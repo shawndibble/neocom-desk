@@ -15,6 +15,7 @@ import {
   mergeDisputeLines,
   billedDisputeTax,
   checkClaimedTransfer,
+  checkClaimedTransfers,
   needsLiveCheck,
   parseEditAction,
   parseSettingsPatch,
@@ -933,6 +934,7 @@ describe('settings patch: start date and member visibility', () => {
       { kind: 'characters', ids: [1, 2, 3, 4, 5, 6] },
       { kind: 'characters', ids: [1.5] },
       { kind: 'characters', ids: [-1] },
+      { kind: 'characters', ids: [0, 3] },
       { kind: 'characters', ids: 'x' },
     ]) {
       expect(() => parseSettingsPatch({ taxContact: bad })).toThrow();
@@ -1112,6 +1114,60 @@ describe('checkClaimedTransfer', () => {
     expect(checkClaimedTransfer({ ...transfer, at: '2026-10-01T00:00:00.000Z' }, ctx).result).toBe(
       'tooOld'
     );
+  });
+
+  it('says too old to check for a transfer before the book started, whatever the sync window', () => {
+    const early = { ...transfer, at: '2026-11-02T18:41:00.000Z' };
+    expect(checkClaimedTransfer(early, { ...ctx, startDate: '2026-11-05' }).result).toBe('tooOld');
+    expect(checkClaimedTransfer(early, { ...ctx, startDate: '2026-11-02' }).result).toBe(
+      'notFound'
+    );
+  });
+
+  describe('only a payment no one holds yet', () => {
+    const open = { id: 'j1_9', characterId: 7, amount: 25_000_000, at: transfer.at };
+
+    it('does not find a payment already credited to a Miner', () => {
+      const payments = [{ ...open, minerId: 'm-a' }];
+      expect(checkClaimedTransfer(transfer, { ...ctx, payments }).result).toBe('notFound');
+    });
+
+    it('does not find a payment an officer marked wholly not tax, or one held for review', () => {
+      expect(
+        checkClaimedTransfer(transfer, {
+          ...ctx,
+          payments: [{ ...open, notTaxAmount: 25_000_000 }],
+        }).result
+      ).toBe('notFound');
+      expect(
+        checkClaimedTransfer(transfer, { ...ctx, payments: [{ ...open, reviewReason: 'x' }] })
+          .result
+      ).toBe('notFound');
+      // Partly not tax: the rest is still tax.
+      expect(
+        checkClaimedTransfer(transfer, { ...ctx, payments: [{ ...open, notTaxAmount: 1 }] }).result
+      ).toBe('found');
+    });
+
+    it('is ambiguous, never found, when several payments or rows match one transfer', () => {
+      const payments = [open, { ...open, id: 'j1_10' }];
+      expect(checkClaimedTransfer(transfer, { ...ctx, payments })).toEqual({
+        result: 'ambiguous',
+      });
+      const uncounted = [{ characterId: 7, amount: 25_000_000, at: transfer.at, division: 3 }];
+      expect(checkClaimedTransfer(transfer, { ...ctx, payments: [open], uncounted }).result).toBe(
+        'ambiguous'
+      );
+    });
+
+    it('never lets two transfers claim the same payment', () => {
+      const checks = checkClaimedTransfers([transfer, { ...transfer, journalRef: 2 }], {
+        ...ctx,
+        payments: [open],
+      });
+      expect(checks.map((c) => c.result)).toEqual(['found', 'notFound']);
+      expect(checks.filter((c) => c.paymentId === 'j1_9')).toHaveLength(1);
+    });
   });
 
   it('names a transfer paid to a person or another corporation, without searching', () => {

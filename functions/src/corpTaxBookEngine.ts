@@ -1282,6 +1282,8 @@ export const DISPUTE_HOLD_DAYS = 14;
 export interface HoldingDispute {
   lines: readonly { recordKey: string; typeId: number; quantity: number }[];
   at: string;
+  /** A dispute filed again after a kept bill keeps the first one's hold window. */
+  holdFrom?: string;
   resolution?: unknown;
   kind?: string;
   claimedPct?: number;
@@ -1296,13 +1298,72 @@ export interface HeldStatementLine {
   tax?: number;
 }
 
-/** Mirror of `disputeHold`: unanswered, and raised less than 14 days before `now`. */
+/** Mirror of `disputeHold`: unanswered, and its hold (from `holdFrom`, else `at`) under 14 days old. */
 export function disputeHolds(
-  dispute: Pick<HoldingDispute, 'at' | 'resolution'>,
+  dispute: Pick<HoldingDispute, 'at' | 'resolution' | 'holdFrom'>,
   now: string
 ): boolean {
   if (dispute.resolution) return false;
-  return Date.parse(now) < Date.parse(dispute.at) + DISPUTE_HOLD_DAYS * 86_400_000;
+  return Date.parse(now) < Date.parse(dispute.holdFrom ?? dispute.at) + DISPUTE_HOLD_DAYS * DAY_MS;
+}
+
+const isObject = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/**
+ * Mirror of the client's `readDisputes` as far as holding goes: the same docs dropped (a missing
+ * or malformed id, Miner, day, author, instant or line), the same malformed `resolution` read as
+ * none (the dispute is still open). The server reads disputes raw otherwise and must never
+ * throw on, or read differently from, a malformed one.
+ */
+export function readHoldingDisputes(raw: readonly unknown[]): (HoldingDispute & {
+  minerId: string;
+})[] {
+  const out: (HoldingDispute & { minerId: string })[] = [];
+  for (const d of raw) {
+    if (!isObject(d)) continue;
+    const { id, minerId, date, by, at, kind, claimedPct, holdFrom, resolution } = d;
+    const lines = Array.isArray(d.lines)
+      ? d.lines.map((l) =>
+          isObject(l) &&
+          typeof l.recordKey === 'string' &&
+          typeof l.typeId === 'number' &&
+          typeof l.quantity === 'number' &&
+          typeof l.payeeName === 'string'
+            ? { recordKey: l.recordKey, typeId: l.typeId, quantity: l.quantity }
+            : null
+        )
+      : [];
+    if (
+      typeof id !== 'string' ||
+      typeof minerId !== 'string' ||
+      typeof date !== 'string' ||
+      typeof by !== 'number' ||
+      typeof at !== 'string' ||
+      lines.length === 0 ||
+      lines.some((l) => l === null)
+    )
+      continue;
+    const answered =
+      isObject(resolution) &&
+      typeof resolution.at === 'string' &&
+      typeof resolution.by === 'number' &&
+      typeof resolution.reason === 'string' &&
+      (resolution.kind === 'rejected' ||
+        (resolution.kind === 'dismissed' && typeof resolution.amountIsk === 'number'));
+    out.push({
+      minerId,
+      lines: lines as HoldingDispute['lines'],
+      at,
+      ...(typeof holdFrom === 'string' && Number.isFinite(Date.parse(holdFrom))
+        ? { holdFrom }
+        : {}),
+      ...(kind === 'quantity' || kind === 'rate' || kind === 'notPaying' ? { kind } : {}),
+      ...(typeof claimedPct === 'number' && Number.isFinite(claimedPct) ? { claimedPct } : {}),
+      ...(answered ? { resolution } : {}),
+    });
+  }
+  return out;
 }
 
 /** Mirror of `heldByStatement`. */

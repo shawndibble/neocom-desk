@@ -25,7 +25,7 @@ export interface OreDisputeLine {
  * is higher than the one that applies. `notPaying`: they will not pay it, and say why.
  */
 export type DisputeKind = 'payee' | 'quantity' | 'rate' | 'notPaying';
-const DISPUTE_KINDS: readonly DisputeKind[] = ['payee', 'quantity', 'rate', 'notPaying'];
+export const DISPUTE_KINDS: readonly DisputeKind[] = ['payee', 'quantity', 'rate', 'notPaying'];
 
 export interface OreDispute {
   id: string;
@@ -43,8 +43,21 @@ export interface OreDispute {
   by: number;
   /** ISO instant it was first flagged. */
   at: string;
+  /**
+   * A dispute filed again after an officer kept the bill keeps the first one's hold window:
+   * the ISO instant that hold started. Absent on a first dispute (`at` then).
+   */
+  holdFrom?: string;
   note?: string;
   resolution?: DisputeResolution;
+  /** Earlier disputes of this day an officer answered, oldest first (a kept bill, then filed again). */
+  history?: DisputeHistoryEntry[];
+}
+
+export interface DisputeHistoryEntry {
+  kind: DisputeKind;
+  reason?: string;
+  resolution: DisputeResolution;
 }
 
 export type DisputeResolution =
@@ -101,11 +114,11 @@ export const DISPUTE_HOLD_DAYS = 14;
 
 /** The hold an open dispute puts on its day at `now`; none once answered or lapsed. */
 export function disputeHold(
-  dispute: Pick<OreDispute, 'at' | 'resolution'>,
+  dispute: Pick<OreDispute, 'at' | 'resolution' | 'holdFrom'>,
   now: string
 ): { until: string } | undefined {
   if (dispute.resolution) return undefined;
-  const until = Date.parse(dispute.at) + DISPUTE_HOLD_DAYS * DAY_MS;
+  const until = Date.parse(dispute.holdFrom ?? dispute.at) + DISPUTE_HOLD_DAYS * DAY_MS;
   return Date.parse(now) < until ? { until: new Date(until).toISOString() } : undefined;
 }
 
@@ -142,7 +155,7 @@ export function readDisputes(raw: readonly unknown[]): OreDispute[] {
   const out: OreDispute[] = [];
   for (const d of raw) {
     if (!isPlainRecord(d)) continue;
-    const { id, minerId, date, by, at, note, resolution, kind, reason, claimedPct } = d;
+    const { id, minerId, date, by, at, note, resolution, kind, reason, claimedPct, holdFrom } = d;
     const lines = Array.isArray(d.lines) ? d.lines.map(readLine) : [];
     if (
       typeof id !== 'string' ||
@@ -167,10 +180,26 @@ export function readDisputes(raw: readonly unknown[]): OreDispute[] {
         : {}),
       ...(typeof reason === 'string' ? { reason } : {}),
       ...(typeof claimedPct === 'number' && Number.isFinite(claimedPct) ? { claimedPct } : {}),
+      ...(typeof holdFrom === 'string' && Number.isFinite(Date.parse(holdFrom))
+        ? { holdFrom }
+        : {}),
       ...readResolution(resolution),
+      ...readHistory(d.history),
     });
   }
   return out;
+}
+
+function readHistory(raw: unknown): { history?: DisputeHistoryEntry[] } {
+  if (!Array.isArray(raw)) return {};
+  const history = raw.flatMap((e): DisputeHistoryEntry[] => {
+    if (!isPlainRecord(e)) return [];
+    const { resolution } = readResolution(e.resolution);
+    if (!resolution) return [];
+    const kind = DISPUTE_KINDS.includes(e.kind as DisputeKind) ? (e.kind as DisputeKind) : 'payee';
+    return [{ kind, ...(typeof e.reason === 'string' ? { reason: e.reason } : {}), resolution }];
+  });
+  return history.length > 0 ? { history } : {};
 }
 
 function readResolution(raw: unknown): { resolution?: DisputeResolution } {
@@ -216,7 +245,10 @@ export interface HeldStatementLine {
  */
 export function heldByStatement(
   statements: readonly { id: string; lines: readonly HeldStatementLine[] }[],
-  disputes: readonly Pick<OreDispute, 'lines' | 'at' | 'resolution' | 'kind' | 'claimedPct'>[],
+  disputes: readonly Pick<
+    OreDispute,
+    'lines' | 'at' | 'holdFrom' | 'resolution' | 'kind' | 'claimedPct'
+  >[],
   credited: ReadonlySet<string>,
   now: string
 ): Map<string, number> {

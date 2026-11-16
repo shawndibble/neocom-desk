@@ -36,7 +36,7 @@ import {
   disputeIdFor,
   type ClaimCheck,
   type ClaimTransfer,
-  checkClaimedTransfer,
+  checkClaimedTransfers,
   type DeclareOwnInput,
   type DisputeConflictInput,
   type DisputeKind,
@@ -98,6 +98,10 @@ import {
   canRebillFrom,
   isRetroactiveRate,
   latestRecordedCorp,
+  creditedLines,
+  disputeHolds,
+  heldByStatement,
+  readHoldingDisputes,
   mergeObservedRows,
   observedRowKey,
   shiftDate,
@@ -885,6 +889,42 @@ interface EditOutcome {
 
 const col = (c: EditCtx, name: string) => sub(c.deps.db, c.corporationId, name);
 
+/**
+ * The ids, among `statements`, that open disputes hold something of at `now`
+ * (`heldByStatement`, priced and credited as the allocation reads them).
+ */
+async function heldStatementIds(c: EditCtx, statements: readonly Data[], now: string) {
+  const held = new Set<string>();
+  for (const minerId of new Set(statements.map((s) => s.minerId as string))) {
+    const disputes = readHoldingDisputes(
+      (await c.tx.get(col(c, DISPUTES).where('minerId', '==', minerId))).docs.map((d) => d.data())
+    ).filter((d) => disputeHolds(d, now));
+    if (disputes.length === 0) continue;
+    const [all, dismissals, extractions] = await Promise.all([
+      c.tx.get(col(c, STATEMENTS).where('minerId', '==', minerId)),
+      c.tx.get(col(c, DISMISSALS)),
+      c.tx.get(col(c, EXTRACTIONS)),
+    ]);
+    const ofMiner = all.docs.map((d) => d.data() as Data);
+    const byId = new Map(ofMiner.map((s) => [s.id as string, s]));
+    for (const s of statements) if (s.minerId === minerId) byId.set(s.id as string, s);
+    const mine = [...byId.values()].map((x) => ({
+      id: x.id as string,
+      lines: (x.lines as DismissableLine[]) ?? [],
+    }));
+    const credits = dismissalCredits({
+      minerId,
+      statements: mine,
+      dismissals: dismissals.docs.map((d) => d.data() as MirrorDismissal),
+      extractions: extractions.docs.map((d) => d.data() as MirrorExtraction),
+      expiryHours: (c.book.structureExpiryHours as Record<string, number> | undefined) ?? {},
+    });
+    const amounts = heldByStatement(mine, disputes, creditedLines(credits), now);
+    for (const [id, amount] of amounts) if (amount > 0) held.add(id);
+  }
+  return held;
+}
+
 async function mustGet(c: EditCtx, ref: DocumentReference, what: string): Promise<Data> {
   const snap = await c.tx.get(ref);
   if (!snap.exists) fail('not-found', `${what} not found`, 'not-found');
@@ -1640,8 +1680,13 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const paid = new Set<string>(
         ((await tx.get(paidRef)).data()?.ids as string[] | undefined) ?? []
       );
-      const fresh = [...new Set(action.statementIds)].filter((id) => !paid.has(id));
-      for (const id of fresh) await mustGet(c, col(c, STATEMENTS).doc(id), 'Statement');
+      const wanted = [...new Set(action.statementIds)].filter((id) => !paid.has(id));
+      const docs: Data[] = [];
+      for (const id of wanted) docs.push(await mustGet(c, col(c, STATEMENTS).doc(id), 'Statement'));
+      // A Statement settles for good (D22), so the server never trusts the caller's plan: an
+      // older client plans without disputes. One an open dispute holds right now is dropped.
+      const held = await heldStatementIds(c, docs, iso);
+      const fresh = wanted.filter((id) => !held.has(id));
       if (fresh.length > 0) {
         // Only ever grown: a Statement settled once keeps its days closed for good (D22).
         tx.set(
@@ -2366,24 +2411,23 @@ export async function declareOwnPayment(deps: BookDeps, caller: Caller, input: D
     // Resolving in the app: the transfers are checked against what the book synced of the
     // corporation's wallet before any officer sees them.
     const transfers = input.transfers ?? [];
-    const checked =
+    const checks =
       transfers.length > 0
         ? await checkTransfers(tx, deps, corporationId, statement.uids as string[], transfers)
-        : { checks: [] as ClaimCheck[], unattributed: new Set<string>() };
-    const { checks } = checked;
-    // Every transfer found in the book: credited at once, nobody had to look.
+        : ([] as ClaimCheck[]);
+    // Every transfer found in the book: confirmed at once, nobody had to look.
     const allFound = checks.length > 0 && checks.every((c) => c.result === 'found');
     const now = deps.now();
     const iso = new Date(now).toISOString();
-    if (allFound) {
-      for (const c of checks) {
-        if (c.paymentId && checked.unattributed.has(c.paymentId))
-          tx.update(sub(deps.db, corporationId, PAYMENTS).doc(c.paymentId), {
-            minerId: statement.minerId,
-            claimedBy: characterId,
-            claimedAt: iso,
-          });
-      }
+    // Each payment found is credited at once, even while others are not: the declaration stays
+    // open for the rest. A found payment is one no one held yet (`checkClaimedTransfer`).
+    for (const c of checks) {
+      if (c.result === 'found' && c.paymentId)
+        tx.update(sub(deps.db, corporationId, PAYMENTS).doc(c.paymentId), {
+          minerId: statement.minerId,
+          claimedBy: characterId,
+          claimedAt: iso,
+        });
     }
     const id = `x${now}_${rand(4)}`;
     tx.create(sub(deps.db, corporationId, DECLARATIONS).doc(id), {
@@ -2435,9 +2479,9 @@ export async function declareOwnPayment(deps: BookDeps, caller: Caller, input: D
 }
 
 /**
- * Checks each claimed transfer against the book (`checkClaimedTransfer`): the payments the
- * Miner's own characters sent, the donations noted in divisions the book does not read, and its
- * last sync. `unattributed`: matched payments credited to no Miner yet, which a full match claims.
+ * Checks each claimed transfer against the book (`checkClaimedTransfers`): the payments the
+ * Miner's own characters sent that no one holds yet, the donations noted in divisions the book
+ * does not read, its last sync and its start.
  */
 async function checkTransfers(
   tx: Transaction,
@@ -2445,7 +2489,7 @@ async function checkTransfers(
   corporationId: number,
   uids: readonly string[],
   transfers: readonly ClaimTransfer[]
-): Promise<{ checks: ClaimCheck[]; unattributed: Set<string> }> {
+): Promise<ClaimCheck[]> {
   const senderIds = uids.flatMap((u) => (u.startsWith('char:') ? [Number(u.slice(5))] : []));
   const book = (await tx.get(bookRef(deps.db, corporationId))).data() ?? {};
   const payments =
@@ -2460,28 +2504,28 @@ async function checkTransfers(
     ((await tx.get(sub(deps.db, corporationId, META).doc(UNCOUNTED_DOC))).data()?.donations as
       { characterId: number; amount: number; at: string; division: number }[] | undefined) ?? [];
   const lastSyncAt = (book.lastSync as { at?: number } | null | undefined)?.at;
-  const ctx = {
+  return checkClaimedTransfers(transfers, {
     senderIds,
     payments: payments.map((p) => ({
       id: p.id,
       characterId: p.characterId as number | undefined,
       amount: p.amount as number,
       at: p.at as string,
+      ...(typeof p.minerId === 'string' ? { minerId: p.minerId } : {}),
+      ...(typeof p.notTaxAmount === 'number' ? { notTaxAmount: p.notTaxAmount } : {}),
+      ...(p.reviewReason !== undefined ? { reviewReason: String(p.reviewReason) } : {}),
     })),
     uncounted,
     lastSyncAt: typeof lastSyncAt === 'number' ? lastSyncAt : undefined,
-  };
-  return {
-    checks: transfers.map((t) => checkClaimedTransfer(t, ctx)),
-    unattributed: new Set(payments.filter((p) => p.minerId === undefined).map((p) => p.id)),
-  };
+    ...(typeof book.startDate === 'string' ? { startDate: book.startDate } : {}),
+  });
 }
 
 /**
  * A Miner flags a Conflict day to the book (#6206): "I gave this ore to {payee}". One record
  * per Miner and day; a second flag for the same day adds its lines. Every line's character
- * must be one of the caller's own Miner's confirmed characters. A day an officer already
- * rejected cannot be flagged again. Officers answer in Needs you: dismiss the day, or reject.
+ * must be one of the caller's own Miner's confirmed characters. A day an officer waived cannot be flagged again; one whose bill
+ * the officer kept can, once more with the old answer in `history` and the hold not renewed. Officers answer in Needs you: dismiss the day, or reject.
  */
 export async function disputeConflict(deps: BookDeps, caller: Caller, input: DisputeConflictInput) {
   const characterId = signedInCharacter(caller);
@@ -2498,8 +2542,14 @@ export async function disputeConflict(deps: BookDeps, caller: Caller, input: Dis
     }
     const disputeId = disputeIdFor(minerId, date);
     const ref = sub(deps.db, corporationId, DISPUTES).doc(disputeId);
-    const held = (await tx.get(ref)).data();
-    if (held?.resolution) fail('failed-precondition', 'An officer answered this day', 'rejected');
+    const stored = (await tx.get(ref)).data();
+    // A waived day stays closed. A bill the officer kept may be disputed again, with the
+    // answer moved into `history` and the first dispute's hold window kept.
+    const answer = stored?.resolution as { kind?: string } | undefined;
+    if (answer && answer.kind !== 'rejected')
+      fail('failed-precondition', 'An officer answered this day', 'rejected');
+    const again = answer !== undefined;
+    const held = again ? undefined : stored;
     // One thing said per day: a second call adds lines to the same kind, never a different one.
     if (held && ((held.kind as string | undefined) ?? 'payee') !== input.kind)
       fail('already-exists', 'This day already has a dispute', 'already-disputed');
@@ -2526,6 +2576,27 @@ export async function disputeConflict(deps: BookDeps, caller: Caller, input: Dis
     };
     if (held) {
       tx.update(ref, { lines, uids, updatedAt: iso, ...said });
+    } else if (stored) {
+      // Filed again after a kept bill: the old record's answer joins `history` (additive; a
+      // reader older than this one ignores it), and the hold does not renew.
+      const past = {
+        kind: (stored.kind as string | undefined) ?? 'payee',
+        ...(typeof stored.reason === 'string' ? { reason: stored.reason } : {}),
+        resolution: stored.resolution,
+      };
+      tx.set(ref, {
+        id: disputeId,
+        minerId,
+        date,
+        lines,
+        by: characterId,
+        at: iso,
+        holdFrom: (stored.holdFrom as string | undefined) ?? (stored.at as string),
+        updatedAt: iso,
+        uids,
+        history: [...((stored.history as unknown[] | undefined) ?? []), past],
+        ...said,
+      });
     } else {
       tx.create(ref, {
         id: disputeId,

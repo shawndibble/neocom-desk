@@ -5,7 +5,7 @@
  * The functions copy of `latestRecordedCorp` lives in `functions/src/corpTaxBookEngine.ts`
  * (ADR 0025: functions cannot import src), kept honest by `functionsMirror.test.ts`.
  */
-import { isFiniteNumber, isRecord } from '../guards';
+import { isFiniteNumber, isId, isRecord } from '../guards';
 import { DEFAULT_GRACE_HOURS } from './billable';
 import { readDivisionNames, type DivisionNames } from './divisionNames';
 import { recordedLater, type CorpRecord } from './observed';
@@ -23,17 +23,15 @@ export type TaxContact =
 /** The most characters a `TaxContact` can name. */
 export const TAX_CONTACT_MAX_CHARACTERS = 5;
 
-const positiveId = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) > 0;
-
 /** A stored `taxContact`, or undefined when absent or malformed (then the CEO is mailed). */
 export function parseTaxContact(v: unknown): TaxContact | undefined {
   if (!isRecord(v)) return undefined;
   if (v.kind === 'mailingList') {
-    return positiveId(v.id) && typeof v.name === 'string'
+    return isId(v.id) && typeof v.name === 'string'
       ? { kind: 'mailingList', id: v.id, name: v.name }
       : undefined;
   }
-  if (v.kind === 'characters' && Array.isArray(v.ids) && v.ids.every(positiveId)) {
+  if (v.kind === 'characters' && Array.isArray(v.ids) && v.ids.every(isId)) {
     const ids = [...new Set(v.ids as number[])];
     return ids.length >= 1 && ids.length <= TAX_CONTACT_MAX_CHARACTERS
       ? { kind: 'characters', ids }

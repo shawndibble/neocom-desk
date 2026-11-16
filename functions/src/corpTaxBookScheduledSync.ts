@@ -89,6 +89,8 @@ import {
   writeOffForAllocation,
   type AllocWriteOff,
   type HoldingDispute,
+  disputeHolds,
+  readHoldingDisputes,
   type MirrorDismissal,
   type ObservedRow,
   type OutgoingDonation,
@@ -231,7 +233,7 @@ async function readBookStateFrom(snap: BookSnap, paidRead?: BookSnap): Promise<A
       list<SyncExtraction>(EXTRACTIONS),
       paidRead ?? ref.collection(META).doc(PAID_DOC).get(),
       list<Record<string, unknown>>(WRITE_OFFS),
-      list<HoldingDispute & { minerId: string }>(DISPUTES),
+      list<unknown>(DISPUTES),
     ]);
   return {
     ...bookDocState(snap),
@@ -241,7 +243,7 @@ async function readBookStateFrom(snap: BookSnap, paidRead?: BookSnap): Promise<A
     dismissals,
     extractions,
     paidStatementIds: paidIdsOf(paid),
-    disputes,
+    disputes: readHoldingDisputes(disputes),
     writeOffs: writeOffDocs.flatMap((d) => {
       const w = writeOffForAllocation(d);
       return w && typeof d.minerId === 'string' ? [{ ...w, minerId: d.minerId }] : [];
@@ -554,6 +556,8 @@ export async function runBookSync(
       assigned.size === 0 &&
       !reassignError &&
       toSettle.length === 0 &&
+      // A hold lapsing changes the plan with only time passing: no run is quiet while a dispute holds.
+      !before.disputes.some((d) => disputeHolds(d, new Date(startedAt).toISOString())) &&
       before.versions !== null
         ? {
             at: startedAt,
