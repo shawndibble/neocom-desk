@@ -190,8 +190,8 @@ export function useAppraisalColumns({
   );
   // Every column, whichever the picker shows; fees blank until the skills load.
   const csvColumns = useMemo(
-    () => appraisalCsvColumns(t, { fees: feeInputs, live: true }),
-    [t, feeInputs]
+    () => appraisalCsvColumns(t, { fees: feeInputs, live: { refineBasis } }),
+    [t, feeInputs, refineBasis]
   );
   // The rows as the table holds them (need/owned, covered lines last), in the table's sort.
   const tableExport = useTableExport({

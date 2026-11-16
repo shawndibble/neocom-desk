@@ -10,6 +10,7 @@ import {
   refineMineralsFor,
   refineWithLeftoverFor,
   type AppraisalNetFees,
+  type RefineBasis,
 } from '@/engine/market/appraisal';
 import type { OwnedRow } from '@/engine/market/appraisalOwned';
 import { priceMarkKey } from './priceStateLabel';
@@ -24,9 +25,11 @@ interface AppraisalCsvOptions {
   /**
    * Adds the columns only the live tab has data for: refine total, LP store,
    * need, owned and price source. Omitted on a Shared Appraisal, which carries
-   * none of them, so its file has no always-empty columns.
+   * none of them, so its file has no always-empty columns. The refine
+   * figures are priced on `refineBasis`, the pilot's remembered Price Basis,
+   * the same as the table's Refine columns.
    */
-  live?: boolean;
+  live?: { refineBasis: RefineBasis };
 }
 
 /**
@@ -40,7 +43,7 @@ interface AppraisalCsvOptions {
  */
 export function appraisalCsvColumns(
   t: CsvTranslate,
-  { fees, live = false }: AppraisalCsvOptions = {}
+  { fees, live }: AppraisalCsvOptions = {}
 ): CsvColumn<OwnedRow>[] {
   const columns: CsvColumn<OwnedRow>[] = [
     { header: t('market.appraisal.columnQuantity'), value: (row) => row.quantity },
@@ -54,16 +57,17 @@ export function appraisalCsvColumns(
     { header: t('market.appraisal.columnVolume'), value: (row) => row.volume },
     { header: t('market.appraisal.columnIskPerM3'), value: (row) => iskPerM3(row) },
   ];
-  if (live) {
+  if (live !== undefined) {
+    const { refineBasis } = live;
     columns.push(
       // Blank where the type has no reprocessing data / no held LP store sells it.
       {
         header: t('market.appraisal.columnRefineTotal'),
-        value: (row) => refineMineralsFor(row, 'buy'),
+        value: (row) => refineMineralsFor(row, refineBasis),
       },
       {
         header: t('market.appraisal.columnRefineWithLeftover'),
-        value: (row) => refineWithLeftoverFor(row, 'buy'),
+        value: (row) => refineWithLeftoverFor(row, refineBasis),
       },
       { header: t('market.appraisal.columnLpTotal'), value: (row) => row.lpIskCost },
       { header: t('market.appraisal.columnLpCost'), value: (row) => row.lpCost },

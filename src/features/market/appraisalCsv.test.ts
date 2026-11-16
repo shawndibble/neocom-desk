@@ -89,7 +89,7 @@ describe('appraisalCsvColumns', () => {
     r: Parameters<ReturnType<typeof appraisalCsvColumns>[number]['value']>[0],
     fees?: Parameters<typeof appraisalCsvColumns>[1]
   ) =>
-    appraisalCsvColumns(t, { live: true, ...fees })
+    appraisalCsvColumns(t, { live: { refineBasis: 'buy' }, ...fees })
       .find((c) => c.header === header)
       ?.value(r);
 
@@ -103,6 +103,27 @@ describe('appraisalCsvColumns', () => {
     expect(at('market.appraisal.columnNeed', { ...row(), need: 30, owned: 70 })).toBe(30);
     expect(at('market.appraisal.columnOwned', { ...row(), need: 30, owned: 70 })).toBe(70);
     expect(at('market.appraisal.columnOwned', row())).toBeUndefined();
+  });
+
+  it('exports the refine figures on the Price Basis the pilot picked', () => {
+    // 1 unit too few to refine, buy 5 / sell 6 each; minerals 900 on buy, 1100 on sell.
+    const refining = row({
+      refineTotal: 900,
+      refinePricedAll: true,
+      refineSellTotal: 1100,
+      refineSellPricedAll: true,
+      refineUnitsLeftOver: 1,
+    });
+    const on = (refineBasis: 'buy' | 'split' | 'sell', header: string) =>
+      appraisalCsvColumns(t, { live: { refineBasis } })
+        .find((c) => c.header === header)
+        ?.value(refining);
+    expect(on('buy', 'market.appraisal.columnRefineTotal')).toBe(900);
+    expect(on('split', 'market.appraisal.columnRefineTotal')).toBe(1000);
+    expect(on('sell', 'market.appraisal.columnRefineTotal')).toBe(1100);
+    expect(on('buy', 'market.appraisal.columnRefineWithLeftover')).toBe(905);
+    expect(on('split', 'market.appraisal.columnRefineWithLeftover')).toBe(1005.5);
+    expect(on('sell', 'market.appraisal.columnRefineWithLeftover')).toBe(1106);
   });
 
   it('names a cached or failed price, and leaves a live one blank', () => {
