@@ -81,21 +81,75 @@ function isUnreadableQuantity(raw: string): boolean {
   return /^\d/.test(token) && !/^\d+$|^\d{1,3}(,\d{3})+$/.test(token);
 }
 
+/** Why a quantity could not be read: a malformed number, or text where a count belongs. */
+export type UnreadableReason = 'unreadable-number' | 'text-quantity';
+
+/** A tab column holding a whole number: 1-indexed, with the text as pasted. */
+export interface QuantityColumn {
+  column: number;
+  value: string;
+}
+
 /** A line whose stated quantity could not be read; it is reported, not priced. */
-interface UnreadableLine {
-  unreadable: true;
+type UnreadableLine =
+  | { unreadable: true; reason: 'unreadable-number' }
+  | { unreadable: true; reason: 'text-quantity'; columns: QuantityColumn[] };
+
+export interface AppraisalPasteOptions {
+  /**
+   * 1-indexed tab column (3 or later) to read as the quantity on a tab line
+   * whose second field is text. Only those lines move; nothing else does.
+   */
+  quantityColumn?: number | null;
+  /**
+   * Count a text-quantity line as one of the thing instead of reporting it —
+   * the old reading, which `parseAppraisalPaste` keeps for the callers that
+   * have no report to show it in (paste routing, blueprint, stock and sell-to
+   * lists). Only the Appraisal reports such lines.
+   */
+  textQuantityAsOne?: boolean;
+}
+
+/** Every field from the third on that is a whole number, as the pilot typed it. */
+function wholeNumberColumns(fields: string[]): QuantityColumn[] {
+  const columns: QuantityColumn[] = [];
+  for (let i = 2; i < fields.length; i++) {
+    const value = fields[i].trim();
+    if (parseQuantity(value) !== null) columns.push({ column: i + 1, value });
+  }
+  return columns;
 }
 
 /** Splits one non-blank line into its name and quantity, or flags it unreadable. */
-function parseLine(text: string): { name: string; quantity: number } | UnreadableLine {
+function parseLine(
+  text: string,
+  {
+    quantityColumn,
+    textQuantityAsOne,
+  }: { quantityColumn: number | null; textQuantityAsOne: boolean }
+): { name: string; quantity: number } | UnreadableLine {
   if (text.includes('\t')) {
-    const [name, quantity = ''] = text.split('\t');
+    const fields = text.split('\t');
+    const [name, quantity = ''] = fields;
     const trimmedName = name.trim();
     // A tab-led line with nothing before the tab is not a name; keep the
     // whole line so it surfaces as unmatched rather than vanishing.
     if (trimmedName === '') return { name: text.trim(), quantity: 1 };
     const parsed = parseQuantity(quantity);
-    if (parsed === null && isUnreadableQuantity(quantity)) return { unreadable: true };
+    if (parsed === null && isUnreadableQuantity(quantity)) {
+      return { unreadable: true, reason: 'unreadable-number' };
+    }
+    // Text where the count belongs (`Name<tab>Group<tab>10000`): never priced
+    // as one. The pilot says which column holds the quantity, or the line is
+    // reported; the parser does not go looking for a number on its own.
+    if (quantity.trim() !== '' && !/\d/.test(quantity)) {
+      if (quantityColumn !== null) {
+        const chosen = parseQuantity(fields[quantityColumn - 1] ?? '');
+        if (chosen !== null) return { name: trimmedName, quantity: chosen };
+      }
+      if (textQuantityAsOne) return { name: trimmedName, quantity: 1 };
+      return { unreadable: true, reason: 'text-quantity', columns: wholeNumberColumns(fields) };
+    }
     return { name: trimmedName, quantity: parsed ?? 1 };
   }
 
@@ -105,7 +159,7 @@ function parseLine(text: string): { name: string; quantity: number } | Unreadabl
     const quantity = parseQuantity(match[2]);
     if (quantity !== null) return { name: match[1], quantity };
     // `Tritanium 12.5`: a trailing decimal is a mis-stated quantity, not a name.
-    if (/[.']/.test(match[2])) return { unreadable: true };
+    if (/[.']/.test(match[2])) return { unreadable: true, reason: 'unreadable-number' };
   }
 
   return { name: text, quantity: 1 };
@@ -149,6 +203,11 @@ interface PasteRow {
   line: number;
 }
 
+/** A reported row, carrying why so the paste's report can say it. */
+interface UnreadableRow extends PasteRow {
+  why: UnreadableLine;
+}
+
 /**
  * An EFT `xN` count, made safe to appraise with. `parseEftFit` hands back
  * whatever `N` the text held, and a hand-edited "Nanite Repair Paste x0" is
@@ -167,16 +226,20 @@ function countOf(quantity: number): number {
  * One row per non-blank line, read as inventory copy, multibuy or a bare name.
  * A line whose quantity cannot be read comes back separately, as its own text.
  */
-function itemRows(text: string): { rows: PasteRow[]; unreadable: PasteRow[] } {
+function itemRows(
+  text: string,
+  options: { quantityColumn: number | null; textQuantityAsOne: boolean }
+): { rows: PasteRow[]; unreadable: UnreadableRow[] } {
   const rows: PasteRow[] = [];
-  const unreadable: PasteRow[] = [];
+  const unreadable: UnreadableRow[] = [];
   const lines = text.split(LINE_BREAK);
   for (let i = 0; i < lines.length; i++) {
     const trimmed = lines[i].trim();
     if (trimmed === '') continue;
-    const parsed = parseLine(trimmed);
-    if ('unreadable' in parsed) unreadable.push({ name: trimmed, quantity: 1, line: i + 1 });
-    else rows.push({ name: parsed.name, quantity: parsed.quantity, line: i + 1 });
+    const parsed = parseLine(trimmed, options);
+    if ('unreadable' in parsed) {
+      unreadable.push({ name: trimmed, quantity: 1, line: i + 1, why: parsed });
+    } else rows.push({ name: parsed.name, quantity: parsed.quantity, line: i + 1 });
   }
   return { rows, unreadable };
 }
@@ -249,6 +312,27 @@ export interface AppraisalUnreadableLine {
   name: string;
   /** 1-indexed source lines carrying exactly this text. */
   lines: number[];
+  reason: UnreadableReason;
+  /** Text-quantity lines only: the columns 3+ that hold a whole number. */
+  columns?: QuantityColumn[];
+}
+
+/**
+ * The columns that could be the quantity for every reported text-quantity line:
+ * each is a whole number on all of them. Empty with none reported, so a caller
+ * opens a picker only when there is something to pick. `sample` is the first
+ * such line's value, to label the choice.
+ */
+export function quantityColumnChoices(
+  unreadable: readonly AppraisalUnreadableLine[]
+): { column: number; sample: string }[] {
+  const text = unreadable.filter((line) => line.reason === 'text-quantity');
+  if (text.length === 0) return [];
+  return (text[0].columns ?? [])
+    .filter(({ column }) =>
+      text.every((line) => line.columns?.some((candidate) => candidate.column === column))
+    )
+    .map(({ column, value }) => ({ column, sample: value }));
 }
 
 /**
@@ -256,15 +340,25 @@ export interface AppraisalUnreadableLine {
  * Those lines are left out of `entries`: the caller reports them rather than
  * pricing them as one of the thing. Never throws.
  */
-export function parseAppraisalPasteDetailed(text: string): {
+export function parseAppraisalPasteDetailed(
+  text: string,
+  { quantityColumn = null, textQuantityAsOne = false }: AppraisalPasteOptions = {}
+): {
   entries: AppraisalPasteEntry[];
   unreadable: AppraisalUnreadableLine[];
 } {
   if (looksLikeEftFit(text)) return { entries: mergeRows(eftRows(text)), unreadable: [] };
-  const { rows, unreadable } = itemRows(text);
+  const { rows, unreadable } = itemRows(text, { quantityColumn, textQuantityAsOne });
+  const whyByLine = new Map(unreadable.map((row) => [row.line, row.why]));
   return {
     entries: mergeRows(rows),
-    unreadable: mergeRows(unreadable).map(({ name, lines }) => ({ name, lines })),
+    unreadable: mergeRows(unreadable).map(({ name, lines }) => {
+      // Lines merged on the same text, so they share one reason.
+      const why = whyByLine.get(lines[0])!;
+      return why.reason === 'text-quantity'
+        ? { name, lines, reason: why.reason, columns: why.columns }
+        : { name, lines, reason: why.reason };
+    }),
   };
 }
 
@@ -272,8 +366,11 @@ export function parseAppraisalPasteDetailed(text: string): {
  * Parse pasted item text into entries. Never throws. A line whose quantity
  * can't be read is left out here; `parseAppraisalPasteDetailed` says which.
  */
-export function parseAppraisalPaste(text: string): AppraisalPasteEntry[] {
-  return parseAppraisalPasteDetailed(text).entries;
+export function parseAppraisalPaste(
+  text: string,
+  options?: AppraisalPasteOptions
+): AppraisalPasteEntry[] {
+  return parseAppraisalPasteDetailed(text, { textQuantityAsOne: true, ...options }).entries;
 }
 
 /**

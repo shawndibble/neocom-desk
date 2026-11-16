@@ -70,6 +70,7 @@ describe('useAppraisal', () => {
     expect(appraisePaste).toHaveBeenCalledWith('Tritanium 5', DEFAULT_TRADE_HUB, 90, null, {
       force: false,
       refining: { stationRate: 0.5, taxRate: 0 },
+      quantityColumn: null,
     });
   });
 
@@ -80,7 +81,10 @@ describe('useAppraisal', () => {
     act(() => result.current.appraise());
 
     await waitFor(() => expect(result.current.compare).not.toBeNull());
-    expect(compareHubs).toHaveBeenCalledWith('Tritanium 5', 90, { force: false });
+    expect(compareHubs).toHaveBeenCalledWith('Tritanium 5', 90, {
+      force: false,
+      quantityColumn: null,
+    });
     expect(result.current.compare).toBe(COMPARE_ROWS);
   });
 
@@ -104,6 +108,7 @@ describe('useAppraisal', () => {
     expect(appraisePaste).toHaveBeenLastCalledWith('Tritanium 5', DEFAULT_TRADE_HUB, 80, null, {
       force: false,
       refining: { stationRate: 0.5, taxRate: 0 },
+      quantityColumn: null,
     });
   });
 
@@ -122,6 +127,7 @@ describe('useAppraisal', () => {
     expect(appraisePaste).toHaveBeenLastCalledWith('Veldspar 100', DEFAULT_TRADE_HUB, 90, 1, {
       force: false,
       refining: { stationRate: 0.54, taxRate: 0.01 },
+      quantityColumn: null,
     });
   });
 
@@ -142,6 +148,7 @@ describe('useAppraisal', () => {
     expect(appraisePaste).toHaveBeenLastCalledWith('Veldspar 100', DEFAULT_TRADE_HUB, 90, 1, {
       force: false,
       refining: setup,
+      quantityColumn: null,
     });
   });
 
@@ -160,6 +167,7 @@ describe('useAppraisal', () => {
     expect(appraisePaste).toHaveBeenLastCalledWith('Tritanium 5', amarr, 90, null, {
       force: false,
       refining: { stationRate: 0.5, taxRate: 0 },
+      quantityColumn: null,
     });
     // The comparison is hub-invariant on its own, but AC #689 says changing
     // the primary hub still recomputes it — which only holds because it
@@ -184,7 +192,32 @@ describe('useAppraisal', () => {
     expect(appraisePaste).toHaveBeenLastCalledWith('Tritanium 5', DEFAULT_TRADE_HUB, 90, 42, {
       force: false,
       refining: { stationRate: 0.5, taxRate: 0 },
+      quantityColumn: null,
     });
+  });
+
+  it('re-prices with a picked quantity column, and drops the pick for a new paste', async () => {
+    const { result } = renderHook(() => useAppraisal(DEFAULT_TRADE_HUB, 90, null));
+    act(() => result.current.appraiseText('Tritanium\tMineral\t10000'));
+    await waitFor(() => expect(appraisePaste).toHaveBeenCalledTimes(1));
+    expect(result.current.quantityColumn).toBeNull();
+
+    act(() => result.current.chooseQuantityColumn(3));
+    await waitFor(() => expect(appraisePaste).toHaveBeenCalledTimes(2));
+    expect(appraisePaste).toHaveBeenLastCalledWith(
+      'Tritanium\tMineral\t10000',
+      DEFAULT_TRADE_HUB,
+      90,
+      null,
+      expect.objectContaining({ quantityColumn: 3 })
+    );
+    expect(compareHubs).toHaveBeenLastCalledWith('Tritanium\tMineral\t10000', 90, {
+      force: false,
+      quantityColumn: 3,
+    });
+
+    act(() => result.current.appraiseText('Pyerite\tMineral\t500'));
+    expect(result.current.quantityColumn).toBeNull();
   });
 
   it('bypasses the price cache on refresh, and only that once', async () => {
@@ -202,8 +235,12 @@ describe('useAppraisal', () => {
     expect(appraisePaste).toHaveBeenLastCalledWith('Tritanium 5', DEFAULT_TRADE_HUB, 90, null, {
       force: true,
       refining: { stationRate: 0.5, taxRate: 0 },
+      quantityColumn: null,
     });
-    expect(compareHubs).toHaveBeenLastCalledWith('Tritanium 5', 90, { force: true });
+    expect(compareHubs).toHaveBeenLastCalledWith('Tritanium 5', 90, {
+      force: true,
+      quantityColumn: null,
+    });
 
     // The next ordinary re-price must not still be forcing a network round trip.
     rerender({ percent: 80 });
@@ -211,6 +248,7 @@ describe('useAppraisal', () => {
     expect(appraisePaste).toHaveBeenLastCalledWith('Tritanium 5', DEFAULT_TRADE_HUB, 80, null, {
       force: false,
       refining: { stationRate: 0.5, taxRate: 0 },
+      quantityColumn: null,
     });
   });
 
@@ -256,6 +294,7 @@ describe('useAppraisal', () => {
     expect(appraisePaste).toHaveBeenCalledWith('Tritanium\nRifter', DEFAULT_TRADE_HUB, 90, null, {
       force: false,
       refining: { stationRate: 0.5, taxRate: 0 },
+      quantityColumn: null,
     });
   });
 
