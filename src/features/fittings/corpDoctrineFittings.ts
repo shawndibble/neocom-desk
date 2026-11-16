@@ -82,9 +82,18 @@ export function useCorpDoctrineFittings(characterId: number | null) {
     rows: DoctrineRow[];
   } | null>(null);
   const requestIdRef = useRef(0);
+  /** `character|corporation` whose read last finished, landed or failed: its rows are final. */
+  const [settledFor, setSettledFor] = useState<string | null>(null);
+  const key = `${characterId}|${corporationId}`;
 
   const refresh = useCallback(async () => {
     const requestId = ++requestIdRef.current;
+    const settle = () => {
+      // Still reading which corporation the Character is in: not settled yet.
+      if (requestId === requestIdRef.current && corporationId !== undefined) {
+        setSettledFor(`${characterId}|${corporationId}`);
+      }
+    };
     if (
       characterId === null ||
       corporationId == null ||
@@ -93,6 +102,7 @@ export function useCorpDoctrineFittings(characterId: number | null) {
       (!isSyncConfigured() && !srpDoctrineBackendOverride())
     ) {
       setState(null);
+      settle();
       return;
     }
     try {
@@ -104,6 +114,7 @@ export function useCorpDoctrineFittings(characterId: number | null) {
       // Not a member any more, offline, or signed out of sync: no Doctrine rows, the rest stands.
       if (requestId === requestIdRef.current) setState(null);
     }
+    settle();
   }, [characterId, corporationId, t]);
 
   useEffect(() => {
@@ -114,7 +125,12 @@ export function useCorpDoctrineFittings(characterId: number | null) {
   // A previous Character's (or corp's) fits are not this one's until its own land.
   const current =
     state?.forCharacter === characterId && state.forCorporation === corporationId ? state : null;
-  return { rows: current?.rows ?? EMPTY, refresh };
+  return {
+    rows: current?.rows ?? EMPTY,
+    refresh,
+    /** This Character's Doctrine rows have loaded, or will not. */
+    settled: settledFor === key,
+  };
 }
 
 const EMPTY: DoctrineRow[] = [];

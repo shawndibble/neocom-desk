@@ -60,6 +60,7 @@ function useDesktopViewport(): void {
 
 beforeEach(() => {
   useLoyaltyStoreOffers.mockReturnValue({
+    instantIskPerLp: new Map(),
     corpName: 'Federal Navy Academy',
     offersFetchedAt: null,
     offersFromCache: false,
@@ -232,6 +233,7 @@ describe('LoyaltyStore basis readout', () => {
 describe('LoyaltyStore with an unreachable price source (offline)', () => {
   function mockOffers(pricesUnreachable: boolean) {
     useLoyaltyStoreOffers.mockReturnValue({
+      instantIskPerLp: new Map(),
       corpName: 'Federal Navy Academy',
       offersFetchedAt: null,
       offersFromCache: false,
@@ -334,6 +336,7 @@ describe('LoyaltyStore filters', () => {
   it('offers Reset filters when the filters hide every offer, and restores the list', async () => {
     useDesktopViewport();
     useLoyaltyStoreOffers.mockReturnValue({
+      instantIskPerLp: new Map(),
       corpName: 'Federal Navy Academy',
       offersFetchedAt: null,
       offersFromCache: false,
@@ -360,6 +363,7 @@ describe('LoyaltyStore filters', () => {
   it('shows an error with Try again, not an empty store, when the offers load failed', async () => {
     const reloadOffers = vi.fn();
     useLoyaltyStoreOffers.mockReturnValue({
+      instantIskPerLp: new Map(),
       corpName: null,
       offersFetchedAt: null,
       offersFromCache: false,
@@ -396,6 +400,7 @@ describe('LoyaltyStore Affordable default (issue #6004)', () => {
 
   function mockLp(playerLp: number | null) {
     useLoyaltyStoreOffers.mockReturnValue({
+      instantIskPerLp: new Map(),
       corpName: 'Federal Navy Academy',
       offersFetchedAt: null,
       offersFromCache: false,
@@ -476,6 +481,7 @@ describe('LoyaltyStore selected offer (issue #1490)', () => {
   it('keeps the item name plain (row selects) and shows the row menu trigger (#2654)', () => {
     useDesktopViewport();
     useLoyaltyStoreOffers.mockReturnValue({
+      instantIskPerLp: new Map(),
       corpName: 'Federal Navy Academy',
       offersFetchedAt: null,
       offersFromCache: false,
@@ -497,6 +503,7 @@ describe('LoyaltyStore selected offer (issue #1490)', () => {
   it('marks the selected row aria-current and announces the change, on desktop', async () => {
     useDesktopViewport();
     useLoyaltyStoreOffers.mockReturnValue({
+      instantIskPerLp: new Map(),
       corpName: 'Federal Navy Academy',
       offersFetchedAt: null,
       offersFromCache: false,
@@ -529,6 +536,7 @@ describe('LoyaltyStore linked offer', () => {
   it('opens with the offer named in ?offer= already selected', () => {
     useDesktopViewport();
     useLoyaltyStoreOffers.mockReturnValue({
+      instantIskPerLp: new Map(),
       corpName: 'Federal Navy Academy',
       offersFetchedAt: null,
       offersFromCache: false,
@@ -552,6 +560,7 @@ describe('LoyaltyStore linked offer', () => {
 
   function mockRows(rows: LoyaltyOfferRow[]) {
     useLoyaltyStoreOffers.mockReturnValue({
+      instantIskPerLp: new Map(),
       corpName: 'Federal Navy Academy',
       offersFetchedAt: null,
       offersFromCache: false,
@@ -610,6 +619,7 @@ describe('LoyaltyStore linked offer', () => {
 describe('LoyaltyStore item context menu (issue #716)', () => {
   beforeEach(() => {
     useLoyaltyStoreOffers.mockReturnValue({
+      instantIskPerLp: new Map(),
       corpName: 'Federal Navy Academy',
       offersFetchedAt: null,
       offersFromCache: false,
@@ -667,6 +677,7 @@ describe('LoyaltyStore item context menu (issue #716)', () => {
 describe('LoyaltyStore blueprint badge (issue #882)', () => {
   it('renders the BP badge at the shared 0.6875rem chip rung', () => {
     useLoyaltyStoreOffers.mockReturnValue({
+      instantIskPerLp: new Map(),
       corpName: 'Federal Navy Academy',
       offersFetchedAt: null,
       offersFromCache: false,
@@ -734,6 +745,7 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
 
   function mockRows(rows: LoyaltyOfferRow[]) {
     useLoyaltyStoreOffers.mockReturnValue({
+      instantIskPerLp: new Map(),
       corpName: 'Federal Navy Academy',
       offersFetchedAt: null,
       offersFromCache: false,
@@ -903,6 +915,7 @@ describe('LoyaltyStore offer detail market links (issue #2205)', () => {
 
   function mockRows(rows: LoyaltyOfferRow[]) {
     useLoyaltyStoreOffers.mockReturnValue({
+      instantIskPerLp: new Map(),
       corpName: 'Federal Navy Academy',
       offersFetchedAt: null,
       offersFromCache: false,
@@ -1165,6 +1178,7 @@ describe('LoyaltyStore switching stores through the search', () => {
   it('keeps the offer count off the header and on the list panel, following the search', async () => {
     useDesktopViewport();
     useLoyaltyStoreOffers.mockReturnValue({
+      instantIskPerLp: new Map(),
       corpName: 'Federal Navy Academy',
       offersFetchedAt: null,
       offersFromCache: false,

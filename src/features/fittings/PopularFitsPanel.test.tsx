@@ -804,6 +804,15 @@ describe('Popular fits can-fly verdicts', () => {
     expect(screen.queryByRole('checkbox', { name: /Can fly now/ })).toBeNull();
   });
 
+  it('offers no Least training sort with no Character', async () => {
+    renderWith({});
+    await screen.findByText('12 losses');
+    await userEvent.click(screen.getByRole('combobox', { name: 'Sort' }));
+    expect(screen.getAllByRole('option').map((o) => o.textContent?.replace('✓', ''))).not.toContain(
+      'Least training'
+    );
+  });
+
   it('shows no verdict with no Character', async () => {
     renderWith({});
     await screen.findByText('12 losses');
