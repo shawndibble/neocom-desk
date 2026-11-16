@@ -65,7 +65,7 @@ import { LoyaltyStoreLanding } from '@/features/loyalty/LoyaltyStoreLanding';
 import { NearestStationLine } from '@/features/loyalty/NearestStationLine';
 import { LpStoreActions } from '@/features/loyalty/LpStoreChrome';
 import { SpendLpButton, SpendPlanPanel } from '@/features/loyalty/SpendPlan';
-import { useSpendPlan } from '@/features/loyalty/useSpendPlan';
+import { hasSpendCandidates, useSpendPlan } from '@/features/loyalty/useSpendPlan';
 import type { LpSearchCrumbState } from '@/features/loyalty/lpStorePath';
 import type { LoyaltyOfferRow } from '@/features/loyalty/offerRows';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
@@ -345,11 +345,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
           <span className="flex items-center gap-2">
             <SpendLpButton
               playerLp={playerLp}
-              rankable={filteredRows.some(
-                (row) =>
-                  row.offer.lp_cost > 0 &&
-                  (instantIskPerLp.get(row.offer.offer_id) ?? null) !== null
-              )}
+              rankable={hasSpendCandidates(filteredRows, instantIskPerLp)}
               loading={spendPlan.plan.status === 'loading'}
               onClick={spendPlan.run}
             />

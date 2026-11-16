@@ -233,6 +233,16 @@ describe('planLpSpend', () => {
     expect(plan.stop).toMatchObject({ reason: 'wallet', offerId: 1 });
   });
 
+  it('blames the loss, not the wallet, when the step it cannot cover would lose ISK', () => {
+    const plan = planLpSpend(
+      input({
+        candidates: [offer({ offerId: 1, iskCost: 500_000 })],
+        walletBalance: 40_000,
+      })
+    );
+    expect(plan.stop).toMatchObject({ reason: 'nothingProfitable', offerId: 1 });
+  });
+
   it('shares a blueprint product buy book with an offer that sells the product', () => {
     const plan = planLpSpend(
       input({

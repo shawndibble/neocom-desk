@@ -194,7 +194,7 @@ export function useCommunityFittings(characterId: number | null) {
     const requestId = ++requestIdRef.current;
     if (characterId === null || !isSyncConfigured()) {
       setState(null);
-      setSettledFor(characterId);
+      if (requestId === requestIdRef.current) setSettledFor(characterId);
       return;
     }
     try {

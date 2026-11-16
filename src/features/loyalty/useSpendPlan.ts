@@ -39,6 +39,19 @@ export interface SpendPlanView {
   candidates: number;
 }
 
+/** An offer the plan can rank: it costs LP and has a Sell now ISK/LP. */
+function rankable(row: LoyaltyOfferRow, instantIskPerLp: ReadonlyMap<number, number | null>) {
+  return row.offer.lp_cost > 0 && (instantIskPerLp.get(row.offer.offer_id) ?? null) !== null;
+}
+
+/** Whether any of `rows` can be handed to the plan: the Spend my LP button's gate. */
+export function hasSpendCandidates(
+  rows: readonly LoyaltyOfferRow[],
+  instantIskPerLp: ReadonlyMap<number, number | null>
+): boolean {
+  return rows.some((row) => rankable(row, instantIskPerLp));
+}
+
 /**
  * The top offers by one-redemption ISK/LP on the Sell now basis — the basis the
  * plan prices on, whatever the table's — as the engine's candidates. Offers
@@ -51,7 +64,7 @@ export function spendCandidates(
 ): { candidate: SpendCandidate; row: LoyaltyOfferRow }[] {
   const rank = (row: LoyaltyOfferRow) => instantIskPerLp.get(row.offer.offer_id) ?? null;
   return rows
-    .filter((row) => rank(row) !== null && row.offer.lp_cost > 0)
+    .filter((row) => rankable(row, instantIskPerLp))
     .sort((a, b) => rank(b)! - rank(a)!)
     .slice(0, SPEND_PLAN_CANDIDATES)
     .map((row) => ({
@@ -112,7 +125,7 @@ async function loadSpendPlan(request: Request): Promise<SpendPlanView> {
     // on Sell now like every step, so the floor and the steps compare like for like.
     request.ownLpValue > 0
       ? Promise.resolve(null)
-      : loadMarketLpValue(request.corporationId, hub, undefined, 'buy').catch(() => null),
+      : loadMarketLpValue(request.corporationId, hub, { basis: 'buy' }).catch(() => null),
     request.activeCharacterId === null
       ? Promise.resolve(null)
       : loadWalletBalance(request.activeCharacterId).catch(() => null),

@@ -252,10 +252,10 @@ describe('loadMarketLpValue', () => {
       fetchedAt: new Date(),
       fromCache: true,
     } as never);
-    await loadMarketLpValue(50, JITA, () => 0);
-    await loadMarketLpValue(50, JITA, () => 60_000);
+    await loadMarketLpValue(50, JITA, { now: () => 0 });
+    await loadMarketLpValue(50, JITA, { now: () => 60_000 });
     expect(loadLoyaltyStoreOffers).toHaveBeenCalledTimes(1);
-    await loadMarketLpValue(50, JITA, () => 16 * 60_000);
+    await loadMarketLpValue(50, JITA, { now: () => 16 * 60_000 });
     expect(loadLoyaltyStoreOffers).toHaveBeenCalledTimes(2);
   });
 });

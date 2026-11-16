@@ -602,7 +602,8 @@ export function FittingStartScreen({
               )}
               {visible.length === 0 &&
                 (source === 'all' ? (
-                  <p className="p-3 text-xs text-text-dim">{t('fittings.start.noMatches')}</p>
+                  // Search only: the search box is the way out (DESIGN.md, EmptyState).
+                  <EmptyState title={t('fittings.start.noMatches')} />
                 ) : (
                   // The Source pick can be what hides the match: name it, and offer its undo.
                   <EmptyState

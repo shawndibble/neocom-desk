@@ -289,27 +289,23 @@ export function planLpSpend(input: SpendPlanInput): SpendPlanResult {
     for (const c of dead) unpriced.push(c.offerId);
     alive = alive.filter((c) => steps.get(c) !== null);
 
-    if (next === null) {
+    // With nothing affordable, the best step the wallet can't cover is checked like any
+    // other: only one that would earn and clear the floor stops the plan for the wallet.
+    const head = next ?? overWallet;
+    if (head === null) {
       stop =
-        overWallet !== null
-          ? {
-              reason: 'wallet',
-              offerId: overWallet.candidate.offerId,
-              iskPerLp: overWallet.iskPerLp,
+        outOfReach === null
+          ? { reason: 'nothingProfitable', offerId: null, iskPerLp: null, floor: null }
+          : {
+              reason: 'lpExhausted',
+              offerId: outOfReach.candidate.offerId,
+              iskPerLp: outOfReach.iskPerLp,
               floor: null,
-            }
-          : outOfReach === null
-            ? { reason: 'nothingProfitable', offerId: null, iskPerLp: null, floor: null }
-            : {
-                reason: 'lpExhausted',
-                offerId: outOfReach.candidate.offerId,
-                iskPerLp: outOfReach.iskPerLp,
-                floor: null,
-              };
+            };
       break;
     }
-    const at = { offerId: next.candidate.offerId, iskPerLp: next.iskPerLp };
-    if (next.profit <= 0) {
+    const at = { offerId: head.candidate.offerId, iskPerLp: head.iskPerLp };
+    if (head.profit <= 0) {
       stop = { reason: 'nothingProfitable', ...at, floor: null };
       break;
     }
@@ -318,9 +314,13 @@ export function planLpSpend(input: SpendPlanInput): SpendPlanResult {
       input.lpValue.rate > 0 &&
       (input.lpValue.source === 'yours' || input.lpValue.source === 'market')
         ? { rate: input.lpValue.rate, source: input.lpValue.source }
-        : bestShareFloor(Math.max(best, next.iskPerLp));
-    if (next.iskPerLp < floor.rate) {
+        : bestShareFloor(Math.max(best, head.iskPerLp));
+    if (head.iskPerLp < floor.rate) {
       stop = { reason: 'belowFloor', ...at, floor };
+      break;
+    }
+    if (next === null) {
+      stop = { reason: 'wallet', ...at, floor: null };
       break;
     }
     commit(next);

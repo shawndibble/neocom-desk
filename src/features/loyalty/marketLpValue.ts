@@ -149,10 +149,7 @@ export async function loadMarketLpValues(
 export async function loadMarketLpValue(
   corporationId: number,
   hub: TradeHub,
-  now: () => number = Date.now,
-  basis: PriceBasis = 'sell'
+  options: { now?: () => number; basis?: PriceBasis } = {}
 ): Promise<number | null> {
-  return (
-    (await loadMarketLpValues([corporationId], hub, { now, basis })).get(corporationId) ?? null
-  );
+  return (await loadMarketLpValues([corporationId], hub, options)).get(corporationId) ?? null;
 }
