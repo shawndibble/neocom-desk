@@ -10,7 +10,7 @@ import {
   useImproveSettingsHydrated,
   useImproveSpace,
   useImproveSpaceByRole,
-} from './useImprove';
+} from './useImproveSettingStores';
 
 beforeEach(async () => {
   await db.settings.clear();

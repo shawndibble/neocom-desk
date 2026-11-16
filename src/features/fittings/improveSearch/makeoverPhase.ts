@@ -18,11 +18,8 @@ import {
 import type { ImproveGoal } from '@/engine/fittings/improve';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
-import { buildVariationIndex } from '@/engine/market/variations';
-import { makeoverOptionsOf } from './improveMakeoverTicks';
-import { modulePool } from './improveModulePool';
-import type { FittingCatalogue } from './useFittingCatalogue';
-import type { VariantEvaluator } from './useFittingEvaluation';
+import { makeoverOptionsOf } from '../improveMakeoverTicks';
+import type { SearchContext } from './context';
 
 /** The Makeover that beat the best single swap, with its rows as options ready to tick. */
 export interface MakeoverResult {
@@ -30,33 +27,27 @@ export interface MakeoverResult {
   options: ImproveOption[];
 }
 
+type MoveOptions = Omit<MakeoverMoveOptions, 'pool'>;
+
 /** The Makeover's one-slot moves on any fit the search reaches, for the catalogue, pilot and settings of this search. */
 export function makeoverMovesFor(
-  variants: VariantEvaluator,
-  catalogue: FittingCatalogue,
-  options: Omit<MakeoverMoveOptions, 'pool'>
+  ctx: SearchContext,
+  options: MoveOptions
 ): (fitting: Fitting) => ImproveCandidate[] {
-  const index = buildVariationIndex(catalogue.variations.types, catalogue.variations.metaGroups);
-  const pool = modulePool(catalogue, variants);
-  return (fitting) => makeoverMoves(fitting.modules, index, catalogue.rackOf, { ...options, pool });
+  const { index, pool } = ctx;
+  const { rackOf } = ctx.request.catalogue;
+  return (fitting) => makeoverMoves(fitting.modules, index, rackOf, { ...options, pool });
 }
 
 /** The forced propulsion step of the Makeover for the Job and this pilot's catalogue; null when the Job needs none. */
 export function makeoverPropulsionFor(
-  variants: VariantEvaluator,
-  catalogue: FittingCatalogue,
-  options: Omit<MakeoverMoveOptions, 'pool'>
+  ctx: SearchContext,
+  options: MoveOptions
 ): PropulsionStart | null {
-  const index = buildVariationIndex(catalogue.variations.types, catalogue.variations.metaGroups);
-  return propulsionStart(index, catalogue.rackOf, {
-    ...options,
-    pool: modulePool(catalogue, variants),
-  });
+  return propulsionStart(ctx.index, ctx.request.catalogue.rackOf, { ...options, pool: ctx.pool });
 }
 
 export interface MakeoverPhaseParams {
-  variants: VariantEvaluator;
-  catalogue: FittingCatalogue;
   moves: (fitting: Fitting) => readonly ImproveCandidate[];
   before: FittingStats;
   goal: ImproveGoal;
@@ -85,12 +76,13 @@ export interface MakeoverPhaseParams {
  * when nothing beat the best single swap, and `stopped` says it ended early.
  */
 export async function runMakeoverPhase(
+  ctx: SearchContext,
   params: MakeoverPhaseParams
 ): Promise<{ makeover: MakeoverResult | null; stopped: boolean } | null> {
-  const { variants, catalogue, listed, target, onProgress, priceOf } = params;
+  const { listed, target, onProgress, priceOf } = params;
   onProgress(0, MAKEOVER_CALCS);
   const search = await findMakeover({
-    fitting: variants.fitting,
+    fitting: ctx.request.fitting,
     before: params.before,
     goal: params.goal,
     moves: params.moves,
@@ -104,10 +96,7 @@ export async function runMakeoverPhase(
     iskBudget: params.iskBudget,
     fitTotal: params.fitTotal,
     // Faction and officer upgrades stay single rows; only a same-tier single swap has to be beaten.
-    bestSingle: makeoverBar(
-      listed,
-      buildVariationIndex(catalogue.variations.types, catalogue.variations.metaGroups)
-    ),
+    bestSingle: makeoverBar(listed, ctx.index),
     concurrency: params.concurrency,
     onProgress,
     isCancelled: params.isCancelled,

@@ -6,7 +6,7 @@ import {
   useImproveRigs,
   useImproveSpace,
   useImproveSpaceByRole,
-} from './useImprove';
+} from './useImproveSettingStores';
 
 const fresh = async () => {
   await db.settings.clear();

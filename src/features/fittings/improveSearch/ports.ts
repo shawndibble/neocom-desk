@@ -1,0 +1,48 @@
+/**
+ * The production adapter of the Improve search's ports: the page's evaluator
+ * (its cached baseline, and the search's own worker pool for variants), the
+ * engine's hull and skill checks, the pilot's Trade Hub prices and the hull's
+ * community fits.
+ */
+import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
+import { getHubPrices } from '@/market/prices';
+import { loadFittingPrice } from '../fittingPrice';
+import type { WorkerPool } from '../fittingWorker';
+import { loadHullCommonality } from '../hullCommonalityLoad';
+import { fitCheckOf } from '../improveModulePool';
+import type { FittingCatalogue } from '../useFittingCatalogue';
+import type { VariantEvaluator } from '../useFittingEvaluation';
+import type { ImproveSearchPorts } from './types';
+
+export interface ImprovePortsInput {
+  variants: VariantEvaluator;
+  catalogue: FittingCatalogue;
+  /** The pilot's Trade Hub; an unknown one prices at the default hub. */
+  hubId: TradeHub['id'];
+  /** The search's own workers, started on first use; the caller ends them. */
+  workers: () => WorkerPool;
+}
+
+export function createImprovePorts({
+  variants,
+  catalogue,
+  hubId,
+  workers,
+}: ImprovePortsInput): ImproveSearchPorts {
+  const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
+  return {
+    baseline: async (signal) => (await variants.compare(variants.fitting, signal)).before,
+    stats: async (fitting, signal) =>
+      (await variants.compare(fitting, signal, workers().send)).after,
+    concurrency: () => workers().size,
+    fitCheck: fitCheckOf(variants),
+    chargeGroups: (slot, typeId) =>
+      variants.engine.chargeGroupIdsFor(variants.fitting.shipTypeId, slot, typeId),
+    prices: async (typeIds) => {
+      const prices = await getHubPrices(hub, [...typeIds]);
+      return (typeId) => prices.get(typeId)?.sellMin ?? null;
+    },
+    fitTotal: async () => (await loadFittingPrice(variants.fitting, hub)).totals.sell,
+    commonality: () => loadHullCommonality(variants.fitting.shipTypeId, catalogue.types),
+  };
+}
