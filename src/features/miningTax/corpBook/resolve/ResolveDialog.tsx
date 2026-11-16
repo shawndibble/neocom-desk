@@ -1,39 +1,36 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, Modal, Radio, TextArea } from '@/components/ui';
+import { selectedRowClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { InlineError } from '@/components/ui/InlineError';
-import { Pill, type PillTone } from '@/components/ui/Pill';
-import { DISPUTE_HOLD_DAYS } from '@/engine/corpTaxBook/disputes';
-import type { ClaimCheck, ClaimCheckResult, ClaimedTransfer } from '@/engine/corpTaxBook/overdue';
-import { DAY_MS } from '@/lib/age';
+import { Pill } from '@/components/ui/Pill';
+import { disputeHold } from '@/engine/corpTaxBook/disputes';
+import type { ClaimCheck, ClaimedTransfer } from '@/engine/corpTaxBook/overdue';
+import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
-import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
+import { IskText } from '../../IskText';
+import type { MadePayment } from '../../paymentLinks';
 import type { TaxQuestionMailOutcome } from '../sendTaxQuestionMail';
+import { isoDay } from '../memberFlag';
+import { CHECK_TONE } from './checkTone';
+import { TransferPicker } from './TransferPicker';
 import { outcomesFor, SELF_SERVICE, type OutcomeId, type ResolveProblem } from './outcomes';
 import { sendProof, tellNotOwed, tellNotPaying, type MailContext } from './resolveSubmit';
 
 const k = (key: string) => `miningTax.resolve.${key}`;
 
-/** What checking a transfer against the book found, as a pill. */
-const CHECK_TONE: Record<ClaimCheckResult, PillTone> = {
-  found: 'success',
-  division: 'warning',
-  notSynced: 'neutral',
-  tooOld: 'neutral',
-  notFound: 'danger',
-  person: 'accent',
-  otherCorp: 'warning',
-  ambiguous: 'warning',
-};
-
 interface Props {
   problem: ResolveProblem;
   /** Who is asking, and who answers tax questions for the book. */
   mail: MailContext;
-  /** The member's own journal transfers that make the "I already paid" proof. */
+  /** The member's own journal transfers that make the "I already paid" proof, when already known. */
   transfers?: ClaimedTransfer[];
+  /** Every payment the member made from their wallet: "Which payment was it?" lists the ones around the billed period. */
+  payments?: readonly MadePayment[];
+  /** The billed period's first day (ISO): payments before it are not listed. */
+  paidSince?: string;
   /** The Payee the member's own entry gave a Conflict day's ore to. */
   payeeName?: string;
   /** The facts above the choices: what the app knows about the problem. */
@@ -55,8 +52,12 @@ type Done =
   | {
       kind: 'sent';
       checks?: ClaimCheck[];
+      /** The transfers that went with it, in the order `checks` answers them. */
+      transfers?: readonly ClaimedTransfer[];
       confirmed?: boolean;
       holdsUntil?: string;
+      /** Said again after an officer kept the bill: the day is not held a second time. */
+      again?: boolean;
       mailed?: TaxQuestionMailOutcome;
     };
 
@@ -69,7 +70,9 @@ type Done =
 export function ResolveDialog({
   problem,
   mail,
-  transfers = [],
+  transfers: presetTransfers = [],
+  payments,
+  paidSince,
   payeeName,
   facts,
   hideKey,
@@ -87,10 +90,18 @@ export function ResolveDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const [done, setDone] = useState<Done | null>(null);
+  const [picked, setPicked] = useState<ReadonlySet<number>>(new Set());
+  const [pickedTransfers, setPickedTransfers] = useState<ClaimedTransfer[]>([]);
+  // Transfers the app already knows (the donations it could not credit) are the proof as they
+  // stand; otherwise the member picks which of their own payments it was.
+  const transfers = presetTransfers.length > 0 ? presetTransfers : pickedTransfers;
+  const picking = presetTransfers.length === 0 && payments !== undefined;
   const corp = problem.corpName;
   const row = problem.row;
   const statementId =
-    problem.kind === 'uncredited' || problem.kind === 'kept' ? problem.statementId : undefined;
+    problem.kind === 'uncredited' || problem.kind === 'kept' || problem.kind === 'overdue'
+      ? problem.statementId
+      : undefined;
 
   const needsText =
     choice === 'notOwed' ? problem.kind !== 'conflict' : choice === 'notPaying' && tell;
@@ -100,7 +111,10 @@ export function ResolveDialog({
     (choice === 'paid' && (offer.noStatement || statementId === undefined)) ||
     (choice === 'fixRecords' && !onFixRecords);
 
-  const holdsUntil = () => new Date(Date.now() + DISPUTE_HOLD_DAYS * DAY_MS).toISOString();
+  const holdsUntil = () => {
+    const now = new Date().toISOString();
+    return disputeHold({ at: now }, now)?.until ?? now;
+  };
 
   const submit = async () => {
     if (choice === 'pay') return onPay();
@@ -116,12 +130,21 @@ export function ResolveDialog({
       } else if (choice === 'notOwed' && row) {
         const mailed = await tellNotOwed(mail, row, text.trim(), payeeName);
         onSent();
-        setDone({ kind: 'sent', mailed, holdsUntil: holdsUntil() });
+        setDone({
+          kind: 'sent',
+          mailed,
+          holdsUntil: holdsUntil(),
+          ...(problem.kind === 'kept' ? { again: true } : {}),
+        });
       } else if (choice === 'paid' && statementId) {
-        const days = row?.date ?? '';
+        // Every day the proof covers, not just the first: the officer reads what it paid.
+        const days =
+          problem.kind === 'uncredited' && problem.days
+            ? problem.days.join(', ')
+            : (row?.date ?? (problem.kind === 'overdue' ? problem.period : ''));
         const out = await sendProof(mail, statementId, transfers, text.trim(), days);
         onSent();
-        setDone({ kind: 'sent', ...out });
+        setDone({ kind: 'sent', ...out, transfers });
       }
     } catch {
       setError(true);
@@ -137,7 +160,9 @@ export function ResolveDialog({
         ? t(k('title.conflict'), { date: row?.date ?? '' })
         : problem.kind === 'kept'
           ? t(k('title.kept'), { corp })
-          : t(k('title.figure'), { date: row?.date ?? '' });
+          : problem.kind === 'overdue'
+            ? t(k('title.overdue'), { corp, period: problem.period })
+            : t(k('title.figure'), { date: row?.date ?? '' });
 
   if (done) {
     return (
@@ -154,7 +179,7 @@ export function ResolveDialog({
           </div>
         }
       >
-        <DoneView done={done} corp={corp} transfers={transfers} />
+        <DoneView done={done} corp={corp} />
       </Modal>
     );
   }
@@ -166,12 +191,13 @@ export function ResolveDialog({
     return (
       <div
         key={id}
+        aria-current={checked ? 'true' : undefined}
         className={cx(
-          'rounded-xs border p-2.5',
-          checked ? 'border-accent bg-accent/5' : 'border-line'
+          'rounded-xs border border-line p-2.5',
+          checked ? selectedRowClassName : 'border-l-2 border-l-transparent'
         )}
       >
-        <label className="flex cursor-pointer items-start gap-2">
+        <label className={cx('flex cursor-pointer items-start gap-2', tappableRowClassName)}>
           <Radio
             name="resolve-outcome"
             checked={checked}
@@ -214,7 +240,12 @@ export function ResolveDialog({
         return (
           <>
             {offer.tellWhy && (
-              <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <label
+                className={cx(
+                  'flex cursor-pointer items-center gap-2 text-sm',
+                  tappableRowClassName
+                )}
+              >
                 <Checkbox checked={tell} onChange={(e) => setTell(e.target.checked)} />
                 {t(k('tellWhy'), { corp })}
               </label>
@@ -239,6 +270,19 @@ export function ResolveDialog({
           );
         return (
           <>
+            {picking && (
+              <TransferPicker
+                payments={payments}
+                bookCorporationId={problem.corporationId}
+                corpName={corp}
+                since={paidSince ?? row?.date ?? ''}
+                chosen={picked}
+                onChange={(next, chosen) => {
+                  setPicked(next);
+                  setPickedTransfers(chosen);
+                }}
+              />
+            )}
             <TextArea
               rows={2}
               value={text}
@@ -312,19 +356,13 @@ export function ResolveDialog({
 /** i18next context for an outcome's wording on a given problem. */
 function outcomeContext(kind: ResolveProblem['kind'], id: OutcomeId): string | undefined {
   if (id === 'pay' && kind === 'uncredited') return 'again';
+  if (id === 'pay' && kind === 'overdue') return 'plain';
   if (id === 'notOwed' && kind === 'conflict') return 'payee';
+  if (id === 'notOwed' && kind === 'kept') return 'kept';
   return undefined;
 }
 
-function DoneView({
-  done,
-  corp,
-  transfers,
-}: {
-  done: Done;
-  corp: string;
-  transfers: readonly ClaimedTransfer[];
-}) {
+function DoneView({ done, corp }: { done: Done; corp: string }) {
   const { t } = useTranslation();
   if (done.kind === 'hidden') return <p className="text-sm">{t(k('result.hidden'), { corp })}</p>;
   return (
@@ -335,19 +373,23 @@ function DoneView({
         <p>
           {done.checks && done.checks.length > 0
             ? t(k('result.sentProof'), { corp })
-            : t(k('result.sent'), { corp, date: (done.holdsUntil ?? '').slice(0, 10) })}
+            : done.again
+              ? t(k('result.sentAgain'), { corp })
+              : t(k('result.sent'), { corp, date: isoDay(done.holdsUntil) })}
         </p>
       )}
       {done.checks && done.checks.length > 0 && (
         <ul className="space-y-1">
           {done.checks.map((c, i) => {
-            const transfer = transfers[i];
+            const transfer = done.transfers?.[i];
             return (
               <li key={i} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
                 {transfer && (
                   <span className="tabular-nums">
-                    <span className="font-semibold">{formatIsk(transfer.amount, 0)} ISK</span> ·{' '}
-                    {eveTimeLabel(Date.parse(transfer.at))}
+                    <span className="font-semibold">
+                      <IskText value={transfer.amount} />
+                    </span>{' '}
+                    · {eveTimeLabel(Date.parse(transfer.at))}
                   </span>
                 )}
                 <Pill tone={CHECK_TONE[c.result]}>

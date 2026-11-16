@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
+import type { MadePayment } from '../../paymentLinks';
 import type { CorpBookView } from '../corpBookView';
 import { useNotPaying } from './notPaying';
 import { ProblemFacts } from './ProblemFacts';
@@ -11,6 +12,8 @@ interface Args {
   /** A tracked Character's name, for the mail. */
   nameOf: (characterId: number) => string;
   reloadCorpBooks: () => void;
+  /** The member's own payments, for "Which payment was it?". */
+  madePayments: readonly MadePayment[];
   onPay: (corporationId: number) => void;
   /** Opens a book day's own row (its Conflict takeover lives there). */
   onOpenDay: (row: BookRowView) => void;
@@ -20,10 +23,18 @@ interface Args {
  * The Tax tab's Resolve dialog (resolving in the app): which problem it is open on, the dialog
  * itself, and the member's own "Not paying" set it hides problems under.
  */
-export function useResolve({ corpView, nameOf, reloadCorpBooks, onPay, onOpenDay }: Args): {
+export function useResolve({
+  corpView,
+  nameOf,
+  reloadCorpBooks,
+  madePayments,
+  onPay,
+  onOpenDay,
+}: Args): {
   open: (target: ResolveTarget) => void;
   hidden: ReadonlySet<string>;
   show: (key: string) => void;
+  hide: (key: string) => void;
   dialog: ReactNode;
 } {
   const [target, setTarget] = useState<ResolveTarget | null>(null);
@@ -44,6 +55,8 @@ export function useResolve({ corpView, nameOf, reloadCorpBooks, onPay, onOpenDay
           contact: book?.loaded.taxContact,
         }}
         {...(target.transfers ? { transfers: target.transfers } : {})}
+        payments={madePayments}
+        {...(target.paidSince !== undefined ? { paidSince: target.paidSince } : {})}
         {...(target.payeeName !== undefined ? { payeeName: target.payeeName } : {})}
         facts={<ProblemFacts target={target} />}
         hideKey={target.hideKey}
@@ -64,6 +77,12 @@ export function useResolve({ corpView, nameOf, reloadCorpBooks, onPay, onOpenDay
         onClose={close}
       />
     );
-  }, [target, corpView, nameOf, hide, onPay, onOpenDay, reloadCorpBooks]);
-  return { open: setTarget, hidden, show: (key) => void show(key), dialog };
+  }, [target, corpView, nameOf, hide, onPay, onOpenDay, reloadCorpBooks, madePayments]);
+  return {
+    open: setTarget,
+    hidden,
+    show: (key) => void show(key),
+    hide: (key) => void hide(key),
+    dialog,
+  };
 }

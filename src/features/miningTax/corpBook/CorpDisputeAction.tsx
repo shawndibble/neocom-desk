@@ -20,6 +20,8 @@ interface Props {
     | 'flagged'
     | 'conflictCause'
   >;
+  /** Opens Resolve on this day: after an officer kept the bill, the member can say it again or pay. */
+  onResolve?: () => void;
   /** The Payee the member's own entry gives the ore to, by name. */
   payeeName: string;
   /** It landed (sent or withdrawn): reload the books. */
@@ -33,7 +35,7 @@ interface Props {
  * officer's reason. Ore listed beyond what the
  * book recorded is never billed, so there is nothing to dispute.
  */
-export function CorpDisputeAction({ view, payeeName, onSent }: Props) {
+export function CorpDisputeAction({ view, payeeName, onSent, onResolve }: Props) {
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<'rejected' | 'other' | null>(null);
@@ -48,6 +50,9 @@ export function CorpDisputeAction({ view, payeeName, onSent }: Props) {
         });
         onSent();
       } catch (e) {
+        // An officer answered between the page loading and the click: read the books again, and
+        // the answer, with what to do next, is on the day.
+        if (callableErrorReason(e) === 'answered') onSent();
         setFailed(callableErrorReason(e) === 'answered' ? 'rejected' : 'other');
       } finally {
         setBusy(false);
@@ -73,7 +78,7 @@ export function CorpDisputeAction({ view, payeeName, onSent }: Props) {
         {failed && (
           <InlineError>
             {failed === 'rejected'
-              ? t(k('tellRejected'), { corp: view.corpName })
+              ? t(k('tellAnswered'), { corp: view.corpName })
               : t(k('withdrawFailed'))}
           </InlineError>
         )}
@@ -88,9 +93,21 @@ export function CorpDisputeAction({ view, payeeName, onSent }: Props) {
     );
   if (view.flagged?.state === 'rejected')
     return (
-      <p className="text-warning">
-        {t(k('toldRejected'), { corp: view.corpName, reason: view.flagged.reason ?? '' })}
-      </p>
+      <div className="space-y-1.5">
+        <p className="text-warning">
+          {t(k('toldRejected'), { corp: view.corpName, reason: view.flagged.reason ?? '' })}
+        </p>
+        {view.flagged.nextStep && (
+          <p className="font-semibold text-text">
+            {t('miningTax.resolve.facts.nextStep', { step: view.flagged.nextStep })}
+          </p>
+        )}
+        {onResolve && (
+          <Button size="sm" onClick={onResolve}>
+            {t('miningTax.resolve.open')}
+          </Button>
+        )}
+      </div>
     );
   const recordKey = view.recordKey;
   if (recordKey === undefined || view.conflictCause === 'overListed') return null;
@@ -110,6 +127,7 @@ export function CorpDisputeAction({ view, payeeName, onSent }: Props) {
       });
       onSent();
     } catch (e) {
+      if (callableErrorReason(e) === 'rejected') onSent();
       setFailed(callableErrorReason(e) === 'rejected' ? 'rejected' : 'other');
     } finally {
       setBusy(false);
@@ -124,7 +142,7 @@ export function CorpDisputeAction({ view, payeeName, onSent }: Props) {
       </NeedsConnection>
       {failed && (
         <InlineError>
-          {t(k(failed === 'rejected' ? 'tellRejected' : 'tellFailed'), { corp: view.corpName })}
+          {t(k(failed === 'rejected' ? 'tellAnswered' : 'tellFailed'), { corp: view.corpName })}
         </InlineError>
       )}
     </div>

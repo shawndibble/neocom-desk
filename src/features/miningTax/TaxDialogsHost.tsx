@@ -10,6 +10,7 @@ import type { PayeeBalance } from '@/features/miningTax/balances';
 import { BulkDismissDialog } from '@/features/miningTax/BulkDismissDialog';
 import { CorpOverlapNotice } from '@/features/miningTax/corpBook/CorpOverlapNotice';
 import { conflictSiblings } from '@/features/miningTax/corpBook/conflictSummary';
+import type { ResolveTarget } from '@/features/miningTax/corpBook/resolve/targets';
 import { CorpRowDetailModal } from '@/features/miningTax/corpBook/CorpRowDetailModal';
 import { isBookRow } from '@/features/miningTax/corpBook/corpRows';
 import type { useCorpStateHint } from '@/features/miningTax/corpBook/useCorpStateText';
@@ -122,6 +123,8 @@ export interface TaxDialogsHostProps {
   corpView: CorpBookView | null;
   /** Something reached a Corp Tax Book (a declaration or a dispute, #6206): read the books again. */
   reloadCorpBooks: () => void;
+  /** Opens the Resolve dialog (resolving in the app) on a problem. */
+  onResolve: (target: ResolveTarget) => void;
   corpStateHint: ReturnType<typeof useCorpStateHint>;
   dismissTargets: DisplayRow[];
   showCharacterColumn: boolean;
@@ -169,6 +172,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     linkSuggestions,
     corpView,
     reloadCorpBooks,
+    onResolve,
     corpStateHint,
     dismissTargets,
     showCharacterColumn,
@@ -627,6 +631,16 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
   }, [linkWalletOwed, madePayments, everyAssignment]);
 
   const corpDetail = detailTarget?.corp?.kind === 'row' ? detailTarget.corp : null;
+  // The member's own entry for a book day, when one lines up: "Fix my records" opens it to edit.
+  const ownEntry = corpDetail
+    ? allDisplayRows.find(
+        (dr) =>
+          dr.corp?.kind !== 'row' &&
+          dr.row.characterId === corpDetail.view.characterId &&
+          dr.row.entry.date === corpDetail.view.date &&
+          dr.row.entry.solarSystemId === corpDetail.view.solarSystemId
+      )
+    : undefined;
 
   return (
     <>
@@ -704,7 +718,12 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             })
           }
           onUnmarkPaid={() => unmarkCorpPayment(corpDetail.view.markedPaidIds)}
-          onBookChanged={reloadCorpBooks}
+          onResolve={(target) => {
+            // The detail is closed first: Resolve is its own dialog, and may send the member back here.
+            actions.openDetail(null);
+            onResolve(target);
+          }}
+          {...(ownEntry ? { onFixRecords: () => actions.openDetail(ownEntry) } : {})}
           notice={
             (corpDetail.view.overlap || corpDetail.view.state === 'conflict') && (
               <CorpOverlapNotice
@@ -719,6 +738,10 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
                 typeNames={typeNames}
                 onChanged={refresh}
                 onBookChanged={reloadCorpBooks}
+                onResolve={(target) => {
+                  actions.openDetail(null);
+                  onResolve(target);
+                }}
               />
             )
           }

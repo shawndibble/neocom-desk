@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Pill } from '@/components/ui/Pill';
 import { disputeKindOf } from '@/engine/corpTaxBook/disputes';
 import { formatIsk } from '@/lib/isk';
+import { IskText } from '../IskText';
 import { wherePaymentGoes, type PayDay } from './paymentLanding';
 
 /** Open days listed before the rest fold into "and N more days". */
@@ -34,7 +35,9 @@ export function WherePaymentGoes({ corpName, days, amount }: Props) {
         {shown.map((d) => (
           <li key={d.id} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 py-1.5">
             <span className="w-24 tabular-nums">{d.date}</span>
-            <span className="w-32 text-right tabular-nums">{formatIsk(d.taxOwed)} ISK</span>
+            <span className="w-32 text-right tabular-nums">
+              <IskText value={d.taxOwed} />
+            </span>
             {d.result === 'paid' && (
               <Pill tone="success">{t('miningTax.corpBook.pay.where.paid')}</Pill>
             )}

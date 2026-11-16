@@ -3,9 +3,13 @@
  * (resolving in the app). Pure: the tab and its attention strip call these.
  */
 import type { ClaimedTransfer } from '@/engine/corpTaxBook/overdue';
-import type { BookRowView, UncreditedDonation } from '@/engine/corpTaxBook/personal';
-import { dayKey, uncreditedKey } from './notPaying';
-import type { ResolveProblem } from './outcomes';
+import type {
+  BookRowView,
+  MemberDeclaration,
+  UncreditedDonation,
+} from '@/engine/corpTaxBook/personal';
+import { notPayingDayKey, statementKey, uncreditedKey } from './notPaying';
+import { notOwedPlan, type ResolveProblem } from './outcomes';
 
 export interface ResolveTarget {
   problem: ResolveProblem;
@@ -17,6 +21,15 @@ export interface ResolveTarget {
   payeeName?: string;
   /** Uncredited donations, for the facts. */
   donations?: readonly UncreditedDonation[];
+  /** A declaration an officer rejected, read word for word with the problem it is about. */
+  declaration?: MemberDeclaration;
+  /**
+   * The member has already told the corporation (a declaration waits on the Statement the days are
+   * on): the problem leaves the attention list until an officer answers (decision 20261116-194150).
+   */
+  answered?: boolean;
+  /** The first day the member's own payments could be for (ISO): the "which payment" picker starts here. */
+  paidSince?: string;
 }
 
 /** A book's uncredited donations: the days they paid, the Statement to declare on, the proof. */
@@ -33,7 +46,9 @@ export function uncreditedTarget(
     )
     .sort((a, b) => a.date.localeCompare(b.date));
   const statementId = days.find((r) => r.statementId !== undefined)?.statementId;
+  const coveredDays = [...new Set(group.flatMap((u) => u.covered))].sort();
   return {
+    answered: days.some((r) => r.declaration?.state === 'waiting'),
     problem: {
       kind: 'uncredited',
       corporationId: first.corporationId,
@@ -42,6 +57,7 @@ export function uncreditedTarget(
       amount: group.reduce((sum, u) => sum + u.amount, 0),
       ...(days[0] ? { row: days[0] } : {}),
       ...(statementId !== undefined ? { statementId } : {}),
+      ...(coveredDays.length > 0 ? { days: coveredDays } : {}),
     },
     hideKey: uncreditedKey(
       first.corporationId,
@@ -62,7 +78,7 @@ const of = (row: BookRowView) => ({
   characterId: row.characterId,
   row,
 });
-const keyOf = (row: BookRowView) => dayKey(row.corporationId, row.characterId, row.date);
+const keyOf = (row: BookRowView) => notPayingDayKey(row.corporationId, row.characterId, row.date);
 
 /** Whether the book bills more than the member's record: the case worth disputing. */
 export function bookAsksMore(row: BookRowView): boolean {
@@ -71,11 +87,40 @@ export function bookAsksMore(row: BookRowView): boolean {
   return d.rate ? d.bookPct > (d.personalPct ?? d.bookPct) : d.bookQuantity > d.personalQuantity;
 }
 
+/**
+ * Whether a day still bills the member: a Billed or Conflict day, or one the member marked paid
+ * that the book still shows owed. A day since paid has nothing left to keep.
+ */
+const stillOwed = (row: BookRowView) =>
+  row.state === 'billed' || row.state === 'conflict' || row.bookOwed !== undefined;
+
+/**
+ * What an officer kept on a day, if it is still owed: their rejection of the member's dispute of
+ * the day, or of the declaration on its Statement. A dispute leads when both are.
+ */
+export function keptBy(row: BookRowView): 'dispute' | 'declaration' | undefined {
+  if (!stillOwed(row)) return undefined;
+  if (row.flagged?.state === 'rejected') return 'dispute';
+  if (row.declaration?.state === 'rejected' && row.statementId !== undefined) return 'declaration';
+  return undefined;
+}
+
 /** A billed day whose figures differ from the member's own record. */
 export const figureTarget = (row: BookRowView): ResolveTarget => ({
   problem: { ...of(row), kind: 'figure', bookAsksMore: bookAsksMore(row) },
   hideKey: keyOf(row),
 });
+
+/**
+ * Whether a billed day's figure strip item is worth showing: the book bills MORE than the
+ * member's record and there is a dispute to send. Billing less leaves nothing to raise.
+ */
+export const figureNeedsAnswer = (row: BookRowView): boolean =>
+  row.state === 'billed' &&
+  row.dispute !== undefined &&
+  row.flagged === undefined &&
+  bookAsksMore(row) &&
+  notOwedPlan(row) !== undefined;
 
 /** A Conflict day: ore the member gave another Payee that the book also recorded. */
 export const conflictTarget = (row: BookRowView, payeeName?: string): ResolveTarget => ({
@@ -84,14 +129,82 @@ export const conflictTarget = (row: BookRowView, payeeName?: string): ResolveTar
   ...(payeeName !== undefined ? { payeeName } : {}),
 });
 
-/** A day an officer kept the bill on, with what to do next. */
-export const keptTarget = (row: BookRowView): ResolveTarget => ({
-  problem: {
-    ...of(row),
-    kind: 'kept',
-    by: 'dispute',
-    ...(row.flagged?.nextStep !== undefined ? { nextStep: row.flagged.nextStep } : {}),
-    ...(row.flagged?.reason !== undefined ? { reason: row.flagged.reason } : {}),
-  },
-  hideKey: keyOf(row),
-});
+/** A day an officer kept the bill on, with what to do next, word for word. */
+export function keptTarget(row: BookRowView, by = keptBy(row) ?? 'dispute'): ResolveTarget {
+  const said = by === 'dispute' ? row.flagged : row.declaration;
+  const reason = said?.reason;
+  const nextStep = said?.nextStep;
+  return {
+    problem: {
+      ...of(row),
+      kind: 'kept',
+      by,
+      ...(nextStep !== undefined ? { nextStep } : {}),
+      ...(reason !== undefined ? { reason } : {}),
+      ...(row.statementId !== undefined ? { statementId: row.statementId } : {}),
+    },
+    hideKey:
+      by === 'declaration' && row.statementId !== undefined
+        ? statementKey(row.corporationId, row.statementId)
+        : keyOf(row),
+    paidSince: row.date,
+  };
+}
+
+/** A Statement past its due date: pay it, say you paid it, or stop being reminded. */
+export function overdueTarget(o: {
+  corporationId: number;
+  corpName: string;
+  statementId: string;
+  characterId: number;
+  periodStart: string;
+  period: string;
+  declaration?: MemberDeclaration;
+}): ResolveTarget {
+  return {
+    problem: {
+      kind: 'overdue',
+      corporationId: o.corporationId,
+      corpName: o.corpName,
+      characterId: o.characterId,
+      statementId: o.statementId,
+      period: o.period,
+    },
+    hideKey: statementKey(o.corporationId, o.statementId),
+    paidSince: o.periodStart,
+    ...(o.declaration?.state === 'rejected' ? { declaration: o.declaration } : {}),
+  };
+}
+
+/**
+ * A donation the book never credited paid this day: the "which payment was it?" picker finds
+ * it in the wallet journal. Absent on a day with no such donation.
+ */
+export function unlinkedTarget(row: BookRowView): ResolveTarget | undefined {
+  if (!row.unlinkedDonation) return undefined;
+  return uncreditedTarget(
+    [
+      {
+        ...row.unlinkedDonation,
+        corporationId: row.corporationId,
+        corpName: row.corpName,
+        characterId: row.characterId,
+        covered: [row.date],
+      },
+    ],
+    [row]
+  );
+}
+
+/**
+ * The Resolve a book day's own row offers, for the row detail's Resolve button: the day an
+ * officer kept, a Conflict, or a Billed day whose figure differs; none for a day with nothing
+ * to resolve. `payeeName` names the Payee a Conflict's own entry gave the ore to.
+ */
+export function rowTarget(row: BookRowView, payeeName?: string): ResolveTarget | undefined {
+  if (keptBy(row)) return keptTarget(row);
+  if (row.state === 'conflict') return conflictTarget(row, payeeName);
+  if (row.state === 'billed' && row.dispute !== undefined && row.flagged === undefined)
+    return figureTarget(row);
+  return row.state === 'billed' ? unlinkedTarget(row) : undefined;
+}

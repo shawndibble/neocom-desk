@@ -6,9 +6,13 @@ import { AttentionStrip } from '@/features/miningTax/AttentionStrip';
 import { AutoAssignmentBar } from '@/features/miningTax/AutoAssignmentBar';
 import { CorpBookSyncNote } from '@/features/miningTax/corpBook/CorpBookSyncNote';
 import { LeftCorpNotices } from '@/features/miningTax/corpBook/LeftCorpNotice';
-import { dayKey } from '@/features/miningTax/corpBook/resolve/notPaying';
+import {
+  notPayingDayKey,
+  parseNotPayingKey,
+} from '@/features/miningTax/corpBook/resolve/notPaying';
+import { useNotPaying } from '@/features/miningTax/corpBook/resolve/notPaying';
 import { QuietStatusLine } from '@/features/miningTax/corpBook/resolve/QuietStatusLine';
-import { conflictTarget } from '@/features/miningTax/corpBook/resolve/targets';
+import { conflictTarget, uncreditedTarget } from '@/features/miningTax/corpBook/resolve/targets';
 import { useResolve } from '@/features/miningTax/corpBook/resolve/useResolve';
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
 import { leftCorpBooksOf } from '@/features/miningTax/corpBook/leftCorpBooks';
@@ -186,29 +190,52 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     [characterFiltered, resolvedPayeeFilter, payeeAliases]
   );
 
-  const conflicts = useMemo(() => summarizeConflicts(characterFiltered), [characterFiltered]);
+  // The member's own "Not paying": days they hid are not a warning, and are listed on the quiet line.
+  const { hidden: notPayingKeys } = useNotPaying();
+  const conflicts = useMemo(
+    () => summarizeConflicts(characterFiltered, notPayingKeys),
+    [characterFiltered, notPayingKeys]
+  );
   // Donations a book hasn't credited, per corporation, from the Characters in view: its Payee card
   // warns before a second payment, naming the Accounts the book reads (as the attention item does).
+  const quietUncredited = useCallback(
+    (b: NonNullable<typeof corpView>['books'][number]) => {
+      const group = b.summary.uncredited
+        .filter(
+          (d) => resolvedCharacterFilter === 'all' || resolvedCharacterFilter.has(d.characterId)
+        )
+        .map((d) => ({ ...d, corporationId: b.loaded.corporationId, corpName: b.corpName }));
+      if (group.length === 0) return false;
+      const target = uncreditedTarget(group, corpView?.overlay.rows ?? []);
+      return target.answered === true || notPayingKeys.has(target.hideKey);
+    },
+    [corpView, resolvedCharacterFilter, notPayingKeys]
+  );
   const uncreditedByCorp = useMemo(
     () =>
       new Map(
         corpView?.books.map((b) => [
           b.loaded.corporationId,
           {
+            // Once the member has sent proof (a declaration waits) or chosen not to pay, the
+            // banner is quiet until the corporation answers.
             amount: sum(
-              b.summary.uncredited
-                .filter(
-                  (d) =>
-                    resolvedCharacterFilter === 'all' || resolvedCharacterFilter.has(d.characterId)
-                )
-                .map((d) => d.amount)
+              quietUncredited(b)
+                ? []
+                : b.summary.uncredited
+                    .filter(
+                      (d) =>
+                        resolvedCharacterFilter === 'all' ||
+                        resolvedCharacterFilter.has(d.characterId)
+                    )
+                    .map((d) => d.amount)
             ),
             accounts: corpPayAccounts(b.loaded.divisions, b.loaded.divisionNames, t).join(', '),
             everyDivision: readsEveryDivision(b.loaded.divisions),
           },
         ]) ?? []
       ),
-    [corpView, resolvedCharacterFilter, t]
+    [corpView, resolvedCharacterFilter, t, quietUncredited]
   );
   const { balances, unassigned, everyAssignment, linkSuggestions, payeeSystems, owedByPayee } =
     useTaxBalances({
@@ -274,6 +301,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     corpView,
     nameOf: (id) => characterNames.get(id) ?? '',
     reloadCorpBooks,
+    madePayments,
     onPay: actions.openCorpPay,
     onOpenDay: openBookDay,
   });
@@ -283,30 +311,27 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     const waiting = new Set([
       ...rows
         .filter((r) => r.flagged?.state === 'sent')
-        .map((r) => dayKey(r.corporationId, r.characterId, r.date)),
+        .map((r) => notPayingDayKey(r.corporationId, r.characterId, r.date)),
       ...rows
         .filter((r) => r.declaration?.state === 'waiting' && r.statementId !== undefined)
         .map((r) => `statement:${r.corporationId}:${r.statementId}`),
     ]).size;
-    const corpName = (id: number) =>
-      corpView?.books.find((b) => b.loaded.corporationId === id)?.corpName ?? String(id);
-    const notPaying = [...resolve.hidden].sort().map((key) => {
-      const [kind, corporationId, , date] = key.split(':');
-      return {
-        key,
-        label:
-          kind === 'uncredited'
-            ? t('miningTax.resolve.quiet.uncreditedLabel', {
-                corp: corpName(Number(corporationId)),
-              })
-            : t('miningTax.resolve.quiet.dayLabel', {
-                corp: corpName(Number(corporationId)),
-                date,
-              }),
-      };
+    const notPaying = [...resolve.hidden].sort().flatMap((key) => {
+      const parsed = parseNotPayingKey(key);
+      if (!parsed) return [];
+      const corp = leftCorp.corpNameOf(parsed.corporationId);
+      return [
+        {
+          key,
+          label:
+            parsed.kind === 'day'
+              ? t('miningTax.resolve.quiet.dayLabel', { corp, date: parsed.date })
+              : t(`miningTax.resolve.quiet.${parsed.kind}Label`, { corp }),
+        },
+      ];
     });
     return { waiting, notPaying };
-  }, [corpView, resolve.hidden, t]);
+  }, [corpView, resolve.hidden, t, leftCorp]);
 
   const attentionItems = useTaxAttentionItems({
     data,
@@ -625,6 +650,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
           linkSuggestions={linkSuggestions}
           corpView={corpView}
           reloadCorpBooks={reloadCorpBooks}
+          onResolve={resolve.open}
           corpStateHint={corpStateHint}
           dismissTargets={selection.dismissTargets}
           showCharacterColumn={showCharacterColumn}

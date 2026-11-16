@@ -1,11 +1,30 @@
 import { describe, expect, it } from 'vitest';
-import { outcomesFor, type ResolveProblem } from './outcomes';
+import { notOwedPlan, outcomesFor, type ResolveProblem } from './outcomes';
 
 const base = { corporationId: 1, corpName: 'Brass', characterId: 7 };
 const row = (over: object = {}) => ({ recordKey: '7:1000:2026-11-06', ...over }) as never;
 
+describe('notOwedPlan', () => {
+  it('is a rate dispute at the member rate, the excess ore, or the payee, and otherwise nothing', () => {
+    expect(
+      notOwedPlan(row({ dispute: { rate: true, quantity: false, personalPct: 10, bookPct: 12 } }))
+    ).toEqual({ kind: 'rate', pct: 10 });
+    expect(
+      notOwedPlan(
+        row({
+          oreLines: [{ typeId: 1, quantity: 9 }],
+          personalOreLines: [{ typeId: 1, quantity: 5 }],
+        })
+      )
+    ).toEqual({ kind: 'quantity', lines: [{ typeId: 1, quantity: 4 }] });
+    expect(notOwedPlan(row({ state: 'conflict' }))).toEqual({ kind: 'payee' });
+    expect(notOwedPlan(row())).toBeUndefined();
+    expect(notOwedPlan(undefined)).toBeUndefined();
+  });
+});
+
 describe('outcomesFor (resolving in the app)', () => {
-  it('offers self-service first and preselects sending the proof for uncredited donations', () => {
+  it('offers self-service first and preselects sending the proof for uncredited donations, never disputing them', () => {
     const p: ResolveProblem = {
       ...base,
       kind: 'uncredited',
@@ -14,25 +33,29 @@ describe('outcomesFor (resolving in the app)', () => {
       row: row(),
     };
     expect(outcomesFor(p)).toEqual({
-      outcomes: ['pay', 'notPaying', 'paid', 'notOwed'],
+      outcomes: ['pay', 'notPaying', 'paid'],
       preselected: 'paid',
       tellWhy: true,
       noStatement: false,
     });
   });
 
-  it('still offers sending the proof without a Statement, but says it cannot go yet', () => {
+  // A preselected outcome whose button is disabled would greet the member with a dead dialog.
+  it('does not preselect sending the proof when there is no Statement to send it on', () => {
     const p: ResolveProblem = { ...base, kind: 'uncredited', amount: 40, row: row() };
-    expect(outcomesFor(p)).toMatchObject({ preselected: 'paid', noStatement: true });
+    expect(outcomesFor(p)).toMatchObject({ preselected: 'pay', noStatement: true });
   });
 
   it('preselects disputing a figure the book bills higher, and paying one it bills lower', () => {
-    const higher: ResolveProblem = { ...base, kind: 'figure', row: row(), bookAsksMore: true };
+    const owes = row({
+      dispute: { rate: true, quantity: false, personalPct: 10, bookPct: 12 },
+    });
+    const higher: ResolveProblem = { ...base, kind: 'figure', row: owes, bookAsksMore: true };
     expect(outcomesFor(higher)).toMatchObject({
       outcomes: ['pay', 'notPaying', 'notOwed'],
       preselected: 'notOwed',
     });
-    const lower: ResolveProblem = { ...base, kind: 'figure', row: row(), bookAsksMore: false };
+    const lower: ResolveProblem = { ...base, kind: 'figure', row: owes, bookAsksMore: false };
     expect(outcomesFor(lower).preselected).toBe('pay');
   });
 
@@ -44,18 +67,21 @@ describe('outcomesFor (resolving in the app)', () => {
     });
   });
 
-  // The server refuses a second dispute of a day an officer answered: only the member's own
-  // hide is left, and paying. A rejected declaration may be declared again.
-  it('after an officer kept the bill, offers paying, hiding, and proof again only for a declaration', () => {
+  // The member may say it again: the hold does not renew, but the answer can change.
+  it('after an officer kept the bill, offers paying, hiding, and saying it again', () => {
     const dispute: ResolveProblem = {
       ...base,
       kind: 'kept',
-      row: row(),
+      row: row({
+        personalOreLines: [{ typeId: 1, quantity: 5 }],
+        oreLines: [{ typeId: 1, quantity: 9 }],
+        flagged: { state: 'rejected', kind: 'quantity' },
+      }),
       by: 'dispute',
       nextStep: 'Pay it',
     };
     expect(outcomesFor(dispute)).toMatchObject({
-      outcomes: ['pay', 'notPaying'],
+      outcomes: ['pay', 'notPaying', 'notOwed'],
       preselected: 'pay',
       tellWhy: false,
     });
@@ -67,6 +93,31 @@ describe('outcomesFor (resolving in the app)', () => {
       statementId: 's1',
     };
     expect(outcomesFor(declaration).outcomes).toEqual(['pay', 'notPaying', 'paid']);
+  });
+
+  it('does not offer disputing a kept day the member own record never disagreed with', () => {
+    const p: ResolveProblem = {
+      ...base,
+      kind: 'kept',
+      row: row({ flagged: { state: 'rejected', kind: 'notPaying' } }),
+      by: 'dispute',
+    };
+    expect(outcomesFor(p).outcomes).toEqual(['pay', 'notPaying']);
+  });
+
+  it('offers paying, not paying and proof on an Overdue Statement', () => {
+    const p: ResolveProblem = { ...base, kind: 'overdue', statementId: 's1', period: 'Oct' };
+    expect(outcomesFor(p)).toMatchObject({
+      outcomes: ['pay', 'notPaying', 'paid'],
+      preselected: 'pay',
+      noStatement: false,
+      tellWhy: false,
+    });
+  });
+
+  it('offers disputing a figure only when the member own record gives something to dispute', () => {
+    const p: ResolveProblem = { ...base, kind: 'figure', bookAsksMore: true, row: row() };
+    expect(outcomesFor(p)).toMatchObject({ outcomes: ['pay', 'notPaying'], preselected: 'pay' });
   });
 
   it('cannot tell the corporation why on a day with no book record to name', () => {

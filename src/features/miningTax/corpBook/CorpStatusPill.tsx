@@ -2,7 +2,7 @@ import { HintText } from '@/components/ui/HintText';
 import { cx } from '@/lib/cx';
 import { useTranslation } from 'react-i18next';
 import { StatusPill } from '../StatusPill';
-import { dayKey, useNotPaying } from './resolve/notPaying';
+import { notPayingDayKey, useNotPaying } from './resolve/notPaying';
 import type { CorpRowInfo } from './corpRows';
 import {
   flaggedPillState,
@@ -41,7 +41,7 @@ export function CorpStatusPill({ corp }: { corp: CorpRowInfo }) {
   const notPaying =
     corp.kind === 'row' &&
     corp.view.state === 'billed' &&
-    hidden.has(dayKey(corp.view.corporationId, corp.view.characterId, corp.view.date));
+    hidden.has(notPayingDayKey(corp.view.corporationId, corp.view.characterId, corp.view.date));
   const flagged = corp.kind === 'row' ? flaggedPillState(corp.view) : undefined;
   const state = (
     notPaying
@@ -50,7 +50,7 @@ export function CorpStatusPill({ corp }: { corp: CorpRowInfo }) {
         ? 'markedPaid'
         : (flagged ?? (corp.kind === 'label' ? corp.state : corp.view.state))
   ) as PillState;
-  return (
+  const pill = (
     <HintText
       content={
         notPaying ? t('miningTax.corpBook.hint.notPaying', { corp: corp.corpName }) : hint(corp)
@@ -65,5 +65,15 @@ export function CorpStatusPill({ corp }: { corp: CorpRowInfo }) {
         {notPaying ? t('miningTax.corpBook.state.notPaying') : label(corp)}
       </span>
     </HintText>
+  );
+  // Never reads as settled: the row says, in words and not only in a tooltip, who still bills it.
+  if (!notPaying) return pill;
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-1.5">
+      {pill}
+      <span className="text-xs text-text-dim">
+        {t('miningTax.corpBook.state.notPayingStill', { corp: corp.corpName })}
+      </span>
+    </span>
   );
 }

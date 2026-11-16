@@ -2631,6 +2631,32 @@ describe('resolving in the app: an open dispute holds its day', () => {
     });
   });
 
+  // The officer's next step must reach the member word for word on the billed day itself.
+  it('says a rejected quantity dispute on a billed, unpaid day, with the next step', () => {
+    const rejected = disputeOn('2026-10-17', {
+      kind: 'quantity',
+      reason: 'Your ledger is short',
+      resolution: {
+        kind: 'rejected',
+        at: '2026-10-19T00:00:00.000Z',
+        by: 1,
+        reason: 'The book is right',
+        nextStep: 'Pay it, or re-mine the shortfall',
+      },
+    });
+    const out = overlay([entry()], [book({ disputes: [rejected] })]);
+    expect(out.rows[0]).toMatchObject({
+      state: 'billed',
+      flagged: {
+        state: 'rejected',
+        kind: 'quantity',
+        reason: 'The book is right',
+        nextStep: 'Pay it, or re-mine the shortfall',
+      },
+    });
+    expect(out.rows[0].held).toBeUndefined();
+  });
+
   it('skips a held day: a donation pays the next oldest instead', () => {
     const out = overlay(days(), [
       book({

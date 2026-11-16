@@ -1,6 +1,7 @@
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
 import type { DisplayRow } from '../groupRows';
 import { answeredByMember, isoDay } from './memberFlag';
+import { notPayingDayKey } from './resolve/notPaying';
 
 /** The Conflict days a miner can still fix, for the Tax tab: what they would cost, and the one to open first. */
 export interface ConflictSummary {
@@ -28,6 +29,8 @@ const dayKey = (view: BookRowView) => `${view.characterId}:${view.date}:${view.s
  * Sums the Conflict rows in view, earliest-resolving first (one with no date last), so a miner
  * sees the bill a Conflict turns into before the next Statement does. Null when there are none.
  *
+ * Days the member chose not to pay are left out: they are listed on the quiet line instead.
+ *
  * Days the member has already answered are counted in `waiting` but still in `days` and
  * `amount`. Dropping them would have been the obvious way to stop nagging someone who has done
  * all they can — and it would have been wrong: the day keeps resolving to the corporation 14
@@ -35,10 +38,20 @@ const dayKey = (view: BookRowView) => `${view.characterId}:${view.date}:${view.s
  * warning with "No moon mining tax outstanding" right up to the day it billed. The caller
  * states the deadline calmly instead.
  */
-export function summarizeConflicts(rows: readonly DisplayRow[]): ConflictSummary | null {
+export function summarizeConflicts(
+  rows: readonly DisplayRow[],
+  /** What the member chose not to pay (`useNotPaying`): their own answer, so no warning about it. */
+  notPaying: ReadonlySet<string> = new Set()
+): ConflictSummary | null {
   const conflicts = rows
     .flatMap((dr) =>
-      dr.corp?.kind === 'row' && dr.corp.view.state === 'conflict' ? [{ dr, corp: dr.corp }] : []
+      dr.corp?.kind === 'row' &&
+      dr.corp.view.state === 'conflict' &&
+      !notPaying.has(
+        notPayingDayKey(dr.corp.view.corporationId, dr.corp.view.characterId, dr.corp.view.date)
+      )
+        ? [{ dr, corp: dr.corp }]
+        : []
     )
     .sort(
       (a, b) =>

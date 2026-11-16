@@ -78,6 +78,23 @@ describe('resolve submits', () => {
     );
   });
 
+  // The old fallback sent the whole day as a quantity dispute: a bill the member never questioned.
+  it('never falls back to a whole-day quantity dispute when nothing differs', async () => {
+    await expect(
+      tellNotOwed(
+        ctx,
+        row({
+          personalOreLines: [{ typeId: 45490, quantity: 100 }],
+          dispute: { quantity: true, rate: false } as never,
+        }),
+        'No'
+      )
+    ).rejects.toThrow();
+    await expect(tellNotOwed(ctx, row(), 'No')).rejects.toThrow();
+    expect(store.disputeCorpTaxBookConflict).not.toHaveBeenCalled();
+    expect(mailer.sendTaxQuestionMail).not.toHaveBeenCalled();
+  });
+
   // Every transfer found in the wallet: credited at once, so there is no one to mail.
   it('sends no mail when the book credits the proof itself', async () => {
     store.declareCorpTaxBookPayment.mockResolvedValueOnce({

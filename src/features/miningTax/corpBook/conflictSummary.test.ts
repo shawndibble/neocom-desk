@@ -41,6 +41,15 @@ describe('summarizeConflicts', () => {
     expect(out?.first).toBe(soon);
   });
 
+  // "Not paying" is the member's own answer: nothing to warn about, and it is on the quiet line.
+  it('leaves out the days the member chose not to pay', () => {
+    const hidden = row(view({ id: 'h', billed: 300, corporationId: 1, characterId: 1 }));
+    const shown = row(view({ id: 's', billed: 200, date: '2026-10-29', corporationId: 1 }));
+    const out = summarizeConflicts([hidden, shown], new Set(['day:1:1:2026-10-28']));
+    expect(out).toMatchObject({ days: 1, amount: 200 });
+    expect(summarizeConflicts([hidden], new Set(['day:1:1:2026-10-28']))).toBeNull();
+  });
+
   // #6206: a day the member has answered still bills on its own 14-day clock, so it stays
   // counted — `waiting` is what lets the caller stop calling it a warning.
   it('counts a day sent to the corporation, and one whose ore it waived, as waiting', () => {
