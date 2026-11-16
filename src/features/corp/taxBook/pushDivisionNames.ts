@@ -5,13 +5,32 @@
  * the book's divisions changed (`divisionNamesToPush`), so a visit normally costs one cached
  * ESI read and no write.
  */
-import { divisionNamesToPush } from '@/engine/corpTaxBook/divisionNames';
+import { divisionNamesToPush, type DivisionNames } from '@/engine/corpTaxBook/divisionNames';
 import { loadCorporationDivisions } from '../wallet';
 import { editBook, type BookSummary } from './bookClient';
 
 export interface PushDivisionNamesDeps {
   load: typeof loadCorporationDivisions;
   edit: typeof editBook;
+}
+
+/**
+ * The names to send with a settings change that sets the book's `divisions`, so a member sees a
+ * newly read division by the corp's name at once rather than after a Director's next visit. Null
+ * when they are unchanged, or when the names could not be read (no role, ESI down): the stored
+ * names then stay as they are.
+ */
+export async function divisionNamesFor(
+  characterId: number,
+  corporationId: number,
+  canReadDivisions: boolean,
+  divisions: readonly number[],
+  stored: Readonly<DivisionNames> | undefined,
+  load: typeof loadCorporationDivisions = loadCorporationDivisions
+): Promise<DivisionNames | null> {
+  const result = await load(characterId, corporationId, canReadDivisions).catch(() => null);
+  const wallet = result?.cached?.data.wallet;
+  return wallet ? divisionNamesToPush(divisions, stored, wallet) : null;
 }
 
 /** Whether it wrote. Throws what the read or the write threw; the caller logs it. */

@@ -9,6 +9,8 @@ import { disputedTax, type OreDispute } from '@/engine/corpTaxBook/disputes';
 import { cx } from '@/lib/cx';
 import { formatCount } from '@/lib/formatCount';
 import { useBook } from './useBook';
+import { useCorpAccess } from '../useCorpAccess';
+import { divisionNamesFor } from '../taxBook/pushDivisionNames';
 import { useTabsProjection } from './useTabsProjection';
 import { useNeedsYou } from './useNeedsYou';
 import {
@@ -92,15 +94,25 @@ export function NeedsYouQueue() {
   // The corp's own name when a Director's visit stored one, else the numbered division.
   const divisionLabel = (division: number) =>
     settings.divisionNames?.[division] ?? t('corpTaxBook.moons.settings.division', { n: division });
+  const canReadDivisions = useCorpAccess().capabilities.canReadDivisions;
+  const countPatch = async (division: number) => {
+    const divisions = [...settings.divisions, division].sort((a, b) => a - b);
+    // Its name goes with it, so members see the corp's name for the division at once (#6161).
+    const divisionNames = await divisionNamesFor(
+      characterId,
+      corporationId,
+      canReadDivisions,
+      divisions,
+      settings.divisionNames
+    );
+    return { divisions, ...(divisionNames ? { divisionNames } : {}) };
+  };
   const answerUncounted = async (u: UncountedDonation, how: 'count' | 'notTax') => {
     setBusy(true);
     try {
       await edit(
         how === 'count'
-          ? {
-              action: 'updateSettings',
-              patch: { divisions: [...settings.divisions, u.division].sort((a, b) => a - b) },
-            }
+          ? { action: 'updateSettings', patch: await countPatch(u.division) }
           : { action: 'ignoreUncounted', uncountedId: u.id }
       );
       setNotice(

@@ -12,6 +12,8 @@ import { NeedsYouQueue } from './NeedsYouQueue';
 import type { BookContextValue } from './bookContextValue';
 
 vi.mock('../taxBook/bookClient', () => ({ editBook: vi.fn(async () => ({})), readAudit: vi.fn() }));
+const loadDivisions = vi.fn(async () => ({ cached: null, needsReauth: false }) as unknown);
+vi.mock('../wallet', () => ({ loadCorporationDivisions: () => loadDivisions() }));
 vi.mock('./statementMailing', () => ({
   mailTarget: vi.fn(),
   useCorporationName: () => 'Brass Anvil Corp',
@@ -123,6 +125,19 @@ describe('NeedsYouQueue (#6207)', () => {
     expect(editBook).toHaveBeenCalledWith(9, 98000001, {
       action: 'updateSettings',
       patch: { divisions: [1, 2] },
+    });
+  });
+
+  it("sends the counted division's name with it, so members see it at once", async () => {
+    loadDivisions.mockResolvedValueOnce({
+      cached: { data: { wallet: [{ division: 2, name: 'Market Funds' }] } },
+      needsReauth: false,
+    });
+    renderQueue([], { uncounted: [noted] });
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Count Division 2' }));
+    expect(editBook).toHaveBeenLastCalledWith(9, 98000001, {
+      action: 'updateSettings',
+      patch: { divisions: [1, 2], divisionNames: { 2: 'Market Funds' } },
     });
   });
 

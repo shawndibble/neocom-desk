@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { corpPayAccount, corpPayAccounts } from './corpPayAccount';
+import { corpPayAccount, corpPayAccounts, readsEveryDivision } from './corpPayAccount';
 
 const t = (key: string, opts?: Record<string, unknown>) =>
   opts ? `${key} ${JSON.stringify(opts)}` : key;
@@ -10,6 +10,14 @@ describe('corpPayAccounts (#6204)', () => {
       'miningTax.corpBook.pay.masterWallet',
       'MOON TAXES',
     ]);
+  });
+});
+
+describe('readsEveryDivision', () => {
+  it('is true only when the book reads all seven wallet divisions', () => {
+    expect(readsEveryDivision([7, 6, 5, 4, 3, 2, 1])).toBe(true);
+    expect(readsEveryDivision([1, 2, 3, 4, 5, 6])).toBe(false);
+    expect(readsEveryDivision([])).toBe(false);
   });
 });
 
