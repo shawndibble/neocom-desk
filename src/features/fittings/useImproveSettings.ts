@@ -40,6 +40,8 @@ import { CRYSTAL_FAMILY_ORES } from '@/engine/fittings/crystalChoice';
 import { IMPROVE_SORTS, type ImproveSort } from '@/engine/fittings/improveRows';
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { db } from '@/db';
+import { isPlainRecord } from '@/engine/guards';
+import type { SettingStore } from '@/lib/settingStore';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import type { ImproveConfig } from './improveSearch/types';
@@ -104,11 +106,10 @@ function keepByRole<V extends string>(
   raw: unknown,
   allowed: readonly V[]
 ): Partial<Record<HullRole, V>> | null {
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
-  const values = raw as Record<string, unknown>;
+  if (!isPlainRecord(raw)) return null;
   const kept: Partial<Record<HullRole, V>> = {};
   for (const role of HULL_ROLES) {
-    const value = values[role];
+    const value = raw[role];
     if (typeof value === 'string' && (allowed as readonly string[]).includes(value))
       kept[role] = value as V;
   }
@@ -236,6 +237,7 @@ const BY_ROLE = {
   job: IMPROVE_STORES.jobByRole,
   space: IMPROVE_STORES.spaceByRole,
 };
+type PerRoleField = keyof typeof BY_ROLE;
 
 /** The remembered Improve settings for one hull role: the goal, the row order, and the search's own. */
 export type ImproveSettingValues = Omit<ImproveConfig, PerFitField> & {
@@ -302,13 +304,15 @@ export function useImproveSettings(role: HullRole): {
   }, [stored, role]);
   const set = useCallback(
     async (patch: Partial<ImproveSettingValues>) => {
-      const writes = Object.entries(patch).map(([field, next]) => {
-        if (field in BY_ROLE) {
-          const store: ValueSetter = BY_ROLE[field as keyof typeof BY_ROLE];
+      const writes = (Object.keys(patch) as (keyof ImproveSettingValues)[]).map((field) => {
+        const next = patch[field];
+        if (next === undefined) return undefined;
+        if (isPerRole(field)) {
+          const store: ValueSetter = BY_ROLE[field];
           const byRole = store.getState().value as object;
           return store.getState().setValue({ ...byRole, [role]: next } as never);
         }
-        const store: ValueSetter = IMPROVE_STORES[field as keyof typeof IMPROVE_STORES];
+        const store: ValueSetter = FOR_ALL[field];
         return store.getState().setValue(next as never);
       });
       await Promise.all(writes);
@@ -317,6 +321,16 @@ export function useImproveSettings(role: HullRole): {
   );
   return { ready, value, set };
 }
+
+const isPerRole = (field: keyof ImproveSettingValues): field is PerRoleField => field in BY_ROLE;
+
+/**
+ * The stores of the settings kept for every hull, by field. Typed against
+ * `ImproveSettingValues`: a field with no store of its type fails to compile.
+ */
+const FOR_ALL: {
+  [K in Exclude<keyof ImproveSettingValues, PerRoleField>]: SettingStore<ImproveSettingValues[K]>;
+} = IMPROVE_STORES;
 
 /** A store written with a value already checked by `ImproveSettingValues`. */
 type ValueSetter = {
