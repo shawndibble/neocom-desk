@@ -1,5 +1,6 @@
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
 import type { DisplayRow } from '../groupRows';
+import { answeredByMember, isoDay } from './memberFlag';
 
 /** The Conflict days a miner can still fix, for the Tax tab: what they would cost, and the one to open first. */
 export interface ConflictSummary {
@@ -10,6 +11,15 @@ export interface ConflictSummary {
   /** The Conflict that resolves first: the one Review opens. */
   first: DisplayRow;
   firstCorpName: string;
+  /** `YYYY-MM-DD` the first one resolves to its corporation; empty when it carries no date. */
+  firstResolvesOn: string;
+  /**
+   * Of `days`, how many the member has already answered — told the corporation about, or had
+   * the ore's tax waived. They stay in `days` and `amount` because the 14-day clock does not
+   * stop for a dispute (`CONFLICT_RESOLVE_DAYS`, `attribution.ts`): the day still bills if
+   * nobody answers. Equal to `days` means there is nothing left for the member to press.
+   */
+  waiting: number;
 }
 
 const dayKey = (view: BookRowView) => `${view.characterId}:${view.date}:${view.solarSystemId}`;
@@ -18,33 +28,41 @@ const dayKey = (view: BookRowView) => `${view.characterId}:${view.date}:${view.s
  * Sums the Conflict rows in view, earliest-resolving first (one with no date last), so a miner
  * sees the bill a Conflict turns into before the next Statement does. Null when there are none.
  *
- * A day the member has already told the corporation about, or that an officer has answered by
- * waiving the ore's tax, is left out: the prompt asks them to review what they can still fix,
- * and there is nothing left for them to do on those. A `rejected` day stays in — the officer
- * handed it back, so it needs them again.
+ * Days the member has already answered are counted in `waiting` but still in `days` and
+ * `amount`. Dropping them would have been the obvious way to stop nagging someone who has done
+ * all they can — and it would have been wrong: the day keeps resolving to the corporation 14
+ * days after it closed whether or not a dispute is open, so hiding it would have replaced a
+ * warning with "No moon mining tax outstanding" right up to the day it billed. The caller
+ * states the deadline calmly instead.
  */
 export function summarizeConflicts(rows: readonly DisplayRow[]): ConflictSummary | null {
   const conflicts = rows
     .flatMap((dr) =>
-      dr.corp?.kind === 'row' &&
-      dr.corp.view.state === 'conflict' &&
-      dr.corp.view.flagged?.state !== 'sent' &&
-      dr.corp.view.flagged?.state !== 'dismissed'
-        ? [{ dr, corp: dr.corp }]
-        : []
+      dr.corp?.kind === 'row' && dr.corp.view.state === 'conflict' ? [{ dr, corp: dr.corp }] : []
     )
     .sort(
       (a, b) =>
         Number(!a.corp.view.resolvesAt) - Number(!b.corp.view.resolvesAt) ||
         (a.corp.view.resolvesAt ?? '').localeCompare(b.corp.view.resolvesAt ?? '')
     );
-  const head = conflicts[0];
+  // Lead with one the member can still act on; only when every day is waiting does Review open
+  // one of those.
+  const head = conflicts.find((c) => !answeredByMember(c.corp.view)) ?? conflicts[0];
   if (!head) return null;
+  // Per day, not per line: a day is only waiting once every book contesting it has been
+  // answered, so one unanswered line still asks the member to look.
+  const byDay = new Map<string, boolean>();
+  for (const c of conflicts) {
+    const key = dayKey(c.corp.view);
+    byDay.set(key, (byDay.get(key) ?? true) && answeredByMember(c.corp.view));
+  }
   return {
-    days: new Set(conflicts.map((c) => dayKey(c.corp.view))).size,
+    days: byDay.size,
+    waiting: [...byDay.values()].filter(Boolean).length,
     amount: conflicts.reduce((sum, c) => sum + c.corp.view.billed, 0),
     first: head.dr,
     firstCorpName: head.corp.corpName,
+    firstResolvesOn: isoDay(head.corp.view.resolvesAt),
   };
 }
 

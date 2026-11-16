@@ -175,6 +175,22 @@ export function OwedBalances({
       )}
 
       {slimPrompts &&
+        unlinkedPaymentCount > 0 &&
+        promptRow(
+          'unlinked',
+          <span className="text-base font-semibold">
+            {t('miningTax.unlinkedPaymentsCardTitle')}
+          </span>,
+          <span className={eyebrowClassName}>
+            {t('miningTax.unlinkedPaymentsCount', { count: unlinkedPaymentCount })}
+          </span>,
+          t('miningTax.unlinkedPaymentsHint'),
+          <Button className="shrink-0" onClick={onReviewPayments}>
+            {t('miningTax.linkPaymentAction')}
+          </Button>
+        )}
+
+      {slimPrompts &&
         unassigned.entryCount > 0 &&
         promptRow(
           'unassigned',
@@ -193,22 +209,6 @@ export function OwedBalances({
             {t('miningTax.assignNextAction')}
           </Button>
         )}
-      {slimPrompts &&
-        unlinkedPaymentCount > 0 &&
-        promptRow(
-          'unlinked',
-          <span className="text-base font-semibold">
-            {t('miningTax.unlinkedPaymentsCardTitle')}
-          </span>,
-          <span className={eyebrowClassName}>
-            {t('miningTax.unlinkedPaymentsCount', { count: unlinkedPaymentCount })}
-          </span>,
-          t('miningTax.unlinkedPaymentsHint'),
-          <Button className="shrink-0" onClick={onReviewPayments}>
-            {t('miningTax.linkPaymentAction')}
-          </Button>
-        )}
-
       {cardCount > 0 && !slimPrompts && (
         <div className={cx('grid grid-cols-1 gap-2', !wide && 'sm:grid-cols-2 xl:grid-cols-3')}>
           {/* Before the owed cards, not after them: a payment that is already sent but unlinked
@@ -352,14 +352,35 @@ export function OwedBalances({
       {conflicts &&
         promptRow(
           'conflicts',
-          <span className="text-base font-semibold text-warning">
-            {t('miningTax.conflictsTitle')}
+          <span
+            className={cx(
+              'text-base font-semibold',
+              // Every day already answered: the member cannot move any of them, so this states
+              // a deadline rather than asking for work. It is never hidden — the 14-day clock
+              // runs whether or not a dispute is open.
+              conflicts.waiting === conflicts.days ? 'text-text' : 'text-warning'
+            )}
+          >
+            {t(
+              conflicts.waiting === conflicts.days
+                ? 'miningTax.conflictsWaitingTitle'
+                : 'miningTax.conflictsTitle'
+            )}
           </span>,
           <span className="text-sm font-semibold tabular-nums">
             {formatIsk(conflicts.amount, 0)}
             <span className="ml-1 text-xs font-normal text-text-dim">ISK</span>
           </span>,
-          t('miningTax.conflictsHint', { count: conflicts.days, corp: conflicts.firstCorpName }),
+          conflicts.waiting === conflicts.days
+            ? t('miningTax.conflictsWaitingHint', {
+                count: conflicts.days,
+                corp: conflicts.firstCorpName,
+                date: conflicts.firstResolvesOn,
+              })
+            : t('miningTax.conflictsHint', {
+                count: conflicts.days,
+                corp: conflicts.firstCorpName,
+              }),
           onReviewConflicts && (
             <Button className="shrink-0" onClick={onReviewConflicts}>
               {t('miningTax.conflictsReview')}

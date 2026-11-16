@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { BookRowView, ConflictCause } from '@/engine/corpTaxBook/personal';
 import { formatIsk } from '@/lib/isk';
 import type { CorpRowInfo } from './corpRows';
+import { answeredByMember, isoDay } from './memberFlag';
 
 export type PillState =
   | 'pending'
@@ -34,14 +35,12 @@ export const PILL_KEY: Record<PillState, string> = {
  * Conflict with the two ways out still on it.
  */
 export function flaggedPillState(view: BookRowView): 'sent' | 'oreWaived' | undefined {
-  if (view.state !== 'conflict') return undefined;
-  if (view.flagged?.state === 'sent') return 'sent';
-  if (view.flagged?.state === 'dismissed') return 'oreWaived';
-  return undefined;
+  if (view.state !== 'conflict' || !answeredByMember(view)) return undefined;
+  return view.flagged?.state === 'sent' ? 'sent' : 'oreWaived';
 }
 
 /** The conflict's resolution day, as the row prints it. */
-export const resolvesOn = (iso: string | undefined) => (iso ? iso.slice(0, 10) : '');
+export const resolvesOn = isoDay;
 
 export function useCorpStateLabel() {
   const { t } = useTranslation();
@@ -96,7 +95,7 @@ export function useCorpStateHint() {
         corp: corpName,
         date: resolvesOn(view.resolvesAt),
         reason: view.dismissalReason ?? '',
-        sentOn: view.flagged?.at.slice(0, 10) ?? '',
+        sentOn: isoDay(view.flagged?.at),
         flagReason: view.flagged?.reason ?? '',
       });
     },

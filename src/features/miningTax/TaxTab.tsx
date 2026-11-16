@@ -243,6 +243,14 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     settleUpRowsFor
   );
 
+  // A Corp Tax Book Payee credits itself from the corporation's wallet journal and hides Link
+  // payment, so a suggestion aimed at one can be acted on nowhere: counting it on the tile
+  // while its card stayed silent was the double-pay this guard exists to stop.
+  const linkable = useMemo(
+    () => linkSuggestions.filter((s) => !isCorpPayeeId(s.balance.payee.id)),
+    [linkSuggestions]
+  );
+
   const attentionItems = useTaxAttentionItems({
     data,
     resolvedCharacterFilter,
@@ -353,7 +361,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                 <OwedBalances
                   balances={balances}
                   unassigned={unassigned}
-                  unlinkedPaymentCount={linkSuggestions.length}
+                  unlinkedPaymentCount={linkable.length}
                   characterNameOf={
                     characters.length > 1
                       ? (balance) =>
@@ -376,13 +384,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                       : undefined
                   }
                   unlinkedOf={(balance) => {
-                    // A Corp Tax Book credits itself from the corp's wallet journal and hides
-                    // Link payment, so its card says this through `uncreditedOf` instead:
-                    // pointing at a button that isn't there would be worse than saying nothing.
-                    if (isCorpPayeeId(balance.payee.id)) return undefined;
-                    const mine = linkSuggestions.filter(
-                      (s) => s.balance.payee.id === balance.payee.id
-                    );
+                    const mine = linkable.filter((s) => s.balance.payee.id === balance.payee.id);
                     if (mine.length === 0) return undefined;
                     return {
                       count: mine.length,

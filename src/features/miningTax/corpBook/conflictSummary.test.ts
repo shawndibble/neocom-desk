@@ -41,9 +41,9 @@ describe('summarizeConflicts', () => {
     expect(out?.first).toBe(soon);
   });
 
-  // #6206: once the member has acted, the prompt is asking them to review something they
-  // cannot move. The officer's answer is what brings it back.
-  it('leaves out a day already sent to the corporation, and one whose ore it waived', () => {
+  // #6206: a day the member has answered still bills on its own 14-day clock, so it stays
+  // counted — `waiting` is what lets the caller stop calling it a warning.
+  it('counts a day sent to the corporation, and one whose ore it waived, as waiting', () => {
     const sent = row(
       view({ id: 'sent', billed: 300, flagged: { state: 'sent', at: '2026-11-01T10:00:00Z' } })
     );
@@ -55,10 +55,14 @@ describe('summarizeConflicts', () => {
         flagged: { state: 'dismissed', at: '2026-11-02T10:00:00Z', reason: 'Fair enough' },
       })
     );
-    expect(summarizeConflicts([sent, waived])).toBeNull();
+    expect(summarizeConflicts([sent, waived])).toMatchObject({
+      days: 2,
+      waiting: 2,
+      amount: 700,
+    });
   });
 
-  it('keeps a day the corporation handed back, so the member answers it again', () => {
+  it('does not count a day the corporation handed back, so it still reads as a warning', () => {
     const rejected = row(
       view({
         id: 'rejected',
@@ -66,7 +70,33 @@ describe('summarizeConflicts', () => {
         flagged: { state: 'rejected', at: '2026-11-02T10:00:00Z', reason: 'Book stands' },
       })
     );
-    expect(summarizeConflicts([rejected])).toMatchObject({ days: 1, amount: 250 });
+    expect(summarizeConflicts([rejected])).toMatchObject({ days: 1, waiting: 0, amount: 250 });
+  });
+
+  it('leads with a day the member can still act on, and reports when it resolves', () => {
+    const sent = row(
+      view({
+        id: 'sent',
+        billed: 300,
+        resolvesAt: '2026-11-10T00:00:00Z',
+        flagged: { state: 'sent', at: '2026-11-01T10:00:00Z' },
+      })
+    );
+    const open = row(
+      view({ id: 'open', billed: 100, date: '2026-10-31', resolvesAt: '2026-11-14T00:00:00Z' })
+    );
+    const out = summarizeConflicts([sent, open]);
+    expect(out).toMatchObject({ days: 2, waiting: 1, firstResolvesOn: '2026-11-14' });
+    expect(out?.first).toBe(open);
+  });
+
+  // One book answered, another on the same day not: the day still needs the member.
+  it('only calls a day waiting once every book contesting it has been answered', () => {
+    const answered = row(
+      view({ id: 'a', billed: 300, flagged: { state: 'sent', at: '2026-11-01T10:00:00Z' } })
+    );
+    const open = row(view({ id: 'b', billed: 200 }), 'Other');
+    expect(summarizeConflicts([answered, open])).toMatchObject({ days: 1, waiting: 0 });
   });
 });
 

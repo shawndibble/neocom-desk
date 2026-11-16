@@ -103,9 +103,11 @@ describe('OwedBalances Conflicts line', () => {
     renderBalances([balance('a', 0)], {
       conflicts: {
         days: 1,
+        waiting: 0,
         amount: 4_271_257,
         first: {} as never,
         firstCorpName: 'Bureau of Unified Harvesting',
+        firstResolvesOn: '2026-11-12',
       },
       onReviewConflicts,
     });
@@ -125,9 +127,11 @@ describe('OwedBalances Conflicts line', () => {
     renderBalances([balance('a', 1_000_000)], {
       conflicts: {
         days: 3,
+        waiting: 0,
         amount: 900_000,
         first: {} as never,
         firstCorpName: 'Brass',
+        firstResolvesOn: '2026-11-12',
       },
     });
     expect(
@@ -209,5 +213,35 @@ describe('OwedBalances with payments still to link', () => {
       unlinkedOf: (b) => (b.payee.id === 'a' ? { count: 1, amount: 4_000_000 } : undefined),
     });
     expect(screen.getAllByText(/isn't linked yet/)).toHaveLength(1);
+  });
+});
+
+describe('OwedBalances Conflicts the member has already answered', () => {
+  const waiting = {
+    days: 1,
+    waiting: 1,
+    amount: 4_271_257,
+    first: {} as never,
+    firstCorpName: 'Bureau of Unified Harvesting',
+    firstResolvesOn: '2026-11-12',
+  };
+
+  // The 14-day clock runs whether or not a dispute is open, so this must never disappear.
+  it('still shows the bill and its date, but stops reading as a warning', () => {
+    renderBalances([balance('a', 0)], { conflicts: waiting });
+    expect(screen.queryByText('No moon mining tax outstanding')).not.toBeInTheDocument();
+    const title = screen.getByText('Waiting on the corp');
+    expect(title.className).not.toMatch(/text-warning/);
+    expect(screen.getByText('4,271,257')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'You have told Bureau of Unified Harvesting. It still bills on 2026-11-12 unless an officer answers first, so check back.'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('still reads as a warning while one day is unanswered', () => {
+    renderBalances([balance('a', 0)], { conflicts: { ...waiting, days: 2, waiting: 1 } });
+    expect(screen.getByText('Conflicts').className).toMatch(/text-warning/);
   });
 });

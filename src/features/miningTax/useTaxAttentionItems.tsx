@@ -25,7 +25,7 @@ import { tagAsIgnored, tagAsMoonOre } from '@/features/miningTax/typeOverrides';
 import type { DisplayRow } from '@/features/miningTax/groupRows';
 import type { PayeeRecord } from '@/db';
 import type { TradeHub } from '@/market/hubs';
-import { extraDuplicateRow } from './duplicateRows';
+import { duplicateRowToOpen } from './duplicateRowToOpen';
 import { PricingGapLinks } from './PricingGapLinks';
 import { UnpricedOreDetail } from './UnpricedOreDetail';
 import { hasReachableUnpricedHub } from './unpricedHubs';
@@ -199,14 +199,14 @@ export function useTaxAttentionItems({
                 systemNames,
                 row.entry.solarSystemId
               )}`;
-              const extra = extraDuplicateRow(row.duplicateAssignmentIds, displayRows);
+              const extra = duplicateRowToOpen(row.duplicateAssignmentIds, displayRows);
               return (
                 <li key={`${row.characterId}:${row.entry.date}:${row.entry.solarSystemId}`}>
                   {extra ? (
                     <button
                       type="button"
                       className={`text-left ${inlineLinkClassName}`}
-                      aria-label={t('miningTax.duplicateUnassign', { entry: label })}
+                      aria-label={t('miningTax.duplicateOpen', { entry: label })}
                       onClick={() => openUnassign(extra)}
                     >
                       {label}
