@@ -41,6 +41,7 @@ import {
   type LibrarySourcePick,
 } from '@/engine/fittings/myFittings';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { NO_HOVER_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { enumParam, textParam } from '@/lib/urlState';
@@ -55,7 +56,6 @@ import { setFittingNotes } from './myFittings';
 import { FittingExportNotice } from './FittingExportMenu';
 import { DeleteFittingModal, RenameFittingModal } from './SavedFittingModals';
 import { useLibraryRowActions } from './useLibraryRowActions';
-import { ADD_PREVIEW_DELAY_MS } from './useModuleAddPreview';
 import { fittingCompareHref } from './fittingRoutes';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import type { FittingLibrarySource } from './useFittingPicker';
@@ -104,6 +104,13 @@ interface FittingStartScreenProps {
   /** The tab bar's `tabsId` and selected tab, so the content under it is that tab's panel. */
   pageTabsPanel?: { tabsId: string; tabId: string };
 }
+
+/**
+ * How long the pointer must rest on a row before the preview takes it: longer
+ * than a module's add preview, since each pick works out a whole Fitting and a
+ * pointer sweeping the list should pick none of the rows it passes.
+ */
+export const LIST_PREVIEW_DELAY_MS = 275;
 
 /**
  * The page's search, in the URL as `?q=` (ADR 0015), so Back from an opened
@@ -165,8 +172,9 @@ export function FittingStartScreen({
   const navigate = useNavigate();
   const isPhone = useIsPhone();
   const page = variant === 'page';
-  // A phone has no room for a preview beside the list.
-  const previewing = preview && !isPhone;
+  const noHover = useMediaQuery(NO_HOVER_QUERY);
+  // A phone has no room for a preview beside the list; a touch tablet no hover to preview with.
+  const previewing = preview && !isPhone && !noHover;
   // Only the page's search is URL state. A dialog's (the editor's Open, the
   // Compare picker) is a passing pick over another page's URL: written there,
   // it would outlive the dialog and come back the next time it opened.
@@ -375,7 +383,7 @@ export function FittingStartScreen({
                   cancelHover();
                   hover.current = {
                     rowId: row.id,
-                    timer: setTimeout(() => setSelectedId(row.id), ADD_PREVIEW_DELAY_MS),
+                    timer: setTimeout(() => setSelectedId(row.id), LIST_PREVIEW_DELAY_MS),
                   };
                 }
               : undefined
@@ -618,7 +626,6 @@ export function FittingStartScreen({
             {previewing &&
               (selected ? (
                 <FittingPreview
-                  key={selected.id}
                   row={selected}
                   catalogue={catalogue}
                   characterId={characterId}

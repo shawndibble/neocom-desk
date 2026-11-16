@@ -78,6 +78,41 @@ function useDurationFields(
   return { text, onChange, onBlur };
 }
 
+/**
+ * The end-time box. A `datetime-local` reports every segment as it is typed
+ * (the year runs 0002, 0020, 0202, 2026), so a parseable value is often one in
+ * the past: that is never saved (it would end a live accelerator mid-typing),
+ * the text stays as typed, and `ended` says why nothing applied.
+ */
+function useEndTimeField(
+  expiresAt: number | null,
+  timeZone: 'UTC' | undefined,
+  onCommit: (expiresAt: number | null) => boolean
+) {
+  const [draft, setDraft] = useState<{ syncedTo: number | null; text: string } | null>(null);
+  const typing = draft !== null && draft.syncedTo === expiresAt;
+  const text = typing
+    ? draft.text
+    : expiresAt === null
+      ? ''
+      : instantToInputValue(expiresAt, timeZone);
+  const typedAt = typing ? inputValueToInstant(draft.text, timeZone) : null;
+  // eslint-disable-next-line react-hooks/purity -- display-only: whether the typed time has passed
+  const ended = typedAt !== null && typedAt <= Date.now();
+
+  const onChange = (raw: string): void => {
+    const at = inputValueToInstant(raw, timeZone);
+    if (at === null || at <= Date.now()) {
+      setDraft({ syncedTo: expiresAt, text: raw });
+      return;
+    }
+    setDraft({ syncedTo: onCommit(at) ? at : expiresAt, text: raw });
+  };
+
+  // Leaving the box keeps what was typed (and why it didn't apply); only a mode switch drops it.
+  return { text, ended, onChange, reset: () => setDraft(null) };
+}
+
 export interface AcceleratorFieldsProps {
   bonus: number;
   expiresAt: number | null;
@@ -112,6 +147,8 @@ export function AcceleratorFields({
   const describedBy = hint ? { 'aria-describedby': hintId } : {};
   const [mode, setMode] = useState<EntryMode>('remaining');
   const expiresIn = useDurationFields(expiresAt, onExpiresChange);
+  const endsAt = useEndTimeField(expiresAt, timeZone, onExpiresChange);
+  const endedId = useId();
 
   return (
     <div className="space-y-2">
@@ -140,22 +177,37 @@ export function AcceleratorFields({
           </div>
         </div>
       ) : (
-        <label className="flex items-center justify-between gap-2" htmlFor={modeId}>
-          {t('accelerator.expiresAt')}
-          <TextInput
-            id={modeId}
-            size="md"
-            type="datetime-local"
-            value={expiresAt === null ? '' : instantToInputValue(expiresAt, timeZone)}
-            onChange={(e) => {
-              const at = inputValueToInstant(e.target.value, timeZone);
-              if (at !== null) onExpiresChange(at);
-            }}
-            {...describedBy}
-            {...invalidProps}
-            className="w-auto"
-          />
-        </label>
+        <div className="space-y-1">
+          <label className="flex items-center justify-between gap-2" htmlFor={modeId}>
+            {t('accelerator.expiresAt')}
+            <TextInput
+              id={modeId}
+              size="md"
+              type="datetime-local"
+              value={endsAt.text}
+              onChange={(e) => endsAt.onChange(e.target.value)}
+              {...describedBy}
+              {...invalidProps}
+              {...(endsAt.ended
+                ? {
+                    'aria-invalid': true,
+                    'aria-describedby': [
+                      invalidProps?.['aria-describedby'] ?? describedBy['aria-describedby'],
+                      endedId,
+                    ]
+                      .filter(Boolean)
+                      .join(' '),
+                  }
+                : {})}
+              className="w-auto"
+            />
+          </label>
+          {endsAt.ended && (
+            <p id={endedId} className="text-[0.6875rem] text-warning">
+              {t('accelerator.alreadyEnded')}
+            </p>
+          )}
+        </div>
       )}
       {hint && <div id={hintId}>{hint}</div>}
       {!bonusLocked && (
@@ -177,7 +229,10 @@ export function AcceleratorFields({
         <Button
           size="sm"
           variant="ghost"
-          onClick={() => setMode(mode === 'remaining' ? 'expires' : 'remaining')}
+          onClick={() => {
+            endsAt.reset();
+            setMode(mode === 'remaining' ? 'expires' : 'remaining');
+          }}
         >
           {mode === 'remaining' ? t('accelerator.useEndTime') : t('accelerator.useTimeLeft')}
         </Button>

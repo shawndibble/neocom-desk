@@ -2,7 +2,9 @@
  * The active Character's corporation's Doctrine Fits as Fittings library rows (#6202). Members
  * read them through a member-verified callable (the Firestore rules keep them officers-only), so a
  * Character who left the corp, or one in a corp without SRP, simply has none: no rows, no empty
- * state. Loaded when the library opens and on its refresh, never live.
+ * state. Loaded when the library opens and on its refresh, never live; a load is kept for
+ * `DOCTRINE_FITS_TTL_MS` per Character and corp, so the page, its Open dialog and the Compare
+ * picker mounting one after another call the backend once. The refresh always reads again.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -17,6 +19,7 @@ import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import { fittingFromDoctrineSnapshot } from '@/engine/srpDoctrineFit';
 import { srpDoctrineBackendOverride } from '@/features/corp/srpDoctrineBackendOverride';
 import type { MemberDoctrineFit } from '@/features/corp/srpTypes';
+import { MINUTE_MS } from '@/lib/age';
 import { typeNameOr } from '@/lib/typeNameOr';
 import { loadFittingSlots, loadTypes } from '@/sde/loadSde';
 import type { LibraryRow } from './useLibraryFittings';
@@ -68,6 +71,17 @@ async function loadRows(characterId: number, corporationId: number, t: TFunction
   );
 }
 
+/** How long a Character's loaded Doctrine Fits stand before a mount reads them again. */
+export const DOCTRINE_FITS_TTL_MS = 5 * MINUTE_MS;
+
+/** This session's loads, by `characterId:corporationId`. */
+const loaded = new Map<string, { at: number; rows: DoctrineRow[] }>();
+
+/** Forgets every load (tests: one file's mounts must not feed the next test's). */
+export function clearDoctrineFitsCache(): void {
+  loaded.clear();
+}
+
 /** The Character's corp Doctrine Fits as rows, and a refresh. Nothing loads without sync or a player corp. */
 export function useCorpDoctrineFittings(characterId: number | null) {
   const { t } = useTranslation();
@@ -83,33 +97,45 @@ export function useCorpDoctrineFittings(characterId: number | null) {
   } | null>(null);
   const requestIdRef = useRef(0);
 
-  const refresh = useCallback(async () => {
-    const requestId = ++requestIdRef.current;
-    if (
-      characterId === null ||
-      corporationId == null ||
-      isNpcCorporationId(corporationId) ||
-      // SRP lives in the cloud backend: none configured, no Doctrine Fits (a story's stand-in aside)
-      (!isSyncConfigured() && !srpDoctrineBackendOverride())
-    ) {
-      setState(null);
-      return;
-    }
-    try {
-      const rows = await loadRows(characterId, corporationId, t);
-      if (requestId === requestIdRef.current) {
-        setState({ forCharacter: characterId, forCorporation: corporationId, rows });
+  const load = useCallback(
+    async (force: boolean) => {
+      const requestId = ++requestIdRef.current;
+      if (
+        characterId === null ||
+        corporationId == null ||
+        isNpcCorporationId(corporationId) ||
+        // SRP lives in the cloud backend: none configured, no Doctrine Fits (a story's stand-in aside)
+        (!isSyncConfigured() && !srpDoctrineBackendOverride())
+      ) {
+        setState(null);
+        return;
       }
-    } catch {
-      // Not a member any more, offline, or signed out of sync: no Doctrine rows, the rest stands.
-      if (requestId === requestIdRef.current) setState(null);
-    }
-  }, [characterId, corporationId, t]);
+      const key = `${characterId}:${corporationId}`;
+      const cached = loaded.get(key);
+      if (!force && cached && Date.now() - cached.at < DOCTRINE_FITS_TTL_MS) {
+        setState({ forCharacter: characterId, forCorporation: corporationId, rows: cached.rows });
+        return;
+      }
+      try {
+        const rows = await loadRows(characterId, corporationId, t);
+        loaded.set(key, { at: Date.now(), rows });
+        if (requestId === requestIdRef.current) {
+          setState({ forCharacter: characterId, forCorporation: corporationId, rows });
+        }
+      } catch {
+        // Not a member any more, offline, or signed out of sync: no Doctrine rows, the rest stands.
+        loaded.delete(key);
+        if (requestId === requestIdRef.current) setState(null);
+      }
+    },
+    [characterId, corporationId, t]
+  );
+  const refresh = useCallback(() => load(true), [load]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- a Character or corp change re-reads the corp's fits, not a render-time derivation
-    void refresh();
-  }, [refresh]);
+    void load(false);
+  }, [load]);
 
   // A previous Character's (or corp's) fits are not this one's until its own land.
   const current =

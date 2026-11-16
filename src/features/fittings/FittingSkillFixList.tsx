@@ -8,8 +8,9 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import type { SkillFix } from '@/engine/fittings/skillFixes';
 import { scheduledSkillTargets } from '@/engine/fittings/skillGains';
+import { splitSharedSchedule } from '@/engine/fittings/sharedSchedule';
 import { romanLevel } from '@/engine/projection';
-import type { EngineSkill, PlanEntry, TrainedSkill } from '@/engine/types';
+import type { EngineSkill, PlanEntry, ScheduledStep, TrainedSkill } from '@/engine/types';
 import type { SkillPlanRecord } from '@/db';
 import { SkillLink } from '@/features/entities';
 import { formatCountdown } from '@/lib/duration';
@@ -32,6 +33,30 @@ interface Props {
   onAdd: (entries: readonly PlanEntry[]) => void;
   /** Why each row fixes the fit; default: it brings the Fitting under budget. */
   reason?: string;
+  /**
+   * The fixes are all needed (missing skills), so they train on one schedule:
+   * each row shows its share, a shared prerequisite counted once, and the rows
+   * add up to the "Missing N skills" total. Otherwise each fix is an
+   * alternative and is timed alone.
+   */
+  together?: boolean;
+}
+
+/** Each fix's schedule: its share of one combined schedule, or alone; null before skills load. */
+function fixSchedules(
+  fixes: readonly Pick<SkillFix, 'entries'>[],
+  scheduleEntriesFor: ScheduleEntries | null,
+  together: boolean
+): (readonly ScheduledStep[] | null)[] {
+  const solo = fixes.map((fix) => scheduleEntriesFor?.(fix.entries) ?? null);
+  if (!together || fixes.length < 2) return solo;
+  const combined = scheduleEntriesFor?.(fixes.flatMap((fix) => fix.entries)) ?? null;
+  if (combined === null || solo.some((steps) => steps === null)) return fixes.map(() => null);
+  return splitSharedSchedule(
+    fixes.map((fix) => fix.entries),
+    combined,
+    solo.map((steps) => steps ?? [])
+  );
 }
 
 /** Quickest to train first; a fix not yet timed last. */
@@ -44,12 +69,14 @@ export function SkillFixList({
   plannedLevels,
   onAdd,
   reason,
+  together = false,
 }: Props) {
   const { t } = useTranslation();
   const skillName = (id: number) => skills?.get(id)?.name ?? `#${id}`;
+  const schedules = fixSchedules(fixes, scheduleEntriesFor, together);
   const rows = fixes
-    .map((fix) => {
-      const scheduled = scheduleEntriesFor?.(fix.entries) ?? null;
+    .map((fix, index) => {
+      const scheduled = schedules[index];
       const seconds = scheduled?.reduce((sum, step) => sum + step.seconds, 0) ?? null;
       // A step for a skill the fix doesn't name is a prerequisite.
       const includesPrerequisites =

@@ -47,8 +47,13 @@ export function CharacterAcceleratorEditor({
         if (record) void setCharacterAccelerator(characterId, next, record.expiresAt);
       }}
       onExpiresChange={(expiresAt) => {
-        if (expiresAt === null) void clearCharacterAccelerator(characterId);
-        else void setCharacterAccelerator(characterId, bonus, expiresAt);
+        if (expiresAt === null) {
+          void clearCharacterAccelerator(characterId);
+          return true;
+        }
+        // A past expiry would end a live record and purge it: never saved.
+        if (expiresAt <= Date.now()) return false;
+        void setCharacterAccelerator(characterId, bonus, expiresAt);
         return true;
       }}
       hint={

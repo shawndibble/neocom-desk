@@ -2817,7 +2817,8 @@
     "clear": "Clear",
     "useEndTime": "Enter end time instead",
     "useTimeLeft": "Enter time left instead",
-    "expiresAt": "Ends at"
+    "expiresAt": "Ends at",
+    "alreadyEnded": "That time has already passed."
   },
   "plans": {
     "closest": {

@@ -1,4 +1,4 @@
-import { Suspense, useRef, useState } from 'react';
+import { Suspense, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { db } from '@/db';
@@ -48,7 +48,7 @@ export function NewPlanSplitButton({
   certified?: { open: boolean; onOpenChange: (open: boolean) => void };
   /** Adds "from your skill queue, optimized" (the phone's home for Optimize queue); omitted hides it. */
   onOptimizeQueue?: () => void;
-  /** The in-game queue is empty: the item stays listed but disabled. */
+  /** The in-game queue is empty: the item stays listed, disabled, with the reason beneath it. */
   queueEmpty?: boolean;
 }) {
   const { t } = useTranslation();
@@ -63,6 +63,7 @@ export function NewPlanSplitButton({
     () => new URLSearchParams(location.search).get('browse') === 'community'
   );
   const copyingFromCommunity = useRef(false);
+  const queueEmptyId = useId();
 
   function syncAfterEdit() {
     if (isSyncConfigured()) scheduleSync(activeCharacterId, { collections: ['plans'] });
@@ -144,10 +145,19 @@ export function NewPlanSplitButton({
             </DropdownMenuItem>
             {onOptimizeQueue && (
               <DropdownMenuItem
+                aria-label={t('plans.fromQueueOptimizedItem')}
                 disabled={queueEmpty}
                 onSelect={() => newPlanMenu.run(onOptimizeQueue)}
+                // A phone has no hover for the desktop button's tooltip: the reason is printed.
+                aria-describedby={queueEmpty ? queueEmptyId : undefined}
+                className={queueEmpty ? 'flex-col items-start' : undefined}
               >
-                {t('plans.fromQueueOptimizedItem')}
+                <span className="block">{t('plans.fromQueueOptimizedItem')}</span>
+                {queueEmpty && (
+                  <span id={queueEmptyId} className="block text-[0.6875rem] text-text-dim">
+                    {t('plans.optimizeQueueEmptyTip')}
+                  </span>
+                )}
               </DropdownMenuItem>
             )}
           </DropdownMenuContent>
