@@ -340,12 +340,12 @@ export function NeedsYouQueue() {
               const statuses = transfers.map((tr, k) =>
                 transferStatus(t, tr, d.checks?.[k], miner.characterIds, ownIds, journals)
               );
-              const paidToYou = transfers.some((tr) => paidToOwn(tr, ownIds) !== undefined);
+              const toYou = transfers.filter((tr) => paidToOwn(tr, ownIds) !== undefined);
+              const paidToYou = toYou.length > 0;
               const ownStatuses = statuses.filter((st) => st?.own);
               const foundInYours =
                 ownStatuses.length > 0 && ownStatuses.every((st) => st?.own?.found);
               const missingInYours = ownStatuses.some((st) => st?.own?.found === false);
-              const claimed = d.amount ?? (transfers.length > 0 ? sumOf(transfers) : item.owed);
               const divisionToCount = statuses.find((st) => st?.division !== undefined)?.division;
               const keepBill = () => setOpen({ kind: 'reject', item, miner });
               const record = () => setOpen({ kind: 'confirm', item, miner });
@@ -373,7 +373,8 @@ export function NeedsYouQueue() {
                       {paidToYou
                         ? t('corpTaxBook.moons.needs.paidToYou.title', {
                             name: nameOf(item.minerId),
-                            amount: isk(claimed),
+                            // Only what went to this officer: the rest went to the corporation.
+                            amount: isk(sumOf(toYou)),
                           })
                         : t('corpTaxBook.moons.needs.declaration.title', {
                             name: nameOf(item.minerId),

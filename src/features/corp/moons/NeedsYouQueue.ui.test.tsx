@@ -510,6 +510,25 @@ describe('NeedsYouQueue (#6207)', () => {
         expect(wallet.loadWalletJournalHistory).toHaveBeenCalledTimes(1);
         expect(wallet.loadWalletJournalHistory).toHaveBeenCalledWith(4242);
       });
+      it('names only what went to you when the rest went to the corporation', async () => {
+        ownCharacters.ids = [4242];
+        wallet.loadWalletJournalHistory.mockResolvedValueOnce({
+          cached: { data: [journalEntry] },
+          needsReauth: false,
+        });
+        renderQueue([
+          claim({
+            transfers: [
+              tr(54, { amount: 3_000_000 }),
+              tr(55, { recipient: 'character', recipientId: 4242 }),
+            ],
+            checks: [{ result: 'notFound' }, { result: 'person' }],
+          }),
+        ]);
+        expect(
+          await screen.findByText(/^Pilot 7 says they paid you 10,000,000 as tax$/)
+        ).toBeInTheDocument();
+      });
       it('says so when it is not in your wallet, back to the oldest entry read', async () => {
         ownCharacters.ids = [4242];
         wallet.loadWalletJournalHistory.mockResolvedValueOnce({
