@@ -71,7 +71,7 @@ export function ImproveResults({
   const sortLabelId = useId();
   const { result } = state;
   const { chosen, setTicked } = selection;
-  const lead = { goal, hold: settings.hold, target };
+  const lead = { goal, hold: settings.value.hold, target };
   const bestFound = bestFoundLine(t, lead, result, state.fitAsIs ?? state.before);
   const makeover = state.makeover;
   const singleGains = useMemo(
@@ -88,7 +88,7 @@ export function ImproveResults({
       options={options}
       own={state.before}
       section={section}
-      sort={settings.sort}
+      sort={settings.value.sort}
       labels={labels}
       selection={selection}
       lead={lead}
@@ -126,7 +126,7 @@ export function ImproveResults({
             <span className="text-text-dim">
               {' '}
               {t('fittings.improve.bestCrystals', {
-                ores: (CRYSTAL_FAMILY_ORES[settings.oreFamily] ?? []).join(', '),
+                ores: (CRYSTAL_FAMILY_ORES[settings.value.oreFamily] ?? []).join(', '),
               })}
             </span>
           )}
@@ -145,8 +145,8 @@ export function ImproveResults({
           <span aria-hidden="true">:</span>
         </span>
         <Select
-          value={settings.sort}
-          onValueChange={(value) => settings.onSortChange(value as ImproveSort)}
+          value={settings.value.sort}
+          onValueChange={(value) => settings.onChange({ sort: value as ImproveSort })}
         >
           <SelectTrigger size="sm" aria-labelledby={sortLabelId} className="w-36">
             <SelectValue />
@@ -203,7 +203,7 @@ export function ImproveResults({
           <ImproveSelectionSummary
             summary={check.summary}
             checked={check.checked}
-            iskBudget={settings.iskBudget}
+            iskBudget={settings.value.iskBudget}
           />
         )}
         {(check.overruns || tickedCovers.length > 0) && (

@@ -20,7 +20,7 @@ const result = {
   checked: 3,
 } as unknown as ImproveResult;
 
-const nothing = (reach: ImproveSettings['reach'], onSearchRework?: () => void) =>
+const nothing = (reach: ImproveSettings['value']['reach'], onSearchRework?: () => void) =>
   render(
     <ImproveNothingFound
       goal="overall"
@@ -28,7 +28,7 @@ const nothing = (reach: ImproveSettings['reach'], onSearchRework?: () => void) =
       before={baseFittingStats()}
       fitTotal={null}
       noModules={false}
-      settings={{ reach } as ImproveSettings}
+      settings={{ value: { reach } } as ImproveSettings}
       labels={{} as ImproveLabels}
       onSearchAgain={vi.fn()}
       onSearchRework={onSearchRework}

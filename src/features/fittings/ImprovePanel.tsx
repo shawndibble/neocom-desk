@@ -98,7 +98,7 @@ export function ImprovePanel({
     search,
     fitting,
     target,
-    iskBudget: settings.iskBudget,
+    iskBudget: settings.value.iskBudget,
     chosen,
   });
   // Ticked rows that no list shows are covers added from the footer: they get a tick of their own there.
@@ -170,7 +170,7 @@ export function ImprovePanel({
         unloaded={unloaded}
         onLoadBestCharge={onLoadBestCharge}
         state={state}
-        oreFamily={settings.oreFamily}
+        oreFamily={settings.value.oreFamily}
         onLoadBestCrystal={onLoadBestCrystal}
       />
 
@@ -211,7 +211,7 @@ export function ImprovePanel({
             settings={settings}
             labels={labels}
             onSearchAgain={search.restart}
-            onSearchRework={() => settings.onReachChange('rework')}
+            onSearchRework={() => settings.onChange({ reach: 'rework' })}
           />
         ) : (
           <ImproveResults

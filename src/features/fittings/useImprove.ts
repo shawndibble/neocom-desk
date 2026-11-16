@@ -2,7 +2,7 @@
  * The hook that runs an Improve search of the open Fitting (`improveSearch/`)
  * while `enabled`, so a closed drawer costs nothing. It owns only the React
  * side: status, the "Show best so far" timer, Cancel, restart and the search's
- * own worker pool. The remembered settings are in `useImproveSettingStores`.
+ * own worker pool. The remembered settings are in `useImproveSettings`.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { searchableGoal, type ImproveGoal } from '@/engine/fittings/improve';

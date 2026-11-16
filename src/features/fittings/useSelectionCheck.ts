@@ -15,7 +15,7 @@ import { setKey } from '@/engine/fittings/improveKeys';
 import { summariseSelection } from '@/engine/fittings/improveSelection';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
-import type { ImproveSettings } from './improveSettings';
+import type { ImproveChoices } from './improveSettings';
 import type { ImproveSearch } from './useImprove';
 import { useCoverSearch } from './useCoverSearch';
 
@@ -23,7 +23,7 @@ interface Input {
   search: ImproveSearch;
   fitting: Fitting | null | undefined;
   target: TargetProfile | undefined;
-  iskBudget: ImproveSettings['iskBudget'];
+  iskBudget: ImproveChoices['iskBudget'];
   chosen: ImproveOption[];
 }
 
