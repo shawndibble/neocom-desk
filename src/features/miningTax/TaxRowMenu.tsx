@@ -30,7 +30,8 @@ const LABEL_KEY: Record<Exclude<RowMenuAction['id'], 'takeOut'>, string> = {
   undismiss: 'miningTax.undismissAction',
   uncombine: 'miningTax.combined.uncombineAll',
   unassign: 'miningTax.detail.unassignAction',
-  corpPay: 'miningTax.corpBook.payAction',
+  // The same word as the Settle up button on the row: one key, so the two cannot drift apart.
+  corpPay: 'miningTax.settleUpAction',
 };
 
 /**

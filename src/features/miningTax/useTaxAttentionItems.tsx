@@ -269,43 +269,85 @@ export function useTaxAttentionItems({
         : {}),
     });
   }
+  // One item per book, not per donation: a second uncredited donation to the same corporation
+  // needs the same sync and the same dispute, so repeating the whole advisory only pushed the
+  // ledger further down the page — which is what folding the old stacked banners into one strip
+  // set out to stop (20261004-135551-mining-tax-redesign-owed-first-combined-entries-edit).
+  const uncreditedByCorp = new Map<number, typeof corp.uncredited>();
   for (const u of corp.uncredited) {
-    const loaded = corpView?.books.find((b) => b.loaded.corporationId === u.corporationId)?.loaded;
+    const group = uncreditedByCorp.get(u.corporationId);
+    if (group) group.push(u);
+    else uncreditedByCorp.set(u.corporationId, [u]);
+  }
+  for (const [corporationId, group] of uncreditedByCorp) {
+    const loaded = corpView?.books.find((b) => b.loaded.corporationId === corporationId)?.loaded;
     const divisions = loaded?.divisions ?? [];
     const accounts = corpPayAccounts(divisions, loaded?.divisionNames, t).join(', ');
     // With every division read, the ISK can't be in an unread one: a sync is due, or it never came.
     const every = readsEveryDivision(divisions);
+    const corpName = group[0].corpName;
+    const only = group.length === 1 ? group[0] : undefined;
+    const total = group.reduce((sum, u) => sum + u.amount, 0);
     attentionItems.push({
-      id: `corp-uncredited:${u.corporationId}:${u.characterId}:${u.at}`,
+      id: `corp-uncredited:${corporationId}`,
       tone: 'warning',
-      title: t(
-        every
-          ? 'miningTax.corpBook.attention.uncreditedEveryTitle'
-          : 'miningTax.corpBook.attention.uncreditedTitle',
-        { corp: u.corpName, amount: formatIsk(u.amount, 0), date: u.at.slice(0, 10) }
-      ),
+      title: only
+        ? t(
+            every
+              ? 'miningTax.corpBook.attention.uncreditedEveryTitle'
+              : 'miningTax.corpBook.attention.uncreditedTitle',
+            { corp: corpName, amount: formatIsk(only.amount, 0), date: only.at.slice(0, 10) }
+          )
+        : t(
+            every
+              ? 'miningTax.corpBook.attention.uncreditedEveryTitleMany'
+              : 'miningTax.corpBook.attention.uncreditedTitleMany',
+            { corp: corpName, n: group.length, amount: formatIsk(total, 0) }
+          ),
       detail: (
         <>
           <p>
             {every
-              ? t('miningTax.corpBook.attention.uncreditedEveryDetail', { corp: u.corpName })
-              : t('miningTax.corpBook.attention.uncreditedDetail', { corp: u.corpName, accounts })}
+              ? t('miningTax.corpBook.attention.uncreditedEveryDetail', { corp: corpName })
+              : t('miningTax.corpBook.attention.uncreditedDetail', { corp: corpName, accounts })}
           </p>
           {/* What the member needs to dispute it: the days it paid, and the transfer itself. */}
-          {u.covered.length > 0 && (
-            <p>
-              {t('miningTax.corpBook.attention.uncreditedCovered', {
-                days: u.covered.join(', '),
-              })}
-            </p>
+          {only ? (
+            <>
+              {only.covered.length > 0 && (
+                <p>
+                  {t('miningTax.corpBook.attention.uncreditedCovered', {
+                    days: only.covered.join(', '),
+                  })}
+                </p>
+              )}
+              <p>
+                {t('miningTax.corpBook.attention.uncreditedDispute', {
+                  corp: corpName,
+                  amount: formatIsk(only.amount, 0),
+                  time: eveTimeLabel(Date.parse(only.at)),
+                })}
+              </p>
+            </>
+          ) : (
+            <>
+              <p>{t('miningTax.corpBook.attention.uncreditedDisputeMany', { corp: corpName })}</p>
+              <ul className="list-disc space-y-0.5 pl-5">
+                {group.map((u) => (
+                  <li key={`${u.characterId}:${u.at}`}>
+                    {t('miningTax.corpBook.attention.uncreditedItem', {
+                      amount: formatIsk(u.amount, 0),
+                      time: eveTimeLabel(Date.parse(u.at)),
+                    })}
+                    {u.covered.length > 0 &&
+                      ` — ${t('miningTax.corpBook.attention.uncreditedItemCovered', {
+                        days: u.covered.join(', '),
+                      })}`}
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
-          <p>
-            {t('miningTax.corpBook.attention.uncreditedDispute', {
-              corp: u.corpName,
-              amount: formatIsk(u.amount, 0),
-              time: eveTimeLabel(Date.parse(u.at)),
-            })}
-          </p>
         </>
       ),
     });

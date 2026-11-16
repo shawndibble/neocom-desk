@@ -61,6 +61,21 @@ describe('TaxRowMenu', () => {
     expect(onAction).toHaveBeenCalledWith({ id: 'markPaid' }, outstanding);
   });
 
+  // The label keys live in a record, which the `t('a.b')` guard in i18n cannot see: an item
+  // whose key is missing renders the raw key instead of a word (miningTax.corpBook.payAction).
+  it('labels every corp book action with a translated word, not a key', async () => {
+    const corp = {
+      kind: 'row',
+      corpName: 'Corp',
+      view: { state: 'billed', corporationId: 1, taxOwed: 100 },
+    } as unknown as DisplayRow['corp'];
+    renderMenu({ ...outstanding, corp, status: 'outstanding' });
+    fireEvent.contextMenu(screen.getByTestId('row'));
+    const items = await screen.findAllByRole('menuitem');
+    expect(items.map((el) => el.textContent)).toEqual(['View details', 'Settle up']);
+    for (const item of items) expect(item.textContent).not.toMatch(/^miningTax\./);
+  });
+
   it('renders no menu around a row with nothing but View details', () => {
     const corp = {
       kind: 'row',
