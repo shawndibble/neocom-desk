@@ -4,10 +4,13 @@ import {
   figureNeedsAnswer,
   keptBy,
   keptTarget,
+  notPayingHides,
   overdueTarget,
+  proofSenders,
   rowTarget,
   uncreditedTarget,
 } from './targets';
+import { notPayingDayKey, uncreditedKey } from './notPaying';
 
 const row = (over: Partial<BookRowView> = {}) =>
   ({
@@ -56,7 +59,54 @@ describe('what an officer kept', () => {
       nextStep: 'Send the ref',
       statementId: 's1',
     });
-    expect(t.hideKey).toBe('statement:1:s1');
+    // Keyed on the officer's answer, so a later answer is a new problem.
+    expect(t.hideKey).toBe('keptStatement:1:s1:x');
+  });
+
+  // "If they say f-it the tool shouldn't annoy them" - but an officer's later answer still shows.
+  it('hides an officer answer only: a new answer on a hidden day shows again', () => {
+    const first = row({ flagged: rejectedFlag });
+    const hidden = new Set([keptTarget(first).hideKey]);
+    expect(notPayingHides(hidden, first)).toBe(true);
+    const later = row({ flagged: { ...rejectedFlag, at: '2026-11-12T00:00:00Z' } });
+    expect(keptTarget(later).hideKey).not.toBe(keptTarget(first).hideKey);
+    expect(notPayingHides(hidden, later)).toBe(false);
+  });
+
+  it('a day hidden before an officer rejected it shows the kept bill, and the pill stops saying Not paying', () => {
+    const hidden = new Set([notPayingDayKey(1, 7, '2026-11-06')]);
+    expect(notPayingHides(hidden, row())).toBe(true);
+    expect(notPayingHides(hidden, row({ state: 'conflict' }))).toBe(true);
+    expect(notPayingHides(hidden, row({ flagged: rejectedFlag }))).toBe(false);
+  });
+
+  it('reads Not paying the same for an Overdue Statement day and an uncredited donation day', () => {
+    expect(notPayingHides(new Set(['statement:1:s1']), row({ statementId: 's1' }))).toBe(true);
+    const donated = row({ unlinkedDonation: { amount: 5, at: '2026-11-08T00:00:00Z' } });
+    expect(
+      notPayingHides(
+        new Set([uncreditedKey(1, ['2026-11-07T00:00:00Z', '2026-11-08T00:00:00Z'])]),
+        donated
+      )
+    ).toBe(true);
+    expect(notPayingHides(new Set([uncreditedKey(1, ['2026-11-09T00:00:00Z'])]), donated)).toBe(
+      false
+    );
+  });
+
+  it('an Overdue Statement hides its rejected declaration by the answer, not the Statement', () => {
+    const o = {
+      corporationId: 1,
+      corpName: 'Bureau',
+      statementId: 's1',
+      characterId: 7,
+      periodStart: '2026-10-01',
+      period: 'Oct',
+    };
+    expect(overdueTarget(o).hideKey).toBe('statement:1:s1');
+    expect(overdueTarget({ ...o, declaration: { state: 'rejected', at: 'y' } }).hideKey).toBe(
+      'keptStatement:1:s1:y'
+    );
   });
 
   // The kept warning must go once the member pays the day.
@@ -121,8 +171,41 @@ describe('targets', () => {
     expect(t.problem.kind).toBe('overdue');
   });
 
+  it('a rejected declaration is the kept item, not also an uncredited one', () => {
+    const donation = {
+      characterId: 7,
+      corporationId: 1,
+      corpName: 'Bureau',
+      amount: 5,
+      at: '2026-11-08T00:00:00Z',
+      refId: 3,
+      covered: ['2026-11-06'],
+    };
+    const rejected = row({
+      statementId: 's1',
+      declaration: { state: 'rejected', at: 'y', nextStep: 'Send it' },
+    });
+    expect(uncreditedTarget([donation], [rejected]).answered).toBe(true);
+  });
+
+  it('a plain billed day, and a day marked paid that the book still bills, have a Resolve', () => {
+    expect(rowTarget(row())?.problem.kind).toBe('billed');
+    const marked = rowTarget(row({ state: 'paid', bookOwed: 40, statementId: 's1' }));
+    expect(marked?.problem).toMatchObject({ kind: 'markedPaid', statementId: 's1' });
+    expect(rowTarget(row({ state: 'paid' }))).toBeUndefined();
+  });
+
+  it("only a Statement's own Characters can be the senders of its proof", () => {
+    const book = {
+      statements: [{ id: 's1', minerId: 'm1' }] as never,
+      miners: [{ id: 'm1', characterIds: [7, 8], mainCharacterId: 7 }],
+    };
+    expect(proofSenders(book, { characterId: 7, statementId: 's1' })).toEqual([7, 8]);
+    expect(proofSenders(book, { characterId: 9 })).toEqual([9]);
+  });
+
   it('a day with nothing to resolve has no target', () => {
-    expect(rowTarget(row())).toBeUndefined();
+    expect(rowTarget(row({ state: 'dismissed' }))).toBeUndefined();
     expect(rowTarget(row({ state: 'conflict' }))?.problem.kind).toBe('conflict');
   });
 });

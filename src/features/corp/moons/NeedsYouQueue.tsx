@@ -36,6 +36,7 @@ import { useOwnWalletJournals } from './useOwnWalletJournals';
 import { MOONS_TABS, minerPath } from './moonsPaths';
 import { tabPath } from '@/lib/pageTabs';
 import { mailTarget, useCorporationName } from './statementMailing';
+import { declaredLeft } from './declaredLeft';
 
 /** The card's second action: a text link off the primary Button, so the pair is not two boxes (DESIGN.md §6, text action off a primary). */
 const secondaryActionClassName = plainTextActionClassName('min-h-9 md:min-h-6');
@@ -387,9 +388,10 @@ export function NeedsYouQueue() {
                       kind: t(`corpTaxBook.moons.needs.declaration.kind.${d.kind}`),
                       date: shortDate(d.at),
                     }),
-                    d.amount !== undefined &&
+                    // What is still to count: transfers the check found are credited already.
+                    declaredLeft(d) !== undefined &&
                       t('corpTaxBook.moons.needs.declaration.declared', {
-                        amount: isk(d.amount),
+                        amount: isk(declaredLeft(d)!),
                       }),
                     d.note &&
                       t('corpTaxBook.moons.needs.declaration.note', {
@@ -704,7 +706,7 @@ export function NeedsYouQueue() {
           minerName={names.character(open.miner.mainCharacterId)}
           // The amount the Miner declared, when they gave one (#6206).
           defaultAmount={
-            open.item.declaration.amount ??
+            declaredLeft(open.item.declaration) ??
             (open.item.declaration.transfers?.length
               ? sumOf(open.item.declaration.transfers)
               : open.item.owed)

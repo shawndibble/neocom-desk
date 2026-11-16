@@ -312,14 +312,34 @@ describe('CorpRowDetailModal: Resolve on a Statement (#6206, resolving in the ap
     );
   });
 
-  it('offers nothing before the day is on a Statement, or with nowhere to send it', () => {
+  it('offers nothing with nowhere to send it', () => {
     renderModal({ ...onStatement() });
     expect(screen.queryByRole('button', { name: 'Resolve' })).toBeNull();
   });
 
-  it('offers nothing before the day is on a Statement', () => {
-    renderModal({ onResolve: vi.fn(), corp: { ...corp, view: { ...view, dispute: undefined } } });
-    expect(screen.queryByRole('button', { name: 'Resolve' })).toBeNull();
+  // A plain billed day can still be paid, or said no to: pay / not paying.
+  it('offers a plain billed day Resolve even before it is on a Statement', async () => {
+    const onResolve = vi.fn();
+    renderModal({ onResolve, corp: { ...corp, view: { ...view, dispute: undefined } } });
+    await userEvent.click(screen.getAllByRole('button', { name: 'Resolve' })[0]);
+    expect(onResolve).toHaveBeenCalledWith(
+      expect.objectContaining({ problem: expect.objectContaining({ kind: 'billed' }) })
+    );
+  });
+
+  it('offers a day marked paid that the book still bills the proof, pay and not paying', async () => {
+    const onResolve = vi.fn();
+    const marked = {
+      ...view,
+      state: 'paid' as const,
+      settledBy: 'yourMark' as const,
+      bookOwed: 500,
+    };
+    renderModal({ onResolve, ...onStatement(marked) });
+    await userEvent.click(screen.getAllByRole('button', { name: 'Resolve' }).at(-1)!);
+    expect(onResolve).toHaveBeenCalledWith(
+      expect.objectContaining({ problem: expect.objectContaining({ kind: 'markedPaid' }) })
+    );
   });
 
   it('says it is waiting for the corporation, and does not offer it twice', () => {

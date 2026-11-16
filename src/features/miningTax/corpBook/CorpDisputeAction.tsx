@@ -4,6 +4,7 @@ import { Button, NeedsConnection, plainTextActionClassName } from '@/components/
 import { InlineError } from '@/components/ui/InlineError';
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
 import { callableErrorReason } from '@/lib/callableError';
+import { mailNotOwed, type MailContext } from './resolve/resolveSubmit';
 import { disputeCorpTaxBookConflict, withdrawCorpTaxBookDispute } from './corpBookStore';
 
 const k = (key: string) => `miningTax.corpBook.conflict.${key}`;
@@ -19,7 +20,10 @@ interface Props {
     | 'recordKey'
     | 'flagged'
     | 'conflictCause'
+    | 'billed'
   >;
+  /** Who is asking and who answers tax questions: "Tell {corp}" also mails them, best effort. */
+  mail?: MailContext;
   /** Opens Resolve on this day: after an officer kept the bill, the member can say it again or pay. */
   onResolve?: () => void;
   /** The Payee the member's own entry gives the ore to, by name. */
@@ -35,7 +39,7 @@ interface Props {
  * officer's reason. Ore listed beyond what the
  * book recorded is never billed, so there is nothing to dispute.
  */
-export function CorpDisputeAction({ view, payeeName, onSent, onResolve }: Props) {
+export function CorpDisputeAction({ view, payeeName, onSent, onResolve, mail }: Props) {
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<'rejected' | 'other' | null>(null);
@@ -125,6 +129,8 @@ export function CorpDisputeAction({ view, payeeName, onSent, onResolve }: Props)
           payeeName,
         })),
       });
+      // The record is in Needs you; the mail is for an officer who is not in the app.
+      if (mail) await mailNotOwed(mail, view, '');
       onSent();
     } catch (e) {
       if (callableErrorReason(e) === 'rejected') onSent();

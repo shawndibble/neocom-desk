@@ -82,6 +82,7 @@ vi.mock('@/features/miningTax/madePayments', () => ({
 }));
 
 const { TaxTab } = await import('./TaxTab');
+const { keptDayKey, useNotPayingSetting } = await import('./corpBook/resolve/notPaying');
 
 const prices: DatedUnitPrices = {
   byHubAndDate: new Map([['jita', new Map([['2026-10-17', new Map([[ZEO, 148]])]])]]),
@@ -329,6 +330,37 @@ describe('a bill an officer kept', () => {
     ).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Resolve' }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('button', { name: 'Not paying' }).length).toBeGreaterThan(0);
+  });
+
+  // "If they say f-it the tool shouldn't annoy them" - but a later answer is a new problem.
+  it('hides the answer the member said no to, and shows a later one again', async () => {
+    const day = '2026-10-17';
+    const answered = (at: string) => ({
+      ...book,
+      disputes: [{ ...rejected, resolution: { ...rejected.resolution, at } }],
+    });
+    const hide = (at: string) =>
+      useNotPayingSetting.setState({
+        value: [keptDayKey(CORP, ME, day, at)],
+        hydrated: true,
+      });
+    hide('2026-10-18T09:00:00.000Z');
+    hoisted.view = viewWith(answered('2026-10-18T09:00:00.000Z'));
+    const { unmount } = render(
+      <MemoryRouter>
+        <TaxTab tabBar={null} tabsId="t" />
+      </MemoryRouter>
+    );
+    // Whatever else is on the strip, the answer the member said no to is not.
+    const show = screen.queryByText('Show');
+    if (show) await userEvent.setup().click(show);
+    expect(screen.queryByText(/kept the bill on 2026-10-17/)).toBeNull();
+    unmount();
+    hoisted.view = viewWith(answered('2026-10-18T12:00:00.000Z'));
+    const user = userEvent.setup();
+    renderTab();
+    await user.click(screen.getByText('Show'));
+    expect(screen.getByText(/kept the bill on 2026-10-17/)).toBeInTheDocument();
   });
 });
 

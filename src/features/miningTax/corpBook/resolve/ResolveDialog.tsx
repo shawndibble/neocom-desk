@@ -29,6 +29,11 @@ interface Props {
   transfers?: ClaimedTransfer[];
   /** Every payment the member made from their wallet: "Which payment was it?" lists the ones around the billed period. */
   payments?: readonly MadePayment[];
+  /**
+   * The Characters whose payments the server accepts as proof for the Statement: the picker lists
+   * only theirs. Absent: every payment given.
+   */
+  senderIds?: readonly number[];
   /** The billed period's first day (ISO): payments before it are not listed. */
   paidSince?: string;
   /** The Payee the member's own entry gave a Conflict day's ore to. */
@@ -71,7 +76,8 @@ export function ResolveDialog({
   problem,
   mail,
   transfers: presetTransfers = [],
-  payments,
+  payments: allPayments,
+  senderIds,
   paidSince,
   payeeName,
   facts,
@@ -87,6 +93,10 @@ export function ResolveDialog({
   const [choice, setChoice] = useState<OutcomeId>(offer.preselected);
   const [tell, setTell] = useState(false);
   const [text, setText] = useState('');
+  // The server only counts a payment from a Character on the Statement.
+  const payments = senderIds
+    ? allPayments?.filter((p) => senderIds.includes(p.characterId))
+    : allPayments;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const [done, setDone] = useState<Done | null>(null);
@@ -99,7 +109,10 @@ export function ResolveDialog({
   const corp = problem.corpName;
   const row = problem.row;
   const statementId =
-    problem.kind === 'uncredited' || problem.kind === 'kept' || problem.kind === 'overdue'
+    problem.kind === 'uncredited' ||
+    problem.kind === 'kept' ||
+    problem.kind === 'overdue' ||
+    problem.kind === 'markedPaid'
       ? problem.statementId
       : undefined;
 
@@ -141,7 +154,9 @@ export function ResolveDialog({
         const days =
           problem.kind === 'uncredited' && problem.days
             ? problem.days.join(', ')
-            : (row?.date ?? (problem.kind === 'overdue' ? problem.period : ''));
+            : problem.kind === 'overdue'
+              ? problem.period
+              : (row?.date ?? '');
         const out = await sendProof(mail, statementId, transfers, text.trim(), days);
         onSent();
         setDone({ kind: 'sent', ...out, transfers });
@@ -162,7 +177,11 @@ export function ResolveDialog({
           ? t(k('title.kept'), { corp })
           : problem.kind === 'overdue'
             ? t(k('title.overdue'), { corp, period: problem.period })
-            : t(k('title.figure'), { date: row?.date ?? '' });
+            : problem.kind === 'markedPaid'
+              ? t(k('title.markedPaid'), { date: row?.date ?? '', corp })
+              : problem.kind === 'billed'
+                ? t(k('title.billed'), { date: row?.date ?? '', corp })
+                : t(k('title.figure'), { date: row?.date ?? '' });
 
   if (done) {
     return (
@@ -212,7 +231,9 @@ export function ResolveDialog({
                 amount: formatIsk(
                   problem.kind === 'uncredited'
                     ? problem.amount
-                    : (row?.taxOwed ?? row?.billed ?? 0),
+                    : problem.kind === 'markedPaid'
+                      ? (row?.bookOwed ?? 0)
+                      : (row?.taxOwed ?? row?.billed ?? 0),
                   0
                 ),
                 context: outcomeContext(problem.kind, id),

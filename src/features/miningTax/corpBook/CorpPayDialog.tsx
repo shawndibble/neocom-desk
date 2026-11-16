@@ -11,6 +11,7 @@ import { corpPayAccount } from './corpPayAccount';
 import { suggestedCode, type PayStatementCode } from './payStatementCodes';
 import type { CorpBookViewBook } from './corpBookView';
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
+import { payableRows } from './paymentLanding';
 import { WherePaymentGoes } from './WherePaymentGoes';
 
 interface Props {
@@ -63,17 +64,21 @@ export function CorpPayDialog({
   const views = new Map(
     rows.flatMap((dr) => (dr.corp?.kind === 'row' ? [[dr.key, dr.corp.view] as const] : []))
   );
-  const settleRows: SettleUpRow[] = rows.flatMap((dr) =>
-    dr.assignment && views.has(dr.key)
-      ? [
-          {
-            assignment: dr.assignment,
-            characterName: dr.row.characterName,
-            payeeName: book.corpName,
-            payeeEntityId: book.loaded.corporationId,
-          },
-        ]
-      : []
+  // A day an open dispute holds is skipped by payments: it is not in the default amount.
+  const settleRows: SettleUpRow[] = payableRows(
+    rows.flatMap((dr) =>
+      dr.assignment && views.has(dr.key)
+        ? [
+            {
+              assignment: dr.assignment,
+              characterName: dr.row.characterName,
+              payeeName: book.corpName,
+              payeeEntityId: book.loaded.corporationId,
+            },
+          ]
+        : []
+    ),
+    (r) => views.get(r.assignment.id)?.held
   );
   // The payer's Miner's oldest open Statement: payments settle the oldest first, and a code of
   // another Miner's Statement is not credited to it. It follows the payer the pilot picks.

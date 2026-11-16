@@ -738,6 +738,15 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
                 typeNames={typeNames}
                 onChanged={refresh}
                 onBookChanged={reloadCorpBooks}
+                mail={{
+                  characterId: corpDetail.view.characterId,
+                  memberName: detailTarget.row.characterName,
+                  corporationId: corpDetail.view.corporationId,
+                  corpName: corpDetail.corpName,
+                  contact: corpView?.books.find(
+                    (b) => b.loaded.corporationId === corpDetail.view.corporationId
+                  )?.loaded.taxContact,
+                }}
                 onResolve={(target) => {
                   actions.openDetail(null);
                   onResolve(target);

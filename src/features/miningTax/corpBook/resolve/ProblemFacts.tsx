@@ -1,6 +1,7 @@
 import { Trans, useTranslation } from 'react-i18next';
 import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
 import { formatCount } from '@/lib/formatCount';
+import { formatIsk } from '@/lib/isk';
 import { IskText } from '../../IskText';
 import { isoDay } from '../memberFlag';
 import type { ResolveTarget } from './targets';
@@ -108,6 +109,18 @@ export function ProblemFacts({ target }: { target: ResolveTarget }) {
           )}
         </>
       );
+    case 'markedPaid':
+      return (
+        <p>
+          {t(k('markedPaid'), {
+            corp,
+            date: row?.date ?? '',
+            owed: formatIsk(row?.bookOwed ?? 0, 0),
+          })}
+        </p>
+      );
+    case 'billed':
+      return bills;
     case 'kept':
       return (
         <>

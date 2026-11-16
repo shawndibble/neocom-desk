@@ -7,6 +7,11 @@ import type { BookRowView } from '@/engine/corpTaxBook/personal';
 import { CorpOverlapNotice } from './CorpOverlapNotice';
 import { readOverlapAcks } from './overlapAck';
 import { disputeCorpTaxBookConflict } from './corpBookStore';
+import { sendTaxQuestionMail } from './sendTaxQuestionMail';
+
+vi.mock('./sendTaxQuestionMail', () => ({
+  sendTaxQuestionMail: vi.fn(async () => ({ status: 'no-scope' })),
+}));
 
 // #6206: what reaches the corporation is a router action; stubbed here.
 vi.mock('./corpBookStore', async (importOriginal) => ({
@@ -293,6 +298,13 @@ describe('CorpOverlapNotice: what reaches the corporation (#6206)', () => {
   const renderWith = (v: BookRowView, onBookChanged = () => {}, onResolve?: () => void) =>
     render(
       <CorpOverlapNotice
+        mail={{
+          characterId: ME,
+          memberName: 'Pilot',
+          corporationId: 98000001,
+          corpName: 'Brass Meridian',
+          contact: undefined,
+        }}
         view={v}
         corpName="Brass Meridian"
         recordedAt="Efa"
@@ -327,6 +339,22 @@ describe('CorpOverlapNotice: what reaches the corporation (#6206)', () => {
         { recordKey: `${ME}:1000:2026-10-17`, typeId: ZEO, quantity: 43_050, payeeName: 'Ashfall' },
       ],
     });
+  });
+
+  it('also mails whoever answers the corporation tax questions', async () => {
+    let changed = 0;
+    renderWith(conflict, () => changed++);
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Tell Brass Meridian it went to Ashfall' })
+    );
+    await waitFor(() => expect(changed).toBe(1));
+    expect(sendTaxQuestionMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        characterId: ME,
+        corporationId: 98000001,
+        input: expect.objectContaining({ kind: 'notOwed', days: '2026-10-17' }),
+      })
+    );
   });
 
   it('says it was sent, or why an officer rejected it, instead of offering it again', () => {

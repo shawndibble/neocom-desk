@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { settleTolerance } from '@/engine/corpTaxBook/allocation';
-import { wherePaymentGoes, type PayDay } from './paymentLanding';
+import { payableRows, wherePaymentGoes, type PayDay } from './paymentLanding';
 
 const day = (date: string, taxOwed: number, over: Partial<PayDay> = {}): PayDay => ({
   id: `c:${date}`,
@@ -73,5 +73,14 @@ describe('wherePaymentGoes', () => {
 
   it('handles no open days', () => {
     expect(wherePaymentGoes([], 5)).toEqual({ days: [], credit: 5 });
+  });
+});
+
+describe('payableRows', () => {
+  it('leaves held days out of the default amount, but keeps them when nothing else is owed', () => {
+    const rows = [{ id: 'a' }, { id: 'b' }];
+    const holds = new Map([['b', { until: '2026-11-30', kind: 'notPaying' as const }]]);
+    expect(payableRows(rows, (r) => holds.get(r.id))).toEqual([{ id: 'a' }]);
+    expect(payableRows([rows[1]!], (r) => holds.get(r.id))).toEqual([{ id: 'b' }]);
   });
 });

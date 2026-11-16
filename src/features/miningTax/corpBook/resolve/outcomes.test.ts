@@ -97,6 +97,7 @@ describe('outcomesFor (resolving in the app)', () => {
     expect(outcomesFor(dispute)).toMatchObject({
       outcomes: ['pay', 'notPaying', 'notOwed'],
       preselected: 'pay',
+      // The server refuses a second dispute of a day an officer answered.
       tellWhy: false,
     });
     const declaration: ResolveProblem = {
@@ -107,6 +108,28 @@ describe('outcomesFor (resolving in the app)', () => {
       statementId: 's1',
     };
     expect(outcomesFor(declaration).outcomes).toEqual(['pay', 'notPaying', 'paid']);
+    // A kept declaration disputed nothing: "Not paying" may tell the corporation why.
+    expect(outcomesFor(declaration).tellWhy).toBe(true);
+  });
+
+  it('lets an Overdue Statement tell why when it has a recorded day, and not without one', () => {
+    const p: ResolveProblem = { ...base, kind: 'overdue', statementId: 's1', period: 'Oct' };
+    expect(outcomesFor(p).tellWhy).toBe(false);
+    expect(outcomesFor({ ...p, row: row() }).tellWhy).toBe(true);
+  });
+
+  it('offers a day marked paid that the book still bills proof, paying and not paying', () => {
+    const p: ResolveProblem = { ...base, kind: 'markedPaid', statementId: 's1', row: row() };
+    expect(outcomesFor(p)).toMatchObject({
+      outcomes: ['pay', 'notPaying', 'paid'],
+      preselected: 'paid',
+      tellWhy: true,
+    });
+  });
+
+  it('offers a plain billed day paying and not paying', () => {
+    const p: ResolveProblem = { ...base, kind: 'billed', row: row() };
+    expect(outcomesFor(p)).toMatchObject({ outcomes: ['pay', 'notPaying'], preselected: 'pay' });
   });
 
   it('does not offer disputing a kept day the member own record never disagreed with', () => {
