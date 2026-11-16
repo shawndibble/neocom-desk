@@ -367,7 +367,9 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     await openPlanTools();
     await openAssumptions();
 
-    expect(await screen.findByLabelText('Days')).toHaveValue('5');
+    expect(await screen.findByRole('button', { name: /^Edit time left/ })).toHaveTextContent(
+      /(5d 0h 0m|4d 23h \d+m)$/
+    );
     expect(screen.getByRole('combobox', { name: 'What-if implants' })).toHaveTextContent('+5');
     expect(screen.getByRole('button', { name: 'Clear' })).toBeEnabled();
   });

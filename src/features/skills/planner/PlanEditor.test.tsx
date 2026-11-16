@@ -1838,9 +1838,11 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     await openTools(user);
     await openAssumptions(user);
 
-    expect((await screen.findByLabelText<HTMLInputElement>('Bonus')).value).toBe('6');
-    expect(screen.getByLabelText<HTMLInputElement>('Days').value).toBe('2');
-    expect(screen.getByLabelText<HTMLInputElement>('Hours').value).toBe('5');
+    // Set, the values read as text until clicked.
+    expect(await screen.findByRole('button', { name: /^Edit bonus/ })).toHaveTextContent('6');
+    expect(screen.getByRole('button', { name: /^Edit time left/ })).toHaveTextContent(
+      /2d 5h \d+m$/
+    );
   });
 
   it('does not erase a saved expiry when a box is cleared to be retyped', async () => {
@@ -1850,6 +1852,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     renderEditor();
     await openTools(user);
     await openAssumptions(user);
+    await user.click(await screen.findByRole('button', { name: /^Edit time left/ }));
 
     const days = await screen.findByLabelText<HTMLInputElement>('Days');
     await user.clear(days);
@@ -1864,6 +1867,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     renderEditor();
     await openTools(user);
     await openAssumptions(user);
+    await user.click(await screen.findByRole('button', { name: /^Edit time left/ }));
 
     await user.clear(await screen.findByLabelText('Days'));
     await user.clear(screen.getByLabelText('Hours'));
@@ -1879,6 +1883,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     renderEditor();
     await openTools(user);
     await openAssumptions(user);
+    await user.click(await screen.findByRole('button', { name: /^Edit time left/ }));
 
     const days = await screen.findByLabelText<HTMLInputElement>('Days');
     await user.clear(days);
@@ -1901,6 +1906,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     await openTools(user);
     await openAssumptions(user);
 
+    await user.click(await screen.findByRole('button', { name: /^Edit bonus/ }));
     const bonus = await screen.findByLabelText('Bonus');
     await user.clear(bonus);
     await user.type(bonus, '45');
