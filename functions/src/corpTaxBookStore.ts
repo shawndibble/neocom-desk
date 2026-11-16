@@ -110,8 +110,8 @@ import { FEEDER_OBSERVED, rollupChanges, writeRollupChanges } from './corpTaxBoo
 import { OBSERVED_UPDATED_AT_FIELD } from './corpTaxBookVersionKeys.js';
 import { POP_SHARING_DOC, applyMoonOverride, popSharingFrom } from './popSharing.js';
 import type { CorporationAllianceLookup } from './sharedPopsEsi.js';
+import { sharedPopsRepublishDue } from './sharedPops.js';
 import {
-  ALLIANCE_RECHECK_MS,
   EDITOR_CHECKED_AT,
   editorStampFields,
   refreshSharedPops,
@@ -831,23 +831,46 @@ export async function syncBookAs(
     await refreshReadModels(deps.db, input.corporationId, deps.now());
   // A sync that changed something republishes the book's Shared Pops (#6223). Best effort. A
   // quiet one has nothing new to publish (a viewer's read drops an expired pop by itself), except
-  // what the publish learns on its own clock: the alliance recheck, and refinery names the
-  // scheduled run learned. So it republishes a doc that old, and costs one read otherwise.
-  if (!quiet || (await sharedPopsStale(deps, input.corporationId)))
-    await refreshSharedPops(deps, input.corporationId);
+  // what the publish learns on its own clock: the alliance, and refinery names the scheduled run
+  // learned. So it republishes a doc that old, or one whose alliance the corporation has left.
+  const republish = await sharedPopsRepublish(deps, input.corporationId, !quiet);
+  if (republish) await refreshSharedPops(deps, input.corporationId, republish);
   return { observedChanged, extractions: input.extractions.length, donationsAdded };
 }
 
-/** Whether the book's Shared Pops doc was last published an alliance recheck ago or more. */
-async function sharedPopsStale(deps: BookDeps, corporationId: number): Promise<boolean> {
+/**
+ * Whether this sync republishes the book's Shared Pops (`sharedPopsRepublishDue`), with the
+ * corporation's alliance it read for that, so a book that joins an alliance shows its pops there
+ * now rather than at the next 6-hourly recheck. Costs the doc's read, and one public ESI read
+ * while a doc is held. Null: no republish.
+ */
+async function sharedPopsRepublish(
+  deps: BookDeps,
+  corporationId: number,
+  changed: boolean
+): Promise<{ allianceId?: number | null } | null> {
+  let held: { publishedAtMs: number | undefined; allianceId: number | null } | null = null;
+  let allianceNow: number | null | undefined;
   try {
-    const held = await sharedPopsRef(deps.db, corporationId).get();
-    const at = (held.get('updatedAt') as { toMillis?: () => number } | undefined)?.toMillis?.();
-    return held.exists && (at === undefined || deps.now() - at >= ALLIANCE_RECHECK_MS);
+    const snap = await sharedPopsRef(deps.db, corporationId).get();
+    if (snap.exists) {
+      held = {
+        publishedAtMs: (
+          snap.get('updatedAt') as { toMillis?: () => number } | undefined
+        )?.toMillis?.(),
+        allianceId: (snap.get('allianceId') as number | null | undefined) ?? null,
+      };
+      allianceNow = await deps.corporationAlliance?.(corporationId).catch((e: unknown) => {
+        console.error('book alliance lookup failed', e instanceof Error ? e.message : e);
+        return undefined;
+      });
+    }
   } catch (e) {
     console.error('shared pops age read failed', e instanceof Error ? e.message : e);
-    return false;
+    if (!changed) return null;
   }
+  if (!sharedPopsRepublishDue({ changed, held, allianceNow, now: deps.now() })) return null;
+  return allianceNow === undefined ? {} : { allianceId: allianceNow };
 }
 
 /**

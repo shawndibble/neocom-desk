@@ -28,6 +28,7 @@ import { isFiniteNumber, isPlainRecord } from './guards.js';
 import { DAY_MS, HOUR_MS } from './vettingTypes.js';
 import { POP_SHARING_DOC, popSharingFrom } from './popSharing.js';
 import {
+  ALLIANCE_RECHECK_MS,
   POP_SHARING_BLOCKS,
   SHARED_POPS,
   SHARED_POP_SOURCES,
@@ -51,8 +52,6 @@ import { PROJECTIONS_COLLECTION } from './projectionStore.js';
 
 type Data = Record<string, unknown>;
 
-/** The book's alliance is re-read at most this often. */
-export const ALLIANCE_RECHECK_MS = 6 * HOUR_MS;
 /** The most of the book's own refinery names one scheduled run looks up. */
 export const MAX_REFINERY_NAME_LOOKUPS = 10;
 /** A refused or missing refinery name is asked for again after this long. */
@@ -179,7 +178,9 @@ const ownersOf = (handled: readonly DocumentSnapshot[]) =>
  */
 export async function publishSharedPops(
   deps: SharedPopsDeps,
-  corporationId: number
+  corporationId: number,
+  /** The corporation's alliance, already read by the caller: used as is, not re-read. */
+  known: { allianceId?: number | null } = {}
 ): Promise<SharedPopsDoc | null> {
   const { db } = deps;
   const now = deps.now();
@@ -213,7 +214,10 @@ export async function publishSharedPops(
 
   let allianceId = held.exists ? ((held.get('allianceId') as number | null) ?? null) : null;
   let allianceCheckedAt = num(held.get('allianceCheckedAt')) ?? 0;
-  if (deps.corporationAlliance && now - allianceCheckedAt >= ALLIANCE_RECHECK_MS) {
+  if (known.allianceId !== undefined) {
+    allianceId = known.allianceId;
+    allianceCheckedAt = now;
+  } else if (deps.corporationAlliance && now - allianceCheckedAt >= ALLIANCE_RECHECK_MS) {
     try {
       allianceId = await deps.corporationAlliance(corporationId);
       allianceCheckedAt = now;
@@ -311,10 +315,11 @@ async function cancelStalePopPushes(
 /** `publishSharedPops`, best effort: a failure is logged and never fails the sync or edit behind it. */
 export async function refreshSharedPops(
   deps: SharedPopsDeps,
-  corporationId: number
+  corporationId: number,
+  known: { allianceId?: number | null } = {}
 ): Promise<void> {
   try {
-    await publishSharedPops(deps, corporationId);
+    await publishSharedPops(deps, corporationId, known);
   } catch (e) {
     console.error('shared pops refresh failed', e instanceof Error ? e.message : e);
   }
