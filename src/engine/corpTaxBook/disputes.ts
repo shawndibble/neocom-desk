@@ -1,11 +1,13 @@
 /**
  * Disputes (#6206): a Miner flags a Conflict day to the Corp Tax Book, "I gave this ore to
  * {payee}". One record per Miner and day (`corps/{id}/disputes/{minerId_date}`), written by the
- * `disputeCorpTaxBookConflictCallable` action. Officers answer it in Needs you: dismiss the day
- * (the existing record dismissal) or reject it with a note. The Payee is the name the Miner
- * sent; officers never see a Miner's own Payee list.
+ * `disputeCorpTaxBookConflictCallable` action. Officers answer it in Needs you: waive the
+ * disputed ore (a credit Adjustment of its tax, `dismissDispute`) or reject it with a note. A
+ * dispute answered before that by dismissing its whole records still counts as answered. The
+ * Payee is the name the Miner sent; officers never see a Miner's own Payee list.
  */
 import { isPlainRecord } from '@/engine/guards';
+import type { DayCharge } from './charges';
 import { activeDismissalFor, type Dismissal } from './dismissals';
 
 export interface OreDisputeLine {
@@ -27,7 +29,38 @@ export interface OreDispute {
   /** ISO instant it was first flagged. */
   at: string;
   note?: string;
-  resolution?: { kind: 'rejected'; at: string; by: number; reason: string };
+  resolution?: DisputeResolution;
+}
+
+export type DisputeResolution =
+  | { kind: 'rejected'; at: string; by: number; reason: string }
+  /** The disputed ore's tax was credited back on the day (`dismissDispute`). */
+  | { kind: 'dismissed'; at: string; by: number; reason: string; amountIsk: number };
+
+/**
+ * The tax on the disputed ore only, at each day charge's own prices and rate: what waiving the
+ * dispute credits. A line never counts more of an ore than its charge holds. Undefined while a
+ * disputed record has no charge in view, so it is never waived at a guessed zero.
+ */
+export function disputedTax(
+  dispute: Pick<OreDispute, 'lines'>,
+  charges: readonly Pick<DayCharge, 'key' | 'oreLines' | 'unitPrices' | 'taxPct'>[]
+): number | undefined {
+  const disputed = new Map<string, number>();
+  for (const l of dispute.lines) {
+    const k = `${l.recordKey}|${l.typeId}`;
+    disputed.set(k, (disputed.get(k) ?? 0) + l.quantity);
+  }
+  let tax = 0;
+  for (const [k, quantity] of disputed) {
+    const [recordKey, type] = k.split('|');
+    const typeId = Number(type);
+    const charge = charges.find((c) => c.key === recordKey);
+    if (!charge) return undefined;
+    const held = charge.oreLines.reduce((n, l) => (l.typeId === typeId ? n + l.quantity : n), 0);
+    tax += Math.min(quantity, held) * (charge.unitPrices[typeId] ?? 0) * (charge.taxPct / 100);
+  }
+  return tax;
 }
 
 /** The disputes Needs you still lists: unanswered, with a line no active dismissal covers. Oldest day first. */
@@ -83,21 +116,23 @@ export function readDisputes(raw: readonly unknown[]): OreDispute[] {
       by,
       at,
       ...(typeof note === 'string' ? { note } : {}),
-      ...(isPlainRecord(resolution) &&
-      resolution.kind === 'rejected' &&
-      typeof resolution.at === 'string' &&
-      typeof resolution.by === 'number' &&
-      typeof resolution.reason === 'string'
-        ? {
-            resolution: {
-              kind: 'rejected' as const,
-              at: resolution.at,
-              by: resolution.by,
-              reason: resolution.reason,
-            },
-          }
-        : {}),
+      ...readResolution(resolution),
     });
   }
   return out;
+}
+
+function readResolution(raw: unknown): { resolution?: DisputeResolution } {
+  if (
+    !isPlainRecord(raw) ||
+    typeof raw.at !== 'string' ||
+    typeof raw.by !== 'number' ||
+    typeof raw.reason !== 'string'
+  )
+    return {};
+  const { at, by, reason } = raw;
+  if (raw.kind === 'rejected') return { resolution: { kind: 'rejected', at, by, reason } };
+  if (raw.kind === 'dismissed' && typeof raw.amountIsk === 'number')
+    return { resolution: { kind: 'dismissed', at, by, reason, amountIsk: raw.amountIsk } };
+  return {};
 }

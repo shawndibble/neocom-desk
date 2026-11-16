@@ -71,12 +71,15 @@ const verdict: OfficerVerdict = {
 const edit = vi.fn();
 vi.mock('../taxBook/bookClient', () => ({
   editBook: (_char: number, _corp: number, action: unknown) => {
-    edit(action);
-    return Promise.resolve({});
+    return Promise.resolve(edit(action) ?? {});
   },
 }));
 
-function renderDialog(overrides: Partial<BookViewInput> = {}, statementId?: string) {
+function renderDialog(
+  overrides: Partial<BookViewInput> = {},
+  statementId?: string,
+  extra: { paymentId?: string; onRecorded?: () => Promise<void> } = {}
+) {
   const view = buildBookView(input(overrides));
   const miner = view.miners.find((m) => m.id === MINER)!;
   render(
@@ -106,6 +109,7 @@ function renderDialog(overrides: Partial<BookViewInput> = {}, statementId?: stri
         minerName="Pilot 1"
         defaultAmount={miner.owed}
         statementId={statementId}
+        {...extra}
       />
     </BookProvider>
   );
@@ -188,6 +192,28 @@ describe('RecordPaymentDialog', () => {
       amount: 16_000_000,
       at: '2026-09-05T12:00:00.000Z',
     });
+  });
+
+  it('records under a fixed id, so a retry after it landed does not record it twice (#6206)', async () => {
+    const onRecorded = vi.fn(async () => {});
+    edit.mockImplementationOnce(() => {
+      throw Object.assign(new Error('exists'), { details: { reason: 'payment-exists' } });
+    });
+    const dialog = renderDialog({}, undefined, { paymentId: 'm_x1', onRecorded });
+    await userEvent.click(within(dialog).getByRole('button', { name: /^Record / }));
+    await waitFor(() => expect(onRecorded).toHaveBeenCalled());
+    expect(edit.mock.calls[0][0]).toMatchObject({ action: 'recordPayment', paymentId: 'm_x1' });
+  });
+
+  it('still fails on a clash when the id was fresh', async () => {
+    const onRecorded = vi.fn(async () => {});
+    edit.mockImplementationOnce(() => {
+      throw Object.assign(new Error('exists'), { details: { reason: 'payment-exists' } });
+    });
+    const dialog = renderDialog({}, undefined, { onRecorded });
+    await userEvent.click(within(dialog).getByRole('button', { name: /^Record / }));
+    await waitFor(() => expect(edit).toHaveBeenCalled());
+    expect(onRecorded).not.toHaveBeenCalled();
   });
 
   it('offers no donation match when the wallet has none', () => {

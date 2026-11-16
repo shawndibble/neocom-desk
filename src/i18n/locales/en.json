@@ -8116,6 +8116,7 @@
         "tell": "Tell {{corp}} it went to {{payee}}",
         "told": "Sent to {{corp}} on {{date}}. An officer answers it in the book.",
         "toldRejected": "{{corp}} kept the bill: {{reason}}",
+        "toldDismissed": "{{corp}} waived the tax on that ore: {{reason}}",
         "tellFailed": "Could not send it. Try again.",
         "tellRejected": "{{corp}} already answered this day; ask an officer.",
         "otherPayee": "another Payee"
@@ -18128,12 +18129,12 @@
         "title_other": "Needs you · {{count}}",
         "declaration": {
           "title": "{{name}} says they paid · {{amount}}",
-          "body": "Declared “paid by {{kind}}” on {{date}}. Overdue is paused for up to 14 days, then resumes on its own.",
+          "body": "{{kind}}, declared on {{date}}. Overdue is paused for up to 14 days, then resumes on its own.",
           "kind": {
-            "contract": "contract",
-            "other-division": "another division",
-            "wrong-corp": "the wrong corporation",
-            "another-way": "another way"
+            "contract": "Paid by contract",
+            "other-division": "Paid to another division",
+            "wrong-corp": "Paid to the wrong corporation",
+            "another-way": "Paid another way"
           },
           "declared": "They say they paid {{amount}}.",
           "note": "“{{note}}”",
@@ -18142,9 +18143,9 @@
         },
         "dispute": {
           "title": "{{name}} says {{date}}'s ore went to {{payee}}",
-          "body": "{{ore}}. Dismiss the day if it was not ours to bill, or reject it with a note they read.",
+          "body": "{{ore}}. Waive that ore's tax if it was not ours to bill, or reject it with a note they read.",
           "line": "{{quantity}} {{ore}} to {{payee}}",
-          "dismiss": "Dismiss the day",
+          "dismiss": "Waive their ore",
           "reject": "Reject"
         },
         "overdue": {
@@ -19080,8 +19081,10 @@
           "sendHint": "The final Statement is mailed from the Statements tab."
         },
         "dispute": {
-          "dismissTitle": "Dismiss {{name}}'s {{date}}?",
-          "dismissIntro": "The day's ore they disputed is waived. It stays on the record as dismissed and can be reversed.",
+          "dismissTitle": "Waive {{name}}'s disputed ore for {{date}}?",
+          "dismissIntro": "{{amount}} of tax on the ore they disputed is credited on their next Statement. The rest of the day stays billed.",
+          "dismissUnpriced": "The book cannot price that day's ore yet, so it cannot be waived. Sync the book, then try again.",
+          "dismissConfirm": "Waive {{amount}}",
           "rejectTitle": "Reject {{name}}'s dispute for {{date}}?",
           "rejectIntro": "The day stays billed. They read your reason on their Tax tab, and cannot dispute that day again."
         },
@@ -19562,7 +19565,8 @@
       "declarationKind": {
         "contract": "Paid by contract",
         "other-division": "Paid to another division",
-        "wrong-corp": "Paid to the wrong corporation"
+        "wrong-corp": "Paid to the wrong corporation",
+        "another-way": "Paid another way"
       },
       "resolution": {
         "confirmed": "Confirmed",

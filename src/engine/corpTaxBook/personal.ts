@@ -205,8 +205,9 @@ export interface MemberDeclaration {
 
 /** A Conflict day the member sent to the corporation (#6206), and its answer. */
 export interface MemberFlag {
-  state: 'sent' | 'rejected';
-  /** When it was sent, or rejected. */
+  /** `dismissed`: an officer waived the disputed ore's tax (#6206). */
+  state: 'sent' | 'rejected' | 'dismissed';
+  /** When it was sent, or answered. */
   at: string;
   reason?: string;
 }
@@ -1403,7 +1404,7 @@ function flagFor(
   recordKey: string,
   disputes: readonly OreDispute[]
 ): MemberFlag | undefined {
-  // A rejected day cannot be disputed again (the server refuses it): every row of it says so,
+  // An answered day cannot be disputed again (the server refuses it): every row of it says so,
   // not only the ones the dispute named.
   const d =
     disputes.find((x) => x.lines.some((l) => l.recordKey === recordKey)) ??
@@ -1416,7 +1417,7 @@ function flagFor(
     );
   if (!d) return undefined;
   return d.resolution
-    ? { state: 'rejected', at: d.resolution.at, reason: d.resolution.reason }
+    ? { state: d.resolution.kind, at: d.resolution.at, reason: d.resolution.reason }
     : { state: 'sent', at: d.at };
 }
 

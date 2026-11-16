@@ -5,7 +5,7 @@ import { Button, Panel, plainTextActionClassName } from '@/components/ui';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import type { MinerRow, NeedsYouItem } from '@/engine/corpTaxBook/bookView';
 import type { UncountedDonation } from '@/engine/corpTaxBook/uncounted';
-import type { OreDispute } from '@/engine/corpTaxBook/disputes';
+import { disputedTax, type OreDispute } from '@/engine/corpTaxBook/disputes';
 import { cx } from '@/lib/cx';
 import { formatCount } from '@/lib/formatCount';
 import { useBook } from './useBook';
@@ -85,6 +85,9 @@ export function NeedsYouQueue() {
   const [open, setOpen] = useState<Open>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const close = () => setOpen(null);
+  // The tax on only the disputed ore: what waiving a dispute credits (undefined: cannot price it).
+  const waiveIsk =
+    open?.kind === 'disputeDismiss' ? disputedTax(open.dispute, view.charges) : undefined;
   const [busy, setBusy] = useState(false);
   // The corp's own name when a Director's visit stored one, else the numbered division.
   const divisionLabel = (division: number) =>
@@ -447,6 +450,8 @@ export function NeedsYouQueue() {
           minerName={names.character(open.miner.mainCharacterId)}
           // The amount the Miner declared, when they gave one (#6206).
           defaultAmount={open.item.declaration.amount ?? open.item.owed}
+          // One payment per declaration: a retry or a second officer cannot record it twice.
+          paymentId={`m_${open.item.declaration.id}`}
           onRecorded={async () => {
             await edit({
               action: 'resolveDeclaration',
@@ -485,18 +490,25 @@ export function NeedsYouQueue() {
             name: names.character(open.dispute.by),
             date: shortDate(open.dispute.date),
           })}
-          intro={t('corpTaxBook.moons.dialogs.dispute.dismissIntro')}
+          intro={
+            waiveIsk === undefined
+              ? t('corpTaxBook.moons.dialogs.dispute.dismissUnpriced')
+              : t('corpTaxBook.moons.dialogs.dispute.dismissIntro', { amount: isk(waiveIsk) })
+          }
           reasonLabel={t('corpTaxBook.moons.dialogs.reasonShown')}
-          confirmLabel={t('corpTaxBook.moons.needs.dispute.dismiss')}
+          confirmLabel={
+            waiveIsk === undefined
+              ? t('corpTaxBook.moons.needs.dispute.dismiss')
+              : t('corpTaxBook.moons.dialogs.dispute.dismissConfirm', { amount: isk(waiveIsk) })
+          }
+          canConfirm={waiveIsk !== undefined && waiveIsk > 0}
           run={async (reason) => {
-            // The day's records the dispute names, as one act (the Director limit sees the total).
-            const keys = [...new Set(open.dispute.lines.map((l) => l.recordKey))];
+            // Only the disputed ore's tax, as one credit (the Director limit sees that amount).
             await edit({
-              action: 'dismissRecords',
-              targets: keys.map((key) => ({
-                targetId: key,
-                amountIsk: view.charges.find((c) => c.key === key)?.taxOwed ?? 0,
-              })),
+              action: 'dismissDispute',
+              disputeId: open.dispute.id,
+              minerId: open.dispute.minerId,
+              amountIsk: waiveIsk,
               reason,
             });
           }}

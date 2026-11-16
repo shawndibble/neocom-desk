@@ -544,6 +544,17 @@ export type EditAction =
       note?: string;
     }
   | { action: 'rejectDispute'; disputeId: string; reason: string }
+  /**
+   * Waives only the disputed ore (#6206): a credit Adjustment of `amountIsk` on the day, not a
+   * dismissal of the whole record. The Director limit applies to that amount.
+   */
+  | {
+      action: 'dismissDispute';
+      disputeId: string;
+      minerId: string;
+      amountIsk: number;
+      reason: string;
+    }
   | {
       action: 'resolveDeclaration';
       declarationId: string;
@@ -568,6 +579,7 @@ export type CloseCredit = { kind: 'refund' } | { kind: 'forfeit'; basis: Forfeit
 export const LIVE_CHECK_ACTIONS: ReadonlySet<EditAction['action']> = new Set([
   'dismiss',
   'dismissRecords',
+  'dismissDispute',
   'reverseDismissal',
   'writeOff',
   'rebill',
@@ -585,7 +597,8 @@ export function needsLiveCheck(action: EditAction): boolean {
 /**
  * Whether a dismissal needs a Director (D6): the approval limit applies to the
  * total dismissed in one act, so a multi-day dismissal cannot slip under it
- * day by day. An omitted amount counts as over the limit.
+ * day by day. An omitted or zero amount counts as over the limit: a zero is a day whose
+ * charge the client did not have in view, not a free dismissal.
  */
 export function dismissalNeedsDirector(
   limit: number | null | undefined,
@@ -593,7 +606,10 @@ export function dismissalNeedsDirector(
   isDirector: boolean
 ): boolean {
   if (isDirector || typeof limit !== 'number') return false;
-  const total = amounts.reduce<number>((sum, a) => sum + (a ?? Infinity), 0);
+  const total = amounts.reduce<number>(
+    (sum, a) => sum + (a !== undefined && a > 0 ? a : Infinity),
+    0
+  );
   return total > limit;
 }
 
@@ -639,6 +655,7 @@ export function parseEditAction(data: unknown): EditAction {
     'declare',
     'resolveDeclaration',
     'rejectDispute',
+    'dismissDispute',
     'recordReminder',
     'recordMail',
     'setPopSharing',
@@ -816,6 +833,14 @@ export function parseEditAction(data: unknown): EditAction {
     }
     case 'rejectDispute':
       return { action, disputeId: docId(d.disputeId, 'disputeId'), reason: reason(d.reason) };
+    case 'dismissDispute':
+      return {
+        action,
+        disputeId: docId(d.disputeId, 'disputeId'),
+        minerId: docId(d.minerId, 'minerId'),
+        amountIsk: money(d.amountIsk, 'amountIsk'),
+        reason: reason(d.reason),
+      };
     case 'recordReminder':
       return { action, statementId: docId(d.statementId, 'statementId') };
     case 'setPopSharing': {
@@ -1256,6 +1281,54 @@ export function parseDisputeConflictInput(data: unknown): DisputeConflictInput {
     lines,
     ...(note !== undefined ? { note } : {}),
   };
+}
+
+/** The ore a book recorded, as the server's Observed Rows hold it. */
+export interface RecordedOre {
+  characterId: number;
+  structureId: number;
+  date: string;
+  typeId: number;
+  quantity: number;
+}
+
+const lineId = (l: DisputeLine) => JSON.stringify([l.recordKey, l.typeId, l.quantity, l.payeeName]);
+
+/**
+ * A dispute's lines after one more call (#6206): `incoming` added to what the day already holds,
+ * an exact repeat dropped (as `arrayUnion` would). Every record and ore must be one the book
+ * recorded, the disputed quantity of each across all its Payees no more than recorded, and the
+ * day at most `DISPUTE_LINES_MAX` lines however many calls built it.
+ */
+export function mergeDisputeLines(
+  held: readonly DisputeLine[],
+  incoming: readonly DisputeLine[],
+  recorded: readonly RecordedOre[]
+): DisputeLine[] {
+  const merged = new Map(held.map((l) => [lineId(l), l]));
+  for (const l of incoming) merged.set(lineId(l), l);
+  const lines = [...merged.values()];
+  if (lines.length > DISPUTE_LINES_MAX)
+    throw new HttpsError('invalid-argument', 'Too many lines for one day', {
+      reason: 'too-many-lines',
+    });
+  const onRecord = new Map<string, number>();
+  for (const r of recorded) {
+    const key = `${r.characterId}:${r.structureId}:${r.date}|${r.typeId}`;
+    onRecord.set(key, (onRecord.get(key) ?? 0) + r.quantity);
+  }
+  const disputed = new Map<string, number>();
+  for (const l of lines) {
+    const key = `${l.recordKey}|${l.typeId}`;
+    disputed.set(key, (disputed.get(key) ?? 0) + l.quantity);
+  }
+  for (const [key, quantity] of disputed) {
+    if (quantity > (onRecord.get(key) ?? 0))
+      throw new HttpsError('invalid-argument', 'That ore is not on the record', {
+        reason: 'not-on-record',
+      });
+  }
+  return lines;
 }
 
 /** One dispute per Miner and day: `solo:7` has a colon, which a doc id avoids. */

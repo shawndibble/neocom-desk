@@ -24,6 +24,7 @@ import type { MinerRow } from '@/engine/corpTaxBook/bookView';
 import { netOf, previewMinerPayment } from '@/engine/corpTaxBook/paymentPreview';
 import { utcDay } from '@/engine/localDay';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { callableErrorReason } from '@/lib/callableError';
 import { callableErrorText } from './feederErrorText';
 import { useBook } from './useBook';
 import { dateWithYear, isk, newId, paidAtFor } from './moonsFormat';
@@ -143,6 +144,7 @@ export function ReasonDialog({
   reasonLabel,
   confirmLabel,
   effect,
+  canConfirm = true,
   run,
 }: {
   open: boolean;
@@ -152,6 +154,8 @@ export function ReasonDialog({
   reasonLabel: string;
   confirmLabel: string;
   effect?: ReactNode;
+  /** False holds the action back whatever the reason says (the intro says why). */
+  canConfirm?: boolean;
   run: (reason: string) => Promise<void>;
 }) {
   const [reason, setReason] = useState('');
@@ -161,7 +165,7 @@ export function ReasonDialog({
       onClose={onClose}
       title={title}
       confirmLabel={confirmLabel}
-      canConfirm={reason.trim().length > 0}
+      canConfirm={canConfirm && reason.trim().length > 0}
       run={() => run(reason.trim())}
     >
       <p>{intro}</p>
@@ -187,6 +191,7 @@ export function RecordPaymentDialog({
   minerName,
   defaultAmount,
   statementId,
+  paymentId,
   onRecorded,
 }: {
   open: boolean;
@@ -196,6 +201,12 @@ export function RecordPaymentDialog({
   defaultAmount: number;
   /** Credit this Statement first (a payment code would do the same). */
   statementId?: string;
+  /**
+   * A fixed id for the hand-recorded payment, e.g. one derived from the declaration it
+   * confirms: a retry, or a second officer, then finds it already recorded instead of
+   * recording the ISK twice, and goes on to `onRecorded`.
+   */
+  paymentId?: string;
   onRecorded?: () => Promise<void>;
 }) {
   const { t } = useTranslation();
@@ -261,15 +272,20 @@ export function RecordPaymentDialog({
           if (!donation) return;
           await edit({ action: 'assignPayment', paymentId: donation.id, minerId: miner.id });
         } else {
-          await edit({
-            action: 'recordPayment',
-            paymentId: newId('m'),
-            minerId: miner.id,
-            characterId: Number(payer),
-            amount: value,
-            at: paidAtFor(date),
-            ...(statementId ? { statementId } : {}),
-          });
+          try {
+            await edit({
+              action: 'recordPayment',
+              paymentId: paymentId ?? newId('m'),
+              minerId: miner.id,
+              characterId: Number(payer),
+              amount: value,
+              at: paidAtFor(date),
+              ...(statementId ? { statementId } : {}),
+            });
+          } catch (e) {
+            // Already recorded under this fixed id: an earlier try landed, so carry on.
+            if (paymentId === undefined || callableErrorReason(e) !== 'payment-exists') throw e;
+          }
         }
         await onRecorded?.();
       }}

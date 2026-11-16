@@ -28,8 +28,8 @@ interface Props {
 
 /**
  * A Conflict day's "Tell {corp}" (#6206): the member sends the book the day, its ore and their
- * Payee, so an officer sees it in Needs you and dismisses the day or rejects it with a note.
- * Once sent it says so, and a rejection shows the officer's reason. Ore listed beyond what the
+ * Payee, so an officer sees it in Needs you and waives that ore's tax or rejects it with a note.
+ * Once sent it says so, and an answer shows the officer's reason. Ore listed beyond what the
  * book recorded is never billed, so there is nothing to dispute.
  */
 export function CorpDisputeAction({ view, payeeName, onSent }: Props) {
@@ -40,6 +40,12 @@ export function CorpDisputeAction({ view, payeeName, onSent }: Props) {
     return (
       <p className="text-text-dim">
         {t(k('told'), { corp: view.corpName, date: view.flagged.at.slice(0, 10) })}
+      </p>
+    );
+  if (view.flagged?.state === 'dismissed')
+    return (
+      <p className="text-text-dim">
+        {t(k('toldDismissed'), { corp: view.corpName, reason: view.flagged.reason ?? '' })}
       </p>
     );
   if (view.flagged?.state === 'rejected')

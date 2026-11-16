@@ -1147,6 +1147,21 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       payeeName: 'Rival Corp',
       ...overrides,
     });
+    // A disputed line must be ore the book recorded (structure 1000, 2026-10-17).
+    const recordOre = (...rows: [characterId: number, typeId?: number][]) =>
+      syncBook(
+        deps(),
+        who(ACCOUNTANT),
+        parseSyncInput(
+          {
+            corporationId: CORP,
+            observed: rows.map(([characterId, typeId = 45490]) =>
+              row(100, '2026-10-18T10:00:00Z', { characterId, typeId })
+            ),
+          },
+          now
+        )
+      );
     // Members see the book only after its setup window; the officer's access is renewed then.
     const pastSetup = async () => {
       now = T0 + 73 * 3_600_000;
@@ -1226,6 +1241,7 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         characterIds: [60, 77],
         mainCharacterId: 60,
       });
+      await recordOre([60], [77, 45491], [50], [99]);
       await pastSetup();
       // A Miner's character disputes for its grouped alt; never for a stranger.
       expect(await reason(dispute(60, [line(99)]))).toBe('not-your-record');
@@ -1239,8 +1255,63 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect(await dispute(50, [line(50)])).toEqual({ disputeId: 'solo_50_2026-10-17' });
     });
 
+    it('refuses ore the book did not record, or more of it than recorded', async () => {
+      await turnOn();
+      await recordOre([50]);
+      await pastSetup();
+      expect(await reason(dispute(50, [line(50, { typeId: 45491 })]))).toBe('not-on-record');
+      expect(await reason(dispute(50, [line(50, { quantity: 101 })]))).toBe('not-on-record');
+      await dispute(50, [line(50, { quantity: 60 })]);
+      // A second call cannot push the day's total past the record.
+      expect(await reason(dispute(50, [line(50, { quantity: 41, payeeName: 'Other Corp' })]))).toBe(
+        'not-on-record'
+      );
+      await dispute(50, [line(50, { quantity: 40, payeeName: 'Other Corp' })]);
+    });
+
+    it('waives only the disputed ore, as a credit Adjustment, behind the Director limit', async () => {
+      await turnOn();
+      await recordOre([50]);
+      await pastSetup();
+      await verifyOfficer(deps(), who(DIRECTOR), parseBookCall(withToken(DIRECTOR)));
+      const { disputeId } = await dispute(50, [line(50, { quantity: 40 })]);
+      const waive = { action: 'dismissDispute', disputeId, minerId: 'solo:50', reason: 'Theirs' };
+      await edit(DIRECTOR, { action: 'updateSettings', patch: { dismissApprovalAboveIsk: 1000 } });
+      expect(await reason(edit(ACCOUNTANT, { ...waive, amountIsk: 1001 }, true))).toBe(
+        'director-approval'
+      );
+      expect(
+        await reason(edit(ACCOUNTANT, { ...waive, minerId: 'solo:51', amountIsk: 900 }, true))
+      ).toBe('wrong-miner');
+      const { adjustmentId } = await edit(ACCOUNTANT, { ...waive, amountIsk: 900 }, true);
+      expect(
+        (
+          await book()
+            .collection('adjustments')
+            .doc(adjustmentId as string)
+            .get()
+        ).data()
+      ).toMatchObject({
+        minerId: 'solo:50',
+        date: '2026-10-17',
+        amount: -900,
+        reason: 'Theirs',
+        disputeId,
+        uids: ['char:50'],
+      });
+      expect(
+        (await book().collection('disputes').doc(disputeId).get()).get('resolution')
+      ).toMatchObject({ kind: 'dismissed', by: ACCOUNTANT, reason: 'Theirs', amountIsk: 900 });
+      // No whole-day dismissal is written.
+      expect((await book().collection('dismissals').get()).size).toBe(0);
+      expect(await reason(edit(ACCOUNTANT, { ...waive, amountIsk: 900 }, true))).toBe(
+        'already-resolved'
+      );
+    });
+
     it('lets an officer reject a dispute once; the day cannot be flagged again', async () => {
       await turnOn();
+      await recordOre([50]);
       await pastSetup();
       const { disputeId } = await dispute(50, [line(50)]);
       await edit(ACCOUNTANT, { action: 'rejectDispute', disputeId, reason: 'Our ore' });

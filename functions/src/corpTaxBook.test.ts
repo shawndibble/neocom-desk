@@ -12,6 +12,7 @@ import {
   parseDeclareOwnInput,
   parseDisputeConflictInput,
   disputeIdFor,
+  mergeDisputeLines,
   needsLiveCheck,
   parseEditAction,
   parseSettingsPatch,
@@ -290,6 +291,82 @@ describe('parsers', () => {
     ).toThrow();
   });
 
+  it('parses an officer waiving a dispute: a priced amount and a reason (#6206)', () => {
+    const base = {
+      action: 'dismissDispute',
+      disputeId: 'm1_2026-11-01',
+      minerId: 'm1',
+      amountIsk: 1_500_000,
+      reason: 'Their ore',
+    };
+    expect(parseEditAction(base)).toEqual(base);
+    // A missing or zero amount would log nothing and slip under the Director limit.
+    expect(() => parseEditAction({ ...base, amountIsk: 0 })).toThrow();
+    expect(() => parseEditAction({ ...base, amountIsk: undefined })).toThrow();
+    expect(() => parseEditAction({ ...base, reason: '' })).toThrow();
+    expect(needsLiveCheck(parseEditAction(base))).toBe(true);
+  });
+
+  describe('mergeDisputeLines (#6206)', () => {
+    const recorded = [
+      { characterId: 7, structureId: 1000, date: '2026-11-01', typeId: 45490, quantity: 60 },
+      { characterId: 7, structureId: 1000, date: '2026-11-01', typeId: 45490, quantity: 40 },
+      { characterId: 7, structureId: 1000, date: '2026-11-01', typeId: 45491, quantity: 10 },
+    ];
+    const line = (o: Record<string, unknown> = {}) => ({
+      recordKey: '7:1000:2026-11-01',
+      typeId: 45490,
+      quantity: 100,
+      payeeName: 'Rival',
+      ...o,
+    });
+    const reasonOf = (fn: () => unknown) => {
+      try {
+        fn();
+      } catch (e) {
+        return (e as { details?: { reason?: string } }).details?.reason;
+      }
+      return undefined;
+    };
+
+    it('adds new lines and drops an exact repeat', () => {
+      expect(
+        mergeDisputeLines([line()], [line(), line({ typeId: 45491, quantity: 10 })], recorded)
+      ).toEqual([line(), line({ typeId: 45491, quantity: 10 })]);
+    });
+
+    it('refuses ore the record does not hold, or more of it than recorded', () => {
+      expect(reasonOf(() => mergeDisputeLines([], [line({ typeId: 1 })], recorded))).toBe(
+        'not-on-record'
+      );
+      expect(
+        reasonOf(() => mergeDisputeLines([], [line({ recordKey: '7:2000:2026-11-01' })], recorded))
+      ).toBe('not-on-record');
+      expect(reasonOf(() => mergeDisputeLines([], [line({ quantity: 101 })], recorded))).toBe(
+        'not-on-record'
+      );
+      // Split between two Payees across calls, the total still cannot pass the record.
+      expect(
+        reasonOf(() =>
+          mergeDisputeLines(
+            [line({ quantity: 60 })],
+            [line({ quantity: 50, payeeName: 'B' })],
+            recorded
+          )
+        )
+      ).toBe('not-on-record');
+    });
+
+    it('caps the lines one day holds across every call', () => {
+      const many = Array.from({ length: 100 }, (_, i) => line({ quantity: 1, payeeName: `P${i}` }));
+      const big = [{ ...recorded[0], quantity: 1000 }];
+      expect(mergeDisputeLines([], many, big)).toHaveLength(100);
+      expect(
+        reasonOf(() => mergeDisputeLines(many, [line({ quantity: 1, payeeName: 'X' })], big))
+      ).toBe('too-many-lines');
+    });
+  });
+
   it('accepts only a 43-character url-safe token', () => {
     expect(parseToken({ token: 'a'.repeat(43) })).toHaveLength(43);
     expect(() => parseToken({ token: 'short' })).toThrow();
@@ -386,6 +463,11 @@ describe('dismissalNeedsDirector (D6, #4194)', () => {
 
   it('counts an omitted amount as over the limit', () => {
     expect(dismissalNeedsDirector(100, [1, undefined], false)).toBe(true);
+  });
+
+  it('counts a zero amount as unpriced, so a day not in view cannot slip under the limit', () => {
+    expect(dismissalNeedsDirector(100, [1, 0], false)).toBe(true);
+    expect(dismissalNeedsDirector(null, [0], false)).toBe(false);
   });
 });
 

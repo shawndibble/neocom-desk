@@ -61,6 +61,8 @@ import {
   dismissalNeedsDirector,
   defaultSettings,
   parseRecordKey,
+  mergeDisputeLines,
+  type RecordedOre,
   parseStatement,
   moveStartRate,
   rateKey,
@@ -1551,6 +1553,61 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         },
       };
     }
+    case 'dismissDispute': {
+      // Only the disputed ore is waived, as a credit on the day (#6206): the rest of the day
+      // stays billed. The client prices it from the day's charge; zero is refused by the parser.
+      const ref = col(c, DISPUTES).doc(action.disputeId);
+      const dispute = await mustGet(c, ref, 'Dispute');
+      if (dispute.resolution) fail('failed-precondition', 'Already resolved', 'already-resolved');
+      if (dispute.minerId !== action.minerId)
+        fail('invalid-argument', "Dispute is another Miner's", 'wrong-miner');
+      if (
+        dismissalNeedsDirector(
+          c.book.dismissApprovalAboveIsk as number | null | undefined,
+          [action.amountIsk],
+          c.access.isDirector
+        )
+      ) {
+        throw new HttpsError(
+          'permission-denied',
+          'A Director must approve this size of dismissal',
+          { reason: 'director-approval' }
+        );
+      }
+      const uids = await minerUids(c, action.minerId);
+      const id = `a${now}_${rand(4)}`;
+      tx.create(col(c, ADJUSTMENTS).doc(id), {
+        id,
+        minerId: action.minerId,
+        date: dispute.date,
+        amount: -action.amountIsk,
+        reason: action.reason,
+        by,
+        at: iso,
+        uids,
+        disputeId: action.disputeId,
+      });
+      tx.update(ref, {
+        resolution: {
+          kind: 'dismissed',
+          at: iso,
+          by,
+          reason: action.reason,
+          amountIsk: action.amountIsk,
+          adjustmentId: id,
+        },
+      });
+      return {
+        detail: {
+          disputeId: action.disputeId,
+          adjustmentId: id,
+          minerId: action.minerId,
+          amountIsk: action.amountIsk,
+          reason: action.reason,
+        },
+        result: { adjustmentId: id },
+      };
+    }
     case 'rejectDispute': {
       const ref = col(c, DISPUTES).doc(action.disputeId);
       const dispute = await mustGet(c, ref, 'Dispute');
@@ -2165,18 +2222,34 @@ export async function disputeConflict(deps: BookDeps, caller: Caller, input: Dis
   return deps.db.runTransaction(async (tx) => {
     await memberBook(tx, deps, corporationId);
     const { minerId, uids } = await callerMiner(tx, deps, corporationId, caller, characterId);
+    const characters = new Set<number>();
     for (const line of input.lines) {
-      if (!uids.includes(`char:${parseRecordKey(line.recordKey).characterId}`))
+      const lineCharacter = parseRecordKey(line.recordKey).characterId;
+      if (!uids.includes(`char:${lineCharacter}`))
         fail('permission-denied', 'Not your ore', 'not-your-record');
+      characters.add(lineCharacter);
     }
     const disputeId = disputeIdFor(minerId, date);
     const ref = sub(deps.db, corporationId, DISPUTES).doc(disputeId);
     const held = (await tx.get(ref)).data();
     if (held?.resolution) fail('failed-precondition', 'An officer answered this day', 'rejected');
+    const heldLines = (held?.lines as DisputeConflictInput['lines'] | undefined) ?? [];
+    for (const line of heldLines) characters.add(parseRecordKey(line.recordKey).characterId);
+    // The ore each line names, held or new, must be on the book's record, no more than recorded.
+    const recorded: RecordedOre[] = [];
+    for (const id of characters) {
+      const rows = await tx.get(
+        sub(deps.db, corporationId, OBSERVED)
+          .where('characterId', '==', id)
+          .where('date', '==', date)
+      );
+      for (const r of rows.docs) recorded.push(r.data() as RecordedOre);
+    }
+    const lines = mergeDisputeLines(heldLines, input.lines, recorded);
     const iso = new Date(deps.now()).toISOString();
     if (held) {
       tx.update(ref, {
-        lines: FieldValue.arrayUnion(...input.lines),
+        lines,
         uids,
         updatedAt: iso,
         ...(input.note !== undefined ? { note: input.note } : {}),
@@ -2186,7 +2259,7 @@ export async function disputeConflict(deps: BookDeps, caller: Caller, input: Dis
         id: disputeId,
         minerId,
         date,
-        lines: input.lines,
+        lines,
         by: characterId,
         at: iso,
         updatedAt: iso,
