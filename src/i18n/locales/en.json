@@ -13712,6 +13712,17 @@
       "unmatched_one": "{{count}} line not matched",
       "unmatched_other": "{{count}} lines not matched",
       "unmatchedLine": "line {{lines}} · {{name}}",
+      "quantityTextHint": "No quantity found on a tab-separated line. Quantity must be the second column: drag it back beside Name in the inventory's details view and copy again.",
+      "quantityColumn": {
+        "link": "Choose the quantity column",
+        "title": "Which column is the quantity?",
+        "intro": "These lines have text where the quantity belongs. Pick the column that holds it, or leave the lines out of the total.",
+        "columnHeader": "Column {{n}}",
+        "choices": "Quantity column",
+        "choice": "Column {{column}} · {{sample}}",
+        "confirm": "Use this column",
+        "leave": "Leave them out"
+      },
       "abyssal_one": "{{count}} abyssal module not priced",
       "abyssal_other": "{{count}} abyssal modules not priced",
       "abyssalHint": "An abyssal module is worth its own rolls, which a pasted name doesn't carry. MutaMarket can estimate one from its in-game link.",

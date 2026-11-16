@@ -5,6 +5,7 @@ import {
   parseAppraisalPaste,
   parseAppraisalPasteDetailed,
   pasteBoxRows,
+  quantityColumnChoices,
 } from '@/engine/market/appraisalPaste';
 
 describe('countPasteLines', () => {
@@ -188,8 +189,8 @@ describe('parseAppraisalPaste', () => {
     ).toEqual({
       entries: [{ name: 'Pyerite', quantity: 5, lines: [1] }],
       unreadable: [
-        { name: 'Tritanium\t12.5', lines: [2, 4] },
-        { name: 'Isogen\t5 m3', lines: [3] },
+        { name: 'Tritanium\t12.5', lines: [2, 4], reason: 'unreadable-number' },
+        { name: 'Isogen\t5 m3', lines: [3], reason: 'unreadable-number' },
       ],
     });
   });
@@ -343,5 +344,84 @@ describe('removeItemFromPaste', () => {
   it('answers null for an EFT fit, whose lines are not one item each', () => {
     const fit = '[Rifter, Test]\nDamage Control II\n\nTritanium x5';
     expect(removeItemFromPaste(fit, 'Tritanium')).toBeNull();
+  });
+});
+
+describe('text in the quantity column (#6281)', () => {
+  const TAB_TEXT = 'Tritanium\tMineral\t10000\nPyerite\tMineral\t500';
+
+  it('reports a tab line whose second field is text instead of pricing it as one', () => {
+    expect(parseAppraisalPaste('Tritanium\tMineral\t10000')).toEqual([]);
+    expect(parseAppraisalPasteDetailed('Tritanium\tMineral\t10000').unreadable).toEqual([
+      {
+        name: 'Tritanium\tMineral\t10000',
+        lines: [1],
+        reason: 'text-quantity',
+        columns: [{ column: 3, value: '10000' }],
+      },
+    ]);
+  });
+
+  it('keeps a blank second field, a bare tab and numeric fields as they were', () => {
+    expect(parseAppraisalPaste('Rifter\t\tFrigate\nIsogen\t')).toEqual([
+      { name: 'Rifter', quantity: 1, lines: [1] },
+      { name: 'Isogen', quantity: 1, lines: [2] },
+    ]);
+    expect(parseAppraisalPaste('Tritanium\t10000\tMineral\t100 m3')).toEqual([
+      { name: 'Tritanium', quantity: 10000, lines: [1] },
+    ]);
+  });
+
+  it('lists only whole-number columns 3 and later, and reads them with parseQuantity rules', () => {
+    const { unreadable } = parseAppraisalPasteDetailed('Tritanium\tMineral\t1,200\t12.5\tx\t7');
+    expect(unreadable[0].columns).toEqual([
+      { column: 3, value: '1,200' },
+      { column: 6, value: '7' },
+    ]);
+  });
+
+  it('prices reported lines with the chosen column', () => {
+    expect(parseAppraisalPaste(TAB_TEXT, { quantityColumn: 3 })).toEqual([
+      { name: 'Tritanium', quantity: 10000, lines: [1] },
+      { name: 'Pyerite', quantity: 500, lines: [2] },
+    ]);
+    expect(parseAppraisalPasteDetailed(TAB_TEXT, { quantityColumn: 3 }).unreadable).toEqual([]);
+  });
+
+  it('leaves a line with no whole number in the chosen column reported', () => {
+    const { entries, unreadable } = parseAppraisalPasteDetailed(
+      'Tritanium\tMineral\t10000\nPyerite\tMineral\tmany',
+      { quantityColumn: 3 }
+    );
+    expect(entries).toEqual([{ name: 'Tritanium', quantity: 10000, lines: [1] }]);
+    expect(unreadable.map((line) => line.lines)).toEqual([[2]]);
+  });
+
+  it('never moves a numeric, blank, multibuy or bare line to the chosen column', () => {
+    const text = 'Tritanium\t5\tMineral\t900\nRifter\t\tFrigate\t3\nPyerite 7\nIsogen';
+    expect(parseAppraisalPaste(text, { quantityColumn: 4 })).toEqual(parseAppraisalPaste(text));
+  });
+
+  it('is not applied to an EFT fit', () => {
+    const fit = '[Rifter, Test]\nDamage Control II';
+    expect(parseAppraisalPaste(fit, { quantityColumn: 3 })).toEqual(parseAppraisalPaste(fit));
+  });
+});
+
+describe('quantityColumnChoices', () => {
+  it('offers a column only when every reported text line holds a whole number there', () => {
+    const { unreadable } = parseAppraisalPasteDetailed(
+      'Tritanium\tMineral\t10000\t4\nPyerite\tMineral\t500\tx'
+    );
+    expect(quantityColumnChoices(unreadable)).toEqual([{ column: 3, sample: '10000' }]);
+  });
+
+  it('is empty with no text-quantity lines or no shared column', () => {
+    expect(quantityColumnChoices([])).toEqual([]);
+    const { unreadable } = parseAppraisalPasteDetailed('Tritanium\tMineral\tx\nIsogen\tGroup\t5');
+    expect(quantityColumnChoices(unreadable)).toEqual([]);
+    expect(
+      quantityColumnChoices(parseAppraisalPasteDetailed('Tritanium\t12.5').unreadable)
+    ).toEqual([]);
   });
 });

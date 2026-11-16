@@ -52,6 +52,9 @@ import { useOwnedAtStation } from './useOwnedAtStation';
 import { isValidPricePercent } from './pricePercent';
 import { PastedLinesNote } from './PastedLinesNote';
 import { AppraisalPasteCard } from './AppraisalPasteCard';
+import { QuantityColumnModal } from './QuantityColumnModal';
+import { quantityColumnChoices } from '@/engine/market/appraisalPaste';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { AppraisalResultActions } from './AppraisalResultActions';
 import { AppraisalSummary } from './AppraisalSummary';
 import { LivePriceBar, LivePriceStatus } from './LivePriceStatus';
@@ -287,6 +290,22 @@ export function AppraisalPanel({
       </p>
     </PastedLinesNote>
   );
+  // Text where a count belongs: reported, with the way out. Only the current
+  // paste's result counts — a stale one must not open a picker for new text.
+  const textLines =
+    result?.pasteText === controller.submitted ? (result.textQuantityLines ?? []) : [];
+  const quantityChoices = quantityColumnChoices(textLines);
+  // Offered once per paste: adjusted during render, like the fold above.
+  const [quantityOfferedFor, setQuantityOfferedFor] = useState<string | null>(null);
+  const [quantityOpen, setQuantityOpen] = useState(false);
+  if (
+    quantityChoices.length > 0 &&
+    controller.quantityColumn === null &&
+    quantityOfferedFor !== controller.submitted
+  ) {
+    setQuantityOfferedFor(controller.submitted);
+    setQuantityOpen(true);
+  }
   const unmatchedLinesNote = unmatched.length > 0 && (
     <PastedLinesNote
       heading={
@@ -297,7 +316,25 @@ export function AppraisalPanel({
       }
       headingClassName="flex items-center gap-1.5 text-warning"
       entries={unmatched}
-    />
+    >
+      {textLines.length > 0 && (
+        <p className="pt-1 text-[0.6875rem] text-text-dim">
+          {t('market.appraisal.quantityTextHint')}
+          {quantityChoices.length > 0 && (
+            <>
+              {' '}
+              <button
+                type="button"
+                className={inlineLinkClassName}
+                onClick={() => setQuantityOpen(true)}
+              >
+                {t('market.appraisal.quantityColumn.link')}
+              </button>
+            </>
+          )}
+        </p>
+      )}
+    </PastedLinesNote>
   );
   // About the pasted list, so it shows folded or open.
   const unmatchedNote = (unmatchedLinesNote || abyssalNote) && (
@@ -498,6 +535,16 @@ export function AppraisalPanel({
           </Panel>
         </div>
       </div>
+      <QuantityColumnModal
+        open={quantityOpen && quantityChoices.length > 0}
+        onClose={() => setQuantityOpen(false)}
+        onChoose={(column) => {
+          setQuantityOpen(false);
+          controller.chooseQuantityColumn(column);
+        }}
+        lines={textLines}
+        choices={quantityChoices}
+      />
       {refineModal !== null && result !== null && (
         <RefineBreakdownModal
           open

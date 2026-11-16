@@ -51,7 +51,11 @@ import {
   type AppraisalCatalogue,
   type AppraisalUnmatched,
 } from '@/engine/market/appraisalMatch';
-import { parseAppraisalPaste, parseAppraisalPasteDetailed } from '@/engine/market/appraisalPaste';
+import {
+  parseAppraisalPaste,
+  parseAppraisalPasteDetailed,
+  type AppraisalUnreadableLine,
+} from '@/engine/market/appraisalPaste';
 import {
   appliedRefiningImplantPct,
   refiningImplantApplies,
@@ -72,6 +76,13 @@ import { DEFAULT_REFINING_SETUP, type RefiningSetup } from '@/engine/industry/re
 export interface AppraisalOutcome {
   appraisal: Appraisal;
   unmatched: AppraisalUnmatched[];
+  /** The paste this was computed from, so a stale result is never read as the current one's. */
+  pasteText?: string;
+  /**
+   * The lines (also in `unmatched`) whose second tab field is text, left out of
+   * the total — each with the whole-number columns the pilot could pick instead.
+   */
+  textQuantityLines?: AppraisalUnreadableLine[];
   /** Unmatched lines naming an abyssal type; kept apart so they don't read as typos. */
   abyssal?: AppraisalUnmatched[];
   /**
@@ -152,6 +163,8 @@ export interface AppraiseOptions {
   force?: boolean;
   /** The pilot's facility yield and tax; absent = an NPC station at 50%, no tax. */
   refining?: RefiningSetup;
+  /** The tab column the pilot chose as the quantity of text-quantity lines. */
+  quantityColumn?: number | null;
 }
 
 /** Every abyssal type's name, lower-case: read only when a paste has unmatched lines. */
@@ -175,9 +188,9 @@ export async function appraisePaste(
   hub: TradeHub,
   pricePercent: number,
   characterId: number | null = null,
-  { force = false, refining }: AppraiseOptions = {}
+  { force = false, refining, quantityColumn = null }: AppraiseOptions = {}
 ): Promise<AppraisalOutcome> {
-  const { entries, unreadable } = parseAppraisalPasteDetailed(text);
+  const { entries, unreadable } = parseAppraisalPasteDetailed(text, { quantityColumn });
   const [catalogue, typesById] = await Promise.all([
     loadAppraisalCatalogue(),
     loadMarketTypesById(),
@@ -290,6 +303,8 @@ export async function appraisePaste(
   return {
     appraisal: buildAppraisal(items, pricePercent),
     unmatched,
+    pasteText: text,
+    textQuantityLines: unreadable.filter((line) => line.reason === 'text-quantity'),
     abyssal,
     implantBonusPct: implantApplied ? (modifiers?.refiningImplantPct ?? 0) : 0,
     refinesOreOrIce,
@@ -325,9 +340,9 @@ export interface HubComparisonRow {
 export async function compareHubs(
   text: string,
   pricePercent: number,
-  { force = false }: AppraiseOptions = {}
+  { force = false, quantityColumn = null }: AppraiseOptions = {}
 ): Promise<HubComparisonRow[]> {
-  const entries = parseAppraisalPaste(text);
+  const entries = parseAppraisalPaste(text, { quantityColumn });
   const catalogue = await loadAppraisalCatalogue();
   const { matched } = matchAppraisalEntries(entries, catalogue);
   const typeIds = matched.map((match) => match.typeId);
