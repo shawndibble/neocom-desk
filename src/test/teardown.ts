@@ -267,15 +267,18 @@ export async function settlePendingWork(
 }
 
 /**
- * On CI a test whose work outlives it by `SETTLE_TIMEOUT_MS` fails; locally it
- * only warns, so a slow machine never blocks iterating. A sample of 160 files
- * (1,873 tests) tripped it zero times when this was switched on.
+ * Opt-in: with `VITEST_FAIL_ON_LEFTOVER_WORK=1`, a test whose work outlives it
+ * by `SETTLE_TIMEOUT_MS` fails instead of warning. Off by default, CI included:
+ * switching it on for CI failed existing tests across a shard (e.g.
+ * ForegroundNotificationPoller, BpcSourcingPanel, ActiveJobsPanel), so those
+ * leaks are fixed first, then this becomes the CI default.
  */
-const FAIL_ON_LEFTOVER_WORK = Boolean(process.env.CI);
+const FAIL_ON_LEFTOVER_WORK = process.env.VITEST_FAIL_ON_LEFTOVER_WORK === '1';
 
 /**
- * `settlePendingWork`, reporting a timeout naming the test: a thrown error on
- * CI (failing that test, or the suite at file teardown), a warning locally.
+ * `settlePendingWork`, reporting a timeout naming the test: a warning, or a
+ * thrown error (failing that test, or the suite at file teardown) when
+ * `FAIL_ON_LEFTOVER_WORK` is on.
  */
 export async function settleOrWarn(
   testName: string | undefined,

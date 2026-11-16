@@ -101,7 +101,7 @@ describe('fake timers a test never restored', () => {
 });
 
 describe('work a test leaves running past the settle window', () => {
-  it('fails the test on CI', async () => {
+  it('fails the test when failing is switched on', async () => {
     void fetch('https://teardown.test/hang').catch(() => {});
     await expect(settleOrWarn('leaky test', 'fetch', true)).rejects.toThrow(
       /\[teardown\] leaky test: still pending/
