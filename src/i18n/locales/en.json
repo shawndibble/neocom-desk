@@ -8025,8 +8025,7 @@
         "safeOnce": "Safe to pay once {{corp}} syncs (last synced {{ago}}).",
         "neverSynced": "Safe to pay once {{corp}} syncs (never synced).",
         "openDay": "{{date}}: safe to pay once it is closed, after {{time}} UTC on {{closeDate}} and {{corp}}'s next sync.",
-        "credit": "{{amount}} ISK credit with {{corp}} goes on your next Statement.",
-        "left": "You left {{corp}}. Its book still shows your lines and what you owe."
+        "credit": "{{amount}} ISK credit with {{corp}} goes on your next Statement."
       },
       "diff": {
         "open": "Compare with the book",

@@ -19,7 +19,8 @@ function shortDate(date: string, language: string): string {
  * D12's "Safe to pay" wording under the corp's balance card: until a sync after
  * the grace period the corp's record is not final ("Safe to pay once <Corp>
  * syncs (last synced 2d ago)"), then "Safe to pay — 12 Jul is closed". Also
- * credit on the next Statement and a leaver's note. A donation still waiting
+ * credit on the next Statement. A corporation the member left says so in its own notice
+ * (`LeftCorpNotice`), with Pay and Stop showing beside it. A donation still waiting
  * for the corp to credit it is left unsaid: that is the corp's side to handle.
  */
 export function CorpBookSyncNote({
@@ -42,7 +43,7 @@ export function CorpBookSyncNote({
   const closedThrough = summary.closedThrough;
   // Shown on the Tax page and in the pay dialog alike (#6204): credit is money the member has.
   const credit = summary.credit > 0;
-  const hasWords = owedNow > 0 || book.pendingFrom !== undefined || book.left || credit;
+  const hasWords = owedNow > 0 || book.pendingFrom !== undefined || credit;
   if (!hasWords) return null;
 
   const safe =
@@ -83,11 +84,6 @@ export function CorpBookSyncNote({
             amount: formatIsk(summary.credit, 0),
             corp: corpName,
           })}
-        </span>
-      )}
-      {book.left && (
-        <span className="text-text-dim">
-          {t('miningTax.corpBook.sync.left', { corp: corpName })}
         </span>
       )}
     </p>
