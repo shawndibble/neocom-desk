@@ -17,8 +17,8 @@ export interface PushDivisionNamesDeps {
 /**
  * The names to send with a settings change that sets the book's `divisions`, so a member sees a
  * newly read division by the corp's name at once rather than after a Director's next visit. Null
- * when they are unchanged, or when the names could not be read (no role, ESI down): the stored
- * names then stay as they are.
+ * when they are unchanged, when none of them is named, or when the names could not be read (no
+ * role, ESI down): the stored names then stay as they are. Only a Director's visit clears them.
  */
 export async function divisionNamesFor(
   characterId: number,
@@ -30,7 +30,8 @@ export async function divisionNamesFor(
 ): Promise<DivisionNames | null> {
   const result = await load(characterId, corporationId, canReadDivisions).catch(() => null);
   const wallet = result?.cached?.data.wallet;
-  return wallet ? divisionNamesToPush(divisions, stored, wallet) : null;
+  const names = wallet ? divisionNamesToPush(divisions, stored, wallet) : null;
+  return names && Object.keys(names).length > 0 ? names : null;
 }
 
 /** Whether it wrote. Throws what the read or the write threw; the caller logs it. */
