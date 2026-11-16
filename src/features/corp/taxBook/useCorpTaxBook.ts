@@ -140,16 +140,14 @@ export function useCorpTaxBook(options: { autoSync?: boolean } = {}): CorpTaxBoo
   }, [autoSync, canSync, loaded, key, summary, now, sync]);
 
   // A Director's visit stores the corp's wallet division names on the book (#6161), once per
-  // visit and again when the book's divisions change (a "Count division" answer), so members'
-  // Settle up names the Account. Silent: a failure changes nothing on screen.
+  // visit, so members' Settle up names the Account. Silent: a failure changes nothing on screen.
   const canReadDivisions = access.capabilities.canReadDivisions;
   const namesPushed = useRef<string | null>(null);
   useEffect(() => {
     if (!autoSync || !canReadDivisions || !loaded || !summary?.active) return;
-    const pushKey = key === null ? null : `${key}:${summary.divisions.join(',')}`;
-    if (pushKey === null || namesPushed.current === pushKey) return;
+    if (key === null || namesPushed.current === key) return;
     if (characterId === null || corporationId === null) return;
-    namesPushed.current = pushKey;
+    namesPushed.current = key;
     pushDivisionNames(characterId, corporationId, summary).catch((error: unknown) =>
       console.warn(
         'Storing the wallet division names on the Corp Tax Book failed',

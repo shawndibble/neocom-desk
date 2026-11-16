@@ -19,23 +19,13 @@ export function corpPayAccount(
     : t('miningTax.corpBook.pay.division', { division });
 }
 
-/**
- * Every Account the book reads donations from, in division order: as `corpPayAccount`, but an
- * unnamed division is just "Division N" — the "(number N in the list)" hint repeated for each
- * of several reads as noise.
- */
+/** Every Account the book reads donations from (`corpPayAccount` each), in division order. */
 export function corpPayAccounts(
   divisions: readonly number[],
   names: Readonly<DivisionNames> | undefined,
   t: Translate
 ): string[] {
-  return divisions.map(
-    (d) =>
-      names?.[d] ||
-      (d === 1
-        ? t('miningTax.corpBook.pay.masterWallet')
-        : t('miningTax.corpBook.pay.divisionShort', { division: d }))
-  );
+  return divisions.map((d) => corpPayAccount(d, names, t));
 }
 
 /** Whether the book reads all of the corp's wallet divisions, so no donation can miss it. */

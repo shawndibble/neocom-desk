@@ -11,13 +11,6 @@ describe('corpPayAccounts (#6204)', () => {
       'MOON TAXES',
     ]);
   });
-
-  it('lists an unnamed division as just its number, without the transfer-window hint', () => {
-    expect(corpPayAccounts([1, 2], undefined, t)).toEqual([
-      'miningTax.corpBook.pay.masterWallet',
-      'miningTax.corpBook.pay.divisionShort {"division":2}',
-    ]);
-  });
 });
 
 describe('readsEveryDivision', () => {

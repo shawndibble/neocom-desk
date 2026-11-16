@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CorporationDivisions } from '@/esi/endpoints';
-import { pushDivisionNames, type PushDivisionNamesDeps } from './pushDivisionNames';
+import {
+  divisionNamesFor,
+  pushDivisionNames,
+  type PushDivisionNamesDeps,
+} from './pushDivisionNames';
 
 function deps(data: CorporationDivisions | null) {
   const edit = vi.fn().mockResolvedValue({});
@@ -33,5 +37,31 @@ describe('pushDivisionNames (#6161)', () => {
     await expect(pushDivisionNames(1, 77, stored, noWallet.deps)).resolves.toBe(false);
     expect(none.edit).not.toHaveBeenCalled();
     expect(noWallet.edit).not.toHaveBeenCalled();
+  });
+});
+
+describe('divisionNamesFor', () => {
+  it('names the divisions a settings change is about to read, for the same patch', async () => {
+    const d = deps({
+      wallet: [
+        { division: 2, name: 'Market Funds' },
+        { division: 5, name: 'X' },
+      ],
+    });
+    await expect(divisionNamesFor(1, 77, true, [1, 2], {}, d.load)).resolves.toEqual({
+      2: 'Market Funds',
+    });
+    expect(d.load).toHaveBeenCalledWith(1, 77, true);
+  });
+
+  it('says nothing when the names are unchanged or could not be read', async () => {
+    const same = deps({ wallet: [{ division: 2, name: 'Market Funds' }] });
+    await expect(
+      divisionNamesFor(1, 77, true, [2], { 2: 'Market Funds' }, same.load)
+    ).resolves.toBeNull();
+    await expect(divisionNamesFor(1, 77, false, [2], {}, deps(null).load)).resolves.toBeNull();
+    await expect(
+      divisionNamesFor(1, 77, true, [2], {}, vi.fn().mockRejectedValue(new Error('down')))
+    ).resolves.toBeNull();
   });
 });
