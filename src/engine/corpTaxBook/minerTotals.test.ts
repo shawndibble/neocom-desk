@@ -10,7 +10,7 @@ import {
 } from '../../../functions/src/corpTaxBookMinerTotals';
 import { overdueAtFor } from '../../../functions/src/corpTaxBookEngine';
 import { allocatePayments, dismissalCredits, isBeforeBook } from './allocation';
-import { placeOfFactory } from './bookView';
+import { placeOfFactory } from './openSet';
 import type { DismissableCharge, Dismissal } from './dismissals';
 import { overdueStatus, type Declaration } from './overdue';
 import type { Statement, StatementLine } from './statements';
