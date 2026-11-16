@@ -392,7 +392,14 @@ top-level acquisition (resolved ME/TE), and then `computeBuildPlan`, which
 clamps runs/ME/TE, resolves the `FacilityPreset` and calls pure
 `engine/industry/buildVsBuy` → `BuildResult` (materials, job fee breakdown,
 build-vs-buy verdict). Never throws — computation errors surface as
-`{ result: null, error }`.
+`{ result: null, error }`. What the plan is worth on top of that resolution
+— the Depth Price re-resolve, the product's troll-capped sale price
+(`productSalePrice`) and the hero's figures on the pilot's Profit Basis — is
+`features/industry/planPricing`: `pricePlan` for the list, Compare and every
+Group Rollup (Depth Prices through a `DepthSource`, `loadDepthPrices` in
+production), `planVerdictOf` for the page, which walks its own cached books
+(`useResolvedPlan`). Never read the product's price or apply the Profit Basis
+outside it.
 
 **SDE build-time pipeline**
 `scripts/build-sde.mjs` downloads Fuzzwork SDE CSVs (`invTypes`, `invGroups`,

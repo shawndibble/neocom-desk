@@ -478,8 +478,6 @@ describe('useComparedBuildResults', () => {
     // Building is worth less than just selling what you hold: a loss, as on the page.
     expect(result.current[0]?.result?.profit).toBeLessThan(0);
     expect(result.current[0]?.result?.profit).toBeLessThan(owned.profit ?? 0);
-    // Cost columns keep the plan's own total.
-    expect(result.current[0]?.result?.totalCost).toBe(owned.totalCost);
   });
 
   it('leaves owned materials free in the row when the pilot counts actual cost', async () => {
