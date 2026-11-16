@@ -218,7 +218,10 @@ export async function appraisePaste(
   const { abyssal } = split;
   // A line whose quantity couldn't be read is reported with the unmatched ones,
   // in source order, after the abyssal split so it can never read as abyssal.
-  const unmatched = [...split.unmatched, ...unreadable].sort((a, b) => a.lines[0] - b.lines[0]);
+  const unmatched = [
+    ...split.unmatched,
+    ...unreadable.map(({ name, lines }) => ({ name, lines })),
+  ].sort((a, b) => a.lines[0] - b.lines[0]);
   const typeIds = matched.map((match) => match.typeId);
 
   const [reprocessingMap, modifiers, lpMatches] =
