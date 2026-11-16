@@ -525,7 +525,7 @@ export function recordCorpPayment(
         const all = (
           await db.miningTaxAssignments.where('characterId').equals(row.characterId).toArray()
         ).filter((a) => a.date === row.date && a.solarSystemId === row.solarSystemId);
-        const corpIds = payeeIds;
+        const corpIds = payeeIds; // a const the filter's closure sees as defined
         const own = all.filter(
           (a) =>
             a.payeeId !== undefined &&

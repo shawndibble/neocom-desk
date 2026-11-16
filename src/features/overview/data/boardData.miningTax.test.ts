@@ -14,9 +14,12 @@ vi.mock('@/features/miningTax/snapshot', () => ({
   }),
 }));
 
-const owed = vi.hoisted(() => ({ balances: [] as unknown[] }));
+const owed = vi.hoisted(() => ({ balances: [] as unknown[], unassignedCount: 0 }));
 vi.mock('@/features/miningTax/owedNow', () => ({
-  loadOwedBalances: async () => owed.balances,
+  loadOwedBalances: async () => ({
+    balances: owed.balances,
+    unassignedCount: owed.unassignedCount,
+  }),
 }));
 
 const { loadMiningTaxBoard } = await import('./boardData');
@@ -55,6 +58,7 @@ describe('loadMiningTaxBoard', () => {
     const board = await loadMiningTaxBoard();
     expect(board.unpaidIsk).toBe(29_980_000);
     expect(board.payeeCount).toBe(1);
+    expect(board.unassignedCount).toBe(0);
     expect(board.oldestUnpaidDays).toBe(0);
     expect(board.payees).toEqual([
       { payeeId: 'corp', name: 'Bureau', unpaidIsk: 29_980_000, oldestDays: 0, entries: 1 },

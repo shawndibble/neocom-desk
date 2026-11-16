@@ -8527,7 +8527,7 @@
       "unassignedHint_other": "{{count}} entries have no Payee yet",
       "acrossPayees_one": "across {{count}} payee",
       "acrossPayees_other": "across {{count}} payees",
-      "uncreditedNote": "{{amount}} ISK you donated isn't credited yet — check the wallet division before paying again."
+      "uncreditedNote": "{{amount}} ISK you donated isn't credited yet — check the wallet division ({{accounts}}) before paying again."
     },
     "continue": {
       "eyebrow": "New EVE day",

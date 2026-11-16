@@ -61,17 +61,19 @@ const payee: PayeeRecord = {
 
 describe('loadOwedBalances', () => {
   it('without a Corp Tax Book, is the personal ledger: owed Assignments per Payee', async () => {
-    const balances = await loadOwedBalances({
+    const { balances, unassignedCount } = await loadOwedBalances({
       rows: [
         row('2026-11-01', [assignment('a1')]),
         row('2026-11-02', [assignment('a2', { date: '2026-11-02', taxOwed: 50 })]),
         row('2026-11-03', [assignment('a3', { date: '2026-11-03', status: 'paid' })]),
+        { ...row('2026-11-04', []), unassignedOreLines: [{ typeId: ORE, quantity: 100 }] },
       ],
       characters: [{ characterId: CHAR, characterName: 'Miner' }],
       payeesByCharacter: new Map([[CHAR, [payee]]]),
     });
 
     expect(balances).toHaveLength(1);
+    expect(unassignedCount).toBe(1);
     expect(balances[0]).toMatchObject({ payee: { id: 'p1' }, owed: 150 });
     expect(balances[0].members.map((m) => m.assignment.id)).toEqual(['a1', 'a2']);
     // No book to overlay: the wallet is never read for in-flight donations.

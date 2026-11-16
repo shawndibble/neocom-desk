@@ -1,12 +1,11 @@
 import { useMemo } from 'react';
 import type { PayeeRecord } from '@/db';
-import { summarizeUnassigned } from '@/features/miningTax/balances';
 import { allMembers, type DisplayRow } from '@/features/miningTax/groupRows';
 import { systemsByPayee } from '@/features/miningTax/suggestPayee';
 import { useLinkSuggestions } from '@/features/miningTax/useMadePayments';
 import type { PersonalOverlay } from '@/engine/corpTaxBook/personal';
 import { computeOwedByPayee } from './owedByPayee';
-import { alsoBilledShareOf, owedBalances } from './owedNow';
+import { alsoBilledShareOf, owedBalances, unassignedSummary } from './owedNow';
 
 interface Args {
   characterFiltered: readonly DisplayRow[];
@@ -40,14 +39,8 @@ export function useTaxBalances({
     () => owedBalances(characterFiltered, ledgerPayees, alsoBilled),
     [characterFiltered, ledgerPayees, alsoBilled]
   );
-  // A row a Corp Tax Book has labelled (Pending corp record, Unattributed) is not waiting on the
-  // member: it stays out of the "needs assigning" count.
   const unassigned = useMemo(
-    () =>
-      summarizeUnassigned(
-        characterFiltered.filter((dr) => !dr.corp),
-        estimatedValueOf
-      ),
+    () => unassignedSummary(characterFiltered, estimatedValueOf),
     [characterFiltered, estimatedValueOf]
   );
 

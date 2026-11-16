@@ -36,10 +36,10 @@ interface OwedBalancesProps {
   hideLinkPayment?: (balance: PayeeBalance) => boolean;
   /**
    * ISK the pilot donated to this Payee's Corp Tax Book that the book hasn't credited (#6204's
-   * uncredited donations), 0 when none. Above 0 the card says so on a line of its own and Settle
-   * up drops to a plain button: paying the full amount again may pay twice.
+   * uncredited donations), with the Accounts the book reads. Above 0 the card says so on a line
+   * of its own and Settle up drops to a plain button: paying the full amount again may pay twice.
    */
-  uncreditedOf?: (balance: PayeeBalance) => number;
+  uncreditedOf?: (balance: PayeeBalance) => { amount: number; accounts: string } | undefined;
   onAssignNext: () => void;
   onReviewPayments: () => void;
   /**
@@ -204,7 +204,8 @@ export function OwedBalances({
           {owed.map((balance) => {
             const days = owedForDays(balance);
             const characterName = characterNameOf?.(balance);
-            const uncredited = uncreditedOf?.(balance) ?? 0;
+            const uncredited = uncreditedOf?.(balance);
+            const warnUncredited = uncredited !== undefined && uncredited.amount > 0;
             const meta = (
               <>
                 <p className="text-xs text-text-dim">
@@ -213,9 +214,12 @@ export function OwedBalances({
                   {t('miningTax.owed.waitingDays', { count: days })}
                   {characterName && ` · ${characterName}`}
                 </p>
-                {uncredited > 0 && (
+                {warnUncredited && (
                   <p className="text-xs text-warning">
-                    {t('miningTax.owed.uncreditedNote', { amount: formatIsk(uncredited, 0) })}
+                    {t('miningTax.owed.uncreditedNote', {
+                      amount: formatIsk(uncredited.amount, 0),
+                      accounts: uncredited.accounts,
+                    })}
                   </p>
                 )}
               </>
@@ -223,7 +227,7 @@ export function OwedBalances({
             const actions = (
               <div className="flex gap-1.5">
                 <Button
-                  variant={uncredited > 0 ? 'ghost' : 'primary'}
+                  variant={warnUncredited ? 'ghost' : 'primary'}
                   className={wide ? 'flex-1 sm:flex-none' : 'flex-1'}
                   onClick={() => onSettleUp(balance)}
                 >

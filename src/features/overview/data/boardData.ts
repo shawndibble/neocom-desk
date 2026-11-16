@@ -39,6 +39,7 @@ import { buildPriceAlertRows, type BoardPriceAlert } from './priceAlertsBoard';
 import { useMarketHub } from '@/features/market/hub';
 import { loadPriceVsMedian } from '@/features/market/priceVsMedian';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
+import { sum } from '@/engine/math';
 import { oldestOwedMs, payeesOwed, type PayeeOwed } from './miningTaxPayees';
 import type {
   BoardExtractionSource,
@@ -188,14 +189,14 @@ export async function loadMiningTaxBoard(): Promise<MiningTaxBoardData> {
   const snapshot = await loadMoonMiningTaxSnapshot();
   const now = Date.now();
   // The Tax tab's "You owe" figure, Corp Tax Book overlay and all, so the two never disagree.
-  const balances = await loadOwedBalances(snapshot, now);
+  const { balances, unassignedCount } = await loadOwedBalances(snapshot, now);
   const payees = payeesOwed(balances, now);
   const oldestUnpaidMs = oldestOwedMs(balances);
 
   return {
-    unpaidIsk: payees.reduce((sum, p) => sum + p.unpaidIsk, 0),
+    unpaidIsk: sum(payees.map((p) => p.unpaidIsk)),
     payeeCount: payees.length,
-    unassignedCount: snapshot.rows.filter((row) => row.unassignedOreLines.length > 0).length,
+    unassignedCount,
     oldestUnpaidDays: oldestUnpaidMs === null ? null : Math.floor((now - oldestUnpaidMs) / DAY_MS),
     needsReauth:
       snapshot.reauthCharacters.length > 0 &&

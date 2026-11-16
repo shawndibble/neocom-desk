@@ -8,7 +8,12 @@ import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { entryKey } from '@/engine/miningTax/types';
 import type { PersonalOverlay } from '@/engine/corpTaxBook/personal';
 import i18n from '@/i18n';
-import { computePayeeBalances, type PayeeBalance } from './balances';
+import {
+  computePayeeBalances,
+  summarizeUnassigned,
+  type PayeeBalance,
+  type UnassignedSummary,
+} from './balances';
 import { loadBookPrices, loadCorpNames, loadTrackedCorpBooks } from './corpBook/corpBookSources';
 import { buildCorpBookView } from './corpBook/corpBookView';
 import { buildDisplayRows } from './corpBook/corpRows';
@@ -39,14 +44,34 @@ export function owedBalances(
 }
 
 /**
- * `owedBalances` over every tracked Character, loading the Corp Tax Books the Tax tab overlays:
+ * Entries still needing a Payee. A row a Corp Tax Book has labelled (Pending corp record,
+ * Unattributed) is not waiting on the member, so it stays out.
+ */
+export function unassignedSummary(
+  rows: readonly DisplayRow[],
+  estimatedValueOf: (dr: DisplayRow) => number
+): UnassignedSummary {
+  return summarizeUnassigned(
+    rows.filter((dr) => !dr.corp),
+    estimatedValueOf
+  );
+}
+
+export interface OwedNow {
+  balances: PayeeBalance[];
+  /** `unassignedSummary`'s entry count. */
+  unassignedCount: number;
+}
+
+/**
+ * `owedBalances` (and the Unassigned count) over every tracked Character, loading the Corp Tax Books the Tax tab overlays:
  * the books, their corporations' names and prices, and (only when a book exists) the wallet's
  * payments the book's in-flight donations read. Without a book it is the personal ledger alone.
  */
 export async function loadOwedBalances(
   snapshot: Pick<MoonMiningTaxSnapshot, 'rows' | 'characters' | 'payeesByCharacter'>,
   now: number = Date.now()
-): Promise<PayeeBalance[]> {
+): Promise<OwedNow> {
   const seen = new Map<string, PayeeRecord>();
   for (const list of snapshot.payeesByCharacter.values()) for (const p of list) seen.set(p.id, p);
   const payees = [...seen.values()];
@@ -84,5 +109,12 @@ export async function loadOwedBalances(
     corpView?.overlay ?? null,
     (id) => characterNames.get(id) ?? `#${id}`
   );
-  return owedBalances(rows, [...payees, ...(corpView?.payees ?? [])], corpView?.overlay.alsoBilled);
+  return {
+    balances: owedBalances(
+      rows,
+      [...payees, ...(corpView?.payees ?? [])],
+      corpView?.overlay.alsoBilled
+    ),
+    unassignedCount: unassignedSummary(rows, () => 0).entryCount,
+  };
 }

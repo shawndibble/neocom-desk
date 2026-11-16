@@ -6,7 +6,7 @@
 import { DAY_MS } from '@/lib/age';
 
 export interface PayeeOwed {
-  /** Empty for an outstanding assignment that names no payee (a snapshot cached before balances). */
+  /** The owed Payee's id (a Corp Tax Book's virtual Payee included). */
   payeeId: string;
   /** The payee's name. */
   name: string;
