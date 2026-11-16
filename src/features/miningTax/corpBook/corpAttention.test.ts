@@ -41,7 +41,12 @@ const view = (rows: BookRowView[], s: BookSummary): CorpBookView =>
 
 describe('corpBookAttention', () => {
   it('is empty with no book', () => {
-    expect(corpBookAttention(null)).toEqual({ overdue: [], uncredited: [], alsoBilled: [] });
+    expect(corpBookAttention(null)).toEqual({
+      overdue: [],
+      uncredited: [],
+      inReview: [],
+      alsoBilled: [],
+    });
   });
 
   it("names each book's Overdue Statements and the donations it never credited", () => {
@@ -66,6 +71,83 @@ describe('corpBookAttention', () => {
     expect(out.uncredited).toEqual([
       { corporationId: CORP, corpName: 'Brass Meridian', ...donation },
     ]);
+  });
+
+  describe('donations the book holds for review without counting them (#6207)', () => {
+    const held = (id: string, at: string, characterId = 1, amount = 26_952_549) => ({
+      id,
+      characterId,
+      amount,
+      at,
+    });
+    const withHeld = (inReview: ReturnType<typeof held>[], s = summary()) =>
+      ({
+        overlay: { rows: [] },
+        books: [
+          {
+            corpName: 'Brass Meridian',
+            summary: s,
+            loaded: {
+              corporationId: CORP,
+              startDate: '2026-11-01',
+              characterIds: [1, 2],
+              statements: [],
+              miners: [],
+              inReview,
+            },
+          },
+        ],
+      }) as unknown as CorpBookView;
+
+    it('lists them once per book, from the book start on, for the Characters in view', () => {
+      const out = corpBookAttention(
+        withHeld([
+          held('j5_2', '2026-11-14T18:28:44.000Z', 1, 10_976_509),
+          held('j5_1', '2026-11-02T22:38:44.000Z'),
+          // Paid before the book bills from: it paid no mining the book bills.
+          held('j5_0', '2026-10-21T17:38:23.000Z'),
+          held('j5_9', '2026-11-03T00:00:00.000Z', 2),
+        ]),
+        new Set([1])
+      );
+      expect(out.inReview).toEqual([
+        {
+          corporationId: CORP,
+          corpName: 'Brass Meridian',
+          donations: [
+            held('j5_1', '2026-11-02T22:38:44.000Z'),
+            held('j5_2', '2026-11-14T18:28:44.000Z', 1, 10_976_509),
+          ],
+        },
+      ]);
+      expect(
+        corpBookAttention(withHeld([held('j5_0', '2026-10-21T17:38:23.000Z')])).inReview
+      ).toEqual([]);
+    });
+
+    it("names the donor Miner's oldest open Statement, to send the proof on", () => {
+      const open = (statementId: string, minerId: string, issuedAt: string) => ({
+        statementId,
+        minerId,
+        code: statementId,
+        periodStart: '2026-11-01',
+        periodEnd: '2026-11-07',
+        issuedAt,
+      });
+      const out = corpBookAttention(
+        withHeld(
+          [held('j5_1', '2026-11-02T22:38:44.000Z')],
+          summary({
+            openStatements: [
+              open('sOther', 'solo:2', '2026-11-01T00:00:00Z'),
+              open('s1', 'solo:1', '2026-11-08T00:00:00Z'),
+              open('s2', 'solo:1', '2026-11-15T00:00:00Z'),
+            ],
+          })
+        )
+      );
+      expect(out.inReview[0].statementId).toBe('s1');
+    });
   });
 
   it('names the Payees whose unpaid ore a book bills too, once per book, with the first day', () => {

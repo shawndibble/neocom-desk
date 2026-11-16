@@ -10,6 +10,8 @@ import {
   openBalances,
   unbilledMinerIds,
   unbilledWhenPaid,
+  billableStoredRows,
+  storedRowsWanted,
   mergeGaps,
   observedRowsFromLedger,
   placeObservedRows,
@@ -232,6 +234,46 @@ describe('functions mirror of the Corp Tax Book sync engine', () => {
           const p = { characterId, at };
           expect(mirror.unbilledWhenPaid(p, rows, book)).toBe(unbilledWhenPaid(p, rows, book));
         }
+  });
+
+  it('agrees on the stored rows a donation is matched against (moon owner mining)', () => {
+    const miners = [{ id: 'm1', characterIds: [50, 52], mainCharacterId: 50 }];
+    const statements = [
+      {
+        id: 's1',
+        minerId: 'm1',
+        code: 'A',
+        coversThrough: '2026-10-05',
+        issuedAt: '2026-10-06T00:00:00Z',
+      },
+    ] as unknown as Statement[];
+    const held = [
+      { characterId: 50, at: '2026-10-05T12:00:00Z' },
+      { characterId: 52, at: '2026-10-08T12:00:00Z' },
+      { characterId: 51, at: '2026-09-20T12:00:00Z' },
+      { characterId: 53, at: '2026-10-09T12:00:00Z' },
+    ];
+    const feeders = [
+      { corporationId: 700, coveragePeriods: [{ from: '2026-10-03', to: '2026-10-07' }] },
+      { corporationId: 701 },
+    ];
+    const rows = [
+      { characterId: 50, date: '2026-10-02', quantity: 5 },
+      { characterId: 52, date: '2026-10-04', quantity: 5, sourceCorporationId: 700 },
+      { characterId: 52, date: '2026-10-08', quantity: 5, sourceCorporationId: 700 },
+      { characterId: 53, date: '2026-10-09', quantity: 5, sourceCorporationId: 701 },
+      { characterId: 53, date: '2026-10-09', quantity: 5, sourceCorporationId: 9 },
+      { characterId: 54, date: '2026-10-09', quantity: 5 },
+    ];
+    for (const startDate of ['2026-01-01', '2026-10-04'])
+      for (const senders of [[], [50], [53, 54]]) {
+        const input = { held, senders, miners, statements, startDate };
+        const wanted = storedRowsWanted(input);
+        expect(mirror.storedRowsWanted(input)).toEqual(wanted);
+        expect(mirror.billableStoredRows(rows, wanted, 9, feeders)).toEqual(
+          billableStoredRows(rows, wanted, 9, feeders)
+        );
+      }
   });
 
   it('agrees on the wallet divisions a book does not read, and their bound (#6207)', () => {

@@ -1,11 +1,14 @@
 /**
  * What the member's Corp Tax Books need them to look at (#6204), as plain facts for the Tax
- * tab's attention strip: Overdue Statements, donations a book never credited, and ore a book
- * bills that the member's own list also owes another Payee.
+ * tab's attention strip: Overdue Statements, donations a book never credited, donations it holds
+ * for review without counting them, and ore a book bills that the member's own list also owes
+ * another Payee.
  */
+import { minerIdFor } from '@/engine/corpTaxBook/charges';
 import type { OverdueStatementView, UncreditedDonation } from '@/engine/corpTaxBook/personal';
 import type { MultiSelectFilter } from '@/lib/multiSelectFilter';
 import type { CorpBookView } from './corpBookView';
+import type { InReviewPayment } from './corpBookStore';
 
 interface OfBook {
   corporationId: number;
@@ -19,6 +22,12 @@ export interface CorpBookAttention {
    */
   overdue: (OfBook & OverdueStatementView & { declarerId?: number })[];
   uncredited: (OfBook & UncreditedDonation)[];
+  /**
+   * Per book: the member's donations it holds for an officer's review without counting them
+   * (#6207), oldest first, and the oldest open Statement of the first one's Miner, to send the
+   * proof on. Only those paid on or after the book's start: before it they paid no mining it bills.
+   */
+  inReview: (OfBook & { donations: InReviewPayment[]; statementId?: string })[];
   /** Per book: the Payees whose unpaid ore it bills too, and the first such row to open. */
   alsoBilled: (OfBook & { payeeIds: string[]; rowId: string })[];
 }
@@ -33,7 +42,7 @@ export function corpBookAttention(
   view: CorpBookView | null,
   characters: MultiSelectFilter<number> = 'all'
 ): CorpBookAttention {
-  const out: CorpBookAttention = { overdue: [], uncredited: [], alsoBilled: [] };
+  const out: CorpBookAttention = { overdue: [], uncredited: [], inReview: [], alsoBilled: [] };
   if (!view) return out;
   const inView = (id: number) => characters === 'all' || characters.has(id);
   for (const book of view.books) {
@@ -49,6 +58,16 @@ export function corpBookAttention(
     }
     for (const d of book.summary.uncredited) {
       if (inView(d.characterId)) out.uncredited.push({ ...of, ...d });
+    }
+    const held = (loaded.inReview ?? [])
+      .filter((p) => inView(p.characterId) && p.at.slice(0, 10) >= loaded.startDate)
+      .sort((a, b) => a.at.localeCompare(b.at));
+    if (held.length > 0) {
+      const minerId = minerIdFor(held[0].characterId, loaded.miners ?? []);
+      const statementId = book.summary.openStatements.find(
+        (s) => s.minerId === minerId
+      )?.statementId;
+      out.inReview.push({ ...of, donations: held, ...(statementId ? { statementId } : {}) });
     }
     // A Conflict is not billed yet, and a paid listing owes nobody: only billed ore still owed
     // to another Payee is counted twice.

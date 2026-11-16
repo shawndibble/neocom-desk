@@ -117,6 +117,30 @@ describe('readPayment', () => {
     expect(readPayment('j1_3', { ...base, notTaxAmount: 100 })?.claimable).toBeUndefined();
   });
 
+  it('reads a donation the sync held for review as one the donor can say was tax, never as claimable', () => {
+    const read = readPayment('j5_4', {
+      ...base,
+      division: 5,
+      reason: 'Moon tax 11-01/11-02',
+      reviewReason: 'no-open-balance',
+    });
+    expect(read?.claimable).toBeUndefined();
+    expect(read?.inReview).toEqual({
+      id: 'j5_4',
+      characterId: 5,
+      amount: 100,
+      at: base.at,
+      refId: 4,
+      reason: 'Moon tax 11-01/11-02',
+    });
+    expect(
+      readPayment('j5_4', { ...base, reviewReason: 'no-open-balance', notTaxAmount: 100 })?.inReview
+    ).toBeUndefined();
+    expect(
+      readPayment('j5_4', { ...base, reviewReason: 'no-open-balance', minerId: 'solo:5' })?.inReview
+    ).toBeUndefined();
+  });
+
   it('skips what is not a payment', () => {
     expect(readPayment('x', { amount: 'a' })).toBeNull();
   });

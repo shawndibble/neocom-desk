@@ -8,6 +8,7 @@ const submit = vi.hoisted(() => ({
   tellNotPaying: vi.fn(async () => ({ status: 'sent', to: [9], fellBackToCeo: false })),
   tellNotOwed: vi.fn(async () => ({ status: 'no-scope' })),
   sendProof: vi.fn(),
+  countHeldDonations: vi.fn(async () => undefined),
 }));
 vi.mock('./resolveSubmit', () => submit);
 vi.mock('@/features/character/names', () => ({
@@ -136,6 +137,40 @@ describe('ResolveDialog', () => {
       screen.getByText(/Bureau's book already credited your payment, to 2026-11-01/)
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send proof' })).toBeDisabled();
+  });
+
+  describe('donations the book holds for review without counting them', () => {
+    const held = [
+      { id: 'j5_1', characterId: 7 },
+      { id: 'j5_2', characterId: 8 },
+    ];
+
+    it('counts them as tax at once when no Statement is open, and says they are credited', async () => {
+      const user = userEvent.setup();
+      const props = open({ ...base, kind: 'uncredited', amount: 37_929_058, held });
+      expect(
+        screen.getByRole('heading', { name: 'Donations held for review' })
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('radio', { name: /Pay it/ })).toBeNull();
+      expect(screen.getByRole('radio', { name: /I already paid/ })).toBeChecked();
+      await user.click(screen.getByRole('button', { name: 'Count them' }));
+      expect(submit.countHeldDonations).toHaveBeenCalledWith(mail, held);
+      expect(submit.sendProof).not.toHaveBeenCalled();
+      expect(await screen.findByText(/counts them as paid/)).toBeInTheDocument();
+      expect(props.onSent).toHaveBeenCalled();
+    });
+
+    it('sends the proof on the open Statement, where an officer sees it', async () => {
+      const user = userEvent.setup();
+      submit.sendProof.mockResolvedValueOnce({ checks: [{ result: 'found' }], confirmed: true });
+      const transfers = [
+        { amount: 1, at: '2026-11-02T22:38:44Z', journalRef: 5, recipient: 'corporation' as const },
+      ];
+      open({ ...base, kind: 'uncredited', amount: 1, statementId: 's1', held }, { transfers });
+      await user.click(screen.getByRole('button', { name: 'Send proof' }));
+      expect(submit.sendProof).toHaveBeenCalledWith(mail, 's1', transfers, '', expect.any(String));
+      expect(submit.countHeldDonations).not.toHaveBeenCalled();
+    });
   });
 
   it('never offers disputing uncredited donations', () => {

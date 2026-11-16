@@ -286,6 +286,105 @@ describe('syncCorpTaxBook', () => {
     expect(d.assignPayment).toHaveBeenCalledWith(5, CORP, 'j1_1', 'm1');
   });
 
+  describe('moon owner mining the book bills (stored rows, not this read)', () => {
+    // A book that bills from 2026-07-01 and whose only refinery read holds nothing for character
+    // 7: their ore was all mined at a moon owner's refinery, stored tagged with that owner.
+    const FEEDER = 98000002;
+    const fed = (date: string, characterId = 7) => ({
+      ...row(characterId, date),
+      sourceCorporationId: FEEDER,
+    });
+    const held = (id: string, at: string) => ({
+      id,
+      characterId: 7,
+      amount: 26_952_549,
+      at,
+      source: 'donation' as const,
+      division: 5,
+      reviewReason: 'no-open-balance' as const,
+    });
+    const onlyFed = (over: Partial<SyncDeps> = {}) =>
+      deps({
+        loadObserverFeed: async () => ({
+          rows: [row(9)],
+          structureIds: [1001],
+          oldestEsiDate: { 1001: '2026-07-19' },
+          truncated: false,
+          systemIds: {},
+        }),
+        loadStoredRows: vi.fn(async () => ({
+          rows: [fed('2026-07-01'), fed('2026-07-02'), fed('2026-07-11')],
+          feeders: [{ corporationId: FEEDER, coveragePeriods: [{ from: '2026-07-01' }] }],
+        })),
+        ...over,
+      });
+    const book = (payments: BookState['payments']) =>
+      emptyState({
+        book: { ...emptyState().book, startDate: '2026-07-01' },
+        payments,
+      });
+
+    it('releases a held donation paid after moon owner mining no Statement covered', async () => {
+      const d = onlyFed({
+        readBookState: async () =>
+          book([
+            held('j5_1', '2026-07-02T22:38:44.000Z'),
+            held('j5_2', '2026-07-14T18:28:44.000Z'),
+            // Paid before the book bills from: the officer's to place.
+            held('j5_0', '2026-06-21T17:38:23.000Z'),
+          ]),
+      });
+      await run(d);
+      expect(
+        vi
+          .mocked(d.assignPayment)
+          .mock.calls.map((c) => c[2])
+          .sort()
+      ).toEqual(['j5_1', 'j5_2']);
+      expect(d.assignPayment).toHaveBeenCalledWith(5, CORP, 'j5_1', 'solo:7');
+    });
+
+    it('keeps a held donation when the moon owner did not cover the day it was mined', async () => {
+      const d = onlyFed({
+        readBookState: async () => book([held('j5_1', '2026-07-02T22:38:44.000Z')]),
+        loadStoredRows: async () => ({
+          rows: [fed('2026-07-01'), fed('2026-07-02')],
+          feeders: [{ corporationId: FEEDER, coveragePeriods: [{ from: '2026-07-10' }] }],
+        }),
+      });
+      await run(d);
+      expect(d.assignPayment).not.toHaveBeenCalled();
+    });
+
+    it('credits a new donation to its Miner when their only unbilled ore is moon owner mining', async () => {
+      const d = onlyFed({
+        readBookState: async () =>
+          book([
+            {
+              id: 'j1_0',
+              characterId: 7,
+              minerId: 'solo:7',
+              amount: 1,
+              at: '2026-07-01T00:00:00Z',
+              source: 'donation',
+            },
+          ]),
+        loadDonations: async () => [
+          { refId: 9, division: 5, characterId: 7, amount: 5, at: '2026-07-14T18:28:44.000Z' },
+        ],
+      });
+      await run(d);
+      const [donation] = vi.mocked(d.uploadSync).mock.calls[0][1].donations ?? [];
+      expect(donation).toMatchObject({ minerId: 'solo:7' });
+    });
+
+    it('reads no stored rows when nothing is held and nothing new came in', async () => {
+      const d = onlyFed();
+      await run(d);
+      expect(d.loadStoredRows).not.toHaveBeenCalled();
+    });
+  });
+
   it('does not resend donations the book already holds', async () => {
     const d = deps({
       readBookState: async () =>

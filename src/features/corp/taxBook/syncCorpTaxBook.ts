@@ -16,6 +16,8 @@ import {
   planSettlements,
   reconcileExtractions,
   resolveDonations,
+  billableStoredRows,
+  storedRowsWanted,
   unbilledMinerIds,
   unbilledWhenPaid,
   type JournalDonation,
@@ -28,6 +30,7 @@ import { noteUncounted, otherDivisions } from '@/engine/corpTaxBook/uncounted';
 import { planAutoGroups, type GroupingEdit } from '@/engine/corpTaxBook/grouping';
 import type { Statement } from '@/engine/corpTaxBook/statements';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
+import type { FeederCoverage } from '@/engine/corpTaxBook/coverage';
 import type { CorpCapabilities } from '@/engine/corpRoles';
 import { db } from '@/db';
 import type { CorporationMiningExtraction } from '@/esi/endpoints';
@@ -35,6 +38,7 @@ import {
   editBook,
   readDeclinedAutoGroup,
   readBookState,
+  readStoredRows,
   uploadSync,
   verifyOfficer,
   type BookState,
@@ -102,6 +106,18 @@ export interface SyncDeps {
     corporationId: number,
     edit: GroupingEdit
   ) => Promise<unknown>;
+  /**
+   * The book's stored observer rows and its moon owners' coverage: the mining it bills at moon
+   * owners' refineries, which this Character's ESI read never holds. Read only when a donation is
+   * held for review or a new one would be, so it can be matched against that mining too.
+   */
+  loadStoredRows?: (
+    characterId: number,
+    corporationId: number
+  ) => Promise<{
+    rows: readonly ObservedRow[];
+    feeders: readonly FeederCoverage[];
+  }>;
   /** Gives a stored Unmatched donation to a Miner (`assignPayment`, audited). */
   assignPayment: (
     characterId: number,
@@ -136,6 +152,7 @@ export const defaultSyncDeps: SyncDeps = {
   applyGrouping: (characterId, corporationId, edit) => editBook(characterId, corporationId, edit),
   assignPayment: (characterId, corporationId, paymentId, minerId) =>
     editBook(characterId, corporationId, { action: 'assignPayment', paymentId, minerId }),
+  loadStoredRows: readStoredRows,
 };
 
 /** What the Character may read from ESI; the rest of the sync does without a source it cannot reach. */
@@ -240,22 +257,28 @@ export async function syncCorpTaxBook(
     ? reconcileExtractions(esiExtractions ?? [], notifications, before.extractions)
     : [];
 
-  const known = new Set<number>([
-    ...feed.rows.map((r) => r.characterId),
-    ...before.miners.flatMap((m) => m.characterIds),
-    ...before.payments.filter((p) => p.minerId !== undefined).map((p) => p.characterId),
-  ]);
   const stored = new Set(before.payments.map((p) => p.id));
   const fresh = (donations ?? [])
     .filter((d) => !stored.has(paymentId(d)))
     .sort((a, b) => b.at.localeCompare(a.at))
     .slice(0, DONATIONS_PER_CALL);
+  // The rows donations are matched against: this read's, and the moon owners' mining the book
+  // bills, which only the stored rows hold.
+  const rows = [
+    ...feed.rows,
+    ...(await billedStoredRows(deps, characterId, corporationId, before, feed.rows, fresh)),
+  ] as ObservedRow[];
+  const known = new Set<number>([
+    ...rows.map((r) => r.characterId),
+    ...before.miners.flatMap((m) => m.characterIds),
+    ...before.payments.filter((p) => p.minerId !== undefined).map((p) => p.characterId),
+  ]);
   const matching = {
     miners: before.miners,
     statements: before.statements as Statement[],
     knownCharacterIds: known,
     openBalance: openBalanceOf(before),
-    unbilled: unbilledOf(before, feed.rows),
+    unbilled: unbilledOf(before, rows),
   };
   const resolved = resolveDonations(fresh, matching);
   const uncounted = elsewhere === null ? undefined : noteUncounted(elsewhere, matching, resolved);
@@ -315,7 +338,7 @@ export async function syncCorpTaxBook(
     {
       before,
       known,
-      rows: feed.rows,
+      rows,
       regrouped: autoGrouped > 0,
     }
   );
@@ -357,6 +380,65 @@ export async function syncCorpTaxBook(
     ...(autoGroupError ? { autoGroupError } : {}),
     ...(reassignError ? { reassignError } : {}),
   };
+}
+
+/**
+ * The stored rows the book bills that a held or would-be-held donation is matched against
+ * (`storedRowsWanted`): its moon owners' mining, which this Character's ESI read never holds.
+ * None when nothing is held and every new donation already matches; a failed read is none too
+ * (the hold stays for the next sync).
+ */
+async function billedStoredRows(
+  deps: SyncDeps,
+  characterId: number,
+  corporationId: number,
+  book: BookState,
+  feedRows: readonly ObservedRow[],
+  fresh: readonly JournalDonation[]
+): Promise<ObservedRow[]> {
+  if (!deps.loadStoredRows) return [];
+  const held = book.payments.filter(
+    (p) =>
+      p.minerId === undefined &&
+      p.reviewReason === 'no-open-balance' &&
+      !(p.notTaxAmount && p.notTaxAmount > 0)
+  );
+  const known = new Set<number>([
+    ...feedRows.map((r) => r.characterId),
+    ...book.miners.flatMap((m) => m.characterIds),
+    ...book.payments.filter((p) => p.minerId !== undefined).map((p) => p.characterId),
+  ]);
+  const feedOnly = {
+    miners: book.miners,
+    statements: book.statements as Statement[],
+    knownCharacterIds: known,
+    openBalance: openBalanceOf(book),
+    unbilled: unbilledOf(book, feedRows),
+  };
+  const senders = [
+    ...new Set(
+      fresh
+        .filter((d) => {
+          const match = matchDonation({ characterId: d.characterId, reason: d.reason }, feedOnly);
+          return match.kind !== 'miner' && match.kind !== 'statement';
+        })
+        .map((d) => d.characterId)
+    ),
+  ];
+  const wanted = storedRowsWanted({
+    held,
+    senders,
+    miners: book.miners,
+    statements: book.statements as Statement[],
+    startDate: book.book.startDate,
+  });
+  if (wanted.size === 0) return [];
+  try {
+    const stored = await deps.loadStoredRows(characterId, corporationId);
+    return billableStoredRows(stored.rows, wanted, corporationId, stored.feeders);
+  } catch {
+    return [];
+  }
 }
 
 /** The Miners with ore this read found that no Statement covers yet, for `matchDonation` (#6207). */

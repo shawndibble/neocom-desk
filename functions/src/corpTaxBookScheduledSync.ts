@@ -73,6 +73,8 @@ import {
   planSettlements,
   reconcileExtractions,
   resolveDonations,
+  billableStoredRows,
+  storedRowsWanted,
   unbilledMinerIds,
   unbilledWhenPaid,
   type JournalDonation,
@@ -424,23 +426,29 @@ export async function runBookSync(
       ? reconcileExtractions(esiExtractions.data, notifications, before.extractions)
       : [];
 
-  const known = new Set<number>([
-    ...feed.rows.map((r) => r.characterId),
-    ...before.miners.flatMap((m) => m.characterIds),
-    ...before.payments.filter((p) => p.minerId !== undefined).map((p) => p.characterId as number),
-  ]);
   const stored = new Set(before.payments.map((p) => p.id));
   // Quiet: every donation is one the quiet run saw stored (quietAfterReads).
   const fresh = (quiet ? [] : donations)
     .filter((d) => !stored.has(paymentId(d)))
     .sort((a, b) => b.at.localeCompare(a.at))
     .slice(0, DONATIONS_PER_CALL);
+  // The rows donations are matched against: this read's, and the moon owners' mining the book
+  // bills, which only the stored rows hold (a quiet run matches nothing, so reads none).
+  const rows: { characterId: number; date: string; quantity: number }[] = [
+    ...feed.rows,
+    ...(quiet ? [] : await billedStoredRows(db, corporationId, before, feed.rows, fresh)),
+  ];
+  const known = new Set<number>([
+    ...rows.map((r) => r.characterId),
+    ...before.miners.flatMap((m) => m.characterIds),
+    ...before.payments.filter((p) => p.minerId !== undefined).map((p) => p.characterId as number),
+  ]);
   const matching = {
     miners: before.miners,
     statements: before.statements,
     knownCharacterIds: known,
     openBalance: quiet ? new Map<string, number>() : openBalanceOf(before),
-    unbilled: quiet ? new Set<string>() : unbilledOf(before, feed.rows),
+    unbilled: quiet ? new Set<string>() : unbilledOf(before, rows),
   };
   const resolved = resolveDonations(fresh, matching);
   // #6207: what looks like tax paid into a division the book does not read. Only on a full run,
@@ -516,7 +524,7 @@ export async function runBookSync(
   // Quiet: the quiet run re-matched nothing, and no Unmatched donation or known Character is new.
   const { assigned, error: reassignError } = quiet
     ? { assigned: new Map<string, string>(), error: undefined }
-    : await reassignUnmatched(edit, before, known, feed.rows);
+    : await reassignUnmatched(edit, before, known, rows);
 
   // --- Settle ---------------------------------------------------------------
   // Read again, right before settling, whenever this run brought in money: a settle is never
@@ -640,6 +648,86 @@ async function readDonationsElsewhere(
     found.push(...donationsFromJournal(journal.data, division, corporationId));
   }
   return found;
+}
+
+/** Stored rows read per run at most: one query per Character, so the read stays bounded. */
+export const STORED_ROWS_CHARACTERS = 50;
+
+/**
+ * The stored rows the book bills that a held or would-be-held donation is matched against
+ * (`storedRowsWanted`): its moon owners' mining, which this run's ledger read never holds. Without
+ * them a Miner who mined only at a moon owner's refinery owes nothing as far as the run can see,
+ * and their donation is held for review for good. Read only for the Characters those donations'
+ * Miners hold, from the first day that can count; none when nothing is held and every new donation
+ * already matches. Best effort: a failed read leaves the hold for the next run.
+ */
+async function billedStoredRows(
+  db: Firestore,
+  corporationId: number,
+  book: AdminBookState,
+  feedRows: readonly ObservedRow[],
+  fresh: readonly JournalDonation[]
+): Promise<ObservedRow[]> {
+  const held = book.payments.filter(
+    (p) =>
+      p.minerId === undefined &&
+      p.reviewReason === 'no-open-balance' &&
+      typeof p.characterId === 'number' &&
+      !(p.notTaxAmount && p.notTaxAmount > 0)
+  ) as { characterId: number; at: string }[];
+  const feedOnly = {
+    miners: book.miners,
+    statements: book.statements,
+    knownCharacterIds: new Set<number>([
+      ...feedRows.map((r) => r.characterId),
+      ...book.miners.flatMap((m) => m.characterIds),
+      ...book.payments.filter((p) => p.minerId !== undefined).map((p) => p.characterId as number),
+    ]),
+    openBalance: openBalanceOf(book),
+    unbilled: unbilledOf(book, feedRows),
+  };
+  const senders = [
+    ...new Set(
+      fresh
+        .filter((d) => {
+          const match = matchDonation({ characterId: d.characterId, reason: d.reason }, feedOnly);
+          return match.kind !== 'miner' && match.kind !== 'statement';
+        })
+        .map((d) => d.characterId)
+    ),
+  ];
+  const wanted = storedRowsWanted({
+    held,
+    senders,
+    miners: book.miners,
+    statements: book.statements,
+    startDate: book.startDate,
+  });
+  if (wanted.size === 0) return [];
+  try {
+    const ref = bookRef(db, corporationId);
+    const reads = [...wanted]
+      .slice(0, STORED_ROWS_CHARACTERS)
+      .map(([characterId, from]) =>
+        ref
+          .collection(OBSERVED)
+          .where('characterId', '==', characterId)
+          .where('date', '>=', from)
+          .get()
+      );
+    const [feeders, ...found] = await Promise.all([ref.collection(FEEDERS).get(), ...reads]);
+    const coverage = feeders.docs.map((d) => ({
+      corporationId: Number(d.id),
+      ...(Array.isArray(d.get('coveragePeriods'))
+        ? { coveragePeriods: d.get('coveragePeriods') as { from: string; to?: string }[] }
+        : {}),
+    }));
+    const rows = found.flatMap((snap) => snap.docs.map((d) => d.data() as ObservedRow));
+    return billableStoredRows(rows, wanted, corporationId, coverage);
+  } catch (e) {
+    console.error('stored rows not read', e instanceof Error ? e.message : e);
+    return [];
+  }
 }
 
 /** The Miners with ore this read found that no Statement covers yet, for `matchDonation` (#6207). */

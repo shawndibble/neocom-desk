@@ -57,6 +57,22 @@ export interface ClaimablePayment {
   at: string;
 }
 
+/**
+ * A donation of the member's own the sync held for an officer's review (#6207) because their
+ * Miner seemed to owe nothing: the book holds the ISK without counting it. The donor may say it
+ * was tax (`claimCorpTaxBookPayment` with `inReview`).
+ */
+export interface InReviewPayment {
+  id: string;
+  characterId: number;
+  amount: number;
+  at: string;
+  /** The corporation's wallet journal ref (from the payment id `j{division}_{refId}`). */
+  refId?: number;
+  /** What the donor wrote on it. */
+  reason?: string;
+}
+
 /** What the book holds of a donation, for telling one it holds from one it does not hold yet. */
 export interface HeldPayment {
   characterId: number;
@@ -88,6 +104,8 @@ export interface LoadedCorpBook {
   payments: TaxPayment[];
   held: HeldPayment[];
   claimable: ClaimablePayment[];
+  /** The tracked Characters' donations it holds for review without counting them (#6207). */
+  inReview?: InReviewPayment[];
   dismissals: Dismissal[];
   statements: Statement[];
   miners: Miner[];
@@ -158,7 +176,12 @@ export function readBookSettings(corporationId: number, d: Data | undefined, now
 export function readPayment(
   id: string,
   d: Data
-): { payment?: TaxPayment; held: HeldPayment; claimable?: ClaimablePayment } | null {
+): {
+  payment?: TaxPayment;
+  held: HeldPayment;
+  claimable?: ClaimablePayment;
+  inReview?: InReviewPayment;
+} | null {
   const characterId = num(d.characterId);
   const amount = num(d.amount);
   const at = str(d.at);
@@ -174,10 +197,22 @@ export function readPayment(
   if (!minerId) {
     // Only a donation can be claimed, and not one an officer has marked "not tax" in full
     // or one the sync held for an officer's review (#6207).
+    const tax = d.source === 'donation' && (notTaxAmount ?? 0) < amount;
     const claimable =
-      d.source === 'donation' && (notTaxAmount ?? 0) < amount && d.reviewReason === undefined
-        ? { id, characterId, amount, at }
-        : undefined;
+      tax && d.reviewReason === undefined ? { id, characterId, amount, at } : undefined;
+    if (tax && d.reviewReason === 'no-open-balance') {
+      const refId = Number(/^j\d+_(\d+)$/.exec(id)?.[1]);
+      const reason = str(d.reason);
+      const inReview: InReviewPayment = {
+        id,
+        characterId,
+        amount,
+        at,
+        ...(Number.isSafeInteger(refId) ? { refId } : {}),
+        ...(reason ? { reason } : {}),
+      };
+      return { held, inReview };
+    }
     return { held, ...(claimable ? { claimable } : {}) };
   }
   const statementId = str(d.statementId);
@@ -532,6 +567,7 @@ async function readOneBook(
   const payments: TaxPayment[] = [];
   const held: HeldPayment[] = [];
   const claimable: ClaimablePayment[] = [];
+  const inReview: InReviewPayment[] = [];
   const dismissals: Dismissal[][] = [];
   const statements: Statement[][] = [];
   const miners: Miner[][] = [];
@@ -624,6 +660,7 @@ async function readOneBook(
       held.push(read.held);
       if (read.payment) payments.push(read.payment);
       if (read.claimable) claimable.push(read.claimable);
+      if (read.inReview) inReview.push(read.inReview);
     }
     dismissals.push(dismissalDocs.flatMap((d) => readDismissal(d.id, d.data) ?? []));
     statements.push(statementDocs.flatMap((d) => readStatement(d.id, d.data) ?? []));
@@ -643,6 +680,7 @@ async function readOneBook(
     payments: mergeById([payments]),
     held,
     claimable: mergeById([claimable]),
+    inReview: mergeById([inReview]),
     dismissals: mergeById(dismissals),
     statements: merged,
     miners: mergeById(miners),
@@ -663,17 +701,24 @@ export async function trackedCharacterCorporations(): Promise<
   );
 }
 
-/** A player claims one of their own Unmatched donations (D5); audited server side. */
+/**
+ * A player claims one of their own Unmatched donations (D5); audited server side. `inReview`: one
+ * the sync held for an officer's review (#6207), which the player says was tax; never automatic.
+ */
 export async function claimCorpTaxBookPayment(
   characterId: number,
   corporationId: number,
-  paymentId: string
+  paymentId: string,
+  options: { inReview?: boolean } = {}
 ): Promise<{ minerId: string }> {
   return underFirebaseSession(async () => {
     await ensureSignedIn(characterId);
-    return callRouted<{ corporationId: number; paymentId: string }, { minerId: string }>(
+    return callRouted<
+      { corporationId: number; paymentId: string; inReview?: true },
+      { minerId: string }
+    >(
       'claimCorpTaxBookPaymentCallable',
-      { corporationId, paymentId },
+      { corporationId, paymentId, ...(options.inReview ? { inReview: true as const } : {}) },
       characterId
     );
   });

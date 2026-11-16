@@ -927,6 +927,38 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect(await reason(claimPayment(deps(), who(77), CORP, 'j1_7'))).toBe('already-assigned');
     });
 
+    it('lets a player count their own donation held for review only when they say so, from the book start', async () => {
+      await turnOn();
+      const held = (id: string, at: string) =>
+        book().collection('payments').doc(id).set({
+          id,
+          source: 'donation',
+          characterId: 77,
+          uid: 'char:77',
+          amount: 10,
+          at,
+          division: 5,
+          reviewReason: 'no-open-balance',
+        });
+      await held('j5_7', '2026-10-18T00:00:00Z');
+      await held('j5_6', '2026-09-20T00:00:00Z');
+      // The automatic claim never takes one: an officer reviews it unless the player says it was tax.
+      expect(await reason(claimPayment(deps(), who(77), CORP, 'j5_7'))).toBe('in-review');
+      expect(await reason(claimPayment(deps(), who(78), CORP, 'j5_7', { inReview: true }))).toBe(
+        'not-found'
+      );
+      // Paid before the book bills from: no mining it bills could have been owed then.
+      expect(await reason(claimPayment(deps(), who(77), CORP, 'j5_6', { inReview: true }))).toBe(
+        'before-start'
+      );
+      expect(await claimPayment(deps(), who(77), CORP, 'j5_7', { inReview: true })).toEqual({
+        minerId: 'solo:77',
+      });
+      const p = (await book().collection('payments').doc('j5_7').get()).data();
+      expect(p).toMatchObject({ minerId: 'solo:77', claimedBy: 77 });
+      expect(p?.reviewReason).toBeUndefined();
+    });
+
     it('credits a claim to the Miner the character is grouped into', async () => {
       await turnOn();
       await edit(ACCOUNTANT, {
@@ -1763,6 +1795,27 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         // The same wallet payments are credited now: a new declaration finds nothing to credit.
         const next = await declare(50, { statementId: 's1', transfers: [transfer(4_000_000, 1)] });
         expect(next.checks[0].result).toBe('notFound');
+      });
+
+      it("credits the member's own donation the sync held for review, clearing the hold", async () => {
+        await turnOn();
+        await edit(ACCOUNTANT, { action: 'issueStatement', statement: statement('s1') });
+        await pastSetup();
+        await book().update({ lastSync: { at: now } });
+        await book().collection('payments').doc('j5_1').set({
+          characterId: 50,
+          amount: 4_000_000,
+          at: paidAt,
+          source: 'donation',
+          division: 5,
+          reviewReason: 'no-open-balance',
+        });
+        const out = await declare(50, { statementId: 's1', transfers: [transfer(4_000_000, 1)] });
+        expect(out.checks).toEqual([{ result: 'found', paymentId: 'j5_1' }]);
+        expect(out.confirmed).toBe(true);
+        const p = (await book().collection('payments').doc('j5_1').get()).data();
+        expect(p).toMatchObject({ minerId: 'solo:50', claimedBy: 50 });
+        expect(p?.reviewReason).toBeUndefined();
       });
 
       it('does not credit when several payments match one transfer', async () => {

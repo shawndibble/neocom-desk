@@ -18,7 +18,13 @@ import { isoDay } from '../memberFlag';
 import { CHECK_TONE } from './checkTone';
 import { TransferPicker } from './TransferPicker';
 import { outcomesFor, SELF_SERVICE, type OutcomeId, type ResolveProblem } from './outcomes';
-import { sendProof, tellNotOwed, tellNotPaying, type MailContext } from './resolveSubmit';
+import {
+  countHeldDonations,
+  sendProof,
+  tellNotOwed,
+  tellNotPaying,
+  type MailContext,
+} from './resolveSubmit';
 
 const k = (key: string) => `miningTax.resolve.${key}`;
 
@@ -64,6 +70,8 @@ type Done =
       holdsUntil?: string;
       /** Said again after an officer kept the bill: the day is not held a second time. */
       again?: boolean;
+      /** Donations the book held for review, counted by the member's own claim. */
+      held?: boolean;
       mailed?: TaxQuestionMailOutcome;
     };
 
@@ -116,13 +124,16 @@ export function ResolveDialog({
     problem.kind === 'markedPaid'
       ? problem.statementId
       : undefined;
+  // Donations the book holds for review: without a Statement to declare on, each is claimed.
+  const held = problem.kind === 'uncredited' ? problem.held : undefined;
+  const countsHeld = held !== undefined && statementId === undefined;
 
   const needsText =
     choice === 'notOwed' ? problem.kind !== 'conflict' : choice === 'notPaying' && tell;
   const blocked =
     busy ||
     (needsText && text.trim() === '') ||
-    (choice === 'paid' && (offer.noStatement || statementId === undefined)) ||
+    (choice === 'paid' && (offer.noStatement || (statementId === undefined && !countsHeld))) ||
     (choice === 'fixRecords' && !onFixRecords);
 
   const holdsUntil = () => {
@@ -150,6 +161,10 @@ export function ResolveDialog({
           holdsUntil: holdsUntil(),
           ...(problem.kind === 'kept' ? { again: true } : {}),
         });
+      } else if (choice === 'paid' && countsHeld) {
+        await countHeldDonations(mail, held);
+        onSent();
+        setDone({ kind: 'sent', confirmed: true, held: true });
       } else if (choice === 'paid' && statementId) {
         // Every day the proof covers, not just the first: the officer reads what it paid.
         const days =
@@ -171,7 +186,7 @@ export function ResolveDialog({
 
   const title =
     problem.kind === 'uncredited'
-      ? t(k('title.uncredited'))
+      ? t(k(held ? 'title.inReview' : 'title.uncredited'))
       : problem.kind === 'conflict'
         ? t(k('title.conflict'), { date: row?.date ?? '' })
         : problem.kind === 'kept'
@@ -286,6 +301,10 @@ export function ResolveDialog({
           </>
         );
       case 'paid':
+        if (countsHeld)
+          return (
+            <span className="block text-xs text-text-dim">{t(k('countsHeld'), { corp })}</span>
+          );
         if (offer.noStatement || statementId === undefined)
           return (
             <span className="block text-xs text-text-dim">
@@ -354,7 +373,12 @@ export function ResolveDialog({
           </Button>
           <Button variant="primary" disabled={blocked} onClick={() => void submit()}>
             {t(k(`action.${choice}`), {
-              context: choice === 'notPaying' && tell ? 'tell' : undefined,
+              context:
+                choice === 'notPaying' && tell
+                  ? 'tell'
+                  : choice === 'paid' && countsHeld
+                    ? 'held'
+                    : undefined,
             })}
           </Button>
         </div>
@@ -395,7 +419,7 @@ function DoneView({ done, corp }: { done: Done; corp: string }) {
   return (
     <div className="space-y-3 text-sm">
       {done.confirmed ? (
-        <p>{t(k('result.credited'), { corp })}</p>
+        <p>{t(k(done.held ? 'result.countedHeld' : 'result.credited'), { corp })}</p>
       ) : (
         <p>
           {done.checks && done.checks.length > 0

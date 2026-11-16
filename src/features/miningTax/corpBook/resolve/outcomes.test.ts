@@ -60,6 +60,23 @@ describe('outcomesFor (resolving in the app)', () => {
     expect(outcomesFor(p)).toMatchObject({ preselected: 'pay', noStatement: true });
   });
 
+  // The book holds these donations already: the member says they were tax, with or without a
+  // Statement to declare on (a claim of their own donation needs none); paying again is no answer.
+  it('offers sending the proof, preselected, for donations the book holds for review', () => {
+    const p: ResolveProblem = {
+      ...base,
+      kind: 'uncredited',
+      amount: 40,
+      held: [{ id: 'j5_1', characterId: 7 }],
+    };
+    expect(outcomesFor(p)).toEqual({
+      outcomes: ['notPaying', 'paid'],
+      preselected: 'paid',
+      tellWhy: false,
+      noStatement: false,
+    });
+  });
+
   it('preselects disputing a figure the book bills higher, and paying one it bills lower', () => {
     const owes = row({
       dispute: { rate: true, quantity: false, personalPct: 10, bookPct: 12 },

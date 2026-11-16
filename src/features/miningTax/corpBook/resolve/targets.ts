@@ -18,6 +18,7 @@ import {
   uncreditedKey,
 } from './notPaying';
 import { notOwedPlan, type ResolveProblem } from './outcomes';
+import type { InReviewPayment } from '../corpBookStore';
 
 export interface ResolveTarget {
   problem: ResolveProblem;
@@ -78,6 +79,47 @@ export function uncreditedTarget(
         : [{ amount: u.amount, at: u.at, journalRef: u.refId, recipient: 'corporation' as const }]
     ),
     donations: group,
+  };
+}
+
+/**
+ * A book's donations it holds for review without counting them (#6207): the member says they were
+ * tax. With an open Statement of the donor's Miner the proof goes on it (the server credits each
+ * held donation it finds, and an officer sees the declaration); without one each is claimed.
+ */
+export function inReviewTarget(group: {
+  corporationId: number;
+  corpName: string;
+  donations: readonly InReviewPayment[];
+  statementId?: string;
+}): ResolveTarget {
+  const { donations } = group;
+  return {
+    problem: {
+      kind: 'uncredited',
+      corporationId: group.corporationId,
+      corpName: group.corpName,
+      characterId: donations[0].characterId,
+      amount: donations.reduce((sum, d) => sum + d.amount, 0),
+      ...(group.statementId !== undefined ? { statementId: group.statementId } : {}),
+      held: donations.map((d) => ({ id: d.id, characterId: d.characterId })),
+    },
+    hideKey: uncreditedKey(
+      group.corporationId,
+      donations.map((d) => d.at)
+    ),
+    transfers: donations.flatMap((d) =>
+      d.refId === undefined
+        ? []
+        : [{ amount: d.amount, at: d.at, journalRef: d.refId, recipient: 'corporation' as const }]
+    ),
+    donations: donations.map((d) => ({
+      characterId: d.characterId,
+      amount: d.amount,
+      at: d.at,
+      ...(d.refId !== undefined ? { refId: d.refId } : {}),
+      covered: [],
+    })),
   };
 }
 
