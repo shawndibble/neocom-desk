@@ -284,11 +284,29 @@ export function useTaxAttentionItems({
         { corp: u.corpName, amount: formatIsk(u.amount, 0), date: u.at.slice(0, 10) }
       ),
       detail: (
-        <p>
-          {every
-            ? t('miningTax.corpBook.attention.uncreditedEveryDetail', { corp: u.corpName })
-            : t('miningTax.corpBook.attention.uncreditedDetail', { corp: u.corpName, accounts })}
-        </p>
+        <>
+          <p>
+            {every
+              ? t('miningTax.corpBook.attention.uncreditedEveryDetail', { corp: u.corpName })
+              : t('miningTax.corpBook.attention.uncreditedDetail', { corp: u.corpName, accounts })}
+          </p>
+          {/* What the member needs to dispute it: the days it paid, and the transfer itself. */}
+          {u.covered.length > 0 && (
+            <p>
+              {t('miningTax.corpBook.attention.uncreditedCovered', {
+                days: u.covered.join(', '),
+              })}
+            </p>
+          )}
+          <p>
+            {t('miningTax.corpBook.attention.uncreditedDispute', {
+              corp: u.corpName,
+              amount: formatIsk(u.amount, 0),
+              // The journal's own stamp, in EVE time (UTC), as the in-game journal shows it.
+              time: u.at.slice(0, 16).replace('T', ' '),
+            })}
+          </p>
+        </>
       ),
     });
   }

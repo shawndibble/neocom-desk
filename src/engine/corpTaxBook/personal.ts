@@ -156,6 +156,12 @@ export interface InFlightDonation {
   at: string;
 }
 
+/** A donation the book no longer counts, with the days it paid while it did: what to dispute. */
+export interface UncreditedDonation extends InFlightDonation {
+  /** The Billed days (dates, oldest first) it covered while it counted. */
+  covered: string[];
+}
+
 /**
  * A donation stops counting as paid once the book synced this long after it and still had not
  * credited it: it most likely went to a wallet division the book does not read (#6204).
@@ -314,7 +320,7 @@ export interface BookSummary {
   /** The member's unsettled Statements past their Overdue days, oldest first. */
   overdue: OverdueStatementView[];
   /** Donations the book synced past without crediting (`UNCREDITED_AFTER_DAYS`): not counted as paid. */
-  uncredited: InFlightDonation[];
+  uncredited: UncreditedDonation[];
   hubId: string;
   oreForm: 'compressed' | 'raw';
 }
@@ -1162,6 +1168,7 @@ export function overlayCorpBooks(input: {
   // 4. Payments: a Statement's days are Paid oldest first; part payments land on the oldest days.
   // A raise billed on another Statement than its day's (or not billed yet) is owed on its own.
   // An officer write-off then forgives the next open days of its Statement (#4637).
+  const uncreditedByBook = new Map<number, UncreditedDonation[]>();
   for (const p of prepared) {
     const mine = rowsByBook.get(p.book.corporationId) ?? [];
     const partsOf = new Map<BookRowView, OwedPart[]>();
@@ -1301,6 +1308,31 @@ export function overlayCorpBooks(input: {
         }
       }
     }
+    // An uncredited donation pays nothing now, but the member disputes it by the days it paid
+    // while it counted: those it would still cover, oldest first, after the counted money.
+    const stillOpen = mine.filter((r) => r.state === 'billed' && (r.taxOwed ?? 0) > 0);
+    const uncredited: UncreditedDonation[] = [];
+    const claimed = new Set<string>();
+    for (const d of [...p.book.inFlight]
+      .filter((x) => isUncredited(x, donationsCheckedAt(p.book)))
+      .sort((a, b) => a.at.localeCompare(b.at))) {
+      const own = stillOpen.filter(
+        (r) => minerOf(r) === minerIdFor(d.characterId, p.book.miners) && !claimed.has(r.id)
+      );
+      const ids = coverInFlight(
+        own.map((r) => ({ id: r.id, date: r.date, taxOwed: r.taxOwed ?? 0 })),
+        d.amount
+      );
+      for (const id of ids) claimed.add(id);
+      uncredited.push({
+        ...d,
+        covered: own
+          .filter((r) => ids.has(r.id))
+          .map((r) => r.date)
+          .sort(),
+      });
+    }
+    uncreditedByBook.set(p.book.corporationId, uncredited);
     // Whatever settled the day, the member's own paid mark under the corporation's Payee stays
     // theirs to undo: the book row hides it, so the row has to carry it.
     const markedIds = memberPaidIds.get(p.book.corporationId);
@@ -1370,7 +1402,7 @@ export function overlayCorpBooks(input: {
       ...(closedThrough !== undefined ? { closedThrough } : {}),
       credit: [...p.credit.values()].reduce((sum, c) => sum + c, 0),
       ...openAndOverdue(p),
-      uncredited: p.book.inFlight.filter((d) => isUncredited(d, donationsCheckedAt(p.book))),
+      uncredited: uncreditedByBook.get(p.book.corporationId) ?? [],
       hubId: p.book.hubId,
       oreForm: p.book.oreForm,
     };

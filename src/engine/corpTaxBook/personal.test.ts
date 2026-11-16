@@ -2348,7 +2348,14 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
     it('stops counting once the book synced 3 days after it, and is named', () => {
       const out = overlay([entry()], [book({ inFlight: [old] })]);
       expect(out.rows[0].state).toBe('billed');
-      expect(out.books[0].uncredited).toEqual([old]);
+      expect(out.books[0].uncredited).toEqual([{ ...old, covered: [out.rows[0].date] }]);
+    });
+
+    it('names the days it paid while it counted, so the member can dispute them', () => {
+      // Too little to cover the day: it covered nothing, and says so.
+      const small = { ...old, amount: 1 };
+      const out = overlay([entry()], [book({ inFlight: [small] })]);
+      expect(out.books[0].uncredited).toEqual([{ ...small, covered: [] }]);
     });
 
     it('waits for a sync that read the wallet, not just any sync', () => {
@@ -2363,7 +2370,7 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
       );
       expect(early.books[0].uncredited).toEqual([]);
       const late = overlay([entry()], [book({ inFlight: [old], donationsCheckedAt: SYNCED })]);
-      expect(late.books[0].uncredited).toEqual([old]);
+      expect(late.books[0].uncredited).toMatchObject([old]);
     });
 
     it('still counts while the book has not synced 3 days after it', () => {

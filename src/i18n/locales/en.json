@@ -8168,6 +8168,8 @@
         "uncreditedDetail": "{{corp}} synced since and still doesn't hold it, so it no longer counts as paid here. Its book reads donations into: {{accounts}}.",
         "uncreditedEveryTitle": "{{corp}} hasn't credited your {{amount}} ISK donation of {{date}} — ask the corp to sync",
         "uncreditedEveryDetail": "Its book reads every wallet division, but its last sync doesn't hold this donation, so it no longer counts as paid here. Ask the corp to sync its book. If it still isn't credited, check in your wallet journal that the ISK went to {{corp}}.",
+        "uncreditedCovered": "Until then it paid {{days}}; those days are owed again.",
+        "uncreditedDispute": "To dispute it, give a {{corp}} officer the donation from your wallet journal: {{amount}} ISK, sent {{time}} EVE time.",
         "alsoBilledTitle": "{{corp}} also bills ore you listed for {{payees}}",
         "alsoBilledDetail": "It is left out of what you owe {{payees}}. Open the day and choose “{{action}}” to take it off your list.",
         "openDay": "Open the day"
