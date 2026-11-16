@@ -466,7 +466,7 @@ function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: str
     ...(book.overdueDays !== undefined ? { overdueDays: book.overdueDays } : {}),
     ...(book.feeders ? { feeders: book.feeders } : {}),
     pricesOn: book.pricesOn,
-    placement: 'observed-rows',
+    placement: { kind: 'observed-rows' },
   });
   const observedByKey = new Map(book.observed.map((o) => [observedEntryKey(o), o]));
   const lineIndex = new Map<string, { id: string; lines: StatementLine[] }>();
@@ -1437,7 +1437,7 @@ function openAndOverdue(p: Prepared): {
   };
   const overdue: OverdueStatementView[] = [];
   for (const s of open) {
-    // The member reads their own declarations (#6206): a pause counts for them too.
+    // Settled with the member's own declarations (#6206), so a pause counts for them too.
     const status = p.settlement.get(s.id)?.overdue;
     if (status?.state === 'overdue') overdue.push({ ...view(s), overdueAt: status.overdueAt });
   }

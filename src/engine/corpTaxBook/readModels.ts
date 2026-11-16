@@ -88,7 +88,7 @@ export interface OpenAmounts {
   billableThrough: string | undefined;
   /** The Miner ids a view lists, in order. */
   minerIds: string[];
-  byMiner: ReadonlyMap<string, { unbilled: number; pending: number }>;
+  byMiner: ReadonlyMap<string, { characterIds: number[]; unbilled: number; pending: number }>;
   unratedCount: number;
 }
 
@@ -97,15 +97,16 @@ export function openSetOf(input: BookViewInput): OpenAmounts {
   const { charges, billableThrough, minerIds, miners, unrated } = settleOpenSet(
     openSetInputOf(input)
   );
-  const byMiner = new Map<string, { unbilled: number; pending: number }>();
+  const byMiner = new Map<string, { characterIds: number[]; unbilled: number; pending: number }>();
   for (const id of minerIds) {
-    const { statements } = miners.get(id)!;
+    const { characterIds, statements } = miners.get(id)!;
     const mine: DayCharge[] = charges.filter((c) => c.minerId === id);
     // The book's billable-through, not the Miner's held one: as this path has always drafted.
     const draft = minerDraft(input, id, statements, mine, billableThrough);
     const billed = new Set<string>();
     for (const s of statements) for (const l of s.lines) if (l.chargeKey) billed.add(l.chargeKey);
     byMiner.set(id, {
+      characterIds,
       unbilled: (draft.kind === 'nothing' ? [] : draft.lines).reduce((sum, l) => sum + l.tax, 0),
       pending: pendingTax(input, mine, billed, billableThrough),
     });
@@ -141,10 +142,10 @@ export function fromReadModels(
   const needsYou: NeedsYouItem[] = [];
 
   for (const id of open.minerIds) {
-    const grouping = input.miners.find((m) => m.id === id);
-    const solo = /^solo:(\d+)$/.exec(id);
-    const characterIds = grouping?.characterIds ?? (solo ? [Number(solo[1])] : []);
-    const mainCharacterId = grouping?.mainCharacterId ?? characterIds[0] ?? 0;
+    const amounts = open.byMiner.get(id);
+    const characterIds = amounts?.characterIds ?? [];
+    const mainCharacterId =
+      input.miners.find((m) => m.id === id)?.mainCharacterId ?? characterIds[0] ?? 0;
     const entry = entries.get(id);
     const owed = entry?.owed ?? 0;
 
@@ -169,7 +170,6 @@ export function fromReadModels(
       }
     }
     const standing = standingOf(characterIds, latestCorp, input);
-    const amounts = open.byMiner.get(id);
     miners.push({
       id,
       mainCharacterId,

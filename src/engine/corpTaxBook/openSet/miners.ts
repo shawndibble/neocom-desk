@@ -32,7 +32,12 @@ function characterIdsOf(input: OpenSetInput, minerId: string): number[] {
  *
  * Dismissal credits look a billed line's day up among every charge, not only the ones now
  * under this Miner: after a regroup an absorbed Miner's Statements still bill days that sit
- * under the new grouping, and a dismissal of one of them still credits the Statement.
+ * under the new grouping. For record, extraction and moon dismissals that matches the server
+ * (`dismissalCredits` in `functions/src/corpTaxBookEngine.ts`). Two gaps are older than this
+ * module: a `miner` dismissal is checked against the day's current Miner here but against the
+ * Statement's Miner on the server, and a billed line whose day has no current charge (no longer
+ * readable or rated) gets no credit here. On the member side (`'observed-rows'` placement) a
+ * day has no Extraction id, so an extraction dismissal never matches there.
  */
 export function settleMiner(
   input: OpenSetInput,
@@ -77,6 +82,7 @@ export function settleMiner(
     .filter((h) => h !== undefined)
     .sort((a, b) => a.from.localeCompare(b.from))[0];
   return {
+    characterIds,
     statements,
     payments,
     dismissalCredits: credits,

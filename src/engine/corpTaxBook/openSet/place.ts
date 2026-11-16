@@ -1,7 +1,8 @@
 import { extractionStatus } from '../extraction';
 import { toEngineExtraction, type SyncExtraction } from '../sync';
 import type { ObservedMiningEntry } from '../types';
-import type { PlaceOf, Placement } from './types';
+import type { PlaceOf } from '../charges';
+import type { Placement } from './types';
 
 /** Which Extraction a refinery was working on a date: from fracture through expiry. */
 export function placeOfFactory(
@@ -39,7 +40,7 @@ function rowPlaceOf(rows: readonly ObservedMiningEntry[]): PlaceOf {
 }
 
 export function placeOfFor(placement: Placement, rows: readonly ObservedMiningEntry[]): PlaceOf {
-  return placement === 'observed-rows'
+  return placement.kind === 'observed-rows'
     ? rowPlaceOf(rows)
     : placeOfFactory(placement.extractions, placement.structureExpiryHours);
 }

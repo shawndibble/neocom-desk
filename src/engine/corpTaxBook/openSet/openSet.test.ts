@@ -94,7 +94,7 @@ function officer(over: Partial<OpenSetInput> = {}): OpenSetInput {
       prices: new Map([[ORE, 1000]]),
       sources: new Map([[ORE, 'saved' as const]]),
     }),
-    placement: { extractions: [PULL], structureExpiryHours: {} },
+    placement: { kind: 'extractions', extractions: [PULL], structureExpiryHours: {} },
     ...over,
   };
 }
@@ -111,7 +111,7 @@ function member(book: OpenSetInput, characterIds: readonly number[]): OpenSetInp
     entries: book.entries.filter((e) => mine.has(e.characterId)),
     statements: book.statements.filter((s) => minerIds.has(s.minerId)),
     payments: book.payments.filter((p) => p.minerId !== undefined && minerIds.has(p.minerId)),
-    placement: 'observed-rows',
+    placement: { kind: 'observed-rows' },
   };
 }
 

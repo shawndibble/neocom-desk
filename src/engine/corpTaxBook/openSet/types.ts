@@ -5,7 +5,7 @@ import type {
   RecordedWriteOff,
   TaxPayment,
 } from '../allocation';
-import type { DayCharge, Miner } from '../charges';
+import type { DayCharge, Miner, PlaceOf } from '../charges';
 import type { FeederCoverage } from '../coverage';
 import type { Dismissal } from '../dismissals';
 import type { FeederReadClock, StaleHold } from '../feederHealth';
@@ -16,12 +16,6 @@ import type { SettlePayment, SyncExtraction } from '../sync';
 import type { ObservedMiningEntry } from '../types';
 import type { DayPrices } from '../valuation';
 
-/** The moon and Extraction a refinery was working on a date, when known. */
-export type PlaceOf = (
-  structureId: number,
-  date: string
-) => { moonId?: number; extractionId?: string };
-
 /**
  * How a refinery-day is placed. An officer has the book's Extractions and each structure's
  * expiry (ADR 0032: the same placement the server stamps). A member cannot read Extractions
@@ -29,10 +23,11 @@ export type PlaceOf = (
  */
 export type Placement =
   | {
+      kind: 'extractions';
       extractions: readonly SyncExtraction[];
       structureExpiryHours: Readonly<Record<string, number>>;
     }
-  | 'observed-rows';
+  | { kind: 'observed-rows' };
 
 /** One book's unbilled and unpaid side, as the reader can see it. */
 export interface OpenSetInput {
@@ -61,6 +56,8 @@ export interface OpenSetInput {
 
 /** One Miner's side of the open set. */
 export interface MinerSettlement {
+  /** Its grouping's characters, or the one a `solo:` id names. */
+  characterIds: number[];
   statements: Statement[];
   /** Its Tax Payments; a donation dated before the book is neither credited nor listed. */
   payments: TaxPayment[];

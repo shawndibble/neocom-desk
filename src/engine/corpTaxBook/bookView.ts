@@ -299,19 +299,23 @@ export function openSetInputOf(input: BookViewInput): OpenSetInput {
     now: input.now,
     startDate: input.startDate,
     graceHours: input.graceHours,
-    ...(input.lastSyncedAt !== undefined ? { lastSyncedAt: input.lastSyncedAt } : {}),
+    lastSyncedAt: input.lastSyncedAt,
     rates: input.rates,
     entries: input.entries,
     miners: input.miners,
     statements: input.statements,
     payments: input.payments,
     dismissals: input.dismissals,
-    ...(input.writeOffs ? { writeOffs: input.writeOffs } : {}),
+    writeOffs: input.writeOffs,
     declarations: input.declarations,
     overdueDays: input.overdueDays,
-    ...(input.feeders ? { feeders: input.feeders } : {}),
+    feeders: input.feeders,
     pricesOn: input.pricesOn,
-    placement: { extractions: input.extractions, structureExpiryHours: input.structureExpiryHours },
+    placement: {
+      kind: 'extractions',
+      extractions: input.extractions,
+      structureExpiryHours: input.structureExpiryHours,
+    },
   };
 }
 
@@ -344,7 +348,7 @@ export function standingOf(
 
 export function buildBookView(input: BookViewInput): BookView {
   const open = settleOpenSet(openSetInputOf(input));
-  const { charges, billableThrough } = open;
+  const { charges } = open;
   const latestCorp = latestCorporationOf(input.entries);
 
   const byMiner = new Map<string, MinerInternals>();
@@ -355,26 +359,31 @@ export function buildBookView(input: BookViewInput): BookView {
   const nowMs = Date.parse(input.now);
 
   for (const id of open.minerIds) {
-    const grouping = input.miners.find((m) => m.id === id);
-    const solo = /^solo:(\d+)$/.exec(id);
-    const characterIds = grouping?.characterIds ?? (solo ? [Number(solo[1])] : []);
-    const mainCharacterId = grouping?.mainCharacterId ?? characterIds[0] ?? 0;
     const settled = open.miners.get(id)!;
-    const { statements, payments, allocation, allocationInput } = settled;
-    const credits = settled.dismissalCredits;
+    const {
+      characterIds,
+      statements,
+      payments,
+      allocation,
+      allocationInput,
+      dismissalCredits,
+      billableThrough,
+      hold,
+    } = settled;
+    const mainCharacterId =
+      input.miners.find((m) => m.id === id)?.mainCharacterId ?? characterIds[0] ?? 0;
     const mine = charges.filter((c) => c.minerId === id);
-    const forgivenKeys = forgivenDayKeys(statements, allocation, credits);
-    const minerThrough = settled.billableThrough;
-    // The hold that set `minerThrough`: its moon owner is why a held day waits (#6210).
-    const minerHold = settled.hold;
+    const forgivenKeys = forgivenDayKeys(statements, allocation, dismissalCredits);
+    // `billableThrough` is the Miner's own; `hold` set it, and its moon owner is why a held day
+    // waits (#6210) from the hold's first day through the book's billable-through.
     const heldByOf = (date: string) =>
-      minerHold &&
-      billableThrough !== undefined &&
-      date >= minerHold.from &&
-      date <= billableThrough
-        ? minerHold.ownerCorporationId
+      hold &&
+      open.billableThrough !== undefined &&
+      date >= hold.from &&
+      date <= open.billableThrough
+        ? hold.ownerCorporationId
         : undefined;
-    const draft = minerDraft(input, id, statements, mine, minerThrough);
+    const draft = minerDraft(input, id, statements, mine, billableThrough);
 
     const draftLines = draft.kind === 'nothing' ? [] : draft.lines;
     const unbilledKeys = new Set(draftLines.map((l) => l.chargeKey));
@@ -455,7 +464,7 @@ export function buildBookView(input: BookViewInput): BookView {
       }
     }
     const unbilled = draftLines.reduce((sum, l) => sum + l.tax, 0);
-    const pending = pendingTax(input, mine, new Set(billedBy.keys()), billableThrough);
+    const pending = pendingTax(input, mine, new Set(billedBy.keys()), open.billableThrough);
     const lastPaid = payments
       .filter((p) => p.amount - (p.notTaxAmount ?? 0) > 0)
       .map((p) => p.at)
@@ -485,7 +494,7 @@ export function buildBookView(input: BookViewInput): BookView {
       allocationInput,
       draft,
       days,
-      billableThrough: minerThrough,
+      billableThrough,
     });
 
     for (const d of input.declarations) {
@@ -539,7 +548,7 @@ export function buildBookView(input: BookViewInput): BookView {
     outsideCoverage: open.outsideCoverage,
     donationsBeforeBook,
     unrated: open.unrated,
-    billableThrough,
+    billableThrough: open.billableThrough,
     miners,
     extractions,
     chunkRates,
