@@ -244,7 +244,7 @@ describe('Widget states', () => {
     expect(within(screen.getByRole('region', { name: 'Mail' })).getByText('4')).toBeInTheDocument();
   });
 
-  it('asks for the permission, with a Grant access action, when the grant lapsed and nothing was saved', () => {
+  it('asks for the permission, with a Grant in EVE action, when the grant lapsed and nothing was saved', async () => {
     useActiveCharacter.setState({ activeCharacterId: 91, hydrated: true });
     renderWidget(model(), (store) =>
       store.set('mail', {
@@ -255,11 +255,15 @@ describe('Widget states', () => {
       })
     );
     const region = screen.getByRole('region', { name: 'Mail' });
-    expect(within(region).getByText('Needs permission')).toBeInTheDocument();
-    expect(within(region).getByRole('button', { name: 'Grant access' })).toBeInTheDocument();
+    expect(await within(region).findByText('This character: grant Mail')).toBeInTheDocument();
+    await userEvent.click(within(region).getByRole('button', { name: 'Grant in EVE' }));
+    expect(grant.begin).toHaveBeenCalledWith(
+      91,
+      expect.arrayContaining(['getCharacterMailHeaders'])
+    );
   });
 
-  it('keeps a saved wallet balance on screen, with a small sign-in note, when the grant lapsed over it', () => {
+  it('keeps a saved wallet balance on screen, with a small sign-in note, when the grant lapsed over it', async () => {
     useActiveCharacter.setState({ activeCharacterId: 91, hydrated: true });
     renderWidget(model({ kind: 'wallet', view: 'number' }), (store) =>
       store.set('wallet', {
@@ -277,11 +281,9 @@ describe('Widget states', () => {
       })
     );
     const region = screen.getByRole('region', { name: 'Wallet' });
-    expect(within(region).queryByText('Needs permission')).not.toBeInTheDocument();
+    expect(await within(region).findByText('This character: grant Wallet')).toBeInTheDocument();
     expect(within(region).getByText('5,000,000 ISK')).toBeInTheDocument();
-    expect(
-      within(region).getByRole('button', { name: 'Log in again with EVE Online' })
-    ).toBeInTheDocument();
+    expect(within(region).getByRole('button', { name: 'Grant in EVE' })).toBeInTheDocument();
   });
 
   it('says it could not load, dims the last good value and retries from the refresh epoch', async () => {
@@ -362,7 +364,7 @@ describe('Widget states', () => {
     );
   });
 
-  it('offers Grant access for the one Jump timer it cannot read, beside the one it can', () => {
+  it('offers the grant for the one Jump timer it cannot read, beside the one it can', async () => {
     useActiveCharacter.setState({ activeCharacterId: 91, hydrated: true });
     renderWidget(model({ kind: 'jumpTimers' }), (store) =>
       store.set('jumpTimers', {
@@ -377,7 +379,10 @@ describe('Widget states', () => {
     );
     const region = screen.getByRole('region', { name: 'Jump timers' });
     expect(within(region).getAllByText('Ready').length).toBeGreaterThan(0);
-    expect(within(region).getByRole('button', { name: 'Grant access' })).toBeInTheDocument();
+    expect(
+      await within(region).findByText('This character: grant Jump fatigue')
+    ).toBeInTheDocument();
+    expect(within(region).getByRole('button', { name: 'Grant in EVE' })).toBeInTheDocument();
   });
 
   it('mining tax shows the Characters that granted it, with no prompt for one that did not', () => {
@@ -401,7 +406,8 @@ describe('Widget states', () => {
     );
     const region = screen.getByRole('region', { name: 'Mining tax' });
     expect(within(region).getByText('10.9M')).toBeInTheDocument();
-    expect(within(region).queryByRole('button', { name: 'Grant access' })).toBeNull();
+    expect(within(region).queryByRole('button', { name: 'Grant in EVE' })).toBeNull();
+    expect(within(region).queryByRole('button', { name: 'Log in' })).toBeNull();
   });
 
   it('mining tax, when no Character can read, asks one that lacks it rather than the active one', async () => {
@@ -424,12 +430,12 @@ describe('Widget states', () => {
       })
     );
     const region = screen.getByRole('region', { name: 'Mining tax' });
-    expect(within(region).getByText(/Shadow Ruler/)).toBeInTheDocument();
-    await userEvent.click(within(region).getByRole('button', { name: 'Grant access' }));
+    expect(await within(region).findByText('Shadow Ruler: grant Mining')).toBeInTheDocument();
+    await userEvent.click(within(region).getByRole('button', { name: 'Grant in EVE' }));
     expect(grant.begin).toHaveBeenCalledWith(92, ['getCharacterMining']);
   });
 
-  it('asks for permission outright when neither Jump timer can be read', () => {
+  it('asks for permission outright when neither Jump timer can be read', async () => {
     useActiveCharacter.setState({ activeCharacterId: 91, hydrated: true });
     renderWidget(model({ kind: 'jumpTimers' }), (store) =>
       store.set('jumpTimers', {
@@ -443,7 +449,10 @@ describe('Widget states', () => {
       })
     );
     const region = screen.getByRole('region', { name: 'Jump timers' });
-    expect(within(region).getByRole('button', { name: 'Grant access' })).toBeInTheDocument();
+    expect(
+      await within(region).findByText('This character: grant Character details, Jump fatigue')
+    ).toBeInTheDocument();
+    expect(within(region).getByRole('button', { name: 'Grant in EVE' })).toBeInTheDocument();
   });
 });
 

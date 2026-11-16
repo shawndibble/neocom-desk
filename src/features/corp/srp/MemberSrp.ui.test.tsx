@@ -183,7 +183,8 @@ describe('MemberSrp', () => {
   it('asks for the killmail Permission instead of listing, and pasting still works', async () => {
     granted.value = false;
     setup();
-    expect(await screen.findByRole('button', { name: 'Grant killmail access' })).toBeTruthy();
+    expect(await screen.findByText('This character: grant Killmails')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Grant in EVE' })).toBeTruthy();
     expect(screen.queryByRole('table', { name: 'My lost ships' })).toBeNull();
     await userEvent.type(
       screen.getByLabelText('Killmail link'),

@@ -419,8 +419,9 @@ describe('Assets', () => {
     );
     const user = userEvent.setup({ delay: null });
     renderAssetsRoute();
-    expect(await screen.findByText('Log in again to refresh.')).toBeInTheDocument();
-    expect(screen.queryByText('Log in again to see your assets')).not.toBeInTheDocument();
+    // The grant holds the scope, so EVE refused it: a re-login, not a Permission.
+    // One note for the Character (it speaks for the page's other banner too), the data under it.
+    expect(await screen.findByText('Pilot One: log in again')).toBeInTheDocument();
     await openLocation(user, JITA);
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
   });
@@ -473,7 +474,9 @@ describe('Assets', () => {
       )
     );
     renderAssetsRoute();
-    expect(await screen.findByText('Log in again to see your assets')).toBeInTheDocument();
+    expect(await screen.findByText('Pilot One: log in again')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument();
+    expect(screen.queryByText('Showing saved data.')).not.toBeInTheDocument();
     expect(screen.queryByText(/no assets cached/i)).not.toBeInTheDocument();
   });
 
@@ -482,10 +485,13 @@ describe('Assets', () => {
     expect(await screen.findByText(JITA)).toBeInTheDocument();
     const note = (await screen.findByText('Jumps away unavailable')).closest('div');
     expect(note).not.toBeNull();
-    // Scoped: the standings scope is also missing in this fixture, so the
-    // shell's own GrantNote renders a second, identically-labelled button.
+    // The standings scope is missing too, so the shell's GrantNote for this
+    // Character folds into this one banner, which names the Permission once.
     expect(
-      within(note as HTMLElement).getByRole('button', { name: 'Grant Character details' })
+      within(note as HTMLElement).getByText('Pilot One: grant Character details')
+    ).toBeInTheDocument();
+    expect(
+      within(note as HTMLElement).getByRole('button', { name: 'Grant in EVE' })
     ).toBeInTheDocument();
   });
 
@@ -958,7 +964,7 @@ describe('Assets in the App', () => {
   it('shows the scope gate, not the page, when the grant lacks the assets scope', async () => {
     await db.tokens.update(CHAR_ID, { scopes: [] });
     render(<App />);
-    expect(await screen.findByText('Log in again to see your assets')).toBeInTheDocument();
+    expect(await screen.findByText('Pilot One: grant Assets')).toBeInTheDocument();
     expect(screen.queryByText(JITA)).not.toBeInTheDocument();
   });
 });

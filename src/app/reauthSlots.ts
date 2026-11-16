@@ -41,14 +41,20 @@ export interface SlotView {
   primary: boolean;
   /** For the primary banner: every endpoint its Character's banners need, once each. */
   endpoints: readonly EsiEndpointId[];
+  /** Whether it speaks for other banners too, so its own context line would mislead. */
+  shared: boolean;
 }
 
 export function slotFor(slots: readonly Slot[], key: string): SlotView {
   const own = slots.find((s) => s.key === key);
-  if (!own) return { primary: false, endpoints: [] };
+  if (!own) return { primary: false, endpoints: [], shared: false };
   const peers = slots.filter((s) => s.characterId === own.characterId);
-  if (peers[0]?.key !== key) return { primary: false, endpoints: [] };
-  return { primary: true, endpoints: [...new Set(peers.flatMap((s) => s.endpoints))] };
+  if (peers[0]?.key !== key) return { primary: false, endpoints: [], shared: false };
+  return {
+    primary: true,
+    endpoints: [...new Set(peers.flatMap((s) => s.endpoints))],
+    shared: peers.length > 1,
+  };
 }
 
 /** Claims a slot while mounted; the answer for this banner. */
@@ -64,7 +70,11 @@ export function useReauthSlot(characterId: number, endpoints: readonly EsiEndpoi
   // which the store's subscription reads as a change, forever.
   const primary = useReauthSlots((state) => slotFor(state.slots, key).primary);
   const allKey = useReauthSlots((state) => slotFor(state.slots, key).endpoints.join(','));
-  return useMemo(() => ({ primary, endpoints: splitKey(allKey) }), [primary, allKey]);
+  const shared = useReauthSlots((state) => slotFor(state.slots, key).shared);
+  return useMemo(
+    () => ({ primary, endpoints: splitKey(allKey), shared }),
+    [primary, allKey, shared]
+  );
 }
 
 function splitKey(key: string): EsiEndpointId[] {

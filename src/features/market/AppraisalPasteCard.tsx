@@ -232,6 +232,7 @@ export function AppraisalPasteCard({
           </div>
           {lacksAssets && (
             <GrantNote
+              {...(characterId !== null ? { characterId } : {})}
               endpoints={ASSETS_ENDPOINTS}
               title={t('market.appraisal.minusOwnedGrantTitle')}
             />

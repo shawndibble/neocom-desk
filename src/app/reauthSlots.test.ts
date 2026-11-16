@@ -16,10 +16,15 @@ describe('reauthSlots', () => {
     expect(slotFor(slots, 'a')).toEqual({
       primary: true,
       endpoints: ['getCharacterWallet', 'getCharacterAssets'],
+      shared: true,
     });
-    expect(slotFor(slots, 'b')).toEqual({ primary: false, endpoints: [] });
+    expect(slotFor(slots, 'b')).toEqual({ primary: false, endpoints: [], shared: false });
     // Another Character's banner is its own.
-    expect(slotFor(slots, 'c')).toEqual({ primary: true, endpoints: ['getCharacterSkills'] });
+    expect(slotFor(slots, 'c')).toEqual({
+      primary: true,
+      endpoints: ['getCharacterSkills'],
+      shared: false,
+    });
   });
 
   it('hands the slot on when the speaking banner goes', () => {
@@ -30,6 +35,7 @@ describe('reauthSlots', () => {
     expect(slotFor(useReauthSlots.getState().slots, 'b')).toEqual({
       primary: true,
       endpoints: ['getCharacterAssets'],
+      shared: false,
     });
   });
 

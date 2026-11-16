@@ -1674,9 +1674,14 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
   });
 
   it('disables Minus owned with a grant note without the assets permission', async () => {
+    // The note judges the active Character's grant; pinned here rather than
+    // left to whatever an earlier test set.
+    useActiveCharacter.setState({ activeCharacterId: 1, hydrated: true });
     await seedGrant(1, []);
     renderPanel({ controller: controller({ result: LIST_OUTCOME }) });
-    expect(await screen.findByText('Grant Assets permission')).toBeInTheDocument();
+    expect(await screen.findByText('This character: grant Assets')).toBeInTheDocument();
+    expect(screen.getByText('Owned stock needs the Assets permission')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Grant in EVE' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Minus what I own at' })).toBeDisabled();
   });
 

@@ -398,8 +398,8 @@ describe('Overview widget grid', () => {
     renderOverviewRoute();
 
     const orders = await widgetCard('Open orders');
-    expect(await within(orders).findByText('Needs permission')).toBeInTheDocument();
-    expect(within(orders).getByRole('button', { name: 'Grant access' })).toBeInTheDocument();
+    expect(await within(orders).findByText('Pilot One: grant Market orders')).toBeInTheDocument();
+    expect(within(orders).getByRole('button', { name: 'Grant in EVE' })).toBeInTheDocument();
   });
 
   it('says what is missing and what the widget is for, and its ⋮ menu removes and saves it', async () => {

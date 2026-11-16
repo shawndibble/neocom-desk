@@ -106,14 +106,17 @@ describe('send-mail Permission', () => {
   it('offers the grant note when the stored grant lacks it', async () => {
     lacks.value = true;
     setup();
-    expect(await screen.findByText('Permission to send mail')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Grant send mail' })).toBeInTheDocument();
+    // The recipient picker's search note is for the same Character, so the two
+    // fold into one banner (search is Core Grant: only Send mail is named).
+    expect(await screen.findByText('This character: grant Send mail')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Grant in EVE' })).toHaveLength(1);
   });
 
   it('shows no grant note when the Permission is held', async () => {
     setup();
     await screen.findByLabelText('Subject');
     expect(screen.queryByText('Permission to send mail')).not.toBeInTheDocument();
+    expect(screen.queryByText('This character: grant Send mail')).not.toBeInTheDocument();
   });
 });
 

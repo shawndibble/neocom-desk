@@ -76,7 +76,8 @@ export function GrantBanner({
           ? t('reauth.missingTitle', { character, permissions })
           : t('reauth.loginTitle', { character })
       }
-      hint={title ?? ''}
+      // A banner speaking for others too would put its own panel's context on theirs.
+      {...(title && !slot.shared ? { hint: title } : {})}
       actionLabel={gap.missing.length > 0 ? t('reauth.grantAction') : t('reauth.loginAction')}
       onLogin={() => void beginGrant(characterId, slot.endpoints)}
       {...(variant ? { variant } : {})}

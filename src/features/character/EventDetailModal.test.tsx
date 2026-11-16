@@ -176,10 +176,12 @@ describe('EventDetailModal', () => {
         )
       );
       render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
-      const login = await screen.findByRole('button', { name: 'Log in again with EVE Online' });
+      expect(await screen.findByText('This character: grant Calendar')).toBeInTheDocument();
+      const login = screen.getByRole('button', { name: 'Grant in EVE' });
       expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
       await userEvent.setup().click(login);
       expect(beginEveLogin).toHaveBeenCalledTimes(1);
+      expect(beginEveLogin).toHaveBeenCalledWith(expect.objectContaining({ characterId: CHAR_ID }));
     });
 
     it('an auth failure with stale cached detail renders that detail normally', async () => {
@@ -196,9 +198,8 @@ describe('EventDetailModal', () => {
       );
       render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
       expect(await screen.findByText('Bring your ship')).toBeInTheDocument();
-      expect(
-        screen.queryByRole('button', { name: 'Log in again with EVE Online' })
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Grant in EVE' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Log in' })).not.toBeInTheDocument();
       // The saved copy says so, rather than passing as current.
       expect(screen.getByText('Showing cached data')).toBeInTheDocument();
     });
@@ -234,8 +235,9 @@ describe('EventDetailModal', () => {
       await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
       await seedGrant(['esi-calendar.read_calendar_events.v1']);
       render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
-      expect(await screen.findByText('Permission to respond to events')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Grant RSVP' })).toBeInTheDocument();
+      expect(await screen.findByText('This character: grant Calendar RSVP')).toBeInTheDocument();
+      expect(screen.getByText('Permission to respond to events')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Grant in EVE' })).toBeInTheDocument();
     });
 
     it('shows no grant note when the RSVP Permission is held', async () => {
