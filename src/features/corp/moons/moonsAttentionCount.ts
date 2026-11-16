@@ -5,14 +5,15 @@
  *
  * The read reuses this device's copy of each part whose version stamp has not moved
  * (bookCache.ts) and reads the ledger rows as a delta (ADR 0031): an unchanged book costs
- * its settings doc and `meta/paid`.
+ * its settings doc and `meta/paid`. Its prices are the ones this session already loaded
+ * (`heldBookPrices`): a recount loads the market only when none held cover the book's ores.
  */
 import { buildBookView } from '@/engine/corpTaxBook/bookView';
 import { tabsProjection } from '@/engine/corpTaxBook/readModels';
 import { READ_MODELS_SCHEMA } from '../../../../functions/src/corpTaxBookVersionKeys';
 import { loadCurrentMemberIds } from '../currentMembers';
 import { bookPartsFor, readBook } from '../taxBook/bookRead';
-import { bookViewInputOf, loadBookPrices } from './bookViewOf';
+import { bookViewInputOf, heldBookPrices } from './bookViewOf';
 import { needsYouOf } from './useNeedsYou';
 
 /** The book's Needs you count now; null when the corporation has no active book. */
@@ -29,7 +30,7 @@ export async function loadNeedsYouCount(
     ],
     corporationId
   ).catch(() => undefined);
-  const prices = await loadBookPrices(data);
+  const prices = await heldBookPrices(data);
   const view = buildBookView(
     bookViewInputOf(corporationId, new Date().toISOString(), data, prices, { memberIds })
   );
