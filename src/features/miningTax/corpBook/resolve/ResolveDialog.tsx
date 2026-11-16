@@ -25,6 +25,7 @@ const CHECK_TONE: Record<ClaimCheckResult, PillTone> = {
   notFound: 'danger',
   person: 'accent',
   otherCorp: 'warning',
+  ambiguous: 'warning',
 };
 
 interface Props {

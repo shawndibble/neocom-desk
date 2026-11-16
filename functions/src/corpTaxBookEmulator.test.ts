@@ -1574,7 +1574,8 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect(
         await reason(edit(ACCOUNTANT, { action: 'rejectDispute', disputeId, reason: 'again' }))
       ).toBe('already-resolved');
-      now += 3_600_000;
+      // A minute on: inside the officer's 10-minute verification window, so the second reject runs.
+      now += 60_000;
       expect(await dispute(50, [line(50, { quantity: 30 })])).toEqual({ disputeId });
       const again = (await book().collection('disputes').doc(disputeId).get()).data();
       // Open again, its old answer in `history`, the hold window the first dispute's.
@@ -1697,12 +1698,6 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
           'solo:50'
         );
         // The same wallet payments are credited now: a new declaration finds nothing to credit.
-        await edit(ACCOUNTANT, {
-          action: 'resolveDeclaration',
-          declarationId: out.declarationId,
-          resolution: 'rejected',
-          reason: 'no',
-        });
         const next = await declare(50, { statementId: 's1', transfers: [transfer(4_000_000, 1)] });
         expect(next.checks[0].result).toBe('notFound');
       });
