@@ -155,6 +155,16 @@ describe('OwedBalances uncredited donation', () => {
     expect(screen.getByRole('button', { name: 'Settle up' }).className).not.toMatch(/bg-accent/);
   });
 
+  it('asks for a sync instead of a division check when the book reads every division', () => {
+    renderBalances([balance('corp', 29_980_000)], {
+      uncreditedOf: () => ({ amount: 8_000_000, accounts: 'Master Wallet', everyDivision: true }),
+    });
+    expect(
+      screen.getByText(/8,000,000 ISK you donated isn't credited yet — ask the corp to sync/)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/check the wallet division/)).not.toBeInTheDocument();
+  });
+
   it('keeps Settle up primary with no note when everything is credited', () => {
     renderBalances([balance('corp', 29_980_000)], {
       uncreditedOf: () => ({ amount: 0, accounts: 'Master Wallet' }),

@@ -39,7 +39,9 @@ interface OwedBalancesProps {
    * uncredited donations), with the Accounts the book reads. Above 0 the card says so on a line
    * of its own and Settle up drops to a plain button: paying the full amount again may pay twice.
    */
-  uncreditedOf?: (balance: PayeeBalance) => { amount: number; accounts: string } | undefined;
+  uncreditedOf?: (
+    balance: PayeeBalance
+  ) => { amount: number; accounts: string; everyDivision?: boolean } | undefined;
   onAssignNext: () => void;
   onReviewPayments: () => void;
   /**
@@ -216,10 +218,14 @@ export function OwedBalances({
                 </p>
                 {warnUncredited && (
                   <p className="text-xs text-warning">
-                    {t('miningTax.owed.uncreditedNote', {
-                      amount: formatIsk(uncredited.amount, 0),
-                      accounts: uncredited.accounts,
-                    })}
+                    {uncredited.everyDivision
+                      ? t('miningTax.owed.uncreditedEveryNote', {
+                          amount: formatIsk(uncredited.amount, 0),
+                        })
+                      : t('miningTax.owed.uncreditedNote', {
+                          amount: formatIsk(uncredited.amount, 0),
+                          accounts: uncredited.accounts,
+                        })}
                   </p>
                 )}
               </>

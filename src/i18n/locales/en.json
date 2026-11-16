@@ -8154,6 +8154,7 @@
         "account": "Account: <strong>{{account}}</strong>",
         "masterWallet": "Master Wallet",
         "division": "Division {{division}} (number {{division}} in the list)",
+        "divisionShort": "Division {{division}}",
         "codeOf": "{{character}} · {{period}} Statement code:",
         "codeInReason": "The Reason is your {{period}} Statement's code.",
         "codeOldest": "The Reason is the code of the payer's oldest open Statement ({{period}}).",
@@ -8166,6 +8167,8 @@
         "overdueDetail": "Code {{code}}. A payment goes to your oldest open Statement first.",
         "uncreditedTitle": "{{corp}} hasn't credited your {{amount}} ISK donation of {{date}} — check the wallet division",
         "uncreditedDetail": "{{corp}} synced since and still doesn't hold it, so it no longer counts as paid here. Its book reads donations into: {{accounts}}.",
+        "uncreditedEveryTitle": "{{corp}} hasn't credited your {{amount}} ISK donation of {{date}} — ask the corp to sync",
+        "uncreditedEveryDetail": "Its book reads every wallet division, but its last sync doesn't hold this donation, so it no longer counts as paid here. Ask an officer to sync the book. If it still isn't credited, check in your wallet journal that the ISK went to {{corp}}.",
         "alsoBilledTitle": "{{corp}} also bills ore you listed for {{payees}}",
         "alsoBilledDetail": "It is left out of what you owe {{payees}}. Open the day and choose “{{action}}” to take it off your list.",
         "openDay": "Open the day"
@@ -8533,7 +8536,8 @@
       "unassignedHint_other": "{{count}} entries have no Payee yet",
       "acrossPayees_one": "across {{count}} payee",
       "acrossPayees_other": "across {{count}} payees",
-      "uncreditedNote": "{{amount}} ISK you donated isn't credited yet — check the wallet division ({{accounts}}) before paying again."
+      "uncreditedNote": "{{amount}} ISK you donated isn't credited yet — check the wallet division ({{accounts}}) before paying again.",
+      "uncreditedEveryNote": "{{amount}} ISK you donated isn't credited yet — ask the corp to sync its book before paying again."
     },
     "continue": {
       "eyebrow": "New EVE day",
