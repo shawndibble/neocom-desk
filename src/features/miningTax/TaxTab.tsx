@@ -128,6 +128,8 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   );
 
   const {
+    ledger,
+    storedAssignments,
     madePayments,
     paymentSources,
     corpView,
@@ -148,8 +150,9 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   const corpStateHint = useCorpStateHint();
 
   const resolvedCharacterFilter = useResolvedCharacterFilter(characterFilter, activeCharacterId);
+  // The ledger as the tab reads it: a paid day its linked ISK does not reach reads owed.
   const { allDisplayRows, personalRows, characterFiltered } = useTaxRows(
-    data,
+    ledger,
     corpView,
     characters,
     resolvedCharacterFilter
@@ -245,6 +248,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
       allPayees,
       estimatedValueOf,
       madePayments,
+      storedAssignments,
       alsoBilled: corpView?.overlay.alsoBilled,
     });
 
@@ -334,7 +338,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   }, [corpView, resolve.hidden, t, leftCorp]);
 
   const attentionItems = useTaxAttentionItems({
-    data,
+    data: ledger,
     resolvedCharacterFilter,
     personalRows,
     displayRows: characterFiltered,
@@ -642,6 +646,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
           allDisplayRows={allDisplayRows}
           characterFiltered={characterFiltered}
           everyAssignment={everyAssignment}
+          storedAssignments={storedAssignments}
           allPayees={allPayees}
           payeeById={payeeById}
           balances={balances}

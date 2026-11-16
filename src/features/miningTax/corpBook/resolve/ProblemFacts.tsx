@@ -1,4 +1,5 @@
 import { Trans, useTranslation } from 'react-i18next';
+import { formatList } from '@/lib/listFormat';
 import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
 import { formatCount } from '@/lib/formatCount';
 import { formatIsk } from '@/lib/isk';
@@ -112,10 +113,11 @@ export function ProblemFacts({ target }: { target: ResolveTarget }) {
     case 'markedPaid':
       return (
         <p>
-          {t(k('markedPaid'), {
+          {t(k(row?.bookSpentOn ? 'markedPaidSpent' : 'markedPaid'), {
             corp,
             date: row?.date ?? '',
             owed: formatIsk(row?.bookOwed ?? 0, 0),
+            days: formatList(row?.bookSpentOn ?? []),
           })}
         </p>
       );

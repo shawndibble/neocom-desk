@@ -7881,6 +7881,7 @@
         "quantity": "{{corp}}'s book recorded {{book}} units of ore on {{date}}; your record has {{yours}}.",
         "bills": "Its book bills <amount/>.",
         "markedPaid": "You marked {{date}} paid, but {{corp}}'s Statement still shows {{owed}} ISK owed. Its book credits a payment it can see.",
+        "markedPaidSpent": "You marked {{date}} paid. {{corp}}'s book holds that payment, but it pays your oldest open days first and spent it on {{days}}, so it still bills {{date}} {{owed}} ISK.",
         "conflict": "You gave this ore to {{payee}}. {{corp}}'s book also recorded it, and bills it on {{date}} unless something changes first.",
         "anotherPayee": "another Payee",
         "kept": "{{corp}} kept the bill on {{date}}: {{reason}}",
@@ -7953,6 +7954,7 @@
       "hiddenNote": "Hidden days stay under Not paying on this tab, and come back with one click.",
       "sendsTo": "Goes to {{corp}}'s Needs you queue, and as an EVE mail to whoever answers its tax questions. Until they answer, it leaves your attention list; their answer comes back here.",
       "noStatement": "Nothing is on a Statement yet: {{corp}}'s book credits your donation on its next sync. If it still hasn't when the Statement goes out, send the proof then.",
+      "noStatementSpent": "{{corp}}'s book already credited your payment, to {{days}}, so there is no Statement to send proof against yet. Pay what it still bills, or once this day is on a Statement send the proof of the payment it was for.",
       "failed": "That didn't reach the book. Check your connection and try again.",
       "done": "Done",
       "result": {
@@ -8146,6 +8148,7 @@
         "waived": "{{corp}} wrote this day off: {{reason}}",
         "paid": "Paid to {{corp}}.",
         "markedPaid": "Marked paid by you — {{corp}} still shows {{owed}} ISK owed.",
+        "markedPaidSpent": "Marked paid by you — {{corp}} spent that payment on {{days}} and still shows {{owed}} ISK owed.",
         "sent": "Sent to {{corp}} on {{sentOn}}. An officer answers it in the book; nothing more to do until they do.",
         "oreWaived": "{{corp}} waived the tax on that ore: {{flagReason}}",
         "notPaying": "You chose not to pay this. {{corp}} still bills it; bring it back under Not paying, above."
@@ -8216,6 +8219,7 @@
         "factSettledBy": "Settled by",
         "yourMarkNote": "The corporation confirms your mark against its wallet.",
         "markedPaidNote": "Marked paid by you — {{corp}} still shows {{owed}} ISK owed. It confirms your mark against its wallet.",
+        "markedPaidSpentNote": "Marked paid by you. {{corp}}'s book already holds that payment, but it pays your oldest open days first and spent it on {{days}}, so it still bills this day {{owed}} ISK. Resolve says what you can do.",
         "settledBy": {
           "yourMark": "Your mark",
           "donation": "Donation",

@@ -269,6 +269,23 @@ describe('SettleUpDialog paid by amount', () => {
     await userEvent.click(screen.getByRole('button', { name: RECORD }));
     expect(paidIds()).toEqual(['a-1']);
   });
+
+  // The Bureau report: 10,898,549 ISK sent for 11-06 and 11-07 never marks 11-09 too.
+  it('records the amount sent against only the days it covers', async () => {
+    renderDialog(
+      [
+        row(assignment('nov09', '2026-11-09', 6_540_106.7)),
+        row(assignment('nov06', '2026-11-06', 10_242_020.95)),
+        row(assignment('nov07', '2026-11-07', 656_528.4)),
+      ],
+      { byAmount: true }
+    );
+    await userEvent.click(screen.getByRole('button', { name: /different amount/i }));
+    await userEvent.type(screen.getByRole('textbox', { name: /sent/i }), '10898549');
+    await userEvent.click(screen.getByRole('button', { name: RECORD }));
+    expect(paidIds()).toEqual(['nov06', 'nov07']);
+    expect(recordedPayment()).toMatchObject({ amount: 10_898_549 });
+  });
 });
 
 describe('SettleUpDialog paying from one Character', () => {

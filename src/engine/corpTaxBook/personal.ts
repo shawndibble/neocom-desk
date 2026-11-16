@@ -77,6 +77,11 @@ export interface PersonalAllocation {
    * like a corporation's own Payee's; the rest stays with the default Payee. Never a conflict.
    */
   releasable?: boolean;
+  /**
+   * The member's wallet journal ids of the payment a paid one records: whether the book already
+   * holds that payment (it is no longer a donation in flight) decides what a mark can say.
+   */
+  paymentRefs?: readonly number[];
 }
 
 export interface PersonalEntry {
@@ -319,6 +324,12 @@ export interface BookRowView {
    * the book still shows owed for the day. The corporation has not credited the payment yet.
    */
   bookOwed?: number;
+  /**
+   * Paid by the member's own mark, not on a Statement, while the book already holds the payment
+   * and spent it on these older days first (it pays a Miner's oldest days): why it still bills
+   * this one (`bookOwed`).
+   */
+  bookSpentOn?: string[];
   /** The member's own paid Assignments this row stands in for, so the member can unmark them. */
   markedPaidIds?: string[];
   statementId?: string;
@@ -769,6 +780,8 @@ function takeOwnAllocations(
   lines: OreLine[];
   paidLines: OreLine[];
   paidIds: string[];
+  /** The journal ids of the payments those paid allocations record. */
+  paidRefs: number[];
   /** What this book took of each allocation. */
   taken: Map<PoolItem, OreLine[]>;
 } {
@@ -776,6 +789,7 @@ function takeOwnAllocations(
   const lines: OreLine[][] = [];
   const paid: OreLine[][] = [];
   const paidIds: string[] = [];
+  const paidRefs: number[] = [];
   const taken = new Map<PoolItem, OreLine[]>();
   const own = (a: PersonalAllocation) => isOwnPayee(ownPayeeIds, a);
   const takeable = (a: PersonalAllocation) =>
@@ -804,9 +818,10 @@ function takeOwnAllocations(
     if (allocation.status === 'paid') {
       paid.push(listed);
       paidIds.push(id);
+      paidRefs.push(...(allocation.paymentRefs ?? []));
     }
   }
-  return { lines: sumLines(...lines), paidLines: sumLines(...paid), paidIds, taken };
+  return { lines: sumLines(...lines), paidLines: sumLines(...paid), paidIds, paidRefs, taken };
 }
 
 /**
@@ -891,6 +906,8 @@ export function overlayCorpBooks(input: {
   const memberPaid = new Map<number, Map<string, OreLine[]>>();
   // The ids of those paid Assignments, kept so a row they paid can offer to unmark them.
   const memberPaidIds = new Map<number, Map<string, string[]>>();
+  // And the journal ids of the payments those marks record.
+  const memberPaidRefs = new Map<number, Map<string, number[]>>();
 
   // The ore each personal entry still has free after the books, per entry key.
   const free = new Map(
@@ -1097,6 +1114,9 @@ export function overlayCorpBooks(input: {
         const idsOf = memberPaidIds.get(p.book.corporationId) ?? new Map<string, string[]>();
         idsOf.set(key, [...(idsOf.get(key) ?? []), ...own.paidIds]);
         memberPaidIds.set(p.book.corporationId, idsOf);
+        const refsOf = memberPaidRefs.get(p.book.corporationId) ?? new Map<string, number[]>();
+        refsOf.set(key, [...(refsOf.get(key) ?? []), ...own.paidRefs]);
+        memberPaidRefs.set(p.book.corporationId, refsOf);
       }
       const resolved = resolveBookShare({
         share,
@@ -1310,17 +1330,24 @@ export function overlayCorpBooks(input: {
         row.taxOwed = parts.reduce((sum, part) => sum + part.owed, 0);
       }
     }
-    // What the member paid under the corporation's own Payee is paid on their side; the
-    // corporation still confirms it against its wallet. The book cannot be told which days a
-    // payment was for — it pays a Miner's oldest days first — so the marks are measured on the
-    // days the member named, then spent the way the book will spend the ISK: oldest first, a day
-    // an open dispute holds skipped (resolving in the app). Otherwise the tab shows days 3 and 4
-    // paid while the book credits 1 and 2.
+    // What the member paid under the corporation's own Payee is paid on their side, on the days
+    // they marked: their record governs which days *they* consider paid. The corporation still
+    // confirms it against its wallet. Money they sent beyond those days (a donation in flight, or
+    // credit the book holds) pays the other open days below, oldest first, as the book will.
     const paidOf = memberPaid.get(p.book.corporationId);
+    const refsOf = memberPaidRefs.get(p.book.corporationId);
     // The same payment may also be a donation in flight or credit the book holds: count it once,
     // per Miner.
     const creditedByMark = new Map<string, number>();
     const minerOf = (row: BookRowView) => row.minerId ?? minerIdFor(row.characterId, p.book.miners);
+    // A day an open dispute holds is skipped: the money pays the next oldest instead.
+    const openNow = () =>
+      mine.filter((r) => r.state === 'billed' && (r.taxOwed ?? 0) > 0 && !r.held);
+    // The book's own picture before any mark: its credit pays each Miner's oldest open days first.
+    const bookCovered = spendOldestFirst(openNow(), minerOf, p.credit);
+    const inFlightRefs = new Set(
+      p.book.inFlight.flatMap((d) => (d.refId === undefined ? [] : [d.refId]))
+    );
     if (paidOf) {
       for (const row of mine) {
         if (row.state !== 'billed' || (row.taxOwed ?? 0) <= 0) continue;
@@ -1336,33 +1363,42 @@ export function overlayCorpBooks(input: {
         if (covered.length === 0) continue;
         paidOf.set(key, minusLines(left, covered));
         const { taxOwed } = computeAssignmentValue(covered, priceMap(row.unitPrices), row.taxPct);
-        const worth = Math.min(row.taxOwed ?? 0, taxOwed);
+        const before = row.taxOwed ?? 0;
+        const worth = Math.min(before, taxOwed);
         creditedByMark.set(minerOf(row), (creditedByMark.get(minerOf(row)) ?? 0) + worth);
-      }
-      for (const [minerId, amount] of creditedByMark) {
-        const open = mine.filter(
-          (r) => minerOf(r) === minerId && r.state === 'billed' && (r.taxOwed ?? 0) > 0 && !r.held
-        );
-        // As `coverInFlight`, but what is left after the last whole day still reduces the next
-        // one: a part payment owes less, as the book will count it.
-        let left = amount;
-        for (const row of [...open].sort(
-          (a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id)
-        )) {
-          if (left <= 0) break;
-          const before = row.taxOwed ?? 0;
-          if (left < before - settleTolerance(before)) {
-            row.taxOwed = before - left;
-            break;
-          }
-          left = Math.max(0, left - before);
-          row.taxOwed = 0;
-          row.state = 'paid';
-          row.settledBy = 'yourMark';
-          // The member's side is done; the book's Statement still bills the day until it credits it.
-          if (row.statementId !== undefined && p.settlement.get(row.statementId)?.settled !== true)
-            row.bookOwed = before;
+        if (worth < before - settleTolerance(before)) {
+          // Part of the day: it owes less.
+          row.taxOwed = before - worth;
+          continue;
         }
+        row.taxOwed = 0;
+        row.state = 'paid';
+        row.settledBy = 'yourMark';
+        if (row.statementId !== undefined) {
+          // The member's side is done; the book's Statement still bills the day until it credits it.
+          if (p.settlement.get(row.statementId)?.settled !== true) row.bookOwed = before;
+          continue;
+        }
+        // The book already holds the payment the mark names, yet its credit went to older days
+        // it still bills (it pays the oldest first): the book still bills this one. Said, not hidden.
+        const refs = refsOf?.get(key) ?? [];
+        const held = refs.length > 0 && refs.every((ref) => !inFlightRefs.has(ref));
+        const reached = bookCovered.get(row) ?? 0;
+        if (!held || reached >= before - settleTolerance(before)) continue;
+        const spentOn = mine
+          .filter(
+            (r) =>
+              r !== row &&
+              minerOf(r) === minerOf(row) &&
+              (bookCovered.get(r) ?? 0) > 0 &&
+              (r.date < row.date || (r.date === row.date && r.id < row.id))
+          )
+          .map((r) => r.date)
+          .sort();
+        // No older day took the credit: nothing to say beyond the mark.
+        if (spentOn.length === 0) continue;
+        row.bookOwed = before - reached;
+        row.bookSpentOn = [...new Set(spentOn)];
       }
     }
     // Donations sent and not yet credited, and credit the book holds for no
@@ -1387,8 +1423,7 @@ export function overlayCorpBooks(input: {
       const minerId = minerIdFor(d.characterId, p.book.miners);
       lostBy.set(minerId, (lostBy.get(minerId) ?? 0) + d.amount);
     }
-    // A day an open dispute holds is skipped: the money pays the next oldest instead.
-    const open = mine.filter((r) => r.state === 'billed' && (r.taxOwed ?? 0) > 0 && !r.held);
+    const open = openNow();
     /** Per Miner: the days the uncredited money paid while it counted, oldest first. */
     const unlinked = new Map<string, BookRowView[]>();
     for (const minerId of new Set([...ahead.keys(), ...lostBy.keys()])) {
@@ -1543,6 +1578,30 @@ function holdFor(
     if (hold) return { ...hold, kind: disputeKindOf(d) };
   }
   return undefined;
+}
+
+/**
+ * What each Miner's `amounts` pay of `rows`, oldest first, as the book spends credit: whole days,
+ * then what is left lowers the next one.
+ */
+function spendOldestFirst(
+  rows: readonly BookRowView[],
+  minerOf: (row: BookRowView) => string,
+  amounts: ReadonlyMap<string, number>
+): Map<BookRowView, number> {
+  const paid = new Map<BookRowView, number>();
+  for (const [minerId, amount] of amounts) {
+    let left = amount;
+    for (const row of rows
+      .filter((r) => minerOf(r) === minerId)
+      .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))) {
+      if (left <= 0) break;
+      const take = Math.min(left, row.taxOwed ?? 0);
+      paid.set(row, take);
+      left -= take;
+    }
+  }
+  return paid;
 }
 
 /** The later of two ISO instants; either may be missing. */

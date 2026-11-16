@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { formatList } from '@/lib/listFormat';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, Modal, Radio, TextArea } from '@/components/ui';
 import { selectedRowClassName, tappableRowClassName } from '@/components/ui/controlStyles';
@@ -287,7 +288,12 @@ export function ResolveDialog({
       case 'paid':
         if (offer.noStatement || statementId === undefined)
           return (
-            <span className="block text-xs text-text-dim">{t(k('noStatement'), { corp })}</span>
+            <span className="block text-xs text-text-dim">
+              {/* A marked day the book spent the payment past: it credited it, just elsewhere. */}
+              {row?.bookSpentOn
+                ? t(k('noStatementSpent'), { corp, days: formatList(row.bookSpentOn) })
+                : t(k('noStatement'), { corp })}
+            </span>
           );
         return (
           <>

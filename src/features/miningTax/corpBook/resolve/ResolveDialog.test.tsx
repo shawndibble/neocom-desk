@@ -120,6 +120,24 @@ describe('ResolveDialog', () => {
     expect(screen.getByRole('button', { name: 'Send proof' })).toBeDisabled();
   });
 
+  // The Bureau report: the book credited the payment, but to an older day; no Statement yet.
+  it('says where the book credited a marked day’s payment when there is no Statement to prove it on', async () => {
+    const spent = {
+      ...row,
+      state: 'paid',
+      settledBy: 'yourMark',
+      bookOwed: 10_242_021,
+      bookSpentOn: ['2026-11-01'],
+    } as BookRowView;
+    open({ ...base, row: spent, kind: 'markedPaid' });
+    expect(screen.getByRole('radio', { name: /Pay it/ })).toBeChecked();
+    await userEvent.click(screen.getByRole('radio', { name: /I already paid/ }));
+    expect(
+      screen.getByText(/Bureau's book already credited your payment, to 2026-11-01/)
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send proof' })).toBeDisabled();
+  });
+
   it('never offers disputing uncredited donations', () => {
     open({ ...base, kind: 'uncredited', amount: 25_000_000, statementId: 's1' });
     expect(screen.queryByRole('radio', { name: /I don't owe this/ })).toBeNull();

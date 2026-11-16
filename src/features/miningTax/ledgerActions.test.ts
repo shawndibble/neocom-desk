@@ -641,10 +641,11 @@ describe('recordCorpPayment', () => {
       assignment({ id: 'stale', payeeId: 'p1', groupId: 'g', date: '2026-09-03' }),
     ]);
 
+    // The ISK sent covers the ticked row and the Combined Entry's other day.
     const result = await recordCorpPayment(
       CORP,
       [bookRow({ personalOreLines: [{ typeId: ORE, quantity: 100 }] })],
-      PAYMENT
+      { ...PAYMENT, amount: 200 }
     );
 
     expect(result.ok).toBe(true);
@@ -655,6 +656,45 @@ describe('recordCorpPayment', () => {
     expect(byId.get('day2')?.payment?.paymentId).toBe(byId.get('day1')?.payment?.paymentId);
     expect(byId.get('other')?.status).toBe('outstanding');
     expect(byId.get('stale')?.status).toBe('outstanding');
+  });
+
+  // The Bureau report: a payment never marks a day its amount does not cover.
+  it('leaves owed a Combined Entry day the ISK sent does not reach', async () => {
+    await db.payees.put({
+      ...payee('p2'),
+      entityId: CORP.corporationId,
+      entityKind: 'corporation',
+    });
+    await db.miningTaxAssignments.bulkPut([
+      assignment({ id: 'day1', payeeId: 'p2', groupId: 'g' }),
+      assignment({ id: 'day2', payeeId: 'p2', groupId: 'g', date: '2026-09-05' }),
+    ]);
+
+    const result = await recordCorpPayment(
+      CORP,
+      [bookRow({ personalOreLines: [{ typeId: ORE, quantity: 100 }] })],
+      PAYMENT
+    );
+
+    expect(result.ok).toBe(true);
+    const byId = new Map((await db.miningTaxAssignments.toArray()).map((a) => [a.id, a]));
+    expect(byId.get('day1')?.status).toBe('paid');
+    expect(byId.get('day2')?.status).toBe('outstanding');
+  });
+
+  it('marks only the ticked rows the amount covers, oldest first', async () => {
+    const result = await recordCorpPayment(
+      CORP,
+      [
+        bookRow({ id: 'book:2', date: '2026-09-05', taxOwed: 100 }),
+        bookRow({ id: 'book:1', date: '2026-09-04', taxOwed: 100 }),
+      ],
+      PAYMENT
+    );
+
+    expect(result.ok).toBe(true);
+    const paid = await db.miningTaxAssignments.toArray();
+    expect(paid.map((a) => [a.date, a.status])).toEqual([['2026-09-04', 'paid']]);
   });
 
   it('records two rows on one entry (two refineries, same ore) in full, each once', async () => {

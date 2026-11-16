@@ -14,6 +14,11 @@ interface Args {
   allPayees: readonly PayeeRecord[];
   estimatedValueOf: (dr: DisplayRow) => number;
   madePayments: Parameters<typeof useLinkSuggestions>[0]['madePayments'];
+  /**
+   * Every stored Assignment, the ones a book row stands in for included: what decides whether a
+   * transaction is already linked. Defaults to the personal rows' Assignments.
+   */
+  storedAssignments?: Parameters<typeof useLinkSuggestions>[0]['everyAssignment'];
   /** What the Corp Tax Books bill too of the member's Assignments to other Payees (#6204). */
   alsoBilled?: PersonalOverlay['alsoBilled'];
 }
@@ -26,6 +31,7 @@ export function useTaxBalances({
   allPayees,
   estimatedValueOf,
   madePayments,
+  storedAssignments,
   alsoBilled,
 }: Args) {
   // The owed cards: per Payee, what is owed *now*. Follows the Character
@@ -49,7 +55,12 @@ export function useTaxBalances({
     [personalRows]
   );
 
-  const linkSuggestions = useLinkSuggestions({ madePayments, everyAssignment, balances });
+  const linkSuggestions = useLinkSuggestions({
+    madePayments,
+    everyAssignment,
+    linkedAssignments: storedAssignments ?? everyAssignment,
+    balances,
+  });
 
   // Every Payee's systems and owed entries, for the Payee manager's rows.
   const payeeSystems = useMemo(

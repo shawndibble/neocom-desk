@@ -2708,7 +2708,10 @@ describe('resolving in the app: an open dispute holds its day', () => {
     expect(out.rows.find((r) => r.date === '2026-10-15')?.held).toBeUndefined();
   });
 
-  describe('marks under the corporation’s own Payee follow the book: oldest day first', () => {
+  // The member's own record governs which days *they* paid: a mark pays the day it names. (Until
+  // the fix for the Bureau report, marks were pooled and spent on the oldest open days, so a
+  // member who marked 11-06 paid saw it stay Billed while an older day turned Paid.)
+  describe('marks under the corporation’s own Payee pay the days they name', () => {
     const owned = (status: 'paid' | 'outstanding') =>
       DAYS.map((date, i) =>
         entry({
@@ -2728,33 +2731,143 @@ describe('resolving in the app: an open dispute holds its day', () => {
         })
       );
 
-    it('pays the oldest day with a mark made on the newest, as the book will', () => {
+    it('pays the newest day a mark names, and leaves the older open days billed', () => {
       const out = overlay(owned('paid'), [
         book({ observed: observedOn(DAYS), ownPayeeIds: ['bmw'] }),
       ]);
       const byDate = Object.fromEntries(out.rows.map((r) => [r.date, r.state]));
       expect(byDate).toEqual({
-        '2026-10-15': 'paid',
+        '2026-10-15': 'billed',
         '2026-10-16': 'billed',
-        '2026-10-17': 'billed',
+        '2026-10-17': 'paid',
       });
-      expect(out.rows.find((r) => r.date === '2026-10-15')?.settledBy).toBe('yourMark');
+      expect(out.rows.find((r) => r.date === '2026-10-17')).toMatchObject({
+        settledBy: 'yourMark',
+        taxOwed: 0,
+      });
+      expect(out.rows.find((r) => r.date === '2026-10-15')?.taxOwed).toBeCloseTo(222_000);
     });
 
-    it('skips a held day with a mark too', () => {
+    it('lets a donation in flight pay only what the mark did not: never the same ISK twice', () => {
+      // 444,000 sent for the 17th (marked) and one more day: the rest pays the oldest open day.
       const out = overlay(owned('paid'), [
         book({
           observed: observedOn(DAYS),
           ownPayeeIds: ['bmw'],
-          disputes: [disputeOn('2026-10-15')],
+          inFlight: [{ characterId: ME, amount: 444_000, at: '2026-10-18T13:10:00Z' }],
         }),
       ]);
       const byDate = Object.fromEntries(out.rows.map((r) => [r.date, r.state]));
       expect(byDate).toEqual({
-        '2026-10-15': 'billed',
-        '2026-10-16': 'paid',
-        '2026-10-17': 'billed',
+        '2026-10-15': 'paid',
+        '2026-10-16': 'billed',
+        '2026-10-17': 'paid',
       });
+      expect(out.rows.find((r) => r.date === '2026-10-15')?.settledBy).toBe('donation');
+    });
+  });
+
+  // The Bureau report (2026-11-16): one 10,898,549 ISK donation paid 11-06 and 11-07, which the
+  // member marked paid. The book's credit pays a Miner's oldest open day (11-01) first.
+  describe('a member who marked 11-06 and 11-07 paid with one donation', () => {
+    const REF = 26251213375;
+    const tax = { '2026-11-01': 17_378_825, '2026-11-06': 10_242_021, '2026-11-07': 656_528 };
+    const dates = Object.keys(tax) as (keyof typeof tax)[];
+    // Price 20 at 5%: one unit of ore is one ISK of tax.
+    const bureau = (over: Partial<PersonalBook> = {}, on = dates) =>
+      book({
+        rates: [{ scope: 'corp', pct: 5, effectiveFrom: '2026-10-01' }],
+        lastSyncedAt: '2026-11-16T09:00:00Z',
+        ownPayeeIds: ['bureau'],
+        observed: on.map((date) => ({
+          characterId: ME,
+          recordedCorporationId: CORP,
+          structureId: 1000,
+          date,
+          solarSystemId: SYSTEM,
+          oreLines: [{ typeId: ZEO, quantity: tax[date] }],
+        })),
+        pricesOn: () => ({ prices: new Map([[ZEO, 20]]), sources: new Map([[ZEO, 'saved']]) }),
+        ...over,
+      });
+    const entries = dates.map((date) =>
+      entry({
+        date,
+        oreLines: [{ typeId: ZEO, quantity: tax[date] }],
+        freeOreLines: [],
+        allocations: [
+          {
+            id: `a-${date}`,
+            payeeId: 'bureau',
+            taxPct: 5,
+            oreLines: [{ typeId: ZEO, quantity: tax[date] }],
+            ...(date === '2026-11-01'
+              ? { status: 'outstanding' }
+              : { status: 'paid', paymentRefs: [REF] }),
+          },
+        ],
+      })
+    );
+    const LATER = '2026-11-16T14:00:00Z';
+    const sent = { characterId: ME, amount: 10_898_549, at: '2026-11-09T15:40:00Z', refId: REF };
+
+    it('reads Paid on the days it names while the donation is in flight', () => {
+      const out = overlay(entries, [bureau({ inFlight: [sent] })], LATER);
+      const byDate = new Map(out.rows.map((r) => [r.date, r]));
+      for (const date of ['2026-11-06', '2026-11-07']) {
+        expect(byDate.get(date)).toMatchObject({ state: 'paid', settledBy: 'yourMark' });
+        expect(byDate.get(date)?.bookOwed).toBeUndefined();
+      }
+      // The donation is the marks' ISK: it pays nothing more.
+      expect(byDate.get('2026-11-01')).toMatchObject({ state: 'billed', taxOwed: 17_378_825 });
+    });
+
+    it('says the book spent the payment on an older day once it holds it, and still bills these', () => {
+      const credited = {
+        id: `j1_${REF}`,
+        minerId: `solo:${ME}`,
+        characterId: ME,
+        amount: 10_898_549,
+        at: sent.at,
+        source: 'donation' as const,
+      };
+      const out = overlay(entries, [bureau({ payments: [credited] })], LATER);
+      const byDate = new Map(out.rows.map((r) => [r.date, r]));
+      expect(byDate.get('2026-11-06')).toMatchObject({
+        state: 'paid',
+        settledBy: 'yourMark',
+        bookOwed: 10_242_021,
+        bookSpentOn: ['2026-11-01'],
+      });
+      expect(byDate.get('2026-11-07')).toMatchObject({
+        state: 'paid',
+        bookOwed: 656_528,
+        bookSpentOn: ['2026-11-01'],
+      });
+      // The book's credit is the marks' ISK: counted once, so 11-01 is still owed in full.
+      expect(byDate.get('2026-11-01')).toMatchObject({ state: 'billed', taxOwed: 17_378_825 });
+    });
+
+    it('says nothing more when the book holds the payment and it reached the marked days', () => {
+      const credited = {
+        id: `j1_${REF}`,
+        minerId: `solo:${ME}`,
+        characterId: ME,
+        amount: 10_898_549,
+        at: sent.at,
+        source: 'donation' as const,
+      };
+      const without = entries.filter((e) => e.date !== '2026-11-01');
+      const out = overlay(
+        without,
+        [bureau({ payments: [credited] }, ['2026-11-06', '2026-11-07'])],
+        LATER
+      );
+      for (const row of out.rows) {
+        expect(row.state).toBe('paid');
+        expect(row.bookOwed).toBeUndefined();
+        expect(row.bookSpentOn).toBeUndefined();
+      }
     });
   });
 

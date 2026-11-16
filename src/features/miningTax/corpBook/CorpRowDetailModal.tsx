@@ -1,4 +1,5 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { formatList } from '@/lib/listFormat';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, InfoTooltip, Modal, ValueList, ValueRow } from '@/components/ui';
@@ -268,10 +269,16 @@ export function CorpRowDetailModal({
               {view.state === 'paid' && view.settledBy === 'yourMark' && (
                 <p>
                   {view.bookOwed !== undefined
-                    ? t('miningTax.corpBook.detail.markedPaidNote', {
-                        corp: corp.corpName,
-                        owed: formatIsk(view.bookOwed, 0),
-                      })
+                    ? t(
+                        view.bookSpentOn
+                          ? 'miningTax.corpBook.detail.markedPaidSpentNote'
+                          : 'miningTax.corpBook.detail.markedPaidNote',
+                        {
+                          corp: corp.corpName,
+                          owed: formatIsk(view.bookOwed, 0),
+                          days: formatList(view.bookSpentOn ?? []),
+                        }
+                      )
                     : t('miningTax.corpBook.detail.yourMarkNote')}
                 </p>
               )}

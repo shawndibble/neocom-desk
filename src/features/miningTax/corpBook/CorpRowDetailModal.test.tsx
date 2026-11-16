@@ -248,6 +248,32 @@ describe('CorpRowDetailModal', () => {
     ).toBeInTheDocument();
   });
 
+  // The Bureau report: the book holds the payment but spent it on an older day it still bills.
+  it('says where the book spent a marked day’s payment, and offers Resolve, off any Statement', async () => {
+    const onResolve = vi.fn();
+    const marked: BookRowView = {
+      ...view,
+      statementId: undefined,
+      state: 'paid',
+      taxOwed: 0,
+      settledBy: 'yourMark',
+      bookOwed: 10_242_021,
+      bookSpentOn: ['2026-11-01'],
+      markedPaidIds: ['a1'],
+      dispute: undefined,
+    };
+    renderModal({ onResolve, corp: { ...corp, view: marked } });
+    expect(
+      screen.getByText(
+        "Marked paid by you. Brass Meridian Logistics's book already holds that payment, but it pays your oldest open days first and spent it on 2026-11-01, so it still bills this day 10,242,021 ISK. Resolve says what you can do."
+      )
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole('button', { name: 'Resolve' }).at(-1)!);
+    expect(onResolve).toHaveBeenCalledWith(
+      expect.objectContaining({ problem: expect.objectContaining({ kind: 'markedPaid' }) })
+    );
+  });
+
   it('says so when the member also marked a day the Statement settled, and offers the unmark', () => {
     const paid: BookRowView = {
       ...view,
