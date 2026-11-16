@@ -2820,6 +2820,9 @@
     "useEndTime": "Enter end time instead",
     "useTimeLeft": "Enter time left instead",
     "expiresAt": "Ends at",
+    "editTimeLeft": "Edit time left",
+    "editEndsAt": "Edit end time",
+    "editBonus": "Edit bonus",
     "alreadyEnded": "That time has already passed."
   },
   "plans": {

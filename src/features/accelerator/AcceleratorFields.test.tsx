@@ -1,50 +1,80 @@
-import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+import { useState } from 'react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
-import { instantToInputValue } from '@/lib/zonedInput';
 import { AcceleratorFields } from './AcceleratorFields';
 
-const HOUR = 3_600_000;
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
 
-async function renderInEndTimeMode(expiresAt: number | null) {
-  const onExpiresChange = vi.fn<(expiresAt: number | null) => boolean>(() => true);
-  render(
-    <AcceleratorFields
-      bonus={10}
-      expiresAt={expiresAt}
-      onBonusChange={() => {}}
-      onExpiresChange={onExpiresChange}
-    />
+function Harness({ initial }: { initial: number | null }) {
+  const [expiresAt, setExpiresAt] = useState(initial);
+  const [bonus, setBonus] = useState(12);
+  return (
+    <>
+      <AcceleratorFields
+        bonus={bonus}
+        expiresAt={expiresAt}
+        onBonusChange={setBonus}
+        onExpiresChange={(next) => {
+          setExpiresAt(next);
+          return true;
+        }}
+      />
+      <button type="button">Elsewhere</button>
+    </>
   );
-  await userEvent.click(screen.getByRole('button', { name: 'Enter end time instead' }));
-  return { onExpiresChange, input: screen.getByLabelText('Ends at') as HTMLInputElement };
 }
 
-describe('AcceleratorFields end time', () => {
-  it('does not save an end time that has already passed, and keeps what was typed', async () => {
-    const live = Date.now() + 5 * HOUR;
-    const { onExpiresChange, input } = await renderInEndTimeMode(live);
-    // A datetime-local fires per segment: typing the year passes through 0020.
-    const partial = instantToInputValue(live, undefined).replace(/^\d{4}/, '0020');
-    fireEvent.change(input, { target: { value: partial } });
+const timeText = () => screen.getByRole('button', { name: /^Edit time left/ });
 
-    expect(onExpiresChange).not.toHaveBeenCalled();
-    expect(input.value).toBe(partial);
-    expect(screen.getByText('That time has already passed.')).toBeInTheDocument();
-    // Leaving the box keeps it, so the pilot sees what didn't apply.
-    fireEvent.blur(input);
-    expect(input.value).toBe(partial);
+describe('AcceleratorFields once a time is set', () => {
+  it('reads as text, and one click on the time opens all three boxes', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={Date.now() + 23 * DAY + 2 * HOUR + 4 * MINUTE + 30_000} />);
+
+    expect(timeText()).toHaveTextContent('23d 2h 5m');
+    expect(screen.getByRole('button', { name: /^Edit bonus/ })).toHaveTextContent('12');
+    expect(screen.queryByRole('textbox')).toBeNull();
+
+    await user.click(timeText());
+    expect(screen.getByLabelText('Days')).toHaveFocus();
+    expect(screen.getByLabelText('Hours')).toHaveValue('2');
+    expect(screen.getByLabelText('Minutes')).toBeInTheDocument();
+
+    // Tabbing between the boxes keeps them open; leaving the group reads as text again.
+    await user.tab();
+    expect(screen.getByLabelText('Hours')).toHaveFocus();
+    await user.clear(screen.getByLabelText('Hours'));
+    await user.type(screen.getByLabelText('Hours'), '5');
+    await user.click(screen.getByRole('button', { name: 'Elsewhere' }));
+    expect(timeText()).toHaveTextContent('23d 5h 5m');
   });
 
-  it('saves a future end time', async () => {
-    const { onExpiresChange, input } = await renderInEndTimeMode(null);
-    const future = Date.now() + 3 * HOUR;
-    const value = instantToInputValue(future, undefined);
-    fireEvent.change(input, { target: { value } });
+  it('keeps the boxes open while typing the first time, then reads as text', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={null} />);
 
-    expect(onExpiresChange).toHaveBeenCalledTimes(1);
-    expect(instantToInputValue(onExpiresChange.mock.calls[0]![0]!, undefined)).toBe(value);
-    expect(screen.queryByText('That time has already passed.')).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText('Days'), '1');
+    expect(screen.getByLabelText('Days')).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Elsewhere' }));
+    expect(timeText()).toHaveTextContent('1d 0h 0m');
+  });
+
+  it('Escape restores the value the field opened with and hands focus back', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={Date.now() + DAY + 30_000} />);
+
+    await user.click(screen.getByRole('button', { name: /^Edit bonus/ }));
+    const field = screen.getByRole('spinbutton');
+    await user.clear(field);
+    await user.type(field, '8');
+    await user.keyboard('{Escape}');
+
+    const bonus = screen.getByRole('button', { name: /^Edit bonus/ });
+    expect(bonus).toHaveTextContent('12');
+    expect(bonus).toHaveFocus();
   });
 });
