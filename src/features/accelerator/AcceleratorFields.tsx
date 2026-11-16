@@ -1,8 +1,8 @@
 /**
  * The editable fields of one cerebral accelerator (GLOSSARY.md **Accelerator**):
  * when it runs out, entered as time left (EVE's own tooltip); then its bonus,
- * unless the attribute sheet
- * already gave it (the caller shows that once, as a fact). Time comes first: it is
+ * unless the attribute sheet already gave it (the caller shows that once, as a
+ * fact). Time comes first: it is
  * the one value EVE never reports, and nothing saves without it. Shared by the
  * Skill Plan's Accelerator section and the Characters table's popover, so the
  * two can never drift apart.
