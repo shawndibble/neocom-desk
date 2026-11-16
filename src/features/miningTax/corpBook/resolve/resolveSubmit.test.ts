@@ -4,6 +4,7 @@ import type { BookRowView } from '@/engine/corpTaxBook/personal';
 const store = vi.hoisted(() => ({
   disputeCorpTaxBookConflict: vi.fn(async () => ({ disputeId: 'd' })),
   declareCorpTaxBookPayment: vi.fn(),
+  claimCorpTaxBookPayment: vi.fn(async () => ({ minerId: 'solo:7' })),
 }));
 const mailer = vi.hoisted(() => ({
   sendTaxQuestionMail: vi.fn(async () => ({ status: 'sent', to: [9], fellBackToCeo: false })),
@@ -11,7 +12,7 @@ const mailer = vi.hoisted(() => ({
 vi.mock('../corpBookStore', () => store);
 vi.mock('../sendTaxQuestionMail', () => mailer);
 
-import { sendProof, tellNotOwed, tellNotPaying } from './resolveSubmit';
+import { countHeldDonations, sendProof, tellNotOwed, tellNotPaying } from './resolveSubmit';
 
 const ctx = {
   characterId: 7,
@@ -127,5 +128,19 @@ describe('resolve submits', () => {
       '2026-10-29'
     );
     expect(out).toMatchObject({ confirmed: false, mailed: { status: 'failed' } });
+  });
+
+  it("counts each donation the book holds for review as its donor's, and mails nothing", async () => {
+    await countHeldDonations(ctx, [
+      { id: 'j5_1', characterId: 7 },
+      { id: 'j5_2', characterId: 8 },
+    ]);
+    expect(store.claimCorpTaxBookPayment).toHaveBeenNthCalledWith(1, 7, 1, 'j5_1', {
+      inReview: true,
+    });
+    expect(store.claimCorpTaxBookPayment).toHaveBeenNthCalledWith(2, 8, 1, 'j5_2', {
+      inReview: true,
+    });
+    expect(mailer.sendTaxQuestionMail).not.toHaveBeenCalled();
   });
 });

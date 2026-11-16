@@ -25,6 +25,29 @@ export function ProblemFacts({ target }: { target: ResolveTarget }) {
   );
   switch (problem.kind) {
     case 'uncredited':
+      if (problem.held)
+        return (
+          <>
+            <p>
+              <Trans
+                i18nKey={k('inReview')}
+                values={{ corp }}
+                components={{ amount: <IskText value={problem.amount} /> }}
+              />
+            </p>
+            <ul className="space-y-0.5 tabular-nums">
+              {(target.donations ?? []).map((d) => (
+                <li key={`${d.characterId}:${d.at}`}>
+                  <span className="font-semibold">
+                    <IskText value={d.amount} />
+                  </span>{' '}
+                  · {eveTimeLabel(Date.parse(d.at))}
+                  {d.refId !== undefined && ` · ${t(k('journalRef'), { ref: d.refId })}`}
+                </li>
+              ))}
+            </ul>
+          </>
+        );
       return (
         <>
           <p>

@@ -50,6 +50,7 @@ import type { RemovalNoticeRecord } from '@/engine/corpTaxBook/mailQueue';
 import type { OwnerRateEntry } from '@/engine/corpTaxBook/ownerRate';
 import type { StoredRefineryLabel, StoredRefineryStructure } from '@/engine/corpTaxBook/refinery';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
+import type { FeederCoverage } from '@/engine/corpTaxBook/coverage';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import type { FeederViewSummary } from './feederViewClient';
 import { openBook } from './openBook';
@@ -542,6 +543,30 @@ export async function readGroupingSources(
   if (!book) return null;
   const [miners, observed] = await Promise.all([book.list<Miner>('miners'), book.observed()]);
   return { miners, observed };
+}
+
+/**
+ * The book's stored observer rows and its moon owners' coverage, for matching donations against
+ * the moon owners' mining the book bills (`syncCorpTaxBook`). Through the same copies the
+ * whole-book read uses. Officer-only.
+ */
+export async function readStoredRows(
+  characterId: number,
+  corporationId: number
+): Promise<{ rows: ObservedRow[]; feeders: FeederCoverage[] }> {
+  const book = await openBook(characterId, corporationId);
+  if (!book) return { rows: [], feeders: [] };
+  const [rows, feeders] = await Promise.all([
+    book.observed(),
+    book.written('feeders') ? book.read<FeederDoc>('feeders') : Promise.resolve([]),
+  ]);
+  return {
+    rows,
+    feeders: feeders.map(({ corporationId: id, coveragePeriods }) => ({
+      corporationId: id,
+      ...(coveragePeriods ? { coveragePeriods } : {}),
+    })),
+  };
 }
 
 /** A declaration as stored: who recorded it, and who resolved it. */

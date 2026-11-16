@@ -13,6 +13,7 @@ import { corpPayAccounts, readsEveryDivision } from '@/features/miningTax/corpBo
 import {
   figureNeedsAnswer,
   figureTarget,
+  inReviewTarget,
   keptBy,
   keptTarget,
   overdueTarget,
@@ -426,6 +427,47 @@ export function useTaxAttentionItems({
               </ul>
             </>
           )}
+        </>
+      ),
+    });
+  }
+  // Donations the book holds for an officer's review without counting them (#6207): neither in
+  // flight (the book has them) nor credited, so nothing else on the tab says where the ISK went.
+  for (const group of corp.inReview) {
+    const target = inReviewTarget(group);
+    if (resolve.hidden.has(target.hideKey)) continue;
+    const only = group.donations.length === 1 ? group.donations[0] : undefined;
+    const total = group.donations.reduce((sum, d) => sum + d.amount, 0);
+    attentionItems.push({
+      id: `corp-in-review:${group.corporationId}`,
+      tone: 'warning',
+      action: resolveActions(target),
+      title: only
+        ? t('miningTax.corpBook.attention.inReviewTitle', {
+            corp: group.corpName,
+            amount: formatIsk(only.amount, 0),
+            date: only.at.slice(0, 10),
+          })
+        : t('miningTax.corpBook.attention.inReviewTitleMany', {
+            corp: group.corpName,
+            n: group.donations.length,
+            amount: formatIsk(total, 0),
+          }),
+      detail: (
+        <>
+          <p>{t('miningTax.corpBook.attention.inReviewDetail')}</p>
+          <ul className="list-disc space-y-0.5 pl-5">
+            {group.donations.map((d) => (
+              <li key={d.id}>
+                {t('miningTax.corpBook.attention.inReviewItem', {
+                  amount: formatIsk(d.amount, 0),
+                  time: eveTimeLabel(Date.parse(d.at)),
+                })}
+                {d.reason &&
+                  ` — ${t('miningTax.corpBook.attention.inReviewReason', { reason: d.reason })}`}
+              </li>
+            ))}
+          </ul>
         </>
       ),
     });

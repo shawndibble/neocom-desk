@@ -6,7 +6,11 @@
 import type { TaxContact } from '@/engine/corpTaxBook/bookDocs';
 import type { ClaimCheck, ClaimedTransfer } from '@/engine/corpTaxBook/overdue';
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
-import { declareCorpTaxBookPayment, disputeCorpTaxBookConflict } from '../corpBookStore';
+import {
+  claimCorpTaxBookPayment,
+  declareCorpTaxBookPayment,
+  disputeCorpTaxBookConflict,
+} from '../corpBookStore';
 import { notOwedPlan } from './outcomes';
 import { sendTaxQuestionMail, type TaxQuestionMailOutcome } from '../sendTaxQuestionMail';
 
@@ -147,4 +151,17 @@ export async function sendProof(
     transfers: transfers.map((t) => ({ amountIsk: t.amount, at: t.at, journalRef: t.journalRef })),
   });
   return { checks, confirmed, mailed };
+}
+
+/**
+ * "I already paid" for donations the book holds for review (#6207) with no Statement to declare
+ * on: each is claimed by its donor as tax (`claimCorpTaxBookPayment` with `inReview`), which the
+ * server audits and credits at once. Nothing is asked of an officer, so no mail goes.
+ */
+export async function countHeldDonations(
+  ctx: Pick<MailContext, 'corporationId'>,
+  held: readonly { id: string; characterId: number }[]
+): Promise<void> {
+  for (const d of held)
+    await claimCorpTaxBookPayment(d.characterId, ctx.corporationId, d.id, { inReview: true });
 }

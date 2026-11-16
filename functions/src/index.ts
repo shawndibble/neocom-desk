@@ -1445,8 +1445,10 @@ corpTaxBookAction('reclaimSrpCallable', (request) =>
 
 // A player claims their own Unmatched donation (D5): uid-authorised, no officer role.
 corpTaxBookAction('claimCorpTaxBookPaymentCallable', (request) => {
-  const { corporationId, paymentId } = parseClaimPaymentInput(request.data);
-  return claimPayment(corpTaxBookDeps(), callerOf(request), corporationId, paymentId);
+  const { corporationId, paymentId, inReview } = parseClaimPaymentInput(request.data);
+  return claimPayment(corpTaxBookDeps(), callerOf(request), corporationId, paymentId, {
+    ...(inReview ? { inReview } : {}),
+  });
 });
 
 // A Miner's own "I paid this another way" and Conflict dispute (#6206): uid-authorised, no officer role.

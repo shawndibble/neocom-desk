@@ -7875,6 +7875,7 @@
         "overdue": "{{corp}}'s Statement for {{period}} is open and not paid.",
         "rateUnrecorded": "{{corp}}'s book bills {{date}} at {{book}}%; your record has no rate for it.",
         "uncredited": "You sent <amount/>. {{corp}}'s book synced and still doesn't hold it, so days you had paid are billed again.",
+        "inReview": "{{corp}}'s book holds <amount/> you donated without counting it: its sync saw nothing you owed when you paid, so it waits for an officer.",
         "journalRef": "journal ref {{ref}}",
         "paidDays": "paid {{days}}",
         "rate": "{{corp}}'s book bills {{date}} at {{book}}%; you recorded {{yours}}%.",
@@ -7902,6 +7903,7 @@
       "title": {
         "overdue": "{{corp}} Statement {{period}}",
         "uncredited": "Donations not credited",
+        "inReview": "Donations held for review",
         "figure": "{{date}}: the book's figure differs",
         "conflict": "{{date}} claimed twice",
         "markedPaid": "{{date}}: marked paid, {{corp}} still bills it",
@@ -7945,6 +7947,7 @@
         "notPaying": "Hide it",
         "notPaying_tell": "Hide it and tell them",
         "paid": "Send proof",
+        "paid_held": "Count them",
         "notOwed": "Send"
       },
       "tellWhy": "Tell {{corp}} why",
@@ -7953,12 +7956,14 @@
       "hiddenNote": "Hidden days stay under Not paying on this tab, and come back with one click.",
       "sendsTo": "Goes to {{corp}}'s Needs you queue, and as an EVE mail to whoever answers its tax questions. Until they answer, it leaves your attention list; their answer comes back here.",
       "noStatement": "Nothing is on a Statement yet: {{corp}}'s book credits your donation on its next sync. If it still hasn't when the Statement goes out, send the proof then.",
+      "countsHeld": "{{corp}}'s book already holds them: they count as your tax at once, and its audit log records that you said so.",
       "failed": "That didn't reach the book. Check your connection and try again.",
       "done": "Done",
       "result": {
         "sentAgain": "Sent to {{corp}} again. The day is not held a second time; their answer comes back here.",
         "hidden": "Hidden. {{corp}} still bills it; it's listed under Not paying on this tab.",
         "credited": "Found in {{corp}}'s wallet and credited. Nothing more to do.",
+        "countedHeld": "{{corp}}'s book counts them as paid now, toward your oldest days. Nothing more to do.",
         "sentProof": "Sent to {{corp}}, with what checking its wallet found:",
         "sent": "Sent to {{corp}}. It holds the day until {{date}} while they answer; their answer comes back here."
       },
@@ -8331,6 +8336,11 @@
         "uncreditedRef": "Your wallet journal reference: {{ref}}.",
         "uncreditedItem": "{{amount}} ISK, sent {{time}}",
         "uncreditedItemCovered": "was paying {{days}} — owed again without it",
+        "inReviewTitle": "{{corp}} holds your {{amount}} ISK donation of {{date}} without counting it",
+        "inReviewTitleMany": "{{corp}} holds {{n}} of your donations without counting them ({{amount}} ISK)",
+        "inReviewDetail": "Its sync saw nothing you owed when you paid, so an officer reviews them and the days they paid still show billed. Resolve it to count them as your tax.",
+        "inReviewItem": "{{amount}} ISK, sent {{time}}",
+        "inReviewReason": "“{{reason}}”",
         "alsoBilledTitle": "{{corp}} also bills ore you listed for {{payees}}",
         "alsoBilledDetail": "It is left out of what you owe {{payees}}. Open the day and choose “{{action}}” to take it off your list.",
         "openDay": "Open the day"
