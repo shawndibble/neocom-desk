@@ -1,6 +1,8 @@
 import { useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IconButton, NativeSelect, Radio } from '@/components/ui';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import * as Icon from '@/components/ui/icons';
 import { TAX_CONTACT_MAX_CHARACTERS } from '@/engine/corpTaxBook/bookDocs';
 import type { TaxContactDraft } from './taxContactDraft';
@@ -81,7 +83,7 @@ export function TaxContactSection({
       <legend className="text-sm font-semibold">{t(k('title'))}</legend>
       <p className="text-xs text-text-dim">{t(k('hint'))}</p>
 
-      <label className="flex items-start gap-2 text-sm">
+      <label className={cx('flex items-start gap-2 text-sm', tappableRowClassName)}>
         <Radio
           name={name}
           checked={draft.mode === 'ceo'}
@@ -94,94 +96,100 @@ export function TaxContactSection({
         </span>
       </label>
 
-      <div className="flex items-start gap-2 text-sm">
-        <Radio
-          name={name}
-          id={`${name}-list`}
-          checked={draft.mode === 'list'}
-          onChange={() => set({ mode: 'list' })}
-          className="mt-0.5"
-        />
-        <span className="min-w-0 flex-1 space-y-1">
-          <label htmlFor={`${name}-list`}>{t(k('list'))}</label>
-          <NativeSelect
-            size="sm"
-            className="max-w-xs"
-            aria-label={t(k('listPick'))}
-            value={draft.listId === null ? '' : String(draft.listId)}
-            onChange={(e) => {
-              const picked = listOptions.find((l) => String(l.id) === e.target.value);
-              set({
-                mode: 'list',
-                listId: picked?.id ?? null,
-                listName: picked?.name ?? '',
-              });
-            }}
-          >
-            <option value="">{t(k('listNone'))}</option>
-            {listOptions.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.name}
-              </option>
-            ))}
-          </NativeSelect>
-          <span className="block text-xs text-text-dim">{t(k('listHint'))}</span>
+      <div className="text-sm">
+        <span className="block min-w-0 space-y-1">
+          <label className={cx('flex items-start gap-2', tappableRowClassName)}>
+            <Radio
+              name={name}
+              checked={draft.mode === 'list'}
+              onChange={() => set({ mode: 'list' })}
+              className="mt-0.5"
+            />
+            <span>{t(k('list'))}</span>
+          </label>
+          <span className="block space-y-1 pl-6">
+            <NativeSelect
+              size="sm"
+              className="max-w-xs"
+              aria-label={t(k('listPick'))}
+              value={draft.listId === null ? '' : String(draft.listId)}
+              onChange={(e) => {
+                const picked = listOptions.find((l) => String(l.id) === e.target.value);
+                set({
+                  mode: 'list',
+                  listId: picked?.id ?? null,
+                  listName: picked?.name ?? '',
+                });
+              }}
+            >
+              <option value="">{t(k('listNone'))}</option>
+              {listOptions.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </NativeSelect>
+            <span className="block text-xs text-text-dim">{t(k('listHint'))}</span>
+          </span>
         </span>
       </div>
 
-      <div className="flex items-start gap-2 text-sm">
-        <Radio
-          name={name}
-          id={`${name}-officers`}
-          checked={draft.mode === 'officers'}
-          onChange={() => set({ mode: 'officers' })}
-          className="mt-0.5"
-        />
-        <span className="min-w-0 flex-1 space-y-1">
-          <label htmlFor={`${name}-officers`}>{t(k('officers'))}</label>
-          <span className="block text-xs text-text-dim">
-            {t(k('officersHint'), { max: TAX_CONTACT_MAX_CHARACTERS })}
+      <div className="text-sm">
+        <span className="block min-w-0 space-y-1">
+          <label className={cx('flex items-start gap-2', tappableRowClassName)}>
+            <Radio
+              name={name}
+              checked={draft.mode === 'officers'}
+              onChange={() => set({ mode: 'officers' })}
+              className="mt-0.5"
+            />
+            <span>{t(k('officers'))}</span>
+          </label>
+          <span className="block space-y-1 pl-6">
+            <span className="block text-xs text-text-dim">
+              {t(k('officersHint'), { max: TAX_CONTACT_MAX_CHARACTERS })}
+            </span>
+            {draft.mode === 'officers' && (
+              <>
+                <ul className="space-y-1">
+                  {draft.officerIds.map((id) => {
+                    const who = names.get(id) ?? t(k('unnamedOfficer'), { id });
+                    return (
+                      <li key={id} className="flex items-center gap-2">
+                        <span className="min-w-0 flex-1 truncate">{who}</span>
+                        <IconButton
+                          icon={<Icon.Close />}
+                          size="row"
+                          label={t(k('removeOfficer'), { name: who })}
+                          onClick={() =>
+                            set({ officerIds: draft.officerIds.filter((x) => x !== id) })
+                          }
+                        />
+                      </li>
+                    );
+                  })}
+                </ul>
+                {!full && (
+                  <PayeeNameField
+                    id={`${name}-search`}
+                    characterId={characterId}
+                    value={query}
+                    onChange={setQuery}
+                    ariaLabel={t(k('officerSearch'))}
+                    placeholder={t(k('officerSearch'))}
+                    size="sm"
+                    className="max-w-xs"
+                    onPick={(match) => {
+                      setQuery('');
+                      if (match.kind !== 'character' || draft.officerIds.includes(match.id)) return;
+                      setNames((prev) => new Map(prev).set(match.id, match.name));
+                      set({ officerIds: [...draft.officerIds, match.id] });
+                    }}
+                  />
+                )}
+              </>
+            )}
           </span>
-          {draft.mode === 'officers' && (
-            <>
-              <ul className="space-y-1">
-                {draft.officerIds.map((id) => {
-                  const who = names.get(id) ?? `#${id}`;
-                  return (
-                    <li key={id} className="flex items-center gap-2">
-                      <span className="min-w-0 flex-1 truncate">{who}</span>
-                      <IconButton
-                        icon={<Icon.Close />}
-                        size="row"
-                        label={t(k('removeOfficer'), { name: who })}
-                        onClick={() =>
-                          set({ officerIds: draft.officerIds.filter((x) => x !== id) })
-                        }
-                      />
-                    </li>
-                  );
-                })}
-              </ul>
-              {!full && (
-                <PayeeNameField
-                  id={`${name}-search`}
-                  characterId={characterId}
-                  value={query}
-                  onChange={setQuery}
-                  ariaLabel={t(k('officerSearch'))}
-                  placeholder={t(k('officerSearch'))}
-                  size="sm"
-                  className="max-w-xs"
-                  onPick={(match) => {
-                    setQuery('');
-                    if (match.kind !== 'character' || draft.officerIds.includes(match.id)) return;
-                    setNames((prev) => new Map(prev).set(match.id, match.name));
-                    set({ officerIds: [...draft.officerIds, match.id] });
-                  }}
-                />
-              )}
-            </>
-          )}
         </span>
       </div>
     </fieldset>

@@ -100,6 +100,7 @@ function renderQueue(
                     minerId: 'solo:7',
                     periodStart: '2026-09-01',
                     periodEnd: '2026-09-30',
+                    lines: [],
                   },
                 ],
                 declarations: [],
@@ -363,6 +364,42 @@ describe('NeedsYouQueue (#6207)', () => {
         screen.getByText(/^Held until \d+ \w+ — payments skip it while you answer$/)
       ).toBeInTheDocument();
     });
+  });
+
+  it('says what a hold did: the held amount, and that the Statement settles on the rest', () => {
+    renderQueue([], {
+      disputes: [{ ...dispute, kind: 'notPaying', at: new Date().toISOString() }],
+      view: {
+        input: {
+          statements: [
+            {
+              id: 's1',
+              minerId: 'solo:7',
+              periodStart: '2026-09-01',
+              periodEnd: '2026-09-30',
+              lines: [
+                {
+                  kind: 'mined',
+                  chargeKey: '7:1000:2026-09-05',
+                  oreLines: [{ typeId: 45490, quantity: 1200 }],
+                  unitPrices: { 45490: 10_000 },
+                  taxPct: 10,
+                  tax: 1_400_000,
+                },
+              ],
+            },
+          ],
+          declarations: [],
+          dismissals: [],
+        },
+        charges: [],
+      },
+    });
+    expect(
+      screen.getByText(
+        /^1,200,000 is held until \d+ \w+: payments skip it, and the Statement settles on the rest\.$/
+      )
+    ).toBeInTheDocument();
   });
 
   describe('declaration wallet check', () => {

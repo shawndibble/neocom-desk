@@ -18258,6 +18258,8 @@
           "notSynced": "Not synced yet",
           "tooOld": "Too old to check",
           "tooOldBody": "before the wallet history the book holds",
+          "ambiguous": "Several matches — an officer picks",
+          "divisionUnknown": "unknown",
           "notFound": "Not in the corp wallet",
           "person": "Paid to a person",
           "otherCorp": "Another corporation"
@@ -18288,6 +18290,7 @@
           "lineQuantity": "{{quantity}} {{ore}}",
           "reason": "“{{reason}}”",
           "held": "Held until {{date}} — payments skip it while you answer",
+          "heldAmount": "{{amount}} is held until {{date}}: payments skip it, and the Statement settles on the rest.",
           "line": "{{quantity}} {{ore}} to {{payee}}",
           "dismiss": "Waive their ore",
           "waive": "Waive it",
@@ -19118,7 +19121,8 @@
           "officers": "These officers",
           "officersHint": "One mail each; up to {{max}}.",
           "officerSearch": "Add an officer by name",
-          "removeOfficer": "Remove {{name}}"
+          "removeOfficer": "Remove {{name}}",
+          "unnamedOfficer": "Character {{id}}"
         },
         "reclaim": {
           "title": "Ownership",

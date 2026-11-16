@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button, Panel, plainTextActionClassName } from '@/components/ui';
-import { Pill, type PillTone } from '@/components/ui/Pill';
+import { Pill } from '@/components/ui/Pill';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import type { MinerRow, NeedsYouItem } from '@/engine/corpTaxBook/bookView';
 import type { UncountedDonation } from '@/engine/corpTaxBook/uncounted';
@@ -10,12 +10,15 @@ import {
   disputeHold,
   disputeKindOf,
   disputedTax,
+  heldByStatement,
+  type DisputeKind,
   type OreDispute,
 } from '@/engine/corpTaxBook/disputes';
-import type { ClaimCheck, ClaimedTransfer } from '@/engine/corpTaxBook/overdue';
+import type { ClaimedTransfer } from '@/engine/corpTaxBook/overdue';
 import { useCharacters } from '@/features/character/useCharacters';
 import { cx } from '@/lib/cx';
 import { formatCount } from '@/lib/formatCount';
+import { useNow } from '@/lib/useNow';
 import { useBook } from './useBook';
 import { useCorpAccess } from '../useCorpAccess';
 import { divisionNamesFor } from '../taxBook/pushDivisionNames';
@@ -28,13 +31,7 @@ import {
   ReasonDialog,
 } from './BookDialogs';
 import { isk, periodLabel, periodsLabel, shortDate, shortDateTime } from './moonsFormat';
-import {
-  autoCredited,
-  findOwnEntry,
-  oldestEntryDate,
-  paidToOwn,
-  type OwnJournal,
-} from './claimWalletCheck';
+import { autoCredited, paidToOwn, transferStatus, type TransferStatus } from './claimWalletCheck';
 import { useOwnWalletJournals } from './useOwnWalletJournals';
 import { MOONS_TABS, minerPath } from './moonsPaths';
 import { tabPath } from '@/lib/pageTabs';
@@ -74,27 +71,6 @@ function QueueCard({
       <span className="flex shrink-0 flex-wrap items-center gap-2 max-sm:pl-3">{actions}</span>
     </li>
   );
-}
-
-const CHECK_TONE: Record<ClaimCheck['result'], PillTone> = {
-  found: 'success',
-  division: 'warning',
-  notSynced: 'neutral',
-  tooOld: 'neutral',
-  notFound: 'danger',
-  person: 'accent',
-  otherCorp: 'warning',
-};
-
-/** What one claimed transfer's check came to, as the card shows it. */
-interface TransferStatus {
-  tone: PillTone;
-  label: string;
-  /** What the check found about it; the transfer's own amount, time and ref go beside it. */
-  note?: string;
-  division?: number;
-  /** Paid to one of this officer's Characters: the own-wallet check decides, and it is found. */
-  own?: { found: boolean };
 }
 
 function TransferLines({
@@ -140,6 +116,43 @@ function MinerTitle({ minerId, children }: { minerId: string | undefined; childr
   );
 }
 
+const D = 'corpTaxBook.moons.needs.dispute';
+
+/** What each kind of dispute says on its card: one record, so nothing branches on the kind twice. */
+const DISPUTE_COPY: Record<
+  DisputeKind,
+  {
+    titleKey: (facts: { billed: number | undefined; priced: number | undefined }) => string;
+    lineKey: string;
+    bodyKey?: string;
+    waiveKey: string;
+  }
+> = {
+  payee: {
+    titleKey: () => `${D}.title`,
+    lineKey: `${D}.line`,
+    bodyKey: `${D}.body`,
+    waiveKey: `${D}.dismiss`,
+  },
+  quantity: {
+    titleKey: () => `${D}.titleQuantity`,
+    lineKey: `${D}.lineQuantity`,
+    bodyKey: `${D}.bodyQuantity`,
+    waiveKey: `${D}.waive`,
+  },
+  rate: {
+    titleKey: ({ billed }) => (billed === undefined ? `${D}.titleRateUnknown` : `${D}.titleRate`),
+    lineKey: `${D}.lineQuantity`,
+    waiveKey: `${D}.waiveDifference`,
+  },
+  notPaying: {
+    titleKey: ({ priced }) =>
+      priced === undefined ? `${D}.titleNotPayingUnpriced` : `${D}.titleNotPaying`,
+    lineKey: `${D}.lineQuantity`,
+    waiveKey: `${D}.writeOff`,
+  },
+};
+
 type Open =
   | { kind: 'confirm'; item: Extract<NeedsYouItem, { kind: 'declaration' }>; miner: MinerRow }
   | { kind: 'reject'; item: Extract<NeedsYouItem, { kind: 'declaration' }>; miner: MinerRow }
@@ -169,7 +182,7 @@ export function NeedsYouQueue() {
   );
   const [open, setOpen] = useState<Open>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [now] = useState(() => Date.now());
+  const now = useNow();
   const close = () => setOpen(null);
   // The tax on only the disputed ore: what waiving a dispute credits (undefined: cannot price it).
   const waiveIsk =
@@ -198,22 +211,25 @@ export function NeedsYouQueue() {
       ...(divisionNames ? { divisionNames } : {}),
     };
   };
-  const answerUncounted = async (
-    u: Pick<UncountedDonation, 'id' | 'division'>,
-    how: 'count' | 'notTax'
-  ) => {
+  const countDivision = async (division: number) => {
     setBusy(true);
     try {
-      await edit(
-        how === 'count'
-          ? { action: 'updateSettings', patch: await countPatch(u.division) }
-          : { action: 'ignoreUncounted', uncountedId: u.id }
-      );
+      await edit({ action: 'updateSettings', patch: await countPatch(division) });
       setNotice(
-        how === 'count'
-          ? t('corpTaxBook.moons.needs.uncounted.counted', { division: divisionLabel(u.division) })
-          : t('corpTaxBook.moons.needs.uncounted.ignored')
+        t('corpTaxBook.moons.needs.uncounted.counted', { division: divisionLabel(division) })
       );
+    } catch {
+      setNotice(t('corpTaxBook.moons.needs.uncounted.failed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const answerUncounted = async (u: UncountedDonation, how: 'count' | 'notTax') => {
+    if (how === 'count') return countDivision(u.division);
+    setBusy(true);
+    try {
+      await edit({ action: 'ignoreUncounted', uncountedId: u.id });
+      setNotice(t('corpTaxBook.moons.needs.uncounted.ignored'));
     } catch {
       setNotice(t('corpTaxBook.moons.needs.uncounted.failed'));
     } finally {
@@ -228,60 +244,6 @@ export function NeedsYouQueue() {
   const minerOf = (id: string) => miners.find((m) => m.id === id)!;
   const nameOf = (id: string) => names.character(minerOf(id).mainCharacterId);
 
-  /** What one claimed transfer's check, or its own-wallet check, found. */
-  const statusOf = (
-    tr: ClaimedTransfer,
-    check: ClaimCheck | undefined,
-    memberCharacterIds: readonly number[]
-  ): TransferStatus | undefined => {
-    const own = paidToOwn(tr, ownIds);
-    if (own !== undefined) return ownStatus(tr, journals.get(own), memberCharacterIds);
-    if (!check) return undefined;
-    return {
-      tone: CHECK_TONE[check.result],
-      label:
-        check.result === 'division'
-          ? t('corpTaxBook.moons.needs.check.division', { division: check.division ?? '?' })
-          : t(`corpTaxBook.moons.needs.check.${check.result}`),
-      note: check.result === 'tooOld' ? t('corpTaxBook.moons.needs.check.tooOldBody') : undefined,
-      division: check.result === 'division' ? check.division : undefined,
-    };
-  };
-  const ownStatus = (
-    tr: ClaimedTransfer,
-    journal: OwnJournal | undefined,
-    memberCharacterIds: readonly number[]
-  ): TransferStatus => {
-    if (journal === undefined)
-      return { tone: 'neutral', label: t('corpTaxBook.moons.needs.paidToYou.reading') };
-    if (journal.state !== 'ok')
-      return {
-        tone: 'neutral',
-        label: t('corpTaxBook.moons.needs.paidToYou.noScope'),
-        note: t('corpTaxBook.moons.needs.paidToYou.noScopeBody'),
-      };
-    const entry = findOwnEntry(journal.entries, tr, memberCharacterIds);
-    if (entry)
-      return {
-        tone: 'success',
-        label: t('corpTaxBook.moons.needs.paidToYou.found'),
-        note: t('corpTaxBook.moons.needs.paidToYou.foundBody', {
-          time: shortDateTime(entry.date),
-          ref: entry.id,
-        }),
-        own: { found: true },
-      };
-    const oldest = oldestEntryDate(journal.entries);
-    return {
-      tone: 'danger',
-      label: t('corpTaxBook.moons.needs.paidToYou.notFound'),
-      note:
-        oldest === undefined
-          ? undefined
-          : t('corpTaxBook.moons.needs.paidToYou.notFoundBody', { date: shortDate(oldest) }),
-      own: { found: false },
-    };
-  };
   const creditedAutomatically = autoCredited(view.input.declarations, now).flatMap((d) => {
     const miner = miners.find((m) =>
       view.input.statements.some((s) => s.id === d.statementId && s.minerId === m.id)
@@ -376,7 +338,7 @@ export function NeedsYouQueue() {
               const d = item.declaration;
               const transfers = d.transfers ?? [];
               const statuses = transfers.map((tr, k) =>
-                statusOf(tr, d.checks?.[k], miner.characterIds)
+                transferStatus(t, tr, d.checks?.[k], miner.characterIds, ownIds, journals)
               );
               const paidToYou = transfers.some((tr) => paidToOwn(tr, ownIds) !== undefined);
               const ownStatuses = statuses.filter((st) => st?.own);
@@ -458,9 +420,7 @@ export function NeedsYouQueue() {
                             type="button"
                             className={secondaryActionClassName}
                             disabled={busy}
-                            onClick={() =>
-                              void answerUncounted({ id: d.id, division: divisionToCount }, 'count')
-                            }
+                            onClick={() => void countDivision(divisionToCount)}
                           >
                             {t('corpTaxBook.moons.needs.declaration.count', {
                               division: divisionToCount,
@@ -609,66 +569,44 @@ export function NeedsYouQueue() {
           const date = shortDate(d.date);
           const priced = disputedTax(d, view.charges);
           const billed = view.charges.find((c) => c.key === d.lines[0]?.recordKey)?.taxPct;
+          const copy = DISPUTE_COPY[kind];
           const ore = d.lines
             .map((l) =>
-              kind === 'payee'
-                ? t('corpTaxBook.moons.needs.dispute.line', {
-                    quantity: formatCount(l.quantity),
-                    ore: names.ore(l.typeId),
-                    payee: l.payeeName,
-                  })
-                : t('corpTaxBook.moons.needs.dispute.lineQuantity', {
-                    quantity: formatCount(l.quantity),
-                    ore: names.ore(l.typeId),
-                  })
+              t(copy.lineKey, {
+                quantity: formatCount(l.quantity),
+                ore: names.ore(l.typeId),
+                payee: l.payeeName,
+              })
             )
             .join('; ');
-          const title =
-            kind === 'quantity'
-              ? t('corpTaxBook.moons.needs.dispute.titleQuantity', { name, date })
-              : kind === 'rate'
-                ? billed === undefined
-                  ? t('corpTaxBook.moons.needs.dispute.titleRateUnknown', {
-                      name,
-                      date,
-                      claimed: d.claimedPct,
-                    })
-                  : t('corpTaxBook.moons.needs.dispute.titleRate', {
-                      name,
-                      date,
-                      claimed: d.claimedPct,
-                      billed,
-                    })
-                : kind === 'notPaying'
-                  ? t(
-                      priced === undefined
-                        ? 'corpTaxBook.moons.needs.dispute.titleNotPayingUnpriced'
-                        : 'corpTaxBook.moons.needs.dispute.titleNotPaying',
-                      { name, date, amount: priced === undefined ? undefined : isk(priced) }
-                    )
-                  : t('corpTaxBook.moons.needs.dispute.title', {
-                      name,
-                      date,
-                      payee: [...new Set(d.lines.map((l) => l.payeeName))].join(', '),
-                    });
+          const title = t(copy.titleKey({ billed, priced }), {
+            name,
+            date,
+            claimed: d.claimedPct,
+            billed,
+            amount: priced === undefined ? undefined : isk(priced),
+            payee: [...new Set(d.lines.map((l) => l.payeeName))].join(', '),
+          });
           const words = d.reason ?? d.note;
           const body = [
-            kind === 'payee' && t('corpTaxBook.moons.needs.dispute.body', { ore }),
-            kind === 'quantity' && t('corpTaxBook.moons.needs.dispute.bodyQuantity', { ore }),
+            copy.bodyKey && t(copy.bodyKey, { ore }),
             words && t('corpTaxBook.moons.needs.dispute.reason', { reason: words }),
           ]
             .filter(Boolean)
             .join(' ');
           const hold = disputeHold(d, new Date(now).toISOString());
-          const waiveLabel = t(
-            kind === 'quantity'
-              ? 'corpTaxBook.moons.needs.dispute.waive'
-              : kind === 'rate'
-                ? 'corpTaxBook.moons.needs.dispute.waiveDifference'
-                : kind === 'notPaying'
-                  ? 'corpTaxBook.moons.needs.dispute.writeOff'
-                  : 'corpTaxBook.moons.needs.dispute.dismiss'
-          );
+          // What the hold did to this Miner's Statements: the part of the bill payments skip.
+          const heldIsk = hold
+            ? [
+                ...heldByStatement(
+                  view.input.statements.filter((s) => s.minerId === d.minerId),
+                  [d],
+                  new Set(),
+                  new Date(now).toISOString()
+                ).values(),
+              ].reduce((n, v) => n + v, 0)
+            : 0;
+          const waiveLabel = t(copy.waiveKey);
           return (
             <QueueCard
               key={`p-${d.id}`}
@@ -684,7 +622,14 @@ export function NeedsYouQueue() {
               detail={
                 hold && (
                   <span className="block text-xs text-text-dim">
-                    {t('corpTaxBook.moons.needs.dispute.held', { date: shortDate(hold.until) })}
+                    {heldIsk > 0
+                      ? t('corpTaxBook.moons.needs.dispute.heldAmount', {
+                          amount: isk(heldIsk),
+                          date: shortDate(hold.until),
+                        })
+                      : t('corpTaxBook.moons.needs.dispute.held', {
+                          date: shortDate(hold.until),
+                        })}
                   </span>
                 )
               }
