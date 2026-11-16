@@ -233,7 +233,13 @@ export function LoyaltyStoreLanding({ active = true }: { active?: boolean }) {
   const total = view === 'stores' ? data.stores.length : data.offers.length;
   const offersPending = view === 'offers' && data.pricing;
   // A linked "I can afford" / "Stores I hold LP with" waits for the balances, not "Nothing matches".
-  const balancesPending = (filters.mineOnly || filters.affordableOnly) && !data.balancesKnown;
+  // So does the store list on its default sort, which puts held LP first: it never reorders
+  // under the pilot when they arrive. A sort the URL names needs no balances.
+  const balancesPending =
+    ((filters.mineOnly || filters.affordableOnly) && !data.balancesKnown) ||
+    (view === 'stores' &&
+      !data.balancesSettled &&
+      !new URLSearchParams(location.search).has('storeSort'));
 
   let body;
   if (data.status === 'loading' || offersPending || balancesPending) {

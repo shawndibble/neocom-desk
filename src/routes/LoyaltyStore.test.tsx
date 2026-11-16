@@ -27,6 +27,7 @@ vi.mock('@/features/loyalty/useLpStoreLanding', () => ({
     pricing: false,
     valuing: false,
     balancesKnown: true,
+    balancesSettled: true,
     systemName: () => null,
     factionName: () => null,
     jumpsStatus: 'ready',

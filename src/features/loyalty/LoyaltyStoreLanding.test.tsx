@@ -67,6 +67,7 @@ function state(over: Partial<LpStoreLandingState> = {}): LpStoreLandingState {
     pricing: false,
     valuing: false,
     balancesKnown: true,
+    balancesSettled: true,
     systemName: () => 'Jita',
     factionName: () => null,
     jumpsStatus: 'ready',
@@ -225,6 +226,36 @@ describe('LoyaltyStoreLanding', () => {
     renderLanding('?view=offers&affordable=1');
     expect(screen.queryByText('Nothing matches')).toBeNull();
     expect(screen.queryByRole('table', { name: 'LP Store offers' })).toBeNull();
+  });
+
+  it('holds the store list until the balances settle, so it never reorders under the pilot', () => {
+    landing.mockReturnValue(state({ balancesKnown: false, balancesSettled: false }));
+    const { rerender } = renderLanding();
+    expect(screen.queryByRole('table', { name: 'LP Stores' })).toBeNull();
+
+    landing.mockReturnValue(state());
+    rerender(
+      <MemoryRouter initialEntries={['/wallet/lp-store']}>
+        <LoyaltyStoreLanding />
+      </MemoryRouter>
+    );
+    expect(rowNames(screen.getByRole('table', { name: 'LP Stores' }))[0]).toContain(
+      'Sisters of EVE'
+    );
+  });
+
+  it('shows the store list at once when the URL names its sort', () => {
+    landing.mockReturnValue(state({ balancesKnown: false, balancesSettled: false }));
+    renderLanding('?storeSort=lpValue:desc');
+    expect(screen.getByRole('table', { name: 'LP Stores' })).toBeInTheDocument();
+  });
+
+  it('lists the stores by LP Value once the balances failed to load', () => {
+    landing.mockReturnValue(
+      state({ balancesKnown: false, stores: [NAVY, { ...SISTERS, yourLp: null, lpValue: 900 }] })
+    );
+    renderLanding();
+    expect(rowNames(screen.getByRole('table', { name: 'LP Stores' }))[0]).toContain('Caldari Navy');
   });
 
   it('says why the page is empty when the snapshot is unavailable', () => {

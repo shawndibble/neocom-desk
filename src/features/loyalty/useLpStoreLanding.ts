@@ -66,6 +66,8 @@ export interface LpStoreLandingState {
   valuing: boolean;
   /** The Character's balances have been read (an empty list then means none held). */
   balancesKnown: boolean;
+  /** The balances read has finished, read or failed, or there is no Character to read. */
+  balancesSettled: boolean;
   systemName: (systemId: number) => string | null;
   factionName: (factionId: number) => string | null;
   /** The Current System is set and distances are resolved. */
@@ -199,9 +201,10 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
   const [balances, setBalances] = useState<{
     characterId: number | null;
     list: CharacterLoyaltyPoints[] | null;
-  }>({ characterId: activeCharacterId, list: null });
+    settled: boolean;
+  }>({ characterId: activeCharacterId, list: null, settled: false });
   if (balances.characterId !== activeCharacterId) {
-    setBalances({ characterId: activeCharacterId, list: null });
+    setBalances({ characterId: activeCharacterId, list: null, settled: false });
   }
   useEffect(() => {
     if (activeCharacterId === null) return;
@@ -209,9 +212,16 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
     void loadCharacterLoyaltyPoints(activeCharacterId)
       .then((read) => {
         if (!cancelled)
-          setBalances({ characterId: activeCharacterId, list: read.cached?.data ?? [] });
+          setBalances({
+            characterId: activeCharacterId,
+            list: read.cached?.data ?? [],
+            settled: true,
+          });
       })
-      .catch(() => {});
+      .catch(() => {
+        // Unread stays unknown, but the store list stops waiting on it.
+        if (!cancelled) setBalances({ characterId: activeCharacterId, list: null, settled: true });
+      });
     return () => {
       cancelled = true;
     };
@@ -416,6 +426,7 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
     pricing: snapshotRows !== null && (rows === null || snapshotLoading),
     valuing: snapshotRows !== null && valuesForHub === null,
     balancesKnown: activeCharacterId !== null && balances.list !== null,
+    balancesSettled: activeCharacterId === null || balances.settled,
     systemName,
     factionName,
     jumpsStatus,
