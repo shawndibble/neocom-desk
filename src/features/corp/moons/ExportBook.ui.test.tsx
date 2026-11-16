@@ -7,13 +7,16 @@ import { BookProvider } from './BookContext';
 import { ExportBookSection, ExportFirst } from './ExportBook';
 import type { BookContextValue } from './bookContextValue';
 
-const readBookData = vi.fn();
+const readBook = vi.fn();
 const readAudit = vi.fn();
 vi.mock('@/esi/endpoints/corp', () => ({
   getCorporationPublicInfo: () => Promise.resolve({ data: { ticker: 'TEST' } }),
 }));
+vi.mock('../taxBook/bookRead', () => ({
+  bookPartsFor: () => new Set(['core', 'observed', 'ledger', 'answers']),
+  readBook: (...a: unknown[]) => readBook(...a),
+}));
 vi.mock('../taxBook/bookClient', () => ({
-  readBookData: (...a: unknown[]) => readBookData(...a),
   readAudit: (...a: unknown[]) => readAudit(...a),
   readRebills: () => Promise.resolve([]),
   readDeclinedAutoGroup: () => Promise.resolve(new Set<number>()),
@@ -94,7 +97,7 @@ function renderIn(children: React.ReactNode) {
 const button = () => screen.getByRole('button', { name: 'Download the book (.xlsx)' });
 
 beforeEach(() => {
-  readBookData.mockReset().mockResolvedValue(book);
+  readBook.mockReset().mockResolvedValue(book);
   readAudit
     .mockReset()
     .mockResolvedValue([{ id: 'a', at: 0, by: ME, byName: 'Me', action: 'turnOn', detail: {} }]);
@@ -108,7 +111,9 @@ describe('ExportBookSection', () => {
     expect(screen.getByRole('heading', { name: 'Export the book' })).toBeInTheDocument();
     await userEvent.click(button());
     const done = await screen.findByRole('status');
-    expect(readBookData).toHaveBeenCalledWith(ME, CORP);
+    expect(readBook).toHaveBeenCalledWith(ME, CORP, {
+      parts: new Set(['core', 'observed', 'ledger', 'answers']),
+    });
     expect(readAudit).toHaveBeenCalledWith(ME, CORP, 2000);
     expect(save.mock.calls[0][0]).toMatch(/^neocom-corp-tax-book-test-\d{4}-\d{2}-\d{2}\.xlsx$/);
     // 2 mining lines + 17 settings rows + 1 log entry.

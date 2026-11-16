@@ -1,14 +1,17 @@
 // The Miner page reads one Miner's read-model slice (issue #5258); every other page the whole book.
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { BookData } from '../taxBook/bookClient';
+import type { BookRead } from '../taxBook/bookRead';
 
-const readBookData = vi.hoisted(() => vi.fn());
-const readMinerBookData = vi.hoisted(() => vi.fn());
+const readBook = vi.hoisted(() => vi.fn());
+const extendBook = vi.hoisted(() => vi.fn());
+vi.mock('../taxBook/bookRead', async (orig) => ({
+  ...(await orig<typeof import('../taxBook/bookRead')>()),
+  readBook,
+  extendBook,
+}));
 vi.mock('../taxBook/bookClient', async (orig) => ({
   ...(await orig<typeof import('../taxBook/bookClient')>()),
-  readBookData,
-  readMinerBookData,
   verifyOfficer: vi.fn().mockResolvedValue({ canView: true, bookActive: true }),
 }));
 vi.mock('../taxBook/observedStore', () => ({ forgetObservedCopy: vi.fn() }));
@@ -46,7 +49,7 @@ import { useCorpBook } from './useCorpBook';
 
 const SYNC = { run: { phase: 'idle' } } as never;
 
-function book(): BookData {
+function book(): BookRead {
   return {
     settings: {
       active: true,
@@ -91,14 +94,27 @@ function book(): BookData {
     ],
     declarations: [],
     adjustments: [],
+    parts: new Set(['core', 'observed', 'ledger', 'answers']),
   };
 }
 
+/** The read the hook asked for: its scope, and nothing else. */
+const asked = (n: number) =>
+  Object.fromEntries(
+    Object.entries(readBook.mock.calls[n]![2] as Record<string, unknown>).filter(
+      ([k]) => k !== 'parts'
+    )
+  );
+
 beforeEach(() => {
-  readBookData.mockReset().mockImplementation(async () => book());
-  readMinerBookData
+  readBook
     .mockReset()
-    .mockImplementation(async () => ({ data: book(), from: '2026-10-15' }));
+    .mockImplementation(async (_c, _b, ask: { minerId?: string }) =>
+      ask.minerId === undefined
+        ? book()
+        : { ...book(), scopedMiner: ask.minerId, minerScope: { from: '2026-10-15' } }
+    );
+  extendBook.mockReset().mockImplementation(async (_c, _b, held: BookRead) => held);
   loadDatedUnitPricesByHub.mockClear();
 });
 
@@ -106,16 +122,17 @@ describe('Miner page read path', () => {
   it('reads the Miner slice only, and prices only its open window', async () => {
     const { result } = renderHook(() => useCorpBook(SYNC, undefined, { minerId: 'solo:5' }));
     await waitFor(() => expect(result.current.state.status).toBe('ready'));
-    expect(readMinerBookData).toHaveBeenCalledWith(7, 98000001, 'solo:5');
-    expect(readBookData).not.toHaveBeenCalled();
+    expect(readBook).toHaveBeenCalledTimes(1);
+    expect(readBook.mock.calls[0]?.slice(0, 2)).toEqual([7, 98000001]);
+    expect(asked(0)).toEqual({ minerId: 'solo:5' });
     expect(loadDatedUnitPricesByHub.mock.calls[0]?.[0]).toEqual([22]);
   });
 
   it('no Miner open: the whole book, every day priced', async () => {
     const { result } = renderHook(() => useCorpBook(SYNC));
     await waitFor(() => expect(result.current.state.status).toBe('ready'));
-    expect(readBookData).toHaveBeenCalledTimes(1);
-    expect(readMinerBookData).not.toHaveBeenCalled();
+    expect(readBook).toHaveBeenCalledTimes(1);
+    expect(asked(0)).toEqual({});
     expect(loadDatedUnitPricesByHub.mock.calls[0]?.[0]).toEqual(expect.arrayContaining([11, 22]));
   });
 
@@ -128,6 +145,7 @@ describe('Miner page read path', () => {
     rerender({ minerId: undefined });
     expect(result.current.state.status).toBe('loading');
     await waitFor(() => expect(result.current.state.status).toBe('ready'));
-    expect(readBookData).toHaveBeenCalledTimes(1);
+    expect(readBook).toHaveBeenCalledTimes(2);
+    expect(asked(1)).toEqual({});
   });
 });

@@ -1,4 +1,4 @@
-// readMoonBookData (issue #5716): which documents a moon page reads, cold and warm.
+// readBook for one moon (issue #5716): which documents a moon page reads, cold and warm.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Data = Record<string, unknown>;
@@ -61,16 +61,24 @@ vi.mock('@/sync/syncAuth', () => ({ ensureSignedIn: vi.fn().mockResolvedValue(un
 vi.mock('@/auth/session', () => ({ getValidAccessToken: vi.fn() }));
 
 import { db } from '@/db';
-import { clearBookCache } from './bookCache';
-import { readMoonBookData } from './bookClient';
+import { clearBookCache } from '../bookCache';
+import { bookPartsFor, readBook } from '.';
 import {
   BOOK_VERSION_FIELD,
   COLLECTION_VERSIONS_FIELD,
-} from '../../../../functions/src/corpTaxBookVersionKeys';
-import { MOON_DOC_SCHEMA } from '../../../../functions/src/corpTaxBookMoonDocs';
+} from '../../../../../functions/src/corpTaxBookVersionKeys';
+import { MOON_DOC_SCHEMA } from '../../../../../functions/src/corpTaxBookMoonDocs';
 import { extractionId } from '@/engine/corpTaxBook/sync';
 
 const CORP = 98000001;
+const readMoon = async (extractionId: string) =>
+  (await readBook(7, CORP, { parts: bookPartsFor('extractions', 'extraction'), extractionId }))!;
+/** A read whose moon docs stood in for the ledger. */
+const scopedMoon = async (extractionId: string) => {
+  const read = await readMoon(extractionId);
+  if (!read.moon) throw new Error('expected a scoped read');
+  return { ...read, ...read.moon };
+};
 const BOOK = `corps/${CORP}`;
 const STRUCTURE = 1001;
 
@@ -161,11 +169,10 @@ beforeEach(async () => {
   obs('f', 1, '2026-08-20'); // between the cycles
 });
 
-describe('readMoonBookData', () => {
+describe('readBook for one moon', () => {
   it('reads the shown pull window and its moon docs, not the ledger', async () => {
-    const read = await readMoonBookData(7, CORP, ID.new);
-    if (read === 'fallback' || read === null) throw new Error('expected a scoped read');
-    expect(read.data.observed.map((r) => `${r.characterId}:${r.date}`).sort()).toEqual([
+    const read = await scopedMoon(ID.new);
+    expect(read.observed.map((r) => `${r.characterId}:${r.date}`).sort()).toEqual([
       '1:2026-09-17',
       '2:2026-09-18',
     ]);
@@ -176,14 +183,14 @@ describe('readMoonBookData', () => {
     expect(reads('moonDocs')).toEqual(
       [`${BOOK}/moonDocs/${ID.new}`, `${BOOK}/moonDocs/${ID.old}`].sort()
     );
-    expect(read.data.parts).toEqual(new Set(['core', 'observed', 'ledger']));
+    expect(read.parts).toEqual(new Set(['core', 'observed', 'ledger']));
   });
 
   it('warm: the docs and records come from this tab, only the window rows are read', async () => {
-    await readMoonBookData(7, CORP, ID.new);
+    await readMoon(ID.new);
     store.reads.length = 0;
-    const read = await readMoonBookData(7, CORP, ID.new);
-    expect(read).not.toBe('fallback');
+    const read = await readMoon(ID.new);
+    expect(read.moon).toBeDefined();
     expect(reads('moonDocs')).toEqual([]);
     expect(reads('statements')).toEqual([]);
     expect(reads('observed')).toEqual([`${BOOK}/observed/b`, `${BOOK}/observed/c`]);
@@ -191,10 +198,9 @@ describe('readMoonBookData', () => {
 
   it('reads a cycle whose Miner can still have an open day', async () => {
     moonDoc(ID.old, STRUCTURE, ['solo:1', 'solo:2']);
-    const read = await readMoonBookData(7, CORP, ID.new);
-    if (read === 'fallback' || read === null) throw new Error('expected a scoped read');
+    const read = await scopedMoon(ID.new);
     expect([...read.fromDocs]).toEqual([]);
-    expect(read.data.observed.map((r) => r.date).sort()).toEqual([
+    expect(read.observed.map((r) => r.date).sort()).toEqual([
       '2026-08-05',
       '2026-09-17',
       '2026-09-18',
@@ -203,9 +209,8 @@ describe('readMoonBookData', () => {
 
   it('survives a missing composite index by filtering the window here', async () => {
     store.noIndex = true;
-    const read = await readMoonBookData(7, CORP, ID.new);
-    if (read === 'fallback' || read === null) throw new Error('expected a scoped read');
-    expect(read.data.observed.map((r) => `${r.characterId}:${r.date}`).sort()).toEqual([
+    const read = await scopedMoon(ID.new);
+    expect(read.observed.map((r) => `${r.characterId}:${r.date}`).sort()).toEqual([
       '1:2026-09-17',
       '2:2026-09-18',
     ]);
@@ -213,19 +218,67 @@ describe('readMoonBookData', () => {
 
   it('falls back to the whole book when a doc is missing', async () => {
     store.docs.delete(`${BOOK}/moonDocs/${ID.new}`);
-    expect(await readMoonBookData(7, CORP, ID.new)).toBe('fallback');
-    expect(reads('observed')).toEqual([]);
+    const read = await readMoon(ID.new);
+    expect(read.moon).toBeUndefined();
+    expect(read.forMoon).toBe(ID.new);
+    // Every ledger row, not the pull's window.
+    expect(read.observed).toHaveLength(6);
+    expect(read.parts).toEqual(bookPartsFor('extractions', 'extraction'));
   });
 
   it('falls back when a doc is on another schema', async () => {
     moonDoc(ID.old, STRUCTURE, ['solo:1'], MOON_DOC_SCHEMA + 1);
-    expect(await readMoonBookData(7, CORP, ID.new)).toBe('fallback');
+    const read = await readMoon(ID.new);
+    expect(read.moon).toBeUndefined();
+    expect(read.observed).toHaveLength(6);
   });
 
   it('reads no row for a pull the book does not have', async () => {
-    const read = await readMoonBookData(7, CORP, 'nope');
-    if (read === 'fallback' || read === null) throw new Error('expected a scoped read');
-    expect(read.data.observed).toEqual([]);
+    const read = await scopedMoon('nope');
+    expect(read.observed).toEqual([]);
     expect(reads('observed')).toEqual([]);
+  });
+
+  it('claims only the parts it read, and holds every field a whole read of them holds', async () => {
+    const scoped = await scopedMoon(ID.new);
+    const whole = (await readBook(7, CORP, { parts: scoped.parts }))!;
+    const fields = (d: object) =>
+      [
+        ...Object.keys(d).filter((k) => (d as Record<string, unknown>)[k] !== undefined),
+        ...Object.keys((d as { state: object }).state).map((k) => `state.${k}`),
+      ]
+        .filter((k) => !['moon', 'forMoon', 'docs', 'fromDocs', 'readModels'].includes(k))
+        .sort();
+    expect(fields(scoped)).toEqual(fields(whole));
+    // The moon page shows no grouping answers: it never claims them.
+    expect(scoped.parts.has('answers')).toBe(false);
+  });
+
+  // #6206/#6207: Needs you lists them on every page, so a moon read reads them as the whole book does.
+  it('reads the disputes and the uncounted donations it claims', async () => {
+    const book = store.docs.get(BOOK)!;
+    store.docs.set(BOOK, {
+      ...book,
+      [COLLECTION_VERSIONS_FIELD]: {
+        ...(book[COLLECTION_VERSIONS_FIELD] as object),
+        disputes: 'v1',
+      },
+    });
+    store.docs.set(`${BOOK}/disputes/q1`, {
+      id: 'q1',
+      minerId: 'solo:2',
+      date: '2026-09-18',
+      lines: [{ recordKey: 'k', typeId: 1, quantity: 1, payeeName: 'Corp' }],
+      by: 2,
+      at: '2026-09-19T00:00:00Z',
+    });
+    store.docs.set(`${BOOK}/meta/uncounted`, {
+      donations: [
+        { id: 'u1', refId: 1, division: 3, characterId: 2, amount: 5, at: '2026-09-19T00:00:00Z' },
+      ],
+    });
+    const read = await scopedMoon(ID.new);
+    expect(read.disputes?.map((x) => x.id)).toEqual(['q1']);
+    expect(read.uncounted?.map((x) => x.id)).toEqual(['u1']);
   });
 });

@@ -1,13 +1,24 @@
 // Which slices of the book `useCorpBook` reads as the page's tab changes (issue #5248).
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { BookData } from '../taxBook/bookClient';
-import type { BookPartSet } from '../taxBook/bookParts';
+import type { BookPart, BookRead } from '../taxBook/bookRead';
 
-const readBookData = vi.hoisted(() => vi.fn());
+type BookPartSet = ReadonlySet<BookPart>;
+/** Every read the hook makes, the ones `extendBook` makes for it included. */
+const readBook = vi.hoisted(() => vi.fn());
+vi.mock('../taxBook/bookRead', async (orig) => ({
+  ...(await orig<typeof import('../taxBook/bookRead')>()),
+  readBook,
+  // The real contract (bookRead tests): read only the wanted slices not held, and add them.
+  extendBook: async (c: number, b: number, held: BookRead, wanted: BookPartSet) => {
+    const missing = new Set([...wanted].filter((p) => !held.parts.has(p)));
+    if (missing.size === 0) return held;
+    const extra: BookRead | null = await readBook(c, b, { parts: missing });
+    return extra ? { ...held, parts: new Set([...held.parts, ...extra.parts]) } : held;
+  },
+}));
 vi.mock('../taxBook/bookClient', async (orig) => ({
   ...(await orig<typeof import('../taxBook/bookClient')>()),
-  readBookData,
   verifyOfficer: vi.fn().mockResolvedValue({ canView: true, bookActive: true }),
 }));
 vi.mock('../taxBook/observedStore', () => ({ forgetObservedCopy: vi.fn() }));
@@ -40,12 +51,12 @@ vi.mock('@/stores/activeCharacter', () => ({
 }));
 vi.mock('../owner', () => ({ useActiveCorporationId: () => 98000001 }));
 
-import { bookPartsFor } from '../taxBook/bookParts';
+import { bookPartsFor } from '../taxBook/bookRead';
 import { useCorpBook } from './useCorpBook';
 
 const SYNC = { run: { phase: 'idle' } } as never;
 
-function book(parts: BookPartSet): BookData {
+function book(parts: BookPartSet): BookRead {
   return {
     settings: {
       active: true,
@@ -75,7 +86,9 @@ function book(parts: BookPartSet): BookData {
 }
 
 beforeEach(() => {
-  readBookData.mockReset().mockImplementation(async (_c, _b, parts: BookPartSet) => book(parts));
+  readBook
+    .mockReset()
+    .mockImplementation(async (_c, _b, ask: { parts: BookPartSet }) => book(ask.parts));
 });
 
 describe('useCorpBook read plan', () => {
@@ -87,23 +100,23 @@ describe('useCorpBook read plan', () => {
       }
     );
     await waitFor(() => expect(result.current.state.status).toBe('ready'));
-    expect(readBookData).toHaveBeenCalledTimes(1);
-    expect(readBookData.mock.calls[0]?.[2]).toEqual(new Set(['core', 'observed']));
+    expect(readBook).toHaveBeenCalledTimes(1);
+    expect(readBook.mock.calls[0]?.[2].parts).toEqual(new Set(['core', 'observed']));
 
     rerender({ tab: 'statements' });
-    await waitFor(() => expect(readBookData).toHaveBeenCalledTimes(2));
-    expect(readBookData.mock.calls[1]?.[2]).toEqual(new Set(['ledger']));
+    await waitFor(() => expect(readBook).toHaveBeenCalledTimes(2));
+    expect(readBook.mock.calls[1]?.[2].parts).toEqual(new Set(['ledger']));
     await waitFor(() => expect(result.current.state.status).toBe('ready'));
 
     // Going back, and on to a tab the held slices cover, reads nothing.
     rerender({ tab: 'extractions' });
     rerender({ tab: 'statements' });
-    expect(readBookData).toHaveBeenCalledTimes(2);
+    expect(readBook).toHaveBeenCalledTimes(2);
   });
 
   it('the Moon owners tab opens without rows, and falls back to them only when it must (#5717)', async () => {
     const owners = (extractions: unknown[], summaries?: Map<number, unknown>) =>
-      readBookData.mockImplementation(async (_c, _b, parts: BookPartSet) => ({
+      readBook.mockImplementation(async (_c, _b, { parts }: { parts: BookPartSet }) => ({
         ...book(parts),
         ...(parts.has('core')
           ? {
@@ -136,18 +149,18 @@ describe('useCorpBook read plan', () => {
     );
     const first = renderHook(() => useCorpBook(SYNC, bookPartsFor('moon-owners', null)));
     await waitFor(() => expect(first.result.current.state.status).toBe('ready'));
-    expect(readBookData.mock.calls.map((c) => [...(c[2] as BookPartSet)].sort())).toEqual([
+    expect(readBook.mock.calls.map((c) => [...(c[2].parts as BookPartSet)].sort())).toEqual([
       ['core', 'owners'],
       ['observed'],
     ]);
     first.unmount();
 
     // The same book with no way to tell (no Extraction, one moon owner) also reads the rows.
-    readBookData.mockClear();
+    readBook.mockClear();
     owners([], new Map());
     const second = renderHook(() => useCorpBook(SYNC, bookPartsFor('moon-owners', null)));
     await waitFor(() => expect(second.result.current.state.status).toBe('ready'));
-    expect(readBookData.mock.calls.map((c) => [...(c[2] as BookPartSet)].sort())).toContainEqual([
+    expect(readBook.mock.calls.map((c) => [...(c[2].parts as BookPartSet)].sort())).toContainEqual([
       'observed',
     ]);
   });
@@ -155,12 +168,12 @@ describe('useCorpBook read plan', () => {
   it('requestRows reads the rows a Moon owners tab opened without, and keeps the page ready', async () => {
     const { result } = renderHook(() => useCorpBook(SYNC, bookPartsFor('moon-owners', null)));
     await waitFor(() => expect(result.current.state.status).toBe('ready'));
-    expect(readBookData).toHaveBeenCalledTimes(1);
+    expect(readBook).toHaveBeenCalledTimes(1);
 
     act(() => result.current.requestRows());
     expect(result.current.state.status).toBe('ready');
-    await waitFor(() => expect(readBookData).toHaveBeenCalledTimes(2));
-    expect([...(readBookData.mock.calls[1]?.[2] as BookPartSet)]).toEqual(['observed']);
+    await waitFor(() => expect(readBook).toHaveBeenCalledTimes(2));
+    expect([...(readBook.mock.calls[1]?.[2].parts as BookPartSet)]).toEqual(['observed']);
     await waitFor(() =>
       expect(
         result.current.state.status === 'ready' && result.current.state.data.parts?.has('observed')
@@ -176,8 +189,8 @@ describe('useCorpBook read plan', () => {
       }
     );
     await waitFor(() => expect(result.current.state.status).toBe('ready'));
-    let finish!: (d: BookData) => void;
-    readBookData.mockReturnValueOnce(new Promise<BookData>((r) => (finish = r)));
+    let finish!: (d: BookRead) => void;
+    readBook.mockReturnValueOnce(new Promise<BookRead>((r) => (finish = r)));
 
     rerender({ tab: 'miners' });
     expect(result.current.state.status).toBe('loading');

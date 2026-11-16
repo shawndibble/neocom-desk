@@ -40,7 +40,7 @@ import { usePageTab } from '@/lib/usePageTab';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { CorpDenied } from '@/features/corp/CorpDenied';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
-import { bookPartsFor } from '@/features/corp/taxBook/bookParts';
+import { bookPartsFor } from '@/features/corp/taxBook/bookRead';
 import { useCorpTaxBook } from '@/features/corp/taxBook/useCorpTaxBook';
 import { AuditFeed } from '@/features/corp/moons/AuditFeed';
 import { useAuditSubject } from '@/features/corp/moons/useAuditSubject';
