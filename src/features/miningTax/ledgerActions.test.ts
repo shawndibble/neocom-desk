@@ -18,6 +18,7 @@ import {
   deletePayee,
   dismiss,
   recordCorpPayment,
+  HeldElsewhereError,
   settle,
   unassign,
   uncombine,
@@ -625,6 +626,96 @@ describe('recordCorpPayment', () => {
     const all = await db.miningTaxAssignments.toArray();
     expect(all).toHaveLength(1);
     expect(all[0]).toMatchObject({ id: 'own', status: 'paid', payment: expect.anything() });
+  });
+
+  it('records two rows on one entry (two refineries, same ore) in full, each once', async () => {
+    const result = await recordCorpPayment(CORP, [
+      bookRow({
+        id: 'book:a',
+        oreLines: [{ typeId: ORE, quantity: 60 }],
+        personalOreLines: [{ typeId: ORE, quantity: 100 }],
+      }),
+      bookRow({
+        id: 'book:b',
+        oreLines: [{ typeId: ORE, quantity: 40 }],
+        personalOreLines: [{ typeId: ORE, quantity: 100 }],
+      }),
+    ]);
+
+    expect(result.ok).toBe(true);
+    const all = await db.miningTaxAssignments.toArray();
+    expect(all.map((a) => a.oreLines[0].quantity).sort()).toEqual([40, 60]);
+    expect(all.every((a) => a.status === 'paid')).toBe(true);
+  });
+
+  it("splits the member's own owed corp Assignment across two rows on its entry, marking it once", async () => {
+    await db.payees.put({
+      ...payee('p2'),
+      entityId: CORP.corporationId,
+      entityKind: 'corporation',
+    });
+    await db.miningTaxAssignments.put(
+      assignment({ id: 'own', payeeId: 'p2', oreLines: [{ typeId: ORE, quantity: 70 }] })
+    );
+    const markSpy = vi.spyOn(db.miningTaxAssignments, 'bulkPut');
+
+    const result = await recordCorpPayment(CORP, [
+      bookRow({
+        id: 'book:a',
+        oreLines: [{ typeId: ORE, quantity: 60 }],
+        personalOreLines: [{ typeId: ORE, quantity: 100 }],
+      }),
+      bookRow({
+        id: 'book:b',
+        oreLines: [{ typeId: ORE, quantity: 40 }],
+        personalOreLines: [{ typeId: ORE, quantity: 100 }],
+      }),
+    ]);
+
+    expect(result.ok).toBe(true);
+    const all = await db.miningTaxAssignments.toArray();
+    expect(all.find((a) => a.id === 'own')?.status).toBe('paid');
+    const added = all.filter((a) => a.id !== 'own');
+    expect(added.map((a) => a.oreLines)).toEqual([[{ typeId: ORE, quantity: 30 }]]);
+    const marked = markSpy.mock.calls.at(-1)?.[0] as MiningTaxAssignmentRecord[];
+    expect(marked.filter((a) => a.id === 'own')).toHaveLength(1);
+    markSpy.mockRestore();
+  });
+
+  it('refuses, naming the row, when another Payee already holds its ore (an overlap)', async () => {
+    await db.miningTaxAssignments.put(assignment({ id: 'personal', payeeId: 'p1' }));
+
+    const result = await recordCorpPayment(CORP, [
+      bookRow({ id: 'book:a', personalOreLines: [{ typeId: ORE, quantity: 100 }] }),
+    ]);
+
+    expect(result.ok).toBe(false);
+    expect(!result.ok && result.reason).toBe('held-elsewhere');
+    expect(!result.ok && (result.cause as HeldElsewhereError).rows).toEqual([
+      { id: 'book:a', date: '2026-09-04' },
+    ]);
+    expect(await db.miningTaxAssignments.toArray()).toEqual([
+      expect.objectContaining({ id: 'personal', status: 'outstanding' }),
+    ]);
+  });
+
+  it("refuses a row whose ore the member's own corp Assignment holds for Needs review", async () => {
+    await db.payees.put({
+      ...payee('p2'),
+      entityId: CORP.corporationId,
+      entityKind: 'corporation',
+    });
+    await db.miningTaxAssignments.put(
+      assignment({ id: 'review', payeeId: 'p2', status: 'needs-review' })
+    );
+
+    const result = await recordCorpPayment(CORP, [
+      bookRow({ personalOreLines: [{ typeId: ORE, quantity: 100 }] }),
+    ]);
+
+    expect(!result.ok && result.reason).toBe('held-elsewhere');
+    expect((await db.miningTaxAssignments.get('review'))?.status).toBe('needs-review');
+    expect(await db.miningTaxAssignments.count()).toBe(1);
   });
 
   it('skips a row that never lined up with a ledger entry', async () => {

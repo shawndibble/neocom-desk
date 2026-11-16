@@ -1,12 +1,11 @@
-import { useCallback, useMemo } from 'react';
-import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
-import { computePayeeBalances, summarizeUnassigned } from '@/features/miningTax/balances';
+import { useMemo } from 'react';
+import type { PayeeRecord } from '@/db';
 import { allMembers, type DisplayRow } from '@/features/miningTax/groupRows';
 import { systemsByPayee } from '@/features/miningTax/suggestPayee';
 import { useLinkSuggestions } from '@/features/miningTax/useMadePayments';
-import { entryKey } from '@/engine/miningTax/types';
 import type { PersonalOverlay } from '@/engine/corpTaxBook/personal';
 import { computeOwedByPayee } from './owedByPayee';
+import { alsoBilledShareOf, owedBalances, unassignedSummary } from './owedNow';
 
 interface Args {
   characterFiltered: readonly DisplayRow[];
@@ -34,26 +33,14 @@ export function useTaxBalances({
   // filter — narrowing the ledger to one Payee must not change a balance.
   // Ore a Corp Tax Book bills is owed to the corporation, not to the member's own Payee too:
   // every owed figure per Payee leaves that share out (#6204).
-  const alsoBilledShare = useCallback(
-    (a: Pick<MiningTaxAssignmentRecord, 'id' | 'characterId' | 'date' | 'solarSystemId'>) =>
-      alsoBilled?.get(entryKey(a.characterId, a.date, a.solarSystemId))?.get(a.id) ?? 0,
-    [alsoBilled]
-  );
+  // The Overview's Mining tax card reads the same figure (`loadOwedBalances`).
+  const alsoBilledShare = useMemo(() => alsoBilledShareOf(alsoBilled), [alsoBilled]);
   const balances = useMemo(
-    () =>
-      computePayeeBalances(characterFiltered, ledgerPayees, ({ assignment }) =>
-        alsoBilledShare(assignment)
-      ),
-    [characterFiltered, ledgerPayees, alsoBilledShare]
+    () => owedBalances(characterFiltered, ledgerPayees, alsoBilled),
+    [characterFiltered, ledgerPayees, alsoBilled]
   );
-  // A row a Corp Tax Book has labelled (Pending corp record, Unattributed) is not waiting on the
-  // member: it stays out of the "needs assigning" count.
   const unassigned = useMemo(
-    () =>
-      summarizeUnassigned(
-        characterFiltered.filter((dr) => !dr.corp),
-        estimatedValueOf
-      ),
+    () => unassignedSummary(characterFiltered, estimatedValueOf),
     [characterFiltered, estimatedValueOf]
   );
 

@@ -1,28 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { payeesOwed } from './miningTaxPayees';
+import { oldestOwedMs, payeesOwed, type OwedBalance } from './miningTaxPayees';
 
 const NOW = Date.parse('2026-10-11T12:00:00Z');
 const DAY = 86_400_000;
 
-const row = (
-  daysAgo: number,
-  ...assignments: { status: string; taxOwed: number; payeeId?: string }[]
-) => ({ entry: { date: new Date(NOW - daysAgo * DAY).toISOString() }, assignments });
-
-const names = new Map([
-  ['p1', 'Corp Tax'],
-  ['p2', 'Alliance'],
-]);
+const balance = (id: string, name: string, owed: number, ...daysAgo: number[]): OwedBalance => ({
+  payee: { id, name },
+  owed,
+  members: daysAgo.map((d) => ({ assignment: { date: new Date(NOW - d * DAY).toISOString() } })),
+});
 
 describe('payeesOwed', () => {
-  it('sums what is still outstanding per payee, the most owed first', () => {
+  it('lists each owed Payee, the most owed first', () => {
     const owed = payeesOwed(
-      [
-        row(3, { status: 'outstanding', taxOwed: 100, payeeId: 'p1' }),
-        row(5, { status: 'outstanding', taxOwed: 50, payeeId: 'p1' }),
-        row(1, { status: 'outstanding', taxOwed: 400, payeeId: 'p2' }),
-      ],
-      names,
+      [balance('p1', 'Corp Tax', 150, 3, 5), balance('p2', 'Alliance', 400, 1)],
       NOW
     );
     expect(owed).toEqual([
@@ -31,46 +22,24 @@ describe('payeesOwed', () => {
     ]);
   });
 
-  it('leaves out paid assignments and entries with nothing outstanding', () => {
-    const owed = payeesOwed(
-      [
-        row(9, { status: 'paid', taxOwed: 999, payeeId: 'p1' }),
-        row(2, { status: 'outstanding', taxOwed: 10, payeeId: 'p1' }),
-        row(4),
-      ],
-      names,
-      NOW
-    );
-    expect(owed).toHaveLength(1);
-    expect(owed[0]).toMatchObject({ unpaidIsk: 10, oldestDays: 2, entries: 1 });
+  it('leaves out a Payee owed nothing', () => {
+    const owed = payeesOwed([balance('p1', 'Corp Tax', 0), balance('p2', 'Alliance', 10, 2)], NOW);
+    expect(owed).toEqual([
+      { payeeId: 'p2', name: 'Alliance', unpaidIsk: 10, oldestDays: 2, entries: 1 },
+    ]);
   });
 
-  it('files an outstanding assignment with no payee under an empty id and name', () => {
-    const owed = payeesOwed([row(2, { status: 'outstanding', taxOwed: 7 })], names, NOW);
-    expect(owed).toEqual([{ payeeId: '', name: '', unpaidIsk: 7, oldestDays: 2, entries: 1 }]);
+  it('counts its oldest day in whole days', () => {
+    expect(payeesOwed([balance('p1', 'Corp Tax', 3, 2.9, 1)], NOW)[0]).toMatchObject({
+      oldestDays: 2,
+      entries: 2,
+    });
   });
+});
 
-  it('keeps the id as the name for a payee that has since been deleted', () => {
-    const owed = payeesOwed(
-      [row(2, { status: 'outstanding', taxOwed: 7, payeeId: 'gone' })],
-      names,
-      NOW
-    );
-    expect(owed[0]!.name).toBe('gone');
-  });
-
-  it('counts a split entry once per assignment, and its oldest day as whole days', () => {
-    const owed = payeesOwed(
-      [
-        row(
-          2.9,
-          { status: 'outstanding', taxOwed: 1, payeeId: 'p1' },
-          { status: 'outstanding', taxOwed: 2, payeeId: 'p1' }
-        ),
-      ],
-      names,
-      NOW
-    );
-    expect(owed[0]).toMatchObject({ unpaidIsk: 3, entries: 2, oldestDays: 2 });
+describe('oldestOwedMs', () => {
+  it('is the oldest owed entry across Payees, null when nothing is owed', () => {
+    expect(oldestOwedMs([balance('p1', 'A', 5, 1), balance('p2', 'B', 5, 4)])).toBe(NOW - 4 * DAY);
+    expect(oldestOwedMs([balance('p1', 'A', 0, 9)])).toBeNull();
   });
 });
