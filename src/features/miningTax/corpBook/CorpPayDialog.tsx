@@ -30,7 +30,7 @@ interface Props {
    * Characters in view): the pay dialog shows where the amount lands among them.
    */
   openDays?: readonly BookRowView[];
-  /** Opened from one row: only it starts ticked, paid by its Character. */
+  /** Opened from one row: paid by that row's Character. The days are never picked: a book is paid by amount. */
   focus?: { rowId: string; characterId: number };
 }
 
@@ -87,7 +87,7 @@ export function CorpPayDialog({
       onPaid={onPaid}
       rows={settleRows}
       payerId={payerId}
-      focusIds={focus ? new Set([focus.rowId]) : undefined}
+      byAmount
       systemNames={systemNames}
       reason={(payerId) => oldestFor(payerId)?.code}
       recordPaid={(ticked, payment) =>

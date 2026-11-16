@@ -2,9 +2,11 @@
  * Which of the five outcomes a problem on the Tax tab offers (resolving in the app, decision
  * 20261116-194150): settle it yourself — pay it, fix my records, not paying — or ask the
  * corporation — I already paid, I don't owe this. Only the ones that apply, self-service first,
- * with the likeliest preselected.
+ * with the likeliest preselected — and never one whose button would be disabled.
  */
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
+import { minusLines } from '@/engine/miningTax/oreLines';
+import type { OreLine } from '@/engine/miningTax/types';
 
 export type OutcomeId = 'pay' | 'fixRecords' | 'notPaying' | 'paid' | 'notOwed';
 
@@ -26,11 +28,15 @@ export type ResolveProblem =
       amount: number;
       /** The Statement the days they paid are on; without one there is nothing to declare yet. */
       statementId?: string;
+      /** Every day the donations were paying, oldest first: what the mail to the corporation says. */
+      days?: string[];
     })
   /** A billed day whose quantity or rate differs from the member's own record. */
   | (Of & { kind: 'figure'; bookAsksMore: boolean })
   /** Ore the member gave another Payee that the book also recorded. */
   | (Of & { kind: 'conflict' })
+  /** A Statement past its due date that nothing has settled. */
+  | (Of & { kind: 'overdue'; statementId: string; period: string })
   /** An officer kept the bill, with what to do next. */
   | (Of & {
       kind: 'kept';
@@ -39,6 +45,28 @@ export type ResolveProblem =
       reason?: string;
       statementId?: string;
     });
+
+/** What "I don't owe this" says about a day: the dispute it sends. */
+export type NotOwedPlan =
+  { kind: 'payee' } | { kind: 'rate'; pct: number } | { kind: 'quantity'; lines: OreLine[] };
+
+/**
+ * The dispute "I don't owe this" would send for a day, or none when the member's own record
+ * gives nothing to dispute — never a whole-day quantity dispute: a rate the member recorded
+ * lower is a rate dispute at their rate; ore the book recorded beyond their own record is a
+ * quantity dispute of the excess; ore they gave another Payee is the original payee dispute.
+ */
+export function notOwedPlan(row: BookRowView | undefined): NotOwedPlan | undefined {
+  if (!row || row.recordKey === undefined) return undefined;
+  if (row.state === 'conflict') return { kind: 'payee' };
+  const d = row.dispute;
+  if (d?.rate === true && d.personalPct !== undefined && d.bookPct > d.personalPct)
+    return { kind: 'rate', pct: d.personalPct };
+  const excess = row.personalOreLines ? minusLines(row.oreLines, row.personalOreLines) : [];
+  if (excess.length > 0) return { kind: 'quantity', lines: excess };
+  // A Conflict the officer already kept resolved to a plain bill: the member's answer is the same.
+  return row.flagged?.kind === 'payee' ? { kind: 'payee' } : undefined;
+}
 
 export interface Offer {
   outcomes: OutcomeId[];
@@ -54,21 +82,27 @@ export function outcomesFor(p: ResolveProblem): Offer {
   // the server refuses a second dispute of a day an officer answered.
   const tellWhy =
     p.row?.recordKey !== undefined && p.row.flagged === undefined && p.kind !== 'kept';
+  const plan = notOwedPlan(p.row);
   switch (p.kind) {
-    case 'uncredited':
+    case 'uncredited': {
+      const noStatement = p.statementId === undefined;
+      // The donation is the proof, not a quarrel with a figure: no "I don't owe this" here.
       return {
-        outcomes: ['pay', 'notPaying', 'paid', ...(tellWhy ? (['notOwed'] as const) : [])],
-        preselected: 'paid',
+        outcomes: ['pay', 'notPaying', 'paid'],
+        preselected: noStatement ? 'pay' : 'paid',
         tellWhy,
-        noStatement: p.statementId === undefined,
+        noStatement,
       };
-    case 'figure':
+    }
+    case 'figure': {
+      const canDispute = tellWhy && plan !== undefined;
       return {
-        outcomes: ['pay', 'notPaying', ...(tellWhy ? (['notOwed'] as const) : [])],
-        preselected: p.bookAsksMore && tellWhy ? 'notOwed' : 'pay',
+        outcomes: ['pay', 'notPaying', ...(canDispute ? (['notOwed'] as const) : [])],
+        preselected: p.bookAsksMore && canDispute ? 'notOwed' : 'pay',
         tellWhy,
         noStatement: false,
       };
+    }
     case 'conflict':
       return {
         outcomes: ['fixRecords', 'notPaying', ...(tellWhy ? (['notOwed'] as const) : [])],
@@ -76,9 +110,22 @@ export function outcomesFor(p: ResolveProblem): Offer {
         tellWhy,
         noStatement: false,
       };
-    case 'kept':
+    case 'overdue':
       return {
-        outcomes: ['pay', 'notPaying', ...(p.by === 'declaration' ? (['paid'] as const) : [])],
+        outcomes: ['pay', 'notPaying', 'paid'],
+        preselected: 'pay',
+        tellWhy: false,
+        noStatement: false,
+      };
+    case 'kept':
+      // The member may say it again: a dispute again (the hold does not renew), or the proof again.
+      return {
+        outcomes: [
+          'pay',
+          'notPaying',
+          ...(p.by === 'declaration' ? (['paid'] as const) : []),
+          ...(p.by === 'dispute' && plan !== undefined ? (['notOwed'] as const) : []),
+        ],
         preselected: 'pay',
         tellWhy: false,
         noStatement: p.by === 'declaration' && p.statementId === undefined,

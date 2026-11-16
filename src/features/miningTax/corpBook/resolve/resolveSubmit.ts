@@ -6,8 +6,8 @@
 import type { TaxContact } from '@/engine/corpTaxBook/bookDocs';
 import type { ClaimCheck, ClaimedTransfer } from '@/engine/corpTaxBook/overdue';
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
-import { minusLines } from '@/engine/miningTax/oreLines';
 import { declareCorpTaxBookPayment, disputeCorpTaxBookConflict } from '../corpBookStore';
+import { notOwedPlan } from './outcomes';
 import { sendTaxQuestionMail, type TaxQuestionMailOutcome } from '../sendTaxQuestionMail';
 
 export interface MailContext {
@@ -60,9 +60,9 @@ export async function tellNotPaying(ctx: MailContext, row: BookRowView, reason: 
 }
 
 /**
- * "I don't owe this": the dispute the problem names. A rate the member recorded lower is a rate
- * dispute at their rate; ore the book recorded beyond their own record is a quantity dispute of
- * the excess; ore they gave another Payee is the original payee dispute.
+ * "I don't owe this": the dispute the day's own figures name (`notOwedPlan`). Never a
+ * whole-day quantity dispute: with nothing the member's record disagrees with there is nothing
+ * to send, and it throws rather than ask an officer to waive a bill the member did not question.
  */
 export async function tellNotOwed(
   ctx: MailContext,
@@ -70,34 +70,29 @@ export async function tellNotOwed(
   reason: string,
   payeeName?: string
 ) {
-  const rate =
-    row.dispute?.rate === true && row.dispute.personalPct !== undefined
-      ? row.dispute.personalPct
-      : undefined;
-  const excess = row.personalOreLines ? minusLines(row.oreLines, row.personalOreLines) : [];
-  if (row.state === 'conflict') {
+  const plan = notOwedPlan(row);
+  if (!plan) throw new Error('Nothing in the member record to dispute');
+  const base = { corporationId: ctx.corporationId, date: row.date };
+  if (plan.kind === 'payee') {
     await disputeCorpTaxBookConflict(ctx.characterId, {
-      corporationId: ctx.corporationId,
-      date: row.date,
+      ...base,
       lines: dayLines(row).map((l) => ({ ...l, payeeName: payeeName ?? '' })),
       ...(reason ? { note: reason } : {}),
     });
-  } else if (rate !== undefined) {
+  } else if (plan.kind === 'rate') {
     await disputeCorpTaxBookConflict(ctx.characterId, {
-      corporationId: ctx.corporationId,
-      date: row.date,
+      ...base,
       kind: 'rate',
       reason,
-      claimedPct: rate,
+      claimedPct: plan.pct,
       lines: dayLines(row),
     });
   } else {
     await disputeCorpTaxBookConflict(ctx.characterId, {
-      corporationId: ctx.corporationId,
-      date: row.date,
+      ...base,
       kind: 'quantity',
       reason,
-      lines: dayLines(row, excess.length > 0 ? excess : row.oreLines),
+      lines: dayLines(row, plan.lines),
     });
   }
   return mail(ctx, {

@@ -72,6 +72,7 @@ function renderDialog(
     onPaid?: () => void;
     payerId?: number;
     focusIds?: ReadonlySet<string>;
+    byAmount?: boolean;
   } = {}
 ) {
   return render(
@@ -84,6 +85,7 @@ function renderDialog(
       onPickFromWallet={extra.onPickFromWallet}
       payerId={extra.payerId}
       focusIds={extra.focusIds}
+      byAmount={extra.byAmount}
     />
   );
 }
@@ -248,6 +250,24 @@ describe('SettleUpDialog', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Already in my wallet? Pick it' }));
     expect(onPickFromWallet).toHaveBeenCalledOnce();
     expect(onPickFromWallet).toHaveBeenCalledWith(new Set(['a-1', 'a-2', 'a-3']));
+  });
+});
+
+describe('SettleUpDialog paid by amount', () => {
+  beforeEach(() => {
+    settle.mockReset();
+    settle.mockResolvedValue({ ok: true, value: undefined });
+  });
+
+  // A Corp Tax Book pays oldest days first and cannot target one: no day is offered to tick.
+  it('offers no days to pick, and still pays the oldest ones for a smaller amount', async () => {
+    renderDialog(THREE_ROWS, { byAmount: true });
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Also pay/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /different amount/i }));
+    await userEvent.type(screen.getByRole('textbox', { name: /sent/i }), '100000');
+    await userEvent.click(screen.getByRole('button', { name: RECORD }));
+    expect(paidIds()).toEqual(['a-1']);
   });
 });
 

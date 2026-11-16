@@ -18,6 +18,13 @@ import { CorpBookDiffModal } from './CorpBookDiffModal';
 import type { CorpBookViewBook } from './corpBookView';
 import { CorpStatusPill } from './CorpStatusPill';
 import { CorpDeclareSlot } from './CorpDeclareAction';
+import {
+  figureTarget,
+  keptBy,
+  rowTarget,
+  unlinkedTarget,
+  type ResolveTarget,
+} from './resolve/targets';
 import type { CorpRowInfo } from './corpRows';
 import { formatCount } from '@/lib/formatCount';
 import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
@@ -37,8 +44,10 @@ interface Props {
   onPay?: () => void;
   /** The notice for a day the miner's own list shares with the corporation's bill: the overlap notice, or a Conflict's. */
   notice?: ReactNode;
-  /** A declaration reached the corporation (#6206): reload the books. Absent: none is offered. */
-  onBookChanged?: () => void;
+  /** Opens the Resolve dialog (resolving in the app) on a problem of this row. Absent: none is offered. */
+  onResolve?: (target: ResolveTarget) => void;
+  /** Opens the member's own entry for this day, to fix their records. Absent: no entry lines up. */
+  onFixRecords?: () => void;
 }
 
 /**
@@ -60,7 +69,8 @@ export function CorpRowDetailModal({
   onPay,
   onUnmarkPaid,
   notice,
-  onBookChanged,
+  onResolve,
+  onFixRecords,
 }: Props) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
@@ -112,8 +122,11 @@ export function CorpRowDetailModal({
   // #6206: "I paid this another way" on a day its Statement still bills (owed, or marked paid by
   // the member while the book still shows it owed), and what came of it. A day with an overlap
   // says it in its notice instead.
+  // What Resolve opens on for this day: an officer's kept bill, a Conflict, a figure that differs.
+  const resolvable = rowTarget(view);
+  const unlinked = unlinkedTarget(view);
   const declaring =
-    onBookChanged !== undefined &&
+    onResolve !== undefined &&
     view.statementId !== undefined &&
     !view.overlap &&
     (owing || view.bookOwed !== undefined || view.declaration !== undefined);
@@ -264,15 +277,38 @@ export function CorpRowDetailModal({
               )}
               {/* Why a day the member saw Paid is Billed again, and the transfer to dispute. */}
               {view.unlinkedDonation && (
-                <p className="text-warning">
-                  {t('miningTax.corpBook.detail.unlinkedDonation', {
-                    corp: corp.corpName,
-                    amount: formatIsk(view.unlinkedDonation.amount, 0),
-                    time: eveTimeLabel(Date.parse(view.unlinkedDonation.at)),
-                  })}
-                </p>
+                <div className="space-y-1.5">
+                  <p className="text-warning">
+                    {t('miningTax.corpBook.detail.unlinkedDonation', {
+                      corp: corp.corpName,
+                      amount: formatIsk(view.unlinkedDonation.amount, 0),
+                      time: eveTimeLabel(Date.parse(view.unlinkedDonation.at)),
+                    })}
+                  </p>
+                  {onResolve && unlinked && (
+                    <Button size="sm" onClick={() => onResolve(unlinked)}>
+                      {t('miningTax.resolve.open')}
+                    </Button>
+                  )}
+                </div>
               )}
-              {declaring && <CorpDeclareSlot view={view} onDeclared={onBookChanged} />}
+              {/* An officer kept the bill on a billed day: their reason and next step, word for word. */}
+              {view.flagged?.state === 'rejected' && keptBy(view) === 'dispute' && (
+                <div className="space-y-1">
+                  <p className="text-warning">
+                    {t('miningTax.corpBook.conflict.toldRejected', {
+                      corp: corp.corpName,
+                      reason: view.flagged.reason ?? '',
+                    })}
+                  </p>
+                  {view.flagged.nextStep && (
+                    <p className="font-semibold text-text">
+                      {t('miningTax.resolve.facts.nextStep', { step: view.flagged.nextStep })}
+                    </p>
+                  )}
+                </div>
+              )}
+              {declaring && <CorpDeclareSlot view={view} onResolve={onResolve} />}
               {(view.state === 'dismissed' || view.state === 'waived') && view.dismissalReason && (
                 <p>{t('miningTax.corpBook.detail.reason', { reasons: view.dismissalReason })}</p>
               )}
@@ -281,9 +317,17 @@ export function CorpRowDetailModal({
                 view.markedPaidIds.length > 0 && (
                   <p>{t('miningTax.corpBook.detail.settled.alsoMarked')}</p>
                 )}
-              <p className="text-text-dim">
-                {t('miningTax.corpBook.detail.lockedShort', { corp: corp.corpName })}
-              </p>
+              <p className="text-text-dim">{t('miningTax.corpBook.detail.lockedShort')}</p>
+              {onResolve && resolvable && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-text-dim">
+                    {t('miningTax.corpBook.detail.lockedResolve', { corp: corp.corpName })}
+                  </span>
+                  <Button size="sm" onClick={() => onResolve(resolvable)}>
+                    {t('miningTax.resolve.open')}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
@@ -346,6 +390,22 @@ export function CorpRowDetailModal({
           view={view}
           systemName={systemName}
           typeNames={typeNames}
+          {...(onResolve
+            ? {
+                onResolve: () => {
+                  setComparing(false);
+                  onResolve(resolvable ?? figureTarget(view));
+                },
+              }
+            : {})}
+          {...(onFixRecords
+            ? {
+                onFixRecords: () => {
+                  setComparing(false);
+                  onFixRecords();
+                },
+              }
+            : {})}
         />
       )}
     </>

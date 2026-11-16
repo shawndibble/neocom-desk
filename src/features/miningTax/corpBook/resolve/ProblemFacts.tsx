@@ -1,11 +1,11 @@
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
 import { formatCount } from '@/lib/formatCount';
-import { formatIsk } from '@/lib/isk';
+import { IskText } from '../../IskText';
+import { isoDay } from '../memberFlag';
 import type { ResolveTarget } from './targets';
 
 const k = (key: string) => `miningTax.resolve.facts.${key}`;
-const isk = (n: number) => `${formatIsk(n, 0)} ISK`;
 
 /** What the app knows about a problem, above its choices: the figures, never advice. */
 export function ProblemFacts({ target }: { target: ResolveTarget }) {
@@ -13,16 +13,33 @@ export function ProblemFacts({ target }: { target: ResolveTarget }) {
   const { problem } = target;
   const corp = problem.corpName;
   const row = problem.row;
+  const bills = (
+    <p className="tabular-nums">
+      <Trans
+        i18nKey={k('bills')}
+        values={{ corp }}
+        components={{ amount: <IskText value={row?.billed ?? 0} /> }}
+      />
+    </p>
+  );
   switch (problem.kind) {
     case 'uncredited':
       return (
         <>
-          <p>{t(k('uncredited'), { corp, amount: isk(problem.amount) })}</p>
+          <p>
+            <Trans
+              i18nKey={k('uncredited')}
+              values={{ corp }}
+              components={{ amount: <IskText value={problem.amount} /> }}
+            />
+          </p>
           <ul className="space-y-0.5 tabular-nums">
             {(target.donations ?? []).map((d) => (
               <li key={`${d.characterId}:${d.at}`}>
-                <span className="font-semibold">{isk(d.amount)}</span> ·{' '}
-                {eveTimeLabel(Date.parse(d.at))}
+                <span className="font-semibold">
+                  <IskText value={d.amount} />
+                </span>{' '}
+                · {eveTimeLabel(Date.parse(d.at))}
                 {d.refId !== undefined && ` · ${t(k('journalRef'), { ref: d.refId })}`}
                 {d.covered.length > 0 && ` · ${t(k('paidDays'), { days: d.covered.join(', ') })}`}
               </li>
@@ -36,12 +53,14 @@ export function ProblemFacts({ target }: { target: ResolveTarget }) {
         <>
           {d?.rate && (
             <p>
-              {t(k('rate'), {
-                corp,
-                date: row?.date ?? '',
-                book: d.bookPct,
-                yours: d.personalPct ?? '?',
-              })}
+              {d.personalPct === undefined
+                ? t(k('rateUnrecorded'), { corp, date: row?.date ?? '', book: d.bookPct })
+                : t(k('rate'), {
+                    corp,
+                    date: row?.date ?? '',
+                    book: d.bookPct,
+                    yours: d.personalPct,
+                  })}
             </p>
           )}
           {d?.quantity && (
@@ -54,7 +73,7 @@ export function ProblemFacts({ target }: { target: ResolveTarget }) {
               })}
             </p>
           )}
-          <p className="tabular-nums">{t(k('bills'), { corp, amount: isk(row?.billed ?? 0) })}</p>
+          {bills}
         </>
       );
     }
@@ -65,21 +84,46 @@ export function ProblemFacts({ target }: { target: ResolveTarget }) {
             {t(k('conflict'), {
               corp,
               payee: target.payeeName ?? t(k('anotherPayee')),
-              date: (row?.resolvesAt ?? '').slice(0, 10),
+              date: isoDay(row?.resolvesAt),
             })}
           </p>
-          <p className="tabular-nums">{t(k('bills'), { corp, amount: isk(row?.billed ?? 0) })}</p>
+          {bills}
+        </>
+      );
+    case 'overdue':
+      return (
+        <>
+          <p>{t(k('overdue'), { corp, period: problem.period })}</p>
+          {target.declaration && (
+            <>
+              <p>
+                {t(k('declarationRejected'), { corp, reason: target.declaration.reason ?? '' })}
+              </p>
+              {target.declaration.nextStep && (
+                <p className="font-semibold text-text">
+                  {t(k('nextStep'), { step: target.declaration.nextStep })}
+                </p>
+              )}
+            </>
+          )}
         </>
       );
     case 'kept':
       return (
         <>
-          <p>{t(k('kept'), { corp, date: row?.date ?? '', reason: problem.reason ?? '' })}</p>
+          <p>
+            {t(k(problem.by === 'declaration' ? 'declarationRejected' : 'kept'), {
+              corp,
+              date: row?.date ?? '',
+              reason: problem.reason ?? '',
+            })}
+          </p>
           {problem.nextStep && (
             <p className="font-semibold text-text">
               {t(k('nextStep'), { step: problem.nextStep })}
             </p>
           )}
+          {bills}
         </>
       );
   }

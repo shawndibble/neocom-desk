@@ -164,7 +164,7 @@ describe('OwedBalances uncredited donation', () => {
       uncreditedOf: () => ({ amount: 8_000_000, accounts: 'Master Wallet', everyDivision: true }),
     });
     expect(
-      screen.getByText(/8,000,000 ISK you donated isn't credited yet — ask the corp to sync/)
+      screen.getByText(/8,000,000 ISK you donated isn't credited yet — Resolve it above/)
     ).toBeInTheDocument();
     expect(screen.queryByText(/check the wallet division/)).not.toBeInTheDocument();
   });

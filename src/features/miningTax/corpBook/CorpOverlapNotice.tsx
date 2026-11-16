@@ -12,6 +12,7 @@ import { useLedgerAction } from '../useLedgerAction';
 import { ConflictNotice } from './ConflictNotice';
 import { CorpDeclareSlot } from './CorpDeclareAction';
 import { CorpDisputeAction } from './CorpDisputeAction';
+import { conflictTarget, type ResolveTarget } from './resolve/targets';
 import { resolvesOn } from './useCorpStateText';
 import { OverlapNotice } from './OverlapNotice';
 import { acknowledgeOverlap, overlapAckKey, readOverlapAcks } from './overlapAck';
@@ -40,6 +41,8 @@ interface Props {
    * and a Conflict offers "Tell {corp}".
    */
   onBookChanged?: () => void;
+  /** Opens the Resolve dialog (resolving in the app) on a problem of this day or its Statement. */
+  onResolve?: (target: ResolveTarget) => void;
 }
 
 /**
@@ -61,6 +64,7 @@ export function CorpOverlapNotice({
   typeNames,
   onChanged,
   onBookChanged,
+  onResolve,
 }: Props) {
   const { t } = useTranslation();
   const conflict = view.state === 'conflict';
@@ -142,6 +146,14 @@ export function CorpOverlapNotice({
       onChanged
     );
 
+  const conflictPayeeName =
+    [...new Set(mine.map((a) => nameOf(a.payeeId ?? '')))].join(', ') ||
+    (view.ownerPayeeId !== undefined
+      ? nameOf(view.ownerPayeeId)
+      : t('miningTax.corpBook.conflict.otherPayee'));
+  const resolveConflict = onResolve
+    ? () => onResolve(conflictTarget(view, conflictPayeeName))
+    : undefined;
   if (conflict) {
     return (
       <ConflictNotice
@@ -165,17 +177,14 @@ export function CorpOverlapNotice({
           void run(() => unsettle(mine.filter((a) => a.status === 'paid')), onChanged)
         }
         onTakeOver={takeOver}
+        onResolve={resolveConflict}
         tell={
           onBookChanged && (
             <CorpDisputeAction
               view={view}
-              payeeName={
-                [...new Set(mine.map((a) => nameOf(a.payeeId ?? '')))].join(', ') ||
-                (view.ownerPayeeId !== undefined
-                  ? nameOf(view.ownerPayeeId)
-                  : t('miningTax.corpBook.conflict.otherPayee'))
-              }
+              payeeName={conflictPayeeName}
               onSent={onBookChanged}
+              {...(onResolve ? { onResolve: resolveConflict } : {})}
             />
           )
         }
@@ -184,10 +193,10 @@ export function CorpOverlapNotice({
   }
   const declare =
     // Only while the Statement still bills the day: a settled one has nothing to declare.
-    onBookChanged &&
+    onResolve &&
     view.statementId !== undefined &&
     (view.state === 'billed' || view.bookOwed !== undefined || view.declaration !== undefined) ? (
-      <CorpDeclareSlot view={view} onDeclared={onBookChanged} />
+      <CorpDeclareSlot view={view} onResolve={onResolve} />
     ) : undefined;
   // A declaration goes to the corporation, so the device's own note no longer hides the notice.
   if (!overlap || acked === null || (!declare && acked.has(key))) return null;

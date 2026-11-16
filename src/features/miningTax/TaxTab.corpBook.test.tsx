@@ -296,6 +296,42 @@ describe('uncredited donations in the attention strip', () => {
   });
 });
 
+describe('a bill an officer kept', () => {
+  const rejected = {
+    id: `solo_${ME}_2026-10-17`,
+    minerId: `solo:${ME}`,
+    date: '2026-10-17',
+    kind: 'quantity' as const,
+    reason: 'My ledger says 41,200',
+    lines: [{ recordKey: `${ME}:1000:2026-10-17`, typeId: ZEO, quantity: 1850, payeeName: '' }],
+    by: ME,
+    at: '2026-10-17T13:00:00.000Z',
+    resolution: {
+      kind: 'rejected' as const,
+      at: '2026-10-18T09:00:00.000Z',
+      by: 1,
+      reason: 'The book is right',
+      nextStep: 'Pay it, or re-mine the shortfall',
+    },
+  };
+
+  // The officer's next step, word for word, with Resolve again and a one-click Not paying.
+  it('reads the next step on the attention strip with Resolve and Not paying', async () => {
+    hoisted.view = viewWith({ ...book, disputes: [rejected] });
+    const user = userEvent.setup();
+    renderTab();
+    await user.click(screen.getByText('Show'));
+    expect(
+      screen.getByText(/Brass Meridian Logistics kept the bill on 2026-10-17/)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('What to do next: Pay it, or re-mine the shortfall')
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Resolve' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: 'Not paying' }).length).toBeGreaterThan(0);
+  });
+});
+
 /**
  * Open a 17 Oct row's detail and then Compare with the book. One day can carry several rows —
  * the member's surplus keeps a personal row where the book observed less, and a contested day
@@ -315,14 +351,14 @@ const openCompare = async (inRow = 'Brass Meridian Logistics') => {
 };
 
 describe('Compare with the book: which way the difference runs', () => {
-  it('sends the member to an officer when the book bills more than their record', async () => {
+  it('gives the member both ways out when the book bills more than their record', async () => {
     // The book observed 43,050; the member recorded 41,200.
     hoisted.view = viewWith(book);
     const compare = await openCompare();
     expect(compare.getByText(/The book recorded more ore than you did/)).toBeInTheDocument();
-    expect(
-      compare.getByText(/Ask a Brass Meridian Logistics officer to correct the book/)
-    ).toBeInTheDocument();
+    // No dead end: the two ways out are right beside the sentence.
+    expect(compare.getByText(/If the book is right, fix your records/)).toBeInTheDocument();
+    expect(compare.getByRole('button', { name: 'Resolve' })).toBeInTheDocument();
   });
 
   it('says there is nothing to raise when the book bills less', async () => {
@@ -347,9 +383,9 @@ describe('Compare with the book: which way the difference runs', () => {
     expect(
       compare.getByText(/The book's rate is higher than the one you recorded/)
     ).toBeInTheDocument();
-    expect(
-      compare.getByText(/Ask a Brass Meridian Logistics officer to correct the book/)
-    ).toBeInTheDocument();
+    // No dead end: the two ways out are right beside the sentence.
+    expect(compare.getByText(/If the book is right, fix your records/)).toBeInTheDocument();
+    expect(compare.getByRole('button', { name: 'Resolve' })).toBeInTheDocument();
   });
 
   it('says there is nothing to raise when the book’s rate is the lower one', async () => {
