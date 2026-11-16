@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { growthMoves, planSplit } from './split';
+import { growthMoves, maxUnreportedClaim, planSplit } from './split';
 
 const A = 45490;
 const B = 45491;
@@ -63,6 +63,15 @@ describe('planSplit with unreported ore', () => {
     expect(() =>
       planSplit(original, [{ typeId: A, quantity: 10 }], [{ typeId: A, quantity: 5 }])
     ).toThrow();
+  });
+
+  it('caps a claim at what ESI already holds of that type, so a keep never passes double', () => {
+    expect(maxUnreportedClaim(100)).toBe(100);
+    expect(planSplit(original, [], [{ typeId: B, quantity: 50 }]).kept).toContainEqual({
+      typeId: B,
+      quantity: 100,
+    });
+    expect(() => planSplit(original, [], [{ typeId: B, quantity: 51 }])).toThrow();
   });
 });
 

@@ -87,6 +87,13 @@ export function useTaxAttentionItems({
     refresh();
   }
 
+  // What a Corp Tax Book says that the tab alone would not (#6204), for the Characters in view —
+  // an item about a filtered-out alt would have no row to open.
+  const corp = useMemo(
+    () => corpBookAttention(corpView, resolvedCharacterFilter),
+    [corpView, resolvedCharacterFilter]
+  );
+
   const duplicateRows =
     data?.entries.filter((row) => (row.duplicateAssignmentIds?.length ?? 0) > 0) ?? [];
 
@@ -228,16 +235,6 @@ export function useTaxAttentionItems({
       ),
     });
   }
-  // What a Corp Tax Book says that the tab alone would not (#6204).
-  const corp = corpBookAttention(corpView);
-  // A tracked Character the Statement bills: its sign-in is on the Statement, so it may declare.
-  const declarerOf = (corporationId: number, statementId: string) => {
-    const loaded = corpView?.books.find((b) => b.loaded.corporationId === corporationId)?.loaded;
-    const statement = loaded?.statements.find((s) => s.id === statementId);
-    return statement?.lines
-      .map((l) => l.characterId)
-      .find((id): id is number => id !== undefined && (loaded?.characterIds.includes(id) ?? false));
-  };
   for (const o of corp.overdue) {
     attentionItems.push({
       id: `corp-overdue:${o.corporationId}:${o.statementId}`,
@@ -256,14 +253,14 @@ export function useTaxAttentionItems({
         </>
       ),
       // #6206: the member says they paid it another way; the corporation's officers answer it.
-      ...(canDeclare(o.declaration) && declarerOf(o.corporationId, o.statementId) !== undefined
+      ...(canDeclare(o.declaration) && o.declarerId !== undefined
         ? {
             action: (
               <CorpDeclareAction
                 corporationId={o.corporationId}
                 corpName={o.corpName}
                 statementId={o.statementId}
-                characterId={declarerOf(o.corporationId, o.statementId)!}
+                characterId={o.declarerId}
                 onDeclared={reloadCorpBooks}
               />
             ),
