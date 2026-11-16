@@ -4,6 +4,7 @@
 import type { Caller } from './actorAuth.js';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
+import { FieldValue } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import {
   parseBookCall,
@@ -413,6 +414,88 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         graceHours: 12,
       });
       expect(await auditCount()).toBe(before + 1);
+    });
+
+    it("adds a counted division to the stored list, keeping another officer's addition", async () => {
+      await turnOn();
+      // Both officers answered "Count division" from the same stale list, [1]. Each also sends
+      // the full list an older server would store; this server ignores it for `addDivision`.
+      await edit(DIRECTOR, {
+        action: 'updateSettings',
+        patch: { addDivision: 3, divisions: [1, 3] },
+      });
+      await edit(ACCOUNTANT, {
+        action: 'updateSettings',
+        patch: { addDivision: 5, divisions: [1, 5] },
+      });
+      expect((await book().get()).get('divisions')).toEqual([1, 3, 5]);
+      await edit(ACCOUNTANT, { action: 'updateSettings', patch: { addDivision: 3 } });
+      expect((await book().get()).get('divisions')).toEqual([1, 3, 5]);
+    });
+
+    it("merges a counted division's name into the stored names, and audits the stored list", async () => {
+      await turnOn();
+      await edit(DIRECTOR, {
+        action: 'updateSettings',
+        patch: { addDivision: 3, divisions: [1, 3], divisionNames: { '1': 'Main', '3': 'Tax' } },
+      });
+      await edit(ACCOUNTANT, {
+        action: 'updateSettings',
+        patch: { addDivision: 5, divisions: [1, 5], divisionNames: { '1': 'Main', '5': 'Ore' } },
+      });
+      expect((await book().get()).get('divisionNames')).toEqual({
+        '1': 'Main',
+        '3': 'Tax',
+        '5': 'Ore',
+      });
+      const audit = await book().collection('audit').get();
+      const details = audit.docs.map(
+        (d) => d.get('detail') as { patch?: { divisions?: number[] } }
+      );
+      expect(details.some((d) => d.patch?.divisions?.join() === '1,3,5')).toBe(true);
+      // The stale list the client sent for an older server was never stored, so never audited.
+      expect(details.some((d) => d.patch?.divisions?.join() === '1,5')).toBe(false);
+    });
+
+    it('reads a book with no stored divisions as division 1, as the sync does', async () => {
+      await turnOn();
+      await book().update({ divisions: FieldValue.delete() });
+      await edit(ACCOUNTANT, {
+        action: 'updateSettings',
+        patch: { divisions: [1, 2], divisionsBase: [1] },
+      });
+      expect((await book().get()).get('divisions')).toEqual([1, 2]);
+      await book().update({ divisions: FieldValue.delete() });
+      await edit(ACCOUNTANT, { action: 'updateSettings', patch: { addDivision: 3 } });
+      expect((await book().get()).get('divisions')).toEqual([1, 3]);
+    });
+
+    it('refuses a divisions list whose base no longer matches the stored one', async () => {
+      await turnOn();
+      // A dialog opened on [1]; meanwhile another officer counted division 4.
+      await edit(DIRECTOR, { action: 'updateSettings', patch: { addDivision: 4 } });
+      const before = await auditCount();
+      expect(
+        await reason(
+          edit(ACCOUNTANT, {
+            action: 'updateSettings',
+            patch: { divisions: [1, 2], divisionsBase: [1], minimumStatement: 1 },
+          })
+        )
+      ).toBe('divisions-changed');
+      expect((await book().get()).data()).toMatchObject({
+        divisions: [1, 4],
+        minimumStatement: 5_000_000,
+      });
+      expect(await auditCount()).toBe(before);
+      await edit(ACCOUNTANT, {
+        action: 'updateSettings',
+        patch: { divisions: [2, 4], divisionsBase: [4, 1] },
+      });
+      expect((await book().get()).get('divisions')).toEqual([2, 4]);
+      // An older client sends no base: its list is stored as-is.
+      await edit(ACCOUNTANT, { action: 'updateSettings', patch: { divisions: [1] } });
+      expect((await book().get()).get('divisions')).toEqual([1]);
     });
 
     it('moves the start date and ends the member setup window, Director only', async () => {

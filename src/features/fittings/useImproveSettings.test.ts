@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '@/db';
-import {
-  useImproveJob,
-  useImproveJobByRole,
-  useImproveRigs,
-  useImproveSpace,
-  useImproveSpaceByRole,
-} from './useImproveSettingStores';
+import { IMPROVE_STORES } from './useImproveSettings';
+
+const {
+  legacyJob: useImproveJob,
+  jobByRole: useImproveJobByRole,
+  includeRigs: useImproveRigs,
+  legacySpace: useImproveSpace,
+  spaceByRole: useImproveSpaceByRole,
+} = IMPROVE_STORES;
 
 const fresh = async () => {
   await db.settings.clear();

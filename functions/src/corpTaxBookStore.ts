@@ -67,6 +67,7 @@ import {
   type RecordedOre,
   parseStatement,
   moveStartRate,
+  sameDivisions,
   rateKey,
   startDateMoveReason,
   reanchorCadence,
@@ -84,6 +85,7 @@ import {
   donationsReadAtPatch,
 } from './corpTaxBook.js';
 import {
+  BOOK_DEFAULTS,
   extractionIdOf,
   allocatePayments,
   dismissalCredits,
@@ -91,10 +93,12 @@ import {
   canOverrideRecordRate,
   canRebillFrom,
   isRetroactiveRate,
+  latestRecordedCorp,
   mergeObservedRows,
   observedRowKey,
   shiftDate,
   writeOffForAllocation,
+  type CorpRecord,
   type CoveragePeriod,
   type DismissableLine,
   type MirrorDismissal,
@@ -111,10 +115,10 @@ import { OBSERVED_UPDATED_AT_FIELD } from './corpTaxBookVersionKeys.js';
 import { POP_SHARING_DOC, applyMoonOverride, popSharingFrom } from './popSharing.js';
 import type { CorporationAllianceLookup } from './sharedPopsEsi.js';
 import {
-  ALLIANCE_RECHECK_MS,
   EDITOR_CHECKED_AT,
   editorStampFields,
   refreshSharedPops,
+  sharedPopsRepublish,
   sharedPopSourcesRef,
   sharedPopsRef,
   stampEditorUseIfSharing,
@@ -831,23 +835,11 @@ export async function syncBookAs(
     await refreshReadModels(deps.db, input.corporationId, deps.now());
   // A sync that changed something republishes the book's Shared Pops (#6223). Best effort. A
   // quiet one has nothing new to publish (a viewer's read drops an expired pop by itself), except
-  // what the publish learns on its own clock: the alliance recheck, and refinery names the
-  // scheduled run learned. So it republishes a doc that old, and costs one read otherwise.
-  if (!quiet || (await sharedPopsStale(deps, input.corporationId)))
-    await refreshSharedPops(deps, input.corporationId);
+  // what the publish learns on its own clock: the alliance, and refinery names the scheduled run
+  // learned. So it republishes a doc that old, or one whose alliance the corporation has left.
+  const republish = await sharedPopsRepublish(deps, input.corporationId, !quiet);
+  if (republish) await refreshSharedPops(deps, input.corporationId, republish);
   return { observedChanged, extractions: input.extractions.length, donationsAdded };
-}
-
-/** Whether the book's Shared Pops doc was last published an alliance recheck ago or more. */
-async function sharedPopsStale(deps: BookDeps, corporationId: number): Promise<boolean> {
-  try {
-    const held = await sharedPopsRef(deps.db, corporationId).get();
-    const at = (held.get('updatedAt') as { toMillis?: () => number } | undefined)?.toMillis?.();
-    return held.exists && (at === undefined || deps.now() - at >= ALLIANCE_RECHECK_MS);
-  } catch (e) {
-    console.error('shared pops age read failed', e instanceof Error ? e.message : e);
-    return false;
-  }
 }
 
 /**
@@ -1009,22 +1001,25 @@ async function recordedHereSince(
   }
 }
 
-/** The corporation recorded on the character's latest day (the first row of that day by id). */
-async function latestRecordedCorp(c: EditCtx, characterId: number): Promise<unknown> {
+/**
+ * The corporation the character was last recorded in, by the engine's rule
+ * (`latestRecordedCorp`: newest day, freshest read, then refinery and corporation id), so the
+ * Close account guard agrees with the guest the officer's view shows. Every row of the newest
+ * day is read: a character can change corporation mid-day.
+ */
+async function latestRecordedCorpOf(c: EditCtx, characterId: number): Promise<number | undefined> {
   const rows = col(c, OBSERVED).where('characterId', '==', characterId);
+  const fields = ['characterId', 'recordedCorporationId', 'date', 'cachedAt', 'structureId'];
   let days: QueryDocumentSnapshot[];
   try {
     const top = await c.tx.get(rows.orderBy('date', 'desc').limit(1));
     if (top.empty) return undefined;
-    // A character can change corporation mid-day: every row of that day, in id order.
     days = (await c.tx.get(rows.where('date', '==', top.docs[0].get('date')))).docs;
   } catch (e) {
     if (!isMissingIndex(e)) throw e;
-    const all = (await c.tx.get(rows.select('recordedCorporationId', 'date'))).docs;
-    const newest = all.reduce((m, d) => (d.get('date') > m ? d.get('date') : m), '');
-    days = all.filter((d) => d.get('date') === newest);
+    days = (await c.tx.get(rows.select(...fields))).docs;
   }
-  return days[0]?.get('recordedCorporationId');
+  return latestRecordedCorp(days.map((d) => d.data() as CorpRecord)).get(characterId)?.corp;
 }
 
 function writeMiner(
@@ -1160,14 +1155,49 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
           reason: 'director-approval',
         });
       }
-      const { structureExpiryHours, dismissApprovalAboveIsk, showToMembers, startDate, ...rest } =
-        action.patch;
+      const {
+        structureExpiryHours,
+        dismissApprovalAboveIsk,
+        showToMembers,
+        startDate,
+        divisions,
+        divisionsBase,
+        addDivision,
+        ...rest
+      } = action.patch;
       if ((startDate !== undefined || showToMembers) && !c.access.isDirector) {
         throw new HttpsError('permission-denied', 'Only a Director sets this', {
           reason: 'director-only',
         });
       }
       const update: Data = { ...rest };
+      // A book stored without divisions reads division 1, as the client and the sync read it.
+      const storedDivisions = Array.isArray(c.book.divisions)
+        ? (c.book.divisions as number[])
+        : [...BOOK_DEFAULTS.divisions];
+      if (addDivision !== undefined) {
+        // Added to what is stored now, so a concurrent addition by another officer is kept.
+        if (!storedDivisions.includes(addDivision)) {
+          update.divisions = [...storedDivisions, addDivision].sort((a, b) => a - b);
+        }
+        // Its names were read for the client's own (maybe stale) list: merged, they never drop
+        // the name of a division another officer counted meanwhile.
+        if (rest.divisionNames) {
+          update.divisionNames = {
+            ...(c.book.divisionNames as Data | undefined),
+            ...rest.divisionNames,
+          };
+        }
+      } else if (divisions) {
+        if (divisionsBase && !sameDivisions(divisionsBase, storedDivisions)) {
+          fail(
+            'failed-precondition',
+            'The divisions changed since you opened the settings',
+            'divisions-changed'
+          );
+        }
+        update.divisions = divisions;
+      }
       if (showToMembers) update.membersSeeFrom = now;
       const oldStart = c.book.startDate as string | undefined;
       if (startDate !== undefined && startDate !== oldStart) {
@@ -1203,8 +1233,14 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         update.dismissApprovalAboveIsk =
           dismissApprovalAboveIsk === null ? FieldValue.delete() : dismissApprovalAboveIsk;
       }
-      tx.update(bookDoc, update);
-      return { detail: { patch: action.patch as Data } };
+      // Counting a division the book already reads changes nothing.
+      if (Object.keys(update).length > 0) tx.update(bookDoc, update);
+      // A counted division audits the list stored, never the fallback list sent for an older server.
+      const audited =
+        addDivision === undefined
+          ? action.patch
+          : { ...action.patch, divisions: update.divisions ?? storedDivisions };
+      return { detail: { patch: audited as Data } };
     }
     case 'recordPayment': {
       const ref = col(c, PAYMENTS).doc(action.paymentId);
@@ -1867,7 +1903,7 @@ async function closeAccount(
 
   // A guest, by the ore's recorded corporation on each character's latest day.
   for (const characterId of characterIds) {
-    const latest = await latestRecordedCorp(c, characterId);
+    const latest = await latestRecordedCorpOf(c, characterId);
     if (latest === c.corporationId)
       fail('failed-precondition', "Only a guest's account can be closed", 'not-a-guest');
   }

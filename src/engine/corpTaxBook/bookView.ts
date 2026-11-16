@@ -45,6 +45,7 @@ import {
 } from './statements';
 import { toEngineExtraction, type SettlePayment, type SyncExtraction } from './sync';
 import type { TaxRate } from './rates';
+import { latestRecordedCorp } from './bookDocs';
 import type { ObservedMiningEntry, OreLine } from './types';
 import type { DayPrices } from './valuation';
 import { DAY_MS } from '@/lib/age';
@@ -319,19 +320,6 @@ export function openSetInputOf(input: BookViewInput): OpenSetInput {
   };
 }
 
-/** Each character's latest recorded corporation, from the ledger rows. */
-export function latestCorporationOf(
-  entries: readonly Pick<ObservedMiningEntry, 'characterId' | 'date' | 'recordedCorporationId'>[]
-): Map<number, { date: string; corp: number }> {
-  const latest = new Map<number, { date: string; corp: number }>();
-  for (const e of entries) {
-    const held = latest.get(e.characterId);
-    if (!held || e.date >= held.date)
-      latest.set(e.characterId, { date: e.date, corp: e.recordedCorporationId });
-  }
-  return latest;
-}
-
 /** Member while a character is in the corporation now; left if it was; else a guest. */
 export function standingOf(
   characterIds: readonly number[],
@@ -349,7 +337,7 @@ export function standingOf(
 export function buildBookView(input: BookViewInput): BookView {
   const open = settleOpenSet(openSetInputOf(input));
   const { charges } = open;
-  const latestCorp = latestCorporationOf(input.entries);
+  const latestCorp = latestRecordedCorp(input.entries);
 
   const byMiner = new Map<string, MinerInternals>();
   const miners: MinerRow[] = [];

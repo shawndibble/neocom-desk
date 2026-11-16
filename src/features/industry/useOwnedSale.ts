@@ -4,7 +4,7 @@ import type { BuildResult } from '@/engine/industry/types';
 import { planOwnedStockSale } from '@/engine/industry/ownedStockSale';
 import type { pricingSourcesForHub } from './buildPlanPricingInputs';
 import type { MarketSnapshot } from './marketData';
-import type { OwnedSale } from './planHeroFigures';
+import type { PlanVerdict } from './planPricing';
 
 /**
  * Both liquidation bases at once, so the Use-or-sell toggle switches between
@@ -18,7 +18,7 @@ export function useOwnedSale(
   snapshot: MarketSnapshot | null,
   modifiers: CharacterModifiers,
   standing: ReturnType<typeof pricingSourcesForHub>['standing']
-): OwnedSale | null {
+): PlanVerdict['ownedSale'] {
   return useMemo(() => {
     if (!result || !snapshot) return null;
     return {

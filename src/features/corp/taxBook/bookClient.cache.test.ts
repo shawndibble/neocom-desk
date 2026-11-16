@@ -47,6 +47,16 @@ const WHOLE = { parts: bookPartsFor() };
 
 const CORP = 98000001;
 const BOOK = `corps/${CORP}`;
+/** A stored observed row as the server writes it (every field `readObservedRow` requires). */
+const OBSERVED_ROW = {
+  structureId: 1001,
+  characterId: 1,
+  recordedCorporationId: CORP,
+  typeId: 1,
+  date: '2026-10-02',
+  quantity: 10,
+  cachedAt: '2026-10-02T12:00:00Z',
+};
 const COLLECTIONS = [
   'miners',
   'statements',
@@ -91,7 +101,7 @@ beforeEach(async () => {
   store.docs.set(BOOK, stamped());
   store.docs.set(`${BOOK}/miners/m1`, { id: 'm1', characterIds: [1] });
   store.docs.set(`${BOOK}/statements/s1`, { id: 's1' });
-  store.docs.set(`${BOOK}/observed/o1`, { date: '2026-10-02', typeId: 1, characterId: 1 });
+  store.docs.set(`${BOOK}/observed/o1`, { ...OBSERVED_ROW });
   store.docs.set(`${BOOK}/feeders/5`, { corporationId: 5, status: 'active' });
   store.docs.set(`${BOOK}/feeders/5/payouts/p1`, { amount: 1 });
   store.docs.set(`${BOOK}/meta/paid`, { ids: ['s0'] });
@@ -136,9 +146,7 @@ describe('readBook over the version marker', () => {
 
   it('after a reload, serves the Dexie copy of an unchanged stamp with no collection read', async () => {
     store.docs.set(`${BOOK}/observed/o1`, {
-      date: '2026-10-02',
-      typeId: 1,
-      characterId: 1,
+      ...OBSERVED_ROW,
       updatedAt: { toMillis: () => 5 },
     });
     const first = await readBook(7, CORP, WHOLE);

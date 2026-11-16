@@ -20,8 +20,8 @@
  * Plans sharing a hub do share that fetch's outcome, so they fail together
  * when it fails; each still reports its own row.
  *
- * Resolution itself is `resolveBuildPlan`, the same call `BuildPlanDetail.tsx`
- * makes for the open plan, against the same `buildPlanPricingInputs.ts`
+ * Pricing itself is `pricePlan` (`planPricing/`), the plan page's own path
+ * (`resolveBuildPlan`, Depth Prices, the Profit Basis), against the same `buildPlanPricingInputs.ts`
  * inputs — Blueprint Acquisition (issue #838/#839), the
  * per-plan Corp Assets blueprint merge and the Reaction Location (issue #698)
  * are all wired there, once, so this hook's totals (the Industry index's
@@ -36,7 +36,6 @@
  * shows lowest-sell totals and then jumps. The plan list and Compare
  * walk only the depth their own plan needs, as the plan page does.
  */
-import { capProductPrice } from './productPriceCap';
 import { useEffect, useRef, useState } from 'react';
 import { depthPriceMap, summedDepthNeeds } from '@/engine/industry/depthPrice';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
@@ -47,12 +46,12 @@ import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
-import { loadDepthPrices, planDepthNeeds, type DepthPrices } from './depthPriceLoader';
+import { loadDepthPrices, type DepthPrices } from './depthPriceLoader';
 import { loadPlanSnapshots, type PlanSnapshots } from './planSnapshots';
 import { createYielder } from './yieldToMain';
 import { shoppingListMaterials } from './subBuildPlan';
-import { onPlanHeroBasis } from './planOwnedBasis';
-import { resolveBuildPlan, type BuildPlanSources } from './resolveBuildPlan';
+import { pricePlan } from './planPricing';
+import type { BuildPlanSources } from './resolveBuildPlan';
 import {
   isPricingReady,
   pricingSourcesForHub,
@@ -122,7 +121,7 @@ function placeholderRow(plan: BuildPlanRecord, catalog: BlueprintCatalog): Compa
  * Prices one plan against the snapshot already requested for it. Batching
  * happens a level up, so this only ever awaits — a plan with no blueprint has
  * no snapshot to await, and reports that instead. Everything past the await
- * is `resolveBuildPlan`, the same resolution the plan's own page runs.
+ * is `pricePlan`, the same pricing the plan's own page runs.
  */
 async function computeRow(
   plan: BuildPlanRecord,
@@ -152,54 +151,26 @@ async function computeRow(
     const inventionMarket = await priced.inventionMarket;
     const hub: TradeHub = getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB;
     const hubSources = pricingSourcesForHub(pricing, hub);
-    const resolveAt = (prices: HubPrices | undefined) =>
-      resolveBuildPlan(
-        plan,
-        { ...sources, ...hubSources, blueprintPurchaseOffersFor, inventionMarket, catalog },
-        {
-          snapshot,
-          reactionSystemCostIndex: reactionSnapshot?.systemCostIndex,
-          depthPrices: prices,
-        },
-        { withGroupResult: computeGroupResult }
-      );
-    let resolved = resolveAt(depthPrices);
-    // The plan page re-prices materials whose need is large against what the
-    // hub lists at Depth Prices; so does the row, or its profit drifts from
-    // the page's (one re-resolve, read off the lowest-sell pass, as there).
-    // A group walk (`depthPrices` given) already did this for the whole group.
-    if (!depthPrices && resolved.result) {
-      const needs = planDepthNeeds(plan, resolved.result, snapshot.hubSellVolumes);
-      if (needs.size > 0) {
-        const depth = await loadDepthPrices(hub, needs).catch(() => null);
-        if (depth && depth.size > 0) resolved = resolveAt(depthPriceMap(depth));
+    // The plan page's own pricing (`pricePlan`): Depth Prices for what this
+    // plan alone needs, unless a group walk (`depthPrices`) already did that
+    // for the whole group, then the pilot's Profit Basis, so the row's profit,
+    // margin and ISK/hour agree with the page.
+    const { resolved, basisResult } = await pricePlan(
+      plan,
+      { ...sources, ...hubSources, blueprintPurchaseOffersFor, inventionMarket, catalog },
+      { snapshot, reactionSystemCostIndex: reactionSnapshot?.systemCostIndex, depthPrices },
+      {
+        depth: depthPrices ? null : loadDepthPrices,
+        profitBasis: pricing.profitBasis,
+        withGroupResult: computeGroupResult,
       }
-    }
-    const { result, error, groupResult, groupError } = resolved;
+    );
     // The group pass's own error surfaces on the row too (only reachable
     // when the primary pass succeeded, since `error` already wins otherwise)
     // — a member whose group computation alone failed must not silently
     // vanish from the rollup with no explanation.
-    // The pilot's Profit Basis setting (`profitBasisSetting.ts`) is read by the
-    // plan page too, so the row's profit, margin and ISK/hour agree with it:
-    // owned materials free, or charged at what they would sell for.
-    const entry = catalog.byBlueprintTypeID.get(plan.blueprintTypeID);
-    const heroBasis =
-      result && entry && pricing.profitBasis === 'sellValue'
-        ? onPlanHeroBasis(result, {
-            snapshot,
-            modifiers: sources.modifiers,
-            standing: hubSources.standing,
-            productQuantity: (entry.blueprint.products[0]?.quantity ?? 0) * plan.runs,
-            productUnitPrice:
-              entry.productTypeID !== null
-                ? (capProductPrice(snapshot, entry.productTypeID).snapshot.hubPrices[
-                    entry.productTypeID
-                  ] ?? null)
-                : null,
-          }).result
-        : result;
-    return { ...base, result: heroBasis, groupResult, error: error ?? groupError };
+    const { error, groupResult, groupError } = resolved;
+    return { ...base, result: basisResult, groupResult, error: error ?? groupError };
   } catch (err) {
     return {
       ...base,

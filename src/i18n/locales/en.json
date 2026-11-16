@@ -18606,6 +18606,7 @@
         "failed": {
           "generic": "Could not connect. Try again, or ask for a new invite link.",
           "director-approval": "Over the book's approval limit: a Director must do this.",
+          "divisions-changed": "Another officer changed the divisions since you opened the settings. Close and reopen them to see the current divisions, then try again.",
           "already-resolved": "Another officer already answered this.",
           "not-priced": "That ore is not on a Statement yet, so its tax has no price to waive. Try again once it is billed.",
           "nothing-to-waive": "The disputed ore carries no tax to waive.",

@@ -17,6 +17,7 @@ import {
   needsLiveCheck,
   parseEditAction,
   parseSettingsPatch,
+  sameDivisions,
   parseStatement,
   parseSyncInput,
   donationsReadAtPatch,
@@ -127,6 +128,33 @@ describe('parsers', () => {
     ).toMatchObject({
       divisions: [1, 2],
     });
+  });
+
+  it('takes an added division and the divisions list a change started from', () => {
+    expect(parseSettingsPatch({ addDivision: 3 })).toEqual({ addDivision: 3 });
+    expect(() => parseSettingsPatch({ addDivision: 8 })).toThrow();
+    expect(() => parseSettingsPatch({ addDivision: '3' })).toThrow();
+    expect(parseSettingsPatch({ divisions: [3, 1], divisionsBase: [2, 1, 2] })).toEqual({
+      divisions: [1, 3],
+      divisionsBase: [1, 2],
+    });
+    // A base only says what a new `divisions` list started from.
+    expect(() => parseSettingsPatch({ divisionsBase: [1] })).toThrow();
+    expect(() => parseSettingsPatch({ divisions: [1], divisionsBase: [9] })).toThrow();
+    // `addDivision` adds to the stored list; a base check alongside it would never run.
+    expect(() =>
+      parseSettingsPatch({ addDivision: 2, divisions: [1, 2], divisionsBase: [1] })
+    ).toThrow();
+    expect(parseSettingsPatch({ addDivision: 2, divisions: [1, 2] })).toEqual({
+      addDivision: 2,
+      divisions: [1, 2],
+    });
+  });
+
+  it('compares divisions lists by the divisions they name', () => {
+    expect(sameDivisions([1, 3], [3, 1, 3])).toBe(true);
+    expect(sameDivisions([1], [1, 4])).toBe(false);
+    expect(sameDivisions([1, 2], [1, 4])).toBe(false);
   });
 
   it('refuses observer rows from the future', () => {

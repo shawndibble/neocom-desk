@@ -18,14 +18,14 @@ import {
   type QuerySnapshot,
 } from 'firebase/firestore/lite';
 import { db as localDb } from '@/db';
-import { DEFAULT_GRACE_HOURS } from '@/engine/corpTaxBook/billable';
-import { DEFAULT_OVERDUE_DAYS, type Declaration } from '@/engine/corpTaxBook/overdue';
+import { parseBookSettings } from '@/engine/corpTaxBook/bookDocs';
+import type { Declaration } from '@/engine/corpTaxBook/overdue';
 import { readDisputes, type OreDispute } from '@/engine/corpTaxBook/disputes';
 import type { RecordedWriteOff, TaxPayment } from '@/engine/corpTaxBook/allocation';
 import type { Miner } from '@/engine/corpTaxBook/charges';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
-import { readDivisionNames, type DivisionNames } from '@/engine/corpTaxBook/divisionNames';
-import { groupObservedEntries } from '@/engine/corpTaxBook/observed';
+import type { DivisionNames } from '@/engine/corpTaxBook/divisionNames';
+import { groupObservedEntries, readObservedRow } from '@/engine/corpTaxBook/observed';
 import { ownerRefinerySystemsToLearn } from '@/engine/corpTaxBook/refinery';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 import type { TaxRate } from '@/engine/corpTaxBook/rates';
@@ -116,23 +116,12 @@ const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : und
 /** The book's settings doc; `null` when it is not an active book, or is still in its setup window (D24: then nothing changes). */
 export function readBookSettings(corporationId: number, d: Data | undefined, now = Date.now()) {
   if (!d || d.active !== true) return null;
+  const settings = parseBookSettings(d);
   // A freshly turned-on book is still being set up (rates, sync, payment matching): members see nothing yet.
-  const seeFrom = num(d.membersSeeFrom);
-  if (seeFrom !== undefined && now < seeFrom) return null;
-  const startDate = str(d.startDate);
-  if (!startDate) return null;
-  const rates = (Array.isArray(d.rates) ? d.rates : []).filter((r): r is TaxRate => {
-    if (typeof r !== 'object' || r === null) return false;
-    const rate = r as Data;
-    return (
-      num(rate.pct) !== undefined &&
-      ['corp', 'guest', 'feeder', 'feeder-member', 'miner', 'moon', 'structure', 'record'].includes(
-        String(rate.scope)
-      )
-    );
-  });
-  const syncedAt = num((d.lastSync as Data | null | undefined)?.at);
-  const divisionNames = readDivisionNames(d.divisionNames);
+  if (settings.membersSeeFrom !== undefined && now < settings.membersSeeFrom) return null;
+  if (!settings.startDate) return null;
+  const syncedAt = num(settings.lastSync?.at);
+  const divisionNames = settings.divisionNames ?? {};
   // Absent on a book no sync has stamped since the record began: the engine then uses lastSync.
   const donationsReadAt = d.donationsReadAt === null ? null : num(d.donationsReadAt);
   const checked: { donationsCheckedAt?: string | null } =
@@ -144,50 +133,16 @@ export function readBookSettings(corporationId: number, d: Data | undefined, now
         };
   return {
     corporationId,
-    startDate,
-    graceHours: num(d.graceHours) ?? DEFAULT_GRACE_HOURS,
-    overdueDays: num(d.overdueDays) ?? DEFAULT_OVERDUE_DAYS,
-    hubId: str(d.hubId) ?? 'jita',
-    oreForm: d.oreForm === 'raw' ? ('raw' as const) : ('compressed' as const),
-    divisions: (Array.isArray(d.divisions) ? d.divisions : [1]).filter(
-      (x): x is number => typeof x === 'number'
-    ),
+    startDate: settings.startDate,
+    graceHours: settings.graceHours,
+    overdueDays: settings.overdueDays,
+    hubId: settings.hubId,
+    oreForm: settings.oreForm,
+    divisions: settings.divisions,
     ...(Object.keys(divisionNames).length > 0 ? { divisionNames } : {}),
-    rates,
+    rates: settings.rates,
     ...(syncedAt !== undefined ? { lastSyncedAt: new Date(syncedAt).toISOString() } : {}),
     ...checked,
-  };
-}
-
-export function readObservedRow(d: Data): ObservedRow | null {
-  const structureId = num(d.structureId);
-  const characterId = num(d.characterId);
-  const typeId = num(d.typeId);
-  const quantity = num(d.quantity);
-  const date = str(d.date);
-  if (
-    structureId === undefined ||
-    characterId === undefined ||
-    typeId === undefined ||
-    quantity === undefined ||
-    !date
-  ) {
-    return null;
-  }
-  const solarSystemId = num(d.solarSystemId);
-  const moonId = num(d.moonId);
-  const sourceCorporationId = num(d.sourceCorporationId);
-  return {
-    structureId,
-    characterId,
-    recordedCorporationId: num(d.recordedCorporationId) ?? 0,
-    typeId,
-    date,
-    quantity,
-    cachedAt: str(d.cachedAt) ?? '1970-01-01T00:00:00Z',
-    ...(solarSystemId !== undefined ? { solarSystemId } : {}),
-    ...(moonId !== undefined ? { moonId } : {}),
-    ...(sourceCorporationId !== undefined ? { sourceCorporationId } : {}),
   };
 }
 

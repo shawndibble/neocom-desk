@@ -740,6 +740,33 @@ export default defineConfig({
     // to stay under, not one to raise: a test that needs more is too slow and
     // gets made faster (CLAUDE.md, "Tests stay under 10 seconds").
     testTimeout: 10000,
+    // What a bare `vi.useFakeTimers()` fakes: vitest 4's own default list
+    // (every timer @sinonjs/fake-timers knows, minus `nextTick` and
+    // `queueMicrotask`) without `setImmediate`/`clearImmediate`. fake-indexeddb
+    // schedules all its work on `setImmediate`, so faking it parks every Dexie
+    // request on the fake clock, and the shared teardown's `useRealTimers`
+    // drops it: the request never finishes (#6267). A test whose code under
+    // test needs a faked `setImmediate` passes its own `toFake`, which replaces
+    // this list. Names a test environment lacks (`requestAnimationFrame` under
+    // node) are skipped. Checked against vitest 4.1's `FakeTimers.useFakeTimers`.
+    fakeTimers: {
+      toFake: [
+        'setTimeout',
+        'clearTimeout',
+        'setInterval',
+        'clearInterval',
+        'Date',
+        'hrtime',
+        'performance',
+        'requestAnimationFrame',
+        'cancelAnimationFrame',
+        'requestIdleCallback',
+        'cancelIdleCallback',
+        // Faked by vitest's default too, but missing from its `FakeMethod`
+        // type, hence the cast.
+        'Intl' as 'Date',
+      ],
+    },
     // Vitest's default is availableParallelism() - 1 forked processes, each
     // spinning up its own jsdom — on this 16-core dev box that's ~15
     // concurrent Node processes, multiplied further by however many

@@ -81,26 +81,23 @@ const openMoreGoals = () =>
 const openSettings = () =>
   userEvent.click(screen.getByRole('button', { name: /^Search settings/ }));
 
-const settings = (patch: Partial<ImproveSettings> = {}): ImproveSettings => ({
-  reach: 'upgrade',
-  onReachChange: vi.fn(),
-  sort: 'gain',
-  onSortChange: vi.fn(),
-  iskBudget: null,
-  onIskBudgetChange: vi.fn(),
-  defense: 'keep',
-  onDefenseChange: vi.fn(),
-  includeRigs: false,
-  onIncludeRigsChange: vi.fn(),
-  includeOfficer: false,
-  onIncludeOfficerChange: vi.fn(),
-  allowMutated: false,
-  onAllowMutatedChange: vi.fn(),
-  oreFamily: 'Simple Asteroid',
-  onOreFamilyChange: vi.fn(),
-  hold: 'cargo',
-  onHoldChange: vi.fn(),
-  ...patch,
+const settings = (
+  value: Partial<ImproveSettings['value']> = {},
+  onChange: ImproveSettings['onChange'] = vi.fn()
+): ImproveSettings => ({
+  value: {
+    reach: 'upgrade',
+    sort: 'gain',
+    iskBudget: null,
+    defense: 'keep',
+    includeRigs: false,
+    includeOfficer: false,
+    allowMutated: false,
+    oreFamily: 'Simple Asteroid',
+    hold: 'cargo',
+    ...value,
+  },
+  onChange,
 });
 
 const renderPanel = (
@@ -510,12 +507,12 @@ describe('ImprovePanel', () => {
     const cheap = option(21, { ehp: 1100 }, { score: 0.1, iskDelta: 1_000_000 });
     const state = search(done({ noDownside: [cheap, pricey] }));
     const first = () => screen.getAllByRole('checkbox')[0]!.closest('li')!;
-    const onSortChange = vi.fn();
-    const { unmount } = renderPanel(state, vi.fn(), vi.fn(), settings({ onSortChange }));
+    const onChange = vi.fn();
+    const { unmount } = renderPanel(state, vi.fn(), vi.fn(), settings({}, onChange));
     expect(first()).toHaveTextContent('+50%');
     await userEvent.click(screen.getByRole('combobox', { name: 'Sort by' }));
     await userEvent.click(await screen.findByRole('option', { name: 'Best value' }));
-    expect(onSortChange).toHaveBeenCalledWith('value');
+    expect(onChange).toHaveBeenCalledWith({ sort: 'value' });
     unmount();
     renderPanel(state, vi.fn(), vi.fn(), settings({ sort: 'value' }));
     expect(first()).toHaveTextContent('+10%');
@@ -638,11 +635,11 @@ describe('ImprovePanel', () => {
     expect(screen.getByRole('group', { name: 'Improve Reach' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Defense Choice' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Rework' }));
-    expect(config.onReachChange).toHaveBeenCalledWith('rework');
+    expect(config.onChange).toHaveBeenCalledWith({ reach: 'rework' });
     expect(screen.queryByRole('group', { name: 'Improve mode' })).not.toBeInTheDocument();
     expect(screen.getByLabelText('Total budget (ISK)')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Armor' }));
-    expect(config.onDefenseChange).toHaveBeenCalledWith('armor');
+    expect(config.onChange).toHaveBeenCalledWith({ defense: 'armor' });
   });
 
   it('hides Defense Choice on goals it does not change', async () => {
@@ -668,7 +665,7 @@ describe('ImprovePanel', () => {
     const rigs = screen.getByRole('checkbox', { name: /^Rigs/ });
     expect(rigs).not.toBeChecked();
     await userEvent.click(rigs);
-    expect(config.onIncludeRigsChange).toHaveBeenCalledWith(true);
+    expect(config.onChange).toHaveBeenCalledWith({ includeRigs: true });
   });
 
   it('labels an add and a pair', () => {
@@ -853,13 +850,13 @@ describe('ImprovePanel', () => {
   });
 
   it('reports the ore the pilot picks', async () => {
-    const onOreFamilyChange = vi.fn();
-    renderPanel(search({ status: 'idle' }), vi.fn(), vi.fn(), settings({ onOreFamilyChange }), {
+    const onChange = vi.fn();
+    renderPanel(search({ status: 'idle' }), vi.fn(), vi.fn(), settings({}, onChange), {
       goal: 'mining',
     });
     await userEvent.click(screen.getByRole('combobox', { name: 'Ore' }));
     await userEvent.click(await screen.findByRole('option', { name: /Rare Moon/ }));
-    expect(onOreFamilyChange).toHaveBeenCalledWith('Rare Moon');
+    expect(onChange).toHaveBeenCalledWith({ oreFamily: 'Rare Moon' });
   });
 
   it('disables Carry more, Align faster and Align and warp faster with their reasons on a hull without them', async () => {
@@ -882,18 +879,18 @@ describe('ImprovePanel', () => {
   it('shows the hold before and after on a Carry more row, and reports the hold the pilot picks', async () => {
     const own = { ...before, holds: { ...before.holds, cargo: 1000, iceHold: 400 } };
     const gain = option(10, { holds: { ...own.holds, cargo: 1250 } });
-    const onHoldChange = vi.fn();
+    const onChange = vi.fn();
     renderPanel(
       search(done({ noDownside: [gain] }, own), own),
       vi.fn(),
       vi.fn(),
-      settings({ onHoldChange }),
+      settings({}, onChange),
       { goal: 'haul' }
     );
     expect(screen.getAllByText('Cargo hold 1,000 → 1,250 m³')).toHaveLength(2);
     await userEvent.click(screen.getByRole('combobox', { name: 'Hold' }));
     await userEvent.click(await screen.findByRole('option', { name: /Ice hold/ }));
-    expect(onHoldChange).toHaveBeenCalledWith('iceHold');
+    expect(onChange).toHaveBeenCalledWith({ hold: 'iceHold' });
   });
 
   it('shows align time and warp speed on an Align and warp faster row', () => {

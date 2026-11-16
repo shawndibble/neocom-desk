@@ -53,6 +53,7 @@ import {
   Tabs,
   useTabsId,
   type ActiveFilter,
+  IncompleteNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
@@ -920,10 +921,9 @@ function CorpAssetsView({
               />
             )}
             {data.truncated && (
-              <p className="text-[0.6875rem] text-warning uppercase">
-                {t('common.incompleteTitle')} —{' '}
-                {t('corp.assets.fetchTruncatedNotice', { shown: data.assetsShown })}
-              </p>
+              <IncompleteNotice
+                hint={t('corp.assets.fetchTruncatedNotice', { shown: data.assetsShown })}
+              />
             )}
             <LiveStatus>
               {selectMode && selectedKeys.size > 0

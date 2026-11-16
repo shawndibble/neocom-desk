@@ -16,6 +16,7 @@ import {
   SelectValue,
   Spinner,
   CachedNotice,
+  IncompleteNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner, GrantNote } from '@/app/GrantNote';
@@ -259,15 +260,14 @@ export function AssetsList({
       )}
       {assetsResult.fromCache && <CachedNotice fetchedAt={assetsResult.fetchedAt} />}
       {assetsTruncated && (
-        <p className="flex flex-wrap items-center gap-2 text-[0.6875rem] text-warning uppercase">
-          <span>
-            {t('common.incompleteTitle')} —{' '}
-            {t('assets.fetchTruncatedNotice', { shown: assetsResult.data.length })}
-          </span>
-          <Button size="sm" disabled={loading} onClick={refresh}>
-            {t('assets.fetchTruncatedRetry')}
-          </Button>
-        </p>
+        <IncompleteNotice
+          hint={t('assets.fetchTruncatedNotice', { shown: assetsResult.data.length })}
+          action={
+            <Button size="sm" disabled={loading} onClick={refresh}>
+              {t('assets.fetchTruncatedRetry')}
+            </Button>
+          }
+        />
       )}
 
       <AssetItemActionsContext.Provider value={assetItemActions}>

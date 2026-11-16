@@ -233,6 +233,10 @@ jobs:
       # `agent` reporter prints totals only, so without this a test over the
       # 1s budget cannot be found from a CI run.
       - name: Run this shard's test files
+        # A test whose fetch or IndexedDB work outlives it fails here rather
+        # than warning (`src/test/teardown.ts`).
+        env:
+          VITEST_FAIL_ON_LEFTOVER_WORK: '1'
         run: |
           # Assigned first so a crash in the script fails the step; `mapfile < <(...)`
           # would swallow it and the shard would pass with no tests run.

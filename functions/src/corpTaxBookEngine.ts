@@ -58,6 +58,44 @@ export function shiftDate(date: string, days: number): string {
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }
 
+/** What tells one recorded corporation from a later one (engine `CorpRecord`). */
+export interface CorpRecord {
+  characterId: number;
+  date: string;
+  cachedAt?: string;
+  structureId?: number;
+  recordedCorporationId: number;
+}
+
+const readMs = (cachedAt: string | undefined) => {
+  const ms = cachedAt === undefined ? Number.NaN : Date.parse(cachedAt);
+  return Number.isNaN(ms) ? Number.NEGATIVE_INFINITY : ms;
+};
+
+/** Engine `recordedLater`: newer day, fresher read, higher refinery id, higher corporation id. */
+function recordedLater(a: CorpRecord, b: CorpRecord): boolean {
+  if (a.date !== b.date) return a.date > b.date;
+  const read = readMs(a.cachedAt) - readMs(b.cachedAt);
+  if (read !== 0 && !Number.isNaN(read)) return read > 0;
+  const structure = (a.structureId ?? 0) - (b.structureId ?? 0);
+  if (structure !== 0) return structure > 0;
+  return a.recordedCorporationId > b.recordedCorporationId;
+}
+
+/** Engine `latestRecordedCorp`: each character's latest recorded corporation. */
+export function latestRecordedCorp(
+  rows: readonly CorpRecord[]
+): Map<number, { date: string; corp: number }> {
+  const best = new Map<number, CorpRecord>();
+  for (const row of rows) {
+    const held = best.get(row.characterId);
+    if (!held || recordedLater(row, held)) best.set(row.characterId, row);
+  }
+  return new Map(
+    [...best].map(([id, row]) => [id, { date: row.date, corp: row.recordedCorporationId }])
+  );
+}
+
 /** Engine `isRetroactiveRate`. The start-date rate at book creation skips it. */
 export function isRetroactiveRate(effectiveFrom: string, today: string): boolean {
   return effectiveFrom < today;

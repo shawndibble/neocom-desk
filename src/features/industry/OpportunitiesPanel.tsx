@@ -290,6 +290,7 @@ export function OpportunitiesPanel({
     ownedStockSnapshot,
     ownedByCharacter,
     assumedMe,
+    profitBasis: pricingInputs.profitBasis,
   });
 
   // Each product's history in its own row's hub region, for "vs 90d". Held while
