@@ -176,3 +176,9 @@ export const loadNpcCorporationsFile = cached<NpcCorporationsFile>('npcCorporati
  */
 export const loadShipMass =
   cached<Record<string, [string, number, number, [number, number, number]?]>>('shipMass.json');
+/**
+ * `shipFlight.json` (issue #6282): `{ typeId: [agility, maxVelocityMs, warpSpeedAuPerS] }`
+ * for the hulls in `shipMass.json`, for Route Safety's trip time. A hull missing
+ * any of the three is absent.
+ */
+export const loadShipFlight = cached<Record<string, [number, number, number]>>('shipFlight.json');

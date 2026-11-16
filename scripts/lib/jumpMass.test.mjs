@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { bakeWormholeMass, bakeShipMass } from './jumpMass.mjs';
+import { bakeWormholeMass, bakeShipMass, bakeShipFlight } from './jumpMass.mjs';
 
 describe('bakeWormholeMass', () => {
   it('keys per-jump and total mass by wormhole name, once, skipping K162 and massless types', () => {
@@ -74,5 +74,28 @@ describe('bakeShipMass', () => {
       { typeID: 12, name: 'Tritanium', groupID: 18, mass: 0, published: true },
     ];
     expect(bakeShipMass(types, new Set([27]))).toEqual({ 10: ['Megathron', 27, 98.4e6] });
+  });
+});
+
+describe('bakeShipFlight', () => {
+  it('keeps hulls with agility, speed and warp speed, and drops the rest', () => {
+    const attrs = new Map([
+      [
+        1,
+        new Map([
+          [70, 3.2],
+          [37, 280],
+          [600, 5],
+        ]),
+      ],
+      [
+        2,
+        new Map([
+          [70, 3.2],
+          [37, 280],
+        ]),
+      ],
+    ]);
+    expect(bakeShipFlight({ 1: ['A'], 2: ['B'], 3: ['C'] }, attrs)).toEqual({ 1: [3.2, 280, 5] });
   });
 });

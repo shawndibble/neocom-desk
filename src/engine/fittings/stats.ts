@@ -825,7 +825,16 @@ export function unheatedIfChanged<S extends { unheated: S | null }>(
  * top speed, which is when warp engages.
  */
 export function alignTimeSeconds(massKg: number, agility: number): number {
-  return (Math.log(4) * agility * massKg) / 1_000_000;
+  return Math.log(4) * inertiaTimeConstantSeconds(massKg, agility);
+}
+
+/**
+ * The inertia time constant τ in seconds: mass × agility / 1,000,000. A ship
+ * accelerating from rest follows v(t) = vMax × (1 − e^(−t/τ)), and aligning
+ * is the time to 75% of top speed, ln(4) × τ.
+ */
+export function inertiaTimeConstantSeconds(massKg: number, agility: number): number {
+  return (agility * massKg) / 1_000_000;
 }
 
 /**

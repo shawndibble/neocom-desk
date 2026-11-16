@@ -17347,6 +17347,14 @@
       "chokepointsLabel": "Chokepoints",
       "chokepointsNone": "None"
     },
+    "tripTime": {
+      "noShip": "Pick a route ship to estimate time",
+      "minutes": "{{count}} min",
+      "line": "{{warp}} warp to 0 · ≈ {{autopilot}} autopilot",
+      "partial": "Gate legs only.",
+      "assumption": "Estimate for the route ship with skills at V, a base hull and no fit. Counts gate legs only.",
+      "ruleHint": "Trip time assumes skills at V, a base hull and no fit."
+    },
     "jumpDrive": {
       "unavailable": "Jump-drive range data isn't available offline yet, so this route has no jump legs.",
       "enabled": "Allow jump drive legs",
