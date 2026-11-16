@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { HeldElsewhereError, type LedgerActionResult } from './ledgerActions';
+import type { HeldElsewhereError, LedgerActionResult } from './ledgerActions';
 
 /**
  * How every Mining Tax dialog runs a ledger action, so a failure reads the
@@ -28,11 +28,13 @@ export function useLedgerAction() {
       try {
         const result = await action();
         if (result.ok || result.reason === 'already-assigned') onDone?.();
-        else if (result.cause instanceof HeldElsewhereError) {
-          const dates = [...new Set(result.cause.rows.map((r) => r.date))].sort();
+        else if (result.reason === 'held-elsewhere') {
+          // By reason, not `instanceof`: dialog tests mock `./ledgerActions` wholesale.
+          const rows = (result.cause as HeldElsewhereError).rows;
+          const dates = [...new Set(rows.map((r) => r.date))].sort();
           setError(
             t('miningTax.corpBook.pay.heldElsewhere', {
-              count: result.cause.rows.length,
+              count: rows.length,
               dates: dates.join(', '),
             })
           );
