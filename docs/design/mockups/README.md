@@ -30,6 +30,7 @@ PNG exports of the chosen mockups for ready tickets. Delete a folder (and its ro
 | [moons-add-my-corps](moons-add-my-corps/README.md) | Grilling session (no issue yet) | Add my other corps: picker, one confirm with How far back, guided sign-in, status list with Yours pills, Hidden corps |
 | [moon-mining-at-scale](moon-mining-at-scale/README.md) | Review request (no issue yet) | Officer pages for one heavy miner across 57 pops: pops folded by month with Statement and owed in each header, payments that filter the pops they cleared, per-pop and per-moon tax adjustments, bulk Statements and reminders |
 | [fittings-doctrine](fittings-doctrine/README.md) | Issue #6202 | Doctrine rows in the Fittings Start list with a Doctrine tag; an older fit's re-save note in the preview, or on the row on a phone |
+| [mining-tax-resolve](mining-tax-resolve/README.md) | Review request (no issue yet) | Not chosen yet: A (inline button + menu) or B (one Resolve dialog per problem); five outcomes split by who has to agree, a quiet line after answering, left-the-corp notice, officer won't-pay card and tax contact setting |
 | [lp-store-spend-my-lp](lp-store-spend-my-lp/README.md) | Issue #6199 | Spend my LP button beside the offers list's actions; the plan opens above the offers: headline, offer × N table, stop line naming the floor or wallet, LP left |
 
 First draft mockup; sample data. The ticket's Agent Brief text wins over the picture where they differ.
