@@ -86,9 +86,12 @@ interface SettleUpDialogProps {
   reason?: string | ((payerId: number | null) => string | undefined);
   /**
    * Payee-specific lines under the To / Amount / Reason box (where a corp's book wants it sent).
-   * A function gets the entries ticked right now and the paying Character.
+   * A function gets the entries ticked right now, the paying Character and the whole-ISK amount
+   * to send (so a notice can show where it lands as the pilot changes it).
    */
-  notice?: ReactNode | ((ticked: readonly SettleUpRow[], payerId: number | null) => ReactNode);
+  notice?:
+    | ReactNode
+    | ((ticked: readonly SettleUpRow[], payerId: number | null, amount: number) => ReactNode);
 }
 
 /** More Characters than this pick from a list instead of a segmented row (DESIGN §4). */
@@ -517,7 +520,7 @@ export function SettleUpDialog({
           )}
           {copyRow('reason', t('miningTax.settleUp.reasonLabel'), reason, reason, true)}
         </div>
-        {typeof notice === 'function' ? notice(included, payer) : notice}
+        {typeof notice === 'function' ? notice(included, payer, amountToSend) : notice}
 
         <div className="space-y-1.5">
           <button
