@@ -171,6 +171,35 @@ describe('BookSettingsDialog tabs', () => {
     );
   });
 
+  it('leaves unchanged divisions and their names out of a save, so it never overwrites them', async () => {
+    loadDivisions.mockResolvedValue({
+      cached: { data: { wallet: [{ division: 1, name: 'Renamed' }] } },
+      needsReauth: false,
+    });
+    const user = userEvent.setup();
+    renderDialog();
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    const call = editBook.mock.calls.find(
+      (c) => (c[2] as { action: string }).action === 'updateSettings'
+    );
+    const patch = (call?.[2] as { patch: Record<string, unknown> }).patch;
+    expect(patch).not.toHaveProperty('divisions');
+    expect(patch).not.toHaveProperty('divisionsBase');
+    expect(patch).not.toHaveProperty('divisionNames');
+  });
+
+  it('says another officer changed the divisions when the server refuses the save', async () => {
+    editBook.mockRejectedValueOnce(
+      Object.assign(new Error('changed'), { details: { reason: 'divisions-changed' } })
+    );
+    const user = userEvent.setup();
+    renderDialog();
+    await user.click(screen.getByRole('tab', { name: 'Billing' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Division 2' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText(/Another officer changed the divisions/)).toBeInTheDocument();
+  });
+
   it("saves the corp's names for the divisions it reads, so members see them at once", async () => {
     loadDivisions.mockResolvedValue({
       cached: { data: { wallet: [{ division: 2, name: 'Market Funds' }] } },
@@ -186,7 +215,11 @@ describe('BookSettingsDialog tabs', () => {
       98000000,
       expect.objectContaining({
         action: 'updateSettings',
-        patch: expect.objectContaining({ divisions: [1, 2], divisionNames: { 2: 'Market Funds' } }),
+        patch: expect.objectContaining({
+          divisions: [1, 2],
+          divisionsBase: [1],
+          divisionNames: { 2: 'Market Funds' },
+        }),
       })
     );
   });

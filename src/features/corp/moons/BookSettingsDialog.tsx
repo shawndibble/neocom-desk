@@ -1,5 +1,5 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { chunkRateFor } from '@/engine/corpTaxBook/extraction';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -173,6 +173,9 @@ export function BookSettingsDialog({
   const [minimum, setMinimum] = useState(String(settings.minimumStatement));
   const [overdue, setOverdue] = useState(String(settings.overdueDays));
   const [divisions, setDivisions] = useState<number[]>(settings.divisions);
+  // The list the dialog opened on: a save that changes the divisions sends it, so the server
+  // refuses it rather than drop another officer's change made meanwhile.
+  const divisionsBase = useRef(settings.divisions).current;
   const [startDate, setStartDate] = useState(settings.startDate);
   const [cadence, setCadence] = useState(settings.cadence.kind);
   const [cadenceDays, setCadenceDays] = useState(
@@ -288,7 +291,6 @@ export function BookSettingsDialog({
         graceHours: Number(grace.replace(',', '.')),
         minimumStatement: Number(minimum),
         overdueDays: Number(overdue),
-        divisions: sortedDivisions,
         cadence:
           cadence === 'monthly'
             ? { kind: 'monthly' }
@@ -300,15 +302,25 @@ export function BookSettingsDialog({
         ),
       };
       if (chunk !== '') patch.chunkM3PerHour = Number(chunk);
+      // Unchanged divisions are left out, so a save of other settings never overwrites them.
+      const baseDivisions = [...divisionsBase].sort((a, b) => a - b);
+      const divisionsChanged = sortedDivisions.join() !== baseDivisions.join();
+      if (divisionsChanged) {
+        patch.divisions = sortedDivisions;
+        patch.divisionsBase = baseDivisions;
+      }
       // The names of the divisions it now reads go with them, so members see the corp's name for
-      // a newly read division at once (#6161).
-      const names = await divisionNamesFor(
-        characterId,
-        corporationId,
-        canReadDivisions,
-        sortedDivisions,
-        settings.divisionNames
-      );
+      // a newly read division at once (#6161). Only with a divisions change: the base check then
+      // guards them too, where names alone would replace the stored map from a stale list.
+      const names = divisionsChanged
+        ? await divisionNamesFor(
+            characterId,
+            corporationId,
+            canReadDivisions,
+            sortedDivisions,
+            settings.divisionNames
+          )
+        : null;
       if (names) patch.divisionNames = names;
       if (verdict.isDirector) {
         patch.dismissApprovalAboveIsk = approval === '' ? null : Number(approval);
