@@ -1577,6 +1577,7 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       // Day 13: withdrawn, and filed again at once.
       now += 13 * 86_400_000;
       await withdraw();
+      await verifyOfficer(deps(), who(ACCOUNTANT), parseBookCall(withToken(ACCOUNTANT)));
       expect(
         await reason(edit(ACCOUNTANT, { action: 'rejectDispute', disputeId, reason: 'Ours' }))
       ).toBe('not-found');
