@@ -277,6 +277,7 @@ export function uploadSync(characterId: number, upload: SyncUpload): Promise<Syn
 export const LIVE_CHECK_ACTIONS: ReadonlySet<string> = new Set([
   'dismiss',
   'dismissRecords',
+  'dismissDispute',
   'reverseDismissal',
   'writeOff',
   'rebill',

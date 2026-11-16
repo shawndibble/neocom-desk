@@ -19,8 +19,16 @@ vi.mock('./statementMailing', () => ({
 // The record dialog previews against a whole book; here only the amount it opens with matters.
 vi.mock('./BookDialogs', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./BookDialogs')>()),
-  RecordPaymentDialog: ({ defaultAmount }: { defaultAmount: number }) => (
-    <p>Record payment: {defaultAmount}</p>
+  RecordPaymentDialog: ({
+    defaultAmount,
+    paymentId,
+  }: {
+    defaultAmount: number;
+    paymentId?: string;
+  }) => (
+    <p>
+      Record payment: {defaultAmount} as {paymentId}
+    </p>
   ),
 }));
 const projection = vi.hoisted(() => ({ value: { miners: [], needsYou: [] } as unknown }));
@@ -74,7 +82,18 @@ function renderQueue(
                 statements: [{ id: 's1', periodStart: '2026-09-01', periodEnd: '2026-09-30' }],
                 dismissals: [],
               },
-              charges: [{ key: '7:1000:2026-09-05', taxOwed: 1_200_000 }],
+              charges: [
+                {
+                  key: '7:1000:2026-09-05',
+                  oreLines: [
+                    { typeId: 45490, quantity: 1200 },
+                    { typeId: 45491, quantity: 500 },
+                  ],
+                  unitPrices: { 45490: 10_000, 45491: 4_000 },
+                  taxPct: 10,
+                  taxOwed: 1_400_000,
+                },
+              ],
             },
             names: {
               character: (id: number) => `Pilot ${id}`,
@@ -166,19 +185,32 @@ describe('NeedsYouQueue (#6207)', () => {
     at: '2026-09-20T00:00:00.000Z',
   };
 
-  it('lists a Miner’s dispute with the day, ore and their Payee, and dismisses the day (#6206)', async () => {
+  it('lists a Miner’s dispute with the day, ore and their Payee, and waives only that ore (#6206)', async () => {
     renderQueue([], { disputes: [dispute] });
     expect(screen.getByText(/^Pilot 7 says .*'s ore went to Rival Corp$/)).toBeInTheDocument();
     expect(screen.getByText(/1,200 Zeolites to Rival Corp/)).toBeInTheDocument();
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Dismiss the day' }));
+    await user.click(screen.getByRole('button', { name: 'Waive their ore' }));
+    // 1,200 × 10,000 × 10%: the day's other ore stays billed.
+    expect(screen.getByText(/1,200,000 of tax on the ore they disputed/)).toBeInTheDocument();
     await user.type(screen.getByRole('textbox'), 'Their ore');
-    await user.click(screen.getAllByRole('button', { name: 'Dismiss the day' }).at(-1)!);
+    await user.click(screen.getByRole('button', { name: 'Waive 1,200,000' }));
     expect(editBook).toHaveBeenCalledWith(9, 98000001, {
-      action: 'dismissRecords',
-      targets: [{ targetId: '7:1000:2026-09-05', amountIsk: 1_200_000 }],
+      action: 'dismissDispute',
+      disputeId: 'solo_7_2026-09-05',
+      minerId: 'solo:7',
+      amountIsk: 1_200_000,
       reason: 'Their ore',
     });
+  });
+
+  it('never waives a dispute whose day it cannot price (#6206)', async () => {
+    renderQueue([], { disputes: [dispute], view: { input: { dismissals: [] }, charges: [] } });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Waive their ore' }));
+    await user.type(screen.getByRole('textbox'), 'Their ore');
+    expect(screen.getByText(/cannot price that day/)).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^Waive/ }).at(-1)).toBeDisabled();
   });
 
   it('rejects a dispute with a note (#6206)', async () => {
@@ -223,7 +255,9 @@ describe('NeedsYouQueue (#6207)', () => {
       },
     ]);
     expect(
-      screen.getByText(/paid by another way.*They say they paid 4,000,000\. “by contract”/)
+      screen.getByText(
+        /Paid another way, declared on .*They say they paid 4,000,000\. “by contract”/
+      )
     ).toBeInTheDocument();
   });
 
@@ -243,7 +277,8 @@ describe('NeedsYouQueue (#6207)', () => {
       },
     ]);
     await userEvent.setup().click(screen.getByRole('button', { name: 'Confirm paid' }));
-    expect(await screen.findByText('Record payment: 4000000')).toBeInTheDocument();
+    // The payment id comes from the declaration, so a retry or a second officer cannot double it.
+    expect(await screen.findByText('Record payment: 4000000 as m_x1')).toBeInTheDocument();
   });
 });
 

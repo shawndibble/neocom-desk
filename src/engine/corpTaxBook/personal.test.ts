@@ -2477,5 +2477,23 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
         reason: 'Ours',
       });
     });
+
+    it('says when an officer waived the disputed ore, with the reason', () => {
+      const waived = dispute({
+        resolution: {
+          kind: 'dismissed',
+          at: '2026-10-19T00:00:00.000Z',
+          by: 1,
+          reason: 'Theirs',
+          amountIsk: 5_000,
+        },
+      });
+      const out = overlay([toOther], [book({ disputes: [waived] })]);
+      expect(out.rows[0].flagged).toEqual({
+        state: 'dismissed',
+        at: '2026-10-19T00:00:00.000Z',
+        reason: 'Theirs',
+      });
+    });
   });
 });

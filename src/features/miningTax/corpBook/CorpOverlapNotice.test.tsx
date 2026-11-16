@@ -341,6 +341,17 @@ describe('CorpOverlapNotice: what reaches the corporation (#6206)', () => {
       flagged: { state: 'rejected', at: '2026-10-19T10:00:00.000Z', reason: 'Our ore' },
     });
     expect(screen.getByText('Brass Meridian kept the bill: Our ore')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Tell / })).toBeNull();
+  });
+
+  it('says an officer waived the tax on that ore, with the reason (#6206)', () => {
+    renderWith({
+      ...conflict,
+      flagged: { state: 'dismissed', at: '2026-10-19T10:00:00.000Z', reason: 'Their ore' },
+    });
+    expect(
+      screen.getByText('Brass Meridian waived the tax on that ore: Their ore')
+    ).toBeInTheDocument();
   });
 
   it('offers nothing to dispute on ore the book never recorded', () => {
