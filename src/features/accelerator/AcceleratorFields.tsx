@@ -1,20 +1,20 @@
 /**
  * The editable fields of one cerebral accelerator (GLOSSARY.md **Accelerator**):
- * when it runs out, entered as time left (EVE's own tooltip) or, behind a quiet
- * switch, as the date and time it ends; then its bonus, unless the attribute sheet
+ * when it runs out, entered as time left (EVE's own tooltip); then its bonus,
+ * unless the attribute sheet
  * already gave it (the caller shows that once, as a fact). Time comes first: it is
  * the one value EVE never reports, and nothing saves without it. Shared by the
  * Skill Plan's Accelerator section and the Characters table's popover, so the
  * two can never drift apart.
  *
  * Stateless about where the value lives: the caller owns it and `onExpiresChange`
- * reports whether the edit applied. The expiry is always an instant; the two modes only differ in
- * how it is typed.
+ * reports whether the edit applied. The expiry is always an instant.
  *
  * Duration boxes follow the blur-commit rule: a set that adds up to something
  * commits at once (a blank box counts as zero); one that adds up to nothing
  * commits `null` only when focus leaves the group and every box is blank,
- * because clearing a box to retype it must not erase a saved expiry.
+ * because clearing a box to retype it must not erase a saved expiry. Blanking
+ * every box is how a saved accelerator is forgotten.
  *
  * Once a time is set, the time and the bonus read as text (`EditableValue`)
  * until clicked: one click on the time opens all three boxes. A field closes
@@ -31,11 +31,8 @@ import {
   type ReactNode,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, EditableValue, TextInput } from '@/components/ui';
-import { useTimeZone } from '@/lib/timeFormat';
-import { formatTimestamp } from '@/lib/timestamp';
+import { EditableValue, TextInput } from '@/components/ui';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
-import { inputValueToInstant, instantToInputValue } from '@/lib/zonedInput';
 import {
   MAX_BOOSTER_BONUS,
   clampBoosterBonus,
@@ -46,7 +43,6 @@ import {
 const DURATION_UNITS = ['days', 'hours', 'minutes'] as const;
 type DurationUnit = (typeof DURATION_UNITS)[number];
 type DurationDraft = Record<DurationUnit, string>;
-type EntryMode = 'remaining' | 'expires';
 
 function useDurationFields(
   expiresAt: number | null,
@@ -93,41 +89,6 @@ function useDurationFields(
   return { text, onChange, onBlur };
 }
 
-/**
- * The end-time box. A `datetime-local` reports every segment as it is typed
- * (the year runs 0002, 0020, 0202, 2026), so a parseable value is often one in
- * the past: that is never saved (it would end a live accelerator mid-typing),
- * the text stays as typed, and `ended` says why nothing applied.
- */
-function useEndTimeField(
-  expiresAt: number | null,
-  timeZone: 'UTC' | undefined,
-  onCommit: (expiresAt: number | null) => boolean
-) {
-  const [draft, setDraft] = useState<{ syncedTo: number | null; text: string } | null>(null);
-  const typing = draft !== null && draft.syncedTo === expiresAt;
-  const text = typing
-    ? draft.text
-    : expiresAt === null
-      ? ''
-      : instantToInputValue(expiresAt, timeZone);
-  const typedAt = typing ? inputValueToInstant(draft.text, timeZone) : null;
-  // eslint-disable-next-line react-hooks/purity -- display-only: whether the typed time has passed
-  const ended = typedAt !== null && typedAt <= Date.now();
-
-  const onChange = (raw: string): void => {
-    const at = inputValueToInstant(raw, timeZone);
-    if (at === null || at <= Date.now()) {
-      setDraft({ syncedTo: expiresAt, text: raw });
-      return;
-    }
-    setDraft({ syncedTo: onCommit(at) ? at : expiresAt, text: raw });
-  };
-
-  // Leaving the box keeps what was typed (and why it didn't apply); only a mode switch drops it.
-  return { text, ended, onChange, reset: () => setDraft(null) };
-}
-
 export interface AcceleratorFieldsProps {
   bonus: number;
   expiresAt: number | null;
@@ -140,8 +101,6 @@ export interface AcceleratorFieldsProps {
   invalidProps?: { 'aria-invalid': true; 'aria-describedby': string };
   /** A note under the time, such as why it still needs setting. */
   hint?: ReactNode;
-  /** Controls at the end of the bottom row, beside the entry-mode switch (Clear). */
-  actions?: ReactNode;
   /**
    * Open with the time's boxes showing, so focus lands in the first: the
    * Characters table's pencil, whose whole click is asking to edit the time.
@@ -159,16 +118,12 @@ export function AcceleratorFields({
   onExpiresChange,
   invalidProps,
   hint,
-  actions,
   editTimeOnOpen = false,
 }: AcceleratorFieldsProps) {
   const { t } = useTranslation();
-  const timeZone = useTimeZone();
-  const modeId = useId();
   const hintId = useId();
   // Read with the time boxes, so a screen reader hears why the time is needed.
   const describedBy = hint ? { 'aria-describedby': hintId } : {};
-  const [mode, setMode] = useState<EntryMode>('remaining');
   // Once a time is set the values read as text; the one being edited shows its
   // field(s) while focus stays in them. Unset, the whole thing is a form.
   const [editing, setEditing] = useState<Editing>(editTimeOnOpen ? 'time' : null);
@@ -183,8 +138,6 @@ export function AcceleratorFields({
   const timeTextRef = useRef<HTMLButtonElement | null>(null);
   const bonusTextRef = useRef<HTMLButtonElement | null>(null);
   const expiresIn = useDurationFields(expiresAt, onExpiresChange);
-  const endsAt = useEndTimeField(expiresAt, timeZone, onExpiresChange);
-  const endedId = useId();
   const isSet = expiresAt !== null;
   // Entered from unset, the whole thing stays a form until focus leaves it, so
   // the first digit saving an expiry doesn't turn the rest into text mid-entry.
@@ -199,8 +152,8 @@ export function AcceleratorFields({
     focusAfterCommit(which === 'time' ? timeFieldRef : bonusFieldRef);
     if (seed === undefined) return;
     if (which === 'bonus') onBonusChange(clampBoosterBonus(Number(seed)));
-    // A digit typed on the time left starts the days; an end time has no single box to seed.
-    else if (mode === 'remaining') expiresIn.onChange('days', seed);
+    // A digit typed on the time left starts the days.
+    else expiresIn.onChange('days', seed);
   };
   const close = (): void => {
     setEditing(null);
@@ -215,22 +168,17 @@ export function AcceleratorFields({
       if (editing === 'bonus') onBonusChange(snapshot.bonus);
       else if (snapshot.expiresAt !== expiresAt) onExpiresChange(snapshot.expiresAt);
     }
-    // An ended end time keeps its field open, so focus stays where it is.
-    const stays = editing === 'time' && mode === 'expires' && endsAt.ended;
-    if (!stays) focusAfterCommit(editing === 'time' ? timeTextRef : bonusTextRef);
+    focusAfterCommit(editing === 'time' ? timeTextRef : bonusTextRef);
     close();
   };
   const closeOnLeave = (event: FocusEvent<HTMLElement>): void => {
     if (event.currentTarget.contains(event.relatedTarget)) return;
     close();
   };
-  // A typed end time that has already passed stays on screen with its warning.
-  const showTimeFields =
-    !isSet || formOpen || editing === 'time' || (mode === 'expires' && endsAt.ended);
+  const showTimeFields = !isSet || formOpen || editing === 'time';
   const showBonusField = !isSet || formOpen || editing === 'bonus';
   const timeText = (() => {
     if (!isSet) return '';
-    if (mode === 'expires') return formatTimestamp(new Date(expiresAt), timeZone);
     // eslint-disable-next-line react-hooks/purity -- display-only: the time left reads the clock
     const d = splitBoosterDuration(expiresAt, Date.now());
     return DURATION_UNITS.map((unit) => `${d[unit]}${t(`plans.boosterUnitShort.${unit}`)}`).join(
@@ -242,9 +190,9 @@ export function AcceleratorFields({
   if (!showTimeFields) {
     time = (
       <div className="flex items-center justify-between gap-2">
-        {mode === 'remaining' ? t('plans.boosterExpiresIn') : t('accelerator.expiresAt')}
+        {t('plans.boosterExpiresIn')}
         <EditableValue
-          label={mode === 'remaining' ? t('accelerator.editTimeLeft') : t('accelerator.editEndsAt')}
+          label={t('accelerator.editTimeLeft')}
           onEdit={(seed) => open('time', seed)}
           ref={timeTextRef}
         >
@@ -252,7 +200,7 @@ export function AcceleratorFields({
         </EditableValue>
       </div>
     );
-  } else if (mode === 'remaining') {
+  } else {
     time = (
       <div
         role="group"
@@ -286,44 +234,6 @@ export function AcceleratorFields({
             ))}
           </div>
         </div>
-      </div>
-    );
-  } else {
-    time = (
-      <div className="space-y-1">
-        <label className="flex items-center justify-between gap-2" htmlFor={modeId}>
-          {t('accelerator.expiresAt')}
-          <TextInput
-            ref={timeFieldRef}
-            id={modeId}
-            size="md"
-            type="datetime-local"
-            value={endsAt.text}
-            onChange={(e) => endsAt.onChange(e.target.value)}
-            onFocus={() => startEditing('time')}
-            onBlur={closeOnLeave}
-            onKeyDown={onFieldKeyDown}
-            {...describedBy}
-            {...invalidProps}
-            {...(endsAt.ended
-              ? {
-                  'aria-invalid': true,
-                  'aria-describedby': [
-                    invalidProps?.['aria-describedby'] ?? describedBy['aria-describedby'],
-                    endedId,
-                  ]
-                    .filter(Boolean)
-                    .join(' '),
-                }
-              : {})}
-            className="w-auto"
-          />
-        </label>
-        {endsAt.ended && (
-          <p id={endedId} className="text-[0.6875rem] text-warning">
-            {t('accelerator.alreadyEnded')}
-          </p>
-        )}
       </div>
     );
   }
@@ -378,21 +288,6 @@ export function AcceleratorFields({
       {time}
       {hint && <div id={hintId}>{hint}</div>}
       {bonusRow}
-      <div className="flex items-center justify-between gap-2">
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => {
-            endsAt.reset();
-            setMode(mode === 'remaining' ? 'expires' : 'remaining');
-            // Switching how the time is typed is asking to type it.
-            if (isSet) open('time');
-          }}
-        >
-          {mode === 'remaining' ? t('accelerator.useEndTime') : t('accelerator.useTimeLeft')}
-        </Button>
-        {actions}
-      </div>
     </div>
   );
 }
