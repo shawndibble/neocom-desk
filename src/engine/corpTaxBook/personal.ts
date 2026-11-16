@@ -241,6 +241,10 @@ export interface MemberFlag {
   nextStep?: string;
   /** The member's own reason, read back to them. */
   said?: string;
+  /** The ore this record's dispute named: what "say it again" repeats on a quantity dispute. */
+  lines?: { typeId: number; quantity: number }[];
+  /** The rate a `rate` dispute claimed, in percent. */
+  claimedPct?: number;
 }
 
 /**
@@ -1563,9 +1567,15 @@ function flagFor(
           x.lines.some((l) => l.recordKey.startsWith(`${row.characterId}:`)))
     );
   if (!d) return undefined;
+  const own = d.lines
+    .filter((l) => l.recordKey === recordKey)
+    .map(({ typeId, quantity }) => ({ typeId, quantity }));
+  const kind = disputeKindOf(d);
   const said = {
-    kind: disputeKindOf(d),
+    kind,
     ...(d.reason !== undefined ? { said: d.reason } : {}),
+    ...(kind === 'quantity' && own.length > 0 ? { lines: own } : {}),
+    ...(d.claimedPct !== undefined ? { claimedPct: d.claimedPct } : {}),
   };
   if (!d.resolution) return { state: 'sent', at: d.at, ...said };
   const r = d.resolution;

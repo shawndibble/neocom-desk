@@ -21,6 +21,20 @@ describe('notOwedPlan', () => {
     expect(notOwedPlan(row())).toBeUndefined();
     expect(notOwedPlan(undefined)).toBeUndefined();
   });
+
+  // A kept bill whose figures now agree still lets the member say the same thing again.
+  it('says a kept dispute again from its own claim when the figures no longer show it', () => {
+    const kept = (flagged: object) => row({ flagged: { state: 'rejected', at: 'x', ...flagged } });
+    expect(notOwedPlan(kept({ kind: 'quantity', lines: [{ typeId: 1, quantity: 4 }] }))).toEqual({
+      kind: 'quantity',
+      lines: [{ typeId: 1, quantity: 4 }],
+    });
+    expect(notOwedPlan(kept({ kind: 'rate', claimedPct: 3 }))).toEqual({ kind: 'rate', pct: 3 });
+    expect(notOwedPlan(kept({ kind: 'quantity' }))).toBeUndefined();
+    expect(
+      notOwedPlan(row({ flagged: { state: 'sent', at: 'x', kind: 'rate', claimedPct: 3 } }))
+    ).toBeUndefined();
+  });
 });
 
 describe('outcomesFor (resolving in the app)', () => {

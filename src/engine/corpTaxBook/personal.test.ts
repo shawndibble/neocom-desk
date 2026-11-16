@@ -2657,6 +2657,26 @@ describe('resolving in the app: an open dispute holds its day', () => {
     expect(out.rows[0].held).toBeUndefined();
   });
 
+  // "Say it again" repeats the claim: the flag carries the ore this record disputed and the rate.
+  it("keeps a kept dispute's own claim on the flag: its ore and its rate", () => {
+    const rejected = disputeOn('2026-10-17', {
+      kind: 'rate',
+      claimedPct: 3,
+      lines: [{ recordKey: keyOf('2026-10-17'), typeId: ZEO, quantity: 1_000, payeeName: '' }],
+      resolution: { kind: 'rejected', at: '2026-10-19T00:00:00.000Z', by: 1, reason: 'No' },
+    });
+    const out = overlay([entry()], [book({ disputes: [rejected] })]);
+    expect(out.rows[0].flagged).toMatchObject({ kind: 'rate', claimedPct: 3 });
+    const quantity = disputeOn('2026-10-17', {
+      kind: 'quantity',
+      lines: [{ recordKey: keyOf('2026-10-17'), typeId: ZEO, quantity: 1_000, payeeName: '' }],
+      resolution: { kind: 'rejected', at: '2026-10-19T00:00:00.000Z', by: 1, reason: 'No' },
+    });
+    expect(overlay([entry()], [book({ disputes: [quantity] })]).rows[0].flagged?.lines).toEqual([
+      { typeId: ZEO, quantity: 1_000 },
+    ]);
+  });
+
   it('skips a held day: a donation pays the next oldest instead', () => {
     const out = overlay(days(), [
       book({

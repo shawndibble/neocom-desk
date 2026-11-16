@@ -64,8 +64,15 @@ export function notOwedPlan(row: BookRowView | undefined): NotOwedPlan | undefin
     return { kind: 'rate', pct: d.personalPct };
   const excess = row.personalOreLines ? minusLines(row.oreLines, row.personalOreLines) : [];
   if (excess.length > 0) return { kind: 'quantity', lines: excess };
+  const f = row.flagged;
   // A Conflict the officer already kept resolved to a plain bill: the member's answer is the same.
-  return row.flagged?.kind === 'payee' ? { kind: 'payee' } : undefined;
+  if (f?.kind === 'payee') return { kind: 'payee' };
+  // A kept bill whose figures no longer show the claim: say the same thing again.
+  if (f?.state !== 'rejected') return undefined;
+  if (f.kind === 'rate' && f.claimedPct !== undefined) return { kind: 'rate', pct: f.claimedPct };
+  if (f.kind === 'quantity' && f.lines && f.lines.length > 0)
+    return { kind: 'quantity', lines: f.lines };
+  return undefined;
 }
 
 export interface Offer {
