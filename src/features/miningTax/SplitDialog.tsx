@@ -19,7 +19,7 @@ import {
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import type { OreLine } from '@/engine/miningTax/types';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
-import { growthMoves, planSplit } from '@/engine/miningTax/split';
+import { growthMoves, maxUnreportedClaim, planSplit } from '@/engine/miningTax/split';
 import { formatIsk } from '@/lib/isk';
 import { cx } from '@/lib/cx';
 import { split, type SplitCollector } from './ledgerActions';
@@ -95,9 +95,9 @@ export function SplitDialog({
   // One figure per ore type — what the original's Payee keeps (issue #6180).
   // The pilot types whichever side they know: the Moves box writes
   // `held − moved` here. Above `held` is ore the client shows but ESI has
-  // not reported yet. A needs-review Assignment starts with its growth moved,
-  // since that is what the pilot is nearly always here to hand on; anything
-  // else starts keeping everything.
+  // not reported yet, up to `maxUnreportedClaim`. A needs-review Assignment
+  // starts with its growth moved, since that is what the pilot is nearly
+  // always here to hand on; anything else starts keeping everything.
   const [keeps, setKeeps] = useState<ReadonlyMap<number, number>>(() => {
     const growth =
       assignment.status === 'needs-review' && assignment.reviewDiff
@@ -135,8 +135,12 @@ export function SplitDialog({
   for (const line of original) {
     const keep = keeps.get(line.typeId) ?? line.quantity;
     if (keep < line.quantity) moves.push({ typeId: line.typeId, quantity: line.quantity - keep });
+    // Clamped again here: an open dialog's entry can shrink under a typed keep.
     if (keep > line.quantity)
-      unreported.push({ typeId: line.typeId, quantity: keep - line.quantity });
+      unreported.push({
+        typeId: line.typeId,
+        quantity: Math.min(keep - line.quantity, maxUnreportedClaim(line.quantity)),
+      });
   }
   // `setKeep` keeps every figure in range, so this never throws — and it is
   // the same plan `splitAssignment` commits.
@@ -175,7 +179,7 @@ export function SplitDialog({
     pctValue <= 100;
 
   function setKeep(typeId: number, raw: number, held: number) {
-    const ceiling = canClaimUnreported ? Number.MAX_SAFE_INTEGER : held;
+    const ceiling = canClaimUnreported ? held + maxUnreportedClaim(held) : held;
     const clamped = clamp(Math.round(raw), 0, ceiling);
     setKeeps((previous) => new Map(previous).set(typeId, clamped));
   }
