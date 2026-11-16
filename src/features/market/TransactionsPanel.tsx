@@ -25,7 +25,7 @@ import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
 import { loadWalletJournal, loadWalletTransactionsWithStatus } from '@/features/character/wallet';
 import { TransactionsSummaryStrip } from './TransactionsSummaryStrip';
-import { TransactionsFilterBar } from '@/features/corp/CorpTransactionsPanel';
+import { TransactionsFilterBar } from '@/features/character/TransactionsFilterBar';
 import {
   EMPTY_TRANSACTION_FILTER_PARAMS,
   EMPTY_WALLET_TRANSACTION_FILTER,
