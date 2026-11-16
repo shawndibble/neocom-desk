@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildBookView,
+  type BookView,
+  type PlannedRun,
   duePeriods,
   extractionDetail,
   isIssuedPeriod,
@@ -1105,5 +1107,69 @@ describe('planStatementRuns: every missed period in one run (#6208)', () => {
   it('is empty when nothing has closed', () => {
     expect(planStatementRuns(buildBookView(input()))).toEqual([]);
     expect(duePeriods(buildBookView(input()))).toEqual([]);
+  });
+});
+
+describe('planStatementRuns: the same plan as re-planning every period from the start', () => {
+  /** The plan as #6208 first computed it: `nextRunPeriod` from scratch on each period's view. */
+  function reference(view: BookView): PlannedRun[] {
+    const runs: PlannedRun[] = [];
+    const seen = new Set<string>();
+    let current = view;
+    for (;;) {
+      const period = nextRunPeriod(current);
+      if (period === undefined || seen.has(period.start)) return runs;
+      seen.add(period.start);
+      const plan = planStatementRun(current, period);
+      runs.push({ plan, view: current });
+      const issued = plan.lines.map((line) => statementForLine(current, plan, line));
+      current = buildBookView({
+        ...current.input,
+        statements: [...current.input.statements, ...issued],
+      });
+    }
+  }
+  const plans = (runs: PlannedRun[]) =>
+    runs.map((r) => ({ plan: r.plan, statements: r.view.input.statements.map((s) => s.id) }));
+
+  const late = input({
+    now: '2026-12-18T14:00:00Z',
+    lastSyncedAt: '2026-12-18T12:00:00Z',
+    entries: [
+      entry(1, '2026-08-10', 1000),
+      entry(2, '2026-08-20', 300),
+      entry(1, '2026-09-10', 2000),
+      entry(3, '2026-10-02', 50),
+      entry(2, '2026-10-12', 4000),
+      entry(1, '2026-11-30', 700),
+      entry(3, '2026-12-01', 900),
+    ],
+  });
+  const issuedAug = (() => {
+    const view = buildBookView(late);
+    const [aug] = planStatementRuns(view);
+    return aug.plan.lines
+      .filter((l) => l.minerId === 'solo:1')
+      .map((l) => statementForLine(aug.view, aug.plan, l));
+  })();
+
+  const cases: [string, BookViewInput][] = [
+    ['several missed months, several miners', late],
+    ['under a minimum that rolls some months over', { ...late, minimumStatement: 150_000 }],
+    ['a 10-day cadence', { ...late, cadence: { kind: 'days', days: 10, anchor: '2026-08-01' } }],
+    ['a miner new to a month already issued for another', { ...late, statements: issuedAug }],
+    ['nothing closed yet', input()],
+  ];
+  it.each(cases)('%s', (_name, bookInput) => {
+    const view = buildBookView(bookInput);
+    const runs = planStatementRuns(view);
+    expect(plans(runs)).toEqual(plans(reference(view)));
+    expect(duePeriods(view)).toEqual(runs.map((r) => r.plan.period));
+    expect(nextRunPeriod(view)).toEqual(runs[0]?.plan.period);
+  });
+
+  it('plans the first period on the view it was given', () => {
+    const view = buildBookView(late);
+    expect(planStatementRuns(view)[0].view).toBe(view);
   });
 });

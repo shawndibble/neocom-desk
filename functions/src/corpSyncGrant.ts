@@ -12,6 +12,7 @@
 // and the token revoked at SSO, so a stopped schedule holds nothing. Nothing here
 // logs or returns a token.
 
+import { runPool } from './asyncPool.js';
 import type { Firestore } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { SsoRefreshError, type RefreshedTokens } from './alertGrant.js';
@@ -471,10 +472,16 @@ export interface FeederRunOptions {
 export const FEEDER_GAP_MS = 1500;
 
 /**
- * Sync every opted-in corporation's book, one at a time (the ESI error budget is
- * shared by every user of the client id, and each sync is many small writes).
+ * Books synced at once. Small: the ESI error budget is shared by every user of the client id
+ * (every call still goes through its rate-limit handling), and each sync is many small writes.
+ * Not one: one at a time, a busy run reached the moon owners last and the timeout cut them first.
+ */
+export const BOOK_SYNC_CONCURRENCY = 3;
+
+/**
+ * Sync every opted-in corporation's book, `BOOK_SYNC_CONCURRENCY` at a time.
  * A corporation that fails is skipped and tried again next run; a budget hit
- * ends the whole run.
+ * starts no further book (the ones running finish) and skips the feeder pass.
  */
 export async function runScheduledCorpSyncs(
   deps: CorpSyncDeps,
@@ -491,39 +498,56 @@ export async function runScheduledCorpSyncs(
   };
   const due = await dueGrants(deps);
   summary.grants = due.length;
-  for (const grant of due) {
-    if (summary.budgetStopped || esi.budgetLow()) {
-      summary.budgetStopped = true;
-      summary.skipped += 1;
-      continue;
+  let started = 0;
+  await runPool(
+    due,
+    BOOK_SYNC_CONCURRENCY,
+    async (grant) => {
+      started += 1;
+      await syncDueBook(deps, esi, grant, summary);
+    },
+    () => {
+      if (esi.budgetLow()) summary.budgetStopped = true;
+      return summary.budgetStopped;
     }
-    try {
-      const result = await runOne(deps, esi, grant);
-      if (result.kind === 'synced') {
-        summary.synced += 1;
-        // Failing to rest it only means it syncs again next run.
-        await deferNextSync(deps, grant).catch((err) =>
-          deps.log('Could not rest a synced book grant', {
-            corporationId: grant.corporationId,
-            error: err instanceof Error ? err.name : 'unknown',
-          })
-        );
-      } else if (result.kind === 'stopped') summary.stopped += 1;
-      else {
-        summary.skipped += 1;
-        if (result.reason === 'esi-budget') summary.budgetStopped = true;
-      }
-    } catch (err) {
-      summary.skipped += 1;
-      deps.log('Scheduled Corp Tax Book sync failed', {
-        corporationId: grant.corporationId,
-        error: err instanceof Error ? err.name : 'unknown',
-        ...(err instanceof HttpsError ? { code: err.code } : {}),
-      });
-    }
-  }
+  );
+  // A budget hit leaves the rest unstarted: skipped, tried again next run.
+  summary.skipped += due.length - started;
   if (!summary.budgetStopped) await runFeederSyncs(deps, esi, summary, feederOptions);
   return summary;
+}
+
+/** One due book's run, counted into `summary`; never throws. */
+async function syncDueBook(
+  deps: CorpSyncDeps,
+  esi: SyncEsi,
+  grant: CorpSyncGrantDoc,
+  summary: RunSummary
+): Promise<void> {
+  try {
+    const result = await runOne(deps, esi, grant);
+    if (result.kind === 'synced') {
+      summary.synced += 1;
+      // Failing to rest it only means it syncs again next run.
+      await deferNextSync(deps, grant).catch((err) =>
+        deps.log('Could not rest a synced book grant', {
+          corporationId: grant.corporationId,
+          error: err instanceof Error ? err.name : 'unknown',
+        })
+      );
+    } else if (result.kind === 'stopped') summary.stopped += 1;
+    else {
+      summary.skipped += 1;
+      if (result.reason === 'esi-budget') summary.budgetStopped = true;
+    }
+  } catch (err) {
+    summary.skipped += 1;
+    deps.log('Scheduled Corp Tax Book sync failed', {
+      corporationId: grant.corporationId,
+      error: err instanceof Error ? err.name : 'unknown',
+      ...(err instanceof HttpsError ? { code: err.code } : {}),
+    });
+  }
 }
 
 /**

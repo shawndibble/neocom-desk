@@ -785,6 +785,34 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
         );
       });
 
+      it('adds no audit entry for a run that changed nothing, but still stamps lastSync', async () => {
+        await optIn(ACCOUNTANT);
+        const syncs = async () =>
+          (await audit()).filter((a) => a.action === 'sync' && a.via === 'scheduled sync').length;
+        now = T0 + 6 * H;
+        await run();
+        // The first run brought rows, an Extraction and a donation: it is audited.
+        expect(await syncs()).toBe(1);
+        for (let i = 2; i <= 3; i++) {
+          now = T0 + i * 6 * H;
+          expect((await run()).synced).toBe(1);
+          expect((await book().get()).data()?.lastSync).toMatchObject({ at: now, scheduled: true });
+        }
+        expect(await syncs()).toBe(1);
+
+        // A new donation is a change again.
+        (esiState.journal as { data: unknown[] }).data.push({
+          id: 4,
+          date: '2026-10-18T10:00:00Z',
+          ref_type: 'player_donation',
+          amount: 1_000_000,
+          first_party_id: 50,
+        });
+        now += 6 * H;
+        await run();
+        expect(await syncs()).toBe(2);
+      });
+
       it('reads in full once the marker is a day old, whatever the stamps say', async () => {
         await quietBook();
         await book().collection('statements').doc('s1').set(statement);

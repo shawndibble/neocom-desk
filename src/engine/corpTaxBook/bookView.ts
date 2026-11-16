@@ -813,23 +813,56 @@ export interface StatementRunPlan {
   creditApplied: number;
 }
 
+/** Each Miner's charges, grouped once per view: a run plans every Miner on several periods. */
+const chargesByMiner = new WeakMap<BookView, Map<string, BookView['charges']>>();
+
+function chargesOf(view: BookView, minerId: string): BookView['charges'] {
+  let byMiner = chargesByMiner.get(view);
+  if (!byMiner) {
+    byMiner = new Map();
+    for (const c of view.charges) {
+      const list = byMiner.get(c.minerId);
+      if (list) list.push(c);
+      else byMiner.set(c.minerId, [c]);
+    }
+    chargesByMiner.set(view, byMiner);
+  }
+  return byMiner.get(minerId) ?? [];
+}
+
+/** The periods with a charge that have ended on a Billable day, oldest first, starting after `after`. */
+function closedPeriods(view: BookView, after?: string): StatementPeriod[] {
+  const { billableThrough } = view;
+  if (billableThrough === undefined) return [];
+  const periods: StatementPeriod[] = [];
+  const seen = new Set<string>();
+  for (const date of view.charges.map((c) => c.date).sort()) {
+    const period = statementPeriod(date, view.input.cadence, view.input.startDate);
+    if (seen.has(period.start)) continue;
+    seen.add(period.start);
+    if (period.end > billableThrough) continue;
+    if (after !== undefined && period.start <= after) continue;
+    periods.push(period);
+  }
+  return periods;
+}
+
+/** The first of `closedPeriods` that still has unbilled lines, with its plan. */
+function firstRun(view: BookView, after?: string): StatementRunPlan | undefined {
+  for (const period of closedPeriods(view, after)) {
+    const plan = planStatementRun(view, period);
+    if (plan.lines.length > 0) return plan;
+  }
+  return undefined;
+}
+
 /**
  * The period the next run sends: the earliest one that has ended on a Billable
  * day and still has unbilled lines, else undefined. A period that has not
  * fully closed is not offered (Sep is "Ready to send" only once 30 Sep is Billable).
  */
 export function nextRunPeriod(view: BookView): StatementPeriod | undefined {
-  if (view.billableThrough === undefined) return undefined;
-  const dates = [...view.charges.map((c) => c.date)].sort();
-  const seen = new Set<string>();
-  for (const date of dates) {
-    const period = statementPeriod(date, view.input.cadence, view.input.startDate);
-    if (seen.has(period.start)) continue;
-    seen.add(period.start);
-    if (period.end > view.billableThrough) continue;
-    if (planStatementRun(view, period).lines.length > 0) return period;
-  }
-  return undefined;
+  return firstRun(view)?.period;
 }
 
 export function planStatementRun(view: BookView, period: StatementPeriod): StatementRunPlan {
@@ -843,7 +876,7 @@ export function planStatementRun(view: BookView, period: StatementPeriod): State
       minerId: m.id,
       startDate: view.input.startDate,
       period,
-      charges: view.charges.filter((c) => c.minerId === m.id),
+      charges: chargesOf(view, m.id),
       adjustments: view.input.adjustments,
       issued: inner.statements,
       paidStatementIds: view.input.paidStatementIds,
@@ -879,20 +912,23 @@ export interface PlannedRun {
  */
 export function planStatementRuns(view: BookView): PlannedRun[] {
   const runs: PlannedRun[] = [];
-  const seen = new Set<string>();
   let current = view;
-  for (;;) {
-    const period = nextRunPeriod(current);
-    if (period === undefined || seen.has(period.start)) return runs;
-    seen.add(period.start);
-    const plan = planStatementRun(current, period);
+  let plan = firstRun(view);
+  while (plan) {
     runs.push({ plan, view: current });
-    const issued = plan.lines.map((line) => statementForLine(current, plan, line));
+    const { start } = plan.period;
+    // Nothing closed after it: no next view to build.
+    if (closedPeriods(current, start).length === 0) return runs;
+    const done = plan;
+    const issued = done.lines.map((line) => statementForLine(current, done, line));
     current = buildBookView({
       ...current.input,
       statements: [...current.input.statements, ...issued],
     });
+    // Issuing a period only bills more, so no earlier one can gain lines: search after it.
+    plan = firstRun(current, start);
   }
+  return runs;
 }
 
 /** The periods the next run bills, oldest first; empty when no run is due. */

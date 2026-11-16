@@ -5,10 +5,20 @@ import '@/i18n';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
-const remote = vi.hoisted(() => ({ status: undefined as Record<string, unknown> | undefined }));
+const remote = vi.hoisted(() => ({
+  status: undefined as Record<string, unknown> | undefined,
+  /** The book's Needs you count as the background read finds it; an Error makes it fail. */
+  count: 0 as number | null | Error,
+}));
 vi.mock('@/sync/firebaseApp', () => ({
   getSyncAuth: () => ({ currentUser: { uid: 'char:1' } }),
   getSyncFirestore: () => ({}),
+}));
+vi.mock('@/features/corp/moons/moonsAttentionCount', () => ({
+  loadNeedsYouCount: async () => {
+    if (remote.count instanceof Error) throw remote.count;
+    return remote.count;
+  },
 }));
 vi.mock('@/sync/uid', () => ({ uidForCharacter: (id: number) => `char:${id}` }));
 vi.mock('firebase/firestore/lite', () => ({
@@ -18,7 +28,7 @@ vi.mock('firebase/firestore/lite', () => ({
 
 import {
   publishMoonsAttention,
-  refreshMoonsSyncStopped,
+  refreshMoonsAttention,
 } from '@/features/corp/moons/moonsNavAttention';
 import { NavItem } from './NavItem';
 import { useNavBadges } from './navBadges';
@@ -39,6 +49,7 @@ const renderEntry = () =>
 
 beforeEach(async () => {
   remote.status = undefined;
+  remote.count = 0;
   await db.settings.clear();
   await db.characters.clear();
   await db.characters.put({ characterId: 1, corporationId: CORP } as never);
@@ -77,13 +88,35 @@ describe('the corp Moons nav dot (#6208)', () => {
       characterName: 'Holder',
       stoppedReason: 'role-lost',
     };
-    await act(() => refreshMoonsSyncStopped(1, CORP));
+    await act(() => refreshMoonsAttention(1, CORP));
     expect(await screen.findByRole('link', { name: 'Moons, needs attention' })).toBeInTheDocument();
   });
 
   it('reads nothing for a Character with no editor visit on record', async () => {
     remote.status = { status: 'stopped', characterId: 1, characterName: 'Holder' };
-    await refreshMoonsSyncStopped(1, CORP);
+    await refreshMoonsAttention(1, CORP);
     expect(await db.settings.count()).toBe(0);
+  });
+
+  it('lights for Needs you work that arrived after the visit, and clears once it is handled', async () => {
+    await publishMoonsAttention(1, CORP, { needsYou: 0, syncStopped: false });
+    renderEntry();
+    remote.count = 2;
+    await act(() => refreshMoonsAttention(1, CORP));
+    expect(await screen.findByRole('link', { name: 'Moons, needs attention' })).toBeInTheDocument();
+    // Another officer handled it.
+    remote.count = 0;
+    await act(() => refreshMoonsAttention(1, CORP));
+    expect(await screen.findByRole('link', { name: 'Moons' })).toBeInTheDocument();
+  });
+
+  it('keeps the last count when the book cannot be read, and drops it when the book is off', async () => {
+    await publishMoonsAttention(1, CORP, { needsYou: 3, syncStopped: false });
+    remote.count = new Error('offline');
+    await refreshMoonsAttention(1, CORP);
+    expect((await db.settings.toArray())[0]?.value).toEqual({ needsYou: 3, syncStopped: false });
+    remote.count = null;
+    await refreshMoonsAttention(1, CORP);
+    expect((await db.settings.toArray())[0]?.value).toEqual({ needsYou: 0, syncStopped: false });
   });
 });

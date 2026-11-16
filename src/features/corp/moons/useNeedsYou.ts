@@ -1,7 +1,13 @@
 import { useMemo } from 'react';
-import { planStatementRuns, type BookView, type PlannedRun } from '@/engine/corpTaxBook/bookView';
+import {
+  planStatementRuns,
+  type BookView,
+  type NeedsYouItem,
+  type PlannedRun,
+} from '@/engine/corpTaxBook/bookView';
 import { uncountedToShow } from '@/engine/corpTaxBook/uncounted';
 import { disputesToShow } from '@/engine/corpTaxBook/disputes';
+import type { BookData } from '../taxBook/bookClient';
 import { useBook } from './useBook';
 import { useTabsProjection } from './useTabsProjection';
 
@@ -22,23 +28,20 @@ export function plannedRuns(view: BookView): PlannedRun[] {
 
 /**
  * Everything the Overview's "Needs you" lists, and how many cards that is: the
- * book's own items, tax noted in a division the book does not read (#6207),
- * a Miner's dispute of a Conflict day until it is dismissed or rejected (#6206),
- * and one card when a Statement run is due (#6208). The panel and the Moons nav
- * dot read the same count.
+ * book's own items (`needsYou`, the tabs projection's), tax noted in a division the
+ * book does not read (#6207), a Miner's dispute of a Conflict day until it is dismissed
+ * or rejected (#6206), and one card when a Statement run is due (#6208). The panel, the
+ * Moons visit and the Moons nav dot's background poll all count it here.
  */
-export function useNeedsYou() {
-  const { view, data, settings } = useBook();
-  const { needsYou } = useTabsProjection();
-  const uncounted = useMemo(
-    () => uncountedToShow({ donations: data.uncounted ?? [] }, settings.divisions),
-    [data.uncounted, settings.divisions]
-  );
-  const disputes = useMemo(
-    () => disputesToShow(data.disputes ?? [], view.input.dismissals),
-    [data.disputes, view.input.dismissals]
-  );
-  const runDue = useMemo(() => plannedRuns(view).map((run) => run.plan.period), [view]);
+export function needsYouOf(
+  view: BookView,
+  data: Pick<BookData, 'uncounted' | 'disputes'>,
+  divisions: readonly number[],
+  needsYou: NeedsYouItem[]
+) {
+  const uncounted = uncountedToShow({ donations: data.uncounted ?? [] }, divisions);
+  const disputes = disputesToShow(data.disputes ?? [], view.input.dismissals);
+  const runDue = plannedRuns(view).map((run) => run.plan.period);
   return {
     needsYou,
     uncounted,
@@ -46,4 +49,14 @@ export function useNeedsYou() {
     runDue,
     count: needsYou.length + uncounted.length + disputes.length + (runDue.length > 0 ? 1 : 0),
   };
+}
+
+/** `needsYouOf` for the open book. */
+export function useNeedsYou() {
+  const { view, data, settings } = useBook();
+  const { needsYou } = useTabsProjection();
+  return useMemo(
+    () => needsYouOf(view, data, settings.divisions, needsYou),
+    [view, data, settings.divisions, needsYou]
+  );
 }

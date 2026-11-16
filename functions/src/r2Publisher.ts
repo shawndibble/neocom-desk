@@ -15,6 +15,7 @@
  * `REFRESH_AFTER_MS` the writer re-uploads every shard; the rule's age must
  * stay comfortably above that.
  */
+import { runPool } from './asyncPool.js';
 import type { R2Put } from './r2Client.js';
 import {
   R2_INDEX_KEY,
@@ -65,18 +66,6 @@ const INDEX_HEADERS = {
   'Content-Type': 'application/json',
   'Cache-Control': 'public, max-age=60',
 };
-
-async function runPool<T>(
-  items: readonly T[],
-  limit: number,
-  work: (item: T) => Promise<void>
-): Promise<void> {
-  let next = 0;
-  const worker = async () => {
-    while (next < items.length) await work(items[next++]);
-  };
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-}
 
 export async function publishContractOffersToR2(args: {
   rows: readonly PublicContractOfferRow[];
