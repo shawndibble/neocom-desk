@@ -309,6 +309,17 @@ describe('ActiveJobsPanel: rendering', () => {
 });
 
 describe('ActiveJobsPanel: 403 (missing scope) surfaces a distinct re-login state', () => {
+  // Named, and with no stored grant, so the banner names the missing Permission.
+  beforeEach(async () => {
+    await db.characters.put({
+      characterId: CHAR_ID,
+      name: 'Pilot One',
+      ownerHash: 'oh1',
+      addedAt: 1,
+    });
+    await db.tokens.delete(CHAR_ID);
+  });
+
   it('shows a re-login message, not the generic empty state or the offline banner', async () => {
     server.use(
       http.get(jobsUrl(), () =>
@@ -324,10 +335,7 @@ describe('ActiveJobsPanel: 403 (missing scope) surfaces a distinct re-login stat
       </MemoryRouter>
     );
 
-    expect(await screen.findByText('Log in again to see jobs')).toBeInTheDocument();
-    expect(
-      screen.getByText(/log this character in again to grant the new permission/i)
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Pilot One: grant Industry')).toBeInTheDocument();
     expect(screen.queryByText(/showing cached data/i)).toBeNull();
     expect(screen.queryByText('No active jobs cached')).toBeNull();
   });
@@ -349,9 +357,10 @@ describe('ActiveJobsPanel: 403 (missing scope) surfaces a distinct re-login stat
       </MemoryRouter>
     );
 
-    const loginButton = await screen.findByRole('button', { name: 'Log in again with EVE Online' });
+    const loginButton = await screen.findByRole('button', { name: 'Grant in EVE' });
     await user.click(loginButton);
     expect(beginEveLogin).toHaveBeenCalledTimes(1);
+    expect(beginEveLogin).toHaveBeenCalledWith({ characterId: CHAR_ID, groups: ['industry'] });
   });
 
   it('REFRESH while scope is missing re-fetches and re-shows the re-login state, not a silent no-op', async () => {
@@ -372,15 +381,13 @@ describe('ActiveJobsPanel: 403 (missing scope) surfaces a distinct re-login stat
       </MemoryRouter>
     );
 
-    await screen.findByText('Log in again to see jobs');
+    await screen.findByText('Pilot One: grant Industry');
     expect(requestCount).toBe(1);
 
     await user.click(screen.getByRole('button', { name: 'Refresh' }));
 
-    expect(await screen.findByText('Log in again to see jobs')).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Log in again with EVE Online' })
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Pilot One: grant Industry')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Grant in EVE' })).toBeInTheDocument();
     expect(requestCount).toBe(2);
   });
 });
@@ -418,7 +425,8 @@ describe('ActiveJobsPanel: offline cache fallback', () => {
     await expandJobs();
     expect(screen.getByText('Widget Alpha')).toBeInTheDocument();
     expect(screen.getByText(/showing cached data/i)).toBeInTheDocument();
-    expect(screen.queryByText('Log in again to see jobs')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Grant in EVE' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Log in' })).toBeNull();
   });
 
   it('distinguishes a failed manual refresh from the initial-load offline banner (UX-REVIEW #10)', async () => {
@@ -1331,8 +1339,9 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     await user.click(await screen.findByRole('button', { name: 'This character' }));
     await user.click(await screen.findByRole('menuitemradio', { name: 'All characters · 2' }));
 
-    expect(await screen.findByText('Pilot Two — Log in again to see jobs')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Log in again with EVE Online' }));
+    // Pilot Two's grant holds the jobs scope, so EVE refused it: a re-login.
+    expect(await screen.findByText('Pilot Two: log in again')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Log in' }));
     expect(beginEveLogin).toHaveBeenCalledWith({ characterId: CHAR_B, groups: ['industry'] });
   });
 

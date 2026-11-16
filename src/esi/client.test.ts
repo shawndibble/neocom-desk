@@ -10,6 +10,7 @@ import {
   isOfflineFailure,
   isUnconfirmedWrite,
   EsiOfflineError,
+  EsiSsoUnavailableError,
   EsiTimeoutError,
   ESI_BASE_URL,
   COMPATIBILITY_DATE,
@@ -829,8 +830,26 @@ describe('isAuthFailure (BUG #3)', () => {
     expect(isAuthFailure(new AuthError('timeout', 'slow', 0))).toBe(false);
   });
 
-  it('is still true for an AuthError SSO answered with a failure status', () => {
-    expect(isAuthFailure(new AuthError('unknown_error', 'bad gateway', 502))).toBe(true);
+  it('is true for an AuthError SSO refused the grant with', () => {
+    expect(isAuthFailure(new AuthError('invalid_client', 'wrong app', 401))).toBe(true);
+  });
+
+  it('is false while SSO itself is down or throttling: nothing says the grant is bad', () => {
+    expect(isAuthFailure(new AuthError('unknown_error', 'bad gateway', 502))).toBe(false);
+    expect(isAuthFailure(new AuthError('unknown_error', 'unavailable', 503))).toBe(false);
+    expect(isAuthFailure(new AuthError('unknown_error', 'slow down', 429))).toBe(false);
+    expect(isAuthFailure(new EsiSsoUnavailableError(503))).toBe(false);
+  });
+
+  it('is false for a 403 that names a missing corporation role: no login can grant a role', () => {
+    expect(
+      isAuthFailure(new EsiError(403, 'Character does not have required role(s): Accountant'))
+    ).toBe(false);
+    expect(
+      isAuthFailure(
+        new EsiError(403, 'Forbidden', { error: 'Character does not have required role(s)' })
+      )
+    ).toBe(false);
   });
 
   it('is false for the offline error', () => {
@@ -866,6 +885,7 @@ describe('isOfflineFailure', () => {
     expect(isOfflineFailure(new EsiError(401, 'bad token'))).toBe(false);
     expect(isOfflineFailure(new AuthError('invalid_grant', 'revoked', 400))).toBe(false);
     expect(isOfflineFailure(new EsiBudgetError('rateLimit', 1000))).toBe(false);
+    expect(isOfflineFailure(new EsiSsoUnavailableError(503))).toBe(false);
     expect(isOfflineFailure(new DOMException('Aborted', 'AbortError'))).toBe(false);
     expect(isOfflineFailure(new Error('boom'))).toBe(false);
     expect(isOfflineFailure(undefined)).toBe(false);
@@ -907,6 +927,26 @@ describe('esiFetch — token refresh that cannot reach SSO', () => {
 
     expect(failure).toBeInstanceOf(EsiOfflineError);
     expect(failure).toBeInstanceOf(EsiError);
+    expect((failure as EsiError).status).toBe(0);
+    expect(isAuthFailure(failure)).toBe(false);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('throws EsiSsoUnavailableError when SSO answered with an outage, not a re-login', async () => {
+    configureEsi({
+      getToken: async () => {
+        throw new AuthError('unknown_error', 'Token request failed (503)', 503);
+      },
+    });
+    const handler = vi.fn(() => HttpResponse.json({}));
+    server.use(http.get(`${ESI_BASE_URL}/characters/123/wallet`, handler));
+
+    const failure = await esiFetch('/characters/123/wallet', {
+      characterId: 123,
+      endpointId: 'getCharacterWallet',
+    }).catch((err: unknown) => err);
+
+    expect(failure).toBeInstanceOf(EsiSsoUnavailableError);
     expect((failure as EsiError).status).toBe(0);
     expect(isAuthFailure(failure)).toBe(false);
     expect(handler).not.toHaveBeenCalled();

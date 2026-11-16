@@ -382,9 +382,6 @@ function WidgetFrame({
             characterId={grantTarget}
             characterName={view.grantCharacterName}
             endpoints={endpoints}
-            title={t('overview.widgets.needsPermission')}
-            hint={t('overview.widgets.needsPermissionHint', { title })}
-            actionLabel={t('overview.widgets.grantAction')}
           />
         ) : (
           <>
@@ -473,9 +470,6 @@ function WidgetFrame({
             characterId={grantTarget}
             characterName={view.grantCharacterName}
             endpoints={view.grantEndpoints}
-            title={t('overview.widgets.needsPermission')}
-            hint={t('overview.widgets.needsPermissionHint', { title })}
-            actionLabel={t('overview.widgets.grantAction')}
           />
         </div>
       </>

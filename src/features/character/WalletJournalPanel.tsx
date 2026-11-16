@@ -106,13 +106,7 @@ export function WalletJournalPanel({
         )
       ) : !showingBeyondActive && journalNeedsReauth ? (
         <div className="p-3">
-          <GrantBanner
-            characterId={activeCharacterId}
-            endpoints={['getCharacterWalletJournal']}
-            title={t('wallet.reauthTitle')}
-            hint={t('wallet.reauthHint')}
-            actionLabel={t('wallet.reauthAction')}
-          />
+          <GrantBanner characterId={activeCharacterId} endpoints={['getCharacterWalletJournal']} />
         </div>
       ) : !showingBeyondActive && (!journalResult || journalLength === 0) ? (
         <CachedEmptyState

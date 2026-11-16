@@ -158,12 +158,7 @@ export function SkillCertificates() {
     body = (
       <>
         {/* Only when the stored grant really lacks the skills read. */}
-        <GrantNote
-          endpoints={['getCharacterSkills']}
-          title={t('skills.reauthTitle')}
-          hint={t('skills.reauthHint')}
-          actionLabel={t('skills.reauthAction')}
-        />
+        <GrantNote endpoints={['getCharacterSkills']} title={t('skills.reauthTitle')} />
         <EmptyState title={t('skills.emptyTitle')} hint={t('skills.emptyHint')} />
       </>
     );

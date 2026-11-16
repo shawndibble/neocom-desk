@@ -460,21 +460,9 @@ export function Contracts() {
           <Spinner block="page" label={t('common.loading')} />
         ) : needsReauth ? (
           source === 'corporation' ? (
-            <GrantBanner
-              characterId={activeCharacterId}
-              endpoints={['getCorporationContracts']}
-              title={t('contracts.corpReauthTitle')}
-              hint={t('contracts.corpReauthHint')}
-              actionLabel={t('contracts.reauthAction')}
-            />
+            <GrantBanner characterId={activeCharacterId} endpoints={['getCorporationContracts']} />
           ) : (
-            <GrantBanner
-              characterId={activeCharacterId}
-              endpoints={['getCharacterContracts']}
-              title={t('contracts.reauthTitle')}
-              hint={t('contracts.reauthHint')}
-              actionLabel={t('contracts.reauthAction')}
-            />
+            <GrantBanner characterId={activeCharacterId} endpoints={['getCharacterContracts']} />
           )
         ) : error || (source === 'corporation' && active.data && view.corporationId === null) ? (
           <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />

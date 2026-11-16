@@ -365,13 +365,7 @@ export function Contacts() {
             ) : contactsNeedsReauth && (!contactsResult || contacts.length === 0) ? (
               // A lapsed grant with no saved contacts: the full banner. With
               // saved contacts the table stays and a small note sits above it.
-              <GrantBanner
-                characterId={activeCharacterId}
-                endpoints={['getCharacterContacts']}
-                title={t('contacts.reauthTitle')}
-                hint={t('contacts.reauthHint')}
-                actionLabel={t('contacts.reauthAction')}
-              />
+              <GrantBanner characterId={activeCharacterId} endpoints={['getCharacterContacts']} />
             ) : error ? (
               <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
             ) : !contactsResult || contacts.length === 0 ? (

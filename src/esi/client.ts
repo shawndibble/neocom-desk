@@ -14,7 +14,13 @@
 import { AuthError } from '@/auth/sso';
 import { emitEsiActivity } from './activityLog';
 import { passEsiGate, observeEsiResponse } from './budget';
-import { EsiError, EsiBudgetError, EsiOfflineError, EsiTimeoutError } from './errors';
+import {
+  EsiError,
+  EsiBudgetError,
+  EsiOfflineError,
+  EsiSsoUnavailableError,
+  EsiTimeoutError,
+} from './errors';
 import { currentEsiLane, gateLane, type EsiLane } from './lane';
 import type { EsiEndpointId } from './registry';
 import { COMPATIBILITY_DATE } from './compatibilityDate';
@@ -26,6 +32,7 @@ export {
   EsiError,
   EsiBudgetError,
   EsiOfflineError,
+  EsiSsoUnavailableError,
   EsiTimeoutError,
   attachEndpointId,
 } from './errors';
@@ -129,10 +136,33 @@ export interface EsiResult<T> {
  * like any other, and reading it as an auth failure had an offline pilot with
  * an expired access token shown a re-login prompt and, on `skipCacheOnAuthFailure`
  * loaders, an emptied view.
+ *
+ * Nor is an SSO outage or throttle (5xx, 429: `isSsoUnavailable`): EVE's login
+ * service being down for a minute said nothing about the grant, and reading it
+ * as one put a re-login banner on every view loading at that moment — the
+ * "log in twice for no reason" the issue reported.
+ *
+ * Nor is a 403 that names a missing corporation role: the token is fine, the
+ * Character lacks the in-game role, and no login can grant that.
  */
 export function isAuthFailure(err: unknown): boolean {
-  if (err instanceof EsiError) return err.status === 401 || err.status === 403;
-  return err instanceof AuthError && err.status !== 0;
+  if (err instanceof EsiError) {
+    if (err.status === 401) return true;
+    return err.status === 403 && !isMissingRole(err);
+  }
+  return err instanceof AuthError && err.status !== 0 && !isSsoUnavailable(err);
+}
+
+/** SSO answered with an outage or a throttle: its own trouble, not the grant's. */
+export function isSsoUnavailable(err: AuthError): boolean {
+  return err.status >= 500 || err.status === 429;
+}
+
+/** ESI's 403 for a Character without the corporation role an endpoint needs. */
+export function isMissingRole(err: unknown): boolean {
+  if (!(err instanceof EsiError) || err.status !== 403) return false;
+  const said = (err.body as { error?: unknown } | undefined)?.error;
+  return /required role/i.test(`${err.message} ${typeof said === 'string' ? said : ''}`);
 }
 
 /**
@@ -191,6 +221,9 @@ async function accessTokenOrOffline(getToken: GetToken, characterId: number): Pr
     return await getToken(characterId);
   } catch (err) {
     if (err instanceof AuthError && err.status === 0) throw new EsiOfflineError(err);
+    if (err instanceof AuthError && isSsoUnavailable(err)) {
+      throw new EsiSsoUnavailableError(err.status, err);
+    }
     throw err;
   }
 }

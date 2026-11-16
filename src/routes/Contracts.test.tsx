@@ -446,7 +446,7 @@ describe('Contracts', () => {
       )
     );
     renderContracts();
-    expect(await screen.findByText('Log in again to see your contracts')).toBeInTheDocument();
+    expect(await screen.findByText(/: log in again$/)).toBeInTheDocument();
     expect(screen.queryByText(/no contracts cached/i)).not.toBeInTheDocument();
   });
 });
@@ -1082,12 +1082,12 @@ describe('Contracts tab strip (issue #908)', () => {
     );
     const user = userEvent.setup();
     renderContracts();
-    expect(await screen.findByText('Log in again to see your contracts')).toBeInTheDocument();
+    expect(await screen.findByText(/: log in again$/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('tab', { name: 'Item search' }));
 
     expect(await screen.findAllByText(SEARCH_UNAVAILABLE)).not.toHaveLength(0);
-    expect(screen.queryByText('Log in again to see your contracts')).not.toBeInTheDocument();
+    expect(screen.queryByText(/: log in again$/)).not.toBeInTheDocument();
   });
 });
 

@@ -28,8 +28,6 @@ export function ReauthCachedNote({ characterId, endpoints, className }: ReauthCa
         characterId={characterId}
         endpoints={endpoints}
         title={t('reauth.cachedTitle')}
-        hint={t('reauth.cachedHint')}
-        actionLabel={t('reauth.cachedAction')}
       />
     </div>
   );

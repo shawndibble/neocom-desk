@@ -11,7 +11,7 @@
 import { create } from 'zustand';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { onDeadGrant } from '@/auth/deadGrantSignal';
-import { onEsiAuthFailure } from '@/esi/authFailureSignal';
+import { onEsiAuthFailure, onEsiRoleRefusal } from '@/esi/authFailureSignal';
 import type { EsiEndpointId } from '@/esi/registry';
 
 /**
@@ -19,8 +19,10 @@ import type { EsiEndpointId } from '@/esi/registry';
  *   can work, so the shell redirects to /login.
  * - `request`: one ESI read answered 401/403. Other views may be fine, so the
  *   shell only notes it.
+ * - `role`: ESI refused a read for a corporation role the Character lacks. No
+ *   login fixes it, so the shell says so and offers none.
  */
-export type AuthFailureKind = 'token' | 'request';
+export type AuthFailureKind = 'token' | 'request' | 'role';
 
 export interface AuthFailure {
   characterId: number;
@@ -95,6 +97,7 @@ interface AuthFailureState {
   failure: AuthFailure | null;
   reportTokenFailure: (characterId: number) => void;
   reportRequestFailure: (characterId: number, endpointId?: EsiEndpointId) => void;
+  reportRoleRefusal: (characterId: number, endpointId?: EsiEndpointId) => void;
   dismiss: () => void;
   /**
    * Drop a stale failure — on character switch, or once the grant works again.
@@ -108,7 +111,7 @@ interface AuthFailureState {
 
 /** `token` outranks `request`: a dead refresh token makes every read moot. */
 function outranks(next: AuthFailureKind, current: AuthFailure | null): boolean {
-  return current === null || next === 'token' || current.kind === 'request';
+  return current === null || next === 'token' || current.kind !== 'token';
 }
 
 export const useAuthFailure = create<AuthFailureState>((set, get) => ({
@@ -120,6 +123,12 @@ export const useAuthFailure = create<AuthFailureState>((set, get) => ({
   reportRequestFailure: (characterId, endpointId) => {
     if (!outranks('request', get().failure)) return;
     set({ failure: { characterId, kind: 'request', endpointId } });
+  },
+  reportRoleRefusal: (characterId, endpointId) => {
+    if (!outranks('role', get().failure)) return;
+    set({
+      failure: { characterId, kind: 'role', ...(endpointId !== undefined ? { endpointId } : {}) },
+    });
   },
   dismiss: () => {
     set({ failure: null });
@@ -144,9 +153,13 @@ export function subscribeToEsiAuthFailures(): () => void {
   const offGrant = onDeadGrant((characterId) => {
     useAuthFailure.getState().reportTokenFailure(characterId);
   });
+  const offRole = onEsiRoleRefusal((characterId, endpointId) => {
+    useAuthFailure.getState().reportRoleRefusal(characterId, endpointId);
+  });
   return () => {
     offRequest();
     offGrant();
+    offRole();
   };
 }
 

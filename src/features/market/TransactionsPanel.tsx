@@ -616,9 +616,6 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
             <GrantBanner
               characterId={activeCharacterId}
               endpoints={['getCharacterWalletTransactions']}
-              title={t('wallet.transactionsReauthTitle')}
-              hint={t('wallet.transactionsReauthHint')}
-              actionLabel={t('wallet.reauthAction')}
             />
           </div>
         ) : !(allScope || transactionsResult) || !hasRows ? (

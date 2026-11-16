@@ -9,7 +9,7 @@ import {
   useAuthFailure,
   useNeedsLogin,
 } from './authFailure';
-import { emitEsiAuthFailure } from '@/esi/authFailureSignal';
+import { emitEsiAuthFailure, emitEsiRoleRefusal } from '@/esi/authFailureSignal';
 import { emitDeadGrant } from '@/auth/deadGrantSignal';
 
 const CHARACTER_ID = 5;
@@ -86,6 +86,20 @@ describe('subscribeToEsiAuthFailures', () => {
       characterId: 42,
       endpointId: 'postCharacterMail',
     });
+    unsubscribe();
+  });
+
+  it('records a missing corp role, which never displaces a dead grant', () => {
+    const unsubscribe = subscribeToEsiAuthFailures();
+    emitEsiRoleRefusal(42, 'getCorporationWallets');
+    expect(useAuthFailure.getState().failure).toEqual({
+      kind: 'role',
+      characterId: 42,
+      endpointId: 'getCorporationWallets',
+    });
+    useAuthFailure.getState().reportTokenFailure(42);
+    emitEsiRoleRefusal(42, 'getCorporationWallets');
+    expect(useAuthFailure.getState().failure).toMatchObject({ kind: 'token' });
     unsubscribe();
   });
 

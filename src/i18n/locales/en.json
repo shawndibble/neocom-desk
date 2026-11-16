@@ -99,23 +99,20 @@
     "banner": "You're offline — showing data saved on this device. Changes sync when you reconnect."
   },
   "reauth": {
-    "cachedTitle": "Log in again to refresh.",
-    "cachedHint": "EVE access for this data has lapsed, so what's saved on this device is shown.",
-    "cachedAction": "Log in again with EVE Online",
+    "missingTitle": "{{character}}: grant {{permissions}}",
+    "loginTitle": "{{character}}: log in again",
+    "grantAction": "Grant in EVE",
+    "loginAction": "Log in",
+    "unknownCharacter": "This character",
+    "refusedHint": "EVE refused the saved login.",
+    "coveredTitle": "{{character}}: covered by the login prompt on this page.",
+    "roleTitle": "{{character}}: missing corp role",
+    "roleHint": "Ask a director for the role. Logging in again won't help.",
+    "cachedTitle": "Showing saved data.",
     "navLocked": "Needs a new login",
-    "staleGrantTitle": "EVE access was refused",
-    "staleGrantHint": "EVE turned down a request for this character's data. If you removed this app's access in EVE's third-party application list, log in again to restore it.",
-    "staleGrantHintNamed": "EVE turned down a request for {{character}}'s data. If you removed this app's access in EVE's third-party application list, log in again to restore it.",
-    "staleGrantAction": "Log in again with EVE Online",
-    "needsLoginTitle": "{{character}} needs a new login",
-    "needsLoginHint": "EVE refused or expired {{character}}'s access, so nothing can load for this character. Log in again to restore it.",
-    "titleFor": "{{character}} — {{title}}",
     "standingsTitle": "Broker fees are assuming 0 standings",
-    "standingsHint": "Every NPC-station broker fee is calculated as if this character had no standings. Grant Character details for accurate fees.",
-    "standingsAction": "Grant Character details",
     "dismiss": "Dismiss",
     "implantsAssumedTitle": "Assumes no implants",
-    "implantsAssumedAction": "Grant Character details",
     "standingsAssumedTitle": "Assumes base standings",
     "standingsAssumedAction": "Grant Character details"
   },
@@ -354,10 +351,7 @@
       }
     },
     "inGame": {
-      "refresh": "Refresh",
-      "reauthTitle": "Allow fittings access",
-      "reauthHint": "Log in again to see this Character's in-game Fittings.",
-      "reauthAction": "Log in again with EVE Online"
+      "refresh": "Refresh"
     },
     "saveToEve": {
       "action": "Save to EVE",
@@ -379,9 +373,6 @@
       "saving": "Saving…",
       "cancel": "Cancel",
       "errorTitle": "Couldn't save",
-      "grantTitle": "Saving to EVE needs the Fittings permission",
-      "grantHint": "This character logged in without it. Grant it, then save again.",
-      "grantAction": "Grant Fittings permission",
       "overwriteFailedTitle": "Saved, but the old Fitting is still there",
       "overwriteFailed": "Saved as \"{{name}}\", but EVE wouldn't remove the Fitting it was replacing: {{message}}. Delete it in-game yourself.",
       "alsoSaveLabel": "Also save to My Fittings",
@@ -2721,8 +2712,6 @@
       "charisma": "CHA"
     },
     "reauthTitle": "Log in again to see skills",
-    "reauthHint": "Log in again to fetch this character's trained skills.",
-    "reauthAction": "Log in again with EVE Online",
     "csvGroup": "Group",
     "csvSkill": "Skill",
     "csvLevel": "Level",
@@ -3854,9 +3843,6 @@
     "jobsEmptyTitle": "No active jobs cached",
     "jobsEmptyHint": "Refresh once you're back online to fetch this character's running industry jobs.",
     "jobsNoneMeta": "None",
-    "jobsReauthTitle": "Log in again to see jobs",
-    "jobsReauthHint": "This character logged in before industry job tracking was added. Log this character in again to grant the new permission.",
-    "jobsReauthAction": "Log in again with EVE Online",
     "jobsCorpBadge": "Corp",
     "jobsDone": "Done",
     "jobsCompletingSoon": "Completing soon",
@@ -3882,9 +3868,6 @@
     "jobsLogProductionPickPlanTitle": "Log production against which plan?",
     "jobsLogProductionPickPlanHint": "More than one Build Plan builds {{name}}. Pick the one this job's production belongs to.",
     "blueprintsTitle": "Owned blueprints",
-    "blueprintsReauthTitle": "Log in again to see owned blueprints",
-    "blueprintsReauthHint": "Log in again to fetch this character's blueprints for ME/TE prefill.",
-    "blueprintsReauthAction": "Log in again with EVE Online",
     "compareToggle": "Compare",
     "compareCancel": "Cancel",
     "compareHandle": "Compare ({{count}})",
@@ -6101,7 +6084,6 @@
       "loading": "Loading",
       "needsPermission": "Needs permission",
       "needsPermissionHint": "{{title}} needs a permission that has not been granted for this Character.",
-      "grantAction": "Grant access",
       "failed": {
         "title": "Could not load",
         "lastGood": "Last good value {{age}}.",
@@ -7299,8 +7281,6 @@
     "archiveSince": "Since {{date}} — your wallet archive starts there.",
     "character": "Character",
     "reauthTitle": "Log in again to see your wallet",
-    "reauthHint": "Log in again to fetch this character's wallet balance.",
-    "reauthAction": "Log in again with EVE Online",
     "corpDivisionLabel": "Wallet division",
     "corpDivisionFallback": "Division {{division}}",
     "corpBalanceEmpty": "No corporation wallet data cached. Couldn't load it yet. Try again shortly.",
@@ -7341,8 +7321,6 @@
     "filterToPlayer": "Filter to this player",
     "transactionsNoFilterMatchesHint": "Clear the search or widen the side and date filters.",
     "transactionsTruncatedHint": "Only the most recent transactions were fetched. Older history is not shown.",
-    "transactionsReauthTitle": "Allow wallet access",
-    "transactionsReauthHint": "Log in again and grant the Wallet Permission to see this character's market transactions.",
     "corpTransactionsEmptyTitle": "No corp transactions cached",
     "corpTransactionsEmptyHint": "Couldn't load this wallet division's market transactions yet. Try again shortly.",
     "refTypeFilterLabel": "Ref type",
@@ -7871,7 +7849,6 @@
     "overviewTab": "Overview",
     "refresh": "Refresh",
     "reauthTitle": "Some characters need to log in again",
-    "reauthHint": "Log in again to fetch this character's personal mining ledger.",
     "reauthAction": "Log in again with EVE Online",
     "reauthCharacterHint": "{{character}} needs to log in again to see their mining ledger.",
     "surveyConnections": {
@@ -8514,12 +8491,7 @@
       "confirm_other": "Mark {{count}} paid with this payment",
       "empty": "No unlinked wallet payments found. Payments appear here once ESI shows them in your wallet journal.",
       "rememberFailed": "Payment linked, but couldn’t remember who {{payee}} is paid. You can close this.",
-      "grantTitle": "Some payments can’t be seen",
-      "grantHint": "No access to {{what}}, so those payments can’t be suggested here.",
-      "grantJournal": "the wallet journal",
-      "grantContracts": "contracts",
-      "grantAnd": "or",
-      "grantAction": "Grant access"
+      "grantTitle": "Some payments can’t be seen"
     },
     "attention": {
       "title_one": "{{count}} thing needs attention",
@@ -8885,9 +8857,6 @@
       "field": "Place nickname",
       "hint": "Only you see this, and only on the Assets page. Leave it empty to show the real name."
     },
-    "reauthTitle": "Log in again to see your assets",
-    "reauthHint": "Log in again to fetch this character's assets.",
-    "reauthAction": "Log in again with EVE Online",
     "fetchTruncatedNotice": "Only the first {{shown}} assets were fetched — this character has more.",
     "fetchTruncatedRetry": "Try again",
     "unknownValue": "-",
@@ -8938,8 +8907,6 @@
         "noRoute": "No route found to this station."
       },
       "locationNotGrantedTitle": "Jumps away unavailable",
-      "locationNotGrantedHint": "Distances show as \"-\" without this character's current location. Grant Character details to see how far away each station is.",
-      "locationNotGrantedAction": "Grant Character details",
       "routePreference": {
         "label": "Route"
       }
@@ -9132,8 +9099,6 @@
   "mail": {
     "title": "Mail",
     "sendGrantTitle": "Permission to send mail",
-    "sendGrantHint": "Grant it to send mail from this character.",
-    "sendGrantAction": "Grant send mail",
     "markup": {
       "openInEve": "Open this in EVE. Neocom Desk can't show it.",
       "realHost": "Opens {{host}}"
@@ -9194,8 +9159,6 @@
     "hideRead": "Hide read",
     "capNotice": "Showing the most recent {{count}} matching mails — narrow with a folder or a search to see more.",
     "markReadGrantTitle": "Organize your mail from here",
-    "markReadGrantHint": "Grant the Mail organize permission to mark mail read or unread, or delete it, in EVE from here. Opening a mail marks it read once it is granted.",
-    "markReadGrantAction": "Grant Mail organize",
     "select": "Select",
     "doneSelecting": "Done",
     "selectionLabel": "Selected mail",
@@ -9228,8 +9191,6 @@
     "deleted_one": "Mail deleted",
     "deleted_other": "{{count}} mails deleted",
     "reauthTitle": "Log in again to see your mail",
-    "reauthHint": "Log in again to fetch this character's mail.",
-    "reauthAction": "Log in again with EVE Online",
     "reply": "Reply",
     "forward": "Forward",
     "composeReplyHeading": "Reply",
@@ -9263,8 +9224,6 @@
     "mailingListsFailed": "Couldn't load your mailing lists. Type {{min}} or more characters to search.",
     "newMailSearchNeedsGrant": "Searching needs a Permission. Your mailing lists are still listed.",
     "searchReauthTitle": "Grant search to find recipients",
-    "searchReauthHint": "Searching for characters, corporations and alliances needs the search Permission.",
-    "searchReauthAction": "Grant search",
     "recipientsFull": "Recipient limit reached ({{max}})",
     "counter": "{{count}} / {{max}}",
     "format": {
@@ -9391,8 +9350,6 @@
     "downloadIcs": "Download .ics",
     "addToGoogleCalendar": "Add to Google Calendar",
     "rsvpGrantTitle": "Permission to respond to events",
-    "rsvpGrantHint": "Grant it to RSVP from this character.",
-    "rsvpGrantAction": "Grant RSVP",
     "rsvpAccept": "Accept",
     "rsvpDecline": "Decline",
     "rsvpTentative": "Tentative",
@@ -9543,9 +9500,6 @@
     },
     "sourcesNeedLogin": "Some sources need a new login: {{sources}}.",
     "detailLoadFailedHint": "Couldn't fetch this event's details. You may be offline or ESI may be busy — try again in a moment. If it keeps failing, the event may have been deleted or your invitation withdrawn.",
-    "detailReauthTitle": "Log in again to see this event",
-    "detailReauthHint": "EVE rejected this character's login when fetching the event's details. Log this character in again to restore calendar access.",
-    "reauthAction": "Log in again with EVE Online",
     "reauthNoticeAction": "Log in again"
   },
   "clones": {
@@ -9633,11 +9587,6 @@
     "unpriced_other": "{{count}} unpriced",
     "cooldownReadyValue": "Ready",
     "cooldownOnCooldownValue": "Until {{date}} ({{duration}} left)",
-    "reauthTitle": "Log in again to see your clones",
-    "reauthHint": "Log in again to fetch this character's jump clones.",
-    "reauthAction": "Log in again with EVE Online",
-    "implantsReauthTitle": "Log in again to see the implants you are wearing",
-    "implantsReauthHint": "The implants plugged into your current clone need the read-implants permission, which this login did not grant.",
     "jumpsAway": "Jumps away",
     "rename": "Rename",
     "renameNamed": "Rename clone {{name}}",
@@ -9654,9 +9603,6 @@
     "emptyTitle": "No planetary colonies cached",
     "emptyHint": "Couldn't load this character's planetary colonies yet. Try again shortly.",
     "emptyFetchedTitle": "No planetary colonies",
-    "reauthTitle": "Log in again to see your colonies",
-    "reauthHint": "Log in again to fetch this character's planetary colonies.",
-    "reauthAction": "Log in again with EVE Online",
     "stalenessLabel": "About colony data freshness",
     "stalenessHint": "ESI only recalculates a colony's data when it's opened in the EVE client.",
     "stalenessTooltip": "Extractor expiry times are fixed at install and always accurate. Stored quantities and the last extraction cycle only update once you open the colony in the game client, so this app never shows those.",
@@ -11031,8 +10977,6 @@
     "title": "Contracts",
     "tabsLabel": "Contracts sections",
     "historyTab": "History",
-    "corpReauthTitle": "Corp contracts need a new grant",
-    "corpReauthHint": "Grant corporation contracts access to read the contracts issued by or assigned to your corporation.",
     "corpEmptyTitle": "No corp contracts cached",
     "corpEmptyHint": "Couldn't load your corporation's contracts yet. Try again shortly.",
     "corpEmptyFetchedTitle": "No corp contracts",
@@ -11075,9 +11019,6 @@
     "dayCount_one": "{{count}} contract",
     "dayCount_other": "{{count}} contracts",
     "fetchTruncatedRetry": "Try again",
-    "reauthTitle": "Log in again to see your contracts",
-    "reauthHint": "Log in again to fetch this character's contracts.",
-    "reauthAction": "Log in again with EVE Online",
     "typeUnknown": "Unknown",
     "typeItemExchange": "Item Exchange",
     "typeAuction": "Auction",
@@ -11589,8 +11530,6 @@
       "subject": "Invitation to join {{community}}",
       "body": "{{admin}} invites you to join the Community \"{{community}}\" on Neocom Desk.\n\nOpen this link to join:\n<a href=\"{{link}}\">{{link}}</a>",
       "grantTitle": "Permission to send mail",
-      "grantHint": "Inviting by mail sends an in-game mail from this Character. Grant that permission to turn it on.",
-      "grantAction": "Grant permission",
       "problem": {
         "notFound": "No Character has that name. Nothing was sent.",
         "lookupFailed": "Could not look up that name. Try again.",
@@ -12204,8 +12143,6 @@
     "standingsEmptyTitle": "No standings yet",
     "standingsEmptyHint": "EVE lists a standing once you have earned or lost one with a faction, corporation or agent.",
     "standingsNoResultsHint": "Clear the search or the filters to see every standing.",
-    "standingsReauthTitle": "Log in again to see your standings",
-    "standingsReauthHint": "Log in again to grant Character details and fetch this character's standings.",
     "acrossLabel": "Contacts across every character",
     "acrossCharacters": "On",
     "acrossCharactersHeaderTooltip": "How many of your characters hold this contact, out of every character logged in on this device. Read from each character's cached contacts.",
@@ -12225,10 +12162,7 @@
     "acrossFetchAll": "Fetch every character",
     "acrossCachedHint": "Read from what each character last cached. A character you have not opened recently may look emptier than it is.",
     "acrossNoResults": "Every character agrees on every contact",
-    "acrossNoResultsHint": "Turn off \"Only disagreements\" to see the full list.",
-    "reauthTitle": "Log in again to see your contacts",
-    "reauthHint": "Log in again to fetch this character's contacts.",
-    "reauthAction": "Log in again with EVE Online"
+    "acrossNoResultsHint": "Turn off \"Only disagreements\" to see the full list."
   },
   "loyalty": {
     "title": "Loyalty Points",
@@ -12238,10 +12172,7 @@
     "noneLine": "Loyalty Points: none ·",
     "corporation": "Corporation",
     "points": "Loyalty Points",
-    "browseStores": "Browse LP Stores",
-    "reauthTitle": "Log in again to see your loyalty points",
-    "reauthHint": "Log in again to fetch this character's loyalty point balances.",
-    "reauthAction": "Log in again with EVE Online"
+    "browseStores": "Browse LP Stores"
   },
   "loyaltyStore": {
     "spendPlan": {
@@ -12477,10 +12408,7 @@
     "csvVolumeTotal": "Volume total",
     "csvStation": "Station",
     "csvCharacter": "Character",
-    "csvDaysLeft": "Days left",
-    "reauthTitle": "Log in again to see your orders",
-    "reauthHint": "Log in again to fetch this character's market orders.",
-    "reauthAction": "Log in again with EVE Online"
+    "csvDaysLeft": "Days left"
   },
   "sync": {
     "idle": "Synced",
@@ -13427,8 +13355,6 @@
       "minusOwnedStation": "Station for owned stock",
       "minusOwnedChip": "Minus owned · {{station}}",
       "minusOwnedGrantTitle": "Owned stock needs the Assets permission",
-      "minusOwnedGrantHint": "This character logged in without it. Grant it to subtract what you own.",
-      "minusOwnedGrantAction": "Grant Assets permission",
       "recentPlaceholder": "Load a recent list",
       "recentLabel": "{{names}} · {{age}}",
       "recentLabelMore": "{{names}} +{{count}} more · {{age}}",
@@ -13912,9 +13838,6 @@
       },
       "corp": {
         "issuedBy": "Issued by",
-        "reauthTitle": "Corp orders need a new grant",
-        "reauthHint": "Grant corporation market orders access to see your corporation's open buy and sell orders.",
-        "reauthAction": "Grant access",
         "emptyTitle": "No corp orders cached",
         "emptyHint": "Couldn't load your corporation's orders yet. Try again shortly.",
         "emptyFetchedTitle": "No corp orders"
@@ -16885,9 +16808,7 @@
           "fullScan_one": "Full scan: {{count}} ship, value, changes",
           "fullScan_other": "Full scan: {{count}} ships, value, changes",
           "grant": {
-            "title": "Your current ship is not shared yet",
-            "hint": "Allow Current ship and this page reads for the ship you are flying. Until then, pick your ship above.",
-            "action": "Allow current ship"
+            "title": "Your current ship is not shared yet"
           }
         }
       },
@@ -19752,10 +19673,7 @@
         "title": "No recent losses",
         "hint": "Losses in your corporation show here once ESI lists them. Pasting a link works for any of them."
       },
-      "loadFailed": "Couldn't load your losses",
-      "grantTitle": "Show my lost ships",
-      "grantHint": "Neocom Desk needs permission to read your killmails. Pasting a link works without it.",
-      "grantAction": "Grant killmail access"
+      "loadFailed": "Couldn't load your losses"
     },
     "notCovered": {
       "withHull": "{{hull}} is not covered.",
@@ -20167,9 +20085,7 @@
         "noScope": "No mail sent: mail permission missing.",
         "corpFallback": "your corporation",
         "hullFallback": "your ship",
-        "grantTitle": "Can't mail the pilot",
-        "grantHint": "SRP result mails go out from your Character. Grant the mail permission to send them.",
-        "grantAction": "Grant mail permission"
+        "grantTitle": "Can't mail the pilot"
       },
       "failed": {
         "generic": "Couldn't save that. Try again.",
@@ -20880,9 +20796,7 @@
         "offer": "Mail {{pilot}} the decision",
         "hint": "In game, from your character.",
         "already": "Already queued from this device.",
-        "grantTitle": "Can't mail the pilot",
-        "grantHint": "The mail goes out from your Character. Grant the mail permission to send it.",
-        "grantAction": "Grant mail permission"
+        "grantTitle": "Can't mail the pilot"
       }
     },
     "mail": {

@@ -8,6 +8,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useAuthFailure, useNeedsLogin } from '@/stores/authFailure';
 import { AuthFailureNotice, AuthFailureRedirect, NeedsLoginNotice } from './AuthFailureNotice';
 import { beginEveLogin } from './loginFlow';
+import { useReauthSlots } from './reauthSlots';
 
 vi.mock('./loginFlow', () => ({ beginEveLogin: vi.fn(async () => {}) }));
 
@@ -49,7 +50,7 @@ describe('AuthFailureRedirect', () => {
     });
     useAuthFailure.getState().reportTokenFailure(CHARACTER_ID);
     renderApp();
-    expect(await screen.findByText('Ada Vance needs a new login')).toBeInTheDocument();
+    expect(await screen.findByText('Ada Vance: log in again')).toBeInTheDocument();
     expect(screen.queryByText('mail view')).not.toBeInTheDocument();
   });
 
@@ -62,7 +63,7 @@ describe('AuthFailureRedirect', () => {
     });
     useAuthFailure.getState().reportTokenFailure(CHARACTER_ID);
     renderApp();
-    await userEvent.click(await screen.findByRole('button', { name: /log in again/i }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Log in' }));
     expect(beginEveLogin).toHaveBeenCalledWith({ characterId: CHARACTER_ID });
   });
 
@@ -83,7 +84,7 @@ describe('AuthFailureRedirect', () => {
     useAuthFailure.getState().reportTokenFailure(CHARACTER_ID);
     renderApp();
     await userEvent.click(await screen.findByRole('button', { name: 'Dismiss' }));
-    expect(screen.queryByText('Ada Vance needs a new login')).not.toBeInTheDocument();
+    expect(screen.queryByText('Ada Vance: log in again')).not.toBeInTheDocument();
     expect(useNeedsLogin.getState().value).toEqual([CHARACTER_ID]);
   });
 
@@ -131,7 +132,7 @@ describe('AuthFailureNotice', () => {
       </MemoryRouter>
     );
 
-    await userEvent.click(screen.getByRole('button', { name: /log in again/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Log in' }));
 
     expect(beginEveLogin).toHaveBeenCalledWith({ characterId: CHARACTER_ID, groups: ['mailSend'] });
   });
@@ -144,7 +145,7 @@ describe('AuthFailureNotice', () => {
       </MemoryRouter>
     );
 
-    await userEvent.click(screen.getByRole('button', { name: /log in again/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Log in' }));
 
     expect(beginEveLogin).toHaveBeenCalledWith({ characterId: CHARACTER_ID, groups: [] });
   });
@@ -166,16 +167,45 @@ describe('AuthFailureNotice', () => {
     expect(await screen.findAllByText(/Pilot One/)).toHaveLength(2);
   });
 
-  it('falls back to the unnamed hint when the character record is not yet loaded', () => {
+  it('stands down while a banner on the page already speaks for that character', () => {
+    useReauthSlots.getState().claim('page', CHARACTER_ID, 'banner', ['getCharacterWallet']);
     useAuthFailure.getState().reportRequestFailure(CHARACTER_ID);
     render(
       <MemoryRouter>
         <AuthFailureNotice />
       </MemoryRouter>
     );
-    expect(
-      screen.getByText("EVE turned down a request for this character's data.", { exact: false })
-    ).toBeInTheDocument();
+    expect(screen.queryByText(/: log in again$/)).not.toBeInTheDocument();
+    useReauthSlots.getState().release('page');
+  });
+
+  it('names a missing corp role plainly, with no login to offer', async () => {
+    await db.characters.put({
+      characterId: CHARACTER_ID,
+      name: 'Ada Vance',
+      ownerHash: 'oh',
+      addedAt: 0,
+    });
+    useAuthFailure.getState().reportRoleRefusal(CHARACTER_ID, 'getCorporationWallets');
+    render(
+      <MemoryRouter>
+        <AuthFailureNotice />
+      </MemoryRouter>
+    );
+    expect(await screen.findAllByText(/Ada Vance: missing corp role/)).not.toHaveLength(0);
+    expect(screen.queryByRole('button', { name: 'Log in' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument();
+  });
+
+  it('says "This character" until the character record is loaded', () => {
+    useAuthFailure.getState().reportRequestFailure(CHARACTER_ID);
+    render(
+      <MemoryRouter>
+        <AuthFailureNotice />
+      </MemoryRouter>
+    );
+    expect(screen.getByText('This character: log in again')).toBeInTheDocument();
+    expect(screen.getByText('EVE refused the saved login.')).toBeInTheDocument();
   });
 });
 

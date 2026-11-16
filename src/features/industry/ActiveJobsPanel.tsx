@@ -811,9 +811,6 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
                 characterName={entry.characterName}
                 endpoints={['getCharacterIndustryJobs']}
                 variant="ghost"
-                title={t('industry.jobsReauthTitle')}
-                hint={t('industry.jobsReauthHint')}
-                actionLabel={t('industry.jobsReauthAction')}
               />
             ))}
           {needsJobSlotFanOut &&
@@ -860,13 +857,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
           <Spinner size="sm" label={t('common.loading')} />
         </div>
       ) : blockingNeedsReauth ? (
-        <GrantBanner
-          characterId={characterId}
-          endpoints={['getCharacterIndustryJobs']}
-          title={t('industry.jobsReauthTitle')}
-          hint={t('industry.jobsReauthHint')}
-          actionLabel={t('industry.jobsReauthAction')}
-        />
+        <GrantBanner characterId={characterId} endpoints={['getCharacterIndustryJobs']} />
       ) : jobs.length === 0 ? (
         // Only the "no data at all" case reaches here — `noneActive` has
         // already taken "answered, none running" out of the body.

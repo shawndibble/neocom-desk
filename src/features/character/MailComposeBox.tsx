@@ -439,8 +439,6 @@ export function MailComposeBox({
         characterId={characterId}
         endpoints={SEND_MAIL_ENDPOINTS}
         title={t('mail.sendGrantTitle')}
-        hint={t('mail.sendGrantHint')}
-        actionLabel={t('mail.sendGrantAction')}
       />
 
       <MailComposeFooter

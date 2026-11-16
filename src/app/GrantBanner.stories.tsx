@@ -15,9 +15,7 @@ const meta = {
   args: {
     characterId: 1,
     endpoints: ['getCharacterAssets'] as const,
-    title: 'Assets need permission',
-    hint: 'Grant asset access to see where your items are.',
-    actionLabel: 'Grant access',
+    title: 'Assets',
   },
 } satisfies Meta<typeof GrantBanner>;
 
@@ -27,5 +25,5 @@ type Story = StoryObj<typeof meta>;
 /** @summary Banner (§6c): a single Character, plain title. */
 export const Default: Story = {};
 
-/** @summary Banner (§6c): `characterName` prefixes the title where several banners stack. */
+/** @summary Banner (§6c): `characterName` names the Character without reading the device. */
 export const Named: Story = { args: { characterName: 'Shawn Dibble' } };

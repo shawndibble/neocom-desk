@@ -52,8 +52,8 @@ const TAB_PATHS = Object.values(PAGE_TABS).flatMap((page) =>
   page.tabs.map((tab) => tabPath(page, tab.id))
 );
 
-/** reauth.staleGrantTitle — the shell's own runtime auth-failure notice, never a route's own ReauthBanner. */
-const STALE_GRANT_TITLE = 'EVE access was refused';
+/** reauth.refusedHint — said only where EVE refused a saved login, never for a Permission not granted. */
+const STALE_GRANT_TITLE = 'EVE refused the saved login.';
 /** error.title — the ErrorBoundary fallback for an uncaught render throw. */
 const ERROR_TITLE = 'Something went wrong';
 

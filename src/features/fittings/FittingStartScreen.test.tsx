@@ -484,7 +484,7 @@ describe('FittingStartScreen', () => {
   it('shows a re-auth banner, and never fetches, when the fittings scope is missing', async () => {
     useEndpointsGrantedMock.mockReturnValue(false);
     renderScreen();
-    expect(await screen.findByText('Allow fittings access')).toBeInTheDocument();
+    expect(await screen.findByText(/: grant Fittings$/)).toBeInTheDocument();
     expect(loadInGameFittingsMock).not.toHaveBeenCalled();
     // The saved ones still list.
     expect(await screen.findByRole('button', { name: /^Kite/ })).toBeInTheDocument();

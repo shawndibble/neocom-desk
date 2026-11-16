@@ -306,13 +306,7 @@ export function FittingStartScreen({
 
   const inGameStatus =
     hasCharacter && inGame.granted === false ? (
-      <GrantBanner
-        characterId={characterId}
-        endpoints={['getCharacterFittings']}
-        title={t('fittings.inGame.reauthTitle')}
-        hint={t('fittings.inGame.reauthHint')}
-        actionLabel={t('fittings.inGame.reauthAction')}
-      />
+      <GrantBanner characterId={characterId} endpoints={['getCharacterFittings']} />
     ) : hasCharacter && inGame.error ? (
       <p className="text-xs text-warning">{t('common.loadFailedHint')}</p>
     ) : null;

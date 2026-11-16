@@ -287,10 +287,8 @@ describe('Wallet', () => {
       );
       window.history.pushState({}, '', '/wallet/journal?char=92');
       renderWalletRoute();
-      expect(await screen.findByText('Log in again to see your wallet')).toBeInTheDocument();
-      expect(
-        screen.getByRole('button', { name: 'Log in again with EVE Online' })
-      ).toBeInTheDocument();
+      expect(await screen.findByText(/: grant Wallet$/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Grant in EVE' })).toBeInTheDocument();
       expect(useActiveCharacter.getState().activeCharacterId).toBe(CHAR_ID);
     });
   });

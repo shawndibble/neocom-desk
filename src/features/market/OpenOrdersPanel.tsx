@@ -634,9 +634,6 @@ export function OpenOrdersPanel({
                 characterName={viewedCharacter?.name}
                 endpoints={['getCharacterOrders']}
                 variant="ghost"
-                title={t('orders.reauthTitle')}
-                hint={t('orders.reauthHint')}
-                actionLabel={t('orders.reauthAction')}
               />
             )}
           {reauthEntries.map((entry) => (
@@ -646,20 +643,11 @@ export function OpenOrdersPanel({
               characterName={entry.characterName}
               endpoints={['getCharacterOrders']}
               variant="ghost"
-              title={t('orders.reauthTitle')}
-              hint={t('orders.reauthHint')}
-              actionLabel={t('orders.reauthAction')}
             />
           ))}
 
           {corpReauth && (
-            <GrantBanner
-              characterId={activeCharacterId}
-              endpoints={['getCorporationOrders']}
-              title={t('market.orders.corp.reauthTitle')}
-              hint={t('market.orders.corp.reauthHint')}
-              actionLabel={t('market.orders.corp.reauthAction')}
-            />
+            <GrantBanner characterId={activeCharacterId} endpoints={['getCorporationOrders']} />
           )}
 
           {fromCacheAny && <CachedNotice withBadge fetchedAt={oldestFetchedAt} />}

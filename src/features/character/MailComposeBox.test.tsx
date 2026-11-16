@@ -504,8 +504,9 @@ describe('send-mail Permission', () => {
   it('offers the grant note when the stored grant lacks it, and still lets Send work', async () => {
     lacks.value = true;
     renderBox('reply');
-    expect(await screen.findByText('Permission to send mail')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Grant send mail' })).toBeInTheDocument();
+    expect(await screen.findByText('This character: grant Send mail')).toBeInTheDocument();
+    expect(screen.getByText('Permission to send mail')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Grant in EVE' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled();
   });
 
@@ -513,6 +514,7 @@ describe('send-mail Permission', () => {
     renderBox('reply');
     await screen.findByLabelText('Subject');
     expect(screen.queryByText('Permission to send mail')).not.toBeInTheDocument();
+    expect(screen.queryByText('This character: grant Send mail')).not.toBeInTheDocument();
   });
 });
 
