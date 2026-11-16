@@ -17,11 +17,13 @@ import {
   reconcileExtractions,
   resolveDonations,
   unbilledMinerIds,
+  unbilledWhenPaid,
   type JournalDonation,
   type MoonNotification,
   type SyncExtraction,
 } from '@/engine/corpTaxBook/sync';
 import { matchDonation } from '@/engine/corpTaxBook/allocation';
+import { minerIdFor } from '@/engine/corpTaxBook/charges';
 import { noteUncounted, otherDivisions } from '@/engine/corpTaxBook/uncounted';
 import { planAutoGroups, type GroupingEdit } from '@/engine/corpTaxBook/grouping';
 import type { Statement } from '@/engine/corpTaxBook/statements';
@@ -387,21 +389,36 @@ async function reassignUnmatched(
     regrouped: boolean;
   }
 ): Promise<{ assigned: number; error?: string }> {
-  // One held for review (#6207) is the officer's to place, never re-matched.
-  const unmatched = args.before.payments
-    .filter(
-      (p) =>
-        p.minerId === undefined &&
-        !(p.notTaxAmount && p.notTaxAmount > 0) &&
-        p.reviewReason === undefined
-    )
+  const open = args.before.payments
+    .filter((p) => p.minerId === undefined && !(p.notTaxAmount && p.notTaxAmount > 0))
     .sort((a, b) => a.at.localeCompare(b.at));
-  if (unmatched.length === 0) return { assigned: 0 };
+  if (open.length === 0) return { assigned: 0 };
+  // One held for review (#6207) is the officer's to place, unless the ledger has since shown ore
+  // its Miner mined and had not been billed for when they paid: the hold was the ledger's lag.
+  const unmatched = open.filter((p) => p.reviewReason === undefined);
   let assigned = 0;
   try {
     const book = args.regrouped
       ? ((await deps.readBookState(characterId, corporationId)) ?? args.before)
       : args.before;
+    for (const p of open) {
+      if (
+        p.reviewReason !== 'no-open-balance' ||
+        !unbilledWhenPaid(p, args.rows, {
+          miners: book.miners,
+          statements: book.statements as Statement[],
+          startDate: book.book.startDate,
+        })
+      )
+        continue;
+      await deps.assignPayment(
+        characterId,
+        corporationId,
+        p.id,
+        minerIdFor(p.characterId, book.miners)
+      );
+      assigned += 1;
+    }
     const known = new Set([...args.known, ...book.miners.flatMap((m) => m.characterIds)]);
     // Only toward a Miner who owes (balance spent oldest first, or ore not yet billed): a sender
     // whose Miner owes nothing waits.

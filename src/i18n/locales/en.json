@@ -8122,6 +8122,8 @@
         "toldDismissed": "{{corp}} waived the tax on that ore: {{reason}}",
         "tellFailed": "Could not send it. Try again.",
         "tellRejected": "{{corp}} already answered this day; ask an officer.",
+        "withdraw": "Withdraw",
+        "withdrawFailed": "Could not withdraw it. An officer may have answered already; reload and try again.",
         "otherPayee": "another Payee"
       },
       "declare": {
@@ -18666,6 +18668,10 @@
         },
         "failed": {
           "generic": "Could not connect. Try again, or ask for a new invite link.",
+          "director-approval": "Over the book's approval limit: a Director must do this.",
+          "already-resolved": "Another officer already answered this.",
+          "not-priced": "That ore is not on a Statement yet, so its tax has no price to waive. Try again once it is billed.",
+          "nothing-to-waive": "The disputed ore carries no tax to waive.",
           "not-an-accountant": "That Character is not an Accountant. In EVE's login, pick a Character that holds the Accountant role in the corporation that owns the moons.",
           "invite-invalid": "That invite link or code is not valid.",
           "invite-revoked": "That invite link was cancelled. Ask for a new one.",

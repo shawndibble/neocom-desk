@@ -36,6 +36,7 @@ import {
   disputeIdFor,
   type DeclareOwnInput,
   type DisputeConflictInput,
+  type WithdrawDisputeInput,
   EXTRACTIONS,
   FEEDER_INVITES_COLLECTION,
   BILLED_BY_COLLECTION,
@@ -61,6 +62,7 @@ import {
   dismissalNeedsDirector,
   defaultSettings,
   parseRecordKey,
+  billedDisputeTax,
   mergeDisputeLines,
   type RecordedOre,
   parseStatement,
@@ -901,6 +903,35 @@ async function minerUids(c: EditCtx, minerId: string): Promise<string[]> {
   return minerCharacters(minerId, miner).map((id) => `char:${id}`);
 }
 
+/**
+ * The Declaration a payment confirms, checked before any write: it must be this Miner's and not
+ * yet answered. Its resolution is the single point both ways of confirming it go through (a
+ * hand-recorded payment, or a matched donation), so whichever lands first wins and the other is
+ * refused in its own transaction, never counting the ISK twice. Returns the write to make.
+ */
+async function confirmingDeclaration(
+  c: EditCtx,
+  declarationId: string | undefined,
+  minerId: string,
+  paymentId: string
+): Promise<() => void> {
+  if (declarationId === undefined) return () => {};
+  const ref = col(c, DECLARATIONS).doc(declarationId);
+  const declaration = await mustGet(c, ref, 'Declaration');
+  if (declaration.resolution) fail('failed-precondition', 'Already resolved', 'already-resolved');
+  if (declaration.minerId !== undefined && declaration.minerId !== minerId)
+    fail('invalid-argument', "Declaration is another Miner's", 'wrong-miner');
+  return () =>
+    c.tx.update(ref, {
+      resolution: {
+        kind: 'confirmed',
+        at: new Date(c.now).toISOString(),
+        by: c.access.characterId,
+        paymentId,
+      },
+    });
+}
+
 /** The characters an officer unlinked: automatic grouping (D26) leaves them alone. */
 const DECLINED_DOC = 'declinedAutoGroup';
 
@@ -1176,6 +1207,13 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const ref = col(c, PAYMENTS).doc(action.paymentId);
       if ((await tx.get(ref)).exists)
         fail('already-exists', 'A payment with that id exists', 'payment-exists');
+      const confirm = await confirmingDeclaration(
+        c,
+        action.declarationId,
+        action.minerId,
+        action.paymentId
+      );
+      confirm();
       tx.create(ref, {
         id: action.paymentId,
         source: 'manual',
@@ -1189,7 +1227,12 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         recordedBy: by,
       });
       return {
-        detail: { paymentId: action.paymentId, minerId: action.minerId, amount: action.amount },
+        detail: {
+          paymentId: action.paymentId,
+          minerId: action.minerId,
+          amount: action.amount,
+          ...(action.declarationId ? { declarationId: action.declarationId } : {}),
+        },
       };
     }
     case 'markNotTax': {
@@ -1232,13 +1275,26 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const payment = await mustGet(c, ref, 'Payment');
       if (payment.minerId !== undefined)
         fail('failed-precondition', 'Already assigned', 'already-assigned');
+      const confirm = await confirmingDeclaration(
+        c,
+        action.declarationId,
+        action.minerId,
+        action.paymentId
+      );
+      confirm();
       // An officer placed a held donation: the review it waited for is done (#6207).
       tx.update(ref, {
         minerId: action.minerId,
         assignedBy: by,
         ...(payment.reviewReason !== undefined ? { reviewReason: FieldValue.delete() } : {}),
       });
-      return { detail: { paymentId: action.paymentId, minerId: action.minerId } };
+      return {
+        detail: {
+          paymentId: action.paymentId,
+          minerId: action.minerId,
+          ...(action.declarationId ? { declarationId: action.declarationId } : {}),
+        },
+      };
     }
     case 'dismiss': {
       // An omitted amount cannot dodge the gate: with a limit set it counts as over it.
@@ -1605,19 +1661,32 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     }
     case 'dismissDispute': {
       // Only the disputed ore is waived, as a credit on the day (#6206): the rest of the day
-      // stays billed. The client prices it from the day's charge; zero is refused by the parser.
+      // stays billed. The server prices it from the Statements that billed it, so a client cannot
+      // understate it to slip under the Director limit. A day on no Statement yet has no price
+      // here: the client's figure stands only for a Director, or a book with no limit.
       const ref = col(c, DISPUTES).doc(action.disputeId);
       const dispute = await mustGet(c, ref, 'Dispute');
       if (dispute.resolution) fail('failed-precondition', 'Already resolved', 'already-resolved');
       if (dispute.minerId !== action.minerId)
         fail('invalid-argument', "Dispute is another Miner's", 'wrong-miner');
-      if (
-        dismissalNeedsDirector(
-          c.book.dismissApprovalAboveIsk as number | null | undefined,
-          [action.amountIsk],
-          c.access.isDirector
-        )
-      ) {
+      const lines = (dispute.lines as DisputeConflictInput['lines'] | undefined) ?? [];
+      const billing: Data[] = [];
+      for (const characterId of new Set(
+        lines.map((l) => parseRecordKey(l.recordKey).characterId)
+      )) {
+        const snap = await tx.get(
+          col(c, STATEMENTS).where('characterIds', 'array-contains', characterId)
+        );
+        billing.push(...snap.docs.map((d) => d.data()));
+      }
+      const priced = billedDisputeTax({ lines }, billing);
+      const limit = c.book.dismissApprovalAboveIsk as number | null | undefined;
+      if (priced === undefined && action.amountIsk === undefined)
+        fail('failed-precondition', 'That ore is not billed yet', 'not-priced');
+      if (priced !== undefined && !(priced > 0))
+        fail('failed-precondition', 'The disputed ore carries no tax', 'nothing-to-waive');
+      const amountIsk = priced ?? (action.amountIsk as number);
+      if (dismissalNeedsDirector(limit, [priced], c.access.isDirector)) {
         throw new HttpsError(
           'permission-denied',
           'A Director must approve this size of dismissal',
@@ -1630,7 +1699,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         id,
         minerId: action.minerId,
         date: dispute.date,
-        amount: -action.amountIsk,
+        amount: -amountIsk,
         reason: action.reason,
         by,
         at: iso,
@@ -1643,7 +1712,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
           at: iso,
           by,
           reason: action.reason,
-          amountIsk: action.amountIsk,
+          amountIsk,
           adjustmentId: id,
         },
       });
@@ -1652,7 +1721,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
           disputeId: action.disputeId,
           adjustmentId: id,
           minerId: action.minerId,
-          amountIsk: action.amountIsk,
+          amountIsk,
           reason: action.reason,
         },
         result: { adjustmentId: id },
@@ -2345,6 +2414,35 @@ export async function disputeConflict(deps: BookDeps, caller: Caller, input: Dis
       { characterId, name: 'Player dispute', via: 'player-claim' },
       'disputeConflict',
       { disputeId, minerId, date, lines: input.lines.length }
+    );
+    return { disputeId };
+  });
+}
+
+/**
+ * A Miner takes back their own dispute of a day while no officer has answered it: it leaves
+ * Needs you and the day is billed as before. Authorised as the dispute was (the caller's own
+ * Miner); anyone else's, or one already answered, is refused. Audited.
+ */
+export async function withdrawDispute(deps: BookDeps, caller: Caller, input: WithdrawDisputeInput) {
+  const characterId = signedInCharacter(caller);
+  const { corporationId, date } = input;
+  return deps.db.runTransaction(async (tx) => {
+    await memberBook(tx, deps, corporationId);
+    const { minerId } = await callerMiner(tx, deps, corporationId, caller, characterId);
+    const disputeId = disputeIdFor(minerId, date);
+    const ref = sub(deps.db, corporationId, DISPUTES).doc(disputeId);
+    const held = (await tx.get(ref)).data();
+    if (!held || held.minerId !== minerId) fail('not-found', 'Dispute not found', 'not-found');
+    if (held.resolution) fail('failed-precondition', 'An officer answered this day', 'answered');
+    tx.delete(ref);
+    appendAudit(
+      tx,
+      deps,
+      corporationId,
+      { characterId, name: 'Player dispute', via: 'player-claim' },
+      'withdrawDispute',
+      { disputeId, minerId, date }
     );
     return { disputeId };
   });

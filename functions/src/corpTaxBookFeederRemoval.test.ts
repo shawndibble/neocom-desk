@@ -5,6 +5,9 @@ import {
   parseRemovalCall,
   parseRemovalLinkCall,
   parseRemovalNoticeCall,
+  parseStaleMailSentCall,
+  STALE_MAIL_CLAIM_MS,
+  staleMailClaimable,
 } from './corpTaxBookFeederRemoval.js';
 import { parseSetFeederPayeeInput } from './corpTaxBookPayee.js';
 
@@ -118,5 +121,39 @@ describe('finalizeDueRemovals reads', () => {
     expect(await finalizeDueRemovals(f.deps, 'pointers')).toEqual({ ended: 0 });
     expect(f.reads).toEqual(['pointers', 'corps/1/feeders/2', 'corps/1/feeders/4']);
     expect(f.log).toHaveBeenCalledTimes(2); // the fallback notice and the failed read
+  });
+});
+
+describe('the stale-ledger mail claim', () => {
+  const spell = 1_000_000;
+  const now = spell + 10 * STALE_MAIL_CLAIM_MS;
+
+  it('is claimable once per spell, and again for a new spell', () => {
+    expect(staleMailClaimable({}, now)).toBe(false);
+    expect(staleMailClaimable({ staleSince: spell }, now)).toBe(true);
+    expect(staleMailClaimable({ staleSince: spell + 1, staleMailedFor: spell }, now)).toBe(true);
+  });
+
+  it('lapses when the claimer never marked it sent, and not before', () => {
+    const claimed = { staleSince: spell, staleMailedFor: spell };
+    expect(
+      staleMailClaimable({ ...claimed, staleMailClaimedAt: now - STALE_MAIL_CLAIM_MS + 1 }, now)
+    ).toBe(false);
+    expect(
+      staleMailClaimable({ ...claimed, staleMailClaimedAt: now - STALE_MAIL_CLAIM_MS }, now)
+    ).toBe(true);
+    // Sent: final.
+    expect(
+      staleMailClaimable({ ...claimed, staleMailClaimedAt: 0, staleMailSentFor: spell }, now)
+    ).toBe(false);
+    // A claim from before claims carried a time stays final.
+    expect(staleMailClaimable(claimed, now)).toBe(false);
+  });
+
+  it('parses the sent mark: the spell is a time', () => {
+    const base = { ...book, feederCorporationId: 98000002 };
+    expect(parseStaleMailSentCall({ ...base, staleSince: 5 }).staleSince).toBe(5);
+    expect(() => parseStaleMailSentCall(base)).toThrow();
+    expect(() => parseStaleMailSentCall({ ...base, staleSince: 'x' })).toThrow();
   });
 });

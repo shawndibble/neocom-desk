@@ -70,6 +70,10 @@ export interface FeederRecord {
   disconnectedAt?: number;
   /** The `staleSince` whose "we can't read your ledger" mail an officer's client claimed (#6210). */
   staleMailedFor?: number;
+  /** When that claim was made (ms): unsent after `STALE_MAIL_CLAIM_MS`, another officer may claim it. */
+  staleMailClaimedAt?: number;
+  /** The `staleSince` whose mail the claiming officer's queue sent: the claim is final. */
+  staleMailSentFor?: number;
   /** One payee: a corporation or a player. */
   payee?: { kind: 'corporation' | 'character'; id: number };
   payeeChangedAt?: number;
@@ -406,6 +410,8 @@ const FEED_STATE: readonly (keyof FeederRecord)[] = [
   'leftAt',
   'staleSince',
   'staleMailedFor',
+  'staleMailClaimedAt',
+  'staleMailSentFor',
   'disconnectedAt',
   'lastSyncResult',
   // A rejoin's holder may read Extractions the old one could not (#6117).

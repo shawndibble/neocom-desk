@@ -192,6 +192,7 @@ export function RecordPaymentDialog({
   defaultAmount,
   statementId,
   paymentId,
+  declarationId,
   onRecorded,
 }: {
   open: boolean;
@@ -207,6 +208,12 @@ export function RecordPaymentDialog({
    * recording the ISK twice, and goes on to `onRecorded`.
    */
   paymentId?: string;
+  /**
+   * The Declaration this payment confirms. The server resolves it in the same write as the
+   * payment or the donation match, so whichever officer lands first wins and the other is
+   * refused (`already-resolved`): the ISK is never counted twice.
+   */
+  declarationId?: string;
   onRecorded?: () => Promise<void>;
 }) {
   const { t } = useTranslation();
@@ -270,7 +277,12 @@ export function RecordPaymentDialog({
       run={async () => {
         if (mode === 'donation') {
           if (!donation) return;
-          await edit({ action: 'assignPayment', paymentId: donation.id, minerId: miner.id });
+          await edit({
+            action: 'assignPayment',
+            paymentId: donation.id,
+            minerId: miner.id,
+            ...(declarationId ? { declarationId } : {}),
+          });
         } else {
           try {
             await edit({
@@ -281,6 +293,7 @@ export function RecordPaymentDialog({
               amount: value,
               at: paidAtFor(date),
               ...(statementId ? { statementId } : {}),
+              ...(declarationId ? { declarationId } : {}),
             });
           } catch (e) {
             // Already recorded under this fixed id: an earlier try landed, so carry on.

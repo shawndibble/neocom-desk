@@ -14,6 +14,8 @@ import { setBookFeederPayee, setFeederPayee } from './corpTaxBookPayee.js';
 import {
   cancelFeederRemoval,
   claimFeederStaleMail,
+  markFeederStaleMailSent,
+  STALE_MAIL_CLAIM_MS,
   finalizeDueRemovals,
   forceRemovalNow,
   getRemovalLink,
@@ -296,6 +298,20 @@ emulatorSuite('removing a moon owner', () => {
       // A new spell (reconnected, then refused again) mails again.
       await goStale(T0 + 90 * H);
       expect((await claim(OTHER_ACCOUNTANT)).recipients).toContain(ACCOUNTANT);
+    });
+
+    it('lets another officer claim it when the claimer never sent it', async () => {
+      await goStale(T0 + 50 * H);
+      expect((await claim(ACCOUNTANT)).recipients.length).toBeGreaterThan(0);
+      now += STALE_MAIL_CLAIM_MS;
+      expect((await claim(OTHER_ACCOUNTANT)).recipients).toContain(ACCOUNTANT);
+      // This one went out: no third officer mails the spell again.
+      await markFeederStaleMailSent(deps(), who(OTHER_ACCOUNTANT), {
+        ...target(OTHER_ACCOUNTANT),
+        staleSince: T0 + 50 * H,
+      });
+      now += STALE_MAIL_CLAIM_MS;
+      expect(await claim(ACCOUNTANT)).toEqual({ recipients: [], ownerRecipients: [] });
     });
 
     it("never mails one of the book's own corporations", async () => {

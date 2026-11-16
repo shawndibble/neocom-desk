@@ -6,6 +6,7 @@ import {
   isStatementMail,
   removalNoticeStillDue,
   startsRemovalClock,
+  staleMailSpell,
   type MailQueueItem,
 } from '@/engine/corpTaxBook/mailQueue';
 import { fillTakesEffect, removalTakesEffectAt } from '@/engine/corpTaxBook/removalMail';
@@ -51,6 +52,19 @@ function liveDeps(sending: (id: string | undefined) => void): QueueDeps {
           item.corporationId,
           item.feederCorporationId!,
           item.sentAt
+        );
+        return;
+      }
+      // A sent stale-ledger copy makes this officer's claim final, so no other officer mails the
+      // spell again (#6210); unmarked, the claim lapses and another officer's client sends it.
+      const spell = staleMailSpell(item);
+      if (spell) {
+        const { markFeederStaleMailSent } = await import('@/features/corp/taxBook/feederClient');
+        await markFeederStaleMailSent(
+          item.senderCharacterId,
+          item.corporationId,
+          spell.feederCorporationId,
+          spell.staleSince
         );
         return;
       }

@@ -9,6 +9,7 @@ import {
   donationsFromJournal,
   openBalances,
   unbilledMinerIds,
+  unbilledWhenPaid,
   mergeGaps,
   observedRowsFromLedger,
   placeObservedRows,
@@ -199,6 +200,38 @@ describe('functions mirror of the Corp Tax Book sync engine', () => {
       const book = { miners, statements, startDate };
       expect(mirror.unbilledMinerIds(rows, book)).toEqual(unbilledMinerIds(rows, book));
     }
+  });
+
+  it('agrees on whether a held donation was paid while ore was unbilled', () => {
+    const miners = [{ id: 'm1', characterIds: [50, 52], mainCharacterId: 50 }];
+    const statements = [
+      {
+        id: 's1',
+        minerId: 'm1',
+        code: 'A',
+        coversThrough: '2026-10-05',
+        issuedAt: '2026-10-06T00:00:00Z',
+      },
+      {
+        id: 's2',
+        minerId: 'm1',
+        code: 'B',
+        coversThrough: '2026-10-09',
+        issuedAt: '2026-10-10T00:00:00Z',
+      },
+    ] as unknown as Statement[];
+    const rows = [
+      { characterId: 52, date: '2026-10-05', quantity: 5 },
+      { characterId: 52, date: '2026-10-07', quantity: 5 },
+      { characterId: 51, date: '2026-09-30', quantity: 5 },
+    ];
+    for (const at of ['2026-10-06T12:00:00Z', '2026-10-07T01:00:00Z', '2026-10-11T00:00:00Z'])
+      for (const characterId of [50, 51])
+        for (const startDate of ['2026-01-01', '2026-10-07']) {
+          const book = { miners, statements, startDate };
+          const p = { characterId, at };
+          expect(mirror.unbilledWhenPaid(p, rows, book)).toBe(unbilledWhenPaid(p, rows, book));
+        }
   });
 
   it('agrees on the wallet divisions a book does not read, and their bound (#6207)', () => {

@@ -490,9 +490,17 @@ export type EditAction =
       at: string;
       statementId?: string;
       note?: string;
+      /** The Declaration this payment confirms, in the same write (one resolution per declaration). */
+      declarationId?: string;
     }
   | { action: 'markNotTax'; paymentId: string; notTaxAmount: number; reason: string }
-  | { action: 'assignPayment'; paymentId: string; minerId: string }
+  | {
+      action: 'assignPayment';
+      paymentId: string;
+      minerId: string;
+      /** The Declaration this donation match confirms, in the same write. */
+      declarationId?: string;
+    }
   /** #6207: an officer says a donation into a division the book does not read is not tax. */
   | { action: 'ignoreUncounted'; uncountedId: string }
   | {
@@ -537,6 +545,7 @@ export type EditAction =
     }
   | { action: 'issueStatement'; statement: Record<string, unknown> }
   | { action: 'settleStatements'; statementIds: string[] }
+  /** An officer-recorded declaration. It carries the Miner's `uids`, so its note is theirs to read. */
   | {
       action: 'declare';
       statementId: string;
@@ -545,14 +554,15 @@ export type EditAction =
     }
   | { action: 'rejectDispute'; disputeId: string; reason: string }
   /**
-   * Waives only the disputed ore (#6206): a credit Adjustment of `amountIsk` on the day, not a
-   * dismissal of the whole record. The Director limit applies to that amount.
+   * Waives only the disputed ore (#6206): a credit Adjustment on the day, not a dismissal of the
+   * whole record. The server prices it from the Statements that billed the day; `amountIsk`, the
+   * client's figure, counts only for a day not billed yet, and then as over the Director limit.
    */
   | {
       action: 'dismissDispute';
       disputeId: string;
       minerId: string;
-      amountIsk: number;
+      amountIsk?: number;
       reason: string;
     }
   | {
@@ -683,6 +693,9 @@ export function parseEditAction(data: unknown): EditAction {
         at: instant(d.at, 'at'),
         statementId: optId(d.statementId, 'statementId'),
         note: optNote(d.note),
+        ...(d.declarationId !== undefined
+          ? { declarationId: docId(d.declarationId, 'declarationId') }
+          : {}),
       };
     case 'markNotTax':
       return {
@@ -696,6 +709,9 @@ export function parseEditAction(data: unknown): EditAction {
         action,
         paymentId: docId(d.paymentId, 'paymentId'),
         minerId: docId(d.minerId, 'minerId'),
+        ...(d.declarationId !== undefined
+          ? { declarationId: docId(d.declarationId, 'declarationId') }
+          : {}),
       };
     case 'ignoreUncounted':
       return { action, uncountedId: docId(d.uncountedId, 'uncountedId') };
@@ -838,7 +854,7 @@ export function parseEditAction(data: unknown): EditAction {
         action,
         disputeId: docId(d.disputeId, 'disputeId'),
         minerId: docId(d.minerId, 'minerId'),
-        amountIsk: money(d.amountIsk, 'amountIsk'),
+        ...(d.amountIsk !== undefined ? { amountIsk: money(d.amountIsk, 'amountIsk') } : {}),
         reason: reason(d.reason),
       };
     case 'recordReminder':
@@ -1283,6 +1299,17 @@ export function parseDisputeConflictInput(data: unknown): DisputeConflictInput {
   };
 }
 
+/** A Miner withdraws their own unanswered dispute of a day. */
+export interface WithdrawDisputeInput {
+  corporationId: number;
+  date: string;
+}
+
+export function parseWithdrawDisputeInput(data: unknown): WithdrawDisputeInput {
+  const d = record(data);
+  return { corporationId: parseBookCall(data).corporationId, date: dateString(d.date, 'date') };
+}
+
 /** The ore a book recorded, as the server's Observed Rows hold it. */
 export interface RecordedOre {
   characterId: number;
@@ -1329,6 +1356,78 @@ export function mergeDisputeLines(
       });
   }
   return lines;
+}
+
+/** A billed ore line as an issued Statement stores it (engine `StatementLine`). */
+interface BilledLine {
+  oreLines: { typeId: number; quantity: number }[];
+  unitPrices: Record<string, number>;
+  taxPct: number;
+}
+
+function billedLineOf(raw: unknown): (BilledLine & { chargeKey: string }) | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const l = raw as Record<string, unknown>;
+  if (l.kind !== 'mined' && l.kind !== 'late-ore') return null;
+  if (typeof l.chargeKey !== 'string' || typeof l.taxPct !== 'number') return null;
+  if (!Array.isArray(l.oreLines) || typeof l.unitPrices !== 'object' || l.unitPrices === null)
+    return null;
+  const oreLines = (l.oreLines as unknown[]).flatMap((o) => {
+    const x = o as { typeId?: unknown; quantity?: unknown } | null;
+    return x && typeof x.typeId === 'number' && typeof x.quantity === 'number'
+      ? [{ typeId: x.typeId, quantity: x.quantity }]
+      : [];
+  });
+  return {
+    chargeKey: l.chargeKey,
+    oreLines,
+    unitPrices: l.unitPrices as Record<string, number>,
+    taxPct: l.taxPct,
+  };
+}
+
+/**
+ * The tax a waived dispute credits, priced on the server from the book's own records: each
+ * disputed ore at the unit price and rate the issued Statements billed it at, never more of it
+ * than they billed (a late-ore line adds its growth). Undefined when a disputed record is on no
+ * Statement yet: the server holds no price for a day not billed, so it is never waived at the
+ * client's word under the Director limit.
+ */
+export function billedDisputeTax(
+  dispute: { lines: readonly Pick<DisputeLine, 'recordKey' | 'typeId' | 'quantity'>[] },
+  statements: readonly { lines?: unknown }[]
+): number | undefined {
+  const billed = new Map<string, BilledLine[]>();
+  for (const s of statements) {
+    if (!Array.isArray(s.lines)) continue;
+    for (const raw of s.lines) {
+      const line = billedLineOf(raw);
+      if (line) billed.set(line.chargeKey, [...(billed.get(line.chargeKey) ?? []), line]);
+    }
+  }
+  const disputed = new Map<string, number>();
+  for (const l of dispute.lines) {
+    const key = `${l.recordKey}|${l.typeId}`;
+    disputed.set(key, (disputed.get(key) ?? 0) + l.quantity);
+  }
+  let tax = 0;
+  for (const [key, quantity] of disputed) {
+    const [recordKey, type] = key.split('|');
+    const typeId = Number(type);
+    const lines = billed.get(recordKey);
+    if (!lines) return undefined;
+    let left = quantity;
+    for (const line of lines) {
+      const held = line.oreLines.reduce((n, o) => (o.typeId === typeId ? n + o.quantity : n), 0);
+      const take = Math.min(left, held);
+      if (take <= 0) continue;
+      const price = line.unitPrices[String(typeId)];
+      if (typeof price !== 'number') return undefined;
+      tax += take * price * (line.taxPct / 100);
+      left -= take;
+    }
+  }
+  return tax;
 }
 
 /** One dispute per Miner and day: `solo:7` has a colon, which a doc id avoids. */

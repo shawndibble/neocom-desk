@@ -335,6 +335,25 @@ export async function claimFeederStaleMail(
   });
 }
 
+/**
+ * The claiming officer's queue sent a copy of the stale-ledger mail (#6210): the claim is final.
+ * Unmarked, it lapses after a few hours so another officer's client sends it instead.
+ */
+export async function markFeederStaleMailSent(
+  characterId: number,
+  corporationId: number,
+  feederCorporationId: number,
+  staleSince: number
+): Promise<void> {
+  const accessToken = await getValidAccessToken(characterId);
+  await call(characterId, 'markCorpTaxBookFeederStaleMailSentCallable', {
+    corporationId,
+    accessToken,
+    feederCorporationId,
+    staleSince,
+  });
+}
+
 /** Cancel a pending removal; returns whom the short cancellation mail goes to. */
 export async function cancelFeederRemoval(
   characterId: number,

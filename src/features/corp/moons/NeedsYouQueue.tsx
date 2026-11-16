@@ -450,15 +450,11 @@ export function NeedsYouQueue() {
           minerName={names.character(open.miner.mainCharacterId)}
           // The amount the Miner declared, when they gave one (#6206).
           defaultAmount={open.item.declaration.amount ?? open.item.owed}
-          // One payment per declaration: a retry or a second officer cannot record it twice.
+          // One payment per declaration: a retry finds it recorded, and the declaration is
+          // resolved in the same write, so a second officer (by hand or by matching a donation)
+          // is refused instead of counting the ISK twice.
           paymentId={`m_${open.item.declaration.id}`}
-          onRecorded={async () => {
-            await edit({
-              action: 'resolveDeclaration',
-              declarationId: open.item.declaration.id,
-              resolution: 'confirmed',
-            });
-          }}
+          declarationId={open.item.declaration.id}
         />
       )}
       {open?.kind === 'reject' && (
@@ -503,7 +499,8 @@ export function NeedsYouQueue() {
           }
           canConfirm={waiveIsk !== undefined && waiveIsk > 0}
           run={async (reason) => {
-            // Only the disputed ore's tax, as one credit (the Director limit sees that amount).
+            // Only the disputed ore's tax, as one credit. The server prices it from the day's
+            // Statement; this figure counts only for a day not billed yet (a Director's call).
             await edit({
               action: 'dismissDispute',
               disputeId: open.dispute.id,

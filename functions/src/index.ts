@@ -83,6 +83,7 @@ import {
   parseClaimPaymentInput,
   parseDeclareOwnInput,
   parseDisputeConflictInput,
+  parseWithdrawDisputeInput,
   parseConfirmGroupingInput,
   parseDeclineByTokenInput,
   parseEditAction,
@@ -170,6 +171,8 @@ import {
 import {
   cancelFeederRemoval,
   claimFeederStaleMail,
+  markFeederStaleMailSent,
+  parseStaleMailSentCall,
   finalizeDueRemovals,
   forceRemovalNow,
   getRemovalLink,
@@ -185,6 +188,7 @@ import {
   claimPayment,
   declareOwnPayment,
   disputeConflict,
+  withdrawDispute,
   confirmGrouping,
   declineGrouping,
   declineGroupingByToken,
@@ -1192,6 +1196,10 @@ corpTaxBookAction('claimCorpTaxBookFeederStaleMailCallable', (request) =>
   claimFeederStaleMail(removalDeps(), callerOf(request), parseRemovalCall(request.data))
 );
 
+corpTaxBookAction('markCorpTaxBookFeederStaleMailSentCallable', (request) =>
+  markFeederStaleMailSent(removalDeps(), callerOf(request), parseStaleMailSentCall(request.data))
+);
+
 corpTaxBookAction('getCorpTaxBookRemovalLinkCallable', (request) =>
   getRemovalLink(removalDeps(), callerOf(request), parseRemovalLinkCall(request.data))
 );
@@ -1447,6 +1455,10 @@ corpTaxBookAction('declareCorpTaxBookPaymentCallable', (request) =>
 
 corpTaxBookAction('disputeCorpTaxBookConflictCallable', (request) =>
   disputeConflict(corpTaxBookDeps(), callerOf(request), parseDisputeConflictInput(request.data))
+);
+
+corpTaxBookAction('withdrawCorpTaxBookDisputeCallable', (request) =>
+  withdrawDispute(corpTaxBookDeps(), callerOf(request), parseWithdrawDisputeInput(request.data))
 );
 
 corpTaxBookAction('confirmCorpTaxBookGroupingCallable', (request) => {
