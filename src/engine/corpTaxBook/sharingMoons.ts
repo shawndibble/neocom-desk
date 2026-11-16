@@ -32,10 +32,20 @@ interface MoonPull {
   sourceCorporationId?: number;
 }
 
-/** One row per moon, in moon id order. */
+/** A moon owner the book still handles (as the publisher reads it); one gone has none here. */
+const HANDLED: ReadonlySet<MoonOwnerFeeder['status']> = new Set(['active', 'pending-removal']);
+/** A record with no status yet (an older read) counts as handled. */
+export const isHandled = (f: { status?: MoonOwnerFeeder['status'] }): boolean =>
+  f.status === undefined || HANDLED.has(f.status);
+
+/** One row per moon, in moon id order. Moons of a moon owner the book no longer handles are left out. */
 export function sharingMoons(
   extractions: readonly MoonPull[],
-  feeders: readonly { corporationId: number; popSharingOptOut?: unknown }[],
+  feeders: readonly {
+    corporationId: number;
+    status?: MoonOwnerFeeder['status'];
+    popSharingOptOut?: unknown;
+  }[],
   doc: PopSharingDoc
 ): SharingMoonRow[] {
   const latest = new Map<number, MoonPull>();
@@ -46,7 +56,10 @@ export function sharingMoons(
   const optedOut = new Set(
     feeders.filter((f) => f.popSharingOptOut !== undefined).map((f) => f.corporationId)
   );
+  // A moon owner the book no longer handles shares nothing (as the publisher reads it): no row.
+  const gone = new Set(feeders.filter((f) => !isHandled(f)).map((f) => f.corporationId));
   return [...latest.values()]
+    .filter((x) => x.sourceCorporationId === undefined || !gone.has(x.sourceCorporationId))
     .sort((a, b) => a.moonId - b.moonId)
     .map((x) => {
       const ownerOptedOut =
@@ -80,9 +93,6 @@ interface KnownOwnerRefineries {
   refineryStructures?: Readonly<Record<string, unknown>>;
 }
 
-/** A moon owner the book still handles (as the publisher reads it); one gone has none here. */
-const HANDLED: ReadonlySet<MoonOwnerFeeder['status']> = new Set(['active', 'pending-removal']);
-
 /**
  * The refineries the book knows that no Extraction places at a moon yet (#6240): its own (the
  * mining observers the Automatic sync read) and each handled moon owner's (its record's refinery
@@ -98,7 +108,7 @@ export function unplacedRefineries(
   for (const id of ownRefineryIds)
     if (!placed.has(id)) found.set(id, { structureId: id, ownerOptedOut: false });
   for (const f of feeders) {
-    if (f.status !== undefined && !HANDLED.has(f.status)) continue;
+    if (!isHandled(f)) continue;
     const ids = [f.refineryLabels, f.refinerySystems, f.refineryStructures].flatMap((r) =>
       Object.keys(r ?? {}).map(Number)
     );

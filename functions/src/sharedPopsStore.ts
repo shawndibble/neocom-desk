@@ -5,7 +5,12 @@
 // collections here are server-only: the rules deny every client, and the one way in is the
 // callables. The maths is in sharedPops.ts.
 
-import { FieldValue, type DocumentSnapshot, type Firestore } from 'firebase-admin/firestore';
+import {
+  FieldValue,
+  type DocumentReference,
+  type DocumentSnapshot,
+  type Firestore,
+} from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { signedInCharacter, type Caller } from './actorAuth.js';
 import { chunk } from './chunk.js';
@@ -28,6 +33,7 @@ import {
   SHARED_POP_SOURCES,
   bookRatePctFor,
   buildSharedPops,
+  currentSharedPops,
   editorStampsFrom,
   qualifyingEditors,
   audienceCharacters,
@@ -153,6 +159,16 @@ function refineriesOf(
   return out;
 }
 
+/** A moon owner whose moons the book handles now; the others share nothing. */
+const isHandledOwner = (f: DocumentSnapshot): boolean => {
+  const status = f.get('status');
+  return f.exists && (status === 'active' || status === 'pending-removal');
+};
+const ownersOf = (handled: readonly DocumentSnapshot[]) =>
+  new Map(
+    handled.map((f) => [Number(f.id), { optedOut: f.get('popSharingOptOut') !== undefined }])
+  );
+
 /**
  * Rebuilds the book's Shared Pops: writes the doc, or deletes it when the book publishes nothing,
  * so turning sharing off, an opt-out or a removed audience takes a pop away at once.
@@ -182,13 +198,8 @@ export async function publishSharedPops(
     book.collection(EXTRACTIONS).where('naturalDecayTime', '>=', since).get(),
     book.collection(FEEDERS).get(),
   ]);
-  const handled = feederSnap.docs.filter((f) => {
-    const status = f.get('status');
-    return status === 'active' || status === 'pending-removal';
-  });
-  const owners = new Map(
-    handled.map((f) => [Number(f.id), { optedOut: f.get('popSharingOptOut') !== undefined }])
-  );
+  const handled = feederSnap.docs.filter(isHandledOwner);
+  const owners = ownersOf(handled);
 
   let allianceId = held.exists ? ((held.get('allianceId') as number | null) ?? null) : null;
   let allianceCheckedAt = num(held.get('allianceCheckedAt')) ?? 0;
@@ -295,6 +306,20 @@ export async function learnOwnRefineryNames(
   }
 }
 
+/** The `sharedPopSources` merge that stamps one officer's editing use at `at`. */
+export const editorStampFields = (
+  officer: { characterId: number; ownerHash: string },
+  at: number
+) => ({
+  editors: {
+    [`char:${officer.characterId}`]: {
+      characterId: officer.characterId,
+      ownerHash: officer.ownerHash,
+      usedAt: at,
+    },
+  },
+});
+
 /** Stamps an officer's use of the book with an editing role: the Community officer rule's clock. */
 export async function stampEditorUse(
   db: Firestore,
@@ -320,19 +345,37 @@ export async function stampEditorUse(
     // Unread: stamp anyway.
   }
   await ref
-    .set(
-      {
-        editors: {
-          [`char:${officer.characterId}`]: {
-            characterId: officer.characterId,
-            ownerHash: officer.ownerHash,
-            usedAt: at,
-          },
-        },
-      },
-      { merge: true }
-    )
+    .set(editorStampFields(officer, at), { merge: true })
     .catch((e) => console.error('editor stamp failed', e instanceof Error ? e.message : e));
+}
+
+/** Field on the officer record: when `stampEditorUseIfSharing` last looked (epoch ms). */
+export const EDITOR_CHECKED_AT = 'editorCheckedAt';
+
+/**
+ * `stampEditorUse` for `authorizeOfficer`, without a read on most calls: once an hour per
+ * officer record (`EDITOR_CHECKED_AT`), and only for a book that has Pop Sharing settings: the
+ * stamp only decides Community shares, and a book that never set Pop Sharing shares nothing.
+ * Turning sharing on stamps the officer who does it (`applyPopSharingEdit`). Best effort.
+ */
+export async function stampEditorUseIfSharing(
+  db: Firestore,
+  corporationId: number,
+  officer: { characterId: number; ownerHash: string },
+  at: number,
+  officerRecord: { ref: DocumentReference; held: Data | undefined }
+): Promise<void> {
+  const checkedAt = num(officerRecord.held?.[EDITOR_CHECKED_AT]);
+  if (checkedAt !== undefined && at - checkedAt >= 0 && at - checkedAt < EDITOR_STAMP_EVERY_MS)
+    return;
+  try {
+    const settings = await corpDoc(db, corporationId).collection(META).doc(POP_SHARING_DOC).get();
+    if (settings.exists) await stampEditorUse(db, corporationId, officer, at);
+    // The record may be gone (a revoked check) or never written (no book): nothing to remember.
+    await officerRecord.ref.update({ [EDITOR_CHECKED_AT]: at }).catch(() => undefined);
+  } catch (e) {
+    console.error('editor stamp check failed', e instanceof Error ? e.message : e);
+  }
 }
 
 /** Stamps a failed role check: the officer stops counting for Community shares until their next editing use. */
@@ -391,6 +434,50 @@ async function communitiesOf(
       out.set(v.characterId, mine);
     })
   );
+  return out;
+}
+
+/**
+ * The docs as each book's settings allow now (`currentSharedPops`): one batched read of every
+ * book, its Pop Sharing settings and the moon owners its pops name. Publishing is best effort and
+ * can race an edit, so this is what makes an opt-out or turning sharing off take pops away at once.
+ */
+async function asSettingsAllowNow(
+  db: Firestore,
+  docs: Iterable<SharedPopsDoc>
+): Promise<SharedPopsDoc[]> {
+  const list = [...docs];
+  if (list.length === 0) return [];
+  const refs = list.map((doc) => {
+    const book = corpDoc(db, doc.corporationId);
+    const ownerIds = [
+      ...new Set(
+        doc.pops.flatMap((p) =>
+          p.ownerCorporationId !== undefined && p.ownerCorporationId !== doc.corporationId
+            ? [p.ownerCorporationId]
+            : []
+        )
+      ),
+    ];
+    return [
+      book,
+      book.collection(META).doc(POP_SHARING_DOC),
+      ...ownerIds.map((id) => book.collection(FEEDERS).doc(String(id))),
+    ];
+  });
+  const snaps = await db.getAll(...refs.flat());
+  const out: SharedPopsDoc[] = [];
+  let i = 0;
+  for (const [n, doc] of list.entries()) {
+    const [bookSnap, sharingSnap, ...feeders] = snaps.slice(i, i + refs[n].length);
+    i += refs[n].length;
+    const current = currentSharedPops(doc, {
+      active: bookSnap.exists && bookSnap.get('active') === true,
+      sharing: popSharingFrom(sharingSnap.data()),
+      owners: ownersOf(feeders.filter(isHandledOwner)),
+    });
+    if (current) out.push(current);
+  }
   return out;
 }
 
@@ -468,7 +555,7 @@ export async function sharedPopsFor(
     ).docs.forEach(keep);
 
   const out: SharedPopView[] = [];
-  for (const doc of docs.values()) {
+  for (const doc of await asSettingsAllowNow(db, docs.values())) {
     const candidates = (doc.communityIds ?? []).filter((c) => memberOf.has(c));
     const status = await sharingCommunities(deps, doc.corporationId, candidates);
     const communityIds = new Set(
@@ -488,14 +575,15 @@ export async function sharedPopsFor(
       };
     });
     for (const pop of visiblePops(doc, { corporationIds, allianceIds, communityIds }, now)) {
-      const view: SharedPopView & { audiences?: string[] } = {
+      const view: SharedPopView & { audiences?: string[]; ownerCorporationId?: number } = {
         ...pop,
         corporationId: doc.corporationId,
         syncedAt: doc.syncedAt ?? null,
         viewerCharacterIds: audienceCharacters(doc, pop, characters),
       };
-      // Who else a pop is shared with is the book's business, not the viewer's.
+      // Who else a pop is shared with, and whose moon it is, are the book's business.
       delete view.audiences;
+      delete view.ownerCorporationId;
       out.push(view);
     }
   }

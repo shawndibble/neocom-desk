@@ -56,6 +56,10 @@ vi.mock('./useBook', () => ({
   }),
 }));
 
+vi.mock('@/esi/endpoints/corp', () => ({
+  getCorporationPublicInfo: async () => ({ data: { alliance_id: 99000001 } }),
+}));
+
 const sharing = vi.hoisted(() => ({ doc: null as unknown }));
 vi.mock('./usePopSharing', () => ({
   usePopSharing: () => ({ load: { state: 'ready', doc: sharing.doc }, reload: vi.fn() }),

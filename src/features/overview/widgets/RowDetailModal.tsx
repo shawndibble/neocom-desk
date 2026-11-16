@@ -97,7 +97,7 @@ export function RowDetailModal({
           {detail.status && <Status status={detail.status} />}
           <StatChips>
             {detail.facts.map((fact) => (
-              <StatChip key={fact.label} label={fact.label} value={fact.value} />
+              <StatChip key={fact.label} label={fact.label} value={fact.value} tone={fact.tone} />
             ))}
           </StatChips>
           {detail.meters && <Meters meters={detail.meters} />}

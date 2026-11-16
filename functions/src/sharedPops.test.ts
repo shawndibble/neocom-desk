@@ -5,6 +5,7 @@ import {
   audienceCharacters,
   bookRatePctFor,
   buildSharedPops,
+  currentSharedPops,
   editorStampsFrom,
   popExpiresAt,
   popInstant,
@@ -182,6 +183,58 @@ describe('buildSharedPops', () => {
       communityNames: { c1: 'Ore' },
     });
     expect(doc!.pops[0].audiences).toEqual(['alliance', 'community:c1']);
+  });
+});
+
+describe('currentSharedPops', () => {
+  const OWNER = 98000555;
+  const owned = extraction({ id: 'x2', moonId: 40002, sourceCorporationId: OWNER });
+  const handled = new Map([[OWNER, { optedOut: false }]]);
+  const published = buildSharedPops(
+    input({ extractions: [extraction(), owned], owners: handled })
+  )!;
+  const book = (over: Partial<Parameters<typeof currentSharedPops>[1]> = {}) => ({
+    active: true,
+    sharing: sharing(),
+    owners: handled,
+    ...over,
+  });
+  const ids = (doc: ReturnType<typeof currentSharedPops>) =>
+    doc?.pops.map((p) => p.extractionId) ?? null;
+
+  it("marks a moon owner's pop with its owner, and the book's own pop with none", () => {
+    expect(published.pops.map((p) => p.ownerCorporationId)).toEqual([undefined, OWNER]);
+  });
+
+  it('keeps every pop the settings still allow', () => {
+    expect(ids(currentSharedPops(published, book()))).toEqual([`1000_${at(START)}`, 'x2']);
+  });
+
+  it('drops everything once sharing is off or the book is inactive, whatever the doc says', () => {
+    expect(currentSharedPops(published, book({ sharing: sharing({ enabled: false }) }))).toBeNull();
+    expect(currentSharedPops(published, book({ active: false }))).toBeNull();
+  });
+
+  it("drops an opted-out moon owner's pops, and an owner the book no longer handles", () => {
+    const optedOut = new Map([[OWNER, { optedOut: true }]]);
+    expect(ids(currentSharedPops(published, book({ owners: optedOut })))).toEqual([
+      `1000_${at(START)}`,
+    ]);
+    expect(ids(currentSharedPops(published, book({ owners: new Map() })))).toEqual([
+      `1000_${at(START)}`,
+    ]);
+  });
+
+  it('drops an audience the settings no longer name, and a pop left with none', () => {
+    const twoAudiences = sharing({
+      defaults: { ...sharing().defaults, audiences: [{ kind: 'corp' }, { kind: 'alliance' }] },
+    });
+    const doc = buildSharedPops(input({ sharing: twoAudiences }))!;
+    expect(currentSharedPops(doc, book())!.pops[0].audiences).toEqual(['corp']);
+    const allianceOnly = sharing({
+      defaults: { ...sharing().defaults, audiences: [{ kind: 'alliance' }] },
+    });
+    expect(currentSharedPops(published, book({ sharing: allianceOnly }))).toBeNull();
   });
 });
 

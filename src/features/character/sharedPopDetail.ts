@@ -5,6 +5,7 @@
  */
 import type { RowDetailModel } from '@/features/overview/widgets/data/types';
 import { startLinkPath } from '@/features/survey/startLink';
+import { HOUR_MS, formatAge } from '@/lib/age';
 import { formatDuration } from '@/lib/duration';
 import { formatCalendarTimestamp } from '@/lib/timestamp';
 import type { Translate } from '@/lib/translate';
@@ -28,13 +29,31 @@ export function sharedPopStartLink(entry: SharedPopEntry): string {
   });
 }
 
+/** A book that has not synced for this long may have missed a laser shot or a cancel. */
+export const SHARED_POP_STALE_MS = 12 * HOUR_MS;
+
+/** The data's age: when the sharing book last synced, flagged once it is stale. */
+function syncedFact(
+  syncedAt: number | null,
+  nowMs: number,
+  t: Translate
+): RowDetailModel['facts'][number] | null {
+  if (syncedAt === null) return null;
+  const ageMs = Math.max(0, nowMs - syncedAt);
+  const age = formatAge(ageMs, t);
+  const label = t('calendar.sharedPop.synced');
+  return ageMs > SHARED_POP_STALE_MS
+    ? { label, value: t('calendar.sharedPop.syncedStale', { age }), tone: 'warning' }
+    : { label, value: age };
+}
+
 const POP_TIME_KEY = {
   ready: 'calendar.sharedPop.popTime.ready',
   'auto-fracture': 'calendar.sharedPop.popTime.autoFracture',
 } as const;
 
 /**
- * The detail modal: refinery, moon, Pop Time and countdown, ore make-up, notes, start link. Ore
+ * The detail modal: refinery, moon, Pop Time and countdown, data age, ore make-up, notes, start link. Ore
  * make-up shared but not known (a moon owner's moon) reads "Unknown"; not shared, it is absent.
  */
 export function sharedPopDetail(
@@ -46,7 +65,8 @@ export function sharedPopDetail(
   const { pop } = entry;
   const popAtMs = Date.parse(pop.popAt);
   const popped = nowMs >= popAtMs;
-  const facts = [
+  const synced = syncedFact(pop.syncedAt, nowMs, t);
+  const facts: RowDetailModel['facts'] = [
     ...(entry.moonName === null
       ? []
       : [{ label: t('calendar.sharedPop.moon'), value: entry.moonName }]),
@@ -63,6 +83,7 @@ export function sharedPopDetail(
       label: t('calendar.sharedPop.rate'),
       value: t('calendar.sharedPop.ratePct', { rate: pop.ratePct }),
     },
+    ...(synced ? [synced] : []),
   ];
   const oreKnown = entry.ore !== null && entry.ore.length > 0;
   if (!oreKnown && pop.oreShared === true)
