@@ -825,7 +825,7 @@ export function unheatedIfChanged<S extends { unheated: S | null }>(
  * top speed, which is when warp engages.
  */
 export function alignTimeSeconds(massKg: number, agility: number): number {
-  return (Math.log(4) * agility * massKg) / 1_000_000;
+  return Math.log(4) * inertiaTimeConstantSeconds(massKg, agility);
 }
 
 /**

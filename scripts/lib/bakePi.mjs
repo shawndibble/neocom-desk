@@ -414,7 +414,7 @@ export function bakePi({ types, piPinTypeIds, attrsByType, raw, planets }) {
   // the reason it cannot be approximated: two colonies of identical shape cost
   // wildly different amounts purely because their planets differ in size (a
   // 6,030 km planet vs an 85,400 km one is a 6.7x difference in link cost).
-  // `mapDenormalize` stores it in metres; km is what the per-km attributes are
+  // `mapPlanets` stores it in metres; km is what the per-km attributes are
   // denominated in, so the conversion happens once, here.
   const piPlanetRadiusKm = planetRadiiKm(planets);
 
@@ -497,13 +497,13 @@ export function bakePi({ types, piPinTypeIds, attrsByType, raw, planets }) {
     // would make every colony's links look free.
     const radiusCount = Object.keys(piPlanetRadiusKm).length;
     if (radiusCount < 10_000) {
-      problems.push(`only ${radiusCount} planet radii found; mapDenormalize looks wrong or empty`);
+      problems.push(`only ${radiusCount} planet radii found; mapPlanets looks wrong or empty`);
     }
     // Planet finders rank systems on these counts: empty, missing Jita, or a
     // type no system holds would make them quietly wrong.
     const systemPlanetCount = Object.keys(piSystemPlanets).length;
     if (systemPlanetCount < 1_000) {
-      problems.push(`only ${systemPlanetCount} systems with planets; mapDenormalize looks wrong`);
+      problems.push(`only ${systemPlanetCount} systems with planets; mapPlanets looks wrong`);
     }
     if (!piSystemPlanets[JITA_SYSTEM_ID]) problems.push('Jita has no planets in pi-system-planets');
     const typesWithSystems = new Set(Object.values(piSystemPlanets).flatMap((c) => Object.keys(c)));
