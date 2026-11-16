@@ -99,6 +99,11 @@ export interface PersonalBook {
   graceHours?: number;
   /** The book's last sync by any officer; absent when never synced. */
   lastSyncedAt?: string;
+  /**
+   * The last sync that read the corp wallet's donations; null when no sync has. Absent on a book
+   * whose syncs predate the record: then `lastSyncedAt` stands in for it.
+   */
+  donationsCheckedAt?: string | null;
   rates: TaxRate[];
   miners: Miner[];
   observed: ObservedMiningEntry[];
@@ -1274,7 +1279,7 @@ export function overlayCorpBooks(input: {
     // day Paid once the book credits the donation that paid it.
     // Each Miner's money pays only that Miner's days, as the book credits it. A donation the
     // book synced past without crediting no longer counts (`UNCREDITED_AFTER_DAYS`).
-    const counting = p.book.inFlight.filter((d) => !isUncredited(d, p.book.lastSyncedAt));
+    const counting = p.book.inFlight.filter((d) => !isUncredited(d, donationsCheckedAt(p.book)));
     const ahead = new Map(p.credit);
     for (const d of counting) {
       const minerId = minerIdFor(d.characterId, p.book.miners);
@@ -1365,7 +1370,7 @@ export function overlayCorpBooks(input: {
       ...(closedThrough !== undefined ? { closedThrough } : {}),
       credit: [...p.credit.values()].reduce((sum, c) => sum + c, 0),
       ...openAndOverdue(p),
-      uncredited: p.book.inFlight.filter((d) => isUncredited(d, p.book.lastSyncedAt)),
+      uncredited: p.book.inFlight.filter((d) => isUncredited(d, donationsCheckedAt(p.book))),
       hubId: p.book.hubId,
       oreForm: p.book.oreForm,
     };
@@ -1412,9 +1417,16 @@ function flagFor(
 }
 
 /** The book synced `UNCREDITED_AFTER_DAYS` after the donation and still does not hold it. */
-const isUncredited = (d: InFlightDonation, lastSyncedAt: string | undefined) =>
-  lastSyncedAt !== undefined &&
-  Date.parse(lastSyncedAt) - Date.parse(d.at) >= UNCREDITED_AFTER_DAYS * DAY_MS;
+/** When the book last read its wallet's donations: the last sync, for a book with no record of it. */
+const donationsCheckedAt = (book: Pick<PersonalBook, 'lastSyncedAt' | 'donationsCheckedAt'>) =>
+  book.donationsCheckedAt === undefined
+    ? book.lastSyncedAt
+    : (book.donationsCheckedAt ?? undefined);
+
+/** A sync that read the wallet came 3 days after the donation and still does not hold it. */
+const isUncredited = (d: InFlightDonation, checkedAt: string | undefined) =>
+  checkedAt !== undefined &&
+  Date.parse(checkedAt) - Date.parse(d.at) >= UNCREDITED_AFTER_DAYS * DAY_MS;
 
 /** The member's unsettled Statements, and those past their Overdue days, oldest first. */
 function openAndOverdue(p: Prepared): {

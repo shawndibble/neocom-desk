@@ -54,6 +54,15 @@ describe('readBookSettings', () => {
     );
   });
 
+  it('reads when a sync last read the wallet: null when none has, absent on an older book', () => {
+    const at = Date.parse('2026-10-17T08:00:00Z');
+    expect(readBookSettings(1, { ...book, donationsReadAt: at })?.donationsCheckedAt).toBe(
+      '2026-10-17T08:00:00.000Z'
+    );
+    expect(readBookSettings(1, { ...book, donationsReadAt: null })?.donationsCheckedAt).toBeNull();
+    expect(readBookSettings(1, book)).not.toHaveProperty('donationsCheckedAt');
+  });
+
   it("reads the book's Overdue days, 14 when unset (#6204)", () => {
     expect(readBookSettings(1, { ...book, overdueDays: 21 })?.overdueDays).toBe(21);
     expect(readBookSettings(1, book)?.overdueDays).toBe(14);

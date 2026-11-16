@@ -420,6 +420,21 @@ describe('syncCorpTaxBook', () => {
     expect(d.loadEsiExtractions).not.toHaveBeenCalled();
     expect(d.loadDonations).not.toHaveBeenCalled();
     expect(out).toMatchObject({ kind: 'synced', missing: ['donations'] });
+    // So members' "not credited" notes do not count this sync as one the donation missed.
+    expect(vi.mocked(d.uploadSync).mock.calls[0][1].donationsRead).toBe(false);
+  });
+
+  it('tells the book whether it read the wallet: yes when it did, no when the read failed', async () => {
+    const ok = deps();
+    await run(ok);
+    expect(vi.mocked(ok.uploadSync).mock.calls[0][1].donationsRead).toBe(true);
+    const failed = deps({
+      loadDonations: vi.fn(async () => {
+        throw new Error('down');
+      }),
+    });
+    await run(failed);
+    expect(vi.mocked(failed.uploadSync).mock.calls[0][1].donationsRead).toBe(false);
   });
 
   it('uploads each observed row with its refinery’s system', async () => {

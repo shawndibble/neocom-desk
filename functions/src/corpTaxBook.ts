@@ -1072,6 +1072,11 @@ export interface SyncInput extends BookCall {
    * list. Absent when the sync did not read those divisions, which leaves the list as it was.
    */
   uncounted?: UncountedDonation[];
+  /**
+   * Whether this sync read the book's wallet divisions for donations. Sent on a sync's first call
+   * only; absent from its overflow calls and from older clients, which leave the record as it was.
+   */
+  donationsRead?: boolean;
 }
 
 export function parseSyncInput(data: unknown, nowMs: number): SyncInput {
@@ -1185,6 +1190,7 @@ export function parseSyncInput(data: unknown, nowMs: number): SyncInput {
     donations,
     gaps,
     ...(uncounted ? { uncounted } : {}),
+    ...(typeof d.donationsRead === 'boolean' ? { donationsRead: d.donationsRead } : {}),
   };
 }
 

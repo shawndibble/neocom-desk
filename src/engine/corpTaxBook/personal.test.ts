@@ -2351,6 +2351,21 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
       expect(out.books[0].uncredited).toEqual([old]);
     });
 
+    it('waits for a sync that read the wallet, not just any sync', () => {
+      // The book synced, but no sync since the donation could read the corp wallet.
+      const unread = overlay([entry()], [book({ inFlight: [old], donationsCheckedAt: null })]);
+      expect(unread.rows[0]).toMatchObject({ state: 'paid', settledBy: 'donation' });
+      expect(unread.books[0].uncredited).toEqual([]);
+      // The last sync that did read it was too soon after the donation.
+      const early = overlay(
+        [entry()],
+        [book({ inFlight: [old], donationsCheckedAt: '2026-10-15T10:00:00Z' })]
+      );
+      expect(early.books[0].uncredited).toEqual([]);
+      const late = overlay([entry()], [book({ inFlight: [old], donationsCheckedAt: SYNCED })]);
+      expect(late.books[0].uncredited).toEqual([old]);
+    });
+
     it('still counts while the book has not synced 3 days after it', () => {
       const recent = { ...old, at: '2026-10-16T10:00:00Z' };
       const out = overlay([entry()], [book({ inFlight: [recent] })]);

@@ -458,14 +458,19 @@ export async function runBookSync(
 
   // --- Upload (the first call carries everything but the overflow) ----------
   const call = (
-    part: Partial<Record<'observed' | 'extractions' | 'donations' | 'uncounted', unknown[]>>
-  ) => parseSyncInput({ corporationId, gaps, ...part }, now);
-  const first = call({
-    observed: batches.shift() ?? [],
-    extractions: extraCalls.shift() ?? [],
-    donations: resolved,
-    ...(uncounted ? { uncounted } : {}),
-  });
+    part: Partial<Record<'observed' | 'extractions' | 'donations' | 'uncounted', unknown[]>>,
+    extra: { donationsRead?: boolean } = {}
+  ) => parseSyncInput({ corporationId, gaps, ...part, ...extra }, now);
+  const first = call(
+    {
+      observed: batches.shift() ?? [],
+      extractions: extraCalls.shift() ?? [],
+      donations: resolved,
+      ...(uncounted ? { uncounted } : {}),
+    },
+    // Members' "not credited" notes wait on a sync that read the wallet, not on any sync.
+    { donationsRead }
+  );
   const receipt = await syncBookAs(deps, access, first, { scheduled: true });
   for (const observed of batches) {
     await syncBookAs(deps, access, call({ observed }), { scheduled: true });

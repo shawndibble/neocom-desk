@@ -788,8 +788,18 @@ export async function syncBookAs(
       (held.get('lastSync') as { gaps?: unknown } | undefined)?.gaps ?? []
     );
   const now = deps.now();
+  // When a sync last read the wallet's donations, which members' "not credited" notes wait on: a
+  // sync that could not read it (no role, no scope) must not read as one the donation missed.
+  // Null until one has; an older client's call, or an overflow call, leaves it as it was.
+  const donationsReadAt =
+    input.donationsRead === true
+      ? { donationsReadAt: now }
+      : input.donationsRead === false && held.get('donationsReadAt') === undefined
+        ? { donationsReadAt: null }
+        : {};
   await deps.db.runTransaction(async (tx) => {
     tx.update(book, {
+      ...donationsReadAt,
       lastSync: {
         at: now,
         byCharacterId: access.characterId,

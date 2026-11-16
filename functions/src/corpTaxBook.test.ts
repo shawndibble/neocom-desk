@@ -145,6 +145,18 @@ describe('parsers', () => {
     ).toHaveLength(1);
   });
 
+  it('takes whether the sync read the wallet, only as a boolean', () => {
+    const now = Date.parse('2026-10-18T12:00:00Z');
+    expect(parseSyncInput({ corporationId: 9, donationsRead: true }, now).donationsRead).toBe(true);
+    expect(parseSyncInput({ corporationId: 9, donationsRead: false }, now).donationsRead).toBe(
+      false
+    );
+    expect(parseSyncInput({ corporationId: 9 }, now)).not.toHaveProperty('donationsRead');
+    expect(parseSyncInput({ corporationId: 9, donationsRead: 'yes' }, now)).not.toHaveProperty(
+      'donationsRead'
+    );
+  });
+
   it('takes the donations noted in other divisions, ids from their journal refs (#6207)', () => {
     const now = Date.parse('2026-10-18T12:00:00Z');
     const noted = { refId: 4, division: 2, characterId: 7, amount: 5, at: '2026-10-17T00:00:00Z' };
