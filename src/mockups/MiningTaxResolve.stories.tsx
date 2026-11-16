@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Button } from '@/components/ui';
 import { CONFLICTS_OPEN, CONFLICTS_WAITING } from './miningTaxResolveFixtures';
+import { OfficerHeldDay, PayOldestFirstDialog } from './miningTaxResolveAllocation';
 import { AFTER_ITEMS, TODAY_ITEMS, proposedItems } from './miningTaxResolveItems';
 import {
   OfficerPaidToYou,
@@ -41,7 +42,7 @@ import {
  * `QuietStatusLine`, `LeftCorpNotice`, `QueueCard: won't pay` (a new kind on the officer's
  * existing card), `RequiredNextStep` (in the officer's keep-the-bill dialog) and
  * `TaxContactSetting`; and for the wallet check, `WalletCheck` (in the pilot's dialog and on
- * every officer card) and `AutoCreditedLine`. `AttentionStrip`, `OwedBalances`, `DataTable`, `Modal`, `Pill`, `Radio`
+ * every officer card) and `AutoCreditedLine`; and `WherePaymentGoes` for paying a Corp Tax Book. `AttentionStrip`, `OwedBalances`, `DataTable`, `Modal`, `Pill`, `Radio`
  * and the rest are the real components.
  */
 const meta = {
@@ -237,6 +238,29 @@ export const CeoPaidToYou: Story = {
   render: () => (
     <div className="mx-auto max-w-page px-4 py-4">
       <OfficerPaidToYou />
+    </div>
+  ),
+};
+
+/** @summary Paying a Corp Tax Book: an amount, not days — the dialog shows the book pays oldest first, and skips a held day. New component: WherePaymentGoes. */
+export const PayOldestFirst: Story = {
+  render: () => (
+    <>
+      <ProposedTab />
+      <PayOldestFirstDialog />
+    </>
+  ),
+};
+
+/** @summary Paying a Corp Tax Book, phone. */
+export const PayOldestFirstPhone: Story = { ...PayOldestFirst, ...phone };
+
+/** @summary Officer · the card says where the member's money landed and which day is held until they answer. */
+export const OfficerHeld: Story = {
+  ...officer,
+  render: () => (
+    <div className="mx-auto max-w-page px-4 py-4">
+      <OfficerHeldDay />
     </div>
   ),
 };

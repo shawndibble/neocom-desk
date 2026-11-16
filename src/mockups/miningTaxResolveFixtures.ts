@@ -114,3 +114,13 @@ export const CLAIMS = {
   old: { who: 'Brin Kael', amount: 9_000_000, at: '2026-09-03 16:20', ref: 6_002_187 },
   notInYours: { who: 'Orsa Tellemar', amount: 4_500_000, at: '2026-11-07 19:44', ref: 9_120_110 },
 } as const;
+
+/** Bureau's open days for the pilot, oldest first, and the one held while it answers. */
+export const OPEN_DAYS = [
+  { date: '2026-10-29', tax: 5_870_000 },
+  { date: '2026-10-30', tax: 6_120_000 },
+  { date: '2026-11-03', tax: 3_980_000 },
+  { date: '2026-11-06', tax: 1_840_320, held: 'Not paying — waiting on Bureau' },
+] as const;
+/** What the pilot pays: exactly the two oldest days. */
+export const PAYING = 11_990_000;

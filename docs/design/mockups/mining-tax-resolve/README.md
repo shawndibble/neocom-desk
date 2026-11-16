@@ -14,7 +14,7 @@ Every problem the Tax tab reports has the same five possible outcomes, split by 
 
 Today the tab leads every warning with "ask an officer" — the slowest, least certain outcome — and offers no control for it. After an answer, the problem leaves the attention strip for one quiet line and comes back only when an officer hands it back, with what to do next. Hiding is never "resolved": the row reads "Not paying — {corp} still bills this".
 
-New components: `ResolveOptions` (A), `ResolveDialog` (B), `QuietStatusLine`, `LeftCorpNotice`, `QueueCard: won't pay`, `RequiredNextStep`, `TaxContactSetting`, `WalletCheck`, `AutoCreditedLine`. Everything else is the real `AttentionStrip`, `OwedBalances`, `DataTable`, `Modal` and `src/components/ui` primitives.
+New components: `ResolveOptions` (A), `ResolveDialog` (B), `QuietStatusLine`, `LeftCorpNotice`, `QueueCard: won't pay`, `RequiredNextStep`, `TaxContactSetting`, `WalletCheck`, `AutoCreditedLine`, `WherePaymentGoes`. Everything else is the real `AttentionStrip`, `OwedBalances`, `DataTable`, `Modal` and `src/components/ui` primitives.
 
 ## Today
 
@@ -48,6 +48,15 @@ The pilot's own journal entry already gives the amount, EVE time, journal ref an
 | Paid to a person: the pilot picks the payment; it went to the CEO, who confirms from his own wallet. Another corporation is flagged too | ![](paid-to-person-1440.png) | |
 | Officer: every claim arrives checked — credited automatically (one quiet line, Undo), found in an uncounted division, not in the corp wallet, or too old to check | ![](officer-checked-1440.png) | ![](officer-checked-phone-390.png) |
 | The CEO: tax paid to him personally, found in his own wallet — record it as tax in one click | ![](ceo-paid-to-you-1440.png) | |
+
+## Paying a Corp Tax Book: an amount, not days
+
+The book pays a Miner's oldest days first and can't target a moon or a day, so the pilot pays an amount and the dialog shows where it lands. A day held by an open dispute or "Not paying" is skipped until an officer answers; the officer's card says where the money went.
+
+| | 1440 | 390 |
+|---|---|---|
+| Pay dialog: oldest first, the held day skipped | ![](pay-oldest-first-1440.png) | ![](pay-oldest-first-phone-390.png) |
+| Officer: where the member's payment landed, and what is held | ![](officer-held-1440.png) | |
 
 ## After the pilot answers
 
