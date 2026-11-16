@@ -5,9 +5,12 @@ import { useResolvedCharacterFilter } from '@/features/character/characterFilter
 import { AttentionStrip } from '@/features/miningTax/AttentionStrip';
 import { AutoAssignmentBar } from '@/features/miningTax/AutoAssignmentBar';
 import { CorpBookSyncNote } from '@/features/miningTax/corpBook/CorpBookSyncNote';
+import { LeftCorpNotices } from '@/features/miningTax/corpBook/LeftCorpNotice';
+import { leftCorpBooksOf } from '@/features/miningTax/corpBook/leftCorpBooks';
 import {
   corporationOfPayee,
   isBookRow,
+  corpPayeeId,
   isCorpPayeeId,
 } from '@/features/miningTax/corpBook/corpRows';
 import { PendingGroupingNotice } from '@/features/miningTax/corpBook/PendingGroupingNotice';
@@ -120,6 +123,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     paymentSources,
     corpView,
     reloadCorpBooks,
+    leftCorp,
     failedClaims,
     systemNames,
     systemSecurity,
@@ -304,6 +308,17 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     corpStateLabel,
   });
 
+  // The corporations every tracked Character has left; the Pay amount is the card's own balance.
+  const leftCorpBooks = useMemo(
+    () =>
+      leftCorpBooksOf(
+        leftCorp.shownBooks,
+        leftCorp.corpNameOf,
+        (id) => balances.find((b) => b.payee.id === corpPayeeId(id))?.owed ?? 0
+      ),
+    [leftCorp, balances]
+  );
+
   /** What a book's rows owe the member right now (its Billed days). */
   const corpOwedNow = useCallback(
     (corporationId: number) =>
@@ -341,6 +356,14 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
             {data && data.fromCache && <CachedNotice fetchedAt={data.fetchedAt} />}
 
             <AttentionStrip items={attentionItems} />
+
+            <LeftCorpNotices
+              books={leftCorpBooks}
+              hidden={leftCorp.hiddenLeft}
+              onPay={actions.openCorpPay}
+              onStopShowing={leftCorp.hide}
+              onShow={leftCorp.show}
+            />
 
             <AutoAssignmentBar
               characterIds={characterIds}
