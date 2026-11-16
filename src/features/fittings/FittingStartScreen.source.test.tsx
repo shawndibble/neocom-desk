@@ -11,6 +11,7 @@ import type { Fitting } from '@/engine/fittings/types';
 import type { MemberDoctrineFit } from '@/features/corp/srpTypes';
 import { seedCharacter } from '@/test/seed';
 import { FittingStartScreen } from './FittingStartScreen';
+import { clearDoctrineFitsCache } from './corpDoctrineFittings';
 import type { FittingLibrarySource } from './useFittingPicker';
 
 // The library's Source filter (issue #6217): one pick of Saved, In-game, Shared or Doctrine,
@@ -91,6 +92,7 @@ function renderScreen(characterId = 7, url = '/fittings') {
 }
 
 beforeEach(async () => {
+  clearDoctrineFitsCache();
   vi.clearAllMocks();
   phone.value = false;
   await db.fittings.clear();

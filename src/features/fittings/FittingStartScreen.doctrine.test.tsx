@@ -11,6 +11,7 @@ import type { Fitting } from '@/engine/fittings/types';
 import type { MemberDoctrineFit } from '@/features/corp/srpTypes';
 import { seedCharacter } from '@/test/seed';
 import { FittingStartScreen } from './FittingStartScreen';
+import { clearDoctrineFitsCache } from './corpDoctrineFittings';
 import type { FittingLibrarySource } from './useFittingPicker';
 
 // The corp's Doctrine Fits in the library (issue #6202): read-only rows tagged Doctrine, opened
@@ -84,6 +85,7 @@ function renderScreen(characterId = 7) {
 }
 
 beforeEach(async () => {
+  clearDoctrineFitsCache();
   vi.clearAllMocks();
   phone.value = false;
   await db.fittings.clear();

@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -10,8 +10,7 @@ import { encodeFittingShare } from '@/engine/fittings/fittingShare';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';
 import type { CharacterFitting } from '@/esi/endpoints';
-import { FittingStartScreen } from './FittingStartScreen';
-import { ADD_PREVIEW_DELAY_MS } from './useModuleAddPreview';
+import { FittingStartScreen, LIST_PREVIEW_DELAY_MS } from './FittingStartScreen';
 import { TEXT_DEBOUNCE_MS } from '@/lib/urlState';
 import type { FittingLibrarySource } from './useFittingPicker';
 
@@ -269,7 +268,7 @@ describe('FittingStartScreen', () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       await user.hover(kite);
       await user.unhover(kite);
-      act(() => vi.advanceTimersByTime(ADD_PREVIEW_DELAY_MS));
+      act(() => vi.advanceTimersByTime(LIST_PREVIEW_DELAY_MS));
     } finally {
       vi.useRealTimers();
     }
@@ -292,14 +291,14 @@ describe('FittingStartScreen', () => {
     try {
       // Boundary events alone, as a scroll under a still pointer fires them.
       fireEvent.pointerOver(kite, { pointerType: 'mouse' });
-      act(() => vi.advanceTimersByTime(ADD_PREVIEW_DELAY_MS));
+      act(() => vi.advanceTimersByTime(LIST_PREVIEW_DELAY_MS));
       expect(screen.getByText('preview of Armor Drake')).toBeInTheDocument();
 
       // A pending hover loses to the keyboard focus that follows it.
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       await user.hover(kite);
       act(() => screen.getByRole('button', { name: /^PvP Rifter/ }).focus());
-      act(() => vi.advanceTimersByTime(ADD_PREVIEW_DELAY_MS));
+      act(() => vi.advanceTimersByTime(LIST_PREVIEW_DELAY_MS));
     } finally {
       vi.useRealTimers();
     }
@@ -539,6 +538,26 @@ describe('FittingStartScreen on a phone', () => {
     expect(
       await screen.findByRole('button', { name: 'More actions for Armor Drake' })
     ).toBeInTheDocument();
+  });
+});
+
+describe('FittingStartScreen on a touch tablet', () => {
+  // Wide enough for the pane, but a finger has no hover to preview with.
+  let matchMedia: MockInstance<typeof window.matchMedia>;
+  beforeEach(() => {
+    const realMatchMedia = window.matchMedia;
+    matchMedia = vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => {
+      const list = realMatchMedia(query);
+      return query === '(hover: none)' ? { ...list, matches: true } : list;
+    });
+  });
+  afterEach(() => matchMedia.mockRestore());
+
+  it('shows no preview pane, and a tap opens the row', async () => {
+    const workspace = renderScreen();
+    await userEvent.click(await screen.findByRole('button', { name: /^Kite/ }));
+    expect(workspace.openSaved).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1' }));
+    expect(screen.queryByText(/^preview of/)).not.toBeInTheDocument();
   });
 });
 

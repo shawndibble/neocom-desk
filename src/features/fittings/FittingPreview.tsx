@@ -15,7 +15,7 @@ import {
   SkillsPanel,
 } from './FittingPreviewPanels';
 import { FittingRing } from './FittingRing';
-import { usePilotProfile } from './fittingPilotProfile';
+import { usePilotProfile, type PilotProfileState } from './fittingPilotProfile';
 import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
 import { useCompareFittings } from './useCompareFittings';
 import { useCompareStats } from './useCompareStats';
@@ -99,7 +99,15 @@ function rowNotes(row: LibraryRow): string {
  * worked out for this one Fitting only, so a long list costs nothing until a
  * row is picked.
  */
-export function FittingPreview({
+export function FittingPreview(props: FittingPreviewProps) {
+  // Loaded once for the pane, not per row: a pointer moving down the list
+  // shouldn't reload the pilot from storage at every row it rests on.
+  const pilot = usePilotProfile(props.characterId);
+  // Keyed: a row's own state (notes being edited, its encoded code) never carries over.
+  return <RowPreview key={props.row.id} {...props} pilot={pilot} />;
+}
+
+function RowPreview({
   row,
   characterId,
   catalogue,
@@ -108,15 +116,11 @@ export function FittingPreview({
   onRename,
   onDelete,
   onSaveNotes,
-}: FittingPreviewProps) {
+  pilot,
+}: FittingPreviewProps & { pilot: PilotProfileState }) {
   const { t } = useTranslation();
   const fitting = usePreviewFitting(row);
-  const {
-    profile,
-    failed: profileFailed,
-    skillsKnown,
-    retry: retryProfile,
-  } = usePilotProfile(characterId);
+  const { profile, failed: profileFailed, skillsKnown, retry: retryProfile } = pilot;
   const fittings = useMemo(() => [fitting], [fitting]);
   const compared = useCompareStats(fittings, profile);
   const shareCode = useShareCode(row, fitting);
