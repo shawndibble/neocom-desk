@@ -26,6 +26,8 @@ import {
 import type { Adjustment, Statement } from '@/engine/corpTaxBook/statements';
 import type { SettlePayment } from '@/engine/corpTaxBook/sync';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
+import { latestRecordedCorp } from '@/engine/corpTaxBook/bookDocs';
+import { readObservedRow } from '@/engine/corpTaxBook/observed';
 import { chunk } from '@/lib/chunk';
 import { readDisputes } from '@/engine/corpTaxBook/disputes';
 import { settingsFrom, type BookDeclaration } from '../bookClient';
@@ -76,6 +78,8 @@ export async function readMinerScope(
   });
   const from = statements.then((s) => openWindowStart(s, settingsFrom(book.data).startDate));
 
+  const rowsOf = (snap: { docs: { data: () => unknown }[] }) =>
+    snap.docs.flatMap((d) => readObservedRow(d.data() as Record<string, unknown>) ?? []);
   const windowRows = async (ids: readonly number[], since: string): Promise<ObservedRow[]> => {
     const rows: ObservedRow[] = [];
     for (const batch of chunk(ids, IN_LIMIT)) {
@@ -83,31 +87,32 @@ export async function readMinerScope(
         const snap = await getDocs(
           query(under('observed'), where('characterId', 'in', batch), where('date', '>=', since))
         );
-        rows.push(...snap.docs.map((d) => d.data() as ObservedRow));
+        rows.push(...rowsOf(snap));
       } catch (error) {
         if (!isMissingIndex(error)) throw error;
         const snap = await getDocs(query(under('observed'), where('characterId', 'in', batch)));
-        rows.push(...snap.docs.map((d) => d.data() as ObservedRow).filter((r) => r.date >= since));
+        rows.push(...rowsOf(snap).filter((r) => r.date >= since));
       }
     }
     return rows;
   };
-  /** The corporation a character's newest ledger row was recorded under: member, leaver or guest. */
+  /**
+   * The corporation a character was last recorded in (`latestRecordedCorp`): member, leaver or
+   * guest. The window holds every row of its newest day when it holds any; otherwise that day
+   * is read whole, since a character can change corporation mid-day.
+   */
   const latestCorp = async (id: number, known: readonly ObservedRow[]) => {
     const mine = known.filter((r) => r.characterId === id);
-    if (mine.length > 0)
-      return mine.reduce((a, b) => (b.date >= a.date ? b : a)).recordedCorporationId;
+    if (mine.length > 0) return latestRecordedCorp(mine).get(id)?.corp ?? corporationId;
     try {
-      const snap = await getDocs(
-        query(
-          under('observed'),
-          where('characterId', '==', id),
-          orderBy('date', 'desc'),
-          limitTo(1)
-        )
+      const mineOnly = where('characterId', '==', id);
+      const newest = query(under('observed'), mineOnly, orderBy('date', 'desc'), limitTo(1));
+      const top = rowsOf(await getDocs(newest))[0];
+      if (!top) return corporationId;
+      const day = rowsOf(
+        await getDocs(query(under('observed'), mineOnly, where('date', '==', top.date)))
       );
-      const newest = snap.docs[0]?.data() as ObservedRow | undefined;
-      return newest?.recordedCorporationId ?? corporationId;
+      return latestRecordedCorp([top, ...day]).get(id)?.corp ?? corporationId;
     } catch {
       return corporationId;
     }

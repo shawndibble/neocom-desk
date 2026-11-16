@@ -8,6 +8,7 @@
 import { collection, getDocs, query, Timestamp, where } from 'firebase/firestore/lite';
 import type { Firestore } from 'firebase/firestore/lite';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
+import { readObservedRow } from '@/engine/corpTaxBook/observed';
 import { OBSERVED_UPDATED_AT_FIELD } from '../../../../functions/src/corpTaxBookVersionKeys';
 import {
   applyObservedDelta,
@@ -35,12 +36,16 @@ const quietly = async <T>(work: () => Promise<T>): Promise<T | undefined> => {
   }
 };
 
-function toStored(docs: { id: string; data: () => unknown }[]): StoredObserved<ObservedRow>[] {
+function toStored(docs: { id: string; data: () => unknown }[]): StoredObserved<unknown>[] {
   return docs.map((d) => {
     const { [OBSERVED_UPDATED_AT_FIELD]: stamp, ...row } = d.data() as Record<string, unknown>;
-    return { id: d.id, row: row as unknown as ObservedRow, updatedMs: millisOf(stamp) };
+    return { id: d.id, row, updatedMs: millisOf(stamp) };
   });
 }
+
+/** The held copy's rows, validated on the way out as the member's reads are: a malformed one is dropped. */
+const rowsOf = (held: readonly StoredObserved<unknown>[]): ObservedRow[] =>
+  held.flatMap((r) => readObservedRow(r.row as Record<string, unknown>) ?? []);
 
 export async function readObservedRows(
   db: Firestore,
@@ -66,7 +71,7 @@ export async function readObservedRows(
   const held = await quietly(() => readObservedCopy(characterId, corporationId));
   const plan = planObservedRead(held?.meta, version, now, bookCreatedAt);
 
-  if (plan.kind === 'cached' && held) return held.rows.map((r) => r.row as ObservedRow);
+  if (plan.kind === 'cached' && held) return rowsOf(held.rows);
 
   let rows: StoredObserved<unknown>[];
   let meta: ObservedCopyMeta;
@@ -97,5 +102,5 @@ export async function readObservedRows(
   } catch (error) {
     return forgetOnDenied(error);
   }
-  return rows.map((r) => r.row as ObservedRow);
+  return rowsOf(rows);
 }

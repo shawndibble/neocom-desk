@@ -144,14 +144,18 @@ describe('readBook for one Miner', () => {
     expect(read!.minerScope?.totals).toBeUndefined();
   });
 
-  it('reads a solo Miner by its character, and a quiet one by its newest row only', async () => {
+  it('reads a solo Miner by its character, and a quiet one by its newest day only', async () => {
     store.docs.delete(`${BOOK}/miners/m1`);
     obs('o5', 5, '2026-07-30', 98000099); // a guest's last row, before the book
     obs('o6', 5, '2026-06-01', 98000099);
     store.reads.length = 0;
     const read = await readMiner('solo:5');
     expect(read!.observed).toEqual([]);
-    expect(store.reads.filter((p) => p.includes('/observed/'))).toEqual([`${BOOK}/observed/o5`]);
+    // The newest row, then every row of that day (a character can change corp mid-day).
+    expect(store.reads.filter((p) => p.includes('/observed/'))).toEqual([
+      `${BOOK}/observed/o5`,
+      `${BOOK}/observed/o5`,
+    ]);
   });
 
   it('claims only the parts it read, and holds every field a whole read of them holds', async () => {

@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { groupObservedEntries, mergeObservedRows, observedRowKey } from './observed';
+import {
+  groupObservedEntries,
+  mergeObservedRows,
+  observedRowKey,
+  readObservedRow,
+} from './observed';
 import type { ObservedRow } from './types';
 
 const ORE_A = 45490;
@@ -87,6 +92,13 @@ describe('groupObservedEntries', () => {
       row({ typeId: ORE_B, recordedCorporationId: 1, cachedAt: '2026-07-12T13:00:00Z' }),
     ]);
     expect(entry.recordedCorporationId).toBe(1);
+    expect(entry.cachedAt).toBe('2026-07-12T13:00:00Z');
+  });
+
+  it('settles one read listing both corps by the higher corporation id, in either order', () => {
+    const both = [row({ typeId: ORE_A }), row({ typeId: ORE_B, recordedCorporationId: 98000009 })];
+    expect(groupObservedEntries(both)[0].recordedCorporationId).toBe(98000009);
+    expect(groupObservedEntries([...both].reverse())[0].recordedCorporationId).toBe(98000009);
   });
 
   it('sums one character at one refinery on one day into an Observed Mining Entry, per ore type', () => {
@@ -102,6 +114,7 @@ describe('groupObservedEntries', () => {
         recordedCorporationId: 98000001,
         structureId: ATHANOR,
         date: '2026-07-11',
+        cachedAt: '2026-07-12T10:00:00Z',
         oreLines: [{ typeId: ORE_A, quantity: 9 }],
       },
       {
@@ -109,6 +122,7 @@ describe('groupObservedEntries', () => {
         recordedCorporationId: 98000001,
         structureId: ATHANOR,
         date: '2026-07-12',
+        cachedAt: '2026-07-12T10:00:00Z',
         oreLines: [
           { typeId: ORE_A, quantity: 100 },
           { typeId: ORE_B, quantity: 50 },
@@ -119,8 +133,35 @@ describe('groupObservedEntries', () => {
         recordedCorporationId: 98000001,
         structureId: TATARA,
         date: '2026-07-12',
+        cachedAt: '2026-07-12T10:00:00Z',
         oreLines: [{ typeId: ORE_A, quantity: 7 }],
       },
     ]);
+  });
+});
+
+describe('readObservedRow', () => {
+  it('reads a stored row with the system, moon and Extraction it was stamped with', () => {
+    expect(
+      readObservedRow({
+        structureId: 1,
+        characterId: 2,
+        recordedCorporationId: 3,
+        typeId: 4,
+        quantity: 5,
+        date: '2026-10-17',
+        cachedAt: '2026-10-18T00:00:00Z',
+        solarSystemId: 30003838,
+        moonId: 40000001,
+        extractionId: '1_1760000000000',
+      })
+    ).toMatchObject({ solarSystemId: 30003838, moonId: 40000001, extractionId: '1_1760000000000' });
+  });
+
+  it('is null for what is not a row', () => {
+    expect(readObservedRow({ structureId: 1 })).toBeNull();
+    expect(
+      readObservedRow({ structureId: 1, characterId: 2, typeId: 4, quantity: 'x', date: 'd' })
+    ).toBeNull();
   });
 });

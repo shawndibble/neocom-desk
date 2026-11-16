@@ -93,10 +93,12 @@ import {
   canOverrideRecordRate,
   canRebillFrom,
   isRetroactiveRate,
+  latestRecordedCorp,
   mergeObservedRows,
   observedRowKey,
   shiftDate,
   writeOffForAllocation,
+  type CorpRecord,
   type CoveragePeriod,
   type DismissableLine,
   type MirrorDismissal,
@@ -999,22 +1001,25 @@ async function recordedHereSince(
   }
 }
 
-/** The corporation recorded on the character's latest day (the first row of that day by id). */
-async function latestRecordedCorp(c: EditCtx, characterId: number): Promise<unknown> {
+/**
+ * The corporation the character was last recorded in, by the engine's rule
+ * (`latestRecordedCorp`: newest day, freshest read, then refinery and corporation id), so the
+ * Close account guard agrees with the guest the officer's view shows. Every row of the newest
+ * day is read: a character can change corporation mid-day.
+ */
+async function latestRecordedCorpOf(c: EditCtx, characterId: number): Promise<number | undefined> {
   const rows = col(c, OBSERVED).where('characterId', '==', characterId);
+  const fields = ['characterId', 'recordedCorporationId', 'date', 'cachedAt', 'structureId'];
   let days: QueryDocumentSnapshot[];
   try {
     const top = await c.tx.get(rows.orderBy('date', 'desc').limit(1));
     if (top.empty) return undefined;
-    // A character can change corporation mid-day: every row of that day, in id order.
     days = (await c.tx.get(rows.where('date', '==', top.docs[0].get('date')))).docs;
   } catch (e) {
     if (!isMissingIndex(e)) throw e;
-    const all = (await c.tx.get(rows.select('recordedCorporationId', 'date'))).docs;
-    const newest = all.reduce((m, d) => (d.get('date') > m ? d.get('date') : m), '');
-    days = all.filter((d) => d.get('date') === newest);
+    days = (await c.tx.get(rows.select(...fields))).docs;
   }
-  return days[0]?.get('recordedCorporationId');
+  return latestRecordedCorp(days.map((d) => d.data() as CorpRecord)).get(characterId)?.corp;
 }
 
 function writeMiner(
@@ -1898,7 +1903,7 @@ async function closeAccount(
 
   // A guest, by the ore's recorded corporation on each character's latest day.
   for (const characterId of characterIds) {
-    const latest = await latestRecordedCorp(c, characterId);
+    const latest = await latestRecordedCorpOf(c, characterId);
     if (latest === c.corporationId)
       fail('failed-precondition', "Only a guest's account can be closed", 'not-a-guest');
   }
