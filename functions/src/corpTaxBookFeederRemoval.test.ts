@@ -6,6 +6,7 @@ import {
   parseRemovalLinkCall,
   parseRemovalNoticeCall,
   parseStaleMailSentCall,
+  parseStaleMailClaimCall,
   STALE_MAIL_CLAIM_MS,
   staleMailClaimable,
 } from './corpTaxBookFeederRemoval.js';
@@ -148,6 +149,12 @@ describe('the stale-ledger mail claim', () => {
     ).toBe(false);
     // A claim from before claims carried a time stays final.
     expect(staleMailClaimable(claimed, now)).toBe(false);
+  });
+
+  it('parses a claim from a client that marks the mail sent', () => {
+    const base = { ...book, feederCorporationId: 98000002 };
+    expect(parseStaleMailClaimCall({ ...base, marksSent: true }).marksSent).toBe(true);
+    expect(parseStaleMailClaimCall(base).marksSent).toBeUndefined();
   });
 
   it('parses the sent mark: the spell is a time', () => {

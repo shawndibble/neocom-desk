@@ -173,6 +173,7 @@ import {
   claimFeederStaleMail,
   markFeederStaleMailSent,
   parseStaleMailSentCall,
+  parseStaleMailClaimCall,
   finalizeDueRemovals,
   forceRemovalNow,
   getRemovalLink,
@@ -1193,7 +1194,7 @@ corpTaxBookAction('cancelCorpTaxBookFeederRemovalCallable', (request) =>
 );
 
 corpTaxBookAction('claimCorpTaxBookFeederStaleMailCallable', (request) =>
-  claimFeederStaleMail(removalDeps(), callerOf(request), parseRemovalCall(request.data))
+  claimFeederStaleMail(removalDeps(), callerOf(request), parseStaleMailClaimCall(request.data))
 );
 
 corpTaxBookAction('markCorpTaxBookFeederStaleMailSentCallable', (request) =>

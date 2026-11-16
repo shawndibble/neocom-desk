@@ -8123,7 +8123,7 @@
         "tellFailed": "Could not send it. Try again.",
         "tellRejected": "{{corp}} already answered this day; ask an officer.",
         "withdraw": "Withdraw",
-        "withdrawFailed": "Could not withdraw it. An officer may have answered already; reload and try again.",
+        "withdrawFailed": "Could not withdraw it. Try again.",
         "otherPayee": "another Payee"
       },
       "declare": {

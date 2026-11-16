@@ -47,8 +47,8 @@ export function CorpDisputeAction({ view, payeeName, onSent }: Props) {
           date: view.date,
         });
         onSent();
-      } catch {
-        setFailed('other');
+      } catch (e) {
+        setFailed(callableErrorReason(e) === 'answered' ? 'rejected' : 'other');
       } finally {
         setBusy(false);
       }
@@ -70,7 +70,13 @@ export function CorpDisputeAction({ view, payeeName, onSent }: Props) {
             </button>
           </NeedsConnection>
         </div>
-        {failed && <InlineError>{t(k('withdrawFailed'))}</InlineError>}
+        {failed && (
+          <InlineError>
+            {failed === 'rejected'
+              ? t(k('tellRejected'), { corp: view.corpName })
+              : t(k('withdrawFailed'))}
+          </InlineError>
+        )}
       </div>
     );
   }

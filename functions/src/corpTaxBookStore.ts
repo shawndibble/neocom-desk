@@ -904,32 +904,31 @@ async function minerUids(c: EditCtx, minerId: string): Promise<string[]> {
 }
 
 /**
- * The Declaration a payment confirms, checked before any write: it must be this Miner's and not
- * yet answered. Its resolution is the single point both ways of confirming it go through (a
- * hand-recorded payment, or a matched donation), so whichever lands first wins and the other is
- * refused in its own transaction, never counting the ISK twice. Returns the write to make.
+ * Confirms the Declaration a payment is for, in the payment's own transaction: it must be this
+ * Miner's and not yet answered. Its resolution is the single point both ways of confirming it go
+ * through (a hand-recorded payment, or a matched donation), so whichever lands first wins and the
+ * other is refused, never counting the ISK twice. Call it after the caller's own reads.
  */
-async function confirmingDeclaration(
+async function confirmDeclaration(
   c: EditCtx,
   declarationId: string | undefined,
   minerId: string,
   paymentId: string
-): Promise<() => void> {
-  if (declarationId === undefined) return () => {};
+): Promise<void> {
+  if (declarationId === undefined) return;
   const ref = col(c, DECLARATIONS).doc(declarationId);
   const declaration = await mustGet(c, ref, 'Declaration');
   if (declaration.resolution) fail('failed-precondition', 'Already resolved', 'already-resolved');
   if (declaration.minerId !== undefined && declaration.minerId !== minerId)
     fail('invalid-argument', "Declaration is another Miner's", 'wrong-miner');
-  return () =>
-    c.tx.update(ref, {
-      resolution: {
-        kind: 'confirmed',
-        at: new Date(c.now).toISOString(),
-        by: c.access.characterId,
-        paymentId,
-      },
-    });
+  c.tx.update(ref, {
+    resolution: {
+      kind: 'confirmed',
+      at: new Date(c.now).toISOString(),
+      by: c.access.characterId,
+      paymentId,
+    },
+  });
 }
 
 /** The characters an officer unlinked: automatic grouping (D26) leaves them alone. */
@@ -1207,13 +1206,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const ref = col(c, PAYMENTS).doc(action.paymentId);
       if ((await tx.get(ref)).exists)
         fail('already-exists', 'A payment with that id exists', 'payment-exists');
-      const confirm = await confirmingDeclaration(
-        c,
-        action.declarationId,
-        action.minerId,
-        action.paymentId
-      );
-      confirm();
+      await confirmDeclaration(c, action.declarationId, action.minerId, action.paymentId);
       tx.create(ref, {
         id: action.paymentId,
         source: 'manual',
@@ -1275,13 +1268,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const payment = await mustGet(c, ref, 'Payment');
       if (payment.minerId !== undefined)
         fail('failed-precondition', 'Already assigned', 'already-assigned');
-      const confirm = await confirmingDeclaration(
-        c,
-        action.declarationId,
-        action.minerId,
-        action.paymentId
-      );
-      confirm();
+      await confirmDeclaration(c, action.declarationId, action.minerId, action.paymentId);
       // An officer placed a held donation: the review it waited for is done (#6207).
       tx.update(ref, {
         minerId: action.minerId,
@@ -2440,7 +2427,7 @@ export async function withdrawDispute(deps: BookDeps, caller: Caller, input: Wit
       tx,
       deps,
       corporationId,
-      { characterId, name: 'Player dispute', via: 'player-claim' },
+      { characterId, name: 'Player dispute withdrawal', via: 'player-claim' },
       'withdrawDispute',
       { disputeId, minerId, date }
     );

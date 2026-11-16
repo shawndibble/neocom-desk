@@ -279,8 +279,9 @@ export const STALE_MAIL_CLAIM_MS = 4 * 60 * 60 * 1000;
 
 /**
  * Whether an officer's client may claim this stale spell's mail now: not yet claimed, or claimed
- * more than `STALE_MAIL_CLAIM_MS` ago and never marked sent. A claim made before claims carried
- * a time (`staleMailClaimedAt`) stays final, as it was.
+ * more than `STALE_MAIL_CLAIM_MS` ago and never marked sent. A claim with no time
+ * (`staleMailClaimedAt`: made before claims carried one, or by a client that never marks it sent)
+ * stays final.
  */
 export function staleMailClaimable(
   held: Pick<
@@ -302,13 +303,24 @@ export function staleMailClaimable(
  * spell's one mail to both sides (the moon owner's CEO and payee, and the book's other
  * officers), so every open tab does not send its own. Nobody named: nothing to send, another
  * officer holds the claim, or it is one of the book's own corporations (never mailed). Mail is
- * client-only (no server holds a mail token), so the claim lapses after `STALE_MAIL_CLAIM_MS`
- * unless the claimer's queue marks it sent (`markFeederStaleMailSent`).
+ * client-only (no server holds a mail token), so a claim from a client that marks it sent
+ * (`marksSent`) lapses after `STALE_MAIL_CLAIM_MS` unless its queue marks it sent
+ * (`markFeederStaleMailSent`).
  */
+export interface StaleMailClaimCall extends RemovalCall {
+  /** The client's queue calls `markFeederStaleMailSent` once a copy went: the claim may lapse. */
+  marksSent?: boolean;
+}
+
+export function parseStaleMailClaimCall(data: unknown): StaleMailClaimCall {
+  const call = parseRemovalCall(data);
+  return record(data).marksSent === true ? { ...call, marksSent: true } : call;
+}
+
 export async function claimFeederStaleMail(
   deps: BookDeps,
   caller: Caller,
-  input: RemovalCall
+  input: StaleMailClaimCall
 ): Promise<{ recipients: number[]; ownerRecipients: number[] }> {
   const access = await authorizeOfficer(deps, caller, input, 'edit', { live: true });
   const ref = feederRef(deps.db, input.corporationId, input.feederCorporationId);
@@ -324,7 +336,12 @@ export async function claimFeederStaleMail(
     ) {
       return undefined;
     }
-    tx.update(ref, { staleMailedFor: held.staleSince, staleMailClaimedAt: now });
+    // Only a client that marks the mail sent gets a claim that can lapse: an older client's
+    // claim stays final, or every officer after it would mail the spell again.
+    tx.update(ref, {
+      staleMailedFor: held.staleSince,
+      staleMailClaimedAt: input.marksSent ? now : FieldValue.delete(),
+    });
     return held;
   });
   if (!claimed) return { recipients: [], ownerRecipients: [] };

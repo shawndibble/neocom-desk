@@ -328,10 +328,12 @@ export async function claimFeederStaleMail(
   feederCorporationId: number
 ): Promise<{ recipients: number[]; ownerRecipients: number[] }> {
   const accessToken = await getValidAccessToken(characterId);
+  // This client's mail queue marks the mail sent, so an unsent claim may lapse to another officer.
   return call(characterId, 'claimCorpTaxBookFeederStaleMailCallable', {
     corporationId,
     accessToken,
     feederCorporationId,
+    marksSent: true,
   });
 }
 
