@@ -17,6 +17,7 @@ import {
   type DataTableColumn,
   type DataTableGroupBy,
   CachedNotice,
+  IncompleteNotice,
 } from '@/components/ui';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { fitColumnWidth } from './transactionColumnWidths';
@@ -640,9 +641,10 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
               />
             )}
             {transactionsTruncated && (
-              <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-                {t('common.incompleteTitle')} — {t('wallet.transactionsTruncatedHint')}
-              </p>
+              <IncompleteNotice
+                className="px-3 pt-2"
+                hint={t('wallet.transactionsTruncatedHint')}
+              />
             )}
             <TransactionsFilterBar
               filter={filter}

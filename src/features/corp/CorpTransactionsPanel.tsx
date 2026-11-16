@@ -30,6 +30,7 @@ import {
   type DataTableColumn,
   type DataTableSort,
   CachedNotice,
+  IncompleteNotice,
 } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
@@ -209,9 +210,7 @@ export function CorpTransactionsPanel({
             />
           )}
           {transactionsResult.truncated && (
-            <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-              {t('common.incompleteTitle')} — {t('wallet.transactionsTruncatedHint')}
-            </p>
+            <IncompleteNotice className="px-3 pt-2" hint={t('wallet.transactionsTruncatedHint')} />
           )}
           <TransactionsFilterBar
             filter={filter}
