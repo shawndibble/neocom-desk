@@ -45,6 +45,8 @@ interface Props {
   onTakeOver: () => void;
   /** #6206: "Tell {corp}" this day's ore went to the entry's Payee, or what was sent. */
   tell?: ReactNode;
+  /** Opens Resolve on this day: for an `ownerCollected` Conflict it is how the member says they paid the owner. */
+  onResolve?: () => void;
 }
 
 /**
@@ -70,6 +72,7 @@ export function ConflictNotice({
   onUnmarkPaid,
   onTakeOver,
   tell,
+  onResolve,
 }: Props) {
   const { t } = useTranslation();
   const anyPaid = entries.some((e) => e.paid);
@@ -85,7 +88,14 @@ export function ConflictNotice({
         {t(k(TITLE_KEY[cause ?? 'otherPayee']), { corp: corpName, owner: ownerName })}
       </p>
       {cause === 'ownerCollected' && (
-        <p>{t(k('ownerCollectedAsk'), { corp: corpName, owner: ownerName })}</p>
+        <div className="space-y-1">
+          <p>{t(k('ownerCollectedAsk'), { corp: corpName, owner: ownerName })}</p>
+          {onResolve && (
+            <Button size="sm" onClick={onResolve}>
+              {t('miningTax.resolve.open')}
+            </Button>
+          )}
+        </div>
       )}
       <ul className="list-disc space-y-0.5 pl-4">
         {entries.length === 0 ? (

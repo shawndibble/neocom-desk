@@ -50,6 +50,7 @@ import type { ObservedMiningEntry, OreLine } from './types';
 import type { DayPrices } from './valuation';
 import { DAY_MS } from '@/lib/age';
 import { wholeIsk } from './wholeIsk';
+import type { OreDispute } from './disputes';
 import { settleOpenSet, type OpenSet, type OpenSetInput } from './openSet';
 
 export interface BookViewInput {
@@ -75,6 +76,8 @@ export interface BookViewInput {
   payments: readonly SettlePayment[];
   dismissals: readonly Dismissal[];
   declarations: readonly Declaration[];
+  /** Members' disputes: an open one holds its amount out of what is due (resolving in the app). */
+  disputes?: readonly OreDispute[];
   adjustments: readonly Adjustment[];
   /** Officer write-offs (#4637): each reduces what its Miner owes. */
   writeOffs?: readonly RecordedWriteOff[];
@@ -309,6 +312,7 @@ export function openSetInputOf(input: BookViewInput): OpenSetInput {
     dismissals: input.dismissals,
     writeOffs: input.writeOffs,
     declarations: input.declarations,
+    ...(input.disputes ? { disputes: input.disputes } : {}),
     overdueDays: input.overdueDays,
     feeders: input.feeders,
     pricesOn: input.pricesOn,

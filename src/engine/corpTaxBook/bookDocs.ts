@@ -5,7 +5,7 @@
  * The functions copy of `latestRecordedCorp` lives in `functions/src/corpTaxBookEngine.ts`
  * (ADR 0025: functions cannot import src), kept honest by `functionsMirror.test.ts`.
  */
-import { isFiniteNumber, isRecord } from '../guards';
+import { isFiniteNumber, isId, isRecord } from '../guards';
 import { DEFAULT_GRACE_HOURS } from './billable';
 import { readDivisionNames, type DivisionNames } from './divisionNames';
 import { recordedLater, type CorpRecord } from './observed';
@@ -15,6 +15,30 @@ import { DEFAULT_MINIMUM_STATEMENT, type StatementCadence } from './statements';
 import type { LastSync } from './sync';
 
 type Data = Record<string, unknown>;
+
+/** Who gets the EVE mail when a member asks about tax: a mailing list, or up to five characters. */
+export type TaxContact =
+  { kind: 'mailingList'; id: number; name: string } | { kind: 'characters'; ids: number[] };
+
+/** The most characters a `TaxContact` can name. */
+export const TAX_CONTACT_MAX_CHARACTERS = 5;
+
+/** A stored `taxContact`, or undefined when absent or malformed (then the CEO is mailed). */
+export function parseTaxContact(v: unknown): TaxContact | undefined {
+  if (!isRecord(v)) return undefined;
+  if (v.kind === 'mailingList') {
+    return isId(v.id) && typeof v.name === 'string'
+      ? { kind: 'mailingList', id: v.id, name: v.name }
+      : undefined;
+  }
+  if (v.kind === 'characters' && Array.isArray(v.ids) && v.ids.every(isId)) {
+    const ids = [...new Set(v.ids as number[])];
+    return ids.length >= 1 && ids.length <= TAX_CONTACT_MAX_CHARACTERS
+      ? { kind: 'characters', ids }
+      : undefined;
+  }
+  return undefined;
+}
 
 /** Every setting the book document stores, every default filled in. */
 export interface BookSettings {
@@ -41,6 +65,8 @@ export interface BookSettings {
   createdBy: number | null;
   /** Epoch ms: until then members' own Mining Tax pages ignore the book (setup window). */
   membersSeeFrom?: number;
+  /** Who gets the EVE mail when a member asks about tax. Absent → the corporation's CEO. */
+  taxContact?: TaxContact;
 }
 
 /** Every scope a stored rate can have — the engine's own list, so a new scope is never dropped. */
@@ -89,6 +115,7 @@ function parseCadence(v: unknown): StatementCadence {
 export function parseBookSettings(d: Data): BookSettings {
   const expiry = isRecord(d.structureExpiryHours) ? d.structureExpiryHours : {};
   const membersSeeFrom = num(d.membersSeeFrom);
+  const taxContact = parseTaxContact(d.taxContact);
   return {
     active: d.active === true,
     startDate: str(d.startDate) ?? '',
@@ -112,6 +139,7 @@ export function parseBookSettings(d: Data): BookSettings {
     ownerCharacterId: num(d.ownerCharacterId) ?? null,
     createdBy: num(d.createdBy) ?? null,
     ...(membersSeeFrom !== undefined ? { membersSeeFrom } : {}),
+    ...(taxContact ? { taxContact } : {}),
   };
 }
 

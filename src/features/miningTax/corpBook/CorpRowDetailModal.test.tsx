@@ -175,7 +175,7 @@ describe('CorpRowDetailModal', () => {
     renderModal({ corp: { ...corp, view: paid } });
     expect(screen.getByText('957,001 ISK')).toBeInTheDocument();
     expect(
-      screen.getByText(/Can't be edited here\. Ask a Brass Meridian Logistics officer/)
+      screen.getByText(/The book owns these figures, so they can't be edited here\./)
     ).toBeInTheDocument();
     expect(screen.getByText('Statement')).toBeInTheDocument();
     expect(screen.getByText('Issued, final')).toBeInTheDocument();
@@ -295,20 +295,51 @@ describe('CorpRowDetailModal', () => {
   });
 });
 
-describe('CorpRowDetailModal: I paid this another way (#6206)', () => {
+describe('CorpRowDetailModal: Resolve on a Statement (#6206, resolving in the app)', () => {
   const onStatement = (over: Partial<BookRowView> = {}) => {
-    const v = { ...view, statementId: 's1', ...over };
+    const v = { ...view, dispute: undefined, statementId: 's1', ...over };
     return { corp: { ...corp, view: v }, dr: { ...dr, corp: { ...corp, view: v } } as DisplayRow };
   };
 
-  it('offers it on a day a Statement bills, when the books can be told', () => {
-    renderModal({ ...onStatement(), onBookChanged: vi.fn() });
-    expect(screen.getByRole('button', { name: 'I paid this another way' })).toBeInTheDocument();
+  it('offers Resolve on a day a Statement bills, opening the Statement problem', async () => {
+    const onResolve = vi.fn();
+    renderModal({ ...onStatement(), onResolve });
+    await userEvent.click(screen.getAllByRole('button', { name: 'Resolve' })[0]);
+    expect(onResolve).toHaveBeenCalledWith(
+      expect.objectContaining({
+        problem: expect.objectContaining({ kind: 'overdue', statementId: 's1' }),
+      })
+    );
   });
 
-  it('offers nothing before the day is on a Statement, or with nowhere to send it', () => {
-    renderModal({ onBookChanged: vi.fn() });
-    expect(screen.queryByRole('button', { name: 'I paid this another way' })).toBeNull();
+  it('offers nothing with nowhere to send it', () => {
+    renderModal({ ...onStatement() });
+    expect(screen.queryByRole('button', { name: 'Resolve' })).toBeNull();
+  });
+
+  // A plain billed day can still be paid, or said no to: pay / not paying.
+  it('offers a plain billed day Resolve even before it is on a Statement', async () => {
+    const onResolve = vi.fn();
+    renderModal({ onResolve, corp: { ...corp, view: { ...view, dispute: undefined } } });
+    await userEvent.click(screen.getAllByRole('button', { name: 'Resolve' })[0]);
+    expect(onResolve).toHaveBeenCalledWith(
+      expect.objectContaining({ problem: expect.objectContaining({ kind: 'billed' }) })
+    );
+  });
+
+  it('offers a day marked paid that the book still bills the proof, pay and not paying', async () => {
+    const onResolve = vi.fn();
+    const marked = {
+      ...view,
+      state: 'paid' as const,
+      settledBy: 'yourMark' as const,
+      bookOwed: 500,
+    };
+    renderModal({ onResolve, ...onStatement(marked) });
+    await userEvent.click(screen.getAllByRole('button', { name: 'Resolve' }).at(-1)!);
+    expect(onResolve).toHaveBeenCalledWith(
+      expect.objectContaining({ problem: expect.objectContaining({ kind: 'markedPaid' }) })
+    );
   });
 
   it('says it is waiting for the corporation, and does not offer it twice', () => {
@@ -316,24 +347,51 @@ describe('CorpRowDetailModal: I paid this another way (#6206)', () => {
       ...onStatement({
         declaration: { state: 'waiting', at: '2026-10-20T00:00:00Z', amount: 900_000 },
       }),
-      onBookChanged: vi.fn(),
+      onResolve: vi.fn(),
     });
     expect(
       screen.getByText('Declared 900,000 ISK — waiting for Brass Meridian Logistics')
     ).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'I paid this another way' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Resolve' })).toBeNull();
   });
 
-  it('shows a rejection with its reason and offers it again', () => {
+  it('shows a rejection with its reason and the next step word for word, and Resolve again', () => {
     renderModal({
       ...onStatement({
-        declaration: { state: 'rejected', at: '2026-10-21T00:00:00Z', reason: 'No contract' },
+        declaration: {
+          state: 'rejected',
+          at: '2026-10-21T00:00:00Z',
+          reason: 'No contract',
+          nextStep: 'Send the journal ref of the transfer',
+        },
       }),
-      onBookChanged: vi.fn(),
+      onResolve: vi.fn(),
     });
     expect(
       screen.getByText('Brass Meridian Logistics rejected your declaration: No contract')
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'I paid this another way' })).toBeInTheDocument();
+    expect(
+      screen.getByText('What to do next: Send the journal ref of the transfer')
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Resolve' }).length).toBeGreaterThan(0);
+  });
+
+  it("shows an officer's kept bill on a billed day, with their next step, and Resolve again", () => {
+    renderModal({
+      ...onStatement({
+        flagged: {
+          state: 'rejected',
+          kind: 'quantity',
+          at: '2026-10-21T00:00:00Z',
+          reason: 'The book is right',
+          nextStep: 'Pay it, or re-mine the shortfall',
+        },
+      }),
+      onResolve: vi.fn(),
+    });
+    expect(
+      screen.getByText('What to do next: Pay it, or re-mine the shortfall')
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Resolve' }).length).toBeGreaterThan(0);
   });
 });

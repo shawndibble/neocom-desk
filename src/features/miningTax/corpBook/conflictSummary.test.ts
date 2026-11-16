@@ -40,6 +40,91 @@ describe('summarizeConflicts', () => {
     expect(out).toMatchObject({ days: 3, amount: 650, firstCorpName: 'Brass' });
     expect(out?.first).toBe(soon);
   });
+
+  // "Not paying" is the member's own answer: nothing to warn about, and it is on the quiet line.
+  it('leaves out the days the member chose not to pay', () => {
+    const hidden = row(view({ id: 'h', billed: 300, corporationId: 1, characterId: 1 }));
+    const shown = row(view({ id: 's', billed: 200, date: '2026-10-29', corporationId: 1 }));
+    const out = summarizeConflicts([hidden, shown], new Set(['day:1:1:2026-10-28']));
+    expect(out).toMatchObject({ days: 1, amount: 200 });
+    expect(summarizeConflicts([hidden], new Set(['day:1:1:2026-10-28']))).toBeNull();
+  });
+
+  // #6206: a day the member has answered still bills on its own 14-day clock, so it stays
+  // counted — `waiting` is what lets the caller stop calling it a warning.
+  it('counts a day sent to the corporation, and one whose ore it waived, as waiting', () => {
+    const sent = row(
+      view({
+        id: 'sent',
+        billed: 300,
+        flagged: { kind: 'payee', state: 'sent', at: '2026-11-01T10:00:00Z' },
+      })
+    );
+    const waived = row(
+      view({
+        id: 'waived',
+        billed: 400,
+        date: '2026-10-29',
+        flagged: {
+          kind: 'payee',
+          state: 'dismissed',
+          at: '2026-11-02T10:00:00Z',
+          reason: 'Fair enough',
+        },
+      })
+    );
+    expect(summarizeConflicts([sent, waived])).toMatchObject({
+      days: 2,
+      waiting: 2,
+      amount: 700,
+    });
+  });
+
+  it('does not count a day the corporation handed back, so it still reads as a warning', () => {
+    const rejected = row(
+      view({
+        id: 'rejected',
+        billed: 250,
+        flagged: {
+          kind: 'payee',
+          state: 'rejected',
+          at: '2026-11-02T10:00:00Z',
+          reason: 'Book stands',
+        },
+      })
+    );
+    expect(summarizeConflicts([rejected])).toMatchObject({ days: 1, waiting: 0, amount: 250 });
+  });
+
+  it('leads with a day the member can still act on, and reports when it resolves', () => {
+    const sent = row(
+      view({
+        id: 'sent',
+        billed: 300,
+        resolvesAt: '2026-11-10T00:00:00Z',
+        flagged: { kind: 'payee', state: 'sent', at: '2026-11-01T10:00:00Z' },
+      })
+    );
+    const open = row(
+      view({ id: 'open', billed: 100, date: '2026-10-31', resolvesAt: '2026-11-14T00:00:00Z' })
+    );
+    const out = summarizeConflicts([sent, open]);
+    expect(out).toMatchObject({ days: 2, waiting: 1, firstResolvesOn: '2026-11-14' });
+    expect(out?.first).toBe(open);
+  });
+
+  // One book answered, another on the same day not: the day still needs the member.
+  it('only calls a day waiting once every book contesting it has been answered', () => {
+    const answered = row(
+      view({
+        id: 'a',
+        billed: 300,
+        flagged: { kind: 'payee', state: 'sent', at: '2026-11-01T10:00:00Z' },
+      })
+    );
+    const open = row(view({ id: 'b', billed: 200 }), 'Other');
+    expect(summarizeConflicts([answered, open])).toMatchObject({ days: 1, waiting: 0 });
+  });
 });
 
 describe('conflictSiblings', () => {

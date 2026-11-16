@@ -106,7 +106,10 @@ export interface WriteOffCredit {
 }
 
 export interface StatementSettlement {
+  /** What is due now: the Statement's amount less what open disputes hold of it. */
   amount: number;
+  /** What open disputes hold back of it (resolving in the app); absent when nothing is held. */
+  held?: number;
   /** Payments, dismissals and officer write-offs credited to it. */
   credited: number;
   /** What officer write-offs forgave of it (part of `credited`). */
@@ -153,6 +156,12 @@ export interface AllocationInput {
   officerWriteOffs?: readonly OfficerWriteOff[];
   /** The book's start date: a donation dated before it credits nothing. Hand-recorded payments always count. */
   startDate?: string;
+  /**
+   * What open disputes hold of each Statement (`heldByStatement`): not due while held, so a
+   * payment settles the Statement on the rest and goes on to the next, as the member meant.
+   * Recomputed from the whole history each time, so a hold that ends reopens it by that much.
+   */
+  held?: ReadonlyMap<string, number>;
 }
 
 export function allocatePayments(rawInput: AllocationInput): Allocation {
@@ -166,9 +175,20 @@ export function allocatePayments(rawInput: AllocationInput): Allocation {
   const ordered = [...input.statements].sort(
     (a, b) => a.issuedAt.localeCompare(b.issuedAt) || a.id.localeCompare(b.id)
   );
-  type Running = { amount: number; credited: number; paidIn: number; forgiven: number };
+  type Running = {
+    amount: number;
+    held: number;
+    credited: number;
+    paidIn: number;
+    forgiven: number;
+  };
+  const heldOf = (s: { id: string; amount: number }) =>
+    Math.min(Math.max(0, input.held?.get(s.id) ?? 0), Math.max(0, s.amount));
   const state = new Map<string, Running>(
-    ordered.map((s) => [s.id, { amount: s.amount, credited: 0, paidIn: 0, forgiven: 0 }])
+    ordered.map((s) => [
+      s.id,
+      { amount: s.amount - heldOf(s), held: heldOf(s), credited: 0, paidIn: 0, forgiven: 0 },
+    ])
   );
   // Only a payment settles within the tolerance; a dismissal must cover in full.
   const isDone = (st: Running): boolean => {
@@ -251,6 +271,7 @@ export function allocatePayments(rawInput: AllocationInput): Allocation {
     writtenOffTotal += writtenOff;
     byStatement.set(s.id, {
       amount: st.amount,
+      ...(st.held > 0 ? { held: st.held } : {}),
       credited: st.credited,
       forgiven: st.forgiven,
       writtenOff,

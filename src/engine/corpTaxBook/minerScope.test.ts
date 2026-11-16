@@ -295,4 +295,31 @@ describe('Miner page read-model path', () => {
     expect(withMinerTotals(old, MINER, undefined)).toBe(old);
     expect(minerDetail(old, MINER)!.row).toEqual(row);
   });
+
+  it('keeps the computed owed and credit while the Miner has an unanswered dispute', () => {
+    const { old } = both();
+    const row = minerDetail(old, MINER)!.row;
+    const doc = {
+      schema: 1,
+      owed: 123,
+      credit: 4,
+      lastPaidAt: '2026-01-01T00:00:00Z',
+    } as MinerTotals;
+    const open = { minerId: MINER } as never;
+    const answered = { minerId: MINER, resolution: { kind: 'rejected' } } as never;
+    const held = minerDetail(
+      withMinerTotals({ ...old, input: { ...old.input, disputes: [open] } }, MINER, doc),
+      MINER
+    )!.row;
+    expect(held).toMatchObject({ owed: row.owed, credit: row.credit });
+    expect(held.lastPaidAt).toBe('2026-01-01T00:00:00Z');
+    // Another Miner's, or an answered one, leaves the stored figures in force.
+    for (const disputes of [[{ minerId: 'other' } as never], [answered]])
+      expect(
+        minerDetail(
+          withMinerTotals({ ...old, input: { ...old.input, disputes } }, MINER, doc),
+          MINER
+        )!.row
+      ).toMatchObject({ owed: 123, credit: 4 });
+  });
 });

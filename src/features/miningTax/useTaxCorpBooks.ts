@@ -3,6 +3,7 @@ import { NO_NAMES } from '@/lib/emptyCollections';
 import { useMadePayments } from '@/features/miningTax/useMadePayments';
 import { useAutoClaimDonations } from '@/features/miningTax/corpBook/useAutoClaimDonations';
 import { useBookSystems } from '@/features/miningTax/corpBook/useBookSystems';
+import { useHiddenLeftCorps } from '@/features/miningTax/corpBook/leftCorpAck';
 import { useCorpBookView } from '@/features/miningTax/corpBook/useCorpBookView';
 import type { TaxSnapshot } from './taxSnapshot';
 import type { TrackedCharacter } from './snapshot';
@@ -25,13 +26,21 @@ export function useTaxCorpBooks(
   );
   // The member's Corp Tax Books (D24: only when their corp has an active one; otherwise null and
   // the tab is exactly what it was).
-  const { view: corpView, reload: reloadCorpBooks } = useCorpBookView({
+  const leftAck = useHiddenLeftCorps();
+  const {
+    view: corpView,
+    reload: reloadCorpBooks,
+    shownBooks,
+    corpNameOf,
+    hiddenLeft,
+  } = useCorpBookView({
     rows: data?.entries,
     characters,
     activeCharacterId,
     madePayments,
     payees,
     reloadKey: data?.fetchedAt?.getTime(),
+    hiddenCorps: leftAck.hidden,
   });
   // The player's own Unmatched donations are claimed for them; only a failed claim is left to retry.
   const { failed: failedClaims } = useAutoClaimDonations(corpView, reloadCorpBooks);
@@ -45,6 +54,7 @@ export function useTaxCorpBooks(
     paymentSources,
     corpView,
     reloadCorpBooks,
+    leftCorp: { shownBooks, corpNameOf, hiddenLeft, hide: leftAck.hide, show: leftAck.show },
     failedClaims,
     systemNames: bookSystems.names,
     systemSecurity: bookSystems.security,

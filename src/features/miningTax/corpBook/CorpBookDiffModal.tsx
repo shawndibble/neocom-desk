@@ -1,6 +1,6 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useTranslation } from 'react-i18next';
-import { Modal } from '@/components/ui';
+import { Button, Modal } from '@/components/ui';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -15,6 +15,10 @@ interface Props {
   view: BookRowView;
   systemName: string;
   typeNames: ReadonlyMap<number, string>;
+  /** Opens Resolve on this day: "I don't owe this" sends the dispute. Absent: not offered. */
+  onResolve?: () => void;
+  /** Opens the member's own entry for the day, to bring it in line with the book. Absent: none lines up. */
+  onFixRecords?: () => void;
 }
 
 const quantityOf = (
@@ -27,7 +31,15 @@ const quantityOf = (
  * with what differs marked — quantity, rate and the tax that follows. Opens
  * from the row detail, never inline.
  */
-export function CorpBookDiffModal({ open, onClose, view, systemName, typeNames }: Props) {
+export function CorpBookDiffModal({
+  open,
+  onClose,
+  view,
+  systemName,
+  typeNames,
+  onResolve,
+  onFixRecords,
+}: Props) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   const dispute = view.dispute;
@@ -161,6 +173,8 @@ export function CorpBookDiffModal({ open, onClose, view, systemName, typeNames }
             </p>
             {view.state === 'billed' && (
               // The one line the member is here for, so it carries the weight — either way round.
+              // When the book bills more, the two ways out sit right under it: take the book's
+              // figure (fix my records) or dispute it (Resolve).
               <p className="font-semibold text-text">
                 {bookAsksMore === undefined
                   ? t('miningTax.corpBook.diff.raiseBoth', { corp: view.corpName })
@@ -174,6 +188,20 @@ export function CorpBookDiffModal({ open, onClose, view, systemName, typeNames }
                           corp: view.corpName,
                         })}
               </p>
+            )}
+            {view.state === 'billed' && bookAsksMore !== false && (onFixRecords || onResolve) && (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {onFixRecords && (
+                  <Button size="sm" onClick={onFixRecords}>
+                    {t('miningTax.corpBook.diff.fixRecords')}
+                  </Button>
+                )}
+                {onResolve && (
+                  <Button size="sm" onClick={onResolve}>
+                    {t('miningTax.resolve.open')}
+                  </Button>
+                )}
+              </div>
             )}
           </div>
         )}

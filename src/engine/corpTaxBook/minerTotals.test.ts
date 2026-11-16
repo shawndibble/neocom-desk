@@ -10,6 +10,7 @@ import {
 } from '../../../functions/src/corpTaxBookMinerTotals';
 import { overdueAtFor } from '../../../functions/src/corpTaxBookEngine';
 import { allocatePayments, dismissalCredits, isBeforeBook } from './allocation';
+import { heldByStatement } from './disputes';
 import { placeOfFactory } from './openSet';
 import type { DismissableCharge, Dismissal } from './dismissals';
 import { overdueStatus, type Declaration } from './overdue';
@@ -485,6 +486,86 @@ describe('Miner running totals', () => {
         assertEqualsFullRecompute(docs, s, `seed ${seed} step ${step} ${event.action}`);
       }
     }
+  });
+
+  it('subtracts what open disputes hold, as the client allocation does, and stops once the hold lapses', () => {
+    const chargeKey = '60:1000:2026-11-01';
+    const statement = {
+      id: 's1',
+      minerId: 'solo:60',
+      amount: 48_000,
+      issuedAt: '2026-11-02T00:00:00.000Z',
+      lines: [
+        {
+          kind: 'mined',
+          chargeKey,
+          date: '2026-11-01',
+          oreLines: [{ typeId: 45490, quantity: 400 }],
+          unitPrices: { '45490': 1000 },
+          taxPct: 12,
+          tax: 48_000,
+          estimatedValue: 400_000,
+        },
+      ],
+    };
+    const dispute = {
+      id: 'solo_60_2026-11-01',
+      minerId: 'solo:60',
+      date: '2026-11-01',
+      by: 60,
+      at: '2026-11-03T00:00:00.000Z',
+      lines: [{ recordKey: chargeKey, typeId: 45490, quantity: 400, payeeName: 'X' }],
+    };
+    const base: BookRecords = {
+      overdueDays: 14,
+      expiryHours: {},
+      dismissals: [],
+      declarations: [],
+      extractions: [],
+      statements: [statement as unknown as Data],
+      payments: [],
+      writeOffs: [],
+      miners: [],
+    };
+    const totalsAt = (now: string | undefined, disputes: unknown[]) =>
+      computeMinerTotals(
+        { minerId: 'solo:60', statements: base.statements, payments: [], writeOffs: [] },
+        { ...base, disputes, ...(now ? { now } : {}) }
+      );
+    const during = '2026-11-10T00:00:00.000Z';
+    const after = '2026-11-20T00:00:00.000Z';
+    // Held in full: nothing is due, and so nothing is Overdue.
+    expect(totalsAt(during, [dispute])).toMatchObject({ owed: 0, overdueAt: null, credit: 0 });
+    // The client's allocation of the same Statement agrees.
+    const held = heldByStatement(
+      [statement as never],
+      [{ ...dispute, lines: [{ ...dispute.lines[0] }] } as never],
+      new Set(),
+      during
+    );
+    const client = allocatePayments({
+      statements: [statement as never],
+      payments: [],
+      dismissalCredits: [],
+      held,
+    });
+    expect(client.byStatement.get('s1')?.settled).toBe(true);
+    // Lapsed, answered, withdrawn (no lines) or another Miner's: due as before.
+    for (const [now, ds] of [
+      [after, [dispute]],
+      [during, [{ ...dispute, resolution: { kind: 'rejected', at: 'a', by: 1, reason: 'r' } }]],
+      [during, [{ ...dispute, lines: undefined, withdrawnAt: during }]],
+      [during, [{ ...dispute, minerId: 'solo:61' }]],
+      [undefined, [dispute]],
+    ] as [string | undefined, unknown[]][])
+      expect(totalsAt(now, ds)).toMatchObject({
+        owed: 48_000,
+        overdueAt: '2026-11-16T00:00:00.000Z',
+      });
+    // A re-dispute keeps the first hold window: no renewal.
+    expect(
+      totalsAt(after, [{ ...dispute, at: '2026-11-18T00:00:00.000Z', holdFrom: dispute.at }])
+    ).toMatchObject({ owed: 48_000 });
   });
 
   it('flags and repairs a total that drifted, and an orphan', () => {

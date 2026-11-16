@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_GRACE_HOURS } from './billable';
-import { latestRecordedCorp, parseBookSettings, parseRate, RATE_SCOPES } from './bookDocs';
+import {
+  latestRecordedCorp,
+  parseBookSettings,
+  parseRate,
+  parseTaxContact,
+  RATE_SCOPES,
+} from './bookDocs';
 import { DEFAULT_OVERDUE_DAYS } from './overdue';
 import { DEFAULT_MINIMUM_STATEMENT } from './statements';
 
@@ -211,5 +217,44 @@ describe('latestRecordedCorp', () => {
     ]);
     expect(latest.get(10)?.corp).toBe(OTHER_CORP);
     expect(latest.get(11)).toBeUndefined();
+  });
+});
+
+describe('taxContact', () => {
+  const base = { active: true, startDate: '2026-10-01' };
+
+  it('reads a mailing list and a set of characters, deduping ids', () => {
+    expect(parseTaxContact({ kind: 'mailingList', id: 7, name: 'Desk' })).toEqual({
+      kind: 'mailingList',
+      id: 7,
+      name: 'Desk',
+    });
+    expect(parseTaxContact({ kind: 'characters', ids: [3, 4, 3] })).toEqual({
+      kind: 'characters',
+      ids: [3, 4],
+    });
+  });
+
+  it.each([
+    undefined,
+    null,
+    'junk',
+    { kind: 'mailingList', id: 0, name: 'x' },
+    { kind: 'mailingList', id: 7, name: 5 },
+    { kind: 'mailingList', id: 1.5, name: 'x' },
+    { kind: 'characters', ids: [] },
+    { kind: 'characters', ids: [1, 2, 3, 4, 5, 6] },
+    { kind: 'characters', ids: [1, -2] },
+    { kind: 'characters', ids: 'x' },
+    { kind: 'other' },
+  ])('treats %j as absent', (bad) => {
+    expect(parseTaxContact(bad)).toBeUndefined();
+    expect(parseBookSettings({ ...base, taxContact: bad })).not.toHaveProperty('taxContact');
+  });
+
+  it('is on the parsed settings when valid', () => {
+    expect(
+      parseBookSettings({ ...base, taxContact: { kind: 'characters', ids: [9] } }).taxContact
+    ).toEqual({ kind: 'characters', ids: [9] });
   });
 });

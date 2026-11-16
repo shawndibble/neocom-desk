@@ -7837,6 +7837,144 @@
     }
   },
   "miningTax": {
+    "iskFigure": "<value/> ISK",
+    "resolve": {
+      "pick": {
+        "privacy": "Only the payments you tick are sent. The rest of your wallet stays on this device.",
+        "toId": "to #{{id}}",
+        "to": "to {{name}}",
+        "none": "No payment in your wallet journal falls in this period. You can still send a note.",
+        "legend": "Which payment was it?",
+        "note": {
+          "otherCorporation": "It went to another corporation's wallet, not to {{corp}}'s. {{corp}}'s officers see where.",
+          "character": "It went to {{name}}, not to {{corp}}'s wallet, which is why the book can't see it. If they are an officer they get a card in Needs you; their own app checks their own wallet."
+        },
+        "kind": {
+          "otherCorporation": "Another corporation",
+          "character": "Paid to a person",
+          "corporation": "Paid to {{corp}}"
+        }
+      },
+      "notPayingAction": "Not paying",
+      "open": "Resolve",
+      "strip": {
+        "rateUnrecorded": "{{date}}: {{corp}} bills {{book}}%, your record has no rate",
+        "keptDeclaration": "{{corp}} rejected what you said you paid",
+        "kept": "{{corp}} kept the bill on {{date}}",
+        "rate": "{{date}}: {{corp}} bills {{book}}%, you recorded {{yours}}%",
+        "quantity": "{{date}}: {{corp}}'s book recorded more ore than you did",
+        "figureDetail": "Its book bills {{amount}} ISK for the day."
+      },
+      "facts": {
+        "declarationRejected": "{{corp}} rejected what you said you paid: {{reason}}",
+        "overdue": "{{corp}}'s Statement for {{period}} is open and not paid.",
+        "rateUnrecorded": "{{corp}}'s book bills {{date}} at {{book}}%; your record has no rate for it.",
+        "uncredited": "You sent <amount/>. {{corp}}'s book synced and still doesn't hold it, so days you had paid are billed again.",
+        "journalRef": "journal ref {{ref}}",
+        "paidDays": "paid {{days}}",
+        "rate": "{{corp}}'s book bills {{date}} at {{book}}%; you recorded {{yours}}%.",
+        "quantity": "{{corp}}'s book recorded {{book}} units of ore on {{date}}; your record has {{yours}}.",
+        "bills": "Its book bills <amount/>.",
+        "markedPaid": "You marked {{date}} paid, but {{corp}}'s Statement still shows {{owed}} ISK owed. Its book credits a payment it can see.",
+        "conflict": "You gave this ore to {{payee}}. {{corp}}'s book also recorded it, and bills it on {{date}} unless something changes first.",
+        "anotherPayee": "another Payee",
+        "kept": "{{corp}} kept the bill on {{date}}: {{reason}}",
+        "nextStep": "What to do next: {{step}}"
+      },
+      "quiet": {
+        "statementLabel": "{{corp}} · Statement",
+        "waiting_one": "Waiting on the corp: 1",
+        "waiting_other": "Waiting on the corp: {{count}}",
+        "notPaying_one": "Not paying: 1",
+        "notPaying_other": "Not paying: {{count}}",
+        "show": "Show them",
+        "hide": "Hide the list",
+        "showAgain": "Show again",
+        "showAgainNamed": "Show {{item}} again",
+        "dayLabel": "{{corp}} · {{date}}",
+        "uncreditedLabel": "{{corp}} · donations not credited"
+      },
+      "title": {
+        "overdue": "{{corp}} Statement {{period}}",
+        "uncredited": "Donations not credited",
+        "figure": "{{date}}: the book's figure differs",
+        "conflict": "{{date}} claimed twice",
+        "markedPaid": "{{date}}: marked paid, {{corp}} still bills it",
+        "billed": "{{date}}: {{corp}} bills this day",
+        "kept": "{{corp}} kept the bill"
+      },
+      "groupSelf": "Settle it yourself",
+      "groupAsk": "Ask {{corp}}",
+      "outcome": {
+        "pay": {
+          "title_plain": "Pay it",
+          "title": "Pay it · {{amount}} ISK",
+          "title_again": "Pay it again · {{amount}} ISK",
+          "hint": "Settles it in {{corp}}'s book, which pays your oldest days first.",
+          "hint_again": "Only if that ISK went somewhere else. The book credits a new payment on its next sync."
+        },
+        "fixRecords": {
+          "title": "Fix my records — {{corp}} is right",
+          "hint": "Opens the day on the ore that comes off your {{payee}} entry, so you owe it once, to {{corp}}. One more click there to confirm."
+        },
+        "notPaying": {
+          "title": "Not paying — hide this",
+          "hint": "Gone from your tab. {{corp}} still bills it."
+        },
+        "paid": {
+          "title": "I already paid — send them the proof",
+          "hint": "The transfers with their journal refs, checked against {{corp}}'s wallet first, so an officer can find them in seconds."
+        },
+        "notOwed": {
+          "hint_kept": "{{corp}} looks at it again. The day is not held a second time: it stays billed while they answer.",
+          "title_kept": "I don't owe this — say it again",
+          "title": "I don't owe this — ask them to change it",
+          "title_payee": "It went to {{payee}} — tell {{corp}}",
+          "hint": "They waive it or keep the bill and tell you what to do next. It holds the day for up to 14 days meanwhile.",
+          "hint_payee": "They waive it or keep the bill. It holds the day for up to 14 days meanwhile."
+        }
+      },
+      "action": {
+        "pay": "Pay",
+        "fixRecords": "Open the day",
+        "notPaying": "Hide it",
+        "notPaying_tell": "Hide it and tell them",
+        "paid": "Send proof",
+        "notOwed": "Send"
+      },
+      "tellWhy": "Tell {{corp}} why",
+      "whyLabel": "Why, in your own words",
+      "noteLabel": "Add a note (optional)",
+      "hiddenNote": "Hidden days stay under Not paying on this tab, and come back with one click.",
+      "sendsTo": "Goes to {{corp}}'s Needs you queue, and as an EVE mail to whoever answers its tax questions. Until they answer, it leaves your attention list; their answer comes back here.",
+      "noStatement": "Nothing is on a Statement yet: {{corp}}'s book credits your donation on its next sync. If it still hasn't when the Statement goes out, send the proof then.",
+      "failed": "That didn't reach the book. Check your connection and try again.",
+      "done": "Done",
+      "result": {
+        "sentAgain": "Sent to {{corp}} again. The day is not held a second time; their answer comes back here.",
+        "hidden": "Hidden. {{corp}} still bills it; it's listed under Not paying on this tab.",
+        "credited": "Found in {{corp}}'s wallet and credited. Nothing more to do.",
+        "sentProof": "Sent to {{corp}}, with what checking its wallet found:",
+        "sent": "Sent to {{corp}}. It holds the day until {{date}} while they answer; their answer comes back here."
+      },
+      "check": {
+        "ambiguous": "Several matches — an officer picks",
+        "found": "Found",
+        "division": "Found · Division {{division}}",
+        "notSynced": "Not synced yet",
+        "tooOld": "Too old to check",
+        "notFound": "Not in the corp wallet",
+        "person": "Paid to a person",
+        "otherCorp": "Another corporation"
+      },
+      "mailed": {
+        "sent_one": "Also mailed in EVE.",
+        "sent_other": "Also mailed {{count}} officers in EVE.",
+        "no-scope": "Not mailed: give this Character the mail permission to also send an EVE mail.",
+        "no-recipient": "Not mailed: no one to mail was found for this corporation.",
+        "failed": "The EVE mail didn't go; the corporation still has it in Needs you."
+      }
+    },
     "title": "Mining",
     "taxTab": "Tax",
     "surveyTab": "Survey",
@@ -7935,7 +8073,8 @@
     "groupTotalValueLabel": "Combined estimated value: {{value}}",
     "markGroupPaidAction": "Mark all as paid",
     "duplicateTitle": "Possible double-assigned mining days",
-    "duplicateHint": "These days each have two identical Assignments, so the tax is counted twice. Open the day and Unassign the extra one — nothing is removed until you do.",
+    "duplicateHint": "These days each have two identical Assignments, so the tax is counted twice. Pick a day to drop its extra Assignment — nothing is removed until you confirm.",
+    "duplicateOpen": "Open {{entry}} to drop its duplicate Assignment",
     "duplicateRowHint": "This day has an identical twin Assignment, so its tax is counted twice. If this is the extra one, Unassign it.",
     "unclassifiedHint": "One or more ore types in your mining ledger aren't recognized as moon ore or ordinary ore/ice. This can happen after a CCP patch — tag it below.",
     "tagAsMoonOre": "Tag as moon ore",
@@ -7978,36 +8117,53 @@
         "failed": "Couldn't save that. Try again."
       },
       "state": {
+        "notPayingStill": "{{corp}} still bills this",
         "pending": "Pending corp record",
         "billed": "Billed",
         "conflict": "Conflict",
         "unattributed": "Unattributed",
         "dismissed": "Dismissed by corp",
         "waived": "Waived",
-        "markedPaid": "Marked paid"
+        "markedPaid": "Marked paid",
+        "sent": "Sent",
+        "oreWaived": "Tax waived",
+        "notPaying": "Not paying"
       },
       "hint": {
         "pending": "{{corp}} has not closed this day in its book yet. Until it does, your own allocation applies and nothing is owed to the corp.",
         "billed": "{{corp}}'s Corp Tax Book decides this day.",
         "conflict": "You gave this ore to another Payee, and {{corp}}'s book also recorded it. It is not owed; it resolves to {{corp}} on {{date}} or on {{corp}}'s next Statement, whichever comes first, unless you sort it out first.",
-        "conflictOverListed": "Your entry for {{corp}} lists more of this ore than its book recorded. {{corp}} does not bill it: take it off your entry, or ask an officer to correct the book.",
+        "conflictOverListed": "Your entry for {{corp}} lists more of this ore than its book recorded. {{corp}} does not bill it: take the extra ore off your entry.",
         "conflictOwnNeedsReview": "Your own entry for {{corp}} needs review, so its book can't take it over. It is not owed; it resolves to {{corp}} on {{date}} or on {{corp}}'s next Statement, whichever comes first, unless you sort it out first.",
         "conflictOwnerCollected": "{{corp}} now collects tax for this moon, and you gave this ore to the moon's owner. It is not owed; it resolves to {{corp}} on {{date}} or on {{corp}}'s next Statement, whichever comes first, unless you sort it out first.",
         "unattributed": "No Corp Tax Book claims this ore. Assign it to your Payee if you owe someone.",
         "dismissed": "{{corp}} dismissed this day: {{reason}}",
         "waived": "{{corp}} wrote this day off: {{reason}}",
         "paid": "Paid to {{corp}}.",
-        "markedPaid": "Marked paid by you — {{corp}} still shows {{owed}} ISK owed."
+        "markedPaid": "Marked paid by you — {{corp}} still shows {{owed}} ISK owed.",
+        "sent": "Sent to {{corp}} on {{sentOn}}. An officer answers it in the book; nothing more to do until they do.",
+        "oreWaived": "{{corp}} waived the tax on that ore: {{flagReason}}",
+        "notPaying": "You chose not to pay this. {{corp}} still bills it; bring it back under Not paying, above."
+      },
+      "leftCorp": {
+        "title": "You left {{corp}}",
+        "owed": "Its book still lists {{amount}} ISK from your time there, and nothing new is added. Its officers already see that you left.",
+        "settled": "Its book lists nothing owed from your time there, and nothing new is added. Its officers already see that you left.",
+        "pay": "Pay {{amount}} ISK",
+        "stop": "Stop showing {{corp}}",
+        "hidden": "Hidden: {{corps}}",
+        "show": "Show",
+        "showLabel": "Show {{corp}} again"
       },
       "sync": {
         "safe": "Safe to pay — {{date}} is closed ({{corp}} synced {{ago}}).",
         "safeOnce": "Safe to pay once {{corp}} syncs (last synced {{ago}}).",
         "neverSynced": "Safe to pay once {{corp}} syncs (never synced).",
         "openDay": "{{date}}: safe to pay once it is closed, after {{time}} UTC on {{closeDate}} and {{corp}}'s next sync.",
-        "credit": "{{amount}} ISK credit with {{corp}} goes on your next Statement.",
-        "left": "You left {{corp}}. Its book still shows your lines and what you owe."
+        "credit": "{{amount}} ISK credit with {{corp}} goes on your next Statement."
       },
       "diff": {
+        "fixRecords": "Fix my records",
         "open": "Compare with the book",
         "title": "{{date}} · you and the book",
         "you": "You",
@@ -8019,11 +8175,11 @@
         "rate": "Rate",
         "tax": "Tax",
         "explain": "Book rate {{pct}}% is the {{scope}}, effective {{from}}. Once {{date}} is Billable, the book's quantity, price and rate decide what you owe {{corp}}.",
-        "raiseQuantity": "The book recorded more ore than you did, so it bills more. Ask a {{corp}} officer to correct the book.",
+        "raiseQuantity": "The book recorded more ore than you did, so it bills more. If the book is right, fix your records; if yours is, Resolve it and tell {{corp}}.",
         "inYourFavourQuantity": "The book recorded less ore than you did, so it bills less — you owe the book's figure, and there is nothing to raise.",
-        "raiseRate": "The book's rate is higher than the one you recorded, so it bills more. Ask a {{corp}} officer to correct the book.",
+        "raiseRate": "The book's rate is higher than the one you recorded, so it bills more. If the book is right, fix your records; if yours is, Resolve it and tell {{corp}}.",
         "inYourFavourRate": "The book's rate is lower than the one you recorded, so it bills less — you owe the book's figure, and there is nothing to raise.",
-        "raiseBoth": "The book's quantity and rate both differ from your record. Ask a {{corp}} officer to confirm the day before you pay."
+        "raiseBoth": "The book's quantity and rate both differ from your record. Fix your records if the book is right, or Resolve it if yours is."
       },
       "disputed": {
         "rate": "Disputed: you {{you}}%, book {{book}}%",
@@ -8041,11 +8197,12 @@
         "record": "correction for this day"
       },
       "detail": {
+        "lockedResolve": "Think one is wrong? Resolve it with {{corp}}.",
         "bookAndYou": "{{book}} (book) · {{you}} (you)",
         "priced": "{{hub}} buy · {{form}} ore · {{pct}}% {{scope}} from {{from}}",
         "bookTitle": "Corp Tax Book",
-        "lockedShort": "Can't be edited here. Ask a {{corp}} officer about any difference.",
-        "unlinkedDonation": "Your {{amount}} ISK donation sent {{time}} paid this day, but {{corp}} never credited it, so it's owed again. To dispute it, give a {{corp}} officer that donation from your wallet journal.",
+        "lockedShort": "The book owns these figures, so they can't be edited here.",
+        "unlinkedDonation": "Your {{amount}} ISK donation sent {{time}} paid this day, but {{corp}} never credited it, so it's owed again. Resolve it to send {{corp}} that transfer from your wallet journal.",
         "factBilling": "Billing",
         "factBillingNext": "Next Statement",
         "factSynced": "Synced",
@@ -8077,7 +8234,7 @@
         "titleOverListed": "Your entry lists more ore than the book recorded",
         "titleOwnNeedsReview": "Your own entry for {{corp}} needs review",
         "titleOwnerCollected": "{{corp}} now collects tax for {{owner}}'s moon",
-        "ownerCollectedAsk": "If you already paid {{owner}}, ask an officer of {{corp}}.",
+        "ownerCollectedAsk": "If you already paid {{owner}}, Resolve it: it tells {{corp}} where the ore went.",
         "yourEntry": "Your entry: {{payee}} · {{amount}} ISK · {{status}}",
         "yourEntryUnknown": "Your entry: gives this ore to another Payee",
         "entryPaid": "marked paid",
@@ -8095,24 +8252,18 @@
         "booksRight": "If the books are right: take what each corporation recorded off your entry.",
         "booksRightPaid": "If the books are right: unmark your payment, then take what each corporation recorded off your entry.",
         "letEachBill": "Let each corp bill its share",
-        "entryRight": "If your entry is right: ask a {{corp}} officer to correct the book.",
+        "entryRight": "If your entry is right: tell {{corp}}, and its officers correct the book or keep the bill and say what to do next.",
         "tell": "Tell {{corp}} it went to {{payee}}",
         "told": "Sent to {{corp}} on {{date}}. An officer answers it in the book.",
         "toldRejected": "{{corp}} kept the bill: {{reason}}",
         "toldDismissed": "{{corp}} waived the tax on that ore: {{reason}}",
         "tellFailed": "Could not send it. Try again.",
-        "tellRejected": "{{corp}} already answered this day; ask an officer.",
+        "tellAnswered": "{{corp}} has just answered this day. The answer, and what to do next, is on the day now.",
         "withdraw": "Withdraw",
         "withdrawFailed": "Could not withdraw it. Try again.",
         "otherPayee": "another Payee"
       },
       "declare": {
-        "action": "I paid this another way",
-        "title": "I paid this another way",
-        "intro": "Tell {{corp}} you paid this Statement outside the book: by contract, into another wallet division, or to the wrong corporation. Overdue pauses for up to 14 days while an officer checks.",
-        "amount": "Amount you paid (optional)",
-        "note": "Note for the officers (optional)",
-        "confirm": "Tell {{corp}}",
         "waiting": "Declared — waiting for {{corp}}",
         "waitingAmount": "Declared {{amount}} ISK — waiting for {{corp}}",
         "confirmed": "{{corp}} confirmed your payment.",
@@ -8138,6 +8289,25 @@
         "codeInReason": "The Reason is your {{period}} Statement's code.",
         "codeOldest": "The Reason is the code of the payer's oldest open Statement ({{period}}).",
         "oldestFirst": "A payment goes to the oldest open Statement first; a code moves it to that Statement first.",
+        "where": {
+          "intro": "{{corp}}'s book pays your oldest days first — a payment can't pick a moon or a day, so this shows where yours lands.",
+          "label": "Where it lands",
+          "paid": "Paid by this",
+          "part": "Part paid",
+          "partOf": "{{amount}} ISK of it",
+          "held": "Held",
+          "next": "Next in line",
+          "heldNote": "{{kind}} — waiting on {{corp}}; no payment lands here",
+          "more_one": "and {{count}} more day",
+          "more_other": "and {{count}} more days",
+          "credit": "{{amount}} ISK left over stays with the book as credit.",
+          "kind": {
+            "payee": "Payee dispute",
+            "quantity": "Quantity dispute",
+            "rate": "Rate dispute",
+            "notPaying": "Not paying"
+          }
+        },
         "heldElsewhere_one": "Nothing was recorded: the entry of {{dates}} already has its ore with another Payee, dismissed, or waiting for review in your ledger. Untick it, or sort it out on its row first.",
         "heldElsewhere_other": "Nothing was recorded: {{count}} entries ({{dates}}) already have their ore with another Payee, dismissed, or waiting for review in your ledger. Untick them, or sort them out on their rows first."
       },
@@ -8146,13 +8316,14 @@
         "overdueDetail": "Code {{code}}. A payment goes to your oldest open Statement first.",
         "uncreditedTitle": "{{corp}} hasn't credited your {{amount}} ISK donation of {{date}} — check the wallet division",
         "uncreditedDetail": "{{corp}} synced since and still doesn't hold it, so it no longer counts as paid here. Its book reads donations into: {{accounts}}.",
-        "uncreditedEveryTitle": "{{corp}} hasn't credited your {{amount}} ISK donation of {{date}} — ask the corp to sync",
-        "uncreditedEveryDetail": "Your wallet journal shows the ISK reached {{corp}}, and its book reads every wallet division — but its last sync doesn't hold the donation, so it no longer counts as paid here. Ask the corp to sync its book.",
+        "uncreditedEveryTitle": "{{corp}} hasn't credited your {{amount}} ISK donation of {{date}}",
+        "uncreditedEveryDetail": "Your wallet journal shows the ISK reached {{corp}}, and its book reads every wallet division, but its last sync doesn't hold the donation, so it no longer counts as paid here. Resolve it to pay again, send {{corp}} the proof, or stop being reminded.",
         "uncreditedCovered": "It was paying {{days}}; without it, those days are owed again.",
-        "uncreditedDispute": "To dispute it, give a {{corp}} officer the donation from your wallet journal: {{amount}} ISK, sent {{time}}.",
+        "uncreditedDispute": "Resolve it to send {{corp}} the donation from your wallet journal: {{amount}} ISK, sent {{time}}.",
         "uncreditedTitleMany": "{{corp}} hasn't credited {{n}} of your donations ({{amount}} ISK) — check the wallet division",
-        "uncreditedEveryTitleMany": "{{corp}} hasn't credited {{n}} of your donations ({{amount}} ISK) — ask the corp to sync",
-        "uncreditedDisputeMany": "To dispute them, give a {{corp}} officer these donations from your wallet journal:",
+        "uncreditedEveryTitleMany": "{{corp}} hasn't credited {{n}} of your donations ({{amount}} ISK)",
+        "uncreditedDisputeMany": "Resolve them to send {{corp}} these donations from your wallet journal:",
+        "uncreditedRef": "Your wallet journal reference: {{ref}}.",
         "uncreditedItem": "{{amount}} ISK, sent {{time}}",
         "uncreditedItemCovered": "was paying {{days}} — owed again without it",
         "alsoBilledTitle": "{{corp}} also bills ore you listed for {{payees}}",
@@ -8219,6 +8390,9 @@
     "conflictsHint_one": "Not owed yet. {{corp}}'s next Statement bills it unless an officer changes the book.",
     "conflictsHint_other": "{{count}} days, not owed yet. Each goes on its corporation's next Statement unless an officer changes the book.",
     "conflictsReview": "Review",
+    "conflictsWaitingTitle": "Waiting on the corp",
+    "conflictsWaitingHint_one": "You have told {{corp}}. It still bills on {{date}} unless an officer answers first, so check back.",
+    "conflictsWaitingHint_other": "{{count}} days you have told their corporations about. The first still bills on {{date}} unless an officer answers first, so check back.",
     "settleUpAction": "Settle up",
     "filterToPayee": "Show only {{payee}}'s entries",
     "unassignedCardTitle": "Unassigned",
@@ -8518,7 +8692,9 @@
       "acrossPayees_one": "across {{count}} payee",
       "acrossPayees_other": "across {{count}} payees",
       "uncreditedNote": "{{amount}} ISK you donated isn't credited yet — check the wallet division ({{accounts}}) before paying again.",
-      "uncreditedEveryNote": "{{amount}} ISK you donated isn't credited yet — ask the corp to sync its book before paying again."
+      "uncreditedEveryNote": "{{amount}} ISK you donated isn't credited yet — Resolve it above before paying again.",
+      "unlinkedNote_one": "{{amount}} ISK you already sent isn't linked yet — link it first, or this figure bills you twice.",
+      "unlinkedNote_other": "{{count}} payments you already sent ({{amount}} ISK) aren't linked yet — link them first, or this figure bills you twice."
     },
     "continue": {
       "eyebrow": "New EVE day",
@@ -18104,14 +18280,55 @@
           "declared": "They say they paid {{amount}}.",
           "note": "“{{note}}”",
           "confirm": "Confirm paid",
-          "reject": "Reject declaration"
+          "reject": "Keep the bill",
+          "transfer": "{{amount}} · {{time}} · journal ref {{ref}}",
+          "count": "Count Division {{division}}"
         },
+        "check": {
+          "found": "Found",
+          "division": "Found · Division {{division}}",
+          "notSynced": "Not synced yet",
+          "tooOld": "Too old to check",
+          "tooOldBody": "before the wallet history the book holds",
+          "ambiguous": "Several matches — an officer picks",
+          "divisionUnknown": "unknown",
+          "notFound": "Not in the corp wallet",
+          "person": "Paid to a person",
+          "otherCorp": "Another corporation"
+        },
+        "paidToYou": {
+          "title": "{{name}} says they paid you {{amount}} as tax",
+          "found": "In your wallet",
+          "foundBody": "{{time}}, your journal ref {{ref}}. The book can't see it because it went to you, not the corporation.",
+          "notFound": "Not in your wallet",
+          "notFoundBody": "Checked your wallet journal back to {{date}}.",
+          "noScope": "Can't check your wallet",
+          "noScopeBody": "This Character has not granted the wallet permission on this device.",
+          "reading": "Checking your wallet…",
+          "record": "Record it as tax",
+          "notTax": "It wasn't tax",
+          "recordAnyway": "Record it anyway"
+        },
+        "autoCredited": "Credited automatically: <miner>{{name}}</miner>, {{amount}} ({{date}}) — found in the corporation's wallet.",
         "dispute": {
           "title": "{{name}} says {{date}}'s ore went to {{payee}}",
-          "body": "{{ore}}. Waive that ore's tax if it was not ours to bill, or reject it with a note they read.",
+          "titleQuantity": "{{name}} says the book recorded too much ore on {{date}}",
+          "titleRate": "{{name}} says {{date}} should be {{claimed}}%, not {{billed}}%",
+          "titleRateUnknown": "{{name}} says {{date}} should be {{claimed}}%",
+          "titleNotPaying": "{{name}} isn't paying {{date}} · {{amount}}",
+          "titleNotPayingUnpriced": "{{name}} isn't paying {{date}}",
+          "body": "{{ore}}. Waive that ore's tax if it was not ours to bill, or keep the bill and tell them what to do next.",
+          "bodyQuantity": "Disputed: {{ore}}.",
+          "lineQuantity": "{{quantity}} {{ore}}",
+          "reason": "“{{reason}}”",
+          "held": "Held until {{date}} — payments skip it while you answer",
+          "heldAmount": "{{amount}} is held until {{date}}: payments skip it, and the Statement settles on the rest.",
           "line": "{{quantity}} {{ore}} to {{payee}}",
           "dismiss": "Waive their ore",
-          "reject": "Reject"
+          "waive": "Waive it",
+          "waiveDifference": "Waive the difference",
+          "writeOff": "Write off",
+          "reject": "Keep the bill"
         },
         "overdue": {
           "title_one": "{{name}} · overdue {{count}} day · {{amount}}",
@@ -18922,6 +19139,23 @@
         "approvalHint": "Currently {{limit}}. Leave it empty for no limit.",
         "approvalHintNone": "No limit is set. Leave it empty to keep it that way.",
         "approvalDirector": "Only a Director sets the approval limit.",
+        "taxContact": {
+          "section": "Members' questions",
+          "title": "Who answers members' tax questions",
+          "hint": "Proof, disputes and won't-pay notes always land in Needs you. This is who also gets an EVE mail, for officers who aren't in Neocom Desk when it happens.",
+          "ceo": "The CEO",
+          "ceoNamed": "The CEO, {{name}}",
+          "ceoDefault": "The default.",
+          "list": "A mailing list",
+          "listPick": "Mailing list",
+          "listNone": "Choose one of your lists",
+          "listHint": "EVE only delivers to a list from its members, so a member who isn't on it mails the CEO instead.",
+          "officers": "These officers",
+          "officersHint": "One mail each; up to {{max}}.",
+          "officerSearch": "Add an officer by name",
+          "removeOfficer": "Remove {{name}}",
+          "unnamedOfficer": "Character {{id}}"
+        },
         "reclaim": {
           "title": "Ownership",
           "hint": "As CEO you can reclaim the book at any time.",
@@ -19055,8 +19289,8 @@
           "dismissIntro": "{{amount}} of tax on the ore they disputed is credited on their next Statement. The rest of the day stays billed.",
           "dismissUnpriced": "The book cannot price that day's ore yet, so it cannot be waived. Sync the book, then try again.",
           "dismissConfirm": "Waive {{amount}}",
-          "rejectTitle": "Reject {{name}}'s dispute for {{date}}?",
-          "rejectIntro": "The day stays billed. They read your reason on their Tax tab, and cannot dispute that day again."
+          "rejectTitle": "Keep the bill on {{name}}'s dispute for {{date}}?",
+          "rejectIntro": "The day stays billed. They read your reason and next step on their Tax tab."
         },
         "dismissMiner": {
           "title": "Dismiss {{name}}'s tax?",
@@ -19106,11 +19340,15 @@
           "effectUnmatchedPart": "{{amount}} is set aside. The rest stays Unmatched until you assign it."
         },
         "reject": {
-          "title": "Reject {{name}}'s declaration",
+          "title": "Keep the bill on {{name}}'s declaration?",
           "intro": "They said they paid {{amount}} by another route. Overdue has been paused since.",
           "reason": "Reason (required, shown to the Miner)",
-          "confirm": "Reject declaration",
+          "confirm": "Keep the bill",
           "effect": "Overdue resumes where it paused, with no extra days. Confirm paid instead if the payment turns up."
+        },
+        "nextStep": {
+          "label": "What should {{name}} do next?",
+          "hint": "Required. {{name}} sees this word for word beside the bill, with a Resolve button."
         },
         "assign": {
           "title": "Assign a donation to a Miner",

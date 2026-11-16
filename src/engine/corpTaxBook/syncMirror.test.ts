@@ -507,6 +507,70 @@ describe('functions mirror of the Corp Tax Book sync engine', () => {
     );
     expect(balances.size).toBeGreaterThan(0);
   });
+  it('planSettlements closes the Statement paid around a held dispute, never the held one, in both copies', () => {
+    const line = (date: string) => ({
+      kind: 'mined',
+      date,
+      chargeKey: `50:1000:${date}`,
+      oreLines: [{ typeId: 45490, quantity: 5_000 }],
+      unitPrices: { '45490': 1000 },
+      taxPct: 100,
+      tax: 5_000_000,
+    });
+    const statements = [
+      {
+        id: 'oct',
+        minerId: 'solo:50',
+        amount: 5_000_000,
+        issuedAt: '2026-11-01T00:00:00Z',
+        lines: [line('2026-10-15')],
+      },
+      {
+        id: 'nov',
+        minerId: 'solo:50',
+        amount: 5_000_000,
+        issuedAt: '2026-12-01T00:00:00Z',
+        lines: [line('2026-11-15')],
+      },
+    ];
+    const disputes = [
+      {
+        id: 'solo_50_2026-10-15',
+        minerId: 'solo:50',
+        date: '2026-10-15',
+        kind: 'notPaying' as const,
+        reason: 'r',
+        by: 50,
+        at: '2026-12-02T00:00:00.000Z',
+        lines: [{ recordKey: '50:1000:2026-10-15', typeId: 45490, quantity: 5_000, payeeName: '' }],
+      },
+    ];
+    const payments = [
+      { id: 'p1', minerId: 'solo:50', amount: 5_000_000, at: '2026-12-03T00:00:00Z' },
+    ];
+    for (const now of ['2026-12-04T00:00:00.000Z', '2026-12-20T00:00:00.000Z']) {
+      const ours = planSettlements({
+        statements: statements as unknown as Statement[],
+        payments: payments.map((p) => ({ ...p, characterId: 1, source: 'donation' as const })),
+        dismissals: [],
+        miners: [],
+        alreadyPaid: new Set(),
+        disputes,
+        now,
+      });
+      const theirs = mirror.planSettlements({
+        statements,
+        payments: payments.map((p) => ({ ...p, source: 'donation' as const })),
+        dismissals: [],
+        alreadyPaid: new Set(),
+        extractions: [],
+        disputes,
+        now,
+      });
+      expect(theirs).toEqual(ours);
+      expect(ours).toEqual(now.startsWith('2026-12-04') ? ['nov'] : ['oct']);
+    }
+  });
   it('planSettlements ignores a donation before the start date in both copies (#4505)', () => {
     const statements = [
       {

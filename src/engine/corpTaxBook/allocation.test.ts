@@ -488,3 +488,49 @@ describe('officer write-offs (#4637)', () => {
     ]);
   });
 });
+
+// Resolving in the app: an open dispute holds its day, so a member can pay around it.
+describe('allocatePayments with held amounts', () => {
+  it('settles a Statement on what is not held, so the money pays the next one', () => {
+    // June bills 10M, 4M of it disputed; the member pays 6M + all of July.
+    const result = allocatePayments({
+      statements: [JUNE, JULY],
+      payments: [payment('p1', 14_000_000, '2026-08-01T00:00:00Z')],
+      dismissalCredits: [],
+      held: new Map([['s1', 4_000_000]]),
+    });
+    expect(result.byStatement.get('s1')).toMatchObject({
+      amount: 6_000_000,
+      held: 4_000_000,
+      credited: 6_000_000,
+      remaining: 0,
+      settled: true,
+    });
+    expect(result.byStatement.get('s2')).toMatchObject({ credited: 8_000_000, settled: true });
+    expect(result.credit).toBe(0);
+  });
+
+  it('without the hold, the same payment would have left July open', () => {
+    const result = allocatePayments({
+      statements: [JUNE, JULY],
+      payments: [payment('p1', 14_000_000, '2026-08-01T00:00:00Z')],
+      dismissalCredits: [],
+    });
+    expect(result.byStatement.get('s2')).toMatchObject({ remaining: 4_000_000, settled: false });
+  });
+
+  it('never holds more than the Statement bills, and reports no hold when there is none', () => {
+    const result = allocatePayments({
+      statements: [JUNE],
+      payments: [],
+      dismissalCredits: [],
+      held: new Map([['s1', 99_000_000]]),
+    });
+    expect(result.byStatement.get('s1')).toMatchObject({ amount: 0, held: 10_000_000 });
+    expect(
+      allocatePayments({ statements: [JUNE], payments: [], dismissalCredits: [] }).byStatement.get(
+        's1'
+      )
+    ).not.toHaveProperty('held');
+  });
+});

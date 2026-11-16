@@ -521,6 +521,69 @@ describe('planSettlements', () => {
   });
   const input = { miners: [], dismissals: [] as Dismissal[], alreadyPaid: new Set<string>() };
 
+  // Resolving in the app: an open dispute holds its day, so the member can pay around it —
+  // but a Statement settled only because part of it is held is not closed for good.
+  describe('with a dispute holding a day', () => {
+    const line = (date: string, tax: number) => ({
+      kind: 'mined' as const,
+      date,
+      chargeKey: `7:1000:${date}`,
+      oreLines: [{ typeId: 45490, quantity: tax / 100 }],
+      unitPrices: { 45490: 1000 },
+      taxPct: 10,
+      estimatedValue: tax * 10,
+      tax,
+    });
+    const oct = statement({
+      id: 'oct',
+      minerId: 'solo:7',
+      amount: 5_000_000,
+      issuedAt: '2026-11-01T00:00:00Z',
+      lines: [line('2026-10-15', 5_000_000)],
+    });
+    const nov = statement({
+      id: 'nov',
+      minerId: 'solo:7',
+      amount: 5_000_000,
+      issuedAt: '2026-12-01T00:00:00Z',
+      lines: [line('2026-11-15', 5_000_000)],
+    });
+    const disputed = {
+      id: 'solo_7_2026-10-15',
+      minerId: 'solo:7',
+      date: '2026-10-15',
+      kind: 'notPaying' as const,
+      reason: 'Untaxed op',
+      lines: [{ recordKey: '7:1000:2026-10-15', typeId: 45490, quantity: 50_000, payeeName: '' }],
+      by: 7,
+      at: '2026-12-02T00:00:00.000Z',
+    };
+
+    it('closes the Statement the member paid, and never the one held for them', () => {
+      expect(
+        planSettlements({
+          ...input,
+          statements: [oct, nov],
+          payments: [pay({ amount: 5_000_000, at: '2026-12-03T00:00:00Z' })],
+          disputes: [disputed],
+          now: '2026-12-04T00:00:00.000Z',
+        })
+      ).toEqual(['nov']);
+    });
+
+    it('pays oldest first as before once the hold has ended', () => {
+      expect(
+        planSettlements({
+          ...input,
+          statements: [oct, nov],
+          payments: [pay({ amount: 5_000_000, at: '2026-12-03T00:00:00Z' })],
+          disputes: [disputed],
+          now: '2026-12-20T00:00:00.000Z',
+        })
+      ).toEqual(['oct']);
+    });
+  });
+
   it('settles a Statement a donation covered', () => {
     expect(planSettlements({ ...input, statements: [s1], payments: [pay()] })).toEqual(['s1']);
   });

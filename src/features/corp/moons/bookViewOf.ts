@@ -49,6 +49,7 @@ export function bookViewInputOf(
     payments: data.state.payments,
     dismissals: data.state.dismissals,
     declarations: data.declarations,
+    ...(data.disputes ? { disputes: data.disputes } : {}),
     adjustments: data.adjustments,
     ...(data.state.writeOffs ? { writeOffs: data.state.writeOffs } : {}),
     feeders: data.feeders,
