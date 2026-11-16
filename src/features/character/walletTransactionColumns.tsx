@@ -41,6 +41,7 @@ export interface WalletTransactionBaseColumnsOptions {
   stickyStartOnPanel?: boolean;
 }
 
+/** In that order, date first: the personal panel slots its Character column in after it. */
 export function walletTransactionBaseColumns<T extends WalletTransactionCommon>({
   t,
   timeZone,
@@ -75,7 +76,7 @@ export function walletTransactionBaseColumns<T extends WalletTransactionCommon>(
       header: t('wallet.item'),
       /** Pinned while the figures scroll sideways on a phone. */
       stickyStart: true,
-      ...(stickyStartOnPanel ? { stickyStartOnPanel } : {}),
+      stickyStartOnPanel,
       // Takes the width the number columns leave; never under ~18ch, so names wrap on words.
       minWidth: '18ch',
       // Wraps to two lines on a phone rather than truncating to "Repu…".
