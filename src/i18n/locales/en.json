@@ -8164,6 +8164,7 @@
         "uncreditedTitleMany": "{{corp}} hasn't credited {{n}} of your donations ({{amount}} ISK) — check the wallet division",
         "uncreditedEveryTitleMany": "{{corp}} hasn't credited {{n}} of your donations ({{amount}} ISK) — ask the corp to sync",
         "uncreditedDisputeMany": "To dispute them, give a {{corp}} officer these donations from your wallet journal:",
+        "uncreditedRef": "Your wallet journal reference: {{ref}}.",
         "uncreditedItem": "{{amount}} ISK, sent {{time}}",
         "uncreditedItemCovered": "was paying {{days}} — owed again without it",
         "alsoBilledTitle": "{{corp}} also bills ore you listed for {{payees}}",

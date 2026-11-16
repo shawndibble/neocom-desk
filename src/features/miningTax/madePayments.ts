@@ -20,7 +20,7 @@
  */
 import type { Contract, WalletJournalEntry } from '@/esi/endpoints';
 import type { EsiEndpointId } from '@/esi/registry';
-import { loadWalletJournalWithStatus } from '@/features/character/wallet';
+import { loadWalletJournalHistory } from '@/features/character/wallet';
 import { loadContracts } from '@/features/character/contracts';
 import { humanizeRefType } from '@/features/character/format';
 import { resolveNames } from '@/features/character/names';
@@ -130,7 +130,12 @@ export async function loadMadePaymentsWithStatus(
   const perCharacter = await Promise.all(
     characterIds.map(async (characterId) => {
       const [journal, contracts] = await Promise.all([
-        loadWalletJournalWithStatus(characterId).catch(() => null),
+        // The history read, not ESI's ~30-day window: a donation the corp never credited, and a
+        // payment nothing is linked to, are exactly the ones still unresolved weeks later. On
+        // the live window they stopped being evidence the day ESI forgot them — the warning
+        // vanished and the debt stayed. Same statuses, same shape, plus the archive this call
+        // has been filling all along.
+        loadWalletJournalHistory(characterId).catch(() => null),
         loadContracts(characterId).catch(() => null),
       ]);
       const status = (read: { needsReauth: boolean } | null): MadePaymentSourceStatus =>

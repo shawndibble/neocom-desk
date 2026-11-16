@@ -225,3 +225,24 @@ export function personalEntriesOf(rows: readonly MoonMiningTaxRow[]): PersonalEn
       })),
   }));
 }
+
+/**
+ * The tab's row for one corporation's day of one Character — what an attention item opens so
+ * the member lands on the day itself, with its Statement, its declaration slot and its figures,
+ * rather than being told to go and find it.
+ *
+ * Undefined when the day has no row in view: a Character filter hiding it, or a day the book
+ * has since dropped. The caller then shows the item without the button.
+ */
+export function corpDayRow(
+  displayRows: readonly DisplayRow[],
+  of: { corporationId: number; characterId: number; date: string }
+): DisplayRow | undefined {
+  return displayRows.find(
+    (dr) =>
+      dr.corp?.kind === 'row' &&
+      dr.corp.view.corporationId === of.corporationId &&
+      dr.corp.view.characterId === of.characterId &&
+      dr.corp.view.date === of.date
+  );
+}

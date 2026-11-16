@@ -10,6 +10,7 @@ import { claimKeyOf } from '@/features/miningTax/corpBook/useAutoClaimDonations'
 import type { CorpBookView } from '@/features/miningTax/corpBook/corpBookView';
 import { corpBookAttention } from '@/features/miningTax/corpBook/corpAttention';
 import { corpPayAccounts, readsEveryDivision } from '@/features/miningTax/corpBook/corpPayAccount';
+import { corpDayRow } from '@/features/miningTax/corpBook/corpRows';
 import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
 import {
   CorpDeclarationStatus,
@@ -313,9 +314,23 @@ export function useTaxAttentionItems({
     const corpName = group[0].corpName;
     const only = group.length === 1 ? group[0] : undefined;
     const total = group.reduce((sum, u) => sum + u.amount, 0);
+    // The day the member can act on: the first the donation paid for, which is where its
+    // Statement, its declaration slot and its figures are. Without it the item could only
+    // repeat the advice to go and find an officer.
+    const day = group
+      .flatMap((u) => u.covered.map((date) => ({ characterId: u.characterId, date })))
+      .map((d) => corpDayRow(displayRows, { corporationId, ...d }))
+      .find((dr) => dr !== undefined);
     attentionItems.push({
       id: `corp-uncredited:${corporationId}`,
       tone: 'warning',
+      ...(day && {
+        action: (
+          <Button size="sm" onClick={() => openDetail(day)}>
+            {t('miningTax.corpBook.attention.openDay')}
+          </Button>
+        ),
+      }),
       title: only
         ? t(
             every
@@ -352,6 +367,8 @@ export function useTaxAttentionItems({
                   amount: formatIsk(only.amount, 0),
                   time: eveTimeLabel(Date.parse(only.at)),
                 })}
+                {only.refId !== undefined &&
+                  ` ${t('miningTax.corpBook.attention.uncreditedRef', { ref: only.refId })}`}
               </p>
             </>
           ) : (
@@ -364,6 +381,8 @@ export function useTaxAttentionItems({
                       amount: formatIsk(u.amount, 0),
                       time: eveTimeLabel(Date.parse(u.at)),
                     })}
+                    {u.refId !== undefined &&
+                      ` ${t('miningTax.corpBook.attention.uncreditedRef', { ref: u.refId })}`}
                     {u.covered.length > 0 &&
                       ` — ${t('miningTax.corpBook.attention.uncreditedItemCovered', {
                         days: u.covered.join(', '),

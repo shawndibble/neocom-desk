@@ -154,6 +154,12 @@ export interface InFlightDonation {
   characterId: number;
   amount: number;
   at: string;
+  /**
+   * The member's own wallet journal id for the transfer. The corporation's journal stamps it
+   * under a different id, so this does not match anything in the book — it is what the member
+   * hands an officer so they can find the ISK, instead of matching by amount and minute.
+   */
+  refId?: number;
 }
 
 /** A donation the book no longer counts, with the days it paid while it did: what to dispute. */
@@ -1600,6 +1606,8 @@ export interface MadeDonation {
   amount: number | null;
   date: string;
   method: string;
+  /** The wallet journal id, carried through as the evidence an officer can search on. */
+  refId?: number;
 }
 
 /** A Tax Payment the book already holds. */
@@ -1642,7 +1650,12 @@ export function inFlightDonations(
             Math.abs(Date.parse(h.at) - Date.parse(m.date)) <= SAME_TRANSFER_MS
         )
     )
-    .map((m) => ({ characterId: m.characterId, amount: m.amount as number, at: m.date }));
+    .map((m) => ({
+      characterId: m.characterId,
+      amount: m.amount as number,
+      at: m.date,
+      ...(m.refId !== undefined ? { refId: m.refId } : {}),
+    }));
 }
 
 /** Which rows an in-flight sum covers: whole days, oldest first, within the settle tolerance. */

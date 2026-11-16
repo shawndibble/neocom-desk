@@ -1388,6 +1388,18 @@ describe('inFlightDonations', () => {
     ...over,
   });
 
+  // The one number an officer can search the corporation's own journal on; without it they
+  // are left matching by amount and minute.
+  it('carries the wallet journal reference when the donation has one', () => {
+    expect(inFlightDonations([made({ refId: 7788991 })], [], CORP, '2026-10-01')).toEqual([
+      { characterId: ME, amount: 500_000, at: '2026-10-18T13:10:00Z', refId: 7788991 },
+    ]);
+  });
+
+  it('omits the reference rather than inventing one when the journal had none', () => {
+    expect(inFlightDonations([made()], [], CORP, '2026-10-01')[0]).not.toHaveProperty('refId');
+  });
+
   it('counts donations to the corp the book has not credited yet', () => {
     expect(inFlightDonations([made()], [], CORP, '2026-10-01')).toEqual([
       { characterId: ME, amount: 500_000, at: '2026-10-18T13:10:00Z' },

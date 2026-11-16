@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import type { BookRowView, PersonalOverlay } from '@/engine/corpTaxBook/personal';
-import { flatten } from '../groupRows';
+import { flatten, type DisplayRow } from '../groupRows';
 import type { MoonMiningTaxRow } from '../snapshot';
 import {
   buildDisplayRows,
+  corpDayRow,
   corpPayee,
   corpPayeeAliases,
   corpPayeeId,
@@ -334,5 +335,47 @@ describe('personalEntriesOf', () => {
       ['paid', false],
       ['mine', false],
     ]);
+  });
+});
+
+describe('corpDayRow', () => {
+  const dr = (over: { corporationId?: number; characterId?: number; date?: string }) =>
+    ({
+      key: `${over.corporationId}:${over.characterId}:${over.date}`,
+      corp: {
+        kind: 'row',
+        corpName: 'Brass',
+        view: {
+          corporationId: over.corporationId ?? 1,
+          characterId: over.characterId ?? 10,
+          date: over.date ?? '2026-10-17',
+        },
+      },
+    }) as unknown as DisplayRow;
+
+  const rows = [
+    dr({ corporationId: 1, characterId: 10, date: '2026-10-16' }),
+    dr({ corporationId: 2, characterId: 10, date: '2026-10-17' }),
+    dr({ corporationId: 1, characterId: 11, date: '2026-10-17' }),
+    dr({ corporationId: 1, characterId: 10, date: '2026-10-17' }),
+  ];
+
+  it('finds the one row for that corporation, Character and day', () => {
+    expect(corpDayRow(rows, { corporationId: 1, characterId: 10, date: '2026-10-17' })).toBe(
+      rows[3]
+    );
+  });
+
+  it('is undefined when the day has no row in view', () => {
+    expect(
+      corpDayRow(rows, { corporationId: 1, characterId: 10, date: '2026-10-20' })
+    ).toBeUndefined();
+  });
+
+  it('ignores a row no book decided', () => {
+    const own = { key: 'own', corp: undefined } as unknown as DisplayRow;
+    expect(
+      corpDayRow([own], { corporationId: 1, characterId: 10, date: '2026-10-17' })
+    ).toBeUndefined();
   });
 });
