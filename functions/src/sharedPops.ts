@@ -405,6 +405,29 @@ export function movedPops(
   });
 }
 
+/** The book's alliance is re-read at most this often, and a quiet sync republishes a doc this old. */
+export const ALLIANCE_RECHECK_MS = 6 * HOUR_MS;
+
+/**
+ * Whether a sync republishes the book's Shared Pops. A sync that changed something always does.
+ * A quiet one (#6254) republishes only a doc an alliance recheck old, or one whose alliance is no
+ * longer the corporation's (`allianceNow`, read by the sync), so an alliance the book joins sees
+ * its pops at once. `allianceNow` undefined (unread) keeps the age rule; `held` null (no doc) has
+ * nothing to bring up to date.
+ */
+export function sharedPopsRepublishDue(input: {
+  changed: boolean;
+  held: { publishedAtMs: number | undefined; allianceId: number | null } | null;
+  allianceNow?: number | null;
+  now: number;
+}): boolean {
+  const { changed, held, allianceNow, now } = input;
+  if (changed) return true;
+  if (held === null) return false;
+  if (allianceNow !== undefined && allianceNow !== held.allianceId) return true;
+  return held.publishedAtMs === undefined || now - held.publishedAtMs >= ALLIANCE_RECHECK_MS;
+}
+
 /**
  * The book's alliance now, read off the affiliation of any Character in its corporation (a
  * viewer or an officer the read already looks up), so a book that left its alliance stops

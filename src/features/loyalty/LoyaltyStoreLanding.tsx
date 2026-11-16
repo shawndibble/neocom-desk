@@ -106,6 +106,7 @@ const FILTER = defineUrlFilter<LpLandingFilters>({
 });
 
 const OFFERS_SORT = { columnId: 'iskPerLp', direction: 'desc' } as const;
+const STORE_SORT_KEY = 'storeSort';
 const STORE_SORT_IDS = ['store', 'lpValue', ...LP_LANDING_STORE_COLUMN_IDS];
 const OFFER_SORT_IDS = ['item', 'iskPerLp', ...LP_LANDING_OFFER_COLUMN_IDS];
 
@@ -194,7 +195,7 @@ export function LoyaltyStoreLanding({ active = true }: { active?: boolean }) {
     LP_LANDING_OFFER_PHONE_OFF
   );
   // A pilot holding LP sees those stores first unless the URL names a sort.
-  const storeSort = useUrlSort('storeSort', lpLandingStoreSort(holdings), STORE_SORT_IDS);
+  const storeSort = useUrlSort(STORE_SORT_KEY, lpLandingStoreSort(holdings), STORE_SORT_IDS);
   const offerSort = useUrlSort('offerSort', OFFERS_SORT, OFFER_SORT_IDS);
 
   // The whole landing URL rides along, so Close after a reload rebuilds this view, not just the query.
@@ -233,7 +234,13 @@ export function LoyaltyStoreLanding({ active = true }: { active?: boolean }) {
   const total = view === 'stores' ? data.stores.length : data.offers.length;
   const offersPending = view === 'offers' && data.pricing;
   // A linked "I can afford" / "Stores I hold LP with" waits for the balances, not "Nothing matches".
-  const balancesPending = (filters.mineOnly || filters.affordableOnly) && !data.balancesKnown;
+  // So does the store list on its default sort, which puts held LP first: it never reorders
+  // under the pilot when they arrive. A sort the URL names needs no balances.
+  const balancesPending =
+    ((filters.mineOnly || filters.affordableOnly) && !data.balancesKnown) ||
+    (view === 'stores' &&
+      !data.balancesSettled &&
+      !new URLSearchParams(location.search).has(STORE_SORT_KEY));
 
   let body;
   if (data.status === 'loading' || offersPending || balancesPending) {
