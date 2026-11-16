@@ -316,7 +316,7 @@ Result panel
 - Table (`DataTable`, rowKey typeId, `responsive="table"`, `rowMoreActions`, `rowContextMenu` = `ItemContextMenu`):
   - Always: Quantity, Item (MarketItemLink -> Browser).
   - Optional (picker): Buy each, Sell each, Buy total, Sell total, Refine total, LP total, Volume (m3, packaged). All sortable (`sortValue`); null sorts last.
-  - Highlighting: Buy total bold green when refine does NOT beat sell-as-is; Refine total bold green when `refineBeatsSellAsIs`; `*` hint if refine partly unpriced; `!` hint when refine only wins because leftover units sell on top; LP total bold when `lpBeatsMarket`, `*` hint when LP unaffordable; LP cell carries `LpStoreLink` icon to `/market/lp-store/:corp`.
+  - Highlighting: Buy total bold green when refine does NOT beat sell-as-is; Refine total bold green when the row's refine verdict is `'refine'`; `*` hint if refine partly unpriced; `!` hint when refine only wins because leftover units sell on top; LP total bold when `lpBeatsMarket`, `*` hint when LP unaffordable; LP cell carries `LpStoreLink` icon to `/market/lp-store/:corp`.
   - Each-price via `formatIskAuto`; totals via `IskAmount`; missing price is a dash, never 0.
 - States: loading spinner (first result only), `failed` (catalogue load) EmptyState, empty (no result), no-matches EmptyState; a re-price shows an inline small spinner in the chip row.
 - Mobile: paste panel folds above the result (its bar says hub and percent, so the Panel header omits them); the table stays a table with Item (count under the name), Buy total and Sell total, each header sorting; the Columns menu swaps others in. Compare Hubs is an icon toggle (pressed while open) and its cards go two across.
@@ -338,7 +338,7 @@ Engine (`src/engine/market/appraisal.ts`)
 - `buildAppraisal`: price*percent/100 per side, totals skip null sides, `unpricedRows` counts them.
 - `appraisalUndercut`: sell price one tick below hub's lowest sell (`priceTick.ts`); null if no seller or at 0.01.
 - `appraisalNet` (always 100%): instantNet = sum(buy*qty - sales tax); listNet = undercut value - sales tax - broker fee (Accounting, Broker Relations, standings via `useTradeHubStandings`).
-- `refineBeatsSellAsIs`: refine total + leftover units' buy value strictly greater than buy total; ties read sell.
+- `appraisalRowFigures/` (`rowFigures(row, basis, fees)`, `pileFigures(rows, basis)`): every derived figure an Appraisal row or pile shows on the Price Basis — split each, as-is each/total, refine minerals / with leftover / pricedAll / verdict, sales tax / broker fee / after fees. The basis is required; the table, the CSV, the Shared Appraisal, the summary chip and the sell groups all read it. Verdict `'refine'`: minerals + leftover units at the basis's as-is unit price strictly greater than the as-is total; ties read sell.
 - `lpBeatsMarket`: affordable LP option cheaper than market sell; `engine/market/lpAcquisition.ts` `cheapestLpOffer` picks per-redemption cost (LP + ISK + required-item turn-in at hub prices, never scaled by percent).
 - `compareMargin` (spread, spread %, after-fees): used by Compare drawer.
 

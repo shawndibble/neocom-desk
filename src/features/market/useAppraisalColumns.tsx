@@ -4,19 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { MenuItem, MenuSeparator, type DataTableColumn } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
 import { useTableExport } from '@/components/ui/useTableExport';
-import {
-  lpBeatsMarket,
-  refineBeatsSellAsIs,
-  refinePricedAllFor,
-  refineMineralsFor,
-  refineWithLeftoverFor,
-  sellAsIsBeatsRefine,
-  type RefineBasis,
-  sellAfterFees,
-  sellBrokerFee,
-  sellSalesTax,
-  splitEach,
-} from '@/engine/market/appraisal';
+import { lpBeatsMarket, type RefineBasis } from '@/engine/market/appraisal';
+import { pileFigures, rowFigures } from '@/engine/market/appraisalRowFigures';
 import { looksLikeEftFit } from '@/engine/import/eftFit';
 import { subtractOwned, type OwnedRow } from '@/engine/market/appraisalOwned';
 import type { ResolvedStandings } from '@/engine/market/standings';
@@ -122,8 +111,7 @@ export function useAppraisalColumns({
       ...withOwned.filter((r) => r.need === 0),
     ];
   }, [rows, owned]);
-  const hasRefine =
-    refineReady && rows.some((row) => refineMineralsFor(row, refineBasis) !== undefined);
+  const hasRefine = refineReady && pileFigures(rows, refineBasis).refinable;
   // Undefined per row when nothing the active Character holds LP with sells
   // this item — same "only earns its place once something has it" rule as
   // the refine column, and also why this never shows with no active
@@ -199,12 +187,11 @@ export function useAppraisalColumns({
     rows: tableRows,
     columns: csvColumns,
   });
-  const taxFor = (row: OwnedRow) =>
-    accountingLevel === null ? null : sellSalesTax(row, accountingLevel);
-  const brokerFor = (row: OwnedRow) =>
-    feeInputs === null ? null : sellBrokerFee(row, feeInputs.brokerRelationsLevel, standing);
-  const afterFeesFor = (row: OwnedRow) =>
-    feeInputs === null ? null : sellAfterFees(row, feeInputs);
+  // Every derived figure a cell shows, on the remembered basis; fees null until the skills load.
+  const figures = (row: OwnedRow) => rowFigures(row, refineBasis, feeInputs);
+  // Selling as is beats refining on this basis, so the as-is total on the basis wears the mark.
+  const asIsWins = (row: OwnedRow, side: RefineBasis) =>
+    refineBasis === side && figures(row).refine.verdict === 'sellAsIs';
 
   // The optional columns' catalog, keyed by `AppraisalColumnId` so the
   // `ColumnPickerMenu` below and the push loop past it share one definition.
@@ -253,8 +240,8 @@ export function useAppraisalColumns({
       headerTooltip: t('market.appraisal.columnSplitEachHelp'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums text-text-dim',
-      render: (row) => eachCell(splitEach(row)),
-      sortValue: (row) => splitEach(row) ?? undefined,
+      render: (row) => eachCell(figures(row).splitEach),
+      sortValue: (row) => figures(row).splitEach ?? undefined,
     },
     buyTotal: {
       id: 'buyTotal',
@@ -264,7 +251,7 @@ export function useAppraisalColumns({
       render: (row) =>
         comparisonCell(
           totalCell(row.buyTotal),
-          refineBasis === 'buy' && sellAsIsBeatsRefine(row, 'buy'),
+          asIsWins(row, 'buy'),
           undefined,
           <>
             {row.buyWalk && (
@@ -299,10 +286,7 @@ export function useAppraisalColumns({
       render: (row) => (
         <>
           {priceMark(row, 'sellTotal')}
-          {comparisonCell(
-            totalCell(row.sellTotal),
-            refineBasis === 'sell' && sellAsIsBeatsRefine(row, 'sell')
-          )}
+          {comparisonCell(totalCell(row.sellTotal), asIsWins(row, 'sell'))}
         </>
       ),
       sortValue: (row) => row.sellTotal ?? undefined,
@@ -313,18 +297,18 @@ export function useAppraisalColumns({
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
       render: (row) => {
-        const refine = refineMineralsFor(row, refineBasis);
-        if (refine === undefined) return '—';
+        const { minerals, verdict, pricedAll } = figures(row).refine;
+        if (minerals === undefined) return '—';
         return comparisonCell(
           onOpenRefine ? (
             <RefineFigureButton name={row.name} onOpen={() => onOpenRefine(row.typeId)}>
-              {totalCell(refine)}
+              {totalCell(minerals)}
             </RefineFigureButton>
           ) : (
-            totalCell(refine)
+            totalCell(minerals)
           ),
-          refineBeatsSellAsIs(row, refineBasis),
-          refinePricedAllFor(row, refineBasis) === false && (
+          verdict === 'refine',
+          pricedAll === false && (
             <HintText
               content={t('market.appraisal.refinePartialHint')}
               className="ml-0.5 text-warning"
@@ -334,7 +318,7 @@ export function useAppraisalColumns({
           )
         );
       },
-      sortValue: (row) => refineMineralsFor(row, refineBasis),
+      sortValue: (row) => figures(row).refine.minerals,
     },
     refineWithLeftover: {
       id: 'refineWithLeftover',
@@ -343,12 +327,12 @@ export function useAppraisalColumns({
       className: 'whitespace-nowrap tabular-nums',
       // The refined minerals plus the units too few to refine, sold as is: what the verdict compares.
       render: (row) => {
-        const refine = refineWithLeftoverFor(row, refineBasis);
-        if (refine === undefined) return '—';
+        const { withLeftover, verdict, pricedAll } = figures(row).refine;
+        if (withLeftover === undefined) return '—';
         return comparisonCell(
-          totalCell(refine),
-          refineBeatsSellAsIs(row, refineBasis),
-          refinePricedAllFor(row, refineBasis) === false && (
+          totalCell(withLeftover),
+          verdict === 'refine',
+          pricedAll === false && (
             <HintText
               content={t('market.appraisal.refinePartialHint')}
               className="ml-0.5 text-warning"
@@ -358,7 +342,7 @@ export function useAppraisalColumns({
           )
         );
       },
-      sortValue: (row) => refineWithLeftoverFor(row, refineBasis),
+      sortValue: (row) => figures(row).refine.withLeftover,
     },
     lpTotal: {
       id: 'lpTotal',
@@ -405,24 +389,24 @@ export function useAppraisalColumns({
       header: t('market.appraisal.columnSalesTax'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums text-text-dim',
-      render: (row) => totalCell(taxFor(row)),
-      sortValue: (row) => taxFor(row) ?? undefined,
+      render: (row) => totalCell(figures(row).fees.salesTax),
+      sortValue: (row) => figures(row).fees.salesTax ?? undefined,
     },
     brokerFee: {
       id: 'brokerFee',
       header: t('market.appraisal.columnBrokerFee'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums text-text-dim',
-      render: (row) => totalCell(brokerFor(row)),
-      sortValue: (row) => brokerFor(row) ?? undefined,
+      render: (row) => totalCell(figures(row).fees.brokerFee),
+      sortValue: (row) => figures(row).fees.brokerFee ?? undefined,
     },
     sellAfterFees: {
       id: 'sellAfterFees',
       header: t('market.appraisal.columnSellAfterFees'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (row) => totalCell(afterFeesFor(row)),
-      sortValue: (row) => afterFeesFor(row) ?? undefined,
+      render: (row) => totalCell(figures(row).fees.afterFees),
+      sortValue: (row) => figures(row).fees.afterFees ?? undefined,
     },
   };
   const availableColumns = APPRAISAL_COLUMN_IDS.filter(

@@ -2,24 +2,15 @@ import { describe, it, expect } from 'vitest';
 import {
   appraisalNet,
   iskPerM3,
-  splitEach,
-  sellSalesTax,
-  sellAfterFees,
-  sellBrokerFee,
   appraisalUndercut,
   compareMargin,
   buildAppraisal,
   buildHubComparison,
-  asIsTotalFor,
   computeAppraisalRefine,
   lpBeatsMarket,
-  refineBeatsSellAsIs,
-  refineMineralsFor,
-  refineWithLeftoverFor,
   type AppraisalItem,
   type AppraisalRow,
 } from '@/engine/market/appraisal';
-import { brokerFeePct, salesTaxPct } from '@/engine/industry/fees';
 import { BASE_STATION_REPROCESSING_RATE } from '@/engine/industry/reprocessing';
 import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import { ZERO_STANDINGS } from '@/engine/market/standings';
@@ -517,87 +508,6 @@ describe('buildHubComparison', () => {
   });
 });
 
-describe('refineBeatsSellAsIs (issue #1048)', () => {
-  /** A priced row carrying a refine comparison; overrides say what the case is. */
-  function row(overrides: Partial<AppraisalRow> = {}): AppraisalRow {
-    return {
-      typeId: 1,
-      name: 'Mercoxit III-Grade',
-      quantity: 100,
-      buyEach: 16_000,
-      sellEach: 17_000,
-      buyTotal: 1_600_000,
-      sellTotal: 1_700_000,
-      volume: null,
-      refineTotal: 1_700_000,
-      refinePricedAll: true,
-      refineUnitsLeftOver: 0,
-      ...overrides,
-    };
-  }
-
-  it('compares the two totals directly when the quantity is whole batches', () => {
-    expect(refineBeatsSellAsIs(row())).toBe(true);
-    expect(refineBeatsSellAsIs(row({ refineTotal: 1_500_000 }))).toBe(false);
-  });
-
-  it('values the leftover units the refine path still holds, at the sell-as-is price', () => {
-    // The worked example from issue #1048, at live Jita prices: 999 Mercoxit
-    // III-Grade refines 900 units for 15,436,890 and leaves 99 to sell at
-    // 16,000 each, beating 15,984,000 sold as-is by 1,036,890 ISK. Comparing
-    // the refine total alone against the full quantity would have called this
-    // for selling and cost the player that difference.
-    const paste = row({
-      quantity: 999,
-      buyTotal: 15_984_000,
-      refineTotal: 15_436_890,
-      refineUnitsLeftOver: 99,
-    });
-    expect(refineBeatsSellAsIs(paste)).toBe(true);
-  });
-
-  it('still calls a genuine loss for selling, leftover included', () => {
-    const paste = row({
-      quantity: 999,
-      buyTotal: 15_984_000,
-      refineTotal: 14_000_000,
-      refineUnitsLeftOver: 99,
-    });
-    expect(refineBeatsSellAsIs(paste)).toBe(false);
-  });
-
-  it('does not call a tie for refining: below one batch, both paths are the same goods', () => {
-    // Nothing refines, so the leftover is the whole paste and the two sides
-    // are exactly equal. A tie is not a win.
-    const partBatch = row({
-      quantity: 99,
-      buyTotal: 1_584_000,
-      refineTotal: 0,
-      refineUnitsLeftOver: 99,
-    });
-    expect(refineBeatsSellAsIs(partBatch)).toBe(false);
-  });
-
-  it('makes no claim on a row with no reprocessing data', () => {
-    expect(
-      refineBeatsSellAsIs(
-        row({ refineTotal: undefined, refinePricedAll: undefined, refineUnitsLeftOver: undefined })
-      )
-    ).toBe(false);
-  });
-
-  it('makes no claim when nobody is buying, rather than valuing the leftover at zero', () => {
-    const unpriced = row({
-      quantity: 999,
-      buyEach: null,
-      buyTotal: null,
-      refineTotal: 15_436_890,
-      refineUnitsLeftOver: 99,
-    });
-    expect(refineBeatsSellAsIs(unpriced)).toBe(false);
-  });
-});
-
 describe('appraisalNet (issue #1426)', () => {
   /** A priced item; overrides say what the case is. `appraisalNet` reads `AppraisalItem` — always the 100%-market price, never a Price-Percent-scaled `AppraisalRow` figure. */
   function item(overrides: Partial<AppraisalItem> = {}): AppraisalItem {
@@ -784,65 +694,6 @@ describe('iskPerM3', () => {
   });
 });
 
-describe('splitEach', () => {
-  it('is the midpoint of the buy and sell each price', () => {
-    expect(splitEach({ buyEach: 5, sellEach: 7 })).toBe(6);
-  });
-
-  it('is null when either side has no price, never half a price or zero', () => {
-    expect(splitEach({ buyEach: null, sellEach: 7 })).toBeNull();
-    expect(splitEach({ buyEach: 5, sellEach: null })).toBeNull();
-    expect(splitEach({ buyEach: null, sellEach: null })).toBeNull();
-  });
-});
-
-describe('sellSalesTax', () => {
-  it('charges the Accounting-reduced rate on the row sell total', () => {
-    const tax = sellSalesTax({ sellTotal: 1_000_000 }, 5);
-    expect(tax).toBeCloseTo((1_000_000 * salesTaxPct(5)) / 100, 6);
-    expect(sellSalesTax({ sellTotal: 1_000_000 }, 0)).toBeGreaterThan(tax as number);
-  });
-
-  it('is null where nothing sells, never a free 0', () => {
-    expect(sellSalesTax({ sellTotal: null }, 3)).toBeNull();
-  });
-});
-
-describe('sellBrokerFee', () => {
-  const standing = { factionStanding: 0, corpStanding: 0 };
-
-  it('charges the broker fee on the row sell total', () => {
-    const fee = sellBrokerFee({ sellTotal: 1_000_000 }, 5, standing) as number;
-    expect(fee).toBeCloseTo((1_000_000 * brokerFeePct(5)) / 100, 6);
-  });
-
-  it('keeps the 100 ISK minimum', () => {
-    expect(sellBrokerFee({ sellTotal: 10 }, 5, standing)).toBe(100);
-  });
-
-  it('is null where nothing sells', () => {
-    expect(sellBrokerFee({ sellTotal: null }, 5, standing)).toBeNull();
-  });
-});
-
-describe('sellAfterFees', () => {
-  const fees = {
-    accountingLevel: 4,
-    brokerRelationsLevel: 3,
-    standing: { factionStanding: 0, corpStanding: 0 },
-  };
-
-  it('is the sell total less sales tax and broker fee', () => {
-    const tax = sellSalesTax({ sellTotal: 1_000_000 }, 4) as number;
-    const broker = sellBrokerFee({ sellTotal: 1_000_000 }, 3, fees.standing) as number;
-    expect(sellAfterFees({ sellTotal: 1_000_000 }, fees)).toBeCloseTo(1_000_000 - tax - broker, 6);
-  });
-
-  it('is null where nothing sells', () => {
-    expect(sellAfterFees({ sellTotal: null }, fees)).toBeNull();
-  });
-});
-
 describe('refine on each price basis', () => {
   const veldspar = { portionSize: 100, materials: [{ typeId: 34, quantity: 400 }] };
   const base = {
@@ -887,57 +738,5 @@ describe('refine on each price basis', () => {
     expect(rows[0].refineTotal).toBeCloseTo(2000 * 5 * 0.9 * 0.9, 6);
     expect(rows[0].refineSellTotal).toBeCloseTo(2000 * 8 * 0.9 * 0.9, 6);
     expect(totals.refineSell).toBeCloseTo(rows[0].refineSellTotal ?? NaN, 6);
-  });
-
-  it('picks the refine figure, the as-is total and the verdict by basis', () => {
-    const { rows } = buildAppraisal([item()], 100);
-    const row = rows[0];
-    // The figure shown is the minerals plus the 50 leftover units at the basis's as-is unit price.
-    expect(refineMineralsFor(row, 'buy')).toBe(row.refineTotal);
-    expect(refineWithLeftoverFor(row, 'buy')).toBeCloseTo(9_000 + 50 * 10, 6);
-    expect(refineWithLeftoverFor(row, 'sell')).toBeCloseTo(14_400 + 50 * 14, 6);
-    expect(refineWithLeftoverFor(row, 'split')).toBeCloseTo((9_000 + 14_400) / 2 + 50 * 12, 6);
-    expect(asIsTotalFor(row, 'buy')).toBe(10_500);
-    expect(asIsTotalFor(row, 'sell')).toBe(14_700);
-    expect(asIsTotalFor(row, 'split')).toBe(12_600);
-    // Buy: 9,000 + 50 x 10 = 9,500 against 10,500. Sell: 14,400 + 50 x 14 = 15,100 against 14,700.
-    expect(refineBeatsSellAsIs(row)).toBe(false);
-    expect(refineBeatsSellAsIs(row, 'buy')).toBe(false);
-    expect(refineBeatsSellAsIs(row, 'sell')).toBe(true);
-  });
-
-  it('has no split or sell answer where a side is missing', () => {
-    const noSell: AppraisalItem = { ...item(), sell: null };
-    const row = buildAppraisal([noSell], 100).rows[0];
-    expect(asIsTotalFor(row, 'sell')).toBeNull();
-    expect(asIsTotalFor(row, 'split')).toBeNull();
-    expect(refineBeatsSellAsIs(row, 'sell')).toBe(false);
-  });
-});
-
-describe('split refine figure', () => {
-  it('is not given where a mineral had no price on one side, rather than half of the other', () => {
-    const base = {
-      quantity: 1050,
-      reprocessing: { portionSize: 100, materials: [{ typeId: 34, quantity: 400 }] },
-      modifiers: NO_CHARACTER_MODIFIERS,
-      refining: { stationRate: 0.5, taxRate: 0 },
-      materialPrices: { 34: 5 },
-    };
-    const item = (materialSellPrices: Record<number, number>): AppraisalItem => ({
-      typeId: 1230,
-      name: 'Veldspar',
-      quantity: 1050,
-      buy: 10,
-      sell: 14,
-      refine: computeAppraisalRefine({ ...base, materialSellPrices }),
-    });
-    const priced = buildAppraisal([item({ 34: 8 })], 100).rows[0];
-    // (10,000 + 16,000) / 2 of minerals, plus 50 leftover units at the split unit price of 12.
-    expect(refineWithLeftoverFor(priced, 'split')).toBeCloseTo(13_000 + 50 * 12, 6);
-    const oneSided = buildAppraisal([item({})], 100).rows[0];
-    expect(refineWithLeftoverFor(oneSided, 'split')).toBeUndefined();
-    // The minerals 10,000 plus the 50 leftover units at 10 each.
-    expect(refineWithLeftoverFor(oneSided, 'buy')).toBeCloseTo(10_500, 6);
   });
 });

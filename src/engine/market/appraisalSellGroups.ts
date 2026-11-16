@@ -2,7 +2,7 @@
  * Splits an Appraisal's items by how to get rid of each one, so every item
  * lands in at most one copy list and the same stack is never pasted into two
  * in-game windows. Reuses the table's own verdicts rather than a second
- * opinion: `refineBeatsSellAsIs` for refine, `appraisalUndercut` for whether a
+ * opinion: the row's refine verdict (`rowFigures`) for refine, `appraisalUndercut` for whether a
  * listing is worth making over selling into the buy order.
  *
  * - `refine`: refining beats selling the item as is.
@@ -13,9 +13,9 @@
  * An item with no buy order and no legal undercut has nowhere to go and is in
  * none of them. Each group keeps the pasted order.
  */
+import { rowFigures } from './appraisalRowFigures';
 import {
   appraisalUndercut,
-  refineBeatsSellAsIs,
   type Appraisal,
   type AppraisalItem,
   type RefineBasis,
@@ -35,7 +35,7 @@ export function appraisalSellGroups(
 
   appraisal.items.forEach((item, index) => {
     const row = appraisal.rows[index];
-    if (row !== undefined && refineBeatsSellAsIs(row, refineBasis)) {
+    if (row !== undefined && rowFigures(row, refineBasis, null).refine.verdict === 'refine') {
       groups.refine.push(item);
       return;
     }
