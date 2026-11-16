@@ -15,15 +15,11 @@ import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import {
   buildAppraisal,
-  refineBeatsSellAsIs,
-  refineMineralsFor,
-  refineMineralsOfRows,
-  refineWithLeftoverFor,
-  splitEach,
   type AppraisalItem,
   type AppraisalRow,
   type RefineBasis,
 } from '@/engine/market/appraisal';
+import { pileFigures, rowFigures } from '@/engine/market/appraisalRowFigures';
 import { basisAvailable, refineEfficiencyRange } from '@/engine/market/refineBreakdown';
 import { ShareShell, type OpenInApp } from '@/features/share/ShareShell';
 import { formatIskAuto } from '@/lib/isk';
@@ -104,10 +100,10 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
   const basisReady = useHydratedStore(useRefineBasis);
   const refineBasis: RefineBasis =
     appraisal !== null && basisAvailable(appraisal, storedBasis) ? storedBasis : 'buy';
-  const hasRefine =
-    basisReady &&
-    setup !== null &&
-    (appraisal?.rows.some((row) => refineMineralsFor(row, refineBasis) !== undefined) ?? false);
+  const pile = appraisal === null ? null : pileFigures(appraisal.rows, refineBasis);
+  const hasRefine = basisReady && setup !== null && (pile?.refinable ?? false);
+  // A Shared Appraisal carries no fee context, so the fee figures are never read here.
+  const figures = (row: AppraisalRow) => rowFigures(row, refineBasis, null);
   const refineRange = hasRefine && appraisal ? refineEfficiencyRange(appraisal.items) : null;
   const refineEfficiency = refineRange ? efficiencyText(refineRange.min, refineRange.max) : null;
   const shareRows = appraisal ? appraisal.rows : NO_ROWS;
@@ -171,8 +167,8 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
       phoneHidden: true,
       align: 'right',
       className: 'whitespace-nowrap tabular-nums text-text-dim',
-      render: (row) => eachCell(splitEach(row)),
-      sortValue: (row) => splitEach(row) ?? undefined,
+      render: (row) => eachCell(figures(row).splitEach),
+      sortValue: (row) => figures(row).splitEach ?? undefined,
     },
     {
       id: 'buyTotal',
@@ -197,33 +193,34 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
             header: t('market.appraisal.columnRefineTotal'),
             align: 'right' as const,
             className: 'whitespace-nowrap tabular-nums',
-            render: (row: AppraisalRow) =>
-              refineMineralsFor(row, refineBasis) === undefined
+            render: (row: AppraisalRow) => {
+              const { minerals, verdict } = figures(row).refine;
+              return minerals === undefined
                 ? '—'
                 : comparisonCell(
                     <RefineFigureButton
                       name={row.name}
                       onOpen={() => setRefineModal({ typeId: row.typeId })}
                     >
-                      {totalCell(refineMineralsFor(row, refineBasis) ?? null)}
+                      {totalCell(minerals)}
                     </RefineFigureButton>,
-                    refineBeatsSellAsIs(row, refineBasis)
-                  ),
-            sortValue: (row: AppraisalRow) => refineMineralsFor(row, refineBasis),
+                    verdict === 'refine'
+                  );
+            },
+            sortValue: (row: AppraisalRow) => figures(row).refine.minerals,
           },
           {
             id: 'refineWithLeftover',
             header: t('market.appraisal.columnRefineWithLeftover'),
             align: 'right' as const,
             className: 'whitespace-nowrap tabular-nums',
-            render: (row: AppraisalRow) =>
-              refineWithLeftoverFor(row, refineBasis) === undefined
+            render: (row: AppraisalRow) => {
+              const { withLeftover, verdict } = figures(row).refine;
+              return withLeftover === undefined
                 ? '—'
-                : comparisonCell(
-                    totalCell(refineWithLeftoverFor(row, refineBasis) ?? null),
-                    refineBeatsSellAsIs(row, refineBasis)
-                  ),
-            sortValue: (row: AppraisalRow) => refineWithLeftoverFor(row, refineBasis),
+                : comparisonCell(totalCell(withLeftover), verdict === 'refine');
+            },
+            sortValue: (row: AppraisalRow) => figures(row).refine.withLeftover,
           },
         ]
       : []),
@@ -256,17 +253,12 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
                 label={t('market.appraisal.buyTotal')}
                 value={totalFigure(state.view.appraisal.totals.buy)}
               />
-              {hasRefine && appraisal && (
+              {hasRefine && pile && (
                 <StatChip
                   label={t('market.appraisal.refineTotal')}
                   value={
                     <RefineChipValue
-                      amount={
-                        <IskAmount
-                          value={refineMineralsOfRows(appraisal.rows, refineBasis)}
-                          decimals={0}
-                        />
-                      }
+                      amount={<IskAmount value={pile.refineMinerals} decimals={0} />}
                       basis={t(`market.appraisal.refineBasisShort.${refineBasis}`)}
                       efficiency={refineEfficiency}
                       onOpen={() => setRefineModal({ typeId: null })}

@@ -7,7 +7,7 @@ function item(overrides: Partial<AppraisalItem> & { typeId: number }): Appraisal
 }
 
 function groups(items: AppraisalItem[]) {
-  const g = appraisalSellGroups(buildAppraisal(items, 100));
+  const g = appraisalSellGroups(buildAppraisal(items, 100), 'buy');
   return {
     sellNow: g.sellNow.map((i) => i.typeId),
     list: g.list.map((i) => i.typeId),

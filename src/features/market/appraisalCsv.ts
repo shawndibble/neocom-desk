@@ -1,16 +1,11 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import {
   iskPerM3,
-  sellAfterFees,
-  sellBrokerFee,
-  sellSalesTax,
-  splitEach,
-} from '@/engine/market/appraisal';
-import {
-  refineMineralsFor,
-  refineWithLeftoverFor,
   type AppraisalNetFees,
+  type AppraisalRow,
+  type RefineBasis,
 } from '@/engine/market/appraisal';
+import { basisFreeFigures, rowFigures } from '@/engine/market/appraisalRowFigures';
 import type { OwnedRow } from '@/engine/market/appraisalOwned';
 import { priceMarkKey } from './priceStateLabel';
 
@@ -24,9 +19,11 @@ interface AppraisalCsvOptions {
   /**
    * Adds the columns only the live tab has data for: refine total, LP store,
    * need, owned and price source. Omitted on a Shared Appraisal, which carries
-   * none of them, so its file has no always-empty columns.
+   * none of them, so its file has no always-empty columns. The refine
+   * figures are priced on `refineBasis`, the pilot's remembered Price Basis,
+   * the same as the table's Refine columns.
    */
-  live?: boolean;
+  live?: { refineBasis: RefineBasis };
 }
 
 /**
@@ -40,30 +37,34 @@ interface AppraisalCsvOptions {
  */
 export function appraisalCsvColumns(
   t: CsvTranslate,
-  { fees, live = false }: AppraisalCsvOptions = {}
+  { fees, live }: AppraisalCsvOptions = {}
 ): CsvColumn<OwnedRow>[] {
   const columns: CsvColumn<OwnedRow>[] = [
     { header: t('market.appraisal.columnQuantity'), value: (row) => row.quantity },
     { header: t('market.appraisal.columnItem'), value: (row) => row.name },
     { header: t('market.appraisal.columnBuyEach'), value: (row) => row.buyEach },
     { header: t('market.appraisal.columnSellEach'), value: (row) => row.sellEach },
-    { header: t('market.appraisal.columnSplitEach'), value: (row) => splitEach(row) },
+    {
+      header: t('market.appraisal.columnSplitEach'),
+      value: (row) => basisFreeFigures(row, null).splitEach,
+    },
     { header: t('market.appraisal.columnBuyTotal'), value: (row) => row.buyTotal },
     { header: t('market.appraisal.columnSellTotal'), value: (row) => row.sellTotal },
     // Packaged m³ (issue #2337); unknown exports empty, the same as an unpriced side.
     { header: t('market.appraisal.columnVolume'), value: (row) => row.volume },
     { header: t('market.appraisal.columnIskPerM3'), value: (row) => iskPerM3(row) },
   ];
-  if (live) {
+  if (live !== undefined) {
+    const refineOf = (row: AppraisalRow) => rowFigures(row, live.refineBasis, null).refine;
     columns.push(
       // Blank where the type has no reprocessing data / no held LP store sells it.
       {
         header: t('market.appraisal.columnRefineTotal'),
-        value: (row) => refineMineralsFor(row, 'buy'),
+        value: (row) => refineOf(row).minerals,
       },
       {
         header: t('market.appraisal.columnRefineWithLeftover'),
-        value: (row) => refineWithLeftoverFor(row, 'buy'),
+        value: (row) => refineOf(row).withLeftover,
       },
       { header: t('market.appraisal.columnLpTotal'), value: (row) => row.lpIskCost },
       { header: t('market.appraisal.columnLpCost'), value: (row) => row.lpCost },
@@ -82,22 +83,20 @@ export function appraisalCsvColumns(
     );
   }
   if (fees !== undefined) {
-    // Blank until the skills are known, never a base-rate guess.
-    const feeCell =
-      (figure: (row: OwnedRow, fees: AppraisalNetFees) => number | null) => (row: OwnedRow) =>
-        fees === null ? null : figure(row, fees);
+    // Blank until the skills are known (`fees` null), never a base-rate guess.
+    const feesOf = (row: AppraisalRow) => basisFreeFigures(row, fees).fees;
     columns.push(
       {
         header: t('market.appraisal.columnSalesTax'),
-        value: feeCell((row, f) => sellSalesTax(row, f.accountingLevel)),
+        value: (row) => feesOf(row).salesTax,
       },
       {
         header: t('market.appraisal.columnBrokerFee'),
-        value: feeCell((row, f) => sellBrokerFee(row, f.brokerRelationsLevel, f.standing)),
+        value: (row) => feesOf(row).brokerFee,
       },
       {
         header: t('market.appraisal.columnSellAfterFees'),
-        value: feeCell(sellAfterFees),
+        value: (row) => feesOf(row).afterFees,
       }
     );
   }
