@@ -106,16 +106,9 @@ export function useImprove(
   const poolRef = useRef<WorkerPool | null>(null);
   const [recalc, setRecalc] = useState<ImproveSearch['recalc']>(null);
   const [completion, setCompletion] = useState<ImproveSearch['completion']>(null);
-  const hullTypeId = variants?.fitting.shipTypeId;
-  const hullGroupId =
-    hullTypeId === undefined ? undefined : catalogue?.types[String(hullTypeId)]?.groupID;
-  const hull = useMemo(
-    () =>
-      hullTypeId !== undefined && hullGroupId !== undefined
-        ? { typeId: hullTypeId, groupId: hullGroupId }
-        : undefined,
-    [hullTypeId, hullGroupId]
-  );
+  // A new object each render; the search reruns only when the hull changes.
+  const hullKey = JSON.stringify(hullOf(variants?.fitting, catalogue) ?? null);
+  const hull = useMemo(() => (JSON.parse(hullKey) as HullRef | null) ?? undefined, [hullKey]);
 
   const closePool = useCallback(() => {
     poolRef.current?.close();
@@ -148,7 +141,6 @@ export function useImprove(
       if (!signal.aborted) searching((current) => ({ ...current, slow: true }));
     }, BEST_SO_FAR_AFTER_MS);
     const request: ImproveRequest = {
-      fitting: variants.fitting,
       catalogue,
       goal,
       hull,

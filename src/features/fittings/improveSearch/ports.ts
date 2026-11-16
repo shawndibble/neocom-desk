@@ -7,7 +7,7 @@
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
 import { loadFittingPrice } from '../fittingPrice';
-import type { WorkerPool } from '../fittingWorker';
+import { searchPoolSize, type WorkerPool } from '../fittingWorker';
 import { loadHullCommonality } from '../hullCommonalityLoad';
 import { fitCheckOf } from '../improveModulePool';
 import type { FittingCatalogue } from '../useFittingCatalogue';
@@ -19,7 +19,7 @@ export interface ImprovePortsInput {
   catalogue: FittingCatalogue;
   /** The pilot's Trade Hub; an unknown one prices at the default hub. */
   hubId: TradeHub['id'];
-  /** The search's own workers, started on first use; the caller ends them. */
+  /** The search's own workers (`searchPoolSize` of them), started on first use; the caller ends them. */
   workers: () => WorkerPool;
 }
 
@@ -31,10 +31,11 @@ export function createImprovePorts({
 }: ImprovePortsInput): ImproveSearchPorts {
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   return {
-    baseline: async (signal) => (await variants.compare(variants.fitting, signal)).before,
+    fitting: variants.fitting,
+    compare: (variant, signal) => variants.compare(variant, signal),
     stats: async (fitting, signal) =>
       (await variants.compare(fitting, signal, workers().send)).after,
-    concurrency: () => workers().size,
+    concurrency: searchPoolSize(),
     fitCheck: fitCheckOf(variants),
     chargeGroups: (slot, typeId) =>
       variants.engine.chargeGroupIdsFor(variants.fitting.shipTypeId, slot, typeId),

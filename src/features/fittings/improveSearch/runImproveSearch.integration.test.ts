@@ -20,10 +20,11 @@ const RIFTER = {
 async function run(
   fitting: Fitting,
   request: ImproveRequest,
-  shouldStop: (seen: { makeover: boolean }) => boolean = () => false
+  shouldStop: (seen: { makeover: boolean }) => boolean = () => false,
+  ports = world.ports(fitting)
 ) {
   const seen = { baseline: false, makeover: false, progress: 0 };
-  const outcome = await runImproveSearch(request, world.ports(fitting), {
+  const outcome = await runImproveSearch(request, ports, {
     signal: new AbortController().signal,
     onBaseline: () => (seen.baseline = true),
     onProgress: (progress) => {
@@ -94,41 +95,54 @@ describe('runImproveSearch (real engine)', () => {
   });
 
   it('never offers a compensating swap of a mutated module, or to Officer or Deadspace', async () => {
+    const STABILIZERS_II = world.id('Inertial Stabilizers II');
+    const SHIELD_EXTENDER_II = world.id('Small Shield Extender II');
     const plain = world.fit('Astero', {
+      // Damage Control II's family has Officer modules; the rig is searched only as compensation (no rigs tick).
       low: ['Damage Control II', 'Inertial Stabilizers II'],
       medium: ['Small Shield Extender II'],
+      rig: ['Small Core Defense Field Extender I'],
     });
-    const DAMAGE_CONTROL_II = world.id('Damage Control II');
-    const STABILIZERS_II = world.id('Inertial Stabilizers II');
     const fitting: Fitting = {
       ...plain,
-      modules: plain.modules.map((module) => {
-        // A rolled Abyssal Damage Control, and an Inertial Stabilizers II whose roll this app
-        // cannot check (still a mutated module: its own type has siblings to swap to).
-        if (module.typeId === DAMAGE_CONTROL_II)
-          return {
-            ...module,
-            typeId: 52227,
-            mutation: { baseTypeId: DAMAGE_CONTROL_II, mutaplasmidTypeId: 52224, attributes: {} },
-          };
-        if (module.typeId === STABILIZERS_II)
-          return {
-            ...module,
-            mutation: { baseTypeId: STABILIZERS_II, mutaplasmidTypeId: 52224, attributes: {} },
-          };
-        return module;
-      }),
+      // A mutated Inertial Stabilizers II (a roll this app cannot check, so it goes in bare): its siblings exist.
+      modules: plain.modules.map((module) =>
+        module.typeId === STABILIZERS_II
+          ? {
+              ...module,
+              mutation: { baseTypeId: STABILIZERS_II, mutaplasmidTypeId: 52224, attributes: {} },
+            }
+          : module
+      ),
     };
-    const result = done((await run(fitting, world.request(fitting, 'tank'))).outcome);
+    // The pilot cannot fly the extender: replacing it is a fix, which brings the compensating swaps into the search.
+    const ports = world.ports(fitting);
+    const fitCheck = ports.fitCheck;
+    ports.fitCheck = (slot, typeId) =>
+      typeId === SHIELD_EXTENDER_II ? { fitsHull: true, canFly: false } : fitCheck(slot, typeId);
+    const priced: number[][] = [];
+    const prices = ports.prices;
+    ports.prices = (typeIds) => {
+      priced.push([...typeIds]);
+      return prices(typeIds);
+    };
+    const metaOf = (typeId: number) => world.variations.types[typeId]?.metaGroupId ?? 0;
+    const allowed = (typeIds: readonly number[]) =>
+      !typeIds.some((typeId) => typeId === STABILIZERS_II || [5, 6].includes(metaOf(typeId)));
+
+    const result = done(
+      (await run(fitting, world.request(fitting, 'tank'), undefined, ports)).outcome
+    );
+    // In the search: the compensating rig sibling is priced, and nothing mutated, Officer or Deadspace is.
+    expect(priced[0]).toContain(world.id('Small Core Defense Field Extender II'));
+    expect(allowed(priced[0]!)).toBe(true);
+    const rows = [...result.result.noDownside, ...result.result.tradeOffs];
+    expect(rows.some((row) => row.candidate.fromTypeId === STABILIZERS_II)).toBe(false);
+
+    // And in the pool a ticked set draws on later.
     const { swaps, priceOf } = await result.completion();
     expect(swaps.length).toBeGreaterThan(0);
     expect(priceOf(swaps[0]!.toTypeId)).toBe(PRICE);
-    const mutated = new Set([52227, STABILIZERS_II]);
-    expect(swaps.some((swap) => mutated.has(swap.fromTypeId))).toBe(false);
-    const metaOf = (typeId: number) => world.variations.types[typeId]?.metaGroupId;
-    expect(swaps.some((swap) => [5, 6].includes(metaOf(swap.toTypeId) ?? 0))).toBe(false);
-    // The search proper leaves the rolled module alone too.
-    const rows = [...result.result.noDownside, ...result.result.tradeOffs];
-    expect(rows.some((row) => mutated.has(row.candidate.fromTypeId ?? 0))).toBe(false);
+    expect(allowed(swaps.flatMap((swap) => [swap.fromTypeId, swap.toTypeId]))).toBe(true);
   });
 });

@@ -11,7 +11,6 @@ import {
   makeoverMoves,
   MAKEOVER_CALCS,
   propulsionStart,
-  type Makeover,
   type MakeoverMoveOptions,
   type PropulsionStart,
 } from '@/engine/fittings/improveMakeover';
@@ -20,12 +19,7 @@ import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { makeoverOptionsOf } from '../improveMakeoverTicks';
 import type { SearchContext } from './context';
-
-/** The Makeover that beat the best single swap, with its rows as options ready to tick. */
-export interface MakeoverResult {
-  makeover: Makeover;
-  options: ImproveOption[];
-}
+import type { MakeoverResult } from './types';
 
 type MoveOptions = Omit<MakeoverMoveOptions, 'pool'>;
 
@@ -82,7 +76,7 @@ export async function runMakeoverPhase(
   const { listed, target, onProgress, priceOf } = params;
   onProgress(0, MAKEOVER_CALCS);
   const search = await findMakeover({
-    fitting: ctx.request.fitting,
+    fitting: ctx.fitting,
     before: params.before,
     goal: params.goal,
     moves: params.moves,

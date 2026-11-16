@@ -25,8 +25,8 @@ export interface Scoring {
 
 /** Mine more's plan for the open Fitting: the crystal key that mines the most, for every miner type. */
 function minePlan(ctx: SearchContext, own: FittingStats): Promise<CrystalPlan | null> {
-  const { request, ports, signal } = ctx;
-  const { catalogue, fitting } = request;
+  const { request, ports, signal, fitting } = ctx;
+  const { catalogue } = request;
   return crystalPlan(
     {
       family: request.config.oreFamily,
@@ -39,7 +39,7 @@ function minePlan(ctx: SearchContext, own: FittingStats): Promise<CrystalPlan | 
       nameOf: (typeId) => catalogue.types[String(typeId)]?.name,
     },
     async (crystalFor) =>
-      (await ports.stats(loadCrystals(fitting, crystalFor), signal)).mining.perSecond
+      (await ports.compare(loadCrystals(fitting, crystalFor), signal)).after.mining.perSecond
   );
 }
 
@@ -49,8 +49,8 @@ export async function scoringFor(
   searched: ImproveGoal,
   own: FittingStats
 ): Promise<Scoring | null> {
-  const { request, ports, signal } = ctx;
-  const { fitting, chargePlan } = request;
+  const { request, ports, signal, fitting } = ctx;
+  const { chargePlan } = request;
   let scoredBefore = own;
   // Empty guns and launchers are scored loaded with the best charge, so an unarmed-looking fit isn't stripped of support.
   let load = (variant: Fitting) => assumeCharges(variant, fitting, chargePlan);
@@ -61,11 +61,11 @@ export async function scoringFor(
     const crystalFor = plan?.crystalFor;
     if (crystalFor) {
       load = (variant) => loadCrystals(assumeCharges(variant, fitting, chargePlan), crystalFor);
-      scoredBefore = await ports.stats(load(fitting), signal);
+      scoredBefore = (await ports.compare(load(fitting), signal)).after;
     }
   }
   if (searched !== 'mining' && chargePlan.length > 0)
-    scoredBefore = await ports.stats(load(fitting), signal);
+    scoredBefore = (await ports.compare(load(fitting), signal)).after;
   const stats = async (variant: Fitting) => {
     const after = await ports.stats(load(variant), signal);
     // A miner with no crystal of the ore would mine another ore's m³/s: left out, not compared.

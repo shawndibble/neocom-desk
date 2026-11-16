@@ -3,9 +3,11 @@ import type {
   DefenseChoice,
   ImproveGoal,
   ImproveHold,
+  ImproveOption,
   ImproveReach,
+  ImproveResult,
 } from '@/engine/fittings/improve';
-import type { ImproveResult } from '@/engine/fittings/improve';
+import type { Makeover } from '@/engine/fittings/improveMakeover';
 import type { ChargeLoadStep } from '@/engine/fittings/improveCharges';
 import type { ExploreSpace, ImproveJob } from '@/engine/fittings/improveJob';
 import type { HullRef } from '@/engine/fittings/improveRole';
@@ -15,7 +17,6 @@ import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { Fitting, FittingSlotKind, FittingStats } from '@/engine/fittings/types';
 import type { CommunityHints } from '../improveCommonHints';
 import type { FittingCatalogue } from '../useFittingCatalogue';
-import type { MakeoverResult } from './makeoverPhase';
 
 /** What the drawer asks of one search beyond the goal. */
 export interface ImproveConfig {
@@ -37,10 +38,14 @@ export interface ImproveConfig {
   hold: ImproveHold;
 }
 
-/** One Improve search of the open Fitting. */
+/** The Makeover that beat the best single swap, with its rows as options ready to tick. */
+export interface MakeoverResult {
+  makeover: Makeover;
+  options: ImproveOption[];
+}
+
+/** One Improve search of the open Fitting (the one `ImproveSearchPorts.fitting` names). */
 export interface ImproveRequest {
-  /** The open Fitting. */
-  fitting: Fitting;
   catalogue: FittingCatalogue;
   /** The remembered goal; a fit that cannot score it searches the hull role's default. */
   goal: ImproveGoal;
@@ -57,12 +62,20 @@ export type PriceOf = (typeId: number) => number | null;
 
 /** What the search reads from outside: the stats engine, the hull and skill checks, prices and the community's fits. */
 export interface ImproveSearchPorts {
-  /** The open Fitting's own stats, under the conditions the page shows. */
-  baseline: (signal: AbortSignal) => Promise<FittingStats>;
-  /** A whole-fit recalculation of a variant under the same conditions. */
+  /** The open Fitting the search improves; every calculation is a change to it. */
+  fitting: Fitting;
+  /**
+   * A variant beside the open Fitting's own stats (the page's cached baseline),
+   * under the conditions the page shows: for the baseline and the scored load.
+   */
+  compare: (
+    variant: Fitting,
+    signal: AbortSignal
+  ) => Promise<{ before: FittingStats; after: FittingStats }>;
+  /** The same recalculation of a candidate, on the search's own workers (started on first use). */
   stats: (fitting: Fitting, signal: AbortSignal) => Promise<FittingStats>;
   /** How many `stats` calculations may run at once. */
-  concurrency: () => number;
+  concurrency: number;
   /** Whether the hull takes the module in that rack and the pilot can fly it; undefined: not known (assumed yes). */
   fitCheck: (
     slot: FittingSlotKind,

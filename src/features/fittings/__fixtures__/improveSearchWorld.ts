@@ -66,24 +66,30 @@ export async function loadImproveSearchWorld() {
   const stats = (fitting: Fitting): Promise<FittingStats> =>
     computeFittingStats(fitting, pilot, undefined, undefined, { overheated: false });
 
-  const ports = (fitting: Fitting): ImproveSearchPorts => ({
-    baseline: () => stats(fitting),
-    stats: (variant) => stats(variant),
-    concurrency: () => 1,
-    fitCheck: (slot, typeId) =>
-      engine.checkCandidates(fitting.shipTypeId, slot, [typeId], pilot).get(typeId),
-    chargeGroups: (slot, typeId) => engine.chargeGroupIdsFor(fitting.shipTypeId, slot, typeId),
-    prices: async () => () => PRICE,
-    fitTotal: async () => FIT_TOTAL,
-    commonality: async () => null,
-  });
+  const ports = (fitting: Fitting): ImproveSearchPorts => {
+    let own: Promise<FittingStats> | undefined;
+    return {
+      fitting,
+      compare: async (variant) => ({
+        before: await (own ??= stats(fitting)),
+        after: await stats(variant),
+      }),
+      stats: (variant) => stats(variant),
+      concurrency: 1,
+      fitCheck: (slot, typeId) =>
+        engine.checkCandidates(fitting.shipTypeId, slot, [typeId], pilot).get(typeId),
+      chargeGroups: (slot, typeId) => engine.chargeGroupIdsFor(fitting.shipTypeId, slot, typeId),
+      prices: async () => () => PRICE,
+      fitTotal: async () => FIT_TOTAL,
+      commonality: async () => null,
+    };
+  };
 
   const request = (
     fitting: Fitting,
     goal: ImproveRequest['goal'],
     config: Partial<ImproveRequest['config']> = {}
   ): ImproveRequest => ({
-    fitting,
     catalogue,
     goal,
     hull: { typeId: fitting.shipTypeId, groupId: types[String(fitting.shipTypeId)]!.groupID },

@@ -56,8 +56,8 @@ function candidateTypeIds(candidates: readonly ImproveCandidate[]): number[] {
 
 /** Every fitted module's compensating swaps, for this search's catalogue and pilot. */
 export function allCompensation(ctx: SearchContext): FitSwap[] {
-  const { request, index, pool } = ctx;
-  return compensationSwaps(request.fitting.modules, index, request.catalogue.rackOf, pool);
+  const { request, index, pool, fitting } = ctx;
+  return compensationSwaps(fitting.modules, index, request.catalogue.rackOf, pool);
 }
 
 export function planSearch(
@@ -66,8 +66,8 @@ export function planSearch(
   own: FittingStats,
   commonality: JobCommonality | null
 ): SearchPlan {
-  const { request, index, pool, jobSetting } = ctx;
-  const { fitting, catalogue, config } = request;
+  const { request, index, pool, jobSetting, fitting } = ctx;
+  const { catalogue, config } = request;
   const { reach, defense, includeRigs, includeOfficer, allowMutated } = config;
   // A tank goal under Shield or Armor runs both sides, the chosen one first, to compare them.
   const sides: DefenseChoice[] =

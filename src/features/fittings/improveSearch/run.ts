@@ -17,7 +17,7 @@ import { targetShareOf } from '@/engine/fittings/hullCommonality';
 import { communityHintsOf } from '../improveCommonHints';
 import { combineSides } from './combine';
 import { searchContext } from './context';
-import { runMakeoverPhase, type MakeoverResult } from './makeoverPhase';
+import { runMakeoverPhase } from './makeoverPhase';
 import { allCompensation, planSearch } from './plan';
 import { scoringFor } from './scoring';
 import type {
@@ -26,6 +26,7 @@ import type {
   ImproveRequest,
   ImproveSearchEvents,
   ImproveSearchPorts,
+  MakeoverResult,
   PriceOf,
 } from './types';
 
@@ -47,9 +48,10 @@ export async function runImproveSearch(
     if (!signal.aborted) events.onProgress?.(p);
   };
   const ctx = searchContext(request, ports, signal);
-  const { fitting, catalogue, config, target } = request;
+  const { catalogue, config, target } = request;
+  const { fitting } = ctx;
 
-  const own = await ports.baseline(signal);
+  const { before: own } = await ports.compare(fitting, signal);
   if (signal.aborted) return null;
   events.onBaseline?.(own);
   // A fit that doesn't fit has nothing to improve yet (`20261019-144736`).
@@ -103,7 +105,7 @@ export async function runImproveSearch(
       ...shared,
       fitting,
       candidates: set.candidates,
-      concurrency: ports.concurrency(),
+      concurrency: ports.concurrency,
       ...(target ? { target } : {}),
       compensators: (fix) =>
         plan.compensation.filter(
@@ -129,7 +131,7 @@ export async function runImproveSearch(
       target,
       propulsion: plan.propulsion,
       listed,
-      concurrency: ports.concurrency(),
+      concurrency: ports.concurrency,
       onProgress: (n, total) => progress({ checked: n, total, makeover: true }),
     });
     if (signal.aborted || search === null) return null;
