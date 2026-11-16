@@ -39,18 +39,34 @@ function offerRow(id: number, iskPerLp: number | null, over: Partial<LoyaltyOffe
 
 afterEach(() => loadLiveBooks.mockReset());
 
+/** Each row's instant ISK/LP as the table shows it. */
+const instantOf = (rows: readonly LoyaltyOfferRow[]) =>
+  new Map(rows.map((row) => [row.offer.offer_id, row.profit.iskPerLp]));
+
 describe('spendCandidates', () => {
-  it('takes the best offers by ISK/LP, leaving unranked ones out', () => {
+  it('takes the best offers by instant ISK/LP, leaving unranked ones out', () => {
     const rows = [
       offerRow(1, 500),
       offerRow(2, null),
       ...Array.from({ length: 12 }, (_, i) => offerRow(10 + i, 1000 + i)),
     ];
-    const picked = spendCandidates(rows, null);
+    const picked = spendCandidates(rows, null, instantOf(rows));
     expect(picked).toHaveLength(SPEND_PLAN_CANDIDATES);
     expect(picked[0]!.candidate).toMatchObject({ offerId: 21, outputTypeId: 621, outputUnits: 1 });
     expect(picked.map((p) => p.candidate.offerId)).not.toContain(2);
     expect(picked.map((p) => p.candidate.offerId)).not.toContain(1);
+  });
+
+  it('ranks on the instant basis, not the table’s listing basis', () => {
+    // Offer 1 lists best but sells now worst; offer 2 is the reverse.
+    const rows = [offerRow(1, 3_000), offerRow(2, 2_000), offerRow(3, 2_500)];
+    const instant = new Map<number, number | null>([
+      [1, 500],
+      [2, 1_900],
+      [3, null],
+    ]);
+    const picked = spendCandidates(rows, null, instant);
+    expect(picked.map((p) => p.candidate.offerId)).toEqual([2, 1]);
   });
 });
 
@@ -58,6 +74,7 @@ describe('useSpendPlan', () => {
   const args = {
     corporationId: 1000125,
     rows: [offerRow(1, 900)],
+    instantIskPerLp: new Map([[1, 900]]),
     catalog: null,
     hub: DEFAULT_TRADE_HUB,
     skills: {},
@@ -104,7 +121,25 @@ describe('useSpendPlan', () => {
     expect(view.walletBalance).toBe(5_000_000);
     expect(view.result.rows).toEqual([expect.objectContaining({ offerId: 1, redemptions: 3 })]);
 
+    expect(view.candidates).toBe(1);
+
     act(() => result.current.close());
+    expect(result.current.open).toBe(false);
+  });
+
+  it('closes an open plan when the active character or hub changes', () => {
+    loadLiveBooks.mockReturnValue(new Promise(() => {}));
+    const { result, rerender } = renderHook((props) => useSpendPlan(props), {
+      initialProps: args,
+    });
+    act(() => result.current.run());
+    expect(result.current.open).toBe(true);
+    rerender({ ...args, activeCharacterId: 90000002 });
+    expect(result.current.open).toBe(false);
+
+    act(() => result.current.run());
+    expect(result.current.open).toBe(true);
+    rerender({ ...args, activeCharacterId: 90000002, hub: { ...args.hub, id: 'amarr' as const } });
     expect(result.current.open).toBe(false);
   });
 });
