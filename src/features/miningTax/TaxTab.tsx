@@ -40,7 +40,7 @@ import { usePayeeFilter } from './usePayeeFilter';
 import { useEntryDeepLink } from './useEntryDeepLink';
 import { useTaxAttentionItems } from './useTaxAttentionItems';
 import { useTaxBalances } from './useTaxBalances';
-import { corpPayAccounts } from './corpBook/corpPayAccount';
+import { corpPayAccounts, readsEveryDivision } from './corpBook/corpPayAccount';
 import { sum } from '@/engine/math';
 import { useTaxCorpBooks } from './useTaxCorpBooks';
 import { useTaxLedgerActions } from './useTaxLedgerActions';
@@ -195,6 +195,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                 .map((d) => d.amount)
             ),
             accounts: corpPayAccounts(b.loaded.divisions, b.loaded.divisionNames, t).join(', '),
+            everyDivision: readsEveryDivision(b.loaded.divisions),
           },
         ]) ?? []
       ),

@@ -1,4 +1,5 @@
 import type { DivisionNames } from '@/engine/corpTaxBook/divisionNames';
+import { otherDivisions } from '@/engine/corpTaxBook/uncounted';
 import type { Translate } from '@/lib/translate';
 
 /**
@@ -25,4 +26,9 @@ export function corpPayAccounts(
   t: Translate
 ): string[] {
   return divisions.map((d) => corpPayAccount(d, names, t));
+}
+
+/** Whether the book reads all of the corp's wallet divisions, so no donation can miss it. */
+export function readsEveryDivision(divisions: readonly number[]): boolean {
+  return otherDivisions(divisions).length === 0;
 }

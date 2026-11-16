@@ -53,7 +53,12 @@ describe('corpBookAttention', () => {
       periodEnd: '2026-10-31',
       overdueAt: '2026-11-14T00:00:00.000Z',
     };
-    const donation = { characterId: 1, amount: 5_000_000, at: '2026-11-01T10:00:00Z' };
+    const donation = {
+      characterId: 1,
+      amount: 5_000_000,
+      at: '2026-11-01T10:00:00Z',
+      covered: ['2026-10-30'],
+    };
     const out = corpBookAttention(
       view([], summary({ overdue: [overdue], uncredited: [donation] }))
     );
@@ -118,8 +123,8 @@ describe('corpBookAttention', () => {
       summary({
         overdue: [overdue('s1'), overdue('s2'), overdue('s3')],
         uncredited: [
-          { characterId: 1, amount: 1, at: '2026-11-01T10:00:00Z' },
-          { characterId: 2, amount: 2, at: '2026-11-01T10:00:00Z' },
+          { characterId: 1, amount: 1, at: '2026-11-01T10:00:00Z', covered: [] },
+          { characterId: 2, amount: 2, at: '2026-11-01T10:00:00Z', covered: [] },
         ],
       })
     );

@@ -8,7 +8,8 @@ import type { MultiSelectFilter } from '@/lib/multiSelectFilter';
 import { claimKeyOf } from '@/features/miningTax/corpBook/useAutoClaimDonations';
 import type { CorpBookView } from '@/features/miningTax/corpBook/corpBookView';
 import { corpBookAttention } from '@/features/miningTax/corpBook/corpAttention';
-import { corpPayAccounts } from '@/features/miningTax/corpBook/corpPayAccount';
+import { corpPayAccounts, readsEveryDivision } from '@/features/miningTax/corpBook/corpPayAccount';
+import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
 import {
   CorpDeclarationStatus,
   CorpDeclareAction,
@@ -270,17 +271,42 @@ export function useTaxAttentionItems({
   }
   for (const u of corp.uncredited) {
     const loaded = corpView?.books.find((b) => b.loaded.corporationId === u.corporationId)?.loaded;
-    const accounts = corpPayAccounts(loaded?.divisions ?? [], loaded?.divisionNames, t).join(', ');
+    const divisions = loaded?.divisions ?? [];
+    const accounts = corpPayAccounts(divisions, loaded?.divisionNames, t).join(', ');
+    // With every division read, the ISK can't be in an unread one: a sync is due, or it never came.
+    const every = readsEveryDivision(divisions);
     attentionItems.push({
       id: `corp-uncredited:${u.corporationId}:${u.characterId}:${u.at}`,
       tone: 'warning',
-      title: t('miningTax.corpBook.attention.uncreditedTitle', {
-        corp: u.corpName,
-        amount: formatIsk(u.amount, 0),
-        date: u.at.slice(0, 10),
-      }),
+      title: t(
+        every
+          ? 'miningTax.corpBook.attention.uncreditedEveryTitle'
+          : 'miningTax.corpBook.attention.uncreditedTitle',
+        { corp: u.corpName, amount: formatIsk(u.amount, 0), date: u.at.slice(0, 10) }
+      ),
       detail: (
-        <p>{t('miningTax.corpBook.attention.uncreditedDetail', { corp: u.corpName, accounts })}</p>
+        <>
+          <p>
+            {every
+              ? t('miningTax.corpBook.attention.uncreditedEveryDetail', { corp: u.corpName })
+              : t('miningTax.corpBook.attention.uncreditedDetail', { corp: u.corpName, accounts })}
+          </p>
+          {/* What the member needs to dispute it: the days it paid, and the transfer itself. */}
+          {u.covered.length > 0 && (
+            <p>
+              {t('miningTax.corpBook.attention.uncreditedCovered', {
+                days: u.covered.join(', '),
+              })}
+            </p>
+          )}
+          <p>
+            {t('miningTax.corpBook.attention.uncreditedDispute', {
+              corp: u.corpName,
+              amount: formatIsk(u.amount, 0),
+              time: eveTimeLabel(Date.parse(u.at)),
+            })}
+          </p>
+        </>
       ),
     });
   }

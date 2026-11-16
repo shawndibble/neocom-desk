@@ -20,6 +20,7 @@ import { CorpStatusPill } from './CorpStatusPill';
 import { CorpDeclareSlot } from './CorpDeclareAction';
 import type { CorpRowInfo } from './corpRows';
 import { formatCount } from '@/lib/formatCount';
+import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
 
 interface Props {
   open: boolean;
@@ -259,6 +260,16 @@ export function CorpRowDetailModal({
                         owed: formatIsk(view.bookOwed, 0),
                       })
                     : t('miningTax.corpBook.detail.yourMarkNote')}
+                </p>
+              )}
+              {/* Why a day the member saw Paid is Billed again, and the transfer to dispute. */}
+              {view.unlinkedDonation && (
+                <p className="text-warning">
+                  {t('miningTax.corpBook.detail.unlinkedDonation', {
+                    corp: corp.corpName,
+                    amount: formatIsk(view.unlinkedDonation.amount, 0),
+                    time: eveTimeLabel(Date.parse(view.unlinkedDonation.at)),
+                  })}
                 </p>
               )}
               {declaring && <CorpDeclareSlot view={view} onDeclared={onBookChanged} />}

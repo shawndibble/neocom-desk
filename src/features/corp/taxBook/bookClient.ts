@@ -104,6 +104,8 @@ export interface SyncUpload {
   gaps?: SyncGap[];
   /** #6207: donations noted in divisions the book does not read; replaces the stored list. */
   uncounted?: UncountedDonation[];
+  /** Whether this sync read the book's divisions for donations; the first call only. */
+  donationsRead?: boolean;
 }
 
 export interface SyncReceipt {

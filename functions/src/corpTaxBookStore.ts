@@ -81,6 +81,7 @@ import {
   type StoredStatement,
   type SyncInput,
   type TurnOnInput,
+  donationsReadAtPatch,
 } from './corpTaxBook.js';
 import {
   extractionIdOf,
@@ -789,7 +790,10 @@ export async function syncBookAs(
     );
   const now = deps.now();
   await deps.db.runTransaction(async (tx) => {
+    // Read in the transaction, so a concurrent sync that read the wallet is never nulled.
+    const readAt = input.donationsRead === false ? (await tx.get(book)).get('donationsReadAt') : 0;
     tx.update(book, {
+      ...donationsReadAtPatch(input.donationsRead, readAt, now),
       lastSync: {
         at: now,
         byCharacterId: access.characterId,

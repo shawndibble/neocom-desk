@@ -99,6 +99,11 @@ export interface PersonalBook {
   graceHours?: number;
   /** The book's last sync by any officer; absent when never synced. */
   lastSyncedAt?: string;
+  /**
+   * The last sync that read the corp wallet's donations; null when no sync has. Absent on a book
+   * whose syncs predate the record: then `lastSyncedAt` stands in for it.
+   */
+  donationsCheckedAt?: string | null;
   rates: TaxRate[];
   miners: Miner[];
   observed: ObservedMiningEntry[];
@@ -149,6 +154,15 @@ export interface InFlightDonation {
   characterId: number;
   amount: number;
   at: string;
+}
+
+/** A donation the book no longer counts, with the days it paid while it did: what to dispute. */
+export interface UncreditedDonation extends InFlightDonation {
+  /**
+   * The days (dates, oldest first) that went back to Billed when it stopped counting: the ones
+   * the member's pooled money paid with it and cannot pay without it.
+   */
+  covered: string[];
 }
 
 /**
@@ -288,6 +302,11 @@ export interface BookRowView {
   refineryLabel?: string;
   /** The Miner grouping the line bills. */
   minerId?: string;
+  /**
+   * The member's donation that paid this day until the book synced past it without crediting it
+   * (`UncreditedDonation`): why a day the member saw Paid is Billed again, and what to dispute.
+   */
+  unlinkedDonation?: { amount: number; at: string };
   /** This line's share of the ore the miner's own entry also gives a Payee. */
   overlap?: BookOverlap;
   correction?: BookCorrection;
@@ -309,7 +328,7 @@ export interface BookSummary {
   /** The member's unsettled Statements past their Overdue days, oldest first. */
   overdue: OverdueStatementView[];
   /** Donations the book synced past without crediting (`UNCREDITED_AFTER_DAYS`): not counted as paid. */
-  uncredited: InFlightDonation[];
+  uncredited: UncreditedDonation[];
   hubId: string;
   oreForm: 'compressed' | 'raw';
 }
@@ -1157,6 +1176,7 @@ export function overlayCorpBooks(input: {
   // 4. Payments: a Statement's days are Paid oldest first; part payments land on the oldest days.
   // A raise billed on another Statement than its day's (or not billed yet) is owed on its own.
   // An officer write-off then forgives the next open days of its Statement (#4637).
+  const uncreditedByBook = new Map<number, UncreditedDonation[]>();
   for (const p of prepared) {
     const mine = rowsByBook.get(p.book.corporationId) ?? [];
     const partsOf = new Map<BookRowView, OwedPart[]>();
@@ -1274,28 +1294,73 @@ export function overlayCorpBooks(input: {
     // day Paid once the book credits the donation that paid it.
     // Each Miner's money pays only that Miner's days, as the book credits it. A donation the
     // book synced past without crediting no longer counts (`UNCREDITED_AFTER_DAYS`).
-    const counting = p.book.inFlight.filter((d) => !isUncredited(d, p.book.lastSyncedAt));
+    const checkedAt = donationsCheckedAt(p.book);
+    const counting = p.book.inFlight.filter((d) => !isUncredited(d, checkedAt));
+    // Oldest first: the oldest takes the oldest days it unlinked.
+    const lost = p.book.inFlight
+      .filter((d) => isUncredited(d, checkedAt))
+      .sort((a, b) => a.at.localeCompare(b.at));
     const ahead = new Map(p.credit);
     for (const d of counting) {
       const minerId = minerIdFor(d.characterId, p.book.miners);
       ahead.set(minerId, (ahead.get(minerId) ?? 0) + d.amount);
     }
+    const lostBy = new Map<string, number>();
+    for (const d of lost) {
+      const minerId = minerIdFor(d.characterId, p.book.miners);
+      lostBy.set(minerId, (lostBy.get(minerId) ?? 0) + d.amount);
+    }
     const open = mine.filter((r) => r.state === 'billed' && (r.taxOwed ?? 0) > 0);
-    for (const [minerId, amount] of ahead) {
-      const paidAhead = Math.max(0, amount - (creditedByMark.get(minerId) ?? 0));
+    /** Per Miner: the days the uncredited money paid while it counted, oldest first. */
+    const unlinked = new Map<string, BookRowView[]>();
+    for (const minerId of new Set([...ahead.keys(), ...lostBy.keys()])) {
+      const amount = ahead.get(minerId) ?? 0;
+      const mark = creditedByMark.get(minerId) ?? 0;
       const own = open.filter((r) => minerOf(r) === minerId);
-      for (const id of coverInFlight(
-        own.map((r) => ({ id: r.id, date: r.date, taxOwed: r.taxOwed ?? 0 })),
-        paidAhead
-      )) {
-        const row = own.find((r) => r.id === id);
-        if (row) {
+      const days = own.map((r) => ({ id: r.id, date: r.date, taxOwed: r.taxOwed ?? 0 }));
+      const paid = coverInFlight(days, Math.max(0, amount - mark));
+      // The same pooled allocation with the uncredited money still in it: the days it adds are
+      // exactly the ones that went back to Billed when it stopped counting.
+      const withLost = lostBy.has(minerId)
+        ? coverInFlight(days, Math.max(0, amount + (lostBy.get(minerId) ?? 0) - mark))
+        : paid;
+      for (const row of own) {
+        if (paid.has(row.id)) {
           row.state = 'paid';
           row.settledBy = 'donation';
           row.taxOwed = 0;
         }
       }
+      unlinked.set(
+        minerId,
+        own
+          .filter((r) => withLost.has(r.id) && !paid.has(r.id))
+          .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))
+      );
     }
+    // An uncredited donation pays nothing now; the member disputes it by the days it paid.
+    const uncredited: UncreditedDonation[] = lost.map((d, i) => {
+      const minerId = minerIdFor(d.characterId, p.book.miners);
+      const left = unlinked.get(minerId) ?? [];
+      const lastOfMiner = !lost
+        .slice(i + 1)
+        .some((x) => minerIdFor(x.characterId, p.book.miners) === minerId);
+      // The Miner's last such donation takes what is left: its money was pooled with the rest.
+      const ids = lastOfMiner
+        ? new Set(left.map((r) => r.id))
+        : coverInFlight(
+            left.map((r) => ({ id: r.id, date: r.date, taxOwed: r.taxOwed ?? 0 })),
+            d.amount
+          );
+      const rows = left.filter((r) => ids.has(r.id));
+      unlinked.set(
+        minerId,
+        left.filter((r) => !ids.has(r.id))
+      );
+      for (const row of rows) row.unlinkedDonation = { amount: d.amount, at: d.at };
+      return { ...d, covered: rows.map((r) => r.date) };
+    });
+    uncreditedByBook.set(p.book.corporationId, uncredited);
     // Whatever settled the day, the member's own paid mark under the corporation's Payee stays
     // theirs to undo: the book row hides it, so the row has to carry it.
     const markedIds = memberPaidIds.get(p.book.corporationId);
@@ -1365,7 +1430,7 @@ export function overlayCorpBooks(input: {
       ...(closedThrough !== undefined ? { closedThrough } : {}),
       credit: [...p.credit.values()].reduce((sum, c) => sum + c, 0),
       ...openAndOverdue(p),
-      uncredited: p.book.inFlight.filter((d) => isUncredited(d, p.book.lastSyncedAt)),
+      uncredited: uncreditedByBook.get(p.book.corporationId) ?? [],
       hubId: p.book.hubId,
       oreForm: p.book.oreForm,
     };
@@ -1411,10 +1476,16 @@ function flagFor(
     : { state: 'sent', at: d.at };
 }
 
-/** The book synced `UNCREDITED_AFTER_DAYS` after the donation and still does not hold it. */
-const isUncredited = (d: InFlightDonation, lastSyncedAt: string | undefined) =>
-  lastSyncedAt !== undefined &&
-  Date.parse(lastSyncedAt) - Date.parse(d.at) >= UNCREDITED_AFTER_DAYS * DAY_MS;
+/** When the book last read its wallet's donations: the last sync, for a book with no record of it. */
+const donationsCheckedAt = (book: Pick<PersonalBook, 'lastSyncedAt' | 'donationsCheckedAt'>) =>
+  book.donationsCheckedAt === undefined
+    ? book.lastSyncedAt
+    : (book.donationsCheckedAt ?? undefined);
+
+/** A sync that read the wallet came `UNCREDITED_AFTER_DAYS` after the donation, without it. */
+const isUncredited = (d: InFlightDonation, checkedAt: string | undefined) =>
+  checkedAt !== undefined &&
+  Date.parse(checkedAt) - Date.parse(d.at) >= UNCREDITED_AFTER_DAYS * DAY_MS;
 
 /** The member's unsettled Statements, and those past their Overdue days, oldest first. */
 function openAndOverdue(p: Prepared): {
