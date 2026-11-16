@@ -45,19 +45,21 @@ export function parseNotPayingKey(key: string): NotPayingKey | undefined {
 }
 
 /** The hidden set, and the two ways to change it; one snapshot for every reader on the page. */
+/** Changes the hidden set from its current value; a failed write leaves the page as it was. */
+function changeNotPaying(update: (held: Set<string>) => void) {
+  const held = new Set(useNotPayingSetting.getState().value);
+  update(held);
+  return useNotPayingSetting
+    .getState()
+    .setValue([...held])
+    .catch(() => undefined);
+}
+
 export function useNotPaying() {
   useHydratedStore(useNotPayingSetting);
   const list = useNotPayingSetting((s) => s.value);
   const hidden = useMemo<ReadonlySet<string>>(() => new Set(list), [list]);
-  const change = (update: (held: Set<string>) => void) => {
-    const held = new Set(useNotPayingSetting.getState().value);
-    update(held);
-    return useNotPayingSetting
-      .getState()
-      .setValue([...held])
-      .catch(() => undefined);
-  };
-  const hide = useCallback((key: string) => change((held) => void held.add(key)), []);
-  const show = useCallback((key: string) => change((held) => void held.delete(key)), []);
+  const hide = useCallback((key: string) => changeNotPaying((held) => void held.add(key)), []);
+  const show = useCallback((key: string) => changeNotPaying((held) => void held.delete(key)), []);
   return useMemo(() => ({ hidden, hide, show }), [hidden, hide, show]);
 }

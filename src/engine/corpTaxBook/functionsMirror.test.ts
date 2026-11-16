@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as mirror from '../../../functions/src/corpTaxBookEngine';
-import * as calls from '../../../functions/src/corpTaxBook';
+import * as calls from '../../../functions/src/corpTaxBookKinds';
 import { allocatePayments, dismissalCredits, isBeforeBook } from './allocation';
 import {
   DISPUTE_HOLD_DAYS,

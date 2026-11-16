@@ -4,7 +4,9 @@
 // this is a small mirror kept honest by a parity test in the root suite
 // (src/engine/corpTaxBook/functionsMirror.test.ts), which runs both copies on
 // the same inputs. Change the engine first, then this file. Dependency-free on
-// purpose so that test can import it from the root package.
+// purpose so that test can import it from the root package (`guards.ts` imports nothing).
+
+import { isPlainRecord } from './guards.js';
 
 export interface ObservedRow {
   structureId: number;
@@ -1307,9 +1309,6 @@ export function disputeHolds(
   return Date.parse(now) < Date.parse(dispute.holdFrom ?? dispute.at) + DISPUTE_HOLD_DAYS * DAY_MS;
 }
 
-const isObject = (v: unknown): v is Record<string, unknown> =>
-  typeof v === 'object' && v !== null && !Array.isArray(v);
-
 /**
  * Mirror of the client's `readDisputes` as far as holding goes: the same docs dropped (a missing
  * or malformed id, Miner, day, author, instant or line), the same malformed `resolution` read as
@@ -1321,11 +1320,11 @@ export function readHoldingDisputes(raw: readonly unknown[]): (HoldingDispute & 
 })[] {
   const out: (HoldingDispute & { minerId: string })[] = [];
   for (const d of raw) {
-    if (!isObject(d)) continue;
+    if (!isPlainRecord(d)) continue;
     const { id, minerId, date, by, at, kind, claimedPct, holdFrom, resolution } = d;
     const lines = Array.isArray(d.lines)
       ? d.lines.map((l) =>
-          isObject(l) &&
+          isPlainRecord(l) &&
           typeof l.recordKey === 'string' &&
           typeof l.typeId === 'number' &&
           typeof l.quantity === 'number' &&
@@ -1345,7 +1344,7 @@ export function readHoldingDisputes(raw: readonly unknown[]): (HoldingDispute & 
     )
       continue;
     const answered =
-      isObject(resolution) &&
+      isPlainRecord(resolution) &&
       typeof resolution.at === 'string' &&
       typeof resolution.by === 'number' &&
       typeof resolution.reason === 'string' &&

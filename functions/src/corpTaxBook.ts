@@ -40,6 +40,14 @@ import {
   type PopSharingOverridePatch,
   type PopSharingSettings,
 } from './popSharing.js';
+import {
+  CLAIM_CHECK_RESULTS,
+  DISPUTE_KINDS,
+  TAX_CONTACT_MAX_CHARACTERS,
+  TRANSFER_RECIPIENTS,
+} from './corpTaxBookKinds.js';
+
+export { CLAIM_CHECK_RESULTS, DISPUTE_KINDS, TAX_CONTACT_MAX_CHARACTERS, TRANSFER_RECIPIENTS };
 
 /** The Tax Book lives under the `corps/{id}` umbrella (issue #4858, ADR 0026). */
 export const BOOKS_COLLECTION = 'corps';
@@ -359,9 +367,6 @@ export interface SettingsPatch {
 /** The mirror of the client's `TaxContact` (`src/engine/corpTaxBook/bookDocs.ts`). */
 export type TaxContact =
   { kind: 'mailingList'; id: number; name: string } | { kind: 'characters'; ids: number[] };
-
-/** Mirror of the client's `TAX_CONTACT_MAX_CHARACTERS` (`functionsMirror.test.ts` keeps them equal). */
-export const TAX_CONTACT_MAX_CHARACTERS = 5;
 
 function parseTaxContact(value: unknown): TaxContact {
   const c = record(value);
@@ -1344,8 +1349,6 @@ export function parseDeclineByTokenInput(data: unknown): { token: string; charac
   return { token: parseToken(data), characterId };
 }
 
-/** Who received a transfer, as the member's own wallet journal names it. */
-export const TRANSFER_RECIPIENTS = ['corporation', 'character', 'otherCorporation'] as const;
 export type TransferRecipient = (typeof TRANSFER_RECIPIENTS)[number];
 
 /** One transfer from the member's wallet journal, sent as the proof of an "I already paid". */
@@ -1401,17 +1404,6 @@ export function parseDeclareOwnInput(data: unknown): DeclareOwnInput {
   };
 }
 
-/** What checking one claimed transfer against the book found. */
-export const CLAIM_CHECK_RESULTS = [
-  'found',
-  'division',
-  'notSynced',
-  'tooOld',
-  'notFound',
-  'ambiguous',
-  'person',
-  'otherCorp',
-] as const;
 export type ClaimCheckResult = (typeof CLAIM_CHECK_RESULTS)[number];
 export interface ClaimCheck {
   result: ClaimCheckResult;
@@ -1505,13 +1497,6 @@ export interface DisputeLine {
   payeeName: string;
 }
 
-/**
- * What a member says about a day (resolving in the app): `payee`, the ore went to another Payee
- * (#6206); `quantity`, the book recorded more ore than they mined; `rate`, the book's rate is
- * higher than the one that applies; `notPaying`, they will not pay it. Mirrors the engine's
- * `DisputeKind` (`src/engine/corpTaxBook/disputes.ts`).
- */
-export const DISPUTE_KINDS = ['payee', 'quantity', 'rate', 'notPaying'] as const;
 export type DisputeKind = (typeof DISPUTE_KINDS)[number];
 
 /** A Miner's word on a day: "I gave this ore to {payee}" (#6206), or one of the other kinds. */
