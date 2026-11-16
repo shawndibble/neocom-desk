@@ -490,6 +490,34 @@ function fitsEntry(
 }
 
 /**
+ * The other owed days of every Combined Entry one of `assignments` belongs to. A Combined Entry
+ * is one obligation, so a Corp Tax Book Settle up that reaches one of its days pays them all —
+ * paying only that day would leave the entry half paid, and `coalesce` would then dissolve it.
+ * A group always shares one character, so each is read by its character.
+ */
+async function owedCombinedSiblings(
+  assignments: readonly MiningTaxAssignmentRecord[]
+): Promise<MiningTaxAssignmentRecord[]> {
+  const groups = new Map<number, Set<string>>();
+  for (const a of assignments) {
+    if (a.groupId === undefined) continue;
+    const set = groups.get(a.characterId) ?? new Set<string>();
+    set.add(a.groupId);
+    groups.set(a.characterId, set);
+  }
+  const siblings: MiningTaxAssignmentRecord[] = [];
+  for (const [characterId, groupIds] of groups) {
+    const own = await db.miningTaxAssignments.where('characterId').equals(characterId).toArray();
+    siblings.push(
+      ...own.filter(
+        (a) => a.status === 'outstanding' && a.groupId !== undefined && groupIds.has(a.groupId)
+      )
+    );
+  }
+  return siblings;
+}
+
+/**
  * Settle up for a Corp Tax Book: the member's side of a payment to the corporation. The ore of
  * each owed book row is recorded Paid under the member's Payee verified as the corporation
  * (created when they have none): their own owed Assignments under it are marked paid, and a new
@@ -501,6 +529,8 @@ function fitsEntry(
  * and each row consumes the member's own corp Assignments and the entry's free ore in turn, so a
  * second row never counts the first one's new Assignment as its own. A row whose ore the ledger
  * already holds elsewhere fails the whole action with `held-elsewhere`, naming every such row.
+ * An owed Assignment that is one day of a Combined Entry pays the entry's other owed days with it
+ * (`owedCombinedSiblings`).
  */
 export function recordCorpPayment(
   corp: { corporationId: number; name: string },
@@ -566,6 +596,9 @@ export function recordCorpPayment(
       recorded.set(created.id, created);
     }
     if (heldElsewhere.length > 0) throw new HeldElsewhereError(heldElsewhere);
+    for (const sibling of await owedCombinedSiblings([...recorded.values()])) {
+      recorded.set(sibling.id, sibling);
+    }
     await markAssignmentsPaid([...recorded.values()], payment);
   });
 }

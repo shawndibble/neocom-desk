@@ -628,6 +628,33 @@ describe('recordCorpPayment', () => {
     expect(all[0]).toMatchObject({ id: 'own', status: 'paid', payment: expect.anything() });
   });
 
+  it('pays every owed day of a Combined Entry one ticked row reaches, under one payment', async () => {
+    await db.payees.put({
+      ...payee('p2'),
+      entityId: CORP.corporationId,
+      entityKind: 'corporation',
+    });
+    await db.miningTaxAssignments.bulkPut([
+      assignment({ id: 'day1', payeeId: 'p2', groupId: 'g' }),
+      assignment({ id: 'day2', payeeId: 'p2', groupId: 'g', date: '2026-09-05' }),
+      assignment({ id: 'other', payeeId: 'p2', groupId: 'h', date: '2026-09-06' }),
+    ]);
+
+    const result = await recordCorpPayment(
+      CORP,
+      [bookRow({ personalOreLines: [{ typeId: ORE, quantity: 100 }] })],
+      PAYMENT
+    );
+
+    expect(result.ok).toBe(true);
+    const byId = new Map((await db.miningTaxAssignments.toArray()).map((a) => [a.id, a]));
+    expect(byId.size).toBe(3);
+    expect(byId.get('day1')?.status).toBe('paid');
+    expect(byId.get('day2')?.status).toBe('paid');
+    expect(byId.get('day2')?.payment?.paymentId).toBe(byId.get('day1')?.payment?.paymentId);
+    expect(byId.get('other')?.status).toBe('outstanding');
+  });
+
   it('records two rows on one entry (two refineries, same ore) in full, each once', async () => {
     const result = await recordCorpPayment(CORP, [
       bookRow({
