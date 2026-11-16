@@ -24,7 +24,7 @@ import { capProductPrice } from './productPriceCap';
 import type { MarketSnapshot, MarketSnapshotRequest } from './marketData';
 import { buyOrderFeePct } from '@/engine/industry/buyOrderPrices';
 import { materialPricesFor } from './priceBasis';
-import { onPlanHeroBasis } from './planOwnedBasis';
+import { planVerdictOf } from './planPricing';
 import type { ProfitBasis } from '@/engine/industry/profitBasis';
 import { planReactionLocation } from './planReactionLocation';
 import type { ReactionLocationState } from '@/engine/industry/reactionLocation';
@@ -405,22 +405,24 @@ export function computeOpportunityRow(
   if (!result) return null;
 
   const productTypeID = candidate.catalogEntry.productTypeID;
-  const sellPrice = productTypeID !== null ? snapshot.hubPrices[productTypeID] : undefined;
   // Held stock is charged at its sell value only on that basis; owned
   // materials free reads the plan's own figure, as the plan page does.
-  const { result: planResult, forgone } =
-    profitBasis === 'sellValue'
-      ? onPlanHeroBasis(result, {
-          snapshot,
-          modifiers,
-          standing,
-          productQuantity: (blueprint.products[0]?.quantity ?? 0) * plan.runs,
-          productUnitPrice: sellPrice ?? null,
-        })
-      : { result, forgone: 0 };
+  const verdict = planVerdictOf(
+    { result },
+    {
+      snapshot,
+      productTypeID,
+      productQuantity: (blueprint.products[0]?.quantity ?? 0) * plan.runs,
+      profitBasis,
+      modifiers,
+      standing,
+    }
+  );
+  const planResult = verdict.basisResult ?? result;
+  const { forgone, productUnitPrice: sellPrice } = verdict;
   const sellVolume = productTypeID !== null ? snapshot.hubSellVolumes[productTypeID] : undefined;
   const sellDepthIsk =
-    sellPrice !== undefined && sellVolume !== undefined ? sellPrice * sellVolume : null;
+    sellPrice !== null && sellVolume !== undefined ? sellPrice * sellVolume : null;
 
   // The same answer the reaction Build Plan's own warning reads, so a row is
   // dimmed exactly when the plan it opens says "Not set" or warns of highsec.
