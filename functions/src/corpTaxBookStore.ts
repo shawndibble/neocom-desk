@@ -67,6 +67,7 @@ import {
   type RecordedOre,
   parseStatement,
   moveStartRate,
+  sameDivisions,
   rateKey,
   startDateMoveReason,
   reanchorCadence,
@@ -1160,14 +1161,38 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
           reason: 'director-approval',
         });
       }
-      const { structureExpiryHours, dismissApprovalAboveIsk, showToMembers, startDate, ...rest } =
-        action.patch;
+      const {
+        structureExpiryHours,
+        dismissApprovalAboveIsk,
+        showToMembers,
+        startDate,
+        divisions,
+        divisionsBase,
+        addDivision,
+        ...rest
+      } = action.patch;
       if ((startDate !== undefined || showToMembers) && !c.access.isDirector) {
         throw new HttpsError('permission-denied', 'Only a Director sets this', {
           reason: 'director-only',
         });
       }
       const update: Data = { ...rest };
+      const storedDivisions = (c.book.divisions as number[] | undefined) ?? [];
+      if (addDivision !== undefined) {
+        // Added to what is stored now, so a concurrent addition by another officer is kept.
+        if (!storedDivisions.includes(addDivision)) {
+          update.divisions = [...storedDivisions, addDivision].sort((a, b) => a - b);
+        }
+      } else if (divisions) {
+        if (divisionsBase && !sameDivisions(divisionsBase, storedDivisions)) {
+          fail(
+            'failed-precondition',
+            'The divisions changed since you opened the settings',
+            'divisions-changed'
+          );
+        }
+        update.divisions = divisions;
+      }
       if (showToMembers) update.membersSeeFrom = now;
       const oldStart = c.book.startDate as string | undefined;
       if (startDate !== undefined && startDate !== oldStart) {
@@ -1203,7 +1228,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         update.dismissApprovalAboveIsk =
           dismissApprovalAboveIsk === null ? FieldValue.delete() : dismissApprovalAboveIsk;
       }
-      tx.update(bookDoc, update);
+      // Counting a division the book already reads changes nothing.
+      if (Object.keys(update).length > 0) tx.update(bookDoc, update);
       return { detail: { patch: action.patch as Data } };
     }
     case 'recordPayment': {

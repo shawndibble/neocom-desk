@@ -173,6 +173,9 @@ export function BookSettingsDialog({
   const [minimum, setMinimum] = useState(String(settings.minimumStatement));
   const [overdue, setOverdue] = useState(String(settings.overdueDays));
   const [divisions, setDivisions] = useState<number[]>(settings.divisions);
+  // The list the dialog opened on: a save that changes the divisions sends it, so the server
+  // refuses it rather than drop another officer's change made meanwhile.
+  const [divisionsBase] = useState<number[]>(settings.divisions);
   const [startDate, setStartDate] = useState(settings.startDate);
   const [cadence, setCadence] = useState(settings.cadence.kind);
   const [cadenceDays, setCadenceDays] = useState(
@@ -288,7 +291,6 @@ export function BookSettingsDialog({
         graceHours: Number(grace.replace(',', '.')),
         minimumStatement: Number(minimum),
         overdueDays: Number(overdue),
-        divisions: sortedDivisions,
         cadence:
           cadence === 'monthly'
             ? { kind: 'monthly' }
@@ -300,6 +302,12 @@ export function BookSettingsDialog({
         ),
       };
       if (chunk !== '') patch.chunkM3PerHour = Number(chunk);
+      // Unchanged divisions are left out, so a save of other settings never overwrites them.
+      const baseDivisions = [...divisionsBase].sort((a, b) => a - b);
+      if (sortedDivisions.join() !== baseDivisions.join()) {
+        patch.divisions = sortedDivisions;
+        patch.divisionsBase = baseDivisions;
+      }
       // The names of the divisions it now reads go with them, so members see the corp's name for
       // a newly read division at once (#6161).
       const names = await divisionNamesFor(

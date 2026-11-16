@@ -124,7 +124,8 @@ describe('NeedsYouQueue (#6207)', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'Count Division 2' }));
     expect(editBook).toHaveBeenCalledWith(9, 98000001, {
       action: 'updateSettings',
-      patch: { divisions: [1, 2] },
+      // The server adds division 2 to what it stores; the list is for an older server.
+      patch: { addDivision: 2, divisions: [1, 2] },
     });
   });
 
@@ -137,7 +138,7 @@ describe('NeedsYouQueue (#6207)', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'Count Division 2' }));
     expect(editBook).toHaveBeenLastCalledWith(9, 98000001, {
       action: 'updateSettings',
-      patch: { divisions: [1, 2], divisionNames: { 2: 'Market Funds' } },
+      patch: { addDivision: 2, divisions: [1, 2], divisionNames: { 2: 'Market Funds' } },
     });
   });
 

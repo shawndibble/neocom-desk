@@ -325,6 +325,18 @@ export interface SettingsPatch {
   overdueDays?: number;
   divisions?: number[];
   /**
+   * The stored `divisions` this patch's `divisions` was built from. When set, the edit is
+   * refused (`divisions-changed`) if the stored list has since changed, so one officer's save
+   * never silently drops another's change. Older clients omit it: their list is stored as-is.
+   */
+  divisionsBase?: number[];
+  /**
+   * One division to add to the stored list inside the edit's transaction ("Count division"), so
+   * two officers counting different divisions at once both land. When set, `divisions` in the
+   * same patch is ignored: a client sends it only for a server that predates `addDivision`.
+   */
+  addDivision?: number;
+  /**
    * The corp's own names for its wallet divisions, by division "1".."7" (#6161): a Director's
    * client reads them with its ordinary corp login and pushes them, so a member's Settle up can
    * name the Account to pick. Replaces the stored map whole; `{}` clears it.
@@ -354,6 +366,19 @@ function parseDivisionNames(value: unknown): Record<string, string> {
   return names;
 }
 
+/** A wallet divisions list: 1-7, de-duplicated, ascending. */
+function parseDivisions(value: unknown, field: string): number[] {
+  const divisions = list(value, field, 7).map((x) => int(x, 'division', 1, 7));
+  return [...new Set(divisions)].sort((a, b) => a - b);
+}
+
+/** Whether two divisions lists name the same divisions, whatever their order or repeats. */
+export function sameDivisions(a: readonly number[], b: readonly number[]): boolean {
+  const x = new Set(a);
+  const y = new Set(b);
+  return x.size === y.size && [...x].every((d) => y.has(d));
+}
+
 export function parseSettingsPatch(data: unknown): SettingsPatch {
   const d = record(data);
   const patch: SettingsPatch = {};
@@ -366,11 +391,16 @@ export function parseSettingsPatch(data: unknown): SettingsPatch {
   }
   if (d.overdueDays !== undefined) patch.overdueDays = int(d.overdueDays, 'overdueDays', 1, 365);
   if (d.divisions !== undefined) {
-    const divisions = list(d.divisions, 'divisions', 7).map((x) => int(x, 'division', 1, 7));
-    if (divisions.length === 0)
+    patch.divisions = parseDivisions(d.divisions, 'divisions');
+    if (patch.divisions.length === 0)
       throw new HttpsError('invalid-argument', 'divisions cannot be empty');
-    patch.divisions = [...new Set(divisions)].sort();
   }
+  if (d.divisionsBase !== undefined) {
+    if (patch.divisions === undefined)
+      throw new HttpsError('invalid-argument', 'divisionsBase needs divisions');
+    patch.divisionsBase = parseDivisions(d.divisionsBase, 'divisionsBase');
+  }
+  if (d.addDivision !== undefined) patch.addDivision = int(d.addDivision, 'addDivision', 1, 7);
   if (d.divisionNames !== undefined) patch.divisionNames = parseDivisionNames(d.divisionNames);
   if (d.cadence !== undefined) {
     const c = record(d.cadence);

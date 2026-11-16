@@ -105,7 +105,13 @@ export function NeedsYouQueue() {
       divisions,
       settings.divisionNames
     );
-    return { divisions, ...(divisionNames ? { divisionNames } : {}) };
+    // The server adds `addDivision` to the list it stores, so another officer's concurrent change
+    // is kept; `divisions` is only for a server that predates `addDivision` and ignores it.
+    return {
+      addDivision: division,
+      divisions,
+      ...(divisionNames ? { divisionNames } : {}),
+    };
   };
   const answerUncounted = async (u: UncountedDonation, how: 'count' | 'notTax') => {
     setBusy(true);

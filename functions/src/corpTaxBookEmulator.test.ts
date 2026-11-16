@@ -415,6 +415,51 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect(await auditCount()).toBe(before + 1);
     });
 
+    it("adds a counted division to the stored list, keeping another officer's addition", async () => {
+      await turnOn();
+      // Both officers answered "Count division" from the same stale list, [1]. Each also sends
+      // the full list an older server would store; this server ignores it for `addDivision`.
+      await edit(DIRECTOR, {
+        action: 'updateSettings',
+        patch: { addDivision: 3, divisions: [1, 3] },
+      });
+      await edit(ACCOUNTANT, {
+        action: 'updateSettings',
+        patch: { addDivision: 5, divisions: [1, 5] },
+      });
+      expect((await book().get()).get('divisions')).toEqual([1, 3, 5]);
+      await edit(ACCOUNTANT, { action: 'updateSettings', patch: { addDivision: 3 } });
+      expect((await book().get()).get('divisions')).toEqual([1, 3, 5]);
+    });
+
+    it('refuses a divisions list whose base no longer matches the stored one', async () => {
+      await turnOn();
+      // A dialog opened on [1]; meanwhile another officer counted division 4.
+      await edit(DIRECTOR, { action: 'updateSettings', patch: { addDivision: 4 } });
+      const before = await auditCount();
+      expect(
+        await reason(
+          edit(ACCOUNTANT, {
+            action: 'updateSettings',
+            patch: { divisions: [1, 2], divisionsBase: [1], minimumStatement: 1 },
+          })
+        )
+      ).toBe('divisions-changed');
+      expect((await book().get()).data()).toMatchObject({
+        divisions: [1, 4],
+        minimumStatement: 5_000_000,
+      });
+      expect(await auditCount()).toBe(before);
+      await edit(ACCOUNTANT, {
+        action: 'updateSettings',
+        patch: { divisions: [2, 4], divisionsBase: [4, 1] },
+      });
+      expect((await book().get()).get('divisions')).toEqual([2, 4]);
+      // An older client sends no base: its list is stored as-is.
+      await edit(ACCOUNTANT, { action: 'updateSettings', patch: { divisions: [1] } });
+      expect((await book().get()).get('divisions')).toEqual([1]);
+    });
+
     it('moves the start date and ends the member setup window, Director only', async () => {
       await turnOn();
       expect(
