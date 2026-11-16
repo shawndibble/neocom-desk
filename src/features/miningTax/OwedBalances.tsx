@@ -34,6 +34,12 @@ interface OwedBalancesProps {
    * payment of the member's own to link to it (#4065).
    */
   hideLinkPayment?: (balance: PayeeBalance) => boolean;
+  /**
+   * ISK the pilot donated to this Payee's Corp Tax Book that the book hasn't credited (#6204's
+   * uncredited donations), 0 when none. Above 0 the card says so on a line of its own and Settle
+   * up drops to a plain button: paying the full amount again may pay twice.
+   */
+  uncreditedOf?: (balance: PayeeBalance) => number;
   onAssignNext: () => void;
   onReviewPayments: () => void;
   /**
@@ -63,6 +69,7 @@ export function OwedBalances({
   onSettleUp,
   onLinkPayment,
   hideLinkPayment,
+  uncreditedOf,
   onAssignNext,
   onReviewPayments,
   conflicts,
@@ -197,18 +204,26 @@ export function OwedBalances({
           {owed.map((balance) => {
             const days = owedForDays(balance);
             const characterName = characterNameOf?.(balance);
+            const uncredited = uncreditedOf?.(balance) ?? 0;
             const meta = (
-              <p className="text-xs text-text-dim">
-                {t('miningTax.owed.entriesFor', { count: balance.members.length })}
-                {' · '}
-                {t('miningTax.owed.waitingDays', { count: days })}
-                {characterName && ` · ${characterName}`}
-              </p>
+              <>
+                <p className="text-xs text-text-dim">
+                  {t('miningTax.owed.entriesFor', { count: balance.members.length })}
+                  {' · '}
+                  {t('miningTax.owed.waitingDays', { count: days })}
+                  {characterName && ` · ${characterName}`}
+                </p>
+                {uncredited > 0 && (
+                  <p className="text-xs text-warning">
+                    {t('miningTax.owed.uncreditedNote', { amount: formatIsk(uncredited, 0) })}
+                  </p>
+                )}
+              </>
             );
             const actions = (
               <div className="flex gap-1.5">
                 <Button
-                  variant="primary"
+                  variant={uncredited > 0 ? 'ghost' : 'primary'}
                   className={wide ? 'flex-1 sm:flex-none' : 'flex-1'}
                   onClick={() => onSettleUp(balance)}
                 >

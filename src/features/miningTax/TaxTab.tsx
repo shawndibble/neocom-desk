@@ -176,6 +176,17 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   );
 
   const conflicts = useMemo(() => summarizeConflicts(characterFiltered), [characterFiltered]);
+  // Donations a book hasn't credited, per corporation: its Payee card warns before a second payment.
+  const uncreditedByCorp = useMemo(
+    () =>
+      new Map(
+        corpView?.books.map((b) => [
+          b.loaded.corporationId,
+          b.summary.uncredited.reduce((sum, d) => sum + d.amount, 0),
+        ]) ?? []
+      ),
+    [corpView]
+  );
   const { balances, unassigned, everyAssignment, linkSuggestions, payeeSystems, owedByPayee } =
     useTaxBalances({
       characterFiltered,
@@ -344,6 +355,11 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                   }
                   onLinkPayment={(balance) => actions.openLinkWallet({ payeeId: balance.payee.id })}
                   hideLinkPayment={(balance) => isCorpPayeeId(balance.payee.id)}
+                  uncreditedOf={(balance) =>
+                    isCorpPayeeId(balance.payee.id)
+                      ? (uncreditedByCorp.get(corporationOfPayee(balance.payee.id)) ?? 0)
+                      : 0
+                  }
                   onAssignNext={assignNext}
                   onReviewPayments={() => actions.openLinkPayment(true)}
                   conflicts={conflicts}

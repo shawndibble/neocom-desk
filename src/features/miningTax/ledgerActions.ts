@@ -81,10 +81,12 @@ export { assignmentsSharingPayment } from './assignments';
 /**
  * Why an action wrote nothing. `already-assigned`: the pilot's view was stale
  * (another tab or device claimed that ore first), so the answer is to reload
- * and show what exists. `save-failed`: anything else — the write, or the
+ * and show what exists. `held-elsewhere`: a Corp Tax Book Settle up would claim ore the ledger
+ * already holds elsewhere (`HeldElsewhereError`), so the pilot sorts those rows out first.
+ * `save-failed`: anything else — the write, or the
  * pricing it needed first, failed and nothing changed.
  */
-export type LedgerFailureReason = 'already-assigned' | 'save-failed';
+export type LedgerFailureReason = 'already-assigned' | 'held-elsewhere' | 'save-failed';
 
 export interface LedgerActionFailure {
   ok: false;
@@ -94,10 +96,28 @@ export interface LedgerActionFailure {
 
 export type LedgerActionResult<T = void> = { ok: true; value: T } | LedgerActionFailure;
 
+/**
+ * Thrown by `recordCorpPayment` when a ticked book row's ore is already held elsewhere in the
+ * member's ledger: another Payee's Assignment, a dismissal, or their own corp Assignment waiting
+ * on Needs review. Recording it would claim that ore twice, so nothing is written and the dialog
+ * names the rows instead of closing.
+ */
+export class HeldElsewhereError extends Error {
+  constructor(readonly rows: readonly { id: string; date: string }[]) {
+    super('Book rows hold ore the ledger already assigns elsewhere');
+    this.name = 'HeldElsewhereError';
+  }
+}
+
 function failure(cause: unknown): LedgerActionFailure {
   return {
     ok: false,
-    reason: cause instanceof AlreadyAssignedError ? 'already-assigned' : 'save-failed',
+    reason:
+      cause instanceof AlreadyAssignedError
+        ? 'already-assigned'
+        : cause instanceof HeldElsewhereError
+          ? 'held-elsewhere'
+          : 'save-failed',
     cause,
   };
 }
@@ -434,6 +454,41 @@ async function corpEntityPayeeIds(
   return [id];
 }
 
+const entryKeyOf = (r: { characterId: number; date: string; solarSystemId: number }) =>
+  `${r.characterId}|${r.date}|${r.solarSystemId}`;
+
+/** One Mining Ledger Entry as `recordCorpPayment` walks its rows: read once, consumed as it goes. */
+interface EntryClaims {
+  /** The member's own owed Assignments under the corporation's Payee, marked paid with the rows. */
+  owedOwn: MiningTaxAssignmentRecord[];
+  /** Ore the member's own paid or owed corp Assignments hold that no earlier row has consumed. */
+  ownPool: MiningTaxOreLine[];
+  /** Ore every stored Assignment on the entry claims, plus what earlier rows recorded, by type. */
+  claimed: Map<number, number>;
+}
+
+function addClaims(claimed: Map<number, number>, lines: readonly MiningTaxOreLine[]): void {
+  for (const l of lines) claimed.set(l.typeId, (claimed.get(l.typeId) ?? 0) + l.quantity);
+}
+
+/**
+ * Whether `lines` fit beside what the entry already claims — `assertUnclaimed`'s rule, so the
+ * write that follows can't be refused: a type nothing claims always fits; a claimed one fits only
+ * within the entry's own ore.
+ */
+function fitsEntry(
+  claims: EntryClaims,
+  lines: readonly MiningTaxOreLine[],
+  entryOreLines: readonly MiningTaxOreLine[] | undefined
+): boolean {
+  return lines.every((l) => {
+    const already = claims.claimed.get(l.typeId) ?? 0;
+    if (already === 0) return true;
+    const held = entryOreLines?.find((e) => e.typeId === l.typeId)?.quantity;
+    return held !== undefined && already + l.quantity <= held;
+  });
+}
+
 /**
  * Settle up for a Corp Tax Book: the member's side of a payment to the corporation. The ore of
  * each owed book row is recorded Paid under the member's Payee verified as the corporation
@@ -441,6 +496,11 @@ async function corpEntityPayeeIds(
  * Paid Assignment covers the rest their marks don't. The book counts that as paid on the
  * member's side; the corporation still confirms it against its wallet. A row that never lined up
  * with a ledger entry has no ore to record and stays owed.
+ *
+ * An entry is read once however many rows it carries (two refineries in one system give two),
+ * and each row consumes the member's own corp Assignments and the entry's free ore in turn, so a
+ * second row never counts the first one's new Assignment as its own. A row whose ore the ledger
+ * already holds elsewhere fails the whole action with `held-elsewhere`, naming every such row.
  */
 export function recordCorpPayment(
   corp: { corporationId: number; name: string },
@@ -449,7 +509,9 @@ export function recordCorpPayment(
 ): Promise<LedgerActionResult> {
   return commit(charactersOf(rows), async () => {
     const payeesOf = new Map<number, string[]>();
-    const recorded: MiningTaxAssignmentRecord[] = [];
+    const entries = new Map<string, EntryClaims>();
+    const recorded = new Map<string, MiningTaxAssignmentRecord>();
+    const heldElsewhere: { id: string; date: string }[] = [];
     for (const row of rows) {
       if (row.solarSystemId === 0) continue;
       let payeeIds = payeesOf.get(row.characterId);
@@ -457,40 +519,53 @@ export function recordCorpPayment(
         payeeIds = await corpEntityPayeeIds(row.characterId, corp, row.taxPct);
         payeesOf.set(row.characterId, payeeIds);
       }
-      const own = (
-        await db.miningTaxAssignments.where('characterId').equals(row.characterId).toArray()
-      ).filter(
-        (a) =>
-          a.date === row.date &&
-          a.solarSystemId === row.solarSystemId &&
-          a.payeeId !== undefined &&
-          payeeIds.includes(a.payeeId) &&
-          (a.status === 'paid' || a.status === 'outstanding')
-      );
-      const owedOwn = own.filter((a) => a.status === 'outstanding');
-      recorded.push(...owedOwn);
-      const oreLines = minusLines(
-        row.oreLines,
-        own.flatMap((a) => a.oreLines)
-      );
+      const key = entryKeyOf(row);
+      let claims = entries.get(key);
+      if (!claims) {
+        const all = (
+          await db.miningTaxAssignments.where('characterId').equals(row.characterId).toArray()
+        ).filter((a) => a.date === row.date && a.solarSystemId === row.solarSystemId);
+        const corpIds = payeeIds;
+        const own = all.filter(
+          (a) =>
+            a.payeeId !== undefined &&
+            corpIds.includes(a.payeeId) &&
+            (a.status === 'paid' || a.status === 'outstanding')
+        );
+        claims = {
+          owedOwn: own.filter((a) => a.status === 'outstanding'),
+          ownPool: own.flatMap((a) => a.oreLines),
+          claimed: new Map(),
+        };
+        for (const a of all) addClaims(claims.claimed, a.oreLines);
+        entries.set(key, claims);
+      }
+      for (const a of claims.owedOwn) recorded.set(a.id, a);
+      const oreLines = minusLines(row.oreLines, claims.ownPool);
+      claims.ownPool = minusLines(claims.ownPool, row.oreLines);
       if (oreLines.length === 0) continue;
+      if (!fitsEntry(claims, oreLines, row.personalOreLines)) {
+        heldElsewhere.push({ id: row.id, date: row.date });
+        continue;
+      }
+      addClaims(claims.claimed, oreLines);
       const value = computeAssignmentValue(oreLines, priceMap(row.unitPrices), row.taxPct);
-      recorded.push(
-        await createAssignment({
-          characterId: row.characterId,
-          date: row.date,
-          solarSystemId: row.solarSystemId,
-          payeeId: payeeIds[0],
-          oreLines,
-          ...(row.personalOreLines ? { entryOreLines: row.personalOreLines } : {}),
-          taxPct: row.taxPct,
-          estimatedValue: value.estimatedValue,
-          taxOwed: value.taxOwed,
-          markPaid: false,
-          ...(row.refineryLabel ? { label: row.refineryLabel } : {}),
-        })
-      );
+      const created = await createAssignment({
+        characterId: row.characterId,
+        date: row.date,
+        solarSystemId: row.solarSystemId,
+        payeeId: payeeIds[0],
+        oreLines,
+        ...(row.personalOreLines ? { entryOreLines: row.personalOreLines } : {}),
+        taxPct: row.taxPct,
+        estimatedValue: value.estimatedValue,
+        taxOwed: value.taxOwed,
+        markPaid: false,
+        ...(row.refineryLabel ? { label: row.refineryLabel } : {}),
+      });
+      recorded.set(created.id, created);
     }
-    await markAssignmentsPaid(recorded, payment);
+    if (heldElsewhere.length > 0) throw new HeldElsewhereError(heldElsewhere);
+    await markAssignmentsPaid([...recorded.values()], payment);
   });
 }

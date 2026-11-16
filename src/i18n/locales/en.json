@@ -8151,7 +8151,9 @@
         "codeOf": "{{character}} · {{period}} Statement code:",
         "codeInReason": "The Reason is your {{period}} Statement's code.",
         "codeOldest": "The Reason is the code of the payer's oldest open Statement ({{period}}).",
-        "oldestFirst": "A payment goes to the oldest open Statement first; a code moves it to that Statement first."
+        "oldestFirst": "A payment goes to the oldest open Statement first; a code moves it to that Statement first.",
+        "heldElsewhere_one": "Nothing was recorded: the entry of {{dates}} already has its ore with another Payee, dismissed, or waiting for review in your ledger. Untick it, or sort it out on its row first.",
+        "heldElsewhere_other": "Nothing was recorded: {{count}} entries ({{dates}}) already have their ore with another Payee, dismissed, or waiting for review in your ledger. Untick them, or sort them out on their rows first."
       },
       "attention": {
         "overdueTitle": "{{corp}} Statement {{period}} overdue since {{date}}",
@@ -8524,7 +8526,8 @@
       "unassignedHint_one": "{{count}} entry has no Payee yet",
       "unassignedHint_other": "{{count}} entries have no Payee yet",
       "acrossPayees_one": "across {{count}} payee",
-      "acrossPayees_other": "across {{count}} payees"
+      "acrossPayees_other": "across {{count}} payees",
+      "uncreditedNote": "{{amount}} ISK you donated isn't credited yet — check the wallet division before paying again."
     },
     "continue": {
       "eyebrow": "New EVE day",
