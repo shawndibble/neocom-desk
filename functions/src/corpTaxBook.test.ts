@@ -19,6 +19,7 @@ import {
   parseSettingsPatch,
   parseStatement,
   parseSyncInput,
+  donationsReadAtPatch,
   parseToken,
   parseTurnOnInput,
   reanchorCadence,
@@ -143,6 +144,14 @@ describe('parsers', () => {
     expect(
       parseSyncInput({ corporationId: 9, observed: [{ ...row, date: '2026-10-18' }] }, now).observed
     ).toHaveLength(1);
+  });
+
+  it('stamps when a sync read the wallet, null until one has, and never clears a stamp', () => {
+    expect(donationsReadAtPatch(true, 5, 9)).toEqual({ donationsReadAt: 9 });
+    expect(donationsReadAtPatch(false, undefined, 9)).toEqual({ donationsReadAt: null });
+    expect(donationsReadAtPatch(false, 5, 9)).toEqual({});
+    expect(donationsReadAtPatch(false, null, 9)).toEqual({});
+    expect(donationsReadAtPatch(undefined, undefined, 9)).toEqual({});
   });
 
   it('takes whether the sync read the wallet, only as a boolean', () => {

@@ -2351,6 +2351,49 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
       expect(out.books[0].uncredited).toEqual([{ ...old, covered: [out.rows[0].date] }]);
     });
 
+    describe('over two days', () => {
+      const day = (date: string) => ({
+        characterId: ME,
+        recordedCorporationId: CORP,
+        structureId: 1000,
+        date,
+        solarSystemId: SYSTEM,
+        oreLines: [{ typeId: ZEO, quantity: 43_050 }],
+      });
+      const twoDays = (inFlight: PersonalBook['inFlight']) =>
+        overlay(
+          [entry({ date: '2026-10-15' }), entry()],
+          [book({ observed: [day('2026-10-15'), day('2026-10-17')], inFlight })]
+        );
+      const tax = 43_050 * 148 * 0.15;
+
+      it('names both days one donation paid, and marks each as unlinked from it', () => {
+        const paidBoth = { ...old, amount: Math.ceil(2 * tax) + 500_000 };
+        const out = twoDays([paidBoth]);
+        expect(out.books[0].uncredited).toEqual([
+          { ...paidBoth, covered: ['2026-10-15', '2026-10-17'] },
+        ]);
+        for (const row of out.rows) {
+          expect(row).toMatchObject({
+            state: 'billed',
+            unlinkedDonation: { amount: paidBoth.amount, at: paidBoth.at },
+          });
+        }
+      });
+
+      it('names only the days that went back to Billed when a newer donation still counts', () => {
+        const counted = { ...old, amount: Math.ceil(tax), at: '2026-10-16T10:00:00Z' };
+        const lost = { ...old, amount: Math.ceil(tax) };
+        const out = twoDays([counted, lost]);
+        // The pooled money paid both days; without the lost one, the newer day is owed again.
+        expect(out.books[0].uncredited).toEqual([{ ...lost, covered: ['2026-10-17'] }]);
+        const byDate = new Map(out.rows.map((r) => [r.date, r]));
+        expect(byDate.get('2026-10-15')).toMatchObject({ state: 'paid', settledBy: 'donation' });
+        expect(byDate.get('2026-10-15')).not.toHaveProperty('unlinkedDonation');
+        expect(byDate.get('2026-10-17')).toMatchObject({ state: 'billed' });
+      });
+    });
+
     it('names the days it paid while it counted, so the member can dispute them', () => {
       // Too little to cover the day: it covered nothing, and says so.
       const small = { ...old, amount: 1 };

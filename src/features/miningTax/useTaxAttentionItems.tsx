@@ -9,6 +9,7 @@ import { claimKeyOf } from '@/features/miningTax/corpBook/useAutoClaimDonations'
 import type { CorpBookView } from '@/features/miningTax/corpBook/corpBookView';
 import { corpBookAttention } from '@/features/miningTax/corpBook/corpAttention';
 import { corpPayAccounts, readsEveryDivision } from '@/features/miningTax/corpBook/corpPayAccount';
+import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
 import {
   CorpDeclarationStatus,
   CorpDeclareAction,
@@ -302,8 +303,7 @@ export function useTaxAttentionItems({
             {t('miningTax.corpBook.attention.uncreditedDispute', {
               corp: u.corpName,
               amount: formatIsk(u.amount, 0),
-              // The journal's own stamp, in EVE time (UTC), as the in-game journal shows it.
-              time: u.at.slice(0, 16).replace('T', ' '),
+              time: eveTimeLabel(Date.parse(u.at)),
             })}
           </p>
         </>

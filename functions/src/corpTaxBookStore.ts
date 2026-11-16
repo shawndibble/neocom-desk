@@ -81,6 +81,7 @@ import {
   type StoredStatement,
   type SyncInput,
   type TurnOnInput,
+  donationsReadAtPatch,
 } from './corpTaxBook.js';
 import {
   extractionIdOf,
@@ -788,18 +789,11 @@ export async function syncBookAs(
       (held.get('lastSync') as { gaps?: unknown } | undefined)?.gaps ?? []
     );
   const now = deps.now();
-  // When a sync last read the wallet's donations, which members' "not credited" notes wait on: a
-  // sync that could not read it (no role, no scope) must not read as one the donation missed.
-  // Null until one has; an older client's call, or an overflow call, leaves it as it was.
-  const donationsReadAt =
-    input.donationsRead === true
-      ? { donationsReadAt: now }
-      : input.donationsRead === false && held.get('donationsReadAt') === undefined
-        ? { donationsReadAt: null }
-        : {};
   await deps.db.runTransaction(async (tx) => {
+    // Read in the transaction, so a concurrent sync that read the wallet is never nulled.
+    const readAt = input.donationsRead === false ? (await tx.get(book)).get('donationsReadAt') : 0;
     tx.update(book, {
-      ...donationsReadAt,
+      ...donationsReadAtPatch(input.donationsRead, readAt, now),
       lastSync: {
         at: now,
         byCharacterId: access.characterId,
