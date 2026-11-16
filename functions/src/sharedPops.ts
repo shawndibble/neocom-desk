@@ -81,13 +81,19 @@ export interface SharedPop {
   ratePct: number;
   /** `audienceKey`s of who may read it. */
   audiences: string[];
+  /**
+   * The moon owner's corporation, on a moon owner's pop: a read drops it at once when that owner
+   * opts out or the book stops handling it. Absent on the book's own pops, and on a doc published
+   * before it existed. Never sent to a viewer.
+   */
+  ownerCorporationId?: number;
 }
 
 /**
  * One Shared Pop as a viewer receives it (`listSharedPopsCallable`): no audience list, plus who
  * shares it and the data's age. The client's read seam is `src/sync/sharedPops.ts`.
  */
-export type SharedPopView = Omit<SharedPop, 'audiences'> & {
+export type SharedPopView = Omit<SharedPop, 'audiences' | 'ownerCorporationId'> & {
   /** The book's corporation: the start link's payee, and the filter by sharing corporation. */
   corporationId: number;
   syncedAt: number | null;
@@ -212,6 +218,9 @@ export function buildSharedPops(input: BuildSharedPopsInput): SharedPopsDoc | nu
       notes: settings.notes,
       ratePct: startLinkRatePct(settings, input.bookRatePct(x)),
       audiences: settings.audiences.map(audienceKey),
+      ...(owner !== undefined && owner !== input.corporationId
+        ? { ownerCorporationId: owner }
+        : {}),
     });
   }
   if (pops.length === 0) return null;
@@ -227,6 +236,38 @@ export function buildSharedPops(input: BuildSharedPopsInput): SharedPopsDoc | nu
     pops,
     syncedAt: input.syncedAt,
   };
+}
+
+/** What a read checks a published doc against: the book and its settings as they are now. */
+export interface BookSharingNow {
+  /** Whether the book is active. */
+  active: boolean;
+  sharing: PopSharingDoc;
+  /** Moon owners the book handles now, each with whether it opted out (as `owners` above). */
+  owners: ReadonlyMap<number, { optedOut: boolean }>;
+}
+
+/**
+ * A published doc as the book's settings allow now, or null when they allow nothing. Publishing
+ * is best effort and can race an edit, so a read never trusts the doc alone: sharing turned off,
+ * an opt-out, a moon owner no longer handled, a blocked moon or a removed audience takes the pop
+ * away at once even when the republish that follows failed or was overtaken.
+ */
+export function currentSharedPops(doc: SharedPopsDoc, book: BookSharingNow): SharedPopsDoc | null {
+  if (!book.active || !book.sharing.enabled) return null;
+  const pops = doc.pops.flatMap((pop) => {
+    const owner = pop.ownerCorporationId;
+    const foreign = owner !== undefined && owner !== doc.corporationId;
+    if (foreign && !book.owners.has(owner)) return [];
+    const { settings, shared } = effectivePopSharing(book.sharing, pop.moonId, {
+      ownerOptedOut: foreign && book.owners.get(owner)!.optedOut,
+    });
+    if (!shared) return [];
+    const allowed = new Set(settings.audiences.map(audienceKey));
+    const audiences = pop.audiences.filter((a) => allowed.has(a));
+    return audiences.length > 0 ? [{ ...pop, audiences }] : [];
+  });
+  return pops.length > 0 ? { ...doc, pops } : null;
 }
 
 export const sharedPopId = (corporationId: number, extractionId: string): string =>

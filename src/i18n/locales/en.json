@@ -9369,6 +9369,9 @@
       "ratePct": "{{rate}}%",
       "ore": "Ore make-up",
       "oreUnknown": "Unknown",
+      "synced": "Synced",
+      "syncedStale": "{{age}}, may be out of date",
+      "unavailable": "This shared pop is no longer available",
       "units_one": "{{count, number}} unit",
       "units_other": "{{count, number}} units",
       "startSurvey": "Start a Survey here"
@@ -17878,6 +17881,7 @@
         "cols": {
           "overrides": "Settings"
         },
+        "noAlliance": "Your corporation is in no alliance",
         "fields": {
           "audiences": "Shared with",
           "audiencesHint": "Corp and Alliance are this book's own corporation and alliance. Communities list the ones you are a Member of.",

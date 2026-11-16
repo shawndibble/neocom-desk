@@ -10,7 +10,7 @@ import {
   type PopAudience,
   type PopSharingDoc,
 } from '../../../functions/src/popSharing';
-import { sharingMoons, type SharingMoonRow } from './sharingMoons';
+import { isHandled, sharingMoons, type SharingMoonRow } from './sharingMoons';
 
 export type PopShareMark = { kind: 'shared'; audiences: PopAudience[] } | { kind: 'opted-out' };
 
@@ -53,7 +53,7 @@ export function popShareMarks(
   }
   // The opt-out is the owner's own, whether or not any of its moons has synced yet.
   for (const f of feeders) {
-    if (f.popSharingOptOut !== undefined)
+    if (f.popSharingOptOut !== undefined && isHandled(f))
       marks.owners[String(f.corporationId)] = { kind: 'opted-out' };
   }
   return marks;

@@ -40,6 +40,7 @@ import { utcDay } from '@/engine/localDay';
 import { loadMyCommunitiesCached } from '@/features/communities/communityStore';
 import { callableErrorText } from './feederErrorText';
 import { audienceKey, type PopSharingSettings } from '../../../../functions/src/popSharing';
+import { getCorporationPublicInfo } from '@/esi/endpoints/corp';
 import { AudienceName, PopSharingDialog, type CommunityChoice } from './PopSharingDialog';
 import { PlaceCell } from './sectionParts';
 import { popShareMark } from '@/engine/corpTaxBook/popShareMarks';
@@ -170,6 +171,22 @@ export function SharingTab() {
       cancelled = true;
     };
   }, [canEdit, characterId]);
+
+  // Alliance reaches nobody while the book's corporation is in none (#6223 publishes it unshared).
+  const [noAlliance, setNoAlliance] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    getCorporationPublicInfo(corporationId).then(
+      (r) => {
+        if (!cancelled && r.data) setNoAlliance(r.data.alliance_id === undefined);
+      },
+      // Unread: Alliance stays on offer; the server still publishes it to nobody.
+      () => undefined
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [corporationId]);
 
   // The book's own rate, at a moon when one is open (a moon, refinery or moon owner rate wins).
   const bookRateAt = useCallback(
@@ -353,6 +370,7 @@ export function SharingTab() {
             communities={communities}
             bookRatePct={bookRatePct}
             canEdit={canEdit}
+            noAlliance={noAlliance}
             onClose={() => setEditing(null)}
             onSave={(patch) => save({ action: 'setPopSharing', defaults: patch })}
           />
@@ -366,6 +384,7 @@ export function SharingTab() {
             communities={communities}
             bookRatePct={bookRateAt(editingMoon)}
             canEdit={canEdit}
+            noAlliance={noAlliance}
             onClose={() => setEditing(null)}
             onSave={(patch) =>
               save({ action: 'setPopSharingMoon', moonId: editingMoon.moonId, ...patch })

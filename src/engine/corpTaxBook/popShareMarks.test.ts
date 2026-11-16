@@ -80,4 +80,16 @@ describe('popShareMarks', () => {
       '558': { kind: 'opted-out' },
     });
   });
+
+  it('marks nothing for a moon owner the book no longer handles, as the server publishes nothing', () => {
+    const marks = popShareMarks(
+      [pull(9, 2000, 555), pull(10, 2001, 556)],
+      [
+        { corporationId: 555, status: 'left' as const },
+        { corporationId: 556, status: 'removed' as const, popSharingOptOut: OPTED_OUT },
+      ],
+      popSharingFrom({ enabled: true })
+    );
+    expect(marks).toEqual({ moons: {}, structures: {}, owners: {} });
+  });
 });

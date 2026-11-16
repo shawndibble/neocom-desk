@@ -29,7 +29,7 @@ A Corp Tax Book's officers can share the pop schedule of the moons the book hand
 - `setPopSharing`, `setPopSharingMoon`, `updateSettings`, `addRate`, `linkSurvey` edits;
 - a moon owner's opt-out or opt-in.
 
-So turning sharing off, removing an audience or an opt-out takes a pop away at once. A pop lives from its Extraction's start until Expired (fracture plus the refinery's expiry, 48 h by default, at most 96 h); Ready shows the chunk's arrival and Auto-fracture its natural decay, and a fired laser moves both to the actual fracture. The book's alliance is re-read from public ESI at most every 6 hours. If sync stops, the doc stays as last published (a started Extraction's times do not change); reads still drop expired pops.
+So turning sharing off, removing an audience or an opt-out takes a pop away at once. A pop lives from its Extraction's start until Expired (fracture plus the refinery's expiry, 48 h by default, at most 96 h); Ready shows the chunk's arrival and Auto-fracture its natural decay, and a fired laser moves both to the actual fracture. The book's alliance is re-read from public ESI at most every 6 hours. If sync stops, the doc stays as last published (a started Extraction's times do not change); reads still drop expired pops. A publish is best effort and can race an edit (a scheduled sync's publish landing after an opt-out), so every read also checks each doc against the book as it is now (`currentSharedPops`: active, sharing on, the moon owner still handled and not opted out, the moon still shared, each audience still named) and drops what the settings no longer allow. Each pop of a moon owner carries `ownerCorporationId` for that check; a doc published before it existed is caught at its next publish.
 
 ### Reading
 
@@ -41,7 +41,7 @@ A pilot reads through the `listSharedPopsCallable` action (`corpTaxBookCall` rou
 4. counts a Community for a book only if it has no block for that corporation and a qualifying officer of the book is a current Member;
 5. returns the pops whose audiences match and which are not Expired, without the audience list.
 
-Corp and Alliance are always the book's own corporation and its alliance (stored on the doc), never a moon owner's. The editor stamp is written by `authorizeOfficer` on any authorized call by a Character with an editing role; a failed live role check, a refused edit, or a lost role on the Automatic sync grant writes `failedAt`.
+Corp and Alliance are always the book's own corporation and its alliance (stored on the doc), never a moon owner's. The editor stamp is written by `authorizeOfficer` on an authorized call by a Character with an editing role, looked at no more than hourly per officer record (`editorCheckedAt`) and only for a book with Pop Sharing settings; turning sharing on stamps the officer who does it; a failed live role check, a refused edit, or a lost role on the Automatic sync grant writes `failedAt`.
 
 The Sharing tab asks `getCorpTaxBookPopSharingCommunitiesCallable` for each chosen Community's state and marks one with no officer "No officer in this Community". A Community admin lists and blocks sharing corporations with `listCommunityPopSharersCallable` and `setCommunityPopSharingBlockCallable` (`communityCall` router).
 

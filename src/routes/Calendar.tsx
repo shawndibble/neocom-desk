@@ -12,6 +12,7 @@ import {
   Panel,
   Spinner,
   CachedNotice,
+  Toast,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { loadCalendarBoard } from '@/features/character/calendarBoardData';
@@ -359,9 +360,19 @@ export function Calendar() {
   // write of the anchor waits for the effect below.
   const [popDayPending, setPopDayPending] = useState(popParam !== null);
   const [popAnchorKey, setPopAnchorKey] = useState<string | null>(null);
+  // A link to a pop that is gone (Expired, unshared, or out of the pilot's audiences) says so,
+  // once the finished load (not a partial or a retained snapshot) still lacks it. A failed read
+  // (`sharedMoonPops` undefined, or the load itself) proves nothing: the link is dropped quietly.
+  const [popUnavailable, setPopUnavailable] = useState(false);
   if (popDayPending && data) {
     const entry = data.sharedPops.find((e) => e.pop.id === popParam);
-    if (entry !== undefined) {
+    if (entry === undefined) {
+      if (!loading) {
+        setPopDayPending(false);
+        setSelectedPopId(null);
+        if (!error && data.sharedMoonPops !== undefined) setPopUnavailable(true);
+      }
+    } else {
       setPopDayPending(false);
       const deadlineMs = sharedPopDeadlineMs(entry.pop, data.loadedAtMs);
       if (!Number.isNaN(deadlineMs)) {
@@ -493,6 +504,12 @@ export function Calendar() {
       ) : (
         <>
           {data?.fromCache && <CachedNotice withBadge fetchedAt={data.oldestFetchedAt} />}
+          {popUnavailable && (
+            <Toast
+              message={t('calendar.sharedPop.unavailable')}
+              onClose={() => setPopUnavailable(false)}
+            />
+          )}
           {/*
             The page no longer gates on one scope, so a refused source has to
             announce itself somewhere the pilot will actually look. Naming the

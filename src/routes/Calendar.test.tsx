@@ -411,6 +411,16 @@ describe('Calendar Shared Pops', () => {
     expect(within(rail).getByText('Efa - Shared Tatara')).toBeInTheDocument();
     expect(within(rail).queryByText('Fleet Op')).toBeNull();
   });
+
+  it('says a linked pop is no longer available when the pilot cannot see it', async () => {
+    sharePop();
+    window.history.pushState({}, '', `/calendar?pop=${SHARING_CORP_ID}_gone`);
+    renderCalendarRoute();
+
+    expect(await screen.findByText('This shared pop is no longer available')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(window.location.search).not.toContain('pop='));
+  });
 });
 
 describe('Calendar', () => {

@@ -38,6 +38,22 @@ describe('sharingMoons', () => {
       effective: { shared: false, blockedBy: 'owner-opted-out', settings: { notes: 'kept' } },
     });
   });
+
+  it('drops a moon owner the book no longer handles, as the publisher does', () => {
+    const rows = sharingMoons(
+      [
+        pull(7, 1000, '2026-10-01T00:00:00Z'),
+        pull(9, 2000, '2026-11-02T00:00:00Z', 555),
+        pull(11, 3000, '2026-11-02T00:00:00Z', 666),
+      ],
+      [
+        { corporationId: 555, status: 'removed' as const },
+        { corporationId: 666, status: 'pending-removal' as const },
+      ],
+      popSharingFrom({ enabled: true })
+    );
+    expect(rows.map((r) => r.moonId)).toEqual([7, 11]);
+  });
 });
 
 describe('unplacedRefineries', () => {
