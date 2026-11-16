@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as mirror from '../../../functions/src/corpTaxBookEngine';
 import { allocatePayments, dismissalCredits, isBeforeBook } from './allocation';
-import { placeOfFactory } from './bookView';
+import { placeOfFactory } from './openSet';
 import { FORFEIT_NO_REPLY_DAYS, forfeitAllowed } from './closeAccount';
 import type { Dismissal } from './dismissals';
 import { extractionId, type SyncExtraction } from './sync';

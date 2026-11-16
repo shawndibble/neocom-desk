@@ -24,19 +24,14 @@
 import { computeAssignmentValue } from '../miningTax/valuation';
 import { entryKey, type OreLine } from '../miningTax/types';
 import { minusLines, priceMap } from '../miningTax/oreLines';
-import {
-  allocatePayments,
-  dismissalCredits,
-  settleTolerance,
-  type RecordedWriteOff,
-  type TaxPayment,
-} from './allocation';
+import { settleTolerance, type RecordedWriteOff, type TaxPayment } from './allocation';
 import { splitAcrossBooks, resolveBookShare, type BookObservation } from './attribution';
-import { dayClosesAt, isDayBillable, lastBillableDate } from './billable';
-import { buildDayCharges, minerIdFor, type DayCharge, type Miner } from './charges';
+import { dayClosesAt, isDayBillable } from './billable';
+import { minerIdFor, type DayCharge, type Miner } from './charges';
 import type { FeederCoverage } from './coverage';
 import { activeDismissalFor, type Dismissal } from './dismissals';
-import { splitByCoverageAndRead, type FeederReadClock } from './feederHealth';
+import type { FeederReadClock } from './feederHealth';
+import { settleOpenSet } from './openSet';
 import { observedEntryKey } from './observed';
 import type { TaxRate, RateScope } from './rates';
 import {
@@ -48,7 +43,7 @@ import {
 } from './statements';
 import type { DayPrices } from './valuation';
 import type { ObservedMiningEntry } from './types';
-import { overdueStatus, DEFAULT_OVERDUE_DAYS, type Declaration } from './overdue';
+import type { Declaration, OverdueStatus } from './overdue';
 import type { OreDispute } from './disputes';
 import { DAY_MS, MINUTE_MS } from '@/lib/age';
 
@@ -434,37 +429,44 @@ interface Prepared {
   pending: { observed: ObservedMiningEntry; entry?: PersonalEntry }[];
   /**
    * Per Statement id: settled; what payments credited towards its non-dismissed days; what
-   * officer write-offs forgave of it, and their reasons.
+   * officer write-offs forgave of it, and their reasons; its Overdue clock while unsettled.
    */
   settlement: Map<
     string,
-    { settled: boolean; pool: number; forgiven: number; forgivenReasons: string[] }
+    {
+      settled: boolean;
+      pool: number;
+      forgiven: number;
+      forgivenReasons: string[];
+      overdue: OverdueStatus | undefined;
+    }
   >;
   /** Credit the book holds per Miner: it pays only that Miner's days. */
   credit: Map<string, number>;
+  /** The latest Billable day; undefined with no sync after the grace. */
+  billableThrough: string | undefined;
 }
 
 function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: string): Prepared {
-  // A moon owner's day outside its coverage owes nothing (#4618); one its ledger was not read
-  // well after is not Billable yet, and holds the miner's whole day with it (#4622).
-  const { readable, unread } = splitByCoverageAndRead(book.observed, {
-    now,
-    bookCorporationId: book.corporationId,
-    feeders: book.feeders ?? [],
-    ...(book.graceHours !== undefined ? { graceHours: book.graceHours } : {}),
-  });
-  const { charges, unrated } = buildDayCharges(readable, {
+  // A member cannot read the book's Extractions: days sit on the moon stamped on its own rows.
+  const open = settleOpenSet({
     corporationId: book.corporationId,
+    now,
     startDate: book.startDate,
-    miners: book.miners,
+    ...(book.graceHours !== undefined ? { graceHours: book.graceHours } : {}),
+    ...(book.lastSyncedAt !== undefined ? { lastSyncedAt: book.lastSyncedAt } : {}),
     rates: book.rates,
+    entries: book.observed,
+    miners: book.miners,
+    statements: book.statements,
+    payments: book.payments,
+    dismissals: book.dismissals,
+    ...(book.writeOffs ? { writeOffs: book.writeOffs } : {}),
+    ...(book.declarations ? { declarations: book.declarations } : {}),
+    ...(book.overdueDays !== undefined ? { overdueDays: book.overdueDays } : {}),
+    ...(book.feeders ? { feeders: book.feeders } : {}),
     pricesOn: book.pricesOn,
-    placeOf: (structureId, date) => {
-      const moonId = book.observed.find(
-        (o) => o.structureId === structureId && o.date === date && o.moonId !== undefined
-      )?.moonId;
-      return moonId === undefined ? {} : { moonId };
-    },
+    placement: 'observed-rows',
   });
   const observedByKey = new Map(book.observed.map((o) => [observedEntryKey(o), o]));
   const lineIndex = new Map<string, { id: string; lines: StatementLine[] }>();
@@ -476,18 +478,15 @@ function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: str
       lineIndex.set(line.chargeKey, held);
     }
   }
-  const clock = {
-    now,
-    ...(book.lastSyncedAt !== undefined ? { lastSyncedAt: book.lastSyncedAt } : {}),
-    ...(book.graceHours !== undefined ? { graceHours: book.graceHours } : {}),
-  };
   const prepared: PreparedCharge[] = [];
   const pending: Prepared['pending'] = [];
-  for (const charge of charges) {
+  for (const charge of open.charges) {
     const observed = observedByKey.get(charge.key)!;
     const statement = lineIndex.get(charge.key);
     const dismissal = activeDismissalFor(charge, book.dismissals);
-    const billable = statement !== undefined || isDayBillable(charge.date, clock);
+    const billable =
+      statement !== undefined ||
+      (open.billableThrough !== undefined && charge.date <= open.billableThrough);
     const entry = matchEntry(observed, entries);
     if (!billable) {
       pending.push({ observed, ...(entry ? { entry } : {}) });
@@ -503,7 +502,7 @@ function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: str
       oreLines: charge.oreLines,
     });
   }
-  for (const observed of [...unrated, ...unread]) {
+  for (const observed of [...open.unrated, ...open.unread]) {
     const entry = matchEntry(observed, entries);
     pending.push({ observed, ...(entry ? { entry } : {}) });
   }
@@ -511,26 +510,13 @@ function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: str
   // Payments credit each Miner's Statements, oldest first (D5/D15).
   const settlement: Prepared['settlement'] = new Map();
   const credit = new Map<string, number>();
-  // A Miner with payments and no Statement yet still has them, as credit.
-  const minerIds = new Set([
-    ...book.statements.map((s) => s.minerId),
-    ...book.payments.map((p) => p.minerId),
-  ]);
-  for (const minerId of minerIds) {
-    const statements = book.statements.filter((s) => s.minerId === minerId);
-    const credits = dismissalCredits(statements, book.dismissals, charges);
-    const writeOffs = (book.writeOffs ?? []).filter((w) => w.minerId === minerId);
-    const allocation = allocatePayments({
-      statements,
-      payments: book.payments.filter((p) => p.minerId === minerId),
-      dismissalCredits: credits,
-      officerWriteOffs: writeOffs,
-      startDate: book.startDate,
-    });
+  for (const [minerId, miner] of open.miners) {
+    const { allocation } = miner;
     if (allocation.credit > 0) credit.set(minerId, allocation.credit);
-    for (const s of statements) {
+    const writeOffs = (book.writeOffs ?? []).filter((w) => w.minerId === minerId);
+    for (const s of miner.statements) {
       const result = allocation.byStatement.get(s.id);
-      const dismissed = credits
+      const dismissed = miner.dismissalCredits
         .filter((c) => c.statementId === s.id)
         .reduce((sum, c) => sum + c.amount, 0);
       const forgiven = result?.forgiven ?? 0;
@@ -547,10 +533,18 @@ function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: str
         pool: Math.max(0, (result?.credited ?? 0) - dismissed - forgiven),
         forgiven,
         forgivenReasons,
+        overdue: miner.overdue.get(s.id),
       });
     }
   }
-  return { book, charges: prepared, pending, settlement, credit };
+  return {
+    book,
+    charges: prepared,
+    pending,
+    settlement,
+    credit,
+    billableThrough: open.billableThrough,
+  };
 }
 
 function dayValue(p: PreparedCharge): {
@@ -1361,11 +1355,7 @@ export function overlayCorpBooks(input: {
   }
 
   const summaries: BookSummary[] = prepared.map((p) => {
-    const closedThrough = lastBillableDate({
-      now,
-      ...(p.book.lastSyncedAt !== undefined ? { lastSyncedAt: p.book.lastSyncedAt } : {}),
-      ...(p.book.graceHours !== undefined ? { graceHours: p.book.graceHours } : {}),
-    });
+    const closedThrough = p.billableThrough;
     return {
       corporationId: p.book.corporationId,
       corpName: p.book.corpName,
@@ -1373,7 +1363,7 @@ export function overlayCorpBooks(input: {
       ...(p.book.lastSyncedAt !== undefined ? { lastSyncedAt: p.book.lastSyncedAt } : {}),
       ...(closedThrough !== undefined ? { closedThrough } : {}),
       credit: [...p.credit.values()].reduce((sum, c) => sum + c, 0),
-      ...openAndOverdue(p, now),
+      ...openAndOverdue(p),
       uncredited: p.book.inFlight.filter((d) => isUncredited(d, p.book.lastSyncedAt)),
       hubId: p.book.hubId,
       oreForm: p.book.oreForm,
@@ -1426,10 +1416,10 @@ const isUncredited = (d: InFlightDonation, lastSyncedAt: string | undefined) =>
   Date.parse(lastSyncedAt) - Date.parse(d.at) >= UNCREDITED_AFTER_DAYS * DAY_MS;
 
 /** The member's unsettled Statements, and those past their Overdue days, oldest first. */
-function openAndOverdue(
-  p: Prepared,
-  now: string
-): { openStatements: OpenStatementView[]; overdue: OverdueStatementView[] } {
+function openAndOverdue(p: Prepared): {
+  openStatements: OpenStatementView[];
+  overdue: OverdueStatementView[];
+} {
   const open = p.book.statements
     .filter((s) => p.settlement.has(s.id) && p.settlement.get(s.id)?.settled !== true)
     .sort((a, b) => a.issuedAt.localeCompare(b.issuedAt) || a.id.localeCompare(b.id));
@@ -1447,15 +1437,9 @@ function openAndOverdue(
   };
   const overdue: OverdueStatementView[] = [];
   for (const s of open) {
-    const status = overdueStatus({
-      issuedAt: s.issuedAt,
-      settled: false,
-      now,
-      // The member reads their own declarations (#6206): a pause counts for them too.
-      declarations: declarations.filter((d) => d.statementId === s.id),
-      overdueDays: p.book.overdueDays ?? DEFAULT_OVERDUE_DAYS,
-    });
-    if (status.state === 'overdue') overdue.push({ ...view(s), overdueAt: status.overdueAt });
+    // The member reads their own declarations (#6206): a pause counts for them too.
+    const status = p.settlement.get(s.id)?.overdue;
+    if (status?.state === 'overdue') overdue.push({ ...view(s), overdueAt: status.overdueAt });
   }
   return { openStatements: open.map((s) => ({ ...view(s), issuedAt: s.issuedAt })), overdue };
 }

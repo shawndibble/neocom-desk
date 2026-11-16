@@ -13,18 +13,15 @@
  */
 import type { MinerListDoc, OverviewDoc } from '../../../functions/src/corpTaxBookReadModels';
 import { DAY_MS } from '@/lib/age';
-import { lastBillableDate } from './billable';
-import { buildDayCharges, type DayCharge } from './charges';
-import { splitByCoverageAndRead } from './feederHealth';
+import type { DayCharge } from './charges';
 import { overdueStatus, type Declaration } from './overdue';
 import { moonSchedule } from './bookSections';
 import {
   extractionRowBase,
   latestCorporationOf,
   minerDraft,
-  minerIdsOf,
+  openSetInputOf,
   pendingTax,
-  placeOfFactory,
   standingOf,
   type BookView,
   type BookViewInput,
@@ -33,6 +30,7 @@ import {
   type NeedsYouItem,
 } from './bookView';
 import type { SettlePayment, SyncExtraction } from './sync';
+import { settleOpenSet } from './openSet';
 
 /** The Extraction fields the Overview's schedule prints. */
 export type ScheduleRow = Pick<
@@ -86,7 +84,7 @@ export function fromBookView(view: BookView): TabsProjection {
 }
 
 /** What the loaded rows decide, whatever the docs say: unbilled, pending and unrated days. */
-export interface OpenSet {
+export interface OpenAmounts {
   billableThrough: string | undefined;
   /** The Miner ids a view lists, in order. */
   minerIds: string[];
@@ -95,32 +93,15 @@ export interface OpenSet {
 }
 
 /** The open set of `input`: the same day charges and drafts `buildBookView` builds, without the ledger. */
-export function openSetOf(input: BookViewInput): OpenSet {
-  const placeOf = placeOfFactory(input.extractions, input.structureExpiryHours);
-  const { readable } = splitByCoverageAndRead(input.entries, {
-    now: input.now,
-    graceHours: input.graceHours,
-    bookCorporationId: input.corporationId,
-    feeders: input.feeders ?? [],
-  });
-  const { charges, unrated } = buildDayCharges(readable, {
-    corporationId: input.corporationId,
-    startDate: input.startDate,
-    miners: input.miners,
-    rates: input.rates,
-    pricesOn: input.pricesOn,
-    placeOf,
-  });
-  const billableThrough = lastBillableDate({
-    now: input.now,
-    lastSyncedAt: input.lastSyncedAt,
-    graceHours: input.graceHours,
-  });
-  const minerIds = [...minerIdsOf(input, charges)];
+export function openSetOf(input: BookViewInput): OpenAmounts {
+  const { charges, billableThrough, minerIds, miners, unrated } = settleOpenSet(
+    openSetInputOf(input)
+  );
   const byMiner = new Map<string, { unbilled: number; pending: number }>();
   for (const id of minerIds) {
-    const statements = input.statements.filter((s) => s.minerId === id);
+    const { statements } = miners.get(id)!;
     const mine: DayCharge[] = charges.filter((c) => c.minerId === id);
+    // The book's billable-through, not the Miner's held one: as this path has always drafted.
     const draft = minerDraft(input, id, statements, mine, billableThrough);
     const billed = new Set<string>();
     for (const s of statements) for (const l of s.lines) if (l.chargeKey) billed.add(l.chargeKey);
@@ -151,7 +132,7 @@ export function readModelsUsable(
 export function fromReadModels(
   docs: { minerList: MinerListDoc; overview: OverviewDoc },
   input: BookViewInput,
-  open: OpenSet = openSetOf(input)
+  open: OpenAmounts = openSetOf(input)
 ): TabsProjection {
   const entries = new Map(docs.minerList.miners.map((e) => [e.minerId, e]));
   const latestCorp = latestCorporationOf(input.entries);
