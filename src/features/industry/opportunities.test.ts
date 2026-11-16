@@ -226,7 +226,10 @@ describe('computeOpportunityRow — auto make-or-buy depth (issue #652)', () => 
         recipeFor,
         depth,
       },
-      DEFAULT_TRADE_HUB
+      DEFAULT_TRADE_HUB,
+      undefined,
+      null,
+      'sellValue'
     );
   }
 
@@ -271,7 +274,9 @@ describe('computeOpportunityRow — priced like a Build Plan (issue #2055)', () 
       new Map(),
       { recipeFor, depth: 0 },
       DEFAULT_TRADE_HUB,
-      standing
+      standing,
+      null,
+      'sellValue'
     );
   }
 
@@ -350,7 +355,10 @@ describe('a plan opened from a row prices the row', () => {
     NO_CHARACTER_MODIFIERS,
     stock,
     { recipeFor, depth: 0 },
-    DEFAULT_TRADE_HUB
+    DEFAULT_TRADE_HUB,
+    undefined,
+    null,
+    'sellValue'
   )!;
 
   const profitOf = (plan: ReturnType<typeof planForOpportunityCandidate>) =>
@@ -412,7 +420,7 @@ describe('rows count owned materials as the plan page’s hero does', () => {
   };
   const stock = new Map([[34, { quantity: 90 }]]) as unknown as DetectedOwnedStockMap;
   const recipeFor = recipeForLookup({ catalog: cat, pi: null, ownedBlueprints: [ownedCopy] });
-  const priceRow = (held: DetectedOwnedStockMap, profitBasis?: ProfitBasis) =>
+  const priceRow = (held: DetectedOwnedStockMap, profitBasis: ProfitBasis = 'sellValue') =>
     computeOpportunityRow(
       candidate,
       snapshot,
@@ -465,10 +473,6 @@ describe('rows count owned materials as the plan page’s hero does', () => {
     expect(row.result.iskPerHour).toBe(free.iskPerHour);
     expect(row.result.marginPct).toBe(free.marginPct);
     expect(row.forgoneSale).toBe(0);
-  });
-
-  it('charges held stock at its sell value on the sell-value basis, as by default', () => {
-    expect(priceRow(stock, 'sellValue').result).toEqual(priceRow(stock).result);
   });
 
   it('charges the stock it uses at what it would sell for, so ISK/hour matches the plan hero', () => {
@@ -583,7 +587,8 @@ describe('rows price with the plan page’s settings', () => {
       { recipeFor, depth: 0 },
       DEFAULT_TRADE_HUB,
       undefined,
-      defaultsFrom
+      defaultsFrom,
+      'sellValue'
     )!;
 
   it('buys materials at the side of the market the latest plan’s basis names', () => {
@@ -677,7 +682,10 @@ describe('reaction rows (issue #5990)', () => {
       NO_CHARACTER_MODIFIERS,
       new Map(),
       { recipeFor, depth: 0 },
-      DEFAULT_TRADE_HUB
+      DEFAULT_TRADE_HUB,
+      undefined,
+      null,
+      'sellValue'
     )!;
 
   it('prices like the reaction Build Plan it opens: same profit, margin and ISK/hour', () => {

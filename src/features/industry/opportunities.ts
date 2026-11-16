@@ -26,7 +26,6 @@ import { buyOrderFeePct } from '@/engine/industry/buyOrderPrices';
 import { materialPricesFor } from './priceBasis';
 import { onPlanHeroBasis } from './planOwnedBasis';
 import type { ProfitBasis } from '@/engine/industry/profitBasis';
-import { DEFAULT_PROFIT_BASIS } from './profitBasisSetting';
 import { planReactionLocation } from './planReactionLocation';
 import type { ReactionLocationState } from '@/engine/industry/reactionLocation';
 import type { ActivityFacilityDefaults } from './facilityDefaults';
@@ -335,11 +334,11 @@ export function computeOpportunityRow(
   autoBuild: OpportunityAutoBuildOptions,
   /** The Trade Hub this candidate's owning Character would price at (issue #2055) — `hubForCharacter`'s resolution, batched per hub by the caller. */
   hub: TradeHub,
-  standing?: ResolvedStandings,
+  standing: ResolvedStandings | undefined,
   /** The owner's latest plan: where a plan made on the plan page starts its price basis and build location. */
-  defaultsFrom: BuildPlanRecord | null = null,
+  defaultsFrom: BuildPlanRecord | null,
   /** The pilot's Profit Basis setting (`profitBasisSetting.ts`), which the plan page and the Build Plans list read too. */
-  profitBasis: ProfitBasis = DEFAULT_PROFIT_BASIS
+  profitBasis: ProfitBasis
 ): UnrankedOpportunityRow | null {
   const blueprint = toIndustryBlueprint(candidate.catalogEntry.blueprint);
   // The plan this row opens prices the product the same way (`capProductPrice`).
