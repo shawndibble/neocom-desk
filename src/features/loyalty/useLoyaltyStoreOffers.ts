@@ -8,7 +8,7 @@
  * (`useDetectedOwnedStock`, the same hook a Build Plan's materials table
  * uses) for the per-offer "use my own materials" toggle.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRetryableLoad } from '@/lib/useRetryableLoad';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useMarketHub } from '@/features/market/hub';
@@ -24,13 +24,14 @@ import { useMarketSnapshot } from '@/features/industry/useMarketSnapshot';
 import { loadCorrectedSkills, skillLevelsOf } from '@/features/skills/correctedSkills';
 import { loadCharacterLoyaltyPoints } from '@/features/character/loyalty';
 import { loadTypeNames } from '@/features/character/typeNames';
-import { revenuePricing, usePriceBasis } from './priceBasis';
+import { revenuePricing, usePriceBasis, type PriceBasis } from './priceBasis';
 import { useLpStoreVolume } from './lpStoreVolume';
 import { useHaulingDemand } from '@/features/market/haulingDemand';
 import {
   useDetectedOwnedStock,
   useOwnedStockSnapshot,
 } from '@/features/industry/useDetectedOwnedStock';
+import type { OwnedStockSnapshot } from '@/features/industry/ownedStockDetection';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import type { MaterialSourcingMap, SkillLevels } from '@/engine/industry/types';
 import type { LoyaltyStoreOffer } from '@/esi/endpoints';
@@ -49,6 +50,11 @@ export interface LoyaltyStoreResult {
   offersError: boolean;
   reloadOffers: () => void;
   rows: LoyaltyOfferRow[];
+  /**
+   * Each offer's one-redemption ISK/LP on the Sell now basis, whatever the
+   * page's basis: Spend my LP ranks its candidates by it (null: unpriced).
+   */
+  instantIskPerLp: ReadonlyMap<number, number | null>;
   /** The character's skills and hub standing the rows were priced with; Offer Detail's "How many" walk reuses them. */
   skills: SkillLevels;
   standing: ResolvedStandings | undefined;
@@ -66,6 +72,8 @@ export interface LoyaltyStoreResult {
   pricesUnreachable: boolean;
   useOwnMaterialsFor: ReadonlySet<number>;
   toggleUseOwnMaterials: (offerId: number) => void;
+  /** Every account Character's assets, for the Spend my LP plan's owned turn-ins. */
+  ownedStockSnapshot: OwnedStockSnapshot;
 }
 
 export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult {
@@ -224,39 +232,53 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
   // case below it.
   const { snapshot } = useMarketSnapshot(hub, hubHydrated ? typeIds : []);
 
-  const rows = useMemo(() => {
-    if (!offers || !catalog || !snapshot) return [];
-    return computeLoyaltyOfferRows({
+  const rowsOn = useCallback(
+    (basis: PriceBasis): LoyaltyOfferRow[] => {
+      if (!offers || !catalog || !snapshot) return [];
+      return computeLoyaltyOfferRows({
+        offers,
+        catalog,
+        hubPrices: snapshot.hubPrices,
+        ...revenuePricing(snapshot, basis),
+        adjustedPrices: snapshot.adjustedPrices,
+        systemCostIndex: snapshot.systemCostIndex,
+        regionalTaxPct: snapshot.regionalTaxPct,
+        skills,
+        standing,
+        materialSourcing,
+        itemNames,
+        useOwnMaterialsFor,
+        playerLp,
+        sellsPerDayByType: volume,
+        tradedPrices: demand?.types,
+      });
+    },
+    [
       offers,
       catalog,
-      hubPrices: snapshot.hubPrices,
-      ...revenuePricing(snapshot, priceBasis),
-      adjustedPrices: snapshot.adjustedPrices,
-      systemCostIndex: snapshot.systemCostIndex,
-      regionalTaxPct: snapshot.regionalTaxPct,
+      snapshot,
       skills,
       standing,
       materialSourcing,
       itemNames,
       useOwnMaterialsFor,
       playerLp,
-      sellsPerDayByType: volume,
-      tradedPrices: demand?.types,
-    });
-  }, [
-    offers,
-    catalog,
-    snapshot,
-    priceBasis,
-    skills,
-    standing,
-    materialSourcing,
-    itemNames,
-    useOwnMaterialsFor,
-    playerLp,
-    volume,
-    demand,
-  ]);
+      volume,
+      demand,
+    ]
+  );
+  const rows = useMemo(() => rowsOn(priceBasis), [rowsOn, priceBasis]);
+  // On the Sell now basis the page's rows already are the instant ones.
+  const instantIskPerLp = useMemo(
+    () =>
+      new Map(
+        (priceBasis === 'buy' ? rows : rowsOn('buy')).map((row) => [
+          row.offer.offer_id,
+          row.profit.iskPerLp,
+        ])
+      ),
+    [rows, rowsOn, priceBasis]
+  );
 
   function toggleUseOwnMaterials(offerId: number): void {
     setUseOwnMaterialsFor((prev) => {
@@ -278,6 +300,7 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
       setReloadKey((k) => k + 1);
     },
     rows,
+    instantIskPerLp,
     catalog,
     playerLp,
     hub,
@@ -294,5 +317,6 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
     pricesUnreachable: snapshot?.hubPricesUnreachable === true,
     useOwnMaterialsFor,
     toggleUseOwnMaterials,
+    ownedStockSnapshot,
   };
 }

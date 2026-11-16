@@ -35,6 +35,7 @@ import * as Icon from '@/components/ui/icons';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { RowTappableContext } from '@/components/ui/tooltipHold';
 import { HintText } from '@/components/ui/HintText';
+import { ShareMark } from '@/components/ui/ShareMark';
 import { openItemInfo } from '@/stores/itemInfoModal';
 import { cx } from '@/lib/cx';
 import type { TableCell, TableColumn, TableModel, TableRowModel } from './data/types';
@@ -87,8 +88,25 @@ const CELL_TONE = { good: 'text-success', caution: 'text-warning', bad: 'text-da
 /** At Small the bar is half as long: the first column keeps the width, the bar is only decoration. */
 function CellValue({ cell, compact }: { cell: TableCell; compact: boolean }) {
   if (typeof cell === 'string') return <>{cell}</>;
-  if ('iskAmount' in cell) return <IskAmount value={cell.iskAmount} decimals={0} />;
+  if ('iskAmount' in cell) {
+    const amount = <IskAmount value={cell.iskAmount} decimals={0} />;
+    return cell.prefix === undefined ? (
+      amount
+    ) : (
+      <>
+        {cell.prefix} {amount}
+      </>
+    );
+  }
   if ('hint' in cell) return <HintText content={cell.hint}>{cell.text}</HintText>;
+  if ('share' in cell) {
+    return (
+      <span className="inline-flex max-w-full items-center gap-1.5">
+        <span className="truncate">{cell.text}</span>
+        <ShareMark label={cell.share.label} off={cell.share.off} />
+      </span>
+    );
+  }
   if (cell.bar === undefined) return <>{cell.text}</>;
   return (
     <span className="inline-flex items-center gap-2">

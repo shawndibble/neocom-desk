@@ -46,6 +46,7 @@ import { FinishSetupHost } from '@/features/character/finishSetup/FinishSetupHos
 import { NetWorthSnapshotRecorder } from '@/features/netWorth/NetWorthSnapshotRecorder';
 import { AlertsPanelProvider } from '@/features/notifications/AlertsPanelContext';
 import { useRequestBadgePoll } from '@/features/communities/requestBadge';
+import { useMoonsAttentionPoll } from '@/features/corp/moons/moonsNavAttention';
 import { useAlertBadge } from '@/features/notifications/useUnreadAlertCount';
 import { barTabs, NAV_LABEL_KEYS, useMobileTabs } from '@/lib/mobileTabs';
 import { CorpGrantPrompt } from '@/features/corp/CorpGrantPrompt';
@@ -316,6 +317,8 @@ export const Layout = memo(function Layout() {
   const alertBadge = useAlertBadge();
   // New Requests on the Communities item, read while the app is open (issue #3810).
   useRequestBadgePoll();
+  // The corp Moons dot's Needs you count and Automatic sync stop, between Moons visits (#6208).
+  useMoonsAttentionPoll();
   const navBadge = useNavBadges();
   const settingsAttention = useSettingsNeedsAttention();
   const railSettingsAttention = useRailSettingsNeedsAttention();
@@ -383,7 +386,10 @@ export const Layout = memo(function Layout() {
                       attention={railSettingsAttention}
                       className="flex-1"
                     />
-                    <RailUpgradeButton />
+                    {/* Mounted only where the rail shows: the rail is CSS-hidden below `md`,
+                        but the callout is a portaled popover that would escape it and
+                        point at nothing on a phone. */}
+                    {isDesktop && <RailUpgradeButton />}
                   </div>
                 ) : (
                   <NavItem key={page.path} to={page.path} label={t(page.labelKey)} locked={false} />

@@ -40,6 +40,8 @@ import { usePayeeFilter } from './usePayeeFilter';
 import { useEntryDeepLink } from './useEntryDeepLink';
 import { useTaxAttentionItems } from './useTaxAttentionItems';
 import { useTaxBalances } from './useTaxBalances';
+import { corpPayAccounts } from './corpBook/corpPayAccount';
+import { sum } from '@/engine/math';
 import { useTaxCorpBooks } from './useTaxCorpBooks';
 import { useTaxLedgerActions } from './useTaxLedgerActions';
 import { useTaxPayeeNames } from './useTaxPayeeNames';
@@ -122,6 +124,13 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     systemNames,
     systemSecurity,
   } = useTaxCorpBooks(data, characters, activeCharacterId);
+  // Offered by Manage Payees as the link for a Payee named for one (#6205).
+  const bookCorporations = useMemo(
+    () =>
+      corpView?.books.map((b) => ({ corporationId: b.loaded.corporationId, name: b.corpName })) ??
+      [],
+    [corpView]
+  );
   const corpStateLabel = useCorpStateLabel();
   const corpStateHint = useCorpStateHint();
 
@@ -169,6 +178,28 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   );
 
   const conflicts = useMemo(() => summarizeConflicts(characterFiltered), [characterFiltered]);
+  // Donations a book hasn't credited, per corporation, from the Characters in view: its Payee card
+  // warns before a second payment, naming the Accounts the book reads (as the attention item does).
+  const uncreditedByCorp = useMemo(
+    () =>
+      new Map(
+        corpView?.books.map((b) => [
+          b.loaded.corporationId,
+          {
+            amount: sum(
+              b.summary.uncredited
+                .filter(
+                  (d) =>
+                    resolvedCharacterFilter === 'all' || resolvedCharacterFilter.has(d.characterId)
+                )
+                .map((d) => d.amount)
+            ),
+            accounts: corpPayAccounts(b.loaded.divisions, b.loaded.divisionNames, t).join(', '),
+          },
+        ]) ?? []
+      ),
+    [corpView, resolvedCharacterFilter, t]
+  );
   const { balances, unassigned, everyAssignment, linkSuggestions, payeeSystems, owedByPayee } =
     useTaxBalances({
       characterFiltered,
@@ -177,6 +208,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
       allPayees,
       estimatedValueOf,
       madePayments,
+      alsoBilled: corpView?.overlay.alsoBilled,
     });
 
   // A Corp Tax Book row is the corp's to continue, not the member's.
@@ -214,6 +246,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     data,
     resolvedCharacterFilter,
     personalRows,
+    displayRows: characterFiltered,
     payeeById,
     corpView,
     failedClaims,
@@ -335,6 +368,11 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                   }
                   onLinkPayment={(balance) => actions.openLinkWallet({ payeeId: balance.payee.id })}
                   hideLinkPayment={(balance) => isCorpPayeeId(balance.payee.id)}
+                  uncreditedOf={(balance) =>
+                    isCorpPayeeId(balance.payee.id)
+                      ? uncreditedByCorp.get(corporationOfPayee(balance.payee.id))
+                      : undefined
+                  }
                   onAssignNext={assignNext}
                   onReviewPayments={() => actions.openLinkPayment(true)}
                   conflicts={conflicts}
@@ -348,7 +386,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                     key={book.loaded.corporationId}
                     book={book}
                     owedNow={corpOwedNow(book.loaded.corporationId)}
-                    showCredit={false}
                   />
                 ))}
 
@@ -450,6 +487,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
           owedByPayee={owedByPayee}
           systemsByPayee={payeeSystems}
           systemNames={systemNames}
+          bookCorporations={bookCorporations}
           refresh={refresh}
         />
 
@@ -475,6 +513,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
           paymentSources={paymentSources}
           linkSuggestions={linkSuggestions}
           corpView={corpView}
+          reloadCorpBooks={reloadCorpBooks}
           corpStateHint={corpStateHint}
           dismissTargets={selection.dismissTargets}
           showCharacterColumn={showCharacterColumn}

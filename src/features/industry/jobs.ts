@@ -135,6 +135,7 @@ export type ActiveJob = Pick<
   | 'end_date'
   | 'status'
   | 'cost'
+  | 'successful_runs'
 >;
 
 /** Ending soonest first. */

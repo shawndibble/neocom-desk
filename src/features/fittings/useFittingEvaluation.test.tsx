@@ -108,7 +108,7 @@ describe('useFittingEvaluation', () => {
   it('waits for the stored Damage Profile, then measures every evaluation against it', async () => {
     damage.hydrated = false;
     const { result, rerender } = render({ fitting: RIFTER });
-    await act(async () => {});
+    // Mounted, so the effect that would start a calculation has run and returned early.
     expect(engine.computeFittingStats).not.toHaveBeenCalled();
     expect(result.current.variants).toBeNull();
 

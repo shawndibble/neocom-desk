@@ -218,7 +218,12 @@ function renderBook(
             graceHours: 6,
             rates: input.rates as BookSettings['rates'],
           } as BookSettings,
-          data: { feeders, state: { extractions: [] }, ...bookData } as unknown as BookData,
+          data: {
+            feeders,
+            state: { extractions: [] },
+            parts: new Set(['core', 'observed', 'ledger', 'answers']),
+            ...bookData,
+          } as unknown as BookData,
           verdict,
           reload,
         }}
@@ -268,6 +273,8 @@ describe('MoonOwnersTab', () => {
     const summary = (over: Partial<FeederViewSummary> = {}) =>
       ({
         schemaVersion: 1,
+        rulesVersion: 2,
+        mode: 'normal',
         status: 'active',
         builtAt: Date.parse('2026-10-20T07:00:00Z'),
         coverageFrom: '2026-10-01',
@@ -575,5 +582,28 @@ describe('Paying a moon owner', () => {
     expect(markFeederPayout).toHaveBeenCalledWith(7, BOOK, ASH, 'p1', true);
     await userEvent.click(screen.getByRole('button', { name: 'Count it' }));
     expect(markFeederPayout).toHaveBeenCalledWith(7, BOOK, ASH, 'p2', false);
+  });
+
+  it('lists a donation without the payout reference to confirm, and shows a disputed one (#6209)', async () => {
+    renderBook(
+      <MoonOwnerDetail id={String(ASH)} />,
+      [
+        feeder(ASH, {
+          agreedRatePct: 8,
+          payouts: [
+            paid('j1_9', 700, { notAPayout: true, unconfirmed: true }),
+            paid('p1', 1000, { disputedAt: 1 }),
+          ],
+        }),
+      ],
+      `/corp/moons/moon-owners/${ASH}`
+    );
+    expect(screen.getByText('To confirm: not counted yet')).toBeInTheDocument();
+    expect(screen.getByText('They dispute this payment')).toBeInTheDocument();
+    const row = screen.getByText('To confirm: not counted yet').closest('tr')!;
+    await userEvent.click(within(row).getByRole('button', { name: 'Count it' }));
+    expect(markFeederPayout).toHaveBeenCalledWith(7, BOOK, ASH, 'j1_9', false);
+    await userEvent.click(within(row).getByRole('button', { name: 'Not a payout' }));
+    expect(markFeederPayout).toHaveBeenCalledWith(7, BOOK, ASH, 'j1_9', true);
   });
 });

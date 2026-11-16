@@ -349,11 +349,11 @@ describe('placeRemaps leading current-attributes segment', () => {
   });
 
   it('N=1: is a pure function of its inputs, whatever ran before it (#3074)', () => {
-    // CI once returned 42338 s here against the 25600 s optimum, then passed
-    // on rerun. placeRemaps and everything under it hold no mutable state (the
-    // one module-level cache is a frozen-in-practice allocation list), so this
-    // pins that: repeated calls, calls interleaved with other remap counts and
-    // clone states, and a frozen input must all agree to the last bit.
+    // CI's 42338 s here (#3074) was a JIT miscompile, not shared state: see
+    // the single-remap fast path in placeRemaps.ts, which has the flags that
+    // reproduce it. This pins the contract: repeated calls, calls interleaved
+    // with other remap counts and clone states, and a frozen input must all
+    // agree to the last bit.
     const skills = skillMap(
       skill(1, 'intelligence', 'memory'),
       skill(2, 'perception', 'willpower')

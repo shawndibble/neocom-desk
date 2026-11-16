@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import {
+  billedPricesOf,
   buildMoonOwners,
   extractionRefineriesOf,
   type MoonOwnersInput,
@@ -23,6 +24,8 @@ export function useMoonOwnersInput(): MoonOwnersInput {
       extractionRefineries: extractionRefineriesOf(view.input.extractions),
       // The moon owner's page's prices (#4621), so the tab, Pay and that page owe one figure.
       pricesOn: view.input.moonOwnerPricesOn ?? ((date) => view.input.pricesOn(date).prices),
+      // An ore with no saved price takes what its line was billed at, as on that page (#6209).
+      billedPrices: billedPricesOf(view.input.statements),
     }),
     [view, settings, data.feeders, data.feederSummaries, corporationId]
   );

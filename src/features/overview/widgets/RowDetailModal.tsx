@@ -3,9 +3,11 @@
  * its facts, optional bars and list, then where it is. Set destination goes to
  * the EVE client; the jump count links to Route Safety.
  */
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Eyebrow, Modal, ProgressBar, StatChip, StatChips } from '@/components/ui';
 import { Pill } from '@/components/ui/Pill';
+import { buttonClassName } from '@/components/ui/buttonClassName';
 import { SetDestinationButton } from '@/features/market/SetDestinationButton';
 import { JumpsLink } from '@/features/route/JumpsLink';
 import type { RowDetailModel } from './data/types';
@@ -70,7 +72,7 @@ function List({ list }: { list: NonNullable<RowDetailModel['list']> }) {
         {list.items.map((item) => (
           <li key={item.key} className="flex items-center justify-between gap-3 py-1.5">
             <span className="flex min-w-0 items-center gap-2">
-              <Pill tone={item.tone}>{item.badge}</Pill>
+              {item.badge !== undefined && <Pill tone={item.tone}>{item.badge}</Pill>}
               <span className="truncate">{item.text}</span>
             </span>
             <span className="shrink-0 tabular-nums text-text-dim">{item.value}</span>
@@ -95,12 +97,17 @@ export function RowDetailModal({
           {detail.status && <Status status={detail.status} />}
           <StatChips>
             {detail.facts.map((fact) => (
-              <StatChip key={fact.label} label={fact.label} value={fact.value} />
+              <StatChip key={fact.label} label={fact.label} value={fact.value} tone={fact.tone} />
             ))}
           </StatChips>
           {detail.meters && <Meters meters={detail.meters} />}
           {detail.list && <List list={detail.list} />}
           {detail.place && <Place place={detail.place} />}
+          {detail.link && (
+            <Link to={detail.link.to} className={buttonClassName({ variant: 'primary' })}>
+              {detail.link.label}
+            </Link>
+          )}
         </div>
       )}
     </Modal>

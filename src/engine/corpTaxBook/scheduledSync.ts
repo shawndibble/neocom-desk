@@ -46,6 +46,8 @@ export interface ScheduledSyncStatus {
   stoppedAt?: number;
   stoppedReason?: ScheduledStopReason;
   lastRun?: ScheduledSyncRun;
+  /** The book's own refineries the sync read, from its `systemIds` keys (#6240); absent when none. */
+  refineryIds?: number[];
 }
 
 /** Reads `meta/scheduledSync`, dropping anything malformed; null when the schedule was never on or was revoked. */
@@ -59,6 +61,13 @@ export function scheduledSyncFrom(
     ? (d.stoppedReason as ScheduledStopReason)
     : undefined;
   const run = d.lastRun as Partial<ScheduledSyncRun> | undefined;
+  const refineryIds =
+    d.systemIds && typeof d.systemIds === 'object'
+      ? Object.keys(d.systemIds)
+          .map(Number)
+          .filter((id) => Number.isSafeInteger(id) && id > 0)
+          .sort((a, b) => a - b)
+      : [];
   return {
     status: d.status,
     characterId: d.characterId,
@@ -69,5 +78,6 @@ export function scheduledSyncFrom(
     ...(run && typeof run.at === 'number' && (run.outcome === 'synced' || run.outcome === 'skipped')
       ? { lastRun: run as ScheduledSyncRun }
       : {}),
+    ...(refineryIds.length > 0 ? { refineryIds } : {}),
   };
 }

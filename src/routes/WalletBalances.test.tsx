@@ -1,12 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import '@/i18n';
 import { db } from '@/db';
-import { App } from '@/app/App';
 import { REQUIRED_SCOPES } from '@/features/netWorth/recordSnapshots';
-import { installWalletHarness, CHAR_ID, server } from '@/test/walletPage';
+import { installWalletHarness, renderWalletRoute, CHAR_ID, server } from '@/test/walletPage';
 
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
 
@@ -15,14 +14,6 @@ vi.mock('@/features/character/walletJournalAll', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/features/character/walletJournalAll')>();
   return { ...actual, loadAllCharactersJournals: vi.fn(actual.loadAllCharactersJournals) };
 });
-
-vi.mock('virtual:pwa-register/react', () => ({
-  useRegisterSW: () => ({
-    needRefresh: [false, vi.fn()],
-    offlineReady: [false, vi.fn()],
-    updateServiceWorker: vi.fn(),
-  }),
-}));
 
 vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => []),
@@ -74,7 +65,7 @@ describe('Wallet', () => {
     it('renders no character filter for an account with one Character — nothing for it to change', async () => {
       // Deliberately no `seedSecondCharacter()`: the outer beforeEach leaves
       // exactly one pilot in Dexie.
-      render(<App />);
+      renderWalletRoute();
 
       expect(await screen.findByText('EverMarks')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'This character' })).toBeNull();
@@ -83,7 +74,7 @@ describe('Wallet', () => {
     it('puts the character filter in the page header, and keeps it there across the panel swap', async () => {
       const user = userEvent.setup();
       await seedSecondCharacter();
-      render(<App />);
+      renderWalletRoute();
 
       // In the PageHeader's scope slot, not the Worth panel's title bar.
       await screen.findByText('EverMarks');
@@ -102,7 +93,7 @@ describe('Wallet', () => {
 
     it("shows only the active character's balance by default — no picker-driven fetch", async () => {
       await seedSecondCharacter();
-      render(<App />);
+      renderWalletRoute();
 
       expect(await screen.findByText('EverMarks')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'This character' })).toBeInTheDocument();
@@ -113,7 +104,7 @@ describe('Wallet', () => {
       const user = userEvent.setup();
       await seedSecondCharacter();
       await grantSnapshotScopes(CHAR_ID, 92);
-      render(<App />);
+      renderWalletRoute();
 
       await screen.findByText('EverMarks');
       await user.click(screen.getByRole('button', { name: 'This character' }));
@@ -131,7 +122,7 @@ describe('Wallet', () => {
       await seedSecondCharacter();
       await grantSnapshotScopes(CHAR_ID, 92);
       await db.settings.put({ key: 'sync.defaultCharacterFilter', value: 'all' });
-      render(<App />);
+      renderWalletRoute();
 
       const table = await screen.findByRole('table', { name: 'Balance by character' });
       await user.click(await within(table).findByText('Pilot Two'));
@@ -152,7 +143,7 @@ describe('Wallet', () => {
       await seedSecondCharacter();
       await grantSnapshotScopes(CHAR_ID, 92);
       await db.settings.put({ key: 'sync.defaultCharacterFilter', value: 'all' });
-      render(<App />);
+      renderWalletRoute();
 
       const table = await screen.findByRole('table', { name: 'Balance by character' });
       await user.click(await within(table).findByText('Pilot Two'));
@@ -174,7 +165,7 @@ describe('Wallet', () => {
       await seedSecondCharacter();
       await db.settings.put({ key: 'sync.defaultCharacterFilter', value: 'all' });
       window.history.pushState({}, '', '/wallet/lp-store');
-      render(<App />);
+      renderWalletRoute();
 
       const title = await screen.findByRole('heading', { level: 1, name: 'LP Store' });
       expect(
@@ -187,7 +178,7 @@ describe('Wallet', () => {
       await seedSecondCharacter();
       await grantSnapshotScopes(CHAR_ID, 92);
       await db.settings.put({ key: 'sync.defaultCharacterFilter', value: 'all' });
-      render(<App />);
+      renderWalletRoute();
 
       const table = await screen.findByRole('table', { name: 'Balance by character' });
       await user.click(await within(table).findByText('Pilot Two'));
@@ -208,7 +199,7 @@ describe('Wallet', () => {
     it('opens on "All characters" when the synced default says so, without the pilot touching the picker', async () => {
       await seedSecondCharacter();
       await db.settings.put({ key: 'sync.defaultCharacterFilter', value: 'all' });
-      render(<App />);
+      renderWalletRoute();
 
       expect(await screen.findByRole('button', { name: /^All characters/ })).toBeInTheDocument();
       const table = await screen.findByRole('table', { name: 'Balance by character' });
@@ -229,7 +220,7 @@ describe('Wallet', () => {
           return HttpResponse.json(1000);
         })
       );
-      render(<App />);
+      renderWalletRoute();
 
       const picker = await screen.findByRole('button', { name: 'This character' });
       expect(picker).toHaveAttribute('aria-busy', 'true');
@@ -253,7 +244,7 @@ describe('Wallet', () => {
         addedAt: 3,
       });
       // CHAR_C deliberately gets no token at all — never granted the scope.
-      render(<App />);
+      renderWalletRoute();
 
       await screen.findByText('EverMarks');
       await user.click(screen.getByRole('button', { name: 'This character' }));

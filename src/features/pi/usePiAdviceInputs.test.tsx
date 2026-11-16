@@ -43,14 +43,16 @@ describe('usePiAdviceInputs', () => {
   });
 
   it('holds loading until the routes settle, so the advice model runs once', async () => {
-    pricesRead = async () => prices(false);
+    const pricesIn = vi.fn(async () => prices(false));
+    pricesRead = pricesIn;
     let release: () => void = () => {};
     routesRead = () =>
       new Promise((resolve) => {
         release = () => resolve({ kind: 'unknown' });
       });
     const { result } = renderHook(() => usePiAdviceInputs(snapshot, 7, 'isk'));
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // The prices are in; only the routes are outstanding.
+    await waitFor(() => expect(pricesIn).toHaveResolved());
     expect(result.current.status).toBe('loading');
     release();
     await waitFor(() => expect(result.current.status).toBe('ready'));

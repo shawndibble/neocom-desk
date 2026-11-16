@@ -719,6 +719,10 @@ export const ESI_REGISTRY = {
     route: '/markets/{region_id}/history',
     scope: PUBLIC,
   },
+  getMarketTypes: {
+    route: '/markets/{region_id}/types',
+    scope: PUBLIC,
+  },
 
   // Its own Permission (issue #538; default-on since #6102): the region order book above never includes a player
   // structure's own orders, so this is the only way to check one. ACL-gated

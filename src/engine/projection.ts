@@ -74,6 +74,9 @@ import {
   openPhase,
   type DenEntrySnapshot,
   type StructureReinforcementExitFire,
+  type SharedMoonPopEntrySnapshot,
+  type SharedMoonPopFire,
+  sharedMoonPopFire,
 } from './notificationDiffs';
 import { reinforcementExitMs, parseEveNotificationPayload } from './eveNotificationPayload';
 import { occurrenceKey, type OccurrenceFire } from './occurrenceKey';
@@ -114,6 +117,7 @@ export const PROJECTABLE_EVENT_IDS = [
   'skyhookRaidable',
   'corpIndustryJobReady',
   'eveNotification',
+  'sharedMoonPop',
 ] as const;
 
 export type ProjectableEventId = (typeof PROJECTABLE_EVENT_IDS)[number];
@@ -171,6 +175,9 @@ export function projectionWording(eventId: ProjectableEventId): ProjectionWordin
     case 'cloneJumpReady':
     case 'calendarEventStarting':
     case 'eveNotification':
+    // A started Extraction's times do not change; an early fracture is a new occurrence.
+    // falls through
+    case 'sharedMoonPop':
       return 'assert';
     default: {
       const exhaustive: never = eventId;
@@ -711,6 +718,55 @@ export function projectAccelerators(
     rows.push(
       buildRow(characterId, 'acceleratorExpiring', fire, fireAt, copy(fire, characterName, {}))
     );
+  }
+  return rows;
+}
+
+/** What a Shared Moon Pop row names, resolved by the caller. */
+export interface SharedMoonPopProjectionNames {
+  /** Sharing corporations' names by id; an absent one leaves the renderer's fallback. */
+  readonly corporations: ReadonlyMap<number, string>;
+  /** The Pop Time in the pilot's chosen clock. */
+  readonly when: (ms: number) => string;
+}
+
+/** What `projectSharedMoonPops` reads. */
+export interface SharedMoonPopProjectionOptions {
+  readonly characterId: number;
+  readonly characterName: string;
+  readonly entries: readonly SharedMoonPopEntrySnapshot[];
+  readonly mutedCorporationIds: ReadonlySet<number>;
+  readonly names: SharedMoonPopProjectionNames;
+  readonly copy: PushCopy<SharedMoonPopFire, { corporation?: string; when?: string }>;
+  readonly nowMs: number;
+  readonly horizonMs?: number;
+}
+
+/**
+ * `sharedMoonPop` (issue #6225): one row per Shared Pop at its Pop Time less the Character's lead
+ * time. A muted sharing corporation projects nothing; so does a pop already past its fire time.
+ */
+export function projectSharedMoonPops({
+  characterId,
+  characterName,
+  entries,
+  mutedCorporationIds,
+  names,
+  copy,
+  nowMs,
+  horizonMs = PROJECTION_HORIZON_MS,
+}: SharedMoonPopProjectionOptions): ProjectionRow[] {
+  const rows: ProjectionRow[] = [];
+  for (const entry of entries) {
+    if (mutedCorporationIds.has(entry.corporationId)) continue;
+    const fireAt = entry.popAtMs - entry.leadMs;
+    if (!inHorizon(fireAt, nowMs, horizonMs)) continue;
+    const fire = sharedMoonPopFire(characterId, entry);
+    const text = copy(fire, characterName, {
+      corporation: names.corporations.get(entry.corporationId),
+      when: names.when(entry.popAtMs),
+    });
+    rows.push(buildRow(characterId, 'sharedMoonPop', fire, fireAt, text));
   }
   return rows;
 }

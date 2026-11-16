@@ -8,6 +8,12 @@ import { IDLE_SYNC_STATUS } from '@/sync/statusFixtures';
 import { DangerBanner } from './DangerBanner';
 import { DEFAULT_NOTIFICATION_PREFERENCES, useNotificationPreferences } from './preferences';
 import { useSnoozeStore } from './snooze';
+import { useVisibleAlertEntries } from './useUnreadAlertCount';
+
+/** The feed the banner reads, counted: once it shows the seeded entry, the banner's read has answered. */
+function FeedProbe() {
+  return <output data-testid="feed">{useVisibleAlertEntries().length}</output>;
+}
 
 vi.mock('@/sync', () => ({
   getSyncStatus: () => IDLE_SYNC_STATUS,
@@ -58,8 +64,8 @@ describe('DangerBanner', () => {
       firedAt: Date.now(),
     });
     const { container } = renderBanner();
-    // Give the live query a turn to resolve before asserting absence.
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    render(<FeedProbe />);
+    await waitFor(() => expect(screen.getByTestId('feed')).toHaveTextContent('1'));
     expect(container.querySelector('[role="alert"]')).toBeNull();
   });
 

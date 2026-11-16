@@ -5,11 +5,22 @@ import type { Caller } from './actorAuth.js';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
 import { HttpsError } from 'firebase-functions/v2/https';
-import { parseBookCall, parseEditAction, parseSyncInput, parseTurnOnInput } from './corpTaxBook.js';
+import {
+  parseBookCall,
+  parseDeclareOwnInput,
+  parseDisputeConflictInput,
+  parseWithdrawDisputeInput,
+  parseEditAction,
+  parseSyncInput,
+  parseTurnOnInput,
+} from './corpTaxBook.js';
 import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
 import {
   KEPT_ON_BOOK_DELETE,
   claimPayment,
+  declareOwnPayment,
+  disputeConflict,
+  withdrawDispute,
   deleteBook,
   confirmGrouping,
   declineGrouping,
@@ -1122,6 +1133,335 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
     });
   });
 
+  describe('confirming a declaration with a payment', () => {
+    const declared = async () => {
+      await turnOn();
+      await edit(ACCOUNTANT, { action: 'issueStatement', statement: statement('s1') });
+      const { declarationId } = await edit(ACCOUNTANT, {
+        action: 'declare',
+        statementId: 's1',
+        kind: 'contract',
+      });
+      await book().collection('payments').doc('j1_1').set({
+        id: 'j1_1',
+        source: 'donation',
+        characterId: 50,
+        uid: 'char:50',
+        amount: 10_000_000,
+        at: '2026-11-02T00:00:00.000Z',
+        division: 1,
+      });
+      return declarationId as string;
+    };
+    const manual = (declarationId: string) => ({
+      action: 'recordPayment',
+      paymentId: `m_${declarationId}`,
+      minerId: 'solo:50',
+      characterId: 50,
+      amount: 10_000_000,
+      at: '2026-11-02T00:00:00.000Z',
+      declarationId,
+    });
+    const match = (declarationId: string) => ({
+      action: 'assignPayment',
+      paymentId: 'j1_1',
+      minerId: 'solo:50',
+      declarationId,
+    });
+    const resolution = async (id: string) =>
+      (await book().collection('declarations').doc(id).get()).get('resolution');
+
+    it('resolves it with the hand-recorded payment, and refuses a donation match after', async () => {
+      const id = await declared();
+      await edit(ACCOUNTANT, manual(id));
+      expect(await resolution(id)).toMatchObject({ kind: 'confirmed', paymentId: `m_${id}` });
+      expect(await reason(edit(ACCOUNTANT, match(id)))).toBe('already-resolved');
+      expect((await book().collection('payments').doc('j1_1').get()).get('minerId')).toBe(
+        undefined
+      );
+    });
+
+    it('resolves it with a matched donation, and refuses a hand-recorded payment after', async () => {
+      const id = await declared();
+      await edit(ACCOUNTANT, match(id));
+      expect(await resolution(id)).toMatchObject({ kind: 'confirmed', paymentId: 'j1_1' });
+      expect(await reason(edit(ACCOUNTANT, manual(id)))).toBe('already-resolved');
+      expect((await book().collection('payments').doc(`m_${id}`).get()).exists).toBe(false);
+    });
+
+    it("refuses another Miner's declaration", async () => {
+      const id = await declared();
+      expect(
+        await reason(edit(ACCOUNTANT, { ...manual(id), minerId: 'solo:51', characterId: 51 }))
+      ).toBe('wrong-miner');
+    });
+  });
+
+  describe("a Miner's own declaration and dispute (#6206)", () => {
+    const declare = (id: number, data: Record<string, unknown>) =>
+      declareOwnPayment(deps(), who(id), parseDeclareOwnInput({ corporationId: CORP, ...data }));
+    const dispute = (id: number, lines: Record<string, unknown>[], date = '2026-10-17') =>
+      disputeConflict(
+        deps(),
+        who(id),
+        parseDisputeConflictInput({ corporationId: CORP, date, lines })
+      );
+    const line = (characterId: number, overrides: Record<string, unknown> = {}) => ({
+      recordKey: `${characterId}:1000:2026-10-17`,
+      typeId: 45490,
+      quantity: 100,
+      payeeName: 'Rival Corp',
+      ...overrides,
+    });
+    // A disputed line must be ore the book recorded (structure 1000, 2026-10-17).
+    const recordOre = (...rows: [characterId: number, typeId?: number][]) =>
+      syncBook(
+        deps(),
+        who(ACCOUNTANT),
+        parseSyncInput(
+          {
+            corporationId: CORP,
+            observed: rows.map(([characterId, typeId = 45490]) =>
+              row(100, '2026-10-18T10:00:00Z', { characterId, typeId })
+            ),
+          },
+          now
+        )
+      );
+    // Members see the book only after its setup window; the officer's access is renewed then.
+    const pastSetup = async () => {
+      now = T0 + 73 * 3_600_000;
+      await verifyOfficer(deps(), who(ACCOUNTANT), parseBookCall(withToken(ACCOUNTANT)));
+    };
+
+    it('declares on the caller’s own open Statement only, once at a time, audited', async () => {
+      await turnOn();
+      await edit(ACCOUNTANT, { action: 'issueStatement', statement: statement('s1') });
+      expect(await reason(declare(50, { statementId: 's1' }))).toBe('no-book');
+      await pastSetup();
+      // Someone else's Statement looks exactly like a missing one.
+      expect(await reason(declare(51, { statementId: 's1' }))).toBe('not-found');
+      expect(await reason(declare(50, { statementId: 's404' }))).toBe('not-found');
+      const { declarationId } = await declare(50, {
+        statementId: 's1',
+        amount: 4_000_000,
+        note: 'by contract',
+      });
+      expect((await book().collection('declarations').doc(declarationId).get()).data()).toEqual({
+        id: declarationId,
+        statementId: 's1',
+        kind: 'another-way',
+        at: new Date(now).toISOString(),
+        recordedBy: 50,
+        via: 'player',
+        minerId: 'solo:50',
+        uids: ['char:50'],
+        amount: 4_000_000,
+        note: 'by contract',
+      });
+      expect(await reason(declare(50, { statementId: 's1' }))).toBe('already-declared');
+      const entry = (await book().collection('audit').where('action', '==', 'declare').get())
+        .docs[0];
+      expect(entry.data()).toMatchObject({ by: 50, via: 'player-claim' });
+      // Once an officer answers, the Miner may declare again.
+      await edit(ACCOUNTANT, {
+        action: 'resolveDeclaration',
+        declarationId,
+        resolution: 'rejected',
+        reason: 'no contract',
+      });
+      await declare(50, { statementId: 's1' });
+    });
+
+    it('refuses a declaration on a settled Statement', async () => {
+      await turnOn();
+      await edit(ACCOUNTANT, { action: 'issueStatement', statement: statement('s1') });
+      await edit(ACCOUNTANT, { action: 'settleStatements', statementIds: ['s1'] });
+      await pastSetup();
+      expect(await reason(declare(50, { statementId: 's1' }))).toBe('settled');
+    });
+
+    it('gives an officer-recorded declaration the Miner’s uids too', async () => {
+      await turnOn();
+      await edit(ACCOUNTANT, { action: 'issueStatement', statement: statement('s1') });
+      const { declarationId } = await edit(ACCOUNTANT, {
+        action: 'declare',
+        statementId: 's1',
+        kind: 'contract',
+      });
+      expect(
+        (
+          await book()
+            .collection('declarations')
+            .doc(declarationId as string)
+            .get()
+        ).data()
+      ).toMatchObject({ minerId: 'solo:50', uids: ['char:50'] });
+    });
+
+    it('keeps one dispute per Miner and day, for the caller’s own characters only', async () => {
+      await turnOn();
+      await edit(ACCOUNTANT, {
+        action: 'setMiner',
+        minerId: 'm-a',
+        characterIds: [60, 77],
+        mainCharacterId: 60,
+      });
+      await recordOre([60], [77, 45491], [50], [99]);
+      await pastSetup();
+      // A Miner's character disputes for its grouped alt; never for a stranger.
+      expect(await reason(dispute(60, [line(99)]))).toBe('not-your-record');
+      expect(await dispute(60, [line(60)])).toEqual({ disputeId: 'm-a_2026-10-17' });
+      await dispute(77, [line(77, { typeId: 45491 })]);
+      const doc = (await book().collection('disputes').doc('m-a_2026-10-17').get()).data();
+      expect(doc).toMatchObject({ minerId: 'm-a', date: '2026-10-17', by: 60 });
+      expect(doc?.lines).toEqual([line(60), line(77, { typeId: 45491 })]);
+      expect([...(doc?.uids as string[])].sort()).toEqual(['char:60', 'char:77']);
+      // A solo Miner's day is its own record.
+      expect(await dispute(50, [line(50)])).toEqual({ disputeId: 'solo_50_2026-10-17' });
+    });
+
+    it('refuses ore the book did not record, or more of it than recorded', async () => {
+      await turnOn();
+      await recordOre([50]);
+      await pastSetup();
+      expect(await reason(dispute(50, [line(50, { typeId: 45491 })]))).toBe('not-on-record');
+      expect(await reason(dispute(50, [line(50, { quantity: 101 })]))).toBe('not-on-record');
+      await dispute(50, [line(50, { quantity: 60 })]);
+      // A second call cannot push the day's total past the record.
+      expect(await reason(dispute(50, [line(50, { quantity: 41, payeeName: 'Other Corp' })]))).toBe(
+        'not-on-record'
+      );
+      await dispute(50, [line(50, { quantity: 40, payeeName: 'Other Corp' })]);
+    });
+
+    // The day's Statement: 100 of ore 45490 at 1,000 ISK, taxed 10%.
+    const billDay = () =>
+      edit(ACCOUNTANT, {
+        action: 'issueStatement',
+        statement: statement('s1', {
+          lines: [
+            {
+              kind: 'mined',
+              date: '2026-10-17',
+              chargeKey: '50:1000:2026-10-17',
+              characterId: 50,
+              structureId: 1000,
+              oreLines: [{ typeId: 45490, quantity: 100 }],
+              unitPrices: { 45490: 1000 },
+              taxPct: 10,
+              estimatedValue: 100_000,
+              tax: 10_000,
+            },
+          ],
+        }),
+      });
+
+    it('waives only the disputed ore, priced on the server, behind the Director limit', async () => {
+      await turnOn();
+      await recordOre([50]);
+      await billDay();
+      await pastSetup();
+      await verifyOfficer(deps(), who(DIRECTOR), parseBookCall(withToken(DIRECTOR)));
+      const { disputeId } = await dispute(50, [line(50, { quantity: 40 })]);
+      const waive = { action: 'dismissDispute', disputeId, minerId: 'solo:50', reason: 'Theirs' };
+      // 40 × 1,000 × 10% = 4,000: a client's understated 1 ISK does not slip under the limit.
+      await edit(DIRECTOR, { action: 'updateSettings', patch: { dismissApprovalAboveIsk: 3000 } });
+      expect(await reason(edit(ACCOUNTANT, { ...waive, amountIsk: 1 }, true))).toBe(
+        'director-approval'
+      );
+      expect(
+        await reason(edit(ACCOUNTANT, { ...waive, minerId: 'solo:51', amountIsk: 1 }, true))
+      ).toBe('wrong-miner');
+      await edit(DIRECTOR, { action: 'updateSettings', patch: { dismissApprovalAboveIsk: 5000 } });
+      const { adjustmentId } = await edit(ACCOUNTANT, { ...waive, amountIsk: 1 }, true);
+      expect(
+        (
+          await book()
+            .collection('adjustments')
+            .doc(adjustmentId as string)
+            .get()
+        ).data()
+      ).toMatchObject({
+        minerId: 'solo:50',
+        date: '2026-10-17',
+        amount: -4000,
+        reason: 'Theirs',
+        disputeId,
+        uids: ['char:50'],
+      });
+      expect(
+        (await book().collection('disputes').doc(disputeId).get()).get('resolution')
+      ).toMatchObject({ kind: 'dismissed', by: ACCOUNTANT, reason: 'Theirs', amountIsk: 4000 });
+      // No whole-day dismissal is written.
+      expect((await book().collection('dismissals').get()).size).toBe(0);
+      expect(await reason(edit(ACCOUNTANT, waive, true))).toBe('already-resolved');
+    });
+
+    it('waives a day not billed yet only at a Director’s word, or with no limit set', async () => {
+      await turnOn();
+      await recordOre([50]);
+      await pastSetup();
+      await verifyOfficer(deps(), who(DIRECTOR), parseBookCall(withToken(DIRECTOR)));
+      const { disputeId } = await dispute(50, [line(50, { quantity: 40 })]);
+      const waive = { action: 'dismissDispute', disputeId, minerId: 'solo:50', reason: 'Theirs' };
+      expect(await reason(edit(ACCOUNTANT, waive, true))).toBe('not-priced');
+      await edit(DIRECTOR, { action: 'updateSettings', patch: { dismissApprovalAboveIsk: 5000 } });
+      expect(await reason(edit(ACCOUNTANT, { ...waive, amountIsk: 1 }, true))).toBe(
+        'director-approval'
+      );
+      const { adjustmentId } = await edit(DIRECTOR, { ...waive, amountIsk: 900 }, true);
+      expect(
+        (
+          await book()
+            .collection('adjustments')
+            .doc(adjustmentId as string)
+            .get()
+        ).get('amount')
+      ).toBe(-900);
+    });
+
+    it('lets the Miner withdraw their own unanswered dispute, audited', async () => {
+      await turnOn();
+      await recordOre([50], [51]);
+      await pastSetup();
+      const withdraw = (id: number) =>
+        withdrawDispute(
+          deps(),
+          who(id),
+          parseWithdrawDisputeInput({ corporationId: CORP, date: '2026-10-17' })
+        );
+      const { disputeId } = await dispute(50, [line(50)]);
+      // Another Miner cannot withdraw it: they have no dispute of their own that day.
+      expect(await reason(withdraw(51))).toBe('not-found');
+      expect(await withdraw(50)).toEqual({ disputeId });
+      expect((await book().collection('disputes').doc(disputeId).get()).exists).toBe(false);
+      expect(
+        (await book().collection('audit').where('action', '==', 'withdrawDispute').get()).size
+      ).toBe(1);
+      expect(await reason(withdraw(50))).toBe('not-found');
+      // Once answered, it stays.
+      await dispute(50, [line(50)]);
+      await edit(ACCOUNTANT, { action: 'rejectDispute', disputeId, reason: 'Our ore' });
+      expect(await reason(withdraw(50))).toBe('answered');
+    });
+
+    it('lets an officer reject a dispute once; the day cannot be flagged again', async () => {
+      await turnOn();
+      await recordOre([50]);
+      await pastSetup();
+      const { disputeId } = await dispute(50, [line(50)]);
+      await edit(ACCOUNTANT, { action: 'rejectDispute', disputeId, reason: 'Our ore' });
+      expect(
+        (await book().collection('disputes').doc(disputeId).get()).get('resolution')
+      ).toMatchObject({ kind: 'rejected', by: ACCOUNTANT, reason: 'Our ore' });
+      expect(
+        await reason(edit(ACCOUNTANT, { action: 'rejectDispute', disputeId, reason: 'again' }))
+      ).toBe('already-resolved');
+      expect(await reason(dispute(50, [line(50)]))).toBe('rejected');
+    });
+  });
+
   describe('audit log', () => {
     it('appends one entry per write, never holds a token, and attributes the actor', async () => {
       await turnOn();
@@ -1587,6 +1927,101 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         true
       );
       expect(await miner()).toMatchObject({ closeCredit: { disposition: 'forfeit' } });
+    });
+  });
+
+  describe('Pop Sharing settings (#6222)', () => {
+    const popSharing = async () => (await book().collection('meta').doc('popSharing').get()).data();
+    const automaticSync = (status: 'active' | 'stopped') =>
+      book().collection('meta').doc('scheduledSync').set({ status });
+    const moon = () =>
+      book().collection('extractions').doc('1000_1').set({ structureId: 1000, moonId: 7 });
+
+    it('refuses turning sharing on without Automatic sync, and allows it with', async () => {
+      await turnOn();
+      expect(await reason(edit(ACCOUNTANT, { action: 'setPopSharing', enabled: true }))).toBe(
+        'needs-automatic-sync'
+      );
+      await automaticSync('stopped');
+      expect(await reason(edit(ACCOUNTANT, { action: 'setPopSharing', enabled: true }))).toBe(
+        'needs-automatic-sync'
+      );
+      await automaticSync('active');
+      await edit(ACCOUNTANT, { action: 'setPopSharing', enabled: true });
+      expect(await popSharing()).toMatchObject({ enabled: true, updatedBy: ACCOUNTANT });
+    });
+
+    it('lets an editor set the default and a Moon override, and keeps each in the history', async () => {
+      await turnOn();
+      await moon();
+      await edit(ACCOUNTANT, {
+        action: 'setPopSharing',
+        defaults: { popTime: 'auto-fracture', notes: 'Comms in Discord' },
+      });
+      await edit(ACCOUNTANT, {
+        action: 'setPopSharingMoon',
+        moonId: 7,
+        set: { showOre: false, ratePct: 5 },
+      });
+      await edit(ACCOUNTANT, {
+        action: 'setPopSharingMoon',
+        moonId: 7,
+        clear: ['ratePct'],
+      });
+      expect(await popSharing()).toMatchObject({
+        enabled: false,
+        defaults: { popTime: 'auto-fracture', notes: 'Comms in Discord', showOre: true },
+        moons: { '7': { showOre: false } },
+      });
+      const audit = (await book().collection('audit').get()).docs.map((d) => d.data());
+      expect(audit).toContainEqual(
+        expect.objectContaining({
+          action: 'setPopSharingMoon',
+          by: ACCOUNTANT,
+          detail: { moonId: 7, set: {}, clear: ['ratePct'] },
+        })
+      );
+      expect(audit).toContainEqual(
+        expect.objectContaining({ action: 'setPopSharing', by: ACCOUNTANT })
+      );
+    });
+
+    it("saves an idle refinery's moon: one Extraction long past, cancelled, or a moon owner's (#6240)", async () => {
+      await turnOn();
+      const pulls = book().collection('extractions');
+      await pulls.doc('1000_1').set({
+        structureId: 1000,
+        moonId: 7,
+        extractionStartTime: '2024-01-01T00:00:00Z',
+        naturalDecayTime: '2024-01-07T00:00:00Z',
+      });
+      await pulls.doc('1001_1').set({
+        structureId: 1001,
+        moonId: 8,
+        extractionStartTime: '2025-03-01T00:00:00Z',
+        cancelledAt: '2025-03-02T00:00:00Z',
+      });
+      await pulls.doc('2000_1').set({ structureId: 2000, moonId: 9, sourceCorporationId: 555 });
+      for (const moonId of [7, 8, 9])
+        await edit(ACCOUNTANT, { action: 'setPopSharingMoon', moonId, set: { notes: 'idle' } });
+      expect((await popSharing())?.moons).toEqual({
+        '7': { notes: 'idle' },
+        '8': { notes: 'idle' },
+        '9': { notes: 'idle' },
+      });
+    });
+
+    it('refuses a read-only officer, and a moon the book does not handle', async () => {
+      await turnOn();
+      expect(
+        await reason(edit(JUNIOR, { action: 'setPopSharing', defaults: { notes: 'x' } }))
+      ).toBe('role-required');
+      expect(
+        await reason(
+          edit(ACCOUNTANT, { action: 'setPopSharingMoon', moonId: 99, set: { notes: 'x' } })
+        )
+      ).toBe('unknown-moon');
+      expect(await popSharing()).toBeUndefined();
     });
   });
 });

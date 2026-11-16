@@ -1,14 +1,14 @@
 import { describe, it, expect, vi } from 'vitest';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import '@/i18n';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { DEFAULT_MAIL_FOLDERS, useMailFolders } from '@/features/character/mailFolderPref';
-import { App } from '@/app/App';
 import {
   installMailHarness,
+  renderMailRoute,
   CHAR_ID,
   CHAR_ID_2,
   headers,
@@ -20,14 +20,6 @@ import {
 
 vi.mock('@/features/character/mailEditor/RichMailBodyEditor', async () => ({
   default: (await import('@/features/character/PlainBodyEditor.testHelper')).PlainBodyEditor,
-}));
-
-vi.mock('virtual:pwa-register/react', () => ({
-  useRegisterSW: () => ({
-    needRefresh: [false, vi.fn()],
-    offlineReady: [false, vi.fn()],
-    updateServiceWorker: vi.fn(),
-  }),
 }));
 
 vi.mock('@/sde/loadSde', () => ({
@@ -42,7 +34,7 @@ installMailHarness();
 describe('Mail', () => {
   it('filters headers by a subject/sender search box', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Fleet up!');
     expect(screen.getByText('Market report')).toBeInTheDocument();
 
@@ -53,7 +45,7 @@ describe('Mail', () => {
 
   it('matches search against the resolved sender name, not just the subject', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Fleet up!');
 
     await user.type(screen.getByLabelText('Search subject or sender'), 'market bot');
@@ -63,7 +55,7 @@ describe('Mail', () => {
 
   it('locally marks a mail read on selection, and can hide read mail', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     const fleetSubject = await screen.findByText('Fleet up!');
     const fleetRow = fleetSubject.closest('li') as HTMLElement;
     expect(within(fleetRow).getByText('Fleet up!')).toHaveClass('font-semibold', 'text-text');
@@ -92,7 +84,7 @@ describe('Mail', () => {
       })
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
 
     await user.click(await screen.findByText('Fleet up!'));
 
@@ -110,7 +102,7 @@ describe('Mail', () => {
       })
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
 
     await user.click(await screen.findByText('Fleet up!'));
 
@@ -130,7 +122,7 @@ describe('Mail', () => {
       })
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
 
     await user.click(await screen.findByText('Fleet up!'));
     await waitFor(() => expect(requestCount).toBe(1));
@@ -153,7 +145,7 @@ describe('Mail', () => {
       })
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
 
     // 'Market report' (mail_id 2) is `is_read: true` in the fixture already.
     await user.click(await screen.findByText('Market report'));
@@ -167,7 +159,7 @@ describe('Mail', () => {
       http.put(`https://esi.evetech.net/characters/${CHAR_ID}/mail/1/`, () => HttpResponse.error())
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     const fleetSubject = await screen.findByText('Fleet up!');
     const fleetRow = fleetSubject.closest('li') as HTMLElement;
 
@@ -191,7 +183,7 @@ describe('Mail', () => {
       )
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await user.click(await screen.findByText('Fleet up!'));
     expect(await screen.findByText(/Fleet Announcements/)).toBeInTheDocument();
   });
@@ -207,7 +199,7 @@ describe('Mail', () => {
       )
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await user.click(await screen.findByText('Fleet up!'));
     expect(await screen.findByText(/Mailing list/)).toBeInTheDocument();
   });
@@ -241,7 +233,7 @@ describe('Mail', () => {
       )
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await user.click(await screen.findByText('Fleet up!'));
 
     expect(await screen.findByText(/Fleet Announcements/)).toBeInTheDocument();
@@ -280,7 +272,7 @@ describe('Mail', () => {
         name: 'Sent',
       });
 
-    const view = render(<App />);
+    const view = renderMailRoute();
     await screen.findByText('Fleet up!');
     await user.click(sentChip());
     expect(sentChip()).toHaveAttribute('aria-pressed', 'false');
@@ -300,7 +292,7 @@ describe('Mail', () => {
     });
     view.unmount();
     useMailFolders.setState({ value: DEFAULT_MAIL_FOLDERS, hydrated: false });
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Second pilot mail');
     await waitFor(() => expect(sentChip()).toHaveAttribute('aria-pressed', 'false'));
   });
@@ -349,7 +341,7 @@ describe('Mail', () => {
       await addSecondCharacter();
       serveSecondCharacter();
       window.history.pushState({}, '', '/mail?scope=all');
-      render(<App />);
+      renderMailRoute();
       const second = await screen.findByText('Second pilot mail');
       const first = await screen.findByText('Fleet up!');
       // 08-03 (Pilot Two) sits above 08-02 (Pilot One).
@@ -368,7 +360,7 @@ describe('Mail', () => {
       serveSecondCharacter();
       window.history.pushState({}, '', '/mail?scope=all');
       const user = userEvent.setup();
-      render(<App />);
+      renderMailRoute();
       await screen.findByText('Second pilot mail');
       const group = screen.getByRole('group', { name: 'Mail folders' });
       // 1 (Pilot One) + 4 (Pilot Two).
@@ -391,7 +383,7 @@ describe('Mail', () => {
       );
       window.history.pushState({}, '', '/mail?scope=all');
       const user = userEvent.setup();
-      render(<App />);
+      renderMailRoute();
       await user.click(await screen.findByText('Second pilot mail'));
       expect(await screen.findByText('Body for the second pilot.')).toBeInTheDocument();
       expect(screen.getByText('For Pilot Two')).toBeInTheDocument();
@@ -430,7 +422,7 @@ describe('Mail', () => {
         scopes: [],
       });
       window.history.pushState({}, '', '/mail?scope=all');
-      render(<App />);
+      renderMailRoute();
       await screen.findByText('Second pilot mail');
       expect(
         screen.getByRole('button', { name: 'All characters · 3. Not included: Pilot Three' })
@@ -440,7 +432,7 @@ describe('Mail', () => {
 
     it('is unchanged with one Character: no scope control, no owner chips', async () => {
       window.history.pushState({}, '', '/mail?scope=all');
-      render(<App />);
+      renderMailRoute();
       const row = (await screen.findByText('Fleet up!')).closest('li') as HTMLElement;
       expect(screen.queryByRole('button', { name: /characters/i })).not.toBeInTheDocument();
       expect(within(row).queryByText('Pilot One')).not.toBeInTheDocument();

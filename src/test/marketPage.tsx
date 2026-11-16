@@ -19,6 +19,8 @@ import { resetEsiBudget } from '@/esi/budget';
 import { useCompareSet } from '@/features/market/compareSet';
 import { ESI_BASE_URL } from '@/esi/client';
 import * as routeChunks from '@/app/routeChunks';
+import { Market } from '@/routes/Market';
+import { renderPageRoute } from '@/test/renderPage';
 import {
   CORAX_TYPE_ID,
   CORMORANT_TYPE_ID,
@@ -26,11 +28,21 @@ import {
   KESTREL_TYPE_ID,
   MERLIN_TYPE_ID,
   PLEX_TYPE_ID,
+  TYPES,
 } from '@/test/marketMocks';
 
 // Shared harness for the Market route tests (src/routes/Market*.test.tsx), one
 // file per concern so CI runs them in parallel. The `vi.mock` calls stay in each
 // test file (vitest hoists them per file); their factories live in marketMocks.tsx.
+
+/**
+ * Renders the Market route on its own (its TabRoute and info modals, no App
+ * boot or shell) at the current `window.location`. The few tests that prove the
+ * App wiring — the rail, the shell — render `<App />` (Market.sections.test.tsx).
+ */
+export function renderMarketRoute() {
+  return renderPageRoute('/market', <Market />);
+}
 
 export const RIFTER_REGION_ID = 10000002; // The Forge (Jita hub's region)
 
@@ -192,6 +204,13 @@ export function plexOrdersHandler(hits: { count: number }) {
   });
 }
 
+/** `GET /markets/{region_id}/types`: `typeIds` listed in every region. */
+export function marketTypesHandler(typeIds: readonly number[]) {
+  return http.get(`${ESI_BASE_URL}/markets/:regionId/types`, () =>
+    HttpResponse.json(typeIds, { headers: { 'X-Pages': '1' } })
+  );
+}
+
 export function historyHandler(
   hits: { count: number },
   regionId: number,
@@ -208,53 +227,64 @@ export function historyHandler(
 // read it override it; the rest don't care, and with no delay between keystrokes
 // it lands before teardown, where it would otherwise be an unhandled request.
 export const server = setupServer(
-  http.get(`${ESI_BASE_URL}/universe/types/:typeId`, () => HttpResponse.error())
+  http.get(`${ESI_BASE_URL}/universe/types/:typeId`, () => HttpResponse.error()),
+  // The tree's "No orders in {Region}" cue (#6200): every fixture type is
+  // listed in every region, so no row carries the cue unless a test says so.
+  marketTypesHandler(TYPES.map((type) => type.typeId))
 );
+
+/** The per-test reset: a fresh Dexie, store and module state, at /market. */
+async function resetMarketSession(): Promise<void> {
+  await db.characters.clear();
+  await db.settings.clear();
+  await db.quickbars.clear();
+  // Price history reads through esiCache; a row left by one test would answer
+  // the next test's request for the same item without reaching its handler.
+  await db.esiCache.clear();
+  // Market needs no ESI scope and no *active* Character; a signed-in one exists,
+  // as the App's RequireCharacter guarantees, for the tests that read Characters.
+  await db.characters.put({ characterId: 1, name: 'Pilot One', ownerHash: 'oh', addedAt: 0 });
+  useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
+  usePublicInfo.setState({ byCharacterId: {} });
+  useMarketHub.setState({ value: 'jita', hydrated: false });
+  useMarketBrowserHub.setState({ value: 'jita', hydrated: false });
+  useLocationMode.setState({ value: DEFAULT_LOCATION_MODE, hydrated: false });
+  useBrowserFilterSetting.setState({ value: DEFAULT_BROWSER_FILTER_SETTING, hydrated: false });
+  useCompareSet.setState({ items: [] });
+  clearOrderBookCache();
+  // Module state, and it latches. One test provoking an ESI error (the 420 in
+  // "an ESI failure clears the spinner" in Market.variations.test.tsx) trips the error-limit gate, and
+  // without this every later test in the file has its fetches declined before
+  // they are sent — eleven of them failed that way on a "Sell Orders" table
+  // that never arrived, with nothing in the message to say why.
+  resetEsiBudget();
+  window.history.pushState({}, '', '/market');
+}
 
 /** Registers the file's MSW lifecycle and the per-test reset. Call once at module scope. */
 export function installMarketHarness(): void {
   beforeAll(async () => {
     server.listen({ onUnhandledRequest: 'error' });
-    // The page is code-split: the first render waits on a cold import of the
-    // Layout and Market chunks. Under CI load that alone outran the first
-    // test's findBy budget, leaving an empty <main> ("Unable to find
-    // role=button Ships"), so import them before any test renders.
-    await Promise.all([routeChunks.loadLayout(), routeChunks.loadMarket()]);
-  });
+    // One throwaway render, so no test pays for the first one: a worker's first
+    // render — compiling the Market graph, warming jsdom and React — landed on
+    // whichever test ran first and could outlast its findBy under CI load
+    // ("Unable to find role=button Ships"). Done here under the hook's budget.
+    await routeChunks.loadMarket();
+    await resetMarketSession();
+    const { unmount } = renderMarketRoute();
+    await screen.findByRole('button', SHIPS_GROUP, { timeout: 25_000 });
+    unmount();
+    server.resetHandlers();
+  }, 30_000);
   afterAll(() => server.close());
   afterEach(() => {
     vi.useRealTimers();
     server.resetHandlers();
   });
-  beforeEach(async () => {
-    await db.characters.clear();
-    await db.settings.clear();
-    await db.quickbars.clear();
-    // Price history reads through esiCache; a row left by one test would answer
-    // the next test's request for the same item without reaching its handler.
-    await db.esiCache.clear();
-    // Market needs no ESI scope and no *active* Character, but the feature area
-    // sits behind RequireCharacter, so one must exist for the route to render.
-    await db.characters.put({ characterId: 1, name: 'Pilot One', ownerHash: 'oh', addedAt: 0 });
-    useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
-    usePublicInfo.setState({ byCharacterId: {} });
-    useMarketHub.setState({ value: 'jita', hydrated: false });
-    useMarketBrowserHub.setState({ value: 'jita', hydrated: false });
-    useLocationMode.setState({ value: DEFAULT_LOCATION_MODE, hydrated: false });
-    useBrowserFilterSetting.setState({ value: DEFAULT_BROWSER_FILTER_SETTING, hydrated: false });
-    useCompareSet.setState({ items: [] });
-    clearOrderBookCache();
-    // Module state, and it latches. One test provoking an ESI error (the 420 in
-    // "an ESI failure clears the spinner" in Market.variations.test.tsx) trips the error-limit gate, and
-    // without this every later test in the file has its fetches declined before
-    // they are sent — eleven of them failed that way on a "Sell Orders" table
-    // that never arrived, with nothing in the message to say why.
-    resetEsiBudget();
-    window.history.pushState({}, '', '/market');
-  });
+  beforeEach(resetMarketSession);
 }
 
-// The Market Group, not the nav rail's "Ships" link: the group is a button.
+// The Market Group, not the "Ships" link an App render's nav rail adds: the group is a button.
 // Matches the plain browse header and the search one, which appends " · <count>".
 export const SHIPS_GROUP = { name: /^Ships(?: ·|$)/ } as const;
 

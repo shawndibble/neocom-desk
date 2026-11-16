@@ -3,8 +3,10 @@
 // caller is the moon owner's own officer (CEO, Director or Accountant, read live from ESI); the view itself is in
 // corpTaxBookFeederView.ts. Failures carry a stable `reason`; no player-facing text lives here.
 
+import { FieldValue } from 'firebase-admin/firestore';
+import { HttpsError } from 'firebase-functions/v2/https';
 import { fail, type Caller } from './actorAuth.js';
-import { record } from './communities.js';
+import { boundedString, record } from './communities.js';
 import { ACCESS_TTL_MS, pctField } from './corpTaxBook.js';
 import { type CorpSyncDeps } from './corpSyncGrant.js';
 import {
@@ -20,8 +22,10 @@ import {
   type FeederViewAccessResult,
   type FeederViewerAccess,
 } from './corpTaxBookFeederView.js';
+import { PAYOUTS } from './corpTaxBookFeederPayouts.js';
 import type { FeederRecord } from './corpTaxBookFeeders.js';
 import { appendAudit, feederRef, type BookDeps } from './corpTaxBookStore.js';
+import { refreshSharedPops } from './sharedPopsStore.js';
 
 export { parseFeederCall };
 
@@ -32,6 +36,7 @@ export const feederBookDeps = (deps: CorpSyncDeps): BookDeps => ({
   verifyToken: deps.verify,
   readIdentity: deps.readIdentity,
   ...(deps.openPrices ? { openPrices: deps.openPrices } : {}),
+  ...(deps.corporationAlliance ? { corporationAlliance: deps.corporationAlliance } : {}),
 });
 
 export interface RequestFeederRateInput extends FeederCall {
@@ -116,6 +121,125 @@ export async function requestFeederRate(
     );
   });
   await tryRebuildFeederView(feederBookDeps(deps), ctx.collectorCorporationId, input.corporationId);
+  return { ok: true };
+}
+
+export interface DisputeFeederPayoutInput extends FeederCall {
+  payoutId: string;
+  /** True flags the payment as disputed; false withdraws the flag. */
+  disputed: boolean;
+}
+
+export function parseDisputeFeederPayoutInput(data: unknown): DisputeFeederPayoutInput {
+  const call = parseFeederCall(data);
+  const d = record(data);
+  if (typeof d.disputed !== 'boolean') {
+    throw new HttpsError('invalid-argument', 'disputed must be true or false');
+  }
+  return { ...call, payoutId: boundedString(d.payoutId, 'payoutId', 64), disputed: d.disputed };
+}
+
+/**
+ * The moon owner flags a payment it disputes (#6209), or withdraws the flag: the accounting
+ * corporation's officers see it on the payment. Only a payment that counts can be disputed; the
+ * flag changes no figure.
+ */
+export async function disputeFeederPayout(
+  deps: CorpSyncDeps,
+  caller: Caller,
+  input: DisputeFeederPayoutInput
+): Promise<{ ok: true }> {
+  const ctx = await authorizeFeederCaller(deps, caller, input, 'edit');
+  if (!ctx)
+    fail('failed-precondition', 'This corporation has no moon owner view', 'not-your-feeder');
+  const ref = feederRef(deps.db, ctx.collectorCorporationId, input.corporationId)
+    .collection(PAYOUTS)
+    .doc(input.payoutId);
+  const changed = await deps.db.runTransaction(async (tx) => {
+    const row = await tx.get(ref);
+    if (!row.exists || row.get('notAPayout') === true)
+      fail('not-found', 'No such payment', 'no-payout');
+    if ((row.get('disputedAt') !== undefined) === input.disputed) return false;
+    tx.update(ref, { disputedAt: input.disputed ? deps.now() : FieldValue.delete() });
+    appendAudit(
+      tx,
+      feederBookDeps(deps),
+      ctx.collectorCorporationId,
+      { characterId: ctx.callerId, name: 'Moon owner' },
+      'feederPayoutDisputed',
+      {
+        feederCorporationId: input.corporationId,
+        payoutId: input.payoutId,
+        disputed: input.disputed,
+      }
+    );
+    return true;
+  });
+  if (changed)
+    await tryRebuildFeederView(
+      feederBookDeps(deps),
+      ctx.collectorCorporationId,
+      input.corporationId
+    );
+  return { ok: true };
+}
+
+export interface SetFeederPopSharingInput extends FeederCall {
+  /** True lets the accounting corporation share this moon owner's pop schedule (the default). */
+  share: boolean;
+}
+
+export function parseSetFeederPopSharingInput(data: unknown): SetFeederPopSharingInput {
+  const call = parseFeederCall(data);
+  const d = record(data);
+  if (typeof d.share !== 'boolean') {
+    throw new HttpsError('invalid-argument', 'share must be true or false');
+  }
+  return { ...call, share: d.share };
+}
+
+/**
+ * The moon owner's Pop Sharing opt-out (#6222): one switch for all its moons, on by default.
+ * Off stops its pops at once; the book's settings for those moons are kept and apply again
+ * when it opts back in. Audited in the book's history.
+ */
+export async function setFeederPopSharing(
+  deps: CorpSyncDeps,
+  caller: Caller,
+  input: SetFeederPopSharingInput
+): Promise<{ ok: true }> {
+  const ctx = await authorizeFeederCaller(deps, caller, input, 'edit');
+  if (!ctx)
+    fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
+  const ref = feederRef(deps.db, ctx.collectorCorporationId, input.corporationId);
+  const changed = await deps.db.runTransaction(async (tx) => {
+    const rec = (await tx.get(ref)).data() as FeederRecord | undefined;
+    if (!rec || (rec.status !== 'active' && rec.status !== 'pending-removal')) {
+      fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
+    }
+    if ((rec.popSharingOptOut === undefined) === input.share) return false;
+    tx.update(ref, {
+      popSharingOptOut: input.share ? FieldValue.delete() : { by: ctx.callerId, at: deps.now() },
+    });
+    appendAudit(
+      tx,
+      feederBookDeps(deps),
+      ctx.collectorCorporationId,
+      { characterId: ctx.callerId, name: 'Moon owner' },
+      'feederPopSharingSet',
+      { feederCorporationId: input.corporationId, share: input.share }
+    );
+    return true;
+  });
+  if (changed) {
+    await tryRebuildFeederView(
+      feederBookDeps(deps),
+      ctx.collectorCorporationId,
+      input.corporationId
+    );
+    // An opt-out takes the moon owner's pops away at once; opting back in returns them (#6223).
+    await refreshSharedPops(feederBookDeps(deps), ctx.collectorCorporationId);
+  }
   return { ok: true };
 }
 

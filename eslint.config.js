@@ -4,6 +4,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
+import testingLibrary from 'eslint-plugin-testing-library';
 
 // Raw text-like <input>s: banned in app code, fine in test fixtures (no
 // styling to be consistent with). The legit raw input is type="file".
@@ -171,6 +172,61 @@ const sortArrowSyntax = [
   },
 ];
 
+// A test waits for a signal, never a duration (docs/agents/testing-and-ci.md
+// "Wait for a signal"). Bans an awaited `new Promise(… setTimeout …)` in a
+// test's own flow — a test, hook, `act` callback or a helper — and a helper
+// that is nothing but such a promise (write a latency stub inline, not as a
+// named helper). A delay inside a stub (an argument to
+// `mockImplementation`, `vi.fn`, an object of fakes, or a factory that
+// returns one) simulates latency in the code under test and stays legal.
+const sleepMessage =
+  'A test waits for a signal, never a duration: findBy*/waitFor on the outcome, or fake timers when the code is timer-driven (docs/agents/testing-and-ci.md).';
+const sleepPromise =
+  "NewExpression[callee.name='Promise']:has(CallExpression[callee.name='setTimeout'], CallExpression[callee.property.name='setTimeout'])";
+const testFlowCall =
+  'CallExpression:not([callee.name=/^(it|test|beforeEach|afterEach|beforeAll|afterAll|describe|act|waitFor)$/]):not([callee.object.name=/^(it|test|describe)$/]):not([callee.callee.object.name=/^(it|test|describe)$/])';
+const sleepSyntax = [
+  {
+    selector: `AwaitExpression:not(${testFlowCall} > :function AwaitExpression):not(${testFlowCall} > TSAsExpression > :function AwaitExpression):not(Property > :function AwaitExpression):not(:function > :function AwaitExpression) > ${sleepPromise}`,
+    message: sleepMessage,
+  },
+  {
+    selector: `:matches(VariableDeclarator > ArrowFunctionExpression, VariableDeclarator > ArrowFunctionExpression > BlockStatement > ReturnStatement, Program > FunctionDeclaration > BlockStatement > ReturnStatement) > ${sleepPromise}`,
+    message: sleepMessage,
+  },
+];
+
+// `src/test/teardown.ts` keeps the running test's fetch phase and abort
+// controller in module state, which is sound only while one test runs at a
+// time in a file. A `.concurrent` test or suite would share them.
+const concurrentSyntax = [
+  {
+    selector:
+      "MemberExpression[object.name=/^(it|test|describe)$/][property.name='concurrent'], MemberExpression[object.object.name=/^(it|test|describe)$/][property.name='concurrent']",
+    message:
+      'No .concurrent tests: src/test/teardown.ts tracks one running test per file (its fetch phase and abort controller are module state).',
+  },
+];
+
+// The async-settle half of eslint-plugin-testing-library: un-awaited queries,
+// utils and events, side effects or several assertions inside a `waitFor`
+// retry, `waitFor` + `getBy` where `findBy` says it, an `act` that wraps
+// nothing or wraps a call that already acts, and `getBy`/`queryBy` matched to
+// presence/absence so a missing element fails at the query.
+const testingLibraryRules = Object.fromEntries(
+  [
+    'await-async-queries',
+    'await-async-utils',
+    'await-async-events',
+    'no-wait-for-side-effects',
+    'no-wait-for-multiple-assertions',
+    'prefer-find-by',
+    'no-unnecessary-act',
+    'no-await-sync-queries',
+    'prefer-presence-queries',
+  ].map((rule) => [`testing-library/${rule}`, 'error'])
+);
+
 export default tseslint.config(
   {
     ignores: [
@@ -273,6 +329,8 @@ export default tseslint.config(
           (r) => !rawInputSyntax.includes(r)
         ),
         ...sortArrowSyntax,
+        ...sleepSyntax,
+        ...concurrentSyntax,
       ],
     },
   },
@@ -308,7 +366,27 @@ export default tseslint.config(
     // Tests and e2e are fixtures: same reasons as stories.
     files: ['src/**/*.test.ts', 'e2e/**/*.ts'],
     rules: {
-      'no-restricted-syntax': ['error', ...withoutNumberFormat(withoutRadius(restrictedSyntax))],
+      'no-restricted-syntax': [
+        'error',
+        ...withoutNumberFormat(withoutRadius(restrictedSyntax)),
+        ...sleepSyntax,
+        ...concurrentSyntax,
+      ],
+    },
+  },
+  {
+    // Test helpers wait like tests do: the no-sleep rule reaches them too.
+    files: ['src/test/**/*.ts'],
+    ignores: ['src/test/**/*.test.ts'],
+    rules: {
+      'no-restricted-syntax': ['error', ...restrictedSyntax, ...sleepSyntax],
+    },
+  },
+  {
+    files: ['src/test/**/*.tsx'],
+    ignores: ['src/test/**/*.test.tsx'],
+    rules: {
+      'no-restricted-syntax': ['error', ...restrictedSyntax, ...sortArrowSyntax, ...sleepSyntax],
     },
   },
   {
@@ -328,10 +406,28 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/components/ui/**/*.test.tsx', 'src/components/ui/**/*.stories.tsx'],
-    ignores: ['src/components/ui/DataTable.test.tsx'],
+    files: ['src/components/ui/**/*.stories.tsx'],
     rules: {
       'no-restricted-syntax': ['error', ...sortArrowSyntax, ...iconSizeSyntax],
+    },
+  },
+  {
+    files: ['src/components/ui/**/*.test.tsx'],
+    ignores: ['src/components/ui/DataTable.test.tsx'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...sortArrowSyntax,
+        ...iconSizeSyntax,
+        ...sleepSyntax,
+        ...concurrentSyntax,
+      ],
+    },
+  },
+  {
+    files: ['src/components/ui/DataTable.test.tsx'],
+    rules: {
+      'no-restricted-syntax': ['error', ...sleepSyntax, ...concurrentSyntax],
     },
   },
   {
@@ -368,6 +464,25 @@ export default tseslint.config(
     files: ['**/*.testutil.tsx'],
     rules: {
       'react-refresh/only-export-components': 'off',
+    },
+  },
+  {
+    // Every test that renders on jsdom (vite.config.ts's `dom` project).
+    files: ['src/**/*.test.tsx', 'src/**/*.dom.test.ts'],
+    plugins: { 'testing-library': testingLibrary },
+    rules: testingLibraryRules,
+  },
+  {
+    files: ['e2e/**/*.ts'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        {
+          property: 'waitForTimeout',
+          message:
+            'Wait for a signal, never a duration: a web-first expect (toBeVisible, toHaveText …), expect.poll or page.waitForResponse.',
+        },
+      ],
     },
   }
 );

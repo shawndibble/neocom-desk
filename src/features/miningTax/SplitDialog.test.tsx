@@ -127,7 +127,10 @@ describe('SplitDialog — a needs-review Assignment', () => {
     };
     renderDialog({ assignment: grown });
 
-    expect(screen.getByRole('textbox', { name: /zeolites/i })).toHaveValue('30');
+    expect(screen.getByRole('textbox', { name: 'Units of Zeolites to move' })).toHaveValue('30');
+    expect(
+      screen.getByRole('textbox', { name: 'Units of Zeolites Jita landlord keeps' })
+    ).toHaveValue('100');
     // The original keeps what it was assigned.
     expect(screen.getByText('100,000 ISK · 10,000 ISK at 10%')).toBeInTheDocument();
   });
@@ -241,7 +244,7 @@ describe('SplitDialog — typing a quantity', () => {
     const big = { ...assignment, oreLines: [{ typeId: ZEOLITES, quantity: 100_000 }] };
     renderDialog({ assignment: big });
 
-    const input = screen.getByRole('textbox', { name: /Zeolites/ });
+    const input = screen.getByRole('textbox', { name: 'Units of Zeolites to move' });
     await userEvent.type(input, '54930');
 
     expect(input).toHaveValue('54,930');
@@ -261,5 +264,123 @@ describe('SplitDialog — dismissal', () => {
     renderDialog({ onClose });
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('SplitDialog — typing what the first Payee keeps (issue #6180)', () => {
+  const keepsBox = () =>
+    screen.getByRole('textbox', { name: 'Units of Zeolites Jita landlord keeps' });
+  const movesBox = () => screen.getByRole('textbox', { name: 'Units of Zeolites to move' });
+  async function pickHek() {
+    await userEvent.click(screen.getByRole('combobox', { name: 'Move part of this day to' }));
+    await userEvent.click(screen.getByRole('option', { name: 'Hek landlord' }));
+  }
+
+  it('fills in the moved figure from the kept one, and the other way round', async () => {
+    renderDialog();
+    await userEvent.clear(keepsBox());
+    await userEvent.type(keepsBox(), '70');
+    expect(movesBox()).toHaveValue('30');
+
+    await userEvent.clear(movesBox());
+    await userEvent.type(movesBox(), '45');
+    expect(keepsBox()).toHaveValue('55');
+  });
+
+  it('hands later ore to the new Payee by default', async () => {
+    renderDialog();
+    await pickHek();
+    await userEvent.type(movesBox(), '40');
+    await userEvent.click(screen.getByRole('button', { name: 'Split · move 40 units' }));
+
+    expect(split).toHaveBeenLastCalledWith(
+      assignment,
+      expect.objectContaining({ collector: 'new', unreported: [] }),
+      expect.anything()
+    );
+  });
+
+  it('keeps more than ESI reports yet: the new side collects only what comes past it', async () => {
+    renderDialog();
+    await pickHek();
+    await userEvent.clear(keepsBox());
+    await userEvent.type(keepsBox(), '130');
+
+    expect(screen.getByText(/30 more than ESI reports yet/)).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Jita landlord \(keeps\)/ })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Split · keep 30 more units' }));
+
+    expect(split).toHaveBeenLastCalledWith(
+      assignment,
+      expect.objectContaining({
+        moves: [],
+        unreported: [{ typeId: ZEOLITES, quantity: 30 }],
+        collector: 'new',
+      }),
+      expect.anything()
+    );
+  });
+
+  it('caps a keep at double what ESI reports and asks for that UTC day only', async () => {
+    renderDialog();
+    await pickHek();
+    await userEvent.clear(keepsBox());
+    await userEvent.type(keepsBox(), '500');
+
+    expect(keepsBox()).toHaveValue('200');
+    expect(screen.getByText(/100 more than ESI reports yet/)).toBeInTheDocument();
+    expect(screen.getByText(/this UTC day only/)).toBeInTheDocument();
+  });
+
+  describe('a second split, with a third Assignment already the Growth Collector (#6205)', () => {
+    const third: MiningTaxAssignmentRecord = {
+      ...assignment,
+      id: 'a-0',
+      payeeId: 'p-hek',
+      oreLines: [{ typeId: ZEOLITES, quantity: 20 }],
+      collectsGrowth: true,
+    };
+    const splitRow: MoonMiningTaxRow = { ...row, assignments: [third, assignment] };
+
+    it('still offers the choice, leaving the current Growth Collector by default', async () => {
+      renderDialog({ row: splitRow });
+      expect(screen.getByRole('radio', { name: /Hek landlord \(collects now\)/ })).toBeChecked();
+      await pickHek();
+      await userEvent.type(movesBox(), '40');
+      await userEvent.click(screen.getByRole('button', { name: 'Split · move 40 units' }));
+
+      const sent = vi.mocked(split).mock.lastCall?.[1];
+      expect(sent?.collector).toBeUndefined();
+    });
+
+    it('lets the new side take the Growth Collector over', async () => {
+      renderDialog({ row: splitRow });
+      await pickHek();
+      await userEvent.click(screen.getByRole('radio', { name: /Hek landlord \(new\)/ }));
+      await userEvent.type(movesBox(), '40');
+      await userEvent.click(screen.getByRole('button', { name: 'Split · move 40 units' }));
+
+      expect(split).toHaveBeenLastCalledWith(
+        assignment,
+        expect.objectContaining({ collector: 'new' }),
+        expect.anything()
+      );
+    });
+
+    it('lets the pilot keep more than ESI reports, handing later ore to the new side', async () => {
+      renderDialog({ row: splitRow });
+      await pickHek();
+      await userEvent.clear(keepsBox());
+      await userEvent.type(keepsBox(), '130');
+      expect(keepsBox()).toHaveValue('130');
+      expect(screen.getByRole('radio', { name: /Hek landlord \(new\)/ })).toBeChecked();
+    });
+  });
+
+  it('never keeps more than held on a paid day', async () => {
+    renderDialog({ assignment: { ...assignment, status: 'paid' } });
+    await userEvent.clear(keepsBox());
+    await userEvent.type(keepsBox(), '130');
+    expect(keepsBox()).toHaveValue('100');
   });
 });

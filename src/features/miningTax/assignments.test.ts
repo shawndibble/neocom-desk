@@ -1298,6 +1298,69 @@ describe('splitAssignment', () => {
     expect(kept.oreLineValues).toBeUndefined();
   });
 
+  it('hands the Growth Collector flag over from a third Assignment on the entry, leaving one collector', async () => {
+    const third: MiningTaxAssignmentRecord = {
+      id: 'third',
+      characterId: CHAR_A,
+      date: '2026-09-05',
+      solarSystemId: 1,
+      payeeId: 'payee-3',
+      oreLines: [{ typeId: TYPE_B, quantity: 10 }],
+      taxPct: 10,
+      estimatedValue: 40,
+      taxOwed: 4,
+      status: 'outstanding',
+      collectsGrowth: true,
+      updatedAt: 1,
+    };
+    await db.miningTaxAssignments.put(third);
+    const original = await seedOriginal();
+
+    const { created } = await splitAssignment(
+      original,
+      {
+        moves: [{ typeId: TYPE_A, quantity: 40 }],
+        payeeId: 'payee-2',
+        taxPct: 8,
+        collector: 'new',
+      },
+      atOneHub
+    );
+
+    expect(created.collectsGrowth).toBe(true);
+    const handedOver = await db.miningTaxAssignments.get('third');
+    expect(handedOver?.collectsGrowth).toBeUndefined();
+    expect(handedOver?.oreLines).toEqual(third.oreLines);
+  });
+
+  it('leaves a third Assignment collecting when no Growth Collector is chosen', async () => {
+    const third: MiningTaxAssignmentRecord = {
+      id: 'third',
+      characterId: CHAR_A,
+      date: '2026-09-05',
+      solarSystemId: 1,
+      payeeId: 'payee-3',
+      oreLines: [{ typeId: TYPE_B, quantity: 10 }],
+      taxPct: 10,
+      estimatedValue: 40,
+      taxOwed: 4,
+      status: 'paid',
+      paidAt: 3,
+      collectsGrowth: true,
+      updatedAt: 1,
+    };
+    await db.miningTaxAssignments.put(third);
+    const original = await seedOriginal();
+
+    await splitAssignment(
+      original,
+      { moves: [{ typeId: TYPE_A, quantity: 40 }], payeeId: 'payee-2', taxPct: 8 },
+      atOneHub
+    );
+
+    expect(await db.miningTaxAssignments.get('third')).toEqual(third);
+  });
+
   it('flags the new side as the collector when asked, and clears the flag on the original', async () => {
     const original = await seedOriginal({ collectsGrowth: true });
 
@@ -1374,6 +1437,47 @@ describe('splitAssignment', () => {
     await expect(
       splitAssignment(original, { moves: [], payeeId: 'payee-2', taxPct: 8 }, atOneHub)
     ).rejects.toThrow();
+  });
+
+  it('lets the kept side claim ore ESI has not reported yet, the new side collecting what comes after', async () => {
+    const original = await seedOriginal();
+
+    const { kept, created } = await splitAssignment(
+      original,
+      {
+        moves: [],
+        unreported: [{ typeId: TYPE_A, quantity: 30 }],
+        payeeId: 'payee-2',
+        taxPct: 8,
+        collector: 'new',
+      },
+      atOneHub
+    );
+
+    expect(kept.oreLines).toEqual([
+      { typeId: TYPE_A, quantity: 130 },
+      { typeId: TYPE_B, quantity: 50 },
+    ]);
+    expect(kept.estimatedValue).toBe(130 * 10 + 50 * 4);
+    expect(created.oreLines).toEqual([]);
+    expect(created.estimatedValue).toBe(0);
+    expect(created.collectsGrowth).toBe(true);
+  });
+
+  it('refuses an unreported claim the new side does not collect after, or on a paid original', async () => {
+    const original = await seedOriginal();
+    const claim = {
+      moves: [],
+      unreported: [{ typeId: TYPE_A, quantity: 30 }],
+      payeeId: 'payee-2',
+      taxPct: 8,
+    };
+    await expect(
+      splitAssignment(original, { ...claim, collector: 'original' }, atOneHub)
+    ).rejects.toThrow();
+    await expect(splitAssignment(original, claim, atOneHub)).rejects.toThrow();
+    const paid = await seedOriginal({ status: 'paid', paidAt: 5 });
+    await expect(splitAssignment(paid, { ...claim, collector: 'new' }, atOneHub)).rejects.toThrow();
   });
 
   it('values each side at its own Payee’s hub when the two bill at different ones', async () => {

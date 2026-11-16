@@ -7,8 +7,10 @@ import { Button, LoadFailedState, Spinner } from '@/components/ui';
 import { leaveFeeder, type FeederSetupStatus } from '../taxBook/feederClient';
 import {
   RECONNECT_CODE,
+  disputeFeederPayout,
   requestFeederRate,
   setFeederPayee,
+  setFeederPopSharing,
   setOwnRefineryLabel,
 } from '../taxBook/feederViewClient';
 import { isStale, owedOnLeaving } from '../taxBook/feederViewModel';
@@ -18,6 +20,7 @@ import { LeaveMoonOwnerDialog } from './LeaveMoonOwnerDialog';
 import { MoonOwnerPrevious } from './MoonOwnerPrevious';
 import { MoonOwnerView } from './MoonOwnerView';
 import { OwnerStaleBanner } from './OwnerStaleBanner';
+import { daysUntilOreLost, staleLedgerClock } from '@/engine/corpTaxBook/feederHealth';
 import { RefineryNamesBanner } from './RefineryNamesBanner';
 import { OwnerStatusStrip } from './OwnerStatusStrip';
 import { shortDate } from './moonsFormat';
@@ -97,6 +100,14 @@ export function MoonOwnerPanel({
           await requestFeederRate(characterId, corporationId, pct);
           reload();
         }}
+        onDisputePayout={async (payoutId, disputed) => {
+          await disputeFeederPayout(characterId, corporationId, payoutId, disputed);
+          reload();
+        }}
+        onSetPopSharing={async (share) => {
+          await setFeederPopSharing(characterId, corporationId, share);
+          reload();
+        }}
         characterId={characterId}
         onSetPayee={async (payee, payeeName) => {
           const out = await setFeederPayee(
@@ -132,7 +143,14 @@ export function MoonOwnerPanel({
           <>
             {isStale(view.summary) && view.summary.staleSince !== null && (
               <>
-                <OwnerStaleBanner since={view.summary.staleSince} onReconnect={reconnect} />
+                <OwnerStaleBanner
+                  since={view.summary.staleSince}
+                  daysLeft={daysUntilOreLost(
+                    staleLedgerClock(view.summary.staleSince, view.summary.lastReadWellAt),
+                    new Date().toISOString()
+                  )}
+                  onReconnect={reconnect}
+                />
                 {reconnectError && <InlineError>{reconnectError}</InlineError>}
               </>
             )}

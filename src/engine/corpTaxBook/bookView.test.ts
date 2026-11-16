@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildBookView,
+  type BookView,
+  type PlannedRun,
+  duePeriods,
   extractionDetail,
   isIssuedPeriod,
   minerDetail,
@@ -9,6 +12,7 @@ import {
   periodRows,
   periodStatements,
   planStatementRun,
+  planStatementRuns,
   statementDetail,
   statementForLine,
   type BookViewInput,
@@ -477,6 +481,81 @@ describe('buildBookView with a feeder', () => {
       })
     );
     expect(view.miners.map((m) => m.id)).toEqual(['solo:2']);
+  });
+});
+
+describe('a held moon owner day and a paid Statement (#6209)', () => {
+  const FEEDER = 98000002;
+  const fed = (characterId: number, date: string, quantity: number) => ({
+    ...entry(characterId, date, quantity),
+    structureId: 2002,
+    sourceCorporationId: FEEDER,
+  });
+
+  it('a day held while the moon owner could not be read is billed later, never written off', () => {
+    const entries = [entry(1, '2026-08-05', 1000), fed(1, '2026-08-20', 1000)];
+    // The moon owner's ledger was last read well on 08-15: its 08-20 ore is held.
+    const held = input({
+      entries,
+      feeders: [{ corporationId: FEEDER, lastReadWellAt: '2026-08-15T00:00:00Z' }],
+    });
+    const first = buildBookView(held);
+    const plan = planStatementRun(first, { start: '2026-08-01', end: '2026-08-31' });
+    const statement = statementForLine(first, plan, plan.lines[0]);
+    // The read comes back and the Statement is paid.
+    const later = buildBookView({
+      ...held,
+      feeders: [{ corporationId: FEEDER, lastReadWellAt: '2026-09-18T10:00:00Z' }],
+      statements: [statement],
+      paidStatementIds: new Set([statement.id]),
+    });
+    const miner = minerDetail(later, 'solo:1')!;
+    expect(miner.lateWriteOffs).toEqual([]);
+    expect(miner.days.find((d) => d.date === '2026-08-20')?.status).toBe('unbilled');
+  });
+
+  it("holds a stale owner's miner before its ore is read at all, so it lands later, not written off", () => {
+    // Miner 1 mined at the moon owner on 08-10 (read) and at the book's own refinery on 08-20;
+    // the owner's 08-20 ore is read only after the August Statement was paid.
+    const own = entry(1, '2026-08-20', 1000);
+    const stale = input({
+      entries: [fed(1, '2026-08-10', 1000), own],
+      feeders: [{ corporationId: FEEDER, lastReadWellAt: '2026-08-15T10:00:00Z' }],
+    });
+    const first = buildBookView(stale);
+    const plan = planStatementRun(first, { start: '2026-08-01', end: '2026-08-31' });
+    const statement = statementForLine(first, plan, plan.lines[0]);
+    expect(statement.coversThrough < '2026-08-15').toBe(true);
+    const later = buildBookView({
+      ...stale,
+      entries: [fed(1, '2026-08-10', 1000), own, fed(1, '2026-08-20', 500)],
+      feeders: [{ corporationId: FEEDER, lastReadWellAt: '2026-09-18T10:00:00Z' }],
+      statements: [statement],
+      paidStatementIds: new Set([statement.id]),
+    });
+    expect(minerDetail(later, 'solo:1')!.lateWriteOffs).toEqual([]);
+  });
+});
+
+describe('a held day says why (#6210)', () => {
+  const FEEDER = 98000002;
+  const fed = (characterId: number, date: string, quantity: number) => ({
+    ...entry(characterId, date, quantity),
+    structureId: 2002,
+    sourceCorporationId: FEEDER,
+  });
+
+  it('names the moon owner whose ledger it waits for', () => {
+    const stale = input({
+      entries: [fed(1, '2026-08-10', 1000), entry(1, '2026-08-20', 1000)],
+      feeders: [{ corporationId: FEEDER, lastReadWellAt: '2026-08-15T10:00:00Z' }],
+    });
+    const days = minerDetail(buildBookView(stale), 'solo:1')!.days;
+    expect(days.find((d) => d.date === '2026-08-20')).toMatchObject({
+      status: 'not-billable',
+      heldBy: FEEDER,
+    });
+    expect(days.find((d) => d.date === '2026-08-10')?.heldBy).toBeUndefined();
   });
 });
 
@@ -977,5 +1056,120 @@ describe('Statement standings read as whole ISK and Due skips paused ones (#5247
       paid: 0,
       outstanding: 1_000_001,
     });
+  });
+});
+
+describe('planStatementRuns: every missed period in one run (#6208)', () => {
+  const late = input({
+    now: '2026-10-18T14:00:00Z',
+    lastSyncedAt: '2026-10-18T12:00:00Z',
+    entries: [entry(1, '2026-08-10', 1000), entry(1, '2026-09-10', 2000)],
+  });
+
+  it('plans Aug then Sep, the second carrying what the first bills', () => {
+    const runs = planStatementRuns(buildBookView(late));
+    expect(runs.map((r) => r.plan.period.start)).toEqual(['2026-08-01', '2026-09-01']);
+    const [aug, sep] = runs;
+    expect(aug.plan.lines[0]).toMatchObject({ carried: 0, balanceDue: 100_000 });
+    expect(sep.plan.lines[0]).toMatchObject({ carried: 100_000, balanceDue: 300_000 });
+    expect(duePeriods(buildBookView(late))).toEqual([
+      { start: '2026-08-01', end: '2026-08-31' },
+      { start: '2026-09-01', end: '2026-09-30' },
+    ]);
+  });
+
+  it('issues each period from its own view, so ids follow the period', () => {
+    const runs = planStatementRuns(buildBookView(late));
+    const ids = runs.map((r) => statementForLine(r.view, r.plan, r.plan.lines[0]).id);
+    expect(ids).toEqual(['2026-08-01_solo:1', '2026-09-01_solo:1']);
+  });
+
+  it('leaves out a period already on a Statement and returns nothing once all are issued', () => {
+    const first = buildBookView(late);
+    const [aug] = planStatementRuns(first);
+    const augStatement = statementForLine(aug.view, aug.plan, aug.plan.lines[0]);
+    const afterAug = buildBookView({ ...late, statements: [augStatement] });
+    expect(duePeriods(afterAug)).toEqual([{ start: '2026-09-01', end: '2026-09-30' }]);
+    const [sep] = planStatementRuns(afterAug);
+    const sepStatement = statementForLine(sep.view, sep.plan, sep.plan.lines[0]);
+    expect(
+      planStatementRuns(buildBookView({ ...late, statements: [augStatement, sepStatement] }))
+    ).toEqual([]);
+  });
+
+  it('rolls a period under the minimum into the next one', () => {
+    const view = buildBookView({ ...late, minimumStatement: 150_000 });
+    const runs = planStatementRuns(view);
+    expect(runs.map((r) => r.plan.period.start)).toEqual(['2026-09-01']);
+    expect(runs[0].plan.lines[0].draft.amount).toBe(300_000);
+  });
+
+  it('is empty when nothing has closed', () => {
+    expect(planStatementRuns(buildBookView(input()))).toEqual([]);
+    expect(duePeriods(buildBookView(input()))).toEqual([]);
+  });
+});
+
+describe('planStatementRuns: the same plan as re-planning every period from the start', () => {
+  /** The plan as #6208 first computed it: `nextRunPeriod` from scratch on each period's view. */
+  function reference(view: BookView): PlannedRun[] {
+    const runs: PlannedRun[] = [];
+    const seen = new Set<string>();
+    let current = view;
+    for (;;) {
+      const period = nextRunPeriod(current);
+      if (period === undefined || seen.has(period.start)) return runs;
+      seen.add(period.start);
+      const plan = planStatementRun(current, period);
+      runs.push({ plan, view: current });
+      const issued = plan.lines.map((line) => statementForLine(current, plan, line));
+      current = buildBookView({
+        ...current.input,
+        statements: [...current.input.statements, ...issued],
+      });
+    }
+  }
+  const plans = (runs: PlannedRun[]) =>
+    runs.map((r) => ({ plan: r.plan, statements: r.view.input.statements.map((s) => s.id) }));
+
+  const late = input({
+    now: '2026-12-18T14:00:00Z',
+    lastSyncedAt: '2026-12-18T12:00:00Z',
+    entries: [
+      entry(1, '2026-08-10', 1000),
+      entry(2, '2026-08-20', 300),
+      entry(1, '2026-09-10', 2000),
+      entry(3, '2026-10-02', 50),
+      entry(2, '2026-10-12', 4000),
+      entry(1, '2026-11-30', 700),
+      entry(3, '2026-12-01', 900),
+    ],
+  });
+  const issuedAug = (() => {
+    const view = buildBookView(late);
+    const [aug] = planStatementRuns(view);
+    return aug.plan.lines
+      .filter((l) => l.minerId === 'solo:1')
+      .map((l) => statementForLine(aug.view, aug.plan, l));
+  })();
+
+  const cases: [string, BookViewInput][] = [
+    ['several missed months, several miners', late],
+    ['under a minimum that rolls some months over', { ...late, minimumStatement: 150_000 }],
+    ['a 10-day cadence', { ...late, cadence: { kind: 'days', days: 10, anchor: '2026-08-01' } }],
+    ['a miner new to a month already issued for another', { ...late, statements: issuedAug }],
+    ['nothing closed yet', input()],
+  ];
+  it.each(cases)('%s', (_name, bookInput) => {
+    const view = buildBookView(bookInput);
+    const runs = planStatementRuns(view);
+    expect(plans(runs)).toEqual(plans(reference(view)));
+    expect(duePeriods(view)).toEqual(runs.map((r) => r.plan.period));
+    expect(nextRunPeriod(view)).toEqual(runs[0]?.plan.period);
+  });
+
+  it('plans the first period on the view it was given', () => {
+    const view = buildBookView(late);
+    expect(planStatementRuns(view)[0].view).toBe(view);
   });
 });

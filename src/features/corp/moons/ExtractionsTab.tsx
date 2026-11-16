@@ -21,7 +21,9 @@ import { LinkSurveyDialog } from './LinkSurveyDialog';
 import { ExtractionStateFilter, ExtractionTimeline } from './ExtractionTimeline';
 import { DEFAULT_STATES, FILTER_STATES } from './extractionStates';
 import { isk, shortDate, shortDateTime } from './moonsFormat';
-import { extractionPath } from './moonsPaths';
+import { extractionPath, sharingMoonPath } from './moonsPaths';
+import { PopShareIcon } from './PopShareIcon';
+import { usePopShareMarks } from './usePopShareMarks';
 import { PlaceCell } from './sectionParts';
 import { MinedBar, OreLine, StateWord } from './moonsParts';
 
@@ -39,6 +41,7 @@ export function ExtractionsTab() {
   const [dismissing, setDismissing] = useState<ExtractionRow | null>(null);
   const { run, onCloseAutoFocus } = useOpenAfterMenu();
   const navigate = useNavigate();
+  const shareMarks = usePopShareMarks();
   // Open moon page is the row click. Beyond it a row earns a menu only with two real actions:
   // Change survey (the ore came from a survey; an unknown-ore row has the visible Link button)
   // and Dismiss tax (inert at zero tax, so it does not count).
@@ -83,12 +86,18 @@ export function ExtractionsTab() {
       primary: true,
       render: (row) => (
         <>
-          <PlaceCell
-            refinery={names.refinery(row.structureId)}
-            undockable={names.undockable?.(row.structureId)}
-            moon={names.moon(row.moonId)}
-            accent
-          />
+          <span className="flex min-w-0 items-center gap-1.5">
+            <PlaceCell
+              refinery={names.refinery(row.structureId)}
+              undockable={names.undockable?.(row.structureId)}
+              moon={names.moon(row.moonId)}
+              accent
+            />
+            <PopShareIcon
+              mark={shareMarks?.moons[String(row.moonId)]}
+              to={sharingMoonPath(row.moonId)}
+            />
+          </span>
           {namesCorporations && (
             <span className="block text-xs text-text-dim">
               {names.corporation(row.sourceCorporationId ?? corporationId)}

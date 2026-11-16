@@ -8,7 +8,8 @@ import { useTranslation } from 'react-i18next';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { downloadWorkbook, type WorkbookDownload } from '@/lib/downloadCsv';
 import { corpTickerOrId } from '../corpTicker';
-import { readAudit, readBookData, readDeclinedAutoGroup, readRebills } from '../taxBook/bookClient';
+import { readAudit, readDeclinedAutoGroup, readRebills } from '../taxBook/bookClient';
+import { bookPartsFor, readBook } from '../taxBook/bookRead';
 import { WorkbookDownloadButton } from '../WorkbookDownloadButton';
 import { bookExportSheets } from './bookExport';
 import { useBook } from './useBook';
@@ -21,7 +22,7 @@ function useExportBook(): () => Promise<WorkbookDownload> {
   const { characterId, corporationId, names } = useBook();
   return useCallback(async () => {
     const [data, audit, rebills, declinedAutoGroup, ticker] = await Promise.all([
-      readBookData(characterId, corporationId),
+      readBook(characterId, corporationId, { parts: bookPartsFor() }),
       readAudit(characterId, corporationId, EXPORT_AUDIT_LIMIT),
       readRebills(characterId, corporationId),
       readDeclinedAutoGroup(characterId, corporationId),

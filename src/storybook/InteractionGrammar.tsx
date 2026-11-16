@@ -48,6 +48,7 @@ import {
   focusRingClassName,
   focusRingInsetClassName,
   inlineLinkClassName,
+  interactiveClassName,
   rowInteractiveClassName,
   toggleChipStateClassName,
 } from '@/components/ui/controlStyles';
@@ -223,6 +224,17 @@ export function InteractionGrammar() {
               />
             </label>
           </ChannelOffTip>
+        </Cue>
+        <Cue rule={k('rules.absenceNote')}>
+          <button
+            type="button"
+            className={`flex w-64 items-center gap-1.5 py-1 text-left text-xs text-text-dim hover:text-accent ${interactiveClassName} ${focusRingInsetClassName}`}
+          >
+            <span className="truncate">Gold Magnate</span>{' '}
+            <span className="ml-auto min-w-16 shrink-[100] truncate pl-2 pr-2 text-[0.6875rem] text-text-dim">
+              {t('market.noOrdersInRegion', { regionName: 'The Forge' })}
+            </span>
+          </button>
         </Cue>
         <Cue rule={k('rules.figureHistory')}>
           <button

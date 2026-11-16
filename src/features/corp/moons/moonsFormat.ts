@@ -1,5 +1,6 @@
 import { formatIsk } from '@/lib/isk';
 import { verifyPeriodLabel } from '@/features/corpTaxBook/verifyPeriodLabel';
+import { formatList } from '@/lib/listFormat';
 import { MONTHS } from '@/engine/corpTaxBook/monthNames';
 import { extractionWindowDays } from '@/engine/corpTaxBook/extractionWindow';
 import type { TFunction } from 'i18next';
@@ -28,6 +29,11 @@ export const isRefineryPlaceholder = (name: string, id: number | string) =>
 export function shortDate(value: string): string {
   const [, m, d] = value.slice(0, 10).split('-').map(Number);
   return `${d} ${MONTHS[m - 1]}`;
+}
+
+/** "Oct 2026" from a `YYYY-MM` month (or any date in it). */
+export function monthLabel(month: string): string {
+  return `${MONTHS[Number(month.slice(5, 7)) - 1]} ${month.slice(0, 4)}`;
 }
 
 /** "18 Oct", or "18 Oct 2025" when the year is not `now`'s: a date that could be read as this year's. */
@@ -70,6 +76,11 @@ export function extractionWindowLabel(
 /** A period label: "Oct 2026" only for a whole calendar month, else the days it covers. */
 export function periodLabel(start: string, end: string): string {
   return verifyPeriodLabel(start, end, 'en');
+}
+
+/** Several periods as one phrase, oldest first: "Aug 2026 and Sep 2026". */
+export function periodsLabel(periods: readonly { start: string; end: string }[]): string {
+  return formatList(periods.map((p) => periodLabel(p.start, p.end)));
 }
 
 export function addDays(date: string, days: number): string {

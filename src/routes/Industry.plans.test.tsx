@@ -1,10 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within, waitFor } from '@testing-library/react';
+import { screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { db } from '@/db';
 import { useAssumedMe } from '@/features/industry/assumedMe';
-import { App } from '@/app/App';
 import {
   CHAR_ID,
   emptySkillsPayload,
@@ -12,12 +11,11 @@ import {
   seedPlan,
   server,
 } from '@/test/industryPage';
+import { holdHydration } from '@/test/holdHydration';
+import { renderIndustryRoutes } from '@/test/industryRoutes';
 
 vi.mock('@/features/market/priceVsMedian', async () =>
   (await import('@/test/industryMocks')).priceVsMedianMock()
-);
-vi.mock('virtual:pwa-register/react', async () =>
-  (await import('@/test/industryMocks')).pwaRegisterMock()
 );
 vi.mock('@/sde/loadSde', async () => (await import('@/test/industryMocks')).loadSdeMock());
 
@@ -28,7 +26,7 @@ describe('Industry: a Build Plan seeded from a BPC listing (issue #637)', () => 
 
   it("opens a plan at the listing's own ME, TE and runs, then clears the seed", async () => {
     window.history.pushState({}, '', SEEDED);
-    render(<App />);
+    await renderIndustryRoutes();
 
     expect(await screen.findByRole('heading', { name: 'Rifter' })).toBeInTheDocument();
     const created = await db.buildPlans.where('characterId').equals(CHAR_ID).first();
@@ -59,7 +57,7 @@ describe('Industry: a Build Plan seeded from a BPC listing (issue #637)', () => 
       )
     );
     window.history.pushState({}, '', SEEDED);
-    render(<App />);
+    await renderIndustryRoutes();
 
     await screen.findByRole('heading', { name: 'Rifter' });
     await waitFor(() => expect(window.location.search).toBe(''));
@@ -71,7 +69,7 @@ describe('Industry: a Build Plan seeded from a BPC listing (issue #637)', () => 
   it('creates the seeded plan beside an existing plan at different research, not instead of it', async () => {
     await db.buildPlans.add(seedPlan());
     window.history.pushState({}, '', SEEDED);
-    render(<App />);
+    await renderIndustryRoutes();
 
     await screen.findByRole('heading', { name: 'Rifter' });
     await waitFor(() => expect(window.location.search).toBe(''));
@@ -86,7 +84,7 @@ describe('Industry: a Build Plan seeded from a BPC listing (issue #637)', () => 
       seedPlan({ id: 'bp-seeded', name: 'Rifter 10/20 ×5', me: 10, te: 20, runs: 5 })
     );
     window.history.pushState({}, '', SEEDED);
-    render(<App />);
+    await renderIndustryRoutes();
 
     await screen.findByRole('heading', { name: 'Rifter' });
     await waitFor(() => expect(window.location.pathname).toBe('/industry/plans/bp-seeded'));
@@ -99,7 +97,7 @@ describe('Industry: a Build Plan seeded from a BPC listing (issue #637)', () => 
     // the way back to the ordinary `?product=` behaviour.
     await db.buildPlans.add(seedPlan());
     window.history.pushState({}, '', '/industry?product=587&me=10');
-    render(<App />);
+    await renderIndustryRoutes();
 
     await waitFor(() => expect(window.location.pathname).toBe('/industry/plans/bp-1'));
     await waitFor(() => expect(window.location.search).toBe(''));
@@ -112,7 +110,7 @@ describe('Industry: a Build Plan seeded from an LP Store offer', () => {
 
   it('opens a plan whose blueprint is the LP pick at that price, then clears the seed', async () => {
     window.history.pushState({}, '', LP_SEEDED);
-    render(<App />);
+    await renderIndustryRoutes();
 
     expect(await screen.findByRole('heading', { name: 'Rifter' })).toBeInTheDocument();
     await waitFor(() => expect(window.location.search).toBe(''));
@@ -127,7 +125,7 @@ describe('Industry: a Build Plan seeded from an LP Store offer', () => {
   it('creates the LP plan beside a plain plan for the same blueprint, not over it', async () => {
     await db.buildPlans.add(seedPlan());
     window.history.pushState({}, '', LP_SEEDED);
-    render(<App />);
+    await renderIndustryRoutes();
 
     await screen.findByRole('heading', { name: 'Rifter' });
     await waitFor(() => expect(window.location.search).toBe(''));
@@ -145,7 +143,7 @@ describe('Industry: a Build Plan seeded from an LP Store offer', () => {
       })
     );
     window.history.pushState({}, '', LP_SEEDED);
-    render(<App />);
+    await renderIndustryRoutes();
 
     await waitFor(() => expect(window.location.pathname).toBe('/industry/plans/bp-lp'));
     expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(1);
@@ -164,7 +162,7 @@ describe('Industry: a Build Plan seeded from an LP Store offer', () => {
       })
     );
     window.history.pushState({}, '', LP_SEEDED);
-    render(<App />);
+    await renderIndustryRoutes();
 
     await waitFor(() => expect(window.location.pathname).toBe('/industry/plans/bp-lp'));
     expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(1);
@@ -175,7 +173,7 @@ describe('Industry: "View in Industry as material" from Assets (issue #414)', ()
   it("opens the character's existing plan whose blueprint consumes the material, then clears the query param", async () => {
     await db.buildPlans.add(seedPlan());
     window.history.pushState({}, '', '/industry?material=34');
-    render(<App />);
+    await renderIndustryRoutes();
 
     await waitFor(() => expect(window.location.pathname).toBe('/industry/plans/bp-1'));
     await waitFor(() => expect(window.location.search).toBe(''));
@@ -189,7 +187,7 @@ describe('Industry: "View in Industry as material" from Assets (issue #414)', ()
     await db.buildPlans.add(seedPlan({ id: 'bp-0', name: 'Other plan', blueprintTypeID: 9841 }));
     await db.buildPlans.add(seedPlan({ id: 'bp-1', name: 'Rifter run', blueprintTypeID: 638 }));
     window.history.pushState({}, '', '/industry?material=35');
-    render(<App />);
+    await renderIndustryRoutes();
 
     await waitFor(() => expect(window.location.pathname).toBe('/industry/plans/bp-1'));
     expect(await screen.findByRole('heading', { name: 'Rifter' })).toBeInTheDocument();
@@ -199,7 +197,7 @@ describe('Industry: "View in Industry as material" from Assets (issue #414)', ()
     await db.buildPlans.add(seedPlan({ blueprintTypeID: 9841 }));
     // 999: not a material of either fixture blueprint.
     window.history.pushState({}, '', '/industry?material=999');
-    render(<App />);
+    await renderIndustryRoutes();
 
     await screen.findByRole('button', { name: 'Rifter run' });
     await waitFor(() => expect(window.location.search).toBe(''));
@@ -215,7 +213,7 @@ describe('Industry: owned-blueprint reauth', () => {
         HttpResponse.json({ error: 'missing scope' }, { status: 403 })
       )
     );
-    render(<App />);
+    await renderIndustryRoutes();
 
     expect(await screen.findByText('Log in again to see owned blueprints')).toBeInTheDocument();
     // The Build Plan list and Active Jobs panel still render.
@@ -254,25 +252,6 @@ describe('Industry: Opportunities "Add to Compare" for an alt-owned row (issue #
       // click. (Masked until the Foreground Poller stopped warming the same
       // reads at mount.)
       http.get('https://esi.evetech.net/characters/:id/implants', () => HttpResponse.json([])),
-      // The sidebar's character switcher now has two characters to show and
-      // fetches public/corp info for each — not exercised by any single-
-      // character test in this suite.
-      http.get('https://esi.evetech.net/characters/:id', ({ params }) =>
-        HttpResponse.json({
-          name: params.id === String(ALT_ID) ? 'Alt Pilot' : 'Pilot One',
-          corporation_id: 1000001,
-          birthday: '2020-01-01T00:00:00Z',
-          bloodline_id: 1,
-          gender: 'male',
-          race_id: 1,
-        })
-      ),
-      http.get('https://esi.evetech.net/characters/:id/corporationhistory', () =>
-        HttpResponse.json([])
-      ),
-      http.get('https://esi.evetech.net/corporations/:id', () =>
-        HttpResponse.json({ name: 'Corp', ticker: 'CORP' })
-      ),
       http.get(`https://esi.evetech.net/characters/${ALT_ID}/blueprints`, () =>
         HttpResponse.json([
           {
@@ -302,7 +281,7 @@ describe('Industry: Opportunities "Add to Compare" for an alt-owned row (issue #
 
   it('seeds both rows onto the active character and shows a real comparison, not the empty state', async () => {
     window.history.pushState({}, '', '/industry/opportunities');
-    render(<App />);
+    await renderIndustryRoutes();
     const user = userEvent.setup();
 
     // The page defaults to "This character" (91, no blueprints); switch to
@@ -340,23 +319,24 @@ describe('Industry: Opportunities "Add to Compare" for an alt-owned row (issue #
 
 describe('Industry: Build Opportunities waits for the pricing-settings hydration gate (#2054)', () => {
   it('shows a spinner in place of the panel, and never mounts it, until Assumed ME hydrates', async () => {
-    // Same reset shape `Settings.test.tsx`/`IndustryPlanPage.test.tsx` use to
-    // force a store back to its pre-hydration state — the workspace's own
-    // mount effect (`buildPlanPricingInputs.ts`) re-hydrates it once this
-    // page renders.
-    useAssumedMe.setState({ value: 0, hydrated: false });
+    // The workspace's own mount effect (`buildPlanPricingInputs.ts`) hydrates
+    // the store once this page renders; held here so the gated frame can't be
+    // raced past by a fast Dexie read.
+    const assumedMe = holdHydration(useAssumedMe, 0);
     window.history.pushState({}, '', '/industry/opportunities');
-    render(<App />);
+    try {
+      await renderIndustryRoutes();
 
-    // One `waitFor` so the find and the assert run in the same tick: the boot
-    // screen's own spinner is also "Loading" and unmounts as the route lands.
-    await waitFor(() =>
-      expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument()
-    );
-    expect(screen.queryByRole('heading', { name: 'Build Opportunities' })).not.toBeInTheDocument();
+      expect((await screen.findAllByRole('status', { name: 'Loading' })).length).toBeGreaterThan(0);
+      expect(
+        screen.queryByRole('heading', { name: 'Build Opportunities' })
+      ).not.toBeInTheDocument();
+      assumedMe.release();
+    } finally {
+      assumedMe.restore();
+    }
 
-    // Resolves on its own once the (real, Dexie-backed) hydrate() call
-    // settles — nothing in the test drives it forward by hand. Market-Wide
+    // Mounts once the (real, Dexie-backed) hydrate() call settles. Market-Wide
     // Build Opportunities reads no pricing input, so it's unaffected and
     // renders alongside the now-mounted panel.
     expect(await screen.findByRole('heading', { name: 'Build Opportunities' })).toBeInTheDocument();
@@ -390,7 +370,7 @@ describe('Industry: Opportunities page order with owned blueprints (#3071)', () 
       )
     );
     window.history.pushState({}, '', '/industry/opportunities');
-    render(<App />);
+    await renderIndustryRoutes();
 
     const ranked = await screen.findByRole('heading', { name: 'Build Opportunities' });
     const profitable = await screen.findByRole('heading', { name: "What's profitable" });

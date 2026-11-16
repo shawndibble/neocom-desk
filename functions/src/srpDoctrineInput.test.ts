@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { HttpsError } from 'firebase-functions/v2/https';
-import { parseDeleteDoctrine, parseSaveDoctrine } from './srpDoctrineInput.js';
+import {
+  MAX_DOCTRINE_SHARE_CODE,
+  parseDeleteDoctrine,
+  parseSaveDoctrine,
+} from './srpDoctrineInput.js';
 
 const fails = (fn: () => unknown) => {
   try {
@@ -52,6 +56,24 @@ describe('parseSaveDoctrine', () => {
     expect(
       fails(() => parseSaveDoctrine({ ...ok, snapshot: { ...ok.snapshot, rigs: many(9) } }))
     ).toMatch(/at most 8/);
+  });
+});
+
+describe('parseSaveDoctrine shareCode', () => {
+  it('keeps a Fitting Share Code; a save without one stays valid', () => {
+    expect(parseSaveDoctrine({ ...ok, shareCode: 'AbC-_9' }).shareCode).toBe('AbC-_9');
+    expect(parseSaveDoctrine(ok)).not.toHaveProperty('shareCode');
+  });
+  it('refuses a code that is not base64url or is too long', () => {
+    expect(fails(() => parseSaveDoctrine({ ...ok, shareCode: 'a b' }))).toMatch(/shareCode/);
+    expect(fails(() => parseSaveDoctrine({ ...ok, shareCode: '' }))).toMatch(/shareCode/);
+    expect(fails(() => parseSaveDoctrine({ ...ok, shareCode: 5 }))).toMatch(/shareCode/);
+    expect(
+      fails(() => parseSaveDoctrine({ ...ok, shareCode: 'a'.repeat(MAX_DOCTRINE_SHARE_CODE + 1) }))
+    ).toMatch(/shareCode/);
+    expect(
+      parseSaveDoctrine({ ...ok, shareCode: 'a'.repeat(MAX_DOCTRINE_SHARE_CODE) }).shareCode
+    ).toHaveLength(MAX_DOCTRINE_SHARE_CODE);
   });
 });
 

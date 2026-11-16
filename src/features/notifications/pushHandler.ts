@@ -51,6 +51,7 @@ import { notifications } from '@/i18n/locales/en.json';
 import {
   notificationOptionsFor,
   fallbackNotificationOptions,
+  occurrencePath,
   type AppNotificationOptions,
 } from './notificationOptions';
 import { NOTIFICATION_EVENT_IDS, type NotificationEventId } from './events';
@@ -64,6 +65,7 @@ import {
   communityJoinRequestText,
   communityMemberJoinedText,
   vettingSharedText,
+  corpTaxBookSyncStoppedText,
   communityRequestPledgedText,
   newMailText,
   priceAlertText,
@@ -258,6 +260,8 @@ async function presentServerFire(
       return { ...priceAlertText(t, fire), feedKey, subjectId: fire.typeId };
     case 'vettingShared':
       return { ...vettingSharedText(t, fire), feedKey, path: vettingSharedPath(fire) };
+    case 'corpTaxBookSyncStopped':
+      return { ...corpTaxBookSyncStoppedText(t, fire), feedKey };
     // New mail (issue #5143): the pop-up names the sender and subject; the feed row never does.
     case 'newMail': {
       const character =
@@ -418,12 +422,14 @@ export async function handlePush(env: PushEnv, rawText: string | null, now: numb
           NAME_READ_BUDGET_MS
         )
       : false;
+  // A Scheduled Push names its subject only through its key (a Shared Moon Pop's pop).
+  const ownPath = path ?? occurrencePath(payload.eventId, payload.occurrenceKey);
   const options = notificationOptionsFor(
     {
       eventId: payload.eventId,
       characterId: payload.characterId,
       subjectId,
-      ...(path === undefined ? {} : { path }),
+      ...(ownPath === undefined ? {} : { path: ownPath }),
     },
     body
   );

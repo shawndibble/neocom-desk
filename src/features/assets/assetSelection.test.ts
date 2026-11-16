@@ -6,6 +6,7 @@ import {
   selectAll,
   namesForSelection,
   quantityLinesForSelection,
+  selectionTotals,
 } from './assetSelection';
 
 describe('selectionStateForIds', () => {
@@ -120,5 +121,68 @@ describe('quantityLinesForSelection', () => {
     expect(parseAppraisalPaste(text).map((e) => [e.name, e.quantity])).toEqual([
       ['Tritanium', 3500],
     ]);
+  });
+});
+
+describe('selectionTotals (#6165)', () => {
+  const assets = new Map([
+    [1, { item_id: 1, type_id: 34, quantity: 500, is_blueprint_copy: false }],
+    [2, { item_id: 2, type_id: 35, quantity: 2, is_blueprint_copy: false }],
+    [3, { item_id: 3, type_id: 999, quantity: 1, is_blueprint_copy: true }],
+    [4, { item_id: 4, type_id: 47000, quantity: 1, is_blueprint_copy: false }],
+  ]);
+  const prices = new Map([
+    [34, 5],
+    [35, 100],
+  ]);
+  const volumes = new Map([
+    [34, 0.01],
+    [35, 2],
+  ]);
+
+  it('sums each selected stack at its own value and quantity × unit volume', () => {
+    expect(selectionTotals([1, 2], assets, prices, new Map(), volumes)).toEqual({
+      isk: 500 * 5 + 2 * 100,
+      volume: 500 * 0.01 + 2 * 2,
+      unpriced: 0,
+    });
+  });
+
+  it('counts a stack with no value as unpriced and adds nothing for it', () => {
+    expect(selectionTotals([1, 4], assets, prices, new Map(), volumes)).toEqual({
+      isk: 2500,
+      volume: 5,
+      unpriced: 1,
+    });
+  });
+
+  it('never counts a blueprint copy as unpriced: it is worth nothing by design', () => {
+    expect(selectionTotals([1, 3], assets, prices, new Map(), volumes)).toEqual({
+      isk: 2500,
+      volume: 5,
+      unpriced: 0,
+    });
+  });
+
+  it('takes a per-item value (copy, abyssal estimate) over the type price', () => {
+    const totals = selectionTotals(
+      [3, 4],
+      assets,
+      prices,
+      new Map([
+        [3, 1_000_000],
+        [4, 42],
+      ]),
+      volumes
+    );
+    expect(totals).toEqual({ isk: 1_000_042, volume: 0, unpriced: 0 });
+  });
+
+  it('skips ids no longer in the asset map', () => {
+    expect(selectionTotals([1, 77], assets, prices, new Map(), volumes)).toEqual({
+      isk: 2500,
+      volume: 5,
+      unpriced: 0,
+    });
   });
 });

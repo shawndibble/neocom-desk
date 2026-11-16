@@ -12,7 +12,9 @@
  *      no volumes. One read per type, so only for a batch up to
  *      `R2_FALLBACK_MAX_TYPES`.
  *
- * Steps 2 and 3 are flagged stale so the caller can say so and never caches them.
+ * Steps 2 and 3 come from a snapshot (`fromSnapshot`), which the caller never
+ * caches; of those, only a type that got a price is flagged stale, so "stale"
+ * never sits beside "no price".
  *
  * Nothing here caches: `prices.ts` owns the TTLs, and wraps this module.
  */
@@ -31,6 +33,7 @@ import {
 } from './fuzzwork';
 import { TRADE_HUBS } from './hubs';
 import { MINUTE_MS, DAY_MS } from '@/lib/age';
+import { registerTestReset } from '@/lib/testResets';
 
 /** Past this many types the ESI step is skipped: one request each would eat the error-limit budget. */
 export const ESI_FALLBACK_MAX_TYPES = 50;
@@ -48,14 +51,32 @@ export interface FallbackPrices {
   prices: Map<number, HubAggregate>;
   /** Types priced from an R2 snapshot (order books or yesterday's close), not a live source. */
   stale: ReadonlySet<number>;
+  /** The whole answer came from an R2 snapshot: never cache it, priced or not. */
+  fromSnapshot: boolean;
+}
+
+function liveAnswer(prices: Map<number, HubAggregate>): FallbackPrices {
+  return { prices, stale: new Set(), fromSnapshot: false };
+}
+
+/** A snapshot answer: stale marks only the types it priced. */
+function snapshotAnswer(prices: Map<number, HubAggregate>): FallbackPrices {
+  const stale = new Set<number>();
+  for (const [typeId, p] of prices) if (p.sellMin !== null || p.buyMax !== null) stale.add(typeId);
+  return { prices, stale, fromSnapshot: true };
 }
 
 let fuzzworkDownUntil = 0;
 
-/** Test-only: forget a recorded Fuzzwork outage. */
+/**
+ * Test-only: forget a recorded Fuzzwork outage. Runs before every test
+ * (`registerTestReset`): a request the last test left running is aborted at its
+ * end, which reads as Fuzzwork down and would send the next test to the fallback.
+ */
 export function resetPriceFallback(): void {
   fuzzworkDownUntil = 0;
 }
+registerTestReset(resetPriceFallback);
 
 function fuzzworkAvailable(nowMs: number): boolean {
   return nowMs >= fuzzworkDownUntil;
@@ -199,12 +220,12 @@ export async function fetchAggregatesWithFallback(
   scope: AggregateScope = 'station',
   now: () => number = Date.now
 ): Promise<FallbackPrices> {
-  if (typeIds.length === 0) return { prices: new Map(), stale: new Set() };
+  if (typeIds.length === 0) return liveAnswer(new Map());
   let emptyAnswer: Map<number, HubAggregate> | null = null;
   if (fuzzworkAvailable(now())) {
     try {
       const prices = await fetchAggregates(locationId, typeIds, scope);
-      if (!noPrices(prices)) return { prices, stale: new Set() };
+      if (!noPrices(prices)) return liveAnswer(prices);
       emptyAnswer = prices;
     } catch {
       markFuzzworkDown(now());
@@ -223,16 +244,16 @@ export async function fetchAggregatesWithFallback(
         buyVolume: b?.buyVolume ?? 0,
       });
     }
-    return { prices, stale: new Set() };
+    return liveAnswer(prices);
   }
 
   if (scope === 'station') {
     const prices =
       (await r2HubBookPrices(locationId, typeIds)) ?? (await r2Prices(locationId, typeIds, now()));
-    if (prices) return { prices, stale: new Set(prices.keys()) };
+    if (prices) return snapshotAnswer(prices);
   }
 
-  if (emptyAnswer) return { prices: emptyAnswer, stale: new Set() };
+  if (emptyAnswer) return liveAnswer(emptyAnswer);
   throw new Error('no price source answered');
 }
 

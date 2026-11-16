@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import '@/i18n';
 import { db } from '@/db';
@@ -7,10 +7,11 @@ import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharact
 import { clearJumpGraphIndex } from '@/sde/jumpGraph';
 import { clearSolarSystemIndex } from '@/sde/solarSystems';
 import { clearRouteKillCaches } from '@/features/travel/routeKillsData';
-import { App } from '@/app/App';
+import { Travel } from '@/routes/Travel';
 import * as routeChunks from '@/app/routeChunks';
 import { clearEveScoutCache, EVE_SCOUT_SIGNATURES_URL } from '@/lib/eveScout';
 import { mswServer } from '@/test/msw';
+import { renderPageRoute } from '@/test/renderPage';
 import {
   JITA,
   JUMPS,
@@ -133,14 +134,14 @@ export const server = mswServer(
 export function installTravelHarness(): void {
   beforeAll(async () => {
     // One throwaway render of a Route Safety route, so no test pays for the
-    // first one. A worker's first `App` render — compiling the lazy route
-    // chunks, warming jsdom and React — cost 4-6s on top of a warm render, and
-    // it landed on whichever test ran first. Done here under the hook's own
-    // budget; `beforeEach` clears every cache it filled.
+    // first one. A worker's first render — compiling the route chunk, warming
+    // jsdom and React — cost seconds on top of a warm render, and it landed on
+    // whichever test ran first. Done here under the hook's own budget;
+    // `beforeEach` clears every cache it filled.
     await routeChunks.loadTravel();
     await resetState();
     window.history.pushState({}, '', `/travel/route?from=${JITA}&to=${UEDAMA}`);
-    const { unmount } = render(<App />);
+    const { unmount } = renderTravelRoute();
     await screen.findByRole('table', { name: 'Systems on the route' }, { timeout: 25_000 });
     unmount();
   }, 30_000);
@@ -188,7 +189,17 @@ export function routeFact(label: string) {
     ?.textContent;
 }
 
+/**
+ * The Travel page on its own route (its tabs, legacy tab paths and info
+ * modals), with no App boot or signed-in shell. The App wiring tests
+ * (Travel.test.tsx's redirects) render `<App />`.
+ */
+export function renderTravelRoute() {
+  return renderPageRoute('/travel', <Travel />);
+}
+
+/** Opens Route Safety at `/travel/route<search>`. */
 export function visit(search: string) {
   window.history.pushState({}, '', `/travel/route${search}`);
-  render(<App />);
+  renderTravelRoute();
 }

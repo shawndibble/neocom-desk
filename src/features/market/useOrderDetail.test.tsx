@@ -249,7 +249,7 @@ describe('useOrderDetail', () => {
 
       // A background refresh hands over a newer snapshot.
       rerender({ row: structureRow, snapshot: { ...SNAPSHOT } });
-      await act(async () => {});
+      // A retry would start in the effect that rerender ran, as checkDeeper's does below.
       expect(loaders.structureCompetition).toHaveBeenCalledTimes(1);
 
       act(() => result.current.checkDeeper());

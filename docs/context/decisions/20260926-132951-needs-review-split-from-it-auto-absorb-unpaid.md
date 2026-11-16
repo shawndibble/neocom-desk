@@ -26,3 +26,5 @@ _Recorded 2026-09-26._
   one when its ore grows.** This is exactly what pressing Accept New Total did
   before; the only change is that it now happens on refresh. Pilots who hand-edit
   a figure should expect it to reset when more ore arrives.
+
+_Narrowed by 20261115-114019 (#6205): only a sole Assignment absorbs; growth on a split day is flagged Needs review._

@@ -241,6 +241,21 @@ export interface LpLandingHoldings {
   best: LpLandingStoreFacts | null;
 }
 
+const LP_VALUE_SORT = { columnId: 'lpValue', direction: 'desc' } as const;
+const YOUR_LP_SORT = { columnId: 'yourLp', direction: 'desc' } as const;
+
+/**
+ * The store list's default sort, when the pilot has not picked one: Your LP
+ * first while the Character holds LP anywhere (a pilot with LP in dozens of
+ * stores otherwise finds every one of them below the fold), LP Value else.
+ * Each is one module-scope object, so the URL codec keeps its identity.
+ */
+export function lpLandingStoreSort(
+  holdings: LpLandingHoldings | null
+): typeof LP_VALUE_SORT | typeof YOUR_LP_SORT {
+  return holdings !== null && holdings.lp > 0 ? YOUR_LP_SORT : LP_VALUE_SORT;
+}
+
 /** The Character's LP across every store, valued; null when it holds none. */
 export function lpLandingHoldings(
   stores: readonly LpLandingStoreFacts[],

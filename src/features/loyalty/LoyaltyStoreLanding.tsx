@@ -48,6 +48,7 @@ import {
   MIN_SELLS_PER_DAY_OPTIONS,
   lpLandingBestOffers,
   lpLandingHoldings,
+  lpLandingStoreSort,
   lpLandingOffers,
   lpLandingStores,
   type LpLandingFilters,
@@ -104,7 +105,6 @@ const FILTER = defineUrlFilter<LpLandingFilters>({
   categories: { key: 'cat', codec: idListParam() },
 });
 
-const STORES_SORT = { columnId: 'lpValue', direction: 'desc' } as const;
 const OFFERS_SORT = { columnId: 'iskPerLp', direction: 'desc' } as const;
 const STORE_SORT_IDS = ['store', 'lpValue', ...LP_LANDING_STORE_COLUMN_IDS];
 const OFFER_SORT_IDS = ['item', 'iskPerLp', ...LP_LANDING_OFFER_COLUMN_IDS];
@@ -193,7 +193,8 @@ export function LoyaltyStoreLanding({ active = true }: { active?: boolean }) {
     LP_LANDING_OFFER_COLUMN_IDS,
     LP_LANDING_OFFER_PHONE_OFF
   );
-  const storeSort = useUrlSort('storeSort', STORES_SORT, STORE_SORT_IDS);
+  // A pilot holding LP sees those stores first unless the URL names a sort.
+  const storeSort = useUrlSort('storeSort', lpLandingStoreSort(holdings), STORE_SORT_IDS);
   const offerSort = useUrlSort('offerSort', OFFERS_SORT, OFFER_SORT_IDS);
 
   // The whole landing URL rides along, so Close after a reload rebuilds this view, not just the query.

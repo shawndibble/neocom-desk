@@ -21,6 +21,7 @@ import type { PayeeRecord } from '@/db';
 import { formatIsk } from '@/lib/isk';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { useSystemName } from '@/features/route/useSolarSystems';
+import { corporationNamed, type NamedCorporation } from '@/engine/miningTax/payeeCorporation';
 import { DefaultSystemsField } from './DefaultSystemsField';
 import { deletePayee } from './ledgerActions';
 import { PayeeNameField } from './PayeeNameField';
@@ -60,6 +61,12 @@ interface PayeeManagerDialogProps {
   systemsByPayee?: ReadonlyMap<string, ReadonlySet<number>>;
   /** Display names for the ids in `systemsByPayee`; an id without one is left out of the row. */
   systemNames?: ReadonlyMap<number, string>;
+  /**
+   * The corporations whose Corp Tax Book the member can see. A Payee named for
+   * one is offered the link to it (#6205): the book only counts a Payee linked
+   * to its corporation as its own (`isCorpEntityPayee`).
+   */
+  bookCorporations?: readonly NamedCorporation[];
 }
 
 export interface PayeeOwed {
@@ -107,6 +114,8 @@ function DefaultSystemTaken({ systemId, holderName }: { systemId: number; holder
   );
 }
 
+const NO_BOOK_CORPORATIONS: readonly NamedCorporation[] = [];
+
 const EMPTY_DRAFT: DraftPayee = {
   id: null,
   name: '',
@@ -139,6 +148,7 @@ export function PayeeManagerDialog({
   owedByPayee,
   systemsByPayee,
   systemNames,
+  bookCorporations = NO_BOOK_CORPORATIONS,
 }: PayeeManagerDialogProps) {
   const { t } = useTranslation();
   const formId = useId();
@@ -167,6 +177,12 @@ export function PayeeManagerDialog({
   }, [payeesByCharacterState]);
 
   const showForm = formOpen || payees.length === 0;
+  // A name matching a Corp Tax Book's corporation the draft is not yet linked to.
+  const namedBook = corporationNamed(draft.name, bookCorporations);
+  const suggestedBook =
+    namedBook && !(draft.entityKind === 'corporation' && draft.entityId === namedBook.corporationId)
+      ? namedBook
+      : undefined;
 
   // A genuinely fresh read after a mutation, since the parent's snapshot map
   // is a point-in-time seed and won't reflect this dialog's own edit until
@@ -427,6 +443,25 @@ export function PayeeManagerDialog({
                   onPick={handlePick}
                 />
               </Field>
+              {suggestedBook && (
+                <div className="flex flex-wrap items-center gap-2 text-xs text-text-dim">
+                  <p className="min-w-0 flex-1">
+                    {t('miningTax.payees.bookLink.note', { corp: suggestedBook.name })}
+                  </p>
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      handlePick({
+                        id: suggestedBook.corporationId,
+                        name: suggestedBook.name,
+                        kind: 'corporation',
+                      })
+                    }
+                  >
+                    {t('miningTax.payees.bookLink.action', { corp: suggestedBook.name })}
+                  </Button>
+                </div>
+              )}
               <Field label={t('miningTax.payees.taxPctLabel')} htmlFor={`${formId}-pct`}>
                 <TextInput
                   id={`${formId}-pct`}
@@ -540,7 +575,6 @@ export function PayeeManagerDialog({
                 </Select>
                 <Button
                   variant="danger"
-                  size="sm"
                   disabled={!moveTargetId}
                   onClick={() => confirmDelete(true)}
                 >

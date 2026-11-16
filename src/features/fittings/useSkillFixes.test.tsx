@@ -52,7 +52,10 @@ describe('useSkillFixes', () => {
     await waitFor(() => expect(compareTrained).toHaveBeenCalled());
     unmount();
     const calls = compareTrained.mock.calls.length;
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Once every calculation started has answered, nothing new has begun.
+    await waitFor(() =>
+      expect(compareTrained).toHaveResolvedTimes(compareTrained.mock.calls.length)
+    );
     // At most the calculation already under way finishes.
     expect(compareTrained.mock.calls.length).toBeLessThanOrEqual(calls + 1);
     expect(calls).toBeLessThan(50);

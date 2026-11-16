@@ -31,7 +31,6 @@ import {
   R2_FALLBACK_MAX_TYPES,
   fetchAggregatesWithFallback,
   fetchOrderCountsWithFallback,
-  resetPriceFallback,
 } from './priceFallback';
 
 const JITA = 60003760;
@@ -51,7 +50,6 @@ const order = (o: Partial<RegionOrder>): RegionOrder =>
 
 beforeEach(() => {
   vi.resetAllMocks();
-  resetPriceFallback();
   mocks.fetchOrderCounts.mockRejectedValue(new Error('down'));
 });
 
@@ -60,6 +58,7 @@ describe('fetchAggregatesWithFallback', () => {
     mocks.fetchAggregates.mockResolvedValue(new Map([[34, live]]));
     const out = await fetchAggregatesWithFallback(JITA, [34]);
     expect(out.prices.get(34)).toEqual(live);
+    expect(out.fromSnapshot).toBe(false);
     expect(out.stale.size).toBe(0);
     expect(mocks.getMarketOrders).not.toHaveBeenCalled();
   });
@@ -166,7 +165,9 @@ describe('fetchAggregatesWithFallback', () => {
     expect(mocks.getMarketOrders).not.toHaveBeenCalled();
     expect(out.prices.get(1)).toEqual({ sellMin: 4, buyMax: 3, sellVolume: 12, buyVolume: 7 });
     expect(out.prices.get(2)).toEqual(none);
-    expect(out.stale.size).toBe(ids.length);
+    // Only a priced type is "stale": a type with no orders reads "no price", never both.
+    expect([...out.stale]).toEqual([1]);
+    expect(out.fromSnapshot).toBe(true);
   });
 
   it('reads no per-type R2 close past its cap when the books are unavailable', async () => {

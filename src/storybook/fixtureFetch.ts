@@ -3,8 +3,10 @@
  * `window.fetch` with a router over fixture responses; any request it has no
  * fixture for is recorded and rejected, and logged as a console error. ESI's
  * client turns a rejected request into a silent offline/empty state, so the
- * record, not the throw, is what makes a missed fixture visible:
- * `unexpectedRequests()` is asserted empty by `src/test/storySmoke.tsx`.
+ * record, not the throw, is what makes a missed fixture visible to a test that
+ * asserts `unexpectedRequests()` empty (`src/routes/Wallet.stories.test.tsx`).
+ * The story smoke (`src/test/storySmoke.tsx`) checks page stories for rendering
+ * only, so a miss there shows up as this console error and an empty state.
  *
  * Same-origin requests (the SDE bake, fonts) pass through to the real fetch.
  */
@@ -33,11 +35,29 @@ export interface FixtureRoute {
   respond: (request: FixtureRequest) => FixtureResponse;
 }
 
-const unexpected: string[] = [];
+const unexpected: { request: string; owner: string | undefined }[] = [];
+let currentOwner: () => string | undefined = () => undefined;
 
-/** Requests the installed router had no fixture for since the last `install`. */
-export function unexpectedRequests(): readonly string[] {
-  return unexpected;
+/**
+ * Lets the story smoke stamp each request with the story that issued it (it
+ * reads an async context), so a request that outlives its story is never blamed
+ * on the next one. Returns a function that stops stamping.
+ */
+export function attributeRequestsTo(owner: () => string | undefined): () => void {
+  currentOwner = owner;
+  return () => {
+    currentOwner = () => undefined;
+  };
+}
+
+/**
+ * Requests the installed router had no fixture for since the last `install`;
+ * given an `owner`, only those that owner issued (see `attributeRequestsTo`).
+ */
+export function unexpectedRequests(owner?: string): readonly string[] {
+  return unexpected
+    .filter((entry) => owner === undefined || entry.owner === owner)
+    .map((entry) => entry.request);
 }
 
 /**
@@ -140,7 +160,7 @@ async function fixtureFetch(input: RequestInfo | URL, init?: RequestInit): Promi
     (candidate) => matches(candidate, method, url.pathname)
   );
   if (!route) {
-    unexpected.push(lastRequest);
+    unexpected.push({ request: lastRequest, owner: currentOwner() });
     console.error(`Story reached the network with no fixture: ${lastRequest}`);
     throw new TypeError(`Story reached the network with no fixture: ${lastRequest}`);
   }

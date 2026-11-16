@@ -116,6 +116,14 @@ each was on, so a report is never pushed to its own pilot's other character) in
 no pilot, goes to at most 50 reviewers (the most recently seen) and holds the submit up for at
 most 3 seconds; one that fails or runs out of time is logged and the report is shared regardless.
 
+`syncCorpTaxBooks` sends the `corpTaxBookSyncStopped` push (ADR 0027) the same way: when a run
+stops a corporation's Automatic sync for any reason but the book being turned off, it pushes to
+the devices that enabled the event of the book's editors (`corps/{id}/officers` docs that may
+edit, checked in the last 30 days) and of the holder, unless the holder lost the role or left the
+corporation. FCM through the Admin SDK again, so redeploying `syncCorpTaxBooks` is all it needs.
+At most 25 editors; the run waits at most 5 seconds for them, and a push that fails or runs out
+of time is logged and the stop stands regardless.
+
 ### Index exemptions are a one-way-ish deploy
 
 `firestore.indexes.json`'s `fieldOverrides` exempt every field of every synced

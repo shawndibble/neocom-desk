@@ -64,7 +64,7 @@ describe('MoonOwnerView', () => {
     expect(
       screen.getByText('Rate set to 8% by Brass Meridian Logistics on 1 Oct. You asked for 6%.')
     ).toBeVisible();
-    expect(screen.getByText(/16 Oct/, { selector: 'li' })).toHaveTextContent(
+    expect(screen.getByText(/16 Oct/, { selector: 'li > span' })).toHaveTextContent(
       'Matched in the wallet journal'
     );
   });
@@ -93,7 +93,7 @@ describe('MoonOwnerView', () => {
       balanceKind: 'none',
       balanceIsk: 0,
     });
-    expect(screen.getByText(/No rate is set, so nothing is owed to you yet/)).toBeVisible();
+    expect(screen.getByText(/No rate is agreed yet, so nothing is owed to you yet/)).toBeVisible();
     // The history in the fixture still holds a past "agreed 8%": it must not read as a rate set.
     expect(screen.queryByText(/Rate set to/)).toBeNull();
     expect(screen.getByText('No rate is set.')).toBeVisible();
@@ -102,10 +102,56 @@ describe('MoonOwnerView', () => {
   it('settled otherwise: the note, mined volume and value, no balance', () => {
     view({ mode: 'settled-otherwise', note: 'Fuel for their refineries', balanceKind: 'none' });
     expect(screen.getByText('Fuel for their refineries')).toBeVisible();
-    expect(screen.getByText(/Nothing is owed in ISK/)).toBeVisible();
+    expect(screen.getByText(/Nothing more builds up in ISK/)).toBeVisible();
     expect(screen.getByText('412,806,000')).toBeVisible();
     expect(screen.queryByText('Payments and rate')).toBeNull();
     expect(screen.queryByText(/is owed to you/)).toBeNull();
+  });
+
+  it('settled otherwise after ore accrued: what is still owed shows, with the payments (#6209)', () => {
+    view({ mode: 'settled-otherwise', balanceKind: 'owed', balanceIsk: 5_000_000 });
+    expect(screen.getByText('5,000,000')).toBeVisible();
+    expect(screen.getByText(/is still owed to you for ore mined before this/)).toBeVisible();
+    expect(screen.getByText('Payments to you')).toBeVisible();
+  });
+
+  it('a requested rate alone reads as asked, with the ore waiting for a rate (#6209)', () => {
+    view({
+      effectiveRatePct: null,
+      agreedRatePct: null,
+      requestedRatePct: 6,
+      rateHistory: [],
+      pendingValueIsk: 2_000_000,
+      balanceKind: 'even',
+      balanceIsk: 0,
+    });
+    expect(
+      screen.getByText(/You asked for 6%. Nothing is owed until they agree a rate/)
+    ).toBeVisible();
+    expect(screen.getByText('2,000,000 of ore mined is waiting for a rate.')).toBeVisible();
+  });
+
+  it('flags a payment as disputed, and withdraws a flag (#6209)', async () => {
+    const onDisputePayout = vi.fn().mockResolvedValue(undefined);
+    const base = fixtureView();
+    render(
+      <MoonOwnerView
+        view={{
+          ...base,
+          payouts: base.payouts.map((p) => (p.id === 'p1' ? { ...p, disputed: true as const } : p)),
+        }}
+        names={nameOf}
+        canEdit
+        onRequestRate={vi.fn()}
+        onDisputePayout={onDisputePayout}
+      />
+    );
+    const user = userEvent.setup();
+    expect(screen.getByText(/You dispute this/)).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Dispute' }));
+    await waitFor(() => expect(onDisputePayout).toHaveBeenCalledWith('p2', true));
+    await user.click(screen.getByRole('button', { name: 'Withdraw dispute' }));
+    await waitFor(() => expect(onDisputePayout).toHaveBeenCalledWith('p1', false));
   });
 
   it('after leaving and settled: only the one line, nothing under it', () => {
@@ -157,13 +203,46 @@ describe('MoonOwnerView', () => {
   });
 });
 
+describe('MoonOwnerView: checking the numbers (#6210)', () => {
+  it('shows how the balance adds up, and the mining day by day, a month at a time', async () => {
+    const v = fixtureView({ accruedIsk: 33_024_480, paidIsk: 20_000_000 });
+    v.days = [
+      ...v.days,
+      {
+        date: '2026-09-28',
+        lines: [{ characterId: 1, structureId: 10, typeId: 45490, volume: 1234, quantity: 1234 }],
+      },
+    ];
+    render(<MoonOwnerView view={v} names={nameOf} canEdit onRequestRate={vi.fn()} />);
+    expect(
+      screen.getByText(
+        'How it adds up: 33,024,480 has built up for you at your rate, less 20,000,000 paid to you.'
+      )
+    ).toBeVisible();
+    expect(screen.getByText('28 Sep')).toBeVisible();
+    expect(screen.getAllByText('1 Oct').length).toBe(4);
+    await userEvent.click(screen.getByRole('combobox', { name: 'Month' }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Sep 2026' }));
+    expect(screen.queryByText('1 Oct')).toBeNull();
+    expect(screen.getByText('28 Sep')).toBeVisible();
+  });
+});
+
 describe('OwnerStaleBanner', () => {
   it('names the date and reconnects', async () => {
     const onReconnect = vi.fn();
-    render(<OwnerStaleBanner since={Date.UTC(2026, 9, 11)} onReconnect={onReconnect} />);
+    render(
+      <OwnerStaleBanner since={Date.UTC(2026, 9, 11)} daysLeft={12} onReconnect={onReconnect} />
+    );
     expect(screen.getByText("We can't read your mining ledger since 11 Oct")).toBeVisible();
+    expect(screen.getByText(/Reconnect within 12 days/)).toBeVisible();
     await userEvent.click(screen.getByRole('button', { name: 'Reconnect' }));
     expect(onReconnect).toHaveBeenCalled();
+  });
+
+  it('says when the oldest unread ore is already lost', () => {
+    render(<OwnerStaleBanner since={Date.UTC(2026, 9, 11)} daysLeft={0} onReconnect={vi.fn()} />);
+    expect(screen.getByText(/can never be counted/)).toBeVisible();
   });
 });
 

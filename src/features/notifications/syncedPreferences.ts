@@ -28,6 +28,7 @@ import {
 } from './eventSelection';
 import type { NotificationEventId } from './events';
 import type { NotificationPreferencesValue } from './preferencesStore';
+import { isCorporationIdList } from './corporationIdList';
 import { setThresholds, type CharacterEventThresholds } from './eventThresholdFields';
 import { recordByCharacterId } from './recordByCharacterId';
 
@@ -37,6 +38,8 @@ export interface SyncedFeedPrefs {
   perCharacter: Record<number, Partial<Record<NotificationEventId, boolean>>>;
   eveNotificationTypesByCharacter: Record<number, Record<string, boolean>>;
   thresholdsByCharacter: Record<number, CharacterEventThresholds>;
+  /** Absent from a blob written before issue #6225, which then changes nothing. */
+  mutedSharedPopCorporations?: number[];
 }
 
 // ---------------------------------------------------------------------------
@@ -97,7 +100,15 @@ export function toSyncedFeedPrefs(value: NotificationPreferencesValue): SyncedFe
       thresholdsByCharacter[Number(characterIdRaw)] = thresholds;
   }
 
-  return { perCharacter, eveNotificationTypesByCharacter, thresholdsByCharacter };
+  return {
+    perCharacter,
+    eveNotificationTypesByCharacter,
+    thresholdsByCharacter,
+    // Carried once set, an empty list included: unmuting the last one must reach other devices.
+    ...(value.mutedSharedPopCorporations === undefined
+      ? {}
+      : { mutedSharedPopCorporations: [...value.mutedSharedPopCorporations] }),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -137,6 +148,7 @@ function isThresholds(raw: unknown): raw is CharacterEventThresholds {
     isOptionalFiniteNumber(r.mercenaryDenAnarchyPercent) &&
     isOptionalFiniteNumber(r.skyhookRaidableLeadHours) &&
     isOptionalFiniteNumber(r.skyhookRaidableMinUnits) &&
+    isOptionalFiniteNumber(r.sharedMoonPopLeadMinutes) &&
     isOptionalFiniteNumber(r.corpWalletBalanceFloorIsk) &&
     isOptionalFiniteNumber(r.corpWalletTransactionCeilingIsk) &&
     isOptionalFiniteNumber(r.walletBalanceChangedThresholdIsk) &&
@@ -155,7 +167,9 @@ function isSyncedFeedPrefs(raw: unknown): raw is SyncedFeedPrefs {
   return (
     isBooleanMapByCharacter(r.perCharacter) &&
     isBooleanMapByCharacter(r.eveNotificationTypesByCharacter) &&
-    isThresholdsByCharacter(r.thresholdsByCharacter)
+    isThresholdsByCharacter(r.thresholdsByCharacter) &&
+    (r.mutedSharedPopCorporations === undefined ||
+      isCorporationIdList(r.mutedSharedPopCorporations))
   );
 }
 
@@ -238,6 +252,10 @@ export function withSyncedFeedPrefsApplied(
         [characterId]: { ...localThresholds, ...thresholds },
       },
     };
+  }
+
+  if (synced.mutedSharedPopCorporations !== undefined) {
+    next = { ...next, mutedSharedPopCorporations: [...synced.mutedSharedPopCorporations] };
   }
 
   return next;

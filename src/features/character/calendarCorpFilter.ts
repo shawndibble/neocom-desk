@@ -13,10 +13,20 @@ export const DEFAULT_CORP_FILTER: CorpEventFilter = 'all';
 export const useCalendarCorpFilter = createLocalSetting<CorpEventFilter>({
   key: CALENDAR_CORP_FILTER_KEY,
   defaultValue: DEFAULT_CORP_FILTER,
-  parse: (raw) =>
-    raw === 'all' || raw === 'none' || (typeof raw === 'number' && Number.isInteger(raw))
-      ? raw
-      : null,
+  parse: (raw) => (raw === 'none' ? raw : parseOneOrAll(raw)),
+});
+
+function parseOneOrAll(raw: unknown): CorpEventFilter | null {
+  return raw === 'all' || (typeof raw === 'number' && Number.isInteger(raw)) ? raw : null;
+}
+
+/** The sharing-corporation filter on Shared Pops: all of them, or one corporation's. */
+export const CALENDAR_SHARING_CORP_FILTER_KEY = 'calendarSharingCorpFilter';
+
+export const useCalendarSharingCorpFilter = createLocalSetting<CorpEventFilter>({
+  key: CALENDAR_SHARING_CORP_FILTER_KEY,
+  defaultValue: DEFAULT_CORP_FILTER,
+  parse: parseOneOrAll,
 });
 
 /**

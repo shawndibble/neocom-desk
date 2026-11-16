@@ -17,8 +17,18 @@ const ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterStandings'];
 const SCOPE = ESI_REGISTRY.getCharacterStandings.scope;
 const COPY = { title: 'Assumes base standings', hint: 'Fees at 0.', actionLabel: 'Grant it' };
 
-/** Lets a live query that would show the note settle before asserting it didn't. */
-const settle = () => new Promise((resolve) => setTimeout(resolve, 30));
+/**
+ * A note that does show (its Character has no token), rendered beside the one
+ * under test: both read the grant in the same commit, so once this one is up
+ * the other's answer has landed too, and an absence means something.
+ */
+const CONTROL_ID = 9;
+function Control() {
+  return (
+    <GrantNote endpoints={ENDPOINTS} characterId={CONTROL_ID} characterName="Control" {...COPY} />
+  );
+}
+const settled = () => screen.findByText('Control — Assumes base standings');
 
 beforeEach(() => {
   vi.mocked(beginEveLogin).mockClear();
@@ -40,10 +50,15 @@ describe('GrantNote', () => {
 
   it('renders nothing when the grant holds the scope', async () => {
     await seedGrant(ACTIVE_ID, [SCOPE]);
-    const { container } = render(<GrantNote endpoints={ENDPOINTS} {...COPY} />);
+    render(
+      <>
+        <GrantNote endpoints={ENDPOINTS} {...COPY} />
+        <Control />
+      </>
+    );
 
-    await settle();
-    expect(container).toBeEmptyDOMElement();
+    await settled();
+    expect(screen.queryByText('Assumes base standings')).toBeNull();
   });
 
   it('treats a Character with no stored token as lacking the scope', async () => {
@@ -64,10 +79,15 @@ describe('GrantNote', () => {
   it('holds back before the active Character has hydrated', async () => {
     useActiveCharacter.setState({ activeCharacterId: ACTIVE_ID, hydrated: false });
     await seedGrant(ACTIVE_ID, []);
-    const { container } = render(<GrantNote endpoints={ENDPOINTS} {...COPY} />);
+    render(
+      <>
+        <GrantNote endpoints={ENDPOINTS} {...COPY} />
+        <Control />
+      </>
+    );
 
-    await settle();
-    expect(container).toBeEmptyDOMElement();
+    await settled();
+    expect(screen.queryByText('Assumes base standings')).toBeNull();
   });
 
   it("checks, names, and grants for the given Character's own grant, not the active one's", async () => {
@@ -92,9 +112,14 @@ describe('GrantNote', () => {
     expect(await screen.findByText('Assumes base standings')).toBeInTheDocument();
 
     // Synchronously after the switch the query still holds ACTIVE_ID's answer.
-    rerender(<GrantNote endpoints={ENDPOINTS} characterId={ALT_ID} {...COPY} />);
+    rerender(
+      <>
+        <GrantNote endpoints={ENDPOINTS} characterId={ALT_ID} {...COPY} />
+        <Control />
+      </>
+    );
     expect(screen.queryByText('Assumes base standings')).toBeNull();
-    await settle();
+    await settled();
     expect(screen.queryByText('Assumes base standings')).toBeNull();
   });
 });

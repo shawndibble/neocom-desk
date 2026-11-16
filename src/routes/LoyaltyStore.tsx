@@ -64,6 +64,8 @@ import { resolveLoyaltyRowItem } from '@/features/loyalty/offerRowDisplay';
 import { LoyaltyStoreLanding } from '@/features/loyalty/LoyaltyStoreLanding';
 import { NearestStationLine } from '@/features/loyalty/NearestStationLine';
 import { LpStoreActions } from '@/features/loyalty/LpStoreChrome';
+import { SpendLpButton, SpendPlanPanel } from '@/features/loyalty/SpendPlan';
+import { hasSpendCandidates, useSpendPlan } from '@/features/loyalty/useSpendPlan';
 import type { LpSearchCrumbState } from '@/features/loyalty/lpStorePath';
 import type { LoyaltyOfferRow } from '@/features/loyalty/offerRows';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
@@ -73,9 +75,12 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { applyBlueprintPriceSeed } from '@/features/industry/planSeed';
 import { lpBlueprintPickPrice } from '@/features/industry/blueprintPurchaseOffers';
 import { formatNumber } from '@/lib/numberLocale';
+import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
+import type { EsiEndpointId } from '@/esi/registry';
 
 /** Module-level so the table's windowing and row memo see one stable function. */
 const offerRowKey = (row: LoyaltyOfferRow) => row.offer.offer_id;
+const LOYALTY_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterLoyaltyPoints'];
 
 /**
  * The filter row's three fields, in the URL (ADR 0015, issue #1302): all
@@ -140,6 +145,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
     offersError,
     reloadOffers,
     rows,
+    instantIskPerLp,
     catalog,
     catalogUnavailable,
     playerLp,
@@ -150,6 +156,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
     toggleUseOwnMaterials,
     skills,
     standing,
+    ownedStockSnapshot,
   } = useLoyaltyStoreOffers(corporationId);
 
   const offersColumnVisibility = useColumnVisibility(
@@ -175,6 +182,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   const [sheetOpen, setSheetOpen] = useState(() => selectedOfferId !== null && !isDesktop);
 
   const activeCharacterId = useActiveCharacter((s) => s.activeCharacterId);
+  const lacksLoyaltyScope = useCharacterLacksEndpoints(activeCharacterId, LOYALTY_ENDPOINTS);
   const itemActions = usePageItemActions({ activeCharacterId });
 
   const filteredRows = useMemo(() => {
@@ -190,6 +198,20 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
       return true;
     });
   }, [rows, rowsSearch, affordableOnly, blueprintsOnly, selectedOfferId, arrivedOfferId]);
+
+  // Spend my LP: nothing loads until the button is pressed (#6199).
+  const spendPlan = useSpendPlan({
+    corporationId,
+    rows: filteredRows,
+    instantIskPerLp,
+    catalog,
+    hub,
+    skills,
+    standing,
+    playerLp,
+    ownedStock: ownedStockSnapshot,
+    activeCharacterId,
+  });
 
   const affordableCount = useMemo(
     () => rows.filter((row) => row.profit.affordableLp !== false).length,
@@ -324,7 +346,18 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
       actions={
         ready &&
         filteredRows.length > 0 && (
-          <TableActionsMenu name={t('loyaltyStore.title')} tableExport={offersExport} />
+          <span className="flex items-center gap-2">
+            <SpendLpButton
+              playerLp={playerLp}
+              lpAccess={
+                activeCharacterId === null ? 'signedOut' : lacksLoyaltyScope ? 'noScope' : null
+              }
+              rankable={hasSpendCandidates(filteredRows, instantIskPerLp)}
+              loading={spendPlan.plan.status === 'loading'}
+              onClick={spendPlan.run}
+            />
+            <TableActionsMenu name={t('loyaltyStore.title')} tableExport={offersExport} />
+          </span>
         )
       }
       padded={false}
@@ -500,6 +533,15 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
           </div>
 
           {offersFromCache && <CachedNotice withBadge fetchedAt={offersFetchedAt} />}
+
+          {spendPlan.open && (
+            <SpendPlanPanel
+              plan={spendPlan.plan}
+              playerLp={playerLp}
+              onSelectOffer={selectRow}
+              onClose={spendPlan.close}
+            />
+          )}
 
           {isDesktop ? (
             <div className="flex items-start gap-3">

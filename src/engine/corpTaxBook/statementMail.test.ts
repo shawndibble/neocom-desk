@@ -36,6 +36,11 @@ function input(patch: Partial<StatementMailInput> = {}): StatementMailInput {
 }
 
 describe('composeStatementMail', () => {
+  it('names the wallet division the book reads donations from (#6204)', () => {
+    const { body } = composeStatementMail(input({ accounts: ['Master Wallet', 'MOON TAXES'] }));
+    expect(body).toContain('Donate to Ore &amp; Glory (Account: Master Wallet or MOON TAXES)');
+  });
+
   it('rejects an empty corporation name instead of mailing a blank one', () => {
     expect(() => composeStatementMail(input({ corporationName: '' }))).toThrow(/corporation name/);
     expect(() => composeStatementMail(input({ corporationName: '  ' }))).toThrow(

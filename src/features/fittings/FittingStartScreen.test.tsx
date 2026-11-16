@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -10,8 +10,8 @@ import { encodeFittingShare } from '@/engine/fittings/fittingShare';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';
 import type { CharacterFitting } from '@/esi/endpoints';
-import { FittingStartScreen } from './FittingStartScreen';
-import { ADD_PREVIEW_DELAY_MS } from './useModuleAddPreview';
+import { FittingStartScreen, LIST_PREVIEW_DELAY_MS } from './FittingStartScreen';
+import { TEXT_DEBOUNCE_MS } from '@/lib/urlState';
 import type { FittingLibrarySource } from './useFittingPicker';
 
 const useEndpointsGrantedMock = vi.hoisted(() => vi.fn());
@@ -261,10 +261,17 @@ describe('FittingStartScreen', () => {
     const kite = await screen.findByRole('button', { name: /^Kite/ });
     expect(await screen.findByText('preview of Armor Drake')).toBeInTheDocument();
 
-    // A pointer passing over a row on its way elsewhere leaves the preview be.
-    await userEvent.hover(kite);
-    await userEvent.unhover(kite);
-    await new Promise((resolve) => setTimeout(resolve, ADD_PREVIEW_DELAY_MS + 50));
+    // A pointer passing over a row on its way elsewhere leaves the preview be,
+    // past the hover delay (fake timers: the delay is a timer).
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      await user.hover(kite);
+      await user.unhover(kite);
+      act(() => vi.advanceTimersByTime(LIST_PREVIEW_DELAY_MS));
+    } finally {
+      vi.useRealTimers();
+    }
     expect(screen.getByText('preview of Armor Drake')).toBeInTheDocument();
 
     await userEvent.hover(kite);
@@ -279,16 +286,24 @@ describe('FittingStartScreen', () => {
     const kite = await screen.findByRole('button', { name: /^Kite/ });
     await screen.findByText('preview of Armor Drake');
 
-    // Boundary events alone, as a scroll under a still pointer fires them.
-    fireEvent.pointerOver(kite, { pointerType: 'mouse' });
-    await new Promise((resolve) => setTimeout(resolve, ADD_PREVIEW_DELAY_MS + 50));
-    expect(screen.getByText('preview of Armor Drake')).toBeInTheDocument();
+    // The hover delay is a timer: step past it rather than wait it out.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], shouldAdvanceTime: true });
+    try {
+      // Boundary events alone, as a scroll under a still pointer fires them.
+      fireEvent.pointerOver(kite, { pointerType: 'mouse' });
+      act(() => vi.advanceTimersByTime(LIST_PREVIEW_DELAY_MS));
+      expect(screen.getByText('preview of Armor Drake')).toBeInTheDocument();
 
-    // A pending hover loses to the keyboard focus that follows it.
-    await userEvent.hover(kite);
-    act(() => screen.getByRole('button', { name: /^PvP Rifter/ }).focus());
-    await new Promise((resolve) => setTimeout(resolve, ADD_PREVIEW_DELAY_MS + 50));
-    expect(screen.getByText('preview of PvP Rifter')).toBeInTheDocument();
+      // A pending hover loses to the keyboard focus that follows it.
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      await user.hover(kite);
+      act(() => screen.getByRole('button', { name: /^PvP Rifter/ }).focus());
+      act(() => vi.advanceTimersByTime(LIST_PREVIEW_DELAY_MS));
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(await screen.findByText('preview of PvP Rifter')).toBeInTheDocument();
+    expect(screen.queryByText('preview of Kite')).not.toBeInTheDocument();
   });
 
   it('Open in the preview hands a saved one to openSaved', async () => {
@@ -368,9 +383,12 @@ describe('FittingStartScreen', () => {
   it('Enter on a row opens it and the arrow keys walk the list, the preview following', async () => {
     const workspace = renderScreen();
     const drake = await screen.findByRole('button', { name: /^Armor Drake/ });
+    // Kite (saved) and Armor Drake (In-game) load separately: ArrowDown from Drake reaches
+    // Kite only once both are listed.
+    await screen.findByRole('button', { name: /^Kite/ });
     act(() => drake.focus());
     await userEvent.keyboard('{ArrowDown}');
-    expect(screen.getByText('preview of Kite')).toBeInTheDocument();
+    expect(await screen.findByText('preview of Kite')).toBeInTheDocument();
     await userEvent.keyboard('{Enter}');
     expect(workspace.openSaved).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1' }));
   });
@@ -523,6 +541,26 @@ describe('FittingStartScreen on a phone', () => {
   });
 });
 
+describe('FittingStartScreen on a touch tablet', () => {
+  // Wide enough for the pane, but a finger has no hover to preview with.
+  let matchMedia: MockInstance<typeof window.matchMedia>;
+  beforeEach(() => {
+    const realMatchMedia = window.matchMedia;
+    matchMedia = vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => {
+      const list = realMatchMedia(query);
+      return query === '(hover: none)' ? { ...list, matches: true } : list;
+    });
+  });
+  afterEach(() => matchMedia.mockRestore());
+
+  it('shows no preview pane, and a tap opens the row', async () => {
+    const workspace = renderScreen();
+    await userEvent.click(await screen.findByRole('button', { name: /^Kite/ }));
+    expect(workspace.openSaved).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1' }));
+    expect(screen.queryByText(/^preview of/)).not.toBeInTheDocument();
+  });
+});
+
 describe('FittingStartScreen in a dialog', () => {
   it('as the editor’s Open dialog: previews the hovered row, and a click opens it and reports it', async () => {
     const { workspace, onOpened } = renderDialog({ preview: true });
@@ -548,11 +586,17 @@ describe('FittingStartScreen in a dialog', () => {
   it("keeps its search off the URL: it is a passing pick over another page's address", async () => {
     renderDialog();
     await screen.findByText('Armor Drake', {}, { timeout: 5000 });
-    await userEvent.type(screen.getByRole('searchbox', { name: 'Search fittings' }), 'kite');
-    expect(screen.queryByText('Armor Drake')).not.toBeInTheDocument();
-    // Past the URL's typing debounce: still nothing written. `useNavigate` is
-    // mocked in this file, so "nothing written" is no call to it.
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    // Past the URL's typing debounce (a timer, so stepped over): still nothing
+    // written. `useNavigate` is mocked in this file, so "nothing written" is no call to it.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      await user.type(screen.getByRole('searchbox', { name: 'Search fittings' }), 'kite');
+      expect(screen.queryByText('Armor Drake')).not.toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(TEXT_DEBOUNCE_MS));
+    } finally {
+      vi.useRealTimers();
+    }
     expect(navigateMock).not.toHaveBeenCalled();
   });
 

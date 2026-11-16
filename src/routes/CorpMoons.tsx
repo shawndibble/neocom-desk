@@ -1,6 +1,6 @@
 /**
  * `/corp/moons` — the Corp Tax Book (issue #4063, epic #4055, D21): Overview,
- * Extractions, Miners, Statements and Moon owners as path-segment tabs (ADR 0015), the moon and Miner
+ * Extractions, Miners, Statements, Moon owners and Sharing as path-segment tabs (ADR 0015), the moon and Miner
  * pages below their tabs, settings behind the header's gear and the audit log
  * behind Activity.
  *
@@ -40,7 +40,7 @@ import { usePageTab } from '@/lib/usePageTab';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { CorpDenied } from '@/features/corp/CorpDenied';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
-import { bookPartsFor } from '@/features/corp/taxBook/bookParts';
+import { bookPartsFor } from '@/features/corp/taxBook/bookRead';
 import { useCorpTaxBook } from '@/features/corp/taxBook/useCorpTaxBook';
 import { AuditFeed } from '@/features/corp/moons/AuditFeed';
 import { useAuditSubject } from '@/features/corp/moons/useAuditSubject';
@@ -48,6 +48,8 @@ import { useBookAudit } from '@/features/corp/moons/useBookAudit';
 import { BookProvider } from '@/features/corp/moons/BookContext';
 import { useBook } from '@/features/corp/moons/useBook';
 import { BookHealthStrip } from '@/features/corp/moons/BookHealthStrip';
+import { useMoonsAttentionPublisher } from '@/features/corp/moons/useMoonsAttentionPublisher';
+import { publishMoonsAttention } from '@/features/corp/moons/moonsNavAttention';
 import { DeleteBookDialog } from '@/features/corp/moons/DeleteBookSection';
 import { BookSettingsDialog, type SettingsTab } from '@/features/corp/moons/BookSettingsDialog';
 import { BookContext } from '@/features/corp/moons/bookContextValue';
@@ -62,11 +64,13 @@ import { MoonOwnersTab } from '@/features/corp/moons/MoonOwnersTab';
 import { MOONS_TABS, moonsDetail } from '@/features/corp/moons/moonsPaths';
 import { StatementPeriodDetail } from '@/features/corp/moons/StatementPeriodDetail';
 import { StatementsTab } from '@/features/corp/moons/StatementsTab';
+import { SharingTab } from '@/features/corp/moons/SharingTab';
 import { MoonsSetup } from '@/features/corp/moons/MoonsSetup';
 import { useCorpBook } from '@/features/corp/moons/useCorpBook';
 import { useAddMyCorps } from '@/features/corp/moons/addCorps/useAddMyCorps';
 import { useMoonOwners } from '@/features/corp/moons/useMoonOwners';
 import { useMoonOwnersSyncNow } from '@/features/corp/moons/useMoonOwnersSyncNow';
+import { useStaleLedgerMail } from '@/features/corp/moons/useStaleLedgerMail';
 import { setMoonsTabsHidden } from '@/features/corp/moons/moonsTabsHidden';
 
 function ActivityPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -93,6 +97,9 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   const hasMoonOwners = moonOwnerRows.length > 0;
   const addCorps = useAddMyCorps(moonOwnerRows);
   const moonOwnersSync = useMoonOwnersSyncNow(moonOwnerRows);
+  // A moon owner's ledger that can't be read is mailed to both sides once per spell (#6210).
+  useStaleLedgerMail(moonOwnerRows);
+  useMoonsAttentionPublisher();
   const syncing = sync.run.phase === 'syncing' || moonOwnersSync.busy;
   const [tab, selectTab] = usePageTab(MOONS_TABS);
   const tabsId = useTabsId();
@@ -203,6 +210,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
               {tab === 'extractions' && <ExtractionsTab />}
               {tab === 'miners' && <MinersTab />}
               {tab === 'statements' && <StatementsTab />}
+              {tab === 'sharing' && <SharingTab />}
               {tab === 'moon-owners' && (
                 <div className="space-y-4">
                   {addCorps.notices}
@@ -299,6 +307,13 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
     if (decided) setMoonsTabsHidden(unavailable);
     return () => setMoonsTabsHidden(false);
   }, [decided, unavailable]);
+  // No book, or no access to it: the Moons nav dot has nothing to point at (#6208).
+  useEffect(() => {
+    if (!unavailable || book.characterId === null || book.corporationId === null) return;
+    void publishMoonsAttention(book.characterId, book.corporationId, null).catch((err) =>
+      console.warn('Moons nav dot could not be cleared', err)
+    );
+  }, [unavailable, book.characterId, book.corporationId]);
 
   if (state.status === 'loading') return <MoonsLoading />;
   if (state.status === 'failed') {

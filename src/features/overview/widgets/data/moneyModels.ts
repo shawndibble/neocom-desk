@@ -451,6 +451,15 @@ function signedPercentOf(ratio: number): string {
 /** Within this fraction of its target a watched price is "close" (amber) until it crosses. */
 export const NEAR_TARGET = 0.05;
 
+/** The watch target: its direction ("≤") before the figure, the figure an `IskAmount`. */
+function targetCell(direction: string, targetPrice: number): TableCell {
+  return {
+    text: `${direction} ${formatIskCompact(targetPrice)}`,
+    iskAmount: targetPrice,
+    prefix: direction,
+  };
+}
+
 /** Green once the target is hit, amber within `NEAR_TARGET` of it, plain beyond. */
 function gapCell(alert: WatchedPrice, ratio: number): TableCell {
   const text = signedPercentOf(ratio);
@@ -495,10 +504,8 @@ export function priceWatchTable(t: Translate, alerts: readonly WatchedPrice[]): 
           priced ? gapCell(alert, (alert.price! - alert.targetPrice) / alert.targetPrice) : UNKNOWN,
           alert.price === null
             ? UNKNOWN
-            : { text: formatCompactNumber(alert.price), iskAmount: alert.price },
-          t(`${W}.priceWatch.target.${alert.direction}`, {
-            isk: formatCompactNumber(alert.targetPrice),
-          }),
+            : { text: formatIskCompact(alert.price), iskAmount: alert.price },
+          targetCell(t(`${W}.priceWatch.target.${alert.direction}`), alert.targetPrice),
           vs90dCell(alert.vs90d),
         ],
         tone: alert.crossed ? 'warning' : 'clear',

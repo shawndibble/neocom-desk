@@ -1,17 +1,12 @@
 import { lazy, Suspense, useEffect, type ReactElement } from 'react';
-import { ACCOUNT_SNAPSHOT_ID, hydrateRouteSnapshots } from '@/lib/routeSnapshotCache';
-import { useHydratedStore } from '@/lib/useHydratedStore';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
 import { withSentryReactRouterV7Routing } from '@sentry/react';
 import { ErrorBoundary } from './ErrorBoundary';
-import { subscribeToEsiAuthFailures } from '@/stores/authFailure';
 import { subscribeToEsiActivity } from '@/stores/activityLog';
 import { subscribeToUpgradeBlockedReports } from './upgradeBlockedReport';
 import { reloadOnDatabaseWipe } from './databaseWipe';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { configureEsi } from '@/esi/client';
-import { configureActiveCharacter } from '@/esi/lane';
 import { triggerSync } from '@/sync';
 import { usePublishSharedLibraries } from '@/features/communities/usePublishSharedLibraries';
 import { useSyncRequestDeliveries } from '@/features/communities/useSyncRequestDeliveries';
@@ -38,74 +33,25 @@ import { ROUTER_BASENAME } from './routerPath';
 import { Spinner, TooltipProvider } from '@/components/ui';
 import { useTranslation } from 'react-i18next';
 import { RequireCharacter } from './RequireCharacter';
-import { ScopeGate } from './ScopeGate';
-import { TabRoute } from './TabRoute';
-import { PAGE_LEGACY_LOCATIONS, PAGE_TABS, routePatternFor } from './pageTabs';
+import { routePatternFor } from './pageTabs';
+import { configureAppEsi, featureRouteElement, useAppStateHydration } from './appWiring';
+import { InfoModals } from './InfoModals';
 import { AuthFailureRedirect } from './AuthFailureNotice';
 import { LegacyPathRedirect } from './LegacyPathRedirect';
 import { AlertsRedirect } from './AlertsRedirect';
-import { useHiddenNav, useRecentNav } from './navPreferences';
-import { useHintCounts } from '@/lib/hintFlags';
-import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
-import { EntityInfoRoute } from '@/features/entities';
-import { ItemInfoModal } from '@/features/entities/ItemInfoModal';
-import { PlaceInfoModal } from '@/features/entities/PlaceInfoModal';
-import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
-import { getAccessTokenReportingFailures } from './tokenProvider';
 import type { AppRoutePath } from './routeScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { useFontScale } from '@/lib/fontScale';
 import { useNumberFormat } from '@/lib/numberFormat';
-import { useTimeFormat } from '@/lib/timeFormat';
-import { useMobileTabs } from '@/lib/mobileTabs';
 import { requestPersistenceWhenInstalled } from '@/lib/persistStorage';
 import { checkStorageAtRisk } from '@/features/settings/storageAtRisk';
 import { useCharacterCountOrLoading } from '@/features/character/useCharacters';
 
-// Wire authenticated ESI calls to stored tokens once, at module load. Wrapped
-// (tokenProvider.ts) so a dead refresh grant is reported centrally instead of
-// surfacing as an empty view in whichever feature happened to ask first.
-configureEsi({ getToken: (characterId) => getAccessTokenReportingFailures(characterId) });
-// The active Character's reads queue ahead of every other Character's (#2281).
-configureActiveCharacter(() => useActiveCharacter.getState().activeCharacterId);
+// Wire authenticated ESI calls to stored tokens once, at module load
+// (`appWiring.tsx`), and queue the active Character's reads first.
+configureAppEsi();
 
 // Code-split routes (`routeChunks.ts`). Login, Callback and NotFound stay
 // eager above: a signed-out cold load can land on them before any choice.
-// Info modals load on first open (each renders nothing without a request), so
-// their tabs, skill plan and price code stay out of the boot chunk.
-const LazyPublicInfoModal = lazy(() =>
-  routeChunks
-    .guarded(() => import('@/components/PublicInfoModal'))
-    .then((m) => ({
-      default: m.PublicInfoModal,
-    }))
-);
-const LazySkillDetailModal = lazy(() =>
-  routeChunks
-    .guarded(() => import('@/components/SkillDetailModal'))
-    .then((m) => ({
-      default: m.SkillDetailModal,
-    }))
-);
-
-function PublicInfoModal() {
-  const open = usePublicInfoModalStore((state) => state.request !== null);
-  return open ? (
-    <Suspense fallback={null}>
-      <LazyPublicInfoModal />
-    </Suspense>
-  ) : null;
-}
-
-function SkillDetailModal() {
-  const open = useSkillDetailModalStore((state) => state.request !== null);
-  return open ? (
-    <Suspense fallback={null}>
-      <LazySkillDetailModal />
-    </Suspense>
-  ) : null;
-}
-
 // The signed-in shell is split so a first visit to /login skips it, and
 // preloaded at boot for a returning user (`bootShellPreload.ts`) —
 // `preloadedLazy` then renders it with no fallback frame once it is in.
@@ -306,50 +252,10 @@ const NO_CHARACTER_IDS: number[] = [];
  * not the `<BrowserRouter>` tree (and its route table) below.
  */
 function AppEffects() {
-  const hydrate = useActiveCharacter((state) => state.hydrate);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  useEffect(() => {
-    void hydrate();
-  }, [hydrate]);
-
-  // The active Character's stored view snapshots, read while the first route's
-  // code is still loading, so that route's first frame already has them.
-  useEffect(() => {
-    if (activeCharacterId === null) return;
-    void hydrateRouteSnapshots(activeCharacterId);
-    void hydrateRouteSnapshots(ACCOUNT_SNAPSHOT_ID);
-  }, [activeCharacterId]);
-
-  // Applies the stored text-scale to <html> as early as possible, regardless
-  // of which route the user lands on — it is not something visiting /settings
-  // should be required for.
-  useHydratedStore(useFontScale);
-
-  // Same reasoning, one level up from any single view: the Time format
-  // preference is read by `DataAgeBadge` — which rides on nearly every
-  // ESI-backed page — plus fourteen more call sites across nine files
-  // (Contracts, Clones, Wallet, Market, Overview, PI, notifications, and
-  // the signed-out landing page's sample timestamps). Hydrating per consumer
-  // would be that many copies of this effect racing for the same Dexie row,
-  // and each would still paint its first frame on the default before the
-  // read landed. Once here, before any route mounts, covers them all.
-  useHydratedStore(useTimeFormat);
-
-  // The Number format preference, for the same reason: every formatter reads it.
-  useHydratedStore(useNumberFormat);
-
-  // And the phone's chosen bottom tabs, for the same reason one level lower:
-  // `Layout` is the only reader, but it renders on every route, so hydrating
-  // it there would still paint the default bar first on a cold load. Here it
-  // is read once, before the shell mounts.
-  useHydratedStore(useMobileTabs);
-
-  // The rail's and More sheet's hidden pages and Recent row: same reason.
-  useHydratedStore(useHiddenNav, useRecentNav, useHintCounts);
-
-  // `esi` publishes auth failures; the store is subscribed here so `esi` keeps
-  // no dependency on `src/stores` (docs/ARCHITECTURE.md §2).
-  useEffect(() => subscribeToEsiAuthFailures(), []);
+  // The state every page reads: the active Character, its view snapshots, the
+  // device preferences and the auth-failure subscription (`appWiring.tsx`).
+  useAppStateHydration();
 
   // Same wiring as the auth-failure signal, for the activity log (issue #32).
   useEffect(() => subscribeToEsiActivity(), []);
@@ -443,25 +349,13 @@ export function App() {
                   {/* A tabbed page (`pageTabs.ts`) mounts once at `<path>/*`, so
                   its tabs are one route instance: switching tab keeps the
                   page mounted, and none of the tables above gain an entry. */}
-                  {FEATURE_ROUTES.map(([path, element]) => {
-                    const tabs = PAGE_TABS[path];
-                    const gated = <ScopeGate path={path}>{element}</ScopeGate>;
-                    return (
-                      <Route
-                        key={path}
-                        path={routePatternFor(path)}
-                        element={
-                          tabs ? (
-                            <TabRoute page={tabs} legacy={PAGE_LEGACY_LOCATIONS[path]}>
-                              {gated}
-                            </TabRoute>
-                          ) : (
-                            gated
-                          )
-                        }
-                      />
-                    );
-                  })}
+                  {FEATURE_ROUTES.map(([path, element]) => (
+                    <Route
+                      key={path}
+                      path={routePatternFor(path)}
+                      element={featureRouteElement(path, element)}
+                    />
+                  ))}
                 </Route>
               </Route>
               {/* A Fitting Share Code opened with no session (#1544) — it must
@@ -493,11 +387,7 @@ export function App() {
             </SentryRoutes>
           </Suspense>
           <ReloadPrompt />
-          <EntityInfoRoute />
-          <PublicInfoModal />
-          <SkillDetailModal />
-          <ItemInfoModal />
-          <PlaceInfoModal />
+          <InfoModals />
         </BrowserRouter>
       </TooltipProvider>
     </ErrorBoundary>

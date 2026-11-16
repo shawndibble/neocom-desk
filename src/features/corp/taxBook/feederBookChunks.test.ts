@@ -4,7 +4,12 @@ import type { SyncExtraction } from '@/engine/corpTaxBook/sync';
 const readFeederChunkParts = vi.hoisted(() => vi.fn());
 vi.mock('./bookClient', () => ({ readFeederChunkParts }));
 
-import { clearFeederBookReads, feederChunkReads, readFeederBooks } from './feederBookChunks';
+import {
+  clearFeederBookReads,
+  feederChunkReads,
+  feederShareMarks,
+  readFeederBooks,
+} from './feederBookChunks';
 
 const NOW = Date.parse('2026-11-12T08:00:00Z');
 const chunk = (structureId: number, owner: number): SyncExtraction => ({
@@ -79,5 +84,24 @@ describe('Feeder pops from Corp Tax Books', () => {
   it('reads nothing for Characters that view no book', async () => {
     expect(await readFeederBooks([viewer(1, 20, false)], undefined, NOW)).toEqual([]);
     expect(readFeederChunkParts).not.toHaveBeenCalled();
+  });
+});
+
+describe('feederShareMarks', () => {
+  it("joins every book's Pop Sharing marks by refinery; a book without marks adds none", () => {
+    expect(
+      feederShareMarks([
+        { extractions: [], feeders: [], shareMarks: { '7001': { kind: 'opted-out' } } },
+        { extractions: [], feeders: [] },
+        {
+          extractions: [],
+          feeders: [],
+          shareMarks: { '8001': { kind: 'shared', audiences: [{ kind: 'corp' }] } },
+        },
+      ])
+    ).toEqual({
+      '7001': { kind: 'opted-out' },
+      '8001': { kind: 'shared', audiences: [{ kind: 'corp' }] },
+    });
   });
 });

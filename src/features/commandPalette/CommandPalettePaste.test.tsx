@@ -4,10 +4,17 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import type { PasteDestination } from '@/engine/import/pasteDestination';
 import { NO_CORP_CAPABILITIES } from '@/engine/corpRoles';
-import { DESTINATIONS } from '@/app/pasteRouting';
+import { DESTINATIONS, routePaste } from '@/app/pasteRouting';
 import { stubViewport } from '@/test/viewport';
 import { CommandPaletteHost } from './CommandPaletteHost';
 import { useCommandPalette } from './store';
+
+// Spied, so a "stays put" test can wait until the paste was really classified
+// rather than asserting an absence before the lazy loads have settled.
+vi.mock('@/app/pasteRouting', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/app/pasteRouting')>();
+  return { ...actual, routePaste: vi.fn(actual.routePaste) };
+});
 
 // The data a paste is classified against; the real loaders fetch.
 vi.mock('@/features/market/appraisalData', () => ({
@@ -82,15 +89,18 @@ async function openPalette() {
   return screen.findByRole('combobox');
 }
 
-async function paste(target: Element, text: string) {
-  await act(async () => {
-    fireEvent.paste(target, { clipboardData: { getData: () => text } });
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
+function paste(target: Element, text: string) {
+  fireEvent.paste(target, { clipboardData: { getData: () => text } });
+}
+
+/** Once the paste has been classified: whatever it was going to do, it has done. */
+async function classified() {
+  await waitFor(() => expect(routePaste).toHaveResolved());
 }
 
 beforeEach(() => {
   stubViewport(() => false);
+  vi.mocked(routePaste).mockClear();
 });
 
 afterEach(() => {
@@ -107,7 +117,7 @@ describe('CommandPalette paste', () => {
         pathname: '/overview',
         search: '',
       });
-      await paste(input, SAMPLES[destination]);
+      paste(input, SAMPLES[destination]);
       await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent(path));
       expect(screen.getByTestId('where').textContent).toContain(
         JSON.stringify(
@@ -121,29 +131,26 @@ describe('CommandPalette paste', () => {
 
   it('leaves a single line to the search', async () => {
     const input = await openPalette();
-    await paste(input, 'Gunnery V');
-    await act(async () => {});
+    paste(input, 'Gunnery V');
+    // A single line is never classified: the search keeps it.
+    expect(routePaste).not.toHaveBeenCalled();
     expect(screen.getByTestId('where')).toHaveTextContent('/overview');
     expect(screen.getByRole('combobox')).toBeInTheDocument();
   });
 
   it('keeps unrecognised multi-line text in the input, no navigation', async () => {
     const input = await openPalette();
-    await paste(input, 'see you in local' + NL + 'o7 fly safe, everyone, see you later.');
-    await act(async () => {});
+    paste(input, 'see you in local' + NL + 'o7 fly safe, everyone, see you later.');
+    await classified();
     expect(screen.getByTestId('where')).toHaveTextContent('/overview');
     expect(screen.getByRole('combobox')).toBeInTheDocument();
   });
 
   it('does not navigate once the palette was closed while the paste classified', async () => {
     const input = await openPalette();
-    act(() => {
-      fireEvent.paste(input, { clipboardData: { getData: () => SAMPLES.fitting } });
-      fireEvent.keyDown(input, { key: 'Escape' });
-    });
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    });
+    paste(input, SAMPLES.fitting);
+    fireEvent.keyDown(input, { key: 'Escape' });
+    await classified();
     expect(screen.getByTestId('where')).toHaveTextContent('/overview');
   });
 });

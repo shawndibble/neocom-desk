@@ -268,6 +268,126 @@ export async function cancelFeederRemoval(
   return { recipients: all };
 }
 
+// --- The stale-ledger mail (#6210) ---------------------------------------------
+
+/**
+ * How long a claimed stale-ledger mail waits to be marked sent before another officer's client
+ * may claim it: mail goes from the claiming officer's own device, and one that never sends must
+ * not lose it for good.
+ */
+export const STALE_MAIL_CLAIM_MS = 4 * 60 * 60 * 1000;
+
+/**
+ * Whether an officer's client may claim this stale spell's mail now: not yet claimed, or claimed
+ * more than `STALE_MAIL_CLAIM_MS` ago and never marked sent. A claim with no time
+ * (`staleMailClaimedAt`: made before claims carried one, or by a client that never marks it sent)
+ * stays final.
+ */
+export function staleMailClaimable(
+  held: Pick<
+    FeederRecord,
+    'staleSince' | 'staleMailedFor' | 'staleMailClaimedAt' | 'staleMailSentFor'
+  >,
+  now: number
+): boolean {
+  if (held.staleSince === undefined) return false;
+  if (held.staleMailedFor !== held.staleSince) return true;
+  if (held.staleMailSentFor === held.staleSince) return false;
+  return (
+    held.staleMailClaimedAt !== undefined && now - held.staleMailClaimedAt >= STALE_MAIL_CLAIM_MS
+  );
+}
+
+/**
+ * The moon owner's ledger can't be read: the first officer client to see it claims this stale
+ * spell's one mail to both sides (the moon owner's CEO and payee, and the book's other
+ * officers), so every open tab does not send its own. Nobody named: nothing to send, another
+ * officer holds the claim, or it is one of the book's own corporations (never mailed). Mail is
+ * client-only (no server holds a mail token), so a claim from a client that marks it sent
+ * (`marksSent`) lapses after `STALE_MAIL_CLAIM_MS` unless its queue marks it sent
+ * (`markFeederStaleMailSent`).
+ */
+export interface StaleMailClaimCall extends RemovalCall {
+  /** The client's queue calls `markFeederStaleMailSent` once a copy went: the claim may lapse. */
+  marksSent?: boolean;
+}
+
+export function parseStaleMailClaimCall(data: unknown): StaleMailClaimCall {
+  const call = parseRemovalCall(data);
+  return record(data).marksSent === true ? { ...call, marksSent: true } : call;
+}
+
+export async function claimFeederStaleMail(
+  deps: BookDeps,
+  caller: Caller,
+  input: StaleMailClaimCall
+): Promise<{ recipients: number[]; ownerRecipients: number[] }> {
+  const access = await authorizeOfficer(deps, caller, input, 'edit', { live: true });
+  const ref = feederRef(deps.db, input.corporationId, input.feederCorporationId);
+  const now = deps.now();
+  const claimed = await deps.db.runTransaction(async (tx) => {
+    const held = (await tx.get(ref)).data() as FeederRecord | undefined;
+    if (
+      !held ||
+      !staleMailClaimable(held, now) ||
+      held.sameOwner === true ||
+      held.status === 'left' ||
+      held.status === 'removed'
+    ) {
+      return undefined;
+    }
+    // Only a client that marks the mail sent gets a claim that can lapse: an older client's
+    // claim stays final, or every officer after it would mail the spell again.
+    tx.update(ref, {
+      staleMailedFor: held.staleSince,
+      staleMailClaimedAt: input.marksSent ? now : FieldValue.delete(),
+    });
+    return held;
+  });
+  if (!claimed) return { recipients: [], ownerRecipients: [] };
+  const { all, owner } = await recipientsFor(
+    deps,
+    input.corporationId,
+    claimed,
+    access.characterId
+  );
+  return { recipients: all, ownerRecipients: owner };
+}
+
+export interface StaleMailSentCall extends RemovalCall {
+  /** The stale spell the sent mail was for. */
+  staleSince: number;
+}
+
+export function parseStaleMailSentCall(data: unknown): StaleMailSentCall {
+  const call = parseRemovalCall(data);
+  const staleSince = record(data).staleSince;
+  if (typeof staleSince !== 'number' || !Number.isSafeInteger(staleSince) || staleSince <= 0)
+    throw new HttpsError('invalid-argument', 'staleSince must be a time');
+  return { ...call, staleSince };
+}
+
+/**
+ * The claiming officer's queue sent a copy of the stale-ledger mail: the claim is final, so no
+ * other officer's client mails this spell again. A copy of a spell that has since ended changes
+ * nothing.
+ */
+export async function markFeederStaleMailSent(
+  deps: BookDeps,
+  caller: Caller,
+  input: StaleMailSentCall
+): Promise<Record<string, never>> {
+  await authorizeOfficer(deps, caller, input, 'edit', { live: false });
+  const ref = feederRef(deps.db, input.corporationId, input.feederCorporationId);
+  await deps.db.runTransaction(async (tx) => {
+    const held = (await tx.get(ref)).data() as FeederRecord | undefined;
+    if (!held || held.staleSince !== input.staleSince || held.staleMailSentFor === input.staleSince)
+      return;
+    tx.update(ref, { staleMailSentFor: input.staleSince });
+  });
+  return {};
+}
+
 // --- The payee's link ---------------------------------------------------------
 
 /**

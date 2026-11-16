@@ -40,6 +40,17 @@ const emptyState = (over: Partial<BookState> = {}): BookState => ({
   ...over,
 });
 
+/** An issued, unpaid Statement: its Miner has an open balance, so a code-less donation credits (#6207). */
+const owing = (minerId: string) =>
+  ({
+    id: `s-${minerId}`,
+    minerId,
+    code: `MT-${minerId}`,
+    issuedAt: '2026-07-01T00:00:00Z',
+    lines: [],
+    amount: 10_000_000,
+  }) as unknown as Statement;
+
 const row = (characterId: number, date = '2026-07-19') => ({
   structureId: 1001,
   characterId,
@@ -125,6 +136,7 @@ describe('syncCorpTaxBook', () => {
 
   it('uploads the ledger, extractions and donations in one call, with the gaps', async () => {
     const d = deps({
+      readBookState: async () => emptyState({ statements: [owing('solo:7')] }),
       loadEsiExtractions: async () => [
         {
           structure_id: 1001,
@@ -143,7 +155,7 @@ describe('syncCorpTaxBook', () => {
     const upload = vi.mocked(d.uploadSync).mock.calls[0][1];
     expect(upload.observed).toHaveLength(1);
     expect(upload.extractions).toHaveLength(1);
-    // Known from the ledger, so the donation is credited to that Miner.
+    // Known from the ledger, and its Miner owes, so the donation is credited to that Miner.
     expect(upload.donations?.[0]).toMatchObject({ refId: 9, minerId: 'solo:7' });
     expect(out).toMatchObject({
       kind: 'synced',
@@ -151,6 +163,127 @@ describe('syncCorpTaxBook', () => {
       extractions: 1,
       donationsAdded: 1,
     });
+  });
+
+  it('credits a known miner’s donation toward ore not yet on a Statement (#6207)', async () => {
+    // Character 7 mined on 2026-07-19 and has no Statement: miners often pay the day they mine.
+    const d = deps({
+      loadDonations: async () => [
+        { refId: 9, division: 1, characterId: 7, amount: 5, at: '2026-07-19T00:00:00.000Z' },
+      ],
+    });
+    await run(d);
+    const [donation] = vi.mocked(d.uploadSync).mock.calls[0][1].donations ?? [];
+    expect(donation).toMatchObject({ minerId: 'solo:7' });
+  });
+
+  it('holds a known miner’s donation for review when their Miner owes nothing (#6207)', async () => {
+    // Billed through the day they mined, and paid in full: nothing owed, no ore unbilled.
+    const billed = { ...owing('solo:7'), coversThrough: '2026-07-31' } as unknown as Statement;
+    const d = deps({
+      readBookState: async () =>
+        emptyState({
+          statements: [billed],
+          payments: [
+            {
+              id: 'j1_1',
+              minerId: 'solo:7',
+              characterId: 7,
+              amount: 10_000_000,
+              at: '2026-07-02T00:00:00Z',
+              source: 'donation',
+            },
+          ],
+        }),
+      loadDonations: async () => [
+        { refId: 9, division: 1, characterId: 7, amount: 5, at: '2026-07-19T00:00:00.000Z' },
+      ],
+    });
+    await run(d);
+    const [donation] = vi.mocked(d.uploadSync).mock.calls[0][1].donations ?? [];
+    expect(donation.minerId).toBeUndefined();
+    expect(donation.reviewReason).toBe('no-open-balance');
+  });
+
+  it('notes tax paid into a division the book does not read, and never credits it (#6207)', async () => {
+    const d = deps({
+      readBookState: async () => emptyState({ statements: [owing('solo:7')] }),
+      loadDonations: vi.fn(async (_c: number, _corp: number, divisions: readonly number[]) =>
+        divisions.includes(1)
+          ? []
+          : [{ refId: 4, division: 2, characterId: 7, amount: 5, at: '2026-07-19T00:00:00.000Z' }]
+      ),
+    });
+    await run(d);
+    const upload = vi.mocked(d.uploadSync).mock.calls[0][1];
+    expect(upload.donations).toEqual([]);
+    expect(upload.uncounted).toEqual([
+      {
+        id: 'j2_4',
+        refId: 4,
+        division: 2,
+        characterId: 7,
+        amount: 5,
+        at: '2026-07-19T00:00:00.000Z',
+      },
+    ]);
+    expect(vi.mocked(d.loadDonations).mock.calls.map((c) => c[2])).toContainEqual([
+      2, 3, 4, 5, 6, 7,
+    ]);
+  });
+
+  it('leaves the noted list alone when the other divisions could not all be read', async () => {
+    const d = deps({
+      loadDonations: async (_c, _corp, divisions) => (divisions.includes(1) ? [] : null),
+    });
+    await run(d);
+    expect('uncounted' in vi.mocked(d.uploadSync).mock.calls[0][1]).toBe(false);
+  });
+
+  it('never re-matches a donation held for review when its Miner owed nothing as they paid, even once they owe', async () => {
+    const d = deps({
+      readBookState: async () =>
+        emptyState({
+          miners: [{ id: 'm1', mainCharacterId: 7, characterIds: [7, 8] }] as BookState['miners'],
+          // Billed through the day mined before the donation: nothing was unbilled when they paid.
+          statements: [{ ...owing('m1'), coversThrough: '2026-07-19' } as unknown as Statement],
+          payments: [
+            {
+              id: 'j1_1',
+              characterId: 8,
+              amount: 5,
+              at: '2026-07-19T00:00:00Z',
+              source: 'donation',
+              reviewReason: 'no-open-balance',
+            },
+          ],
+        }),
+    });
+    await run(d);
+    expect(d.assignPayment).not.toHaveBeenCalled();
+  });
+
+  it('matches a held donation once the lagging ledger shows ore its Miner had not been billed for when paying', async () => {
+    const d = deps({
+      readBookState: async () =>
+        emptyState({
+          miners: [{ id: 'm1', mainCharacterId: 7, characterIds: [7, 8] }] as BookState['miners'],
+          statements: [owing('m1')],
+          payments: [
+            {
+              id: 'j1_1',
+              characterId: 8,
+              amount: 5,
+              at: '2026-07-19T00:00:00Z',
+              source: 'donation',
+              reviewReason: 'no-open-balance',
+            },
+          ],
+        }),
+    });
+    await run(d);
+    // Character 7 mined on the day character 8 paid; the ledger only showed it on this sync.
+    expect(d.assignPayment).toHaveBeenCalledWith(5, CORP, 'j1_1', 'm1');
   });
 
   it('does not resend donations the book already holds', async () => {
@@ -180,6 +313,7 @@ describe('syncCorpTaxBook', () => {
       readBookState: async () =>
         emptyState({
           miners: [{ id: 'm1', mainCharacterId: 7, characterIds: [7, 8] }] as BookState['miners'],
+          statements: [owing('m1')],
           payments: [
             {
               id: 'j1_1',
@@ -216,6 +350,7 @@ describe('syncCorpTaxBook', () => {
       readBookState: async () =>
         emptyState({
           miners: [{ id: 'm1', mainCharacterId: 7, characterIds: [7, 8] }] as BookState['miners'],
+          statements: [owing('m1')],
           payments: [
             {
               id: 'j1_1',

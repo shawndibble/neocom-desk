@@ -18,6 +18,9 @@ import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { DEFAULT_TIME_FORMAT, useTimeFormat } from '@/lib/timeFormat';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { App } from '@/app/App';
+import * as routeChunks from '@/app/routeChunks';
+import { Industry } from '@/routes/Industry';
+import { renderPageRoute } from '@/test/renderPage';
 import { useLpValue } from '@/features/loyalty/lpValue';
 import {
   communityOfferToSearchRow,
@@ -345,18 +348,25 @@ async function resetSession() {
 
 beforeAll(async () => {
   // One throwaway render of the panel, so no test pays for the first one. A
-  // worker's first `App` render — compiling the lazy route chunks, warming
-  // jsdom and React — took ~4.5s even on a quiet machine, against the 5s
-  // `findBy*` budget, and failed whichever test ran first on a loaded CI
-  // shard. Done here under the hook's own budget.
+  // worker's first render — compiling the route's chunks, warming jsdom and
+  // React — took ~4.5s even on a quiet machine, against the 5s `findBy*`
+  // budget, and failed whichever test ran first on a loaded CI shard. Done
+  // here under the hook's own budget.
   await resetSession();
   loadPublicBpcContracts.mockResolvedValue(
     cachedSnapshot([row({ contractId: 1, typeId: 638, regionId: 10000002 })])
   );
-  const { unmount } = render(<App />);
+  const { unmount } = renderIndustry();
   await screen.findByRole('table', { name: 'BPC Sourcing' }, { timeout: 25_000 });
   unmount();
+  // The shell's chunk, for the one test that renders `<App />`.
+  await routeChunks.loadLayout();
 }, 30_000);
+
+/** The Industry page (Sourcing is its tab) on its route, without App's boot or the shell. */
+function renderIndustry() {
+  return renderPageRoute('/industry', <Industry />);
+}
 
 beforeEach(resetSession);
 afterEach(() => {
@@ -417,7 +427,7 @@ describe('BpcSourcingPanel', () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([row({ contractId: 1, typeId: 638, regionId: 10000002 })])
     );
-    render(<App />);
+    renderIndustry();
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
@@ -434,7 +444,7 @@ describe('BpcSourcingPanel', () => {
       cachedSnapshot([row({ contractId: 1, typeId: 638, regionId: 10000002, isMultiType: true })])
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     await within(table).findByText('Rifter Blueprint');
@@ -461,7 +471,7 @@ describe('BpcSourcingPanel', () => {
       ])
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(await within(table).findByText('Caracal Blueprint')).toBeInTheDocument();
@@ -480,7 +490,7 @@ describe('BpcSourcingPanel', () => {
   it('groups the typed max price as it is typed, with no echo line', async () => {
     loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
     await screen.findByRole('table', { name: 'BPC Sourcing' });
 
     await openFilters(user);
@@ -494,7 +504,7 @@ describe('BpcSourcingPanel', () => {
   it('draws every filter field at one height, selects and inputs alike', async () => {
     loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
     await screen.findByRole('table', { name: 'BPC Sourcing' });
 
     await openFilters(user);
@@ -520,7 +530,7 @@ describe('BpcSourcingPanel', () => {
       ])
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
@@ -534,14 +544,14 @@ describe('BpcSourcingPanel', () => {
 
   it('shows an empty state, not a crash, when nothing has synced yet', async () => {
     loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([]));
-    render(<App />);
+    renderIndustry();
 
     expect(await screen.findByText('No public BPC listings synced yet')).toBeInTheDocument();
   });
 
   it('says the index could not be reached, not "synced yet", when the read returned nothing', async () => {
     loadPublicBpcContracts.mockResolvedValue(null);
-    render(<App />);
+    renderIndustry();
 
     expect(
       await screen.findAllByText("Couldn't reach the contract index — nothing cached yet")
@@ -552,7 +562,7 @@ describe('BpcSourcingPanel', () => {
 
   it('announces a failed load with the same words the page shows', async () => {
     loadPublicBpcContracts.mockRejectedValue(new Error('boom'));
-    render(<App />);
+    renderIndustry();
     expect(await screen.findAllByText('Could not load')).not.toHaveLength(0);
     expect(screen.queryByText(/Couldn't reach the contract index/)).not.toBeInTheDocument();
   });
@@ -561,7 +571,7 @@ describe('BpcSourcingPanel', () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([row({ contractId: 1, typeId: 638, regionId: 10000002 })])
     );
-    render(<App />);
+    renderIndustry();
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     fireEvent.contextMenu(within(table).getByText('Rifter Blueprint'));
@@ -583,7 +593,7 @@ describe('BpcSourcingPanel', () => {
       cachedSnapshot([row({ contractId: 1, typeId: 638, regionId: 10000002 })])
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     await within(table).findByText('Rifter Blueprint');
@@ -616,6 +626,7 @@ describe('BpcSourcingPanel', () => {
     expect(shared(buttonItems)).toEqual(shared(contextItems));
   });
 
+  // The one App-level test here: the /bpc-contracts redirect lives in App's route table.
   it('still lands on the sourcing tab from the old /bpc-contracts link', async () => {
     loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
     window.history.pushState({}, '', '/bpc-contracts');
@@ -636,7 +647,7 @@ describe('BpcSourcingPanel', () => {
       ])
     );
     const user = userEvent.setup({ delay: null });
-    const { unmount } = render(<App />);
+    const { unmount } = renderIndustry();
     await screen.findByRole('table', { name: 'BPC Sourcing' });
 
     await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
@@ -649,7 +660,7 @@ describe('BpcSourcingPanel', () => {
     expect(params.get('sourcing.q')).toBe('Rifter Blueprint');
 
     unmount();
-    render(<App />);
+    renderIndustry();
     expect(await screen.findByText('2 offers on contract')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Search blueprint name…')).toHaveValue('Rifter Blueprint');
   });
@@ -659,7 +670,7 @@ describe('BpcSourcingPanel', () => {
       cachedSnapshot([row({ contractId: 1, typeId: 638 }), row({ contractId: 2, typeId: 870 })])
     );
     window.history.pushState({}, '', '/industry/sourcing?sourcing.type=638');
-    render(<App />);
+    renderIndustry();
 
     expect(await screen.findByText('1 offer on contract')).toBeInTheDocument();
   });
@@ -677,7 +688,7 @@ describe('BpcSourcingPanel', () => {
     );
     window.history.pushState({}, '', '/industry/sourcing?sourcing.type=638&sourcing.minMe=10');
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
 
     expect(await screen.findByText('1 offer on contract')).toBeInTheDocument();
     await user.click(within(await screen.findByRole('table')).getByText('Rifter Blueprint'));
@@ -697,7 +708,7 @@ describe('BpcSourcingPanel', () => {
       ])
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
     await screen.findByRole('table', { name: 'BPC Sourcing' });
 
     await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
@@ -713,7 +724,7 @@ describe('BpcSourcingPanel', () => {
       cachedSnapshot([row({ contractId: 1, typeId: 638 }), row({ contractId: 2, typeId: 638 })])
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
     await screen.findByRole('table', { name: 'BPC Sourcing' });
 
     const box = screen.getByPlaceholderText('Search blueprint name…');
@@ -739,7 +750,7 @@ describe('BpcSourcingPanel', () => {
   it('hides the suggestions on Escape without clearing the typed text', async () => {
     loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
     await screen.findByRole('table', { name: 'BPC Sourcing' });
 
     await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
@@ -761,7 +772,7 @@ describe('BpcSourcingPanel', () => {
       ])
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
     await screen.findByRole('table', { name: 'BPC Sourcing' });
 
     await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
@@ -790,7 +801,7 @@ describe('BpcSourcingPanel', () => {
       ])
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
     await screen.findByRole('table', { name: 'BPC Sourcing' });
 
     await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
@@ -808,7 +819,7 @@ describe('BpcSourcingPanel', () => {
 
   describe('Cheapest by region', () => {
     async function pickRifter(user: ReturnType<typeof userEvent.setup>) {
-      render(<App />);
+      renderIndustry();
       await screen.findByRole('table', { name: 'BPC Sourcing' });
       await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
       await user.click(
@@ -862,7 +873,7 @@ describe('BpcSourcingPanel', () => {
       );
       window.history.pushState({}, '', '/industry/sourcing?sourcing.region=10000002');
       const user = userEvent.setup({ delay: null });
-      render(<App />);
+      renderIndustry();
       await screen.findByRole('table', { name: 'BPC Sourcing' });
       await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
       await user.click(
@@ -883,7 +894,7 @@ describe('BpcSourcingPanel', () => {
         row({ contractId: 2, typeId: 870, price: 1_000_000 }),
       ])
     );
-    render(<App />);
+    renderIndustry();
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     // Row 0 is the header; the cheapest row must lead under the default sort.
@@ -899,7 +910,7 @@ describe('BpcSourcingPanel', () => {
       cachedSnapshot([row({ contractId: 1, typeId: 638 }), row({ contractId: 2, typeId: 870 })])
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
 
     await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
@@ -925,7 +936,7 @@ describe('BpcSourcingPanel result cap', () => {
 
   it('shows at most 200 rows and says how many matched', async () => {
     loadPublicBpcContracts.mockResolvedValue(cachedSnapshot(rowsOf(201)));
-    render(<App />);
+    renderIndustry();
 
     await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(
@@ -935,7 +946,7 @@ describe('BpcSourcingPanel result cap', () => {
 
   it('says nothing when every match fits', async () => {
     loadPublicBpcContracts.mockResolvedValue(cachedSnapshot(rowsOf(200)));
-    render(<App />);
+    renderIndustry();
 
     await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(screen.queryByText(/narrow the search for the rest/)).not.toBeInTheDocument();
@@ -952,7 +963,7 @@ describe('BpcSourcingPanel active filter pills', () => {
     );
     window.history.pushState({}, '', '/industry/sourcing?sourcing.minMe=8&sourcing.hidePlex=1');
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
@@ -987,7 +998,7 @@ describe('BpcSourcingPanel search matching', () => {
       ])
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
@@ -1010,7 +1021,7 @@ describe('BpcSourcingPanel search matching', () => {
       cachedSnapshot([row({ contractId: 1, typeId: 638, regionId: 10000002 })])
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
 
     await screen.findByRole('table', { name: 'BPC Sourcing' });
     await user.type(screen.getByPlaceholderText(/search/i), 'Rifter Blueprint');
@@ -1048,7 +1059,7 @@ describe('BpcSourcingPanel row identity', () => {
       ])
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getAllByText('Rifter Blueprint')).toHaveLength(4);
@@ -1065,7 +1076,7 @@ describe('BpcSourcingPanel page header', () => {
   it('puts Refresh in the Industry header, re-reading the snapshot, and no panel title bar', async () => {
     loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
     await screen.findByRole('table', { name: 'BPC Sourcing' });
     const calls = loadPublicBpcContracts.mock.calls.length;
 
@@ -1083,7 +1094,7 @@ describe('BpcSourcingPanel source multiselect', () => {
     loadCharacterBlueprints.mockResolvedValue(
       ownedResult([ownedBlueprint({ item_id: 1, type_id: 870 })])
     );
-    render(<App />);
+    renderIndustry();
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
@@ -1101,7 +1112,7 @@ describe('BpcSourcingPanel source multiselect', () => {
       ownedResult([ownedBlueprint({ item_id: 1, type_id: 870 })])
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
 
@@ -1118,7 +1129,7 @@ describe('BpcSourcingPanel source multiselect', () => {
       ownedResult([ownedBlueprint({ item_id: 1, type_id: 870, quantity: 2 })])
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
 
@@ -1144,7 +1155,7 @@ describe('BpcSourcingPanel source multiselect', () => {
     loadCharacterBlueprints.mockResolvedValue(
       ownedResult([ownedBlueprint({ item_id: 1, type_id: 870 })])
     );
-    render(<App />);
+    renderIndustry();
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     const firstBodyRow = within(table).getAllByRole('row')[1];
@@ -1156,7 +1167,7 @@ describe('BpcSourcingPanel source multiselect', () => {
     loadCharacterBlueprints.mockResolvedValue(
       ownedResult([ownedBlueprint({ item_id: 1, type_id: 870 })])
     );
-    render(<App />);
+    renderIndustry();
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     const ownedRow = (await within(table).findByText('Caracal Blueprint')).closest(
@@ -1171,7 +1182,7 @@ describe('BpcSourcingPanel source multiselect', () => {
       ownedResult([ownedBlueprint({ item_id: 1, type_id: 638, runs: -1 })])
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     await within(table).findByText('Rifter Blueprint');
@@ -1191,7 +1202,7 @@ describe('BpcSourcingPanel source multiselect', () => {
     loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
     loadCharacterBlueprints.mockResolvedValue(ownedResult([], true));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
 
@@ -1218,7 +1229,7 @@ describe('BpcSourcingPanel source multiselect', () => {
   it('shows a dedicated empty state when every source is deselected', async () => {
     loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
     await screen.findByRole('table', { name: 'BPC Sourcing' });
 
     await openFilters(user);
@@ -1244,7 +1255,7 @@ describe('BpcSourcingPanel source multiselect', () => {
       ownedResult([ownedBlueprint({ item_id: 1, type_id: 870 })])
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
 
@@ -1273,7 +1284,7 @@ describe('BpcSourcingPanel source multiselect', () => {
       space: 'highsec',
     });
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
 
@@ -1295,7 +1306,7 @@ describe('BpcSourcingPanel Auctions/PLEX filters (issue #1105)', () => {
       ])
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
 
@@ -1314,7 +1325,7 @@ describe('BpcSourcingPanel Auctions/PLEX filters (issue #1105)', () => {
       ])
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
 
@@ -1329,7 +1340,7 @@ describe('BpcSourcingPanel Auctions/PLEX filters (issue #1105)', () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([row({ contractId: 1, typeId: 638, price: 0, requestedPlex: 1000 })])
     );
-    render(<App />);
+    renderIndustry();
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
 
     expect(within(table).getByText('1,000 PLEX')).toBeInTheDocument();
@@ -1339,7 +1350,7 @@ describe('BpcSourcingPanel Auctions/PLEX filters (issue #1105)', () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([row({ contractId: 1, typeId: 638, price: 100, requestedPlex: 100 })])
     );
-    render(<App />);
+    renderIndustry();
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
 
     expect(within(table).getByText('100.00 + 100 PLEX')).toBeInTheDocument();
@@ -1353,7 +1364,7 @@ describe('BpcSourcingPanel Auctions/PLEX filters (issue #1105)', () => {
       ])
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
     await screen.findByRole('table', { name: 'BPC Sourcing' });
 
     await openFilters(user);
@@ -1371,14 +1382,14 @@ describe('BpcSourcingPanel remembered Source', () => {
   function revisit(unmount: () => void) {
     unmount();
     window.history.pushState({}, '', '/industry/sourcing');
-    render(<App />);
+    renderIndustry();
     return screen.findByRole('table', { name: 'BPC Sourcing' });
   }
 
   it('keeps the Source picks on a bare revisit, without writing them into the URL', async () => {
     loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
     const user = userEvent.setup({ delay: null });
-    const { unmount } = render(<App />);
+    const { unmount } = renderIndustry();
     await screen.findByRole('table', { name: 'BPC Sourcing' });
 
     await openFilters(user);
@@ -1401,7 +1412,7 @@ describe('BpcSourcingPanel remembered Source', () => {
     await db.settings.put({ key: BPC_SOURCES_SETTING_KEY, value: ['contract', 'market', 'owned'] });
     window.history.pushState({}, '', '/industry/sourcing?sourcing.src=contract');
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
     await screen.findByRole('table', { name: 'BPC Sourcing' });
 
     await openFilters(user);
@@ -1418,7 +1429,7 @@ describe('BpcSourcingPanel remembered Source', () => {
   it('forgets the remembered Source when Reset filters puts the defaults back', async () => {
     loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
     const user = userEvent.setup({ delay: null });
-    const { unmount } = render(<App />);
+    const { unmount } = renderIndustry();
     await screen.findByRole('table', { name: 'BPC Sourcing' });
 
     await openFilters(user);
@@ -1446,7 +1457,7 @@ describe('BpcSourcingPanel Location/Space', () => {
       regionId: 10000002,
       space: 'highsec',
     });
-    render(<App />);
+    renderIndustry();
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getByText('Jita IV - Moon 4')).toBeInTheDocument();
@@ -1465,7 +1476,7 @@ describe('BpcSourcingPanel Location/Space', () => {
         : { name: 'Jita IV - Moon 4', regionId: 10000002, space: 'highsec' as const }
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
@@ -1502,7 +1513,7 @@ describe('BpcSourcingPanel Location/Space', () => {
       space: 'highsec',
     });
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     await within(table).findByText('Caracal Blueprint');
 
@@ -1542,7 +1553,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
         cachedSnapshot([row({ contractId: 1, typeId: 638 })])
       );
       const user = userEvent.setup({ delay: null });
-      render(<App />);
+      renderIndustry();
       await screen.findByRole('table', { name: 'BPC Sourcing' });
 
       expect(screen.queryByRole('button', { name: /^Source:/ })).not.toBeInTheDocument();
@@ -1572,7 +1583,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
         ownedResult([ownedBlueprint({ item_id: 1, type_id: 870 })])
       );
       const user = userEvent.setup({ delay: null });
-      render(<App />);
+      renderIndustry();
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
       expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
 
@@ -1597,7 +1608,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
         ownedResult([ownedBlueprint({ item_id: 1, type_id: 870 })])
       );
       const user = userEvent.setup({ delay: null });
-      render(<App />);
+      renderIndustry();
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
 
       await user.click(screen.getByRole('button', { name: /^Filters/ }));
@@ -1621,7 +1632,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
         cachedSnapshot([row({ contractId: 1, typeId: 638 })])
       );
       const user = userEvent.setup({ delay: null });
-      render(<App />);
+      renderIndustry();
       await screen.findByRole('table', { name: 'BPC Sourcing' });
 
       expect(screen.queryByRole('button', { name: /^Filters \(/ })).not.toBeInTheDocument();
@@ -1648,7 +1659,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
     it('checks no market Order Book while the search is empty', async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1 })]));
-      render(<App />);
+      renderIndustry();
       await screen.findByRole('table', { name: 'BPC Sourcing' });
       // Past the lookup debounce, so a pending fan-out would have started.
       await vi.advanceTimersByTimeAsync(400);
@@ -1662,7 +1673,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
           [row({ contractId: 2, runs: -1, price: 4_000_000, me: 8, te: 16 })]
         )
       );
-      render(<App />);
+      renderIndustry();
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
       const badge = (await within(table).findByText(/BPO on contract: 4M/)).parentElement!;
       // Short visible text; price and location live in the tooltip.
@@ -1680,7 +1691,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
           [row({ contractId: 2, runs: -1, price: 4_000_000 })]
         )
       );
-      render(<App />);
+      renderIndustry();
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
       await within(table).findByText(/BPO on contract: 4M/);
       expect(within(table).getAllByText(/BPO on contract/)).toHaveLength(1);
@@ -1696,7 +1707,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
           [row({ contractId: 999, runs: -1, price: 4_000_000 })]
         )
       );
-      render(<App />);
+      renderIndustry();
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
       await within(table).findByText(/BPO on contract: 4M/);
       expect(within(table).getAllByText(/BPO on contract/)).toHaveLength(1);
@@ -1719,7 +1730,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       }));
       loadContractLocationInfo.mockResolvedValue({ name: 'Jita IV - Moon 4', space: 'highsec' });
       const user = userEvent.setup({ delay: null });
-      render(<App />);
+      renderIndustry();
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
 
       await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
@@ -1788,7 +1799,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
           [row({ contractId: 2, runs: -1, price: 40_000_000 })]
         )
       );
-      render(<App />);
+      renderIndustry();
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
       const badge = (await within(table).findByText(/BPO on contract: 40M/)).parentElement!;
       expect(badge).not.toHaveTextContent('BPO may be cheaper');
@@ -1806,7 +1817,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       loadContractLocationInfo.mockResolvedValue({ name: 'Jita IV - Moon 4', space: 'highsec' });
       window.history.pushState({}, '', '/industry/sourcing?sourcing.src=contract,owned');
       const user = userEvent.setup({ delay: null });
-      render(<App />);
+      renderIndustry();
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
 
       await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
@@ -1844,7 +1855,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       loadContractLocationInfo.mockResolvedValue({ name: 'Jita IV - Moon 4', space: 'highsec' });
       window.history.pushState({}, '', '/industry/sourcing?sourcing.src=contract,owned');
       const user = userEvent.setup({ delay: null });
-      render(<App />);
+      renderIndustry();
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
       await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
       await within(table).findByText(/BPO on market: 2M/);
@@ -1895,7 +1906,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       useLpValue.setState({ value: 1_000, hydrated: true });
       window.history.pushState({}, '', '/industry/sourcing?sourcing.src=contract,lp');
       const user = userEvent.setup({ delay: null });
-      render(<App />);
+      renderIndustry();
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
 
       const lpCell = await within(table).findByText('Sisters of EVE');
@@ -1911,7 +1922,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       );
       findLpOfferMatches.mockResolvedValue({ matchesByTypeId: new Map(), requiredItemTypeIds: [] });
       window.history.pushState({}, '', '/industry/sourcing?sourcing.src=contract,lp');
-      render(<App />);
+      renderIndustry();
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
 
       await waitFor(() => expect(findLpOfferMatches).toHaveBeenCalled());
@@ -1925,7 +1936,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       );
       getOrderBook.mockRejectedValue(new Error('420'));
       const user = userEvent.setup({ delay: null });
-      render(<App />);
+      renderIndustry();
       await screen.findByRole('table', { name: 'BPC Sourcing' });
 
       await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
@@ -1942,7 +1953,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
         cachedSnapshot([row({ contractId: 1, typeId: 638, price: 5_000_000 })])
       );
       const user = userEvent.setup({ delay: null });
-      render(<App />);
+      renderIndustry();
       await screen.findByRole('table', { name: 'BPC Sourcing' });
 
       await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
@@ -1960,7 +1971,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       );
       window.history.pushState({}, '', '/industry/sourcing?sourcing.src=contract,owned');
       const user = userEvent.setup({ delay: null });
-      render(<App />);
+      renderIndustry();
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
       expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
 
@@ -1998,7 +2009,7 @@ describe('BpcSourcingPanel Jump Range', () => {
   it('keeps only rows within range of the game location, counting the range as active', async () => {
     loadCharacterSolarSystemId.mockResolvedValue(JITA);
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getAllByText('Caracal Blueprint')).toHaveLength(2);
 
@@ -2016,7 +2027,7 @@ describe('BpcSourcingPanel Jump Range', () => {
 
   it("shows each row's own distance from the current system, even with no range filter applied", async () => {
     loadCharacterSolarSystemId.mockResolvedValue(JITA);
-    render(<App />);
+    renderIndustry();
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     await screen.findByText('Jita IV - Moon 4');
     const rows = within(table).getAllByRole('row');
@@ -2042,7 +2053,7 @@ describe('BpcSourcingPanel Jump Range', () => {
     // Never resolves — the same "still loading" state a fresh page load or a
     // slow Dexie read leaves the cell in, regardless of the filter's range.
     localJumpDistances.mockReturnValue(new Promise(() => {}));
-    render(<App />);
+    renderIndustry();
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     await screen.findByText('Jita IV - Moon 4');
     const rows = within(table).getAllByRole('row');
@@ -2057,7 +2068,7 @@ describe('BpcSourcingPanel Jump Range', () => {
     // unlike the Rifter row's unresolved one, this row's own systemId is
     // known, so the missing cell can only be the filter's no-origin state.
     loadCharacterSolarSystemId.mockResolvedValue(null);
-    render(<App />);
+    renderIndustry();
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     await screen.findByText('Jita IV - Moon 4');
     const rows = within(table).getAllByRole('row');
@@ -2080,7 +2091,7 @@ describe('BpcSourcingPanel Jump Range', () => {
 
   it('says so and filters nothing when there is no current system to measure from', async () => {
     window.history.pushState({}, '', '/industry/sourcing?sourcing.jumps=3');
-    render(<App />);
+    renderIndustry();
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
 
     expect(
@@ -2119,7 +2130,7 @@ describe('Ask to copy on a Community Offer row', () => {
     communityRows.value = [offerRow({ typeId: 638, runs: -1 })];
     openCommunity();
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderIndustry();
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
 
     await user.click(await within(table).findByRole('button', { name: 'ask Ann to copy' }));
@@ -2131,7 +2142,7 @@ describe('Ask to copy on a Community Offer row', () => {
   it('keeps "from <name>" as plain text on a copy row', async () => {
     communityRows.value = [offerRow({ typeId: 638, runs: 10 })];
     openCommunity();
-    render(<App />);
+    renderIndustry();
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
 
     expect(await within(table).findByText('from Ann')).toBeInTheDocument();
@@ -2146,7 +2157,7 @@ describe('Ask to copy on a Community Offer row', () => {
     try {
       communityRows.value = [offerRow({ typeId: Number(FORMULA), runs: -1 })];
       openCommunity();
-      render(<App />);
+      renderIndustry();
       const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
 
       expect(await within(table).findByText('ask Ann to copy')).toBeInTheDocument();

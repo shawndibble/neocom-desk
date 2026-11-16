@@ -1,13 +1,27 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DataTable, Panel, StatChip, StatChips, TextInput } from '@/components/ui';
+import {
+  Checkbox,
+  DataTable,
+  Panel,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  StatChip,
+  StatChips,
+  TextInput,
+} from '@/components/ui';
 import { Button } from '@/components/ui/Button';
+import { InlineError } from '@/components/ui/InlineError';
 import { payeeChangeNotice, payeeNoticeKey } from '@/engine/corpTaxBook/payeeChange';
 import type { Payee } from '@/engine/corpTaxBook/payouts';
 import type { FeederView } from '../taxBook/feederViewClient';
 import {
   isSettledAfterLeaving,
-  minedRows,
+  minedDayRows,
+  minedMonths,
   pageState,
   payeeIdOf,
   parseRequestedRate,
@@ -18,8 +32,9 @@ import {
 } from '../taxBook/feederViewModel';
 import { DialogShell } from './BookDialogs';
 import { RefineryLabels } from './RefineryLabels';
+import { callableErrorText } from './feederErrorText';
 import { ChangePayeeDialog, PayeeChangeStrip, PayeeLine } from './MoonOwnerPayee';
-import { isk, shortDate } from './moonsFormat';
+import { isk, monthLabel, shortDate } from './moonsFormat';
 
 type Names = (characterId: number) => string;
 /** An ore's name; undefined until it resolves. */
@@ -37,7 +52,14 @@ function Statement({ view, name }: { view: FeederView; name: string }) {
       <div className="space-y-1 text-sm">
         <p className="text-text-dim">{t(k('intro'), { name })}</p>
         {rate === null ? (
-          <p>{t(k('noRate'))}</p>
+          <>
+            <p>{t(k('noRate'))}</p>
+            {(s.pendingValueIsk ?? 0) > 0 && (
+              <p className="text-xs text-text-dim">
+                {t(k('pending'), { value: isk(s.pendingValueIsk ?? 0) })}
+              </p>
+            )}
+          </>
         ) : s.balanceKind === 'owed' ? (
           <>
             <p className="text-2xl font-semibold tabular-nums">{isk(s.balanceIsk)}</p>
@@ -68,6 +90,11 @@ function Statement({ view, name }: { view: FeederView; name: string }) {
               })}
           </p>
         )}
+        {s.balanceKind !== 'none' && (
+          <p className="text-xs text-text-dim">
+            {t(k('accrued'), { accrued: isk(s.accruedIsk), paid: isk(s.paidIsk) })}
+          </p>
+        )}
         {s.unpricedDays > 0 && (
           <p className="text-xs text-text-dim">{t(k('unpriced'), { count: s.unpricedDays })}</p>
         )}
@@ -76,21 +103,42 @@ function Statement({ view, name }: { view: FeederView; name: string }) {
   );
 }
 
-/** Settled otherwise: the note, mined volume and value, nothing owed in ISK. */
-function SettledOtherwise({ view, name }: { view: FeederView; name: string }) {
+/**
+ * Settled otherwise: the note, mined volume and value. Nothing more builds up in ISK, but what was
+ * owed before the switch stays owed and shows here until it is paid (#6209).
+ */
+function SettledOtherwise({
+  view,
+  name,
+  payments,
+}: {
+  view: FeederView;
+  name: string;
+  payments: ReactNode;
+}) {
   const { t } = useTranslation();
   const s = view.summary;
+  const owed = s.balanceKind === 'owed';
   return (
     <>
       <Panel title={t('corpTaxBook.moons.ownerView.settledOtherwise.title')}>
         <div className="space-y-1 text-sm">
           <p>{t('corpTaxBook.moons.ownerView.settledOtherwise.intro', { name })}</p>
           {s.note && <p className="font-semibold">{s.note}</p>}
+          {owed && (
+            <p>
+              <span className="text-2xl font-semibold tabular-nums">{isk(s.balanceIsk)}</span>{' '}
+              {t('corpTaxBook.moons.ownerView.settledOtherwise.stillOwed')}
+            </p>
+          )}
           <p className="text-xs text-text-dim">
             {t('corpTaxBook.moons.ownerView.settledOtherwise.nothingOwed')}
           </p>
         </div>
       </Panel>
+      {(owed || view.payouts.length > 0) && (
+        <Panel title={t('corpTaxBook.moons.ownerView.paymentsToYou')}>{payments}</Panel>
+      )}
       <StatChips>
         <StatChip
           label={t('corpTaxBook.moons.ownerView.minedValue')}
@@ -112,7 +160,13 @@ function SettledOtherwise({ view, name }: { view: FeederView; name: string }) {
   );
 }
 
-/** Who mined at the moon owner's refineries, per character and refinery. Nothing is capped. */
+/** The month filter's "every month" value: Radix Select has no empty value. */
+const ALL_MONTHS = 'all';
+
+/**
+ * Who mined at the moon owner's refineries, per day, character, refinery and ore, so each day
+ * can be checked against the moon owner's own ledger (#6210); a month at a time. Nothing is capped.
+ */
 function MinedTable({
   view,
   names,
@@ -127,11 +181,37 @@ function MinedTable({
   title: string;
 }) {
   const { t } = useTranslation();
-  const rows = minedRows(view.days);
+  const months = minedMonths(view.days);
+  const [picked, setPicked] = useState<string>(ALL_MONTHS);
+  const month = picked !== ALL_MONTHS && months.includes(picked) ? picked : null;
+  const rows = minedDayRows(view.days, month);
   const oreName = (r: MinedRow) =>
     r.typeId === null ? '—' : (typeName?.(r.typeId) ?? `#${r.typeId}`);
+  const filterLabel = t('corpTaxBook.moons.ownerView.month');
   return (
-    <Panel title={title} padded={rows.length === 0}>
+    <Panel
+      title={title}
+      padded={rows.length === 0}
+      actions={
+        months.length > 1 ? (
+          <Select value={month ?? ALL_MONTHS} onValueChange={setPicked}>
+            <SelectTrigger aria-label={filterLabel} size="sm" active={month !== null}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_MONTHS}>
+                {t('corpTaxBook.moons.ownerView.allMonths')}
+              </SelectItem>
+              {months.map((m) => (
+                <SelectItem key={m} value={m}>
+                  {monthLabel(m)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : undefined
+      }
+    >
       {rows.length === 0 ? (
         <p className="text-sm text-text-dim">{t('corpTaxBook.moons.owner.noMining')}</p>
       ) : (
@@ -139,8 +219,15 @@ function MinedTable({
           label={title}
           rows={rows}
           rowKey={(r) => r.key}
-          defaultSort={{ columnId: 'volume', direction: 'desc' }}
+          defaultSort={{ columnId: 'date', direction: 'desc' }}
           columns={[
+            {
+              id: 'date',
+              header: t('corpTaxBook.moons.ownerView.cols.date'),
+              className: 'tabular-nums whitespace-nowrap',
+              render: (r) => shortDate(r.date),
+              sortValue: (r) => r.date,
+            },
             {
               id: 'character',
               header: t('corpTaxBook.moons.ownerView.cols.character'),
@@ -216,23 +303,109 @@ function RateLine({
 
 const METHOD = { donation: 'donation', other: 'other' } as const;
 
-function Payments({ view }: { view: FeederView }) {
+/**
+ * The payments to the moon owner, newest first. With `onDispute` (its officers), each one can be
+ * flagged as a payment it disputes, or the flag withdrawn (#6209); the accounting side sees it.
+ */
+function Payments({
+  view,
+  onDispute,
+}: {
+  view: FeederView;
+  onDispute?: (payoutId: string, disputed: boolean) => Promise<void>;
+}) {
   const { t } = useTranslation();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const k = (key: string) => `corpTaxBook.moons.ownerView.payments.${key}`;
   const rows = payoutRows(view.payouts);
-  if (rows.length === 0)
-    return (
-      <p className="text-sm text-text-dim">{t('corpTaxBook.moons.ownerView.payments.none')}</p>
-    );
+  if (rows.length === 0) return <p className="text-sm text-text-dim">{t(k('none'))}</p>;
+  const toggle = async (id: string, disputed: boolean) => {
+    if (!onDispute) return;
+    setBusy(id);
+    setFailed(false);
+    try {
+      await onDispute(id, disputed);
+    } catch {
+      setFailed(true);
+    } finally {
+      setBusy(null);
+    }
+  };
   return (
-    <ul className="space-y-0.5 text-xs text-text-dim">
-      {rows.map((p, i) => (
-        <li key={`${p.date}:${p.amount}:${i}`}>
-          {shortDate(p.date)} · <span className="tabular-nums">{isk(p.amount)}</span> ·{' '}
-          {t(`corpTaxBook.moons.ownerView.payments.method.${METHOD[p.method]}`)} ·{' '}
-          {t(`corpTaxBook.moons.ownerView.payments.status.${p.status}`)}
-        </li>
-      ))}
-    </ul>
+    <div className="space-y-1">
+      <ul className="space-y-1 text-xs text-text-dim">
+        {rows.map((p) => (
+          <li key={p.id} className="flex items-center gap-2">
+            <span>
+              {shortDate(p.date)} · <span className="tabular-nums">{isk(p.amount)}</span> ·{' '}
+              {t(k(`method.${METHOD[p.method]}`))} · {t(k(`status.${p.status}`))}
+              {p.disputed && <span className="text-warning"> · {t(k('disputed'))}</span>}
+            </span>
+            {onDispute && (
+              <Button
+                size="sm"
+                variant="ghost"
+                loading={busy === p.id}
+                onClick={() => void toggle(p.id, !p.disputed)}
+              >
+                {t(k(p.disputed ? 'withdraw' : 'dispute'))}
+              </Button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {failed && <InlineError>{t(k('disputeFailed'))}</InlineError>}
+    </div>
+  );
+}
+
+/**
+ * The moon owner's Pop Sharing opt-out (#6222): one switch for all its moons, on by default.
+ * Off stops the accounting corporation sharing their pops at once; on lets it again.
+ */
+function PopSharingSwitch({
+  name,
+  share,
+  onChange,
+}: {
+  name: string;
+  share: boolean;
+  /** Absent: shown, not changeable (not an officer who edits). */
+  onChange?: (share: boolean) => Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const change = async (next: boolean) => {
+    if (!onChange) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await onChange(next);
+    } catch (e) {
+      setError(callableErrorText(t, e, 'corpTaxBook.moons.ownerView.popSharing.failed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Panel title={t('corpTaxBook.moons.ownerView.popSharing.title')}>
+      <div className="space-y-2 text-sm">
+        <label className="flex min-h-9 items-center gap-2">
+          <Checkbox
+            checked={share}
+            disabled={!onChange || busy}
+            onChange={(e) => void change(e.target.checked)}
+          />
+          {t('corpTaxBook.moons.ownerView.popSharing.label', { name })}
+        </label>
+        <p className="text-xs text-text-dim">
+          {t('corpTaxBook.moons.ownerView.popSharing.hint', { name })}
+        </p>
+        {error && <InlineError>{error}</InlineError>}
+      </div>
+    </Panel>
   );
 }
 
@@ -282,6 +455,8 @@ export function MoonOwnerView({
   canEdit,
   onSetRefineryLabel,
   onRequestRate,
+  onDisputePayout,
+  onSetPopSharing,
   characterId,
   onSetPayee,
   banner,
@@ -299,6 +474,10 @@ export function MoonOwnerView({
   /** Label a refinery for both sides; null clears it. With `canEdit`, shows the pencil. */
   onSetRefineryLabel?: (structureId: number, label: string | null) => Promise<void>;
   onRequestRate: (pct: number) => Promise<void>;
+  /** Flag a payment as disputed, or withdraw it (#6209); with `canEdit`, shows Dispute. */
+  onDisputePayout?: (payoutId: string, disputed: boolean) => Promise<void>;
+  /** The Pop Sharing opt-out (#6222): false stops the pops being shared. With `canEdit`, it changes. */
+  onSetPopSharing?: (share: boolean) => Promise<void>;
   /** Whose token the payee name search runs under; with `onSetPayee`, shows Change. */
   characterId?: number;
   onSetPayee?: (payee: Payee, name: string) => Promise<void>;
@@ -315,6 +494,12 @@ export function MoonOwnerView({
   const state = pageState(view.summary);
   const name = view.summary.collectorName ?? t('corpTaxBook.moons.owner.anonymous');
   const ended = state === 'ended';
+  const payments = (
+    <Payments
+      view={view}
+      {...(canEdit && !ended && onDisputePayout ? { onDispute: onDisputePayout } : {})}
+    />
+  );
   const setBy = view.summary.payeeSetBy ?? null;
   // The accounting corporation changed who gets paid (#4653): a strip until dismissed.
   const payeeNotice = payeeChangeNotice({
@@ -356,7 +541,9 @@ export function MoonOwnerView({
       {!folded && (
         <>
           {state === 'normal' && <Statement view={view} name={name} />}
-          {state === 'settled-otherwise' && <SettledOtherwise view={view} name={name} />}
+          {state === 'settled-otherwise' && (
+            <SettledOtherwise view={view} name={name} payments={payments} />
+          )}
           {(!ended || view.days.length > 0) && (
             <>
               <MinedTable
@@ -376,6 +563,13 @@ export function MoonOwnerView({
                 {...(labelEdit ? { edit: labelEdit } : {})}
               />
             </>
+          )}
+          {!ended && (
+            <PopSharingSwitch
+              name={name}
+              share={view.summary.popSharingOptedOut !== true}
+              {...(canEdit && onSetPopSharing ? { onChange: onSetPopSharing } : {})}
+            />
           )}
           {state === 'normal' && (
             <Panel title={t('corpTaxBook.moons.ownerView.paymentsAndRate')}>
@@ -397,7 +591,7 @@ export function MoonOwnerView({
                     : {})}
                   onChange={canSetPayee ? () => setChangingPayee(true) : undefined}
                 />
-                <Payments view={view} />
+                {payments}
               </div>
             </Panel>
           )}

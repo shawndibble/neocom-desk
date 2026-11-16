@@ -24,6 +24,7 @@ import {
 } from './corpTaxBook.js';
 import {
   clampCoverageFrom,
+  reconnectCoverageFrom,
   deriveModeChanges,
   reopenPeriod,
   type CoveragePeriod,
@@ -67,11 +68,22 @@ export interface FeederRecord {
   staleSince?: number;
   /** When it disconnected after 30 days stale (ms). */
   disconnectedAt?: number;
+  /** The `staleSince` whose "we can't read your ledger" mail an officer's client claimed (#6210). */
+  staleMailedFor?: number;
+  /** When that claim was made (ms): unsent after `STALE_MAIL_CLAIM_MS`, another officer may claim it. */
+  staleMailClaimedAt?: number;
+  /** The `staleSince` whose mail the claiming officer's queue sent: the claim is final. */
+  staleMailSentFor?: number;
   /** One payee: a corporation or a player. */
   payee?: { kind: 'corporation' | 'character'; id: number };
   payeeChangedAt?: number;
   /** Who set the payee last (#4653): either side may; absent on a payee set before it was kept. */
   payeeSetBy?: PayeeSetBy;
+  /**
+   * The moon owner turned Pop Sharing off for all its moons (#6222): who and when. Absent is the
+   * default, sharing allowed. The book's settings for its moons are kept and come back on opt-in.
+   */
+  popSharingOptOut?: { by: number; at: number };
   /** A removal the accounting corporation started (#4520); present while status is `pending-removal`. */
   removal?: Removal;
   /** The id (hash) of the removal mail's link; the link's code is only ever in the mail. */
@@ -397,6 +409,9 @@ export interface AcceptUndo {
 const FEED_STATE: readonly (keyof FeederRecord)[] = [
   'leftAt',
   'staleSince',
+  'staleMailedFor',
+  'staleMailClaimedAt',
+  'staleMailSentFor',
   'disconnectedAt',
   'lastSyncResult',
   // A rejoin's holder may read Extractions the old one could not (#6117).
@@ -482,7 +497,16 @@ export async function acceptInviteCore(
     // The first covered day: the invite's ask within 30 days back, never before the book began
     // and (on a rejoin) never inside an earlier period.
     const startDate: unknown = collectorBook.get('startDate');
-    let from = clampCoverageFrom(held?.coveragePeriods ?? [], invite.coverageFrom, today);
+    // Taking back a disconnected moon owner with no asked day is a reconnect: it reaches back to
+    // the day after its last covered one, so ore EVE still holds is not lost.
+    let from =
+      takenBack && invite.coverageFrom === undefined
+        ? reconnectCoverageFrom(
+            held?.coveragePeriods ?? [],
+            today,
+            held ? utcDate(held.joinedAt) : undefined
+          )
+        : clampCoverageFrom(held?.coveragePeriods ?? [], invite.coverageFrom, today);
     if (typeof startDate === 'string' && startDate > from && startDate <= today) from = startDate;
     const sameOwner = invite.sameOwner === true;
     const settled: FeederModeChange = { from, mode: 'settled-otherwise' };

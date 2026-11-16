@@ -73,6 +73,8 @@ const overlay: PersonalOverlay = {
   ],
   takenFromFree: new Map(),
   absorbed: new Map(),
+  trimmed: new Map(),
+  alsoBilled: new Map(),
   labels: new Map(),
   books: [],
 };

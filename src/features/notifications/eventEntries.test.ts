@@ -58,6 +58,7 @@ describe('NOTIFICATION_EVENT_ENTRIES', () => {
       mercenaryDenAnarchyPercent: ['mercenaryDenAnarchy'],
       skyhookRaidableLeadHours: ['skyhookRaidable'],
       skyhookRaidableMinUnits: ['skyhookRaidable'],
+      sharedMoonPopLeadMinutes: ['sharedMoonPop'],
       structureFuelLowDays: ['structureFuelLow'],
       corpWalletBalanceFloorIsk: ['corpWalletThreshold'],
       corpWalletTransactionCeilingIsk: ['corpWalletThreshold'],
@@ -74,6 +75,7 @@ describe('NOTIFICATION_EVENT_ENTRIES', () => {
       'marketOrderUndercut',
       'skyhookRaidable',
       'vettingShared',
+      'corpTaxBookSyncStopped',
     ]);
   });
 });
@@ -232,6 +234,33 @@ describe('one event through its entry', () => {
     expect(entry.thresholds.fields.map((field) => field.key)).toEqual([
       'acceleratorExpiringLeadHours',
     ]);
+  });
+
+  it('sharedMoonPop: fires at the pop time, names refinery, Pop Time, corporation and rate, owns the lead-minutes threshold', () => {
+    const entry = NOTIFICATION_EVENT_ENTRIES.sharedMoonPop;
+    const pop = {
+      popId: '98000001_1035_1762900000000',
+      corporationId: 98000001,
+      refineryName: 'Efa - Moon Drill',
+      popTime: 'auto-fracture' as const,
+      popAtMs: T0 + 60_000,
+      ratePct: 7.5,
+      leadMs: 0,
+    };
+    const fires = entry.diff(
+      C,
+      { entries: [pop], nowMs: T0 },
+      { entries: [pop], nowMs: T0 + 120_000 }
+    );
+    expect(fires).toHaveLength(1);
+    const names = { corporation: 'Moon Collectors', when: '14:00' };
+    const expected = {
+      title: 'Moon pop · Efa - Moon Drill',
+      body: 'Auto-fracture at 14:00 · taxed by Moon Collectors · 7.5%',
+    };
+    expect(entry.copy.poll(fires[0], PILOT, names)).toEqual(expected);
+    expect(entry.projection.push(fires[0], PILOT, names)).toEqual(expected);
+    expect(entry.thresholds.fields.map((field) => field.key)).toEqual(['sharedMoonPopLeadMinutes']);
   });
 
   it('mercenaryDenReinforced: warns inside the lead window, pushes hedged, owns the lead-hours threshold', () => {

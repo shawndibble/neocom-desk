@@ -26,15 +26,12 @@ export function CorpBookSyncNote({
   book,
   owedNow,
   now: nowOverride,
-  showCredit = true,
 }: {
   book: CorpBookViewBook;
   /** What the book's rows owe right now. */
   owedNow: number;
   /** Test seam; the note reads the shared minute ticker otherwise. */
   now?: number;
-  /** The Tax page leaves the Statement credit line out; the pay dialog keeps it. */
-  showCredit?: boolean;
 }) {
   const ticked = useTicker(MINUTE_MS);
   const now = nowOverride ?? ticked;
@@ -43,7 +40,8 @@ export function CorpBookSyncNote({
   const synced = summary.lastSyncedAt;
   const ago = synced ? formatAge(Math.max(0, now - Date.parse(synced)), t) : null;
   const closedThrough = summary.closedThrough;
-  const credit = showCredit && summary.credit > 0;
+  // Shown on the Tax page and in the pay dialog alike (#6204): credit is money the member has.
+  const credit = summary.credit > 0;
   const hasWords = owedNow > 0 || book.pendingFrom !== undefined || book.left || credit;
   if (!hasWords) return null;
 

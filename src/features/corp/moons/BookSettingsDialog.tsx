@@ -58,7 +58,17 @@ const displayDate = (iso: string) =>
   new Date(`${iso}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' });
 
 const DIVISIONS = [1, 2, 3, 4, 5, 6, 7] as const;
-const RATE_SCOPES = ['corp', 'guest', 'miner', 'moon', 'structure', 'feeder'] as const;
+const RATE_SCOPES = [
+  'corp',
+  'guest',
+  'miner',
+  'moon',
+  'structure',
+  'feeder',
+  'feeder-member',
+] as const;
+/** Scopes that name a moon owner corporation. */
+const OWNER_SCOPES: readonly string[] = ['feeder', 'feeder-member'];
 
 function rateLabel(
   rate: TaxRate,
@@ -74,6 +84,7 @@ function rateLabel(
     case 'structure':
       return refinery(rate.structureId);
     case 'feeder':
+    case 'feeder-member':
       return corporation(rate.feederId);
     case 'record':
       return rate.recordKey;
@@ -237,7 +248,7 @@ export function BookSettingsDialog({
     (rateScope !== 'miner' || rateMiner !== '') &&
     (rateScope !== 'moon' || rateMoon !== '') &&
     (rateScope !== 'structure' || rateRefinery !== '') &&
-    (rateScope !== 'feeder' || rateOwner !== '');
+    (!OWNER_SCOPES.includes(rateScope) || rateOwner !== '');
   // One save model: Save commits the settings and a rate left in the form.
   const rateFilled = ratePct !== '';
 
@@ -261,8 +272,8 @@ export function BookSettingsDialog({
               ? { scope: 'moon', moonId: Number(rateMoon), ...base }
               : rateScope === 'structure'
                 ? { scope: 'structure', structureId: Number(rateRefinery), ...base }
-                : rateScope === 'feeder'
-                  ? { scope: 'feeder', feederId: Number(rateOwner), ...base }
+                : OWNER_SCOPES.includes(rateScope)
+                  ? { scope: rateScope, feederId: Number(rateOwner), ...base }
                   : { scope: rateScope, ...base };
         await edit({ action: 'addRate', rate });
         rateAdded = true;
@@ -423,13 +434,13 @@ export function BookSettingsDialog({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {RATE_SCOPES.filter((s) => s !== 'feeder' || owners.length > 0).map(
-                            (s) => (
-                              <SelectItem key={s} value={s}>
-                                {t(`corpTaxBook.moons.settings.rateScope.${s}`)}
-                              </SelectItem>
-                            )
-                          )}
+                          {RATE_SCOPES.filter(
+                            (s) => !OWNER_SCOPES.includes(s) || owners.length > 0
+                          ).map((s) => (
+                            <SelectItem key={s} value={s}>
+                              {t(`corpTaxBook.moons.settings.rateScope.${s}`)}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </Label>
@@ -490,7 +501,7 @@ export function BookSettingsDialog({
                         </Select>
                       </Label>
                     )}
-                    {rateScope === 'feeder' && (
+                    {OWNER_SCOPES.includes(rateScope) && (
                       <Label text={t('corpTaxBook.moons.settings.rateScope.feeder')}>
                         <Select value={rateOwner} onValueChange={setRateOwner}>
                           <SelectTrigger

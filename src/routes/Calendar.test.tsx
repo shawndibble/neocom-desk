@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
@@ -21,15 +21,44 @@ import {
   DEFAULT_CORP_FILTER,
 } from '@/features/character/calendarCorpFilter';
 import { CHARACTER_BOARD_ITEM_KINDS } from '@/engine/character/board';
-import { App } from '@/app/App';
+import { Calendar } from '@/routes/Calendar';
+import { renderPageRoute } from '@/test/renderPage';
+import * as routeChunks from '@/app/routeChunks';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { exportRows } from '@/lib/downloadCsv';
 import { stubViewport } from '@/test/viewport';
+
+// A pinned "today": mid-month, mid-morning, so the hour offsets below and the
+// five-day-out fixture never cross midnight or a month end, whenever the suite
+// runs. Only `Date` is faked, and it keeps ticking (an RSVP must land before the
+// reload that overrides it), so every timer stays real. Hoisted, so `TODAY`
+// below and any clock a module reads at import see it; set again before each
+// test, since the shared teardown (`restoreRealTimers`) puts the real clock
+// back after every test.
+const { pinClock } = vi.hoisted(() => {
+  const pinClock = () =>
+    vi.useFakeTimers({
+      now: new Date(2026, 5, 10, 9, 0),
+      toFake: ['Date'],
+      shouldAdvanceTime: true,
+    });
+  pinClock();
+  return { pinClock };
+});
+beforeEach(() => {
+  pinClock();
+});
 
 // The export test reads the rows handed to the export rather than a file.
 vi.mock('@/lib/downloadCsv', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/downloadCsv')>()),
   exportRows: vi.fn(async () => {}),
+}));
+
+// The Shared Pops callable (#6223): no Firebase here; each test says what it returns.
+const sharedPops = vi.hoisted(() => ({ list: [] as unknown[] }));
+vi.mock('@/sync/sharedPops', () => ({
+  fetchSharedPops: async () => sharedPops.list,
 }));
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -50,11 +79,7 @@ vi.mock('@/sde/loadSde', () => ({
 const CHAR_ID = 91;
 const ESI = `https://esi.evetech.net/characters/${CHAR_ID}`;
 
-/**
- * Anchored to "today" rather than to a fixed date, so a fixture always lands
- * inside the visible grid and inside the board's own horizon whenever the
- * suite actually runs.
- */
+/** "Today", pinned before the page's modules load (see the `vi.hoisted` above). */
 const TODAY = new Date();
 const inHours = (hours: number) =>
   new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate(), TODAY.getHours() + hours);
@@ -163,6 +188,7 @@ beforeEach(async () => {
   useCalendarDensity.setState({ value: DEFAULT_CALENDAR_DENSITY, hydrated: false });
   useCalendarHiddenKinds.setState({ value: DEFAULT_HIDDEN_KINDS, hydrated: false });
   useCalendarCorpFilter.setState({ value: DEFAULT_CORP_FILTER, hydrated: false });
+  sharedPops.list = [];
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.tokens.put({
@@ -247,10 +273,20 @@ async function addHoldingCorpDirector() {
   );
 }
 
+/** The Calendar page on its own route, with no App boot or signed-in shell. */
+const renderCalendarRoute = () => renderPageRoute('/calendar', <Calendar />);
+
+// The one App-level test below: its graph and shell chunk load here, under the
+// hook's own budget, not inside the test's findBy. Every other test renders the
+// page on its own (`renderCalendarRoute`).
+beforeAll(async () => {
+  await Promise.all([import('@/app/App'), routeChunks.loadLayout(), routeChunks.loadCalendar()]);
+}, 30_000);
+
 describe('Calendar corporation events', () => {
   it('shows fuel-out and timer events of a corporation the active Character is not in', async () => {
     await addHoldingCorpDirector();
-    render(<App />);
+    renderCalendarRoute();
 
     const rail = await screen.findByRole('list', { name: /coming up/i });
     const rows = await within(rail).findAllByText('Perimeter - Holding Astrahus');
@@ -264,7 +300,7 @@ describe('Calendar corporation events', () => {
   it("hides them from the corporation filter, and keeps the pilot's own events", async () => {
     const user = userEvent.setup();
     await addHoldingCorpDirector();
-    render(<App />);
+    renderCalendarRoute();
     await screen.findAllByText('Perimeter - Holding Astrahus');
 
     await user.click(screen.getByRole('button', { name: /filter event types/i }));
@@ -280,7 +316,7 @@ describe('Calendar corporation events', () => {
 
   it('offers no corporation filter when no corporation can be read', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderCalendarRoute();
     expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /filter event types/i }));
@@ -290,10 +326,107 @@ describe('Calendar corporation events', () => {
   });
 });
 
+const SHARING_CORP_ID = 98000005;
+
+/** A Shared Pop of refinery 1001, the one `grantCorpScopes` also reads from ESI. */
+function sharePop() {
+  sharedPops.list = [
+    {
+      id: `${SHARING_CORP_ID}_x1`,
+      extractionId: 'x1',
+      moonId: 40000001,
+      structureId: 1001,
+      refineryName: 'Efa - Shared Tatara',
+      solarSystemId: 30000142,
+      popTime: 'ready',
+      popAt: inHours(8).toISOString(),
+      fractured: false,
+      startedAt: inHours(-48).toISOString(),
+      expiresAt: inHours(60).toISOString(),
+      ore: null,
+      notes: 'Fleet forms in local.',
+      ratePct: 12,
+      corporationId: SHARING_CORP_ID,
+      syncedAt: null,
+    },
+  ];
+  server.use(
+    http.get('https://esi.evetech.net/universe/moons/40000001', () =>
+      HttpResponse.json({ moon_id: 40000001, name: 'Efa I - Moon 1', system_id: 30000142 })
+    ),
+    http.get(`https://esi.evetech.net/corporations/${SHARING_CORP_ID}`, () =>
+      HttpResponse.json({ name: 'Sharing Corp', ticker: 'SHARE' })
+    )
+  );
+}
+
+describe('Calendar Shared Pops', () => {
+  it('shows a Shared Pop with its moon and sharing corporation', async () => {
+    sharePop();
+    renderCalendarRoute();
+
+    const rail = await screen.findByRole('list', { name: /coming up/i });
+    expect(await within(rail).findByText('Efa - Shared Tatara')).toBeInTheDocument();
+    expect(within(rail).getByText('Efa I - Moon 1')).toBeInTheDocument();
+    expect(within(rail).getByText(/Shared moon pops · ready · Sharing Corp/)).toBeInTheDocument();
+  });
+
+  it('hides it when the pilot reads that moon from ESI', async () => {
+    sharePop();
+    await grantCorpScopes(['Station_Manager']);
+    renderCalendarRoute();
+
+    expect(await screen.findByText('Moon 40000001')).toBeInTheDocument();
+    expect(screen.queryByText('Efa - Shared Tatara')).toBeNull();
+  });
+
+  it('opens the Shared Pop from ?pop=<id> with its Survey start link, leaving a clean URL', async () => {
+    sharePop();
+    window.history.pushState({}, '', `/calendar?pop=${SHARING_CORP_ID}_x1`);
+    renderCalendarRoute();
+
+    const dialog = await screen.findByRole('dialog', { name: 'Efa - Shared Tatara' });
+    expect(within(dialog).getByText('Fleet forms in local.')).toBeInTheDocument();
+    const link = within(dialog).getByRole('link', { name: /start a survey here/i });
+    expect(link.getAttribute('href')).toBe(
+      `/survey?place=Efa+-+Shared+Tatara&placeId=1001&payeeId=${SHARING_CORP_ID}&rate=12`
+    );
+    await waitFor(() => expect(window.location.search).not.toContain('pop='));
+  });
+
+  it("moves the map to the pop's day from ?pop=<id>, scoping the rail to it", async () => {
+    sharePop();
+    // Seven weeks out: past any month grid that opens on today, so the map has to move.
+    Object.assign(sharedPops.list[0] as object, {
+      popAt: inHours(49 * 24).toISOString(),
+      expiresAt: inHours(49 * 24 + 48).toISOString(),
+    });
+    window.history.pushState({}, '', `/calendar?pop=${SHARING_CORP_ID}_x1`);
+    renderCalendarRoute();
+
+    await screen.findByRole('dialog', { name: 'Efa - Shared Tatara' });
+    // A day off the opening grid can only be pressed once the map moved to it.
+    expect(await screen.findByRole('button', { pressed: true })).toBeInTheDocument();
+    const rail = screen.getByRole('list', { name: /coming up/i });
+    expect(within(rail).getByText('Efa - Shared Tatara')).toBeInTheDocument();
+    expect(within(rail).queryByText('Fleet Op')).toBeNull();
+  });
+
+  it('says a linked pop is no longer available when the pilot cannot see it', async () => {
+    sharePop();
+    window.history.pushState({}, '', `/calendar?pop=${SHARING_CORP_ID}_gone`);
+    renderCalendarRoute();
+
+    expect(await screen.findByText('This shared pop is no longer available')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(window.location.search).not.toContain('pop='));
+  });
+});
+
 describe('Calendar', () => {
   it('puts a moon chunk on the board for a Character who can read extractions', async () => {
     await grantCorpScopes(['Station_Manager']);
-    render(<App />);
+    renderCalendarRoute();
 
     expect(await screen.findByText('Moon 40000001')).toBeInTheDocument();
     expect(screen.getByText(/arrives/i)).toBeInTheDocument();
@@ -308,7 +441,7 @@ describe('Calendar', () => {
         return HttpResponse.json([]);
       })
     );
-    render(<App />);
+    renderCalendarRoute();
 
     expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /filter event types/i }));
@@ -317,17 +450,23 @@ describe('Calendar', () => {
     expect(extractionRequests).not.toHaveBeenCalled();
   });
 
-  it('shows the calendar map and the coming-up rail together', async () => {
+  // The one App-level test of the Calendar route: it mounts at /calendar inside
+  // the signed-in shell, its rail link current.
+  it('shows the calendar map and the coming-up rail together, at /calendar inside the shell', async () => {
+    const { App } = await import('@/app/App');
     render(<App />);
 
     expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
     expect(screen.getByRole('group', { name: /calendar map/i })).toBeInTheDocument();
     expect(screen.getByRole('list', { name: /coming up/i })).toBeInTheDocument();
+    const rail = (await screen.findAllByRole('navigation'))[0];
+    const links = await within(rail).findAllByRole('link', { name: 'Calendar' });
+    expect(links.some((link) => link.getAttribute('aria-current') === 'page')).toBe(true);
   });
 
   it('keeps the shown month in the URL, and restores it on a fresh visit', async () => {
     const user = userEvent.setup();
-    const { unmount } = render(<App />);
+    const { unmount } = renderCalendarRoute();
     await screen.findByText('Fleet Op');
 
     await user.click(screen.getByRole('button', { name: 'Next month' }));
@@ -336,14 +475,14 @@ describe('Calendar', () => {
     const shownMonth = monthLabel.textContent;
 
     unmount();
-    render(<App />);
+    renderCalendarRoute();
     await screen.findByText('Fleet Op');
     expect(screen.getByText(shownMonth as string)).toBeInTheDocument();
   });
 
   it('falls back to today rather than crashing on a garbage anchor value', async () => {
     window.history.pushState({}, '', '/calendar?anchor=not-a-date');
-    render(<App />);
+    renderCalendarRoute();
     // Falls back to today's grid, where the fixture event actually lands —
     // a garbage anchor parsed literally would show an empty, unrelated month.
     expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
@@ -352,7 +491,7 @@ describe('Calendar', () => {
   /** The redesign's whole premise: the rail is not a calendar feed, it is every clock. */
   it('merges another clock source into the same list', async () => {
     server.use(http.get(`${ESI}/industry/jobs`, () => HttpResponse.json(jobs)));
-    render(<App />);
+    renderCalendarRoute();
 
     expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
     expect(await screen.findByText(/industry jobs/i)).toBeInTheDocument();
@@ -373,7 +512,7 @@ describe('Calendar', () => {
    */
   it('names the kinds landing on a day, rather than a severity', async () => {
     server.use(http.get(`${ESI}/industry/jobs`, () => HttpResponse.json(jobs)));
-    render(<App />);
+    renderCalendarRoute();
 
     expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
     // A month of cells, which is what proves this is the grid and not the ticker.
@@ -397,7 +536,7 @@ describe('Calendar', () => {
   it('names the same kinds on the Day Ticker', async () => {
     useNarrowViewport();
     server.use(http.get(`${ESI}/industry/jobs`, () => HttpResponse.json(jobs)));
-    render(<App />);
+    renderCalendarRoute();
 
     expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
     // Exactly a fortnight of columns — the ticker, not the grid.
@@ -424,7 +563,7 @@ describe('Calendar', () => {
       http.get(`${ESI}/industry/jobs`, () => HttpResponse.json(jobs)),
       http.get(`${ESI}/calendar`, () => new HttpResponse(null, { status: 403 }))
     );
-    render(<App />);
+    renderCalendarRoute();
 
     // The industry job still arrives...
     expect(await screen.findByText(/industry jobs/i)).toBeInTheDocument();
@@ -437,14 +576,14 @@ describe('Calendar', () => {
 
   it('opens the event detail from ?open=<eventId>, leaving a clean URL', async () => {
     window.history.pushState({}, '', '/calendar?open=1');
-    render(<App />);
+    renderCalendarRoute();
 
     expect(await screen.findByText('Bring your ship')).toBeInTheDocument();
     await waitFor(() => expect(window.location.search).not.toContain('open='));
   });
 
   it('opens the event detail from a calendar row', async () => {
-    render(<App />);
+    renderCalendarRoute();
     await userEvent.click(await screen.findByText('Fleet Op'));
 
     expect(await screen.findByText('Bring your ship')).toBeInTheDocument();
@@ -460,7 +599,7 @@ describe('Calendar', () => {
    */
   it('reflects an RSVP in the rail without waiting for a refetch', async () => {
     server.use(http.put(`${ESI}/calendar/1/`, () => new HttpResponse(null, { status: 204 })));
-    render(<App />);
+    renderCalendarRoute();
     await userEvent.click(await screen.findByText('Fleet Op'));
 
     expect(screen.queryByText('Declined')).not.toBeInTheDocument();
@@ -481,7 +620,7 @@ describe('Calendar', () => {
    */
   it('lets a fresh reload override the earlier local RSVP once one arrives', async () => {
     server.use(http.put(`${ESI}/calendar/1/`, () => new HttpResponse(null, { status: 204 })));
-    render(<App />);
+    renderCalendarRoute();
     await userEvent.click(await screen.findByText('Fleet Op'));
     await userEvent.click(await screen.findByRole('button', { name: 'Decline' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Decline' })).not.toBeDisabled());
@@ -495,7 +634,7 @@ describe('Calendar', () => {
 
   it('hides a kind from the filter menu and remembers it', async () => {
     server.use(http.get(`${ESI}/industry/jobs`, () => HttpResponse.json(jobs)));
-    render(<App />);
+    renderCalendarRoute();
     expect(await screen.findByText(/industry jobs/i)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: /filter event types/i }));
@@ -517,7 +656,7 @@ describe('Calendar', () => {
     server.use(http.get(`${ESI}/calendar`, () => HttpResponse.json([...events, later])));
     vi.mocked(exportRows).mockClear();
     const user = userEvent.setup();
-    render(<App />);
+    renderCalendarRoute();
     expect(await screen.findByText('Later Op')).toBeInTheDocument();
 
     // Earliest day with a load holds the first event.
@@ -544,14 +683,14 @@ describe('Calendar', () => {
       key: CALENDAR_HIDDEN_KINDS_KEY,
       value: [...CHARACTER_BOARD_ITEM_KINDS],
     });
-    render(<App />);
+    renderCalendarRoute();
 
     expect(await screen.findByText(/no event types selected/i)).toBeInTheDocument();
   });
 
   it('reports nothing coming up when every source reads fine and is empty', async () => {
     server.use(http.get(`${ESI}/calendar`, () => HttpResponse.json([])));
-    render(<App />);
+    renderCalendarRoute();
 
     expect(await screen.findByText(/nothing coming up/i)).toBeInTheDocument();
   });

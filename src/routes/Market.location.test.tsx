@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { describe, it, expect, onTestFinished, vi } from 'vitest';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { db } from '@/db';
@@ -8,7 +8,6 @@ import { useMarketBrowserHub } from '@/features/market/browserHub';
 import { LOCATION_MODE_SETTING_KEY } from '@/features/market/locationMode';
 import { useBrowserFilterSetting } from '@/features/market/browserFilterSetting';
 import { ESI_BASE_URL } from '@/esi/client';
-import { App } from '@/app/App';
 import {
   RIFTER_REGION_ID,
   SHIPS_GROUP,
@@ -17,6 +16,7 @@ import {
   ordersHandler,
   plexOrdersHandler,
   server,
+  renderMarketRoute,
 } from '@/test/marketPage';
 
 vi.mock('@/sde/loadSde', async () => (await import('@/test/marketMocks')).loadSdeMock());
@@ -38,7 +38,7 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
     const hits = { count: 0 };
     server.use(ordersHandler(hits));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
@@ -52,7 +52,7 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
     const hits = { count: 0 };
     server.use(ordersHandler(hits));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
@@ -77,7 +77,7 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
     server.use(ordersHandler({ count: 0 }));
     const user = userEvent.setup({ delay: null });
     window.history.pushState({}, '', '/market/browser?type=587&region=10000002');
-    render(<App />);
+    renderMarketRoute();
 
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
     expect(within(sellTable).getByText('2,000,000')).toBeInTheDocument();
@@ -129,7 +129,7 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
     );
     const user = userEvent.setup({ delay: null });
     window.history.pushState({}, '', '/market/browser?type=587&region=10000002');
-    render(<App />);
+    renderMarketRoute();
 
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
     // Off by default: the bait row shows, flagged.
@@ -164,7 +164,7 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
     const hits = { count: 0 };
     server.use(ordersHandler(hits));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
@@ -181,7 +181,7 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
 
   it('the Region select offers All regions plus only Market Regions', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.click(await screen.findByRole('button', { name: 'Region' }));
 
@@ -205,7 +205,7 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
       ordersHandler({ count: 0 })
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'plex');
     await user.click(await screen.findByText('PLEX'));
@@ -222,7 +222,7 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
   it('keeps the caret and every letter when editing the middle of the search text', async () => {
     server.use(ordersHandler({ count: 0 }));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     const box = await screen.findByRole('searchbox');
     await user.type(box, 'rifer{ArrowLeft}{ArrowLeft}t');
@@ -233,9 +233,12 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
 
   it('keeps the selected item when an item is picked before the search text has settled', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
     server.use(ordersHandler({ count: 0 }));
     const user = userEvent.setup({ delay: null, advanceTimers: vi.advanceTimersByTime });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
@@ -248,7 +251,7 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
   it('offers close spellings when a typo matches nothing', async () => {
     server.use(ordersHandler({ count: 0 }));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'rifetr');
     expect(await screen.findByText('Rifter')).toBeInTheDocument();
@@ -258,7 +261,7 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
   it('selecting an item and changing location updates the query string', async () => {
     server.use(ordersHandler({ count: 0 }));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
@@ -278,7 +281,7 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
   it('opening a Market Browser URL with item and location parameters restores that exact view', async () => {
     server.use(ordersHandler({ count: 0 }));
     window.history.pushState({}, '', '/market?type=587&hub=jita');
-    render(<App />);
+    renderMarketRoute();
 
     expect(await screen.findByRole('heading', { name: 'Rifter', level: 2 })).toBeInTheDocument();
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
@@ -287,7 +290,7 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
 
   it('an unknown item id in the URL degrades to the default view instead of erroring', async () => {
     window.history.pushState({}, '', '/market?type=999999');
-    render(<App />);
+    renderMarketRoute();
 
     expect(await screen.findByText('Select an item')).toBeInTheDocument();
   });
@@ -295,7 +298,7 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
   it('a malformed location parameter degrades to the default location', async () => {
     server.use(ordersHandler({ count: 0 }));
     window.history.pushState({}, '', '/market?type=587&region=not-a-number');
-    render(<App />);
+    renderMarketRoute();
 
     // Falls back to the persisted default (Trade Hub mode, Jita) rather than erroring.
     expect(await screen.findByRole('heading', { name: 'Rifter', level: 2 })).toBeInTheDocument();
@@ -311,7 +314,7 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
       value: { mode: 'region', regionId: 11000012 },
     });
     window.history.pushState({}, '', '/market?type=587');
-    render(<App />);
+    renderMarketRoute();
 
     // Still Region mode, over the Jita hub's region: the player structure shows.
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
@@ -320,7 +323,7 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
 
   it('does not touch the URL while the user is still typing a search', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
     await screen.findByRole('button', SHIPS_GROUP);
     const pushSpy = vi.spyOn(window.history, 'pushState');
 
@@ -339,7 +342,7 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
     );
     window.history.pushState({}, '', '/market?type=587&hub=amarr');
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
     await screen.findByRole('heading', { name: 'Rifter', level: 2 });
     // The linked hub is copied into the device setting only once that setting
     // has hydrated; toggling before then would find the old Jita default.
@@ -354,7 +357,7 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
 
   it('remembers the last picked Trade Hub across a remount, per device, without touching the synced default', async () => {
     const user = userEvent.setup({ delay: null });
-    const { unmount } = render(<App />);
+    const { unmount } = renderMarketRoute();
     await screen.findByRole('button', SHIPS_GROUP);
 
     await user.click(screen.getByRole('combobox', { name: 'Trade Hub' }));
@@ -367,7 +370,7 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
 
     unmount();
     window.history.pushState({}, '', '/market');
-    render(<App />);
+    renderMarketRoute();
     await screen.findByRole('button', SHIPS_GROUP);
 
     expect(await screen.findByRole('combobox', { name: 'Trade Hub' })).toHaveTextContent('Amarr');
@@ -375,7 +378,7 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
 
   it('keeps its own Trade Hub when the synced Settings default changes underneath it', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
     await screen.findByRole('button', SHIPS_GROUP);
 
     await user.click(screen.getByRole('combobox', { name: 'Trade Hub' }));
@@ -398,7 +401,7 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
       plexOrdersHandler({ count: 0 })
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));

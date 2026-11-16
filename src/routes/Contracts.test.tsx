@@ -17,6 +17,8 @@ import {
 import { formatDateOnly, formatTimestamp } from '@/lib/timestamp';
 import { App } from '@/app/App';
 import * as routeChunks from '@/app/routeChunks';
+import { Contracts } from '@/routes/Contracts';
+import { renderPageRoute } from '@/test/renderPage';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { stubViewport } from '@/test/viewport';
 
@@ -143,12 +145,16 @@ const server = setupServer(
 
 beforeAll(async () => {
   server.listen({ onUnhandledRequest: 'error' });
-  // Compile the lazy Layout and Contracts chunks here, under the hook's own
-  // budget: a worker's first `App` render pays for them, took seconds under
-  // parallel load on CI, and landed on the file's first test, past its findBy
-  // timeout (Wallet.test.tsx does the same).
-  await Promise.all([routeChunks.loadLayout(), routeChunks.loadContracts()]);
+  // Compile the lazy Layout chunk here, under the hook's own budget, for the
+  // App-level tests at the end: a worker's first `App` render pays for it and
+  // took seconds under parallel load on CI, past a findBy timeout.
+  await routeChunks.loadLayout();
 });
+
+/** The Contracts page on its route, without App's boot or the signed-in shell. */
+function renderContracts() {
+  return renderPageRoute('/contracts', <Contracts />);
+}
 afterAll(() => server.close());
 afterEach(() => server.resetHandlers());
 beforeEach(async () => {
@@ -186,7 +192,7 @@ beforeEach(async () => {
 
 describe('Contracts', () => {
   it('renders every page from mocked ESI with resolved issuer name and a humanized status', async () => {
-    render(<App />);
+    renderContracts();
     expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
     const table = screen.getByRole('table', { name: 'Contracts' });
     expect(within(table).getByText('Courier')).toBeInTheDocument();
@@ -196,7 +202,7 @@ describe('Contracts', () => {
   });
 
   it('keeps the static status off the accent colour and labels the amount column price / reward', async () => {
-    render(<App />);
+    renderContracts();
     await screen.findByText('Rifter fit');
     const table = screen.getByRole('table', { name: 'Contracts' });
     const outstanding = within(table).getByText('Outstanding').closest('td')!;
@@ -228,7 +234,7 @@ describe('Contracts', () => {
         );
       })
     );
-    render(<App />);
+    renderContracts();
     await screen.findByText('Rifter fit');
     const table = screen.getByRole('table', { name: 'Contracts' });
 
@@ -271,7 +277,7 @@ describe('Contracts', () => {
         );
       })
     );
-    render(<App />);
+    renderContracts();
     await screen.findByText('Rifter fit');
     const table = screen.getByRole('table', { name: 'Contracts' });
     const row = within(table).getByText('Lapsed offer').closest('tr') as HTMLElement;
@@ -280,7 +286,7 @@ describe('Contracts', () => {
   });
 
   it('gives each row a More-actions button whose only row action is Open in EVE', async () => {
-    render(<App />);
+    renderContracts();
     await screen.findByText('Rifter fit');
     expect(screen.getAllByRole('button', { name: /^More actions/ }).length).toBeGreaterThan(0);
   });
@@ -292,7 +298,7 @@ describe('Contracts', () => {
       )
     );
     window.history.pushState({}, '', '/contracts/history?open=1');
-    render(<App />);
+    renderContracts();
     const dialog = await screen.findByRole('dialog', { name: /Item Exchange/ });
     expect(within(dialog).getByText('Rifter fit')).toBeInTheDocument();
     await waitFor(() => expect(window.location.search).not.toContain('open='));
@@ -305,7 +311,7 @@ describe('Contracts', () => {
       )
     );
     window.history.pushState({}, '', '/contracts/history?highlight=1');
-    render(<App />);
+    renderContracts();
     const dialog = await screen.findByRole('dialog', { name: /Item Exchange/ });
     expect(within(dialog).getByText('Rifter fit')).toBeInTheDocument();
     await waitFor(() => expect(window.location.search).not.toContain('highlight='));
@@ -313,7 +319,7 @@ describe('Contracts', () => {
 
   it('opens nothing for a ?highlight= contract that never loads', async () => {
     window.history.pushState({}, '', '/contracts/history?highlight=987654');
-    render(<App />);
+    renderContracts();
     expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(
@@ -339,7 +345,7 @@ describe('Contracts', () => {
       archiveDate: '2026-01-08T00:00:00Z',
     });
     window.history.pushState({}, '', '/contracts/history?highlight=987654');
-    render(<App />);
+    renderContracts();
     expect(await screen.findByRole('dialog', { name: /Item Exchange/ })).toBeInTheDocument();
     expect(
       screen.queryByText('This contract is older than 30 days and EVE no longer sends it.')
@@ -349,7 +355,7 @@ describe('Contracts', () => {
   it('opens nothing for ?highlight= on a non-History tab, even after switching to History', async () => {
     const user = userEvent.setup();
     window.history.pushState({}, '', '/contracts/search/items?highlight=1');
-    render(<App />);
+    renderContracts();
     await user.click(await screen.findByRole('tab', { name: 'History' }));
     expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -363,7 +369,7 @@ describe('Contracts', () => {
     );
     const user = userEvent.setup();
     window.history.pushState({}, '', '/contracts/history?highlight=1');
-    render(<App />);
+    renderContracts();
     await screen.findByRole('dialog', { name: /Item Exchange/ });
     await user.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
@@ -371,7 +377,7 @@ describe('Contracts', () => {
 
   it('ignores an ?open= contract that never loads', async () => {
     window.history.pushState({}, '', '/contracts/history?open=987654');
-    render(<App />);
+    renderContracts();
     expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
@@ -383,7 +389,7 @@ describe('Contracts', () => {
       )
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderContracts();
     await user.click(await screen.findByRole('button', { name: 'Rifter fit' }));
     const dialog = await screen.findByRole('dialog', { name: /Item Exchange/ });
     expect(within(dialog).getByText('Rifter fit')).toBeInTheDocument();
@@ -403,7 +409,7 @@ describe('Contracts', () => {
         HttpResponse.error()
       )
     );
-    render(<App />);
+    renderContracts();
     expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
     expect(screen.getByText(/showing cached data/i)).toBeInTheDocument();
   });
@@ -414,7 +420,7 @@ describe('Contracts', () => {
         HttpResponse.error()
       )
     );
-    render(<App />);
+    renderContracts();
     expect(await screen.findByText(/no contracts cached/i)).toBeInTheDocument();
   });
 
@@ -424,7 +430,7 @@ describe('Contracts', () => {
         HttpResponse.json([])
       )
     );
-    render(<App />);
+    renderContracts();
     expect(await screen.findByText('No contracts')).toBeInTheDocument();
     expect(
       screen.getByText(
@@ -439,7 +445,7 @@ describe('Contracts', () => {
         HttpResponse.json({ error: 'missing scope' }, { status: 403 })
       )
     );
-    render(<App />);
+    renderContracts();
     expect(await screen.findByText('Log in again to see your contracts')).toBeInTheDocument();
     expect(screen.queryByText(/no contracts cached/i)).not.toBeInTheDocument();
   });
@@ -460,7 +466,7 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
       )
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderContracts();
     await screen.findByText('Rifter fit');
     const table = screen.getByRole('table', { name: 'Contracts' });
     const [issuerButton] = within(table).getAllByRole('link', { name: 'Some Trader' });
@@ -472,7 +478,7 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
 
   it('a status filter chip narrows the table to matching rows', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderContracts();
     await screen.findByText('Rifter fit');
     const table = screen.getByRole('table', { name: 'Contracts' });
     expect(within(table).getByText('Courier')).toBeInTheDocument();
@@ -488,7 +494,7 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
 
   it('search narrows contracts by title', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderContracts();
     await screen.findByText('Rifter fit');
     const table = screen.getByRole('table', { name: 'Contracts' });
 
@@ -501,7 +507,7 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
   it('offers one-click Reset filters when the filters match no contract', async () => {
     const user = userEvent.setup();
     window.history.pushState({}, '', '/contracts/history');
-    render(<App />);
+    renderContracts();
     await screen.findByText('Rifter fit');
 
     // The phone chip row (jsdom has no CSS to hide it), not the filter popover.
@@ -542,7 +548,7 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
 
   it('Reset filters clears a search-only filter from the URL too', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderContracts();
     await screen.findByText('Rifter fit');
 
     await user.type(
@@ -562,7 +568,7 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
   it('on a narrow viewport, the filter sheet reopens cleared after Reset filters', async () => {
     stubViewport(NARROW_QUERY);
     const user = userEvent.setup();
-    render(<App />);
+    renderContracts();
     await screen.findAllByText('Rifter fit');
 
     await user.click(screen.getByRole('button', { name: 'Filters' }));
@@ -598,7 +604,7 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
       })
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderContracts();
     await screen.findByText('Rifter fit');
     expect(screen.getByText(/incomplete data/i)).toBeInTheDocument();
     const requestsBeforeRetry = page2Requests;
@@ -618,7 +624,7 @@ describe('Contact standing cross-reference', () => {
         ])
       )
     );
-    render(<App />);
+    renderContracts();
     await screen.findByText('Rifter fit');
     const table = screen.getByRole('table', { name: 'Contracts' });
     // Both fixture contracts share issuer_id 500001 — both rows carry the tag.
@@ -628,7 +634,7 @@ describe('Contact standing cross-reference', () => {
   });
 
   it('shows no tag next to a stranger', async () => {
-    render(<App />);
+    renderContracts();
     await screen.findByText('Rifter fit');
     const table = screen.getByRole('table', { name: 'Contracts' });
     expect(within(table).queryByRole('img')).not.toBeInTheDocument();
@@ -646,7 +652,7 @@ describe('Contact standing cross-reference', () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contacts`, () => HttpResponse.error())
     );
-    render(<App />);
+    renderContracts();
     expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
     const table = screen.getByRole('table', { name: 'Contracts' });
     expect(within(table).queryByRole('img')).not.toBeInTheDocument();
@@ -661,7 +667,7 @@ describe('Contact standing cross-reference', () => {
         HttpResponse.json([{ character_id: 500001, corporation_id: 2 }])
       )
     );
-    render(<App />);
+    renderContracts();
     await screen.findByText('Rifter fit');
     const table = screen.getByRole('table', { name: 'Contracts' });
     // Both fixture contracts share issuer_id 500001 — both rows carry the tag.
@@ -673,7 +679,7 @@ describe('Contact standing cross-reference', () => {
   });
 
   it('shows an Issued column and sorts newest-issued first by default', async () => {
-    render(<App />);
+    renderContracts();
     await screen.findByText('Rifter fit');
     const table = screen.getByRole('table', { name: 'Contracts' });
     const issued = within(table).getByRole('columnheader', { name: /Issued/ });
@@ -695,7 +701,7 @@ describe('Contact standing cross-reference', () => {
       )
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderContracts();
     await user.click(await screen.findByRole('button', { name: 'Rifter fit' }));
     const dialog = await screen.findByRole('dialog', { name: /Item Exchange/ });
     expect(
@@ -737,7 +743,7 @@ describe('Received by column', () => {
         ])
       )
     );
-    render(<App />);
+    renderContracts();
     await screen.findByText('Accepted one');
     const table = screen.getByRole('table', { name: 'Contracts' });
     expect(within(table).getByRole('link', { name: 'Buyer Bob' })).toBeInTheDocument();
@@ -763,7 +769,7 @@ describe('Time format preference', () => {
     expect(formatDateOnly(EXPIRES, 'UTC')).not.toBe(formatDateOnly(EXPIRES));
     await db.settings.put({ key: TIME_FORMAT_SETTING_KEY, value: 'eve' });
 
-    render(<App />);
+    renderContracts();
     await screen.findByText('Rifter fit');
     const table = screen.getByRole('table', { name: 'Contracts' });
 
@@ -782,13 +788,13 @@ describe('Time format preference', () => {
   it('reformats an already-rendered table when the pilot switches to EVE time', async () => {
     expect(formatDateOnly(EXPIRES, 'UTC')).not.toBe(formatDateOnly(EXPIRES));
 
-    render(<App />);
+    renderContracts();
     await screen.findByText('Rifter fit');
     const table = screen.getByRole('table', { name: 'Contracts' });
     expect(within(table).getByText(formatDateOnly(EXPIRES))).toBeInTheDocument();
 
     // The store's own setter, exactly as a Settings control would call it —
-    // it takes the hydration generation, so App's in-flight `hydrate()`
+    // it takes the hydration generation, so the render's in-flight `hydrate()`
     // cannot land afterwards and undo the choice.
     await act(async () => {
       await useTimeFormat.getState().setValue('eve');
@@ -832,7 +838,7 @@ describe('Contracts corp source', () => {
     );
     await db.tokens.update(CHAR_ID, { scopes: CORP_SCOPES });
     window.history.pushState({}, '', '/contracts/history?scope=corp');
-    render(<App />);
+    renderContracts();
     expect(await screen.findByText('Corp haul')).toBeInTheDocument();
     expect(screen.queryByText('Rifter fit')).not.toBeInTheDocument();
     expect(characterReads).toBe(0);
@@ -842,7 +848,7 @@ describe('Contracts corp source', () => {
     await db.tokens.update(CHAR_ID, { scopes: CORP_SCOPES });
     window.history.pushState({}, '', '/contracts/history');
     const user = userEvent.setup();
-    render(<App />);
+    renderContracts();
     await screen.findByText('Rifter fit');
     await user.click(screen.getByRole('button', { name: 'This character' }));
     await user.click(screen.getByRole('menuitemradio', { name: 'Corporation' }));
@@ -887,7 +893,7 @@ describe('Contracts All characters source', () => {
 
   it("lists every Character's contracts once, with a Character column only here", async () => {
     window.history.pushState({}, '', '/contracts/history?history.chars=all');
-    render(<App />);
+    renderContracts();
     expect(await screen.findByText('Alt trade')).toBeInTheDocument();
     expect(screen.getAllByText('Rifter fit')).toHaveLength(1);
     expect(screen.getByRole('columnheader', { name: 'Character' })).toBeInTheDocument();
@@ -902,7 +908,7 @@ describe('Contracts All characters source', () => {
     });
     // No token: never granted the contracts scope, so "All" leaves it out.
     window.history.pushState({}, '', '/contracts/history?history.chars=all');
-    render(<App />);
+    renderContracts();
     expect(await screen.findByText('Alt trade')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /^All characters.*Not included: Pilot Three$/ })
@@ -912,7 +918,7 @@ describe('Contracts All characters source', () => {
 
   it('has no Character column for This character', async () => {
     window.history.pushState({}, '', '/contracts/history');
-    render(<App />);
+    renderContracts();
     await screen.findByText('Rifter fit');
     expect(screen.queryByRole('columnheader', { name: 'Character' })).not.toBeInTheDocument();
   });
@@ -920,7 +926,7 @@ describe('Contracts All characters source', () => {
   it('offers This character and All characters', async () => {
     window.history.pushState({}, '', '/contracts/history');
     const user = userEvent.setup();
-    render(<App />);
+    renderContracts();
     await screen.findByText('Rifter fit');
     await user.click(screen.getByRole('button', { name: 'This character' }));
     expect(
@@ -947,7 +953,7 @@ describe('Contracts row right-click (issue #676)', () => {
       scopes: ['esi-contracts.read_character_contracts.v1', 'esi-ui.open_window.v1'],
     });
     const user = userEvent.setup();
-    render(<App />);
+    renderContracts();
     await openContractMenu('Rifter fit');
     await user.click(await screen.findByRole('menuitem', { name: 'Open in EVE' }));
     await waitFor(() => expect(openContractMock).toHaveBeenCalledWith(CHAR_ID, 1));
@@ -955,7 +961,7 @@ describe('Contracts row right-click (issue #676)', () => {
   });
 
   it('has no row copies: no Copy title or Copy Contract ID, and no modal on right-click', async () => {
-    render(<App />);
+    renderContracts();
     await openContractMenu('Rifter fit');
 
     // Right-click may still offer the table's own Export; never row copies.
@@ -971,7 +977,7 @@ describe('Contracts row right-click (issue #676)', () => {
       )
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderContracts();
     await user.click(await screen.findByText('Rifter fit'));
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
@@ -984,7 +990,7 @@ describe('Contracts tab strip (issue #908)', () => {
 
   it('lands on Item search with no tab in the URL', async () => {
     window.history.pushState({}, '', '/contracts');
-    render(<App />);
+    renderContracts();
     expect(await screen.findAllByText(SEARCH_UNAVAILABLE)).not.toHaveLength(0);
     expect(screen.getByRole('tab', { name: 'Item search' })).toHaveAttribute(
       'aria-selected',
@@ -997,7 +1003,7 @@ describe('Contracts tab strip (issue #908)', () => {
   it('remembers the last-used Courier tab across a fresh visit (issue #1719)', async () => {
     useContractSearchMode.setState({ value: 'courier', hydrated: true });
     window.history.pushState({}, '', '/contracts');
-    render(<App />);
+    renderContracts();
     expect(await screen.findAllByText(SEARCH_UNAVAILABLE)).not.toHaveLength(0);
     await waitFor(() => expect(window.location.pathname).toBe('/contracts/search/courier'));
   });
@@ -1008,7 +1014,7 @@ describe('Contracts tab strip (issue #908)', () => {
     // them apart, and a URL that already names a real tab never gets one.
     useContractSearchMode.setState({ value: 'courier', hydrated: true });
     window.history.pushState({}, '', '/contracts/search/items');
-    render(<App />);
+    renderContracts();
     expect(await screen.findAllByText(SEARCH_UNAVAILABLE)).not.toHaveLength(0);
     expect(window.location.pathname).toBe('/contracts/search/items');
   });
@@ -1016,7 +1022,7 @@ describe('Contracts tab strip (issue #908)', () => {
   it('swaps the public search for the contracts table when History is picked', async () => {
     const user = userEvent.setup();
     window.history.pushState({}, '', '/contracts');
-    render(<App />);
+    renderContracts();
     await screen.findAllByText(SEARCH_UNAVAILABLE);
 
     await user.click(screen.getByRole('tab', { name: 'History' }));
@@ -1027,7 +1033,7 @@ describe('Contracts tab strip (issue #908)', () => {
 
   it('opens History from a deep link, and returns to Item search on the way back', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderContracts();
 
     expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'History' })).toHaveAttribute('aria-selected', 'true');
@@ -1040,7 +1046,7 @@ describe('Contracts tab strip (issue #908)', () => {
 
   it('ignores an older `?tab=search` link and lands on the default tab', async () => {
     window.history.pushState({}, '', '/contracts?tab=search');
-    render(<App />);
+    renderContracts();
 
     expect(await screen.findAllByText(SEARCH_UNAVAILABLE)).not.toHaveLength(0);
     expect(screen.getByRole('tab', { name: 'Item search' })).toHaveAttribute(
@@ -1059,7 +1065,7 @@ describe('Contracts tab strip (issue #908)', () => {
       )
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderContracts();
     expect(await screen.findByText(/^no contracts$/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole('tab', { name: 'Item search' }));
@@ -1075,7 +1081,7 @@ describe('Contracts tab strip (issue #908)', () => {
       )
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderContracts();
     expect(await screen.findByText('Log in again to see your contracts')).toBeInTheDocument();
 
     await user.click(screen.getByRole('tab', { name: 'Item search' }));
@@ -1116,7 +1122,7 @@ describe('Contracts Search tab page header', () => {
 
   it("shows the public snapshot's age beside the page title, and an enabled Refresh", async () => {
     window.history.pushState({}, '', '/contracts/search/items');
-    const { container } = render(<App />);
+    const { container } = renderContracts();
 
     // The panel drew this pair itself before; it now has to reach the route.
     await waitFor(() =>
@@ -1131,7 +1137,7 @@ describe('Contracts Search tab page header', () => {
   it('picks Item search, Courier and History from one tab row, with no switch in the panel', async () => {
     const user = userEvent.setup();
     window.history.pushState({}, '', '/contracts/search/items');
-    render(<App />);
+    renderContracts();
 
     const tabs = await screen.findByRole('tablist', { name: 'Contracts sections' });
     expect(
@@ -1157,7 +1163,7 @@ describe('Issued / Expires date-only cells (issue #3105)', () => {
 
   it('shows a date without the time, with the full timestamp on a tooltip', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderContracts();
     await screen.findByText('Rifter fit');
     const table = screen.getByRole('table', { name: 'Contracts' });
     const issued = new Date(base.date_issued);
@@ -1176,7 +1182,7 @@ describe('Issued / Expires date-only cells (issue #3105)', () => {
         ])
       )
     );
-    render(<App />);
+    renderContracts();
     await screen.findByText('Morning one');
     const table = screen.getByRole('table', { name: 'Contracts' });
     const names = () =>
@@ -1194,9 +1200,24 @@ describe('Issued / Expires date-only cells (issue #3105)', () => {
 
   it('exposes a title in full through a tooltip on its opener', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderContracts();
     await screen.findByText('Rifter fit');
     await user.hover(screen.getByRole('button', { name: 'Rifter fit' }));
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Rifter fit');
+  });
+});
+
+// Every test above renders the page on its own route (`renderContracts`). This
+// one proves the App wiring that leaves out: /contracts mounts inside the
+// signed-in shell.
+describe('Contracts in the App', () => {
+  it('opens /contracts/history inside the signed-in shell, its rail link current', async () => {
+    render(<App />);
+    expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
+    const rail = (await screen.findAllByRole('navigation'))[0];
+    expect(await within(rail).findByRole('link', { name: 'Contracts' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
   });
 });

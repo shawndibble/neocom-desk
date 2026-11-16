@@ -26,6 +26,7 @@ describe('NOTIFICATION_EVENTS', () => {
       'acceleratorEnded',
       'mercenaryDenReinforced',
       'mercenaryDenAnarchy',
+      'sharedMoonPop',
       'marketOrderFilled',
       'marketOrderUndercut',
       'newCalendarEvent',
@@ -54,6 +55,7 @@ describe('NOTIFICATION_EVENTS', () => {
       'communityMemberJoined',
       'communityRequestPledged',
       'vettingShared',
+      'corpTaxBookSyncStopped',
     ]);
   });
 

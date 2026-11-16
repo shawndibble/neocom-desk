@@ -561,6 +561,30 @@ describe('FittingWhatToTrainPanel — over budget', () => {
     expect(within(card.closest('div') as HTMLElement).getByText('Gunnery III')).toBeInTheDocument();
   });
 
+  it('counts a prerequisite two missing skills share once, under the one trained first', async () => {
+    render(
+      <MemoryRouter>
+        <FittingWhatToTrainPanel
+          evaluator={evaluator}
+          characterId={CHARACTER_ID}
+          fittingName="Rifter"
+          catalogue={catalogue}
+          missingSkills={[
+            { skillTypeID: 3315, targetLevel: 1 },
+            { skillTypeID: 3300, targetLevel: 3 },
+          ]}
+        />
+      </MemoryRouter>
+    );
+    // Gunnery III trains first and carries its own levels; Surgical Strike I is then just its own.
+    expect(
+      await screen.findByRole('button', { name: 'Add to plan: Surgical Strike I' })
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: /incl\. prerequisites: surgical strike i/i })
+    ).toBeNull();
+  });
+
   it('shows no fix block within budget', async () => {
     skillFixesState.fixes = [{ entries: [{ skillTypeID: 3436, targetLevel: 4 }], after: {} }];
     renderPanel();

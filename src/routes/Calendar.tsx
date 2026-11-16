@@ -12,11 +12,15 @@ import {
   Panel,
   Spinner,
   CachedNotice,
+  Toast,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { loadCalendarBoard } from '@/features/character/calendarBoardData';
 import { EventDetailModal } from '@/features/character/EventDetailModal';
 import { skyhookRaidDetail } from '@/features/character/skyhookRaidDetail';
+import { sharedPopDetail } from '@/features/character/sharedPopDetail';
+import { useSharedPopParam } from '@/features/character/sharedPopLink';
+import { sharedPopDeadlineMs } from '@/features/character/calendarSharedPops';
 import { RowDetailModal } from '@/features/overview/widgets/RowDetailModal';
 import { CalendarMap } from '@/features/character/CalendarMap';
 import { CalendarDayTicker } from '@/features/character/CalendarDayTicker';
@@ -34,13 +38,18 @@ import {
   shownKinds,
   toggleHiddenKind,
 } from '@/features/character/calendarKindFilter';
-import { activeCorpFilter, useCalendarCorpFilter } from '@/features/character/calendarCorpFilter';
+import {
+  activeCorpFilter,
+  useCalendarCorpFilter,
+  useCalendarSharingCorpFilter,
+} from '@/features/character/calendarCorpFilter';
 import { buildCharacterBoard, type CharacterBoardItemKind } from '@/engine/character/board';
 import {
   countsByDay,
   countsByKind,
   filterByCorporation,
   filterByKinds,
+  filterBySharingCorporation,
 } from '@/engine/character/deadlines';
 import {
   addDays,
@@ -147,10 +156,13 @@ export function Calendar() {
   const weekStart = useCalendarWeekStart((state) => state.value);
   const savedCorpFilter = useCalendarCorpFilter((state) => state.value);
   const setCorpFilter = useCalendarCorpFilter((state) => state.setValue);
+  const savedSharingCorpFilter = useCalendarSharingCorpFilter((state) => state.value);
+  const setSharingCorpFilter = useCalendarSharingCorpFilter((state) => state.setValue);
   useHydratedStore(
     useCalendarDensity,
     useCalendarHiddenKinds,
     useCalendarCorpFilter,
+    useCalendarSharingCorpFilter,
     useCalendarSkillPlans,
     useCalendarWeekStart
   );
@@ -191,6 +203,9 @@ export function Calendar() {
   // `?open=` selects the event as a click would; it shows once the events load.
   const [selectedEventId, setSelectedEventId] = useState<number | null>(openParamId);
   const [selectedSkyhookId, setSelectedSkyhookId] = useState<number | null>(null);
+  // `?pop=` (a Shared Moon Pop notification) opens that Shared Pop once the board loads.
+  const popParam = useSharedPopParam();
+  const [selectedPopId, setSelectedPopId] = useState<string | null>(popParam);
 
   /**
    * RSVP responses applied locally, ahead of `data` catching up.
@@ -284,9 +299,17 @@ export function Calendar() {
 
   const selected = useMemo(() => shownKinds(hiddenKinds), [hiddenKinds]);
   const corpFilter = activeCorpFilter(savedCorpFilter, data?.corporations ?? []);
+  const sharingCorpFilter = activeCorpFilter(
+    savedSharingCorpFilter,
+    data?.sharingCorporations ?? []
+  );
   const visible = useMemo(
-    () => filterByKinds(filterByCorporation(board, corpFilter), selected),
-    [board, corpFilter, selected]
+    () =>
+      filterByKinds(
+        filterBySharingCorporation(filterByCorporation(board, corpFilter), sharingCorpFilter),
+        selected
+      ),
+    [board, corpFilter, sharingCorpFilter, selected]
   );
   const loads = useMemo(() => countsByDay(visible, zone), [visible, zone]);
   // Counted off the unfiltered board: a kind's own count must not drop to zero
@@ -326,6 +349,43 @@ export function Calendar() {
     const raid = data?.skyhookRaidDetails.find((r) => r.id === selectedSkyhookId);
     return raid === undefined ? null : skyhookRaidDetail(raid, nowMs, t, zone);
   }, [data, selectedSkyhookId, nowMs, t, zone]);
+  // Looked up in every live pop, not only the rows: a link still opens one hidden as a duplicate.
+  const popDetail = useMemo(() => {
+    const entry = data?.sharedPops.find((e) => e.pop.id === selectedPopId);
+    return entry === undefined ? null : sharedPopDetail(entry, nowMs, t, zone);
+  }, [data, selectedPopId, nowMs, t, zone]);
+  // `?pop=` also moves the map to the pop's day and scopes the rail to it (issue #6239), once:
+  // the first snapshot that holds the pop. A later reload must not pull the pilot back.
+  // Adjusted during render, not an effect (`react-hooks/set-state-in-effect`); only the URL
+  // write of the anchor waits for the effect below.
+  const [popDayPending, setPopDayPending] = useState(popParam !== null);
+  const [popAnchorKey, setPopAnchorKey] = useState<string | null>(null);
+  // A link to a pop that is gone (Expired, unshared, or out of the pilot's audiences) says so,
+  // once the finished load (not a partial or a retained snapshot) still lacks it. A failed read
+  // (`sharedMoonPops` undefined, or the load itself) proves nothing: the link is dropped quietly.
+  const [popUnavailable, setPopUnavailable] = useState(false);
+  if (popDayPending && data) {
+    const entry = data.sharedPops.find((e) => e.pop.id === popParam);
+    if (entry === undefined) {
+      if (!loading) {
+        setPopDayPending(false);
+        setSelectedPopId(null);
+        if (!error && data.sharedMoonPops !== undefined) setPopUnavailable(true);
+      }
+    } else {
+      setPopDayPending(false);
+      const deadlineMs = sharedPopDeadlineMs(entry.pop, data.loadedAtMs);
+      if (!Number.isNaN(deadlineMs)) {
+        setSelectedDay({ zone, ms: dayStart(deadlineMs, zone) });
+        setPopAnchorKey(dayKey(cellOf(deadlineMs, zone)));
+      }
+    }
+  }
+  useEffect(() => {
+    if (popAnchorKey === null) return;
+    anchorKeyRef.current = popAnchorKey;
+    setAnchorKey(popAnchorKey);
+  }, [popAnchorKey, setAnchorKey]);
 
   function goToday() {
     setAnchor(cellOf(Date.now(), zone));
@@ -419,6 +479,9 @@ export function Calendar() {
               corporations={data?.corporations}
               corpFilter={corpFilter}
               onCorpFilter={(filter) => void setCorpFilter(filter)}
+              sharingCorporations={data?.sharingCorporations}
+              sharingCorpFilter={sharingCorpFilter}
+              onSharingCorpFilter={(filter) => void setSharingCorpFilter(filter)}
             />
             <TableActionsMenu name={t('calendar.title')} tableExport={eventsExport} size="md" />
             <IconButton
@@ -441,6 +504,12 @@ export function Calendar() {
       ) : (
         <>
           {data?.fromCache && <CachedNotice withBadge fetchedAt={data.oldestFetchedAt} />}
+          {popUnavailable && (
+            <Toast
+              message={t('calendar.sharedPop.unavailable')}
+              onClose={() => setPopUnavailable(false)}
+            />
+          )}
           {/*
             The page no longer gates on one scope, so a refused source has to
             announce itself somewhere the pilot will actually look. Naming the
@@ -491,6 +560,7 @@ export function Calendar() {
               onClearDay={() => setSelectedDayMs(null)}
               onSelectEvent={setSelectedEventId}
               onSelectSkyhook={setSelectedSkyhookId}
+              onSelectSharedPop={setSelectedPopId}
               noKindsSelected={selected.size === 0}
             />
           </div>
@@ -498,6 +568,7 @@ export function Calendar() {
       )}
 
       <RowDetailModal detail={skyhookDetail} onClose={() => setSelectedSkyhookId(null)} />
+      <RowDetailModal detail={popDetail} onClose={() => setSelectedPopId(null)} />
 
       {selectedEvent && activeCharacterId !== null && (
         <EventDetailModal

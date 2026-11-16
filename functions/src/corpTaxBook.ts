@@ -14,6 +14,7 @@
 //     statements/{id}                           issued Statements, create-only (forward-only)
 //     miners/{minerId}                          Miner groupings
 //     meta/paid                                 paidStatementIds, only ever grown (D22)
+//     meta/uncounted                            donations into divisions the book does not read (#6207)
 //     audit/{at~rand}                           immutable audit log
 //   corpTaxBookTokens/{token}                   verify-link tokens; no client access at all
 
@@ -27,6 +28,17 @@ import {
   type ForfeitBasis,
   type StatementDays,
 } from './corpTaxBookEngine.js';
+import { UNCOUNTED_LIMIT, type UncountedDonation } from './corpTaxBookSyncEngine.js';
+import {
+  MAX_POP_AUDIENCES,
+  MAX_POP_NOTES,
+  POP_SHARING_KEYS,
+  POP_TIMES,
+  audienceKey,
+  type PopAudience,
+  type PopSharingOverridePatch,
+  type PopSharingSettings,
+} from './popSharing.js';
 
 /** The Tax Book lives under the `corps/{id}` umbrella (issue #4858, ADR 0026). */
 export const BOOKS_COLLECTION = 'corps';
@@ -44,6 +56,8 @@ export const EXTRACTIONS = 'extractions';
 export const PAYMENTS = 'payments';
 export const DISMISSALS = 'dismissals';
 export const DECLARATIONS = 'declarations';
+/** `disputes/{minerId_date}`: a Miner says a Conflict day's ore went to another Payee (#6206). */
+export const DISPUTES = 'disputes';
 export const ADJUSTMENTS = 'adjustments';
 export const WRITE_OFFS = 'writeOffs';
 export const REBILLS = 'rebills';
@@ -53,6 +67,12 @@ export const STATEMENT_LINKS = 'statementLinks';
 export const MINERS = 'miners';
 export const META = 'meta';
 export const PAID_DOC = 'paid';
+/** Doc under `meta`: the scheduled sync's public status (ADR 0025); `status: 'active'` is Automatic sync on. */
+export const SCHEDULED_SYNC_DOC = 'scheduledSync';
+/** Doc under `meta`: the donations a sync noted in divisions the book does not read (#6207). */
+export const UNCOUNTED_DOC = 'uncounted';
+/** How many "not tax" answers to uncounted donations the doc keeps, so a sync never re-notes them. */
+export const UNCOUNTED_IGNORED_MAX = 200;
 export const AUDIT = 'audit';
 /** `corps/{collector}/feeders/{feederCorp}`: a feeder's record (issue #4507). */
 export const FEEDERS = 'feeders';
@@ -256,7 +276,7 @@ export type StoredRate =
   | { scope: 'miner'; minerId: string; pct: number; effectiveFrom: string }
   | { scope: 'moon'; moonId: number; pct: number; effectiveFrom: string }
   | { scope: 'structure'; structureId: number; pct: number; effectiveFrom: string }
-  | { scope: 'feeder'; feederId: number; pct: number; effectiveFrom: string }
+  | { scope: 'feeder' | 'feeder-member'; feederId: number; pct: number; effectiveFrom: string }
   | { scope: 'record'; recordKey: string; pct: number };
 
 export function parseDatedRate(data: unknown): Exclude<StoredRate, { scope: 'record' }> {
@@ -268,6 +288,7 @@ export function parseDatedRate(data: unknown): Exclude<StoredRate, { scope: 'rec
     'moon',
     'structure',
     'feeder',
+    'feeder-member',
   ] as const);
   const base = {
     pct: num(d.pct, 'pct', 0, 100),
@@ -279,7 +300,10 @@ export function parseDatedRate(data: unknown): Exclude<StoredRate, { scope: 'rec
   if (scope === 'structure')
     return { scope, structureId: int(d.structureId, 'structureId'), ...base };
   // Every refinery of one moon owner corporation: the miner rate chain's per-feeder tier.
-  if (scope === 'feeder') return { scope, feederId: int(d.feederId, 'feederId'), ...base };
+  // Every refinery of one moon owner corporation, for its own members only (#6210): above the
+  // Guest default they would otherwise mine its moon at.
+  if (scope === 'feeder' || scope === 'feeder-member')
+    return { scope, feederId: int(d.feederId, 'feederId'), ...base };
   return { scope, ...base };
 }
 
@@ -420,7 +444,7 @@ export const rateKey = (r: StoredRate): string =>
     ? `record:${r.recordKey}`
     : `${r.scope}:${'minerId' in r ? r.minerId : ''}:${'moonId' in r ? r.moonId : ''}:${r.effectiveFrom}` +
       (r.scope === 'structure' ? `:${r.structureId}` : '') +
-      (r.scope === 'feeder' ? `:${r.feederId}` : '');
+      (r.scope === 'feeder' || r.scope === 'feeder-member' ? `:${r.feederId}` : '');
 
 /**
  * An N-day cadence anchored on the old start date moves with the start date; a custom anchor,
@@ -466,9 +490,19 @@ export type EditAction =
       at: string;
       statementId?: string;
       note?: string;
+      /** The Declaration this payment confirms, in the same write (one resolution per declaration). */
+      declarationId?: string;
     }
   | { action: 'markNotTax'; paymentId: string; notTaxAmount: number; reason: string }
-  | { action: 'assignPayment'; paymentId: string; minerId: string }
+  | {
+      action: 'assignPayment';
+      paymentId: string;
+      minerId: string;
+      /** The Declaration this donation match confirms, in the same write. */
+      declarationId?: string;
+    }
+  /** #6207: an officer says a donation into a division the book does not read is not tax. */
+  | { action: 'ignoreUncounted'; uncountedId: string }
   | {
       action: 'dismiss';
       scope: 'record' | 'miner' | 'moon' | 'extraction';
@@ -511,11 +545,25 @@ export type EditAction =
     }
   | { action: 'issueStatement'; statement: Record<string, unknown> }
   | { action: 'settleStatements'; statementIds: string[] }
+  /** An officer-recorded declaration. It carries the Miner's `uids`, so its note is theirs to read. */
   | {
       action: 'declare';
       statementId: string;
       kind: 'contract' | 'other-division' | 'wrong-corp';
       note?: string;
+    }
+  | { action: 'rejectDispute'; disputeId: string; reason: string }
+  /**
+   * Waives only the disputed ore (#6206): a credit Adjustment on the day, not a dismissal of the
+   * whole record. The server prices it from the Statements that billed the day; `amountIsk`, the
+   * client's figure, counts only for a day not billed yet, and then as over the Director limit.
+   */
+  | {
+      action: 'dismissDispute';
+      disputeId: string;
+      minerId: string;
+      amountIsk?: number;
+      reason: string;
     }
   | {
       action: 'resolveDeclaration';
@@ -524,6 +572,10 @@ export type EditAction =
       reason?: string;
     }
   | { action: 'recordReminder'; statementId: string }
+  /** Pop Sharing (#6222): the switch and the Sharing default. Turning it on needs Automatic sync. */
+  | { action: 'setPopSharing'; enabled?: boolean; defaults?: Partial<PopSharingSettings> }
+  /** One moon's overrides; null returns a setting to the Sharing default. */
+  | { action: 'setPopSharingMoon'; moonId: number; override: PopSharingOverridePatch }
   | {
       action: 'recordMail';
       statementId: string;
@@ -537,6 +589,7 @@ export type CloseCredit = { kind: 'refund' } | { kind: 'forfeit'; basis: Forfeit
 export const LIVE_CHECK_ACTIONS: ReadonlySet<EditAction['action']> = new Set([
   'dismiss',
   'dismissRecords',
+  'dismissDispute',
   'reverseDismissal',
   'writeOff',
   'rebill',
@@ -554,7 +607,8 @@ export function needsLiveCheck(action: EditAction): boolean {
 /**
  * Whether a dismissal needs a Director (D6): the approval limit applies to the
  * total dismissed in one act, so a multi-day dismissal cannot slip under it
- * day by day. An omitted amount counts as over the limit.
+ * day by day. An omitted or zero amount counts as over the limit: a zero is a day whose
+ * charge the client did not have in view, not a free dismissal.
  */
 export function dismissalNeedsDirector(
   limit: number | null | undefined,
@@ -562,7 +616,10 @@ export function dismissalNeedsDirector(
   isDirector: boolean
 ): boolean {
   if (isDirector || typeof limit !== 'number') return false;
-  const total = amounts.reduce<number>((sum, a) => sum + (a ?? Infinity), 0);
+  const total = amounts.reduce<number>(
+    (sum, a) => sum + (a !== undefined && a > 0 ? a : Infinity),
+    0
+  );
   return total > limit;
 }
 
@@ -590,6 +647,7 @@ export function parseEditAction(data: unknown): EditAction {
     'recordPayment',
     'markNotTax',
     'assignPayment',
+    'ignoreUncounted',
     'dismiss',
     'dismissRecords',
     'reverseDismissal',
@@ -606,8 +664,12 @@ export function parseEditAction(data: unknown): EditAction {
     'settleStatements',
     'declare',
     'resolveDeclaration',
+    'rejectDispute',
+    'dismissDispute',
     'recordReminder',
     'recordMail',
+    'setPopSharing',
+    'setPopSharingMoon',
   ] as const);
   switch (action) {
     case 'addRate':
@@ -631,6 +693,9 @@ export function parseEditAction(data: unknown): EditAction {
         at: instant(d.at, 'at'),
         statementId: optId(d.statementId, 'statementId'),
         note: optNote(d.note),
+        ...(d.declarationId !== undefined
+          ? { declarationId: docId(d.declarationId, 'declarationId') }
+          : {}),
       };
     case 'markNotTax':
       return {
@@ -644,7 +709,12 @@ export function parseEditAction(data: unknown): EditAction {
         action,
         paymentId: docId(d.paymentId, 'paymentId'),
         minerId: docId(d.minerId, 'minerId'),
+        ...(d.declarationId !== undefined
+          ? { declarationId: docId(d.declarationId, 'declarationId') }
+          : {}),
       };
+    case 'ignoreUncounted':
+      return { action, uncountedId: docId(d.uncountedId, 'uncountedId') };
     case 'dismiss':
       return {
         action,
@@ -777,8 +847,47 @@ export function parseEditAction(data: unknown): EditAction {
         reason: resolution === 'rejected' ? reason(d.reason) : optNote(d.reason),
       };
     }
+    case 'rejectDispute':
+      return { action, disputeId: docId(d.disputeId, 'disputeId'), reason: reason(d.reason) };
+    case 'dismissDispute':
+      return {
+        action,
+        disputeId: docId(d.disputeId, 'disputeId'),
+        minerId: docId(d.minerId, 'minerId'),
+        ...(d.amountIsk !== undefined ? { amountIsk: money(d.amountIsk, 'amountIsk') } : {}),
+        reason: reason(d.reason),
+      };
     case 'recordReminder':
       return { action, statementId: docId(d.statementId, 'statementId') };
+    case 'setPopSharing': {
+      if (d.enabled !== undefined && typeof d.enabled !== 'boolean')
+        throw new HttpsError('invalid-argument', 'enabled must be true or false');
+      const defaults = d.defaults === undefined ? undefined : popSettingsPatch(d.defaults, false);
+      if (defaults && Object.keys(defaults).length === 0)
+        throw new HttpsError('invalid-argument', 'nothing to change');
+      if (d.enabled === undefined && defaults === undefined)
+        throw new HttpsError('invalid-argument', 'nothing to change');
+      return {
+        action,
+        ...(d.enabled === undefined ? {} : { enabled: d.enabled }),
+        ...(defaults ? { defaults } : {}),
+      };
+    }
+    case 'setPopSharingMoon': {
+      const set = d.set === undefined ? {} : popSettingsPatch(d.set, true);
+      const clear = [
+        ...new Set(
+          list(d.clear ?? [], 'clear', POP_SHARING_KEYS.length).map((k) =>
+            oneOf(k, 'clear', POP_SHARING_KEYS)
+          )
+        ),
+      ];
+      if (Object.keys(set).length + clear.length === 0)
+        throw new HttpsError('invalid-argument', 'nothing to change');
+      if (clear.some((k) => k in set))
+        throw new HttpsError('invalid-argument', 'a setting cannot be set and cleared');
+      return { action, moonId: int(d.moonId, 'moonId'), override: { set, clear } };
+    }
     case 'recordMail':
       return {
         action,
@@ -787,6 +896,63 @@ export function parseEditAction(data: unknown): EditAction {
         kind: oneOf(d.kind, 'kind', ['statement', 'reminder'] as const),
       };
   }
+}
+
+function popAudience(raw: unknown): PopAudience {
+  const a = record(raw);
+  const kind = oneOf(a.kind, 'audience.kind', ['corp', 'alliance', 'community'] as const);
+  if (kind !== 'community') return { kind };
+  return {
+    kind,
+    communityId: docId(a.communityId, 'communityId'),
+    name: boundedString(a.name, 'community name', 100),
+  };
+}
+
+/**
+ * Pop Sharing settings from a client (#6222): only known settings, each validated. A null
+ * `ratePct` is the book's own rate.
+ */
+function popSettingsPatch(raw: unknown, allowEmpty: boolean): Partial<PopSharingSettings> {
+  const p = record(raw);
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(p)) {
+    if (!(POP_SHARING_KEYS as readonly string[]).includes(key))
+      throw new HttpsError('invalid-argument', `unknown setting ${key}`);
+  }
+  for (const key of POP_SHARING_KEYS) {
+    const v = p[key];
+    if (v === undefined) continue;
+    switch (key) {
+      case 'audiences': {
+        const audiences = list(v, 'audiences', MAX_POP_AUDIENCES).map(popAudience);
+        if (new Set(audiences.map(audienceKey)).size !== audiences.length)
+          throw new HttpsError('invalid-argument', 'an audience is listed twice');
+        out.audiences = audiences;
+        break;
+      }
+      case 'popTime':
+        out.popTime = oneOf(v, 'popTime', POP_TIMES);
+        break;
+      case 'showOre':
+        if (typeof v !== 'boolean')
+          throw new HttpsError('invalid-argument', 'showOre must be true or false');
+        out.showOre = v;
+        break;
+      case 'ratePct':
+        out.ratePct = v === null ? null : pctField(v, 'ratePct');
+        break;
+      case 'notes': {
+        if (typeof v !== 'string' || v.trim().length > MAX_POP_NOTES)
+          throw new HttpsError('invalid-argument', `notes must be 0-${MAX_POP_NOTES} characters`);
+        out.notes = v.trim();
+        break;
+      }
+    }
+  }
+  if (!allowEmpty && Object.keys(out).length === 0)
+    throw new HttpsError('invalid-argument', 'nothing to change');
+  return out as Partial<PopSharingSettings>;
 }
 
 /** The Statement fields the book relies on; the rest of the engine's shape is stored as given. */
@@ -898,8 +1064,14 @@ export interface SyncInput extends BookCall {
     reason?: string;
     minerId?: string;
     statementId?: string;
+    reviewReason?: 'no-open-balance';
   }[];
   gaps: { structureId: number; from: string; to: string }[];
+  /**
+   * #6207: donations the sync noted in divisions the book does not read; replaces the stored
+   * list. Absent when the sync did not read those divisions, which leaves the list as it was.
+   */
+  uncounted?: UncountedDonation[];
 }
 
 export function parseSyncInput(data: unknown, nowMs: number): SyncInput {
@@ -975,6 +1147,11 @@ export function parseSyncInput(data: unknown, nowMs: number): SyncInput {
       reason: x.reason === undefined ? undefined : String(x.reason).slice(0, 200),
       minerId: optId(x.minerId, 'minerId'),
       statementId: optId(x.statementId, 'statementId'),
+      // #6207: a known sender's donation held for review; only on one with no Miner.
+      reviewReason:
+        x.reviewReason === 'no-open-balance' && x.minerId === undefined
+          ? ('no-open-balance' as const)
+          : undefined,
     };
   });
   const gaps = list(d.gaps ?? [], 'gaps', 20).map((r) => {
@@ -985,7 +1162,30 @@ export function parseSyncInput(data: unknown, nowMs: number): SyncInput {
       to: dateString(g.to, 'to'),
     };
   });
-  return { ...parseBookCall(data), observed, extractions, donations, gaps };
+  const uncounted =
+    d.uncounted === undefined
+      ? undefined
+      : list(d.uncounted, 'uncounted', UNCOUNTED_LIMIT).map((r) => {
+          const x = record(r);
+          const division = int(x.division, 'division', 1, 7);
+          const refId = int(x.refId, 'refId');
+          return {
+            id: `j${division}_${refId}`,
+            refId,
+            division,
+            characterId: int(x.characterId, 'characterId'),
+            amount: money(x.amount, 'amount'),
+            at: instant(x.at, 'at'),
+          };
+        });
+  return {
+    ...parseBookCall(data),
+    observed,
+    extractions,
+    donations,
+    gaps,
+    ...(uncounted ? { uncounted } : {}),
+  };
 }
 
 export interface TokenInput {
@@ -1033,6 +1233,206 @@ export function parseDeclineByTokenInput(data: unknown): { token: string; charac
   if (typeof characterId !== 'number' || !Number.isSafeInteger(characterId) || characterId <= 0)
     throw new HttpsError('invalid-argument', 'characterId must be a positive integer');
   return { token: parseToken(data), characterId };
+}
+
+/** A Miner's own "I paid this another way" on one of their Statements (#6206). */
+export interface DeclareOwnInput {
+  corporationId: number;
+  statementId: string;
+  /** What they say they paid; absent when they did not say. */
+  amount?: number;
+  note?: string;
+}
+
+export function parseDeclareOwnInput(data: unknown): DeclareOwnInput {
+  const d = record(data);
+  const note = optNote(d.note);
+  return {
+    corporationId: parseBookCall(data).corporationId,
+    statementId: docId(d.statementId, 'statementId'),
+    ...(d.amount !== undefined ? { amount: money(d.amount, 'amount') } : {}),
+    ...(note !== undefined ? { note } : {}),
+  };
+}
+
+/** One ore line of a disputed Conflict day: the record, the ore, and the Payee the Miner gave it to. */
+export interface DisputeLine {
+  recordKey: string;
+  typeId: number;
+  quantity: number;
+  payeeName: string;
+}
+
+/** A Miner's "I gave this ore to {payee}" on a Conflict day (#6206). */
+export interface DisputeConflictInput {
+  corporationId: number;
+  date: string;
+  lines: DisputeLine[];
+  note?: string;
+}
+
+/** The most ore lines one disputed day carries: a day's ore types across a Miner's characters. */
+export const DISPUTE_LINES_MAX = 100;
+
+export function parseDisputeConflictInput(data: unknown): DisputeConflictInput {
+  const d = record(data);
+  const date = dateString(d.date, 'date');
+  const raw = list(d.lines, 'lines', DISPUTE_LINES_MAX);
+  if (raw.length === 0) throw new HttpsError('invalid-argument', 'lines must not be empty');
+  const lines = raw.map((x) => {
+    const l = record(x);
+    const key = parseRecordKey(l.recordKey);
+    if (key.date !== date) throw new HttpsError('invalid-argument', 'Every line must be that day');
+    return {
+      recordKey: key.key,
+      typeId: int(l.typeId, 'typeId'),
+      quantity: int(l.quantity, 'quantity'),
+      payeeName: boundedString(l.payeeName, 'payeeName', 100),
+    };
+  });
+  const note = optNote(d.note);
+  return {
+    corporationId: parseBookCall(data).corporationId,
+    date,
+    lines,
+    ...(note !== undefined ? { note } : {}),
+  };
+}
+
+/** A Miner withdraws their own unanswered dispute of a day. */
+export interface WithdrawDisputeInput {
+  corporationId: number;
+  date: string;
+}
+
+export function parseWithdrawDisputeInput(data: unknown): WithdrawDisputeInput {
+  const d = record(data);
+  return { corporationId: parseBookCall(data).corporationId, date: dateString(d.date, 'date') };
+}
+
+/** The ore a book recorded, as the server's Observed Rows hold it. */
+export interface RecordedOre {
+  characterId: number;
+  structureId: number;
+  date: string;
+  typeId: number;
+  quantity: number;
+}
+
+const lineId = (l: DisputeLine) => JSON.stringify([l.recordKey, l.typeId, l.quantity, l.payeeName]);
+
+/**
+ * A dispute's lines after one more call (#6206): `incoming` added to what the day already holds,
+ * an exact repeat dropped (as `arrayUnion` would). Every record and ore must be one the book
+ * recorded, the disputed quantity of each across all its Payees no more than recorded, and the
+ * day at most `DISPUTE_LINES_MAX` lines however many calls built it.
+ */
+export function mergeDisputeLines(
+  held: readonly DisputeLine[],
+  incoming: readonly DisputeLine[],
+  recorded: readonly RecordedOre[]
+): DisputeLine[] {
+  const merged = new Map(held.map((l) => [lineId(l), l]));
+  for (const l of incoming) merged.set(lineId(l), l);
+  const lines = [...merged.values()];
+  if (lines.length > DISPUTE_LINES_MAX)
+    throw new HttpsError('invalid-argument', 'Too many lines for one day', {
+      reason: 'too-many-lines',
+    });
+  const onRecord = new Map<string, number>();
+  for (const r of recorded) {
+    const key = `${r.characterId}:${r.structureId}:${r.date}|${r.typeId}`;
+    onRecord.set(key, (onRecord.get(key) ?? 0) + r.quantity);
+  }
+  const disputed = new Map<string, number>();
+  for (const l of lines) {
+    const key = `${l.recordKey}|${l.typeId}`;
+    disputed.set(key, (disputed.get(key) ?? 0) + l.quantity);
+  }
+  for (const [key, quantity] of disputed) {
+    if (quantity > (onRecord.get(key) ?? 0))
+      throw new HttpsError('invalid-argument', 'That ore is not on the record', {
+        reason: 'not-on-record',
+      });
+  }
+  return lines;
+}
+
+/** A billed ore line as an issued Statement stores it (engine `StatementLine`). */
+interface BilledLine {
+  oreLines: { typeId: number; quantity: number }[];
+  unitPrices: Record<string, number>;
+  taxPct: number;
+}
+
+function billedLineOf(raw: unknown): (BilledLine & { chargeKey: string }) | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const l = raw as Record<string, unknown>;
+  if (l.kind !== 'mined' && l.kind !== 'late-ore') return null;
+  if (typeof l.chargeKey !== 'string' || typeof l.taxPct !== 'number') return null;
+  if (!Array.isArray(l.oreLines) || typeof l.unitPrices !== 'object' || l.unitPrices === null)
+    return null;
+  const oreLines = (l.oreLines as unknown[]).flatMap((o) => {
+    const x = o as { typeId?: unknown; quantity?: unknown } | null;
+    return x && typeof x.typeId === 'number' && typeof x.quantity === 'number'
+      ? [{ typeId: x.typeId, quantity: x.quantity }]
+      : [];
+  });
+  return {
+    chargeKey: l.chargeKey,
+    oreLines,
+    unitPrices: l.unitPrices as Record<string, number>,
+    taxPct: l.taxPct,
+  };
+}
+
+/**
+ * The tax a waived dispute credits, priced on the server from the book's own records: each
+ * disputed ore at the unit price and rate the issued Statements billed it at, never more of it
+ * than they billed (a late-ore line adds its growth). Undefined when a disputed record is on no
+ * Statement yet: the server holds no price for a day not billed, so it is never waived at the
+ * client's word under the Director limit.
+ */
+export function billedDisputeTax(
+  dispute: { lines: readonly Pick<DisputeLine, 'recordKey' | 'typeId' | 'quantity'>[] },
+  statements: readonly { lines?: unknown }[]
+): number | undefined {
+  const billed = new Map<string, BilledLine[]>();
+  for (const s of statements) {
+    if (!Array.isArray(s.lines)) continue;
+    for (const raw of s.lines) {
+      const line = billedLineOf(raw);
+      if (line) billed.set(line.chargeKey, [...(billed.get(line.chargeKey) ?? []), line]);
+    }
+  }
+  const disputed = new Map<string, number>();
+  for (const l of dispute.lines) {
+    const key = `${l.recordKey}|${l.typeId}`;
+    disputed.set(key, (disputed.get(key) ?? 0) + l.quantity);
+  }
+  let tax = 0;
+  for (const [key, quantity] of disputed) {
+    const [recordKey, type] = key.split('|');
+    const typeId = Number(type);
+    const lines = billed.get(recordKey);
+    if (!lines) return undefined;
+    let left = quantity;
+    for (const line of lines) {
+      const held = line.oreLines.reduce((n, o) => (o.typeId === typeId ? n + o.quantity : n), 0);
+      const take = Math.min(left, held);
+      if (take <= 0) continue;
+      const price = line.unitPrices[String(typeId)];
+      if (typeof price !== 'number') return undefined;
+      tax += take * price * (line.taxPct / 100);
+      left -= take;
+    }
+  }
+  return tax;
+}
+
+/** One dispute per Miner and day: `solo:7` has a colon, which a doc id avoids. */
+export function disputeIdFor(minerId: string, date: string): string {
+  return `${minerId.replace(/[^A-Za-z0-9_-]/g, '_')}_${date}`;
 }
 
 /** A player claims one of their own Unmatched donations (D5). */

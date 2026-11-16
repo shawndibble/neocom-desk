@@ -93,6 +93,24 @@ export function groupByDay(items: readonly CharacterBoardItem[], zone?: DayZone)
 }
 
 /**
+ * The rail's long-overdue items apart from the rest: past their deadline by more than
+ * `windowMs`. A month of PI extractors nobody restarted would otherwise open the agenda above
+ * everything current; the rail folds these into one summary row. Recently overdue items stay
+ * in place. Both halves keep board order, so `longOverdue` runs oldest first.
+ */
+export function splitLongOverdue(
+  items: readonly CharacterBoardItem[],
+  nowMs: number,
+  windowMs: number
+): { longOverdue: CharacterBoardItem[]; rest: CharacterBoardItem[] } {
+  const longOverdue: CharacterBoardItem[] = [];
+  const rest: CharacterBoardItem[] = [];
+  for (const item of items)
+    (item.remainingMs <= 0 && nowMs - item.deadlineMs > windowMs ? longOverdue : rest).push(item);
+  return { longOverdue, rest };
+}
+
+/**
  * Which of the three headings a day gets. The view owns the wording; this owns
  * the decision, because "is that tomorrow" is date arithmetic and date
  * arithmetic belongs in a tested engine rather than in a component.
@@ -150,6 +168,26 @@ export function filterByCorporation(
   items: readonly CharacterBoardItem[],
   filter: CorpEventFilter
 ): CharacterBoardItem[] {
+  return byCorporationField(items, filter, (item) => item.corporation);
+}
+
+/** Shared Pops of one sharing corporation, or all of them; every other clock passes. */
+export function filterBySharingCorporation(
+  items: readonly CharacterBoardItem[],
+  filter: CorpEventFilter
+): CharacterBoardItem[] {
+  return byCorporationField(items, filter, (item) => item.sharedBy);
+}
+
+/** Rows without the field always pass; 'none' drops every row with one. */
+function byCorporationField(
+  items: readonly CharacterBoardItem[],
+  filter: CorpEventFilter,
+  field: (item: CharacterBoardItem) => { id: number } | undefined
+): CharacterBoardItem[] {
   if (filter === 'all') return [...items];
-  return items.filter((item) => item.corporation === undefined || item.corporation.id === filter);
+  return items.filter((item) => {
+    const corporation = field(item);
+    return corporation === undefined || corporation.id === filter;
+  });
 }

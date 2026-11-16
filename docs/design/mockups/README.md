@@ -11,7 +11,7 @@ Hand-written HTML and copied token CSS are not the default. A mockup is a page-l
 5. Phone variant: a second story with `globals: { viewport: { value: 'mobile1', isRotated: false } }`.
 6. Screenshots: `npm run ui:shot -- mockups-<page>--<story>` (1440 and 390 by default; PNGs land in `.cache/ui-shot/`). Today: `npm run ui:shot -- pages-<page>--<story>` from the real page story, or an e2e-seeded page if no page story exists.
 7. Publish: copy the PNGs to `docs/design/mockups/<name>/` with a README that shows today vs proposed in a table (see `wallet-balance-trend/`). Link that README from the ticket.
-8. Mockup stories are excluded from the manifest (`!manifest`) and from coverage (`src/mockups/**` in `vite.config.ts`). They still render in `src/storybook/smoke/*.test.tsx`, so a broken mockup fails CI.
+8. Mockup stories are excluded from the manifest (`!manifest`) and from coverage (`src/mockups/**` in `vite.config.ts`). They are not smoke-rendered (`src/storybook/smoke/*.test.tsx` skips them: a mockup is a throwaway); typecheck and `src/mockups/mockups.test.ts` still run on them.
 9. Delete the mockup story and its folder when the ticket closes; git history keeps it.
 
 ## Mockup screenshots
@@ -29,5 +29,7 @@ PNG exports of the chosen mockups for ready tickets. Delete a folder (and its ro
 | [srp](srp/README.md) | Epic #4608 (mockups #4847; build #4848-#4856) | Member filing with lost-ships list, officer queue (approve, reject with reason, override, Mark paid), Director settings with Hull Rules, `corpSrp` widget; phone uses dense cards |
 | [moons-add-my-corps](moons-add-my-corps/README.md) | Grilling session (no issue yet) | Add my other corps: picker, one confirm with How far back, guided sign-in, status list with Yours pills, Hidden corps |
 | [moon-mining-at-scale](moon-mining-at-scale/README.md) | Review request (no issue yet) | Officer pages for one heavy miner across 57 pops: pops folded by month with Statement and owed in each header, payments that filter the pops they cleared, per-pop and per-moon tax adjustments, bulk Statements and reminders |
+| [fittings-doctrine](fittings-doctrine/README.md) | Issue #6202 | Doctrine rows in the Fittings Start list with a Doctrine tag; an older fit's re-save note in the preview, or on the row on a phone |
+| [lp-store-spend-my-lp](lp-store-spend-my-lp/README.md) | Issue #6199 | Spend my LP button beside the offers list's actions; the plan opens above the offers: headline, offer × N table, stop line naming the floor or wallet, LP left |
 
 First draft mockup; sample data. The ticket's Agent Brief text wins over the picture where they differ.

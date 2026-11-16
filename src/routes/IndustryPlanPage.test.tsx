@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { cleanup, render, screen, within, waitFor, fireEvent } from '@testing-library/react';
+import { cleanup, screen, within, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -8,10 +8,7 @@ import { db, type BuildPlanRecord } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useAuthFailure } from '@/stores/authFailure';
-import { App } from '@/app/App';
-import * as routeChunks from '@/app/routeChunks';
 import { resetRevalidationState } from '@/esi/cache';
-import { clearMarketPriceCache } from '@/market/prices';
 import { clearCostIndexCache } from '@/features/industry/marketData';
 import { useBuildGroups } from '@/features/industry/buildGroups';
 import { useAssumedMe } from '@/features/industry/assumedMe';
@@ -25,27 +22,11 @@ import {
 } from '@/features/industry/reactionFacilityDefaults';
 import type { BlueprintMap, TypeMap } from '@/sde/types';
 import { stubViewport } from '@/test/viewport';
+import { holdHydration } from '@/test/holdHydration';
+import { renderIndustryRoutes } from '@/test/industryRoutes';
 
 // The "vs 90d" figures read market history; nothing here is about them.
 vi.mock('@/features/market/priceVsMedian', () => ({ loadPriceVsMedian: async () => null }));
-/**
- * The boot cache warm-up starts on a 2 s timer under jsdom, so one test's
- * run outlives it and lands in the next: a /skillqueue read it planned under
- * `resetSession`'s scoped token hit the scopeless test's counter. The plan
- * page reads nothing it warms.
- */
-vi.mock('@/app/bootPrefetch', () => ({
-  scheduleBootPrefetch: () => () => {},
-  scheduleCachePrune: () => () => {},
-  scheduleLazySdeWarm: () => () => {},
-}));
-vi.mock('virtual:pwa-register/react', () => ({
-  useRegisterSW: () => ({
-    needRefresh: [false, vi.fn()],
-    offlineReady: [false, vi.fn()],
-    updateServiceWorker: vi.fn(),
-  }),
-}));
 
 // Small hand-made fixture, not the real SDE: one blueprint (Rifter, typeID
 // 638) with two priced materials (Tritanium, Mechanical Parts) and a
@@ -214,7 +195,6 @@ afterEach(async () => {
   // global afterEach in vitest.setup.dom.ts.
   cleanup();
   server.resetHandlers();
-  clearMarketPriceCache();
   clearCostIndexCache();
 });
 /** A signed-in Pilot One on `/industry/plans/bp-1`, with nothing left over from the last test. */
@@ -259,14 +239,12 @@ async function resetSession() {
 beforeAll(async () => {
   server.listen({ onUnhandledRequest: 'error' });
   // One throwaway render of the plan page, so no test pays for the first one.
-  // A worker's first `App` render — compiling the lazy route chunks, warming
-  // jsdom and React — cost 3-6s on top of the ~1s a warm render takes, and
-  // it landed on whichever test ran first, tipping that one past the 10s test
-  // timeout under parallel load. Done here under the hook's own budget.
-  await Promise.all([routeChunks.loadIndustryPlanPage(), routeChunks.loadIndustry()]);
+  // A worker's first render — jsdom and React warm-up, the page's own lazy
+  // chunks — landed on whichever test ran first, tipping that one past the 10s
+  // test timeout under parallel load. Done here under the hook's own budget.
   await resetSession();
   await db.buildPlans.add(seedPlan());
-  const { unmount } = render(<App />);
+  const { unmount } = await renderIndustryRoutes();
   await screen.findByRole('heading', { name: 'Rifter' }, { timeout: 25_000 });
   // Also the setup panel and facility picker, so the first test to open them
   // doesn't pay for their lazy chunks.
@@ -277,7 +255,6 @@ beforeAll(async () => {
   await screen.findByRole('option', { name: 'Raitaru' });
   unmount();
   server.resetHandlers();
-  clearMarketPriceCache();
   clearCostIndexCache();
 }, 30_000);
 
@@ -289,7 +266,7 @@ describe('IndustryPlanPage: jargon tooltips (UX-REVIEW #8)', () => {
   it('gives the facility tax input an accessible tooltip without polluting its label', async () => {
     const user = userEvent.setup({ delay: null });
     await db.buildPlans.add(seedPlan());
-    render(<App />);
+    await renderIndustryRoutes();
 
     await screen.findByRole('heading', { name: 'Rifter' });
     await openSetup(user);
@@ -315,7 +292,7 @@ describe('IndustryPlanPage: build plan settings grouping (#120)', () => {
   it('keeps Runs in the hero and the rest under Location & market', async () => {
     const user = userEvent.setup({ delay: null });
     await db.buildPlans.add(seedPlan());
-    render(<App />);
+    await renderIndustryRoutes();
 
     await screen.findByRole('heading', { name: 'Rifter' });
     await openSetup(user);
@@ -379,7 +356,7 @@ describe('IndustryPlanPage: /skills is stale until the character logs in', () =>
         finish_date: '2026-01-05T00:00:00Z',
       },
     ]);
-    render(<App />);
+    await renderIndustryRoutes();
 
     expect(await screen.findByText('16m')).toBeInTheDocument();
     expect(screen.queryByText('20m')).not.toBeInTheDocument();
@@ -388,7 +365,7 @@ describe('IndustryPlanPage: /skills is stale until the character logs in', () =>
   it('does not credit a paused queue entry, which carries no finish date', async () => {
     // peterhaneve/evemon#40: an absent date is "ETA unknown", never "done".
     await signInWithQueue(94, [{ skill_id: 3380, queue_position: 0, finished_level: 5 }]);
-    render(<App />);
+    await renderIndustryRoutes();
 
     expect(await screen.findByText('20m')).toBeInTheDocument();
   });
@@ -424,7 +401,7 @@ describe('IndustryPlanPage: /skills is stale until the character logs in', () =>
       })
     );
     await db.buildPlans.add(seedPlan({ characterId: SCOPELESS_ID }));
-    render(<App />);
+    await renderIndustryRoutes();
 
     // No queue correction applied: base blueprint time stands.
     expect(await screen.findByText('20m')).toBeInTheDocument();
@@ -440,7 +417,7 @@ describe('IndustryPlanPage: results panel', () => {
       http.get('https://esi.evetech.net/industry/systems', () => HttpResponse.error())
     );
     await db.buildPlans.add(seedPlan());
-    render(<App />);
+    await renderIndustryRoutes();
 
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(screen.getByText('Pyerite')).toBeInTheDocument();
@@ -471,7 +448,7 @@ describe('IndustryPlanPage: Log production prefill from a job (#1787)', () => {
       '',
       '/industry/plans/bp-1'
     );
-    render(<App />);
+    await renderIndustryRoutes();
 
     await screen.findByRole('heading', { name: 'Rifter' });
     expect(await screen.findByRole('heading', { name: 'Log Production' })).toBeInTheDocument();
@@ -489,7 +466,7 @@ describe('IndustryPlanPage: Log production prefill from a job (#1787)', () => {
       '',
       '/industry/plans/bp-2'
     );
-    render(<App />);
+    await renderIndustryRoutes();
 
     await screen.findByRole('heading', { name: 'Mechanical Parts' });
     expect(await screen.findByRole('heading', { name: 'Log Production' })).toBeInTheDocument();
@@ -504,7 +481,7 @@ describe('IndustryPlanPage: Log production prefill from a job (#1787)', () => {
       '/industry/plans/bp-1'
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    await renderIndustryRoutes();
 
     await screen.findByRole('heading', { name: 'Log Production' });
     await user.click(screen.getByRole('button', { name: 'Close' }));
@@ -546,7 +523,7 @@ describe('IndustryPlanPage: Log production prefill from a job (#1787)', () => {
       )
     );
     await db.buildPlans.add(seedPlan());
-    render(<App />);
+    await renderIndustryRoutes();
 
     // Label and text queries, and role queries only inside the dialog: every
     // `findByRole` poll walks the whole plan page's accessibility tree, and
@@ -569,7 +546,7 @@ describe('IndustryPlanPage: Log production prefill from a job (#1787)', () => {
 describe('IndustryPlanPage: materials row menu', () => {
   it('gives a material row the item menu on right-click and a More-actions button', async () => {
     await db.buildPlans.add(seedPlan());
-    render(<App />);
+    await renderIndustryRoutes();
     const row = (await screen.findByText('Mechanical Parts')).closest('tr');
     if (!row) throw new Error('expected a Mechanical Parts materials row');
 
@@ -612,7 +589,7 @@ describe('IndustryPlanPage: make-or-buy marker on materials', () => {
       )
     );
     await db.buildPlans.add(seedPlan());
-    render(<App />);
+    await renderIndustryRoutes();
 
     // The control needs no prices to appear — only its tooltip's price
     // rationale does, so that's what has to wait for the market snapshot.
@@ -651,7 +628,7 @@ describe('IndustryPlanPage: make-or-buy marker on materials', () => {
       )
     );
     await db.buildPlans.add(seedPlan());
-    render(<App />);
+    await renderIndustryRoutes();
 
     const control = await screen.findByRole('button', {
       name: 'Build instead: Mechanical Parts',
@@ -665,7 +642,7 @@ describe('IndustryPlanPage: make-or-buy marker on materials', () => {
 
   it('leaves minerals with no control — nothing in the SDE produces them', async () => {
     await db.buildPlans.add(seedPlan());
-    render(<App />);
+    await renderIndustryRoutes();
     // Wait for the row that does get a control, so this can't pass just by
     // reading the table before it renders.
     await screen.findByRole('button', { name: 'Build instead: Mechanical Parts' });
@@ -680,7 +657,7 @@ describe('IndustryPlanPage: make-or-buy marker on materials', () => {
       http.get('https://esi.evetech.net/industry/systems', () => HttpResponse.error())
     );
     await db.buildPlans.add(seedPlan());
-    render(<App />);
+    await renderIndustryRoutes();
     expect((await screen.findAllByText('Prices unavailable right now')).length).toBeGreaterThan(0);
 
     // The control itself still needs no prices to offer building; only the
@@ -702,7 +679,7 @@ describe('IndustryPlanPage: owned-stock scope (#454)', () => {
     const user = userEvent.setup({ delay: null });
     const plan = seedPlan();
     await db.buildPlans.add(plan);
-    render(<App />);
+    await renderIndustryRoutes();
 
     await screen.findByRole('heading', { name: 'Rifter' });
     // The scope lives in the Owned materials popover.
@@ -739,7 +716,7 @@ describe('IndustryPlanPage: owned-stock scope (#454)', () => {
 
 describe('IndustryPlanPage: not-found handling', () => {
   it('sends the pilot back to the index for a plan id that does not exist', async () => {
-    render(<App />);
+    await renderIndustryRoutes();
     await waitFor(() => expect(window.location.pathname).toBe('/industry/plans'));
   });
 
@@ -751,29 +728,29 @@ describe('IndustryPlanPage: not-found handling', () => {
       addedAt: 2,
     });
     await db.buildPlans.add(seedPlan({ characterId: 92 }));
-    render(<App />);
+    await renderIndustryRoutes();
     await waitFor(() => expect(window.location.pathname).toBe('/industry/plans'));
   });
 });
 
 describe('IndustryPlanPage: waits for the pricing-settings hydration gate (#2054)', () => {
   it('shows a spinner instead of the plan, and never mounts it, until Assumed ME hydrates', async () => {
-    // Same reset shape `Settings.test.tsx` uses to force a store back to its
-    // pre-hydration state — `useBuildPlanPricingInputs`'s own mount effect
-    // (`buildPlanPricingInputs.ts`) re-hydrates it once the page renders.
-    useAssumedMe.setState({ value: 0, hydrated: false });
+    // `useBuildPlanPricingInputs`'s own mount effect (`buildPlanPricingInputs.ts`)
+    // hydrates the store once the page renders; held here so the gated frame
+    // can't be raced past by a fast Dexie read.
+    const assumedMe = holdHydration(useAssumedMe, 0);
     await db.buildPlans.add(seedPlan());
-    render(<App />);
+    try {
+      await renderIndustryRoutes();
 
-    // One `waitFor` so the find and the assert run in the same tick: the boot
-    // screen's own spinner is also "Loading" and unmounts as the route lands.
-    await waitFor(() =>
-      expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument()
-    );
-    expect(screen.queryByRole('heading', { name: 'Rifter' })).not.toBeInTheDocument();
+      expect((await screen.findAllByRole('status', { name: 'Loading' })).length).toBeGreaterThan(0);
+      expect(screen.queryByRole('heading', { name: 'Rifter' })).not.toBeInTheDocument();
+      assumedMe.release();
+    } finally {
+      assumedMe.restore();
+    }
 
-    // Resolves on its own once the (real, Dexie-backed) hydrate() call
-    // settles — nothing in the test drives it forward by hand.
+    // Mounts once the (real, Dexie-backed) hydrate() call settles.
     await screen.findByRole('heading', { name: 'Rifter' });
   });
 });

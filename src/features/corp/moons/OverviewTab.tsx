@@ -12,6 +12,8 @@ import { NeedsYouQueue } from './NeedsYouQueue';
 import { BookTotals, OverdueAging } from './BookTotals';
 import { isk, shortDate } from './moonsFormat';
 import { extractionPath } from './moonsPaths';
+import { PopShareIcon } from './PopShareIcon';
+import { usePopShareMarks } from './usePopShareMarks';
 import { PlaceCell } from './sectionParts';
 
 /**
@@ -24,6 +26,7 @@ export function OverviewTab() {
   const { t } = useTranslation();
   const { view, names } = useBook();
   const { billableThrough, donationsBeforeBook, schedule } = useTabsProjection();
+  const shareMarks = usePopShareMarks();
   const now = Date.parse(view.input.now);
   const until = (iso: string) => formatCountdown(Math.max(0, Date.parse(iso) - now) / 1000);
   const groups: {
@@ -95,13 +98,14 @@ export function OverviewTab() {
                 <ul className="divide-y divide-line border-b border-line last:border-b-0">
                   {g.rows.map((r) => (
                     <li key={r.id} className="flex items-center gap-3 px-3 py-2.5 text-sm">
-                      <span className="min-w-0 flex-1">
+                      <span className="flex min-w-0 flex-1 items-center gap-1.5">
                         <PlaceCell
                           refinery={names.refinery(r.structureId)}
                           undockable={names.undockable?.(r.structureId)}
                           moon={names.moon(r.moonId)}
                           to={extractionPath(r.id)}
                         />
+                        <PopShareIcon mark={shareMarks?.moons[String(r.moonId)]} />
                       </span>
                       <span className="text-right text-xs tabular-nums">
                         <span className="block">{g.when(r)}</span>

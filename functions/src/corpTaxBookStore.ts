@@ -6,6 +6,7 @@
 // never written to Firestore or to the audit log.
 
 import { randomBytes } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import {
   FieldPath,
   FieldValue,
@@ -31,6 +32,11 @@ import {
   BOOKS_COLLECTION,
   DECLARATIONS,
   DISMISSALS,
+  DISPUTES,
+  disputeIdFor,
+  type DeclareOwnInput,
+  type DisputeConflictInput,
+  type WithdrawDisputeInput,
   EXTRACTIONS,
   FEEDER_INVITES_COLLECTION,
   BILLED_BY_COLLECTION,
@@ -39,10 +45,13 @@ import {
   FEEDER_PREVIOUS_COLLECTION,
   MEMBER_SETUP_MS,
   META,
+  SCHEDULED_SYNC_DOC,
   MINERS,
   OBSERVED,
   OFFICERS,
   PAID_DOC,
+  UNCOUNTED_DOC,
+  UNCOUNTED_IGNORED_MAX,
   PAYMENTS,
   REBILLS,
   STATEMENTS,
@@ -53,6 +62,9 @@ import {
   dismissalNeedsDirector,
   defaultSettings,
   parseRecordKey,
+  billedDisputeTax,
+  mergeDisputeLines,
+  type RecordedOre,
   parseStatement,
   moveStartRate,
   rateKey,
@@ -95,6 +107,18 @@ import { VETTING_COLLECTIONS } from './vettingTypes.js';
 import { isMissingIndex } from './indexedSweep.js';
 import { FEEDER_OBSERVED, rollupChanges, writeRollupChanges } from './corpTaxBookFeederRollup.js';
 import { OBSERVED_UPDATED_AT_FIELD } from './corpTaxBookVersionKeys.js';
+import { POP_SHARING_DOC, applyMoonOverride, popSharingFrom } from './popSharing.js';
+import type { CorporationAllianceLookup } from './sharedPopsEsi.js';
+import {
+  ALLIANCE_RECHECK_MS,
+  EDITOR_CHECKED_AT,
+  editorStampFields,
+  refreshSharedPops,
+  sharedPopSourcesRef,
+  sharedPopsRef,
+  stampEditorUseIfSharing,
+  stampFailedRoleCheck,
+} from './sharedPopsStore.js';
 import { editScope } from './corpTaxBookMinerTotals.js';
 import { refreshAfterEvent } from './corpTaxBookMinerTotalsStore.js';
 import { pullsOfDays, refreshMoonDocs } from './corpTaxBookMoonDocsStore.js';
@@ -120,6 +144,8 @@ export interface BookDeps {
   openPrices?: OpenPricesReader;
   /** A corporation's CEO (public ESI); the removal (#4520) and payee (#4653) callables need it. */
   corporationCeo?: (corporationId: number) => Promise<number | undefined>;
+  /** The book corporation's alliance (public ESI), for Shared Pops (#6223); absent keeps the last read. */
+  corporationAlliance?: CorporationAllianceLookup;
 }
 
 type Data = Record<string, unknown>;
@@ -197,8 +223,12 @@ export async function authorizeOfficer(
         corporationId: call.corporationId,
         need: 'canView',
         denied: { message: 'No officer role in this corporation', reason: 'not-an-officer' },
-        // A failed renewal revokes the read access the old check granted.
-        onDenied: () => revokeOfficer(officerRef, held),
+        // A failed renewal revokes the read access the old check granted, and the officer stops
+        // counting for Community pop shares until their next editing use (#6223).
+        onDenied: async () => {
+          await stampFailedRoleCheck(deps.db, call.corporationId, characterId, now);
+          await revokeOfficer(officerRef, held);
+        },
       });
       access = {
         ...roles,
@@ -211,16 +241,37 @@ export async function authorizeOfficer(
         expiresAt: now + ACCESS_TTL_MS,
       };
       if ((await bookRef(deps.db, call.corporationId).get()).exists)
-        await cacheOfficer(officerRef, access);
+        await cacheOfficer(officerRef, withEditorCheck(access, held));
     }
   }
   if (!satisfies(access, need)) {
+    if (need !== 'view' && !access.canEdit)
+      await stampFailedRoleCheck(deps.db, call.corporationId, characterId, now);
     throw new HttpsError('permission-denied', `This needs the ${need} role`, {
       reason: 'role-required',
       need,
     });
   }
+  // The Community officer rule's clock (#6223): a use of the book with an editing role.
+  // Read from the officer record already held (a live re-check carries its check time over), so
+  // most calls read nothing more.
+  if (access.canEdit)
+    await stampEditorUseIfSharing(deps.db, call.corporationId, access, now, {
+      ref: officerRef,
+      held: held as Data | undefined,
+    });
   return access;
+}
+
+/**
+ * The record a live check writes, keeping the held record's `EDITOR_CHECKED_AT` while the same
+ * pilot could still edit: a role regained after a refusal is looked at again at once.
+ */
+function withEditorCheck(access: OfficerAccess, held: OfficerAccess | undefined): OfficerAccess {
+  const checkedAt = (held as Data | undefined)?.[EDITOR_CHECKED_AT];
+  return held?.ownerHash === access.ownerHash && held.canEdit && typeof checkedAt === 'number'
+    ? ({ ...access, [EDITOR_CHECKED_AT]: checkedAt } as OfficerAccess)
+    : access;
 }
 
 export interface VerifyOfficerResult extends OfficerRoles {
@@ -438,6 +489,11 @@ export async function deleteBook(
   await deleteBookContents(ref);
   // A scheduled sync that loaded its grant before it was dropped may still have been writing.
   await deleteBookContents(ref);
+  // Its published Shared Pops and their inputs go with it (#6223).
+  await Promise.all([
+    sharedPopsRef(deps.db, call.corporationId).delete(),
+    sharedPopSourcesRef(deps.db, call.corporationId).delete(),
+  ]);
   // Last, so a late sync has the narrowest window to write one back (can't close it).
   await deleteBilledByPointers(deps, call.corporationId);
   return { deleted: true };
@@ -646,6 +702,8 @@ export async function storeFeederExtractions(
   await refreshMoonDocs(deps.db, collectorCorporationId, touched);
   // The Overview and Extractions tabs read Extractions from the tab docs (ADR 0032).
   await refreshReadModels(deps.db, collectorCorporationId, deps.now());
+  // A moon owner's new or cancelled chunk is a Shared Pop too (#6223). Best effort.
+  await refreshSharedPops(deps, collectorCorporationId);
 }
 
 /**
@@ -660,8 +718,8 @@ export async function syncBookAs(
   options: { scheduled?: boolean } = {}
 ) {
   const book = bookRef(deps.db, input.corporationId);
-  if (!(await book.get()).exists)
-    fail('not-found', 'This corporation has no Corp Tax Book', 'no-book');
+  const held = await book.get();
+  if (!held.exists) fail('not-found', 'This corporation has no Corp Tax Book', 'no-book');
   if (input.extractions.length > 0 && !access.isStationManager) {
     fail(
       'permission-denied',
@@ -705,6 +763,7 @@ export async function syncBookAs(
       ...(dn.reason !== undefined ? { reason: dn.reason } : {}),
       ...(dn.minerId !== undefined ? { minerId: dn.minerId } : {}),
       ...(dn.statementId !== undefined ? { statementId: dn.statementId } : {}),
+      ...(dn.reviewReason !== undefined ? { reviewReason: dn.reviewReason } : {}),
     };
     try {
       // create(): a re-synced donation never overwrites an officer's "not tax" mark.
@@ -716,6 +775,18 @@ export async function syncBookAs(
     }
   }
 
+  // A scheduled run that changed nothing (no row, Extraction or donation, the same gaps) is the
+  // common case every two hours: it still stamps `lastSync` (the health strip's "last synced",
+  // and the next run's gap detection), but adds no audit entry and republishes no Shared Pops.
+  const quiet =
+    options.scheduled === true &&
+    observedChanged === 0 &&
+    touchedPulls.size === 0 &&
+    donationsAdded === 0 &&
+    isDeepStrictEqual(
+      input.gaps,
+      (held.get('lastSync') as { gaps?: unknown } | undefined)?.gaps ?? []
+    );
   const now = deps.now();
   await deps.db.runTransaction(async (tx) => {
     tx.update(book, {
@@ -727,6 +798,7 @@ export async function syncBookAs(
         gaps: input.gaps,
       },
     });
+    if (quiet) return;
     appendAudit(
       tx,
       deps,
@@ -741,13 +813,58 @@ export async function syncBookAs(
       }
     );
   });
+  // A note for officers, not the sync's own writes: best effort, the next sync writes it again.
+  if (input.uncounted !== undefined)
+    await storeUncounted(deps, input.corporationId, input.uncounted).catch((e) =>
+      console.error('uncounted donations write failed', e instanceof Error ? e.message : e)
+    );
   if (paidMiners.size > 0) await refreshAfterEvent(deps.db, input.corporationId, [...paidMiners]);
   // Rows or a chunk make-up moved these pulls (ADR 0032). Best effort, like the totals above.
   await refreshMoonDocs(deps.db, input.corporationId, touchedPulls);
   // Only donations and Extractions are in the Overview and Miners tab docs (ADR 0032); rows are not. Best effort.
-  if (donationsAdded > 0 || input.extractions.length > 0)
+  // A quiet run wrote none of either: the docs stand.
+  if (!quiet && (donationsAdded > 0 || input.extractions.length > 0))
     await refreshReadModels(deps.db, input.corporationId, deps.now());
+  // A sync that changed something republishes the book's Shared Pops (#6223). Best effort. A
+  // quiet one has nothing new to publish (a viewer's read drops an expired pop by itself), except
+  // what the publish learns on its own clock: the alliance recheck, and refinery names the
+  // scheduled run learned. So it republishes a doc that old, and costs one read otherwise.
+  if (!quiet || (await sharedPopsStale(deps, input.corporationId)))
+    await refreshSharedPops(deps, input.corporationId);
   return { observedChanged, extractions: input.extractions.length, donationsAdded };
+}
+
+/** Whether the book's Shared Pops doc was last published an alliance recheck ago or more. */
+async function sharedPopsStale(deps: BookDeps, corporationId: number): Promise<boolean> {
+  try {
+    const held = await sharedPopsRef(deps.db, corporationId).get();
+    const at = (held.get('updatedAt') as { toMillis?: () => number } | undefined)?.toMillis?.();
+    return held.exists && (at === undefined || deps.now() - at >= ALLIANCE_RECHECK_MS);
+  } catch (e) {
+    console.error('shared pops age read failed', e instanceof Error ? e.message : e);
+    return false;
+  }
+}
+
+/**
+ * #6207: replaces the noted donations into divisions the book does not read, leaving out the
+ * ones an officer already called not tax. Officers-only (`meta`): it names donors and amounts.
+ */
+async function storeUncounted(
+  deps: BookDeps,
+  corporationId: number,
+  uncounted: NonNullable<SyncInput['uncounted']>
+) {
+  const ref = sub(deps.db, corporationId, META).doc(UNCOUNTED_DOC);
+  await deps.db.runTransaction(async (tx) => {
+    const held = (await tx.get(ref)).data();
+    const ignored = new Set((held?.ignored as string[] | undefined) ?? []);
+    const donations = uncounted.filter((u) => !ignored.has(u.id));
+    // Unchanged writes nothing: every write to `meta` moves its version stamp, which makes
+    // officers' devices read the doc again (#5047).
+    if (isDeepStrictEqual(donations, held?.donations ?? [])) return;
+    tx.set(ref, { donations }, { merge: true });
+  });
 }
 
 // --- Edits -----------------------------------------------------------------
@@ -784,6 +901,34 @@ function minerCharacters(minerId: string, miner: Data | undefined): number[] {
 async function minerUids(c: EditCtx, minerId: string): Promise<string[]> {
   const miner = (await c.tx.get(col(c, MINERS).doc(minerId))).data();
   return minerCharacters(minerId, miner).map((id) => `char:${id}`);
+}
+
+/**
+ * Confirms the Declaration a payment is for, in the payment's own transaction: it must be this
+ * Miner's and not yet answered. Its resolution is the single point both ways of confirming it go
+ * through (a hand-recorded payment, or a matched donation), so whichever lands first wins and the
+ * other is refused, never counting the ISK twice. Call it after the caller's own reads.
+ */
+async function confirmDeclaration(
+  c: EditCtx,
+  declarationId: string | undefined,
+  minerId: string,
+  paymentId: string
+): Promise<void> {
+  if (declarationId === undefined) return;
+  const ref = col(c, DECLARATIONS).doc(declarationId);
+  const declaration = await mustGet(c, ref, 'Declaration');
+  if (declaration.resolution) fail('failed-precondition', 'Already resolved', 'already-resolved');
+  if (declaration.minerId !== undefined && declaration.minerId !== minerId)
+    fail('invalid-argument', "Declaration is another Miner's", 'wrong-miner');
+  c.tx.update(ref, {
+    resolution: {
+      kind: 'confirmed',
+      at: new Date(c.now).toISOString(),
+      by: c.access.characterId,
+      paymentId,
+    },
+  });
 }
 
 /** The characters an officer unlinked: automatic grouping (D26) leaves them alone. */
@@ -1061,6 +1206,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const ref = col(c, PAYMENTS).doc(action.paymentId);
       if ((await tx.get(ref)).exists)
         fail('already-exists', 'A payment with that id exists', 'payment-exists');
+      await confirmDeclaration(c, action.declarationId, action.minerId, action.paymentId);
       tx.create(ref, {
         id: action.paymentId,
         source: 'manual',
@@ -1074,7 +1220,12 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         recordedBy: by,
       });
       return {
-        detail: { paymentId: action.paymentId, minerId: action.minerId, amount: action.amount },
+        detail: {
+          paymentId: action.paymentId,
+          minerId: action.minerId,
+          amount: action.amount,
+          ...(action.declarationId ? { declarationId: action.declarationId } : {}),
+        },
       };
     }
     case 'markNotTax': {
@@ -1097,13 +1248,40 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         },
       };
     }
+    case 'ignoreUncounted': {
+      const ref = col(c, META).doc(UNCOUNTED_DOC);
+      const held = (await tx.get(ref)).data();
+      const donations = ((held?.donations as Data[] | undefined) ?? []).filter(
+        (u) => u.id !== action.uncountedId
+      );
+      const ignored = [
+        ...((held?.ignored as string[] | undefined) ?? []).filter(
+          (id) => id !== action.uncountedId
+        ),
+        action.uncountedId,
+      ].slice(-UNCOUNTED_IGNORED_MAX);
+      tx.set(ref, { donations, ignored }, { merge: true });
+      return { detail: { uncountedId: action.uncountedId } };
+    }
     case 'assignPayment': {
       const ref = col(c, PAYMENTS).doc(action.paymentId);
       const payment = await mustGet(c, ref, 'Payment');
       if (payment.minerId !== undefined)
         fail('failed-precondition', 'Already assigned', 'already-assigned');
-      tx.update(ref, { minerId: action.minerId, assignedBy: by });
-      return { detail: { paymentId: action.paymentId, minerId: action.minerId } };
+      await confirmDeclaration(c, action.declarationId, action.minerId, action.paymentId);
+      // An officer placed a held donation: the review it waited for is done (#6207).
+      tx.update(ref, {
+        minerId: action.minerId,
+        assignedBy: by,
+        ...(payment.reviewReason !== undefined ? { reviewReason: FieldValue.delete() } : {}),
+      });
+      return {
+        detail: {
+          paymentId: action.paymentId,
+          minerId: action.minerId,
+          ...(action.declarationId ? { declarationId: action.declarationId } : {}),
+        },
+      };
     }
     case 'dismiss': {
       // An omitted amount cannot dodge the gate: with a limit set it counts as over it.
@@ -1429,7 +1607,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       return { detail: { statementIds: fresh }, result: { settled: fresh } };
     }
     case 'declare': {
-      await mustGet(c, col(c, STATEMENTS).doc(action.statementId), 'Statement');
+      const statement = await mustGet(c, col(c, STATEMENTS).doc(action.statementId), 'Statement');
       const id = `x${now}_${rand(4)}`;
       tx.create(col(c, DECLARATIONS).doc(id), {
         id,
@@ -1437,6 +1615,9 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         kind: action.kind,
         at: iso,
         recordedBy: by,
+        // The Miner reads their own declarations (#6206), as they read the Statement.
+        minerId: statement.minerId,
+        uids: statement.uids ?? [],
         ...(action.note ? { note: action.note } : {}),
       });
       return {
@@ -1465,6 +1646,81 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         },
       };
     }
+    case 'dismissDispute': {
+      // Only the disputed ore is waived, as a credit on the day (#6206): the rest of the day
+      // stays billed. The server prices it from the Statements that billed it, so a client cannot
+      // understate it to slip under the Director limit. A day on no Statement yet has no price
+      // here: the client's figure stands only for a Director, or a book with no limit.
+      const ref = col(c, DISPUTES).doc(action.disputeId);
+      const dispute = await mustGet(c, ref, 'Dispute');
+      if (dispute.resolution) fail('failed-precondition', 'Already resolved', 'already-resolved');
+      if (dispute.minerId !== action.minerId)
+        fail('invalid-argument', "Dispute is another Miner's", 'wrong-miner');
+      const lines = (dispute.lines as DisputeConflictInput['lines'] | undefined) ?? [];
+      const billing: Data[] = [];
+      for (const characterId of new Set(
+        lines.map((l) => parseRecordKey(l.recordKey).characterId)
+      )) {
+        const snap = await tx.get(
+          col(c, STATEMENTS).where('characterIds', 'array-contains', characterId)
+        );
+        billing.push(...snap.docs.map((d) => d.data()));
+      }
+      const priced = billedDisputeTax({ lines }, billing);
+      const limit = c.book.dismissApprovalAboveIsk as number | null | undefined;
+      if (priced === undefined && action.amountIsk === undefined)
+        fail('failed-precondition', 'That ore is not billed yet', 'not-priced');
+      if (priced !== undefined && !(priced > 0))
+        fail('failed-precondition', 'The disputed ore carries no tax', 'nothing-to-waive');
+      const amountIsk = priced ?? (action.amountIsk as number);
+      if (dismissalNeedsDirector(limit, [priced], c.access.isDirector)) {
+        throw new HttpsError(
+          'permission-denied',
+          'A Director must approve this size of dismissal',
+          { reason: 'director-approval' }
+        );
+      }
+      const uids = await minerUids(c, action.minerId);
+      const id = `a${now}_${rand(4)}`;
+      tx.create(col(c, ADJUSTMENTS).doc(id), {
+        id,
+        minerId: action.minerId,
+        date: dispute.date,
+        amount: -amountIsk,
+        reason: action.reason,
+        by,
+        at: iso,
+        uids,
+        disputeId: action.disputeId,
+      });
+      tx.update(ref, {
+        resolution: {
+          kind: 'dismissed',
+          at: iso,
+          by,
+          reason: action.reason,
+          amountIsk,
+          adjustmentId: id,
+        },
+      });
+      return {
+        detail: {
+          disputeId: action.disputeId,
+          adjustmentId: id,
+          minerId: action.minerId,
+          amountIsk,
+          reason: action.reason,
+        },
+        result: { adjustmentId: id },
+      };
+    }
+    case 'rejectDispute': {
+      const ref = col(c, DISPUTES).doc(action.disputeId);
+      const dispute = await mustGet(c, ref, 'Dispute');
+      if (dispute.resolution) fail('failed-precondition', 'Already resolved', 'already-resolved');
+      tx.update(ref, { resolution: { kind: 'rejected', at: iso, by, reason: action.reason } });
+      return { detail: { disputeId: action.disputeId, reason: action.reason } };
+    }
     case 'recordReminder': {
       const ref = col(c, STATEMENTS).doc(action.statementId);
       const statement = await mustGet(c, ref, 'Statement');
@@ -1484,7 +1740,71 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         detail: { statementId: action.statementId, mailId: action.mailId, kind: action.kind },
       };
     }
+    case 'setPopSharing':
+    case 'setPopSharingMoon':
+      return applyPopSharingEdit(c, action);
   }
+}
+
+/**
+ * Pop Sharing settings (#6222): the switch, the Sharing default and Moon overrides, in
+ * `meta/popSharing`. Turning sharing on needs Automatic sync running; a Moon override must
+ * name a moon the book has an Extraction for (its own or a moon owner's). Every Extraction ever
+ * synced is kept, past and cancelled ones too, so a refinery between cycles keeps its moon; one
+ * with no Extraction yet has no known moon (#6240).
+ */
+async function applyPopSharingEdit(
+  c: EditCtx,
+  action: Extract<EditAction, { action: 'setPopSharing' | 'setPopSharingMoon' }>
+): Promise<EditOutcome> {
+  const ref = col(c, META).doc(POP_SHARING_DOC);
+  const current = popSharingFrom((await c.tx.get(ref)).data());
+  const next = { ...current, moons: { ...current.moons } };
+  let detail: Data;
+  // Turning sharing on stamps the book's editing officers: their uses went unstamped while the
+  // book had no Pop Sharing settings (`stampEditorUseIfSharing`). The officer who turns it on now;
+  // each other editing officer at its last role check (its record lives a day).
+  const turningOn =
+    action.action === 'setPopSharing' && action.enabled === true && !current.enabled;
+  let editors: { characterId: number; ownerHash: string; at: number }[] = [];
+  if (action.action === 'setPopSharing') {
+    if (turningOn) {
+      const sync = (await c.tx.get(col(c, META).doc(SCHEDULED_SYNC_DOC))).data();
+      if (sync?.status !== 'active')
+        fail('failed-precondition', 'Pop Sharing needs Automatic sync', 'needs-automatic-sync');
+      editors = (await c.tx.get(col(c, OFFICERS))).docs.flatMap((d) => {
+        const o = d.data() as Partial<OfficerAccess>;
+        return o.canEdit === true &&
+          typeof o.characterId === 'number' &&
+          typeof o.ownerHash === 'string' &&
+          typeof o.checkedAt === 'number' &&
+          o.characterId !== c.access.characterId
+          ? [{ characterId: o.characterId, ownerHash: o.ownerHash, at: o.checkedAt }]
+          : [];
+      });
+      editors.push({ ...c.access, at: c.now });
+    }
+    if (action.enabled !== undefined) next.enabled = action.enabled;
+    if (action.defaults) next.defaults = { ...current.defaults, ...action.defaults };
+    detail = {
+      ...(action.enabled === undefined ? {} : { enabled: action.enabled }),
+      ...(action.defaults ? { defaults: action.defaults } : {}),
+    };
+  } else {
+    const known = await c.tx.get(col(c, EXTRACTIONS).where('moonId', '==', action.moonId).limit(1));
+    if (known.empty) fail('not-found', 'This book has no such moon', 'unknown-moon');
+    const key = String(action.moonId);
+    const override = applyMoonOverride(current.moons[key], action.override);
+    if (override) next.moons[key] = override;
+    else delete next.moons[key];
+    detail = { moonId: action.moonId, set: action.override.set, clear: action.override.clear };
+  }
+  c.tx.set(ref, { ...next, updatedAt: c.now, updatedBy: c.access.characterId });
+  for (const e of editors)
+    c.tx.set(sharedPopSourcesRef(c.deps.db, c.corporationId), editorStampFields(e, e.at), {
+      merge: true,
+    });
+  return { detail };
 }
 
 /** Stores an issued Statement and its verify link; returns the link's token. Reads nothing: callers check first. */
@@ -1726,8 +2046,19 @@ export async function editBookAs(
       Object.keys(action.patch.structureExpiryHours).map(Number)
     ).catch((e) => console.error('expiry restamp failed', e instanceof Error ? e.message : e));
   }
+  // Settings, a rate, an expiry or a survey change what the book's Shared Pops say (#6223).
+  if (SHARED_POP_EDITS.has(action.action)) await refreshSharedPops(deps, call.corporationId);
   return result;
 }
+
+/** Edits that change a Shared Pop: its settings, its rate, its expiry or its ore. */
+const SHARED_POP_EDITS = new Set<EditAction['action']>([
+  'setPopSharing',
+  'setPopSharingMoon',
+  'updateSettings',
+  'addRate',
+  'linkSurvey',
+]);
 
 /**
  * A guest or member confirms their own character into a Miner grouping (D26b). The only
@@ -1891,13 +2222,12 @@ async function claimPaymentTx(
       fail('failed-precondition', 'Already assigned', 'already-assigned');
     if (((payment.notTaxAmount as number | undefined) ?? 0) >= (payment.amount as number))
       fail('failed-precondition', 'An officer marked this as not tax', 'not-tax');
-    const grouped = await tx.get(
-      sub(deps.db, corporationId, MINERS).where('characterIds', 'array-contains', characterId)
-    );
-    // A guest's character stays unlinked until they confirm (D26b): only a Miner that lists
-    // this character in its readable `uids` counts.
-    const miner = grouped.docs.find((d) => (d.get('uids') as string[]).includes(caller.uid));
-    const minerId = miner ? miner.id : `solo:${characterId}`;
+    // #6207: held because the player's Miner owed nothing (a buyback, say): an officer decides.
+    if (payment.reviewReason !== undefined)
+      fail('failed-precondition', 'An officer reviews this payment', 'in-review');
+    // A guest's character stays unlinked until they confirm (D26b): `callerMiner` counts only a
+    // Miner that lists this character in its readable `uids`.
+    const { minerId } = await callerMiner(tx, deps, corporationId, caller, characterId);
     tx.update(paymentRef, {
       minerId,
       claimedBy: characterId,
@@ -1912,6 +2242,196 @@ async function claimPaymentTx(
       { paymentId, minerId }
     );
     return { minerId };
+  });
+}
+
+/**
+ * The book a member writes to (#6206): it must exist, be on, and be past its setup
+ * window, as the member read path shows it. Read inside the transaction.
+ */
+async function memberBook(tx: Transaction, deps: BookDeps, corporationId: number): Promise<void> {
+  const book = await tx.get(bookRef(deps.db, corporationId));
+  if (!book.exists || book.get('active') !== true)
+    fail('not-found', 'This corporation has no Corp Tax Book', 'no-book');
+  const seeFrom = book.get('membersSeeFrom') as unknown;
+  if (typeof seeFrom === 'number' && deps.now() < seeFrom)
+    fail('not-found', 'This corporation has no Corp Tax Book', 'no-book');
+}
+
+/**
+ * The Miner the caller's character belongs to, as `claimPayment` finds it: a grouping that lists
+ * the caller's sign-in in its `uids` (a guest's unconfirmed character does not count), else a Miner
+ * of its own. `uids` are that Miner's confirmed sign-ins.
+ */
+async function callerMiner(
+  tx: Transaction,
+  deps: BookDeps,
+  corporationId: number,
+  caller: Caller,
+  characterId: number
+): Promise<{ minerId: string; uids: string[] }> {
+  const grouped = await tx.get(
+    sub(deps.db, corporationId, MINERS).where('characterIds', 'array-contains', characterId)
+  );
+  const miner = grouped.docs.find((d) => (d.get('uids') as string[]).includes(caller.uid));
+  return miner
+    ? { minerId: miner.id, uids: miner.get('uids') as string[] }
+    : { minerId: `solo:${characterId}`, uids: [caller.uid] };
+}
+
+/**
+ * A Miner's own "I paid this another way" (#6206): a declaration on one of their own
+ * unsettled Statements, with an optional amount and note. No officer role: the caller's
+ * sign-in must be one the Statement lists (`uids`, the same proof the rules give the member
+ * read), and the answer for someone else's Statement is the same as for a missing one. It
+ * pauses the Overdue clock like an officer-recorded declaration, until an officer answers.
+ */
+export async function declareOwnPayment(deps: BookDeps, caller: Caller, input: DeclareOwnInput) {
+  const characterId = signedInCharacter(caller);
+  const { corporationId, statementId } = input;
+  const declared = await deps.db.runTransaction(async (tx) => {
+    await memberBook(tx, deps, corporationId);
+    const statementSnap = await tx.get(sub(deps.db, corporationId, STATEMENTS).doc(statementId));
+    const statement = statementSnap.data();
+    if (!statement || !((statement.uids as string[] | undefined) ?? []).includes(caller.uid))
+      fail('not-found', 'Statement not found', 'not-found');
+    const paid = (await tx.get(sub(deps.db, corporationId, META).doc(PAID_DOC))).data();
+    if (((paid?.ids as string[] | undefined) ?? []).includes(statementId))
+      fail('failed-precondition', 'This Statement is settled', 'settled');
+    const open = await tx.get(
+      sub(deps.db, corporationId, DECLARATIONS).where('statementId', '==', statementId)
+    );
+    if (open.docs.some((d) => d.get('resolution') === undefined))
+      fail('already-exists', 'A declaration is already waiting', 'already-declared');
+    const now = deps.now();
+    const id = `x${now}_${rand(4)}`;
+    tx.create(sub(deps.db, corporationId, DECLARATIONS).doc(id), {
+      id,
+      statementId,
+      kind: 'another-way',
+      at: new Date(now).toISOString(),
+      recordedBy: characterId,
+      via: 'player',
+      minerId: statement.minerId,
+      uids: statement.uids,
+      ...(input.amount !== undefined ? { amount: input.amount } : {}),
+      ...(input.note !== undefined ? { note: input.note } : {}),
+    });
+    appendAudit(
+      tx,
+      deps,
+      corporationId,
+      { characterId, name: 'Player declaration', via: 'player-claim' },
+      'declare',
+      {
+        declarationId: id,
+        statementId,
+        kind: 'another-way',
+        ...(input.amount !== undefined ? { amount: input.amount } : {}),
+      }
+    );
+    return { declarationId: id, minerId: statement.minerId as string };
+  });
+  await refreshAfterEvent(deps.db, corporationId, [declared.minerId]);
+  await refreshReadModels(deps.db, corporationId, deps.now());
+  return { declarationId: declared.declarationId };
+}
+
+/**
+ * A Miner flags a Conflict day to the book (#6206): "I gave this ore to {payee}". One record
+ * per Miner and day; a second flag for the same day adds its lines. Every line's character
+ * must be one of the caller's own Miner's confirmed characters. A day an officer already
+ * rejected cannot be flagged again. Officers answer in Needs you: dismiss the day, or reject.
+ */
+export async function disputeConflict(deps: BookDeps, caller: Caller, input: DisputeConflictInput) {
+  const characterId = signedInCharacter(caller);
+  const { corporationId, date } = input;
+  return deps.db.runTransaction(async (tx) => {
+    await memberBook(tx, deps, corporationId);
+    const { minerId, uids } = await callerMiner(tx, deps, corporationId, caller, characterId);
+    const characters = new Set<number>();
+    for (const line of input.lines) {
+      const lineCharacter = parseRecordKey(line.recordKey).characterId;
+      if (!uids.includes(`char:${lineCharacter}`))
+        fail('permission-denied', 'Not your ore', 'not-your-record');
+      characters.add(lineCharacter);
+    }
+    const disputeId = disputeIdFor(minerId, date);
+    const ref = sub(deps.db, corporationId, DISPUTES).doc(disputeId);
+    const held = (await tx.get(ref)).data();
+    if (held?.resolution) fail('failed-precondition', 'An officer answered this day', 'rejected');
+    const heldLines = (held?.lines as DisputeConflictInput['lines'] | undefined) ?? [];
+    for (const line of heldLines) characters.add(parseRecordKey(line.recordKey).characterId);
+    // The ore each line names, held or new, must be on the book's record, no more than recorded.
+    const recorded: RecordedOre[] = [];
+    for (const id of characters) {
+      const rows = await tx.get(
+        sub(deps.db, corporationId, OBSERVED)
+          .where('characterId', '==', id)
+          .where('date', '==', date)
+      );
+      for (const r of rows.docs) recorded.push(r.data() as RecordedOre);
+    }
+    const lines = mergeDisputeLines(heldLines, input.lines, recorded);
+    const iso = new Date(deps.now()).toISOString();
+    if (held) {
+      tx.update(ref, {
+        lines,
+        uids,
+        updatedAt: iso,
+        ...(input.note !== undefined ? { note: input.note } : {}),
+      });
+    } else {
+      tx.create(ref, {
+        id: disputeId,
+        minerId,
+        date,
+        lines,
+        by: characterId,
+        at: iso,
+        updatedAt: iso,
+        uids,
+        ...(input.note !== undefined ? { note: input.note } : {}),
+      });
+    }
+    appendAudit(
+      tx,
+      deps,
+      corporationId,
+      { characterId, name: 'Player dispute', via: 'player-claim' },
+      'disputeConflict',
+      { disputeId, minerId, date, lines: input.lines.length }
+    );
+    return { disputeId };
+  });
+}
+
+/**
+ * A Miner takes back their own dispute of a day while no officer has answered it: it leaves
+ * Needs you and the day is billed as before. Authorised as the dispute was (the caller's own
+ * Miner); anyone else's, or one already answered, is refused. Audited.
+ */
+export async function withdrawDispute(deps: BookDeps, caller: Caller, input: WithdrawDisputeInput) {
+  const characterId = signedInCharacter(caller);
+  const { corporationId, date } = input;
+  return deps.db.runTransaction(async (tx) => {
+    await memberBook(tx, deps, corporationId);
+    const { minerId } = await callerMiner(tx, deps, corporationId, caller, characterId);
+    const disputeId = disputeIdFor(minerId, date);
+    const ref = sub(deps.db, corporationId, DISPUTES).doc(disputeId);
+    const held = (await tx.get(ref)).data();
+    if (!held || held.minerId !== minerId) fail('not-found', 'Dispute not found', 'not-found');
+    if (held.resolution) fail('failed-precondition', 'An officer answered this day', 'answered');
+    tx.delete(ref);
+    appendAudit(
+      tx,
+      deps,
+      corporationId,
+      { characterId, name: 'Player dispute withdrawal', via: 'player-claim' },
+      'withdrawDispute',
+      { disputeId, minerId, date }
+    );
+    return { disputeId };
   });
 }
 
@@ -2009,6 +2529,8 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
       overdueDays: b.overdueDays,
       minimumStatement: b.minimumStatement,
       divisions: b.divisions,
+      // The corp's own names for them, so the verify page names the Account to pay into (#6204).
+      divisionNames: b.divisionNames,
       cadence: b.cadence,
     },
     payments: here

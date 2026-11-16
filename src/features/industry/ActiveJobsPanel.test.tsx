@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { act, render, screen, within, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
@@ -1007,9 +1007,8 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Log production' }));
 
     await waitFor(() => expect(gatedSetActiveCharacter).toHaveBeenCalledWith(CHAR_B));
-    // Flush every pending React update (including router transitions): with
-    // the switch still pending, nothing may have navigated yet.
-    await act(async () => {});
+    // waitFor drains a macrotask before it returns, so any router transition
+    // has landed: with the switch still pending, nothing may have navigated yet.
     expect(location?.pathname).toBe('/');
 
     releaseSwitch();
@@ -1663,6 +1662,33 @@ describe('ActiveJobsPanel: Job History (#2866)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Active' }));
     expect(await screen.findByText('Widget Gamma')).toBeInTheDocument();
+  });
+
+  it('reads a delivered invention job as "N of M succeeded", and nothing when ESI left the count out (#6166)', async () => {
+    server.use(
+      http.get(jobsUrl(), () =>
+        HttpResponse.json([
+          esiJob({
+            job_id: 7,
+            activity_id: 8,
+            product_type_id: undefined,
+            runs: 5,
+            successful_runs: 0,
+          }),
+          esiJob({ job_id: 8, activity_id: 8, product_type_id: undefined, runs: 4 }),
+          esiJob({ job_id: 9, successful_runs: 3 }),
+          RUNNING,
+        ])
+      )
+    );
+    renderPanel();
+    await expandJobs();
+    await openHistory();
+
+    const zero = await screen.findByText('0 of 5 succeeded');
+    expect(zero).not.toHaveClass('text-danger');
+    // Job 8 (no count from ESI) and job 9 (manufacturing) show plain runs.
+    expect(screen.getAllByText(/of \d+ succeeded/)).toHaveLength(1);
   });
 
   it('says how many delivered jobs are unlogged while the panel is folded', async () => {

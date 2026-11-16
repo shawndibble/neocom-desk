@@ -439,7 +439,8 @@ function FireRow({
           to={notificationUrlForSubject(
             fire.eventId,
             fire.subjectId ?? fire.typeId,
-            fire.characterId
+            fire.characterId,
+            fire.id
           )}
           onClick={onNavigate}
           className="min-w-0 flex-1 basis-48 rounded-xs text-xs text-text-dim hover:text-text hover:underline"

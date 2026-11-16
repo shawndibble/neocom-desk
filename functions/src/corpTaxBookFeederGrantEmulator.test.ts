@@ -281,6 +281,44 @@ emulatorSuite('moon owner onboarding', () => {
     expect(revoked).toEqual([`rt-${ALT}`]);
   });
 
+  it('reconnect after a disconnect: coverage starts the day after the last covered day', async () => {
+    await save(await newInvite());
+    await collectorBook()
+      .collection('feeders')
+      .doc(String(FEEDER))
+      .update({
+        status: 'disconnected',
+        disconnectedAt: T0 - 1000,
+        joinedAt: Date.parse('2026-10-01T00:00:00Z'),
+        coveragePeriods: [{ from: '2026-10-01', to: '2026-10-10' }],
+      });
+    await db.collection(CORP_SYNC_GRANTS_COLLECTION).doc(String(FEEDER)).delete();
+    await save(RECONNECT_CODE, undefined, OTHER_ALT);
+    expect(await feederRecord()).toMatchObject({
+      status: 'active',
+      coveragePeriods: [{ from: '2026-10-01', to: '2026-10-10' }, { from: '2026-10-11' }],
+    });
+  });
+
+  it('reconnect after a disconnect never covers days before the moon owner last joined', async () => {
+    await save(await newInvite());
+    await collectorBook()
+      .collection('feeders')
+      .doc(String(FEEDER))
+      .update({
+        status: 'disconnected',
+        disconnectedAt: T0 - 1000,
+        coveragePeriods: [{ from: '2026-09-20', to: '2026-10-01' }],
+      });
+    await db.collection(CORP_SYNC_GRANTS_COLLECTION).doc(String(FEEDER)).delete();
+    await save(RECONNECT_CODE, undefined, OTHER_ALT);
+    // Joined on T0 (10-18): the gap since 10-01 was not in the book.
+    expect((await feederRecord())?.coveragePeriods).toEqual([
+      { from: '2026-09-20', to: '2026-10-01' },
+      { from: '2026-10-18' },
+    ]);
+  });
+
   it('reconnect: a new holder reads Extractions at once, despite the old one being refused (#6117)', async () => {
     extractionsRead = 'forbidden';
     await save(await newInvite());
@@ -313,6 +351,7 @@ emulatorSuite('moon owner onboarding', () => {
       .doc(String(FEEDER))
       .update({
         status: 'disconnected',
+        joinedAt: Date.parse('2026-10-01T00:00:00Z'),
         coveragePeriods: [{ from: '2026-10-01', to: '2026-10-10' }],
       });
     // A disconnect drops the grant.
@@ -328,7 +367,7 @@ emulatorSuite('moon owner onboarding', () => {
     const record = await feederRecord();
     expect(record).toMatchObject({
       status: 'active',
-      coveragePeriods: [{ from: '2026-10-01', to: '2026-10-10' }, { from: '2026-10-18' }],
+      coveragePeriods: [{ from: '2026-10-01', to: '2026-10-10' }, { from: '2026-10-11' }],
     });
     expect(record).not.toHaveProperty('disconnectedAt');
   });
@@ -371,7 +410,8 @@ emulatorSuite('moon owner onboarding', () => {
       collectorCorporationId: COLLECTOR,
       feederStatus: 'active',
       requestedRatePct: 6,
-      effectiveRatePct: 6,
+      // A request alone is no rate until one is agreed (#6209).
+      effectiveRatePct: null,
       isHolder: false,
       refineries: [{ structureId: 4001, volume: 100 }],
     });

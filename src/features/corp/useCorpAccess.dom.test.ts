@@ -9,6 +9,7 @@ import { scopesForGroup, SCOPES } from '@/esi/scopes';
 import { CORP_SCOPES_FOR_CAPABILITY } from './corpScopes';
 import { loadCharacterRoles } from './roles';
 import { useCorpAccess } from './useCorpAccess';
+import { deferred } from '@/test/deferred';
 
 vi.mock('./roles', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./roles')>()),
@@ -149,9 +150,10 @@ describe('useCorpAccess — none', () => {
 describe('useCorpAccess — a roles read that could not complete', () => {
   it('stays unknown when the roles read fails outright, rather than claiming none', async () => {
     mockedGrantedScopes.mockReturnValue(ALL_CORP_SCOPES);
-    mockedLoadRoles.mockResolvedValue({ cached: null, needsReauth: true });
+    const read = deferred<Awaited<ReturnType<typeof loadCharacterRoles>>>();
+    mockedLoadRoles.mockReturnValue(read.promise);
     const { result } = renderHook(() => useCorpAccess());
-    await act(async () => {});
+    await act(async () => read.resolve({ cached: null, needsReauth: true }));
     expect(result.current.state).toBe('unknown');
   });
 
@@ -159,7 +161,7 @@ describe('useCorpAccess — a roles read that could not complete', () => {
     mockedGrantedScopes.mockReturnValue(ALL_CORP_SCOPES);
     mockedLoadRoles.mockRejectedValue(new Error('offline'));
     const { result } = renderHook(() => useCorpAccess());
-    await act(async () => {});
+    await waitFor(() => expect(result.current.readFailed).toBe(true));
     expect(result.current.state).toBe('unknown');
   });
 
@@ -174,9 +176,10 @@ describe('useCorpAccess — a roles read that could not complete', () => {
 
   it('does not offer a retry when the login itself was refused', async () => {
     mockedGrantedScopes.mockReturnValue(ALL_CORP_SCOPES);
-    mockedLoadRoles.mockResolvedValue({ cached: null, needsReauth: true });
+    const read = deferred<Awaited<ReturnType<typeof loadCharacterRoles>>>();
+    mockedLoadRoles.mockReturnValue(read.promise);
     const { result } = renderHook(() => useCorpAccess());
-    await act(async () => {});
+    await act(async () => read.resolve({ cached: null, needsReauth: true }));
     expect(result.current.state).toBe('unknown');
     expect(result.current.readFailed).toBe(false);
   });

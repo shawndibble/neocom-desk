@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -8,9 +8,7 @@ import { db, type BuildPlanRecord } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useAuthFailure } from '@/stores/authFailure';
-import { App } from '@/app/App';
-import * as routeChunks from '@/app/routeChunks';
-import { clearMarketPriceCache } from '@/market/prices';
+import { renderIndustryRoutes } from '@/test/industryRoutes';
 import { clearCostIndexCache } from '@/features/industry/marketData';
 import {
   SYNCED_BUILD_GROUPS_KEY,
@@ -19,14 +17,6 @@ import {
 } from '@/features/industry/buildGroups';
 import { loadBlueprints } from '@/sde/loadSde';
 import type { BlueprintMap, TypeMap } from '@/sde/types';
-
-vi.mock('virtual:pwa-register/react', () => ({
-  useRegisterSW: () => ({
-    needRefresh: [false, vi.fn()],
-    offlineReady: [false, vi.fn()],
-    updateServiceWorker: vi.fn(),
-  }),
-}));
 
 // Same small fixture the other Industry route tests use: Rifter (638) needs
 // Tritanium/Pyerite/Mechanical Parts; 9841 builds Mechanical Parts.
@@ -147,7 +137,6 @@ afterAll(() => server.close());
 
 afterEach(() => {
   server.resetHandlers();
-  clearMarketPriceCache();
   clearCostIndexCache();
 });
 async function resetSession() {
@@ -181,25 +170,16 @@ async function resetSession() {
 
 beforeAll(async () => {
   server.listen({ onUnhandledRequest: 'error' });
-  // One throwaway render of the group page, so no test pays for the first one.
-  // A worker's first `App` render (compiling the lazy route chunks, warming
-  // jsdom and React) takes longer than the 5s `findBy*` budget on a cold
-  // worker, and it landed on whichever test ran first: the page sat on
-  // "Loading..." until that test's `findByText` gave up. Done here under the
-  // hook's own budget, as IndustryPlanPage.test.tsx does.
-  await Promise.all([
-    routeChunks.loadIndustryGroupPage(),
-    routeChunks.loadIndustryPlanPage(),
-    routeChunks.loadIndustry(),
-  ]);
+  // One throwaway render of the group page, so no test pays for a worker's
+  // first cold render (module graph, jsdom and React warm-up), done here under
+  // the hook's own budget, as IndustryPlanPage.test.tsx does.
   await resetSession();
   await seedGroup('g1', 'Rifter fit');
   await db.buildPlans.add(seedPlan({ id: 'bp-1', name: 'Rifter run', buildGroupId: 'g1' }));
-  const { unmount } = render(<App />);
+  const { unmount } = await renderIndustryRoutes();
   await screen.findByRole('link', { name: /Rifter run/ }, { timeout: 25_000 });
   unmount();
   server.resetHandlers();
-  clearMarketPriceCache();
   clearCostIndexCache();
 }, 30_000);
 
@@ -218,7 +198,7 @@ describe('IndustryGroupPage', () => {
         updatedAt: 2,
       })
     );
-    render(<App />);
+    await renderIndustryRoutes();
 
     expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
     expect(await screen.findByRole('link', { name: /Rifter run/ })).toBeInTheDocument();
@@ -230,7 +210,7 @@ describe('IndustryGroupPage', () => {
     vi.mocked(loadBlueprints).mockRejectedValueOnce(new Error('offline'));
     await seedGroup('g1', 'Rifter fit');
     await db.buildPlans.add(seedPlan({ id: 'bp-1', name: 'Rifter run', buildGroupId: 'g1' }));
-    render(<App />);
+    await renderIndustryRoutes();
 
     expect((await screen.findAllByText("Blueprint data couldn't load")).length).toBeGreaterThan(0);
     await user.click(screen.getByRole('button', { name: 'Try again' }));
@@ -241,7 +221,7 @@ describe('IndustryGroupPage', () => {
     const user = userEvent.setup();
     await seedGroup('g1', 'Rifter fit');
     await db.buildPlans.add(seedPlan({ id: 'bp-1', name: 'Rifter run', buildGroupId: 'g1' }));
-    render(<App />);
+    await renderIndustryRoutes();
 
     await user.click(await screen.findByRole('link', { name: /Rifter run/ }));
 
@@ -250,7 +230,7 @@ describe('IndustryGroupPage', () => {
   });
 
   it('sends the pilot back to the index for a group id that does not exist', async () => {
-    render(<App />);
+    await renderIndustryRoutes();
     await waitFor(() => expect(window.location.pathname).toBe('/industry/plans'));
   });
 
@@ -258,7 +238,7 @@ describe('IndustryGroupPage', () => {
     await db.characters.put({ characterId: 92, name: 'Pilot Two', ownerHash: 'oh2', addedAt: 2 });
     const value: BuildGroupsValue = { 92: [{ id: 'g1', name: "Someone else's group", order: 0 }] };
     await db.settings.put({ key: SYNCED_BUILD_GROUPS_KEY, value });
-    render(<App />);
+    await renderIndustryRoutes();
     await waitFor(() => expect(window.location.pathname).toBe('/industry/plans'));
   });
 });

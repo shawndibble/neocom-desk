@@ -171,6 +171,13 @@ const CATALOG = [
     scope: requiredScope('getCharacterMercenaryDens'),
   },
   {
+    // Shared Pops another corporation's Corp Tax Book shares (issue #6225). Read through the
+    // backend with the Characters' own sign-in, so no Permission gates it.
+    id: 'sharedMoonPop',
+    labelKey: 'settings.notifications.event.sharedMoonPop',
+    defaultChannels: 'both',
+  },
+  {
     id: 'marketOrderFilled',
     labelKey: 'settings.notifications.event.marketOrderFilled',
     defaultChannels: 'feedOnly',
@@ -378,6 +385,14 @@ const CATALOG = [
   {
     id: 'vettingShared',
     labelKey: 'settings.notifications.event.vettingShared',
+    defaultChannels: 'both',
+  },
+  // The scheduled server sync stopped a Corp Tax Book's Automatic sync (issue #6208). Raised by
+  // the backend as it stops it (ADR 0027), so no ESI scope; like `vettingShared`, every Character
+  // is offered the row, whose hint says it only reaches the book's editors.
+  {
+    id: 'corpTaxBookSyncStopped',
+    labelKey: 'settings.notifications.event.corpTaxBookSyncStopped',
     defaultChannels: 'both',
   },
 ] as const satisfies readonly CatalogRow[];

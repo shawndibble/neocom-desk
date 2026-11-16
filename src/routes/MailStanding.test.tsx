@@ -1,12 +1,12 @@
-import { describe, it, expect, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { describe, it, expect, onTestFinished, vi } from 'vitest';
+import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { App } from '@/app/App';
 import {
   installMailHarness,
+  renderMailRoute,
   CHAR_ID,
   CHAR_ID_2,
   headers,
@@ -19,14 +19,6 @@ import {
 
 vi.mock('@/features/character/mailEditor/RichMailBodyEditor', async () => ({
   default: (await import('@/features/character/PlainBodyEditor.testHelper')).PlainBodyEditor,
-}));
-
-vi.mock('virtual:pwa-register/react', () => ({
-  useRegisterSW: () => ({
-    needRefresh: [false, vi.fn()],
-    offlineReady: [false, vi.fn()],
-    updateServiceWorker: vi.fn(),
-  }),
 }));
 
 vi.mock('@/sde/loadSde', () => ({
@@ -49,7 +41,7 @@ describe('Mail', () => {
         )
       );
       const user = userEvent.setup();
-      render(<App />);
+      renderMailRoute();
       await user.click(await screen.findByText('Fleet up!'));
       expect(
         await screen.findByRole('img', { name: 'Your contact: Terrible standing (-10)' })
@@ -58,7 +50,7 @@ describe('Mail', () => {
 
     it('shows no tag for a sender who is a stranger', async () => {
       const user = userEvent.setup();
-      render(<App />);
+      renderMailRoute();
       await user.click(await screen.findByText('Fleet up!'));
       await screen.findByText(/Corp Recruiter/);
       expect(screen.queryByRole('img')).not.toBeInTheDocument();
@@ -74,7 +66,7 @@ describe('Mail', () => {
         )
       );
       const user = userEvent.setup();
-      render(<App />);
+      renderMailRoute();
       await user.click(await screen.findByText('Fleet up!'));
       expect(
         await screen.findByRole('img', {
@@ -118,13 +110,13 @@ describe('Mail', () => {
         return HttpResponse.json([]);
       })
     );
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('From a corp');
     await vi.waitFor(() => expect(sent).toEqual([90000001]));
   });
 
   it('does not render an Export CSV button', async () => {
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Fleet up!');
     expect(screen.queryByRole('button', { name: /export csv/i })).not.toBeInTheDocument();
   });
@@ -143,7 +135,7 @@ describe('Mail', () => {
         HttpResponse.json(manyHeaders)
       )
     );
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Mail 0');
     // The scroller wraps the date sections, each its own <ul>.
     const list = screen.getByText('Mail 0').closest('.overflow-y-auto');
@@ -154,6 +146,9 @@ describe('Mail', () => {
     // Only Date is faked: real timers keep findBy/waitFor polling. Local noon,
     // so the 09:00 mail is Today in any runner zone.
     vi.useFakeTimers({ toFake: ['Date'] });
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
     vi.setSystemTime(new Date(2026, 7, 2, 12));
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>
@@ -164,7 +159,7 @@ describe('Mail', () => {
       )
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     const subject = await screen.findByText('Fleet up!');
     const today = screen.getByRole('heading', { name: 'Today' });
     // Device locale, like every other date in the app.
@@ -183,7 +178,7 @@ describe('Mail', () => {
   });
 
   it('does not show a "load more" affordance when fewer than 50 mails are cached', async () => {
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Fleet up!');
     expect(screen.queryByRole('button', { name: /load more/i })).not.toBeInTheDocument();
   });
@@ -206,7 +201,7 @@ describe('Mail', () => {
     );
 
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Mail 1000');
 
     const loadMore = screen.getByRole('button', { name: /load more/i });
@@ -230,7 +225,7 @@ describe('Mail', () => {
       )
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Mail 1000');
     await onlyFolders(user, ['Sent']);
     expect(await screen.findByText('No recent mail in this folder')).toBeInTheDocument();
@@ -254,7 +249,7 @@ describe('Mail', () => {
     );
 
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Mail 1000');
     await user.click(screen.getByRole('button', { name: /load more/i }));
 
@@ -281,7 +276,7 @@ describe('Mail', () => {
       )
     );
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await user.click(await screen.findByText('Fleet up!'));
 
     expect(await screen.findByText("This mail hasn't been downloaded yet.")).toBeInTheDocument();
@@ -309,7 +304,7 @@ describe('Mail', () => {
     );
 
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Mail 1000');
     await user.click(screen.getByRole('button', { name: /load more/i }));
 
@@ -345,7 +340,7 @@ describe('Mail', () => {
     );
 
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Mail 1000');
     await user.click(screen.getByRole('button', { name: /load more/i }));
     await user.click(await screen.findByText('Older mail', {}, { timeout: 5000 }));
@@ -376,11 +371,18 @@ describe('Mail', () => {
       })
     );
     await addSecondCharacter();
+    // A full page for the second Character too, so its Load more stays on
+    // screen across the switch: its label is how the test sees the stale
+    // request finish (it reads "Loading" until the dropped page settles).
+    const secondPage = Array.from({ length: 50 }, (_, i) => ({
+      mail_id: 500 - i,
+      subject: i === 0 ? 'Second pilot mail' : `Second ${500 - i}`,
+      timestamp: '2026-08-03T00:00:00Z',
+      labels: [],
+    }));
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID_2}/mail`, () =>
-        HttpResponse.json([
-          { mail_id: 4, subject: 'Second pilot mail', timestamp: '2026-08-03T00:00:00Z' },
-        ])
+        HttpResponse.json(secondPage)
       ),
       http.get(`https://esi.evetech.net/characters/${CHAR_ID_2}/mail/labels`, () =>
         HttpResponse.json({ labels: mailLabels.labels, total_unread_count: 0 })
@@ -388,7 +390,7 @@ describe('Mail', () => {
     );
 
     const user = userEvent.setup();
-    render(<App />);
+    renderMailRoute();
     await screen.findByText('Mail 1000');
     await user.click(screen.getByRole('button', { name: /load more/i }));
 
@@ -396,17 +398,14 @@ describe('Mail', () => {
       await useActiveCharacter.getState().setActiveCharacter(CHAR_ID_2);
     });
     await screen.findByText('Second pilot mail');
+    // Same page instance, still waiting on the first Character's older page.
+    expect(screen.getByRole('button', { name: 'Loading' })).toBeDisabled();
 
     await act(async () => {
       resolveOlderPage?.();
-      // Let the stale fetch's response parsing, resolveNames, and any state
-      // updates it triggers fully settle across several microtask/macrotask
-      // hops before asserting on the result.
-      for (let i = 0; i < 10; i++) {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      }
     });
-
+    // The stale request has settled once the button is back.
+    expect(await screen.findByRole('button', { name: /load more/i })).toBeEnabled();
     expect(screen.queryByText('Older mail')).not.toBeInTheDocument();
     expect(screen.getByText('Second pilot mail')).toBeInTheDocument();
   });

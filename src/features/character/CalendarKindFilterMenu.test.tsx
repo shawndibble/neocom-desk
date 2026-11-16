@@ -137,3 +137,53 @@ describe('CalendarKindFilterMenu corporation filter', () => {
     expect(screen.getByRole('menuitemradio', { name: 'Hide corporation events' })).toBeVisible();
   });
 });
+
+describe('CalendarKindFilterMenu sharing-corporation filter (#6224)', () => {
+  const sharing = [
+    { id: 5, name: 'Sharing One', ticker: 'SH1' },
+    { id: 6, name: 'Sharing Two', ticker: 'SH2' },
+  ];
+
+  function renderMenu(list: typeof sharing, onSharingCorpFilter = vi.fn()) {
+    render(
+      <CalendarKindFilterMenu
+        hidden={[]}
+        onToggle={() => {}}
+        onShowAll={() => {}}
+        counts={new Map([['sharedMoonPop', 2]])}
+        readableKinds={['sharedMoonPop']}
+        reauthKinds={[]}
+        skillPlanChoices={[]}
+        chosenSkillPlanId={null}
+        skillPlanError={null}
+        onChooseSkillPlan={() => {}}
+        sharingCorporations={list}
+        sharingCorpFilter="all"
+        onSharingCorpFilter={onSharingCorpFilter}
+      />
+    );
+    return onSharingCorpFilter;
+  }
+
+  it('lists Shared moon pops as a kind and picks one sharing corporation', async () => {
+    const user = userEvent.setup();
+    const onSharingCorpFilter = renderMenu(sharing);
+    await user.click(screen.getByRole('button', { name: /filter event types/i }));
+    expect(
+      await screen.findByRole('menuitemcheckbox', { name: /shared moon pops/i })
+    ).toBeVisible();
+    (await screen.findByRole('menuitem', { name: /shared moon pops by/i })).focus();
+    await user.keyboard('{Enter}');
+    (await screen.findByRole('menuitemradio', { name: 'Sharing Two [SH2]' })).focus();
+    await user.keyboard('{Enter}');
+    expect(onSharingCorpFilter).toHaveBeenCalledWith(6);
+  });
+
+  it('offers no sharing filter for a single sharing corporation', async () => {
+    const user = userEvent.setup();
+    renderMenu(sharing.slice(0, 1));
+    await user.click(screen.getByRole('button', { name: /filter event types/i }));
+    await screen.findByRole('menuitemcheckbox', { name: /shared moon pops/i });
+    expect(screen.queryByRole('menuitem', { name: /shared moon pops by/i })).toBeNull();
+  });
+});

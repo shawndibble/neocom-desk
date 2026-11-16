@@ -7,6 +7,7 @@ import {
   refineryNamesOf,
   readBookSettings,
   readDismissal,
+  readMemberDeclaration,
   readMiner,
   readObservedRow,
   readPayment,
@@ -34,6 +35,7 @@ describe('readBookSettings', () => {
       corporationId: 98000001,
       startDate: '2026-10-01',
       graceHours: 12,
+      overdueDays: 14,
       hubId: 'amarr',
       oreForm: 'raw',
       divisions: [2],
@@ -50,6 +52,11 @@ describe('readBookSettings', () => {
     expect(readBookSettings(1, { ...book, divisionNames: 'junk' })).not.toHaveProperty(
       'divisionNames'
     );
+  });
+
+  it("reads the book's Overdue days, 14 when unset (#6204)", () => {
+    expect(readBookSettings(1, { ...book, overdueDays: 21 })?.overdueDays).toBe(21);
+    expect(readBookSettings(1, book)?.overdueDays).toBe(14);
   });
 
   it('keeps a per-feeder rate', () => {
@@ -164,6 +171,32 @@ describe('the other readers', () => {
       mainCharacterId: 2,
     });
     expect(readMiner('m', { characterIds: [] })).toBeNull();
+  });
+});
+
+describe('readMemberDeclaration (#6206)', () => {
+  it('reads a declaration with its amount and answer, and drops a malformed one', () => {
+    expect(
+      readMemberDeclaration('x1', {
+        statementId: 's1',
+        kind: 'another-way',
+        at: '2026-11-01T00:00:00.000Z',
+        amount: 5,
+        note: 'contract',
+        uids: ['char:1'],
+        resolution: { kind: 'rejected', at: '2026-11-02T00:00:00.000Z', by: 9, reason: 'no' },
+      })
+    ).toEqual({
+      id: 'x1',
+      statementId: 's1',
+      kind: 'another-way',
+      at: '2026-11-01T00:00:00.000Z',
+      amount: 5,
+      note: 'contract',
+      resolution: { kind: 'rejected', at: '2026-11-02T00:00:00.000Z', reason: 'no' },
+    });
+    expect(readMemberDeclaration('x2', { statementId: 's1', kind: 'other', at: 'x' })).toBeNull();
+    expect(readMemberDeclaration('x3', { kind: 'contract', at: 'x' })).toBeNull();
   });
 });
 

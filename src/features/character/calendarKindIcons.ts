@@ -20,6 +20,7 @@ export const KIND_ICON: Record<CharacterBoardItemKind, typeof Icon.Skills> = {
   structureTimer: Icon.StructureTimer,
   structureFuel: Icon.StructureFuel,
   moonChunk: Icon.MoonMining,
+  sharedMoonPop: Icon.SharedMoonPop,
   corpJob: Icon.Industry,
   skyhookRaid: Icon.PiSkyhook,
   contractExpiry: Icon.Contracts,

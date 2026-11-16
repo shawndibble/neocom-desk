@@ -1,8 +1,7 @@
 import { useState, type KeyboardEvent } from 'react';
-import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui';
+import { Trans, useTranslation } from 'react-i18next';
+import { Button, IskAmount } from '@/components/ui';
 import { cx } from '@/lib/cx';
-import { formatCompactNumber } from '@/lib/compactNumber';
 import {
   chargeScore,
   iskPerMinute,
@@ -287,8 +286,16 @@ export function ChargeChart({
               : t('fittings.chargePicker.isk', {
                   isk: formatIskExact(selected.price),
                 })}
-            {perMin !== null &&
-              ` · ${t('fittings.chargePicker.perMinute', { isk: formatCompactNumber(perMin) })}`}
+            {perMin !== null && (
+              <>
+                {' · '}
+                <Trans
+                  t={t}
+                  i18nKey="fittings.chargePicker.perMinuteAmount"
+                  components={{ isk: <IskAmount value={perMin} /> }}
+                />
+              </>
+            )}
           </span>
         </div>
         <div className="flex items-center justify-between gap-2 text-text-dim">

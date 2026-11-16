@@ -822,7 +822,7 @@ describe('AppraisalPanel', () => {
     /**
      * Regression: the buy-total highlight must never fire on a row with
      * nothing to compare against — a row with no refine value is not a
-     * winner just because `refineBeatsSellAsIs` defaults to false for it.
+     * winner just because its refine verdict is not `'refine'`.
      */
     it('does not bold the buy total on a row with no refine comparison', () => {
       renderPanel({ controller: controller({ result: refineOutcome() }) });

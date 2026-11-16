@@ -29,6 +29,7 @@ import { flagPartlyFailed } from './corpAcrossKit';
 import { hbarsFromRows, severityColor } from './chartBuilders';
 import type { NumberModel, TableCell, TableModel } from './types';
 import type { Translate } from '@/lib/translate';
+import { popShareMarkLabel } from '@/features/corp/taxBook/popShareMarkLabel';
 
 const C = 'overview.widgets.chart';
 const STRUCTURES_PAGE = '/corp/structures';
@@ -277,6 +278,14 @@ export const moonChunks: Builder = (feeds, { t, now, scopeAll }) => {
   const named =
     scopeAll && new Set(chunks.map((chunk) => chunk.corporation?.id).filter(Boolean)).size > 1;
   const corpOf = (chunk: BoardClockSource) => (named ? chunk.corporation : undefined);
+  // A Corp Tax Book officer sees which moons the book shares (#6226); a drill's id is its refinery.
+  const drillCell = (chunk: BoardClockSource): TableCell => {
+    const text = shortStructureName(chunk.subject);
+    const mark = data.shareMarks?.[chunk.id];
+    return mark
+      ? { text, share: { label: popShareMarkLabel(t, mark), off: mark.kind === 'opted-out' } }
+      : text;
+  };
 
   const table: TableModel = {
     columns: [
@@ -292,7 +301,7 @@ export const moonChunks: Builder = (feeds, { t, now, scopeAll }) => {
       return {
         key: `${chunk.corporation?.id ?? ''}:${chunk.id}:${i}`,
         cells: [
-          shortStructureName(chunk.subject),
+          drillCell(chunk),
           ...(named ? [corp ? corpCell(corp) : UNKNOWN] : []),
           untilOf(chunk.deadlineMs),
           eventOf(chunk.detail),

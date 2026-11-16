@@ -81,6 +81,9 @@ import {
 import {
   parseBookCall,
   parseClaimPaymentInput,
+  parseDeclareOwnInput,
+  parseDisputeConflictInput,
+  parseWithdrawDisputeInput,
   parseConfirmGroupingInput,
   parseDeclineByTokenInput,
   parseEditAction,
@@ -128,9 +131,13 @@ import {
 } from './corpTaxBookFeederGrant.js';
 import {
   dismissFeederHistory,
+  disputeFeederPayout,
   getFeederViewAccess,
+  parseDisputeFeederPayoutInput,
   parseRequestFeederRateInput,
+  parseSetFeederPopSharingInput,
   requestFeederRate,
+  setFeederPopSharing,
 } from './corpTaxBookFeederViewCalls.js';
 import {
   parseSetBookFeederPayeeInput,
@@ -163,6 +170,10 @@ import {
 } from './corpTaxBookRefineryLabels.js';
 import {
   cancelFeederRemoval,
+  claimFeederStaleMail,
+  markFeederStaleMailSent,
+  parseStaleMailSentCall,
+  parseStaleMailClaimCall,
   finalizeDueRemovals,
   forceRemovalNow,
   getRemovalLink,
@@ -176,6 +187,9 @@ import { esiSyncReader } from './corpTaxBookSyncEsi.js';
 import { verifyAllMinerTotals } from './corpTaxBookMinerTotalsStore.js';
 import {
   claimPayment,
+  declareOwnPayment,
+  disputeConflict,
+  withdrawDispute,
   confirmGrouping,
   declineGrouping,
   declineGroupingByToken,
@@ -188,11 +202,29 @@ import {
   syncBook,
   turnOnBook,
   verifyOfficer,
+  authorizeOfficer,
   type BookDeps,
 } from './corpTaxBookStore.js';
+import { esiAffiliations, esiCorporationAlliance } from './sharedPopsEsi.js';
+import {
+  listCommunityPopSharers,
+  parseCommunityPopBlockInput,
+  parseListSharedPopsInput,
+  provenViewers,
+  setCommunityPopBlock,
+  settingsCommunityIds,
+  sharedPopsFor,
+  sharingCommunities,
+  type SharedPopsReadDeps,
+} from './sharedPopsStore.js';
 import { parseSrpSettingsPatch } from './srp.js';
 import { getSrpClaimValues, parseClaimValuesInput } from './srpClaimValues.js';
-import { deleteSrpDoctrine, previewSrpDoctrineCheck, saveSrpDoctrine } from './srpDoctrineStore.js';
+import {
+  deleteSrpDoctrine,
+  listSrpDoctrineFits,
+  previewSrpDoctrineCheck,
+  saveSrpDoctrine,
+} from './srpDoctrineStore.js';
 import { parseDeleteDoctrine, parseSaveDoctrine } from './srpDoctrineInput.js';
 import { parseFileClaimInput } from './srpKillmail.js';
 import { srpKillmailSource } from './srpKillmailEsi.js';
@@ -880,6 +912,24 @@ communityAction('removeCommunityFleetPayoutCallable', async (request) => {
   await removeFleetPayout(firestore(), callerOf(request), communityId, payoutId);
 });
 
+// A Community admin sees which corporations share moon pops into it, and blocks one (#6223).
+communityAction('listCommunityPopSharersCallable', (request) =>
+  listCommunityPopSharers(
+    sharedPopsReadDeps(),
+    callerOf(request),
+    parseCommunityIdInput(request.data).communityId
+  )
+);
+
+communityAction('setCommunityPopSharingBlockCallable', (request) =>
+  setCommunityPopBlock(
+    firestore(),
+    callerOf(request),
+    parseCommunityPopBlockInput(request.data),
+    Date.now()
+  )
+);
+
 communityAction('removeCommunityPledgeCallable', async (request) => {
   const { communityId, requestId, pledgeUid } = parseRemovePledgeInput(request.data);
   await removePledge(firestore(), callerOf(request), communityId, requestId, pledgeUid);
@@ -895,6 +945,15 @@ const corpTaxBookDeps = (): BookDeps => ({
   now: Date.now,
   verifyToken: (token) => verifyEveAccessToken(token, verifyOptions),
   readIdentity: esiIdentityReader(),
+  corporationAlliance: esiCorporationAlliance(),
+});
+
+// One per instance, so its few-minute affiliation cache is shared across calls (#6223).
+const sharedPopAffiliations = esiAffiliations();
+const sharedPopsReadDeps = (): SharedPopsReadDeps => ({
+  db: firestore(),
+  now: Date.now,
+  affiliations: sharedPopAffiliations,
 });
 
 const corpTaxBookActions = createActionGroup();
@@ -945,7 +1004,11 @@ function corpSyncDeps(): CorpSyncDeps {
     revoke: (clientId, refreshToken) => revokeAtSso(clientId, refreshToken),
     readIdentity: esiIdentityReader(),
     openPrices: r2OpenPrices,
+    corporationAlliance: esiCorporationAlliance(),
     log: (message, data) => logWarn(message, data),
+    // A stop tells the book's editors (`corpTaxBookSyncStopped`, ADR 0027): FCM through the
+    // Admin SDK, so the scheduled sync needs no secret for it.
+    push: getMessaging(),
   };
 }
 
@@ -1011,6 +1074,15 @@ corpTaxBookAction('requestCorpTaxBookFeederRateCallable', (request) =>
   requestFeederRate(corpSyncDeps(), callerOf(request), parseRequestFeederRateInput(request.data))
 );
 
+// The moon owner flags a payment it disputes, or withdraws the flag (#6209).
+corpTaxBookAction('disputeCorpTaxBookFeederPayoutCallable', (request) =>
+  disputeFeederPayout(
+    corpSyncDeps(),
+    callerOf(request),
+    parseDisputeFeederPayoutInput(request.data)
+  )
+);
+
 // The moon owner names its payee: its own CEO, Directors and Accountants. The accounting
 // corporation's officers set it too (#4653), through `setCorpTaxBookFeederPayeeFromBookCallable`.
 corpTaxBookAction('setCorpTaxBookFeederPayeeCallable', (request) =>
@@ -1021,6 +1093,38 @@ corpTaxBookAction('setCorpTaxBookFeederPayeeCallable', (request) =>
     esiIdCategoryLookup()
   )
 );
+
+// The moon owner's Pop Sharing opt-out (#6222): one switch for all its moons.
+corpTaxBookAction('setCorpTaxBookFeederPopSharingCallable', (request) =>
+  setFeederPopSharing(
+    corpSyncDeps(),
+    callerOf(request),
+    parseSetFeederPopSharingInput(request.data)
+  )
+);
+
+// Shared Pops (#6223, ADR 0034): every pop the caller's Characters may read now. The signed-in
+// Character counts; other Characters count when their access token verifies (used, never stored).
+corpTaxBookAction('listSharedPopsCallable', async (request) => {
+  const caller = callerOf(request);
+  const { accessTokens } = parseListSharedPopsInput(request.data);
+  const viewers = await provenViewers(caller, accessTokens, async (token) => {
+    const claims = await verifyEveAccessToken(token, verifyOptions);
+    return { characterId: claims.characterId, ownerHash: claims.ownerHash };
+  });
+  return { pops: await sharedPopsFor(sharedPopsReadDeps(), viewers) };
+});
+
+// The Sharing tab: for each Community the settings name, whether an officer of the book is a
+// Member there (else it shares nothing) and whether its admin blocked the book.
+corpTaxBookAction('getCorpTaxBookPopSharingCommunitiesCallable', async (request) => {
+  const call = parseBookCall(request.data);
+  await authorizeOfficer(corpTaxBookDeps(), callerOf(request), call, 'view', { live: false });
+  const deps = sharedPopsReadDeps();
+  const ids = await settingsCommunityIds(deps.db, call.corporationId);
+  const status = await sharingCommunities(deps, call.corporationId, ids);
+  return { communities: Object.fromEntries(status) };
+});
 
 corpTaxBookAction('dismissCorpTaxBookFeederHistoryCallable', (request) =>
   dismissFeederHistory(corpSyncDeps(), callerOf(request), parseFeederCall(request.data))
@@ -1089,6 +1193,14 @@ corpTaxBookAction('cancelCorpTaxBookFeederRemovalCallable', (request) =>
   cancelFeederRemoval(removalDeps(), callerOf(request), parseRemovalCall(request.data))
 );
 
+corpTaxBookAction('claimCorpTaxBookFeederStaleMailCallable', (request) =>
+  claimFeederStaleMail(removalDeps(), callerOf(request), parseStaleMailClaimCall(request.data))
+);
+
+corpTaxBookAction('markCorpTaxBookFeederStaleMailSentCallable', (request) =>
+  markFeederStaleMailSent(removalDeps(), callerOf(request), parseStaleMailSentCall(request.data))
+);
+
 corpTaxBookAction('getCorpTaxBookRemovalLinkCallable', (request) =>
   getRemovalLink(removalDeps(), callerOf(request), parseRemovalLinkCall(request.data))
 );
@@ -1130,7 +1242,7 @@ corpTaxBookAction('revokeCorpTaxBookSyncGrantCallable', (request) =>
 );
 
 /**
- * syncCorpTaxBooks (issue #4068, ADR 0025): at 00:35, 06:35, 12:35 and 18:35 UTC, syncs and settles each
+ * syncCorpTaxBooks (issue #4068, ADR 0025): every 2 hours at 35 past (00:35 UTC first), syncs and settles each
  * opted-in corporation's Corp Tax Book with its grant holder's token. Never issues
  * a Statement or sends mail. Deploy is manual:
  * `firebase deploy --only functions:syncCorpTaxBooks`.
@@ -1241,6 +1353,11 @@ corpTaxBookAction('saveSrpDoctrineCallable', (request) =>
   )
 );
 
+// Any verified member lists the corp's Doctrine Fits for their Fittings library (#6202).
+corpTaxBookAction('listSrpDoctrineFitsCallable', (request) =>
+  listSrpDoctrineFits(srpDeps(), callerOf(request), parseBookCall(request.data))
+);
+
 corpTaxBookAction('deleteSrpDoctrineCallable', (request) =>
   deleteSrpDoctrine(
     srpDeps(),
@@ -1331,6 +1448,19 @@ corpTaxBookAction('claimCorpTaxBookPaymentCallable', (request) => {
   const { corporationId, paymentId } = parseClaimPaymentInput(request.data);
   return claimPayment(corpTaxBookDeps(), callerOf(request), corporationId, paymentId);
 });
+
+// A Miner's own "I paid this another way" and Conflict dispute (#6206): uid-authorised, no officer role.
+corpTaxBookAction('declareCorpTaxBookPaymentCallable', (request) =>
+  declareOwnPayment(corpTaxBookDeps(), callerOf(request), parseDeclareOwnInput(request.data))
+);
+
+corpTaxBookAction('disputeCorpTaxBookConflictCallable', (request) =>
+  disputeConflict(corpTaxBookDeps(), callerOf(request), parseDisputeConflictInput(request.data))
+);
+
+corpTaxBookAction('withdrawCorpTaxBookDisputeCallable', (request) =>
+  withdrawDispute(corpTaxBookDeps(), callerOf(request), parseWithdrawDisputeInput(request.data))
+);
 
 corpTaxBookAction('confirmCorpTaxBookGroupingCallable', (request) => {
   const { corporationId, minerId } = parseConfirmGroupingInput(request.data);

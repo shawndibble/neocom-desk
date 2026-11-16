@@ -65,6 +65,7 @@ const LIVE = new Set([
   'active',
   'cant-read',
   'removal-pending',
+  'removal-unsent',
   'disconnected',
   'settled-otherwise',
 ]);

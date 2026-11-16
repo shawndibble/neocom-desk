@@ -7,8 +7,15 @@
  */
 import { DAY_MS } from '@/lib/age';
 import { DEFAULT_GRACE_HOURS, isDayBillable, lastBillableDate } from './billable';
-import { closePeriod, splitByCoverage, type CoveragePeriod, type FeederCoverage } from './coverage';
+import {
+  closePeriod,
+  MAX_COVERAGE_BACKDATE_DAYS,
+  splitByCoverage,
+  type CoveragePeriod,
+  type FeederCoverage,
+} from './coverage';
 import { shiftDate } from '../miningTax/yieldRange';
+import { utcDay } from '@/engine/localDay';
 import type { ObservedMiningEntry } from './types';
 
 export const FEEDER_DISCONNECT_DAYS = 30;
@@ -48,6 +55,20 @@ export function advanceFeederHealth(
   return next;
 }
 
+/** The last day a good read at `lastReadWellAt` fully read (past its grace); never read well: none. */
+function lastFullyReadDay(
+  lastReadWellAt: string | undefined,
+  graceHours: number | undefined
+): string | undefined {
+  return lastReadWellAt === undefined
+    ? undefined
+    : lastBillableDate({
+        now: lastReadWellAt,
+        lastSyncedAt: lastReadWellAt,
+        ...(graceHours !== undefined ? { graceHours } : {}),
+      });
+}
+
 /**
  * Coverage once a feeder disconnects: it ends on the last fully synced day (a
  * closed day a good read followed). Never read well: it covered nothing.
@@ -57,19 +78,62 @@ export function disconnectedCoverage(
   health: Pick<FeederHealth, 'lastReadWellAt'>,
   graceHours: number = DEFAULT_GRACE_HOURS
 ): CoveragePeriod[] {
-  const lastFull =
-    health.lastReadWellAt === undefined
-      ? undefined
-      : lastBillableDate({
-          now: health.lastReadWellAt,
-          lastSyncedAt: health.lastReadWellAt,
-          graceHours,
-        });
+  const lastFull = lastFullyReadDay(health.lastReadWellAt, graceHours);
   if (lastFull === undefined) {
     const open = periods.find((p) => p.to === undefined);
     return open ? closePeriod(periods, open.from) : [...periods];
   }
   return closePeriod(periods, shiftDate(lastFull, 1));
+}
+
+/** A stale ledger's clock: its last good read and when it was first refused (ISO instants). */
+export interface StaleLedgerClock {
+  lastReadWellAt?: string;
+  staleSince: string;
+}
+
+/** A stale ledger's clock from what a row or view summary holds: ms, or an ISO instant. */
+export function staleLedgerClock(
+  staleSince: number,
+  lastReadWellAt: number | string | null | undefined
+): StaleLedgerClock {
+  const read =
+    lastReadWellAt === null || lastReadWellAt === undefined
+      ? undefined
+      : typeof lastReadWellAt === 'string'
+        ? lastReadWellAt
+        : new Date(lastReadWellAt).toISOString();
+  return {
+    staleSince: new Date(staleSince).toISOString(),
+    ...(read !== undefined ? { lastReadWellAt: read } : {}),
+  };
+}
+
+/**
+ * The UTC day EVE no longer holds the first unread day of a stale ledger, so ore a reconnect
+ * could still count (`reconnectCoverageFrom` reaches 30 days back) starts being lost. The first
+ * unread day follows the last fully read one; never read well, it is the day it went stale.
+ */
+export function oreLostOn(
+  health: StaleLedgerClock,
+  graceHours: number = DEFAULT_GRACE_HOURS
+): string {
+  const lastFull = lastFullyReadDay(health.lastReadWellAt, graceHours);
+  const firstUnread =
+    lastFull === undefined ? utcDay(Date.parse(health.staleSince)) : shiftDate(lastFull, 1);
+  return shiftDate(firstUnread, MAX_COVERAGE_BACKDATE_DAYS + 1);
+}
+
+/** Whole days left before `oreLostOn`; 0: already lost. */
+export function daysUntilOreLost(
+  health: StaleLedgerClock,
+  now: string,
+  graceHours: number = DEFAULT_GRACE_HOURS
+): number {
+  const left = Math.round(
+    (Date.parse(oreLostOn(health, graceHours)) - Date.parse(utcDay(Date.parse(now)))) / DAY_MS
+  );
+  return Math.max(0, left);
 }
 
 export interface FeederReadClock {
@@ -137,4 +201,81 @@ export function splitByCoverageAndRead<
   const readable = withholdUnreadFeederDays(covered, clock);
   const kept = new Set(readable);
   return { readable, unread: covered.filter((r) => !kept.has(r)), outsideCoverage };
+}
+
+/**
+ * The last day a miner's next Statement may cover while one of its days is held (#6209): the day
+ * before its earliest held day, else the book's `billableThrough`. A Statement must not cover a
+ * held day: once paid, ore that lands on that day later would be written off as recorded after
+ * payment instead of reaching the next Statement.
+ */
+export function heldBillableThrough(
+  billableThrough: string | undefined,
+  characterIds: readonly number[],
+  holds: ReadonlyMap<number, Pick<StaleHold, 'from'>>
+): string | undefined {
+  if (billableThrough === undefined) return undefined;
+  let through = billableThrough;
+  for (const id of characterIds) {
+    const held = holds.get(id)?.from;
+    if (held === undefined) continue;
+    const before = shiftDate(held, -1);
+    if (before < through) through = before;
+  }
+  return through;
+}
+
+type StaleHoldClock = {
+  now: string;
+  graceHours?: number;
+  bookCorporationId: number;
+  feeders: readonly (FeederReadClock & FeederCoverage)[];
+};
+
+/** A miner's hold: from which day, and the moon owner whose unread ledger holds it (#6210). */
+export interface StaleHold {
+  from: string;
+  ownerCorporationId: number;
+}
+
+/**
+ * The day each miner is held from while a moon owner it mines at cannot be read (#6209): a stale
+ * moon owner's first unread day (its first covered day when never read well), for every character
+ * with a row at its refineries. Its ore for those days may not be read yet, so a Statement must not
+ * cover them. An owner read up to `billableThrough`, or whose coverage ended before its first
+ * unread day, holds nothing. Each hold names its moon owner, so a held day can say why (#6210).
+ */
+export function staleOwnerHolds(
+  entries: readonly Pick<ObservedMiningEntry, 'characterId' | 'sourceCorporationId'>[],
+  clock: StaleHoldClock,
+  billableThrough: string | undefined
+): Map<number, StaleHold> {
+  const out = new Map<number, StaleHold>();
+  if (billableThrough === undefined) return out;
+  const heldFrom = new Map<number, string>();
+  for (const f of clock.feeders) {
+    if (f.corporationId === clock.bookCorporationId) continue;
+    const lastRead = lastFullyReadDay(f.lastReadWellAt, clock.graceHours);
+    const unread = lastRead === undefined ? '' : shiftDate(lastRead, 1);
+    // The first covered day on or after it; no coverage known: the first unread day itself.
+    const first =
+      f.coveragePeriods === undefined
+        ? unread || undefined
+        : f.coveragePeriods
+            .filter((p) => p.to === undefined || p.to >= unread)
+            .map((p) => (p.from > unread ? p.from : unread))
+            .sort()[0];
+    if (first === undefined || first === '' || first > billableThrough) continue;
+    heldFrom.set(f.corporationId, first);
+  }
+  if (heldFrom.size === 0) return out;
+  for (const e of entries) {
+    const day =
+      e.sourceCorporationId === undefined ? undefined : heldFrom.get(e.sourceCorporationId);
+    if (day === undefined) continue;
+    const held = out.get(e.characterId);
+    if (held === undefined || day < held.from)
+      out.set(e.characterId, { from: day, ownerCorporationId: e.sourceCorporationId! });
+  }
+  return out;
 }

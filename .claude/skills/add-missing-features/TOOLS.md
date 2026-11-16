@@ -20,10 +20,10 @@ Atlas (LP finder = #718/#1050/#1068), IndustrialEVE (PI alerts: kill-tests 12,
 0020), EVE Nexus (mobile; EVE Empire/Pod-shaped, cleared item by item),
 Adam4EVE, Ravworks/Slipway (Jobs view = Active Jobs), EVE Tycoon, Janice
 (#4022), EVE Appraisal, Iron Whales Appraiser, Fuzzwork, EVE Ref, EveLens
-(#5006), jEveAssets, GESI, Dr.MoonGoo, EVE Horizon, EVE Forge,
+(#5006), jEveAssets (releases to 8.2.3 + GitHub issues/PRs to #597 read; #6165, #6166), GESI, Dr.MoonGoo, EVE Horizon, EVE Forge,
 EVE-HUB, RIFT (desktop; wallet Insights, asset filters, What's new list v2.2–6.2 read in full; #5601, #5602, #5605), EVE Industry Scanner Tool (#5007), Blizbor's skill trio (#2390; no
 licence, data unusable), Quantum Anomaly (#1040), Uedama Scout (#1043), EQM
-(2.0/2.1 changelog + Local Scan/D-Scan docs read; repo n00bgames/eve-quartermaster, v1.0–1.0.7 industry/PI/PLEX/HyperNet notes re-read, post 51 is a UI-overhaul teaser; #5668, #5669), EVE Retroindustry (v0.11.27–41 release notes and the whole README/site inventory read; nothing newer than 0.11.41; #5797 rejected), Canopus (v1.0–1.2.1: PI calculator, LP store pricing, My trades, Doctrines multibuy, freelance board = all covered or killed), EVE Industry Scanner Tool (v0.7–1.1.8 read; #5853's sibling items all covered).
+(2.0/2.1 changelog + Local Scan/D-Scan docs read; repo n00bgames/eve-quartermaster, v1.0–1.0.7 industry/PI/PLEX/HyperNet notes re-read, post 51 is a UI-overhaul teaser; #5668, #5669), EVE Retroindustry (v0.11.27–41 release notes and the whole README/site inventory read; nothing newer than 0.11.41; #5797 rejected), Canopus (v1.0–1.2.1: PI calculator, LP store pricing, My trades, Doctrines multibuy, freelance board = all covered or killed), EVE Industry Scanner Tool (v0.7–1.1.8 read; #5853's sibling items all covered), Vyraj (madalinmiclea/vyraj, all-in-one web PWA; README + `src/data/changelog.ts` to 2026-11-10 read, Romanian strings in `src/i18n/en.ts`; PolyForm Strict, ideas only; #6199, #6200).
 
 **Examined, nothing left:** EVE Blue Desk, SolCore Dynamics, EvE Blueprint, EVE
 Courier, ISK.GG, EVE Miner Hub, EVE-Industry-Scanner,
@@ -69,7 +69,7 @@ kill-test 2.
    margin finder, evetools.dev, evetrade.space, Oracle Market Genius, Trading
    Matrix, EveBoosters.com, ETT. All-in-one companion apps are the same set,
    their extras dropping on remit: EVE Online Tooling, EVE Tools Suite, Koru
-   Desktop, EveTogether, ECT EVE Assets (v3.0.1 read: resizable columns = #5866; no column reorder/picker), Pod, EVE Empire (changelog 1.4–1.6.6 read; overlay is non-ISK
+   Desktop, EveTogether, ECT EVE Assets (v3.0.1 read: resizable columns = #5866; no column reorder/picker), Pod, EVE Empire (changelog 1.4–1.7.1 read, raw at `/notes/whats_new_en.md`; overlay is non-ISK
    read in full, PI planner screenshots; #5642–#5646), Esparto Industries,
    Capsuleers.app/eHub, ISKONOMY, Vigilant, EVE Flipper.
 
@@ -217,6 +217,10 @@ Numbering is stable; later runs cite these by number. Append, never renumber.
 
 ## Filed candidates
 
+- Vyraj: #6199 NARROW LP Store "Spend my LP" plan (instant only, top ~10 offers, shared consumable books, fixed 70% floor; amends `20261030-180139`). #6200 NARROW Market tree "No orders in {Region}" cue (`/markets/{region}/types/`, negative only, no hide toggle, single-region modes only).
+- #6165 SHIP Assets select-mode bar totals the selection's ISK + m³ (jEveAssets #575; sum selected items only, column bases).
+- #6166 NARROW History: delivered invention job shows "N of M succeeded" (`successful_runs`; jEveAssets #554). Realized-vs-expected rate and cost per copy cut: job carries no decryptor/skills/datacores.
+- EVE Empire 1.6.7–1.7.1: #6167 NARROW Build Plan "Buy order" material basis pays the placement broker fee (NPC hub only; amends `20260902-202708`). #6038 alt-Character structure search: owner closed not planned (no user ask).
 - #5929 NARROW Route Safety: attacker hull classes as "on N of M kills" per gate kill group (eve-gatecheck premium; never sum attackers across mails). Low value, haulers only.
 
 `SHIP` is the hostile review's verdict, not the ticket's fate (#858 carried
@@ -291,6 +295,7 @@ Other open: #642, #718, #819, #821, #824, #880, #926, #1015, #1017, #1018,
 
 ## Killed / dropped candidates (never filed)
 
+- jEveAssets 8.2.x: stockpile blueprint materials (Build Plans + Group shopping list), remembered sort (declined, 20260907-092320), table padding (DESIGN density-first), filtered-to-zero cue (EmptyState Reset filters rule), Academy/Aberrant meta (in `variations.json`), PLEX vault (no ESI), asset treemap (kill-test 3), reaction recursion (kill-test 6).
 - eve-gatecheck gatecamp finder (map-wide zKill, combat intel off remit; camp radar PARTIAL); war-target intel (no ESI corp war list, decision 20261021-140400; Pilot Lookup covers per-pilot); waypoints (shipped, 20261003-175151).
 
 The reason is what stops a re-pitch. Numbers are kill-tests.
@@ -413,6 +418,7 @@ The reason is what stops a re-pitch. Numbers are kill-tests.
   by org (`20261008-143948`); intel dossiers/sightings, battle reports, ship/
   industry reports, fleet assignments (corp or cross-player, 1); appraisal
   5-day regional trades (item detail price history); PI checkpoint sim (17).
+- **EVE Empire 1.6.7–1.7.1 leftovers:** unrefined (alchemy) reaction refine value (KILL: <5% reach, Build Plans exclude refining per `docs/features/industry-plans.md` and `20261025-175221`, Appraisal covers it); per-blueprint remembered ME (covered: owned blueprints + `assumedMe`/`assumedTe`); NPC-station cost index default, What to build volume-capped ISK/day (`iskPerDay.ts`), cash to start (`buildCost` column), skills per pilot (#1062), LP required items depth walk (`redemptions.ts`), LP store ranking, stock low alerts (`pollDomains/stockTargets`), mining raw/compressed/reprocessed (`miningTax` valuation), courier due alert, Orders "Needs you", Results log: all covered; reaction chain diagram (3); PvE Activity ISK/h, live mining from game logs, overlay (47, 2, non-ISK); PI plan file share, multi-product spread (#5642 cap covers the market-share half); central Prices page, untraded marker, favourite hubs, folded phone filters (infra/cosmetic).
 - **EVE Empire leftovers:** in-game PI template export (unbuilt plans have no pin
   geometry; CCP's JSON is undocumented, 13); virtual pilots (alts dropped with the
   Advisor, #2619 not-planned, what-ifs never in a plan, 47); setup capital/payback
@@ -435,6 +441,7 @@ The reason is what stops a re-pitch. Numbers are kill-tests.
 - **Thread-sweep leftovers (Omni, Industry Scanner, Canopus, EQM, Retroindustry):** plan-vs-reported job fee / implied facility tax (49); Open Orders net-of-fees total (no fee engine under `src/engine/market`; 27, 30); Storyline/Cosmic production tab and gas site picker (niche reach, hand-kept mission data; unverified beyond that); Freelance Jobs board filters (ESI projects are corp-scoped, `getCorporationProjects`; the member's own projects are in Opportunities, #4786); "gain vs selling directly" for own reaction/gas material (`ownedStockSale`, `oreDecision`; gas sell-vs-react already weak); PI storage as owned stock (17); Industry Report/Inventory Report share links, ship analytics over time (1, 5, 7); PLEX FIFO ledger (10); HyperNet; wormhole mapper (weak J-space gap above); setup role picker (rail defaults are settled, `20261009-230259`). Already built, don't re-pitch: reactions apply no ME (`computeBuildPlan`), invention base ME2/TE4 (`INVENTED_BASE_ME`), an omitted history day is a zero (`averageDailyVolume`), infrastructure hold in hauling (`cargoHolds.ts`), max buy price / min margin (`haulingPlan`), J-space cost-index override (`costIndexOverride.ts`), Assets jumps away, net worth keeps stale characters out of the day's row (`20261008-081039`).
 - **Nov 5 sweep leftovers:** EQM Receipts / market-run reimbursement report (KILL: corp-logistics niche; shared links need a server; SRP, Hauling, Shopping list cover the rest); stale-settings banner (KILL: Opportunities `needs-refresh` + content-keyed cache exist); BPO price off per run (covered: blueprint acquisition tier, `breakEvenRuns`); job-cost formula, margin = profit / revenue, sell-now without broker fee, outbid in structures, m³ column, contracts kept a year (#5655), Omnitool Assets screen: all covered; Empire compressed-gas buy and Omnitool Mineral optimizer: niche/killed; EQM Journey, Matchups, headcount, battle kills, Empire overlay: non-ISK.
 - **Nov 2 sweep leftovers:** Omnitool Mineral optimizer (KILL: Ranked + "Use my stock" #2847, `ownedStockSale`, #5134 cover most; a solver must mirror every pricing-basis change; small audience); ECT installer-on-corp-jobs (Active Jobs) and assets jumps sort (`jumpsAway`) covered; Omni infrastructure hold (`cargoHolds.ts`) covered, maps/wormholes non-ISK.
+- **Vyraj leftovers:** R&D agent RP/datacores panel and agent finder (KILL: deferred in `docs/plans/feature-parity/briefs/I-niche-tabs.md` #7; 100 RP + 10k ISK per datacore is a client constant, 13; new scope re-consents everyone; small reach). Covered: decryptor comparison (invention tiers), free PI slots (Interplanetary Consolidation nudge), "realistic" ISK/LP (Traded Price Ceiling), LP traps (Low volume tag, ceiling), owned turn-ins, ledger ore/mineral value, compressed-ore target (#5134), instant-buy→instant-sell table (`hubHaulGaps`), What's missing (shopping lists minus owned), escrow (#5853); Intel Jita screens (class 3).
 - **Housekeeping only:** Mining Yield `specialisationLevel: 0`, dead i18n keys.
 - **RIFT ratting rollup** (kills by faction/system, ISK per kill): per-line `BountyFactionSummary`/`killsByFaction` exists; a bounty line's ISK is shared across NPC types, so per-class ISK is an estimate. RIFT daily-goals tab: ref-type breakdown + `dailyGoalMessageIdOf` cover it. "Open ship in Fittings" from Assets: shipped (`assetShipLocation.ts`).
 - **RIFT What's new leftovers:** freelance jobs (#4609), cost indices (`cheaperNearbySystems`), skyhooks, clones, LP totals = covered; PI time seek = kill-tests 3/17; intel, overlay, chat, combat/log alerts, settings copying, map markers = kill-test 2 (client-reading).

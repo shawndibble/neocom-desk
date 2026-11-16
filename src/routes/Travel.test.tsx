@@ -44,6 +44,11 @@ vi.mock('@/features/market/useHubJumps', async () =>
 );
 
 installTravelHarness();
+// The App-level tests below (the bare /travel entries and the redirect out to
+// Market, inside the signed-in shell): the shell chunk loads here, under the
+// hook's own budget, not inside a test's findBy. Every other Travel test
+// renders the page on its own (`visit`).
+beforeAll(() => routeChunks.loadLayout(), 30_000);
 
 describe('Travel › Route Safety', () => {
   describe('before a route exists', () => {
@@ -296,6 +301,9 @@ describe('Travel › Route Safety', () => {
 
     expect(await screen.findByText('Pick where the route starts and ends')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/travel/route');
+    const rail = (await screen.findAllByRole('navigation'))[0];
+    const links = await within(rail).findAllByRole('link', { name: 'Route Safety' });
+    expect(links.some((link) => link.getAttribute('aria-current') === 'page')).toBe(true);
   });
 
   it('opens Pilot Lookup from a bare /travel?pilot= link', async () => {

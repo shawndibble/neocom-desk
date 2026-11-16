@@ -124,7 +124,7 @@ describe('useOpportunities recompute (issue #4918)', () => {
 
     // Any plan write rebuilds the lookup; a rename moves no price.
     rerender({ ...args, defaultsForCharacter: () => null });
-    await act(async () => {});
+    // A reprice would have asked for snapshots in the effect that rerender ran.
     expect(loadMarketSnapshots).toHaveBeenCalledTimes(requests);
   });
 

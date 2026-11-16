@@ -1,20 +1,21 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { MarketTypeEntry } from '@/sde/marketTypes';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { loadGlobalMarkets, loadMarketTypes, loadNpcStations } from '@/sde/loadMarketSde';
 import { ESI_BASE_URL } from '@/esi/client';
-import { App } from '@/app/App';
-import { RECENT_DATE, TYPES } from '@/test/marketMocks';
+import { CORMORANT_TYPE_ID, PLEX_TYPE_ID, RECENT_DATE, TYPES } from '@/test/marketMocks';
 import {
   RIFTER_REGION_ID,
   SHIPS_GROUP,
   historyHandler,
   installMarketHarness,
+  marketTypesHandler,
   ordersHandler,
   plexOrdersHandler,
   server,
+  renderMarketRoute,
 } from '@/test/marketPage';
 
 vi.mock('@/sde/loadSde', async () => (await import('@/test/marketMocks')).loadSdeMock());
@@ -34,7 +35,7 @@ installMarketHarness();
 describe('Market Browser', () => {
   it('filters the Market Group tree in place, hiding branches with no match', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     expect(await screen.findByRole('button', SHIPS_GROUP)).toBeInTheDocument();
     expect(screen.getByText('Ore')).toBeInTheDocument();
@@ -48,7 +49,7 @@ describe('Market Browser', () => {
 
   it('pins an exact-name match under a "Best match" heading above the tree (issue #1742)', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'rifter');
 
@@ -58,7 +59,7 @@ describe('Market Browser', () => {
 
   it('tells assistive tech whether a Market Group is expanded', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     const ships = await screen.findByRole('button', SHIPS_GROUP);
     expect(ships).toHaveAttribute('aria-expanded', 'false');
@@ -68,7 +69,7 @@ describe('Market Browser', () => {
 
   it('shows a "type more" hint below the search threshold instead of silently showing the full tree (issue #412)', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await screen.findByRole('button', SHIPS_GROUP);
     await user.type(screen.getByRole('searchbox'), 'ri');
@@ -87,7 +88,7 @@ describe('Market Browser', () => {
 
   it('announces the match count, and a miss, through a status region (issue #3354)', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await screen.findByRole('button', SHIPS_GROUP);
     await user.type(screen.getByRole('searchbox'), 'rifter');
@@ -100,7 +101,7 @@ describe('Market Browser', () => {
 
   it('lets a matched group be collapsed and re-expanded while a search is active', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     expect(await screen.findByText('Rifter')).toBeInTheDocument();
@@ -126,7 +127,7 @@ describe('Market Browser', () => {
 
     it('starts a lone matching category expanded, with its count in the header name', async () => {
       const user = userEvent.setup({ delay: null });
-      render(<App />);
+      renderMarketRoute();
       await user.type(await screen.findByRole('searchbox'), 'rift');
 
       const ships = await screen.findByRole('button', { name: 'Ships · 1' });
@@ -141,7 +142,7 @@ describe('Market Browser', () => {
         ...zephyrs(3, 3),
       ]);
       const user = userEvent.setup({ delay: null });
-      render(<App />);
+      renderMarketRoute();
       await user.type(await screen.findByRole('searchbox'), 'zephyr');
 
       expect(await screen.findByRole('button', { name: 'Ships · 2' })).toHaveAttribute(
@@ -162,7 +163,7 @@ describe('Market Browser', () => {
         ...zephyrs(8, 3),
       ]);
       const user = userEvent.setup({ delay: null });
-      render(<App />);
+      renderMarketRoute();
       const box = await screen.findByRole('searchbox');
       await user.type(box, 'zephyr');
 
@@ -193,7 +194,7 @@ describe('Market Browser', () => {
 
   it('a ?group= link lands the tree expanded down to that category (issue #407)', async () => {
     window.history.pushState({}, '', '/market?group=4');
-    render(<App />);
+    renderMarketRoute();
 
     // Group 4 ("Destroyers") sits under group 1 ("Ships") — both must expand
     // for its items to show, with no click needed.
@@ -202,16 +203,79 @@ describe('Market Browser', () => {
     expect(screen.getByText('Destroyers')).toBeInTheDocument();
   });
 
+  describe('"No orders in {Region}" on tree rows (issue #6200)', () => {
+    const listedExcept = (...absent: number[]) =>
+      marketTypesHandler(
+        TYPES.map((type) => type.typeId).filter((typeId) => !absent.includes(typeId))
+      );
+
+    it('marks only the items with no order in the hub region', async () => {
+      server.use(listedExcept(CORMORANT_TYPE_ID));
+      window.history.pushState({}, '', '/market?group=4');
+      renderMarketRoute();
+
+      expect(
+        await screen.findByRole('button', { name: 'Cormorant No orders in The Forge' })
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Merlin' })).toBeInTheDocument();
+      expect(screen.getAllByText('No orders in The Forge')).toHaveLength(1);
+    });
+
+    it('never marks a Global Market Region item, which trades in its own region', async () => {
+      server.use(listedExcept(PLEX_TYPE_ID, 34));
+      window.history.pushState({}, '', '/market?group=3');
+      renderMarketRoute();
+
+      // The list is read once Tritanium, absent from it too, carries the cue.
+      expect(
+        await screen.findByRole('button', { name: 'Tritanium No orders in The Forge' })
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'PLEX' })).toBeInTheDocument();
+    });
+
+    it('shows no cue when the region list fails, since unread is never "no orders"', async () => {
+      let hits = 0;
+      server.use(
+        http.get(`${ESI_BASE_URL}/markets/:regionId/types`, () => {
+          hits += 1;
+          return HttpResponse.json({ error: 'down' }, { status: 503 });
+        })
+      );
+      window.history.pushState({}, '', '/market?group=4');
+      renderMarketRoute();
+
+      expect(await screen.findByRole('button', { name: 'Cormorant' })).toBeInTheDocument();
+      await waitFor(() => expect(hits).toBeGreaterThan(0));
+      expect(screen.queryByText(/No orders in/)).not.toBeInTheDocument();
+    });
+
+    it('asks no region for its list under All regions', async () => {
+      let hits = 0;
+      server.use(
+        http.get(`${ESI_BASE_URL}/markets/:regionId/types`, () => {
+          hits += 1;
+          return HttpResponse.json([]);
+        })
+      );
+      window.history.pushState({}, '', '/market?group=4&region=all');
+      renderMarketRoute();
+
+      expect(await screen.findByRole('button', { name: 'Cormorant' })).toBeInTheDocument();
+      expect(screen.queryByText(/No orders in/)).not.toBeInTheDocument();
+      expect(hits).toBe(0);
+    });
+  });
+
   it('ignores a ?group= id that is not in the loaded catalogue', async () => {
     window.history.pushState({}, '', '/market?group=999');
-    render(<App />);
+    renderMarketRoute();
 
     expect(await screen.findByRole('button', SHIPS_GROUP)).toBeInTheDocument();
     expect(screen.queryByText('Merlin')).not.toBeInTheDocument();
   });
 
   it('prompts to search or browse when nothing is selected', async () => {
-    render(<App />);
+    renderMarketRoute();
     expect(await screen.findByText('Select an item')).toBeInTheDocument();
   });
 
@@ -219,7 +283,7 @@ describe('Market Browser', () => {
     const hits = { count: 0 };
     server.use(ordersHandler(hits));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
@@ -240,7 +304,7 @@ describe('Market Browser', () => {
 
   it('focuses the item panel heading on selection, and the tree row on Back (issue #1485)', async () => {
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     const treeRow = (await screen.findByText('Rifter')).closest('button');
@@ -265,7 +329,7 @@ describe('Market Browser', () => {
       )
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
@@ -282,7 +346,7 @@ describe('Market Browser', () => {
     server.use(ordersHandler({ count: 0 }));
     window.history.pushState({}, '', '/market?type=587');
 
-    render(<App />);
+    renderMarketRoute();
 
     expect(await screen.findByRole('table', { name: 'Sell Orders' })).toBeInTheDocument();
   });
@@ -290,7 +354,7 @@ describe('Market Browser', () => {
   it('Refresh retries a failed catalogue load instead of staying disabled', async () => {
     vi.mocked(loadNpcStations).mockRejectedValueOnce(new Error('network error'));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     expect(await screen.findByText("Couldn't load the market catalogue")).toBeInTheDocument();
     const refresh = screen.getByRole('button', { name: 'Refresh' });
@@ -306,7 +370,7 @@ describe('Market Browser', () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
     try {
       vi.mocked(loadNpcStations).mockRejectedValueOnce(new Error('network error'));
-      render(<App />);
+      renderMarketRoute();
 
       expect(await screen.findByText("Couldn't load the market catalogue")).toBeInTheDocument();
       expect(screen.getByText(/needs a one-time download/)).toBeInTheDocument();
@@ -326,7 +390,7 @@ describe('Market Browser', () => {
     server.use(ordersHandler({ count: 0 }));
     window.history.pushState({}, '', '/market?type=587');
 
-    render(<App />);
+    renderMarketRoute();
 
     expect(await screen.findByRole('table', { name: 'Sell Orders' })).toBeInTheDocument();
   });
@@ -359,7 +423,7 @@ describe('Market Browser', () => {
       )
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
@@ -377,7 +441,7 @@ describe('Market Browser', () => {
     const hits = { count: 0 };
     server.use(ordersHandler(hits));
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
@@ -409,7 +473,7 @@ describe('Price History tab (issue #11)', () => {
       })
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
@@ -455,7 +519,7 @@ describe('Price History tab (issue #11)', () => {
       })
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
@@ -479,7 +543,7 @@ describe('Price History tab (issue #11)', () => {
       historyHandler({ count: 0 }, RIFTER_REGION_ID, { 587: [] })
     );
     const user = userEvent.setup({ delay: null });
-    render(<App />);
+    renderMarketRoute();
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
@@ -505,7 +569,7 @@ describe('Price History tab (issue #11)', () => {
       '',
       '/market?type=587&browser.itemTab=history&browser.compare=10000043'
     );
-    render(<App />);
+    renderMarketRoute();
 
     await waitFor(() =>
       expect(screen.getByTestId('price-history-chart')).toHaveTextContent(

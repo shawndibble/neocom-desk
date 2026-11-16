@@ -89,8 +89,9 @@ describe('InstallPrompt', () => {
   it('stays hidden on desktop even when beforeinstallprompt fires', async () => {
     renderPrompt();
     await waitFor(() => expect(useInstallPromptSeen.getState().hydrated).toBe(true));
-    dispatchBeforeInstallPrompt();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    // Inside act, so the render the captured event causes has happened by the assert.
+    act(() => dispatchBeforeInstallPrompt());
+    expect(useInstallApp.getState().deferredPrompt).not.toBeNull();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
@@ -214,8 +215,8 @@ describe('InstallPrompt', () => {
     act(() => void router.navigate('/skills'));
     act(() => void router.navigate('/skills/trained', { replace: true }));
 
-    await waitFor(() => expect(useInstallPromptPageVisits.getState().value).toBe(1));
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    // A count applies at once (persisted after), in the effects each act above flushed:
+    // a second one for the redirect would already show.
     expect(useInstallPromptPageVisits.getState().value).toBe(1);
   });
 

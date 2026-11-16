@@ -331,7 +331,9 @@ describe('MemberSrp', () => {
       setup();
       const preview = vi.spyOn(backend, 'previewDoctrine');
       await paste('https://zkillboard.com/kill/123/hurricane');
-      await new Promise((r) => setTimeout(r, 600));
+      // The link field shows once the hull rules have loaded, and with none checked
+      // the preview never arms its debounce: nothing is pending, not even a check.
+      expect(screen.queryByText('Checking your fit against the corp’s Doctrine Fits…')).toBeNull();
       expect(preview).not.toHaveBeenCalled();
     });
 

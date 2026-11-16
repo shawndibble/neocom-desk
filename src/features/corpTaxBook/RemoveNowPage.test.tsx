@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 
@@ -119,9 +119,7 @@ describe('RemoveNowPage', () => {
   it('never explains why, whatever the page says', async () => {
     api.link.mockResolvedValue({ available: false, effectiveAt: null });
     render(<RemoveNowPage code="c" />);
-    await waitFor(() =>
-      expect(screen.getByText("This can't be done right now.")).toBeInTheDocument()
-    );
+    expect(await screen.findByText("This can't be done right now.")).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/payee|48|hour|changed|because/i);
   });
 });

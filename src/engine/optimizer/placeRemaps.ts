@@ -310,7 +310,17 @@ export function placeRemaps(
     let pairOrder: string[] = [];
     let bestSeconds = Infinity;
     let bestIndex = -1;
-    let bestSegment: BestAttributesResult | null = null;
+    // The winner is kept as its two values, read the moment it is priced, not
+    // as the result object. Once V8's Maglev tier (Node 24) has compiled this
+    // function, a kept object's `seconds` reads back as the LAST segment
+    // priced: CI returned 42338 s (25600 s attributes, the whole-plan
+    // segment's 29538 s) twice, #3074. Reproduce with
+    // `npx vitest run src/engine/optimizer/placeRemaps.test.ts
+    // --execArgv=--stress-maglev --execArgv=--no-turbofan
+    // --execArgv=--maglev-filter=placeRemaps`: about one run in three fails
+    // with the object kept; none of 34 runs fail with the two values.
+    let bestSegmentAttributes: Attributes | null = null;
+    let bestSegmentSeconds = 0;
     for (let i = runCount - 1; i >= 0; i--) {
       const run = runs[i];
       suffixSp.set(run.pair, (suffixSp.get(run.pair) ?? 0) + run.sp);
@@ -327,27 +337,28 @@ export function placeRemaps(
         currentPrefix[i],
         bestAttributesForPairs(spByPair, implants, cloneState)
       );
-      const total = currentPrefix[i] + best.seconds;
+      const segmentSeconds = best.seconds;
+      const total = currentPrefix[i] + segmentSeconds;
       if (total <= bestSeconds) {
         bestSeconds = total;
         bestIndex = i;
-        bestSegment = best;
+        bestSegmentAttributes = best.attributes;
+        bestSegmentSeconds = segmentSeconds;
       }
     }
     // Not remapping at all is always a candidate (see the DP path below).
     if (currentSeconds <= tieBound(bestSeconds)) return noRemapResult();
 
-    const best = bestSegment as BestAttributesResult;
     const segments: RemapSegment[] = [
       {
         startIndex: runs[bestIndex].startStep,
         endIndex: runs[runCount - 1].endStep,
-        attributes: best.attributes,
-        seconds: best.seconds,
+        attributes: bestSegmentAttributes as Attributes,
+        seconds: bestSegmentSeconds,
         remap: true,
       },
     ];
-    return resultWithLeadingPrefix(segments, best.seconds, bestIndex);
+    return resultWithLeadingPrefix(segments, bestSegmentSeconds, bestIndex);
   }
 
   // ---- General DP: up to `maxSegments` allocations ------------------------

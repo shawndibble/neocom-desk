@@ -6,6 +6,14 @@ import { db, type MiningTaxAssignmentRecord, type PayeeRecord } from '@/db';
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
 import { CorpOverlapNotice } from './CorpOverlapNotice';
 import { readOverlapAcks } from './overlapAck';
+import { declareCorpTaxBookPayment, disputeCorpTaxBookConflict } from './corpBookStore';
+
+// #6206: what reaches the corporation is a router action; stubbed here.
+vi.mock('./corpBookStore', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./corpBookStore')>()),
+  declareCorpTaxBookPayment: vi.fn(async () => ({ declarationId: 'x1' })),
+  disputeCorpTaxBookConflict: vi.fn(async () => ({ disputeId: 'd1' })),
+}));
 
 // Releasing ore re-prices what is left; the market read is stubbed.
 vi.mock('../pricing', async (importOriginal) => ({
@@ -174,6 +182,26 @@ describe('CorpOverlapNotice on a Conflict day', () => {
     );
   });
 
+  it('names an own entry for the corporation that needs review, not another Payee', () => {
+    renderConflict(assignment, { ...conflict, conflictCause: 'ownNeedsReview' });
+    expect(screen.getByRole('region', { name: 'Conflict' })).toHaveTextContent(
+      'Your own entry for Brass Meridian needs review'
+    );
+  });
+
+  it("says a Collector now collects for the moon owner the miner's entry names", () => {
+    renderConflict(assignment, {
+      ...conflict,
+      conflictCause: 'ownerCollected',
+      ownerPayeeId: 'p1',
+    });
+    const region = screen.getByRole('region', { name: 'Conflict' });
+    expect(region).toHaveTextContent("Brass Meridian now collects tax for Ashfall's moon");
+    expect(region).toHaveTextContent(
+      'If you already paid Ashfall, ask an officer of Brass Meridian.'
+    );
+  });
+
   it('takes what each corporation recorded off the entry in one go when several books contest the day', async () => {
     const second = {
       ...conflict,
@@ -258,5 +286,106 @@ describe('CorpOverlapNotice on a Conflict day', () => {
       'Your entry: gives this ore to another Payee'
     );
     expect(screen.queryByRole('button')).toBeNull();
+  });
+});
+
+describe('CorpOverlapNotice: what reaches the corporation (#6206)', () => {
+  const renderWith = (v: BookRowView, onBookChanged = () => {}) =>
+    render(
+      <CorpOverlapNotice
+        view={v}
+        corpName="Brass Meridian"
+        recordedAt="Efa"
+        everyAssignment={[assignment]}
+        payeeById={new Map([['p1', payee]])}
+        typeNames={new Map([[ZEO, 'Zeolites']])}
+        onChanged={() => {}}
+        onBookChanged={onBookChanged}
+      />
+    );
+  const conflict = {
+    ...view,
+    state: 'conflict',
+    conflictCause: 'otherPayee',
+    recordKey: `${ME}:1000:2026-10-17`,
+    oreLines: [{ typeId: ZEO, quantity: 43_050 }],
+    billed: 319_000,
+  } as BookRowView;
+
+  it('sends a Conflict day to the corporation, naming the Payee', async () => {
+    let changed = 0;
+    renderWith(conflict, () => changed++);
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Tell Brass Meridian it went to Ashfall' })
+    );
+    await waitFor(() => expect(changed).toBe(1));
+    expect(disputeCorpTaxBookConflict).toHaveBeenCalledWith(ME, {
+      corporationId: 98000001,
+      date: '2026-10-17',
+      lines: [
+        { recordKey: `${ME}:1000:2026-10-17`, typeId: ZEO, quantity: 43_050, payeeName: 'Ashfall' },
+      ],
+    });
+  });
+
+  it('says it was sent, or why an officer rejected it, instead of offering it again', () => {
+    const { unmount } = renderWith({
+      ...conflict,
+      flagged: { state: 'sent', at: '2026-10-18T10:00:00.000Z' },
+    });
+    expect(screen.getByText(/Sent to Brass Meridian on 2026-10-18/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Tell / })).toBeNull();
+    unmount();
+    renderWith({
+      ...conflict,
+      flagged: { state: 'rejected', at: '2026-10-19T10:00:00.000Z', reason: 'Our ore' },
+    });
+    expect(screen.getByText('Brass Meridian kept the bill: Our ore')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Tell / })).toBeNull();
+  });
+
+  it('says an officer waived the tax on that ore, with the reason (#6206)', () => {
+    renderWith({
+      ...conflict,
+      flagged: { state: 'dismissed', at: '2026-10-19T10:00:00.000Z', reason: 'Their ore' },
+    });
+    expect(
+      screen.getByText('Brass Meridian waived the tax on that ore: Their ore')
+    ).toBeInTheDocument();
+  });
+
+  it('offers nothing to dispute on ore the book never recorded', () => {
+    renderWith({ ...conflict, conflictCause: 'overListed' });
+    expect(screen.queryByRole('button', { name: /^Tell / })).toBeNull();
+  });
+
+  it('on a day billed on a Statement, "I paid this another way" goes to the corporation', async () => {
+    let changed = 0;
+    renderWith({ ...view, state: 'billed', statementId: 's1' } as BookRowView, () => changed++);
+    await userEvent.click(await screen.findByRole('button', { name: 'I paid this another way' }));
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Amount you paid (optional)' }),
+      '5000'
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Tell Brass Meridian' }));
+    await waitFor(() => expect(changed).toBe(1));
+    expect(declareCorpTaxBookPayment).toHaveBeenCalledWith(ME, {
+      corporationId: 98000001,
+      statementId: 's1',
+      amount: 5000,
+    });
+    // Nothing was saved on the device: the corporation holds it now.
+    expect((await readOverlapAcks()).size).toBe(0);
+  });
+
+  it('shows a waiting declaration instead of the button', async () => {
+    renderWith({
+      ...view,
+      state: 'billed',
+      statementId: 's1',
+      declaration: { state: 'waiting', at: '2026-10-18T10:00:00.000Z' },
+    } as BookRowView);
+    expect(await screen.findByText('Declared — waiting for Brass Meridian')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'I paid this another way' })).toBeNull();
   });
 });

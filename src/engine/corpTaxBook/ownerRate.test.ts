@@ -4,6 +4,7 @@ import {
   latestRateChange,
   ownerMargin,
   rateChangeEvent,
+  pendingRateRequest,
   rateNotice,
   requestedOwnerRate,
   type OwnerRateEntry,
@@ -20,16 +21,21 @@ describe('effectiveOwnerRate', () => {
     expect(effectiveOwnerRate([req(6, '2026-10-05')], '2026-10-04')).toBeUndefined();
   });
 
-  it('uses the requested rate when nothing was agreed', () => {
-    expect(effectiveOwnerRate([req(6, '2026-10-01')], '2026-10-10')).toEqual({
-      pct: 6,
-      kind: 'requested',
-      effectiveFrom: '2026-10-01',
+  it('never takes a requested rate: with nothing agreed there is no rate', () => {
+    expect(effectiveOwnerRate([req(6, '2026-10-01')], '2026-10-10')).toBeUndefined();
+  });
+
+  it('backdates the first agreed rate over the days before it', () => {
+    const history = [req(6, '2026-10-01'), agreed(8, '2026-10-05'), agreed(9, '2026-10-07')];
+    expect(effectiveOwnerRate(history, '2026-09-20')).toEqual({
+      pct: 8,
+      kind: 'agreed',
+      effectiveFrom: '2026-10-05',
     });
   });
 
   it('is effective-dated: the latest entry on or before the day, never a later one', () => {
-    const history = [req(6, '2026-10-01'), req(7, '2026-10-10')];
+    const history = [agreed(6, '2026-10-01'), agreed(7, '2026-10-10')];
     expect(effectiveOwnerRate(history, '2026-10-09')?.pct).toBe(6);
     expect(effectiveOwnerRate(history, '2026-10-10')?.pct).toBe(7);
   });
@@ -39,9 +45,9 @@ describe('effectiveOwnerRate', () => {
     expect(effectiveOwnerRate(history, '2026-10-10')).toMatchObject({ pct: 8, kind: 'agreed' });
   });
 
-  it('keeps the requested rate on days before the agreed rate starts', () => {
+  it('a request never applies, even on days before the agreed rate starts', () => {
     const history = [req(6, '2026-10-01'), agreed(8, '2026-10-05')];
-    expect(effectiveOwnerRate(history, '2026-10-04')).toMatchObject({ pct: 6, kind: 'requested' });
+    expect(effectiveOwnerRate(history, '2026-10-04')).toMatchObject({ pct: 8, kind: 'agreed' });
   });
 
   it('a feeder request after an override is a request only and never changes the rate', () => {
@@ -72,6 +78,16 @@ describe('requestedOwnerRate', () => {
   });
 });
 
+describe('pendingRateRequest', () => {
+  it('is the request made with nothing agreed, or after the last agreement and different from it', () => {
+    expect(pendingRateRequest([])).toBeUndefined();
+    expect(pendingRateRequest([req(6, '2026-10-01')])).toBe(6);
+    expect(pendingRateRequest([req(6, '2026-10-01'), agreed(8, '2026-10-05')])).toBeUndefined();
+    expect(pendingRateRequest([agreed(8, '2026-10-01'), req(6, '2026-10-05')])).toBe(6);
+    expect(pendingRateRequest([agreed(8, '2026-10-01'), req(8, '2026-10-05')])).toBeUndefined();
+  });
+});
+
 describe('ownerMargin', () => {
   it('is the miner rate minus the owner rate, computed on read', () => {
     expect(ownerMargin(10, 8)).toBe(2);
@@ -90,11 +106,11 @@ describe('ownerMargin', () => {
 
 describe('rateChangeEvent', () => {
   it('reports old, new and requested rate and the date when an override changes the rate', () => {
-    const before = [req(6, '2026-10-01')];
+    const before = [agreed(7, '2026-10-01'), req(6, '2026-10-02')];
     const after = [...before, agreed(8, '2026-10-05')];
     expect(rateChangeEvent({ before, after, date: '2026-10-05' })).toEqual({
       date: '2026-10-05',
-      oldPct: 6,
+      oldPct: 7,
       newPct: 8,
       requestedPct: 6,
       recordedAt: '2026-10-05T00:00:00Z',
@@ -141,23 +157,17 @@ describe('rateChangeEvent', () => {
     ).toBeUndefined();
   });
 
-  it('reports a feeder request that moves the rate while nothing was agreed', () => {
+  it('a request alone never moves the rate', () => {
     const before = [req(6, '2026-10-01')];
     expect(
       rateChangeEvent({ before, after: [...before, req(5, '2026-10-08')], date: '2026-10-08' })
-    ).toEqual({
-      date: '2026-10-08',
-      oldPct: 6,
-      newPct: 5,
-      requestedPct: 5,
-      recordedAt: '2026-10-08T00:00:00Z',
-    });
+    ).toBeUndefined();
   });
 });
 
 describe('latestRateChange', () => {
   it('is the last agreed change, with what is asked for now', () => {
-    const history = [req(6, '2026-10-01'), agreed(8, '2026-10-05'), req(7, '2026-10-08')];
+    const history = [agreed(6, '2026-10-01'), agreed(8, '2026-10-05'), req(7, '2026-10-08')];
     expect(latestRateChange(history)).toEqual({
       date: '2026-10-05',
       oldPct: 6,
@@ -169,7 +179,14 @@ describe('latestRateChange', () => {
 
   it('is undefined with a request alone or an agreement to the rate in force', () => {
     expect(latestRateChange([req(6, '2026-10-01')])).toBeUndefined();
-    expect(latestRateChange([req(6, '2026-10-01'), agreed(6, '2026-10-05')])).toBeUndefined();
+    expect(
+      latestRateChange([agreed(6, '2026-10-01'), req(5, '2026-10-02'), agreed(6, '2026-10-05')])
+    ).toEqual({
+      date: '2026-10-01',
+      newPct: 6,
+      requestedPct: 5,
+      recordedAt: '2026-10-01T00:00:00Z',
+    });
   });
 
   it('keeps the earlier change when a later agreement repeats the rate', () => {

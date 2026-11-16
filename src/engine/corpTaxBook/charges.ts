@@ -22,6 +22,14 @@ export interface Miner {
   finalStatementId?: string;
 }
 
+/** The characters a Miner bills: its grouping's, or the one character of a Miner of its own. */
+export function characterIdsOfMiner(minerId: string, miners: readonly Miner[]): number[] {
+  const grouped = miners.find((m) => m.id === minerId);
+  if (grouped) return grouped.characterIds;
+  const solo = Number(minerId.replace(/^solo:/, ''));
+  return Number.isFinite(solo) && minerId.startsWith('solo:') ? [solo] : [];
+}
+
 /** The Miner a character is billed under: its grouping, or a Miner of its own. */
 export function minerIdFor(characterId: number, miners: readonly Miner[]): string {
   return miners.find((m) => m.characterIds.includes(characterId))?.id ?? `solo:${characterId}`;
@@ -51,6 +59,12 @@ export interface DayCharge {
   taxOwed: number;
 }
 
+/** The moon and Extraction a refinery was working on a date, when known. */
+export type PlaceOf = (
+  structureId: number,
+  date: string
+) => { moonId?: number; extractionId?: string };
+
 export interface ChargeBook {
   corporationId: number;
   /** The book's start date (D10): earlier mining is history that owes nothing. */
@@ -59,8 +73,7 @@ export interface ChargeBook {
   rates: readonly TaxRate[];
   /** The day's prices at the book's hub and Ore Form (`priceObservedDay`). */
   pricesOn: (date: string) => Pick<DayPrices, 'prices' | 'sources'>;
-  /** The moon and Extraction a refinery was working on a date, when known. */
-  placeOf: (structureId: number, date: string) => { moonId?: number; extractionId?: string };
+  placeOf: PlaceOf;
 }
 
 export interface DayCharges {
@@ -93,6 +106,7 @@ export function buildDayCharges(
       ...(entry.sourceCorporationId !== undefined ? { feederId: entry.sourceCorporationId } : {}),
       recordKey: key,
       isGuest,
+      minerCorporationId: entry.recordedCorporationId,
     });
     if (!rate) {
       result.unrated.push(entry);

@@ -70,6 +70,8 @@ const overlay = (over: Partial<PersonalOverlay> = {}): PersonalOverlay => ({
   rows: [],
   takenFromFree: new Map(),
   absorbed: new Map(),
+  trimmed: new Map(),
+  alsoBilled: new Map(),
   labels: new Map(),
   books: [],
   ...over,
@@ -116,6 +118,34 @@ describe('buildDisplayRows', () => {
       nameOf
     );
     expect(out.map((d) => d.assignment?.payeeId)).toEqual(['ashfall']);
+  });
+
+  it('shrinks an Assignment a book took part of to what stays with its Payee', () => {
+    const key = `${ME}:2026-10-17:30003838`;
+    const row = {
+      ...mined('2026-10-17'),
+      unassignedOreLines: [],
+      assignments: [{ ...assigned('landlord'), estimatedValue: 100_000, taxOwed: 10_000 }],
+    };
+    const [out] = buildDisplayRows(
+      [row],
+      overlay({
+        trimmed: new Map([
+          [
+            key,
+            new Map([
+              ['landlord', { oreLines: [{ typeId: ZEO, quantity: 250 }], valueShare: 0.25 }],
+            ]),
+          ],
+        ]),
+      }),
+      nameOf
+    );
+    expect(out.assignment).toMatchObject({
+      oreLines: [{ typeId: ZEO, quantity: 250 }],
+      estimatedValue: 25_000,
+      taxOwed: 2_500,
+    });
   });
 
   it('labels the unassigned row Pending corp record or Unattributed', () => {

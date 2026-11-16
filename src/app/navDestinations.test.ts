@@ -43,6 +43,7 @@ const MOONS_TAB_PATHS = [
   '/corp/moons/miners',
   '/corp/moons/statements',
   '/corp/moons/moon-owners',
+  '/corp/moons/sharing',
 ];
 
 describe('NAV_PAGES', () => {

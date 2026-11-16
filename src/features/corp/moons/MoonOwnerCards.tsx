@@ -1,10 +1,12 @@
 import { useTranslation } from 'react-i18next';
 import { Pill } from '@/components/ui/Pill';
-import { Button, Panel } from '@/components/ui';
+import { Button, Panel, isRowOwnEvent } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { canPayMoonOwner, type MoonOwnerRow } from '@/engine/corpTaxBook/moonOwners';
 import { focusRingClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
+import type { PopShareMark } from '@/engine/corpTaxBook/popShareMarks';
+import { PopShareIcon } from './PopShareIcon';
 import { MoonOwnerStatusPill } from './MoonOwnerStatusPill';
 import { moonOwnerNote } from './moonOwnerNote';
 import { isk } from './moonsFormat';
@@ -24,6 +26,7 @@ export function MoonOwnerCards({
   now,
   onOpen,
   onPay,
+  shareMarks,
 }: {
   rows: readonly MoonOwnerRow[];
   name: (corporationId: number) => string;
@@ -31,6 +34,8 @@ export function MoonOwnerCards({
   now: number;
   onOpen: (row: MoonOwnerRow) => void;
   onPay?: (row: MoonOwnerRow) => void;
+  /** Pop Sharing marks by moon owner corporation (#6226). */
+  shareMarks?: Readonly<Record<string, PopShareMark>>;
 }) {
   const { t } = useTranslation();
   return (
@@ -43,7 +48,8 @@ export function MoonOwnerCards({
               'flex cursor-pointer items-center gap-3 px-3 py-3',
               rowInteractiveClassName
             )}
-            onClick={() => onOpen(r)}
+            // A tap on the share mark reads its tooltip, not the row.
+            onClick={(e) => isRowOwnEvent(e) && onOpen(r)}
           >
             <div className="min-w-0 flex-1 space-y-1">
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -61,6 +67,7 @@ export function MoonOwnerCards({
                   {name(r.corporationId)}
                 </button>
                 {r.sameOwner && <Pill tone="accent">{t(k('yours'))}</Pill>}
+                <PopShareIcon mark={shareMarks?.[String(r.corporationId)]} />
                 {r.status !== 'active' && <MoonOwnerStatusPill status={r.status} />}
               </p>
               <p className="text-xs text-text-dim">{moonOwnerNote(r, now, t)}</p>
@@ -88,10 +95,11 @@ function OwedLine({
   onPay: ((row: MoonOwnerRow) => void) | undefined;
 }) {
   const { t } = useTranslation();
-  if (r.mode === 'settled-otherwise')
+  // Settled otherwise still shows what was owed before the switch (#6209).
+  if (r.mode === 'settled-otherwise' && r.owed === 0)
     return <p className="pt-1 text-xs text-text-dim">{t(k('settled'))}</p>;
-  if (r.theirRatePct === undefined)
-    return <p className="pt-1 text-xs text-text-dim">{t(k('nothingDue'))}</p>;
+  if (r.theirRatePct === undefined && r.owed === 0)
+    return <p className="pt-1 text-xs text-text-dim">{t(k('waitsForRate'))}</p>;
   return (
     <div className="flex items-center justify-between gap-3 pt-1">
       <p className="min-w-0">

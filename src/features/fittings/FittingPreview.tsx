@@ -15,12 +15,13 @@ import {
   SkillsPanel,
 } from './FittingPreviewPanels';
 import { FittingRing } from './FittingRing';
-import { usePilotProfile } from './fittingPilotProfile';
+import { usePilotProfile, type PilotProfileState } from './fittingPilotProfile';
 import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
 import { useCompareFittings } from './useCompareFittings';
 import { useCompareStats } from './useCompareStats';
 import { useShipDataNeedsConnection } from './useDogmaEngineStatus';
-import { heldFitting, type LibraryRow } from './useLibraryFittings';
+import { heldFitting, libraryRowCode, type LibraryRow } from './useLibraryFittings';
+import { StatNote } from './StatFacts';
 
 interface FittingPreviewProps {
   row: LibraryRow;
@@ -47,17 +48,11 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-/** The Fitting Share Code a saved or shared row carries; an In-game row has none. */
-function rowCode(row: LibraryRow): string | null {
-  if (row.source === 'saved') return row.record.code;
-  return row.source === 'shared' ? row.shared.code : null;
-}
-
 /** In-game and Active Fit rows hold their Fitting, no code: encoded only when needed. */
 const holdsFitting = (row: LibraryRow) => row.source === 'inGame' || row.source === 'active';
 
 function usePreviewFitting(row: LibraryRow): Fitting | null {
-  const savedCode = rowCode(row);
+  const savedCode = libraryRowCode(row);
   const codes = useMemo(() => (savedCode === null ? [] : [savedCode]), [savedCode]);
   const decoded = useCompareFittings(codes)[0]?.fitting ?? null;
   const held = useMemo(() => heldFitting(row), [row]);
@@ -78,7 +73,7 @@ function useShareCode(row: LibraryRow, fitting: Fitting | null): string | null |
       cancelled = true;
     };
   }, [encodes, fitting]);
-  if (!encodes) return rowCode(row);
+  if (!encodes) return libraryRowCode(row);
   return encoded?.fitting === fitting ? encoded.code : undefined;
 }
 
@@ -104,7 +99,15 @@ function rowNotes(row: LibraryRow): string {
  * worked out for this one Fitting only, so a long list costs nothing until a
  * row is picked.
  */
-export function FittingPreview({
+export function FittingPreview(props: FittingPreviewProps) {
+  // Loaded once for the pane, not per row: a pointer moving down the list
+  // shouldn't reload the pilot from storage at every row it rests on.
+  const pilot = usePilotProfile(props.characterId);
+  // Keyed: a row's own state (notes being edited, its encoded code) never carries over.
+  return <RowPreview key={props.row.id} {...props} pilot={pilot} />;
+}
+
+function RowPreview({
   row,
   characterId,
   catalogue,
@@ -113,15 +116,11 @@ export function FittingPreview({
   onRename,
   onDelete,
   onSaveNotes,
-}: FittingPreviewProps) {
+  pilot,
+}: FittingPreviewProps & { pilot: PilotProfileState }) {
   const { t } = useTranslation();
   const fitting = usePreviewFitting(row);
-  const {
-    profile,
-    failed: profileFailed,
-    skillsKnown,
-    retry: retryProfile,
-  } = usePilotProfile(characterId);
+  const { profile, failed: profileFailed, skillsKnown, retry: retryProfile } = pilot;
   const fittings = useMemo(() => [fitting], [fitting]);
   const compared = useCompareStats(fittings, profile);
   const shareCode = useShareCode(row, fitting);
@@ -156,15 +155,17 @@ export function FittingPreview({
                 ? t('fittings.start.sourceInGame')
                 : row.source === 'active'
                   ? t('fittings.start.sourceActive')
-                  : sharedByText(row, t)}
+                  : row.source === 'doctrine'
+                    ? t('fittings.start.doctrineOf')
+                    : sharedByText(row, t)}
           </p>
           <div className="flex flex-wrap items-center gap-2">
             {row.source === 'saved' && (
               <>
-                <Button size="sm" variant="ghost" onClick={onRename}>
+                <Button variant="ghost" onClick={onRename}>
                   {t('fittings.start.preview.rename')}
                 </Button>
-                <Button size="sm" variant="ghost" onClick={onDelete}>
+                <Button variant="ghost" onClick={onDelete}>
                   {t('fittings.start.preview.delete')}
                 </Button>
               </>
@@ -181,6 +182,10 @@ export function FittingPreview({
             </Button>
           </div>
         </div>
+
+        {row.source === 'doctrine' && row.legacy && (
+          <StatNote>{t('fittings.start.doctrineLegacy')}</StatNote>
+        )}
 
         {unreadable ? (
           <p className="text-xs text-warning">{t('fittings.start.preview.unreadable')}</p>

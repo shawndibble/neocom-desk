@@ -4,8 +4,10 @@ import {
   canPayMoonOwner,
   deriveModeChanges,
   deriveOwnerRateHistory,
+  billedPricesOf,
   extractionRefineriesOf,
   moonOwnerDetail,
+  staleLedgerMailDue,
   type MoonOwnerFeeder,
   type MoonOwnerPayout,
   type MoonOwnersInput,
@@ -152,6 +154,74 @@ describe('buildMoonOwners', () => {
     const r = rowOf(input({ feeders: [feeder(A, { mode: 'settled-otherwise' })] }));
     expect(r.status).toBe('settled-otherwise');
     expect(r.owed).toBe(0);
+    expect(canPayMoonOwner(r)).toBe(false);
+  });
+
+  it('settled otherwise from a later day keeps what accrued before it owed and payable', () => {
+    const r = rowOf(
+      input({
+        entries: [entry(A, '2026-10-05', 1000), entry(A, '2026-10-12', 1000)],
+        feeders: [feeder(A, { modeChanges: [{ from: '2026-10-10', mode: 'settled-otherwise' }] })],
+      })
+    );
+    expect(r.status).toBe('settled-otherwise');
+    expect(r.mode).toBe('settled-otherwise');
+    expect(r.owed).toBe(80);
+    expect(r.balance).toEqual({ kind: 'owed', isk: 80 });
+    expect(canPayMoonOwner(r)).toBe(true);
+  });
+
+  it('a requested rate alone owes nothing yet, asks for a look, and backdates once agreed', () => {
+    const asked = feeder(A, { agreedRatePct: undefined, requestedRatePct: 6 });
+    const r = rowOf(input({ feeders: [asked] }));
+    expect(r.owed).toBe(0);
+    expect(r.status).toBe('rate-asked');
+    expect(r.askedRatePct).toBe(6);
+    expect(r.theirRatePct).toBeUndefined();
+    expect(buildMoonOwners(input({ feeders: [asked] })).totals.needALook).toBe(1);
+    const agreedLater = feeder(A, {
+      ownerRateHistory: [
+        {
+          kind: 'requested',
+          pct: 6,
+          effectiveFrom: '2026-10-01',
+          recordedAt: '2026-10-01T10:00:00Z',
+        },
+        { kind: 'agreed', pct: 6, effectiveFrom: '2026-10-15', recordedAt: '2026-10-15T10:00:00Z' },
+      ],
+    });
+    const agreed = rowOf(input({ feeders: [agreedLater] }));
+    expect(agreed.owed).toBe(60);
+    expect(agreed.status).toBe('active');
+  });
+
+  it('a request newer than the agreed rate asks for a look; the agreed rate stands', () => {
+    const r = rowOf(
+      input({
+        feeders: [
+          feeder(A, {
+            ownerRateHistory: [
+              {
+                kind: 'agreed',
+                pct: 8,
+                effectiveFrom: '2026-10-01',
+                recordedAt: '2026-10-01T10:00:00Z',
+              },
+              {
+                kind: 'requested',
+                pct: 10,
+                effectiveFrom: '2026-10-10',
+                recordedAt: '2026-10-10T10:00:00Z',
+              },
+            ],
+          }),
+        ],
+      })
+    );
+    expect(r.status).toBe('rate-asked');
+    expect(r.askedRatePct).toBe(10);
+    expect(r.theirRatePct).toBe(8);
+    expect(r.owed).toBe(80);
   });
 
   it('shows the miner rate the book charges at their refineries', () => {
@@ -209,6 +279,10 @@ describe('buildMoonOwners', () => {
       'settled-otherwise'
     );
     expect(statusOf({ agreedRatePct: undefined })).toBe('no-rate');
+    expect(statusOf({ agreedRatePct: undefined, requestedRatePct: 5 })).toBe('rate-asked');
+    expect(
+      statusOf({ mode: 'settled-otherwise', agreedRatePct: undefined, requestedRatePct: 5 })
+    ).toBe('settled-otherwise');
     expect(statusOf({})).toBe('active');
     expect(statusOf({ status: 'disconnected' })).toBe('disconnected');
   });
@@ -254,6 +328,28 @@ describe('buildMoonOwners', () => {
       })
     );
     expect(totals).toEqual({ owed: 55, paidThisMonth: 20, count: 2, needALook: 1 });
+  });
+});
+
+describe('billed prices (#6209)', () => {
+  it('keeps the first price each Statement line was billed at, by line', () => {
+    const lines = (key: string, price: number) => ({
+      lines: [{ chargeKey: key, unitPrices: { 100: price } }, { adjustmentId: 'a' }],
+    });
+    expect(billedPricesOf([lines('1:10:2026-10-05', 3), lines('1:10:2026-10-05', 9)])).toEqual(
+      new Map([['1:10:2026-10-05', { 100: 3 }]])
+    );
+  });
+
+  it('values ore with no saved price at the price its line was billed at, else 0', () => {
+    const unsaved = input({
+      entries: [entry(A, '2026-10-05', 1000), entry(A, '2026-10-06', 1000)],
+      pricesOn: () => new Map([[100, 0]]),
+      billedPrices: new Map([['1:10:2026-10-05', { 100: 2 }]]),
+    });
+    const r = rowOf(unsaved);
+    expect(r.mined).toBe(2000);
+    expect(r.owed).toBe(160);
   });
 });
 
@@ -417,5 +513,68 @@ describe('refineries seen (#6097)', () => {
     const row = rowOf(input({ entries: [], extractionRefineries: new Map() }));
     expect(row).toMatchObject({ refineryCount: 0, nothingSeen: true });
     expect(rowOf(input({ entries: [] })).nothingSeen).toBe(true);
+  });
+});
+
+describe('a removal waiting on its notice mail (#6210)', () => {
+  const startedAt = Date.parse('2026-10-19T12:00:00Z');
+
+  it('reads as its own status until the notice is out, and asks for a look', () => {
+    const unsent = feeder(A, {
+      status: 'pending-removal',
+      removal: { startedAt, startedByName: 'Ada' },
+    });
+    expect(rowOf(input({ feeders: [unsent] })).status).toBe('removal-unsent');
+    expect(buildMoonOwners(input({ feeders: [unsent] })).totals.needALook).toBe(1);
+    const sent = feeder(A, {
+      status: 'pending-removal',
+      removal: { startedAt, startedByName: 'Ada', effectiveAt: startedAt + 86_400_000 },
+    });
+    expect(rowOf(input({ feeders: [sent] })).status).toBe('removal-pending');
+  });
+});
+
+describe('staleLedgerMailDue (#6210)', () => {
+  const staleSince = Date.parse('2026-10-11T09:12:00Z');
+  const now = '2026-10-20T12:00:00Z';
+
+  it('is due while a ledger it still reads, or just lost, cannot be read', () => {
+    expect(staleLedgerMailDue({ status: 'cant-read', staleSince }, now)).toBe(true);
+    expect(staleLedgerMailDue({ status: 'removal-pending', staleSince }, now)).toBe(true);
+    expect(staleLedgerMailDue({ status: 'disconnected', staleSince }, now)).toBe(true);
+  });
+
+  it('is not due when it reads, has ended, or is one of our own corporations', () => {
+    expect(staleLedgerMailDue({ status: 'active' }, now)).toBe(false);
+    expect(staleLedgerMailDue({ status: 'left', staleSince }, now)).toBe(false);
+    expect(staleLedgerMailDue({ status: 'removed', staleSince }, now)).toBe(false);
+    expect(staleLedgerMailDue({ status: 'cant-read', staleSince, sameOwner: true }, now)).toBe(
+      false
+    );
+  });
+
+  it('is not due once EVE dropped the first unread day: reconnecting can no longer save it', () => {
+    const row = {
+      status: 'disconnected' as const,
+      staleSince,
+      lastReadWellAt: '2026-10-10T12:00:00Z',
+    };
+    expect(staleLedgerMailDue(row, '2026-11-09T01:00:00Z')).toBe(true);
+    expect(staleLedgerMailDue(row, '2026-11-10T01:00:00Z')).toBe(false);
+  });
+});
+
+describe("the moon owner's own members' rate (#6210)", () => {
+  const rates = [
+    { scope: 'corp' as const, pct: 12, effectiveFrom: '2026-01-01' },
+    { scope: 'guest' as const, pct: 15, effectiveFrom: '2026-01-01' },
+    { scope: 'feeder-member' as const, feederId: A, pct: 4, effectiveFrom: '2026-01-01' },
+  ];
+
+  it("shows what the owner's members pay at its refineries", () => {
+    // The default entry is recorded in the moon owner's own corporation.
+    expect(rowOf(input({ rates })).minerRatePct).toBe(4);
+    const guest = entry(A, '2026-10-05', 1000, { recordedCorporationId: 98000555 });
+    expect(rowOf(input({ rates, entries: [guest] })).minerRatePct).toBe(15);
   });
 });

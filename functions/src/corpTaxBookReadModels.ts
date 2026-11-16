@@ -136,7 +136,9 @@ export function buildReadModels(records: BookRecords, now: number): ReadModels {
       isBeforeBook(p.at as string, records.startDate)
     )
       donationsBeforeBook += 1;
-    else if (!p.minerId) unmatchedPayments.push(p);
+    // A donation wholly marked not tax needs nothing more; a partly marked one still does.
+    else if (!p.minerId && (p.amount as number) - ((p.notTaxAmount as number | undefined) ?? 0) > 0)
+      unmatchedPayments.push(p);
   }
   const extractions = (records.extractions as unknown as MirrorExtraction[]).filter((x) =>
     inWindow(x, records.expiryHours, now)

@@ -496,6 +496,61 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       ).toBe(true);
     });
 
+    it('holds a known miner’s donation for review when their Miner owes nothing (#6207)', async () => {
+      // Billed through the day character 50 mined, and paid in full: nothing owed, nothing unbilled.
+      await book()
+        .collection('statements')
+        .doc('sPaid')
+        .set({ ...statement, id: 'sPaid', code: 'PAID01', coversThrough: '2026-10-31' });
+      await book().collection('payments').doc('j0').set({
+        id: 'j0',
+        source: 'manual',
+        minerId: 'solo:50',
+        characterId: 50,
+        uid: 'char:50',
+        amount: 10_000_000,
+        at: '2026-10-16T12:00:00.000Z',
+      });
+      await optIn(ACCOUNTANT);
+      const summary = await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+      expect(summary.synced).toBe(1);
+      const payment = (await book().collection('payments').doc('j1_1').get()).data();
+      expect(payment?.minerId).toBeUndefined();
+      expect(payment?.reviewReason).toBe('no-open-balance');
+    });
+
+    it('matches a held donation once the lagging ledger shows the ore mined before it was paid', async () => {
+      // Held on an earlier run: the ledger had not yet shown character 50's mining of that day.
+      await book().collection('payments').doc('j1_0').set({
+        id: 'j1_0',
+        source: 'donation',
+        characterId: 50,
+        uid: 'char:50',
+        amount: 1_000_000,
+        at: '2026-10-17T18:00:00.000Z',
+        division: 1,
+        reviewReason: 'no-open-balance',
+      });
+      await optIn(ACCOUNTANT);
+      await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+      const payment = (await book().collection('payments').doc('j1_0').get()).data();
+      expect(payment?.minerId).toBe('solo:50');
+      expect(payment?.reviewReason).toBeUndefined();
+    });
+
+    it('notes tax paid into a division the book does not read, without crediting it (#6207)', async () => {
+      await book().collection('statements').doc('s1').set(statement);
+      await optIn(ACCOUNTANT);
+      // The fake wallet answers the same journal for every division: division 2's copy is the
+      // Miner who owes paying where the book does not look.
+      await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+      const noted = (await book().collection('meta').doc('uncounted').get()).data();
+      expect(noted?.donations).toContainEqual(
+        expect.objectContaining({ id: 'j2_1', division: 2, characterId: 50 })
+      );
+      expect((await book().collection('payments').doc('j2_1').get()).exists).toBe(false);
+    });
+
     describe('settled rows (#5048)', () => {
       const H = 3_600_000;
       const row = (date: string, quantity: number, character = 50) => ({
@@ -576,10 +631,14 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
 
         now = T0 + 12 * H;
         esiState.ledger = readAt([row('2026-10-10', 100)]);
+        // Once: a run reads every wallet division's journal (#6207).
+        let recreated = false;
         const recreating: SyncEsi = {
           ...fakeEsi(),
           // While the run reads ESI, the book is deleted and turned on again, empty.
           journal: async () => {
+            if (recreated) return esiState.journal as never;
+            recreated = true;
             await deleteBook(
               bookDeps(),
               who(DIRECTOR),
@@ -745,6 +804,34 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
         );
       });
 
+      it('adds no audit entry for a run that changed nothing, but still stamps lastSync', async () => {
+        await optIn(ACCOUNTANT);
+        const syncs = async () =>
+          (await audit()).filter((a) => a.action === 'sync' && a.via === 'scheduled sync').length;
+        now = T0 + 6 * H;
+        await run();
+        // The first run brought rows, an Extraction and a donation: it is audited.
+        expect(await syncs()).toBe(1);
+        for (let i = 2; i <= 3; i++) {
+          now = T0 + i * 6 * H;
+          expect((await run()).synced).toBe(1);
+          expect((await book().get()).data()?.lastSync).toMatchObject({ at: now, scheduled: true });
+        }
+        expect(await syncs()).toBe(1);
+
+        // A new donation is a change again.
+        (esiState.journal as { data: unknown[] }).data.push({
+          id: 4,
+          date: '2026-10-18T10:00:00Z',
+          ref_type: 'player_donation',
+          amount: 1_000_000,
+          first_party_id: 50,
+        });
+        now += 6 * H;
+        await run();
+        expect(await syncs()).toBe(2);
+      });
+
       it('reads in full once the marker is a day old, whatever the stamps say', async () => {
         await quietBook();
         await book().collection('statements').doc('s1').set(statement);
@@ -831,6 +918,96 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       expect(await status()).toMatchObject({ status: 'stopped', stoppedReason: 'book-off' });
     });
 
+    describe('telling the editors (#6208)', () => {
+      const pushed: { token: string; data: Record<string, string> }[] = [];
+      const pushDeps = (): CorpSyncDeps => ({
+        ...syncDeps(),
+        push: {
+          send: async (message) => {
+            pushed.push(message);
+            return 'sent';
+          },
+        },
+      });
+      /** A device registered for `characterId` with the given server events on. */
+      const device = (characterId: number, events: string[]) =>
+        db
+          .collection('deviceRegistrations')
+          .doc(`d${characterId}`)
+          .set({
+            fcmToken: `fcm-${characterId}`,
+            characterIds: [characterId],
+            serverEventsByCharacter: { [String(characterId)]: events },
+          });
+
+      beforeEach(async () => {
+        pushed.length = 0;
+        await device(DIRECTOR, ['corpTaxBookSyncStopped']);
+        await device(ACCOUNTANT, ['corpTaxBookSyncStopped']);
+      });
+
+      it('pushes the stop to the holder and each editor seen lately, keyed by the stop', async () => {
+        await optIn(ACCOUNTANT);
+        dead.add('rt-2-1');
+        await runScheduledCorpSyncs(pushDeps(), fakeEsi());
+        expect(pushed.map((m) => m.token).sort()).toEqual(['fcm-1', 'fcm-2']);
+        const director = pushed.find((m) => m.token === 'fcm-1');
+        expect(director?.data).toMatchObject({
+          characterId: String(DIRECTOR),
+          eventId: 'corpTaxBookSyncStopped',
+          occurrenceKey: `${DIRECTOR}:corpTaxBookSyncStopped:${CORP}:${T0}`,
+        });
+        expect(JSON.parse(director?.data.fire ?? '')).toEqual({
+          eventId: 'corpTaxBookSyncStopped',
+          characterId: DIRECTOR,
+          corporationId: CORP,
+          reason: 'token-revoked',
+          characterName: 'Pilot 2',
+          stoppedAt: T0,
+        });
+      });
+
+      it('does not tell a holder who lost the role', async () => {
+        await optIn(ACCOUNTANT);
+        identities.set(ACCOUNTANT, as(['Junior_Accountant']));
+        await runScheduledCorpSyncs(pushDeps(), fakeEsi());
+        expect(pushed.map((m) => m.token)).toEqual(['fcm-1']);
+      });
+
+      it('tells nobody when the book was turned off, or an editor was not seen for 30 days', async () => {
+        await optIn(ACCOUNTANT);
+        await book().update({ active: false });
+        await runScheduledCorpSyncs(pushDeps(), fakeEsi());
+        expect(pushed).toEqual([]);
+
+        await book().update({ active: true });
+        await optIn(ACCOUNTANT, 'rt-2-5');
+        identities.set(ACCOUNTANT, as(['Junior_Accountant']));
+        now = T0 + 30 * 86_400_000;
+        await runScheduledCorpSyncs(pushDeps(), fakeEsi());
+        expect(await status()).toMatchObject({ status: 'stopped', stoppedReason: 'role-lost' });
+        expect(pushed).toEqual([]);
+      });
+
+      it('stops the schedule even when the push hangs past its budget', async () => {
+        await optIn(ACCOUNTANT);
+        dead.add('rt-2-1');
+        const logged: string[] = [];
+        const summary = await runScheduledCorpSyncs(
+          {
+            ...syncDeps(),
+            push: { send: () => new Promise<string>(() => {}) },
+            notifyBudgetMs: 50,
+            log: (message) => logged.push(message),
+          },
+          fakeEsi()
+        );
+        expect(summary).toMatchObject({ stopped: 1 });
+        expect(await status()).toMatchObject({ status: 'stopped', stoppedReason: 'token-revoked' });
+        expect(logged).toContain('corpTaxBookSyncStopped push timed out');
+      });
+    });
+
     it('keeps the schedule through a transient failure and tries again next run', async () => {
       await optIn(ACCOUNTANT);
       refreshFailure = new Error('SSO is down');
@@ -888,14 +1065,14 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
         expect((await grantDoc())?.nextSyncAt).toBe(now + SYNC_REST_MS);
 
         esiState.calls.length = 0;
-        now += H;
+        now += SYNC_REST_MS - 60_000;
         expect(await runScheduledCorpSyncs(syncDeps(), fakeEsi())).toMatchObject({
           grants: 0,
           synced: 0,
         });
         expect(esiState.calls).toEqual([]);
 
-        now += SYNC_REST_MS;
+        now += 60_000;
         expect(await runScheduledCorpSyncs(syncDeps(), fakeEsi())).toMatchObject({
           grants: 1,
           synced: 1,

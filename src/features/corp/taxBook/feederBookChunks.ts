@@ -97,6 +97,13 @@ export function feederChunkReads(
   return out;
 }
 
+/** Every book's Pop Sharing marks by refinery (#6226), for the Moon extractions widget. */
+export function feederShareMarks(
+  books: readonly FeederChunkParts[]
+): NonNullable<FeederChunkParts['shareMarks']> {
+  return Object.assign({}, ...books.map((b) => b.shareMarks ?? {}));
+}
+
 /** Forget every held book read (tests). */
 export function clearFeederBookReads(): void {
   bookReads.clear();

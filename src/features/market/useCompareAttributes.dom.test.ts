@@ -8,8 +8,13 @@ import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import { loadSkills } from '@/sde/loadSde';
 import { loadTypeInfo } from '@/sde/loadTypeInfo';
 import { db } from '@/db';
-import { ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
+import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 
+// Spied, so a test can wait for a fan-out to finish (every worker returned).
+vi.mock('@/lib/concurrency', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/concurrency')>();
+  return { ...actual, mapWithConcurrencyLimit: vi.fn(actual.mapWithConcurrencyLimit) };
+});
 vi.mock('@/sde/loadMarketSde', () => ({
   loadAttributeDictionary: vi.fn(),
 }));
@@ -210,8 +215,9 @@ describe('useCompareAttributes', () => {
 
     rerender({ enabled: false });
     release();
-    // Let the first wave settle and any queued workers get their turn.
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // The fan-out has finished: every worker has returned, so none is left to fetch.
+    const pool = vi.mocked(mapWithConcurrencyLimit);
+    await waitFor(() => expect(pool).toHaveResolvedTimes(pool.mock.calls.length));
 
     expect(calls).toBe(ESI_FANOUT_CONCURRENCY);
   });

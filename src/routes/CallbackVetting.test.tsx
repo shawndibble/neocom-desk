@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { StrictMode } from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import { mswServer } from '@/test/msw';
@@ -130,7 +130,8 @@ describe('Callback, Vetting round trip', () => {
     stashVettingLogin('state-v');
     const first = renderCallback('?code=good-code&state=state-v');
     await screen.findByText(/apply at \/apply\/98000001: ok/);
-    expect(heldVettingLogin()).toBeNull();
+    // The page drops the login in an effect after it commits, which can trail the text.
+    await waitFor(() => expect(heldVettingLogin()).toBeNull());
     first.unmount();
     render(
       <MemoryRouter initialEntries={['/apply/98000001']}>

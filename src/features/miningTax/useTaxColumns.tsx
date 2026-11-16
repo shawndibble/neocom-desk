@@ -315,7 +315,12 @@ export function useTaxColumns({
                   : undefined,
         render: (dr) =>
           // A Conflict owes nothing yet; it shows what the book bills, and when, if it is left.
-          dr.corp?.kind === 'row' && dr.corp.view.state === 'conflict' ? (
+          dr.corp?.kind === 'row' &&
+          dr.corp.view.state === 'conflict' &&
+          dr.corp.view.conflictCause === 'overListed' ? (
+            // Ore the book never recorded: no Statement bills it.
+            '—'
+          ) : dr.corp?.kind === 'row' && dr.corp.view.state === 'conflict' ? (
             <span className="block">
               <span className="block">{`${formatIsk(dr.corp.view.billed)} ISK`}</span>
               <span className="block text-[0.6875rem] font-normal text-warning">

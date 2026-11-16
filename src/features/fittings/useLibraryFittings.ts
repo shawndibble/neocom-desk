@@ -1,7 +1,8 @@
 /**
  * The Fittings the library offers — the active Character's saved ones (My
  * Fittings, Dexie), their In-game ones (ESI), their Active Fit (the ship they
- * fly, read off their assets) and the ones shared into their Communities —
+ * fly, read off their assets), the ones shared into their Communities and
+ * their corporation's Doctrine Fits (`corpDoctrineFittings.ts`) —
  * read once here so the tabbed panels and the Start screen's single
  * searchable list show the same rows.
  */
@@ -34,7 +35,7 @@ import { loadCharacterShip } from '@/features/character/ship';
 import { loadCharacterAssets } from '@/features/assets/assets';
 import { shipItemsToFitting } from './assetShipLocation';
 
-/** One row of the Start screen's list: a saved, In-game, Active or shared Fitting. */
+/** One row of the Start screen's list: a saved, In-game, Active, shared or Doctrine Fitting. */
 export type LibraryRow = MyFittingRow &
   (
     | { source: 'saved'; record: FittingRecord }
@@ -48,6 +49,12 @@ export type LibraryRow = MyFittingRow &
         sharer: string | null;
         communityNames: string[];
       }
+    /**
+     * One of the active Character's corp Doctrine Fits (#6202), opened read-only like a shared
+     * one. `legacy`: saved before the corp kept the whole fit, so `code` holds only its hull,
+     * modules, rigs and subsystems.
+     */
+    | { source: 'doctrine'; code: string; legacy: boolean }
   );
 
 /** A saved Fitting's row, for callers that only list those. */
@@ -180,11 +187,14 @@ export function useCommunityFittings(characterId: number | null) {
     sharerNames: ReadonlyMap<string, string>;
   } | null>(null);
   const requestIdRef = useRef(0);
+  /** The Character whose read last finished, landed or failed: its rows are final. */
+  const [settledFor, setSettledFor] = useState<number | null | undefined>(undefined);
 
   const refresh = useCallback(async () => {
     const requestId = ++requestIdRef.current;
     if (characterId === null || !isSyncConfigured()) {
       setState(null);
+      if (requestId === requestIdRef.current) setSettledFor(characterId);
       return;
     }
     try {
@@ -195,6 +205,7 @@ export function useCommunityFittings(characterId: number | null) {
       // Offline or signed out of sync: the library just lists its own Fittings.
       if (requestId === requestIdRef.current) setState(null);
     }
+    if (requestId === requestIdRef.current) setSettledFor(characterId);
   }, [characterId]);
 
   useEffect(() => {
@@ -225,7 +236,14 @@ export function useCommunityFittings(characterId: number | null) {
       ),
     [current, uid]
   );
-  return { communities: current?.communities ?? [], rows, mine, refresh };
+  return {
+    communities: current?.communities ?? [],
+    rows,
+    mine,
+    refresh,
+    /** This Character's Shared rows have loaded, or will not. */
+    settled: settledFor === characterId,
+  };
 }
 
 /** Shared Fittings as list rows: not the viewer's own, one row per Fitting. */
@@ -245,6 +263,13 @@ export function sharedRows(
     sharer: sharerNames.get(shared.ownerUid) ?? null,
     communityNames: shared.communityIds.map((id) => communityName.get(id) ?? ''),
   }));
+}
+
+/** The Fitting Share Code a saved, shared or Doctrine row carries; null for one that holds its Fitting. */
+export function libraryRowCode(row: LibraryRow): string | null {
+  if (row.source === 'saved') return row.record.code;
+  if (row.source === 'shared') return row.shared.code;
+  return row.source === 'doctrine' ? row.code : null;
 }
 
 /** The Fitting an In-game or Active Fit row carries itself; null for a row that only has a code. */

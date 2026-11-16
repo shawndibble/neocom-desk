@@ -135,9 +135,12 @@ export interface ListRow {
  */
 export type TableCell =
   | string
-  | { text: string; iskAmount: number }
+  /** An ISK figure; `prefix` is a short translated word or sign drawn before it ("≤"). */
+  | { text: string; iskAmount: number; prefix?: string }
   /** Short text with more behind it (a ticker, the corporation's full name in a tooltip). */
   | { text: string; hint: string }
+  /** Text followed by a share mark (`ShareMark`): `label` is its tooltip, `off` slashes it. */
+  | { text: string; share: { label: string; off: boolean } }
   | { text: string; tone?: 'good' | 'caution' | 'bad'; bar?: number };
 
 export interface TableColumn {
@@ -202,8 +205,11 @@ export interface RowDetailModel {
   title: string;
   /** A status line above the facts: a toned badge, then plain text, then an optional dim note. */
   status?: { badge: string; tone: DetailTone; text?: string; note?: string };
-  /** Labelled facts, in reading order; each value is already formatted. */
-  facts: { label: string; value: string }[];
+  /**
+   * Labelled facts, in reading order; each value is already formatted. `tone: 'warning'` flags
+   * a value to doubt (stale data); the text says why, so colour is never the only signal.
+   */
+  facts: { label: string; value: string; tone?: 'warning' }[];
   /** Bars under their own heading, each with a badge and a readout (a den's Development and Anarchy). */
   meters?: {
     title: string;
@@ -219,10 +225,13 @@ export interface RowDetailModel {
   /** A titled list, each entry a toned badge, its text and a trailing value. */
   list?: {
     title: string;
-    items: { key: string; badge: string; tone: DetailTone; text: string; value: string }[];
+    /** `badge` and `tone` are left out for a plain line (a Shared Pop's ore). */
+    items: { key: string; badge?: string; tone?: DetailTone; text: string; value: string }[];
   };
   /** Where it is: Set destination, and the jump count as a link to Route Safety. */
   place?: { systemId: number; name: string; jumps?: number };
+  /** One in-app destination the record leads on to (a Shared Pop's Survey start link). */
+  link?: { label: string; to: string };
 }
 
 export interface TableModel {

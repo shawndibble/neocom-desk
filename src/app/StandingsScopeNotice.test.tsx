@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { GrantNote } from './GrantNote';
 import { StandingsScopeNotice } from './StandingsScopeNotice';
 
 const beginEveLogin = vi.fn();
@@ -28,6 +29,28 @@ beforeEach(async () => {
   useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
 });
 
+/**
+ * A Grant note that does show (its Character has no token), rendered beside the
+ * notice: both read the grant in the same commit, so once this one is up the
+ * notice's answer has landed too, and its absence means something.
+ */
+function WithControl() {
+  return (
+    <>
+      <StandingsScopeNotice />
+      <GrantNote
+        endpoints={['getCharacterStandings']}
+        characterId={CHARACTER_ID + 1}
+        title="Control"
+        hint="Control hint"
+        actionLabel="Control action"
+      />
+    </>
+  );
+}
+const settled = () => screen.findByText('Control');
+const notice = () => screen.queryByRole('button', { name: /grant character details/i });
+
 describe('StandingsScopeNotice', () => {
   it('offers to grant the missing standings scope, not a re-login', async () => {
     await grant(['esi-characters.read_contacts.v1']);
@@ -41,11 +64,10 @@ describe('StandingsScopeNotice', () => {
 
   it('stays silent when the grant already holds the scope', async () => {
     await grant(['esi-characters.read_standings.v1']);
-    render(<StandingsScopeNotice />);
+    render(<WithControl />);
 
-    // Let the live query resolve before asserting absence.
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    await settled();
+    expect(notice()).not.toBeInTheDocument();
   });
 
   it('stays dismissed for that Character once dismissed', async () => {
@@ -55,8 +77,8 @@ describe('StandingsScopeNotice', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
 
     unmount();
-    render(<StandingsScopeNotice />);
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    render(<WithControl />);
+    await settled();
+    expect(notice()).not.toBeInTheDocument();
   });
 });

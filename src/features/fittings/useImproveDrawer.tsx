@@ -33,11 +33,10 @@ import { ImproveTrain } from './ImproveTrain';
 import type { FitResource } from './makeItFitContext';
 import type { TargetProfiles } from './targetProfiles';
 import type { FittingCatalogue } from './useFittingCatalogue';
+import { hullOf, useImprove } from './useImprove';
 import {
-  useImprove,
   useImproveGoal,
   useImproveGoalByRole,
-  hullOf,
   useImproveHold,
   useImproveJob,
   useImproveJobByRole,
@@ -51,7 +50,7 @@ import {
   useImproveSort,
   useImproveBudget,
   migrateSpendCap,
-} from './useImprove';
+} from './useImproveSettingStores';
 import { hasImproveResults } from './improveHasResults';
 import type { FittingWorkspace } from './useFittingWorkspace';
 

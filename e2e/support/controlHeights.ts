@@ -27,7 +27,7 @@ import { expect } from './testBase';
 export const CONTROL_ROW_WIDTHS = [1280, 390] as const;
 
 /** Each row, inside `scope`, whose inline controls differ in height by more than 1px. */
-async function findControlHeightMismatches(page: Page, scope: string): Promise<string[]> {
+export async function findControlHeightMismatches(page: Page, scope: string): Promise<string[]> {
   return page.evaluate((scopeSelector) => {
     const CONTROL =
       'button, a[href], input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="range"]), select, [role="combobox"], [role="button"], [role="group"], [role="radiogroup"]';

@@ -16,4 +16,5 @@ export * from './kills';
 export * from './dens';
 export * from './skyhooks';
 export * from './accelerator';
+export * from './sharedMoonPop';
 export * from './signIn';

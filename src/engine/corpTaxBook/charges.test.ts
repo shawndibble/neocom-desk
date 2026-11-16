@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildDayCharges, minerIdFor, type Miner } from './charges';
+import { buildDayCharges, characterIdsOfMiner, minerIdFor, type Miner } from './charges';
 import type { ObservedMiningEntry } from './types';
 import type { TaxRate } from './rates';
 
@@ -39,6 +39,15 @@ const book = {
     structureId === 2002 ? { moonId: 40000001, extractionId: 'x1' } : {},
 };
 
+describe('characterIdsOfMiner', () => {
+  const miners: Miner[] = [{ id: 'm1', characterIds: [1, 2], mainCharacterId: 1 }];
+  it("gives a grouping's characters, a solo Miner's own one, and none for an unknown id", () => {
+    expect(characterIdsOfMiner('m1', miners)).toEqual([1, 2]);
+    expect(characterIdsOfMiner('solo:7', miners)).toEqual([7]);
+    expect(characterIdsOfMiner('gone', miners)).toEqual([]);
+  });
+});
+
 describe('minerIdFor', () => {
   it('finds the Miner a character is grouped into', () => {
     expect(minerIdFor(90000002, miners)).toBe('m1');
@@ -75,6 +84,21 @@ describe('buildDayCharges', () => {
   it('bills a guest at the Guest default', () => {
     const { charges } = buildDayCharges([entry({ recordedCorporationId: 1 })], book);
     expect(charges[0]).toMatchObject({ isGuest: true, taxPct: 20, taxOwed: 600 });
+  });
+
+  it("bills a moon owner's own member at its moon at the owner's member rate (#6210)", () => {
+    const OWNER = 98000050;
+    const member: TaxRate = {
+      scope: 'feeder-member',
+      feederId: OWNER,
+      pct: 3,
+      effectiveFrom: '2026-01-01',
+    };
+    const at = { ...book, rates: [...rates, member] };
+    const own = entry({ recordedCorporationId: OWNER, sourceCorporationId: OWNER });
+    expect(buildDayCharges([own], at).charges[0]).toMatchObject({ isGuest: true, taxPct: 3 });
+    const stranger = entry({ recordedCorporationId: 1, sourceCorporationId: OWNER });
+    expect(buildDayCharges([stranger], at).charges[0]).toMatchObject({ taxPct: 20 });
   });
 
   it('carries the refinery’s moon and Extraction, and the moon rate', () => {

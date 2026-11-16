@@ -18,6 +18,7 @@ import { cleanup, configure } from '@testing-library/react';
 import { afterAll, afterEach, beforeEach, expect } from 'vitest';
 import { settleEsiCacheLoads } from '@/esi/cache';
 import { claimSessionHint, resetSessionHints } from '@/lib/hintFlags';
+import { restoreRealTimers, unmountAtTestEnd } from '@/test/teardown';
 import { fakeMediaQueryList } from '@/test/viewport';
 
 /**
@@ -46,20 +47,25 @@ configure({ asyncUtilTimeout: 5000 });
 /**
  * A read still running when its test ends writes into `esiCache` after the next
  * test's `resetSession()` cleared it, and that test reads the stale row as fresh
- * without ever calling its own MSW handler. Unmount first (so nothing new
- * starts), then wait for every cache load to finish writing. A load that won't
- * settle is reported here, naming its key.
+ * without ever calling its own MSW handler. Real timers back first (the settle
+ * waits on `setTimeout`), then unmount (so nothing new starts) and wait for
+ * every cache load to finish — the runner already aborted the test's requests
+ * (`src/test/teardown.ts`). A load that won't settle is reported here, naming its key.
+ * `vitest.setup.ts`'s `afterEach` then runs and drains IndexedDB.
  * Don't hand-roll drains in a test file (`waitFor(esiInFlight)`, extra ticks).
  */
+unmountAtTestEnd(cleanup);
 afterEach(async () => {
+  restoreRealTimers();
+  // Already unmounted by the runner step; this catches a render from a hook.
   cleanup();
   try {
     await settleEsiCacheLoads(1000);
   } catch (error) {
-    // Warn rather than fail: a test with no msw server (Settings, SkillPlans,
-    // ...) leaves a request that hangs on CI's offline network. That load can
-    // never write a row, so failing the test would be a false positive; the
-    // message still names the key, so a real late writer is findable.
+    // Warn rather than fail: the requests are already aborted, so a load still
+    // pending here is waiting on something other than the network. Failing
+    // the test would blame it for that; the message names the key, so a real
+    // late writer is findable.
     const reason = error instanceof Error ? error.message : String(error);
     console.warn(`[esi settle] ${expect.getState().currentTestName}: ${reason}`);
   }

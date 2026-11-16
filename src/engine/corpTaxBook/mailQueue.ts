@@ -19,8 +19,9 @@ export const OFFLINE_RETRY_MS = 30_000;
 const MAX_RATE_LIMIT_WAIT_MS = 10 * MINUTE_MS;
 
 /**
- * `rate-change` (#4515), `removal`/`removalCancelled` (#4520) and `payee-change` (#4653) are moon
- * owner mails, not Statements. `srp-result` (an officer telling a pilot an SRP claim was decided)
+ * `rate-change` (#4515), `removal`/`removalCancelled` (#4520), `payee-change` (#4653) and
+ * `mode-change` (settled otherwise on or off, #6209) and `grant-stale` (the ledger can't be read,
+ * #6210) are moon owner mails, not Statements. `srp-result` (an officer telling a pilot an SRP claim was decided)
  * and `vetting-result` (a reviewer telling a pilot how their vetting review was decided) belong to
  * no Corp Tax Book at all: they only ride the same paced queue.
  */
@@ -29,6 +30,8 @@ export type MailKind =
   | 'reminder'
   | 'rate-change'
   | 'payee-change'
+  | 'mode-change'
+  | 'grant-stale'
   | 'removal'
   | 'removalCancelled'
   | 'srp-result'
@@ -329,4 +332,16 @@ export function removalNoticeStillDue(
   if (item.kind !== 'removal') return true;
   if (record?.status !== 'pending-removal') return false;
   return item.removalStartedAt === undefined || record.removal?.startedAt === item.removalStartedAt;
+}
+
+/**
+ * The moon owner and stale spell a queued stale-ledger copy (`grant-stale`, #6210) was for, read
+ * from its `stale:{feeder}:{staleSince}:{recipient}` id; undefined for any other mail.
+ */
+export function staleMailSpell(
+  item: Pick<MailQueueItem, 'kind' | 'statementId'>
+): { feederCorporationId: number; staleSince: number } | undefined {
+  if (item.kind !== 'grant-stale') return undefined;
+  const m = /^stale:(\d+):(\d+):\d+$/.exec(item.statementId);
+  return m ? { feederCorporationId: Number(m[1]), staleSince: Number(m[2]) } : undefined;
 }

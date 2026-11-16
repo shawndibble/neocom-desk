@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import {
   combineOverlaps,
@@ -9,6 +10,8 @@ import {
 import { releaseOre, unsettle } from '../ledgerActions';
 import { useLedgerAction } from '../useLedgerAction';
 import { ConflictNotice } from './ConflictNotice';
+import { CorpDeclareSlot } from './CorpDeclareAction';
+import { CorpDisputeAction } from './CorpDisputeAction';
 import { resolvesOn } from './useCorpStateText';
 import { OverlapNotice } from './OverlapNotice';
 import { acknowledgeOverlap, overlapAckKey, readOverlapAcks } from './overlapAck';
@@ -31,6 +34,12 @@ interface Props {
   typeNames: ReadonlyMap<number, string>;
   /** A change landed: reload the ledger. */
   onChanged: () => void;
+  /**
+   * A message reached the corporation (#6206): reload the books. With it, "I paid it another way"
+   * on a day billed on a Statement goes to the corporation instead of staying a device-only note,
+   * and a Conflict offers "Tell {corp}".
+   */
+  onBookChanged?: () => void;
 }
 
 /**
@@ -51,7 +60,9 @@ export function CorpOverlapNotice({
   payeeById,
   typeNames,
   onChanged,
+  onBookChanged,
 }: Props) {
+  const { t } = useTranslation();
   const conflict = view.state === 'conflict';
   const overlap = useMemo(
     () =>
@@ -136,6 +147,7 @@ export function CorpOverlapNotice({
       <ConflictNotice
         corpName={corpName}
         cause={view.conflictCause}
+        {...(view.ownerPayeeId !== undefined && { ownerName: nameOf(view.ownerPayeeId) })}
         entries={mine.map((a) => ({
           id: a.id,
           payeeName: nameOf(a.payeeId ?? ''),
@@ -153,10 +165,32 @@ export function CorpOverlapNotice({
           void run(() => unsettle(mine.filter((a) => a.status === 'paid')), onChanged)
         }
         onTakeOver={takeOver}
+        tell={
+          onBookChanged && (
+            <CorpDisputeAction
+              view={view}
+              payeeName={
+                [...new Set(mine.map((a) => nameOf(a.payeeId ?? '')))].join(', ') ||
+                (view.ownerPayeeId !== undefined
+                  ? nameOf(view.ownerPayeeId)
+                  : t('miningTax.corpBook.conflict.otherPayee'))
+              }
+              onSent={onBookChanged}
+            />
+          )
+        }
       />
     );
   }
-  if (!overlap || acked === null || acked.has(key)) return null;
+  const declare =
+    // Only while the Statement still bills the day: a settled one has nothing to declare.
+    onBookChanged &&
+    view.statementId !== undefined &&
+    (view.state === 'billed' || view.bookOwed !== undefined || view.declaration !== undefined) ? (
+      <CorpDeclareSlot view={view} onDeclared={onBookChanged} />
+    ) : undefined;
+  // A declaration goes to the corporation, so the device's own note no longer hides the notice.
+  if (!overlap || acked === null || (!declare && acked.has(key))) return null;
 
   return (
     <OverlapNotice
@@ -171,6 +205,7 @@ export function CorpOverlapNotice({
       onPaidAnotherWay={() =>
         void acknowledgeOverlap(key).then(() => setAcked((held) => new Set(held).add(key)))
       }
+      {...(declare ? { paidAnotherWay: declare } : {})}
     />
   );
 }

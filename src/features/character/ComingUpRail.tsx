@@ -8,18 +8,33 @@
  * a view switcher (see the scope decision).
  *
  * Grouping only; the ordering is `engine/character/board.ts`'s and is never
- * re-derived here.
+ * re-derived here. Items overdue for over `LONG_OVERDUE_MS` fold into one
+ * summary row at the top ("Overdue over 2 days · oldest 31 days", with the
+ * count), which expands in place (§6c's leading caret); a picked day folds
+ * nothing.
  */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, LiveStatus, Panel, textActionClassName } from '@/components/ui';
+import { Disclosure, EmptyState, LiveStatus, Panel, textActionClassName } from '@/components/ui';
 import type { CharacterBoardItem } from '@/engine/character/board';
+import { DAY_MS } from '@/lib/age';
 import { useTimeZone } from '@/lib/timeFormat';
-import { groupByDay, relativeDayFor } from '@/engine/character/deadlines';
+import {
+  groupByDay,
+  relativeDayFor,
+  splitLongOverdue,
+  type DayGroup,
+} from '@/engine/character/deadlines';
 import { CalendarClocks } from './CalendarClocks';
 import { CharacterBoardRow } from './CharacterBoardRow';
+
+/**
+ * Overdue for longer than this, an item folds into the rail's one summary row: a month of
+ * extractors nobody restarted must not open the agenda above everything current.
+ */
+export const LONG_OVERDUE_MS = 2 * DAY_MS;
 
 export interface ComingUpRailProps {
   items: readonly CharacterBoardItem[];
@@ -29,6 +44,7 @@ export interface ComingUpRailProps {
   onClearDay: () => void;
   onSelectEvent: (eventId: number) => void;
   onSelectSkyhook?: (skyhookId: number) => void;
+  onSelectSharedPop?: (popId: string) => void;
   /** True when the pilot has deselected every kind — a different answer from "nothing due". */
   noKindsSelected: boolean;
 }
@@ -40,11 +56,22 @@ export function ComingUpRail({
   onClearDay,
   onSelectEvent,
   onSelectSkyhook,
+  onSelectSharedPop,
   noKindsSelected,
 }: ComingUpRailProps) {
   const { t, i18n } = useTranslation();
   const zone = useTimeZone();
-  const groups = useMemo(() => groupByDay(items, zone), [items, zone]);
+  const [showLongOverdue, setShowLongOverdue] = useState(false);
+  // A picked day shows all of that day: the pilot asked for it.
+  const { longOverdue, rest } = useMemo(
+    () =>
+      selectedDayMs === null
+        ? splitLongOverdue(items, nowMs, LONG_OVERDUE_MS)
+        : { longOverdue: [], rest: [...items] },
+    [items, nowMs, selectedDayMs]
+  );
+  const groups = useMemo(() => groupByDay(rest, zone), [rest, zone]);
+  const longOverdueGroups = useMemo(() => groupByDay(longOverdue, zone), [longOverdue, zone]);
 
   const dayHeading = useMemo(() => {
     const formatter = new Intl.DateTimeFormat(i18n.language, {
@@ -62,6 +89,32 @@ export function ComingUpRail({
     };
   }, [i18n.language, nowMs, t, zone]);
 
+  const dayGroup = (group: DayGroup) => (
+    <li key={group.dayStartMs}>
+      <h3
+        className={cx(
+          eyebrowClassName,
+          'sticky top-0 z-10 border-y border-line bg-panel-2 px-3 py-1.5'
+        )}
+      >
+        {dayHeading(group.dayStartMs)}
+        <span className="float-right tabular-nums">{group.items.length}</span>
+      </h3>
+      <ul className="divide-y divide-line">
+        {group.items.map((item) => (
+          <li key={item.id}>
+            <CharacterBoardRow
+              item={item}
+              onSelectEvent={onSelectEvent}
+              onSelectSkyhook={onSelectSkyhook}
+              onSelectSharedPop={onSelectSharedPop}
+            />
+          </li>
+        ))}
+      </ul>
+    </li>
+  );
+
   /**
    * Three states, and they are three different sentences.
    *
@@ -73,30 +126,25 @@ export function ComingUpRail({
     <EmptyState title={t('calendar.rail.noKinds')} hint={t('calendar.rail.noKindsHint')} />
   ) : items.length > 0 ? (
     <ul aria-label={t('calendar.rail.title')}>
-      {groups.map((group) => (
-        <li key={group.dayStartMs}>
-          <h3
-            className={cx(
-              eyebrowClassName,
-              'sticky top-0 z-10 border-y border-line bg-panel-2 px-3 py-1.5'
-            )}
+      {longOverdue.length > 0 && (
+        <li>
+          <Disclosure
+            className="border-b border-line"
+            label={t('calendar.rail.longOverdue', {
+              count: Math.floor(
+                (nowMs - Math.min(...longOverdue.map((i) => i.deadlineMs))) / DAY_MS
+              ),
+              windowDays: LONG_OVERDUE_MS / DAY_MS,
+            })}
+            trailing={longOverdue.length}
+            expanded={showLongOverdue}
+            onToggle={() => setShowLongOverdue((open) => !open)}
           >
-            {dayHeading(group.dayStartMs)}
-            <span className="float-right tabular-nums">{group.items.length}</span>
-          </h3>
-          <ul className="divide-y divide-line">
-            {group.items.map((item) => (
-              <li key={item.id}>
-                <CharacterBoardRow
-                  item={item}
-                  onSelectEvent={onSelectEvent}
-                  onSelectSkyhook={onSelectSkyhook}
-                />
-              </li>
-            ))}
-          </ul>
+            <ul>{longOverdueGroups.map(dayGroup)}</ul>
+          </Disclosure>
         </li>
-      ))}
+      )}
+      {groups.map(dayGroup)}
     </ul>
   ) : selectedDayMs === null ? (
     <EmptyState title={t('calendar.rail.empty')} hint={t('calendar.rail.emptyHint')} />

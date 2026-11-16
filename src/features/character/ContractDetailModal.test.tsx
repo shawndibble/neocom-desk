@@ -12,6 +12,13 @@ import { ContractDetailModal, type ContractDetailModalProps } from './ContractDe
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import type { Contract } from '@/esi/endpoints';
 import { LocationProbe } from '@/test/LocationProbe';
+import { loadSystemName } from './systemSecurity';
+
+// Spied, so a test can wait for a system lookup to settle before asserting what it left out.
+vi.mock('./systemSecurity', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./systemSecurity')>();
+  return { ...actual, loadSystemName: vi.fn(actual.loadSystemName) };
+});
 
 vi.mock('@/sde/loadSde', () => ({
   loadTypes: vi.fn(async () => ({
@@ -289,9 +296,13 @@ describe('ContractDetailModal System rows', () => {
       onClose: () => {},
     });
     expect(await screen.findByText('Somewhere Station')).toBeInTheDocument();
-    // Let the system lookup settle before asserting the row never appeared.
+    // Once the system lookup has settled, the row never appeared.
     await waitFor(() => expect(systemAsked).toBe(true));
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await waitFor(() =>
+      expect(vi.mocked(loadSystemName).mock.settledResults.at(-1)?.type).toMatch(
+        /fulfilled|rejected/
+      )
+    );
     expect(screen.queryByText('System')).toBeNull();
     expect(screen.queryByText('#30009999')).toBeNull();
   });

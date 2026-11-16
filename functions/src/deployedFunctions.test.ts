@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { SYNC_CORP_TAX_BOOKS_SCHEDULE } from './corpSyncGrant.js';
+import { SYNC_CORP_TAX_BOOKS_SCHEDULE, SYNC_REST_MS } from './corpSyncGrant.js';
+import { BOOK_SYNC_HOURS_UTC } from './corpTaxBookSchedule.js';
 
 /**
  * Every `export const` of `index.ts` is a function Cloud Functions deploys, and a full deploy has a
@@ -43,12 +44,18 @@ describe('deployed functions', () => {
     expect(source).not.toMatch(/^export const \w*Srp\w* =/m);
   });
 
-  it('runs syncCorpTaxBooks at 00:35, 06:35, 12:35 and 18:35 UTC (yesterday closes at 00:30)', () => {
+  it('runs syncCorpTaxBooks every 2 hours at 35 past, 00:35 UTC first (yesterday closes at 00:30)', () => {
     expect(SYNC_CORP_TAX_BOOKS_SCHEDULE).toEqual({
-      schedule: '35 0,6,12,18 * * *',
+      schedule: '35 0,2,4,6,8,10,12,14,16,18,20,22 * * *',
       timeZone: 'UTC',
     });
     const source = readFileSync(new URL('./index.ts', import.meta.url), 'utf8');
     expect(source).toMatch(/\.\.\.SYNC_CORP_TAX_BOOKS_SCHEDULE/);
+  });
+
+  it('rests a synced book for less than the shortest gap between runs, so a late run never skips a slot', () => {
+    const hours = [...BOOK_SYNC_HOURS_UTC, BOOK_SYNC_HOURS_UTC[0] + 24];
+    const shortestGapMs = Math.min(...hours.slice(1).map((h, i) => (h - hours[i]) * 3_600_000));
+    expect(SYNC_REST_MS).toBeLessThan(shortestGapMs);
   });
 });

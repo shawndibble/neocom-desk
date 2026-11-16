@@ -139,6 +139,8 @@ const EVENT_SEVERITY: Readonly<Partial<Record<NotificationEventId, DeadlineSever
   communityRequestPledged: 'watch',
   // A report waits on the reviewers; nothing is burning.
   vettingShared: 'watch',
+  // A standing fault: the book stops staying current until an editor turns it on again.
+  corpTaxBookSyncStopped: 'warning',
   // Waiting on you, but nothing is burning.
   spExtractionReady: 'watch',
   industryJobComplete: 'watch',

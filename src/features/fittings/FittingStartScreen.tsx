@@ -17,6 +17,11 @@ import {
   RowActionsMenu,
   RowMoreActions,
   SearchInput,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Spinner,
   TabPanel,
   Tooltip,
@@ -25,11 +30,21 @@ import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
 import type { FittingRecord } from '@/db';
 import { esiFittingToFitting } from '@/engine/fittings/esiFittingMapper';
-import { filterMyFittings, groupByHull } from '@/engine/fittings/myFittings';
+import {
+  effectiveSource,
+  filterBySource,
+  filterMyFittings,
+  groupByHull,
+  LIBRARY_SOURCES,
+  librarySources,
+  type LibrarySource,
+  type LibrarySourcePick,
+} from '@/engine/fittings/myFittings';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { NO_HOVER_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
-import { textParam } from '@/lib/urlState';
+import { enumParam, textParam } from '@/lib/urlState';
 import { useUrlParam } from '@/lib/useUrlState';
 import { warmDogmaEngine } from './dogmaFittingEngine';
 import { StatNote } from './StatFacts';
@@ -41,7 +56,6 @@ import { setFittingNotes } from './myFittings';
 import { FittingExportNotice } from './FittingExportMenu';
 import { DeleteFittingModal, RenameFittingModal } from './SavedFittingModals';
 import { useLibraryRowActions } from './useLibraryRowActions';
-import { ADD_PREVIEW_DELAY_MS } from './useModuleAddPreview';
 import { fittingCompareHref } from './fittingRoutes';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import type { FittingLibrarySource } from './useFittingPicker';
@@ -54,6 +68,7 @@ import {
   useSavedFittings,
   type LibraryRow,
 } from './useLibraryFittings';
+import { useCorpDoctrineFittings } from './corpDoctrineFittings';
 
 interface FittingStartScreenProps {
   /** The open workspace, or the Compare picker's stand-in that returns a Fitting Share Code. */
@@ -91,11 +106,28 @@ interface FittingStartScreenProps {
 }
 
 /**
+ * How long the pointer must rest on a row before the preview takes it: longer
+ * than a module's add preview, since each pick works out a whole Fitting and a
+ * pointer sweeping the list should pick none of the rows it passes.
+ */
+export const LIST_PREVIEW_DELAY_MS = 275;
+
+/**
  * The page's search, in the URL as `?q=` (ADR 0015), so Back from an opened
  * Fitting returns to the list as it was searched.
  */
 const QUERY_KEY = 'q';
 const QUERY_PARAM = textParam();
+/** The page's Source filter (issue #6217), in the URL beside the search as `?source=`. */
+const SOURCE_KEY = 'source';
+const SOURCE_PARAM = enumParam(['all', ...LIBRARY_SOURCES] as const, 'all');
+const SOURCE_LABEL: Record<LibrarySourcePick, string> = {
+  all: 'fittings.start.allSources',
+  saved: 'fittings.start.sourceSaved',
+  inGame: 'fittings.start.sourceInGame',
+  shared: 'fittings.start.sourceShared',
+  doctrine: 'fittings.start.sourceDoctrine',
+};
 
 /** The content under a page tab bar as its panel; without a bar it is just the content. */
 function MaybeTabPanel({
@@ -140,8 +172,9 @@ export function FittingStartScreen({
   const navigate = useNavigate();
   const isPhone = useIsPhone();
   const page = variant === 'page';
-  // A phone has no room for a preview beside the list.
-  const previewing = preview && !isPhone;
+  const noHover = useMediaQuery(NO_HOVER_QUERY);
+  // A phone has no room for a preview beside the list; a touch tablet no hover to preview with.
+  const previewing = preview && !isPhone && !noHover;
   // Only the page's search is URL state. A dialog's (the editor's Open, the
   // Compare picker) is a passing pick over another page's URL: written there,
   // it would outlive the dialog and come back the next time it opened.
@@ -149,6 +182,11 @@ export function FittingStartScreen({
   const [dialogQuery, setDialogQuery] = useState('');
   const query = page ? urlQuery : dialogQuery;
   const setQuery = page ? setUrlQuery : setDialogQuery;
+  // The Source filter keeps to the search's rule: the page's in the URL, a dialog's its own.
+  const [urlSource, setUrlSource] = useUrlParam(SOURCE_KEY, SOURCE_PARAM);
+  const [dialogSource, setDialogSource] = useState<LibrarySourcePick>('all');
+  const pickedSource = page ? urlSource : dialogSource;
+  const setSource = page ? setUrlSource : setDialogSource;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // The row the pointer is resting on, and its timer to take the preview.
   const hover = useRef<{ rowId: string; timer: ReturnType<typeof setTimeout> } | null>(null);
@@ -181,6 +219,7 @@ export function FittingStartScreen({
   const inGame = useInGameFittings(characterId);
   const community = useCommunityFittings(characterId);
   const active = useActiveFitting(characterId);
+  const doctrine = useCorpDoctrineFittings(characterId);
   const timeZone = useTimeZone();
   const hasCharacter = characterId !== null;
   const { refresh: refreshInGame } = inGame;
@@ -199,14 +238,33 @@ export function FittingStartScreen({
           )
         : []),
       ...(hasCharacter ? community.rows : []),
+      ...(hasCharacter ? doctrine.rows : []),
     ],
-    [saved.records, saved.hulls, inGame.result, inGame.hullNames, community.rows, hasCharacter, t]
+    [
+      saved.records,
+      saved.hulls,
+      inGame.result,
+      inGame.hullNames,
+      community.rows,
+      doctrine.rows,
+      hasCharacter,
+      t,
+    ]
   );
-  const groups = useMemo(() => groupByHull(filterMyFittings(rows, query)), [rows, query]);
-  // Above the hulls, so it is the first pick.
+  // Only the sources with rows are offered; a pick whose source has emptied reads as All sources.
+  const sources = useMemo<LibrarySource[]>(
+    () => librarySources(active.row ? [...rows, active.row] : rows),
+    [rows, active.row]
+  );
+  const source = effectiveSource(pickedSource, sources);
+  const groups = useMemo(
+    () => groupByHull(filterMyFittings(filterBySource(rows, source), query)),
+    [rows, source, query]
+  );
+  // Above the hulls, so it is the first pick. It is the ship fitted in game: In-game.
   const activeShown = useMemo(
-    () => (active.row ? filterMyFittings([active.row], query) : []),
-    [active.row, query]
+    () => (active.row ? filterMyFittings(filterBySource([active.row], source), query) : []),
+    [active.row, source, query]
   );
   const visible = useMemo(
     () => [...activeShown, ...groups.flatMap((group) => group.rows)],
@@ -220,6 +278,8 @@ export function FittingStartScreen({
     if (row.source === 'saved') workspace.openSaved(row.record);
     // A Community's Fitting opens like an import: stated for this pilot, nothing saved until they save.
     else if (row.source === 'shared') void workspace.loadFromInput(row.shared.code);
+    // The corp's Doctrine Fit opens the same way; Save a copy makes it the pilot's own.
+    else if (row.source === 'doctrine') void workspace.loadFromInput(row.code);
     // The flown ship opens as an In-game Fitting does (the Compare picker has no other way in).
     else if (row.source === 'active')
       void workspace.openLoaded({
@@ -264,6 +324,14 @@ export function FittingStartScreen({
   const loading =
     savedPending ||
     (hasCharacter && (inGame.granted === undefined || (inGame.loading && !inGame.result)));
+  // A linked `?source=` whose source has no rows once every source has loaded is
+  // dropped from the URL, so it can't quietly narrow the list when rows arrive later.
+  const sourcesSettled =
+    !loading && !active.pending && (!hasCharacter || (community.settled && doctrine.settled));
+  const urlSourceDead = page && sourcesSettled && urlSource !== 'all' && urlSource !== source;
+  useEffect(() => {
+    if (urlSourceDead) setUrlSource('all');
+  }, [urlSourceDead, setUrlSource]);
 
   const refreshInGameButton =
     hasCharacter && inGame.granted === true ? (
@@ -274,6 +342,7 @@ export function FittingStartScreen({
         onClick={() => {
           void inGame.refresh();
           void active.refresh();
+          void doctrine.refresh();
         }}
         disabled={inGame.loading}
       />
@@ -322,7 +391,7 @@ export function FittingStartScreen({
                   cancelHover();
                   hover.current = {
                     rowId: row.id,
-                    timer: setTimeout(() => setSelectedId(row.id), ADD_PREVIEW_DELAY_MS),
+                    timer: setTimeout(() => setSelectedId(row.id), LIST_PREVIEW_DELAY_MS),
                   };
                 }
               : undefined
@@ -342,6 +411,12 @@ export function FittingStartScreen({
                 {[row.sharer ?? t('fittings.share.unknownSharer'), row.communityNames.join(', ')]
                   .filter(Boolean)
                   .join(' · ')}
+              </span>
+            )}
+            {/* The preview pane says it when there is one; without it, the row does. */}
+            {row.source === 'doctrine' && row.legacy && !previewing && (
+              <span className="block text-xs text-text-dim">
+                {t('fittings.start.doctrineLegacy')}
               </span>
             )}
             {/* Its heading isn't its hull's, so the row names the hull. */}
@@ -370,7 +445,9 @@ export function FittingStartScreen({
             <span className="shrink-0 text-[0.625rem] tracking-widest text-text-dim uppercase">
               {row.source === 'saved'
                 ? t('fittings.start.sourceSaved')
-                : t('fittings.start.sourceInGame')}
+                : row.source === 'doctrine'
+                  ? t('fittings.start.sourceDoctrine')
+                  : t('fittings.start.sourceInGame')}
             </span>
           )}
           {/* Without the preview pane a row opens the editor (it loads state, so no href). */}
@@ -427,15 +504,40 @@ export function FittingStartScreen({
       {pageTabs}
       <MaybeTabPanel panel={pageTabsPanel}>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="min-w-64 flex-1">
-            <SearchInput
-              aria-label={t('fittings.start.searchFittings')}
-              placeholder={t('fittings.start.searchFittingsPlaceholder')}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              // The page's own box; a dialog's is a passing pick, not a `/` target.
-              pageSearch={page}
-            />
+          {/* The Source filter stays on the search's line, down to a phone. */}
+          <div className="flex min-w-64 flex-1 gap-2">
+            <div className="min-w-0 flex-1">
+              <SearchInput
+                aria-label={t('fittings.start.searchFittings')}
+                placeholder={t('fittings.start.searchFittingsPlaceholder')}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                // The page's own box; a dialog's is a passing pick, not a `/` target.
+                pageSearch={page}
+              />
+            </div>
+            {/* One source has nothing to narrow to. */}
+            {sources.length > 1 && (
+              <Select
+                value={source}
+                onValueChange={(value) => setSource(value as LibrarySourcePick)}
+              >
+                <SelectTrigger
+                  active={source !== 'all'}
+                  aria-label={t('fittings.start.sourceFilter')}
+                  className="w-32 shrink-0"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(['all', ...sources] as const).map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {t(SOURCE_LABEL[option])}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
           {/* A dialog has no page header for the In-game refresh: it sits by the search. */}
           {!pageTitle && refreshInGameButton}
@@ -506,9 +608,23 @@ export function FittingStartScreen({
                   {t('fittings.start.matches', { count: visible.length })}
                 </p>
               )}
-              {visible.length === 0 && (
-                <p className="p-3 text-xs text-text-dim">{t('fittings.start.noMatches')}</p>
-              )}
+              {visible.length === 0 &&
+                (source === 'all' ? (
+                  // Search only: the search box is the way out (DESIGN.md, EmptyState).
+                  <EmptyState title={t('fittings.start.noMatches')} />
+                ) : (
+                  // The Source pick can be what hides the match: name it, and offer its undo.
+                  <EmptyState
+                    title={t('fittings.start.noMatchesInSource', {
+                      source: t(SOURCE_LABEL[source]),
+                    })}
+                    action={
+                      <Button size="sm" onClick={() => setSource('all')}>
+                        {t('fittings.start.showAllSources')}
+                      </Button>
+                    }
+                  />
+                ))}
               {activeShown.length > 0 && (
                 <section className="pb-1">
                   <h3 className={cx(eyebrowClassName, 'px-3 pt-3 pb-1')}>
@@ -532,7 +648,6 @@ export function FittingStartScreen({
             {previewing &&
               (selected ? (
                 <FittingPreview
-                  key={selected.id}
                   row={selected}
                   catalogue={catalogue}
                   characterId={characterId}

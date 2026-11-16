@@ -105,9 +105,14 @@ describe('accrueFeeder', () => {
     expect(r.byDay.map((d) => d.due)).toEqual([100, 200]);
   });
 
-  it('owes nothing with no rate, and a rate set later accrues forward only', () => {
+  it('owes nothing with no rate, and a rate agreed later reaches back over the pending days', () => {
     const entries = [entry('2026-06-05', 1000), entry('2026-06-08', 1000)];
-    expect(accrueFeeder(input({ ownerRateHistory: [], entries })).accrued).toBe(0);
+    const none = accrueFeeder(input({ ownerRateHistory: [], entries }));
+    expect(none.accrued).toBe(0);
+    expect(none.pending).toEqual([
+      { date: '2026-06-05', value: 1000 },
+      { date: '2026-06-08', value: 1000 },
+    ]);
     const later = accrueFeeder(
       input({
         ownerRateHistory: [
@@ -116,8 +121,22 @@ describe('accrueFeeder', () => {
         entries,
       })
     );
-    expect(later.byDay.map((d) => d.date)).toEqual(['2026-06-08']);
-    expect(later.accrued).toBe(100);
+    expect(later.byDay.map((d) => d.date)).toEqual(['2026-06-05', '2026-06-08']);
+    expect(later.accrued).toBe(200);
+    expect(later.pending).toEqual([]);
+  });
+
+  it('a requested rate alone accrues nothing: the days wait as pending', () => {
+    const r = accrueFeeder(
+      input({
+        ownerRateHistory: [
+          { kind: 'requested', pct: 10, effectiveFrom: '2026-06-01', recordedAt: 'a' },
+        ],
+        entries: [entry('2026-06-05', 1000)],
+      })
+    );
+    expect(r.accrued).toBe(0);
+    expect(r.pending).toEqual([{ date: '2026-06-05', value: 1000 }]);
   });
 
   it('settled otherwise owes nothing; switching off resumes from the switch day, not backfilled', () => {
@@ -177,10 +196,17 @@ describe('feederBalance', () => {
 });
 
 describe('settled otherwise', () => {
-  it('keeps no balance, however much was accrued, and is never on the pay list', () => {
+  it('keeps what accrued before the switch owed, and on the pay list', () => {
     const b = feederBalance(500, [payout(100)], true);
-    expect(b).toEqual({ balance: 0, display: { kind: 'none', isk: 0 } });
-    expect(onPayList(b)).toBe(false);
+    expect(b).toEqual({ balance: 400, display: { kind: 'owed', isk: 400 } });
+    expect(onPayList(b)).toBe(true);
+  });
+
+  it('shows no balance once nothing is owed', () => {
+    expect(feederBalance(0, [], true).display).toEqual({ kind: 'none', isk: 0 });
+    expect(feederBalance(100, [payout(100)], true).display).toEqual({ kind: 'none', isk: 0 });
+    expect(feederBalance(100, [payout(150)], true).display).toEqual({ kind: 'none', isk: 0 });
+    expect(onPayList(feederBalance(0, [], true))).toBe(false);
   });
 });
 

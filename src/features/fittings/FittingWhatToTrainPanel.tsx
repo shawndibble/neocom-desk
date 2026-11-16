@@ -144,7 +144,7 @@ function WhatToTrainRanking({
   // Only once some level is seen to clear part of an overage: a fit within budget has nothing to fix.
   const overBudget = gains?.some((gain) => (gain.budgetFreed ?? 0) > 0) ?? false;
   const skillFixes = useSkillFixes(evaluator, overBudget);
-  // Each missing skill is a fix on its own: the fit can't be flown without it.
+  // Each missing skill is a row of its own, timed as its share of training them all.
   const missingFixes = useMemo(
     () => missingSkills.map((entry) => ({ entries: [entry] })),
     [missingSkills]
@@ -223,6 +223,7 @@ function WhatToTrainRanking({
           fixes={missingFixes}
           {...fixListProps}
           reason={t('fittings.skillFixes.missing')}
+          together
         />
       )}
       {skillFixes.fixes && skillFixes.fixes.length > 0 && (

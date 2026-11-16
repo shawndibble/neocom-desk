@@ -861,7 +861,6 @@ function CorpAssetsView({
           }
         />
         <Button
-          size="sm"
           className="ml-auto"
           disabled={!targetsApi.hydrated || data?.corporationId == null}
           onClick={() => setTargetsOpen(true)}

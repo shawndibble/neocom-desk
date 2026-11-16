@@ -39,6 +39,7 @@ import {
   DEFAULT_ACCELERATOR_EXPIRING_LEAD_HOURS,
   DEFAULT_SKYHOOK_RAIDABLE_LEAD_HOURS,
   DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS,
+  DEFAULT_SHARED_MOON_POP_LEAD_MINUTES,
   DEFAULT_SKILL_QUEUE_ENDING_LEAD_HOURS,
   DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
   defaultedThresholds,
@@ -51,6 +52,7 @@ import {
   characterEventPrefs,
   characterEveTypePrefs,
   isBrowserChannelEnabled,
+  mutedSharedPopCorporations,
   type NotificationPreferencesValue,
 } from './preferencesStore';
 
@@ -66,6 +68,7 @@ export {
   isBrowserChannelEnabled,
   isFeedChannelEnabled,
   isDismissOnView,
+  mutedSharedPopCorporations,
   type NotificationPreferencesValue,
 } from './preferencesStore';
 export type { CharacterEventThresholds } from './eventThresholdFields';
@@ -115,6 +118,7 @@ const DEFAULT_PROJECTION_ENTRY = JSON.stringify([
   DEFAULT_ACCELERATOR_EXPIRING_LEAD_HOURS,
   DEFAULT_SKYHOOK_RAIDABLE_LEAD_HOURS,
   DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS,
+  DEFAULT_SHARED_MOON_POP_LEAD_MINUTES,
 ]);
 
 function projectionInputs(value: NotificationPreferencesValue): string {
@@ -157,6 +161,7 @@ function projectionInputs(value: NotificationPreferencesValue): string {
       acceleratorExpiringLeadHours,
       skyhookRaidableLeadHours,
       skyhookRaidableMinUnits,
+      sharedMoonPopLeadMinutes,
     } = characterEventThresholds(value, characterId);
     const entry = JSON.stringify([
       eventsOffDefault,
@@ -171,6 +176,7 @@ function projectionInputs(value: NotificationPreferencesValue): string {
       acceleratorExpiringLeadHours,
       skyhookRaidableLeadHours,
       skyhookRaidableMinUnits,
+      sharedMoonPopLeadMinutes,
     ]);
     // An all-default Character reads the same as an absent one.
     if (entry !== DEFAULT_PROJECTION_ENTRY) characters[id] = entry;
@@ -181,6 +187,7 @@ function projectionInputs(value: NotificationPreferencesValue): string {
     isBrowserChannelEnabled(value),
     characters,
     quietHoursPayload(value),
+    [...mutedSharedPopCorporations(value)].sort((a, b) => a - b),
   ]);
 }
 
@@ -237,6 +244,38 @@ export function updateNotificationPrefs(
     if (channel === 'browser') return;
     await setSyncedSetting(SYNCED_NOTIFICATION_FEED_PREFS_KEY, toSyncedFeedPrefs(next));
     scheduleSync(characterId, { collections: ['settings'] });
+  });
+}
+
+/** Mutes or unmutes one sharing corporation's Shared Moon Pops (issue #6225). */
+export function withSharedPopCorporationMuted(
+  value: NotificationPreferencesValue,
+  corporationId: number,
+  muted: boolean
+): NotificationPreferencesValue {
+  const others = (value.mutedSharedPopCorporations ?? []).filter((id) => id !== corporationId);
+  return { ...value, mutedSharedPopCorporations: muted ? [...others, corporationId] : others };
+}
+
+/**
+ * Writes a sharing corporation's mute for the whole account: locally, to the synced feed slice,
+ * and a sync for every Character on the device, since the list belongs to none of them.
+ */
+export function setSharedPopCorporationMuted(
+  characterIds: readonly number[],
+  corporationId: number,
+  muted: boolean
+): Promise<void> {
+  const next = withSharedPopCorporationMuted(
+    useNotificationPreferences.getState().value,
+    corporationId,
+    muted
+  );
+  return writeLocalPrefs(next, async () => {
+    await useNotificationPreferences.getState().setValue(next);
+    await setSyncedSetting(SYNCED_NOTIFICATION_FEED_PREFS_KEY, toSyncedFeedPrefs(next));
+    for (const characterId of characterIds)
+      scheduleSync(characterId, { collections: ['settings'] });
   });
 }
 

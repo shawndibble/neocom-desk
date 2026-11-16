@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import {
+  enqueueGrantStaleMail,
   enqueuePayeeChangeMail,
   enqueueRateChangeMail,
   enqueueReminder,
@@ -268,6 +269,38 @@ describe('enqueuePayeeChangeMail', () => {
     await enqueuePayeeChangeMail(base);
     expect(await enqueuePayeeChangeMail(base)).toEqual({ queued: 0 });
     expect(await db.corpMailQueue.count()).toBe(2);
+  });
+});
+
+describe('enqueueGrantStaleMail (#6210)', () => {
+  const base = {
+    corporationId: 5,
+    accountingCorporationName: 'B-UH Moons',
+    moonOwnerName: 'Rock Holders',
+    senderCharacterId: 1,
+    feederCorporationId: 10,
+    staleSince: Date.parse('2026-10-11T08:00:00Z'),
+    lostOn: '2026-11-10',
+    recipients: [
+      { id: 501, name: 'Pilot 501' },
+      { id: 700, name: 'Pilot 700' },
+    ],
+  };
+  beforeEach(async () => {
+    await db.corpMailQueue.clear();
+  });
+
+  it('queues one mail per recipient, once per stale spell', async () => {
+    expect(await enqueueGrantStaleMail(base)).toEqual({ queued: 2 });
+    const rows = await db.corpMailQueue.toArray();
+    for (const r of rows) {
+      expect(r).toMatchObject({ kind: 'grant-stale', feederCorporationId: 10 });
+      expect(r.body).toContain('since 2026-10-11');
+    }
+    expect(await enqueueGrantStaleMail(base)).toEqual({ queued: 0 });
+    expect(await enqueueGrantStaleMail({ ...base, staleSince: base.staleSince + 1 })).toEqual({
+      queued: 2,
+    });
   });
 });
 

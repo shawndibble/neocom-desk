@@ -14,6 +14,13 @@ vi.mock('@/esi/endpoints', () => ({
 }));
 
 import { OpenInEveButton } from './OpenInEveButton';
+import { useCharacterIdsWithScopes } from '@/app/useGrantedScopes';
+
+/** Who holds the permission, as the button reads it: once this has answered, the button's read has too. */
+function HoldersProbe() {
+  const holders = useCharacterIdsWithScopes(['esi-ui.open_window.v1']);
+  return <output data-testid="holders">{holders === undefined ? 'loading' : holders.size}</output>;
+}
 
 const ONE = 91;
 
@@ -185,9 +192,10 @@ describe('OpenInEveButton from a fixed Character', () => {
     render(
       <MemoryRouter>
         <OpenInEveButton kind="information" id={7} characterId={PAYER} />
+        <HoldersProbe />
       </MemoryRouter>
     );
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await vi.waitFor(() => expect(screen.getByTestId('holders')).toHaveTextContent('0'));
     expect(screen.queryByRole('button', { name: 'Open in EVE' })).not.toBeInTheDocument();
     // The same render shows it, still blocked for the payer, once another Character grants it.
     await db.tokens.update(ONE, { scopes: ['esi-ui.open_window.v1'] });

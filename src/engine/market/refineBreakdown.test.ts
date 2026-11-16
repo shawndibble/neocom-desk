@@ -1,13 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  buildAppraisal,
-  refineBeatsSellAsIs,
-  refineFromDetail,
-  refineMineralsFor,
-  refineMineralsOfRows,
-  refineWithLeftoverFor,
-  type AppraisalItem,
-} from '@/engine/market/appraisal';
+import { buildAppraisal, refineFromDetail, type AppraisalItem } from '@/engine/market/appraisal';
+import { pileFigures, rowFigures } from '@/engine/market/appraisalRowFigures';
 import {
   buildRefineBreakdown,
   buildRefineComparison,
@@ -396,16 +389,20 @@ describe('Janice parity', () => {
     for (const basis of ['buy', 'split', 'sell'] as const) {
       const breakdown = comparison[basis];
       // The chip is the minerals alone; the table's Refine + ore column and the comparison's total add the leftover.
-      expect(refineMineralsOfRows(appraisal.rows, basis)).toBeCloseTo(breakdown?.net ?? NaN, 2);
+      expect(pileFigures(appraisal.rows, basis).refineMinerals).toBeCloseTo(
+        breakdown?.net ?? NaN,
+        2
+      );
       const withLeftover = appraisal.rows.reduce(
-        (sum, row) => sum + (refineWithLeftoverFor(row, basis) ?? 0),
+        (sum, row) => sum + (rowFigures(row, basis, null).refine.withLeftover ?? 0),
         0
       );
       expect(withLeftover).toBeCloseTo(breakdown?.total ?? NaN, 2);
       appraisal.rows.forEach((row, index) => {
         const line = breakdown?.items[index];
-        expect(refineMineralsFor(row, basis)).toBeCloseTo(line?.refined ?? NaN, 2);
-        expect(refineWithLeftoverFor(row, basis)).toBeCloseTo(
+        const { refine } = rowFigures(row, basis, null);
+        expect(refine.minerals).toBeCloseTo(line?.refined ?? NaN, 2);
+        expect(refine.withLeftover).toBeCloseTo(
           (line?.refined ?? NaN) + (line?.leftoverValue ?? NaN),
           2
         );
@@ -440,7 +437,7 @@ describe('a basis with no as-is price is no comparison, as in the table', () => 
     const appraisal = buildAppraisal([item], 100);
     const sell = buildRefineBreakdown({ appraisal, pricePercent: 100, taxRate: 0, basis: 'sell' });
     expect(sell.items[0].wins).toBe(false);
-    expect(refineBeatsSellAsIs(appraisal.rows[0], 'sell')).toBe(false);
+    expect(rowFigures(appraisal.rows[0], 'sell', null).refine.verdict).not.toBe('refine');
     expect(sell.unbuyable).toBe(1);
   });
 });

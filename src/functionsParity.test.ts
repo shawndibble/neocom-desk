@@ -8,6 +8,8 @@
  * `functions/src`; the reverse (`functions/` importing `src/`) cannot.
  */
 import { readFileSync } from 'node:fs';
+import { resolveRate, type TaxRate } from '@/engine/corpTaxBook/rates';
+import { bookRatePctFor } from '../functions/src/sharedPops';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { COMPARED_HUBS, DAILY_JOB_HUBS } from '@/market/hubs';
 import { isFiniteNumber, isPlainRecord, isRecord } from '@/engine/guards';
@@ -54,6 +56,7 @@ import {
 } from '../functions/src/buybackTerms';
 import {
   COMMUNITY_EVENT_IDS,
+  CORP_TAX_BOOK_EVENT_IDS,
   POLLED_EVENT_IDS,
   VETTING_EVENT_IDS,
   diffPriceAlerts,
@@ -238,6 +241,7 @@ describe('server-pushed events (issue #5121)', () => {
         ...POLLED_EVENT_IDS,
         ...NEARBY_EVENT_IDS,
         ...VETTING_EVENT_IDS,
+        ...CORP_TAX_BOOK_EVENT_IDS,
         'newMail',
       ].sort()
     ).toEqual([...SERVER_PUSHED_EVENT_IDS].sort());
@@ -296,6 +300,14 @@ describe('server-pushed events (issue #5121)', () => {
       corporationId: 98000001,
       reviewId: 'v-0042',
       kind: 'application',
+    },
+    {
+      eventId: 'corpTaxBookSyncStopped',
+      characterId: 7,
+      corporationId: 98000001,
+      reason: 'esi-refused',
+      characterName: 'Holder',
+      stoppedAt: 4000,
     },
   ];
 
@@ -404,4 +416,41 @@ describe('server-pushed new mail (issue #5143)', () => {
     expect(Number(data.fireAt)).toBe(occurrenceFiredAt(fire, 50_000));
     expect(parseServerEventFire('newMail', 7, data.fire)).toEqual(fire);
   });
+});
+
+describe("a Shared Pop's start-link rate (functions/src/sharedPops.ts)", () => {
+  const rates: TaxRate[] = [
+    { scope: 'corp', pct: 10, effectiveFrom: '2026-01-01' },
+    { scope: 'corp', pct: 12, effectiveFrom: '2026-11-01' },
+    { scope: 'corp', pct: 99, effectiveFrom: '2027-01-01' },
+    { scope: 'guest', pct: 20, effectiveFrom: '2026-01-01' },
+    { scope: 'structure', structureId: 2000, pct: 8, effectiveFrom: '2026-01-01' },
+    { scope: 'moon', moonId: 40003, pct: 5, effectiveFrom: '2026-01-01' },
+    { scope: 'feeder', feederId: 98000555, pct: 15, effectiveFrom: '2026-01-01' },
+    { scope: 'miner', minerId: 'solo:1', pct: 1, effectiveFrom: '2026-01-01' },
+  ];
+  const pulls = [
+    { moonId: 40003, structureId: 2000 },
+    { moonId: 40001, structureId: 2000 },
+    { moonId: 40001, structureId: 1, sourceCorporationId: 98000555 },
+    { moonId: 40001, structureId: 1 },
+  ];
+
+  it.each(['2026-11-15', '2026-06-01', '2025-01-01'])(
+    "is the Sharing tab's book rate (resolveRate for a corp member) on %s",
+    (today) => {
+      for (const pull of pulls)
+        expect(bookRatePctFor(rates, pull, today)).toBe(
+          resolveRate(rates, {
+            date: today,
+            minerId: '',
+            moonId: pull.moonId,
+            structureId: pull.structureId,
+            feederId: pull.sourceCorporationId,
+            recordKey: '',
+            isGuest: false,
+          })?.pct ?? 0
+        );
+    }
+  );
 });

@@ -1,7 +1,8 @@
 /**
  * Loads corporations' market **LP Value** at a Trade Hub — each store priced
  * exactly as the LP Store page prices it (`computeLoyaltyOfferRows`, selling
- * at the hub's sell price), then read by `marketLpValue`. Priced for no
+ * at the hub's sell price, or into its buy orders on the `buy` basis), then
+ * read by `marketLpValue`. Priced for no
  * particular pilot: untrained trade skills and no standing, so the fees are
  * the full ones and the rate errs low rather than flattering the LP.
  *
@@ -17,6 +18,7 @@ import { loadMarketSnapshots, type MarketSnapshot } from '@/features/industry/ma
 import type { TradeHub } from '@/market/hubs';
 import { loadHaulingDemand, type HaulingDemand } from '@/features/market/haulingDemand';
 import { computeLoyaltyOfferRows, offerPriceTypeIds } from './offerRows';
+import { revenuePricing, type PriceBasis } from './priceBasis';
 import { loadLoyaltyStoreOffers } from './store';
 
 const REMEMBER_MS = 15 * 60 * 1000;
@@ -27,7 +29,8 @@ function valueOf(
   offers: readonly LoyaltyStoreOffer[],
   catalog: BlueprintCatalog,
   snapshot: MarketSnapshot,
-  demand: HaulingDemand | null
+  demand: HaulingDemand | null,
+  basis: PriceBasis
 ): number | null {
   const rows = computeLoyaltyOfferRows({
     offers,
@@ -38,7 +41,7 @@ function valueOf(
     regionalTaxPct: snapshot.regionalTaxPct,
     skills: {},
     materialSourcing: undefined,
-    liquidationBasis: 'order',
+    ...revenuePricing(snapshot, basis),
     playerLp: 0,
     tradedPrices: demand?.types,
   });
@@ -73,7 +76,8 @@ interface PricedStores {
 async function computeMany(
   corporationIds: number[],
   hub: TradeHub,
-  held: HeldLpOffers | undefined
+  held: HeldLpOffers | undefined,
+  basis: PriceBasis
 ): Promise<PricedStores> {
   const [catalog, demand, offersByCorp] = await Promise.all([
     loadBlueprintCatalog(),
@@ -93,7 +97,7 @@ async function computeMany(
   const values = new Map<number, number | null>(corporationIds.map((id) => [id, null]));
   await Promise.all(
     priced.map(async (store, i) => {
-      values.set(store.id, valueOf(store.offers, catalog, await snapshots[i]!, demand));
+      values.set(store.id, valueOf(store.offers, catalog, await snapshots[i]!, demand, basis));
     })
   );
   return { values, checked: demand !== null };
@@ -103,20 +107,26 @@ async function computeMany(
  * ISK per LP the market pays for each of `corporationIds`' LP at `hub`; null
  * for a store that gives too little to go on. `held` supplies offers the
  * caller already has, so pricing every store does not ask ESI for each one.
+ * `basis` is the side the sale is priced on: `sell` (list an order, the
+ * default) or `buy` (sell now into the buy orders, as Spend my LP does).
  */
 export async function loadMarketLpValues(
   corporationIds: Iterable<number>,
   hub: TradeHub,
-  { now = Date.now, held }: { now?: () => number; held?: HeldLpOffers } = {}
+  {
+    now = Date.now,
+    held,
+    basis = 'sell',
+  }: { now?: () => number; held?: HeldLpOffers; basis?: PriceBasis } = {}
 ): Promise<Map<number, number | null>> {
   const ids = [...new Set(corporationIds)];
-  const keyOf = (id: number) => `${id}|${hub.id}`;
+  const keyOf = (id: number) => `${id}|${hub.id}|${basis}`;
   const stale = ids.filter((id) => {
     const hit = remembered.get(keyOf(id));
     return !hit || now() - hit.at >= REMEMBER_MS;
   });
   if (stale.length > 0) {
-    const batch = computeMany(stale, hub, held);
+    const batch = computeMany(stale, hub, held, basis);
     for (const id of stale) {
       const value = batch.then(({ values }) => values.get(id) ?? null);
       remembered.set(keyOf(id), { at: now(), value });
@@ -139,7 +149,7 @@ export async function loadMarketLpValues(
 export async function loadMarketLpValue(
   corporationId: number,
   hub: TradeHub,
-  now: () => number = Date.now
+  options: { now?: () => number; basis?: PriceBasis } = {}
 ): Promise<number | null> {
-  return (await loadMarketLpValues([corporationId], hub, { now })).get(corporationId) ?? null;
+  return (await loadMarketLpValues([corporationId], hub, options)).get(corporationId) ?? null;
 }

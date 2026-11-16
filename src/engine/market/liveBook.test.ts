@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { applyLiveBooks, liveStationBook, type LiveOrder } from '@/engine/market/liveBook';
+import {
+  applyLiveBooks,
+  liveHubOrders,
+  liveStationBook,
+  type LiveOrder,
+} from '@/engine/market/liveBook';
 import { appraisalUndercut, type AppraisalItem } from '@/engine/market/appraisal';
 
 const HUB = 60003760;
@@ -180,5 +185,19 @@ describe('liveStationBook with a buy walk', () => {
       walkAt(40)
     );
     expect(book).toEqual({ sell: null, buy: 4.5, sellIsOwn: false });
+  });
+});
+
+describe('liveHubOrders', () => {
+  it('maps a live book to HubOrders, a missing volume read as none', () => {
+    expect(
+      liveHubOrders([
+        { order_id: 1, is_buy_order: false, location_id: 9, price: 10, volume_remain: 4 },
+        { order_id: 2, is_buy_order: true, location_id: 9, price: 8 },
+      ])
+    ).toEqual([
+      { price: 10, volume_remain: 4, is_buy_order: false, location_id: 9 },
+      { price: 8, volume_remain: 0, is_buy_order: true, location_id: 9 },
+    ]);
   });
 });

@@ -113,6 +113,22 @@ export function classifyHistoryJobs(
 /** Activity ids the Production Log can record: manufacturing and reactions. */
 const LOGGABLE_ACTIVITIES = new Set([1, 11]);
 
+/** ESI `activity_id` for invention. */
+const INVENTION_ACTIVITY = 8;
+
+/**
+ * A delivered invention job's result: how many of its runs produced a copy
+ * (issue #6166). Null for any other activity, and when ESI left
+ * `successful_runs` out, so a missing count never reads as "0 succeeded".
+ */
+export function inventionOutcome(
+  job: Pick<IndustryJob, 'activity_id' | 'runs' | 'successful_runs'>
+): { succeeded: number; runs: number } | null {
+  if (job.activity_id !== INVENTION_ACTIVITY || typeof job.successful_runs !== 'number')
+    return null;
+  return { succeeded: job.successful_runs, runs: job.runs };
+}
+
 /** Whether a delivered job is something the Production Log could hold at all. */
 export function isLoggableHistoryJob(
   job: Pick<IndustryJob, 'activity_id' | 'product_type_id'>

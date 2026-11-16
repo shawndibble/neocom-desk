@@ -153,10 +153,15 @@ describe('readObservedRows', () => {
     put('a', 1, T0);
     await open('v1', T0);
     let release!: () => void;
-    const gate = new Promise<void>((r) => (release = r));
+    const probe = new Promise<void>((r) => (release = r));
+    // A thenable over the probe, so the test sees the read take it up.
+    const gate = { then: vi.fn((ok: () => void, fail: () => void) => probe.then(ok, fail)) };
     let settled = false;
-    const pending = open('v1', T0 + 1, 7, gate).then((r) => ((settled = true), r));
-    await new Promise((r) => setTimeout(r, 20));
+    const pending = open('v1', T0 + 1, 7, gate as unknown as Promise<void>).then(
+      (r) => ((settled = true), r)
+    );
+    // Parked on the probe: nothing has been handed out.
+    await vi.waitFor(() => expect(gate.then).toHaveBeenCalled());
     expect(settled).toBe(false);
     release();
     expect(await pending).toHaveLength(1);

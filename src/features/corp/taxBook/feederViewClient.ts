@@ -24,6 +24,8 @@ export interface FeederViewRateEntry {
 /** `feederViews/{feeder}`. */
 export interface FeederViewSummary {
   schemaVersion: 1;
+  /** The accrual rules it was built under (#6209); absent on a view built before. */
+  rulesVersion?: number;
   feederCorporationId: number;
   collectorCorporationId: number;
   collectorName: string | null;
@@ -44,6 +46,8 @@ export interface FeederViewSummary {
   minedVolume: number;
   minedValueIsk: number;
   accruedIsk: number;
+  /** Ore value with no agreed rate yet, owed once one is agreed (#6209); absent on older views. */
+  pendingValueIsk?: number;
   paidIsk: number;
   balanceKind: 'owed' | 'credit' | 'even' | 'none';
   balanceIsk: number;
@@ -65,6 +69,8 @@ export interface FeederViewSummary {
    * to grant again; absent on a view built before it existed.
    */
   refineryNamesGranted?: boolean;
+  /** The moon owner turned Pop Sharing off (#6222); absent on a view built before it. */
+  popSharingOptedOut?: boolean;
   /** Server-side digest of the view; unused here, `builtAt` is the stamp. */
   contentHash?: string;
 }
@@ -99,10 +105,14 @@ export interface FeederViewRefinery {
 
 /** `feederViews/{feeder}/payouts/{id}`. */
 export interface FeederViewPayout {
+  /** The payment's document id, which a dispute names. */
+  id: string;
   date: string;
   amount: number;
   method: 'donation' | 'other';
   status: 'recorded' | 'waiting-for-journal' | 'matched';
+  /** The moon owner flagged it as a payment it disputes (#6209). */
+  disputed?: true;
 }
 
 export interface FeederView {
@@ -168,6 +178,36 @@ export async function requestFeederRate(
     corporationId,
     accessToken,
     pct,
+  });
+}
+
+/** The moon owner flags a payment it disputes, or withdraws the flag (#6209). */
+export async function disputeFeederPayout(
+  characterId: number,
+  corporationId: number,
+  payoutId: string,
+  disputed: boolean
+): Promise<{ ok: true }> {
+  const accessToken = await getValidAccessToken(characterId);
+  return call(characterId, 'disputeCorpTaxBookFeederPayoutCallable', {
+    corporationId,
+    accessToken,
+    payoutId,
+    disputed,
+  });
+}
+
+/** The moon owner's Pop Sharing opt-out (#6222): `share` false turns it off for all its moons. */
+export async function setFeederPopSharing(
+  characterId: number,
+  corporationId: number,
+  share: boolean
+): Promise<{ ok: true }> {
+  const accessToken = await getValidAccessToken(characterId);
+  return call(characterId, 'setCorpTaxBookFeederPopSharingCallable', {
+    corporationId,
+    accessToken,
+    share,
   });
 }
 
@@ -244,14 +284,15 @@ export async function readFeederView(
   const summary = summarySnap.data() as FeederViewSummary;
   const cached = viewCache.get(key);
   if (cached && cached.stamp === summary.builtAt) return { ...cached.view, summary };
-  const sub = async <T>(name: string): Promise<T[]> =>
-    (await getDocs(collection(...base, String(feederCorporationId), name))).docs.map(
-      (d) => d.data() as T
+  const sub = async <T>(name: string, withId = false): Promise<T[]> =>
+    (await getDocs(collection(...base, String(feederCorporationId), name))).docs.map((d) =>
+      withId ? ({ ...d.data(), id: d.id } as T) : (d.data() as T)
     );
   const [days, refineries, payouts] = await Promise.all([
     sub<FeederViewDay>('days'),
     sub<FeederViewRefinery>('refineries'),
-    sub<FeederViewPayout>('payouts'),
+    // A payment carries its document id: a dispute names it (#6209).
+    sub<FeederViewPayout>('payouts', true),
   ]);
   const view = { summary, days, refineries, payouts };
   viewCache.set(key, { stamp: summary.builtAt, view });

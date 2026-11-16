@@ -91,14 +91,28 @@ function assertUnclaimed(
  * collector's status (a Survey connection's ore). Meant to run inside the
  * write's transaction.
  */
+/**
+ * Every stored Assignment on `record`'s Mining Ledger Entry (same character,
+ * day and system). Returns Dexie's own promise, not an `async` wrapper: an
+ * extra native await inside a write's transaction commits it too early
+ * (`PrematureCommitError`).
+ */
+function entryAssignments(
+  record: Pick<MiningTaxAssignmentRecord, 'characterId' | 'date' | 'solarSystemId'>
+): Promise<MiningTaxAssignmentRecord[]> {
+  return db.miningTaxAssignments
+    .where('characterId')
+    .equals(record.characterId)
+    .filter((a) => a.date === record.date && a.solarSystemId === record.solarSystemId)
+    .toArray();
+}
+
 async function claimNewOre(
   record: MiningTaxAssignmentRecord,
   entryOreLines?: readonly MiningTaxOreLine[],
   takesGrowth = false
 ): Promise<MiningTaxAssignmentRecord[]> {
-  const covering = (
-    await db.miningTaxAssignments.where('characterId').equals(record.characterId).toArray()
-  ).filter((a) => a.date === record.date && a.solarSystemId === record.solarSystemId);
+  const covering = await entryAssignments(record);
   assertUnclaimed(covering, record.oreLines, entryOreLines);
   if (covering.length === 0) return [record];
   const collector = growthCollector(covering);
@@ -607,18 +621,30 @@ export async function unlinkPaymentTransaction(
   await db.miningTaxAssignments.bulkPut(updated);
 }
 
+/** Which side of a split becomes the Growth Collector. */
+export type SplitCollector = 'original' | 'new';
+
 export interface SplitInput {
   /** Units to move out of `original`, per ore type — each at most what `original` holds of that type; zero-quantity lines are ignored. */
   moves: readonly MiningTaxOreLine[];
+  /**
+   * Ore the original's Payee is owed that ESI has not reported yet (issue
+   * #6180) — the pilot's in-game figure running ahead of the ledger. Added to
+   * the kept side (`planSplit`), so later ore fills that claim before any
+   * reaches the new side. Needs `collector: 'new'`, and never on a paid
+   * original: paid stays paid (ADR 0024).
+   */
+  unreported?: readonly MiningTaxOreLine[];
   /** The second Payee, and the rate the moved ore is taxed at. */
   payeeId: string;
   taxPct: number;
   /**
    * Which side collects any further ore ESI reports for this day
-   * (`engine/miningTax/ownership.ts`). Omit to leave both unflagged — e.g.
-   * when a third Assignment on the same entry already collects.
+   * (`engine/miningTax/ownership.ts`). Either side takes the flag over from a
+   * third Assignment on the same entry, so the entry keeps one Growth
+   * Collector. Omit to leave both unflagged and any third collector as it is.
    */
-  collector?: 'original' | 'new';
+  collector?: SplitCollector;
   /** "Moon / structure" note for the NEW slice; the kept slice keeps its own. */
   label?: string;
 }
@@ -657,9 +683,19 @@ export async function splitAssignment(
   input: SplitInput,
   prices: SplitPrices
 ): Promise<{ kept: MiningTaxAssignmentRecord; created: MiningTaxAssignmentRecord }> {
-  const { kept: keptLines, moved: movedLines } = planSplit(original.oreLines, input.moves);
-  if (movedLines.length === 0) throw new Error('Nothing to move');
+  const unreported = (input.unreported ?? []).filter((l) => l.quantity > 0);
+  const { kept: keptLines, moved: movedLines } = planSplit(
+    original.oreLines,
+    input.moves,
+    unreported
+  );
+  if (movedLines.length === 0 && unreported.length === 0) throw new Error('Nothing to move');
   if (keptLines.length === 0) throw new Error('Cannot move every unit — unassign instead');
+  if (unreported.length > 0) {
+    // The claim is only a cap if someone else takes the ore past it.
+    if (input.collector !== 'new') throw new Error('Unreported ore needs the new side to collect');
+    if (original.status === 'paid') throw new Error('A paid day cannot claim more ore');
+  }
 
   const now = Date.now();
   const marker = oreFormMarker();
@@ -710,7 +746,19 @@ export async function splitAssignment(
     updatedAt: now,
   };
 
-  await db.miningTaxAssignments.bulkPut([kept, created]);
+  // One Growth Collector per entry (coalescing and `SplitDialog` rely on it):
+  // a side that takes the flag takes it from whichever sibling held it.
+  const handedOver = input.collector
+    ? (await entryAssignments(original))
+        .filter((a) => a.id !== original.id && a.collectsGrowth === true)
+        .map((a) => {
+          const unflagged: MiningTaxAssignmentRecord = { ...a, updatedAt: now };
+          delete unflagged.collectsGrowth;
+          return unflagged;
+        })
+    : [];
+
+  await db.miningTaxAssignments.bulkPut([kept, created, ...handedOver]);
   return { kept, created };
 }
 

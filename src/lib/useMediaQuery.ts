@@ -27,6 +27,12 @@ export function useMediaQuery(query: string): boolean {
  */
 export const COARSE_POINTER_QUERY = '(pointer: coarse)';
 
+/**
+ * The primary input cannot hover (a touch tablet or phone): anything shown on
+ * hover needs another way in. Written as `none` so the test stub reads as a mouse.
+ */
+export const NO_HOVER_QUERY = '(hover: none)';
+
 /** i18next `context` for copy with a `_touch` variant ("Tap" for "Click"/"Hover or focus"). */
 export function useTouchContext(): 'touch' | undefined {
   return useMediaQuery(COARSE_POINTER_QUERY) ? 'touch' : undefined;

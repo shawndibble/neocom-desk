@@ -588,6 +588,18 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // A Miner's declarations ("I paid this another way") and Conflict disputes (#6206): the Miner
+      // sees each one's answer. A declaration written before #6206 has no `uids`: officers only.
+      match /declarations/{declarationId} {
+        allow get, list: if isOfficer() || isOnOwnLine();
+        allow write: if false;
+      }
+
+      match /disputes/{disputeId} {
+        allow get, list: if isOfficer() || isOnOwnLine();
+        allow write: if false;
+      }
+
       // Each moon owner's coverage periods and read clock (issue #4622), server-written: the
       // miners this book bills (their `corpTaxBookBilledBy` pointer names it) read it to hold
       // the same days back the book does. No payee, rates, notes or names.
@@ -602,7 +614,7 @@ service cloud.firestore {
       }
 
       match /{officerOnly}/{docId} {
-        allow get, list: if officerOnly in ['extractions', 'declarations', 'rebills', 'meta', 'audit', 'feeders', 'minerTotals', 'moonDocs', 'readModels']
+        allow get, list: if officerOnly in ['extractions', 'rebills', 'meta', 'audit', 'feeders', 'minerTotals', 'moonDocs', 'readModels']
           && isOfficer();
         allow write: if false;
       }
@@ -689,6 +701,16 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Shared Pops (issue #6223, ADR 0034): a book's published pops, and the inputs kept to
+    // publish them (officers' last editing use, own refinery names). Function-only: a pilot
+    // reads pops through `listSharedPopsCallable`, which checks the audience live.
+    match /sharedPops/{corporationId} {
+      allow read, write: if false;
+    }
+    match /sharedPopSources/{corporationId} {
+      allow read, write: if false;
+    }
+
     // Collector books (issue #4507): feeder invite links (keyed by the code's hash)
     // and the feeder → Collector pointer. Function-only; a client never reads either.
     match /corpTaxBookFeederInvites/{inviteId} {
@@ -747,6 +769,12 @@ service cloud.firestore {
 
       allow get: if isMember();
       allow list, write: if false;
+
+      // Corporations whose Shared Pops the admin blocked here (issue #6223). Function-only:
+      // the admin reads and changes them through the community callables.
+      match /popSharingBlocks/{corporationId} {
+        allow read, write: if false;
+      }
 
       // Mail invites sent from this Community (issue #3604), one doc per
       // invited Character: only the admin reads them, only the callables write.

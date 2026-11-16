@@ -17,6 +17,22 @@ vi.mock('@/engine/industry/autoMakeOrBuy', async (importOriginal) => {
   return { ...actual, autoBuildHere: vi.fn(actual.autoBuildHere) };
 });
 
+// Each member's blueprints also load Blueprint Acquisition offers (ESI market,
+// LP stores) and an invention market (SDE invention data, hub prices).
+// Unmocked, those ran for real: seconds per test, past the 10 s budget under
+// CI load. No test here reads either, so both resolve to nothing.
+vi.mock('./blueprintPurchaseOffers', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./blueprintPurchaseOffers')>();
+  return {
+    ...actual,
+    loadBlueprintPurchaseOffers: vi.fn(async () => actual.NO_BLUEPRINT_PURCHASE_OFFERS),
+  };
+});
+vi.mock('./inventionSources', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./inventionSources')>()),
+  loadInventionMarket: vi.fn(async () => null),
+}));
+
 const mockedSnapshots = vi.mocked(loadMarketSnapshots);
 const autoBuildHereSpy = vi.mocked(autoBuildHere);
 

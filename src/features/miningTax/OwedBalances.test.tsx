@@ -140,3 +140,26 @@ describe('OwedBalances Conflicts line', () => {
     expect(card.compareDocumentPosition(conflicts) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
+
+describe('OwedBalances uncredited donation', () => {
+  it("names the uncredited ISK on the Payee's card and drops Settle up from primary", () => {
+    renderBalances([balance('corp', 29_980_000)], {
+      uncreditedOf: (b) =>
+        b.payee.id === 'corp' ? { amount: 8_000_000, accounts: 'Master Wallet' } : undefined,
+    });
+    expect(
+      screen.getByText(
+        /8,000,000 ISK you donated isn't credited yet — check the wallet division \(Master Wallet\)/
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Settle up' }).className).not.toMatch(/bg-accent/);
+  });
+
+  it('keeps Settle up primary with no note when everything is credited', () => {
+    renderBalances([balance('corp', 29_980_000)], {
+      uncreditedOf: () => ({ amount: 0, accounts: 'Master Wallet' }),
+    });
+    expect(screen.queryByText(/isn't credited/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Settle up' }).className).toMatch(/bg-accent/);
+  });
+});

@@ -15,6 +15,7 @@ import type { PopularFitsResult } from './popularFits';
 import { PopularFitsPanel, type PopularFitsSources } from './PopularFitsPanel';
 import type { WorkbenchFit, WorkbenchFitsResult } from './workbenchFits';
 import { resetWorkbenchCheckCache } from './workbenchHullRows';
+import { deferred } from '@/test/deferred';
 
 /**
  * The skill schedule behind a missing verdict's training time and its inline
@@ -714,10 +715,8 @@ describe('PopularFitsPanel EVE Workbench guides', () => {
       openWorkbench({ ok: true, fits: MANY });
       await screen.findByText('Fit 1');
       const box = document.querySelector<HTMLElement>('[data-virtual-scroll-root]')!;
-      act(() => {
-        box.scrollTop = 1_000_000;
-        fireEvent.scroll(box);
-      });
+      box.scrollTop = 1_000_000;
+      fireEvent.scroll(box);
       expect(await screen.findByText(/^Fit 80/)).toBeTruthy();
       expect(rowOf('Fit 80').getAttribute('aria-posinset')).toBe('80');
       expect(screen.queryByText('Fit 1')).toBeNull();
@@ -740,10 +739,8 @@ describe('PopularFitsPanel EVE Workbench guides', () => {
       expect(document.querySelectorAll('[data-virtual-scroll-root]')).toHaveLength(1);
       expect(loadButtons().length).toBeLessThan(40);
       const host = document.querySelector<HTMLElement>('[data-virtual-scroll-root]')!;
-      act(() => {
-        host.scrollTop = 1_000_000;
-        fireEvent.scroll(host);
-      });
+      host.scrollTop = 1_000_000;
+      fireEvent.scroll(host);
       expect(await screen.findByText(/^Fit 80/)).toBeTruthy();
     });
 
@@ -807,6 +804,15 @@ describe('Popular fits can-fly verdicts', () => {
     expect(screen.queryByRole('checkbox', { name: /Can fly now/ })).toBeNull();
   });
 
+  it('offers no Least training sort with no Character', async () => {
+    renderWith({});
+    await screen.findByText('12 losses');
+    await userEvent.click(screen.getByRole('combobox', { name: 'Sort' }));
+    expect(screen.getAllByRole('option').map((o) => o.textContent?.replace('✓', ''))).not.toContain(
+      'Least training'
+    );
+  });
+
   it('shows no verdict with no Character', async () => {
     renderWith({});
     await screen.findByText('12 losses');
@@ -853,9 +859,10 @@ describe('Popular fits can-fly verdicts', () => {
 
   it("shows no verdict when the pilot's skills could not be read", async () => {
     useActiveCharacter.setState({ activeCharacterId: 7 });
-    renderWith({ skillLevels: () => Promise.reject(new Error('skills unknown')) });
+    const skills = deferred<never>();
+    renderWith({ skillLevels: () => skills.promise });
     await screen.findByText('12 losses');
-    await act(async () => {});
+    await act(async () => skills.reject(new Error('skills unknown')));
     expect(screen.queryByTestId('popular-fit-verdict')).toBeNull();
   });
 

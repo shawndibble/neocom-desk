@@ -26,6 +26,8 @@ vi.mock('./ExtractionTimeline', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./ExtractionTimeline')>()),
   ExtractionTimeline: ({ filter }: { filter?: React.ReactNode }) => <>{filter}</>,
 }));
+const shareMarks = vi.hoisted(() => ({ value: null as unknown }));
+vi.mock('./usePopShareMarks', () => ({ usePopShareMarks: () => shareMarks.value }));
 vi.mock('./LinkSurveyDialog', () => ({ LinkSurveyDialog: () => <div>link survey dialog</div> }));
 vi.mock('./BookDialogs', () => ({
   ReasonDialog: ({ title }: { title: string }) => <div>{`reason dialog: ${title}`}</div>,
@@ -189,6 +191,39 @@ describe('ExtractionsTab ⋮', () => {
       expect(await screen.findByText(/reason dialog/)).toBeInTheDocument();
     } finally {
       real.table = false;
+    }
+  });
+});
+
+describe('ExtractionsTab Pop Sharing marks (#6226)', () => {
+  it("links a shared moon's mark to its Sharing tab row, and marks an opted-out moon unlinked", () => {
+    real.table = true;
+    book.rows = [ex('a', 'unknown', 0), { ...ex('b', 'unknown', 0), moonId: 2, structureId: 2 }];
+    shareMarks.value = {
+      moons: {
+        '1': { kind: 'shared', audiences: [{ kind: 'corp' }, { kind: 'alliance' }] },
+        '2': { kind: 'opted-out' },
+      },
+      structures: {},
+      owners: {},
+    };
+    try {
+      render(
+        <MemoryRouter>
+          <ExtractionsTab />
+        </MemoryRouter>
+      );
+      expect(screen.getByRole('link', { name: 'Pops shared with Corp, Alliance' })).toHaveAttribute(
+        'href',
+        '/corp/moons/sharing?highlight=1'
+      );
+      expect(
+        screen.getByRole('img', { name: 'Moon owner turned sharing off' })
+      ).toBeInTheDocument();
+    } finally {
+      real.table = false;
+      book.rows = null;
+      shareMarks.value = null;
     }
   });
 });

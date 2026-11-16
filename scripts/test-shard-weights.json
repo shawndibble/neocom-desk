@@ -2409,7 +2409,6 @@
   "src/stores/skillDetailModal.test.ts": 1,
   "src/storybook/fixtureFetch.test.ts": 1,
   "src/storybook/InteractionGrammar.test.tsx": 1,
-  "src/storybook/smoke/mockups.test.tsx": 16,
   "src/storybook/smoke/rest.test.tsx": 7,
   "src/storybook/smoke/routesRest.test.tsx": 11,
   "src/storybook/smoke/routesSrp.test.tsx": 12,

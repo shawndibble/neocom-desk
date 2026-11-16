@@ -446,14 +446,21 @@ describe('price watch', () => {
       'Near',
       { text: '+5%', tone: 'caution' },
       { text: '105', iskAmount: 105 },
-      'overview.widgets.priceWatch.target.below{"isk":"100"}',
+      {
+        text: 'overview.widgets.priceWatch.target.below 100',
+        iskAmount: 100,
+        prefix: 'overview.widgets.priceWatch.target.below',
+      },
       '',
     ]);
     const [far] = priceWatchTable(t, [alert('Far', 'above', 100, 50)]).rows;
     expect(far!.cells[1]).toBe('-50%');
     const [hit] = priceWatchTable(t, [alert('Hit', 'above', 100, 130, true)]).rows;
     expect(hit!.cells[1]).toEqual({ text: '+30%', tone: 'good' });
-    expect(far!.cells[3]).toBe('overview.widgets.priceWatch.target.above{"isk":"100"}');
+    expect(far!.cells[3]).toMatchObject({
+      iskAmount: 100,
+      prefix: 'overview.widgets.priceWatch.target.above',
+    });
   });
 
   it('opens Show info for the watched item', () => {

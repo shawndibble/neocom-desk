@@ -8,6 +8,7 @@ import { db } from '@/db';
 import { NotificationEventList } from './NotificationEventList';
 import type { EventRowContext } from './eventRowSupport';
 import { NOTIFICATION_EVENT_IDS, NOTIFICATION_EVENTS } from './events';
+import { groupNotificationEvents } from './eventGroups';
 import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   useNotificationPreferences,
@@ -109,7 +110,7 @@ describe('NotificationEventList on desktop', () => {
       })
     );
 
-    await waitFor(() => expect(screen.getByText('1 differs')).toBeInTheDocument());
+    expect(await screen.findByText('1 differs')).toBeInTheDocument();
     const chip = screen.getByText('Beta Pilot').closest('li')!;
     expect(chip.className).toMatch(/border-warning/);
     // The odd one is named by words and position too, not by colour alone.
@@ -331,9 +332,9 @@ describe('NotificationEventList on desktop', () => {
   it('says the Corporation permission once on the corp group, not on every corp row', () => {
     render(
       <Harness
-        ids={NOTIFICATION_EVENT_IDS.filter(
-          (id) => id.startsWith('corp') || id === 'structureFuelLow'
-        )}
+        // The Corporation group's events (a corp-named event pushed by the backend, like
+        // corpTaxBookSyncStopped, files under World and needs no Permission).
+        ids={groupNotificationEvents(NOTIFICATION_EVENT_IDS).corp}
         over={{
           scopesByCharacterId: new Map([
             [1, ALL_SCOPES],
@@ -488,7 +489,7 @@ describe('NotificationEventList Apply to all', () => {
         name: 'Skill level complete, Beta Pilot, device notifications',
       })
     );
-    await waitFor(() => expect(screen.getByText('1 differs')).toBeInTheDocument());
+    expect(await screen.findByText('1 differs')).toBeInTheDocument();
     expect(
       within(screen.getByText('Beta Pilot').closest('li')!).getByRole('checkbox', {
         name: 'Skill level complete, Beta Pilot, device notifications',
@@ -499,7 +500,7 @@ describe('NotificationEventList Apply to all', () => {
       screen.getByRole('button', { name: 'Apply to all characters: Skill level complete' })
     );
 
-    await waitFor(() => expect(screen.getByText('All 3 alike')).toBeInTheDocument());
+    expect(await screen.findByText('All 3 alike')).toBeInTheDocument();
     for (const { name } of CHARACTERS) {
       expect(
         within(screen.getByText(name).closest('li')!).getByRole('checkbox', {

@@ -14,6 +14,7 @@ import { CorpRowDetailModal } from '@/features/miningTax/corpBook/CorpRowDetailM
 import { isBookRow } from '@/features/miningTax/corpBook/corpRows';
 import type { useCorpStateHint } from '@/features/miningTax/corpBook/useCorpStateText';
 import type { CorpBookView } from '@/features/miningTax/corpBook/corpBookView';
+import { payStatementCodes } from '@/features/miningTax/corpBook/payStatementCodes';
 import { allMembers, type DisplayRow, type GroupMember } from '@/features/miningTax/groupRows';
 import { findRowForEntry } from '@/features/miningTax/paymentDeepLink';
 import { GroupSummaryModal } from '@/features/miningTax/GroupSummaryModal';
@@ -119,6 +120,8 @@ export interface TaxDialogsHostProps {
   paymentSources: readonly MadePaymentSources[];
   linkSuggestions: ReturnType<typeof useLinkSuggestions>;
   corpView: CorpBookView | null;
+  /** Something reached a Corp Tax Book (a declaration or a dispute, #6206): read the books again. */
+  reloadCorpBooks: () => void;
   corpStateHint: ReturnType<typeof useCorpStateHint>;
   dismissTargets: DisplayRow[];
   showCharacterColumn: boolean;
@@ -165,6 +168,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     paymentSources,
     linkSuggestions,
     corpView,
+    reloadCorpBooks,
     corpStateHint,
     dismissTargets,
     showCharacterColumn,
@@ -179,7 +183,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     onAddPayee,
     onToast,
   } = props;
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const {
     detailTarget,
     detailConfirmUnassign,
@@ -700,6 +704,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             })
           }
           onUnmarkPaid={() => unmarkCorpPayment(corpDetail.view.markedPaidIds)}
+          onBookChanged={reloadCorpBooks}
           notice={
             (corpDetail.view.overlap || corpDetail.view.state === 'conflict') && (
               <CorpOverlapNotice
@@ -713,6 +718,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
                 payeeById={payeeById}
                 typeNames={typeNames}
                 onChanged={refresh}
+                onBookChanged={reloadCorpBooks}
               />
             )
           }
@@ -729,20 +735,12 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
               dr.corp.view.corporationId === corpPayTarget &&
               dr.status === 'outstanding'
           );
-          const codes = [
-            ...new Set(
-              owedRows.flatMap((dr) =>
-                dr.corp?.kind === 'row' && dr.corp.view.statementId
-                  ? [dr.corp.view.statementId]
-                  : []
-              )
-            ),
-          ].flatMap((id) => {
-            const statement = book.loaded.statements.find((s) => s.id === id);
-            return statement
-              ? [{ code: statement.code, period: `${statement.periodStart.slice(0, 7)}` }]
-              : [];
-          });
+          // Every open Statement, oldest first: one a local mark or donation reads Paid is still
+          // open in the book, and payments settle the oldest first (#6204).
+          const names = new Map(
+            allDisplayRows.map((dr) => [dr.row.characterId, dr.row.characterName])
+          );
+          const codes = payStatementCodes(book, (id) => names.get(id), i18n.language);
           return (
             <Suspense fallback={null}>
               <CorpPayDialog

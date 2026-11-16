@@ -139,6 +139,9 @@ import {
   diffCharacterNeedsLogin,
   type CharacterNeedsLoginFire,
   type SignInSnapshot,
+  diffSharedMoonPop,
+  type SharedMoonPopFire,
+  type SharedMoonPopSnapshot,
 } from '@/engine/notificationDiffs';
 import type { NotificationCopy } from '@/engine/notificationWording';
 import type { ProjectableEventId, PushCopy } from '@/engine/projection';
@@ -177,6 +180,9 @@ import {
   communityMemberJoinedCopy,
   communityRequestPledgedCopy,
   vettingSharedCopy,
+  corpTaxBookSyncStoppedCopy,
+  sharedMoonPopCopy,
+  type SharedMoonPopNames,
   type IncursionNames,
   type DomainCopy,
   type NoNames,
@@ -191,6 +197,11 @@ import {
   type VettingAlertSnapshot,
   type VettingSharedFire,
 } from '@/engine/vettingAlert';
+import {
+  diffCorpTaxBookSyncStopped,
+  type CorpTaxBookSyncStoppedFire,
+  type SyncStoppedAlertSnapshot,
+} from '@/engine/corpTaxBook/syncStoppedAlert';
 import type { EveNotificationNames } from './eveNotificationText';
 import type { NotificationEventId } from './events';
 import { THRESHOLD_FIELDS, type ThresholdField } from './eventThresholdFields';
@@ -231,7 +242,9 @@ export type AnyNotificationFire =
   | CommunityJoinRequestFire
   | CommunityMemberJoinedFire
   | CommunityRequestPledgedFire
-  | VettingSharedFire;
+  | VettingSharedFire
+  | CorpTaxBookSyncStoppedFire
+  | SharedMoonPopFire;
 
 /* -------------------------------------------------------------------------- */
 /* Snapshot sources                                                            */
@@ -283,6 +296,8 @@ export const SNAPSHOT_SOURCES = {
   communities: source<CommunityAlertSnapshot>('communities'),
   signIn: source<SignInSnapshot>('signIn'),
   vetting: source<VettingAlertSnapshot>('vetting'),
+  corpTaxBookSync: source<SyncStoppedAlertSnapshot>('corpTaxBookSync'),
+  sharedMoonPops: source<SharedMoonPopSnapshot, SharedMoonPopNames>('sharedMoonPops'),
 } as const;
 
 /* -------------------------------------------------------------------------- */
@@ -508,6 +523,16 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     projection: null,
     thresholds: { fields: [THRESHOLD_FIELDS.mercenaryDenAnarchyPercent], hintKey: null },
     rowHintKey: 'settings.notifications.mercenaryDenAnarchyForegroundOnlyHint',
+  }),
+  // Shared Pops another corporation's book shares (issue #6225): projected, so a closed app is
+  // told at the Pop Time or the Character's lead time before it.
+  sharedMoonPop: defineEvent({
+    source: SNAPSHOT_SOURCES.sharedMoonPops,
+    diff: diffSharedMoonPop,
+    copy: sharedMoonPopCopy,
+    projection: { push: sharedMoonPopCopy.push, everyOccurrence: true },
+    thresholds: { fields: [THRESHOLD_FIELDS.sharedMoonPopLeadMinutes], hintKey: null },
+    rowHintKey: null,
   }),
   marketOrderFilled: defineEvent({
     source: SNAPSHOT_SOURCES.marketOrders,
@@ -772,6 +797,15 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     projection: null,
     thresholds: null,
     rowHintKey: 'settings.notifications.vettingSharedHint',
+  }),
+  // Raised by the backend alone (`pollDomains/corpTaxBookSync.ts`): the diff never fires.
+  corpTaxBookSyncStopped: defineEvent({
+    source: SNAPSHOT_SOURCES.corpTaxBookSync,
+    diff: diffCorpTaxBookSyncStopped,
+    copy: corpTaxBookSyncStoppedCopy,
+    projection: null,
+    thresholds: null,
+    rowHintKey: 'settings.notifications.corpTaxBookSyncStoppedHint',
   }),
 } satisfies { readonly [K in NotificationEventId]: ErasedEntryFor<K> };
 

@@ -225,7 +225,7 @@ function AddItemForm({ onAdd, error }: { onAdd: (name: string) => void; error: s
           placeholder={t('fittings.implants.addPlaceholder')}
           aria-label={t('fittings.implants.addLabel')}
         />
-        <Button type="submit" size="sm" disabled={query.trim() === ''}>
+        <Button type="submit" disabled={query.trim() === ''}>
           {t('fittings.implants.add')}
         </Button>
       </form>

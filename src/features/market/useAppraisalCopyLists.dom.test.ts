@@ -27,7 +27,12 @@ describe('useAppraisalCopyLists with live prices', () => {
     const cached = outcome({ priceState: 'cached', sell: 1_000 });
     const live = outcome({ priceState: 'live', sell: 800 });
     const { result } = renderHook(() =>
-      useAppraisalCopyLists({ result: cached, owned: null, settleLive: async () => live })
+      useAppraisalCopyLists({
+        result: cached,
+        owned: null,
+        refineBasis: 'buy',
+        settleLive: async () => live,
+      })
     );
 
     await act(async () => result.current.handleCopy('list'));
@@ -40,7 +45,12 @@ describe('useAppraisalCopyLists with live prices', () => {
     configureClipboard(write);
     const own = outcome({ priceState: 'live', sell: 800, sellIsOwn: true });
     const { result } = renderHook(() =>
-      useAppraisalCopyLists({ result: own, owned: null, settleLive: async () => own })
+      useAppraisalCopyLists({
+        result: own,
+        owned: null,
+        refineBasis: 'buy',
+        settleLive: async () => own,
+      })
     );
     await act(async () => result.current.handleCopy('list'));
     expect(write).toHaveBeenCalledWith('Tritanium\t800');
@@ -53,7 +63,7 @@ describe('useAppraisalCopyLists with live prices', () => {
     let release: (value: AppraisalOutcome) => void = () => {};
     const settleLive = vi.fn(() => new Promise<AppraisalOutcome>((resolve) => (release = resolve)));
     const { result } = renderHook(() =>
-      useAppraisalCopyLists({ result: cached, owned: null, settleLive })
+      useAppraisalCopyLists({ result: cached, owned: null, refineBasis: 'buy', settleLive })
     );
 
     let first: Promise<void> = Promise.resolve();

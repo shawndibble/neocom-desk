@@ -62,7 +62,8 @@ describe('OverviewSubNav', () => {
     ]);
     expect(within(nav).getByRole('link', { name: 'SRP' })).toHaveAttribute('href', '/srp');
     expect(within(nav).getByRole('link', { name: 'SRP' })).toHaveAttribute('aria-current', 'page');
-    expect(within(nav).getByRole('link', { name: 'SRP' }).querySelector('.bg-warning')).toBeNull();
+    const linkEl = within(nav).getByRole('link', { name: 'SRP' });
+    expect(linkEl.querySelector('.bg-warning')).toBeNull();
   });
 
   it('marks the current view as the active tab', () => {

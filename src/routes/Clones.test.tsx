@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { mswServer } from '@/test/msw';
@@ -6,7 +6,9 @@ import '@/i18n';
 import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
-import { App } from '@/app/App';
+import { Clones } from '@/routes/Clones';
+import { renderPageRoute } from '@/test/renderPage';
+import * as routeChunks from '@/app/routeChunks';
 import { routeToHref } from '@/features/route/routeSafetyLink';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useCloneNicknames } from '@/features/character/cloneNicknames';
@@ -178,8 +180,21 @@ beforeEach(async () => {
   window.history.pushState({}, '', '/clones');
 });
 
+/** The Clones page on its own route, with no App boot or signed-in shell. */
+const renderClonesRoute = () => renderPageRoute('/clones', <Clones />);
+
+// The one App-level test below: its graph and shell chunk load here, under the
+// hook's own budget, not inside the test's findBy. Every other test renders the
+// page on its own (`renderClonesRoute`).
+beforeAll(async () => {
+  await Promise.all([import('@/app/App'), routeChunks.loadLayout(), routeChunks.loadClones()]);
+}, 30_000);
+
 describe('Clones', () => {
-  it('lists jump clones with resolved location and implant names, and the cooldown', async () => {
+  // The one App-level test of the Clones route: it mounts at /clones inside the
+  // signed-in shell, its rail link current.
+  it('lists jump clones with resolved location and implant names, and the cooldown, at /clones inside the shell', async () => {
+    const { App } = await import('@/app/App');
     render(<App />);
     expect(
       await screen.findAllByText('Jita IV - Moon 4 - Caldari Navy Assembly Plant')
@@ -187,10 +202,13 @@ describe('Clones', () => {
     expect(screen.getByText('High-grade Ascendancy Alpha')).toBeInTheDocument();
     expect(screen.getByText('No implants')).toBeInTheDocument();
     expect(screen.getByText(/Until/)).toBeInTheDocument();
+    const rail = (await screen.findAllByRole('navigation'))[0];
+    const links = await within(rail).findAllByRole('link', { name: 'Clones' });
+    expect(links.some((link) => link.getAttribute('aria-current') === 'page')).toBe(true);
   });
 
   it('links each implant name to its Show info, unlike the plain-text empty state', async () => {
-    render(<App />);
+    renderClonesRoute();
     expect(
       await screen.findByRole('link', { name: 'High-grade Ascendancy Alpha' })
     ).toHaveAttribute('href', '/clones?info=type-19540');
@@ -199,7 +217,7 @@ describe('Clones', () => {
   });
 
   it('shows an implant description tooltip on hover, still linking to Show info', async () => {
-    render(<App />);
+    renderClonesRoute();
     const link = await screen.findByRole('link', { name: 'High-grade Ascendancy Alpha' });
     fireEvent.pointerMove(link);
     expect(await screen.findByRole('tooltip')).toHaveTextContent('+4 Willpower bonus');
@@ -207,7 +225,7 @@ describe('Clones', () => {
   });
 
   it('surfaces the home station and last jump-clone-change date', async () => {
-    render(<App />);
+    renderClonesRoute();
     await screen.findByText('High-grade Ascendancy Alpha');
     // Home station shares its id with a jump clone, so its name resolves
     // from the same batch — appearing once in the home-location line and
@@ -250,7 +268,7 @@ describe('Clones', () => {
       })
     );
 
-    render(<App />);
+    renderClonesRoute();
 
     expect(await screen.findByText('Type #19540')).toBeInTheDocument();
     expect(screen.getByText('Type #19541')).toBeInTheDocument();
@@ -259,7 +277,7 @@ describe('Clones', () => {
   });
 
   it('renders a clone in an inaccessible structure as an id fallback, without a re-auth banner', async () => {
-    render(<App />);
+    renderClonesRoute();
     await screen.findAllByText('Jita IV - Moon 4 - Caldari Navy Assembly Plant');
     expect(screen.getByText('Structure #1000000000002')).toBeInTheDocument();
     expect(screen.queryByText('Log in again to see your clones')).not.toBeInTheDocument();
@@ -279,7 +297,7 @@ describe('Clones', () => {
         })
       )
     );
-    render(<App />);
+    renderClonesRoute();
     const alpha = await screen.findByText('Alpha');
     expect(alpha.closest('li')).toHaveTextContent(/^Alpha\s*Jita IV - Moon 4 - Caldari Navy/);
     expect(screen.getByText('Beta')).toBeInTheDocument();
@@ -305,7 +323,7 @@ describe('Clones', () => {
       )
     );
     window.history.pushState({}, '', '/clones?highlight=2');
-    render(<App />);
+    renderClonesRoute();
     const beta = (await screen.findByText('Beta')).closest('li') as HTMLElement;
     expect(beta).toHaveClass('row-pulse');
     expect(beta).toHaveAttribute('data-row-key', '2');
@@ -314,7 +332,7 @@ describe('Clones', () => {
   });
 
   it("names a clone in place, keeps the pilot's name over ESI's, and clears back to the place", async () => {
-    render(<App />);
+    renderClonesRoute();
     await screen.findByText('High-grade Ascendancy Alpha');
     fireEvent.click(
       screen.getByRole('button', {
@@ -341,7 +359,7 @@ describe('Clones', () => {
   });
 
   it('drops an edit on Escape', async () => {
-    render(<App />);
+    renderClonesRoute();
     await screen.findByText('High-grade Ascendancy Alpha');
     fireEvent.click(
       screen.getByRole('button', {
@@ -359,14 +377,14 @@ describe('Clones', () => {
   });
 
   it('says why no clone has a name until one is named', async () => {
-    render(<App />);
+    renderClonesRoute();
     expect(
       await screen.findByText(/EVE no longer shares the names you gave your clones/)
     ).toBeInTheDocument();
   });
 
   it('lists each implant with its slot and attribute bonus', async () => {
-    render(<App />);
+    renderClonesRoute();
     const link = await screen.findByRole('link', { name: 'High-grade Ascendancy Alpha' });
     const row = link.closest('li');
     await waitFor(() => expect(row).toHaveTextContent(/^Slot 4\s*High-grade Ascendancy Alpha/));
@@ -377,7 +395,7 @@ describe('Clones', () => {
     server.use(
       http.get(`${ESI}/characters/${CHAR_ID}/clones`, () => HttpResponse.json({ jump_clones: [] }))
     );
-    render(<App />);
+    renderClonesRoute();
     expect(await screen.findByText('No jump clones')).toBeInTheDocument();
     expect(
       screen.getByText(
@@ -387,7 +405,7 @@ describe('Clones', () => {
   });
 
   it('carries the same character header the Overview tab shows, not a page title', async () => {
-    render(<App />);
+    renderClonesRoute();
 
     // Identity, corp/alliance and SP: identical to /overview, so nothing above
     // the tabs moves as you switch between them.
@@ -399,7 +417,7 @@ describe('Clones', () => {
   });
 
   it("keeps this view's data age and Refresh below the tabs, not in the shared header", async () => {
-    render(<App />);
+    renderClonesRoute();
     await screen.findByRole('heading', { level: 1, name: 'Pilot One' });
 
     const refresh = screen.getByRole('button', { name: 'Refresh' });
@@ -414,7 +432,7 @@ describe('Clones', () => {
     server.use(
       http.get(`${ESI}/characters/${CHAR_ID}/clones`, () => HttpResponse.json({ jump_clones: [] }))
     );
-    render(<App />);
+    renderClonesRoute();
     await screen.findByText('No jump clones');
 
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
@@ -426,7 +444,7 @@ describe('Clones', () => {
         HttpResponse.json({ error: 'missing scope' }, { status: 403 })
       )
     );
-    render(<App />);
+    renderClonesRoute();
     expect(await screen.findByText('Log in again to see your clones')).toBeInTheDocument();
   });
 
@@ -442,14 +460,14 @@ describe('Clones', () => {
         HttpResponse.json({ error: 'missing scope' }, { status: 403 })
       )
     );
-    render(<App />);
+    renderClonesRoute();
     expect(await screen.findByText('Log in again to refresh.')).toBeInTheDocument();
     expect(screen.queryByText('Log in again to see your clones')).not.toBeInTheDocument();
     expect(await screen.findAllByText('High-grade Ascendancy Alpha')).not.toHaveLength(0);
   });
 
   it('shows jumps away on the home clone and each clone, the count opening the route to that station', async () => {
-    render(<App />);
+    renderClonesRoute();
     // The Character is in Jita's system, the home and first clone's station: 0 jumps.
     const counts = await screen.findAllByRole('button', { name: '0 jumps' });
     expect(counts).toHaveLength(2);
@@ -466,7 +484,7 @@ describe('Clones', () => {
         HttpResponse.json({ error: 'missing scope' }, { status: 403 })
       )
     );
-    render(<App />);
+    renderClonesRoute();
     await screen.findByText('High-grade Ascendancy Alpha');
     await waitFor(() => expect(screen.getAllByText('-').length).toBeGreaterThanOrEqual(3));
     expect(screen.queryByRole('button', { name: /jump/ })).not.toBeInTheDocument();
@@ -481,7 +499,7 @@ describe('Clones', () => {
         'esi-skills.read_skillqueue.v1',
       ],
     });
-    render(<App />);
+    renderClonesRoute();
     await screen.findByText('High-grade Ascendancy Alpha');
     await waitFor(async () => {
       expect((await db.esiCache.get([CHAR_ID, 'implants']))?.value).toEqual([19541]);
@@ -492,7 +510,7 @@ describe('Clones', () => {
   it('falls back to the cached worn implants offline, with no re-login prompt', async () => {
     await db.esiCache.put({ characterId: CHAR_ID, key: 'implants', value: [19540], fetchedAt: 1 });
     server.use(http.get(`${ESI}/characters/${CHAR_ID}/implants`, () => HttpResponse.error()));
-    render(<App />);
+    renderClonesRoute();
     expect(await screen.findAllByText('High-grade Ascendancy Alpha')).toHaveLength(2);
     expect(
       screen.queryByText('Log in again to see the implants you are wearing')
@@ -500,7 +518,7 @@ describe('Clones', () => {
   });
 
   it('states the jump cooldown once, as shared by every clone', async () => {
-    render(<App />);
+    renderClonesRoute();
     expect(await screen.findByText(/Until/)).toBeInTheDocument();
     expect(screen.getAllByText(/shared by every clone/)).toHaveLength(1);
     expect(screen.getAllByRole('progressbar')).toHaveLength(1);
@@ -517,7 +535,7 @@ describe('Clones', () => {
         HttpResponse.json({ skills: [], total_sp: 0 })
       )
     );
-    render(<App />);
+    renderClonesRoute();
     expect(await screen.findByText('Ready')).toBeInTheDocument();
     expect(screen.queryByText(/Last jump/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Infomorph Synchronizing/)).not.toBeInTheDocument();
@@ -526,7 +544,7 @@ describe('Clones', () => {
   });
 
   it("links the respawn station and the worn clone's system, and leaves a Station #id fallback plain", async () => {
-    render(<App />);
+    renderClonesRoute();
     const station = await screen.findAllByRole('link', {
       name: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant',
     });
@@ -560,7 +578,7 @@ describe('Clones', () => {
         })
       )
     );
-    render(<App />);
+    renderClonesRoute();
     const alpha = (await screen.findByText('Alpha')).closest('li');
     expect(
       within(alpha as HTMLElement)
@@ -581,13 +599,13 @@ describe('Clones', () => {
         })
       )
     );
-    render(<App />);
+    renderClonesRoute();
     expect(await screen.findByText('Structure #1000000000002')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Structure #/ })).not.toBeInTheDocument();
   });
 
   it('lists the clone being worn first, its implants linking to Show info, with count and value', async () => {
-    render(<App />);
+    renderClonesRoute();
     const worn = await screen.findByRole('link', { name: 'Worn Implant' });
     expect(worn).toHaveAttribute('href', '/clones?info=type-19541');
     const row = worn.closest('li')?.parentElement?.closest('li') ?? null;
@@ -610,7 +628,7 @@ describe('Clones', () => {
         HttpResponse.json({ error: 'missing scope' }, { status: 403 })
       )
     );
-    render(<App />);
+    renderClonesRoute();
     expect(
       await screen.findByText('Log in again to see the implants you are wearing')
     ).toBeInTheDocument();

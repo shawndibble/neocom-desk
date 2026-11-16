@@ -337,6 +337,7 @@ export function editScope(action: { action: string } & Data): Scope {
     }
     case 'recordPayment':
     case 'addAdjustment':
+    case 'dismissDispute':
     case 'writeOff':
     case 'rebill':
       miner(a.minerId);

@@ -12,6 +12,7 @@
 // and the token revoked at SSO, so a stopped schedule holds nothing. Nothing here
 // logs or returns a token.
 
+import { runPool } from './asyncPool.js';
 import type { Firestore } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { SsoRefreshError, type RefreshedTokens } from './alertGrant.js';
@@ -22,8 +23,10 @@ import { BOOK_SYNC_CRON } from './corpTaxBookSchedule.js';
 import {
   FEEDER_OF_COLLECTION,
   META,
+  SCHEDULED_SYNC_DOC,
   decideRoles,
   parseBookCall,
+  OFFICERS,
   type OfficerAccess,
 } from './corpTaxBook.js';
 import {
@@ -62,9 +65,19 @@ import {
   type Caller,
 } from './actorAuth.js';
 import type { EveTokenClaims } from './verifyEveToken.js';
+import type { PushSender } from './projectionStore.js';
+import { deliverServerEvent } from './serverEventStore.js';
+import {
+  SYNC_STOPPED_NOTIFY_BUDGET_MS,
+  isAlertedStop,
+  syncStoppedFires,
+  syncStoppedRecipients,
+} from './corpSyncStoppedAlert.js';
+import type { CorporationAllianceLookup } from './sharedPopsEsi.js';
+import { learnOwnRefineryNames, stampFailedRoleCheck } from './sharedPopsStore.js';
 
 export const CORP_SYNC_GRANTS_COLLECTION = 'corpTaxBookSyncGrants';
-export const SCHEDULED_SYNC_DOC = 'scheduledSync';
+export { SCHEDULED_SYNC_DOC };
 
 export { CORP_SYNC_SCOPES };
 
@@ -133,6 +146,8 @@ export interface CorpSyncDeps {
   readIdentity: IdentityReader;
   /** Prices the moon owner's view, rebuilt after each ledger read (issue #4512). */
   openPrices?: OpenPricesReader;
+  /** The book corporation's alliance, for Shared Pops (#6223); absent keeps the last read. */
+  corporationAlliance?: CorporationAllianceLookup;
   /**
    * ESI for a moon owner's last ledger read before its grant is dropped (Leave, a removal
    * taking effect). Without it the feed ends on the last scheduled read.
@@ -140,6 +155,13 @@ export interface CorpSyncDeps {
   esi?: SyncEsi;
   /** Receives only messages and ids — never a token. */
   log: (message: string, data?: Record<string, unknown>) => void;
+  /**
+   * Tells the book's editors' devices that the schedule stopped (`corpTaxBookSyncStopped`, ADR
+   * 0027; FCM in production). Without it a stop is only on the book's status.
+   */
+  push?: PushSender;
+  /** Test seam: how long a stop waits for its pushes. `SYNC_STOPPED_NOTIFY_BUDGET_MS` when absent. */
+  notifyBudgetMs?: number;
 }
 
 const PURPOSE = 'corpSyncGrant' as const;
@@ -155,6 +177,7 @@ const bookDeps = (deps: CorpSyncDeps): BookDeps => ({
   verifyToken: deps.verify,
   readIdentity: deps.readIdentity,
   ...(deps.openPrices ? { openPrices: deps.openPrices } : {}),
+  ...(deps.corporationAlliance ? { corporationAlliance: deps.corporationAlliance } : {}),
 });
 
 function sameScopes(scopes: readonly string[]): boolean {
@@ -435,7 +458,7 @@ export interface RunSummary {
   stopped: number;
   /** True when ESI's shared budget made the run stop early. */
   budgetStopped: boolean;
-  /** The feeder pass (#4509): runs after every book, so a feeder never holds one up. */
+  /** The feeder pass (#4509): its own lane beside the books, so a feeder never holds one up. */
   feeders: { read: number; stale: number; skipped: number; disconnected: number };
 }
 
@@ -449,10 +472,16 @@ export interface FeederRunOptions {
 export const FEEDER_GAP_MS = 1500;
 
 /**
- * Sync every opted-in corporation's book, one at a time (the ESI error budget is
- * shared by every user of the client id, and each sync is many small writes).
- * A corporation that fails is skipped and tried again next run; a budget hit
- * ends the whole run.
+ * Books synced at once. Small: the ESI error budget is shared by every user of the client id
+ * (every call still goes through its rate-limit handling), and each sync is many small writes.
+ */
+export const BOOK_SYNC_CONCURRENCY = 3;
+
+/**
+ * Sync every opted-in corporation's book, `BOOK_SYNC_CONCURRENCY` at a time, beside the
+ * feeder pass: run after the books, one at a time, the moon owners were what the job's
+ * timeout cut first on a busy run. A corporation that fails is skipped and tried again next
+ * run; a budget hit starts no further book (the ones running finish) and no further feeder read.
  */
 export async function runScheduledCorpSyncs(
   deps: CorpSyncDeps,
@@ -469,39 +498,56 @@ export async function runScheduledCorpSyncs(
   };
   const due = await dueGrants(deps);
   summary.grants = due.length;
-  for (const grant of due) {
-    if (summary.budgetStopped || esi.budgetLow()) {
-      summary.budgetStopped = true;
-      summary.skipped += 1;
-      continue;
+  let started = 0;
+  const books = runPool(
+    due,
+    BOOK_SYNC_CONCURRENCY,
+    async (grant) => {
+      started += 1;
+      await syncDueBook(deps, esi, grant, summary);
+    },
+    () => {
+      if (esi.budgetLow()) summary.budgetStopped = true;
+      return summary.budgetStopped;
     }
-    try {
-      const result = await runOne(deps, esi, grant);
-      if (result.kind === 'synced') {
-        summary.synced += 1;
-        // Failing to rest it only means it syncs again next run.
-        await deferNextSync(deps, grant).catch((err) =>
-          deps.log('Could not rest a synced book grant', {
-            corporationId: grant.corporationId,
-            error: err instanceof Error ? err.name : 'unknown',
-          })
-        );
-      } else if (result.kind === 'stopped') summary.stopped += 1;
-      else {
-        summary.skipped += 1;
-        if (result.reason === 'esi-budget') summary.budgetStopped = true;
-      }
-    } catch (err) {
-      summary.skipped += 1;
-      deps.log('Scheduled Corp Tax Book sync failed', {
-        corporationId: grant.corporationId,
-        error: err instanceof Error ? err.name : 'unknown',
-        ...(err instanceof HttpsError ? { code: err.code } : {}),
-      });
-    }
-  }
-  if (!summary.budgetStopped) await runFeederSyncs(deps, esi, summary, feederOptions);
+  );
+  await Promise.all([books, runFeederSyncs(deps, esi, summary, feederOptions)]);
+  // A budget hit leaves the rest unstarted: skipped, tried again next run.
+  summary.skipped += due.length - started;
   return summary;
+}
+
+/** One due book's run, counted into `summary`; never throws. */
+async function syncDueBook(
+  deps: CorpSyncDeps,
+  esi: SyncEsi,
+  grant: CorpSyncGrantDoc,
+  summary: RunSummary
+): Promise<void> {
+  try {
+    const result = await runOne(deps, esi, grant);
+    if (result.kind === 'synced') {
+      summary.synced += 1;
+      // Failing to rest it only means it syncs again next run.
+      await deferNextSync(deps, grant).catch((err) =>
+        deps.log('Could not rest a synced book grant', {
+          corporationId: grant.corporationId,
+          error: err instanceof Error ? err.name : 'unknown',
+        })
+      );
+    } else if (result.kind === 'stopped') summary.stopped += 1;
+    else {
+      summary.skipped += 1;
+      if (result.reason === 'esi-budget') summary.budgetStopped = true;
+    }
+  } catch (err) {
+    summary.skipped += 1;
+    deps.log('Scheduled Corp Tax Book sync failed', {
+      corporationId: grant.corporationId,
+      error: err instanceof Error ? err.name : 'unknown',
+      ...(err instanceof HttpsError ? { code: err.code } : {}),
+    });
+  }
 }
 
 /**
@@ -514,8 +560,8 @@ export const SYNC_CORP_TAX_BOOKS_SCHEDULE = {
   timeZone: 'UTC',
 } as const;
 
-/** A synced book rests this long; under the 6-hour tick spacing, so a late run never skips a slot. */
-export const SYNC_REST_MS = 5 * 3_600_000;
+/** A synced book rests this long; under the 2-hour tick spacing, so a late run never skips a slot. */
+export const SYNC_REST_MS = 3_600_000;
 
 /** One doc: when the last `nextSyncAt` backfill scan ran. */
 const GRANT_BACKFILL_DOC = 'corpTaxBookSyncGrantMeta/nextSyncAtBackfill';
@@ -567,7 +613,7 @@ async function deferNextSync(deps: CorpSyncDeps, grant: CorpSyncGrantDoc): Promi
 // --- The feeder pass (#4509) ---------------------------------------------------
 
 /**
- * Read every feeder's ledger, one at a time, after the books. Driven by the
+ * Read every feeder's ledger, one at a time, beside the books. Driven by the
  * feeder → Collector pointers rather than the grant docs, so a feeder whose token
  * died (grant doc gone) still ages toward disconnect. One feeder's failure never
  * touches another or a book.
@@ -873,7 +919,11 @@ async function runOne(
   }
   if (identity.corporationId !== grant.corporationId) return stopGrant(deps, grant, 'left-corp');
   const roles = decideRoles(identity.roles, identity.ceoId === grant.characterId);
-  if (!roles.canEdit) return stopGrant(deps, grant, 'role-lost');
+  if (!roles.canEdit) {
+    // The holder stops counting as an officer for Community pop shares (#6223).
+    await stampFailedRoleCheck(deps.db, grant.corporationId, grant.characterId, deps.now());
+    return stopGrant(deps, grant, 'role-lost');
+  }
 
   const now = deps.now();
   const access: OfficerAccess = {
@@ -892,6 +942,10 @@ async function runOne(
     Object.entries(status?.systemIds ?? {}).map(([k, v]) => [Number(k), v])
   );
 
+  // Shared Pops name the book's own refineries; the grant carries the structures scope (#6223).
+  await learnOwnRefineryNames(bookDeps(deps), grant.corporationId, (id) =>
+    esi.structure(id, accessToken)
+  );
   const result = await runBookSync({
     deps: bookDeps(deps),
     esi,
@@ -956,6 +1010,7 @@ async function stopGrant(
   grant: CorpSyncGrantDoc,
   reason: StopReason
 ): Promise<BookSyncResult> {
+  const stoppedAt = deps.now();
   const stopped = await deps.db.runTransaction(async (tx) => {
     const ref = grantRef(deps.db, grant.corporationId);
     const held = (await tx.get(ref)).data() as CorpSyncGrantDoc | undefined;
@@ -966,7 +1021,7 @@ async function stopGrant(
       characterId: grant.characterId,
       characterName: grant.characterName,
       enabledAt: grant.enabledAt,
-      stoppedAt: deps.now(),
+      stoppedAt,
       stoppedReason: reason,
     };
     tx.set(statusRef(deps.db, grant.corporationId), status);
@@ -985,5 +1040,66 @@ async function stopGrant(
     await revokeStored(deps, grant);
   }
   deps.log('Scheduled Corp Tax Book sync stopped', { corporationId: grant.corporationId, reason });
+  // Only a stop this run made: a re-grant that won the race has nothing to tell.
+  if (stopped) await notifyStopped(deps, grant, reason, stoppedAt);
   return { kind: 'stopped', reason };
+}
+
+/** Sends `corpTaxBookSyncStopped` to each editor `syncStoppedRecipients` picks. Never throws. */
+async function pushStopped(
+  deps: CorpSyncDeps,
+  push: PushSender,
+  grant: CorpSyncGrantDoc,
+  reason: StopReason,
+  stoppedAt: number
+): Promise<void> {
+  if (!isAlertedStop(reason)) return;
+  try {
+    const now = deps.now();
+    const officers = await bookRef(deps.db, grant.corporationId).collection(OFFICERS).get();
+    const recipients = syncStoppedRecipients(
+      officers.docs.map((doc) => doc.data()),
+      grant.characterId,
+      reason,
+      now
+    );
+    const fires = syncStoppedFires(recipients, {
+      corporationId: grant.corporationId,
+      reason,
+      characterName: grant.characterName,
+      stoppedAt,
+    });
+    await Promise.all(fires.map((fire) => deliverServerEvent(deps.db, push, fire, now, deps.log)));
+  } catch (err) {
+    deps.log('corpTaxBookSyncStopped push failed', {
+      corporationId: grant.corporationId,
+      error: err instanceof Error ? err.name : 'unknown',
+    });
+  }
+}
+
+/**
+ * Tells the book's editors that the schedule stopped, on the devices that chose it. After the stop
+ * has committed and never its problem: a failure is logged and swallowed, and the run waits for it
+ * no longer than the budget before it moves on to the next book.
+ */
+async function notifyStopped(
+  deps: CorpSyncDeps,
+  grant: CorpSyncGrantDoc,
+  reason: StopReason,
+  stoppedAt: number
+): Promise<void> {
+  if (!deps.push) return;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<true>((resolve) => {
+    timer = setTimeout(() => resolve(true), deps.notifyBudgetMs ?? SYNC_STOPPED_NOTIFY_BUDGET_MS);
+  });
+  const late = await Promise.race([
+    pushStopped(deps, deps.push, grant, reason, stoppedAt),
+    timedOut,
+  ]);
+  clearTimeout(timer);
+  if (late) {
+    deps.log('corpTaxBookSyncStopped push timed out', { corporationId: grant.corporationId });
+  }
 }

@@ -88,6 +88,8 @@ function inputs(overrides: Partial<BuildPlanPricingInputs> = {}): BuildPlanPrici
 
 beforeEach(() => {
   mockedAssumedMe.setState({ value: 0, hydrated: false, hydrate: vi.fn() });
+  // A real setting: an earlier test's render hydrates it from Dexie.
+  useProfitBasis.setState({ value: useProfitBasis.getInitialState().value, hydrated: false });
   mockedBpcContracts.mockReset();
   mockedBpcContracts.mockResolvedValue(null);
   mockedStandings.mockReset();

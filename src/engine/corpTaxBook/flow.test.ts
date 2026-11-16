@@ -80,7 +80,13 @@ describe('a month of the Corp Tax Book', () => {
 
     const match = matchDonation(
       { characterId: 90000001, reason: 'moon tax' },
-      { miners: [], statements: [statement], knownCharacterIds: new Set([90000001]) }
+      {
+        miners: [],
+        statements: [statement],
+        knownCharacterIds: new Set([90000001]),
+        openBalance: new Map([['solo:90000001', statement.amount]]),
+        unbilled: new Set<string>(),
+      }
     );
     expect(match).toEqual({ kind: 'miner', minerId: 'solo:90000001' });
 

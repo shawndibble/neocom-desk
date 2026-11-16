@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { screen, type RenderResult } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -7,15 +7,13 @@ import { db, type BuildPlanRecord } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useAuthFailure } from '@/stores/authFailure';
-import { App } from '@/app/App';
-import * as routeChunks from '@/app/routeChunks';
-import { clearMarketPriceCache } from '@/market/prices';
 import { clearCostIndexCache } from '@/features/industry/marketData';
 import { useBuildGroups } from '@/features/industry/buildGroups';
 import {
   DEFAULT_FACILITY_DEFAULTS,
   useFacilityDefaults,
 } from '@/features/industry/facilityDefaults';
+import { renderIndustryRoutes } from './industryRoutes';
 import {
   DEFAULT_REACTION_FACILITY_DEFAULTS,
   useReactionFacilityDefaults,
@@ -157,27 +155,30 @@ export async function seedRun() {
   });
 }
 
-/** Registers the MSW lifecycle, the warm-up render and the per-test reset. Call once at module scope. */
-export function installIndustryHarness(): void {
+/**
+ * Registers the MSW lifecycle, the warm-up render and the per-test reset. Call once at module scope.
+ * The warm-up renders the industry routes alone (`renderIndustryRoutes`); a file that renders the
+ * whole `App` passes its own, so its first `App` render is the one paid here.
+ */
+export function installIndustryHarness(
+  warmUp: () => RenderResult | Promise<RenderResult> = renderIndustryRoutes
+): void {
   afterAll(() => server.close());
   afterEach(() => {
     server.resetHandlers();
-    clearMarketPriceCache();
     clearCostIndexCache();
   });
   beforeAll(async () => {
     server.listen({ onUnhandledRequest: 'error' });
     // One throwaway render, so no test pays for the first one: a worker's first
-    // `App` render (lazy route chunks, jsdom and React warm-up) took over the
-    // 5s `findBy*` budget on its own and failed whichever test ran first.
-    // Same fix as `IndustryPlanPage.test.tsx`, paid under this hook's budget.
-    await routeChunks.loadIndustry();
+    // render (lazy chunks, jsdom and React warm-up) took over the 5s `findBy*`
+    // budget on its own and failed whichever test ran first. Same fix as
+    // `IndustryPlanPage.test.tsx`, paid under this hook's budget.
     await resetSession();
-    const { unmount } = render(<App />);
+    const { unmount } = await warmUp();
     await screen.findByRole('searchbox', { name: 'Add Build Plan' }, { timeout: 25_000 });
     unmount();
     server.resetHandlers();
-    clearMarketPriceCache();
     clearCostIndexCache();
   }, 30_000);
   beforeEach(resetSession);

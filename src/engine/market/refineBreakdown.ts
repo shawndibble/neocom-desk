@@ -12,17 +12,16 @@
  * snapshot go through this one function. An item with no `detail` has no
  * breakdown and is counted in `skipped`.
  *
- * The comparison is deliberately the table's: `refineBeatsSellAsIs` judges a
- * row as refined value plus leftover units, at the row's as-is unit price on
- * the basis, against its as-is total on the basis (`asIsEachFor` /
- * `asIsTotalFor`), and this does the same over the whole pile. A row with no
+ * The comparison is deliberately the table's: `rowFigures(...).refine.verdict`
+ * judges a row as refined value plus leftover units, at the row's as-is unit
+ * price on the basis, against its as-is total on the basis
+ * (`asIsFigures`), and this does the same over the whole pile. A row with no
  * as-is price on the basis is no comparison there: not a win.
  */
 import { reprocessingYield } from '@/engine/industry/reprocessing';
 import { netOfReprocessingTax } from '@/engine/industry/refiningSetup';
+import { asIsFigures } from './appraisalRowFigures';
 import {
-  asIsEachFor,
-  asIsTotalFor,
   priceOnBasis,
   REFINE_BASES,
   type Appraisal,
@@ -148,7 +147,7 @@ function netMineralValue(
       gross += output.quantity * (mineralPrice(detail, output.typeId, basis) ?? 0);
     }
     value += (gross * pricePercent) / 100;
-    leftover += yielded.unitsLeftOver * (asIsEachFor(row, basis) ?? 0);
+    leftover += yielded.unitsLeftOver * (asIsFigures(row, basis).each ?? 0);
   }
   return { value: netOfReprocessingTax(value, taxRate), leftover };
 }
@@ -220,9 +219,11 @@ export function buildRefineBreakdown({
       minerals.set(output.typeId, line);
     }
     const refined = netOfReprocessingTax(gross, taxRate);
-    const itemLeftover = yielded.unitsLeftOver * (asIsEachFor(row, basis) ?? 0);
-    const itemAsIs = asIsTotalFor(row, basis) ?? 0;
-    if (asIsTotalFor(row, basis) === null || asIsEachFor(row, basis) === null) unbuyable += 1;
+    const rowAsIs = asIsFigures(row, basis);
+    const unpriced = rowAsIs.total === null || rowAsIs.each === null;
+    const itemLeftover = yielded.unitsLeftOver * (rowAsIs.each ?? 0);
+    const itemAsIs = rowAsIs.total ?? 0;
+    if (unpriced) unbuyable += 1;
     mineralValue += gross;
     unitsLeftOver += yielded.unitsLeftOver;
     leftoverValue += itemLeftover;
@@ -244,10 +245,7 @@ export function buildRefineBreakdown({
       leftoverValue: itemLeftover,
       asIs: itemAsIs,
       // No as-is price on this basis is no comparison, as in the table: not a win.
-      wins:
-        asIsTotalFor(row, basis) !== null &&
-        asIsEachFor(row, basis) !== null &&
-        refined + itemLeftover > itemAsIs,
+      wins: !unpriced && refined + itemLeftover > itemAsIs,
     });
   }
 

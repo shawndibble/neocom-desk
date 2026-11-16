@@ -318,6 +318,44 @@ export async function recordFeederRemovalSent(
   });
 }
 
+/**
+ * The moon owner's ledger can't be read: claims this stale spell's one mail (#6210). Nobody
+ * named: another officer already claimed it, or the ledger reads again.
+ */
+export async function claimFeederStaleMail(
+  characterId: number,
+  corporationId: number,
+  feederCorporationId: number
+): Promise<{ recipients: number[]; ownerRecipients: number[] }> {
+  const accessToken = await getValidAccessToken(characterId);
+  // This client's mail queue marks the mail sent, so an unsent claim may lapse to another officer.
+  return call(characterId, 'claimCorpTaxBookFeederStaleMailCallable', {
+    corporationId,
+    accessToken,
+    feederCorporationId,
+    marksSent: true,
+  });
+}
+
+/**
+ * The claiming officer's queue sent a copy of the stale-ledger mail (#6210): the claim is final.
+ * Unmarked, it lapses after a few hours so another officer's client sends it instead.
+ */
+export async function markFeederStaleMailSent(
+  characterId: number,
+  corporationId: number,
+  feederCorporationId: number,
+  staleSince: number
+): Promise<void> {
+  const accessToken = await getValidAccessToken(characterId);
+  await call(characterId, 'markCorpTaxBookFeederStaleMailSentCallable', {
+    corporationId,
+    accessToken,
+    feederCorporationId,
+    staleSince,
+  });
+}
+
 /** Cancel a pending removal; returns whom the short cancellation mail goes to. */
 export async function cancelFeederRemoval(
   characterId: number,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  rateKey,
   ACCESS_TTL_MS,
   ROLE_CACHE_MS,
   decideRoles,
@@ -8,6 +9,11 @@ import {
   isCacheFresh,
   moveStartRate,
   parseClaimPaymentInput,
+  parseDeclareOwnInput,
+  parseDisputeConflictInput,
+  disputeIdFor,
+  mergeDisputeLines,
+  billedDisputeTax,
   needsLiveCheck,
   parseEditAction,
   parseSettingsPatch,
@@ -139,6 +145,38 @@ describe('parsers', () => {
     ).toHaveLength(1);
   });
 
+  it('takes the donations noted in other divisions, ids from their journal refs (#6207)', () => {
+    const now = Date.parse('2026-10-18T12:00:00Z');
+    const noted = { refId: 4, division: 2, characterId: 7, amount: 5, at: '2026-10-17T00:00:00Z' };
+    expect(parseSyncInput({ corporationId: 9, uncounted: [noted] }, now).uncounted).toEqual([
+      { id: 'j2_4', ...noted, at: '2026-10-17T00:00:00.000Z' },
+    ]);
+    expect('uncounted' in parseSyncInput({ corporationId: 9 }, now)).toBe(false);
+    expect(() =>
+      parseSyncInput({ corporationId: 9, uncounted: [{ ...noted, division: 8 }] }, now)
+    ).toThrow();
+    expect(() =>
+      parseSyncInput({ corporationId: 9, uncounted: Array(21).fill(noted) }, now)
+    ).toThrow();
+  });
+
+  it('keeps a donation held for review only when it names no Miner (#6207)', () => {
+    const now = Date.parse('2026-10-18T12:00:00Z');
+    const donation = {
+      refId: 1,
+      division: 1,
+      characterId: 2,
+      amount: 5,
+      at: '2026-10-17T00:00:00Z',
+      reviewReason: 'no-open-balance',
+    };
+    const parse = (d: Record<string, unknown>) =>
+      parseSyncInput({ corporationId: 9, donations: [d] }, now).donations[0];
+    expect(parse(donation).reviewReason).toBe('no-open-balance');
+    expect(parse({ ...donation, minerId: 'solo:2' }).reviewReason).toBeUndefined();
+    expect(parse({ ...donation, reviewReason: 'other' }).reviewReason).toBeUndefined();
+  });
+
   it('keeps the system and moon an officer client sends with an observer row', () => {
     const now = Date.parse('2026-10-18T12:00:00Z');
     const row = {
@@ -175,6 +213,242 @@ describe('parsers', () => {
     });
     expect(() => parseClaimPaymentInput({ corporationId: 9, paymentId: '../x' })).toThrow();
     expect(() => parseClaimPaymentInput({ corporationId: 0, paymentId: 'a' })).toThrow();
+  });
+
+  it('parses a Miner declaring their own Statement paid: amount and note optional (#6206)', () => {
+    expect(parseDeclareOwnInput({ corporationId: 9, statementId: 's1' })).toEqual({
+      corporationId: 9,
+      statementId: 's1',
+    });
+    expect(
+      parseDeclareOwnInput({
+        corporationId: 9,
+        statementId: 's1',
+        amount: 1500000,
+        note: ' sent by contract ',
+      })
+    ).toEqual({ corporationId: 9, statementId: 's1', amount: 1500000, note: 'sent by contract' });
+    expect(() => parseDeclareOwnInput({ corporationId: 9, statementId: '../x' })).toThrow();
+    expect(() =>
+      parseDeclareOwnInput({ corporationId: 9, statementId: 's1', amount: 0 })
+    ).toThrow();
+    expect(() =>
+      parseDeclareOwnInput({ corporationId: 9, statementId: 's1', note: 'x'.repeat(501) })
+    ).toThrow();
+  });
+
+  it('parses a Conflict dispute: one day, its own record keys, the Payee named (#6206)', () => {
+    const line = {
+      recordKey: '7:1000:2026-11-01',
+      typeId: 45490,
+      quantity: 1200,
+      payeeName: 'Rival Corp',
+    };
+    expect(
+      parseDisputeConflictInput({ corporationId: 9, date: '2026-11-01', lines: [line] })
+    ).toEqual({
+      corporationId: 9,
+      date: '2026-11-01',
+      lines: [line],
+    });
+    // A line from another day is not this day's dispute.
+    expect(() =>
+      parseDisputeConflictInput({
+        corporationId: 9,
+        date: '2026-11-02',
+        lines: [line],
+      })
+    ).toThrow();
+    expect(() =>
+      parseDisputeConflictInput({ corporationId: 9, date: '2026-11-01', lines: [] })
+    ).toThrow();
+    expect(() =>
+      parseDisputeConflictInput({
+        corporationId: 9,
+        date: '2026-11-01',
+        lines: [{ ...line, quantity: -1 }],
+      })
+    ).toThrow();
+    expect(() =>
+      parseDisputeConflictInput({
+        corporationId: 9,
+        date: '2026-11-01',
+        lines: [{ ...line, payeeName: '' }],
+      })
+    ).toThrow();
+  });
+
+  it('names one dispute per Miner and day, a safe doc id (#6206)', () => {
+    expect(disputeIdFor('solo:7', '2026-11-01')).toBe('solo_7_2026-11-01');
+    expect(disputeIdFor('m1', '2026-11-01')).toBe('m1_2026-11-01');
+  });
+
+  it('parses an officer rejecting a dispute: a reason is required (#6206)', () => {
+    expect(
+      parseEditAction({ action: 'rejectDispute', disputeId: 'm1_2026-11-01', reason: 'Our ore' })
+    ).toEqual({ action: 'rejectDispute', disputeId: 'm1_2026-11-01', reason: 'Our ore' });
+    expect(() =>
+      parseEditAction({ action: 'rejectDispute', disputeId: 'm1_2026-11-01', reason: '' })
+    ).toThrow();
+  });
+
+  it('parses an officer waiving a dispute: a priced amount and a reason (#6206)', () => {
+    const base = {
+      action: 'dismissDispute',
+      disputeId: 'm1_2026-11-01',
+      minerId: 'm1',
+      amountIsk: 1_500_000,
+      reason: 'Their ore',
+    };
+    expect(parseEditAction(base)).toEqual(base);
+    // The server prices it; the client's figure is only a fallback, never zero.
+    expect(() => parseEditAction({ ...base, amountIsk: 0 })).toThrow();
+    const { amountIsk: _a, ...unpriced } = base;
+    void _a;
+    expect(parseEditAction(unpriced)).toEqual(unpriced);
+    expect(() => parseEditAction({ ...base, reason: '' })).toThrow();
+    expect(needsLiveCheck(parseEditAction(base))).toBe(true);
+  });
+
+  describe('mergeDisputeLines (#6206)', () => {
+    const recorded = [
+      { characterId: 7, structureId: 1000, date: '2026-11-01', typeId: 45490, quantity: 60 },
+      { characterId: 7, structureId: 1000, date: '2026-11-01', typeId: 45490, quantity: 40 },
+      { characterId: 7, structureId: 1000, date: '2026-11-01', typeId: 45491, quantity: 10 },
+    ];
+    const line = (o: Record<string, unknown> = {}) => ({
+      recordKey: '7:1000:2026-11-01',
+      typeId: 45490,
+      quantity: 100,
+      payeeName: 'Rival',
+      ...o,
+    });
+    const reasonOf = (fn: () => unknown) => {
+      try {
+        fn();
+      } catch (e) {
+        return (e as { details?: { reason?: string } }).details?.reason;
+      }
+      return undefined;
+    };
+
+    it('adds new lines and drops an exact repeat', () => {
+      expect(
+        mergeDisputeLines([line()], [line(), line({ typeId: 45491, quantity: 10 })], recorded)
+      ).toEqual([line(), line({ typeId: 45491, quantity: 10 })]);
+    });
+
+    it('refuses ore the record does not hold, or more of it than recorded', () => {
+      expect(reasonOf(() => mergeDisputeLines([], [line({ typeId: 1 })], recorded))).toBe(
+        'not-on-record'
+      );
+      expect(
+        reasonOf(() => mergeDisputeLines([], [line({ recordKey: '7:2000:2026-11-01' })], recorded))
+      ).toBe('not-on-record');
+      expect(reasonOf(() => mergeDisputeLines([], [line({ quantity: 101 })], recorded))).toBe(
+        'not-on-record'
+      );
+      // Split between two Payees across calls, the total still cannot pass the record.
+      expect(
+        reasonOf(() =>
+          mergeDisputeLines(
+            [line({ quantity: 60 })],
+            [line({ quantity: 50, payeeName: 'B' })],
+            recorded
+          )
+        )
+      ).toBe('not-on-record');
+    });
+
+    it('caps the lines one day holds across every call', () => {
+      const many = Array.from({ length: 100 }, (_, i) => line({ quantity: 1, payeeName: `P${i}` }));
+      const big = [{ ...recorded[0], quantity: 1000 }];
+      expect(mergeDisputeLines([], many, big)).toHaveLength(100);
+      expect(
+        reasonOf(() => mergeDisputeLines(many, [line({ quantity: 1, payeeName: 'X' })], big))
+      ).toBe('too-many-lines');
+    });
+  });
+
+  describe('billedDisputeTax: a waived dispute priced from the book’s issued Statements', () => {
+    const disputed = {
+      lines: [
+        { recordKey: '60:1000:2026-11-01', typeId: 45490, quantity: 100, payeeName: 'A' },
+        { recordKey: '77:1000:2026-11-01', typeId: 45491, quantity: 50, payeeName: 'A' },
+      ],
+    };
+    const mined = (chargeKey: string, typeId: number, quantity: number, taxPct = 10) => ({
+      kind: 'mined',
+      date: '2026-11-01',
+      chargeKey,
+      oreLines: [{ typeId, quantity }],
+      unitPrices: { [typeId]: typeId === 45490 ? 1000 : 2000 },
+      taxPct,
+    });
+
+    it('prices the disputed ore at the prices and rate its Statement billed', () => {
+      const statements = [
+        { lines: [mined('60:1000:2026-11-01', 45490, 100)] },
+        { lines: [mined('77:1000:2026-11-01', 45491, 50, 20)] },
+      ];
+      // 100 × 1000 × 10% + 50 × 2000 × 20%
+      expect(billedDisputeTax(disputed, statements)).toBe(30_000);
+    });
+
+    it('caps the disputed ore at what the Statements billed, late ore included', () => {
+      const late = { ...mined('60:1000:2026-11-01', 45490, 30), kind: 'late-ore' };
+      const statements = [
+        { lines: [mined('60:1000:2026-11-01', 45490, 40), late] },
+        { lines: [mined('77:1000:2026-11-01', 45491, 50)] },
+      ];
+      expect(billedDisputeTax(disputed, statements)).toBe(70 * 100 + 50 * 200);
+    });
+
+    it('cannot price a disputed record no Statement billed yet', () => {
+      expect(
+        billedDisputeTax(disputed, [{ lines: [mined('60:1000:2026-11-01', 45490, 100)] }])
+      ).toBeUndefined();
+      expect(billedDisputeTax(disputed, [])).toBeUndefined();
+    });
+
+    it('ignores correction lines and malformed lines', () => {
+      const statements = [
+        {
+          lines: [
+            { kind: 'correction', date: '2026-11-01', adjustmentId: 'a1', tax: -5 },
+            { kind: 'mined', chargeKey: '77:1000:2026-11-01' },
+            mined('60:1000:2026-11-01', 45490, 100),
+          ],
+        },
+      ];
+      expect(billedDisputeTax(disputed, statements)).toBeUndefined();
+    });
+  });
+
+  it('parses a manual payment or a donation match that confirms a declaration', () => {
+    const payment = {
+      action: 'recordPayment',
+      paymentId: 'm_x1',
+      minerId: 'm1',
+      characterId: 7,
+      amount: 5,
+      at: '2026-11-01T00:00:00.000Z',
+      declarationId: 'x1',
+    };
+    expect(parseEditAction(payment)).toMatchObject({ declarationId: 'x1' });
+    expect(
+      parseEditAction({
+        action: 'assignPayment',
+        paymentId: 'j1_1',
+        minerId: 'm1',
+        declarationId: 'x1',
+      })
+    ).toEqual({ action: 'assignPayment', paymentId: 'j1_1', minerId: 'm1', declarationId: 'x1' });
+    expect(parseEditAction({ action: 'assignPayment', paymentId: 'j1_1', minerId: 'm1' })).toEqual({
+      action: 'assignPayment',
+      paymentId: 'j1_1',
+      minerId: 'm1',
+    });
   });
 
   it('accepts only a 43-character url-safe token', () => {
@@ -273,6 +547,11 @@ describe('dismissalNeedsDirector (D6, #4194)', () => {
 
   it('counts an omitted amount as over the limit', () => {
     expect(dismissalNeedsDirector(100, [1, undefined], false)).toBe(true);
+  });
+
+  it('counts a zero amount as unpriced, so a day not in view cannot slip under the limit', () => {
+    expect(dismissalNeedsDirector(100, [1, 0], false)).toBe(true);
+    expect(dismissalNeedsDirector(null, [0], false)).toBe(false);
   });
 });
 
@@ -416,6 +695,21 @@ describe('per-moon-owner miner rate', () => {
       })
     ).toThrow();
   });
+
+  it("parses a rate for the moon owner's own members, keyed apart from its per-moon-owner rate (#6210)", () => {
+    const rate = {
+      scope: 'feeder-member',
+      feederId: 98000002,
+      pct: 4,
+      effectiveFrom: '2026-10-21',
+    } as const;
+    expect(parseEditAction({ action: 'addRate', rate })).toEqual({ action: 'addRate', rate });
+    expect(() =>
+      parseEditAction({ action: 'addRate', rate: { ...rate, feederId: undefined } })
+    ).toThrow();
+    expect(rateKey(rate)).not.toBe(rateKey({ ...rate, scope: 'feeder' }));
+    expect(rateKey(rate)).not.toBe(rateKey({ ...rate, feederId: 98000003 }));
+  });
 });
 
 describe('moveStartRate', () => {
@@ -514,5 +808,82 @@ describe('reanchorCadence', () => {
     const monthly = { kind: 'monthly' };
     expect(reanchorCadence(monthly, '2026-10-01', '2026-09-25')).toBe(monthly);
     expect(reanchorCadence(undefined, '2026-10-01', '2026-09-25')).toBeUndefined();
+  });
+});
+
+describe('Pop Sharing edits (#6222)', () => {
+  it('parses turning sharing on and a Sharing default change', () => {
+    expect(
+      parseEditAction({
+        action: 'setPopSharing',
+        enabled: true,
+        defaults: {
+          audiences: [{ kind: 'corp' }, { kind: 'community', communityId: 'c1', name: ' Miners ' }],
+          popTime: 'auto-fracture',
+          showOre: false,
+          ratePct: 7.5,
+          notes: '  Fleet on comms  ',
+        },
+      })
+    ).toEqual({
+      action: 'setPopSharing',
+      enabled: true,
+      defaults: {
+        audiences: [{ kind: 'corp' }, { kind: 'community', communityId: 'c1', name: 'Miners' }],
+        popTime: 'auto-fracture',
+        showOre: false,
+        ratePct: 7.5,
+        notes: 'Fleet on comms',
+      },
+    });
+  });
+
+  it('takes empty notes, the book rate (null) and a lone switch', () => {
+    expect(
+      parseEditAction({ action: 'setPopSharing', defaults: { notes: '', ratePct: null } })
+    ).toEqual({ action: 'setPopSharing', defaults: { notes: '', ratePct: null } });
+    expect(parseEditAction({ action: 'setPopSharing', enabled: false })).toEqual({
+      action: 'setPopSharing',
+      enabled: false,
+    });
+  });
+
+  it('refuses nothing to change, a bad value, a duplicate audience or an unknown setting', () => {
+    const bad = (data: Record<string, unknown>) =>
+      expect(() => parseEditAction({ action: 'setPopSharing', ...data })).toThrow();
+    bad({});
+    bad({ enabled: 'yes' });
+    bad({ defaults: { popTime: 'whenever' } });
+    bad({ defaults: { ratePct: 101 } });
+    bad({ defaults: { notes: 'x'.repeat(501) } });
+    bad({ defaults: { audiences: [{ kind: 'corp' }, { kind: 'corp' }] } });
+    bad({ defaults: { audiences: [{ kind: 'community', communityId: '../x', name: 'a' }] } });
+    bad({ defaults: { colour: 'red' } });
+  });
+
+  it('parses a Moon override: settings to set, and settings back to the default', () => {
+    expect(
+      parseEditAction({
+        action: 'setPopSharingMoon',
+        moonId: 40001,
+        set: { popTime: 'ready', ratePct: null },
+        clear: ['notes'],
+      })
+    ).toEqual({
+      action: 'setPopSharingMoon',
+      moonId: 40001,
+      override: { set: { popTime: 'ready', ratePct: null }, clear: ['notes'] },
+    });
+    const bad = (data: Record<string, unknown>) =>
+      expect(() =>
+        parseEditAction({ action: 'setPopSharingMoon', moonId: 40001, ...data })
+      ).toThrow();
+    bad({});
+    bad({ set: {}, clear: [] });
+    bad({ clear: ['colour'] });
+    bad({ set: { notes: 'a' }, clear: ['notes'] });
+    expect(() =>
+      parseEditAction({ action: 'setPopSharingMoon', moonId: 'x', set: { notes: 'a' } })
+    ).toThrow();
   });
 });

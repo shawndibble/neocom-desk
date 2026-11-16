@@ -42,8 +42,8 @@ export const SRP_FIXTURE_CORPORATION_ID = 98765432;
 
 /**
  * The public reads an SRP page makes for the pilot (their sheet, then their corporation).
- * Without them a story that paints before its seed lands reaches the network, and the
- * smoke test's `unexpectedRequests()` check fails on a timing race.
+ * Without them a story that paints before its seed lands reaches for the network and
+ * shows the pilot as unknown.
  * `corporationOf` names the corporation a pilot's sheet reports, so it matches the story's seed.
  */
 export function srpPublicInfoRoutes(

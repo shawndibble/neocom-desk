@@ -106,7 +106,8 @@ describe('BuildPlanDetail material price basis', () => {
     await user.click(basisSelect());
     await user.click(await screen.findByRole('option', { name: /Buy order/ }));
 
-    await waitFor(() => expect(tritaniumPrice().value).toBe('4'));
+    // The highest buy order (4) plus an untrained Character's 3% placement fee (#6167).
+    await waitFor(() => expect(tritaniumPrice().value).toBe('4.12'));
     // One snapshot, both sides: switching basis must never spend a request.
     expect(loadMarketSnapshot.mock.calls.length).toBe(fetchesBefore);
   });
@@ -118,7 +119,7 @@ describe('BuildPlanDetail material price basis', () => {
     await openSetup(user);
 
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-    expect(tritaniumPrice().value).toBe('4');
+    expect(tritaniumPrice().value).toBe('4.12');
     expect(basisSelect()).toHaveTextContent('Buy order');
   });
 });

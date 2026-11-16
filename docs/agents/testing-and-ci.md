@@ -78,6 +78,26 @@ Detail moved out of `CLAUDE.md` so it is read on demand. The short rules stay in
   awaits `settleEsiCacheLoads()` after every dom test and warns naming any
   key still pending, so a read still writing to `esiCache` can't leak into the next
   test. Don't hand-roll drains (`waitFor(esiInFlight)`, extra ticks).
+- **Teardown is deterministic** (`src/test/teardown.ts`, both projects). Every
+  `fetch` a test makes is aborted the moment its body ends, before any
+  `afterEach` (`vitest.runner.ts`), so a late response can't write after the
+  file's resets or call `setState` once jsdom is gone. A `fetch` the test's
+  leftover work starts after that (a load that was still reading IndexedDB)
+  is refused with the same `AbortError` until the next test, or the next
+  suite once those leftovers are drained;
+  `beforeAll` requests (warm-up renders) still run, but an `afterEach` or
+  `afterAll` can't fetch. The runner step also drains IndexedDB (real timers
+  only), so such a load fails before the file's resets. Then the shared
+  `afterEach` puts real timers and the real `Date` back and waits for pending
+  IndexedDB opens and transactions (Dexie, and Firebase's heartbeat probe that
+  failed shards with "self is not defined"). A test that fakes timers still
+  restores them itself. Dexie is not wiped between tests: files seed in
+  `beforeAll`, so each file keeps clearing the tables it uses.
+  Work still pending a second after the test ends logs a `[teardown]` warning;
+  set `VITEST_FAIL_ON_LEFTOVER_WORK=1` to make it fail the test instead (not yet
+  on in CI: existing leaks must be fixed first). Because that state is per file,
+  `it.concurrent` / `describe.concurrent` are banned by lint, and
+  `src/test/teardownOrder.test.ts` pins the runner order the abort relies on.
 - **Tests stay under 10 seconds each.** `testTimeout` is 10000 in
   `vite.config.ts`, and that is a budget to stay under, not a number to raise.
   A test that needs more is too slow: make it faster instead of adding a
@@ -86,6 +106,15 @@ Detail moved out of `CLAUDE.md` so it is read on demand. The short rules stay in
   render (lazy route chunks, jsdom, React warm-up), which lands on whichever
   test happens to run first. Pay it once in a `beforeAll` warm-up render with
   its own hook timeout, as `src/routes/IndustryPlanPage.test.tsx` does.
+- **Test a page through `renderPageRoute` / `renderPageRoutes`
+  (`src/test/renderPage.tsx`), not `<App />`.** It mounts the route with
+  App's own per-page wiring (`src/app/appWiring.tsx`: ScopeGate, TabRoute,
+  info modals, ESI token provider, store hydration) and none of its boot,
+  shell or pollers, which is what cost a whole-App route test seconds per
+  scenario. Keep only one to three `<App />` tests per route, for what only
+  App does: the URL is reachable, legacy paths and redirects, the shell, auth
+  gating. Wrap it in a one-line area helper (`renderMarketRoute`) if a page's
+  tests need one; never copy its wiring.
 - **Unit shards are dealt out by file run time, not by hash.** `ci.yml`'s
   `test-shard` jobs run the files `scripts/test-shard.mjs` assigns them, using
   `scripts/test-shard-weights.json` (seconds per file). A new test file needs
@@ -110,6 +139,46 @@ Detail moved out of `CLAUDE.md` so it is read on demand. The short rules stay in
   moves must be justified in the PR from the engine or SDE change that caused
   it. Never re-pin blind. A bug the suite reveals is filed, and today's value
   stays pinned with a `TODO(#issue)`.
+
+## Wait for a signal, never a duration
+
+Most past flake fixes were a test asserting before async work settled. Lint
+(`eslint.config.js`) stops the patterns that cause it:
+
+- **eslint-plugin-testing-library** on every jsdom test (`*.test.tsx`,
+  `*.dom.test.ts`): async queries, utils and events are awaited; a `waitFor`
+  holds one assertion and no side effects (fire the event before it, wait for the
+  outcome inside it); `findBy*` instead of `waitFor` + `getBy*`; no `act` that
+  wraps nothing (`await act(async () => {})`) or wraps a call that already acts.
+- **No sleeps in a test's own flow.** An awaited `new Promise(… setTimeout …)` in
+  a test, hook, `act` callback or helper is an error, and so is a helper that is
+  only such a promise. A delay inside a stub (an argument to `mockImplementation`
+  or `vi.fn`, a property of a fake) simulates latency and stays legal; write
+  it inline, as a named helper that is only a timed promise is flagged too.
+- **e2e: no `page.waitForTimeout`.** Use a web-first `expect`, `expect.poll` on
+  the real condition, or `page.waitForResponse`.
+
+What to wait on instead:
+
+- The outcome itself: `findBy*`, or `waitFor` on the state you assert.
+- Timer-driven code (a debounce, a hover delay): fake timers and
+  `vi.advanceTimersByTime(THE_DELAY_CONSTANT)`. Where Dexie (fake-indexeddb) is
+  in play, fake only `setTimeout`/`clearTimeout` with `shouldAdvanceTime: true`,
+  or its own scheduling deadlocks.
+- A promise you control: `deferred()` (`src/test/deferred.ts`), settled inside
+  `await act(async () => d.resolve(x))`.
+- A spied module function: `vi.mock(path, importOriginal)` wrapping it in
+  `vi.fn(actual.fn)`, then `waitFor(() => expect(fn).toHaveResolvedTimes(fn.mock.calls.length))`.
+- **Asserting absence ("renders nothing", "never calls X")**: first wait for a
+  positive signal that the work finished, then assert. For a live query, render
+  a control beside the subject that reads the same table and does show, wait for
+  it, then assert the subject is empty (`GrantNote.test.tsx`). An effect that
+  bails out synchronously needs no wait at all: its render's `act` already ran it.
+
+A sleep that is genuinely the only option (a real timer the code races and
+fake timers deadlock, or Node's unhandled-rejection turn) takes an
+`eslint-disable-next-line no-restricted-syntax -- <reason>` on that line. Keep
+those rare; grep for the existing ones before adding another.
 
 ## Running the app against the Firebase emulators (local only)
 

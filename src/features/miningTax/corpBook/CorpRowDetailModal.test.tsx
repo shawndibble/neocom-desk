@@ -147,6 +147,22 @@ describe('CorpRowDetailModal', () => {
     expect(screen.queryByRole('button', { name: /settle up/i })).not.toBeInTheDocument();
   });
 
+  it('shows an over-listed excess as never billed: the book did not record it', () => {
+    const excess: BookRowView = {
+      ...view,
+      state: 'conflict',
+      conflictCause: 'overListed',
+      taxOwed: null,
+      billed: 0,
+      dispute: undefined,
+    };
+    renderModal({ corp: { ...corp, view: excess } });
+    expect(
+      screen.getByText("Not billed · Brass Meridian Logistics's book did not record this ore")
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/next Statement/)).not.toBeInTheDocument();
+  });
+
   it('says why the day is locked and keeps the billed amount once it is paid', () => {
     const paid: BookRowView = {
       ...view,
@@ -201,6 +217,24 @@ describe('CorpRowDetailModal', () => {
     expect(onUnmarkPaid).toHaveBeenCalledOnce();
   });
 
+  it('says the book still bills a day the member marked paid while its Statement is open (#6204)', () => {
+    const marked: BookRowView = {
+      ...view,
+      state: 'paid',
+      taxOwed: 0,
+      settledBy: 'yourMark',
+      bookOwed: 900_000,
+      markedPaidIds: ['a1'],
+      dispute: undefined,
+    };
+    renderModal({ corp: { ...corp, view: marked } });
+    expect(
+      screen.getByText(
+        'Marked paid by you — Brass Meridian Logistics still shows 900,000 ISK owed. It confirms your mark against its wallet.'
+      )
+    ).toBeInTheDocument();
+  });
+
   it('says so when the member also marked a day the Statement settled, and offers the unmark', () => {
     const paid: BookRowView = {
       ...view,
@@ -245,5 +279,48 @@ describe('CorpRowDetailModal', () => {
         /Corrected by the corporation: 900,000 → 800,000\. Their reason: Wrong hub price/
       )
     ).toBeInTheDocument();
+  });
+});
+
+describe('CorpRowDetailModal: I paid this another way (#6206)', () => {
+  const onStatement = (over: Partial<BookRowView> = {}) => {
+    const v = { ...view, statementId: 's1', ...over };
+    return { corp: { ...corp, view: v }, dr: { ...dr, corp: { ...corp, view: v } } as DisplayRow };
+  };
+
+  it('offers it on a day a Statement bills, when the books can be told', () => {
+    renderModal({ ...onStatement(), onBookChanged: vi.fn() });
+    expect(screen.getByRole('button', { name: 'I paid this another way' })).toBeInTheDocument();
+  });
+
+  it('offers nothing before the day is on a Statement, or with nowhere to send it', () => {
+    renderModal({ onBookChanged: vi.fn() });
+    expect(screen.queryByRole('button', { name: 'I paid this another way' })).toBeNull();
+  });
+
+  it('says it is waiting for the corporation, and does not offer it twice', () => {
+    renderModal({
+      ...onStatement({
+        declaration: { state: 'waiting', at: '2026-10-20T00:00:00Z', amount: 900_000 },
+      }),
+      onBookChanged: vi.fn(),
+    });
+    expect(
+      screen.getByText('Declared 900,000 ISK — waiting for Brass Meridian Logistics')
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'I paid this another way' })).toBeNull();
+  });
+
+  it('shows a rejection with its reason and offers it again', () => {
+    renderModal({
+      ...onStatement({
+        declaration: { state: 'rejected', at: '2026-10-21T00:00:00Z', reason: 'No contract' },
+      }),
+      onBookChanged: vi.fn(),
+    });
+    expect(
+      screen.getByText('Brass Meridian Logistics rejected your declaration: No contract')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'I paid this another way' })).toBeInTheDocument();
   });
 });

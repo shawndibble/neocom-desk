@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { growthMoves, planSplit } from './split';
+import { growthMoves, maxUnreportedClaim, planSplit } from './split';
 
 const A = 45490;
 const B = 45491;
@@ -31,6 +31,47 @@ describe('planSplit', () => {
   it('refuses to move more than the original holds', () => {
     expect(() => planSplit(original, [{ typeId: A, quantity: 101 }])).toThrow();
     expect(() => planSplit(original, [{ typeId: 999, quantity: 1 }])).toThrow();
+  });
+});
+
+describe('planSplit with unreported ore', () => {
+  const original = [
+    { typeId: A, quantity: 100 },
+    { typeId: B, quantity: 50 },
+  ];
+
+  it('claims ore ESI has not reported yet on the kept side', () => {
+    const plan = planSplit(original, [], [{ typeId: A, quantity: 30 }]);
+    expect(plan.kept).toEqual([
+      { typeId: A, quantity: 130 },
+      { typeId: B, quantity: 50 },
+    ]);
+    expect(plan.moved).toEqual([]);
+  });
+
+  it('moves one type while the kept side claims more of another', () => {
+    const plan = planSplit(original, [{ typeId: B, quantity: 50 }], [{ typeId: A, quantity: 5 }]);
+    expect(plan.kept).toEqual([{ typeId: A, quantity: 105 }]);
+    expect(plan.moved).toEqual([{ typeId: B, quantity: 50 }]);
+  });
+
+  it('refuses a claim on a type the original does not hold', () => {
+    expect(() => planSplit(original, [], [{ typeId: 999, quantity: 7 }])).toThrow();
+  });
+
+  it('refuses to both move and claim more of one type', () => {
+    expect(() =>
+      planSplit(original, [{ typeId: A, quantity: 10 }], [{ typeId: A, quantity: 5 }])
+    ).toThrow();
+  });
+
+  it('caps a claim at what ESI already holds of that type, so a keep never passes double', () => {
+    expect(maxUnreportedClaim(100)).toBe(100);
+    expect(planSplit(original, [], [{ typeId: B, quantity: 50 }]).kept).toContainEqual({
+      typeId: B,
+      quantity: 100,
+    });
+    expect(() => planSplit(original, [], [{ typeId: B, quantity: 51 }])).toThrow();
   });
 });
 

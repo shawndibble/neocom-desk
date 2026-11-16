@@ -93,7 +93,8 @@ describe('Button disabled and loading', () => {
 
   it('keeps the label laid out while loading, so the width does not shift', () => {
     const { rerender } = render(<Button>Refresh</Button>);
-    expect(screen.getByRole('button').querySelector('svg')).toBeNull();
+    const buttonEl = screen.getByRole('button');
+    expect(buttonEl.querySelector('svg')).toBeNull();
     rerender(<Button loading>Refresh</Button>);
     const label = screen.getByText('Refresh');
     expect(label.className).toContain('opacity-0');

@@ -34,7 +34,14 @@ import {
   utcDate,
 } from './corpTaxBook.js';
 import { FEEDER_SYNC_SCOPES } from './corpSyncScopes.js';
-import { closePeriod, isDayCovered, reopenPeriod } from './corpTaxBookEngine.js';
+import {
+  closePeriod,
+  deriveOwnerRateHistory,
+  effectiveOwnerRatePct,
+  isDayCovered,
+  reconnectCoverageFrom,
+  reopenPeriod,
+} from './corpTaxBookEngine.js';
 import type { CorporationLookup } from './corpTaxBookEsi.js';
 import {
   acceptInviteCore,
@@ -65,6 +72,7 @@ import {
   fail,
   type Caller,
 } from './actorAuth.js';
+import { refreshSharedPops } from './sharedPopsStore.js';
 
 export interface FeederGrantDeps extends CorpSyncDeps {
   esi: SyncEsi;
@@ -80,6 +88,7 @@ export const bookDeps = (deps: CorpSyncDeps): BookDeps => ({
   verifyToken: deps.verify,
   readIdentity: deps.readIdentity,
   ...(deps.openPrices ? { openPrices: deps.openPrices } : {}),
+  ...(deps.corporationAlliance ? { corporationAlliance: deps.corporationAlliance } : {}),
 });
 
 // --- Input -----------------------------------------------------------------
@@ -264,8 +273,13 @@ async function reconnectCore(
     const reopened = rec.status === 'disconnected';
     let coveragePeriods: FeederRecord['coveragePeriods'] | undefined;
     if (reopened) {
-      // Back after a disconnect: a new coverage period, the balance and rate history carry on.
-      coveragePeriods = reopenPeriod(rec.coveragePeriods, utcDate(deps.now()));
+      // Back after a disconnect: a new coverage period from the day after the last covered one
+      // (as far back as EVE still holds), so no ore is lost; balance and rate history carry on.
+      const today = utcDate(deps.now());
+      coveragePeriods = reopenPeriod(
+        rec.coveragePeriods,
+        reconnectCoverageFrom(rec.coveragePeriods, today, utcDate(rec.joinedAt))
+      );
       patch.status = 'active';
       patch.coveragePeriods = coveragePeriods;
       patch.disconnectedAt = FieldValue.delete();
@@ -782,8 +796,11 @@ export async function endFeeder(deps: CorpSyncDeps, input: EndFeederInput): Prom
     return grant?.kind === 'feeder' ? grant : undefined;
   });
   if (dropped) await revokeStored(deps, dropped);
-  if (input.rebuildView !== false)
+  if (input.rebuildView !== false) {
     await tryRebuildFeederView(bookDeps(deps), collector, feederCorp);
+    // A moon owner the book no longer handles shares no pops through it (#6223).
+    await refreshSharedPops(bookDeps(deps), collector);
+  }
 }
 
 const ENDABLE: readonly FeederRecord['status'][] = ['active', 'pending-removal', 'disconnected'];
@@ -894,7 +911,8 @@ export async function getFeederStatus(
     readPrevious(deps.db, input.corporationId),
   ]);
   const name = book.get('corporationName');
-  const effective = rec.agreedRatePct ?? rec.requestedRatePct ?? null;
+  // Only an agreed rate is in effect; a request alone never is (#6209).
+  const effective = effectiveOwnerRatePct(deriveOwnerRateHistory(rec), utcDate(deps.now())) ?? null;
   const last = rec.lastSyncResult;
   return {
     status: 'feeder',

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { db } from '@/db';
 import {
   loadPaginatedWithCacheStatus,
@@ -30,13 +30,15 @@ describe('settleEsiCacheLoads', () => {
 
   it('resolves only after a slow load has written its row', async () => {
     const live = deferred<string>();
-    const load = loadWithCacheStatus(CHAR_ID, KEY, () => live.promise);
+    const fetchLive = vi.fn(() => live.promise);
+    const load = loadWithCacheStatus(CHAR_ID, KEY, fetchLive);
 
     let settled = false;
     const settle = settleEsiCacheLoads().then(() => {
       settled = true;
     });
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    // Past its cache reads and out on the network: only the write is left to wait for.
+    await vi.waitFor(() => expect(fetchLive).toHaveBeenCalled());
     expect(settled).toBe(false);
 
     live.resolve('payload');
@@ -63,6 +65,24 @@ describe('settleEsiCacheLoads', () => {
 
     live.resolve('payload');
     await load;
+    await settleEsiCacheLoads();
+  });
+
+  it('forgets a load that will not settle, so the next one of its key starts its own request', async () => {
+    const stuck = deferred<string>();
+    const stuckLoad = loadWithCacheStatus(CHAR_ID, KEY, () => stuck.promise);
+    await expect(settleEsiCacheLoads(30)).rejects.toThrow(`${CHAR_ID}:${KEY}`);
+
+    // Joined onto the stuck load, this would never call its own fetch.
+    const fetchLive = vi.fn(async () => 'fresh');
+    const next = await loadWithCacheStatus(CHAR_ID, KEY, fetchLive);
+    expect(fetchLive).toHaveBeenCalledOnce();
+    expect(next.cached?.data).toBe('fresh');
+    await settleEsiCacheLoads();
+
+    // The stuck load ending later leaves the next load's bookkeeping alone.
+    stuck.resolve('late');
+    await stuckLoad;
     await settleEsiCacheLoads();
   });
 });

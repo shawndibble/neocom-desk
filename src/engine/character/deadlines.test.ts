@@ -7,6 +7,7 @@ import {
   groupByDay,
   localMidnight,
   relativeDayFor,
+  splitLongOverdue,
 } from './deadlines';
 
 /**
@@ -131,6 +132,7 @@ describe('countsByDay', () => {
       planetExtractions: [clock('planet', day)],
       mercenaryDens: [clock('den', day)],
       moonChunks: [clock('moon', day)],
+      sharedMoonPops: [clock('sharedPop', day)],
       structureFuel: [clock('fuel', day)],
       structureTimers: [clock('timer', day)],
       corpJobs: [clock('corpJob', day)],
@@ -142,7 +144,7 @@ describe('countsByDay', () => {
     });
 
     expect(countsByDay(board).get(local(2026, 9, 11, 0, 0))).toEqual({
-      count: 14,
+      count: 15,
       kinds: [...CHARACTER_BOARD_ITEM_KINDS],
     });
   });
@@ -238,5 +240,32 @@ describe('countsByKind', () => {
     expect(counts.get('industryJob')).toBe(2);
     expect(counts.get('orderExpiry')).toBe(1);
     expect(counts.get('calendarEvent')).toBeUndefined();
+  });
+});
+
+describe('splitLongOverdue', () => {
+  const DAY = 86_400_000;
+
+  it('takes out the items overdue for longer than the window, in board order, oldest first', () => {
+    const board = buildCharacterBoard({
+      nowMs: NOW,
+      planetExtractions: [
+        clock('month-old', NOW - 31 * DAY),
+        clock('week-old', NOW - 7 * DAY),
+        clock('yesterday', NOW - DAY),
+        clock('soon', NOW + DAY),
+      ],
+    });
+    const { longOverdue, rest } = splitLongOverdue(board, NOW, 2 * DAY);
+    expect(longOverdue.map((i) => i.subject)).toEqual(['month-old', 'week-old']);
+    expect(rest.map((i) => i.subject)).toEqual(['yesterday', 'soon']);
+  });
+
+  it('keeps everything when nothing is overdue for that long', () => {
+    const board = buildCharacterBoard({
+      nowMs: NOW,
+      planetExtractions: [clock('edge', NOW - 2 * DAY), clock('soon', NOW + DAY)],
+    });
+    expect(splitLongOverdue(board, NOW, 2 * DAY)).toEqual({ longOverdue: [], rest: board });
   });
 });

@@ -174,8 +174,8 @@ describe('priceCandidatesAsPlans', () => {
       hubId: 'jita',
     } as unknown as Awaited<ReturnType<typeof loadLatestBuildPlan>>);
     const [buy] = await priceCandidatesAsPlans([candidate()], context);
-    // 100 Tritanium at 300 against 500.
-    expect(buy!.profit - sell!.profit).toBe(100 * (500 - 300));
+    // 100 Tritanium at 300 plus an untrained 3% placement fee (#6167), against 500.
+    expect(buy!.profit - sell!.profit).toBeCloseTo(100 * (500 - 300 * 1.03));
   });
 
   it('leaves out a candidate whose material has no price rather than guessing', async () => {

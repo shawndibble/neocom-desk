@@ -307,6 +307,30 @@ describe('SettleUpDialog paying from one Character', () => {
     expect(paidIds()).toEqual(['arch-1']);
   });
 
+  it("gives a Payee-specific Reason and notice the payer the pilot picks and what's ticked", async () => {
+    render(
+      <SettleUpDialog
+        open
+        onClose={vi.fn()}
+        rows={MIXED}
+        systemNames={new Map([[30000142, 'Jita']])}
+        onPaid={vi.fn()}
+        payerId={OTICHODA}
+        focusIds={new Set(['oti-1'])}
+        reason={(payerId) => `CODE-${payerId}`}
+        notice={(ticked, payerId) => (
+          <p>{`notice ${payerId}: ${ticked.reduce((sum, r) => sum + r.assignment.taxOwed, 0)}`}</p>
+        )}
+      />
+    );
+    expect(screen.getByText(`CODE-${OTICHODA}`)).toBeInTheDocument();
+    expect(screen.getByText(`notice ${OTICHODA}: 1300000`)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /Ashken Archangel · / }));
+    expect(screen.getByText(`CODE-${ARCHANGEL}`)).toBeInTheDocument();
+    expect(screen.getByText(`notice ${ARCHANGEL}: 18000000`)).toBeInTheDocument();
+  });
+
   it("can tick in another Character's entries to pay on their behalf", async () => {
     renderDialog(MIXED, { payerId: ARCHANGEL });
     await userEvent.click(

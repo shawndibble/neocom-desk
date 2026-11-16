@@ -1693,7 +1693,7 @@ describe('Characters table view', () => {
     await user.click(screen.getByRole('combobox', { name: 'Group' }));
     await user.click(await screen.findByRole('option', { name: 'Ungrouped' }));
 
-    await waitFor(() => expect(screen.getByText('Pilot One')).toBeInTheDocument());
+    expect(await screen.findByText('Pilot One')).toBeInTheDocument();
     expect(screen.queryByText('Pilot Two')).not.toBeInTheDocument();
   });
 

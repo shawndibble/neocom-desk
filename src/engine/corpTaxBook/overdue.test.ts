@@ -125,7 +125,7 @@ describe('overdueStatus', () => {
     expect(status).toMatchObject({ state: 'overdue', overdueAt: '2026-08-17T00:00:00.000Z' });
   });
 
-  it('a rejected declaration gives a fresh 14 days from the rejection', () => {
+  it('a rejected declaration resumes the original clock: no fresh 14 days (#6206)', () => {
     const status = overdueStatus({
       issuedAt: ISSUED,
       settled: false,
@@ -136,6 +136,7 @@ describe('overdueStatus', () => {
         }),
       ],
     });
-    expect(status).toMatchObject({ state: 'open', overdueAt: '2026-09-05T00:00:00.000Z' });
+    // Only the two days it waited count, as for a confirmed one.
+    expect(status).toMatchObject({ state: 'overdue', overdueAt: '2026-08-17T00:00:00.000Z' });
   });
 });

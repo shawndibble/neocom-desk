@@ -61,7 +61,8 @@ describe('StatChip', () => {
     expect(link).toHaveAttribute('href', '/corp/moons/miners?balance=overdue');
     expect(link).toHaveClass('underline');
     expect(link.parentElement).toHaveClass('text-danger');
-    expect(screen.getByText('Overdue').closest('a')).toBeNull();
+    const textEl = screen.getByText('Overdue');
+    expect(textEl.closest('a')).toBeNull();
   });
 });
 

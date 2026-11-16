@@ -7,7 +7,8 @@ import '@/i18n';
 import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
-import { App } from '@/app/App';
+import { Overview } from '@/routes/Overview';
+import { renderPageRoute } from '@/test/renderPage';
 import * as routeChunks from '@/app/routeChunks';
 import type { SkillType } from '@/sde/types';
 import { PHONE_QUERY } from '@/lib/useIsPhone';
@@ -180,9 +181,10 @@ const CALENDAR_SCOPE = 'esi-calendar.read_calendar_events.v1';
 
 beforeAll(async () => {
   server.listen({ onUnhandledRequest: 'error' });
-  // One throwaway render, so no test pays for the worker's first `App` render
+  // One throwaway render, so no test pays for the worker's first page render
   // (lazy route chunks, jsdom, React warm-up) inside a short `findBy` wait.
-  await routeChunks.loadOverview();
+  // The one App-level test's graph and shell chunk load here too.
+  await Promise.all([routeChunks.loadOverview(), routeChunks.loadLayout(), import('@/app/App')]);
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.tokens.put({
     characterId: CHAR_ID,
@@ -193,7 +195,7 @@ beforeAll(async () => {
   });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
   window.history.pushState({}, '', '/overview');
-  const { unmount } = render(<App />);
+  const { unmount } = renderOverviewRoute();
   await screen.findByRole('heading', { name: 'Pilot One' }, { timeout: 25_000 });
   unmount();
   server.resetHandlers();
@@ -250,10 +252,13 @@ async function storedKinds(): Promise<string[] | undefined> {
   return (row?.value as OverviewLayout | undefined)?.widgets.map((w) => w.kind);
 }
 
+/** The Overview page on its own route, with no App boot or signed-in shell. */
+const renderOverviewRoute = () => renderPageRoute('/overview', <Overview />);
+
 describe('Overview widget grid', () => {
   it('asks a first-time pilot what to start from, then builds the basics and saves them', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderOverviewRoute();
     expect(
       await screen.findByRole('heading', { name: /what do you do in eve/i })
     ).toBeInTheDocument();
@@ -271,7 +276,7 @@ describe('Overview widget grid', () => {
 
   it('builds from the chosen roles', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderOverviewRoute();
     await screen.findByRole('heading', { name: /what do you do in eve/i });
     await user.click(screen.getByRole('button', { name: 'Planetary industry' }));
     await user.click(screen.getByRole('button', { name: 'Build my Overview' }));
@@ -284,11 +289,9 @@ describe('Overview widget grid', () => {
   it('customizes from the header: the edit bar takes over Done, and Cancel restores', async () => {
     await seedLayout(widget('a', 'wallet', { size: 'S' }), widget('b', 'training', { size: 'S' }));
     const user = userEvent.setup();
-    render(<App />);
+    renderOverviewRoute();
     await widgetCard('Wallet');
-    await user.click(
-      await within(screen.getByRole('main')).findByRole('button', { name: 'Customize' })
-    );
+    await user.click(await screen.findByRole('button', { name: 'Customize' }));
     expect(
       await screen.findByRole('region', { name: 'Customize the Overview' })
     ).toBeInTheDocument();
@@ -299,8 +302,12 @@ describe('Overview widget grid', () => {
     await waitFor(async () => expect(await storedKinds()).toEqual(['wallet', 'training']));
   });
 
-  it('draws the saved layout: the wallet figure, and the skill training now', async () => {
+  // The one App-level test of the Overview route: it mounts at /overview inside
+  // the signed-in shell, its rail link current. Every other Overview test
+  // renders the page on its own (`renderOverviewRoute`).
+  it('draws the saved layout: the wallet figure, and the skill training now, at /overview inside the shell', async () => {
     await seedLayout(widget('a', 'wallet', { size: 'S' }), widget('b', 'training', { size: 'S' }));
+    const { App } = await import('@/app/App');
     render(<App />);
 
     const wallet = await widgetCard('Wallet');
@@ -309,11 +316,14 @@ describe('Overview widget grid', () => {
     expect(await within(training).findByText(/Gunnery/)).toBeInTheDocument();
     // Nothing on the board carries a New tag: every widget is new.
     expect(screen.queryByText('New')).not.toBeInTheDocument();
+    const rail = (await screen.findAllByRole('navigation'))[0];
+    const links = await within(rail).findAllByRole('link', { name: 'Overview' });
+    expect(links.some((link) => link.getAttribute('aria-current') === 'page')).toBe(true);
   });
 
   it('says nothing about cached data while every read is fresh, and names it once one is cached', async () => {
     await seedLayout(widget('a', 'wallet', { size: 'S' }), widget('n', 'netWorth', { size: 'S' }));
-    const { unmount } = render(<App />);
+    const { unmount } = renderOverviewRoute();
     await widgetCard('Wallet');
     expect(await screen.findByRole('button', { name: /Data updated/ })).toBeInTheDocument();
     // A Net Worth widget reads recorded history, which is not a cached read.
@@ -330,14 +340,14 @@ describe('Overview widget grid', () => {
     server.use(
       http.get('https://esi.evetech.net/characters/:id/wallet', () => HttpResponse.error())
     );
-    render(<App />);
+    renderOverviewRoute();
     await widgetCard('Wallet');
     expect(await screen.findByText('Showing cached data')).toBeInTheDocument();
   });
 
   it('offers the training finish as the header Next deadline', async () => {
     await seedLayout(widget('b', 'training', { size: 'S' }));
-    render(<App />);
+    renderOverviewRoute();
     const next = await screen.findByRole('link', { name: /next skill finishes/i });
     expect(next).toHaveAttribute('href', '/skills/plans');
     // A real button-styled link, not static text.
@@ -360,7 +370,7 @@ describe('Overview widget grid', () => {
     ];
     await db.settings.put({ key: OVERVIEW_HIDDEN_CARDS_KEY, value: hidden });
     await grantScopes([MAIL_SCOPE]);
-    render(<App />);
+    renderOverviewRoute();
 
     expect(await widgetCard('Wallet')).toBeInTheDocument();
     expect(await widgetCard('Training')).toBeInTheDocument();
@@ -375,7 +385,7 @@ describe('Overview widget grid', () => {
   it('shows unread mail as a headline count with the newest mails as rows in List view', async () => {
     await grantScopes([MAIL_SCOPE]);
     await seedLayout(widget('m', 'mail', { view: 'table' }));
-    render(<App />);
+    renderOverviewRoute();
 
     const mail = await widgetCard('Mail');
     expect(await within(mail).findByText('Docking fee')).toBeInTheDocument();
@@ -385,7 +395,7 @@ describe('Overview widget grid', () => {
 
   it('asks for the permission instead of printing a zero when a grant is missing', async () => {
     await seedLayout(widget('o', 'orders'));
-    render(<App />);
+    renderOverviewRoute();
 
     const orders = await widgetCard('Open orders');
     expect(await within(orders).findByText('Needs permission')).toBeInTheDocument();
@@ -396,7 +406,7 @@ describe('Overview widget grid', () => {
     const user = userEvent.setup();
     await grantScopes([CALENDAR_SCOPE]);
     await seedLayout(widget('w', 'wallet', { size: 'S' }), widget('c', 'comingUp'));
-    render(<App />);
+    renderOverviewRoute();
 
     const coming = await widgetCard('Coming up');
     expect(
@@ -424,7 +434,7 @@ describe('Overview widget grid', () => {
       addedAt: 2,
     });
     await seedLayout(widget('w', 'wallet', { size: 'S', scope: 'all' }));
-    render(<App />);
+    renderOverviewRoute();
 
     // The wallet cannot sum, so it says it is still one Character's.
     const wallet = await widgetCard('Wallet');
@@ -439,23 +449,24 @@ describe('Overview widget grid', () => {
       addedAt: 2,
     });
     await seedLayout(widget('w', 'wallet', { size: 'S' }));
-    render(<App />);
+    renderOverviewRoute();
 
     await widgetCard('Wallet');
-    const main = within(screen.getByRole('main'));
-    expect(main.queryByRole('button', { name: /character: /i })).not.toBeInTheDocument();
-    expect(main.queryByText('Total SP')).not.toBeInTheDocument();
-    expect(main.queryByText('Unallocated SP')).not.toBeInTheDocument();
+    // The page alone (the shell's rail and top bar are not mounted), so
+    // `screen` holds only the page's own header and content.
+    expect(screen.queryByRole('button', { name: /character: /i })).not.toBeInTheDocument();
+    expect(screen.queryByText('Total SP')).not.toBeInTheDocument();
+    expect(screen.queryByText('Unallocated SP')).not.toBeInTheDocument();
     // No header Refresh; the data age sits on the tab row, not beside the name.
-    expect(main.queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument();
-    const heading = main.getByRole('heading', { level: 1 });
-    const dataAge = await main.findByRole('button', { name: /Data updated/ });
+    expect(screen.queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument();
+    const heading = screen.getByRole('heading', { level: 1 });
+    const dataAge = await screen.findByRole('button', { name: /Data updated/ });
     expect(heading.parentElement).not.toContainElement(dataAge);
   });
 
   it('opens a per-widget table of when each read landed from the data age', async () => {
     await seedLayout(widget('w', 'wallet', { size: 'S' }));
-    render(<App />);
+    renderOverviewRoute();
 
     await widgetCard('Wallet');
     const trigger = await screen.findByRole('button', { name: /Data updated/ });
@@ -480,7 +491,7 @@ describe('Overview widget grid on a phone', () => {
       widget('w', 'wallet', { size: 'S' }),
       widget('t', 'training', { size: 'S', showOnPhone: false })
     );
-    render(<App />);
+    renderOverviewRoute();
 
     expect(await widgetCard('Wallet')).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Training' })).not.toBeInTheDocument();
