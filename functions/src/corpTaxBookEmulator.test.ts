@@ -615,6 +615,15 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       ).toBe('already-reversed');
     });
 
+    it("lets an officer set and clear who answers members' tax questions", async () => {
+      await turnOn();
+      const taxContact = { kind: 'characters', ids: [11, 12] };
+      await edit(ACCOUNTANT, { action: 'updateSettings', patch: { taxContact } });
+      expect((await book().get()).get('taxContact')).toEqual(taxContact);
+      await edit(ACCOUNTANT, { action: 'updateSettings', patch: { taxContact: null } });
+      expect((await book().get()).data()).not.toHaveProperty('taxContact');
+    });
+
     it('asks a Director above the dismissal approval limit', async () => {
       await turnOn();
       expect(

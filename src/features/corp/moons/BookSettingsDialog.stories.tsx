@@ -30,5 +30,22 @@ export const Billing: Story = { args: { initialTab: 'billing' } };
 /** @summary Extractions tab: the chunk-rate fallback and each refinery's measured rate and field expiry. */
 export const Extractions: Story = { args: { initialTab: 'extractions' } };
 
-/** @summary Access tab: the approval limit, Automatic sync, reclaiming and deleting the book. */
+/** @summary Access tab: the approval limit, who answers members' tax questions, Automatic sync, reclaiming and deleting the book. */
 export const Access: Story = { args: { initialTab: 'access' } };
+
+/** @summary Access tab with a mailing list named to answer members' tax questions (the default is the CEO). */
+export const TaxContactMailingList: Story = {
+  args: { initialTab: 'access' },
+  decorators: [
+    (Story) => (
+      <BookProvider
+        value={bookSettingsValue(
+          {},
+          { taxContact: { kind: 'mailingList', id: 77, name: 'Tax desk' } }
+        )}
+      >
+        <Story />
+      </BookProvider>
+    ),
+  ],
+};
