@@ -11,12 +11,12 @@
  * division switch resets the filter in the same place it resets the journal's
  * (see `routes/CorpWallet.tsx`).
  *
- * The filter bar is the personal panel's too (`TransactionsFilterBar`, in
- * `features/character`): both wallets filter the same fields the same way.
+ * The filter bar and the six columns are the personal panel's too
+ * (`TransactionsFilterBar` and `walletTransactionBaseColumns`, in
+ * `features/character`): both wallets filter and read the same way. Only the
+ * row menu's "Filter to this item" is the corp panel's own.
  */
-import { formatCount } from '@/lib/formatCount';
 import { useCallback, useMemo, type ReactElement } from 'react';
-import { COL_DATETIME, COL_ISK, COL_QUANTITY } from '@/components/ui/dataTableWidths';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -33,7 +33,6 @@ import {
 } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
-import { ItemInfoLink } from '@/features/entities';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import {
   activeWalletTransactionFilters,
@@ -41,13 +40,9 @@ import {
   type WalletTransactionFilter,
 } from '@/features/character/walletTransactionFilter';
 import { TransactionsFilterBar } from '@/features/character/TransactionsFilterBar';
-import {
-  transactionTotal,
-  walletTransactionsCsvColumns,
-} from '@/features/character/walletTransactionsCsv';
-import { iskToneClass } from '@/features/character/format';
-import { formatIsk } from '@/lib/isk';
-import { formatTimestamp } from '@/lib/timestamp';
+import { walletTransactionsCsvColumns } from '@/features/character/walletTransactionsCsv';
+import { walletTransactionBaseColumns } from '@/features/character/walletTransactionColumns';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { useTimeZone } from '@/lib/timeFormat';
 
 import type { CachedResult } from '@/esi/cache';
@@ -98,67 +93,22 @@ export function CorpTransactionsPanel({
   const { t } = useTranslation();
   const timeZone = useTimeZone();
 
-  // The same six columns Market's character panel draws, and in the same
-  // order: the two tables answer the same question about different wallets,
+  const isPhone = useIsPhone();
+
+  // The same six columns Market's character panel draws, built by the same
+  // helper: the two tables answer the same question about different wallets,
   // and a manager reconciling one against the other should not have to find
-  // the columns twice.
-  const columns = useMemo<DataTableColumn<CorporationWalletTransaction>[]>(
-    () => [
-      {
-        id: 'date',
-        header: t('wallet.date'),
-        width: COL_DATETIME,
-        className: 'whitespace-nowrap text-text-dim',
-        render: (txn) => formatTimestamp(new Date(txn.date), timeZone),
-        sortValue: (txn) => txn.date,
-      },
-      {
-        id: 'item',
-        header: t('wallet.item'),
-        className: 'truncate',
-        /** Pinned while the figures scroll sideways on a phone. */
-        stickyStart: true,
+  // the columns twice, or read their figures at two precisions.
+  const columns = useMemo(
+    () =>
+      walletTransactionBaseColumns<CorporationWalletTransaction>({
+        t,
+        timeZone,
+        isPhone,
+        nameFor,
         stickyStartOnPanel: true,
-        render: (txn) => <ItemInfoLink typeId={txn.type_id}>{nameFor(txn.type_id)}</ItemInfoLink>,
-        sortValue: (txn) => nameFor(txn.type_id),
-      },
-      {
-        id: 'side',
-        header: t('wallet.side'),
-        width: '8ch',
-        render: (txn) => (txn.is_buy ? t('wallet.buy') : t('wallet.sell')),
-        sortValue: (txn) => (txn.is_buy ? 0 : 1),
-      },
-      {
-        id: 'quantity',
-        header: t('wallet.quantity'),
-        align: 'right',
-        width: COL_QUANTITY,
-        className: 'tabular-nums whitespace-nowrap',
-        render: (txn) => formatCount(txn.quantity),
-        sortValue: (txn) => txn.quantity,
-      },
-      {
-        id: 'unitPrice',
-        header: t('wallet.unitPrice'),
-        align: 'right',
-        width: COL_ISK,
-        className: 'tabular-nums whitespace-nowrap',
-        render: (txn) => formatIsk(txn.unit_price, 2),
-        sortValue: (txn) => txn.unit_price,
-      },
-      {
-        id: 'total',
-        header: t('wallet.total'),
-        align: 'right',
-        width: COL_ISK,
-        className: 'tabular-nums whitespace-nowrap',
-        cellClassName: (txn) => iskToneClass(transactionTotal(txn)),
-        render: (txn) => formatIsk(transactionTotal(txn), 2),
-        sortValue: (txn) => transactionTotal(txn),
-      },
-    ],
-    [t, nameFor, timeZone]
+      }),
+    [t, nameFor, timeZone, isPhone]
   );
 
   const { visible, isVisible, toggle, reset } = useColumnVisibility(
