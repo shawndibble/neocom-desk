@@ -52,6 +52,20 @@ before pitching.
 EveTerminal.io, Mining Timer Tool, EVE Hauling Advisor, EVE Market Pro (HTTP
 530), scan.eveonline.it (503). Reddit returns 403.
 
+**Route planning (#6282):** DOTLAN route + jump planner, ARGUS (eve-argus.app;
+camp-aware routing, capital planner, blue landings), EVE Courier, EVE-NAV,
+HookWatch (skyhook multi-stop), MISMAPS, Eve-Scout API, Wayfinder (Pathfinder
+successor), PushX quote; Red Frog calculator 404. None shows a trip time.
+References for route work: CCP's Route Calculation guide (costs =
+`jumpRoute.ts`), Map Data guide (1 LY = 9.46e15 m; jump drives low/null only),
+ESI `POST /route` (`avoid_systems` and one-way `connections` each ≤1000,
+uncached, group `routes` 3600/15m, no region avoid), SDE JSONL map files
+(`mapStargates.position` = in-system gate metres; `position2D`;
+`mapSecondarySuns`/`systemWideEffects` 2026; sov is ESI-only). Our map bake
+reads Fuzzwork's CSVs (`mapSolarSystems`, `mapSolarSystemJumps`,
+`mapDenormalize` — gate positions are group 10), not CCP's JSONL; moving to
+CCP-direct is plumbing, not a candidate.
+
 **Remit (#2328, decision `20260929-234357`):** intel and travel tools are in
 scope: route safety, Thera/Turnur connections, pilot lookup. "Intel" alone no
 longer clears a tool. Client-reading intel (Local scan, DScan) still dies on
@@ -131,7 +145,8 @@ the module or route, in `GLOSSARY.md` vocabulary, on `origin/develop`.
 - **Contracts/Courier**: item-exchange/auction value; ISK/jump, ISK/m³,
   Reverse Lane, Endpoint Space, Completion Risk, Going Rate bait detection.
 - **Travel**: Hauling Trip Plan (`haulPlan.ts`, multi-stop), waypoints, route
-  safety, Thera/Turnur, Ansiblex legs.
+  safety, Thera/Turnur, Ansiblex legs, multi-stop order (`tripPlan.ts`),
+  jump-drive legs/fuel/fatigue, hull mass, pod-kill/EDENCOM avoid, gate kills.
 - **Skills**: plan import (Append/Replace dedupes), EVEMon/EFT/queue import,
   remap optimizer, masteries with "Add tier to plan", Skill Detail unlocks
   (#400), Skill Compare, Alpha caps.
@@ -217,6 +232,7 @@ Numbering is stable; later runs cite these by number. Append, never renumber.
 
 ## Filed candidates
 
+- #6282 NARROW Route Safety trip time: "warp to 0 ≈ N · autopilot ≈ M min" for the route ship (gate legs only, skills V, base hull; courier modal cut, no route ship there).
 - Vyraj: #6199 NARROW LP Store "Spend my LP" plan (instant only, top ~10 offers, shared consumable books, fixed 70% floor; amends `20261030-180139`). #6200 NARROW Market tree "No orders in {Region}" cue (`/markets/{region}/types/`, negative only, no hide toggle, single-region modes only).
 - #6165 SHIP Assets select-mode bar totals the selection's ISK + m³ (jEveAssets #575; sum selected items only, column bases).
 - #6166 NARROW History: delivered invention job shows "N of M succeeded" (`successful_runs`; jEveAssets #554). Realized-vs-expected rate and cost per copy cut: job carries no decryptor/skills/datacores.
@@ -295,6 +311,7 @@ Other open: #642, #718, #819, #821, #824, #880, #926, #1015, #1017, #1018,
 
 ## Killed / dropped candidates (never filed)
 
+- Route planning: avoid a region/constellation (KILL: Prefer safer covers the highsec case; rest is low/null minority; `sync.avoidedSystems` is system ids only, `20260930-153212`; ESI 1000 cap); FW-warzone/sov-holder avoid (Prefer safer; null niche); wormhole-effect warnings (niche); fleetmates on a shared route (server, non-ISK); friendly-citadel/cyno-beacon capital landing (niche); camp-aware routing (pod-kill avoid + gate kill tags); "when is it quiet" heat map (`routeKillTrend`, intel).
 - jEveAssets 8.2.x: stockpile blueprint materials (Build Plans + Group shopping list), remembered sort (declined, 20260907-092320), table padding (DESIGN density-first), filtered-to-zero cue (EmptyState Reset filters rule), Academy/Aberrant meta (in `variations.json`), PLEX vault (no ESI), asset treemap (kill-test 3), reaction recursion (kill-test 6).
 - eve-gatecheck gatecamp finder (map-wide zKill, combat intel off remit; camp radar PARTIAL); war-target intel (no ESI corp war list, decision 20261021-140400; Pilot Lookup covers per-pilot); waypoints (shipped, 20261003-175151).
 
