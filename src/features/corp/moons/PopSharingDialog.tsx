@@ -94,6 +94,7 @@ export function PopSharingDialog({
   communities,
   bookRatePct,
   canEdit,
+  noAlliance = false,
   onClose,
   onSave,
 }: {
@@ -108,6 +109,11 @@ export function PopSharingDialog({
   /** The book's own rate, shown for an empty start-link rate. */
   bookRatePct: number | null;
   canEdit: boolean;
+  /**
+   * The book's corporation is in no alliance (public ESI): Alliance reaches nobody, so it says so
+   * and is offered disabled, unless already chosen (it can still be unticked).
+   */
+  noAlliance?: boolean;
   onClose: () => void;
   onSave: (patch: Partial<PopSharingSettings> | PopSharingOverridePatch) => Promise<void>;
 }) {
@@ -165,18 +171,27 @@ export function PopSharingDialog({
     >
       <Row label={t(`${k}.fields.audiences`)} own={ownToggle('audiences')}>
         <ul className="space-y-0.5">
-          {audienceChoices(draft.audiences, communities).map((a) => (
-            <li key={audienceKey(a)}>
-              <label className="flex min-h-9 items-center gap-2">
-                <Checkbox
-                  checked={chosen.has(audienceKey(a))}
-                  disabled={!editable('audiences')}
-                  onChange={(e) => toggleAudience(a, e.target.checked)}
-                />
-                <AudienceName audience={a} />
-              </label>
-            </li>
-          ))}
+          {audienceChoices(draft.audiences, communities).map((a) => {
+            // Chosen before the corporation left its alliance: still untickable, and says why.
+            const unreachable = a.kind === 'alliance' && noAlliance;
+            return (
+              <li key={audienceKey(a)}>
+                <label className="flex min-h-9 items-center gap-2">
+                  <Checkbox
+                    checked={chosen.has(audienceKey(a))}
+                    disabled={
+                      !editable('audiences') || (unreachable && !chosen.has(audienceKey(a)))
+                    }
+                    onChange={(e) => toggleAudience(a, e.target.checked)}
+                  />
+                  <AudienceName audience={a} />
+                  {unreachable && (
+                    <span className="text-xs text-text-dim">{t(`${k}.noAlliance`)}</span>
+                  )}
+                </label>
+              </li>
+            );
+          })}
         </ul>
         <p className="text-xs text-text-dim">{t(`${k}.fields.audiencesHint`)}</p>
       </Row>

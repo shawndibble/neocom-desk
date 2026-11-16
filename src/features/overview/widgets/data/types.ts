@@ -205,8 +205,11 @@ export interface RowDetailModel {
   title: string;
   /** A status line above the facts: a toned badge, then plain text, then an optional dim note. */
   status?: { badge: string; tone: DetailTone; text?: string; note?: string };
-  /** Labelled facts, in reading order; each value is already formatted. */
-  facts: { label: string; value: string }[];
+  /**
+   * Labelled facts, in reading order; each value is already formatted. `tone: 'warning'` flags
+   * a value to doubt (stale data); the text says why, so colour is never the only signal.
+   */
+  facts: { label: string; value: string; tone?: 'warning' }[];
   /** Bars under their own heading, each with a badge and a readout (a den's Development and Anarchy). */
   meters?: {
     title: string;

@@ -1,10 +1,12 @@
 // Shared Pops against the Firestore emulator (#6223): publishing a book's pops and who may read
 // them. Runs only under `npm run test:rules` at the repo root; a plain `npm test` skips it.
+import { FieldValue } from 'firebase-admin/firestore';
 import { beforeEach, expect, it } from 'vitest';
 import type { Caller } from './actorAuth.js';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
 import { OFFICER_WINDOW_MS } from './sharedPops.js';
 import type { Affiliation } from './sharedPopsEsi.js';
+import { ROLES_SCOPE } from './corpTaxBookEsi.js';
 import type { OfficerAccess } from './corpTaxBook.js';
 import { authorizeOfficer, editBookAs, type BookDeps } from './corpTaxBookStore.js';
 import {
@@ -190,6 +192,27 @@ emulatorSuite('Shared Pops', () => {
     expect(await seen(ALLY)).toEqual([]);
   });
 
+  it("hides an opted-out or no longer handled moon owner's pops before any republish", async () => {
+    await publishSharedPops(publishDeps(), BOOK);
+    const feeder = book().collection('feeders').doc(String(OWNER));
+    // A publish that raced the opt-out, or a refresh after it that failed, leaves the doc as it was.
+    await feeder.update({ popSharingOptOut: { by: 5, at: now } });
+    expect(await seen(CORPMATE)).toEqual([40001]);
+    await feeder.update({ popSharingOptOut: FieldValue.delete(), status: 'removed' });
+    expect(await seen(CORPMATE)).toEqual([40001]);
+    await feeder.update({ status: 'active' });
+    expect(await seen(CORPMATE)).toEqual([40001, 40002]);
+  });
+
+  it('hides every pop once sharing is off or the book inactive, before any republish', async () => {
+    await publishSharedPops(publishDeps(), BOOK);
+    await setSharing({ enabled: false });
+    expect(await seen(CORPMATE)).toEqual([]);
+    await setSharing({ enabled: true, defaults: { audiences: [{ kind: 'corp' }] } });
+    await book().update({ active: false });
+    expect(await seen(CORPMATE)).toEqual([]);
+  });
+
   it('takes every pop away when sharing is turned off', async () => {
     await publishSharedPops(publishDeps(), BOOK);
     await setSharing({ enabled: false });
@@ -327,5 +350,89 @@ emulatorSuite('Shared Pops', () => {
     ).rejects.toThrow();
     const failed = (await sharedPopSourcesRef(db, BOOK).get()).get(`editors.char:${OFFICER}`);
     expect(failed).toMatchObject({ usedAt: now - 1, failedAt: now });
+  });
+
+  it('reads the stamp at most hourly per officer, and never stamps a book with no Pop Sharing', async () => {
+    const officerDoc = book().collection('officers').doc(`char:${OFFICER}`);
+    const call = { corporationId: BOOK };
+    await book().collection('meta').doc('popSharing').delete();
+    await officerDoc.set(officerAccess({ canEdit: true }));
+    await authorizeOfficer(bookDeps(), caller(OFFICER), call, 'view', { live: false });
+    expect((await sharedPopSourcesRef(db, BOOK).get()).exists).toBe(false);
+    expect((await officerDoc.get()).get('editorCheckedAt')).toBe(now);
+
+    await setSharing({ enabled: true, defaults: { audiences: [{ kind: 'corp' }] } });
+    // The role check stays fresh (10 minutes); the record keeps its stamp check time.
+    const later = async (minutes: number) => {
+      now += minutes * 60_000;
+      await officerDoc.update({ checkedAt: now });
+    };
+    await later(30);
+    await authorizeOfficer(bookDeps(), caller(OFFICER), call, 'view', { live: false });
+    // Within the hour: nothing looked at again.
+    expect((await sharedPopSourcesRef(db, BOOK).get()).get(`editors.char:${OFFICER}`)).toBe(
+      undefined
+    );
+    await later(31);
+    await authorizeOfficer(bookDeps(), caller(OFFICER), call, 'view', { live: false });
+    expect(
+      (await sharedPopSourcesRef(db, BOOK).get()).get(`editors.char:${OFFICER}`)
+    ).toMatchObject({ usedAt: now });
+  });
+
+  it('stamps the officer who turns sharing on, and the other editing officers', async () => {
+    await setSharing({ enabled: false });
+    const officers = book().collection('officers');
+    await officers.doc('char:22').set({
+      ...officerAccess({ canEdit: true }),
+      characterId: 22,
+      ownerHash: 'h22',
+      checkedAt: now - 2 * H,
+    });
+    await officers.doc('char:23').set({
+      ...officerAccess({ canEdit: false }),
+      characterId: 23,
+      ownerHash: 'h23',
+    });
+    await book().collection('meta').doc('scheduledSync').set({ status: 'active' });
+    await editBookAs(
+      bookDeps(),
+      officerAccess({ canEdit: true }),
+      { corporationId: BOOK },
+      { action: 'setPopSharing', enabled: true }
+    );
+    expect(
+      (await sharedPopSourcesRef(db, BOOK).get()).get(`editors.char:${OFFICER}`)
+    ).toMatchObject({ characterId: OFFICER, ownerHash: `h${OFFICER}`, usedAt: now });
+    const sources = await sharedPopSourcesRef(db, BOOK).get();
+    expect(sources.get('editors.char:22')).toMatchObject({ usedAt: now - 2 * H });
+    expect(sources.get('editors.char:23')).toBeUndefined();
+  });
+
+  it('keeps the stamp check time across a live role re-check', async () => {
+    const officerDoc = book().collection('officers').doc(`char:${OFFICER}`);
+    await officerDoc.set({ ...officerAccess({ canEdit: true }), editorCheckedAt: now });
+    const live: BookDeps = {
+      ...bookDeps(),
+      verifyToken: async () =>
+        ({
+          characterId: OFFICER,
+          ownerHash: `h${OFFICER}`,
+          name: 'Officer',
+          scopes: [ROLES_SCOPE],
+          clientId: 'c',
+        }) as never,
+      readIdentity: async () => ({ corporationId: BOOK, ceoId: null, roles: ['Accountant'] }),
+    };
+    now += 20 * 60_000;
+    await authorizeOfficer(
+      live,
+      caller(OFFICER),
+      { corporationId: BOOK, accessToken: 'tok' },
+      'view',
+      { live: true }
+    );
+    const record = (await officerDoc.get()).data();
+    expect(record).toMatchObject({ checkedAt: now, editorCheckedAt: now - 20 * 60_000 });
   });
 });

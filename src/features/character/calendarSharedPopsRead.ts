@@ -1,12 +1,13 @@
 /**
  * The Calendar's Shared Pops read: `fetchSharedPops` (a callable that spends ESI and Firestore
- * reads on the server) held for a few minutes, never called per render, then every name a pop
+ * reads on the server) held for a few minutes in the cache the notification poll shares, never
+ * called per render, then every name a pop
  * shows resolved once: its moon, its sharing corporation and its ore.
  */
 import type { BoardCorporation } from '@/engine/character/board';
 import { loadCorpLabels } from '@/features/corp/corpTicker';
-import { registerTestReset } from '@/lib/testResets';
 import { MINUTE_MS } from '@/lib/age';
+import { loadSharedPopsCached } from '@/features/notifications/sharedPopsCache';
 import type { SharedPopView } from '@/sync/sharedPops';
 import { loadMoonNames } from './moonNames';
 import { loadTypeNames } from './typeNames';
@@ -15,23 +16,12 @@ import type { SharedPopEntry } from './calendarSharedPops';
 /** How long one read serves the Calendar before it asks again. */
 export const SHARED_POPS_TTL_MS = 5 * MINUTE_MS;
 
-let held: { atMs: number; pops: Promise<SharedPopView[]> } | null = null;
-registerTestReset(() => {
-  held = null;
-});
-
-/** The viewer's Shared Pops, read at most once per `SHARED_POPS_TTL_MS`; a failed read is not kept. */
-function readSharedPops(nowMs: number): Promise<SharedPopView[]> {
-  if (held !== null && nowMs - held.atMs < SHARED_POPS_TTL_MS) return held.pops;
-  // Lazy: the sync seam pulls in Firebase, which the boot graph must not reach (bootImportGraph.test).
-  const pops = import('@/sync/sharedPops').then(({ fetchSharedPops }) => fetchSharedPops());
-  const entry = { atMs: nowMs, pops };
-  held = entry;
-  pops.catch(() => {
-    if (held === entry) held = null;
-  });
-  return pops;
-}
+/**
+ * The viewer's Shared Pops from the one cache the notification poll shares
+ * (`sharedPopsCache.ts`), no older than `SHARED_POPS_TTL_MS`; a failed read is not kept.
+ */
+const readSharedPops = (nowMs: number): Promise<SharedPopView[]> =>
+  loadSharedPopsCached(nowMs, SHARED_POPS_TTL_MS);
 
 export interface SharedPopsRead {
   /** Every live pop with its names; `undefined` when the read failed. */

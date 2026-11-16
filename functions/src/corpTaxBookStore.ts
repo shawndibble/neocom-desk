@@ -108,10 +108,12 @@ import { OBSERVED_UPDATED_AT_FIELD } from './corpTaxBookVersionKeys.js';
 import { POP_SHARING_DOC, applyMoonOverride, popSharingFrom } from './popSharing.js';
 import type { CorporationAllianceLookup } from './sharedPopsEsi.js';
 import {
+  EDITOR_CHECKED_AT,
+  editorStampFields,
   refreshSharedPops,
   sharedPopSourcesRef,
   sharedPopsRef,
-  stampEditorUse,
+  stampEditorUseIfSharing,
   stampFailedRoleCheck,
 } from './sharedPopsStore.js';
 import { editScope } from './corpTaxBookMinerTotals.js';
@@ -236,7 +238,7 @@ export async function authorizeOfficer(
         expiresAt: now + ACCESS_TTL_MS,
       };
       if ((await bookRef(deps.db, call.corporationId).get()).exists)
-        await cacheOfficer(officerRef, access);
+        await cacheOfficer(officerRef, withEditorCheck(access, held));
     }
   }
   if (!satisfies(access, need)) {
@@ -248,8 +250,25 @@ export async function authorizeOfficer(
     });
   }
   // The Community officer rule's clock (#6223): a use of the book with an editing role.
-  if (access.canEdit) await stampEditorUse(deps.db, call.corporationId, access, now);
+  // Read from the officer record already held (a live re-check carries its check time over), so
+  // most calls read nothing more.
+  if (access.canEdit)
+    await stampEditorUseIfSharing(deps.db, call.corporationId, access, now, {
+      ref: officerRef,
+      held: held as Data | undefined,
+    });
   return access;
+}
+
+/**
+ * The record a live check writes, keeping the held record's `EDITOR_CHECKED_AT` while the same
+ * pilot could still edit: a role regained after a refusal is looked at again at once.
+ */
+function withEditorCheck(access: OfficerAccess, held: OfficerAccess | undefined): OfficerAccess {
+  const checkedAt = (held as Data | undefined)?.[EDITOR_CHECKED_AT];
+  return held?.ownerHash === access.ownerHash && held.canEdit && typeof checkedAt === 'number'
+    ? ({ ...access, [EDITOR_CHECKED_AT]: checkedAt } as OfficerAccess)
+    : access;
 }
 
 export interface VerifyOfficerResult extends OfficerRoles {
@@ -1655,11 +1674,28 @@ async function applyPopSharingEdit(
   const current = popSharingFrom((await c.tx.get(ref)).data());
   const next = { ...current, moons: { ...current.moons } };
   let detail: Data;
+  // Turning sharing on stamps the book's editing officers: their uses went unstamped while the
+  // book had no Pop Sharing settings (`stampEditorUseIfSharing`). The officer who turns it on now;
+  // each other editing officer at its last role check (its record lives a day).
+  const turningOn =
+    action.action === 'setPopSharing' && action.enabled === true && !current.enabled;
+  let editors: { characterId: number; ownerHash: string; at: number }[] = [];
   if (action.action === 'setPopSharing') {
-    if (action.enabled === true && !current.enabled) {
+    if (turningOn) {
       const sync = (await c.tx.get(col(c, META).doc(SCHEDULED_SYNC_DOC))).data();
       if (sync?.status !== 'active')
         fail('failed-precondition', 'Pop Sharing needs Automatic sync', 'needs-automatic-sync');
+      editors = (await c.tx.get(col(c, OFFICERS))).docs.flatMap((d) => {
+        const o = d.data() as Partial<OfficerAccess>;
+        return o.canEdit === true &&
+          typeof o.characterId === 'number' &&
+          typeof o.ownerHash === 'string' &&
+          typeof o.checkedAt === 'number' &&
+          o.characterId !== c.access.characterId
+          ? [{ characterId: o.characterId, ownerHash: o.ownerHash, at: o.checkedAt }]
+          : [];
+      });
+      editors.push({ ...c.access, at: c.now });
     }
     if (action.enabled !== undefined) next.enabled = action.enabled;
     if (action.defaults) next.defaults = { ...current.defaults, ...action.defaults };
@@ -1677,6 +1713,10 @@ async function applyPopSharingEdit(
     detail = { moonId: action.moonId, set: action.override.set, clear: action.override.clear };
   }
   c.tx.set(ref, { ...next, updatedAt: c.now, updatedBy: c.access.characterId });
+  for (const e of editors)
+    c.tx.set(sharedPopSourcesRef(c.deps.db, c.corporationId), editorStampFields(e, e.at), {
+      merge: true,
+    });
   return { detail };
 }
 

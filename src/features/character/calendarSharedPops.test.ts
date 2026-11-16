@@ -155,4 +155,20 @@ describe('Shared Pop start link and detail', () => {
       expect(detail.facts.map((f) => f.label)).not.toContain('calendar.sharedPop.ore');
     }
   });
+
+  it("shows the data's age, flagged once the book has not synced for 12 hours", () => {
+    const fresh = sharedPopDetail(entry({ syncedAt: NOW - 3 * HOUR }), NOW, t, 'UTC');
+    expect(fresh.facts).toContainEqual({
+      label: 'calendar.sharedPop.synced',
+      value: 'common.age.hours{"count":3}',
+    });
+    const stale = sharedPopDetail(entry({ syncedAt: NOW - 13 * HOUR }), NOW, t, 'UTC');
+    expect(stale.facts).toContainEqual({
+      label: 'calendar.sharedPop.synced',
+      value: 'calendar.sharedPop.syncedStale{"age":"common.age.hours{\\"count\\":13}"}',
+      tone: 'warning',
+    });
+    const unknown = sharedPopDetail(entry({ syncedAt: null }), NOW, t, 'UTC');
+    expect(unknown.facts.map((f) => f.label)).not.toContain('calendar.sharedPop.synced');
+  });
 });
