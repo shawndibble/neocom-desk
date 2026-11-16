@@ -294,6 +294,16 @@ export function useTaxAttentionItems({
     const period = verifyPeriodLabel(o.periodStart, o.periodEnd, i18n.language);
     // #6206: the member says they paid it another way, or pays it, or stops being reminded;
     // every way out is the Resolve dialog, which also mails whoever answers tax questions.
+    // Told the corporation already: the quiet "Waiting on the corp" line covers it, not the strip.
+    if (o.declaration?.state === 'waiting') continue;
+    // A recorded day of the Statement, so "Not paying" can tell the corporation why.
+    const dayOf = (corpView?.overlay.rows ?? []).find(
+      (r) =>
+        r.corporationId === o.corporationId &&
+        r.statementId === o.statementId &&
+        r.state === 'billed' &&
+        r.recordKey !== undefined
+    );
     const target =
       o.declarerId !== undefined && canDeclare(o.declaration)
         ? overdueTarget({
@@ -304,6 +314,7 @@ export function useTaxAttentionItems({
             periodStart: o.periodStart,
             period,
             ...(o.declaration ? { declaration: o.declaration } : {}),
+            ...(dayOf ? { row: dayOf } : {}),
           })
         : undefined;
     if (target && resolve.hidden.has(target.hideKey)) continue;

@@ -12,6 +12,7 @@ import { useLedgerAction } from '../useLedgerAction';
 import { ConflictNotice } from './ConflictNotice';
 import { CorpDeclareSlot } from './CorpDeclareAction';
 import { CorpDisputeAction } from './CorpDisputeAction';
+import type { MailContext } from './resolve/resolveSubmit';
 import { conflictTarget, type ResolveTarget } from './resolve/targets';
 import { resolvesOn } from './useCorpStateText';
 import { OverlapNotice } from './OverlapNotice';
@@ -43,6 +44,8 @@ interface Props {
   onBookChanged?: () => void;
   /** Opens the Resolve dialog (resolving in the app) on a problem of this day or its Statement. */
   onResolve?: (target: ResolveTarget) => void;
+  /** Who is asking and who answers the book's tax questions: a Conflict's "Tell" mails them too. */
+  mail?: MailContext;
 }
 
 /**
@@ -65,6 +68,7 @@ export function CorpOverlapNotice({
   onChanged,
   onBookChanged,
   onResolve,
+  mail,
 }: Props) {
   const { t } = useTranslation();
   const conflict = view.state === 'conflict';
@@ -184,6 +188,7 @@ export function CorpOverlapNotice({
               view={view}
               payeeName={conflictPayeeName}
               onSent={onBookChanged}
+              {...(mail ? { mail } : {})}
               {...(onResolve ? { onResolve: resolveConflict } : {})}
             />
           )

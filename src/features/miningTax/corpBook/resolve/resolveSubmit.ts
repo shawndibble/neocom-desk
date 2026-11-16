@@ -95,6 +95,15 @@ export async function tellNotOwed(
       lines: dayLines(row, plan.lines),
     });
   }
+  return mailNotOwed(ctx, row, reason);
+}
+
+/** The EVE mail that goes with an "I don't owe this" dispute (best effort: the record is already in Needs you). */
+export function mailNotOwed(
+  ctx: MailContext,
+  row: Pick<BookRowView, 'date' | 'billed'>,
+  reason: string
+) {
   return mail(ctx, {
     kind: 'notOwed',
     memberName: ctx.memberName,

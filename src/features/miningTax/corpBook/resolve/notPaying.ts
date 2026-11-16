@@ -29,6 +29,17 @@ export const uncreditedKey = (corporationId: number, sentAt: readonly string[]) 
 export const statementKey = (corporationId: number, statementId: string) =>
   `statement:${corporationId}:${statementId}`;
 
+/**
+ * An officer's answer on a day, as the member reads it: "Not paying" hides that answer only,
+ * so a later answer (the `at` of its resolution) is a new problem and shows again.
+ */
+export const keptDayKey = (corporationId: number, characterId: number, date: string, at: string) =>
+  `kept:${corporationId}:${characterId}:${date}:${at}`;
+
+/** An officer's answer on a Statement's declaration, keyed by when they answered. */
+export const keptStatementKey = (corporationId: number, statementId: string, at: string) =>
+  `keptStatement:${corporationId}:${statementId}:${at}`;
+
 /** What a hide key is about, for the one quiet line that lists them. */
 export type NotPayingKey =
   | { kind: 'day'; corporationId: number; date: string }
@@ -40,6 +51,9 @@ export function parseNotPayingKey(key: string): NotPayingKey | undefined {
   const corporationId = Number(corp);
   if (!Number.isInteger(corporationId)) return undefined;
   if (kind === 'day' && rest.length === 2) return { kind, corporationId, date: rest[1] };
+  // The answer's time has colons of its own: only the first two parts are the day.
+  if (kind === 'kept' && rest.length >= 3) return { kind: 'day', corporationId, date: rest[1] };
+  if (kind === 'keptStatement') return { kind: 'statement', corporationId };
   if (kind === 'uncredited' || kind === 'statement') return { kind, corporationId };
   return undefined;
 }

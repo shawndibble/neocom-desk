@@ -7881,6 +7881,7 @@
         "rate": "{{corp}}'s book bills {{date}} at {{book}}%; you recorded {{yours}}%.",
         "quantity": "{{corp}}'s book recorded {{book}} units of ore on {{date}}; your record has {{yours}}.",
         "bills": "Its book bills <amount/>.",
+        "markedPaid": "You marked {{date}} paid, but {{corp}}'s Statement still shows {{owed}} ISK owed. Its book credits a payment it can see.",
         "conflict": "You gave this ore to {{payee}}. {{corp}}'s book also recorded it, and bills it on {{date}} unless something changes first.",
         "anotherPayee": "another Payee",
         "kept": "{{corp}} kept the bill on {{date}}: {{reason}}",
@@ -7904,6 +7905,8 @@
         "uncredited": "Donations not credited",
         "figure": "{{date}}: the book's figure differs",
         "conflict": "{{date}} claimed twice",
+        "markedPaid": "{{date}}: marked paid, {{corp}} still bills it",
+        "billed": "{{date}}: {{corp}} bills this day",
         "kept": "{{corp}} kept the bill"
       },
       "groupSelf": "Settle it yourself",

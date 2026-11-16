@@ -49,3 +49,13 @@ export function wherePaymentGoes(days: readonly PayDay[], amount: number): Payme
   });
   return { days: out, credit: left };
 }
+
+/**
+ * The rows a payment's default amount adds up: the days no dispute holds (payments skip a held
+ * day, so ticking it would overpay). When every day is held there is nothing else to offer, so
+ * they all stay.
+ */
+export function payableRows<T>(rows: readonly T[], heldOf: (row: T) => RowHold | undefined): T[] {
+  const free = rows.filter((r) => !heldOf(r));
+  return free.length > 0 ? free : [...rows];
+}

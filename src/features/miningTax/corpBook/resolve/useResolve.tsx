@@ -5,7 +5,7 @@ import type { CorpBookView } from '../corpBookView';
 import { useNotPaying } from './notPaying';
 import { ProblemFacts } from './ProblemFacts';
 import { ResolveDialog } from './ResolveDialog';
-import type { ResolveTarget } from './targets';
+import { proofSenders, type ResolveTarget } from './targets';
 
 interface Args {
   corpView: CorpBookView | null;
@@ -56,6 +56,18 @@ export function useResolve({
         }}
         {...(target.transfers ? { transfers: target.transfers } : {})}
         payments={madePayments}
+        senderIds={proofSenders(book?.loaded, {
+          characterId: problem.characterId,
+          ...(problem.row ? { row: problem.row } : {}),
+          ...(problem.kind === 'uncredited' ||
+          problem.kind === 'kept' ||
+          problem.kind === 'overdue' ||
+          problem.kind === 'markedPaid'
+            ? problem.statementId !== undefined
+              ? { statementId: problem.statementId }
+              : {}
+            : {}),
+        })}
         {...(target.paidSince !== undefined ? { paidSince: target.paidSince } : {})}
         {...(target.payeeName !== undefined ? { payeeName: target.payeeName } : {})}
         facts={<ProblemFacts target={target} />}

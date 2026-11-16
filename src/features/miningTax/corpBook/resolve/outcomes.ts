@@ -37,6 +37,10 @@ export type ResolveProblem =
   | (Of & { kind: 'conflict' })
   /** A Statement past its due date that nothing has settled. */
   | (Of & { kind: 'overdue'; statementId: string; period: string })
+  /** A day the member marked paid that the book's Statement still bills. */
+  | (Of & { kind: 'markedPaid'; statementId?: string })
+  /** A plain billed day with nothing disputed: pay it, or stop being reminded. */
+  | (Of & { kind: 'billed' })
   /** An officer kept the bill, with what to do next. */
   | (Of & {
       kind: 'kept';
@@ -86,9 +90,8 @@ export interface Offer {
 
 export function outcomesFor(p: ResolveProblem): Offer {
   // A reason reaches the corporation as a dispute of the day: it needs the book's record, and
-  // the server refuses a second dispute of a day an officer answered.
-  const tellWhy =
-    p.row?.recordKey !== undefined && p.row.flagged === undefined && p.kind !== 'kept';
+  // the server refuses a second dispute of a day already disputed (a kept bill by dispute).
+  const tellWhy = p.row?.recordKey !== undefined && p.row.flagged === undefined;
   const plan = notOwedPlan(p.row);
   switch (p.kind) {
     case 'uncredited': {
@@ -121,9 +124,20 @@ export function outcomesFor(p: ResolveProblem): Offer {
       return {
         outcomes: ['pay', 'notPaying', 'paid'],
         preselected: 'pay',
-        tellWhy: false,
+        tellWhy,
         noStatement: false,
       };
+    case 'markedPaid': {
+      const noStatement = p.statementId === undefined;
+      return {
+        outcomes: ['pay', 'notPaying', 'paid'],
+        preselected: noStatement ? 'pay' : 'paid',
+        tellWhy,
+        noStatement,
+      };
+    }
+    case 'billed':
+      return { outcomes: ['pay', 'notPaying'], preselected: 'pay', tellWhy, noStatement: false };
     case 'kept':
       // The member may say it again: a dispute again (the hold does not renew), or the proof again.
       return {
@@ -134,7 +148,7 @@ export function outcomesFor(p: ResolveProblem): Offer {
           ...(p.by === 'dispute' && plan !== undefined ? (['notOwed'] as const) : []),
         ],
         preselected: 'pay',
-        tellWhy: false,
+        tellWhy,
         noStatement: p.by === 'declaration' && p.statementId === undefined,
       };
   }

@@ -2,6 +2,8 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '@/db';
 import {
+  keptDayKey,
+  keptStatementKey,
   notPayingDayKey,
   statementKey,
   parseNotPayingKey,
@@ -53,6 +55,15 @@ describe('not paying, on this device', () => {
       corporationId: 2,
     });
     expect(parseNotPayingKey(statementKey(3, 's1'))).toEqual({
+      kind: 'statement',
+      corporationId: 3,
+    });
+    expect(parseNotPayingKey(keptDayKey(1, 7, '2026-11-06', '2026-11-10T00:00:00Z'))).toEqual({
+      kind: 'day',
+      corporationId: 1,
+      date: '2026-11-06',
+    });
+    expect(parseNotPayingKey(keptStatementKey(3, 's1', '2026-11-10T00:00:00Z'))).toEqual({
       kind: 'statement',
       corporationId: 3,
     });

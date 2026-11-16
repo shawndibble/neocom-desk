@@ -2,7 +2,8 @@ import { HintText } from '@/components/ui/HintText';
 import { cx } from '@/lib/cx';
 import { useTranslation } from 'react-i18next';
 import { StatusPill } from '../StatusPill';
-import { notPayingDayKey, useNotPaying } from './resolve/notPaying';
+import { useNotPaying } from './resolve/notPaying';
+import { keptBy, notPayingHides } from './resolve/targets';
 import type { CorpRowInfo } from './corpRows';
 import {
   flaggedPillState,
@@ -38,10 +39,12 @@ export function CorpStatusPill({ corp }: { corp: CorpRowInfo }) {
   }
   // The member's own "Not paying" (resolving in the app): never reads as settled, and the
   // tooltip says the book still bills it.
-  const notPaying =
-    corp.kind === 'row' &&
-    corp.view.state === 'billed' &&
-    hidden.has(notPayingDayKey(corp.view.corporationId, corp.view.characterId, corp.view.date));
+  // A day the member said no to, whatever kind of problem it was; an officer's later answer is
+  // not hidden (its key names the answer), so the row shows it again with the next step.
+  const notPaying = corp.kind === 'row' && notPayingHides(hidden, corp.view);
+  const said = corp.kind === 'row' && keptBy(corp.view) ? corp.view : undefined;
+  const nextStep =
+    said?.flagged?.state === 'rejected' ? said.flagged.nextStep : said?.declaration?.nextStep;
   const flagged = corp.kind === 'row' ? flaggedPillState(corp.view) : undefined;
   const state = (
     notPaying
@@ -53,7 +56,11 @@ export function CorpStatusPill({ corp }: { corp: CorpRowInfo }) {
   const pill = (
     <HintText
       content={
-        notPaying ? t('miningTax.corpBook.hint.notPaying', { corp: corp.corpName }) : hint(corp)
+        notPaying
+          ? t('miningTax.corpBook.hint.notPaying', { corp: corp.corpName })
+          : nextStep
+            ? `${hint(corp)} ${t('miningTax.resolve.facts.nextStep', { step: nextStep })}`
+            : hint(corp)
       }
     >
       <span
