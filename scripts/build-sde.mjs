@@ -10,6 +10,7 @@
 import { runSanityChecks } from './lib/bakeChecks.mjs';
 import { CACHE_DIR, FILES, SHIP_CATEGORY_ID } from './lib/bakeConstants.mjs';
 import { download, parseCsv } from './lib/bakeCsv.mjs';
+import { MAP_FILES, mapJumpPairs, mapRegions, mapSystems } from './lib/bakeMap.mjs';
 import { bakeIndustry } from './lib/bakeIndustry.mjs';
 import { bakeMarket } from './lib/bakeMarket.mjs';
 import { bakePi } from './lib/bakePi.mjs';
@@ -54,6 +55,7 @@ async function main() {
       'npcCharacters.jsonl',
       'npcCorporations.jsonl',
       'npcCorporationDivisions.jsonl',
+      ...MAP_FILES,
     ],
     ESI_USER_AGENT
   );
@@ -64,6 +66,13 @@ async function main() {
     console.warn(`  WARN: ${message}; baking anyway (SDE_ALLOW_BUILD_MISMATCH=1)`);
   }
   const ccpTypes = parseJsonl(ccpStaticData['types.jsonl']);
+  const stargates = parseJsonl(ccpStaticData['mapStargates.jsonl']);
+  const map = {
+    systems: mapSystems(parseJsonl(ccpStaticData['mapSolarSystems.jsonl'])),
+    jumpPairs: mapJumpPairs(stargates),
+    regions: mapRegions(parseJsonl(ccpStaticData['mapRegions.jsonl'])),
+  };
+  const planets = parseJsonl(ccpStaticData['mapPlanets.jsonl']);
   const {
     groups,
     types,
@@ -101,7 +110,7 @@ async function main() {
     piPlanetRadiusKm,
     piSystemPlanets,
     pi,
-  } = bakePi({ types, piPinTypeIds, attrsByType, raw });
+  } = bakePi({ types, piPinTypeIds, attrsByType, raw, planets });
   const {
     marketGroups,
     marketTypes,
@@ -126,7 +135,7 @@ async function main() {
     globalMarketRegions,
     globalMarkets,
     attributeDictionary,
-  } = await bakeMarket({ raw, types, packagedVolumeByType, groups, typeMap });
+  } = await bakeMarket({ raw, map, types, packagedVolumeByType, groups, typeMap });
 
   // --- shipTree.json: the in-game Ship Tree's contents. Pure join logic
   // lives in `lib/shipTree.mjs` so it's testable without this whole download

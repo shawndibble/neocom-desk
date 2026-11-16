@@ -2,6 +2,7 @@
 // Extracted from scripts/build-sde.mjs; see lib/bakeConstants.mjs for the shared bands.
 import { JITA_SYSTEM_ID } from './bakeConstants.mjs';
 import { indexHeader } from './bakeCsv.mjs';
+import { planetRadiiKm } from './bakeMap.mjs';
 
 // The eight values ESI reports for CharacterPlanet.planet_type (mirrors
 // `PlanetType` in src/esi/endpoints/). P0_PLANET_TYPES is checked against
@@ -133,7 +134,7 @@ export const P0_PLANET_TYPES = {
   'Suspended Plasma': ['lava', 'plasma', 'storm'],
 };
 
-export function bakePi({ types, piPinTypeIds, attrsByType, raw }) {
+export function bakePi({ types, piPinTypeIds, attrsByType, raw, planets }) {
   // --- pi.json: planetary industry schematics, keyed by the typeID they
   // produce. Item names ride along inside this payload rather than being
   // looked up in types.json: that map only carries types some blueprint or
@@ -415,38 +416,18 @@ export function bakePi({ types, piPinTypeIds, attrsByType, raw }) {
   // 6,030 km planet vs an 85,400 km one is a 6.7x difference in link cost).
   // `mapDenormalize` stores it in metres; km is what the per-km attributes are
   // denominated in, so the conversion happens once, here.
-  const piPlanetRadiusKm = {};
-  {
-    const rows = raw['mapDenormalize.csv'];
-    const h = indexHeader(rows);
-    for (let i = 1; i < rows.length; i++) {
-      const r = rows[i];
-      if (Number(r[h.groupID]) !== PLANET_GROUP_ID) continue;
-      const metres = Number(r[h.radius]);
-      if (!Number.isFinite(metres) || metres <= 0) continue;
-      // Rounded to the km the formula works in: sub-km precision on a body
-      // thousands of km across cannot change a pin count, and the payload is
-      // one entry per planet in New Eden.
-      piPlanetRadiusKm[r[h.itemID]] = Math.round(metres / 1000);
-    }
-  }
+  const piPlanetRadiusKm = planetRadiiKm(planets);
 
   // --- System -> planet-type counts (issue #2631) ---
   // Same rows as the radius table, grouped by system and typed through the
   // planet typeID mapping (Shattered variants map to their base type there).
   // Planets of a type ESI has no colony string for are left out.
   const piSystemPlanets = {};
-  {
-    const rows = raw['mapDenormalize.csv'];
-    const h = indexHeader(rows);
-    for (let i = 1; i < rows.length; i++) {
-      const r = rows[i];
-      if (Number(r[h.groupID]) !== PLANET_GROUP_ID) continue;
-      const planetType = piPlanetTypeByTypeId[r[h.typeID]];
-      if (!planetType) continue;
-      const counts = (piSystemPlanets[r[h.solarSystemID]] ??= {});
-      counts[planetType] = (counts[planetType] ?? 0) + 1;
-    }
+  for (const p of planets) {
+    const planetType = piPlanetTypeByTypeId[p.typeID];
+    if (!planetType) continue;
+    const counts = (piSystemPlanets[p.solarSystemID] ??= {});
+    counts[planetType] = (counts[planetType] ?? 0) + 1;
   }
 
   const piPlanetTypeCoverage = new Set(Object.values(piPlanetTypeByTypeId));
