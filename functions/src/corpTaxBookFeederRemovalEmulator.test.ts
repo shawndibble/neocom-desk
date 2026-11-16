@@ -14,6 +14,8 @@ import { setBookFeederPayee, setFeederPayee } from './corpTaxBookPayee.js';
 import {
   cancelFeederRemoval,
   claimFeederStaleMail,
+  markFeederStaleMailSent,
+  STALE_MAIL_CLAIM_MS,
   finalizeDueRemovals,
   forceRemovalNow,
   getRemovalLink,
@@ -278,6 +280,8 @@ emulatorSuite('removing a moon owner', () => {
 
   describe('the stale-ledger mail (#6210)', () => {
     const claim = (id: number) => claimFeederStaleMail(deps(), who(id), target(id));
+    const claimMarking = (id: number) =>
+      claimFeederStaleMail(deps(), who(id), { ...target(id), marksSent: true });
     const goStale = (at: number) =>
       collectorBook().collection('feeders').doc(String(FEEDER)).update({ staleSince: at });
 
@@ -296,6 +300,27 @@ emulatorSuite('removing a moon owner', () => {
       // A new spell (reconnected, then refused again) mails again.
       await goStale(T0 + 90 * H);
       expect((await claim(OTHER_ACCOUNTANT)).recipients).toContain(ACCOUNTANT);
+    });
+
+    it('lets another officer claim it when the claimer never sent it', async () => {
+      await goStale(T0 + 50 * H);
+      // An older client, which never marks it sent, keeps its claim final.
+      expect((await claim(ACCOUNTANT)).recipients.length).toBeGreaterThan(0);
+      now += STALE_MAIL_CLAIM_MS;
+      expect(await claim(OTHER_ACCOUNTANT)).toEqual({ recipients: [], ownerRecipients: [] });
+      await goStale(T0 + 60 * H);
+      expect((await claimMarking(ACCOUNTANT)).recipients.length).toBeGreaterThan(0);
+      now += STALE_MAIL_CLAIM_MS - 1;
+      expect(await claimMarking(OTHER_ACCOUNTANT)).toEqual({ recipients: [], ownerRecipients: [] });
+      now += 1;
+      expect((await claimMarking(OTHER_ACCOUNTANT)).recipients).toContain(ACCOUNTANT);
+      // This one went out: no third officer mails the spell again.
+      await markFeederStaleMailSent(deps(), who(OTHER_ACCOUNTANT), {
+        ...target(OTHER_ACCOUNTANT),
+        staleSince: T0 + 60 * H,
+      });
+      now += STALE_MAIL_CLAIM_MS;
+      expect(await claimMarking(ACCOUNTANT)).toEqual({ recipients: [], ownerRecipients: [] });
     });
 
     it("never mails one of the book's own corporations", async () => {

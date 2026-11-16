@@ -457,6 +457,44 @@ export function unbilledMinerIds(
 }
 
 /**
+ * Whether a held donation's Miner had ore not yet on a Statement when they paid: a ledger row
+ * dated on or before the payment's UTC day, after everything the Statements issued by then
+ * covered. The ESI ledger lags the mining by about an hour, so a Miner who pays straight after
+ * mining is held for review (`no-open-balance`) though they owed; a later sync that finds such a
+ * row matches the donation as the first sync would have, had the ledger been current.
+ */
+export function unbilledWhenPaid(
+  payment: { characterId: number; at: string },
+  rows: readonly { characterId: number; date: string; quantity: number }[],
+  book: {
+    miners: readonly Miner[];
+    statements: readonly { minerId: string; coversThrough?: string; issuedAt?: string }[];
+    startDate: string;
+  }
+): boolean {
+  const minerId = minerIdFor(payment.characterId, book.miners);
+  const paidDay = payment.at.slice(0, 10);
+  let billedThrough = '';
+  for (const s of book.statements)
+    if (
+      s.minerId === minerId &&
+      s.coversThrough &&
+      s.issuedAt !== undefined &&
+      s.issuedAt <= payment.at &&
+      s.coversThrough > billedThrough
+    )
+      billedThrough = s.coversThrough;
+  return rows.some(
+    (r) =>
+      r.quantity > 0 &&
+      r.date >= book.startDate &&
+      r.date <= paidDay &&
+      r.date > billedThrough &&
+      minerIdFor(r.characterId, book.miners) === minerId
+  );
+}
+
+/**
  * What each Miner still owes on issued Statements, after payments, dismissals and
  * write-offs: the open balance `matchDonation` checks before crediting a code-less
  * donation (#6207). A Miner who owes nothing is absent or zero.

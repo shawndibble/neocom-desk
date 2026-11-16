@@ -13,6 +13,7 @@ import {
   parseDisputeConflictInput,
   disputeIdFor,
   mergeDisputeLines,
+  billedDisputeTax,
   needsLiveCheck,
   parseEditAction,
   parseSettingsPatch,
@@ -300,9 +301,11 @@ describe('parsers', () => {
       reason: 'Their ore',
     };
     expect(parseEditAction(base)).toEqual(base);
-    // A missing or zero amount would log nothing and slip under the Director limit.
+    // The server prices it; the client's figure is only a fallback, never zero.
     expect(() => parseEditAction({ ...base, amountIsk: 0 })).toThrow();
-    expect(() => parseEditAction({ ...base, amountIsk: undefined })).toThrow();
+    const { amountIsk: _a, ...unpriced } = base;
+    void _a;
+    expect(parseEditAction(unpriced)).toEqual(unpriced);
     expect(() => parseEditAction({ ...base, reason: '' })).toThrow();
     expect(needsLiveCheck(parseEditAction(base))).toBe(true);
   });
@@ -364,6 +367,87 @@ describe('parsers', () => {
       expect(
         reasonOf(() => mergeDisputeLines(many, [line({ quantity: 1, payeeName: 'X' })], big))
       ).toBe('too-many-lines');
+    });
+  });
+
+  describe('billedDisputeTax: a waived dispute priced from the book’s issued Statements', () => {
+    const disputed = {
+      lines: [
+        { recordKey: '60:1000:2026-11-01', typeId: 45490, quantity: 100, payeeName: 'A' },
+        { recordKey: '77:1000:2026-11-01', typeId: 45491, quantity: 50, payeeName: 'A' },
+      ],
+    };
+    const mined = (chargeKey: string, typeId: number, quantity: number, taxPct = 10) => ({
+      kind: 'mined',
+      date: '2026-11-01',
+      chargeKey,
+      oreLines: [{ typeId, quantity }],
+      unitPrices: { [typeId]: typeId === 45490 ? 1000 : 2000 },
+      taxPct,
+    });
+
+    it('prices the disputed ore at the prices and rate its Statement billed', () => {
+      const statements = [
+        { lines: [mined('60:1000:2026-11-01', 45490, 100)] },
+        { lines: [mined('77:1000:2026-11-01', 45491, 50, 20)] },
+      ];
+      // 100 × 1000 × 10% + 50 × 2000 × 20%
+      expect(billedDisputeTax(disputed, statements)).toBe(30_000);
+    });
+
+    it('caps the disputed ore at what the Statements billed, late ore included', () => {
+      const late = { ...mined('60:1000:2026-11-01', 45490, 30), kind: 'late-ore' };
+      const statements = [
+        { lines: [mined('60:1000:2026-11-01', 45490, 40), late] },
+        { lines: [mined('77:1000:2026-11-01', 45491, 50)] },
+      ];
+      expect(billedDisputeTax(disputed, statements)).toBe(70 * 100 + 50 * 200);
+    });
+
+    it('cannot price a disputed record no Statement billed yet', () => {
+      expect(
+        billedDisputeTax(disputed, [{ lines: [mined('60:1000:2026-11-01', 45490, 100)] }])
+      ).toBeUndefined();
+      expect(billedDisputeTax(disputed, [])).toBeUndefined();
+    });
+
+    it('ignores correction lines and malformed lines', () => {
+      const statements = [
+        {
+          lines: [
+            { kind: 'correction', date: '2026-11-01', adjustmentId: 'a1', tax: -5 },
+            { kind: 'mined', chargeKey: '77:1000:2026-11-01' },
+            mined('60:1000:2026-11-01', 45490, 100),
+          ],
+        },
+      ];
+      expect(billedDisputeTax(disputed, statements)).toBeUndefined();
+    });
+  });
+
+  it('parses a manual payment or a donation match that confirms a declaration', () => {
+    const payment = {
+      action: 'recordPayment',
+      paymentId: 'm_x1',
+      minerId: 'm1',
+      characterId: 7,
+      amount: 5,
+      at: '2026-11-01T00:00:00.000Z',
+      declarationId: 'x1',
+    };
+    expect(parseEditAction(payment)).toMatchObject({ declarationId: 'x1' });
+    expect(
+      parseEditAction({
+        action: 'assignPayment',
+        paymentId: 'j1_1',
+        minerId: 'm1',
+        declarationId: 'x1',
+      })
+    ).toEqual({ action: 'assignPayment', paymentId: 'j1_1', minerId: 'm1', declarationId: 'x1' });
+    expect(parseEditAction({ action: 'assignPayment', paymentId: 'j1_1', minerId: 'm1' })).toEqual({
+      action: 'assignPayment',
+      paymentId: 'j1_1',
+      minerId: 'm1',
     });
   });
 

@@ -682,6 +682,45 @@ export function unbilledMinerIds(
   return out;
 }
 
+/**
+ * Engine `unbilledWhenPaid`.
+ * Whether a held donation's Miner had ore not yet on a Statement when they paid: a ledger row
+ * dated on or before the payment's UTC day, after everything the Statements issued by then
+ * covered. The ESI ledger lags the mining by about an hour, so a Miner who pays straight after
+ * mining is held for review (`no-open-balance`) though they owed; a later sync that finds such a
+ * row matches the donation as the first sync would have, had the ledger been current.
+ */
+export function unbilledWhenPaid(
+  payment: { characterId: number; at: string },
+  rows: readonly { characterId: number; date: string; quantity: number }[],
+  book: {
+    miners: readonly MinerLike[];
+    statements: readonly { minerId: string; coversThrough?: string; issuedAt?: string }[];
+    startDate: string;
+  }
+): boolean {
+  const minerId = minerIdFor(payment.characterId, book.miners);
+  const paidDay = payment.at.slice(0, 10);
+  let billedThrough = '';
+  for (const s of book.statements)
+    if (
+      s.minerId === minerId &&
+      s.coversThrough &&
+      s.issuedAt !== undefined &&
+      s.issuedAt <= payment.at &&
+      s.coversThrough > billedThrough
+    )
+      billedThrough = s.coversThrough;
+  return rows.some(
+    (r) =>
+      r.quantity > 0 &&
+      r.date >= book.startDate &&
+      r.date <= paidDay &&
+      r.date > billedThrough &&
+      minerIdFor(r.characterId, book.miners) === minerId
+  );
+}
+
 /** Engine `openBalances`: what each Miner still owes on issued Statements. */
 export function openBalances(input: Omit<SettleInput, 'alreadyPaid'>): Map<string, number> {
   const out = new Map<string, number>();
