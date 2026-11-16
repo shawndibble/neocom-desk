@@ -1,5 +1,5 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { chunkRateFor } from '@/engine/corpTaxBook/extraction';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -175,7 +175,7 @@ export function BookSettingsDialog({
   const [divisions, setDivisions] = useState<number[]>(settings.divisions);
   // The list the dialog opened on: a save that changes the divisions sends it, so the server
   // refuses it rather than drop another officer's change made meanwhile.
-  const [divisionsBase] = useState<number[]>(settings.divisions);
+  const divisionsBase = useRef(settings.divisions).current;
   const [startDate, setStartDate] = useState(settings.startDate);
   const [cadence, setCadence] = useState(settings.cadence.kind);
   const [cadenceDays, setCadenceDays] = useState(
