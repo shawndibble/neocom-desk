@@ -295,10 +295,10 @@ describe('Wallet', () => {
 
     renderWalletRoute();
 
-    expect(await screen.findByRole('button', { name: /log in again/i })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Log in' })).toBeInTheDocument();
     expect(screen.queryByText(/no wallet data cached/i)).not.toBeInTheDocument();
     const { beginEveLogin } = await import('@/app/loginFlow');
-    screen.getByRole('button', { name: /log in again/i }).click();
+    screen.getByRole('button', { name: 'Log in' }).click();
     expect(beginEveLogin).toHaveBeenCalled();
   });
 
@@ -328,7 +328,7 @@ describe('Wallet', () => {
     const user = userEvent.setup();
     renderWalletRoute();
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
-    expect(await screen.findByText('Log in again to see your wallet')).toBeInTheDocument();
+    expect(await screen.findByText(/: log in again$/)).toBeInTheDocument();
     expect(screen.queryByText('No journal entries cached')).not.toBeInTheDocument();
   });
 
@@ -337,7 +337,7 @@ describe('Wallet', () => {
     renderWalletRoute();
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     expect(await screen.findByText('Bounty')).toBeInTheDocument();
-    expect(screen.queryByText('Log in again to see your wallet')).not.toBeInTheDocument();
+    expect(screen.queryByText(/: (log in again|grant Wallet)$/)).not.toBeInTheDocument();
   });
 
   it('shows the offline notice and cached rows, no banner, when the journal fails offline', async () => {
@@ -356,7 +356,7 @@ describe('Wallet', () => {
     renderWalletRoute();
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     expect(await screen.findByText(/showing cached data/i)).toBeInTheDocument();
-    expect(screen.queryByText('Log in again to see your wallet')).not.toBeInTheDocument();
+    expect(screen.queryByText(/: (log in again|grant Wallet)$/)).not.toBeInTheDocument();
   });
 
   /**

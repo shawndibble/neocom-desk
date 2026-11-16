@@ -1,7 +1,7 @@
 /**
  * PI with the planets read refused (403, #2762): the colony count is unknown,
  * not zero, so the strip's facts popover shows "—", Plan and Map never say "no colonies", and
- * one login banner shows (the shell's "EVE access was refused" stays quiet on
+ * one login banner shows (the shell's "<Character>: log in again" stays quiet on
  * PI). `PI_SHOTS=<dir>` also writes screenshots.
  */
 import type { Page } from '@playwright/test';
@@ -33,11 +33,10 @@ for (const [label, viewport] of VIEWPORTS) {
       test.setTimeout(60_000);
       await page.setViewportSize(viewport);
       await openRefused(page, tab);
-      await expect(page.getByText('Log in again to see your colonies')).toBeVisible({
-        timeout: 30_000,
-      });
-      await expect(page.getByText('EVE access was refused')).toHaveCount(0);
-      await expect(page.getByRole('button', { name: /Log in again/ })).toHaveCount(1);
+      await expect(page.getByText(/: log in again$/)).toBeVisible({ timeout: 30_000 });
+      // One banner and one login: the shell's notice stands down for the page's.
+      await expect(page.getByText(/: log in again$/)).toHaveCount(1);
+      await expect(page.getByRole('button', { name: 'Log in', exact: true })).toHaveCount(1);
       await page.getByRole('button', { name: 'Home, colonies and route' }).click();
       await expect(page.getByRole('dialog', { name: 'Home, colonies and route' })).toContainText(
         '—'
