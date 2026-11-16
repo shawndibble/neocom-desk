@@ -162,13 +162,7 @@ export function EventDetailModal({
         <Spinner block="panel" label={t('common.loading')} />
       ) : state.status === 'needs-reauth' ? (
         // No Try again: retrying can't fix an expired or revoked grant.
-        <GrantBanner
-          characterId={characterId}
-          endpoints={['getCharacterCalendarEvent']}
-          title={t('calendar.detailReauthTitle')}
-          hint={t('calendar.detailReauthHint')}
-          actionLabel={t('calendar.reauthAction')}
-        />
+        <GrantBanner characterId={characterId} endpoints={['getCharacterCalendarEvent']} />
       ) : state.status === 'failed' ? (
         <EmptyState
           title={t('common.loadFailedTitle')}
@@ -249,8 +243,6 @@ export function EventDetailModal({
               characterId={characterId}
               endpoints={RSVP_ENDPOINTS}
               title={t('calendar.rsvpGrantTitle')}
-              hint={t('calendar.rsvpGrantHint')}
-              actionLabel={t('calendar.rsvpGrantAction')}
             />
             {rsvpFailed !== null && (
               <p role="alert" className="mt-2 text-[0.6875rem] text-danger">

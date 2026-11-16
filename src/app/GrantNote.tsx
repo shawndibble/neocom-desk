@@ -1,24 +1,23 @@
 import { useTranslation } from 'react-i18next';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { ReauthBanner } from '@/components/ui';
-import type { EsiEndpointId } from '@/esi/registry';
+import { db } from '@/db';
+import { PERMISSIONS, type EsiEndpointId } from '@/esi/registry';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { beginGrant } from './grantAction';
+import { missingPermissions } from './missingPermissions';
+import { useReauthSlot } from './reauthSlots';
 import { useCharacterLacksEndpoints } from './useGrantedScopes';
 
-interface GrantCopy {
-  /** Already translated; prefixed with `characterName` when one is given. */
-  title: string;
-  hint: string;
-  actionLabel: string;
-}
-
-interface GrantBannerProps extends GrantCopy {
+interface GrantBannerProps {
   /** Whose grant the action extends — the Character whose data needs it. */
   characterId: number;
-  /** Names that Character in the title, where several banners can stack. */
+  /** The Character's name, when the caller already has it; read from the device otherwise. */
   characterName?: string;
   /** What the data needs; mapped to the Permission(s) the Grant asks for. */
   endpoints: readonly EsiEndpointId[];
+  /** One short line on what is affected ("Skills", "Broker fees assume 0 standings"). */
+  title?: string;
   variant?: 'primary' | 'ghost';
   soleAction?: boolean;
   /** The one-line form for a note beside saved data (`ReauthBanner`'s `compact`). */
@@ -26,30 +25,68 @@ interface GrantBannerProps extends GrantCopy {
 }
 
 /**
- * A re-login banner the caller has already decided to show — typically on a
- * load that came back `needsReauth` — whose action grants `endpoints`'
- * Permission for `characterId` (`beginGrant`). The caller only says which
- * Character and which endpoints; the "{Character} — …" title and the
- * endpoints → Permission mapping live here.
+ * The Character's name and which Permissions its stored grant lacks for
+ * `endpoints`; `undefined` until read. Only the scope list leaves the query,
+ * never the token (ADR 0001).
+ */
+function useGrantGap(characterId: number, endpoints: readonly EsiEndpointId[]) {
+  const endpointsKey = endpoints.join(',');
+  return useLiveQuery(async () => {
+    const [character, token] = await Promise.all([
+      db.characters.get(characterId),
+      db.tokens.get(characterId),
+    ]);
+    return {
+      characterId,
+      name: character?.name,
+      missing: missingPermissions(endpoints, token?.scopes ?? []),
+    };
+    // Keyed by value: callers may rebuild the array every render.
+  }, [characterId, endpointsKey]);
+}
+
+/**
+ * The one re-login banner a page shows for a Character. It says who and what,
+ * briefly: "Kestrel Vane: grant Wallet, Assets" when the stored grant lacks a
+ * Permission (naming each), else "Kestrel Vane: log in again" (the grant was
+ * refused or lapsed). Several on one page (Overview widgets, a page's panels)
+ * collapse into the first: it speaks, and its one login asks for every
+ * Permission the others needed (`reauthSlots`).
  */
 export function GrantBanner({
   characterId,
   characterName,
   endpoints,
   title,
-  ...banner
+  variant,
+  soleAction,
+  compact,
 }: GrantBannerProps) {
   const { t } = useTranslation();
+  const slot = useReauthSlot(characterId, endpoints);
+  const gap = useGrantGap(characterId, slot.primary ? slot.endpoints : endpoints);
+  // Held back until read, so the wrong one of the two never flashes.
+  if (!slot.primary || gap?.characterId !== characterId) return null;
+  const character = characterName ?? gap.name ?? t('reauth.unknownCharacter');
+  const permissions = gap.missing.map((group) => t(PERMISSIONS[group].labelKey)).join(', ');
   return (
     <ReauthBanner
-      {...banner}
-      title={characterName ? t('reauth.titleFor', { character: characterName, title }) : title}
-      onLogin={() => void beginGrant(characterId, endpoints)}
+      title={
+        gap.missing.length > 0
+          ? t('reauth.missingTitle', { character, permissions })
+          : t('reauth.loginTitle', { character })
+      }
+      hint={title ?? ''}
+      actionLabel={gap.missing.length > 0 ? t('reauth.grantAction') : t('reauth.loginAction')}
+      onLogin={() => void beginGrant(characterId, slot.endpoints)}
+      {...(variant ? { variant } : {})}
+      {...(soleAction ? { soleAction } : {})}
+      {...(compact ? { compact } : {})}
     />
   );
 }
 
-interface GrantNoteProps extends GrantCopy {
+interface GrantNoteProps {
   endpoints: readonly EsiEndpointId[];
   /**
    * Whose stored grant decides it, and whom the Grant is for. The active
@@ -58,6 +95,8 @@ interface GrantNoteProps extends GrantCopy {
    */
   characterId?: number;
   characterName?: string;
+  /** One short line on what is affected. */
+  title?: string;
   className?: string;
   /** The one-line form (`ReauthBanner`'s `compact`). */
   compact?: boolean;

@@ -1,5 +1,10 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/db';
+import { PERMISSIONS, type ScopeGroup } from '@/esi/registry';
+import { permissionForScope } from '@/esi/scopes';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useViewedCharacterId } from '@/features/character/viewedCharacter';
 import { ReauthBanner } from '@/components/ui';
 import { pageTitleFor } from './documentTitle';
@@ -9,7 +14,6 @@ import {
   isGatedRoute,
   missingScopesForRoute,
   permissionsForRoute,
-  routeStringsNamespace,
   type AppRoutePath,
 } from './routeScopes';
 
@@ -46,18 +50,32 @@ export function ScopeGate({ path, children }: ScopeGateProps) {
   // Assets opened for another Character (`?char=`) judges that
   // Character's grant itself (its own `GrantBanner`), not the active one's.
   const viewingOther = useViewedCharacterId() !== undefined && path === '/assets';
+  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  const name = useLiveQuery(
+    async () =>
+      activeCharacterId === null ? undefined : (await db.characters.get(activeCharacterId))?.name,
+    [activeCharacterId]
+  );
 
   if (!gated || granted === undefined || viewingOther) return <>{children}</>;
-  if (missingScopesForRoute(path, granted).length === 0) return <>{children}</>;
+  const missingScopes = missingScopesForRoute(path, granted);
+  if (missingScopes.length === 0) return <>{children}</>;
 
-  const namespace = routeStringsNamespace(path);
+  // Each Permission the page still needs, named once: what to tick at EVE.
+  const missing = [
+    ...new Set(
+      missingScopes.map(permissionForScope).filter((g): g is ScopeGroup => g !== undefined)
+    ),
+  ];
   return (
     <>
       <h1 className="sr-only">{pageTitleFor(path, t)}</h1>
       <ReauthBanner
-        title={t(`${namespace}.reauthTitle`)}
-        hint={t(`${namespace}.reauthHint`)}
-        actionLabel={t(`${namespace}.reauthAction`)}
+        title={t('reauth.missingTitle', {
+          character: name ?? t('reauth.unknownCharacter'),
+          permissions: missing.map((group) => t(PERMISSIONS[group].labelKey)).join(', '),
+        })}
+        actionLabel={t('reauth.grantAction')}
         onLogin={() => void beginEveLogin({ groups: permissionsForRoute(path) })}
         soleAction
       />

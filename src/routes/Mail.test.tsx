@@ -263,8 +263,9 @@ describe('Mail', () => {
       )
     );
     renderMailRoute();
-    expect(await screen.findByText('Log in again to refresh.')).toBeInTheDocument();
-    expect(screen.queryByText('Log in again to see your mail')).not.toBeInTheDocument();
+    expect(await screen.findByText('Showing saved data.')).toBeInTheDocument();
+    // getByText: exactly one — the note beside the data, no full banner over it.
+    expect(screen.getByText(/: log in again$/)).toBeInTheDocument();
     expect(await screen.findByText('Fleet up!')).toBeInTheDocument();
   });
 
@@ -311,7 +312,7 @@ describe('Mail', () => {
       )
     );
     renderMailRoute();
-    expect(await screen.findByText('Log in again to see your mail')).toBeInTheDocument();
+    expect(await screen.findByText(/: log in again$/)).toBeInTheDocument();
     expect(screen.queryByText(/no mail cached/i)).not.toBeInTheDocument();
   });
 

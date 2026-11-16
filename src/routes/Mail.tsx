@@ -374,8 +374,6 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
               characterName={c.name}
               endpoints={['getCharacterMailHeaders']}
               title={t('mail.reauthTitle')}
-              hint={t('mail.reauthHint')}
-              actionLabel={t('mail.reauthAction')}
             />
           ))}
 
@@ -384,13 +382,7 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
       ) : needsReauth && (!headersResult || rows.length === 0) ? (
         // A lapsed grant with no saved mail: the full banner. With saved mail
         // the list stays and a small note sits above it.
-        <GrantBanner
-          characterId={activeCharacterId}
-          endpoints={['getCharacterMailHeaders']}
-          title={t('mail.reauthTitle')}
-          hint={t('mail.reauthHint')}
-          actionLabel={t('mail.reauthAction')}
-        />
+        <GrantBanner characterId={activeCharacterId} endpoints={['getCharacterMailHeaders']} />
       ) : error ? (
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : !headersResult || rows.length === 0 ? (
@@ -415,8 +407,6 @@ function MailView({ scope, scopeControl, openTarget }: MailViewProps) {
             compact
             endpoints={['putCharacterMail']}
             title={t('mail.markReadGrantTitle')}
-            hint={t('mail.markReadGrantHint')}
-            actionLabel={t('mail.markReadGrantAction')}
           />
 
           {(isDesktop || selectedKey === null) && (

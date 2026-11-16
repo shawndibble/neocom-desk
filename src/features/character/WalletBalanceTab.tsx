@@ -181,13 +181,7 @@ export function WalletBalanceTab({
             <>
               {balanceNeedsReauth && (
                 <div className="mt-3">
-                  <GrantBanner
-                    characterId={activeCharacterId}
-                    endpoints={['getCharacterWallet']}
-                    title={t('wallet.reauthTitle')}
-                    hint={t('wallet.reauthHint')}
-                    actionLabel={t('wallet.reauthAction')}
-                  />
+                  <GrantBanner characterId={activeCharacterId} endpoints={['getCharacterWallet']} />
                 </div>
               )}
               {(balanceResult?.fromCache || loyaltyResult?.fromCache) && (
@@ -202,9 +196,6 @@ export function WalletBalanceTab({
                   <GrantBanner
                     characterId={activeCharacterId}
                     endpoints={['getCharacterWalletJournal']}
-                    title={t('wallet.reauthTitle')}
-                    hint={t('wallet.reauthHint')}
-                    actionLabel={t('wallet.reauthAction')}
                   />
                 </div>
               ) : (

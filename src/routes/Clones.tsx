@@ -265,13 +265,7 @@ export function Clones() {
           <Spinner block="page" label={t('common.loading')} />
         ) : clonesBlocked ? (
           <div className="p-3">
-            <GrantBanner
-              characterId={activeCharacterId}
-              endpoints={['getCharacterClones']}
-              title={t('clones.reauthTitle')}
-              hint={t('clones.reauthHint')}
-              actionLabel={t('clones.reauthAction')}
-            />
+            <GrantBanner characterId={activeCharacterId} endpoints={['getCharacterClones']} />
           </div>
         ) : error ? (
           <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
@@ -288,13 +282,7 @@ export function Clones() {
             )}
             {implantsNeedsReauth && (
               <div className="border-b border-line p-3">
-                <GrantBanner
-                  characterId={activeCharacterId}
-                  endpoints={['getCharacterImplants']}
-                  title={t('clones.implantsReauthTitle')}
-                  hint={t('clones.implantsReauthHint')}
-                  actionLabel={t('clones.reauthAction')}
-                />
+                <GrantBanner characterId={activeCharacterId} endpoints={['getCharacterImplants']} />
               </div>
             )}
             {clonesResult.fromCache && (

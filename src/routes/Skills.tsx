@@ -358,13 +358,7 @@ export function Skills() {
       ) : error ? (
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : skillsBlocked ? (
-        <GrantBanner
-          characterId={activeCharacterId}
-          endpoints={['getCharacterSkills']}
-          title={t('skills.reauthTitle')}
-          hint={t('skills.reauthHint')}
-          actionLabel={t('skills.reauthAction')}
-        />
+        <GrantBanner characterId={activeCharacterId} endpoints={['getCharacterSkills']} />
       ) : !skillsResult ? (
         <EmptyState title={t('skills.emptyTitle')} hint={t('skills.emptyHint')} />
       ) : (

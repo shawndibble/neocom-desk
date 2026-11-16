@@ -247,13 +247,7 @@ export function AssetsList({
   ) : assetsNeedsReauth && !assetsResult ? (
     // A lapsed grant with nothing saved: the full banner. With a saved
     // copy the items stay and a small note sits above them.
-    <GrantBanner
-      characterId={activeCharacterId}
-      endpoints={['getCharacterAssets']}
-      title={t('assets.reauthTitle')}
-      hint={t('assets.reauthHint')}
-      actionLabel={t('assets.reauthAction')}
-    />
+    <GrantBanner characterId={activeCharacterId} endpoints={['getCharacterAssets']} />
   ) : error ? (
     <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
   ) : !assetsResult ? (
@@ -462,8 +456,6 @@ export function AssetsList({
                 characterId={activeCharacterId}
                 endpoints={LOCATION_ENDPOINTS}
                 title={t('assets.jumpsAway.locationNotGrantedTitle')}
-                hint={t('assets.jumpsAway.locationNotGrantedHint')}
-                actionLabel={t('assets.jumpsAway.locationNotGrantedAction')}
               />
             </>
           )}

@@ -26,6 +26,12 @@ beforeEach(async () => {
   beginEveLogin.mockClear();
   localStorage.clear();
   await db.tokens.clear();
+  await db.characters.put({
+    characterId: CHARACTER_ID,
+    name: 'Kestrel Vane',
+    ownerHash: 'h',
+    addedAt: 0,
+  });
   useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
 });
 
@@ -42,21 +48,21 @@ function WithControl() {
         endpoints={['getCharacterStandings']}
         characterId={CHARACTER_ID + 1}
         title="Control"
-        hint="Control hint"
-        actionLabel="Control action"
       />
     </>
   );
 }
 const settled = () => screen.findByText('Control');
-const notice = () => screen.queryByRole('button', { name: /grant character details/i });
+const notice = () => screen.queryByText('Kestrel Vane: grant Character details');
 
 describe('StandingsScopeNotice', () => {
   it('offers to grant the missing standings scope, not a re-login', async () => {
     await grant(['esi-characters.read_contacts.v1']);
     render(<StandingsScopeNotice />);
 
-    await userEvent.click(await screen.findByRole('button', { name: /grant character details/i }));
+    // Names the Character and the one Permission missing, nothing more.
+    expect(await screen.findByText('Kestrel Vane: grant Character details')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Grant in EVE' }));
 
     expect(screen.queryByText(/logged in before/i)).not.toBeInTheDocument();
     expect(beginEveLogin).toHaveBeenCalledTimes(1);

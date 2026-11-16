@@ -8,12 +8,10 @@ import {
   missingScopesForRoute,
   permissionsForRoute,
   requiredScopesForRoute,
-  routeStringsNamespace,
   type AppRoutePath,
   type RouteRequirement,
 } from './routeScopes';
 import { SCOPES } from '@/esi/scopes';
-import en from '@/i18n/locales/en.json';
 
 const paths = Object.keys(ROUTE_REQUIREMENTS) as AppRoutePath[];
 
@@ -87,18 +85,6 @@ describe('gated routes', () => {
       '/wallet/lp-store',
       '/wallet/lp-store/:corporationId',
     ]);
-  });
-
-  it('each name an i18next namespace that carries the three reauth keys', () => {
-    const catalog = en as unknown as Record<string, Record<string, string>>;
-    for (const path of paths.filter(isGatedRoute)) {
-      const namespace = routeStringsNamespace(path);
-      expect(catalog[namespace], namespace).toMatchObject({
-        reauthTitle: expect.any(String),
-        reauthHint: expect.any(String),
-        reauthAction: expect.any(String),
-      });
-    }
   });
 
   it('declare only endpoints whose scope requirement is not PUBLIC-only', () => {

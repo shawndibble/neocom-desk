@@ -52,8 +52,6 @@ export function StandingsScopeNotice() {
         characterId={characterId}
         endpoints={STANDINGS_ENDPOINTS}
         title={t('reauth.standingsTitle')}
-        hint={t('reauth.standingsHint')}
-        actionLabel={t('reauth.standingsAction')}
         // Renders above a route that may have its own primary button
         // (docs/DESIGN.md §5, one per view).
         variant="ghost"

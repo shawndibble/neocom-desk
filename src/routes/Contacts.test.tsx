@@ -225,8 +225,9 @@ describe('Contacts', () => {
       )
     );
     renderContactsRoute();
-    expect(await screen.findByText('Log in again to refresh.')).toBeInTheDocument();
-    expect(screen.queryByText('Log in again to see your contacts')).not.toBeInTheDocument();
+    expect(await screen.findByText('Showing saved data.')).toBeInTheDocument();
+    // getByText: exactly one — the note beside the data, no full banner over it.
+    expect(screen.getByText(/: log in again$/)).toBeInTheDocument();
     expect(await screen.findByText('Good Friend')).toBeInTheDocument();
   });
 
@@ -254,7 +255,7 @@ describe('Contacts', () => {
       )
     );
     renderContactsRoute();
-    expect(await screen.findByText('Log in again to see your contacts')).toBeInTheDocument();
+    expect(await screen.findByText(/: log in again$/)).toBeInTheDocument();
     expect(screen.queryByText(/no contacts cached/i)).not.toBeInTheDocument();
   });
 });

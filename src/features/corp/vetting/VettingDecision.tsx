@@ -227,8 +227,6 @@ export function VettingDecision({
                 characterId={reviewerId}
                 endpoints={SEND_MAIL_ENDPOINTS}
                 title={t('vetting.decision.mail.grantTitle')}
-                hint={t('vetting.decision.mail.grantHint')}
-                actionLabel={t('vetting.decision.mail.grantAction')}
               />
             )}
           </div>

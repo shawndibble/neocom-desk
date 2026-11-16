@@ -474,7 +474,7 @@ describe('PlanetaryIndustry', () => {
       )
     );
     await renderIndustryRoutes();
-    expect(await screen.findByText('Log in again to see your colonies')).toBeInTheDocument();
+    expect(await screen.findByText(/: log in again$/)).toBeInTheDocument();
   });
 
   it('shows the alt-colonies toggle alongside the re-login prompt, not instead of it, when an alt has cached colonies', async () => {
@@ -505,9 +505,7 @@ describe('PlanetaryIndustry', () => {
     await renderIndustryRoutes();
 
     // The banner is not a substitute for the panel: both render.
-    expect(
-      (await screen.findAllByText('Log in again to see your colonies')).length
-    ).toBeGreaterThan(0);
+    expect((await screen.findAllByText(/: log in again$/)).length).toBeGreaterThan(0);
     const toggle = await screen.findByRole('button', { name: /show \d+ alt/i });
 
     const user = userEvent.setup({ delay: null });
@@ -753,14 +751,15 @@ describe('PlanetaryIndustry', () => {
     expect(screen.getByText(/Scopeless Alt/)).toHaveTextContent(/no planetary access/i);
     // The trap this guards: a live 403 on an alt raises the app-wide re-auth
     // banner, naming a character the player never asked about.
-    expect(screen.queryByText('Log in again to see your colonies')).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Scopeless Alt: /)).not.toBeInTheDocument();
   });
 
   it('shows the page banner for a planets refusal another reader recorded', async () => {
     useAuthFailure.getState().reportRequestFailure(CHAR_ID, 'getCharacterPlanets');
     await renderIndustryRoutes();
-    expect(await screen.findByText('Log in again to see your colonies')).toBeInTheDocument();
-    expect(screen.queryByText('EVE access was refused')).not.toBeInTheDocument();
+    expect(await screen.findByText(/: log in again$/)).toBeInTheDocument();
+    // One banner: the shell's notice stands down for the page's.
+    expect(screen.getAllByText(/: log in again$/)).toHaveLength(1);
   });
 
   it('keeps the colony view on the default tab, with no URL param needed', async () => {

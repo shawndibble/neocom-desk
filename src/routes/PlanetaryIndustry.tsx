@@ -201,13 +201,7 @@ export function PlanetaryIndustry() {
               <PiExplainer open={explainerOpen} onClose={() => setExplainerOpen(false)} />
 
               {(data?.planetsNeedsReauth || planetsRefused) && (
-                <GrantBanner
-                  characterId={activeCharacterId}
-                  endpoints={['getCharacterPlanets']}
-                  title={t('pi.reauthTitle')}
-                  hint={t('pi.reauthHint')}
-                  actionLabel={t('pi.reauthAction')}
-                />
+                <GrantBanner characterId={activeCharacterId} endpoints={['getCharacterPlanets']} />
               )}
 
               {planetsResult?.fromCache && (

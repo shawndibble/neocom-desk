@@ -235,14 +235,7 @@ function MemberSrpBody({ characterId, data, windowDays, fleetRequired, hullRules
   // The grant prompt, or what stands in for the list while it is not there to show.
   const lostNote =
     lost.state === 'denied' ? (
-      <GrantBanner
-        variant="ghost"
-        characterId={characterId}
-        endpoints={KILLMAIL_ENDPOINTS}
-        title={t('srpMember.lost.grantTitle')}
-        hint={t('srpMember.lost.grantHint')}
-        actionLabel={t('srpMember.lost.grantAction')}
-      />
+      <GrantBanner variant="ghost" characterId={characterId} endpoints={KILLMAIL_ENDPOINTS} />
     ) : lost.state === 'failed' ? (
       <LoadFailedState title={t('srpMember.lost.loadFailed')} onRetry={data.retry} />
     ) : lost.state === 'loading' ? (

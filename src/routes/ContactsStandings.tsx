@@ -200,15 +200,7 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
 
   let content: ReactNode;
   if (lacksScope) {
-    content = (
-      <GrantBanner
-        characterId={characterId}
-        endpoints={['getCharacterStandings']}
-        title={t('contacts.standingsReauthTitle')}
-        hint={t('contacts.standingsReauthHint')}
-        actionLabel={t('contacts.reauthAction')}
-      />
-    );
+    content = <GrantBanner characterId={characterId} endpoints={['getCharacterStandings']} />;
   } else if (!state || status !== 'ok') {
     // Shown by the `DataGate` below: its spinner, or "couldn't load" with Retry —
     // "no NPC standings" would be a guess when nothing was loaded.

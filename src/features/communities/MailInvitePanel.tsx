@@ -160,8 +160,6 @@ export function MailInvitePanel({
         characterId={characterId}
         endpoints={SEND_MAIL_ENDPOINTS}
         title={t('communities.mailInvite.grantTitle')}
-        hint={t('communities.mailInvite.grantHint')}
-        actionLabel={t('communities.mailInvite.grantAction')}
       />
       <form
         className="flex flex-wrap items-end gap-2"

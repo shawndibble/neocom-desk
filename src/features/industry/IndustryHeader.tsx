@@ -103,13 +103,7 @@ export function IndustryHeader({
 
       {blueprintsNeedsReauth && (
         <Panel title={t('industry.blueprintsTitle')}>
-          <GrantBanner
-            characterId={activeCharacterId}
-            endpoints={['getCharacterBlueprints']}
-            title={t('industry.blueprintsReauthTitle')}
-            hint={t('industry.blueprintsReauthHint')}
-            actionLabel={t('industry.blueprintsReauthAction')}
-          />
+          <GrantBanner characterId={activeCharacterId} endpoints={['getCharacterBlueprints']} />
         </Panel>
       )}
 

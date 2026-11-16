@@ -26,12 +26,6 @@ export type Ungated = typeof UNGATED;
 export interface GatedRoute {
   /** Every ESI endpoint the page's content depends on; public ones contribute no scope. */
   readonly endpoints: readonly EsiEndpointId[];
-  /**
-   * i18next namespace holding this route's `reauth*` keys. Named rather than
-   * derived from the path, so the gate speaks the view's own language ("see
-   * your mail", not a generic string).
-   */
-  readonly strings: string;
 }
 
 export type RouteRequirement = Ungated | GatedRoute;
@@ -39,7 +33,6 @@ export type RouteRequirement = Ungated | GatedRoute;
 /** One LP Store page, with or without a corp picked yet — one gate, so the two can't drift. */
 const LP_STORE_REQUIREMENT: GatedRoute = {
   endpoints: ['getCharacterLoyaltyPoints'],
-  strings: 'loyalty',
 };
 
 /**
@@ -195,11 +188,9 @@ export const ROUTE_REQUIREMENTS = {
       'getUniverseType',
       'getUniverseGroup',
     ],
-    strings: 'assets',
   },
   '/mail': {
     endpoints: ['getCharacterMailHeaders', 'getCharacterMail', 'postUniverseNames'],
-    strings: 'mail',
   },
   // Multi-source page: the Calendar merges six clocks (calendar, skill queue,
   // industry jobs, planets, contracts, orders) and each read fails on its own.
@@ -238,7 +229,6 @@ export const ROUTE_REQUIREMENTS = {
   // untrained (24h) estimate instead of erroring.
   '/clones': {
     endpoints: ['getCharacterClones'],
-    strings: 'clones',
   },
   // The page needs no scope to render: Plan's Find best and Map are SDE +
   // market only. Only the colony list needs the planets grant, so the page
@@ -265,7 +255,6 @@ export const ROUTE_REQUIREMENTS = {
   '/wallet/loyalty/:corporationId': UNGATED,
   '/contacts': {
     endpoints: ['getCharacterContacts', 'getCharacterContactLabels', 'postUniverseNames'],
-    strings: 'contacts',
   },
   // The Moon Mining Tax ledger (issue #523) is built entirely on the personal
   // mining ledger — without the scope there is nothing to show. The universe
@@ -274,7 +263,6 @@ export const ROUTE_REQUIREMENTS = {
   // the route actually calls.
   '/mining': {
     endpoints: ['getCharacterMining', 'getUniverseSystem', 'postUniverseNames'],
-    strings: 'miningTax',
   },
 } as const satisfies Record<string, RouteRequirement>;
 
@@ -286,11 +274,6 @@ export type GatedRoutePath = {
 
 export function isGatedRoute(path: AppRoutePath): path is GatedRoutePath {
   return ROUTE_REQUIREMENTS[path] !== UNGATED;
-}
-
-/** i18next namespace carrying the gated route's re-auth strings. */
-export function routeStringsNamespace(path: GatedRoutePath): string {
-  return (ROUTE_REQUIREMENTS[path] as GatedRoute).strings;
 }
 
 /**

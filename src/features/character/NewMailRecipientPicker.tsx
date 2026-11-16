@@ -305,8 +305,6 @@ export function NewMailRecipientPicker({
           characterId={characterId}
           endpoints={SEARCH_ENDPOINTS}
           title={t('mail.searchReauthTitle')}
-          hint={t('mail.searchReauthHint')}
-          actionLabel={t('mail.searchReauthAction')}
         />
       )}
     </div>
