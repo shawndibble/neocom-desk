@@ -7843,6 +7843,102 @@
     }
   },
   "miningTax": {
+    "resolve": {
+      "facts": {
+        "uncredited": "You sent {{amount}}. {{corp}}'s book synced and still doesn't hold it, so days you had paid are billed again.",
+        "journalRef": "journal ref {{ref}}",
+        "paidDays": "paid {{days}}",
+        "rate": "{{corp}}'s book bills {{date}} at {{book}}%; you recorded {{yours}}%.",
+        "quantity": "{{corp}}'s book recorded {{book}} units of ore on {{date}}; your record has {{yours}}.",
+        "bills": "Its book bills {{amount}}.",
+        "conflict": "You gave this ore to {{payee}}. {{corp}}'s book also recorded it, and bills it on {{date}} unless something changes first.",
+        "anotherPayee": "another Payee",
+        "kept": "{{corp}} kept the bill on {{date}}: {{reason}}",
+        "nextStep": "What to do next: {{step}}"
+      },
+      "quiet": {
+        "waiting_one": "Waiting on the corp: 1",
+        "waiting_other": "Waiting on the corp: {{count}}",
+        "notPaying_one": "Not paying: 1",
+        "notPaying_other": "Not paying: {{count}}",
+        "show": "Show them",
+        "hide": "Hide the list",
+        "showAgain": "Show again",
+        "showAgainNamed": "Show {{item}} again"
+      },
+      "title": {
+        "uncredited": "Donations not credited",
+        "figure": "{{date}}: the book's figure differs",
+        "conflict": "{{date}} claimed twice",
+        "kept": "{{corp}} kept the bill"
+      },
+      "groupSelf": "Settle it yourself",
+      "groupAsk": "Ask {{corp}}",
+      "outcome": {
+        "pay": {
+          "title": "Pay it · {{amount}} ISK",
+          "title_again": "Pay it again · {{amount}} ISK",
+          "hint": "Settles it in {{corp}}'s book, which pays your oldest days first.",
+          "hint_again": "Only if that ISK went somewhere else. The book credits a new payment on its next sync."
+        },
+        "fixRecords": {
+          "title": "Fix my records — {{corp}} is right",
+          "hint": "Opens the day on the ore that comes off your {{payee}} entry, so you owe it once, to {{corp}}. One more click there to confirm."
+        },
+        "notPaying": {
+          "title": "Not paying — hide this",
+          "hint": "Gone from your tab. {{corp}} still bills it."
+        },
+        "paid": {
+          "title": "I already paid — send them the proof",
+          "hint": "The transfers with their journal refs, checked against {{corp}}'s wallet first, so an officer can find them in seconds."
+        },
+        "notOwed": {
+          "title": "I don't owe this — ask them to change it",
+          "title_payee": "It went to {{payee}} — tell {{corp}}",
+          "hint": "They waive it or keep the bill and tell you what to do next. It holds the day for up to 14 days meanwhile.",
+          "hint_payee": "They waive it or keep the bill. It holds the day for up to 14 days meanwhile."
+        }
+      },
+      "action": {
+        "pay": "Pay",
+        "fixRecords": "Open the day",
+        "notPaying": "Hide it",
+        "notPaying_tell": "Hide it and tell them",
+        "paid": "Send proof",
+        "notOwed": "Send"
+      },
+      "tellWhy": "Tell {{corp}} why",
+      "whyLabel": "Why, in your own words",
+      "noteLabel": "Add a note (optional)",
+      "hiddenNote": "Hidden days stay under Not paying on this tab, and come back with one click.",
+      "sendsTo": "Goes to {{corp}}'s Needs you queue, and as an EVE mail to whoever answers its tax questions. Until they answer, it leaves your attention list; their answer comes back here.",
+      "noStatement": "Nothing is on a Statement yet: {{corp}}'s book credits your donation on its next sync. If it still hasn't when the Statement goes out, send the proof then.",
+      "failed": "That didn't reach the book. Check your connection and try again.",
+      "done": "Done",
+      "result": {
+        "hidden": "Hidden. {{corp}} still bills it; it's listed under Not paying on this tab.",
+        "credited": "Found in {{corp}}'s wallet and credited. Nothing more to do.",
+        "sentProof": "Sent to {{corp}}, with what checking its wallet found:",
+        "sent": "Sent to {{corp}}. It holds the day until {{date}} while they answer; their answer comes back here."
+      },
+      "check": {
+        "found": "Found",
+        "division": "Found · Division {{division}}",
+        "notSynced": "Not synced yet",
+        "tooOld": "Too old to check",
+        "notFound": "Not in the corp wallet",
+        "person": "Paid to a person",
+        "otherCorp": "Another corporation"
+      },
+      "mailed": {
+        "sent_one": "Also mailed in EVE.",
+        "sent_other": "Also mailed {{count}} officers in EVE.",
+        "no-scope": "Not mailed: give this Character the mail permission to also send an EVE mail.",
+        "no-recipient": "Not mailed: no one to mail was found for this corporation.",
+        "failed": "The EVE mail didn't go; the corporation still has it in Needs you."
+      }
+    },
     "title": "Mining",
     "taxTab": "Tax",
     "surveyTab": "Survey",
