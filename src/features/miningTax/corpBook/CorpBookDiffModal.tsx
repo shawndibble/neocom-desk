@@ -50,6 +50,26 @@ export function CorpBookDiffModal({ open, onClose, view, systemName, typeNames }
           0
         );
   const bookTax = view.billed;
+  /**
+   * Only a book that bills MORE than the member's own record is worth an officer's time: the
+   * other way round the book's lower figure is what they owe, and the old copy sent them to
+   * argue for a bigger bill.
+   *
+   * Read the direction from the two numbers `disputeOf` itself compared — the ones the headline
+   * below prints — never from the Tax row. `personalTax` prices the member's WHOLE entry while
+   * `billed` is this book's share of a day several books can split, so the two are not
+   * comparable; and `personalTax` is undefined whenever the member allocated the day at more
+   * than one rate or none, which is exactly when the Tax row reads "—".
+   *
+   * `undefined` where quantity and rate both differ: they can pull opposite ways (less ore at a
+   * higher rate), so the net is not knowable here and the copy makes no claim.
+   */
+  const bookAsksMore =
+    dispute === undefined || (dispute.quantity && dispute.rate)
+      ? undefined
+      : dispute.rate
+        ? dispute.bookPct > (dispute.personalPct ?? dispute.bookPct)
+        : dispute.bookQuantity > dispute.personalQuantity;
 
   const cell = (differs: boolean) => cx('text-right tabular-nums', differs && 'font-semibold');
   const differs = (
@@ -125,19 +145,37 @@ export function CorpBookDiffModal({ open, onClose, view, systemName, typeNames }
           </tbody>
         </table>
         {dispute && (
-          <p className="font-semibold text-warning">
-            {dispute.rate && !dispute.quantity
-              ? t('miningTax.corpBook.disputed.rate', {
-                  you: dispute.personalPct,
-                  book: dispute.bookPct,
-                })
-              : dispute.quantity && !dispute.rate
-                ? t('miningTax.corpBook.disputed.quantity', {
-                    you: formatCount(dispute.personalQuantity),
-                    book: formatCount(dispute.bookQuantity),
+          <div className="space-y-1 rounded-xs border border-warning/60 bg-warning/10 p-2">
+            <p className="font-semibold text-warning">
+              {dispute.rate && !dispute.quantity
+                ? t('miningTax.corpBook.disputed.rate', {
+                    you: dispute.personalPct,
+                    book: dispute.bookPct,
                   })
-                : t('miningTax.corpBook.disputed.both')}
-          </p>
+                : dispute.quantity && !dispute.rate
+                  ? t('miningTax.corpBook.disputed.quantity', {
+                      you: formatCount(dispute.personalQuantity),
+                      book: formatCount(dispute.bookQuantity),
+                    })
+                  : t('miningTax.corpBook.disputed.both')}
+            </p>
+            {view.state === 'billed' && (
+              // The one line the member is here for, so it carries the weight — either way round.
+              <p className="font-semibold text-text">
+                {bookAsksMore === undefined
+                  ? t('miningTax.corpBook.diff.raiseBoth', { corp: view.corpName })
+                  : dispute.rate
+                    ? bookAsksMore
+                      ? t('miningTax.corpBook.diff.raiseRate', { corp: view.corpName })
+                      : t('miningTax.corpBook.diff.inYourFavourRate', { corp: view.corpName })
+                    : bookAsksMore
+                      ? t('miningTax.corpBook.diff.raiseQuantity', { corp: view.corpName })
+                      : t('miningTax.corpBook.diff.inYourFavourQuantity', {
+                          corp: view.corpName,
+                        })}
+              </p>
+            )}
+          </div>
         )}
         <p className="text-xs text-text-dim">
           {t('miningTax.corpBook.diff.explain', {

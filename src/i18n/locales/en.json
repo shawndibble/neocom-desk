@@ -8024,7 +8024,12 @@
         "basis": "{{hub}} buy, {{form}}",
         "rate": "Rate",
         "tax": "Tax",
-        "explain": "Book rate {{pct}}% is the {{scope}}, effective {{from}}. Once {{date}} is Billable, the book's quantity, price and rate decide what you owe {{corp}}. Raise a difference with an officer."
+        "explain": "Book rate {{pct}}% is the {{scope}}, effective {{from}}. Once {{date}} is Billable, the book's quantity, price and rate decide what you owe {{corp}}.",
+        "raiseQuantity": "The book recorded more ore than you did, so it bills more. Ask a {{corp}} officer to correct the book.",
+        "inYourFavourQuantity": "The book recorded less ore than you did, so it bills less — you owe the book's figure, and there is nothing to raise.",
+        "raiseRate": "The book's rate is higher than the one you recorded, so it bills more. Ask a {{corp}} officer to correct the book.",
+        "inYourFavourRate": "The book's rate is lower than the one you recorded, so it bills less — you owe the book's figure, and there is nothing to raise.",
+        "raiseBoth": "The book's quantity and rate both differ from your record. Ask a {{corp}} officer to confirm the day before you pay."
       },
       "disputed": {
         "rate": "Disputed: you {{you}}%, book {{book}}%",
@@ -8148,9 +8153,14 @@
         "uncreditedTitle": "{{corp}} hasn't credited your {{amount}} ISK donation of {{date}} — check the wallet division",
         "uncreditedDetail": "{{corp}} synced since and still doesn't hold it, so it no longer counts as paid here. Its book reads donations into: {{accounts}}.",
         "uncreditedEveryTitle": "{{corp}} hasn't credited your {{amount}} ISK donation of {{date}} — ask the corp to sync",
-        "uncreditedEveryDetail": "Its book reads every wallet division, but its last sync doesn't hold this donation, so it no longer counts as paid here. Ask the corp to sync its book. If it still isn't credited, check in your wallet journal that the ISK went to {{corp}}.",
+        "uncreditedEveryDetail": "Your wallet journal shows the ISK reached {{corp}}, and its book reads every wallet division — but its last sync doesn't hold the donation, so it no longer counts as paid here. Ask the corp to sync its book.",
         "uncreditedCovered": "It was paying {{days}}; without it, those days are owed again.",
         "uncreditedDispute": "To dispute it, give a {{corp}} officer the donation from your wallet journal: {{amount}} ISK, sent {{time}}.",
+        "uncreditedTitleMany": "{{corp}} hasn't credited {{n}} of your donations ({{amount}} ISK) — check the wallet division",
+        "uncreditedEveryTitleMany": "{{corp}} hasn't credited {{n}} of your donations ({{amount}} ISK) — ask the corp to sync",
+        "uncreditedDisputeMany": "To dispute them, give a {{corp}} officer these donations from your wallet journal:",
+        "uncreditedItem": "{{amount}} ISK, sent {{time}}",
+        "uncreditedItemCovered": "was paying {{days}} — owed again without it",
         "alsoBilledTitle": "{{corp}} also bills ore you listed for {{payees}}",
         "alsoBilledDetail": "It is left out of what you owe {{payees}}. Open the day and choose “{{action}}” to take it off your list.",
         "openDay": "Open the day"
@@ -8514,7 +8524,7 @@
       "acrossPayees_one": "across {{count}} payee",
       "acrossPayees_other": "across {{count}} payees",
       "uncreditedNote": "{{amount}} ISK you donated isn't credited yet — check the wallet division ({{accounts}}) before paying again.",
-      "uncreditedEveryNote": "{{amount}} ISK you donated isn't credited yet — ask the corp to sync its book, and check in your wallet journal that the ISK went to the corp, before paying again."
+      "uncreditedEveryNote": "{{amount}} ISK you donated isn't credited yet — ask the corp to sync its book before paying again."
     },
     "continue": {
       "eyebrow": "New EVE day",
