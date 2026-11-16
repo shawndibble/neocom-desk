@@ -82,3 +82,39 @@ export function planetRadiiKm(planets) {
   }
   return out;
 }
+
+/** Gate counts outside this band mean the stargate table was cut short or doubled. */
+export const GATE_COUNT_MIN = 6_000;
+export const GATE_COUNT_MAX = 20_000;
+
+/**
+ * What is wrong with the baked gate positions, as messages (none when sound):
+ * the gate count is plausible, Jita's gates are there, and every jump the
+ * graph holds has a gate to fly it by. The last is the drift check: a graph
+ * edge with no gate position would give a trip no time, so the two files must
+ * be baked together.
+ * @param {Record<string, number[]>} gates `bakeGatePositions` output
+ * @param {Record<string, number[]>} jumps `jumps.json`: system -> neighbours
+ * @param {number} jitaId
+ */
+export function gatePositionProblems(gates, jumps, jitaId) {
+  const problems = [];
+  const count = Object.values(gates).reduce((n, flat) => n + flat.length / 4, 0);
+  if (count < GATE_COUNT_MIN || count > GATE_COUNT_MAX) {
+    problems.push(
+      `gate count ${count} outside the plausible ${GATE_COUNT_MIN}-${GATE_COUNT_MAX} range`
+    );
+  }
+  if (!(gates[jitaId]?.length > 0)) problems.push('Jita has no gate positions');
+  let missing = 0;
+  for (const [from, tos] of Object.entries(jumps)) {
+    const flat = gates[from] ?? [];
+    for (const to of tos) {
+      let found = false;
+      for (let i = 0; i < flat.length; i += 4) if (flat[i] === to) found = true;
+      if (!found) missing++;
+    }
+  }
+  if (missing > 0) problems.push(`${missing} jump graph edges have no gate position`);
+  return problems;
+}

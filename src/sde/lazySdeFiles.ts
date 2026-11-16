@@ -24,6 +24,8 @@ export const LAZY_SDE_FILES: readonly string[] = [
   'typeNames.json',
   'pi-planet-radius.json',
   'pi-system-planets.json',
+  // In-system gate positions (~500 KB): read only by Route Safety's trip time.
+  'market/gates.json',
   'reprocessing.json',
   'marketWideTrees.json',
   'invention.json',

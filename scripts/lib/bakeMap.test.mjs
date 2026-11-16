@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   bakeGatePositions,
+  gatePositionProblems,
   mapJumpPairs,
   mapRegions,
   mapSystems,
@@ -59,6 +60,19 @@ describe('CCP map tables', () => {
       planetRadiiKm([{ _key: 1, radius: 5_060_000 }, { _key: 2 }, { _key: 3, radius: 0 }])
     ).toEqual({
       1: 5060,
+    });
+  });
+
+  describe('gatePositionProblems', () => {
+    const jumps = { 1: [2], 2: [1] };
+    const gates = { 1: [2, 0, 0, 0], 2: [1, 0, 0, 0] };
+    it('flags a count outside the band', () => {
+      expect(gatePositionProblems(gates, jumps, 1)[0]).toMatch(/gate count 2 outside/);
+    });
+    it('flags a missing Jita and a graph edge with no gate', () => {
+      const problems = gatePositionProblems({ 1: [2, 0, 0, 0] }, jumps, 9);
+      expect(problems).toContain('Jita has no gate positions');
+      expect(problems).toContain('1 jump graph edges have no gate position');
     });
   });
 });

@@ -10,7 +10,13 @@
 import { runSanityChecks } from './lib/bakeChecks.mjs';
 import { CACHE_DIR, FILES, SHIP_CATEGORY_ID } from './lib/bakeConstants.mjs';
 import { download, parseCsv } from './lib/bakeCsv.mjs';
-import { MAP_FILES, mapJumpPairs, mapRegions, mapSystems } from './lib/bakeMap.mjs';
+import {
+  MAP_FILES,
+  bakeGatePositions,
+  mapJumpPairs,
+  mapRegions,
+  mapSystems,
+} from './lib/bakeMap.mjs';
 import { bakeIndustry } from './lib/bakeIndustry.mjs';
 import { bakeMarket } from './lib/bakeMarket.mjs';
 import { bakePi } from './lib/bakePi.mjs';
@@ -21,7 +27,7 @@ import { bakeCertificates } from './lib/certificates.mjs';
 import { bakeCertifiedPlans, factionNames, parseJsonl } from './lib/certifiedPlans.mjs';
 import { USER_AGENT as ESI_USER_AGENT } from './lib/constants.mjs';
 import { bakeCharacterTitles } from './lib/characterTitles.mjs';
-import { bakeShipMass, bakeWormholeMass } from './lib/jumpMass.mjs';
+import { bakeShipFlight, bakeShipMass, bakeWormholeMass } from './lib/jumpMass.mjs';
 import { bakeMutaplasmids, dogmaAttributeInfo } from './lib/mutaplasmids.mjs';
 import { bakeAgents, bakeNpcCorporations } from './lib/npcAgents.mjs';
 import { ccpBuildFromSdeJsonl, fetchFuzzworkDump } from './lib/sdeBuild.mjs';
@@ -72,6 +78,7 @@ async function main() {
     jumpPairs: mapJumpPairs(stargates),
     regions: mapRegions(parseJsonl(ccpStaticData['mapRegions.jsonl'])),
   };
+  const gatePositions = bakeGatePositions(stargates);
   const planets = parseJsonl(ccpStaticData['mapPlanets.jsonl']);
   const {
     groups,
@@ -213,6 +220,8 @@ async function main() {
     new Set([...groups].filter(([, g]) => g.categoryID === SHIP_CATEGORY_ID).map(([id]) => id)),
     attrsByType
   );
+  // Agility, speed and warp speed per hull, for the trip time (issue #6282).
+  const shipFlight = bakeShipFlight(shipMass, attrsByType);
   if (Object.keys(wormholeMass).length < 80 || wormholeMass.M267?.[0] !== 375_000_000) {
     throw new Error(
       'wormholeMass.json looks wrong: expected 80+ types and M267 at 375 Mt per jump'
@@ -262,6 +271,8 @@ async function main() {
     mutaplasmids,
     wormholeMass,
     shipMass,
+    shipFlight,
+    gatePositions,
     characterTitles,
     agents,
     npcCorporationData,
@@ -326,6 +337,7 @@ async function main() {
     solarSystems,
     npcStations,
     solarSystemJumps,
+    gatePositions,
     marketRegions,
     globalMarketRegions,
     globalMarkets,
