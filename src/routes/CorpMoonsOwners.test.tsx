@@ -61,7 +61,11 @@ vi.mock('@/features/corp/moons/useCorpBook', async () => {
             moon: (id: number) => `Moon ${id}`,
             ore: () => 'Ore',
           },
-          data: { feeders: book.feeders, state: { extractions: [] } } as unknown as BookData,
+          data: {
+            feeders: book.feeders,
+            state: { extractions: [] },
+            parts: new Set(['core', 'observed', 'ledger', 'answers']),
+          } as unknown as BookData,
         },
         reload: vi.fn(),
         characterId: 7,

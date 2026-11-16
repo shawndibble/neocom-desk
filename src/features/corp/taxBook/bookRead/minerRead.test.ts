@@ -1,4 +1,4 @@
-// readMinerBookData (issue #5258): which documents one Miner's page reads.
+// readBook for one Miner (issue #5258): which documents one Miner's page reads.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Data = Record<string, unknown>;
@@ -60,8 +60,11 @@ vi.mock('@/sync/syncAuth', () => ({ ensureSignedIn: vi.fn().mockResolvedValue(un
 vi.mock('@/auth/session', () => ({ getValidAccessToken: vi.fn() }));
 
 import { db } from '@/db';
-import { clearBookCache } from './bookCache';
-import { readMinerBookData } from './bookClient';
+import { clearBookCache } from '../bookCache';
+import { bookPartsFor, readBook } from '.';
+
+const readMiner = (minerId: string) =>
+  readBook(7, CORP, { parts: bookPartsFor('miners', 'miner'), minerId });
 
 const CORP = 98000001;
 const BOOK = `corps/${CORP}`;
@@ -109,12 +112,12 @@ beforeEach(async () => {
   obs('o4', 9, '2026-09-12'); // someone else's
 });
 
-describe('readMinerBookData', () => {
+describe('readBook for one Miner', () => {
   it('reads this Miner and the open window, not the ledger', async () => {
-    const read = await readMinerBookData(7, CORP, 'm1');
-    const d = read!.data;
-    expect(read!.from).toBe('2026-09-01');
-    expect(read!.totals).toMatchObject({ owed: 5 });
+    const d = (await readMiner('m1'))!;
+    expect(d.scopedMiner).toBe('m1');
+    expect(d.minerScope?.from).toBe('2026-09-01');
+    expect(d.minerScope?.totals).toMatchObject({ owed: 5 });
     expect(d.state.statements.map((s) => s.id).sort()).toEqual(['s-new', 's-old']);
     expect(d.state.payments.map((p) => p.id)).toEqual(['p1']);
     expect(d.declarations.map((x) => x.id)).toEqual(['x1']);
@@ -131,14 +134,14 @@ describe('readMinerBookData', () => {
 
   it('survives a missing composite index by filtering the window here', async () => {
     store.noIndex = true;
-    const read = await readMinerBookData(7, CORP, 'm1');
-    expect(read!.data.observed.map((r) => r.date).sort()).toEqual(['2026-09-10', '2026-09-12']);
+    const read = await readMiner('m1');
+    expect(read!.observed.map((r) => r.date).sort()).toEqual(['2026-09-10', '2026-09-12']);
   });
 
   it('survives a totals doc that is not deployed', async () => {
     store.docs.delete(`${BOOK}/minerTotals/m1`);
-    const read = await readMinerBookData(7, CORP, 'm1');
-    expect(read!.totals).toBeUndefined();
+    const read = await readMiner('m1');
+    expect(read!.minerScope?.totals).toBeUndefined();
   });
 
   it('reads a solo Miner by its character, and a quiet one by its newest row only', async () => {
@@ -146,8 +149,63 @@ describe('readMinerBookData', () => {
     obs('o5', 5, '2026-07-30', 98000099); // a guest's last row, before the book
     obs('o6', 5, '2026-06-01', 98000099);
     store.reads.length = 0;
-    const read = await readMinerBookData(7, CORP, 'solo:5');
-    expect(read!.data.observed).toEqual([]);
+    const read = await readMiner('solo:5');
+    expect(read!.observed).toEqual([]);
     expect(store.reads.filter((p) => p.includes('/observed/'))).toEqual([`${BOOK}/observed/o5`]);
   });
+
+  it('claims only the parts it read, and holds every field a whole read of them holds', async () => {
+    const scoped = (await readMiner('m1'))!;
+    const whole = (await readBook(7, CORP, { parts: scoped.parts }))!;
+    expect([...scoped.parts].sort()).toEqual(['answers', 'core', 'ledger', 'observed']);
+    expect(fieldsOf(scoped)).toEqual(fieldsOf(whole));
+  });
+
+  // #6206/#6207: Needs you lists them on every page, so a one-Miner read that claims the core
+  // and the ledger reads them as the whole book does.
+  it("reads the disputes it claims, this Miner's only, and the uncounted donations", async () => {
+    store.docs.set(BOOK, {
+      active: true,
+      startDate: '2026-08-01',
+      bookVersion: 'b1',
+      collectionVersions: { disputes: 'v1', meta: 'v1' },
+    });
+    const dispute = (id: string, minerId: string) =>
+      store.docs.set(`${BOOK}/disputes/${id}`, {
+        id,
+        minerId,
+        date: '2026-09-12',
+        lines: [{ recordKey: 'k', typeId: 1, quantity: 1, payeeName: 'Corp' }],
+        by: 9,
+        at: '2026-09-13T00:00:00Z',
+      });
+    dispute('q1', 'm1');
+    dispute('q2', 'm9');
+    store.docs.set(`${BOOK}/meta/uncounted`, {
+      donations: [
+        { id: 'u1', refId: 1, division: 3, characterId: 9, amount: 5, at: '2026-09-13T00:00:00Z' },
+      ],
+    });
+    const d = (await readMiner('m1'))!;
+    expect(d.disputes?.map((x) => x.id)).toEqual(['q1']);
+    // By Miner, as the page's other records: another Miner's dispute is never read.
+    expect(store.reads).not.toContain(`${BOOK}/disputes/q2`);
+    expect(d.uncounted?.map((x) => x.id)).toEqual(['u1']);
+  });
 });
+
+/** The fields a read filled in, `state`'s included: what a page can join. */
+function fieldsOf(data: object): string[] {
+  const state = (data as { state: object }).state;
+  return [
+    ...Object.entries(data)
+      .filter(([, v]) => v !== undefined)
+      .map(([k]) => k),
+    ...Object.entries(state)
+      .filter(([, v]) => v !== undefined)
+      .map(([k]) => `state.${k}`),
+  ]
+    .filter((k) => !SCOPE_ONLY.has(k))
+    .sort();
+}
+const SCOPE_ONLY = new Set(['scopedMiner', 'minerScope', 'readModels']);

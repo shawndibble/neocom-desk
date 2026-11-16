@@ -1,9 +1,24 @@
 import type { ModulePool } from '@/engine/fittings/improve';
+import type { FittingSlotKind } from '@/engine/fittings/types';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import type { VariantEvaluator } from './useFittingEvaluation';
 
+/** Whether the hull takes the module in that rack and the pilot can fly it; undefined: not known (assumed yes). */
+export type FitCheck = (
+  slot: FittingSlotKind,
+  typeId: number
+) => { fitsHull: boolean; canFly: boolean } | undefined;
+
+/** The engine's hull and skill check of one module on the open Fitting's hull, for its pilot. */
+export function fitCheckOf(variants: VariantEvaluator): FitCheck {
+  return (slot, typeId) =>
+    variants.engine
+      .checkCandidates(variants.fitting.shipTypeId, slot, [typeId], variants.profile)
+      .get(typeId);
+}
+
 /** The module pool the catalogue gives Rework and the fills: group, group members, market-listed, hull and skills. */
-export function modulePool(catalogue: FittingCatalogue, variants: VariantEvaluator): ModulePool {
+export function modulePool(catalogue: FittingCatalogue, fitCheck: FitCheck): ModulePool {
   const listed = new Set(catalogue.marketTypes.map((entry) => entry.typeId));
   const flyable = new Map<string, boolean>();
   const skilled = new Map<string, boolean>();
@@ -17,9 +32,7 @@ export function modulePool(catalogue: FittingCatalogue, variants: VariantEvaluat
       const key = `${slot}:${typeId}`;
       let ok = skilled.get(key);
       if (ok === undefined) {
-        const check = variants.engine
-          .checkCandidates(variants.fitting.shipTypeId, slot, [typeId], variants.profile)
-          .get(typeId);
+        const check = fitCheck(slot, typeId);
         ok = check ? check.canFly : true;
         skilled.set(key, ok);
       }
@@ -30,9 +43,7 @@ export function modulePool(catalogue: FittingCatalogue, variants: VariantEvaluat
       const key = `${slot}:${typeId}`;
       let ok = flyable.get(key);
       if (ok === undefined) {
-        const check = variants.engine
-          .checkCandidates(variants.fitting.shipTypeId, slot, [typeId], variants.profile)
-          .get(typeId);
+        const check = fitCheck(slot, typeId);
         ok = check ? check.fitsHull && check.canFly : true;
         flyable.set(key, ok);
       }

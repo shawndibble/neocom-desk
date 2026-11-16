@@ -13,18 +13,15 @@
  */
 import type { MinerListDoc, OverviewDoc } from '../../../functions/src/corpTaxBookReadModels';
 import { DAY_MS } from '@/lib/age';
-import { lastBillableDate } from './billable';
-import { buildDayCharges, type DayCharge } from './charges';
-import { splitByCoverageAndRead } from './feederHealth';
+import type { DayCharge } from './charges';
 import { overdueStatus, type Declaration } from './overdue';
 import { moonSchedule } from './bookSections';
 import {
   extractionRowBase,
   latestCorporationOf,
   minerDraft,
-  minerIdsOf,
+  openSetInputOf,
   pendingTax,
-  placeOfFactory,
   standingOf,
   type BookView,
   type BookViewInput,
@@ -33,6 +30,7 @@ import {
   type NeedsYouItem,
 } from './bookView';
 import type { SettlePayment, SyncExtraction } from './sync';
+import { settleOpenSet } from './openSet';
 
 /** The Extraction fields the Overview's schedule prints. */
 export type ScheduleRow = Pick<
@@ -86,45 +84,29 @@ export function fromBookView(view: BookView): TabsProjection {
 }
 
 /** What the loaded rows decide, whatever the docs say: unbilled, pending and unrated days. */
-export interface OpenSet {
+export interface OpenAmounts {
   billableThrough: string | undefined;
   /** The Miner ids a view lists, in order. */
   minerIds: string[];
-  byMiner: ReadonlyMap<string, { unbilled: number; pending: number }>;
+  byMiner: ReadonlyMap<string, { characterIds: number[]; unbilled: number; pending: number }>;
   unratedCount: number;
 }
 
 /** The open set of `input`: the same day charges and drafts `buildBookView` builds, without the ledger. */
-export function openSetOf(input: BookViewInput): OpenSet {
-  const placeOf = placeOfFactory(input.extractions, input.structureExpiryHours);
-  const { readable } = splitByCoverageAndRead(input.entries, {
-    now: input.now,
-    graceHours: input.graceHours,
-    bookCorporationId: input.corporationId,
-    feeders: input.feeders ?? [],
-  });
-  const { charges, unrated } = buildDayCharges(readable, {
-    corporationId: input.corporationId,
-    startDate: input.startDate,
-    miners: input.miners,
-    rates: input.rates,
-    pricesOn: input.pricesOn,
-    placeOf,
-  });
-  const billableThrough = lastBillableDate({
-    now: input.now,
-    lastSyncedAt: input.lastSyncedAt,
-    graceHours: input.graceHours,
-  });
-  const minerIds = [...minerIdsOf(input, charges)];
-  const byMiner = new Map<string, { unbilled: number; pending: number }>();
+export function openSetOf(input: BookViewInput): OpenAmounts {
+  const { charges, billableThrough, minerIds, miners, unrated } = settleOpenSet(
+    openSetInputOf(input)
+  );
+  const byMiner = new Map<string, { characterIds: number[]; unbilled: number; pending: number }>();
   for (const id of minerIds) {
-    const statements = input.statements.filter((s) => s.minerId === id);
+    const { characterIds, statements } = miners.get(id)!;
     const mine: DayCharge[] = charges.filter((c) => c.minerId === id);
+    // The book's billable-through, not the Miner's held one: as this path has always drafted.
     const draft = minerDraft(input, id, statements, mine, billableThrough);
     const billed = new Set<string>();
     for (const s of statements) for (const l of s.lines) if (l.chargeKey) billed.add(l.chargeKey);
     byMiner.set(id, {
+      characterIds,
       unbilled: (draft.kind === 'nothing' ? [] : draft.lines).reduce((sum, l) => sum + l.tax, 0),
       pending: pendingTax(input, mine, billed, billableThrough),
     });
@@ -151,7 +133,7 @@ export function readModelsUsable(
 export function fromReadModels(
   docs: { minerList: MinerListDoc; overview: OverviewDoc },
   input: BookViewInput,
-  open: OpenSet = openSetOf(input)
+  open: OpenAmounts = openSetOf(input)
 ): TabsProjection {
   const entries = new Map(docs.minerList.miners.map((e) => [e.minerId, e]));
   const latestCorp = latestCorporationOf(input.entries);
@@ -160,10 +142,10 @@ export function fromReadModels(
   const needsYou: NeedsYouItem[] = [];
 
   for (const id of open.minerIds) {
-    const grouping = input.miners.find((m) => m.id === id);
-    const solo = /^solo:(\d+)$/.exec(id);
-    const characterIds = grouping?.characterIds ?? (solo ? [Number(solo[1])] : []);
-    const mainCharacterId = grouping?.mainCharacterId ?? characterIds[0] ?? 0;
+    const amounts = open.byMiner.get(id);
+    const characterIds = amounts?.characterIds ?? [];
+    const mainCharacterId =
+      input.miners.find((m) => m.id === id)?.mainCharacterId ?? characterIds[0] ?? 0;
     const entry = entries.get(id);
     const owed = entry?.owed ?? 0;
 
@@ -188,7 +170,6 @@ export function fromReadModels(
       }
     }
     const standing = standingOf(characterIds, latestCorp, input);
-    const amounts = open.byMiner.get(id);
     miners.push({
       id,
       mainCharacterId,

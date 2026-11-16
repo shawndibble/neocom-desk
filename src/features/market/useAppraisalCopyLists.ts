@@ -41,12 +41,12 @@ export function useAppraisalCopyLists({
   result,
   owned,
   settleLive,
-  refineBasis = 'buy',
+  refineBasis,
 }: {
   result: Result;
   owned: ReadonlyMap<number, number> | null;
   /** The remembered price basis, which decides what counts as "refine" in the copy lists. */
-  refineBasis?: RefineBasis;
+  refineBasis: RefineBasis;
   /** Resolves with the result once every row has settled on its live book. */
   settleLive: AppraisalController['settleLive'];
 }) {

@@ -1,6 +1,8 @@
 // Every route renders the same figures from its own book parts as from the whole book (#5247).
 // A route that joins a slice its `bookPartsFor` leaves out shows wrong figures silently, as the
-// Overview did when it read `core` only: owed and Needs you ignored payments.
+// Overview did when it read `core` only: owed and Needs you ignored payments. The book is read
+// through the real `readBook` over a stand-in Firestore, so a field filed under the wrong part
+// (bookRead/slices.ts) shows here too.
 import { cleanup, render } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { MemoryRouter } from 'react-router-dom';
@@ -15,8 +17,8 @@ import {
 } from '@/engine/corpTaxBook/bookView';
 import { extractionId } from '@/engine/corpTaxBook/sync';
 import type { ObservedMiningEntry } from '@/engine/corpTaxBook/types';
-import type { BookData, BookFeeder, BookSettings, OfficerVerdict } from '../taxBook/bookClient';
-import { bookPartsFor, type BookDetailKind, type BookPartSet } from '../taxBook/bookParts';
+import type { BookData, BookFeeder, BookPart, OfficerVerdict } from '../taxBook/bookClient';
+import { bookPartsFor, readBook } from '../taxBook/bookRead';
 import { BookProvider } from './BookContext';
 import { ExtractionsTab } from './ExtractionsTab';
 import { MinerDetail } from './MinerDetail';
@@ -28,6 +30,33 @@ import { OverviewTab } from './OverviewTab';
 import { StatementPeriodDetail } from './StatementPeriodDetail';
 import { StatementsTab } from './StatementsTab';
 
+type BookPartSet = ReadonlySet<BookPart>;
+type BookDetailKind = NonNullable<Parameters<typeof bookPartsFor>[1]>;
+
+/** The stand-in Firestore: documents by path. */
+const store = vi.hoisted(() => new Map<string, Record<string, unknown>>());
+vi.mock('firebase/firestore/lite', () => ({
+  doc: (_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }),
+  collection: (_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }),
+  getDoc: async (ref: { path: string }) => {
+    const data = store.get(ref.path);
+    return { exists: () => data !== undefined, data: () => data, get: () => undefined };
+  },
+  getDocs: async (ref: { path: string }) => {
+    const prefix = `${ref.path}/`;
+    const docs = [...store]
+      .filter(([path]) => path.startsWith(prefix) && !path.slice(prefix.length).includes('/'))
+      .map(([path, data]) => ({ id: path.slice(prefix.length), data: () => data }));
+    return { docs };
+  },
+  query: (ref: { path: string }) => ref,
+  where: vi.fn(),
+  Timestamp: { fromMillis: (ms: number) => ({ toMillis: () => ms }) },
+  orderBy: vi.fn(),
+  limit: vi.fn(),
+}));
+vi.mock('@/sync/firebaseApp', () => ({ getSyncFirestore: () => ({}) }));
+vi.mock('@/sync/syncAuth', () => ({ ensureSignedIn: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('../taxBook/bookClient', async (orig) => ({
   ...(await orig<typeof import('../taxBook/bookClient')>()),
   editBook: vi.fn(),
@@ -231,31 +260,46 @@ function richBook() {
 
 const RICH = richBook();
 
-/** What `readBookData` returns for a read of `parts`: the slices left out come back empty. */
-function bookData(parts: BookPartSet | undefined): BookData {
-  const has = (p: 'core' | 'ledger' | 'answers') => parts === undefined || parts.has(p);
-  const ledger = has('ledger');
-  return {
-    settings: {
-      graceHours: base.graceHours,
-      minimumStatement: 0,
-      rates: base.rates,
-    } as unknown as BookSettings,
-    state: {
-      miners: base.miners,
-      statements: RICH.statements,
-      extractions: base.extractions,
-      payments: ledger ? RICH.payments : [],
-      dismissals: ledger ? RICH.dismissals : [],
-      writeOffs: ledger ? RICH.writeOffs : [],
-      paidStatementIds: new Set<string>(),
-    } as never,
-    observed: [],
-    declarations: ledger ? RICH.declarations : [],
-    adjustments: ledger ? RICH.adjustments : [],
-    feeders: [FEEDER],
-    groupingAnswers: [],
+/** The rich book as Firestore holds it: no version stamps, so every read is fresh. */
+function seed() {
+  const book = `corps/${CORP}`;
+  store.clear();
+  store.set(book, {
+    active: true,
+    startDate: base.startDate,
+    graceHours: base.graceHours,
+    minimumStatement: 0,
+    overdueDays: base.overdueDays,
+    cadence: base.cadence,
+    hubId: base.hubId,
+    oreForm: base.oreForm,
+    rates: base.rates,
+  });
+  store.set(`${book}/meta/paid`, { ids: [] });
+  // Stored as a record: the clock in ms, and the payouts (none) under it.
+  store.set(`${book}/feeders/${MOON_OWNER}`, {
+    ...FEEDER,
+    payouts: undefined,
+    lastReadWellAt: Date.parse(FEEDER.lastReadWellAt!),
+  });
+  base.extractions.forEach((x, i) => store.set(`${book}/extractions/e${i}`, { ...x }));
+  const lists: Record<string, readonly { id: string }[]> = {
+    miners: base.miners,
+    statements: RICH.statements,
+    payments: RICH.payments,
+    dismissals: RICH.dismissals,
+    declarations: RICH.declarations,
+    adjustments: RICH.adjustments,
+    writeOffs: RICH.writeOffs,
   };
+  for (const [name, rows] of Object.entries(lists))
+    for (const row of rows) store.set(`${book}/${name}/${row.id}`, row);
+}
+
+/** What `readBook` returns for a read of `parts` (undefined: the whole book). */
+async function bookData(parts: BookPartSet | undefined): Promise<BookData> {
+  seed();
+  return (await readBook(7, CORP, { parts: parts ?? bookPartsFor() }))!;
 }
 
 function viewOf(data: BookData) {
@@ -282,8 +326,8 @@ const verdict: OfficerVerdict = {
 };
 
 /** What a route puts on screen, from a book read as `parts`. */
-function screenText(ui: ReactElement, parts: BookPartSet | undefined): string {
-  const data = bookData(parts);
+async function screenText(ui: ReactElement, parts: BookPartSet | undefined): Promise<string> {
+  const data = await bookData(parts);
   const { container } = render(
     <MemoryRouter initialEntries={['/corp/moons']}>
       <BookProvider
@@ -369,28 +413,28 @@ describe('book parts parity', () => {
     expect(RICH.statements.some((s) => s.id.endsWith('-rebill'))).toBe(true);
   });
 
-  it.each(ROUTES)('$name renders the same from its own parts as from the whole book', (r) => {
+  it.each(ROUTES)('$name renders the same from its own parts as from the whole book', async (r) => {
     const parts = bookPartsFor(r.tab, r.detail);
-    const whole = screenText(r.ui, undefined);
+    const whole = await screenText(r.ui, undefined);
     expect(whole.length).toBeGreaterThan(20);
-    expect(screenText(r.ui, parts)).toBe(whole);
+    expect(await screenText(r.ui, parts)).toBe(whole);
   });
 
-  it('the harness sees a missing slice: the Overview on core alone differs from the whole book', () => {
-    const whole = screenText(<OverviewTab />, undefined);
-    expect(screenText(<OverviewTab />, new Set(['core']))).not.toBe(whole);
+  it('the harness sees a missing slice: the Overview on core alone differs from the whole book', async () => {
+    const whole = await screenText(<OverviewTab />, undefined);
+    expect(await screenText(<OverviewTab />, new Set(['core']))).not.toBe(whole);
   });
 
-  it('the Extractions detail needs the ledger for its dismissed days', () => {
-    const whole = screenText(<MoonDetail id={SEP_ID} />, undefined);
-    expect(screenText(<MoonDetail id={SEP_ID} />, new Set(['core']))).not.toBe(whole);
+  it('the Extractions detail needs the ledger for its dismissed days', async () => {
+    const whole = await screenText(<MoonDetail id={SEP_ID} />, undefined);
+    expect(await screenText(<MoonDetail id={SEP_ID} />, new Set(['core']))).not.toBe(whole);
   });
 
-  it('the Overview owes what the Miners tab owes, for a Miner who paid', () => {
-    const view = viewOf(bookData(bookPartsFor('overview', null)));
+  it('the Overview owes what the Miners tab owes, for a Miner who paid', async () => {
+    const view = viewOf(await bookData(bookPartsFor('overview', null)));
     const sum = view.miners.reduce((total, m) => total + m.owed, 0);
     expect(view.totals.owed).toBe(sum);
-    const whole = viewOf(bookData(undefined));
+    const whole = viewOf(await bookData(undefined));
     const g1 = (v: typeof view) => v.miners.find((m) => m.id === 'g1')!;
     const billed = RICH.statements
       .filter((s) => s.minerId === 'g1')
@@ -399,7 +443,7 @@ describe('book parts parity', () => {
     expect(g1(view).owed).toBe(g1(whole).owed);
     expect(view.totals.owed).toBe(whole.totals.owed);
     // What the Miners tab reads is the same row.
-    const minersTab = viewOf(bookData(bookPartsFor('miners', null)));
+    const minersTab = viewOf(await bookData(bookPartsFor('miners', null)));
     expect(g1(minersTab).owed).toBe(g1(view).owed);
     expect(minersTab.totals.owed).toBe(view.totals.owed);
   });

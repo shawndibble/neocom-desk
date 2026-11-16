@@ -214,3 +214,20 @@ export function unguardedJobs(goal: ImproveGoal, job?: ImproveJob): readonly Job
  */
 export const effectiveSpace = (space: ExploreSpace, carriesCombatDrones: boolean): ExploreSpace =>
   carriesCombatDrones ? 'dangerous' : space;
+
+/** Combat drones (Hobgoblin, Hammerhead, Ogre and the like); salvage, mining and EWAR drones are other groups. */
+const COMBAT_DRONE_GROUP = 100;
+
+/** Explore's space for the search: Safe still holds the tank of a fit that carries combat drones (it expects combat sites). Other jobs: as chosen. */
+export function searchSpace(
+  job: ImproveJob,
+  space: ExploreSpace,
+  drones: readonly { typeId: number; quantity: number }[],
+  groupOf: (typeId: number) => number | undefined
+): ExploreSpace {
+  if (job !== 'explore') return space;
+  const combat = drones.some(
+    (drone) => drone.quantity > 0 && groupOf(drone.typeId) === COMBAT_DRONE_GROUP
+  );
+  return effectiveSpace(space, combat);
+}

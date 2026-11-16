@@ -1,24 +1,32 @@
 /**
- * Which slices of a Corp Tax Book a `/corp/moons` page reads (issue #5248).
- * Opening a tab reads only its slices; a later tab reads the ones it adds, and
- * the slices already held are reused.
+ * Which parts of a Corp Tax Book a `/corp/moons` page reads (issue #5248); `slices.ts` names
+ * the fields each one fills, and is the list to trust over this summary.
+ * Opening a tab reads only its parts; a later tab reads the ones it adds, and
+ * the parts already held are reused.
  *
- * - `core`: miners, statements, extractions, feeders (with payouts) and the scheduled-sync
- *   status. Every tab joins these.
+ * - `core`: miners, statements, extractions, feeders (with payouts), the scheduled-sync
+ *   status and the uncounted donations (#6207). Every tab joins these.
  * - `observed`: the ledger rows (a Dexie delta on a device that holds a copy, ADR 0031). Every
  *   tab reads them except Moon owners, whose figures come from the `owners` summaries (#5717);
  *   that tab asks for them only when a summary cannot stand in (`needsRowsFallback`).
- * - `ledger`: payments, dismissals, declarations, adjustments and write-offs.
+ * - `ledger`: payments, dismissals, declarations, adjustments, write-offs and disputes (#6206).
  *   A Miner's balance, a Statement's state and an Extraction page's per-day billing read them.
  * - `answers`: guests' answers to a hand-made grouping, shown beside a Miner.
  * - `owners`: each moon owner's server-built view summary (one doc per moon owner), which the
  *   Moon owners tab shows in place of accrual worked from every ledger row (#5717). Not in
  *   `ALL_BOOK_PARTS`: a whole-book read (the export) has no use for it.
  *
- * The settings document and `meta/paid` are not slices: every read takes them fresh.
+ * The settings document and `meta/paid` are not parts: every read takes them fresh.
  */
-export const ALL_BOOK_PARTS = ['core', 'observed', 'ledger', 'answers'] as const;
-export type BookPart = (typeof ALL_BOOK_PARTS)[number] | 'owners';
+import type { BookPart } from '../bookClient';
+
+export type { BookPart };
+export const ALL_BOOK_PARTS = [
+  'core',
+  'observed',
+  'ledger',
+  'answers',
+] as const satisfies readonly BookPart[];
 
 export type BookPartSet = ReadonlySet<BookPart>;
 
@@ -27,7 +35,9 @@ export const ALL_BOOK_PART_SET: BookPartSet = new Set(ALL_BOOK_PARTS);
 /** What a page asks for: a tab id, or a detail page below it. */
 export type BookDetailKind = 'extraction' | 'miner' | 'moonOwner' | 'statementPeriod';
 
-export function bookPartsFor(tab: string, detail: BookDetailKind | null): BookPartSet {
+/** The parts a page reads. No page: the whole book, as the export reads it. */
+export function bookPartsFor(tab?: string, detail: BookDetailKind | null = null): BookPartSet {
+  if (tab === undefined) return ALL_BOOK_PART_SET;
   const route = detail ?? tab;
   switch (route) {
     // The read models stand in for payments and declarations, but the open set (unbilled
@@ -53,17 +63,12 @@ export function bookPartsFor(tab: string, detail: BookDetailKind | null): BookPa
   }
 }
 
-/** The wanted parts not yet held. `held` undefined is a book read whole. */
-export function missingBookParts(wanted: BookPartSet, held: BookPartSet | undefined): BookPartSet {
-  if (held === undefined) return new Set();
+/** The wanted parts not yet held. */
+export function missingParts(wanted: BookPartSet, held: BookPartSet): BookPartSet {
   return new Set([...wanted].filter((p) => !held.has(p)));
 }
 
-/** Two reads of one book as one. `undefined` is a book read whole. */
-export function mergeBookParts(
-  a: BookPartSet | undefined,
-  b: BookPartSet | undefined
-): BookPartSet {
-  if (a === undefined || b === undefined) return new Set(ALL_BOOK_PARTS);
-  return new Set([...a, ...b]);
+/** Whether a read holds every part a page joins: no `extendBook` read is due. */
+export function holdsParts(read: { parts: BookPartSet }, wanted: BookPartSet): boolean {
+  return missingParts(wanted, read.parts).size === 0;
 }

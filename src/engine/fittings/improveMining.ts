@@ -109,3 +109,59 @@ export function minerWithoutCrystal(
 ): boolean {
   return rows.some((row) => !row.isDrone && (row.chargeTypeId ?? null) !== crystalFor(row.typeId));
 }
+
+/** Mine more's ore plan: what each miner loads, the best crystal's key, and which crystals each miner type takes. */
+export interface CrystalPlan {
+  crystalFor: (moduleTypeId: number) => number | null;
+  bestKey: string;
+  crystalsOf: (moduleTypeId: number) => number[];
+}
+
+/** What `crystalPlan` reads of the fit and the type catalogue. */
+export interface CrystalSource {
+  /** The ore's crystal family. */
+  family: string;
+  /** The fitted miners' type ids (not drones). */
+  minerTypeIds: Iterable<number>;
+  /** The charge groups a module type takes on this hull; none for a module that takes no charge. */
+  chargeGroupsOf: (moduleTypeId: number) => readonly number[];
+  typeIdsInGroup: (groupId: number) => readonly number[];
+  nameOf: (typeId: number) => string | undefined;
+}
+
+/**
+ * Mine more's ore: which crystal each miner type loads, for the family. The
+ * crystal letter and tech level that `yieldOf` scores best (the open Fitting's
+ * m³/s with every miner loaded so) is used for every miner type, so each row
+ * is the one ore's best case. Null when no fitted miner takes a crystal of the family.
+ */
+export async function crystalPlan(
+  source: CrystalSource,
+  yieldOf: (crystalFor: (moduleTypeId: number) => number | null) => Promise<number>
+): Promise<CrystalPlan | null> {
+  const { family, nameOf } = source;
+  const known = new Map<number, number[]>();
+  const crystalsOf = (typeId: number): number[] => {
+    let crystals = known.get(typeId);
+    if (!crystals) {
+      crystals = crystalsOfFamily(
+        family,
+        source.chargeGroupsOf(typeId).flatMap((group) => source.typeIdsInGroup(group)),
+        nameOf
+      );
+      known.set(typeId, crystals);
+    }
+    return crystals;
+  };
+  const keyOf = (crystal: number) => crystalKeyOf(nameOf(crystal) ?? '');
+  const forKey = (key: string) => (typeId: number) =>
+    crystalsOf(typeId).find((crystal) => keyOf(crystal) === key) ?? null;
+  const keys = new Set<string>();
+  for (const typeId of new Set(source.minerTypeIds))
+    for (const crystal of crystalsOf(typeId)) {
+      const key = keyOf(crystal);
+      if (key) keys.add(key);
+    }
+  const best = await bestCrystalKey([...keys], (key) => yieldOf(forKey(key)));
+  return best === null ? null : { crystalFor: forKey(best), bestKey: best, crystalsOf };
+}

@@ -59,6 +59,12 @@ export interface DayCharge {
   taxOwed: number;
 }
 
+/** The moon and Extraction a refinery was working on a date, when known. */
+export type PlaceOf = (
+  structureId: number,
+  date: string
+) => { moonId?: number; extractionId?: string };
+
 export interface ChargeBook {
   corporationId: number;
   /** The book's start date (D10): earlier mining is history that owes nothing. */
@@ -67,8 +73,7 @@ export interface ChargeBook {
   rates: readonly TaxRate[];
   /** The day's prices at the book's hub and Ore Form (`priceObservedDay`). */
   pricesOn: (date: string) => Pick<DayPrices, 'prices' | 'sources'>;
-  /** The moon and Extraction a refinery was working on a date, when known. */
-  placeOf: (structureId: number, date: string) => { moonId?: number; extractionId?: string };
+  placeOf: PlaceOf;
 }
 
 export interface DayCharges {
