@@ -54,6 +54,7 @@ function argsWith(overrides: Partial<UseOpportunitiesArgs> = {}): UseOpportuniti
     ownedStockSnapshot: STOCK,
     ownedByCharacter: new Map(),
     assumedMe: 10,
+    profitBasis: 'sellValue',
     ...overrides,
   };
 }

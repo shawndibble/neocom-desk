@@ -255,8 +255,8 @@ describe('OpenOrdersPanel', () => {
     const user = userEvent.setup();
     renderPanel();
 
-    expect(await screen.findByText('Bravo — Log in again to see your orders')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Log in again with EVE Online' }));
+    expect(await screen.findByText('Bravo: grant Market orders')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Grant in EVE' }));
     expect(beginEveLogin).toHaveBeenCalledWith({ characterId: 2, groups: ['marketOrders'] });
   });
 
@@ -967,9 +967,7 @@ describe('OpenOrdersPanel', () => {
         mockedLoadAll.mockResolvedValue(snapshot([], [{ characterId: 2, name: 'Bravo' }]));
         renderPanel('/market/orders?char=2');
         expect(await screen.findByText('Bravo only')).toBeInTheDocument();
-        expect(
-          await screen.findByText('Bravo — Log in again to see your orders')
-        ).toBeInTheDocument();
+        expect(await screen.findByText('Bravo: grant Market orders')).toBeInTheDocument();
         expect(screen.queryByText(/No open orders/i)).not.toBeInTheDocument();
       });
     });
@@ -1163,8 +1161,8 @@ describe('OpenOrdersPanel — Corporation source', () => {
 
   it('asks for the corp orders grant without reading, and shows no list under it', async () => {
     renderCorp({ corporationNeedsGrant: true });
-    expect(await screen.findByText(/Corp orders need a new grant/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Grant access' })).toBeInTheDocument();
+    expect(await screen.findByText('This character: grant Corporation')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Grant in EVE' })).toBeInTheDocument();
     expect(screen.queryByText('No orders match your filters.')).not.toBeInTheDocument();
     expect(loadCorpOrdersFeed).not.toHaveBeenCalled();
     expect(mockedLoadAll).not.toHaveBeenCalled();

@@ -45,6 +45,10 @@ export interface AppraisalController {
   appraiseText: (next: string) => void;
   /** The text that was priced; empty until the first Appraise, and again after Clear. */
   submitted: string;
+  /** The tab column the pilot picked as the quantity of `submitted`'s text lines; null before a pick. */
+  quantityColumn: number | null;
+  /** Re-prices the submitted paste's text-quantity lines from this tab column. */
+  chooseQuantityColumn: (column: number) => void;
   /** Null until the first Appraise, and again after Clear. */
   result: AppraisalOutcome | null;
   /** The same pile priced at all 5 Trade Hubs. Null and set together with `result`. */
@@ -80,6 +84,10 @@ export function useAppraisal(
   const { stationRate, taxRate } = refining;
   const [text, setText] = useState('');
   const [submitted, setSubmitted] = useState('');
+  // The pilot's pick, tied to the paste it was made for: replacing the paste
+  // retires the pick without any reset to remember.
+  const [pick, setPick] = useState<{ text: string; column: number } | null>(null);
+  const quantityColumn = pick !== null && pick.text === submitted ? pick.column : null;
   // The cached (Fuzzwork) outcome; `useAppraisalLive` swaps rows to live books on top of it.
   const [base, setBase] = useState<AppraisalOutcome | null>(null);
   const [baseCompare, setBaseCompare] = useState<HubComparisonRow[] | null>(null);
@@ -111,8 +119,9 @@ export function useAppraisal(
           appraisePaste(submitted, hub, pricePercent, characterId, {
             force,
             refining: { stationRate, taxRate },
+            quantityColumn,
           }),
-          compareHubs(submitted, pricePercent, { force }),
+          compareHubs(submitted, pricePercent, { force, quantityColumn }),
         ]);
         if (cancelled) return;
         setBase(outcome);
@@ -131,10 +140,23 @@ export function useAppraisal(
     return () => {
       cancelled = true;
     };
-  }, [submitted, hub, pricePercent, characterId, forceTick, stationRate, taxRate, refiningReady]);
+  }, [
+    submitted,
+    hub,
+    pricePercent,
+    characterId,
+    forceTick,
+    stationRate,
+    taxRate,
+    refiningReady,
+    quantityColumn,
+  ]);
 
   const appraiseText = useCallback((next: string) => {
     setText(next);
+    // A replaced paste drops the pick for good, so pasting the old text back
+    // later does not revive it. The same text re-run keeps it.
+    setPick((current) => (current?.text === next ? current : null));
     // Guarded rather than left to the effect: an empty submit would otherwise
     // leave the previous result on screen with nothing backing it.
     if (next.trim() === '') return;
@@ -157,6 +179,7 @@ export function useAppraisal(
 
   const clear = useCallback(() => {
     setText('');
+    setPick(null);
     setSubmitted('');
     setBase(null);
     setBaseCompare(null);
@@ -184,6 +207,8 @@ export function useAppraisal(
     setText,
     appraiseText,
     submitted,
+    quantityColumn,
+    chooseQuantityColumn: (column: number) => setPick({ text: submitted, column }),
     result,
     compare,
     loading,

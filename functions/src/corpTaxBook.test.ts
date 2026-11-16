@@ -14,9 +14,12 @@ import {
   disputeIdFor,
   mergeDisputeLines,
   billedDisputeTax,
+  checkClaimedTransfer,
+  checkClaimedTransfers,
   needsLiveCheck,
   parseEditAction,
   parseSettingsPatch,
+  sameDivisions,
   parseStatement,
   parseSyncInput,
   donationsReadAtPatch,
@@ -127,6 +130,33 @@ describe('parsers', () => {
     ).toMatchObject({
       divisions: [1, 2],
     });
+  });
+
+  it('takes an added division and the divisions list a change started from', () => {
+    expect(parseSettingsPatch({ addDivision: 3 })).toEqual({ addDivision: 3 });
+    expect(() => parseSettingsPatch({ addDivision: 8 })).toThrow();
+    expect(() => parseSettingsPatch({ addDivision: '3' })).toThrow();
+    expect(parseSettingsPatch({ divisions: [3, 1], divisionsBase: [2, 1, 2] })).toEqual({
+      divisions: [1, 3],
+      divisionsBase: [1, 2],
+    });
+    // A base only says what a new `divisions` list started from.
+    expect(() => parseSettingsPatch({ divisionsBase: [1] })).toThrow();
+    expect(() => parseSettingsPatch({ divisions: [1], divisionsBase: [9] })).toThrow();
+    // `addDivision` adds to the stored list; a base check alongside it would never run.
+    expect(() =>
+      parseSettingsPatch({ addDivision: 2, divisions: [1, 2], divisionsBase: [1] })
+    ).toThrow();
+    expect(parseSettingsPatch({ addDivision: 2, divisions: [1, 2] })).toEqual({
+      addDivision: 2,
+      divisions: [1, 2],
+    });
+  });
+
+  it('compares divisions lists by the divisions they name', () => {
+    expect(sameDivisions([1, 3], [3, 1, 3])).toBe(true);
+    expect(sameDivisions([1], [1, 4])).toBe(false);
+    expect(sameDivisions([1, 2], [1, 4])).toBe(false);
   });
 
   it('refuses observer rows from the future', () => {
@@ -270,6 +300,8 @@ describe('parsers', () => {
     ).toEqual({
       corporationId: 9,
       date: '2026-11-01',
+      // A client older than kinds sends none: the original payee dispute.
+      kind: 'payee',
       lines: [line],
     });
     // A line from another day is not this day's dispute.
@@ -297,6 +329,77 @@ describe('parsers', () => {
         lines: [{ ...line, payeeName: '' }],
       })
     ).toThrow();
+  });
+
+  it('parses the other kinds: a reason always, a claimed rate for a rate dispute, no Payee', () => {
+    const line = { recordKey: '7:1000:2026-11-01', typeId: 45490, quantity: 1200 };
+    expect(
+      parseDisputeConflictInput({
+        corporationId: 9,
+        date: '2026-11-01',
+        kind: 'rate',
+        reason: 'We agreed 10%',
+        claimedPct: 10,
+        lines: [line],
+      })
+    ).toEqual({
+      corporationId: 9,
+      date: '2026-11-01',
+      kind: 'rate',
+      reason: 'We agreed 10%',
+      claimedPct: 10,
+      lines: [{ ...line, payeeName: '' }],
+    });
+    // Not paying, without saying why, is the member's own hide: nothing reaches the server.
+    expect(() =>
+      parseDisputeConflictInput({
+        corporationId: 9,
+        date: '2026-11-01',
+        kind: 'notPaying',
+        lines: [line],
+      })
+    ).toThrow();
+    expect(() =>
+      parseDisputeConflictInput({
+        corporationId: 9,
+        date: '2026-11-01',
+        kind: 'rate',
+        reason: 'r',
+        lines: [line],
+      })
+    ).toThrow();
+    expect(() =>
+      parseDisputeConflictInput({
+        corporationId: 9,
+        date: '2026-11-01',
+        kind: 'mystery',
+        reason: 'r',
+        lines: [line],
+      })
+    ).toThrow();
+  });
+
+  it("carries an officer's next step when a bill is kept, and still accepts none", () => {
+    expect(
+      parseEditAction({
+        action: 'rejectDispute',
+        disputeId: 'm_2026-11-01',
+        reason: 'Book stands',
+        nextStep: 'Send the journal screenshot to Imra',
+      })
+    ).toMatchObject({ nextStep: 'Send the journal screenshot to Imra' });
+    expect(
+      parseEditAction({ action: 'rejectDispute', disputeId: 'm_2026-11-01', reason: 'r' })
+    ).not.toHaveProperty('nextStep');
+    expect(
+      parseEditAction({
+        action: 'resolveDeclaration',
+        declarationId: 'x1',
+        resolution: 'rejected',
+        reason: 'Not in any division',
+        nextStep: 'Pay it to the Master wallet',
+      })
+    ).toMatchObject({ nextStep: 'Pay it to the Master wallet' });
   });
 
   it('names one dispute per Miner and day, a safe doc id (#6206)', () => {
@@ -430,6 +533,18 @@ describe('parsers', () => {
         billedDisputeTax(disputed, [{ lines: [mined('60:1000:2026-11-01', 45490, 100)] }])
       ).toBeUndefined();
       expect(billedDisputeTax(disputed, [])).toBeUndefined();
+    });
+
+    // A rate dispute is about the rate: waiving it credits the gap, never the whole tax.
+    it('prices a rate dispute as the gap between the billed and claimed rates', () => {
+      const statements = [{ lines: [mined('60:1000:2026-11-01', 45490, 100, 12)] }];
+      const rate = {
+        kind: 'rate' as const,
+        claimedPct: 10,
+        lines: [{ recordKey: '60:1000:2026-11-01', typeId: 45490, quantity: 100 }],
+      };
+      expect(billedDisputeTax(rate, statements)).toBeCloseTo(100 * 1000 * 0.02);
+      expect(billedDisputeTax({ ...rate, claimedPct: 15 }, statements)).toBe(0);
     });
 
     it('ignores correction lines and malformed lines', () => {
@@ -799,6 +914,33 @@ describe('settings patch: start date and member visibility', () => {
     expect(() => parseSettingsPatch({ showToMembers: false })).toThrow();
   });
 
+  it("takes who answers members' tax questions, null clearing it", () => {
+    const list = { kind: 'mailingList', id: 7, name: ' Desk ' };
+    expect(parseSettingsPatch({ taxContact: list })).toEqual({
+      taxContact: { kind: 'mailingList', id: 7, name: 'Desk' },
+    });
+    expect(parseSettingsPatch({ taxContact: { kind: 'characters', ids: [3, 4, 3] } })).toEqual({
+      taxContact: { kind: 'characters', ids: [3, 4] },
+    });
+    expect(parseSettingsPatch({ taxContact: null })).toEqual({ taxContact: null });
+    for (const bad of [
+      'x',
+      [],
+      { kind: 'other' },
+      { kind: 'mailingList', id: 0, name: 'x' },
+      { kind: 'mailingList', id: 7, name: '  ' },
+      { kind: 'mailingList', id: 7 },
+      { kind: 'characters', ids: [] },
+      { kind: 'characters', ids: [1, 2, 3, 4, 5, 6] },
+      { kind: 'characters', ids: [1.5] },
+      { kind: 'characters', ids: [-1] },
+      { kind: 'characters', ids: [0, 3] },
+      { kind: 'characters', ids: 'x' },
+    ]) {
+      expect(() => parseSettingsPatch({ taxContact: bad })).toThrow();
+    }
+  });
+
   it('takes the wallet division names a Director read (#6161)', () => {
     expect(parseSettingsPatch({ divisionNames: { '1': ' Master ', '5': 'MOON TAXES' } })).toEqual({
       divisionNames: { '1': 'Master', '5': 'MOON TAXES' },
@@ -905,6 +1047,160 @@ describe('Pop Sharing edits (#6222)', () => {
     bad({ set: { notes: 'a' }, clear: ['notes'] });
     expect(() =>
       parseEditAction({ action: 'setPopSharingMoon', moonId: 'x', set: { notes: 'a' } })
+    ).toThrow();
+  });
+});
+
+// Resolving in the app: an "I already paid" is checked against what the book synced of the
+// corporation's wallet before any officer sees it.
+describe('checkClaimedTransfer', () => {
+  const transfer = {
+    amount: 25_000_000,
+    at: '2026-11-02T18:41:00.000Z',
+    journalRef: 7_788_991,
+    recipient: 'corporation' as const,
+  };
+  const ctx = {
+    senderIds: [7],
+    payments: [] as {
+      id: string;
+      characterId?: number;
+      amount: number;
+      at: string;
+      minerId?: string;
+    }[],
+    uncounted: [] as { characterId: number; amount: number; at: string; division: number }[],
+    lastSyncAt: Date.parse('2026-11-16T14:00:00.000Z'),
+  };
+
+  it('finds a payment the book holds from the sender, even a day apart', () => {
+    const payments = [
+      { id: 'j1_9', characterId: 7, amount: 25_000_000, at: '2026-11-03T10:00:00.000Z' },
+    ];
+    expect(checkClaimedTransfer(transfer, { ...ctx, payments })).toEqual({
+      result: 'found',
+      paymentId: 'j1_9',
+    });
+  });
+
+  it('finds it in a division the book does not read', () => {
+    const uncounted = [{ characterId: 7, amount: 25_000_000, at: transfer.at, division: 3 }];
+    expect(checkClaimedTransfer(transfer, { ...ctx, uncounted })).toEqual({
+      result: 'division',
+      division: 3,
+    });
+  });
+
+  it('never matches another sender or another amount', () => {
+    const payments = [
+      { id: 'a', characterId: 8, amount: 25_000_000, at: transfer.at },
+      { id: 'b', characterId: 7, amount: 24_000_000, at: transfer.at },
+    ];
+    expect(checkClaimedTransfer(transfer, { ...ctx, payments }).result).toBe('notFound');
+  });
+
+  it('says the book has not synced since, rather than not found, for a transfer after the last sync', () => {
+    expect(checkClaimedTransfer({ ...transfer, at: '2026-11-16T15:00:00.000Z' }, ctx).result).toBe(
+      'notSynced'
+    );
+    expect(checkClaimedTransfer(transfer, { ...ctx, lastSyncAt: undefined }).result).toBe(
+      'notSynced'
+    );
+  });
+
+  // ESI keeps 30 days of a wallet journal: older than that before the last sync, the book
+  // could not have seen it, so "not found" would be a claim it cannot make.
+  it('says too old to check, never not found, beyond what the book could have read', () => {
+    expect(checkClaimedTransfer({ ...transfer, at: '2026-10-01T00:00:00.000Z' }, ctx).result).toBe(
+      'tooOld'
+    );
+  });
+
+  it('says too old to check for a transfer before the book started, whatever the sync window', () => {
+    const early = { ...transfer, at: '2026-11-02T18:41:00.000Z' };
+    expect(checkClaimedTransfer(early, { ...ctx, startDate: '2026-11-05' }).result).toBe('tooOld');
+    expect(checkClaimedTransfer(early, { ...ctx, startDate: '2026-11-02' }).result).toBe(
+      'notFound'
+    );
+  });
+
+  describe('only a payment no one holds yet', () => {
+    const open = { id: 'j1_9', characterId: 7, amount: 25_000_000, at: transfer.at };
+
+    it('does not find a payment already credited to a Miner', () => {
+      const payments = [{ ...open, minerId: 'm-a' }];
+      expect(checkClaimedTransfer(transfer, { ...ctx, payments }).result).toBe('notFound');
+    });
+
+    it('does not find a payment an officer marked wholly not tax, or one held for review', () => {
+      expect(
+        checkClaimedTransfer(transfer, {
+          ...ctx,
+          payments: [{ ...open, notTaxAmount: 25_000_000 }],
+        }).result
+      ).toBe('notFound');
+      expect(
+        checkClaimedTransfer(transfer, { ...ctx, payments: [{ ...open, reviewReason: 'x' }] })
+          .result
+      ).toBe('notFound');
+      // Partly not tax: the rest is still tax.
+      expect(
+        checkClaimedTransfer(transfer, { ...ctx, payments: [{ ...open, notTaxAmount: 1 }] }).result
+      ).toBe('found');
+    });
+
+    it('is ambiguous, never found, when several payments or rows match one transfer', () => {
+      const payments = [open, { ...open, id: 'j1_10' }];
+      expect(checkClaimedTransfer(transfer, { ...ctx, payments })).toEqual({
+        result: 'ambiguous',
+      });
+      const uncounted = [{ characterId: 7, amount: 25_000_000, at: transfer.at, division: 3 }];
+      expect(checkClaimedTransfer(transfer, { ...ctx, payments: [open], uncounted }).result).toBe(
+        'ambiguous'
+      );
+    });
+
+    it('never lets two transfers claim the same payment', () => {
+      const checks = checkClaimedTransfers([transfer, { ...transfer, journalRef: 2 }], {
+        ...ctx,
+        payments: [open],
+      });
+      expect(checks.map((c) => c.result)).toEqual(['found', 'notFound']);
+      expect(checks.filter((c) => c.paymentId === 'j1_9')).toHaveLength(1);
+    });
+  });
+
+  it('names a transfer paid to a person or another corporation, without searching', () => {
+    expect(checkClaimedTransfer({ ...transfer, recipient: 'character' }, ctx).result).toBe(
+      'person'
+    );
+    expect(checkClaimedTransfer({ ...transfer, recipient: 'otherCorporation' }, ctx).result).toBe(
+      'otherCorp'
+    );
+  });
+});
+
+describe('parseDeclareOwnInput transfers', () => {
+  it('reads up to 10 transfers with who received them', () => {
+    const t = {
+      amount: 25_000_000,
+      at: '2026-11-02T18:41:00.000Z',
+      journalRef: 7,
+      recipient: 'character',
+      recipientId: 2119,
+    };
+    expect(
+      parseDeclareOwnInput({ corporationId: 9, statementId: 's1', transfers: [t] })
+    ).toMatchObject({ transfers: [t] });
+    expect(() =>
+      parseDeclareOwnInput({ corporationId: 9, statementId: 's1', transfers: Array(11).fill(t) })
+    ).toThrow();
+    expect(() =>
+      parseDeclareOwnInput({
+        corporationId: 9,
+        statementId: 's1',
+        transfers: [{ ...t, recipient: 'someone' }],
+      })
     ).toThrow();
   });
 });

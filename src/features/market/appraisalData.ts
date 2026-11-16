@@ -51,7 +51,10 @@ import {
   type AppraisalCatalogue,
   type AppraisalUnmatched,
 } from '@/engine/market/appraisalMatch';
-import { parseAppraisalPaste, parseAppraisalPasteDetailed } from '@/engine/market/appraisalPaste';
+import {
+  parseAppraisalPasteDetailed,
+  type AppraisalUnreadableLine,
+} from '@/engine/market/appraisalPaste';
 import {
   appliedRefiningImplantPct,
   refiningImplantApplies,
@@ -72,6 +75,13 @@ import { DEFAULT_REFINING_SETUP, type RefiningSetup } from '@/engine/industry/re
 export interface AppraisalOutcome {
   appraisal: Appraisal;
   unmatched: AppraisalUnmatched[];
+  /** The paste this was computed from, so a stale result is never read as the current one's. */
+  pasteText?: string;
+  /**
+   * The lines (also in `unmatched`) whose second tab field is text, left out of
+   * the total — each with the whole-number columns the pilot could pick instead.
+   */
+  textQuantityLines?: AppraisalUnreadableLine[];
   /** Unmatched lines naming an abyssal type; kept apart so they don't read as typos. */
   abyssal?: AppraisalUnmatched[];
   /**
@@ -152,6 +162,14 @@ export interface AppraiseOptions {
   force?: boolean;
   /** The pilot's facility yield and tax; absent = an NPC station at 50%, no tax. */
   refining?: RefiningSetup;
+  /** The tab column the pilot chose as the quantity of text-quantity lines. */
+  quantityColumn?: number | null;
+  /**
+   * Price a text-quantity line as one instead of reporting it. The Appraisal
+   * reports it (its panel can show why); a caller with no such panel, like the
+   * fleet payout, keeps the old reading rather than silently paying nothing.
+   */
+  textQuantityAsOne?: boolean;
 }
 
 /** Every abyssal type's name, lower-case: read only when a paste has unmatched lines. */
@@ -175,9 +193,17 @@ export async function appraisePaste(
   hub: TradeHub,
   pricePercent: number,
   characterId: number | null = null,
-  { force = false, refining }: AppraiseOptions = {}
+  {
+    force = false,
+    refining,
+    quantityColumn = null,
+    textQuantityAsOne = false,
+  }: AppraiseOptions = {}
 ): Promise<AppraisalOutcome> {
-  const { entries, unreadable } = parseAppraisalPasteDetailed(text);
+  const { entries, unreadable } = parseAppraisalPasteDetailed(text, {
+    quantityColumn,
+    textQuantityAsOne,
+  });
   const [catalogue, typesById] = await Promise.all([
     loadAppraisalCatalogue(),
     loadMarketTypesById(),
@@ -192,7 +218,10 @@ export async function appraisePaste(
   const { abyssal } = split;
   // A line whose quantity couldn't be read is reported with the unmatched ones,
   // in source order, after the abyssal split so it can never read as abyssal.
-  const unmatched = [...split.unmatched, ...unreadable].sort((a, b) => a.lines[0] - b.lines[0]);
+  const unmatched = [
+    ...split.unmatched,
+    ...unreadable.map(({ name, lines }) => ({ name, lines })),
+  ].sort((a, b) => a.lines[0] - b.lines[0]);
   const typeIds = matched.map((match) => match.typeId);
 
   const [reprocessingMap, modifiers, lpMatches] =
@@ -290,6 +319,8 @@ export async function appraisePaste(
   return {
     appraisal: buildAppraisal(items, pricePercent),
     unmatched,
+    pasteText: text,
+    textQuantityLines: unreadable.filter((line) => line.reason === 'text-quantity'),
     abyssal,
     implantBonusPct: implantApplied ? (modifiers?.refiningImplantPct ?? 0) : 0,
     refinesOreOrIce,
@@ -325,9 +356,10 @@ export interface HubComparisonRow {
 export async function compareHubs(
   text: string,
   pricePercent: number,
-  { force = false }: AppraiseOptions = {}
+  { force = false, quantityColumn = null, textQuantityAsOne = false }: AppraiseOptions = {}
 ): Promise<HubComparisonRow[]> {
-  const entries = parseAppraisalPaste(text);
+  // The same reading appraisePaste prices, so the compare table matches the total.
+  const { entries } = parseAppraisalPasteDetailed(text, { quantityColumn, textQuantityAsOne });
   const catalogue = await loadAppraisalCatalogue();
   const { matched } = matchAppraisalEntries(entries, catalogue);
   const typeIds = matched.map((match) => match.typeId);

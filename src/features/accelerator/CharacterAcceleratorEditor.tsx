@@ -1,13 +1,12 @@
 /**
  * Edits one Character's accelerator (GLOSSARY.md **Accelerator**) through the
- * shared `AcceleratorFields`: every change is saved as it is made, and Clear
- * forgets it so detection from the attribute sheet applies again. The
+ * shared `AcceleratorFields`: every change is saved as it is made, and blanking
+ * the time left forgets it so detection from the attribute sheet applies again. The
  * Characters table's popover and the Skill Plan's Assumptions both host it, so
  * they edit the same record.
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui';
 import type { CharacterAcceleratorRecord } from '@/db';
 import { DEFAULT_ACCELERATOR_BONUS } from '@/features/skills/planner/planBooster';
 import { AcceleratorFields } from './AcceleratorFields';
@@ -19,12 +18,15 @@ interface CharacterAcceleratorEditorProps {
   record: CharacterAcceleratorRecord | undefined;
   /** What the attribute sheet implies, to prefill the bonus. */
   detectedBonus: number | null;
+  /** Open with the time's boxes showing (the Characters table's pencil popover). */
+  editTimeOnOpen?: boolean;
 }
 
 export function CharacterAcceleratorEditor({
   characterId,
   record,
   detectedBonus,
+  editTimeOnOpen,
 }: CharacterAcceleratorEditorProps) {
   const { t } = useTranslation();
   // Only the bonus can be typed before there is an expiry to save it with.
@@ -39,6 +41,7 @@ export function CharacterAcceleratorEditor({
     <AcceleratorFields
       bonus={bonus}
       expiresAt={record?.expiresAt ?? null}
+      editTimeOnOpen={editTimeOnOpen}
       bonusLocked={!record && detectedBonus !== null}
       onBonusChange={(next) => {
         // An emptied box reads as 0: not a bonus anyone means to save.
@@ -60,17 +63,6 @@ export function CharacterAcceleratorEditor({
         record ? null : (
           <p className="text-[0.6875rem] text-text-dim">{t('plans.acceleratorNoExpiry')}</p>
         )
-      }
-      actions={
-        record ? (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => void clearCharacterAccelerator(characterId)}
-          >
-            {t('accelerator.clear')}
-          </Button>
-        ) : null
       }
     />
   );

@@ -55,22 +55,24 @@ export function ImproveSettingsPanel({
 }: Props) {
   const { t } = useTranslation();
   const settingsSummary = [
-    ...(settings.job
+    ...(settings.value.job
       ? [
-          settings.job === 'explore'
+          settings.value.job === 'explore'
             ? t('fittings.improve.job.summaryExplore', {
-                space: t(`fittings.improve.job.spaceShort.${settings.space ?? 'dangerous'}`),
+                space: t(`fittings.improve.job.spaceShort.${settings.value.space ?? 'dangerous'}`),
               })
-            : t(`fittings.improve.job.${settings.job}`),
+            : t(`fittings.improve.job.${settings.value.job}`),
         ]
       : []),
-    t(`fittings.improve.reach.${settings.reach}`),
-    settings.iskBudget === null
+    t(`fittings.improve.reach.${settings.value.reach}`),
+    settings.value.iskBudget === null
       ? t('fittings.improve.summaryNoCap')
       : t('fittings.improve.summaryCap', {
-          cap: formatIskCompact(settings.iskBudget),
+          cap: formatIskCompact(settings.value.iskBudget),
         }),
-    ...(settings.job && settings.includeRigs ? [t('fittings.improve.summaryRigsOn')] : []),
+    ...(settings.value.job && settings.value.includeRigs
+      ? [t('fittings.improve.summaryRigsOn')]
+      : []),
   ].join(' · ');
 
   return (
@@ -93,14 +95,14 @@ export function ImproveSettingsPanel({
       </div>
       <Collapse open={settingsOpen} id={settingsId} className="pt-2">
         <div className="space-y-3">
-          {settings.job && settings.onJobChange && (
+          {settings.value.job && (
             <ImproveJobChoice
-              job={settings.job}
-              onJobChange={settings.onJobChange}
-              space={settings.space}
-              onSpaceChange={(space) => settings.onSpaceChange?.(space)}
-              noPropulsion={settings.noPropulsion}
-              onNoPropulsionChange={settings.onNoPropulsionChange}
+              job={settings.value.job}
+              onJobChange={(job) => settings.onChange({ job })}
+              space={settings.value.space}
+              onSpaceChange={(space) => settings.onChange({ space })}
+              noPropulsion={settings.value.noPropulsion}
+              onNoPropulsionChange={(noPropulsion) => settings.onChange({ noPropulsion })}
             />
           )}
           <p className="text-text-dim text-xs">
@@ -118,18 +120,20 @@ export function ImproveSettingsPanel({
               value,
               label: t(`fittings.improve.reach.${value}`),
             }))}
-            value={settings.reach}
-            onChange={settings.onReachChange}
+            value={settings.value.reach}
+            onChange={(reach) => settings.onChange({ reach })}
             fill
           />
           <p className="text-text-dim text-xs">
-            {t(`fittings.improve.reachHint.${settings.reach}`)}
+            {t(`fittings.improve.reachHint.${settings.value.reach}`)}
           </p>
           <label className="block space-y-1 text-sm">
             <span>{t('fittings.improve.cap')}</span>
             <IskInput
-              value={settings.iskBudget === null ? '' : String(settings.iskBudget)}
-              onChange={(value) => settings.onIskBudgetChange(value === '' ? null : Number(value))}
+              value={settings.value.iskBudget === null ? '' : String(settings.value.iskBudget)}
+              onChange={(value) =>
+                settings.onChange({ iskBudget: value === '' ? null : Number(value) })
+              }
             />
           </label>
           {TANK_GOALS.has(goal) && (
@@ -143,19 +147,22 @@ export function ImproveSettingsPanel({
                   // Upgrade swaps a module within its own type, so it can't change tank side.
                   ...(value !== 'keep' &&
                   value !== settings.fittedSide &&
-                  settings.reach === 'upgrade'
+                  settings.value.reach === 'upgrade'
                     ? { disabled: true, disabledReason: t('fittings.improve.defenseUpgrade') }
                     : {}),
                 }))}
-                value={shownDefense(settings.defense, settings.fittedSide ?? null)}
+                value={shownDefense(settings.value.defense, settings.fittedSide ?? null)}
                 onChange={(picked) =>
-                  settings.onDefenseChange(
-                    picked === 'keep' ? 'keep' : pickedDefense(picked, settings.fittedSide ?? null)
-                  )
+                  settings.onChange({
+                    defense:
+                      picked === 'keep'
+                        ? 'keep'
+                        : pickedDefense(picked, settings.fittedSide ?? null),
+                  })
                 }
                 fill
               />
-              {settings.reach === 'upgrade' && (
+              {settings.value.reach === 'upgrade' && (
                 <p className="text-text-dim text-xs">{t('fittings.improve.defenseUpgrade')}</p>
               )}
             </>
@@ -175,22 +182,24 @@ export function ImproveSettingsPanel({
               <div className="space-y-1">
                 <label className={cx('flex items-center gap-2 text-sm', tappableRowClassName)}>
                   <Checkbox
-                    checked={settings.includeRigs}
-                    onChange={(event) => settings.onIncludeRigsChange(event.target.checked)}
+                    checked={settings.value.includeRigs}
+                    onChange={(event) => settings.onChange({ includeRigs: event.target.checked })}
                   />
                   {t('fittings.improve.includeRigs')}
                 </label>
                 <label className={cx('flex items-center gap-2 text-sm', tappableRowClassName)}>
                   <Checkbox
-                    checked={settings.includeOfficer}
-                    onChange={(event) => settings.onIncludeOfficerChange(event.target.checked)}
+                    checked={settings.value.includeOfficer}
+                    onChange={(event) =>
+                      settings.onChange({ includeOfficer: event.target.checked })
+                    }
                   />
                   {t('fittings.improve.includeOfficer')}
                 </label>
                 <label className={cx('flex items-center gap-2 text-sm', tappableRowClassName)}>
                   <Checkbox
-                    checked={settings.allowMutated}
-                    onChange={(event) => settings.onAllowMutatedChange(event.target.checked)}
+                    checked={settings.value.allowMutated}
+                    onChange={(event) => settings.onChange({ allowMutated: event.target.checked })}
                   />
                   {t('fittings.improve.allowMutated')}
                 </label>

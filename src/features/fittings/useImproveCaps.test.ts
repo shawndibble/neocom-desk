@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '@/db';
-import { migrateSpendCap, useImproveBudget } from './useImproveSettingStores';
+import { IMPROVE_STORES, migrateSpendCap } from './useImproveSettings';
+
+const useImproveBudget = IMPROVE_STORES.iskBudget;
 
 beforeEach(async () => {
   await db.settings.clear();

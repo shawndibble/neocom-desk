@@ -280,7 +280,7 @@ describe('Clones', () => {
     renderClonesRoute();
     await screen.findAllByText('Jita IV - Moon 4 - Caldari Navy Assembly Plant');
     expect(screen.getByText('Structure #1000000000002')).toBeInTheDocument();
-    expect(screen.queryByText('Log in again to see your clones')).not.toBeInTheDocument();
+    expect(screen.queryByText(/: log in again$/)).not.toBeInTheDocument();
   });
 
   it('heads a named clone with its name and an unnamed one with its place, never "Unnamed"', async () => {
@@ -445,7 +445,7 @@ describe('Clones', () => {
       )
     );
     renderClonesRoute();
-    expect(await screen.findByText('Log in again to see your clones')).toBeInTheDocument();
+    expect(await screen.findByText(/: log in again$/)).toBeInTheDocument();
   });
 
   it('keeps the saved clones on screen, with a small log-in note, when the clones grant lapsed over them', async () => {
@@ -461,8 +461,9 @@ describe('Clones', () => {
       )
     );
     renderClonesRoute();
-    expect(await screen.findByText('Log in again to refresh.')).toBeInTheDocument();
-    expect(screen.queryByText('Log in again to see your clones')).not.toBeInTheDocument();
+    expect(await screen.findByText('Showing saved data.')).toBeInTheDocument();
+    // getByText: exactly one — the note beside the data, no full banner over it.
+    expect(screen.getByText(/: log in again$/)).toBeInTheDocument();
     expect(await screen.findAllByText('High-grade Ascendancy Alpha')).not.toHaveLength(0);
   });
 
@@ -488,7 +489,7 @@ describe('Clones', () => {
     await screen.findByText('High-grade Ascendancy Alpha');
     await waitFor(() => expect(screen.getAllByText('-').length).toBeGreaterThanOrEqual(3));
     expect(screen.queryByRole('button', { name: /jump/ })).not.toBeInTheDocument();
-    expect(screen.queryByText('Log in again to see your clones')).not.toBeInTheDocument();
+    expect(screen.queryByText(/: log in again$/)).not.toBeInTheDocument();
   });
 
   it('loads and caches the worn clone implants and the training queue', async () => {
@@ -512,9 +513,7 @@ describe('Clones', () => {
     server.use(http.get(`${ESI}/characters/${CHAR_ID}/implants`, () => HttpResponse.error()));
     renderClonesRoute();
     expect(await screen.findAllByText('High-grade Ascendancy Alpha')).toHaveLength(2);
-    expect(
-      screen.queryByText('Log in again to see the implants you are wearing')
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/: log in again$/)).not.toBeInTheDocument();
   });
 
   it('states the jump cooldown once, as shared by every clone', async () => {
@@ -629,10 +628,9 @@ describe('Clones', () => {
       )
     );
     renderClonesRoute();
-    expect(
-      await screen.findByText('Log in again to see the implants you are wearing')
-    ).toBeInTheDocument();
+    // Names the one Permission missing; the clones table stays.
+    expect(await screen.findByText(/: grant Character details$/)).toBeInTheDocument();
     expect(screen.getByText('High-grade Ascendancy Alpha')).toBeInTheDocument();
-    expect(screen.queryByText('Log in again to see your clones')).not.toBeInTheDocument();
+    expect(screen.queryByText(/: log in again$/)).not.toBeInTheDocument();
   });
 });

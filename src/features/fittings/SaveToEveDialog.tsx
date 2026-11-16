@@ -250,9 +250,6 @@ export function SaveToEveDialog({
             variant="ghost"
             characterId={characterId}
             endpoints={['postCharacterFitting']}
-            title={t('fittings.saveToEve.grantTitle')}
-            hint={t('fittings.saveToEve.grantHint')}
-            actionLabel={t('fittings.saveToEve.grantAction')}
           />
         )}
         {!online ? (

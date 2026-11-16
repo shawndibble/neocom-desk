@@ -267,11 +267,13 @@ export async function settlePendingWork(
 }
 
 /**
- * Opt-in: with `VITEST_FAIL_ON_LEFTOVER_WORK=1`, a test whose work outlives it
- * by `SETTLE_TIMEOUT_MS` fails instead of warning. Off by default, CI included:
- * switching it on for CI failed existing tests across a shard (e.g.
- * ForegroundNotificationPoller, BpcSourcingPanel, ActiveJobsPanel), so those
- * leaks are fixed first, then this becomes the CI default.
+ * With `VITEST_FAIL_ON_LEFTOVER_WORK=1`, a test whose work outlives it by
+ * `SETTLE_TIMEOUT_MS` fails instead of warning. CI's unit shards set it
+ * (`.github/workflows/ci.yml`); a local run only warns unless you set it too.
+ * Under fake timers, check the test's own `toFake`: the config default
+ * (`test.fakeTimers` in `vite.config.ts`) keeps `setImmediate` real, and a
+ * `toFake` that adds it parks fake-indexeddb's work on the fake clock. See
+ * "Teardown is deterministic" in `docs/agents/testing-and-ci.md`.
  */
 const FAIL_ON_LEFTOVER_WORK = process.env.VITEST_FAIL_ON_LEFTOVER_WORK === '1';
 
@@ -313,8 +315,10 @@ export function unmountAtTestEnd(cleanup: () => void): void {
  * IndexedDB is drained here too, so a load that was still reading a token or
  * a cached row reaches its `fetch` now, is refused, and fails before the
  * file's resets rather than after them (a price source marked down for the
- * next test). Not under fake timers: `fake-indexeddb` runs on `setImmediate`,
- * which a test may have faked; the shared `afterEach` drains it on real ones.
+ * next test). Not under fake timers: `fake-indexeddb` runs on `setImmediate`.
+ * The config default (`test.fakeTimers` in `vite.config.ts`) keeps it real,
+ * but a test's own `toFake` may fake it; the shared `afterEach` drains
+ * IndexedDB once real timers are back.
  */
 export async function endTestWork(): Promise<void> {
   unmountRendered?.();

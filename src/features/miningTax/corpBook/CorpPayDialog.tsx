@@ -10,6 +10,9 @@ import { CorpBookSyncNote } from './CorpBookSyncNote';
 import { corpPayAccount } from './corpPayAccount';
 import { suggestedCode, type PayStatementCode } from './payStatementCodes';
 import type { CorpBookViewBook } from './corpBookView';
+import type { BookRowView } from '@/engine/corpTaxBook/personal';
+import { payableRows } from './paymentLanding';
+import { WherePaymentGoes } from './WherePaymentGoes';
 
 interface Props {
   onClose: () => void;
@@ -23,7 +26,12 @@ interface Props {
    * donation reason pins it to one.
    */
   statementCodes: readonly PayStatementCode[];
-  /** Opened from one row: only it starts ticked, paid by its Character. */
+  /**
+   * The member's open days in this book (`BookRowView`s of state `billed` still owing, for the
+   * Characters in view): the pay dialog shows where the amount lands among them.
+   */
+  openDays?: readonly BookRowView[];
+  /** Opened from one row: paid by that row's Character. The days are never picked: a book is paid by amount. */
   focus?: { rowId: string; characterId: number };
 }
 
@@ -45,6 +53,7 @@ export function CorpPayDialog({
   rows,
   systemNames,
   statementCodes,
+  openDays = [],
   focus,
 }: Props) {
   const { t } = useTranslation();
@@ -55,17 +64,21 @@ export function CorpPayDialog({
   const views = new Map(
     rows.flatMap((dr) => (dr.corp?.kind === 'row' ? [[dr.key, dr.corp.view] as const] : []))
   );
-  const settleRows: SettleUpRow[] = rows.flatMap((dr) =>
-    dr.assignment && views.has(dr.key)
-      ? [
-          {
-            assignment: dr.assignment,
-            characterName: dr.row.characterName,
-            payeeName: book.corpName,
-            payeeEntityId: book.loaded.corporationId,
-          },
-        ]
-      : []
+  // A day an open dispute holds is skipped by payments: it is not in the default amount.
+  const settleRows: SettleUpRow[] = payableRows(
+    rows.flatMap((dr) =>
+      dr.assignment && views.has(dr.key)
+        ? [
+            {
+              assignment: dr.assignment,
+              characterName: dr.row.characterName,
+              payeeName: book.corpName,
+              payeeEntityId: book.loaded.corporationId,
+            },
+          ]
+        : []
+    ),
+    (r) => views.get(r.assignment.id)?.held
   );
   // The payer's Miner's oldest open Statement: payments settle the oldest first, and a code of
   // another Miner's Statement is not credited to it. It follows the payer the pilot picks.
@@ -79,7 +92,7 @@ export function CorpPayDialog({
       onPaid={onPaid}
       rows={settleRows}
       payerId={payerId}
-      focusIds={focus ? new Set([focus.rowId]) : undefined}
+      byAmount
       systemNames={systemNames}
       reason={(payerId) => oldestFor(payerId)?.code}
       recordPaid={(ticked, payment) =>
@@ -89,11 +102,26 @@ export function CorpPayDialog({
           payment
         )
       }
-      notice={(ticked, payerId) => {
+      notice={(ticked, payerId, amount) => {
         const oldest = oldestFor(payerId);
         const owed = ticked.reduce((sum, r) => sum + r.assignment.taxOwed, 0);
+        // The book pays a Miner's days; the payer's own Miner grouping when the rows name one.
+        const minerIds = new Set(
+          openDays.flatMap((d) => (d.characterId === payerId && d.minerId ? [d.minerId] : []))
+        );
+        const payerDays = openDays
+          .filter((d) =>
+            d.minerId && minerIds.size > 0 ? minerIds.has(d.minerId) : d.characterId === payerId
+          )
+          .map((d) => ({
+            id: d.id,
+            date: d.date,
+            taxOwed: d.taxOwed ?? 0,
+            ...(d.held ? { held: d.held } : {}),
+          }));
         return (
           <div className="space-y-1.5 text-xs text-text-dim">
+            <WherePaymentGoes corpName={book.corpName} days={payerDays} amount={amount} />
             <p>
               <Trans
                 i18nKey="miningTax.corpBook.pay.account"

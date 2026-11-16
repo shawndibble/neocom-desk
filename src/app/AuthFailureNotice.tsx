@@ -10,6 +10,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { permissionsForEndpoints } from '@/esi/registry';
 import { beginEveLogin } from './loginFlow';
 import { pageOwnsReauth } from './pageOwnsReauth';
+import { useSlotCovers } from './reauthSlots';
 
 /**
  * Total auth failure → /login, once, centrally. Covers what `ScopeGate` cannot:
@@ -74,9 +75,9 @@ export function NeedsLoginNotice() {
   return (
     <div role="status" className="rounded-xs border border-warning/40 bg-panel px-3 py-1">
       <ReauthBanner
-        title={t('reauth.needsLoginTitle', { character: character.name })}
-        hint={t('reauth.needsLoginHint', { character: character.name })}
-        actionLabel={t('reauth.staleGrantAction')}
+        title={t('reauth.loginTitle', { character: character.name })}
+        hint={t('reauth.refusedHint')}
+        actionLabel={t('reauth.loginAction')}
         onLogin={() => void beginEveLogin({ characterId: character.characterId })}
       />
       <div className="pb-2">
@@ -111,44 +112,62 @@ export function AuthFailureNotice() {
   );
 
   const { pathname } = useLocation();
+  // A banner on the page already speaks for this Character: two login buttons would stack.
+  const pageCovers = useSlotCovers(failure?.characterId);
 
-  // The page shows its own banner for this refusal; two login buttons would stack.
   const shown =
     failure?.kind === 'request' &&
     failure.characterId === activeCharacterId &&
+    !pageCovers &&
     !pageOwnsReauth(pathname, failure.endpointId)
       ? failure
       : null;
-  const hint = character
-    ? t('reauth.staleGrantHintNamed', { character: character.name })
-    : t('reauth.staleGrantHint');
+  const name = character?.name ?? t('reauth.unknownCharacter');
+  const title = t('reauth.loginTitle', { character: name });
+  // A corp role the Character lacks: said plainly, with no login to offer, since none fixes it.
+  const role =
+    failure?.kind === 'role' && failure.characterId === activeCharacterId
+      ? t('reauth.roleTitle', { character: name })
+      : null;
 
   // The region stays mounted (empty) and fills when the notice appears. The
   // visible block holds buttons, so it is neither `aria-hidden` nor a live region.
   return (
     <>
-      <LiveStatus>{shown && `${t('reauth.staleGrantTitle')}. ${hint}`}</LiveStatus>
-      {shown && <AuthFailureBlock failure={shown} hint={hint} onDismiss={dismiss} />}
+      <LiveStatus>
+        {shown && `${title}. ${t('reauth.refusedHint')}`}
+        {role && `${role}. ${t('reauth.roleHint')}`}
+      </LiveStatus>
+      {shown && <AuthFailureBlock failure={shown} title={title} onDismiss={dismiss} />}
+      {role && (
+        <div className="mb-4 rounded-xs border border-warning/40 bg-panel px-3 py-2 text-xs">
+          <p className="font-semibold text-warning">{role}</p>
+          <p className="text-text-dim">{t('reauth.roleHint')}</p>
+          <Button size="sm" className="mt-2" onClick={dismiss}>
+            {t('reauth.dismiss')}
+          </Button>
+        </div>
+      )}
     </>
   );
 }
 
 function AuthFailureBlock({
   failure,
-  hint,
+  title,
   onDismiss,
 }: {
   failure: Pick<AuthFailure, 'characterId' | 'endpointId'>;
-  hint: string;
+  title: string;
   onDismiss: () => void;
 }) {
   const { t } = useTranslation();
   return (
     <div className="mb-4 rounded-xs border border-warning/40 bg-panel px-3 py-1">
       <ReauthBanner
-        title={t('reauth.staleGrantTitle')}
-        hint={hint}
-        actionLabel={t('reauth.staleGrantAction')}
+        title={title}
+        hint={t('reauth.refusedHint')}
+        actionLabel={t('reauth.loginAction')}
         // The Permission behind the refused request, when it is known. A
         // refusal for a scope the grant never held (a mail send on a token that
         // predates `send_mail`) is only fixed by asking for it; a stale grant

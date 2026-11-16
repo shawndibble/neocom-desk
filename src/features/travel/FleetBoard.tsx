@@ -221,8 +221,6 @@ export function FleetBoard({
                 <GrantNote
                   endpoints={['getCharacterShip']}
                   title={t('travel.pilot.dscan.danger.grant.title')}
-                  hint={t('travel.pilot.dscan.danger.grant.hint')}
-                  actionLabel={t('travel.pilot.dscan.danger.grant.action')}
                 />
               ) : undefined
             }

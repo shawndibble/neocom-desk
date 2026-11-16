@@ -13,26 +13,23 @@ import type { ImproveSearch, ImproveState } from './useImprove';
 
 const before = baseFittingStats();
 
-const settings = (patch: Partial<ImproveSettings> = {}): ImproveSettings => ({
-  reach: 'rework',
-  onReachChange: vi.fn(),
-  sort: 'gain',
-  onSortChange: vi.fn(),
-  iskBudget: null,
-  onIskBudgetChange: vi.fn(),
-  defense: 'keep',
-  onDefenseChange: vi.fn(),
-  includeRigs: true,
-  onIncludeRigsChange: vi.fn(),
-  includeOfficer: false,
-  onIncludeOfficerChange: vi.fn(),
-  allowMutated: false,
-  onAllowMutatedChange: vi.fn(),
-  oreFamily: 'Simple Asteroid',
-  onOreFamilyChange: vi.fn(),
-  hold: 'cargo',
-  onHoldChange: vi.fn(),
-  ...patch,
+const settings = (
+  value: Partial<ImproveSettings['value']> = {},
+  onChange: ImproveSettings['onChange'] = vi.fn()
+): ImproveSettings => ({
+  value: {
+    reach: 'rework',
+    sort: 'gain',
+    iskBudget: null,
+    defense: 'keep',
+    includeRigs: true,
+    includeOfficer: false,
+    allowMutated: false,
+    oreFamily: 'Simple Asteroid',
+    hold: 'cargo',
+    ...value,
+  },
+  onChange,
 });
 
 /** A single swap of the same module as the Makeover's first row (Shield Power Relay II, low slot 0). */
@@ -147,9 +144,9 @@ describe('Improve panel with a Makeover', () => {
 
 describe('Improve panel nudge', () => {
   it('switches Reach to Rework from the nothing-found nudge', async () => {
-    const onReachChange = vi.fn();
-    renderPanel(state({}, 'none'), vi.fn(), settings({ reach: 'upgrade', onReachChange }));
+    const onChange = vi.fn();
+    renderPanel(state({}, 'none'), vi.fn(), settings({ reach: 'upgrade' }, onChange));
     await userEvent.click(screen.getByRole('button', { name: 'Search with Rework' }));
-    expect(onReachChange).toHaveBeenCalledWith('rework');
+    expect(onChange).toHaveBeenCalledWith({ reach: 'rework' });
   });
 });

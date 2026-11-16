@@ -86,10 +86,10 @@ test('the locked-route reauth button meets the 36px touch floor at 390px', async
   // other namespaces and with the shell's own `AuthFailureNotice`, so the
   // button is looked up inside the banner rather than on the page. Asserting
   // the title first also proves the locked state actually painted.
-  const banner = page.getByText('Log in again to see your clones').locator('..');
+  const banner = page.getByText(/: grant .+$/).locator('..');
   await expect(banner).toBeVisible();
 
-  const loginButton = banner.getByRole('button', { name: 'Log in again with EVE Online' });
+  const loginButton = banner.getByRole('button', { name: 'Grant in EVE' });
   await expect(loginButton).toBeVisible();
 
   const box = await loginButton.boundingBox();

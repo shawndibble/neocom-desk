@@ -24,7 +24,7 @@ import {
   cachedKeySet,
 } from './cache';
 import { clearCachePurgePending, purgeCharacterCacheOrSuppress } from './cachePurge';
-import { onEsiAuthFailure } from './authFailureSignal';
+import { onEsiAuthFailure, onEsiRoleRefusal } from './authFailureSignal';
 import { resetEsiBudget } from './budget';
 import { configureActiveCharacter, currentEsiLane, inBackgroundLane } from './lane';
 import type { PriorityTicket } from '@/lib/concurrency';
@@ -199,6 +199,33 @@ describe('loadWithCacheStatus — shell auth-failure signal (issue #1521)', () =
     unsubscribe();
 
     expect(onFailure).toHaveBeenCalledWith(CHAR_ID);
+  });
+
+  it('reports a 403 naming a missing corp role as that, never as a re-login', async () => {
+    const onFailure = vi.fn();
+    const onRole = vi.fn();
+    const offFailure = onEsiAuthFailure(onFailure);
+    const offRole = onEsiRoleRefusal(onRole);
+
+    const result = await loadWithCacheStatus(
+      CHAR_ID,
+      KEY,
+      async () => {
+        throw new EsiError(
+          403,
+          'Character does not have required role(s)',
+          undefined,
+          'getCorporationWallets'
+        );
+      },
+      { authFailureEndpoint: 'getCorporationWallets' }
+    );
+    offFailure();
+    offRole();
+
+    expect(result.needsReauth).toBe(false);
+    expect(onFailure).not.toHaveBeenCalled();
+    expect(onRole).toHaveBeenCalledWith(CHAR_ID, 'getCorporationWallets');
   });
 
   it('names the endpoint in the signal when the caller says which read it is', async () => {

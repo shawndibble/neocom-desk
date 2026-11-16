@@ -206,9 +206,10 @@ describe('LinkWalletPaymentDialog grant note', () => {
     renderDialog([], SOURCES({ journal: 'skipped-no-permission' }));
 
     expect(await screen.findByText(/Some payments can’t be seen/)).toBeInTheDocument();
-    expect(screen.getByText(/the wallet journal/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Grant access' }));
-    expect(beginEveLogin).toHaveBeenCalledWith(expect.objectContaining({ characterId: 1 }));
+    // Names the journal's Permission only: the contracts read went through.
+    expect(screen.getByText('Pilot One: grant Wallet')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Grant in EVE' }));
+    expect(beginEveLogin).toHaveBeenCalledWith({ characterId: 1, groups: ['wallet'] });
   });
 
   it('shows nothing when both permissions loaded', async () => {

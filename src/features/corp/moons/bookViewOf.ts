@@ -12,9 +12,13 @@ import {
   pricesAtHubOnDate,
   sourcesAtHubOnDate,
 } from '@/features/miningTax/pricing';
+import { registerTestReset } from '@/lib/testResets';
 import type { BookData } from '../taxBook/bookClient';
 
-export type BookPrices = Awaited<ReturnType<typeof loadBookPrices>>;
+export interface BookPrices {
+  pricesOn: BookViewInput['pricesOn'];
+  moonOwnerPricesOn: NonNullable<BookViewInput['moonOwnerPricesOn']>;
+}
 
 /** The view's input from a book read, its prices and what the page learned beside it. */
 export function bookViewInputOf(
@@ -45,6 +49,7 @@ export function bookViewInputOf(
     payments: data.state.payments,
     dismissals: data.state.dismissals,
     declarations: data.declarations,
+    ...(data.disputes ? { disputes: data.disputes } : {}),
     adjustments: data.adjustments,
     ...(data.state.writeOffs ? { writeOffs: data.state.writeOffs } : {}),
     feeders: data.feeders,
@@ -57,11 +62,43 @@ export function bookViewInputOf(
   };
 }
 
-/** The unit prices every loaded row and Extraction needs, as the view's two lookups. */
-export async function loadBookPrices(data: BookData, from?: string) {
-  const priced = from !== undefined ? data.observed.filter((r) => r.date >= from) : data.observed;
+/**
+ * The last prices loaded per hub and Ore Form today, with the ores and days they price: the Moons
+ * nav dot's 30-minute recount reads its count off these rather than loading the market again.
+ */
+const heldPrices = new Map<
+  string,
+  { loadedOn: string; typeIds: ReadonlySet<number>; dates: ReadonlySet<string>; prices: BookPrices }
+>();
+registerTestReset(() => heldPrices.clear());
+
+const heldKey = (data: BookData) => `${data.settings.hubId}:${data.settings.oreForm}`;
+
+function typeIdsOf(data: BookData, priced: BookData['observed']): Set<number> {
   const typeIds = new Set<number>(priced.map((r) => r.typeId));
   for (const x of data.state.extractions) for (const l of x.oreLines ?? []) typeIds.add(l.typeId);
+  return typeIds;
+}
+
+/**
+ * Prices for a count, not for display (the Moons nav dot): the ones loaded today at the book's
+ * hub and Ore Form when they price every ore and day it holds, else a load. The Moons page loads
+ * its own, fresh.
+ */
+export async function cachedBookPrices(data: BookData): Promise<BookPrices> {
+  const held = heldPrices.get(heldKey(data));
+  const covers =
+    held !== undefined &&
+    held.loadedOn === utcDay() &&
+    [...typeIdsOf(data, data.observed)].every((id) => held.typeIds.has(id)) &&
+    data.observed.every((r) => held.dates.has(r.date));
+  return covers ? held.prices : loadBookPrices(data);
+}
+
+/** The unit prices every loaded row and Extraction needs, as the view's two lookups. */
+export async function loadBookPrices(data: BookData, from?: string): Promise<BookPrices> {
+  const priced = from !== undefined ? data.observed.filter((r) => r.date >= from) : data.observed;
+  const typeIds = typeIdsOf(data, priced);
   const dates = new Set<string>(priced.map((r) => r.date));
   const loadedOn = utcDay();
   dates.add(loadedOn);
@@ -72,7 +109,7 @@ export async function loadBookPrices(data: BookData, from?: string) {
     data.settings.oreForm === 'compressed',
     { moonOwner: true }
   );
-  return {
+  const result = {
     // A page left open past midnight asks for a day it never priced: use the last loaded one.
     pricesOn: (date: string) => {
       const day = priceDay(prices, data.settings.hubId, date);
@@ -82,6 +119,8 @@ export async function loadBookPrices(data: BookData, from?: string) {
     moonOwnerPricesOn: (date: string) =>
       moonOwnerPricesAtHubOnDate(prices, hubForPayee(data.settings.hubId).id, date),
   };
+  heldPrices.set(heldKey(data), { loadedOn, typeIds, dates, prices: result });
+  return result;
 }
 
 function priceDay(

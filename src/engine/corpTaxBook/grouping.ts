@@ -6,7 +6,8 @@
  * A group keeps the id of the Miner it grows from (`solo:<id>` included), so
  * its Statements, payments and dismissals stay with it.
  */
-import { latestCorporationOf, standingOf, type MinerRow } from './bookView';
+import { standingOf, type MinerRow } from './bookView';
+import { latestRecordedCorp } from './bookDocs';
 import type { Miner } from './charges';
 import type { ObservedMiningEntry } from './types';
 
@@ -102,10 +103,11 @@ export function minerChoices(input: {
   corporationId: number;
   startDate?: string;
   miners: readonly Miner[];
-  entries: readonly Pick<ObservedMiningEntry, 'characterId' | 'date' | 'recordedCorporationId'>[];
+  entries: readonly (Pick<ObservedMiningEntry, 'characterId' | 'date' | 'recordedCorporationId'> &
+    Partial<Pick<ObservedMiningEntry, 'cachedAt' | 'structureId'>>)[];
   memberIds?: ReadonlySet<number>;
 }): MinerChoice[] {
-  const latestCorp = latestCorporationOf(input.entries);
+  const latestCorp = latestRecordedCorp(input.entries);
   const grouped = new Set(input.miners.flatMap((m) => m.characterIds));
   const solo = [
     ...new Set(

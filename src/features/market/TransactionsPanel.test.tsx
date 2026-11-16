@@ -297,9 +297,8 @@ describe('TransactionsPanel — desktop filter and totals', () => {
     mockTransactions(null, true);
     renderPanel();
 
-    expect(
-      await screen.findByRole('button', { name: 'Log in again with EVE Online' })
-    ).toBeInTheDocument();
+    expect(await screen.findByText('This character: grant Wallet')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Grant in EVE' })).toBeInTheDocument();
     expect(screen.queryByText('No transactions cached')).toBeNull();
   });
 

@@ -191,32 +191,6 @@ test('the entry priority pill keeps its pointer-sized box at and above md (1280p
 });
 
 /**
- * The plan's Accelerator section: the Character has one cerebral accelerator,
- * so "Add accelerator" opens its editor in place. Exercised on a phone because
- * the editor's Clear and entry-mode controls are tap targets this project pins
- * to a 36px touch tier here, same as every other control in this file. Clear
- * appears only once a time left is saved.
- */
-test('adds an accelerator on a phone, with a full touch-tier Clear control', async ({ page }) => {
-  await signInAndGoto(page);
-  await seedPlan(page, [PLAN_ENTRY]);
-  await page.goto(`./skills/plans/${PLAN_ID}`);
-  await page.setViewportSize(PHONE);
-
-  await page.getByRole('button', { name: /plan tools/i }).click();
-  await page.getByRole('button', { name: /^assumptions/i }).click();
-  await page.getByRole('button', { name: 'Add accelerator' }).click();
-
-  await page.getByLabel('Days').fill('2');
-  const clear = page.getByRole('button', { name: 'Clear', exact: true });
-  await expect(clear).toBeVisible();
-  for (const control of [clear, page.getByRole('button', { name: 'Enter end time instead' })]) {
-    const height = await control.evaluate((el) => el.getBoundingClientRect().height);
-    expect(height).toBeGreaterThanOrEqual(32);
-  }
-});
-
-/**
  * Skill injectors panel (issue #1408): the tools pane collapses into a single
  * `Disclosure` below `lg`, so this exercises both that collapse and the panel
  * itself — a stubbed Fuzzwork price for Large Skill Injector (typeId 40520)

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { popSharingFrom, type PopSharingDoc } from './popSharing.js';
 import {
+  ALLIANCE_RECHECK_MS,
   OFFICER_WINDOW_MS,
   audienceCharacters,
   bookAllianceNow,
@@ -14,6 +15,7 @@ import {
   popInstant,
   popIsLive,
   qualifyingEditors,
+  sharedPopsRepublishDue,
   visiblePops,
   type BuildSharedPopsInput,
   type PopExtraction,
@@ -405,5 +407,60 @@ describe('namedCommunityIds', () => {
     });
     expect(namedCommunityIds(doc)).toEqual(['c1', 'c2']);
     expect(namedCommunityIds({ ...doc, enabled: false })).toEqual([]);
+  });
+});
+
+describe('sharedPopsRepublishDue', () => {
+  const now = at(ARRIVAL);
+  const held = (hoursAgo: number, allianceId: number | null = 99) => ({
+    publishedAtMs: now - hoursAgo * H,
+    allianceId,
+  });
+
+  it('republishes after a sync that changed something', () => {
+    expect(sharedPopsRepublishDue({ changed: true, held: held(0), allianceNow: 99, now })).toBe(
+      true
+    );
+    expect(sharedPopsRepublishDue({ changed: true, held: null, now })).toBe(true);
+  });
+
+  it('holds a quiet sync until the published doc is an alliance recheck old', () => {
+    expect(sharedPopsRepublishDue({ changed: false, held: held(1), allianceNow: 99, now })).toBe(
+      false
+    );
+    expect(
+      sharedPopsRepublishDue({
+        changed: false,
+        held: { publishedAtMs: now - ALLIANCE_RECHECK_MS, allianceId: 99 },
+        now,
+      })
+    ).toBe(true);
+    expect(
+      sharedPopsRepublishDue({
+        changed: false,
+        held: { publishedAtMs: undefined, allianceId: 99 },
+        now,
+      })
+    ).toBe(true);
+  });
+
+  it('republishes at once when the corporation joined, left or changed alliance', () => {
+    expect(
+      sharedPopsRepublishDue({ changed: false, held: held(1, null), allianceNow: 7, now })
+    ).toBe(true);
+    expect(
+      sharedPopsRepublishDue({ changed: false, held: held(1, 99), allianceNow: null, now })
+    ).toBe(true);
+    expect(sharedPopsRepublishDue({ changed: false, held: held(1, 99), allianceNow: 7, now })).toBe(
+      true
+    );
+  });
+
+  it('keeps the throttle when the alliance could not be read', () => {
+    expect(sharedPopsRepublishDue({ changed: false, held: held(1), now })).toBe(false);
+  });
+
+  it('publishes nothing for a quiet sync with no doc held', () => {
+    expect(sharedPopsRepublishDue({ changed: false, held: null, allianceNow: 7, now })).toBe(false);
   });
 });

@@ -28,7 +28,6 @@ export function AssumesBaseStandingsNote(props: AssumesBaseStandingsNoteProps) {
       {...props}
       endpoints={STANDINGS_ENDPOINTS}
       title={t('reauth.standingsAssumedTitle')}
-      actionLabel={t('reauth.standingsAssumedAction')}
     />
   );
 }

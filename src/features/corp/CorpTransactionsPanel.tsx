@@ -11,14 +11,12 @@
  * division switch resets the filter in the same place it resets the journal's
  * (see `routes/CorpWallet.tsx`).
  *
- * A filter bar, unlike the character panel in Market. That asymmetry is
- * deliberate for now: a corp division's fills are the many-Characters case, so
- * "what did we buy last Tuesday" is a question worth a control, and the
- * character view answers a much smaller list.
+ * The filter bar and the six columns are the personal panel's too
+ * (`TransactionsFilterBar` and `walletTransactionBaseColumns`, in
+ * `features/character`): both wallets filter and read the same way. Only the
+ * row menu's "Filter to this item" is the corp panel's own.
  */
-import { formatCount } from '@/lib/formatCount';
-import { useCallback, useMemo, type ReactElement, type ReactNode } from 'react';
-import { COL_DATETIME, COL_ISK, COL_QUANTITY } from '@/components/ui/dataTableWidths';
+import { useCallback, useMemo, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -26,41 +24,26 @@ import {
   MenuItem,
   DataAgeBadge,
   DataTable,
-  DateRangeFields,
   EmptyState,
-  FilterBar,
-  FilterField,
   Panel,
-  SearchInput,
-  MultiSelect,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Spinner,
   type DataTableColumn,
   type DataTableSort,
-  type MultiSelectOption,
   CachedNotice,
+  IncompleteNotice,
 } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
-import { ItemInfoLink } from '@/features/entities';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import {
   activeWalletTransactionFilters,
   EMPTY_WALLET_TRANSACTION_FILTER,
-  type TransactionSide,
   type WalletTransactionFilter,
 } from '@/features/character/walletTransactionFilter';
-import {
-  transactionTotal,
-  walletTransactionsCsvColumns,
-} from '@/features/character/walletTransactionsCsv';
-import { iskToneClass } from '@/features/character/format';
-import { formatIsk } from '@/lib/isk';
-import { formatTimestamp } from '@/lib/timestamp';
+import { TransactionsFilterBar } from '@/features/character/TransactionsFilterBar';
+import { walletTransactionsCsvColumns } from '@/features/character/walletTransactionsCsv';
+import { walletTransactionBaseColumns } from '@/features/character/walletTransactionColumns';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { useTimeZone } from '@/lib/timeFormat';
 
 import type { CachedResult } from '@/esi/cache';
@@ -92,120 +75,6 @@ interface CorpTransactionsPanelProps {
   refreshFailed: boolean;
 }
 
-/** Radix needs a value here, and `''` reads to it as "nothing selected". */
-const SIDE_OPTIONS: readonly TransactionSide[] = ['all', 'buy', 'sell'];
-
-const SIDE_LABEL: Record<TransactionSide, string> = {
-  all: 'wallet.sideFilterAll',
-  buy: 'wallet.buy',
-  sell: 'wallet.sell',
-};
-
-export function TransactionsFilterBar({
-  filter,
-  onChange,
-  actions,
-  stationOptions,
-  resultCount,
-}: {
-  filter: WalletTransactionFilter;
-  onChange: (filter: WalletTransactionFilter) => void;
-  /** The column picker, inline between the search box and the funnel. */
-  actions?: ReactNode;
-  /** Transactions the filter leaves, for the phone sheet's done button. */
-  resultCount?: number;
-  /**
-   * The stations to pick from. Market History passes them for its Station
-   * filter; the corp wallet doesn't, and gets no such field.
-   */
-  stationOptions?: readonly MultiSelectOption<number>[];
-}) {
-  const { t } = useTranslation();
-  return (
-    <FilterBar
-      value={filter}
-      onChange={onChange}
-      active={activeWalletTransactionFilters(filter, t, stationOptions)}
-      resultCount={resultCount}
-      className="border-b border-line px-3 py-2"
-      search={
-        <SearchInput
-          value={filter.text}
-          onChange={(event) => onChange({ ...filter, text: event.target.value })}
-          placeholder={t('wallet.transactionsSearchPlaceholder')}
-          className="min-w-28 flex-1"
-        />
-      }
-      actions={actions}
-    >
-      {(draft, setDraft) => (
-        <>
-          <FilterField label={t('wallet.sideFilterLabel')}>
-            <Select
-              value={draft.side}
-              onValueChange={(value) => setDraft({ ...draft, side: value as TransactionSide })}
-            >
-              <SelectTrigger
-                active={draft.side !== 'all'}
-                aria-label={t('wallet.sideFilterLabel')}
-                className="w-32"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {SIDE_OPTIONS.map((side) => (
-                  <SelectItem key={side} value={side}>
-                    {t(SIDE_LABEL[side])}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </FilterField>
-          <DateRangeFields
-            from={draft.startDate}
-            to={draft.endDate}
-            onFromChange={(value) => setDraft({ ...draft, startDate: value })}
-            onToChange={(value) => setDraft({ ...draft, endDate: value })}
-            fromLabel={t('wallet.dateFromLabel')}
-            toLabel={t('wallet.dateToLabel')}
-          />
-          {stationOptions && (
-            <FilterField label={t('wallet.stationsFilterLabel')}>
-              <MultiSelect<number>
-                label={t('wallet.stationsFilterLabel')}
-                triggerLabel={
-                  draft.stations.length === 0
-                    ? t('wallet.stationsAll')
-                    : t('wallet.stationsFilterLabel')
-                }
-                summary={
-                  draft.stations.length === 0
-                    ? undefined
-                    : `${draft.stations.length} / ${stationOptions.length}`
-                }
-                searchPlaceholder={t('wallet.stationsSearchPlaceholder')}
-                noResultsLabel={t('wallet.stationsNoResults')}
-                options={stationOptions}
-                selected={new Set(draft.stations)}
-                onToggle={(id) =>
-                  setDraft({
-                    ...draft,
-                    stations: draft.stations.includes(id)
-                      ? draft.stations.filter((station) => station !== id)
-                      : [...draft.stations, id].sort((a, b) => a - b),
-                  })
-                }
-                active={draft.stations.length > 0}
-                className="w-44"
-              />
-            </FilterField>
-          )}
-        </>
-      )}
-    </FilterBar>
-  );
-}
-
 /** Module-level so the table's windowing and row memo see one stable function. */
 const corpTransactionRowKey = (txn: CorporationWalletTransaction) => txn.transaction_id;
 
@@ -225,67 +94,22 @@ export function CorpTransactionsPanel({
   const { t } = useTranslation();
   const timeZone = useTimeZone();
 
-  // The same six columns Market's character panel draws, and in the same
-  // order: the two tables answer the same question about different wallets,
+  const isPhone = useIsPhone();
+
+  // The same six columns Market's character panel draws, built by the same
+  // helper: the two tables answer the same question about different wallets,
   // and a manager reconciling one against the other should not have to find
-  // the columns twice.
-  const columns = useMemo<DataTableColumn<CorporationWalletTransaction>[]>(
-    () => [
-      {
-        id: 'date',
-        header: t('wallet.date'),
-        width: COL_DATETIME,
-        className: 'whitespace-nowrap text-text-dim',
-        render: (txn) => formatTimestamp(new Date(txn.date), timeZone),
-        sortValue: (txn) => txn.date,
-      },
-      {
-        id: 'item',
-        header: t('wallet.item'),
-        className: 'truncate',
-        /** Pinned while the figures scroll sideways on a phone. */
-        stickyStart: true,
+  // the columns twice, or read their figures at two precisions.
+  const columns = useMemo(
+    () =>
+      walletTransactionBaseColumns<CorporationWalletTransaction>({
+        t,
+        timeZone,
+        isPhone,
+        nameFor,
         stickyStartOnPanel: true,
-        render: (txn) => <ItemInfoLink typeId={txn.type_id}>{nameFor(txn.type_id)}</ItemInfoLink>,
-        sortValue: (txn) => nameFor(txn.type_id),
-      },
-      {
-        id: 'side',
-        header: t('wallet.side'),
-        width: '8ch',
-        render: (txn) => (txn.is_buy ? t('wallet.buy') : t('wallet.sell')),
-        sortValue: (txn) => (txn.is_buy ? 0 : 1),
-      },
-      {
-        id: 'quantity',
-        header: t('wallet.quantity'),
-        align: 'right',
-        width: COL_QUANTITY,
-        className: 'tabular-nums whitespace-nowrap',
-        render: (txn) => formatCount(txn.quantity),
-        sortValue: (txn) => txn.quantity,
-      },
-      {
-        id: 'unitPrice',
-        header: t('wallet.unitPrice'),
-        align: 'right',
-        width: COL_ISK,
-        className: 'tabular-nums whitespace-nowrap',
-        render: (txn) => formatIsk(txn.unit_price, 2),
-        sortValue: (txn) => txn.unit_price,
-      },
-      {
-        id: 'total',
-        header: t('wallet.total'),
-        align: 'right',
-        width: COL_ISK,
-        className: 'tabular-nums whitespace-nowrap',
-        cellClassName: (txn) => iskToneClass(transactionTotal(txn)),
-        render: (txn) => formatIsk(transactionTotal(txn), 2),
-        sortValue: (txn) => transactionTotal(txn),
-      },
-    ],
-    [t, nameFor, timeZone]
+      }),
+    [t, nameFor, timeZone, isPhone]
   );
 
   const { visible, isVisible, toggle, reset } = useColumnVisibility(
@@ -386,9 +210,7 @@ export function CorpTransactionsPanel({
             />
           )}
           {transactionsResult.truncated && (
-            <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-              {t('common.incompleteTitle')} — {t('wallet.transactionsTruncatedHint')}
-            </p>
+            <IncompleteNotice className="px-3 pt-2" hint={t('wallet.transactionsTruncatedHint')} />
           )}
           <TransactionsFilterBar
             filter={filter}

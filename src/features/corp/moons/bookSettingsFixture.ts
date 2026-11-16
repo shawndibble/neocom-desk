@@ -28,7 +28,8 @@ const rates: TaxRate[] = [
 export const LEFT_OWNER = 98000003;
 
 export function bookSettingsValue(
-  roles: Partial<OfficerVerdict> = {}
+  roles: Partial<OfficerVerdict> = {},
+  settingsOverride: Partial<BookSettings> = {}
 ): Omit<BookContextValue, 'edit' | 'canEdit'> {
   const input: BookViewInput = {
     corporationId: BOOK,
@@ -83,6 +84,7 @@ export function bookSettingsValue(
     structureExpiryHours: {},
     dismissApprovalAboveIsk: null,
     rates,
+    ...settingsOverride,
   } as unknown as BookSettings;
   return {
     characterId: 7,

@@ -96,22 +96,6 @@ const roleSpecific = new Set<ImproveGoal>(HULL_ROLES.flatMap((role) => UNLOCKS[r
 const suits = (goal: ImproveGoal, role: HullRole) =>
   role === 'combat' ? !roleSpecific.has(goal) : UNLOCKS[role].includes(goal);
 
-/**
- * The goal to start on for `role`: its own remembered one, else (once, while
- * no role has one) the old global goal if it suits the role, else the role's
- * default.
- */
-export function rememberedGoal(
-  byRole: GoalsByRole,
-  legacy: ImproveGoal,
-  role: HullRole
-): ImproveGoal {
-  const own = byRole[role];
-  if (own) return own;
-  if (Object.keys(byRole).length === 0 && suits(legacy, role)) return legacy;
-  return DEFAULT_GOAL_OF_ROLE[role];
-}
-
 /** The Improve Job a role starts on when it has none remembered: explorers Explore, every other hull PvE. */
 export const DEFAULT_JOB_OF_ROLE: Record<HullRole, ImproveJob> = {
   combat: DEFAULT_IMPROVE_JOB,
@@ -128,28 +112,51 @@ export type JobsByRole = Partial<Record<HullRole, ImproveJob>>;
 export type SpacesByRole = Partial<Record<HullRole, ExploreSpace>>;
 
 /**
- * The Job to start on for `role`: its own remembered one, else (once, while no
- * role has one) the old device-wide Job if the pilot ever moved it off the
- * default and it suits the role (a stored default says nothing, so the Astero
- * still opens on Explore; Explore seeds only explorers), else the role's default.
+ * How a value remembered per hull role starts on a role with none of its own:
+ * whether the old device-wide value (`legacy`) seeds it, and else its default.
  */
-export function rememberedJob(byRole: JobsByRole, legacy: ImproveJob, role: HullRole): ImproveJob {
-  const own = byRole[role];
-  if (own) return own;
-  // The old row seeds only a role it suits: Explore chosen on an Astero must not open a Drake on Explore.
-  const suits = (legacy === 'explore') === (DEFAULT_JOB_OF_ROLE[role] === 'explore');
-  if (Object.keys(byRole).length === 0 && legacy !== DEFAULT_IMPROVE_JOB && suits) return legacy;
-  return DEFAULT_JOB_OF_ROLE[role];
+export interface RoleMemory<V> {
+  seeds: (legacy: V, role: HullRole) => boolean;
+  fallback: (role: HullRole) => V;
 }
 
-/** The Explore space to start on for `role`: its own, else (once) the old device-wide one if moved off Dangerous, else Dangerous. */
-export function rememberedSpace(
-  byRole: SpacesByRole,
-  legacy: ExploreSpace,
-  role: HullRole
-): ExploreSpace {
+/**
+ * The value to start on for `role`: its own remembered one, else (once, while
+ * no role has one) the old device-wide value if `memory` lets it seed the role,
+ * else the role's default.
+ */
+export function rememberedByRole<V>(
+  byRole: Partial<Record<HullRole, NoInfer<V>>>,
+  legacy: NoInfer<V>,
+  role: HullRole,
+  memory: RoleMemory<V>
+): V {
   const own = byRole[role];
-  if (own) return own;
-  if (Object.keys(byRole).length === 0 && legacy !== DEFAULT_EXPLORE_SPACE) return legacy;
-  return DEFAULT_EXPLORE_SPACE;
+  if (own !== undefined) return own;
+  if (Object.keys(byRole).length === 0 && memory.seeds(legacy, role)) return legacy;
+  return memory.fallback(role);
 }
+
+/** The goal: the old global goal seeds a role it suits (a role-specific goal its role, the rest combat). */
+export const GOAL_MEMORY: RoleMemory<ImproveGoal> = {
+  seeds: suits,
+  fallback: (role) => DEFAULT_GOAL_OF_ROLE[role],
+};
+
+/**
+ * The Job: the old row seeds a role only if the pilot moved it off the default
+ * (a stored default says nothing, so the Astero still opens on Explore) and it
+ * suits the role: Explore chosen on an Astero must not open a Drake on Explore.
+ */
+export const JOB_MEMORY: RoleMemory<ImproveJob> = {
+  seeds: (legacy, role) =>
+    legacy !== DEFAULT_IMPROVE_JOB &&
+    (legacy === 'explore') === (DEFAULT_JOB_OF_ROLE[role] === 'explore'),
+  fallback: (role) => DEFAULT_JOB_OF_ROLE[role],
+};
+
+/** The Explore space: the old row seeds a role if moved off Dangerous. */
+export const SPACE_MEMORY: RoleMemory<ExploreSpace> = {
+  seeds: (legacy) => legacy !== DEFAULT_EXPLORE_SPACE,
+  fallback: () => DEFAULT_EXPLORE_SPACE,
+};

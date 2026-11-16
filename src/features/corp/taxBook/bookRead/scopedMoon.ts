@@ -10,6 +10,7 @@ import { collection, getDocs, query, where } from 'firebase/firestore/lite';
 import { moonDocUsable, planMoonScope } from '@/engine/corpTaxBook/pullFigures';
 import { extractionId as extractionIdOf } from '@/engine/corpTaxBook/sync';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
+import { readObservedRow } from '@/engine/corpTaxBook/observed';
 import type { MoonDoc } from '../../../../../functions/src/corpTaxBookMoonDocs';
 import { settingsFrom } from '../bookClient';
 import { errorCode } from '../openBook';
@@ -77,19 +78,19 @@ export async function readMoonScope(
   });
   if (!scope.ok) return whole();
 
+  const rowsOf = (snap: { docs: { data: () => unknown }[] }): ObservedRow[] =>
+    snap.docs.flatMap((d) => readObservedRow(d.data() as Record<string, unknown>) ?? []);
   const windowRows = async (w: { structureId: number; from: string; to: string }) => {
     const days = [where('date', '>=', w.from), where('date', '<=', w.to)] as const;
     try {
       const snap = await getDocs(
         query(under('observed'), where('structureId', '==', w.structureId), ...days)
       );
-      return snap.docs.map((d) => d.data() as ObservedRow);
+      return rowsOf(snap);
     } catch (error) {
       if (!errorCode(error).endsWith('failed-precondition')) throw error;
       const snap = await getDocs(query(under('observed'), ...days));
-      return snap.docs
-        .map((d) => d.data() as ObservedRow)
-        .filter((r) => r.structureId === w.structureId);
+      return rowsOf(snap).filter((r) => r.structureId === w.structureId);
     }
   };
   const parts = new Set<BookPart>([...MOON_PARTS, ...asked]);

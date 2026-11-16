@@ -20,11 +20,6 @@ interface ImplantsAssumedNoteProps {
 export function ImplantsAssumedNote(props: ImplantsAssumedNoteProps) {
   const { t } = useTranslation();
   return (
-    <GrantNote
-      {...props}
-      endpoints={IMPLANTS_ENDPOINTS}
-      title={t('reauth.implantsAssumedTitle')}
-      actionLabel={t('reauth.implantsAssumedAction')}
-    />
+    <GrantNote {...props} endpoints={IMPLANTS_ENDPOINTS} title={t('reauth.implantsAssumedTitle')} />
   );
 }

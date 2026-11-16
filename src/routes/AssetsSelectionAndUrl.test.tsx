@@ -590,7 +590,7 @@ describe('view state in the URL (issue #1306)', () => {
     window.history.replaceState({}, '', `/assets?char=${CHAR_ID_2}`);
     renderAssetsRoute();
 
-    expect(await screen.findByText('Log in again to see your assets')).toBeInTheDocument();
+    expect(await screen.findByText(/: grant Assets$/)).toBeInTheDocument();
   });
 
   it('writes a picked character filter to the URL', async () => {

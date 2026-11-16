@@ -34,3 +34,28 @@ export function emitEsiAuthFailure(characterId: number, endpointId?: EsiEndpoint
     }
   }
 }
+
+type RoleRefusalListener = (characterId: number, endpointId?: EsiEndpointId) => void;
+
+const roleListeners = new Set<RoleRefusalListener>();
+
+/**
+ * ESI refused a read because the Character lacks the in-game corporation role
+ * it needs (a 403 naming "required role"). No login can fix that, so it is its
+ * own signal: the shell names the missing role instead of offering a re-login.
+ */
+export function onEsiRoleRefusal(listener: RoleRefusalListener): () => void {
+  roleListeners.add(listener);
+  return () => roleListeners.delete(listener);
+}
+
+export function emitEsiRoleRefusal(characterId: number, endpointId?: EsiEndpointId): void {
+  for (const listener of roleListeners) {
+    try {
+      if (endpointId === undefined) listener(characterId);
+      else listener(characterId, endpointId);
+    } catch {
+      // ignored
+    }
+  }
+}

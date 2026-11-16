@@ -103,9 +103,11 @@ describe('OwedBalances Conflicts line', () => {
     renderBalances([balance('a', 0)], {
       conflicts: {
         days: 1,
+        waiting: 0,
         amount: 4_271_257,
         first: {} as never,
         firstCorpName: 'Bureau of Unified Harvesting',
+        firstResolvesOn: '2026-11-12',
       },
       onReviewConflicts,
     });
@@ -125,9 +127,11 @@ describe('OwedBalances Conflicts line', () => {
     renderBalances([balance('a', 1_000_000)], {
       conflicts: {
         days: 3,
+        waiting: 0,
         amount: 900_000,
         first: {} as never,
         firstCorpName: 'Brass',
+        firstResolvesOn: '2026-11-12',
       },
     });
     expect(
@@ -160,7 +164,7 @@ describe('OwedBalances uncredited donation', () => {
       uncreditedOf: () => ({ amount: 8_000_000, accounts: 'Master Wallet', everyDivision: true }),
     });
     expect(
-      screen.getByText(/8,000,000 ISK you donated isn't credited yet — ask the corp to sync/)
+      screen.getByText(/8,000,000 ISK you donated isn't credited yet — Resolve it above/)
     ).toBeInTheDocument();
     expect(screen.queryByText(/check the wallet division/)).not.toBeInTheDocument();
   });
@@ -171,5 +175,73 @@ describe('OwedBalances uncredited donation', () => {
     });
     expect(screen.queryByText(/isn't credited/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Settle up' }).className).toMatch(/bg-accent/);
+  });
+});
+
+describe('OwedBalances with payments still to link', () => {
+  const unlinkedOf = () => ({ count: 1, amount: 4_000_000 });
+
+  it('puts "Payments to link" ahead of the owed cards, so it is dealt with first', () => {
+    const { container } = renderBalances([balance('a', 9_000_000)], {
+      unlinkedPaymentCount: 1,
+      unlinkedOf,
+    });
+    const titles = [...(container.querySelector('.grid')?.children ?? [])].map(
+      (tile) => tile.textContent ?? ''
+    );
+    expect(titles[0]).toContain('Payments to link');
+    expect(titles[1]).toContain('Payee a');
+  });
+
+  it('warns on the card and steps Settle up down, so the owed figure is not paid twice', () => {
+    renderBalances([balance('a', 9_000_000)], { unlinkedPaymentCount: 1, unlinkedOf });
+    expect(screen.getByText(/4,000,000 ISK you already sent isn't linked yet/)).toBeInTheDocument();
+    // `ghost`, not `primary`: still there, no longer the card's loudest control.
+    const settle = screen.getByRole('button', { name: 'Settle up' });
+    expect(settle.className).toMatch(/bg-transparent/);
+    expect(settle.className).not.toMatch(/bg-accent/);
+  });
+
+  it('leaves Settle up primary when every payment is accounted for', () => {
+    renderBalances([balance('a', 9_000_000)]);
+    expect(screen.getByRole('button', { name: 'Settle up' }).className).toMatch(/bg-accent/);
+  });
+
+  it('leaves a Payee with nothing unlinked alone', () => {
+    renderBalances([balance('a', 9_000_000), balance('b', 1_000_000)], {
+      unlinkedPaymentCount: 1,
+      unlinkedOf: (b) => (b.payee.id === 'a' ? { count: 1, amount: 4_000_000 } : undefined),
+    });
+    expect(screen.getAllByText(/isn't linked yet/)).toHaveLength(1);
+  });
+});
+
+describe('OwedBalances Conflicts the member has already answered', () => {
+  const waiting = {
+    days: 1,
+    waiting: 1,
+    amount: 4_271_257,
+    first: {} as never,
+    firstCorpName: 'Bureau of Unified Harvesting',
+    firstResolvesOn: '2026-11-12',
+  };
+
+  // The 14-day clock runs whether or not a dispute is open, so this must never disappear.
+  it('still shows the bill and its date, but stops reading as a warning', () => {
+    renderBalances([balance('a', 0)], { conflicts: waiting });
+    expect(screen.queryByText('No moon mining tax outstanding')).not.toBeInTheDocument();
+    const title = screen.getByText('Waiting on the corp');
+    expect(title.className).not.toMatch(/text-warning/);
+    expect(screen.getByText('4,271,257')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'You have told Bureau of Unified Harvesting. It still bills on 2026-11-12 unless an officer answers first, so check back.'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('still reads as a warning while one day is unanswered', () => {
+    renderBalances([balance('a', 0)], { conflicts: { ...waiting, days: 2, waiting: 1 } });
+    expect(screen.getByText('Conflicts').className).toMatch(/text-warning/);
   });
 });

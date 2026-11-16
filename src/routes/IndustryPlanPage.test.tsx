@@ -406,7 +406,7 @@ describe('IndustryPlanPage: /skills is stale until the character logs in', () =>
     // No queue correction applied: base blueprint time stands.
     expect(await screen.findByText('20m')).toBeInTheDocument();
     expect(queueRequests).toBe(0);
-    expect(screen.queryByText('EVE access was refused')).not.toBeInTheDocument();
+    expect(screen.queryByText(/: log in again$/)).not.toBeInTheDocument();
   });
 });
 

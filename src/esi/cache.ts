@@ -7,8 +7,8 @@
  */
 import { db, type CachedPage, type EsiCacheMetaRecord, type EsiCacheRecord } from '@/db';
 import { metaOf } from '@/db/esiCacheMeta';
-import { emitEsiAuthFailure } from './authFailureSignal';
-import { EsiError, EsiTimeoutError, isAuthFailure, type EsiResult } from './client';
+import { emitEsiAuthFailure, emitEsiRoleRefusal } from './authFailureSignal';
+import { EsiError, EsiTimeoutError, isAuthFailure, isMissingRole, type EsiResult } from './client';
 import { isCachePurgePending } from './cachePurge';
 import { effectiveFetchedAt, metaVouchesFor } from './cacheRows';
 import { promoteEsiLane } from './budget';
@@ -940,7 +940,10 @@ async function loadWithCacheStatusLive<T>(
     }
   } catch (err) {
     unsent = timedOutAtGate(err);
-    if (detectAuthFailure(err)) {
+    // A missing corp role is no login problem: said as such, never as a re-login (even by a
+    // loader whose own `detectAuthFailure` counts every 403).
+    if (isMissingRole(err)) emitEsiRoleRefusal(characterId, options.authFailureEndpoint);
+    else if (detectAuthFailure(err)) {
       needsReauth = true;
       // The shell renders one notice (src/app/Layout.tsx). Covers the window
       // the route scope gate cannot: a revoke done in EVE's third-party-app
@@ -1292,8 +1295,9 @@ async function loadPaginatedWithCacheStatusLive<T>(
     unsent = timedOutAtGate(err);
     // Offline/5xx: fall back to cache, as loadWithCacheStatus does. An auth
     // failure additionally sets needsReauth so a revoked scope offers a
-    // re-login instead of a silent empty list (issue #14).
-    if (detectAuthFailure(err)) {
+    // re-login instead of a silent empty list (issue #14). A missing corp role is said as such.
+    if (isMissingRole(err)) emitEsiRoleRefusal(characterId, options.authFailureEndpoint);
+    else if (detectAuthFailure(err)) {
       needsReauth = true;
       // Gated by isWorthReportingToShell (issue #1521) — see loadWithCacheStatusLive.
       if (await isWorthReportingToShell(characterId, err))

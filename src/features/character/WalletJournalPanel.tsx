@@ -8,6 +8,7 @@ import {
   LoadFailedState,
   Panel,
   Spinner,
+  IncompleteNotice,
 } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -105,13 +106,7 @@ export function WalletJournalPanel({
         )
       ) : !showingBeyondActive && journalNeedsReauth ? (
         <div className="p-3">
-          <GrantBanner
-            characterId={activeCharacterId}
-            endpoints={['getCharacterWalletJournal']}
-            title={t('wallet.reauthTitle')}
-            hint={t('wallet.reauthHint')}
-            actionLabel={t('wallet.reauthAction')}
-          />
+          <GrantBanner characterId={activeCharacterId} endpoints={['getCharacterWalletJournal']} />
         </div>
       ) : !showingBeyondActive && (!journalResult || journalLength === 0) ? (
         <CachedEmptyState
@@ -133,9 +128,7 @@ export function WalletJournalPanel({
             />
           )}
           {journalIsTruncated && (
-            <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-              {t('common.incompleteTitle')} — {t('wallet.journalTruncatedHint')}
-            </p>
+            <IncompleteNotice className="px-3 pt-2" hint={t('wallet.journalTruncatedHint')} />
           )}
           {itemNamesTruncated && (
             <p className="px-3 pt-2 text-[0.6875rem] text-text-dim">

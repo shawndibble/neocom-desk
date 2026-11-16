@@ -4,6 +4,7 @@
 import type { Caller } from './actorAuth.js';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
+import { FieldValue } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import {
   parseBookCall,
@@ -415,6 +416,88 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect(await auditCount()).toBe(before + 1);
     });
 
+    it("adds a counted division to the stored list, keeping another officer's addition", async () => {
+      await turnOn();
+      // Both officers answered "Count division" from the same stale list, [1]. Each also sends
+      // the full list an older server would store; this server ignores it for `addDivision`.
+      await edit(DIRECTOR, {
+        action: 'updateSettings',
+        patch: { addDivision: 3, divisions: [1, 3] },
+      });
+      await edit(ACCOUNTANT, {
+        action: 'updateSettings',
+        patch: { addDivision: 5, divisions: [1, 5] },
+      });
+      expect((await book().get()).get('divisions')).toEqual([1, 3, 5]);
+      await edit(ACCOUNTANT, { action: 'updateSettings', patch: { addDivision: 3 } });
+      expect((await book().get()).get('divisions')).toEqual([1, 3, 5]);
+    });
+
+    it("merges a counted division's name into the stored names, and audits the stored list", async () => {
+      await turnOn();
+      await edit(DIRECTOR, {
+        action: 'updateSettings',
+        patch: { addDivision: 3, divisions: [1, 3], divisionNames: { '1': 'Main', '3': 'Tax' } },
+      });
+      await edit(ACCOUNTANT, {
+        action: 'updateSettings',
+        patch: { addDivision: 5, divisions: [1, 5], divisionNames: { '1': 'Main', '5': 'Ore' } },
+      });
+      expect((await book().get()).get('divisionNames')).toEqual({
+        '1': 'Main',
+        '3': 'Tax',
+        '5': 'Ore',
+      });
+      const audit = await book().collection('audit').get();
+      const details = audit.docs.map(
+        (d) => d.get('detail') as { patch?: { divisions?: number[] } }
+      );
+      expect(details.some((d) => d.patch?.divisions?.join() === '1,3,5')).toBe(true);
+      // The stale list the client sent for an older server was never stored, so never audited.
+      expect(details.some((d) => d.patch?.divisions?.join() === '1,5')).toBe(false);
+    });
+
+    it('reads a book with no stored divisions as division 1, as the sync does', async () => {
+      await turnOn();
+      await book().update({ divisions: FieldValue.delete() });
+      await edit(ACCOUNTANT, {
+        action: 'updateSettings',
+        patch: { divisions: [1, 2], divisionsBase: [1] },
+      });
+      expect((await book().get()).get('divisions')).toEqual([1, 2]);
+      await book().update({ divisions: FieldValue.delete() });
+      await edit(ACCOUNTANT, { action: 'updateSettings', patch: { addDivision: 3 } });
+      expect((await book().get()).get('divisions')).toEqual([1, 3]);
+    });
+
+    it('refuses a divisions list whose base no longer matches the stored one', async () => {
+      await turnOn();
+      // A dialog opened on [1]; meanwhile another officer counted division 4.
+      await edit(DIRECTOR, { action: 'updateSettings', patch: { addDivision: 4 } });
+      const before = await auditCount();
+      expect(
+        await reason(
+          edit(ACCOUNTANT, {
+            action: 'updateSettings',
+            patch: { divisions: [1, 2], divisionsBase: [1], minimumStatement: 1 },
+          })
+        )
+      ).toBe('divisions-changed');
+      expect((await book().get()).data()).toMatchObject({
+        divisions: [1, 4],
+        minimumStatement: 5_000_000,
+      });
+      expect(await auditCount()).toBe(before);
+      await edit(ACCOUNTANT, {
+        action: 'updateSettings',
+        patch: { divisions: [2, 4], divisionsBase: [4, 1] },
+      });
+      expect((await book().get()).get('divisions')).toEqual([2, 4]);
+      // An older client sends no base: its list is stored as-is.
+      await edit(ACCOUNTANT, { action: 'updateSettings', patch: { divisions: [1] } });
+      expect((await book().get()).get('divisions')).toEqual([1]);
+    });
+
     it('moves the start date and ends the member setup window, Director only', async () => {
       await turnOn();
       expect(
@@ -530,6 +613,15 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
           )
         )
       ).toBe('already-reversed');
+    });
+
+    it("lets an officer set and clear who answers members' tax questions", async () => {
+      await turnOn();
+      const taxContact = { kind: 'characters', ids: [11, 12] };
+      await edit(ACCOUNTANT, { action: 'updateSettings', patch: { taxContact } });
+      expect((await book().get()).get('taxContact')).toEqual(taxContact);
+      await edit(ACCOUNTANT, { action: 'updateSettings', patch: { taxContact: null } });
+      expect((await book().get()).data()).not.toHaveProperty('taxContact');
     });
 
     it('asks a Director above the dismissal approval limit', async () => {
@@ -1453,7 +1545,12 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       // Another Miner cannot withdraw it: they have no dispute of their own that day.
       expect(await reason(withdraw(51))).toBe('not-found');
       expect(await withdraw(50)).toEqual({ disputeId });
-      expect((await book().collection('disputes').doc(disputeId).get()).exists).toBe(false);
+      // A tombstone: no `lines` (no reader sees a dispute), the hold window and answers kept.
+      const gone = (await book().collection('disputes').doc(disputeId).get()).data();
+      expect(gone?.lines).toBeUndefined();
+      expect(gone).toMatchObject({ minerId: 'solo:50', date: '2026-10-17', uids: ['char:50'] });
+      expect(typeof gone?.holdFrom).toBe('string');
+      expect(typeof gone?.withdrawnAt).toBe('string');
       expect(
         (await book().collection('audit').where('action', '==', 'withdrawDispute').get()).size
       ).toBe(1);
@@ -1464,19 +1561,225 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect(await reason(withdraw(50))).toBe('answered');
     });
 
-    it('lets an officer reject a dispute once; the day cannot be flagged again', async () => {
+    it('does not let withdrawing and filing again renew the hold, and officers cannot answer a withdrawn day', async () => {
+      await turnOn();
+      await recordOre([50]);
+      await billDay();
+      await pastSetup();
+      const withdraw = () =>
+        withdrawDispute(
+          deps(),
+          who(50),
+          parseWithdrawDisputeInput({ corporationId: CORP, date: '2026-10-17' })
+        );
+      const { disputeId } = await dispute(50, [line(50, { quantity: 40 })]);
+      const first = (await book().collection('disputes').doc(disputeId).get()).get('at');
+      // Day 13: withdrawn, and filed again at once.
+      now += 13 * 86_400_000;
+      await withdraw();
+      await verifyOfficer(deps(), who(ACCOUNTANT), parseBookCall(withToken(ACCOUNTANT)));
+      expect(
+        await reason(edit(ACCOUNTANT, { action: 'rejectDispute', disputeId, reason: 'Ours' }))
+      ).toBe('not-found');
+      await dispute(50, [line(50, { quantity: 40 })]);
+      const again = (await book().collection('disputes').doc(disputeId).get()).data();
+      expect(again?.holdFrom).toBe(first);
+      expect(again?.withdrawnAt).toBeUndefined();
+      expect(again?.lines).toHaveLength(1);
+      expect(again?.history).toEqual([]);
+      // Day 15: the first dispute's 14 days are up, so the Statement settles.
+      now += 2 * 86_400_000;
+      await verifyOfficer(deps(), who(ACCOUNTANT), parseBookCall(withToken(ACCOUNTANT)));
+      expect(
+        await edit(ACCOUNTANT, { action: 'settleStatements', statementIds: ['s1'] })
+      ).toMatchObject({ settled: ['s1'] });
+    });
+
+    it('keeps the Miner’s stored totals hold-aware: filing, withdrawing and a lapse recompute them', async () => {
+      await turnOn();
+      await recordOre([50]);
+      await billDay();
+      await pastSetup();
+      const totals = async () =>
+        (await book().collection('minerTotals').doc('solo:50').get()).data();
+      const { disputeId } = await dispute(50, [line(50)]);
+      const held = await totals();
+      expect(held?.owed).toBeLessThan(held?.billed as number);
+      expect(typeof held?.overdueAt === 'string' || held?.overdueAt === null).toBe(true);
+      await withdrawDispute(
+        deps(),
+        who(50),
+        parseWithdrawDisputeInput({ corporationId: CORP, date: '2026-10-17' })
+      );
+      expect((await totals())?.owed).toBe(held?.billed);
+      // Filed again, then answered: the officer's answer ends the hold.
+      await dispute(50, [line(50)]);
+      expect((await totals())?.owed).toBeLessThan(held?.billed as number);
+      await edit(ACCOUNTANT, { action: 'rejectDispute', disputeId, reason: 'Ours' });
+      expect((await totals())?.owed).toBe(held?.billed);
+    });
+
+    it('lets an officer reject a dispute once; the Miner may flag the day again, keeping the hold', async () => {
       await turnOn();
       await recordOre([50]);
       await pastSetup();
       const { disputeId } = await dispute(50, [line(50)]);
-      await edit(ACCOUNTANT, { action: 'rejectDispute', disputeId, reason: 'Our ore' });
+      const first = (await book().collection('disputes').doc(disputeId).get()).get('at');
+      await edit(ACCOUNTANT, {
+        action: 'rejectDispute',
+        disputeId,
+        reason: 'Our ore',
+        nextStep: 'Pay it, or ask in Discord',
+      });
       expect(
         (await book().collection('disputes').doc(disputeId).get()).get('resolution')
       ).toMatchObject({ kind: 'rejected', by: ACCOUNTANT, reason: 'Our ore' });
       expect(
         await reason(edit(ACCOUNTANT, { action: 'rejectDispute', disputeId, reason: 'again' }))
       ).toBe('already-resolved');
+      // A minute on: inside the officer's 10-minute verification window, so the second reject runs.
+      now += 60_000;
+      expect(await dispute(50, [line(50, { quantity: 30 })])).toEqual({ disputeId });
+      const again = (await book().collection('disputes').doc(disputeId).get()).data();
+      // Open again, its old answer in `history`, the hold window the first dispute's.
+      expect(again?.resolution).toBeUndefined();
+      expect(again?.lines).toEqual([line(50, { quantity: 30 })]);
+      expect(again?.holdFrom).toBe(first);
+      expect(again?.at).toBe(new Date(now).toISOString());
+      expect(again?.history).toEqual([
+        {
+          kind: 'payee',
+          resolution: expect.objectContaining({
+            kind: 'rejected',
+            nextStep: 'Pay it, or ask in Discord',
+          }),
+        },
+      ]);
+      // Rejected again and filed a third time: the window is still the first one's.
+      await edit(ACCOUNTANT, { action: 'rejectDispute', disputeId, reason: 'Still ours' });
+      await dispute(50, [line(50)]);
+      const third = (await book().collection('disputes').doc(disputeId).get()).data();
+      expect(third?.holdFrom).toBe(first);
+      expect(third?.history).toHaveLength(2);
+    });
+
+    it('keeps a waived day closed to a new dispute', async () => {
+      await turnOn();
+      await recordOre([50]);
+      await billDay();
+      await pastSetup();
+      const { disputeId } = await dispute(50, [line(50, { quantity: 40 })]);
+      await edit(
+        ACCOUNTANT,
+        { action: 'dismissDispute', disputeId, minerId: 'solo:50', reason: 'Theirs', amountIsk: 1 },
+        true
+      );
       expect(await reason(dispute(50, [line(50)]))).toBe('rejected');
+    });
+
+    it('drops a Statement an open dispute holds from settleStatements, and settles it once the hold lapses', async () => {
+      await turnOn();
+      await recordOre([50]);
+      await billDay();
+      await pastSetup();
+      await dispute(50, [line(50, { quantity: 40 })]);
+      const settle = () => edit(ACCOUNTANT, { action: 'settleStatements', statementIds: ['s1'] });
+      const paid = async () =>
+        (await book().collection('meta').doc('paid').get()).data()?.ids ?? [];
+      expect(await settle()).toMatchObject({ settled: [] });
+      expect(await paid()).not.toContain('s1');
+      // The 14-day hold lapses with time alone.
+      now += 15 * 86_400_000;
+      await verifyOfficer(deps(), who(ACCOUNTANT), parseBookCall(withToken(ACCOUNTANT)));
+      expect(await settle()).toMatchObject({ settled: ['s1'] });
+      expect(await paid()).toContain('s1');
+    });
+
+    it('does not let a re-dispute renew the hold that lapsed', async () => {
+      await turnOn();
+      await recordOre([50]);
+      await billDay();
+      await pastSetup();
+      const { disputeId } = await dispute(50, [line(50, { quantity: 40 })]);
+      await edit(ACCOUNTANT, { action: 'rejectDispute', disputeId, reason: 'Ours' });
+      now += 15 * 86_400_000;
+      await verifyOfficer(deps(), who(ACCOUNTANT), parseBookCall(withToken(ACCOUNTANT)));
+      await dispute(50, [line(50, { quantity: 40 })]);
+      expect(
+        await edit(ACCOUNTANT, { action: 'settleStatements', statementIds: ['s1'] })
+      ).toMatchObject({ settled: ['s1'] });
+    });
+
+    describe('an "I already paid" checked against the wallet', () => {
+      const paidAt = '2026-10-20T10:00:00.000Z';
+      const transfer = (amount: number, journalRef: number) => ({
+        amount,
+        at: paidAt,
+        journalRef,
+        recipient: 'corporation',
+      });
+      const wallet = async () => {
+        await book().update({ lastSync: { at: now } });
+        for (const [id, amount] of [
+          ['j1_1', 4_000_000],
+          ['j1_2', 5_000_000],
+        ] as const)
+          await book().collection('payments').doc(id).set({ characterId: 50, amount, at: paidAt });
+      };
+
+      it('credits the transfers it finds at once and leaves the declaration open for the rest', async () => {
+        await turnOn();
+        await edit(ACCOUNTANT, { action: 'issueStatement', statement: statement('s1') });
+        await pastSetup();
+        await wallet();
+        const out = await declare(50, {
+          statementId: 's1',
+          transfers: [transfer(4_000_000, 1), transfer(9_000_000, 2)],
+        });
+        expect(out.checks.map((c) => c.result)).toEqual(['found', 'notFound']);
+        expect(out.confirmed).toBe(false);
+        const p1 = (await book().collection('payments').doc('j1_1').get()).data();
+        expect(p1).toMatchObject({ minerId: 'solo:50', claimedBy: 50 });
+        expect((await book().collection('payments').doc('j1_2').get()).get('minerId')).toBe(
+          undefined
+        );
+        const d = (await book().collection('declarations').doc(out.declarationId).get()).data();
+        expect(d?.resolution).toBeUndefined();
+      });
+
+      it('confirms a declaration whose transfers are all found, and never twice for one payment', async () => {
+        await turnOn();
+        await edit(ACCOUNTANT, { action: 'issueStatement', statement: statement('s1') });
+        await pastSetup();
+        await wallet();
+        const out = await declare(50, {
+          statementId: 's1',
+          transfers: [transfer(4_000_000, 1), transfer(5_000_000, 2)],
+        });
+        expect(out.confirmed).toBe(true);
+        expect((await book().collection('payments').doc('j1_2').get()).get('minerId')).toBe(
+          'solo:50'
+        );
+        // The same wallet payments are credited now: a new declaration finds nothing to credit.
+        const next = await declare(50, { statementId: 's1', transfers: [transfer(4_000_000, 1)] });
+        expect(next.checks[0].result).toBe('notFound');
+      });
+
+      it('does not credit when several payments match one transfer', async () => {
+        await turnOn();
+        await edit(ACCOUNTANT, { action: 'issueStatement', statement: statement('s1') });
+        await pastSetup();
+        await wallet();
+        await book()
+          .collection('payments')
+          .doc('j1_3')
+          .set({ characterId: 50, amount: 4_000_000, at: paidAt });
+        const out = await declare(50, { statementId: 's1', transfers: [transfer(4_000_000, 1)] });
+        expect(out.checks[0].result).toBe('ambiguous');
+        expect((await book().collection('payments').doc('j1_1').get()).get('minerId')).toBe(
+          undefined
+        );
+      });
     });
   });
 

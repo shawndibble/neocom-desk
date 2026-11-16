@@ -1206,7 +1206,8 @@ describe('BpcSourcingPanel source multiselect', () => {
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
 
-    expect(screen.getByText('Log in again to see owned blueprints')).toBeInTheDocument();
+    // The test grant lacks the blueprints scope, so the banner names that Permission.
+    expect(await screen.findByText(/: grant Industry$/)).toBeInTheDocument();
 
     await openFilters(user);
     await toggleFilterOption(user, 'Contracts');

@@ -18,6 +18,7 @@ import {
   useTabsId,
   type DataTableColumn,
   CachedNotice,
+  IncompleteNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useColumnVisibility } from '@/lib/columnVisibility';
@@ -364,13 +365,7 @@ export function Contacts() {
             ) : contactsNeedsReauth && (!contactsResult || contacts.length === 0) ? (
               // A lapsed grant with no saved contacts: the full banner. With
               // saved contacts the table stays and a small note sits above it.
-              <GrantBanner
-                characterId={activeCharacterId}
-                endpoints={['getCharacterContacts']}
-                title={t('contacts.reauthTitle')}
-                hint={t('contacts.reauthHint')}
-                actionLabel={t('contacts.reauthAction')}
-              />
+              <GrantBanner characterId={activeCharacterId} endpoints={['getCharacterContacts']} />
             ) : error ? (
               <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
             ) : !contactsResult || contacts.length === 0 ? (
@@ -397,11 +392,7 @@ export function Contacts() {
                     fetchedAt={contactsResult.fetchedAt}
                   />
                 )}
-                {contactsTruncated && (
-                  <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-                    {t('common.incompleteTitle')}
-                  </p>
-                )}
+                {contactsTruncated && <IncompleteNotice className="px-3 pt-2" />}
                 {filteredContacts.length === 0 ? (
                   <EmptyState
                     title={t('contacts.noResults')}

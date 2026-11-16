@@ -10,11 +10,9 @@ import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import type { TradeHub } from '@/market/hubs';
 import type { MarketSnapshot } from './marketData';
-import type { OwnedSale, planHeroFigures } from './planHeroFigures';
+import type { PlanVerdict } from './planPricing';
 import { ResultsSummary } from './ResultsSummary';
 import type { usePlanMaterials } from './usePlanMaterials';
-
-type HeroFigures = ReturnType<typeof planHeroFigures>;
 
 interface PlanCostsPanelProps {
   result: BuildResult;
@@ -25,9 +23,9 @@ interface PlanCostsPanelProps {
   pricesUnreachable: boolean;
   pricesLoading: boolean;
   snapshot: MarketSnapshot | null;
-  heroFigures: HeroFigures['heroFigures'];
+  heroFigures: PlanVerdict['figures'];
   heroBasis: ProfitBasis | null;
-  sellNow: HeroFigures['sellNow'];
+  sellNow: PlanVerdict['sellNow'];
   productName: string;
   productTypeID: number | null;
   productUnitPrice: number | null;
@@ -36,7 +34,7 @@ interface PlanCostsPanelProps {
   buildSystem: { id: number; name: string } | null;
   hub: TradeHub;
   activity: IndustryActivity;
-  ownedSale: OwnedSale | null;
+  ownedSale: PlanVerdict['ownedSale'];
   saleBasis: LiquidationBasis;
   onSaleBasisChange: (basis: LiquidationBasis) => void;
   cheaperNearby: ReactNode;

@@ -17,15 +17,16 @@ import {
   type DataTableColumn,
   type DataTableGroupBy,
   CachedNotice,
+  IncompleteNotice,
 } from '@/components/ui';
-import { COL_DATETIME, COL_DATETIME_STACKED } from '@/components/ui/dataTableWidths';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { fitColumnWidth } from './transactionColumnWidths';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
 import { loadWalletJournal, loadWalletTransactionsWithStatus } from '@/features/character/wallet';
 import { TransactionsSummaryStrip } from './TransactionsSummaryStrip';
-import { TransactionsFilterBar } from '@/features/corp/CorpTransactionsPanel';
+import { TransactionsFilterBar } from '@/features/character/TransactionsFilterBar';
+import { walletTransactionBaseColumns } from '@/features/character/walletTransactionColumns';
 import {
   EMPTY_TRANSACTION_FILTER_PARAMS,
   EMPTY_WALLET_TRANSACTION_FILTER,
@@ -35,7 +36,7 @@ import {
   type WalletTransactionFilter,
 } from '@/features/character/walletTransactionFilter';
 import { useUrlFilter } from '@/lib/useUrlState';
-import { ItemInfoLink, PlaceLink } from '@/features/entities';
+import { PlaceLink } from '@/features/entities';
 import { placeKey, usePlaceDetails, type PlaceRef } from '@/features/places';
 import { formatPercent } from '@/features/industry/format';
 import type { CachedResult } from '@/esi/cache';
@@ -43,7 +44,6 @@ import { loadTypeNames } from '@/features/character/typeNames';
 import { iskToneClass } from '@/features/character/format';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatMarketIsk } from '@/lib/isk';
-import { splitTimestamp } from '@/lib/timestamp';
 import { HintText } from '@/components/ui/HintText';
 import type { MarginGap } from '@/engine/market/realizedMargin';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -395,29 +395,16 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
     };
   }, [transactions, margins, gaps, t]);
 
-  const columns = useMemo<DataTableColumn<WalletTransaction>[]>(
-    () => [
-      {
-        id: 'date',
-        header: t('wallet.date'),
-        // Stacked date over time below `sm` (see render), one line from there up.
-        width: isPhone ? COL_DATETIME_STACKED : COL_DATETIME,
-        className: 'whitespace-nowrap text-text-dim max-sm:px-1',
-        headerClassName: 'max-sm:px-1',
-        // Date over time on a phone, freeing width for the other columns; one line from `sm` up.
-        render: (txn) => {
-          const { date, time } = splitTimestamp(new Date(txn.date), timeZone);
-          const body = date.trimEnd();
-          return (
-            <>
-              <span className="max-sm:block">{body}</span>
-              <span className="max-sm:hidden">{date.slice(body.length)}</span>
-              {time && <span className="max-sm:block">{time}</span>}
-            </>
-          );
-        },
-        sortValue: (txn) => txn.date,
-      },
+  const columns = useMemo<DataTableColumn<WalletTransaction>[]>(() => {
+    const [date, ...base] = walletTransactionBaseColumns<WalletTransaction>({
+      t,
+      timeZone,
+      isPhone,
+      nameFor,
+      widths: numberWidths,
+    });
+    return [
+      date,
       ...(allScope
         ? [
             {
@@ -431,59 +418,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
             } satisfies DataTableColumn<WalletTransaction>,
           ]
         : []),
-      {
-        id: 'item',
-        header: t('wallet.item'),
-        stickyStart: true,
-        // Takes the width the number columns leave; never under ~18ch, so names wrap on words.
-        minWidth: '18ch',
-        // Wraps to two lines on a phone rather than truncating to "Repu…".
-        className: 'sm:truncate',
-        render: (txn) => (
-          <span className="max-sm:line-clamp-2 max-sm:break-words">
-            <ItemInfoLink typeId={txn.type_id}>
-              {typeNames.get(txn.type_id) ?? `Type #${txn.type_id}`}
-            </ItemInfoLink>
-          </span>
-        ),
-        sortValue: (txn) => nameFor(txn.type_id),
-      },
-      {
-        id: 'side',
-        header: t('wallet.side'),
-        width: '7ch',
-        // The Total's sign and tone already say buy or sell (off by default on a phone).
-        render: (txn) => (txn.is_buy ? t('wallet.buy') : t('wallet.sell')),
-        sortValue: (txn) => (txn.is_buy ? 0 : 1),
-      },
-      {
-        id: 'quantity',
-        header: t('wallet.quantity'),
-        width: numberWidths.quantity,
-        align: 'right',
-        className: 'tabular-nums',
-        render: (txn) => formatCount(txn.quantity),
-        sortValue: (txn) => txn.quantity,
-      },
-      {
-        id: 'unitPrice',
-        header: t('wallet.unitPrice'),
-        width: numberWidths.unitPrice,
-        align: 'right',
-        className: 'tabular-nums',
-        render: (txn) => formatMarketIsk(txn.unit_price),
-        sortValue: (txn) => txn.unit_price,
-      },
-      {
-        id: 'total',
-        header: t('wallet.total'),
-        width: numberWidths.total,
-        align: 'right',
-        className: 'tabular-nums',
-        cellClassName: (txn) => iskToneClass(transactionTotal(txn)),
-        render: (txn) => formatMarketIsk(transactionTotal(txn)),
-        sortValue: (txn) => transactionTotal(txn),
-      },
+      ...base,
       {
         id: 'margin',
         header: t('wallet.margin'),
@@ -559,9 +494,8 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
         render: (txn) => <PlaceLink id={txn.location_id}>{placeNameFor(txn)}</PlaceLink>,
         sortValue: (txn) => placeNameFor(txn),
       },
-    ],
-    [t, typeNames, timeZone, nameFor, margins, gaps, allScope, placeNameFor, isPhone, numberWidths]
-  );
+    ];
+  }, [t, timeZone, nameFor, margins, gaps, allScope, placeNameFor, isPhone, numberWidths]);
 
   const columnsById = useMemo(
     () =>
@@ -682,9 +616,6 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
             <GrantBanner
               characterId={activeCharacterId}
               endpoints={['getCharacterWalletTransactions']}
-              title={t('wallet.transactionsReauthTitle')}
-              hint={t('wallet.transactionsReauthHint')}
-              actionLabel={t('wallet.reauthAction')}
             />
           </div>
         ) : !(allScope || transactionsResult) || !hasRows ? (
@@ -707,9 +638,10 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
               />
             )}
             {transactionsTruncated && (
-              <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-                {t('common.incompleteTitle')} — {t('wallet.transactionsTruncatedHint')}
-              </p>
+              <IncompleteNotice
+                className="px-3 pt-2"
+                hint={t('wallet.transactionsTruncatedHint')}
+              />
             )}
             <TransactionsFilterBar
               filter={filter}

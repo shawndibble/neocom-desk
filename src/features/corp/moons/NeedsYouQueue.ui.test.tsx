@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -7,6 +7,7 @@ import type { MinerRow, NeedsYouItem } from '@/engine/corpTaxBook/bookView';
 import type { TabsProjection } from '@/engine/corpTaxBook/readModels';
 import type { UncountedDonation } from '@/engine/corpTaxBook/uncounted';
 import type { OreDispute } from '@/engine/corpTaxBook/disputes';
+import type { ClaimedTransfer, Declaration } from '@/engine/corpTaxBook/overdue';
 import { BookProvider } from './BookContext';
 import { NeedsYouQueue } from './NeedsYouQueue';
 import type { BookContextValue } from './bookContextValue';
@@ -33,6 +34,18 @@ vi.mock('./BookDialogs', async (importOriginal) => ({
     </p>
   ),
 }));
+const ownCharacters = vi.hoisted(() => ({ ids: [] as number[] }));
+vi.mock('@/features/character/useCharacters', () => ({
+  useCharacters: () => ownCharacters.ids.map((characterId) => ({ characterId })),
+}));
+const wallet = vi.hoisted(() => ({
+  hasWalletScope: vi.fn(async () => true),
+  loadWalletJournalHistory: vi.fn(async () => ({
+    cached: { data: [] as unknown[] },
+    needsReauth: false,
+  })),
+}));
+vi.mock('@/features/character/wallet', () => wallet);
 const projection = vi.hoisted(() => ({ value: { miners: [], needsYou: [] } as unknown }));
 vi.mock('./useTabsProjection', () => ({ useTabsProjection: () => projection.value }));
 const { editBook } = await import('../taxBook/bookClient');
@@ -81,7 +94,16 @@ function renderQueue(
             corporationId: 98000001,
             view: view ?? {
               input: {
-                statements: [{ id: 's1', periodStart: '2026-09-01', periodEnd: '2026-09-30' }],
+                statements: [
+                  {
+                    id: 's1',
+                    minerId: 'solo:7',
+                    periodStart: '2026-09-01',
+                    periodEnd: '2026-09-30',
+                    lines: [],
+                  },
+                ],
+                declarations: [],
                 dismissals: [],
               },
               charges: [
@@ -124,7 +146,8 @@ describe('NeedsYouQueue (#6207)', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'Count Division 2' }));
     expect(editBook).toHaveBeenCalledWith(9, 98000001, {
       action: 'updateSettings',
-      patch: { divisions: [1, 2] },
+      // The server adds division 2 to what it stores; the list is for an older server.
+      patch: { addDivision: 2, divisions: [1, 2] },
     });
   });
 
@@ -137,7 +160,7 @@ describe('NeedsYouQueue (#6207)', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'Count Division 2' }));
     expect(editBook).toHaveBeenLastCalledWith(9, 98000001, {
       action: 'updateSettings',
-      patch: { divisions: [1, 2], divisionNames: { 2: 'Market Funds' } },
+      patch: { addDivision: 2, divisions: [1, 2], divisionNames: { 2: 'Market Funds' } },
     });
   });
 
@@ -220,7 +243,10 @@ describe('NeedsYouQueue (#6207)', () => {
   });
 
   it('never waives a dispute whose day it cannot price (#6206)', async () => {
-    renderQueue([], { disputes: [dispute], view: { input: { dismissals: [] }, charges: [] } });
+    renderQueue([], {
+      disputes: [dispute],
+      view: { input: { dismissals: [], declarations: [] }, charges: [] },
+    });
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Waive their ore' }));
     await user.type(screen.getByRole('textbox'), 'Their ore');
@@ -231,13 +257,20 @@ describe('NeedsYouQueue (#6207)', () => {
   it('rejects a dispute with a note (#6206)', async () => {
     renderQueue([], { disputes: [dispute] });
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Reject' }));
-    await user.type(screen.getByRole('textbox'), 'Our moon');
-    await user.click(screen.getAllByRole('button', { name: 'Reject' }).at(-1)!);
+    await user.click(screen.getByRole('button', { name: 'Keep the bill' }));
+    const [reason, nextStep] = screen.getAllByRole('textbox');
+    await user.type(reason!, 'Our moon');
+    // The next step is required: Confirm stays disabled until it is filled.
+    const confirm = screen.getAllByRole('button', { name: 'Keep the bill' }).at(-1)!;
+    expect(confirm).toBeDisabled();
+    expect(screen.getByText(/Required\. Pilot 7 sees this word for word/)).toBeInTheDocument();
+    await user.type(nextStep!, 'Send the journal line');
+    await user.click(confirm);
     expect(editBook).toHaveBeenCalledWith(9, 98000001, {
       action: 'rejectDispute',
       disputeId: 'solo_7_2026-09-05',
       reason: 'Our moon',
+      nextStep: 'Send the journal line',
     });
   });
 
@@ -294,6 +327,269 @@ describe('NeedsYouQueue (#6207)', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'Confirm paid' }));
     // The payment id comes from the declaration, so a retry or a second officer cannot double it.
     expect(await screen.findByText('Record payment: 4000000 as m_x1')).toBeInTheDocument();
+  });
+
+  describe('dispute cards by kind', () => {
+    const line = dispute.lines;
+    it('reads a quantity dispute with its lines and reason', () => {
+      renderQueue([], {
+        disputes: [{ ...dispute, kind: 'quantity', reason: 'I mined half that' }],
+      });
+      expect(
+        screen.getByText(/^Pilot 7 says the book recorded too much ore on /)
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/Disputed: 1,200 Zeolites\. “I mined half that”/)
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Waive it' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Keep the bill' })).toBeInTheDocument();
+    });
+    it('reads a rate dispute with the claimed and the billed rate', () => {
+      renderQueue([], {
+        disputes: [{ ...dispute, kind: 'rate', claimedPct: 5, reason: 'Fleet rate', lines: line }],
+      });
+      expect(screen.getByText(/should be 5%, not 10%$/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Waive the difference' })).toBeInTheDocument();
+    });
+    it('reads a not-paying dispute with the amount and writes it off', async () => {
+      renderQueue([], { disputes: [{ ...dispute, kind: 'notPaying', reason: 'Untaxed op' }] });
+      expect(screen.getByText(/^Pilot 7 isn't paying .* · 1,200,000$/)).toBeInTheDocument();
+      expect(screen.getByText('“Untaxed op”')).toBeInTheDocument();
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Write off' }));
+      expect(screen.getByText(/1,200,000 of tax on the ore they disputed/)).toBeInTheDocument();
+    });
+    it('says an open dispute holds its day', () => {
+      renderQueue([], { disputes: [{ ...dispute, at: new Date().toISOString() }] });
+      expect(
+        screen.getByText(/^Held until \d+ \w+ — payments skip it while you answer$/)
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('says what a hold did: the held amount, and that the Statement settles on the rest', () => {
+    renderQueue([], {
+      disputes: [{ ...dispute, kind: 'notPaying', at: new Date().toISOString() }],
+      view: {
+        input: {
+          statements: [
+            {
+              id: 's1',
+              minerId: 'solo:7',
+              periodStart: '2026-09-01',
+              periodEnd: '2026-09-30',
+              lines: [
+                {
+                  kind: 'mined',
+                  chargeKey: '7:1000:2026-09-05',
+                  oreLines: [{ typeId: 45490, quantity: 1200 }],
+                  unitPrices: { 45490: 10_000 },
+                  taxPct: 10,
+                  tax: 1_400_000,
+                },
+              ],
+            },
+          ],
+          declarations: [],
+          dismissals: [],
+        },
+        charges: [],
+      },
+    });
+    expect(
+      screen.getByText(
+        /^1,200,000 is held until \d+ \w+: payments skip it, and the Statement settles on the rest\.$/
+      )
+    ).toBeInTheDocument();
+  });
+
+  describe('declaration wallet check', () => {
+    const claim = (over: Partial<Declaration> = {}): NeedsYouItem => ({
+      kind: 'declaration',
+      minerId: 'solo:7',
+      owed: 5_000_000,
+      declaration: {
+        id: 'x1',
+        statementId: 's1',
+        kind: 'another-way',
+        at: '2026-11-10T00:00:00Z',
+        ...over,
+      },
+    });
+    const tr = (journalRef: number, over: Partial<ClaimedTransfer> = {}): ClaimedTransfer => ({
+      amount: 10_000_000,
+      at: '2026-11-10T12:00:00.000Z',
+      journalRef,
+      recipient: 'corporation',
+      ...over,
+    });
+    it.each([
+      ['found', 'Found'],
+      ['division', 'Found · Division 3'],
+      ['notSynced', 'Not synced yet'],
+      ['tooOld', 'Too old to check'],
+      ['notFound', 'Not in the corp wallet'],
+      ['person', 'Paid to a person'],
+      ['otherCorp', 'Another corporation'],
+    ] as const)('pills a %s check', (result, label) => {
+      renderQueue([
+        claim({
+          transfers: [tr(77)],
+          checks: [{ result, ...(result === 'division' ? { division: 3 } : {}) }],
+        }),
+      ]);
+      expect(screen.getByText(label)).toBeInTheDocument();
+      expect(screen.getByText(/10,000,000 · 10 Nov 12:00 · journal ref 77/)).toBeInTheDocument();
+    });
+    it('explains a transfer too old to check, and offers to count a division', async () => {
+      renderQueue([
+        claim({
+          transfers: [tr(1), tr(2)],
+          checks: [{ result: 'tooOld' }, { result: 'division', division: 3 }],
+        }),
+      ]);
+      expect(screen.getByText('before the wallet history the book holds')).toBeInTheDocument();
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Count Division 3' }));
+      expect(editBook).toHaveBeenLastCalledWith(
+        9,
+        98000001,
+        expect.objectContaining({ action: 'updateSettings' })
+      );
+    });
+    it('keeps a bill only with a next step, and sends it', async () => {
+      renderQueue([claim({ amount: 4_000_000 })]);
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: 'Keep the bill' }));
+      const [reason, nextStep] = screen.getAllByRole('textbox');
+      await user.type(reason!, 'Not found');
+      const confirm = screen.getAllByRole('button', { name: 'Keep the bill' }).at(-1)!;
+      expect(confirm).toBeDisabled();
+      await user.type(nextStep!, 'Send a screenshot');
+      await user.click(confirm);
+      expect(editBook).toHaveBeenLastCalledWith(9, 98000001, {
+        action: 'resolveDeclaration',
+        declarationId: 'x1',
+        resolution: 'rejected',
+        reason: 'Not found',
+        nextStep: 'Send a screenshot',
+      });
+    });
+
+    describe('paid to you', () => {
+      beforeEach(() => {
+        wallet.loadWalletJournalHistory.mockClear();
+      });
+      const toYou = claim({
+        transfers: [tr(55, { recipient: 'character', recipientId: 4242 })],
+        checks: [{ result: 'person' }],
+      });
+      const journalEntry = {
+        id: 9001,
+        date: '2026-11-10T12:20:00Z',
+        ref_type: 'player_donation',
+        description: '',
+        amount: 10_000_000,
+        first_party_id: 7,
+      };
+      it('finds it in your own wallet and records it as tax', async () => {
+        ownCharacters.ids = [4242];
+        wallet.loadWalletJournalHistory.mockResolvedValueOnce({
+          cached: { data: [journalEntry] },
+          needsReauth: false,
+        });
+        renderQueue([toYou]);
+        expect(
+          await screen.findByText(/^Pilot 7 says they paid you 10,000,000 as tax$/)
+        ).toBeInTheDocument();
+        expect(await screen.findByText('In your wallet')).toBeInTheDocument();
+        expect(
+          screen.getByText(/your journal ref 9001\. The book can't see it/)
+        ).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: "It wasn't tax" })).toBeInTheDocument();
+        await userEvent.setup().click(screen.getByRole('button', { name: 'Record it as tax' }));
+        expect(await screen.findByText('Record payment: 10000000 as m_x1')).toBeInTheDocument();
+        expect(wallet.loadWalletJournalHistory).toHaveBeenCalledTimes(1);
+        expect(wallet.loadWalletJournalHistory).toHaveBeenCalledWith(4242);
+      });
+      it('names only what went to you when the rest went to the corporation', async () => {
+        ownCharacters.ids = [4242];
+        wallet.loadWalletJournalHistory.mockResolvedValueOnce({
+          cached: { data: [journalEntry] },
+          needsReauth: false,
+        });
+        renderQueue([
+          claim({
+            transfers: [
+              tr(54, { amount: 3_000_000 }),
+              tr(55, { recipient: 'character', recipientId: 4242 }),
+            ],
+            checks: [{ result: 'notFound' }, { result: 'person' }],
+          }),
+        ]);
+        expect(
+          await screen.findByText(/^Pilot 7 says they paid you 10,000,000 as tax$/)
+        ).toBeInTheDocument();
+      });
+      it('says so when it is not in your wallet, back to the oldest entry read', async () => {
+        ownCharacters.ids = [4242];
+        wallet.loadWalletJournalHistory.mockResolvedValueOnce({
+          cached: { data: [{ ...journalEntry, id: 1, amount: 5, date: '2026-10-01T00:00:00Z' }] },
+          needsReauth: false,
+        });
+        renderQueue([toYou]);
+        expect(await screen.findByText('Not in your wallet')).toBeInTheDocument();
+        expect(screen.getByText('Checked your wallet journal back to 1 Oct.')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Record it anyway' })).toBeInTheDocument();
+      });
+      it('does not read a wallet the Character gave no scope for', async () => {
+        ownCharacters.ids = [4242];
+        wallet.hasWalletScope.mockResolvedValueOnce(false);
+        renderQueue([toYou]);
+        expect(await screen.findByText("Can't check your wallet")).toBeInTheDocument();
+        expect(wallet.loadWalletJournalHistory).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('credited automatically', () => {
+    it('lists a claim the book confirmed itself in the last week, as a line with a Miner link', () => {
+      const at = new Date(Date.now() - 86_400_000).toISOString();
+      renderQueue([], {
+        view: {
+          input: {
+            statements: [{ id: 's1', minerId: 'solo:7' }],
+            dismissals: [],
+            declarations: [
+              {
+                id: 'a1',
+                statementId: 's1',
+                kind: 'another-way',
+                at,
+                transfers: [{ amount: 3_000_000, at, journalRef: 1, recipient: 'corporation' }],
+                resolution: { kind: 'confirmed', at, by: 0 },
+              },
+              {
+                id: 'a2',
+                statementId: 's1',
+                kind: 'another-way',
+                at,
+                resolution: { kind: 'confirmed', at: '2026-01-01T00:00:00Z', by: 0 },
+              },
+            ],
+          },
+          charges: [],
+        },
+      });
+      expect(
+        screen.getByText(
+          /Credited automatically:.*, 3,000,000 \(.*\) — found in the corporation's wallet\./
+        )
+      ).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Pilot 7' })).toHaveAttribute(
+        'href',
+        '/corp/moons/miners/solo%3A7'
+      );
+      expect(screen.getAllByText(/Credited automatically/)).toHaveLength(1);
+    });
   });
 });
 

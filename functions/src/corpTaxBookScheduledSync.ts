@@ -26,6 +26,7 @@ import {
   OBSERVED,
   FEEDERS,
   WRITE_OFFS,
+  DISPUTES,
 } from './corpTaxBook.js';
 import {
   SCHEDULED_VIA,
@@ -87,10 +88,14 @@ import {
   outgoingDonationsFromJournal,
   writeOffForAllocation,
   type AllocWriteOff,
+  type HoldingDispute,
+  disputeHolds,
+  readHoldingDisputes,
   type MirrorDismissal,
   type ObservedRow,
   type OutgoingDonation,
 } from './corpTaxBookEngine.js';
+import { refreshAfterEvent } from './corpTaxBookMinerTotalsStore.js';
 import { reconcileFeederPayouts } from './corpTaxBookFeederPayouts.js';
 
 /** Same bounds the officer's client uses against the callable's caps (corpTaxBook.ts MAX_SYNC_*). */
@@ -146,6 +151,8 @@ export interface AdminBookState {
   paidStatementIds: Set<string>;
   /** Officer write-offs (#4637): a Statement one forgives in full settles. */
   writeOffs?: (AllocWriteOff & { minerId: string })[];
+  /** Members' disputes (resolving in the app): an open one holds its Statement from settling for good. */
+  disputes: (HoldingDispute & { minerId: string })[];
   /** Per refinery, the last read merged in full: which rows are final (corpTaxBookObservedThrough.ts). */
   observedThrough: ObservedThrough;
   /** The book doc's `createdAt`: tells this book from one deleted and turned on again. */
@@ -197,6 +204,7 @@ async function readQuietBookState(
     extractions: extractions.docs.map((d) => d.data() as SyncExtraction),
     paidStatementIds: paidIdsOf(paid),
     writeOffs: [],
+    disputes: [],
   };
 }
 
@@ -217,7 +225,7 @@ async function readBookStateFrom(snap: BookSnap, paidRead?: BookSnap): Promise<A
   const ref = snap.ref;
   const list = async <T>(name: string): Promise<T[]> =>
     (await ref.collection(name).get()).docs.map((d) => d.data() as T);
-  const [miners, statements, payments, dismissals, extractions, paid, writeOffDocs] =
+  const [miners, statements, payments, dismissals, extractions, paid, writeOffDocs, disputes] =
     await Promise.all([
       list<AdminBookState['miners'][number]>(MINERS),
       list<AdminBookState['statements'][number]>(STATEMENTS),
@@ -226,6 +234,7 @@ async function readBookStateFrom(snap: BookSnap, paidRead?: BookSnap): Promise<A
       list<SyncExtraction>(EXTRACTIONS),
       paidRead ?? ref.collection(META).doc(PAID_DOC).get(),
       list<Record<string, unknown>>(WRITE_OFFS),
+      list<unknown>(DISPUTES),
     ]);
   return {
     ...bookDocState(snap),
@@ -235,6 +244,7 @@ async function readBookStateFrom(snap: BookSnap, paidRead?: BookSnap): Promise<A
     dismissals,
     extractions,
     paidStatementIds: paidIdsOf(paid),
+    disputes: readHoldingDisputes(disputes),
     writeOffs: writeOffDocs.flatMap((d) => {
       const w = writeOffForAllocation(d);
       return w && typeof d.minerId === 'string' ? [{ ...w, minerId: d.minerId }] : [];
@@ -527,10 +537,25 @@ export async function runBookSync(
           extractions: after.extractions,
           ...(after.writeOffs ? { writeOffs: after.writeOffs } : {}),
           startDate: after.startDate,
+          disputes: after.disputes,
+          now: new Date(deps.now()).toISOString(),
         })
       : [];
   for (const ids of chunks(toSettle, SETTLE_PER_CALL)) {
     await edit({ action: 'settleStatements', statementIds: ids });
+  }
+
+  // --- Holds that lapsed ---------------------------------------------------
+  // A Miner's stored totals count an open dispute's amount as not due while its hold lasts, and
+  // a hold lapses with only time passing. The run after a lapse is never quiet (no marker is
+  // written while a dispute holds), so it recomputes the totals of every Miner with an
+  // unanswered dispute that no longer holds. Best effort: the daily verifier repairs a miss.
+  if (!quiet) {
+    const at = new Date(deps.now()).toISOString();
+    const lapsed = new Set(
+      before.disputes.filter((d) => !d.resolution && !disputeHolds(d, at)).map((d) => d.minerId)
+    );
+    if (lapsed.size > 0) await refreshAfterEvent(db, corporationId, [...lapsed], deps.now);
   }
 
   // --- Quiet marker ---------------------------------------------------------
@@ -545,6 +570,8 @@ export async function runBookSync(
       assigned.size === 0 &&
       !reassignError &&
       toSettle.length === 0 &&
+      // A hold lapsing changes the plan with only time passing: no run is quiet while a dispute holds.
+      !before.disputes.some((d) => disputeHolds(d, new Date(startedAt).toISOString())) &&
       before.versions !== null
         ? {
             at: startedAt,

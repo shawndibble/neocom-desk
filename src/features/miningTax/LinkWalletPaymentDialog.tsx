@@ -204,18 +204,6 @@ export function LinkWalletPaymentDialog({
             characterName={gap.characterName}
             endpoints={gap.endpoints}
             title={t('miningTax.linkWallet.grantTitle')}
-            hint={t('miningTax.linkWallet.grantHint', {
-              what: gap.endpoints
-                .map((e) =>
-                  t(
-                    e === 'getCharacterWalletJournal'
-                      ? 'miningTax.linkWallet.grantJournal'
-                      : 'miningTax.linkWallet.grantContracts'
-                  )
-                )
-                .join(` ${t('miningTax.linkWallet.grantAnd')} `),
-            })}
-            actionLabel={t('miningTax.linkWallet.grantAction')}
           />
         ))}
 

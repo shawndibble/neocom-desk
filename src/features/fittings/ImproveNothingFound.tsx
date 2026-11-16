@@ -40,7 +40,7 @@ export function ImproveNothingFound({
   onSearchRework,
 }: Props) {
   const { t } = useTranslation();
-  const nudge = settings.reach === 'upgrade' && !noModules && onSearchRework !== undefined;
+  const nudge = settings.value.reach === 'upgrade' && !noModules && onSearchRework !== undefined;
   return (
     <div className="space-y-2">
       <p className="text-sm">
@@ -60,14 +60,16 @@ export function ImproveNothingFound({
         <MakeItFitSection heading={t('fittings.improve.closest')}>
           <ul className="space-y-1">
             {result.rejected.map((option) => {
-              const line = moveLine(t, goal, settings.hold, option, before);
+              const line = moveLine(t, goal, settings.value.hold, option, before);
               return (
                 <li key={optionKey(option)} className="border-line rounded-xs border p-2 text-sm">
                   <p className="font-medium">{labels.swapLabel(option)}</p>
                   {goal === 'mining' && <p className="text-xs">{oreLine(t, option, before)}</p>}
                   {line && <p className="text-xs">{line}</p>}
                   <p className="text-text-dim text-xs">{changeLine(t, option, before)}</p>
-                  <p className="text-warning text-xs">{brokeText(t, option, settings, fitTotal)}</p>
+                  <p className="text-warning text-xs">
+                    {brokeText(t, option, settings.value, fitTotal)}
+                  </p>
                 </li>
               );
             })}
@@ -84,7 +86,9 @@ export function ImproveNothingFound({
         </div>
       )}
       {!noModules && !nudge && (
-        <p className="text-text-dim text-xs">{t(`fittings.improve.widen.${settings.reach}`)}</p>
+        <p className="text-text-dim text-xs">
+          {t(`fittings.improve.widen.${settings.value.reach}`)}
+        </p>
       )}
     </div>
   );

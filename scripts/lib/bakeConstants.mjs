@@ -35,14 +35,6 @@ export const FILES = [
   'planetSchematicsTypeMap.csv',
   'planetSchematicsPinMap.csv',
   'invMetaGroups.csv',
-  'mapRegions.csv',
-  'mapSolarSystems.csv',
-  // Stargate adjacency, for the local jump graph (issue #942); see
-  // `solarSystemJumps` below.
-  'mapSolarSystemJumps.csv',
-  // Per-planet radius, for PI link cost (issue #440). Only the group-7 rows
-  // are kept; see `piPlanetRadius` below.
-  'mapDenormalize.csv',
   'staStations.csv',
   // NPC corporation -> faction, for the owner faction on stations.json (issue
   // #1675); ESI omits `faction_id` for NPC corps.

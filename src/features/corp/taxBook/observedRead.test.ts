@@ -47,8 +47,17 @@ const open = (
   gate: Promise<unknown> = ok,
   bookCreatedAt?: number
 ) => readObservedRows({} as never, character, CORP, version, gate, now, bookCreatedAt);
+const ROW = {
+  structureId: 1001,
+  characterId: 9,
+  recordedCorporationId: CORP,
+  typeId: 1,
+  date: '2026-10-17',
+  cachedAt: '2026-10-17T10:00:00Z',
+};
 const put = (id: string, quantity: number, updatedMs?: number) =>
   store.docs.set(`${PATH}/${id}`, {
+    ...ROW,
     quantity,
     ...(updatedMs !== undefined ? { updatedAt: stamp(updatedMs) } : {}),
   });
@@ -75,7 +84,13 @@ describe('readObservedRows', () => {
 
   it('strips the server stamp from the rows it returns', async () => {
     put('a', 1, T0);
-    expect(await open('v1', T0)).toEqual([{ quantity: 1 }]);
+    expect(await open('v1', T0)).toEqual([{ ...ROW, quantity: 1 }]);
+  });
+
+  it('drops a stored doc that is not an observed row, as the member read does', async () => {
+    put('a', 1, T0);
+    store.docs.set(`${PATH}/junk`, { quantity: 'x', updatedAt: stamp(T0) });
+    expect(await open('v1', T0)).toEqual([{ ...ROW, quantity: 1 }]);
   });
 
   it('reads only rows written since the watermark when the stamp moves, edits included', async () => {

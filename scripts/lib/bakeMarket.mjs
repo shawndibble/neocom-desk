@@ -16,7 +16,7 @@ import {
   stationReprocessingFields,
 } from './stationOwners.mjs';
 
-export async function bakeMarket({ raw, types, packagedVolumeByType, groups, typeMap }) {
+export async function bakeMarket({ raw, map, types, packagedVolumeByType, groups, typeMap }) {
   // --- market/groups.json: invMarketGroups -> MarketGroupNode[] ---
   const marketGroups = [];
   {
@@ -223,39 +223,29 @@ export async function bakeMarket({ raw, types, packagedVolumeByType, groups, typ
   const solarSystems = [];
   const regionAllSystemsSynthetic = new Map();
   const systemMetres = [];
-  {
-    const rows = raw['mapSolarSystems.csv'];
-    const h = indexHeader(rows);
-    for (let i = 1; i < rows.length; i++) {
-      const r = rows[i];
-      const regionId = Number(r[h.regionID]);
-      solarSystems.push({
-        id: Number(r[h.solarSystemID]),
-        name: r[h.solarSystemName],
-        security: num(r[h.security]) ?? 0,
-        regionId,
-      });
-      const x = num(r[h.x]) ?? 0;
-      const y = num(r[h.y]) ?? 0;
-      const z = num(r[h.z]) ?? 0;
-      systemMetres.push({ id: Number(r[h.solarSystemID]), x, y, z });
-      const synthetic = Math.hypot(x, y, z) < SYNTHETIC_POSITION_MAX_M;
-      regionAllSystemsSynthetic.set(
-        regionId,
-        synthetic && (regionAllSystemsSynthetic.get(regionId) ?? true)
-      );
-    }
-    solarSystems.sort((a, b) => a.id - b.id);
+  for (const sys of map.systems) {
+    solarSystems.push({
+      id: sys.id,
+      name: sys.name,
+      security: sys.security,
+      regionId: sys.regionId,
+    });
+    systemMetres.push({ id: sys.id, x: sys.x, y: sys.y, z: sys.z });
+    const synthetic = Math.hypot(sys.x, sys.y, sys.z) < SYNTHETIC_POSITION_MAX_M;
+    regionAllSystemsSynthetic.set(
+      sys.regionId,
+      synthetic && (regionAllSystemsSynthetic.get(sys.regionId) ?? true)
+    );
   }
   const globalMarketRegionIds = new Set(
     [...regionAllSystemsSynthetic].filter(([, synthetic]) => synthetic).map(([id]) => id)
   );
 
-  // --- market/jumps.json: mapSolarSystemJumps -> JumpGraphData ---
+  // --- market/jumps.json: mapStargates -> JumpGraphData ---
   //
   // Adjacency by solar system id, which is all a pathfinder needs — the CSV's
-  // constellation and region columns describe the systems, and `systems.json`
-  // already carries that. Fuzzwork lists every gate in both directions, so the
+  // systems' constellation and region are in `systems.json`. Every gate is listed
+  // in both directions, so the
   // two halves of a pair arrive as separate rows and each one is recorded on
   // its own `from` system; no edge is mirrored by hand.
   //
@@ -269,14 +259,9 @@ export async function bakeMarket({ raw, types, packagedVolumeByType, groups, typ
   const solarSystemJumps = {};
   for (const sys of solarSystems) solarSystemJumps[sys.id] = [];
   {
-    const rows = raw['mapSolarSystemJumps.csv'];
-    const h = indexHeader(rows);
-    for (let i = 1; i < rows.length; i++) {
-      const r = rows[i];
-      const from = intOrNull(r[h.fromSolarSystemID]);
-      const to = intOrNull(r[h.toSolarSystemID]);
-      if (from === null || to === null || from === to) continue;
-      // `??=` only fires for a `from` system absent from mapSolarSystems —
+    for (const [from, to] of map.jumpPairs) {
+      if (from === to) continue;
+      // `??=` only fires for a `from` system absent from the systems table —
       // every real one is seeded above — which lets the sanity check below
       // report that rather than this loop throwing on it.
       (solarSystemJumps[from] ??= []).push(to);
@@ -335,15 +320,7 @@ export async function bakeMarket({ raw, types, packagedVolumeByType, groups, typ
   const lpCorporations = await probeLpStoreCorporations(npcCorps, CACHE_DIR);
 
   // --- market/regions.json: mapRegions, probed live against ESI for orders ---
-  const regionCandidates = [];
-  {
-    const rows = raw['mapRegions.csv'];
-    const h = indexHeader(rows);
-    for (let i = 1; i < rows.length; i++) {
-      const r = rows[i];
-      regionCandidates.push({ id: Number(r[h.regionID]), name: r[h.regionName] });
-    }
-  }
+  const regionCandidates = map.regions;
   console.log(`Probing ${regionCandidates.length} regions against ESI for live orders...`);
   const regionsWithOrders = await probeMarketRegions(regionCandidates, CACHE_DIR);
   const marketRegions = regionsWithOrders.filter((r) => !globalMarketRegionIds.has(r.id));

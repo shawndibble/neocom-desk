@@ -65,17 +65,15 @@ describe('ScopeGate', () => {
     await grantResolved();
 
     expect(screen.getByText('Mail from Aura')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /log in again/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Grant in EVE' })).not.toBeInTheDocument();
   });
 
   it('renders the re-auth banner INSTEAD of the view when the scope is missing', async () => {
     await seedGrant(['esi-assets.read_assets.v1']);
     renderGate();
 
-    expect(await screen.findByText(/log in again to see your mail/i)).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: /log in again with eve online/i })
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/: grant Mail$/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Grant in EVE' })).toBeInTheDocument();
     // The point of gating before the fetch: no spinner-then-empty-table to
     // misread.
     expect(screen.queryByText('Mail from Aura')).not.toBeInTheDocument();
@@ -92,7 +90,7 @@ describe('ScopeGate', () => {
     await seedGrant(['esi-assets.read_assets.v1']);
     renderGate();
 
-    const login = await screen.findByRole('button', { name: /log in again with eve online/i });
+    const login = await screen.findByRole('button', { name: 'Grant in EVE' });
     // The gate replaces the whole view, so this button is the only thing on the
     // page to tap: DESIGN.md §3's 44px tier, not the 36px one a banner sitting
     // beside a view's own controls gets.
@@ -101,7 +99,7 @@ describe('ScopeGate', () => {
 
   it('treats a character with no stored token as granting nothing', async () => {
     renderGate();
-    expect(await screen.findByText(/log in again to see your mail/i)).toBeInTheDocument();
+    expect(await screen.findByText(/: grant Mail$/)).toBeInTheDocument();
   });
 
   it('shows no banner on any gated route for a character holding every scope', async () => {
@@ -110,7 +108,7 @@ describe('ScopeGate', () => {
       const { unmount } = renderGate(path);
       await grantResolved();
       expect(screen.getByText('Mail from Aura'), path).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /log in again/i }), path).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Grant in EVE' }), path).not.toBeInTheDocument();
       unmount();
     }
   });
@@ -121,7 +119,7 @@ describe('ScopeGate', () => {
     const user = userEvent.setup();
     renderGate('/mail');
 
-    await user.click(await screen.findByRole('button', { name: /log in again with eve online/i }));
+    await user.click(await screen.findByRole('button', { name: 'Grant in EVE' }));
 
     expect(beginEveLogin).toHaveBeenCalledWith({ groups: ['mail'] });
   });
@@ -143,7 +141,7 @@ describe('ScopeGate', () => {
       const { unmount } = renderGate(path);
       await grantResolved();
       expect(screen.getByText('Mail from Aura'), path).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /log in again/i }), path).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Grant in EVE' }), path).not.toBeInTheDocument();
       unmount();
     }
   });

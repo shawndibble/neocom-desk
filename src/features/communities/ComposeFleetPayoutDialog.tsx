@@ -159,7 +159,7 @@ export function ComposeFleetPayoutDialog({
     if (!wantsPrice) return;
     let cancelled = false;
     const timer = setTimeout(() => {
-      appraisePaste(lootText, hub, percent, null).then(
+      appraisePaste(lootText, hub, percent, null, { textQuantityAsOne: true }).then(
         (outcome) => !cancelled && setPriced({ key: priceKey, outcome }),
         () => !cancelled && setPriced({ key: priceKey, outcome: null })
       );

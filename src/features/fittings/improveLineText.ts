@@ -17,7 +17,7 @@ import { alignOf } from '@/engine/fittings/improveFigures';
 import type { FittingStats } from '@/engine/fittings/types';
 import { formatIskCompact } from '@/lib/isk';
 import { createNumberFormat } from '@/lib/numberLocale';
-import type { ImproveSettings } from './improveSettings';
+import type { ImproveChoices } from './improveSettings';
 
 export const m3sFormat = createNumberFormat({ maximumFractionDigits: 1 });
 export const m3Format = createNumberFormat({ maximumFractionDigits: 0 });
@@ -27,7 +27,7 @@ export const twoDecimals = createNumberFormat({ maximumFractionDigits: 2 });
 export function brokeText(
   t: TFunction,
   option: RejectedOption,
-  { iskBudget }: Pick<ImproveSettings, 'iskBudget'>,
+  { iskBudget }: Pick<ImproveChoices, 'iskBudget'>,
   fitTotal: number | null
 ): string {
   if (option.guardrail !== 'spend' || iskBudget === null || option.iskDelta === null)

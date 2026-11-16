@@ -19,7 +19,26 @@ vi.mock('../wallet', async (importOriginal) => ({
   loadCorporationDivisions: (...a: unknown[]) => loadDivisions(...a),
 }));
 
+const mailingLists = vi.fn();
+vi.mock('@/features/character/mail', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/character/mail')>()),
+  loadMailingLists: (...a: unknown[]) => mailingLists(...a),
+}));
+vi.mock('@/features/corp/members', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/corp/members')>()),
+  loadCorporationCeoId: () => Promise.resolve(31),
+}));
+vi.mock('@/features/character/names', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/character/names')>()),
+  resolveNames: (ids: number[]) =>
+    Promise.resolve(new Map(ids.map((id) => [id, id === 31 ? 'Varro Halden' : `Name ${id}`]))),
+}));
+
 beforeEach(() => {
+  mailingLists.mockReset();
+  mailingLists.mockResolvedValue({
+    cached: { data: [{ mailing_list_id: 77, name: 'Tax desk' }] },
+  });
   editBook.mockReset();
   editBook.mockResolvedValue({});
   loadDivisions.mockReset();
@@ -171,6 +190,35 @@ describe('BookSettingsDialog tabs', () => {
     );
   });
 
+  it('leaves unchanged divisions and their names out of a save, so it never overwrites them', async () => {
+    loadDivisions.mockResolvedValue({
+      cached: { data: { wallet: [{ division: 1, name: 'Renamed' }] } },
+      needsReauth: false,
+    });
+    const user = userEvent.setup();
+    renderDialog();
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    const call = editBook.mock.calls.find(
+      (c) => (c[2] as { action: string }).action === 'updateSettings'
+    );
+    const patch = (call?.[2] as { patch: Record<string, unknown> }).patch;
+    expect(patch).not.toHaveProperty('divisions');
+    expect(patch).not.toHaveProperty('divisionsBase');
+    expect(patch).not.toHaveProperty('divisionNames');
+  });
+
+  it('says another officer changed the divisions when the server refuses the save', async () => {
+    editBook.mockRejectedValueOnce(
+      Object.assign(new Error('changed'), { details: { reason: 'divisions-changed' } })
+    );
+    const user = userEvent.setup();
+    renderDialog();
+    await user.click(screen.getByRole('tab', { name: 'Billing' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Division 2' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText(/Another officer changed the divisions/)).toBeInTheDocument();
+  });
+
   it("saves the corp's names for the divisions it reads, so members see them at once", async () => {
     loadDivisions.mockResolvedValue({
       cached: { data: { wallet: [{ division: 2, name: 'Market Funds' }] } },
@@ -186,7 +234,11 @@ describe('BookSettingsDialog tabs', () => {
       98000000,
       expect.objectContaining({
         action: 'updateSettings',
-        patch: expect.objectContaining({ divisions: [1, 2], divisionNames: { 2: 'Market Funds' } }),
+        patch: expect.objectContaining({
+          divisions: [1, 2],
+          divisionsBase: [1],
+          divisionNames: { 2: 'Market Funds' },
+        }),
       })
     );
   });
@@ -214,5 +266,39 @@ describe('BookSettingsDialog tabs', () => {
       </MemoryRouter>
     );
     expect(screen.getByRole('tab', { name: 'Access' })).toHaveAttribute('aria-selected', 'true');
+  });
+});
+
+describe('BookSettingsDialog who answers tax questions', () => {
+  it('defaults to the CEO, named, and saves nothing for it', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    await user.click(screen.getByRole('tab', { name: 'Access' }));
+    expect(await screen.findByText('The CEO, Varro Halden')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    const patch = editBook.mock.calls[0][2].patch as Record<string, unknown>;
+    expect(patch).not.toHaveProperty('taxContact');
+  });
+
+  it("saves one of the officer's own mailing lists with its name", async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    await user.click(screen.getByRole('tab', { name: 'Access' }));
+    await screen.findByText('The CEO, Varro Halden');
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Mailing list' }),
+      await screen.findByRole('option', { name: 'Tax desk' })
+    );
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(editBook).toHaveBeenCalledWith(
+      7,
+      98000000,
+      expect.objectContaining({
+        action: 'updateSettings',
+        patch: expect.objectContaining({
+          taxContact: { kind: 'mailingList', id: 77, name: 'Tax desk' },
+        }),
+      })
+    );
   });
 });

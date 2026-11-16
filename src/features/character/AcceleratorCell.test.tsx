@@ -63,15 +63,11 @@ describe('AcceleratorCell', () => {
     });
   });
 
-  it('switches to entering the end time from a quiet control under the fields', async () => {
+  it('opens on a set accelerator with focus in the first time box', async () => {
     const user = userEvent.setup();
-    renderCell(undefined, 12);
+    renderCell({ bonus: 12, expiresAt: Date.now() + 5 * HOUR + 30 * 60_000 });
     await user.click(screen.getByRole('button', { name: 'Edit accelerator for Pilot Seven' }));
-    await user.click(await screen.findByRole('button', { name: 'Enter end time instead' }));
-
-    expect(screen.getByLabelText('Ends at')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Days')).toBeNull();
-    await user.click(screen.getByRole('button', { name: 'Enter time left instead' }));
-    expect(screen.getByLabelText('Days')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Days')).toHaveFocus();
+    expect(screen.getByLabelText('Hours')).toHaveValue('5');
   });
 });

@@ -8,6 +8,7 @@ import type {
 import type { DayCharge, Miner, PlaceOf } from '../charges';
 import type { FeederCoverage } from '../coverage';
 import type { Dismissal } from '../dismissals';
+import type { OreDispute } from '../disputes';
 import type { FeederReadClock, StaleHold } from '../feederHealth';
 import type { Declaration, OverdueStatus } from '../overdue';
 import type { TaxRate } from '../rates';
@@ -46,6 +47,8 @@ export interface OpenSetInput {
   dismissals: readonly Dismissal[];
   writeOffs?: readonly RecordedWriteOff[];
   declarations?: readonly Declaration[];
+  /** Members' disputes: an open one holds its disputed amount out of what is due (`heldByStatement`). */
+  disputes?: readonly OreDispute[];
   /** Days after issue an unsettled Statement goes Overdue; absent: the default. */
   overdueDays?: number;
   /** Moon owners' coverage and read clock; absent means none. */

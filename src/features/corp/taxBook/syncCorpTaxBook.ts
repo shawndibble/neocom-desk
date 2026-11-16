@@ -335,6 +335,8 @@ export async function syncCorpTaxBook(
         extractions: after.extractions,
         ...(after.writeOffs ? { writeOffs: after.writeOffs } : {}),
         startDate: after.book.startDate,
+        ...(after.disputes ? { disputes: after.disputes } : {}),
+        now: new Date(deps.now()).toISOString(),
       })
     : [];
   for (const ids of chunk(toSettle, SETTLE_PER_CALL)) {

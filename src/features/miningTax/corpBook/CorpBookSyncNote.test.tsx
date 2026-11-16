@@ -73,8 +73,11 @@ describe('CorpBookSyncNote', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('tells a leaver their lines are still readable', () => {
-    render(<CorpBookSyncNote book={book({}, { left: true })} owedNow={0} now={NOW} />);
-    expect(screen.getByText(/You left Brass Meridian Logistics/)).toBeInTheDocument();
+  // `LeftCorpNotice` says it, with Pay and Stop showing: saying it here too only repeated it.
+  it('leaves a leaver to the left-the-corp notice', () => {
+    const { container } = render(
+      <CorpBookSyncNote book={book({}, { left: true })} owedNow={0} now={NOW} />
+    );
+    expect(container).toBeEmptyDOMElement();
   });
 });

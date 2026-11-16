@@ -7,10 +7,10 @@ import {
   type MadePaymentSources,
 } from './madePayments';
 
-const loadWalletJournalWithStatus = vi.fn();
+const loadWalletJournalHistory = vi.fn();
 const loadContracts = vi.fn();
 vi.mock('@/features/character/wallet', () => ({
-  loadWalletJournalWithStatus: (...a: unknown[]) => loadWalletJournalWithStatus(...a),
+  loadWalletJournalHistory: (...a: unknown[]) => loadWalletJournalHistory(...a),
 }));
 vi.mock('@/features/character/contracts', () => ({
   loadContracts: (...a: unknown[]) => loadContracts(...a),
@@ -41,13 +41,13 @@ const ok = <T>(data: T) => ({ cached: { data }, needsReauth: false });
 const noPermission = { cached: null, needsReauth: true };
 
 beforeEach(() => {
-  loadWalletJournalWithStatus.mockReset();
+  loadWalletJournalHistory.mockReset();
   loadContracts.mockReset();
 });
 
 describe('loadMadePaymentsWithStatus', () => {
   it('marks a missing journal permission skipped and still returns contract payments', async () => {
-    loadWalletJournalWithStatus.mockResolvedValue(noPermission);
+    loadWalletJournalHistory.mockResolvedValue(noPermission);
     loadContracts.mockResolvedValue(ok([CONTRACT]));
 
     const result = await loadMadePaymentsWithStatus([1]);
@@ -59,7 +59,7 @@ describe('loadMadePaymentsWithStatus', () => {
   });
 
   it('marks both sources ok when both load', async () => {
-    loadWalletJournalWithStatus.mockResolvedValue(ok([JOURNAL]));
+    loadWalletJournalHistory.mockResolvedValue(ok([JOURNAL]));
     loadContracts.mockResolvedValue(ok([CONTRACT]));
 
     const result = await loadMadePaymentsWithStatus([1]);
@@ -69,7 +69,7 @@ describe('loadMadePaymentsWithStatus', () => {
   });
 
   it('marks a thrown read failed, not skipped', async () => {
-    loadWalletJournalWithStatus.mockRejectedValue(new Error('offline'));
+    loadWalletJournalHistory.mockRejectedValue(new Error('offline'));
     loadContracts.mockResolvedValue(ok([]));
 
     const result = await loadMadePaymentsWithStatus([1]);

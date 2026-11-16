@@ -34,8 +34,12 @@ import {
   DISMISSALS,
   DISPUTES,
   disputeIdFor,
+  type ClaimCheck,
+  type ClaimTransfer,
+  checkClaimedTransfers,
   type DeclareOwnInput,
   type DisputeConflictInput,
+  type DisputeKind,
   type WithdrawDisputeInput,
   EXTRACTIONS,
   FEEDER_INVITES_COLLECTION,
@@ -67,6 +71,7 @@ import {
   type RecordedOre,
   parseStatement,
   moveStartRate,
+  sameDivisions,
   rateKey,
   startDateMoveReason,
   reanchorCadence,
@@ -84,6 +89,7 @@ import {
   donationsReadAtPatch,
 } from './corpTaxBook.js';
 import {
+  BOOK_DEFAULTS,
   extractionIdOf,
   allocatePayments,
   dismissalCredits,
@@ -91,10 +97,16 @@ import {
   canOverrideRecordRate,
   canRebillFrom,
   isRetroactiveRate,
+  latestRecordedCorp,
+  creditedLines,
+  disputeHolds,
+  heldByStatement,
+  readHoldingDisputes,
   mergeObservedRows,
   observedRowKey,
   shiftDate,
   writeOffForAllocation,
+  type CorpRecord,
   type CoveragePeriod,
   type DismissableLine,
   type MirrorDismissal,
@@ -111,10 +123,10 @@ import { OBSERVED_UPDATED_AT_FIELD } from './corpTaxBookVersionKeys.js';
 import { POP_SHARING_DOC, applyMoonOverride, popSharingFrom } from './popSharing.js';
 import type { CorporationAllianceLookup } from './sharedPopsEsi.js';
 import {
-  ALLIANCE_RECHECK_MS,
   EDITOR_CHECKED_AT,
   editorStampFields,
   refreshSharedPops,
+  sharedPopsRepublish,
   sharedPopSourcesRef,
   sharedPopsRef,
   stampEditorUseIfSharing,
@@ -822,7 +834,8 @@ export async function syncBookAs(
     await storeUncounted(deps, input.corporationId, input.uncounted).catch((e) =>
       console.error('uncounted donations write failed', e instanceof Error ? e.message : e)
     );
-  if (paidMiners.size > 0) await refreshAfterEvent(deps.db, input.corporationId, [...paidMiners]);
+  if (paidMiners.size > 0)
+    await refreshAfterEvent(deps.db, input.corporationId, [...paidMiners], deps.now);
   // Rows or a chunk make-up moved these pulls (ADR 0032). Best effort, like the totals above.
   await refreshMoonDocs(deps.db, input.corporationId, touchedPulls);
   // Only donations and Extractions are in the Overview and Miners tab docs (ADR 0032); rows are not. Best effort.
@@ -831,23 +844,11 @@ export async function syncBookAs(
     await refreshReadModels(deps.db, input.corporationId, deps.now());
   // A sync that changed something republishes the book's Shared Pops (#6223). Best effort. A
   // quiet one has nothing new to publish (a viewer's read drops an expired pop by itself), except
-  // what the publish learns on its own clock: the alliance recheck, and refinery names the
-  // scheduled run learned. So it republishes a doc that old, and costs one read otherwise.
-  if (!quiet || (await sharedPopsStale(deps, input.corporationId)))
-    await refreshSharedPops(deps, input.corporationId);
+  // what the publish learns on its own clock: the alliance, and refinery names the scheduled run
+  // learned. So it republishes a doc that old, or one whose alliance the corporation has left.
+  const republish = await sharedPopsRepublish(deps, input.corporationId, !quiet);
+  if (republish) await refreshSharedPops(deps, input.corporationId, republish);
   return { observedChanged, extractions: input.extractions.length, donationsAdded };
-}
-
-/** Whether the book's Shared Pops doc was last published an alliance recheck ago or more. */
-async function sharedPopsStale(deps: BookDeps, corporationId: number): Promise<boolean> {
-  try {
-    const held = await sharedPopsRef(deps.db, corporationId).get();
-    const at = (held.get('updatedAt') as { toMillis?: () => number } | undefined)?.toMillis?.();
-    return held.exists && (at === undefined || deps.now() - at >= ALLIANCE_RECHECK_MS);
-  } catch (e) {
-    console.error('shared pops age read failed', e instanceof Error ? e.message : e);
-    return false;
-  }
 }
 
 /**
@@ -887,7 +888,46 @@ interface EditOutcome {
   result?: Data;
 }
 
+/** A dispute doc that still names ore; a withdrawn day's tombstone has none. */
+const hasLines = (d: Data) => Array.isArray(d.lines) && d.lines.length > 0;
+
 const col = (c: EditCtx, name: string) => sub(c.deps.db, c.corporationId, name);
+
+/**
+ * The ids, among `statements`, that open disputes hold something of at `now`
+ * (`heldByStatement`, priced and credited as the allocation reads them).
+ */
+async function heldStatementIds(c: EditCtx, statements: readonly Data[], now: string) {
+  const held = new Set<string>();
+  for (const minerId of new Set(statements.map((s) => s.minerId as string))) {
+    const disputes = readHoldingDisputes(
+      (await c.tx.get(col(c, DISPUTES).where('minerId', '==', minerId))).docs.map((d) => d.data())
+    ).filter((d) => disputeHolds(d, now));
+    if (disputes.length === 0) continue;
+    const [all, dismissals, extractions] = await Promise.all([
+      c.tx.get(col(c, STATEMENTS).where('minerId', '==', minerId)),
+      c.tx.get(col(c, DISMISSALS)),
+      c.tx.get(col(c, EXTRACTIONS)),
+    ]);
+    const ofMiner = all.docs.map((d) => d.data() as Data);
+    const byId = new Map(ofMiner.map((s) => [s.id as string, s]));
+    for (const s of statements) if (s.minerId === minerId) byId.set(s.id as string, s);
+    const mine = [...byId.values()].map((x) => ({
+      id: x.id as string,
+      lines: (x.lines as DismissableLine[]) ?? [],
+    }));
+    const credits = dismissalCredits({
+      minerId,
+      statements: mine,
+      dismissals: dismissals.docs.map((d) => d.data() as MirrorDismissal),
+      extractions: extractions.docs.map((d) => d.data() as MirrorExtraction),
+      expiryHours: (c.book.structureExpiryHours as Record<string, number> | undefined) ?? {},
+    });
+    const amounts = heldByStatement(mine, disputes, creditedLines(credits), now);
+    for (const [id, amount] of amounts) if (amount > 0) held.add(id);
+  }
+  return held;
+}
 
 async function mustGet(c: EditCtx, ref: DocumentReference, what: string): Promise<Data> {
   const snap = await c.tx.get(ref);
@@ -1009,22 +1049,25 @@ async function recordedHereSince(
   }
 }
 
-/** The corporation recorded on the character's latest day (the first row of that day by id). */
-async function latestRecordedCorp(c: EditCtx, characterId: number): Promise<unknown> {
+/**
+ * The corporation the character was last recorded in, by the engine's rule
+ * (`latestRecordedCorp`: newest day, freshest read, then refinery and corporation id), so the
+ * Close account guard agrees with the guest the officer's view shows. Every row of the newest
+ * day is read: a character can change corporation mid-day.
+ */
+async function latestRecordedCorpOf(c: EditCtx, characterId: number): Promise<number | undefined> {
   const rows = col(c, OBSERVED).where('characterId', '==', characterId);
+  const fields = ['characterId', 'recordedCorporationId', 'date', 'cachedAt', 'structureId'];
   let days: QueryDocumentSnapshot[];
   try {
     const top = await c.tx.get(rows.orderBy('date', 'desc').limit(1));
     if (top.empty) return undefined;
-    // A character can change corporation mid-day: every row of that day, in id order.
     days = (await c.tx.get(rows.where('date', '==', top.docs[0].get('date')))).docs;
   } catch (e) {
     if (!isMissingIndex(e)) throw e;
-    const all = (await c.tx.get(rows.select('recordedCorporationId', 'date'))).docs;
-    const newest = all.reduce((m, d) => (d.get('date') > m ? d.get('date') : m), '');
-    days = all.filter((d) => d.get('date') === newest);
+    days = (await c.tx.get(rows.select(...fields))).docs;
   }
-  return days[0]?.get('recordedCorporationId');
+  return latestRecordedCorp(days.map((d) => d.data() as CorpRecord)).get(characterId)?.corp;
 }
 
 function writeMiner(
@@ -1160,14 +1203,54 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
           reason: 'director-approval',
         });
       }
-      const { structureExpiryHours, dismissApprovalAboveIsk, showToMembers, startDate, ...rest } =
-        action.patch;
+      const {
+        structureExpiryHours,
+        dismissApprovalAboveIsk,
+        showToMembers,
+        startDate,
+        divisions,
+        divisionsBase,
+        addDivision,
+        taxContact,
+        ...rest
+      } = action.patch;
       if ((startDate !== undefined || showToMembers) && !c.access.isDirector) {
         throw new HttpsError('permission-denied', 'Only a Director sets this', {
           reason: 'director-only',
         });
       }
       const update: Data = { ...rest };
+      // A book stored without divisions reads division 1, as the client and the sync read it.
+      const storedDivisions = Array.isArray(c.book.divisions)
+        ? (c.book.divisions as number[])
+        : [...BOOK_DEFAULTS.divisions];
+      if (addDivision !== undefined) {
+        // Added to what is stored now, so a concurrent addition by another officer is kept.
+        if (!storedDivisions.includes(addDivision)) {
+          update.divisions = [...storedDivisions, addDivision].sort((a, b) => a - b);
+        }
+        // Its names were read for the client's own (maybe stale) list: merged, they never drop
+        // the name of a division another officer counted meanwhile.
+        if (rest.divisionNames) {
+          update.divisionNames = {
+            ...(c.book.divisionNames as Data | undefined),
+            ...rest.divisionNames,
+          };
+        }
+      } else if (divisions) {
+        if (divisionsBase && !sameDivisions(divisionsBase, storedDivisions)) {
+          fail(
+            'failed-precondition',
+            'The divisions changed since you opened the settings',
+            'divisions-changed'
+          );
+        }
+        update.divisions = divisions;
+      }
+      // Any officer who can edit sets it (not a Director-only setting); null deletes the field.
+      if (taxContact !== undefined) {
+        update.taxContact = taxContact === null ? FieldValue.delete() : taxContact;
+      }
       if (showToMembers) update.membersSeeFrom = now;
       const oldStart = c.book.startDate as string | undefined;
       if (startDate !== undefined && startDate !== oldStart) {
@@ -1203,8 +1286,14 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         update.dismissApprovalAboveIsk =
           dismissApprovalAboveIsk === null ? FieldValue.delete() : dismissApprovalAboveIsk;
       }
-      tx.update(bookDoc, update);
-      return { detail: { patch: action.patch as Data } };
+      // Counting a division the book already reads changes nothing.
+      if (Object.keys(update).length > 0) tx.update(bookDoc, update);
+      // A counted division audits the list stored, never the fallback list sent for an older server.
+      const audited =
+        addDivision === undefined
+          ? action.patch
+          : { ...action.patch, divisions: update.divisions ?? storedDivisions };
+      return { detail: { patch: audited as Data } };
     }
     case 'recordPayment': {
       const ref = col(c, PAYMENTS).doc(action.paymentId);
@@ -1595,8 +1684,13 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const paid = new Set<string>(
         ((await tx.get(paidRef)).data()?.ids as string[] | undefined) ?? []
       );
-      const fresh = [...new Set(action.statementIds)].filter((id) => !paid.has(id));
-      for (const id of fresh) await mustGet(c, col(c, STATEMENTS).doc(id), 'Statement');
+      const wanted = [...new Set(action.statementIds)].filter((id) => !paid.has(id));
+      const docs: Data[] = [];
+      for (const id of wanted) docs.push(await mustGet(c, col(c, STATEMENTS).doc(id), 'Statement'));
+      // A Statement settles for good (D22), so the server never trusts the caller's plan: an
+      // older client plans without disputes. One an open dispute holds right now is dropped.
+      const held = await heldStatementIds(c, docs, iso);
+      const fresh = wanted.filter((id) => !held.has(id));
       if (fresh.length > 0) {
         // Only ever grown: a Statement settled once keeps its days closed for good (D22).
         tx.set(
@@ -1640,6 +1734,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
           at: iso,
           by,
           ...(action.reason ? { reason: action.reason } : {}),
+          ...(action.nextStep ? { nextStep: action.nextStep } : {}),
         },
       });
       return {
@@ -1657,6 +1752,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       // here: the client's figure stands only for a Director, or a book with no limit.
       const ref = col(c, DISPUTES).doc(action.disputeId);
       const dispute = await mustGet(c, ref, 'Dispute');
+      if (!hasLines(dispute)) fail('not-found', 'Dispute not found', 'not-found');
       if (dispute.resolution) fail('failed-precondition', 'Already resolved', 'already-resolved');
       if (dispute.minerId !== action.minerId)
         fail('invalid-argument', "Dispute is another Miner's", 'wrong-miner');
@@ -1670,7 +1766,14 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         );
         billing.push(...snap.docs.map((d) => d.data()));
       }
-      const priced = billedDisputeTax({ lines }, billing);
+      const priced = billedDisputeTax(
+        {
+          lines,
+          ...(typeof dispute.kind === 'string' ? { kind: dispute.kind as DisputeKind } : {}),
+          ...(typeof dispute.claimedPct === 'number' ? { claimedPct: dispute.claimedPct } : {}),
+        },
+        billing
+      );
       const limit = c.book.dismissApprovalAboveIsk as number | null | undefined;
       if (priced === undefined && action.amountIsk === undefined)
         fail('failed-precondition', 'That ore is not billed yet', 'not-priced');
@@ -1721,9 +1824,13 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     case 'rejectDispute': {
       const ref = col(c, DISPUTES).doc(action.disputeId);
       const dispute = await mustGet(c, ref, 'Dispute');
+      if (!hasLines(dispute)) fail('not-found', 'Dispute not found', 'not-found');
       if (dispute.resolution) fail('failed-precondition', 'Already resolved', 'already-resolved');
-      tx.update(ref, { resolution: { kind: 'rejected', at: iso, by, reason: action.reason } });
-      return { detail: { disputeId: action.disputeId, reason: action.reason } };
+      const nextStep = action.nextStep !== undefined ? { nextStep: action.nextStep } : {};
+      tx.update(ref, {
+        resolution: { kind: 'rejected', at: iso, by, reason: action.reason, ...nextStep },
+      });
+      return { detail: { disputeId: action.disputeId, reason: action.reason, ...nextStep } };
     }
     case 'recordReminder': {
       const ref = col(c, STATEMENTS).doc(action.statementId);
@@ -1867,7 +1974,7 @@ async function closeAccount(
 
   // A guest, by the ore's recorded corporation on each character's latest day.
   for (const characterId of characterIds) {
-    const latest = await latestRecordedCorp(c, characterId);
+    const latest = await latestRecordedCorpOf(c, characterId);
     if (latest === c.corporationId)
       fail('failed-precondition', "Only a guest's account can be closed", 'not-a-guest');
   }
@@ -2031,7 +2138,7 @@ export async function editBookAs(
     return outcome.result ?? {};
   });
   // The edit changed some Miners' frozen totals (ADR 0032). Best effort: the verifier repairs.
-  await refreshAfterEvent(deps.db, call.corporationId, editScope(action));
+  await refreshAfterEvent(deps.db, call.corporationId, editScope(action), deps.now);
   // Statements freeze a pull's tax, and a survey link or expiry changes its doc (ADR 0032). Best effort.
   await refreshMoonDocsAfterEdit(deps.db, call.corporationId, action);
   // The same edits move the Overview and Miners tab docs (ADR 0032). Best effort.
@@ -2094,7 +2201,7 @@ export async function confirmGrouping(
     });
     appendAudit(tx, deps, corporationId, { characterId, name: '' }, 'confirmGrouping', { minerId });
   });
-  await refreshAfterEvent(deps.db, corporationId, [minerId]);
+  await refreshAfterEvent(deps.db, corporationId, [minerId], deps.now);
   await refreshReadModels(deps.db, corporationId, deps.now());
 }
 
@@ -2123,7 +2230,7 @@ async function declinePending(
     });
     appendAudit(tx, deps, corporationId, actor, 'declineGrouping', { minerId, characterId });
   });
-  await refreshAfterEvent(deps.db, corporationId, [minerId, `solo:${characterId}`]);
+  await refreshAfterEvent(deps.db, corporationId, [minerId, `solo:${characterId}`], deps.now);
   await refreshReadModels(deps.db, corporationId, deps.now());
 }
 
@@ -2201,7 +2308,7 @@ export async function claimPayment(
   paymentId: string
 ) {
   const claimed = await claimPaymentTx(deps, caller, corporationId, paymentId);
-  await refreshAfterEvent(deps.db, corporationId, [claimed.minerId]);
+  await refreshAfterEvent(deps.db, corporationId, [claimed.minerId], deps.now);
   await refreshReadModels(deps.db, corporationId, deps.now());
   return claimed;
 }
@@ -2307,19 +2414,51 @@ export async function declareOwnPayment(deps: BookDeps, caller: Caller, input: D
     );
     if (open.docs.some((d) => d.get('resolution') === undefined))
       fail('already-exists', 'A declaration is already waiting', 'already-declared');
+    // Resolving in the app: the transfers are checked against what the book synced of the
+    // corporation's wallet before any officer sees them.
+    const transfers = input.transfers ?? [];
+    const checks =
+      transfers.length > 0
+        ? await checkTransfers(tx, deps, corporationId, statement.uids as string[], transfers)
+        : ([] as ClaimCheck[]);
+    // Every transfer found in the book: confirmed at once, nobody had to look.
+    const allFound = checks.length > 0 && checks.every((c) => c.result === 'found');
     const now = deps.now();
+    const iso = new Date(now).toISOString();
+    // Each payment found is credited at once, even while others are not: the declaration stays
+    // open for the rest. A found payment is one no one held yet (`checkClaimedTransfer`).
+    for (const c of checks) {
+      if (c.result === 'found' && c.paymentId)
+        tx.update(sub(deps.db, corporationId, PAYMENTS).doc(c.paymentId), {
+          minerId: statement.minerId,
+          claimedBy: characterId,
+          claimedAt: iso,
+        });
+    }
     const id = `x${now}_${rand(4)}`;
     tx.create(sub(deps.db, corporationId, DECLARATIONS).doc(id), {
       id,
       statementId,
       kind: 'another-way',
-      at: new Date(now).toISOString(),
+      at: iso,
       recordedBy: characterId,
       via: 'player',
       minerId: statement.minerId,
       uids: statement.uids,
       ...(input.amount !== undefined ? { amount: input.amount } : {}),
       ...(input.note !== undefined ? { note: input.note } : {}),
+      ...(transfers.length > 0 ? { transfers, checks } : {}),
+      // By the system (0): the book itself holds every transfer.
+      ...(allFound
+        ? {
+            resolution: {
+              kind: 'confirmed',
+              at: iso,
+              by: 0,
+              reason: "Found in the corporation's wallet",
+            },
+          }
+        : {}),
     });
     appendAudit(
       tx,
@@ -2334,25 +2473,74 @@ export async function declareOwnPayment(deps: BookDeps, caller: Caller, input: D
         ...(input.amount !== undefined ? { amount: input.amount } : {}),
       }
     );
-    return { declarationId: id, minerId: statement.minerId as string };
+    return { declarationId: id, minerId: statement.minerId as string, checks, confirmed: allFound };
   });
-  await refreshAfterEvent(deps.db, corporationId, [declared.minerId]);
+  await refreshAfterEvent(deps.db, corporationId, [declared.minerId], deps.now);
   await refreshReadModels(deps.db, corporationId, deps.now());
-  return { declarationId: declared.declarationId };
+  return {
+    declarationId: declared.declarationId,
+    checks: declared.checks,
+    confirmed: declared.confirmed,
+  };
+}
+
+/**
+ * Checks each claimed transfer against the book (`checkClaimedTransfers`): the payments the
+ * Miner's own characters sent that no one holds yet, the donations noted in divisions the book
+ * does not read, its last sync and its start.
+ */
+async function checkTransfers(
+  tx: Transaction,
+  deps: BookDeps,
+  corporationId: number,
+  uids: readonly string[],
+  transfers: readonly ClaimTransfer[]
+): Promise<ClaimCheck[]> {
+  const senderIds = uids.flatMap((u) => (u.startsWith('char:') ? [Number(u.slice(5))] : []));
+  const book = (await tx.get(bookRef(deps.db, corporationId))).data() ?? {};
+  const payments =
+    senderIds.length === 0
+      ? []
+      : (
+          await tx.get(
+            sub(deps.db, corporationId, PAYMENTS).where('characterId', 'in', senderIds.slice(0, 30))
+          )
+        ).docs.map((d): Data & { id: string } => ({ ...(d.data() as Data), id: d.id }));
+  const uncounted =
+    ((await tx.get(sub(deps.db, corporationId, META).doc(UNCOUNTED_DOC))).data()?.donations as
+      { characterId: number; amount: number; at: string; division: number }[] | undefined) ?? [];
+  const lastSyncAt = (book.lastSync as { at?: number } | null | undefined)?.at;
+  return checkClaimedTransfers(transfers, {
+    senderIds,
+    payments: payments.map((p) => ({
+      id: p.id,
+      characterId: p.characterId as number | undefined,
+      amount: p.amount as number,
+      at: p.at as string,
+      ...(typeof p.minerId === 'string' ? { minerId: p.minerId } : {}),
+      ...(typeof p.notTaxAmount === 'number' ? { notTaxAmount: p.notTaxAmount } : {}),
+      ...(p.reviewReason !== undefined ? { reviewReason: String(p.reviewReason) } : {}),
+    })),
+    uncounted,
+    lastSyncAt: typeof lastSyncAt === 'number' ? lastSyncAt : undefined,
+    ...(typeof book.startDate === 'string' ? { startDate: book.startDate } : {}),
+  });
 }
 
 /**
  * A Miner flags a Conflict day to the book (#6206): "I gave this ore to {payee}". One record
  * per Miner and day; a second flag for the same day adds its lines. Every line's character
- * must be one of the caller's own Miner's confirmed characters. A day an officer already
- * rejected cannot be flagged again. Officers answer in Needs you: dismiss the day, or reject.
+ * must be one of the caller's own Miner's confirmed characters. A day an officer waived cannot be flagged again; one whose bill
+ * the officer kept can, once more with the old answer in `history` and the hold not renewed. Officers answer in Needs you: dismiss the day, or reject.
  */
 export async function disputeConflict(deps: BookDeps, caller: Caller, input: DisputeConflictInput) {
   const characterId = signedInCharacter(caller);
   const { corporationId, date } = input;
-  return deps.db.runTransaction(async (tx) => {
+  let touched = '';
+  const result = await deps.db.runTransaction(async (tx) => {
     await memberBook(tx, deps, corporationId);
     const { minerId, uids } = await callerMiner(tx, deps, corporationId, caller, characterId);
+    touched = minerId;
     const characters = new Set<number>();
     for (const line of input.lines) {
       const lineCharacter = parseRecordKey(line.recordKey).characterId;
@@ -2362,8 +2550,20 @@ export async function disputeConflict(deps: BookDeps, caller: Caller, input: Dis
     }
     const disputeId = disputeIdFor(minerId, date);
     const ref = sub(deps.db, corporationId, DISPUTES).doc(disputeId);
-    const held = (await tx.get(ref)).data();
-    if (held?.resolution) fail('failed-precondition', 'An officer answered this day', 'rejected');
+    const stored = (await tx.get(ref)).data();
+    // A waived day stays closed. A bill the officer kept may be disputed again, with the
+    // answer moved into `history` and the first dispute's hold window kept.
+    // A withdrawn day is a tombstone (no `lines`: every reader drops it) that keeps `holdFrom`
+    // and `history`, so withdrawing and filing again does not renew the hold.
+    const tombstone = stored !== undefined && !hasLines(stored);
+    const answer = stored?.resolution as { kind?: string } | undefined;
+    if (answer && answer.kind !== 'rejected')
+      fail('failed-precondition', 'An officer answered this day', 'rejected');
+    const again = answer !== undefined || tombstone;
+    const held = again ? undefined : stored;
+    // One thing said per day: a second call adds lines to the same kind, never a different one.
+    if (held && ((held.kind as string | undefined) ?? 'payee') !== input.kind)
+      fail('already-exists', 'This day already has a dispute', 'already-disputed');
     const heldLines = (held?.lines as DisputeConflictInput['lines'] | undefined) ?? [];
     for (const line of heldLines) characters.add(parseRecordKey(line.recordKey).characterId);
     // The ore each line names, held or new, must be on the book's record, no more than recorded.
@@ -2378,12 +2578,38 @@ export async function disputeConflict(deps: BookDeps, caller: Caller, input: Dis
     }
     const lines = mergeDisputeLines(heldLines, input.lines, recorded);
     const iso = new Date(deps.now()).toISOString();
+    // A payee dispute is stored as before (no `kind`), so a reader older than kinds still reads it.
+    const said = {
+      ...(input.kind !== 'payee' ? { kind: input.kind } : {}),
+      ...(input.reason !== undefined ? { reason: input.reason } : {}),
+      ...(input.claimedPct !== undefined ? { claimedPct: input.claimedPct } : {}),
+      ...(input.note !== undefined ? { note: input.note } : {}),
+    };
     if (held) {
-      tx.update(ref, {
+      tx.update(ref, { lines, uids, updatedAt: iso, ...said });
+    } else if (stored) {
+      // Filed again after a kept bill: the old record's answer joins `history` (additive; a
+      // reader older than this one ignores it), and the hold does not renew.
+      const past = tombstone
+        ? undefined
+        : {
+            kind: (stored.kind as string | undefined) ?? 'payee',
+            ...(typeof stored.reason === 'string' ? { reason: stored.reason } : {}),
+            resolution: stored.resolution,
+          };
+      tx.set(ref, {
+        id: disputeId,
+        minerId,
+        date,
         lines,
-        uids,
+        by: characterId,
+        at: iso,
+        holdFrom:
+          (stored.holdFrom as string | undefined) ?? (stored.at as string | undefined) ?? iso,
         updatedAt: iso,
-        ...(input.note !== undefined ? { note: input.note } : {}),
+        uids,
+        history: [...((stored.history as unknown[] | undefined) ?? []), ...(past ? [past] : [])],
+        ...said,
       });
     } else {
       tx.create(ref, {
@@ -2395,7 +2621,7 @@ export async function disputeConflict(deps: BookDeps, caller: Caller, input: Dis
         at: iso,
         updatedAt: iso,
         uids,
-        ...(input.note !== undefined ? { note: input.note } : {}),
+        ...said,
       });
     }
     appendAudit(
@@ -2404,10 +2630,13 @@ export async function disputeConflict(deps: BookDeps, caller: Caller, input: Dis
       corporationId,
       { characterId, name: 'Player dispute', via: 'player-claim' },
       'disputeConflict',
-      { disputeId, minerId, date, lines: input.lines.length }
+      { disputeId, minerId, date, kind: input.kind, lines: input.lines.length }
     );
     return { disputeId };
   });
+  // A dispute holds its Statement's disputed amount, so the Miner's stored totals move (best effort).
+  await refreshAfterEvent(deps.db, corporationId, [touched], deps.now);
+  return result;
 }
 
 /**
@@ -2418,15 +2647,28 @@ export async function disputeConflict(deps: BookDeps, caller: Caller, input: Dis
 export async function withdrawDispute(deps: BookDeps, caller: Caller, input: WithdrawDisputeInput) {
   const characterId = signedInCharacter(caller);
   const { corporationId, date } = input;
-  return deps.db.runTransaction(async (tx) => {
+  let touched = '';
+  const result = await deps.db.runTransaction(async (tx) => {
     await memberBook(tx, deps, corporationId);
     const { minerId } = await callerMiner(tx, deps, corporationId, caller, characterId);
+    touched = minerId;
     const disputeId = disputeIdFor(minerId, date);
     const ref = sub(deps.db, corporationId, DISPUTES).doc(disputeId);
     const held = (await tx.get(ref)).data();
-    if (!held || held.minerId !== minerId) fail('not-found', 'Dispute not found', 'not-found');
+    if (!held || held.minerId !== minerId || !hasLines(held))
+      fail('not-found', 'Dispute not found', 'not-found');
     if (held.resolution) fail('failed-precondition', 'An officer answered this day', 'answered');
-    tx.delete(ref);
+    // A tombstone, not a delete: with `lines` gone every reader (older clients included) sees no
+    // dispute, but `holdFrom` and `history` stay so filing again keeps the first hold window.
+    tx.set(ref, {
+      id: disputeId,
+      minerId,
+      date,
+      uids: held.uids,
+      holdFrom: (held.holdFrom as string | undefined) ?? (held.at as string),
+      ...(Array.isArray(held.history) ? { history: held.history } : {}),
+      withdrawnAt: new Date(deps.now()).toISOString(),
+    });
     appendAudit(
       tx,
       deps,
@@ -2437,6 +2679,9 @@ export async function withdrawDispute(deps: BookDeps, caller: Caller, input: Wit
     );
     return { disputeId };
   });
+  // The hold is released: the Miner's stored totals count the amount as due again (best effort).
+  await refreshAfterEvent(deps.db, corporationId, [touched], deps.now);
+  return result;
 }
 
 // --- Verify link -----------------------------------------------------------

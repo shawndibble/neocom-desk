@@ -324,9 +324,7 @@ describe('Market Open Orders tab', () => {
     renderMarketRoute();
     // The banner is now per character, since this page covers every selling
     // character at once — title is prefixed with the character's name.
-    expect(
-      await screen.findByText('Pilot One — Log in again to see your orders')
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Pilot One: log in again')).toBeInTheDocument();
     // NB: this currently fails — OpenOrdersPanel.tsx renders the reauth
     // banner and the "no open orders cached" EmptyState unconditionally
     // side by side (the old code was an if/else: reauth XOR empty/table).

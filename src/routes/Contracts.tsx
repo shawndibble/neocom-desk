@@ -17,6 +17,7 @@ import {
   TabPanel,
   useTabsId,
   CachedNotice,
+  IncompleteNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { CONTRACTS_HISTORY_COLUMN_IDS } from '@/features/contracts/contractsColumns';
@@ -459,21 +460,9 @@ export function Contracts() {
           <Spinner block="page" label={t('common.loading')} />
         ) : needsReauth ? (
           source === 'corporation' ? (
-            <GrantBanner
-              characterId={activeCharacterId}
-              endpoints={['getCorporationContracts']}
-              title={t('contracts.corpReauthTitle')}
-              hint={t('contracts.corpReauthHint')}
-              actionLabel={t('contracts.reauthAction')}
-            />
+            <GrantBanner characterId={activeCharacterId} endpoints={['getCorporationContracts']} />
           ) : (
-            <GrantBanner
-              characterId={activeCharacterId}
-              endpoints={['getCharacterContracts']}
-              title={t('contracts.reauthTitle')}
-              hint={t('contracts.reauthHint')}
-              actionLabel={t('contracts.reauthAction')}
-            />
+            <GrantBanner characterId={activeCharacterId} endpoints={['getCharacterContracts']} />
           )
         ) : error || (source === 'corporation' && active.data && view.corporationId === null) ? (
           <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
@@ -509,12 +498,14 @@ export function Contracts() {
                     />
                   )}
                   {contractsTruncated && (
-                    <p className="flex flex-wrap items-center gap-2 px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-                      <span>{t('common.incompleteTitle')}</span>
-                      <Button size="sm" disabled={loading} onClick={refresh}>
-                        {t('contracts.fetchTruncatedRetry')}
-                      </Button>
-                    </p>
+                    <IncompleteNotice
+                      className="px-3 pt-2"
+                      action={
+                        <Button size="sm" disabled={loading} onClick={refresh}>
+                          {t('contracts.fetchTruncatedRetry')}
+                        </Button>
+                      }
+                    />
                   )}
                 </>
               }

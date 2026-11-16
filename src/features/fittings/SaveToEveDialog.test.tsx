@@ -136,8 +136,10 @@ describe('SaveToEveDialog', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-    expect(await screen.findByText(/needs the Fittings permission/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /grant fittings permission/i })).toBeInTheDocument();
+    expect(
+      await screen.findByText('This character: grant Save Fittings to EVE')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Grant in EVE' })).toBeInTheDocument();
     expect(screen.queryByText(/Couldn't save/)).not.toBeInTheDocument();
   });
 

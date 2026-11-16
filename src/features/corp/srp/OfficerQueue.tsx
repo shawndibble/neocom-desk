@@ -308,12 +308,7 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
   return (
     <div className="grid gap-4">
       {mailMissing && (
-        <GrantNote
-          endpoints={SEND_MAIL_ENDPOINTS}
-          title={t('srp.officer.mail.grantTitle')}
-          hint={t('srp.officer.mail.grantHint')}
-          actionLabel={t('srp.officer.mail.grantAction')}
-        />
+        <GrantNote endpoints={SEND_MAIL_ENDPOINTS} title={t('srp.officer.mail.grantTitle')} />
       )}
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <p className="text-sm tabular-nums" aria-live="polite">

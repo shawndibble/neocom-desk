@@ -49,6 +49,8 @@ function controller(overrides: Partial<AppraisalController> = {}): AppraisalCont
     setText: vi.fn(),
     appraiseText: vi.fn(),
     submitted: '',
+    quantityColumn: null,
+    chooseQuantityColumn: vi.fn(),
     result: null,
     compare: null,
     loading: false,
@@ -976,6 +978,82 @@ describe('AppraisalPanel', () => {
     expect(screen.getByText('line 3, 7 · Nanite Repair Past')).toBeInTheDocument();
   });
 
+  describe('text in the quantity column (#6281)', () => {
+    const PASTE = 'Tritanium\tMineral\t10000\nPyerite\tMineral\t500';
+    const textLines = [
+      {
+        name: 'Tritanium\tMineral\t10000',
+        lines: [1],
+        reason: 'text-quantity' as const,
+        columns: [{ column: 3, value: '10000' }],
+      },
+      {
+        name: 'Pyerite\tMineral\t500',
+        lines: [2],
+        reason: 'text-quantity' as const,
+        columns: [{ column: 3, value: '500' }],
+      },
+    ];
+    const reported = () =>
+      outcome({
+        unmatched: textLines.map(({ name, lines }) => ({ name, lines })),
+        pasteText: PASTE,
+        textQuantityLines: textLines,
+      });
+
+    it('opens the picker once, and confirming a column hands it to the controller', async () => {
+      const chooseQuantityColumn = vi.fn();
+      const user = userEvent.setup();
+      renderPanel({
+        controller: controller({
+          submitted: PASTE,
+          result: reported(),
+          chooseQuantityColumn,
+        }),
+      });
+      const dialog = await screen.findByRole('dialog', { name: 'Which column is the quantity?' });
+      const confirm = within(dialog).getByRole('button', { name: 'Use this column' });
+      expect(confirm).toBeDisabled();
+      await user.click(within(dialog).getByRole('radio', { name: 'Column 3 · 10000' }));
+      await user.click(confirm);
+      expect(chooseQuantityColumn).toHaveBeenCalledWith(3);
+    });
+
+    it('leaving the picker keeps the report and a link that reopens it', async () => {
+      const user = userEvent.setup();
+      renderPanel({ controller: controller({ submitted: PASTE, result: reported() }) });
+      const dialog = await screen.findByRole('dialog', { name: 'Which column is the quantity?' });
+      await user.click(within(dialog).getByRole('button', { name: 'Leave them out' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      expect(screen.getByText('2 lines not matched')).toBeInTheDocument();
+      expect(screen.getByText(/Quantity must be the second column/)).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Choose the quantity column' }));
+      expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    });
+
+    it('shows only the hint when no column holds a number on every line', () => {
+      const lines = [{ ...textLines[0], columns: [] }];
+      renderPanel({
+        controller: controller({
+          submitted: PASTE,
+          result: outcome({
+            unmatched: [{ name: lines[0].name, lines: [1] }],
+            pasteText: PASTE,
+            textQuantityLines: lines,
+          }),
+        }),
+      });
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(screen.getByText(/Quantity must be the second column/)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Choose the quantity column' })).toBeNull();
+    });
+
+    it('ignores a result computed from an older paste', () => {
+      renderPanel({ controller: controller({ submitted: 'Isogen\t5', result: reported() }) });
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+  });
+
   it('says a pasted abyssal module is unpriced, apart from unmatched lines, and where to price it', () => {
     renderPanel({
       controller: controller({
@@ -1674,9 +1752,14 @@ describe('AppraisalPanel — shopping list (#2868)', () => {
   });
 
   it('disables Minus owned with a grant note without the assets permission', async () => {
+    // The note judges the active Character's grant; pinned here rather than
+    // left to whatever an earlier test set.
+    useActiveCharacter.setState({ activeCharacterId: 1, hydrated: true });
     await seedGrant(1, []);
     renderPanel({ controller: controller({ result: LIST_OUTCOME }) });
-    expect(await screen.findByText('Grant Assets permission')).toBeInTheDocument();
+    expect(await screen.findByText('This character: grant Assets')).toBeInTheDocument();
+    expect(screen.getByText('Owned stock needs the Assets permission')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Grant in EVE' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Minus what I own at' })).toBeDisabled();
   });
 

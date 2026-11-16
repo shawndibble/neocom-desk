@@ -15,10 +15,11 @@ const REVIEWED = new Set<string>([
   'src/features/character/JournalDescriptionCell.tsx',
   // A show-info link inside a mail body's prose, not a row: no primary action competes.
   'src/features/character/MailBodyView.tsx',
+  // The shared wallet-transaction Item column (personal and corp panels); neither row has a primary action.
+  'src/features/character/walletTransactionColumns.tsx',
   'src/features/communities/SharedBlueprintTable.tsx',
   'src/features/contracts/PublicContractDetailModal.tsx',
   'src/features/corp/CorpRoster.tsx',
-  'src/features/corp/CorpTransactionsPanel.tsx',
   'src/features/fittings/AbyssalRunPlanner.tsx',
   'src/features/fittings/FittingFightersPanel.tsx',
   'src/features/fittings/FittingModuleList.tsx',
@@ -30,7 +31,6 @@ const REVIEWED = new Set<string>([
   'src/features/industry/MaterialsTable.tsx',
   'src/features/industry/ProductionLogPanel.tsx',
   'src/features/market/HaulingItemDetail.tsx',
-  'src/features/market/TransactionsPanel.tsx',
   'src/features/market/MadeFromSection.tsx',
   'src/features/market/UsedInSection.tsx',
   // A skill's per-level unlock list: plain name rows with no action of their own.

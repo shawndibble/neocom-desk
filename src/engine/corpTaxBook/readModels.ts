@@ -16,9 +16,9 @@ import { DAY_MS } from '@/lib/age';
 import type { DayCharge } from './charges';
 import { overdueStatus, type Declaration } from './overdue';
 import { moonSchedule } from './bookSections';
+import { latestRecordedCorp } from './bookDocs';
 import {
   extractionRowBase,
-  latestCorporationOf,
   minerDraft,
   openSetInputOf,
   pendingTax,
@@ -136,7 +136,7 @@ export function fromReadModels(
   open: OpenAmounts = openSetOf(input)
 ): TabsProjection {
   const entries = new Map(docs.minerList.miners.map((e) => [e.minerId, e]));
-  const latestCorp = latestCorporationOf(input.entries);
+  const latestCorp = latestRecordedCorp(input.entries);
   const nowMs = Date.parse(input.now);
   const miners: MinerRow[] = [];
   const needsYou: NeedsYouItem[] = [];

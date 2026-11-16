@@ -9,6 +9,7 @@ import { teachRefinerySystems, type LoadedCorpBook } from './corpBookStore';
 import { loadBookPrices, loadCorpNames, loadTrackedCorpBooks } from './corpBookSources';
 import { buildCorpBookView, type CorpBookView } from './corpBookView';
 import { MINUTE_MS } from '@/lib/age';
+import { hiddenLeftBooksOf, withoutHiddenLeft } from './leftCorpBooks';
 
 interface Args {
   /** The ledger as loaded; undefined until it has. */
@@ -20,7 +21,11 @@ interface Args {
   payees: readonly PayeeRecord[];
   /** Changes whenever the ledger was reloaded, so the books are read again with it. */
   reloadKey: number | undefined;
+  /** Corporations the member left and chose to stop showing: their books are left out of the view. */
+  hiddenCorps?: ReadonlySet<number>;
 }
+
+const NONE_HIDDEN: ReadonlySet<number> = new Set();
 
 /**
  * Loads the Corp Tax Books of the member's corporations (D24: none, nothing
@@ -35,7 +40,16 @@ export function useCorpBookView({
   madePayments,
   payees,
   reloadKey,
-}: Args): { view: CorpBookView | null; reload: () => void } {
+  hiddenCorps = NONE_HIDDEN,
+}: Args): {
+  view: CorpBookView | null;
+  reload: () => void;
+  /** The loaded books still in view (hidden left ones removed), and each corporation's name. */
+  shownBooks: readonly LoadedCorpBook[];
+  corpNameOf: (corporationId: number) => string;
+  /** Left books the member hid, for the line that shows them again. */
+  hiddenLeft: { corporationId: number; corpName: string }[];
+} {
   const { t } = useTranslation();
   const nowMs = useTicker(MINUTE_MS);
   const [version, setVersion] = useState(0);
@@ -85,6 +99,18 @@ export function useCorpBookView({
     );
   }, [rows, loaded]);
 
+  // The one place a hidden left book is filtered: its rows, Conflicts and attention items all come
+  // from the view built here.
+  const shownBooks = useMemo(() => withoutHiddenLeft(loaded, hiddenCorps), [loaded, hiddenCorps]);
+  const corpNameOf = useCallback(
+    (corporationId: number) => corpNames.get(corporationId) ?? `#${corporationId}`,
+    [corpNames]
+  );
+  const hiddenLeft = useMemo(
+    () => hiddenLeftBooksOf(loaded, hiddenCorps, corpNameOf),
+    [loaded, hiddenCorps, corpNameOf]
+  );
+
   const view = useMemo(
     () =>
       rows === undefined
@@ -92,7 +118,7 @@ export function useCorpBookView({
         : buildCorpBookView(
             {
               rows,
-              loaded,
+              loaded: shownBooks,
               pricesByCorp,
               corpNames,
               payees,
@@ -102,8 +128,8 @@ export function useCorpBookView({
             },
             (corp) => t('miningTax.corpBook.payeeName', { corp })
           ),
-    [rows, loaded, pricesByCorp, corpNames, payees, madePayments, characters, nowMs, t]
+    [rows, shownBooks, pricesByCorp, corpNames, payees, madePayments, characters, nowMs, t]
   );
   const reload = useCallback(() => setVersion((v) => v + 1), []);
-  return { view, reload };
+  return { view, reload, shownBooks, corpNameOf, hiddenLeft };
 }

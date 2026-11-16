@@ -153,3 +153,22 @@ export class EsiOfflineError extends EsiError {
     if (cause !== undefined) this.cause = cause;
   }
 }
+
+/**
+ * An authenticated request that could not start because SSO answered the token
+ * refresh with an outage or a throttle (5xx, 429): EVE's login service is down
+ * or busy, which says nothing about the grant. Thrown by `esiFetch` in place of
+ * that `AuthError`, so a blip at SSO reads like ESI being down (stale data, no
+ * re-login prompt) rather than a dead login. Status 0: ESI said nothing.
+ */
+export class EsiSsoUnavailableError extends EsiError {
+  /** What SSO answered with. */
+  readonly ssoStatus: number;
+
+  constructor(ssoStatus: number, cause?: unknown) {
+    super(0, `EVE's login service answered ${ssoStatus}: the token could not be refreshed`);
+    this.name = 'EsiSsoUnavailableError';
+    this.ssoStatus = ssoStatus;
+    if (cause !== undefined) this.cause = cause;
+  }
+}

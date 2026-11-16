@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import * as mirror from '../../../functions/src/corpTaxBookEngine';
+import * as calls from '../../../functions/src/corpTaxBookKinds';
 import { allocatePayments, dismissalCredits, isBeforeBook } from './allocation';
+import {
+  DISPUTE_HOLD_DAYS,
+  DISPUTE_KINDS,
+  disputeHold,
+  heldByStatement,
+  readDisputes,
+} from './disputes';
+import { CLAIM_CHECK_RESULTS, TRANSFER_RECIPIENTS } from './overdue';
+import { TAX_CONTACT_MAX_CHARACTERS } from './bookDocs';
 import { placeOfFactory } from './openSet';
 import { FORFEIT_NO_REPLY_DAYS, forfeitAllowed } from './closeAccount';
 import type { Dismissal } from './dismissals';
@@ -49,6 +59,7 @@ import { DEFAULT_GRACE_HOURS, dayClosesAt } from './billable';
 import { DEFAULT_OVERDUE_DAYS } from './overdue';
 import { DIVISION_NAME_MAX } from './divisionNames';
 import { mergeObservedRows, observedRowKey } from './observed';
+import { latestRecordedCorp } from './bookDocs';
 import { canOverrideRecordRate, isRetroactiveRate } from './rates';
 import {
   DEFAULT_MINIMUM_STATEMENT,
@@ -180,6 +191,149 @@ describe('functions mirror of the Corp Tax Book engine', () => {
     expect([...theirs.byStatement]).toEqual([...ours.byStatement]);
     expect(theirs.credit).toBe(ours.credit);
     expect(theirs.balance).toBe(ours.balance);
+  });
+
+  it('keeps the dispute, transfer and tax contact vocabularies equal', () => {
+    expect([...calls.DISPUTE_KINDS]).toEqual([...DISPUTE_KINDS]);
+    expect([...calls.TRANSFER_RECIPIENTS]).toEqual([...TRANSFER_RECIPIENTS]);
+    expect([...calls.CLAIM_CHECK_RESULTS]).toEqual([...CLAIM_CHECK_RESULTS]);
+    expect(calls.TAX_CONTACT_MAX_CHARACTERS).toBe(TAX_CONTACT_MAX_CHARACTERS);
+  });
+
+  it('reads stored disputes and their hold the way the client does, malformed ones included', () => {
+    const line = { recordKey: '60:1000:2026-11-01', typeId: 45490, quantity: 10, payeeName: 'X' };
+    const base = {
+      id: 'd',
+      minerId: 'm',
+      date: '2026-11-01',
+      by: 60,
+      at: '2026-11-03T00:00:00.000Z',
+    };
+    const stored: unknown[] = [
+      { ...base, lines: [line] },
+      { ...base, lines: [line], holdFrom: '2026-10-01T00:00:00.000Z' },
+      { ...base, lines: [line], holdFrom: 'junk' },
+      { ...base, lines: [line], resolution: { kind: 'rejected', at: 'a', by: 1, reason: 'r' } },
+      { ...base, lines: [line], resolution: { kind: 'rejected' } },
+      { ...base, lines: [line], resolution: 'rejected' },
+      { ...base, lines: [line], resolution: { kind: 'dismissed', at: 'a', by: 1, reason: 'r' } },
+      { ...base, lines: [] },
+      { ...base },
+      // A withdrawn day's tombstone: no lines, so no reader sees a dispute, but it keeps its hold.
+      {
+        id: 'd',
+        minerId: 'm',
+        date: '2026-11-01',
+        holdFrom: '2026-10-01T00:00:00.000Z',
+        history: [],
+        withdrawnAt: '2026-11-04T00:00:00.000Z',
+      },
+      { ...base, lines: [line, { recordKey: 5 }] },
+      { ...base, lines: 'lines' },
+      { ...base, lines: [line], kind: 'rate', claimedPct: 10 },
+      { ...base, lines: [line], kind: 'bogus' },
+      { ...base, at: 5, lines: [line] },
+      null,
+      'x',
+    ];
+    const theirs = mirror.readHoldingDisputes(stored);
+    const ours = readDisputes(stored);
+    expect(theirs).toHaveLength(ours.length);
+    for (const now of ['2026-11-05T00:00:00.000Z', '2026-11-20T00:00:00.000Z']) {
+      expect(theirs.map((d) => mirror.disputeHolds(d, now))).toEqual(
+        ours.map((d) => disputeHold(d, now) !== undefined)
+      );
+    }
+    // The first dispute's hold window survives a re-dispute: no renewal.
+    expect(mirror.disputeHolds(theirs[1], '2026-10-20T00:00:00.000Z')).toBe(false);
+    expect(disputeHold(ours[1], '2026-10-20T00:00:00.000Z')).toBeUndefined();
+  });
+
+  it('holds disputed amounts identically, and allocates around them the same way', () => {
+    expect(mirror.DISPUTE_HOLD_DAYS).toBe(DISPUTE_HOLD_DAYS);
+    const statements = [
+      {
+        id: 's1',
+        lines: [
+          {
+            kind: 'mined',
+            chargeKey: '60:1000:2026-11-01',
+            oreLines: [{ typeId: 45490, quantity: 400 }],
+            unitPrices: { '45490': 1000 },
+            taxPct: 12,
+            tax: 48_000,
+          },
+          {
+            kind: 'mined',
+            chargeKey: '60:1000:2026-11-02',
+            oreLines: [{ typeId: 45490, quantity: 100 }],
+            unitPrices: { '45490': 1000 },
+            taxPct: 12,
+            tax: 12_000,
+          },
+        ],
+      },
+    ];
+    const disputes = [
+      {
+        at: '2026-11-03T00:00:00.000Z',
+        kind: 'rate',
+        claimedPct: 10,
+        lines: [{ recordKey: '60:1000:2026-11-01', typeId: 45490, quantity: 400 }],
+      },
+      {
+        at: '2026-11-03T00:00:00.000Z',
+        lines: [{ recordKey: '60:1000:2026-11-02', typeId: 45490, quantity: 100 }],
+      },
+    ];
+    for (const now of ['2026-11-05T00:00:00.000Z', '2026-12-01T00:00:00.000Z']) {
+      for (const credited of [new Set<string>(), new Set(['s1|60:1000:2026-11-02'])]) {
+        const theirs = mirror.heldByStatement(statements, disputes, credited, now);
+        const ours = heldByStatement(
+          statements,
+          disputes.map((d) => ({
+            ...d,
+            lines: d.lines.map((l) => ({ ...l, payeeName: '' })),
+          })) as never,
+          credited,
+          now
+        );
+        expect([...theirs]).toEqual([...ours]);
+      }
+    }
+    const held = new Map([['s1', 20_000]]);
+    const theirs = mirror.allocatePayments({
+      statements: [{ id: 's1', amount: 60_000, issuedAt: '2026-11-30T00:00:00Z' }],
+      payments: [{ id: 'p1', amount: 40_000, at: '2026-12-01T00:00:00Z' }],
+      dismissalCredits: [],
+      held,
+    });
+    const ours = allocatePayments({
+      statements: [
+        {
+          id: 's1',
+          amount: 60_000,
+          issuedAt: '2026-11-30T00:00:00Z',
+          minerId: 'm',
+          code: '',
+          lines: [],
+        } as never,
+      ],
+      payments: [
+        {
+          id: 'p1',
+          amount: 40_000,
+          at: '2026-12-01T00:00:00Z',
+          minerId: 'm',
+          characterId: 1,
+          source: 'donation',
+        },
+      ],
+      dismissalCredits: [],
+      held,
+    });
+    expect([...theirs.byStatement]).toEqual([...ours.byStatement]);
+    expect(ours.byStatement.get('s1')).toMatchObject({ settled: true, held: 20_000 });
   });
 
   it('applies officer write-offs identically (#4637)', () => {
@@ -354,7 +508,7 @@ describe('functions mirror of the Corp Tax Book engine', () => {
           ),
           dismissals,
           charges
-        ).map((c) => ({ statementId: c.statementId, amount: c.amount }));
+        ).map((c) => ({ statementId: c.statementId, amount: c.amount, chargeKey: c.chargeKey }));
         const theirs = mirror.dismissalCredits({
           minerId: 'solo:50',
           statements,
@@ -857,6 +1011,35 @@ describe('remaining engine parity (#4515, #4520, #4621)', () => {
   it('isBeforeBook agrees', () => {
     for (const at of ['2026-09-30T23:59:59Z', '2026-10-01T00:00:00Z', '2026-10-02']) {
       expect(mirror.isBeforeBook(at, '2026-10-01')).toBe(isBeforeBook(at, '2026-10-01'));
+    }
+  });
+});
+
+describe('latest recorded corp mirror', () => {
+  const row = (over: Partial<Parameters<typeof latestRecordedCorp>[0][number]> = {}) => ({
+    characterId: 9,
+    date: '2026-10-17',
+    recordedCorporationId: 98000001,
+    structureId: 1020,
+    cachedAt: '2026-10-17T10:00:00Z',
+    ...over,
+  });
+  it.each([
+    ['newest day', [row({ date: '2026-10-16', recordedCorporationId: 2 }), row()]],
+    [
+      'mid-day corp change, fresher read',
+      [
+        row({ structureId: 2000 }),
+        row({ recordedCorporationId: 2, cachedAt: '2026-10-17T15:00:00Z' }),
+      ],
+    ],
+    ['one read, two refineries', [row({ structureId: 2000 }), row({ recordedCorporationId: 2 })]],
+    ['one read, one refinery', [row({ recordedCorporationId: 2 }), row()]],
+    ['a row with no read time', [row({ cachedAt: undefined, recordedCorporationId: 2 }), row()]],
+    ['several characters', [row(), row({ characterId: 10, recordedCorporationId: 2 })]],
+  ])('%s', (_, rows) => {
+    for (const order of [rows, [...rows].reverse()]) {
+      expect(mirror.latestRecordedCorp(order)).toEqual(latestRecordedCorp(order));
     }
   });
 });

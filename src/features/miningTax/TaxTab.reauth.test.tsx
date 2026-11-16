@@ -41,7 +41,13 @@ vi.mock('@/lib/useRouteSnapshot', () => ({
   }),
 }));
 vi.mock('./corpBook/useCorpBookView', () => ({
-  useCorpBookView: () => ({ view: null, reload: vi.fn() }),
+  useCorpBookView: () => ({
+    view: null,
+    reload: vi.fn(),
+    shownBooks: [],
+    corpNameOf: (id: number) => `Corp ${id}`,
+    hiddenLeft: [],
+  }),
 }));
 vi.mock('@/features/miningTax/madePayments', () => ({
   loadMadePaymentsWithStatus: async () => ({ payments: [], sources: [] }),

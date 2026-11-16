@@ -24,7 +24,7 @@ import type { MaterialsTableHandle } from './MaterialsTable';
 import { productionLogDefaults } from './productionLogDefaults';
 import { planBreakEvenRuns } from './planBreakEven';
 import { planBreakdownContext } from './planBreakdownContext';
-import { planHeroFigures } from './planHeroFigures';
+import { planVerdictOf } from './planPricing';
 import { planLocations } from './planLocations';
 import { priceVsMedianFor, usePriceVsMedian } from './usePriceVsMedian';
 import { useAutoBuildPlan } from './useAutoBuildPlan';
@@ -37,7 +37,6 @@ import { usePlanEdits } from './usePlanEdits';
 import { usePlanFacilityContexts } from './usePlanFacilityContexts';
 import { usePlanJobSchedule } from './usePlanJobSchedule';
 import { usePlanMaterialsExport } from './usePlanMaterialsExport';
-import { capProductPrice } from './productPriceCap';
 import { usePlanOwnedStock } from './usePlanOwnedStock';
 import { usePlanPricing } from './usePlanPricing';
 import { useReactionLocationBlock } from './useReactionLocationBlock';
@@ -261,12 +260,24 @@ export function BuildPlanDetail({
 
   const { itemMenuFor, itemActionsFor } = buildItemMenuProps(catalog, onSearchBpcSourcing);
 
-  const { snapshot: pricedSnapshot, capped: productPriceCapped } = capProductPrice(
+  // The hero's verdict, through the one path the Build Plans list prices by (`planPricing`).
+  const {
+    productUnitPrice,
+    priceCapped: productPriceCapped,
+    ownedForSale,
+    basis: heroBasis,
+    figures: heroFigures,
+    sellNow,
+  } = planVerdictOf(resolved, {
     snapshot,
-    entry.productTypeID
-  );
-  const productUnitPrice =
-    entry.productTypeID !== null ? (pricedSnapshot?.hubPrices[entry.productTypeID] ?? null) : null;
+    productTypeID: entry.productTypeID,
+    productQuantity,
+    profitBasis,
+    saleBasis,
+    modifiers,
+    standing,
+    ownedSale,
+  });
 
   const breakdownContext = planBreakdownContext({
     plan,
@@ -288,19 +299,6 @@ export function BuildPlanDetail({
   const lacksBlueprintRow =
     result !== null &&
     !result.materials.some((m) => m.typeID === plan.blueprintTypeID && m.acquisitionTier);
-
-  const { ownedForSale, heroBasis, heroFigures, sellNow } = planHeroFigures({
-    result,
-    ownedSale,
-    saleBasis,
-    profitBasis,
-    snapshot,
-    productTypeID: entry.productTypeID,
-    productQuantity,
-    productUnitPrice,
-    skills: modifiers.skills,
-    standing,
-  });
 
   /** Runs at which this plan's profit first reaches zero, applied to the plan. */
   const findBreakEvenRuns = () => {

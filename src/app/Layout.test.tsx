@@ -485,7 +485,7 @@ describe('Layout runtime auth-failure notice', () => {
   it('shows nothing while no failure has been reported', () => {
     mockIsSyncConfigured.mockReturnValue(false);
     renderLayout();
-    expect(screen.queryByText(/eve access was refused/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/: log in again$/)).not.toBeInTheDocument();
   });
 
   it('surfaces a runtime auth failure once, in the shell, for the active character', async () => {
@@ -494,7 +494,7 @@ describe('Layout runtime auth-failure notice', () => {
     useAuthFailure.getState().reportRequestFailure(CHARACTER_ID);
     renderLayout();
 
-    expect(screen.getByText(/eve access was refused/i)).toBeInTheDocument();
+    expect(screen.getByText(/: log in again$/)).toBeInTheDocument();
     // Still on the page: a refused request is not a reason to move the user.
     expect(screen.getByText('page content')).toBeInTheDocument();
   });
@@ -505,7 +505,7 @@ describe('Layout runtime auth-failure notice', () => {
     useAuthFailure.getState().reportRequestFailure(CHARACTER_ID + 1);
     renderLayout();
 
-    expect(screen.queryByText(/eve access was refused/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/: log in again$/)).not.toBeInTheDocument();
   });
 
   it('is dismissible, so a 403 re-auth cannot fix never pins on', async () => {
@@ -515,7 +515,7 @@ describe('Layout runtime auth-failure notice', () => {
     renderLayout();
 
     await userEvent.setup().click(screen.getByRole('button', { name: 'Dismiss' }));
-    expect(screen.queryByText(/eve access was refused/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/: log in again$/)).not.toBeInTheDocument();
   });
 
   it('does not redirect on a token failure — that is AuthFailureRedirect’s job, not the shell’s', async () => {
@@ -524,7 +524,7 @@ describe('Layout runtime auth-failure notice', () => {
     useAuthFailure.getState().reportTokenFailure(CHARACTER_ID);
     renderLayout();
 
-    expect(screen.queryByText(/eve access was refused/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/: log in again$/)).not.toBeInTheDocument();
     expect(screen.getByText('page content')).toBeInTheDocument();
   });
 });

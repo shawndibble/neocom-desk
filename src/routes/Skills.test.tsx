@@ -440,7 +440,7 @@ describe('Skills', () => {
     expect(screen.getByRole('img', { name: 'Level 3 of 5' })).toBeInTheDocument();
     expect(screen.getByText('8,000 SP')).toBeInTheDocument();
     expect(queueRequests).toBe(0);
-    expect(screen.queryByText('EVE access was refused')).not.toBeInTheDocument();
+    expect(screen.queryByText(/: (log in again|grant .+)$/)).not.toBeInTheDocument();
   });
 
   it('falls back to cached skills when ESI is unreachable', async () => {
@@ -479,11 +479,11 @@ describe('Skills', () => {
 
     renderSkillsRoutes();
 
-    expect(await screen.findByRole('button', { name: /log in again/i })).toBeInTheDocument();
+    expect(await screen.findByText('Pilot One: log in again')).toBeInTheDocument();
     expect(screen.queryByText(/no skill data cached/i)).not.toBeInTheDocument();
     const { beginEveLogin } = await import('@/app/loginFlow');
-    screen.getByRole('button', { name: /log in again/i }).click();
-    expect(beginEveLogin).toHaveBeenCalled();
+    screen.getByRole('button', { name: 'Log in' }).click();
+    expect(beginEveLogin).toHaveBeenCalledWith(expect.objectContaining({ characterId: CHAR_ID }));
   });
 
   it('keeps the saved skills on screen, with a small log-in note, when the grant lapsed over them', async () => {
@@ -501,8 +501,8 @@ describe('Skills', () => {
 
     renderSkillsRoutes();
 
-    expect(await screen.findByText(/log in again to refresh/i)).toBeInTheDocument();
-    expect(screen.queryByText(/log in again to see skills/i)).not.toBeInTheDocument();
+    expect(await screen.findByText('Showing saved data.')).toBeInTheDocument();
+    expect(screen.getByText('Pilot One: log in again')).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: /^Gunnery/ })).toBeInTheDocument();
   });
 
@@ -528,7 +528,7 @@ describe('Skills', () => {
 
     // The route's own note, not Layout's global auth notice — the latter
     // fires on emitEsiAuthFailure, before the snapshot settles.
-    expect(await screen.findByText(/log in again to refresh/i)).toBeInTheDocument();
+    expect(await screen.findByText('Showing saved data.')).toBeInTheDocument();
 
     const copied: string[] = [];
     configureClipboard(async (text) => {
