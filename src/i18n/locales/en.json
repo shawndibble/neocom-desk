@@ -8010,6 +8010,16 @@
         "sent": "Sent to {{corp}} on {{sentOn}}. An officer answers it in the book; nothing more to do until they do.",
         "oreWaived": "{{corp}} waived the tax on that ore: {{flagReason}}"
       },
+      "leftCorp": {
+        "title": "You left {{corp}}",
+        "owed": "Its book still lists {{amount}} ISK from your time there, and nothing new is added. Its officers already see that you left.",
+        "settled": "Its book lists nothing owed from your time there, and nothing new is added. Its officers already see that you left.",
+        "pay": "Pay {{amount}} ISK",
+        "stop": "Stop showing {{corp}}",
+        "hidden": "Hidden: {{corps}}",
+        "show": "Show",
+        "showLabel": "Show {{corp}} again"
+      },
       "sync": {
         "safe": "Safe to pay — {{date}} is closed ({{corp}} synced {{ago}}).",
         "safeOnce": "Safe to pay once {{corp}} syncs (last synced {{ago}}).",
