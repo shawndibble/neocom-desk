@@ -69,7 +69,11 @@ export function namesForSelection(
 export interface SelectionTotals {
   isk: number;
   volume: number;
-  /** Selected stacks with no value: left out of `isk` and counted here. */
+  /**
+   * Selected stacks with no value: left out of `isk` and counted here. A
+   * blueprint copy with no value is not counted: a copy is worth nothing by
+   * design, not missing a price.
+   */
   unpriced: number;
 }
 
@@ -95,7 +99,7 @@ export function selectionTotals(
     if (!asset) continue;
     const value = assetStackValue(asset, priceByTypeId, itemValueByItemId);
     if (value > 0) totals.isk += value;
-    else totals.unpriced += 1;
+    else if (!asset.is_blueprint_copy) totals.unpriced += 1;
     totals.volume += asset.quantity * (volumeByTypeId.get(asset.type_id) ?? 0);
   }
   return totals;
