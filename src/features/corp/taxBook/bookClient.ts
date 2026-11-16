@@ -24,7 +24,7 @@ import {
 } from 'firebase/firestore/lite';
 import { getValidAccessToken } from '@/auth/session';
 import { popShareMarks, type PopShareMarks } from '@/engine/corpTaxBook/popShareMarks';
-import { readPopSharing } from './popSharingClient';
+import { readPopSharingCached } from './popSharingCache';
 import type { RecordedWriteOff } from '@/engine/corpTaxBook/allocation';
 import type { Miner } from '@/engine/corpTaxBook/charges';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
@@ -197,7 +197,7 @@ export async function readFeederChunkParts(
       getDoc(doc(book, 'readModels', 'overview')),
       getDocs(collection(book, 'feeders')),
       // Best effort: the pops still list without their marks.
-      readPopSharing(characterId, corporationId).catch(() => null),
+      readPopSharingCached(characterId, corporationId).catch(() => null),
     ]);
     const windowed = overview.data()?.extractions as SyncExtraction[] | undefined;
     const extractions =

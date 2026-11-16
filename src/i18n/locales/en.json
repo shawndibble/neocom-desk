@@ -9520,6 +9520,8 @@
     },
     "rail": {
       "title": "Coming up",
+      "longOverdue_one": "Overdue over {{windowDays}} days · oldest {{count}} day",
+      "longOverdue_other": "Overdue over {{windowDays}} days · oldest {{count}} days",
       "count_one": "{{count}} ahead",
       "count_other": "{{count}} ahead",
       "countForDay_one": "{{count}} ahead on this day",
@@ -11731,8 +11733,9 @@
     },
     "popSharing": {
       "title": "Moon pops shared here",
-      "hint": "Corporations whose Corp Tax Book shares moon pop schedules with this Community. Block one and its pops show to no Member here until you unblock it.",
+      "hint": "Corporations whose Corp Tax Book shares moon pop schedules with this Community. Block one and its pops show to no Member here until you unblock it. A corporation's pops show only while one of its book's officers is a Member here.",
       "blocked": "Blocked",
+      "notShowing": "Not showing",
       "block": "Block",
       "unblock": "Unblock",
       "failed": "Couldn't change that. Try again."
@@ -12626,7 +12629,8 @@
         "titleUnnamed": "Moon pop",
         "body": "{{popTime}} at {{when}} · taxed by {{corporation}} · {{rate}}%",
         "ready": "Ready",
-        "autoFracture": "Auto-fracture"
+        "autoFracture": "Auto-fracture",
+        "fracturedEarly": "Fractured early"
       },
       "acceleratorExpiring": {
         "title": "Accelerator running out soon",

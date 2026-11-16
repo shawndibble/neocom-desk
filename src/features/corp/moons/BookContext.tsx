@@ -5,6 +5,7 @@
  */
 import { useCallback, useMemo, type ReactNode } from 'react';
 import { editBook } from '../taxBook/bookClient';
+import { invalidatePopSharing } from '../taxBook/popSharingCache';
 import { BookContext, type BookContextValue } from './bookContextValue';
 
 export function BookProvider({
@@ -21,6 +22,7 @@ export function BookProvider({
         return await editBook<Out>(characterId, corporationId, action);
       } finally {
         // Even a refused edit may have changed what is on screen (a stale view).
+        if (action.action.startsWith('setPopSharing')) invalidatePopSharing(corporationId);
         reload();
       }
     },

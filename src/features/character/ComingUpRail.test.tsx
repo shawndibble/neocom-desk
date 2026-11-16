@@ -53,3 +53,37 @@ describe('ComingUpRail skyhook raids', () => {
     expect(onSelectSkyhook).toHaveBeenCalledWith(5);
   });
 });
+
+describe('ComingUpRail long-overdue items', () => {
+  const DAY = 86_400_000;
+  const extractor = (id: string, ageDays: number) => ({
+    id: `planetExtraction:${id}`,
+    sourceId: id,
+    kind: 'planetExtraction' as const,
+    subject: id,
+    detail: '',
+    deadlineMs: base.nowMs - ageDays * DAY,
+    remainingMs: -ageDays * DAY,
+    response: null,
+    important: false,
+  });
+  const items = [extractor('Old A', 31), extractor('Old B', 9), extractor('Fresh', 1)];
+
+  it('folds items overdue for over two days into one summary row that expands', async () => {
+    render(<ComingUpRail {...base} selectedDayMs={null} items={items} />);
+    const summary = await screen.findByRole('button', { name: /oldest 31 days/i });
+    expect(summary).toHaveAttribute('aria-expanded', 'false');
+    expect(summary).toHaveTextContent('2');
+    expect(screen.queryByText('Old A')).toBeNull();
+    expect(screen.getByText('Fresh')).toBeInTheDocument();
+    await userEvent.click(summary);
+    expect(screen.getByText('Old A')).toBeInTheDocument();
+    expect(screen.getByText('Old B')).toBeInTheDocument();
+  });
+
+  it('folds nothing on a picked day', async () => {
+    render(<ComingUpRail {...base} selectedDayMs={base.nowMs - 31 * DAY} items={items} />);
+    expect(await screen.findByText('Old A')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /oldest/i })).toBeNull();
+  });
+});

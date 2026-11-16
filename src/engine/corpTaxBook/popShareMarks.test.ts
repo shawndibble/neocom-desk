@@ -36,16 +36,23 @@ describe('popShareMarks', () => {
     expect(popShareMarks([pull(7, 1000)], [], noAudience).moons).toEqual({});
   });
 
-  it("marks a moon owner's moons opted out, even while the book shares nothing", () => {
-    for (const enabled of [true, false]) {
-      const marks = popShareMarks(
-        [pull(9, 2000, 555)],
-        [{ corporationId: 555, popSharingOptOut: OPTED_OUT }],
-        popSharingFrom({ enabled })
-      );
-      expect(marks.moons['9']).toEqual({ kind: 'opted-out' });
-      expect(marks.structures['2000']).toEqual({ kind: 'opted-out' });
-    }
+  it("marks a moon owner's moons opted out while the book shares", () => {
+    const marks = popShareMarks(
+      [pull(9, 2000, 555)],
+      [{ corporationId: 555, popSharingOptOut: OPTED_OUT }],
+      popSharingFrom({ enabled: true })
+    );
+    expect(marks.moons['9']).toEqual({ kind: 'opted-out' });
+    expect(marks.structures['2000']).toEqual({ kind: 'opted-out' });
+  });
+
+  it('marks nothing opted out while the book shares nothing: the mark would be noise', () => {
+    const marks = popShareMarks(
+      [pull(9, 2000, 555)],
+      [{ corporationId: 555, popSharingOptOut: OPTED_OUT }],
+      popSharingFrom({ enabled: false })
+    );
+    expect(marks).toEqual({ moons: {}, structures: {}, owners: {} });
   });
 
   it('marks a moon owner by its moons: opted out, else every audience its shared moons reach', () => {

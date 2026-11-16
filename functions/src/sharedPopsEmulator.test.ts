@@ -285,7 +285,7 @@ emulatorSuite('Shared Pops', () => {
     await publishSharedPops(publishDeps(), BOOK);
     await join('c1', OFFICER);
     await stampEditorUse(db, BOOK, viewer(OFFICER), now - H);
-    expect((await listCommunityPopSharers(db, caller(ADMIN), 'c1')).sharers).toEqual([
+    expect((await listCommunityPopSharers(readDeps(), caller(ADMIN), 'c1')).sharers).toEqual([
       { corporationId: BOOK, sharing: true, blocked: false },
     ]);
     await expect(
@@ -304,7 +304,7 @@ emulatorSuite('Shared Pops', () => {
     );
     expect(await seen(FRIEND)).toEqual([]);
     expect(await seen(ALLY)).toEqual([40002]); // the Alliance audience is not the Community's
-    expect((await listCommunityPopSharers(db, caller(ADMIN), 'c1')).sharers).toEqual([
+    expect((await listCommunityPopSharers(readDeps(), caller(ADMIN), 'c1')).sharers).toEqual([
       { corporationId: BOOK, sharing: true, blocked: true },
     ]);
     await setCommunityPopBlock(
@@ -314,6 +314,64 @@ emulatorSuite('Shared Pops', () => {
       now
     );
     expect(await seen(FRIEND)).toEqual([40002]);
+  });
+
+  it("keeps a sharer on the admin's list between extractions, and says when its pops show", async () => {
+    await publishSharedPops(publishDeps(), BOOK);
+    const sharers = async () =>
+      (await listCommunityPopSharers(readDeps(), caller(ADMIN), 'c1')).sharers;
+    // No officer of the book is a Member: the settings name c1, but nothing shows there.
+    expect(await sharers()).toEqual([{ corporationId: BOOK, sharing: false, blocked: false }]);
+    await join('c1', OFFICER);
+    await stampEditorUse(db, BOOK, viewer(OFFICER), now - H);
+    // Every pop Expired: the published doc goes, the sharer stays listed and blockable.
+    now = Date.parse(DECAY) + 48 * H;
+    expect(await publishSharedPops(publishDeps(), BOOK)).toBeNull();
+    expect((await sharedPopsRef(db, BOOK).get()).exists).toBe(false);
+    expect(await sharers()).toEqual([{ corporationId: BOOK, sharing: true, blocked: false }]);
+    // Sharing off: no longer a sharer.
+    await setSharing({ enabled: false });
+    await publishSharedPops(publishDeps(), BOOK);
+    expect(await sharers()).toEqual([]);
+  });
+
+  it('stops showing an Alliance pop once the book leaves its alliance, before any republish', async () => {
+    await publishSharedPops(publishDeps(), BOOK);
+    await stampEditorUse(db, BOOK, viewer(OFFICER), now - H);
+    expect(await seen(ALLY)).toEqual([40002]);
+    affiliation[OFFICER] = { corporationId: BOOK, allianceId: null };
+    try {
+      expect(await seen(ALLY)).toEqual([]);
+    } finally {
+      affiliation[OFFICER] = { corporationId: BOOK, allianceId: ALLIANCE };
+    }
+  });
+
+  it("cancels a pop's unfired Scheduled Push for its old time once the laser fires early", async () => {
+    await publishSharedPops(publishDeps(), BOOK);
+    const popId = `${BOOK}_1000_${Date.parse(START)}`;
+    const row = (popAtMs: number, fired = false) => ({
+      occurrenceKey: `sharedMoonPop:${popId}:${popAtMs}:0`,
+      eventId: 'sharedMoonPop',
+      fireAt: popAtMs,
+      fired,
+    });
+    const projections = db.collection('projections');
+    await projections.doc('dev1:old').set(row(Date.parse(ARRIVAL)));
+    await projections.doc('dev1:fired').set(row(Date.parse(ARRIVAL) - H, true));
+    await projections.doc('dev1:other').set({
+      ...row(Date.parse(ARRIVAL)),
+      occurrenceKey: `sharedMoonPop:${BOOK}_2000_${Date.parse(START)}:${Date.parse(ARRIVAL)}:0`,
+    });
+    const fired = '2026-11-14T06:00:00.000Z';
+    await book()
+      .collection('extractions')
+      .doc(`1000_${Date.parse(START)}`)
+      .update({ laserFiredAt: fired });
+    now = Date.parse(fired) + H;
+    await publishSharedPops(publishDeps(), BOOK);
+    const left = (await projections.get()).docs.map((d) => d.id).sort();
+    expect(left).toEqual(['dev1:fired', 'dev1:other']);
   });
 
   it('drops an Expired pop and publishes nothing once all are', async () => {

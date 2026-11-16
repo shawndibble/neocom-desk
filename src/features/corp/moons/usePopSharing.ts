@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { PopSharingDoc } from '../../../../functions/src/popSharing';
 import {
-  readPopSharing,
+  invalidatePopSharing,
+  onPopSharingInvalidated,
+  readPopSharingCached,
+} from '../taxBook/popSharingCache';
+import {
   readPopSharingCommunities,
   type PopSharingCommunityStatus,
 } from '../taxBook/popSharingClient';
@@ -9,7 +13,11 @@ import {
 export type PopSharingLoad =
   { state: 'loading' } | { state: 'failed' } | { state: 'ready'; doc: PopSharingDoc };
 
-/** The book's Pop Sharing settings (#6222), read on mount and after each `reload`. */
+/**
+ * The book's Pop Sharing settings (#6222), through the one cached read every list shares.
+ * `reload` drops that read, so every mounted list reads the settings again; so does an edit
+ * of them anywhere on the device.
+ */
 export function usePopSharing(
   characterId: number,
   corporationId: number
@@ -18,7 +26,7 @@ export function usePopSharing(
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let cancelled = false;
-    readPopSharing(characterId, corporationId).then(
+    readPopSharingCached(characterId, corporationId).then(
       (doc) => !cancelled && setLoad({ state: 'ready', doc }),
       () => !cancelled && setLoad({ state: 'failed' })
     );
@@ -26,7 +34,14 @@ export function usePopSharing(
       cancelled = true;
     };
   }, [characterId, corporationId, attempt]);
-  const reload = useCallback(() => setAttempt((n) => n + 1), []);
+  useEffect(
+    () =>
+      onPopSharingInvalidated((corp) => {
+        if (corp === corporationId) setAttempt((n) => n + 1);
+      }),
+    [corporationId]
+  );
+  const reload = useCallback(() => invalidatePopSharing(corporationId), [corporationId]);
   return { load, reload };
 }
 

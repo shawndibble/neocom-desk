@@ -8,6 +8,13 @@
  * poll and this one, so a pop is told once. A crossing more than `LATE_LIMIT_MS` ago is dropped:
  * a device opened hours later is not told the belt "is popping now". Which Characters see a pop
  * the poll domain has already applied to `entries`; a muted one fires nothing.
+ *
+ * A chunk fractured early: the laser shot moves the Pop Time back to the actual fracture, which
+ * the book learns only at its next sync, hours later. That time is then already behind the last
+ * poll and no window crosses it, so a pop whose time moved earlier to one already past is told
+ * once as fractured early (`early`), up to `EARLY_LATE_LIMIT_MS` after the fracture: the belt
+ * lasts 48 hours, and the book syncs every 6. Its Occurrence Key names the new time, so it is
+ * told apart from the push for the old one, which the server cancels when it republishes.
  */
 import { HOUR_MS } from '@/lib/age';
 
@@ -49,10 +56,14 @@ export interface SharedMoonPopFire {
   popAtMs: number;
   ratePct: number;
   thresholdMs: number;
+  /** The chunk fractured early: told after the fact, when the Pop Time moved back past now. */
+  early?: true;
 }
 
 /** How late a live poll may still report a crossing. */
 const LATE_LIMIT_MS = HOUR_MS;
+/** How long after an early fracture it is still news: past one book sync (6 h), with margin. */
+export const EARLY_LATE_LIMIT_MS = 12 * HOUR_MS;
 
 export function sharedMoonPopFire(
   characterId: number,
@@ -78,13 +89,25 @@ export function diffSharedMoonPop(
   next: SharedMoonPopSnapshot
 ): SharedMoonPopFire[] {
   if (!prev) return [];
-  return next.entries
-    .filter((entry) => {
-      if (entry.muted === true) return false;
-      const fireAt = entry.popAtMs - entry.leadMs;
-      return fireAt > prev.nowMs && fireAt <= next.nowMs && next.nowMs - fireAt <= LATE_LIMIT_MS;
-    })
-    .map((entry) => sharedMoonPopFire(characterId, entry));
+  const prevAt = new Map(prev.entries.map((e) => [e.popId, e.popAtMs]));
+  return next.entries.flatMap((entry) => {
+    if (entry.muted === true) return [];
+    const was = prevAt.get(entry.popId);
+    const fireAt = entry.popAtMs - entry.leadMs;
+    // Moved earlier to a fire time this poll's window can no longer cross: tell it now.
+    if (
+      was !== undefined &&
+      entry.popAtMs < was &&
+      fireAt <= prev.nowMs &&
+      next.nowMs - entry.popAtMs <= EARLY_LATE_LIMIT_MS
+    ) {
+      const fire = sharedMoonPopFire(characterId, entry);
+      return [entry.popAtMs <= next.nowMs ? { ...fire, early: true as const } : fire];
+    }
+    const crossed =
+      fireAt > prev.nowMs && fireAt <= next.nowMs && next.nowMs - fireAt <= LATE_LIMIT_MS;
+    return crossed ? [sharedMoonPopFire(characterId, entry)] : [];
+  });
 }
 
 /** The Calendar's deep link to one Shared Pop (agreed with issue #6224). */

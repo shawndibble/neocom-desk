@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import type { SharedMoonPopFire } from '@/engine/notificationDiffs';
 import type { SharedPopView } from '@/sync/sharedPops';
+import { sharedMoonPopCopy } from './copy/sharedMoonPop';
 import { sharedMoonPopEntries } from './sharedMoonPops';
 
 const pop = (over: Partial<SharedPopView> = {}): SharedPopView => ({
@@ -53,5 +55,29 @@ describe('sharedMoonPopEntries', () => {
 
   it('drops a pop with an unreadable Pop Time', () => {
     expect(sharedMoonPopEntries([pop({ popAt: 'soon' })], 7, 0, new Set())).toEqual([]);
+  });
+});
+
+describe('sharedMoonPopCopy', () => {
+  const fire: SharedMoonPopFire = {
+    eventId: 'sharedMoonPop',
+    characterId: 7,
+    popId: '98000001_1035_1762900000000',
+    corporationId: 98000001,
+    refineryName: 'Efa - Moon Drill',
+    popTime: 'auto-fracture',
+    popAtMs: Date.parse('2026-11-15T14:00:00.000Z'),
+    ratePct: 10,
+    thresholdMs: 0,
+  };
+
+  it('reads a chunk fractured early as such, not as its Pop Time setting', () => {
+    const names = { corporation: 'Ore Co', when: '14:00' };
+    expect(sharedMoonPopCopy.poll(fire, 'Pilot', names).body).toBe(
+      'Auto-fracture at 14:00 · taxed by Ore Co · 10%'
+    );
+    expect(sharedMoonPopCopy.poll({ ...fire, early: true }, 'Pilot', names).body).toBe(
+      'Fractured early at 14:00 · taxed by Ore Co · 10%'
+    );
   });
 });

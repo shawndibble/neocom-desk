@@ -3,10 +3,13 @@ import { popSharingFrom, type PopSharingDoc } from './popSharing.js';
 import {
   OFFICER_WINDOW_MS,
   audienceCharacters,
+  bookAllianceNow,
   bookRatePctFor,
   buildSharedPops,
   currentSharedPops,
   editorStampsFrom,
+  movedPops,
+  namedCommunityIds,
   popExpiresAt,
   popInstant,
   popIsLive,
@@ -345,5 +348,62 @@ describe('bookRatePctFor', () => {
     ).toBe(15);
     expect(bookRatePctFor(rates, { moonId: 40001, structureId: 1 }, today)).toBe(12);
     expect(bookRatePctFor([], { moonId: 40001, structureId: 1 }, today)).toBe(0);
+  });
+});
+
+describe('movedPops', () => {
+  const pops = (over: Partial<PopExtraction> = {}) =>
+    buildSharedPops(input({ extractions: [extraction(over)] }))!.pops;
+
+  it('names a pop whose time moved, such as an early fracture, with its new time', () => {
+    const fired = '2026-11-15T01:10:00.000Z';
+    expect(movedPops(pops(), pops({ laserFiredAt: fired }))).toEqual([
+      { id: pops()[0].id, popAtMs: Date.parse(fired) },
+    ]);
+  });
+
+  it('names nothing when no time moved, or the pop was not published before', () => {
+    expect(movedPops(pops(), pops())).toEqual([]);
+    expect(movedPops(undefined, pops())).toEqual([]);
+    expect(movedPops([], pops({ laserFiredAt: ARRIVAL }))).toEqual([]);
+  });
+});
+
+describe('bookAllianceNow', () => {
+  const BOOK = 98000001;
+
+  it("reads the book's alliance off any Character in its corporation now", () => {
+    expect(
+      bookAllianceNow(BOOK, 99000001, [
+        { corporationId: 98000777, allianceId: 99000001 },
+        { corporationId: BOOK, allianceId: null },
+      ])
+    ).toBeNull();
+    expect(bookAllianceNow(BOOK, null, [{ corporationId: BOOK, allianceId: 99000002 }])).toBe(
+      99000002
+    );
+  });
+
+  it('keeps the alliance last published when no Character in the corporation is known', () => {
+    expect(bookAllianceNow(BOOK, 99000001, [{ corporationId: 98000777, allianceId: null }])).toBe(
+      99000001
+    );
+  });
+});
+
+describe('namedCommunityIds', () => {
+  const community = (communityId: string) => ({
+    kind: 'community' as const,
+    communityId,
+    name: communityId,
+  });
+
+  it('lists the Communities the default and every Moon override name, once, while sharing is on', () => {
+    const doc = sharing({
+      defaults: { ...sharing().defaults, audiences: [community('c2'), { kind: 'corp' }] },
+      moons: { '7': { audiences: [community('c1'), community('c2')] } },
+    });
+    expect(namedCommunityIds(doc)).toEqual(['c1', 'c2']);
+    expect(namedCommunityIds({ ...doc, enabled: false })).toEqual([]);
   });
 });

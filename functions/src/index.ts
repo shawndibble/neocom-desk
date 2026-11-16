@@ -915,7 +915,7 @@ communityAction('removeCommunityFleetPayoutCallable', async (request) => {
 // A Community admin sees which corporations share moon pops into it, and blocks one (#6223).
 communityAction('listCommunityPopSharersCallable', (request) =>
   listCommunityPopSharers(
-    firestore(),
+    sharedPopsReadDeps(),
     callerOf(request),
     parseCommunityIdInput(request.data).communityId
   )
