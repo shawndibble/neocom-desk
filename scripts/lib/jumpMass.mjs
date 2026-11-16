@@ -10,6 +10,9 @@ const MAX_STABLE_MASS = 1383;
 const JUMP_DRIVE_RANGE = 867;
 const JUMP_DRIVE_FUEL_TYPE = 866;
 const JUMP_DRIVE_FUEL_PER_LY = 868;
+const AGILITY = 70;
+const MAX_VELOCITY = 37;
+const WARP_SPEED = 600;
 
 /**
  * `{ name: [maxJumpKg, maxStableKg] }`. K162 (the far end of any hole) and
@@ -53,6 +56,24 @@ export function bakeShipMass(types, shipGroupIds, attrsByType = new Map()) {
       ]);
     }
     out[t.typeID] = row;
+  }
+  return out;
+}
+
+/**
+ * `{ typeId: [agility, maxVelocityMs, warpSpeedAuPerS] }` for the hulls
+ * `shipMass.json` holds (issue #6282): what Route Safety's trip time needs
+ * beside mass. A hull missing any of the three is left out, so a time is never
+ * built on a guess.
+ * @param {Record<string, unknown>} shipMass the baked hulls, by type id
+ * @param {Map<number, Map<number, number|null>>} attrsByType
+ */
+export function bakeShipFlight(shipMass, attrsByType) {
+  const out = {};
+  for (const id of Object.keys(shipMass)) {
+    const attrs = attrsByType.get(Number(id));
+    const row = [attrs?.get(AGILITY), attrs?.get(MAX_VELOCITY), attrs?.get(WARP_SPEED)];
+    if (row.every((v) => typeof v === 'number' && v > 0)) out[id] = row;
   }
   return out;
 }

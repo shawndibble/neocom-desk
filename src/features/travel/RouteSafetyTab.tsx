@@ -106,6 +106,7 @@ import { RouteRulesPanel } from './RouteRulesPanel';
 import { RouteSkeleton } from './RouteSkeleton';
 import { TheraModal } from './TheraModal';
 import { RouteStrip } from './RouteStrip';
+import { TripTimeLine } from './TripTimeLine';
 import { RouteSystemsTable, type HoleRowProps } from './RouteSystemsTable';
 import { pinFirstLeg, ROUTE_PARAMS } from '@/features/route/routeSafetyLink';
 import { routeSystemName } from './routeSystemName';
@@ -635,6 +636,7 @@ function RouteBody({
                 />
               </SetWaypoints>
             )}
+            {trip && <TripTimeLine trip={trip} />}
             {trip && (
               <RouteStrip
                 rows={trip.rows}

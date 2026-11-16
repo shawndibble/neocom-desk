@@ -306,6 +306,7 @@ export function RouteHoleFields({
             ))}
           </SelectContent>
         </Select>
+        <p className="text-text-dim">{t('travel.tripTime.ruleHint')}</p>
       </div>
       {jump && ship?.drive && (
         <RouteJumpFields jump={jump} maxLy={hullJumpDrive(ship.groupId, ship.drive).rangeLy} />

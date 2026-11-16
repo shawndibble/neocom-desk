@@ -45,6 +45,11 @@ export const loadSolarSystems = cached<SolarSystemEntry[]>('systems.json');
 /** Every system's map position in light years, for jump-drive range (issue #2862). */
 export const loadSystemPositions = cached<SystemPositionData>('systemPositions.json');
 export const loadNpcStations = cached<NpcStationEntry[]>('stations.json');
+/**
+ * In-system gate positions (issue #6282): `{ systemId: [toSystemId, x, y, z, ...] }`,
+ * in Mm from the star. Lazy: read only by Route Safety's trip time.
+ */
+export const loadGatePositions = cached<Record<string, number[]>>('gates.json');
 export const loadSolarSystemJumps = cached<JumpGraphData>('jumps.json');
 export const loadMarketRegions = cached<MarketRegionEntry[]>('regions.json');
 export const loadGlobalMarkets = cached<GlobalMarketEntry[]>('globalMarkets.json');

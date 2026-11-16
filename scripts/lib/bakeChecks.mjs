@@ -1,6 +1,7 @@
 // Post-write sanity checks; failures set process.exitCode.
 // Extracted from scripts/build-sde.mjs; see lib/bakeConstants.mjs for the shared bands.
 import { isDeepStrictEqual } from 'node:util';
+import { gatePositionProblems } from './bakeMap.mjs';
 import {
   AGENTS_MAX,
   AGENTS_MIN,
@@ -99,6 +100,7 @@ export function runSanityChecks({
   solarSystems,
   npcStations,
   solarSystemJumps,
+  gatePositions,
   marketRegions,
   globalMarketRegions,
   globalMarkets,
@@ -666,6 +668,10 @@ export function runSanityChecks({
     // handful of gates; zero here means the join silently produced nothing.
     if (!(solarSystemJumps[JITA_SYSTEM_ID]?.length > 0)) {
       console.error('  FAIL: Jita has no stargates in the jump graph');
+      process.exitCode = 1;
+    }
+    for (const problem of gatePositionProblems(gatePositions, solarSystemJumps, JITA_SYSTEM_ID)) {
+      console.error(`  FAIL: ${problem}`);
       process.exitCode = 1;
     }
     // Every gated system must also be a system we can name and place, or a

@@ -35,6 +35,8 @@ export async function writeOutputs({
   mutaplasmids,
   wormholeMass,
   shipMass,
+  shipFlight,
+  gatePositions,
   characterTitles,
   agents,
   npcCorporationData,
@@ -113,6 +115,8 @@ export async function writeOutputs({
     ['mutaplasmids.json', mutaplasmids],
     ['wormholeMass.json', wormholeMass],
     ['shipMass.json', shipMass],
+    // Agility, speed and warp speed per hull, for Route Safety's trip time.
+    ['shipFlight.json', shipFlight],
     ['characterTitles.json', characterTitles],
     // NPC agents and corporations for the Contacts standings view; lazy, see lib/npcAgents.mjs.
     ['agents.json', agents],
@@ -132,6 +136,8 @@ export async function writeOutputs({
     ['systemPositions.json', bakeSystemPositions(systemMetres)],
     ['stations.json', npcStations],
     ['jumps.json', solarSystemJumps],
+    // In-system gate positions, for Route Safety's trip time; lazy.
+    ['gates.json', gatePositions],
     ['regions.json', marketRegions],
     ['globalMarkets.json', globalMarkets],
     ['attributes.json', attributeDictionary],
