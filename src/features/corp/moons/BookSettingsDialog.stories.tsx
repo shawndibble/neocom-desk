@@ -5,7 +5,8 @@ import { bookSettingsValue } from './bookSettingsFixture';
 import { BOOK_CONTEXT, BOOK_VIEW, CORP_ID } from './corpBookFixture';
 import { popSharingFrom } from '../../../../functions/src/popSharing';
 import { seedPopSharing } from '../taxBook/popSharingCache';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { installFixtureFetch } from '@/storybook/fixtureFetch';
 
 /** @summary The book's settings: dated rates (corp, Guest, Miner, moon, refinery), pricing, grace and Statements. */
 const meta = {
@@ -40,6 +41,18 @@ export const Sharing: Story = {
   decorators: [
     (Story) => {
       // Seeded before the tab mounts: its first read finds this, so no callable is needed.
+      const [uninstall] = useState(() =>
+        // The tab asks ESI whether the corporation is in an alliance.
+        installFixtureFetch([
+          {
+            path: /^\/corporations\/\d+$/,
+            respond: () => ({
+              body: { name: 'Sample Corp', ticker: 'SMPL', alliance_id: 99000001 },
+            }),
+          },
+        ])
+      );
+      useEffect(() => uninstall, [uninstall]);
       const [ready] = useState(() => {
         seedPopSharing(
           CORP_ID,
