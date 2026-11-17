@@ -936,6 +936,11 @@ describe('remaining engine parity (#4515, #4520, #4621)', () => {
       );
     }
     expect(mirror.effectiveOwnerRatePct([], '2026-06-01')).toBeUndefined();
+    const asOf = [{ ...history[1]!, noBackdate: true as const }];
+    for (const date of ['2026-06-03', '2026-06-04']) {
+      expect(mirror.effectiveOwnerRatePct(asOf, date)).toBe(effectiveOwnerRate(asOf, date)?.pct);
+    }
+    expect(mirror.effectiveOwnerRatePct(asOf, '2026-06-03')).toBeUndefined();
     const askedOnly = [history[0]!];
     expect(mirror.effectiveOwnerRatePct(askedOnly, '2026-06-02')).toBeUndefined();
     expect(effectiveOwnerRate(askedOnly, '2026-06-02')).toBeUndefined();

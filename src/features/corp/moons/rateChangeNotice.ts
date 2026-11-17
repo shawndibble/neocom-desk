@@ -15,18 +15,18 @@ import { enqueueModeChangeMail, enqueueRateChangeMail } from '@/features/corpTax
 import { queueOfficerMail } from '@/features/corpTaxBook/officerMail';
 import { utcDay } from '@/engine/localDay';
 
-/** The change the agreed rate `pct` makes today, or undefined when the effective rate does not move. */
+/** The change the agreed rate `pct` makes from `asOf` (today by default), or undefined when the effective rate does not move. */
 export function agreedRateChange(
   before: readonly OwnerRateEntry[],
   pct: number,
-  now: Date
+  now: Date,
+  asOf: string = utcDay(now.getTime())
 ): OwnerRateChange | undefined {
-  const date = utcDay(now.getTime());
   const after: OwnerRateEntry[] = [
     ...before,
-    { kind: 'agreed', pct, effectiveFrom: date, recordedAt: now.toISOString() },
+    { kind: 'agreed', pct, effectiveFrom: asOf, recordedAt: now.toISOString(), noBackdate: true },
   ];
-  return rateChangeEvent({ before, after, date });
+  return rateChangeEvent({ before, after, date: asOf });
 }
 
 type Payee = { kind: 'corporation' | 'character'; id: number };

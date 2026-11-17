@@ -228,6 +228,7 @@ emulatorSuite('feeder invites', () => {
           pct: 5,
           effectiveFrom: '2026-10-18',
           recordedAt: new Date(T0).toISOString(),
+          noBackdate: true,
         },
       ]);
       // A link with no offered rate sets none.
@@ -464,6 +465,7 @@ emulatorSuite('feeder invites', () => {
           pct: 6,
           effectiveFrom: '2026-10-18',
           recordedAt: new Date(T0).toISOString(),
+          noBackdate: true,
         },
       ]);
       expect(await auditActions()).toContain('feederRateAgreed');
