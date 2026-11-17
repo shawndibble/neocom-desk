@@ -42,11 +42,13 @@ import { useTimeZone } from '@/lib/timeFormat';
 import { formatDateOnly, formatTimestamp } from '@/lib/timestamp';
 import { useNow } from '@/lib/useNow';
 import { VettingAnswerList } from './VettingAnswerList';
+import { RequestPanel } from './RequestPanel';
 import { VettingDecision } from './VettingDecision';
 import { VettingEntity } from './VettingEntity';
 import { VettingFlagList } from './VettingFlagList';
 import { deletionLine, reviewKindLabel } from './vettingText';
 import { useVettingDecisionMail } from './useVettingDecisionMail';
+import { useVettingRequestMail } from './useVettingRequestMail';
 import { vettingBackend } from './vettingClient';
 import { VETTING_TABS } from './vettingTabs';
 import { missingChecks, resultLine } from './vettingView';
@@ -318,6 +320,22 @@ export function VettingReport({
   const [attempt, setAttempt] = useState(0);
   const started = useRef('');
   const load: Load = loaded !== null && loaded.key === key ? loaded.load : { status: 'loading' };
+  // The request mail was queued and recorded: show "Mail sent" here, and refresh the queue.
+  const requestMail = useVettingRequestMail(characterId, corporationId, (overview) => {
+    const sentAt = overview.reviews.find((row) => row.id === reviewId)?.requestMail;
+    setLoaded((current) =>
+      current !== null && current.key === key && current.load.status === 'ready'
+        ? {
+            key,
+            load: {
+              status: 'ready',
+              review: { ...current.load.review, ...(sentAt ? { requestMail: sentAt } : {}) },
+            },
+          }
+        : current
+    );
+    onDecided();
+  });
 
   useEffect(() => {
     // Once per visit (and per Retry): the open is logged, so StrictMode's second effect run must
@@ -424,14 +442,31 @@ export function VettingReport({
       )}
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="min-w-0 space-y-4">
+          {review.state === 'requested' && (
+            <RequestPanel
+              review={review}
+              reviewerId={characterId}
+              send={() => requestMail.send(review)}
+              preview={() => requestMail.preview(review)}
+            />
+          )}
           {assessment === null ? (
             <Panel>
-              <EmptyState
-                title={t(
-                  `vetting.report.noReport.${review.state === 'declined' ? 'declined' : 'waiting'}`
-                )}
-                hint={t('vetting.report.noReport.hint')}
-              />
+              {review.state === 'requested' ? (
+                <EmptyState
+                  title={t('vetting.requestPanel.nothingShared')}
+                  hint={t('vetting.requestPanel.nothingSharedHint', {
+                    name: review.pilot.name.split(' ')[0] ?? review.pilot.name,
+                  })}
+                />
+              ) : (
+                <EmptyState
+                  title={t(
+                    `vetting.report.noReport.${review.state === 'declined' ? 'declined' : 'waiting'}`
+                  )}
+                  hint={t('vetting.report.noReport.hint')}
+                />
+              )}
             </Panel>
           ) : (
             <>

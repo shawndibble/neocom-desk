@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { userEvent, within } from 'storybook/test';
 import {
   seedVettingCorporation,
+  vettingRosterRoutes,
   VETTING_SHELL_SCOPES,
   vettingShellRoutes,
 } from '@/storybook/vettingShell';
@@ -158,4 +159,38 @@ export const ReviewMember: Story = {
     await userEvent.click(await body.findByRole('button', { name: 'Review a member' }));
     await body.findByRole('dialog', { name: 'Review a member' });
   },
+};
+
+/** @summary "Review a member" with the corp's member list readable: pick from the roster instead of typing the exact name. */
+export const ReviewMemberRoster: Story = {
+  parameters: {
+    shell: {
+      ...shell('/corp/vetting/open', () => [...directorRoutes(), ...vettingRosterRoutes()]),
+      // Mail the member: the asking officer's send-mail grant.
+      scopes: [...VETTING_SHELL_SCOPES, 'esi-mail.send_mail.v1'],
+    },
+  },
+  play: ReviewMember.play,
+};
+
+const requests = { vetting: { extra: 'requests' as const } };
+
+/** @summary Queue with the waiting rows: mail not sent, mail sent 6 hours ago, and the one about you left out. */
+export const QueueRequests: Story = { parameters: requests };
+
+/** @summary Requested review, mail not sent: Request panel (asked by you, role, Mail not sent, Send mail), "Nothing shared yet", the rail with you barred. */
+export const RequestedNoMail: Story = {
+  parameters: report(VETTING_FIXTURE_REVIEWS.waiting),
+};
+/** @summary Phone: requested review, one column. */
+export const RequestedNoMailPhone: Story = { ...RequestedNoMail, globals: phone };
+
+/** @summary Requested review, mail sent 6 hours ago: Resend waits a day, the reason printed under it. */
+export const RequestedMailed: Story = {
+  parameters: { ...requests, ...report(VETTING_FIXTURE_REVIEWS.mailed) },
+};
+
+/** @summary A review about the signed-in officer: closed, with the existing wording. */
+export const AboutYou: Story = {
+  parameters: { ...requests, ...report(VETTING_FIXTURE_REVIEWS.aboutYou) },
 };

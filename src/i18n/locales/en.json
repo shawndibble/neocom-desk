@@ -17962,6 +17962,7 @@
         "grant-stale": "Ledger can't be read",
         "srp-result": "SRP result",
         "vetting-result": "Vetting decision",
+        "vetting-request": "Vetting request",
         "removal": "Moon owner removal",
         "removalCancelled": "Removal cancelled"
       },
@@ -21041,6 +21042,28 @@
       "note": "They are asked to share. You cannot sign off a review you asked for.",
       "confirm": "Ask for a review"
     },
+    "member": {
+      "label": "Member",
+      "search": "Search {{count}} members",
+      "listLabel": "Members",
+      "loading": "Reading the member list…",
+      "countAll": "{{count}} members. Type to narrow.",
+      "countShown": "{{shown}} of {{count}} members",
+      "noMatch": "No member named \u201c{{name}}\u201d in the corporation",
+      "noMatchHint": "Check the spelling. Someone who left, or has not joined yet, cannot be reviewed. For someone applying, send them the apply link instead.",
+      "waiting": "Review waiting",
+      "waitingBy": "Review asked by {{name}}, {{ago}}",
+      "waitingAgo": "Review asked {{ago}}",
+      "you": "You",
+      "seen": "seen {{ago}}",
+      "change": "Change",
+      "unreadable": "The member list could not be read. Type the name exactly as in game; it is checked when you ask."
+    },
+    "role": {
+      "placeholder": "Pick one below or type your own",
+      "titles": "Titles in the corporation",
+      "eveRoles": "EVE roles"
+    },
     "settings": {
       "sectionsLabel": "Vetting settings",
       "sections": {
@@ -21568,8 +21591,24 @@
       },
       "anOfficer": "An officer",
       "promotion": "Promotion to {{role}}",
-      "asked": "<b>{{name}}</b> asked for a review before you are made <b>{{role}}</b>. Other officers decide.",
-      "oneTime": "A one-time read of the characters you share.",
+      "intro": {
+        "asked": "<b>{{name}}</b> asked you to share your characters before you are made <b>{{role}}</b> in {{corp}}. Other officers decide it, not {{first}}.",
+        "askedAnon": "An officer asked you to share your characters before you are made <b>{{role}}</b> in {{corp}}. Other officers decide it.",
+        "step1": "Log in your characters",
+        "step1None": "No characters are on this device yet. Log in each one you want to share.",
+        "step1All_one": "Your character is ready on this device. No other login is needed.",
+        "step1All_other": "All {{count}} are ready on this device. No other login is needed.",
+        "step1Some_one": "{{ready}} of {{total}} are ready on this device. {{count}} more needs a new login.",
+        "step1Some_other": "{{ready}} of {{total}} are ready on this device. {{count}} more need a new login.",
+        "step2": "Choose which to share",
+        "step2Body": "Share the ones you want read.",
+        "step3": "Share, or decline",
+        "step3Body": "Declining tells the reviewers and reads nothing.",
+        "factOnce": "Read once, when you press Share. No login is kept.",
+        "factMail": "Mail: who wrote to whom only, never the subject or the text.",
+        "factSee": "You see who opens the report, and can delete it at any time.",
+        "terms": "See exactly what is read"
+      },
       "charactersTitle": "Characters to share",
       "onDevice_one": "{{count}} of {{total}} can be shared without another login",
       "onDevice_other": "{{count}} of {{total}} can be shared without another login",
@@ -21582,6 +21621,66 @@
         "body": "{{name}} and the reviewers are told. Nothing is read.",
         "action": "Decline"
       }
+    },
+    "requestMail": {
+      "subject": "Review requested before {{role}}",
+      "asked": "I asked for a review before you are made {{role}} in {{corp}}. Other officers decide it. I cannot sign it off.",
+      "what": "What happens: you log in with your characters and choose which to share. Neocom Desk reads them once: corporation history, wallet, contracts, contacts, skills, and who you exchanged mail with (never the subject or the text). No login is kept.",
+      "rights": "You can see who opens the report, delete it at any time, or decline. If you decline, the reviewers are told and nothing is read.",
+      "open": "Open it: {{link}}\nLog in as {{pilot}}."
+    },
+    "tell": {
+      "title": "Review asked",
+      "waitingFor": "Waiting for {{name}}",
+      "intro": "{{name}} sees this only when they open Neocom Desk. Mail them the link so they can log in and share their characters.",
+      "hint": "Nothing is sent until you press Send. It goes from {{officer}}, with your other mail.",
+      "queued": "Mail queued for {{name}}. It goes out in about a minute.",
+      "already": "Already queued from this device.",
+      "send": "Send mail to {{name}}",
+      "resend": "Resend mail to {{name}}",
+      "preview": "Preview mail",
+      "copyLink": "Copy link",
+      "linkCopied": "Link copied",
+      "done": "Done",
+      "queueHint": "The queue row's menu keeps Send mail and Copy link, so you can come back to them.",
+      "failed": "Mail to {{name}} could not be queued. Try again.",
+      "grantTitle": "Can't mail the member"
+    },
+    "mailPreview": {
+      "title": "Mail to {{name}}",
+      "from": "From",
+      "to": "To",
+      "subject": "Subject",
+      "close": "Close",
+      "fixed": "The text is fixed, so what is read is always said the same way. It is queued with your other mail and goes out from {{officer}}."
+    },
+    "requestPanel": {
+      "title": "Request",
+      "askedBy": "Asked by",
+      "you": "{{name}} (you)",
+      "asked": "Asked",
+      "for": "For",
+      "mail": "Mail",
+      "mailNone": "Not sent",
+      "nothingShared": "Nothing shared yet",
+      "nothingSharedHint": "The report shows here once {{name}} shares their characters. They can also decline."
+    },
+    "requestRow": {
+      "waitingFor": "Waiting for {{name}}",
+      "asked": "Asked {{age}}",
+      "askedBy": "Asked {{age}} by {{name}}",
+      "mailSent": "Mail sent {{age}}",
+      "mailNone": "Mail not sent",
+      "send": "Send mail to {{name}}",
+      "resend": "Resend mail to {{name}}",
+      "resendWait": "Sent {{age}}. You can resend after a day.",
+      "copyLink": "Copy link",
+      "mailQueued": "Mail queued for {{name}}.",
+      "mailAlready": "Already queued from this device.",
+      "mailFailed": "Mail to {{name}} could not be queued. Try again.",
+      "mailUnrecorded": "Mail to {{name}} was queued, but not recorded here. Do not resend yet; reload to check.",
+      "mailCooldown": "This member was already mailed in the last day. Nothing sent.",
+      "grantTitle": "Can't mail the member"
     },
     "errors": {
       "generic": "That did not work. Try again.",
@@ -21609,6 +21708,9 @@
       "barred": "You cannot sign off this review.",
       "own-review": "This review is about you, so you cannot open it.",
       "already-signed": "You already signed this review off.",
+      "not-requested": "This review is no longer waiting for the member.",
+      "not-asker": "Only the officer who asked can record the mail.",
+      "mail-cooldown": "The member was mailed less than a day ago.",
       "esi-backoff": "EVE's servers are busy. Try again in a few minutes.",
       "esi-error": "EVE's servers did not answer. Try again in a few minutes.",
       "esi-forbidden": "EVE refused that login. Log in again."

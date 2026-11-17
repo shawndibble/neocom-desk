@@ -32,6 +32,7 @@ import {
   listMyVettingRequests,
   openVettingReview,
   removeVettingCharacter,
+  recordVettingRequestMail,
   requestVettingReview,
   revokeVettingInvite,
   saveVettingSettings,
@@ -790,6 +791,18 @@ emulatorSuite('vetting (emulator)', () => {
       },
     ]);
     expect(await reason(request('Pilot 5'))).toBe('already-requested');
+
+    // The asking officer records the mail; nobody else, and not twice in a day.
+    const askedId = overview.reviews[0].id;
+    const mailed = (by: number) =>
+      recordVettingRequestMail(deps(), who(by), call(by), { reviewId: askedId });
+    expect(await reason(mailed(RECRUITER_2))).toBe('not-asker');
+    const afterMail = await mailed(RECRUITER);
+    expect(afterMail.reviews[0]).toMatchObject({
+      requestedBy: { characterId: RECRUITER },
+      requestMail: { sentAt: T0 },
+    });
+    expect(await reason(mailed(RECRUITER))).toBe('mail-cooldown');
 
     expect(await myRequests(DIRECTOR)).toEqual([]);
     const [mine] = await myRequests(MEMBER);

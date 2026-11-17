@@ -20,11 +20,20 @@ import {
   useTabPanelProps,
   useTabsId,
 } from '@/components/ui';
+import { GrantNote } from '@/app/GrantNote';
+import { SEND_MAIL_ENDPOINTS } from '@/esi/registry';
+import { ActionResult } from '@/features/settings/settingsFields';
+import { useCharacterNames } from '@/features/character/useCharacters';
+import type { VettingReviewSummary } from '@/engine/vetting';
 import { writeToClipboard } from '@/lib/clipboard';
 import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { usePageTab } from '@/lib/usePageTab';
 import { ReviewMemberDialog } from './ReviewMemberDialog';
+import { markMembers } from './reviewRoster';
+import { useReviewRoster } from './useReviewRoster';
+import { useVettingRequestMail } from './useVettingRequestMail';
+import type { RequestMailRun } from './vettingRequestMail';
 import { VettingQueue } from './VettingQueue';
 import { VettingReport } from './VettingReport';
 import { VettingInvitesDialog } from './VettingInvitesDialog';
@@ -37,8 +46,8 @@ import {
   settingsSectionFromPathname,
   type VettingTabId,
 } from './vettingTabs';
-import { applyLink } from './vettingText';
-import { isDecided, needsYours } from './vettingView';
+import { applyLink, requestLink } from './vettingText';
+import { isDecided, needsYours, visibleReviews } from './vettingView';
 import { useVettingOverview } from './useVettingOverview';
 
 export function VettingPage() {
@@ -51,7 +60,11 @@ export function VettingPage() {
   const { state, characterId, corporationId, reload, replace } = useVettingOverview();
   const { copied, flash } = useCopyFeedback(2000);
   const [requesting, setRequesting] = useState(false);
+  const roster = useReviewRoster(requesting ? characterId : null, corporationId);
   const [invitesOpen, setInvitesOpen] = useState<'new' | 'list' | null>(null);
+  const [rowMail, setRowMail] = useState<{ name: string; run: RequestMailRun } | null>(null);
+  const names = useCharacterNames();
+  const requestMail = useVettingRequestMail(characterId ?? 0, corporationId ?? 0, replace);
   const reviewId = reviewIdFromPathname(pathname);
   const canConfigure = state.status === 'ready' && state.overview.canConfigure;
   const shown: VettingTabId = tab === 'settings' && !canConfigure ? 'open' : tab;
@@ -101,8 +114,10 @@ export function VettingPage() {
   }
 
   const { overview } = state;
-  const open = overview.reviews.filter((review) => !isDecided(review.state));
-  const decided = overview.reviews.filter((review) => isDecided(review.state));
+  // A review about the viewing officer is closed to them, so the queue does not list it.
+  const reviews = visibleReviews(overview.reviews, characterId);
+  const open = reviews.filter((review) => !isDecided(review.state));
+  const decided = reviews.filter((review) => isDecided(review.state));
   const yours = open.filter(needsYours).length;
   const on = overview.settings.on;
   const tabs: { id: VettingTabId; label: string; count?: number; countTone?: 'warning' }[] = [
@@ -119,6 +134,17 @@ export function VettingPage() {
   const copy = async () => {
     try {
       await writeToClipboard(applyLink(corporationId));
+      flash();
+    } catch {
+      // The clipboard was refused; nothing was copied and nothing claims it was.
+    }
+  };
+  const mailRow = async (review: VettingReviewSummary) => {
+    setRowMail({ name: review.pilot.name, run: await requestMail.send(review) });
+  };
+  const copyRequestLink = async () => {
+    try {
+      await writeToClipboard(requestLink());
       flash();
     } catch {
       // The clipboard was refused; nothing was copied and nothing claims it was.
@@ -182,6 +208,33 @@ export function VettingPage() {
           tabs={tabs}
         />
       )}
+      {rowMail && (
+        <div className="space-y-2">
+          {rowMail.run.unrecorded ? (
+            <ActionResult kind="error">
+              {t('vetting.requestRow.mailUnrecorded', { name: rowMail.name })}
+            </ActionResult>
+          ) : rowMail.run.cooldown ? (
+            <ActionResult kind="info">{t('vetting.requestRow.mailCooldown')}</ActionResult>
+          ) : rowMail.run.queued.length > 0 ? (
+            <ActionResult kind="success">
+              {t('vetting.requestRow.mailQueued', { name: rowMail.name })}
+            </ActionResult>
+          ) : rowMail.run.missingScope ? (
+            <GrantNote
+              characterId={characterId}
+              endpoints={SEND_MAIL_ENDPOINTS}
+              title={t('vetting.requestRow.grantTitle')}
+            />
+          ) : rowMail.run.failed.length > 0 ? (
+            <ActionResult kind="error">
+              {t('vetting.requestRow.mailFailed', { name: rowMail.name })}
+            </ActionResult>
+          ) : (
+            <ActionResult kind="info">{t('vetting.requestRow.mailAlready')}</ActionResult>
+          )}
+        </div>
+      )}
       <div {...panel}>
         {shown === 'settings' ? (
           <VettingSettingsView
@@ -198,6 +251,9 @@ export function VettingPage() {
             tab={shown}
             rows={shown === 'open' ? open : decided}
             onOpen={(review) => navigate(reviewPath(shown, review.id))}
+            reviewerId={characterId}
+            onRequestMail={(review) => void mailRow(review)}
+            onCopyRequestLink={() => void copyRequestLink()}
           />
         )}
       </div>
@@ -220,9 +276,48 @@ export function VettingPage() {
       )}
       {requesting && (
         <ReviewMemberDialog
+          roster={roster}
+          mark={(members) =>
+            markMembers(members, {
+              selfId: characterId,
+              waiting: new Map(
+                overview.reviews
+                  .filter((review) => review.state === 'requested' || review.state === 'open')
+                  .map((review) => [
+                    review.pilot.characterId,
+                    {
+                      at: review.createdAt,
+                      ...(review.requestedBy ? { by: review.requestedBy.name } : {}),
+                    },
+                  ])
+              ),
+            })
+          }
           onClose={() => setRequesting(false)}
+          mail={{
+            officerId: characterId,
+            officerName: names.get(characterId) ?? '',
+            send: requestMail.send,
+            preview: requestMail.preview,
+          }}
           onRequest={async (memberName, role) => {
-            replace(await vettingBackend().request(characterId, corporationId, memberName, role));
+            const next = await vettingBackend().request(
+              characterId,
+              corporationId,
+              memberName,
+              role
+            );
+            replace(next);
+            // The review just made: the newest request waiting on this member.
+            return (
+              next.reviews
+                .filter(
+                  (review) =>
+                    review.state === 'requested' &&
+                    review.pilot.name.toLowerCase() === memberName.toLowerCase()
+                )
+                .sort((a, b) => b.createdAt - a.createdAt)[0] ?? null
+            );
           }}
         />
       )}

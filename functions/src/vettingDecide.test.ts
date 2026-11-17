@@ -13,6 +13,7 @@ import {
   openExpiry,
   pilotStatus,
   readVettingSettings,
+  recordRequestMail,
   recallTimed,
   referencedPartyIds,
   rememberTimed,
@@ -33,6 +34,7 @@ import {
   VETTING_DEFAULT_SETTINGS,
   VETTING_INVITES_MAX,
   VETTING_KEEP_DAYS,
+  VETTING_MAIL_COOLDOWN_MS,
   VETTING_OPEN_KEEP_DAYS,
   type VettingAssessment,
   type VettingInvite,
@@ -342,6 +344,7 @@ describe('reviewSummary', () => {
       role: 'Director',
       state: 'open',
       pilot: { characterId: 50, name: 'Pilot 50', corporationName: 'Test Corp' },
+      requestedBy: { characterId: 1, name: 'Pilot 1' },
       characters: 1,
       flags: 2,
       worst: 'critical',
@@ -961,5 +964,56 @@ describe('the timed cache', () => {
     rememberTimed(cache, 2, 9, T0 + 9, 3);
     expect([...cache.keys()]).toEqual([3, 4, 2]);
     expect(recallTimed(cache, 2, T0 + 9, HOUR_MS)?.value).toBe(9);
+  });
+});
+
+describe('the request mail', () => {
+  const asked = (over: Partial<StoredVettingReview> = {}) =>
+    review({ state: 'requested', requestedBy: actor(2), ...over });
+
+  it('shows who asked and when the link was mailed, on a row and the report', () => {
+    const held = asked({ requestMail: { sentAt: T0 } });
+    for (const view of [reviewSummary('r1', held, actor(3)), reviewView('r1', held, actor(3))]) {
+      expect(view.requestedBy).toEqual({ characterId: 2, name: 'Pilot 2' });
+      expect(view.requestMail).toEqual({ sentAt: T0 });
+    }
+    const bare = reviewSummary('r1', review({ requestedBy: undefined }), actor(3));
+    expect(bare).not.toHaveProperty('requestedBy');
+    expect(bare).not.toHaveProperty('requestMail');
+    expect(JSON.stringify(reviewSummary('r1', asked(), actor(3)))).not.toContain('h2');
+  });
+
+  it('records the first mail, and a resend only after the cooldown', () => {
+    const first = recordRequestMail(asked(), actor(2), T0);
+    expect(first).toMatchObject({ ok: true, review: { requestMail: { sentAt: T0 } } });
+    if (!first.ok) return;
+    expect(recordRequestMail(first.review, actor(2), T0 + VETTING_MAIL_COOLDOWN_MS - 1)).toEqual({
+      ok: false,
+      reason: 'mail-cooldown',
+    });
+    expect(recordRequestMail(first.review, actor(2), T0 + VETTING_MAIL_COOLDOWN_MS)).toMatchObject({
+      ok: true,
+      review: { requestMail: { sentAt: T0 + VETTING_MAIL_COOLDOWN_MS } },
+    });
+  });
+
+  it('is only for the officer who asked, while the member has not shared', () => {
+    expect(recordRequestMail(asked(), actor(3), T0)).toEqual({ ok: false, reason: 'not-asker' });
+    expect(
+      recordRequestMail(review({ state: 'requested', requestedBy: undefined }), actor(2), T0)
+    ).toEqual({
+      ok: false,
+      reason: 'not-asker',
+    });
+    // An empty stored owner hash never matches another character with an empty hash.
+    expect(recordRequestMail(asked({ requestedBy: actor(2, '') }), actor(3, ''), T0)).toEqual({
+      ok: false,
+      reason: 'not-asker',
+    });
+    expect(recordRequestMail(asked({ requestedBy: actor(2, '') }), actor(2, ''), T0).ok).toBe(true);
+    expect(recordRequestMail(asked({ state: 'open' }), actor(2), T0)).toEqual({
+      ok: false,
+      reason: 'not-requested',
+    });
   });
 });

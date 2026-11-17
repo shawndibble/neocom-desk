@@ -14,6 +14,7 @@ import {
   VETTING_DEFAULT_SETTINGS,
   VETTING_INVITES_MAX,
   VETTING_KEEP_DAYS,
+  VETTING_MAIL_COOLDOWN_MS,
   VETTING_OPEN_KEEP_DAYS,
   type VettingAnswer,
   type VettingCharacterInput,
@@ -46,6 +47,10 @@ export const VETTING_FIXTURE_REVIEWS = {
   nothing: 'v-0040',
   incomplete: 'v-0039',
   waiting: 'v-0038',
+  /** Promotion request the signed-in officer asked and already mailed (`extra: 'requests'`). */
+  mailed: 'v-0037',
+  /** A review about the signed-in officer (`extra: 'requests'`): closed to them. */
+  aboutYou: 'v-0036',
   decided: 'v-0031',
 } as const;
 
@@ -273,6 +278,7 @@ interface ReviewSeed {
   ageMs: number;
   signOffs?: VettingReview['signOffs'];
   requestedBy?: { characterId: number; name: string };
+  requestMail?: { sentAt: number };
 }
 
 function buildReview(
@@ -320,6 +326,7 @@ function buildReview(
     note: seed.note ?? '',
     answers: read && seed.kind === 'application' ? answers : [],
     ...(seed.requestedBy ? { requestedBy: seed.requestedBy } : {}),
+    ...(seed.requestMail ? { requestMail: seed.requestMail } : {}),
     barred: false,
     reportCharacters: seed.samples.map((sample) => ({
       characterId: sample.characterId,
@@ -370,6 +377,8 @@ function summaryOf(review: VettingReview): VettingReviewSummary {
     createdAt,
     decidedAt,
     invite,
+    requestedBy,
+    requestMail,
   } = review;
   return {
     id,
@@ -388,6 +397,8 @@ function summaryOf(review: VettingReview): VettingReviewSummary {
     createdAt,
     decidedAt,
     ...(invite ? { invite } : {}),
+    ...(requestedBy ? { requestedBy } : {}),
+    ...(requestMail ? { requestMail } : {}),
   };
 }
 
@@ -405,6 +416,8 @@ export interface VettingFixtureOptions {
    * (`true`, answered by `myRequests`) or already shared and with the reviewers (`'shared'`).
    */
   request?: boolean | 'shared';
+  /** More requests in the queue: one already mailed, and one about the signed-in officer. */
+  extra?: 'requests';
   /** Where the applicant's own application stands when the page opens. */
   application?: 'none' | 'draft' | 'sent' | 'opened' | 'accepted' | 'rejected';
   /** What the corp set, over the defaults (`VETTING_FIXTURE_CONFIGURED` is one that set it all). */
@@ -511,6 +524,41 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
           ageMs: 2 * DAY_MS,
           requestedBy: { characterId: reviewer.characterId, name: reviewer.name },
         },
+        ...(options.extra === 'requests'
+          ? [
+              {
+                id: VETTING_FIXTURE_REVIEWS.mailed,
+                kind: 'promotion' as const,
+                role: 'Director',
+                state: 'requested' as const,
+                samples: [],
+                pilot: {
+                  characterId: 2118000060,
+                  name: 'Dorn Kessel',
+                  corporationName: corp.name,
+                },
+                needed: 2,
+                ageMs: 3 * DAY_MS,
+                requestedBy: { characterId: reviewer.characterId, name: reviewer.name },
+                requestMail: { sentAt: now - 6 * HOUR_MS },
+              },
+              {
+                id: VETTING_FIXTURE_REVIEWS.aboutYou,
+                kind: 'promotion' as const,
+                role: 'Director',
+                state: 'requested' as const,
+                samples: [],
+                pilot: {
+                  characterId: reviewer.characterId,
+                  name: reviewer.name,
+                  corporationName: corp.name,
+                },
+                needed: 2,
+                ageMs: DAY_MS,
+                requestedBy: BRAM,
+              },
+            ]
+          : []),
         {
           id: VETTING_FIXTURE_REVIEWS.decided,
           kind: 'application',
@@ -535,6 +583,8 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
   );
   const waiting = reviews.get(VETTING_FIXTURE_REVIEWS.waiting);
   if (waiting) waiting.barred = true;
+  const mailed = reviews.get(VETTING_FIXTURE_REVIEWS.mailed);
+  if (mailed) mailed.barred = true;
 
   // The pilot's side: one application (public page) and one request (the signed-in member).
   const applicationHandle: VettingHandle = {
@@ -775,6 +825,8 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
     overview: async () => overview(),
     open: async (_characterId, _corporationId, reviewId) => {
       const review = reviewOf(reviewId);
+      // The server never opens a review about the caller.
+      if (review.pilot.characterId === reviewer.characterId) throw refusal('own-review');
       review.log = [
         ...review.log,
         { at: now, characterId: reviewer.characterId, name: reviewer.name, action: 'opened' },
@@ -842,6 +894,16 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
       );
       review.barred = true;
       reviews.set(id, review);
+      return overview();
+    },
+    recordRequestMail: async (_characterId, _corporationId, reviewId) => {
+      const review = reviewOf(reviewId);
+      if (review.state !== 'requested') throw refusal('not-requested');
+      if (review.requestedBy?.characterId !== reviewer.characterId) throw refusal('not-asker');
+      if (review.requestMail && now - review.requestMail.sentAt < VETTING_MAIL_COOLDOWN_MS) {
+        throw refusal('mail-cooldown');
+      }
+      review.requestMail = { sentAt: now };
       return overview();
     },
     createInvite: async (_characterId, _corporationId, label) => {

@@ -25,6 +25,7 @@ import {
   type VettingSignOffView,
   type VettingStatus,
   type VettingWatchEntry,
+  VETTING_MAIL_COOLDOWN_MS,
 } from './vettingEngine.js';
 import type { VettingSettingsPatch } from './vettingParse.js';
 import {
@@ -445,7 +446,42 @@ export function reviewSummary(
     decidedAt: review.decidedAt,
     // The label only: the code is the corp's to hand out, not a row's to show.
     ...(review.invite ? { invite: review.invite.label } : {}),
+    ...(review.requestedBy
+      ? {
+          requestedBy: {
+            characterId: review.requestedBy.characterId,
+            name: review.requestedBy.name,
+          },
+        }
+      : {}),
+    ...(review.requestMail ? { requestMail: { sentAt: review.requestMail.sentAt } } : {}),
   };
+}
+
+/**
+ * Records that the asking officer mailed the member the link. Only the officer who asked, only
+ * while the member has not shared, and not again within `VETTING_MAIL_COOLDOWN_MS` of the last.
+ */
+export function recordRequestMail(
+  review: StoredVettingReview,
+  actor: VettingActor,
+  now: number
+):
+  | { ok: true; review: StoredVettingReview }
+  | { ok: false; reason: 'not-requested' | 'not-asker' | 'mail-cooldown' } {
+  if (review.state !== 'requested') return { ok: false, reason: 'not-requested' };
+  if (
+    !review.requestedBy ||
+    (review.requestedBy.characterId !== actor.characterId &&
+      // An empty stored hash never matches by hash.
+      !(review.requestedBy.ownerHash !== '' && review.requestedBy.ownerHash === actor.ownerHash))
+  ) {
+    return { ok: false, reason: 'not-asker' };
+  }
+  if (review.requestMail && now - review.requestMail.sentAt < VETTING_MAIL_COOLDOWN_MS) {
+    return { ok: false, reason: 'mail-cooldown' };
+  }
+  return { ok: true, review: { ...review, requestMail: { sentAt: now } } };
 }
 
 /**
@@ -481,14 +517,6 @@ export function reviewView(
     corporationId: review.corporationId,
     note: review.note,
     answers: review.answers ?? [],
-    ...(review.requestedBy
-      ? {
-          requestedBy: {
-            characterId: review.requestedBy.characterId,
-            name: review.requestedBy.name,
-          },
-        }
-      : {}),
     barred: isBarred(review, viewer),
     reportCharacters: review.reportCharacters,
     parties: review.parties,

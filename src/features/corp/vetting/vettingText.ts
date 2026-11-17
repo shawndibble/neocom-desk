@@ -31,6 +31,15 @@ export function applyLink(corporationId: number, invite?: string): string {
   return `${window.location.origin}${base}${applyPath(corporationId, invite)}`;
 }
 
+/**
+ * The link a member is mailed: this app's `/vetting`. Signed out, it goes through the normal EVE
+ * login and returns to the request.
+ */
+export function requestLink(): string {
+  const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+  return `${window.location.origin}${base}/vetting`;
+}
+
 /** One minimum a corp asks, as the applicant reads it: "A character at least 365 days old". */
 export function minimumLine(id: VettingMinimumId, value: number, t: Translate): string {
   return t(`vetting.asks.${id}`, { count: value, amount: formatCount(value) });

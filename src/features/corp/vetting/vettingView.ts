@@ -51,6 +51,14 @@ export function reviewResult(
   return { result: 'nothing', tone: 'neutral' };
 }
 
+/** The queue never lists a review about the viewing officer: it is closed to them. */
+export function visibleReviews<T extends Pick<VettingReviewSummary, 'pilot'>>(
+  reviews: readonly T[],
+  viewerId: number
+): T[] {
+  return reviews.filter((review) => review.pilot.characterId !== viewerId);
+}
+
 /** The caller still owes a sign-off the queue should point at. */
 export function needsYours(row: Pick<VettingReviewSummary, 'state' | 'yours'>): boolean {
   return row.yours && row.state === 'open';
@@ -243,8 +251,9 @@ export function signOffRows(
           note: signOff.note ?? '',
         }
   );
-  if (review.state !== 'open') return rows;
-  if (review.yours) rows.push({ kind: 'yours' });
+  if (review.state !== 'open' && review.state !== 'requested') return rows;
+  if (review.state === 'open' && review.yours) rows.push({ kind: 'yours' });
+  // A requested review still shows who asked: they cannot sign it off, before or after sharing.
   if (review.requestedBy) {
     rows.push({
       kind: 'barred',
@@ -356,6 +365,9 @@ const KNOWN_REASONS: ReadonlySet<string> = new Set([
   'unknown-name',
   'not-a-member',
   'already-requested',
+  'not-requested',
+  'not-asker',
+  'mail-cooldown',
   'watchlist-full',
   'invite-required',
   'invites-full',

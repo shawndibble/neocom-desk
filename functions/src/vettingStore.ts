@@ -45,6 +45,7 @@ import {
   pilotStatus,
   readVettingSettings,
   recallTimed,
+  recordRequestMail,
   referencedPartyIds,
   rememberTimed,
   reportCharacter,
@@ -1171,6 +1172,36 @@ export async function requestVettingReview(
       expiresAt: requestExpiry(now),
     };
     tx.create(reviews.doc(newReviewId()), review);
+  });
+  return overview(deps, call.corporationId, reviewer);
+}
+
+const MAIL_REFUSAL = {
+  'not-requested': ['failed-precondition', 'This review is not waiting for the member'],
+  'not-asker': ['permission-denied', 'Only the officer who asked can record the mail'],
+  'mail-cooldown': ['failed-precondition', 'The member was mailed less than a day ago'],
+} as const;
+
+/**
+ * Notes that the asking officer mailed the member the link (the client sends the mail from the
+ * officer's own Character; the server cannot). A resend waits `VETTING_MAIL_COOLDOWN_MS`.
+ */
+export async function recordVettingRequestMail(
+  deps: VettingDeps,
+  caller: Caller,
+  call: BookCall,
+  input: { reviewId: string }
+): Promise<VettingOverview> {
+  const reviewer = await authorizeReviewer(deps, caller, call, 'review');
+  const ref = reviewRef(deps.db, call.corporationId, input.reviewId);
+  await deps.db.runTransaction(async (tx) => {
+    const review = officerReview(await tx.get(ref));
+    const out = recordRequestMail(review, reviewer.actor, deps.now());
+    if (!out.ok) {
+      const [code, message] = MAIL_REFUSAL[out.reason];
+      return fail(code, message, out.reason);
+    }
+    tx.update(ref, { requestMail: out.review.requestMail });
   });
   return overview(deps, call.corporationId, reviewer);
 }
