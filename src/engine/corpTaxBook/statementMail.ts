@@ -82,31 +82,55 @@ interface Row {
 
 const bold = (t: string): MarkupNode => ({ type: 'b', children: [text(t)] });
 
-function rowsAt(input: StatementMailInput, level: MailDetailLevel): Row[] {
-  const where = (line: StatementMailInput['lines'][number]) =>
-    line.structureId === undefined
-      ? (line.reason ?? '—')
-      : (input.refineryName(line.structureId) ?? `Structure ${line.structureId}`);
-  const raw: Row[] = input.lines.map((line) => ({
-    date: line.date,
-    where: where(line),
-    value: line.estimatedValue,
-    tax: line.tax,
-  }));
+/**
+ * Rows at a detail level: as given, merged per date and place, or merged per place over the
+ * whole span. `dropPlaceByDay` blanks the place when merging per day (a notice's by-day list).
+ */
+function mergeRows(raw: Row[], level: MailDetailLevel, dropPlaceByDay = false): Row[] {
   if (level === 'lines') return raw;
   const merged = new Map<string, Row>();
   const dates = raw.map((r) => r.date).sort();
   const span = dates.length > 0 ? `${dates[0]} – ${dates[dates.length - 1]}` : '';
   for (const row of raw) {
     const date = level === 'byDay' ? row.date : span;
-    const key = `${date}|${row.where}`;
+    const where = level === 'byDay' && dropPlaceByDay ? '' : row.where;
+    const key = `${date}|${where}`;
     const existing = merged.get(key);
     if (existing) {
       existing.value += row.value;
       existing.tax += row.tax;
-    } else merged.set(key, { ...row, date });
+    } else merged.set(key, { ...row, date, where });
   }
   return [...merged.values()].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function rowsAt(input: StatementMailInput, level: MailDetailLevel): Row[] {
+  const where = (line: StatementMailInput['lines'][number]) =>
+    line.structureId === undefined
+      ? (line.reason ?? '—')
+      : (input.refineryName(line.structureId) ?? `Structure ${line.structureId}`);
+  return mergeRows(
+    input.lines.map((line) => ({
+      date: line.date,
+      where: where(line),
+      value: line.estimatedValue,
+      tax: line.tax,
+    })),
+    level
+  );
+}
+
+/** The donate paragraph both mails share; `tail` is what differs after the any-character clause. */
+function donateNode(input: StatementMailInput, tail: string): MarkupNode {
+  return text(
+    `Donate to ${input.corporationName}` +
+      (input.accounts?.length ? ` (Account: ${input.accounts.join(' or ')})` : '') +
+      `; any of your characters counts${tail}`
+  );
+}
+
+function linkNode(url: string): MarkupNode {
+  return { type: 'link', href: url, target: { kind: 'http', url }, children: [text(url)] };
 }
 
 function build(input: StatementMailInput, detail: MailDetailLevel): StatementMail {
@@ -140,19 +164,10 @@ function build(input: StatementMailInput, detail: MailDetailLevel): StatementMai
         (input.carried > 0 ? ` (includes ${formatIsk(input.carried)} still owed).` : '.')
     ),
     br(),
-    text(
-      `Donate to ${input.corporationName}` +
-        (input.accounts?.length ? ` (Account: ${input.accounts.join(' or ')})` : '') +
-        `; any of your characters counts. Code ${input.code} pins it to this Statement.`
-    ),
+    donateNode(input, `. Code ${input.code} pins it to this Statement.`),
     br(),
     text("The link has every line's pricing, terms and payments: "),
-    {
-      type: 'link',
-      href: input.verifyUrl,
-      target: { kind: 'http', url: input.verifyUrl },
-      children: [text(input.verifyUrl)],
-    }
+    linkNode(input.verifyUrl)
   );
   return {
     subject: `${reminder ? 'Reminder: ' : ''}${input.corporationName} moon tax Statement, ${input.periodLabel}`,
@@ -161,22 +176,16 @@ function build(input: StatementMailInput, detail: MailDetailLevel): StatementMai
   };
 }
 
-/** A notice's days at a detail level: each day and place, each day, or each place over the span. */
-function noticeRows(days: readonly NoticeMailDay[], level: MailDetailLevel): NoticeMailDay[] {
+/** A notice's days at a detail level, oldest first: each day and place, each day, or each place. */
+function noticeRows(days: readonly NoticeMailDay[], level: MailDetailLevel): Row[] {
   const sorted = [...days].sort(
     (a, b) => a.date.localeCompare(b.date) || a.place.localeCompare(b.place)
   );
-  if (level === 'lines') return sorted;
-  const span = sorted.length > 0 ? `${sorted[0].date} – ${sorted[sorted.length - 1].date}` : '';
-  const merged = new Map<string, NoticeMailDay>();
-  for (const d of sorted) {
-    const row = level === 'byDay' ? { ...d, place: '' } : { ...d, date: span };
-    const key = `${row.date}|${row.place}`;
-    const held = merged.get(key);
-    if (held) held.tax += d.tax;
-    else merged.set(key, row);
-  }
-  return [...merged.values()];
+  return mergeRows(
+    sorted.map((d) => ({ date: d.date, where: d.place, value: 0, tax: d.tax })),
+    level,
+    true
+  );
 }
 
 function buildNotice(input: StatementMailInput, notice: NoticeMail, detail: MailDetailLevel) {
@@ -194,7 +203,7 @@ function buildNotice(input: StatementMailInput, notice: NoticeMail, detail: Mail
     br(),
     ...rows.flatMap((r) => [
       text(
-        r.place ? `${r.date} · ${r.place} · ${formatIsk(r.tax)}` : `${r.date} · ${formatIsk(r.tax)}`
+        r.where ? `${r.date} · ${r.where} · ${formatIsk(r.tax)}` : `${r.date} · ${formatIsk(r.tax)}`
       ),
       br(),
     ]),
@@ -206,20 +215,13 @@ function buildNotice(input: StatementMailInput, notice: NoticeMail, detail: Mail
   }
   nodes.push(
     br(),
-    text(
-      `Donate to ${input.corporationName}` +
-        (input.accounts?.length ? ` (Account: ${input.accounts.join(' or ')})` : '') +
-        `; any of your characters counts, and put ${input.code} in the reason. ` +
-        'A payment pays your oldest day first.'
+    donateNode(
+      input,
+      `, and put ${input.code} in the reason. A payment pays your oldest day first.`
     ),
     br(),
     text('The link has the live total, every day and your payments: '),
-    {
-      type: 'link',
-      href: input.verifyUrl,
-      target: { kind: 'http', url: input.verifyUrl },
-      children: [text(input.verifyUrl)],
-    }
+    linkNode(input.verifyUrl)
   );
   return {
     subject: `${reminder ? 'Reminder: ' : ''}${input.corporationName} moon tax: late notice`,
