@@ -32,5 +32,6 @@ PNG exports of the chosen mockups for ready tickets. Delete a folder (and its ro
 | [fittings-doctrine](fittings-doctrine/README.md) | Issue #6202 | Doctrine rows in the Fittings Start list with a Doctrine tag; an older fit's re-save note in the preview, or on the row on a phone |
 | [mining-tax-resolve](mining-tax-resolve/README.md) | Review request (no issue yet) | Not chosen yet: A (inline button + menu) or B (one Resolve dialog per problem); five outcomes split by who has to agree, a quiet line after answering, left-the-corp notice, officer won't-pay card and tax contact setting |
 | [lp-store-spend-my-lp](lp-store-spend-my-lp/README.md) | Issue #6199 | Spend my LP button beside the offers list's actions; the plan opens above the offers: headline, offer × N table, stop line naming the floor or wallet, LP left |
+| [moon-owner-archive](moon-owner-archive/README.md) | Issue #6298 | Not chosen yet: miner name link (A) or row + caret (B); refinery name opens its page; Archive on the page (A, recommended) or also on the row (B); Archived section with Restore; offer rule R3 (ESI gone or 60 days idle) |
 
 First draft mockup; sample data. The ticket's Agent Brief text wins over the picture where they differ.
