@@ -29,9 +29,9 @@ describe('buildVettingRequestMail', () => {
       [
         'Hi Ren Halvard,',
         'I asked for a review before you are made Accountant in Brass Meridian Logistics. Other officers decide it. I cannot sign it off.',
-        'What happens: you sign in with your characters and choose which to share. Neocom Desk reads them once: corporation history, wallet, contracts, contacts, skills, and who you exchanged mail with (never the subject or the text). No sign-in is kept.',
+        'What happens: you log in with your characters and choose which to share. Neocom Desk reads them once: corporation history, wallet, contracts, contacts, skills, and who you exchanged mail with (never the subject or the text). No login is kept.',
         'You can see who opens the report, delete it at any time, or decline. If you decline, the reviewers are told and nothing is read.',
-        'Open it: https://neocomdesk.com/vetting\nSign in as Ren Halvard.',
+        'Open it: https://neocomdesk.com/vetting\nLog in as Ren Halvard.',
         'Bram Kessel',
       ].join('\n\n')
     );
