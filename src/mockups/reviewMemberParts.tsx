@@ -16,6 +16,7 @@ import {
   textActionClassName,
   type DataTableColumn,
 } from '@/components/ui';
+import { rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 import * as Icon from '@/components/ui/icons';
 import { Pill } from '@/components/ui/Pill';
@@ -195,7 +196,7 @@ export function MemberCombobox({ query, onQuery, onPick, rosterMissing }: Member
                   onClick={off ? undefined : () => onPick(member)}
                   className={cx(
                     'flex min-h-11 items-center gap-2.5 px-2.5 py-1.5',
-                    off ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-panel',
+                    off ? 'cursor-not-allowed' : cx('cursor-pointer', rowInteractiveClassName),
                     index === active &&
                       'bg-panel outline outline-1 -outline-offset-1 outline-accent'
                   )}
