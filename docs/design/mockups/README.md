@@ -35,5 +35,6 @@ PNG exports of the chosen mockups for ready tickets. Delete a folder (and its ro
 | [extraction-autofracture-bar](extraction-autofracture-bar/README.md) | Issue #6297 | Extractions timeline: today's green bar runs Ready to Expired as one bar, laser tick for early fracture, tooltip with Ready / Auto-fracture / Expired dates and time left |
 | [moon-owner-archive](moon-owner-archive/README.md) | Issue #6298 | Chosen: miner name is an accent link (A); refinery name opens its page, pencil kept; Archive on the refinery page only (A); Archived section with Restore; offer rule R3 (ESI gone or 60 days idle); mining at an archived refinery restores it |
 | [moons-all-moons](moons-all-moons/README.md) | Issue #6299 | Chosen: Moons tab with a flat sortable list (A); opened moon is a table of Extractions (A), a row opens `/corp/moons/extractions/:id`; moon names in other lists link to the moon page |
+| [review-member](review-member/README.md) | Owner request (no issue yet) | Not chosen yet: roster autocomplete for Review a member (no-match, already-waiting, picked states), role suggestions, result step with a sent-on-purpose in-game mail and preview, waiting queue rows with mail state and menu, request page before the member shares, the member's page top |
 
 First draft mockup; sample data. The ticket's Agent Brief text wins over the picture where they differ.
