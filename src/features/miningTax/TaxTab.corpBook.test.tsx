@@ -69,6 +69,7 @@ vi.mock('@/lib/useRouteSnapshot', () => ({
 }));
 vi.mock('./corpBook/useCorpBookView', () => ({
   useCorpBookView: () => ({
+    booksRead: true,
     view: hoisted.view,
     reload: vi.fn(),
     // No book the member has left: the left-the-corp notice has nothing to say here.

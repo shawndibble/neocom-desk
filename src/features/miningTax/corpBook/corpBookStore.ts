@@ -412,6 +412,19 @@ function mergeById<T extends { id: string }>(lists: readonly (readonly T[])[]): 
 export async function loadCorpBooks(
   characters: readonly { characterId: number; corporationId: number }[]
 ): Promise<LoadedCorpBook[]> {
+  return (await readCorpBooks(characters)).books;
+}
+
+/** The books read, and the corporations whose read threw (as opposed to a book that is gone or hidden). */
+export interface CorpBooksRead {
+  books: LoadedCorpBook[];
+  failed: number[];
+}
+
+/** `loadCorpBooks` that also says which reads failed, so a caller holding the last good book can keep it. */
+export async function readCorpBooks(
+  characters: readonly { characterId: number; corporationId: number }[]
+): Promise<CorpBooksRead> {
   // A leaver keeps read access to their own lines, but nothing says which corp they left: remember
   // each corporation whose book a Character has been read in.
   const remembered = await readRememberedCorps();
@@ -441,6 +454,7 @@ export async function loadCorpBooks(
     }
   }
   const books: LoadedCorpBook[] = [];
+  const failed: number[] = [];
   for (const [corporationId, { characterIds, members }] of byCorp) {
     try {
       const book = await underFirebaseSession(() =>
@@ -460,9 +474,10 @@ export async function loadCorpBooks(
       await rememberCorp(book.characterIds, corporationId);
     } catch {
       // Quiet by design: see above.
+      failed.push(corporationId);
     }
   }
-  return books;
+  return { books, failed };
 }
 
 /**

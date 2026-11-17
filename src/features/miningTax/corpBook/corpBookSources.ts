@@ -6,11 +6,37 @@
  */
 import { resolveNames } from '@/features/character/names';
 import { loadDatedUnitPricesByHub, type DatedUnitPrices } from '@/features/miningTax/pricing';
-import { loadCorpBooks, trackedCharacterCorporations, type LoadedCorpBook } from './corpBookStore';
+import {
+  readCorpBooks,
+  trackedCharacterCorporations,
+  type CorpBooksRead,
+  type LoadedCorpBook,
+} from './corpBookStore';
 
 /** The Corp Tax Books of the tracked Characters' corporations; none when they cannot be read. */
-export function loadTrackedCorpBooks(): Promise<LoadedCorpBook[]> {
-  return trackedCharacterCorporations().then(loadCorpBooks, () => []);
+export async function loadTrackedCorpBooks(): Promise<LoadedCorpBook[]> {
+  return (await readTrackedCorpBooks()).books;
+}
+
+/** `CorpBooksRead` for the tracked Characters; `unreadable` when even their corporations could not be listed. */
+export function readTrackedCorpBooks(): Promise<CorpBooksRead & { unreadable: boolean }> {
+  return trackedCharacterCorporations().then(
+    async (characters) => ({ ...(await readCorpBooks(characters)), unreadable: false }),
+    () => ({ books: [], failed: [], unreadable: true })
+  );
+}
+
+/**
+ * The books to show: what was read, plus the last good copy of any book whose read failed (offline,
+ * a lapsed session). A book that is gone or hidden was not a failure and is not kept.
+ */
+export function withStoredBooks(
+  read: CorpBooksRead & { unreadable: boolean },
+  stored: readonly LoadedCorpBook[]
+): LoadedCorpBook[] {
+  if (read.unreadable) return [...stored];
+  const kept = stored.filter((b) => read.failed.includes(b.corporationId));
+  return [...read.books, ...kept];
 }
 
 /** Each book's corporation name; empty when the lookup fails (callers fall back to `#id`). */
