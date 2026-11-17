@@ -1,11 +1,13 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Disclosure, SeverityIcon } from '@/components/ui';
+import { Disclosure, SeverityIcon, textActionClassName } from '@/components/ui';
 import { Pill } from '@/components/ui/Pill';
 import type {
   VettingEvidence,
   VettingFlag,
   VettingParty,
+  VettingRawSource,
   VettingReportCharacter,
 } from '@/engine/vetting';
 import { formatCompactNumber } from '@/lib/compactNumber';
@@ -15,11 +17,34 @@ import { signedIsk } from '@/lib/signedIsk';
 import { useTimeZone } from '@/lib/timeFormat';
 import { formatTimestamp } from '@/lib/timestamp';
 import { VettingEntity } from './VettingEntity';
+import { flagDataTarget } from './rawRowsView';
 import { CHECK_SOURCE_LABEL, evidenceWhatKey, flagFindingParams, partyLabel } from './vettingView';
 
 interface Names {
   parties: readonly VettingParty[];
   characters: readonly VettingReportCharacter[];
+}
+
+/** Where a flag's rows are on the data page: the source and the query that tints them. */
+export type DataHref = (source: VettingRawSource, query: string) => string;
+
+/** The way from a flag to its rows in the data the review kept, when it has any. */
+function FlagDataLink({ flag, dataHref }: { flag: VettingFlag; dataHref: DataHref }) {
+  const { t } = useTranslation();
+  const target = flagDataTarget(flag);
+  if (target === null) return null;
+  const only = flag.characterIds.length === 1 ? `character=${flag.characterIds[0]}&` : '';
+  const source = t(`vetting.data.source.${target.source}`);
+  return (
+    <Link
+      to={dataHref(target.source, `${only}flagged=1`)}
+      className={`${textActionClassName()} inline-flex px-3 py-1.5 text-sm`}
+    >
+      {target.count === null
+        ? t('vetting.data.openRowCyno', { source })
+        : t('vetting.data.openRows', { count: target.count, source })}
+    </Link>
+  );
 }
 
 /** The rows behind a flag: when, who with (an entity link), what, and the ISK where there is any. */
@@ -85,7 +110,20 @@ function EvidenceRows({ flag, names }: { flag: VettingFlag; names: Names }) {
  * One flag: severity glyph and word, a title, one sentence a recruiter can act on, which
  * character and source it came from, and the rows behind it under a disclosure.
  */
-function FlagItem({ flag, names, open }: { flag: VettingFlag; names: Names; open: boolean }) {
+function FlagItem({
+  flag,
+  names,
+  open,
+  first,
+  dataHref,
+}: {
+  flag: VettingFlag;
+  names: Names;
+  open: boolean;
+  /** The first flag of its check: the one `#flag-<check>` points at. */
+  first: boolean;
+  dataHref?: DataHref;
+}) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(open);
   const critical = flag.severity === 'critical';
@@ -99,7 +137,7 @@ function FlagItem({ flag, names, open }: { flag: VettingFlag; names: Names; open
     party: (id) => partyLabel(names.parties, id) ?? t('vetting.report.unknownParty', { id }),
   });
   return (
-    <li className="space-y-2 px-3 py-3">
+    <li id={first ? `flag-${flag.check}` : undefined} className="scroll-mt-4 space-y-2 px-3 py-3">
       <div className="flex items-start gap-2">
         <SeverityIcon severity={flag.severity} className="mt-1" />
         <div className="min-w-0 flex-1 space-y-1">
@@ -126,7 +164,13 @@ function FlagItem({ flag, names, open }: { flag: VettingFlag; names: Names; open
             onToggle={() => setExpanded((value) => !value)}
           >
             <EvidenceRows flag={flag} names={names} />
+            {dataHref && <FlagDataLink flag={flag} dataHref={dataHref} />}
           </Disclosure>
+        </div>
+      )}
+      {flag.evidence.length === 0 && dataHref && (
+        <div className="pl-6">
+          <FlagDataLink flag={flag} dataHref={dataHref} />
         </div>
       )}
     </li>
@@ -137,10 +181,13 @@ export function VettingFlagList({
   flags,
   parties,
   characters,
+  dataHref,
 }: {
   flags: readonly VettingFlag[];
   parties: readonly VettingParty[];
   characters: readonly VettingReportCharacter[];
+  /** Where a flag's rows are in the kept data; absent when the review has none to browse. */
+  dataHref?: DataHref;
 }) {
   const names = { parties, characters };
   return (
@@ -152,6 +199,8 @@ export function VettingFlagList({
           flag={flag}
           names={names}
           open={index === 0}
+          first={flags.findIndex((other) => other.check === flag.check) === index}
+          dataHref={dataHref}
         />
       ))}
     </ul>

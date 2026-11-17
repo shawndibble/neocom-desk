@@ -14976,7 +14976,7 @@
           "description": "Only if your corporation uses SRP or a Corp Tax Book, or you shared a Vetting report with a corporation. These are the corporation's records, not yours: they sit on our server (Google Firebase) under the corporation's ID, and Delete all data leaves them with it. A Vetting report is the exception: the pilot can delete their own from its status page.",
           "srp": "SRP Claims: the killmail, the Character's name and ID, the hull, system and loss value, the fleet or FC and note you gave, the Reimbursement and the claim's state. Also the corporation's SRP settings, its Doctrine Fits and its SRP log: each filing (with the pilot's name, killmail, hull and amount) and each officer action. The CEO, Directors and Accountants read all of it; a pilot reads only their own claims.",
           "corpTaxBook": "The Corp Tax Book: what each Character mined at the refineries it covers (corp members, Guests, and miners at a moon owner's refineries it collects for), the Statements sent, the payments that settle them, write-offs and corrections, a miner's own \"I paid this another way\" declarations and disputes of a line with the officers' answers, a log of who did each, and which books bill each Character (kept under that Character's ID). The CEO, Directors, Accountants and Junior Accountants read the whole book; a corp member reads only their own lines; a moon owner reads only its own mined volume, rate, amount due and payouts, never what each miner owes. A Statement's verify link, sent by mail, shows that Statement to whoever has the link. With Pop Sharing on, each shared moon's pop (refinery, moon, Pop Time, ore make-up if shared, notes and rate, never ISK) is kept for the pilots in the audiences the officers chose, until the belt expires; a Community admin's block of a sharing corporation is kept in the Community.",
-          "vetting": "Vetting: for a pilot who applied to a corporation or shared a review with it, a report of what one read of their Characters found. It holds each Character's name, corporation, age and skill points, the flags raised with up to 10 rows behind each (who a wallet, contract, contact or mail row was with, when, and the ISK), the pilot's note and their answers to the corporation's questions, the invite link it started from, and who opened or decided it. No mail subject or text is kept, and no login is kept. The corporation's CEO, Directors and Personnel Managers read it; the pilot sees who opened it and can delete it. Also the corporation's watchlist, questions, invite links and settings, and which of its reviewers opened the vetting page in the last 30 days, used only to send the alert for a new report."
+          "vetting": "Vetting: for a pilot who applied to a corporation or shared a review with it, a report of what one read of their Characters found. It holds each Character's name, corporation, age and skill points, the flags raised with up to 10 rows behind each (who a wallet, contract, contact or mail row was with, when, and the ISK), and every row the read returned, kept as it was read: the last 30 days of wallet journal and contracts, every contact, mail headers (who wrote to whom, never a subject or text), every trained skill and corporation history, which the corporation's officers can browse, the pilot's note and their answers to the corporation's questions, the invite link it started from, and who opened or decided it. No mail subject or text is kept, and no login is kept. The corporation's CEO, Directors and Personnel Managers read it; the pilot sees who opened it and can delete it. Also the corporation's watchlist, questions, invite links and settings, and which of its reviewers opened the vetting page in the last 30 days, used only to send the alert for a new report."
         },
         "notes": {
           "push": "Push notifications, if on: this device's token, its character IDs, and the next 72 hours of alert text, so alerts arrive while the app is closed. The EVE token used to verify each character is discarded right after.",
@@ -15039,7 +15039,7 @@
           "corpTaxBook": "Corp Tax Book:",
           "corpTaxBookKept": "no expiry. Its lines, Statements, payments, verify links and log stay until whoever turned the book on, or the CEO, deletes the book, which deletes everything in it, including its place in the record of which books bill each Character.",
           "vetting": "Vetting reports:",
-          "vettingKept": "deleted 30 days after the corporation decides, or 90 days after it was shared if nobody decides (checked daily), or at once when the pilot deletes it. While a pilot is still adding Characters, the rows read are kept for 24 hours and removed by the daily clean-up; they are deleted at once when the report is sent."
+          "vettingKept": "deleted 30 days after the corporation decides, or 90 days after it was shared if nobody decides (checked daily), or at once when the pilot deletes it. While a pilot is still adding Characters, the rows read are kept for 24 hours and removed by the daily clean-up; once the report is sent they are kept with it, until the same dates."
         }
       },
       "helpPointer": "Bug, question or idea? See <help>Support</help>."
@@ -21300,6 +21300,8 @@
         "keptUntil": "Kept until",
         "orAfterDecision_one": "or {{count}} day after a decision",
         "orAfterDecision_other": "or {{count}} days after a decision",
+        "rowsKept": "Rows kept",
+        "allOfThem": "All of them",
         "signInKept": "Login kept",
         "none": "None",
         "log": "Record"
@@ -21405,18 +21407,125 @@
         "skills": "Skills"
       },
       "readNotes": {
-        "wallet": "Last 30 days",
-        "mail": "Who you wrote with. No subject or text is kept"
+        "history": "Public. Every corporation you have been in",
+        "wallet": "Every row from the last 30 days",
+        "contact": "Every contact",
+        "mail": "Who sent and who received each mail. Never the subject or the text",
+        "contract": "Every contract from the last 30 days",
+        "skills": "Every trained skill"
       },
-      "notRead": "Not read, not kept",
-      "mailText": "The text of your mail",
-      "signIn": "Your EVE login",
-      "signInNote": "No key is kept. Nothing is read again",
+      "kept": "Kept after you press Send",
+      "keptRows": "Every row listed here, kept with your report",
+      "deleted": "Deleted {{count}} days after the decision, or {{open}} days after you share if nobody decides, or when you delete it",
+      "deleted_one": "Deleted {{count}} day after the decision, or {{open}} days after you share if nobody decides, or when you delete it",
+      "deleted_other": "Deleted {{count}} days after the decision, or {{open}} days after you share if nobody decides, or when you delete it",
       "control": "You stay in control",
-      "onlyReviewers": "Only the reviewers can open it",
-      "seeOpened": "You see who opened it",
-      "deleted_one": "Deleted {{count}} day after the decision ({{open}} days if nobody decides), or when you withdraw",
-      "deleted_other": "Deleted {{count}} days after the decision ({{open}} days if nobody decides), or when you withdraw"
+      "onlyReviewers": {
+        "recruiters": "Only the reviewers can open it",
+        "officers": "Only officers (CEO, Director, Personnel Manager) can open it, but not the one who asked for the review or the person reviewed"
+      },
+      "seeOpened": "You see who opened it, and when",
+      "youDelete": "You can delete it at any time",
+      "notRead": "Not read, not kept",
+      "mailText": "The subject or text of your mail",
+      "signIn": "Your EVE login",
+      "signInNote": "No key is kept. We do not keep your login"
+    },
+    "data": {
+      "title": "Data we read",
+      "crumb": "Report: {{name}}",
+      "crumbPlain": "Report",
+      "subtitle": "Every row the read returned, not only the ones a check flagged.",
+      "andMore_one": "and {{count}} more",
+      "andMore_other": "and {{count}} more",
+      "readAt": "read {{at}}",
+      "sourcesLabel": "Data sources",
+      "character": "Character",
+      "allCharacters": "All {{count}}",
+      "allCharactersSelect": "All characters",
+      "noneKeptTitle": "No rows were kept for this review",
+      "noneKeptHint": "It was read before rows were kept. A fresh read needs the pilot to share again.",
+      "source": {
+        "wallet": "Wallet journal",
+        "contact": "Contacts",
+        "mail": "Mail headers",
+        "contract": "Contracts",
+        "skills": "Skills",
+        "history": "Corporation history"
+      },
+      "kind": {
+        "wallet": "Type",
+        "contact": "Standing",
+        "mail": "Direction",
+        "contract": "Contract type",
+        "skills": "Skill group"
+      },
+      "allKinds": "All {{kind}}s",
+      "direction": { "Sent": "Sent", "Received": "Received" },
+      "standing": { "hostile": "Hostile", "neutral": "Neutral", "friendly": "Friendly" },
+      "contactKind": {
+        "character": "Character",
+        "corporation": "Corporation",
+        "alliance": "Alliance",
+        "faction": "Faction"
+      },
+      "columns": {
+        "when": "When",
+        "with": "With",
+        "amount": "Amount",
+        "contact": "Contact",
+        "kind": "Kind",
+        "sent": "Sent",
+        "senderOrRecipient": "Sender or recipient",
+        "recipients": "All recipients",
+        "issued": "Issued",
+        "price": "Price",
+        "status": "Status",
+        "skill": "Skill",
+        "group": "Group",
+        "level": "Level",
+        "corporation": "Corporation",
+        "joined": "Joined",
+        "left": "Left",
+        "timeThere": "Time there",
+        "character": "Character",
+        "flag": "Flag"
+      },
+      "unknownSkill": "Skill {{id}}",
+      "stillThere": "Still there",
+      "search": "Search {{source}}",
+      "searchPlaceholder": "Search names, types, corporations",
+      "searchSkills": "Search skills",
+      "dates": "Dates",
+      "datesRange": "{{from}} to {{to}}",
+      "start": "start",
+      "now": "now",
+      "from": "From",
+      "to": "To",
+      "flaggedOnly": "Flagged rows only",
+      "clearFilters": "Clear filters",
+      "allRows_one": "All {{total}} row read. Scroll for the rest.",
+      "allRows_other": "All {{total}} rows read. Scroll for the rest.",
+      "ofRows": "{{shown}} of {{total}} rows",
+      "loadingMore": "Loading more ({{loaded}} of {{total}} rows)",
+      "loadFailed": "Could not load the rest. {{loaded}} of {{total}} rows loaded.",
+      "emptyTitle": "No {{source}} rows",
+      "emptyHint": "The read found nothing here for {{who}}. Empty is a result: the source was read.",
+      "emptyHintWindow": "The read found nothing here for {{who}} in the last 30 days. Empty is a result: the source was read.",
+      "theseCharacters": "these characters",
+      "noMatchTitle": "No rows match",
+      "noMatchHint_one": "The {{shown}} row read does not fit these filters.",
+      "noMatchHint_other": "None of the {{shown}} rows read fits these filters.",
+      "openRows_one": "Open the {{count}} row in {{source}}",
+      "openRows_other": "Open the {{count}} rows in {{source}}",
+      "openRowCyno": "Open the skill in {{source}}"
+    },
+    "dataWeRead": {
+      "source": "Source",
+      "rows": "Rows read",
+      "total_one": "{{total}} row",
+      "total_other": "{{total}} rows",
+      "note": "Every row the read returned, kept with this report, not only the ones a check flagged. Mail is headers only: who wrote to whom, never a subject or text. Opening a source is logged with the other opens."
     },
     "characters": {
       "title": "Your characters",

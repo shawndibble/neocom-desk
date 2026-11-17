@@ -28,6 +28,8 @@ const DOCS: [path: string, parent: string][] = [
   [`${CORP}/vetting/reviewers`, `${CORP}/vetting`],
   [REVIEW, `${CORP}/vettingReviews`],
   [`${REVIEW}/inputs/50`, `${REVIEW}/inputs`],
+  // Every row a read returned, kept with the review (ADR 0035): officers get it through the action.
+  [`${REVIEW}/rawRows/50_abc_wallet_0`, `${REVIEW}/rawRows`],
   [`${CORP}/vettingThrottle/50`, `${CORP}/vettingThrottle`],
 ];
 
@@ -54,6 +56,7 @@ beforeEach(async () => {
       keyHash: 'abc',
     });
     await setDoc(doc(db, `${REVIEW}/inputs/50`), { characterId: 50, json: '{}' });
+    await setDoc(doc(db, `${REVIEW}/rawRows/50_abc_wallet_0`), { characterId: 50, json: '[]' });
     await setDoc(doc(db, `${CORP}/vettingThrottle/50`), { windowStart: 0, count: 1 });
     // An SRP officer record: officer access to SRP opens nothing here.
     await setDoc(doc(db, `${CORP}/srpOfficers/char:2`), {
@@ -89,8 +92,9 @@ describe.each(CLIENTS)('vetting rules: %s', (_who, client) => {
     await assertFails(deleteDoc(doc(client(), path)));
   });
 
-  it('cannot reach reviews or inputs through a collection group', async () => {
+  it('cannot reach reviews, inputs or raw rows through a collection group', async () => {
     await assertFails(getDocs(collectionGroup(client(), 'vettingReviews')));
     await assertFails(getDocs(collectionGroup(client(), 'inputs')));
+    await assertFails(getDocs(collectionGroup(client(), 'rawRows')));
   });
 });

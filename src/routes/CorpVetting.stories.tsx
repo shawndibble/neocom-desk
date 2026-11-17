@@ -54,6 +54,23 @@ export const Flagged: Story = { parameters: report(VETTING_FIXTURE_REVIEWS.flagg
 /** @summary Phone: the flagged report in one column, the decision after the findings. */
 export const FlaggedPhone: Story = { ...Flagged, globals: phone };
 
+const data = (source: string, query = '') => ({
+  shell: shell(`/corp/vetting/open/${VETTING_FIXTURE_REVIEWS.flagged}/data/${source}${query}`),
+});
+
+/** @summary Data we read: every kept row, 4,652 wallet journal rows in one windowed table, a tab per source with its count, a character switcher and filters. */
+export const DataWeRead: Story = { parameters: data('wallet') };
+/** @summary Phone: the data page, the table scrolls sideways under a pinned first column. */
+export const DataWeReadPhone: Story = { ...DataWeRead, globals: phone };
+/** @summary Flagged rows only: the rows a flag shows, tinted, each with a link back to its flag. */
+export const DataFlaggedRows: Story = { parameters: data('wallet', '?flagged=1') };
+/** @summary Skills: the Cyno skill row tinted with its Flag link, skill names from the static data. */
+export const DataSkills: Story = { parameters: data('skills') };
+/** @summary Corporation history: joined, left and the time there. */
+export const DataHistory: Story = { parameters: data('history') };
+/** @summary Empty source: the read found nothing, said as a result. */
+export const DataEmptySource: Story = { parameters: data('contact') };
+
 /** @summary Nothing found: a neutral result line that says it is not a verdict, every check listed. */
 export const NothingFound: Story = { parameters: report(VETTING_FIXTURE_REVIEWS.nothing) };
 

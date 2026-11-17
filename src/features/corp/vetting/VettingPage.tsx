@@ -35,12 +35,14 @@ import { useReviewRoster } from './useReviewRoster';
 import { useVettingRequestMail } from './useVettingRequestMail';
 import type { RequestMailRun } from './vettingRequestMail';
 import { VettingQueue } from './VettingQueue';
+import { VettingRawData } from './VettingRawData';
 import { VettingReport } from './VettingReport';
 import { VettingInvitesDialog } from './VettingInvitesDialog';
 import { VettingSettingsView } from './VettingSettingsView';
 import { vettingBackend } from './vettingClient';
 import {
   VETTING_TABS,
+  dataFromPathname,
   reviewIdFromPathname,
   reviewPath,
   settingsSectionFromPathname,
@@ -66,9 +68,22 @@ export function VettingPage() {
   const names = useCharacterNames();
   const requestMail = useVettingRequestMail(characterId ?? 0, corporationId ?? 0, replace);
   const reviewId = reviewIdFromPathname(pathname);
+  const data = dataFromPathname(pathname);
   const canConfigure = state.status === 'ready' && state.overview.canConfigure;
   const shown: VettingTabId = tab === 'settings' && !canConfigure ? 'open' : tab;
   const panel = useTabPanelProps(phone ? null : tabsId, shown);
+
+  if (data !== null && characterId !== null && corporationId !== null) {
+    return (
+      <VettingRawData
+        characterId={characterId}
+        corporationId={corporationId}
+        reviewId={data.reviewId}
+        tab={data.tab}
+        source={data.source}
+      />
+    );
+  }
 
   if (reviewId !== null && characterId !== null && corporationId !== null && tab !== 'settings') {
     return (

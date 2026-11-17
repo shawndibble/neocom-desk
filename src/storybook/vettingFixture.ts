@@ -33,6 +33,7 @@ import {
 import type { VettingBackend, VettingHandle } from '@/features/corp/vetting/vettingBackend';
 import { DAY_MS, HOUR_MS } from '@/lib/age';
 import { SAMPLE_ACTIVE_CHARACTER, SAMPLE_CHARACTERS } from './sampleData';
+import { rawCountsOf, rawPage, rawParties, rawRowsFor } from './vettingRawFixture';
 
 export const VETTING_FIXTURE_CORPORATION = {
   corporationId: SAMPLE_ACTIVE_CHARACTER.corporationId,
@@ -581,6 +582,17 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
   const reviews = new Map(
     seeds.map((seed) => [seed.id, buildReview(seed, now, watchIds(), answersNow())])
   );
+  // The rows each read review kept (#6341), and how many of each.
+  const rawSets = new Map(
+    seeds
+      .filter((seed) => seed.samples.length > 0)
+      .map((seed) => [seed.id, rawRowsFor(seed.samples, now)] as const)
+  );
+  for (const [id, set] of rawSets) {
+    const review = reviews.get(id);
+    if (review) review.rawCounts = rawCountsOf(set);
+  }
+  const rawPartyList = rawParties(PARTIES);
   const waiting = reviews.get(VETTING_FIXTURE_REVIEWS.waiting);
   if (waiting) waiting.barred = true;
   const mailed = reviews.get(VETTING_FIXTURE_REVIEWS.mailed);
@@ -832,6 +844,13 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
         { at: now, characterId: reviewer.characterId, name: reviewer.name, action: 'opened' },
       ];
       return structuredClone(review);
+    },
+    rawRows: async (_characterId, _corporationId, reviewId, source, cursor) => {
+      const review = reviewOf(reviewId);
+      if (review.pilot.characterId === reviewer.characterId) throw refusal('own-review');
+      const set = rawSets.get(reviewId);
+      if (!set) throw refusal('not-found');
+      return rawPage(reviewId, source, set, rawPartyList, cursor);
     },
     decide: async (_characterId, _corporationId, reviewId, decision, note) => {
       const review = reviewOf(reviewId);

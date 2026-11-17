@@ -1,6 +1,7 @@
 // Vetting retention sweep: deletes drafts never shared (`VETTING_DRAFT_HOURS`), requests never
 // answered or declined (30 days), shared reviews nobody decided (`VETTING_OPEN_KEEP_DAYS`) and
-// decided reviews past `deleteAt`, each with whatever was read into it; and clears what a member
+// decided reviews past `deleteAt`, each with whatever was read into it, its kept raw rows
+// included (ADR 0035); and clears what a member
 // read into a request and left unsent for a day. Which of those applies is `decideVettingSweep`
 // (vettingDecide.ts); every review carries the time the sweep next acts on it in `expiresAt`.
 // It also deletes the draft throttle's counters once their day is long over.
@@ -8,6 +9,7 @@
 import type { DocumentReference, Firestore, Query } from 'firebase-admin/firestore';
 import { indexedPages, isTopLevelChild, pages } from './indexedSweep.js';
 import { CORPS_COLLECTION } from './srpTypes.js';
+import { pruneRaw } from './vettingRawStore.js';
 import { decideVettingSweep, requestExpiry } from './vettingDecide.js';
 import {
   DAY_MS,
@@ -107,6 +109,10 @@ export async function sweepVetting(
           break sweep;
         }
         try {
+          // The kept raw rows first, while the review that names them still exists: once it is
+          // gone nothing would find them. Due times only pass, so an expired review stays due,
+          // and a failure here leaves the review for the next run.
+          await pruneRaw(candidate.ref);
           // Decided again inside the transaction: a draft shared meanwhile is kept.
           const done = await db.runTransaction(async (tx) => {
             const fresh = (await tx.get(candidate.ref)).data() as StoredVettingReview | undefined;

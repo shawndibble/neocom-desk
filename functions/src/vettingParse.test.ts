@@ -5,6 +5,7 @@ import {
   parseVettingHandle,
   parseVettingInviteCode,
   parseVettingInviteLabel,
+  parseVettingRawRows,
   parseVettingRequest,
   parseVettingSettingsPatch,
   parseVettingStart,
@@ -20,6 +21,20 @@ describe('vetting input parsing', () => {
     expect(() => parseVettingHandle({ ...handle, key: 'short' })).toThrow();
     expect(() => parseVettingHandle({ ...handle, corporationId: '98000001' })).toThrow();
     expect(() => parseVettingHandle(null)).toThrow();
+  });
+
+  it('reads a raw-rows request: a known source, an optional well-formed cursor', () => {
+    const base = { reviewId: 'r'.repeat(22), source: 'wallet' };
+    expect(parseVettingRawRows(base)).toEqual(base);
+    expect(parseVettingRawRows({ ...base, cursor: 'MTox' })).toEqual({ ...base, cursor: 'MTox' });
+    for (const source of ['wallet', 'contact', 'mail', 'contract', 'skills', 'history']) {
+      expect(parseVettingRawRows({ ...base, source }).source).toBe(source);
+    }
+    expect(() => parseVettingRawRows({ ...base, source: 'killmails' })).toThrow();
+    expect(() => parseVettingRawRows({ reviewId: base.reviewId })).toThrow();
+    expect(() => parseVettingRawRows({ ...base, cursor: 'not a cursor!' })).toThrow();
+    expect(() => parseVettingRawRows({ ...base, cursor: 7 })).toThrow();
+    expect(() => parseVettingRawRows({ ...base, reviewId: 'a/b' })).toThrow();
   });
 
   it('needs a token to start', () => {

@@ -2,8 +2,9 @@
 
 ## Status
 
-Accepted (2026-11-12). Builds on ADR 0001 and ADR 0023; contrasts with ADR 0020
-and ADR 0025.
+Accepted (2026-11-12). Partly superseded by 0035 (what is stored after Send:
+the rows a read returned are no longer deleted on Send). Builds on ADR 0001 and
+ADR 0023; contrasts with ADR 0020 and ADR 0025.
 
 ## Context
 
