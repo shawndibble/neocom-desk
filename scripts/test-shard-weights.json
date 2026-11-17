@@ -1049,7 +1049,6 @@
   "src/features/corp/CorpRoster.test.tsx": 1,
   "src/features/corp/corpRosterColumns.test.ts": 1,
   "src/features/corp/corpScopes.test.ts": 1,
-  "src/features/corp/CorpTransactionsPanel.test.tsx": 2,
   "src/features/corp/currentMembers.test.ts": 1,
   "src/features/corp/divisions.test.ts": 1,
   "src/features/corp/grantPromptDismissal.test.ts": 1,

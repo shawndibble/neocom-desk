@@ -1,7 +1,7 @@
 import { NO_NAMES } from '@/lib/emptyCollections';
 /**
  * `/corp/wallet` — the corporation's wallet, one division at a time: its
- * balance, its journal and its market transactions (issues #298, #570).
+ * balance and its journal (issues #298, #570, #6320).
  *
  * This used to be the Corporation side of a Personal / Corporation switch on
  * `/wallet` (round 38). It moved here so `/wallet` is only ever the pilot's
@@ -15,10 +15,9 @@ import { NO_NAMES } from '@/lib/emptyCollections';
  *
  * No tab bar of its own: Corp Wallet is a page of its own, not a tab, so the
  * page is a strip of every division's balance (clicking one selects it) above
- * one table, switched between Journal and Transactions by a
- * `SegmentedControl` (`?view=`). Both reads load for the selected division
- * either way — the journal's market lines name their item from the fills — so
- * switching the view never re-pages anything (issue #413).
+ * the journal. The division's market fills are read too, but never drawn: the
+ * journal's market lines name their item from them. An old `?view=transactions`
+ * link just shows the journal.
  *
  * The journal is the same table `/wallet` draws (`WalletJournalTable.tsx`) —
  * ESI returns the same schema for both.
@@ -39,7 +38,6 @@ import {
   IconButton,
   PageHeader,
   Panel,
-  SegmentedControl,
   Spinner,
   Tooltip,
   type DataTableColumn,
@@ -79,15 +77,7 @@ import {
   useJournalFilterResult,
 } from '@/features/character/walletJournal';
 import { JournalTable, type PlayerOption } from '@/features/character/WalletJournalTable';
-import {
-  EMPTY_TRANSACTION_FILTER_PARAMS,
-  filterWalletTransactions,
-  TRANSACTION_FIELD_TO_PARAM,
-  TRANSACTION_FILTER_PARAMS,
-  type WalletTransactionFilter,
-} from '@/features/character/walletTransactionFilter';
 import { CorpDenied } from '@/features/corp/CorpDenied';
-import { CorpTransactionsPanel } from '@/features/corp/CorpTransactionsPanel';
 import { walletDivisions, type WalletDivision } from '@/features/corp/divisions';
 import { useActiveCorporationIdState } from '@/features/corp/owner';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
@@ -102,19 +92,13 @@ import {
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { formatIsk } from '@/lib/isk';
-import { enumParam, intParam } from '@/lib/urlState';
+import { intParam } from '@/lib/urlState';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useUrlFilter, useUrlParam, useUrlSort } from '@/lib/useUrlState';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
 /** `?division=` (issue #419, #1302). ESI divisions are 1-7. */
 const DIVISION_PARAM = intParam(1, { min: 1, max: 7 });
-
-/** Which table the page shows for the selected division. */
-type WalletTable = 'journal' | 'transactions';
-const VIEW_PARAM = enumParam<WalletTable>(['journal', 'transactions'], 'journal');
-
-const TRANSACTIONS_SORT = { columnId: 'date', direction: 'desc' } as const;
 
 const NO_IDS: ReadonlySet<number> = new Set();
 
@@ -141,12 +125,8 @@ async function loadCorpBalances(
 }
 
 /**
- * One division's fills, plus the names for the item ids in them.
- *
- * Resolved here rather than in the panel because it is a network read: the
- * table's item column and the filter's own text match both spell a `type_id`
- * through the same `nameFor`, so an unresolved id reads as `Type #99999` in
- * both places instead of quietly dropping out of a search.
+ * One division's fills, plus the names for the item ids in them: the journal
+ * names its market lines' items from these (a network read, so it lives here).
  */
 interface CorpTransactionsSnapshot {
   transactionsResult: StatusResult<CorporationWalletTransaction[]>;
@@ -461,10 +441,9 @@ function CorpWalletView({ canReadDivisions }: { canReadDivisions: boolean }) {
   const corporationIdState = useActiveCorporationIdState();
   const corporationId = corporationIdState ?? null;
   const corpPending = corporationIdState === undefined;
-  const [view, setView] = useUrlParam('view', VIEW_PARAM);
   const [iskPanelOpen, setIskPanelOpen] = useState(false);
 
-  // Corp Transactions' item context menu (issue #817) — same Quickbar/Item
+  // The journal's item context menu (issue #817) — same Quickbar/Item
   // Detail plumbing as every other item table.
   const itemActions = usePageItemActions({ activeCharacterId });
 
@@ -518,8 +497,7 @@ function CorpWalletView({ canReadDivisions }: { canReadDivisions: boolean }) {
     { name: 'corp-wallet:journal', characterId: activeCharacterId }
   );
 
-  // Loaded for both views: Transactions draws it, and the journal's market
-  // lines name their item from these same fills.
+  // Never drawn: the journal's market lines name their item from these fills.
   const corpTransactions = useCorpSnapshot<CorpTransactionsSnapshot | null>(
     divisionKey,
     async () =>
@@ -543,8 +521,8 @@ function CorpWalletView({ canReadDivisions }: { canReadDivisions: boolean }) {
   const corpTransactionsResult = corpTransactions.data?.transactionsResult.cached ?? null;
   const corpTransactionRows = corpTransactionsResult?.data ?? EMPTY_TRANSACTIONS;
   const corpTypeNames = corpTransactions.data?.typeNames ?? NO_NAMES;
-  // The one spelling of an item id on this page: the table's column, the CSV
-  // and the search all go through it, so what is drawn is what is searched.
+  // The one spelling of an item id on this page: the column, the CSV and the
+  // search all go through it, so what is drawn is what is searched.
   const nameForType = useMemo(() => typeNameLookup(corpTypeNames), [corpTypeNames]);
   const linkFor = useMemo(
     () => journalTransactionLinks(corpTransactionRows),
@@ -604,33 +582,13 @@ function CorpWalletView({ canReadDivisions }: { canReadDivisions: boolean }) {
   );
   const journalSortProps = useUrlSort('journal.sort', JOURNAL_SORT, JOURNAL_SORT_COLUMN_IDS);
 
-  const [transactionFilter, setTransactionFilter, transactionRowsFilter] =
-    useUrlFilter<WalletTransactionFilter>(
-      filterScope,
-      TRANSACTION_FILTER_PARAMS,
-      TRANSACTION_FIELD_TO_PARAM,
-      EMPTY_TRANSACTION_FILTER_PARAMS
-    );
-  const filteredTransactions = useMemo(
-    () => filterWalletTransactions(corpTransactionRows, transactionRowsFilter, nameForType),
-    [corpTransactionRows, transactionRowsFilter, nameForType]
-  );
-  const transactionsSortProps = useUrlSort('txn.sort', TRANSACTIONS_SORT, [
-    'date',
-    'item',
-    'side',
-    'quantity',
-    'unitPrice',
-    'total',
-  ]);
-
   return (
     <ItemActionsProvider page={itemActions}>
       <div
         className={cx(
           'mx-auto max-w-page space-y-4',
           // Same shift as `/wallet`: 26rem = SlideOver's 25rem max width plus a 1rem gutter.
-          view === 'journal' && iskPanelOpen && 'md:mr-[26rem] md:ml-0'
+          iskPanelOpen && 'md:mr-[26rem] md:ml-0'
         )}
       >
         <PageHeader
@@ -655,53 +613,25 @@ function CorpWalletView({ canReadDivisions }: { canReadDivisions: boolean }) {
           refreshFailed={corpBalances.refreshCount > 0}
         />
 
-        {/* A view switch, not a second tab bar: the Corp sub-nav is the one level of tabs. */}
-        <SegmentedControl
-          label={t('corp.wallet.viewLabel')}
-          size="sm"
-          options={[
-            { value: 'journal', label: t('wallet.journalTab') },
-            { value: 'transactions', label: t('corp.wallet.transactionsView') },
-          ]}
-          value={view}
-          onChange={setView}
+        <CorpJournalPanel
+          journalResult={corpJournalResult}
+          journal={stampedJournal}
+          loading={corpPending || (corpJournal.loading && corpJournal.data === null)}
+          journalColumns={journalColumns}
+          playerOptions={playerOptions}
+          playerNameFor={playerNameFor}
+          linkFor={linkFor}
+          nameFor={nameForType}
+          filter={journalFilter}
+          rowsFilter={journalRowsFilter}
+          onFilterChange={setJournalFilter}
+          sort={journalSortProps.sort}
+          onSortChange={journalSortProps.onSortChange}
+          divisionQualifier={divisionQualifier}
+          refreshFailed={corpJournal.refreshCount > 0}
+          iskPanelOpen={iskPanelOpen}
+          onIskPanelOpenChange={setIskPanelOpen}
         />
-
-        {view === 'journal' ? (
-          <CorpJournalPanel
-            journalResult={corpJournalResult}
-            journal={stampedJournal}
-            loading={corpPending || (corpJournal.loading && corpJournal.data === null)}
-            journalColumns={journalColumns}
-            playerOptions={playerOptions}
-            playerNameFor={playerNameFor}
-            linkFor={linkFor}
-            nameFor={nameForType}
-            filter={journalFilter}
-            rowsFilter={journalRowsFilter}
-            onFilterChange={setJournalFilter}
-            sort={journalSortProps.sort}
-            onSortChange={journalSortProps.onSortChange}
-            divisionQualifier={divisionQualifier}
-            refreshFailed={corpJournal.refreshCount > 0}
-            iskPanelOpen={iskPanelOpen}
-            onIskPanelOpenChange={setIskPanelOpen}
-          />
-        ) : (
-          <CorpTransactionsPanel
-            transactionsResult={corpTransactionsResult}
-            transactions={corpTransactionRows}
-            filteredTransactions={filteredTransactions}
-            loading={corpPending || (corpTransactions.loading && corpTransactions.data === null)}
-            filter={transactionFilter}
-            onFilterChange={setTransactionFilter}
-            sort={transactionsSortProps.sort}
-            onSortChange={transactionsSortProps.onSortChange}
-            nameFor={nameForType}
-            divisionQualifier={divisionQualifier}
-            refreshFailed={corpTransactions.refreshCount > 0}
-          />
-        )}
       </div>
     </ItemActionsProvider>
   );

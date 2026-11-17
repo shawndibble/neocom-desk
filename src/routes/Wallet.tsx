@@ -203,12 +203,11 @@ export function Wallet() {
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
   // The corporation wallet was this page's Corporation side until it moved to
   // `/corp/wallet`. A bookmark or alert from then (`?owner=corporation`, with
-  // its `?division=`) still lands on the same division there, and its old
-  // Transactions tab on that page's Transactions view.
+  // its `?division=`) still lands on the same division there; its old
+  // Transactions tab lands on that page's journal.
   if (new URLSearchParams(location.search).get('owner') === 'corporation') {
     const search = new URLSearchParams(location.search);
     search.delete('owner');
-    if (tab === 'transactions') search.set('view', 'transactions');
     const query = search.toString();
     return <Navigate to={`/corp/wallet${query ? `?${query}` : ''}`} replace />;
   }
