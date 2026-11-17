@@ -51,6 +51,7 @@ import {
   META,
   SCHEDULED_SYNC_DOC,
   MINERS,
+  ACCOUNTS,
   OBSERVED,
   OFFICERS,
   PAID_DOC,
@@ -1851,6 +1852,14 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       tx.update(ref, { manualRemindersSent: FieldValue.increment(1) });
       return { detail: { statementId: action.statementId } };
     }
+    case 'recordAccounts': {
+      // Only a running account is billed by day; a calendar book's figures are its Statements.
+      if (typeof c.book.runningAccountFrom !== 'string')
+        fail('failed-precondition', 'This book bills by Statement', 'not-running-account');
+      for (const a of action.accounts)
+        tx.set(col(c, ACCOUNTS).doc(a.minerId), { ...a, at: iso, by });
+      return { detail: { count: action.accounts.length } };
+    }
     case 'recordMail': {
       // The queue sent this mail (D16): log it on the Statement and in the audit trail.
       const ref = col(c, STATEMENTS).doc(action.statementId);
@@ -2670,6 +2679,30 @@ export async function disputeConflict(deps: BookDeps, caller: Caller, input: Dis
 }
 
 /**
+ * A recorded running account less what the Miner paid since: their net payments now (less "not
+ * tax") beyond the ones the officer's client counted, whenever each was synced.
+ */
+export function liveAccount(
+  recorded: Data,
+  payments: readonly Data[]
+): { owed: number; days: number; oldest: string | null; paidThrough: string | null; asOf: string } {
+  const net = (p: Data) => {
+    const amount = Number(p.amount) || 0;
+    return Math.max(0, amount - Math.min(Number(p.notTaxAmount) || 0, amount));
+  };
+  const paidNow = payments.reduce((sum, p) => sum + net(p), 0);
+  const since = Math.max(0, paidNow - (Number(recorded.paid) || 0));
+  const owed = Math.max(0, (Number(recorded.owed) || 0) - since);
+  return {
+    owed,
+    days: owed > 0 ? Number(recorded.days) || 0 : 0,
+    oldest: owed > 0 ? ((recorded.oldest as string | undefined) ?? null) : null,
+    paidThrough: (recorded.paidThrough as string | undefined) ?? null,
+    asOf: recorded.at as string,
+  };
+}
+
+/**
  * A Miner takes back their own dispute of a day while no officer has answered it: it leaves
  * Needs you and the day is billed as before. Authorised as the dispute was (the caller's own
  * Miner); anyone else's, or one already answered, is refused. Audited.
@@ -2734,6 +2767,7 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
     declarations,
     miner,
     writeOffs,
+    account,
   ] = await Promise.all([
     bookRef(deps.db, corporationId).get(),
     sub(deps.db, corporationId, STATEMENTS).where('minerId', '==', minerId).get(),
@@ -2744,6 +2778,7 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
     sub(deps.db, corporationId, DECLARATIONS).where('statementId', '==', statementId).get(),
     sub(deps.db, corporationId, MINERS).doc(minerId).get(),
     sub(deps.db, corporationId, WRITE_OFFS).where('minerId', '==', minerId).get(),
+    sub(deps.db, corporationId, ACCOUNTS).doc(minerId).get(),
   ]);
   const thisStatement = statements.docs.find((d) => d.id === statementId);
   if (!thisStatement) fail('not-found', 'Verify link is not valid', 'invalid-token');
@@ -2764,6 +2799,7 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
     'corporationName',
     'minerName',
     'refineryNames',
+    'kind',
   ]) {
     if (s[key] !== undefined) shown[key] = s[key];
   }
@@ -2829,6 +2865,15 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
       return { kind: x.kind, at: x.at, resolution: x.resolution ?? null };
     }),
     settled: ((paid.data()?.ids as string[] | undefined) ?? []).includes(statementId),
+    // A running account's total now (#6294): what an officer's client last worked out, less the
+    // payments credited to this Miner since. Days mined since then show once it recounts.
+    account:
+      typeof b.runningAccountFrom === 'string' && account.exists
+        ? liveAccount(
+            account.data() as Data,
+            payments.docs.map((d) => d.data())
+          )
+        : null,
     remindersStopped: s.remindersStopped === true,
     // A guest's closed account (epic): set by the `closeAccount` edit (#4184).
     accountClosed: miner.exists && miner.get('closedAt') != null,

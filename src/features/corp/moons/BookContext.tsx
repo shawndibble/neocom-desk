@@ -3,7 +3,9 @@
  * and dialogs take few props: the joined view, names, who the viewer is, and
  * `edit` — one action through `editBook` (ADR 0023), then a reload.
  */
-import { useCallback, useMemo, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, type ReactNode } from 'react';
+import { accountRecords } from '@/engine/corpTaxBook/accountRecords';
+import { chunk } from '@/lib/chunk';
 import { editBook } from '../taxBook/bookClient';
 import { invalidatePopSharing } from '../taxBook/popSharingCache';
 import { BookContext, type BookContextValue } from './bookContextValue';
@@ -28,9 +30,44 @@ export function BookProvider({
     },
     [characterId, corporationId, reload]
   );
+  useRecordAccounts(value, verdict.canEdit);
   const merged = useMemo(
     () => ({ ...value, edit, canEdit: verdict.canEdit }),
     [value, edit, verdict.canEdit]
   );
   return <BookContext.Provider value={merged}>{children}</BookContext.Provider>;
+}
+
+/** What this tab last recorded per book and Miner, so an unchanged account is never sent again. */
+const recorded = new Map<number, Map<string, string>>();
+
+/**
+ * A running account's figures for the pay page (#6294): the server cannot price days, so an
+ * editor's tab records each Miner's account once its rows and payments are read, and again
+ * whenever it changes. Best effort and quiet: no reload, and a refusal leaves the page as it was.
+ */
+function useRecordAccounts(value: Omit<BookContextValue, 'edit' | 'canEdit'>, canEdit: boolean) {
+  const { view, data, characterId, corporationId } = value;
+  useEffect(() => {
+    // Only a read with every row and payment counts; a moon's page holds other Miners' days only in part.
+    const whole = data.parts.has('observed') && data.parts.has('ledger');
+    if (!canEdit || !whole || (data as { moon?: unknown }).moon) return;
+    const sent = recorded.get(corporationId) ?? new Map<string, string>();
+    const changed = accountRecords(view, data.scopedMiner).filter(
+      (a) => sent.get(a.minerId) !== JSON.stringify(a)
+    );
+    if (changed.length === 0) return;
+    for (const a of changed) sent.set(a.minerId, JSON.stringify(a));
+    recorded.set(corporationId, sent);
+    void (async () => {
+      for (const accounts of chunk(changed, 200)) {
+        try {
+          await editBook(characterId, corporationId, { action: 'recordAccounts', accounts });
+        } catch {
+          // Sent again on the next change or visit.
+          for (const x of accounts) sent.delete(x.minerId);
+        }
+      }
+    })();
+  }, [view, data, canEdit, characterId, corporationId]);
 }

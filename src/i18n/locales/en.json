@@ -17882,6 +17882,11 @@
         "manual": "Recorded by an officer"
       },
       "balanceDue": "Balance due",
+      "owedNow": "Owed now",
+      "owedNowLine_one": "Everything you owe {{corp}} today: {{count}} day, oldest {{date}}. Counted {{asOf}}; what you paid since is taken off.",
+      "owedNowLine_other": "Everything you owe {{corp}} today: {{count}} days, oldest {{date}}. Counted {{asOf}}; what you paid since is taken off.",
+      "paidUp": "You are paid up with {{corp}}.",
+      "paidUpThrough": "You are paid through {{date}} with {{corp}}.",
       "balanceSum": "Billed {{billed}} − paid {{paid}}.",
       "dismissed": "{{amount}} was waived by an officer.",
       "forgiven": "{{amount}} was written off by an officer.",

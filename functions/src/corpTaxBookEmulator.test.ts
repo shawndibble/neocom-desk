@@ -2004,6 +2004,41 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
   });
 
   describe('verify link', () => {
+    it('shows a running account owed now: the recorded count less what the Miner paid since', async () => {
+      await turnOn();
+      expect(
+        await reason(
+          edit(ACCOUNTANT, {
+            action: 'recordAccounts',
+            accounts: [{ minerId: 'solo:50', owed: 1, paid: 0, days: 1 }],
+          })
+        )
+      ).toBe('not-running-account');
+      await edit(DIRECTOR, { action: 'updateSettings', patch: { switchToRunningAccount: true } });
+      const { verifyToken } = await edit(ACCOUNTANT, {
+        action: 'issueStatement',
+        statement: { ...statement('s1'), kind: 'notice' },
+      });
+      await edit(ACCOUNTANT, {
+        action: 'recordAccounts',
+        accounts: [
+          { minerId: 'solo:50', owed: 12_000_000, paid: 0, days: 3, oldest: '2026-10-05' },
+        ],
+      });
+      // Synced after the count, whatever its own date: it comes off what is owed now.
+      await edit(ACCOUNTANT, {
+        action: 'recordPayment',
+        paymentId: 'm1',
+        minerId: 'solo:50',
+        characterId: 50,
+        amount: 2_000_000,
+        at: '2026-10-01T00:00:00Z',
+      });
+      const view = await readStatementByToken(deps(), String(verifyToken));
+      expect(view.statement.kind).toBe('notice');
+      expect(view.account).toMatchObject({ owed: 10_000_000, days: 3, oldest: '2026-10-05' });
+    });
+
     it('reads the Statement by token, and stops reminders with one audited manual reminder allowed', async () => {
       await turnOn();
       const { verifyToken } = await edit(ACCOUNTANT, {
