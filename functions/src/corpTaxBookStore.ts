@@ -1337,7 +1337,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       }
       tx.update(ref, {
         notTaxAmount: action.notTaxAmount,
-        notTaxReason: action.reason,
+        notTaxReason: action.reason ?? FieldValue.delete(),
         notTaxBy: by,
         notTaxAt: iso,
       });
@@ -1345,7 +1345,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         detail: {
           paymentId: action.paymentId,
           notTaxAmount: action.notTaxAmount,
-          reason: action.reason,
+          ...(action.reason ? { reason: action.reason } : {}),
         },
       };
     }

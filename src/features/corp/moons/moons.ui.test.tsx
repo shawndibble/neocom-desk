@@ -20,6 +20,7 @@ import { MinersTab } from './MinersTab';
 import { BookTotals, OverdueAging } from './BookTotals';
 import { MINERS_COLUMN_IDS, useVisibleMinersColumns } from './moonsColumns';
 import { StatementRun } from './StatementRun';
+import { MarkNotTaxDialog } from './BookDialogs';
 import type { BookSettings, OfficerVerdict } from '../taxBook/bookClient';
 
 const editBook = vi.fn();
@@ -264,6 +265,27 @@ describe('Record payment dialog', () => {
     const sent = editBook.mock.calls.at(-1)?.[2] as Record<string, unknown>;
     expect(sent).toMatchObject({ action: 'recordPayment', amount: 1000 });
     expect(sent).not.toHaveProperty('note');
+  });
+});
+
+describe('Mark not tax dialog', () => {
+  it('confirms with the optional reason empty and sends none', async () => {
+    renderBook(
+      <MarkNotTaxDialog
+        open
+        onClose={vi.fn()}
+        payment={{ id: 'p1', amount: 5000, at: '2026-09-10T12:00:00Z', minerId: 'm1' }}
+        fromName="Pilot 1"
+      />
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Reason (optional)')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'All' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: /^Mark .* not tax$/ }));
+    await waitFor(() => expect(editBook).toHaveBeenCalled());
+    const sent = editBook.mock.calls.at(-1)?.[2] as Record<string, unknown>;
+    expect(sent).toMatchObject({ action: 'markNotTax', paymentId: 'p1', notTaxAmount: 5000 });
+    expect(sent).not.toHaveProperty('reason');
   });
 });
 

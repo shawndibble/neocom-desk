@@ -386,7 +386,16 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect(again.donationsAdded).toBe(0);
       expect((await book().collection('payments').doc('j1_99').get()).data()).toMatchObject({
         notTaxAmount: 400_000,
+        notTaxReason: 'buyback',
       });
+      await edit(
+        DIRECTOR,
+        { action: 'markNotTax', paymentId: 'j1_99', notTaxAmount: 300_000 },
+        true
+      );
+      const reasonless = (await book().collection('payments').doc('j1_99').get()).data();
+      expect(reasonless).toMatchObject({ notTaxAmount: 300_000 });
+      expect(reasonless).not.toHaveProperty('notTaxReason');
     });
   });
 
