@@ -186,9 +186,13 @@ function useColumns(source: SourceId, allCharacters: boolean): DataTableColumn<R
     sortValue: (row) => row.flag?.title,
     render: (row) =>
       row.flag ? (
-        <NewComponent name="NewFlagLink">
+        <span
+          data-new-component="NewFlagLink"
+          title="New component: NewFlagLink"
+          className="inline-flex rounded-xs border border-dashed border-warning px-1.5 py-0.5"
+        >
           <NewFlagLink id={row.flag.id} title={row.flag.title} />
-        </NewComponent>
+        </span>
       ) : (
         <span className="text-text-faint">-</span>
       ),
