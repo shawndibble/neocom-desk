@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { MiningTaxAssignmentRecord } from '@/db';
 import type { PayeeBalance } from './balances';
 import { linkRecordedPayment } from './ledgerActions';
-import { loadMadePaymentsWithStatus, type MadePaymentSources } from './madePayments';
+import { useRetainedResult } from '@/lib/useRetainedResult';
+import { loadMadePaymentsWithStatus, type MadePaymentsResult } from './madePayments';
 import {
   autoMatchRecordedPayments,
   suggestLinks,
@@ -22,6 +23,9 @@ interface UseLinkSuggestionsInput {
   balances: readonly PayeeBalance[];
 }
 
+const NO_PAYMENTS: MadePaymentsResult['payments'] = [];
+const NO_SOURCES: MadePaymentsResult['sources'] = [];
+
 /**
  * Payments already made (issue #540), loaded *after* the ledger rather than
  * as part of its snapshot. Two paginated ESI reads per tracked character —
@@ -34,9 +38,18 @@ interface UseLinkSuggestionsInput {
  * @param trackedCharacterIds Comma-joined character ids — a string so the
  *   effect keys on the roster, never on `data` (see below).
  */
-export function useMadePayments(trackedCharacterIds: string) {
-  const [madePayments, setMadePayments] = useState<MadePayment[]>([]);
-  const [paymentSources, setPaymentSources] = useState<MadePaymentSources[]>([]);
+export function useMadePayments(trackedCharacterIds: string, ownerId: number | null) {
+  const [fresh, setFresh] = useState<MadePaymentsResult | null>(null);
+  // The last good read, so the first frame (and an offline one) has the payments the ledger's
+  // coverage depends on instead of an empty list the late read then corrects.
+  const { read, startLoad } = useRetainedResult<MadePaymentsResult>(
+    'moonMiningTaxMadePayments',
+    ownerId,
+    trackedCharacterIds
+  );
+  const retained = read();
+  const madePayments = fresh?.payments ?? retained?.payments ?? NO_PAYMENTS;
+  const paymentSources = fresh?.sources ?? retained?.sources ?? NO_SOURCES;
   /**
    * Keyed on the character roster, never on `data`. `useRouteSnapshot`
    * re-runs its loader on `onCacheRevalidated`, which is a *global* signal —
@@ -51,15 +64,29 @@ export function useMadePayments(trackedCharacterIds: string) {
   useEffect(() => {
     if (trackedCharacterIds === '') return;
     let cancelled = false;
+    const save = startLoad();
     void loadMadePaymentsWithStatus(trackedCharacterIds.split(',').map(Number)).then((result) => {
       if (cancelled) return;
-      setMadePayments(result.payments);
-      setPaymentSources(result.sources);
+      // A read that threw for a character left its payments out: keep the last complete read
+      // rather than present a list with a hole in it as the truth.
+      const incomplete = result.sources.some(
+        (s) => s.journal === 'failed' || s.contracts === 'failed'
+      );
+      const prior = incomplete ? read() : null;
+      if (prior?.payments && prior.sources) {
+        setFresh({ payments: prior.payments, sources: result.sources });
+        return;
+      }
+      setFresh(result);
+      if (!incomplete) save(result);
     });
     return () => {
       cancelled = true;
     };
-  }, [trackedCharacterIds]);
+    // `read` and `startLoad` change only with the roster and owner, which `trackedCharacterIds` and
+    // `ownerId` already name; listing them would re-run the reads for no new reason.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trackedCharacterIds, ownerId]);
 
   return { madePayments, paymentSources };
 }

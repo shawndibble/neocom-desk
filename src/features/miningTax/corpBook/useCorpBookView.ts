@@ -2,11 +2,17 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { PayeeRecord } from '@/db';
 import { useTicker } from '@/lib/ticker';
+import { useRetainedResult } from '@/lib/useRetainedResult';
 import type { DatedUnitPrices } from '@/features/miningTax/pricing';
 import type { MadePayment } from '../paymentLinks';
 import type { MoonMiningTaxRow, TrackedCharacter } from '../snapshot';
 import { teachRefinerySystems, type LoadedCorpBook } from './corpBookStore';
-import { loadBookPrices, loadCorpNames, loadTrackedCorpBooks } from './corpBookSources';
+import {
+  loadBookPrices,
+  loadCorpNames,
+  readTrackedCorpBooks,
+  withStoredBooks,
+} from './corpBookSources';
 import { buildCorpBookView, type CorpBookView } from './corpBookView';
 import { MINUTE_MS } from '@/lib/age';
 import { payeesOfBookCorporation } from '@/engine/miningTax/payeeCorporation';
@@ -31,6 +37,16 @@ interface Args {
 }
 
 const NONE_HIDDEN: ReadonlySet<number> = new Set();
+const NO_BOOKS: LoadedCorpBook[] = [];
+const NO_PRICES: ReadonlyMap<number, DatedUnitPrices> = new Map();
+const NO_NAMES: ReadonlyMap<number, string> = new Map();
+
+/** What the books' loads last produced, kept so the tab opens on it (`useRetainedResult`). */
+interface CorpLayers {
+  loaded: LoadedCorpBook[];
+  pricesByCorp: ReadonlyMap<number, DatedUnitPrices>;
+  corpNames: ReadonlyMap<number, string>;
+}
 
 /**
  * Loads the Corp Tax Books of the member's corporations (D24: none, nothing
@@ -58,42 +74,70 @@ export function useCorpBookView({
   const { t } = useTranslation();
   const nowMs = useTicker(MINUTE_MS);
   const [version, setVersion] = useState(0);
-  const [loaded, setLoaded] = useState<LoadedCorpBook[]>([]);
-  const [pricesByCorp, setPricesByCorp] = useState<ReadonlyMap<number, DatedUnitPrices>>(new Map());
-  const [corpNames, setCorpNames] = useState<ReadonlyMap<number, string>>(new Map());
+  // Null until this mount's own load lands; until then the last good one stands in, so the first
+  // frame (and an offline one) already has the books instead of none the load then adds.
+  const [freshLoaded, setFreshLoaded] = useState<LoadedCorpBook[] | null>(null);
+  const [freshPrices, setFreshPrices] = useState<ReadonlyMap<number, DatedUnitPrices> | null>(null);
+  const [freshNames, setFreshNames] = useState<ReadonlyMap<number, string> | null>(null);
+  const { read: readRetained, startLoad } = useRetainedResult<CorpLayers>(
+    'moonMiningTaxCorpBooks',
+    activeCharacterId,
+    characters.map((c) => c.characterId).join(',')
+  );
+  const retained = readRetained();
+  const loaded = freshLoaded ?? retained?.loaded ?? NO_BOOKS;
+  const pricesByCorp = freshPrices ?? retained?.pricesByCorp ?? NO_PRICES;
+  const corpNames = freshNames ?? retained?.corpNames ?? NO_NAMES;
   const loadedLedger = rows !== undefined;
 
   useEffect(() => {
     if (!loadedLedger) return;
     let cancelled = false;
+    const save = startLoad();
     void (async () => {
-      const books = await loadTrackedCorpBooks();
+      const read = await readTrackedCorpBooks();
       if (cancelled) return;
-      setLoaded(books);
+      // A book that could not be read this time keeps its last good copy.
+      const books = withStoredBooks(read, readRetained()?.loaded ?? NO_BOOKS);
+      setFreshLoaded(books);
+      save({ loaded: books });
       if (books.length === 0) {
-        setPricesByCorp(new Map());
+        setFreshPrices(new Map());
+        setFreshNames(new Map());
+        save({ pricesByCorp: new Map(), corpNames: new Map() });
         return;
       }
       const names = await loadCorpNames(books);
-      if (!cancelled) setCorpNames(names);
+      if (cancelled) return;
+      const merged = new Map([...(readRetained()?.corpNames ?? NO_NAMES), ...names]);
+      setFreshNames(merged);
+      save({ corpNames: merged });
     })();
     return () => {
       cancelled = true;
     };
+    // The loads follow the ledger and the reload keys, not the roster the retained copy is keyed by.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadedLedger, reloadKey, version]);
 
   // Prices for each book at its own hub and Ore Form, for the days it observed.
   useEffect(() => {
-    if (loaded.length === 0 || activeCharacterId === null) return;
+    if (freshLoaded === null || freshLoaded.length === 0 || activeCharacterId === null) return;
     let cancelled = false;
+    const save = startLoad();
     void (async () => {
-      const prices = await loadBookPrices(loaded);
-      if (!cancelled) setPricesByCorp(prices);
+      const prices = await loadBookPrices(freshLoaded);
+      if (cancelled) return;
+      // A book whose prices failed to load keeps the ones it had.
+      const merged = new Map([...(readRetained()?.pricesByCorp ?? NO_PRICES), ...prices]);
+      setFreshPrices(merged);
+      save({ pricesByCorp: merged });
     })();
     return () => {
       cancelled = true;
     };
-  }, [loaded, activeCharacterId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [freshLoaded, activeCharacterId]);
 
   // A Payee that is a book's corporation but is missing its link on this device (named exactly as
   // it, or carrying its id with no kind) gets the link, synced, so every device reads the same.

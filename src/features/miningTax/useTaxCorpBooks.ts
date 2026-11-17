@@ -18,7 +18,8 @@ export function useTaxCorpBooks(
   activeCharacterId: number | null
 ) {
   const { madePayments, paymentSources } = useMadePayments(
-    characters.map((c) => c.characterId).join(',')
+    characters.map((c) => c.characterId).join(','),
+    activeCharacterId
   );
 
   // Every Assignment the ledger stores, the ones a book row stands in for included: whether a
