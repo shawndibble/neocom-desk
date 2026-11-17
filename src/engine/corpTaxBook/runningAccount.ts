@@ -9,12 +9,19 @@
  * payment reached stays owed in full. Credit is only money ahead of every billed day.
  *
  * Recomputed from the whole history each time, like `allocatePayments`; a day at or before the
- * stored `paidThrough` stays paid even when money is later taken back (D22).
+ * stored paid-through stays paid even when money is later taken back (D22), and takes no more
+ * money. Days are settled a date at a time: what one date's lines owe together.
  */
-import { allocatePayments, type Allocation, type AllocationInput } from './allocation';
+import {
+  allocatePayments,
+  SETTLE_TOLERANCE_PCT,
+  type Allocation,
+  type AllocationInput,
+} from './allocation';
 import type { StatementLine } from './statements';
 
-export const DAY_SETTLE_TOLERANCE_PCT = 0.5;
+/** The default per-day tolerance: the Statement tolerance's percent, without its ISK floor. */
+export const DAY_SETTLE_TOLERANCE_PCT = SETTLE_TOLERANCE_PCT;
 
 /** How short of one day's tax a payment may fall and still pay it: a percent, never an ISK floor. */
 export function daySettleTolerance(tax: number, pct: number = DAY_SETTLE_TOLERANCE_PCT): number {
@@ -51,12 +58,12 @@ export interface DaySettlement {
 }
 
 export interface RunningAccountInput extends AllocationInput {
-  /** The Miner's closed days not on any Statement, oldest first or not. */
+  /** The Miner's closed days not on any Statement, in any order; several entries for a date add up. */
   days: readonly RunningDay[];
-  /** Days with an open dispute. */
+  /** Dates an open dispute holds (unlike `held`, which is by Statement). */
   heldDays?: ReadonlySet<string>;
-  /** The newest day the book has recorded as paid: it never reopens. */
-  paidThrough?: string;
+  /** The newest day the book has recorded as paid (`meta/paid`): it and every day before it stay closed. */
+  storedPaidThrough?: string;
   /** The book's per-day tolerance, in percent. */
   dayTolerancePct?: number;
 }
@@ -69,9 +76,12 @@ export interface RunningAccount {
   credit: number;
   /** Everything billed less everything paid, forgiven or written off; negative is credit. */
   balance: number;
-  /** The newest day with nothing owed on or before it (held days aside); null when none. */
+  /**
+   * The newest day with nothing owed on or before it (days an open dispute holds neither stop nor
+   * advance it), never before the stored one; null while a Statement is unpaid or no day is paid yet.
+   */
   paidThrough: string | null;
-  /** What is owed now, or null when nothing is. */
+  /** What is owed now: the amount, how many dates it covers (an unpaid Statement's too), the oldest. */
   owes: { amount: number; days: number; oldest: string } | null;
 }
 
@@ -79,9 +89,16 @@ type Running = { tax: number; credited: number; paidIn: number; forgiven: number
 
 export function allocateRunningAccount(input: RunningAccountInput): RunningAccount {
   const legacy = allocatePayments(input);
+  // Money that is not a payment (negative Statements, dismissals) reaches days without the tolerance.
+  const legacyNonPayment = Math.min(
+    legacy.credit,
+    allocatePayments({ ...input, payments: [] }).credit
+  );
   const pct = input.dayTolerancePct ?? DAY_SETTLE_TOLERANCE_PCT;
   const held = input.heldDays ?? new Set<string>();
-  const days = [...input.days].sort((a, b) => a.date.localeCompare(b.date));
+  const stored = input.storedPaidThrough;
+  // One unit per date, whatever the caller passed.
+  const days = runningDaysFromLines(input.days);
   const state = new Map<string, Running>(
     days.map((d) => [
       d.date,
@@ -90,10 +107,11 @@ export function allocateRunningAccount(input: RunningAccountInput): RunningAccou
         credited: 0,
         paidIn: 0,
         forgiven: 0,
-        pinned: input.paidThrough !== undefined && d.date <= input.paidThrough,
+        pinned: stored !== undefined && d.date <= stored,
       },
     ])
   );
+  const isHeld = (d: RunningDay) => held.has(d.date) && d.tax > 0;
   const isDone = (st: Running) => {
     const remaining = st.tax - st.credited;
     return remaining <= 0 || (st.paidIn > 0 && remaining <= daySettleTolerance(st.tax, pct));
@@ -102,7 +120,8 @@ export function allocateRunningAccount(input: RunningAccountInput): RunningAccou
     for (const d of days) {
       if (available <= 0) break;
       const st = state.get(d.date)!;
-      if (held.has(d.date) || st.tax <= 0 || isDone(st)) continue;
+      // A day already recorded paid is closed: money goes on to the oldest day still owed.
+      if (isHeld(d) || st.tax <= 0 || st.pinned || isDone(st)) continue;
       const take = Math.min(available, st.tax - st.credited);
       st.credited += take;
       if (kind === 'payment') st.paidIn += take;
@@ -112,10 +131,10 @@ export function allocateRunningAccount(input: RunningAccountInput): RunningAccou
     return available;
   };
 
-  // A day that came out negative (credit corrections) pays the days after it, as a payment can't.
+  // A day that came out negative (credit corrections) pays the oldest owed days, as a dismissal would.
   const corrections = days.reduce((sum, d) => sum + Math.max(0, -d.tax), 0);
-  let credit = pay(corrections, 'correction');
-  credit += pay(legacy.credit, 'payment');
+  let credit = pay(corrections + legacyNonPayment, 'correction');
+  credit += pay(legacy.credit - legacyNonPayment, 'payment');
 
   // What an officer write-off with no Statement left over, after every Statement it could reduce.
   const usedByWriteOff = new Map<string, number>();
@@ -131,30 +150,30 @@ export function allocateRunningAccount(input: RunningAccountInput): RunningAccou
   let forgivenTotal = 0;
   let writtenOffTotal = 0;
   let owedAmount = 0;
-  let owedDays = 0;
-  let oldestOwed: string | undefined;
-  let paidThrough: string | null = null;
+  const owedDates = new Set<string>();
+  let paidThrough: string | null = stored ?? null;
   let gap = false;
   for (const d of days) {
     const st = state.get(d.date)!;
-    const isHeld = held.has(d.date) && st.tax > 0;
-    const settled = st.tax <= 0 || st.pinned || (!isHeld && isDone(st));
+    const dayHeld = isHeld(d);
+    const settled = st.tax <= 0 || st.pinned || (!dayHeld && isDone(st));
     const shortfall = Math.max(0, st.tax - st.credited);
     const writtenOff = settled ? shortfall : 0;
     const remaining = shortfall - writtenOff;
-    billed += Math.max(0, st.tax);
+    // A held day is not due, as `allocatePayments` leaves a held amount out of what is billed.
+    if (!dayHeld) billed += Math.max(0, st.tax);
     forgivenTotal += st.forgiven;
     writtenOffTotal += writtenOff;
-    if (!settled && !isHeld) {
+    if (!settled && !dayHeld) {
       owedAmount += remaining;
-      owedDays += 1;
-      oldestOwed ??= d.date;
+      owedDates.add(d.date);
       gap = true;
     }
-    if (!gap && (settled || isHeld)) paidThrough = d.date;
+    // A held day neither stops nor advances "paid through".
+    if (!gap && settled && (!paidThrough || d.date > paidThrough)) paidThrough = d.date;
     byDay.set(d.date, {
       tax: st.tax,
-      held: isHeld,
+      held: dayHeld,
       credited: st.credited,
       forgiven: st.forgiven,
       writtenOff,
@@ -164,23 +183,23 @@ export function allocateRunningAccount(input: RunningAccountInput): RunningAccou
   }
 
   let legacyOwed = 0;
-  let legacyOldest: string | undefined;
   for (const s of input.statements) {
     const st = legacy.byStatement.get(s.id);
     if (!st || st.settled || st.remaining <= 0) continue;
     legacyOwed += st.remaining;
-    if (!legacyOldest || s.coversFrom < legacyOldest) legacyOldest = s.coversFrom;
+    const dates = s.lines.filter((l) => l.tax > 0).map((l) => l.date);
+    for (const date of dates.length > 0 ? dates : [s.coversFrom]) owedDates.add(date);
   }
   if (legacyOwed > 0) paidThrough = null;
 
   const amount = legacyOwed + owedAmount;
-  const oldest = [legacyOldest, oldestOwed].filter((x): x is string => !!x).sort()[0];
+  const oldest = [...owedDates].sort()[0];
   return {
     legacy,
     byDay,
     credit,
     balance: legacy.balance + billed - corrections - forgivenTotal - writtenOffTotal,
     paidThrough,
-    owes: amount > 0 && oldest ? { amount, days: owedDays, oldest } : null,
+    owes: amount > 0 && oldest ? { amount, days: owedDates.size, oldest } : null,
   };
 }

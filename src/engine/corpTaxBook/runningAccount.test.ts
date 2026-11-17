@@ -31,7 +31,9 @@ function legacy(id: string, amount: number, issuedAt: string): Statement {
     hubId: 'jita',
     oreForm: 'compressed',
     amount,
-    lines: [],
+    lines: [
+      { kind: 'mined', date: '2026-10-05', oreLines: [], estimatedValue: amount * 10, tax: amount },
+    ],
   };
 }
 
@@ -156,7 +158,7 @@ describe('allocateRunningAccount', () => {
       statements: [legacy('s1', 5_000_000, '2026-11-01T00:00:00Z')],
       days: [day('2026-11-01', 1_000_000)],
     });
-    expect(r.owes).toEqual({ amount: 6_000_000, days: 1, oldest: '2026-10-01' });
+    expect(r.owes).toEqual({ amount: 6_000_000, days: 2, oldest: '2026-10-05' });
     expect(r.paidThrough).toBeNull();
   });
 
@@ -190,7 +192,7 @@ describe('allocateRunningAccount', () => {
     const r = allocateRunningAccount({
       ...base,
       days: NOV,
-      paidThrough: '2026-11-02',
+      storedPaidThrough: '2026-11-02',
       payments: [payment('p1', 3_000_000, '2026-11-04T10:00:00Z', { notTaxAmount: 3_000_000 })],
     });
     expect(r.byDay.get('2026-11-01')?.settled).toBe(true);
@@ -216,5 +218,77 @@ describe('allocateRunningAccount', () => {
       payments: [payment('p1', 1_000_000, '2026-10-30T10:00:00Z')],
     });
     expect(r.byDay.get('2026-11-01')?.settled).toBe(false);
+  });
+
+  it('sends a payment coded to a Statement on to the oldest day once the Statement is paid', () => {
+    const r = allocateRunningAccount({
+      ...base,
+      statements: [legacy('s1', 1_000_000, '2026-11-01T00:00:00Z')],
+      days: NOV,
+      payments: [payment('p1', 2_000_000, '2026-11-04T10:00:00Z', { statementId: 's1' })],
+    });
+    expect(r.legacy.byStatement.get('s1')?.settled).toBe(true);
+    expect(r.byDay.get('2026-11-01')?.settled).toBe(true);
+    expect(r.owes?.oldest).toBe('2026-11-02');
+  });
+
+  it('pays dates oldest first whatever order they come in, adding up entries for one date', () => {
+    const r = allocateRunningAccount({
+      ...base,
+      days: [day('2026-11-02', 1_000_000), day('2026-11-01', 400_000), day('2026-11-01', 600_000)],
+      payments: [payment('p1', 1_000_000, '2026-11-04T10:00:00Z')],
+    });
+    expect(r.byDay.get('2026-11-01')).toMatchObject({ tax: 1_000_000, settled: true });
+    expect(r.byDay.get('2026-11-02')?.settled).toBe(false);
+    expect(r.balance).toBe(1_000_000);
+  });
+
+  it('gives a day already recorded paid no more money: the next payment pays the oldest owed day', () => {
+    const r = allocateRunningAccount({
+      ...base,
+      days: NOV,
+      storedPaidThrough: '2026-11-01',
+      payments: [payment('p1', 2_000_000, '2026-11-04T10:00:00Z')],
+    });
+    expect(r.byDay.get('2026-11-01')).toMatchObject({ settled: true, credited: 0 });
+    expect(r.byDay.get('2026-11-02')).toMatchObject({ settled: true, credited: 2_000_000 });
+    expect(r.paidThrough).toBe('2026-11-02');
+  });
+
+  it('keeps the stored paid-through when there are no days', () => {
+    const r = allocateRunningAccount({ ...base, days: [], storedPaidThrough: '2026-11-03' });
+    expect(r.paidThrough).toBe('2026-11-03');
+    expect(r.owes).toBeNull();
+  });
+
+  it('never moves paid-through onto a held day', () => {
+    const r = allocateRunningAccount({
+      ...base,
+      days: [day('2026-11-01', 1_000_000), day('2026-11-02', 1_000_000)],
+      heldDays: new Set(['2026-11-02']),
+      payments: [payment('p1', 1_000_000, '2026-11-04T10:00:00Z')],
+    });
+    expect(r.paidThrough).toBe('2026-11-01');
+    expect(r.owes).toBeNull();
+    expect(r.balance).toBe(0);
+  });
+
+  it('leaves a held day out of the balance, as it is not due', () => {
+    const r = allocateRunningAccount({
+      ...base,
+      days: NOV,
+      heldDays: new Set(['2026-11-01']),
+      payments: [payment('p1', 2_000_000, '2026-11-04T10:00:00Z')],
+    });
+    expect(r.balance).toBe(r.owes!.amount);
+  });
+
+  it('forgives no shortfall on a day only a credit correction reached', () => {
+    const r = allocateRunningAccount({
+      ...base,
+      statements: [legacy('s1', -9_990_000, '2026-11-01T00:00:00Z')],
+      days: [day('2026-11-01', 10_000_000)],
+    });
+    expect(r.byDay.get('2026-11-01')).toMatchObject({ settled: false, remaining: 10_000 });
   });
 });
