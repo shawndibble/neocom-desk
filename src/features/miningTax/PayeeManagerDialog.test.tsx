@@ -591,6 +591,28 @@ describe('PayeeManagerDialog — a Payee is someone in EVE', () => {
     expect(await loadPayees(CHAR)).toEqual([]);
   });
 
+  // Picking a suggestion is a new draft too: a lookup still pending for the typed name is dropped.
+  it('drops a lookup that answers after the pilot picked a suggestion', async () => {
+    let answer: (m: unknown[]) => void = () => {};
+    searchMock.resolvePayeeName.mockImplementationOnce(
+      () => new Promise((resolve) => (answer = resolve))
+    );
+    searchMock.searchPayeeEntities.mockResolvedValue([corp]);
+    renderDialog();
+
+    await fillAndSave('Moon');
+    await userEvent.click(screen.getByLabelText('Name'));
+    await userEvent.click(await screen.findByRole('option', { name: /Moon Corp/ }));
+    answer([
+      { id: 98_000_002, name: 'Moon', kind: 'corporation' },
+      { id: 90_000_002, name: 'Moon', kind: 'character' },
+    ]);
+
+    expect(await screen.findByText(/Corporation — verified/)).toBeInTheDocument();
+    expect(screen.queryByText(/Pick which/)).toBeNull();
+    expect(await loadPayees(CHAR)).toEqual([]);
+  });
+
   it('saves nothing and says to try again when the lookup fails', async () => {
     searchMock.resolvePayeeName.mockRejectedValue(new Error('offline'));
     renderDialog();

@@ -349,6 +349,7 @@ export function PayeeManagerDialog({
   }
 
   function handlePick(match: PayeeEntityMatch) {
+    draftGeneration.current += 1;
     setChoices(null);
     setError(null);
     setDraft(picked(match));
