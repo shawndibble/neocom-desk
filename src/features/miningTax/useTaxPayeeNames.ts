@@ -13,8 +13,11 @@ export function useTaxPayeeNames(
 
   const payeeName = useCallback(
     (payeeId: string | undefined): string =>
-      ledgerPayees.find((p) => p.id === payeeId)?.name ?? t('miningTax.unknownPayee'),
-    [ledgerPayees, t]
+      // A duplicate record of a Payee is not listed (`ledgerPayees` holds its primary), but names it.
+      ledgerPayees.find((p) => p.id === payeeId)?.name ??
+      payeeById.get(payeeId ?? '')?.name ??
+      t('miningTax.unknownPayee'),
+    [ledgerPayees, payeeById, t]
   );
 
   /** The detail modal's Payee display: a resolved name, "No tax owed" for a dismissal, or a dash when unassigned. */

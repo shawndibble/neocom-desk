@@ -19,6 +19,7 @@ import { buildCorpBookView } from './corpBook/corpBookView';
 import { buildDisplayRows } from './corpBook/corpRows';
 import type { DisplayRow } from './groupRows';
 import { loadMadePaymentsWithStatus } from './madePayments';
+import { groupPayees, payeeDuplicateAliases } from './payeeGroups';
 import type { MoonMiningTaxSnapshot } from './snapshot';
 
 type AssignmentRef = Pick<
@@ -37,10 +38,12 @@ export function alsoBilledShareOf(
 export function owedBalances(
   rows: readonly DisplayRow[],
   ledgerPayees: readonly PayeeRecord[],
-  alsoBilled: PersonalOverlay['alsoBilled'] | undefined
+  alsoBilled: PersonalOverlay['alsoBilled'] | undefined,
+  /** Duplicate records of one Payee mapped to the primary (`payeeDuplicateAliases`). */
+  aliases?: ReadonlyMap<string, string>
 ): PayeeBalance[] {
   const share = alsoBilledShareOf(alsoBilled);
-  return computePayeeBalances(rows, ledgerPayees, ({ assignment }) => share(assignment));
+  return computePayeeBalances(rows, ledgerPayees, ({ assignment }) => share(assignment), aliases);
 }
 
 /**
@@ -113,7 +116,8 @@ export async function loadOwedBalances(
     balances: owedBalances(
       rows,
       [...payees, ...(corpView?.payees ?? [])],
-      corpView?.overlay.alsoBilled
+      corpView?.overlay.alsoBilled,
+      payeeDuplicateAliases(groupPayees(payees))
     ),
     unassignedCount: unassignedSummary(rows, () => 0).entryCount,
   };

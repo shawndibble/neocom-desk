@@ -12,6 +12,8 @@ interface Args {
   personalRows: readonly DisplayRow[];
   ledgerPayees: readonly PayeeRecord[];
   allPayees: readonly PayeeRecord[];
+  /** Duplicate records of one Payee mapped to the primary (`payeeDuplicateAliases`). */
+  duplicateAliases: ReadonlyMap<string, string>;
   estimatedValueOf: (dr: DisplayRow) => number;
   madePayments: Parameters<typeof useLinkSuggestions>[0]['madePayments'];
   /**
@@ -29,6 +31,7 @@ export function useTaxBalances({
   personalRows,
   ledgerPayees,
   allPayees,
+  duplicateAliases,
   estimatedValueOf,
   madePayments,
   storedAssignments,
@@ -42,8 +45,8 @@ export function useTaxBalances({
   // The Overview's Mining tax card reads the same figure (`loadOwedBalances`).
   const alsoBilledShare = useMemo(() => alsoBilledShareOf(alsoBilled), [alsoBilled]);
   const balances = useMemo(
-    () => owedBalances(characterFiltered, ledgerPayees, alsoBilled),
-    [characterFiltered, ledgerPayees, alsoBilled]
+    () => owedBalances(characterFiltered, ledgerPayees, alsoBilled, duplicateAliases),
+    [characterFiltered, ledgerPayees, alsoBilled, duplicateAliases]
   );
   const unassigned = useMemo(
     () => unassignedSummary(characterFiltered, estimatedValueOf),
