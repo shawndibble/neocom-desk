@@ -57,7 +57,7 @@ describe('CorpBookSyncNote', () => {
     ).toBeInTheDocument();
   });
 
-  it('on a running account says how far behind, or paid through, and credit only as ahead', () => {
+  it('on a running account says how far behind, and prints nothing for paid through or ahead', () => {
     const behind = {
       paidThrough: '2026-10-14',
       owes: { amount: 5_000_000, days: 2, oldest: '2026-10-15' },
@@ -69,18 +69,14 @@ describe('CorpBookSyncNote', () => {
       screen.getByText('You owe Brass Meridian Logistics 5,000,000 ISK: 2 days, oldest 15 Oct.')
     ).toBeInTheDocument();
     unmount();
-    render(
+    const { container } = render(
       <CorpBookSyncNote
         book={book({ credit: 56_000, account: { paidThrough: '2026-10-17', owes: null } })}
         owedNow={0}
         now={NOW}
       />
     );
-    expect(
-      screen.getByText('Paid through 17 Oct with Brass Meridian Logistics.')
-    ).toBeInTheDocument();
-    expect(screen.getByText(/^56,000 ISK ahead with Brass Meridian Logistics/)).toBeInTheDocument();
-    expect(screen.queryByText(/next Statement/)).not.toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
   });
 
   it('shows credit for the next Statement, and never a donation waiting to be credited', () => {
