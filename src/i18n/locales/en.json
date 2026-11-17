@@ -19330,9 +19330,10 @@
         "rateIncomplete": "Finish the rate in the form, or clear its percent, to save.",
         "addRate": "Add rate",
         "removePending": "Remove",
+        "removePendingNamed": "Remove pending rate: {{name}}, {{pct}}%",
         "pendingTitle_one": "Pending rate ({{count}})",
         "pendingTitle_other": "Pending rates ({{count}})",
-        "pendingBlocked": "Fix or remove the marked pending rates to save.",
+        "pendingBlocked": "Fix or remove the marked pending rates in Rates to save.",
         "pendingProblem": {
           "past": "This day has passed. A rate cannot start before today.",
           "start": "This day is before the book start date.",

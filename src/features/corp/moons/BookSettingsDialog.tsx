@@ -509,7 +509,7 @@ export function BookSettingsDialog({
           <span className="flex gap-2">
             {confirmDiscard ? (
               <>
-                <Button variant="ghost" onClick={() => setConfirmDiscard(false)}>
+                <Button variant="ghost" autoFocus onClick={() => setConfirmDiscard(false)}>
                   {t('corpTaxBook.moons.settings.keepEditing')}
                 </Button>
                 <Button variant="danger" onClick={onClose}>
@@ -703,7 +703,7 @@ export function BookSettingsDialog({
                   <Button
                     variant="accent"
                     onClick={addPending}
-                    disabled={!rateReady || rateIsDuplicate}
+                    disabled={!rateReady || rateIsDuplicate || pending.length >= 50}
                   >
                     {t('corpTaxBook.moons.settings.addRate')}
                   </Button>
@@ -743,6 +743,12 @@ export function BookSettingsDialog({
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                aria-label={t('corpTaxBook.moons.settings.removePendingNamed', {
+                                  name:
+                                    target ||
+                                    t(`corpTaxBook.moons.settings.rateScope.${rate.scope}`),
+                                  pct: rate.pct,
+                                })}
                                 onClick={() => {
                                   setPending((p) => p.filter((x) => x.id !== id));
                                   setConfirmDiscard(false);

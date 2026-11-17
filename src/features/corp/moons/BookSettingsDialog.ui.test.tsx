@@ -121,7 +121,7 @@ describe('BookSettingsDialog pending rates (#6323)', () => {
       await addGuest(user, pct);
     }
     expect(screen.getByText('Pending rates (3)')).toBeInTheDocument();
-    await user.click(screen.getAllByRole('button', { name: 'Remove' })[1]);
+    await user.click(screen.getAllByRole('button', { name: /Remove pending rate/ })[1]);
     expect(editBook).not.toHaveBeenCalled();
     expect(screen.getByText('Pending rates (2)')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Save' }));
