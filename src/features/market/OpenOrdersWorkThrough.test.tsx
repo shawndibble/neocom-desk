@@ -326,6 +326,7 @@ describe('Open Orders work through', () => {
     await user.click(await screen.findByRole('button', { name: 'Work through (1)' }));
     const dialog = await screen.findByRole('dialog');
     await waitFor(() => expect(dialog).toHaveTextContent(/Loses .* at 448\.90/));
+    expect(dialog).toHaveTextContent(/Lowest price that still profits: /);
   });
 
   it('starts the queue on arrival from the Overview link', async () => {

@@ -14311,6 +14311,7 @@
         "notChanged": "Not changed",
         "loses": "Loses <isk/> at {{price}}",
         "costUnknown": "Cost unknown",
+        "floor": "Lowest price that still profits: {{price}}",
         "logInAs": "Log in as {{name}} to open this one"
       },
       "fixList": {

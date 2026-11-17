@@ -12,6 +12,7 @@ import type { OpenOrderRow } from './openOrdersModel';
 import type { WorkThroughPrice } from './useWorkThrough';
 import { WorkThroughContext, type WorkThroughContextValue } from './workThroughContext';
 import { workThroughLoss } from './workThrough';
+import { formatOrderFloorPrice } from './orderRowFormat';
 
 function Dot() {
   return (
@@ -139,6 +140,11 @@ export function WorkThroughModalNotes({ row }: { row: OpenOrderRow }) {
           </>
         )}
       </p>
+      {row.floor !== null && !row.isBuyOrder && (
+        <p className="text-xs text-text-dim tabular-nums">
+          {t('market.orders.workThrough.floor', { price: formatOrderFloorPrice(row.floor) })}
+        </p>
+      )}
       <LossLine row={row} context={context} />
       <OwnerNote row={row} context={context} />
     </div>
