@@ -36,6 +36,8 @@ export const UNVERSIONED_COLLECTIONS: ReadonlySet<string> = new Set([
   'vettingThrottle',
   // A server-side mirror of `observed` (corpTaxBookFeederRollup.ts); no client reads it.
   'feederObserved',
+  // A running account's figures for the pay page (#6294); only the verify link reads them.
+  'accounts',
 ]);
 
 /**

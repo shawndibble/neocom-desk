@@ -19,7 +19,8 @@ function shortDate(date: string, language: string): string {
  * D12's "Safe to pay" wording under the corp's balance card: until a sync after
  * the grace period the corp's record is not final ("Safe to pay once <Corp>
  * syncs (last synced 2d ago)"), then "Safe to pay — 12 Jul is closed". Also
- * credit on the next Statement. A corporation the member left says so in its own notice
+ * credit on the next Statement; on a running account, paid through a day or how far behind, and
+ * only true overpayment as "ahead". A corporation the member left says so in its own notice
  * (`LeftCorpNotice`), with Pay and Stop showing beside it. A donation still waiting
  * for the corp to credit it is left unsaid: that is the corp's side to handle.
  */
@@ -43,7 +44,22 @@ export function CorpBookSyncNote({
   const closedThrough = summary.closedThrough;
   // Shown on the Tax page and in the pay dialog alike (#6204): credit is money the member has.
   const credit = summary.credit > 0;
-  const hasWords = owedNow > 0 || book.pendingFrom !== undefined || credit;
+  // A running account (#6294) says where the member stands: paid through a day, or how far behind.
+  const account = summary.account;
+  const standing = account?.owes
+    ? t('miningTax.corpBook.sync.behind', {
+        amount: formatIsk(account.owes.amount, 0),
+        count: account.owes.days,
+        date: shortDate(account.owes.oldest, i18n.language),
+        corp: corpName,
+      })
+    : account?.paidThrough
+      ? t('miningTax.corpBook.sync.paidThrough', {
+          date: shortDate(account.paidThrough, i18n.language),
+          corp: corpName,
+        })
+      : null;
+  const hasWords = owedNow > 0 || book.pendingFrom !== undefined || credit || standing !== null;
   if (!hasWords) return null;
 
   const safe =
@@ -78,9 +94,12 @@ export function CorpBookSyncNote({
           })}
         </span>
       )}
+      {standing && (
+        <span className={account?.owes ? 'text-text' : 'text-text-dim'}>{standing}</span>
+      )}
       {credit && (
         <span className="text-text-dim">
-          {t('miningTax.corpBook.sync.credit', {
+          {t(account ? 'miningTax.corpBook.sync.ahead' : 'miningTax.corpBook.sync.credit', {
             amount: formatIsk(summary.credit, 0),
             corp: corpName,
           })}

@@ -14,6 +14,7 @@ import {
   type DismissalCredit,
   type PaymentCredit,
   type RecordedWriteOff,
+  type StatementSettlement,
   type TaxPayment,
 } from './allocation';
 import type { FeederReadClock } from './feederHealth';
@@ -247,8 +248,13 @@ export interface BookView {
 }
 
 interface MinerInternals {
+  /** Every Statement of its, late notices included. */
   statements: Statement[];
   payments: TaxPayment[];
+  /**
+   * Payments against its Statements. On a running account a late notice is not Statement debt:
+   * its settlement here is read off its days (`noticeSettlement`), and it takes no payment.
+   */
   allocation: Allocation;
   /** What `allocation` was computed from, so a payment can be previewed against it. */
   allocationInput: AllocationInput;
@@ -256,6 +262,46 @@ interface MinerInternals {
   days: DayRow[];
   /** The book's `billableThrough`, stopped before a day of this miner's that is held (#6209). */
   billableThrough: string | undefined;
+  /** Its running account, on a book switched to one (#6294). */
+  running?: RunningAccount;
+}
+
+/**
+ * A late notice's standing, read off its days on the running account (#6294): what its lines
+ * billed of each date, that date's share of what was credited, written off and is still owed.
+ * Settled once every date it lists is (a date an open dispute holds is not due); a date no longer
+ * on the account (dismissed since) owes nothing.
+ */
+export function noticeSettlement(
+  notice: Pick<Statement, 'lines'>,
+  running: Pick<RunningAccount, 'byDay'>
+): StatementSettlement {
+  const byDate = new Map<string, number>();
+  for (const l of notice.lines) byDate.set(l.date, (byDate.get(l.date) ?? 0) + l.tax);
+  const out = { amount: 0, held: 0, credited: 0, forgiven: 0, writtenOff: 0, remaining: 0 };
+  let settled = true;
+  for (const [date, tax] of byDate) {
+    if (tax <= 0) continue;
+    const day = running.byDay.get(date);
+    if (!day || day.tax <= 0) {
+      out.amount += tax;
+      out.credited += tax;
+      continue;
+    }
+    const share = Math.min(1, tax / day.tax);
+    if (day.held) {
+      out.held += tax;
+      continue;
+    }
+    out.amount += tax;
+    out.credited += day.credited * share;
+    out.forgiven += day.forgiven * share;
+    out.writtenOff += day.writtenOff * share;
+    out.remaining += day.remaining * share;
+    if (!day.settled) settled = false;
+  }
+  const { held, ...rest } = out;
+  return { ...rest, ...(held > 0 ? { held } : {}), settled };
 }
 
 /**
@@ -328,6 +374,7 @@ export function pendingTax(
 /** What the open set of a whole book is settled from, as an officer reads it. */
 export function openSetInputOf(input: BookViewInput): OpenSetInput {
   return {
+    ...(input.runningAccountFrom ? { runningAccount: true } : {}),
     corporationId: input.corporationId,
     now: input.now,
     startDate: input.startDate,
@@ -394,7 +441,11 @@ export function buildBookView(input: BookViewInput): BookView {
     const mainCharacterId =
       input.miners.find((m) => m.id === id)?.mainCharacterId ?? characterIds[0] ?? 0;
     const mine = charges.filter((c) => c.minerId === id);
-    const forgivenKeys = forgivenDayKeys(statements, allocation, dismissalCredits);
+    // On a running account a late notice's days stay running days (#6294): only the other
+    // Statements are Statement debt whose days are billed, frozen and closed once paid.
+    const notices = input.runningAccountFrom ? statements.filter((s) => s.kind === 'notice') : [];
+    const legacy = notices.length > 0 ? statements.filter((s) => s.kind !== 'notice') : statements;
+    const forgivenKeys = forgivenDayKeys(legacy, allocation, dismissalCredits);
     // `billableThrough` is the Miner's own; `hold` set it, and its moon owner is why a held day
     // waits (#6210) from the hold's first day through the book's billable-through.
     const heldByOf = (date: string) =>
@@ -404,7 +455,7 @@ export function buildBookView(input: BookViewInput): BookView {
       date <= open.billableThrough
         ? hold.ownerCorporationId
         : undefined;
-    const draft = minerDraft(input, id, statements, mine, billableThrough);
+    const draft = minerDraft(input, id, legacy, mine, billableThrough);
 
     const draftLines = draft.kind === 'nothing' ? [] : draft.lines;
     const unbilledKeys = new Set(draftLines.map((l) => l.chargeKey));
@@ -422,16 +473,33 @@ export function buildBookView(input: BookViewInput): BookView {
           dayTolerancePct: input.dayTolerancePct,
         })
       : undefined;
+    // A notice takes no payment: what its days were credited is its standing.
+    const shown: Allocation =
+      running && notices.length > 0
+        ? {
+            ...allocation,
+            byStatement: new Map([
+              ...allocation.byStatement,
+              ...notices.map((n) => [n.id, noticeSettlement(n, running)] as const),
+            ]),
+          }
+        : allocation;
     const dismissedKeys = new Map(draft.dismissed.map((d) => [d.charge.key, d.dismissal.id]));
     const writtenOffKeys = new Set(draft.writtenOff.map((w) => w.chargeKey));
     const billedBy = new Map<string, Statement>();
     const linesBy = new Map<string, StatementLine[]>();
-    for (const s of statements)
+    for (const s of legacy)
       for (const line of s.lines) {
         if (!line.chargeKey) continue;
         billedBy.set(line.chargeKey, s);
         linesBy.set(line.chargeKey, [...(linesBy.get(line.chargeKey) ?? []), line]);
       }
+    /** The newest late notice that listed each day: a running day still, only named. */
+    const noticeBy = new Map<string, Statement>();
+    for (const n of [...notices].sort(
+      (a, b) => a.issuedAt.localeCompare(b.issuedAt) || a.id.localeCompare(b.id)
+    ))
+      for (const line of n.lines) if (line.chargeKey) noticeBy.set(line.chargeKey, n);
 
     const days: DayRow[] = mine
       .map((c): DayRow => {
@@ -481,7 +549,11 @@ export function buildBookView(input: BookViewInput): BookView {
             ? { owed: runningOwed(running, c.date, value.tax) }
             : {}),
           ...(heldBy !== undefined ? { heldBy } : {}),
-          ...(statement ? { statementId: statement.id } : {}),
+          ...(statement
+            ? { statementId: statement.id }
+            : noticeBy.has(c.key)
+              ? { statementId: noticeBy.get(c.key)!.id }
+              : {}),
           ...(dismissal ? { dismissalId: dismissal.id } : {}),
         };
       })
@@ -493,7 +565,22 @@ export function buildBookView(input: BookViewInput): BookView {
     let overdueDays: number | null = null;
     let overdueStatementId: string | undefined;
     let paused = false;
-    for (const [statementId, status] of settled.overdue) {
+    // A late notice's Overdue clock starts at its issue, as a Statement's does, until its days are paid.
+    const overdue = new Map(settled.overdue);
+    for (const n of notices) {
+      if (shown.byStatement.get(n.id)?.settled) continue;
+      overdue.set(
+        n.id,
+        overdueStatus({
+          issuedAt: n.issuedAt,
+          settled: false,
+          now: input.now,
+          declarations: input.declarations.filter((d) => d.statementId === n.id),
+          overdueDays: input.overdueDays,
+        })
+      );
+    }
+    for (const [statementId, status] of overdue) {
       if (status.state === 'paused') paused = true;
       if (status.state === 'overdue') {
         const days = Math.max(1, Math.floor((nowMs - Date.parse(status.overdueAt)) / DAY_MS));
@@ -532,11 +619,12 @@ export function buildBookView(input: BookViewInput): BookView {
     byMiner.set(id, {
       statements,
       payments,
-      allocation,
+      allocation: shown,
       allocationInput,
       draft,
       days,
       billableThrough,
+      ...(running ? { running } : {}),
     });
 
     for (const d of input.declarations) {
@@ -557,7 +645,9 @@ export function buildBookView(input: BookViewInput): BookView {
         kind: 'leaver',
         minerId: id,
         owed,
-        statementId: statements.find((s) => !allocation.byStatement.get(s.id)?.settled)?.id,
+        // On a running account the days may be on no Statement: the newest notice stands for them.
+        statementId:
+          statements.find((s) => !shown.byStatement.get(s.id)?.settled)?.id ?? newest(notices)?.id,
       });
     }
   }
@@ -894,6 +984,8 @@ function closedPeriods(view: BookView, after?: string): StatementPeriod[] {
 
 /** The first of `closedPeriods` that still has unbilled lines, with its plan. */
 function firstRun(view: BookView, after?: string): StatementRunPlan | undefined {
+  // A running account issues late notices instead (#6294, `planNotices`).
+  if (view.input.runningAccountFrom) return undefined;
   for (const period of closedPeriods(view, after)) {
     const plan = planStatementRun(view, period);
     if (plan.lines.length > 0) return plan;
@@ -1184,6 +1276,12 @@ function ownPeriodBilling(
   }
   return { miners, billed, rolled, rolledAmount };
 }
+
+/** The Statement issued last, if any. */
+export const newest = <T extends Pick<Statement, 'issuedAt' | 'id'>>(statements: readonly T[]) =>
+  [...statements]
+    .sort((a, b) => a.issuedAt.localeCompare(b.issuedAt) || a.id.localeCompare(b.id))
+    .at(-1);
 
 const earliest = (dates: readonly (string | null | undefined)[]) =>
   dates.filter((d): d is string => !!d).sort()[0] ?? null;

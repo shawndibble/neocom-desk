@@ -206,6 +206,44 @@ describe('VerifyPage', () => {
     expect(await screen.findByText(/No payments have been credited/)).toBeInTheDocument();
   });
 
+  it('on a running account shows everything owed now beside the notice', async () => {
+    api.read.mockResolvedValue(
+      payload({
+        account: {
+          owed: 12_345_678,
+          days: 3,
+          oldest: '2026-10-02',
+          paidThrough: '2026-10-01',
+          asOf: '2026-10-20T10:00:00Z',
+        },
+      })
+    );
+    render(<VerifyPage token="tok" />);
+    expect(await screen.findByText('Owed now')).toBeInTheDocument();
+    expect(screen.getByText('12,345,678 ISK')).toBeInTheDocument();
+    expect(screen.getByText(/today: 3 days, oldest/)).toBeInTheDocument();
+  });
+
+  it('reads a late notice by the account: no Statement balance, payments or settled line', async () => {
+    const base = payload();
+    api.read.mockResolvedValue(
+      payload({
+        statement: { ...base.statement, kind: 'notice' },
+        account: {
+          owed: 5,
+          days: 1,
+          oldest: '2026-10-02',
+          paidThrough: null,
+          asOf: '2026-10-20T10:00:00Z',
+        },
+      })
+    );
+    render(<VerifyPage token="tok" />);
+    expect(await screen.findByText('Owed now')).toBeInTheDocument();
+    expect(screen.queryByText('Balance due')).not.toBeInTheDocument();
+    expect(screen.getByText(/so the payment is matched to you/)).toBeInTheDocument();
+  });
+
   it('notes a closed account', async () => {
     api.read.mockResolvedValue(payload({ accountClosed: true }));
     render(<VerifyPage token="tok" />);

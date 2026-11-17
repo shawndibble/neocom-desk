@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import * as mirror from '../../../functions/src/corpTaxBookEngine';
 import * as calls from '../../../functions/src/corpTaxBookKinds';
+import { liveAccount } from '../../../functions/src/corpTaxBookAccounts';
+import { netOf } from './paymentPreview';
 import { allocatePayments, dismissalCredits, isBeforeBook } from './allocation';
 import {
   DISPUTE_HOLD_DAYS,
@@ -200,6 +202,19 @@ describe('functions mirror of the Corp Tax Book engine', () => {
     expect([...calls.TRANSFER_RECIPIENTS]).toEqual([...TRANSFER_RECIPIENTS]);
     expect([...calls.CLAIM_CHECK_RESULTS]).toEqual([...CLAIM_CHECK_RESULTS]);
     expect(calls.TAX_CONTACT_MAX_CHARACTERS).toBe(TAX_CONTACT_MAX_CHARACTERS);
+  });
+
+  it('takes payments off the pay page’s total net of not tax, as the client counts them', () => {
+    const payments = [
+      { amount: 5 },
+      { amount: 7, notTaxAmount: 3 },
+      { amount: 2, notTaxAmount: 9 },
+    ];
+    const counted = payments.reduce((sum, p) => sum + netOf(p), 0);
+    expect(liveAccount({ owed: 100, paid: 0, days: 1, at: 'x' }, payments).owed).toBe(
+      100 - counted
+    );
+    expect(liveAccount({ owed: 100, paid: counted, days: 1, at: 'x' }, payments).owed).toBe(100);
   });
 
   it('keeps the running account’s notice rules and day tolerance equal', () => {

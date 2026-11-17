@@ -47,21 +47,23 @@ export function settleMiner(
   book: { billableThrough: string | undefined; holds: ReadonlyMap<number, StaleHold> }
 ): MinerSettlement {
   const statements = input.statements.filter((s) => s.minerId === minerId);
+  // On a running account a late notice's days are running days (#6294): never Statement debt.
+  const billed = input.runningAccount ? statements.filter((s) => s.kind !== 'notice') : statements;
   // A donation before the book is neither credited nor shown as a payment.
   const payments = input.payments.filter(
     (p): p is TaxPayment =>
       p.minerId === minerId && (p.source !== 'donation' || !isBeforeBook(p.at, input.startDate))
   );
-  const credits = dismissalCredits(statements, input.dismissals, charges);
+  const credits = dismissalCredits(billed, input.dismissals, charges);
   // A member's open dispute holds its amount out of what is due (resolving in the app).
   const held = heldByStatement(
-    statements,
+    billed,
     (input.disputes ?? []).filter((d) => d.minerId === minerId),
     new Set(credits.map((c) => `${c.statementId}|${c.chargeKey}`)),
     input.now
   );
   const allocationInput: AllocationInput = {
-    statements,
+    statements: billed,
     payments,
     dismissalCredits: credits,
     officerWriteOffs: (input.writeOffs ?? []).filter((w) => w.minerId === minerId),
@@ -71,7 +73,7 @@ export function settleMiner(
   const allocation = allocatePayments(allocationInput);
 
   const overdue = new Map<string, OverdueStatus>();
-  for (const s of statements) {
+  for (const s of billed) {
     if (allocation.byStatement.get(s.id)?.settled) continue;
     overdue.set(
       s.id,

@@ -55,12 +55,18 @@ export interface OpenSetInput {
   feeders?: readonly (FeederCoverage & FeederReadClock)[];
   pricesOn: (date: string) => Pick<DayPrices, 'prices' | 'sources'>;
   placement: Placement;
+  /**
+   * A book switched to a running account (#6294): its late notices are running days, not
+   * Statement debt, so payments and the Overdue clock here read the other Statements only.
+   */
+  runningAccount?: boolean;
 }
 
 /** One Miner's side of the open set. */
 export interface MinerSettlement {
   /** Its grouping's characters, or the one a `solo:` id names. */
   characterIds: number[];
+  /** Every Statement of its, late notices included. */
   statements: Statement[];
   /** Its Tax Payments; a donation dated before the book is neither credited nor listed. */
   payments: TaxPayment[];

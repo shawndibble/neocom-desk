@@ -81,6 +81,10 @@ export function CloseAccountDialog({
           reason: reason.trim(),
           credit: disposition,
           ...(statement ? { statement } : {}),
+          // A running account's credit only this client can price (#6294).
+          ...(view.input.runningAccountFrom && plan
+            ? { runningCredit: Math.round(plan.creditAfter) }
+            : {}),
         });
         onClosed?.();
       }}

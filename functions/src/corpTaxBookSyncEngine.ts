@@ -623,6 +623,8 @@ export interface SettleStatement {
   minerId: string;
   amount: number;
   issuedAt: string;
+  /** A running account's late notice (#6294): never settled, never an open balance. */
+  kind?: string;
   lines: {
     chargeKey?: string;
     date?: string;
@@ -677,17 +679,20 @@ export function planSettlements(input: SettleInput): string[] {
   return settled;
 }
 
+/** Engine `billsDays`: a running account's late notice (#6294) bills no days of its own. */
+export const billsDays = (s: { kind?: string }): boolean => s.kind !== 'notice';
+
 /** Engine `unbilledMinerIds`. */
 export function unbilledMinerIds(
   rows: readonly { characterId: number; date: string; quantity: number }[],
   book: {
     miners: readonly MinerLike[];
-    statements: readonly { minerId: string; coversThrough?: string }[];
+    statements: readonly { minerId: string; coversThrough?: string; kind?: string }[];
     startDate: string;
   }
 ): Set<string> {
   const billedThrough = new Map<string, string>();
-  for (const s of book.statements)
+  for (const s of book.statements.filter(billsDays))
     if (s.coversThrough && s.coversThrough > (billedThrough.get(s.minerId) ?? ''))
       billedThrough.set(s.minerId, s.coversThrough);
   const out = new Set<string>();
@@ -712,7 +717,12 @@ export function unbilledWhenPaid(
   rows: readonly { characterId: number; date: string; quantity: number }[],
   book: {
     miners: readonly MinerLike[];
-    statements: readonly { minerId: string; coversThrough?: string; issuedAt?: string }[];
+    statements: readonly {
+      minerId: string;
+      coversThrough?: string;
+      issuedAt?: string;
+      kind?: string;
+    }[];
     startDate: string;
   }
 ): boolean {
@@ -733,12 +743,17 @@ function billedThroughWhenPaid(
   payment: { characterId: number; at: string },
   book: {
     miners: readonly MinerLike[];
-    statements: readonly { minerId: string; coversThrough?: string; issuedAt?: string }[];
+    statements: readonly {
+      minerId: string;
+      coversThrough?: string;
+      issuedAt?: string;
+      kind?: string;
+    }[];
   }
 ): string {
   const minerId = minerIdFor(payment.characterId, book.miners);
   let billedThrough = '';
-  for (const s of book.statements)
+  for (const s of book.statements.filter(billsDays))
     if (
       s.minerId === minerId &&
       s.coversThrough &&
@@ -758,7 +773,12 @@ export function storedRowsWanted(input: {
   held: readonly { characterId: number; at: string }[];
   senders: readonly number[];
   miners: readonly MinerLike[];
-  statements: readonly { minerId: string; coversThrough?: string; issuedAt?: string }[];
+  statements: readonly {
+    minerId: string;
+    coversThrough?: string;
+    issuedAt?: string;
+    kind?: string;
+  }[];
   startDate: string;
 }): Map<number, string> {
   const out = new Map<number, string>();
@@ -778,7 +798,7 @@ export function storedRowsWanted(input: {
   for (const characterId of input.senders) {
     const minerId = minerIdFor(characterId, input.miners);
     let billedThrough = '';
-    for (const s of input.statements)
+    for (const s of input.statements.filter(billsDays))
       if (s.minerId === minerId && s.coversThrough && s.coversThrough > billedThrough)
         billedThrough = s.coversThrough;
     want(characterId, billedThrough);
@@ -818,9 +838,10 @@ export function openBalances(input: Omit<SettleInput, 'alreadyPaid'>): Map<strin
 }
 
 function allocateEachMiner(input: Omit<SettleInput, 'alreadyPaid'>) {
-  const minerIds = [...new Set(input.statements.map((s) => s.minerId))];
+  const billing = input.statements.filter(billsDays);
+  const minerIds = [...new Set(billing.map((s) => s.minerId))];
   return minerIds.map((minerId) => {
-    const statements = input.statements.filter((s) => s.minerId === minerId);
+    const statements = billing.filter((s) => s.minerId === minerId);
     const payments = input.payments.filter((p) => p.minerId === minerId);
     const credits = dismissalCredits({
       minerId,

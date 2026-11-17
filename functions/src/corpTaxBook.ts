@@ -75,6 +75,11 @@ export const STATEMENTS = 'statements';
 /** `statementLinks/{statementId}`: the verify token, readable by editors only. */
 export const STATEMENT_LINKS = 'statementLinks';
 export const MINERS = 'miners';
+/**
+ * `accounts/{minerId}` (#6294): a running account's figures as an officer's client last worked
+ * them out (the server cannot price days), for the pay page's live total. Function-only.
+ */
+export const ACCOUNTS = 'accounts';
 export const META = 'meta';
 export const PAID_DOC = 'paid';
 /** Doc under `meta`: the scheduled sync's public status (ADR 0025); `status: 'active'` is Automatic sync on. */
@@ -655,6 +660,11 @@ export type EditAction =
       statement?: Record<string, unknown>;
       /** Credit is refunded unless the guest consented or went 90 days without replying. */
       credit: CloseCredit;
+      /**
+       * A running account's credit as the officer's client works it out (#6294): money ahead of
+       * every day. The server cannot price days, so it takes this on such a book.
+       */
+      runningCredit?: number;
     }
   | { action: 'issueStatement'; statement: Record<string, unknown> }
   | { action: 'settleStatements'; statementIds: string[] }
@@ -701,7 +711,20 @@ export type EditAction =
       statementId: string;
       mailId: number;
       kind: 'statement' | 'reminder';
-    };
+    }
+  /** A running account's figures per Miner, as the officer's client works them out (#6294). */
+  | { action: 'recordAccounts'; accounts: RecordedAccount[] };
+
+/** What a Miner owes on a running account, as one officer's client worked it out. */
+export interface RecordedAccount {
+  minerId: string;
+  owed: number;
+  /** The Miner's net payments (less "not tax") the client counted: later ones come off `owed`. */
+  paid: number;
+  days: number;
+  oldest?: string;
+  paidThrough?: string;
+}
 
 export type CloseCredit = { kind: 'refund' } | { kind: 'forfeit'; basis: ForfeitBasis };
 
@@ -793,6 +816,7 @@ export function parseEditAction(data: unknown): EditAction {
     'dismissDispute',
     'recordReminder',
     'recordMail',
+    'recordAccounts',
     'setPopSharing',
     'setPopSharingMoon',
   ] as const);
@@ -951,6 +975,9 @@ export function parseEditAction(data: unknown): EditAction {
         reason: reason(d.reason),
         ...(statement ? { statement } : {}),
         credit: parseCloseCredit(d.credit),
+        ...(d.runningCredit !== undefined
+          ? { runningCredit: num(d.runningCredit, 'runningCredit', 0, 1e13) }
+          : {}),
       };
     }
     case 'settleStatements':
@@ -1030,6 +1057,23 @@ export function parseEditAction(data: unknown): EditAction {
         statementId: docId(d.statementId, 'statementId'),
         mailId: int(d.mailId, 'mailId', 1, Number.MAX_SAFE_INTEGER),
         kind: oneOf(d.kind, 'kind', ['statement', 'reminder'] as const),
+      };
+    case 'recordAccounts':
+      return {
+        action,
+        accounts: list(d.accounts, 'accounts', 200).map((raw) => {
+          const a = record(raw);
+          return {
+            minerId: docId(a.minerId, 'minerId'),
+            owed: num(a.owed, 'owed', 0, 1e13),
+            paid: num(a.paid, 'paid', 0, 1e15),
+            days: int(a.days, 'days', 0, 100_000),
+            ...(a.oldest !== undefined ? { oldest: dateString(a.oldest, 'oldest') } : {}),
+            ...(a.paidThrough !== undefined
+              ? { paidThrough: dateString(a.paidThrough, 'paidThrough') }
+              : {}),
+          };
+        }),
       };
   }
 }

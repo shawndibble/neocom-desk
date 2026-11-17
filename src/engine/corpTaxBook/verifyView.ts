@@ -20,6 +20,8 @@ export interface VerifyPayload {
     hubId: string;
     oreForm: 'compressed' | 'raw';
     lines: VerifyPayloadLine[];
+    /** A running account's late notice (#6294); absent on a Statement. */
+    kind?: 'notice';
     /** Names the officer's client stored with the Statement, when it did. */
     corporationName?: string;
     minerName?: string;
@@ -51,6 +53,18 @@ export interface VerifyPayload {
   accountClosed: boolean;
   /** Characters an officer added by hand that still wait for their own confirmation (D26b). */
   pendingCharacterIds: number[];
+  /**
+   * A running account's total now (#6294): what an officer's client last counted, less what the
+   * Miner paid since. Absent from older servers, null on a calendar book or before any count.
+   */
+  account?: {
+    owed: number;
+    days: number;
+    oldest: string | null;
+    paidThrough: string | null;
+    /** When it was counted. */
+    asOf: string;
+  } | null;
 }
 
 export interface VerifyPayloadLine {
