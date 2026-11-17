@@ -45,6 +45,7 @@ import { OrderNumbersSection } from './OrderNumbersSection';
 import { OrderCostSection } from './OrderCostSection';
 import { OrderExitsSection } from './OrderExitsSection';
 import { WorkThroughModalNotes, WorkThroughNextButton } from './WorkThroughControls';
+import { useWalkCopyPrice } from './workThroughContext';
 
 export interface OrderDetailModalProps {
   row: OpenOrderRow;
@@ -138,7 +139,11 @@ export function OrderDetailContent({
       : 'known';
 
   const advice = adviseOrder(row);
-  const { copyPrice, keepPerUnit } = verdictFigures(row, advice);
+  const verdict = verdictFigures(row, advice);
+  const { keepPerUnit } = verdict;
+  // The verdict's own price first; else the walk's one-tick price (an undercut order).
+  const walkPrice = useWalkCopyPrice(walking);
+  const copyPrice = verdict.copyPrice ?? walkPrice;
   const station =
     location === 'structure'
       ? structureStationScopeState(row, structureMarket)

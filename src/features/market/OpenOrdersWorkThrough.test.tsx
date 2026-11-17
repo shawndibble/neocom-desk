@@ -225,6 +225,19 @@ describe('Open Orders work through', () => {
     expect(within(summaryLine()).getByText('All 2 done')).toBeInTheDocument();
   });
 
+  it('an undercut order offers Copy for the one-tick price in the modal', async () => {
+    const user = userEvent.setup();
+    vi.mocked(loadAllCharactersOpenOrders).mockResolvedValue({
+      entries: [entry([UNDERCUT, EXPIRING])],
+      skipped: [],
+    });
+    renderPanel();
+    await user.click(await screen.findByRole('button', { name: 'Work through (2)' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(await within(dialog).findByRole('button', { name: 'Copy 448.90' }));
+    expect(copied).toHaveBeenCalledWith('448.90');
+  });
+
   it('Escape ends the walk', async () => {
     const user = userEvent.setup();
     vi.mocked(loadAllCharactersOpenOrders).mockResolvedValue({
