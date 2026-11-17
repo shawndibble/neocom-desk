@@ -2066,6 +2066,21 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect(view.account).toMatchObject({ owed: 10_000_000, days: 3, oldest: '2026-10-05' });
     });
 
+    it('does not write an account again when its figures are unchanged', async () => {
+      await turnOn();
+      const accounts = [{ minerId: 'solo:50', owed: 5, paid: 0, days: 1, oldest: '2026-10-05' }];
+      const doc = () => book().collection('accounts').doc('solo:50');
+      await edit(ACCOUNTANT, { action: 'recordAccounts', accounts });
+      const first = (await doc().get()).data();
+      await edit(ACCOUNTANT, { action: 'recordAccounts', accounts });
+      expect((await doc().get()).data()?.at).toBe(first?.at);
+      await edit(ACCOUNTANT, {
+        action: 'recordAccounts',
+        accounts: [{ ...accounts[0], owed: 6 }],
+      });
+      expect((await doc().get()).data()?.owed).toBe(6);
+    });
+
     describe('stored paid-through (D22)', () => {
       const record = (settledThrough: string, minerId = 'solo:50') =>
         edit(ACCOUNTANT, {
