@@ -59,6 +59,8 @@ import { MinerDetail } from '@/features/corp/moons/MinerDetail';
 import { MinersTab } from '@/features/corp/moons/MinersTab';
 import { OverviewTab } from '@/features/corp/moons/OverviewTab';
 import { MoonDetail } from '@/features/corp/moons/MoonDetail';
+import { MoonPage } from '@/features/corp/moons/MoonPage';
+import { MoonsTab } from '@/features/corp/moons/MoonsTab';
 import { MoonOwnerDetail } from '@/features/corp/moons/MoonOwnerDetail';
 import { MoonOwnersTab } from '@/features/corp/moons/MoonOwnersTab';
 import { MOONS_TABS, moonsDetail } from '@/features/corp/moons/moonsPaths';
@@ -208,6 +210,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
             <TabPanel tabsId={tabsId} tabId={tab}>
               {tab === 'overview' && <OverviewTab />}
               {tab === 'extractions' && <ExtractionsTab />}
+              {tab === 'moons' && <MoonsTab />}
               {tab === 'miners' && <MinersTab />}
               {tab === 'statements' && <StatementsTab />}
               {tab === 'sharing' && <SharingTab />}
@@ -222,6 +225,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
           </>
         )}
         {detail?.kind === 'extraction' && <MoonDetail key={detail.id} id={detail.id} />}
+        {detail?.kind === 'moon' && <MoonPage moonId={Number(detail.id)} />}
         {detail?.kind === 'miner' && <MinerDetail key={detail.id} id={detail.id} />}
         {detail?.kind === 'moonOwner' && <MoonOwnerDetail id={detail.id} />}
         {detail?.kind === 'statementPeriod' && <StatementPeriodDetail periodStart={detail.id} />}

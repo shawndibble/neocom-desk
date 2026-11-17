@@ -33,7 +33,7 @@ export type BookPartSet = ReadonlySet<BookPart>;
 export const ALL_BOOK_PART_SET: BookPartSet = new Set(ALL_BOOK_PARTS);
 
 /** What a page asks for: a tab id, or a detail page below it. */
-export type BookDetailKind = 'extraction' | 'miner' | 'moonOwner' | 'statementPeriod';
+export type BookDetailKind = 'extraction' | 'moon' | 'miner' | 'moonOwner' | 'statementPeriod';
 
 /** The parts a page reads. No page: the whole book, as the export reads it. */
 export function bookPartsFor(tab?: string, detail: BookDetailKind | null = null): BookPartSet {
