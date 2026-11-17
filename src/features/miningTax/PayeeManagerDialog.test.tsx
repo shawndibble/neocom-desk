@@ -816,6 +816,23 @@ describe('PayeeManagerDialog — linking a Payee named for a Corp Tax Book corpo
     expect(screen.getByRole('button', { name: 'Link to Corp A' })).toBeInTheDocument();
   });
 
+  it('spans the link note across the form grid, so its long sentence cannot widen the label column', async () => {
+    const stored: PayeeRecord = {
+      id: 'p1',
+      characterId: CHAR,
+      name: 'Corp A',
+      defaultTaxPct: 10,
+      updatedAt: 1,
+    };
+    await db.payees.put(stored);
+    renderDialog([stored], { bookCorporations });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Corp A' }));
+    expect(screen.getByText(/Corp A keeps a Corp Tax Book/).parentElement).toHaveClass(
+      'col-span-full'
+    );
+  });
+
   it('suggests nothing for a Payee already linked to that corporation', async () => {
     const stored: PayeeRecord = {
       id: 'p1',
