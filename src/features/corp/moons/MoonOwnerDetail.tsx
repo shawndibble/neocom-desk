@@ -246,7 +246,7 @@ export function MoonOwnerDetail({ id }: { id: string }) {
         <SetRateDialog
           initial={detail.row.theirRatePct ?? null}
           today={utcDay()}
-          earliest={earliestAsOf(utcDay(), feeder ? utcDay(feeder.joinedAt) : '')}
+          earliest={earliestAsOf(utcDay(), feeder ? utcDay(feeder.joinedAt) : '0000-00-00')}
           onClose={() => setDialog(null)}
           onSave={(pct, asOf) =>
             afterEdit(async () => {

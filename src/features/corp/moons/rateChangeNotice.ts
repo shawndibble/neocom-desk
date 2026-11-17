@@ -22,12 +22,11 @@ export function agreedRateChange(
   now: Date,
   asOf: string = utcDay(now.getTime())
 ): OwnerRateChange | undefined {
-  const date = asOf;
   const after: OwnerRateEntry[] = [
     ...before,
-    { kind: 'agreed', pct, effectiveFrom: date, recordedAt: now.toISOString(), noBackdate: true },
+    { kind: 'agreed', pct, effectiveFrom: asOf, recordedAt: now.toISOString(), noBackdate: true },
   ];
-  return rateChangeEvent({ before, after, date });
+  return rateChangeEvent({ before, after, date: asOf });
 }
 
 type Payee = { kind: 'corporation' | 'character'; id: number };

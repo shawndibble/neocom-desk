@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { effectiveOwnerRatePct } from './corpTaxBookEngine.js';
 import {
   appendAgreedRate,
-  resolveAsOf,
   appendModeChange,
+  resolveAsOf,
   parseSetFeederModeInput,
   parseSetFeederRateInput,
 } from './corpTaxBookFeederOwnerCalls.js';
@@ -129,6 +129,21 @@ describe('appendAgreedRate', () => {
       ['agreed', 5],
       ['agreed', 6],
     ]);
+  });
+  it('repeating the rate in force with an earlier as-of day adds an entry', () => {
+    const rec = record({ ownerRateHistory: appendAgreedRate(record(), 6, JOINED, '2026-10-10') });
+    const history = appendAgreedRate(rec, 6, NOW, '2026-10-05');
+    expect(history.at(-1)).toMatchObject({ pct: 6, effectiveFrom: '2026-10-05' });
+  });
+  it('compares with the rate in force, not the last one recorded', () => {
+    const rec = record({
+      ownerRateHistory: [
+        ...appendAgreedRate(record(), 5, JOINED, '2026-10-10'),
+        { kind: 'agreed', pct: 8, effectiveFrom: '2026-10-17', recordedAt: '2026-10-17T00:00:00Z' },
+      ],
+    });
+    expect(appendAgreedRate(rec, 8, NOW, '2026-10-18')).toEqual(rec.ownerRateHistory);
+    expect(appendAgreedRate(rec, 5, NOW, '2026-10-14')).toHaveLength(3);
   });
   it('adds nothing when the standing agreed rate is repeated', () => {
     const rec = record({ ownerRateHistory: appendAgreedRate(record(), 6, JOINED) });

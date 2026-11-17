@@ -16,7 +16,12 @@ import {
   type BookCall,
   type FeederTargetCall,
 } from './corpTaxBook.js';
-import { shiftDate, type FeederModeChange, type OwnerRateEntry } from './corpTaxBookEngine.js';
+import {
+  latestOwnerRate,
+  shiftDate,
+  type FeederModeChange,
+  type OwnerRateEntry,
+} from './corpTaxBookEngine.js';
 import {
   deriveModeChanges,
   deriveOwnerRateHistory,
@@ -55,7 +60,9 @@ export function parseSetFeederRateInput(data: unknown): SetFeederRateInput {
 export function resolveAsOf(rec: FeederRecord, asOf: string | undefined, now: number): string {
   const today = utcDate(now);
   if (asOf === undefined) return today;
-  const earliest = [shiftDate(today, -MAX_AS_OF_DAYS_BACK), utcDate(rec.joinedAt)].sort().at(-1)!;
+  const limit = shiftDate(today, -MAX_AS_OF_DAYS_BACK);
+  const joined = utcDate(rec.joinedAt);
+  const earliest = joined > limit ? joined : limit;
   if (asOf > today || asOf < earliest) {
     fail('invalid-argument', 'The as-of date is outside the allowed days', 'as-of-out-of-range');
   }
@@ -85,7 +92,8 @@ export function parseSetFeederModeInput(data: unknown): SetFeederModeInput {
 
 /**
  * The history with an agreed rate dated `asOf` (default today). The entry counts from that day
- * only (`noBackdate`, #6347). Repeating the standing agreed rate adds nothing.
+ * only (`noBackdate`, #6347). Repeating the rate in force adds nothing, unless it is dated
+ * before the entry in force.
  */
 export function appendAgreedRate(
   rec: FeederRecord,
@@ -94,8 +102,8 @@ export function appendAgreedRate(
   asOf: string = utcDate(now)
 ): OwnerRateEntry[] {
   const history = deriveOwnerRateHistory(rec);
-  const lastAgreed = [...history].reverse().find((e) => e.kind === 'agreed');
-  if (lastAgreed?.pct === pct) return history;
+  const standing = latestOwnerRate(history, 'agreed', utcDate(now));
+  if (standing?.pct === pct && asOf >= standing.effectiveFrom) return history;
   return [
     ...history,
     {

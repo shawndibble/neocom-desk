@@ -83,7 +83,7 @@ function reachBackEntry(history: readonly OwnerRateEntry[]): OwnerRateEntry | un
 
 /**
  * The agreed rate in effect on `date`; before the first agreed rate starts, that first one
- * (backdated). A requested rate never takes effect: with nothing agreed there is no rate.
+ * (backdated, unless set with an as-of day). A requested rate never takes effect: with nothing agreed there is no rate.
  */
 export function effectiveOwnerRate(
   history: readonly OwnerRateEntry[],
