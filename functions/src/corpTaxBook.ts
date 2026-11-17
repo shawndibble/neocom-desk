@@ -822,13 +822,15 @@ export function parseEditAction(data: unknown): EditAction {
           ? { declarationId: docId(d.declarationId, 'declarationId') }
           : {}),
       };
-    case 'markNotTax':
+    case 'markNotTax': {
+      const why = optReason(d.reason);
       return {
         action,
         paymentId: docId(d.paymentId, 'paymentId'),
         notTaxAmount: num(d.notTaxAmount, 'notTaxAmount', 0, 1e13),
-        ...(optReason(d.reason) !== undefined ? { reason: optReason(d.reason) } : {}),
+        ...(why !== undefined ? { reason: why } : {}),
       };
+    }
     case 'assignPayment':
       return {
         action,
