@@ -55,9 +55,7 @@ export function CorpBookSyncNote({
       })
     : null;
   const hasWords =
-    owedNow > 0 ||
-    book.pendingFrom !== undefined ||
-    (credit && !account) || standing !== null;
+    owedNow > 0 || book.pendingFrom !== undefined || (credit && !account) || standing !== null;
   if (!hasWords) return null;
 
   const safe =
