@@ -15,6 +15,7 @@ import {
   type EditableRow,
 } from './payload';
 import { utcDay } from '@/engine/localDay';
+import { OVERVIEW_GROUPS_SETTING_KEY } from '@/features/character/overviewGroups';
 
 /**
  * Dexie table names for every Editable Data table a Character owns — the
@@ -46,6 +47,15 @@ async function writeEditableTables(editableTables: Record<string, EditableRow[]>
   }
 }
 
+/**
+ * Synced settings, plus the device-local Overview character groups: a group is
+ * a statement about several characters, so it follows the characters into a
+ * backup. An older backup simply lacks the row, and import skips it if present.
+ */
+function isBackedUpSetting(s: { key: string }): boolean {
+  return isAllowedSyncedSettingKey(s.key) || s.key === OVERVIEW_GROUPS_SETTING_KEY;
+}
+
 /** Builds the full-device backup payload and encrypts it under `password`. */
 export async function exportBackup(
   password: string
@@ -56,7 +66,7 @@ export async function exportBackup(
     readEditableTables(),
     db.settings.toArray(),
   ]);
-  const settings = allSettings.filter((s) => isAllowedSyncedSettingKey(s.key));
+  const settings = allSettings.filter(isBackedUpSetting);
   const payload: BackupPayload = buildBackupPayload(characters, tokens, editableTables, settings);
   const file = await encryptExportPayload(payload, password);
   const filename = `neocom-desk-backup-${utcDay()}.json`;
