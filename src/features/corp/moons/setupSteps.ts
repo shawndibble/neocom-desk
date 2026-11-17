@@ -7,7 +7,7 @@ import type { TaxRate } from '@/engine/corpTaxBook/rates';
 import type { ScheduledSyncStatus } from '@/engine/corpTaxBook/scheduledSync';
 import { isRefineryPlaceholder, refineryPlaceholder } from './moonsFormat';
 
-export type SetupStepId = 'rate' | 'autoSync' | 'refineryNames' | 'firstStatement';
+export type SetupStepId = 'rate' | 'autoSync' | 'refineryNames';
 
 /** `checking`: the names are still being looked up, so the step is neither done nor to do. */
 export type SetupStepState = 'done' | 'todo' | 'checking';
@@ -24,7 +24,6 @@ export interface SetupChecklistInput {
   scheduledSync: ScheduledSyncStatus | null | undefined;
   /** The book's own refineries (not a moon owner's), each with the name it reads by now. */
   refineries: readonly { id: number; name: string }[];
-  statementCount: number;
   /** EVE/UTC `YYYY-MM-DD`, to pick the corp rate in force. */
   today: string;
 }
@@ -58,7 +57,6 @@ export function setupChecklist(input: SetupChecklistInput): SetupChecklist {
           : { id: 'refineryNames', state: 'done' }
     );
   }
-  steps.push({ id: 'firstStatement', state: input.statementCount > 0 ? 'done' : 'todo' });
   const done = steps.filter((s) => s.state === 'done').length;
   return {
     steps,

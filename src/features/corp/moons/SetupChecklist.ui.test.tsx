@@ -27,19 +27,19 @@ describe('SetupChecklist', () => {
 
   it('lists each step, with a button only on a step to do', async () => {
     render();
-    expect(screen.getByText('3 of 4 done')).toBeInTheDocument();
+    expect(screen.getByText('2 of 3 done')).toBeInTheDocument();
     expect(screen.getByText('10% for every Miner without a rate of their own')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Go to Statements' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Turn on' }));
     expect(openSettings).toHaveBeenCalledWith('access');
   });
 
-  it('offers the Statements tab while no Statement has been issued', () => {
+  it('does not list a first Statement as a setup step', () => {
     render({
       ...BOOK_CONTEXT,
       view: { ...BOOK_VIEW, input: { ...BOOK_VIEW.input, statements: [] } },
     });
-    expect(screen.getByRole('button', { name: 'Go to Statements' })).toBeInTheDocument();
+    expect(screen.queryByText('First Statement issued')).not.toBeInTheDocument();
+    expect(screen.getByText('2 of 3 done')).toBeInTheDocument();
   });
 
   it('stays hidden once dismissed, for this book', async () => {

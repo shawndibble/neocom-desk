@@ -1,0 +1,9 @@
+# Scope decisions — Corp Tax Book setup checklist drops First Statement issued (issue #6309)
+
+_Recorded 2026-11-17 · issue #6309._
+
+- **<Decision>.** <Why, and what it rules out.>
+
+- **"First Statement issued" is no longer a setup step.** It amends the step list in `20261112-220942-corp-tax-book-setup-checklist-on-the-overview.md`. A new book cannot issue a Statement until a period closes, usually weeks later, so the checklist stayed open for weeks and never completed. Issuing Statements is a recurring task, not setup; the Statement run prompt and the Moons nav badge already say when a run is due.
+- **Steps now: Corp tax rate set, Automatic sync turned on, Refinery names readable.** The checklist completes and hides once those are done. The Statements tab button is gone from the checklist.
+- **The dismissal `localStorage` key is unchanged**, so a book that dismissed or completed the checklist stays hidden.
