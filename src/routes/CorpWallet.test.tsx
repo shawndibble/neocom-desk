@@ -262,13 +262,13 @@ describe('Corp Wallet: the gate', () => {
     await findDivisions();
   });
 
-  /** A page of its own, not a tab: it switches its table with a view control. */
+  /** A page of its own, not a tab. */
   it('has no tab bar of its own', async () => {
     renderCorpWalletRoute();
     await findDivisions();
 
     expect(screen.queryByRole('tablist')).toBeNull();
-    expect(screen.getByRole('group', { name: 'Wallet view' })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Wallet view' })).toBeNull();
   });
 });
 
@@ -415,26 +415,14 @@ describe('Corp Wallet: divisions and the journal (AC 2, AC 3)', () => {
     expect(screen.queryByRole('button', { name: /^(All|This) characters?/ })).toBeNull();
   });
 
-  it('does not re-page the journal when the view is switched away and back (issue #413)', async () => {
-    let journalRequests = 0;
-    server.use(
-      http.get(`${BASE}/corporations/${CORP_ID}/wallets/:division/journal`, ({ params }) => {
-        journalRequests += 1;
-        return HttpResponse.json(corpJournalByDivision[Number(params.division)] ?? []);
-      })
-    );
-    const user = userEvent.setup();
+  it('draws the journal alone: no Transactions control, and an old ?view=transactions link lands on it', async () => {
+    window.history.pushState({}, '', '/corp/wallet?view=transactions');
     renderCorpWalletRoute();
 
     expect(await screen.findByText('Master division payout')).toBeInTheDocument();
-    expect(journalRequests).toBe(1);
-
-    await user.click(screen.getByRole('button', { name: 'Transactions' }));
-    await screen.findByRole('table', { name: 'Transactions' });
-    await user.click(screen.getByRole('button', { name: 'Journal' }));
-
-    expect(await screen.findByText('Master division payout')).toBeInTheDocument();
-    expect(journalRequests).toBe(1);
+    expect(screen.queryByRole('button', { name: 'Transactions' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Wallet view' })).toBeNull();
+    expect(screen.queryByRole('table', { name: 'Transactions' })).toBeNull();
   });
 
   it('names the journal CSV export after the division, so exporting two divisions never overwrites the same file (issue #413)', async () => {
@@ -559,101 +547,15 @@ describe('Wallet no longer carries the corporation', () => {
     expect(await screen.findByText('SRP division payout')).toBeInTheDocument();
   });
 
-  it('sends the old corp Transactions tab on to the Transactions view', async () => {
-    window.history.pushState({}, '', '/wallet/transactions?owner=corporation');
-    renderCorpWalletRoute();
-
-    await waitFor(() => expect(window.location.pathname).toBe('/corp/wallet'));
-    expect(window.location.search).toBe('?view=transactions');
-    expect(await screen.findByRole('table', { name: 'Transactions' })).toBeInTheDocument();
-  });
-
-  it('keeps the division, and any filter, alongside the Transactions view', async () => {
-    window.history.pushState(
-      {},
-      '',
-      '/wallet/transactions?owner=corporation&division=2&txn.q=Pyerite'
-    );
+  it('sends the old corp Transactions tab on to the journal', async () => {
+    window.history.pushState({}, '', '/wallet/transactions?owner=corporation&division=2');
     renderCorpWalletRoute();
 
     await waitFor(() => expect(window.location.pathname).toBe('/corp/wallet'));
     const params = new URLSearchParams(window.location.search);
     expect(params.get('division')).toBe('2');
-    expect(params.get('view')).toBe('transactions');
-    expect(params.get('txn.q')).toBe('Pyerite');
+    expect(params.has('view')).toBe(false);
     expect(params.has('owner')).toBe(false);
-  });
-});
-
-/**
- * The Transactions view (issue #570): fetch, draw and filter the selected
- * division's own fills.
- */
-describe('Corp Wallet: transactions', () => {
-  it('lists a division’s fills, and filters them by side', async () => {
-    const user = userEvent.setup();
-    window.history.pushState({}, '', '/corp/wallet?view=transactions');
-    renderCorpWalletRoute();
-
-    const table = await screen.findByRole('table', { name: 'Transactions' });
-    expect(await within(table).findByText('Tritanium')).toBeInTheDocument();
-    expect(within(table).getByText('Pyerite')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: /^Filters/ }));
-    await user.click(screen.getByRole('combobox', { name: 'Side' }));
-    await user.click(await screen.findByRole('option', { name: 'Sell' }));
-
-    expect(await within(table).findByText('Pyerite')).toBeInTheDocument();
-    expect(within(table).queryByText('Tritanium')).not.toBeInTheDocument();
-  });
-
-  /**
-   * The filter lives in the URL (issue #1302). Corp access and the division
-   * list resolve a render or two after mount, and the reset-on-scope-change
-   * effect must not mistake that settling for a real division change — or a
-   * reload of a link carrying a transaction filter would wipe it the instant
-   * they finished loading.
-   */
-  it('keeps a transaction filter carried in the URL, even while corp access is still resolving', async () => {
-    window.history.pushState({}, '', '/corp/wallet?view=transactions&txn.q=Pyerite');
-    renderCorpWalletRoute();
-
-    const table = await screen.findByRole('table', { name: 'Transactions' });
-    expect(await within(table).findByText('Pyerite')).toBeInTheDocument();
-    expect(within(table).queryByText('Tritanium')).not.toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Search item…')).toHaveValue('Pyerite');
-  });
-
-  /**
-   * The filter still resets on a division switch: "this division traded
-   * nothing" is what a filter left over from another division looks like.
-   */
-  it('drops the filter when the division switches away and back', async () => {
-    const user = userEvent.setup();
-    window.history.pushState({}, '', '/corp/wallet?view=transactions');
-    renderCorpWalletRoute();
-
-    const search = await screen.findByPlaceholderText('Search item…');
-    await user.type(search, 'Megacyte');
-    expect(await screen.findByText('No transactions match this filter.')).toBeInTheDocument();
-
-    await user.click(divisionButton('SRP'));
-    await user.click(divisionButton('Master Wallet'));
-
-    const table = await screen.findByRole('table', { name: 'Transactions' });
-    expect(await within(table).findByText('Tritanium')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Search item…')).toHaveValue('');
-  });
-
-  it('says so when the filter, not the division, is why the table is empty', async () => {
-    const user = userEvent.setup();
-    window.history.pushState({}, '', '/corp/wallet?view=transactions');
-    renderCorpWalletRoute();
-
-    const search = await screen.findByPlaceholderText('Search item…');
-    await user.type(search, 'Megacyte');
-
-    expect(await screen.findByText('No transactions match this filter.')).toBeInTheDocument();
-    expect(screen.queryByText('No corp transactions cached')).not.toBeInTheDocument();
+    expect(await screen.findByText('SRP division payout')).toBeInTheDocument();
   });
 });

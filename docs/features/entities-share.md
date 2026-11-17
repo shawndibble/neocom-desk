@@ -101,7 +101,7 @@ Mounted while `?info=type-<id>` is set; lazy-loads `ItemDetailModal` (guarded ch
 
 ## Related docs
 
-Corporation pages that open Show Info links (`CorpRoster`, `CorpTransactionsPanel`): `docs/features/corp.md`; Item Detail: `docs/features/assets.md`; Pilot Lookup (same profile view as the Character tab): `docs/features/pilot-lookup.md`; share creation UX: `docs/features/share-links.md`. Shell-side hooks (where the modals are mounted and what closes them): `docs/features/app-shell.md`.
+Corporation pages that open Show Info links (`CorpRoster`): `docs/features/corp.md`; Item Detail: `docs/features/assets.md`; Pilot Lookup (same profile view as the Character tab): `docs/features/pilot-lookup.md`; share creation UX: `docs/features/share-links.md`. Shell-side hooks (where the modals are mounted and what closes them): `docs/features/app-shell.md`.
 
 ## Observed gaps
 
