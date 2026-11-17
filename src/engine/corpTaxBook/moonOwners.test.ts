@@ -7,6 +7,7 @@ import {
   billedPricesOf,
   extractionRefineriesOf,
   moonOwnerDetail,
+  moonOwnerRefineryMining,
   staleLedgerMailDue,
   type MoonOwnerFeeder,
   type MoonOwnerPayout,
@@ -576,5 +577,18 @@ describe("the moon owner's own members' rate (#6210)", () => {
     expect(rowOf(input({ rates })).minerRatePct).toBe(4);
     const guest = entry(A, '2026-10-05', 1000, { recordedCorporationId: 98000555 });
     expect(rowOf(input({ rates, entries: [guest] })).minerRatePct).toBe(15);
+  });
+});
+
+describe('moonOwnerRefineryMining', () => {
+  it('lists covered entries by day, valued at 100%, and knows no stranger', () => {
+    const lines = moonOwnerRefineryMining(
+      input({ entries: [entry(A, '2026-10-05', 1000), entry(A, '2026-09-05', 500)] }),
+      A
+    );
+    expect(lines).toEqual([
+      { structureId: 10, characterId: 1, date: '2026-10-05', quantity: 1000, value: 1000 },
+    ]);
+    expect(moonOwnerRefineryMining(input(), B)).toBeUndefined();
   });
 });

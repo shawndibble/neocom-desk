@@ -63,6 +63,7 @@ import { MoonDetail } from '@/features/corp/moons/MoonDetail';
 import { MoonPage } from '@/features/corp/moons/MoonPage';
 import { MoonsTab } from '@/features/corp/moons/MoonsTab';
 import { MoonOwnerDetail } from '@/features/corp/moons/MoonOwnerDetail';
+import { RefineryDetail } from '@/features/corp/moons/RefineryDetail';
 import { MoonOwnersTab } from '@/features/corp/moons/MoonOwnersTab';
 import {
   MOONS_TABS,
@@ -255,6 +256,9 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
         {detail?.kind === 'moon' && <MoonPage moonId={Number(detail.id)} />}
         {detail?.kind === 'miner' && <MinerDetail key={detail.id} id={detail.id} />}
         {detail?.kind === 'moonOwner' && <MoonOwnerDetail id={detail.id} />}
+        {detail?.kind === 'refinery' && (
+          <RefineryDetail ownerId={detail.id} structureId={detail.structureId} />
+        )}
         {detail?.kind === 'statementPeriod' && <StatementPeriodDetail periodStart={detail.id} />}
         {view && settingsDialog && (
           <BookSettingsDialog

@@ -13,8 +13,14 @@ import {
   setBookFeederPayee,
   setFeederMode,
   setFeederRate,
+  setRefineryArchive,
   setRefineryLabel,
 } from '../taxBook/feederClient';
+import { minerIdFor } from '@/engine/corpTaxBook/charges';
+import { ArchivedRefineries } from './ArchivedRefineries';
+import { minerPath, moonOwnerRefineryPath } from './moonsPaths';
+import { refineryMeta, offerLabel } from './refineryText';
+import { useOwnerRefineries } from './useOwnerRefineries';
 import { ChangePayeeDialog, PayeeChangeStrip } from './MoonOwnerPayee';
 import { enqueuePayeeChangeMail } from '@/features/corpTaxBook/mailQueue';
 import { canSendMail, queueOfficerMail } from '@/features/corpTaxBook/officerMail';
@@ -38,7 +44,8 @@ const BACK = '/corp/moons/moon-owners';
 /** A moon owner's page at `/corp/moons/moon-owners/:id`, wired to the book. */
 export function MoonOwnerDetail({ id }: { id: string }) {
   const { t } = useTranslation();
-  const { names, canEdit, characterId, corporationId, reload, data } = useBook();
+  const { names, canEdit, characterId, corporationId, reload, data, view } = useBook();
+  const refineries = useOwnerRefineries(Number(id));
   const grantedScopes = useGrantedScopes();
   const accountingName = useCorporationName();
   const input = useMoonOwnersInput();
@@ -94,6 +101,44 @@ export function MoonOwnerDetail({ id }: { id: string }) {
         name={name}
         {...(accountingName ? { accountingName } : {})}
         characterName={names.character}
+        minerPath={(miner) => minerPath(minerIdFor(miner, view.input.miners))}
+        refineries={{
+          ids: refineries.active.map((r) => r.structureId),
+          info: (structureId) => {
+            const r = refineries.active.find((x) => x.structureId === structureId)!;
+            return {
+              to: moonOwnerRefineryPath(corp, structureId),
+              meta: refineryMeta(t, r, r.moonId === undefined ? undefined : names.moon(r.moonId)),
+              ...(r.offer ? { offer: offerLabel(t, r.offer) } : {}),
+            };
+          },
+          archived: (
+            <ArchivedRefineries
+              rows={refineries.archived}
+              name={names.ownerRefinery}
+              moonName={(r) => (r.moonId === undefined ? undefined : names.moon(r.moonId))}
+              pathOf={(structureId) => moonOwnerRefineryPath(corp, structureId)}
+              byName={names.character}
+              {...(canEdit && feeder?.status !== 'left' && feeder?.status !== 'removed'
+                ? {
+                    onRestore: async (structureId: number) => {
+                      try {
+                        await setRefineryArchive(
+                          characterId,
+                          corporationId,
+                          corp,
+                          structureId,
+                          false
+                        );
+                      } finally {
+                        reload();
+                      }
+                    },
+                  }
+                : {})}
+            />
+          ),
+        }}
         refineryName={names.ownerRefinery}
         oreName={names.ore}
         backTo={BACK}

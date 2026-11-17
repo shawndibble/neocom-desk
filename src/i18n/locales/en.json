@@ -18610,6 +18610,8 @@
           "withdrawDispute": "withdrew a dispute",
           "refineryLabelSet": "named a refinery",
           "refinerySystemLearned": "learned a refinery's system",
+          "refineryArchived": "archived a refinery",
+          "refineryRestored": "restored an archived refinery",
           "feederInviteCreated": "invited a moon owner",
           "feederInviteRevoked": "cancelled a moon owner invite",
           "feederJoined": "joined as a moon owner",
@@ -19077,7 +19079,67 @@
         "editTooltip": "Edit label",
         "field": "Refinery label",
         "hint": "Both corporations see this label, and miners see it on their tax lines. Leave it empty to use the default name.",
-        "failed": "Could not save the label. Try again."
+        "failed": "Could not save the label. Try again.",
+        "extractionCount_one": "{{count}} Extraction",
+        "extractionCount_other": "{{count}} Extractions",
+        "lastMined": "last mined {{date}}",
+        "neverMined": "nothing mined yet",
+        "offerGone": "Gone in the game",
+        "offerIdle_one": "No Extraction or mining in {{count}} day",
+        "offerIdle_other": "No Extraction or mining in {{count}} days",
+        "archived": {
+          "title": "Archived ({{count}})",
+          "show": "Show archived refineries",
+          "hide": "Hide archived refineries",
+          "empty": "Nothing archived. Archive a refinery from its page once it is gone from the game; its records stay.",
+          "row": "Archived {{date}} by {{name}} · {{why}}",
+          "why": {
+            "gone": "gone in the game",
+            "idle": "no Extraction for a long time",
+            "manual": "archived by hand"
+          },
+          "restore": "Restore",
+          "restoreLabel": "Restore {{name}}",
+          "restoreFailed": "Could not restore it. Try again."
+        }
+      },
+      "refinery": {
+        "notFound": "This refinery is not one of this moon owner's.",
+        "archive": "Archive",
+        "restore": "Restore",
+        "archivedPill": "Archived",
+        "editLabel": "Edit the label for {{name}}",
+        "hintGone": "The game no longer shows this structure to its owner. Archive it to take it off the list. Everything stays.",
+        "hintIdle": "No Extraction and no mining here in {{count}} days; last mined {{date}}. If it is gone, archive it. Everything stays.",
+        "hintIdleNever": "No Extraction here in {{count}} days and nothing ever mined. If it is gone, archive it. Everything stays.",
+        "archivedBanner": "Archived {{date}} by {{name}} ({{why}}). It is off the Refineries list. Its Extractions, mining and label are all still here. Restore brings it back, and so does mining here again.",
+        "facts": {
+          "moon": "Moon",
+          "extractions": "Extractions",
+          "lastExtraction": "Last Extraction",
+          "mined": "Mined"
+        },
+        "extractionsTitle": "Extractions",
+        "extractionsNone": "No Extraction was recorded at this refinery.",
+        "historyTitle": "Mining history",
+        "historyNone": "Nothing was mined here yet.",
+        "cols": {
+          "popped": "Popped",
+          "state": "State",
+          "ore": "Ore make-up",
+          "value": "Est. value (ISK)",
+          "month": "Month",
+          "miners": "Miners",
+          "units": "Units",
+          "mined": "Value (ISK)"
+        },
+        "fullyMined": "Fully mined",
+        "confirm": {
+          "title": "Archive {{name}}?",
+          "body": "It leaves the Refineries list. Its Extractions, mining rows, label and Statements stay, and every figure still counts them. Restore it any time, or mine there again.",
+          "action": "Archive"
+        },
+        "failed": "Could not save that. Try again."
       },
       "ownerView": {
         "statement": {

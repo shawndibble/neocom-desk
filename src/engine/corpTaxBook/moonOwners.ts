@@ -19,6 +19,7 @@ import { effectiveOwnerRate, pendingRateRequest, type OwnerRateEntry } from './o
 import { resolveRate, type TaxRate } from './rates';
 import type { ObservedMiningEntry } from './types';
 import { utcDay } from '@/engine/localDay';
+import type { RefineryMining } from './moonOwnerRefineries';
 
 /**
  * The accounting corporation's side of its moon owners (feeders): one row per
@@ -703,4 +704,25 @@ export function moonOwnerDetail(input: MoonOwnersInput, id: number): MoonOwnerDe
     payee: payeeOf(f),
     ...(period ? { period } : {}),
   };
+}
+
+/**
+ * What was mined at a moon owner's refineries, one line per recorded day on the covered days and
+ * valued at 100%: the page's "Mined" figures, split by day for a refinery's own page (#6298).
+ */
+export function moonOwnerRefineryMining(
+  input: MoonOwnersInput,
+  id: number
+): RefineryMining[] | undefined {
+  const f = input.feeders.find((x) => x.corporationId === id);
+  if (!f) return undefined;
+  const own = input.entries.filter((e) => e.sourceCorporationId === f.corporationId);
+  const { covered, coveredValues } = work(input, f, own);
+  return covered.map((e, i) => ({
+    structureId: e.structureId,
+    characterId: e.characterId,
+    date: e.date,
+    quantity: e.oreLines.reduce((sum, l) => sum + l.quantity, 0),
+    value: coveredValues[i]!,
+  }));
 }

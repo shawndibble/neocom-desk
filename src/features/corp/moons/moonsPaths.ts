@@ -21,11 +21,21 @@ export type MoonsDetail =
   | { kind: 'moon'; id: string }
   | { kind: 'miner'; id: string }
   | { kind: 'moonOwner'; id: string }
+  /** A moon owner's refinery page (#6298): `id` is the moon owner, `structureId` the refinery. */
+  | { kind: 'refinery'; id: string; structureId: number }
   | { kind: 'statementPeriod'; id: string }
   | null;
 
-/** The moon, Miner, moon owner or Statements period page a pathname names, if any. */
+/** The moon, Miner, moon owner, refinery or Statements period page a pathname names, if any. */
 export function moonsDetail(pathname: string): MoonsDetail {
+  const refinery = /^\/corp\/moons\/moon-owners\/([^/]+)\/refineries\/(\d+)\/?$/.exec(pathname);
+  if (refinery) {
+    return {
+      kind: 'refinery',
+      id: decodeURIComponent(refinery[1]),
+      structureId: Number(refinery[2]),
+    };
+  }
   const match =
     /^\/corp\/moons\/(extractions|moons|miners|moon-owners|statements)\/([^/]+)\/?$/.exec(pathname);
   if (!match) return null;
@@ -42,6 +52,9 @@ export const moonPath = (moonId: number) => `/corp/moons/moons/${moonId}`;
 export const moonsTabPath = tabPath(MOONS_TABS, 'moons');
 export const minerPath = (id: string) => `/corp/moons/miners/${encodeURIComponent(id)}`;
 export const moonOwnerPath = (id: string) => `/corp/moons/moon-owners/${encodeURIComponent(id)}`;
+/** A moon owner's refinery page (#6298), below the moon owner's own. */
+export const moonOwnerRefineryPath = (ownerId: string | number, structureId: number) =>
+  `${moonOwnerPath(String(ownerId))}/refineries/${structureId}`;
 export const statementPeriodPath = (periodStart: string) =>
   `/corp/moons/statements/${encodeURIComponent(periodStart)}`;
 

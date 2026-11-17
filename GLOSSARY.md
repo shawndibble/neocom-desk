@@ -69,6 +69,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Price Percent**: The fraction of market an **Appraisal** is quoted at —
   100 is the order book untouched, and a buyer quoting loot pays some fraction
   of it.
+- **Archived refinery**: A moon owner's refinery an accounting officer took off the Moon owner page's list. Hides only: its Extractions, mining rows and label stay, and every figure still counts them. Mining there on a later day brings it back on its own; an officer may Restore it any time. Not the wallet's journal archive.
 - **Asset Category**: The top-level market group an item sits under ("Ships", "Ship Equipment", "Blueprints & Reactions"), as Assets, Corp Assets and the LP Store landing's Category filter use it. Not EVE's own inventory category. An item outside the market tree has none and reads "Not on the market".
 - **Assignment**: Links a Mining Ledger Entry (or a split slice of its ore) to
   a Payee, snapshotting the tax % and ISK value at assignment time. It acts

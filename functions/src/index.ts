@@ -168,6 +168,7 @@ import {
   setOwnRefineryLabel,
   setRefineryLabel,
 } from './corpTaxBookRefineryLabels.js';
+import { parseSetRefineryArchiveInput, setRefineryArchive } from './corpTaxBookRefineryArchive.js';
 import {
   cancelFeederRemoval,
   claimFeederStaleMail,
@@ -1145,6 +1146,15 @@ corpTaxBookAction('setCorpTaxBookFeederModeCallable', (request) =>
 // own officers do not.
 corpTaxBookAction('setCorpTaxBookRefineryLabelCallable', (request) =>
   setRefineryLabel(feederOwnerDeps(), callerOf(request), parseSetRefineryLabelInput(request.data))
+);
+
+// Archive a moon owner's refinery, or restore it (issue #6298): the accounting side only.
+corpTaxBookAction('setCorpTaxBookRefineryArchiveCallable', (request) =>
+  setRefineryArchive(
+    feederOwnerDeps(),
+    callerOf(request),
+    parseSetRefineryArchiveInput(request.data)
+  )
 );
 
 corpTaxBookAction('setCorpTaxBookOwnRefineryLabelCallable', (request) =>
