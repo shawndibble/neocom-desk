@@ -95,6 +95,34 @@ back to the main checkout, `git worktree remove "$WORKTREE_PATH" --force`,
 `git worktree prune`, then stop per that step's instructions (report and
 STOP, or continue to pick a different ticket, as stated).
 
+## Hold for review (a `hold-for-review` ticket)
+
+A ticket carrying the `hold-for-review` label ends with an **open, unmerged PR
+and screenshots**, never a merge. Check the label right after step 2's claim
+(`gh issue view <n> --json labels`). Typically it is a UI ticket where the
+agent designs its own mockups (stories per `docs/design/mockups/README.md`,
+1440 and 390, in the folder the ticket names), picks one design, implements
+it, then proves it with screenshots of the real app. What changes:
+
+- Step 7: pass `--hold` to `open-pr.mjs`. It does not arm auto-merge. Use
+  `Part of #<n>` in the commit and PR body, never `Closes`, so the issue stays
+  open.
+- Step 5: build the mockup stories first, choose one, say why in the PR.
+- Before step 8's wait: take screenshots of what was actually implemented
+  (real app, 1440 and 390, every state the ticket names), commit them under
+  `docs/design/mockups/<folder>/implemented/`, push, and link them in the PR
+  body so they render. Also list the design choice and any deviation.
+- Step 8 still runs (CI green, `/code-review` already done before the PR).
+- Skip step 9: never run `finish.mjs` and never merge. Instead: release the
+  claim (`gh issue edit <n> --remove-assignee @me --remove-label in-progress`),
+  comment the PR URL on the issue, remove the worktree
+  (`git worktree remove "$WORKTREE_PATH" --force`, `git worktree prune`), and
+  report with `status=held`.
+- The issue stays open and keeps `ready-for-agent` and `hold-for-review`;
+  after the claim is released the selector would pick it up again, so also
+  swap `ready-for-agent` for `ready-for-human` (the PR is now waiting on a
+  human). A human merges the PR and closes the issue.
+
 ## Never wait for a human
 
 This run is headless. Nobody answers a question, so a final message that
@@ -307,7 +335,7 @@ that one spec: `npx playwright test e2e/plans.spec.ts -g "<test name>"`.
 - Write the PR body to a scratch file (what changed and why, `Closes #<n>`,
   any deviations from the ticket, and a "Review notes" section for
   unaddressed judgement-call findings from `/code-review`).
-- `node scripts/next-ticket/open-pr.mjs "<type>: <summary> (#<n>)" <body-file>`
+- `node scripts/next-ticket/open-pr.mjs "<type>: <summary> (#<n>)" <body-file>` (add `--hold` for a `hold-for-review` ticket, see above)
   — pushes the branch (`-u origin HEAD`), creates the PR against `develop`, and
   arms auto-merge (`gh pr merge --merge --auto --delete-branch`) so GitHub
   merges it itself the instant it's mergeable and green — no need to
@@ -400,6 +428,8 @@ playwright-report`), then report back: the failing job and test, the
 
 ## 9. Merge, close, and clean up
 
+A `hold-for-review` ticket skips this step (see "Hold for review").
+
 `cd` back to the checkout this session started in (not the worktree — this
 script removes it), then:
 
@@ -432,7 +462,7 @@ End your final message with exactly one machine-parseable line, so a wrapper
 script can extract it — nothing after it:
 
 ```
-RESULT ticket=#<n> pr=<pr-url|none> status=<merged|blocked|no-ticket>
+RESULT ticket=#<n> pr=<pr-url|none> status=<merged|held|blocked|no-ticket>
 ```
 
 - `no-ticket` — step 2 found nothing unblocked (`ticket=none pr=none`).
@@ -440,5 +470,6 @@ RESULT ticket=#<n> pr=<pr-url|none> status=<merged|blocked|no-ticket>
   step 8 gave up after 5 rounds (`pr=none` if no PR was opened, otherwise the
   PR URL).
 - `merged` — step 9 completed.
+- `held` — a `hold-for-review` ticket: PR open, CI green, screenshots in the PR, not merged.
 
 Then stop — do not pick up another ticket this run.
