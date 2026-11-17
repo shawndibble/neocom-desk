@@ -1141,24 +1141,13 @@ describe('OrderDetailModal', () => {
       expect(exits).toHaveTextContent(/Hold ·/);
     });
 
-    it('opens and closes a section on its toggle, and opens the one asked for on arrival', () => {
+    it('opens and closes a section on its toggle', () => {
       renderModal({ row: RICH_ROW, stationChecked: true });
       const who = screen.getByRole('button', { name: /Who is cheaper/ });
       fireEvent.click(who);
       expect(who).toHaveAttribute('aria-expanded', 'true');
       fireEvent.click(who);
       expect(who).toHaveAttribute('aria-expanded', 'false');
-
-      cleanup();
-      renderModal({ row: RICH_ROW, stationChecked: true, initialSection: 'exits' });
-      expect(screen.getByRole('button', { name: /Other ways out/ })).toHaveAttribute(
-        'aria-expanded',
-        'true'
-      );
-      expect(screen.getByRole('button', { name: /Who is cheaper/ })).toHaveAttribute(
-        'aria-expanded',
-        'false'
-      );
     });
 
     it('reads "Clear" once every scope is checked and clean, and "Not checked" while any scope still is not', () => {

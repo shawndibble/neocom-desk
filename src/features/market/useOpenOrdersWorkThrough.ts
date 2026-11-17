@@ -15,20 +15,16 @@ interface UseOpenOrdersWorkThroughOptions {
   data: OpenOrdersPageSnapshot | null;
   snapshot: OpenOrdersPageSnapshot | null;
   ordersByOrderId: ReadonlyMap<number, MarketOrder>;
-  isPhone: boolean;
   rowCount: number;
-  onSeeExits: (row: OpenOrderRow) => void;
 }
 
-/** The page's work-through: queue, start-from-link, scroll-to-current, and the context it shares. */
+/** The page's work-through: queue, start-from-link, scroll-to-current, and the context its modal shares. */
 export function useOpenOrdersWorkThrough({
   sortedRows,
   data,
   snapshot,
   ordersByOrderId,
-  isPhone,
   rowCount,
-  onSeeExits,
 }: UseOpenOrdersWorkThroughOptions) {
   const workQueue = useMemo(() => workThroughQueue(sortedRows), [sortedRows]);
   const openInEveCharacterIds = useCharacterIdsWithScopes(
@@ -49,9 +45,7 @@ export function useOpenOrdersWorkThrough({
   );
   const workThrough = useWorkThrough({
     queue: workQueue,
-    isPhone,
     ownOrderIds,
-    canOpenInEve,
     ordersById: ordersByOrderId,
     fetchedAtByCharacter,
   });
@@ -76,8 +70,8 @@ export function useOpenOrdersWorkThrough({
     [workQueue]
   );
   const workThroughContext = useMemo<WorkThroughContextValue>(
-    () => ({ workThrough, canOpenInEve, manyOwners, onSeeExits }),
-    [workThrough, canOpenInEve, manyOwners, onSeeExits]
+    () => ({ workThrough, canOpenInEve, manyOwners }),
+    [workThrough, canOpenInEve, manyOwners]
   );
   return { workCurrentId, workCurrent, workThroughContext };
 }
