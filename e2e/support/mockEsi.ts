@@ -183,6 +183,8 @@ export async function installEsiMock(page: Page): Promise<void> {
           }))
       );
     }
+    // Exact-name lookups (Payees, pilot search): nobody unless a spec serves its own.
+    if (path === '/universe/ids') return json({});
     if (path === '/universe/names') {
       const ids = route.request().postDataJSON() as number[];
       return json(
