@@ -3,36 +3,61 @@ import { useTranslation } from 'react-i18next';
 import { Checkbox, TextArea, TextInput } from '@/components/ui';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { parseRequestedRate } from '../taxBook/feederViewModel';
+import { MAX_AS_OF_DAYS_BACK } from '@/engine/corpTaxBook/ownerRate';
 import { DialogShell, Label } from './BookDialogs';
 
-/** Set the rate a moon owner is owed (the agreed rate); it wins over the one they asked for. */
+/**
+ * Set the rate a moon owner is owed (the agreed rate); it wins over the one they asked for. It
+ * counts from the as-of day, today by default, and never reaches back before it (#6347).
+ */
 export function SetRateDialog({
   initial,
+  today,
+  earliest,
   onClose,
   onSave,
 }: {
   initial: number | null;
+  /** Latest as-of day, and the default: the current EVE (UTC) day. */
+  today: string;
+  /** Earliest as-of day: 30 days back, or the moon owner's first day if later. */
+  earliest: string;
   onClose: () => void;
-  onSave: (pct: number) => Promise<void>;
+  /** `asOf` is undefined for today, so the server dates it by its own clock. */
+  onSave: (pct: number, asOf: string | undefined) => Promise<void>;
 }) {
   const { t } = useTranslation();
   const [text, setText] = useState(initial === null ? '' : String(initial));
+  const [asOf, setAsOf] = useState(today);
   const pct = parseRequestedRate(text);
+  const asOfOk = asOf >= earliest && asOf <= today;
   return (
     <DialogShell
       open
       onClose={onClose}
       title={t('corpTaxBook.moons.moonOwners.dialogs.rate.title')}
       confirmLabel={t('corpTaxBook.moons.moonOwners.dialogs.rate.confirm')}
-      canConfirm={pct !== null}
+      canConfirm={pct !== null && asOfOk}
       run={async () => {
-        if (pct !== null) await onSave(pct);
+        if (pct !== null) await onSave(pct, asOf === today ? undefined : asOf);
       }}
     >
       <Label text={t('corpTaxBook.moons.moonOwners.dialogs.rate.field')}>
         <TextInput inputMode="decimal" value={text} onChange={(e) => setText(e.target.value)} />
       </Label>
-      <p className="text-xs text-text-dim">{t('corpTaxBook.moons.moonOwners.dialogs.rate.hint')}</p>
+      <Label text={t('corpTaxBook.moons.moonOwners.dialogs.rate.asOf')}>
+        <TextInput
+          type="date"
+          value={asOf}
+          min={earliest}
+          max={today}
+          aria-invalid={!asOfOk}
+          onChange={(e) => setAsOf(e.target.value)}
+        />
+      </Label>
+      <p className="text-xs text-text-dim">
+        {t('corpTaxBook.moons.moonOwners.dialogs.rate.hint', { days: MAX_AS_OF_DAYS_BACK })}
+      </p>
     </DialogShell>
   );
 }

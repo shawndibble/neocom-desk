@@ -4,8 +4,20 @@
  * and the Collector may agree one; only an agreed rate is ever in effect, so a
  * request is recorded and changes nothing on its own (#6209). Dates are bare
  * EVE/UTC days; an agreed entry applies from its effective-from day, and the
- * first one also reaches back over the days before it, which waited as pending.
+ * first one also reaches back over the days before it, which waited as pending, unless it was
+ * set with an as-of date (#6347).
  */
+
+import { shiftUtcDate } from '../localDay';
+
+/** How far back an agreed rate may be dated (#6347). Mirrored in `functions/`. */
+export const MAX_AS_OF_DAYS_BACK = 30;
+
+/** The earliest as-of day: `MAX_AS_OF_DAYS_BACK` before `today`, or the moon owner's first day if later. */
+export function earliestAsOf(today: string, joinedDay: string): string {
+  const limit = shiftUtcDate(today, -MAX_AS_OF_DAYS_BACK);
+  return joinedDay > limit ? joinedDay : limit;
+}
 
 export type OwnerRateKind = 'requested' | 'agreed';
 
@@ -16,6 +28,11 @@ export interface OwnerRateEntry {
   effectiveFrom: string;
   /** ISO instant the entry was recorded; breaks a tie between entries of one day. */
   recordedAt: string;
+  /**
+   * Set on an agreed entry written with an as-of date (#6347): it counts from `effectiveFrom`
+   * only and never reaches back. Absent on older entries, which keep reaching back.
+   */
+  noBackdate?: true;
 }
 
 export interface EffectiveOwnerRate {
@@ -58,15 +75,21 @@ function firstAgreed(history: readonly OwnerRateEntry[]): OwnerRateEntry | undef
   return first;
 }
 
+/** The first agreed entry, unless it was set with an as-of date: then nothing reaches back. */
+function reachBackEntry(history: readonly OwnerRateEntry[]): OwnerRateEntry | undefined {
+  const first = firstAgreed(history);
+  return first?.noBackdate ? undefined : first;
+}
+
 /**
  * The agreed rate in effect on `date`; before the first agreed rate starts, that first one
- * (backdated). A requested rate never takes effect: with nothing agreed there is no rate.
+ * (backdated, unless set with an as-of day). A requested rate never takes effect: with nothing agreed there is no rate.
  */
 export function effectiveOwnerRate(
   history: readonly OwnerRateEntry[],
   date: string
 ): EffectiveOwnerRate | undefined {
-  const entry = latestOf(history, 'agreed', date) ?? firstAgreed(history);
+  const entry = latestOf(history, 'agreed', date) ?? reachBackEntry(history);
   return entry && { pct: entry.pct, kind: entry.kind, effectiveFrom: entry.effectiveFrom };
 }
 

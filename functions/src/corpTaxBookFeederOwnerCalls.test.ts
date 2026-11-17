@@ -3,6 +3,8 @@ import { effectiveOwnerRatePct } from './corpTaxBookEngine.js';
 import {
   appendAgreedRate,
   appendModeChange,
+  MAX_AS_OF_DAYS_BACK,
+  resolveAsOf,
   parseSetFeederModeInput,
   parseSetFeederRateInput,
 } from './corpTaxBookFeederOwnerCalls.js';
@@ -37,6 +39,43 @@ describe('parseSetFeederRateInput', () => {
   });
 });
 
+describe('parseSetFeederRateInput as-of', () => {
+  const base = { corporationId: 9, accessToken: 't', feederCorporationId: 5, pct: 5 };
+  it('reads an optional YYYY-MM-DD day', () => {
+    expect(parseSetFeederRateInput({ ...base, asOf: '2026-10-10' }).asOf).toBe('2026-10-10');
+    expect(parseSetFeederRateInput(base).asOf).toBeUndefined();
+  });
+  it.each(['10/10/2026', '2026-02-31', 5])('rejects an as-of of %s', (asOf) => {
+    expect(() => parseSetFeederRateInput({ ...base, asOf })).toThrow();
+  });
+});
+
+describe('resolveAsOf', () => {
+  it('the window matches the engine in src/ (30 days)', () => {
+    expect(MAX_AS_OF_DAYS_BACK).toBe(30);
+  });
+
+  // NOW is 2026-10-18: 30 days back is 2026-09-18; the record joined 2026-10-01.
+  it('is today when no day is given', () => {
+    expect(resolveAsOf(record(), undefined, NOW)).toBe('2026-10-18');
+  });
+  it('allows today and the moon owner first day', () => {
+    expect(resolveAsOf(record(), '2026-10-18', NOW)).toBe('2026-10-18');
+    expect(resolveAsOf(record(), '2026-10-01', NOW)).toBe('2026-10-01');
+  });
+  it('refuses a day before the moon owner first day', () => {
+    expect(() => resolveAsOf(record(), '2026-09-30', NOW)).toThrow(/as-of/);
+  });
+  it('refuses a future day', () => {
+    expect(() => resolveAsOf(record(), '2026-10-19', NOW)).toThrow(/as-of/);
+  });
+  it('allows exactly 30 days back and refuses 31', () => {
+    const old = record({ joinedAt: Date.parse('2026-06-01T00:00:00Z') });
+    expect(resolveAsOf(old, '2026-09-18', NOW)).toBe('2026-09-18');
+    expect(() => resolveAsOf(old, '2026-09-17', NOW)).toThrow(/as-of/);
+  });
+});
+
 describe('parseSetFeederModeInput', () => {
   const base = { corporationId: 9, accessToken: 't', feederCorporationId: 5 };
   it('reads the mode and an optional note', () => {
@@ -66,10 +105,22 @@ describe('appendAgreedRate', () => {
       pct: 6,
       effectiveFrom: '2026-10-18',
       recordedAt: '2026-10-18T12:00:00.000Z',
+      noBackdate: true,
     });
     expect(effectiveOwnerRatePct(history, '2026-10-18')).toBe(6);
-    // A request never applies: the first agreed rate reaches back over the days before (#6209).
-    expect(effectiveOwnerRatePct(history, '2026-10-17')).toBe(6);
+    // A new entry counts from its day only: nothing reaches back (#6347).
+    expect(effectiveOwnerRatePct(history, '2026-10-17')).toBeUndefined();
+  });
+  it('dates the entry by the as-of day', () => {
+    const history = appendAgreedRate(record(), 6, NOW, '2026-10-10');
+    expect(history.at(-1)).toMatchObject({ effectiveFrom: '2026-10-10', noBackdate: true });
+    expect(effectiveOwnerRatePct(history, '2026-10-09')).toBeUndefined();
+    expect(effectiveOwnerRatePct(history, '2026-10-10')).toBe(6);
+  });
+  it('keeps an old first entry reaching back', () => {
+    const rec = record({ agreedRatePct: 5 });
+    const history = appendAgreedRate(rec, 6, NOW);
+    expect(effectiveOwnerRatePct(history, '2026-09-20')).toBe(5);
   });
   it('a later agreed rate never reaches back past the one already in force', () => {
     const history = appendAgreedRate(record({ requestedRatePct: 4, agreedRatePct: 5 }), 6, NOW);
@@ -83,6 +134,21 @@ describe('appendAgreedRate', () => {
       ['agreed', 5],
       ['agreed', 6],
     ]);
+  });
+  it('repeating the rate in force with an earlier as-of day adds an entry', () => {
+    const rec = record({ ownerRateHistory: appendAgreedRate(record(), 6, JOINED, '2026-10-10') });
+    const history = appendAgreedRate(rec, 6, NOW, '2026-10-05');
+    expect(history.at(-1)).toMatchObject({ pct: 6, effectiveFrom: '2026-10-05' });
+  });
+  it('compares with the rate in force, not the last one recorded', () => {
+    const rec = record({
+      ownerRateHistory: [
+        ...appendAgreedRate(record(), 5, JOINED, '2026-10-10'),
+        { kind: 'agreed', pct: 8, effectiveFrom: '2026-10-17', recordedAt: '2026-10-17T00:00:00Z' },
+      ],
+    });
+    expect(appendAgreedRate(rec, 8, NOW, '2026-10-18')).toEqual(rec.ownerRateHistory);
+    expect(appendAgreedRate(rec, 5, NOW, '2026-10-14')).toHaveLength(3);
   });
   it('adds nothing when the standing agreed rate is repeated', () => {
     const rec = record({ ownerRateHistory: appendAgreedRate(record(), 6, JOINED) });

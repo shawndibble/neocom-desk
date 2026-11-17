@@ -19145,7 +19145,7 @@
       "ownerView": {
         "statement": {
           "intro": "{{name}} handles the tax on your moons.",
-          "noRate": "No rate is agreed yet, so nothing is owed to you yet. Once one is agreed, it counts from your first day. Ask for one below.",
+          "noRate": "No rate is agreed yet, so nothing is owed to you yet. Once one is agreed, it counts from the day they pick. Ask for one below.",
           "pending": "{{value}} of ore mined is waiting for a rate.",
           "owed": "is owed to you for ore mined at your refineries since {{since}}, at your rate of {{pct}}%.",
           "owedUndated": "is owed to you for ore mined at your refineries, at your rate of {{pct}}%.",
@@ -19197,7 +19197,7 @@
         "rate": {
           "none": "No rate is set.",
           "plain": "Your rate is {{pct}}%.",
-          "asked": "You asked for {{pct}}%. Nothing is owed until they agree a rate; then it counts from your first day.",
+          "asked": "You asked for {{pct}}%. Nothing is owed until they agree a rate; then it counts from the day they pick.",
           "override": "Rate set to {{pct}}% by {{name}} on {{date}}. You asked for {{asked}}%.",
           "overrideUndated": "Rate set to {{pct}}% by {{name}}. You asked for {{asked}}%.",
           "set": "Rate set to {{pct}}% by {{name}} on {{date}}.",
@@ -19694,7 +19694,7 @@
           "marginHint": "Miner rate − their rate",
           "asked": "They asked for {{pct}}%. Yours stands.",
           "askedSame": "They asked for {{pct}}%.",
-          "noRate": "No rate set. Their ore waits until you set one, then counts from their first day.",
+          "noRate": "No rate set. Nothing is owed until you set one. It counts from the day you pick.",
           "notSet": "Not set",
           "history": {
             "agreed": "Rate set to {{pct}}%",
@@ -19758,7 +19758,8 @@
           "rate": {
             "title": "Set their rate",
             "field": "Rate (%)",
-            "hint": "Your rate wins over what they asked for, from today. Their requests are kept and change nothing.",
+            "asOf": "Counts from",
+            "hint": "Your rate wins over what they asked for. It counts from this day only, up to {{days}} days back. Days before it stay unpaid. Their requests are kept and change nothing.",
             "confirm": "Set rate"
           },
           "settled": {
