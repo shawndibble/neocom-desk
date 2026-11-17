@@ -23,6 +23,8 @@ const row = (id: string, structureId: number): ExtractionRow =>
     chunkArrivalAt: '2026-10-17T00:00:00Z',
     fracturedAt: '2026-10-17T12:00:00Z',
     expiresAt: '2026-10-25T00:00:00Z',
+    plannedFractureAt: '2026-10-17T12:00:00Z',
+    plannedExpiresAt: '2026-10-25T00:00:00Z',
   }) as unknown as ExtractionRow;
 
 describe('ExtractionTimeline', () => {
@@ -89,6 +91,53 @@ describe('ExtractionTimeline', () => {
       </MemoryRouter>
     );
     expect(document.querySelector('.bg-success')?.className).toContain('min-w-1.5');
+  });
+
+  it('draws one green bar from Ready to the planned Expired for a chunk not fractured yet', () => {
+    const waiting = {
+      ...row('w', 4),
+      fracturedAt: undefined,
+      expiresAt: undefined,
+      plannedExpiresAt: '2026-10-19T03:00:00Z',
+    };
+    render(
+      <MemoryRouter>
+        <ExtractionTimeline rows={[waiting]} states={DEFAULT_STATES} />
+      </MemoryRouter>
+    );
+    const bar = screen.getByRole('link');
+    expect(bar.querySelectorAll('.bg-success')).toHaveLength(1);
+    expect(bar.querySelectorAll('.bg-warning')).toHaveLength(0);
+  });
+
+  it('ticks an early laser fracture and no other', () => {
+    const laser = { ...row('l', 5), fracturedBy: 'laser' as const };
+    const { rerender } = render(
+      <MemoryRouter>
+        <ExtractionTimeline rows={[laser]} states={DEFAULT_STATES} />
+      </MemoryRouter>
+    );
+    expect(screen.getAllByTestId('laser-tick')).toHaveLength(1);
+    rerender(
+      <MemoryRouter>
+        <ExtractionTimeline rows={[row('a', 1)]} states={DEFAULT_STATES} />
+      </MemoryRouter>
+    );
+    expect(screen.queryByTestId('laser-tick')).toBeNull();
+  });
+
+  it('lists Ready, Auto-fracture and Expired in the bar tooltip on focus', async () => {
+    render(
+      <MemoryRouter>
+        <ExtractionTimeline rows={[row('a', 1)]} states={DEFAULT_STATES} />
+      </MemoryRouter>
+    );
+    await userEvent.tab();
+    await userEvent.tab();
+    const tip = await screen.findByRole('tooltip');
+    expect(tip).toHaveTextContent('Ready (chunk arrives)');
+    expect(tip).toHaveTextContent('Auto-fracture');
+    expect(tip).toHaveTextContent('Expired');
   });
 });
 

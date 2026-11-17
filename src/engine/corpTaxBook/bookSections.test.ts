@@ -116,6 +116,8 @@ describe('moonSchedule', () => {
     moonId: 1,
     state: 'extracting',
     startedAt: '2026-10-01T00:00:00Z',
+    plannedFractureAt: '2026-10-21T00:00:00Z',
+    plannedExpiresAt: '2026-10-23T00:00:00Z',
     chunkArrivalAt: '2026-10-30T00:00:00Z',
     oreSource: 'unknown',
     oreLines: [],

@@ -44,7 +44,8 @@ function iso(ms: number): string {
   return new Date(ms).toISOString();
 }
 
-function fractureAndExpiry(ex: Extraction, expiryHours: number | undefined) {
+/** When the chunk fractures (laser, else on its own) and the field is assumed gone, in any state. */
+export function fractureAndExpiry(ex: Extraction, expiryHours: number | undefined) {
   const fracturedBy: 'laser' | 'auto' = ex.laserFiredAt ? 'laser' : 'auto';
   const fracturedAt = Date.parse(ex.laserFiredAt ?? ex.naturalDecayAt);
   const hours = Math.min(expiryHours ?? DEFAULT_EXPIRY_HOURS, MAX_EXPIRY_HOURS);
