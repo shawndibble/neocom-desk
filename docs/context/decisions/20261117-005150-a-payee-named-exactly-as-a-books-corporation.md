@@ -22,3 +22,19 @@ _Recorded 2026-11-17._
   learned from a payment; a Payee verified as a corporation or character keeps its link. Paying a
   corporation's CEO or an officer once had re-pointed the member's corporation Payee to that
   character, and the book stopped counting it as its own.
+
+- **A Payee is always someone in EVE: a corporation or a character.** Adding or renaming one in
+  Manage Payees saves only a picked suggestion or a name that is exactly one corporation or
+  character (an exact-name `/universe/ids` lookup, `lookupPayeeName`); no match, a failed lookup or
+  an alliance saves nothing and says why, and a name a corporation and a character share asks the
+  pilot to pick. The Survey's Assign Taxes creates a Payee only the same way and otherwise explains
+  in its row. This replaces "a moon or place name must always be saveable" (free-text Payees): an
+  unlinked Payee is what made a member's book days read as Conflicts, and it can never be paid.
+  Alliance-linked Payees from before keep working and stay editable; only new ones are limited.
+  Editing a linked Payee without renaming it asks ESI nothing.
+
+- **Unlinked Payees from before are linked where the name allows, and flagged where it doesn't.**
+  The Tax tab looks every unlinked Payee's name up in one batched call, once a session per Payee,
+  and links an exact single corporation/character match (`rememberPayeeEntity`, synced). The rest
+  are one Tax tab attention item opening Manage Payees, and their rows there read "Not found in
+  EVE — edit to pick who this is" (the row's Edit carries the fix, so no extra control).

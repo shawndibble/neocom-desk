@@ -164,9 +164,9 @@ export async function updatePayee(payee: PayeeRecord, input: PayeeInput): Promis
 
 /**
  * Records who this Payee actually is in game (issue #540), learned when the
- * pilot confirms that a payment to `entityId` settled this Payee's entries —
- * never asked for up front, since a Payee is a free-text label and a field
- * almost nobody fills in is worse than none.
+ * pilot confirms that a payment to `entityId` settled this Payee's entries, or
+ * when an unlinked Payee from before Payees had to be someone in EVE is matched
+ * by name (`payeeAutoLink`).
  *
  * A later confirmation against a different recipient wins: a corp renamed, or
  * a landlord who now collects on a different character, is exactly the case

@@ -7735,6 +7735,11 @@
       "manage": "Assign Taxes",
       "needLogin": "Log in to access",
       "failed": "Couldn't connect this moon to that Payee. Try again.",
+      "notInEve": {
+        "none": "No corporation or character in EVE is named {{name}}. Enter who gets the tax as it is spelled in game.",
+        "several": "A corporation and a character in EVE are both named {{name}}. Add the Payee in Manage Payees on the Mining Tax tab to pick which.",
+        "failed": "Couldn't check {{name}} with EVE, so no Payee was added. Try again."
+      },
       "addedPayee": "Added {{name}} as a Payee at {{pct}}%.",
       "assigned_one": "Assigned {{count}} mining entry to {{name}}.",
       "assigned_other": "Assigned {{count}} mining entries to {{name}}.",
@@ -8620,6 +8625,12 @@
         "note": "{{corp}} keeps a Corp Tax Book. Link this Payee to it so the book counts what you pay as its own.",
         "action": "Link to {{corp}}"
       },
+      "notInEve": {
+        "none": "No corporation or character in EVE is named {{name}}. Pick one from the suggestions, spelled as it is in game.",
+        "several": "More than one in EVE is named {{name}}. Pick which:",
+        "choice": "{{name}} · {{kind}}",
+        "failed": "Couldn't check that name with EVE. Try again."
+      },
       "verify": {
         "openUnresolved": "Couldn't find one character, corporation or alliance named {{name}}, so there is nothing to open.",
         "suggestionsLabel": "Matching characters, corporations and alliances",
@@ -8630,8 +8641,8 @@
         },
         "verifiedNote": "{{kind}} — verified, so Settle up can open it in EVE.",
         "linkedNote": "Linked to an EVE character or corporation from a payment.",
-        "unverifiedNote": "Unverified — not a character, corporation or alliance we could find. It stays a free-text label.",
-        "unverifiedShort": "Unverified",
+        "unverifiedNote": "Not found in EVE. Pick who this is from the suggestions to save it.",
+        "notFoundShort": "Not found in EVE — edit to pick who this is",
         "linkedShort": "Linked"
       }
     },
@@ -8697,7 +8708,11 @@
       "more_other": "+{{count}} more",
       "show": "Show",
       "hide": "Hide",
-      "unclassifiedOre": "{{character}} mined an ore type this app doesn't recognise: {{ore}}"
+      "unclassifiedOre": "{{character}} mined an ore type this app doesn't recognise: {{ore}}",
+      "unlinkedPayees_one": "{{count}} Payee isn't linked to anyone in EVE",
+      "unlinkedPayees_other": "{{count}} Payees aren't linked to anyone in EVE",
+      "unlinkedPayeesDetail": "No single corporation or character in EVE has the name of {{names}}. A Corp Tax Book can't tell what you paid such a Payee. Edit each in Manage Payees to pick who it is.",
+      "unlinkedPayeesAction": "Manage Payees"
     },
     "owed": {
       "entriesFor_one": "{{count}} entry",

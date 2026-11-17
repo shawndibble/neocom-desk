@@ -19,6 +19,10 @@ vi.mock('@/features/miningTax/surveyConnections', async (importOriginal) => ({
   autoAssignFromSurveys,
 }));
 
+// Every name is one EVE corporation unless a test says otherwise: a Payee is always someone in game.
+const { lookupPayeeName } = vi.hoisted(() => ({ lookupPayeeName: vi.fn() }));
+vi.mock('@/features/miningTax/payeeLookup', () => ({ lookupPayeeName }));
+
 const BITUMENS = 45492;
 vi.mock('@/sde/loadSde', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/sde/loadSde')>()),
@@ -88,6 +92,10 @@ beforeEach(async () => {
   setSurveyTax.mockResolvedValue(undefined);
   autoAssignFromSurveys.mockReset();
   autoAssignFromSurveys.mockResolvedValue([]);
+  lookupPayeeName.mockReset();
+  lookupPayeeName.mockImplementation((name: string) =>
+    Promise.resolve({ status: 'found', match: { id: 98_000_001, name, kind: 'corporation' } })
+  );
 });
 afterEach(cleanup);
 
@@ -122,7 +130,27 @@ describe('MoonTaxRow', () => {
     await waitFor(() => expect((open as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(open);
     await waitFor(async () => expect(await db.payees.count()).toBe(1));
-    expect((await db.payees.toArray())[0]).toMatchObject({ name: 'New Corp', defaultTaxPct: 12 });
+    expect((await db.payees.toArray())[0]).toMatchObject({
+      name: 'New Corp',
+      defaultTaxPct: 12,
+      entityId: 98_000_001,
+      entityKind: 'corporation',
+    });
+  });
+
+  it('adds no Payee nobody in EVE is named, and says what to do', async () => {
+    lookupPayeeName.mockResolvedValue({ status: 'none' });
+    renderRow();
+    type('Who gets the tax', 'Moon 1 Planet 2');
+    type('Tax rate, percent', '12');
+    const open = screen.getByRole('button', { name: 'Assign Taxes' });
+    await waitFor(() => expect((open as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(open);
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'No corporation or character in EVE is named Moon 1 Planet 2. Enter who gets the tax as it is spelled in game.'
+    );
+    expect(await db.payees.count()).toBe(0);
+    expect(screen.getByTestId('where').textContent).toBe('/mining/survey');
   });
 
   it('stores a complete name and rate on the survey when focus leaves the pair, and only then', async () => {
@@ -325,6 +353,29 @@ describe('MoonTaxReadout', () => {
     );
     expect(useSurveyConnections.getState().value).toEqual([]);
     add.mockRestore();
+  });
+
+  it('connects nothing and says to try again when EVE cannot be asked who the Payee is', async () => {
+    useActiveCharacter.setState({ activeCharacterId: 7, hydrated: true });
+    lookupPayeeName.mockResolvedValue({ status: 'failed' });
+    renderReadout();
+    fireEvent.click(screen.getByRole('button', { name: 'Assign Taxes' }));
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      "Couldn't check Moon Corp with EVE, so no Payee was added. Try again."
+    );
+    expect(await db.payees.count()).toBe(0);
+    expect(useSurveyConnections.getState().value).toEqual([]);
+  });
+
+  it('asks the pilot to pick on the Tax tab when several in EVE share the name', async () => {
+    useActiveCharacter.setState({ activeCharacterId: 7, hydrated: true });
+    lookupPayeeName.mockResolvedValue({ status: 'several', matches: [] });
+    renderReadout();
+    fireEvent.click(screen.getByRole('button', { name: 'Assign Taxes' }));
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'A corporation and a character in EVE are both named Moon Corp. Add the Payee in Manage Payees on the Mining Tax tab to pick which.'
+    );
+    expect(await db.payees.count()).toBe(0);
   });
 
   it('without a survey to connect, opens the Tax tab on their own Payee', async () => {

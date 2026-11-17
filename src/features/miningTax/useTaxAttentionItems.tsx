@@ -38,6 +38,7 @@ import { UnpricedOreDetail } from './UnpricedOreDetail';
 import { hasReachableUnpricedHub } from './unpricedHubs';
 import { useClaimDonation } from './useClaimDonation';
 import type { TaxSnapshot } from './taxSnapshot';
+import { unlinkedPayeesItem } from './unlinkedPayeesAttention';
 
 const NO_HUBS: ReadonlySet<TradeHub['id']> = new Set();
 
@@ -48,6 +49,9 @@ interface Args {
   /** Every row of the tab, the books' own included: an attention item opens one. */
   displayRows: readonly DisplayRow[];
   payeeById: ReadonlyMap<string, PayeeRecord>;
+  /** The member's Payees nobody in EVE answers to, after the automatic link tried them (`useAutoLinkPayees`). */
+  unlinkedPayees: readonly PayeeRecord[];
+  openPayeeManager: () => void;
   corpView: CorpBookView | null;
   failedClaims: ReadonlySet<string>;
   reloadCorpBooks: () => void;
@@ -76,6 +80,8 @@ export function useTaxAttentionItems({
   personalRows,
   displayRows,
   payeeById,
+  unlinkedPayees,
+  openPayeeManager,
   corpView,
   failedClaims,
   reloadCorpBooks,
@@ -561,6 +567,8 @@ export function useTaxAttentionItems({
       }),
     });
   }
+  const unlinked = unlinkedPayeesItem(unlinkedPayees, t, openPayeeManager);
+  if (unlinked) attentionItems.push(unlinked);
   for (const u of data.unclassified) {
     for (const typeId of u.typeIds) {
       attentionItems.push({
