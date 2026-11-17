@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import '@/i18n';
+import { AUDIT_ACTIONS } from '../../../../functions/src/corpTaxBookKinds';
 import { AuditFeed } from './AuditFeed';
 
 const at = Date.parse('2026-10-18T12:00:00Z');
@@ -72,5 +73,27 @@ describe('AuditFeed links the Miner an entry is about', () => {
       '/corp/moons/miners/solo:2'
     );
     expect(screen.getAllByRole('link')).toHaveLength(2);
+  });
+});
+
+describe('AuditFeed copy', () => {
+  it('reads every audit action the server writes as a sentence, never its key', () => {
+    const { container } = render(
+      <div>
+        {AUDIT_ACTIONS.map((action) => (
+          <AuditFeed
+            key={action}
+            entries={[{ id: action, at, by: 1, byName: 'Pilot', action, detail: {} }]}
+          />
+        ))}
+      </div>
+    );
+    const rows = [...container.querySelectorAll('li')];
+    expect(rows).toHaveLength(AUDIT_ACTIONS.length);
+    rows.forEach((row, i) => {
+      const said = row.textContent?.split('Pilot')[1]?.trim().split(/\s+/);
+      expect(said, AUDIT_ACTIONS[i]).not.toEqual([AUDIT_ACTIONS[i]]);
+      expect(said?.length, AUDIT_ACTIONS[i]).toBeGreaterThan(1);
+    });
   });
 });

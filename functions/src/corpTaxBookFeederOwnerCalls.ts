@@ -22,6 +22,7 @@ import {
   tryRebuildFeederView,
 } from './corpTaxBookFeederView.js';
 import type { FeederInviteDoc, FeederRecord } from './corpTaxBookFeeders.js';
+import type { AuditAction } from './corpTaxBookKinds.js';
 import { appendAudit, authorizeOfficer, feederRef, type BookDeps } from './corpTaxBookStore.js';
 
 const MAX_NOTE = 500;
@@ -102,7 +103,7 @@ async function editFeeder(
   edit: (
     rec: FeederRecord,
     now: number
-  ) => { update: Record<string, unknown>; action: string; detail: Record<string, unknown> }
+  ) => { update: Record<string, unknown>; action: AuditAction; detail: Record<string, unknown> }
 ): Promise<{ ok: true }> {
   const access = await authorizeOfficer(deps, caller, input, 'edit', { live: true });
   const ref = feederRef(deps.db, input.corporationId, input.feederCorporationId);

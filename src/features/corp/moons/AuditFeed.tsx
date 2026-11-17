@@ -72,7 +72,7 @@ export function AuditLine({
           components={{ name: minerLink ?? <Fragment /> }}
         />
       ) : (
-        t(`corpTaxBook.moons.activity.actions.${action}`, { defaultValue: a.action })
+        t(`corpTaxBook.moons.activity.actions.${action}`)
       )}
       {!inSentence && minerLink && <> · {minerLink}</>}
       {a.via === 'scheduled sync' && (

@@ -145,6 +145,7 @@ import {
   verifyCallerToken,
   type Caller,
 } from './actorAuth.js';
+import type { AuditAction } from './corpTaxBookKinds.js';
 import type { EveTokenClaims } from './verifyEveToken.js';
 
 /** One type's parsed R2 open-prices object (`readOpenPricesFromR2`), or null when R2 has none. Throws on a failed read. */
@@ -329,7 +330,7 @@ export function appendAudit(
   deps: BookDeps,
   corporationId: number,
   actor: Actor,
-  action: string,
+  action: AuditAction,
   detail: Data
 ): void {
   const at = deps.now();
