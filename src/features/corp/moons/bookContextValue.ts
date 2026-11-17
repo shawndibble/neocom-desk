@@ -1,7 +1,7 @@
 import { createContext } from 'react';
 import type { BookView } from '@/engine/corpTaxBook/bookView';
 import type { BookData, BookSettings, OfficerVerdict } from '../taxBook/bookClient';
-import type { SettingsTab } from './BookSettingsDialog';
+import type { SettingsTab } from './moonsPaths';
 import type { BookNames } from './useCorpBook';
 
 export interface BookContextValue {

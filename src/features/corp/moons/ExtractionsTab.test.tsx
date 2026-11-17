@@ -215,7 +215,7 @@ describe('ExtractionsTab Pop Sharing marks (#6226)', () => {
       );
       expect(screen.getByRole('link', { name: 'Pops shared with Corp, Alliance' })).toHaveAttribute(
         'href',
-        '/corp/moons/sharing?highlight=1'
+        '/corp/moons/extractions?settings=sharing&highlight=1'
       );
       expect(
         screen.getByRole('img', { name: 'Moon owner turned sharing off' })

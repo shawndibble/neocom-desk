@@ -636,7 +636,9 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   audit. A moon owner's opt-out is `popSharingOptOut` on its feeder record, set by the
   `setCorpTaxBookFeederPopSharingCallable` action and mirrored as `popSharingOptedOut` on its
   view summary. The one resolver for a moon's effective settings is `effectivePopSharing`
-  (`functions/src/popSharing.ts`, shared with the client); the Sharing tab is
+  (`functions/src/popSharing.ts`, shared with the client); the Sharing tab of Moon settings
+  (`BookSettingsDialog`, #6304; no longer a page tab: `/corp/moons/sharing` redirects to
+  `/corp/moons/overview?settings=sharing`, and `?settings=<tab>` opens the dialog once) is
   `features/corp/moons/SharingTab.tsx` over `engine/corpTaxBook/sharingMoons.ts`.
 - **Shared Pops** (issue #6223, ADR 0034). The server publishes a sharing book's pops to
   `sharedPops/{corp}` (server-only) after every sync and every settings, rate, survey or opt-out

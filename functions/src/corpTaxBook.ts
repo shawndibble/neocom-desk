@@ -369,8 +369,8 @@ export interface SettingsPatch {
   /** End the member setup window now (Director): `membersSeeFrom` becomes the call time. */
   showToMembers?: true;
   /**
-   * Switch the book to a running account now (Director, #6294): `runningAccountFrom` becomes the
-   * call time, once; it never clears, and from then on only late notices are issued.
+   * Stamps a running account's switch-over (Director, #6294). Every book is one now (decision
+   * 20261117-060555); kept so an older client's call still succeeds.
    */
   switchToRunningAccount?: true;
   /** A running account's late notices. */

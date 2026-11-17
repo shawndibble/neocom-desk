@@ -26,13 +26,14 @@ import {
 } from '@/components/ui';
 import type { TaxRate } from '@/engine/corpTaxBook/rates';
 import { Pill } from '@/components/ui/Pill';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { COMPARED_HUBS } from '@/market/hubs';
 import { callableErrorText } from './feederErrorText';
 import { useBook } from './useBook';
 import { Label } from './BookDialogs';
+import { SharingTab } from './SharingTab';
+import type { SettingsTab } from './moonsPaths';
 import { isk } from './moonsFormat';
 import { AutomaticSyncSection } from './AutomaticSyncSection';
 import { DeleteBookSection } from './DeleteBookSection';
@@ -134,9 +135,6 @@ function useWalletDivisionNames(characterId: number, corporationId: number): Map
   return names;
 }
 
-/** The settings dialog's four tabs. */
-export type SettingsTab = 'rates' | 'billing' | 'extractions' | 'access';
-
 /**
  * The book's settings (D21: from the page header's gear): the dated rates
  * (corp default, Guest default, per-Miner, per-moon, per-refinery, per-moon-owner), hub and Ore Form, grace,
@@ -217,7 +215,6 @@ export function BookSettingsDialog({
   const [noticeMinimum, setNoticeMinimum] = useState(String(rules.minimum));
   const [cooldown, setCooldown] = useState(String(rules.cooldownDays));
   const [tolerance, setTolerance] = useState(String(settings.dayTolerancePct));
-  const [confirmSwitch, setConfirmSwitch] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -412,6 +409,7 @@ export function BookSettingsDialog({
     { id: 'rates', label: t('corpTaxBook.moons.settings.tabs.rates') },
     { id: 'billing', label: t('corpTaxBook.moons.settings.tabs.billing') },
     { id: 'extractions', label: t('corpTaxBook.moons.settings.tabs.extractions') },
+    { id: 'sharing', label: t('corpTaxBook.moons.settings.tabs.sharing') },
     { id: 'access', label: t('corpTaxBook.moons.settings.tabs.access') },
   ];
 
@@ -750,28 +748,8 @@ export function BookSettingsDialog({
                 </div>
               </Field>
               <FieldsHeading>{t('corpTaxBook.moons.settings.running.heading')}</FieldsHeading>
-              <Field
-                label={t('corpTaxBook.moons.settings.running.billing')}
-                note={
-                  !settings.runningAccountFrom && !verdict.isDirector
-                    ? t('corpTaxBook.moons.settings.running.directorOnly')
-                    : undefined
-                }
-              >
-                <span className="flex flex-wrap items-center gap-2">
-                  <span>
-                    {settings.runningAccountFrom
-                      ? t('corpTaxBook.moons.settings.running.since', {
-                          date: displayDate(settings.runningAccountFrom.slice(0, 10)),
-                        })
-                      : t('corpTaxBook.moons.settings.running.calendar')}
-                  </span>
-                  {!settings.runningAccountFrom && verdict.isDirector && canEdit && (
-                    <Button size="sm" onClick={() => setConfirmSwitch(true)}>
-                      {t('corpTaxBook.moons.settings.running.switch')}
-                    </Button>
-                  )}
-                </span>
+              <Field label={t('corpTaxBook.moons.settings.running.billing')}>
+                <span>{t('corpTaxBook.moons.settings.running.summary')}</span>
               </Field>
               <Field
                 label={t('corpTaxBook.moons.settings.running.noticeWhen')}
@@ -901,6 +879,8 @@ export function BookSettingsDialog({
             </Section>
           )}
 
+          {tab === 'sharing' && <SharingTab onOpenSyncSettings={() => setTab('access')} />}
+
           {tab === 'access' && (
             <>
               <Section title={t('corpTaxBook.moons.settings.approvals')}>
@@ -952,23 +932,6 @@ export function BookSettingsDialog({
           )}
         </TabPanel>
       </div>
-      {confirmSwitch && (
-        <ConfirmDialog
-          open
-          title={t('corpTaxBook.moons.settings.running.confirmTitle')}
-          body={t('corpTaxBook.moons.settings.running.confirmBody')}
-          actionLabel={t('corpTaxBook.moons.settings.running.confirm')}
-          danger={false}
-          cancelLabel={t('common.cancel')}
-          failedLabel={t('corpTaxBook.moons.settings.running.failed')}
-          onConfirm={async () => {
-            // One-way (decision 20261117-033049): the server stamps the switch-over instant.
-            await edit({ action: 'updateSettings', patch: { switchToRunningAccount: true } });
-            setConfirmSwitch(false);
-          }}
-          onClose={() => setConfirmSwitch(false)}
-        />
-      )}
     </Modal>
   );
 }

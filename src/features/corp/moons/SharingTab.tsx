@@ -1,5 +1,5 @@
 /**
- * The Moons page's Sharing tab (issue #6222): the book's Pop Sharing switch and Sharing
+ * Moon settings' Sharing tab (issue #6222; moved off the Moons page by #6304): the book's Pop Sharing switch and Sharing
  * default on top, every moon the book handles below (its own refineries and its moon
  * owners'), each row opening its overrides. A refinery with no Extraction yet is listed apart:
  * its moon is not known until one syncs (#6240). Book editors change the settings; read-only
@@ -146,10 +146,9 @@ function SettingsSummary({
   );
 }
 
-export function SharingTab() {
+export function SharingTab({ onOpenSyncSettings }: { onOpenSyncSettings: () => void }) {
   const { t } = useTranslation();
-  const { view, data, settings, names, canEdit, edit, characterId, corporationId, openSettings } =
-    useBook();
+  const { view, data, settings, names, canEdit, edit, characterId, corporationId } = useBook();
   const { load, reload } = usePopSharing(characterId, corporationId);
   const communityStatus = usePopSharingCommunities(characterId, corporationId, load);
   // A moon's share mark elsewhere (the Extractions tab) links to its row here.
@@ -314,6 +313,7 @@ export function SharingTab() {
         >
           <div className="space-y-3">
             <p className="text-sm text-text-dim">{t(`${k}.intro`)}</p>
+            <p className="text-sm text-text-dim">{t(`${k}.savesAlone`)}</p>
             <label className="flex min-h-9 items-center gap-2 text-sm">
               <Checkbox
                 checked={doc.enabled}
@@ -325,15 +325,9 @@ export function SharingTab() {
             {!syncOn && (
               <p className="text-sm text-warning">
                 {t(doc.enabled ? `${k}.syncStopped` : `${k}.needsSync`)}{' '}
-                {openSettings && (
-                  <button
-                    type="button"
-                    className={inlineLinkClassName}
-                    onClick={() => openSettings('access')}
-                  >
-                    {t(`${k}.openSyncSettings`)}
-                  </button>
-                )}
+                <button type="button" className={inlineLinkClassName} onClick={onOpenSyncSettings}>
+                  {t(`${k}.openSyncSettings`)}
+                </button>
               </p>
             )}
             {switchError && <InlineError>{switchError}</InlineError>}
