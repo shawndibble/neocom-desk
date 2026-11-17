@@ -7,6 +7,7 @@ import {
   DefaultSystemTakenError,
   createPayee,
   loadPayees,
+  linkPayeeToCorporation,
   rememberPayeeEntity,
   removePayeeRecord,
   updatePayee,
@@ -121,12 +122,82 @@ describe('rememberPayeeEntity', () => {
     expect((await rememberPayeeEntity(first, 90_000_002)).entityId).toBe(90_000_002);
   });
 
+  // A Payee verified as a corporation or character is who it is: paying its CEO or an officer
+  // once must not re-point it (it then stopped matching its Corp Tax Book).
+  it('never re-points a Payee verified as someone else', async () => {
+    const payee = await createPayee(CHAR_A, {
+      name: 'Bureau',
+      defaultTaxPct: 5,
+      entityId: 98_837_836,
+      entityKind: 'corporation',
+    });
+    vi.clearAllMocks();
+
+    expect(await rememberPayeeEntity(payee, 90_000_001)).toBe(payee);
+    expect((await db.payees.get(payee.id))?.entityId).toBe(98_837_836);
+    expect(syncMock.scheduleSync).not.toHaveBeenCalled();
+  });
+
+  // A dialog's copy read before the Payee was verified must not re-point it now.
+  it('judges the stored Payee, not a stale unlinked copy', async () => {
+    const stale = await createPayee(CHAR_A, { name: 'Bureau', defaultTaxPct: 5 });
+    await linkPayeeToCorporation(stale.id, 98_837_836);
+    vi.clearAllMocks();
+
+    expect(await rememberPayeeEntity(stale, 90_000_001)).toBe(stale);
+    expect(await db.payees.get(stale.id)).toMatchObject({
+      entityId: 98_837_836,
+      entityKind: 'corporation',
+    });
+    expect(syncMock.scheduleSync).not.toHaveBeenCalled();
+  });
+
   it('writes nothing when the recipient is already recorded', async () => {
     const payee = await createPayee(CHAR_A, { name: 'Landlord', defaultTaxPct: 10 });
     const learned = await rememberPayeeEntity(payee, 90_000_001);
     vi.clearAllMocks();
 
     expect(await rememberPayeeEntity(learned, 90_000_001)).toBe(learned);
+    expect(syncMock.scheduleSync).not.toHaveBeenCalled();
+  });
+});
+
+describe('linkPayeeToCorporation', () => {
+  it('links the stored Payee as the corporation, read fresh, and syncs', async () => {
+    const payee = await createPayee(CHAR_A, { name: 'Bureau', defaultTaxPct: 5 });
+    // Edited since the caller's copy was read: the link keeps the edit.
+    await updatePayee(payee, { name: 'Bureau', defaultTaxPct: 7 });
+    vi.clearAllMocks();
+
+    await linkPayeeToCorporation(payee.id, 98_837_836);
+
+    expect(await db.payees.get(payee.id)).toMatchObject({
+      defaultTaxPct: 7,
+      entityId: 98_837_836,
+      entityKind: 'corporation',
+    });
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A, { collections: ['payees'] });
+  });
+
+  it('leaves a Payee already linked, or linked to someone else since', async () => {
+    const linked = await createPayee(CHAR_A, {
+      name: 'Bureau',
+      defaultTaxPct: 5,
+      entityId: 98_837_836,
+      entityKind: 'corporation',
+    });
+    const other = await createPayee(CHAR_A, {
+      name: 'Bureau',
+      defaultTaxPct: 5,
+      entityId: 1,
+      entityKind: 'corporation',
+    });
+    vi.clearAllMocks();
+
+    await linkPayeeToCorporation(linked.id, 98_837_836);
+    await linkPayeeToCorporation(other.id, 98_837_836);
+
+    expect((await db.payees.get(other.id))?.entityId).toBe(1);
     expect(syncMock.scheduleSync).not.toHaveBeenCalled();
   });
 });
@@ -289,15 +360,21 @@ describe('Payee entity kind', () => {
     expect((await rememberPayeeEntity(bare, 90_000_002, 'character')).entityKind).toBe('character');
   });
 
-  it('rememberPayeeEntity drops a stale kind when the recipient changes without one', async () => {
-    const payee = await createPayee(CHAR_A, {
+  // Re-pointing a verified Payee to a payment's recipient is what made a member's Corp Tax Book
+  // Payee stop matching its book: a verified link is kept (`never re-points a Payee verified …`).
+  it('rememberPayeeEntity keeps a verified Payee, and re-learns only an unverified one', async () => {
+    const verified = await createPayee(CHAR_A, {
       name: 'Landlord',
       defaultTaxPct: 10,
       entityId: 90_000_001,
       entityKind: 'corporation',
     });
-    const moved = await rememberPayeeEntity(payee, 90_000_005);
-    expect(moved.entityId).toBe(90_000_005);
-    expect('entityKind' in moved).toBe(false);
+    expect(await rememberPayeeEntity(verified, 90_000_005)).toBe(verified);
+    const learned = await createPayee(CHAR_A, {
+      name: 'Landlord 2',
+      defaultTaxPct: 10,
+      entityId: 90_000_001,
+    });
+    expect((await rememberPayeeEntity(learned, 90_000_005)).entityId).toBe(90_000_005);
   });
 });

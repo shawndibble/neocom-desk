@@ -244,16 +244,21 @@ describe('corpPayeeAliases', () => {
     expect(aliases).toEqual(new Map([[virtual.id, 'mine']]));
   });
 
-  it('leaves it alone for a same-named label, a character or another corporation', () => {
+  it('leaves it alone for a character or another corporation', () => {
     const aliases = corpPayeeAliases(
       [
-        stored('label'),
-        stored('char', { entityId: 98000001, entityKind: 'character' }),
+        stored('char', { name: 'Someone', entityId: 98000001, entityKind: 'character' }),
         stored('other', { entityId: 98000002, entityKind: 'corporation' }),
       ],
       [virtual]
     );
     expect(aliases.size).toBe(0);
+  });
+
+  // A Payee missing its link on this device is still the corporation when named exactly as it.
+  it('points the book Payee at an unlinked Payee named exactly as the corporation', () => {
+    const aliases = corpPayeeAliases([stored('label')], [virtual]);
+    expect(aliases.get(virtual.id)).toBe('label');
   });
 });
 

@@ -48,16 +48,25 @@ test.describe('Fittings Start preview at desktop widths', () => {
       const value = page
         .getByRole('meter', { name: label })
         .locator('xpath=following-sibling::span');
-      const box = (await value.boundingBox())!;
-      const lineHeight = await value.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
-      expect(box.height).toBeLessThanOrEqual(lineHeight + 1);
+      // The preview fills in a meter at a time, and a value mid-render can wrap for a frame: wait
+      // for it to settle on one line (a value that never does still fails, by timeout).
+      await expect
+        .poll(async () => {
+          const box = await value.boundingBox();
+          const lineHeight = await value.evaluate((el) =>
+            parseFloat(getComputedStyle(el).lineHeight)
+          );
+          return box !== null && box.height <= lineHeight + 1;
+        })
+        .toBe(true);
     }
 
     const boxes = [];
     for (const name of ['EM', 'Therm', 'Kin', 'Exp']) {
-      boxes.push(
-        (await page.getByRole('columnheader', { name, exact: true }).first().boundingBox())!
-      );
+      // The resist table can render a beat after the meters: a header not yet laid out has no box.
+      const header = page.getByRole('columnheader', { name, exact: true }).first();
+      await expect(header).toBeVisible();
+      boxes.push((await header.boundingBox())!);
     }
     for (let i = 1; i < boxes.length; i++) {
       expect(boxes[i]!.x).toBeGreaterThanOrEqual(boxes[i - 1]!.x + boxes[i - 1]!.width - 0.5);
@@ -67,7 +76,9 @@ test.describe('Fittings Start preview at desktop widths', () => {
   test('at 1440px the Ring stays beside the stats', async ({ page }) => {
     await openInGamePreview(page, { width: 1440, height: 900 });
 
-    const ring = (await page.getByLabel(/^High slots 1[:,]/).boundingBox())!;
+    const slot = page.getByLabel(/^High slots 1[:,]/);
+    await expect(slot).toBeVisible();
+    const ring = (await slot.boundingBox())!;
     const meters = (await page.getByRole('meter', { name: 'CPU' }).boundingBox())!;
     expect(ring.x + ring.width).toBeLessThanOrEqual(meters.x);
   });

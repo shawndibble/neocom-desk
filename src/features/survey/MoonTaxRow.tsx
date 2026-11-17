@@ -41,6 +41,7 @@ import {
   initialTaxDraft,
   MINING_TAX_HREF,
   parseTaxPct,
+  PayeeNotInEveError,
   type TaxDraft,
 } from './moonTaxPayee';
 import { setSurveyTax, type SurveyTaxShare } from './surveyStore';
@@ -55,6 +56,25 @@ export interface TaxSurvey {
   id: string;
   expiresAt: number;
   published: SurveyTaxShare | null;
+}
+
+/** Why Assign Taxes did nothing: no single EVE corporation or character has the name, or anything else. */
+function useFailureMessage() {
+  const { t } = useTranslation();
+  return (cause: unknown) =>
+    cause instanceof PayeeNotInEveError
+      ? t(`survey.moonTax.notInEve.${cause.reason}`, { name: cause.payeeName })
+      : t('survey.moonTax.failed');
+}
+
+/** The alert under the row, when Assign Taxes or Stop failed. */
+function FailedLine({ message }: { message: string | null }) {
+  if (message === null) return null;
+  return (
+    <span role="alert" className="w-full text-xs text-danger">
+      {message}
+    </span>
+  );
 }
 
 /** "Auto-assigned until …" on its own line below the row, while the Survey is connected. */
@@ -185,7 +205,8 @@ export function MoonTaxRow({
   const setSaved = onDraftChange ?? setOwn;
   const payees = useLiveQuery(() => loadPayees(characterId), [characterId]) ?? NO_PAYEES;
   const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+  const failureMessage = useFailureMessage();
   // Focus is inside the name/rate pair: nothing is stored until it leaves.
   const [focused, setFocused] = useState(false);
   const inFlight = useRef(false);
@@ -195,7 +216,7 @@ export function MoonTaxRow({
   const ready = name !== '' && pct !== null;
   const moon = useManageTaxes(
     { characterId, survey: connectable, tax: ready ? { name, pct } : null, updateRate: true },
-    () => setFailed(true)
+    () => setFailed(t('survey.moonTax.failed'))
   );
 
   // Stored on the survey once focus leaves the pair. Best effort: a failed write
@@ -228,7 +249,7 @@ export function MoonTaxRow({
     if (!ready || inFlight.current) return;
     inFlight.current = true;
     setBusy(true);
-    setFailed(false);
+    setFailed(null);
     try {
       if (connectable) {
         await moon.connect();
@@ -237,8 +258,8 @@ export function MoonTaxRow({
         await useSurveyPayeeId.getState().setValue(payee.id);
         navigate(MINING_TAX_HREF);
       }
-    } catch {
-      setFailed(true);
+    } catch (cause) {
+      setFailed(failureMessage(cause));
     } finally {
       inFlight.current = false;
       setBusy(false);
@@ -298,11 +319,7 @@ export function MoonTaxRow({
           {t('survey.moonTax.open')}
         </Button>
       </MoonConnectionSlot>
-      {failed && (
-        <span role="alert" className="w-full text-xs text-danger">
-          {t('survey.moonTax.failed')}
-        </span>
-      )}
+      <FailedLine message={failed} />
     </InfoRow>
   );
 }
@@ -328,20 +345,21 @@ export function MoonTaxReadout({
   const navigate = useNavigate();
   const characterId = useActiveCharacter((s) => (s.hydrated ? s.activeCharacterId : null));
   const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+  const failureMessage = useFailureMessage();
   const inFlight = useRef(false);
   const hintId = useId();
   const loggedOut = characterId === null;
   const moon = useManageTaxes(
     { characterId, survey: connectable, tax: { name: tax.name, pct: tax.pct }, updateRate: false },
-    () => setFailed(true)
+    () => setFailed(t('survey.moonTax.failed'))
   );
 
   async function open() {
     if (characterId === null || inFlight.current) return;
     inFlight.current = true;
     setBusy(true);
-    setFailed(false);
+    setFailed(null);
     try {
       if (connectable) {
         await moon.connect();
@@ -350,8 +368,8 @@ export function MoonTaxReadout({
         if (known) await useSurveyPayeeId.getState().setValue(known.id);
         navigate(MINING_TAX_HREF);
       }
-    } catch {
-      setFailed(true);
+    } catch (cause) {
+      setFailed(failureMessage(cause));
     } finally {
       inFlight.current = false;
       setBusy(false);
@@ -385,11 +403,7 @@ export function MoonTaxReadout({
           )}
         </div>
       </MoonConnectionSlot>
-      {failed && (
-        <span role="alert" className="w-full text-xs text-danger">
-          {t('survey.moonTax.failed')}
-        </span>
-      )}
+      <FailedLine message={failed} />
     </InfoRow>
   );
 }

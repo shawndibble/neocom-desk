@@ -94,7 +94,7 @@ describe('buildCorpBookView', () => {
     expect(view.books[0]).toMatchObject({ corpName: 'Brass Meridian Logistics', left: false });
   });
 
-  it('connects a stored Payee verified as the corporation, and no other', () => {
+  it('connects a stored Payee verified as the corporation, or named exactly as it with no link, and no other', () => {
     const payee = (id: string, over: Partial<PayeeRecord>): PayeeRecord => ({
       id,
       characterId: ME,
@@ -105,7 +105,7 @@ describe('buildCorpBookView', () => {
     });
     const cases = [
       payee('verified', { entityId: CORP, entityKind: 'corporation' }),
-      // Same name, no verified id: a label, not the corporation.
+      // Same name, no link at all: the corporation (EVE names are unique), linked on load.
       payee('label', {}),
       payee('character', { entityId: CORP, entityKind: 'character' }),
       payee('other', { entityId: CORP + 1, entityKind: 'corporation' }),
@@ -143,7 +143,7 @@ describe('buildCorpBookView', () => {
       )!;
       seen.push([...view.overlay.absorbed.values()].flatMap((s) => [...s]));
     }
-    expect(seen).toEqual([['a'], [], [], []]);
+    expect(seen).toEqual([['a'], ['a'], [], []]);
   });
 
   it('marks a book none of the tracked Characters is in any more as left', () => {

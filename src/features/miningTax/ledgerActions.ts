@@ -59,9 +59,9 @@ import {
 } from './assignments';
 import { recordDefaultOptOuts } from './defaultOptOuts';
 import type { GroupMember } from './groupRows';
-import { isCorpEntityPayee } from './corpBook/corpRows';
+import { payeesOfBookCorporation } from '@/engine/miningTax/payeeCorporation';
 import { linkTargetsWithin } from './paymentLinks';
-import { removePayeeRecord } from './payees';
+import { removePayeeRecord, withCorporationLink } from './payees';
 import { amountSlack } from './paymentMatches';
 import { allocateOldestFirst } from './settleAllocation';
 import type { SessionContinuation } from './sessionContinuation';
@@ -442,7 +442,13 @@ async function corpEntityPayeeIds(
   taxPct: number
 ): Promise<string[]> {
   const payees = await db.payees.where('characterId').equals(characterId).toArray();
-  const ids = payees.filter((p) => isCorpEntityPayee(p, corp.corporationId)).map((p) => p.id);
+  // Never a second Payee for the corporation: one named as it but missing its link is it, linked now.
+  const found = payeesOfBookCorporation(payees, corp);
+  for (const f of found.filter((x) => x.link)) {
+    const payee = payees.find((p) => p.id === f.id);
+    if (payee) await db.payees.put(withCorporationLink(payee, corp.corporationId));
+  }
+  const ids = found.map((f) => f.id);
   if (ids.length > 0) return ids;
   const id = crypto.randomUUID();
   await db.payees.put({

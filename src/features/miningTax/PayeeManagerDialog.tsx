@@ -1,6 +1,6 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { InlineError } from '@/components/ui/InlineError';
-import { useId, useMemo, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -25,7 +25,8 @@ import { corporationNamed, type NamedCorporation } from '@/engine/miningTax/paye
 import { DefaultSystemsField } from './DefaultSystemsField';
 import { deletePayee } from './ledgerActions';
 import { PayeeNameField } from './PayeeNameField';
-import { resolvePayeeName, type PayeeEntityMatch } from './payeeEntitySearch';
+import type { PayeeEntityMatch } from './payeeEntitySearch';
+import { lookupPayeeName, NEW_PAYEE_KINDS } from './payeeLookup';
 import {
   DefaultSystemTakenError,
   createPayee,
@@ -63,8 +64,8 @@ interface PayeeManagerDialogProps {
   systemNames?: ReadonlyMap<number, string>;
   /**
    * The corporations whose Corp Tax Book the member can see. A Payee named for
-   * one is offered the link to it (#6205): the book only counts a Payee linked
-   * to its corporation as its own (`isCorpEntityPayee`).
+   * one is offered the link to it (#6205): the book counts a Payee linked to its
+   * corporation as its own (`payeesOfBookCorporation`).
    */
   bookCorporations?: readonly NamedCorporation[];
 }
@@ -158,6 +159,13 @@ export function PayeeManagerDialog({
   // the dialog is for. An empty list shows it regardless (see `showForm`).
   const [formOpen, setFormOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Bumped whenever the form starts over or its name changes: a lookup answered after that
+  // belongs to an older draft and is dropped.
+  const draftGeneration = useRef(0);
+  // Several corporations/characters answer to the typed name: the pilot picks one.
+  const [choices, setChoices] = useState<{ name: string; matches: PayeeEntityMatch[] } | null>(
+    null
+  );
   // A Default System another of the Character's Payees already holds: shown above Save.
   const [taken, setTaken] = useState<{ systemId: number; holderName: string } | null>(null);
   // Shown above the list: the add/edit form (and its own error line) may be closed.
@@ -197,19 +205,24 @@ export function PayeeManagerDialog({
   }
 
   function closeForm() {
+    draftGeneration.current += 1;
     setDraft(EMPTY_DRAFT);
     setError(null);
+    setChoices(null);
     setTaken(null);
     setFormOpen(false);
   }
 
   function startAdd() {
+    draftGeneration.current += 1;
     setDraft(EMPTY_DRAFT);
     setError(null);
+    setChoices(null);
     setFormOpen(true);
   }
 
   function startEdit(payee: PayeeRecord) {
+    draftGeneration.current += 1;
     setDraft({
       id: payee.id,
       name: payee.name,
@@ -220,17 +233,18 @@ export function PayeeManagerDialog({
       defaultSystemIds: payee.defaultSystems?.map((s) => s.systemId) ?? [],
       entityId: payee.entityId,
       entityKind: payee.entityKind,
-      // Only a kind-verified name is tied to its entity; an id learned from a
-      // payment stays through a rename (the label can differ from the name).
-      verifiedName: payee.entityKind !== undefined ? payee.name : undefined,
+      // Any link is tied to the name it was made under: renaming asks EVE again, so a Payee is
+      // never saved under one name while pointing at someone else.
+      verifiedName: payee.entityId !== undefined ? payee.name : undefined,
     });
     setError(null);
+    setChoices(null);
     setFormOpen(true);
   }
 
-  async function handleSave() {
-    const name = draft.name.trim();
-    const pct = Number(draft.defaultTaxPct);
+  async function handleSave(current: DraftPayee = draft) {
+    const name = current.name.trim();
+    const pct = Number(current.defaultTaxPct);
     if (!name) {
       setError(t('miningTax.payeeNameRequired'));
       return;
@@ -239,34 +253,60 @@ export function PayeeManagerDialog({
       setError(t('miningTax.payeeTaxPctInvalid'));
       return;
     }
-    // A name typed without picking a suggestion gets one exact-name lookup. A
-    // single match is attached; none, several, or a failed lookup leave a
-    // free-text label — a moon or place name must always be saveable.
-    let { entityId, entityKind } = draft;
+    // A Payee is someone in EVE (scope decision 20261117-005150): a name typed
+    // without picking a suggestion gets one exact-name lookup, and only a single
+    // corporation or character saves. None, several (the pilot picks) or a failed
+    // lookup save nothing. A linked Payee whose name is unchanged asks nothing.
+    let { entityId, entityKind } = current;
+    let savedName = name;
+    setChoices(null);
+    // An old unlinked Payee kept under its own name may still have its rate, hub or systems
+    // changed: it stays flagged until the pilot picks who it is, but is never locked.
+    const existingUnlinked = payees.find(
+      (p) => p.id === current.id && p.entityId === undefined && p.name.trim() === name
+    );
     if (entityId === undefined) {
-      try {
-        const matches = await resolvePayeeName(name);
-        if (matches.length === 1) {
-          entityId = matches[0].id;
-          entityKind = matches[0].kind;
+      const generation = draftGeneration.current;
+      const lookup = await lookupPayeeName(name);
+      // The pilot moved on (another Payee, a new name, the form closed): not this draft's answer.
+      if (generation !== draftGeneration.current) return;
+      if (lookup.status === 'found') {
+        entityId = lookup.match.id;
+        entityKind = lookup.match.kind;
+        savedName = lookup.match.name;
+      } else if (!existingUnlinked) {
+        if (lookup.status === 'several') {
+          setError(null);
+          setChoices({ name, matches: lookup.matches });
+        } else {
+          setError(
+            t(
+              lookup.status === 'none'
+                ? 'miningTax.payees.notInEve.none'
+                : 'miningTax.payees.notInEve.failed',
+              {
+                name,
+              }
+            )
+          );
         }
-      } catch {
-        // Unverified, not blocked.
+        return;
       }
+      // Otherwise an old unlinked Payee saved as it was: still unlinked, still flagged.
     }
     // The default hub is stored as *no* hub, which is what every Payee
     // predating this field already means — so "Jita" never becomes a second
     // way of saying the same thing that only some records carry.
     const input = {
-      name,
+      name: savedName,
       defaultTaxPct: pct,
-      defaultSystemIds: draft.defaultSystemIds,
-      entityId: entityId ?? null,
+      defaultSystemIds: current.defaultSystemIds,
+      entityId,
       // An id with no kind (learned from a payment) keeps whatever the record has.
-      entityKind: entityKind ?? (entityId === undefined ? null : undefined),
-      ...(draft.hubId === DEFAULT_TRADE_HUB.id ? {} : { hubId: draft.hubId }),
+      entityKind,
+      ...(current.hubId === DEFAULT_TRADE_HUB.id ? {} : { hubId: current.hubId }),
     };
-    const existing = draft.id ? payees.find((p) => p.id === draft.id) : undefined;
+    const existing = current.id ? payees.find((p) => p.id === current.id) : undefined;
     try {
       if (existing) {
         await updatePayee(existing, input);
@@ -287,6 +327,8 @@ export function PayeeManagerDialog({
   }
 
   function handleNameChange(name: string) {
+    draftGeneration.current += 1;
+    setChoices(null);
     // Editing the name after verifying clears the verification.
     const stale = draft.verifiedName !== undefined && name !== draft.verifiedName;
     setDraft({
@@ -296,14 +338,28 @@ export function PayeeManagerDialog({
     });
   }
 
-  function handlePick(match: PayeeEntityMatch) {
-    setDraft({
+  function picked(match: PayeeEntityMatch): DraftPayee {
+    return {
       ...draft,
       name: match.name,
       entityId: match.id,
       entityKind: match.kind,
       verifiedName: match.name,
-    });
+    };
+  }
+
+  function handlePick(match: PayeeEntityMatch) {
+    draftGeneration.current += 1;
+    setChoices(null);
+    setError(null);
+    setDraft(picked(match));
+  }
+
+  /** One of several of the same name, picked after Save asked: saves it straight away. */
+  function handleChoose(match: PayeeEntityMatch) {
+    const next = picked(match);
+    setDraft(next);
+    void handleSave(next);
   }
 
   async function handleDelete(payee: PayeeRecord, moveToPayeeId?: string) {
@@ -393,11 +449,16 @@ export function PayeeManagerDialog({
                         : t('miningTax.payees.detail', { pct: payee.defaultTaxPct, hub })}
                       <span>
                         {' · '}
-                        {payee.entityKind !== undefined
-                          ? t(`miningTax.payees.verify.kind.${payee.entityKind}`)
-                          : payee.entityId !== undefined
-                            ? t('miningTax.payees.verify.linkedShort')
-                            : t('miningTax.payees.verify.unverifiedShort')}
+                        {payee.entityKind !== undefined ? (
+                          t(`miningTax.payees.verify.kind.${payee.entityKind}`)
+                        ) : payee.entityId !== undefined ? (
+                          t('miningTax.payees.verify.linkedShort')
+                        ) : (
+                          // The row's Edit carries the fix: pick who this is there.
+                          <span className="text-warning">
+                            {t('miningTax.payees.verify.notFoundShort')}
+                          </span>
+                        )}
                       </span>
                     </p>
                   </div>
@@ -441,8 +502,28 @@ export function PayeeManagerDialog({
                   value={draft.name}
                   onChange={handleNameChange}
                   onPick={handlePick}
+                  kinds={NEW_PAYEE_KINDS}
                 />
               </Field>
+              {choices && (
+                <div className="space-y-2 text-xs">
+                  <p>{t('miningTax.payees.notInEve.several', { name: choices.name })}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {choices.matches.map((match) => (
+                      <Button
+                        key={`${match.kind}-${match.id}`}
+                        size="sm"
+                        onClick={() => handleChoose(match)}
+                      >
+                        {t('miningTax.payees.notInEve.choice', {
+                          name: match.name,
+                          kind: t(`miningTax.payees.verify.kind.${match.kind}`),
+                        })}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
               {suggestedBook && (
                 <div className="flex flex-wrap items-center gap-2 text-xs text-text-dim">
                   <p className="min-w-0 flex-1">
