@@ -1,4 +1,4 @@
-import { settleTolerance } from '@/engine/corpTaxBook/allocation';
+import { daySettleTolerance } from '@/engine/corpTaxBook/runningAccount';
 import type { RowHold } from '@/engine/corpTaxBook/personal';
 
 /** One open day of the member's book (a `BookRowView` reduced to what a payment needs). */
@@ -26,9 +26,9 @@ export interface PaymentLanding {
 }
 
 /**
- * Where a payment to a Corp Tax Book lands, mirroring the book's rule (`allocation.ts`): oldest
- * day first (date, then id); a day is paid when what is left covers it within `settleTolerance`;
- * what is left after the last whole day part-pays the next one; a day an open dispute holds is
+ * Where a payment to a Corp Tax Book lands, mirroring the book's rule (`runningAccount.ts`):
+ * oldest day first (date, then id); a day is paid when what is left covers it within
+ * `daySettleTolerance` (a percent, no ISK floor); what is left after the last whole day part-pays the next one; a day an open dispute holds is
  * skipped and never paid. The member pays an amount and cannot pick a day.
  */
 export function wherePaymentGoes(days: readonly PayDay[], amount: number): PaymentLanding {
@@ -36,7 +36,7 @@ export function wherePaymentGoes(days: readonly PayDay[], amount: number): Payme
   let left = Number.isFinite(amount) && amount > 0 ? amount : 0;
   const out = sorted.map((d): PayDayLanding => {
     if (d.held) return { ...d, result: 'held', held: d.held };
-    if (left > 0 && left >= d.taxOwed - settleTolerance(d.taxOwed)) {
+    if (left > 0 && left >= d.taxOwed - daySettleTolerance(d.taxOwed)) {
       left -= Math.min(left, d.taxOwed);
       return { ...d, result: 'paid' };
     }

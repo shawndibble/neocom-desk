@@ -30,7 +30,8 @@ export interface StatementPeriod {
   end: string;
 }
 
-function daysBetween(from: string, to: string): number {
+/** Whole days from one `YYYY-MM-DD` to another. */
+export function daysBetween(from: string, to: string): number {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS);
 }
 
@@ -123,6 +124,8 @@ export interface Statement {
   remindersStopped?: boolean;
   /** Reminders an officer sent by hand; one is allowed after the Miner stopped them. */
   manualRemindersSent?: number;
+  /** A running account's late notice (#6294); absent on a calendar Statement. */
+  kind?: 'notice';
 }
 
 /**

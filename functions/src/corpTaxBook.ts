@@ -43,6 +43,7 @@ import {
 import {
   CLAIM_CHECK_RESULTS,
   DISPUTE_KINDS,
+  NOTICE_AFTER_KINDS,
   TAX_CONTACT_MAX_CHARACTERS,
   TRANSFER_RECIPIENTS,
 } from './corpTaxBookKinds.js';
@@ -74,6 +75,11 @@ export const STATEMENTS = 'statements';
 /** `statementLinks/{statementId}`: the verify token, readable by editors only. */
 export const STATEMENT_LINKS = 'statementLinks';
 export const MINERS = 'miners';
+/**
+ * `accounts/{minerId}` (#6294): a running account's figures as an officer's client last worked
+ * them out (the server cannot price days), for the pay page's live total. Function-only.
+ */
+export const ACCOUNTS = 'accounts';
 export const META = 'meta';
 export const PAID_DOC = 'paid';
 /** Doc under `meta`: the scheduled sync's public status (ADR 0025); `status: 'active'` is Automatic sync on. */
@@ -362,6 +368,36 @@ export interface SettingsPatch {
   startDate?: string;
   /** End the member setup window now (Director): `membersSeeFrom` becomes the call time. */
   showToMembers?: true;
+  /**
+   * Switch the book to a running account now (Director, #6294): `runningAccountFrom` becomes the
+   * call time, once; it never clears, and from then on only late notices are issued.
+   */
+  switchToRunningAccount?: true;
+  /** A running account's late notices. */
+  noticeRules?: NoticeRules;
+  /** A running account's per-day tolerance, in percent. */
+  dayTolerancePct?: number;
+}
+
+/** Mirror of the client's `NoticeRules` (`src/engine/corpTaxBook/notices.ts`). */
+export interface NoticeRules {
+  after: { kind: 'behind'; days: number } | { kind: 'dayOfMonth'; day: number };
+  minimum: number;
+  cooldownDays: number;
+}
+
+function parseNoticeRules(raw: unknown): NoticeRules {
+  const d = record(raw);
+  const a = record(d.after);
+  const kind = oneOf(a.kind, 'noticeRules.after.kind', NOTICE_AFTER_KINDS);
+  return {
+    after:
+      kind === 'behind'
+        ? { kind, days: int(a.days, 'noticeRules.after.days', 1, 365) }
+        : { kind, day: int(a.day, 'noticeRules.after.day', 1, 28) },
+    minimum: num(d.minimum, 'noticeRules.minimum', 0, 1e12),
+    cooldownDays: int(d.cooldownDays, 'noticeRules.cooldownDays', 1, 90),
+  };
 }
 
 /** The mirror of the client's `TaxContact` (`src/engine/corpTaxBook/bookDocs.ts`). */
@@ -486,6 +522,14 @@ export function parseSettingsPatch(data: unknown): SettingsPatch {
       throw new HttpsError('invalid-argument', 'showToMembers must be true');
     patch.showToMembers = true;
   }
+  if (d.switchToRunningAccount !== undefined) {
+    if (d.switchToRunningAccount !== true)
+      throw new HttpsError('invalid-argument', 'switchToRunningAccount must be true');
+    patch.switchToRunningAccount = true;
+  }
+  if (d.noticeRules !== undefined) patch.noticeRules = parseNoticeRules(d.noticeRules);
+  if (d.dayTolerancePct !== undefined)
+    patch.dayTolerancePct = num(d.dayTolerancePct, 'dayTolerancePct', 0, 5);
   if (Object.keys(patch).length === 0)
     throw new HttpsError('invalid-argument', 'no settings given');
   return patch;
@@ -567,7 +611,7 @@ export type EditAction =
       /** The Declaration this payment confirms, in the same write (one resolution per declaration). */
       declarationId?: string;
     }
-  | { action: 'markNotTax'; paymentId: string; notTaxAmount: number; reason: string }
+  | { action: 'markNotTax'; paymentId: string; notTaxAmount: number; reason?: string }
   | {
       action: 'assignPayment';
       paymentId: string;
@@ -616,6 +660,11 @@ export type EditAction =
       statement?: Record<string, unknown>;
       /** Credit is refunded unless the guest consented or went 90 days without replying. */
       credit: CloseCredit;
+      /**
+       * A running account's credit as the officer's client works it out (#6294): money ahead of
+       * every day. The server cannot price days, so it takes this on such a book.
+       */
+      runningCredit?: number;
     }
   | { action: 'issueStatement'; statement: Record<string, unknown> }
   | { action: 'settleStatements'; statementIds: string[] }
@@ -662,7 +711,20 @@ export type EditAction =
       statementId: string;
       mailId: number;
       kind: 'statement' | 'reminder';
-    };
+    }
+  /** A running account's figures per Miner, as the officer's client works them out (#6294). */
+  | { action: 'recordAccounts'; accounts: RecordedAccount[] };
+
+/** What a Miner owes on a running account, as one officer's client worked it out. */
+export interface RecordedAccount {
+  minerId: string;
+  owed: number;
+  /** The Miner's net payments (less "not tax") the client counted: later ones come off `owed`. */
+  paid: number;
+  days: number;
+  oldest?: string;
+  paidThrough?: string;
+}
 
 export type CloseCredit = { kind: 'refund' } | { kind: 'forfeit'; basis: ForfeitBasis };
 
@@ -705,6 +767,9 @@ export function dismissalNeedsDirector(
 }
 
 const reason = (v: unknown) => boundedString(v, 'reason', 500);
+/** Optional reason: absent or blank stores nothing. */
+const optReason = (v: unknown) =>
+  v === undefined || (typeof v === 'string' && v.trim() === '') ? undefined : reason(v);
 const optNote = (v: unknown) => (v === undefined ? undefined : boundedString(v, 'note', 500));
 const optNextStep = (v: unknown) =>
   v === undefined ? undefined : boundedString(v, 'nextStep', 500);
@@ -751,6 +816,7 @@ export function parseEditAction(data: unknown): EditAction {
     'dismissDispute',
     'recordReminder',
     'recordMail',
+    'recordAccounts',
     'setPopSharing',
     'setPopSharingMoon',
   ] as const);
@@ -780,13 +846,15 @@ export function parseEditAction(data: unknown): EditAction {
           ? { declarationId: docId(d.declarationId, 'declarationId') }
           : {}),
       };
-    case 'markNotTax':
+    case 'markNotTax': {
+      const why = optReason(d.reason);
       return {
         action,
         paymentId: docId(d.paymentId, 'paymentId'),
         notTaxAmount: num(d.notTaxAmount, 'notTaxAmount', 0, 1e13),
-        reason: reason(d.reason),
+        ...(why !== undefined ? { reason: why } : {}),
       };
+    }
     case 'assignPayment':
       return {
         action,
@@ -907,6 +975,9 @@ export function parseEditAction(data: unknown): EditAction {
         reason: reason(d.reason),
         ...(statement ? { statement } : {}),
         credit: parseCloseCredit(d.credit),
+        ...(d.runningCredit !== undefined
+          ? { runningCredit: num(d.runningCredit, 'runningCredit', 0, 1e13) }
+          : {}),
       };
     }
     case 'settleStatements':
@@ -987,6 +1058,23 @@ export function parseEditAction(data: unknown): EditAction {
         mailId: int(d.mailId, 'mailId', 1, Number.MAX_SAFE_INTEGER),
         kind: oneOf(d.kind, 'kind', ['statement', 'reminder'] as const),
       };
+    case 'recordAccounts':
+      return {
+        action,
+        accounts: list(d.accounts, 'accounts', 200).map((raw) => {
+          const a = record(raw);
+          return {
+            minerId: docId(a.minerId, 'minerId'),
+            owed: num(a.owed, 'owed', 0, 1e13),
+            paid: num(a.paid, 'paid', 0, 1e15),
+            days: int(a.days, 'days', 0, 100_000),
+            ...(a.oldest !== undefined ? { oldest: dateString(a.oldest, 'oldest') } : {}),
+            ...(a.paidThrough !== undefined
+              ? { paidThrough: dateString(a.paidThrough, 'paidThrough') }
+              : {}),
+          };
+        }),
+      };
   }
 }
 
@@ -1059,6 +1147,8 @@ export interface StoredStatement {
   issuedAt: string;
   hubId: string;
   oreForm: string;
+  /** A running account's late notice (#6294); absent on a calendar Statement. */
+  kind?: 'notice';
   lines: { kind: string; date: string; characterId?: number }[];
   amount: number;
   /** Characters of the Miner, for the own-lines rule. */
@@ -1105,6 +1195,9 @@ export function parseStatement(raw: Record<string, unknown>): StoredStatement {
   });
   return {
     ...(raw as object),
+    ...(raw.kind !== undefined
+      ? { kind: oneOf(raw.kind, 'statement.kind', ['notice'] as const) }
+      : {}),
     id: docId(raw.id, 'statement.id'),
     minerId: docId(raw.minerId, 'statement.minerId'),
     code: boundedString(raw.code, 'statement.code', 64),

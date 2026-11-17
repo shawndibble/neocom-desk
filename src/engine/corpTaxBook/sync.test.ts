@@ -358,10 +358,10 @@ describe('resolveDonations', () => {
     expect(stranger.reviewReason).toBeUndefined();
   });
 
-  it('holds a known miner’s code-less donation for review when they owe nothing (#6207)', () => {
-    const [held] = resolveDonations([donation(7)], { ...book, openBalance: new Map() });
-    expect(held.minerId).toBeUndefined();
-    expect(held.reviewReason).toBe('no-open-balance');
+  it('credits a known miner’s code-less donation even when they owe nothing (#6300)', () => {
+    const [prepaid] = resolveDonations([donation(7)], { ...book, openBalance: new Map() });
+    expect(prepaid).toMatchObject({ minerId: 'solo:7' });
+    expect(prepaid.reviewReason).toBeUndefined();
   });
 
   it('credits a Miner with ore not yet billed, whatever their balance', () => {
@@ -374,21 +374,21 @@ describe('resolveDonations', () => {
     expect(prepaid.reviewReason).toBeUndefined();
   });
 
-  it('spends the balance oldest first, so a second donation past it is held', () => {
+  it('credits a second donation past the balance too, as prepaid credit', () => {
     const later = donation(7, undefined, { refId: 2, at: '2026-08-03T00:00:00.000Z' });
     const earlier = donation(7, undefined, { refId: 1, at: '2026-08-02T00:00:00.000Z' });
     // Newest first, the order the sync passes them in.
     const [second, first] = resolveDonations([later, earlier], book);
     expect(first).toMatchObject({ minerId: 'solo:7' });
-    expect(second.minerId).toBeUndefined();
-    expect(second.reviewReason).toBe('no-open-balance');
+    expect(second).toMatchObject({ minerId: 'solo:7' });
+    expect(second.reviewReason).toBeUndefined();
   });
 
   it('counts a pay-coded donation against the balance too', () => {
     const coded = donation(7, 'MT-AB12', { refId: 1 });
     const plain = donation(7, undefined, { refId: 2, at: '2026-08-03T00:00:00.000Z' });
     const [, after] = resolveDonations([coded, plain], book);
-    expect(after.reviewReason).toBe('no-open-balance');
+    expect(after).toMatchObject({ minerId: 'solo:7' });
   });
 });
 
@@ -625,6 +625,35 @@ describe('openBalances', () => {
     });
     expect(balances.get('solo:7')).toBe(7_000_000);
     expect(balances.get('solo:8') ?? 0).toBe(0);
+  });
+});
+
+describe('a running account’s late notice (#6294)', () => {
+  const notice = {
+    ...statement({ id: 'n1', minerId: 'solo:7', amount: 10_000_000 }),
+    kind: 'notice' as const,
+    coversThrough: '2026-09-30',
+  };
+  const pay = {
+    id: 'p1',
+    minerId: 'solo:7',
+    characterId: 7,
+    amount: 10_000_000,
+    at: '2026-10-02T00:00:00Z',
+    source: 'donation' as const,
+  };
+
+  it('is never settled for good and holds no open balance of its own', () => {
+    const base = { miners: [], dismissals: [] as Dismissal[], statements: [notice] };
+    expect(planSettlements({ ...base, payments: [pay], alreadyPaid: new Set() })).toEqual([]);
+    expect(openBalances({ ...base, payments: [] }).size).toBe(0);
+  });
+
+  it('never moves billed through: the days it listed are still on the account', () => {
+    const rows = [{ characterId: 7, date: '2026-09-20', quantity: 10 }];
+    expect(
+      unbilledMinerIds(rows, { miners: [], statements: [notice], startDate: '2026-09-01' })
+    ).toEqual(new Set(['solo:7']));
   });
 });
 

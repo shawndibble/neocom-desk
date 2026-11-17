@@ -8,6 +8,8 @@ import { useTranslation } from 'react-i18next';
 import { oldestUnsettled } from '@/engine/corpTaxBook/bookSections';
 import { minerDetail, type MinerRow } from '@/engine/corpTaxBook/bookView';
 import type { Statement } from '@/engine/corpTaxBook/statements';
+import { owedDays } from '@/engine/corpTaxBook/lateNotices';
+import type { NoticeMail } from '@/engine/corpTaxBook/statementMail';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useEntityName } from '@/features/character/useEntityName';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -37,6 +39,33 @@ export function statementRefineryNames(
   return out;
 }
 
+/**
+ * What a late notice's mail lists (#6294): every day the Miner owes now, oldest first, by moon
+ * (else refinery); a Statement from before the switch-over stands as one line.
+ */
+export function noticeMailOf(
+  ctx: Pick<BookContextValue, 'names' | 'view'>,
+  miner: Pick<MinerRow, 'id' | 'account'>,
+  fallbackOldest: string
+): NoticeMail {
+  const days = owedDays(ctx.view, miner.id).map((d) => {
+    const statement = d.statementId
+      ? ctx.view.input.statements.find((s) => s.id === d.statementId)
+      : undefined;
+    const place = statement
+      ? i18n.t('corpTaxBook.moons.run.statementPlace', {
+          period: periodLabel(statement.periodStart, statement.periodEnd),
+        })
+      : d.moonId !== undefined
+        ? ctx.names.moon(d.moonId)
+        : d.structureId !== undefined
+          ? ctx.names.refinery(d.structureId)
+          : '—';
+    return { date: d.date, place, tax: d.owed };
+  });
+  return { days, oldest: miner.account?.owes?.oldest ?? days[0]?.date ?? fallbackOldest };
+}
+
 export function mailTarget(
   ctx: Pick<BookContextValue, 'names' | 'view'> & Partial<Pick<BookContextValue, 'settings'>>,
   statement: Statement,
@@ -60,6 +89,9 @@ export function mailTarget(
       : {}),
     dueDate: addDays(statement.issuedAt.slice(0, 10), ctx.view.input.overdueDays),
     lines: statement.lines,
+    ...(statement.kind === 'notice'
+      ? { notice: noticeMailOf(ctx, miner, statement.coversFrom) }
+      : {}),
   };
 }
 

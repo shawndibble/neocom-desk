@@ -5,7 +5,8 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { BookProvider } from './BookContext';
-import { BOOK_CONTEXT, MOON_ID, VARRO_ID } from './corpBookFixture';
+import { BOOK_CONTEXT, BOOK_VIEW, MOON_ID, VARRO_ID } from './corpBookFixture';
+import { buildBookView } from '@/engine/corpTaxBook/bookView';
 import { MinerDetail } from './MinerDetail';
 import { MoonDetail } from './MoonDetail';
 import { OverviewTab } from './OverviewTab';
@@ -19,10 +20,10 @@ vi.mock('@/features/corpTaxBook/mailQueueStore', () => ({
 }));
 vi.mock('@/features/character/useEntityName', () => ({ useEntityName: () => 'Ore & Glory' }));
 
-function renderBook(ui: React.ReactElement) {
+function renderBook(ui: React.ReactElement, context = BOOK_CONTEXT) {
   return render(
     <MemoryRouter initialEntries={['/corp/moons']}>
-      <BookProvider value={BOOK_CONTEXT}>{ui}</BookProvider>
+      <BookProvider value={context}>{ui}</BookProvider>
     </MemoryRouter>
   );
 }
@@ -127,6 +128,31 @@ describe('Miner page', () => {
     expect(within(table).getAllByText('Efa V - Moon 3').length).toBeGreaterThan(0);
     expect(within(table).queryByText('Efa V - Moon 3 - Brass Anvil')).not.toBeInTheDocument();
     expect(within(table).getAllByText('Brass Anvil').length).toBeGreaterThan(0);
+  });
+});
+
+describe('Miner page on a running account', () => {
+  const view = buildBookView({ ...BOOK_VIEW.input, runningAccountFrom: '2026-08-01T00:00:00Z' });
+  const running = { ...BOOK_CONTEXT, view };
+
+  it('lists Owed days and says where the Miner stands instead of a Next Statement', () => {
+    renderBook(<MinerDetail id={VARRO_ID} />, running);
+    expect(screen.queryByText(/^Next Statement · /)).not.toBeInTheDocument();
+    expect(screen.getByText(/^Owed days · /)).toBeInTheDocument();
+    expect(screen.getByText('Account')).toBeInTheDocument();
+    expect(screen.getByText(/^(Owes .* oldest|Paid through)/)).toBeInTheDocument();
+  });
+
+  it('reads the past days and payments of the last 7 days', async () => {
+    renderBook(<MinerDetail id={VARRO_ID} />, running);
+    const earlier = () =>
+      Number(/· (\d+)/.exec(screen.getByText(/^Earlier days · /).textContent!)![1]);
+    const before = earlier();
+    await userEvent.click(screen.getByRole('button', { name: 'Last 7 days' }));
+    expect(screen.getByText(/^Tax .* · paid /)).toBeInTheDocument();
+    expect(earlier()).toBeLessThan(before);
+    // What is owed now is never narrowed.
+    expect(screen.getByRole('checkbox', { name: 'Select 2026-09-04' })).toBeInTheDocument();
   });
 });
 

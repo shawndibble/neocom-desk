@@ -71,6 +71,8 @@ export function CloseAccountDialog({
               corporationName,
               minerName,
               refineryNames: statementRefineryNames(plan.statement, names),
+              // A running account issues only late notices (#6294); its final bill is one.
+              ...(view.input.runningAccountFrom ? { kind: 'notice' as const } : {}),
             }
           : undefined;
         await edit({
@@ -79,6 +81,10 @@ export function CloseAccountDialog({
           reason: reason.trim(),
           credit: disposition,
           ...(statement ? { statement } : {}),
+          // A running account's credit only this client can price (#6294).
+          ...(view.input.runningAccountFrom && plan
+            ? { runningCredit: Math.round(plan.creditAfter) }
+            : {}),
         });
         onClosed?.();
       }}

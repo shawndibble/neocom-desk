@@ -386,7 +386,16 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect(again.donationsAdded).toBe(0);
       expect((await book().collection('payments').doc('j1_99').get()).data()).toMatchObject({
         notTaxAmount: 400_000,
+        notTaxReason: 'buyback',
       });
+      await edit(
+        DIRECTOR,
+        { action: 'markNotTax', paymentId: 'j1_99', notTaxAmount: 300_000 },
+        true
+      );
+      const reasonless = (await book().collection('payments').doc('j1_99').get()).data();
+      expect(reasonless).toMatchObject({ notTaxAmount: 300_000 });
+      expect(reasonless).not.toHaveProperty('notTaxReason');
     });
   });
 
@@ -511,6 +520,29 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect(data.rates[0].effectiveFrom).toBe('2026-09-20');
       await edit(DIRECTOR, { action: 'updateSettings', patch: { showToMembers: true } });
       expect((await book().get()).get('membersSeeFrom')).toBe(now);
+    });
+
+    it('switches to a running account once (Director), then issues only late notices', async () => {
+      await turnOn();
+      expect(
+        await reason(
+          edit(ACCOUNTANT, { action: 'updateSettings', patch: { switchToRunningAccount: true } })
+        )
+      ).toBe('director-only');
+      await edit(DIRECTOR, { action: 'updateSettings', patch: { switchToRunningAccount: true } });
+      const from = (await book().get()).get('runningAccountFrom');
+      expect(from).toBe(new Date(now).toISOString());
+      now += 60_000;
+      await edit(DIRECTOR, { action: 'updateSettings', patch: { switchToRunningAccount: true } });
+      expect((await book().get()).get('runningAccountFrom')).toBe(from);
+      expect(
+        await reason(edit(ACCOUNTANT, { action: 'issueStatement', statement: statement('s1') }))
+      ).toBe('running-account');
+      await edit(ACCOUNTANT, {
+        action: 'issueStatement',
+        statement: { ...statement('s1'), kind: 'notice' },
+      });
+      expect((await book().collection('statements').doc('s1').get()).get('kind')).toBe('notice');
     });
 
     it('never makes a rate retroactive, and only on a day not yet on a Statement for a record rate', async () => {
@@ -1981,6 +2013,41 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
   });
 
   describe('verify link', () => {
+    it('shows a running account owed now: the recorded count less what the Miner paid since', async () => {
+      await turnOn();
+      expect(
+        await reason(
+          edit(ACCOUNTANT, {
+            action: 'recordAccounts',
+            accounts: [{ minerId: 'solo:50', owed: 1, paid: 0, days: 1 }],
+          })
+        )
+      ).toBe('not-running-account');
+      await edit(DIRECTOR, { action: 'updateSettings', patch: { switchToRunningAccount: true } });
+      const { verifyToken } = await edit(ACCOUNTANT, {
+        action: 'issueStatement',
+        statement: { ...statement('s1'), kind: 'notice' },
+      });
+      await edit(ACCOUNTANT, {
+        action: 'recordAccounts',
+        accounts: [
+          { minerId: 'solo:50', owed: 12_000_000, paid: 0, days: 3, oldest: '2026-10-05' },
+        ],
+      });
+      // Synced after the count, whatever its own date: it comes off what is owed now.
+      await edit(ACCOUNTANT, {
+        action: 'recordPayment',
+        paymentId: 'm1',
+        minerId: 'solo:50',
+        characterId: 50,
+        amount: 2_000_000,
+        at: '2026-10-01T00:00:00Z',
+      });
+      const view = await readStatementByToken(deps(), String(verifyToken));
+      expect(view.statement.kind).toBe('notice');
+      expect(view.account).toMatchObject({ owed: 10_000_000, days: 3, oldest: '2026-10-05' });
+    });
+
     it('reads the Statement by token, and stops reminders with one audited manual reminder allowed', async () => {
       await turnOn();
       const { verifyToken } = await edit(ACCOUNTANT, {
@@ -2221,6 +2288,16 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect(log.find((e) => e.action === 'closeAccount')).toMatchObject({
         detail: { minerId: 'solo:50', statementId: 'final_solo:50', disposition: 'refund' },
       });
+    });
+
+    it('on a running account takes only a late notice as the final bill', async () => {
+      await turnOn();
+      await edit(DIRECTOR, { action: 'updateSettings', patch: { switchToRunningAccount: true } });
+      expect(await reason(close({ statement: statement('final_solo:50') }))).toBe(
+        'running-account'
+      );
+      const out = await close({ statement: { ...statement('final_solo:50'), kind: 'notice' } });
+      expect(out).toMatchObject({ statementId: 'final_solo:50' });
     });
 
     it('records the credit left to refund by default', async () => {

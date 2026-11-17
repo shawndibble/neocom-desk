@@ -4,9 +4,11 @@
  * the Overview's moon schedule, ore lines per Miner and moon, the place line,
  * and the merged Payments and Activity ledgers.
  */
-import type { BookView, DayRow, ExtractionRow } from './bookView';
+import type { BookView, DayRow, ExtractionRow, RunningAccountStatus } from './bookView';
 import type { OreLine } from './types';
 import { DAY_MS } from '@/lib/age';
+import { shiftUtcDate, utcDay } from '../localDay';
+import { netOf } from './paymentPreview';
 
 /** How far ahead the Overview looks for an Extracting moon's chunk to arrive. */
 export const POPS_WINDOW_DAYS = 7;
@@ -39,6 +41,45 @@ export function statementAdjustment(nextStatement: readonly DayRow[], row: { unb
   const delta = row.unbilled - nextStatement.reduce((s, d) => s + d.tax, 0);
   return Math.abs(delta) < 0.5 ? 0 : delta;
 }
+
+/** The ranges a Miner's page reads its days and payments in: every day, or the last N UTC days. */
+export const DAY_RANGES = ['all', '7', '30'] as const;
+export type DayRange = (typeof DAY_RANGES)[number];
+
+/** The first UTC day a range takes in (today counts as one), or undefined for every day. */
+export function rangeStart(range: DayRange, now: string): string | undefined {
+  return range === 'all' ? undefined : shiftUtcDate(utcDay(Date.parse(now)), 1 - Number(range));
+}
+
+/** Whether a date or ISO instant falls in a range that starts on `from` (undefined: every day). */
+export const inRange = (dateOrInstant: string, from: string | undefined): boolean =>
+  from === undefined || dateOrInstant.slice(0, 10) >= from;
+
+/**
+ * A range's figures on a Miner's page: the tax of the Billable days mined in it that were billed
+ * to the Miner (not dismissed, not written off), and the tax payments received in it.
+ */
+export function rangeFigures(
+  days: readonly Pick<DayRow, 'date' | 'status' | 'tax'>[],
+  payments: readonly { at: string; amount: number; notTaxAmount?: number }[],
+  from: string | undefined
+): { tax: number; paid: number } {
+  const billed = new Set<DayRow['status']>(['unbilled', 'paid', 'on-statement']);
+  return {
+    tax: days
+      .filter((d) => billed.has(d.status) && inRange(d.date, from))
+      .reduce((s, d) => s + d.tax, 0),
+    paid: payments.filter((p) => inRange(p.at, from)).reduce((s, p) => s + netOf(p), 0),
+  };
+}
+
+/** What a list of days still owes: a running day's remainder (`owed`), else its tax. */
+export const owedOf = (days: readonly Pick<DayRow, 'tax' | 'owed'>[]): number =>
+  days.reduce((s, d) => s + (d.owed ?? d.tax), 0);
+
+/** Sorts Miners by how far behind they are: the oldest unpaid day first, the paid-up after. */
+export const accountSortValue = (account: RunningAccountStatus | undefined): string =>
+  account?.owes ? account.owes.oldest : `~${account?.paidThrough ?? ''}`;
 
 // --- Overview schedule -----------------------------------------------------
 
@@ -195,7 +236,9 @@ export function extractionBilling(
     ...new Set(days.flatMap((d) => (d.statementId === undefined ? [] : [d.statementId]))),
   ];
   // A moon whose days were all dismissed was never billed: one day has to sit on a Statement.
-  const onStatement = days.some((d) => d.status === 'on-statement' || d.status === 'paid');
+  const onStatement = days.some(
+    (d) => d.statementId !== undefined && (d.status === 'on-statement' || d.status === 'paid')
+  );
   const waiting = days
     .filter((d) => d.status === 'unbilled' || d.status === 'not-billable')
     .reduce((sum, d) => sum + d.tax, 0);

@@ -4,7 +4,9 @@ import {
   coverInFlight,
   inFlightDonations,
   overlayCorpBooks,
+  personalAccountStatus,
   previewTakeover,
+  type BookRowState,
   type PersonalBook,
   type PersonalEntry,
 } from './personal';
@@ -1104,6 +1106,101 @@ describe('overlayCorpBooks', () => {
       '2026-10-16': ['billed', 222_000],
     });
     expect(out.books[0].credit).toBe(222_000);
+  });
+
+  describe('on a running account', () => {
+    const observed = ['2026-10-15', '2026-10-16'].map((date) => ({
+      characterId: ME,
+      recordedCorporationId: CORP,
+      structureId: 1000,
+      date,
+      solarSystemId: SYSTEM,
+      oreLines: [{ typeId: ZEO, quantity: 10_000 }],
+    }));
+    const entries = ['2026-10-15', '2026-10-16'].map((date) =>
+      entry({ date, oreLines: [{ typeId: ZEO, quantity: 10_000 }] })
+    );
+    const paid = (amount: number) => ({
+      id: 'p1',
+      minerId: `solo:${ME}`,
+      characterId: ME,
+      amount,
+      at: '2026-10-18T13:10:00Z',
+      source: 'donation' as const,
+    });
+    const running = (amount: number) =>
+      overlay(entries, [
+        book({ observed, payments: [paid(amount)], runningAccountFrom: '2026-10-01T00:00:00Z' }),
+      ]).books[0];
+
+    it('shows no credit for money that paid a day, and says what is still owed', () => {
+      expect(running(222_000)).toMatchObject({
+        credit: 0,
+        account: {
+          paidThrough: '2026-10-15',
+          owes: { amount: 222_000, days: 1, oldest: '2026-10-16' },
+        },
+      });
+    });
+
+    it('leaves a day an open dispute holds out of what is owed and of paid through', () => {
+      const row = (date: string, state: BookRowState, taxOwed: number, held = false) => ({
+        date,
+        state,
+        taxOwed,
+        ...(held ? { held: { until: '2026-11-30', kind: 'quantity' as const } } : {}),
+      });
+      expect(
+        personalAccountStatus([
+          row('2026-10-14', 'paid', 0),
+          row('2026-10-15', 'billed', 50, true),
+          row('2026-10-16', 'billed', 70),
+        ])
+      ).toEqual({
+        paidThrough: '2026-10-14',
+        owes: { amount: 70, days: 1, oldest: '2026-10-16' },
+      });
+    });
+
+    it('pays a day a late notice listed like any running day, by the per-day rule', () => {
+      const notice: Statement = {
+        id: 'notice_2026-10-15_solo:1_2026-10-17',
+        kind: 'notice',
+        minerId: `solo:${ME}`,
+        code: 'NTX-ABCD',
+        periodStart: '2026-10-15',
+        periodEnd: '2026-10-16',
+        coversFrom: '2026-10-15',
+        coversThrough: '2026-10-16',
+        issuedAt: '2026-10-17T00:00:00Z',
+        hubId: 'jita',
+        oreForm: 'compressed',
+        // Priced differently from the day itself: the day's own figure is what is owed.
+        amount: 999_999_999,
+        lines: [],
+      };
+      const out = overlay(entries, [
+        book({
+          observed,
+          statements: [notice],
+          payments: [{ ...paid(222_000), statementId: notice.id }],
+          runningAccountFrom: '2026-10-01T00:00:00Z',
+        }),
+      ]).books[0];
+      expect(out).toMatchObject({
+        credit: 0,
+        // Only for its code, while the member owes.
+        openStatements: [{ statementId: notice.id, code: 'NTX-ABCD' }],
+        account: { paidThrough: '2026-10-15', owes: { amount: 222_000, days: 1 } },
+      });
+    });
+
+    it('holds only a true overpayment as credit, and reads paid through the last day', () => {
+      expect(running(500_000)).toMatchObject({
+        credit: 56_000,
+        account: { paidThrough: '2026-10-16', owes: null },
+      });
+    });
   });
 
   it('reports the sync note facts: last synced, closed through, credit', () => {

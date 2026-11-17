@@ -10,6 +10,7 @@ import {
 } from '@/engine/corpTaxBook/overdueAging';
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
 import { useTabsProjection } from './useTabsProjection';
+import { useBook } from './useBook';
 import { isk } from './moonsFormat';
 import { minersBalancePath } from './moonsPaths';
 
@@ -29,6 +30,8 @@ function linkTo(miners: readonly MinerRow[], balance: MinerBalance) {
 export function BookTotals({ children }: { children?: ReactNode }) {
   const { t } = useTranslation();
   const { totals, miners } = useTabsProjection();
+  // A running account has no Next Statement: every Billable day is owed already (#6294).
+  const running = !!useBook().view.input.runningAccountFrom;
   return (
     <StatChips>
       <StatChip
@@ -46,7 +49,9 @@ export function BookTotals({ children }: { children?: ReactNode }) {
         {...(totals.overdueCount > 0 ? { tone: 'danger' as const } : {})}
         {...linkTo(miners, 'overdue')}
       />
-      <StatChip label={t('corpTaxBook.moons.chips.unbilled')} value={isk(totals.unbilled)} />
+      {!running && (
+        <StatChip label={t('corpTaxBook.moons.chips.unbilled')} value={isk(totals.unbilled)} />
+      )}
       <StatChip
         label={t('corpTaxBook.moons.chips.credit')}
         value={isk(totals.credit)}

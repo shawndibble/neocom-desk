@@ -309,15 +309,15 @@ describe('matchDonation', () => {
     ).toEqual({ kind: 'miner', minerId: 'solo:777' });
   });
 
-  it('holds a code-less donation for review when its Miner owes nothing (#6207)', () => {
-    // e.g. a buyback payment: crediting it as tax would hide the next debt.
+  it('credits a code-less donation to its Miner even when they owe nothing (#6300)', () => {
+    // Prepaid money becomes credit; an officer can mark it "not tax" (a buyback, say).
     for (const openBalance of [new Map(), new Map([['m1', 0]]), new Map([['m1', -5]])]) {
       expect(
         matchDonation(
           { characterId: 90000001, reason: 'ore buyback' },
           { miners, statements: [], knownCharacterIds: new Set(), openBalance, unbilled: none }
         )
-      ).toEqual({ kind: 'review', minerId: 'm1' });
+      ).toEqual({ kind: 'miner', minerId: 'm1' });
     }
   });
 

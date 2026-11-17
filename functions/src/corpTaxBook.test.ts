@@ -88,6 +88,13 @@ describe('parsers', () => {
     expect(() => parseTurnOnInput({ ...base, corporationId: '9' })).toThrow();
   });
 
+  it('markNotTax takes no reason and stores none when blank', () => {
+    const base = { action: 'markNotTax', paymentId: 'p1', notTaxAmount: 5 };
+    expect(parseEditAction(base)).toEqual(base);
+    expect(parseEditAction({ ...base, reason: '  ' })).toEqual(base);
+    expect(parseEditAction({ ...base, reason: ' buyback ' })).toMatchObject({ reason: 'buyback' });
+  });
+
   it('refuses a path-escaping id and an unknown action', () => {
     expect(() => parseEditAction({ action: 'dismissAll' })).toThrow();
     expect(() =>
@@ -130,6 +137,26 @@ describe('parsers', () => {
     ).toMatchObject({
       divisions: [1, 2],
     });
+  });
+
+  it('takes the running account switch and bounds its notice rules', () => {
+    expect(parseSettingsPatch({ switchToRunningAccount: true })).toEqual({
+      switchToRunningAccount: true,
+    });
+    expect(() => parseSettingsPatch({ switchToRunningAccount: false })).toThrow();
+    const rules = { after: { kind: 'dayOfMonth', day: 5 }, minimum: 10_000_000, cooldownDays: 7 };
+    expect(parseSettingsPatch({ noticeRules: rules, dayTolerancePct: 0.5 })).toEqual({
+      noticeRules: rules,
+      dayTolerancePct: 0.5,
+    });
+    expect(() =>
+      parseSettingsPatch({ noticeRules: { ...rules, after: { kind: 'dayOfMonth', day: 31 } } })
+    ).toThrow();
+    expect(() =>
+      parseSettingsPatch({ noticeRules: { ...rules, after: { kind: 'weekly' } } })
+    ).toThrow();
+    expect(() => parseSettingsPatch({ noticeRules: { ...rules, cooldownDays: 0 } })).toThrow();
+    expect(() => parseSettingsPatch({ dayTolerancePct: 6 })).toThrow();
   });
 
   it('takes an added division and the divisions list a change started from', () => {

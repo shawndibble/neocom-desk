@@ -506,7 +506,7 @@ export function PayeeManagerDialog({
                 />
               </Field>
               {choices && (
-                <div className="space-y-2 text-xs">
+                <div className="col-span-full space-y-2 text-xs">
                   <p>{t('miningTax.payees.notInEve.several', { name: choices.name })}</p>
                   <div className="flex flex-wrap gap-2">
                     {choices.matches.map((match) => (
@@ -525,7 +525,7 @@ export function PayeeManagerDialog({
                 </div>
               )}
               {suggestedBook && (
-                <div className="flex flex-wrap items-center gap-2 text-xs text-text-dim">
+                <div className="col-span-full flex flex-wrap items-center gap-2 text-xs text-text-dim">
                   <p className="min-w-0 flex-1">
                     {t('miningTax.payees.bookLink.note', { corp: suggestedBook.name })}
                   </p>

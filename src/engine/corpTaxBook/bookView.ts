@@ -14,6 +14,7 @@ import {
   type DismissalCredit,
   type PaymentCredit,
   type RecordedWriteOff,
+  type StatementSettlement,
   type TaxPayment,
 } from './allocation';
 import type { FeederReadClock } from './feederHealth';
@@ -23,6 +24,7 @@ import { activeDismissalFor, type Dismissal } from './dismissals';
 import {
   chunkRateFor,
   extractionStatus,
+  fractureAndExpiry,
   learnChunkRates,
   minedDuringExtraction,
   type ChunkRate,
@@ -50,7 +52,8 @@ import type { ObservedMiningEntry, OreLine } from './types';
 import type { DayPrices } from './valuation';
 import { DAY_MS } from '@/lib/age';
 import { wholeIsk } from './wholeIsk';
-import type { OreDispute } from './disputes';
+import { disputeHold, disputesToShow, type OreDispute } from './disputes';
+import { allocateRunningAccount, type RunningAccount } from './runningAccount';
 import { settleOpenSet, type OpenSet, type OpenSetInput } from './openSet';
 
 export interface BookViewInput {
@@ -89,6 +92,10 @@ export interface BookViewInput {
   feeders?: readonly (FeederReadClock & FeederCoverage)[];
   extractions: readonly SyncExtraction[];
   paidStatementIds: ReadonlySet<string>;
+  /** The instant the book switched to a running account (#6294); absent, it bills by Statement. */
+  runningAccountFrom?: string;
+  /** A running account's per-day tolerance, in percent. */
+  dayTolerancePct?: number;
   /** The day's prices at the book's hub and Ore Form, by raw type id. */
   pricesOn: (date: string) => Pick<DayPrices, 'prices' | 'sources'>;
   /**
@@ -110,7 +117,7 @@ export interface MinerRow {
   mainCharacterId: number;
   characterIds: number[];
   standing: MinerStanding;
-  /** Unsettled Statements, less nothing: what is still due. */
+  /** Unsettled Statements, less nothing: what is still due (on a running account, unpaid days too). */
   owed: number;
   /** Whole days past the oldest overdue Statement's due date; null when none is overdue. */
   overdueDays: number | null;
@@ -122,6 +129,14 @@ export interface MinerRow {
   lastPaidAt: string | null;
   /** An unsettled Statement is paused by a declaration. */
   paused: boolean;
+  /** On a book switched to a running account (#6294): paid through, or what is owed. */
+  account?: RunningAccountStatus;
+}
+
+/** A Miner's running account status: "Paid through {date}" or "Owes X (N days, oldest D)". */
+export interface RunningAccountStatus {
+  paidThrough: string | null;
+  owes: RunningAccount['owes'];
 }
 
 export type DayStatus =
@@ -141,6 +156,11 @@ export interface DayRow {
   rateEffectiveFrom?: string;
   tax: number;
   status: DayStatus;
+  /**
+   * On a running account, what is still owed of an `unbilled` day: its share of the date's
+   * remainder, 0 while an open dispute holds the date (#6294).
+   */
+  owed?: number;
   /** A `not-billable` day held while this moon owner's ledger cannot be read (#6210). */
   heldBy?: number;
   statementId?: string;
@@ -157,6 +177,9 @@ export interface ExtractionRow {
   fracturedAt?: string;
   fracturedBy?: 'laser' | 'auto';
   expiresAt?: string;
+  /** Fracture and Expired as the engine plans them, set in every state, so a chunk not yet fractured still has a span to draw. */
+  plannedFractureAt: string;
+  plannedExpiresAt: string;
   oreSource: 'notification' | 'survey' | 'unknown';
   oreLines: OreLine[];
   /** The chunk rate a survey estimate was made at (D13); absent for the other sources. */
@@ -225,8 +248,13 @@ export interface BookView {
 }
 
 interface MinerInternals {
+  /** Every Statement of its, late notices included. */
   statements: Statement[];
   payments: TaxPayment[];
+  /**
+   * Payments against its Statements. On a running account a late notice is not Statement debt:
+   * its settlement here is read off its days (`noticeSettlement`), and it takes no payment.
+   */
   allocation: Allocation;
   /** What `allocation` was computed from, so a payment can be previewed against it. */
   allocationInput: AllocationInput;
@@ -234,6 +262,46 @@ interface MinerInternals {
   days: DayRow[];
   /** The book's `billableThrough`, stopped before a day of this miner's that is held (#6209). */
   billableThrough: string | undefined;
+  /** Its running account, on a book switched to one (#6294). */
+  running?: RunningAccount;
+}
+
+/**
+ * A late notice's standing, read off its days on the running account (#6294): what its lines
+ * billed of each date, that date's share of what was credited, written off and is still owed.
+ * Settled once every date it lists is (a date an open dispute holds is not due); a date no longer
+ * on the account (dismissed since) owes nothing.
+ */
+export function noticeSettlement(
+  notice: Pick<Statement, 'lines'>,
+  running: Pick<RunningAccount, 'byDay'>
+): StatementSettlement {
+  const byDate = new Map<string, number>();
+  for (const l of notice.lines) byDate.set(l.date, (byDate.get(l.date) ?? 0) + l.tax);
+  const out = { amount: 0, held: 0, credited: 0, forgiven: 0, writtenOff: 0, remaining: 0 };
+  let settled = true;
+  for (const [date, tax] of byDate) {
+    if (tax <= 0) continue;
+    const day = running.byDay.get(date);
+    if (!day || day.tax <= 0) {
+      out.amount += tax;
+      out.credited += tax;
+      continue;
+    }
+    const share = Math.min(1, tax / day.tax);
+    if (day.held) {
+      out.held += tax;
+      continue;
+    }
+    out.amount += tax;
+    out.credited += day.credited * share;
+    out.forgiven += day.forgiven * share;
+    out.writtenOff += day.writtenOff * share;
+    out.remaining += day.remaining * share;
+    if (!day.settled) settled = false;
+  }
+  const { held, ...rest } = out;
+  return { ...rest, ...(held > 0 ? { held } : {}), settled };
 }
 
 /**
@@ -255,6 +323,13 @@ function frozenDay(lines: readonly StatementLine[], charge: DayCharge) {
     rateEffectiveFrom: rate.rateEffectiveFrom,
     tax: lines.reduce((sum, l) => sum + l.tax, 0),
   };
+}
+
+/** A running day's share of what its date still owes: none while a dispute holds the date. */
+function runningOwed(running: RunningAccount, date: string, tax: number): number {
+  const day = running.byDay.get(date);
+  if (!day || day.held || day.tax <= 0) return 0;
+  return (day.remaining * tax) / day.tax;
 }
 
 /** What the next Statement would bill one Miner, in full: the draft every figure below it reads. */
@@ -299,6 +374,7 @@ export function pendingTax(
 /** What the open set of a whole book is settled from, as an officer reads it. */
 export function openSetInputOf(input: BookViewInput): OpenSetInput {
   return {
+    ...(input.runningAccountFrom ? { runningAccount: true } : {}),
     corporationId: input.corporationId,
     now: input.now,
     startDate: input.startDate,
@@ -365,7 +441,11 @@ export function buildBookView(input: BookViewInput): BookView {
     const mainCharacterId =
       input.miners.find((m) => m.id === id)?.mainCharacterId ?? characterIds[0] ?? 0;
     const mine = charges.filter((c) => c.minerId === id);
-    const forgivenKeys = forgivenDayKeys(statements, allocation, dismissalCredits);
+    // On a running account a late notice's days stay running days (#6294): only the other
+    // Statements are Statement debt whose days are billed, frozen and closed once paid.
+    const notices = input.runningAccountFrom ? statements.filter((s) => s.kind === 'notice') : [];
+    const legacy = notices.length > 0 ? statements.filter((s) => s.kind !== 'notice') : statements;
+    const forgivenKeys = forgivenDayKeys(legacy, allocation, dismissalCredits);
     // `billableThrough` is the Miner's own; `hold` set it, and its moon owner is why a held day
     // waits (#6210) from the hold's first day through the book's billable-through.
     const heldByOf = (date: string) =>
@@ -375,20 +455,51 @@ export function buildBookView(input: BookViewInput): BookView {
       date <= open.billableThrough
         ? hold.ownerCorporationId
         : undefined;
-    const draft = minerDraft(input, id, statements, mine, billableThrough);
+    const draft = minerDraft(input, id, legacy, mine, billableThrough);
 
     const draftLines = draft.kind === 'nothing' ? [] : draft.lines;
     const unbilledKeys = new Set(draftLines.map((l) => l.chargeKey));
+    // A running account (#6294): every Billable day on no Statement is owed now, oldest paid first.
+    const running = input.runningAccountFrom
+      ? allocateRunningAccount({
+          ...allocationInput,
+          days: draftLines,
+          // An open dispute nobody has dismissed yet holds its date (`disputesToShow`).
+          heldDays: new Set(
+            disputesToShow(input.disputes ?? [], input.dismissals)
+              .filter((d) => d.minerId === id && disputeHold(d, input.now))
+              .map((d) => d.date)
+          ),
+          dayTolerancePct: input.dayTolerancePct,
+        })
+      : undefined;
+    // A notice takes no payment: what its days were credited is its standing.
+    const shown: Allocation =
+      running && notices.length > 0
+        ? {
+            ...allocation,
+            byStatement: new Map([
+              ...allocation.byStatement,
+              ...notices.map((n) => [n.id, noticeSettlement(n, running)] as const),
+            ]),
+          }
+        : allocation;
     const dismissedKeys = new Map(draft.dismissed.map((d) => [d.charge.key, d.dismissal.id]));
     const writtenOffKeys = new Set(draft.writtenOff.map((w) => w.chargeKey));
     const billedBy = new Map<string, Statement>();
     const linesBy = new Map<string, StatementLine[]>();
-    for (const s of statements)
+    for (const s of legacy)
       for (const line of s.lines) {
         if (!line.chargeKey) continue;
         billedBy.set(line.chargeKey, s);
         linesBy.set(line.chargeKey, [...(linesBy.get(line.chargeKey) ?? []), line]);
       }
+    /** The newest late notice that listed each day: a running day still, only named. */
+    const noticeBy = new Map<string, Statement>();
+    for (const n of [...notices].sort(
+      (a, b) => a.issuedAt.localeCompare(b.issuedAt) || a.id.localeCompare(b.id)
+    ))
+      for (const line of n.lines) if (line.chargeKey) noticeBy.set(line.chargeKey, n);
 
     const days: DayRow[] = mine
       .map((c): DayRow => {
@@ -397,7 +508,8 @@ export function buildBookView(input: BookViewInput): BookView {
         let status: DayStatus;
         if (dismissal || dismissedKeys.has(c.key)) status = 'dismissed';
         else if (writtenOffKeys.has(c.key)) status = 'written-off';
-        else if (unbilledKeys.has(c.key)) status = 'unbilled';
+        else if (unbilledKeys.has(c.key))
+          status = running?.byDay.get(c.date)?.settled ? 'paid' : 'unbilled';
         else if (statement && forgivenKeys.has(c.key)) status = 'written-off';
         else if (statement)
           status = allocation.byStatement.get(statement.id)?.settled ? 'paid' : 'on-statement';
@@ -433,8 +545,15 @@ export function buildBookView(input: BookViewInput): BookView {
             : {}),
           tax: value.tax,
           status,
+          ...(running && status === 'unbilled'
+            ? { owed: runningOwed(running, c.date, value.tax) }
+            : {}),
           ...(heldBy !== undefined ? { heldBy } : {}),
-          ...(statement ? { statementId: statement.id } : {}),
+          ...(statement
+            ? { statementId: statement.id }
+            : noticeBy.has(c.key)
+              ? { statementId: noticeBy.get(c.key)!.id }
+              : {}),
           ...(dismissal ? { dismissalId: dismissal.id } : {}),
         };
       })
@@ -442,10 +561,26 @@ export function buildBookView(input: BookViewInput): BookView {
 
     let owed = 0;
     for (const s of allocation.byStatement.values()) if (!s.settled) owed += s.remaining;
+    if (running) owed = running.owes?.amount ?? 0;
     let overdueDays: number | null = null;
     let overdueStatementId: string | undefined;
     let paused = false;
-    for (const [statementId, status] of settled.overdue) {
+    // A late notice's Overdue clock starts at its issue, as a Statement's does, until its days are paid.
+    const overdue = new Map(settled.overdue);
+    for (const n of notices) {
+      if (shown.byStatement.get(n.id)?.settled) continue;
+      overdue.set(
+        n.id,
+        overdueStatus({
+          issuedAt: n.issuedAt,
+          settled: false,
+          now: input.now,
+          declarations: input.declarations.filter((d) => d.statementId === n.id),
+          overdueDays: input.overdueDays,
+        })
+      );
+    }
+    for (const [statementId, status] of overdue) {
       if (status.state === 'paused') paused = true;
       if (status.state === 'overdue') {
         const days = Math.max(1, Math.floor((nowMs - Date.parse(status.overdueAt)) / DAY_MS));
@@ -455,7 +590,8 @@ export function buildBookView(input: BookViewInput): BookView {
         }
       }
     }
-    const unbilled = draftLines.reduce((sum, l) => sum + l.tax, 0);
+    // On a running account nothing waits for a Statement: those days are owed (or paid) already.
+    const unbilled = running ? 0 : draftLines.reduce((sum, l) => sum + l.tax, 0);
     const pending = pendingTax(input, mine, new Set(billedBy.keys()), open.billableThrough);
     const lastPaid = payments
       .filter((p) => p.amount - (p.notTaxAmount ?? 0) > 0)
@@ -474,19 +610,21 @@ export function buildBookView(input: BookViewInput): BookView {
       overdueDays,
       unbilled,
       pending,
-      credit: allocation.credit,
+      credit: running ? running.credit : allocation.credit,
       lastPaidAt: lastPaid ?? null,
       paused,
+      ...(running ? { account: { paidThrough: running.paidThrough, owes: running.owes } } : {}),
     };
     miners.push(row);
     byMiner.set(id, {
       statements,
       payments,
-      allocation,
+      allocation: shown,
       allocationInput,
       draft,
       days,
       billableThrough,
+      ...(running ? { running } : {}),
     });
 
     for (const d of input.declarations) {
@@ -507,7 +645,9 @@ export function buildBookView(input: BookViewInput): BookView {
         kind: 'leaver',
         minerId: id,
         owed,
-        statementId: statements.find((s) => !allocation.byStatement.get(s.id)?.settled)?.id,
+        // On a running account the days may be on no Statement: the newest notice stands for them.
+        statementId:
+          statements.find((s) => !shown.byStatement.get(s.id)?.settled)?.id ?? newest(notices)?.id,
       });
     }
   }
@@ -584,6 +724,7 @@ export function extractionRowBase(
   const ex = toEngineExtraction(x);
   const expiryHours = input.structureExpiryHours[String(x.structureId)];
   const status = extractionStatus(ex, input.now, { expiryHours });
+  const planned = fractureAndExpiry(ex, expiryHours);
   // Source order (D13): the ExtractionStarted notification, then a linked Survey.
   const notified = x.oreLines ?? [];
   const surveyed = notified.length === 0 ? (input.surveyOreLines?.get(ex.id) ?? []) : [];
@@ -601,6 +742,8 @@ export function extractionRowBase(
     ...(status.fracturedAt ? { fracturedAt: status.fracturedAt } : {}),
     ...(status.fracturedBy ? { fracturedBy: status.fracturedBy } : {}),
     ...(status.expiresAt ? { expiresAt: status.expiresAt } : {}),
+    plannedFractureAt: new Date(planned.fracturedAt).toISOString(),
+    plannedExpiresAt: new Date(planned.expiresAt).toISOString(),
     oreSource: notified.length > 0 ? 'notification' : surveyed.length > 0 ? 'survey' : 'unknown',
     oreLines,
     ...(surveyed.length > 0
@@ -841,6 +984,8 @@ function closedPeriods(view: BookView, after?: string): StatementPeriod[] {
 
 /** The first of `closedPeriods` that still has unbilled lines, with its plan. */
 function firstRun(view: BookView, after?: string): StatementRunPlan | undefined {
+  // A running account issues late notices instead (#6294, `planNotices`).
+  if (view.input.runningAccountFrom) return undefined;
   for (const period of closedPeriods(view, after)) {
     const plan = planStatementRun(view, period);
     if (plan.lines.length > 0) return plan;
@@ -1131,6 +1276,12 @@ function ownPeriodBilling(
   }
   return { miners, billed, rolled, rolledAmount };
 }
+
+/** The Statement issued last, if any. */
+export const newest = <T extends Pick<Statement, 'issuedAt' | 'id'>>(statements: readonly T[]) =>
+  [...statements]
+    .sort((a, b) => a.issuedAt.localeCompare(b.issuedAt) || a.id.localeCompare(b.id))
+    .at(-1);
 
 const earliest = (dates: readonly (string | null | undefined)[]) =>
   dates.filter((d): d is string => !!d).sort()[0] ?? null;

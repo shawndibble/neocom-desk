@@ -233,6 +233,9 @@ describe('Miner page read-model path', () => {
     const { mine, from } = both();
     expect(from).toBe(mine.reduce((m, s) => (s.coversFrom > m ? s.coversFrom : m), ''));
     expect(openWindowStart([], '2026-08-01')).toBe('2026-08-01');
+    // A late notice never moves the window: unpaid days before it stay on the page.
+    const notice = { coversFrom: '2026-10-01', kind: 'notice' } as Statement;
+    expect(openWindowStart([notice], '2026-08-01')).toBe('2026-08-01');
   });
 
   it('rebuilds a frozen day from its Statement lines, once, ore by ore', () => {
@@ -294,6 +297,13 @@ describe('Miner page read-model path', () => {
     expect(withMinerTotals(old, MINER, { ...doc, owed: NaN })).toBe(old);
     expect(withMinerTotals(old, MINER, undefined)).toBe(old);
     expect(minerDetail(old, MINER)!.row).toEqual(row);
+  });
+
+  it('ignores the stored totals on a running account, which count Statements only', () => {
+    const { old } = both();
+    const running = { ...old, input: { ...old.input, runningAccountFrom: '2026-01-01T00:00:00Z' } };
+    const doc = { schema: 1, owed: 123, credit: 4, lastPaidAt: null } as MinerTotals;
+    expect(withMinerTotals(running, MINER, doc)).toBe(running);
   });
 
   it('keeps the computed owed and credit while the Miner has an unanswered dispute', () => {

@@ -35,5 +35,5 @@ export async function loadNeedsYouCount(
     bookViewInputOf(corporationId, new Date().toISOString(), data, prices, { memberIds })
   );
   const { needsYou } = tabsProjection(view, data.readModels, READ_MODELS_SCHEMA);
-  return needsYouOf(view, data, data.settings.divisions, needsYou).count;
+  return needsYouOf(view, data, data.settings.divisions, needsYou, data.settings.noticeRules).count;
 }

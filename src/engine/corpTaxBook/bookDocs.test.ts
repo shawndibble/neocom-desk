@@ -8,6 +8,8 @@ import {
   RATE_SCOPES,
 } from './bookDocs';
 import { DEFAULT_OVERDUE_DAYS } from './overdue';
+import { DEFAULT_NOTICE_RULES } from './notices';
+import { DAY_SETTLE_TOLERANCE_PCT } from './runningAccount';
 import { DEFAULT_MINIMUM_STATEMENT } from './statements';
 
 describe('parseRate', () => {
@@ -99,12 +101,25 @@ describe('parseBookSettings', () => {
       minimumStatement: DEFAULT_MINIMUM_STATEMENT,
       overdueDays: DEFAULT_OVERDUE_DAYS,
       cadence: { kind: 'monthly' },
+      noticeRules: DEFAULT_NOTICE_RULES,
+      dayTolerancePct: DAY_SETTLE_TOLERANCE_PCT,
       chunkM3PerHour: null,
       rates: [],
       dismissApprovalAboveIsk: null,
       ownerCharacterId: null,
       createdBy: null,
     });
+  });
+
+  it('reads the running account switch-over and its rules', () => {
+    const s = parseBookSettings({
+      runningAccountFrom: '2026-11-17T04:00:00.000Z',
+      noticeRules: { after: { kind: 'dayOfMonth', day: 5 }, minimum: 20_000_000, cooldownDays: 7 },
+      dayTolerancePct: 1,
+    });
+    expect(s.runningAccountFrom).toBe('2026-11-17T04:00:00.000Z');
+    expect(s.noticeRules.after).toEqual({ kind: 'dayOfMonth', day: 5 });
+    expect(s.dayTolerancePct).toBe(1);
   });
 
   it('keeps the officer-only fields and the setup window', () => {

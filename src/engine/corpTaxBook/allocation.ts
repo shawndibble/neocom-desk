@@ -42,8 +42,8 @@ export interface TaxPayment {
   /** How much of it an officer marked "not tax". */
   notTaxAmount?: number;
   /**
-   * Why the sync left a known sender's donation Unmatched for an officer (#6207):
-   * their Miner owed nothing, so it may not be tax at all. Never auto-credited later.
+   * Legacy (#6207, reversed by #6300): a known sender's donation held Unmatched because their
+   * Miner owed nothing. No longer set; the next sync assigns any still stored.
    */
   reviewReason?: 'no-open-balance';
 }
@@ -292,8 +292,6 @@ export function allocatePayments(rawInput: AllocationInput): Allocation {
 export type DonationMatch =
   | { kind: 'statement'; statementId: string; minerId: string }
   | { kind: 'miner'; minerId: string }
-  /** A known sender with no code whose Miner owes nothing: Unmatched, for an officer to review. */
-  | { kind: 'review'; minerId: string }
   | { kind: 'unmatched' };
 
 function escapeRegExp(text: string): string {
@@ -308,10 +306,10 @@ function carriesCode(reason: string, code: string): boolean {
  * Whom a donation into the book's division(s) credits. A code in the reason
  * wins, from any character, without revealing any grouping; then a character
  * the book knows — grouped into a Miner, or one that mined at its refineries —
- * but only while that Miner owes: an open balance on issued Statements, or ore
- * not yet on one. A donation from a Miner with neither (a buyback, say) is held
- * for review instead (#6207). Anyone else
- * is Unmatched, to be claimed or assigned.
+ * credits that Miner whether or not they owe yet (#6300): money beyond what
+ * they owe is credit, and an officer can mark it "not tax". Anyone else is
+ * Unmatched, to be claimed or assigned. `openBalance` and `unbilled` no longer
+ * gate the match.
  */
 export function matchDonation(
   donation: { characterId: number; reason: string | undefined },
@@ -334,9 +332,7 @@ export function matchDonation(
   const grouped = book.miners.some((m) => m.characterIds.includes(donation.characterId));
   if (grouped || book.knownCharacterIds.has(donation.characterId)) {
     const minerId = minerIdFor(donation.characterId, book.miners);
-    if ((book.openBalance.get(minerId) ?? 0) > 0 || book.unbilled.has(minerId))
-      return { kind: 'miner', minerId };
-    return { kind: 'review', minerId };
+    return { kind: 'miner', minerId };
   }
   return { kind: 'unmatched' };
 }

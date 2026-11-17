@@ -87,6 +87,8 @@ export interface LoadedCorpBook {
   graceHours: number;
   /** Days after issue an unsettled Statement goes Overdue (the book's setting). */
   overdueDays?: number;
+  /** The instant the book switched to a running account (#6294). */
+  runningAccountFrom?: string;
   hubId: string;
   oreForm: 'compressed' | 'raw';
   /** The book's divisions, division 1 by default — where a donation should go. */
@@ -161,6 +163,7 @@ export function readBookSettings(corporationId: number, d: Data | undefined, now
     startDate: settings.startDate,
     graceHours: settings.graceHours,
     overdueDays: settings.overdueDays,
+    ...(settings.runningAccountFrom ? { runningAccountFrom: settings.runningAccountFrom } : {}),
     hubId: settings.hubId,
     oreForm: settings.oreForm,
     divisions: settings.divisions,

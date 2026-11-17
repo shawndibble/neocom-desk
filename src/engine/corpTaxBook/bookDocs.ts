@@ -13,6 +13,8 @@ import { DEFAULT_OVERDUE_DAYS } from './overdue';
 import { SCOPE_ORDER, type RateScope, type TaxRate } from './rates';
 import { DEFAULT_MINIMUM_STATEMENT, type StatementCadence } from './statements';
 import type { LastSync } from './sync';
+import { parseNoticeRules, type NoticeRules } from './notices';
+import { DAY_SETTLE_TOLERANCE_PCT } from './runningAccount';
 
 type Data = Record<string, unknown>;
 
@@ -67,6 +69,15 @@ export interface BookSettings {
   membersSeeFrom?: number;
   /** Who gets the EVE mail when a member asks about tax. Absent → the corporation's CEO. */
   taxContact?: TaxContact;
+  /**
+   * The instant the book switched to a running account (#6294); absent, it bills by calendar
+   * Statement. Once set, it never clears.
+   */
+  runningAccountFrom?: string;
+  /** A running account's late notices. */
+  noticeRules: NoticeRules;
+  /** A running account's per-day tolerance, in percent. */
+  dayTolerancePct: number;
 }
 
 /** Every scope a stored rate can have — the engine's own list, so a new scope is never dropped. */
@@ -140,6 +151,9 @@ export function parseBookSettings(d: Data): BookSettings {
     createdBy: num(d.createdBy) ?? null,
     ...(membersSeeFrom !== undefined ? { membersSeeFrom } : {}),
     ...(taxContact ? { taxContact } : {}),
+    ...(str(d.runningAccountFrom) ? { runningAccountFrom: str(d.runningAccountFrom) } : {}),
+    noticeRules: parseNoticeRules(d.noticeRules),
+    dayTolerancePct: num(d.dayTolerancePct) ?? DAY_SETTLE_TOLERANCE_PCT,
   };
 }
 
