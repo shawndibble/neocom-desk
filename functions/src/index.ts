@@ -308,6 +308,7 @@ import {
   parseVettingMember,
   parseVettingRemoveCharacter,
   parseVettingRequest,
+  parseVettingRawRows,
   parseVettingReviewId,
   parseVettingSettingsPatch,
   parseVettingStart,
@@ -322,6 +323,7 @@ import {
   getVettingOverview,
   getVettingStatus,
   listMyVettingRequests,
+  getVettingRawRows,
   openVettingReview,
   removeVettingCharacter,
   recordVettingRequestMail,
@@ -1570,6 +1572,14 @@ vettingAction('openVettingReviewCallable', (request) =>
     callerOf(request),
     parseBookCall(request.data),
     parseVettingReviewId(request.data)
+  )
+);
+vettingAction('getVettingRawRowsCallable', (request) =>
+  getVettingRawRows(
+    vettingDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseVettingRawRows(request.data)
   )
 );
 vettingAction('decideVettingReviewCallable', (request) =>

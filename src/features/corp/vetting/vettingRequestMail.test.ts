@@ -29,7 +29,7 @@ describe('buildVettingRequestMail', () => {
       [
         'Hi Ren Halvard,',
         'I asked for a review before you are made Accountant in Brass Meridian Logistics. Other officers decide it. I cannot sign it off.',
-        'What happens: you log in with your characters and choose which to share. Neocom Desk reads them once: corporation history, wallet, contracts, contacts, skills, and who you exchanged mail with (never the subject or the text). No login is kept.',
+        'What happens: you log in with your characters and choose which to share. Neocom Desk reads them once: corporation history, wallet, contracts, contacts, skills, and who you exchanged mail with (never the subject or the text). Every row read is kept with the report, for officers only, until it is deleted: 30 days after a decision, 90 days after you share if nobody decides, or when you delete it. No login is kept.',
         'You can see who opens the report, delete it at any time, or decline. If you decline, the reviewers are told and nothing is read.',
         'Open it: https://neocomdesk.com/vetting\nLog in as Ren Halvard.',
         'Bram Kessel',

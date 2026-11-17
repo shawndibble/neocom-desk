@@ -12,6 +12,7 @@ import { getValidAccessToken } from '@/auth/session';
 import type {
   VettingCorpInfo,
   VettingOverview,
+  VettingRawPage,
   VettingReview,
   VettingStatus,
 } from '@/engine/vetting';
@@ -30,6 +31,7 @@ const ACTION = {
   myRequests: 'listMyVettingRequestsCallable',
   overview: 'getVettingOverviewCallable',
   open: 'openVettingReviewCallable',
+  rawRows: 'getVettingRawRowsCallable',
   decide: 'decideVettingReviewCallable',
   request: 'requestVettingReviewCallable',
   recordRequestMail: 'recordVettingRequestMailCallable',
@@ -103,6 +105,13 @@ const client: VettingBackend = {
     signedIn<VettingOverview>(characterId, ACTION.overview, { corporationId }),
   open: (characterId, corporationId, reviewId) =>
     signedIn<VettingReview>(characterId, ACTION.open, { corporationId, reviewId }),
+  rawRows: (characterId, corporationId, reviewId, source, cursor) =>
+    signedIn<VettingRawPage>(characterId, ACTION.rawRows, {
+      corporationId,
+      reviewId,
+      source,
+      ...(cursor ? { cursor } : {}),
+    }),
   decide: (characterId, corporationId, reviewId, decision, note) =>
     signedIn<VettingReview>(characterId, ACTION.decide, {
       corporationId,

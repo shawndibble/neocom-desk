@@ -18,7 +18,7 @@ function playerId(value: unknown): number | null {
     : null;
 }
 
-const text = (value: unknown): string | null =>
+export const text = (value: unknown): string | null =>
   typeof value === 'string' && value.length > 0 ? value.slice(0, 64) : null;
 
 export function walletDealings(characterId: number, rows: readonly unknown[]): VettingDealing[] {
@@ -91,6 +91,24 @@ function issuerAmount(row: Record<string, unknown>): { amount: number; signed: b
   return price === null ? null : { amount: price, signed: false };
 }
 
+/**
+ * The ISK a contract moved from this character's side, as `contractDealings` signs it; undefined
+ * when the row gives none.
+ */
+export function contractAmount(
+  characterId: number,
+  row: Record<string, unknown>
+): number | undefined {
+  const issued = row.issuer_id === characterId;
+  const moved = issuerAmount(row);
+  if (issued || row.acceptor_id === characterId) {
+    // `|| 0`: a free contract is 0, never -0.
+    return moved ? (moved.signed && !issued ? -moved.amount : moved.amount) || 0 : undefined;
+  }
+  // Only assigned to this character, not accepted: nothing moved yet, so the price as given.
+  return isFiniteNumber(row.price) ? row.price : undefined;
+}
+
 export function contractDealings(characterId: number, rows: readonly unknown[]): VettingDealing[] {
   return rows.flatMap((row): VettingDealing[] => {
     if (!isPlainRecord(row)) return [];
@@ -100,14 +118,8 @@ export function contractDealings(characterId: number, rows: readonly unknown[]):
     const at = text(row.date_issued);
     if (partyId === null || partyId === characterId || what === null || at === null) return [];
     const dealing: VettingDealing = { source: 'contract', at, partyId, what };
-    const moved = issuerAmount(row);
-    if (issued || row.acceptor_id === characterId) {
-      // `|| 0`: a free contract is 0, never -0.
-      if (moved) dealing.amount = (moved.signed && !issued ? -moved.amount : moved.amount) || 0;
-    } else if (isFiniteNumber(row.price)) {
-      // Only assigned to this character, not accepted: nothing moved yet, so the price as given.
-      dealing.amount = row.price;
-    }
+    const amount = contractAmount(characterId, row);
+    if (amount !== undefined) dealing.amount = amount;
     return [dealing];
   });
 }

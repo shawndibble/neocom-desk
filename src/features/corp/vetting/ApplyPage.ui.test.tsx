@@ -69,7 +69,9 @@ describe('ApplyPage', () => {
       await screen.findByRole('heading', { level: 1, name: /Apply to Brass Meridian Logistics/ })
     ).toBeInTheDocument();
     expect(screen.getByText('How it works')).toBeInTheDocument();
-    expect(screen.getByText('Who you wrote with. No subject or text is kept')).toBeInTheDocument();
+    expect(
+      screen.getByText('Who sent and who received each mail. Never the subject or the text')
+    ).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Log in with EVE Online' }));
     expect(onSignIn).toHaveBeenCalledWith(undefined);
     expect(fixture.calls.map((call) => call.method)).toEqual(['corpInfo']);

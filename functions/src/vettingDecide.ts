@@ -524,6 +524,8 @@ export function reviewView(
     signOffs,
     log: review.log,
     deleteAt: review.deleteAt,
+    // Only when rows were kept: a review stored before that has nothing to browse.
+    ...(review.rawCounts ? { rawCounts: review.rawCounts } : {}),
   };
 }
 

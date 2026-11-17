@@ -10,10 +10,12 @@ import {
   VETTING_NOTE_MAX,
   VETTING_QUESTIONS_MAX,
   VETTING_QUESTION_MAX,
+  VETTING_RAW_SOURCES,
   VETTING_ROLE_MAX,
   VETTING_WELCOME_MAX,
   type VettingKind,
   type VettingMinimums,
+  type VettingRawSource,
   type VettingRejection,
 } from './vettingEngine.js';
 import { VETTING_WATCH_ADD_MAX } from './vettingTypes.js';
@@ -151,6 +153,24 @@ export function parseVettingMember(data: unknown): { accessToken: string } {
 
 export function parseVettingReviewId(data: unknown): { reviewId: string } {
   return { reviewId: secret(record(data).reviewId, 'reviewId', 10) };
+}
+
+export interface VettingRawRowsInput {
+  reviewId: string;
+  source: VettingRawSource;
+  /** The `next` of the previous page; absent for the first. */
+  cursor?: string;
+}
+
+export function parseVettingRawRows(data: unknown): VettingRawRowsInput {
+  const d = record(data);
+  const source = VETTING_RAW_SOURCES.find((candidate) => candidate === d.source);
+  if (!source) throw new HttpsError('invalid-argument', 'source is not valid');
+  return {
+    ...parseVettingReviewId(data),
+    source,
+    ...(d.cursor === undefined ? {} : { cursor: secret(d.cursor, 'cursor', 1) }),
+  };
 }
 
 export interface VettingDecideInput {

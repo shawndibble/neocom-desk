@@ -5,19 +5,26 @@
 // the budget is shared by every user of the client id, and after a 420/429 no reader in this
 // instance calls ESI again until its `Retry-After` has passed. The token is used for these calls
 // and dropped: nothing here stores, logs or returns it. Mail is read as headers only, and only
-// who and when is kept.
+// who, when and which way is kept.
 
 import { fail } from './actorAuth.js';
 import { chunk } from './chunk.js';
 import { ESI_BASE, esiHeaders, isBudgetLow, retryAfterMs } from './esiClient.js';
 import { isFiniteNumber, isPlainRecord } from './guards.js';
 import type {
-  VettingCharacterInput,
   VettingDealing,
   VettingParty,
   VettingSource,
   VettingWatchEntry,
 } from './vettingEngine.js';
+import {
+  rawContactRows,
+  rawContractRows,
+  rawHistoryRows,
+  rawMailRows,
+  rawSkillRows,
+  rawWalletRows,
+} from './vettingRawRows.js';
 import {
   capDealings,
   contactDealings,
@@ -28,7 +35,7 @@ import {
   walletDealings,
 } from './vettingRows.js';
 import type { VettingScope } from './vettingScopes.js';
-import { VETTING_MAX_DEALINGS } from './vettingTypes.js';
+import { VETTING_MAX_DEALINGS, type VettingRead } from './vettingTypes.js';
 
 /** A paginated read stops after this many pages; ESI serves the newest rows first. */
 export const VETTING_MAX_PAGES = 20;
@@ -75,14 +82,15 @@ export interface VettingAffiliation {
 
 export interface VettingEsi {
   /**
-   * Everything one character shares. A source whose scope is not in `scopes`, or that ESI
-   * refuses with 403, is listed in `missing` and contributes nothing.
+   * Everything one character shares: what the checks read (`input`) and every row ESI returned
+   * (`raw`, uncapped). A source whose scope is not in `scopes`, or that ESI refuses with 403, is
+   * listed in `input.missing` and contributes nothing.
    */
   readCharacter(
     characterId: number,
     accessToken: string,
     scopes: readonly string[]
-  ): Promise<VettingCharacterInput>;
+  ): Promise<VettingRead>;
   /** A corporation's public name and ticker, or null when ESI knows no such corporation. */
   corporation(corporationId: number): Promise<{ name: string; ticker: string } | null>;
   /** Names and categories for ids; an id ESI cannot name is left out. */
@@ -280,9 +288,11 @@ export function esiVettingReader(
       const contacts = await shared('contact', () => paged(`${at}/contacts/`, accessToken));
       const mail = await shared('mail', () => mailHeaders(characterId, accessToken));
       const contracts = await shared('contract', () => paged(`${at}/contracts/`, accessToken));
+      let skillsBody: unknown = null;
       const skills = await shared('skills', async () => {
         const got = settle(await request(`${at}/skills/`, accessToken));
         if (got.kind === 'forbidden') return null;
+        skillsBody = got.body;
         return skillsOf(got.body) ?? unavailable();
       });
 
@@ -294,15 +304,26 @@ export function esiVettingReader(
       ];
       const order: VettingSource[] = ['wallet', 'contact', 'mail', 'contract', 'skills'];
       return {
-        characterId,
-        name: body.name,
-        corporationId: body.corporation_id,
-        birthday: body.birthday,
-        skillPoints: skills?.skillPoints ?? null,
-        history: historyOf(history.body as unknown[]),
-        dealings: capDealings(dealings, VETTING_MAX_DEALINGS),
-        skills: skills?.skills ?? [],
-        missing: order.filter((source) => missing.includes(source)),
+        input: {
+          characterId,
+          name: body.name,
+          corporationId: body.corporation_id,
+          birthday: body.birthday,
+          skillPoints: skills?.skillPoints ?? null,
+          history: historyOf(history.body as unknown[]),
+          dealings: capDealings(dealings, VETTING_MAX_DEALINGS),
+          skills: skills?.skills ?? [],
+          missing: order.filter((source) => missing.includes(source)),
+        },
+        // Every row, none filtered or capped: a source not shared is an empty list.
+        raw: {
+          wallet: rawWalletRows(characterId, wallet ?? []),
+          contact: rawContactRows(characterId, contacts ?? []),
+          mail: rawMailRows(characterId, mail ?? []),
+          contract: rawContractRows(characterId, contracts ?? []),
+          skills: rawSkillRows(characterId, skillsBody),
+          history: rawHistoryRows(characterId, history.body as unknown[]),
+        },
       };
     },
 

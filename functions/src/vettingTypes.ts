@@ -10,16 +10,24 @@
 //                                                             (StoredVettingReviewers)
 //   corps/{corporationId}/vettingReviews/{reviewId}           one review (StoredVettingReview)
 //   corps/{corporationId}/vettingReviews/{reviewId}/inputs/{characterId}
-//                                                             what one read of a character returned,
-//                                                             held only until submit or withdraw
+//                                                             what the checks read of a character,
+//                                                             held until submit
+//   corps/{corporationId}/vettingReviews/{reviewId}/rawRows/{characterId}_{gen}_{source}_{seq}
+//                                                             every row the read returned, in chunks
+//                                                             (StoredRawChunk); kept with the review
+//                                                             until it is deleted (ADR 0035). The
+//                                                             character's `raw` says which exist.
 //   corps/{corporationId}/vettingThrottle/{characterId}       per-character daily draft counter
 import type {
   VettingAnswer,
+  VettingCharacterInput,
   VettingAssessment,
   VettingInvite,
   VettingKind,
   VettingLogEntry,
   VettingParty,
+  VettingRawRow,
+  VettingRawSource,
   VettingReportCharacter,
   VettingSettings,
   VettingSource,
@@ -32,10 +40,13 @@ export const VETTING_SETTINGS_DOC = 'settings';
 export const VETTING_REVIEWERS_DOC = 'reviewers';
 export const VETTING_REVIEWS = 'vettingReviews';
 export const VETTING_INPUTS = 'inputs';
+/** A review's kept raw rows, a subcollection of the review (ADR 0035). */
+export const VETTING_RAW = 'rawRows';
 export const VETTING_THROTTLE = 'vettingThrottle';
 
 /**
- * Every vetting subcollection directly under `corps/{id}`. The Corp Tax Book shares that
+ * Every vetting subcollection directly under `corps/{id}`. (`inputs` and `rawRows` sit under a
+ * review, so they go with it and are not listed.) The Corp Tax Book shares that
  * document, and deleting the book deletes every subcollection it is not told to keep
  * (corpTaxBookStore.ts `deleteBookContents`); a new one goes here, or the book's delete wipes it
  * (vettingTypes.test.ts guards this).
@@ -53,7 +64,10 @@ export const VETTING_LOG_MAX = 100;
 export const VETTING_MAX_READS = 30;
 /** Drafts one verified character may start per corporation per day. */
 export const VETTING_DAILY_DRAFTS = 10;
-/** Dealings kept per character, newest first, so an input document stays under 1 MiB. */
+/**
+ * Dealings the checks read per character, newest first, so an input document stays under 1 MiB.
+ * The raw rows an officer browses are not capped: they are chunked (vettingRawChunks.ts).
+ */
 export const VETTING_MAX_DEALINGS = 5000;
 /** Names one settings save may add to the watchlist. */
 export const VETTING_WATCH_ADD_MAX = 50;
@@ -135,6 +149,41 @@ export interface StoredVettingCharacter {
    * cannot open the report as a reviewer. Absent on a review stored before it was kept.
    */
   ownerHash?: string;
+  /**
+   * Which kept raw rows belong to this read (ADR 0035). The officer's page reads exactly these
+   * documents, so a chunk left by a failed or replaced read is never shown. Absent on a
+   * character read before rows were kept, and once a draft's reads are dropped.
+   */
+  raw?: StoredVettingRaw;
+}
+
+/** One read's kept rows: a generation token (in the chunk ids) and what each source holds. */
+export interface StoredVettingRaw {
+  gen: string;
+  sources: Record<VettingRawSource, { rows: number; chunks: number }>;
+}
+
+/**
+ * One document under `rawRows`: rows and parties as JSON strings, so thousands of rows cost no
+ * index entries (as `inputs` does).
+ */
+export interface StoredRawChunk {
+  characterId: number;
+  source: VettingRawSource;
+  gen: string;
+  seq: number;
+  rows: number;
+  /** `VettingRawRow[]` */
+  json: string;
+  /** `VettingParty[]` */
+  partiesJson: string;
+}
+
+/** What one read of a character returned: what the checks use, and every row for browsing. */
+export interface VettingRead {
+  input: VettingCharacterInput;
+  /** Every row of each source; a source in `input.missing` is empty. */
+  raw: Record<VettingRawSource, VettingRawRow[]>;
 }
 
 export interface StoredVettingReview {
@@ -164,6 +213,11 @@ export interface StoredVettingReview {
   signOffs: StoredSignOff[];
   log: VettingLogEntry[];
   signOffsNeeded: number;
+  /**
+   * Rows kept per source, all characters, set at submit. Absent on a review stored before rows
+   * were kept: it has nothing to browse.
+   */
+  rawCounts?: Record<VettingRawSource, number>;
   createdAt: number;
   readAt: number | null;
   decidedAt: number | null;

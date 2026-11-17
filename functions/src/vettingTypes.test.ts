@@ -35,9 +35,10 @@ function sourceCollections(): string[] {
 
 describe('VETTING_COLLECTIONS', () => {
   it('names every collection the vetting code keeps directly under corps/{id}', () => {
-    // `inputs` sits under a review, so it goes with (and is kept with) `vettingReviews`.
+    // Both sit under a review: no collection of their own.
     const used = sourceCollections().filter(
-      (name) => name !== CORPS_COLLECTION && name !== vetting.VETTING_INPUTS
+      (name) =>
+        name !== CORPS_COLLECTION && name !== vetting.VETTING_INPUTS && name !== vetting.VETTING_RAW
     );
     expect([...used].sort()).toEqual([...vetting.VETTING_COLLECTIONS].sort());
   });

@@ -3,7 +3,7 @@
  * a Director) settings. A path below Open or Decided is one review's report, drawn as a page of
  * its own with a crumb back.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -35,12 +35,15 @@ import { useReviewRoster } from './useReviewRoster';
 import { useVettingRequestMail } from './useVettingRequestMail';
 import type { RequestMailRun } from './vettingRequestMail';
 import { VettingQueue } from './VettingQueue';
+import { clearVettingSession } from './vettingSession';
+import { VettingRawData } from './VettingRawData';
 import { VettingReport } from './VettingReport';
 import { VettingInvitesDialog } from './VettingInvitesDialog';
 import { VettingSettingsView } from './VettingSettingsView';
 import { vettingBackend } from './vettingClient';
 import {
   VETTING_TABS,
+  dataFromPathname,
   reviewIdFromPathname,
   reviewPath,
   settingsSectionFromPathname,
@@ -65,10 +68,26 @@ export function VettingPage() {
   const [rowMail, setRowMail] = useState<{ name: string; run: RequestMailRun } | null>(null);
   const names = useCharacterNames();
   const requestMail = useVettingRequestMail(characterId ?? 0, corporationId ?? 0, replace);
+  // Kept rows and the opened review live only while an officer is on Vetting, as this character
+  // in this corporation: leaving, or a switch, forgets them (the role is checked again on return).
+  useEffect(() => clearVettingSession, [characterId, corporationId]);
   const reviewId = reviewIdFromPathname(pathname);
+  const data = dataFromPathname(pathname);
   const canConfigure = state.status === 'ready' && state.overview.canConfigure;
   const shown: VettingTabId = tab === 'settings' && !canConfigure ? 'open' : tab;
   const panel = useTabPanelProps(phone ? null : tabsId, shown);
+
+  if (data !== null && characterId !== null && corporationId !== null) {
+    return (
+      <VettingRawData
+        characterId={characterId}
+        corporationId={corporationId}
+        reviewId={data.reviewId}
+        tab={data.tab}
+        source={data.source}
+      />
+    );
+  }
 
   if (reviewId !== null && characterId !== null && corporationId !== null && tab !== 'settings') {
     return (

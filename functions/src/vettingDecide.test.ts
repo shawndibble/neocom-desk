@@ -226,6 +226,12 @@ describe('isSubject', () => {
 });
 
 describe('reviewView', () => {
+  it('carries the kept row counts when the review has them, and omits them when it does not', () => {
+    const counts = { wallet: 3, contact: 0, mail: 2, contract: 0, skills: 0, history: 1 };
+    expect(reviewView('r1', review({ rawCounts: counts }), actor(3)).rawCounts).toEqual(counts);
+    expect('rawCounts' in reviewView('r1', review(), actor(3))).toBe(false);
+  });
+
   it('hides another reviewer’s decision and note until the viewer has decided', () => {
     const once = decided(review({ signOffsNeeded: 3 }), actor(2), 'yes');
     const blind = reviewView('r1', once, actor(3));

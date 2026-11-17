@@ -125,6 +125,7 @@ export const CALLABLE_ACTIONS = {
     'listMyVettingRequestsCallable',
     'getVettingOverviewCallable',
     'openVettingReviewCallable',
+    'getVettingRawRowsCallable',
     'decideVettingReviewCallable',
     'requestVettingReviewCallable',
     'recordVettingRequestMailCallable',
