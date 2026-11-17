@@ -18126,8 +18126,6 @@
         "notFound": "This moon has no Extractions in the book.",
         "summary_one": "{{count}} moon",
         "summary_other": "{{count}} moons",
-        "extractionsSummary_one": "{{count}} Extraction",
-        "extractionsSummary_other": "{{count}} Extractions",
         "nextPop": "Next pop {{date}}",
         "lastPop": "Last pop {{date}}",
         "by": { "laser": "By laser", "auto": "Broke on its own" },

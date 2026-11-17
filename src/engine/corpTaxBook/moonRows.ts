@@ -24,7 +24,11 @@ const newestFirst = (a: ExtractionRow, b: ExtractionRow) => b.startedAt.localeCo
 /** One row per moon, in no particular order (the table sorts). */
 export function moonRows(extractions: readonly ExtractionRow[]): MoonRow[] {
   const byMoon = new Map<number, ExtractionRow[]>();
-  for (const x of extractions) byMoon.set(x.moonId, [...(byMoon.get(x.moonId) ?? []), x]);
+  for (const x of extractions) {
+    const held = byMoon.get(x.moonId);
+    if (held) held.push(x);
+    else byMoon.set(x.moonId, [x]);
+  }
   return [...byMoon].map(([moonId, rows]) => {
     const [newest] = [...rows].sort(newestFirst);
     const states: MoonRow['states'] = {};

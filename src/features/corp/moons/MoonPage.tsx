@@ -115,7 +115,7 @@ export function MoonPage({ moonId }: { moonId: number }) {
           defaultSort={{ columnId: 'state', direction: 'desc' }}
           mobileSort
           stackColumns={2}
-          stackSummary={t('corpTaxBook.moons.moons.extractionsSummary', { count: rows.length })}
+          stackSummary={t('corpTaxBook.moons.extractionsSummary', { count: rows.length })}
         />
       </div>
       {rows.length === 1 && (
