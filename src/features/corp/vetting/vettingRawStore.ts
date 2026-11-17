@@ -4,6 +4,7 @@
  * The store lives outside React so a page that arrives after its tab was left still lands in the
  * right place, and a second visit never starts a second load of the same cursor.
  */
+import { MINUTE_MS } from '@/lib/age';
 import type {
   VettingParty,
   VettingRawPage,
@@ -12,7 +13,7 @@ import type {
 } from '@/engine/vetting';
 
 /** How long kept rows are served from memory: a role lost or a review deleted is re-checked after. */
-export const VETTING_CACHE_TTL_MS = 10 * 60_000;
+export const VETTING_CACHE_TTL_MS = 10 * MINUTE_MS;
 
 export interface RawEntry {
   /** When the entry was made: past the TTL it is dropped and read again. */

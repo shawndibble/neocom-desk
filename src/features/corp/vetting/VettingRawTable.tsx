@@ -28,7 +28,7 @@ import {
   type DataTableSort,
 } from '@/components/ui';
 import type { ActiveFilter } from '@/components/ui/activeFilters';
-import type { VettingFlag, VettingParty, VettingRawSource } from '@/engine/vetting';
+import type { VettingFlag, VettingRawSource } from '@/engine/vetting';
 import { cx } from '@/lib/cx';
 import { formatTenure } from '@/lib/duration';
 import { formatCount } from '@/lib/formatCount';
@@ -171,8 +171,19 @@ export function VettingRawTable({
       sortValue: (item) => data.parties.get(item.row.partyId ?? -1)?.name,
       render: (item) => {
         const who = item.row.partyId === undefined ? undefined : data.parties.get(item.row.partyId);
-        if (!who) return <span className="text-text-faint">-</span>;
-        return <PartyCell party={who} parties={data.parties} />;
+        if (item.row.partyId === undefined) return <span className="text-text-faint">-</span>;
+        if (!who) {
+          return (
+            <span className="text-text-dim">
+              {t('vetting.report.unknownParty', { id: item.row.partyId })}
+            </span>
+          );
+        }
+        return (
+          <VettingEntity id={who.id} category={who.category}>
+            {who.name}
+          </VettingEntity>
+        );
       },
     });
     const money = (header: string): DataTableColumn<RawItem> => ({
@@ -601,28 +612,5 @@ export function VettingRawTable({
       )}
       {body}
     </div>
-  );
-}
-
-function PartyCell({
-  party,
-  parties,
-}: {
-  party: VettingParty;
-  parties: ReadonlyMap<number, VettingParty>;
-}) {
-  const corporation =
-    party.category === 'character' && party.corporationId !== undefined
-      ? parties.get(party.corporationId)
-      : undefined;
-  return (
-    <span className="min-w-0">
-      <VettingEntity id={party.id} category={party.category}>
-        {party.name}
-      </VettingEntity>
-      {corporation && (
-        <span className="block truncate text-xs text-text-dim">{corporation.name}</span>
-      )}
-    </span>
   );
 }

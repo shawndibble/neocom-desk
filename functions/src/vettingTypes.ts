@@ -11,7 +11,7 @@
 //   corps/{corporationId}/vettingReviews/{reviewId}           one review (StoredVettingReview)
 //   corps/{corporationId}/vettingReviews/{reviewId}/inputs/{characterId}
 //                                                             what the checks read of a character,
-//                                                             held until submit (deleted on Send)
+//                                                             held until submit
 //   corps/{corporationId}/vettingReviews/{reviewId}/rawRows/{characterId}_{gen}_{source}_{seq}
 //                                                             every row the read returned, in chunks
 //                                                             (StoredRawChunk); kept with the review

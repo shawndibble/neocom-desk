@@ -99,8 +99,7 @@ describe('filterRawItems', () => {
   ];
   const items = prepareRawItems('wallet', rows, ctx());
 
-  it('searches names, the party corporation and the type', () => {
-    expect(filterRawItems(items, { ...NO_RAW_FILTERS, query: 'black kite' })).toHaveLength(2);
+  it('searches names and the type', () => {
     expect(filterRawItems(items, { ...NO_RAW_FILTERS, query: 'orrin' })).toHaveLength(1);
     expect(filterRawItems(items, { ...NO_RAW_FILTERS, query: 'bounty' })).toHaveLength(1);
   });

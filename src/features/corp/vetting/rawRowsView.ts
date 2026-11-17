@@ -145,7 +145,6 @@ export function prepareRawItems(
     const hay = [
       row.what === '' ? undefined : ctx.whatLabel(row.what),
       party?.name,
-      party?.corporationId === undefined ? undefined : name(party.corporationId),
       ...(row.recipients ?? []).map(name),
       name(row.corporationId),
       row.status,

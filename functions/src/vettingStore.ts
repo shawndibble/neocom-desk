@@ -13,10 +13,8 @@
 // An access token is verified, used for the ESI read and dropped: never written or logged.
 // What the checks read (`inputs`) is held only until the report is submitted, withdrawn or
 // swept, and is not used once `VETTING_DRAFT_HOURS` old even if the daily sweep has not run
-// yet. Every row the read returned is kept apart, in chunks under `rawRows` (vettingRawStore.ts,
-// ADR 0035): deleted with `inputs` wherever a draft is dropped, but kept at submit, for officers
-// to browse (`getVettingRawRows`), until the review itself is deleted. The review keeps the
-// assessment, the parties it names, per-character summaries and how many rows each source gave.
+// yet. Every row the read returned is kept apart under `rawRows` until the review is deleted
+// (ADR 0035, vettingRawStore.ts).
 
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { DocumentReference, Firestore, Transaction } from 'firebase-admin/firestore';
@@ -487,8 +485,7 @@ export async function startVetting(
     tx.set(inputRef(ref, read.character.characterId), inputDoc(read));
     return { review: next, settings: current };
   });
-  // After the review exists, which names these chunks: a failure here leaves a draft nobody holds
-  // the key to, deleted with its rows by the sweep, and no chunk under a review that is not there.
+  // After the review exists. A failure leaves a draft the sweep deletes with its rows.
   try {
     await writeRaw(ref, read.raw);
   } catch (err) {
@@ -556,8 +553,7 @@ export async function addVettingCharacter(
   await reserveRead(deps, ref, input, claims.characterId);
   const read = await readVerified(deps, claims, input.accessToken);
   const settings = await loadSettings(deps, input.corporationId);
-  // The new read's chunks go first, under their own generation: nothing names them until the
-  // transaction below does, and a read they replace keeps its own until then.
+  // Own generation first: nothing names these chunks until the transaction below does.
   let done: { status: VettingStatus; replacedRaw: StoredVettingCharacter['raw'] };
   try {
     await writeRaw(ref, read.raw);
@@ -797,9 +793,8 @@ async function notifyShared(
 }
 
 /**
- * Runs the checks, hands the report to the corp, and deletes what the checks read (`inputs`). The
- * rows each read returned stay with the review for officers to browse (ADR 0035), those of
- * characters not on the report excepted. From here
+ * Runs the checks, hands the report to the corp, and deletes what the checks read (`inputs`). Raw
+ * rows stay for officers (ADR 0035), except those of characters not on the report. From here
  * the review waits `VETTING_OPEN_KEEP_DAYS` for a decision, and is deleted if none comes. An
  * application must first answer the corp's required questions and meet its minimums; a
  * promotion review is asked neither.
@@ -882,7 +877,7 @@ export async function submitVetting(
     for (const doc of stored.docs) tx.delete(doc.ref);
     return next;
   });
-  // Chunks of a read that is not on the report, or that a re-read replaced: unreachable already.
+  // Chunks of a read not on the report: nothing names them any more.
   await tidyRaw(ref, keptRaw(shared.characters), deps.logWarn);
   if (settings.notifyReviewers) await notifyShared(deps, input.reviewId, shared);
   return pilotStatus(input.reviewId, shared, settings, deps.now());
@@ -901,10 +896,8 @@ export async function getVettingStatus(
 
 /**
  * Deletes the review and anything read into it, in any state: the report is the pilot's. The
- * review and its `inputs` go in one transaction, so a character being added meanwhile cannot leave
- * an `inputs` document behind a deleted review: that add finds the review gone and fails. The raw
- * rows go before it (never under a review that is gone, which nothing would ever find again) and
- * once more after it, for a read that landed in between.
+ * review and its `inputs` go in one transaction, so a character added meanwhile finds it gone. Raw
+ * rows go before it and again after, for a read that landed in between.
  */
 export async function withdrawVetting(
   deps: VettingDeps,
@@ -1182,13 +1175,9 @@ export async function openVettingReview(
 }
 
 /**
- * One page of one source's kept rows, all the review's characters together: one stored chunk per
- * page, characters in the review's order, then oldest chunk first. Officers only, with the same
- * checks as `openVettingReview` (a draft is not visible; the pilot, a character on the report and
- * another character of an account one was read from are refused) and the same log line, once an
- * hour per officer, so paging adds nothing to it. The pages come from what each character's
- * `raw` metadata names; a chunk document that is missing is skipped. `next` is an opaque cursor,
- * null on the last page; a review with nothing kept for the source returns an empty last page.
+ * One page of one source's kept rows across the review's characters: one stored chunk per page.
+ * Officers only, with the checks and once-an-hour log line of `openVettingReview`, so paging adds
+ * none. `next` is an opaque cursor, null on the last page.
  */
 export async function getVettingRawRows(
   deps: VettingDeps,
@@ -1204,8 +1193,7 @@ export async function getVettingRawRows(
   }
   return deps.db.runTransaction(async (tx) => {
     const review = officerReview(await tx.get(ref));
-    // Not with the corp until the pilot shares: a request holds only what a member is still
-    // putting together, and a declined one nothing.
+    // A request is not with the corp yet: the member is still putting it together.
     if (review.state === 'requested' || review.state === 'declined') {
       fail('not-found', 'No such review', 'not-found');
     }
