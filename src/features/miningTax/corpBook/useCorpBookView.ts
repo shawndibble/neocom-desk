@@ -11,10 +11,10 @@ import { buildCorpBookView, type CorpBookView } from './corpBookView';
 import { MINUTE_MS } from '@/lib/age';
 import { payeesOfBookCorporation } from '@/engine/miningTax/payeeCorporation';
 import { linkPayeeToCorporation } from '../payees';
+import { hiddenLeftBooksOf, withoutHiddenLeft } from './leftCorpBooks';
 
 /** Payees linked as a book's corporation this session (`linkPayeeToCorporation`). */
 const linkedThisSession = new Set<string>();
-import { hiddenLeftBooksOf, withoutHiddenLeft } from './leftCorpBooks';
 
 interface Args {
   /** The ledger as loaded; undefined until it has. */

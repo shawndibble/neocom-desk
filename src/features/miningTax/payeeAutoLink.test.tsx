@@ -38,11 +38,10 @@ describe('linkUnlinkedPayees', () => {
     expect(lookupMock.lookupPayeeNames).toHaveBeenCalledTimes(1);
     expect(lookupMock.lookupPayeeNames).toHaveBeenCalledWith(['moon corp', 'Moon 1 Planet 2']);
     expect(done?.map((p) => p.id)).toEqual(['p1']);
-    expect(await db.payees.get('p1')).toMatchObject({
-      name: 'moon corp',
-      entityId: 2,
-      entityKind: 'corporation',
-    });
+    // By id alone: unverified, so a confirmed payment can still correct it.
+    const p1 = await db.payees.get('p1');
+    expect(p1).toMatchObject({ name: 'moon corp', entityId: 2 });
+    expect(p1 && 'entityKind' in p1).toBe(false);
     expect('entityId' in ((await db.payees.get('p2')) ?? {})).toBe(false);
     expect(syncMock.scheduleSync).toHaveBeenCalledWith(1, { collections: ['payees'] });
   });
@@ -62,6 +61,27 @@ describe('linkUnlinkedPayees', () => {
     lookupMock.lookupPayeeNames.mockRejectedValue(new Error('offline'));
     expect(await linkUnlinkedPayees([moonCorp])).toEqual([]);
     expect('entityId' in ((await db.payees.get('p1')) ?? {})).toBe(false);
+  });
+
+  // "Bob" is some stranger: a character name is flagged for the pilot, never linked unasked.
+  it('never links a Payee whose name is a character', async () => {
+    lookupMock.lookupPayeeNames.mockResolvedValue(
+      new Map([
+        ['moon corp', { status: 'found', match: { id: 9, name: 'Moon Corp', kind: 'character' } }],
+      ])
+    );
+    expect(await linkUnlinkedPayees([moonCorp])).toEqual([]);
+    expect('entityId' in ((await db.payees.get('p1')) ?? {})).toBe(false);
+  });
+});
+
+describe('useAutoLinkPayees when EVE is unreachable', () => {
+  // An outage is not "nobody in EVE has this name": nothing is flagged.
+  it('flags nothing', async () => {
+    lookupMock.lookupPayeeNames.mockRejectedValue(new Error('offline'));
+    await linkUnlinkedPayees([moonCorp, moonLabel]);
+    const { result } = renderHook(() => useAutoLinkPayees([moonCorp, moonLabel], vi.fn()));
+    expect(result.current).toEqual([]);
   });
 });
 

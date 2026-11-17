@@ -147,7 +147,7 @@ describe('MoonTaxRow', () => {
     await waitFor(() => expect((open as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(open);
     expect((await screen.findByRole('alert')).textContent).toBe(
-      'No corporation or character in EVE is named Moon 1 Planet 2. Enter who gets the tax as it is spelled in game.'
+      "No corporation or character in EVE is named Moon 1 Planet 2, so it can't be your Payee. Whoever set this Survey up can correct the name."
     );
     expect(await db.payees.count()).toBe(0);
     expect(screen.getByTestId('where').textContent).toBe('/mining/survey');

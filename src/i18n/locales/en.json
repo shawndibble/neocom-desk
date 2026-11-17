@@ -7736,7 +7736,7 @@
       "needLogin": "Log in to access",
       "failed": "Couldn't connect this moon to that Payee. Try again.",
       "notInEve": {
-        "none": "No corporation or character in EVE is named {{name}}. Enter who gets the tax as it is spelled in game.",
+        "none": "No corporation or character in EVE is named {{name}}, so it can't be your Payee. Whoever set this Survey up can correct the name.",
         "several": "A corporation and a character in EVE are both named {{name}}. Add the Payee in Manage Payees on the Mining Tax tab to pick which.",
         "failed": "Couldn't check {{name}} with EVE, so no Payee was added. Try again."
       },

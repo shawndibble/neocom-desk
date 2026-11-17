@@ -1,8 +1,9 @@
 /**
  * Links the Payees made before a Payee had to be someone in EVE (or synced in
  * from a device that still allowed it): a Payee whose name is exactly one
- * corporation or character is linked to it (`rememberPayeeEntity`, which syncs),
- * so a Corp Tax Book can tell its corporation's Payee from a stranger's.
+ * corporation is linked to it by id alone (`rememberPayeeEntity`, which syncs),
+ * so a later confirmed payment can still correct it. A name that is a character
+ * is never linked unasked — "Bob" is some stranger — but flagged for the pilot.
  * Best effort and quiet: one `/universe/ids` call for every unlinked name, each
  * Payee asked about once a session, a failed lookup left for the next session.
  * What still can't be linked is the pilot's to fix in Manage Payees.
@@ -45,19 +46,20 @@ export async function linkUnlinkedPayees(
     const lookups = await lookupPayeeNames(due.map((p) => p.name));
     for (const p of due) {
       const lookup = lookups.get(payeeNameKey(p.name));
-      if (lookup?.status !== 'found') continue;
+      if (lookup?.status !== 'found' || lookup.match.kind !== 'corporation') continue;
       // Re-read: the list may be older than an edit made while ESI answered.
       const fresh = await db.payees.get(p.id);
       if (!fresh || !isUnlinkedPayee(fresh) || payeeNameKey(fresh.name) !== payeeNameKey(p.name)) {
         continue;
       }
-      linked.push(await rememberPayeeEntity(fresh, lookup.match.id, lookup.match.kind));
+      // By id alone, no kind: unverified, so a confirmed payment can still re-point it.
+      linked.push(await rememberPayeeEntity(fresh, lookup.match.id));
       linkedHere.add(p.id);
     }
-  } catch {
-    // Offline or ESI erred: left unlinked, and not asked again this session.
-  } finally {
+    // Only an answer settles a Payee: an outage must never read as "nobody in EVE".
     for (const p of due) settled.add(p.id);
+  } catch {
+    // Offline or ESI erred: left unlinked and unflagged, and not asked again this session.
   }
   return linked;
 }

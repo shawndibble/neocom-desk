@@ -35,6 +35,10 @@ _Recorded 2026-11-17._
 
 - **Unlinked Payees from before are linked where the name allows, and flagged where it doesn't.**
   The Tax tab looks every unlinked Payee's name up in one batched call, once a session per Payee,
-  and links an exact single corporation/character match (`rememberPayeeEntity`, synced). The rest
-  are one Tax tab attention item opening Manage Payees, and their rows there read "Not found in
-  EVE — edit to pick who this is" (the row's Edit carries the fix, so no extra control).
+  and links an exact single corporation match by id alone (`rememberPayeeEntity`, synced; no kind,
+  so a later confirmed payment can still correct it). A name that is a character is never linked
+  unasked: "Bob" or "Landlord" is some stranger. The rest are one Tax tab attention item opening
+  Manage Payees, and their rows there read "Not found in EVE — edit to pick who this is" (the row's
+  Edit carries the fix, so no extra control). A failed lookup flags nothing: an outage is not
+  "nobody in EVE". An old unlinked Payee is never locked: saved under its own name it keeps its
+  rate, hub and systems edits, and stays flagged; renaming any linked Payee asks EVE again.

@@ -660,6 +660,55 @@ describe('PayeeManagerDialog — a Payee is someone in EVE', () => {
     });
   });
 
+  // Never locked: an old label EVE doesn't know keeps working; its rate still changes.
+  it('saves an old unlinked Payee under its own name even when EVE knows no such name', async () => {
+    const stored: PayeeRecord = {
+      id: 'p1',
+      characterId: CHAR,
+      name: 'Moon 1 Planet 2',
+      defaultTaxPct: 10,
+      updatedAt: 1,
+    };
+    await db.payees.put(stored);
+    searchMock.resolvePayeeName.mockResolvedValue([]);
+    renderDialog([stored]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Moon 1 Planet 2' }));
+    const pct = screen.getByLabelText('Default tax %');
+    await userEvent.clear(pct);
+    await userEvent.type(pct, '12');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(async () => {
+      expect((await loadPayees(CHAR))[0]).toMatchObject({ defaultTaxPct: 12 });
+    });
+    expect('entityId' in (await loadPayees(CHAR))[0]).toBe(false);
+  });
+
+  // A link learned from a payment (an id, no kind) is tied to its name too.
+  it('asks EVE again when a Payee linked from a payment is renamed', async () => {
+    const stored: PayeeRecord = {
+      id: 'p1',
+      characterId: CHAR,
+      name: 'Moon Corp',
+      defaultTaxPct: 10,
+      entityId: 98_000_001,
+      updatedAt: 1,
+    };
+    await db.payees.put(stored);
+    searchMock.resolvePayeeName.mockResolvedValue([]);
+    renderDialog([stored]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Moon Corp' }));
+    const name = screen.getByLabelText('Name');
+    await userEvent.clear(name);
+    await userEvent.type(name, 'Somebody Else');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(searchMock.resolvePayeeName).toHaveBeenCalled();
+    expect((await loadPayees(CHAR))[0]).toMatchObject({ name: 'Moon Corp', entityId: 98_000_001 });
+  });
+
   it('looks the new name up when a linked Payee is renamed', async () => {
     const stored: PayeeRecord = {
       id: 'p1',

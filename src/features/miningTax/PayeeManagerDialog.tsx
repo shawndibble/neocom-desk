@@ -227,9 +227,9 @@ export function PayeeManagerDialog({
       defaultSystemIds: payee.defaultSystems?.map((s) => s.systemId) ?? [],
       entityId: payee.entityId,
       entityKind: payee.entityKind,
-      // Only a kind-verified name is tied to its entity; an id learned from a
-      // payment stays through a rename (the label can differ from the name).
-      verifiedName: payee.entityKind !== undefined ? payee.name : undefined,
+      // Any link is tied to the name it was made under: renaming asks EVE again, so a Payee is
+      // never saved under one name while pointing at someone else.
+      verifiedName: payee.entityId !== undefined ? payee.name : undefined,
     });
     setError(null);
     setChoices(null);
@@ -254,24 +254,36 @@ export function PayeeManagerDialog({
     let { entityId, entityKind } = current;
     let savedName = name;
     setChoices(null);
+    // An old unlinked Payee kept under its own name may still have its rate, hub or systems
+    // changed: it stays flagged until the pilot picks who it is, but is never locked.
+    const existingUnlinked = payees.find(
+      (p) => p.id === current.id && p.entityId === undefined && p.name.trim() === name
+    );
     if (entityId === undefined) {
       const lookup = await lookupPayeeName(name);
-      if (lookup.status === 'none') {
-        setError(t('miningTax.payees.notInEve.none', { name }));
+      if (lookup.status === 'found') {
+        entityId = lookup.match.id;
+        entityKind = lookup.match.kind;
+        savedName = lookup.match.name;
+      } else if (!existingUnlinked) {
+        if (lookup.status === 'several') {
+          setError(null);
+          setChoices({ name, matches: lookup.matches });
+        } else {
+          setError(
+            t(
+              lookup.status === 'none'
+                ? 'miningTax.payees.notInEve.none'
+                : 'miningTax.payees.notInEve.failed',
+              {
+                name,
+              }
+            )
+          );
+        }
         return;
       }
-      if (lookup.status === 'failed') {
-        setError(t('miningTax.payees.notInEve.failed'));
-        return;
-      }
-      if (lookup.status === 'several') {
-        setError(null);
-        setChoices({ name, matches: lookup.matches });
-        return;
-      }
-      entityId = lookup.match.id;
-      entityKind = lookup.match.kind;
-      savedName = lookup.match.name;
+      // Otherwise an old unlinked Payee saved as it was: still unlinked, still flagged.
     }
     // The default hub is stored as *no* hub, which is what every Payee
     // predating this field already means — so "Jita" never becomes a second
