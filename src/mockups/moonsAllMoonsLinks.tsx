@@ -23,7 +23,13 @@ const cols: DataTableColumn<MoonRow>[] = [
     header: 'Latest',
     render: (r) => (r.newest ? <StateWord state={r.newest} /> : '—'),
   },
-  { id: 'pops', header: 'Pops', align: 'right', className: 'tabular-nums', render: (r) => r.pops },
+  {
+    id: 'pops',
+    header: 'Extractions',
+    align: 'right',
+    className: 'tabular-nums',
+    render: (r) => r.pops,
+  },
   {
     id: 'mined',
     header: 'Mined (est.)',
@@ -55,10 +61,12 @@ const extractionCols: DataTableColumn<MoonRow>[] = [
     id: 'moon',
     header: 'Moon',
     primary: true,
-    // The row opens the moon page, so the name is the accent handle, not a second link.
+    // The row opens that Extraction's page; the moon name is a real link to the moon page (§6c).
     render: (r) => (
       <span className="block">
-        <span className="font-medium text-accent">{r.moon}</span>
+        <a href={`/corp/moons/moons/${r.id}`} className={entityLinkClassName('font-medium')}>
+          {r.moon}
+        </a>
         <span className="block text-xs text-text-dim">{r.refinery}</span>
       </span>
     ),

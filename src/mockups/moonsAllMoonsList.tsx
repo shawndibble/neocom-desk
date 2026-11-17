@@ -47,9 +47,9 @@ const moonColumn = (withStation: boolean, phone: boolean): DataTableColumn<MoonR
   sortValue: (r) => r.moon,
 });
 
-function columns(grouped: boolean, phone: boolean): DataTableColumn<MoonRow>[] {
+function columns(phone: boolean): DataTableColumn<MoonRow>[] {
   const cols: DataTableColumn<MoonRow>[] = [
-    moonColumn(!grouped, phone),
+    moonColumn(true, phone),
     {
       id: 'owner',
       header: 'Owner',
@@ -83,7 +83,7 @@ function columns(grouped: boolean, phone: boolean): DataTableColumn<MoonRow>[] {
     },
     {
       id: 'pops',
-      header: 'Pops',
+      header: 'Extractions',
       align: 'right',
       className: 'tabular-nums',
       render: (r) => r.pops,
@@ -120,35 +120,14 @@ function columns(grouped: boolean, phone: boolean): DataTableColumn<MoonRow>[] {
     return cols.filter((c) => !dropped.has(c.id));
   }
   cols.push({ id: 'go', header: '', align: 'right', className: 'w-6', render: () => <RowCaret /> });
-  return grouped ? cols.filter((c) => c.id !== 'owner') : cols;
-}
-
-/** Group header of variant B: the refinery, who owns it, how many moons. */
-function StationHeader({ rows }: { rows: readonly MoonRow[] }) {
-  const first = rows[0];
-  return (
-    <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 text-left">
-      <span className="font-semibold">{first.refinery}</span>
-      <span className="text-xs text-text-dim">
-        {first.owner === BOOK_CORP ? 'Our corp' : first.owner} · {rows.length}{' '}
-        {rows.length === 1 ? 'moon' : 'moons'}
-      </span>
-      {first.archived && <Pill>Archived</Pill>}
-    </span>
-  );
+  return cols;
 }
 
 /**
  * The all-moons list. Variant A: one flat sortable table, the station under
  * each name. Variant B: the same rows folded under their refinery.
  */
-export function MoonsList({
-  variant,
-  archivedShown = false,
-}: {
-  variant: 'A' | 'B';
-  archivedShown?: boolean;
-}) {
+export function MoonsList({ archivedShown = false }: { archivedShown?: boolean }) {
   const phone = useIsPhone();
   const [filters, setFilters] = useState<Filters>({ owner: 'all', archived: archivedShown });
   const [query, setQuery] = useState('');
@@ -160,7 +139,6 @@ export function MoonsList({
   );
   const live = MOONS.filter((m) => m.newest === 'extracting' || m.newest === 'ready');
   const hidden = MOONS.filter((m) => m.archived).length;
-  const grouped = variant === 'B';
   const active = [
     ...(filters.owner !== 'all'
       ? [
@@ -185,7 +163,7 @@ export function MoonsList({
     <div className="space-y-4">
       <StatChips>
         <StatChip label="Moons" value={String(MOONS.length - 1)} />
-        <StatChip label="Pops kept" value={String(MOONS.reduce((s, m) => s + m.pops, 0))} />
+        <StatChip label="Extractions" value={String(MOONS.reduce((s, m) => s + m.pops, 0))} />
         <StatChip label="Next pop" value="16 Nov 09:05" />
         <StatChip label="Live chunks" value={String(live.length)} />
       </StatChips>
@@ -240,7 +218,7 @@ export function MoonsList({
         </div>
         <DataTable
           label="Moons"
-          columns={columns(grouped, phone)}
+          columns={columns(phone)}
           rows={visible}
           rowKey={(r) => r.id}
           onRowClick={() => {}}
@@ -249,17 +227,6 @@ export function MoonsList({
           defaultSort={{ columnId: 'next', direction: 'asc' }}
           mobileSort
           stackLayout="dense"
-          {...(grouped
-            ? {
-                groupBy: {
-                  key: (r: MoonRow) => r.refinery,
-                  renderHeader: (rows: readonly MoonRow[]) => <StationHeader rows={rows} />,
-                  defaultExpanded: () => true,
-                  allWidths: true,
-                  minSize: 1,
-                },
-              }
-            : {})}
         />
       </Panel>
     </div>
