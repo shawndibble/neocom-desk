@@ -889,6 +889,8 @@ interface EditCtx {
 
 interface EditOutcome {
   detail: Data;
+  /** Several audit entries for one write (each with its own action); replaces `detail`'s entry. */
+  audits?: { action: AuditAction; detail: Data }[];
   result?: Data;
 }
 
@@ -1183,6 +1185,22 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       if (next.length > 500) fail('resource-exhausted', 'Too many rates', 'too-many-rates');
       tx.update(bookDoc, { rates: next });
       return { detail: { rate: action.rate } };
+    }
+    case 'addRates': {
+      const today = utcDate(now);
+      if (action.rates.some((r) => isRetroactiveRate(r.effectiveFrom, today))) {
+        fail('failed-precondition', 'A rate cannot start before today', 'retroactive-rate');
+      }
+      const keys = new Set(action.rates.map(rateKey));
+      if (keys.size !== action.rates.length)
+        fail('invalid-argument', 'Two of the rates are the same', 'duplicate-rate');
+      const next = [...rates.filter((r) => !keys.has(rateKey(r))), ...action.rates];
+      if (next.length > 500) fail('resource-exhausted', 'Too many rates', 'too-many-rates');
+      tx.update(bookDoc, { rates: next });
+      return {
+        detail: {},
+        audits: action.rates.map((rate) => ({ action: 'addRate', detail: { rate } })),
+      };
     }
     case 'setRecordRate': {
       const { characterId, date } = parseRecordKey(action.recordKey);
@@ -2197,7 +2215,12 @@ export async function editBookAs(
       now: deps.now(),
     };
     const outcome = await applyEdit(ctx, action);
-    appendAudit(tx, deps, call.corporationId, actorOf(access, via), action.action, outcome.detail);
+    const actor = actorOf(access, via);
+    // `addRates` is never an audit action itself: it always returns its own per-rate `audits`.
+    for (const a of outcome.audits ?? [
+      { action: action.action as AuditAction, detail: outcome.detail },
+    ])
+      appendAudit(tx, deps, call.corporationId, actor, a.action, a.detail);
     return outcome.result ?? {};
   });
   // The edit changed some Miners' frozen totals (ADR 0032). Best effort: the verifier repairs.
@@ -2231,6 +2254,7 @@ const SHARED_POP_EDITS = new Set<EditAction['action']>([
   'setPopSharingMoon',
   'updateSettings',
   'addRate',
+  'addRates',
   'linkSurvey',
 ]);
 

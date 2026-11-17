@@ -294,6 +294,9 @@ export type StoredRate =
   | { scope: 'feeder' | 'feeder-member'; feederId: number; pct: number; effectiveFrom: string }
   | { scope: 'record'; recordKey: string; pct: number };
 
+/** The most rates one `addRates` takes. */
+const MAX_BATCH_RATES = 50;
+
 export function parseDatedRate(data: unknown): Exclude<StoredRate, { scope: 'record' }> {
   const d = record(data);
   const scope = oneOf(d.scope, 'scope', [
@@ -597,6 +600,8 @@ export function moveStartRate(
 
 export type EditAction =
   | { action: 'addRate'; rate: ReturnType<typeof parseDatedRate> }
+  /** #6323: several rates in one all-or-nothing write; each is audited as its own `addRate`. */
+  | { action: 'addRates'; rates: ReturnType<typeof parseDatedRate>[] }
   | { action: 'setRecordRate'; recordKey: string; pct: number; reason: string }
   | { action: 'updateSettings'; patch: SettingsPatch }
   | {
@@ -790,6 +795,7 @@ export function parseEditAction(data: unknown): EditAction {
   const d = record(data);
   const action = oneOf(d.action, 'action', [
     'addRate',
+    'addRates',
     'setRecordRate',
     'updateSettings',
     'recordPayment',
@@ -823,6 +829,11 @@ export function parseEditAction(data: unknown): EditAction {
   switch (action) {
     case 'addRate':
       return { action, rate: parseDatedRate(d.rate) };
+    case 'addRates': {
+      const rates = list(d.rates, 'rates', MAX_BATCH_RATES).map(parseDatedRate);
+      if (rates.length === 0) throw new HttpsError('invalid-argument', 'rates must not be empty');
+      return { action, rates };
+    }
     case 'setRecordRate':
       return {
         action,

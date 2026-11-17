@@ -19357,6 +19357,21 @@
         "startHint": "Mining before this day owes nothing. Earlier is always allowed; later only while no Statement covers the days in between.",
         "saved": "Settings saved",
         "rateIncomplete": "Finish the rate in the form, or clear its percent, to save.",
+        "addRate": "Add rate",
+        "removePending": "Remove",
+        "removePendingNamed": "Remove pending rate: {{name}}, {{pct}}%",
+        "pendingTitle_one": "Pending rate ({{count}})",
+        "pendingTitle_other": "Pending rates ({{count}})",
+        "pendingBlocked": "Fix or remove the marked pending rates in Rates to save.",
+        "pendingProblem": {
+          "past": "This day has passed. A rate cannot start before today.",
+          "start": "This day is before the book start date.",
+          "duplicate": "Another pending rate has the same scope, target and day."
+        },
+        "discardPending_one": "{{count}} pending rate is not saved. Discard it?",
+        "discardPending_other": "{{count}} pending rates are not saved. Discard them?",
+        "keepEditing": "Keep editing",
+        "discard": "Discard",
         "rateAddedSettingsFailed": "Rate added, but the other settings were not saved.",
         "divisionNamed": "Division {{n}}, {{name}}",
         "running": {

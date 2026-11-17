@@ -103,6 +103,79 @@ describe('BookSettingsDialog per-moon-owner rate', () => {
   });
 });
 
+describe('BookSettingsDialog pending rates (#6323)', () => {
+  const addGuest = async (user: ReturnType<typeof userEvent.setup>, pct: string) => {
+    await user.type(screen.getByLabelText('Rate (%)'), pct);
+    await user.click(screen.getByRole('button', { name: 'Add rate' }));
+  };
+
+  it('adds three, removes one, and Save sends the other two as one batch', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    for (const [pct, day] of [
+      ['1', '2099-01-01'],
+      ['2', '2099-01-02'],
+      ['3', '2099-01-03'],
+    ]) {
+      fireEvent.change(screen.getByLabelText('Effective from'), { target: { value: day } });
+      await addGuest(user, pct);
+    }
+    expect(screen.getByText('Pending rates (3)')).toBeInTheDocument();
+    await user.click(screen.getAllByRole('button', { name: /Remove pending rate/ })[1]);
+    expect(editBook).not.toHaveBeenCalled();
+    expect(screen.getByText('Pending rates (2)')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(editBook).toHaveBeenCalledWith(7, 98000000, {
+      action: 'addRates',
+      rates: [
+        expect.objectContaining({ pct: 1, effectiveFrom: '2099-01-01' }),
+        expect.objectContaining({ pct: 3, effectiveFrom: '2099-01-03' }),
+      ],
+    });
+  });
+
+  it('keeps the scope and clears the percent after Add rate', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    await user.click(screen.getByRole('combobox', { name: 'Applies to' }));
+    await user.click(screen.getByRole('option', { name: 'Moon owner' }));
+    await user.click(screen.getByRole('combobox', { name: 'Moon owner' }));
+    await user.click(screen.getByRole('option', { name: `Corp ${OWNER}` }));
+    await addGuest(user, '9');
+    expect(screen.getByLabelText('Rate (%)')).toHaveValue('');
+    expect(screen.getByRole('combobox', { name: 'Applies to' })).toHaveTextContent('Moon owner');
+  });
+
+  it('marks a duplicate and will not add it', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    await addGuest(user, '1');
+    await user.type(screen.getByLabelText('Rate (%)'), '2');
+    expect(screen.getByRole('button', { name: 'Add rate' })).toBeDisabled();
+    expect(
+      screen.getByText('Another pending rate has the same scope, target and day.')
+    ).toBeInTheDocument();
+  });
+
+  it('asks before closing with pending rates', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(
+      <MemoryRouter>
+        <BookProvider value={bookSettingsValue()}>
+          <BookSettingsDialog open onClose={onClose} />
+        </BookProvider>
+      </MemoryRouter>
+    );
+    await addGuest(user, '1');
+    await user.click(screen.getAllByRole('button', { name: 'Close' }).at(-1)!);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText('1 pending rate is not saved. Discard it?')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Discard' }));
+    expect(onClose).toHaveBeenCalled();
+  });
+});
+
 describe('BookSettingsDialog tabs', () => {
   it('opens on Rates and shows one tab of settings at a time', async () => {
     const user = userEvent.setup();
@@ -155,7 +228,6 @@ describe('BookSettingsDialog tabs', () => {
         </BookProvider>
       </MemoryRouter>
     );
-    expect(screen.queryByRole('button', { name: 'Add rate' })).not.toBeInTheDocument();
     expect(screen.queryByText(/with the reason/)).not.toBeInTheDocument();
     await user.type(screen.getByLabelText('Rate (%)'), '12');
     await user.click(screen.getByRole('button', { name: 'Save' }));
