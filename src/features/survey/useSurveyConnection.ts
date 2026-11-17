@@ -22,7 +22,6 @@ import {
 } from '@/engine/miningTax/surveyConnection';
 import type { SurveySummary } from '@/engine/survey/series';
 import { deletePayee, unassign } from '@/features/miningTax/ledgerActions';
-import { createPayee, loadPayees } from '@/features/miningTax/payees';
 import { useSurveyPayeeId } from '@/features/miningTax/surveyPayeePref';
 import {
   autoAssignFromSurveys,
@@ -35,7 +34,7 @@ import {
 } from '@/features/miningTax/surveyConnections';
 import { resolvePlaceSystemId } from '@/features/route/placeSystem';
 import { useHydratedStore } from '@/lib/useHydratedStore';
-import { ensurePayee, findPayeeByName, samePayeeName } from './moonTaxPayee';
+import { ensurePayee, findOrCreatePayee, samePayeeName } from './moonTaxPayee';
 
 /** How often an open, connected Survey re-reads the ledger. ESI caches it for ten minutes, so oftener finds nothing new. */
 export const AUTO_ASSIGN_EVERY_MS = 5 * 60 * 1000;
@@ -199,11 +198,14 @@ export function useSurveyConnection({
   /** Adds the Payee if need be, connects the moon and assigns what is already mined. Rejects when nothing could be saved. */
   async function connect(): Promise<void> {
     if (characterId === null || survey === undefined || tax === null) return;
-    const known = findPayeeByName(await loadPayees(characterId), tax.name);
-    const payee = updateRate
-      ? await ensurePayee(characterId, tax.name, tax.pct)
-      : (known ??
-        (await createPayee(characterId, { name: tax.name.trim(), defaultTaxPct: tax.pct })));
+    // A new Payee is linked to the one EVE corporation or character of that name;
+    // with none it throws `PayeeNotInEveError`, which the row explains.
+    const found = await findOrCreatePayee(characterId, tax.name, tax.pct);
+    const known = found.created ? undefined : found.payee;
+    const payee =
+      updateRate && known !== undefined && known.defaultTaxPct !== tax.pct
+        ? await ensurePayee(characterId, known.name, tax.pct)
+        : found.payee;
     // Still the Assign dialog's suggestion for ore this connection can't place.
     await useSurveyPayeeId.getState().setValue(payee.id);
     const [typeIds, systemId] = await Promise.all([

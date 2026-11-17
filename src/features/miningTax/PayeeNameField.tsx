@@ -12,14 +12,15 @@ import {
   searchPayeeEntitiesPublic,
   type PayeeEntityMatch,
 } from './payeeEntitySearch';
+import type { PayeeEntityKind } from './payees';
 
 const SEARCH_ENDPOINTS = ['getCharacterSearch'] as const;
 /**
- * The Payee form's Name box: free text, with suggestions of the characters,
- * corporations and alliances it could be. Picking one verifies the Payee. A
- * label that is none of them (a moon, a place) is simply typed and stays a
- * label. Without the search permission the suggestions are the exact-name
- * matches only, which need no scope.
+ * The Payee form's Name box: typed text, with suggestions of the characters,
+ * corporations and alliances it could be (narrowed by `kinds`). Picking one
+ * verifies the Payee; the Payee form looks a typed name up on Save and saves
+ * nothing that isn't someone in EVE. Without the search permission the
+ * suggestions are the exact-name matches only, which need no scope.
  */
 export function PayeeNameField({
   id,
@@ -31,6 +32,7 @@ export function PayeeNameField({
   ariaLabel,
   className,
   size,
+  kinds,
 }: {
   id: string;
   /** Whose token the search runs under; null with nobody logged in, which leaves the public exact-name matches. */
@@ -46,6 +48,8 @@ export function PayeeNameField({
   className?: string;
   /** The box's size; `sm` beside other `sm` controls in a row. */
   size?: 'sm' | 'md';
+  /** Only suggestions of these kinds; absent offers all three. */
+  kinds?: readonly PayeeEntityKind[];
 }) {
   const { t } = useTranslation();
   const listboxId = useId();
@@ -58,7 +62,12 @@ export function PayeeNameField({
   // Only the newest search may write results: ESI can answer out of order.
   const latest = useRef(0);
   const trimmed = value.trim();
-  const shown = trimmed.length >= MIN_PAYEE_SEARCH_LENGTH ? suggestions : [];
+  const shown =
+    trimmed.length < MIN_PAYEE_SEARCH_LENGTH
+      ? []
+      : kinds
+        ? suggestions.filter((match) => kinds.includes(match.kind))
+        : suggestions;
 
   useEffect(() => {
     if (!typing.current || trimmed.length < MIN_PAYEE_SEARCH_LENGTH) return;
@@ -74,7 +83,7 @@ export function PayeeNameField({
           if (ticket === latest.current) setSuggestions(hits);
         })
         .catch(() => {
-          // A failed suggestion lookup leaves a free-text label, never a blocked save.
+          // A failed suggestion lookup leaves the typed name; Save looks it up itself.
           if (ticket === latest.current && !controller.signal.aborted) setSuggestions([]);
         });
     }, LOOKUP_DEBOUNCE_MS);

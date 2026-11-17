@@ -148,11 +148,13 @@ async function seedPayeeBalance(page: Page, options: SeedOptions = {}): Promise<
           value: { system_id: solarSystemId, name: 'Jita', security_status: 0.9 },
           fetchedAt: now,
         });
+        // A Payee is someone in EVE: linked, so the Tax tab asks ESI nothing about it.
         tx.objectStore('payees').put({
           id: payeeId,
           characterId,
           name: payeeName,
           defaultTaxPct: 10,
+          entityId: 98000777,
           updatedAt: now,
         });
         // Outstanding Assignment covering the whole entry, so `computePayeeBalances`
@@ -884,6 +886,7 @@ async function seedSecondPayee(page: Page): Promise<void> {
           characterId,
           name: payeeName,
           defaultTaxPct: 10,
+          entityId: 98000777,
           updatedAt: Date.now(),
         });
         tx.oncomplete = () => resolve();

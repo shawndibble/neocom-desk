@@ -13,6 +13,7 @@ import type {
   PersonalEntry,
   PersonalOverlay,
 } from '@/engine/corpTaxBook/personal';
+import { payeesOfBookCorporation } from '@/engine/miningTax/payeeCorporation';
 import { isUnpaidDefault } from '@/engine/miningTax/defaultSystems';
 import { minusLines } from '@/engine/miningTax/oreLines';
 import { entryKey } from '@/engine/miningTax/types';
@@ -33,10 +34,6 @@ export const isCorpPayeeId = (payeeId: string | undefined): payeeId is string =>
 export const corporationOfPayee = (payeeId: string): number =>
   Number(payeeId.slice(CORP_PAYEE_PREFIX.length));
 
-/** A stored Payee verified as this corporation (its entity id), never one that only shares its name. */
-export const isCorpEntityPayee = (payee: PayeeRecord, corporationId: number): boolean =>
-  payee.entityKind === 'corporation' && payee.entityId === corporationId;
-
 /**
  * Each book's virtual Payee mapped to the stored Payee that is the same corporation, so the Payee
  * filter lists the corporation once and a pick covers both sets of rows.
@@ -47,9 +44,11 @@ export function corpPayeeAliases(
 ): Map<string, string> {
   const aliases = new Map<string, string>();
   for (const book of bookPayees) {
-    const mine = storedPayees.find(
-      (p) => book.entityId !== undefined && isCorpEntityPayee(p, book.entityId)
-    );
+    if (book.entityId === undefined) continue;
+    const [mine] = payeesOfBookCorporation(storedPayees, {
+      corporationId: book.entityId,
+      name: book.name,
+    });
     if (mine) aliases.set(book.id, mine.id);
   }
   return aliases;

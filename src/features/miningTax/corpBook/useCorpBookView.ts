@@ -9,7 +9,12 @@ import { teachRefinerySystems, type LoadedCorpBook } from './corpBookStore';
 import { loadBookPrices, loadCorpNames, loadTrackedCorpBooks } from './corpBookSources';
 import { buildCorpBookView, type CorpBookView } from './corpBookView';
 import { MINUTE_MS } from '@/lib/age';
+import { payeesOfBookCorporation } from '@/engine/miningTax/payeeCorporation';
+import { linkPayeeToCorporation } from '../payees';
 import { hiddenLeftBooksOf, withoutHiddenLeft } from './leftCorpBooks';
+
+/** Payees linked as a book's corporation this session (`linkPayeeToCorporation`). */
+const linkedThisSession = new Set<string>();
 
 interface Args {
   /** The ledger as loaded; undefined until it has. */
@@ -89,6 +94,24 @@ export function useCorpBookView({
       cancelled = true;
     };
   }, [loaded, activeCharacterId]);
+
+  // A Payee that is a book's corporation but is missing its link on this device (named exactly as
+  // it, or carrying its id with no kind) gets the link, synced, so every device reads the same.
+  useEffect(() => {
+    for (const book of loaded) {
+      const name = corpNames.get(book.corporationId);
+      if (name === undefined) continue;
+      const corporation = { corporationId: book.corporationId, name };
+      for (const found of payeesOfBookCorporation(payees, corporation)) {
+        // Once a session: the snapshot's copy stays unlinked until the ledger reloads.
+        if (!found.link || linkedThisSession.has(found.id)) continue;
+        linkedThisSession.add(found.id);
+        void linkPayeeToCorporation(found.id, book.corporationId).catch(() => {
+          linkedThisSession.delete(found.id);
+        });
+      }
+    }
+  }, [loaded, corpNames, payees]);
 
   // The member's own ledger places the moon owner refineries the book cannot (#4650).
   useEffect(() => {

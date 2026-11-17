@@ -8,8 +8,8 @@ import { PayeeManagerDialog } from './PayeeManagerDialog';
 import { loadPayees } from './payees';
 
 const searchMock = vi.hoisted(() => ({
-  searchPayeeEntities: vi.fn(async () => [] as unknown[]),
-  resolvePayeeName: vi.fn(async () => [] as unknown[]),
+  searchPayeeEntities: vi.fn<(...args: unknown[]) => Promise<unknown[]>>(async () => []),
+  resolvePayeeName: vi.fn<(name: string) => Promise<unknown[]>>(async () => []),
 }));
 vi.mock('./payeeEntitySearch', () => ({
   MIN_PAYEE_SEARCH_LENGTH: 3,
@@ -85,8 +85,17 @@ async function pickHub(name: string) {
   await userEvent.click(screen.getByRole('option', { name }));
 }
 
+/** The id the default lookup gives any typed name: one EVE corporation of that name. */
+const LOOKED_UP_ID = 98_000_100;
+
 beforeEach(async () => {
   vi.clearAllMocks();
+  searchMock.searchPayeeEntities.mockResolvedValue([]);
+  // A Payee must be someone in EVE: unless a test says otherwise, every typed
+  // name is exactly one corporation.
+  searchMock.resolvePayeeName.mockImplementation(async (name: string) => [
+    { id: LOOKED_UP_ID, name: name.trim(), kind: 'corporation' },
+  ]);
   await db.payees.clear();
 });
 
@@ -451,10 +460,16 @@ describe('PayeeManagerDialog — deleting a Payee that is still owed', () => {
   });
 });
 
-describe('PayeeManagerDialog — entity verification', () => {
+describe('PayeeManagerDialog — a Payee is someone in EVE', () => {
   const corp = { id: 98_000_001, name: 'Moon Corp', kind: 'corporation' };
 
-  it('stores the entity of a picked suggestion', async () => {
+  async function fillAndSave(name: string) {
+    await userEvent.type(screen.getByLabelText('Name'), name);
+    await userEvent.type(screen.getByLabelText('Default tax %'), '10');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+  }
+
+  it('stores the entity of a picked suggestion without looking the name up again', async () => {
     searchMock.searchPayeeEntities.mockResolvedValue([corp]);
     renderDialog();
 
@@ -471,40 +486,146 @@ describe('PayeeManagerDialog — entity verification', () => {
         entityKind: 'corporation',
       });
     });
+    expect(searchMock.resolvePayeeName).not.toHaveBeenCalled();
   });
 
-  it('attaches a single exact-name match on save', async () => {
-    searchMock.searchPayeeEntities.mockResolvedValue([]);
+  it('never suggests an alliance: a new Payee is a corporation or a character', async () => {
+    searchMock.searchPayeeEntities.mockResolvedValue([
+      corp,
+      { id: 99_000_001, name: 'Moon Alliance', kind: 'alliance' },
+    ]);
+    renderDialog();
+
+    await userEvent.type(screen.getByLabelText('Name'), 'Moon');
+    expect(await screen.findByRole('option', { name: /Moon Corp/ })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /Moon Alliance/ })).not.toBeInTheDocument();
+  });
+
+  it('links a typed name that is exactly one corporation, spelled as EVE spells it', async () => {
     searchMock.resolvePayeeName.mockResolvedValue([corp]);
     renderDialog();
 
-    await userEvent.type(screen.getByLabelText('Name'), 'Moon Corp');
-    await userEvent.type(screen.getByLabelText('Default tax %'), '10');
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await fillAndSave('moon corp');
 
     await waitFor(async () => {
-      expect((await loadPayees(CHAR))[0]).toMatchObject({ entityKind: 'corporation' });
+      expect((await loadPayees(CHAR))[0]).toMatchObject({
+        name: 'Moon Corp',
+        entityId: 98_000_001,
+        entityKind: 'corporation',
+      });
     });
   });
 
-  it('saves a moon label with no match as an unverified free-text Payee', async () => {
-    searchMock.searchPayeeEntities.mockResolvedValue([]);
+  // Replaces "saves a moon label with no match as an unverified free-text
+  // Payee": an unlinked Payee on one device made a member's Corp Tax Book days
+  // read as Conflicts, and a Payee is who the ISK goes to, so it must be someone
+  // in game. A moon or place name no longer saves.
+  it('saves nothing for a name no corporation or character has, and says what to do', async () => {
     searchMock.resolvePayeeName.mockResolvedValue([]);
     renderDialog();
 
-    await userEvent.type(screen.getByLabelText('Name'), 'Moon 1 Planet 2');
-    await userEvent.type(screen.getByLabelText('Default tax %'), '10');
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await fillAndSave('Moon 1 Planet 2');
 
-    await waitFor(async () => {
-      expect((await loadPayees(CHAR)).length).toBe(1);
-    });
-    const [payee] = await loadPayees(CHAR);
-    expect('entityId' in payee).toBe(false);
-    expect(await screen.findByText(/Unverified/)).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'No corporation or character in EVE is named Moon 1 Planet 2. Pick one from the suggestions, spelled as it is in game.'
+    );
+    expect(await loadPayees(CHAR)).toEqual([]);
+    expect(screen.getByLabelText('Name')).toHaveValue('Moon 1 Planet 2');
   });
 
-  it('clears the verification when the name is edited afterwards', async () => {
+  it('saves nothing for an alliance-only name', async () => {
+    searchMock.resolvePayeeName.mockResolvedValue([
+      { id: 99_000_001, name: 'Moon Alliance', kind: 'alliance' },
+    ]);
+    renderDialog();
+
+    await fillAndSave('Moon Alliance');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'No corporation or character in EVE is named Moon Alliance.'
+    );
+    expect(await loadPayees(CHAR)).toEqual([]);
+  });
+
+  it('lets the pilot pick when a corporation and a character share the name, never guessing', async () => {
+    searchMock.resolvePayeeName.mockResolvedValue([
+      { id: 98_000_002, name: 'Moon', kind: 'corporation' },
+      { id: 90_000_002, name: 'Moon', kind: 'character' },
+    ]);
+    renderDialog();
+
+    await fillAndSave('Moon');
+
+    expect(
+      await screen.findByText('More than one in EVE is named Moon. Pick which:')
+    ).toBeInTheDocument();
+    expect(await loadPayees(CHAR)).toEqual([]);
+    await userEvent.click(screen.getByRole('button', { name: 'Moon · Character' }));
+
+    await waitFor(async () => {
+      expect((await loadPayees(CHAR))[0]).toMatchObject({
+        name: 'Moon',
+        entityId: 90_000_002,
+        entityKind: 'character',
+      });
+    });
+  });
+
+  // An answer for an earlier draft must never fill the choices of the one now open.
+  it('drops a lookup that answers after the pilot changed the name', async () => {
+    let answer: (m: unknown[]) => void = () => {};
+    searchMock.resolvePayeeName.mockImplementationOnce(
+      () => new Promise((resolve) => (answer = resolve))
+    );
+    renderDialog();
+
+    await fillAndSave('Moon');
+    await userEvent.type(screen.getByLabelText('Name'), ' Two');
+    answer([
+      { id: 98_000_002, name: 'Moon', kind: 'corporation' },
+      { id: 90_000_002, name: 'Moon', kind: 'character' },
+    ]);
+
+    await waitFor(() => expect(screen.getByLabelText('Name')).toHaveValue('Moon Two'));
+    expect(screen.queryByText(/Pick which/)).toBeNull();
+    expect(await loadPayees(CHAR)).toEqual([]);
+  });
+
+  // Picking a suggestion is a new draft too: a lookup still pending for the typed name is dropped.
+  it('drops a lookup that answers after the pilot picked a suggestion', async () => {
+    let answer: (m: unknown[]) => void = () => {};
+    searchMock.resolvePayeeName.mockImplementationOnce(
+      () => new Promise((resolve) => (answer = resolve))
+    );
+    searchMock.searchPayeeEntities.mockResolvedValue([corp]);
+    renderDialog();
+
+    await fillAndSave('Moon');
+    await userEvent.click(screen.getByLabelText('Name'));
+    await userEvent.click(await screen.findByRole('option', { name: /Moon Corp/ }));
+    answer([
+      { id: 98_000_002, name: 'Moon', kind: 'corporation' },
+      { id: 90_000_002, name: 'Moon', kind: 'character' },
+    ]);
+
+    expect(await screen.findByText(/Corporation — verified/)).toBeInTheDocument();
+    expect(screen.queryByText(/Pick which/)).toBeNull();
+    expect(await loadPayees(CHAR)).toEqual([]);
+  });
+
+  it('saves nothing and says to try again when the lookup fails', async () => {
+    searchMock.resolvePayeeName.mockRejectedValue(new Error('offline'));
+    renderDialog();
+
+    await fillAndSave('Moon Corp');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "Couldn't check that name with EVE. Try again."
+    );
+    expect(await loadPayees(CHAR)).toEqual([]);
+  });
+
+  it('edits a linked Payee without asking EVE again when the name is unchanged', async () => {
     const stored: PayeeRecord = {
       id: 'p1',
       characterId: CHAR,
@@ -515,7 +636,132 @@ describe('PayeeManagerDialog — entity verification', () => {
       updatedAt: 1,
     };
     await db.payees.put(stored);
+    searchMock.resolvePayeeName.mockRejectedValue(new Error('offline'));
+    renderDialog([stored]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Moon Corp' }));
+    await userEvent.clear(screen.getByLabelText('Default tax %'));
+    await userEvent.type(screen.getByLabelText('Default tax %'), '12');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(async () => {
+      expect((await loadPayees(CHAR))[0]).toMatchObject({
+        defaultTaxPct: 12,
+        entityId: 98_000_001,
+        entityKind: 'corporation',
+      });
+    });
+    expect(searchMock.resolvePayeeName).not.toHaveBeenCalled();
+  });
+
+  it('keeps an alliance Payee from before working and editable', async () => {
+    const stored: PayeeRecord = {
+      id: 'p1',
+      characterId: CHAR,
+      name: 'Moon Alliance',
+      defaultTaxPct: 10,
+      entityId: 99_000_001,
+      entityKind: 'alliance',
+      updatedAt: 1,
+    };
+    await db.payees.put(stored);
+    renderDialog([stored]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Moon Alliance' }));
+    await pickHub('Hek');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(async () => {
+      expect((await loadPayees(CHAR))[0]).toMatchObject({
+        hubId: 'hek',
+        entityId: 99_000_001,
+        entityKind: 'alliance',
+      });
+    });
+    expect(searchMock.resolvePayeeName).not.toHaveBeenCalled();
+  });
+
+  it('marks an unlinked Payee as not found in EVE, and saving it links it', async () => {
+    const stored: PayeeRecord = {
+      id: 'p1',
+      characterId: CHAR,
+      name: 'Moon Corp',
+      defaultTaxPct: 10,
+      updatedAt: 1,
+    };
+    await db.payees.put(stored);
+    searchMock.resolvePayeeName.mockResolvedValue([corp]);
+    renderDialog([stored]);
+
+    expect(screen.getByText('Not found in EVE — edit to pick who this is')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Moon Corp' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(async () => {
+      expect((await loadPayees(CHAR))[0]).toMatchObject({ entityId: 98_000_001 });
+    });
+  });
+
+  // Never locked: an old label EVE doesn't know keeps working; its rate still changes.
+  it('saves an old unlinked Payee under its own name even when EVE knows no such name', async () => {
+    const stored: PayeeRecord = {
+      id: 'p1',
+      characterId: CHAR,
+      name: 'Moon 1 Planet 2',
+      defaultTaxPct: 10,
+      updatedAt: 1,
+    };
+    await db.payees.put(stored);
     searchMock.resolvePayeeName.mockResolvedValue([]);
+    renderDialog([stored]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Moon 1 Planet 2' }));
+    const pct = screen.getByLabelText('Default tax %');
+    await userEvent.clear(pct);
+    await userEvent.type(pct, '12');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(async () => {
+      expect((await loadPayees(CHAR))[0]).toMatchObject({ defaultTaxPct: 12 });
+    });
+    expect('entityId' in (await loadPayees(CHAR))[0]).toBe(false);
+  });
+
+  // A link learned from a payment (an id, no kind) is tied to its name too.
+  it('asks EVE again when a Payee linked from a payment is renamed', async () => {
+    const stored: PayeeRecord = {
+      id: 'p1',
+      characterId: CHAR,
+      name: 'Moon Corp',
+      defaultTaxPct: 10,
+      entityId: 98_000_001,
+      updatedAt: 1,
+    };
+    await db.payees.put(stored);
+    searchMock.resolvePayeeName.mockResolvedValue([]);
+    renderDialog([stored]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Moon Corp' }));
+    const name = screen.getByLabelText('Name');
+    await userEvent.clear(name);
+    await userEvent.type(name, 'Somebody Else');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(searchMock.resolvePayeeName).toHaveBeenCalled();
+    expect((await loadPayees(CHAR))[0]).toMatchObject({ name: 'Moon Corp', entityId: 98_000_001 });
+  });
+
+  it('looks the new name up when a linked Payee is renamed', async () => {
+    const stored: PayeeRecord = {
+      id: 'p1',
+      characterId: CHAR,
+      name: 'Moon Corp',
+      defaultTaxPct: 10,
+      entityId: 98_000_001,
+      entityKind: 'corporation',
+      updatedAt: 1,
+    };
+    await db.payees.put(stored);
     renderDialog([stored]);
 
     await userEvent.click(screen.getByRole('button', { name: 'Edit Moon Corp' }));
@@ -523,9 +769,11 @@ describe('PayeeManagerDialog — entity verification', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(async () => {
-      const [payee] = await loadPayees(CHAR);
-      expect(payee.name).toBe('Moon Corp Holdings');
-      expect('entityId' in payee || 'entityKind' in payee).toBe(false);
+      expect((await loadPayees(CHAR))[0]).toMatchObject({
+        name: 'Moon Corp Holdings',
+        entityId: LOOKED_UP_ID,
+        entityKind: 'corporation',
+      });
     });
   });
 });
@@ -534,7 +782,6 @@ describe('PayeeManagerDialog — linking a Payee named for a Corp Tax Book corpo
   const bookCorporations = [{ corporationId: 98_000_007, name: 'Corp A' }];
 
   it('suggests the link on create, and saving stores it as the corporation', async () => {
-    searchMock.searchPayeeEntities.mockResolvedValue([]);
     searchMock.resolvePayeeName.mockResolvedValue([]);
     renderDialog([], { bookCorporations });
 

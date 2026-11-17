@@ -51,6 +51,7 @@ import { TaxSelectionBar } from './TaxSelectionBar';
 import { usePayeeFilter } from './usePayeeFilter';
 import { useEntryDeepLink } from './useEntryDeepLink';
 import { useTaxAttentionItems } from './useTaxAttentionItems';
+import { useAutoLinkPayees } from './payeeAutoLink';
 import { useTaxBalances } from './useTaxBalances';
 import { corpPayAccounts, readsEveryDivision } from './corpBook/corpPayAccount';
 import { sum } from '@/engine/math';
@@ -174,6 +175,8 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     canManagePayees,
     payeesInline,
   } = useTaxPayeeManager(Boolean(data), characters, activeCharacterId, allPayees, corpView);
+  // Payees from before a Payee had to be someone in EVE: linked where the name is one, once a session.
+  const unlinkedPayees = useAutoLinkPayees(allPayees, refresh);
   const datedPrices = data?.datedPrices ?? EMPTY_DATED_PRICES;
   const { pricesFor, priceSourcesFor, estimatedValueOf, systemName, systemSecurityOf } =
     useTaxPricing(datedPrices, systemNames, systemSecurity);
@@ -343,6 +346,8 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     personalRows,
     displayRows: characterFiltered,
     payeeById,
+    unlinkedPayees,
+    openPayeeManager,
     corpView,
     failedClaims,
     reloadCorpBooks,
