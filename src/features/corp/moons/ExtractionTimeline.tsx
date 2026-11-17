@@ -210,7 +210,7 @@ function TimelineBody({ shown, now }: { shown: readonly ExtractionRow[]; now: nu
               <Tooltip content={<PlanTip row={e} now={now} />} side="bottom">
                 <div
                   tabIndex={0}
-                  aria-label={`${extractionWindowLabel(t, e)}`}
+                  aria-label={extractionWindowLabel(t, e)}
                   className="relative h-4 w-full rounded-xs bg-panel-2 focus-visible:outline-2 focus-visible:outline-accent sm:w-auto sm:flex-1"
                 >
                   <span
