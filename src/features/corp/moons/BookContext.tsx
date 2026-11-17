@@ -53,8 +53,10 @@ function useRecordAccounts(value: Omit<BookContextValue, 'edit' | 'canEdit'>, ca
   useEffect(() => {
     // Only a read with every row and payment counts. A moon page's read (`BookRead.moon`) holds
     // other Miners' days only in part; a one-Miner page counts that Miner only.
-    const whole = data.parts.has('observed') && data.parts.has('ledger');
-    if (!canEdit || !whole || (data as { moon?: unknown }).moon) return;
+    // A context built by hand (a story, a test) may carry no parts: then it counts nothing.
+    const whole = !!data?.parts?.has('observed') && !!data.parts.has('ledger');
+    if (!canEdit || !whole || !view.input.runningAccountFrom || (data as { moon?: unknown }).moon)
+      return;
     const sent = recorded.get(corporationId) ?? new Map<string, string>();
     recorded.set(corporationId, sent);
     const changed = accountRecords(view, data.scopedMiner).filter(
