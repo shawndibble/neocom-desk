@@ -1,3 +1,4 @@
+import { formatTenure } from '@/lib/duration';
 import { useMemo, useState } from 'react';
 import {
   Button,
@@ -42,6 +43,7 @@ import {
   SOURCE_LABEL,
   SOURCE_TYPES,
   rowsOf,
+  READ_AT,
   type RawRow,
   type SourceId,
 } from './vettingRawDataFixtures';
@@ -332,6 +334,14 @@ function useColumns(source: SourceId, allCharacters: boolean): DataTableColumn<R
         sortValue: (row) => row.left ?? '9999',
         render: (row) => row.left ?? <span className="text-text-dim">Still there</span>,
       },
+      {
+        id: 'tenure',
+        header: 'Time there',
+        width: '14ch',
+        className: 'tabular-nums',
+        sortValue: (row) => tenureSeconds(row),
+        render: (row) => formatTenure(tenureSeconds(row)),
+      },
     ],
   };
   const columns = [...base[source]];
@@ -351,6 +361,12 @@ function NewFlagLink({ id, title }: { id: string; title: string }) {
       {title}
     </a>
   );
+}
+
+/** Seconds in a corporation, to the day the read ran when the character is still there. */
+function tenureSeconds(row: RawRow): number {
+  const end = row.left ? Date.parse(row.left) : READ_AT;
+  return (end - Date.parse(row.joined ?? '')) / 1000;
 }
 
 const DEFAULT_SORT: Record<SourceId, DataTableSort> = {

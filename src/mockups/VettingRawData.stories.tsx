@@ -115,7 +115,7 @@ export const ContractsFiltered: Story = {
 /** @summary Skills: skill, group, level; the Cynosural Field Theory V row links to its flag (Cyno skill, no capital). Skill group filter, no date range. */
 export const Skills: Story = { render: () => <DataBrowserPage source="skills" /> };
 
-/** @summary Corporation history: corporation, joined, left; public. Six corporations for Tamsin, 9 rows across the three characters. */
+/** @summary Corporation history: corporation, joined, left, time there (days under two months, then months, then years); public. Six corporations for Tamsin, 9 rows across the three characters. */
 export const CorpHistory: Story = { render: () => <DataBrowserPage source="history" /> };
 
 // --------------------------------------------------------------- Odd states

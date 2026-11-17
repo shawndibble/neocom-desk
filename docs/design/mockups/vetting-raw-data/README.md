@@ -34,7 +34,7 @@ One recommended design, with the decisions made in review at the end. It shares 
 | Mail headers | ![](mail-headers-1440.png) | ![](mail-headers-phone-390.png) |
 | Contracts, filtered (type, dates) | ![](contracts-filtered-1440.png) | ![](contracts-filtered-phone-390.png) |
 | Skills, flagged row | ![](skills-1440.png) | ![](skills-phone-390.png) |
-| Corporation history | ![](corp-history-1440.png) | ![](corp-history-phone-390.png) |
+| Corporation history (with time there) | ![](corp-history-1440.png) | ![](corp-history-phone-390.png) |
 | Empty source (shared, nothing found) | ![](empty-source-1440.png) | ![](empty-source-phone-390.png) |
 | Filters match nothing | ![](no-match-1440.png) | ![](no-match-phone-390.png) |
 | Consent terms alone | ![](consent-terms-only-1440.png) | ![](consent-terms-only-phone-390.png) |
