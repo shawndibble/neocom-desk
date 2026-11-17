@@ -6,6 +6,7 @@ import {
   parseRate,
   parseTaxContact,
   RATE_SCOPES,
+  RUNNING_ACCOUNTS_FROM,
 } from './bookDocs';
 import { DEFAULT_OVERDUE_DAYS } from './overdue';
 import { DEFAULT_NOTICE_RULES } from './notices';
@@ -101,6 +102,7 @@ describe('parseBookSettings', () => {
       minimumStatement: DEFAULT_MINIMUM_STATEMENT,
       overdueDays: DEFAULT_OVERDUE_DAYS,
       cadence: { kind: 'monthly' },
+      runningAccountFrom: RUNNING_ACCOUNTS_FROM,
       noticeRules: DEFAULT_NOTICE_RULES,
       dayTolerancePct: DAY_SETTLE_TOLERANCE_PCT,
       chunkM3PerHour: null,

@@ -143,7 +143,7 @@ export interface PersonalBook {
   inReviewRefs?: readonly number[];
   /** Days after issue an unsettled Statement goes Overdue (the book's setting; 14 by default). */
   overdueDays?: number;
-  /** The instant the book switched to a running account (#6294); absent, it bills by Statement. */
+  /** The instant the book switched to a running account (#6294); every book has one (`RUNNING_ACCOUNTS_FROM` when none was stored). */
   runningAccountFrom?: string;
   /** Refinery names by structure id, where ESI let the app read them. */
   structureNames?: Record<number, string>;
