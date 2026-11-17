@@ -273,6 +273,17 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     [allPayees, duplicateAliases]
   );
 
+  /**
+   * The picker list plus the duplicate record an existing Assignment still names: the dialog finds
+   * its Payee by id, and a duplicate is otherwise not listed.
+   */
+  function payeesWithRecordsOf(payeeIds: readonly (string | undefined)[]): PayeeRecord[] {
+    const extra = payeeIds.flatMap((id) =>
+      id !== undefined && duplicateAliases.has(id) ? (payeeById.get(id) ?? []) : []
+    );
+    return extra.length > 0 ? [...pickablePayees, ...new Set(extra)] : pickablePayees;
+  }
+
   function suggestionFor(row: MoonMiningTaxRow) {
     return suggestPayeeForSystem(
       everyAssignment.filter((a) => a.characterId === row.characterId),
@@ -708,7 +719,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             members={allMembers(editTarget)}
             systemName={systemName(editTarget)}
             systemSecurity={systemSecurityOf(editTarget)}
-            payees={pickablePayees}
+            payees={payeesWithRecordsOf(allMembers(editTarget).map((m) => m.assignment.payeeId))}
             assignments={everyAssignment}
             typeNames={typeNames}
             pricesFor={pricesFor}
@@ -833,7 +844,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             systemSecurity={systemSecurityOf(detailTarget)}
             priceSourcesFor={priceSourcesFor}
             typeNames={typeNames}
-            payees={pickablePayees}
+            payees={payeesWithRecordsOf([detailTarget.assignment?.payeeId])}
             suggestion={detailTarget.assignment ? undefined : suggestionFor(detailTarget.row)}
             pricesFor={pricesFor}
             unreachableHubs={unreachableHubs}
@@ -914,7 +925,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             }
             row={splitTarget.row}
             systemName={systemName(splitTarget)}
-            payees={pickablePayees}
+            payees={payeesWithRecordsOf([splitTarget.assignment.payeeId])}
             assignments={everyAssignment}
             typeNames={typeNames}
             pricesFor={pricesFor}
@@ -939,7 +950,12 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
                 : joinCandidatesFor(joinTarget)
             }
             initialSelection={joinCandidateOverride ? 'all' : 'none'}
-            payees={pickablePayees}
+            payees={payeesWithRecordsOf([
+              joinTarget.assignment?.payeeId,
+              ...(joinCandidateOverride ?? joinCandidatesFor(joinTarget)).map(
+                (c) => c.assignment?.payeeId
+              ),
+            ])}
             typeNames={typeNames}
             pricesFor={pricesFor}
             busy={busy}
