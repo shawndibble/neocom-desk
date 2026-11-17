@@ -10,12 +10,13 @@ import { boundedString, record } from './communities.js';
 import {
   FEEDER_INVITES_COLLECTION,
   parseFeederTarget,
+  dateString,
   pctField,
   utcDate,
   type BookCall,
   type FeederTargetCall,
 } from './corpTaxBook.js';
-import type { FeederModeChange, OwnerRateEntry } from './corpTaxBookEngine.js';
+import { shiftDate, type FeederModeChange, type OwnerRateEntry } from './corpTaxBookEngine.js';
 import {
   deriveModeChanges,
   deriveOwnerRateHistory,
@@ -27,16 +28,38 @@ import { appendAudit, authorizeOfficer, feederRef, type BookDeps } from './corpT
 
 const MAX_NOTE = 500;
 
+/** How far back an agreed rate may be dated (#6347): "we agreed last week", not "months ago". */
+export const MAX_AS_OF_DAYS_BACK = 30;
+
 // --- Input -----------------------------------------------------------------
 
 export interface SetFeederRateInput extends FeederTargetCall {
   /** The agreed owner rate (0-100). */
   pct: number;
+  /** First EVE/UTC day the rate counts from (YYYY-MM-DD). Absent means today. */
+  asOf?: string;
 }
 
 export function parseSetFeederRateInput(data: unknown): SetFeederRateInput {
   const target = parseFeederTarget(data);
-  return { ...target, pct: pctField(record(data).pct, 'pct') };
+  const d = record(data);
+  const asOf = d.asOf === undefined || d.asOf === null ? undefined : dateString(d.asOf, 'asOf');
+  return { ...target, pct: pctField(d.pct, 'pct'), ...(asOf !== undefined ? { asOf } : {}) };
+}
+
+/**
+ * The day an agreed rate counts from: `asOf`, or today. Never in the future, never more than
+ * `MAX_AS_OF_DAYS_BACK` days back, never before the moon owner's first day. Judged on the
+ * server clock.
+ */
+export function resolveAsOf(rec: FeederRecord, asOf: string | undefined, now: number): string {
+  const today = utcDate(now);
+  if (asOf === undefined) return today;
+  const earliest = [shiftDate(today, -MAX_AS_OF_DAYS_BACK), utcDate(rec.joinedAt)].sort().at(-1)!;
+  if (asOf > today || asOf < earliest) {
+    fail('invalid-argument', 'The as-of date is outside the allowed days', 'as-of-out-of-range');
+  }
+  return asOf;
 }
 
 export interface SetFeederModeInput extends FeederTargetCall {
@@ -60,8 +83,16 @@ export function parseSetFeederModeInput(data: unknown): SetFeederModeInput {
 
 // --- History ---------------------------------------------------------------
 
-/** The history with an agreed rate dated today. Repeating the standing agreed rate adds nothing. */
-export function appendAgreedRate(rec: FeederRecord, pct: number, now: number): OwnerRateEntry[] {
+/**
+ * The history with an agreed rate dated `asOf` (default today). The entry counts from that day
+ * only (`noBackdate`, #6347). Repeating the standing agreed rate adds nothing.
+ */
+export function appendAgreedRate(
+  rec: FeederRecord,
+  pct: number,
+  now: number,
+  asOf: string = utcDate(now)
+): OwnerRateEntry[] {
   const history = deriveOwnerRateHistory(rec);
   const lastAgreed = [...history].reverse().find((e) => e.kind === 'agreed');
   if (lastAgreed?.pct === pct) return history;
@@ -70,8 +101,9 @@ export function appendAgreedRate(rec: FeederRecord, pct: number, now: number): O
     {
       kind: 'agreed',
       pct,
-      effectiveFrom: utcDate(now),
+      effectiveFrom: asOf,
       recordedAt: new Date(now).toISOString(),
+      noBackdate: true,
     },
   ];
 }
@@ -128,17 +160,23 @@ async function editFeeder(
   return { ok: true };
 }
 
-/** Agree a rate with a moon owner. It wins over what the moon owner asked for, from today on. */
+/** Agree a rate with a moon owner. It wins over what the moon owner asked for, from `asOf` (today by default) on. */
 export function setFeederRate(
   deps: BookDeps,
   caller: Caller,
   input: SetFeederRateInput
 ): Promise<{ ok: true }> {
-  return editFeeder(deps, caller, input, (rec, now) => ({
-    update: { agreedRatePct: input.pct, ownerRateHistory: appendAgreedRate(rec, input.pct, now) },
-    action: 'feederRateAgreed',
-    detail: { pct: input.pct },
-  }));
+  return editFeeder(deps, caller, input, (rec, now) => {
+    const asOf = resolveAsOf(rec, input.asOf, now);
+    return {
+      update: {
+        agreedRatePct: input.pct,
+        ownerRateHistory: appendAgreedRate(rec, input.pct, now, asOf),
+      },
+      action: 'feederRateAgreed',
+      detail: { pct: input.pct, asOf },
+    };
+  });
 }
 
 /** Settle a moon owner otherwise (or back to normal), from today on. */

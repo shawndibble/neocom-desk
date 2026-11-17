@@ -27,6 +27,8 @@ import { canSendMail, queueOfficerMail } from '@/features/corpTaxBook/officerMai
 import { PayMoonOwnerHost } from './PayMoonOwnerHost';
 import { RemoveMoonOwnerDialog, SetRateDialog, SettledOtherwiseDialog } from './MoonOwnerDialogs';
 import { MoonOwnerPage } from './MoonOwnerPage';
+import { earliestAsOf } from '@/engine/corpTaxBook/ownerRate';
+import { utcDay } from '@/engine/localDay';
 import { agreedRateChange, mailModeChange, mailRateChange } from './rateChangeNotice';
 import { Crumb } from './moonsParts';
 import {
@@ -243,13 +245,15 @@ export function MoonOwnerDetail({ id }: { id: string }) {
       {dialog === 'rate' && (
         <SetRateDialog
           initial={detail.row.theirRatePct ?? null}
+          today={utcDay()}
+          earliest={earliestAsOf(utcDay(), feeder ? utcDay(feeder.joinedAt) : '')}
           onClose={() => setDialog(null)}
-          onSave={(pct) =>
+          onSave={(pct, asOf) =>
             afterEdit(async () => {
               const change = feeder
-                ? agreedRateChange(deriveOwnerRateHistory(feeder), pct, new Date())
+                ? agreedRateChange(deriveOwnerRateHistory(feeder), pct, new Date(), asOf)
                 : undefined;
-              await setFeederRate(characterId, corporationId, corp, pct);
+              await setFeederRate(characterId, corporationId, corp, pct, asOf);
               // After the save, and never awaited: the rate change does not wait on the mail.
               if (change && accountingName) {
                 void mailRateChange({

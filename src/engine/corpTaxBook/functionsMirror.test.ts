@@ -74,7 +74,8 @@ import {
 } from './statements';
 import type { ObservedRow } from './types';
 import * as removal from './removal';
-import { effectiveOwnerRate } from './ownerRate';
+import { effectiveOwnerRate, MAX_AS_OF_DAYS_BACK } from './ownerRate';
+import { MAX_AS_OF_DAYS_BACK as FUNCTIONS_AS_OF_DAYS_BACK } from '../../../functions/src/corpTaxBookFeederOwnerCalls';
 import { moonOwnerMailRecipients } from './ownerRateMail';
 
 // `functions/` cannot import `src/`, so the callables enforce a mirror of these
@@ -936,6 +937,12 @@ describe('remaining engine parity (#4515, #4520, #4621)', () => {
       );
     }
     expect(mirror.effectiveOwnerRatePct([], '2026-06-01')).toBeUndefined();
+    const asOf = [{ ...history[1]!, noBackdate: true as const }];
+    for (const date of ['2026-06-03', '2026-06-04']) {
+      expect(mirror.effectiveOwnerRatePct(asOf, date)).toBe(effectiveOwnerRate(asOf, date)?.pct);
+    }
+    expect(mirror.effectiveOwnerRatePct(asOf, '2026-06-03')).toBeUndefined();
+    expect(FUNCTIONS_AS_OF_DAYS_BACK).toBe(MAX_AS_OF_DAYS_BACK);
     const askedOnly = [history[0]!];
     expect(mirror.effectiveOwnerRatePct(askedOnly, '2026-06-02')).toBeUndefined();
     expect(effectiveOwnerRate(askedOnly, '2026-06-02')).toBeUndefined();

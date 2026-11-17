@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  earliestAsOf,
   effectiveOwnerRate,
   latestRateChange,
   ownerMargin,
@@ -15,7 +16,28 @@ const req = (pct: number, effectiveFrom: string, recordedAt = `${effectiveFrom}T
 const agreed = (pct: number, effectiveFrom: string, recordedAt = `${effectiveFrom}T00:00:00Z`) =>
   ({ kind: 'agreed', pct, effectiveFrom, recordedAt }) satisfies OwnerRateEntry;
 
+describe('earliestAsOf', () => {
+  it('is 30 days back, or the first day when that is later', () => {
+    expect(earliestAsOf('2026-10-18', '2026-01-01')).toBe('2026-09-18');
+    expect(earliestAsOf('2026-10-18', '2026-10-01')).toBe('2026-10-01');
+  });
+});
+
 describe('effectiveOwnerRate', () => {
+  it('does not reach back from an entry that was agreed with an as-of date (#6347)', () => {
+    const history = [{ ...agreed(8, '2026-10-05'), noBackdate: true as const }];
+    expect(effectiveOwnerRate(history, '2026-10-04')).toBeUndefined();
+    expect(effectiveOwnerRate(history, '2026-10-05')?.pct).toBe(8);
+  });
+
+  it('a legacy first entry still reaches back when a later as-of entry follows it', () => {
+    const history = [
+      agreed(8, '2026-10-05'),
+      { ...agreed(9, '2026-10-10'), noBackdate: true as const },
+    ];
+    expect(effectiveOwnerRate(history, '2026-09-20')?.pct).toBe(8);
+  });
+
   it('is undefined with no history or before any rate takes effect', () => {
     expect(effectiveOwnerRate([], '2026-10-01')).toBeUndefined();
     expect(effectiveOwnerRate([req(6, '2026-10-05')], '2026-10-04')).toBeUndefined();

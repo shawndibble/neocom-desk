@@ -129,12 +129,13 @@ export interface OpenInvite {
   offeredOwnerRatePct?: number;
 }
 
-/** Agree a rate with a moon owner; it wins over the rate they asked for, from today. */
+/** Agree a rate with a moon owner; it wins over the rate they asked for, from `asOf` (today when absent). */
 export async function setFeederRate(
   characterId: number,
   corporationId: number,
   feederCorporationId: number,
-  pct: number
+  pct: number,
+  asOf?: string
 ): Promise<{ ok: true }> {
   const accessToken = await getValidAccessToken(characterId);
   return call(characterId, 'setCorpTaxBookFeederRateCallable', {
@@ -142,6 +143,7 @@ export async function setFeederRate(
     accessToken,
     feederCorporationId,
     pct,
+    ...(asOf === undefined ? {} : { asOf }),
   });
 }
 
