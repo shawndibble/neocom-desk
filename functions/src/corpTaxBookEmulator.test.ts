@@ -2015,7 +2015,6 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
   describe('verify link', () => {
     it('shows a running account owed now: the recorded count less what the Miner paid since', async () => {
       await turnOn();
-      await edit(DIRECTOR, { action: 'updateSettings', patch: { switchToRunningAccount: true } });
       const { verifyToken } = await edit(ACCOUNTANT, {
         action: 'issueStatement',
         statement: { ...statement('s1'), kind: 'notice' },
