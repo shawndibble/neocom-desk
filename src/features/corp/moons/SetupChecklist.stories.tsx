@@ -18,10 +18,9 @@ function Checklist({ context, overview }: { context: Context; overview?: boolean
   );
 }
 
-/** A book just turned on: no Statement yet, and one refinery this Character cannot dock at. */
+/** A book just turned on: one refinery this Character cannot dock at. */
 const FRESH: Context = {
   ...BOOK_CONTEXT,
-  view: { ...BOOK_VIEW, input: { ...BOOK_VIEW.input, statements: [] } },
   names: {
     ...BOOK_CONTEXT.names,
     refinery: (id: number) =>
@@ -45,10 +44,10 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Partly done: rate, names and a first Statement done; Automatic sync to turn on. */
+/** @summary Partly done: rate and names done; Automatic sync to turn on. */
 export const PartlyDone: Story = {};
 
-/** @summary Just turned on: Automatic sync, an unreadable refinery and the first Statement to do. */
+/** @summary Just turned on: Automatic sync and an unreadable refinery to do. */
 export const JustTurnedOn: Story = { args: { context: FRESH } };
 
 /** @summary On the Overview, above the totals (the full sample book, so Needs you stays consistent). */

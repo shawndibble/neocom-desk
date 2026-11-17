@@ -18950,11 +18950,6 @@
           "title": "Refinery names readable",
           "todo_one": "{{count}} refinery shows as Unknown/Undockable. Open this page with a Character that can dock there and its name is read.",
           "todo_other": "{{count}} refineries show as Unknown/Undockable. Open this page with a Character that can dock there and their names are read."
-        },
-        "firstStatement": {
-          "title": "First Statement issued",
-          "todo": "Once a period closes, send each Miner what they owe.",
-          "action": "Go to Statements"
         }
       },
       "setup": {

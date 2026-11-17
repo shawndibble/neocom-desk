@@ -14,7 +14,6 @@ const fresh: SetupChecklistInput = {
   rates: [{ scope: 'corp', pct: 10, effectiveFrom: '2026-08-01' }],
   scheduledSync: null,
   refineries: [{ id: 11, name: 'Efa V - Moon 3 - Brass Anvil' }],
-  statementCount: 0,
   today: '2026-10-18',
 };
 
@@ -24,17 +23,11 @@ const stateOf = (input: SetupChecklistInput) =>
 describe('setupChecklist', () => {
   it('a book just turned on has its rate set and the rest to do', () => {
     const list = setupChecklist(fresh);
-    expect(list.steps.map((s) => s.id)).toEqual([
-      'rate',
-      'autoSync',
-      'refineryNames',
-      'firstStatement',
-    ]);
+    expect(list.steps.map((s) => s.id)).toEqual(['rate', 'autoSync', 'refineryNames']);
     expect(stateOf(fresh)).toEqual({
       rate: 'done',
       autoSync: 'todo',
       refineryNames: 'done',
-      firstStatement: 'todo',
     });
     expect(list.done).toBe(2);
     expect(list.complete).toBe(false);
@@ -102,12 +95,12 @@ describe('setupChecklist', () => {
 
   it('a book with no refineries of its own (one that collects for moon owners) skips the names step', () => {
     const list = setupChecklist({ ...fresh, refineries: [] });
-    expect(list.steps.map((s) => s.id)).toEqual(['rate', 'autoSync', 'firstStatement']);
+    expect(list.steps.map((s) => s.id)).toEqual(['rate', 'autoSync']);
   });
 
   it('is complete once every step is done', () => {
-    const list = setupChecklist({ ...fresh, scheduledSync: active, statementCount: 3 });
-    expect(list.done).toBe(4);
+    const list = setupChecklist({ ...fresh, scheduledSync: active });
+    expect(list.done).toBe(3);
     expect(list.complete).toBe(true);
   });
 });
