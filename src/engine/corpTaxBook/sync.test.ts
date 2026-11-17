@@ -358,10 +358,10 @@ describe('resolveDonations', () => {
     expect(stranger.reviewReason).toBeUndefined();
   });
 
-  it('holds a known miner’s code-less donation for review when they owe nothing (#6207)', () => {
-    const [held] = resolveDonations([donation(7)], { ...book, openBalance: new Map() });
-    expect(held.minerId).toBeUndefined();
-    expect(held.reviewReason).toBe('no-open-balance');
+  it('credits a known miner’s code-less donation even when they owe nothing (#6300)', () => {
+    const [prepaid] = resolveDonations([donation(7)], { ...book, openBalance: new Map() });
+    expect(prepaid).toMatchObject({ minerId: 'solo:7' });
+    expect(prepaid.reviewReason).toBeUndefined();
   });
 
   it('credits a Miner with ore not yet billed, whatever their balance', () => {
@@ -374,21 +374,21 @@ describe('resolveDonations', () => {
     expect(prepaid.reviewReason).toBeUndefined();
   });
 
-  it('spends the balance oldest first, so a second donation past it is held', () => {
+  it('credits a second donation past the balance too, as prepaid credit', () => {
     const later = donation(7, undefined, { refId: 2, at: '2026-08-03T00:00:00.000Z' });
     const earlier = donation(7, undefined, { refId: 1, at: '2026-08-02T00:00:00.000Z' });
     // Newest first, the order the sync passes them in.
     const [second, first] = resolveDonations([later, earlier], book);
     expect(first).toMatchObject({ minerId: 'solo:7' });
-    expect(second.minerId).toBeUndefined();
-    expect(second.reviewReason).toBe('no-open-balance');
+    expect(second).toMatchObject({ minerId: 'solo:7' });
+    expect(second.reviewReason).toBeUndefined();
   });
 
   it('counts a pay-coded donation against the balance too', () => {
     const coded = donation(7, 'MT-AB12', { refId: 1 });
     const plain = donation(7, undefined, { refId: 2, at: '2026-08-03T00:00:00.000Z' });
     const [, after] = resolveDonations([coded, plain], book);
-    expect(after.reviewReason).toBe('no-open-balance');
+    expect(after).toMatchObject({ minerId: 'solo:7' });
   });
 });
 

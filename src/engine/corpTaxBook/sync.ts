@@ -234,7 +234,7 @@ export function donationsFromJournal(
 
 /**
  * Fills each donation's `minerId` and `statementId` with `matchDonation`; a stranger's stays
- * unset (Unmatched), and a known sender's whose Miner owes nothing is marked for review.
+ * unset (Unmatched); a known sender's credits their Miner even when it owes nothing (#6300).
  * Oldest first, each credited donation spends its Miner's balance, so two in one sync never
  * both count against the same debt. Returned in the order given.
  */
@@ -266,9 +266,7 @@ export function resolveDonations(
         ? { ...d, minerId: match.minerId, statementId: match.statementId }
         : match.kind === 'miner'
           ? { ...d, minerId: match.minerId }
-          : match.kind === 'review'
-            ? { ...d, reviewReason: 'no-open-balance' }
-            : d
+          : d
     );
   }
   return donations.map((d) => resolved.get(d)!);

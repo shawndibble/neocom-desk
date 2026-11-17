@@ -188,7 +188,6 @@ export function minerIdFor(characterId: number, miners: readonly MinerLike[]): s
 export type DonationMatch =
   | { kind: 'statement'; statementId: string; minerId: string }
   | { kind: 'miner'; minerId: string }
-  | { kind: 'review'; minerId: string }
   | { kind: 'unmatched' };
 
 function escapeRegExp(text: string): string {
@@ -218,9 +217,7 @@ export function matchDonation(
   const grouped = book.miners.some((m) => m.characterIds.includes(donation.characterId));
   if (grouped || book.knownCharacterIds.has(donation.characterId)) {
     const minerId = minerIdFor(donation.characterId, book.miners);
-    if ((book.openBalance.get(minerId) ?? 0) > 0 || book.unbilled.has(minerId))
-      return { kind: 'miner', minerId };
-    return { kind: 'review', minerId };
+    return { kind: 'miner', minerId };
   }
   return { kind: 'unmatched' };
 }
@@ -254,9 +251,7 @@ export function resolveDonations(
         ? { ...d, minerId: match.minerId, statementId: match.statementId }
         : match.kind === 'miner'
           ? { ...d, minerId: match.minerId }
-          : match.kind === 'review'
-            ? { ...d, reviewReason: 'no-open-balance' }
-            : d
+          : d
     );
   }
   return donations.map((d) => resolved.get(d)!);
