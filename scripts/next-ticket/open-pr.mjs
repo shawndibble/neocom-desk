@@ -2,7 +2,10 @@
 // Push the branch and open the PR. Mechanism only — the agent still
 // authors the title and body (judgment), this just executes them.
 //
-// Usage: node scripts/next-ticket/open-pr.mjs <title> <body-file>
+// Usage: node scripts/next-ticket/open-pr.mjs <title> <body-file> [--hold]
+//
+// `--hold` (a `hold-for-review` ticket) opens the PR but does NOT arm
+// auto-merge: the PR is left for a human to review and merge.
 //
 // Also arms auto-merge (repo has allow_auto_merge on, and `validate` + `e2e`
 // are required checks) so GitHub merges the PR itself the moment it goes
@@ -17,14 +20,16 @@
 //
 // Prints one line of JSON to stdout:
 //   {"status":"open","number":123,"url":"...","autoMergeArmed":true}
+//   {"status":"open","number":123,"url":"...","autoMergeArmed":false,"held":true}
 //   {"status":"error","message":"..."}
 
 import fs from 'node:fs';
 import { run, gh, tryRun, printResult, INTEGRATION_BRANCH } from './lib.mjs';
 
-const [, , title, bodyFile] = process.argv;
+const [, , title, bodyFile, ...flags] = process.argv;
+const hold = flags.includes('--hold');
 if (!title || !bodyFile) {
-  console.error('usage: open-pr.mjs <title> <body-file>');
+  console.error('usage: open-pr.mjs <title> <body-file> [--hold]');
   process.exit(2);
 }
 const body = fs.readFileSync(bodyFile, 'utf8');
@@ -52,6 +57,11 @@ if (!create.ok) {
 
 const url = create.stdout.trim().split('\n').pop();
 const number = Number((/\/pull\/(\d+)/.exec(url) || [])[1]);
+
+if (hold) {
+  printResult({ status: 'open', number, url, autoMergeArmed: false, held: true });
+  process.exit(0);
+}
 
 // Best-effort: a failure here (e.g. auto-merge briefly unavailable) isn't
 // fatal — step 9 (finish.mjs) still merges directly as a fallback.
