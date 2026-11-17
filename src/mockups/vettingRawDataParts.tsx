@@ -67,6 +67,8 @@ export function DataWeReadPanel() {
       id: 'source',
       header: 'Source',
       primary: true,
+      stickyStart: true,
+      stickyStartOnPanel: true,
       render: (row) => (
         <a href="#" onClick={stay} className={textActionClassName()}>
           {SOURCE_LABEL[row.id]}
