@@ -48,6 +48,7 @@ export function CorpBookSyncNote({
   const account = summary.account;
   const standing = account?.owes
     ? t('miningTax.corpBook.sync.behind', {
+        amount: formatIsk(account.owes.amount, 0),
         count: account.owes.days,
         date: shortDate(account.owes.oldest, i18n.language),
         corp: corpName,

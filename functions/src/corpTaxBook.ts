@@ -660,6 +660,11 @@ export type EditAction =
       statement?: Record<string, unknown>;
       /** Credit is refunded unless the guest consented or went 90 days without replying. */
       credit: CloseCredit;
+      /**
+       * A running account's credit as the officer's client works it out (#6294): money ahead of
+       * every day. The server cannot price days, so it takes this on such a book.
+       */
+      runningCredit?: number;
     }
   | { action: 'issueStatement'; statement: Record<string, unknown> }
   | { action: 'settleStatements'; statementIds: string[] }
@@ -965,6 +970,9 @@ export function parseEditAction(data: unknown): EditAction {
         reason: reason(d.reason),
         ...(statement ? { statement } : {}),
         credit: parseCloseCredit(d.credit),
+        ...(d.runningCredit !== undefined
+          ? { runningCredit: num(d.runningCredit, 'runningCredit', 0, 1e13) }
+          : {}),
       };
     }
     case 'settleStatements':

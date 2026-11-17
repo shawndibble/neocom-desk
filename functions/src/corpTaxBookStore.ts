@@ -114,7 +114,8 @@ import {
   type MirrorExtraction,
   type ObservedRow,
 } from './corpTaxBookEngine.js';
-import type { FeederExtraction } from './corpTaxBookSyncEngine.js';
+import { billsDays, type FeederExtraction } from './corpTaxBookSyncEngine.js';
+import { liveAccount } from './corpTaxBookAccounts.js';
 import type { IdentityReader } from './corpTaxBookEsi.js';
 import { SRP_COLLECTIONS } from './srpTypes.js';
 import { VETTING_COLLECTIONS } from './vettingTypes.js';
@@ -1700,7 +1701,9 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       // A Statement settles for good (D22), so the server never trusts the caller's plan: an
       // older client plans without disputes. One an open dispute holds right now is dropped.
       const held = await heldStatementIds(c, docs, iso);
-      const fresh = wanted.filter((id) => !held.has(id));
+      // A late notice (#6294) is never settled for good: its days stay on the running account.
+      const notices = new Set(docs.filter((d) => !billsDays(d)).map((d) => d.id as string));
+      const fresh = wanted.filter((id) => !held.has(id) && !notices.has(id));
       if (fresh.length > 0) {
         // Only ever grown: a Statement settled once keeps its days closed for good (D22).
         tx.set(
@@ -1858,7 +1861,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         fail('failed-precondition', 'This book bills by Statement', 'not-running-account');
       for (const a of action.accounts)
         tx.set(col(c, ACCOUNTS).doc(a.minerId), { ...a, at: iso, by });
-      return { detail: { count: action.accounts.length } };
+      // The figures as recorded, so the audit says what the pay page was told.
+      return { detail: { count: action.accounts.length, accounts: action.accounts } };
     }
     case 'recordMail': {
       // The queue sent this mail (D16): log it on the Statement and in the audit trail.
@@ -2020,9 +2024,10 @@ async function closeAccount(
     tx.get(col(c, EXTRACTIONS)),
     tx.get(col(c, WRITE_OFFS).where('minerId', '==', action.minerId)),
   ]);
-  const held = statements.docs.map((d) => d.data() as Data);
+  // A running account's notices bill no days of their own (#6294): legacy Statements only.
+  const held = statements.docs.map((d) => d.data() as Data).filter(billsDays);
   const allocation = allocatePayments({
-    statements: [...held, ...(statement ? [statement] : [])].map((x) => ({
+    statements: [...held, ...(statement && billsDays(statement) ? [statement] : [])].map((x) => ({
       id: x.id as string,
       amount: x.amount as number,
       issuedAt: x.issuedAt as string,
@@ -2041,7 +2046,12 @@ async function closeAccount(
     officerWriteOffs: writeOffs.docs.flatMap((d) => writeOffForAllocation(d.data()) ?? []),
     startDate: c.book.startDate as string | undefined,
   });
-  const credit = Math.max(0, allocation.credit);
+  // Payments that paid running days are no credit; only the officer's client can price those days.
+  const running = typeof c.book.runningAccountFrom === 'string';
+  const credit = Math.max(
+    0,
+    running && action.runningCredit !== undefined ? action.runningCredit : allocation.credit
+  );
   const owed = [...allocation.byStatement.values()]
     .filter((s) => !s.settled)
     .reduce((sum, s) => sum + s.remaining, 0);
@@ -2679,30 +2689,6 @@ export async function disputeConflict(deps: BookDeps, caller: Caller, input: Dis
 }
 
 /**
- * A recorded running account less what the Miner paid since: their net payments now (less "not
- * tax") beyond the ones the officer's client counted, whenever each was synced.
- */
-export function liveAccount(
-  recorded: Data,
-  payments: readonly Data[]
-): { owed: number; days: number; oldest: string | null; paidThrough: string | null; asOf: string } {
-  const net = (p: Data) => {
-    const amount = Number(p.amount) || 0;
-    return Math.max(0, amount - Math.min(Number(p.notTaxAmount) || 0, amount));
-  };
-  const paidNow = payments.reduce((sum, p) => sum + net(p), 0);
-  const since = Math.max(0, paidNow - (Number(recorded.paid) || 0));
-  const owed = Math.max(0, (Number(recorded.owed) || 0) - since);
-  return {
-    owed,
-    days: owed > 0 ? Number(recorded.days) || 0 : 0,
-    oldest: owed > 0 ? ((recorded.oldest as string | undefined) ?? null) : null,
-    paidThrough: (recorded.paidThrough as string | undefined) ?? null,
-    asOf: recorded.at as string,
-  };
-}
-
-/**
  * A Miner takes back their own dispute of a day while no officer has answered it: it leaves
  * Needs you and the day is billed as before. Authorised as the dispute was (the caller's own
  * Miner); anyone else's, or one already answered, is refused. Audited.
@@ -2812,15 +2798,17 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
 
   // The payments credited to THIS Statement: the Miner's whole allocation, then
   // the part of each payment that landed here (the miner's other Statements stay private).
+  // A running account's notices bill no days of their own (#6294): legacy Statements only.
+  const billing = statements.docs.filter((d) => billsDays(d.data()));
   const allocation = allocatePayments({
-    statements: statements.docs.map((d) => {
+    statements: billing.map((d) => {
       const x = d.data();
       return { id: d.id, amount: x.amount as number, issuedAt: x.issuedAt as string };
     }),
     payments: payments.docs.map((d) => paymentForAllocation(d.id, d.data())),
     dismissalCredits: dismissalCredits({
       minerId,
-      statements: statements.docs.map((d) => ({
+      statements: billing.map((d) => ({
         id: d.id,
         lines: (d.data().lines as DismissableLine[]) ?? [],
       })),

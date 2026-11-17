@@ -60,13 +60,13 @@ describe('CorpBookSyncNote', () => {
   it('on a running account says how far behind, or paid through, and credit only as ahead', () => {
     const behind = {
       paidThrough: '2026-10-14',
-      owes: { amount: 5, days: 2, oldest: '2026-10-15' },
+      owes: { amount: 5_000_000, days: 2, oldest: '2026-10-15' },
     };
     const { unmount } = render(
       <CorpBookSyncNote book={book({ account: behind })} owedNow={5} now={NOW} />
     );
     expect(
-      screen.getByText('2 days owed to Brass Meridian Logistics, oldest 15 Oct.')
+      screen.getByText('You owe Brass Meridian Logistics 5,000,000 ISK: 2 days, oldest 15 Oct.')
     ).toBeInTheDocument();
     unmount();
     render(

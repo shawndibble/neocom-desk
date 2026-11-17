@@ -118,6 +118,27 @@ describe('planNotices (#6294)', () => {
     expect(planNotices(paid, rules({ after: { kind: 'behind', days: 16 } }))).toHaveLength(1);
   });
 
+  it('counts a Statement mailed just before the switch-over as the last bill, for the cooldown', () => {
+    const legacy: Statement = {
+      id: '2026-08-01_solo:1',
+      minerId: 'solo:1',
+      code: 'NTX-LEGA',
+      periodStart: '2026-08-01',
+      periodEnd: '2026-08-31',
+      coversFrom: '2026-08-01',
+      coversThrough: '2026-08-31',
+      issuedAt: '2026-09-15T00:00:00Z',
+      hubId: 'jita',
+      oreForm: 'compressed',
+      amount: 1_000_000,
+      lines: [],
+    };
+    const base = input({ statements: [legacy] });
+    expect(planNotices(buildBookView(base), rules())).toEqual([]);
+    const later = { ...base, now: '2026-09-22T14:00:00Z' };
+    expect(planNotices(buildBookView(later), rules(), later.now)).toHaveLength(1);
+  });
+
   it('sends none once the Miner is paid up, and none to a closed account', () => {
     expect(planNotices(buildBookView(input({ payments: [pay(30_000_000)] })), rules())).toEqual([]);
     const closed = input({

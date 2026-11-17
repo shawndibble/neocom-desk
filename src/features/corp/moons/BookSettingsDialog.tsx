@@ -47,6 +47,7 @@ import { divisionNamesFor } from '../taxBook/pushDivisionNames';
 import { utcDay } from '@/engine/localDay';
 import {
   DEFAULT_NOTICE_RULES,
+  parseNoticeRules,
   type NoticeAfter,
   type NoticeRules,
 } from '@/engine/corpTaxBook/notices';
@@ -336,10 +337,22 @@ export function BookSettingsDialog({
         minimum: Number(noticeMinimum),
         cooldownDays: Number(cooldown),
       };
-      if (JSON.stringify(noticeRules) !== JSON.stringify(settings.noticeRules))
+      // Out-of-bounds or blank figures are never sent (the server would refuse the whole save):
+      // `parseNoticeRules` puts back a default for any it cannot take, so they differ.
+      const asStored = JSON.stringify(parseNoticeRules(noticeRules));
+      if (
+        asStored === JSON.stringify(noticeRules) &&
+        asStored !== JSON.stringify(parseNoticeRules(settings.noticeRules))
+      )
         patch.noticeRules = noticeRules;
       const tolerancePct = Number(tolerance.replace(',', '.'));
-      if (tolerancePct !== settings.dayTolerancePct) patch.dayTolerancePct = tolerancePct;
+      if (
+        tolerance.trim() !== '' &&
+        tolerancePct >= 0 &&
+        tolerancePct <= 5 &&
+        tolerancePct !== settings.dayTolerancePct
+      )
+        patch.dayTolerancePct = tolerancePct;
       if (chunk !== '') patch.chunkM3PerHour = Number(chunk);
       // Unchanged divisions are left out, so a save of other settings never overwrites them.
       const baseDivisions = [...divisionsBase].sort((a, b) => a - b);

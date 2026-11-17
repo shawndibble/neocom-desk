@@ -492,7 +492,9 @@ export function buildBookView(input: BookViewInput): BookView {
       }
     /** The newest late notice that listed each day: a running day still, only named. */
     const noticeBy = new Map<string, Statement>();
-    for (const n of [...notices].sort((a, b) => a.issuedAt.localeCompare(b.issuedAt)))
+    for (const n of [...notices].sort(
+      (a, b) => a.issuedAt.localeCompare(b.issuedAt) || a.id.localeCompare(b.id)
+    ))
       for (const line of n.lines) if (line.chargeKey) noticeBy.set(line.chargeKey, n);
 
     const days: DayRow[] = mine

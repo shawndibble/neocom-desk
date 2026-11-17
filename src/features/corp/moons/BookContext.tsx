@@ -40,6 +40,8 @@ export function BookProvider({
 
 /** What this tab last recorded per book and Miner, so an unchanged account is never sent again. */
 const recorded = new Map<number, Map<string, string>>();
+/** The sends in flight per book, chained. */
+const sending = new Map<number, Promise<void>>();
 
 /**
  * A running account's figures for the pay page (#6294): the server cannot price days, so an
@@ -49,25 +51,32 @@ const recorded = new Map<number, Map<string, string>>();
 function useRecordAccounts(value: Omit<BookContextValue, 'edit' | 'canEdit'>, canEdit: boolean) {
   const { view, data, characterId, corporationId } = value;
   useEffect(() => {
-    // Only a read with every row and payment counts; a moon's page holds other Miners' days only in part.
+    // Only a read with every row and payment counts. A moon page's read (`BookRead.moon`) holds
+    // other Miners' days only in part; a one-Miner page counts that Miner only.
     const whole = data.parts.has('observed') && data.parts.has('ledger');
     if (!canEdit || !whole || (data as { moon?: unknown }).moon) return;
     const sent = recorded.get(corporationId) ?? new Map<string, string>();
+    recorded.set(corporationId, sent);
     const changed = accountRecords(view, data.scopedMiner).filter(
       (a) => sent.get(a.minerId) !== JSON.stringify(a)
     );
     if (changed.length === 0) return;
     for (const a of changed) sent.set(a.minerId, JSON.stringify(a));
-    recorded.set(corporationId, sent);
-    void (async () => {
-      for (const accounts of chunk(changed, 200)) {
-        try {
-          await editBook(characterId, corporationId, { action: 'recordAccounts', accounts });
-        } catch {
-          // Sent again on the next change or visit.
-          for (const x of accounts) sent.delete(x.minerId);
+    // One send at a time per book, in order, so an older count never lands over a newer one.
+    const before = sending.get(corporationId) ?? Promise.resolve();
+    sending.set(
+      corporationId,
+      before.then(async () => {
+        for (const accounts of chunk(changed, 200)) {
+          try {
+            await editBook(characterId, corporationId, { action: 'recordAccounts', accounts });
+          } catch {
+            // Sent again on the next change or visit, unless a newer count is already queued.
+            for (const x of accounts)
+              if (sent.get(x.minerId) === JSON.stringify(x)) sent.delete(x.minerId);
+          }
         }
-      }
-    })();
+      })
+    );
   }, [view, data, canEdit, characterId, corporationId]);
 }

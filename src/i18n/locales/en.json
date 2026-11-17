@@ -8181,8 +8181,8 @@
         "credit": "{{amount}} ISK credit with {{corp}} goes on your next Statement.",
         "ahead": "{{amount}} ISK ahead with {{corp}}: it pays your next days as they close.",
         "paidThrough": "Paid through {{date}} with {{corp}}.",
-        "behind_one": "{{count}} day owed to {{corp}}, oldest {{date}}.",
-        "behind_other": "{{count}} days owed to {{corp}}, oldest {{date}}."
+        "behind_one": "You owe {{corp}} {{amount}} ISK: {{count}} day, oldest {{date}}.",
+        "behind_other": "You owe {{corp}} {{amount}} ISK: {{count}} days, oldest {{date}}."
       },
       "diff": {
         "fixRecords": "Fix my records",
@@ -17894,6 +17894,8 @@
       "howToPay": "Donate ISK to {{corp}}; any of your characters counts.",
       "payCodeLead": "Put the code",
       "payCodeTail": "in the reason to pin a donation to this Statement.",
+      "payCodeTailNotice": "in the reason so the payment is matched to you; it pays your oldest days first.",
+      "onNotice": "On this notice",
       "payAccount": "Pick the Account {{accounts}} in EVE's transfer window: a donation into another division is not credited.",
       "settled": "This Statement is settled.",
       "declaration": "You told {{corp}} on {{date}} that you paid another way.",
@@ -18551,6 +18553,7 @@
           "resolveDeclaration": "answered a declaration",
           "recordReminder": "sent a reminder",
           "recordMail": "mailed a Statement",
+          "recordAccounts": "counted Miners' accounts for their pay page",
           "stopReminders": "stopped reminders",
           "setPopSharing": "changed pop sharing",
           "setPopSharingMoon": "changed a moon's pop sharing",

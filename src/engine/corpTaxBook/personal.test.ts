@@ -4,7 +4,9 @@ import {
   coverInFlight,
   inFlightDonations,
   overlayCorpBooks,
+  personalAccountStatus,
   previewTakeover,
+  type BookRowState,
   type PersonalBook,
   type PersonalEntry,
 } from './personal';
@@ -1138,6 +1140,58 @@ describe('overlayCorpBooks', () => {
           paidThrough: '2026-10-15',
           owes: { amount: 222_000, days: 1, oldest: '2026-10-16' },
         },
+      });
+    });
+
+    it('leaves a day an open dispute holds out of what is owed and of paid through', () => {
+      const row = (date: string, state: BookRowState, taxOwed: number, held = false) => ({
+        date,
+        state,
+        taxOwed,
+        ...(held ? { held: { until: '2026-11-30', kind: 'quantity' as const } } : {}),
+      });
+      expect(
+        personalAccountStatus([
+          row('2026-10-14', 'paid', 0),
+          row('2026-10-15', 'billed', 50, true),
+          row('2026-10-16', 'billed', 70),
+        ])
+      ).toEqual({
+        paidThrough: '2026-10-14',
+        owes: { amount: 70, days: 1, oldest: '2026-10-16' },
+      });
+    });
+
+    it('pays a day a late notice listed like any running day, by the per-day rule', () => {
+      const notice: Statement = {
+        id: 'notice_2026-10-15_solo:1_2026-10-17',
+        kind: 'notice',
+        minerId: `solo:${ME}`,
+        code: 'NTX-ABCD',
+        periodStart: '2026-10-15',
+        periodEnd: '2026-10-16',
+        coversFrom: '2026-10-15',
+        coversThrough: '2026-10-16',
+        issuedAt: '2026-10-17T00:00:00Z',
+        hubId: 'jita',
+        oreForm: 'compressed',
+        // Priced differently from the day itself: the day's own figure is what is owed.
+        amount: 999_999_999,
+        lines: [],
+      };
+      const out = overlay(entries, [
+        book({
+          observed,
+          statements: [notice],
+          payments: [{ ...paid(222_000), statementId: notice.id }],
+          runningAccountFrom: '2026-10-01T00:00:00Z',
+        }),
+      ]).books[0];
+      expect(out).toMatchObject({
+        credit: 0,
+        // Only for its code, while the member owes.
+        openStatements: [{ statementId: notice.id, code: 'NTX-ABCD' }],
+        account: { paidThrough: '2026-10-15', owes: { amount: 222_000, days: 1 } },
       });
     });
 

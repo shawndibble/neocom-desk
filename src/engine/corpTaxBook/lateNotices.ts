@@ -132,7 +132,7 @@ export function draftNotice(
 }
 
 /** The most recent `day` of a month on or before `today`. */
-function lastDayOfMonth(today: string, day: number): string {
+function lastAnchorDay(today: string, day: number): string {
   const [y, m, d] = today.split('-').map(Number);
   return utcDay(Date.UTC(y, d >= day ? m - 1 : m - 2, day));
 }
@@ -147,7 +147,7 @@ export function noticeDue(
   if (lastIssued !== undefined && daysBetween(lastIssued.slice(0, 10), today) < rules.cooldownDays)
     return false;
   if (rules.after.kind === 'behind') return daysBetween(oldest, today) >= rules.after.days;
-  const anchor = lastDayOfMonth(today, rules.after.day);
+  const anchor = lastAnchorDay(today, rules.after.day);
   return oldest < anchor && (lastIssued === undefined || lastIssued.slice(0, 10) < anchor);
 }
 
@@ -167,10 +167,10 @@ export function planNotices(
   for (const row of view.miners) {
     const owes = row.account?.owes;
     if (closed.has(row.id) || !owes || owes.amount < rules.minimum) continue;
-    const notices = (view.internals.byMiner.get(row.id)?.statements ?? []).filter(
-      (s) => s.kind === 'notice'
-    );
-    if (!noticeDue(rules, today, owes.oldest, newest(notices)?.issuedAt)) continue;
+    // The last bill of any kind: a Statement mailed just before the switch-over counts as the
+    // first reminder, so no notice follows it within the cooldown.
+    const bills = view.internals.byMiner.get(row.id)?.statements ?? [];
+    if (!noticeDue(rules, today, owes.oldest, newest(bills)?.issuedAt)) continue;
     const plan = draftNotice(view, row.id, { now });
     if (plan) plans.push(plan);
   }

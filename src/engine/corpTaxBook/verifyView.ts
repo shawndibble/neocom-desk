@@ -20,6 +20,8 @@ export interface VerifyPayload {
     hubId: string;
     oreForm: 'compressed' | 'raw';
     lines: VerifyPayloadLine[];
+    /** A running account's late notice (#6294); absent on a Statement. */
+    kind?: 'notice';
     /** Names the officer's client stored with the Statement, when it did. */
     corporationName?: string;
     minerName?: string;
