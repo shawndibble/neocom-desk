@@ -1,6 +1,6 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { InlineError } from '@/components/ui/InlineError';
-import { useId, useMemo, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -159,6 +159,9 @@ export function PayeeManagerDialog({
   // the dialog is for. An empty list shows it regardless (see `showForm`).
   const [formOpen, setFormOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Bumped whenever the form starts over or its name changes: a lookup answered after that
+  // belongs to an older draft and is dropped.
+  const draftGeneration = useRef(0);
   // Several corporations/characters answer to the typed name: the pilot picks one.
   const [choices, setChoices] = useState<{ name: string; matches: PayeeEntityMatch[] } | null>(
     null
@@ -202,6 +205,7 @@ export function PayeeManagerDialog({
   }
 
   function closeForm() {
+    draftGeneration.current += 1;
     setDraft(EMPTY_DRAFT);
     setError(null);
     setChoices(null);
@@ -210,6 +214,7 @@ export function PayeeManagerDialog({
   }
 
   function startAdd() {
+    draftGeneration.current += 1;
     setDraft(EMPTY_DRAFT);
     setError(null);
     setChoices(null);
@@ -217,6 +222,7 @@ export function PayeeManagerDialog({
   }
 
   function startEdit(payee: PayeeRecord) {
+    draftGeneration.current += 1;
     setDraft({
       id: payee.id,
       name: payee.name,
@@ -260,7 +266,10 @@ export function PayeeManagerDialog({
       (p) => p.id === current.id && p.entityId === undefined && p.name.trim() === name
     );
     if (entityId === undefined) {
+      const generation = draftGeneration.current;
       const lookup = await lookupPayeeName(name);
+      // The pilot moved on (another Payee, a new name, the form closed): not this draft's answer.
+      if (generation !== draftGeneration.current) return;
       if (lookup.status === 'found') {
         entityId = lookup.match.id;
         entityKind = lookup.match.kind;
@@ -318,6 +327,7 @@ export function PayeeManagerDialog({
   }
 
   function handleNameChange(name: string) {
+    draftGeneration.current += 1;
     setChoices(null);
     // Editing the name after verifying clears the verification.
     const stale = draft.verifiedName !== undefined && name !== draft.verifiedName;

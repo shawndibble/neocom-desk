@@ -138,6 +138,20 @@ describe('rememberPayeeEntity', () => {
     expect(syncMock.scheduleSync).not.toHaveBeenCalled();
   });
 
+  // A dialog's copy read before the Payee was verified must not re-point it now.
+  it('judges the stored Payee, not a stale unlinked copy', async () => {
+    const stale = await createPayee(CHAR_A, { name: 'Bureau', defaultTaxPct: 5 });
+    await linkPayeeToCorporation(stale.id, 98_837_836);
+    vi.clearAllMocks();
+
+    expect(await rememberPayeeEntity(stale, 90_000_001)).toBe(stale);
+    expect(await db.payees.get(stale.id)).toMatchObject({
+      entityId: 98_837_836,
+      entityKind: 'corporation',
+    });
+    expect(syncMock.scheduleSync).not.toHaveBeenCalled();
+  });
+
   it('writes nothing when the recipient is already recorded', async () => {
     const payee = await createPayee(CHAR_A, { name: 'Landlord', defaultTaxPct: 10 });
     const learned = await rememberPayeeEntity(payee, 90_000_001);

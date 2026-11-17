@@ -10,7 +10,7 @@
  */
 import type { PayeeRecord } from '@/db';
 import { lookupPayeeName } from '@/features/miningTax/payeeLookup';
-import { createPayee, loadPayees, updatePayee } from '@/features/miningTax/payees';
+import { createPayeeOnce, loadPayees, updatePayee } from '@/features/miningTax/payees';
 
 /** Why a typed name made no Payee: nobody in EVE has it, several do, or ESI didn't answer. */
 export class PayeeNotInEveError extends Error {
@@ -72,13 +72,12 @@ export async function findOrCreatePayee(
   const lookup = await lookupPayeeName(trimmed);
   if (lookup.status !== 'found') throw new PayeeNotInEveError(trimmed, lookup.status);
   const { match } = lookup;
-  const payee = await createPayee(characterId, {
-    name: match.name,
-    defaultTaxPct: taxPct,
-    entityId: match.id,
-    entityKind: match.kind,
-  });
-  return { payee, created: true };
+  // Checked again with the write: another request may have made it while EVE answered.
+  return createPayeeOnce(
+    characterId,
+    { name: match.name, defaultTaxPct: taxPct, entityId: match.id, entityKind: match.kind },
+    (stored) => findPayeeByName(stored, name) ?? findPayeeByName(stored, match.name)
+  );
 }
 
 export async function ensurePayee(

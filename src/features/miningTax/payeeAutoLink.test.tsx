@@ -63,6 +63,13 @@ describe('linkUnlinkedPayees', () => {
     expect('entityId' in ((await db.payees.get('p1')) ?? {})).toBe(false);
   });
 
+  it("leaves a same-named label alone when the Character already has that corporation's Payee", async () => {
+    const corpPayee = payee('p9', 'Moon Corp', { entityId: 2, entityKind: 'corporation' });
+    await db.payees.put(corpPayee);
+    expect(await linkUnlinkedPayees([moonCorp, corpPayee])).toEqual([]);
+    expect('entityId' in ((await db.payees.get('p1')) ?? {})).toBe(false);
+  });
+
   // "Bob" is some stranger: a character name is flagged for the pilot, never linked unasked.
   it('never links a Payee whose name is a character', async () => {
     lookupMock.lookupPayeeNames.mockResolvedValue(

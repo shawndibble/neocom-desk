@@ -47,6 +47,10 @@ export async function linkUnlinkedPayees(
     for (const p of due) {
       const lookup = lookups.get(payeeNameKey(p.name));
       if (lookup?.status !== 'found' || lookup.match.kind !== 'corporation') continue;
+      // The Character already has this corporation's Payee: a same-named one beside it is the
+      // separate label its owner made (`payeesOfBookCorporation`), never linked to it.
+      const matchId = lookup.match.id;
+      if (payees.some((o) => o.characterId === p.characterId && o.entityId === matchId)) continue;
       // Re-read: the list may be older than an edit made while ESI answered.
       const fresh = await db.payees.get(p.id);
       if (!fresh || !isUnlinkedPayee(fresh) || payeeNameKey(fresh.name) !== payeeNameKey(p.name)) {

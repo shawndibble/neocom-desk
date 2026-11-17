@@ -571,6 +571,26 @@ describe('PayeeManagerDialog — a Payee is someone in EVE', () => {
     });
   });
 
+  // An answer for an earlier draft must never fill the choices of the one now open.
+  it('drops a lookup that answers after the pilot changed the name', async () => {
+    let answer: (m: unknown[]) => void = () => {};
+    searchMock.resolvePayeeName.mockImplementationOnce(
+      () => new Promise((resolve) => (answer = resolve))
+    );
+    renderDialog();
+
+    await fillAndSave('Moon');
+    await userEvent.type(screen.getByLabelText('Name'), ' Two');
+    answer([
+      { id: 98_000_002, name: 'Moon', kind: 'corporation' },
+      { id: 90_000_002, name: 'Moon', kind: 'character' },
+    ]);
+
+    await waitFor(() => expect(screen.getByLabelText('Name')).toHaveValue('Moon Two'));
+    expect(screen.queryByText(/Pick which/)).toBeNull();
+    expect(await loadPayees(CHAR)).toEqual([]);
+  });
+
   it('saves nothing and says to try again when the lookup fails', async () => {
     searchMock.resolvePayeeName.mockRejectedValue(new Error('offline'));
     renderDialog();

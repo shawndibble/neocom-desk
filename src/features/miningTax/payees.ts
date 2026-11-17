@@ -120,6 +120,38 @@ export async function createPayee(characterId: number, input: PayeeInput): Promi
   return record;
 }
 
+/**
+ * Creates the Payee unless `existing` finds one among the Character's stored Payees, both in one
+ * transaction: two callers racing (two Survey surfaces) never make two records for one recipient.
+ * No Default Systems: a caller that sets them uses `createPayee`.
+ */
+export async function createPayeeOnce(
+  characterId: number,
+  input: Omit<PayeeInput, 'defaultSystemIds'>,
+  existing: (payees: readonly PayeeRecord[]) => PayeeRecord | undefined
+): Promise<{ payee: PayeeRecord; created: boolean }> {
+  const out = await db.transaction('rw', db.payees, async () => {
+    const found = existing(await db.payees.where('characterId').equals(characterId).toArray());
+    if (found) return { payee: found, created: false };
+    const record: PayeeRecord = {
+      id: crypto.randomUUID(),
+      characterId,
+      name: input.name,
+      defaultTaxPct: input.defaultTaxPct,
+      ...(input.hubId !== undefined ? { hubId: input.hubId } : {}),
+      ...(input.entityId != null ? { entityId: input.entityId } : {}),
+      ...(input.entityId != null && input.entityKind != null
+        ? { entityKind: input.entityKind }
+        : {}),
+      updatedAt: Date.now(),
+    };
+    await db.payees.put(record);
+    return { payee: record, created: true };
+  });
+  if (out.created) scheduleSync(characterId, { collections: ['payees'] });
+  return out;
+}
+
 export async function updatePayee(payee: PayeeRecord, input: PayeeInput): Promise<PayeeRecord> {
   const updated: PayeeRecord = {
     ...payee,
@@ -181,48 +213,70 @@ export async function rememberPayeeEntity(
   entityId: number,
   kind?: PayeeEntityKind
 ): Promise<PayeeRecord> {
+  // Judged on the stored record, in one transaction with the write: a caller's older copy must
+  // never re-point a Payee verified since it was read.
+  return (await writeIf(payee.id, (stored) => learnedEntity(stored, entityId, kind))) ?? payee;
+}
+
+function learnedEntity(
+  payee: PayeeRecord,
+  entityId: number,
+  kind: PayeeEntityKind | undefined
+): PayeeRecord | undefined {
   if (payee.entityId === entityId) {
     // A kind the pilot verified is never overwritten by a guess.
-    if (kind === undefined || payee.entityKind !== undefined) return payee;
-    return writeEntity({ ...payee, entityKind: kind });
+    if (kind === undefined || payee.entityKind !== undefined) return undefined;
+    return { ...payee, entityKind: kind };
   }
   // A Payee verified as a corporation or character is who it is: a payment to someone else (its
   // CEO, an officer) is never a reason to re-point it.
-  if (payee.entityKind !== undefined) return payee;
+  if (payee.entityKind !== undefined) return undefined;
   // A different recipient: the old kind described someone else.
   const next: PayeeRecord = { ...payee, entityId };
   delete next.entityKind;
   if (kind !== undefined) next.entityKind = kind;
-  return writeEntity(next);
+  return next;
 }
 
 /**
- * Links a stored Payee as `corporationId` (`payeesOfBookCorporation`'s `link`), read fresh so an
- * edit since the caller's copy is kept. Only while it is still unlinked, or carries that id with no
- * kind: never re-points a Payee linked to someone else meanwhile.
+ * Links a stored Payee as `corporationId` (`payeesOfBookCorporation`'s `link`), read and written in
+ * one transaction so an edit since the caller's copy is kept. Only while it is still unlinked, or
+ * carries that id with no kind: never re-points a Payee linked to someone else meanwhile.
  */
 export async function linkPayeeToCorporation(
   payeeId: string,
   corporationId: number
 ): Promise<void> {
-  const payee = await db.payees.get(payeeId);
-  if (!payee) return;
-  const unlinked = payee.entityId === undefined;
-  const kindless = payee.entityId === corporationId && payee.entityKind === undefined;
-  if (!unlinked && !kindless) return;
-  await writeEntity(withCorporationLink(payee, corporationId));
+  await writeIf(payeeId, (payee) => {
+    const unlinked = payee.entityId === undefined;
+    const kindless = payee.entityId === corporationId && payee.entityKind === undefined;
+    return unlinked || kindless ? withCorporationLink(payee, corporationId) : undefined;
+  });
+}
+
+/**
+ * Reads the stored Payee, asks `change` what it becomes (undefined: nothing to write) and writes
+ * it, all in one transaction; the sync is scheduled once it has committed.
+ */
+async function writeIf(
+  payeeId: string,
+  change: (stored: PayeeRecord) => PayeeRecord | undefined
+): Promise<PayeeRecord | undefined> {
+  const updated = await db.transaction('rw', db.payees, async () => {
+    const stored = await db.payees.get(payeeId);
+    const next = stored ? change(stored) : undefined;
+    if (!next) return undefined;
+    const record: PayeeRecord = { ...next, updatedAt: Date.now() };
+    await db.payees.put(record);
+    return record;
+  });
+  if (updated) scheduleSync(updated.characterId, { collections: ['payees'] });
+  return updated;
 }
 
 /** The Payee linked as `corporationId`: what every path that links one writes. */
 export function withCorporationLink(payee: PayeeRecord, corporationId: number): PayeeRecord {
   return { ...payee, entityId: corporationId, entityKind: 'corporation', updatedAt: Date.now() };
-}
-
-async function writeEntity(next: PayeeRecord): Promise<PayeeRecord> {
-  const updated: PayeeRecord = { ...next, updatedAt: Date.now() };
-  await db.payees.put(updated);
-  scheduleSync(updated.characterId, { collections: ['payees'] });
-  return updated;
 }
 
 /**

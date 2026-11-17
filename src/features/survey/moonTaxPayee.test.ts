@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import {
   ensurePayee,
+  findOrCreatePayee,
   findPayeeByName,
   MINING_TAX_HREF,
   parseTaxPct,
@@ -64,6 +65,17 @@ describe('ensurePayee', () => {
     await expect(made).rejects.toBeInstanceOf(PayeeNotInEveError);
     await expect(made).rejects.toMatchObject({ payeeName: 'Moon 1 Planet 2', reason });
     expect(await db.payees.count()).toBe(0);
+  });
+
+  // Two Survey surfaces asking at once both pass the first name check before EVE answers.
+  it('makes one Payee when two requests race through the lookup', async () => {
+    const [a, b] = await Promise.all([
+      findOrCreatePayee(1, 'Moon Corp', 10),
+      findOrCreatePayee(1, 'Moon Corp', 10),
+    ]);
+    expect(await db.payees.count()).toBe(1);
+    expect(a.payee.id).toBe(b.payee.id);
+    expect([a.created, b.created].sort()).toEqual([false, true]);
   });
 
   it('reuses a Payee of the same name in any case, taking the new rate', async () => {
