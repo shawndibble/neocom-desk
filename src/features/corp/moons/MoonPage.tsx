@@ -10,6 +10,7 @@ import { isk, shortDate, shortDateTime } from './moonsFormat';
 import { extractionPath, moonsTabPath } from './moonsPaths';
 import { Crumb, MinedBar, OreLine, StateWord } from './moonsParts';
 import { UndockableChip } from './sectionParts';
+import { MoonRate } from './MoonRate';
 
 /**
  * One moon's page (#6299): every Extraction the book synced for it, future and past, newest
@@ -105,6 +106,7 @@ export function MoonPage({ moonId }: { moonId: number }) {
           </span>
         }
       />
+      <MoonRate target={{ structureId, moonId }} />
       <div className="overflow-x-auto">
         <DataTable
           label={t('corpTaxBook.moons.tabs.extractions')}

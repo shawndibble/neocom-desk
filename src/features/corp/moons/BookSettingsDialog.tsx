@@ -35,6 +35,7 @@ import { Label } from './BookDialogs';
 import { SharingTab } from './SharingTab';
 import type { SettingsTab } from './moonsPaths';
 import { isk } from './moonsFormat';
+import { datedRateReady } from './rateForm';
 import { AutomaticSyncSection } from './AutomaticSyncSection';
 import { DeleteBookSection } from './DeleteBookSection';
 import { ExportBookSection } from './ExportBook';
@@ -269,10 +270,7 @@ export function BookSettingsDialog({
   };
 
   const rateReady =
-    ratePct !== '' &&
-    Number(ratePct) >= 0 &&
-    Number(ratePct) <= 100 &&
-    rateFrom >= today &&
+    datedRateReady(ratePct, rateFrom, today) &&
     (rateScope !== 'miner' || rateMiner !== '') &&
     (rateScope !== 'moon' || rateMoon !== '') &&
     (rateScope !== 'structure' || rateRefinery !== '') &&
