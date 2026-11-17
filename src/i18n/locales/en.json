@@ -21638,6 +21638,8 @@
       "mailQueued": "Mail queued for {{name}}.",
       "mailAlready": "Already queued from this device.",
       "mailFailed": "Mail to {{name}} could not be queued. Try again.",
+      "mailUnrecorded": "Mail to {{name}} was queued, but not recorded here. Do not resend yet; reload to check.",
+      "mailCooldown": "This member was already mailed in the last day. Nothing sent.",
       "grantTitle": "Can't mail the member"
     },
     "errors": {

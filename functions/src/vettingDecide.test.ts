@@ -1005,6 +1005,12 @@ describe('the request mail', () => {
       ok: false,
       reason: 'not-asker',
     });
+    // An empty stored owner hash never matches another character with an empty hash.
+    expect(recordRequestMail(asked({ requestedBy: actor(2, '') }), actor(3, ''), T0)).toEqual({
+      ok: false,
+      reason: 'not-asker',
+    });
+    expect(recordRequestMail(asked({ requestedBy: actor(2, '') }), actor(2, ''), T0).ok).toBe(true);
     expect(recordRequestMail(asked({ state: 'open' }), actor(2), T0)).toEqual({
       ok: false,
       reason: 'not-requested',

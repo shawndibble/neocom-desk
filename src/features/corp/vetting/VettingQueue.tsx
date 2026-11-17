@@ -44,6 +44,8 @@ interface VettingQueueProps {
    * A request's row menu: mail the member the link, or copy it. Absent (a reviewer who cannot
    * act on requests): a waiting row has no menu.
    */
+  /** The signed-in reviewer: only the officer who asked may mail, so others get no menu. */
+  reviewerId?: number;
   onRequestMail?: (review: VettingReviewSummary) => void;
   onCopyRequestLink?: (review: VettingReviewSummary) => void;
 }
@@ -58,6 +60,7 @@ export function VettingQueue({
   tab,
   rows,
   onOpen,
+  reviewerId,
   onRequestMail,
   onCopyRequestLink,
 }: VettingQueueProps) {
@@ -203,7 +206,15 @@ export function VettingQueue({
   }, [t, tab, now, timeZone, phone]);
 
   const rowMenu = (row: VettingReviewSummary, tr: React.ReactElement) => {
-    if (row.state !== 'requested' || !onRequestMail || !onCopyRequestLink) return tr;
+    // Copy link alone is one action: a non-asker's row has no menu (the row click opens it).
+    if (
+      row.state !== 'requested' ||
+      !onRequestMail ||
+      !onCopyRequestLink ||
+      row.requestedBy?.characterId !== reviewerId
+    ) {
+      return tr;
+    }
     const name = firstName(row.pilot.name);
     const wait = requestMailCooldown(row.requestMail, now);
     const waitReason = row.requestMail

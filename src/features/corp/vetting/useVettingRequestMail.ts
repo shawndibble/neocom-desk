@@ -8,12 +8,14 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { VettingOverview, VettingReviewSummary } from '@/engine/vetting';
 import { useCharacterNames } from '@/features/character/useCharacters';
-import { officerCorporationName, type MailRun } from '@/features/corpTaxBook/officerMail';
+import { officerCorporationName } from '@/features/corpTaxBook/officerMail';
 import { vettingBackend } from './vettingClient';
 import {
   buildVettingRequestMail,
+  mailGate,
   queueVettingRequestMail,
   requestMailInput,
+  type RequestMailRun,
 } from './vettingRequestMail';
 import { requestLink } from './vettingText';
 
@@ -31,7 +33,7 @@ export function useVettingRequestMail(
   corporationId: number,
   onRecorded: (overview: VettingOverview) => void
 ): {
-  send: (review: Asked) => Promise<MailRun>;
+  send: (review: Asked) => Promise<RequestMailRun>;
   preview: (review: Asked) => Promise<RequestMailPreview | null>;
 } {
   const { t } = useTranslation();
@@ -48,17 +50,25 @@ export function useVettingRequestMail(
   );
 
   const send = useCallback(
-    async (review: Asked): Promise<MailRun> => {
-      const none: MailRun = { queued: [], failed: [], missingScope: false };
+    async (row: Asked): Promise<RequestMailRun> => {
+      const none: RequestMailRun = { queued: [], failed: [], missingScope: false };
       try {
+        // The row may be stale (another tab mailed it): judge on the server's copy.
+        const overview = await vettingBackend().overview(officerId, corporationId);
+        const gate = mailGate(overview, row.id, officerId, Date.now());
+        if (!gate.ok) {
+          onRecorded(overview);
+          return gate.reason === 'cooldown' ? { ...none, cooldown: true } : none;
+        }
+        const review = gate.review;
         const mail = await compose(review);
         if (mail === null) return none;
-        const run = await queueVettingRequestMail(t, {
+        const run: RequestMailRun = await queueVettingRequestMail(t, {
           corporationId,
           reviewId: review.id,
           senderCharacterId: officerId,
           pilotId: review.pilot.characterId,
-          previousSentAt: review.requestMail?.sentAt ?? 0,
+          previousSentAt: gate.previousSentAt,
           mail,
         });
         if (run.queued.length > 0) {
@@ -67,12 +77,13 @@ export function useVettingRequestMail(
               await vettingBackend().recordRequestMail(officerId, corporationId, review.id)
             );
           } catch {
-            // The mail is queued; only the "Mail sent" line is missing.
+            // Queued, but not recorded: the officer is told, so no one resends blind.
+            return { ...run, unrecorded: true };
           }
         }
         return run;
       } catch {
-        return { ...none, failed: [review.pilot.name] };
+        return { ...none, failed: [row.pilot.name] };
       }
     },
     [compose, corporationId, officerId, onRecorded, t]

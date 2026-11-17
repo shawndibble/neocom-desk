@@ -5,7 +5,6 @@ import { Pill } from '@/components/ui/Pill';
 import { GrantNote } from '@/app/GrantNote';
 import type { VettingReview } from '@/engine/vetting';
 import { SEND_MAIL_ENDPOINTS } from '@/esi/registry';
-import type { MailRun } from '@/features/corpTaxBook/officerMail';
 import { ActionResult } from '@/features/settings/settingsFields';
 import { formatAge } from '@/lib/age';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -13,7 +12,7 @@ import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import { useNow } from '@/lib/useNow';
 import { ReviewMailPreview } from './ReviewMailPreview';
 import type { RequestMailPreview } from './useVettingRequestMail';
-import { requestMailCooldown } from './vettingRequestMail';
+import { requestMailCooldown, type RequestMailRun } from './vettingRequestMail';
 import { requestLink } from './vettingText';
 import { askedByReviewer } from './vettingView';
 
@@ -21,7 +20,7 @@ interface RequestPanelProps {
   review: VettingReview;
   /** The signed-in reviewer: tells "(you)" and whose Character sends the mail. */
   reviewerId: number;
-  send: () => Promise<MailRun>;
+  send: () => Promise<RequestMailRun>;
   preview: () => Promise<RequestMailPreview | null>;
 }
 
@@ -34,7 +33,7 @@ export function RequestPanel({ review, reviewerId, send, preview }: RequestPanel
   const now = useNow();
   const { copied, flash } = useCopyFeedback(2000);
   const [busy, setBusy] = useState(false);
-  const [run, setRun] = useState<MailRun | null>(null);
+  const [run, setRun] = useState<RequestMailRun | null>(null);
   const [shown, setShown] = useState<RequestMailPreview | null>(null);
   const first = review.pilot.name.split(' ')[0] ?? review.pilot.name;
   const asker = review.requestedBy;
@@ -85,7 +84,15 @@ export function RequestPanel({ review, reviewerId, send, preview }: RequestPanel
             tone={review.requestMail ? 'default' : 'warning'}
           />
         </ValueList>
-        {run !== null && run.queued.length > 0 && (
+        {run?.unrecorded && (
+          <ActionResult kind="error">
+            {t('vetting.requestRow.mailUnrecorded', { name: first })}
+          </ActionResult>
+        )}
+        {run?.cooldown && (
+          <ActionResult kind="info">{t('vetting.requestRow.mailCooldown')}</ActionResult>
+        )}
+        {run !== null && !run.unrecorded && run.queued.length > 0 && (
           <ActionResult kind="success">
             {t('vetting.requestRow.mailQueued', { name: first })}
           </ActionResult>
@@ -103,22 +110,24 @@ export function RequestPanel({ review, reviewerId, send, preview }: RequestPanel
           />
         )}
         <div className="flex flex-wrap gap-2 [&>button]:w-full sm:[&>button]:w-auto">
-          <Button
-            variant={review.requestMail ? undefined : 'primary'}
-            loading={busy}
-            aria-disabled={waiting || undefined}
-            onClick={waiting ? undefined : () => void press()}
-          >
-            {t(review.requestMail ? 'vetting.requestRow.resend' : 'vetting.requestRow.send', {
-              name: first,
-            })}
-          </Button>
+          {isYou && (
+            <Button
+              variant={review.requestMail ? undefined : 'primary'}
+              loading={busy}
+              aria-disabled={waiting || undefined}
+              onClick={waiting ? undefined : () => void press()}
+            >
+              {t(review.requestMail ? 'vetting.requestRow.resend' : 'vetting.requestRow.send', {
+                name: first,
+              })}
+            </Button>
+          )}
           <Button onClick={() => void preview().then(setShown)}>{t('vetting.tell.preview')}</Button>
           <Button onClick={() => void copy()}>
             {t(copied ? 'vetting.tell.linkCopied' : 'vetting.tell.copyLink')}
           </Button>
         </div>
-        {waiting && review.requestMail && (
+        {isYou && waiting && review.requestMail && (
           <p className="text-xs text-text-dim">
             {t('vetting.requestRow.resendWait', { age: age(review.requestMail.sentAt) })}
           </p>

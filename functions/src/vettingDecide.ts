@@ -473,7 +473,8 @@ export function recordRequestMail(
   if (
     !review.requestedBy ||
     (review.requestedBy.characterId !== actor.characterId &&
-      review.requestedBy.ownerHash !== actor.ownerHash)
+      // An empty stored hash never matches by hash.
+      !(review.requestedBy.ownerHash !== '' && review.requestedBy.ownerHash === actor.ownerHash))
   ) {
     return { ok: false, reason: 'not-asker' };
   }

@@ -3,6 +3,7 @@ import i18n from '@/i18n';
 import { MAX_MAIL_SUBJECT } from '@/engine/communities/requestMail';
 import {
   buildVettingRequestMail,
+  mailGate,
   requestMailCooldown,
   requestMailInput,
   type VettingRequestMailInput,
@@ -73,5 +74,39 @@ describe('requestMailCooldown', () => {
     expect(requestMailCooldown({ sentAt: now - 6 * HOUR }, now)).toEqual({
       remainingMs: 18 * HOUR,
     });
+  });
+});
+
+describe('mailGate', () => {
+  const now = 100 * HOUR;
+  const row = (over: Record<string, unknown> = {}) => ({
+    id: 'r1',
+    state: 'requested',
+    requestedBy: { characterId: 7, name: 'Bram' },
+    ...over,
+  });
+  const gate = (reviews: unknown[], officer = 7) =>
+    mailGate({ reviews } as never, 'r1', officer, now);
+
+  it('passes with slot 0 when never mailed', () => {
+    expect(gate([row()])).toMatchObject({ ok: true, previousSentAt: 0 });
+  });
+  it('uses the server sentAt as the slot once a day has passed', () => {
+    const sentAt = now - 25 * HOUR;
+    expect(gate([row({ requestMail: { sentAt } })])).toMatchObject({
+      ok: true,
+      previousSentAt: sentAt,
+    });
+  });
+  it('refuses within a day (another tab mailed it)', () => {
+    expect(gate([row({ requestMail: { sentAt: now - HOUR } })])).toEqual({
+      ok: false,
+      reason: 'cooldown',
+    });
+  });
+  it('refuses a non-asker, a shared review and a missing one', () => {
+    expect(gate([row()], 8)).toEqual({ ok: false, reason: 'not-asker' });
+    expect(gate([row({ state: 'open' })])).toEqual({ ok: false, reason: 'gone' });
+    expect(gate([])).toEqual({ ok: false, reason: 'gone' });
   });
 });

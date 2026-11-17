@@ -22,7 +22,6 @@ import {
 } from '@/components/ui';
 import { GrantNote } from '@/app/GrantNote';
 import { SEND_MAIL_ENDPOINTS } from '@/esi/registry';
-import type { MailRun } from '@/features/corpTaxBook/officerMail';
 import { ActionResult } from '@/features/settings/settingsFields';
 import { useCharacterNames } from '@/features/character/useCharacters';
 import type { VettingReviewSummary } from '@/engine/vetting';
@@ -34,6 +33,7 @@ import { ReviewMemberDialog } from './ReviewMemberDialog';
 import { markMembers } from './reviewRoster';
 import { useReviewRoster } from './useReviewRoster';
 import { useVettingRequestMail } from './useVettingRequestMail';
+import type { RequestMailRun } from './vettingRequestMail';
 import { VettingQueue } from './VettingQueue';
 import { VettingReport } from './VettingReport';
 import { VettingInvitesDialog } from './VettingInvitesDialog';
@@ -62,7 +62,7 @@ export function VettingPage() {
   const [requesting, setRequesting] = useState(false);
   const roster = useReviewRoster(requesting ? characterId : null, corporationId);
   const [invitesOpen, setInvitesOpen] = useState<'new' | 'list' | null>(null);
-  const [rowMail, setRowMail] = useState<{ name: string; run: MailRun } | null>(null);
+  const [rowMail, setRowMail] = useState<{ name: string; run: RequestMailRun } | null>(null);
   const names = useCharacterNames();
   const requestMail = useVettingRequestMail(characterId ?? 0, corporationId ?? 0, replace);
   const reviewId = reviewIdFromPathname(pathname);
@@ -210,7 +210,13 @@ export function VettingPage() {
       )}
       {rowMail && (
         <div className="space-y-2">
-          {rowMail.run.queued.length > 0 ? (
+          {rowMail.run.unrecorded ? (
+            <ActionResult kind="error">
+              {t('vetting.requestRow.mailUnrecorded', { name: rowMail.name })}
+            </ActionResult>
+          ) : rowMail.run.cooldown ? (
+            <ActionResult kind="info">{t('vetting.requestRow.mailCooldown')}</ActionResult>
+          ) : rowMail.run.queued.length > 0 ? (
             <ActionResult kind="success">
               {t('vetting.requestRow.mailQueued', { name: rowMail.name })}
             </ActionResult>
@@ -245,6 +251,7 @@ export function VettingPage() {
             tab={shown}
             rows={shown === 'open' ? open : decided}
             onOpen={(review) => navigate(reviewPath(shown, review.id))}
+            reviewerId={characterId}
             onRequestMail={(review) => void mailRow(review)}
             onCopyRequestLink={() => void copyRequestLink()}
           />

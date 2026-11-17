@@ -6,7 +6,12 @@
  */
 import type { TFunction } from 'i18next';
 import { clipToCodePoints, MAX_MAIL_SUBJECT } from '@/engine/communities/requestMail';
-import { VETTING_MAIL_COOLDOWN_MS, type VettingReview } from '@/engine/vetting';
+import {
+  VETTING_MAIL_COOLDOWN_MS,
+  type VettingOverview,
+  type VettingReview,
+  type VettingReviewSummary,
+} from '@/engine/vetting';
 import { enqueueVettingRequestMail } from '@/features/corpTaxBook/mailQueue';
 import { queueOfficerMail, type MailRun } from '@/features/corpTaxBook/officerMail';
 import { mailSafe } from '@/lib/mailSafe';
@@ -64,6 +69,33 @@ export function requestMailCooldown(
   if (!mail) return null;
   const remainingMs = mail.sentAt + VETTING_MAIL_COOLDOWN_MS - now;
   return remainingMs > 0 ? { remainingMs } : null;
+}
+
+/** A mail run, plus what only a request mail can hit. */
+export interface RequestMailRun extends MailRun {
+  /** The server's record says it was mailed within a day (another tab or device): nothing sent. */
+  cooldown?: boolean;
+  /** The mail is queued but the server did not record it, so the queue does not say "Mail sent". */
+  unrecorded?: boolean;
+}
+
+/**
+ * Whether a request mail may go, judged on the server's copy of the review (the row on screen may
+ * be stale: another tab may have mailed it). `previousSentAt` is the slot the queue dedupes on.
+ */
+export function mailGate(
+  overview: Pick<VettingOverview, 'reviews'>,
+  reviewId: string,
+  officerId: number,
+  now: number
+):
+  | { ok: true; review: VettingReviewSummary; previousSentAt: number }
+  | { ok: false; reason: 'gone' | 'not-asker' | 'cooldown' } {
+  const review = overview.reviews.find((r) => r.id === reviewId);
+  if (!review || review.state !== 'requested') return { ok: false, reason: 'gone' };
+  if (review.requestedBy?.characterId !== officerId) return { ok: false, reason: 'not-asker' };
+  if (requestMailCooldown(review.requestMail, now)) return { ok: false, reason: 'cooldown' };
+  return { ok: true, review, previousSentAt: review.requestMail?.sentAt ?? 0 };
 }
 
 /**

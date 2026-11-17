@@ -1,4 +1,4 @@
-import { useId, useMemo, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useMemo, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, TextInput } from '@/components/ui';
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
@@ -52,16 +52,22 @@ export function MemberCombobox({ members, query, onQuery, onPick, inputRef }: Me
   const [active, setActive] = useState(0);
   const rows = useMemo(() => narrowMembers(members, query), [members, query]);
   const none = rows.length === 0;
+  const current = Math.min(active, Math.max(0, rows.length - 1));
+  useEffect(() => {
+    // jsdom has no scrollIntoView.
+    document.getElementById(`${listId}-${current}`)?.scrollIntoView?.({ block: 'nearest' });
+  }, [listId, current]);
   const keys = (event: KeyboardEvent) => {
     if (event.key === 'ArrowDown') {
       event.preventDefault();
-      setActive((i) => Math.min(rows.length - 1, i + 1));
+      setActive(Math.min(rows.length - 1, current + 1));
     } else if (event.key === 'ArrowUp') {
       event.preventDefault();
-      setActive((i) => Math.max(0, i - 1));
+      setActive(Math.max(0, current - 1));
     } else if (event.key === 'Enter') {
+      if (event.nativeEvent.isComposing) return;
       event.preventDefault();
-      const row = rows[active];
+      const row = rows[current];
       if (row && pickable(row)) onPick(row);
     } else if (event.key === 'Escape' && query !== '') {
       event.preventDefault();
@@ -82,10 +88,10 @@ export function MemberCombobox({ members, query, onQuery, onPick, inputRef }: Me
           <TextInput
             ref={inputRef}
             role="combobox"
-            aria-expanded="true"
-            aria-controls={listId}
+            aria-expanded={!none}
+            aria-controls={none ? undefined : listId}
             aria-autocomplete="list"
-            aria-activedescendant={none ? undefined : `${listId}-${active}`}
+            aria-activedescendant={none ? undefined : `${listId}-${current}`}
             className="w-full pl-8"
             placeholder={t('vetting.member.search', { count: members.length })}
             value={query}
@@ -124,13 +130,13 @@ export function MemberCombobox({ members, query, onQuery, onPick, inputRef }: Me
                   key={member.characterId}
                   id={`${listId}-${index}`}
                   role="option"
-                  aria-selected={index === active}
+                  aria-selected={index === current}
                   aria-disabled={off || undefined}
                   onClick={off ? undefined : () => onPick(member)}
                   className={cx(
                     'flex min-h-11 items-center gap-2.5 px-2.5 py-1.5',
                     off ? 'cursor-not-allowed' : cx('cursor-pointer', rowInteractiveClassName),
-                    index === active &&
+                    index === current &&
                       'bg-panel outline outline-1 -outline-offset-1 outline-accent'
                   )}
                 >
