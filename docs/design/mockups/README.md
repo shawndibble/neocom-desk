@@ -38,5 +38,6 @@ PNG exports of the chosen mockups for ready tickets. Delete a folder (and its ro
 | [review-member](review-member/README.md) | Owner request (no issue yet) | Not chosen yet: roster autocomplete for Review a member (no-match, already-waiting, picked states), role suggestions, result step with a sent-on-purpose in-game mail and preview, waiting queue rows with mail state and menu, request page before the member shares, the member's page top |
 | [moons-settings-and-layout](moons-settings-and-layout/README.md) | Issue #6304 | Chosen by the agent: Sharing is a fifth Moon settings tab (scrolls in the modal, saves apart); Moons page keeps its layout, six tabs |
 | [payee-one-per-entity](payee-one-per-entity/README.md) | Issue #6308 | Chosen by the agent: one Manage Payees row per recipient with "Used by N characters"; differing terms shown as one "Use … for all" button per distinct terms |
+| [vetting-raw-data](vetting-raw-data/README.md) | Issue #6341 | Chosen by the agent: Data we read on the report (one row per source); a page per review with source tabs, a character switcher, filters and one windowed table (all rows, no cap); flagged rows and flags link both ways; not shared, empty and no-match are three states; consent says rows are kept after Send |
 
 First draft mockup; sample data. The ticket's Agent Brief text wins over the picture where they differ.
