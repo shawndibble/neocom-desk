@@ -43,8 +43,15 @@ export function suggestPayeeForSystem(
   assignments: readonly MiningTaxAssignmentRecord[],
   payees: readonly PayeeRecord[],
   solarSystemId: number,
-  characterId: number
+  characterId: number,
+  /**
+   * Duplicate records of one Payee mapped to its primary (`payeeDuplicateAliases`). `payees` is
+   * every stored record: history and Default Systems read all of them, the suggestion and the
+   * ranked list name one Payee per recipient.
+   */
+  aliases: ReadonlyMap<string, string> = new Map()
 ): PayeeSuggestion {
+  const canon = (id: string) => aliases.get(id) ?? id;
   const byId = new Map(payees.map((p) => [p.id, p]));
   const usesHere = new Map<string, number>();
   let last: MiningTaxAssignmentRecord | undefined;
@@ -52,21 +59,24 @@ export function suggestPayeeForSystem(
   for (const a of assignments) {
     if (a.payeeId === undefined || a.status === 'dismissed' || !byId.has(a.payeeId)) continue;
     if (a.solarSystemId !== solarSystemId) continue;
-    usesHere.set(a.payeeId, (usesHere.get(a.payeeId) ?? 0) + 1);
+    usesHere.set(canon(a.payeeId), (usesHere.get(canon(a.payeeId)) ?? 0) + 1);
     if (!last || a.date > last.date || (a.date === last.date && a.updatedAt > last.updatedAt)) {
       last = a;
     }
   }
 
-  const fromHistory = last?.payeeId !== undefined ? byId.get(last.payeeId) : undefined;
-  const suggested = fromHistory ?? defaultPayeeForSystem(payees, characterId, solarSystemId);
+  const fromHistory = last?.payeeId !== undefined ? byId.get(canon(last.payeeId)) : undefined;
+  const byDefault = defaultPayeeForSystem(payees, characterId, solarSystemId);
+  const suggested = fromHistory ?? (byDefault ? byId.get(canon(byDefault.id)) : undefined);
 
-  const ranked = [...payees].sort((a, b) => {
-    if (a.id === suggested?.id) return -1;
-    if (b.id === suggested?.id) return 1;
-    const uses = (usesHere.get(b.id) ?? 0) - (usesHere.get(a.id) ?? 0);
-    return uses !== 0 ? uses : a.name.localeCompare(b.name);
-  });
+  const ranked = payees
+    .filter((p) => !aliases.has(p.id))
+    .sort((a, b) => {
+      if (a.id === suggested?.id) return -1;
+      if (b.id === suggested?.id) return 1;
+      const uses = (usesHere.get(b.id) ?? 0) - (usesHere.get(a.id) ?? 0);
+      return uses !== 0 ? uses : a.name.localeCompare(b.name);
+    });
 
   return { suggested, fromHistory: fromHistory !== undefined, ranked };
 }

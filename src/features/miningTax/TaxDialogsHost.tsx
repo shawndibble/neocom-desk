@@ -120,7 +120,10 @@ export interface TaxDialogsHostProps {
    * them links is used, and never offered to link again. Defaults to `everyAssignment`.
    */
   storedAssignments?: readonly MiningTaxAssignmentRecord[];
+  /** Every stored Payee record; the pickers list one per recipient (`duplicateAliases`). */
   allPayees: PayeeRecord[];
+  /** Duplicate records of one Payee mapped to its primary (`payeeDuplicateAliases`). */
+  duplicateAliases: ReadonlyMap<string, string>;
   payeeById: ReadonlyMap<string, PayeeRecord>;
   balances: readonly PayeeBalance[];
   madePayments: readonly MadePayment[];
@@ -172,6 +175,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     everyAssignment,
     storedAssignments = everyAssignment,
     allPayees,
+    duplicateAliases,
     payeeById,
     balances,
     madePayments,
@@ -264,12 +268,18 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
   });
 
   /** Prefill for a new Assignment's Payee: the one last used in that system, by that pilot. */
+  const pickablePayees = useMemo(
+    () => allPayees.filter((p) => !duplicateAliases.has(p.id)),
+    [allPayees, duplicateAliases]
+  );
+
   function suggestionFor(row: MoonMiningTaxRow) {
     return suggestPayeeForSystem(
       everyAssignment.filter((a) => a.characterId === row.characterId),
       allPayees,
       row.entry.solarSystemId,
-      row.characterId
+      row.characterId,
+      duplicateAliases
     );
   }
 
@@ -698,7 +708,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             members={allMembers(editTarget)}
             systemName={systemName(editTarget)}
             systemSecurity={systemSecurityOf(editTarget)}
-            payees={allPayees}
+            payees={pickablePayees}
             assignments={everyAssignment}
             typeNames={typeNames}
             pricesFor={pricesFor}
@@ -823,7 +833,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             systemSecurity={systemSecurityOf(detailTarget)}
             priceSourcesFor={priceSourcesFor}
             typeNames={typeNames}
-            payees={allPayees}
+            payees={pickablePayees}
             suggestion={detailTarget.assignment ? undefined : suggestionFor(detailTarget.row)}
             pricesFor={pricesFor}
             unreachableHubs={unreachableHubs}
@@ -904,7 +914,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             }
             row={splitTarget.row}
             systemName={systemName(splitTarget)}
-            payees={allPayees}
+            payees={pickablePayees}
             assignments={everyAssignment}
             typeNames={typeNames}
             pricesFor={pricesFor}
@@ -929,7 +939,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
                 : joinCandidatesFor(joinTarget)
             }
             initialSelection={joinCandidateOverride ? 'all' : 'none'}
-            payees={allPayees}
+            payees={pickablePayees}
             typeNames={typeNames}
             pricesFor={pricesFor}
             busy={busy}

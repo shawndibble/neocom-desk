@@ -50,6 +50,25 @@ function displayRow(
   };
 }
 
+describe('computePayeeBalances with duplicate Payees', () => {
+  it('sums a duplicate record into its primary and lists the Payee once', () => {
+    const rows = [
+      displayRow(assignment({ id: 'a1', payeeId: 'p1', taxOwed: 100 })),
+      displayRow(assignment({ id: 'a2', payeeId: 'p2', taxOwed: 40 })),
+    ];
+    const balances = computePayeeBalances(
+      rows,
+      [payee('p1', 'Vega'), payee('p2', 'Vega')],
+      () => 0,
+      new Map([['p2', 'p1']])
+    );
+    expect(balances).toHaveLength(1);
+    expect(balances[0].payee.id).toBe('p1');
+    expect(balances[0].owed).toBe(140);
+    expect(balances[0].members.map((m) => m.assignment.id)).toEqual(['a1', 'a2']);
+  });
+});
+
 describe('computePayeeBalances', () => {
   const payees = [payee('p1', 'Vega'), payee('p2', 'Lunar'), payee('p3', 'Oren')];
 
