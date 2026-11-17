@@ -18385,8 +18385,8 @@
         "unmatched": {
           "title": "Unmatched donation · {{amount}} from {{name}}",
           "body": "{{date}}. {{name}} has not mined at your refineries, so there is no Miner to credit.",
-          "bodyInMiner": "{{date}}. {{name}} is in a Miner now; a sync assigns it once that Miner owes tax, or you can assign it.",
-          "bodyReview": "{{date}}. {{name}}'s Miner owed no tax then and had no ore waiting for a Statement, so it may be for something else, such as a buyback. Assign it if it was tax, or mark it not tax.",
+          "bodyInMiner": "{{date}}. {{name}} is in a Miner now; the next sync assigns it, or you can assign it.",
+          "bodyReview": "{{date}}. {{name}}'s Miner owed no tax then, so an earlier sync held it. The next sync assigns it as credit. Mark it not tax if it was for something else, such as a buyback.",
           "assign": "Assign to a Miner",
           "notTax": "Mark not tax"
         },
