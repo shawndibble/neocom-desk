@@ -19092,8 +19092,8 @@
         "lastMined": "last mined {{date}}",
         "neverMined": "nothing mined yet",
         "offerGone": "Gone in the game",
-        "offerIdle_one": "No Extraction in {{count}} day",
-        "offerIdle_other": "No Extraction in {{count}} days",
+        "offerIdle_one": "No Extraction or mining in {{count}} day",
+        "offerIdle_other": "No Extraction or mining in {{count}} days",
         "archived": {
           "title": "Archived ({{count}})",
           "show": "Show archived refineries",

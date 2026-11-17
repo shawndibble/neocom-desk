@@ -58,7 +58,8 @@ export async function setRefineryArchive(
   const access = await authorizeOfficer(deps, caller, input, 'edit', { live: true });
   const book = bookRef(deps.db, input.corporationId);
   const feeder = input.feederCorporationId;
-  // Only a refinery the book knows from this moon owner: the map never grows past its refineries.
+  // Archiving only a refinery the book knows from this moon owner keeps the map bounded; a restore
+  // must work for any stored entry.
   const [observed, extractions] = await Promise.all([
     book
       .collection(OBSERVED)
@@ -73,7 +74,7 @@ export async function setRefineryArchive(
       .limit(1)
       .get(),
   ]);
-  if (observed.empty && extractions.empty) {
+  if (input.archived && observed.empty && extractions.empty) {
     fail('not-found', 'Not one of this moon owner’s refineries', 'unknown-refinery');
   }
   const ref = feederRef(deps.db, input.corporationId, feeder);
@@ -85,6 +86,9 @@ export async function setRefineryArchive(
     if (ENDED.includes(rec.status)) {
       fail('failed-precondition', 'This moon owner has left', 'feeder-ended');
     }
+    // Already in the requested state: keep the first officer's `at`/`by`, write no audit row.
+    const stored = rec.refineryArchive?.[String(input.structureId)];
+    if (input.archived === (stored !== undefined)) return;
     const doc: RefineryArchiveDoc = {
       at: deps.now(),
       by: access.characterId,

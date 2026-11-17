@@ -1,4 +1,4 @@
-import { DAY_MS } from '@/lib/age';
+import { daysBetween } from '@/engine/corpTaxBook/statements';
 import { utcDay } from '@/engine/localDay';
 
 /**
@@ -67,9 +67,6 @@ export interface RefineryRowsInput {
   archive?: Readonly<Record<string, RefineryArchive>>;
 }
 
-const daysBetween = (later: string, earlier: string) =>
-  Math.floor((Date.parse(later) - Date.parse(earlier)) / DAY_MS);
-
 const maxOf = (values: readonly string[]) =>
   values.length === 0 ? undefined : values.reduce((a, b) => (a > b ? a : b));
 
@@ -100,7 +97,7 @@ export function refineryRows(input: RefineryRowsInput): {
       ...exts.flatMap((x) => [x.startedAt.slice(0, 10), x.chunkArrivalAt.slice(0, 10)]),
       ...(lastMinedOn ? [lastMinedOn] : []),
     ]);
-    const idleDays = lastActive === undefined ? 0 : daysBetween(today, lastActive);
+    const idleDays = lastActive === undefined ? 0 : daysBetween(lastActive, today);
     const offer: ArchiveOffer | null = archive
       ? null
       : input.isGone(structureId)
