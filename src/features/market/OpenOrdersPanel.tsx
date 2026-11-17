@@ -171,7 +171,6 @@ export function OpenOrdersPanel({
   const [viewPicked, setViewPicked] = useState(false);
   const isPhone = useIsPhone();
   const [detailOrderId, setDetailOrderId] = useState<number | null>(openParamId);
-  /** Set only by a work-through row's "See exits": the detail opens at its exits. */
   /** The table's header-click sort, held here so the work-through walks rows in the order they show. */
   const [tableSort, setTableSort] = useState<DataTableSort | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
@@ -423,9 +422,16 @@ export function OpenOrdersPanel({
    * highlighted one, sits outside it — the walk takes in Watch's system and
    * region undercuts too.
    */
+  const view = shownView(filter.view, workCurrent ?? (viewPicked ? null : highlightedRow));
   // A work-through shows its current order in the modal; a row click shows its own.
   const modalRow = workCurrent ?? detailRow;
-  const view = shownView(filter.view, workCurrent ?? (viewPicked ? null : highlightedRow));
+  // A walk replaces a row-click modal: drop it, so it cannot reappear when the walk ends.
+  const walking = workCurrent !== null;
+  const [wasWalking, setWasWalking] = useState(false);
+  if (walking !== wasWalking) {
+    setWasWalking(walking);
+    if (walking) setDetailOrderId(null);
+  }
   const viewRows = useMemo(
     () => (view === 'all' ? sortedRows : sortedRows.filter((row) => rowInView(row, view))),
     [sortedRows, view]

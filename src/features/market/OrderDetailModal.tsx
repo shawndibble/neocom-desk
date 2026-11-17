@@ -162,6 +162,10 @@ export function OrderDetailContent({
     }
   })();
 
+  const phoneCopy = isPhone && copyPrice !== null && (
+    <CopyPriceButton price={copyPrice} className="w-full" />
+  );
+
   return (
     <Modal
       open
@@ -172,13 +176,11 @@ export function OrderDetailContent({
         walking ? (
           // Copy keeps the full width on a phone, Next under it; one row from `md`.
           <div className="flex w-full flex-col gap-2 md:flex-row md:justify-end">
-            {isPhone && copyPrice !== null && (
-              <CopyPriceButton price={copyPrice} className="w-full" />
-            )}
+            {phoneCopy}
             <WorkThroughNextButton className="w-full md:w-auto" />
           </div>
         ) : (
-          isPhone && copyPrice !== null && <CopyPriceButton price={copyPrice} className="w-full" />
+          phoneCopy
         )
       }
     >
