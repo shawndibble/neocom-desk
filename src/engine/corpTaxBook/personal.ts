@@ -24,7 +24,8 @@
 import { computeAssignmentValue } from '../miningTax/valuation';
 import { entryKey, type OreLine } from '../miningTax/types';
 import { minusLines, priceMap } from '../miningTax/oreLines';
-import { settleTolerance, type RecordedWriteOff, type TaxPayment } from './allocation';
+import { type RecordedWriteOff, type TaxPayment } from './allocation';
+import { daySettleTolerance } from './runningAccount';
 import { splitAcrossBooks, resolveBookShare, type BookObservation } from './attribution';
 import { dayClosesAt, isDayBillable } from './billable';
 import { minerIdFor, type DayCharge, type Miner } from './charges';
@@ -1372,7 +1373,7 @@ export function overlayCorpBooks(input: {
         const before = row.taxOwed ?? 0;
         const worth = Math.min(before, taxOwed);
         creditedByMark.set(minerOf(row), (creditedByMark.get(minerOf(row)) ?? 0) + worth);
-        if (worth < before - settleTolerance(before)) {
+        if (worth < before - daySettleTolerance(before)) {
           // Part of the day: it owes less.
           row.taxOwed = before - worth;
           continue;
@@ -1391,7 +1392,7 @@ export function overlayCorpBooks(input: {
         const held =
           refs.length > 0 && refs.every((ref) => !inFlightRefs.has(ref) && !inReviewRefs.has(ref));
         const reached = bookCovered.get(row) ?? 0;
-        if (!held || reached >= before - settleTolerance(before)) continue;
+        if (!held || reached >= before - daySettleTolerance(before)) continue;
         const spentOn = mine
           .filter(
             (r) =>
@@ -1841,7 +1842,7 @@ export function coverInFlight(
     (a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id)
   )) {
     // A day smaller than the tolerance is still not covered by nothing.
-    if (left <= 0 || left < row.taxOwed - settleTolerance(row.taxOwed)) break;
+    if (left <= 0 || left < row.taxOwed - daySettleTolerance(row.taxOwed)) break;
     covered.add(row.id);
     left = Math.max(0, left - row.taxOwed);
   }

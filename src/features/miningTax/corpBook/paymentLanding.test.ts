@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { settleTolerance } from '@/engine/corpTaxBook/allocation';
+import { daySettleTolerance } from '@/engine/corpTaxBook/runningAccount';
 import { payableRows, wherePaymentGoes, type PayDay } from './paymentLanding';
 
 const day = (date: string, taxOwed: number, over: Partial<PayDay> = {}): PayDay => ({
@@ -32,9 +32,13 @@ describe('wherePaymentGoes', () => {
   });
 
   it('settles a day within the tolerance', () => {
-    const short = 10_000_000 - settleTolerance(10_000_000);
+    const short = 10_000_000 - daySettleTolerance(10_000_000);
     expect(results(days, short)).toEqual(['paid', 'next']);
     expect(results(days, short - 1)).toEqual(['part', 'next']);
+  });
+
+  it('never lets a token amount pay a small day (no ISK floor per day)', () => {
+    expect(results([day('2026-11-01', 90_000)], 1)).toEqual(['part']);
   });
 
   it('part-pays the day after the last whole one', () => {
