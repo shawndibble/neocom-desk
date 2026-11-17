@@ -879,6 +879,26 @@ describe('per-refinery rate (#4621)', () => {
   });
 });
 
+describe('addRates (#6323)', () => {
+  const a = { scope: 'guest', pct: 5, effectiveFrom: '2026-10-21' } as const;
+  const b = { scope: 'miner', minerId: 'm1', pct: 7, effectiveFrom: '2026-10-21' } as const;
+
+  it('parses a list of dated rates', () => {
+    expect(parseEditAction({ action: 'addRates', rates: [a, b] })).toEqual({
+      action: 'addRates',
+      rates: [a, b],
+    });
+  });
+
+  it('refuses an empty list, a non-list, and a bad rate in the list', () => {
+    expect(() => parseEditAction({ action: 'addRates', rates: [] })).toThrow();
+    expect(() => parseEditAction({ action: 'addRates', rates: a })).toThrow();
+    expect(() =>
+      parseEditAction({ action: 'addRates', rates: [a, { ...b, minerId: '' }] })
+    ).toThrow();
+  });
+});
+
 describe('per-moon-owner miner rate', () => {
   it('parses a feeder-scoped rate with its moon owner corporation id', () => {
     expect(

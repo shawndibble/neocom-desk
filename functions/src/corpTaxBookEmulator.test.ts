@@ -594,6 +594,33 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       ).toEqual([1035000000001, 1035000000002]);
     });
 
+    it('writes a batch of rates all or nothing, one audit entry per rate (#6323)', async () => {
+      await turnOn();
+      const before = await auditCount();
+      const rates = [
+        { scope: 'guest', pct: 25, effectiveFrom: '2026-10-18' },
+        { scope: 'corp', pct: 10, effectiveFrom: '2026-10-19' },
+      ];
+      await edit(ACCOUNTANT, { action: 'addRates', rates });
+      expect(await auditCount()).toBe(before + 2);
+      const stored = (await book().get()).get('rates') as unknown[];
+      expect(stored).toEqual(expect.arrayContaining(rates));
+      // One retroactive rate refuses the whole batch: nothing written, nothing audited.
+      expect(
+        await reason(
+          edit(ACCOUNTANT, {
+            action: 'addRates',
+            rates: [
+              { scope: 'guest', pct: 30, effectiveFrom: '2026-10-20' },
+              { scope: 'corp', pct: 20, effectiveFrom: '2026-10-17' },
+            ],
+          })
+        )
+      ).toBe('retroactive-rate');
+      expect((await book().get()).get('rates')).toHaveLength(stored.length);
+      expect(await auditCount()).toBe(before + 2);
+    });
+
     it('re-checks the role live for dismiss, write-off, rebill and not tax', async () => {
       await turnOn();
       const dismiss = {
