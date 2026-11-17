@@ -61,7 +61,13 @@ export function OrePanel({
   }
   const units = row.oreLines.reduce((sum, l) => sum + l.quantity, 0);
   const columns: DataTableColumn<ExtractionRow['oreLines'][number]>[] = [
-    { id: 'ore', header: t(kp('ore.cols.ore')), primary: true, render: (l) => names.ore(l.typeId) },
+    {
+      id: 'ore',
+      header: t(kp('ore.cols.ore')),
+      primary: true,
+      stickyStart: true,
+      render: (l) => names.ore(l.typeId),
+    },
     {
       id: 'share',
       header: t(kp('ore.cols.share')),
@@ -321,6 +327,7 @@ export function MinersPanel({
       id: 'miner',
       header: t('corpTaxBook.moons.cols.miner'),
       primary: true,
+      stickyStart: true,
       render: (m) => (
         <Link to={minerPath(m.minerId)} className={entityLinkClassName()}>
           {nameOf(m.minerId)}
