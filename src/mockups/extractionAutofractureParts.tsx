@@ -40,8 +40,8 @@ function row(
     state,
     startedAt: at(startH),
     chunkArrivalAt: at(arriveH),
-    plannedFractureAt: at(arriveH + 3),
-    plannedExpiresAt: at(arriveH + 3 + FIELD_H),
+    plannedFractureAt: at(fracture?.atH ?? arriveH + AUTO_H),
+    plannedExpiresAt: at((fracture?.atH ?? arriveH + AUTO_H) + FIELD_H),
     ...(fracture
       ? {
           fracturedAt: at(fracture.atH),
