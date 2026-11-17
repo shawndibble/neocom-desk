@@ -68,13 +68,14 @@ export function useMadePayments(trackedCharacterIds: string) {
     const save = startLoad();
     void loadMadePaymentsWithStatus(trackedCharacterIds.split(',').map(Number)).then((result) => {
       if (cancelled) return;
-      // A read that threw for a character left its payments out: keep the last complete read
-      // rather than present a list with a hole in it as the truth.
-      const incomplete = result.sources.some(
-        (s) => s.journal === 'failed' || s.contracts === 'failed'
-      );
-      const prior = incomplete ? read() : null;
-      if (prior?.payments && prior.sources) {
+      // A read that threw for a character left its payments out, and one that found nothing at
+      // all where the last read found some is offline with the cache row gone: neither is the
+      // truth, so keep the last complete read (the wallet archive means real payments do not vanish).
+      const prior = read();
+      const incomplete =
+        result.sources.some((s) => s.journal === 'failed' || s.contracts === 'failed') ||
+        (result.payments.length === 0 && (prior?.payments?.length ?? 0) > 0);
+      if (incomplete && prior?.payments && prior.sources) {
         setLoaded({
           roster: trackedCharacterIds,
           result: { payments: prior.payments, sources: result.sources },

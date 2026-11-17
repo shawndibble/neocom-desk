@@ -77,4 +77,18 @@ describe('useMadePayments retention', () => {
     const second = renderHook(() => useMadePayments('7,8'));
     expect(second.result.current.madePayments).toEqual([]);
   });
+
+  it('does not let an empty read replace stored payments', async () => {
+    load.mockResolvedValueOnce({ payments: [payment], sources: [ok] });
+    const first = renderHook(() => useMadePayments('7'));
+    await waitFor(() => expect(first.result.current.madePayments).toEqual([payment]));
+    first.unmount();
+
+    load.mockResolvedValueOnce({ payments: [], sources: [ok] });
+    const second = renderHook(() => useMadePayments('7'));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(second.result.current.madePayments).toEqual([payment]);
+  });
 });

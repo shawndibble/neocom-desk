@@ -64,6 +64,8 @@ export function useCorpBookView({
   hiddenCorps = NONE_HIDDEN,
 }: Args): {
   view: CorpBookView | null;
+  /** This mount's own read of the books has landed; until then `view` is built from the last good copy. */
+  booksRead: boolean;
   reload: () => void;
   /** The loaded books still in view (hidden left ones removed), and each corporation's name. */
   shownBooks: readonly LoadedCorpBook[];
@@ -200,5 +202,5 @@ export function useCorpBookView({
     [rows, shownBooks, pricesByCorp, corpNames, payees, madePayments, characters, nowMs, t]
   );
   const reload = useCallback(() => setVersion((v) => v + 1), []);
-  return { view, reload, shownBooks, corpNameOf, hiddenLeft };
+  return { view, booksRead: freshLoaded !== undefined, reload, shownBooks, corpNameOf, hiddenLeft };
 }

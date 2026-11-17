@@ -46,6 +46,7 @@ export function useTaxCorpBooks(
   const leftAck = useHiddenLeftCorps();
   const {
     view: corpView,
+    booksRead,
     reload: reloadCorpBooks,
     shownBooks,
     corpNameOf,
@@ -60,7 +61,11 @@ export function useTaxCorpBooks(
     hiddenCorps: leftAck.hidden,
   });
   // The player's own Unmatched donations are claimed for them; only a failed claim is left to retry.
-  const { failed: failedClaims } = useAutoClaimDonations(corpView, reloadCorpBooks);
+  // Only from a book read this visit: the last good copy can offer a donation already claimed since.
+  const { failed: failedClaims } = useAutoClaimDonations(
+    booksRead ? corpView : null,
+    reloadCorpBooks
+  );
   // Book rows carry a raw solar system id; resolve it like a personal row's.
   const bookSystems = useBookSystems(corpView, {
     names: data?.systemNames ?? NO_NAMES,
