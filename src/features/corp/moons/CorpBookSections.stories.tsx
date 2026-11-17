@@ -7,6 +7,7 @@ import { ExtractionsTab } from './ExtractionsTab';
 import { MinerDetail } from './MinerDetail';
 import { MinersTab } from './MinersTab';
 import { MoonDetail } from './MoonDetail';
+import { MoonPage as MoonPageRoute } from './MoonPage';
 import { OverviewTab } from './OverviewTab';
 import { StatementPeriodDetail } from './StatementPeriodDetail';
 import { StatementsTab } from './StatementsTab';
@@ -115,6 +116,17 @@ export const MoonPage: Story = {
 };
 /** @summary Moon page, phone. */
 export const MoonPagePhone: Story = { ...MoonPage, ...phone };
+
+/** @summary A moon's own page (#6322): the rate in force, where it comes from, and Change rate. */
+export const MoonRatePage: Story = {
+  render: () => (
+    <Page>
+      <MoonPageRoute moonId={3} />
+    </Page>
+  ),
+};
+/** @summary A moon's own page, phone. */
+export const MoonRatePagePhone: Story = { ...MoonRatePage, ...phone };
 
 /** @summary Extractions tab: the timeline of past, ready and extracting chunks. */
 export const Extractions: Story = {

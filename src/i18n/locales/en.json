@@ -18130,6 +18130,31 @@
         "by": { "laser": "By laser", "auto": "Broke on its own" },
         "emptyHistory": "The book keeps every Extraction it syncs, from its start. No earlier Extraction of this moon exists."
       },
+      "rate": {
+        "label": "Rate",
+        "thisMoon": "this moon",
+        "thisRefinery": "this refinery",
+        "guests": "guests {{pct}}%",
+        "since": "since {{date}}",
+        "none": "No rate yet. Set one so this moon's mining is taxed.",
+        "scheduled": "Scheduled: {{pct}}% from {{date}}",
+        "minerWins": "A Miner's own rate still beats this one.",
+        "change": "Change rate",
+        "dialogTitle": "Change the rate for {{scope}}",
+        "appliesTo": "Applies to {{scope}} only.",
+        "save": "Save rate",
+        "effect": "Mining from {{date}}. Earlier days keep their rate.",
+        "source": {
+          "moon": "set on {{scope}}",
+          "structure": "set on the refinery",
+          "feeder": "the moon owner's rate",
+          "feeder-member": "the moon owner's rate for its members",
+          "guest": "the Guest default",
+          "corp": "the corp default",
+          "miner": "a Miner's rate",
+          "record": "a record's rate"
+        }
+      },
       "state": {
         "extracting": "Extracting",
         "ready": "Ready",
