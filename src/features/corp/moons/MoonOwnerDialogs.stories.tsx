@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { RemoveMoonOwnerDialog, SetRateDialog } from './MoonOwnerDialogs';
+import { RemoveMoonOwnerDialog } from './MoonOwnerDialogs';
 
 /** @summary "Remove from this book": who is mailed, what is kept, and the 24-hour wait. */
 const meta = {
@@ -23,16 +23,3 @@ export const WithPayee: Story = {};
 
 /** @summary No payee on record. */
 export const NoPayee: Story = { args: { hasPayee: false } };
-
-/** @summary "Set their rate" with the as-of day: today by default, up to 30 days back. */
-export const SetRate: StoryObj<typeof SetRateDialog> = {
-  render: () => (
-    <SetRateDialog
-      initial={null}
-      today="2026-11-17"
-      earliest="2026-10-18"
-      onClose={() => {}}
-      onSave={async () => {}}
-    />
-  ),
-};
