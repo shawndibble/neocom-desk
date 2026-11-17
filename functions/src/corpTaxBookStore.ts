@@ -6,6 +6,7 @@
 // never written to Firestore or to the audit log.
 
 import { randomBytes } from 'node:crypto';
+import { chunk } from './chunk';
 import { isDeepStrictEqual } from 'node:util';
 import {
   FieldPath,
@@ -1172,8 +1173,9 @@ function keepInGroup(c: EditCtx, characterIds: readonly number[]): void {
 /**
  * The paid-through days `recordAccounts` may store (D22): per Miner the day the client asked for,
  * never before the stored one, never today or later (its ore is still coming in), never on or
- * past a day an open dispute holds (the hold may end with the officer keeping the bill). A day that fails is skipped, not an error: the next run asks again.
- * The server has no prices, so the saved-price rule is the client's (`closableThrough`).
+ * past a day an open dispute holds (the hold may end with the officer keeping the bill). A day
+ * that fails is skipped, not an error: the next run asks again. The server has no prices, so the
+ * saved-price rule is the client's (`closableThrough`).
  */
 async function storableSettledThrough(
   c: EditCtx,
@@ -1188,15 +1190,28 @@ async function storableSettledThrough(
     string
   >;
   const today = iso.slice(0, 10);
-  const out: Record<string, string> = {};
-  for (const { minerId, settledThrough: day } of asked) {
-    if (day === undefined || day >= today || day <= (stored[minerId] ?? '')) continue;
-    const held = (await c.tx.get(col(c, DISPUTES).where('minerId', '==', minerId))).docs
-      .map((d) => d.data())
-      .filter((d) => readHoldingDisputes([d]).some((h) => disputeHolds(h, iso)));
-    if (held.some((d) => typeof d.date !== 'string' || d.date <= day)) continue;
-    out[minerId] = day;
+  const candidates = asked.filter(
+    (a) =>
+      a.settledThrough !== undefined &&
+      a.settledThrough < today &&
+      a.settledThrough > (stored[a.minerId] ?? '')
+  );
+  // The earliest day an open dispute holds, per Miner; read once for every Miner asked about.
+  const heldFrom = new Map<string, string>();
+  for (const ids of chunk(
+    candidates.map((a) => a.minerId),
+    30
+  )) {
+    for (const doc of (await c.tx.get(col(c, DISPUTES).where('minerId', 'in', ids))).docs) {
+      const d = doc.data();
+      if (!readHoldingDisputes([d]).some((h) => disputeHolds(h, iso))) continue;
+      const held = d.date as string; // a dispute with no date reads as no hold
+      if (held < (heldFrom.get(d.minerId) ?? '9999')) heldFrom.set(d.minerId, held);
+    }
   }
+  const out: Record<string, string> = {};
+  for (const { minerId, settledThrough: day } of candidates)
+    if (day !== undefined && day < (heldFrom.get(minerId) ?? '9999')) out[minerId] = day;
   return out;
 }
 

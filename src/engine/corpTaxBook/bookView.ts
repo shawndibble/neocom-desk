@@ -53,6 +53,7 @@ import type { DayPrices } from './valuation';
 import { DAY_MS } from '@/lib/age';
 import { wholeIsk } from './wholeIsk';
 import { disputeHold, disputesToShow, type OreDispute } from './disputes';
+import { utcDay } from '../localDay';
 import {
   allocateRunningAccount,
   closableThrough,
@@ -150,10 +151,8 @@ function savedPriceDays(
   const saved = (l: Pick<StatementLine, 'kind' | 'priceSources'>) =>
     l.kind === 'correction' ||
     (l.priceSources !== undefined && Object.values(l.priceSources).every((x) => x === 'saved'));
-  return runningDaysFromLines(lines).map((d) => ({
-    ...d,
-    savedPrices: lines.filter((l) => l.date === d.date).every(saved),
-  }));
+  const unsaved = new Set(lines.filter((l) => !saved(l)).map((l) => l.date));
+  return runningDaysFromLines(lines).map((d) => ({ ...d, savedPrices: !unsaved.has(d.date) }));
 }
 
 /** A Miner's running account status: "Paid through {date}" or "Owes X (N days, oldest D)". */
@@ -649,7 +648,7 @@ export function buildBookView(input: BookViewInput): BookView {
                 account: running,
                 days: savedPriceDays(draftLines),
                 heldDays,
-                today: input.now.slice(0, 10),
+                today: utcDay(Date.parse(input.now)),
               }),
             },
           }
