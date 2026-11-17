@@ -2097,7 +2097,7 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
             date: '2026-10-12',
             by: 50,
             at: '2026-10-17T00:00:00Z',
-            lines: [{ recordKey: 'k', typeId: 1, quantity: 1 }],
+            lines: [{ recordKey: 'k', typeId: 1, quantity: 1, payeeName: 'Pilot' }],
           });
         await record('2026-10-14');
         expect(await stored()).toEqual({});
