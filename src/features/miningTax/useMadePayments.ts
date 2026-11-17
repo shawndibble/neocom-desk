@@ -38,13 +38,14 @@ const NO_SOURCES: MadePaymentsResult['sources'] = [];
  * @param trackedCharacterIds Comma-joined character ids — a string so the
  *   effect keys on the roster, never on `data` (see below).
  */
-export function useMadePayments(trackedCharacterIds: string, ownerId: number | null) {
-  const [fresh, setFresh] = useState<MadePaymentsResult | null>(null);
+export function useMadePayments(trackedCharacterIds: string) {
+  // Tagged with the roster it was read for: a roster change must not keep showing the old one's.
+  const [loaded, setLoaded] = useState<{ roster: string; result: MadePaymentsResult } | null>(null);
+  const fresh = loaded?.roster === trackedCharacterIds ? loaded.result : null;
   // The last good read, so the first frame (and an offline one) has the payments the ledger's
   // coverage depends on instead of an empty list the late read then corrects.
   const { read, startLoad } = useRetainedResult<MadePaymentsResult>(
     'moonMiningTaxMadePayments',
-    ownerId,
     trackedCharacterIds
   );
   const retained = read();
@@ -74,19 +75,19 @@ export function useMadePayments(trackedCharacterIds: string, ownerId: number | n
       );
       const prior = incomplete ? read() : null;
       if (prior?.payments && prior.sources) {
-        setFresh({ payments: prior.payments, sources: result.sources });
+        setLoaded({
+          roster: trackedCharacterIds,
+          result: { payments: prior.payments, sources: result.sources },
+        });
         return;
       }
-      setFresh(result);
+      setLoaded({ roster: trackedCharacterIds, result });
       if (!incomplete) save(result);
     });
     return () => {
       cancelled = true;
     };
-    // `read` and `startLoad` change only with the roster and owner, which `trackedCharacterIds` and
-    // `ownerId` already name; listing them would re-run the reads for no new reason.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trackedCharacterIds, ownerId]);
+  }, [trackedCharacterIds, read, startLoad]);
 
   return { madePayments, paymentSources };
 }

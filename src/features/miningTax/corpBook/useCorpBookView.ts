@@ -74,20 +74,26 @@ export function useCorpBookView({
   const { t } = useTranslation();
   const nowMs = useTicker(MINUTE_MS);
   const [version, setVersion] = useState(0);
-  // Null until this mount's own load lands; until then the last good one stands in, so the first
+  // This mount's own loads, tagged with the roster they were read for (a roster change must not
+  // keep showing the old one's books). Until they land the last good ones stand in, so the first
   // frame (and an offline one) already has the books instead of none the load then adds.
-  const [freshLoaded, setFreshLoaded] = useState<LoadedCorpBook[] | null>(null);
-  const [freshPrices, setFreshPrices] = useState<ReadonlyMap<number, DatedUnitPrices> | null>(null);
-  const [freshNames, setFreshNames] = useState<ReadonlyMap<number, string> | null>(null);
+  const roster = characters.map((c) => c.characterId).join(',');
+  const [loadedFor, setLoadedFor] = useState<{ roster: string } & Partial<CorpLayers>>({ roster });
+  const fresh = loadedFor.roster === roster ? loadedFor : null;
+  const patchFresh = useCallback(
+    (patch: Partial<CorpLayers>) =>
+      setLoadedFor((prev) => ({ ...(prev.roster === roster ? prev : { roster }), ...patch })),
+    [roster]
+  );
   const { read: readRetained, startLoad } = useRetainedResult<CorpLayers>(
     'moonMiningTaxCorpBooks',
-    activeCharacterId,
-    characters.map((c) => c.characterId).join(',')
+    roster
   );
   const retained = readRetained();
+  const freshLoaded = fresh?.loaded;
   const loaded = freshLoaded ?? retained?.loaded ?? NO_BOOKS;
-  const pricesByCorp = freshPrices ?? retained?.pricesByCorp ?? NO_PRICES;
-  const corpNames = freshNames ?? retained?.corpNames ?? NO_NAMES;
+  const pricesByCorp = fresh?.pricesByCorp ?? retained?.pricesByCorp ?? NO_PRICES;
+  const corpNames = fresh?.corpNames ?? retained?.corpNames ?? NO_NAMES;
   const loadedLedger = rows !== undefined;
 
   useEffect(() => {
@@ -99,30 +105,27 @@ export function useCorpBookView({
       if (cancelled) return;
       // A book that could not be read this time keeps its last good copy.
       const books = withStoredBooks(read, readRetained()?.loaded ?? NO_BOOKS);
-      setFreshLoaded(books);
       save({ loaded: books });
       if (books.length === 0) {
-        setFreshPrices(new Map());
-        setFreshNames(new Map());
+        patchFresh({ loaded: books, pricesByCorp: new Map(), corpNames: new Map() });
         save({ pricesByCorp: new Map(), corpNames: new Map() });
         return;
       }
+      patchFresh({ loaded: books });
       const names = await loadCorpNames(books);
       if (cancelled) return;
       const merged = new Map([...(readRetained()?.corpNames ?? NO_NAMES), ...names]);
-      setFreshNames(merged);
+      patchFresh({ corpNames: merged });
       save({ corpNames: merged });
     })();
     return () => {
       cancelled = true;
     };
-    // The loads follow the ledger and the reload keys, not the roster the retained copy is keyed by.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadedLedger, reloadKey, version]);
+  }, [loadedLedger, reloadKey, version, startLoad, readRetained, patchFresh]);
 
   // Prices for each book at its own hub and Ore Form, for the days it observed.
   useEffect(() => {
-    if (freshLoaded === null || freshLoaded.length === 0 || activeCharacterId === null) return;
+    if (freshLoaded === undefined || freshLoaded.length === 0 || activeCharacterId === null) return;
     let cancelled = false;
     const save = startLoad();
     void (async () => {
@@ -130,14 +133,13 @@ export function useCorpBookView({
       if (cancelled) return;
       // A book whose prices failed to load keeps the ones it had.
       const merged = new Map([...(readRetained()?.pricesByCorp ?? NO_PRICES), ...prices]);
-      setFreshPrices(merged);
+      patchFresh({ pricesByCorp: merged });
       save({ pricesByCorp: merged });
     })();
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [freshLoaded, activeCharacterId]);
+  }, [freshLoaded, activeCharacterId, startLoad, readRetained, patchFresh]);
 
   // A Payee that is a book's corporation but is missing its link on this device (named exactly as
   // it, or carrying its id with no kind) gets the link, synced, so every device reads the same.

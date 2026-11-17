@@ -1,5 +1,10 @@
 import { useCallback } from 'react';
-import { readRouteSnapshot, routeSnapshotEpoch, writeRouteSnapshot } from './routeSnapshotCache';
+import {
+  ACCOUNT_SNAPSHOT_ID,
+  readRouteSnapshot,
+  routeSnapshotEpoch,
+  writeRouteSnapshot,
+} from './routeSnapshotCache';
 import { useRouteSnapshotHydration } from './useRouteSnapshotHydration';
 
 interface Stored<T> {
@@ -15,32 +20,27 @@ interface Stored<T> {
  * Without it each such load starts empty on every mount and the page repaints as
  * each one arrives, the early frames showing a ledger the late ones correct.
  *
- * `read` is for render and for a load's merge step; it is `null` for another
- * `key`. `startLoad` is called as a load begins and returns the function that
+ * Kept under `ACCOUNT_SNAPSHOT_ID`: these span every tracked Character, so a purge of any one
+ * (a corp change on an alt included) forgets them. `read` is for render and for a load's merge
+ * step; it is `null` for another `key`. `startLoad` is called as a load begins and returns the function that
  * stores its result, so a purge that lands mid-load drops it. A save merges its
  * fields onto what is stored, for a result that arrives in parts.
  */
-export function useRetainedResult<T extends object>(
-  name: string,
-  ownerId: number | null,
-  key: string
-) {
+export function useRetainedResult<T extends object>(name: string, key: string) {
   const read = useCallback((): Partial<T> | null => {
-    if (ownerId === null) return null;
-    const stored = readRouteSnapshot<Stored<Partial<T>>>(name, ownerId);
+    const stored = readRouteSnapshot<Stored<Partial<T>>>(name, ACCOUNT_SNAPSHOT_ID);
     return stored?.key === key ? stored.value : null;
-  }, [name, ownerId, key]);
+  }, [name, key]);
   // First visit after a reload: the stored copy, once it is in memory.
-  useRouteSnapshotHydration(ownerId, read() === null);
+  useRouteSnapshotHydration(ACCOUNT_SNAPSHOT_ID, read() === null);
 
   const startLoad = useCallback(() => {
-    if (ownerId === null) return () => undefined;
-    const startedAt = routeSnapshotEpoch(ownerId);
+    const startedAt = routeSnapshotEpoch(ACCOUNT_SNAPSHOT_ID);
     return (patch: Partial<T>) => {
       const value: Stored<Partial<T>> = { key, value: { ...read(), ...patch } };
-      writeRouteSnapshot(name, ownerId, value, { startedAt });
+      writeRouteSnapshot(name, ACCOUNT_SNAPSHOT_ID, value, { startedAt });
     };
-  }, [name, ownerId, key, read]);
+  }, [name, key, read]);
 
   return { read, startLoad };
 }
