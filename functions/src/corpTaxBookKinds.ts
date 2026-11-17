@@ -94,6 +94,8 @@ export const AUDIT_ACTIONS = [
   'withdrawDispute',
   'refineryLabelSet',
   'refinerySystemLearned',
+  'refineryArchived',
+  'refineryRestored',
   'feederInviteCreated',
   'feederInviteRevoked',
   'feederJoined',

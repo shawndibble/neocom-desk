@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { daysUntilOreLost, staleLedgerClock } from '@/engine/corpTaxBook/feederHealth';
 import {
@@ -8,6 +9,7 @@ import {
   Panel,
   StatChip,
   StatChips,
+  entityLinkClassName,
   type DataTableColumn,
 } from '@/components/ui';
 import { ownerMargin, type OwnerRateEntry } from '@/engine/corpTaxBook/ownerRate';
@@ -23,7 +25,7 @@ import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import { formatCount } from '@/lib/formatCount';
 import { isk, shortDate } from './moonsFormat';
 import { Crumb } from './moonsParts';
-import { RefineryLabels, type RefineryLabelEdit } from './RefineryLabels';
+import { RefineryLabels, type RefineryLabelEdit, type RefineryRowInfo } from './RefineryLabels';
 import { RemovalStrip } from './RemovalStrip';
 import { MoonOwnerStatusPill } from './MoonOwnerStatusPill';
 
@@ -142,8 +144,10 @@ export function MoonOwnerPage({
   name,
   accountingName,
   characterName,
+  minerPath,
   refineryName,
   refineryEdit,
+  refineries,
   oreName,
   backTo,
   payee,
@@ -163,7 +167,18 @@ export function MoonOwnerPage({
   /** The accounting corporation's own name: who set an agreed rate. */
   accountingName?: string;
   characterName: (id: number) => string;
+  /** Where a miner's name goes (their Miner page); absent: plain text. */
+  minerPath?: (characterId: number) => string;
   refineryName: (id: number) => string;
+  /**
+   * The refineries list on a page that opens them (#6298): the active ids, a link and hint per
+   * refinery, and the Archived section after it. Absent: the plain list from the mined lines.
+   */
+  refineries?: {
+    ids: readonly number[];
+    info: (structureId: number) => RefineryRowInfo;
+    archived: ReactNode;
+  };
   /** Label their refineries for both sides; absent for a viewer who may not edit. */
   refineryEdit?: RefineryLabelEdit;
   oreName: (typeId: number) => string;
@@ -267,7 +282,14 @@ export function MoonOwnerPage({
       id: 'character',
       header: t(k('cols.character')),
       primary: true,
-      render: (m) => characterName(m.characterId),
+      render: (m) =>
+        minerPath ? (
+          <Link to={minerPath(m.characterId)} className={entityLinkClassName()}>
+            {characterName(m.characterId)}
+          </Link>
+        ) : (
+          characterName(m.characterId)
+        ),
       sortValue: (m) => characterName(m.characterId),
     },
     {
@@ -450,12 +472,14 @@ export function MoonOwnerPage({
         )}
       </Panel>
       <RefineryLabels
-        structureIds={[...new Set(detail.mined.map((m) => m.structureId))]}
+        structureIds={refineries?.ids ?? [...new Set(detail.mined.map((m) => m.structureId))]}
         name={refineryName}
+        {...(refineries ? { info: refineries.info } : {})}
         {...(refineryEdit && row.status !== 'left' && row.status !== 'removed'
           ? { edit: refineryEdit }
           : {})}
       />
+      {refineries?.archived}
       {(onSettledOtherwise || canRemove) && (
         <div className="flex flex-wrap gap-2 border-t border-line pt-4">
           {onSettledOtherwise && (

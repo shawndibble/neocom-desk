@@ -59,6 +59,7 @@ export const CALLABLE_ACTIONS = {
     'setCorpTaxBookFeederModeCallable',
     'setCorpTaxBookRefineryLabelCallable',
     'setCorpTaxBookOwnRefineryLabelCallable',
+    'setCorpTaxBookRefineryArchiveCallable',
     'learnCorpTaxBookRefinerySystemsCallable',
     'setCorpTaxBookFeederPayeeFromBookCallable',
     'startCorpTaxBookFeederRemovalCallable',

@@ -48,6 +48,7 @@ import type {
 import type { FeederReadClock } from '@/engine/corpTaxBook/feederHealth';
 import type { RemovalNoticeRecord } from '@/engine/corpTaxBook/mailQueue';
 import type { OwnerRateEntry } from '@/engine/corpTaxBook/ownerRate';
+import type { RefineryArchive } from '@/engine/corpTaxBook/moonOwnerRefineries';
 import type { StoredRefineryLabel, StoredRefineryStructure } from '@/engine/corpTaxBook/refinery';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import type { FeederCoverage } from '@/engine/corpTaxBook/coverage';
@@ -464,6 +465,8 @@ export interface BookFeeder extends FeederReadClock {
   modeChanges?: FeederModeChange[];
   /** Refinery labels by structure id, set by either side's officers (#4640). */
   refineryLabels?: Record<string, StoredRefineryLabel>;
+  /** Refineries an officer archived, by structure id (#6298); absent when none were. */
+  refineryArchive?: Record<string, RefineryArchive>;
   /** Refinery systems by structure id, learned from miners' own ledgers (#4650). */
   refinerySystems?: Record<string, number>;
   /** Refinery names and systems the sync read with the moon owner's grant (#4654). */

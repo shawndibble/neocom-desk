@@ -4,6 +4,7 @@
  * `feederGrant.ts`. Player-facing text never says feeder or Collector.
  */
 import { getValidAccessToken } from '@/auth/session';
+import type { ArchiveReason } from '@/engine/corpTaxBook/moonOwnerRefineries';
 import type { FeederMode } from '@/engine/corpTaxBook/feederAccrual';
 import type { OutgoingDonation, Payee } from '@/engine/corpTaxBook/payouts';
 import { callableErrorReason } from '@/lib/callableError';
@@ -178,6 +179,29 @@ export async function setRefineryLabel(
     feederCorporationId,
     structureId,
     label,
+  });
+}
+
+/**
+ * Archives one of the moon owner's refineries, or restores it (#6298). Hides only; the book keeps
+ * every row. `reason` is what the page offered it for, `manual` when nothing.
+ */
+export async function setRefineryArchive(
+  characterId: number,
+  corporationId: number,
+  feederCorporationId: number,
+  structureId: number,
+  archived: boolean,
+  reason: ArchiveReason = 'manual'
+): Promise<{ ok: true }> {
+  const accessToken = await getValidAccessToken(characterId);
+  return call(characterId, 'setCorpTaxBookRefineryArchiveCallable', {
+    corporationId,
+    accessToken,
+    feederCorporationId,
+    structureId,
+    archived,
+    reason,
   });
 }
 

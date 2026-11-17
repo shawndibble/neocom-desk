@@ -121,6 +121,12 @@ export interface FeederRecord {
    */
   refineryLabels?: Record<string, RefineryLabelDoc>;
   /**
+   * Refineries an officer archived, by structure id (#6298): the page lists them apart. Hides only;
+   * every row, Extraction and label stays. Mining on a later day brings one back (the client reads
+   * it so), and a restore deletes the entry. Absent on every record from before.
+   */
+  refineryArchive?: Record<string, RefineryArchiveDoc>;
+  /**
    * Each refinery's system by structure id (#4650), learned from a miner's own ledger: a moon
    * owner's rows rarely carry one. The first learned stays.
    */
@@ -147,6 +153,16 @@ export interface RefineryStructureDoc {
   checkedAt: number;
   /** ESI said 403 (no docking access) or 404: not retried until a week has passed. */
   denied?: boolean;
+}
+
+/** One archived refinery on a moon owner's record. */
+export interface RefineryArchiveDoc {
+  /** When it was archived (ms). */
+  at: number;
+  /** The officer's Character id. */
+  by: number;
+  /** What the page offered it for, or `manual` when it offered nothing. */
+  reason: 'gone' | 'idle' | 'manual';
 }
 
 /** The side and officer that set a moon owner's payee, and when (ms). */

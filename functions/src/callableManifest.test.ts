@@ -60,6 +60,7 @@ const WIRE_NAMES = [
   'corpTaxBook:setCorpTaxBookFeederModeCallable',
   'corpTaxBook:setCorpTaxBookRefineryLabelCallable',
   'corpTaxBook:setCorpTaxBookOwnRefineryLabelCallable',
+  'corpTaxBook:setCorpTaxBookRefineryArchiveCallable',
   'corpTaxBook:learnCorpTaxBookRefinerySystemsCallable',
   'corpTaxBook:setCorpTaxBookFeederPayeeFromBookCallable',
   'corpTaxBook:startCorpTaxBookFeederRemovalCallable',
