@@ -1856,9 +1856,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       return { detail: { statementId: action.statementId } };
     }
     case 'recordAccounts': {
-      // Only a running account is billed by day; a calendar book's figures are its Statements.
-      if (typeof c.book.runningAccountFrom !== 'string')
-        fail('failed-precondition', 'This book bills by Statement', 'not-running-account');
+      // Every book is a running account (decision 20261117-060555).
       for (const a of action.accounts)
         tx.set(col(c, ACCOUNTS).doc(a.minerId), { ...a, at: iso, by });
       // The figures as recorded, so the audit says what the pay page was told.
@@ -2047,10 +2045,10 @@ async function closeAccount(
     startDate: c.book.startDate as string | undefined,
   });
   // Payments that paid running days are no credit; only the officer's client can price those days.
-  const running = typeof c.book.runningAccountFrom === 'string';
+  // Every book is a running account (decision 20261117-060555): the client's credit when sent.
   const credit = Math.max(
     0,
-    running && action.runningCredit !== undefined ? action.runningCredit : allocation.credit
+    action.runningCredit !== undefined ? action.runningCredit : allocation.credit
   );
   const owed = [...allocation.byStatement.values()]
     .filter((s) => !s.settled)
@@ -2855,13 +2853,12 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
     settled: ((paid.data()?.ids as string[] | undefined) ?? []).includes(statementId),
     // A running account's total now (#6294): what an officer's client last worked out, less the
     // payments credited to this Miner since. Days mined since then show once it recounts.
-    account:
-      typeof b.runningAccountFrom === 'string' && account.exists
-        ? liveAccount(
-            account.data() as Data,
-            payments.docs.map((d) => d.data())
-          )
-        : null,
+    account: account.exists
+      ? liveAccount(
+          account.data() as Data,
+          payments.docs.map((d) => d.data())
+        )
+      : null,
     remindersStopped: s.remindersStopped === true,
     // A guest's closed account (epic): set by the `closeAccount` edit (#4184).
     accountClosed: miner.exists && miner.get('closedAt') != null,

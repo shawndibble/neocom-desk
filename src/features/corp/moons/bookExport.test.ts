@@ -26,6 +26,7 @@ const settings: BookSettings = {
   minimumStatement: 5_000_000,
   overdueDays: 14,
   cadence: { kind: 'monthly' },
+  runningAccountFrom: '2026-01-01T00:00:00.000Z',
   noticeRules: DEFAULT_NOTICE_RULES,
   dayTolerancePct: 0.5,
   chunkM3PerHour: null,

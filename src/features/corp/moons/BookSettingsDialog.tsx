@@ -26,7 +26,6 @@ import {
 } from '@/components/ui';
 import type { TaxRate } from '@/engine/corpTaxBook/rates';
 import { Pill } from '@/components/ui/Pill';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { COMPARED_HUBS } from '@/market/hubs';
@@ -217,7 +216,6 @@ export function BookSettingsDialog({
   const [noticeMinimum, setNoticeMinimum] = useState(String(rules.minimum));
   const [cooldown, setCooldown] = useState(String(rules.cooldownDays));
   const [tolerance, setTolerance] = useState(String(settings.dayTolerancePct));
-  const [confirmSwitch, setConfirmSwitch] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -750,28 +748,8 @@ export function BookSettingsDialog({
                 </div>
               </Field>
               <FieldsHeading>{t('corpTaxBook.moons.settings.running.heading')}</FieldsHeading>
-              <Field
-                label={t('corpTaxBook.moons.settings.running.billing')}
-                note={
-                  !settings.runningAccountFrom && !verdict.isDirector
-                    ? t('corpTaxBook.moons.settings.running.directorOnly')
-                    : undefined
-                }
-              >
-                <span className="flex flex-wrap items-center gap-2">
-                  <span>
-                    {settings.runningAccountFrom
-                      ? t('corpTaxBook.moons.settings.running.since', {
-                          date: displayDate(settings.runningAccountFrom.slice(0, 10)),
-                        })
-                      : t('corpTaxBook.moons.settings.running.calendar')}
-                  </span>
-                  {!settings.runningAccountFrom && verdict.isDirector && canEdit && (
-                    <Button size="sm" onClick={() => setConfirmSwitch(true)}>
-                      {t('corpTaxBook.moons.settings.running.switch')}
-                    </Button>
-                  )}
-                </span>
+              <Field label={t('corpTaxBook.moons.settings.running.billing')}>
+                <span>{t('corpTaxBook.moons.settings.running.summary')}</span>
               </Field>
               <Field
                 label={t('corpTaxBook.moons.settings.running.noticeWhen')}
@@ -952,23 +930,6 @@ export function BookSettingsDialog({
           )}
         </TabPanel>
       </div>
-      {confirmSwitch && (
-        <ConfirmDialog
-          open
-          title={t('corpTaxBook.moons.settings.running.confirmTitle')}
-          body={t('corpTaxBook.moons.settings.running.confirmBody')}
-          actionLabel={t('corpTaxBook.moons.settings.running.confirm')}
-          danger={false}
-          cancelLabel={t('common.cancel')}
-          failedLabel={t('corpTaxBook.moons.settings.running.failed')}
-          onConfirm={async () => {
-            // One-way (decision 20261117-033049): the server stamps the switch-over instant.
-            await edit({ action: 'updateSettings', patch: { switchToRunningAccount: true } });
-            setConfirmSwitch(false);
-          }}
-          onClose={() => setConfirmSwitch(false)}
-        />
-      )}
     </Modal>
   );
 }
