@@ -4,7 +4,7 @@
  * through `useBook().edit` (`editBook`, role re-checked live on the server)
  * and shows the refusal's mapped reason when it refuses.
  */
-import { useId, useMemo, useState, type ReactNode } from 'react';
+import { useId, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -12,11 +12,6 @@ import {
   IskInput,
   Modal,
   SegmentedControl,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   TextArea,
   TextInput,
 } from '@/components/ui';
@@ -28,6 +23,7 @@ import { callableErrorReason } from '@/lib/callableError';
 import { callableErrorText } from './feederErrorText';
 import { useBook } from './useBook';
 import { dateWithYear, isk, newId, paidAtFor } from './moonsFormat';
+import { MinerPicker } from './MinerPicker';
 import { DonationPicker, PaymentOutcomePanel } from './RecordPaymentParts';
 
 export function Label({ text, children }: { text: ReactNode; children: ReactNode }) {
@@ -53,6 +49,8 @@ interface ShellProps {
    * dialog asks for, `'plain'` is for a dialog that asks for none, `false` drops the note.
    */
   showLogged?: boolean | 'plain';
+  /** The field focus starts in, instead of the dialog body. */
+  initialFocusRef?: RefObject<HTMLElement | null>;
   children: ReactNode;
 }
 
@@ -66,6 +64,7 @@ export function DialogShell({
   run,
   danger = false,
   showLogged = true,
+  initialFocusRef,
   children,
 }: ShellProps) {
   const { t } = useTranslation();
@@ -89,6 +88,7 @@ export function DialogShell({
       open={open}
       onClose={onClose}
       title={title}
+      initialFocusRef={initialFocusRef}
       placement={phone ? 'sheet' : 'center'}
       footer={
         <div className="flex justify-end gap-2">
@@ -484,8 +484,10 @@ export function AssignDonationDialog({
   const { t } = useTranslation();
   const { edit, view, names } = useBook();
   const [minerId, setMinerId] = useState('');
+  const filterRef = useRef<HTMLInputElement>(null);
   return (
     <DialogShell
+      initialFocusRef={filterRef}
       open={open}
       onClose={onClose}
       title={t('corpTaxBook.moons.dialogs.assign.title')}
@@ -504,23 +506,13 @@ export function AssignDonationDialog({
           reason: payment.reason ?? '—',
         })}
       </p>
-      <Label text={t('corpTaxBook.moons.dialogs.assign.miner')}>
-        <Select value={minerId} onValueChange={setMinerId}>
-          <SelectTrigger
-            aria-label={t('corpTaxBook.moons.dialogs.assign.miner')}
-            className="w-full"
-          >
-            <SelectValue placeholder={t('corpTaxBook.moons.dialogs.assign.pick')} />
-          </SelectTrigger>
-          <SelectContent>
-            {view.miners.map((m) => (
-              <SelectItem key={m.id} value={m.id}>
-                {names.character(m.mainCharacterId)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </Label>
+      <MinerPicker
+        miners={view.miners}
+        nameOf={names.character}
+        value={minerId}
+        onChange={setMinerId}
+        filterRef={filterRef}
+      />
       <Effect>{t('corpTaxBook.moons.dialogs.assign.effect')}</Effect>
     </DialogShell>
   );
