@@ -13,6 +13,7 @@ import {
   InfoTooltip,
   DropdownMenuItem,
   PageHeader,
+  SegmentedControl,
   Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
@@ -20,7 +21,13 @@ import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import {
   activityFeed,
+  DAY_RANGES,
   daysByPhase,
+  inRange,
+  owedOf,
+  rangeFigures,
+  rangeStart,
+  type DayRange,
   minerMoons,
   statementAdjustment,
   moonByStructure,
@@ -39,6 +46,7 @@ import { ActivityRow, AuditLine } from './AuditFeed';
 import { useBookAudit } from './useBookAudit';
 import { useBook } from './useBook';
 import { CloseAccountDialog } from './CloseAccountDialog';
+import { AccountStatus } from './AccountStatus';
 import { MarkNotTaxDialog, ReasonDialog, RecordPaymentDialog } from './BookDialogs';
 import { isk, iskOrDash, periodLabel, shortDate, shortDateTime, signedIsk } from './moonsFormat';
 import type { AuditEntry } from '../taxBook/bookClient';
@@ -83,6 +91,9 @@ export function MinerDetail({ id }: { id: string }) {
   const queue = useLiveQuery(() => listQueue(corporationId), [corporationId], []);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [filter, setFilter] = useState<'all' | ActivityKind>('all');
+  const [range, setRange] = useState<DayRange>('all');
+  const running = !!view.input.runningAccountFrom;
+  const from = rangeStart(range, view.input.now);
   const [dialog, setDialog] = useState<
     | { kind: 'record' }
     | { kind: 'dismiss' }
@@ -109,16 +120,24 @@ export function MinerDetail({ id }: { id: string }) {
       }),
     [audit.entries, id, statementIds, paymentIds]
   );
-  const phases = useMemo(() => daysByPhase(detail?.days ?? []), [detail]);
+  // The range narrows what happened (Earlier days, Payments); what is owed now always shows whole.
+  const phases = useMemo(() => {
+    const all = daysByPhase(detail?.days ?? []);
+    return { ...all, earlier: all.earlier.filter((d) => inRange(d.date, from)) };
+  }, [detail, from]);
+  const rangeTax = useMemo(
+    () => rangeFigures(detail?.days ?? [], detail?.payments ?? [], from),
+    [detail, from]
+  );
   const moons = useMemo(() => minerMoons(view, id), [view, id]);
   const moonOf = useMemo(() => moonByStructure(view), [view]);
   const ledger = useMemo(
     () =>
       paymentLedger(
-        detail?.payments ?? [],
-        data.adjustments.filter((a) => a.minerId === id)
+        (detail?.payments ?? []).filter((p) => inRange(p.at, from)),
+        data.adjustments.filter((a) => a.minerId === id && inRange(a.at, from))
       ),
-    [detail, data.adjustments, id]
+    [detail, data.adjustments, id, from]
   );
   const feed = useMemo(
     () =>
@@ -297,7 +316,9 @@ export function MinerDetail({ id }: { id: string }) {
             <span className={cx('block text-xs whitespace-nowrap', STATUS_TONE[d.status])}>
               {d.heldBy !== undefined
                 ? t('corpTaxBook.moons.dayStatus.held', { owner: names.corporation(d.heldBy) })
-                : t(`corpTaxBook.moons.dayStatus.${d.status}`)}
+                : t(
+                    `corpTaxBook.moons.dayStatus.${running && d.status === 'unbilled' ? 'owed' : d.status}`
+                  )}
               {(() => {
                 const st = statementOf(d.statementId);
                 return st && <> · {statementLink(st)}</>;
@@ -342,12 +363,15 @@ export function MinerDetail({ id }: { id: string }) {
     opts: { select: boolean; status: boolean; startOpen: boolean }
   ) => {
     const columns = dayColumns(opts.select, opts.status, phone);
-    const adjust = key === 'nextStatement' ? statementAdjustment(phases.nextStatement, row) : 0;
+    const adjust =
+      key === 'nextStatement' && !running ? statementAdjustment(phases.nextStatement, row) : 0;
     return (
       <BookSection
         title={title}
         noun={noun('days')}
-        empty={t(`corpTaxBook.moons.miner.empty.${key === 'earlier' ? 'earlier' : key}`)}
+        empty={t(
+          `corpTaxBook.moons.miner.empty.${key === 'nextStatement' && running ? 'owedDays' : key}`
+        )}
         rows={phases[key]}
         sortColumns={columns}
         meta={meta}
@@ -356,7 +380,9 @@ export function MinerDetail({ id }: { id: string }) {
         startOpen={opts.startOpen}
         summary={t('corpTaxBook.moons.miner.daysSummary', {
           count: phases[key].length,
-          tax: isk(sumTax(phases[key]) + adjust),
+          tax: isk(
+            key === 'nextStatement' && running ? owedOf(phases[key]) : sumTax(phases[key]) + adjust
+          ),
         })}
       >
         {(shown, table) => (
@@ -669,19 +695,26 @@ export function MinerDetail({ id }: { id: string }) {
         facts={[
           { label: t('corpTaxBook.moons.miner.paid'), value: iskOrDash(paidTotal) },
           { label: t('corpTaxBook.moons.chips.credit'), value: iskOrDash(row.credit) },
-          {
-            label: t('corpTaxBook.moons.chips.unbilled'),
-            value: (
-              <span className="inline-flex items-center gap-1">
-                {iskOrDash(row.unbilled)}
-                <InfoTooltip
-                  label={t('corpTaxBook.moons.chips.unbilled')}
-                  content={t('corpTaxBook.moons.miner.unbilledTip', { pending: isk(row.pending) })}
-                  glyph="info"
-                />
-              </span>
-            ),
-          },
+          running && row.account
+            ? {
+                label: t('corpTaxBook.moons.cols.account'),
+                value: <AccountStatus account={row.account} />,
+              }
+            : {
+                label: t('corpTaxBook.moons.chips.unbilled'),
+                value: (
+                  <span className="inline-flex items-center gap-1">
+                    {iskOrDash(row.unbilled)}
+                    <InfoTooltip
+                      label={t('corpTaxBook.moons.chips.unbilled')}
+                      content={t('corpTaxBook.moons.miner.unbilledTip', {
+                        pending: isk(row.pending),
+                      })}
+                      glyph="info"
+                    />
+                  </span>
+                ),
+              },
           { label: t('corpTaxBook.moons.chips.pending'), value: iskOrDash(row.pending) },
           // Nothing written off, nothing to say: the fact would be a row of zeros.
           ...(toleranceTotal === 0 && detail.lateWriteOffs.length === 0
@@ -723,11 +756,32 @@ export function MinerDetail({ id }: { id: string }) {
         { select: true, status: false, startOpen: false }
       )}
       {daysSection(
-        t('corpTaxBook.moons.sections.nextStatement'),
+        t(`corpTaxBook.moons.sections.${running ? 'owedDays' : 'nextStatement'}`),
         'nextStatement',
-        <span className="text-xs text-text-dim">{t('corpTaxBook.moons.miner.daysHint')}</span>,
+        <span className="text-xs text-text-dim">
+          {t(running ? 'corpTaxBook.moons.miner.owedDaysHint' : 'corpTaxBook.moons.miner.daysHint')}
+        </span>,
         { select: true, status: false, startOpen: true }
       )}
+      <div className="flex flex-wrap items-center gap-3">
+        <SegmentedControl
+          label={t('corpTaxBook.moons.account.range.label')}
+          value={range}
+          onChange={setRange}
+          options={DAY_RANGES.map((r) => ({
+            value: r,
+            label: t(`corpTaxBook.moons.account.range.${r}`),
+          }))}
+        />
+        {from !== undefined && (
+          <span className="text-sm text-text-dim tabular-nums">
+            {t('corpTaxBook.moons.account.range.summary', {
+              tax: isk(rangeTax.tax),
+              paid: isk(rangeTax.paid),
+            })}
+          </span>
+        )}
+      </div>
       {daysSection(
         t('corpTaxBook.moons.sections.earlierDays'),
         'earlier',

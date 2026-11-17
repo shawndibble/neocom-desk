@@ -34,11 +34,15 @@ export function MinerExpandedRow({ miner }: { miner: MinerRow }) {
   const next = daysByPhase(detail?.days ?? []).nextStatement;
   const payments = (detail?.payments ?? []).slice(0, 2);
   const moons = minerMoons(view, miner.id);
-  const adjust = statementAdjustment(next, miner);
+  // A running account's owed days (#6294): what each still owes, and no Statement to adjust.
+  const running = !!view.input.runningAccountFrom;
+  const adjust = running ? 0 : statementAdjustment(next, miner);
   return (
     <div className="sticky left-0 w-[calc(100cqw-1.5rem)] max-w-full space-y-3 p-3">
       <div className="grid gap-4 @2xl:grid-cols-3">
-        <MiniList title={`${t('corpTaxBook.moons.sections.nextStatement')} · ${next.length}`}>
+        <MiniList
+          title={`${t(`corpTaxBook.moons.sections.${running ? 'owedDays' : 'nextStatement'}`)} · ${next.length}`}
+        >
           {miner.pending > 0 && (
             <li className="text-text-dim tabular-nums">
               {t('corpTaxBook.moons.miners.accruing', { amount: isk(miner.pending) })}
@@ -49,7 +53,7 @@ export function MinerExpandedRow({ miner }: { miner: MinerRow }) {
               <span className="min-w-0 truncate">
                 {shortDate(d.date)} · {d.oreLines.map((l) => names.ore(l.typeId)).join(', ')}
               </span>
-              <span className={AMOUNT}>{isk(d.tax)}</span>
+              <span className={AMOUNT}>{isk(running ? (d.owed ?? d.tax) : d.tax)}</span>
             </li>
           ))}
           {next.length > SHOWN && (

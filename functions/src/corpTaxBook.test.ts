@@ -132,6 +132,26 @@ describe('parsers', () => {
     });
   });
 
+  it('takes the running account switch and bounds its notice rules', () => {
+    expect(parseSettingsPatch({ switchToRunningAccount: true })).toEqual({
+      switchToRunningAccount: true,
+    });
+    expect(() => parseSettingsPatch({ switchToRunningAccount: false })).toThrow();
+    const rules = { after: { kind: 'dayOfMonth', day: 5 }, minimum: 10_000_000, cooldownDays: 7 };
+    expect(parseSettingsPatch({ noticeRules: rules, dayTolerancePct: 0.5 })).toEqual({
+      noticeRules: rules,
+      dayTolerancePct: 0.5,
+    });
+    expect(() =>
+      parseSettingsPatch({ noticeRules: { ...rules, after: { kind: 'dayOfMonth', day: 31 } } })
+    ).toThrow();
+    expect(() =>
+      parseSettingsPatch({ noticeRules: { ...rules, after: { kind: 'weekly' } } })
+    ).toThrow();
+    expect(() => parseSettingsPatch({ noticeRules: { ...rules, cooldownDays: 0 } })).toThrow();
+    expect(() => parseSettingsPatch({ dayTolerancePct: 6 })).toThrow();
+  });
+
   it('takes an added division and the divisions list a change started from', () => {
     expect(parseSettingsPatch({ addDivision: 3 })).toEqual({ addDivision: 3 });
     expect(() => parseSettingsPatch({ addDivision: 8 })).toThrow();

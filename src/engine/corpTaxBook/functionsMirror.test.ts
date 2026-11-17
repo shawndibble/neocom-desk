@@ -11,6 +11,8 @@ import {
 } from './disputes';
 import { CLAIM_CHECK_RESULTS, TRANSFER_RECIPIENTS } from './overdue';
 import { TAX_CONTACT_MAX_CHARACTERS } from './bookDocs';
+import { DEFAULT_NOTICE_RULES, NOTICE_AFTER_KINDS } from './notices';
+import { DAY_SETTLE_TOLERANCE_PCT } from './runningAccount';
 import { placeOfFactory } from './openSet';
 import { FORFEIT_NO_REPLY_DAYS, forfeitAllowed } from './closeAccount';
 import type { Dismissal } from './dismissals';
@@ -198,6 +200,12 @@ describe('functions mirror of the Corp Tax Book engine', () => {
     expect([...calls.TRANSFER_RECIPIENTS]).toEqual([...TRANSFER_RECIPIENTS]);
     expect([...calls.CLAIM_CHECK_RESULTS]).toEqual([...CLAIM_CHECK_RESULTS]);
     expect(calls.TAX_CONTACT_MAX_CHARACTERS).toBe(TAX_CONTACT_MAX_CHARACTERS);
+  });
+
+  it('keeps the running account’s notice rules and day tolerance equal', () => {
+    expect([...calls.NOTICE_AFTER_KINDS]).toEqual([...NOTICE_AFTER_KINDS]);
+    expect(calls.NOTICE_DEFAULTS).toEqual(DEFAULT_NOTICE_RULES);
+    expect(calls.DAY_TOLERANCE_PCT_DEFAULT).toBe(DAY_SETTLE_TOLERANCE_PCT);
   });
 
   it('reads stored disputes and their hold the way the client does, malformed ones included', () => {

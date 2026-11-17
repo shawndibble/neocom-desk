@@ -96,6 +96,60 @@ describe('buildBookView', () => {
     ]);
   });
 
+  describe('on a running account', () => {
+    const pay = (amount: number, at = '2026-09-18T10:00:00Z') => ({
+      id: `p${amount}`,
+      minerId: 'solo:1',
+      characterId: 1,
+      amount,
+      at,
+      source: 'donation' as const,
+    });
+    const running = (over: Partial<BookViewInput> = {}) =>
+      input({
+        runningAccountFrom: '2026-08-01T00:00:00Z',
+        entries: [
+          entry(1, '2026-09-15', 1000),
+          entry(1, '2026-09-16', 2000),
+          entry(1, '2026-09-18', 500),
+        ],
+        ...over,
+      });
+
+    it('owes every Billable day at once, with nothing waiting for a Statement', () => {
+      const [miner] = buildBookView(running()).miners;
+      expect(miner.unbilled).toBe(0);
+      expect(miner.owed).toBe(300_000);
+      expect(miner.pending).toBe(50_000);
+      expect(miner.account).toEqual({
+        paidThrough: null,
+        owes: { amount: 300_000, days: 2, oldest: '2026-09-15' },
+      });
+    });
+
+    it('marks the days a payment covered paid, oldest first, and holds only an overpayment as credit', () => {
+      const view = buildBookView(running({ payments: [pay(100_000)] }));
+      expect(view.miners[0].account?.paidThrough).toBe('2026-09-15');
+      expect(minerDetail(view, 'solo:1')!.days.map((d) => [d.date, d.status])).toEqual([
+        ['2026-09-18', 'not-billable'],
+        ['2026-09-16', 'unbilled'],
+        ['2026-09-15', 'paid'],
+      ]);
+      const owing = minerDetail(view, 'solo:1')!.days.find((d) => d.date === '2026-09-16');
+      expect(owing?.owed).toBe(200_000);
+      const ahead = buildBookView(running({ payments: [pay(350_000)] }));
+      expect(ahead.miners[0]).toMatchObject({ owed: 0, credit: 50_000 });
+      expect(ahead.miners[0].account).toEqual({ paidThrough: '2026-09-16', owes: null });
+      expect(ahead.totals.unbilled).toBe(0);
+    });
+
+    it('leaves a calendar book as it was', () => {
+      expect(
+        buildBookView(input({ entries: [entry(1, '2026-09-15', 1000)] })).miners[0].account
+      ).toBeUndefined();
+    });
+  });
+
   it('plans the Aug run, issues a Statement and then owes it until a donation settles it', () => {
     const base = input({ entries: [entry(1, '2026-08-10', 1000)] });
     const first = buildBookView(base);

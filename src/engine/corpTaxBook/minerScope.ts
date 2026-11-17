@@ -17,10 +17,14 @@ import type { BookView } from './bookView';
 import type { ObservedRow } from './types';
 import { observedEntryKey } from './observed';
 
-/** First day whose ledger rows the page reads: the newest Statement's first day, else the book's start. */
+/**
+ * First day whose ledger rows the page reads: the newest Statement's first day, else the book's
+ * start. A late notice (#6294) never moves it: a running account's unpaid days before a notice
+ * stay owed and on the page.
+ */
 export function openWindowStart(statements: readonly Statement[], startDate: string): string {
   let from = startDate;
-  for (const s of statements) if (s.coversFrom > from) from = s.coversFrom;
+  for (const s of statements) if (s.kind !== 'notice' && s.coversFrom > from) from = s.coversFrom;
   return from;
 }
 
@@ -117,7 +121,8 @@ export function withMinerTotals(
     Number.isFinite(totals.owed) &&
     Number.isFinite(totals.credit) &&
     (totals.lastPaidAt === null || typeof totals.lastPaidAt === 'string');
-  if (!ok) return view;
+  // The stored totals count Statements only: a running account's owed days are the live figures.
+  if (!ok || view.input.runningAccountFrom) return view;
   // An unanswered dispute holds ISK out of what is due until its hold lapses, which the stored
   // totals only catch up with after a recompute (and a doc written before holds counted them
   // not at all): the live figures, which read the holds at this moment, stand for that Miner.

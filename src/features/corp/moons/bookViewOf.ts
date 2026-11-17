@@ -55,6 +55,9 @@ export function bookViewInputOf(
     feeders: data.feeders,
     extractions: data.state.extractions,
     paidStatementIds: data.state.paidStatementIds,
+    ...(s.runningAccountFrom
+      ? { runningAccountFrom: s.runningAccountFrom, dayTolerancePct: s.dayTolerancePct }
+      : {}),
     pricesOn: prices.pricesOn,
     moonOwnerPricesOn: prices.moonOwnerPricesOn,
     memberIds: extra.memberIds,

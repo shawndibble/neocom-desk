@@ -43,6 +43,7 @@ import {
 import {
   CLAIM_CHECK_RESULTS,
   DISPUTE_KINDS,
+  NOTICE_AFTER_KINDS,
   TAX_CONTACT_MAX_CHARACTERS,
   TRANSFER_RECIPIENTS,
 } from './corpTaxBookKinds.js';
@@ -362,6 +363,36 @@ export interface SettingsPatch {
   startDate?: string;
   /** End the member setup window now (Director): `membersSeeFrom` becomes the call time. */
   showToMembers?: true;
+  /**
+   * Switch the book to a running account now (Director, #6294): `runningAccountFrom` becomes the
+   * call time, once; it never clears, and from then on only late notices are issued.
+   */
+  switchToRunningAccount?: true;
+  /** A running account's late notices. */
+  noticeRules?: NoticeRules;
+  /** A running account's per-day tolerance, in percent. */
+  dayTolerancePct?: number;
+}
+
+/** Mirror of the client's `NoticeRules` (`src/engine/corpTaxBook/notices.ts`). */
+export interface NoticeRules {
+  after: { kind: 'behind'; days: number } | { kind: 'dayOfMonth'; day: number };
+  minimum: number;
+  cooldownDays: number;
+}
+
+function parseNoticeRules(raw: unknown): NoticeRules {
+  const d = record(raw);
+  const a = record(d.after);
+  const kind = oneOf(a.kind, 'noticeRules.after.kind', NOTICE_AFTER_KINDS);
+  return {
+    after:
+      kind === 'behind'
+        ? { kind, days: int(a.days, 'noticeRules.after.days', 1, 365) }
+        : { kind, day: int(a.day, 'noticeRules.after.day', 1, 28) },
+    minimum: num(d.minimum, 'noticeRules.minimum', 0, 1e12),
+    cooldownDays: int(d.cooldownDays, 'noticeRules.cooldownDays', 1, 90),
+  };
 }
 
 /** The mirror of the client's `TaxContact` (`src/engine/corpTaxBook/bookDocs.ts`). */
@@ -486,6 +517,14 @@ export function parseSettingsPatch(data: unknown): SettingsPatch {
       throw new HttpsError('invalid-argument', 'showToMembers must be true');
     patch.showToMembers = true;
   }
+  if (d.switchToRunningAccount !== undefined) {
+    if (d.switchToRunningAccount !== true)
+      throw new HttpsError('invalid-argument', 'switchToRunningAccount must be true');
+    patch.switchToRunningAccount = true;
+  }
+  if (d.noticeRules !== undefined) patch.noticeRules = parseNoticeRules(d.noticeRules);
+  if (d.dayTolerancePct !== undefined)
+    patch.dayTolerancePct = num(d.dayTolerancePct, 'dayTolerancePct', 0, 5);
   if (Object.keys(patch).length === 0)
     throw new HttpsError('invalid-argument', 'no settings given');
   return patch;
@@ -1059,6 +1098,8 @@ export interface StoredStatement {
   issuedAt: string;
   hubId: string;
   oreForm: string;
+  /** A running account's late notice (#6294); absent on a calendar Statement. */
+  kind?: 'notice';
   lines: { kind: string; date: string; characterId?: number }[];
   amount: number;
   /** Characters of the Miner, for the own-lines rule. */
@@ -1105,6 +1146,9 @@ export function parseStatement(raw: Record<string, unknown>): StoredStatement {
   });
   return {
     ...(raw as object),
+    ...(raw.kind !== undefined
+      ? { kind: oneOf(raw.kind, 'statement.kind', ['notice'] as const) }
+      : {}),
     id: docId(raw.id, 'statement.id'),
     minerId: docId(raw.minerId, 'statement.minerId'),
     code: boundedString(raw.code, 'statement.code', 64),

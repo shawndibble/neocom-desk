@@ -513,6 +513,29 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect((await book().get()).get('membersSeeFrom')).toBe(now);
     });
 
+    it('switches to a running account once (Director), then issues only late notices', async () => {
+      await turnOn();
+      expect(
+        await reason(
+          edit(ACCOUNTANT, { action: 'updateSettings', patch: { switchToRunningAccount: true } })
+        )
+      ).toBe('director-only');
+      await edit(DIRECTOR, { action: 'updateSettings', patch: { switchToRunningAccount: true } });
+      const from = (await book().get()).get('runningAccountFrom');
+      expect(from).toBe(new Date(now).toISOString());
+      now += 60_000;
+      await edit(DIRECTOR, { action: 'updateSettings', patch: { switchToRunningAccount: true } });
+      expect((await book().get()).get('runningAccountFrom')).toBe(from);
+      expect(
+        await reason(edit(ACCOUNTANT, { action: 'issueStatement', statement: statement('s1') }))
+      ).toBe('running-account');
+      await edit(ACCOUNTANT, {
+        action: 'issueStatement',
+        statement: { ...statement('s1'), kind: 'notice' },
+      });
+      expect((await book().collection('statements').doc('s1').get()).get('kind')).toBe('notice');
+    });
+
     it('never makes a rate retroactive, and only on a day not yet on a Statement for a record rate', async () => {
       await turnOn();
       expect(
@@ -2221,6 +2244,16 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect(log.find((e) => e.action === 'closeAccount')).toMatchObject({
         detail: { minerId: 'solo:50', statementId: 'final_solo:50', disposition: 'refund' },
       });
+    });
+
+    it('on a running account takes only a late notice as the final bill', async () => {
+      await turnOn();
+      await edit(DIRECTOR, { action: 'updateSettings', patch: { switchToRunningAccount: true } });
+      expect(await reason(close({ statement: statement('final_solo:50') }))).toBe(
+        'running-account'
+      );
+      const out = await close({ statement: { ...statement('final_solo:50'), kind: 'notice' } });
+      expect(out).toMatchObject({ statementId: 'final_solo:50' });
     });
 
     it('records the credit left to refund by default', async () => {

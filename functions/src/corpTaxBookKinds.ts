@@ -29,3 +29,17 @@ export const CLAIM_CHECK_RESULTS = [
  * `DisputeKind` (`src/engine/corpTaxBook/disputes.ts`).
  */
 export const DISPUTE_KINDS = ['payee', 'quantity', 'rate', 'notPaying'] as const;
+
+/**
+ * A running account's late notices (#6294): when one is due — `behind`, the Miner's oldest unpaid
+ * day is `days` old; `dayOfMonth`, on that day of each month while they owe — the least owed for
+ * one, and the days before another. Mirrors `src/engine/corpTaxBook/notices.ts`.
+ */
+export const NOTICE_AFTER_KINDS = ['behind', 'dayOfMonth'] as const;
+export const NOTICE_DEFAULTS = {
+  after: { kind: 'behind', days: 14 },
+  minimum: 10_000_000,
+  cooldownDays: 7,
+} as const;
+/** A running account's per-day tolerance, in percent; mirrors `DAY_SETTLE_TOLERANCE_PCT`. */
+export const DAY_TOLERANCE_PCT_DEFAULT = 0.5;

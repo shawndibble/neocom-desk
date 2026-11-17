@@ -9,7 +9,13 @@ import type { BookRecords } from '../../../functions/src/corpTaxBookMinerTotals'
 import { buildBookView, nextRunPeriod, planStatementRun, statementForLine } from './bookView';
 import type { BookViewInput } from './bookView';
 import { observedEntryKey } from './observed';
-import { fromBookView, fromReadModels, openSetOf, readModelsUsable } from './readModels';
+import {
+  fromBookView,
+  fromReadModels,
+  openSetOf,
+  readModelsUsable,
+  tabsProjection,
+} from './readModels';
 import type { ObservedMiningEntry } from './types';
 
 // The Overview and Miners tabs read either the whole-book view or the two server-built
@@ -326,5 +332,12 @@ describe('Overview and Miners tab read models', () => {
     expect(readModelsUsable(docs.minerList, docs.overview, READ_MODELS_SCHEMA)).toBe(true);
     expect(readModelsUsable(docs.minerList, docs.overview, READ_MODELS_SCHEMA + 1)).toBe(false);
     expect(readModelsUsable(undefined, docs.overview, READ_MODELS_SCHEMA)).toBe(false);
+  });
+
+  it('reads a running account from the view, as the docs count Statements only', () => {
+    const input = { ...book(), runningAccountFrom: '2026-08-01T00:00:00Z' };
+    const view = buildBookView(input);
+    const docs = docsAt(book());
+    expect(tabsProjection(view, docs, READ_MODELS_SCHEMA)).toEqual(fromBookView(view));
   });
 });
