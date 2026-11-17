@@ -21508,6 +21508,8 @@
       "allRows_other": "All {{total}} rows read. Scroll for the rest.",
       "ofRows": "{{shown}} of {{total}} rows",
       "loadingMore": "Loading more ({{loaded}} of {{total}} rows)",
+      "missingRows_one": "{{missing}} of {{total}} rows could not be loaded",
+      "missingRows_other": "{{missing}} of {{total}} rows could not be loaded",
       "loadFailed": "Could not load the rest. {{loaded}} of {{total}} rows loaded.",
       "emptyTitle": "No {{source}} rows",
       "emptyHint": "The read found nothing here for {{who}}. Empty is a result: the source was read.",
@@ -21576,7 +21578,7 @@
       "how": {
         "title": "How it works",
         "signIn": "Log in with EVE, once per character.",
-        "read": "Each character is read once.",
+        "read": "Each character is read once. Every row read is kept with the report, for officers only, until it is deleted. Mail is headers only. No login is kept.",
         "report": "Recruiters get a report and reply in game."
       },
       "signIn": {
@@ -21713,9 +21715,9 @@
         "step2Body": "Share the ones you want read.",
         "step3": "Share, or decline",
         "step3Body": "Declining tells the reviewers and reads nothing.",
-        "factOnce": "Read once, when you press Share. No login is kept.",
+        "factOnce": "Read once, when you press Share. Every row read is kept with the report until it is deleted. No login is kept.",
         "factMail": "Mail: who wrote to whom only, never the subject or the text.",
-        "factSee": "You see who opens the report, and can delete it at any time.",
+        "factSee": "Only officers open it. You see who does, and can delete it at any time. It is deleted 30 days after a decision, or 90 days after you share if nobody decides.",
         "terms": "See exactly what is read"
       },
       "charactersTitle": "Characters to share",
@@ -21734,7 +21736,7 @@
     "requestMail": {
       "subject": "Review requested before {{role}}",
       "asked": "I asked for a review before you are made {{role}} in {{corp}}. Other officers decide it. I cannot sign it off.",
-      "what": "What happens: you log in with your characters and choose which to share. Neocom Desk reads them once: corporation history, wallet, contracts, contacts, skills, and who you exchanged mail with (never the subject or the text). No login is kept.",
+      "what": "What happens: you log in with your characters and choose which to share. Neocom Desk reads them once: corporation history, wallet, contracts, contacts, skills, and who you exchanged mail with (never the subject or the text). Every row read is kept with the report, for officers only, until it is deleted: 30 days after a decision, 90 days after you share if nobody decides, or when you delete it. No login is kept.",
       "rights": "You can see who opens the report, delete it at any time, or decline. If you decline, the reviewers are told and nothing is read.",
       "open": "Open it: {{link}}\nLog in as {{pilot}}."
     },
@@ -21816,6 +21818,7 @@
       "not-open": "This review is already decided.",
       "barred": "You cannot sign off this review.",
       "own-review": "This review is about you, so you cannot open it.",
+      "bad-cursor": "Those rows could not be read. Open the page again.",
       "already-signed": "You already signed this review off.",
       "not-requested": "This review is no longer waiting for the member.",
       "not-asker": "Only the officer who asked can record the mail.",

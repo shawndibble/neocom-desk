@@ -1,7 +1,7 @@
 // The vetting actions against the Firestore emulator. Runs only under the emulator
 // (`npm run test:emulator`); a plain `npm test` skips it.
 import type { Caller } from './actorAuth.js';
-import { afterAll, beforeEach, expect, it } from 'vitest';
+import { afterAll, beforeEach, expect, it, vi } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { parseBookCall } from './corpTaxBook.js';
@@ -1008,6 +1008,84 @@ emulatorSuite('vetting (emulator)', () => {
       failed: 0,
     });
     expect(await rawIds(undecided.reviewId)).toEqual([]);
+  });
+
+  it('does not serve the rows of a request or a declined request, only of a shared review', async () => {
+    await turnOn();
+    rawOverride.set(MEMBER, { wallet: manyRows(MEMBER, 5) });
+    await request('Pilot 5');
+    const [{ handle }] = await myRequests(MEMBER);
+    await addVettingCharacter(deps(), { ...handle, accessToken: tok(MEMBER) });
+    expect((await rawIds(handle.reviewId)).length).toBeGreaterThan(0);
+    // Read in, not shared: not for officers yet.
+    expect(await reason(rawPage(handle.reviewId, DIRECTOR))).toBe('not-found');
+    await submit(handle);
+    expect((await rawPage(handle.reviewId, DIRECTOR)).rows).toHaveLength(5);
+
+    await decide(handle.reviewId, RECRUITER, 'no');
+    await decide(handle.reviewId, RECRUITER_2, 'no');
+    await request('Pilot 5', 'Director', CEO);
+    const [{ handle: second }] = await myRequests(MEMBER);
+    await declineVetting(deps(), second);
+    expect(await reason(rawPage(second.reviewId, DIRECTOR))).toBe('not-found');
+  });
+
+  it('leaves no chunk behind when writing them fails part way', async () => {
+    await turnOn();
+    rawChunkBytes = 1500;
+    rawOverride.set(APPLICANT, { wallet: manyRows(APPLICANT, 300) });
+    rawOverride.set(APPLICANT_ALT, { wallet: manyRows(APPLICANT_ALT, 300) });
+    const failSecondBatch = () => {
+      const original = Object.getPrototypeOf(db).batch as () => FirebaseFirestore.WriteBatch;
+      let commits = 0;
+      return vi.spyOn(Object.getPrototypeOf(db), 'batch').mockImplementation(function (
+        this: unknown
+      ) {
+        const batch = original.call(this);
+        const commit = batch.commit.bind(batch);
+        batch.commit = async () => {
+          commits += 1;
+          if (commits === 2) throw new Error('write failed');
+          return commit();
+        };
+        return batch;
+      });
+    };
+
+    const spy = failSecondBatch();
+    await expect(start()).rejects.toThrow('write failed');
+    spy.mockRestore();
+    const made = await corp().collection('vettingReviews').get();
+    expect(made.size).toBe(1);
+    expect(await rawIds(made.docs[0].id)).toEqual([]);
+
+    const { handle } = await start(APPLICANT);
+    const before = await rawIds(handle.reviewId);
+    expect(before.length).toBeGreaterThan(10);
+    const again = failSecondBatch();
+    await expect(
+      addVettingCharacter(deps(), { ...handle, accessToken: tok(APPLICANT_ALT) })
+    ).rejects.toThrow('write failed');
+    again.mockRestore();
+    expect(await rawIds(handle.reviewId)).toEqual(before);
+  });
+
+  it('keeps the rows of a review the sweep finds no longer due when it decides again', async () => {
+    await turnOn();
+    rawOverride.set(APPLICANT, { wallet: manyRows(APPLICANT, 3) });
+    const handle = await shared();
+    const before = await rawIds(handle.reviewId);
+    expect(before.length).toBeGreaterThan(0);
+    const original = db.runTransaction.bind(db);
+    const spy = vi.spyOn(db, 'runTransaction').mockImplementationOnce(((fn: never, opts: never) =>
+      reviewDoc(handle.reviewId)
+        .update({ expiresAt: T0 + 200 * DAY_MS })
+        .then(() => original(fn, opts))) as never);
+    const result = await sweepVetting(db, T0 + VETTING_OPEN_KEEP_DAYS * DAY_MS);
+    spy.mockRestore();
+    expect(result).toMatchObject({ deleted: 0, failed: 0 });
+    expect((await reviewDoc(handle.reviewId).get()).exists).toBe(true);
+    expect(await rawIds(handle.reviewId)).toEqual(before);
   });
 
   it('never shows a reviewer the report about themselves', async () => {

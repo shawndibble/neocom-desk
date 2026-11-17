@@ -489,7 +489,16 @@ export async function startVetting(
   });
   // After the review exists, which names these chunks: a failure here leaves a draft nobody holds
   // the key to, deleted with its rows by the sweep, and no chunk under a review that is not there.
-  await writeRaw(ref, read.raw);
+  try {
+    await writeRaw(ref, read.raw);
+  } catch (err) {
+    await tidyRawIds(
+      ref,
+      read.raw.chunks.map((piece) => piece.id),
+      deps.logWarn
+    );
+    throw err;
+  }
   return {
     handle: { corporationId: input.corporationId, reviewId, key },
     status: pilotStatus(reviewId, made.review, made.settings, now),
@@ -549,10 +558,9 @@ export async function addVettingCharacter(
   const settings = await loadSettings(deps, input.corporationId);
   // The new read's chunks go first, under their own generation: nothing names them until the
   // transaction below does, and a read they replace keeps its own until then.
-  await writeRaw(ref, read.raw);
-
   let done: { status: VettingStatus; replacedRaw: StoredVettingCharacter['raw'] };
   try {
+    await writeRaw(ref, read.raw);
     done = await addRead(deps, ref, input, read, settings);
   } catch (err) {
     await tidyRawIds(
@@ -1196,6 +1204,11 @@ export async function getVettingRawRows(
   }
   return deps.db.runTransaction(async (tx) => {
     const review = officerReview(await tx.get(ref));
+    // Not with the corp until the pilot shares: a request holds only what a member is still
+    // putting together, and a declined one nothing.
+    if (review.state === 'requested' || review.state === 'declined') {
+      fail('not-found', 'No such review', 'not-found');
+    }
     refuseOwnReview(review, actor);
     const position = rawPagePosition(review.characters, input.source, cursor);
     if (position === null) fail('invalid-argument', 'cursor is not valid', 'bad-cursor');

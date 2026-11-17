@@ -45,6 +45,7 @@ import {
   prepareRawItems,
   rawKindOptions,
   tenureSeconds,
+  validTime,
   type RawFilters,
   type RawItem,
 } from './rawRowsView';
@@ -93,6 +94,15 @@ export function VettingRawTable({
 }: TableProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
+  /** A date as the report words it; the raw string when it is not a date, never a throw. */
+  const stamp = (iso: string) => {
+    const ms = validTime(iso);
+    return ms === null ? iso : formatTimestamp(new Date(ms), timeZone);
+  };
+  const day = (iso: string) => {
+    const ms = validTime(iso);
+    return ms === null ? iso : formatDateOnly(new Date(ms), timeZone);
+  };
   const [filters, setFilters] = useState<RawFilters>({ ...NO_RAW_FILTERS, ...initial });
   const names = useMemo(
     () => new Map(characters.map((c) => [c.characterId, c.name])),
@@ -150,9 +160,9 @@ export function VettingRawTable({
       stickyStartOnPanel: true,
       className: 'whitespace-nowrap tabular-nums text-text-dim',
       width: '20ch',
-      sortValue: (item) => (item.row.at === null ? undefined : Date.parse(item.row.at)),
-      render: (item) =>
-        item.row.at === null ? '-' : formatTimestamp(new Date(item.row.at), timeZone),
+      sortValue: (item) =>
+        item.row.at === null ? undefined : (validTime(item.row.at) ?? undefined),
+      render: (item) => (item.row.at === null ? '-' : stamp(item.row.at)),
     });
     const withParty = (header: string): DataTableColumn<RawItem> => ({
       id: 'party',
@@ -266,7 +276,8 @@ export function VettingRawTable({
           stickyStart: true,
           stickyStartOnPanel: true,
           minWidth: '28ch',
-          sortValue: (item) => skills.get(item.row.skillId ?? -1)?.name ?? item.row.skillId,
+          sortValue: (item) =>
+            skills.get(item.row.skillId ?? -1)?.name ?? String(item.row.skillId ?? ''),
           render: (item) =>
             skills.get(item.row.skillId ?? -1)?.name ??
             t('vetting.data.unknownSkill', { id: item.row.skillId }),
@@ -312,8 +323,7 @@ export function VettingRawTable({
           width: '16ch',
           className: 'tabular-nums',
           sortValue: (item) => item.row.joined,
-          render: (item) =>
-            item.row.joined ? formatDateOnly(new Date(item.row.joined), timeZone) : '-',
+          render: (item) => (item.row.joined ? day(item.row.joined) : '-'),
         },
         {
           id: 'left',
@@ -323,7 +333,7 @@ export function VettingRawTable({
           sortValue: (item) => item.row.left ?? '9999',
           render: (item) =>
             item.row.left ? (
-              formatDateOnly(new Date(item.row.left), timeZone)
+              day(item.row.left)
             ) : (
               <span className="text-text-dim">{t('vetting.data.stillThere')}</span>
             ),
@@ -450,13 +460,15 @@ export function VettingRawTable({
     />
   );
 
+  // The read kept `total` rows and fewer arrived: never claim all of them, or an empty source.
+  const short = !data.loading && !data.failed && data.rows.length < total;
   const waiting = data.loading && scope.length === 0;
-  const empty = !data.loading && !data.failed && scope.length === 0;
+  const empty = !data.loading && !data.failed && !short && scope.length === 0;
   let body;
   if (waiting) {
     body = <p className="p-3 text-sm text-text-dim">{t('common.loading')}</p>;
-  } else if (empty || (data.failed && scope.length === 0)) {
-    body = data.failed ? null : (
+  } else if (empty || scope.length === 0) {
+    body = !empty ? null : (
       <EmptyState
         title={t('vetting.data.emptyTitle', { source: label.toLowerCase() })}
         hint={t(RAW_DATED[source] ? 'vetting.data.emptyHintWindow' : 'vetting.data.emptyHint', {
@@ -550,22 +562,28 @@ export function VettingRawTable({
         </FilterBar>
       )}
       <p className="text-xs text-text-dim" aria-live="polite">
-        {data.loading
-          ? t('vetting.data.loadingMore', {
-              loaded: formatCount(data.rows.length),
+        {short
+          ? t('vetting.data.missingRows', {
+              count: total - data.rows.length,
+              missing: formatCount(total - data.rows.length),
               total: formatCount(total),
             })
-          : scope.length === 0
-            ? ''
-            : filtered
-              ? t('vetting.data.ofRows', {
-                  shown: formatCount(rows.length),
-                  total: formatCount(scope.length),
-                })
-              : t('vetting.data.allRows', {
-                  count: scope.length,
-                  total: formatCount(scope.length),
-                })}
+          : data.loading
+            ? t('vetting.data.loadingMore', {
+                loaded: formatCount(data.rows.length),
+                total: formatCount(total),
+              })
+            : scope.length === 0
+              ? ''
+              : filtered
+                ? t('vetting.data.ofRows', {
+                    shown: formatCount(rows.length),
+                    total: formatCount(scope.length),
+                  })
+                : t('vetting.data.allRows', {
+                    count: scope.length,
+                    total: formatCount(scope.length),
+                  })}
       </p>
       {data.failed && (
         <div

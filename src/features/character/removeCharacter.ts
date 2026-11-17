@@ -12,6 +12,7 @@
 
 import { dropCharacterHubEntry } from '@/features/market/tradeHubActions';
 import { clearBookCache } from '@/features/corp/taxBook/bookCache';
+import { clearVettingSession } from '@/features/corp/vetting/vettingSession';
 import { clearObservedCopies } from '@/features/corp/taxBook/observedStore';
 import { clearWalletArchive } from '@/features/character/walletArchive';
 import { clearContractArchive } from '@/features/character/contractArchive';
@@ -158,6 +159,8 @@ export async function removeCharacter(characterId: number, syncPush = true): Pro
       await clearObservedCopies(characterId);
       // This tab's own copies of those books, which a matching stamp would otherwise still serve.
       clearBookCache();
+      // Officer-only review rows held in memory (ADR 0035) go with it.
+      clearVettingSession();
       // Orphaned feed rows are invisible in the UI (both the bell panel and the
       // other-character counts skip ids with no Character) but `refreshAppBadge`
       // counts the whole table — leaving an app-icon count nothing can dismiss.

@@ -1,7 +1,7 @@
 // Vetting retention sweep: deletes drafts never shared (`VETTING_DRAFT_HOURS`), requests never
 // answered or declined (30 days), shared reviews nobody decided (`VETTING_OPEN_KEEP_DAYS`) and
 // decided reviews past `deleteAt`, each with whatever was read into it, its kept raw rows
-// included (ADR 0035); and clears what a member
+// included (ADR 0035, pruned after the review's transaction commits); and clears what a member
 // read into a request and left unsent for a day. Which of those applies is `decideVettingSweep`
 // (vettingDecide.ts); every review carries the time the sweep next acts on it in `expiresAt`.
 // It also deletes the draft throttle's counters once their day is long over.
@@ -9,6 +9,7 @@
 import type { DocumentReference, Firestore, Query } from 'firebase-admin/firestore';
 import { indexedPages, isTopLevelChild, pages } from './indexedSweep.js';
 import { CORPS_COLLECTION } from './srpTypes.js';
+import { warn as logWarn } from 'firebase-functions/logger';
 import { pruneRaw } from './vettingRawStore.js';
 import { decideVettingSweep, requestExpiry } from './vettingDecide.js';
 import {
@@ -109,10 +110,6 @@ export async function sweepVetting(
           break sweep;
         }
         try {
-          // The kept raw rows first, while the review that names them still exists: once it is
-          // gone nothing would find them. Due times only pass, so an expired review stays due,
-          // and a failure here leaves the review for the next run.
-          await pruneRaw(candidate.ref);
           // Decided again inside the transaction: a draft shared meanwhile is kept.
           const done = await db.runTransaction(async (tx) => {
             const fresh = (await tx.get(candidate.ref)).data() as StoredVettingReview | undefined;
@@ -132,6 +129,19 @@ export async function sweepVetting(
           });
           if (done === 'delete') result.deleted += 1;
           if (done === 'clear-inputs') result.cleared += 1;
+          if (done !== 'keep') {
+            // After the commit, so a review re-decided to 'keep' meanwhile keeps its rows. The
+            // held ref lists chunks after the parent is gone. A failure leaves chunks no review
+            // names (unreachable, never shown) and counts as failed so it is not silent.
+            try {
+              await pruneRaw(candidate.ref);
+            } catch (err) {
+              result.failed += 1;
+              logWarn('vetting raw rows not pruned', {
+                reason: err instanceof Error ? err.message : String(err),
+              });
+            }
+          }
         } catch {
           result.failed += 1;
         }

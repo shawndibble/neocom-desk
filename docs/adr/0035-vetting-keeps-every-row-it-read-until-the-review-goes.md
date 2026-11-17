@@ -49,12 +49,17 @@ the draft and request rules unchanged.
   is dropped (remove character, expiry, decline, the sweep's `clear-inputs`);
   kept at Send for the characters on the report; deleted with the review
   (withdraw, the sweep's delete).
-- **Ordering rule.** A chunk is never left under a review that no longer exists,
-  because nothing would find it again. Where the review document is deleted
-  (withdraw, sweep) the chunks are deleted first (and by withdraw again after);
-  where the review stays, the transaction commits first and the chunks are pruned
-  after, best effort. Chunks are written outside the review's transaction: its
-  commit is capped at 10 MiB and 30,000 rows is several MiB.
+- **Ordering rule.** The sweep re-decides the review in its own transaction, so
+  chunks are pruned only after it commits (a review re-decided to "keep" meanwhile
+  keeps its rows). It prunes through the held reference, which lists chunks after
+  the parent is deleted; a prune failure counts as `failed` and is logged, and
+  leaves chunks no review names: unreachable, never shown. Withdraw deletes the
+  chunks first (and again after the review). Chunks are written outside the
+  review's transaction: its commit is capped at 10 MiB and 30,000 rows is several
+  MiB. A chunk write that fails partway is deleted by exact id.
+- **State.** Only a shared report's rows are readable: a `requested` or
+  `declined` review answers `not-found`, since a member can still add characters
+  to a request before sharing.
 - **Additive.** Dev and production share one Firestore. A review stored before
   this has no `rawRows`, no per-character metadata and no `rawCounts`; it works
   as before and its officer view omits `rawCounts`.

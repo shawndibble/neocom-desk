@@ -246,6 +246,57 @@ describe('the data page', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
+  it('says how many rows could not be loaded, and never claims all of them', async () => {
+    fixture = createVettingFixture();
+    const rawRows = fixture.rawRows;
+    fixture.rawRows = async (...args) => {
+      const page = await rawRows(...args);
+      // The server stops early: no cursor after the first page.
+      return { ...page, next: null };
+    };
+    setVettingBackendOverride(fixture);
+    await seedCharacter(CHARACTER);
+    await db.characters.update(CHARACTER, {
+      corporationId: VETTING_FIXTURE_CORPORATION.corporationId,
+    });
+    useActiveCharacter.setState({ activeCharacterId: CHARACTER, hydrated: true });
+    render(
+      <MemoryRouter initialEntries={[dataPage('skills')]}>
+        <Routes>
+          <Route path="/corp/vetting/*" element={<VettingPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    expect(await screen.findByText('20 of 31 rows could not be loaded')).toBeInTheDocument();
+    expect(screen.queryByText(/^All \d+ rows read/)).toBeNull();
+  });
+
+  it('draws a row with a malformed date instead of throwing', async () => {
+    fixture = createVettingFixture();
+    const rawRows = fixture.rawRows;
+    fixture.rawRows = async (...args) => {
+      const page = await rawRows(...args);
+      return {
+        ...page,
+        rows: page.rows.map((row) => (row.at ? { ...row, at: 'not-a-date' } : row)),
+      };
+    };
+    setVettingBackendOverride(fixture);
+    await seedCharacter(CHARACTER);
+    await db.characters.update(CHARACTER, {
+      corporationId: VETTING_FIXTURE_CORPORATION.corporationId,
+    });
+    useActiveCharacter.setState({ activeCharacterId: CHARACTER, hydrated: true });
+    render(
+      <MemoryRouter initialEntries={[dataPage('mail')]}>
+        <Routes>
+          <Route path="/corp/vetting/*" element={<VettingPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    expect((await screen.findAllByText('not-a-date')).length).toBeGreaterThan(0);
+  });
+
   it('says so, with no rows, when the review is about the reviewer', async () => {
     await setup(`/corp/vetting/open/${VETTING_FIXTURE_REVIEWS.aboutYou}/data/wallet`, {
       extra: 'requests',

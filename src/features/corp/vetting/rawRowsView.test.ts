@@ -9,6 +9,7 @@ import {
   rawKindOptions,
   standingBucket,
   tenureSeconds,
+  validTime,
   type RawContext,
 } from './rawRowsView';
 
@@ -112,13 +113,15 @@ describe('filterRawItems', () => {
     expect(filterRawItems(items, { ...NO_RAW_FILTERS, flagged: true })).toHaveLength(1);
   });
 
-  it('does not drop undated rows on a date range', () => {
+  it('drops undated rows once a date range is set, and keeps them otherwise', () => {
     const skill = prepareRawItems(
       'skills',
       [{ characterId: 2, at: null, what: '', skillId: 3300, level: 1 }],
       ctx()
     );
-    expect(filterRawItems(skill, { ...NO_RAW_FILTERS, from: '2026-11-01' })).toHaveLength(1);
+    expect(filterRawItems(skill, { ...NO_RAW_FILTERS, from: '2026-11-01' })).toHaveLength(0);
+    expect(filterRawItems(skill, { ...NO_RAW_FILTERS, to: '2026-11-01' })).toHaveLength(0);
+    expect(filterRawItems(skill, NO_RAW_FILTERS)).toHaveLength(1);
   });
 });
 
@@ -191,5 +194,15 @@ describe('flagDataTarget', () => {
   });
   it('has no target for a flag whose rows are not in a source', () => {
     expect(flagDataTarget({ ...cynoFlag, check: 'thinCharacter' })).toBeNull();
+  });
+});
+
+describe('malformed dates', () => {
+  it('reads as no time, and a tenure of zero', () => {
+    expect(validTime('not a date')).toBeNull();
+    expect(validTime(null)).toBeNull();
+    expect(validTime('2026-11-04T00:00:00Z')).toBe(Date.parse('2026-11-04T00:00:00Z'));
+    const row: VettingRawRow = { characterId: 1, at: null, what: '', joined: 'x', left: null };
+    expect(tenureSeconds(row, Date.now())).toBe(0);
   });
 });

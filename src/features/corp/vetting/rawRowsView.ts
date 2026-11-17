@@ -170,7 +170,9 @@ export function filterRawItems(items: readonly RawItem[], filters: RawFilters): 
   return items.filter((item) => {
     if (filters.flagged && item.flag === null) return false;
     if (filters.kind !== '' && item.kind !== filters.kind) return false;
-    if (item.row.at !== null) {
+    if (filters.from !== null || filters.to !== null) {
+      // An undated row is in no range.
+      if (item.row.at === null) return false;
       const day = item.row.at.slice(0, 10);
       if (filters.from !== null && day < filters.from) return false;
       if (filters.to !== null && day > filters.to) return false;
@@ -188,7 +190,15 @@ export function rawKindOptions(items: readonly RawItem[]): string[] {
 export function tenureSeconds(row: VettingRawRow, readAt: number): number {
   if (row.joined === undefined) return 0;
   const end = row.left ? Date.parse(row.left) : readAt;
-  return Math.max(0, (end - Date.parse(row.joined)) / 1000);
+  const seconds = (end - Date.parse(row.joined)) / 1000;
+  return Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
+}
+
+/** A time the server sent, or null when it is not a date: a malformed row must not throw in a format call. */
+export function validTime(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const ms = Date.parse(iso);
+  return Number.isNaN(ms) ? null : ms;
 }
 
 /**
