@@ -1,0 +1,99 @@
+/**
+ * Mails a member the link to a review request, from the asking officer's Character, by the paced
+ * Officer mail queue. Only on an explicit press; never throws (whatever goes wrong comes back as a
+ * `MailRun`). Once queued it tells the server, so the queue shows "Mail sent" and the 24 hour
+ * resend wait.
+ */
+import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { VettingOverview, VettingReviewSummary } from '@/engine/vetting';
+import { useCharacterNames } from '@/features/character/useCharacters';
+import { officerCorporationName, type MailRun } from '@/features/corpTaxBook/officerMail';
+import { vettingBackend } from './vettingClient';
+import {
+  buildVettingRequestMail,
+  queueVettingRequestMail,
+  requestMailInput,
+} from './vettingRequestMail';
+import { requestLink } from './vettingText';
+
+export interface RequestMailPreview {
+  from: string;
+  to: string;
+  subject: string;
+  body: string;
+}
+
+type Asked = Pick<VettingReviewSummary, 'id' | 'state' | 'role' | 'pilot' | 'requestMail'>;
+
+export function useVettingRequestMail(
+  officerId: number,
+  corporationId: number,
+  onRecorded: (overview: VettingOverview) => void
+): {
+  send: (review: Asked) => Promise<MailRun>;
+  preview: (review: Asked) => Promise<RequestMailPreview | null>;
+} {
+  const { t } = useTranslation();
+  const names = useCharacterNames();
+  const officer = names.get(officerId) ?? '';
+
+  const compose = useCallback(
+    async (review: Asked) => {
+      const corpName =
+        (await officerCorporationName(corporationId)) ?? t('srp.officer.mail.corpFallback');
+      return requestMailInput(review, corpName, officer, requestLink());
+    },
+    [corporationId, officer, t]
+  );
+
+  const send = useCallback(
+    async (review: Asked): Promise<MailRun> => {
+      const none: MailRun = { queued: [], failed: [], missingScope: false };
+      try {
+        const mail = await compose(review);
+        if (mail === null) return none;
+        const run = await queueVettingRequestMail(t, {
+          corporationId,
+          reviewId: review.id,
+          senderCharacterId: officerId,
+          pilotId: review.pilot.characterId,
+          previousSentAt: review.requestMail?.sentAt ?? 0,
+          mail,
+        });
+        if (run.queued.length > 0) {
+          try {
+            onRecorded(
+              await vettingBackend().recordRequestMail(officerId, corporationId, review.id)
+            );
+          } catch {
+            // The mail is queued; only the "Mail sent" line is missing.
+          }
+        }
+        return run;
+      } catch {
+        return { ...none, failed: [review.pilot.name] };
+      }
+    },
+    [compose, corporationId, officerId, onRecorded, t]
+  );
+
+  const preview = useCallback(
+    async (review: Asked): Promise<RequestMailPreview | null> => {
+      try {
+        const mail = await compose(review);
+        if (mail === null) return null;
+        return {
+          from: officer,
+          to: review.pilot.name,
+          ...buildVettingRequestMail(t, mail),
+        };
+      } catch {
+        return null;
+      }
+    },
+    [compose, officer, t]
+  );
+
+  return { send, preview };
+}

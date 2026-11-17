@@ -32,6 +32,7 @@ const ACTION = {
   open: 'openVettingReviewCallable',
   decide: 'decideVettingReviewCallable',
   request: 'requestVettingReviewCallable',
+  recordRequestMail: 'recordVettingRequestMailCallable',
   createInvite: 'createVettingInviteCallable',
   revokeInvite: 'revokeVettingInviteCallable',
   saveSettings: 'saveVettingSettingsCallable',
@@ -111,6 +112,8 @@ const client: VettingBackend = {
     }),
   request: (characterId, corporationId, memberName, role) =>
     signedIn<VettingOverview>(characterId, ACTION.request, { corporationId, memberName, role }),
+  recordRequestMail: (characterId, corporationId, reviewId) =>
+    signedIn<VettingOverview>(characterId, ACTION.recordRequestMail, { corporationId, reviewId }),
   createInvite: (characterId, corporationId, label) =>
     signedIn<VettingOverview>(characterId, ACTION.createInvite, { corporationId, label }),
   revokeInvite: (characterId, corporationId, code) =>

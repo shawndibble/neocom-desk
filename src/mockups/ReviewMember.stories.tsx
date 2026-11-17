@@ -101,7 +101,7 @@ export const Today: Story = {
         roster={{ status: 'unreadable' }}
         mark={(members) => [...members]}
         onClose={() => undefined}
-        onRequest={async () => undefined}
+        onRequest={async () => null}
       />
     </>
   ),

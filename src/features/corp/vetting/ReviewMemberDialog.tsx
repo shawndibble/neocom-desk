@@ -1,13 +1,20 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, TextInput } from '@/components/ui';
+import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
+import { Pill } from '@/components/ui/Pill';
+import type { VettingReviewSummary } from '@/engine/vetting';
+import type { MailRun } from '@/features/corpTaxBook/officerMail';
 import { InlineError } from '@/components/ui/InlineError';
 import { callableErrorReason } from '@/lib/callableError';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { MemberCombobox, PickedMember } from './MemberCombobox';
 import { RoleField } from './RoleField';
 import { pickable, type RosterMember } from './reviewRoster';
+import { TellMemberStep } from './TellMemberStep';
 import type { ReviewRosterState } from './useReviewRoster';
+import type { RequestMailPreview } from './useVettingRequestMail';
+import { reviewKindLabel } from './vettingText';
 import { vettingErrorKey } from './vettingView';
 
 interface ReviewMemberDialogProps {
@@ -16,15 +23,28 @@ interface ReviewMemberDialogProps {
   roster: ReviewRosterState;
   /** Members flagged (waiting review, the officer) before they reach the list. */
   mark: (members: readonly RosterMember[]) => RosterMember[];
-  /** Asks the member for a review; rejects with the server's refusal. */
-  onRequest: (memberName: string, role: string) => Promise<void>;
+  /** Asks the member for a review; rejects with the server's refusal. Resolves to the new review. */
+  onRequest: (memberName: string, role: string) => Promise<VettingReviewSummary | null>;
+  /** Mailing the member the link, offered once the review exists. Absent: the dialog just closes. */
+  mail?: {
+    officerId: number;
+    officerName: string;
+    send: (review: VettingReviewSummary) => Promise<MailRun>;
+    preview: (review: VettingReviewSummary) => Promise<RequestMailPreview | null>;
+  };
 }
 
 /**
  * "Review a member…": ask a member for a review before a promotion. The exact in-game name and
  * the role they are up for. Whoever asks cannot sign the review off, which the dialog says.
  */
-export function ReviewMemberDialog({ onClose, roster, mark, onRequest }: ReviewMemberDialogProps) {
+export function ReviewMemberDialog({
+  onClose,
+  roster,
+  mark,
+  onRequest,
+  mail,
+}: ReviewMemberDialogProps) {
   const { t } = useTranslation();
   const phone = useIsPhone();
   const nameRef = useRef<HTMLInputElement>(null);
@@ -33,6 +53,7 @@ export function ReviewMemberDialog({ onClose, roster, mark, onRequest }: ReviewM
   const [role, setRole] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [asked, setAsked] = useState<VettingReviewSummary | null>(null);
   const listed = roster.status === 'ready';
   const members = roster.status === 'ready' ? mark(roster.roster.members) : [];
   const who = listed ? (picked && pickable(picked) ? picked.name : '') : name.trim();
@@ -42,14 +63,53 @@ export function ReviewMemberDialog({ onClose, roster, mark, onRequest }: ReviewM
     setBusy(true);
     setError(null);
     try {
-      await onRequest(who, role.trim());
-      onClose();
+      const created = await onRequest(who, role.trim());
+      if (created && mail) setAsked(created);
+      else onClose();
     } catch (err) {
       setError(t(vettingErrorKey(callableErrorReason(err))));
     } finally {
       setBusy(false);
     }
   };
+  if (asked && mail) {
+    return (
+      <Modal
+        open
+        onClose={onClose}
+        title={t('vetting.tell.title')}
+        placement={phone ? 'sheet' : 'center'}
+        dismissOnOutsidePress={false}
+        footer={
+          <div className="flex justify-end gap-2 [&>button]:max-sm:w-full">
+            <Button variant="ghost" onClick={onClose}>
+              {t('vetting.tell.done')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4 text-sm">
+          <div className="flex items-center gap-3">
+            <CharacterAvatar characterId={asked.pilot.characterId} size="md" />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-semibold">{asked.pilot.name}</span>
+              <span className="block truncate text-xs text-text-dim">
+                {reviewKindLabel(asked, t)}
+              </span>
+            </span>
+            <Pill>{t('vetting.tell.waitingFor', { name: asked.pilot.name.split(' ')[0] })}</Pill>
+          </div>
+          <TellMemberStep
+            name={asked.pilot.name}
+            officerId={mail.officerId}
+            officerName={mail.officerName}
+            send={() => mail.send(asked)}
+            preview={() => mail.preview(asked)}
+          />
+        </div>
+      </Modal>
+    );
+  }
   const buttons = (
     <>
       <Button variant="ghost" onClick={onClose}>

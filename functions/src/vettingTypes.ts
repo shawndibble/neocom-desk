@@ -146,6 +146,8 @@ export interface StoredVettingReview {
   role?: string;
   pilot: { characterId: number; name: string; corporationName: string };
   requestedBy?: VettingActor;
+  /** When the asking officer last recorded mailing the member the link (additive). */
+  requestMail?: { sentAt: number };
   /** SHA-256 of the pilot's secret, hex; null until a requested member is handed one. */
   keyHash: string | null;
   /** The invite an application started from. Officers are shown the label, nobody the code. */

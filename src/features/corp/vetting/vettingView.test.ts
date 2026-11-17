@@ -24,6 +24,7 @@ import {
   reviewResult,
   signOffRows,
   vettingErrorKey,
+  visibleReviews,
 } from './vettingView';
 
 const summary = (over: Partial<VettingReviewSummary>): VettingReviewSummary => ({
@@ -407,5 +408,16 @@ describe('vettingErrorKey', () => {
     expect(isReviewGone('not-found')).toBe(true);
     expect(isReviewGone('vetting-off')).toBe(false);
     expect(isReviewGone(null)).toBe(false);
+  });
+});
+
+describe('visibleReviews', () => {
+  it('drops a review about the viewing officer and keeps the rest', () => {
+    const about = (id: number) => ({
+      pilot: { characterId: id, name: `P${id}`, corporationName: 'C' },
+    });
+    expect(
+      visibleReviews([about(1), about(2), about(3)], 2).map((r) => r.pilot.characterId)
+    ).toEqual([1, 3]);
   });
 });

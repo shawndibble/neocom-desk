@@ -1,0 +1,77 @@
+import { describe, expect, it } from 'vitest';
+import i18n from '@/i18n';
+import { MAX_MAIL_SUBJECT } from '@/engine/communities/requestMail';
+import {
+  buildVettingRequestMail,
+  requestMailCooldown,
+  requestMailInput,
+  type VettingRequestMailInput,
+} from './vettingRequestMail';
+
+const t = i18n.t.bind(i18n);
+const HOUR = 3_600_000;
+
+const input = (over: Partial<VettingRequestMailInput> = {}): VettingRequestMailInput => ({
+  pilot: 'Ren Halvard',
+  role: 'Accountant',
+  corpName: 'Brass Meridian Logistics',
+  officer: 'Bram Kessel',
+  link: 'https://neocomdesk.com/vetting',
+  ...over,
+});
+
+describe('buildVettingRequestMail', () => {
+  it('says who asked, for what, what is read, that they may decline, and the link', () => {
+    const mail = buildVettingRequestMail(t, input());
+    expect(mail.subject).toBe('Review requested before Accountant');
+    expect(mail.body).toBe(
+      [
+        'Hi Ren Halvard,',
+        'I asked for a review before you are made Accountant in Brass Meridian Logistics. Other officers decide it. I cannot sign it off.',
+        'What happens: you sign in with your characters and choose which to share. Neocom Desk reads them once: corporation history, wallet, contracts, contacts, skills, and who you exchanged mail with (never the subject or the text). No sign-in is kept.',
+        'You can see who opens the report, delete it at any time, or decline. If you decline, the reviewers are told and nothing is read.',
+        'Open it: https://neocomdesk.com/vetting\nSign in as Ren Halvard.',
+        'Bram Kessel',
+      ].join('\n\n')
+    );
+  });
+
+  it('strips markup from names and the role, and clips the subject', () => {
+    const mail = buildVettingRequestMail(
+      t,
+      input({ role: '<b>Big</b> ' + 'x'.repeat(200), pilot: 'A<br>B' })
+    );
+    expect(mail.body).not.toContain('<');
+    expect(mail.subject.length).toBeLessThanOrEqual(MAX_MAIL_SUBJECT);
+  });
+});
+
+describe('requestMailInput', () => {
+  const review = {
+    state: 'requested' as const,
+    kind: 'promotion' as const,
+    role: 'Accountant',
+    pilot: { characterId: 1, name: 'Ren Halvard', corporationName: 'Brass' },
+  };
+  it('needs a request still waiting on the member', () => {
+    expect(requestMailInput(review, 'Corp', 'Bram', 'link')).toMatchObject({
+      pilot: 'Ren Halvard',
+      role: 'Accountant',
+      officer: 'Bram',
+    });
+    expect(requestMailInput({ ...review, state: 'open' }, 'Corp', 'Bram', 'link')).toBeNull();
+  });
+});
+
+describe('requestMailCooldown', () => {
+  const now = 100 * HOUR;
+  it('is free before any mail, and after a day', () => {
+    expect(requestMailCooldown(undefined, now)).toBeNull();
+    expect(requestMailCooldown({ sentAt: now - 24 * HOUR }, now)).toBeNull();
+  });
+  it('says how long is left within a day', () => {
+    expect(requestMailCooldown({ sentAt: now - 6 * HOUR }, now)).toEqual({
+      remainingMs: 18 * HOUR,
+    });
+  });
+});

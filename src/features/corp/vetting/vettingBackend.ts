@@ -87,6 +87,15 @@ export interface VettingBackend {
     memberName: string,
     role: string
   ): Promise<VettingOverview>;
+  /**
+   * Notes that the asking officer mailed the member the link. Only they, only while the member
+   * has not shared, and not again within a day (`VETTING_MAIL_COOLDOWN_MS`).
+   */
+  recordRequestMail(
+    characterId: number,
+    corporationId: number,
+    reviewId: string
+  ): Promise<VettingOverview>;
   /** Any reviewer may hand out an invite link. */
   createInvite(characterId: number, corporationId: number, label: string): Promise<VettingOverview>;
   revokeInvite(characterId: number, corporationId: number, code: string): Promise<VettingOverview>;

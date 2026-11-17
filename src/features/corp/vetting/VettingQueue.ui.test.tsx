@@ -14,14 +14,26 @@ import {
   type VettingFixture,
   type VettingFixtureOptions,
 } from '@/storybook/vettingFixture';
+import type { VettingReviewSummary } from '@/engine/vetting';
 import { VettingPage } from './VettingPage';
 import { setVettingBackendOverride } from './vettingBackend';
 
 const CHARACTER = 2119876543;
 let fixture: VettingFixture;
 
-async function setup(path = '/corp/vetting/open', options: VettingFixtureOptions = {}) {
+async function setup(
+  path = '/corp/vetting/open',
+  options: VettingFixtureOptions = {},
+  tweak?: (rows: VettingReviewSummary[]) => VettingReviewSummary[]
+) {
   fixture = createVettingFixture(options);
+  if (tweak) {
+    const overview = fixture.overview;
+    fixture.overview = async (...args) => {
+      const next = await overview(...args);
+      return { ...next, reviews: tweak(next.reviews) };
+    };
+  }
   setVettingBackendOverride(fixture);
   await seedCharacter(CHARACTER);
   await db.characters.update(CHARACTER, {
@@ -60,9 +72,11 @@ describe('VettingPage queue', () => {
 
     expect(within(await rowOf('Pell Okonru')).getByText('Nothing found')).toBeInTheDocument();
     expect(within(await rowOf('Dara Quill')).getByText('Incomplete')).toBeInTheDocument();
-    // Waiting on the pilot: nothing for the caller to sign yet.
+    // Waiting on the pilot: nothing for the caller to sign yet; who asked, and where the mail stands.
     const ren = within(await rowOf('Ren Halvard'));
-    expect(ren.getByText('Waiting for pilot')).toBeInTheDocument();
+    expect(ren.getByText('Waiting for Ren')).toBeInTheDocument();
+    expect(ren.getByText(/Asked 2d ago by /)).toBeInTheDocument();
+    expect(ren.getByText('Mail not sent')).toBeInTheDocument();
     expect(ren.queryByText('Yours needed')).toBeNull();
 
     expect(screen.getByText('5 open')).toBeInTheDocument();
@@ -118,10 +132,52 @@ describe('VettingPage queue', () => {
     expect(screen.getByRole('link', { name: 'Vetting' })).toBeInTheDocument();
   });
 
-  it('does not open a request the pilot has not answered', async () => {
+  it('opens a request the pilot has not answered like any other row', async () => {
     await setup();
     await userEvent.click(await screen.findByText('Ren Halvard'));
-    expect(fixture.calls.some((call) => call.method === 'open')).toBe(false);
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Ren Halvard' })
+    ).toBeInTheDocument();
+  });
+
+  it('offers Send mail and Copy link on a waiting row, never on a shared one', async () => {
+    await setup();
+    const row = within(await rowOf('Ren Halvard'));
+    await userEvent.click(row.getByRole('button', { name: /more actions/i }));
+    expect(await screen.findByRole('menuitem', { name: 'Send mail to Ren' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Copy link' })).toBeInTheDocument();
+    expect(
+      within(await rowOf('Tamsin Vell')).queryByRole('button', { name: /more actions/i })
+    ).toBeNull();
+  });
+
+  it('shows when the mail went and holds a resend for a day', async () => {
+    await setup('/corp/vetting/open', {}, (rows) =>
+      rows.map((row) =>
+        row.state === 'requested'
+          ? { ...row, requestMail: { sentAt: Date.now() - 6 * 3_600_000 } }
+          : row
+      )
+    );
+    const row = within(await rowOf('Ren Halvard'));
+    expect(row.getByText(/^Mail sent /)).toBeInTheDocument();
+    await userEvent.click(row.getByRole('button', { name: /more actions/i }));
+    const resend = await screen.findByRole('menuitem', { name: /Resend mail to Ren/ });
+    expect(resend).toHaveAttribute('aria-disabled', 'true');
+    expect(resend).toHaveTextContent(/Sent .+\. You can resend after a day\./);
+  });
+
+  it('does not list a review about the viewing officer', async () => {
+    await setup('/corp/vetting/open', {}, (rows) => [
+      {
+        ...rows[0],
+        id: 'about-me',
+        pilot: { characterId: CHARACTER, name: 'Sample Officer', corporationName: 'X' },
+      },
+      ...rows,
+    ]);
+    expect(await screen.findByText('Tamsin Vell')).toBeInTheDocument();
+    expect(screen.queryByText('Sample Officer')).toBeNull();
   });
 
   it('says nothing found neutrally, with the checks listed', async () => {
@@ -169,6 +225,10 @@ describe('VettingPage queue', () => {
     );
     await userEvent.type(dialog.getByLabelText('Role they are up for'), 'Accountant');
     await userEvent.click(ask);
+    // The review exists; the member is offered the mail, never sent one unasked.
+    expect(await dialog.findByText('Waiting for Sio')).toBeInTheDocument();
+    expect(dialog.getByRole('button', { name: 'Send mail to Sio' })).toBeInTheDocument();
+    await userEvent.click(dialog.getByRole('button', { name: 'Done' }));
     expect(await rowOf('Sio Tane')).toHaveTextContent('Promotion to Accountant');
     expect(fixture.calls.find((call) => call.method === 'request')?.args.slice(2)).toEqual([
       'Sio Tane',

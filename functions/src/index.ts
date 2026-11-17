@@ -324,6 +324,7 @@ import {
   listMyVettingRequests,
   openVettingReview,
   removeVettingCharacter,
+  recordVettingRequestMail,
   requestVettingReview,
   revokeVettingInvite,
   saveVettingSettings,
@@ -1585,6 +1586,14 @@ vettingAction('requestVettingReviewCallable', (request) =>
     callerOf(request),
     parseBookCall(request.data),
     parseVettingRequest(request.data)
+  )
+);
+vettingAction('recordVettingRequestMailCallable', (request) =>
+  recordVettingRequestMail(
+    vettingDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseVettingReviewId(request.data)
   )
 );
 vettingAction('createVettingInviteCallable', (request) =>

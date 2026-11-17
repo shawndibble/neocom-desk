@@ -589,6 +589,9 @@ export const VETTING_KEEP_DAYS = 30;
 export const VETTING_OPEN_KEEP_DAYS = 90;
 /** Longest role name a promotion review carries. */
 export const VETTING_ROLE_MAX = 40;
+
+/** The asking officer may resend a member's request mail only after this long (24 hours). */
+export const VETTING_MAIL_COOLDOWN_MS = 86_400_000;
 /** Hours an unsent draft is kept. */
 export const VETTING_DRAFT_HOURS = 24;
 export const VETTING_MAX_CHARACTERS = 30;
@@ -651,6 +654,10 @@ export interface VettingReviewSummary {
   decidedAt: number | null;
   /** The invite the application started from, when there was one. */
   invite?: string;
+  /** The officer who asked, on a promotion review. */
+  requestedBy?: { characterId: number; name: string };
+  /** When the asking officer last mailed the member the link; absent until they did. */
+  requestMail?: { sentAt: number };
 }
 
 /** The full report an officer opens. */
@@ -658,7 +665,6 @@ export interface VettingReview extends VettingReviewSummary {
   corporationId: number;
   note: string;
   answers: VettingAnswer[];
-  requestedBy?: { characterId: number; name: string };
   /** True when the caller asked for this review, or it is about them, so they cannot sign it off. */
   barred: boolean;
   reportCharacters: VettingReportCharacter[];

@@ -1,6 +1,14 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DataTable, EmptyState, Panel, type DataTableColumn } from '@/components/ui';
+import {
+  DataTable,
+  DisabledMenuItem,
+  EmptyState,
+  MenuItem,
+  Panel,
+  RowActionsMenu,
+  type DataTableColumn,
+} from '@/components/ui';
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 import { Pill } from '@/components/ui/Pill';
 import type { VettingReviewSummary } from '@/engine/vetting';
@@ -9,6 +17,7 @@ import { useTimeZone } from '@/lib/timeFormat';
 import { formatDateOnly } from '@/lib/timestamp';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useNow } from '@/lib/useNow';
+import { requestMailCooldown } from './vettingRequestMail';
 import { reviewKindLabel } from './vettingText';
 import { needsYours, reviewResult } from './vettingView';
 
@@ -31,13 +40,27 @@ interface VettingQueueProps {
   rows: readonly VettingReviewSummary[];
   /** Opens a review's report. */
   onOpen: (review: VettingReviewSummary) => void;
+  /**
+   * A request's row menu: mail the member the link, or copy it. Absent (a reviewer who cannot
+   * act on requests): a waiting row has no menu.
+   */
+  onRequestMail?: (review: VettingReviewSummary) => void;
+  onCopyRequestLink?: (review: VettingReviewSummary) => void;
 }
+
+const firstName = (name: string) => name.split(' ')[0] ?? name;
 
 /**
  * One row per pilot: who, what for, the result in words, sign-offs with "Yours needed". A row
  * click opens the report; there is no Accept or Reject here, because a decision needs it read.
  */
-export function VettingQueue({ tab, rows, onOpen }: VettingQueueProps) {
+export function VettingQueue({
+  tab,
+  rows,
+  onOpen,
+  onRequestMail,
+  onCopyRequestLink,
+}: VettingQueueProps) {
   const { t } = useTranslation();
   const now = useNow();
   const phone = useIsPhone();
@@ -52,15 +75,7 @@ export function VettingQueue({ tab, rows, onOpen }: VettingQueueProps) {
           <span className="flex min-w-0 items-center gap-2">
             <CharacterAvatar characterId={row.pilot.characterId} size="sm" loading="lazy" />
             <span className="min-w-0">
-              <span
-                className={
-                  row.state === 'requested'
-                    ? 'block truncate font-semibold'
-                    : 'block truncate font-semibold text-accent'
-                }
-              >
-                {row.pilot.name}
-              </span>
+              <span className="block truncate font-semibold text-accent">{row.pilot.name}</span>
               <span className="block truncate text-xs text-text-dim">
                 {row.pilot.corporationName}
               </span>
@@ -100,7 +115,12 @@ export function VettingQueue({ tab, rows, onOpen }: VettingQueueProps) {
         id: 'result',
         header: t('vetting.queue.columns.result'),
         cardCorner: true,
-        render: (row) => <VettingResultPill review={row} />,
+        render: (row) =>
+          row.state === 'requested' ? (
+            <Pill>{t('vetting.requestRow.waitingFor', { name: firstName(row.pilot.name) })}</Pill>
+          ) : (
+            <VettingResultPill review={row} />
+          ),
       },
     ];
     if (tab === 'open') {
@@ -130,12 +150,36 @@ export function VettingQueue({ tab, rows, onOpen }: VettingQueueProps) {
           header: t('vetting.queue.columns.read'),
           align: 'right',
           className: 'whitespace-nowrap text-text-dim tabular-nums',
-          render: (row) =>
-            row.readAt !== null
-              ? formatAge(Math.max(0, now - row.readAt), t)
-              : t('vetting.queue.asked', {
-                  age: formatAge(Math.max(0, now - row.createdAt), t),
-                }),
+          render: (row) => {
+            if (row.readAt !== null) return formatAge(Math.max(0, now - row.readAt), t);
+            const age = formatAge(Math.max(0, now - row.createdAt), t);
+            if (row.state !== 'requested') return t('vetting.queue.asked', { age });
+            return (
+              <span className={phone ? undefined : 'block'}>
+                {row.requestedBy
+                  ? t('vetting.requestRow.askedBy', { age, name: row.requestedBy.name })
+                  : t('vetting.requestRow.asked', { age })}
+                <span
+                  className={
+                    row.requestMail
+                      ? phone
+                        ? undefined
+                        : 'block text-xs'
+                      : phone
+                        ? 'text-warning'
+                        : 'block text-xs text-warning'
+                  }
+                >
+                  {phone && ' · '}
+                  {row.requestMail
+                    ? t('vetting.requestRow.mailSent', {
+                        age: formatAge(Math.max(0, now - row.requestMail.sentAt), t),
+                      })
+                    : t('vetting.requestRow.mailNone')}
+                </span>
+              </span>
+            );
+          },
         }
       );
     } else {
@@ -158,6 +202,45 @@ export function VettingQueue({ tab, rows, onOpen }: VettingQueueProps) {
     return list;
   }, [t, tab, now, timeZone, phone]);
 
+  const rowMenu = (row: VettingReviewSummary, tr: React.ReactElement) => {
+    if (row.state !== 'requested' || !onRequestMail || !onCopyRequestLink) return tr;
+    const name = firstName(row.pilot.name);
+    const wait = requestMailCooldown(row.requestMail, now);
+    const waitReason = row.requestMail
+      ? t('vetting.requestRow.resendWait', {
+          age: formatAge(Math.max(0, now - row.requestMail.sentAt), t),
+        })
+      : '';
+    return (
+      <RowActionsMenu
+        name={row.pilot.name}
+        items={
+          <>
+            {wait ? (
+              <DisabledMenuItem reason={waitReason}>
+                <span>
+                  {t('vetting.requestRow.resend', { name })}
+                  <span className="block text-xs text-text-dim">{waitReason}</span>
+                </span>
+              </DisabledMenuItem>
+            ) : (
+              <MenuItem onSelect={() => onRequestMail(row)}>
+                {t(row.requestMail ? 'vetting.requestRow.resend' : 'vetting.requestRow.send', {
+                  name,
+                })}
+              </MenuItem>
+            )}
+            <MenuItem onSelect={() => onCopyRequestLink(row)}>
+              {t('vetting.requestRow.copyLink')}
+            </MenuItem>
+          </>
+        }
+      >
+        {tr}
+      </RowActionsMenu>
+    );
+  };
+
   if (rows.length === 0) {
     return (
       <Panel title={t(`vetting.queue.title.${tab}`)}>
@@ -176,8 +259,8 @@ export function VettingQueue({ tab, rows, onOpen }: VettingQueueProps) {
         rows={rows}
         rowKey={(row) => row.id}
         onRowClick={onOpen}
-        // A request the pilot has not answered has no report to open.
-        rowClickable={(row) => row.state !== 'requested'}
+        rowContextMenu={onRequestMail ? rowMenu : undefined}
+        rowMoreActions={onRequestMail !== undefined}
         stackLayout={phone ? 'dense' : 'labelled'}
       />
     </Panel>

@@ -14,6 +14,7 @@ import {
   VETTING_DEFAULT_SETTINGS,
   VETTING_INVITES_MAX,
   VETTING_KEEP_DAYS,
+  VETTING_MAIL_COOLDOWN_MS,
   VETTING_OPEN_KEEP_DAYS,
   type VettingAnswer,
   type VettingCharacterInput,
@@ -273,6 +274,7 @@ interface ReviewSeed {
   ageMs: number;
   signOffs?: VettingReview['signOffs'];
   requestedBy?: { characterId: number; name: string };
+  requestMail?: { sentAt: number };
 }
 
 function buildReview(
@@ -320,6 +322,7 @@ function buildReview(
     note: seed.note ?? '',
     answers: read && seed.kind === 'application' ? answers : [],
     ...(seed.requestedBy ? { requestedBy: seed.requestedBy } : {}),
+    ...(seed.requestMail ? { requestMail: seed.requestMail } : {}),
     barred: false,
     reportCharacters: seed.samples.map((sample) => ({
       characterId: sample.characterId,
@@ -370,6 +373,8 @@ function summaryOf(review: VettingReview): VettingReviewSummary {
     createdAt,
     decidedAt,
     invite,
+    requestedBy,
+    requestMail,
   } = review;
   return {
     id,
@@ -388,6 +393,8 @@ function summaryOf(review: VettingReview): VettingReviewSummary {
     createdAt,
     decidedAt,
     ...(invite ? { invite } : {}),
+    ...(requestedBy ? { requestedBy } : {}),
+    ...(requestMail ? { requestMail } : {}),
   };
 }
 
@@ -842,6 +849,16 @@ export function createVettingFixture(options: VettingFixtureOptions = {}): Vetti
       );
       review.barred = true;
       reviews.set(id, review);
+      return overview();
+    },
+    recordRequestMail: async (_characterId, _corporationId, reviewId) => {
+      const review = reviewOf(reviewId);
+      if (review.state !== 'requested') throw refusal('not-requested');
+      if (review.requestedBy?.characterId !== reviewer.characterId) throw refusal('not-asker');
+      if (review.requestMail && now - review.requestMail.sentAt < VETTING_MAIL_COOLDOWN_MS) {
+        throw refusal('mail-cooldown');
+      }
+      review.requestMail = { sentAt: now };
       return overview();
     },
     createInvite: async (_characterId, _corporationId, label) => {

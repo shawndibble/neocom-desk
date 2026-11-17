@@ -17962,6 +17962,7 @@
         "grant-stale": "Ledger can't be read",
         "srp-result": "SRP result",
         "vetting-result": "Vetting decision",
+        "vetting-request": "Vetting request",
         "removal": "Moon owner removal",
         "removalCancelled": "Removal cancelled"
       },
@@ -21565,6 +21566,53 @@
         "action": "Decline"
       }
     },
+    "requestMail": {
+      "subject": "Review requested before {{role}}",
+      "asked": "I asked for a review before you are made {{role}} in {{corp}}. Other officers decide it. I cannot sign it off.",
+      "what": "What happens: you sign in with your characters and choose which to share. Neocom Desk reads them once: corporation history, wallet, contracts, contacts, skills, and who you exchanged mail with (never the subject or the text). No sign-in is kept.",
+      "rights": "You can see who opens the report, delete it at any time, or decline. If you decline, the reviewers are told and nothing is read.",
+      "open": "Open it: {{link}}\nSign in as {{pilot}}."
+    },
+    "tell": {
+      "title": "Review asked",
+      "waitingFor": "Waiting for {{name}}",
+      "intro": "{{name}} sees this only when they open Neocom Desk. Mail them the link so they can sign in and share their characters.",
+      "hint": "Nothing is sent until you press Send. It goes from {{officer}}, with your other mail.",
+      "queued": "Mail queued for {{name}}. It goes out in about a minute.",
+      "already": "Already queued from this device.",
+      "send": "Send mail to {{name}}",
+      "resend": "Resend mail to {{name}}",
+      "preview": "Preview mail",
+      "copyLink": "Copy link",
+      "linkCopied": "Link copied",
+      "done": "Done",
+      "queueHint": "The queue row's menu keeps Send mail and Copy link, so you can come back to them.",
+      "failed": "Mail to {{name}} could not be queued. Try again.",
+      "grantTitle": "Can't mail the member"
+    },
+    "mailPreview": {
+      "title": "Mail to {{name}}",
+      "from": "From",
+      "to": "To",
+      "subject": "Subject",
+      "close": "Close",
+      "fixed": "The text is fixed, so what is read is always said the same way. It is queued with your other mail and goes out from {{officer}}."
+    },
+    "requestRow": {
+      "waitingFor": "Waiting for {{name}}",
+      "asked": "Asked {{age}}",
+      "askedBy": "Asked {{age}} by {{name}}",
+      "mailSent": "Mail sent {{age}}",
+      "mailNone": "Mail not sent",
+      "send": "Send mail to {{name}}",
+      "resend": "Resend mail to {{name}}",
+      "resendWait": "Sent {{age}}. You can resend after a day.",
+      "copyLink": "Copy link",
+      "mailQueued": "Mail queued for {{name}}.",
+      "mailAlready": "Already queued from this device.",
+      "mailFailed": "Mail to {{name}} could not be queued. Try again.",
+      "grantTitle": "Can't mail the member"
+    },
     "errors": {
       "generic": "That did not work. Try again.",
       "not-found": "This review no longer exists.",
@@ -21591,6 +21639,9 @@
       "barred": "You cannot sign off this review.",
       "own-review": "This review is about you, so you cannot open it.",
       "already-signed": "You already signed this review off.",
+      "not-requested": "This review is no longer waiting for the member.",
+      "not-asker": "Only the officer who asked can record the mail.",
+      "mail-cooldown": "The member was mailed less than a day ago.",
       "esi-backoff": "EVE's servers are busy. Try again in a few minutes.",
       "esi-error": "EVE's servers did not answer. Try again in a few minutes.",
       "esi-forbidden": "EVE refused that login. Log in again."
