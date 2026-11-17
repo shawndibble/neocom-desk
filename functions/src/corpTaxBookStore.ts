@@ -1170,6 +1170,16 @@ function keepInGroup(c: EditCtx, characterIds: readonly number[]): void {
   );
 }
 
+const ACCOUNT_FIGURES = ['owed', 'paid', 'days', 'oldest', 'paidThrough'] as const;
+
+/** Whether a stored account already holds these figures (its `at` and `by` aside). */
+function sameAccount(
+  stored: FirebaseFirestore.DocumentData | undefined,
+  next: Record<string, unknown>
+): boolean {
+  return !!stored && ACCOUNT_FIGURES.every((k) => stored[k] === next[k]);
+}
+
 /**
  * The paid-through days `recordAccounts` may store (D22): per Miner the day the client asked for,
  * never before the stored one, never today or later (its ore is still coming in), never on or
@@ -1949,11 +1959,16 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       // Every book is a running account (decision 20261117-060555).
       const paidRef = col(c, META).doc(PAID_DOC);
       const settled = await storableSettledThrough(c, action.accounts, paidRef, iso);
-      for (const account of action.accounts) {
+      // Every editor's open tab records the same figures (#6313): one already stored is not
+      // written again, so a second tab adds no write and no newer `at`/`by`.
+      const refs = action.accounts.map((a) => col(c, ACCOUNTS).doc(a.minerId));
+      const stored = refs.length > 0 ? await c.tx.getAll(...refs) : [];
+      action.accounts.forEach((account, i) => {
         const a = { ...account };
         delete a.settledThrough; // the pay page's record; the marker lives in `meta/paid`
-        tx.set(col(c, ACCOUNTS).doc(a.minerId), { ...a, at: iso, by });
-      }
+        if (sameAccount(stored[i].data(), a)) return;
+        tx.set(refs[i], { ...a, at: iso, by });
+      });
       // Only ever grown: a day recorded paid stays paid, even if money is later taken back (D22).
       if (Object.keys(settled).length > 0)
         tx.set(paidRef, { minerPaidThrough: settled }, { merge: true });
