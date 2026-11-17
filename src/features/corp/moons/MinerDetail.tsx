@@ -24,6 +24,8 @@ import {
   DAY_RANGES,
   daysByPhase,
   inRange,
+  owedOf,
+  rangeFigures,
   rangeStart,
   type DayRange,
   minerMoons,
@@ -118,8 +120,13 @@ export function MinerDetail({ id }: { id: string }) {
       }),
     [audit.entries, id, statementIds, paymentIds]
   );
-  const phases = useMemo(
-    () => daysByPhase((detail?.days ?? []).filter((d) => inRange(d.date, from))),
+  // The range narrows what happened (Earlier days, Payments); what is owed now always shows whole.
+  const phases = useMemo(() => {
+    const all = daysByPhase(detail?.days ?? []);
+    return { ...all, earlier: all.earlier.filter((d) => inRange(d.date, from)) };
+  }, [detail, from]);
+  const rangeTax = useMemo(
+    () => rangeFigures(detail?.days ?? [], detail?.payments ?? [], from),
     [detail, from]
   );
   const moons = useMemo(() => minerMoons(view, id), [view, id]);
@@ -309,7 +316,9 @@ export function MinerDetail({ id }: { id: string }) {
             <span className={cx('block text-xs whitespace-nowrap', STATUS_TONE[d.status])}>
               {d.heldBy !== undefined
                 ? t('corpTaxBook.moons.dayStatus.held', { owner: names.corporation(d.heldBy) })
-                : t(`corpTaxBook.moons.dayStatus.${d.status}`)}
+                : t(
+                    `corpTaxBook.moons.dayStatus.${running && d.status === 'unbilled' ? 'owed' : d.status}`
+                  )}
               {(() => {
                 const st = statementOf(d.statementId);
                 return st && <> · {statementLink(st)}</>;
@@ -371,7 +380,9 @@ export function MinerDetail({ id }: { id: string }) {
         startOpen={opts.startOpen}
         summary={t('corpTaxBook.moons.miner.daysSummary', {
           count: phases[key].length,
-          tax: isk(sumTax(phases[key]) + adjust),
+          tax: isk(
+            key === 'nextStatement' && running ? owedOf(phases[key]) : sumTax(phases[key]) + adjust
+          ),
         })}
       >
         {(shown, table) => (
@@ -744,6 +755,14 @@ export function MinerDetail({ id }: { id: string }) {
         />,
         { select: true, status: false, startOpen: false }
       )}
+      {daysSection(
+        t(`corpTaxBook.moons.sections.${running ? 'owedDays' : 'nextStatement'}`),
+        'nextStatement',
+        <span className="text-xs text-text-dim">
+          {t(running ? 'corpTaxBook.moons.miner.owedDaysHint' : 'corpTaxBook.moons.miner.daysHint')}
+        </span>,
+        { select: true, status: false, startOpen: true }
+      )}
       <div className="flex flex-wrap items-center gap-3">
         <SegmentedControl
           label={t('corpTaxBook.moons.account.range.label')}
@@ -753,39 +772,16 @@ export function MinerDetail({ id }: { id: string }) {
             value: r,
             label: t(`corpTaxBook.moons.account.range.${r}`),
           }))}
-          uppercase={false}
         />
         {from !== undefined && (
           <span className="text-sm text-text-dim tabular-nums">
             {t('corpTaxBook.moons.account.range.summary', {
-              tax: isk(
-                sumTax(
-                  detail.days.filter(
-                    (d) =>
-                      inRange(d.date, from) &&
-                      (d.status === 'unbilled' ||
-                        d.status === 'paid' ||
-                        d.status === 'on-statement')
-                  )
-                )
-              ),
-              paid: isk(
-                detail.payments
-                  .filter((p) => inRange(p.at, from))
-                  .reduce((s, p) => s + p.amount - (p.notTaxAmount ?? 0), 0)
-              ),
+              tax: isk(rangeTax.tax),
+              paid: isk(rangeTax.paid),
             })}
           </span>
         )}
       </div>
-      {daysSection(
-        t(`corpTaxBook.moons.sections.${running ? 'owedDays' : 'nextStatement'}`),
-        'nextStatement',
-        <span className="text-xs text-text-dim">
-          {t(running ? 'corpTaxBook.moons.miner.owedDaysHint' : 'corpTaxBook.moons.miner.daysHint')}
-        </span>,
-        { select: true, status: false, startOpen: true }
-      )}
       {daysSection(
         t('corpTaxBook.moons.sections.earlierDays'),
         'earlier',

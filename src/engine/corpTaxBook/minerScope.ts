@@ -17,10 +17,14 @@ import type { BookView } from './bookView';
 import type { ObservedRow } from './types';
 import { observedEntryKey } from './observed';
 
-/** First day whose ledger rows the page reads: the newest Statement's first day, else the book's start. */
+/**
+ * First day whose ledger rows the page reads: the newest Statement's first day, else the book's
+ * start. A late notice (#6294) never moves it: a running account's unpaid days before a notice
+ * stay owed and on the page.
+ */
 export function openWindowStart(statements: readonly Statement[], startDate: string): string {
   let from = startDate;
-  for (const s of statements) if (s.coversFrom > from) from = s.coversFrom;
+  for (const s of statements) if (s.kind !== 'notice' && s.coversFrom > from) from = s.coversFrom;
   return from;
 }
 

@@ -24,20 +24,24 @@ export const DEFAULT_NOTICE_RULES: NoticeRules = {
   cooldownDays: 7,
 };
 
-/** A stored `noticeRules`, every missing or malformed part at its default. */
+/** Bounds the server holds them to (`parseSettingsPatch`). */
+const isWhole = (x: unknown, min: number, max: number): x is number =>
+  isFiniteNumber(x) && Number.isInteger(x) && x >= min && x <= max;
+
+/** A stored `noticeRules`, every missing, malformed or out-of-bounds part at its default. */
 export function parseNoticeRules(raw: unknown): NoticeRules {
   const d = isRecord(raw) ? raw : {};
   const a = isRecord(d.after) ? d.after : {};
   const after: NoticeAfter =
-    a.kind === 'dayOfMonth' && isFiniteNumber(a.day)
+    a.kind === 'dayOfMonth' && isWhole(a.day, 1, 28)
       ? { kind: 'dayOfMonth', day: a.day }
-      : a.kind === 'behind' && isFiniteNumber(a.days)
+      : a.kind === 'behind' && isWhole(a.days, 1, 365)
         ? { kind: 'behind', days: a.days }
         : DEFAULT_NOTICE_RULES.after;
   return {
     after,
-    minimum: isFiniteNumber(d.minimum) ? d.minimum : DEFAULT_NOTICE_RULES.minimum,
-    cooldownDays: isFiniteNumber(d.cooldownDays)
+    minimum: isFiniteNumber(d.minimum) && d.minimum >= 0 ? d.minimum : DEFAULT_NOTICE_RULES.minimum,
+    cooldownDays: isWhole(d.cooldownDays, 1, 90)
       ? d.cooldownDays
       : DEFAULT_NOTICE_RULES.cooldownDays,
   };

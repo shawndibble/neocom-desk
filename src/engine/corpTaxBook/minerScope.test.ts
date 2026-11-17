@@ -233,6 +233,9 @@ describe('Miner page read-model path', () => {
     const { mine, from } = both();
     expect(from).toBe(mine.reduce((m, s) => (s.coversFrom > m ? s.coversFrom : m), ''));
     expect(openWindowStart([], '2026-08-01')).toBe('2026-08-01');
+    // A late notice never moves the window: unpaid days before it stay on the page.
+    const notice = { coversFrom: '2026-10-01', kind: 'notice' } as Statement;
+    expect(openWindowStart([notice], '2026-08-01')).toBe('2026-08-01');
   });
 
   it('rebuilds a frozen day from its Statement lines, once, ore by ore', () => {

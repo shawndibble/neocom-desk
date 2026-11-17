@@ -12,6 +12,8 @@ import {
 import {
   accountSortValue,
   inRange,
+  owedOf,
+  rangeFigures,
   rangeStart,
   activityFeed,
   daysByPhase,
@@ -69,6 +71,26 @@ describe('rangeStart and inRange', () => {
     expect(inRange('2026-11-11', '2026-11-11')).toBe(true);
     expect(inRange('2026-11-10T23:59:00Z', '2026-11-11')).toBe(false);
     expect(inRange('2026-01-01', undefined)).toBe(true);
+  });
+});
+
+describe('rangeFigures and owedOf', () => {
+  it('sums billed days mined and tax paid in the range, net of not-tax', () => {
+    const days = [
+      { date: '2026-11-15', status: 'unbilled' as const, tax: 10 },
+      { date: '2026-11-14', status: 'dismissed' as const, tax: 99 },
+      { date: '2026-11-01', status: 'paid' as const, tax: 5 },
+    ];
+    const payments = [
+      { at: '2026-11-15T10:00:00Z', amount: 8, notTaxAmount: 3 },
+      { at: '2026-10-01T10:00:00Z', amount: 50 },
+    ];
+    expect(rangeFigures(days, payments, '2026-11-11')).toEqual({ tax: 10, paid: 5 });
+    expect(rangeFigures(days, payments, undefined)).toEqual({ tax: 15, paid: 55 });
+  });
+
+  it('counts what a running day still owes, else its tax', () => {
+    expect(owedOf([{ tax: 10, owed: 4 }, { tax: 6 }, { tax: 9, owed: 0 }])).toBe(10);
   });
 });
 

@@ -1679,13 +1679,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const miner = await tx.get(col(c, MINERS).doc(statement.minerId));
       if (miner.exists && miner.get('closedAt') != null)
         fail('failed-precondition', "This Miner's account is closed", 'account-closed');
-      // A running account bills by day: an older client's calendar run is refused (#6294).
-      if (typeof c.book.runningAccountFrom === 'string' && statement.kind !== 'notice')
-        fail(
-          'failed-precondition',
-          'This book bills a running account: only late notices are issued',
-          'running-account'
-        );
+      refuseCalendarStatement(c, statement);
       const token = await issueStatementDoc(c, statement);
       return {
         detail: { statementId: statement.id, minerId: statement.minerId, amount: statement.amount },
@@ -1960,6 +1954,16 @@ async function issueStatementDoc(c: EditCtx, statement: StoredStatement): Promis
   return token;
 }
 
+/** A running account bills by day (#6294): an older client's calendar Statement is refused. */
+function refuseCalendarStatement(c: { book: Data }, statement: { kind?: string }): void {
+  if (typeof c.book.runningAccountFrom === 'string' && statement.kind !== 'notice')
+    fail(
+      'failed-precondition',
+      'This book bills a running account: only late notices are issued',
+      'running-account'
+    );
+}
+
 /**
  * Guest close-account (epic #4055, #4184): a final Statement, then the Miner
  * is closed so Statement mail stops. Credit is refunded unless the guest
@@ -1997,6 +2001,7 @@ async function closeAccount(
   const statement = action.statement ? parseStatement(action.statement) : undefined;
   if (statement && statement.minerId !== action.minerId)
     fail('invalid-argument', "Statement is another Miner's", 'wrong-miner');
+  if (statement) refuseCalendarStatement(c, statement);
 
   // The credit the guest is left with once the final Statement is counted.
   const [statements, payments, dismissals, extractions, writeOffs] = await Promise.all([

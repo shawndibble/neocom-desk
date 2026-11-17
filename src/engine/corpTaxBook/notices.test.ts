@@ -7,6 +7,9 @@ describe('parseNoticeRules', () => {
     expect(parseNoticeRules({ minimum: 'x', after: { kind: 'behind' } })).toEqual(
       DEFAULT_NOTICE_RULES
     );
+    expect(
+      parseNoticeRules({ after: { kind: 'dayOfMonth', day: 31 }, minimum: -1, cooldownDays: 0 })
+    ).toEqual(DEFAULT_NOTICE_RULES);
   });
 
   it('reads a day-of-month rule and the corp’s own figures', () => {

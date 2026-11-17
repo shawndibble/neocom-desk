@@ -50,12 +50,8 @@ import type { ObservedMiningEntry, OreLine } from './types';
 import type { DayPrices } from './valuation';
 import { DAY_MS } from '@/lib/age';
 import { wholeIsk } from './wholeIsk';
-import { disputeHold, type OreDispute } from './disputes';
-import {
-  allocateRunningAccount,
-  runningDaysFromLines,
-  type RunningAccount,
-} from './runningAccount';
+import { disputeHold, disputesToShow, type OreDispute } from './disputes';
+import { allocateRunningAccount, type RunningAccount } from './runningAccount';
 import { settleOpenSet, type OpenSet, type OpenSetInput } from './openSet';
 
 export interface BookViewInput {
@@ -98,8 +94,6 @@ export interface BookViewInput {
   runningAccountFrom?: string;
   /** A running account's per-day tolerance, in percent. */
   dayTolerancePct?: number;
-  /** The newest day the book recorded paid for each Miner on a running account, by Miner id. */
-  paidThroughByMiner?: ReadonlyMap<string, string>;
   /** The day's prices at the book's hub and Ore Form, by raw type id. */
   pricesOn: (date: string) => Pick<DayPrices, 'prices' | 'sources'>;
   /**
@@ -160,6 +154,11 @@ export interface DayRow {
   rateEffectiveFrom?: string;
   tax: number;
   status: DayStatus;
+  /**
+   * On a running account, what is still owed of an `unbilled` day: its share of the date's
+   * remainder, 0 while an open dispute holds the date (#6294).
+   */
+  owed?: number;
   /** A `not-billable` day held while this moon owner's ledger cannot be read (#6210). */
   heldBy?: number;
   statementId?: string;
@@ -274,6 +273,13 @@ function frozenDay(lines: readonly StatementLine[], charge: DayCharge) {
     rateEffectiveFrom: rate.rateEffectiveFrom,
     tax: lines.reduce((sum, l) => sum + l.tax, 0),
   };
+}
+
+/** A running day's share of what its date still owes: none while a dispute holds the date. */
+function runningOwed(running: RunningAccount, date: string, tax: number): number {
+  const day = running.byDay.get(date);
+  if (!day || day.held || day.tax <= 0) return 0;
+  return (day.remaining * tax) / day.tax;
 }
 
 /** What the next Statement would bill one Miner, in full: the draft every figure below it reads. */
@@ -402,14 +408,14 @@ export function buildBookView(input: BookViewInput): BookView {
     const running = input.runningAccountFrom
       ? allocateRunningAccount({
           ...allocationInput,
-          days: runningDaysFromLines(draftLines),
+          days: draftLines,
+          // An open dispute nobody has dismissed yet holds its date (`disputesToShow`).
           heldDays: new Set(
-            (input.disputes ?? [])
+            disputesToShow(input.disputes ?? [], input.dismissals)
               .filter((d) => d.minerId === id && disputeHold(d, input.now))
               .map((d) => d.date)
           ),
           dayTolerancePct: input.dayTolerancePct,
-          storedPaidThrough: input.paidThroughByMiner?.get(id),
         })
       : undefined;
     const dismissedKeys = new Map(draft.dismissed.map((d) => [d.charge.key, d.dismissal.id]));
@@ -467,6 +473,9 @@ export function buildBookView(input: BookViewInput): BookView {
             : {}),
           tax: value.tax,
           status,
+          ...(running && status === 'unbilled'
+            ? { owed: runningOwed(running, c.date, value.tax) }
+            : {}),
           ...(heldBy !== undefined ? { heldBy } : {}),
           ...(statement ? { statementId: statement.id } : {}),
           ...(dismissal ? { dismissalId: dismissal.id } : {}),

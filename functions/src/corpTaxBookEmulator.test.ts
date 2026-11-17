@@ -2246,6 +2246,16 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       });
     });
 
+    it('on a running account takes only a late notice as the final bill', async () => {
+      await turnOn();
+      await edit(DIRECTOR, { action: 'updateSettings', patch: { switchToRunningAccount: true } });
+      expect(await reason(close({ statement: statement('final_solo:50') }))).toBe(
+        'running-account'
+      );
+      const out = await close({ statement: { ...statement('final_solo:50'), kind: 'notice' } });
+      expect(out).toMatchObject({ statementId: 'final_solo:50' });
+    });
+
     it('records the credit left to refund by default', async () => {
       await turnOn();
       await edit(ACCOUNTANT, {

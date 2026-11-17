@@ -135,6 +135,8 @@ describe('buildBookView', () => {
         ['2026-09-16', 'unbilled'],
         ['2026-09-15', 'paid'],
       ]);
+      const owing = minerDetail(view, 'solo:1')!.days.find((d) => d.date === '2026-09-16');
+      expect(owing?.owed).toBe(200_000);
       const ahead = buildBookView(running({ payments: [pay(350_000)] }));
       expect(ahead.miners[0]).toMatchObject({ owed: 0, credit: 50_000 });
       expect(ahead.miners[0].account).toEqual({ paidThrough: '2026-09-16', owes: null });

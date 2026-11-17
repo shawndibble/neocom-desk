@@ -143,12 +143,16 @@ describe('Miner page on a running account', () => {
     expect(screen.getByText(/^(Owes .* oldest|Paid through)/)).toBeInTheDocument();
   });
 
-  it('reads the days and payments of the last 7 days', async () => {
+  it('reads the past days and payments of the last 7 days', async () => {
     renderBook(<MinerDetail id={VARRO_ID} />, running);
-    expect(screen.getByRole('checkbox', { name: 'Select 2026-09-04' })).toBeInTheDocument();
+    const earlier = () =>
+      Number(/· (\d+)/.exec(screen.getByText(/^Earlier days · /).textContent!)![1]);
+    const before = earlier();
     await userEvent.click(screen.getByRole('button', { name: 'Last 7 days' }));
     expect(screen.getByText(/^Tax .* · paid /)).toBeInTheDocument();
-    expect(screen.queryByRole('checkbox', { name: 'Select 2026-09-04' })).not.toBeInTheDocument();
+    expect(earlier()).toBeLessThan(before);
+    // What is owed now is never narrowed.
+    expect(screen.getByRole('checkbox', { name: 'Select 2026-09-04' })).toBeInTheDocument();
   });
 });
 
