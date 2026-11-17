@@ -140,6 +140,25 @@ describe('VettingPage queue', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows the request, nothing shared and the barred asker on a requested review', async () => {
+    await setup(`/corp/vetting/open/${VETTING_FIXTURE_REVIEWS.waiting}`);
+    expect(await screen.findByText('Nothing shared yet')).toBeInTheDocument();
+    expect(screen.getByText('Not sent')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send mail to Ren' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy link' })).toBeInTheDocument();
+    expect(
+      screen.getByText('You asked for this review, so you cannot sign it off.')
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
+  });
+
+  it('holds the resend of a requested review for a day once it was mailed', async () => {
+    await setup(`/corp/vetting/open/${VETTING_FIXTURE_REVIEWS.mailed}`, { extra: 'requests' });
+    const resend = await screen.findByRole('button', { name: 'Resend mail to Dorn' });
+    expect(resend).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByText(/You can resend after a day/)).toBeInTheDocument();
+  });
+
   it('offers Send mail and Copy link on a waiting row, never on a shared one', async () => {
     await setup();
     const row = within(await rowOf('Ren Halvard'));

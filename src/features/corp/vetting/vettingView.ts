@@ -251,8 +251,9 @@ export function signOffRows(
           note: signOff.note ?? '',
         }
   );
-  if (review.state !== 'open') return rows;
-  if (review.yours) rows.push({ kind: 'yours' });
+  if (review.state !== 'open' && review.state !== 'requested') return rows;
+  if (review.state === 'open' && review.yours) rows.push({ kind: 'yours' });
+  // A requested review still shows who asked: they cannot sign it off, before or after sharing.
   if (review.requestedBy) {
     rows.push({
       kind: 'barred',

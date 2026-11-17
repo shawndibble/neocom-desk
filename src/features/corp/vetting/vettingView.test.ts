@@ -325,6 +325,13 @@ describe('signOffRows', () => {
     expect(askedByReviewer(review({}), 9)).toBe(false);
   });
 
+  it('draws the asker barred before the member shares, and never a Yours row', () => {
+    const requestedBy = { characterId: 9, name: 'Bram Soto' };
+    const asked = review({ kind: 'promotion', state: 'requested', requestedBy, yours: false });
+    expect(signOffRows(asked, 9)).toEqual([{ kind: 'barred', name: 'Bram Soto', you: true }]);
+    expect(signOffRows(asked, 6)).toEqual([{ kind: 'barred', name: 'Bram Soto', you: false }]);
+  });
+
   it('adds no row for the caller once the review is decided', () => {
     expect(signOffRows(review({ state: 'accepted', yours: false }), 6)).toEqual([]);
   });

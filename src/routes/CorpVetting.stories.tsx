@@ -159,3 +159,22 @@ export const ReviewMember: Story = {
     await body.findByRole('dialog', { name: 'Review a member' });
   },
 };
+
+const requests = { vetting: { extra: 'requests' as const } };
+
+/** @summary Requested review, mail not sent: Request panel (asked by you, role, Mail not sent, Send mail), "Nothing shared yet", the rail with you barred. */
+export const RequestedNoMail: Story = {
+  parameters: report(VETTING_FIXTURE_REVIEWS.waiting),
+};
+/** @summary Phone: requested review, one column. */
+export const RequestedNoMailPhone: Story = { ...RequestedNoMail, globals: phone };
+
+/** @summary Requested review, mail sent 6 hours ago: Resend waits a day, the reason printed under it. */
+export const RequestedMailed: Story = {
+  parameters: { ...requests, ...report(VETTING_FIXTURE_REVIEWS.mailed) },
+};
+
+/** @summary A review about the signed-in officer: closed, with the existing wording. */
+export const AboutYou: Story = {
+  parameters: { ...requests, ...report(VETTING_FIXTURE_REVIEWS.aboutYou) },
+};
