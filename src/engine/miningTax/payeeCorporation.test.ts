@@ -62,6 +62,23 @@ describe('payeesOfBookCorporation', () => {
     ).toEqual([{ id: 'linked', link: false }]);
   });
 
+  // Payees are per Character: an alt's unlinked one is judged on its own, not hidden by the main's.
+  it("judges each Character's Payees apart", () => {
+    expect(
+      payeesOfBookCorporation(
+        [
+          payee({ id: 'main', characterId: 1, entityId: 98837836, entityKind: 'corporation' }),
+          payee({ id: 'alt', characterId: 2 }),
+          payee({ id: 'mainLabel', characterId: 1 }),
+        ],
+        bureau
+      )
+    ).toEqual([
+      { id: 'main', link: false },
+      { id: 'alt', link: true },
+    ]);
+  });
+
   it('never takes a Payee linked to someone else, or only similar in name', () => {
     expect(
       payeesOfBookCorporation(

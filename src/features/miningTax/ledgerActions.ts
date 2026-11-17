@@ -61,7 +61,7 @@ import { recordDefaultOptOuts } from './defaultOptOuts';
 import type { GroupMember } from './groupRows';
 import { payeesOfBookCorporation } from '@/engine/miningTax/payeeCorporation';
 import { linkTargetsWithin } from './paymentLinks';
-import { removePayeeRecord } from './payees';
+import { removePayeeRecord, withCorporationLink } from './payees';
 import { amountSlack } from './paymentMatches';
 import { allocateOldestFirst } from './settleAllocation';
 import type { SessionContinuation } from './sessionContinuation';
@@ -446,13 +446,7 @@ async function corpEntityPayeeIds(
   const found = payeesOfBookCorporation(payees, corp);
   for (const f of found.filter((x) => x.link)) {
     const payee = payees.find((p) => p.id === f.id);
-    if (payee)
-      await db.payees.put({
-        ...payee,
-        entityId: corp.corporationId,
-        entityKind: 'corporation',
-        updatedAt: Date.now(),
-      });
+    if (payee) await db.payees.put(withCorporationLink(payee, corp.corporationId));
   }
   const ids = found.map((f) => f.id);
   if (ids.length > 0) return ids;

@@ -10,7 +10,10 @@ import { loadBookPrices, loadCorpNames, loadTrackedCorpBooks } from './corpBookS
 import { buildCorpBookView, type CorpBookView } from './corpBookView';
 import { MINUTE_MS } from '@/lib/age';
 import { payeesOfBookCorporation } from '@/engine/miningTax/payeeCorporation';
-import { rememberPayeeEntity } from '../payees';
+import { linkPayeeToCorporation } from '../payees';
+
+/** Payees linked as a book's corporation this session (`linkPayeeToCorporation`). */
+const linkedThisSession = new Set<string>();
 import { hiddenLeftBooksOf, withoutHiddenLeft } from './leftCorpBooks';
 
 interface Args {
@@ -100,9 +103,12 @@ export function useCorpBookView({
       if (name === undefined) continue;
       const corporation = { corporationId: book.corporationId, name };
       for (const found of payeesOfBookCorporation(payees, corporation)) {
-        const payee = payees.find((p) => p.id === found.id);
-        if (found.link && payee)
-          void rememberPayeeEntity(payee, book.corporationId, 'corporation').catch(() => {});
+        // Once a session: the snapshot's copy stays unlinked until the ledger reloads.
+        if (!found.link || linkedThisSession.has(found.id)) continue;
+        linkedThisSession.add(found.id);
+        void linkPayeeToCorporation(found.id, book.corporationId).catch(() => {
+          linkedThisSession.delete(found.id);
+        });
       }
     }
   }, [loaded, corpNames, payees]);

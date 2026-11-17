@@ -1,9 +1,9 @@
 /**
- * Which corporation a typed Payee name names (#6205). A Corp Tax Book matches
- * a Payee by corporation id only (`isCorpEntityPayee`), so a Payee typed as
- * "Corp A" without that link is a second, conflicting Payee. Payee setup uses
- * this to suggest the link. Whole names only, ignoring case and surrounding
- * spaces: a pilot types names, and EVE names are unique case-insensitively.
+ * Which corporation a typed Payee name names (#6205). Payee setup uses this to
+ * suggest the link, and a Corp Tax Book takes an unlinked Payee named exactly
+ * as its corporation as its own (`payeesOfBookCorporation`). Whole names only,
+ * ignoring case and surrounding spaces: a pilot types names, and EVE names are
+ * unique case-insensitively.
  */
 export interface NamedCorporation {
   corporationId: number;
@@ -24,6 +24,8 @@ export function corporationNamed<C extends NamedCorporation>(
 /** The Payee fields `payeesOfBookCorporation` reads. */
 export interface PayeeLike {
   id: string;
+  /** Payees are per Character: each Character's are judged apart. */
+  characterId?: number;
   name: string;
   entityId?: number;
   entityKind?: 'corporation' | 'character' | 'alliance';
@@ -37,6 +39,25 @@ export interface PayeeLike {
  * linked to someone else, whatever its name.
  */
 export function payeesOfBookCorporation(
+  payees: readonly PayeeLike[],
+  corporation: NamedCorporation
+): { id: string; link: boolean }[] {
+  const byCharacter = new Map<number | undefined, PayeeLike[]>();
+  for (const p of payees)
+    byCharacter.set(p.characterId, [...(byCharacter.get(p.characterId) ?? []), p]);
+  const link = new Map(
+    [...byCharacter.values()].flatMap((own) =>
+      ofOneCharacter(own, corporation).map((f) => [f.id, f.link] as const)
+    )
+  );
+  // In the order given, so a caller's first is the first Payee it passed.
+  return payees.flatMap((p) => {
+    const l = link.get(p.id);
+    return l === undefined ? [] : [{ id: p.id, link: l }];
+  });
+}
+
+function ofOneCharacter(
   payees: readonly PayeeLike[],
   corporation: NamedCorporation
 ): { id: string; link: boolean }[] {

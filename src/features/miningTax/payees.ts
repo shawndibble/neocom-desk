@@ -186,11 +186,36 @@ export async function rememberPayeeEntity(
     if (kind === undefined || payee.entityKind !== undefined) return payee;
     return writeEntity({ ...payee, entityKind: kind });
   }
+  // A Payee verified as a corporation or character is who it is: a payment to someone else (its
+  // CEO, an officer) is never a reason to re-point it.
+  if (payee.entityKind !== undefined) return payee;
   // A different recipient: the old kind described someone else.
   const next: PayeeRecord = { ...payee, entityId };
   delete next.entityKind;
   if (kind !== undefined) next.entityKind = kind;
   return writeEntity(next);
+}
+
+/**
+ * Links a stored Payee as `corporationId` (`payeesOfBookCorporation`'s `link`), read fresh so an
+ * edit since the caller's copy is kept. Only while it is still unlinked, or carries that id with no
+ * kind: never re-points a Payee linked to someone else meanwhile.
+ */
+export async function linkPayeeToCorporation(
+  payeeId: string,
+  corporationId: number
+): Promise<void> {
+  const payee = await db.payees.get(payeeId);
+  if (!payee) return;
+  const unlinked = payee.entityId === undefined;
+  const kindless = payee.entityId === corporationId && payee.entityKind === undefined;
+  if (!unlinked && !kindless) return;
+  await writeEntity(withCorporationLink(payee, corporationId));
+}
+
+/** The Payee linked as `corporationId`: what every path that links one writes. */
+export function withCorporationLink(payee: PayeeRecord, corporationId: number): PayeeRecord {
+  return { ...payee, entityId: corporationId, entityKind: 'corporation', updatedAt: Date.now() };
 }
 
 async function writeEntity(next: PayeeRecord): Promise<PayeeRecord> {

@@ -63,8 +63,8 @@ interface PayeeManagerDialogProps {
   systemNames?: ReadonlyMap<number, string>;
   /**
    * The corporations whose Corp Tax Book the member can see. A Payee named for
-   * one is offered the link to it (#6205): the book only counts a Payee linked
-   * to its corporation as its own (`isCorpEntityPayee`).
+   * one is offered the link to it (#6205): the book counts a Payee linked to its
+   * corporation as its own (`payeesOfBookCorporation`).
    */
   bookCorporations?: readonly NamedCorporation[];
 }
