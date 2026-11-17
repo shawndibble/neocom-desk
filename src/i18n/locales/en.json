@@ -18220,9 +18220,16 @@
         "empty": "No chunk in this window.",
         "legend": {
           "extracting": "Extracting",
-          "ready": "Ready",
-          "fractured": "Fractured, minable",
-          "expired": "Expired"
+          "ready": "Ready to Expired",
+          "expired": "Expired",
+          "laser": "Early laser fracture"
+        },
+        "tip": {
+          "ready": "Ready (chunk arrives)",
+          "auto": "Auto-fracture",
+          "laser": "Fractured (laser)",
+          "expired": "Expired",
+          "in": "in {{time}}"
         }
       },
       "moon": {

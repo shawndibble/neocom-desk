@@ -23,6 +23,7 @@ import { activeDismissalFor, type Dismissal } from './dismissals';
 import {
   chunkRateFor,
   extractionStatus,
+  fractureAndExpiry,
   learnChunkRates,
   minedDuringExtraction,
   type ChunkRate,
@@ -175,6 +176,9 @@ export interface ExtractionRow {
   fracturedAt?: string;
   fracturedBy?: 'laser' | 'auto';
   expiresAt?: string;
+  /** Fracture and Expired as the engine plans them, set in every state, so a chunk not yet fractured still has a span to draw. */
+  plannedFractureAt: string;
+  plannedExpiresAt: string;
   oreSource: 'notification' | 'survey' | 'unknown';
   oreLines: OreLine[];
   /** The chunk rate a survey estimate was made at (D13); absent for the other sources. */
@@ -630,6 +634,7 @@ export function extractionRowBase(
   const ex = toEngineExtraction(x);
   const expiryHours = input.structureExpiryHours[String(x.structureId)];
   const status = extractionStatus(ex, input.now, { expiryHours });
+  const planned = fractureAndExpiry(ex, expiryHours);
   // Source order (D13): the ExtractionStarted notification, then a linked Survey.
   const notified = x.oreLines ?? [];
   const surveyed = notified.length === 0 ? (input.surveyOreLines?.get(ex.id) ?? []) : [];
@@ -647,6 +652,8 @@ export function extractionRowBase(
     ...(status.fracturedAt ? { fracturedAt: status.fracturedAt } : {}),
     ...(status.fracturedBy ? { fracturedBy: status.fracturedBy } : {}),
     ...(status.expiresAt ? { expiresAt: status.expiresAt } : {}),
+    plannedFractureAt: new Date(planned.fracturedAt).toISOString(),
+    plannedExpiresAt: new Date(planned.expiresAt).toISOString(),
     oreSource: notified.length > 0 ? 'notification' : surveyed.length > 0 ? 'survey' : 'unknown',
     oreLines,
     ...(surveyed.length > 0

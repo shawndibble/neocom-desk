@@ -10,6 +10,8 @@ import { splitPlace } from '@/engine/corpTaxBook/bookSections';
 import { useBook } from './useBook';
 import { FILTER_STATES } from './extractionStates';
 import { extractionWindowLabel, shortDate } from './moonsFormat';
+import { formatCountdown } from '@/lib/duration';
+import { formatLocalDateTime } from '@/lib/localDate';
 import { extractionPath } from './moonsPaths';
 import { StateWord } from './moonsParts';
 import { DAY_MS } from '@/lib/age';
@@ -70,9 +72,42 @@ export function ExtractionStateFilter({
   );
 }
 
+/** The dates an officer plans around, in local time, with the time left where one is still ahead. */
+function PlanTip({ row, now }: { row: ExtractionRow; now: number }) {
+  const { t } = useTranslation();
+  const line = (label: string, iso: string) => {
+    const ms = Date.parse(iso);
+    return (
+      <div>
+        <div className="text-text-dim">{label}</div>
+        <div className="tabular-nums">
+          {formatLocalDateTime(new Date(ms))}
+          {ms > now && (
+            <span className="text-text-dim">
+              {' · '}
+              {t('corpTaxBook.moons.timeline.tip.in', { time: formatCountdown((ms - now) / 1000) })}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
+  const laser = row.fracturedBy === 'laser';
+  return (
+    <div className="space-y-1 text-left">
+      {line(t('corpTaxBook.moons.timeline.tip.ready'), row.chunkArrivalAt)}
+      {line(
+        t(`corpTaxBook.moons.timeline.tip.${laser ? 'laser' : 'auto'}`),
+        row.fracturedAt ?? row.plannedFractureAt
+      )}
+      {line(t('corpTaxBook.moons.timeline.tip.expired'), row.expiresAt ?? row.plannedExpiresAt)}
+    </div>
+  );
+}
+
 /**
- * Every chunk on one time axis (#4056 step 1): Extracting, Ready, then
- * Fractured-and-minable until the field is assumed gone. A row opens the
+ * Every chunk on one time axis (#4056 step 1): Extracting, then one bar from
+ * Ready to Expired (a tick marks an early laser fracture). A row opens the
  * moon's page; the line is now. Shared scale across rows so they compare.
  */
 export function ExtractionTimeline({
@@ -150,8 +185,7 @@ function TimelineBody({ shown, now }: { shown: readonly ExtractionRow[]; now: nu
         {shown.map((e) => {
           const start = Date.parse(e.startedAt);
           const ready = Date.parse(e.chunkArrivalAt);
-          const fracture = e.fracturedAt ? Date.parse(e.fracturedAt) : ready;
-          const end = e.expiresAt ? Date.parse(e.expiresAt) : ready;
+          const end = Date.parse(e.expiresAt ?? e.plannedExpiresAt);
           const place = splitPlace(names.refinery(e.structureId), names.moon(e.moonId));
           return (
             <Link
@@ -173,26 +207,32 @@ function TimelineBody({ shown, now }: { shown: readonly ExtractionRow[]; now: nu
                 </Tooltip>
                 <StateWord state={e.state} />
               </span>
-              <Tooltip content={extractionWindowLabel(t, e)} side="bottom">
-                <div className="relative h-4 w-full rounded-xs bg-panel-2 sm:w-auto sm:flex-1">
+              <Tooltip content={<PlanTip row={e} now={now} />} side="bottom">
+                <div
+                  tabIndex={0}
+                  aria-label={`${extractionWindowLabel(t, e)}`}
+                  className="relative h-4 w-full rounded-xs bg-panel-2 focus-visible:outline-2 focus-visible:outline-accent sm:w-auto sm:flex-1"
+                >
                   <span
                     className="absolute inset-y-1 rounded-xs bg-line-bright"
                     style={{ left: pct(start), width: width(start, ready) }}
                   />
-                  <span
-                    className="absolute inset-y-0 min-w-1.5 rounded-xs bg-success"
-                    style={{
-                      left: pct(ready),
-                      width: width(ready, Math.max(fracture, ready + DAY_MS / 24)),
-                    }}
-                  />
+                  {/* One bar, Ready to Expired: the whole time the chunk can be mined or is about to be. */}
                   <span
                     className={cx(
-                      'absolute inset-y-0 rounded-xs',
-                      e.state === 'expired' ? 'bg-text-faint' : 'bg-warning'
+                      'absolute inset-y-0 min-w-1.5 rounded-xs',
+                      e.state === 'expired' ? 'bg-text-faint' : 'bg-success'
                     )}
-                    style={{ left: pct(fracture), width: width(fracture, end) }}
+                    style={{ left: pct(ready), width: width(ready, end) }}
                   />
+                  {e.fracturedBy === 'laser' && e.fracturedAt && (
+                    <span
+                      aria-hidden="true"
+                      data-testid="laser-tick"
+                      className="absolute inset-y-0 w-0.5 bg-panel"
+                      style={{ left: pct(Date.parse(e.fracturedAt)) }}
+                    />
+                  )}
                 </div>
               </Tooltip>
               <span className="hidden w-6 justify-end sm:flex">
@@ -207,7 +247,6 @@ function TimelineBody({ shown, now }: { shown: readonly ExtractionRow[]; now: nu
           [
             ['bg-line-bright', 'extracting'],
             ['bg-success', 'ready'],
-            ['bg-warning', 'fractured'],
             ['bg-text-faint', 'expired'],
           ] as const
         ).map(([color, key]) => (
@@ -216,6 +255,10 @@ function TimelineBody({ shown, now }: { shown: readonly ExtractionRow[]; now: nu
             {t(`corpTaxBook.moons.timeline.legend.${key}`)}
           </span>
         ))}
+        <span>
+          <span className="mr-1 inline-block h-2 w-0.5 bg-text-dim" />
+          {t('corpTaxBook.moons.timeline.legend.laser')}
+        </span>
       </p>
     </div>
   );
