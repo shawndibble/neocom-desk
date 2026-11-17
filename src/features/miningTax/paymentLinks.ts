@@ -19,7 +19,7 @@ import { formatIsk } from '@/lib/isk';
 import type { PayeeBalance } from './balances';
 import { allMembers, type DisplayRow, type GroupMember } from './groupRows';
 import type { LinkedTransaction } from './PaymentLinksCard';
-import { amountsMatch, LINK_WINDOW_DAYS } from './paymentMatches';
+import { amountSlack, amountsMatch, LINK_WINDOW_DAYS } from './paymentMatches';
 import { allocateOldestFirst } from './settleAllocation';
 import type { MoonMiningTaxRow } from './snapshot';
 
@@ -210,7 +210,7 @@ export function paymentCoverage(
     new Set(
       allocateOldestFirst(
         members.map((m) => ({ id: m.id, date: m.date, taxOwed: m.taxOwed })),
-        amount + Math.max(1, amount * 0.005)
+        amount + amountSlack(amount)
       ).coveredIds
     );
   for (const members of groups.values()) {
@@ -240,7 +240,9 @@ export function paymentCoverage(
       reaches.set(key, new Set(added.length > 0 ? added : next ? [next.id] : []));
       before = now;
     }
-    for (const m of members) if (!before.has(m.id)) uncovered.add(m.id);
+    // As `linkTargetsWithin`: ISK that finishes no day still part-pays the oldest, which stays paid.
+    const paid = before.size > 0 ? before : new Set(members.slice(0, 1).map((m) => m.id));
+    for (const m of members) if (!paid.has(m.id)) uncovered.add(m.id);
   }
   return { uncovered, reaches };
 }
@@ -278,7 +280,7 @@ export function linkTargetsWithin<
   const covered = new Set(
     allocateOldestFirst(
       assignments.map((a) => ({ id: a.id, date: a.date, taxOwed: a.taxOwed })),
-      amount + Math.max(1, amount * 0.005)
+      amount + amountSlack(amount)
     ).coveredIds
   );
   const oldest = [...assignments].sort(

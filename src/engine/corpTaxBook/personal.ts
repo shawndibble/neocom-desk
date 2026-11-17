@@ -135,6 +135,11 @@ export interface PersonalBook {
    * sender's Miner, as the book credits it.
    */
   inFlight: InFlightDonation[];
+  /**
+   * Wallet journal refs of the member's donations the book holds for review without counting them
+   * (#6207): the book has spent that ISK on nothing yet.
+   */
+  inReviewRefs?: readonly number[];
   /** Days after issue an unsettled Statement goes Overdue (the book's setting; 14 by default). */
   overdueDays?: number;
   /** Refinery names by structure id, where ESI let the app read them. */
@@ -1348,6 +1353,7 @@ export function overlayCorpBooks(input: {
     const inFlightRefs = new Set(
       p.book.inFlight.flatMap((d) => (d.refId === undefined ? [] : [d.refId]))
     );
+    const inReviewRefs = new Set(p.book.inReviewRefs ?? []);
     if (paidOf) {
       for (const row of mine) {
         if (row.state !== 'billed' || (row.taxOwed ?? 0) <= 0) continue;
@@ -1382,7 +1388,8 @@ export function overlayCorpBooks(input: {
         // The book already holds the payment the mark names, yet its credit went to older days
         // it still bills (it pays the oldest first): the book still bills this one. Said, not hidden.
         const refs = refsOf?.get(key) ?? [];
-        const held = refs.length > 0 && refs.every((ref) => !inFlightRefs.has(ref));
+        const held =
+          refs.length > 0 && refs.every((ref) => !inFlightRefs.has(ref) && !inReviewRefs.has(ref));
         const reached = bookCovered.get(row) ?? 0;
         if (!held || reached >= before - settleTolerance(before)) continue;
         const spentOn = mine

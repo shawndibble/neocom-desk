@@ -691,6 +691,16 @@ describe('paymentCoverage', () => {
     expect([...(out.reaches.get('journal:2') ?? [])]).toEqual(['b']);
   });
 
+  // As `linkTargetsWithin` records it: a short payment linked to one day part-pays it, so that
+  // day stays paid with its payment, and only days after it are left owed.
+  it('keeps the oldest day paid when the ISK finishes no day', () => {
+    const short = paid('short', '2026-11-06', 10_242_020.95, 'p', [7], 5_000_000);
+    const later = paid('later', '2026-11-07', 656_528.4, 'p', [7], 5_000_000);
+    const out = paymentCoverage([later, short], (key) => (key === 'journal:7' ? 5_000_000 : null));
+    expect([...out.uncovered]).toEqual(['later']);
+    expect(paymentCoverage([short], () => 5_000_000).uncovered.size).toBe(0);
+  });
+
   it('ignores an owed Assignment and a paid one with no link', () => {
     const bare = assignment({ id: 'bare', status: 'paid' });
     const out = paymentCoverage([bare, assignment({ id: 'owed' })], amountOf);

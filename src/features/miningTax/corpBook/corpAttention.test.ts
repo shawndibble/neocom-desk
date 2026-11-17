@@ -125,28 +125,27 @@ describe('corpBookAttention', () => {
       ).toEqual([]);
     });
 
-    it("names the donor Miner's oldest open Statement, to send the proof on", () => {
-      const open = (statementId: string, minerId: string, issuedAt: string) => ({
-        statementId,
-        minerId,
-        code: statementId,
-        periodStart: '2026-11-01',
-        periodEnd: '2026-11-07',
-        issuedAt,
-      });
+    // Counted at once, each to its own Miner: never tied to one Statement a waiting
+    // declaration could block.
+    it('names no Statement, even when the donor Miner has one open', () => {
       const out = corpBookAttention(
         withHeld(
           [held('j5_1', '2026-11-02T22:38:44.000Z')],
           summary({
             openStatements: [
-              open('sOther', 'solo:2', '2026-11-01T00:00:00Z'),
-              open('s1', 'solo:1', '2026-11-08T00:00:00Z'),
-              open('s2', 'solo:1', '2026-11-15T00:00:00Z'),
+              {
+                statementId: 's1',
+                minerId: 'solo:1',
+                code: 's1',
+                periodStart: '2026-11-01',
+                periodEnd: '2026-11-07',
+                issuedAt: '2026-11-08T00:00:00Z',
+              },
             ],
           })
         )
       );
-      expect(out.inReview[0].statementId).toBe('s1');
+      expect(out.inReview[0]).not.toHaveProperty('statementId');
     });
   });
 

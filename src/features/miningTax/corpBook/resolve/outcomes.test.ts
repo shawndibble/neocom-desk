@@ -62,7 +62,8 @@ describe('outcomesFor (resolving in the app)', () => {
 
   // The book holds these donations already: the member says they were tax, with or without a
   // Statement to declare on (a claim of their own donation needs none); paying again is no answer.
-  it('offers sending the proof, preselected, for donations the book holds for review', () => {
+  // "Not paying" ISK the book already holds would say it still bills it: only counting them fits.
+  it('offers only counting them, for donations the book holds for review', () => {
     const p: ResolveProblem = {
       ...base,
       kind: 'uncredited',
@@ -70,7 +71,7 @@ describe('outcomesFor (resolving in the app)', () => {
       held: [{ id: 'j5_1', characterId: 7 }],
     };
     expect(outcomesFor(p)).toEqual({
-      outcomes: ['notPaying', 'paid'],
+      outcomes: ['paid'],
       preselected: 'paid',
       tellWhy: false,
       noStatement: false,

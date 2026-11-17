@@ -100,10 +100,11 @@ export function outcomesFor(p: ResolveProblem): Offer {
   const plan = notOwedPlan(p.row);
   switch (p.kind) {
     case 'uncredited': {
-      // The book holds them already: paying again is no answer, and claiming needs no Statement.
+      // The book holds them already: paying again, or "not paying" ISK it holds, is no answer;
+      // claiming needs no Statement.
       if (p.held)
         return {
-          outcomes: ['notPaying', 'paid'],
+          outcomes: ['paid'],
           preselected: 'paid',
           tellWhy,
           noStatement: false,

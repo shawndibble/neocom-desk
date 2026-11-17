@@ -2848,6 +2848,26 @@ describe('resolving in the app: an open dispute holds its day', () => {
       expect(byDate.get('2026-11-01')).toMatchObject({ state: 'billed', taxOwed: 17_378_825 });
     });
 
+    // Held for review, the book holds the ISK without counting it: it has spent it on nothing.
+    it('says nothing about where the book spent a payment it holds for review', () => {
+      // The book counts another payment of the member's (spent on 11-01), not the marks' one.
+      const other = {
+        id: 'j1_1',
+        minerId: `solo:${ME}`,
+        characterId: ME,
+        amount: 10_898_549,
+        at: sent.at,
+        source: 'donation' as const,
+      };
+      const out = overlay(entries, [bureau({ payments: [other], inReviewRefs: [REF] })], LATER);
+      for (const date of ['2026-11-06', '2026-11-07']) {
+        const row = out.rows.find((r) => r.date === date);
+        expect(row).toMatchObject({ state: 'paid', settledBy: 'yourMark' });
+        expect(row?.bookSpentOn).toBeUndefined();
+        expect(row?.bookOwed).toBeUndefined();
+      }
+    });
+
     it('says nothing more when the book holds the payment and it reached the marked days', () => {
       const credited = {
         id: `j1_${REF}`,

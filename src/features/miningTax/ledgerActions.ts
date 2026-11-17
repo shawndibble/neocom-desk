@@ -62,6 +62,7 @@ import type { GroupMember } from './groupRows';
 import { isCorpEntityPayee } from './corpBook/corpRows';
 import { linkTargetsWithin } from './paymentLinks';
 import { removePayeeRecord } from './payees';
+import { amountSlack } from './paymentMatches';
 import { allocateOldestFirst } from './settleAllocation';
 import type { SessionContinuation } from './sessionContinuation';
 
@@ -621,7 +622,7 @@ export function recordCorpPayment(
       ? new Set(
           allocateOldestFirst(
             siblings.filter((a) => !recorded.has(a.id)),
-            left + Math.max(1, payment.amount * 0.005)
+            left + amountSlack(payment.amount)
           ).coveredIds
         )
       : null;

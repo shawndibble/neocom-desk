@@ -436,7 +436,7 @@ export async function runBookSync(
   // bills, which only the stored rows hold (a quiet run matches nothing, so reads none).
   const rows: { characterId: number; date: string; quantity: number }[] = [
     ...feed.rows,
-    ...(quiet ? [] : await billedStoredRows(db, corporationId, before, feed.rows, fresh)),
+    ...(quiet ? [] : await billedStoredRows(db, corporationId, before, feed.rows, fresh, now)),
   ];
   const known = new Set<number>([
     ...rows.map((r) => r.characterId),
@@ -651,7 +651,9 @@ async function readDonationsElsewhere(
 }
 
 /** Stored rows read per run at most: one query per Character, so the read stays bounded. */
-export const STORED_ROWS_CHARACTERS = 50;
+const STORED_ROWS_CHARACTERS = 50;
+/** The scheduled sync's interval: each run starts the capped reads one window further on. */
+const STORED_ROWS_ROTATION_MS = 2 * 60 * 60 * 1000;
 
 /**
  * The stored rows the book bills that a held or would-be-held donation is matched against
@@ -666,7 +668,8 @@ async function billedStoredRows(
   corporationId: number,
   book: AdminBookState,
   feedRows: readonly ObservedRow[],
-  fresh: readonly JournalDonation[]
+  fresh: readonly JournalDonation[],
+  now: number
 ): Promise<ObservedRow[]> {
   const held = book.payments.filter(
     (p) =>
@@ -706,13 +709,24 @@ async function billedStoredRows(
   if (wanted.size === 0) return [];
   try {
     const ref = bookRef(db, corporationId);
-    const reads = [...wanted]
+    // A row mined after the last of these payments can never count toward one of them.
+    const through = [...held.map((p) => p.at), ...fresh.map((d) => d.at)]
+      .map((at) => at.slice(0, 10))
+      .reduce((a, b) => (b > a ? b : a), '');
+    // Past the cap, each run starts further along the list, so no Character's hold is never read.
+    const all = [...wanted];
+    const start =
+      all.length > STORED_ROWS_CHARACTERS
+        ? Math.floor(now / STORED_ROWS_ROTATION_MS) % all.length
+        : 0;
+    const reads = [...all.slice(start), ...all.slice(0, start)]
       .slice(0, STORED_ROWS_CHARACTERS)
       .map(([characterId, from]) =>
         ref
           .collection(OBSERVED)
           .where('characterId', '==', characterId)
           .where('date', '>=', from)
+          .where('date', '<=', through)
           .get()
       );
     const [feeders, ...found] = await Promise.all([ref.collection(FEEDERS).get(), ...reads]);

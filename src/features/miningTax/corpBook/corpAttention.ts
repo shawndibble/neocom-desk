@@ -4,7 +4,6 @@
  * for review without counting them, and ore a book bills that the member's own list also owes
  * another Payee.
  */
-import { minerIdFor } from '@/engine/corpTaxBook/charges';
 import type { OverdueStatementView, UncreditedDonation } from '@/engine/corpTaxBook/personal';
 import type { MultiSelectFilter } from '@/lib/multiSelectFilter';
 import type { CorpBookView } from './corpBookView';
@@ -27,7 +26,7 @@ export interface CorpBookAttention {
    * (#6207), oldest first, and the oldest open Statement of the first one's Miner, to send the
    * proof on. Only those paid on or after the book's start: before it they paid no mining it bills.
    */
-  inReview: (OfBook & { donations: InReviewPayment[]; statementId?: string })[];
+  inReview: (OfBook & { donations: InReviewPayment[] })[];
   /** Per book: the Payees whose unpaid ore it bills too, and the first such row to open. */
   alsoBilled: (OfBook & { payeeIds: string[]; rowId: string })[];
 }
@@ -62,13 +61,9 @@ export function corpBookAttention(
     const held = (loaded.inReview ?? [])
       .filter((p) => inView(p.characterId) && p.at.slice(0, 10) >= loaded.startDate)
       .sort((a, b) => a.at.localeCompare(b.at));
-    if (held.length > 0) {
-      const minerId = minerIdFor(held[0].characterId, loaded.miners ?? []);
-      const statementId = book.summary.openStatements.find(
-        (s) => s.minerId === minerId
-      )?.statementId;
-      out.inReview.push({ ...of, donations: held, ...(statementId ? { statementId } : {}) });
-    }
+    // Counted as tax at once, each to its own donor's Miner: the book already holds the ISK, so
+    // no Statement is needed (and none can be blocked by a declaration already waiting on it).
+    if (held.length > 0) out.inReview.push({ ...of, donations: held });
     // A Conflict is not billed yet, and a paid listing owes nobody: only billed ore still owed
     // to another Payee is counted twice.
     const rows = view.overlay.rows.filter(
