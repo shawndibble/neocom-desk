@@ -1604,19 +1604,20 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       };
     }
     case 'writeOff': {
-      if (action.statementId) {
-        const statement = await mustGet(c, col(c, STATEMENTS).doc(action.statementId), 'Statement');
-        if (statement.minerId !== action.minerId)
-          fail('invalid-argument', "Statement is another Miner's", 'wrong-miner');
-      }
+      const statementDoc = action.statementId
+        ? await mustGet(c, col(c, STATEMENTS).doc(action.statementId), 'Statement')
+        : undefined;
+      if (statementDoc && statementDoc.minerId !== action.minerId)
+        fail('invalid-argument', "Statement is another Miner's", 'wrong-miner');
       // A write-off that closes a day closes the Miner's dispute of it too (#6307): answered, so
       // it leaves the officer's Needs you and no longer holds the day from the write-off.
-      const statementDoc = action.statementId
-        ? (await c.tx.get(col(c, STATEMENTS).doc(action.statementId))).data()
-        : undefined;
       const mineOpen = (
         await c.tx.get(col(c, DISPUTES).where('minerId', '==', action.minerId))
-      ).docs.map((d) => d.data());
+      ).docs
+        .map((d) => d.data())
+        .filter(hasLines); // a withdrawn dispute is a tombstone: nothing to answer
+      // Every read stays above the first write: a Firestore transaction refuses a read after one.
+      const uids = await minerUids(c, action.minerId);
       const closing = disputesClosedByWriteOff(
         mineOpen,
         { amount: action.amount },
@@ -1635,7 +1636,6 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
           },
         });
       // The book applies it (#4637), and the Miner reads it on the personal tab.
-      const uids = await minerUids(c, action.minerId);
       tx.create(col(c, WRITE_OFFS).doc(id), {
         id,
         minerId: action.minerId,
