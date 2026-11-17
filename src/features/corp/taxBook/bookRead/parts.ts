@@ -51,9 +51,6 @@ export function bookPartsFor(tab?: string, detail: BookDetailKind | null = null)
     // An Extraction's page says whether its days are billed, dismissed or in Today's mining.
     case 'moon-owners':
       return new Set<BookPart>(['core', 'owners']);
-    // Pop Sharing (#6222) lists the moons from the Extractions and the moon owners' opt-outs.
-    case 'sharing':
-      return new Set<BookPart>(['core']);
     case 'extraction':
     case 'statements':
     case 'statementPeriod':

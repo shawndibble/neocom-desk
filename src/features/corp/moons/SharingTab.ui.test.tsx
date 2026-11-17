@@ -1,5 +1,5 @@
 /**
- * The Moons page's Sharing tab (#6222, #6240): its moon rows, a moon's override dialog, the
+ * Moon settings' Sharing tab (#6222, #6240, moved by #6304): its moon rows, a moon's override dialog, the
  * opted-out and 'No officer' marks, the refineries no Extraction places yet, and the
  * `?highlight=<moonId>` row a share icon on the Extractions tab links to.
  */
@@ -69,10 +69,10 @@ vi.mock('@/features/communities/communityStore', () => ({
   loadMyCommunitiesCached: async () => [{ id: 'c1', name: 'Ore Club' }],
 }));
 
-function renderTab(path = '/corp/moons/sharing') {
+function renderTab(path = '/corp/moons/overview') {
   return render(
     <MemoryRouter initialEntries={[path]}>
-      <SharingTab />
+      <SharingTab onOpenSyncSettings={() => {}} />
     </MemoryRouter>
   );
 }
@@ -156,7 +156,7 @@ describe('SharingTab', () => {
 
   it("pulses the row a share icon's ?highlight=<moonId> link names", () => {
     sharing.doc = popSharingFrom({ enabled: true });
-    renderTab('/corp/moons/sharing?highlight=40000002');
+    renderTab('/corp/moons/overview?highlight=40000002');
     expect(rowOf('Moon 40000002').className).toContain('row-pulse');
     expect(rowOf('Moon 40000001').className).not.toContain('row-pulse');
   });
