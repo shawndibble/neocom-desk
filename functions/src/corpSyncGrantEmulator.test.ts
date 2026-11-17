@@ -538,6 +538,99 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       expect(payment?.reviewReason).toBeUndefined();
     });
 
+    describe('moon owner mining the book bills (stored rows only)', () => {
+      const FEEDER = 98000077;
+      // Character 60 mined only at a moon owner's refinery: this run's own ledger never shows it.
+      const fed = (date: string, quantity = 100) =>
+        book().collection('observed').doc(`60_46281_${date}_7000`).set({
+          structureId: 7000,
+          characterId: 60,
+          recordedCorporationId: CORP,
+          typeId: 46281,
+          date,
+          quantity,
+          cachedAt: '2026-10-17T00:00:00.000Z',
+          sourceCorporationId: FEEDER,
+        });
+      const heldDonation = (id: string, at: string) =>
+        book().collection('payments').doc(id).set({
+          id,
+          source: 'donation',
+          characterId: 60,
+          uid: 'char:60',
+          amount: 26_952_549,
+          at,
+          division: 1,
+          reviewReason: 'no-open-balance',
+        });
+      const coverFrom = (from: string) =>
+        book()
+          .collection('feeders')
+          .doc(String(FEEDER))
+          .set({ corporationId: FEEDER, status: 'active', coveragePeriods: [{ from }] });
+
+      it('releases held donations paid after the moon owner mining they paid for', async () => {
+        await coverFrom('2026-10-01');
+        await fed('2026-10-01');
+        await fed('2026-10-02');
+        await fed('2026-10-11');
+        await heldDonation('j1_901', '2026-10-02T22:38:44.000Z');
+        await heldDonation('j1_902', '2026-10-14T18:28:44.000Z');
+        // Paid before the book bills from: the officer's to place.
+        await heldDonation('j1_900', '2026-09-21T17:38:23.000Z');
+        await optIn(ACCOUNTANT);
+        await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+        const payment = async (id: string) =>
+          (await book().collection('payments').doc(id).get()).data();
+        for (const id of ['j1_901', 'j1_902']) {
+          expect(await payment(id)).toMatchObject({ minerId: 'solo:60' });
+          expect((await payment(id))?.reviewReason).toBeUndefined();
+        }
+        expect((await payment('j1_900'))?.minerId).toBeUndefined();
+        expect((await payment('j1_900'))?.reviewReason).toBe('no-open-balance');
+      });
+
+      it('keeps a held donation when the moon owner did not cover the day mined', async () => {
+        await coverFrom('2026-10-10');
+        await fed('2026-10-02');
+        await heldDonation('j1_901', '2026-10-02T22:38:44.000Z');
+        await optIn(ACCOUNTANT);
+        await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+        const payment = (await book().collection('payments').doc('j1_901').get()).data();
+        expect(payment?.minerId).toBeUndefined();
+        expect(payment?.reviewReason).toBe('no-open-balance');
+      });
+
+      it('credits a new donation to the Miner whose only unbilled ore is moon owner mining', async () => {
+        await coverFrom('2026-10-01');
+        await fed('2026-10-11');
+        // Known to the book: an earlier payment of theirs was credited.
+        await book().collection('payments').doc('m0').set({
+          id: 'm0',
+          source: 'manual',
+          minerId: 'solo:60',
+          characterId: 60,
+          uid: 'char:60',
+          amount: 1,
+          at: '2026-10-05T00:00:00.000Z',
+        });
+        esiState.journal = ok([
+          {
+            id: 77,
+            date: '2026-10-17T10:00:00Z',
+            ref_type: 'player_donation',
+            amount: 10_976_509,
+            first_party_id: 60,
+          },
+        ]);
+        await optIn(ACCOUNTANT);
+        await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+        const payment = (await book().collection('payments').doc('j1_77').get()).data();
+        expect(payment?.minerId).toBe('solo:60');
+        expect(payment?.reviewReason).toBeUndefined();
+      });
+    });
+
     it('notes tax paid into a division the book does not read, without crediting it (#6207)', async () => {
       await book().collection('statements').doc('s1').set(statement);
       await optIn(ACCOUNTANT);

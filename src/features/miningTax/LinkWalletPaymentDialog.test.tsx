@@ -159,6 +159,18 @@ describe('LinkWalletPaymentDialog', () => {
     expect(screen.getByText('250,000 ISK short — the rest stays owed')).toBeInTheDocument();
   });
 
+  // The Bureau report: a donation used up by two days was linked to a third as well.
+  it('marks paid only the days the ISK reaches: the rest stays owed, as the line says', async () => {
+    renderDialog();
+    await userEvent.click(screen.getByText('350,000 ISK · 2026-09-10'));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Include 2026-09-06' }));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Mark 3 paid with this payment' }));
+
+    await waitFor(() => expect(settle).toHaveBeenCalled());
+    expect(paidIds()).toEqual(['a-1', 'a-2']);
+  });
+
   it('does not remember the recipient when that box is unticked', async () => {
     const { onLinked } = renderDialog();
     await userEvent.click(screen.getByText('350,000 ISK · 2026-09-10'));

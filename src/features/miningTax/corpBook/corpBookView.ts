@@ -111,6 +111,7 @@ export function buildCorpBookView(
         prices: new Map(pricesAtHubOnDate(dated, book.hubId, date)),
         sources: new Map(sourcesAtHubOnDate(dated, book.hubId, date)),
       }),
+      inReviewRefs: (book.inReview ?? []).flatMap((d) => (d.refId === undefined ? [] : [d.refId])),
       inFlight: inFlightDonations(
         input.made.map((m) => ({
           characterId: m.characterId,

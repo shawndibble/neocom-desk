@@ -10,7 +10,7 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import { useCorpSnapshot } from '@/features/corp/useCorpSnapshot';
 import { miningTaxEntryHref } from '@/features/miningTax/paymentDeepLink';
 import { autoLinkRecordedPaymentsFromJournals } from '@/features/miningTax/autoLinkFromJournal';
-import { linkedAssignmentsByRef } from '@/features/miningTax/paymentLinks';
+import { linkedAssignmentsByRef, reachedByTransaction } from '@/features/miningTax/paymentLinks';
 import { walletJournalCsvColumns } from '@/features/character/walletJournalCsv';
 import { classifyJournal, journalCoverage, type JournalLine } from '@/engine/journalNetting';
 import {
@@ -148,19 +148,33 @@ export function useWalletJournalView({
   // to each tax entry they settled. Every character's Assignments, since the
   // journal can show any of them.
   const taxLinks = useLiveQuery(
-    async () => linkedAssignmentsByRef(await db.miningTaxAssignments.toArray()),
+    async () => {
+      const all = await db.miningTaxAssignments.toArray();
+      return { ...linkedAssignmentsByRef(all), all };
+    },
     [],
     undefined
   );
   const miningTaxEntriesFor = useCallback(
     (entry: WalletJournalEntry): MiningTaxEntryLink[] | undefined => {
       if (!taxLinks) return undefined;
+      const byJournal = taxLinks.journal.get(entry.id);
       const linked =
-        taxLinks.journal.get(entry.id) ??
+        byJournal ??
         (entry.context_id_type === 'contract_id' && entry.context_id !== undefined
           ? taxLinks.contract.get(entry.context_id)
           : undefined);
-      return linked?.map((a) => ({
+      // Only the days the entry's ISK reaches: a day linked past it is not paid by it.
+      const reached =
+        byJournal && entry.amount !== undefined
+          ? reachedByTransaction(
+              `journal:${entry.id}`,
+              Math.abs(entry.amount),
+              byJournal,
+              taxLinks.all
+            )
+          : linked;
+      return reached?.map((a) => ({
         href: miningTaxEntryHref(a.id),
         date: a.date,
         taxOwed: a.taxOwed,

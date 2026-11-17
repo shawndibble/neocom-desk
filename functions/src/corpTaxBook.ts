@@ -1428,7 +1428,10 @@ export interface CheckablePayment {
   minerId?: string;
   /** An officer marked (some of) it not tax: a payment wholly so is no one's to credit. */
   notTaxAmount?: number;
-  /** Held for an officer's review (#6207): never credited by a claim. */
+  /**
+   * Held for an officer's review (#6207). The sender's own donation held because their Miner
+   * seemed to owe nothing (`no-open-balance`) is still theirs to prove: the book holds the ISK.
+   */
   reviewReason?: string;
 }
 
@@ -1443,9 +1446,17 @@ export interface ClaimCheckContext {
   taken?: Set<string>;
 }
 
-/** A payment a claim may credit: no one holds it yet, and it is tax. */
-const creditable = (p: CheckablePayment) =>
-  p.minerId === undefined && p.reviewReason === undefined && (p.notTaxAmount ?? 0) < p.amount;
+/**
+ * A payment a claim may credit: no one holds it yet, and it is tax. One held for review because
+ * its sender's Miner seemed to owe nothing counts (the claim is the sender's own: `same`), if paid
+ * on or after the book's start: before it, it paid no mining the book bills.
+ */
+const creditable = (p: CheckablePayment, startDate: string | undefined) =>
+  p.minerId === undefined &&
+  (p.reviewReason === undefined ||
+    (p.reviewReason === 'no-open-balance' &&
+      (startDate === undefined || p.at.slice(0, 10) >= startDate))) &&
+  (p.notTaxAmount ?? 0) < p.amount;
 
 /**
  * Checks one claimed transfer against what the book synced of the corporation's wallet, before
@@ -1466,7 +1477,9 @@ export function checkClaimedTransfer(t: ClaimTransfer, ctx: ClaimCheckContext): 
     ctx.senderIds.includes(x.characterId) &&
     Math.abs(x.amount - t.amount) < 1 &&
     Math.abs(Date.parse(x.at) - at) <= CLAIM_MATCH_MS;
-  const payments = ctx.payments.filter((p) => same(p) && creditable(p) && !ctx.taken?.has(p.id));
+  const payments = ctx.payments.filter(
+    (p) => same(p) && creditable(p, ctx.startDate) && !ctx.taken?.has(p.id)
+  );
   const uncounted = ctx.uncounted.filter(same);
   if (payments.length + uncounted.length > 1) return { result: 'ambiguous' };
   if (payments[0]) {
@@ -1698,9 +1711,12 @@ export function disputeIdFor(minerId: string, date: string): string {
 export function parseClaimPaymentInput(data: unknown): {
   corporationId: number;
   paymentId: string;
+  /** The player says their own donation held for review was tax (`claimPayment`). */
+  inReview?: true;
 } {
   return {
     corporationId: parseBookCall(data).corporationId,
     paymentId: docId(record(data).paymentId, 'paymentId'),
+    ...(record(data).inReview === true ? { inReview: true as const } : {}),
   };
 }

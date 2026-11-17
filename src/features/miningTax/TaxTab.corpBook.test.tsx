@@ -297,6 +297,47 @@ describe('uncredited donations in the attention strip', () => {
   });
 });
 
+describe('donations the book holds for review without counting them (#6207)', () => {
+  const held = (refId: number, at: string, amount: number, reason?: string) => ({
+    id: `j5_${refId}`,
+    characterId: ME,
+    amount,
+    at,
+    refId,
+    ...(reason ? { reason } : {}),
+  });
+
+  // Neither in flight (the book has them) nor credited: nothing else on the tab says where the
+  // ISK went, so the member sees them, with every one listed and a Resolve.
+  it('names them once per book, each with its amount and what the member wrote', async () => {
+    hoisted.view = viewWith({
+      ...book,
+      inReview: [
+        held(26226487580, '2026-10-02T22:38:44.000Z', 26_952_549, 'Moon tax 10-01/10-02'),
+        held(26271892482, '2026-10-14T18:28:44.000Z', 10_976_509),
+        // Paid before the book bills from: it paid no mining the book bills.
+        held(26177051185, '2026-09-21T17:38:23.000Z', 11_340_032),
+      ],
+    });
+    const user = userEvent.setup();
+    renderTab();
+    await user.click(screen.getByText('Show'));
+    expect(
+      screen.getByText(
+        /Brass Meridian Logistics holds 2 of your donations without counting them \(37,929,058 ISK\)/
+      )
+    ).toBeInTheDocument();
+    const items = screen
+      .getAllByRole('listitem')
+      .map((li) => li.textContent)
+      .join(' | ');
+    expect(items).toMatch(/26,952,549 ISK, sent .*Moon tax 10-01\/10-02/);
+    expect(items).toMatch(/10,976,509 ISK, sent/);
+    expect(items).not.toMatch(/11,340,032/);
+    expect(screen.getAllByRole('button', { name: 'Resolve' }).length).toBeGreaterThan(0);
+  });
+});
+
 describe('a bill an officer kept', () => {
   const rejected = {
     id: `solo_${ME}_2026-10-17`,

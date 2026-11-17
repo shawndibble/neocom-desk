@@ -17,6 +17,7 @@ import { isUnpaidDefault } from '@/engine/miningTax/defaultSystems';
 import { minusLines } from '@/engine/miningTax/oreLines';
 import { entryKey } from '@/engine/miningTax/types';
 import { flatten, type DisplayRow } from '../groupRows';
+import { normalizePaymentInfo } from '../paymentLinks';
 import type { MoonMiningTaxRow } from '../snapshot';
 
 /** What a Tax-tab row knows about the Corp Tax Book it came from. */
@@ -203,6 +204,12 @@ export function buildDisplayRows(
   return [...flat, ...own];
 }
 
+const paymentRefsOf = (a: MiningTaxAssignmentRecord) => {
+  if (a.status !== 'paid' || !a.payment) return {};
+  const refs = (normalizePaymentInfo(a.payment).journalLinks ?? []).map((l) => l.refId);
+  return refs.length > 0 ? { paymentRefs: refs } : {};
+};
+
 /** The engine's view of the member's Mining Ledger Entries. */
 export function personalEntriesOf(rows: readonly MoonMiningTaxRow[]): PersonalEntry[] {
   return rows.map((row) => ({
@@ -222,6 +229,8 @@ export function personalEntriesOf(rows: readonly MoonMiningTaxRow[]): PersonalEn
         status: a.status,
         // A Default System's unpaid Assignment is ore given to no Payee as far as the book goes.
         ...(isUnpaidDefault(a) ? { releasable: true } : {}),
+        // Whether the book already holds the payment a mark records (`PersonalAllocation`).
+        ...paymentRefsOf(a),
       })),
   }));
 }

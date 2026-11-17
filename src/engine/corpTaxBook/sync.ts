@@ -11,6 +11,7 @@
 import type { EveNotificationPayload } from '../eveNotificationPayload';
 import { heldByStatement, type OreDispute } from './disputes';
 import { shiftDate } from '../miningTax/yieldRange';
+import { isDayCovered, type CoveragePeriod } from './coverage';
 import {
   allocatePayments,
   dismissalCredits,
@@ -483,6 +484,26 @@ export function unbilledWhenPaid(
 ): boolean {
   const minerId = minerIdFor(payment.characterId, book.miners);
   const paidDay = payment.at.slice(0, 10);
+  const billedThrough = billedThroughWhenPaid(payment, book);
+  return rows.some(
+    (r) =>
+      r.quantity > 0 &&
+      r.date >= book.startDate &&
+      r.date <= paidDay &&
+      r.date > billedThrough &&
+      minerIdFor(r.characterId, book.miners) === minerId
+  );
+}
+
+/** The last day the Statements issued to a payment's Miner by the time it was paid cover ('' for none). */
+function billedThroughWhenPaid(
+  payment: { characterId: number; at: string },
+  book: {
+    miners: readonly Miner[];
+    statements: readonly { minerId: string; coversThrough?: string; issuedAt?: string }[];
+  }
+): string {
+  const minerId = minerIdFor(payment.characterId, book.miners);
   let billedThrough = '';
   for (const s of book.statements)
     if (
@@ -493,14 +514,73 @@ export function unbilledWhenPaid(
       s.coversThrough > billedThrough
     )
       billedThrough = s.coversThrough;
-  return rows.some(
-    (r) =>
-      r.quantity > 0 &&
-      r.date >= book.startDate &&
-      r.date <= paidDay &&
-      r.date > billedThrough &&
-      minerIdFor(r.characterId, book.miners) === minerId
-  );
+  return billedThrough;
+}
+
+/**
+ * The stored rows a sync reads to match donations, by Character: the first day it wants. A
+ * sync's own ESI read holds only the book's refineries, but the book also bills ore mined at its
+ * moon owners' refineries, which their reads store. Without those rows a Miner who mined only
+ * there looks like owing nothing, and their donation is held for review for good. Wanted: each
+ * held (`no-open-balance`) donation's Miner, from after what the Statements issued by the time
+ * it was paid cover, if it was paid on or after the book's start; and each new donation's
+ * sender's Miner, from after what its Statements cover. Every Character of the Miner, from the
+ * book's start at the earliest.
+ */
+export function storedRowsWanted(input: {
+  held: readonly { characterId: number; at: string }[];
+  senders: readonly number[];
+  miners: readonly Miner[];
+  statements: readonly { minerId: string; coversThrough?: string; issuedAt?: string }[];
+  startDate: string;
+}): Map<number, string> {
+  const out = new Map<number, string>();
+  const want = (characterId: number, billedThrough: string, through?: string) => {
+    const after = billedThrough ? shiftDate(billedThrough, 1) : '';
+    const from = after > input.startDate ? after : input.startDate;
+    if (through !== undefined && from > through) return;
+    const minerId = minerIdFor(characterId, input.miners);
+    const characters = input.miners.find((m) => m.id === minerId)?.characterIds ?? [characterId];
+    for (const c of characters) {
+      const held = out.get(c);
+      if (held === undefined || from < held) out.set(c, from);
+    }
+  };
+  for (const p of input.held)
+    want(p.characterId, billedThroughWhenPaid(p, input), p.at.slice(0, 10));
+  for (const characterId of input.senders) {
+    const minerId = minerIdFor(characterId, input.miners);
+    let billedThrough = '';
+    for (const s of input.statements)
+      if (s.minerId === minerId && s.coversThrough && s.coversThrough > billedThrough)
+        billedThrough = s.coversThrough;
+    want(characterId, billedThrough);
+  }
+  return out;
+}
+
+/**
+ * The stored rows `storedRowsWanted` asked for that the book bills: a wanted Character's, from
+ * its day on, and a moon owner's only on a day its coverage holds (outside it, mining owes
+ * nothing). The book's own refineries' rows, and a moon owner it does not know, are not tested.
+ */
+export function billableStoredRows<
+  T extends { characterId: number; date: string; sourceCorporationId?: number },
+>(
+  rows: readonly T[],
+  wanted: ReadonlyMap<number, string>,
+  bookCorporationId: number,
+  feeders: readonly { corporationId: number; coveragePeriods?: readonly CoveragePeriod[] }[]
+): T[] {
+  const periodsOf = new Map(feeders.map((f) => [f.corporationId, f.coveragePeriods]));
+  return rows.filter((r) => {
+    const from = wanted.get(r.characterId);
+    if (from === undefined || r.date < from) return false;
+    const source = r.sourceCorporationId;
+    const periods =
+      source === undefined || source === bookCorporationId ? undefined : periodsOf.get(source);
+    return periods === undefined || isDayCovered(periods, r.date);
+  });
 }
 
 /**

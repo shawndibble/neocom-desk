@@ -9,6 +9,7 @@ import {
   proofSenders,
   rowTarget,
   uncreditedTarget,
+  inReviewTarget,
 } from './targets';
 import { notPayingDayKey, uncreditedKey } from './notPaying';
 
@@ -207,5 +208,56 @@ describe('targets', () => {
   it('a day with nothing to resolve has no target', () => {
     expect(rowTarget(row({ state: 'dismissed' }))).toBeUndefined();
     expect(rowTarget(row({ state: 'conflict' }))?.problem.kind).toBe('conflict');
+  });
+});
+
+describe('inReviewTarget (donations the book holds for review)', () => {
+  const group = {
+    corporationId: 1,
+    corpName: 'Bureau',
+    donations: [
+      {
+        id: 'j5_26226487580',
+        characterId: 7,
+        amount: 26_952_549,
+        at: '2026-11-02T22:38:44.000Z',
+        refId: 26226487580,
+        reason: 'Moon tax 11-01/11-02',
+      },
+      { id: 'j5_x', characterId: 8, amount: 10_976_509, at: '2026-11-14T18:28:44.000Z' },
+    ],
+  };
+
+  it('asks the corporation to count them, naming each held payment and its donor', () => {
+    const t = inReviewTarget({ ...group, statementId: 's1' });
+    expect(t.problem).toEqual({
+      kind: 'uncredited',
+      corporationId: 1,
+      corpName: 'Bureau',
+      characterId: 7,
+      amount: 26_952_549 + 10_976_509,
+      statementId: 's1',
+      held: [
+        { id: 'j5_26226487580', characterId: 7 },
+        { id: 'j5_x', characterId: 8 },
+      ],
+    });
+    expect(t.hideKey).toBe(
+      uncreditedKey(1, ['2026-11-02T22:38:44.000Z', '2026-11-14T18:28:44.000Z'])
+    );
+    // The proof is what the book holds: amount and time (the journal ref where known).
+    expect(t.transfers).toEqual([
+      {
+        amount: 26_952_549,
+        at: '2026-11-02T22:38:44.000Z',
+        journalRef: 26226487580,
+        recipient: 'corporation',
+      },
+    ]);
+    expect(t.donations?.map((d) => d.amount)).toEqual([26_952_549, 10_976_509]);
+  });
+
+  it('has no Statement when the Miner has none open', () => {
+    expect('statementId' in inReviewTarget(group).problem).toBe(false);
   });
 });

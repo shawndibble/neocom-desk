@@ -23,7 +23,12 @@ export const PAYMENT_REF_TYPES: ReadonlySet<string> = new Set([
  */
 export const LINK_WINDOW_DAYS = 14;
 
-/** True when two ISK figures agree within half a percent (or one ISK, whichever is larger). */
+/** How far two ISK figures may differ and still match: half a percent, or one ISK, whichever is larger. */
+export function amountSlack(amount: number): number {
+  return Math.max(1, amount * 0.005);
+}
+
+/** True when two ISK figures agree within `amountSlack`. */
 export function amountsMatch(a: number, b: number): boolean {
-  return Math.abs(a - b) <= Math.max(1, b * 0.005);
+  return Math.abs(a - b) <= amountSlack(b);
 }
