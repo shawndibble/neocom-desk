@@ -25,6 +25,8 @@ import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { usePageTab } from '@/lib/usePageTab';
 import { ReviewMemberDialog } from './ReviewMemberDialog';
+import { markMembers } from './reviewRoster';
+import { useReviewRoster } from './useReviewRoster';
 import { VettingQueue } from './VettingQueue';
 import { VettingReport } from './VettingReport';
 import { VettingInvitesDialog } from './VettingInvitesDialog';
@@ -51,6 +53,7 @@ export function VettingPage() {
   const { state, characterId, corporationId, reload, replace } = useVettingOverview();
   const { copied, flash } = useCopyFeedback(2000);
   const [requesting, setRequesting] = useState(false);
+  const roster = useReviewRoster(requesting ? characterId : null, corporationId);
   const [invitesOpen, setInvitesOpen] = useState<'new' | 'list' | null>(null);
   const reviewId = reviewIdFromPathname(pathname);
   const canConfigure = state.status === 'ready' && state.overview.canConfigure;
@@ -220,6 +223,17 @@ export function VettingPage() {
       )}
       {requesting && (
         <ReviewMemberDialog
+          roster={roster}
+          mark={(members) =>
+            markMembers(members, {
+              selfId: characterId,
+              waiting: new Map(
+                overview.reviews
+                  .filter((review) => review.state === 'requested' || review.state === 'open')
+                  .map((review) => [review.pilot.characterId, { at: review.createdAt }])
+              ),
+            })
+          }
           onClose={() => setRequesting(false)}
           onRequest={async (memberName, role) => {
             replace(await vettingBackend().request(characterId, corporationId, memberName, role));

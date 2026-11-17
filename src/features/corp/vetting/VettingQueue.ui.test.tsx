@@ -163,7 +163,10 @@ describe('VettingPage queue', () => {
     const dialog = within(await screen.findByRole('dialog'));
     const ask = dialog.getByRole('button', { name: 'Ask for a review' });
     expect(ask).toHaveAttribute('aria-disabled', 'true');
-    await userEvent.type(dialog.getByLabelText('Character name, exactly as in game'), 'Sio Tane');
+    await userEvent.type(
+      await dialog.findByLabelText('Character name, exactly as in game'),
+      'Sio Tane'
+    );
     await userEvent.type(dialog.getByLabelText('Role they are up for'), 'Accountant');
     await userEvent.click(ask);
     expect(await rowOf('Sio Tane')).toHaveTextContent('Promotion to Accountant');

@@ -97,7 +97,12 @@ export const Today: Story = {
   render: () => (
     <>
       {behind}
-      <ReviewMemberDialog onClose={() => undefined} onRequest={async () => undefined} />
+      <ReviewMemberDialog
+        roster={{ status: 'unreadable' }}
+        mark={(members) => [...members]}
+        onClose={() => undefined}
+        onRequest={async () => undefined}
+      />
     </>
   ),
 };
