@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { userEvent, within } from 'storybook/test';
 import {
   seedVettingCorporation,
+  vettingRosterRoutes,
   VETTING_SHELL_SCOPES,
   vettingShellRoutes,
 } from '@/storybook/vettingShell';
@@ -160,7 +161,22 @@ export const ReviewMember: Story = {
   },
 };
 
+/** @summary "Review a member" with the corp's member list readable: pick from the roster instead of typing the exact name. */
+export const ReviewMemberRoster: Story = {
+  parameters: {
+    shell: {
+      ...shell('/corp/vetting/open', () => [...directorRoutes(), ...vettingRosterRoutes()]),
+      // Mail the member: the asking officer's send-mail grant.
+      scopes: [...VETTING_SHELL_SCOPES, 'esi-mail.send_mail.v1'],
+    },
+  },
+  play: ReviewMember.play,
+};
+
 const requests = { vetting: { extra: 'requests' as const } };
+
+/** @summary Queue with the waiting rows: mail not sent, mail sent 6 hours ago, and the one about you left out. */
+export const QueueRequests: Story = { parameters: requests };
 
 /** @summary Requested review, mail not sent: Request panel (asked by you, role, Mail not sent, Send mail), "Nothing shared yet", the rail with you barred. */
 export const RequestedNoMail: Story = {
