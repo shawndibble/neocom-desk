@@ -5,6 +5,7 @@ import { useAutoClaimDonations } from '@/features/miningTax/corpBook/useAutoClai
 import { useBookSystems } from '@/features/miningTax/corpBook/useBookSystems';
 import { useHiddenLeftCorps } from '@/features/miningTax/corpBook/leftCorpAck';
 import { useCorpBookView } from '@/features/miningTax/corpBook/useCorpBookView';
+import { owedWhereUncovered, paymentCoverage } from './paymentLinks';
 import type { TaxSnapshot } from './taxSnapshot';
 import type { TrackedCharacter } from './snapshot';
 
@@ -20,6 +21,22 @@ export function useTaxCorpBooks(
     characters.map((c) => c.characterId).join(',')
   );
 
+  // Every Assignment the ledger stores, the ones a book row stands in for included: whether a
+  // transaction is already linked is decided over all of them, or a donation two book days used
+  // up is offered again to link to a third.
+  const storedAssignments = useMemo(
+    () => (data?.entries ?? []).flatMap((row) => row.assignments),
+    [data?.entries]
+  );
+  // A paid day the ISK linked to it does not reach is still owed (`paymentCoverage`).
+  const ledger = useMemo((): TaxSnapshot | null => {
+    if (!data) return null;
+    const amounts = new Map(madePayments.map((m) => [m.key, m.amount]));
+    const { uncovered } = paymentCoverage(storedAssignments, (key) => amounts.get(key));
+    const entries = owedWhereUncovered(data.entries, uncovered);
+    return entries === data.entries ? data : { ...data, entries };
+  }, [data, madePayments, storedAssignments]);
+
   const payees = useMemo(
     () => [...(data?.payeesByCharacter.values() ?? [])].flat(),
     [data?.payeesByCharacter]
@@ -34,7 +51,7 @@ export function useTaxCorpBooks(
     corpNameOf,
     hiddenLeft,
   } = useCorpBookView({
-    rows: data?.entries,
+    rows: ledger?.entries,
     characters,
     activeCharacterId,
     madePayments,
@@ -50,6 +67,8 @@ export function useTaxCorpBooks(
     security: data?.systemSecurity ?? NO_SECURITY,
   });
   return {
+    ledger,
+    storedAssignments,
     madePayments,
     paymentSources,
     corpView,

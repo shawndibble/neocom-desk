@@ -32,9 +32,13 @@ _Recorded 2026-11-16._ Mockups: `docs/design/mockups/mining-tax-resolve/`.
   rules out an unbounded pause that lets a dispute stall a bill.
 
 - **A Corp Tax Book is paid by amount, never by day.** The book pays a Miner's oldest days
-  first and cannot target a moon or a day, so the member's own marks and in-flight donations
-  follow the same rule, skipping held days, and the pay dialog shows where a payment lands.
-  Picking specific entries stays for personal Payees, where it is real.
+  first and cannot target a moon or a day, so in-flight donations follow the same rule,
+  skipping held days, and the pay dialog shows where a payment lands. Picking specific entries
+  stays for personal Payees, where it is real. The member's own marks are the exception: a mark
+  pays the day it names on their tab (their side is done), only money beyond the marked days
+  pays other open days oldest first, a payment is only ever recorded or linked against the days
+  its amount covers, and once the book holds a marked payment but spent it on older days, the
+  row says so and offers Resolve.
 
 - **"Not paying" is the member's own, on their device, and never reads as resolved.** One
   click, no reason, nothing sent; the row reads "Not paying — {corp} still bills this" and is

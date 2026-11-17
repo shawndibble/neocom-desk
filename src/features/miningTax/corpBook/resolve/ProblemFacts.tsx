@@ -1,4 +1,5 @@
 import { Trans, useTranslation } from 'react-i18next';
+import { formatList } from '@/lib/listFormat';
 import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
 import { formatCount } from '@/lib/formatCount';
 import { formatIsk } from '@/lib/isk';
@@ -25,6 +26,29 @@ export function ProblemFacts({ target }: { target: ResolveTarget }) {
   );
   switch (problem.kind) {
     case 'uncredited':
+      if (problem.held)
+        return (
+          <>
+            <p>
+              <Trans
+                i18nKey={k('inReview')}
+                values={{ corp }}
+                components={{ amount: <IskText value={problem.amount} /> }}
+              />
+            </p>
+            <ul className="space-y-0.5 tabular-nums">
+              {(target.donations ?? []).map((d) => (
+                <li key={`${d.characterId}:${d.at}`}>
+                  <span className="font-semibold">
+                    <IskText value={d.amount} />
+                  </span>{' '}
+                  · {eveTimeLabel(Date.parse(d.at))}
+                  {d.refId !== undefined && ` · ${t(k('journalRef'), { ref: d.refId })}`}
+                </li>
+              ))}
+            </ul>
+          </>
+        );
       return (
         <>
           <p>
@@ -112,10 +136,11 @@ export function ProblemFacts({ target }: { target: ResolveTarget }) {
     case 'markedPaid':
       return (
         <p>
-          {t(k('markedPaid'), {
+          {t(k(row?.bookSpentOn ? 'markedPaidSpent' : 'markedPaid'), {
             corp,
             date: row?.date ?? '',
             owed: formatIsk(row?.bookOwed ?? 0, 0),
+            days: formatList(row?.bookSpentOn ?? []),
           })}
         </p>
       );

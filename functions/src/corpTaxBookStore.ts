@@ -2305,9 +2305,10 @@ export async function claimPayment(
   deps: BookDeps,
   caller: Caller,
   corporationId: number,
-  paymentId: string
+  paymentId: string,
+  options: { inReview?: boolean } = {}
 ) {
-  const claimed = await claimPaymentTx(deps, caller, corporationId, paymentId);
+  const claimed = await claimPaymentTx(deps, caller, corporationId, paymentId, options);
   await refreshAfterEvent(deps.db, corporationId, [claimed.minerId], deps.now);
   await refreshReadModels(deps.db, corporationId, deps.now());
   return claimed;
@@ -2317,7 +2318,8 @@ async function claimPaymentTx(
   deps: BookDeps,
   caller: Caller,
   corporationId: number,
-  paymentId: string
+  paymentId: string,
+  options: { inReview?: boolean }
 ) {
   const characterId = signedInCharacter(caller);
   const paymentRef = sub(deps.db, corporationId, PAYMENTS).doc(paymentId);
@@ -2333,9 +2335,14 @@ async function claimPaymentTx(
       fail('failed-precondition', 'Already assigned', 'already-assigned');
     if (((payment.notTaxAmount as number | undefined) ?? 0) >= (payment.amount as number))
       fail('failed-precondition', 'An officer marked this as not tax', 'not-tax');
-    // #6207: held because the player's Miner owed nothing (a buyback, say): an officer decides.
-    if (payment.reviewReason !== undefined)
+    // #6207: held because the player's Miner owed nothing (a buyback, say): an officer decides,
+    // unless the player says it was tax (`inReview`, never the automatic claim). Only one paid on
+    // or after the book's start: mining before it is never billed, so nothing was owed then.
+    const inReview = payment.reviewReason !== undefined;
+    if (inReview && (!options.inReview || payment.reviewReason !== 'no-open-balance'))
       fail('failed-precondition', 'An officer reviews this payment', 'in-review');
+    if (inReview && String(payment.at ?? '').slice(0, 10) < String(book.get('startDate') ?? ''))
+      fail('failed-precondition', 'Paid before the book started', 'before-start');
     // A guest's character stays unlinked until they confirm (D26b): `callerMiner` counts only a
     // Miner that lists this character in its readable `uids`.
     const { minerId } = await callerMiner(tx, deps, corporationId, caller, characterId);
@@ -2343,6 +2350,7 @@ async function claimPaymentTx(
       minerId,
       claimedBy: characterId,
       claimedAt: new Date(deps.now()).toISOString(),
+      ...(inReview ? { reviewReason: FieldValue.delete() } : {}),
     });
     appendAudit(
       tx,
@@ -2350,7 +2358,7 @@ async function claimPaymentTx(
       corporationId,
       { characterId, name: 'Player claim', via: 'player-claim' },
       'claimPayment',
-      { paymentId, minerId }
+      { paymentId, minerId, ...(inReview ? { inReview: true } : {}) }
     );
     return { minerId };
   });
@@ -2427,12 +2435,14 @@ export async function declareOwnPayment(deps: BookDeps, caller: Caller, input: D
     const iso = new Date(now).toISOString();
     // Each payment found is credited at once, even while others are not: the declaration stays
     // open for the rest. A found payment is one no one held yet (`checkClaimedTransfer`).
+    // One the sync held for review is the member's own money too: crediting it ends the hold.
     for (const c of checks) {
       if (c.result === 'found' && c.paymentId)
         tx.update(sub(deps.db, corporationId, PAYMENTS).doc(c.paymentId), {
           minerId: statement.minerId,
           claimedBy: characterId,
           claimedAt: iso,
+          reviewReason: FieldValue.delete(),
         });
     }
     const id = `x${now}_${rand(4)}`;

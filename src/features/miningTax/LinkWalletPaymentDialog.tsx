@@ -13,7 +13,7 @@ import { rememberPayeeEntity } from './payees';
 import { missingPaymentEndpoints, paidOnFromIso, type MadePaymentSources } from './madePayments';
 import { systemLabel } from './names';
 import * as Icon from '@/components/ui/icons';
-import { exactAmountMatches, type MadePayment } from './paymentLinks';
+import { exactAmountMatches, linkTargetsWithin, type MadePayment } from './paymentLinks';
 import { allocateOldestFirst } from './settleAllocation';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
@@ -157,7 +157,11 @@ export function LinkWalletPaymentDialog({
     const link = [{ refId: selected.refId, source: 'manual' as const }];
     const result = await run(() =>
       settle(
-        included.map((m) => m.assignment),
+        // A day the ISK sent cannot reach stays owed, as the "short" line says.
+        linkTargetsWithin(
+          included.map((m) => m.assignment),
+          selected.amount
+        ),
         {
           paidOn: paidOnFromIso(selected.date),
           method: selected.method,

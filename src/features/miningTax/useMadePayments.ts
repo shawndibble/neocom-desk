@@ -14,6 +14,11 @@ import {
 interface UseLinkSuggestionsInput {
   madePayments: readonly MadePayment[];
   everyAssignment: readonly MiningTaxAssignmentRecord[];
+  /**
+   * Every stored Assignment, the ones a book row stands in for included: a transaction any of
+   * them links is already used. Defaults to `everyAssignment`.
+   */
+  linkedAssignments?: readonly MiningTaxAssignmentRecord[];
   balances: readonly PayeeBalance[];
 }
 
@@ -68,6 +73,7 @@ export function useMadePayments(trackedCharacterIds: string) {
 export function useLinkSuggestions({
   madePayments,
   everyAssignment,
+  linkedAssignments = everyAssignment,
   balances,
 }: UseLinkSuggestionsInput) {
   // Settle-up payments already recorded (paid-on/method/amount) but never
@@ -78,9 +84,9 @@ export function useLinkSuggestions({
   // see `autoMatchRecordedPayments`'s own doc comment for why this skips the
   // confirmation dialog `suggestLink` uses.
   const recordedMatches = useMemo(() => {
-    const candidates = unlinkedPayments(madePayments, everyAssignment);
-    return autoMatchRecordedPayments(candidates, unlinkedRecordedPayments(everyAssignment));
-  }, [everyAssignment, madePayments]);
+    const candidates = unlinkedPayments(madePayments, linkedAssignments);
+    return autoMatchRecordedPayments(candidates, unlinkedRecordedPayments(linkedAssignments));
+  }, [linkedAssignments, madePayments]);
 
   // Attempted once per `paymentId`, not on every render this effect's deps
   // happen to recompute — the write lands in Dexie but nothing here forces a
@@ -112,13 +118,13 @@ export function useLinkSuggestions({
   // a standing alert. Excludes whatever `recordedMatches` just claimed
   // automatically — those never need the confirmation dialog.
   const linkSuggestions = useMemo(() => {
-    const candidates = unlinkedPayments(madePayments, everyAssignment);
+    const candidates = unlinkedPayments(madePayments, linkedAssignments);
     const autoLinked = new Set(recordedMatches.map((m) => m.payment.key));
     return suggestLinks(
       candidates.filter((p) => !autoLinked.has(p.key)),
       balances
     );
-  }, [everyAssignment, madePayments, balances, recordedMatches]);
+  }, [linkedAssignments, madePayments, balances, recordedMatches]);
 
   return linkSuggestions;
 }

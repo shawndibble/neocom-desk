@@ -19,7 +19,9 @@ import { formatIsk } from '@/lib/isk';
 import type { PayeeBalance } from './balances';
 import { allMembers, type DisplayRow, type GroupMember } from './groupRows';
 import type { LinkedTransaction } from './PaymentLinksCard';
-import { amountsMatch, LINK_WINDOW_DAYS } from './paymentMatches';
+import { amountSlack, amountsMatch, LINK_WINDOW_DAYS } from './paymentMatches';
+import { allocateOldestFirst } from './settleAllocation';
+import type { MoonMiningTaxRow } from './snapshot';
 
 /**
  * One payment the pilot has already made, normalized across its two sources:
@@ -147,6 +149,171 @@ export function linkedAssignmentsByRef(assignments: readonly MiningTaxAssignment
     for (const list of map.values()) list.sort((x, y) => x.date.localeCompare(y.date));
   }
   return { journal, contract };
+}
+
+/** What linked ISK actually reaches (`paymentCoverage`). */
+export interface PaymentCoverage {
+  /** Paid Assignments the ISK of their linked transactions is used up before. */
+  uncovered: ReadonlySet<string>;
+  /** Per linked transaction (`MadePayment.key`): the Assignments its ISK reaches. */
+  reaches: ReadonlyMap<string, ReadonlySet<string>>;
+}
+
+const linkKeys = (payment: MiningTaxPaymentInfo): string[] => {
+  const normalized = normalizePaymentInfo(payment);
+  return [
+    ...(normalized.journalLinks ?? []).map((l) => `journal:${l.refId}`),
+    ...(normalized.contractLinks ?? []).map((l) => `contract:${l.refId}`),
+  ];
+};
+
+/**
+ * Which paid Assignments the transactions linked to them can actually pay. Assignments that share
+ * a transaction (or a recorded payment) share its ISK, and it pays them oldest first, whole days
+ * only (`allocateOldestFirst`, within `amountsMatch`'s slack): a day it is used up before is not
+ * paid by it, however it came to be linked — a manual link once reused a donation two other days
+ * had already used up. A group with a transaction whose amount is unknown (`amountOf` gives
+ * `null`/`undefined`, as for a payment in kind) is not judged: every link reaches all of it.
+ */
+export function paymentCoverage(
+  assignments: readonly MiningTaxAssignmentRecord[],
+  amountOf: (key: string) => number | null | undefined
+): PaymentCoverage {
+  const linked = assignments.filter(
+    (a) => a.status === 'paid' && a.payment && linkKeys(a.payment).length > 0
+  );
+  // Union-find over the Assignments: by a shared transaction, or a shared recorded payment.
+  const parent = new Map<string, string>();
+  const find = (x: string): string => {
+    const up = parent.get(x) ?? x;
+    if (up === x) return x;
+    const root = find(up);
+    parent.set(x, root);
+    return root;
+  };
+  const union = (a: string, b: string) => parent.set(find(a), find(b));
+  const firstBy = new Map<string, string>();
+  for (const a of linked) {
+    parent.set(a.id, find(a.id));
+    for (const key of [...linkKeys(a.payment!), `payment:${a.payment!.paymentId}`]) {
+      const first = firstBy.get(key);
+      if (first === undefined) firstBy.set(key, a.id);
+      else union(a.id, first);
+    }
+  }
+  const groups = new Map<string, MiningTaxAssignmentRecord[]>();
+  for (const a of linked) groups.set(find(a.id), [...(groups.get(find(a.id)) ?? []), a]);
+
+  const uncovered = new Set<string>();
+  const reaches = new Map<string, Set<string>>();
+  const fits = (members: readonly MiningTaxAssignmentRecord[], amount: number) =>
+    new Set(
+      allocateOldestFirst(
+        members.map((m) => ({ id: m.id, date: m.date, taxOwed: m.taxOwed })),
+        amount + amountSlack(amount)
+      ).coveredIds
+    );
+  for (const members of groups.values()) {
+    members.sort((x, y) => x.date.localeCompare(y.date) || x.id.localeCompare(y.id));
+    // Journal ids rise with time: the transactions in the order they were sent.
+    const keys = [...new Set(members.flatMap((m) => linkKeys(m.payment!)))].sort((x, y) =>
+      x.localeCompare(y, undefined, { numeric: true })
+    );
+    const amounts = keys.map((key) => amountOf(key));
+    if (amounts.some((x) => x === null || x === undefined)) {
+      for (const key of keys)
+        reaches.set(
+          key,
+          new Set(members.filter((m) => linkKeys(m.payment!).includes(key)).map((m) => m.id))
+        );
+      continue;
+    }
+    // Each transaction in turn: what the ISK so far reaches that the earlier ones did not. One
+    // that only adds to a day it cannot finish reaches that day.
+    let total = 0;
+    let before = new Set<string>();
+    for (const [i, key] of keys.entries()) {
+      total += amounts[i] as number;
+      const now = fits(members, total);
+      const added = [...now].filter((id) => !before.has(id));
+      const next = members.find((m) => !now.has(m.id));
+      reaches.set(key, new Set(added.length > 0 ? added : next ? [next.id] : []));
+      before = now;
+    }
+    // As `linkTargetsWithin`: ISK that finishes no day still part-pays the oldest, which stays paid.
+    const paid = before.size > 0 ? before : new Set(members.slice(0, 1).map((m) => m.id));
+    for (const m of members) if (!paid.has(m.id)) uncovered.add(m.id);
+  }
+  return { uncovered, reaches };
+}
+
+/**
+ * Of the Assignments linked to one transaction (`key`, as `MadePayment.key`), those its ISK
+ * reaches (`paymentCoverage`), judged with only its own `amount` known: what the wallet journal
+ * lists under the entry. A transaction that shares its days with another one whose amount this
+ * does not know is not judged: every linked day is listed.
+ */
+export function reachedByTransaction(
+  key: string,
+  amount: number | null,
+  linked: readonly MiningTaxAssignmentRecord[],
+  all: readonly MiningTaxAssignmentRecord[]
+): MiningTaxAssignmentRecord[] {
+  const paymentIds = new Set(linked.flatMap((a) => (a.payment ? [a.payment.paymentId] : [])));
+  const group = all.filter(
+    (a) => linked.includes(a) || (a.payment !== undefined && paymentIds.has(a.payment.paymentId))
+  );
+  const reach = paymentCoverage(group, (k) => (k === key ? amount : undefined)).reaches.get(key);
+  return reach ? linked.filter((a) => reach.has(a.id)) : [...linked];
+}
+
+/**
+ * Of the Assignments a transaction is about to be recorded against, those its ISK pays: oldest
+ * first, whole days, within `amountsMatch`'s slack (`paymentCoverage`'s rule). A day it cannot
+ * reach stays owed, as the dialogs' "short" line says; one it can only part-pay is the oldest,
+ * kept alone. A payment in kind (`null`) has no figure to judge by: every day is kept.
+ */
+export function linkTargetsWithin<
+  T extends Pick<MiningTaxAssignmentRecord, 'id' | 'date' | 'taxOwed'>,
+>(assignments: readonly T[], amount: number | null): T[] {
+  if (amount === null || assignments.length === 0) return [...assignments];
+  const covered = new Set(
+    allocateOldestFirst(
+      assignments.map((a) => ({ id: a.id, date: a.date, taxOwed: a.taxOwed })),
+      amount + amountSlack(amount)
+    ).coveredIds
+  );
+  const oldest = [...assignments].sort(
+    (a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id)
+  );
+  const kept = oldest.filter((a) => covered.has(a.id));
+  return kept.length > 0 ? kept : oldest.slice(0, 1);
+}
+
+/**
+ * The ledger as the tab reads it: a paid Assignment its linked ISK does not reach
+ * (`paymentCoverage`) is still owed, its payment record left off. The stored record is untouched
+ * until the member acts on the day.
+ */
+export function owedWhereUncovered(
+  rows: readonly MoonMiningTaxRow[],
+  uncovered: ReadonlySet<string>
+): MoonMiningTaxRow[] {
+  if (uncovered.size === 0) return rows as MoonMiningTaxRow[];
+  return rows.map((row) =>
+    row.assignments.some((a) => uncovered.has(a.id))
+      ? {
+          ...row,
+          assignments: row.assignments.map((a) => {
+            if (!uncovered.has(a.id)) return a;
+            const owed: MiningTaxAssignmentRecord = { ...a, status: 'outstanding' };
+            delete owed.payment;
+            delete owed.paidAt;
+            return owed;
+          }),
+        }
+      : row
+  );
 }
 
 /** The journal and contract ids some Assignment already records a payment against. */

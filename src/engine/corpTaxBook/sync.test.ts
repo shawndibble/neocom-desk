@@ -9,6 +9,8 @@ import {
   planSettlements,
   unbilledMinerIds,
   unbilledWhenPaid,
+  billableStoredRows,
+  storedRowsWanted,
   reconcileExtractions,
   resolveDonations,
   restampPlan,
@@ -472,6 +474,124 @@ describe('unbilledWhenPaid (held donation, lagging ledger)', () => {
     expect(unbilledWhenPaid(at, [row(7, '2026-09-05')], { ...book, startDate: '2026-09-06' })).toBe(
       false
     );
+  });
+});
+
+describe('stored rows a held or new donation is matched against (moon owner mining)', () => {
+  // Shaped like a real book: started 2026-11-12 billing from 2026-11-01, its Miner's ore all
+  // mined at two moon owners' refineries (rows the moon owner reads store, tagged with the owner).
+  const BOOK = 98837836;
+  const ME = 91262608;
+  const feeders = [
+    { corporationId: 98847985, coveragePeriods: [{ from: '2026-11-01' }] },
+    { corporationId: 98847903, coveragePeriods: [{ from: '2026-11-01' }] },
+  ];
+  const fed = (date: string, quantity: number, source = 98847985) => ({
+    structureId: 1054576755229,
+    characterId: ME,
+    recordedCorporationId: BOOK,
+    typeId: 46281,
+    date,
+    quantity,
+    sourceCorporationId: source,
+  });
+  const stored = [
+    fed('2026-11-01', 72137),
+    fed('2026-11-02', 16037),
+    fed('2026-11-06', 93419, 98847903),
+    fed('2026-11-07', 10116, 98847903),
+    fed('2026-11-11', 53869),
+  ];
+  const book = { miners: [], statements: [] as Statement[], startDate: '2026-11-01' };
+  const held = (id: string, at: string) => ({ id, characterId: ME, at });
+
+  it('wants the rows of a held donation’s Miner from the book’s start, only if paid since', () => {
+    const wanted = storedRowsWanted({
+      ...book,
+      held: [
+        held('j5_26177051185', '2026-10-21T17:38:23.000Z'),
+        held('j5_26226487580', '2026-11-02T22:38:44.000Z'),
+      ],
+      senders: [],
+    });
+    expect(wanted).toEqual(new Map([[ME, '2026-11-01']]));
+    // Paid before the book's start: no mining it bills could have been owed then.
+    expect(
+      storedRowsWanted({
+        ...book,
+        held: [held('j5_26177051185', '2026-10-21T17:38:23.000Z')],
+        senders: [],
+      }).size
+    ).toBe(0);
+  });
+
+  it('wants rows after what Statements cover, for every Character of the Miner', () => {
+    const miners = [{ id: 'm1', characterIds: [ME, 7], mainCharacterId: ME }];
+    const statements = [
+      statement({
+        id: 's1',
+        minerId: 'm1',
+        coversThrough: '2026-11-05',
+        issuedAt: '2026-11-06T00:00:00Z',
+      }),
+    ];
+    // A held payment counts only the Statements issued by the time it was paid.
+    expect(
+      storedRowsWanted({
+        ...book,
+        miners,
+        statements,
+        held: [held('j1', '2026-11-05T12:00:00Z')],
+        senders: [],
+      })
+    ).toEqual(
+      new Map([
+        [ME, '2026-11-01'],
+        [7, '2026-11-01'],
+      ])
+    );
+    // A new donation counts all of them.
+    expect(storedRowsWanted({ ...book, miners, statements, held: [], senders: [7] })).toEqual(
+      new Map([
+        [ME, '2026-11-06'],
+        [7, '2026-11-06'],
+      ])
+    );
+  });
+
+  it('keeps a moon owner’s rows only inside its coverage, and the wanted days only', () => {
+    const outside = { ...fed('2026-11-03', 500), sourceCorporationId: 98847921 };
+    const own = { ...fed('2026-11-04', 500), sourceCorporationId: undefined };
+    const rows = billableStoredRows(
+      [...stored, outside, own, { ...fed('2026-11-02', 5), characterId: 9 }],
+      new Map([[ME, '2026-11-02']]),
+      BOOK,
+      [...feeders, { corporationId: 98847921, coveragePeriods: [{ from: '2026-11-05' }] }]
+    );
+    expect(rows.map((r) => r.date)).toEqual([
+      '2026-11-02',
+      '2026-11-06',
+      '2026-11-07',
+      '2026-11-11',
+      '2026-11-04',
+    ]);
+  });
+
+  it('releases the donations paid after moon owner mining the book bills', () => {
+    const wantedFor = (p: { id: string; characterId: number; at: string }) =>
+      billableStoredRows(
+        stored,
+        storedRowsWanted({ ...book, held: [p], senders: [] }),
+        BOOK,
+        feeders
+      );
+    for (const p of [
+      held('j5_26226487580', '2026-11-02T22:38:44.000Z'),
+      held('j5_26271892482', '2026-11-14T18:28:44.000Z'),
+    ])
+      expect(unbilledWhenPaid(p, wantedFor(p), book)).toBe(true);
+    const before = held('j5_26177051185', '2026-10-21T17:38:23.000Z');
+    expect(unbilledWhenPaid(before, wantedFor(before), book)).toBe(false);
   });
 });
 

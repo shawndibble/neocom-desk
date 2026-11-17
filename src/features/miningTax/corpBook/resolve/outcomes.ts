@@ -30,6 +30,11 @@ export type ResolveProblem =
       statementId?: string;
       /** Every day the donations were paying, oldest first: what the mail to the corporation says. */
       days?: string[];
+      /**
+       * Donations the book holds for an officer's review without counting them (#6207), not ones
+       * it lacks: each the member may say was tax (a claim of their own, no Statement needed).
+       */
+      held?: { id: string; characterId: number }[];
     })
   /** A billed day whose quantity or rate differs from the member's own record. */
   | (Of & { kind: 'figure'; bookAsksMore: boolean })
@@ -95,6 +100,15 @@ export function outcomesFor(p: ResolveProblem): Offer {
   const plan = notOwedPlan(p.row);
   switch (p.kind) {
     case 'uncredited': {
+      // The book holds them already: paying again, or "not paying" ISK it holds, is no answer;
+      // claiming needs no Statement.
+      if (p.held)
+        return {
+          outcomes: ['paid'],
+          preselected: 'paid',
+          tellWhy,
+          noStatement: false,
+        };
       const noStatement = p.statementId === undefined;
       // The donation is the proof, not a quarrel with a figure: no "I don't owe this" here.
       return {

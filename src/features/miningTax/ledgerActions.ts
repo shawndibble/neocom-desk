@@ -60,7 +60,10 @@ import {
 import { recordDefaultOptOuts } from './defaultOptOuts';
 import type { GroupMember } from './groupRows';
 import { isCorpEntityPayee } from './corpBook/corpRows';
+import { linkTargetsWithin } from './paymentLinks';
 import { removePayeeRecord } from './payees';
+import { amountSlack } from './paymentMatches';
+import { allocateOldestFirst } from './settleAllocation';
 import type { SessionContinuation } from './sessionContinuation';
 
 export type {
@@ -536,7 +539,9 @@ async function owedCombinedSiblings(
  * second row never counts the first one's new Assignment as its own. A row whose ore the ledger
  * already holds elsewhere fails the whole action with `held-elsewhere`, naming every such row.
  * An owed Assignment that is one day of a Combined Entry pays the entry's other owed days with it
- * (`owedCombinedSiblings`).
+ * (`owedCombinedSiblings`). With a payment, only what its amount covers is marked, oldest first:
+ * the ticked rows (`linkTargetsWithin`), then the Combined Entry days the rest still reaches. A
+ * payment is never marked against a day it cannot pay.
  */
 export function recordCorpPayment(
   corp: { corporationId: number; name: string },
@@ -548,8 +553,13 @@ export function recordCorpPayment(
     const entries = new Map<string, EntryClaims>();
     const recorded = new Map<string, MiningTaxAssignmentRecord>();
     const heldElsewhere: { id: string; date: string }[] = [];
+    // A payment marks only the days its amount covers, oldest first, as the book spends it.
+    const owedOf = (r: BookRowView) => ({ id: r.id, date: r.date, taxOwed: r.taxOwed ?? 0 });
+    const paying = payment
+      ? new Set(linkTargetsWithin(rows.map(owedOf), payment.amount).map((r) => r.id))
+      : null;
     for (const row of rows) {
-      if (row.solarSystemId === 0) continue;
+      if (row.solarSystemId === 0 || (paying && !paying.has(row.id))) continue;
       let payeeIds = payeesOf.get(row.characterId);
       if (!payeeIds) {
         payeeIds = await corpEntityPayeeIds(row.characterId, corp, row.taxPct);
@@ -602,7 +612,22 @@ export function recordCorpPayment(
       recorded.set(created.id, created);
     }
     if (heldElsewhere.length > 0) throw new HeldElsewhereError(heldElsewhere);
-    for (const sibling of await owedCombinedSiblings([...recorded.values()])) {
+    const siblings = await owedCombinedSiblings([...recorded.values()]);
+    // A Combined Entry's other days ride along only as far as the ISK left after the rows reaches.
+    const left = payment
+      ? payment.amount -
+        rows.filter((r) => paying?.has(r.id)).reduce((sum, r) => sum + (r.taxOwed ?? 0), 0)
+      : Infinity;
+    const reached = payment
+      ? new Set(
+          allocateOldestFirst(
+            siblings.filter((a) => !recorded.has(a.id)),
+            left + amountSlack(payment.amount)
+          ).coveredIds
+        )
+      : null;
+    for (const sibling of siblings) {
+      if (reached && !recorded.has(sibling.id) && !reached.has(sibling.id)) continue;
       recorded.set(sibling.id, sibling);
     }
     await markAssignmentsPaid([...recorded.values()], payment);

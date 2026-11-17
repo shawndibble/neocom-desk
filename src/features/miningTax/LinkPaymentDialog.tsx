@@ -11,7 +11,7 @@ import { settle } from './ledgerActions';
 import { paidOnFromIso } from './madePayments';
 import { systemLabel } from './names';
 import { rememberPayeeEntity } from './payees';
-import type { LinkSuggestion } from './paymentLinks';
+import { linkTargetsWithin, type LinkSuggestion } from './paymentLinks';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
 import { toggleInSet } from '@/lib/sets';
@@ -99,7 +99,11 @@ export function LinkPaymentDialog({
     const { payment, balance } = selected;
     const result = await run(() =>
       settle(
-        included.map((m) => m.assignment),
+        // A day the ISK sent cannot reach stays outstanding, as the "short" line says.
+        linkTargetsWithin(
+          included.map((m) => m.assignment),
+          payment.amount
+        ),
         {
           paidOn: paidOnFromIso(payment.date),
           method: payment.method,

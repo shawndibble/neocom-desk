@@ -42,6 +42,7 @@ import {
   coPaidAssignments,
   coPaidOutsideGroup,
   linkedTransactionsFor,
+  linkTargetsWithin,
   unlinkedPayments,
   type MadePayment,
 } from '@/features/miningTax/paymentLinks';
@@ -114,6 +115,11 @@ export interface TaxDialogsHostProps {
   allDisplayRows: readonly DisplayRow[];
   characterFiltered: readonly DisplayRow[];
   everyAssignment: readonly MiningTaxAssignmentRecord[];
+  /**
+   * Every stored Assignment, the ones a book row stands in for included: a transaction any of
+   * them links is used, and never offered to link again. Defaults to `everyAssignment`.
+   */
+  storedAssignments?: readonly MiningTaxAssignmentRecord[];
   allPayees: PayeeRecord[];
   payeeById: ReadonlyMap<string, PayeeRecord>;
   balances: readonly PayeeBalance[];
@@ -164,6 +170,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     allDisplayRows,
     characterFiltered,
     everyAssignment,
+    storedAssignments = everyAssignment,
     allPayees,
     payeeById,
     balances,
@@ -434,9 +441,9 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     if (!linkTransactionTarget) return [];
     return unlinkedPayments(
       madePayments.filter((p) => p.characterId === linkTransactionTarget.row.characterId),
-      everyAssignment
+      storedAssignments
     );
-  }, [linkTransactionTarget, madePayments, everyAssignment]);
+  }, [linkTransactionTarget, madePayments, storedAssignments]);
 
   const linkTransactionTargetAmount = useMemo(() => {
     if (!linkTransactionTarget) return 0;
@@ -447,7 +454,11 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
 
   async function handleConfirmLinkTransaction(payment: MadePayment, source: 'auto' | 'manual') {
     if (!linkTransactionTarget) return;
-    const targets = assignmentsForLinkTarget(linkTransactionTarget, everyAssignment);
+    // Linked only to the days its ISK reaches: a smaller transaction is not proof of the rest.
+    const targets = linkTargetsWithin(
+      assignmentsForLinkTarget(linkTransactionTarget, everyAssignment),
+      payment.amount
+    );
     if (targets.length === 0) return;
     await runRowAction(
       () =>
@@ -626,9 +637,9 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     const miners = new Set(linkWalletOwed.map((m) => m.row.characterId));
     return unlinkedPayments(
       madePayments.filter((p) => miners.has(p.characterId)),
-      everyAssignment
+      storedAssignments
     );
-  }, [linkWalletOwed, madePayments, everyAssignment]);
+  }, [linkWalletOwed, madePayments, storedAssignments]);
 
   const corpDetail = detailTarget?.corp?.kind === 'row' ? detailTarget.corp : null;
   // The member's own entry for a book day, when one lines up: "Fix my records" opens it to edit.

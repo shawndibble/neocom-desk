@@ -262,6 +262,12 @@ describe('parsers', () => {
       corporationId: 9,
       paymentId: 'j1_5',
     });
+    expect(parseClaimPaymentInput({ corporationId: 9, paymentId: 'j5_5', inReview: true })).toEqual(
+      { corporationId: 9, paymentId: 'j5_5', inReview: true }
+    );
+    expect(
+      parseClaimPaymentInput({ corporationId: 9, paymentId: 'j5_5', inReview: false })
+    ).toEqual({ corporationId: 9, paymentId: 'j5_5' });
     expect(() => parseClaimPaymentInput({ corporationId: 9, paymentId: '../x' })).toThrow();
     expect(() => parseClaimPaymentInput({ corporationId: 0, paymentId: 'a' })).toThrow();
   });
@@ -1132,7 +1138,7 @@ describe('checkClaimedTransfer', () => {
       expect(checkClaimedTransfer(transfer, { ...ctx, payments }).result).toBe('notFound');
     });
 
-    it('does not find a payment an officer marked wholly not tax, or one held for review', () => {
+    it('does not find a payment an officer marked wholly not tax', () => {
       expect(
         checkClaimedTransfer(transfer, {
           ...ctx,
@@ -1147,6 +1153,33 @@ describe('checkClaimedTransfer', () => {
       expect(
         checkClaimedTransfer(transfer, { ...ctx, payments: [{ ...open, notTaxAmount: 1 }] }).result
       ).toBe('found');
+    });
+
+    // The sender's own donation the sync held because their Miner seemed to owe nothing: the
+    // book holds the member's money, and the proof says it was tax. Credited, not "not found".
+    it("finds the sender's own donation held for review (no-open-balance)", () => {
+      const held = { ...open, reviewReason: 'no-open-balance' };
+      expect(checkClaimedTransfer(transfer, { ...ctx, payments: [held] })).toEqual({
+        result: 'found',
+        paymentId: 'j1_9',
+      });
+      // Still only the sender's own, and never twice.
+      expect(
+        checkClaimedTransfer(transfer, { ...ctx, payments: [{ ...held, characterId: 8 }] }).result
+      ).toBe('notFound');
+      const checks = checkClaimedTransfers([transfer, { ...transfer, journalRef: 2 }], {
+        ...ctx,
+        payments: [held],
+      });
+      expect(checks.map((c) => c.result)).toEqual(['found', 'notFound']);
+      expect(
+        checkClaimedTransfer(transfer, { ...ctx, payments: [held, { ...open, id: 'j1_10' }] })
+          .result
+      ).toBe('ambiguous');
+      // Paid before the book bills from: it paid no mining the book bills, so it stays held.
+      expect(
+        checkClaimedTransfer(transfer, { ...ctx, payments: [held], startDate: '2026-11-03' }).result
+      ).toBe('tooOld');
     });
 
     it('is ambiguous, never found, when several payments or rows match one transfer', () => {

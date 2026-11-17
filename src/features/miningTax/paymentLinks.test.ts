@@ -14,6 +14,10 @@ import {
   linkedAssignmentsByRef,
   linkedTransactionsFor,
   normalizePaymentInfo,
+  linkTargetsWithin,
+  owedWhereUncovered,
+  paymentCoverage,
+  reachedByTransaction,
   suggestLink,
   unlinkedPayments,
   unlinkedRecordedPayments,
@@ -632,5 +636,151 @@ describe('coPaidOutsideGroup', () => {
       'o2',
       'o1',
     ]);
+  });
+});
+
+// The Bureau report (2026-11-16): one 10,898,549 ISK donation (journal 26251213375) paid 11-06 and
+// 11-07 under one Settle up; five days later a manual link reused it for 11-09 as a second payment.
+describe('paymentCoverage', () => {
+  const REF = 26251213375;
+  const paid = (
+    id: string,
+    date: string,
+    taxOwed: number,
+    paymentId: string,
+    refs: number[],
+    amount = 10_898_549
+  ) =>
+    assignment({
+      id,
+      date,
+      taxOwed,
+      status: 'paid',
+      payment: {
+        paymentId,
+        paidOn: '2026-11-09',
+        method: 'donation',
+        amount,
+        journalLinks: refs.map((refId) => ({ refId, source: 'auto' as const })),
+      },
+    });
+  const nov06 = paid('nov06', '2026-11-06', 10_242_020.95, 'aed69be7', [REF]);
+  const nov07 = paid('nov07', '2026-11-07', 656_528.4, 'aed69be7', [REF]);
+  const nov09 = paid('nov09', '2026-11-09', 6_540_106.7, '8f691da6', [REF]);
+  const amounts = new Map([[`journal:${REF}`, 10_898_549]]);
+  const amountOf = (key: string) => amounts.get(key);
+
+  it('leaves a day the linked ISK is used up before as not paid by it', () => {
+    const out = paymentCoverage([nov09, nov07, nov06], amountOf);
+    expect([...out.uncovered]).toEqual(['nov09']);
+    expect([...(out.reaches.get(`journal:${REF}`) ?? [])].sort()).toEqual(['nov06', 'nov07']);
+  });
+
+  it('judges nothing when a linked amount is unknown', () => {
+    const out = paymentCoverage([nov06, nov07, nov09], () => undefined);
+    expect(out.uncovered.size).toBe(0);
+    expect(out.reaches.get(`journal:${REF}`)?.size).toBe(3);
+  });
+
+  it('adds up a payment paid in installments', () => {
+    const a = paid('a', '2026-11-01', 600, 'p', [1, 2], 1_000);
+    const b = paid('b', '2026-11-02', 400, 'p', [1, 2], 1_000);
+    const out = paymentCoverage([a, b], (key) => (key === 'journal:1' ? 600 : 400));
+    expect(out.uncovered.size).toBe(0);
+    expect([...(out.reaches.get('journal:1') ?? [])]).toEqual(['a']);
+    expect([...(out.reaches.get('journal:2') ?? [])]).toEqual(['b']);
+  });
+
+  // As `linkTargetsWithin` records it: a short payment linked to one day part-pays it, so that
+  // day stays paid with its payment, and only days after it are left owed.
+  it('keeps the oldest day paid when the ISK finishes no day', () => {
+    const short = paid('short', '2026-11-06', 10_242_020.95, 'p', [7], 5_000_000);
+    const later = paid('later', '2026-11-07', 656_528.4, 'p', [7], 5_000_000);
+    const out = paymentCoverage([later, short], (key) => (key === 'journal:7' ? 5_000_000 : null));
+    expect([...out.uncovered]).toEqual(['later']);
+    expect(paymentCoverage([short], () => 5_000_000).uncovered.size).toBe(0);
+  });
+
+  it('ignores an owed Assignment and a paid one with no link', () => {
+    const bare = assignment({ id: 'bare', status: 'paid' });
+    const out = paymentCoverage([bare, assignment({ id: 'owed' })], amountOf);
+    expect(out.uncovered.size).toBe(0);
+  });
+});
+
+describe('owedWhereUncovered', () => {
+  it('reads an uncovered Assignment as owed, its payment record off, and leaves the rest', () => {
+    const covered = assignment({ id: 'ok', status: 'paid', paidAt: 5 });
+    const short = assignment({
+      id: 'short',
+      status: 'paid',
+      paidAt: 5,
+      payment: { paymentId: 'x', paidOn: '2026-11-09', method: 'donation', amount: 1 },
+    });
+    const row = { ...member(covered).row, assignments: [covered, short] };
+    const [out] = owedWhereUncovered([row], new Set(['short']));
+    expect(out.assignments[0]).toBe(covered);
+    expect(out.assignments[1]).toMatchObject({ id: 'short', status: 'outstanding' });
+    expect(out.assignments[1]).not.toHaveProperty('payment');
+    expect(out.assignments[1]).not.toHaveProperty('paidAt');
+    expect(owedWhereUncovered([row], new Set())[0]).toBe(row);
+  });
+});
+
+describe('linkTargetsWithin', () => {
+  const day = (id: string, date: string, taxOwed: number) => assignment({ id, date, taxOwed });
+  const days = [
+    day('nov09', '2026-11-09', 6_540_106.7),
+    day('nov06', '2026-11-06', 10_242_020.95),
+    day('nov07', '2026-11-07', 656_528.4),
+  ];
+
+  it('keeps only the oldest days the ISK sent covers', () => {
+    expect(linkTargetsWithin(days, 10_898_549).map((a) => a.id)).toEqual(['nov06', 'nov07']);
+  });
+
+  it('keeps every day an amount covers, and all of them for a payment in kind', () => {
+    expect(linkTargetsWithin(days, 17_438_656)).toHaveLength(3);
+    expect(linkTargetsWithin(days, null)).toHaveLength(3);
+  });
+
+  it('keeps the oldest day alone when the ISK cannot finish even that one', () => {
+    expect(linkTargetsWithin(days, 1_000).map((a) => a.id)).toEqual(['nov06']);
+  });
+});
+
+describe('reachedByTransaction', () => {
+  const REF = 26251213375;
+  const paid = (id: string, date: string, taxOwed: number, paymentId: string) =>
+    assignment({
+      id,
+      date,
+      taxOwed,
+      status: 'paid',
+      payment: {
+        paymentId,
+        paidOn: '2026-11-09',
+        method: 'donation',
+        amount: 10_898_549,
+        journalLinks: [{ refId: REF, source: 'manual' as const }],
+      },
+    });
+  const all = [
+    paid('nov09', '2026-11-09', 6_540_106.7, '8f691da6'),
+    paid('nov06', '2026-11-06', 10_242_020.95, 'aed69be7'),
+    paid('nov07', '2026-11-07', 656_528.4, 'aed69be7'),
+    assignment({ id: 'other' }),
+  ];
+
+  it('lists only the days the journal entry’s ISK reaches, oldest first', () => {
+    const linked = linkedAssignmentsByRef(all).journal.get(REF) ?? [];
+    expect(
+      reachedByTransaction(`journal:${REF}`, 10_898_549, linked, all).map((a) => a.id)
+    ).toEqual(['nov06', 'nov07']);
+  });
+
+  it('lists every linked day when the amount is unknown', () => {
+    const linked = linkedAssignmentsByRef(all).journal.get(REF) ?? [];
+    expect(reachedByTransaction(`journal:${REF}`, null, linked, all)).toHaveLength(3);
   });
 });
