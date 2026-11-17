@@ -53,13 +53,9 @@ export function CorpBookSyncNote({
         date: shortDate(account.owes.oldest, i18n.language),
         corp: corpName,
       })
-    : account?.paidThrough
-      ? t('miningTax.corpBook.sync.paidThrough', {
-          date: shortDate(account.paidThrough, i18n.language),
-          corp: corpName,
-        })
-      : null;
-  const hasWords = owedNow > 0 || book.pendingFrom !== undefined || credit || standing !== null;
+    : null;
+  const hasWords =
+    owedNow > 0 || book.pendingFrom !== undefined || (credit && !account) || standing !== null;
   if (!hasWords) return null;
 
   const safe =
@@ -97,9 +93,9 @@ export function CorpBookSyncNote({
       {standing && (
         <span className={account?.owes ? 'text-text' : 'text-text-dim'}>{standing}</span>
       )}
-      {credit && (
+      {credit && !account && (
         <span className="text-text-dim">
-          {t(account ? 'miningTax.corpBook.sync.ahead' : 'miningTax.corpBook.sync.credit', {
+          {t('miningTax.corpBook.sync.credit', {
             amount: formatIsk(summary.credit, 0),
             corp: corpName,
           })}

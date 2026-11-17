@@ -8176,8 +8176,6 @@
         "neverSynced": "Safe to pay once {{corp}} syncs (never synced).",
         "openDay": "{{date}}: safe to pay once it is closed, after {{time}} UTC on {{closeDate}} and {{corp}}'s next sync.",
         "credit": "{{amount}} ISK credit with {{corp}} goes on your next Statement.",
-        "ahead": "{{amount}} ISK ahead with {{corp}}: it pays your next days as they close.",
-        "paidThrough": "Paid through {{date}} with {{corp}}.",
         "behind_one": "You owe {{corp}} {{amount}} ISK: {{count}} day, oldest {{date}}.",
         "behind_other": "You owe {{corp}} {{amount}} ISK: {{count}} days, oldest {{date}}."
       },
