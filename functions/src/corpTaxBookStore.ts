@@ -1169,6 +1169,37 @@ function keepInGroup(c: EditCtx, characterIds: readonly number[]): void {
   );
 }
 
+/**
+ * The paid-through days `recordAccounts` may store (D22): per Miner the day the client asked for,
+ * never before the stored one, never today or later (its ore is still coming in), never on or
+ * past a day an open dispute holds (the hold may end with the officer keeping the bill). A day that fails is skipped, not an error: the next run asks again.
+ * The server has no prices, so the saved-price rule is the client's (`closableThrough`).
+ */
+async function storableSettledThrough(
+  c: EditCtx,
+  accounts: readonly { minerId: string; settledThrough?: string }[],
+  paidRef: DocumentReference,
+  iso: string
+): Promise<Record<string, string>> {
+  const asked = accounts.filter((a) => a.settledThrough !== undefined);
+  if (asked.length === 0) return {};
+  const stored = ((await c.tx.get(paidRef)).data()?.minerPaidThrough ?? {}) as Record<
+    string,
+    string
+  >;
+  const today = iso.slice(0, 10);
+  const out: Record<string, string> = {};
+  for (const { minerId, settledThrough: day } of asked) {
+    if (day === undefined || day >= today || day <= (stored[minerId] ?? '')) continue;
+    const held = (await c.tx.get(col(c, DISPUTES).where('minerId', '==', minerId))).docs
+      .map((d) => d.data())
+      .filter((d) => readHoldingDisputes([d]).some((h) => disputeHolds(h, iso)));
+    if (held.some((d) => typeof d.date !== 'string' || d.date <= day)) continue;
+    out[minerId] = day;
+  }
+  return out;
+}
+
 async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
   const { tx, now } = c;
   const iso = new Date(now).toISOString();
@@ -1901,8 +1932,16 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     }
     case 'recordAccounts': {
       // Every book is a running account (decision 20261117-060555).
-      for (const a of action.accounts)
+      const paidRef = col(c, META).doc(PAID_DOC);
+      const settled = await storableSettledThrough(c, action.accounts, paidRef, iso);
+      for (const account of action.accounts) {
+        const a = { ...account };
+        delete a.settledThrough; // the pay page's record; the marker lives in `meta/paid`
         tx.set(col(c, ACCOUNTS).doc(a.minerId), { ...a, at: iso, by });
+      }
+      // Only ever grown: a day recorded paid stays paid, even if money is later taken back (D22).
+      if (Object.keys(settled).length > 0)
+        tx.set(paidRef, { minerPaidThrough: settled }, { merge: true });
       // The figures as recorded, so the audit says what the pay page was told.
       return { detail: { count: action.accounts.length, accounts: action.accounts } };
     }

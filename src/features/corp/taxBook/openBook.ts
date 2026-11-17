@@ -40,6 +40,13 @@ export async function openBook(characterId: number, corporationId: number) {
   const store = bookPartStore(characterId, corporationId);
   const paidStatementIds = async () =>
     new Set(((await paid).data()?.ids as string[] | undefined) ?? []);
+  /** Each Miner's stored paid-through day (`meta/paid.minerPaidThrough`): forward-only (D22). */
+  const minerPaidThrough = async () =>
+    new Map(
+      Object.entries(
+        ((await paid).data()?.minerPaidThrough as Record<string, string> | undefined) ?? {}
+      )
+    );
   const part = async <T>(
     collectionName: string,
     readPart: () => Promise<T>,
@@ -79,7 +86,17 @@ export async function openBook(characterId: number, corporationId: number) {
     );
   // A collection the stamps never name was never written (every server write stamps it): no read.
   const written = (name: string) => versions === null || versions.collections[name] !== undefined;
-  return { db, data, part, read, list, observed, paidStatementIds, written };
+  return {
+    db,
+    data,
+    part,
+    read,
+    list,
+    observed,
+    paidStatementIds,
+    minerPaidThrough,
+    written,
+  };
 }
 
 /** A Firestore error's code (`permission-denied`, `failed-precondition`, ...); '' when it has none. */

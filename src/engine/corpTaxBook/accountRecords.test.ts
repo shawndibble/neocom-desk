@@ -26,6 +26,7 @@ const view = (running: boolean) =>
         owed: 300.6,
         account: {
           paidThrough: '2026-11-02',
+          closableThrough: '2026-11-02',
           owes: { amount: 300.6, days: 2, oldest: '2026-11-03' },
         },
       },
@@ -43,6 +44,7 @@ describe('accountRecords', () => {
         days: 2,
         oldest: '2026-11-03',
         paidThrough: '2026-11-02',
+        settledThrough: '2026-11-02',
       },
       { minerId: 'm2', owed: 0, paid: 0, days: 0 },
     ]);
