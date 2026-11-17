@@ -197,7 +197,7 @@ describe('Open Orders work through', () => {
     ).toBeInTheDocument();
   });
 
-  it('walks the queue worst first: Next copies the click-time price, opens it in EVE as the owner and moves on', async () => {
+  it('walks the queue worst first in one modal: Next moves on, copies and opens nothing, and the last reads "All 2 done"', async () => {
     const user = userEvent.setup();
     vi.mocked(loadAllCharactersOpenOrders).mockResolvedValue({
       entries: [entry([EXPIRING, UNDERCUT])],
@@ -206,27 +206,26 @@ describe('Open Orders work through', () => {
     renderPanel();
     await user.click(await screen.findByRole('button', { name: 'Work through (2)' }));
 
-    expect(within(summaryLine()).getByText('1 of 2')).toBeInTheDocument();
-    const current = () => document.querySelector('[aria-current="true"]') as HTMLElement;
-    await waitFor(() => expect(current()).toHaveAttribute('data-row-key', '101'));
-    expect(await within(current()).findByText('New price 448.90')).toBeInTheDocument();
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('heading', { name: 'Tritanium' })).toBeInTheDocument();
+    expect(within(dialog).getByText('1 of 2')).toBeInTheDocument();
+    expect(document.querySelector('[aria-current="true"]')).toHaveAttribute('data-row-key', '101');
 
-    await user.click(within(current()).getByRole('button', { name: 'Next' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Next' }));
 
-    await waitFor(() => expect(current()).toHaveAttribute('data-row-key', '201'));
-    expect(copied).toHaveBeenCalledWith('448.90');
-    expect(openInEve).toHaveBeenCalledWith(1, { kind: 'marketDetails', id: 34 });
-    expect(vi.mocked(loadRegionCompetition)).toHaveBeenCalledWith(REGION, 34);
-    const passed = document.querySelector('[data-row-key="101"]') as HTMLElement;
-    expect(within(passed).getByText('448.90 copied')).toBeInTheDocument();
-    expect(within(passed).getByText('Sent')).toBeInTheDocument();
-    expect(within(summaryLine()).getByText('2 of 2')).toBeInTheDocument();
-    expect(
-      await within(current()).findByText('No other order at this station')
-    ).toBeInTheDocument();
+    // The same dialog element carries on: no close and reopen between orders.
+    expect(screen.getByRole('dialog')).toBe(dialog);
+    expect(await within(dialog).findByRole('heading', { name: 'Mexallon' })).toBeInTheDocument();
+    expect(within(dialog).getByText('2 of 2')).toBeInTheDocument();
+    expect(copied).not.toHaveBeenCalled();
+    expect(openInEve).not.toHaveBeenCalled();
+
+    await user.click(within(dialog).getByRole('button', { name: 'All 2 done' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(within(summaryLine()).getByText('All 2 done')).toBeInTheDocument();
   });
 
-  it('Skip moves on without copying or opening anything, and Stop ends the walk', async () => {
+  it('an undercut order offers Copy for the one-tick price in the modal', async () => {
     const user = userEvent.setup();
     vi.mocked(loadAllCharactersOpenOrders).mockResolvedValue({
       entries: [entry([UNDERCUT, EXPIRING])],
@@ -234,41 +233,43 @@ describe('Open Orders work through', () => {
     });
     renderPanel();
     await user.click(await screen.findByRole('button', { name: 'Work through (2)' }));
-    const current = () => document.querySelector('[aria-current="true"]') as HTMLElement;
-    await waitFor(() => expect(current()).toHaveAttribute('data-row-key', '101'));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(await within(dialog).findByRole('button', { name: 'Copy 448.90' }));
+    expect(copied).toHaveBeenCalledWith('448.90');
+  });
 
-    await user.click(within(current()).getByRole('button', { name: 'Skip' }));
-    await waitFor(() => expect(current()).toHaveAttribute('data-row-key', '201'));
-    expect(copied).not.toHaveBeenCalled();
-    expect(openInEve).not.toHaveBeenCalled();
+  it('Escape ends the walk', async () => {
+    const user = userEvent.setup();
+    vi.mocked(loadAllCharactersOpenOrders).mockResolvedValue({
+      entries: [entry([UNDERCUT, EXPIRING])],
+      skipped: [],
+    });
+    renderPanel();
+    await user.click(await screen.findByRole('button', { name: 'Work through (2)' }));
+    await screen.findByRole('dialog');
 
-    await user.click(within(summaryLine()).getByRole('button', { name: 'Stop' }));
-    expect(document.querySelector('[aria-current="true"]')).toBeNull();
+    await user.keyboard('{Escape}');
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(
       within(summaryLine()).getByRole('button', { name: 'Work through (2)' })
     ).toBeInTheDocument();
   });
 
-  it('without the Open in EVE permission, Next copies and moves on only', async () => {
+  it('a row click opens the modal with no walk controls', async () => {
     const user = userEvent.setup();
-    await db.tokens.clear();
     vi.mocked(loadAllCharactersOpenOrders).mockResolvedValue({
       entries: [entry([UNDERCUT, EXPIRING])],
       skipped: [],
     });
     renderPanel();
-    await user.click(await screen.findByRole('button', { name: 'Work through (2)' }));
-    const current = () => document.querySelector('[aria-current="true"]') as HTMLElement;
-    await waitFor(() => expect(current()).toHaveAttribute('data-row-key', '101'));
-    await user.click(within(current()).getByRole('button', { name: 'Next' }));
-
-    await waitFor(() => expect(current()).toHaveAttribute('data-row-key', '201'));
-    expect(copied).toHaveBeenCalledWith('448.90');
-    expect(openInEve).not.toHaveBeenCalled();
-    expect(screen.queryByText('Sent')).toBeNull();
+    await user.click(await screen.findByText('Tritanium'));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByRole('button', { name: 'Next' })).toBeNull();
+    expect(within(dialog).queryByText(/ of 2$/)).toBeNull();
   });
 
-  it('marks a sent row "Not changed" once an orders read from after the press shows it untouched, and keeps it after Stop', async () => {
+  it('marks a passed row "Not changed" once an orders read from after the press shows it untouched, and keeps it after Stop', async () => {
     const user = userEvent.setup();
     vi.mocked(loadAllCharactersOpenOrders).mockResolvedValue({
       entries: [entry([UNDERCUT, EXPIRING])],
@@ -276,14 +277,14 @@ describe('Open Orders work through', () => {
     });
     renderPanel();
     await user.click(await screen.findByRole('button', { name: 'Work through (2)' }));
-    const current = () => document.querySelector('[aria-current="true"]') as HTMLElement;
-    await waitFor(() => expect(current()).toHaveAttribute('data-row-key', '101'));
-    await user.click(within(current()).getByRole('button', { name: 'Next' }));
-    await waitFor(() => expect(current()).toHaveAttribute('data-row-key', '201'));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Next' }));
+    await user.click(await within(dialog).findByRole('button', { name: 'All 2 done' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     await user.click(within(summaryLine()).getByRole('button', { name: 'Stop' }));
 
     const row = () => document.querySelector('[data-row-key="101"]') as HTMLElement;
-    expect(within(row()).getByText('Sent')).toBeInTheDocument();
+    expect(within(row()).queryByText('Not changed')).toBeNull();
     vi.mocked(loadAllCharactersOpenOrders).mockResolvedValue({
       entries: [entry([UNDERCUT, EXPIRING], Date.now() + ORDERS_CACHE_MS + 1)],
       skipped: [],
@@ -292,7 +293,7 @@ describe('Open Orders work through', () => {
     expect(await within(row()).findByText('Not changed')).toBeInTheDocument();
   });
 
-  it('warns what a below-floor order loses at the new price, with See exits', async () => {
+  it('warns in the modal what a below-floor order loses at the new price', async () => {
     const user = userEvent.setup();
     vi.mocked(loadCorrectedSkills).mockResolvedValue({
       skillsResult: null,
@@ -323,16 +324,9 @@ describe('Open Orders work through', () => {
     });
     renderPanel();
     await user.click(await screen.findByRole('button', { name: 'Work through (1)' }));
-    const current = () => document.querySelector('[aria-current="true"]') as HTMLElement;
-    await waitFor(() => expect(current()).toHaveAttribute('data-row-key', '101'));
-    await waitFor(() =>
-      expect(
-        within(current()).getByRole('button', { name: 'See exits' }).parentElement
-      ).toHaveTextContent(/^Loses .* at 448\.90See exits$/)
-    );
-
-    await user.click(within(current()).getByRole('button', { name: 'See exits' }));
-    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => expect(dialog).toHaveTextContent(/Loses .* at 448\.90/));
+    expect(dialog).toHaveTextContent(/Lowest price that still profits: /);
   });
 
   it('starts the queue on arrival from the Overview link', async () => {
@@ -341,10 +335,9 @@ describe('Open Orders work through', () => {
       skipped: [],
     });
     renderPanel('/market/orders?orders.workThrough=1');
-    await waitFor(() =>
-      expect(document.querySelector('[aria-current="true"]')).toHaveAttribute('data-row-key', '101')
-    );
-    expect(within(summaryLine()).getByText('1 of 2')).toBeInTheDocument();
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('heading', { name: 'Tritanium' })).toBeInTheDocument();
+    expect(within(dialog).getByText('1 of 2')).toBeInTheDocument();
   });
 });
 
@@ -353,7 +346,7 @@ describe('Open Orders work through — phone', () => {
     stubViewport(() => true);
   });
 
-  it('shows the new price large with Open in EVE · Next · Skip, and never copies', async () => {
+  it('shows a full-width Next in the footer, and Next moves on', async () => {
     const user = userEvent.setup();
     vi.mocked(loadAllCharactersOpenOrders).mockResolvedValue({
       entries: [entry([UNDERCUT, EXPIRING])],
@@ -361,19 +354,10 @@ describe('Open Orders work through — phone', () => {
     });
     renderPanel();
     await user.click(await screen.findByRole('button', { name: 'Work through (2)' }));
-    const current = () => document.querySelector('[aria-current="true"]') as HTMLElement;
-    await waitFor(() => expect(current()).toHaveAttribute('data-row-key', '101'));
-    expect(await within(current()).findByText('448.90')).toBeInTheDocument();
-
-    await user.click(within(current()).getByRole('button', { name: 'Open in EVE' }));
-    await waitFor(() =>
-      expect(openInEve).toHaveBeenCalledWith(1, { kind: 'marketDetails', id: 34 })
-    );
-    await user.click(within(current()).getByRole('button', { name: 'Next' }));
-
-    await waitFor(() => expect(current()).toHaveAttribute('data-row-key', '201'));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('button', { name: 'Next' })).toHaveClass('w-full');
+    await user.click(within(dialog).getByRole('button', { name: 'Next' }));
+    expect(await within(dialog).findByRole('heading', { name: 'Mexallon' })).toBeInTheDocument();
     expect(copied).not.toHaveBeenCalled();
-    const passed = document.querySelector('[data-row-key="101"]') as HTMLElement;
-    expect(within(passed).getByText('Sent')).toBeInTheDocument();
   });
 });

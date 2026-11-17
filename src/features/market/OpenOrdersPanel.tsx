@@ -171,8 +171,6 @@ export function OpenOrdersPanel({
   const [viewPicked, setViewPicked] = useState(false);
   const isPhone = useIsPhone();
   const [detailOrderId, setDetailOrderId] = useState<number | null>(openParamId);
-  /** Set only by a work-through row's "See exits": the detail opens at its exits. */
-  const [detailAtExits, setDetailAtExits] = useState(false);
   /** The table's header-click sort, held here so the work-through walks rows in the order they show. */
   const [tableSort, setTableSort] = useState<DataTableSort | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
@@ -410,18 +408,12 @@ export function OpenOrdersPanel({
   const detailRow =
     detailOrderId !== null ? (allRows.find((r) => r.orderId === detailOrderId) ?? null) : null;
 
-  const onSeeExits = useCallback((row: OpenOrderRow) => {
-    setDetailAtExits(true);
-    setDetailOrderId(row.orderId);
-  }, []);
   const { workCurrentId, workCurrent, workThroughContext } = useOpenOrdersWorkThrough({
     sortedRows,
     data,
     snapshot,
     ordersByOrderId,
-    isPhone,
     rowCount: allRows.length,
-    onSeeExits,
   });
 
   /**
@@ -431,6 +423,15 @@ export function OpenOrdersPanel({
    * region undercuts too.
    */
   const view = shownView(filter.view, workCurrent ?? (viewPicked ? null : highlightedRow));
+  // A work-through shows its current order in the modal; a row click shows its own.
+  const modalRow = workCurrent ?? detailRow;
+  // A walk replaces a row-click modal: drop it, so it cannot reappear when the walk ends.
+  const walking = workCurrent !== null;
+  const [wasWalking, setWasWalking] = useState(false);
+  if (walking !== wasWalking) {
+    setWasWalking(walking);
+    if (walking) setDetailOrderId(null);
+  }
   const viewRows = useMemo(
     () => (view === 'all' ? sortedRows : sortedRows.filter((row) => rowInView(row, view))),
     [sortedRows, view]
@@ -555,7 +556,6 @@ export function OpenOrdersPanel({
 
   // The modal loads what the order needs as it opens (`useOpenOrderDetail`).
   function openDetails(row: OpenOrderRow) {
-    setDetailAtExits(false);
     setDetailOrderId(row.orderId);
   }
 
@@ -826,17 +826,20 @@ export function OpenOrdersPanel({
             notShared={pickerNamesMissing ? [] : notShared}
           />
 
-          {detailRow && (
+          {modalRow && (
             <OrderDetailModal
               // Keyed by orderId so the modal remounts (and its folded-section
-              // state resets) between orders, rather than reusing one instance
-              // across every row (issue #1428).
-              key={detailRow.orderId}
-              row={detailRow}
+              // state resets) between orders (issue #1428). A work-through keeps
+              // one modal across every order: a remount per Next would push a
+              // history entry each time.
+              key={workCurrent ? 'work-through' : modalRow.orderId}
+              row={modalRow}
               snapshot={snapshot}
               detail={orderDetail}
-              initialSection={detailAtExits ? 'exits' : undefined}
-              onClose={() => setDetailOrderId(null)}
+              walking={workCurrent !== null}
+              onClose={
+                workCurrent ? workThroughContext.workThrough.stop : () => setDetailOrderId(null)
+              }
             />
           )}
           <OrderBadgeLegend open={legendOpen} onClose={() => setLegendOpen(false)} />

@@ -1,19 +1,18 @@
 /**
- * Open Orders' work-through mode, on screen. No bar or row of its own: the
- * start action and progress end the headline's quiet line; the current order's
- * controls sit in its row.
+ * Open Orders' work-through mode, on screen. The start action and progress end
+ * the headline's quiet line; the current order opens in its modal, which adds
+ * the walk's notes and a Next button. A passed row keeps its status.
  */
-import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useContext, type ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import * as Icon from '@/components/ui/icons';
-import { Button, IskAmount, NeedsConnection, textActionClassName } from '@/components/ui';
+import { Button, IskAmount, textActionClassName } from '@/components/ui';
 import { formatMarketIsk } from '@/lib/isk';
 import type { OpenOrderRow } from './openOrdersModel';
 import type { WorkThroughPrice } from './useWorkThrough';
 import { WorkThroughContext, type WorkThroughContextValue } from './workThroughContext';
 import { workThroughLoss } from './workThrough';
+import { formatOrderFloorPrice } from './orderRowFormat';
 
 function Dot() {
   return (
@@ -104,9 +103,6 @@ function LossLine({ row, context }: { row: OpenOrderRow; context: WorkThroughCon
               components={{ isk: <IskAmount value={loss.amount} /> }}
             />
           </span>
-          <Button size="sm" onClick={() => context.onSeeExits(row)}>
-            {t('market.orders.workThrough.seeExits')}
-          </Button>
         </>
       )}
     </span>
@@ -123,75 +119,30 @@ function OwnerNote({ row, context }: { row: OpenOrderRow; context: WorkThroughCo
   );
 }
 
-/** The current row's controls on a desktop table: the price, Next and Skip. */
-function TableControls({ row, context }: { row: OpenOrderRow; context: WorkThroughContextValue }) {
+/** The modal's walk notes: where the walk stands, what the price read says when it gave none, the loss, the owner. */
+export function WorkThroughModalNotes({ row }: { row: OpenOrderRow }) {
   const { t } = useTranslation();
+  const context = useContext(WorkThroughContext);
+  if (context === null) return null;
   const { workThrough } = context;
-  const pending = workThrough.pendingId === row.orderId;
-  return (
-    <span className="flex flex-col items-start gap-1">
-      <span className="flex flex-wrap items-center gap-x-1.5 text-xs">
-        <span className="tabular-nums text-text">{priceLine(workThrough.preview, t)}</span>
-        <Dot />
-        <TextAction onClick={workThrough.next} disabled={pending}>
-          {pending ? t('market.orders.workThrough.working') : t('market.orders.workThrough.next')}
-        </TextAction>
-        <Dot />
-        <TextAction onClick={workThrough.skip} disabled={pending}>
-          {t('market.orders.workThrough.skip')}
-        </TextAction>
-      </span>
-      <LossLine row={row} context={context} />
-      <OwnerNote row={row} context={context} />
-    </span>
-  );
-}
-
-/** The current row's controls on a phone: no copy, the new price large, then Open in EVE · Next · Skip. */
-function ListControls({ row, context }: { row: OpenOrderRow; context: WorkThroughContextValue }) {
-  const { t } = useTranslation();
-  const { workThrough, canOpenInEve } = context;
+  const { position, total } = workThrough.progress;
   const price = workThrough.preview;
   return (
-    <div className="space-y-2 px-3 pb-3">
-      <div>
-        <p className={eyebrowClassName}>{t('market.orders.workThrough.newPriceLabel')}</p>
-        {price?.kind === 'price' ? (
-          <p className="text-2xl font-semibold text-text tabular-nums">
-            {formatMarketIsk(price.price)}
-          </p>
-        ) : (
-          <p className="text-sm text-text-dim">{priceLine(price, t)}</p>
-        )}
-      </div>
-      <div className="flex flex-wrap items-center gap-x-1.5">
-        {canOpenInEve(row.characterId) && (
+    <div className="space-y-1">
+      <p className="flex flex-wrap items-center gap-x-1.5 text-sm">
+        <span className="tabular-nums font-semibold text-text">
+          {t('market.orders.workThrough.progress', { position, total })}
+        </span>
+        {price?.kind !== 'price' && (
           <>
-            <NeedsConnection>
-              <button
-                type="button"
-                className={textActionClassName('inline-flex whitespace-nowrap')}
-                onClick={workThrough.openCurrent}
-              >
-                {t('openInEve.label')}
-              </button>
-            </NeedsConnection>
-            {workThrough.currentSent && <SentMark />}
             <Dot />
+            <span className="text-text-dim">{priceLine(price, t)}</span>
           </>
         )}
-        {/* Not before the price shows: a phone's Next records the price the pilot saw. */}
-        <TextAction onClick={workThrough.next} disabled={price === null}>
-          {t('market.orders.workThrough.next')}
-        </TextAction>
-        <Dot />
-        <TextAction onClick={workThrough.skip}>{t('market.orders.workThrough.skip')}</TextAction>
-      </div>
-      {workThrough.currentOpenFailed !== null && (
-        <p className="text-xs text-danger">
-          {t('openInEve.failed', {
-            message: workThrough.currentOpenFailed.message ?? t('openInEve.unknownError'),
-          })}
+      </p>
+      {row.floor !== null && !row.isBuyOrder && (
+        <p className="text-xs text-text-dim tabular-nums">
+          {t('market.orders.workThrough.floor', { price: formatOrderFloorPrice(row.floor) })}
         </p>
       )}
       <LossLine row={row} context={context} />
@@ -200,72 +151,37 @@ function ListControls({ row, context }: { row: OpenOrderRow; context: WorkThroug
   );
 }
 
-/** "Sent", its check mark kept from the accessible name. */
-function SentMark() {
+/** The modal's Next: the one control that passes the order, fixed or not. The last order reads "All N done". */
+export function WorkThroughNextButton({ className }: { className?: string }) {
   const { t } = useTranslation();
+  const context = useContext(WorkThroughContext);
+  if (context === null) return null;
+  const { workThrough } = context;
+  const { position, total } = workThrough.progress;
   return (
-    <span className="inline-flex items-center gap-1 text-xs text-success">
-      <span>{t('market.orders.workThrough.sent')}</span>
-      <Icon.Done size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-    </span>
+    <Button variant="primary" className={className} onClick={workThrough.next}>
+      {position >= total
+        ? t('market.orders.workThrough.done', { total })
+        : t('market.orders.workThrough.next')}
+    </Button>
   );
 }
 
-/** What a row already passed says: copied, sent, or — from an orders read after the press — not changed. */
+/** What a passed row says: "Not changed", from an orders read after the press. Kept after Stop. */
 function RowStatus({ orderId, context }: { orderId: number; context: WorkThroughContextValue }) {
   const { t } = useTranslation();
-  const handled = context.workThrough.handled.get(orderId);
-  if (handled === undefined) return null;
-  const parts: ReactNode[] = [];
-  if (handled.copied && handled.newPrice !== null) {
-    parts.push(
-      <span key="copied" className="tabular-nums text-text-dim">
-        {t('market.orders.workThrough.copied', { price: formatMarketIsk(handled.newPrice) })}
-      </span>
-    );
-  }
-  if (context.workThrough.notChangedIds.has(orderId)) {
-    parts.push(
-      <span key="status" className="text-warning">
-        {t('market.orders.workThrough.notChanged')}
-      </span>
-    );
-  } else if (handled.sent) {
-    parts.push(<SentMark key="status" />);
-  } else if (handled.openError !== undefined) {
-    parts.push(
-      <span key="status" className="text-danger">
-        {t('openInEve.failed', { message: handled.openError ?? t('openInEve.unknownError') })}
-      </span>
-    );
-  }
-  if (parts.length === 0) return null;
-  return (
-    <span className="flex flex-wrap items-center gap-x-1.5 text-xs">
-      {parts.map((part, index) => (
-        <span key={index} className="contents">
-          {index > 0 && <Dot />}
-          {part}
-        </span>
-      ))}
-    </span>
-  );
+  if (!context.workThrough.notChangedIds.has(orderId)) return null;
+  return <span className="text-xs text-warning">{t('market.orders.workThrough.notChanged')}</span>;
 }
 
 /** Where a row stands in the walk: the current one, one already passed, or neither. */
 function useRowWorkThrough(row: OpenOrderRow) {
   const context = useContext(WorkThroughContext);
   if (context === null) return null;
-  if (context.workThrough.currentId === row.orderId) return { context, current: true };
-  if (context.workThrough.handled.has(row.orderId)) return { context, current: false };
-  return null;
+  return context.workThrough.handled.has(row.orderId) ? { context } : null;
 }
 
-/**
- * A desktop row's work-through content in place of its summary sentence:
- * current row's controls, or a passed row's status — kept after Stop so a
- * later orders read can still say "Not changed".
- */
+/** A desktop row's status for an order already passed, in place of its summary sentence. */
 export function WorkThroughTableSlot({
   row,
   fallback,
@@ -275,20 +191,14 @@ export function WorkThroughTableSlot({
 }) {
   const place = useRowWorkThrough(row);
   if (place === null) return <>{fallback}</>;
-  return place.current ? (
-    <TableControls row={row} context={place.context} />
-  ) : (
-    <RowStatus orderId={row.orderId} context={place.context} />
-  );
+  return <RowStatus orderId={row.orderId} context={place.context} />;
 }
 
-/** A phone row's work-through content, below the row's own button (buttons don't nest). */
+/** A phone row's status for an order already passed, below the row's own button (buttons don't nest). */
 export function WorkThroughListSlot({ row }: { row: OpenOrderRow }) {
   const place = useRowWorkThrough(row);
   if (place === null) return null;
-  return place.current ? (
-    <ListControls row={row} context={place.context} />
-  ) : (
+  return (
     <div className="px-3 pb-2">
       <RowStatus orderId={row.orderId} context={place.context} />
     </div>
