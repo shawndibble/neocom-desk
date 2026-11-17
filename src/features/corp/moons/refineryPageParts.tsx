@@ -269,17 +269,19 @@ export function ExtractionsPanel({
               })}
             </div>
           )}
-          <DataTable
-            label={t(kp('ext.label'))}
-            columns={columns}
-            rows={shown}
-            rowKey={({ row }) => row.id}
-            density="compact"
-            onRowClick={({ row }) => onOpen(row.id)}
-            defaultSort={{ columnId: 'state', direction: 'desc' }}
-            mobileSort
-            stackColumns={2}
-          />
+          <div className="overflow-x-auto">
+            <DataTable
+              label={t(kp('ext.label'))}
+              columns={columns}
+              rows={shown}
+              rowKey={({ row }) => row.id}
+              density="compact"
+              onRowClick={({ row }) => onOpen(row.id)}
+              defaultSort={{ columnId: 'state', direction: 'desc' }}
+              mobileSort
+              stackColumns={2}
+            />
+          </div>
         </>
       )}
     </Panel>
