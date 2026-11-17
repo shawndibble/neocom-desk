@@ -9,6 +9,8 @@ import { teachRefinerySystems, type LoadedCorpBook } from './corpBookStore';
 import { loadBookPrices, loadCorpNames, loadTrackedCorpBooks } from './corpBookSources';
 import { buildCorpBookView, type CorpBookView } from './corpBookView';
 import { MINUTE_MS } from '@/lib/age';
+import { payeesOfBookCorporation } from '@/engine/miningTax/payeeCorporation';
+import { rememberPayeeEntity } from '../payees';
 import { hiddenLeftBooksOf, withoutHiddenLeft } from './leftCorpBooks';
 
 interface Args {
@@ -89,6 +91,21 @@ export function useCorpBookView({
       cancelled = true;
     };
   }, [loaded, activeCharacterId]);
+
+  // A Payee that is a book's corporation but is missing its link on this device (named exactly as
+  // it, or carrying its id with no kind) gets the link, synced, so every device reads the same.
+  useEffect(() => {
+    for (const book of loaded) {
+      const name = corpNames.get(book.corporationId);
+      if (name === undefined) continue;
+      const corporation = { corporationId: book.corporationId, name };
+      for (const found of payeesOfBookCorporation(payees, corporation)) {
+        const payee = payees.find((p) => p.id === found.id);
+        if (found.link && payee)
+          void rememberPayeeEntity(payee, book.corporationId, 'corporation').catch(() => {});
+      }
+    }
+  }, [loaded, corpNames, payees]);
 
   // The member's own ledger places the moon owner refineries the book cannot (#4650).
   useEffect(() => {

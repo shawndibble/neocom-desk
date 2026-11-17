@@ -19,7 +19,8 @@ import {
 import type { MadePayment } from '../paymentLinks';
 import type { MoonMiningTaxRow } from '../snapshot';
 import type { ClaimablePayment, LoadedCorpBook } from './corpBookStore';
-import { corpPayee, isCorpEntityPayee, personalEntriesOf } from './corpRows';
+import { payeesOfBookCorporation } from '@/engine/miningTax/payeeCorporation';
+import { corpPayee, personalEntriesOf } from './corpRows';
 
 export interface CorpBookViewBook {
   loaded: LoadedCorpBook;
@@ -103,9 +104,12 @@ export function buildCorpBookView(
       ...(book.structureNames ? { structureNames: book.structureNames } : {}),
       hubId: book.hubId,
       oreForm: book.oreForm,
-      ownPayeeIds: input.payees
-        .filter((p) => isCorpEntityPayee(p, book.corporationId))
-        .map((p) => p.id),
+      // Linked, or named exactly as the corporation (`payeesOfBookCorporation`): a Payee missing
+      // its link on this device is still the corporation's own, never a second Payee.
+      ownPayeeIds: payeesOfBookCorporation(input.payees, {
+        corporationId: book.corporationId,
+        name: nameOf(book.corporationId),
+      }).map((p) => p.id),
       payeeCorporations,
       pricesOn: (date) => ({
         prices: new Map(pricesAtHubOnDate(dated, book.hubId, date)),

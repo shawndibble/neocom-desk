@@ -13,6 +13,7 @@ import type {
   PersonalEntry,
   PersonalOverlay,
 } from '@/engine/corpTaxBook/personal';
+import { payeesOfBookCorporation } from '@/engine/miningTax/payeeCorporation';
 import { isUnpaidDefault } from '@/engine/miningTax/defaultSystems';
 import { minusLines } from '@/engine/miningTax/oreLines';
 import { entryKey } from '@/engine/miningTax/types';
@@ -47,9 +48,11 @@ export function corpPayeeAliases(
 ): Map<string, string> {
   const aliases = new Map<string, string>();
   for (const book of bookPayees) {
-    const mine = storedPayees.find(
-      (p) => book.entityId !== undefined && isCorpEntityPayee(p, book.entityId)
-    );
+    if (book.entityId === undefined) continue;
+    const [mine] = payeesOfBookCorporation(storedPayees, {
+      corporationId: book.entityId,
+      name: book.name,
+    });
     if (mine) aliases.set(book.id, mine.id);
   }
   return aliases;
