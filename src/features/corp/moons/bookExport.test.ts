@@ -3,6 +3,7 @@ import type { CsvColumn } from '@/lib/csv';
 import type { XlsxSheet } from '@/lib/xlsx';
 import type { BookSettings } from '../taxBook/bookClient';
 import { bookExportSheets, type BookExportInput } from './bookExport';
+import { DEFAULT_NOTICE_RULES } from '@/engine/corpTaxBook/notices';
 
 const t = (key: string) => key;
 const names = {
@@ -25,6 +26,8 @@ const settings: BookSettings = {
   minimumStatement: 5_000_000,
   overdueDays: 14,
   cadence: { kind: 'monthly' },
+  noticeRules: DEFAULT_NOTICE_RULES,
+  dayTolerancePct: 0.5,
   chunkM3PerHour: null,
   rates: [
     { scope: 'corp', pct: 10, effectiveFrom: '2026-01-01' },

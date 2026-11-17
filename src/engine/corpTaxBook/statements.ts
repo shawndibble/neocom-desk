@@ -123,6 +123,8 @@ export interface Statement {
   remindersStopped?: boolean;
   /** Reminders an officer sent by hand; one is allowed after the Miner stopped them. */
   manualRemindersSent?: number;
+  /** A running account's late notice (#6294); absent on a calendar Statement. */
+  kind?: 'notice';
 }
 
 /**

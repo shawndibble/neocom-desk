@@ -1212,9 +1212,13 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         divisionsBase,
         addDivision,
         taxContact,
+        switchToRunningAccount,
         ...rest
       } = action.patch;
-      if ((startDate !== undefined || showToMembers) && !c.access.isDirector) {
+      if (
+        (startDate !== undefined || showToMembers || switchToRunningAccount) &&
+        !c.access.isDirector
+      ) {
         throw new HttpsError('permission-denied', 'Only a Director sets this', {
           reason: 'director-only',
         });
@@ -1252,6 +1256,10 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         update.taxContact = taxContact === null ? FieldValue.delete() : taxContact;
       }
       if (showToMembers) update.membersSeeFrom = now;
+      // Once, and never back: Statements issued before it keep their own rules.
+      if (switchToRunningAccount && typeof c.book.runningAccountFrom !== 'string') {
+        update.runningAccountFrom = iso;
+      }
       const oldStart = c.book.startDate as string | undefined;
       if (startDate !== undefined && startDate !== oldStart) {
         const statements = await tx.get(col(c, STATEMENTS));
@@ -1671,6 +1679,13 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const miner = await tx.get(col(c, MINERS).doc(statement.minerId));
       if (miner.exists && miner.get('closedAt') != null)
         fail('failed-precondition', "This Miner's account is closed", 'account-closed');
+      // A running account bills by day: an older client's calendar run is refused (#6294).
+      if (typeof c.book.runningAccountFrom === 'string' && statement.kind !== 'notice')
+        fail(
+          'failed-precondition',
+          'This book bills a running account: only late notices are issued',
+          'running-account'
+        );
       const token = await issueStatementDoc(c, statement);
       return {
         detail: { statementId: statement.id, minerId: statement.minerId, amount: statement.amount },
