@@ -825,7 +825,10 @@ export function BookSettingsDialog({
                   />
                 </span>
               </Field>
-              <Field label={t('corpTaxBook.moons.settings.cadenceLabel')}>
+              <Field
+                note={t('corpTaxBook.moons.settings.issuedBeforeNote')}
+                label={t('corpTaxBook.moons.settings.cadenceLabel')}
+              >
                 <SegmentedControl
                   label={t('corpTaxBook.moons.settings.cadenceLabel')}
                   value={cadence}
@@ -849,7 +852,10 @@ export function BookSettingsDialog({
                   />
                 )}
               </Field>
-              <Field label={t('corpTaxBook.moons.settings.minimum')}>
+              <Field
+                note={t('corpTaxBook.moons.settings.issuedBeforeNote')}
+                label={t('corpTaxBook.moons.settings.minimum')}
+              >
                 <IskInput
                   value={minimum}
                   onChange={setMinimum}
@@ -865,7 +871,11 @@ export function BookSettingsDialog({
                   onChange={(e) => setGrace(e.target.value)}
                 />
               </Field>
-              <Field label={t('corpTaxBook.moons.settings.overdue')} htmlFor={`${fieldId}-overdue`}>
+              <Field
+                note={t('corpTaxBook.moons.settings.issuedBeforeNote')}
+                label={t('corpTaxBook.moons.settings.overdue')}
+                htmlFor={`${fieldId}-overdue`}
+              >
                 <TextInput
                   className="w-20"
                   inputMode="numeric"

@@ -116,7 +116,7 @@ describe('OwedBalances Conflicts line', () => {
     expect(screen.getByText('4,271,257')).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Not owed yet. Bureau of Unified Harvesting's next Statement bills it unless an officer changes the book."
+        "Not owed yet. Bureau of Unified Harvesting's book bills it on its date unless an officer changes the book."
       )
     ).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Review' }));
@@ -136,7 +136,7 @@ describe('OwedBalances Conflicts line', () => {
     });
     expect(
       screen.getByText(
-        "3 days, not owed yet. Each goes on its corporation's next Statement unless an officer changes the book."
+        '3 days, not owed yet. Each is billed on its date unless an officer changes the book.'
       )
     ).toBeInTheDocument();
     const card = screen.getByText('Payee a');
