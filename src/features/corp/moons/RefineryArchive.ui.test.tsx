@@ -141,6 +141,24 @@ describe('the Archived section', () => {
     expect(onRestore).toHaveBeenCalledWith(1001);
   });
 
+  it('stays collapsed when its rows load after the page', () => {
+    const onRestore = vi.fn();
+    const { rerender } = section([], onRestore);
+    rerender(
+      <MemoryRouter>
+        <ArchivedRefineries
+          rows={[archived]}
+          name={(id) => `Refinery ${id}`}
+          moonName={() => 'Moon 7'}
+          pathOf={(id) => `/r/${id}`}
+          byName={(id) => `Officer ${id}`}
+          onRestore={onRestore}
+        />
+      </MemoryRouter>
+    );
+    expect(screen.queryByText(/Archived 3 Nov by Officer 5/)).toBeNull();
+  });
+
   it('gives a viewer the rows without Restore', async () => {
     section([archived]);
     await userEvent.click(screen.getByRole('button', { name: 'Show archived refineries' }));
@@ -184,7 +202,7 @@ describe('the refinery page', () => {
     refineries.active = [row({ offer: { kind: 'idle', days: 71 }, lastMinedOn: '2026-09-02' })];
     open();
     expect(
-      screen.getByText(/No Extraction in 71 days and nothing mined since 2 Sep/)
+      screen.getByText(/No Extraction and no mining here in 71 days; last mined 2 Sep/)
     ).toBeVisible();
   });
 

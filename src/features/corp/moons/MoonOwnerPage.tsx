@@ -456,6 +456,15 @@ export function MoonOwnerPage({
           />
         )}
       </Panel>
+      <RefineryLabels
+        structureIds={refineries?.ids ?? [...new Set(detail.mined.map((m) => m.structureId))]}
+        name={refineryName}
+        {...(refineries ? { info: refineries.info } : {})}
+        {...(refineryEdit && row.status !== 'left' && row.status !== 'removed'
+          ? { edit: refineryEdit }
+          : {})}
+      />
+      {refineries?.archived}
       <Panel title={t(k('minedTitle'))} padded={false}>
         {detail.mined.length === 0 ? (
           <p className="p-3 text-sm text-text-dim">{t(k('minedNone'))}</p>
@@ -471,15 +480,6 @@ export function MoonOwnerPage({
           />
         )}
       </Panel>
-      <RefineryLabels
-        structureIds={refineries?.ids ?? [...new Set(detail.mined.map((m) => m.structureId))]}
-        name={refineryName}
-        {...(refineries ? { info: refineries.info } : {})}
-        {...(refineryEdit && row.status !== 'left' && row.status !== 'removed'
-          ? { edit: refineryEdit }
-          : {})}
-      />
-      {refineries?.archived}
       {(onSettledOtherwise || canRemove) && (
         <div className="flex flex-wrap gap-2 border-t border-line pt-4">
           {onSettledOtherwise && (

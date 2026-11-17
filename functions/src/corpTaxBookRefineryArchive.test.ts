@@ -1,5 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { parseSetRefineryArchiveInput } from './corpTaxBookRefineryArchive.js';
+import { archiveNeedsWrite, parseSetRefineryArchiveInput } from './corpTaxBookRefineryArchive.js';
+
+describe('archiveNeedsWrite', () => {
+  const day = Date.UTC(2026, 10, 1, 12);
+  const stored = { at: day, by: 1, reason: 'idle' as const };
+  it('writes an archive or restore that changes the state', () => {
+    expect(archiveNeedsWrite(undefined, true, day)).toBe(true);
+    expect(archiveNeedsWrite(stored, false, day)).toBe(true);
+  });
+  it('skips a restore of nothing and a second archive the same UTC day', () => {
+    expect(archiveNeedsWrite(undefined, false, day)).toBe(false);
+    expect(archiveNeedsWrite(stored, true, Date.UTC(2026, 10, 1, 23, 59))).toBe(false);
+  });
+  it('re-archives an entry from an earlier day: mining since may have brought it back', () => {
+    expect(archiveNeedsWrite(stored, true, Date.UTC(2026, 10, 2))).toBe(true);
+  });
+});
 
 describe('parseSetRefineryArchiveInput', () => {
   const base = { corporationId: 9, accessToken: 't', feederCorporationId: 5, structureId: 4001 };

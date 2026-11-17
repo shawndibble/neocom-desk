@@ -5,7 +5,7 @@
 
 import { FieldPath, FieldValue } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
-import { record } from './communities.js';
+import { record, utcDayKey } from './communities.js';
 import { EXTRACTIONS, OBSERVED, parseFeederTarget, type FeederTargetCall } from './corpTaxBook.js';
 import { ENDED } from './corpTaxBookFeederOwnerCalls.js';
 import type { FeederRecord, RefineryArchiveDoc } from './corpTaxBookFeeders.js';
@@ -49,6 +49,20 @@ export function parseSetRefineryArchiveInput(data: unknown): SetRefineryArchiveI
   };
 }
 
+/**
+ * Whether a call changes the stored entry. A second archive the same UTC day keeps the first
+ * officer's entry. One from an earlier day is rewritten: mining after its day shows the refinery
+ * as back (the client derives that), so a fresh archive must move `at` past that mining.
+ */
+export function archiveNeedsWrite(
+  stored: RefineryArchiveDoc | undefined,
+  archived: boolean,
+  now: number
+): boolean {
+  if (!archived) return stored !== undefined;
+  return stored === undefined || utcDayKey(stored.at) < utcDayKey(now);
+}
+
 /** The accounting corporation's officers (Accountant or higher, live role check). */
 export async function setRefineryArchive(
   deps: BookDeps,
@@ -86,9 +100,8 @@ export async function setRefineryArchive(
     if (ENDED.includes(rec.status)) {
       fail('failed-precondition', 'This moon owner has left', 'feeder-ended');
     }
-    // Already in the requested state: keep the first officer's `at`/`by`, write no audit row.
     const stored = rec.refineryArchive?.[String(input.structureId)];
-    if (input.archived === (stored !== undefined)) return;
+    if (!archiveNeedsWrite(stored, input.archived, deps.now())) return;
     const doc: RefineryArchiveDoc = {
       at: deps.now(),
       by: access.characterId,

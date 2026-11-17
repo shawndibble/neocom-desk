@@ -94,13 +94,15 @@ export function ArchivedRefineries({
   onRestore?: (structureId: number) => Promise<void>;
 }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(rows.length === 0);
+  // Until toggled, follows the rows: the moon owner records can load after the page mounts.
+  const [toggled, setToggled] = useState<boolean>();
+  const open = toggled ?? rows.length === 0;
   if (rows.length === 0 && !onRestore) return null;
   return (
     <CollapsiblePanel
       title={t(k('title'), { count: rows.length })}
       expanded={open}
-      onToggle={() => setOpen((v) => !v)}
+      onToggle={() => setToggled(!open)}
       labels={{ show: t(k('show')), hide: t(k('hide')) }}
       padded={false}
     >
