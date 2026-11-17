@@ -1106,6 +1106,49 @@ describe('overlayCorpBooks', () => {
     expect(out.books[0].credit).toBe(222_000);
   });
 
+  describe('on a running account', () => {
+    const observed = ['2026-10-15', '2026-10-16'].map((date) => ({
+      characterId: ME,
+      recordedCorporationId: CORP,
+      structureId: 1000,
+      date,
+      solarSystemId: SYSTEM,
+      oreLines: [{ typeId: ZEO, quantity: 10_000 }],
+    }));
+    const entries = ['2026-10-15', '2026-10-16'].map((date) =>
+      entry({ date, oreLines: [{ typeId: ZEO, quantity: 10_000 }] })
+    );
+    const paid = (amount: number) => ({
+      id: 'p1',
+      minerId: `solo:${ME}`,
+      characterId: ME,
+      amount,
+      at: '2026-10-18T13:10:00Z',
+      source: 'donation' as const,
+    });
+    const running = (amount: number) =>
+      overlay(entries, [
+        book({ observed, payments: [paid(amount)], runningAccountFrom: '2026-10-01T00:00:00Z' }),
+      ]).books[0];
+
+    it('shows no credit for money that paid a day, and says what is still owed', () => {
+      expect(running(222_000)).toMatchObject({
+        credit: 0,
+        account: {
+          paidThrough: '2026-10-15',
+          owes: { amount: 222_000, days: 1, oldest: '2026-10-16' },
+        },
+      });
+    });
+
+    it('holds only a true overpayment as credit, and reads paid through the last day', () => {
+      expect(running(500_000)).toMatchObject({
+        credit: 56_000,
+        account: { paidThrough: '2026-10-16', owes: null },
+      });
+    });
+  });
+
   it('reports the sync note facts: last synced, closed through, credit', () => {
     const out = overlay([entry()], [book()]);
     expect(out.books[0]).toMatchObject({
