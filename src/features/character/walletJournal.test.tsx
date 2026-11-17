@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, renderHook } from '@testing-library/react';
+import { render, renderHook, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { WalletJournalEntry } from '@/esi/endpoints';
@@ -45,5 +45,58 @@ describe('wallet journal columns', () => {
       })
     );
     expect(date?.sortValue?.(entry)).toBe(entry.date);
+  });
+
+  describe('Player column and description links', () => {
+    const corpEntry = {
+      ...entry,
+      ref_type: 'player_donation',
+      description: 'Pilot One deposited cash',
+      playerId: 42,
+    };
+    function corpColumns() {
+      const { result } = renderHook(() => useJournalColumnsBuilder());
+      return result.current(
+        () => undefined,
+        () => '',
+        undefined,
+        undefined,
+        () => 'Pilot One'
+      );
+    }
+
+    it('links the Player cell and the name in the description to the pilot info', () => {
+      const cols = corpColumns();
+      const player = render(
+        <MemoryRouter>{cols.find((c) => c.id === 'player')?.render(corpEntry)}</MemoryRouter>
+      );
+      expect(
+        within(player.container).getByRole('link', { name: 'Pilot One' }).getAttribute('href')
+      ).toContain('info=character-42');
+      const desc = render(
+        <MemoryRouter>{cols.find((c) => c.id === 'description')?.render(corpEntry)}</MemoryRouter>
+      );
+      expect(
+        within(desc.container).getByRole('link', { name: 'Pilot One' }).getAttribute('href')
+      ).toContain('info=character-42');
+      expect(desc.container.textContent).toBe('Pilot One deposited cash');
+    });
+
+    it('has no link on a row without a player, or when the name is not in the text', () => {
+      const cols = corpColumns();
+      const none = { ...corpEntry, playerId: undefined };
+      const player = render(
+        <MemoryRouter>{cols.find((c) => c.id === 'player')?.render(none)}</MemoryRouter>
+      );
+      expect(within(player.container).queryByRole('link')).toBeNull();
+      const desc = render(
+        <MemoryRouter>
+          {cols
+            .find((c) => c.id === 'description')
+            ?.render({ ...corpEntry, description: 'Corp transfer' })}
+        </MemoryRouter>
+      );
+      expect(within(desc.container).queryByRole('link')).toBeNull();
+    });
   });
 });

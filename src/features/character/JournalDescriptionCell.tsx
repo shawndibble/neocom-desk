@@ -20,7 +20,7 @@ import { HintText } from '@/components/ui/HintText';
 import { Button, Tooltip, TypeIcon } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import type { WalletJournalEntry, WalletTransactionCommon } from '@/esi/endpoints';
-import { ItemInfoLink } from '@/features/entities';
+import { CharacterLink, ItemInfoLink } from '@/features/entities';
 import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
 import { formatIsk } from '@/lib/isk';
 import { useInsuranceLossModalStore } from '@/stores/insuranceLossModal';
@@ -44,6 +44,25 @@ interface JournalDescriptionCellProps {
   miningTaxEntries?: readonly MiningTaxEntryLink[];
   /** The Character whose losses an insurance payout line can be matched against; absent where the line can't be (the corp journal). Opens the loss in a modal. */
   lossCharacterId?: number;
+  /** The corp journal line's Player, by id and name: where the description spells that name, it is their info link. */
+  player?: { id: number; name: string };
+}
+
+/** The description with the Player's name, where it appears, as a link; plain when the name is not in the text. */
+function describedWithPlayer(
+  description: string | undefined,
+  player: JournalDescriptionCellProps['player']
+) {
+  if (!description || !player?.name) return description;
+  const at = description.indexOf(player.name);
+  if (at < 0) return description;
+  return (
+    <>
+      {description.slice(0, at)}
+      <CharacterLink id={player.id}>{player.name}</CharacterLink>
+      {description.slice(at + player.name.length)}
+    </>
+  );
 }
 
 export function JournalDescriptionCell({
@@ -52,6 +71,7 @@ export function JournalDescriptionCell({
   itemName,
   miningTaxEntries,
   lossCharacterId,
+  player,
 }: JournalDescriptionCellProps) {
   const { t } = useTranslation();
   const openLoss = useInsuranceLossModalStore((state) => state.open);
@@ -78,7 +98,7 @@ export function JournalDescriptionCell({
     !miningTaxEntries?.length &&
     !canViewLoss
   ) {
-    return <>{entry.description}</>;
+    return <>{describedWithPlayer(entry.description, player)}</>;
   }
   // One entry and a memo ("Moon tax 10-05 Ainsan"): the memo is the link. Otherwise each entry gets its own labelled link.
   const soleTaxEntry = miningTaxEntries?.length === 1 ? miningTaxEntries[0] : undefined;
@@ -92,7 +112,7 @@ export function JournalDescriptionCell({
     : null;
   return (
     <div className="flex flex-col gap-1">
-      <span>{entry.description}</span>
+      <span>{describedWithPlayer(entry.description, player)}</span>
       {kills ? (
         <BountyFactionSummary kills={kills} />
       ) : (

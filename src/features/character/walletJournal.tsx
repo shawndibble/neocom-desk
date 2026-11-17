@@ -16,6 +16,7 @@ import {
   JournalDescriptionCell,
   type MiningTaxEntryLink,
 } from '@/features/character/JournalDescriptionCell';
+import { CharacterLink } from '@/features/entities';
 import {
   filterWalletJournal,
   journalRefTypes,
@@ -144,7 +145,12 @@ export function useJournalColumnsBuilder(): (
               width: '22ch',
               className: 'max-sm:px-1 sm:truncate',
               headerClassName: 'max-sm:px-1',
-              render: playerNameFor,
+              render: (entry: JournalRow) =>
+                entry.playerId === undefined ? (
+                  ''
+                ) : (
+                  <CharacterLink id={entry.playerId}>{playerNameFor(entry)}</CharacterLink>
+                ),
               sortValue: playerNameFor,
             },
           ]
@@ -199,6 +205,11 @@ export function useJournalColumnsBuilder(): (
                   itemName={transaction ? nameFor(transaction.type_id) : ''}
                   miningTaxEntries={miningTaxEntriesFor?.(entry)}
                   lossCharacterId={lossCharacterFor?.(entry)}
+                  player={
+                    playerNameFor && entry.playerId !== undefined
+                      ? { id: entry.playerId, name: playerNameFor(entry) }
+                      : undefined
+                  }
                 />
                 {entry.internal && (
                   <span className="block text-xs text-text-dim">
