@@ -14,6 +14,7 @@ import {
   disputeIdFor,
   mergeDisputeLines,
   billedDisputeTax,
+  disputesClosedByWriteOff,
   checkClaimedTransfer,
   checkClaimedTransfers,
   needsLiveCheck,
@@ -527,6 +528,38 @@ describe('parsers', () => {
     });
   });
 
+  describe('disputesClosedByWriteOff: a write-off answers the disputes of the days it closes (#6307)', () => {
+    const statement = {
+      id: 's1',
+      amount: 900_000,
+      coversFrom: '2026-11-01',
+      coversThrough: '2026-11-02',
+      lines: [{ kind: 'mined', date: '2026-11-01' }],
+    };
+    const dispute = (id: string, date: string, resolution?: unknown) => ({ id, date, resolution });
+    const disputes = [
+      dispute('a', '2026-11-01'),
+      dispute('b', '2026-11-02'),
+      dispute('c', '2026-11-09'),
+      dispute('d', '2026-11-01', { kind: 'rejected' }),
+    ];
+
+    it('a Statement written off in full closes the open disputes of its days', () => {
+      expect(disputesClosedByWriteOff(disputes, { amount: 900_000 }, statement)).toEqual([
+        'a',
+        'b',
+      ]);
+    });
+
+    it('a part write-off leaves them open', () => {
+      expect(disputesClosedByWriteOff(disputes, { amount: 400_000 }, statement)).toEqual([]);
+    });
+
+    it('the leaver write-off, with no Statement, closes every open dispute', () => {
+      expect(disputesClosedByWriteOff(disputes, { amount: 1 })).toEqual(['a', 'b', 'c']);
+    });
+  });
+
   describe('billedDisputeTax: a waived dispute priced from the book’s issued Statements', () => {
     const disputed = {
       lines: [
@@ -842,6 +875,26 @@ describe('per-refinery rate (#4621)', () => {
         action: 'addRate',
         rate: { scope: 'structure', pct: 4, effectiveFrom: '2026-10-18' },
       })
+    ).toThrow();
+  });
+});
+
+describe('addRates (#6323)', () => {
+  const a = { scope: 'guest', pct: 5, effectiveFrom: '2026-10-21' } as const;
+  const b = { scope: 'miner', minerId: 'm1', pct: 7, effectiveFrom: '2026-10-21' } as const;
+
+  it('parses a list of dated rates', () => {
+    expect(parseEditAction({ action: 'addRates', rates: [a, b] })).toEqual({
+      action: 'addRates',
+      rates: [a, b],
+    });
+  });
+
+  it('refuses an empty list, a non-list, and a bad rate in the list', () => {
+    expect(() => parseEditAction({ action: 'addRates', rates: [] })).toThrow();
+    expect(() => parseEditAction({ action: 'addRates', rates: a })).toThrow();
+    expect(() =>
+      parseEditAction({ action: 'addRates', rates: [a, { ...b, minerId: '' }] })
     ).toThrow();
   });
 });

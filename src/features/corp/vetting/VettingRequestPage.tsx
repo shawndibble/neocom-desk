@@ -7,7 +7,7 @@
  * Only access tokens are sent, one per character, straight to the server's read.
  */
 import { useEffect, useRef, useState } from 'react';
-import { Trans, useTranslation } from 'react-i18next';
+import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Button,
@@ -26,6 +26,7 @@ import type { VettingStatus } from '@/engine/vetting';
 import { useCharacters } from '@/features/character/useCharacters';
 import { callableErrorReason } from '@/lib/callableError';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { CONSENT_ANCHOR, RequestIntro } from './RequestIntro';
 import { VettingCharacterList } from './VettingCharacterList';
 import { VettingConsentTerms } from './VettingConsentTerms';
 import { VettingStatusView } from './VettingStatusView';
@@ -209,18 +210,13 @@ export function VettingRequestPage({ login, onSignIn }: VettingRequestPageProps)
   return page(
     status.corporationName,
     <>
-      <Panel title={t('vetting.request.promotion', { role })}>
-        <div className="space-y-2 text-sm">
-          <p>
-            <Trans
-              i18nKey="vetting.request.asked"
-              values={{ name: asker, role }}
-              components={{ b: <span className="font-semibold" /> }}
-            />
-          </p>
-          <p className="text-text-dim">{t('vetting.request.oneTime')}</p>
-        </div>
-      </Panel>
+      <RequestIntro
+        asker={status.requestedBy}
+        role={role}
+        corporationName={status.corporationName}
+        ready={onDevice}
+        total={rows.length}
+      />
       <Panel
         title={t('vetting.request.charactersTitle')}
         meta={t('vetting.request.onDevice', { count: onDevice, total: rows.length })}
@@ -248,9 +244,11 @@ export function VettingRequestPage({ login, onSignIn }: VettingRequestPageProps)
       </Panel>
       <LiveStatus>{announce}</LiveStatus>
       {error && <InlineError>{error}</InlineError>}
-      <Panel title={t('vetting.consent.title')}>
-        <VettingConsentTerms readers="officers" />
-      </Panel>
+      <div id={CONSENT_ANCHOR}>
+        <Panel title={t('vetting.consent.title')}>
+          <VettingConsentTerms readers="officers" />
+        </Panel>
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         <Button
           variant="primary"

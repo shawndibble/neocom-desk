@@ -48,12 +48,10 @@ describe('OwedBalances summary line', () => {
     expect(screen.getByText(/3,000,000 ISK/)).toBeInTheDocument();
   });
 
-  it('says nothing is outstanding when no Payee is owed', () => {
+  it('prints no line when no Payee is owed', () => {
     renderBalances([balance('a', 0)]);
     expect(screen.queryByText('You owe')).not.toBeInTheDocument();
-    const line = screen.getByText('No moon mining tax outstanding');
-    expect(line).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: line.textContent ?? '' })).toBeInTheDocument();
+    expect(screen.queryByText('No moon mining tax outstanding')).not.toBeInTheDocument();
   });
 });
 
@@ -116,7 +114,7 @@ describe('OwedBalances Conflicts line', () => {
     expect(screen.getByText('4,271,257')).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Not owed yet. Bureau of Unified Harvesting's next Statement bills it unless an officer changes the book."
+        "Not owed yet. Bureau of Unified Harvesting's book bills it on its date unless an officer changes the book."
       )
     ).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Review' }));
@@ -136,7 +134,7 @@ describe('OwedBalances Conflicts line', () => {
     });
     expect(
       screen.getByText(
-        "3 days, not owed yet. Each goes on its corporation's next Statement unless an officer changes the book."
+        '3 days, not owed yet. Each is billed on its date unless an officer changes the book.'
       )
     ).toBeInTheDocument();
     const card = screen.getByText('Payee a');

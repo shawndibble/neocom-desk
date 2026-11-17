@@ -21,7 +21,7 @@ import { LinkSurveyDialog } from './LinkSurveyDialog';
 import { ExtractionStateFilter, ExtractionTimeline } from './ExtractionTimeline';
 import { DEFAULT_STATES, FILTER_STATES } from './extractionStates';
 import { isk, shortDate, shortDateTime } from './moonsFormat';
-import { extractionPath, moonPath, sharingMoonPath } from './moonsPaths';
+import { extractionPath, refineryPath, sharingMoonPath } from './moonsPaths';
 import { PopShareIcon } from './PopShareIcon';
 import { usePopShareMarks } from './usePopShareMarks';
 import { PlaceCell } from './sectionParts';
@@ -91,7 +91,7 @@ export function ExtractionsTab() {
               refinery={names.refinery(row.structureId)}
               undockable={names.undockable?.(row.structureId)}
               moon={names.moon(row.moonId)}
-              to={moonPath(row.moonId)}
+              refineryTo={refineryPath(row.structureId)}
             />
             <PopShareIcon
               mark={shareMarks?.moons[String(row.moonId)]}

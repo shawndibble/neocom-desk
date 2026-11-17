@@ -294,6 +294,9 @@ export type StoredRate =
   | { scope: 'feeder' | 'feeder-member'; feederId: number; pct: number; effectiveFrom: string }
   | { scope: 'record'; recordKey: string; pct: number };
 
+/** The most rates one `addRates` takes. */
+const MAX_BATCH_RATES = 50;
+
 export function parseDatedRate(data: unknown): Exclude<StoredRate, { scope: 'record' }> {
   const d = record(data);
   const scope = oneOf(d.scope, 'scope', [
@@ -597,6 +600,8 @@ export function moveStartRate(
 
 export type EditAction =
   | { action: 'addRate'; rate: ReturnType<typeof parseDatedRate> }
+  /** #6323: several rates in one all-or-nothing write; each is audited as its own `addRate`. */
+  | { action: 'addRates'; rates: ReturnType<typeof parseDatedRate>[] }
   | { action: 'setRecordRate'; recordKey: string; pct: number; reason: string }
   | { action: 'updateSettings'; patch: SettingsPatch }
   | {
@@ -724,6 +729,12 @@ export interface RecordedAccount {
   days: number;
   oldest?: string;
   paidThrough?: string;
+  /**
+   * The newest day the officer's client says is paid for good (D22), stored in `meta/paid`. Only
+   * ever moves forward. The server has no prices, so it can't check the day was priced at a saved
+   * close-of-day price; it trusts the client for that and checks only what it can see.
+   */
+  settledThrough?: string;
 }
 
 export type CloseCredit = { kind: 'refund' } | { kind: 'forfeit'; basis: ForfeitBasis };
@@ -790,6 +801,7 @@ export function parseEditAction(data: unknown): EditAction {
   const d = record(data);
   const action = oneOf(d.action, 'action', [
     'addRate',
+    'addRates',
     'setRecordRate',
     'updateSettings',
     'recordPayment',
@@ -823,6 +835,11 @@ export function parseEditAction(data: unknown): EditAction {
   switch (action) {
     case 'addRate':
       return { action, rate: parseDatedRate(d.rate) };
+    case 'addRates': {
+      const rates = list(d.rates, 'rates', MAX_BATCH_RATES).map(parseDatedRate);
+      if (rates.length === 0) throw new HttpsError('invalid-argument', 'rates must not be empty');
+      return { action, rates };
+    }
     case 'setRecordRate':
       return {
         action,
@@ -1071,6 +1088,9 @@ export function parseEditAction(data: unknown): EditAction {
             ...(a.oldest !== undefined ? { oldest: dateString(a.oldest, 'oldest') } : {}),
             ...(a.paidThrough !== undefined
               ? { paidThrough: dateString(a.paidThrough, 'paidThrough') }
+              : {}),
+            ...(a.settledThrough !== undefined
+              ? { settledThrough: dateString(a.settledThrough, 'settledThrough') }
               : {}),
           };
         }),
@@ -1793,6 +1813,35 @@ export function billedDisputeTax(
     }
   }
   return tax;
+}
+
+/**
+ * The ids of a Miner's open disputes an officer write-off closes (#6307). A write-off with no
+ * Statement is the leaver's whole balance: it closes every open dispute. One that names a
+ * Statement and forgives all of it closes the disputes of the days that Statement bills; a part
+ * write-off leaves them open, their hold still standing.
+ */
+export function disputesClosedByWriteOff(
+  disputes: readonly { id?: unknown; date?: unknown; resolution?: unknown }[],
+  writeOff: { amount: number },
+  statement?: {
+    id: string;
+    amount?: unknown;
+    coversFrom: string;
+    coversThrough: string;
+    lines: { kind: string; date: string }[];
+  }
+): string[] {
+  const open = disputes.filter((d) => typeof d.id === 'string' && !d.resolution);
+  if (statement) {
+    const amount = typeof statement.amount === 'number' ? statement.amount : Infinity;
+    if (writeOff.amount < amount - 0.01) return [];
+    const days = statementDays(statement);
+    return open
+      .filter((d) => typeof d.date === 'string' && days.has(d.date))
+      .map((d) => d.id as string);
+  }
+  return open.map((d) => d.id as string);
 }
 
 /** One dispute per Miner and day: `solo:7` has a colon, which a doc id avoids. */

@@ -1,3 +1,4 @@
+import { VETTING_RAW_SOURCES, type VettingRawSource } from '@/engine/vetting';
 import { definePageTabs } from '@/lib/pageTabs';
 import { VETTING_SETTINGS_SECTIONS, type VettingSettingsSection } from './vettingSettingsForm';
 
@@ -33,4 +34,29 @@ export function settingsSectionFromPathname(pathname: string): VettingSettingsSe
 
 export function settingsSectionPath(section: VettingSettingsSection): string {
   return `${VETTING_TABS.base}/settings/${section}`;
+}
+
+/**
+ * The data page a path names: `/corp/vetting/open/<reviewId>/data/<source>`, the rows a review
+ * kept. An unknown source falls back to the first, as an unknown settings section does.
+ */
+export function dataFromPathname(
+  pathname: string
+): { tab: 'open' | 'decided'; reviewId: string; source: VettingRawSource } | null {
+  const match = /^\/corp\/vetting\/(open|decided)\/([^/]+)\/data(?:\/([^/]+))?\/?$/.exec(pathname);
+  if (!match) return null;
+  const source = VETTING_RAW_SOURCES.find((candidate) => candidate === match[3]);
+  return {
+    tab: match[1] as 'open' | 'decided',
+    reviewId: decodeURIComponent(match[2] ?? ''),
+    source: source ?? VETTING_RAW_SOURCES[0],
+  };
+}
+
+export function dataPath(
+  tab: 'open' | 'decided',
+  reviewId: string,
+  source: VettingRawSource
+): string {
+  return `${reviewPath(tab, reviewId)}/data/${source}`;
 }

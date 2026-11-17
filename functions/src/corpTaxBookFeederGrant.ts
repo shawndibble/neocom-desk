@@ -33,6 +33,7 @@ import {
   pctField,
   utcDate,
 } from './corpTaxBook.js';
+import type { AuditAction } from './corpTaxBookKinds.js';
 import { FEEDER_SYNC_SCOPES } from './corpSyncScopes.js';
 import {
   closePeriod,
@@ -694,7 +695,7 @@ export interface EndFeederInput {
   effectiveAt: number;
   finalStatus: 'left' | 'removed';
   actor: { characterId: number | null; name: string; via?: string };
-  action: string;
+  action: AuditAction;
   /** The statuses this may end; anything else is refused. */
   allowed: readonly FeederRecord['status'][];
   /** False when the view is about to go with its book (a book delete). */

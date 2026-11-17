@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -366,8 +366,27 @@ describe('MoonOwnerDetail', () => {
     await userEvent.clear(field);
     await userEvent.type(field, '9');
     await userEvent.click(screen.getAllByRole('button', { name: 'Set rate' }).at(-1)!);
-    expect(setFeederRate).toHaveBeenCalledWith(7, BOOK, ASH, 9);
+    expect(setFeederRate).toHaveBeenCalledWith(7, BOOK, ASH, 9, undefined);
     expect(reload).toHaveBeenCalled();
+  });
+
+  it('sends an earlier as-of day, and blocks one beyond 30 days back', async () => {
+    renderBook(
+      <MoonOwnerDetail id={String(ASH)} />,
+      [feeder(ASH, { agreedRatePct: 8 })],
+      `/corp/moons/moon-owners/${ASH}`
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Set rate' }));
+    const field = screen.getByLabelText('Rate (%)');
+    await userEvent.clear(field);
+    await userEvent.type(field, '9');
+    const day = screen.getByLabelText('Counts from');
+    const min = day.getAttribute('min')!;
+    fireEvent.change(day, { target: { value: '2000-01-01' } });
+    expect(screen.getAllByRole('button', { name: 'Set rate' }).at(-1)).toBeDisabled();
+    fireEvent.change(day, { target: { value: min } });
+    await userEvent.click(screen.getAllByRole('button', { name: 'Set rate' }).at(-1)!);
+    expect(setFeederRate).toHaveBeenCalledWith(7, BOOK, ASH, 9, min);
   });
 
   it('refuses a rate outside 0 to 100', async () => {

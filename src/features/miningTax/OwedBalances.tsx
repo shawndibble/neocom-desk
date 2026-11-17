@@ -156,10 +156,6 @@ export function OwedBalances({
     >
       {/* One owed Payee: the single card already carries the name and the
           same amount, so the summary would only repeat it (issue #3065). */}
-      {/* With a Conflict on the way, "nothing outstanding" is the reassurance that misleads. */}
-      {owed.length === 0 && !conflicts && (
-        <p className="text-xs text-text-dim">{t('miningTax.balancesNothing')}</p>
-      )}
       {owed.length > 1 && (
         <p className="flex flex-wrap items-baseline gap-x-2">
           <span className="text-[0.6875rem] font-semibold text-text-dim">

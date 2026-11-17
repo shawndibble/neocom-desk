@@ -589,6 +589,9 @@ export const VETTING_KEEP_DAYS = 30;
 export const VETTING_OPEN_KEEP_DAYS = 90;
 /** Longest role name a promotion review carries. */
 export const VETTING_ROLE_MAX = 40;
+
+/** The asking officer may resend a member's request mail only after this long (24 hours). */
+export const VETTING_MAIL_COOLDOWN_MS = 86_400_000;
 /** Hours an unsent draft is kept. */
 export const VETTING_DRAFT_HOURS = 24;
 export const VETTING_MAX_CHARACTERS = 30;
@@ -651,6 +654,10 @@ export interface VettingReviewSummary {
   decidedAt: number | null;
   /** The invite the application started from, when there was one. */
   invite?: string;
+  /** The officer who asked, on a promotion review. */
+  requestedBy?: { characterId: number; name: string };
+  /** When the asking officer last mailed the member the link; absent until they did. */
+  requestMail?: { sentAt: number };
 }
 
 /** The full report an officer opens. */
@@ -658,7 +665,6 @@ export interface VettingReview extends VettingReviewSummary {
   corporationId: number;
   note: string;
   answers: VettingAnswer[];
-  requestedBy?: { characterId: number; name: string };
   /** True when the caller asked for this review, or it is about them, so they cannot sign it off. */
   barred: boolean;
   reportCharacters: VettingReportCharacter[];
@@ -667,6 +673,69 @@ export interface VettingReview extends VettingReviewSummary {
   signOffs: VettingSignOffView[];
   log: VettingLogEntry[];
   deleteAt: number | null;
+  /**
+   * How many rows of each source the read returned and the review keeps (ADR 0035), all
+   * characters together. Absent on a review stored before rows were kept: it has no data to
+   * browse.
+   */
+  rawCounts?: Record<VettingRawSource, number>;
+}
+
+/** The sources an officer can browse: the five that are read with a scope, and public history. */
+export const VETTING_RAW_SOURCES = [
+  'wallet',
+  'contact',
+  'mail',
+  'contract',
+  'skills',
+  'history',
+] as const;
+export type VettingRawSource = (typeof VETTING_RAW_SOURCES)[number];
+
+/**
+ * One row a read returned, kept as read: every row, not only the ones a check used. Ids only;
+ * names ride beside a page in `VettingRawPage.parties`. Which fields are set depends on the
+ * source:
+ * - `wallet`: `at`, `what` (the journal `ref_type`), `partyId` (the other side, absent when the
+ *   row has none, such as a transaction tax), `amount` (signed ISK from the character's side).
+ * - `contact`: `what` is the contact's kind (`character`, `corporation`, `alliance`, `faction`),
+ *   `partyId`, `standing` (-10 to 10). No `at`.
+ * - `mail`: headers only, never a subject or text. `at`, `what` is `Sent` or `Received`,
+ *   `partyId` is the sender (received) or the first recipient (sent), `recipients` is every
+ *   recipient id.
+ * - `contract`: `at` (issued), `what` (the contract type), `partyId` (the other side),
+ *   `amount` (as `contractDealings` signs it), `status`.
+ * - `skills`: `what` is empty, `skillId`, `level`. No `at`. The client names the skill.
+ * - `history`: `at` is `joined`, `corporationId`, `joined`, `left` (null while still there).
+ */
+export interface VettingRawRow {
+  characterId: number;
+  at: string | null;
+  what: string;
+  partyId?: number;
+  amount?: number;
+  standing?: number;
+  recipients?: number[];
+  status?: string;
+  skillId?: number;
+  level?: number;
+  corporationId?: number;
+  joined?: string;
+  left?: string | null;
+}
+
+/**
+ * One page of one source's rows, all the review's characters together. A page is one stored
+ * chunk, so its size is whatever the server wrote; `next` is the cursor for the following page
+ * and null on the last.
+ */
+export interface VettingRawPage {
+  reviewId: string;
+  source: VettingRawSource;
+  rows: VettingRawRow[];
+  /** Name and category of every id the page's rows name (`partyId`, `recipients`, `corporationId`). */
+  parties: VettingParty[];
+  next: string | null;
 }
 
 /** What the pilot sees of their own review. */

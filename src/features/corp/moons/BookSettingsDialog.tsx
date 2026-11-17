@@ -35,6 +35,7 @@ import { Label } from './BookDialogs';
 import { SharingTab } from './SharingTab';
 import type { SettingsTab } from './moonsPaths';
 import { isk } from './moonsFormat';
+import { datedRateReady } from './rateForm';
 import { AutomaticSyncSection } from './AutomaticSyncSection';
 import { DeleteBookSection } from './DeleteBookSection';
 import { ExportBookSection } from './ExportBook';
@@ -83,6 +84,19 @@ const RATE_SCOPES = [
 ] as const;
 /** Scopes that name a moon owner corporation. */
 const OWNER_SCOPES: readonly string[] = ['feeder', 'feeder-member'];
+
+type NewRate = Exclude<TaxRate, { scope: 'record' }>;
+
+/** Two pending rates for the same scope, target and day: the server keeps only one. */
+const pendingKey = (r: NewRate) =>
+  [
+    r.scope,
+    'minerId' in r ? r.minerId : '',
+    'moonId' in r ? r.moonId : '',
+    'structureId' in r ? r.structureId : '',
+    'feederId' in r ? r.feederId : '',
+    r.effectiveFrom,
+  ].join(':');
 
 function rateLabel(
   rate: TaxRate,
@@ -226,6 +240,10 @@ export function BookSettingsDialog({
   const [ratePct, setRatePct] = useState('');
   const today = utcDay();
   const [rateFrom, setRateFrom] = useState(today);
+  // Rates added with "Add rate", written together by Save (#6323).
+  const [pending, setPending] = useState<{ id: number; rate: NewRate }[]>([]);
+  const nextPendingId = useRef(0);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
 
   const structures = useMemo(
     () => [...new Set(view.input.extractions.map((x) => x.structureId))],
@@ -269,16 +287,62 @@ export function BookSettingsDialog({
   };
 
   const rateReady =
-    ratePct !== '' &&
-    Number(ratePct) >= 0 &&
-    Number(ratePct) <= 100 &&
-    rateFrom >= today &&
+    datedRateReady(ratePct, rateFrom, today) &&
+    rateFrom >= settings.startDate &&
     (rateScope !== 'miner' || rateMiner !== '') &&
     (rateScope !== 'moon' || rateMoon !== '') &&
     (rateScope !== 'structure' || rateRefinery !== '') &&
     (!OWNER_SCOPES.includes(rateScope) || rateOwner !== '');
   // One save model: Save commits the settings and a rate left in the form.
   const rateFilled = ratePct !== '';
+
+  const formRate = (): NewRate => {
+    const base = { pct: Number(ratePct), effectiveFrom: rateFrom };
+    return rateScope === 'miner'
+      ? { scope: 'miner', minerId: rateMiner, ...base }
+      : rateScope === 'moon'
+        ? { scope: 'moon', moonId: Number(rateMoon), ...base }
+        : rateScope === 'structure'
+          ? { scope: 'structure', structureId: Number(rateRefinery), ...base }
+          : rateScope === 'feeder' || rateScope === 'feeder-member'
+            ? { scope: rateScope, feederId: Number(rateOwner), ...base }
+            : { scope: rateScope, ...base };
+  };
+
+  // Why a pending rate cannot be written, by its id: the rules a single rate always had.
+  const pendingProblems = useMemo(() => {
+    const seen = new Set<string>();
+    const out = new Map<number, 'start' | 'past' | 'duplicate'>();
+    for (const { id, rate } of pending) {
+      const key = pendingKey(rate);
+      if (rate.effectiveFrom < today) out.set(id, 'past');
+      else if (rate.effectiveFrom < settings.startDate) out.set(id, 'start');
+      else if (seen.has(key)) out.set(id, 'duplicate');
+      seen.add(key);
+    }
+    return out;
+  }, [pending, today, settings.startDate]);
+
+  const rateIsDuplicate =
+    rateReady && pending.some((p) => pendingKey(p.rate) === pendingKey(formRate()));
+  const problem = pendingProblems.size > 0 ? 'pending' : rateFilled && !rateReady ? 'form' : null;
+
+  const addPending = () => {
+    const rate = formRate();
+    setPending((p) => [...p, { id: nextPendingId.current++, rate }]);
+    // The scope stays: the next rate is likely the same kind.
+    setRatePct('');
+    setRateMiner('');
+    setRateMoon('');
+    setRateRefinery('');
+    setRateOwner('');
+    setRateFrom(today);
+  };
+
+  const requestClose = () => {
+    if (pending.length > 0 && !confirmDiscard) setConfirmDiscard(true);
+    else onClose();
+  };
 
   // The N-day anchor is the start date being saved, unless the officer kept a custom one:
   // a stored anchor that is not the old start date stays.
@@ -290,21 +354,17 @@ export function BookSettingsDialog({
 
   const save = () =>
     run(async () => {
-      let rateAdded = false;
-      if (rateFilled) {
-        const base = { pct: Number(ratePct), effectiveFrom: rateFrom };
-        const rate =
-          rateScope === 'miner'
-            ? { scope: 'miner', minerId: rateMiner, ...base }
-            : rateScope === 'moon'
-              ? { scope: 'moon', moonId: Number(rateMoon), ...base }
-              : rateScope === 'structure'
-                ? { scope: 'structure', structureId: Number(rateRefinery), ...base }
-                : OWNER_SCOPES.includes(rateScope)
-                  ? { scope: rateScope, feederId: Number(rateOwner), ...base }
-                  : { scope: rateScope, ...base };
-        await edit({ action: 'addRate', rate });
-        rateAdded = true;
+      if (problem || rateIsDuplicate) return;
+      const toWrite = [...pending.map((p) => p.rate), ...(rateFilled ? [formRate()] : [])];
+      const rateAdded = toWrite.length > 0;
+      if (rateAdded) {
+        // One rate keeps the single `addRate` an older server knows; several go as one batch.
+        await edit(
+          toWrite.length === 1
+            ? { action: 'addRate', rate: toWrite[0] }
+            : { action: 'addRates', rates: toWrite }
+        );
+        setPending([]);
         setRatePct('');
       }
       const sortedDivisions = [...divisions].sort((a, b) => a - b);
@@ -416,7 +476,7 @@ export function BookSettingsDialog({
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={requestClose}
       title={t('corpTaxBook.moons.settings.title')}
       placement="wide"
       footer={
@@ -425,26 +485,51 @@ export function BookSettingsDialog({
             <span role="alert" className="text-sm text-danger">
               {error}
             </span>
-          ) : rateFilled && !rateReady ? (
+          ) : confirmDiscard ? (
+            <span role="alert" className="text-sm text-warning">
+              {t('corpTaxBook.moons.settings.discardPending', { count: pending.length })}
+            </span>
+          ) : problem === 'pending' ? (
+            <span id={rateHintId} className="text-sm text-danger">
+              {t('corpTaxBook.moons.settings.pendingBlocked')}
+            </span>
+          ) : problem === 'form' || rateIsDuplicate ? (
             <span id={rateHintId} className="text-sm text-text-dim">
-              {t('corpTaxBook.moons.settings.rateIncomplete')}
+              {t(
+                rateIsDuplicate
+                  ? 'corpTaxBook.moons.settings.pendingProblem.duplicate'
+                  : 'corpTaxBook.moons.settings.rateIncomplete'
+              )}
             </span>
           ) : (
             <span />
           )}
           <span className="flex gap-2">
-            <Button variant="ghost" onClick={onClose}>
-              {t('common.close')}
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() => void save()}
-              disabled={!canEdit || busy}
-              aria-disabled={rateFilled && !rateReady ? true : undefined}
-              aria-describedby={rateFilled && !rateReady && !error ? rateHintId : undefined}
-            >
-              {t('common.save')}
-            </Button>
+            {confirmDiscard ? (
+              <>
+                <Button variant="ghost" autoFocus onClick={() => setConfirmDiscard(false)}>
+                  {t('corpTaxBook.moons.settings.keepEditing')}
+                </Button>
+                <Button variant="danger" onClick={onClose}>
+                  {t('corpTaxBook.moons.settings.discard')}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="ghost" onClick={requestClose}>
+                  {t('common.close')}
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={() => void save()}
+                  disabled={!canEdit || busy}
+                  aria-disabled={problem || rateIsDuplicate ? true : undefined}
+                  aria-describedby={(problem || rateIsDuplicate) && !error ? rateHintId : undefined}
+                >
+                  {t('common.save')}
+                </Button>
+              </>
+            )}
           </span>
         </div>
       }
@@ -613,6 +698,73 @@ export function BookSettingsDialog({
                       />
                     </Label>
                   </div>
+                  <Button
+                    variant="accent"
+                    onClick={addPending}
+                    disabled={!rateReady || rateIsDuplicate || pending.length >= 50}
+                  >
+                    {t('corpTaxBook.moons.settings.addRate')}
+                  </Button>
+                  {pending.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className={eyebrowClassName}>
+                        {t('corpTaxBook.moons.settings.pendingTitle', { count: pending.length })}
+                      </h4>
+                      <ul className="divide-y divide-line rounded-xs border border-line bg-panel">
+                        {pending.map(({ id, rate }) => {
+                          const target = rateLabel(
+                            rate,
+                            minerName,
+                            names.refinery,
+                            names.corporation
+                          );
+                          const bad = pendingProblems.get(id);
+                          return (
+                            <li
+                              key={id}
+                              className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2"
+                            >
+                              <Pill>{t(`corpTaxBook.moons.settings.rateScope.${rate.scope}`)}</Pill>
+                              {target && (
+                                <span className="min-w-0 flex-1 basis-44 break-words">
+                                  {target}
+                                </span>
+                              )}
+                              <span className="text-xs text-text-dim tabular-nums">
+                                {t('corpTaxBook.moons.settings.from', {
+                                  date: displayDate(rate.effectiveFrom),
+                                })}
+                              </span>
+                              <span className="w-14 text-right font-semibold tabular-nums">
+                                {rate.pct}%
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                aria-label={t('corpTaxBook.moons.settings.removePendingNamed', {
+                                  name:
+                                    target ||
+                                    t(`corpTaxBook.moons.settings.rateScope.${rate.scope}`),
+                                  pct: rate.pct,
+                                })}
+                                onClick={() => {
+                                  setPending((p) => p.filter((x) => x.id !== id));
+                                  setConfirmDiscard(false);
+                                }}
+                              >
+                                {t('corpTaxBook.moons.settings.removePending')}
+                              </Button>
+                              {bad && (
+                                <span role="alert" className="basis-full text-xs text-danger">
+                                  {t(`corpTaxBook.moons.settings.pendingProblem.${bad}`)}
+                                </span>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -673,7 +825,10 @@ export function BookSettingsDialog({
                   />
                 </span>
               </Field>
-              <Field label={t('corpTaxBook.moons.settings.cadenceLabel')}>
+              <Field
+                note={t('corpTaxBook.moons.settings.issuedBeforeNote')}
+                label={t('corpTaxBook.moons.settings.cadenceLabel')}
+              >
                 <SegmentedControl
                   label={t('corpTaxBook.moons.settings.cadenceLabel')}
                   value={cadence}
@@ -697,7 +852,10 @@ export function BookSettingsDialog({
                   />
                 )}
               </Field>
-              <Field label={t('corpTaxBook.moons.settings.minimum')}>
+              <Field
+                note={t('corpTaxBook.moons.settings.issuedBeforeNote')}
+                label={t('corpTaxBook.moons.settings.minimum')}
+              >
                 <IskInput
                   value={minimum}
                   onChange={setMinimum}
@@ -713,7 +871,11 @@ export function BookSettingsDialog({
                   onChange={(e) => setGrace(e.target.value)}
                 />
               </Field>
-              <Field label={t('corpTaxBook.moons.settings.overdue')} htmlFor={`${fieldId}-overdue`}>
+              <Field
+                note={t('corpTaxBook.moons.settings.issuedBeforeNote')}
+                label={t('corpTaxBook.moons.settings.overdue')}
+                htmlFor={`${fieldId}-overdue`}
+              >
                 <TextInput
                   className="w-20"
                   inputMode="numeric"

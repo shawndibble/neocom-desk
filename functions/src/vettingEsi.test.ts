@@ -77,9 +77,26 @@ describe('esiVettingReader.readCharacter', () => {
       }
       return publicRoutes(call);
     });
-    const input = await esiVettingReader(impl).readCharacter(ME, 'tok', [
+    const { input, raw } = await esiVettingReader(impl).readCharacter(ME, 'tok', [
       'esi-skills.read_skills.v1',
     ]);
+    expect(raw).toEqual({
+      wallet: [],
+      contact: [],
+      mail: [],
+      contract: [],
+      skills: [{ characterId: ME, at: null, what: '', skillId: 3344, level: 1 }],
+      history: [
+        {
+          characterId: ME,
+          at: '2020-01-01T00:00:00Z',
+          what: '',
+          corporationId: 98000001,
+          joined: '2020-01-01T00:00:00Z',
+          left: null,
+        },
+      ],
+    });
     expect(input).toEqual({
       characterId: ME,
       name: 'Me',
@@ -155,7 +172,7 @@ describe('esiVettingReader.readCharacter', () => {
       if (call.path === `/characters/${ME}/skills/`) return { status: 403 };
       return publicRoutes(call);
     });
-    const input = await esiVettingReader(impl).readCharacter(ME, 'tok', VETTING_SCOPES);
+    const { input, raw } = await esiVettingReader(impl).readCharacter(ME, 'tok', VETTING_SCOPES);
     // One request at a time, in a fixed order.
     expect(seen.mostAtOnce).toBe(1);
     expect(calls.map((call) => call.path.replace(`/characters/${ME}`, ''))).toEqual([
@@ -176,6 +193,19 @@ describe('esiVettingReader.readCharacter', () => {
     ]);
     expect(input.dealings.filter((d) => d.source === 'mail')).toHaveLength(53);
     expect(JSON.stringify(input)).not.toContain('secret subject');
+    // Every row comes back as a raw row, uncapped by the checks' filters; mail has no subject.
+    expect(raw.wallet.map((row) => row.amount)).toEqual([-1, 2]);
+    expect(raw.mail).toHaveLength(53);
+    expect(raw.mail[0]).toEqual({
+      characterId: ME,
+      at: '2026-10-01T00:00:00Z',
+      what: 'Received',
+      partyId: PAL,
+      recipients: [ME],
+    });
+    expect(JSON.stringify(raw)).not.toContain('secret subject');
+    expect(raw.contact).toEqual([]);
+    expect(raw.skills).toEqual([]);
     // Headers only: no mail is ever opened.
     expect(calls.some((call) => /\/mail\/\d+/.test(call.path))).toBe(false);
   });

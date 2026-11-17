@@ -112,6 +112,8 @@ export type CorpBookState =
       view: BookView;
       names: BookNames;
       data: BookData;
+      /** A refinery page's moon docs (#6348); absent on every other page. */
+      refinery?: BookRead['refinery'];
     };
 
 export interface CorpBook {
@@ -155,10 +157,11 @@ async function failedFetch(
 export function useCorpBook(
   sync: CorpTaxBookSync,
   wanted: ReadonlySet<BookPart> = bookPartsFor(),
-  options: { minerId?: string; extractionId?: string } = {}
+  options: { minerId?: string; extractionId?: string; structureId?: number } = {}
 ): CorpBook {
   const scopedMiner = options.minerId;
   const scopedMoon = options.extractionId;
+  const scopedRefinery = options.structureId;
   const characterId = useActiveCharacter((s) => s.activeCharacterId);
   const corporationId = useActiveCorporationId();
   const [fetched, setFetched] = useState<Fetched>({ status: 'loading' });
@@ -215,6 +218,7 @@ export function useCorpBook(
           parts: wantedRef.current,
           ...(scopedMiner !== undefined ? { minerId: scopedMiner } : {}),
           ...(scopedMoon !== undefined ? { extractionId: scopedMoon } : {}),
+          ...(scopedRefinery !== undefined ? { structureId: scopedRefinery } : {}),
         });
         // The page moved on while this read ran: take the parts it now wants.
         const data =
@@ -243,7 +247,7 @@ export function useCorpBook(
     return () => {
       cancelled = true;
     };
-  }, [characterId, corporationId, attempt, finishedAt, scopedMiner, scopedMoon]);
+  }, [characterId, corporationId, attempt, finishedAt, scopedMiner, scopedMoon, scopedRefinery]);
 
   // A page that wants parts the book was opened without reads just those.
   useEffect(() => {
@@ -469,6 +473,7 @@ export function useCorpBook(
         view &&
         fetched.data.scopedMiner === scopedMiner &&
         fetched.data.forMoon === scopedMoon &&
+        fetched.data.refinery?.structureId === scopedRefinery &&
         holdsParts(fetched.data, required)
         ? {
             status: 'ready',
@@ -477,6 +482,7 @@ export function useCorpBook(
             view,
             names: bookNames,
             data: fetched.data,
+            ...(fetched.data.refinery ? { refinery: fetched.data.refinery } : {}),
           }
         : { status: 'loading' }
       : fetched;

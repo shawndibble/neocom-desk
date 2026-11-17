@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { userEvent, within } from 'storybook/test';
 import {
   seedVettingCorporation,
+  vettingRosterRoutes,
   VETTING_SHELL_SCOPES,
   vettingShellRoutes,
 } from '@/storybook/vettingShell';
@@ -52,6 +53,23 @@ export const VettingOff: Story = { parameters: { vetting: { on: false } } };
 export const Flagged: Story = { parameters: report(VETTING_FIXTURE_REVIEWS.flagged) };
 /** @summary Phone: the flagged report in one column, the decision after the findings. */
 export const FlaggedPhone: Story = { ...Flagged, globals: phone };
+
+const data = (source: string, query = '') => ({
+  shell: shell(`/corp/vetting/open/${VETTING_FIXTURE_REVIEWS.flagged}/data/${source}${query}`),
+});
+
+/** @summary Data we read: every kept row, 4,652 wallet journal rows in one windowed table, a tab per source with its count, a character switcher and filters. */
+export const DataWeRead: Story = { parameters: data('wallet') };
+/** @summary Phone: the data page, the table scrolls sideways under a pinned first column. */
+export const DataWeReadPhone: Story = { ...DataWeRead, globals: phone };
+/** @summary Flagged rows only: the rows a flag shows, tinted, each with a link back to its flag. */
+export const DataFlaggedRows: Story = { parameters: data('wallet', '?flagged=1') };
+/** @summary Skills: the Cyno skill row tinted with its Flag link, skill names from the static data. */
+export const DataSkills: Story = { parameters: data('skills') };
+/** @summary Corporation history: joined, left and the time there. */
+export const DataHistory: Story = { parameters: data('history') };
+/** @summary Empty source: the read found nothing, said as a result. */
+export const DataEmptySource: Story = { parameters: data('contact') };
 
 /** @summary Nothing found: a neutral result line that says it is not a verdict, every check listed. */
 export const NothingFound: Story = { parameters: report(VETTING_FIXTURE_REVIEWS.nothing) };
@@ -158,4 +176,38 @@ export const ReviewMember: Story = {
     await userEvent.click(await body.findByRole('button', { name: 'Review a member' }));
     await body.findByRole('dialog', { name: 'Review a member' });
   },
+};
+
+/** @summary "Review a member" with the corp's member list readable: pick from the roster instead of typing the exact name. */
+export const ReviewMemberRoster: Story = {
+  parameters: {
+    shell: {
+      ...shell('/corp/vetting/open', () => [...directorRoutes(), ...vettingRosterRoutes()]),
+      // Mail the member: the asking officer's send-mail grant.
+      scopes: [...VETTING_SHELL_SCOPES, 'esi-mail.send_mail.v1'],
+    },
+  },
+  play: ReviewMember.play,
+};
+
+const requests = { vetting: { extra: 'requests' as const } };
+
+/** @summary Queue with the waiting rows: mail not sent, mail sent 6 hours ago, and the one about you left out. */
+export const QueueRequests: Story = { parameters: requests };
+
+/** @summary Requested review, mail not sent: Request panel (asked by you, role, Mail not sent, Send mail), "Nothing shared yet", the rail with you barred. */
+export const RequestedNoMail: Story = {
+  parameters: report(VETTING_FIXTURE_REVIEWS.waiting),
+};
+/** @summary Phone: requested review, one column. */
+export const RequestedNoMailPhone: Story = { ...RequestedNoMail, globals: phone };
+
+/** @summary Requested review, mail sent 6 hours ago: Resend waits a day, the reason printed under it. */
+export const RequestedMailed: Story = {
+  parameters: { ...requests, ...report(VETTING_FIXTURE_REVIEWS.mailed) },
+};
+
+/** @summary A review about the signed-in officer: closed, with the existing wording. */
+export const AboutYou: Story = {
+  parameters: { ...requests, ...report(VETTING_FIXTURE_REVIEWS.aboutYou) },
 };

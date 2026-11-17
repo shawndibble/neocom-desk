@@ -199,7 +199,7 @@ export function VettingDecision({
             </div>
           </>
         )}
-        {review.state === 'open' && review.barred && (
+        {(review.state === 'open' || review.state === 'requested') && review.barred && (
           <p className="text-xs text-text-dim">
             {t(
               askedByReviewer(review, reviewerId)

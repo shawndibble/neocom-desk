@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, IconButton, Panel, ProgressBar } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { utcDay } from '@/engine/localDay';
 import { readLocal, writeLocal } from '@/lib/safeLocalStorage';
 import { cx } from '@/lib/cx';
-import { tabPath } from '@/lib/pageTabs';
 import type { SettingsTab } from './moonsPaths';
-import { MOONS_TABS } from './moonsPaths';
 import { setupChecklist, type SetupStep } from './setupSteps';
 import { useBook } from './useBook';
 
@@ -18,7 +15,7 @@ const k = (key: string) => `corpTaxBook.moons.setupChecklist.${key}`;
 const dismissedKey = (corporationId: number) =>
   `corpTaxBook.setupChecklistDismissed:${corporationId}`;
 
-/** Where each step is done: a Settings tab, or the Statements tab. */
+/** Where each step is done: a Settings tab. */
 const SETTINGS_TAB: Partial<Record<SetupStep['id'], SettingsTab>> = {
   rate: 'rates',
   autoSync: 'access',
@@ -31,7 +28,6 @@ const SETTINGS_TAB: Partial<Record<SetupStep['id'], SettingsTab>> = {
  */
 export function SetupChecklist() {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const { view, names, data, canEdit, corporationId, openSettings } = useBook();
   const [dismissed, setDismissed] = useState(() => readLocal(dismissedKey(corporationId)) !== null);
 
@@ -45,7 +41,6 @@ export function SetupChecklist() {
       rates: view.input.rates,
       scheduledSync: data.scheduledSync,
       refineries: [...own].map((id) => ({ id, name: names.refinery(id) })),
-      statementCount: view.input.statements.length,
       today: utcDay(Date.parse(view.input.now)),
     });
   }, [view, names, data.scheduledSync]);
@@ -70,13 +65,6 @@ export function SetupChecklist() {
       return (
         <Button size="sm" onClick={() => openSettings(tab)}>
           {t(k(`${step.id}.action`))}
-        </Button>
-      );
-    }
-    if (step.id === 'firstStatement') {
-      return (
-        <Button size="sm" onClick={() => navigate(tabPath(MOONS_TABS, 'statements'))}>
-          {t(k('firstStatement.action'))}
         </Button>
       );
     }

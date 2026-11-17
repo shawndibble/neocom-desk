@@ -195,6 +195,39 @@ export async function updatePayee(payee: PayeeRecord, input: PayeeInput): Promis
 }
 
 /**
+ * Makes every target bill like `source` (#6308: the pilot picks which of a merged Payee's records
+ * wins): its name, tax %, Trade Hub and EVE link. Default Systems are left alone, they route one
+ * Character's ore. Returns nothing; each target's Character is synced once.
+ */
+export async function applyPayeeTerms(
+  source: PayeeRecord,
+  targets: readonly PayeeRecord[]
+): Promise<void> {
+  const now = Date.now();
+  const written = targets
+    .filter((t) => t.id !== source.id)
+    .map((target) => {
+      const next: PayeeRecord = {
+        ...target,
+        name: source.name,
+        defaultTaxPct: source.defaultTaxPct,
+        updatedAt: now,
+      };
+      // Firestore rejects `undefined`: an absent field is dropped, never written empty.
+      for (const key of ['hubId', 'entityId', 'entityKind'] as const) {
+        if (source[key] === undefined) delete next[key];
+        else Object.assign(next, { [key]: source[key] });
+      }
+      return next;
+    });
+  if (written.length === 0) return;
+  await db.payees.bulkPut(written);
+  for (const characterId of new Set(written.map((p) => p.characterId))) {
+    scheduleSync(characterId, { collections: ['payees'] });
+  }
+}
+
+/**
  * Records who this Payee actually is in game (issue #540), learned when the
  * pilot confirms that a payment to `entityId` settled this Payee's entries, or
  * when an unlinked Payee from before Payees had to be someone in EVE is matched

@@ -24,6 +24,7 @@ import {
   reviewResult,
   signOffRows,
   vettingErrorKey,
+  visibleReviews,
 } from './vettingView';
 
 const summary = (over: Partial<VettingReviewSummary>): VettingReviewSummary => ({
@@ -324,6 +325,13 @@ describe('signOffRows', () => {
     expect(askedByReviewer(review({}), 9)).toBe(false);
   });
 
+  it('draws the asker barred before the member shares, and never a Yours row', () => {
+    const requestedBy = { characterId: 9, name: 'Bram Soto' };
+    const asked = review({ kind: 'promotion', state: 'requested', requestedBy, yours: false });
+    expect(signOffRows(asked, 9)).toEqual([{ kind: 'barred', name: 'Bram Soto', you: true }]);
+    expect(signOffRows(asked, 6)).toEqual([{ kind: 'barred', name: 'Bram Soto', you: false }]);
+  });
+
   it('adds no row for the caller once the review is decided', () => {
     expect(signOffRows(review({ state: 'accepted', yours: false }), 6)).toEqual([]);
   });
@@ -407,5 +415,16 @@ describe('vettingErrorKey', () => {
     expect(isReviewGone('not-found')).toBe(true);
     expect(isReviewGone('vetting-off')).toBe(false);
     expect(isReviewGone(null)).toBe(false);
+  });
+});
+
+describe('visibleReviews', () => {
+  it('drops a review about the viewing officer and keeps the rest', () => {
+    const about = (id: number) => ({
+      pilot: { characterId: id, name: `P${id}`, corporationName: 'C' },
+    });
+    expect(
+      visibleReviews([about(1), about(2), about(3)], 2).map((r) => r.pilot.characterId)
+    ).toEqual([1, 3]);
   });
 });

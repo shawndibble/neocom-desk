@@ -168,6 +168,7 @@ import {
   setOwnRefineryLabel,
   setRefineryLabel,
 } from './corpTaxBookRefineryLabels.js';
+import { parseSetRefineryArchiveInput, setRefineryArchive } from './corpTaxBookRefineryArchive.js';
 import {
   cancelFeederRemoval,
   claimFeederStaleMail,
@@ -307,6 +308,7 @@ import {
   parseVettingMember,
   parseVettingRemoveCharacter,
   parseVettingRequest,
+  parseVettingRawRows,
   parseVettingReviewId,
   parseVettingSettingsPatch,
   parseVettingStart,
@@ -321,8 +323,10 @@ import {
   getVettingOverview,
   getVettingStatus,
   listMyVettingRequests,
+  getVettingRawRows,
   openVettingReview,
   removeVettingCharacter,
+  recordVettingRequestMail,
   requestVettingReview,
   revokeVettingInvite,
   saveVettingSettings,
@@ -1147,6 +1151,15 @@ corpTaxBookAction('setCorpTaxBookRefineryLabelCallable', (request) =>
   setRefineryLabel(feederOwnerDeps(), callerOf(request), parseSetRefineryLabelInput(request.data))
 );
 
+// Archive a moon owner's refinery, or restore it (issue #6298): the accounting side only.
+corpTaxBookAction('setCorpTaxBookRefineryArchiveCallable', (request) =>
+  setRefineryArchive(
+    feederOwnerDeps(),
+    callerOf(request),
+    parseSetRefineryArchiveInput(request.data)
+  )
+);
+
 corpTaxBookAction('setCorpTaxBookOwnRefineryLabelCallable', (request) =>
   setOwnRefineryLabel(
     corpSyncDeps(),
@@ -1561,6 +1574,14 @@ vettingAction('openVettingReviewCallable', (request) =>
     parseVettingReviewId(request.data)
   )
 );
+vettingAction('getVettingRawRowsCallable', (request) =>
+  getVettingRawRows(
+    vettingDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseVettingRawRows(request.data)
+  )
+);
 vettingAction('decideVettingReviewCallable', (request) =>
   decideVettingReview(
     vettingDeps(),
@@ -1575,6 +1596,14 @@ vettingAction('requestVettingReviewCallable', (request) =>
     callerOf(request),
     parseBookCall(request.data),
     parseVettingRequest(request.data)
+  )
+);
+vettingAction('recordVettingRequestMailCallable', (request) =>
+  recordVettingRequestMail(
+    vettingDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseVettingReviewId(request.data)
   )
 );
 vettingAction('createVettingInviteCallable', (request) =>

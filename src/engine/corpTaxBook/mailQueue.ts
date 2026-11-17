@@ -22,7 +22,8 @@ const MAX_RATE_LIMIT_WAIT_MS = 10 * MINUTE_MS;
  * `rate-change` (#4515), `removal`/`removalCancelled` (#4520), `payee-change` (#4653) and
  * `mode-change` (settled otherwise on or off, #6209) and `grant-stale` (the ledger can't be read,
  * #6210) are moon owner mails, not Statements. `srp-result` (an officer telling a pilot an SRP claim was decided)
- * and `vetting-result` (a reviewer telling a pilot how their vetting review was decided) belong to
+ * `vetting-result` (a reviewer telling a pilot how their vetting review was decided) and
+ * `vetting-request` (the asking officer telling a member a review awaits them) belong to
  * no Corp Tax Book at all: they only ride the same paced queue.
  */
 export type MailKind =
@@ -35,7 +36,8 @@ export type MailKind =
   | 'removal'
   | 'removalCancelled'
   | 'srp-result'
-  | 'vetting-result';
+  | 'vetting-result'
+  | 'vetting-request';
 
 /** Only Statement mail is logged on a Statement; other kinds have none to log on. */
 export const isStatementMail = (kind: MailKind): kind is 'statement' | 'reminder' =>

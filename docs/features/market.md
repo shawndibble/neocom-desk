@@ -229,12 +229,12 @@ What: fix list of every authenticated character's open market orders, each filed
 
 ### History (`/market/history`)
 
-What: character's buy/sell fills; corp fills live on `/corp/wallet`. `TransactionsPanel.tsx`.
+What: character's buy/sell fills; the corporation's fills are not drawn anywhere (`/corp/wallet` reads them only to name the journal's market lines). `TransactionsPanel.tsx`.
 
 - Data: `GET /characters/{id}/wallet/transactions` (`esi-wallet.read_character_wallet.v1`; `loadWalletTransactionsWithStatus`, page cap -> `truncated` warning) + wallet journal (only for Margin; failure blanks Margin, not the tab). cacheKey `market:transactions`.
 - Page header (portaled via `PageHeaderPortals.tsx`, no panel title bar): refresh and `TableActionsMenu` (CSV surface `wallet-transactions`, filtered rows) beside the bell; `DataAgeBadge` beside the page title.
 - Layout: Sold / Bought / Net card, then the table card (filter bar on top).
-- Filter bar: reuses `TransactionsFilterBar` from `src/features/corp/CorpTransactionsPanel.tsx:94` — search, Side select, From/To date fields; URL `transactions.*` (`walletTransactionFilter.ts`).
+- Filter bar: reuses `TransactionsFilterBar` (`src/features/character/TransactionsFilterBar.tsx`) — search, Side select, From/To date fields; URL `transactions.*` (`walletTransactionFilter.ts`).
 - Summary card (`TransactionsSummaryStrip.tsx`): date range, Sold / Bought / Net over filtered rows.
 - Columns: Date (`formatTimestamp`, user time zone), Item (`ItemInfoLink`, sticky start), Side (phone hidden), Quantity, Unit price, Total (signed, toned), Margin (phone hidden, header tooltip, cell tooltip shows unit cost + sales tax; "—" if no margin; blank on buys). Default sort date desc; all columns sortable. Virtualized.
 - Highlight: `?highlight=<typeId>` -> newest sell of that item (`transactionHighlight.ts`), pulsed.

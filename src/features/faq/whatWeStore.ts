@@ -138,6 +138,7 @@ export const CORP_COLLECTION_FAQ_ITEM = {
   vetting: 'vetting',
   vettingReviews: 'vetting',
   inputs: 'vetting',
+  rawRows: 'vetting',
   vettingThrottle: 'vetting',
 } as const satisfies Record<string, CorpFaqItemId>;
 

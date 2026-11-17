@@ -12,6 +12,7 @@ import { getValidAccessToken } from '@/auth/session';
 import type {
   VettingCorpInfo,
   VettingOverview,
+  VettingRawPage,
   VettingReview,
   VettingStatus,
 } from '@/engine/vetting';
@@ -30,8 +31,10 @@ const ACTION = {
   myRequests: 'listMyVettingRequestsCallable',
   overview: 'getVettingOverviewCallable',
   open: 'openVettingReviewCallable',
+  rawRows: 'getVettingRawRowsCallable',
   decide: 'decideVettingReviewCallable',
   request: 'requestVettingReviewCallable',
+  recordRequestMail: 'recordVettingRequestMailCallable',
   createInvite: 'createVettingInviteCallable',
   revokeInvite: 'revokeVettingInviteCallable',
   saveSettings: 'saveVettingSettingsCallable',
@@ -102,6 +105,13 @@ const client: VettingBackend = {
     signedIn<VettingOverview>(characterId, ACTION.overview, { corporationId }),
   open: (characterId, corporationId, reviewId) =>
     signedIn<VettingReview>(characterId, ACTION.open, { corporationId, reviewId }),
+  rawRows: (characterId, corporationId, reviewId, source, cursor) =>
+    signedIn<VettingRawPage>(characterId, ACTION.rawRows, {
+      corporationId,
+      reviewId,
+      source,
+      ...(cursor ? { cursor } : {}),
+    }),
   decide: (characterId, corporationId, reviewId, decision, note) =>
     signedIn<VettingReview>(characterId, ACTION.decide, {
       corporationId,
@@ -111,6 +121,8 @@ const client: VettingBackend = {
     }),
   request: (characterId, corporationId, memberName, role) =>
     signedIn<VettingOverview>(characterId, ACTION.request, { corporationId, memberName, role }),
+  recordRequestMail: (characterId, corporationId, reviewId) =>
+    signedIn<VettingOverview>(characterId, ACTION.recordRequestMail, { corporationId, reviewId }),
   createInvite: (characterId, corporationId, label) =>
     signedIn<VettingOverview>(characterId, ACTION.createInvite, { corporationId, label }),
   revokeInvite: (characterId, corporationId, code) =>

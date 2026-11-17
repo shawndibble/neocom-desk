@@ -33,7 +33,14 @@ export type BookPartSet = ReadonlySet<BookPart>;
 export const ALL_BOOK_PART_SET: BookPartSet = new Set(ALL_BOOK_PARTS);
 
 /** What a page asks for: a tab id, or a detail page below it. */
-export type BookDetailKind = 'extraction' | 'moon' | 'miner' | 'moonOwner' | 'statementPeriod';
+export type BookDetailKind =
+  | 'extraction'
+  | 'legacyMoon'
+  | 'legacyRefinery'
+  | 'miner'
+  | 'moonOwner'
+  | 'refinery'
+  | 'statementPeriod';
 
 /** The parts a page reads. No page: the whole book, as the export reads it. */
 export function bookPartsFor(tab?: string, detail: BookDetailKind | null = null): BookPartSet {
@@ -48,6 +55,12 @@ export function bookPartsFor(tab?: string, detail: BookDetailKind | null = null)
     case 'miner':
     case 'miners':
       return new Set<BookPart>(['core', 'observed', 'ledger', 'answers']);
+    // A refinery's page reads its Extractions' moon docs, not the ledger (#6348); the retired
+    // moon and refinery URLs only look up where to go.
+    case 'refinery':
+    case 'legacyMoon':
+    case 'legacyRefinery':
+      return new Set<BookPart>(['core']);
     // An Extraction's page says whether its days are billed, dismissed or in Today's mining.
     case 'moon-owners':
       return new Set<BookPart>(['core', 'owners']);

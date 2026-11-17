@@ -147,6 +147,22 @@ describe('VettingDecision', () => {
     expect(screen.queryByRole('textbox')).toBeNull();
   });
 
+  it('bars the asker on a requested review before the member shares, with no buttons', () => {
+    setup({
+      kind: 'promotion',
+      state: 'requested',
+      barred: true,
+      yours: false,
+      needed: 2,
+      requestedBy: { characterId: 6, name: 'Kestrel Vane' },
+    });
+    expect(screen.getByText('Cannot sign')).toBeInTheDocument();
+    expect(
+      screen.getByText('You asked for this review, so you cannot sign it off.')
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
+  });
+
   it('does not say the caller asked when someone else did and they are barred all the same', () => {
     setup({
       kind: 'promotion',

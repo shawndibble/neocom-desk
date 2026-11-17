@@ -630,6 +630,8 @@ export interface OwnerRateEntry {
   pct: number;
   effectiveFrom: string;
   recordedAt: string;
+  /** Engine `noBackdate`: an as-of entry never reaches back (#6347). */
+  noBackdate?: true;
 }
 
 /** The entry of one kind in effect on `date`: latest effective-from on or before it, then latest recorded. */
@@ -673,7 +675,8 @@ export function effectiveOwnerRatePct(
   history: readonly OwnerRateEntry[],
   date: string
 ): number | undefined {
-  return (latestOwnerRate(history, 'agreed', date) ?? firstAgreedOwnerRate(history))?.pct;
+  const first = firstAgreedOwnerRate(history);
+  return (latestOwnerRate(history, 'agreed', date) ?? (first?.noBackdate ? undefined : first))?.pct;
 }
 
 /** Engine `FEEDER_VIEW_RULES`: the accrual rules a moon owner view summary is built under (#6209). */

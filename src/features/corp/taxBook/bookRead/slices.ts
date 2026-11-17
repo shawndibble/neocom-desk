@@ -44,6 +44,8 @@ export interface BookRead extends BookData {
   forMoon?: string;
   /** The moon docs that stand in for the ledger rows of a moon page's earlier cycles. */
   moon?: { docs: ReadonlyMap<string, MoonDoc>; fromDocs: ReadonlySet<string> };
+  /** A refinery page's read (#6348): every moon doc the refinery has, by extraction id. */
+  refinery?: { structureId: number; docs: ReadonlyMap<string, MoonDoc> };
 }
 
 /** One book read: the open book, and each field it reads once however many readers ask. */
@@ -234,6 +236,7 @@ export async function readSlices(
 function shape(
   settings: BookSettings,
   paidStatementIds: Set<string>,
+  minerPaidThrough: Map<string, string>,
   parts: BookPartSet,
   fields: Fields
 ): BookRead {
@@ -249,6 +252,7 @@ function shape(
       dismissals,
       extractions,
       paidStatementIds,
+      minerPaidThrough,
       writeOffs,
     },
     ...(defined as Omit<Fields, keyof BookData['state']>),
@@ -258,7 +262,13 @@ function shape(
 
 /** A read's fields with the settings document and `meta/paid`, both always read fresh. */
 export async function bookOf(ctx: ReadContext, parts: BookPartSet, fields: Fields) {
-  return shape(settingsFrom(ctx.book.data), await ctx.book.paidStatementIds(), parts, fields);
+  return shape(
+    settingsFrom(ctx.book.data),
+    await ctx.book.paidStatementIds(),
+    await ctx.book.minerPaidThrough(),
+    parts,
+    fields
+  );
 }
 
 /**
@@ -300,12 +310,13 @@ export function mergeReads(held: BookRead, extra: BookRead): BookRead {
       fieldsIn(part).map(([name]) => [name, from[extra.parts.has(part) ? 'extra' : 'held'][name]])
     )
   ) as Fields;
-  const { scopedMiner, minerScope, forMoon, moon } = held;
+  const { scopedMiner, minerScope, forMoon, moon, refinery } = held;
   const readModels = extra.readModels ?? held.readModels;
   return {
     ...shape(
       held.settings,
       extra.state.paidStatementIds,
+      extra.state.minerPaidThrough ?? new Map(),
       new Set([...held.parts, ...extra.parts]),
       fields
     ),
@@ -314,5 +325,6 @@ export function mergeReads(held: BookRead, extra: BookRead): BookRead {
     ...(minerScope ? { minerScope } : {}),
     ...(forMoon !== undefined ? { forMoon } : {}),
     ...(moon ? { moon } : {}),
+    ...(refinery ? { refinery } : {}),
   };
 }

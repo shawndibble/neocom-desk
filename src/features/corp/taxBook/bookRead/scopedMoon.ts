@@ -28,6 +28,32 @@ import {
 /** The parts a moon page reads in its scope: the window's rows stand in for the ledger rows. */
 const MOON_PARTS: readonly BookPart[] = ['core', 'observed', 'ledger'];
 
+/** Every moon doc a refinery has, one per Extraction (the read is cached for the tab). */
+export function structureMoonDocs(
+  book: ReadContext['book'],
+  corporationId: number,
+  structureId: number
+): Promise<MoonDoc[]> {
+  return book.part(
+    'moonDocs',
+    async () =>
+      (
+        await getDocs(
+          query(
+            collection(book.db, 'corps', String(corporationId), 'moonDocs'),
+            where('structureId', '==', structureId)
+          )
+        )
+      ).docs.map((d) => {
+        // The server's timestamp is not part of the figures, and a class instance does not clone into the copy.
+        const fields = { ...d.data() };
+        delete fields.updatedAt;
+        return fields as unknown as MoonDoc;
+      }),
+    `moonDocs:s:${structureId}`
+  );
+}
+
 /** A moon page's read: the scoped parts and any other asked, or the asked parts whole. */
 export async function readMoonScope(
   ctx: ReadContext,
@@ -47,24 +73,10 @@ export async function readMoonScope(
 
   const shown = extractions.find((x) => extractionIdOf(x) === extractionId);
   const docList = shown
-    ? await book
-        .part(
-          'moonDocs',
-          async () =>
-            (
-              await getDocs(query(under('moonDocs'), where('structureId', '==', shown.structureId)))
-            ).docs.map((d) => {
-              // The server's timestamp is not part of the figures, and a class instance does not clone into the copy.
-              const fields = { ...d.data() };
-              delete fields.updatedAt;
-              return fields as unknown as MoonDoc;
-            }),
-          `moonDocs:s:${shown.structureId}`
-        )
-        .catch((error) => {
-          if (errorCode(error).endsWith('permission-denied')) throw error;
-          return undefined;
-        })
+    ? await structureMoonDocs(book, corporationId, shown.structureId).catch((error) => {
+        if (errorCode(error).endsWith('permission-denied')) throw error;
+        return undefined;
+      })
     : [];
   if (!docList) return whole();
   const docs = new Map(docList.filter(moonDocUsable).map((d) => [d.extractionId, d]));

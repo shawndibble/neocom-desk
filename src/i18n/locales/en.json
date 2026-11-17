@@ -7315,13 +7315,10 @@
     "sideFilterAll": "All sides",
     "transactionsSearchPlaceholder": "Search item…",
     "transactionsNoFilterMatches": "No transactions match this filter.",
-    "filterToItem": "Filter to this item",
     "filterToType": "Filter to this type",
     "filterToPlayer": "Filter to this player",
     "transactionsNoFilterMatchesHint": "Clear the search or widen the side and date filters.",
     "transactionsTruncatedHint": "Only the most recent transactions were fetched. Older history is not shown.",
-    "corpTransactionsEmptyTitle": "No corp transactions cached",
-    "corpTransactionsEmptyHint": "Couldn't load this wallet division's market transactions yet. Try again shortly.",
     "refTypeFilterLabel": "Ref type",
     "refTypeFilterAll": "All types",
     "dateFromLabel": "From",
@@ -8149,10 +8146,10 @@
       "hint": {
         "pending": "{{corp}} has not closed this day in its book yet. Until it does, your own allocation applies and nothing is owed to the corp.",
         "billed": "{{corp}}'s Corp Tax Book decides this day.",
-        "conflict": "You gave this ore to another Payee, and {{corp}}'s book also recorded it. It is not owed; it resolves to {{corp}} on {{date}} or on {{corp}}'s next Statement, whichever comes first, unless you sort it out first.",
+        "conflict": "You gave this ore to another Payee, and {{corp}}'s book also recorded it. It is not owed; it resolves to {{corp}} on {{date}} unless you sort it out first.",
         "conflictOverListed": "Your entry for {{corp}} lists more of this ore than its book recorded. {{corp}} does not bill it: take the extra ore off your entry.",
-        "conflictOwnNeedsReview": "Your own entry for {{corp}} needs review, so its book can't take it over. It is not owed; it resolves to {{corp}} on {{date}} or on {{corp}}'s next Statement, whichever comes first, unless you sort it out first.",
-        "conflictOwnerCollected": "{{corp}} now collects tax for this moon, and you gave this ore to the moon's owner. It is not owed; it resolves to {{corp}} on {{date}} or on {{corp}}'s next Statement, whichever comes first, unless you sort it out first.",
+        "conflictOwnNeedsReview": "Your own entry for {{corp}} needs review, so its book can't take it over. It is not owed; it resolves to {{corp}} on {{date}} unless you sort it out first.",
+        "conflictOwnerCollected": "{{corp}} now collects tax for this moon, and you gave this ore to the moon's owner. It is not owed; it resolves to {{corp}} on {{date}} unless you sort it out first.",
         "unattributed": "No Corp Tax Book claims this ore. Assign it to your Payee if you owe someone.",
         "dismissed": "{{corp}} dismissed this day: {{reason}}",
         "waived": "{{corp}} wrote this day off: {{reason}}",
@@ -8179,8 +8176,6 @@
         "neverSynced": "Safe to pay once {{corp}} syncs (never synced).",
         "openDay": "{{date}}: safe to pay once it is closed, after {{time}} UTC on {{closeDate}} and {{corp}}'s next sync.",
         "credit": "{{amount}} ISK credit with {{corp}} goes on your next Statement.",
-        "ahead": "{{amount}} ISK ahead with {{corp}}: it pays your next days as they close.",
-        "paidThrough": "Paid through {{date}} with {{corp}}.",
         "behind_one": "You owe {{corp}} {{amount}} ISK: {{count}} day, oldest {{date}}.",
         "behind_other": "You owe {{corp}} {{amount}} ISK: {{count}} days, oldest {{date}}."
       },
@@ -8226,7 +8221,7 @@
         "lockedShort": "The book owns these figures, so they can't be edited here.",
         "unlinkedDonation": "Your {{amount}} ISK donation sent {{time}} paid this day, but {{corp}} never credited it, so it's owed again. Resolve it to send {{corp}} that transfer from your wallet journal.",
         "factBilling": "Billing",
-        "factBillingNext": "Next Statement",
+        "factBillingNext": "On its date",
         "factSynced": "Synced",
         "factStatement": "Statement",
         "factStatementFinal": "Issued, final",
@@ -8265,10 +8260,10 @@
         "bookEntry": "{{corp}}'s book: recorded it at {{place}}",
         "alsoContested": "Also in conflict on this day: {{list}}.",
         "alsoContestedItem": "{{corp}} ({{amount}} ISK)",
-        "headerNotOwed": "Not owed yet · on {{corp}}'s next Statement unless an officer changes the book",
+        "headerNotOwed": "Not owed yet · {{corp}}'s book bills it on its date unless an officer changes the book",
         "headerNotBilled": "Not billed · {{corp}}'s book did not record this ore",
         "countsFrom": "From {{date}} this app also counts it as owed to {{corp}}.",
-        "cardBills": "Next Statement",
+        "cardBills": "On its date",
         "fixTitle": "To fix it",
         "bookRight": "If the book is right: take this ore off your entry.",
         "bookRightPaid": "If the book is right: unmark your payment, then take this ore off your entry.",
@@ -8415,8 +8410,8 @@
     "balancesLabel": "You owe",
     "balancesNothing": "No moon mining tax outstanding",
     "conflictsTitle": "Conflicts",
-    "conflictsHint_one": "Not owed yet. {{corp}}'s next Statement bills it unless an officer changes the book.",
-    "conflictsHint_other": "{{count}} days, not owed yet. Each goes on its corporation's next Statement unless an officer changes the book.",
+    "conflictsHint_one": "Not owed yet. {{corp}}'s book bills it on its date unless an officer changes the book.",
+    "conflictsHint_other": "{{count}} days, not owed yet. Each is billed on its date unless an officer changes the book.",
     "conflictsReview": "Review",
     "conflictsWaitingTitle": "Waiting on the corp",
     "conflictsWaitingHint_one": "You have told {{corp}}. It still bills on {{date}} unless an officer answers first, so check back.",
@@ -8608,6 +8603,10 @@
       "detailWithSystems": "{{pct}}% · {{hub}} · {{systems}}",
       "owed": "{{amount}} ISK",
       "settled": "Settled",
+      "sharedByCharacters_one": "Used by {{count}} character",
+      "sharedByCharacters_other": "Used by {{count}} characters",
+      "termsDiffer": "Your characters bill this Payee differently.",
+      "useTermsForAll": "Use {{pct}}% · {{hub}} for all ({{characters}})",
       "nameLabel": "Name",
       "taxPctLabel": "Default tax %",
       "defaultSystemsLabel": "Default systems",
@@ -14303,19 +14302,14 @@
         "done": "All {{total}} done",
         "stop": "Stop",
         "next": "Next",
-        "skip": "Skip",
-        "working": "Working…",
         "reading": "Reading the market…",
         "newPrice": "New price {{price}}",
-        "newPriceLabel": "New price",
         "noRival": "No other order at this station",
         "unavailable": "Price unavailable",
-        "copied": "{{price}} copied",
-        "sent": "Sent",
         "notChanged": "Not changed",
         "loses": "Loses <isk/> at {{price}}",
         "costUnknown": "Cost unknown",
-        "seeExits": "See exits",
+        "floor": "Lowest price that still profits: {{price}}",
         "logInAs": "Log in as {{name}} to open this one"
       },
       "fixList": {
@@ -14982,7 +14976,7 @@
           "description": "Only if your corporation uses SRP or a Corp Tax Book, or you shared a Vetting report with a corporation. These are the corporation's records, not yours: they sit on our server (Google Firebase) under the corporation's ID, and Delete all data leaves them with it. A Vetting report is the exception: the pilot can delete their own from its status page.",
           "srp": "SRP Claims: the killmail, the Character's name and ID, the hull, system and loss value, the fleet or FC and note you gave, the Reimbursement and the claim's state. Also the corporation's SRP settings, its Doctrine Fits and its SRP log: each filing (with the pilot's name, killmail, hull and amount) and each officer action. The CEO, Directors and Accountants read all of it; a pilot reads only their own claims.",
           "corpTaxBook": "The Corp Tax Book: what each Character mined at the refineries it covers (corp members, Guests, and miners at a moon owner's refineries it collects for), the Statements sent, the payments that settle them, write-offs and corrections, a miner's own \"I paid this another way\" declarations and disputes of a line with the officers' answers, a log of who did each, and which books bill each Character (kept under that Character's ID). The CEO, Directors, Accountants and Junior Accountants read the whole book; a corp member reads only their own lines; a moon owner reads only its own mined volume, rate, amount due and payouts, never what each miner owes. A Statement's verify link, sent by mail, shows that Statement to whoever has the link. With Pop Sharing on, each shared moon's pop (refinery, moon, Pop Time, ore make-up if shared, notes and rate, never ISK) is kept for the pilots in the audiences the officers chose, until the belt expires; a Community admin's block of a sharing corporation is kept in the Community.",
-          "vetting": "Vetting: for a pilot who applied to a corporation or shared a review with it, a report of what one read of their Characters found. It holds each Character's name, corporation, age and skill points, the flags raised with up to 10 rows behind each (who a wallet, contract, contact or mail row was with, when, and the ISK), the pilot's note and their answers to the corporation's questions, the invite link it started from, and who opened or decided it. No mail subject or text is kept, and no login is kept. The corporation's CEO, Directors and Personnel Managers read it; the pilot sees who opened it and can delete it. Also the corporation's watchlist, questions, invite links and settings, and which of its reviewers opened the vetting page in the last 30 days, used only to send the alert for a new report."
+          "vetting": "Vetting: for a pilot who applied to a corporation or shared a review with it, a report of what one read of their Characters found. It holds each Character's name, corporation, age and skill points, the flags raised with up to 10 rows behind each (who a wallet, contract, contact or mail row was with, when, and the ISK), and every row the read returned, kept as it was read: the last 30 days of wallet journal and contracts, every contact, mail headers (who wrote to whom, never a subject or text), every trained skill and corporation history, which the corporation's officers can browse, the pilot's note and their answers to the corporation's questions, the invite link it started from, and who opened or decided it. No mail subject or text is kept, and no login is kept. The corporation's CEO, Directors and Personnel Managers read it; the pilot sees who opened it and can delete it. Also the corporation's watchlist, questions, invite links and settings, and which of its reviewers opened the vetting page in the last 30 days, used only to send the alert for a new report."
         },
         "notes": {
           "push": "Push notifications, if on: this device's token, its character IDs, and the next 72 hours of alert text, so alerts arrive while the app is closed. The EVE token used to verify each character is discarded right after.",
@@ -15045,7 +15039,7 @@
           "corpTaxBook": "Corp Tax Book:",
           "corpTaxBookKept": "no expiry. Its lines, Statements, payments, verify links and log stay until whoever turned the book on, or the CEO, deletes the book, which deletes everything in it, including its place in the record of which books bill each Character.",
           "vetting": "Vetting reports:",
-          "vettingKept": "deleted 30 days after the corporation decides, or 90 days after it was shared if nobody decides (checked daily), or at once when the pilot deletes it. While a pilot is still adding Characters, the rows read are kept for 24 hours and removed by the daily clean-up; they are deleted at once when the report is sent."
+          "vettingKept": "deleted 30 days after the corporation decides, or 90 days after it was shared if nobody decides (checked daily), or at once when the pilot deletes it. While a pilot is still adding Characters, the rows read are kept for 24 hours and removed by the daily clean-up; once the report is sent they are kept with it, until the same dates."
         }
       },
       "helpPointer": "Bug, question or idea? See <help>Support</help>."
@@ -15877,8 +15871,6 @@
       "unusedDivisions_other": "{{count}} unused divisions",
       "divisionsShow": "Show all divisions",
       "divisionsHide": "Hide divisions",
-      "viewLabel": "Wallet view",
-      "transactionsView": "Transactions",
       "noAccessTitle": "Corp wallet needs Accountant",
       "noAccessHint": "EVE only opens the corporation wallet to a Director, Accountant or Junior Accountant. Roles can only be changed in game, and granting access here will not change that.",
       "roleLine": "The corporation wallet needs Director, Accountant or Junior Accountant."
@@ -17970,6 +17962,7 @@
         "grant-stale": "Ledger can't be read",
         "srp-result": "SRP result",
         "vetting-result": "Vetting decision",
+        "vetting-request": "Vetting request",
         "removal": "Moon owner removal",
         "removalCancelled": "Removal cancelled"
       },
@@ -18038,7 +18031,7 @@
       "tabs": {
         "overview": "Overview",
         "extractions": "Extractions",
-        "moons": "Moons",
+        "refineries": "Refineries",
         "miners": "Miners",
         "statements": "Statements",
         "moonOwners": "Moon owners"
@@ -18122,14 +18115,98 @@
       "extractionsSummary_one": "{{count}} Extraction",
       "extractionsSummary_other": "{{count}} Extractions",
       "moons": {
-        "none": "No moons yet. A moon shows once the book has synced its first Extraction.",
-        "notFound": "This moon has no Extractions in the book.",
-        "summary_one": "{{count}} moon",
-        "summary_other": "{{count}} moons",
         "nextPop": "Next pop {{date}}",
         "lastPop": "Last pop {{date}}",
-        "by": { "laser": "By laser", "auto": "Broke on its own" },
-        "emptyHistory": "The book keeps every Extraction it syncs, from its start. No earlier Extraction of this moon exists."
+        "by": { "laser": "By laser", "auto": "Broke on its own" }
+      },
+      "refineries": {
+        "none": "No refineries yet. A refinery shows once the book has synced its first Extraction.",
+        "summary_one": "{{count}} refinery",
+        "summary_other": "{{count}} refineries"
+      },
+      "refineryPage": {
+        "notFound": "This refinery is not in the book.",
+        "moonUnknown": "Moon not known yet",
+        "ownerOurs": "{{name}} (our corp)",
+        "facts": {
+          "extractions": "Extractions",
+          "nextPop": "Next pop",
+          "lastPop": "Last pop",
+          "mined": "Mined (est.)",
+          "minedTip": "Ore mined here during each Extraction, from the fracture to the field's end. Mining outside those windows is not counted. Valued at today's hub prices.",
+          "tax": "Tax billed",
+          "taxTip": "The tax Statements have already billed for these Extractions. Tax for days not yet billed shows on the Extraction's own page."
+        },
+        "ore": {
+          "title": "Ore in the chunk",
+          "unknown": "Ore unknown.",
+          "unknownWhy": "Neither the moon notification nor a survey reached the book for the Extraction started {{date}}, so the make-up is not shown.",
+          "source": {
+            "notification": "From the moon notification",
+            "survey": "From a survey"
+          },
+          "shareOf": "{{ore}} share",
+          "cols": {
+            "ore": "Ore",
+            "share": "Share",
+            "units": "Units",
+            "value": "Est. value (ISK)"
+          }
+        },
+        "ext": {
+          "title": "Extractions · {{count}}",
+          "label": "Extractions",
+          "show": "Show",
+          "chipCount": "{{count}} Extractions",
+          "mined": "Mined",
+          "minedPct": "{{pct}}% mined · {{isk}} ISK",
+          "minedIsk": "{{isk}} ISK",
+          "fullyMined": "Fully mined",
+          "tax": "Tax billed"
+        },
+        "miners": {
+          "title": "Miners · {{count}}",
+          "label": "Miners",
+          "meta": "Every Extraction · biggest first",
+          "show": "Show Miners",
+          "hide": "Hide Miners",
+          "summary": "{{count}} Miners · {{isk}} ISK mined",
+          "none": "Nobody has mined here yet.",
+          "noneYet": "Nobody has mined here yet. Miners show up once the chunk pops ({{date}}) and someone mines it.",
+          "pullsOf": "{{count}} of {{of}}",
+          "foot": "Mined during each Extraction's window, fracture to field end. A Miner's name opens their page.",
+          "cols": {
+            "pulls": "Extractions",
+            "last": "Last mined",
+            "share": "Share",
+            "mined": "Mined (est. ISK)"
+          }
+        }
+      },
+      "rate": {
+        "label": "Rate",
+        "thisMoon": "this moon",
+        "thisRefinery": "this refinery",
+        "guests": "guests {{pct}}%",
+        "since": "since {{date}}",
+        "none": "No rate yet. Set one so this moon's mining is taxed.",
+        "scheduled": "Scheduled: {{pct}}% from {{date}}",
+        "minerWins": "A Miner's own rate still beats this one.",
+        "change": "Change rate",
+        "dialogTitle": "Change the rate for {{scope}}",
+        "appliesTo": "Applies to {{scope}} only.",
+        "save": "Save rate",
+        "effect": "Mining from {{date}}. Earlier days keep their rate.",
+        "source": {
+          "moon": "set on {{scope}}",
+          "structure": "set on the refinery",
+          "feeder": "the moon owner's rate",
+          "feeder-member": "the moon owner's rate for its members",
+          "guest": "the Guest default",
+          "corp": "the corp default",
+          "miner": "a Miner's rate",
+          "record": "a record's rate"
+        }
       },
       "state": {
         "extracting": "Extracting",
@@ -18577,7 +18654,46 @@
           "stopReminders": "stopped reminders",
           "setPopSharing": "changed pop sharing",
           "setPopSharingMoon": "changed a moon's pop sharing",
-          "feederPopSharingSet": "changed whether its pop schedule is shared"
+          "feederPopSharingSet": "changed whether its pop schedule is shared",
+          "ignoreUncounted": "marked a donation into an unread division as not tax",
+          "dismissRecords": "dismissed tax for several days",
+          "linkSurvey": "linked a Moon Ore Survey to a chunk",
+          "setFullyMined": "changed whether a chunk is fully mined",
+          "regroupMiner": "merged Miners into one",
+          "closeAccount": "closed a Miner's account",
+          "rejectDispute": "rejected a dispute",
+          "dismissDispute": "waived a disputed day",
+          "confirmGrouping": "confirmed a grouping of characters",
+          "declineGrouping": "declined a grouping of characters",
+          "claimPayment": "claimed a donation",
+          "disputeConflict": "found a dispute that conflicts with a Statement",
+          "withdrawDispute": "withdrew a dispute",
+          "refineryLabelSet": "named a refinery",
+          "refinerySystemLearned": "learned a refinery's system",
+          "refineryArchived": "archived a refinery",
+          "refineryRestored": "restored an archived refinery",
+          "feederInviteCreated": "invited a moon owner",
+          "feederInviteRevoked": "cancelled a moon owner invite",
+          "feederJoined": "joined as a moon owner",
+          "feederRejoined": "rejoined as a moon owner",
+          "feederJoinUndone": "undid joining as a moon owner",
+          "feederLeft": "left as a moon owner",
+          "feederRemovalStarted": "started removing a moon owner",
+          "feederRemovalNoticeSent": "sent a moon owner their removal notice",
+          "feederRemovalCancelled": "cancelled a moon owner's removal",
+          "feederRemovalForced": "left while a removal was pending",
+          "feederRemoved": "removed a moon owner",
+          "feederRemovedBookDeleted": "removed a moon owner when the book was deleted",
+          "feederDisconnected": "found a moon owner disconnected",
+          "feederRateRequested": "asked for a rate",
+          "feederRateAgreed": "agreed a rate with a moon owner",
+          "feederModeSet": "changed how a moon owner is settled",
+          "feederPayeeSet": "changed who is paid for a moon owner",
+          "feederPayoutRecorded": "recorded a payout to a moon owner",
+          "feederPayoutMarked": "marked a payout as sent",
+          "feederPayoutsReconciled": "matched payouts to the wallet",
+          "feederPayoutDisputed": "disputed a payout",
+          "feederViewDismissed": "dismissed a notice on the moon owner page"
         },
         "actionsTo": {
           "issueStatement": "issued a Statement to <name>{{name}}</name>, {{amount}} ISK",
@@ -18913,11 +19029,6 @@
           "title": "Refinery names readable",
           "todo_one": "{{count}} refinery shows as Unknown/Undockable. Open this page with a Character that can dock there and its name is read.",
           "todo_other": "{{count}} refineries show as Unknown/Undockable. Open this page with a Character that can dock there and their names are read."
-        },
-        "firstStatement": {
-          "title": "First Statement issued",
-          "todo": "Once a period closes, send each Miner what they owe.",
-          "action": "Go to Statements"
         }
       },
       "setup": {
@@ -19028,12 +19139,52 @@
         "editTooltip": "Edit label",
         "field": "Refinery label",
         "hint": "Both corporations see this label, and miners see it on their tax lines. Leave it empty to use the default name.",
-        "failed": "Could not save the label. Try again."
+        "failed": "Could not save the label. Try again.",
+        "extractionCount_one": "{{count}} Extraction",
+        "extractionCount_other": "{{count}} Extractions",
+        "lastMined": "last mined {{date}}",
+        "neverMined": "nothing mined yet",
+        "offerGone": "Gone in the game",
+        "offerIdle_one": "No Extraction or mining in {{count}} day",
+        "offerIdle_other": "No Extraction or mining in {{count}} days",
+        "archived": {
+          "title": "Archived ({{count}})",
+          "show": "Show archived refineries",
+          "hide": "Hide archived refineries",
+          "empty": "Nothing archived. Archive a refinery from its page once it is gone from the game; its records stay.",
+          "row": "Archived {{date}} by {{name}} · {{why}}",
+          "why": {
+            "gone": "gone in the game",
+            "idle": "no Extraction for a long time",
+            "manual": "archived by hand"
+          },
+          "restore": "Restore",
+          "restoreLabel": "Restore {{name}}",
+          "restoreFailed": "Could not restore it. Try again."
+        }
+      },
+      "refinery": {
+        "archive": "Archive",
+        "restore": "Restore",
+        "archivedPill": "Archived",
+        "editLabel": "Edit the label for {{name}}",
+        "hintGone": "The game no longer shows this structure to its owner. Archive it to take it off the list. Everything stays.",
+        "hintIdle": "No Extraction and no mining here in {{count}} days; last mined {{date}}. If it is gone, archive it. Everything stays.",
+        "hintIdleNever": "No Extraction here in {{count}} days and nothing ever mined. If it is gone, archive it. Everything stays.",
+        "archivedBanner": "Archived {{date}} by {{name}} ({{why}}). It is off the Refineries list. Its Extractions, mining and label are all still here. Restore brings it back, and so does mining here again.",
+        "extractionsNone": "No Extraction was recorded at this refinery.",
+        "cols": { "ore": "Ore make-up" },
+        "confirm": {
+          "title": "Archive {{name}}?",
+          "body": "It leaves the Refineries list. Its Extractions, mining rows, label and Statements stay, and every figure still counts them. Restore it any time, or mine there again.",
+          "action": "Archive"
+        },
+        "failed": "Could not save that. Try again."
       },
       "ownerView": {
         "statement": {
           "intro": "{{name}} handles the tax on your moons.",
-          "noRate": "No rate is agreed yet, so nothing is owed to you yet. Once one is agreed, it counts from your first day. Ask for one below.",
+          "noRate": "No rate is agreed yet, so nothing is owed to you yet. Once one is agreed, it counts from the day they pick. Ask for one below.",
           "pending": "{{value}} of ore mined is waiting for a rate.",
           "owed": "is owed to you for ore mined at your refineries since {{since}}, at your rate of {{pct}}%.",
           "owedUndated": "is owed to you for ore mined at your refineries, at your rate of {{pct}}%.",
@@ -19085,7 +19236,7 @@
         "rate": {
           "none": "No rate is set.",
           "plain": "Your rate is {{pct}}%.",
-          "asked": "You asked for {{pct}}%. Nothing is owed until they agree a rate; then it counts from your first day.",
+          "asked": "You asked for {{pct}}%. Nothing is owed until they agree a rate; then it counts from the day they pick.",
           "override": "Rate set to {{pct}}% by {{name}} on {{date}}. You asked for {{asked}}%.",
           "overrideUndated": "Rate set to {{pct}}% by {{name}}. You asked for {{asked}}%.",
           "set": "Rate set to {{pct}}% by {{name}} on {{date}}.",
@@ -19229,6 +19380,7 @@
         "grace": "Grace after day end (hours)",
         "overdue": "Overdue after (days)",
         "minimum": "Minimum Statement",
+        "issuedBeforeNote": "Applies only to Statements issued before the running account.",
         "cadenceLabel": "Statements",
         "cadence": {
           "monthly": "Monthly",
@@ -19301,6 +19453,21 @@
         "startHint": "Mining before this day owes nothing. Earlier is always allowed; later only while no Statement covers the days in between.",
         "saved": "Settings saved",
         "rateIncomplete": "Finish the rate in the form, or clear its percent, to save.",
+        "addRate": "Add rate",
+        "removePending": "Remove",
+        "removePendingNamed": "Remove pending rate: {{name}}, {{pct}}%",
+        "pendingTitle_one": "Pending rate ({{count}})",
+        "pendingTitle_other": "Pending rates ({{count}})",
+        "pendingBlocked": "Fix or remove the marked pending rates in Rates to save.",
+        "pendingProblem": {
+          "past": "This day has passed. A rate cannot start before today.",
+          "start": "This day is before the book start date.",
+          "duplicate": "Another pending rate has the same scope, target and day."
+        },
+        "discardPending_one": "{{count}} pending rate is not saved. Discard it?",
+        "discardPending_other": "{{count}} pending rates are not saved. Discard them?",
+        "keepEditing": "Keep editing",
+        "discard": "Discard",
         "rateAddedSettingsFailed": "Rate added, but the other settings were not saved.",
         "divisionNamed": "Division {{n}}, {{name}}",
         "running": {
@@ -19566,7 +19733,7 @@
           "marginHint": "Miner rate − their rate",
           "asked": "They asked for {{pct}}%. Yours stands.",
           "askedSame": "They asked for {{pct}}%.",
-          "noRate": "No rate set. Their ore waits until you set one, then counts from their first day.",
+          "noRate": "No rate set. Nothing is owed until you set one. It counts from the day you pick.",
           "notSet": "Not set",
           "history": {
             "agreed": "Rate set to {{pct}}%",
@@ -19630,7 +19797,8 @@
           "rate": {
             "title": "Set their rate",
             "field": "Rate (%)",
-            "hint": "Your rate wins over what they asked for, from today. Their requests are kept and change nothing.",
+            "asOf": "Counts from",
+            "hint": "Your rate wins over what they asked for. It counts from this day only, up to {{days}} days back. Days before it stay unpaid. Their requests are kept and change nothing.",
             "confirm": "Set rate"
           },
           "settled": {
@@ -20874,6 +21042,28 @@
       "note": "They are asked to share. You cannot sign off a review you asked for.",
       "confirm": "Ask for a review"
     },
+    "member": {
+      "label": "Member",
+      "search": "Search {{count}} members",
+      "listLabel": "Members",
+      "loading": "Reading the member list…",
+      "countAll": "{{count}} members. Type to narrow.",
+      "countShown": "{{shown}} of {{count}} members",
+      "noMatch": "No member named \u201c{{name}}\u201d in the corporation",
+      "noMatchHint": "Check the spelling. Someone who left, or has not joined yet, cannot be reviewed. For someone applying, send them the apply link instead.",
+      "waiting": "Review waiting",
+      "waitingBy": "Review asked by {{name}}, {{ago}}",
+      "waitingAgo": "Review asked {{ago}}",
+      "you": "You",
+      "seen": "seen {{ago}}",
+      "change": "Change",
+      "unreadable": "The member list could not be read. Type the name exactly as in game; it is checked when you ask."
+    },
+    "role": {
+      "placeholder": "Pick one below or type your own",
+      "titles": "Titles in the corporation",
+      "eveRoles": "EVE roles"
+    },
     "settings": {
       "sectionsLabel": "Vetting settings",
       "sections": {
@@ -21110,6 +21300,8 @@
         "keptUntil": "Kept until",
         "orAfterDecision_one": "or {{count}} day after a decision",
         "orAfterDecision_other": "or {{count}} days after a decision",
+        "rowsKept": "Rows kept",
+        "allOfThem": "All of them",
         "signInKept": "Login kept",
         "none": "None",
         "log": "Record"
@@ -21215,18 +21407,127 @@
         "skills": "Skills"
       },
       "readNotes": {
-        "wallet": "Last 30 days",
-        "mail": "Who you wrote with. No subject or text is kept"
+        "history": "Public. Every corporation you have been in",
+        "wallet": "Every row from the last 30 days",
+        "contact": "Every contact",
+        "mail": "Who sent and who received each mail. Never the subject or the text",
+        "contract": "Every contract from the last 30 days",
+        "skills": "Every trained skill"
       },
-      "notRead": "Not read, not kept",
-      "mailText": "The text of your mail",
-      "signIn": "Your EVE login",
-      "signInNote": "No key is kept. Nothing is read again",
+      "kept": "Kept after you press Send",
+      "keptRows": "Every row listed here, kept with your report",
+      "deleted": "Deleted {{count}} days after the decision, or {{open}} days after you share if nobody decides, or when you delete it",
+      "deleted_one": "Deleted {{count}} day after the decision, or {{open}} days after you share if nobody decides, or when you delete it",
+      "deleted_other": "Deleted {{count}} days after the decision, or {{open}} days after you share if nobody decides, or when you delete it",
       "control": "You stay in control",
-      "onlyReviewers": "Only the reviewers can open it",
-      "seeOpened": "You see who opened it",
-      "deleted_one": "Deleted {{count}} day after the decision ({{open}} days if nobody decides), or when you withdraw",
-      "deleted_other": "Deleted {{count}} days after the decision ({{open}} days if nobody decides), or when you withdraw"
+      "onlyReviewers": {
+        "recruiters": "Only the reviewers can open it",
+        "officers": "Only officers (CEO, Director, Personnel Manager) can open it, but not the one who asked for the review or the person reviewed"
+      },
+      "seeOpened": "You see who opened it, and when",
+      "youDelete": "You can delete it at any time",
+      "notRead": "Not read, not kept",
+      "mailText": "The subject or text of your mail",
+      "signIn": "Your EVE login",
+      "signInNote": "No key is kept. We do not keep your login"
+    },
+    "data": {
+      "title": "Data we read",
+      "crumb": "Report: {{name}}",
+      "crumbPlain": "Report",
+      "subtitle": "Every row the read returned, not only the ones a check flagged.",
+      "andMore_one": "and {{count}} more",
+      "andMore_other": "and {{count}} more",
+      "readAt": "read {{at}}",
+      "sourcesLabel": "Data sources",
+      "character": "Character",
+      "allCharacters": "All {{count}}",
+      "allCharactersSelect": "All characters",
+      "noneKeptTitle": "No rows were kept for this review",
+      "noneKeptHint": "It was read before rows were kept. A fresh read needs the pilot to share again.",
+      "source": {
+        "wallet": "Wallet journal",
+        "contact": "Contacts",
+        "mail": "Mail headers",
+        "contract": "Contracts",
+        "skills": "Skills",
+        "history": "Corporation history"
+      },
+      "kind": {
+        "wallet": "Type",
+        "contact": "Standing",
+        "mail": "Direction",
+        "contract": "Contract type",
+        "skills": "Skill group"
+      },
+      "allKinds": "All {{kind}}s",
+      "direction": { "Sent": "Sent", "Received": "Received" },
+      "standing": { "hostile": "Hostile", "neutral": "Neutral", "friendly": "Friendly" },
+      "contactKind": {
+        "character": "Character",
+        "corporation": "Corporation",
+        "alliance": "Alliance",
+        "faction": "Faction"
+      },
+      "columns": {
+        "when": "When",
+        "with": "With",
+        "amount": "Amount",
+        "contact": "Contact",
+        "kind": "Kind",
+        "sent": "Sent",
+        "senderOrRecipient": "Sender or recipient",
+        "recipients": "All recipients",
+        "issued": "Issued",
+        "price": "Price",
+        "status": "Status",
+        "skill": "Skill",
+        "group": "Group",
+        "level": "Level",
+        "corporation": "Corporation",
+        "joined": "Joined",
+        "left": "Left",
+        "timeThere": "Time there",
+        "character": "Character",
+        "flag": "Flag"
+      },
+      "unknownSkill": "Skill {{id}}",
+      "stillThere": "Still there",
+      "search": "Search {{source}}",
+      "searchPlaceholder": "Search names, types, corporations…",
+      "searchSkills": "Search skills",
+      "dates": "Dates",
+      "datesRange": "{{from}} to {{to}}",
+      "start": "start",
+      "now": "now",
+      "from": "From",
+      "to": "To",
+      "flaggedOnly": "Flagged rows only",
+      "clearFilters": "Clear filters",
+      "allRows_one": "All {{total}} row read. Scroll for the rest.",
+      "allRows_other": "All {{total}} rows read. Scroll for the rest.",
+      "ofRows": "{{shown}} of {{total}} rows",
+      "loadingMore": "Loading more ({{loaded}} of {{total}} rows)",
+      "missingRows_one": "{{missing}} of {{total}} rows could not be loaded",
+      "missingRows_other": "{{missing}} of {{total}} rows could not be loaded",
+      "loadFailed": "Could not load the rest. {{loaded}} of {{total}} rows loaded.",
+      "emptyTitle": "No {{source}} rows",
+      "emptyHint": "The read found nothing here for {{who}}. Empty is a result: the source was read.",
+      "emptyHintWindow": "The read found nothing here for {{who}} in the last 30 days. Empty is a result: the source was read.",
+      "theseCharacters": "these characters",
+      "noMatchTitle": "No rows match",
+      "noMatchHint_one": "The {{shown}} row read does not fit these filters.",
+      "noMatchHint_other": "None of the {{shown}} rows read fits these filters.",
+      "openRows_one": "Open the {{count}} row in {{source}}",
+      "openRows_other": "Open the {{count}} rows in {{source}}",
+      "openRowCyno": "Open the skill in {{source}}"
+    },
+    "dataWeRead": {
+      "source": "Source",
+      "rows": "Rows read",
+      "total_one": "{{total}} row",
+      "total_other": "{{total}} rows",
+      "note": "Every row the read returned, kept with this report, not only the ones a check flagged. Mail is headers only: who wrote to whom, never a subject or text. Opening a source is logged with the other opens."
     },
     "characters": {
       "title": "Your characters",
@@ -21277,7 +21578,7 @@
       "how": {
         "title": "How it works",
         "signIn": "Log in with EVE, once per character.",
-        "read": "Each character is read once.",
+        "read": "Each character is read once. Every row read is kept with the report, for officers only, until it is deleted. Mail is headers only. No login is kept.",
         "report": "Recruiters get a report and reply in game."
       },
       "signIn": {
@@ -21401,8 +21702,24 @@
       },
       "anOfficer": "An officer",
       "promotion": "Promotion to {{role}}",
-      "asked": "<b>{{name}}</b> asked for a review before you are made <b>{{role}}</b>. Other officers decide.",
-      "oneTime": "A one-time read of the characters you share.",
+      "intro": {
+        "asked": "<b>{{name}}</b> asked you to share your characters before you are made <b>{{role}}</b> in {{corp}}. Other officers decide it, not {{first}}.",
+        "askedAnon": "An officer asked you to share your characters before you are made <b>{{role}}</b> in {{corp}}. Other officers decide it.",
+        "step1": "Log in your characters",
+        "step1None": "No characters are on this device yet. Log in each one you want to share.",
+        "step1All_one": "Your character is ready on this device. No other login is needed.",
+        "step1All_other": "All {{count}} are ready on this device. No other login is needed.",
+        "step1Some_one": "{{ready}} of {{total}} are ready on this device. {{count}} more needs a new login.",
+        "step1Some_other": "{{ready}} of {{total}} are ready on this device. {{count}} more need a new login.",
+        "step2": "Choose which to share",
+        "step2Body": "Share the ones you want read.",
+        "step3": "Share, or decline",
+        "step3Body": "Declining tells the reviewers and reads nothing.",
+        "factOnce": "Read once, when you press Share. Every row read is kept with the report until it is deleted. No login is kept.",
+        "factMail": "Mail: who wrote to whom only, never the subject or the text.",
+        "factSee": "Only officers open it. You see who does, and can delete it at any time. It is deleted 30 days after a decision, or 90 days after you share if nobody decides.",
+        "terms": "See exactly what is read"
+      },
       "charactersTitle": "Characters to share",
       "onDevice_one": "{{count}} of {{total}} can be shared without another login",
       "onDevice_other": "{{count}} of {{total}} can be shared without another login",
@@ -21415,6 +21732,66 @@
         "body": "{{name}} and the reviewers are told. Nothing is read.",
         "action": "Decline"
       }
+    },
+    "requestMail": {
+      "subject": "Review requested before {{role}}",
+      "asked": "I asked for a review before you are made {{role}} in {{corp}}. Other officers decide it. I cannot sign it off.",
+      "what": "What happens: you log in with your characters and choose which to share. Neocom Desk reads them once: corporation history, wallet, contracts, contacts, skills, and who you exchanged mail with (never the subject or the text). Every row read is kept with the report, for officers only, until it is deleted: 30 days after a decision, 90 days after you share if nobody decides, or when you delete it. No login is kept.",
+      "rights": "You can see who opens the report, delete it at any time, or decline. If you decline, the reviewers are told and nothing is read.",
+      "open": "Open it: {{link}}\nLog in as {{pilot}}."
+    },
+    "tell": {
+      "title": "Review asked",
+      "waitingFor": "Waiting for {{name}}",
+      "intro": "{{name}} sees this only when they open Neocom Desk. Mail them the link so they can log in and share their characters.",
+      "hint": "Nothing is sent until you press Send. It goes from {{officer}}, with your other mail.",
+      "queued": "Mail queued for {{name}}. It goes out in about a minute.",
+      "already": "Already queued from this device.",
+      "send": "Send mail to {{name}}",
+      "resend": "Resend mail to {{name}}",
+      "preview": "Preview mail",
+      "copyLink": "Copy link",
+      "linkCopied": "Link copied",
+      "done": "Done",
+      "queueHint": "The queue row's menu keeps Send mail and Copy link, so you can come back to them.",
+      "failed": "Mail to {{name}} could not be queued. Try again.",
+      "grantTitle": "Can't mail the member"
+    },
+    "mailPreview": {
+      "title": "Mail to {{name}}",
+      "from": "From",
+      "to": "To",
+      "subject": "Subject",
+      "close": "Close",
+      "fixed": "The text is fixed, so what is read is always said the same way. It is queued with your other mail and goes out from {{officer}}."
+    },
+    "requestPanel": {
+      "title": "Request",
+      "askedBy": "Asked by",
+      "you": "{{name}} (you)",
+      "asked": "Asked",
+      "for": "For",
+      "mail": "Mail",
+      "mailNone": "Not sent",
+      "nothingShared": "Nothing shared yet",
+      "nothingSharedHint": "The report shows here once {{name}} shares their characters. They can also decline."
+    },
+    "requestRow": {
+      "waitingFor": "Waiting for {{name}}",
+      "asked": "Asked {{age}}",
+      "askedBy": "Asked {{age}} by {{name}}",
+      "mailSent": "Mail sent {{age}}",
+      "mailNone": "Mail not sent",
+      "send": "Send mail to {{name}}",
+      "resend": "Resend mail to {{name}}",
+      "resendWait": "Sent {{age}}. You can resend after a day.",
+      "copyLink": "Copy link",
+      "mailQueued": "Mail queued for {{name}}.",
+      "mailAlready": "Already queued from this device.",
+      "mailFailed": "Mail to {{name}} could not be queued. Try again.",
+      "mailUnrecorded": "Mail to {{name}} was queued, but not recorded here. Do not resend yet; reload to check.",
+      "mailCooldown": "This member was already mailed in the last day. Nothing sent.",
+      "grantTitle": "Can't mail the member"
     },
     "errors": {
       "generic": "That did not work. Try again.",
@@ -21441,7 +21818,11 @@
       "not-open": "This review is already decided.",
       "barred": "You cannot sign off this review.",
       "own-review": "This review is about you, so you cannot open it.",
+      "bad-cursor": "Those rows could not be read. Open the page again.",
       "already-signed": "You already signed this review off.",
+      "not-requested": "This review is no longer waiting for the member.",
+      "not-asker": "Only the officer who asked can record the mail.",
+      "mail-cooldown": "The member was mailed less than a day ago.",
       "esi-backoff": "EVE's servers are busy. Try again in a few minutes.",
       "esi-error": "EVE's servers did not answer. Try again in a few minutes.",
       "esi-forbidden": "EVE refused that login. Log in again."

@@ -7,7 +7,7 @@
  * mount, never on hover or prefetch.
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   CollapsiblePanel,
@@ -42,13 +42,17 @@ import { useTimeZone } from '@/lib/timeFormat';
 import { formatDateOnly, formatTimestamp } from '@/lib/timestamp';
 import { useNow } from '@/lib/useNow';
 import { VettingAnswerList } from './VettingAnswerList';
+import { RequestPanel } from './RequestPanel';
+import { VettingDataWeRead } from './VettingDataWeRead';
 import { VettingDecision } from './VettingDecision';
 import { VettingEntity } from './VettingEntity';
 import { VettingFlagList } from './VettingFlagList';
 import { deletionLine, reviewKindLabel } from './vettingText';
 import { useVettingDecisionMail } from './useVettingDecisionMail';
+import { useVettingRequestMail } from './useVettingRequestMail';
 import { vettingBackend } from './vettingClient';
-import { VETTING_TABS } from './vettingTabs';
+import { rememberVettingReview } from './vettingReviewCache';
+import { VETTING_TABS, dataPath } from './vettingTabs';
 import { missingChecks, resultLine } from './vettingView';
 
 /** The report's one-line answer. Three states, never "safe"; "nothing found" is neutral. */
@@ -251,6 +255,13 @@ function AboutReport({ review }: { review: VettingReview }) {
               value={deletionLine(review, (at) => formatDateOnly(new Date(at), timeZone), t)}
             />
           )}
+          {review.rawCounts !== undefined && (
+            <ValueRow
+              label={t('vetting.report.about.rowsKept')}
+              value={t('vetting.report.about.allOfThem')}
+              tone="warning"
+            />
+          )}
           <ValueRow
             label={t('vetting.report.about.signInKept')}
             value={t('vetting.report.about.none')}
@@ -318,6 +329,22 @@ export function VettingReport({
   const [attempt, setAttempt] = useState(0);
   const started = useRef('');
   const load: Load = loaded !== null && loaded.key === key ? loaded.load : { status: 'loading' };
+  // The request mail was queued and recorded: show "Mail sent" here, and refresh the queue.
+  const requestMail = useVettingRequestMail(characterId, corporationId, (overview) => {
+    const sentAt = overview.reviews.find((row) => row.id === reviewId)?.requestMail;
+    setLoaded((current) =>
+      current !== null && current.key === key && current.load.status === 'ready'
+        ? {
+            key,
+            load: {
+              status: 'ready',
+              review: { ...current.load.review, ...(sentAt ? { requestMail: sentAt } : {}) },
+            },
+          }
+        : current
+    );
+    onDecided();
+  });
 
   useEffect(() => {
     // Once per visit (and per Retry): the open is logged, so StrictMode's second effect run must
@@ -328,7 +355,10 @@ export function VettingReport({
     vettingBackend()
       .open(characterId, corporationId, reviewId)
       .then(
-        (review) => setLoaded({ key, load: { status: 'ready', review } }),
+        (review) => {
+          rememberVettingReview(characterId, corporationId, review);
+          setLoaded({ key, load: { status: 'ready', review } });
+        },
         (error: unknown) =>
           setLoaded({
             key,
@@ -338,6 +368,15 @@ export function VettingReport({
           })
       );
   }, [key, attempt, characterId, corporationId, reviewId]);
+
+  // A link from the data page names a flag (`#flag-<check>`): the report draws after its load, so
+  // the browser's own jump finds nothing; scroll once the flags are there.
+  const { hash } = useLocation();
+  const ready = load.status === 'ready';
+  useEffect(() => {
+    if (!ready || !hash.startsWith('#flag-')) return;
+    document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' });
+  }, [ready, hash]);
 
   const crumb = (
     <Link
@@ -424,14 +463,31 @@ export function VettingReport({
       )}
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="min-w-0 space-y-4">
+          {review.state === 'requested' && (
+            <RequestPanel
+              review={review}
+              reviewerId={characterId}
+              send={() => requestMail.send(review)}
+              preview={() => requestMail.preview(review)}
+            />
+          )}
           {assessment === null ? (
             <Panel>
-              <EmptyState
-                title={t(
-                  `vetting.report.noReport.${review.state === 'declined' ? 'declined' : 'waiting'}`
-                )}
-                hint={t('vetting.report.noReport.hint')}
-              />
+              {review.state === 'requested' ? (
+                <EmptyState
+                  title={t('vetting.requestPanel.nothingShared')}
+                  hint={t('vetting.requestPanel.nothingSharedHint', {
+                    name: review.pilot.name.split(' ')[0] ?? review.pilot.name,
+                  })}
+                />
+              ) : (
+                <EmptyState
+                  title={t(
+                    `vetting.report.noReport.${review.state === 'declined' ? 'declined' : 'waiting'}`
+                  )}
+                  hint={t('vetting.report.noReport.hint')}
+                />
+              )}
             </Panel>
           ) : (
             <>
@@ -442,8 +498,16 @@ export function VettingReport({
                     flags={assessment.flags}
                     parties={review.parties}
                     characters={review.reportCharacters}
+                    dataHref={
+                      review.rawCounts === undefined
+                        ? undefined
+                        : (source, query) => `${dataPath(tab, review.id, source)}?${query}`
+                    }
                   />
                 </Panel>
+              )}
+              {review.rawCounts !== undefined && (
+                <VettingDataWeRead tab={tab} reviewId={review.id} counts={review.rawCounts} />
               )}
               <MissingChecksPanel review={{ ...review, assessment }} />
               <ClearChecksPanel assessment={assessment} open={assessment.flags.length === 0} />
@@ -467,6 +531,7 @@ export function VettingReport({
                 decision,
                 note
               );
+              rememberVettingReview(characterId, corporationId, next);
               setLoaded({ key, load: { status: 'ready', review: next } });
               onDecided();
             }}

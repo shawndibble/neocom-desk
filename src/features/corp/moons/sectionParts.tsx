@@ -40,6 +40,7 @@ export function PlaceCell({
   refinery,
   moon,
   to,
+  refineryTo,
   accent = false,
   undockable = false,
 }: {
@@ -47,6 +48,8 @@ export function PlaceCell({
   moon: string | undefined;
   /** The moon's page, when it has one. */
   to?: string;
+  /** The refinery's page (#6348): the refinery name leads and links there, the moon is dim text under it. */
+  refineryTo?: string;
   /** Moon in the accent colour without a link: the row it sits in is the link. */
   accent?: boolean;
   /** The station has a name (read by someone who can dock) but the viewer cannot dock there. */
@@ -54,6 +57,22 @@ export function PlaceCell({
 }) {
   const place = splitPlace(refinery, moon);
   const chip = undockable ? <UndockableChip /> : null;
+  if (refineryTo) {
+    return (
+      <span className="block min-w-0">
+        <Link
+          to={refineryTo}
+          className={entityLinkClassName(cx('[overflow-wrap:anywhere]', tapTargetClassName))}
+        >
+          {place.station}
+        </Link>
+        {chip}
+        {place.moon !== undefined && (
+          <span className="block text-xs text-text-dim">{place.moon}</span>
+        )}
+      </span>
+    );
+  }
   return (
     <span className="block min-w-0">
       {place.moon === undefined ? (

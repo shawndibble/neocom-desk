@@ -15,6 +15,11 @@ export interface AccountRecord {
   days: number;
   oldest?: string;
   paidThrough?: string;
+  /**
+   * The newest day to store as paid for good (`meta/paid`), when every day up to it is paid and
+   * saved-price: only the officer's client can know, the server has no prices.
+   */
+  settledThrough?: string;
 }
 
 /**
@@ -29,7 +34,7 @@ export function accountRecords(view: BookView, only?: string): AccountRecord[] {
     if (p.minerId) paidBy.set(p.minerId, (paidBy.get(p.minerId) ?? 0) + netOf(p));
   return view.miners.flatMap((m) => {
     if (!m.account || (only !== undefined && m.id !== only)) return [];
-    const { owes, paidThrough } = m.account;
+    const { owes, paidThrough, closableThrough } = m.account;
     return [
       {
         minerId: m.id,
@@ -38,6 +43,7 @@ export function accountRecords(view: BookView, only?: string): AccountRecord[] {
         days: owes?.days ?? 0,
         ...(owes ? { oldest: owes.oldest } : {}),
         ...(paidThrough ? { paidThrough } : {}),
+        ...(closableThrough ? { settledThrough: closableThrough } : {}),
       },
     ];
   });

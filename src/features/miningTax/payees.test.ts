@@ -7,6 +7,7 @@ import {
   DefaultSystemTakenError,
   createPayee,
   loadPayees,
+  applyPayeeTerms,
   linkPayeeToCorporation,
   rememberPayeeEntity,
   removePayeeRecord,
@@ -376,5 +377,46 @@ describe('Payee entity kind', () => {
       entityId: 90_000_001,
     });
     expect((await rememberPayeeEntity(learned, 90_000_005)).entityId).toBe(90_000_005);
+  });
+});
+
+describe('applyPayeeTerms', () => {
+  it("copies a Payee's name, rate, hub and link onto the others, keeping their Default Systems", async () => {
+    const source = await createPayee(CHAR_A, {
+      name: 'BUH',
+      defaultTaxPct: 7,
+      hubId: 'amarr',
+      entityId: 9,
+      entityKind: 'corporation',
+    });
+    const other = await createPayee(CHAR_B, {
+      name: 'Bureau',
+      defaultTaxPct: 10,
+      defaultSystemIds: [30000142],
+      entityId: 9,
+      entityKind: 'corporation',
+    });
+    vi.clearAllMocks();
+
+    await applyPayeeTerms(source, [source, other]);
+
+    const stored = await db.payees.get(other.id);
+    expect(stored).toMatchObject({
+      name: 'BUH',
+      defaultTaxPct: 7,
+      hubId: 'amarr',
+      entityId: 9,
+      entityKind: 'corporation',
+    });
+    expect(stored?.defaultSystems?.map((s) => s.systemId)).toEqual([30000142]);
+    expect(syncMock.scheduleSync).toHaveBeenCalledTimes(1);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_B, { collections: ['payees'] });
+  });
+
+  it('drops a hub the source does not have, as the default hub is stored as none', async () => {
+    const source = await createPayee(CHAR_A, { name: 'BUH', defaultTaxPct: 7 });
+    const other = await createPayee(CHAR_B, { name: 'BUH', defaultTaxPct: 7, hubId: 'amarr' });
+    await applyPayeeTerms(source, [other]);
+    expect('hubId' in ((await db.payees.get(other.id)) ?? {})).toBe(false);
   });
 });

@@ -7,6 +7,7 @@ import { ExtractionsTab } from './ExtractionsTab';
 import { MinerDetail } from './MinerDetail';
 import { MinersTab } from './MinersTab';
 import { MoonDetail } from './MoonDetail';
+import { RefineryPage } from './RefineryPage';
 import { OverviewTab } from './OverviewTab';
 import { StatementPeriodDetail } from './StatementPeriodDetail';
 import { StatementsTab } from './StatementsTab';
@@ -115,6 +116,19 @@ export const MoonPage: Story = {
 };
 /** @summary Moon page, phone. */
 export const MoonPagePhone: Story = { ...MoonPage, ...phone };
+
+/** @summary A refinery's page (#6348): the rate in force, ore, Extractions and Miners. */
+export const RefineryPageStory: Story = {
+  render: () => (
+    <Page>
+      <RefineryPage
+        structureId={BOOK_VIEW.extractions.find((x) => x.moonId === 3)?.structureId ?? 0}
+      />
+    </Page>
+  ),
+};
+/** @summary A refinery's page, phone. */
+export const RefineryPagePhone: Story = { ...RefineryPageStory, ...phone };
 
 /** @summary Extractions tab: the timeline of past, ready and extracting chunks. */
 export const Extractions: Story = {

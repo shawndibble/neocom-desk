@@ -11,6 +11,8 @@
 import type {
   VettingCorpInfo,
   VettingOverview,
+  VettingRawPage,
+  VettingRawSource,
   VettingReview,
   VettingSettings,
   VettingStatus,
@@ -73,6 +75,17 @@ export interface VettingBackend {
   overview(characterId: number, corporationId: number): Promise<VettingOverview>;
   /** Opens a report, which is logged where the pilot can see it. */
   open(characterId: number, corporationId: number, reviewId: string): Promise<VettingReview>;
+  /**
+   * One page of the rows a review kept for one source (all its characters together), after the
+   * page `cursor` names; the first page when absent. Not logged: the report's open is.
+   */
+  rawRows(
+    characterId: number,
+    corporationId: number,
+    reviewId: string,
+    source: VettingRawSource,
+    cursor?: string
+  ): Promise<VettingRawPage>;
   decide(
     characterId: number,
     corporationId: number,
@@ -86,6 +99,15 @@ export interface VettingBackend {
     corporationId: number,
     memberName: string,
     role: string
+  ): Promise<VettingOverview>;
+  /**
+   * Notes that the asking officer mailed the member the link. Only they, only while the member
+   * has not shared, and not again within a day (`VETTING_MAIL_COOLDOWN_MS`).
+   */
+  recordRequestMail(
+    characterId: number,
+    corporationId: number,
+    reviewId: string
   ): Promise<VettingOverview>;
   /** Any reviewer may hand out an invite link. */
   createInvite(characterId: number, corporationId: number, label: string): Promise<VettingOverview>;

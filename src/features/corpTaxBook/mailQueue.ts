@@ -431,6 +431,35 @@ export function enqueueVettingDecisionMail(input: {
 }
 
 /**
+ * Queues the mail that tells a member an officer asked for a vetting review. `sentSlot` is when
+ * the asking officer last recorded one (0 before any), so each resend is a new mail while a double
+ * press before it is recorded queues once.
+ */
+export function enqueueVettingRequestMail(input: {
+  corporationId: number;
+  senderCharacterId: number;
+  reviewId: string;
+  sentSlot: number;
+  recipient: { id: number; name: string };
+  mail: { subject: string; body: string };
+}): Promise<{ queued: number }> {
+  return queueNotices(
+    {
+      corporationId: input.corporationId,
+      senderCharacterId: input.senderCharacterId,
+      kind: 'vetting-request',
+    },
+    [
+      {
+        recipient: input.recipient,
+        statementId: `vetting-request:${input.reviewId}:${input.recipient.id}:${input.sentSlot}`,
+        mail: input.mail,
+      },
+    ]
+  );
+}
+
+/**
  * Queues the mail that tells each pilot how their SRP claims were decided. The mails are
  * written by the caller (they need the officer's i18n); the queue only paces and persists them.
  * A decision is its kind plus the claims it covers, so a double submit mails once per pilot.

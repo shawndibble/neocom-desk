@@ -44,6 +44,8 @@ import { OrderWhoCheaperSection } from './OrderWhoCheaperSection';
 import { OrderNumbersSection } from './OrderNumbersSection';
 import { OrderCostSection } from './OrderCostSection';
 import { OrderExitsSection } from './OrderExitsSection';
+import { WorkThroughModalNotes, WorkThroughNextButton } from './WorkThroughControls';
+import { useWalkCopyPrice } from './workThroughContext';
 
 export interface OrderDetailModalProps {
   row: OpenOrderRow;
@@ -55,8 +57,8 @@ export interface OrderDetailModalProps {
    * structure books also reclassify the worklist's rows.
    */
   detail: OrderDetail;
-  /** A section to open on arrival, e.g. the work-through loss line's "See exits". */
-  initialSection?: OrderDetailSectionId;
+  /** A work-through is showing this order: the modal adds the walk's notes and Next. */
+  walking?: boolean;
   onClose: () => void;
 }
 
@@ -65,7 +67,7 @@ export function OrderDetailModal({
   row,
   snapshot,
   detail,
-  initialSection,
+  walking,
   onClose,
 }: OrderDetailModalProps) {
   const { view, checkDeeper } = useOpenOrderDetail(detail, row, snapshot);
@@ -73,7 +75,7 @@ export function OrderDetailModal({
     <OrderDetailContent
       row={row}
       {...view}
-      initialSection={initialSection}
+      walking={walking}
       onCheckDeeper={checkDeeper}
       onClose={onClose}
     />
@@ -82,13 +84,15 @@ export function OrderDetailModal({
 
 export type OrderDetailContentProps = OrderDetailView & {
   row: OpenOrderRow;
-  initialSection?: OrderDetailSectionId;
+  walking?: boolean;
   onCheckDeeper: () => void;
   onClose: () => void;
 };
 
 /** The modal's four folding sections, all folded on arrival. */
 export type OrderDetailSectionId = 'numbers' | 'whoCheaper' | 'costBasis' | 'exits';
+
+const NONE_OPEN: ReadonlySet<OrderDetailSectionId> = new Set();
 
 /** The modal itself, rendering a finished view — `OrderDetailModal` is what a page mounts. */
 export function OrderDetailContent({
@@ -106,7 +110,7 @@ export function OrderDetailContent({
   structureMarket,
   relistFees,
   accountingLevel,
-  initialSection,
+  walking = false,
   onCheckDeeper,
   onClose,
 }: OrderDetailContentProps) {
@@ -114,17 +118,19 @@ export function OrderDetailContent({
   const isPhone = useIsPhone();
   const nowTick = useNow();
   // All folded: verdict, Copy and the facts are the answer, each trailing read
-  // its summary. Remounts per orderId, so nothing carries between orders.
-  const [openSections, setOpenSections] = useState<ReadonlySet<OrderDetailSectionId>>(
-    () => new Set(initialSection ? [initialSection] : [])
+  // its summary. A page remounts per orderId, but a work-through keeps one
+  // modal across orders: the open set is tagged with its order, so Next folds
+  // everything again.
+  const [opened, setOpened] = useState<{ orderId: number; ids: ReadonlySet<OrderDetailSectionId> }>(
+    { orderId: row.orderId, ids: new Set() }
   );
+  const openSections = opened.orderId === row.orderId ? opened.ids : NONE_OPEN;
   const isExpanded = (id: OrderDetailSectionId) => openSections.has(id);
-  const toggleSection = (id: OrderDetailSectionId) =>
-    setOpenSections((prev) => {
-      const next = new Set(prev);
-      if (!next.delete(id)) next.add(id);
-      return next;
-    });
+  const toggleSection = (id: OrderDetailSectionId) => {
+    const ids = new Set(openSections);
+    if (!ids.delete(id)) ids.add(id);
+    setOpened({ orderId: row.orderId, ids });
+  };
 
   const location: LocationState = !stationsLoaded
     ? 'unknown'
@@ -133,7 +139,11 @@ export function OrderDetailContent({
       : 'known';
 
   const advice = adviseOrder(row);
-  const { copyPrice, keepPerUnit } = verdictFigures(row, advice);
+  const verdict = verdictFigures(row, advice);
+  const { keepPerUnit } = verdict;
+  // The verdict's own price first; else the walk's one-tick price (an undercut order).
+  const walkPrice = useWalkCopyPrice(walking);
+  const copyPrice = verdict.copyPrice ?? walkPrice;
   const station =
     location === 'structure'
       ? structureStationScopeState(row, structureMarket)
@@ -157,6 +167,10 @@ export function OrderDetailContent({
     }
   })();
 
+  const phoneCopy = isPhone && copyPrice !== null && (
+    <CopyPriceButton price={copyPrice} className="w-full" />
+  );
+
   return (
     <Modal
       open
@@ -164,10 +178,19 @@ export function OrderDetailContent({
       title={row.typeName}
       placement={isPhone ? 'sheet' : 'center'}
       footer={
-        isPhone && copyPrice !== null && <CopyPriceButton price={copyPrice} className="w-full" />
+        walking ? (
+          // Copy keeps the full width on a phone, Next under it; one row from `md`.
+          <div className="flex w-full flex-col gap-2 md:flex-row md:justify-end">
+            {phoneCopy}
+            <WorkThroughNextButton className="w-full md:w-auto" />
+          </div>
+        ) : (
+          phoneCopy
+        )
       }
     >
       <div className="space-y-4">
+        {walking && <WorkThroughModalNotes row={row} />}
         <OrderDetailHeader row={row} advice={advice} copyPrice={copyPrice} isPhone={isPhone} />
 
         <StatChips>

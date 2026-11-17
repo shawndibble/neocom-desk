@@ -162,10 +162,8 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   useHydratedStore(useSurveyPayeeId);
   useEntryDeepLink(Boolean(data), allDisplayRows, loading, actions.openDetail);
 
-  const { allPayees, payeeById, ledgerPayees, filterPayees, payeeAliases } = useTaxPayees(
-    data,
-    corpView
-  );
+  const { allPayees, payeeById, duplicateAliases, ledgerPayees, filterPayees, payeeAliases } =
+    useTaxPayees(data, corpView);
   const {
     payeeManagerCharacterId,
     openPayeeManager,
@@ -249,6 +247,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
       personalRows,
       ledgerPayees,
       allPayees,
+      duplicateAliases,
       estimatedValueOf,
       madePayments,
       storedAssignments,
@@ -653,6 +652,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
           everyAssignment={everyAssignment}
           storedAssignments={storedAssignments}
           allPayees={allPayees}
+          duplicateAliases={duplicateAliases}
           payeeById={payeeById}
           balances={balances}
           madePayments={madePayments}

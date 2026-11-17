@@ -1,7 +1,7 @@
 // The vetting actions against the Firestore emulator. Runs only under the emulator
 // (`npm run test:emulator`); a plain `npm test` skips it.
 import type { Caller } from './actorAuth.js';
-import { afterAll, beforeEach, expect, it } from 'vitest';
+import { afterAll, beforeEach, expect, it, vi } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { parseBookCall } from './corpTaxBook.js';
@@ -16,6 +16,8 @@ import {
   type VettingCharacterInput,
   type VettingDealing,
   type VettingParty,
+  type VettingRawRow,
+  type VettingRawSource,
 } from './vettingEngine.js';
 import type { VettingEsi } from './vettingEsi.js';
 import { parseVettingSettingsPatch, type VettingHandle } from './vettingParse.js';
@@ -28,10 +30,12 @@ import {
   decideVettingReview,
   getVettingCorp,
   getVettingOverview,
+  getVettingRawRows,
   getVettingStatus,
   listMyVettingRequests,
   openVettingReview,
   removeVettingCharacter,
+  recordVettingRequestMail,
   requestVettingReview,
   revokeVettingInvite,
   saveVettingSettings,
@@ -68,6 +72,10 @@ const names = new Map<number, VettingParty>();
 const homes = new Map<number, { corporationId: number; allianceId?: number }>();
 /** Scopes each token carries beside the roles scope; all five unless a test narrows them. */
 const scopes = new Map<number, string[]>();
+/** Raw rows a test hands a character in place of the ones derived from its sheet. */
+const rawOverride = new Map<number, Partial<Record<VettingRawSource, VettingRawRow[]>>>();
+/** Bytes of rows per stored chunk; small, so a few rows make several chunks. */
+let rawChunkBytes: number | undefined;
 const esiCalls: string[] = [];
 /** What the fake FCM sender was asked to send; `pushFails` makes every send throw. */
 const pushed: { token: string; data: Record<string, string> }[] = [];
@@ -94,12 +102,34 @@ const esi: VettingEsi = {
     esiCalls.push(`read:${characterId}:${accessToken}`);
     const found = sheets.get(characterId) ?? sheet(characterId);
     const shared = (scope: string) => granted.includes(scope);
+    const dealings = found.dealings.filter(
+      (dealing) => dealing.source !== 'mail' || shared('esi-mail.read_mail.v1')
+    );
+    const rows = (source: string): VettingRawRow[] =>
+      dealings
+        .filter((dealing) => dealing.source === source)
+        .map((dealing) => ({
+          characterId,
+          at: dealing.at,
+          what: dealing.what,
+          partyId: dealing.partyId,
+          ...(dealing.amount === undefined ? {} : { amount: dealing.amount }),
+        }));
+    const over = rawOverride.get(characterId) ?? {};
     return {
-      ...found,
-      missing: shared('esi-mail.read_mail.v1') ? [] : ['mail'],
-      dealings: found.dealings.filter(
-        (dealing) => dealing.source !== 'mail' || shared('esi-mail.read_mail.v1')
-      ),
+      input: {
+        ...found,
+        missing: shared('esi-mail.read_mail.v1') ? [] : ['mail'],
+        dealings,
+      },
+      raw: {
+        wallet: over.wallet ?? rows('wallet'),
+        contact: over.contact ?? rows('contact'),
+        mail: over.mail ?? (shared('esi-mail.read_mail.v1') ? rows('mail') : []),
+        contract: over.contract ?? rows('contract'),
+        skills: over.skills ?? [],
+        history: over.history ?? [],
+      },
     };
   },
   corporation: async (corporationId) => {
@@ -139,6 +169,7 @@ const deps = (): VettingDeps => ({
   },
   lookupCorporation: async (characterId) => homes.get(characterId)?.corporationId ?? CORP,
   esi,
+  rawChunkBytes,
   push: {
     send: async (message) => {
       if (pushFails) throw new Error('fcm down');
@@ -167,6 +198,43 @@ const reviewDoc = (id: string) => corp().collection('vettingReviews').doc(id);
 const stored = async (id: string) => (await reviewDoc(id).get()).data();
 const inputIds = async (id: string) =>
   (await reviewDoc(id).collection('inputs').get()).docs.map((d) => d.id).sort();
+
+const rawIds = async (id: string) =>
+  (await reviewDoc(id).collection('rawRows').get()).docs.map((d) => d.id).sort();
+const rawPage = (
+  reviewId: string,
+  by: number,
+  source: VettingRawSource = 'wallet',
+  cursor?: string
+) =>
+  getVettingRawRows(deps(), who(by), call(by), {
+    reviewId,
+    source,
+    ...(cursor === undefined ? {} : { cursor }),
+  });
+/** Every page of a source, following `next`. */
+async function rawAll(reviewId: string, by: number, source: VettingRawSource = 'wallet') {
+  const rows: VettingRawRow[] = [];
+  const parties: VettingParty[] = [];
+  let pages = 0;
+  for (let cursor: string | undefined; ;) {
+    const page = await rawPage(reviewId, by, source, cursor);
+    pages += 1;
+    rows.push(...page.rows);
+    parties.push(...page.parties);
+    if (page.next === null) return { rows, parties, pages };
+    cursor = page.next;
+  }
+}
+const manyRows = (characterId: number, count: number): VettingRawRow[] =>
+  Array.from({ length: count }, (_, n) => ({
+    characterId,
+    at: `2026-10-${String(1 + (n % 28)).padStart(2, '0')}T00:00:00Z`,
+    what: 'player_donation',
+    // NPC and unresolvable ids stay: nothing is filtered out.
+    partyId: n % 3 === 0 ? 1_000_125 : n % 3 === 1 ? STRANGER : 2_100_009_999,
+    amount: n,
+  }));
 
 const save = (patch: Record<string, unknown>, by = DIRECTOR) =>
   saveVettingSettings(deps(), who(by), call(by), parseVettingSettingsPatch({ patch }));
@@ -222,7 +290,8 @@ emulatorSuite('vetting (emulator)', () => {
     esiCalls.length = 0;
     pushed.length = 0;
     pushFails = false;
-    for (const map of [identities, owners, sheets, names, homes, scopes]) map.clear();
+    for (const map of [identities, owners, sheets, names, homes, scopes, rawOverride]) map.clear();
+    rawChunkBytes = undefined;
     identities.set(CEO, { corporationId: CORP, ceoId: CEO, roles: [] });
     identities.set(DIRECTOR, { corporationId: CORP, ceoId: CEO, roles: ['Director'] });
     identities.set(DIRECTOR_ALT, { corporationId: CORP, ceoId: CEO, roles: ['Director'] });
@@ -734,6 +803,291 @@ emulatorSuite('vetting (emulator)', () => {
     expect((await stored(id))?.expiresAt).toBe(T0 + 9 + VETTING_KEEP_DAYS * DAY_MS);
   });
 
+  it('keeps every row read, in chunks, past a submit, and pages them to an officer', async () => {
+    await turnOn();
+    rawChunkBytes = 3000;
+    rawOverride.set(APPLICANT, {
+      wallet: manyRows(APPLICANT, 120),
+      mail: [
+        {
+          characterId: APPLICANT,
+          at: 't',
+          what: 'Sent',
+          partyId: STRANGER,
+          recipients: [STRANGER, SPY],
+        },
+      ],
+    });
+    const { handle } = await start();
+    const id = handle.reviewId;
+    const draftIds = await rawIds(id);
+    expect(draftIds.length).toBeGreaterThan(3);
+    expect(await inputIds(id)).toEqual([String(APPLICANT)]);
+    // A draft is not with the corp: its rows cannot be read.
+    expect(await reason(rawPage(id, RECRUITER))).toBe('not-found');
+
+    await submit(handle);
+    // Inputs go on Send; the rows do not.
+    expect(await inputIds(id)).toEqual([]);
+    expect(await rawIds(id)).toEqual(draftIds);
+    const review = await stored(id);
+    expect(review?.rawCounts).toEqual({
+      wallet: 120,
+      contact: 0,
+      mail: 1,
+      contract: 0,
+      skills: 0,
+      history: 0,
+    });
+    expect((await open(id, RECRUITER)).rawCounts).toEqual(review?.rawCounts);
+
+    // One stored chunk per page; all 120 come back, none dropped, none capped.
+    const first = await rawPage(id, RECRUITER);
+    expect(first.next).not.toBeNull();
+    expect(first).toMatchObject({ reviewId: id, source: 'wallet' });
+    const all = await rawAll(id, RECRUITER);
+    expect(all.pages).toBe(draftIds.filter((d) => d.includes('_wallet_')).length);
+    expect(all.rows).toEqual(manyRows(APPLICANT, 120));
+    // Names ride with the page; an id ESI cannot name is left unnamed, and nothing fails.
+    expect(all.parties.map((p) => p.id).sort()).toContain(STRANGER);
+    expect(all.parties.some((p) => p.id === 2_100_009_999)).toBe(false);
+    const mail = await rawAll(id, RECRUITER, 'mail');
+    expect(mail.rows).toHaveLength(1);
+    expect(mail.rows[0]).toMatchObject({ what: 'Sent', recipients: [STRANGER, SPY] });
+    expect(mail.parties.map((p) => p.id).sort()).toEqual([SPY, STRANGER].sort());
+    // A source with nothing is an empty last page.
+    expect(await rawPage(id, RECRUITER, 'contract')).toMatchObject({ rows: [], next: null });
+
+    // Opening the review and paging it is one log line for the hour, not one per page.
+    expect(
+      ((await stored(id))?.log as { action: string; characterId: number }[]).filter(
+        (entry) => entry.action === 'opened' && entry.characterId === RECRUITER
+      )
+    ).toHaveLength(1);
+
+    // A cursor this server did not write is refused.
+    expect(await reason(rawPage(id, RECRUITER, 'wallet', 'abc'))).toBe('bad-cursor');
+    const absent = Buffer.from(`${STRANGER}:0`).toString('base64url');
+    expect(await reason(rawPage(id, RECRUITER, 'wallet', absent))).toBe('bad-cursor');
+    const past = Buffer.from(`${APPLICANT}:999`).toString('base64url');
+    expect(await reason(rawPage(id, RECRUITER, 'wallet', past))).toBe('bad-cursor');
+  });
+
+  it('shows the rows to an officer only, never the subject or an account they were read from', async () => {
+    await turnOn();
+    names.set(RECRUITER, { id: RECRUITER, name: 'Pilot 3', category: 'character' });
+    await request('Pilot 3');
+    const [{ handle }] = await myRequests(RECRUITER);
+    await addVettingCharacter(deps(), { ...handle, accessToken: tok(RECRUITER) });
+    await addVettingCharacter(deps(), { ...handle, accessToken: tok(APPLICANT_ALT) });
+    await submit(handle);
+    const id = handle.reviewId;
+
+    expect(await reason(rawPage(id, RECRUITER))).toBe('own-review');
+    identities.set(APPLICANT_ALT, { corporationId: CORP, ceoId: CEO, roles: ['Director'] });
+    expect(await reason(rawPage(id, APPLICANT_ALT))).toBe('own-review');
+    owners.set(RECRUITER_2, ownerOf(APPLICANT_ALT));
+    expect(await reason(rawPage(id, RECRUITER_2))).toBe('own-review');
+    owners.delete(RECRUITER_2);
+    // Not an officer of this corp, and an officer of another.
+    expect(await reason(rawPage(id, MEMBER))).toBe('not-a-reviewer');
+    expect(await reason(rawPage(id, OUTSIDER))).toBe('wrong-corp');
+    // The log has no open: nothing was served.
+    expect((await getVettingStatus(deps(), handle)).openedBy).toEqual([]);
+
+    // Officers read it, the one who asked for it included (as with the flags).
+    for (const by of [DIRECTOR, CEO, RECRUITER_2]) {
+      expect((await rawPage(id, by, 'history')).next).toBeNull();
+    }
+    // The pilot's own status never carries the rows or their counts.
+    expect(JSON.stringify(await getVettingStatus(deps(), handle))).not.toContain('rawCounts');
+  });
+
+  it('replaces a re-read character rows, drops removed and unreferenced chunks', async () => {
+    await turnOn();
+    rawChunkBytes = 1500;
+    rawOverride.set(APPLICANT, { wallet: manyRows(APPLICANT, 30) });
+    const { handle } = await start();
+    const id = handle.reviewId;
+    const first = await rawIds(id);
+    rawOverride.set(APPLICANT, { wallet: manyRows(APPLICANT, 5) });
+    await addVettingCharacter(deps(), { ...handle, accessToken: tok(APPLICANT) });
+    const second = await rawIds(id);
+    // The old read's chunks are gone; only the new read's remain.
+    expect(second.filter((doc) => first.includes(doc))).toEqual([]);
+    expect(second.length).toBeLessThan(first.length);
+
+    rawOverride.set(APPLICANT_ALT, { wallet: manyRows(APPLICANT_ALT, 4) });
+    await addVettingCharacter(deps(), { ...handle, accessToken: tok(APPLICANT_ALT) });
+    const both = await rawIds(id);
+    expect(both.some((doc) => doc.startsWith(`${APPLICANT_ALT}_`))).toBe(true);
+    await removeVettingCharacter(deps(), { ...handle, characterId: APPLICANT_ALT });
+    expect(await rawIds(id)).toEqual(second);
+
+    // A chunk nothing names (a read that failed half way) is never shown, and goes at submit.
+    await reviewDoc(id)
+      .collection('rawRows')
+      .doc(`${APPLICANT}_deadbeef_wallet_0`)
+      .set({ json: JSON.stringify(manyRows(APPLICANT, 2)), partiesJson: '[]' });
+    await submit(handle);
+    expect(await rawIds(id)).toEqual(second);
+    expect((await rawAll(id, DIRECTOR)).rows).toEqual(manyRows(APPLICANT, 5));
+    expect((await stored(id))?.rawCounts).toMatchObject({ wallet: 5 });
+  });
+
+  it('keeps working for a review stored before rows were kept', async () => {
+    await turnOn();
+    const handle = await shared();
+    const id = handle.reviewId;
+    // As an older review is stored: no rawRows, no per-character metadata, no rawCounts.
+    for (const doc of (await reviewDoc(id).collection('rawRows').get()).docs)
+      await doc.ref.delete();
+    const review = (await stored(id))!;
+    delete review.rawCounts;
+    for (const character of review.characters) delete character.raw;
+    await reviewDoc(id).set(review);
+    const view = await open(id, RECRUITER);
+    expect('rawCounts' in view).toBe(false);
+    expect(await rawPage(id, RECRUITER)).toMatchObject({ rows: [], parties: [], next: null });
+    // It is still decided and deleted as before.
+    await decide(id, RECRUITER, 'yes');
+    expect(await sweepVetting(db, T0 + 30 * DAY_MS)).toMatchObject({ deleted: 1, failed: 0 });
+  });
+
+  it('deletes the rows with the review: withdraw, decline, a draft that expired, a decided review', async () => {
+    await turnOn();
+    for (const id of [APPLICANT, STRANGER, APPLICANT_ALT, MEMBER, SPY]) {
+      rawOverride.set(id, { wallet: manyRows(id, 3) });
+    }
+    // Withdraw, whatever the state.
+    const draft = await start();
+    expect((await rawIds(draft.handle.reviewId)).length).toBeGreaterThan(0);
+    await withdrawVetting(deps(), draft.handle);
+    expect(await rawIds(draft.handle.reviewId)).toEqual([]);
+    const sent = await shared(STRANGER);
+    expect((await rawIds(sent.reviewId)).length).toBeGreaterThan(0);
+    await withdrawVetting(deps(), sent);
+    expect(await rawIds(sent.reviewId)).toEqual([]);
+    // A wrong key deletes nothing.
+    const kept = await shared(APPLICANT_ALT);
+    const before = await rawIds(kept.reviewId);
+    expect(await reason(withdrawVetting(deps(), { ...kept, key: 'x'.repeat(43) }))).toBe('bad-key');
+    expect(await rawIds(kept.reviewId)).toEqual(before);
+
+    // A request the member declines.
+    await request('Pilot 5');
+    const [{ handle: asked }] = await myRequests(MEMBER);
+    await addVettingCharacter(deps(), { ...asked, accessToken: tok(MEMBER) });
+    expect((await rawIds(asked.reviewId)).length).toBeGreaterThan(0);
+    await declineVetting(deps(), asked);
+    expect(await rawIds(asked.reviewId)).toEqual([]);
+
+    // A draft past its day, and what a member read into a request and never sent: a day on.
+    const old = await start(MEMBER);
+    await request('Pilot 5');
+    const [{ handle: again }] = await myRequests(MEMBER);
+    await addVettingCharacter(deps(), { ...again, accessToken: tok(MEMBER) });
+    expect((await rawIds(old.handle.reviewId)).length).toBeGreaterThan(0);
+    expect((await rawIds(again.reviewId)).length).toBeGreaterThan(0);
+    await decide(kept.reviewId, RECRUITER, 'yes');
+    const undecided = await shared(SPY);
+    expect((await rawIds(undecided.reviewId)).length).toBeGreaterThan(0);
+    await sweepVetting(db, T0 + VETTING_DRAFT_HOURS * HOUR_MS);
+    expect(await rawIds(old.handle.reviewId)).toEqual([]);
+    expect(await rawIds(again.reviewId)).toEqual([]);
+    expect(await stored(again.reviewId)).toMatchObject({ state: 'requested', characters: [] });
+
+    // The 30-day rule for a decided review, the 90-day rule for an undecided one.
+    expect(await sweepVetting(db, T0 + 30 * DAY_MS - 1)).toMatchObject({ deleted: 0, failed: 0 });
+    expect(await rawIds(kept.reviewId)).toEqual(before);
+    expect(await sweepVetting(db, T0 + 30 * DAY_MS)).toMatchObject({ failed: 0 });
+    expect((await reviewDoc(kept.reviewId).get()).exists).toBe(false);
+    expect(await rawIds(kept.reviewId)).toEqual([]);
+    expect((await rawIds(undecided.reviewId)).length).toBeGreaterThan(0);
+    expect(await sweepVetting(db, T0 + VETTING_OPEN_KEEP_DAYS * DAY_MS)).toMatchObject({
+      failed: 0,
+    });
+    expect(await rawIds(undecided.reviewId)).toEqual([]);
+  });
+
+  it('does not serve the rows of a request or a declined request, only of a shared review', async () => {
+    await turnOn();
+    rawOverride.set(MEMBER, { wallet: manyRows(MEMBER, 5) });
+    await request('Pilot 5');
+    const [{ handle }] = await myRequests(MEMBER);
+    await addVettingCharacter(deps(), { ...handle, accessToken: tok(MEMBER) });
+    expect((await rawIds(handle.reviewId)).length).toBeGreaterThan(0);
+    // Read in, not shared: not for officers yet.
+    expect(await reason(rawPage(handle.reviewId, DIRECTOR))).toBe('not-found');
+    await submit(handle);
+    expect((await rawPage(handle.reviewId, DIRECTOR)).rows).toHaveLength(5);
+
+    await decide(handle.reviewId, RECRUITER, 'no');
+    await decide(handle.reviewId, RECRUITER_2, 'no');
+    await request('Pilot 5', 'Director', CEO);
+    const [{ handle: second }] = await myRequests(MEMBER);
+    await declineVetting(deps(), second);
+    expect(await reason(rawPage(second.reviewId, DIRECTOR))).toBe('not-found');
+  });
+
+  it('leaves no chunk behind when writing them fails part way', async () => {
+    await turnOn();
+    rawChunkBytes = 1500;
+    rawOverride.set(APPLICANT, { wallet: manyRows(APPLICANT, 300) });
+    rawOverride.set(APPLICANT_ALT, { wallet: manyRows(APPLICANT_ALT, 300) });
+    const failSecondBatch = () => {
+      const original = Object.getPrototypeOf(db).batch as () => FirebaseFirestore.WriteBatch;
+      let commits = 0;
+      return vi.spyOn(Object.getPrototypeOf(db), 'batch').mockImplementation(function (
+        this: unknown
+      ) {
+        const batch = original.call(this);
+        const commit = batch.commit.bind(batch);
+        batch.commit = async () => {
+          commits += 1;
+          if (commits === 2) throw new Error('write failed');
+          return commit();
+        };
+        return batch;
+      });
+    };
+
+    const spy = failSecondBatch();
+    await expect(start()).rejects.toThrow('write failed');
+    spy.mockRestore();
+    const made = await corp().collection('vettingReviews').get();
+    expect(made.size).toBe(1);
+    expect(await rawIds(made.docs[0].id)).toEqual([]);
+
+    const { handle } = await start(APPLICANT);
+    const before = await rawIds(handle.reviewId);
+    expect(before.length).toBeGreaterThan(10);
+    const again = failSecondBatch();
+    await expect(
+      addVettingCharacter(deps(), { ...handle, accessToken: tok(APPLICANT_ALT) })
+    ).rejects.toThrow('write failed');
+    again.mockRestore();
+    expect(await rawIds(handle.reviewId)).toEqual(before);
+  });
+
+  it('keeps the rows of a review the sweep finds no longer due when it decides again', async () => {
+    await turnOn();
+    rawOverride.set(APPLICANT, { wallet: manyRows(APPLICANT, 3) });
+    const handle = await shared();
+    const before = await rawIds(handle.reviewId);
+    expect(before.length).toBeGreaterThan(0);
+    const original = db.runTransaction.bind(db);
+    const spy = vi.spyOn(db, 'runTransaction').mockImplementationOnce(((fn: never, opts: never) =>
+      reviewDoc(handle.reviewId)
+        .update({ expiresAt: T0 + 200 * DAY_MS })
+        .then(() => original(fn, opts))) as never);
+    const result = await sweepVetting(db, T0 + VETTING_OPEN_KEEP_DAYS * DAY_MS);
+    spy.mockRestore();
+    expect(result).toMatchObject({ deleted: 0, failed: 0 });
+    expect((await reviewDoc(handle.reviewId).get()).exists).toBe(true);
+    expect(await rawIds(handle.reviewId)).toEqual(before);
+  });
+
   it('never shows a reviewer the report about themselves', async () => {
     await turnOn();
     names.set(RECRUITER, { id: RECRUITER, name: 'Pilot 3', category: 'character' });
@@ -790,6 +1144,18 @@ emulatorSuite('vetting (emulator)', () => {
       },
     ]);
     expect(await reason(request('Pilot 5'))).toBe('already-requested');
+
+    // The asking officer records the mail; nobody else, and not twice in a day.
+    const askedId = overview.reviews[0].id;
+    const mailed = (by: number) =>
+      recordVettingRequestMail(deps(), who(by), call(by), { reviewId: askedId });
+    expect(await reason(mailed(RECRUITER_2))).toBe('not-asker');
+    const afterMail = await mailed(RECRUITER);
+    expect(afterMail.reviews[0]).toMatchObject({
+      requestedBy: { characterId: RECRUITER },
+      requestMail: { sentAt: T0 },
+    });
+    expect(await reason(mailed(RECRUITER))).toBe('mail-cooldown');
 
     expect(await myRequests(DIRECTOR)).toEqual([]);
     const [mine] = await myRequests(MEMBER);

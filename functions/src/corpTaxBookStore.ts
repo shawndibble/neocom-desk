@@ -17,6 +17,7 @@ import {
   type Transaction,
 } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
+import { chunk } from './chunk.js';
 import {
   loadStampContext,
   restampStructures,
@@ -68,6 +69,7 @@ import {
   defaultSettings,
   parseRecordKey,
   billedDisputeTax,
+  disputesClosedByWriteOff,
   mergeDisputeLines,
   type RecordedOre,
   parseStatement,
@@ -145,6 +147,7 @@ import {
   verifyCallerToken,
   type Caller,
 } from './actorAuth.js';
+import type { AuditAction } from './corpTaxBookKinds.js';
 import type { EveTokenClaims } from './verifyEveToken.js';
 
 /** One type's parsed R2 open-prices object (`readOpenPricesFromR2`), or null when R2 has none. Throws on a failed read. */
@@ -329,7 +332,7 @@ export function appendAudit(
   deps: BookDeps,
   corporationId: number,
   actor: Actor,
-  action: string,
+  action: AuditAction,
   detail: Data
 ): void {
   const at = deps.now();
@@ -887,6 +890,8 @@ interface EditCtx {
 
 interface EditOutcome {
   detail: Data;
+  /** Several audit entries for one write (each with its own action); replaces `detail`'s entry. */
+  audits?: { action: AuditAction; detail: Data }[];
   result?: Data;
 }
 
@@ -1165,6 +1170,61 @@ function keepInGroup(c: EditCtx, characterIds: readonly number[]): void {
   );
 }
 
+const ACCOUNT_FIGURES = ['owed', 'paid', 'days', 'oldest', 'paidThrough'] as const;
+
+/** Whether a stored account already holds these figures (its `at` and `by` aside). */
+function sameAccount(
+  stored: FirebaseFirestore.DocumentData | undefined,
+  next: Record<string, unknown>
+): boolean {
+  return !!stored && ACCOUNT_FIGURES.every((k) => stored[k] === next[k]);
+}
+
+/**
+ * The paid-through days `recordAccounts` may store (D22): per Miner the day the client asked for,
+ * never before the stored one, never today or later (its ore is still coming in), never on or
+ * past a day an open dispute holds (the hold may end with the officer keeping the bill). A day
+ * that fails is skipped, not an error: the next run asks again. The server has no prices, so the
+ * saved-price rule is the client's (`closableThrough`).
+ */
+async function storableSettledThrough(
+  c: EditCtx,
+  accounts: readonly { minerId: string; settledThrough?: string }[],
+  paidRef: DocumentReference,
+  iso: string
+): Promise<Record<string, string>> {
+  const asked = accounts.filter((a) => a.settledThrough !== undefined);
+  if (asked.length === 0) return {};
+  const stored = ((await c.tx.get(paidRef)).data()?.minerPaidThrough ?? {}) as Record<
+    string,
+    string
+  >;
+  const today = iso.slice(0, 10);
+  const candidates = asked.filter(
+    (a) =>
+      a.settledThrough !== undefined &&
+      a.settledThrough < today &&
+      a.settledThrough > (stored[a.minerId] ?? '')
+  );
+  // The earliest day an open dispute holds, per Miner; read once for every Miner asked about.
+  const heldFrom = new Map<string, string>();
+  for (const ids of chunk(
+    candidates.map((a) => a.minerId),
+    30
+  )) {
+    for (const doc of (await c.tx.get(col(c, DISPUTES).where('minerId', 'in', ids))).docs) {
+      const d = doc.data();
+      if (!readHoldingDisputes([d]).some((h) => disputeHolds(h, iso))) continue;
+      const held = d.date as string; // a dispute with no date reads as no hold
+      if (held < (heldFrom.get(d.minerId) ?? '9999')) heldFrom.set(d.minerId, held);
+    }
+  }
+  const out: Record<string, string> = {};
+  for (const { minerId, settledThrough: day } of candidates)
+    if (day !== undefined && day < (heldFrom.get(minerId) ?? '9999')) out[minerId] = day;
+  return out;
+}
+
 async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
   const { tx, now } = c;
   const iso = new Date(now).toISOString();
@@ -1181,6 +1241,22 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       if (next.length > 500) fail('resource-exhausted', 'Too many rates', 'too-many-rates');
       tx.update(bookDoc, { rates: next });
       return { detail: { rate: action.rate } };
+    }
+    case 'addRates': {
+      const today = utcDate(now);
+      if (action.rates.some((r) => isRetroactiveRate(r.effectiveFrom, today))) {
+        fail('failed-precondition', 'A rate cannot start before today', 'retroactive-rate');
+      }
+      const keys = new Set(action.rates.map(rateKey));
+      if (keys.size !== action.rates.length)
+        fail('invalid-argument', 'Two of the rates are the same', 'duplicate-rate');
+      const next = [...rates.filter((r) => !keys.has(rateKey(r))), ...action.rates];
+      if (next.length > 500) fail('resource-exhausted', 'Too many rates', 'too-many-rates');
+      tx.update(bookDoc, { rates: next });
+      return {
+        detail: {},
+        audits: action.rates.map((rate) => ({ action: 'addRate', detail: { rate } })),
+      };
     }
     case 'setRecordRate': {
       const { characterId, date } = parseRecordKey(action.recordKey);
@@ -1602,14 +1678,38 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       };
     }
     case 'writeOff': {
-      if (action.statementId) {
-        const statement = await mustGet(c, col(c, STATEMENTS).doc(action.statementId), 'Statement');
-        if (statement.minerId !== action.minerId)
-          fail('invalid-argument', "Statement is another Miner's", 'wrong-miner');
-      }
-      const id = `w${now}_${rand(4)}`;
-      // The book applies it (#4637), and the Miner reads it on the personal tab.
+      const statementDoc = action.statementId
+        ? await mustGet(c, col(c, STATEMENTS).doc(action.statementId), 'Statement')
+        : undefined;
+      if (statementDoc && statementDoc.minerId !== action.minerId)
+        fail('invalid-argument', "Statement is another Miner's", 'wrong-miner');
+      // A write-off that closes a day closes the Miner's dispute of it too (#6307): answered, so
+      // it leaves the officer's Needs you and no longer holds the day from the write-off.
+      const mineOpen = (
+        await c.tx.get(col(c, DISPUTES).where('minerId', '==', action.minerId))
+      ).docs
+        .map((d) => d.data())
+        .filter(hasLines); // a withdrawn dispute is a tombstone: nothing to answer
+      // Every read stays above the first write: a Firestore transaction refuses a read after one.
       const uids = await minerUids(c, action.minerId);
+      const closing = disputesClosedByWriteOff(
+        mineOpen,
+        { amount: action.amount },
+        statementDoc as Parameters<typeof disputesClosedByWriteOff>[2]
+      );
+      const id = `w${now}_${rand(4)}`;
+      for (const disputeId of closing)
+        tx.update(col(c, DISPUTES).doc(disputeId), {
+          resolution: {
+            kind: 'dismissed',
+            at: iso,
+            by,
+            reason: action.reason,
+            amountIsk: 0,
+            writeOffId: id,
+          },
+        });
+      // The book applies it (#4637), and the Miner reads it on the personal tab.
       tx.create(col(c, WRITE_OFFS).doc(id), {
         id,
         minerId: action.minerId,
@@ -1857,8 +1957,21 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     }
     case 'recordAccounts': {
       // Every book is a running account (decision 20261117-060555).
-      for (const a of action.accounts)
-        tx.set(col(c, ACCOUNTS).doc(a.minerId), { ...a, at: iso, by });
+      const paidRef = col(c, META).doc(PAID_DOC);
+      const settled = await storableSettledThrough(c, action.accounts, paidRef, iso);
+      // Every editor's open tab records the same figures (#6313): one already stored is not
+      // written again, so a second tab adds no write and no newer `at`/`by`.
+      const refs = action.accounts.map((a) => col(c, ACCOUNTS).doc(a.minerId));
+      const stored = refs.length > 0 ? await c.tx.getAll(...refs) : [];
+      action.accounts.forEach((account, i) => {
+        const a = { ...account };
+        delete a.settledThrough; // the pay page's record; the marker lives in `meta/paid`
+        if (sameAccount(stored[i].data(), a)) return;
+        tx.set(refs[i], { ...a, at: iso, by });
+      });
+      // Only ever grown: a day recorded paid stays paid, even if money is later taken back (D22).
+      if (Object.keys(settled).length > 0)
+        tx.set(paidRef, { minerPaidThrough: settled }, { merge: true });
       // The figures as recorded, so the audit says what the pay page was told.
       return { detail: { count: action.accounts.length, accounts: action.accounts } };
     }
@@ -2171,7 +2284,12 @@ export async function editBookAs(
       now: deps.now(),
     };
     const outcome = await applyEdit(ctx, action);
-    appendAudit(tx, deps, call.corporationId, actorOf(access, via), action.action, outcome.detail);
+    const actor = actorOf(access, via);
+    // `addRates` is never an audit action itself: it always returns its own per-rate `audits`.
+    for (const a of outcome.audits ?? [
+      { action: action.action as AuditAction, detail: outcome.detail },
+    ])
+      appendAudit(tx, deps, call.corporationId, actor, a.action, a.detail);
     return outcome.result ?? {};
   });
   // The edit changed some Miners' frozen totals (ADR 0032). Best effort: the verifier repairs.
@@ -2205,6 +2323,7 @@ const SHARED_POP_EDITS = new Set<EditAction['action']>([
   'setPopSharingMoon',
   'updateSettings',
   'addRate',
+  'addRates',
   'linkSurvey',
 ]);
 

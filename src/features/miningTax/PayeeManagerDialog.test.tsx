@@ -850,3 +850,47 @@ describe('PayeeManagerDialog — linking a Payee named for a Corp Tax Book corpo
     expect(screen.queryByRole('button', { name: 'Link to Corp A' })).not.toBeInTheDocument();
   });
 });
+
+describe('PayeeManagerDialog — one Payee per recipient', () => {
+  const corp = { entityId: 98_000_001, entityKind: 'corporation' as const };
+  const two = [
+    { id: 'a', characterId: CHAR, name: 'BUH', defaultTaxPct: 10, updatedAt: 1, ...corp },
+    { id: 'b', characterId: 2, name: 'BUH', defaultTaxPct: 7, updatedAt: 1, ...corp },
+  ] satisfies PayeeRecord[];
+
+  function renderTwoCharacters() {
+    const onChanged = vi.fn();
+    render(
+      <PayeeManagerDialog
+        open
+        onClose={vi.fn()}
+        characters={[...characters, { characterId: 2, characterName: 'Second Alt' }]}
+        payeesByCharacter={
+          new Map([
+            [CHAR, [two[0]]],
+            [2, [two[1]]],
+          ])
+        }
+        initialCharacterId={CHAR}
+        onChanged={onChanged}
+      />
+    );
+  }
+
+  it('lists a recipient once and lets the pilot pick which terms all its records use', async () => {
+    await db.payees.bulkPut(two);
+    renderTwoCharacters();
+
+    expect(screen.getAllByText('BUH')).toHaveLength(1);
+    expect(screen.getByText('Used by 2 characters')).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: /Use 7% · Jita for all \(Second Alt\)/ })
+    );
+
+    await waitFor(async () => {
+      expect((await db.payees.get('a'))?.defaultTaxPct).toBe(7);
+    });
+    expect((await db.payees.get('b'))?.defaultTaxPct).toBe(7);
+    expect(screen.queryByText('Your characters bill this Payee differently.')).toBeNull();
+  });
+});
