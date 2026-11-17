@@ -7,7 +7,7 @@ import { utcDay } from '@/engine/localDay';
 import { readLocal, writeLocal } from '@/lib/safeLocalStorage';
 import { cx } from '@/lib/cx';
 import { tabPath } from '@/lib/pageTabs';
-import type { SettingsTab } from './BookSettingsDialog';
+import type { SettingsTab } from './moonsPaths';
 import { MOONS_TABS } from './moonsPaths';
 import { setupChecklist, type SetupStep } from './setupSteps';
 import { useBook } from './useBook';

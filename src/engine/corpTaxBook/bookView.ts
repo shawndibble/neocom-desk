@@ -92,7 +92,7 @@ export interface BookViewInput {
   feeders?: readonly (FeederReadClock & FeederCoverage)[];
   extractions: readonly SyncExtraction[];
   paidStatementIds: ReadonlySet<string>;
-  /** The instant the book switched to a running account (#6294); absent, it bills by Statement. */
+  /** The instant the book switched to a running account (#6294); every book has one (`RUNNING_ACCOUNTS_FROM` when none was stored). */
   runningAccountFrom?: string;
   /** A running account's per-day tolerance, in percent. */
   dayTolerancePct?: number;

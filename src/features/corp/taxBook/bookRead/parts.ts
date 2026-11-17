@@ -33,7 +33,7 @@ export type BookPartSet = ReadonlySet<BookPart>;
 export const ALL_BOOK_PART_SET: BookPartSet = new Set(ALL_BOOK_PARTS);
 
 /** What a page asks for: a tab id, or a detail page below it. */
-export type BookDetailKind = 'extraction' | 'miner' | 'moonOwner' | 'statementPeriod';
+export type BookDetailKind = 'extraction' | 'moon' | 'miner' | 'moonOwner' | 'statementPeriod';
 
 /** The parts a page reads. No page: the whole book, as the export reads it. */
 export function bookPartsFor(tab?: string, detail: BookDetailKind | null = null): BookPartSet {
@@ -51,9 +51,6 @@ export function bookPartsFor(tab?: string, detail: BookDetailKind | null = null)
     // An Extraction's page says whether its days are billed, dismissed or in Today's mining.
     case 'moon-owners':
       return new Set<BookPart>(['core', 'owners']);
-    // Pop Sharing (#6222) lists the moons from the Extractions and the moon owners' opt-outs.
-    case 'sharing':
-      return new Set<BookPart>(['core']);
     case 'extraction':
     case 'statements':
     case 'statementPeriod':

@@ -36,6 +36,11 @@ export function readPopSharingCached(
   return entry.doc;
 }
 
+/** Stories only: holds `doc` as the book's settings, so a story needs no callable. */
+export function seedPopSharing(corporationId: number, doc: PopSharingDoc): void {
+  cache.set(corporationId, { at: Date.now(), doc: Promise.resolve(doc) });
+}
+
 /** Drops the book's cached settings and tells every mounted list to read them again. */
 export function invalidatePopSharing(corporationId: number): void {
   cache.delete(corporationId);

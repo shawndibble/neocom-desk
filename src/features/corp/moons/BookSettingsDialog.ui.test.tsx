@@ -313,31 +313,10 @@ describe('BookSettingsDialog running account and late notices (#6294)', () => {
       </MemoryRouter>
     );
 
-  it('lets a Director switch over, one way, after a confirm that says what happens', async () => {
-    const user = userEvent.setup();
+  it('says every book is a running account, with no switch to offer', () => {
     renderWith({ isDirector: true });
-    await user.click(screen.getByRole('button', { name: 'Switch to a running account' }));
-    const confirm = screen.getByRole('dialog', { name: 'Switch to a running account?' });
-    expect(within(confirm).getByText(/Statements already issued stay as they are/)).toBeVisible();
-    await user.click(within(confirm).getByRole('button', { name: 'Switch now' }));
-    expect(editBook).toHaveBeenCalledWith(7, 98000000, {
-      action: 'updateSettings',
-      patch: { switchToRunningAccount: true },
-    });
-  });
-
-  it('offers no switch to an officer who is not a Director, nor once switched', () => {
-    const { unmount } = renderWith();
-    expect(
-      screen.queryByRole('button', { name: 'Switch to a running account' })
-    ).not.toBeInTheDocument();
-    expect(screen.getByText(/Only a Director can switch/)).toBeInTheDocument();
-    unmount();
-    renderWith({ isDirector: true }, { runningAccountFrom: '2026-10-15T08:00:00Z' });
-    expect(
-      screen.queryByRole('button', { name: 'Switch to a running account' })
-    ).not.toBeInTheDocument();
-    expect(screen.getByText(/A running account since/)).toBeInTheDocument();
+    expect(screen.getByText(/Each day is owed as it closes/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /running account/i })).not.toBeInTheDocument();
   });
 
   it('saves the notice rules and the day tolerance only when they change', async () => {

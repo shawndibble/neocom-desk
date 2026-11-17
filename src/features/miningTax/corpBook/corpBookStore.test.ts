@@ -12,6 +12,7 @@ import {
   readPayment,
   readStatement,
 } from './corpBookStore';
+import { RUNNING_ACCOUNTS_FROM } from '@/engine/corpTaxBook/bookDocs';
 
 describe('readBookSettings', () => {
   const book = {
@@ -35,6 +36,7 @@ describe('readBookSettings', () => {
       startDate: '2026-10-01',
       graceHours: 12,
       overdueDays: 14,
+      runningAccountFrom: RUNNING_ACCOUNTS_FROM,
       hubId: 'amarr',
       oreForm: 'raw',
       divisions: [2],
