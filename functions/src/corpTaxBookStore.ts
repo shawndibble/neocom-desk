@@ -17,6 +17,7 @@ import {
   type Transaction,
 } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
+import { chunk } from './chunk.js';
 import {
   loadStampContext,
   restampStructures,
@@ -1169,6 +1170,51 @@ function keepInGroup(c: EditCtx, characterIds: readonly number[]): void {
   );
 }
 
+/**
+ * The paid-through days `recordAccounts` may store (D22): per Miner the day the client asked for,
+ * never before the stored one, never today or later (its ore is still coming in), never on or
+ * past a day an open dispute holds (the hold may end with the officer keeping the bill). A day
+ * that fails is skipped, not an error: the next run asks again. The server has no prices, so the
+ * saved-price rule is the client's (`closableThrough`).
+ */
+async function storableSettledThrough(
+  c: EditCtx,
+  accounts: readonly { minerId: string; settledThrough?: string }[],
+  paidRef: DocumentReference,
+  iso: string
+): Promise<Record<string, string>> {
+  const asked = accounts.filter((a) => a.settledThrough !== undefined);
+  if (asked.length === 0) return {};
+  const stored = ((await c.tx.get(paidRef)).data()?.minerPaidThrough ?? {}) as Record<
+    string,
+    string
+  >;
+  const today = iso.slice(0, 10);
+  const candidates = asked.filter(
+    (a) =>
+      a.settledThrough !== undefined &&
+      a.settledThrough < today &&
+      a.settledThrough > (stored[a.minerId] ?? '')
+  );
+  // The earliest day an open dispute holds, per Miner; read once for every Miner asked about.
+  const heldFrom = new Map<string, string>();
+  for (const ids of chunk(
+    candidates.map((a) => a.minerId),
+    30
+  )) {
+    for (const doc of (await c.tx.get(col(c, DISPUTES).where('minerId', 'in', ids))).docs) {
+      const d = doc.data();
+      if (!readHoldingDisputes([d]).some((h) => disputeHolds(h, iso))) continue;
+      const held = d.date as string; // a dispute with no date reads as no hold
+      if (held < (heldFrom.get(d.minerId) ?? '9999')) heldFrom.set(d.minerId, held);
+    }
+  }
+  const out: Record<string, string> = {};
+  for (const { minerId, settledThrough: day } of candidates)
+    if (day !== undefined && day < (heldFrom.get(minerId) ?? '9999')) out[minerId] = day;
+  return out;
+}
+
 async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
   const { tx, now } = c;
   const iso = new Date(now).toISOString();
@@ -1901,8 +1947,16 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     }
     case 'recordAccounts': {
       // Every book is a running account (decision 20261117-060555).
-      for (const a of action.accounts)
+      const paidRef = col(c, META).doc(PAID_DOC);
+      const settled = await storableSettledThrough(c, action.accounts, paidRef, iso);
+      for (const account of action.accounts) {
+        const a = { ...account };
+        delete a.settledThrough; // the pay page's record; the marker lives in `meta/paid`
         tx.set(col(c, ACCOUNTS).doc(a.minerId), { ...a, at: iso, by });
+      }
+      // Only ever grown: a day recorded paid stays paid, even if money is later taken back (D22).
+      if (Object.keys(settled).length > 0)
+        tx.set(paidRef, { minerPaidThrough: settled }, { merge: true });
       // The figures as recorded, so the audit says what the pay page was told.
       return { detail: { count: action.accounts.length, accounts: action.accounts } };
     }

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   allocateRunningAccount,
+  closableThrough,
   daySettleTolerance,
   DAY_SETTLE_TOLERANCE_PCT,
   runningDaysFromLines,
@@ -290,5 +291,75 @@ describe('allocateRunningAccount', () => {
       days: [day('2026-11-01', 10_000_000)],
     });
     expect(r.byDay.get('2026-11-01')).toMatchObject({ settled: false, remaining: 10_000 });
+  });
+});
+
+describe('closableThrough', () => {
+  const dayOf = (date: string, tax: number, savedPrices = true) => ({ date, tax, savedPrices });
+  const paidDays = [dayOf('2026-11-01', 1_000_000), dayOf('2026-11-02', 2_000_000)];
+  const account = (days: RunningDay[], payAmount: number, storedPaidThrough?: string) =>
+    allocateRunningAccount({
+      ...base,
+      days,
+      payments: [payment('p1', payAmount, '2026-11-04T00:00:00Z')],
+      ...(storedPaidThrough ? { storedPaidThrough } : {}),
+    });
+  const call = (
+    days: ReturnType<typeof dayOf>[],
+    pay: number,
+    extra: Partial<Parameters<typeof closableThrough>[0]> = {}
+  ) =>
+    closableThrough({
+      account: account(days, pay),
+      days,
+      heldDays: new Set(),
+      today: '2026-11-10',
+      ...extra,
+    });
+
+  it('is the newest paid day when every day has saved prices', () => {
+    expect(call(paidDays, 3_000_000)).toBe('2026-11-02');
+  });
+
+  it('stops before a day with no saved close-of-day price', () => {
+    const days = [dayOf('2026-11-01', 1_000_000), dayOf('2026-11-02', 0, false)];
+    expect(call(days, 1_000_000)).toBe('2026-11-01');
+  });
+
+  it('is null when the first day has no saved price', () => {
+    expect(call([dayOf('2026-11-01', 0, false)], 0)).toBeNull();
+  });
+
+  it('stops before a day an open dispute holds', () => {
+    const days = [...paidDays, dayOf('2026-11-03', 3_000_000)];
+    expect(call(days, 6_000_000, { heldDays: new Set(['2026-11-02']) })).toBe('2026-11-01');
+  });
+
+  it('stops before today, whose ore is still coming in', () => {
+    const days = [dayOf('2026-11-01', 1_000_000), dayOf('2026-11-10', 0)];
+    expect(call(days, 1_000_000)).toBe('2026-11-01');
+  });
+
+  it('stops before a day still owed', () => {
+    expect(call(paidDays, 1_000_000)).toBe('2026-11-01');
+  });
+
+  it('is null while a Statement is unpaid', () => {
+    const a = allocateRunningAccount({
+      ...base,
+      statements: [legacy('s1', 500, '2026-10-31T00:00:00Z')],
+      days: paidDays,
+      payments: [],
+    });
+    expect(
+      closableThrough({ account: a, days: paidDays, heldDays: new Set(), today: '2026-11-10' })
+    ).toBeNull();
+  });
+
+  it('never goes before the stored day', () => {
+    const a = account(paidDays, 0, '2026-11-02');
+    expect(
+      closableThrough({ account: a, days: paidDays, heldDays: new Set(), today: '2026-11-10' })
+    ).toBe('2026-11-02');
   });
 });

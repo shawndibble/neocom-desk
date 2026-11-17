@@ -55,6 +55,7 @@ export function bookViewInputOf(
     feeders: data.feeders,
     extractions: data.state.extractions,
     paidStatementIds: data.state.paidStatementIds,
+    ...(data.state.minerPaidThrough ? { minerPaidThrough: data.state.minerPaidThrough } : {}),
     ...(s.runningAccountFrom
       ? { runningAccountFrom: s.runningAccountFrom, dayTolerancePct: s.dayTolerancePct }
       : {}),

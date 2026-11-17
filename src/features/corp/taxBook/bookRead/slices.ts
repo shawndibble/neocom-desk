@@ -234,6 +234,7 @@ export async function readSlices(
 function shape(
   settings: BookSettings,
   paidStatementIds: Set<string>,
+  minerPaidThrough: Map<string, string>,
   parts: BookPartSet,
   fields: Fields
 ): BookRead {
@@ -249,6 +250,7 @@ function shape(
       dismissals,
       extractions,
       paidStatementIds,
+      minerPaidThrough,
       writeOffs,
     },
     ...(defined as Omit<Fields, keyof BookData['state']>),
@@ -258,7 +260,13 @@ function shape(
 
 /** A read's fields with the settings document and `meta/paid`, both always read fresh. */
 export async function bookOf(ctx: ReadContext, parts: BookPartSet, fields: Fields) {
-  return shape(settingsFrom(ctx.book.data), await ctx.book.paidStatementIds(), parts, fields);
+  return shape(
+    settingsFrom(ctx.book.data),
+    await ctx.book.paidStatementIds(),
+    await ctx.book.minerPaidThrough(),
+    parts,
+    fields
+  );
 }
 
 /**
@@ -306,6 +314,7 @@ export function mergeReads(held: BookRead, extra: BookRead): BookRead {
     ...shape(
       held.settings,
       extra.state.paidStatementIds,
+      extra.state.minerPaidThrough ?? new Map(),
       new Set([...held.parts, ...extra.parts]),
       fields
     ),

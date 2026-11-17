@@ -2066,6 +2066,46 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect(view.account).toMatchObject({ owed: 10_000_000, days: 3, oldest: '2026-10-05' });
     });
 
+    describe('stored paid-through (D22)', () => {
+      const record = (settledThrough: string, minerId = 'solo:50') =>
+        edit(ACCOUNTANT, {
+          action: 'recordAccounts',
+          accounts: [{ minerId, owed: 0, paid: 0, days: 0, settledThrough }],
+        });
+      const stored = async () =>
+        (await book().collection('meta').doc('paid').get()).data()?.minerPaidThrough ?? {};
+
+      it('only ever moves forward, and never reaches today', async () => {
+        await turnOn();
+        await record('2026-10-10');
+        await record('2026-10-05');
+        expect(await stored()).toEqual({ 'solo:50': '2026-10-10' });
+        await record('2026-10-18');
+        expect(await stored()).toEqual({ 'solo:50': '2026-10-10' });
+        await record('2026-10-17');
+        expect(await stored()).toEqual({ 'solo:50': '2026-10-17' });
+      });
+
+      it('stops before a day an open dispute holds', async () => {
+        await turnOn();
+        await book()
+          .collection('disputes')
+          .doc('d1')
+          .set({
+            id: 'd1',
+            minerId: 'solo:50',
+            date: '2026-10-12',
+            by: 50,
+            at: '2026-10-17T00:00:00Z',
+            lines: [{ recordKey: 'k', typeId: 1, quantity: 1, payeeName: 'Pilot' }],
+          });
+        await record('2026-10-14');
+        expect(await stored()).toEqual({});
+        await record('2026-10-11');
+        expect(await stored()).toEqual({ 'solo:50': '2026-10-11' });
+      });
+    });
+
     it('reads the Statement by token, and stops reminders with one audited manual reminder allowed', async () => {
       await turnOn();
       const { verifyToken } = await edit(ACCOUNTANT, {

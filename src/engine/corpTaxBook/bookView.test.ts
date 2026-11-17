@@ -124,7 +124,34 @@ describe('buildBookView', () => {
       expect(miner.account).toEqual({
         paidThrough: null,
         owes: { amount: 300_000, days: 2, oldest: '2026-09-15' },
+        closableThrough: null,
       });
+    });
+
+    it('offers to store a paid day only when its prices are saved close-of-day prices', () => {
+      const paid = { payments: [pay(350_000)] };
+      expect(buildBookView(running(paid)).miners[0].account?.closableThrough).toBe('2026-09-16');
+      const live = buildBookView(
+        running({
+          ...paid,
+          pricesOn: () => ({
+            prices: new Map([[ORE, 1000]]),
+            sources: new Map([[ORE, 'live' as const]]),
+          }),
+        })
+      );
+      expect(live.miners[0].account?.closableThrough).toBeNull();
+    });
+
+    it('keeps a stored paid-through day paid when its payment is marked "not tax"', () => {
+      const notTax = { ...pay(350_000), notTaxAmount: 350_000 };
+      const unstored = buildBookView(running({ payments: [notTax] }));
+      expect(unstored.miners[0].account?.paidThrough).toBeNull();
+      const stored = buildBookView(
+        running({ payments: [notTax], minerPaidThrough: new Map([['solo:1', '2026-09-16']]) })
+      );
+      expect(stored.miners[0].account?.paidThrough).toBe('2026-09-16');
+      expect(stored.miners[0].owed).toBe(0);
     });
 
     it('marks the days a payment covered paid, oldest first, and holds only an overpayment as credit', () => {
@@ -139,7 +166,7 @@ describe('buildBookView', () => {
       expect(owing?.owed).toBe(200_000);
       const ahead = buildBookView(running({ payments: [pay(350_000)] }));
       expect(ahead.miners[0]).toMatchObject({ owed: 0, credit: 50_000 });
-      expect(ahead.miners[0].account).toEqual({ paidThrough: '2026-09-16', owes: null });
+      expect(ahead.miners[0].account).toMatchObject({ paidThrough: '2026-09-16', owes: null });
       expect(ahead.totals.unbilled).toBe(0);
     });
 

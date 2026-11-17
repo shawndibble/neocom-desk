@@ -729,6 +729,12 @@ export interface RecordedAccount {
   days: number;
   oldest?: string;
   paidThrough?: string;
+  /**
+   * The newest day the officer's client says is paid for good (D22), stored in `meta/paid`. Only
+   * ever moves forward. The server has no prices, so it can't check the day was priced at a saved
+   * close-of-day price; it trusts the client for that and checks only what it can see.
+   */
+  settledThrough?: string;
 }
 
 export type CloseCredit = { kind: 'refund' } | { kind: 'forfeit'; basis: ForfeitBasis };
@@ -1082,6 +1088,9 @@ export function parseEditAction(data: unknown): EditAction {
             ...(a.oldest !== undefined ? { oldest: dateString(a.oldest, 'oldest') } : {}),
             ...(a.paidThrough !== undefined
               ? { paidThrough: dateString(a.paidThrough, 'paidThrough') }
+              : {}),
+            ...(a.settledThrough !== undefined
+              ? { settledThrough: dateString(a.settledThrough, 'settledThrough') }
               : {}),
           };
         }),

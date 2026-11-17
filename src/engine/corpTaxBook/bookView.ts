@@ -53,7 +53,13 @@ import type { DayPrices } from './valuation';
 import { DAY_MS } from '@/lib/age';
 import { wholeIsk } from './wholeIsk';
 import { disputeHold, disputesToShow, type OreDispute } from './disputes';
-import { allocateRunningAccount, type RunningAccount } from './runningAccount';
+import { utcDay } from '../localDay';
+import {
+  allocateRunningAccount,
+  closableThrough,
+  runningDaysFromLines,
+  type RunningAccount,
+} from './runningAccount';
 import { settleOpenSet, type OpenSet, type OpenSetInput } from './openSet';
 
 export interface BookViewInput {
@@ -96,6 +102,8 @@ export interface BookViewInput {
   runningAccountFrom?: string;
   /** A running account's per-day tolerance, in percent. */
   dayTolerancePct?: number;
+  /** Each Miner's stored paid-through day (`meta/paid`): it and every day before it stay paid for good (D22). */
+  minerPaidThrough?: ReadonlyMap<string, string>;
   /** The day's prices at the book's hub and Ore Form, by raw type id. */
   pricesOn: (date: string) => Pick<DayPrices, 'prices' | 'sources'>;
   /**
@@ -133,10 +141,26 @@ export interface MinerRow {
   account?: RunningAccountStatus;
 }
 
+/**
+ * A Miner's running days, each with whether every ore line was priced at the hub's saved
+ * close-of-day price (never a live one, which is a guess that moves).
+ */
+function savedPriceDays(
+  lines: readonly Pick<StatementLine, 'kind' | 'date' | 'tax' | 'priceSources'>[]
+): { date: string; tax: number; savedPrices: boolean }[] {
+  const saved = (l: Pick<StatementLine, 'kind' | 'priceSources'>) =>
+    l.kind === 'correction' ||
+    (l.priceSources !== undefined && Object.values(l.priceSources).every((x) => x === 'saved'));
+  const unsaved = new Set(lines.filter((l) => !saved(l)).map((l) => l.date));
+  return runningDaysFromLines(lines).map((d) => ({ ...d, savedPrices: !unsaved.has(d.date) }));
+}
+
 /** A Miner's running account status: "Paid through {date}" or "Owes X (N days, oldest D)". */
 export interface RunningAccountStatus {
   paidThrough: string | null;
   owes: RunningAccount['owes'];
+  /** The newest day an officer's client may store as paid for good; see `closableThrough`. */
+  closableThrough?: string | null;
 }
 
 export type DayStatus =
@@ -460,17 +484,19 @@ export function buildBookView(input: BookViewInput): BookView {
     const draftLines = draft.kind === 'nothing' ? [] : draft.lines;
     const unbilledKeys = new Set(draftLines.map((l) => l.chargeKey));
     // A running account (#6294): every Billable day on no Statement is owed now, oldest paid first.
+    // An open dispute nobody has dismissed yet holds its date (`disputesToShow`).
+    const heldDays = new Set(
+      disputesToShow(input.disputes ?? [], input.dismissals)
+        .filter((d) => d.minerId === id && disputeHold(d, input.now))
+        .map((d) => d.date)
+    );
     const running = input.runningAccountFrom
       ? allocateRunningAccount({
           ...allocationInput,
           days: draftLines,
-          // An open dispute nobody has dismissed yet holds its date (`disputesToShow`).
-          heldDays: new Set(
-            disputesToShow(input.disputes ?? [], input.dismissals)
-              .filter((d) => d.minerId === id && disputeHold(d, input.now))
-              .map((d) => d.date)
-          ),
+          heldDays,
           dayTolerancePct: input.dayTolerancePct,
+          storedPaidThrough: input.minerPaidThrough?.get(id),
         })
       : undefined;
     // A notice takes no payment: what its days were credited is its standing.
@@ -613,7 +639,20 @@ export function buildBookView(input: BookViewInput): BookView {
       credit: running ? running.credit : allocation.credit,
       lastPaidAt: lastPaid ?? null,
       paused,
-      ...(running ? { account: { paidThrough: running.paidThrough, owes: running.owes } } : {}),
+      ...(running
+        ? {
+            account: {
+              paidThrough: running.paidThrough,
+              owes: running.owes,
+              closableThrough: closableThrough({
+                account: running,
+                days: savedPriceDays(draftLines),
+                heldDays,
+                today: utcDay(Date.parse(input.now)),
+              }),
+            },
+          }
+        : {}),
     };
     miners.push(row);
     byMiner.set(id, {

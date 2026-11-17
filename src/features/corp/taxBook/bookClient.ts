@@ -92,6 +92,8 @@ export interface BookState {
   extractions: SyncExtraction[];
   /** Statement ids settled so far (`meta/paid`), which only ever grows (D22). */
   paidStatementIds: Set<string>;
+  /** Each Miner's stored paid-through day (`meta/paid`): their days up to it stay paid (D22). */
+  minerPaidThrough?: Map<string, string>;
   /** Officer write-offs (#4637): they reduce what a Miner owes. */
   writeOffs?: RecordedWriteOff[];
   /** Members' disputes: an open one keeps its Statement from settling for good (resolving in the app). */

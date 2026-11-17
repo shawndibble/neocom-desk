@@ -203,3 +203,28 @@ export function allocateRunningAccount(input: RunningAccountInput): RunningAccou
     owes: amount > 0 && oldest ? { amount, days: owedDates.size, oldest } : null,
   };
 }
+
+/**
+ * The newest day that may be stored as paid for good (D22): every day up to it is settled, held
+ * by no dispute, before `today`, and priced at a saved close-of-day price. A day with no price
+ * has no tax and reads as paid, so storing past one would forgive it; a live price is a guess
+ * that moves. Null while a Statement is unpaid or no day qualifies. Only an officer's client can
+ * compute it: the server has no prices. The stored day never moves back (`paidThrough` holds it).
+ */
+export function closableThrough(input: {
+  account: Pick<RunningAccount, 'byDay' | 'paidThrough'>;
+  /** The Miner's running days with whether every line was priced at a saved close-of-day price. */
+  days: readonly (RunningDay & { savedPrices: boolean })[];
+  heldDays: ReadonlySet<string>;
+  /** The UTC date of the read; ore for it is still coming in. */
+  today: string;
+}): string | null {
+  if (input.account.paidThrough === null) return null;
+  let through: string | null = null;
+  for (const d of [...input.days].sort((a, b) => a.date.localeCompare(b.date))) {
+    const settled = input.account.byDay.get(d.date)?.settled === true;
+    if (d.date >= input.today || input.heldDays.has(d.date) || !d.savedPrices || !settled) break;
+    through = d.date;
+  }
+  return through;
+}
