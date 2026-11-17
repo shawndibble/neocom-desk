@@ -2675,6 +2675,104 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
         reason: 'Theirs',
       });
     });
+
+    describe('a day an officer closed by write-off or waiver (#6307)', () => {
+      const KEY = `${ME}:1000:2026-10-17`;
+      const answered = (over: Partial<OreDispute> = {}) =>
+        dispute({
+          kind: 'notPaying',
+          reason: 'Will not pay',
+          lines: [{ recordKey: KEY, typeId: ZEO, quantity: 43_050, payeeName: '' }],
+          ...over,
+        });
+      const owes = entry({
+        oreLines: [{ typeId: ZEO, quantity: 43_050 }],
+        freeOreLines: [{ typeId: ZEO, quantity: 43_050 }],
+      });
+      const statement = statementOf({ issuedAt: '2026-10-01T00:00:00Z' });
+      const nothingToDo = (out: ReturnType<typeof overlay>) => {
+        expect(out.books[0].openStatements).toEqual([]);
+        expect(out.books[0].overdue).toEqual([]);
+      };
+
+      it('a waived dispute that credits the whole day leaves every open area and reads Waived', () => {
+        const day = 43_050 * 140 * 0.15;
+        const waivedAll = answered({
+          resolution: {
+            kind: 'dismissed',
+            at: '2026-10-19T00:00:00.000Z',
+            by: 1,
+            reason: 'Fair',
+            amountIsk: day,
+          },
+        });
+        const out = overlay(
+          [owes],
+          [
+            book({
+              statements: [
+                statementOf({
+                  issuedAt: '2026-10-01T00:00:00Z',
+                  amount: day,
+                  lines: [{ ...line(ME, '2026-10-17', day), chargeKey: KEY }],
+                }),
+              ],
+              adjustments: [
+                {
+                  id: 'a9',
+                  minerId: `solo:${ME}`,
+                  date: '2026-10-17',
+                  amount: -day,
+                  reason: 'Fair',
+                  by: 1,
+                  at: '2026-10-19T00:00:00.000Z',
+                },
+              ],
+              disputes: [waivedAll],
+            }),
+          ]
+        );
+        expect(out.rows[0]).toMatchObject({ state: 'waived', taxOwed: 0 });
+        expect(out.rows[0].flagged?.state).toBe('dismissed');
+        nothingToDo(out);
+      });
+
+      it('a Statement written off in full leaves every open area and reads Waived', () => {
+        const out = overlay(
+          [owes],
+          [
+            book({
+              statements: [statement],
+              writeOffs: [
+                {
+                  id: 'w1',
+                  minerId: `solo:${ME}`,
+                  amount: 900_000,
+                  reason: 'Goodwill',
+                  at: '2026-10-20T00:00:00Z',
+                  statementId: 's1',
+                },
+              ],
+              disputes: [
+                answered({
+                  resolution: {
+                    kind: 'dismissed',
+                    at: '2026-10-20T00:00:00.000Z',
+                    by: 1,
+                    reason: 'Goodwill',
+                    amountIsk: 0,
+                  },
+                }),
+              ],
+            }),
+          ]
+        );
+        expect(out.rows[0].state).toBe('waived');
+        expect(out.rows[0].billed).toBe(900_000);
+        expect(out.rows[0].flagged?.state).toBe('dismissed');
+        nothingToDo(out);
+      });
+    });
   });
 });
 

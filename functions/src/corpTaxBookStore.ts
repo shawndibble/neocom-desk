@@ -68,6 +68,7 @@ import {
   defaultSettings,
   parseRecordKey,
   billedDisputeTax,
+  disputesClosedByWriteOff,
   mergeDisputeLines,
   type RecordedOre,
   parseStatement,
@@ -1608,7 +1609,31 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         if (statement.minerId !== action.minerId)
           fail('invalid-argument', "Statement is another Miner's", 'wrong-miner');
       }
+      // A write-off that closes a day closes the Miner's dispute of it too (#6307): answered, so
+      // it leaves the officer's Needs you and no longer holds the day from the write-off.
+      const statementDoc = action.statementId
+        ? (await c.tx.get(col(c, STATEMENTS).doc(action.statementId))).data()
+        : undefined;
+      const mineOpen = (
+        await c.tx.get(col(c, DISPUTES).where('minerId', '==', action.minerId))
+      ).docs.map((d) => d.data());
+      const closing = disputesClosedByWriteOff(
+        mineOpen,
+        { amount: action.amount },
+        statementDoc as Parameters<typeof disputesClosedByWriteOff>[2]
+      );
       const id = `w${now}_${rand(4)}`;
+      for (const disputeId of closing)
+        tx.update(col(c, DISPUTES).doc(disputeId), {
+          resolution: {
+            kind: 'dismissed',
+            at: iso,
+            by,
+            reason: action.reason,
+            amountIsk: 0,
+            writeOffId: id,
+          },
+        });
       // The book applies it (#4637), and the Miner reads it on the personal tab.
       const uids = await minerUids(c, action.minerId);
       tx.create(col(c, WRITE_OFFS).doc(id), {

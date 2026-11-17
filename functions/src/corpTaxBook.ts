@@ -1795,6 +1795,35 @@ export function billedDisputeTax(
   return tax;
 }
 
+/**
+ * The ids of a Miner's open disputes an officer write-off closes (#6307). A write-off with no
+ * Statement is the leaver's whole balance: it closes every open dispute. One that names a
+ * Statement and forgives all of it closes the disputes of the days that Statement bills; a part
+ * write-off leaves them open, their hold still standing.
+ */
+export function disputesClosedByWriteOff(
+  disputes: readonly { id?: unknown; date?: unknown; resolution?: unknown }[],
+  writeOff: { amount: number },
+  statement?: {
+    id: string;
+    amount?: unknown;
+    coversFrom: string;
+    coversThrough: string;
+    lines: { kind: string; date: string }[];
+  }
+): string[] {
+  const open = disputes.filter((d) => typeof d.id === 'string' && !d.resolution);
+  if (statement) {
+    const amount = typeof statement.amount === 'number' ? statement.amount : Infinity;
+    if (writeOff.amount < amount - 0.01) return [];
+    const days = statementDays(statement);
+    return open
+      .filter((d) => typeof d.date === 'string' && days.has(d.date))
+      .map((d) => d.id as string);
+  }
+  return open.map((d) => d.id as string);
+}
+
 /** One dispute per Miner and day: `solo:7` has a colon, which a doc id avoids. */
 export function disputeIdFor(minerId: string, date: string): string {
   return `${minerId.replace(/[^A-Za-z0-9_-]/g, '_')}_${date}`;
