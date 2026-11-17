@@ -50,7 +50,12 @@ import type { ObservedMiningEntry, OreLine } from './types';
 import type { DayPrices } from './valuation';
 import { DAY_MS } from '@/lib/age';
 import { wholeIsk } from './wholeIsk';
-import type { OreDispute } from './disputes';
+import { disputeHold, type OreDispute } from './disputes';
+import {
+  allocateRunningAccount,
+  runningDaysFromLines,
+  type RunningAccount,
+} from './runningAccount';
 import { settleOpenSet, type OpenSet, type OpenSetInput } from './openSet';
 
 export interface BookViewInput {
@@ -89,6 +94,12 @@ export interface BookViewInput {
   feeders?: readonly (FeederReadClock & FeederCoverage)[];
   extractions: readonly SyncExtraction[];
   paidStatementIds: ReadonlySet<string>;
+  /** The instant the book switched to a running account (#6294); absent, it bills by Statement. */
+  runningAccountFrom?: string;
+  /** A running account's per-day tolerance, in percent. */
+  dayTolerancePct?: number;
+  /** The newest day the book recorded paid for each Miner on a running account, by Miner id. */
+  paidThroughByMiner?: ReadonlyMap<string, string>;
   /** The day's prices at the book's hub and Ore Form, by raw type id. */
   pricesOn: (date: string) => Pick<DayPrices, 'prices' | 'sources'>;
   /**
@@ -110,7 +121,7 @@ export interface MinerRow {
   mainCharacterId: number;
   characterIds: number[];
   standing: MinerStanding;
-  /** Unsettled Statements, less nothing: what is still due. */
+  /** Unsettled Statements, less nothing: what is still due (on a running account, unpaid days too). */
   owed: number;
   /** Whole days past the oldest overdue Statement's due date; null when none is overdue. */
   overdueDays: number | null;
@@ -122,6 +133,14 @@ export interface MinerRow {
   lastPaidAt: string | null;
   /** An unsettled Statement is paused by a declaration. */
   paused: boolean;
+  /** On a book switched to a running account (#6294): paid through, or what is owed. */
+  account?: RunningAccountStatus;
+}
+
+/** A Miner's running account status: "Paid through {date}" or "Owes X (N days, oldest D)". */
+export interface RunningAccountStatus {
+  paidThrough: string | null;
+  owes: RunningAccount['owes'];
 }
 
 export type DayStatus =
@@ -379,6 +398,20 @@ export function buildBookView(input: BookViewInput): BookView {
 
     const draftLines = draft.kind === 'nothing' ? [] : draft.lines;
     const unbilledKeys = new Set(draftLines.map((l) => l.chargeKey));
+    // A running account (#6294): every Billable day on no Statement is owed now, oldest paid first.
+    const running = input.runningAccountFrom
+      ? allocateRunningAccount({
+          ...allocationInput,
+          days: runningDaysFromLines(draftLines),
+          heldDays: new Set(
+            (input.disputes ?? [])
+              .filter((d) => d.minerId === id && disputeHold(d, input.now))
+              .map((d) => d.date)
+          ),
+          dayTolerancePct: input.dayTolerancePct,
+          storedPaidThrough: input.paidThroughByMiner?.get(id),
+        })
+      : undefined;
     const dismissedKeys = new Map(draft.dismissed.map((d) => [d.charge.key, d.dismissal.id]));
     const writtenOffKeys = new Set(draft.writtenOff.map((w) => w.chargeKey));
     const billedBy = new Map<string, Statement>();
@@ -397,7 +430,8 @@ export function buildBookView(input: BookViewInput): BookView {
         let status: DayStatus;
         if (dismissal || dismissedKeys.has(c.key)) status = 'dismissed';
         else if (writtenOffKeys.has(c.key)) status = 'written-off';
-        else if (unbilledKeys.has(c.key)) status = 'unbilled';
+        else if (unbilledKeys.has(c.key))
+          status = running?.byDay.get(c.date)?.settled ? 'paid' : 'unbilled';
         else if (statement && forgivenKeys.has(c.key)) status = 'written-off';
         else if (statement)
           status = allocation.byStatement.get(statement.id)?.settled ? 'paid' : 'on-statement';
@@ -442,6 +476,7 @@ export function buildBookView(input: BookViewInput): BookView {
 
     let owed = 0;
     for (const s of allocation.byStatement.values()) if (!s.settled) owed += s.remaining;
+    if (running) owed = running.owes?.amount ?? 0;
     let overdueDays: number | null = null;
     let overdueStatementId: string | undefined;
     let paused = false;
@@ -455,7 +490,8 @@ export function buildBookView(input: BookViewInput): BookView {
         }
       }
     }
-    const unbilled = draftLines.reduce((sum, l) => sum + l.tax, 0);
+    // On a running account nothing waits for a Statement: those days are owed (or paid) already.
+    const unbilled = running ? 0 : draftLines.reduce((sum, l) => sum + l.tax, 0);
     const pending = pendingTax(input, mine, new Set(billedBy.keys()), open.billableThrough);
     const lastPaid = payments
       .filter((p) => p.amount - (p.notTaxAmount ?? 0) > 0)
@@ -474,9 +510,10 @@ export function buildBookView(input: BookViewInput): BookView {
       overdueDays,
       unbilled,
       pending,
-      credit: allocation.credit,
+      credit: running ? running.credit : allocation.credit,
       lastPaidAt: lastPaid ?? null,
       paused,
+      ...(running ? { account: { paidThrough: running.paidThrough, owes: running.owes } } : {}),
     };
     miners.push(row);
     byMiner.set(id, {

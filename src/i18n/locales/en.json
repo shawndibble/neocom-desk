@@ -18007,6 +18007,18 @@
     "moons": {
       "undockable": "Undockable",
       "title": "Moons",
+      "account": {
+        "owes_one": "Owes {{amount}} ({{count}} day, oldest {{date}})",
+        "owes_other": "Owes {{amount}} ({{count}} days, oldest {{date}})",
+        "paidThrough": "Paid through {{date}}",
+        "range": {
+          "label": "Days shown",
+          "all": "All",
+          "7": "Last 7 days",
+          "30": "Last 30 days",
+          "summary": "Tax {{tax}} · paid {{paid}}"
+        }
+      },
       "payeeNotice": {
         "title": "Who gets paid changed",
         "body": "Payments now go to {{payee}}. {{by}} changed this on {{date}}.",
@@ -18111,6 +18123,7 @@
       },
       "dayStatus": {
         "paid": "Paid",
+        "owed": "Owed",
         "on-statement": "On Statement",
         "unbilled": "Next Statement",
         "not-billable": "Today's mining",
@@ -18161,6 +18174,7 @@
         "owed": "Owed",
         "overdue": "Overdue",
         "unbilled": "Next Statement",
+        "account": "Account",
         "credit": "Credit",
         "lastPaid": "Last paid",
         "day": "Day",
@@ -18432,6 +18446,7 @@
         "dismissSelected_one": "Dismiss selected ({{count}})",
         "dismissSelected_other": "Dismiss selected ({{count}})",
         "daysHint": "Newest first",
+        "owedDaysHint": "Paid oldest first; a payment pays these as soon as the book holds it",
         "payments": "Payments",
         "paymentsHint": "Credited oldest debt first",
         "sum": "Statements {{billed}} − written off {{written}} − payments and dismissals {{settled}} = {{owed}} owed",
@@ -18463,6 +18478,7 @@
         },
         "empty": {
           "nextStatement": "Nothing is waiting for the next Statement.",
+          "owedDays": "No day is owed.",
           "stillAccruing": "Nothing in today's mining.",
           "earlier": "No earlier days.",
           "payments": "No payments yet.",
@@ -19622,6 +19638,7 @@
       },
       "sections": {
         "nextStatement": "Next Statement",
+        "owedDays": "Owed days",
         "stillAccruing": "Today's mining",
         "earlierDays": "Earlier days",
         "show": "Show {{title}}",

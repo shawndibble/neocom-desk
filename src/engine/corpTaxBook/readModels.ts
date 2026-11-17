@@ -247,7 +247,12 @@ export function tabsProjection(
   docs: ReadModelDocs | undefined,
   schema: number
 ): TabsProjection {
-  if (docs && readModelsUsable(docs.minerList, docs.overview, schema))
+  // The docs count Statements only: a running account's owed days come from the view (#6294).
+  if (
+    docs &&
+    !view.input.runningAccountFrom &&
+    readModelsUsable(docs.minerList, docs.overview, schema)
+  )
     return fromReadModels({ minerList: docs.minerList, overview: docs.overview! }, view.input);
   return fromBookView(view);
 }

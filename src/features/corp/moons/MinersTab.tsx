@@ -55,6 +55,8 @@ import { MinerExpandedRow } from './MinerExpandedRow';
 import { MinerRowMenu } from './MinerRowMenu';
 import { useCards } from './sectionHelpers';
 import { MarkNotTaxDialog, ReasonDialog, RecordPaymentDialog } from './BookDialogs';
+import { AccountStatus } from './AccountStatus';
+import { accountSortValue } from '@/engine/corpTaxBook/bookSections';
 
 const PARAMS = {
   q: textParam(),
@@ -209,14 +211,23 @@ export function MinersTab() {
       render: (m) => <OverdueWord days={m.overdueDays} paused={m.paused} />,
       sortValue: (m) => m.overdueDays ?? -1,
     },
-    {
-      id: 'unbilled',
-      header: t('corpTaxBook.moons.cols.unbilled'),
-      align: 'right',
-      className: 'tabular-nums',
-      render: (m) => (m.unbilled ? isk(m.unbilled) : '—'),
-      sortValue: (m) => m.unbilled,
-    },
+    // A running account bills every day as it closes (#6294): its column says where each Miner stands.
+    view.input.runningAccountFrom
+      ? {
+          id: 'unbilled',
+          header: t('corpTaxBook.moons.cols.account'),
+          render: (m) => (m.account ? <AccountStatus account={m.account} /> : '—'),
+          sortValue: (m) => accountSortValue(m.account),
+          sortFirst: 'asc',
+        }
+      : {
+          id: 'unbilled',
+          header: t('corpTaxBook.moons.cols.unbilled'),
+          align: 'right',
+          className: 'tabular-nums',
+          render: (m) => (m.unbilled ? isk(m.unbilled) : '—'),
+          sortValue: (m) => m.unbilled,
+        },
     {
       id: 'credit',
       header: t('corpTaxBook.moons.cols.credit'),

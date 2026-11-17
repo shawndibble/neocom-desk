@@ -296,6 +296,13 @@ describe('Miner page read-model path', () => {
     expect(minerDetail(old, MINER)!.row).toEqual(row);
   });
 
+  it('ignores the stored totals on a running account, which count Statements only', () => {
+    const { old } = both();
+    const running = { ...old, input: { ...old.input, runningAccountFrom: '2026-01-01T00:00:00Z' } };
+    const doc = { schema: 1, owed: 123, credit: 4, lastPaidAt: null } as MinerTotals;
+    expect(withMinerTotals(running, MINER, doc)).toBe(running);
+  });
+
   it('keeps the computed owed and credit while the Miner has an unanswered dispute', () => {
     const { old } = both();
     const row = minerDetail(old, MINER)!.row;

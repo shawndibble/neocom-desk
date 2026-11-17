@@ -117,7 +117,8 @@ export function withMinerTotals(
     Number.isFinite(totals.owed) &&
     Number.isFinite(totals.credit) &&
     (totals.lastPaidAt === null || typeof totals.lastPaidAt === 'string');
-  if (!ok) return view;
+  // The stored totals count Statements only: a running account's owed days are the live figures.
+  if (!ok || view.input.runningAccountFrom) return view;
   // An unanswered dispute holds ISK out of what is due until its hold lapses, which the stored
   // totals only catch up with after a recompute (and a doc written before holds counted them
   // not at all): the live figures, which read the holds at this moment, stand for that Miner.

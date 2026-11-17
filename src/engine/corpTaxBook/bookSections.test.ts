@@ -10,6 +10,9 @@ import {
   type ExtractionRow,
 } from './bookView';
 import {
+  accountSortValue,
+  inRange,
+  rangeStart,
   activityFeed,
   daysByPhase,
   extractionBilling,
@@ -55,6 +58,31 @@ describe('daysByPhase', () => {
     expect(split.nextStatement.map((d) => d.key)).toEqual(['a', 'd']);
     expect(split.stillAccruing.map((d) => d.key)).toEqual(['b']);
     expect(split.earlier.map((d) => d.key)).toEqual(['c', 'e', 'f']);
+  });
+});
+
+describe('rangeStart and inRange', () => {
+  it('takes today and the N-1 days before it; all takes every day', () => {
+    const now = '2026-11-17T03:00:00Z';
+    expect(rangeStart('7', now)).toBe('2026-11-11');
+    expect(rangeStart('all', now)).toBeUndefined();
+    expect(inRange('2026-11-11', '2026-11-11')).toBe(true);
+    expect(inRange('2026-11-10T23:59:00Z', '2026-11-11')).toBe(false);
+    expect(inRange('2026-01-01', undefined)).toBe(true);
+  });
+});
+
+describe('accountSortValue', () => {
+  it('puts the oldest unpaid day first and paid-up Miners after', () => {
+    const owes = (oldest: string) => ({ paidThrough: null, owes: { amount: 1, days: 1, oldest } });
+    const sorted = [
+      { paidThrough: '2026-11-10', owes: null },
+      owes('2026-11-05'),
+      owes('2026-10-01'),
+    ]
+      .map(accountSortValue)
+      .sort();
+    expect(sorted).toEqual(['2026-10-01', '2026-11-05', '~2026-11-10']);
   });
 });
 
