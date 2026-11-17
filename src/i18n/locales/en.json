@@ -18132,7 +18132,7 @@
           "nextPop": "Next pop",
           "lastPop": "Last pop",
           "mined": "Mined (est.)",
-          "minedTip": "Ore mined here during each Extraction, from the fracture to the field's end. Mining outside those windows is not counted.",
+          "minedTip": "Ore mined here during each Extraction, from the fracture to the field's end. Mining outside those windows is not counted. Valued at today's hub prices.",
           "tax": "Tax billed",
           "taxTip": "The tax Statements have already billed for these Extractions. Tax for days not yet billed shows on the Extraction's own page."
         },

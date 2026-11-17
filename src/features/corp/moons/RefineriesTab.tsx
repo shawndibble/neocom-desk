@@ -29,7 +29,7 @@ import { useRefineryList, type RefineryEntry } from './useRefineryList';
  */
 export function RefineriesTab() {
   const { t } = useTranslation();
-  const { names, corporationId, canEdit, characterId, reload } = useBook();
+  const { names, corporationId, canEdit, characterId, reload, data } = useBook();
   const navigate = useNavigate();
   const list = useRefineryList();
   const nameOf = (r: Pick<RefineryEntry, 'structureId' | 'ownerId'>) =>
@@ -144,6 +144,12 @@ export function RefineriesTab() {
         moonName={(r) => (r.moonId === undefined ? undefined : names.moon(r.moonId))}
         pathOf={refineryPath}
         byName={names.character}
+        canRestore={(structureId) => {
+          const status = data.feeders?.find(
+            (f) => f.corporationId === ownerOf.get(structureId)
+          )?.status;
+          return status !== 'left' && status !== 'removed';
+        }}
         {...(canEdit
           ? {
               onRestore: async (structureId: number) => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MoonDoc } from '../../../functions/src/corpTaxBookMoonDocs';
-import { docMining, minedPullCount, oreValue, refineryMiners } from './refineryDocs';
+import { minedPullCount, oreValue, refineryMiners } from './refineryDocs';
 
 const price = (id: number) => (id === 1 ? 10 : id === 2 ? 100 : 0);
 const doc = (id: string, over: Partial<MoonDoc> = {}): MoonDoc => ({
@@ -79,15 +79,5 @@ describe('minedPullCount', () => {
   it('counts the Extractions someone mined in', () => {
     const mined = doc('a', { miners: [{ minerId: 'm1', oreLines: [] }] });
     expect(minedPullCount([mined, doc('b')])).toBe(1);
-  });
-});
-
-describe('docMining', () => {
-  it('dates a line the day its window ends, never after today', () => {
-    const d = doc('a', { miners: [{ minerId: 'm1', oreLines: [{ typeId: 1, quantity: 4 }] }] });
-    expect(docMining([d], price, '2026-12-01')).toEqual([
-      { structureId: 5, characterId: 0, date: '2026-10-08', quantity: 4, value: 40 },
-    ]);
-    expect(docMining([d], price, '2026-10-06')[0].date).toBe('2026-10-06');
   });
 });

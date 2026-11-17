@@ -21,7 +21,27 @@ export interface RefineryListRow {
   tax: number;
 }
 
-const newestFirst = (a: ExtractionRow, b: ExtractionRow) => b.startedAt.localeCompare(a.startedAt);
+export const newestFirst = (a: ExtractionRow, b: ExtractionRow) =>
+  b.startedAt.localeCompare(a.startedAt);
+
+/** The soonest chunk still to pop, and the latest that popped (not cancelled, not still to come). */
+export function popBounds(rows: readonly ExtractionRow[]): {
+  nextPopAt?: string;
+  lastPopAt?: string;
+} {
+  const upcoming = rows
+    .filter((x) => x.state === 'extracting')
+    .map((x) => x.chunkArrivalAt)
+    .sort();
+  const popped = rows
+    .filter((x) => x.state !== 'cancelled' && x.state !== 'extracting')
+    .map((x) => x.chunkArrivalAt)
+    .sort();
+  return {
+    ...(upcoming[0] !== undefined ? { nextPopAt: upcoming[0] } : {}),
+    ...(popped.length > 0 ? { lastPopAt: popped[popped.length - 1] } : {}),
+  };
+}
 
 /** One row per refinery that has an Extraction, in no particular order (the table sorts). */
 export function refineryListRows(extractions: readonly ExtractionRow[]): RefineryListRow[] {
@@ -35,14 +55,7 @@ export function refineryListRows(extractions: readonly ExtractionRow[]): Refiner
     const [newest] = [...rows].sort(newestFirst);
     const states: RefineryListRow['states'] = {};
     for (const x of rows) states[x.state] = (states[x.state] ?? 0) + 1;
-    const upcoming = rows
-      .filter((x) => x.state === 'extracting')
-      .map((x) => x.chunkArrivalAt)
-      .sort();
-    const popped = rows
-      .filter((x) => x.state !== 'cancelled' && x.state !== 'extracting')
-      .map((x) => x.chunkArrivalAt)
-      .sort();
+    const { nextPopAt, lastPopAt } = popBounds(rows);
     return {
       structureId,
       moonId: newest.moonId,
@@ -51,8 +64,8 @@ export function refineryListRows(extractions: readonly ExtractionRow[]): Refiner
         : {}),
       extractionCount: rows.length,
       states,
-      ...(upcoming[0] !== undefined ? { nextPopAt: upcoming[0] } : {}),
-      ...(popped.length > 0 ? { lastPopAt: popped[popped.length - 1] } : {}),
+      ...(nextPopAt !== undefined ? { nextPopAt } : {}),
+      ...(lastPopAt !== undefined ? { lastPopAt } : {}),
       tax: rows.reduce((s, x) => s + x.tax, 0),
     };
   });

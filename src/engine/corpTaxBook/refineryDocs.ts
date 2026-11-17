@@ -5,7 +5,6 @@
  * doc, so it is not counted here.
  */
 import type { MoonDoc, OreQty } from '../../../functions/src/corpTaxBookMoonDocs';
-import type { RefineryMining } from './moonOwnerRefineries';
 
 /** The unit price of an ore, 0 when it has none. */
 export type PriceOf = (typeId: number) => number;
@@ -51,26 +50,3 @@ export function refineryMiners(docs: readonly MoonDoc[], priceOf: PriceOf): Refi
 /** How many Extractions had anyone mining: the "of N" under each Miner's count. */
 export const minedPullCount = (docs: readonly MoonDoc[]): number =>
   docs.filter((d) => d.miners.length > 0).length;
-
-/**
- * The docs as mining lines for the archive rules (`refineryRows`): one per Miner per
- * Extraction, dated the day its window ends, never later than today. Only the date and the
- * value matter there.
- */
-export function docMining(
-  docs: readonly MoonDoc[],
-  priceOf: PriceOf,
-  today: string
-): RefineryMining[] {
-  return docs.flatMap((doc) => {
-    const end = (doc.expiresAt ?? doc.fracturedAt ?? doc.chunkArrivalAt).slice(0, 10);
-    const date = end > today ? today : end;
-    return doc.miners.map((m) => ({
-      structureId: doc.structureId,
-      characterId: 0,
-      date,
-      quantity: m.oreLines.reduce((sum, l) => sum + l.quantity, 0),
-      value: oreValue(m.oreLines, priceOf),
-    }));
-  });
-}

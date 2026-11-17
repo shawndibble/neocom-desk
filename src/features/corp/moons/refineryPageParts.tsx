@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -19,7 +19,7 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { FILTER_STATES } from './extractionStates';
 import { isk, shortDate, shortDateTime } from './moonsFormat';
 import { minerPath } from './moonsPaths';
-import { StateWord } from './moonsParts';
+import { OreLine, StateWord } from './moonsParts';
 import { useBook } from './useBook';
 
 const kp = (key: string) => `corpTaxBook.moons.refineryPage.${key}`;
@@ -154,11 +154,9 @@ function MinedCell({ pull }: { pull: PullRow }) {
 export function ExtractionsPanel({
   pulls,
   onOpen,
-  oreCell,
 }: {
   pulls: readonly PullRow[];
   onOpen: (id: string) => void;
-  oreCell: (row: ExtractionRow) => ReactNode;
 }) {
   const { t } = useTranslation();
   const [off, setOff] = useState<ReadonlySet<string>>(new Set());
@@ -213,7 +211,7 @@ export function ExtractionsPanel({
     {
       id: 'ore',
       header: t('corpTaxBook.moons.refinery.cols.ore'),
-      render: ({ row }) => oreCell(row),
+      render: ({ row }) => <OreLine row={row} />,
     },
     {
       id: 'mined',

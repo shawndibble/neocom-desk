@@ -8,11 +8,13 @@ import { RefineriesTab } from './RefineriesTab';
 import type { RefineryList } from './useRefineryList';
 
 let list: RefineryList;
+let feederStatus = 'active';
 vi.mock('./useRefineryList', () => ({ useRefineryList: () => list }));
 vi.mock('./useBook', () => ({
   useBook: () => ({
     corporationId: 98000001,
     canEdit: true,
+    data: { feeders: [{ corporationId: 77, status: feederStatus }] },
     characterId: 5,
     reload: vi.fn(),
     names: {
@@ -80,5 +82,15 @@ describe('RefineriesTab', () => {
       '/corp/moons/refineries/3'
     );
     expect(screen.getByRole('button', { name: 'Restore Station 3' })).toBeTruthy();
+  });
+
+  it('offers no Restore on a refinery whose moon owner has left', async () => {
+    feederStatus = 'left';
+    list = { active: [], archived: [{ row: archivedRow, ownerId: 77 }] };
+    open();
+    await userEvent.click(screen.getByRole('button', { name: 'Show archived refineries' }));
+    expect(screen.getByRole('link', { name: 'Station 3' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Restore Station 3' })).toBeNull();
+    feederStatus = 'active';
   });
 });

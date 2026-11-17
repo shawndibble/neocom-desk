@@ -5,6 +5,7 @@
  */
 import { moonDocUsable } from '@/engine/corpTaxBook/pullFigures';
 import type { BookPartSet } from './parts';
+import { errorCode } from '../openBook';
 import { structureMoonDocs } from './scopedMoon';
 import { readWhole, type BookRead, type ReadContext } from './slices';
 
@@ -16,7 +17,11 @@ export async function readRefineryScope(
 ): Promise<BookRead> {
   const [read, docs] = await Promise.all([
     readWhole(ctx, asked),
-    structureMoonDocs(ctx.book, ctx.corporationId, structureId),
+    // Docs that cannot be read leave the page with its records and no mining; only a refusal ends it.
+    structureMoonDocs(ctx.book, ctx.corporationId, structureId).catch((error) => {
+      if (errorCode(error).endsWith('permission-denied')) throw error;
+      return [];
+    }),
   ]);
   return {
     ...read,

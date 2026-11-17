@@ -17,26 +17,22 @@ import * as Icon from '@/components/ui/icons';
 import { splitPlace } from '@/engine/corpTaxBook/bookSections';
 import { refineryRows, type ArchiveReason } from '@/engine/corpTaxBook/moonOwnerRefineries';
 import { withMoonDocs } from '@/engine/corpTaxBook/pullFigures';
-import {
-  docMining,
-  minedPullCount,
-  oreValue,
-  refineryMiners,
-} from '@/engine/corpTaxBook/refineryDocs';
-import { refineryExtractions } from '@/engine/corpTaxBook/refineryList';
+import { minedPullCount, oreValue, refineryMiners } from '@/engine/corpTaxBook/refineryDocs';
+import { newestFirst, popBounds, refineryExtractions } from '@/engine/corpTaxBook/refineryList';
 import { utcDay } from '@/engine/localDay';
 import { formatCount } from '@/lib/formatCount';
 import { setRefineryArchive, setRefineryLabel } from '../taxBook/feederClient';
 import { callableErrorText } from './feederErrorText';
 import { isk, shortDate, shortDateTime } from './moonsFormat';
 import { extractionPath, moonOwnerPath, refineriesTabPath } from './moonsPaths';
-import { Crumb, OreLine } from './moonsParts';
+import { Crumb } from './moonsParts';
 import { MoonRate } from './MoonRate';
 import { ExtractionsPanel, MinersPanel, OrePanel, type PullRow } from './refineryPageParts';
 import { RefineryTitleEdit } from './RefineryTitleEdit';
 import { offerLabel } from './refineryText';
 import { UndockableChip } from './sectionParts';
 import { useBook } from './useBook';
+import { useRefineryList } from './useRefineryList';
 
 const k = (key: string) => `corpTaxBook.moons.refinery.${key}`;
 const kl = (key: string) => `corpTaxBook.moons.refineryLabels.${key}`;
@@ -62,8 +58,14 @@ export function RefineryPage({ structureId }: { structureId: number }) {
     [view.extractions, structureId]
   );
   const key = String(structureId);
+  // The Refineries list owns which refineries exist, who owns them and whether one is archived.
+  const list = useRefineryList();
+  const listed = list.active.find((r) => r.structureId === structureId);
+  const listedArchived = list.archived.find((r) => r.row.structureId === structureId);
   // A refinery with no Extraction yet still belongs to the moon owner whose record names it.
   const ownerId =
+    listed?.ownerId ??
+    listedArchived?.ownerId ??
     own[0]?.sourceCorporationId ??
     data.feeders?.find(
       (f) => f.refineryStructures?.[key] ?? f.refineryLabels?.[key] ?? f.refineryArchive?.[key]
@@ -84,11 +86,16 @@ export function RefineryPage({ structureId }: { structureId: number }) {
         new Set(docs.map((d) => d.extractionId))
       )
         .extractions.filter((x) => x.structureId === structureId)
-        .sort((a, b) => b.startedAt.localeCompare(a.startedAt)),
+        .sort(newestFirst),
     [view, docs, structureId]
   );
   const crumb = <Crumb to={refineriesTabPath} label={t('corpTaxBook.moons.tabs.refineries')} />;
-  const known = own.length > 0 || ownerId !== undefined || docs.length > 0;
+  const known =
+    listed !== undefined ||
+    listedArchived !== undefined ||
+    own.length > 0 ||
+    ownerId !== undefined ||
+    docs.length > 0;
   if (!known) {
     return (
       <div className="space-y-4">
@@ -103,15 +110,19 @@ export function RefineryPage({ structureId }: { structureId: number }) {
   const moonId = rows[0]?.moonId;
   const place = splitPlace(name, moonId === undefined ? undefined : names.moon(moonId));
   const title = place.moon === undefined ? name : place.station;
-  const state = refineryRows({
-    now: view.input.now,
-    structureIds: [structureId],
-    extractions: rows,
-    mining: docMining(docs, priceOf, today),
-    isGone: () => feeder?.refineryStructures?.[key]?.denied === true,
-    ...(feeder?.refineryArchive ? { archive: feeder.refineryArchive } : {}),
-  });
-  const row = state.active[0] ?? state.archived[0];
+  // A refinery the list does not hold (a moon owner's record names it, nothing else does) has no
+  // mining to age, so its state is read from the record alone.
+  const row =
+    listed?.row ??
+    listedArchived?.row ??
+    refineryRows({
+      now: view.input.now,
+      structureIds: [structureId],
+      extractions: rows,
+      mining: [],
+      isGone: () => feeder?.refineryStructures?.[key]?.denied === true,
+      ...(feeder?.refineryArchive ? { archive: feeder.refineryArchive } : {}),
+    }).active[0];
   const archived = row?.archive !== undefined;
   const ended = feeder?.status === 'left' || feeder?.status === 'removed';
   const mayArchive = ownerId !== undefined && canEdit && !ended;
@@ -122,15 +133,7 @@ export function RefineryPage({ structureId }: { structureId: number }) {
   });
   const minedTotal = pulls.reduce((sum, p) => sum + (p.minedIsk ?? 0), 0);
   const taxTotal = rows.reduce((sum, x) => sum + x.tax, 0);
-  const nextPop = rows
-    .filter((x) => x.state === 'extracting')
-    .map((x) => x.chunkArrivalAt)
-    .sort()[0];
-  const lastPop = rows
-    .filter((x) => x.state !== 'cancelled' && x.state !== 'extracting')
-    .map((x) => x.chunkArrivalAt)
-    .sort()
-    .at(-1);
+  const { nextPopAt: nextPop, lastPopAt: lastPop } = popBounds(rows);
   const miners = refineryMiners(docs, priceOf);
   const minerName = (minerId: string) => {
     const main = view.miners.find((m) => m.id === minerId)?.mainCharacterId;
@@ -250,11 +253,7 @@ export function RefineryPage({ structureId }: { structureId: number }) {
       </StatChips>
       <MoonRate target={{ structureId, ...(moonId !== undefined ? { moonId } : {}) }} />
       {rows[0] && <OrePanel row={rows[0]} priceOf={priceOf} />}
-      <ExtractionsPanel
-        pulls={pulls}
-        onOpen={(id) => navigate(extractionPath(id))}
-        oreCell={(x) => <OreLine row={x} />}
-      />
+      <ExtractionsPanel pulls={pulls} onOpen={(id) => navigate(extractionPath(id))} />
       <MinersPanel
         miners={miners}
         pulled={minedPullCount(docs)}

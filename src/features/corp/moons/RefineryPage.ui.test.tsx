@@ -4,12 +4,48 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { MoonDoc } from '../../../../functions/src/corpTaxBookMoonDocs';
+import { refineryRows, type RefineryExtraction } from '@/engine/corpTaxBook/moonOwnerRefineries';
 import { RefineryPage } from './RefineryPage';
 
 const setRefineryArchive = vi.fn();
 vi.mock('../taxBook/feederClient', () => ({
   setRefineryArchive: (...args: unknown[]) => setRefineryArchive(...args),
   setRefineryLabel: vi.fn(),
+}));
+
+let listOverride: unknown;
+// The list without its ledger mining (the real hook reads moon owners' mining rows).
+vi.mock('./useRefineryList', () => ({
+  useRefineryList: () => {
+    if (listOverride) return listOverride;
+    const f = feeder as { corporationId: number; refineryArchive?: Record<string, never> };
+    const mine = (extractions as { sourceCorporationId?: number }[]).filter(
+      (x) => x.sourceCorporationId === f.corporationId
+    ) as unknown as RefineryExtraction[];
+    const rows = refineryRows({
+      now: NOW,
+      structureIds: [
+        ...new Set([
+          ...mine.map((x) => x.structureId),
+          ...Object.keys(f.refineryArchive ?? {}).map(Number),
+        ]),
+      ],
+      extractions: mine,
+      mining: [],
+      isGone: (id) =>
+        (feeder as { refineryStructures?: Record<string, { denied?: boolean }> })
+          .refineryStructures?.[String(id)]?.denied === true,
+      ...(f.refineryArchive ? { archive: f.refineryArchive } : {}),
+    });
+    return {
+      active: rows.active.map((row) => ({
+        structureId: row.structureId,
+        ownerId: f.corporationId,
+        row,
+      })),
+      archived: rows.archived.map((row) => ({ row, ownerId: f.corporationId })),
+    };
+  },
 }));
 
 const NOW = '2026-11-17T00:00:00Z';
@@ -29,12 +65,20 @@ vi.mock('./useBook', () => ({
       ore: () => 'Zeolites',
     },
     canEdit,
+    settings: { graceHours: 24, rates: [] },
     characterId: 5,
     corporationId: 9,
     reload,
-    data: { feeders: [feeder] },
+    data: { feeders: [{ joinedAt: Date.UTC(2026, 0, 1), coveragePeriods: [], ...feeder }] },
     view: {
-      input: { now: NOW, rates: [], pricesOn: () => ({ prices: new Map([[1, 10]]) }) },
+      input: {
+        now: NOW,
+        rates: [],
+        entries: [],
+        statements: [],
+        extractions,
+        pricesOn: () => ({ prices: new Map([[1, 10]]) }),
+      },
       extractions,
       miners: [],
     },
@@ -86,6 +130,7 @@ beforeEach(() => {
   extractions = [pull('a')];
   feeder = { corporationId: 98, status: 'active' };
   docs = [];
+  listOverride = undefined;
 });
 
 const open = () =>
@@ -138,6 +183,45 @@ describe('the refinery page', () => {
     feeder = { corporationId: 98, status: 'active', refineryStructures: { '1001': {} } };
     open();
     expect(screen.getByText(/No Extraction was recorded/)).toBeTruthy();
+  });
+
+  it('opens a moon owner refinery the list knows only from mining', () => {
+    extractions = [];
+    feeder = { corporationId: 98, status: 'active' };
+    listOverride = {
+      active: [{ structureId: 1001, ownerId: 98, extractionCount: 0, states: {}, tax: 0 }],
+      archived: [],
+    };
+    open();
+    expect(screen.getByText(/No Extraction was recorded/)).toBeTruthy();
+    expect(screen.queryByText('This refinery is not in the book.')).toBeNull();
+  });
+
+  it('takes the archive from the list, so the page and the list cannot differ', () => {
+    // Doc windows end after the archive day; the list's ledger mining does not.
+    docs = [doc('a', [{ minerId: 'solo:1', oreLines: [{ typeId: 1, quantity: 5 }] }])];
+    feeder = {
+      ...feeder,
+      refineryArchive: { '1001': { at: Date.UTC(2026, 10, 14), by: 5, reason: 'manual' } },
+    };
+    listOverride = {
+      active: [],
+      archived: [
+        {
+          ownerId: 98,
+          row: {
+            structureId: 1001,
+            extractionCount: 1,
+            mined: 0,
+            offer: null,
+            archive: { at: Date.UTC(2026, 10, 14), by: 5, reason: 'manual' },
+          },
+        },
+      ],
+    };
+    open();
+    expect(screen.getByRole('button', { name: 'Restore' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Archive' })).toBeNull();
   });
 
   it('still lets an officer archive by hand', async () => {
