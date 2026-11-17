@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   earliestAsOf,
+  MAX_AS_OF_DAYS_BACK,
   effectiveOwnerRate,
   latestRateChange,
   ownerMargin,
@@ -17,6 +18,10 @@ const agreed = (pct: number, effectiveFrom: string, recordedAt = `${effectiveFro
   ({ kind: 'agreed', pct, effectiveFrom, recordedAt }) satisfies OwnerRateEntry;
 
 describe('earliestAsOf', () => {
+  it('the window is 30 days (pinned equal in functions/ by its own test)', () => {
+    expect(MAX_AS_OF_DAYS_BACK).toBe(30);
+  });
+
   it('is 30 days back, or the first day when that is later', () => {
     expect(earliestAsOf('2026-10-18', '2026-01-01')).toBe('2026-09-18');
     expect(earliestAsOf('2026-10-18', '2026-10-01')).toBe('2026-10-01');

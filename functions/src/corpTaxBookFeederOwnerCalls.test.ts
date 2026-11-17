@@ -3,6 +3,7 @@ import { effectiveOwnerRatePct } from './corpTaxBookEngine.js';
 import {
   appendAgreedRate,
   appendModeChange,
+  MAX_AS_OF_DAYS_BACK,
   resolveAsOf,
   parseSetFeederModeInput,
   parseSetFeederRateInput,
@@ -50,6 +51,10 @@ describe('parseSetFeederRateInput as-of', () => {
 });
 
 describe('resolveAsOf', () => {
+  it('the window matches the engine in src/ (30 days)', () => {
+    expect(MAX_AS_OF_DAYS_BACK).toBe(30);
+  });
+
   // NOW is 2026-10-18: 30 days back is 2026-09-18; the record joined 2026-10-01.
   it('is today when no day is given', () => {
     expect(resolveAsOf(record(), undefined, NOW)).toBe('2026-10-18');
