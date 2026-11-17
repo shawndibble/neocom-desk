@@ -64,7 +64,7 @@ export const ReportToday: Story = {
 /** @summary Phone: today's report. */
 export const ReportTodayPhone: Story = { ...ReportToday, ...PHONE };
 
-/** @summary Proposed report: flags, a link from each flag to its rows, and Data we read (one row per source: rows read, what it covers, who did not share). New components: DataWeRead, FlagDataLinks. */
+/** @summary Proposed report: flags, a link from each flag to its rows, and Data we read (one row per source: rows read). New components: DataWeRead, FlagDataLinks. */
 export const Report: Story = { render: () => <ProposedReport /> };
 /** @summary Phone: the report in one column, Data we read as a table that scrolls sideways. */
 export const ReportPhone: Story = { ...Report, ...PHONE };
@@ -97,9 +97,9 @@ export const WalletFlaggedOnly: Story = {
 /** @summary Contacts: contact, kind, standing (worst first), Standing filter (Hostile, Neutral, Friendly), no date range because contacts have no dates. */
 export const Contacts: Story = { render: () => <DataBrowserPage source="contact" /> };
 
-/** @summary Mail headers: sent time, direction, sender or recipient and every recipient; no subject and no text column. Mira Vell did not share mail, so a line above the table says the rows are from 2 of 3 characters. */
+/** @summary Mail headers: sent time, direction, sender or recipient and every recipient; no subject and no text column. */
 export const MailHeaders: Story = { render: () => <DataBrowserPage source="mail" /> };
-/** @summary Phone: mail headers with the not-shared line. */
+/** @summary Phone: mail headers. */
 export const MailHeadersPhone: Story = { ...MailHeaders, ...PHONE };
 
 /** @summary Contracts: filtered to Courier, search and a date range set, so the pills show what narrowed the list. */
@@ -115,19 +115,12 @@ export const ContractsFiltered: Story = {
 /** @summary Skills: skill, group, level; the Cynosural Field Theory V row links to its flag (Cyno skill, no capital). Skill group filter, no date range. */
 export const Skills: Story = { render: () => <DataBrowserPage source="skills" /> };
 
-/** @summary Corporation history: corporation, joined, left; public, so always shared. Six corporations for Tamsin, 9 rows across the three characters. */
+/** @summary Corporation history: corporation, joined, left; public. Six corporations for Tamsin, 9 rows across the three characters. */
 export const CorpHistory: Story = { render: () => <DataBrowserPage source="history" /> };
 
 // --------------------------------------------------------------- Odd states
 
-/** @summary Character switcher on one character who did not share the source: Mira Vell and Mail. Says so, says why nothing is shown, offers Show all characters. */
-export const NotShared: Story = {
-  render: () => <DataBrowserPage source="mail" characterId={2118000002} />,
-};
-/** @summary Phone: a source that was not shared. */
-export const NotSharedPhone: Story = { ...NotShared, ...PHONE };
-
-/** @summary An empty source: Vell Hauling shared Wallet journal and the read found nothing in 30 days. Empty is a result, kept apart from Not shared. */
+/** @summary An empty source: the read found nothing for Vell Hauling in Wallet journal in 30 days. Empty is a result, kept apart from No rows match. */
 export const EmptySource: Story = {
   render: () => <DataBrowserPage source="wallet" characterId={2118000003} />,
 };
@@ -152,7 +145,7 @@ export const ConsentToday: Story = {
   ),
 };
 
-/** @summary Proposed consent on /vetting: a Changed note, Every row listed, Kept after you press Send (30 and 90 days, or when you delete it), officers only, mail headers only, no key kept. New component: ConsentTermsKept. */
+/** @summary Proposed consent on /vetting: Every row listed, Kept after you press Send (30 and 90 days, or when you delete it), officers only, mail headers only, no key kept. New component: ConsentTermsKept. */
 export const ConsentProposed: Story = { render: () => <ProposedMemberConsent /> };
 /** @summary Phone: the proposed consent. */
 export const ConsentProposedPhone: Story = { ...ConsentProposed, ...PHONE };

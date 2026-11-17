@@ -26,7 +26,6 @@ import {
   type DataTableSort,
 } from '@/components/ui';
 import type { ActiveFilter } from '@/components/ui/activeFilters';
-import { Pill } from '@/components/ui/Pill';
 import { isoDay } from '@/features/miningTax/corpBook/memberFlag';
 import { VettingEntity } from '@/features/corp/vetting/VettingEntity';
 import { cx } from '@/lib/cx';
@@ -43,7 +42,6 @@ import {
   SOURCE_LABEL,
   SOURCE_TYPES,
   rowsOf,
-  shared,
   type RawRow,
   type SourceId,
 } from './vettingRawDataFixtures';
@@ -366,28 +364,18 @@ interface BrowserProps {
   source: SourceId;
   /** Null: all characters. */
   characterId?: number | null;
-  onCharacter?: (id: number | null) => void;
   initial?: Partial<BrowserFilters>;
   sort?: DataTableSort;
 }
 
 /** One source's rows: filters, a character switcher, and the table. Everything is a real DataTable. */
-export function SourceBrowser({
-  source,
-  characterId = null,
-  onCharacter,
-  initial,
-  sort,
-}: BrowserProps) {
+export function SourceBrowser({ source, characterId = null, initial, sort }: BrowserProps) {
   const who = characterId;
-  const setWho = (id: number | null) => onCharacter?.(id);
   const [filters, setFilters] = useState<BrowserFilters>({ ...NO_FILTERS, ...initial });
   const allCharacters = who === null;
   const columns = useColumns(source, allCharacters);
   const scope = useMemo(() => rowsOf(source, who), [source, who]);
   const rows = useMemo(() => applyFilters(source, scope, filters), [source, scope, filters]);
-  const sharing = PILOTS.filter((p) => who === null || p.characterId === who);
-  const notShared = sharing.filter((p) => !shared(p, source));
   const typeNames = typeOptions(source);
   const active: ActiveFilter<BrowserFilters>[] = [];
   if (filters.type !== '')
@@ -404,32 +392,17 @@ export function SourceBrowser({
     });
   if (filters.flagged)
     active.push({ label: 'Flagged rows only', clear: (v) => ({ ...v, flagged: false }) });
-  const nothingToFilter =
-    scope.length === 0 || (sharing.length > 0 && notShared.length === sharing.length);
+  const nothingToFilter = scope.length === 0;
   const filtered = active.length > 0 || filters.query.trim() !== '';
 
   const body = (() => {
-    if (sharing.length > 0 && notShared.length === sharing.length) {
-      const names = notShared.map((p) => p.name).join(' and ');
-      return (
-        <EmptyState
-          title={`${names} did not share ${SOURCE_LABEL[source]}`}
-          hint="Nothing was read from this source, so there is nothing to browse. The checks that need it say they could not run. A fresh read is the only way to get it."
-          action={
-            who !== null && PILOTS.some((p) => p.characterId !== who && shared(p, source)) ? (
-              <Button onClick={() => setWho(null)}>Show all characters</Button>
-            ) : undefined
-          }
-        />
-      );
-    }
     if (scope.length === 0) {
       return (
         <EmptyState
           title={`No ${SOURCE_LABEL[source].toLowerCase()} rows`}
           hint={`The read found nothing here for ${
             who === null ? 'these characters' : first(PILOT_BY_ID.get(who)?.name ?? '')
-          }${HAS_DATES[source] && source !== 'history' ? ' in the last 30 days' : ''}. Empty is a result: the source was shared and read.`}
+          }${HAS_DATES[source] && source !== 'history' ? ' in the last 30 days' : ''}. Empty is a result: the source was read.`}
         />
       );
     }
@@ -459,15 +432,6 @@ export function SourceBrowser({
 
   return (
     <div className="space-y-3">
-      {notShared.length > 0 && notShared.length < sharing.length && (
-        <p className="flex flex-wrap items-center gap-2 text-sm">
-          <Pill tone="warning">Not shared</Pill>
-          <span>
-            {notShared.map((p) => p.name).join(' and ')} did not share {SOURCE_LABEL[source]}. The
-            rows below are from {sharing.length - notShared.length} of {sharing.length} characters.
-          </span>
-        </p>
-      )}
       {!nothingToFilter && (
         <>
           <FilterBar<BrowserFilters>
@@ -627,7 +591,6 @@ export function DataBrowserPage({
                 key={`${current}:${who}`}
                 source={current}
                 characterId={who}
-                onCharacter={setWho}
                 initial={current === source ? initial : undefined}
                 sort={current === source ? sort : undefined}
               />

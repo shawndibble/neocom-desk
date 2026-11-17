@@ -26,24 +26,12 @@ export const SOURCE_LABEL: Record<SourceId, string> = {
   history: 'Corporation history',
 };
 
-/** What a source covers, in the member's words (matches the consent terms). */
-export const SOURCE_COVERS: Record<SourceId, string> = {
-  wallet: 'Last 30 days',
-  contact: 'Every contact and standing',
-  mail: 'Who wrote to whom, never the subject or text',
-  contract: 'Last 30 days',
-  skills: 'Every trained skill',
-  history: 'Every corporation, public',
-};
-
 export const READ_AT = Date.parse('2026-11-14T10:00:00Z');
 
 export interface Pilot {
   characterId: number;
   name: string;
   corporation: string;
-  /** Sources this character did not share. */
-  missing: SourceId[];
 }
 
 export const PILOTS: readonly Pilot[] = [
@@ -51,19 +39,16 @@ export const PILOTS: readonly Pilot[] = [
     characterId: 2118000001,
     name: 'Tamsin Vell',
     corporation: 'Hollow Reach Mining',
-    missing: [],
   },
   {
     characterId: 2118000002,
     name: 'Mira Vell',
     corporation: 'Hollow Reach Mining',
-    missing: ['mail'],
   },
   {
     characterId: 2118000003,
     name: 'Vell Hauling',
     corporation: 'Caldari Provisions',
-    missing: [],
   },
 ];
 
@@ -397,7 +382,7 @@ export const ROWS: Record<SourceId, RawRow[]> = {
       standing: 0,
     },
   ],
-  mail: [...mail(TAMSIN, 1284, 31), ...mail(HAULING, 37, 32)],
+  mail: [...mail(TAMSIN, 1284, 31), ...mail(MIRA, 188, 33), ...mail(HAULING, 37, 32)],
   contract: [
     ...contracts(TAMSIN, 236, 41),
     ...contracts(MIRA, 41, 42),
@@ -409,11 +394,6 @@ export const ROWS: Record<SourceId, RawRow[]> = {
 
 export function rowsOf(source: SourceId, characterId: number | null): RawRow[] {
   return ROWS[source].filter((row) => characterId === null || row.characterId === characterId);
-}
-
-/** Whether a character shared this source (corporation history is public: always). */
-export function shared(pilot: Pilot, source: SourceId): boolean {
-  return !pilot.missing.includes(source);
 }
 
 export const SOURCE_TYPES: Record<SourceId, string[]> = {

@@ -12,7 +12,6 @@ import {
   SeverityIcon,
   type DataTableColumn,
 } from '@/components/ui';
-import { Pill } from '@/components/ui/Pill';
 import {
   VETTING_DEFAULT_SETTINGS,
   VETTING_KEEP_DAYS,
@@ -29,15 +28,7 @@ import {
   VETTING_FIXTURE_REVIEWS,
 } from '@/storybook/vettingFixture';
 import { NewComponent } from './NewComponent';
-import {
-  PILOTS,
-  ROWS,
-  SOURCE_COVERS,
-  SOURCE_IDS,
-  SOURCE_LABEL,
-  shared,
-  type SourceId,
-} from './vettingRawDataFixtures';
+import { PILOTS, ROWS, SOURCE_IDS, SOURCE_LABEL, type SourceId } from './vettingRawDataFixtures';
 
 /** Mockup links go nowhere: keep the page where it is. */
 const stay = (e: { preventDefault: () => void }) => e.preventDefault();
@@ -45,20 +36,15 @@ const stay = (e: { preventDefault: () => void }) => e.preventDefault();
 interface SourceLine {
   id: SourceId;
   rows: number;
-  covers: string;
-  notShared: string[];
 }
 
 const LINES: SourceLine[] = SOURCE_IDS.map((id) => ({
   id,
   rows: ROWS[id].length,
-  covers: SOURCE_COVERS[id],
-  notShared: PILOTS.filter((p) => !shared(p, id)).map((p) => p.name),
 }));
 
 /**
- * The report's "Data we read": one row per source with how many rows were read, what it covers
- * and who did not share it. A row opens that source's browser (row click and accent name, DESIGN
+ * The report's "Data we read": one row per source with how many rows were read. A row opens that source's browser (row click and accent name, DESIGN
  * section 6c: no separate Open button).
  */
 export function DataWeReadPanel() {
@@ -81,22 +67,6 @@ export function DataWeReadPanel() {
       align: 'right',
       className: 'tabular-nums',
       render: (row) => formatCount(row.rows),
-    },
-    {
-      id: 'covers',
-      header: 'Covers',
-      className: 'text-text-dim',
-      render: (row) => row.covers,
-    },
-    {
-      id: 'shared',
-      header: 'Shared by',
-      render: (row) =>
-        row.notShared.length > 0 ? (
-          <Pill tone="warning">Not {row.notShared.map((n) => n.split(' ')[0]).join(', ')}</Pill>
-        ) : (
-          <span className="text-text-dim">All {PILOTS.length}</span>
-        ),
     },
   ];
   return (
@@ -235,13 +205,6 @@ export function ProposedConsentTerms() {
   return (
     <NewComponent name="ConsentTermsKept">
       <div className="space-y-4">
-        <div className="flex items-start gap-2 rounded-xs border border-line bg-panel-2 p-3 text-sm">
-          <p>
-            <Pill tone="accent">Changed</Pill>{' '}
-            <span className="font-semibold">After you press Send, we keep every row we read,</span>{' '}
-            not only the ones that looked unusual. Officers can look through them.
-          </p>
-        </div>
         <div className="grid gap-4 text-sm sm:grid-cols-2">
           <div className="space-y-2">
             <Eyebrow>The officers reviewing you will see</Eyebrow>
