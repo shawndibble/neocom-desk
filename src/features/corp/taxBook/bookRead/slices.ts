@@ -44,6 +44,8 @@ export interface BookRead extends BookData {
   forMoon?: string;
   /** The moon docs that stand in for the ledger rows of a moon page's earlier cycles. */
   moon?: { docs: ReadonlyMap<string, MoonDoc>; fromDocs: ReadonlySet<string> };
+  /** A refinery page's read (#6348): every moon doc the refinery has, by extraction id. */
+  refinery?: { structureId: number; docs: ReadonlyMap<string, MoonDoc> };
 }
 
 /** One book read: the open book, and each field it reads once however many readers ask. */
@@ -308,7 +310,7 @@ export function mergeReads(held: BookRead, extra: BookRead): BookRead {
       fieldsIn(part).map(([name]) => [name, from[extra.parts.has(part) ? 'extra' : 'held'][name]])
     )
   ) as Fields;
-  const { scopedMiner, minerScope, forMoon, moon } = held;
+  const { scopedMiner, minerScope, forMoon, moon, refinery } = held;
   const readModels = extra.readModels ?? held.readModels;
   return {
     ...shape(
@@ -323,5 +325,6 @@ export function mergeReads(held: BookRead, extra: BookRead): BookRead {
     ...(minerScope ? { minerScope } : {}),
     ...(forMoon !== undefined ? { forMoon } : {}),
     ...(moon ? { moon } : {}),
+    ...(refinery ? { refinery } : {}),
   };
 }

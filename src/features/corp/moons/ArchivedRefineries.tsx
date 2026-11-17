@@ -84,6 +84,7 @@ export function ArchivedRefineries({
   pathOf,
   byName,
   onRestore,
+  canRestore,
 }: {
   rows: readonly RefineryRow[];
   name: (structureId: number) => string;
@@ -92,6 +93,8 @@ export function ArchivedRefineries({
   byName: (characterId: number) => string;
   /** Absent for a viewer who may not edit. */
   onRestore?: (structureId: number) => Promise<void>;
+  /** Hides Restore on a row whose moon owner left or was removed. Every row, when absent. */
+  canRestore?: (structureId: number) => boolean;
 }) {
   const { t } = useTranslation();
   // Until toggled, follows the rows: the moon owner records can load after the page mounts.
@@ -120,7 +123,9 @@ export function ArchivedRefineries({
                 to={pathOf(row.structureId)}
                 moonName={moonName(row)}
                 byName={byName(row.archive!.by)}
-                {...(onRestore ? { onRestore: () => onRestore(row.structureId) } : {})}
+                {...(onRestore && (canRestore?.(row.structureId) ?? true)
+                  ? { onRestore: () => onRestore(row.structureId) }
+                  : {})}
               />
             ))}
         </ul>

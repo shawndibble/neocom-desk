@@ -18,7 +18,7 @@ import {
 } from '../taxBook/feederClient';
 import { minerIdFor } from '@/engine/corpTaxBook/charges';
 import { ArchivedRefineries } from './ArchivedRefineries';
-import { minerPath, moonOwnerRefineryPath } from './moonsPaths';
+import { minerPath, refineryPath } from './moonsPaths';
 import { refineryMeta, offerLabel } from './refineryText';
 import { useOwnerRefineries } from './useOwnerRefineries';
 import { ChangePayeeDialog, PayeeChangeStrip } from './MoonOwnerPayee';
@@ -109,7 +109,7 @@ export function MoonOwnerDetail({ id }: { id: string }) {
           info: (structureId) => {
             const r = refineries.active.find((x) => x.structureId === structureId)!;
             return {
-              to: moonOwnerRefineryPath(corp, structureId),
+              to: refineryPath(structureId),
               meta: refineryMeta(t, r, r.moonId === undefined ? undefined : names.moon(r.moonId)),
               ...(r.offer ? { offer: offerLabel(t, r.offer) } : {}),
             };
@@ -119,7 +119,7 @@ export function MoonOwnerDetail({ id }: { id: string }) {
               rows={refineries.archived}
               name={names.ownerRefinery}
               moonName={(r) => (r.moonId === undefined ? undefined : names.moon(r.moonId))}
-              pathOf={(structureId) => moonOwnerRefineryPath(corp, structureId)}
+              pathOf={refineryPath}
               byName={names.character}
               {...(canEdit && feeder?.status !== 'left' && feeder?.status !== 'removed'
                 ? {

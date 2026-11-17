@@ -15,7 +15,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { canViewCorpTaxBook } from '@/engine/corpRoles';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -60,16 +60,17 @@ import { MinerDetail } from '@/features/corp/moons/MinerDetail';
 import { MinersTab } from '@/features/corp/moons/MinersTab';
 import { OverviewTab } from '@/features/corp/moons/OverviewTab';
 import { MoonDetail } from '@/features/corp/moons/MoonDetail';
-import { MoonPage } from '@/features/corp/moons/MoonPage';
-import { MoonsTab } from '@/features/corp/moons/MoonsTab';
+import { RefineriesTab } from '@/features/corp/moons/RefineriesTab';
+import { RefineryPage } from '@/features/corp/moons/RefineryPage';
+import { LegacyRefineryRedirect } from '@/features/corp/moons/LegacyRefineryRedirect';
 import { MoonOwnerDetail } from '@/features/corp/moons/MoonOwnerDetail';
-import { RefineryDetail } from '@/features/corp/moons/RefineryDetail';
 import { MoonOwnersTab } from '@/features/corp/moons/MoonOwnersTab';
 import {
   MOONS_TABS,
   SETTINGS_PARAM,
   isSettingsTab,
   moonsDetail,
+  refineriesTabPath,
   type SettingsTab,
 } from '@/features/corp/moons/moonsPaths';
 import { StatementPeriodDetail } from '@/features/corp/moons/StatementPeriodDetail';
@@ -239,7 +240,8 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
             <TabPanel tabsId={tabsId} tabId={tab}>
               {tab === 'overview' && <OverviewTab />}
               {tab === 'extractions' && <ExtractionsTab />}
-              {tab === 'moons' && <MoonsTab />}
+              {tab === 'refineries' && <RefineriesTab />}
+              {tab === 'moons' && <Navigate replace to={refineriesTabPath} />}
               {tab === 'miners' && <MinersTab />}
               {tab === 'statements' && <StatementsTab />}
               {tab === 'moon-owners' && (
@@ -253,12 +255,13 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
           </>
         )}
         {detail?.kind === 'extraction' && <MoonDetail key={detail.id} id={detail.id} />}
-        {detail?.kind === 'moon' && <MoonPage moonId={Number(detail.id)} />}
+        {detail?.kind === 'legacyMoon' && <LegacyRefineryRedirect moonId={Number(detail.id)} />}
+        {detail?.kind === 'legacyRefinery' && (
+          <LegacyRefineryRedirect structureId={detail.structureId} />
+        )}
         {detail?.kind === 'miner' && <MinerDetail key={detail.id} id={detail.id} />}
         {detail?.kind === 'moonOwner' && <MoonOwnerDetail id={detail.id} />}
-        {detail?.kind === 'refinery' && (
-          <RefineryDetail ownerId={detail.id} structureId={detail.structureId} />
-        )}
+        {detail?.kind === 'refinery' && <RefineryPage structureId={detail.structureId} />}
         {detail?.kind === 'statementPeriod' && <StatementPeriodDetail periodStart={detail.id} />}
         {view && settingsDialog && (
           <BookSettingsDialog
@@ -332,6 +335,7 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
   const book = useCorpBook(sync, wanted, {
     minerId: open?.kind === 'miner' ? open.id : undefined,
     extractionId: open?.kind === 'extraction' ? open.id : undefined,
+    structureId: open?.kind === 'refinery' ? open.structureId : undefined,
   });
   const { state } = book;
   // The rail and the page title list Moons' tabs only when the page will show them: a book
@@ -428,6 +432,7 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
         names: state.names,
         settings: state.settings,
         data: state.data,
+        ...(state.refinery ? { refinery: state.refinery } : {}),
         verdict: state.verdict,
         reload: book.reload,
         requestRows: book.requestRows,

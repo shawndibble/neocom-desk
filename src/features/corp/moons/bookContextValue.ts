@@ -1,6 +1,7 @@
 import { createContext } from 'react';
 import type { BookView } from '@/engine/corpTaxBook/bookView';
 import type { BookData, BookSettings, OfficerVerdict } from '../taxBook/bookClient';
+import type { MoonDoc } from '../../../../functions/src/corpTaxBookMoonDocs';
 import type { SettingsTab } from './moonsPaths';
 import type { BookNames } from './useCorpBook';
 
@@ -11,6 +12,8 @@ export interface BookContextValue {
   names: BookNames;
   settings: BookSettings;
   data: BookData;
+  /** A refinery page's moon docs, by extraction id (#6348); absent on every other page. */
+  refinery?: { structureId: number; docs: ReadonlyMap<string, MoonDoc> };
   verdict: OfficerVerdict;
   canEdit: boolean;
   reload: () => void;
