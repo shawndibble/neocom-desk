@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, TextInput } from '@/components/ui';
 import { resolveRate, type RateContext, type TaxRate } from '@/engine/corpTaxBook/rates';
@@ -41,17 +41,12 @@ export function MoonRate({ target }: { target: RateTarget }) {
     target.moonId !== undefined
       ? r.scope === 'moon' && r.moonId === target.moonId
       : r.scope === 'structure' && r.structureId === target.structureId;
-  const scheduled = useMemo(
-    () =>
-      rates
-        .filter(
-          (r): r is Exclude<TaxRate, { scope: 'record' }> =>
-            r.scope !== 'record' && own(r) && r.effectiveFrom > today
-        )
-        .sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom))[0],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rates, today, target.moonId, target.structureId]
-  );
+  const scheduled = rates
+    .filter(
+      (r): r is Exclude<TaxRate, { scope: 'record' }> =>
+        r.scope !== 'record' && own(r) && r.effectiveFrom > today
+    )
+    .sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom))[0];
   const minerRates = rates.some((r) => r.scope === 'miner');
   const scopeWord = t(
     target.moonId !== undefined

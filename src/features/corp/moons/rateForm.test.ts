@@ -13,5 +13,6 @@ describe('datedRateReady', () => {
     expect(datedRateReady('-1', '2026-11-17', '2026-11-17')).toBe(false);
     expect(datedRateReady('8', '2026-11-16', '2026-11-17')).toBe(false);
     expect(datedRateReady('8', '', '2026-11-17')).toBe(false);
+    expect(datedRateReady('  ', '2026-11-17', '2026-11-17')).toBe(false);
   });
 });
