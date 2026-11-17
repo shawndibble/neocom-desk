@@ -22,7 +22,8 @@ import { ProposedConsentTerms, ProposedMemberConsent, ProposedReport } from './v
  * `FlagDataLinks` (a flag's way into its rows; in the build it sits in each flag's disclosure),
  * `RawDataBrowser` (source tabs, character switcher, filter row and a windowed table: composed
  * of Tabs, SegmentedControl, FilterBar and DataTable, so the new part is the arrangement),
- * `ConsentTermsKept` (the consent terms with a Kept after you press Send group).
+ * `ConsentTermsKept` (the consent terms with a Kept after you press Send group),
+ * `NewFlagLink` (the browser's Flag column: severity glyph and flag title linking to the flag).
  * The decision rail and the flag list are the real components.
  */
 const meta = {

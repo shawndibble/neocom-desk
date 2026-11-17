@@ -8,11 +8,11 @@ import {
   ValueList,
   ValueRow,
   textActionClassName,
+  CharacterAvatar,
+  SeverityIcon,
   type DataTableColumn,
 } from '@/components/ui';
-import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 import { Pill } from '@/components/ui/Pill';
-import { SeverityIcon } from '@/components/ui';
 import {
   VETTING_DEFAULT_SETTINGS,
   VETTING_KEEP_DAYS,
@@ -39,6 +39,9 @@ import {
   type SourceId,
 } from './vettingRawDataFixtures';
 
+/** Mockup links go nowhere: keep the page where it is. */
+const stay = (e: { preventDefault: () => void }) => e.preventDefault();
+
 interface SourceLine {
   id: SourceId;
   rows: number;
@@ -64,7 +67,11 @@ export function DataWeReadPanel() {
       id: 'source',
       header: 'Source',
       primary: true,
-      render: (row) => <a className={textActionClassName()}>{SOURCE_LABEL[row.id]}</a>,
+      render: (row) => (
+        <a href="#" onClick={stay} className={textActionClassName()}>
+          {SOURCE_LABEL[row.id]}
+        </a>
+      ),
     },
     {
       id: 'rows',
@@ -123,7 +130,9 @@ export function FlagDataLinks() {
         <li id="flag-watchlistIsk" className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <SeverityIcon severity="critical" />
           <span className="font-semibold">Watchlist ISK</span>
-          <a className={textActionClassName()}>Open the 3 rows in Wallet journal</a>
+          <a href="#" onClick={stay} className={textActionClassName()}>
+            Open the 3 rows in Wallet journal
+          </a>
           <span className="text-text-dim">
             (the flag shows up to 10; the journal has all {formatCount(ROWS.wallet.length)})
           </span>
@@ -131,7 +140,9 @@ export function FlagDataLinks() {
         <li id="flag-cynoNoCapital" className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <SeverityIcon severity="warning" />
           <span className="font-semibold">Cyno skill, no capital</span>
-          <a className={textActionClassName()}>Open the skill in Skills</a>
+          <a href="#" onClick={stay} className={textActionClassName()}>
+            Open the skill in Skills
+          </a>
         </li>
       </ul>
     </NewComponent>
@@ -157,7 +168,7 @@ export function ProposedReport({ children }: { children?: ReactNode }) {
   const assessment = review.assessment;
   return (
     <div className="mx-auto max-w-page space-y-4 px-4 py-4">
-      <a className={cx(textActionClassName(), 'inline-flex w-fit text-sm')}>
+      <a href="#" onClick={stay} className={cx(textActionClassName(), 'inline-flex w-fit text-sm')}>
         <span aria-hidden="true">‹&nbsp;</span>Vetting
       </a>
       <div className="flex items-center gap-3">
@@ -225,7 +236,7 @@ export function ProposedConsentTerms() {
         <div className="flex items-start gap-2 rounded-xs border border-line bg-panel-2 p-3 text-sm">
           <p>
             <Pill tone="accent">Changed</Pill>{' '}
-            <span className="font-semibold">When you press Send, we keep every row we read,</span>{' '}
+            <span className="font-semibold">After you press Send, we keep every row we read,</span>{' '}
             not only the ones that looked unusual. Officers can look through them.
           </p>
         </div>
@@ -255,7 +266,10 @@ export function ProposedConsentTerms() {
             <div className="space-y-2">
               <Eyebrow>You stay in control</Eyebrow>
               <ul className="space-y-1.5">
-                <li>Only officers (CEO, Director, Personnel Manager) can open it</li>
+                <li>
+                  Only officers (CEO, Director, Personnel Manager) can open it, but not the one who
+                  asked for the review or the person reviewed
+                </li>
                 <li>You see who opened it, and when</li>
                 <li>You can delete it at any time</li>
               </ul>
@@ -267,7 +281,7 @@ export function ProposedConsentTerms() {
                 <li>
                   Your EVE login
                   <span className="block text-xs text-text-dim">
-                    No key is kept. Nothing is read again
+                    No key is kept. We do not keep your login
                   </span>
                 </li>
               </ul>

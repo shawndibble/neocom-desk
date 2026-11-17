@@ -4,6 +4,8 @@
  * a screenshot never changes. Thousands of wallet rows on purpose: the list must not be capped.
  */
 
+import { DAY_MS, HOUR_MS } from '@/lib/age';
+
 export type SourceId = 'wallet' | 'contact' | 'mail' | 'contract' | 'skills' | 'history';
 
 export const SOURCE_IDS: readonly SourceId[] = [
@@ -35,7 +37,6 @@ export const SOURCE_COVERS: Record<SourceId, string> = {
 };
 
 export const READ_AT = Date.parse('2026-11-14T10:00:00Z');
-const DAY = 86_400_000;
 
 export interface Pilot {
   characterId: number;
@@ -201,7 +202,7 @@ function wallet(pilot: Pilot, count: number, seed: number): RawRow[] {
     rows.push({
       key: `w${pilot.characterId}-${i}`,
       characterId: pilot.characterId,
-      at: isoAgo(Math.floor(next() * 30 * DAY)),
+      at: isoAgo(Math.floor(next() * 30 * DAY_MS)),
       party:
         kind.what === 'Transaction tax' || kind.what === 'Broker fee'
           ? undefined
@@ -222,7 +223,7 @@ const flagged = (
 ): RawRow => ({
   key: `wf${pilot.characterId}-${days}-${party.id}`,
   characterId: pilot.characterId,
-  at: isoAgo(days * DAY + 3 * 3_600_000),
+  at: isoAgo(days * DAY_MS + 3 * HOUR_MS),
   party,
   what: 'Donation',
   amount,
@@ -239,7 +240,7 @@ function mail(pilot: Pilot, count: number, seed: number): RawRow[] {
     rows.push({
       key: `m${pilot.characterId}-${i}`,
       characterId: pilot.characterId,
-      at: isoAgo(Math.floor(next() * 400 * DAY)),
+      at: isoAgo(Math.floor(next() * 400 * DAY_MS)),
       party: other,
       what: 'Mail',
       direction: sent ? 'Sent' : 'Received',
@@ -276,7 +277,7 @@ function contracts(pilot: Pilot, count: number, seed: number): RawRow[] {
   return Array.from({ length: count }, (_, i) => ({
     key: `k${pilot.characterId}-${i}`,
     characterId: pilot.characterId,
-    at: isoAgo(Math.floor(next() * 30 * DAY)),
+    at: isoAgo(Math.floor(next() * 30 * DAY_MS)),
     party: pick(next, PEOPLE),
     what: pick(next, CONTRACT_TYPES),
     amount: Math.round(next() * 400_000_000),

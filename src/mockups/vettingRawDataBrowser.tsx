@@ -17,6 +17,8 @@ import {
   SelectValue,
   SkillBar,
   TabPanel,
+  CharacterAvatar,
+  SeverityIcon,
   Tabs,
   textActionClassName,
   useTabsId,
@@ -24,9 +26,8 @@ import {
   type DataTableSort,
 } from '@/components/ui';
 import type { ActiveFilter } from '@/components/ui/activeFilters';
-import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 import { Pill } from '@/components/ui/Pill';
-import { SeverityIcon } from '@/components/ui';
+import { isoDay } from '@/features/miningTax/corpBook/memberFlag';
 import { VettingEntity } from '@/features/corp/vetting/VettingEntity';
 import { cx } from '@/lib/cx';
 import { formatCount } from '@/lib/formatCount';
@@ -46,6 +47,9 @@ import {
   type RawRow,
   type SourceId,
 } from './vettingRawDataFixtures';
+
+/** Mockup links go nowhere: keep the page where it is. */
+const stay = (e: { preventDefault: () => void }) => e.preventDefault();
 
 export interface BrowserFilters {
   query: string;
@@ -111,7 +115,7 @@ function applyFilters(source: SourceId, rows: RawRow[], f: BrowserFilters): RawR
     if (f.flagged && !row.flag) return false;
     if (f.type !== '' && typeOf(source, row) !== f.type) return false;
     if (row.at !== null) {
-      const day = row.at.slice(0, 10);
+      const day = isoDay(row.at);
       if (f.from !== null && day < f.from) return false;
       if (f.to !== null && day > f.to) return false;
     }
@@ -184,7 +188,9 @@ function useColumns(source: SourceId, allCharacters: boolean): DataTableColumn<R
     sortValue: (row) => row.flag?.title,
     render: (row) =>
       row.flag ? (
-        <NewFlagLink id={row.flag.id} title={row.flag.title} />
+        <NewComponent name="NewFlagLink">
+          <NewFlagLink id={row.flag.id} title={row.flag.title} />
+        </NewComponent>
       ) : (
         <span className="text-text-faint">-</span>
       ),
@@ -591,7 +597,7 @@ export function DataBrowserPage({
   const [who, setWho] = useState<number | null>(characterId);
   return (
     <div className="mx-auto max-w-page space-y-4 px-4 py-4">
-      <a className={cx(textActionClassName(), 'inline-flex w-fit text-sm')}>
+      <a href="#" onClick={stay} className={cx(textActionClassName(), 'inline-flex w-fit text-sm')}>
         <span aria-hidden="true">‹&nbsp;</span>Report: Tamsin Vell
       </a>
       <div className="space-y-1">
