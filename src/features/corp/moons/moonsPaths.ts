@@ -10,6 +10,7 @@ import { definePageTabs, tabPath } from '@/lib/pageTabs';
 export const MOONS_TABS = definePageTabs('/corp/moons', [
   { id: 'overview', labelKey: 'corpTaxBook.moons.tabs.overview' },
   { id: 'extractions', labelKey: 'corpTaxBook.moons.tabs.extractions', deep: true },
+  { id: 'moons', labelKey: 'corpTaxBook.moons.tabs.moons', deep: true },
   { id: 'miners', labelKey: 'corpTaxBook.moons.tabs.miners', deep: true },
   { id: 'statements', labelKey: 'corpTaxBook.moons.tabs.statements', deep: true },
   { id: 'moon-owners', labelKey: 'corpTaxBook.moons.tabs.moonOwners', deep: true },
@@ -18,6 +19,7 @@ export const MOONS_TABS = definePageTabs('/corp/moons', [
 
 export type MoonsDetail =
   | { kind: 'extraction'; id: string }
+  | { kind: 'moon'; id: string }
   | { kind: 'miner'; id: string }
   | { kind: 'moonOwner'; id: string }
   | { kind: 'statementPeriod'; id: string }
@@ -25,17 +27,20 @@ export type MoonsDetail =
 
 /** The moon, Miner, moon owner or Statements period page a pathname names, if any. */
 export function moonsDetail(pathname: string): MoonsDetail {
-  const match = /^\/corp\/moons\/(extractions|miners|moon-owners|statements)\/([^/]+)\/?$/.exec(
-    pathname
-  );
+  const match =
+    /^\/corp\/moons\/(extractions|moons|miners|moon-owners|statements)\/([^/]+)\/?$/.exec(pathname);
   if (!match) return null;
   const id = decodeURIComponent(match[2]);
   if (match[1] === 'extractions') return { kind: 'extraction', id };
+  if (match[1] === 'moons') return { kind: 'moon', id };
   if (match[1] === 'statements') return { kind: 'statementPeriod', id };
   return match[1] === 'miners' ? { kind: 'miner', id } : { kind: 'moonOwner', id };
 }
 
 export const extractionPath = (id: string) => `/corp/moons/extractions/${encodeURIComponent(id)}`;
+/** A moon's page: every Extraction the book synced for it (#6299). */
+export const moonPath = (moonId: number) => `/corp/moons/moons/${moonId}`;
+export const moonsTabPath = tabPath(MOONS_TABS, 'moons');
 export const minerPath = (id: string) => `/corp/moons/miners/${encodeURIComponent(id)}`;
 export const moonOwnerPath = (id: string) => `/corp/moons/moon-owners/${encodeURIComponent(id)}`;
 export const statementPeriodPath = (periodStart: string) =>

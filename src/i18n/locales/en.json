@@ -18038,6 +18038,7 @@
       "tabs": {
         "overview": "Overview",
         "extractions": "Extractions",
+        "moons": "Moons",
         "miners": "Miners",
         "statements": "Statements",
         "moonOwners": "Moon owners",
@@ -18120,6 +18121,16 @@
       "extractionsNoneShown": "No Extraction matches the states shown",
       "extractionsSummary_one": "{{count}} Extraction",
       "extractionsSummary_other": "{{count}} Extractions",
+      "moons": {
+        "none": "No moons yet. A moon shows once the book has synced its first Extraction.",
+        "notFound": "This moon has no Extractions in the book.",
+        "summary_one": "{{count}} moon",
+        "summary_other": "{{count}} moons",
+        "nextPop": "Next pop {{date}}",
+        "lastPop": "Last pop {{date}}",
+        "by": { "laser": "By laser", "auto": "Broke on its own" },
+        "emptyHistory": "The book keeps every Extraction it syncs, from its start. No earlier Extraction of this moon exists."
+      },
       "state": {
         "extracting": "Extracting",
         "ready": "Ready",
@@ -18170,6 +18181,8 @@
       },
       "cols": {
         "moon": "Moon",
+        "owner": "Owner",
+        "pop": "Pop time",
         "state": "State",
         "when": "When",
         "ore": "Ore",
