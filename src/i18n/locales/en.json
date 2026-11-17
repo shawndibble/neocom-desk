@@ -19417,7 +19417,8 @@
           "confirm": "Assign {{amount}}",
           "intro": "{{amount}} from {{name}}, {{date}}, reason “{{reason}}”. No Miner has this character yet.",
           "miner": "Miner",
-          "pick": "Pick a Miner",
+          "find": "Find a Miner",
+          "noMatch": "No Miner matches",
           "effect": "It is credited to that Miner's oldest debt, or held as credit. The player can still claim it themselves from their own lines."
         },
         "writeOff": {
