@@ -7,3 +7,4 @@ Real app screenshots, seeded with two expiring orders. `*-first`: order 1 of 2. 
 | First | ![](implemented/1440-first.png) | ![](implemented/390-first.png) |
 | Last | ![](implemented/1440-last.png) | ![](implemented/390-last.png) |
 | Done | ![](implemented/1440-done.png) | ![](implemented/390-done.png) |
+| Undercut, with a cost basis (bought at 3.00, rival at 5.50): Copy 5.49 and the lowest profitable price 5.41 | ![](implemented/1440-undercut.png) | ![](implemented/390-undercut.png) |
