@@ -136,8 +136,6 @@ function useWalletDivisionNames(characterId: number, corporationId: number): Map
   return names;
 }
 
-export type { SettingsTab };
-
 /**
  * The book's settings (D21: from the page header's gear): the dated rates
  * (corp default, Guest default, per-Miner, per-moon, per-refinery, per-moon-owner), hub and Ore Form, grace,

@@ -36,6 +36,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { tabBarTabs } from '@/lib/pageTabs';
 import { cx } from '@/lib/cx';
+import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
 import { usePageTab } from '@/lib/usePageTab';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { CorpDenied } from '@/features/corp/CorpDenied';
@@ -134,6 +135,9 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
       (prev) => {
         const params = new URLSearchParams(prev);
         params.delete(SETTINGS_PARAM);
+        // The Sharing tab latched `?highlight=` on mount; both updaters read the same stale
+        // params, so this one must drop it too or its write would bring it back.
+        if (settingsParam === 'sharing') params.delete(HIGHLIGHT_PARAM);
         return params;
       },
       { replace: true }
