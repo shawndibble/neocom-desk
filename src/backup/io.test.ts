@@ -66,6 +66,18 @@ describe('exportBackup / importBackup', () => {
     expect(plans2).toHaveLength(1);
   });
 
+  it('carries Overview character groups through a backup', async () => {
+    const value = { groups: [{ id: 'g1', name: 'Miners', characterIds: [1, 2] }], updatedAt: 5 };
+    await db.settings.put({ key: 'overviewGroups', value });
+    const { contents } = await exportBackup(PASSWORD);
+    await db.settings.clear();
+
+    const summary = await importBackup(contents, PASSWORD);
+
+    expect(summary.addedSettingKeys).toEqual(['overviewGroups']);
+    expect((await db.settings.get('overviewGroups'))?.value).toEqual(value);
+  });
+
   it('rejects the wrong password without writing anything', async () => {
     await db.characters.bulkAdd([{ characterId: 5, name: 'X', ownerHash: 'h', addedAt: 0 }]);
     const { contents } = await exportBackup(PASSWORD);
