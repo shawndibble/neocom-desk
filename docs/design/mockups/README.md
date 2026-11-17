@@ -37,5 +37,6 @@ PNG exports of the chosen mockups for ready tickets. Delete a folder (and its ro
 | [moons-all-moons](moons-all-moons/README.md) | Issue #6299 | Chosen: Moons tab with a flat sortable list (A); opened moon is a table of Extractions (A), a row opens `/corp/moons/extractions/:id`; moon names in other lists link to the moon page |
 | [review-member](review-member/README.md) | Owner request (no issue yet) | Not chosen yet: roster autocomplete for Review a member (no-match, already-waiting, picked states), role suggestions, result step with a sent-on-purpose in-game mail and preview, waiting queue rows with mail state and menu, request page before the member shares, the member's page top |
 | [moons-settings-and-layout](moons-settings-and-layout/README.md) | Issue #6304 | Chosen by the agent: Sharing is a fifth Moon settings tab (scrolls in the modal, saves apart); Moons page keeps its layout, six tabs |
+| [payee-one-per-entity](payee-one-per-entity/README.md) | Issue #6308 | Chosen by the agent: one Manage Payees row per recipient with "Used by N characters"; differing terms shown as one "Use … for all" button per distinct terms |
 
 First draft mockup; sample data. The ticket's Agent Brief text wins over the picture where they differ.

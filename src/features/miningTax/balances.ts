@@ -35,15 +35,21 @@ export interface UnassignedSummary {
 export function computePayeeBalances(
   rows: readonly DisplayRow[],
   payees: readonly PayeeRecord[],
-  alsoBilled: (member: GroupMember) => number = () => 0
+  alsoBilled: (member: GroupMember) => number = () => 0,
+  /** Payee ids that are another record of the same Payee (`payeeDuplicateAliases`): summed into it. */
+  aliases: ReadonlyMap<string, string> = new Map()
 ): PayeeBalance[] {
   const byPayee = new Map<string, PayeeBalance>(
-    payees.map((payee) => [payee.id, { payee, owed: 0, members: [] }])
+    payees
+      .filter((payee) => !aliases.has(payee.id))
+      .map((payee) => [payee.id, { payee, owed: 0, members: [] }])
   );
   for (const dr of rows) {
     for (const member of allMembers(dr)) {
       if (member.assignment.status !== 'outstanding' || !member.assignment.payeeId) continue;
-      const balance = byPayee.get(member.assignment.payeeId);
+      const balance = byPayee.get(
+        aliases.get(member.assignment.payeeId) ?? member.assignment.payeeId
+      );
       if (!balance) continue;
       const share = Math.min(1, alsoBilled(member));
       const owed = member.assignment.taxOwed * (1 - share);

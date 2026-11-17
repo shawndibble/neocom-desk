@@ -149,3 +149,32 @@ describe('systemsByPayee', () => {
     expect(systems.size).toBe(1);
   });
 });
+
+describe('suggestPayeeForSystem with duplicate Payee records', () => {
+  const primary = payee('a', 'BUH');
+  const duplicate = payee('b', 'BUH', { characterId: 2 });
+  const aliases = new Map([['b', 'a']]);
+
+  it("suggests the primary when history used another character's record", () => {
+    const result = suggestPayeeForSystem(
+      [assigned('b', '2026-09-01')],
+      [primary, duplicate],
+      AINSAN,
+      1,
+      aliases
+    );
+    expect(result.suggested?.id).toBe('a');
+    expect(result.fromHistory).toBe(true);
+    expect(result.ranked.map((p) => p.id)).toEqual(['a']);
+  });
+
+  it("suggests the primary when the duplicate holds the system's default", () => {
+    const held = payee('b', 'BUH', {
+      characterId: 1,
+      defaultSystems: [{ systemId: TALIDAL, from: '2026-01-01' }],
+    });
+    const result = suggestPayeeForSystem([], [primary, held], TALIDAL, 1, aliases);
+    expect(result.suggested?.id).toBe('a');
+    expect(result.fromHistory).toBe(false);
+  });
+});

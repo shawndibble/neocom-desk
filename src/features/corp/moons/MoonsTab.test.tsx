@@ -24,7 +24,9 @@ const ex = (id: string, moonId: number, state: string, startedAt: string) => ({
 vi.mock('./useBook', () => ({
   useBook: () => ({
     corporationId: 98000001,
+    canEdit: false,
     view: {
+      input: { rates: [] },
       extractions: [
         ex('a', 10, 'fractured', '2026-09-01T00:00:00Z'),
         ex('b', 10, 'expired', '2026-08-01T00:00:00Z'),

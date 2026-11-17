@@ -883,10 +883,11 @@ async function seedSecondPayee(page: Page): Promise<void> {
         const tx = database.transaction('payees', 'readwrite');
         tx.objectStore('payees').put({
           id: payeeId,
+          // A different recipient: the same entity would merge it into the first Payee.
           characterId,
           name: payeeName,
           defaultTaxPct: 10,
-          entityId: 98000777,
+          entityId: 98000778,
           updatedAt: Date.now(),
         });
         tx.oncomplete = () => resolve();

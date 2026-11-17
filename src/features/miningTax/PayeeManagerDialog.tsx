@@ -27,8 +27,10 @@ import { deletePayee } from './ledgerActions';
 import { PayeeNameField } from './PayeeNameField';
 import type { PayeeEntityMatch } from './payeeEntitySearch';
 import { lookupPayeeName, NEW_PAYEE_KINDS } from './payeeLookup';
+import { groupPayees, type PayeeGroup, type PayeeVariant } from './payeeGroups';
 import {
   DefaultSystemTakenError,
+  applyPayeeTerms,
   createPayee,
   loadPayees,
   updatePayee,
@@ -184,6 +186,13 @@ export function PayeeManagerDialog({
     return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
   }, [payeesByCharacterState]);
 
+  // One row per corporation or player: a pilot's alts each hold a record of the same recipient.
+  const groups = useMemo(() => groupPayees(payees), [payees]);
+  const groupOf = (payeeId: string) => groups.find((g) => g.members.some((m) => m.id === payeeId));
+
+  const characterNameOf = (characterId: number) =>
+    characters.find((c) => c.characterId === characterId)?.characterName ?? `#${characterId}`;
+
   const showForm = formOpen || payees.length === 0;
   // A name matching a Corp Tax Book's corporation the draft is not yet linked to.
   const namedBook = corporationNamed(draft.name, bookCorporations);
@@ -309,7 +318,9 @@ export function PayeeManagerDialog({
     const existing = current.id ? payees.find((p) => p.id === current.id) : undefined;
     try {
       if (existing) {
-        await updatePayee(existing, input);
+        const saved = await updatePayee(existing, input);
+        // A Payee is one recipient whatever the Character: its other records bill the same.
+        await applyPayeeTerms(saved, groupOf(existing.id)?.members ?? []);
       } else {
         await createPayee(initialCharacterId, input);
       }
@@ -365,9 +376,14 @@ export function PayeeManagerDialog({
   async function handleDelete(payee: PayeeRecord, moveToPayeeId?: string) {
     // One transaction: a failure leaves the Payee and every entry's label intact.
     setDeleteError(null);
-    if (!(await deletePayee(payee, moveToPayeeId)).ok) {
-      setDeleteError(t('miningTax.payees.deleteFailed', { name: payee.name }));
-      return;
+    const members = groupOf(payee.id)?.members ?? [payee];
+    for (const member of members) {
+      if (!(await deletePayee(member, moveToPayeeId)).ok) {
+        setDeleteError(t('miningTax.payees.deleteFailed', { name: payee.name }));
+        await refresh();
+        onChanged();
+        return;
+      }
     }
     if (draft.id === payee.id) closeForm();
     await refresh();
@@ -383,15 +399,32 @@ export function PayeeManagerDialog({
     const payee = deletingPayee;
     setDeletingPayee(null);
     if (!payee) return;
-    const owed = owedByPayee?.get(payee.id);
+    const owed = owedOfGroup(groupOf(payee.id));
     void handleDelete(payee, moveAndDelete && owed && moveTargetId ? moveTargetId : undefined);
   }
 
+  /** What a group is owed: its records' Assignments summed. */
+  function owedOfGroup(group: PayeeGroup | undefined): PayeeOwed | undefined {
+    const parts = group?.members.flatMap((m) => owedByPayee?.get(m.id) ?? []) ?? [];
+    if (parts.length === 0) return undefined;
+    return parts.reduce((sum, o) => ({
+      amount: sum.amount + o.amount,
+      count: sum.count + o.count,
+      moving: sum.moving + o.moving,
+    }));
+  }
+
+  /** The pilot's pick of which terms a merged Payee's records all bill with. */
+  async function applyVariant(group: PayeeGroup, variant: PayeeVariant) {
+    await applyPayeeTerms(variant.members[0], group.members);
+    await refresh();
+    onChanged();
+  }
+
+  const deletingGroup = deletingPayee ? groupOf(deletingPayee.id) : undefined;
   const deletingOwed =
-    deletingPayee && (owedByPayee?.get(deletingPayee.id)?.count ?? 0) > 0
-      ? owedByPayee?.get(deletingPayee.id)
-      : undefined;
-  const moveTargets = deletingPayee ? payees.filter((p) => p.id !== deletingPayee.id) : [];
+    (owedOfGroup(deletingGroup)?.count ?? 0) > 0 ? owedOfGroup(deletingGroup) : undefined;
+  const moveTargets = groups.filter((g) => g !== deletingGroup).map((g) => g.primary);
 
   return (
     <Modal
@@ -418,12 +451,16 @@ export function PayeeManagerDialog({
           <p className="text-xs text-text-dim">{t('miningTax.payeesEmpty')}</p>
         ) : (
           <ul className="divide-y divide-line">
-            {payees.map((payee) => {
-              const owed = owedByPayee?.get(payee.id);
-              const systems = payeeSystemNames(systemsByPayee?.get(payee.id), systemNames);
+            {groups.map((group) => {
+              const payee = group.primary;
+              const owed = owedOfGroup(group);
+              const systems = payeeSystemNames(
+                new Set(group.members.flatMap((m) => [...(systemsByPayee?.get(m.id) ?? [])])),
+                systemNames
+              );
               const hub = hubForPayee(payee.hubId).systemName;
               return (
-                <li key={payee.id} className="flex items-center gap-1 py-1.5">
+                <li key={group.key} className="flex items-center gap-1 py-1.5">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline gap-2">
                       <Tooltip content={payee.name}>
@@ -461,6 +498,37 @@ export function PayeeManagerDialog({
                         )}
                       </span>
                     </p>
+                    {group.members.length > 1 && (
+                      <p className="mt-0.5 text-[0.6875rem] text-text-dim">
+                        {t('miningTax.payees.sharedByCharacters', {
+                          count: group.members.length,
+                        })}
+                      </p>
+                    )}
+                    {group.variants.length > 1 && (
+                      <div className="mt-1 space-y-1">
+                        <p className="text-[0.6875rem] text-warning">
+                          {t('miningTax.payees.termsDiffer')}
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {group.variants.map((variant) => (
+                            <Button
+                              key={`${variant.members[0].defaultTaxPct}-${variant.members[0].hubId ?? ''}`}
+                              size="sm"
+                              onClick={() => void applyVariant(group, variant)}
+                            >
+                              {t('miningTax.payees.useTermsForAll', {
+                                pct: variant.members[0].defaultTaxPct,
+                                hub: hubForPayee(variant.members[0].hubId).systemName,
+                                characters: variant.members
+                                  .map((m) => characterNameOf(m.characterId))
+                                  .join(', '),
+                              })}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <IconButton
                     variant="plain"
