@@ -496,7 +496,7 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       ).toBe(true);
     });
 
-    it('holds a known miner’s donation for review when their Miner owes nothing (#6207)', async () => {
+    it('credits a known miner’s donation even when their Miner owes nothing (#6300)', async () => {
       // Billed through the day character 50 mined, and paid in full: nothing owed, nothing unbilled.
       await book()
         .collection('statements')
@@ -515,8 +515,8 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       const summary = await runScheduledCorpSyncs(syncDeps(), fakeEsi());
       expect(summary.synced).toBe(1);
       const payment = (await book().collection('payments').doc('j1_1').get()).data();
-      expect(payment?.minerId).toBeUndefined();
-      expect(payment?.reviewReason).toBe('no-open-balance');
+      expect(payment?.minerId).toBe('solo:50');
+      expect(payment?.reviewReason).toBeUndefined();
     });
 
     it('matches a held donation once the lagging ledger shows the ore mined before it was paid', async () => {
@@ -576,7 +576,7 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
         await fed('2026-10-11');
         await heldDonation('j1_901', '2026-10-02T22:38:44.000Z');
         await heldDonation('j1_902', '2026-10-14T18:28:44.000Z');
-        // Paid before the book bills from: the officer's to place.
+        // Paid before the book bills from: still credited to the Miner, the book ignores it.
         await heldDonation('j1_900', '2026-09-21T17:38:23.000Z');
         await optIn(ACCOUNTANT);
         await runScheduledCorpSyncs(syncDeps(), fakeEsi());
@@ -586,8 +586,7 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
           expect(await payment(id)).toMatchObject({ minerId: 'solo:60' });
           expect((await payment(id))?.reviewReason).toBeUndefined();
         }
-        expect((await payment('j1_900'))?.minerId).toBeUndefined();
-        expect((await payment('j1_900'))?.reviewReason).toBe('no-open-balance');
+        expect(await payment('j1_900')).toMatchObject({ minerId: 'solo:60' });
       });
 
       it('keeps a held donation when the moon owner did not cover the day mined', async () => {

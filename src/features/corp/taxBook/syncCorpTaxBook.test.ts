@@ -177,7 +177,7 @@ describe('syncCorpTaxBook', () => {
     expect(donation).toMatchObject({ minerId: 'solo:7' });
   });
 
-  it('holds a known miner’s donation for review when their Miner owes nothing (#6207)', async () => {
+  it('credits a known miner’s donation even when their Miner owes nothing (#6300)', async () => {
     // Billed through the day they mined, and paid in full: nothing owed, no ore unbilled.
     const billed = { ...owing('solo:7'), coversThrough: '2026-07-31' } as unknown as Statement;
     const d = deps({
@@ -201,8 +201,8 @@ describe('syncCorpTaxBook', () => {
     });
     await run(d);
     const [donation] = vi.mocked(d.uploadSync).mock.calls[0][1].donations ?? [];
-    expect(donation.minerId).toBeUndefined();
-    expect(donation.reviewReason).toBe('no-open-balance');
+    expect(donation.minerId).toBe('solo:7');
+    expect(donation.reviewReason).toBeUndefined();
   });
 
   it('notes tax paid into a division the book does not read, and never credits it (#6207)', async () => {
@@ -240,7 +240,7 @@ describe('syncCorpTaxBook', () => {
     expect('uncounted' in vi.mocked(d.uploadSync).mock.calls[0][1]).toBe(false);
   });
 
-  it('never re-matches a donation held for review when its Miner owed nothing as they paid, even once they owe', async () => {
+  it('assigns a donation held under #6207 to its Miner even though they owed nothing as they paid (#6300)', async () => {
     const d = deps({
       readBookState: async () =>
         emptyState({
@@ -260,7 +260,7 @@ describe('syncCorpTaxBook', () => {
         }),
     });
     await run(d);
-    expect(d.assignPayment).not.toHaveBeenCalled();
+    expect(d.assignPayment).toHaveBeenCalledWith(5, CORP, 'j1_1', 'm1');
   });
 
   it('matches a held donation once the lagging ledger shows ore its Miner had not been billed for when paying', async () => {
@@ -330,7 +330,7 @@ describe('syncCorpTaxBook', () => {
           book([
             held('j5_1', '2026-07-02T22:38:44.000Z'),
             held('j5_2', '2026-07-14T18:28:44.000Z'),
-            // Paid before the book bills from: the officer's to place.
+            // Paid before the book bills from: still credited to the Miner, the book ignores it.
             held('j5_0', '2026-06-21T17:38:23.000Z'),
           ]),
       });
@@ -340,7 +340,7 @@ describe('syncCorpTaxBook', () => {
           .mocked(d.assignPayment)
           .mock.calls.map((c) => c[2])
           .sort()
-      ).toEqual(['j5_1', 'j5_2']);
+      ).toEqual(['j5_0', 'j5_1', 'j5_2']);
       expect(d.assignPayment).toHaveBeenCalledWith(5, CORP, 'j5_1', 'solo:7');
     });
 

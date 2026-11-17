@@ -188,7 +188,6 @@ export function minerIdFor(characterId: number, miners: readonly MinerLike[]): s
 export type DonationMatch =
   | { kind: 'statement'; statementId: string; minerId: string }
   | { kind: 'miner'; minerId: string }
-  | { kind: 'review'; minerId: string }
   | { kind: 'unmatched' };
 
 function escapeRegExp(text: string): string {
@@ -218,9 +217,7 @@ export function matchDonation(
   const grouped = book.miners.some((m) => m.characterIds.includes(donation.characterId));
   if (grouped || book.knownCharacterIds.has(donation.characterId)) {
     const minerId = minerIdFor(donation.characterId, book.miners);
-    if ((book.openBalance.get(minerId) ?? 0) > 0 || book.unbilled.has(minerId))
-      return { kind: 'miner', minerId };
-    return { kind: 'review', minerId };
+    return { kind: 'miner', minerId };
   }
   return { kind: 'unmatched' };
 }
@@ -254,9 +251,7 @@ export function resolveDonations(
         ? { ...d, minerId: match.minerId, statementId: match.statementId }
         : match.kind === 'miner'
           ? { ...d, minerId: match.minerId }
-          : match.kind === 'review'
-            ? { ...d, reviewReason: 'no-open-balance' }
-            : d
+          : d
     );
   }
   return donations.map((d) => resolved.get(d)!);
@@ -301,11 +296,13 @@ export function noteUncounted(
       openBalance.set(c.minerId, (openBalance.get(c.minerId) ?? 0) - c.amount);
   return donations
     .filter((d) => {
-      const kind = matchDonation(
-        { characterId: d.characterId, reason: d.reason },
-        { ...book, openBalance }
-      ).kind;
-      return kind === 'statement' || kind === 'miner';
+      const match = matchDonation({ characterId: d.characterId, reason: d.reason }, book);
+      if (match.kind === 'statement') return true;
+      // A known sender's donation here is likely tax only while their Miner owes (#6207).
+      return (
+        match.kind === 'miner' &&
+        ((openBalance.get(match.minerId) ?? 0) > 0 || book.unbilled.has(match.minerId))
+      );
     })
     .sort((a, b) => b.at.localeCompare(a.at) || b.refId - a.refId)
     .slice(0, UNCOUNTED_LIMIT)
