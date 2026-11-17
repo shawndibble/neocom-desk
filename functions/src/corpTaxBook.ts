@@ -606,7 +606,7 @@ export type EditAction =
       /** The Declaration this payment confirms, in the same write (one resolution per declaration). */
       declarationId?: string;
     }
-  | { action: 'markNotTax'; paymentId: string; notTaxAmount: number; reason: string }
+  | { action: 'markNotTax'; paymentId: string; notTaxAmount: number; reason?: string }
   | {
       action: 'assignPayment';
       paymentId: string;
@@ -744,6 +744,9 @@ export function dismissalNeedsDirector(
 }
 
 const reason = (v: unknown) => boundedString(v, 'reason', 500);
+/** Optional reason: absent or blank stores nothing. */
+const optReason = (v: unknown) =>
+  v === undefined || (typeof v === 'string' && v.trim() === '') ? undefined : reason(v);
 const optNote = (v: unknown) => (v === undefined ? undefined : boundedString(v, 'note', 500));
 const optNextStep = (v: unknown) =>
   v === undefined ? undefined : boundedString(v, 'nextStep', 500);
@@ -819,13 +822,15 @@ export function parseEditAction(data: unknown): EditAction {
           ? { declarationId: docId(d.declarationId, 'declarationId') }
           : {}),
       };
-    case 'markNotTax':
+    case 'markNotTax': {
+      const why = optReason(d.reason);
       return {
         action,
         paymentId: docId(d.paymentId, 'paymentId'),
         notTaxAmount: num(d.notTaxAmount, 'notTaxAmount', 0, 1e13),
-        reason: reason(d.reason),
+        ...(why !== undefined ? { reason: why } : {}),
       };
+    }
     case 'assignPayment':
       return {
         action,

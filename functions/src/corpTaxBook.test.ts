@@ -88,6 +88,13 @@ describe('parsers', () => {
     expect(() => parseTurnOnInput({ ...base, corporationId: '9' })).toThrow();
   });
 
+  it('markNotTax takes no reason and stores none when blank', () => {
+    const base = { action: 'markNotTax', paymentId: 'p1', notTaxAmount: 5 };
+    expect(parseEditAction(base)).toEqual(base);
+    expect(parseEditAction({ ...base, reason: '  ' })).toEqual(base);
+    expect(parseEditAction({ ...base, reason: ' buyback ' })).toMatchObject({ reason: 'buyback' });
+  });
+
   it('refuses a path-escaping id and an unknown action', () => {
     expect(() => parseEditAction({ action: 'dismissAll' })).toThrow();
     expect(() =>

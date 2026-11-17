@@ -409,13 +409,13 @@ export function MarkNotTaxDialog({
       onClose={onClose}
       title={t('corpTaxBook.moons.dialogs.notTax.title')}
       confirmLabel={t('corpTaxBook.moons.dialogs.notTax.confirm', { amount: isk(amount || 0) })}
-      canConfirm={amount > 0 && amount <= payment.amount && reason.trim().length > 0}
+      canConfirm={amount > 0 && amount <= payment.amount}
       run={async () => {
         await edit({
           action: 'markNotTax',
           paymentId: payment.id,
           notTaxAmount: amount,
-          reason: reason.trim(),
+          ...(reason.trim() ? { reason: reason.trim() } : {}),
         });
       }}
     >

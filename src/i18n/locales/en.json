@@ -19396,7 +19396,7 @@
           "all": "All",
           "part": "Part",
           "amount": "Amount not tax",
-          "reason": "Reason (required)",
+          "reason": "Reason (optional)",
           "effect": "The debt reopens by {{amount}}. What is left stays credited.",
           "effectUnmatchedAll": "It leaves Unmatched. Nothing is credited to anyone.",
           "effectUnmatchedPart": "{{amount}} is set aside. The rest stays Unmatched until you assign it."
