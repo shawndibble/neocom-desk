@@ -30,7 +30,8 @@ export interface StatementPeriod {
   end: string;
 }
 
-function daysBetween(from: string, to: string): number {
+/** Whole days from one `YYYY-MM-DD` to another. */
+export function daysBetween(from: string, to: string): number {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS);
 }
 

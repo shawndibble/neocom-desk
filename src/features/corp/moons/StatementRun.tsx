@@ -33,7 +33,7 @@ import { editErrorMessage, useBook } from './useBook';
 import { isk, periodsLabel } from './moonsFormat';
 import { TRADE_HUBS } from '@/market/hubs';
 import { mailTarget, statementRefineryNames, useCorporationName } from './statementMailing';
-import { plannedRuns } from './useNeedsYou';
+import { plannedNotices, plannedRuns } from './useNeedsYou';
 
 type Step = 'check' | 'send' | 'done';
 
@@ -78,7 +78,9 @@ function StepDot({
 export function StatementRun() {
   const { t } = useTranslation();
   const ctx = useBook();
-  const { view, names, canEdit, corporationId, characterId, reload } = ctx;
+  const { view, names, canEdit, corporationId, characterId, reload, settings } = ctx;
+  // A running account sends late notices instead of a calendar run (#6294).
+  const running = !!view.input.runningAccountFrom;
   const corporationName = useCorporationName();
   const [step, setStep] = useState<Step>('check');
   const [previewId, setPreviewId] = useState<string | null>(null);
@@ -107,6 +109,10 @@ export function StatementRun() {
   const queue = useLiveQuery(() => listQueue(corporationId), [corporationId], []);
 
   const runs = useMemo(() => plannedRuns(view), [view]);
+  const notices = useMemo(
+    () => plannedNotices(view, settings.noticeRules),
+    [view, settings.noticeRules]
+  );
   /** Every new Statement of the run, oldest period first, with the view it is issued from. */
   const lines = useMemo(
     () => runs.flatMap((run) => run.plan.lines.map((line) => ({ run, line }))),
@@ -136,8 +142,8 @@ export function StatementRun() {
     [view, queue]
   );
 
-  const nothingToDo = runs.length === 0 && unmailed.length === 0;
-  const total = lines.length + unmailed.length;
+  const nothingToDo = runs.length === 0 && notices.length === 0 && unmailed.length === 0;
+  const total = lines.length + notices.length + unmailed.length;
   const minerRow = (id: string) => view.miners.find((m) => m.id === id)!;
 
   /** Everything the run will send: newly drafted Statements, then earlier unmailed ones. */
@@ -158,6 +164,15 @@ export function StatementRun() {
         carried: line.carried,
       });
     }
+    for (const n of notices) {
+      out.push({
+        key: `notice:${n.minerId}`,
+        minerId: n.minerId,
+        statement: n.statement,
+        amountDue: n.owed,
+        carried: n.carried,
+      });
+    }
     for (const s of unmailed) {
       // A Miner since unlinked or regrouped has no row to address the mail to; skip it rather than crash.
       const row = view.miners.find((m) => m.id === s.minerId);
@@ -172,7 +187,7 @@ export function StatementRun() {
       });
     }
     return out;
-  }, [view, lines, unmailed]);
+  }, [view, lines, notices, unmailed]);
 
   const previewFor = (item: (typeof previews)[number], corpName: string): MailPreviewContent => {
     const target = mailTarget(ctx, item.statement, minerRow(item.minerId), {
@@ -264,6 +279,24 @@ export function StatementRun() {
         }
         await queueTargets(targets);
       }
+      // Late notices (#6294): each issued (which makes its verify link), then all queued.
+      const noticeTargets = [];
+      for (const n of notices) {
+        const row = minerRow(n.minerId);
+        await editBook(characterId, corporationId, {
+          action: 'issueStatement',
+          statement: {
+            ...n.statement,
+            corporationName,
+            minerName: names.character(row.mainCharacterId),
+            refineryNames: statementRefineryNames(n.statement, names),
+          },
+        });
+        noticeTargets.push(
+          mailTarget(ctx, n.statement, row, { amountDue: n.owed, carried: n.carried })
+        );
+      }
+      await queueTargets(noticeTargets);
       setResult(sent);
       setStep('done');
     } catch (e) {
@@ -298,8 +331,9 @@ export function StatementRun() {
     </div>
   );
 
-  const title =
-    runs.length > 0
+  const title = running
+    ? t('corpTaxBook.moons.run.noticesTitle')
+    : runs.length > 0
       ? t('corpTaxBook.moons.run.title', {
           period: periodsLabel(runs.map((run) => run.plan.period)),
         })
@@ -308,7 +342,9 @@ export function StatementRun() {
   return (
     <Panel title={title}>
       {nothingToDo ? (
-        <p className="text-sm text-text-dim">{t('corpTaxBook.moons.run.nothing')}</p>
+        <p className="text-sm text-text-dim">
+          {t(running ? 'corpTaxBook.moons.run.noticesNothing' : 'corpTaxBook.moons.run.nothing')}
+        </p>
       ) : (
         <>
           <ol className="mb-4 flex flex-wrap gap-x-6 gap-y-2">
@@ -331,10 +367,22 @@ export function StatementRun() {
                 <div className="space-y-3 text-sm">
                   <StatChips>
                     <StatChip
-                      label={t('corpTaxBook.moons.run.statements')}
+                      label={t(
+                        running
+                          ? 'corpTaxBook.moons.run.notices'
+                          : 'corpTaxBook.moons.run.statements'
+                      )}
                       value={t('corpTaxBook.moons.run.toSend', { count: total })}
                       emphasis
                     />
+                    {notices.length > 0 && (
+                      <StatChip
+                        label={t('corpTaxBook.moons.run.noticesOwed')}
+                        value={isk(notices.reduce((sum, n) => sum + n.owed, 0))}
+                        tooltip={t('corpTaxBook.moons.run.noticesOwedTip')}
+                        tooltipGlyph="info"
+                      />
+                    )}
                     {latest && (
                       <StatChip
                         label={t('corpTaxBook.moons.run.balances')}
@@ -365,12 +413,17 @@ export function StatementRun() {
                         className="text-success"
                         aria-hidden
                       />
-                      {t('corpTaxBook.moons.run.billable', {
-                        hub:
-                          TRADE_HUBS.find((h) => h.id === view.input.hubId)?.systemName ??
-                          view.input.hubId,
-                        form: t(`corpTaxBook.moons.settings.form.${view.input.oreForm}`),
-                      })}
+                      {t(
+                        running
+                          ? 'corpTaxBook.moons.run.noticesBillable'
+                          : 'corpTaxBook.moons.run.billable',
+                        {
+                          hub:
+                            TRADE_HUBS.find((h) => h.id === view.input.hubId)?.systemName ??
+                            view.input.hubId,
+                          form: t(`corpTaxBook.moons.settings.form.${view.input.oreForm}`),
+                        }
+                      )}
                     </li>
                     {unmailed.length > 0 && (
                       <li className="flex items-center gap-2">
@@ -441,7 +494,12 @@ export function StatementRun() {
                       onClick={() => void send()}
                       disabled={busy || corporationName === null}
                     >
-                      {t('corpTaxBook.moons.run.sendButton', { count: total })}
+                      {t(
+                        running
+                          ? 'corpTaxBook.moons.run.sendNotices'
+                          : 'corpTaxBook.moons.run.sendButton',
+                        { count: total }
+                      )}
                     </Button>
                     <Button variant="ghost" onClick={() => setStep('check')} disabled={busy}>
                       {t('corpTaxBook.moons.run.back')}
@@ -453,7 +511,12 @@ export function StatementRun() {
                 <div className="space-y-3 text-sm">
                   {result && (
                     <p>
-                      {t('corpTaxBook.moons.run.queued', { count: result.queued })}
+                      {t(
+                        running
+                          ? 'corpTaxBook.moons.run.noticesQueued'
+                          : 'corpTaxBook.moons.run.queued',
+                        { count: result.queued }
+                      )}
                       {result.skipped > 0 &&
                         ` ${t('corpTaxBook.moons.run.skipped', { count: result.skipped })}`}
                       {result.missingLink > 0 &&

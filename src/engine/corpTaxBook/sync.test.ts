@@ -628,6 +628,35 @@ describe('openBalances', () => {
   });
 });
 
+describe('a running account’s late notice (#6294)', () => {
+  const notice = {
+    ...statement({ id: 'n1', minerId: 'solo:7', amount: 10_000_000 }),
+    kind: 'notice' as const,
+    coversThrough: '2026-09-30',
+  };
+  const pay = {
+    id: 'p1',
+    minerId: 'solo:7',
+    characterId: 7,
+    amount: 10_000_000,
+    at: '2026-10-02T00:00:00Z',
+    source: 'donation' as const,
+  };
+
+  it('is never settled for good and holds no open balance of its own', () => {
+    const base = { miners: [], dismissals: [] as Dismissal[], statements: [notice] };
+    expect(planSettlements({ ...base, payments: [pay], alreadyPaid: new Set() })).toEqual([]);
+    expect(openBalances({ ...base, payments: [] }).size).toBe(0);
+  });
+
+  it('never moves billed through: the days it listed are still on the account', () => {
+    const rows = [{ characterId: 7, date: '2026-09-20', quantity: 10 }];
+    expect(
+      unbilledMinerIds(rows, { miners: [], statements: [notice], startDate: '2026-09-01' })
+    ).toEqual(new Set(['solo:7']));
+  });
+});
+
 describe('planSettlements', () => {
   const s1 = statement({ id: 's1', minerId: 'solo:7', amount: 10_000_000 });
   const pay = (over = {}) => ({

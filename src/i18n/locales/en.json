@@ -8178,7 +8178,11 @@
         "safeOnce": "Safe to pay once {{corp}} syncs (last synced {{ago}}).",
         "neverSynced": "Safe to pay once {{corp}} syncs (never synced).",
         "openDay": "{{date}}: safe to pay once it is closed, after {{time}} UTC on {{closeDate}} and {{corp}}'s next sync.",
-        "credit": "{{amount}} ISK credit with {{corp}} goes on your next Statement."
+        "credit": "{{amount}} ISK credit with {{corp}} goes on your next Statement.",
+        "ahead": "{{amount}} ISK ahead with {{corp}}: it pays your next days as they close.",
+        "paidThrough": "Paid through {{date}} with {{corp}}.",
+        "behind_one": "You owe {{corp}} {{amount}} ISK: {{count}} day, oldest {{date}}.",
+        "behind_other": "You owe {{corp}} {{amount}} ISK: {{count}} days, oldest {{date}}."
       },
       "diff": {
         "fixRecords": "Fix my records",
@@ -17878,6 +17882,11 @@
         "manual": "Recorded by an officer"
       },
       "balanceDue": "Balance due",
+      "owedNow": "Owed now",
+      "owedNowLine_one": "Everything you owe {{corp}} today: {{count}} day, oldest {{date}}. Counted {{asOf}}; what you paid since is taken off.",
+      "owedNowLine_other": "Everything you owe {{corp}} today: {{count}} days, oldest {{date}}. Counted {{asOf}}; what you paid since is taken off.",
+      "paidUp": "You are paid up with {{corp}}.",
+      "paidUpThrough": "You are paid through {{date}} with {{corp}}.",
       "balanceSum": "Billed {{billed}} − paid {{paid}}.",
       "dismissed": "{{amount}} was waived by an officer.",
       "forgiven": "{{amount}} was written off by an officer.",
@@ -17885,6 +17894,8 @@
       "howToPay": "Donate ISK to {{corp}}; any of your characters counts.",
       "payCodeLead": "Put the code",
       "payCodeTail": "in the reason to pin a donation to this Statement.",
+      "payCodeTailNotice": "in the reason so the payment is matched to you; it pays your oldest days first.",
+      "onNotice": "On this notice",
       "payAccount": "Pick the Account {{accounts}} in EVE's transfer window: a donation into another division is not credited.",
       "settled": "This Statement is settled.",
       "declaration": "You told {{corp}} on {{date}} that you paid another way.",
@@ -18409,6 +18420,11 @@
           "body_one": "A closed period has Billable days on no Statement, so nobody is billed for it yet. Open Statements to send the run.",
           "body_other": "{{count}} closed periods have Billable days on no Statement, so nobody is billed for them yet. One run sends them all, oldest first."
         },
+        "noticesDue": {
+          "title_one": "Late notice due for {{count}} Miner",
+          "title_other": "Late notices due for {{count}} Miners",
+          "body": "They are behind by the book's notice rules and owe {{amount}} between them. Open Statements to send the notices from your Character."
+        },
         "uncounted": {
           "title": "Donation of {{amount}} from {{name}} into {{division}} — not counted",
           "body": "{{date}}. The book does not read that wallet division, so it paid no tax. Count the division to credit it, or mark it not tax.",
@@ -18537,6 +18553,7 @@
           "resolveDeclaration": "answered a declaration",
           "recordReminder": "sent a reminder",
           "recordMail": "mailed a Statement",
+          "recordAccounts": "counted Miners' accounts for their pay page",
           "stopReminders": "stopped reminders",
           "setPopSharing": "changed pop sharing",
           "setPopSharingMoon": "changed a moon's pop sharing",
@@ -18619,7 +18636,18 @@
         "missingLink_one": "{{count}} has no verify link and was not queued.",
         "missingLink_other": "{{count}} have no verify link and were not queued.",
         "chipNote": "Every mail's status is in the progress chip at the top of the page.",
-        "again": "Back to Check"
+        "again": "Back to Check",
+        "noticesTitle": "Late notices",
+        "noticesNothing": "No late notice is due: nobody is behind by the book's notice rules, or they had one recently.",
+        "notices": "Late notices",
+        "noticesOwed": "Owed by them",
+        "noticesOwedTip": "Everything these Miners owe now. Each notice lists every unpaid day.",
+        "noticesBillable": "Each Miner's days are priced as they closed ({{hub}} buy, {{form}})",
+        "sendNotices_one": "Send {{count}} late notice",
+        "sendNotices_other": "Send {{count}} late notices",
+        "noticesQueued_one": "{{count}} late notice is in the send queue.",
+        "noticesQueued_other": "{{count}} late notices are in the send queue.",
+        "statementPlace": "Statement, {{period}}"
       },
       "statementPanel": {
         "remaining": "Remaining",
@@ -19253,7 +19281,30 @@
         "saved": "Settings saved",
         "rateIncomplete": "Finish the rate in the form, or clear its percent, to save.",
         "rateAddedSettingsFailed": "Rate added, but the other settings were not saved.",
-        "divisionNamed": "Division {{n}}, {{name}}"
+        "divisionNamed": "Division {{n}}, {{name}}",
+        "running": {
+          "heading": "Running account and late notices",
+          "billing": "Billing",
+          "since": "A running account since {{date}}: each day is owed as it closes, and late notices replace Statements.",
+          "calendar": "Statements by period.",
+          "switch": "Switch to a running account",
+          "directorOnly": "Only a Director can switch the book to a running account.",
+          "confirmTitle": "Switch to a running account?",
+          "confirmBody": "Statements already issued stay as they are and are paid first. From now on each Miner's days are owed as they close, payments pay the oldest day first, and a Miner who falls behind gets a late notice instead of a Statement. Nothing unbilled is forgiven. This can't be undone.",
+          "confirm": "Switch now",
+          "failed": "Could not switch the book. Try again.",
+          "noticeWhen": "Late notice when",
+          "behind": "Behind",
+          "dayOfMonth": "Day of month",
+          "behindDays": "Days the oldest unpaid day is old",
+          "monthDay": "Day of the month (1-28)",
+          "noticeHint": "Behind: once a Miner's oldest unpaid day is this many days old. Day of month: on that day each month, to every Miner who owes from before it.",
+          "minimum": "Late notice minimum",
+          "minimumHint": "No notice goes to a Miner who owes less than this.",
+          "cooldown": "Days between notices",
+          "tolerance": "Day tolerance (%)",
+          "toleranceHint": "A day a payment reaches counts as paid when it falls short of the day's tax by no more than this; the gap is written off. 0 to 5."
+        }
       },
       "grouping": {
         "hint": "One payment covers them all; mail goes to the main.",

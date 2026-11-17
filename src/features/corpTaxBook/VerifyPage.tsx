@@ -156,6 +156,11 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
   const due = dueDate(statement.issuedAt, overdueDays);
   const credited = payload.payments.reduce((sum, p) => sum + p.amount, 0);
   const remaining = settlement?.remaining ?? Math.max(0, statement.amount - credited);
+  // A running account (#6294): the notice's own balance, and everything owed now beside it.
+  const account = payload.account ?? null;
+  const notice = statement.kind === 'notice';
+  // A notice's own figure stands in until an officer's tab has counted the account.
+  const owedNow = account ? account.owed : statement.amount;
   const forgiven = settlement?.forgiven ?? 0;
   const dismissed = settlement ? settlement.credited - credited - forgiven : 0;
   const rates = ratesUsed(rows);
@@ -198,37 +203,71 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
       <div className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,1fr)_22rem] md:grid-rows-[auto_auto_minmax(0,1fr)] md:items-start">
         <div className="order-3 min-w-0 space-y-4 md:order-none md:col-start-1 md:row-span-3 md:row-start-1">
           <StatementLines statement={statement} />
-          <StatementPayments payments={payload.payments} />
+          {/* A notice is paid by the account, oldest day first: no payment is its own. */}
+          {!notice && <StatementPayments payments={payload.payments} />}
         </div>
         <Panel className="order-1 md:order-none md:col-start-2 md:row-start-1">
           <StatChips>
-            <StatChip
-              label={t('corpTaxBook.verify.balanceDue')}
-              value={isk(remaining)}
-              tone={remaining > 0 ? 'danger' : 'success'}
-              emphasis
-            />
-          </StatChips>
-          <p className="mt-2 text-sm tabular-nums">
-            {t('corpTaxBook.verify.balanceSum', {
-              billed: isk(statement.amount),
-              paid: isk(credited),
-            })}
-            {dismissed > 0 && <> {t('corpTaxBook.verify.dismissed', { amount: isk(dismissed) })}</>}
-            {forgiven > 0 && <> {t('corpTaxBook.verify.forgiven', { amount: isk(forgiven) })}</>}
-            {settlement && settlement.writtenOff > 0 && (
-              <> {t('corpTaxBook.verify.writtenOff', { amount: isk(settlement.writtenOff) })}</>
+            {(account || notice) && (
+              <StatChip
+                label={t(account ? 'corpTaxBook.verify.owedNow' : 'corpTaxBook.verify.onNotice')}
+                value={isk(owedNow)}
+                tone={owedNow > 0 ? 'danger' : 'success'}
+                emphasis
+              />
             )}
-          </p>
-          {remaining > 0 && (
+            {!notice && (
+              <StatChip
+                label={t('corpTaxBook.verify.balanceDue')}
+                value={isk(remaining)}
+                tone={remaining > 0 ? 'danger' : 'success'}
+                emphasis={!account}
+              />
+            )}
+          </StatChips>
+          {account && (
+            <p className="mt-2 text-sm">
+              {account.owed > 0 && account.oldest
+                ? t('corpTaxBook.verify.owedNowLine', {
+                    corp,
+                    count: account.days,
+                    date: shortDate(account.oldest, locale),
+                    asOf: shortDate(account.asOf, locale),
+                  })
+                : account.paidThrough
+                  ? t('corpTaxBook.verify.paidUpThrough', {
+                      corp,
+                      date: shortDate(account.paidThrough, locale),
+                    })
+                  : t('corpTaxBook.verify.paidUp', { corp })}
+            </p>
+          )}
+          {!notice && (
+            <p className="mt-2 text-sm tabular-nums">
+              {t('corpTaxBook.verify.balanceSum', {
+                billed: isk(statement.amount),
+                paid: isk(credited),
+              })}
+              {dismissed > 0 && (
+                <> {t('corpTaxBook.verify.dismissed', { amount: isk(dismissed) })}</>
+              )}
+              {forgiven > 0 && <> {t('corpTaxBook.verify.forgiven', { amount: isk(forgiven) })}</>}
+              {settlement && settlement.writtenOff > 0 && (
+                <> {t('corpTaxBook.verify.writtenOff', { amount: isk(settlement.writtenOff) })}</>
+              )}
+            </p>
+          )}
+          {(account || notice ? owedNow : remaining) > 0 && (
             <p className="mt-2 text-sm">
               {t('corpTaxBook.verify.howToPay', { corp })} {t('corpTaxBook.verify.payCodeLead')}{' '}
               <span className="font-mono">{statement.code}</span>{' '}
-              {t('corpTaxBook.verify.payCodeTail')}
+              {t(
+                notice ? 'corpTaxBook.verify.payCodeTailNotice' : 'corpTaxBook.verify.payCodeTail'
+              )}
               {accounts && <> {t('corpTaxBook.verify.payAccount', { accounts })}</>}
             </p>
           )}
-          {payload.settled && remaining === 0 && (
+          {!notice && payload.settled && remaining === 0 && (
             <p className="mt-2 text-sm text-text-dim">{t('corpTaxBook.verify.settled')}</p>
           )}
           {lastDeclaration && (

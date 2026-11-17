@@ -10,6 +10,7 @@ import { shiftDate } from '../miningTax/yieldRange';
 import type { Miner } from './charges';
 import type { BookView } from './bookView';
 import { paymentCode } from './bookView';
+import { draftNotice } from './lateNotices';
 import { issueStatement, type Statement } from './statements';
 
 /** A guest's credit is forfeited without consent only after this many days with no reply. */
@@ -58,6 +59,17 @@ export function planCloseAccount(view: BookView, minerId: string): ClosePlan | u
   if (!row || !inner) return undefined;
   const { draft } = inner;
   const base = { pendingTax: row.pending };
+  if (view.input.runningAccountFrom) {
+    // A running account owes its days already (#6294): the final bill is a late notice of the
+    // unpaid days no notice listed, and it changes neither what is owed nor the credit.
+    const notice = draftNotice(view, minerId, { id: `final_${minerId}` });
+    return {
+      ...base,
+      ...(notice && notice.statement.lines.length > 0 ? { statement: notice.statement } : {}),
+      owedAfter: row.owed,
+      creditAfter: row.credit,
+    };
+  }
   if (draft.kind !== 'statement') {
     return { ...base, owedAfter: row.owed, creditAfter: row.credit };
   }

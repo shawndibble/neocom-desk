@@ -51,6 +51,7 @@ import {
   META,
   SCHEDULED_SYNC_DOC,
   MINERS,
+  ACCOUNTS,
   OBSERVED,
   OFFICERS,
   PAID_DOC,
@@ -113,7 +114,8 @@ import {
   type MirrorExtraction,
   type ObservedRow,
 } from './corpTaxBookEngine.js';
-import type { FeederExtraction } from './corpTaxBookSyncEngine.js';
+import { billsDays, type FeederExtraction } from './corpTaxBookSyncEngine.js';
+import { liveAccount } from './corpTaxBookAccounts.js';
 import type { IdentityReader } from './corpTaxBookEsi.js';
 import { SRP_COLLECTIONS } from './srpTypes.js';
 import { VETTING_COLLECTIONS } from './vettingTypes.js';
@@ -1699,7 +1701,9 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       // A Statement settles for good (D22), so the server never trusts the caller's plan: an
       // older client plans without disputes. One an open dispute holds right now is dropped.
       const held = await heldStatementIds(c, docs, iso);
-      const fresh = wanted.filter((id) => !held.has(id));
+      // A late notice (#6294) is never settled for good: its days stay on the running account.
+      const notices = new Set(docs.filter((d) => !billsDays(d)).map((d) => d.id as string));
+      const fresh = wanted.filter((id) => !held.has(id) && !notices.has(id));
       if (fresh.length > 0) {
         // Only ever grown: a Statement settled once keeps its days closed for good (D22).
         tx.set(
@@ -1850,6 +1854,15 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       }
       tx.update(ref, { manualRemindersSent: FieldValue.increment(1) });
       return { detail: { statementId: action.statementId } };
+    }
+    case 'recordAccounts': {
+      // Only a running account is billed by day; a calendar book's figures are its Statements.
+      if (typeof c.book.runningAccountFrom !== 'string')
+        fail('failed-precondition', 'This book bills by Statement', 'not-running-account');
+      for (const a of action.accounts)
+        tx.set(col(c, ACCOUNTS).doc(a.minerId), { ...a, at: iso, by });
+      // The figures as recorded, so the audit says what the pay page was told.
+      return { detail: { count: action.accounts.length, accounts: action.accounts } };
     }
     case 'recordMail': {
       // The queue sent this mail (D16): log it on the Statement and in the audit trail.
@@ -2011,9 +2024,10 @@ async function closeAccount(
     tx.get(col(c, EXTRACTIONS)),
     tx.get(col(c, WRITE_OFFS).where('minerId', '==', action.minerId)),
   ]);
-  const held = statements.docs.map((d) => d.data() as Data);
+  // A running account's notices bill no days of their own (#6294): legacy Statements only.
+  const held = statements.docs.map((d) => d.data() as Data).filter(billsDays);
   const allocation = allocatePayments({
-    statements: [...held, ...(statement ? [statement] : [])].map((x) => ({
+    statements: [...held, ...(statement && billsDays(statement) ? [statement] : [])].map((x) => ({
       id: x.id as string,
       amount: x.amount as number,
       issuedAt: x.issuedAt as string,
@@ -2032,7 +2046,12 @@ async function closeAccount(
     officerWriteOffs: writeOffs.docs.flatMap((d) => writeOffForAllocation(d.data()) ?? []),
     startDate: c.book.startDate as string | undefined,
   });
-  const credit = Math.max(0, allocation.credit);
+  // Payments that paid running days are no credit; only the officer's client can price those days.
+  const running = typeof c.book.runningAccountFrom === 'string';
+  const credit = Math.max(
+    0,
+    running && action.runningCredit !== undefined ? action.runningCredit : allocation.credit
+  );
   const owed = [...allocation.byStatement.values()]
     .filter((s) => !s.settled)
     .reduce((sum, s) => sum + s.remaining, 0);
@@ -2734,6 +2753,7 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
     declarations,
     miner,
     writeOffs,
+    account,
   ] = await Promise.all([
     bookRef(deps.db, corporationId).get(),
     sub(deps.db, corporationId, STATEMENTS).where('minerId', '==', minerId).get(),
@@ -2744,6 +2764,7 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
     sub(deps.db, corporationId, DECLARATIONS).where('statementId', '==', statementId).get(),
     sub(deps.db, corporationId, MINERS).doc(minerId).get(),
     sub(deps.db, corporationId, WRITE_OFFS).where('minerId', '==', minerId).get(),
+    sub(deps.db, corporationId, ACCOUNTS).doc(minerId).get(),
   ]);
   const thisStatement = statements.docs.find((d) => d.id === statementId);
   if (!thisStatement) fail('not-found', 'Verify link is not valid', 'invalid-token');
@@ -2764,6 +2785,7 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
     'corporationName',
     'minerName',
     'refineryNames',
+    'kind',
   ]) {
     if (s[key] !== undefined) shown[key] = s[key];
   }
@@ -2776,15 +2798,17 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
 
   // The payments credited to THIS Statement: the Miner's whole allocation, then
   // the part of each payment that landed here (the miner's other Statements stay private).
+  // A running account's notices bill no days of their own (#6294): legacy Statements only.
+  const billing = statements.docs.filter((d) => billsDays(d.data()));
   const allocation = allocatePayments({
-    statements: statements.docs.map((d) => {
+    statements: billing.map((d) => {
       const x = d.data();
       return { id: d.id, amount: x.amount as number, issuedAt: x.issuedAt as string };
     }),
     payments: payments.docs.map((d) => paymentForAllocation(d.id, d.data())),
     dismissalCredits: dismissalCredits({
       minerId,
-      statements: statements.docs.map((d) => ({
+      statements: billing.map((d) => ({
         id: d.id,
         lines: (d.data().lines as DismissableLine[]) ?? [],
       })),
@@ -2829,6 +2853,15 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
       return { kind: x.kind, at: x.at, resolution: x.resolution ?? null };
     }),
     settled: ((paid.data()?.ids as string[] | undefined) ?? []).includes(statementId),
+    // A running account's total now (#6294): what an officer's client last worked out, less the
+    // payments credited to this Miner since. Days mined since then show once it recounts.
+    account:
+      typeof b.runningAccountFrom === 'string' && account.exists
+        ? liveAccount(
+            account.data() as Data,
+            payments.docs.map((d) => d.data())
+          )
+        : null,
     remindersStopped: s.remindersStopped === true,
     // A guest's closed account (epic): set by the `closeAccount` edit (#4184).
     accountClosed: miner.exists && miner.get('closedAt') != null,

@@ -143,6 +143,8 @@ export interface PersonalBook {
   inReviewRefs?: readonly number[];
   /** Days after issue an unsettled Statement goes Overdue (the book's setting; 14 by default). */
   overdueDays?: number;
+  /** The instant the book switched to a running account (#6294); absent, it bills by Statement. */
+  runningAccountFrom?: string;
   /** Refinery names by structure id, where ESI let the app read them. */
   structureNames?: Record<number, string>;
   /**
@@ -376,6 +378,32 @@ export interface BookRowView {
   oreForm: 'compressed' | 'raw';
 }
 
+/** "Paid through {date}" or "Owes X (N days, oldest D)", from the member's own book rows. */
+export interface PersonalAccountStatus {
+  paidThrough: string | null;
+  owes: { amount: number; days: number; oldest: string } | null;
+}
+
+/** A running account's status from one book's rows: the days still owed, and the last paid one before them. */
+export function personalAccountStatus(
+  rows: readonly Pick<BookRowView, 'date' | 'state' | 'taxOwed' | 'held'>[]
+): PersonalAccountStatus {
+  // A day an open dispute holds is not owed now, and neither stops nor advances "paid through".
+  const owed = rows.filter((r) => r.state === 'billed' && !r.held && (r.taxOwed ?? 0) > 0);
+  const dates = [...new Set(owed.map((r) => r.date))].sort();
+  const oldest = dates[0];
+  const paid = rows
+    .filter((r) => (r.state === 'paid' || r.state === 'waived') && (!oldest || r.date < oldest))
+    .map((r) => r.date)
+    .sort();
+  return {
+    paidThrough: paid.at(-1) ?? null,
+    owes: oldest
+      ? { amount: owed.reduce((s, r) => s + (r.taxOwed ?? 0), 0), days: dates.length, oldest }
+      : null,
+  };
+}
+
 export interface BookSummary {
   corporationId: number;
   corpName: string;
@@ -383,8 +411,13 @@ export interface BookSummary {
   lastSyncedAt?: string;
   /** The latest Billable day, or undefined with no sync after the grace. */
   closedThrough?: string;
-  /** Payment the book holds beyond what its Statements bill — printed on the next Statement. */
+  /**
+   * Payment the book holds beyond what its Statements bill — printed on the next Statement. On a
+   * running account, only what is left once every billed day is paid: the member is that far ahead.
+   */
   credit: number;
+  /** On a running account (#6294): paid through a day, or what the member owes now. */
+  account?: PersonalAccountStatus;
   /** The member's unsettled Statements, oldest first: payments settle them in this order. */
   openStatements: OpenStatementView[];
   /** The member's unsettled Statements past their Overdue days, oldest first. */
@@ -550,10 +583,13 @@ function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: str
     ...(book.feeders ? { feeders: book.feeders } : {}),
     pricesOn: book.pricesOn,
     placement: { kind: 'observed-rows' },
+    // A running account's notices bill no days of their own (#6294): they stay running days.
+    ...(book.runningAccountFrom ? { runningAccount: true } : {}),
   });
   const observedByKey = new Map(book.observed.map((o) => [observedEntryKey(o), o]));
   const lineIndex = new Map<string, { id: string; lines: StatementLine[] }>();
   for (const statement of book.statements) {
+    if (book.runningAccountFrom && statement.kind === 'notice') continue;
     for (const line of statement.lines) {
       if (!line.chargeKey) continue;
       const held = lineIndex.get(line.chargeKey) ?? { id: statement.id, lines: [] };
@@ -1260,6 +1296,8 @@ export function overlayCorpBooks(input: {
   // A raise billed on another Statement than its day's (or not billed yet) is owed on its own.
   // An officer write-off then forgives the next open days of its Statement (#4637).
   const uncreditedByBook = new Map<number, UncreditedDonation[]>();
+  /** Per book: the book's credit no open day took, summed over Miners (a running account's "ahead"). */
+  const aheadByBook = new Map<number, number>();
   for (const p of prepared) {
     const mine = rowsByBook.get(p.book.corporationId) ?? [];
     const partsOf = new Map<BookRowView, OwedPart[]>();
@@ -1445,6 +1483,13 @@ export function overlayCorpBooks(input: {
       const withLost = lostBy.has(minerId)
         ? coverInFlight(days, Math.max(0, amount + (lostBy.get(minerId) ?? 0) - mark))
         : paid;
+      // What the money left once the days it paid were paid: only the book's own credit counts.
+      const spent = own.filter((r) => paid.has(r.id)).reduce((s, r) => s + (r.taxOwed ?? 0), 0);
+      const left = Math.max(0, amount - mark - spent);
+      aheadByBook.set(
+        p.book.corporationId,
+        (aheadByBook.get(p.book.corporationId) ?? 0) + Math.min(p.credit.get(minerId) ?? 0, left)
+      );
       for (const row of own) {
         if (paid.has(row.id)) {
           row.state = 'paid';
@@ -1549,8 +1594,10 @@ export function overlayCorpBooks(input: {
       startDate: p.book.startDate,
       ...(p.book.lastSyncedAt !== undefined ? { lastSyncedAt: p.book.lastSyncedAt } : {}),
       ...(closedThrough !== undefined ? { closedThrough } : {}),
-      credit: [...p.credit.values()].reduce((sum, c) => sum + c, 0),
-      ...openAndOverdue(p),
+      credit: p.book.runningAccountFrom
+        ? (aheadByBook.get(p.book.corporationId) ?? 0)
+        : [...p.credit.values()].reduce((sum, c) => sum + c, 0),
+      ...accountAndOpen(p, rowsByBook.get(p.book.corporationId) ?? []),
       uncredited: uncreditedByBook.get(p.book.corporationId) ?? [],
       hubId: p.book.hubId,
       oreForm: p.book.oreForm,
@@ -1667,6 +1714,29 @@ const isUncredited = (d: InFlightDonation, checkedAt: string | undefined) =>
   Date.parse(checkedAt) - Date.parse(d.at) >= UNCREDITED_AFTER_DAYS * DAY_MS;
 
 /** The member's unsettled Statements, and those past their Overdue days, oldest first. */
+/**
+ * The open Statements and Overdue, and on a running account (#6294) where the member stands. A
+ * late notice is not a bill of its own: only the newest stays open, for its code, while the member
+ * owes, and it is never Overdue here (its days are the account's).
+ */
+function accountAndOpen(p: Prepared, rows: readonly BookRowView[]) {
+  const { openStatements, overdue } = openAndOverdue(p);
+  if (!p.book.runningAccountFrom) return { openStatements, overdue };
+  const account = personalAccountStatus(rows);
+  const isNotice = (id: string) =>
+    p.book.statements.some((s) => s.id === id && s.kind === 'notice');
+  const notices = openStatements.filter((s) => isNotice(s.statementId));
+  const newest = notices.at(-1);
+  return {
+    account,
+    openStatements: [
+      ...openStatements.filter((s) => !isNotice(s.statementId)),
+      ...(account.owes && newest ? [newest] : []),
+    ],
+    overdue: overdue.filter((s) => !isNotice(s.statementId)),
+  };
+}
+
 function openAndOverdue(p: Prepared): {
   openStatements: OpenStatementView[];
   overdue: OverdueStatementView[];

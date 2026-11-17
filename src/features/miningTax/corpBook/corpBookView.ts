@@ -86,6 +86,7 @@ export function buildCorpBookView(
       startDate: book.startDate,
       graceHours: book.graceHours,
       ...(book.overdueDays !== undefined ? { overdueDays: book.overdueDays } : {}),
+      ...(book.runningAccountFrom ? { runningAccountFrom: book.runningAccountFrom } : {}),
       ...(book.lastSyncedAt !== undefined ? { lastSyncedAt: book.lastSyncedAt } : {}),
       ...(book.donationsCheckedAt !== undefined
         ? { donationsCheckedAt: book.donationsCheckedAt }
