@@ -32,5 +32,8 @@ PNG exports of the chosen mockups for ready tickets. Delete a folder (and its ro
 | [fittings-doctrine](fittings-doctrine/README.md) | Issue #6202 | Doctrine rows in the Fittings Start list with a Doctrine tag; an older fit's re-save note in the preview, or on the row on a phone |
 | [mining-tax-resolve](mining-tax-resolve/README.md) | Review request (no issue yet) | Not chosen yet: A (inline button + menu) or B (one Resolve dialog per problem); five outcomes split by who has to agree, a quiet line after answering, left-the-corp notice, officer won't-pay card and tax contact setting |
 | [lp-store-spend-my-lp](lp-store-spend-my-lp/README.md) | Issue #6199 | Spend my LP button beside the offers list's actions; the plan opens above the offers: headline, offer × N table, stop line naming the floor or wallet, LP left |
+| [extraction-autofracture-bar](extraction-autofracture-bar/README.md) | Issue #6297 | Extractions timeline: today's green bar runs Ready to Expired as one bar, laser tick for early fracture, tooltip with Ready / Auto-fracture / Expired dates and time left |
+| [moon-owner-archive](moon-owner-archive/README.md) | Issue #6298 | Chosen: miner name is an accent link (A); refinery name opens its page, pencil kept; Archive on the refinery page only (A); Archived section with Restore; offer rule R3 (ESI gone or 60 days idle); mining at an archived refinery restores it |
+| [moons-all-moons](moons-all-moons/README.md) | Issue #6299 | Chosen: Moons tab with a flat sortable list (A); opened moon is a table of Extractions (A), a row opens `/corp/moons/extractions/:id`; moon names in other lists link to the moon page |
 
 First draft mockup; sample data. The ticket's Agent Brief text wins over the picture where they differ.
