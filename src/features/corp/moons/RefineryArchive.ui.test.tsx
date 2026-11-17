@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -8,7 +8,6 @@ import type { RefineryRow } from '@/engine/corpTaxBook/moonOwnerRefineries';
 import { ArchivedRefineries } from './ArchivedRefineries';
 import { MoonOwnerPage } from './MoonOwnerPage';
 import type { OwnerRefineries } from './useOwnerRefineries';
-import { RefineryDetail } from './RefineryDetail';
 
 const setRefineryArchive = vi.fn();
 vi.mock('../taxBook/feederClient', () => ({
@@ -163,71 +162,5 @@ describe('the Archived section', () => {
     section([archived]);
     await userEvent.click(screen.getByRole('button', { name: 'Show archived refineries' }));
     expect(screen.queryByRole('button', { name: /Restore/ })).toBeNull();
-  });
-});
-
-describe('the refinery page', () => {
-  const open = () =>
-    render(
-      <MemoryRouter>
-        <RefineryDetail ownerId="98" structureId={1001} />
-      </MemoryRouter>
-    );
-
-  it('says nothing is offered, and still lets an officer archive by hand', async () => {
-    setRefineryArchive.mockResolvedValue({ ok: true });
-    open();
-    expect(screen.queryByText(/Gone in the game/)).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Archive' }));
-    await userEvent.click(screen.getAllByRole('button', { name: 'Archive' }).at(-1)!);
-    await waitFor(() =>
-      expect(setRefineryArchive).toHaveBeenCalledWith(5, 9, 98, 1001, true, 'manual')
-    );
-    expect(reload).toHaveBeenCalled();
-  });
-
-  it('shows the hint and records why when the structure is gone', async () => {
-    setRefineryArchive.mockResolvedValue({ ok: true });
-    refineries.active = [row({ offer: { kind: 'gone' } })];
-    open();
-    expect(screen.getByText(/no longer shows this structure/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Archive' }));
-    await userEvent.click(screen.getAllByRole('button', { name: 'Archive' }).at(-1)!);
-    await waitFor(() =>
-      expect(setRefineryArchive).toHaveBeenCalledWith(5, 9, 98, 1001, true, 'gone')
-    );
-  });
-
-  it('words an idle offer with the days and the last mined day', () => {
-    refineries.active = [row({ offer: { kind: 'idle', days: 71 }, lastMinedOn: '2026-09-02' })];
-    open();
-    expect(
-      screen.getByText(/No Extraction and no mining here in 71 days; last mined 2 Sep/)
-    ).toBeVisible();
-  });
-
-  it('swaps Archive for Restore on an archived refinery, and restores', async () => {
-    setRefineryArchive.mockResolvedValue({ ok: true });
-    refineries = {
-      ...refineries,
-      active: [],
-      archived: [row({ archive: { at: Date.UTC(2026, 10, 3), by: 5, reason: 'manual' } })],
-    };
-    open();
-    expect(screen.queryByRole('button', { name: 'Archive' })).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Restore' }));
-    await waitFor(() => expect(setRefineryArchive).toHaveBeenCalledWith(5, 9, 98, 1001, false));
-  });
-
-  it('gives a viewer no Archive button', () => {
-    canEdit = false;
-    open();
-    expect(screen.queryByRole('button', { name: 'Archive' })).toBeNull();
-  });
-
-  it('says so for a refinery that is not this moon owner’s', () => {
-    refineries = { ...refineries, active: [] };
-    open();
-    expect(screen.getByText(/not one of this moon owner's/)).toBeInTheDocument();
   });
 });

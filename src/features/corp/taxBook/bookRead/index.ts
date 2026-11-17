@@ -8,6 +8,7 @@ import { openBook } from '../openBook';
 import { missingParts, type BookPart, type BookPartSet } from './parts';
 import { readMinerScope } from './scopedMiner';
 import { readMoonScope } from './scopedMoon';
+import { readRefineryScope } from './scopedRefinery';
 import { mergeReads, readContext, readWhole, type BookRead } from './slices';
 
 export { bookPartsFor, holdsParts } from './parts';
@@ -16,19 +17,27 @@ export type { BookRead };
 /**
  * The asked parts (`bookPartsFor`), null when the corporation has no book. `minerId` reads one
  * Miner's page (#5258), `extractionId` one moon's (#5716), which reads the whole book's parts
- * when its moon docs cannot stand in. A scoped read may fill more parts than asked: those its
+
+ * when its moon docs cannot stand in; `structureId` a refinery's (#6348), read from its moon docs
+ * with no ledger rows. A scoped read may fill more parts than asked: those its
  * scope always reads.
  */
 export async function readBook(
   characterId: number,
   corporationId: number,
-  ask: { parts: ReadonlySet<BookPart>; minerId?: string; extractionId?: string }
+  ask: {
+    parts: ReadonlySet<BookPart>;
+    minerId?: string;
+    extractionId?: string;
+    structureId?: number;
+  }
 ): Promise<BookRead | null> {
   const book = await openBook(characterId, corporationId);
   if (!book) return null;
   const ctx = readContext(book, characterId, corporationId);
   if (ask.minerId !== undefined) return readMinerScope(ctx, ask.minerId, ask.parts);
   if (ask.extractionId !== undefined) return readMoonScope(ctx, ask.extractionId, ask.parts);
+  if (ask.structureId !== undefined) return readRefineryScope(ctx, ask.structureId, ask.parts);
   return readWhole(ctx, ask.parts);
 }
 

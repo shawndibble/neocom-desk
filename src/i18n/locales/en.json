@@ -18030,7 +18030,7 @@
       "tabs": {
         "overview": "Overview",
         "extractions": "Extractions",
-        "moons": "Moons",
+        "refineries": "Refineries",
         "miners": "Miners",
         "statements": "Statements",
         "moonOwners": "Moon owners"
@@ -18114,14 +18114,73 @@
       "extractionsSummary_one": "{{count}} Extraction",
       "extractionsSummary_other": "{{count}} Extractions",
       "moons": {
-        "none": "No moons yet. A moon shows once the book has synced its first Extraction.",
-        "notFound": "This moon has no Extractions in the book.",
-        "summary_one": "{{count}} moon",
-        "summary_other": "{{count}} moons",
         "nextPop": "Next pop {{date}}",
         "lastPop": "Last pop {{date}}",
-        "by": { "laser": "By laser", "auto": "Broke on its own" },
-        "emptyHistory": "The book keeps every Extraction it syncs, from its start. No earlier Extraction of this moon exists."
+        "by": { "laser": "By laser", "auto": "Broke on its own" }
+      },
+      "refineries": {
+        "none": "No refineries yet. A refinery shows once the book has synced its first Extraction.",
+        "summary_one": "{{count}} refinery",
+        "summary_other": "{{count}} refineries"
+      },
+      "refineryPage": {
+        "notFound": "This refinery is not in the book.",
+        "moonUnknown": "Moon not known yet",
+        "ownerOurs": "{{name}} (our corp)",
+        "facts": {
+          "extractions": "Extractions",
+          "nextPop": "Next pop",
+          "lastPop": "Last pop",
+          "mined": "Mined (est.)",
+          "minedTip": "Ore mined here during each Extraction, from the fracture to the field's end. Mining outside those windows is not counted.",
+          "tax": "Tax billed",
+          "taxTip": "The tax Statements have already billed for these Extractions. Tax for days not yet billed shows on the Extraction's own page."
+        },
+        "ore": {
+          "title": "Ore in the chunk",
+          "unknown": "Ore unknown.",
+          "unknownWhy": "Neither the moon notification nor a survey reached the book for the Extraction started {{date}}, so the make-up is not shown.",
+          "source": {
+            "notification": "From the moon notification",
+            "survey": "From a survey"
+          },
+          "shareOf": "{{ore}} share",
+          "cols": {
+            "ore": "Ore",
+            "share": "Share",
+            "units": "Units",
+            "value": "Est. value (ISK)"
+          }
+        },
+        "ext": {
+          "title": "Extractions · {{count}}",
+          "label": "Extractions",
+          "show": "Show",
+          "chipCount": "{{count}} Extractions",
+          "mined": "Mined",
+          "minedPct": "{{pct}}% mined · {{isk}} ISK",
+          "minedIsk": "{{isk}} ISK",
+          "fullyMined": "Fully mined",
+          "tax": "Tax billed"
+        },
+        "miners": {
+          "title": "Miners · {{count}}",
+          "label": "Miners",
+          "meta": "Every Extraction · biggest first",
+          "show": "Show Miners",
+          "hide": "Hide Miners",
+          "summary": "{{count}} Miners · {{isk}} ISK mined",
+          "none": "Nobody has mined here yet.",
+          "noneYet": "Nobody has mined here yet. Miners show up once the chunk pops ({{date}}) and someone mines it.",
+          "pullsOf": "{{count}} of {{of}}",
+          "foot": "Mined during each Extraction's window, fracture to field end. A Miner's name opens their page.",
+          "cols": {
+            "pulls": "Extractions",
+            "last": "Last mined",
+            "share": "Share",
+            "mined": "Mined (est. ISK)"
+          }
+        }
       },
       "rate": {
         "label": "Rate",
@@ -19104,7 +19163,6 @@
         }
       },
       "refinery": {
-        "notFound": "This refinery is not one of this moon owner's.",
         "archive": "Archive",
         "restore": "Restore",
         "archivedPill": "Archived",
@@ -19113,27 +19171,8 @@
         "hintIdle": "No Extraction and no mining here in {{count}} days; last mined {{date}}. If it is gone, archive it. Everything stays.",
         "hintIdleNever": "No Extraction here in {{count}} days and nothing ever mined. If it is gone, archive it. Everything stays.",
         "archivedBanner": "Archived {{date}} by {{name}} ({{why}}). It is off the Refineries list. Its Extractions, mining and label are all still here. Restore brings it back, and so does mining here again.",
-        "facts": {
-          "moon": "Moon",
-          "extractions": "Extractions",
-          "lastExtraction": "Last Extraction",
-          "mined": "Mined"
-        },
-        "extractionsTitle": "Extractions",
         "extractionsNone": "No Extraction was recorded at this refinery.",
-        "historyTitle": "Mining history",
-        "historyNone": "Nothing was mined here yet.",
-        "cols": {
-          "popped": "Popped",
-          "state": "State",
-          "ore": "Ore make-up",
-          "value": "Est. value (ISK)",
-          "month": "Month",
-          "miners": "Miners",
-          "units": "Units",
-          "mined": "Value (ISK)"
-        },
-        "fullyMined": "Fully mined",
+        "cols": { "ore": "Ore make-up" },
         "confirm": {
           "title": "Archive {{name}}?",
           "body": "It leaves the Refineries list. Its Extractions, mining rows, label and Statements stay, and every figure still counts them. Restore it any time, or mine there again.",
