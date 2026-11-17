@@ -171,7 +171,7 @@ export function NeedsYouQueue() {
   const ctx = useBook();
   const { view, names, edit, canEdit, characterId, corporationId, settings } = ctx;
   const { miners } = useTabsProjection();
-  const { needsYou, uncounted, disputes, runDue, count } = useNeedsYou();
+  const { needsYou, uncounted, disputes, runDue, noticesDue, count } = useNeedsYou();
   // The officer's own Characters on this device: a transfer paid to one is checked in its journal.
   const ownIds = new Set(useCharacters().map((c) => c.characterId));
   const journals = useOwnWalletJournals(
@@ -329,6 +329,25 @@ export function NeedsYouQueue() {
               </Link>
             }
             body={t('corpTaxBook.moons.needs.runDue.body', { count: runDue.length })}
+            actions={null}
+          />
+        )}
+        {noticesDue.length > 0 && (
+          // #6294: on a running account a Miner who is behind gets a late notice, mailed from an
+          // officer's Character like the run; automatic sync never sends one.
+          <QueueCard
+            tone="warning"
+            title={
+              <Link
+                to={tabPath(MOONS_TABS, 'statements')}
+                className={entityLinkClassName('inline-block py-0.5')}
+              >
+                {t('corpTaxBook.moons.needs.noticesDue.title', { count: noticesDue.length })}
+              </Link>
+            }
+            body={t('corpTaxBook.moons.needs.noticesDue.body', {
+              amount: isk(noticesDue.reduce((sum, n) => sum + n.owed, 0)),
+            })}
             actions={null}
           />
         )}

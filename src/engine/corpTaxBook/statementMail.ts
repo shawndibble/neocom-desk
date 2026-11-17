@@ -4,7 +4,8 @@
  * Per line only date, location (refinery), mined value and tax; then the total,
  * the amount due with its due date, the pay code and the verify link. The
  * verify link carries pricing, terms and payments credited, so none of that is
- * mailed. Pure: names and the link arrive from the caller.
+ * mailed. Pure: names and the link arrive from the caller. A late notice (#6294) lists every
+ * day still owed instead, with the total owed now, the code and the same link.
  */
 import {
   EVE_MARKUP_LIMIT,
@@ -43,6 +44,25 @@ export interface StatementMailInput {
   /** ISO date the balance is due by. */
   dueDate: string;
   verifyUrl: string;
+  /**
+   * A late notice on a running account (#6294): the mail lists every day still owed instead of
+   * the lines, and `amountDue` is everything owed now. Absent on a calendar Statement.
+   */
+  notice?: NoticeMail;
+}
+
+/** One day a late notice lists: where it was mined (the moon, else the refinery) and what is owed. */
+export interface NoticeMailDay {
+  date: string;
+  place: string;
+  tax: number;
+}
+
+export interface NoticeMail {
+  /** Every unpaid day, in any order: the mail lists them oldest first. */
+  days: readonly NoticeMailDay[];
+  /** The oldest unpaid day. */
+  oldest: string;
 }
 
 export type MailDetailLevel = 'lines' | 'byDay' | 'byRefinery';
@@ -141,6 +161,73 @@ function build(input: StatementMailInput, detail: MailDetailLevel): StatementMai
   };
 }
 
+/** A notice's days at a detail level: each day and place, each day, or each place over the span. */
+function noticeRows(days: readonly NoticeMailDay[], level: MailDetailLevel): NoticeMailDay[] {
+  const sorted = [...days].sort(
+    (a, b) => a.date.localeCompare(b.date) || a.place.localeCompare(b.place)
+  );
+  if (level === 'lines') return sorted;
+  const span = sorted.length > 0 ? `${sorted[0].date} – ${sorted[sorted.length - 1].date}` : '';
+  const merged = new Map<string, NoticeMailDay>();
+  for (const d of sorted) {
+    const row = level === 'byDay' ? { ...d, place: '' } : { ...d, date: span };
+    const key = `${row.date}|${row.place}`;
+    const held = merged.get(key);
+    if (held) held.tax += d.tax;
+    else merged.set(key, row);
+  }
+  return [...merged.values()];
+}
+
+function buildNotice(input: StatementMailInput, notice: NoticeMail, detail: MailDetailLevel) {
+  const rows = noticeRows(notice.days, detail);
+  const reminder = input.kind === 'reminder';
+  const dayCount = new Set(notice.days.map((d) => d.date)).size;
+  const nodes: MarkupNode[] = [
+    text(
+      `Hi ${input.recipientName}, your ${input.corporationName} moon tax is behind. ` +
+        `You owe ${formatIsk(input.amountDue)} ISK for ${dayCount} ${dayCount === 1 ? 'day' : 'days'}, the oldest ${notice.oldest}.`
+    ),
+    br(),
+    br(),
+    bold(detail === 'byDay' ? 'Date · Tax still owed' : 'Date · Moon · Tax still owed'),
+    br(),
+    ...rows.flatMap((r) => [
+      text(
+        r.place ? `${r.date} · ${r.place} · ${formatIsk(r.tax)}` : `${r.date} · ${formatIsk(r.tax)}`
+      ),
+      br(),
+    ]),
+    bold(`Total owed now: ${formatIsk(input.amountDue)} ISK`),
+    br(),
+  ];
+  if (detail !== 'lines') {
+    nodes.push(text('Days are summarised to fit a mail; the link below has every one.'), br());
+  }
+  nodes.push(
+    br(),
+    text(
+      `Donate to ${input.corporationName}` +
+        (input.accounts?.length ? ` (Account: ${input.accounts.join(' or ')})` : '') +
+        `; any of your characters counts, and put ${input.code} in the reason. ` +
+        'A payment pays your oldest day first.'
+    ),
+    br(),
+    text('The link has the live total, every day and your payments: '),
+    {
+      type: 'link',
+      href: input.verifyUrl,
+      target: { kind: 'http', url: input.verifyUrl },
+      children: [text(input.verifyUrl)],
+    }
+  );
+  return {
+    subject: `${reminder ? 'Reminder: ' : ''}${input.corporationName} moon tax: late notice`,
+    body: serializeEveMarkup(nodes),
+    detail,
+  };
+}
+
 /**
  * The mail, with every line when it fits; past the 10,000-character cap one
  * line per day per refinery, then one per refinery for the period. The total,
@@ -150,9 +237,12 @@ export function composeStatementMail(input: StatementMailInput): StatementMail {
   if (input.corporationName.trim() === '') {
     throw new Error('composeStatementMail needs the corporation name; it was empty');
   }
+  const { notice } = input;
+  const compose = (detail: MailDetailLevel) =>
+    notice ? buildNotice(input, notice, detail) : build(input, detail);
   for (const detail of ['lines', 'byDay', 'byRefinery'] as const) {
-    const mail = build(input, detail);
+    const mail = compose(detail);
     if (mail.body.length <= EVE_MARKUP_LIMIT) return mail;
   }
-  return build(input, 'byRefinery');
+  return compose('byRefinery');
 }

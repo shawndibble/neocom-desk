@@ -302,3 +302,78 @@ describe('BookSettingsDialog who answers tax questions', () => {
     );
   });
 });
+
+describe('BookSettingsDialog running account and late notices (#6294)', () => {
+  const renderWith = (...args: Parameters<typeof bookSettingsValue>) =>
+    render(
+      <MemoryRouter>
+        <BookProvider value={bookSettingsValue(...args)}>
+          <BookSettingsDialog open onClose={() => {}} initialTab="billing" />
+        </BookProvider>
+      </MemoryRouter>
+    );
+
+  it('lets a Director switch over, one way, after a confirm that says what happens', async () => {
+    const user = userEvent.setup();
+    renderWith({ isDirector: true });
+    await user.click(screen.getByRole('button', { name: 'Switch to a running account' }));
+    const confirm = screen.getByRole('dialog', { name: 'Switch to a running account?' });
+    expect(within(confirm).getByText(/Statements already issued stay as they are/)).toBeVisible();
+    await user.click(within(confirm).getByRole('button', { name: 'Switch now' }));
+    expect(editBook).toHaveBeenCalledWith(7, 98000000, {
+      action: 'updateSettings',
+      patch: { switchToRunningAccount: true },
+    });
+  });
+
+  it('offers no switch to an officer who is not a Director, nor once switched', () => {
+    const { unmount } = renderWith();
+    expect(
+      screen.queryByRole('button', { name: 'Switch to a running account' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/Only a Director can switch/)).toBeInTheDocument();
+    unmount();
+    renderWith({ isDirector: true }, { runningAccountFrom: '2026-10-15T08:00:00Z' });
+    expect(
+      screen.queryByRole('button', { name: 'Switch to a running account' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/A running account since/)).toBeInTheDocument();
+  });
+
+  it('saves the notice rules and the day tolerance only when they change', async () => {
+    const user = userEvent.setup();
+    renderWith();
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    const untouched = editBook.mock.calls[0][2] as { patch: Record<string, unknown> };
+    expect(untouched.patch).not.toHaveProperty('noticeRules');
+    expect(untouched.patch).not.toHaveProperty('dayTolerancePct');
+
+    editBook.mockClear();
+    await user.click(screen.getByRole('button', { name: 'Day of month' }));
+    const day = screen.getByRole('textbox', { name: 'Day of the month (1-28)' });
+    await user.clear(day);
+    await user.type(day, '5');
+    const cooldown = screen.getByRole('textbox', { name: 'Days between notices' });
+    await user.clear(cooldown);
+    await user.type(cooldown, '10');
+    const tolerance = screen.getByRole('textbox', { name: 'Day tolerance (%)' });
+    await user.clear(tolerance);
+    await user.type(tolerance, '1,5');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(editBook).toHaveBeenCalledWith(
+      7,
+      98000000,
+      expect.objectContaining({
+        action: 'updateSettings',
+        patch: expect.objectContaining({
+          noticeRules: {
+            after: { kind: 'dayOfMonth', day: 5 },
+            minimum: 10_000_000,
+            cooldownDays: 10,
+          },
+          dayTolerancePct: 1.5,
+        }),
+      })
+    );
+  });
+});

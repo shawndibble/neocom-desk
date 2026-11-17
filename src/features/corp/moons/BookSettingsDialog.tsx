@@ -26,6 +26,7 @@ import {
 } from '@/components/ui';
 import type { TaxRate } from '@/engine/corpTaxBook/rates';
 import { Pill } from '@/components/ui/Pill';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { COMPARED_HUBS } from '@/market/hubs';
@@ -44,8 +45,16 @@ import { useCorpAccess } from '../useCorpAccess';
 import { loadCorporationDivisions } from '../wallet';
 import { divisionNamesFor } from '../taxBook/pushDivisionNames';
 import { utcDay } from '@/engine/localDay';
+import {
+  DEFAULT_NOTICE_RULES,
+  type NoticeAfter,
+  type NoticeRules,
+} from '@/engine/corpTaxBook/notices';
 
 const formatDecimal = createNumberFormat({ maximumFractionDigits: 3 });
+/** The "behind" days a book that notices by day of month starts from, if switched back. */
+const behindDefault =
+  DEFAULT_NOTICE_RULES.after.kind === 'behind' ? DEFAULT_NOTICE_RULES.after.days : 14;
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -195,6 +204,19 @@ export function BookSettingsDialog({
     )
   );
   const [taxContact, setTaxContact] = useState(() => draftFromContact(settings.taxContact));
+  // A running account's late notices and per-day tolerance (#6294).
+  const rules = settings.noticeRules;
+  const [noticeAfter, setNoticeAfter] = useState<NoticeAfter['kind']>(rules.after.kind);
+  const [noticeDays, setNoticeDays] = useState(
+    String(rules.after.kind === 'behind' ? rules.after.days : behindDefault)
+  );
+  const [noticeDay, setNoticeDay] = useState(
+    String(rules.after.kind === 'dayOfMonth' ? rules.after.day : 1)
+  );
+  const [noticeMinimum, setNoticeMinimum] = useState(String(rules.minimum));
+  const [cooldown, setCooldown] = useState(String(rules.cooldownDays));
+  const [tolerance, setTolerance] = useState(String(settings.dayTolerancePct));
+  const [confirmSwitch, setConfirmSwitch] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -305,6 +327,19 @@ export function BookSettingsDialog({
         ),
       };
       Object.assign(patch, taxContactPatch(taxContact, settings.taxContact));
+      // Sent only when changed, so a save of other settings never touches them.
+      const noticeRules: NoticeRules = {
+        after:
+          noticeAfter === 'behind'
+            ? { kind: 'behind', days: Number(noticeDays) }
+            : { kind: 'dayOfMonth', day: Number(noticeDay) },
+        minimum: Number(noticeMinimum),
+        cooldownDays: Number(cooldown),
+      };
+      if (JSON.stringify(noticeRules) !== JSON.stringify(settings.noticeRules))
+        patch.noticeRules = noticeRules;
+      const tolerancePct = Number(tolerance.replace(',', '.'));
+      if (tolerancePct !== settings.dayTolerancePct) patch.dayTolerancePct = tolerancePct;
       if (chunk !== '') patch.chunkM3PerHour = Number(chunk);
       // Unchanged divisions are left out, so a save of other settings never overwrites them.
       const baseDivisions = [...divisionsBase].sort((a, b) => a - b);
@@ -701,6 +736,100 @@ export function BookSettingsDialog({
                   ))}
                 </div>
               </Field>
+              <FieldsHeading>{t('corpTaxBook.moons.settings.running.heading')}</FieldsHeading>
+              <Field
+                label={t('corpTaxBook.moons.settings.running.billing')}
+                note={
+                  !settings.runningAccountFrom && !verdict.isDirector
+                    ? t('corpTaxBook.moons.settings.running.directorOnly')
+                    : undefined
+                }
+              >
+                <span className="flex flex-wrap items-center gap-2">
+                  <span>
+                    {settings.runningAccountFrom
+                      ? t('corpTaxBook.moons.settings.running.since', {
+                          date: displayDate(settings.runningAccountFrom.slice(0, 10)),
+                        })
+                      : t('corpTaxBook.moons.settings.running.calendar')}
+                  </span>
+                  {!settings.runningAccountFrom && verdict.isDirector && canEdit && (
+                    <Button size="sm" onClick={() => setConfirmSwitch(true)}>
+                      {t('corpTaxBook.moons.settings.running.switch')}
+                    </Button>
+                  )}
+                </span>
+              </Field>
+              <Field
+                label={t('corpTaxBook.moons.settings.running.noticeWhen')}
+                note={t('corpTaxBook.moons.settings.running.noticeHint')}
+              >
+                <SegmentedControl
+                  label={t('corpTaxBook.moons.settings.running.noticeWhen')}
+                  value={noticeAfter}
+                  onChange={setNoticeAfter}
+                  options={[
+                    { value: 'behind', label: t('corpTaxBook.moons.settings.running.behind') },
+                    {
+                      value: 'dayOfMonth',
+                      label: t('corpTaxBook.moons.settings.running.dayOfMonth'),
+                    },
+                  ]}
+                  uppercase={false}
+                />
+                {noticeAfter === 'behind' ? (
+                  <TextInput
+                    className="w-20"
+                    inputMode="numeric"
+                    aria-label={t('corpTaxBook.moons.settings.running.behindDays')}
+                    value={noticeDays}
+                    onChange={(e) => setNoticeDays(e.target.value)}
+                  />
+                ) : (
+                  <TextInput
+                    className="w-20"
+                    inputMode="numeric"
+                    aria-label={t('corpTaxBook.moons.settings.running.monthDay')}
+                    value={noticeDay}
+                    onChange={(e) => setNoticeDay(e.target.value)}
+                  />
+                )}
+              </Field>
+              <Field
+                label={t('corpTaxBook.moons.settings.running.minimum')}
+                note={t('corpTaxBook.moons.settings.running.minimumHint')}
+              >
+                <IskInput
+                  value={noticeMinimum}
+                  onChange={setNoticeMinimum}
+                  aria-label={t('corpTaxBook.moons.settings.running.minimum')}
+                />
+              </Field>
+              <Field
+                label={t('corpTaxBook.moons.settings.running.cooldown')}
+                htmlFor={`${fieldId}-cooldown`}
+              >
+                <TextInput
+                  className="w-20"
+                  inputMode="numeric"
+                  id={`${fieldId}-cooldown`}
+                  value={cooldown}
+                  onChange={(e) => setCooldown(e.target.value)}
+                />
+              </Field>
+              <Field
+                label={t('corpTaxBook.moons.settings.running.tolerance')}
+                htmlFor={`${fieldId}-tolerance`}
+                note={t('corpTaxBook.moons.settings.running.toleranceHint')}
+              >
+                <TextInput
+                  className="w-20"
+                  inputMode="decimal"
+                  id={`${fieldId}-tolerance`}
+                  value={tolerance}
+                  onChange={(e) => setTolerance(e.target.value)}
+                />
+              </Field>
             </Fields>
           )}
 
@@ -810,6 +939,23 @@ export function BookSettingsDialog({
           )}
         </TabPanel>
       </div>
+      {confirmSwitch && (
+        <ConfirmDialog
+          open
+          title={t('corpTaxBook.moons.settings.running.confirmTitle')}
+          body={t('corpTaxBook.moons.settings.running.confirmBody')}
+          actionLabel={t('corpTaxBook.moons.settings.running.confirm')}
+          danger={false}
+          cancelLabel={t('common.cancel')}
+          failedLabel={t('corpTaxBook.moons.settings.running.failed')}
+          onConfirm={async () => {
+            // One-way (decision 20261117-033049): the server stamps the switch-over instant.
+            await edit({ action: 'updateSettings', patch: { switchToRunningAccount: true } });
+            setConfirmSwitch(false);
+          }}
+          onClose={() => setConfirmSwitch(false)}
+        />
+      )}
     </Modal>
   );
 }

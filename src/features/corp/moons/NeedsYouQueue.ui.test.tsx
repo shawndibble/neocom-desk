@@ -8,6 +8,7 @@ import type { TabsProjection } from '@/engine/corpTaxBook/readModels';
 import type { UncountedDonation } from '@/engine/corpTaxBook/uncounted';
 import type { OreDispute } from '@/engine/corpTaxBook/disputes';
 import type { ClaimedTransfer, Declaration } from '@/engine/corpTaxBook/overdue';
+import { DEFAULT_NOTICE_RULES } from '@/engine/corpTaxBook/notices';
 import { BookProvider } from './BookContext';
 import { NeedsYouQueue } from './NeedsYouQueue';
 import type { BookContextValue } from './bookContextValue';
@@ -125,7 +126,7 @@ function renderQueue(
               ore: () => 'Zeolites',
             },
             data: { uncounted, disputes },
-            settings: { divisions, divisionNames: {} },
+            settings: { divisions, divisionNames: {}, noticeRules: DEFAULT_NOTICE_RULES },
             verdict: { canEdit: true },
             reload: vi.fn(),
           } as unknown as Omit<BookContextValue, 'edit' | 'canEdit'>
@@ -636,6 +637,52 @@ describe('NeedsYouQueue: a Statement run is due (#6208)', () => {
 
   it('has no run card while every closed period is on a Statement', () => {
     renderQueue([]);
+    expect(screen.queryByText(/Statements ready/)).not.toBeInTheDocument();
+  });
+});
+
+describe('NeedsYouQueue: late notices are due on a running account (#6294)', () => {
+  it('shows one notice card in place of the run, linking to the Statements tab', async () => {
+    const { buildBookView } = await import('@/engine/corpTaxBook/bookView');
+    const view = buildBookView({
+      corporationId: 98000001,
+      now: '2026-10-18T14:00:00Z',
+      startDate: '2026-08-01',
+      graceHours: 6,
+      minimumStatement: 0,
+      overdueDays: 14,
+      cadence: { kind: 'monthly' },
+      hubId: 'jita',
+      oreForm: 'compressed',
+      structureExpiryHours: {},
+      lastSyncedAt: '2026-10-18T12:00:00Z',
+      rates: [{ scope: 'corp', pct: 10, effectiveFrom: '2026-08-01' }],
+      // 100,000 units at 1,000 ISK and 10%: 10M a day, the default notice minimum each.
+      entries: ['2026-08-10', '2026-09-10'].map((date) => ({
+        characterId: 7,
+        recordedCorporationId: 98000001,
+        structureId: 1001,
+        date,
+        oreLines: [{ typeId: 45490, quantity: 100_000 }],
+      })),
+      miners: [],
+      statements: [],
+      payments: [],
+      dismissals: [],
+      declarations: [],
+      adjustments: [],
+      extractions: [],
+      paidStatementIds: new Set(),
+      runningAccountFrom: '2026-08-01T00:00:00Z',
+      pricesOn: () => ({ prices: new Map([[45490, 1000]]), sources: new Map() }),
+    });
+    renderQueue([], { view });
+    expect(screen.getByRole('heading', { name: 'Needs you · 1' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Late notice due for 1 Miner' })).toHaveAttribute(
+      'href',
+      '/corp/moons/statements'
+    );
+    expect(screen.getByText(/owe 20,000,000 between them/)).toBeInTheDocument();
     expect(screen.queryByText(/Statements ready/)).not.toBeInTheDocument();
   });
 });
