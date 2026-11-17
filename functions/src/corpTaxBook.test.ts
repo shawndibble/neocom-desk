@@ -14,6 +14,7 @@ import {
   disputeIdFor,
   mergeDisputeLines,
   billedDisputeTax,
+  disputesClosedByWriteOff,
   checkClaimedTransfer,
   checkClaimedTransfers,
   needsLiveCheck,
@@ -524,6 +525,38 @@ describe('parsers', () => {
       expect(
         reasonOf(() => mergeDisputeLines(many, [line({ quantity: 1, payeeName: 'X' })], big))
       ).toBe('too-many-lines');
+    });
+  });
+
+  describe('disputesClosedByWriteOff: a write-off answers the disputes of the days it closes (#6307)', () => {
+    const statement = {
+      id: 's1',
+      amount: 900_000,
+      coversFrom: '2026-11-01',
+      coversThrough: '2026-11-02',
+      lines: [{ kind: 'mined', date: '2026-11-01' }],
+    };
+    const dispute = (id: string, date: string, resolution?: unknown) => ({ id, date, resolution });
+    const disputes = [
+      dispute('a', '2026-11-01'),
+      dispute('b', '2026-11-02'),
+      dispute('c', '2026-11-09'),
+      dispute('d', '2026-11-01', { kind: 'rejected' }),
+    ];
+
+    it('a Statement written off in full closes the open disputes of its days', () => {
+      expect(disputesClosedByWriteOff(disputes, { amount: 900_000 }, statement)).toEqual([
+        'a',
+        'b',
+      ]);
+    });
+
+    it('a part write-off leaves them open', () => {
+      expect(disputesClosedByWriteOff(disputes, { amount: 400_000 }, statement)).toEqual([]);
+    });
+
+    it('the leaver write-off, with no Statement, closes every open dispute', () => {
+      expect(disputesClosedByWriteOff(disputes, { amount: 1 })).toEqual(['a', 'b', 'c']);
     });
   });
 

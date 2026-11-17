@@ -1365,11 +1365,24 @@ export function overlayCorpBooks(input: {
       // Paid once every part was billed on a Statement and nothing of it is left;
       // Waived when a write-off forgave all of it.
       if (parts.every((part) => settledParts.has(part) && part.owed === 0)) {
-        const waived = forgiven !== undefined && (billedOf.get(row) ?? 0) - forgiven.amount < 0.01;
+        const writtenOff =
+          forgiven !== undefined && (billedOf.get(row) ?? 0) - forgiven.amount < 0.01;
+        // An officer's credit that took the whole day (a waived dispute, #6307) closes it too.
+        const credited =
+          row.correction !== undefined &&
+          row.correction.before >= 0.01 &&
+          row.correction.after < 0.01;
+        const waived = writtenOff || credited;
         row.state = waived ? 'waived' : 'paid';
         if (!waived) row.settledBy = 'statement';
         row.taxOwed = 0;
-        if (waived) row.dismissalReason = forgiven.reasons.join(' · ');
+        if (waived) {
+          row.dismissalReason = (
+            writtenOff ? forgiven.reasons : (row.correction?.reasons ?? [])
+          ).join(' · ');
+          // Amount forgiven, as a write-off leaves it.
+          if (row.correction) row.billed = row.correction.before;
+        }
       } else {
         row.taxOwed = parts.reduce((sum, part) => sum + part.owed, 0);
       }
@@ -1720,7 +1733,19 @@ const isUncredited = (d: InFlightDonation, checkedAt: string | undefined) =>
  * owes, and it is never Overdue here (its days are the account's).
  */
 function accountAndOpen(p: Prepared, rows: readonly BookRowView[]) {
-  const { openStatements, overdue } = openAndOverdue(p);
+  const all = openAndOverdue(p);
+  // A Statement every day of which an officer wrote off or waived is done: nothing to pay or
+  // chase (#6307), though its credit may only reach the book with the next Statement.
+  const closed = new Set(
+    all.openStatements
+      .map((s) => s.statementId)
+      .filter((id) => {
+        const days = rows.filter((r) => r.statementId === id);
+        return days.length > 0 && days.every((r) => r.state === 'waived');
+      })
+  );
+  const openStatements = all.openStatements.filter((s) => !closed.has(s.statementId));
+  const overdue = all.overdue.filter((s) => !closed.has(s.statementId));
   if (!p.book.runningAccountFrom) return { openStatements, overdue };
   const account = personalAccountStatus(rows);
   const isNotice = (id: string) =>

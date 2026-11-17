@@ -68,6 +68,7 @@ import {
   defaultSettings,
   parseRecordKey,
   billedDisputeTax,
+  disputesClosedByWriteOff,
   mergeDisputeLines,
   type RecordedOre,
   parseStatement,
@@ -1603,14 +1604,38 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       };
     }
     case 'writeOff': {
-      if (action.statementId) {
-        const statement = await mustGet(c, col(c, STATEMENTS).doc(action.statementId), 'Statement');
-        if (statement.minerId !== action.minerId)
-          fail('invalid-argument', "Statement is another Miner's", 'wrong-miner');
-      }
-      const id = `w${now}_${rand(4)}`;
-      // The book applies it (#4637), and the Miner reads it on the personal tab.
+      const statementDoc = action.statementId
+        ? await mustGet(c, col(c, STATEMENTS).doc(action.statementId), 'Statement')
+        : undefined;
+      if (statementDoc && statementDoc.minerId !== action.minerId)
+        fail('invalid-argument', "Statement is another Miner's", 'wrong-miner');
+      // A write-off that closes a day closes the Miner's dispute of it too (#6307): answered, so
+      // it leaves the officer's Needs you and no longer holds the day from the write-off.
+      const mineOpen = (
+        await c.tx.get(col(c, DISPUTES).where('minerId', '==', action.minerId))
+      ).docs
+        .map((d) => d.data())
+        .filter(hasLines); // a withdrawn dispute is a tombstone: nothing to answer
+      // Every read stays above the first write: a Firestore transaction refuses a read after one.
       const uids = await minerUids(c, action.minerId);
+      const closing = disputesClosedByWriteOff(
+        mineOpen,
+        { amount: action.amount },
+        statementDoc as Parameters<typeof disputesClosedByWriteOff>[2]
+      );
+      const id = `w${now}_${rand(4)}`;
+      for (const disputeId of closing)
+        tx.update(col(c, DISPUTES).doc(disputeId), {
+          resolution: {
+            kind: 'dismissed',
+            at: iso,
+            by,
+            reason: action.reason,
+            amountIsk: 0,
+            writeOffId: id,
+          },
+        });
+      // The book applies it (#4637), and the Miner reads it on the personal tab.
       tx.create(col(c, WRITE_OFFS).doc(id), {
         id,
         minerId: action.minerId,
