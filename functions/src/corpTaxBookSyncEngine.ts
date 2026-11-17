@@ -296,11 +296,13 @@ export function noteUncounted(
       openBalance.set(c.minerId, (openBalance.get(c.minerId) ?? 0) - c.amount);
   return donations
     .filter((d) => {
-      const kind = matchDonation(
-        { characterId: d.characterId, reason: d.reason },
-        { ...book, openBalance }
-      ).kind;
-      return kind === 'statement' || kind === 'miner';
+      const match = matchDonation({ characterId: d.characterId, reason: d.reason }, book);
+      if (match.kind === 'statement') return true;
+      // A known sender's donation here is likely tax only while their Miner owes (#6207).
+      return (
+        match.kind === 'miner' &&
+        ((openBalance.get(match.minerId) ?? 0) > 0 || book.unbilled.has(match.minerId))
+      );
     })
     .sort((a, b) => b.at.localeCompare(a.at) || b.refId - a.refId)
     .slice(0, UNCOUNTED_LIMIT)
