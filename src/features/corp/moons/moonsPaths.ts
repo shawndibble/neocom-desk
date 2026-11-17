@@ -14,7 +14,6 @@ export const MOONS_TABS = definePageTabs('/corp/moons', [
   { id: 'miners', labelKey: 'corpTaxBook.moons.tabs.miners', deep: true },
   { id: 'statements', labelKey: 'corpTaxBook.moons.tabs.statements', deep: true },
   { id: 'moon-owners', labelKey: 'corpTaxBook.moons.tabs.moonOwners', deep: true },
-  { id: 'sharing', labelKey: 'corpTaxBook.moons.tabs.sharing' },
 ]);
 
 export type MoonsDetail =
@@ -46,9 +45,32 @@ export const moonOwnerPath = (id: string) => `/corp/moons/moon-owners/${encodeUR
 export const statementPeriodPath = (periodStart: string) =>
   `/corp/moons/statements/${encodeURIComponent(periodStart)}`;
 
-/** A moon's row on the Sharing tab, scrolled to and pulsed (`?highlight=`). */
+/** Moon settings' tabs, in the order the dialog shows them. */
+export const SETTINGS_TABS = ['rates', 'billing', 'extractions', 'sharing', 'access'] as const;
+export type SettingsTab = (typeof SETTINGS_TABS)[number];
+export const isSettingsTab = (v: string | null): v is SettingsTab =>
+  SETTINGS_TABS.some((tab) => tab === v);
+
+/** `?settings=<tab>`: opens Moon settings on that tab once, whichever Moons tab it rides on. */
+export const SETTINGS_PARAM = 'settings';
+
+/**
+ * A moon's row on Moon settings' Sharing tab, scrolled to and pulsed (`?highlight=`).
+ * Sharing was a Moons page tab (#6222) until #6304 moved it into Moon settings.
+ */
 export const sharingMoonPath = (moonId: number) =>
-  `${tabPath(MOONS_TABS, 'sharing')}?${HIGHLIGHT_PARAM}=${moonId}`;
+  `${tabPath(MOONS_TABS, 'extractions')}?${SETTINGS_PARAM}=sharing&${HIGHLIGHT_PARAM}=${moonId}`;
+
+/** The retired `/corp/moons/sharing` tab opens Moon settings on Sharing; its query rides along. */
+export function legacyMoonsLocation(
+  pathname: string,
+  search: string
+): { pathname: string; search: string } | null {
+  if (pathname.replace(/\/$/, '') !== '/corp/moons/sharing') return null;
+  const params = new URLSearchParams(search);
+  params.set(SETTINGS_PARAM, 'sharing');
+  return { pathname: tabPath(MOONS_TABS, 'overview'), search: `?${params.toString()}` };
+}
 
 /** The Miners tab narrowed by its Balance filter (`?balance=`): who owes, who is overdue, who holds credit. */
 export const minersBalancePath = (balance: MinerBalance) =>

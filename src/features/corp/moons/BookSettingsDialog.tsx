@@ -32,6 +32,8 @@ import { COMPARED_HUBS } from '@/market/hubs';
 import { callableErrorText } from './feederErrorText';
 import { useBook } from './useBook';
 import { Label } from './BookDialogs';
+import { SharingTab } from './SharingTab';
+import type { SettingsTab } from './moonsPaths';
 import { isk } from './moonsFormat';
 import { AutomaticSyncSection } from './AutomaticSyncSection';
 import { DeleteBookSection } from './DeleteBookSection';
@@ -132,9 +134,6 @@ function useWalletDivisionNames(characterId: number, corporationId: number): Map
   }, [characterId, corporationId, canRead]);
   return names;
 }
-
-/** The settings dialog's four tabs. */
-export type SettingsTab = 'rates' | 'billing' | 'extractions' | 'access';
 
 /**
  * The book's settings (D21: from the page header's gear): the dated rates
@@ -410,6 +409,7 @@ export function BookSettingsDialog({
     { id: 'rates', label: t('corpTaxBook.moons.settings.tabs.rates') },
     { id: 'billing', label: t('corpTaxBook.moons.settings.tabs.billing') },
     { id: 'extractions', label: t('corpTaxBook.moons.settings.tabs.extractions') },
+    { id: 'sharing', label: t('corpTaxBook.moons.settings.tabs.sharing') },
     { id: 'access', label: t('corpTaxBook.moons.settings.tabs.access') },
   ];
 
@@ -878,6 +878,8 @@ export function BookSettingsDialog({
               </Fields>
             </Section>
           )}
+
+          {tab === 'sharing' && <SharingTab onOpenSyncSettings={() => setTab('access')} />}
 
           {tab === 'access' && (
             <>

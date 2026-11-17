@@ -1,7 +1,7 @@
 /**
  * `/corp/moons` — the Corp Tax Book (issue #4063, epic #4055, D21): Overview,
- * Extractions, Miners, Statements, Moon owners and Sharing as path-segment tabs (ADR 0015), the moon and Miner
- * pages below their tabs, settings behind the header's gear and the audit log
+ * Extractions, Miners, Statements and Moon owners as path-segment tabs (ADR 0015), the moon and Miner
+ * pages below their tabs, settings (Rates, Billing, Extractions, Sharing, Access) behind the header's gear and the audit log
  * behind Activity.
  *
  * Visible to a Character whose roles can view the book (D8: Director,
@@ -15,7 +15,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { canViewCorpTaxBook } from '@/engine/corpRoles';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -36,6 +36,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { tabBarTabs } from '@/lib/pageTabs';
 import { cx } from '@/lib/cx';
+import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
 import { usePageTab } from '@/lib/usePageTab';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { CorpDenied } from '@/features/corp/CorpDenied';
@@ -51,7 +52,7 @@ import { BookHealthStrip } from '@/features/corp/moons/BookHealthStrip';
 import { useMoonsAttentionPublisher } from '@/features/corp/moons/useMoonsAttentionPublisher';
 import { publishMoonsAttention } from '@/features/corp/moons/moonsNavAttention';
 import { DeleteBookDialog } from '@/features/corp/moons/DeleteBookSection';
-import { BookSettingsDialog, type SettingsTab } from '@/features/corp/moons/BookSettingsDialog';
+import { BookSettingsDialog } from '@/features/corp/moons/BookSettingsDialog';
 import { BookContext } from '@/features/corp/moons/bookContextValue';
 import { ExtractionsTab } from '@/features/corp/moons/ExtractionsTab';
 import { InviteMoonOwnerDialog } from '@/features/corp/moons/InviteMoonOwnerDialog';
@@ -63,10 +64,15 @@ import { MoonPage } from '@/features/corp/moons/MoonPage';
 import { MoonsTab } from '@/features/corp/moons/MoonsTab';
 import { MoonOwnerDetail } from '@/features/corp/moons/MoonOwnerDetail';
 import { MoonOwnersTab } from '@/features/corp/moons/MoonOwnersTab';
-import { MOONS_TABS, moonsDetail } from '@/features/corp/moons/moonsPaths';
+import {
+  MOONS_TABS,
+  SETTINGS_PARAM,
+  isSettingsTab,
+  moonsDetail,
+  type SettingsTab,
+} from '@/features/corp/moons/moonsPaths';
 import { StatementPeriodDetail } from '@/features/corp/moons/StatementPeriodDetail';
 import { StatementsTab } from '@/features/corp/moons/StatementsTab';
-import { SharingTab } from '@/features/corp/moons/SharingTab';
 import { MoonsSetup } from '@/features/corp/moons/MoonsSetup';
 import { useCorpBook } from '@/features/corp/moons/useCorpBook';
 import { useAddMyCorps } from '@/features/corp/moons/addCorps/useAddMyCorps';
@@ -115,6 +121,28 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   const { view, canEdit, characterId, corporationId, names } = book;
   // The Overview's setup checklist opens this same dialog, so there is one settings host.
   const openSettings = useCallback((tab?: SettingsTab) => setSettingsDialog({ tab }), []);
+  // `?settings=<tab>` (a share mark's link, the retired Sharing tab's URL) opens it once.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const settingsParam = searchParams.get(SETTINGS_PARAM);
+  const [seenParam, setSeenParam] = useState<string | null>(null);
+  if (settingsParam !== seenParam) {
+    setSeenParam(settingsParam);
+    if (isSettingsTab(settingsParam)) setSettingsDialog({ tab: settingsParam });
+  }
+  useEffect(() => {
+    if (settingsParam === null) return;
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        params.delete(SETTINGS_PARAM);
+        // The Sharing tab latched `?highlight=` on mount; both updaters read the same stale
+        // params, so this one must drop it too or its write would bring it back.
+        if (settingsParam === 'sharing') params.delete(HIGHLIGHT_PARAM);
+        return params;
+      },
+      { replace: true }
+    );
+  }, [settingsParam, setSearchParams]);
   const bookWithSettings = useMemo(() => ({ ...book, openSettings }), [book, openSettings]);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -213,7 +241,6 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
               {tab === 'moons' && <MoonsTab />}
               {tab === 'miners' && <MinersTab />}
               {tab === 'statements' && <StatementsTab />}
-              {tab === 'sharing' && <SharingTab />}
               {tab === 'moon-owners' && (
                 <div className="space-y-4">
                   {addCorps.notices}

@@ -20,7 +20,7 @@ import { legacyAssetsLocation } from '@/engine/assetPath';
 import { INDUSTRY_TABS } from '@/features/industry/industryTabs';
 import { SHIPS_TABS } from '@/features/fittings/shipsTabs';
 import { CORP_MEMBERS_TABS, legacyCorpMembersLocation } from '@/features/corp/corpMembersTabs';
-import { MOONS_TABS } from '@/features/corp/moons/moonsPaths';
+import { MOONS_TABS, legacyMoonsLocation } from '@/features/corp/moons/moonsPaths';
 import { SRP_TABS } from '@/features/corp/srp/srpTabs';
 import { VETTING_TABS } from '@/features/corp/vetting/vettingTabs';
 import { ROUTE_REQUIREMENTS, type AppRoutePath } from './routeScopes';
@@ -184,6 +184,7 @@ export const PAGE_LEGACY_LOCATIONS: Partial<
 > = {
   '/assets': legacyAssetsLocation,
   '/corp/members': legacyCorpMembersLocation,
+  '/corp/moons': legacyMoonsLocation,
   '/market': legacyMarketLocation,
   '/travel': legacyTravelLocation,
   '/industry': legacyIndustryLocation,

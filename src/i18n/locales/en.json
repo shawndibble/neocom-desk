@@ -18041,12 +18041,12 @@
         "moons": "Moons",
         "miners": "Miners",
         "statements": "Statements",
-        "moonOwners": "Moon owners",
-        "sharing": "Sharing"
+        "moonOwners": "Moon owners"
       },
       "sharing": {
         "title": "Pop sharing",
         "intro": "Share when this book's moons pop with the pilots you choose: the refinery, its Pop Time and, if you like, the ore make-up and a start link at your rate. Nothing is shown to anyone until you turn sharing on.",
+        "savesAlone": "Changes here save as you make them. The Save button below does not apply to this tab.",
         "enabled": "Share this book's moon pops",
         "needsSync": "Sharing needs Automatic sync, so pops stay current without an officer visiting.",
         "syncStopped": "Automatic sync has stopped: shared pops keep showing with their data age until it runs again.",
@@ -19291,6 +19291,7 @@
           "rates": "Rates",
           "billing": "Billing",
           "extractions": "Extractions",
+          "sharing": "Sharing",
           "access": "Access"
         },
         "scheduled": "Scheduled",
