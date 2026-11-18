@@ -4,7 +4,7 @@
 // result so the poller never reads a status code — 403 is "this grant cannot read the
 // location", 420/429 stop the run, a low budget stops it after this call.
 
-import { ESI_ROOT, esiHeaders, isBudgetLow, retryAfterMs } from './esiClient.js';
+import { ESI_ROOT, esiGet } from './esiClient.js';
 import type { IncursionListing, RaidableSkyhook } from './nearbyAlerts.js';
 import { isRecord } from './guards.js';
 
@@ -24,17 +24,27 @@ async function getJson(
   accessToken: string | null,
   fetchImpl: typeof fetch
 ): Promise<{ kind: 'ok'; body: unknown; budgetLow: boolean } | Failure> {
-  const res = await fetchImpl(`${ESI_ROOT}${path}`, {
-    headers: esiHeaders(accessToken),
-    signal: AbortSignal.timeout(TIMEOUT_MS),
+  const got = await esiGet(`${ESI_ROOT}${path}`, {
+    token: accessToken,
+    timeoutMs: TIMEOUT_MS,
+    fetchImpl,
   });
-  if (res.status === 403) return { kind: 'forbidden' };
-  if (res.status === 420 || res.status === 429) {
-    return { kind: 'backoff', retryAfterMs: retryAfterMs(res.headers) };
+  switch (got.kind) {
+    case 'ok':
+      return { kind: 'ok', body: got.body ?? undefined, budgetLow: got.budgetLow };
+    case 'forbidden':
+      return { kind: 'forbidden' };
+    case 'backoff':
+      return { kind: 'backoff', retryAfterMs: got.retryAfterMs };
+    case 'error':
+      return { kind: 'error', status: got.status ?? 0 };
+    case 'expired':
+      return { kind: 'error', status: 401 };
+    case 'not-found':
+      return { kind: 'error', status: 404 };
+    case 'not-modified':
+      return { kind: 'error', status: 304 };
   }
-  if (!res.ok) return { kind: 'error', status: res.status };
-  const body: unknown = await res.json().catch(() => undefined);
-  return { kind: 'ok', body, budgetLow: isBudgetLow(res.headers) };
 }
 
 /** `GET /characters/{id}/location` (scope `esi-location.read_location.v1`). */

@@ -9,10 +9,10 @@ import {
   type ImproveOption,
   type RejectedOption,
 } from '@/engine/fittings/improve';
-import { fittedSide } from '@/engine/fittings/improveCandidateFilter';
-import { overBudgetResources } from '@/engine/fittings/improveFree';
-import { hullRoleOf } from '@/engine/fittings/improveRole';
-import { loadBestCharges, unloadedWeapons } from '@/engine/fittings/improveCharges';
+import { fittedSide } from '@/engine/fittings/improve';
+import { overBudgetResources } from '@/engine/fittings/improve';
+import { hullRoleOf } from '@/engine/fittings/improve';
+import { loadBestCharges, unloadedWeapons } from '@/engine/fittings/improve';
 import type { Fitting, FittingImplantSet, FittingModuleResult } from '@/engine/fittings/types';
 import type { FittingStatsDelta } from '@/engine/fittings/variationDelta';
 import type { FittingContext } from './fittingContext';

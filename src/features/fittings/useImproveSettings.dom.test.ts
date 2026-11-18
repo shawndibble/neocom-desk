@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { db } from '@/db';
-import type { HullRole } from '@/engine/fittings/improveRole';
+import type { HullRole } from '@/engine/fittings/improve';
 import type { SettingStore } from '@/lib/settingStore';
 import { holdHydration } from '@/test/holdHydration';
 import { IMPROVE_STORES, useImproveSettings } from './useImproveSettings';

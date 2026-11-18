@@ -27,7 +27,7 @@ import {
   type HullRole,
   type JobsByRole,
   type SpacesByRole,
-} from '@/engine/fittings/improveRole';
+} from '@/engine/fittings/improve';
 import {
   DEFAULT_EXPLORE_SPACE,
   DEFAULT_IMPROVE_JOB,
@@ -35,9 +35,9 @@ import {
   IMPROVE_JOBS,
   type ExploreSpace,
   type ImproveJob,
-} from '@/engine/fittings/improveJob';
+} from '@/engine/fittings/improve';
 import { CRYSTAL_FAMILY_ORES } from '@/engine/fittings/crystalChoice';
-import { IMPROVE_SORTS, type ImproveSort } from '@/engine/fittings/improveRows';
+import { IMPROVE_SORTS, type ImproveSort } from '@/engine/fittings/improve';
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { db } from '@/db';
 import { isPlainRecord } from '@/engine/guards';

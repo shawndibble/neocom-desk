@@ -6,7 +6,7 @@
 import { useTranslation } from 'react-i18next';
 import { IskAmount } from '@/components/ui';
 import type { FittingStats } from '@/engine/fittings/types';
-import type { SelectionSummary } from '@/engine/fittings/improveSelection';
+import type { SelectionSummary } from '@/engine/fittings/improve';
 import { cx } from '@/lib/cx';
 import { formatIskCompact } from '@/lib/isk';
 import { m3Format, m3sFormat } from './improveLineText';

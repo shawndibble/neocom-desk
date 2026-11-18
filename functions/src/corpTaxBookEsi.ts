@@ -5,7 +5,8 @@
 // every other ESI call (esiClient.ts).
 
 import { HttpsError } from 'firebase-functions/v2/https';
-import { ESI_BASE, esiHeaders } from './esiClient.js';
+import { ESI_BASE, esiGet } from './esiClient.js';
+import { throwForEsi } from './esiThrow.js';
 
 export const ROLES_SCOPE = 'esi-characters.read_corporation_roles.v1';
 
@@ -22,23 +23,8 @@ async function getJson(
   accessToken: string | null,
   fetchImpl: typeof fetch
 ): Promise<unknown> {
-  const res = await fetchImpl(url, {
-    headers: esiHeaders(accessToken),
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (res.status === 403 || res.status === 401) {
-    throw new HttpsError('permission-denied', 'ESI refused this Character', {
-      reason: 'esi-forbidden',
-    });
-  }
-  if (res.status === 420 || res.status === 429) {
-    throw new HttpsError('resource-exhausted', 'ESI is rate limiting; try again shortly', {
-      reason: 'esi-backoff',
-    });
-  }
-  if (!res.ok)
-    throw new HttpsError('unavailable', `ESI answered ${res.status}`, { reason: 'esi-error' });
-  return res.json().catch(() => null);
+  return throwForEsi(await esiGet(url, { token: accessToken, fetchImpl }), { forbidden: true })
+    .body;
 }
 
 export function esiIdentityReader(fetchImpl: typeof fetch = fetch): IdentityReader {
@@ -90,20 +76,9 @@ export type CorporationLookup = (characterId: number) => Promise<number>;
  */
 export function esiCorporationLookup(fetchImpl: typeof fetch = fetch): CorporationLookup {
   return async (characterId) => {
-    const res = await fetchImpl(`${ESI_BASE}/characters/affiliation/`, {
-      method: 'POST',
-      headers: { ...esiHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify([characterId]),
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (res.status === 420 || res.status === 429) {
-      throw new HttpsError('resource-exhausted', 'ESI is rate limiting; try again shortly', {
-        reason: 'esi-backoff',
-      });
-    }
-    if (!res.ok)
-      throw new HttpsError('unavailable', `ESI answered ${res.status}`, { reason: 'esi-error' });
-    const body = (await res.json().catch(() => null)) as unknown;
+    const { body } = throwForEsi(
+      await esiGet(`${ESI_BASE}/characters/affiliation/`, { body: [characterId], fetchImpl })
+    );
     const row = Array.isArray(body)
       ? (body as { character_id?: unknown; corporation_id?: unknown }[]).find(
           (r) => r?.character_id === characterId
@@ -122,22 +97,10 @@ export type IdCategoryLookup = (id: number) => Promise<string | undefined>;
 /** ESI's public `POST /universe/names/`: one id in, its category out. No token, no scope. */
 export function esiIdCategoryLookup(fetchImpl: typeof fetch = fetch): IdCategoryLookup {
   return async (id) => {
-    const res = await fetchImpl(`${ESI_BASE}/universe/names/`, {
-      method: 'POST',
-      headers: { ...esiHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify([id]),
-      signal: AbortSignal.timeout(15_000),
-    });
     // ESI answers 404 when an id in the list is not a valid id.
-    if (res.status === 404) return undefined;
-    if (res.status === 420 || res.status === 429) {
-      throw new HttpsError('resource-exhausted', 'ESI is rate limiting; try again shortly', {
-        reason: 'esi-backoff',
-      });
-    }
-    if (!res.ok)
-      throw new HttpsError('unavailable', `ESI answered ${res.status}`, { reason: 'esi-error' });
-    const body = (await res.json().catch(() => null)) as unknown;
+    const got = await esiGet(`${ESI_BASE}/universe/names/`, { body: [id], fetchImpl });
+    if (got.kind === 'not-found') return undefined;
+    const { body } = throwForEsi(got);
     const hit = Array.isArray(body)
       ? (body as { id?: unknown; category?: unknown }[]).find((e) => e?.id === id)
       : undefined;

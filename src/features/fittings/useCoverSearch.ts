@@ -5,8 +5,8 @@
  */
 import { useEffect, useState } from 'react';
 import { applyImproveCandidate, type ImproveOption } from '@/engine/fittings/improve';
-import { findCompletions } from '@/engine/fittings/improveComplete';
-import { slotsOf } from '@/engine/fittings/improveKeys';
+import { findCompletions } from '@/engine/fittings/improve';
+import { slotsOf } from '@/engine/fittings/improve';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import type { ImproveSearch } from './useImprove';
 

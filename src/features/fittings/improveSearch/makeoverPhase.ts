@@ -4,7 +4,7 @@
  * the single swaps set, progress, and the result shaped as tickable options.
  */
 import type { ImproveCandidate, ImproveHold, ImproveOption } from '@/engine/fittings/improve';
-import type { JobSetting } from '@/engine/fittings/improveJob';
+import type { JobSetting } from '@/engine/fittings/improve';
 import {
   findMakeover,
   makeoverBar,
@@ -13,7 +13,7 @@ import {
   propulsionStart,
   type MakeoverMoveOptions,
   type PropulsionStart,
-} from '@/engine/fittings/improveMakeover';
+} from '@/engine/fittings/improve';
 import type { ImproveGoal } from '@/engine/fittings/improve';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';

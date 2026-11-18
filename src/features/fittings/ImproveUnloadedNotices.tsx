@@ -4,8 +4,8 @@
  */
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
-import type { UnloadedWeapons } from '@/engine/fittings/improveCharges';
-import { crystalParts } from '@/engine/fittings/improveMining';
+import type { UnloadedWeapons } from '@/engine/fittings/improve';
+import { crystalParts } from '@/engine/fittings/improve';
 import { crystalBasisOf } from './improveCrystalBasis';
 import { m3sFormat } from './improveLineText';
 import type { ImproveSearch } from './useImprove';
