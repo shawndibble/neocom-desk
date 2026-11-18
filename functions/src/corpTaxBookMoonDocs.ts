@@ -18,6 +18,7 @@ import {
   type MirrorExtraction,
   type ObservedRow,
 } from './corpTaxBookEngine.js';
+import { HOUR_MS } from './timeConstants.js';
 
 export const MOON_DOCS = 'moonDocs';
 /** Bump when a field's meaning changes; the verifier then rewrites every doc. */
@@ -59,7 +60,6 @@ export interface MoonDoc {
   frozenLines: number;
 }
 
-const HOUR_MS = 3_600_000;
 const money = (n: number) => Math.round(n * 100) / 100;
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);

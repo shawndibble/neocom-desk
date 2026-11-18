@@ -44,7 +44,7 @@ import {
   withdrawVetting,
   type VettingDeps,
 } from './vettingStore.js';
-import { DAY_MS, HOUR_MS } from './vettingTypes.js';
+import { DAY_MS, HOUR_MS } from './timeConstants.js';
 
 const CORP = 98000001;
 const BAD_CORP = 98000666;

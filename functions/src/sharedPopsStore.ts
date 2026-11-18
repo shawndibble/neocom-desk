@@ -25,7 +25,7 @@ import {
 } from './communities.js';
 import { requireAdmin } from './communitiesStore.js';
 import { isFiniteNumber, isPlainRecord } from './guards.js';
-import { DAY_MS, HOUR_MS } from './vettingTypes.js';
+import { DAY_MS, HOUR_MS } from './timeConstants.js';
 import { POP_SHARING_DOC, popSharingFrom } from './popSharing.js';
 import {
   ALLIANCE_RECHECK_MS,

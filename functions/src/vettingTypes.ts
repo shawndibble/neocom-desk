@@ -79,9 +79,6 @@ export const VETTING_NOTIFY_MAX = 50;
 /** How long a submit waits for that push before it answers the pilot without it. */
 export const VETTING_NOTIFY_BUDGET_MS = 3000;
 
-export const HOUR_MS = 3_600_000;
-export const DAY_MS = 86_400_000;
-
 /** The settings document: the settings, plus the corp's name so the public page needs no ESI. */
 export interface StoredVettingSettings extends VettingSettings {
   /** Server-owned, like the watchlist: changed only by the invite actions and a start. */

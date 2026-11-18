@@ -9,10 +9,10 @@ import { int } from './corpTaxBook.js';
 import type { SrpHullRule, SrpPricingInput } from './srpPricing.js';
 import type { DoctrineFitSnapshot } from './srpDoctrine.js';
 import type { HullRule, SrpSettings } from './srpTypes.js';
+import { DAY_MS } from './timeConstants.js';
 
 export const MAX_NOTE_LENGTH = 500;
 const FUTURE_SLACK_MS = 60 * 60_000;
-const DAY_MS = 86_400_000;
 
 export interface KillmailRef {
   killmailId: number;

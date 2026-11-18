@@ -12,10 +12,7 @@ import {
   type PopSharingDoc,
   type PopTime,
 } from './popSharing.js';
-
-// Local: this module is shared with the client project, which cannot reach vettingTypes.ts.
-const HOUR_MS = 3_600_000;
-const DAY_MS = 24 * HOUR_MS;
+import { DAY_MS, HOUR_MS } from './timeConstants.js';
 
 /** `sharedPops/{corporationId}`: one server-only doc per sharing book. */
 export const SHARED_POPS = 'sharedPops';

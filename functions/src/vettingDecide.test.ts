@@ -40,14 +40,13 @@ import {
   type VettingInvite,
 } from './vettingEngine.js';
 import {
-  DAY_MS,
-  HOUR_MS,
   VETTING_NOTIFY_MAX,
   VETTING_REVIEWER_DAYS,
   type StoredVettingReview,
   type StoredVettingSettings,
   type VettingActor,
 } from './vettingTypes.js';
+import { DAY_MS, HOUR_MS } from './timeConstants.js';
 
 const T0 = Date.parse('2026-11-01T12:00:00Z');
 const actor = (id: number, owner = `h${id}`): VettingActor => ({

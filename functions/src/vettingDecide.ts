@@ -29,8 +29,6 @@ import {
 } from './vettingEngine.js';
 import type { VettingSettingsPatch } from './vettingParse.js';
 import {
-  DAY_MS,
-  HOUR_MS,
   VETTING_DAILY_DRAFTS,
   VETTING_LOG_MAX,
   VETTING_NOTIFY_MAX,
@@ -42,6 +40,7 @@ import {
   type StoredVettingSettings,
   type VettingActor,
 } from './vettingTypes.js';
+import { DAY_MS, HOUR_MS } from './timeConstants.js';
 
 // --- Settings ---------------------------------------------------------------
 

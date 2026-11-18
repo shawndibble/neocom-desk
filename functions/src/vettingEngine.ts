@@ -1,6 +1,6 @@
 // Lives in functions/src (deploy uploads functions/ alone); src re-exports it. Keep it import-free.
 /**
- * Vetting checks. Pure: no fetch/DOM/Dexie, and no imports, because
+ * Vetting checks. Pure: no fetch/DOM/Dexie, and no imports beyond `timeConstants.js`, because
  * `src/engine/vetting.ts` re-exports this file (the server runs the checks;
  * the client only reads the result's types).
  *
@@ -9,6 +9,8 @@
  * could not run because a character did not share that source. It never says
  * "safe": a check that found nothing is `clear`, not a verdict.
  */
+
+import { DAY_MS } from './timeConstants.js';
 
 export type VettingSource = 'wallet' | 'contact' | 'mail' | 'contract' | 'skills';
 
@@ -115,7 +117,6 @@ export const VETTING_UNDECLARED_ROWS = 5;
 export const VETTING_THIN_AGE_DAYS = 3 * 365;
 export const VETTING_THIN_SKILL_POINTS = 5_000_000;
 
-const DAY = 86_400_000;
 const CYNO_SKILL = 21603;
 /** Racial carriers, dreadnoughts and titans, Precursor Dreadnought, Capital Ships, Black Ops. */
 const CAPITAL_SKILLS = [
@@ -241,7 +242,7 @@ export function assessVetting(input: VettingInput): VettingAssessment {
       // History is newest first, so the stay ended when the one before it in the list began.
       const left = character.history[index - 1]?.startDate;
       const leftAt = left ? Date.parse(left) : input.now;
-      if (input.now - leftAt <= VETTING_RECENT_DAYS * DAY) recentStay = true;
+      if (input.now - leftAt <= VETTING_RECENT_DAYS * DAY_MS) recentStay = true;
       stays.push({
         characterId: character.characterId,
         at: stay.startDate,
@@ -290,7 +291,8 @@ export function assessVetting(input: VettingInput): VettingAssessment {
   for (const character of input.characters) {
     const joined = character.history.filter(
       (stay) =>
-        !isNpcCorporation(stay.corporationId) && input.now - Date.parse(stay.startDate) <= 365 * DAY
+        !isNpcCorporation(stay.corporationId) &&
+        input.now - Date.parse(stay.startDate) <= 365 * DAY_MS
     );
     if (joined.length >= VETTING_HOP_JOINS) {
       flags.push(
@@ -325,7 +327,7 @@ export function assessVetting(input: VettingInput): VettingAssessment {
   }
 
   for (const character of skilled) {
-    const ageDays = (input.now - Date.parse(character.birthday)) / DAY;
+    const ageDays = (input.now - Date.parse(character.birthday)) / DAY_MS;
     if (
       character.skillPoints !== null &&
       ageDays >= VETTING_THIN_AGE_DAYS &&
@@ -550,7 +552,7 @@ export function unmetVettingMinimums(
   const unmet: VettingMinimumId[] = [];
   if (
     minimums.ageDays > 0 &&
-    !characters.some((c) => now - Date.parse(c.birthday) >= minimums.ageDays * DAY)
+    !characters.some((c) => now - Date.parse(c.birthday) >= minimums.ageDays * DAY_MS)
   ) {
     unmet.push('ageDays');
   }
@@ -591,7 +593,7 @@ export const VETTING_OPEN_KEEP_DAYS = 90;
 export const VETTING_ROLE_MAX = 40;
 
 /** The asking officer may resend a member's request mail only after this long (24 hours). */
-export const VETTING_MAIL_COOLDOWN_MS = 86_400_000;
+export const VETTING_MAIL_COOLDOWN_MS = DAY_MS;
 /** Hours an unsent draft is kept. */
 export const VETTING_DRAFT_HOURS = 24;
 export const VETTING_MAX_CHARACTERS = 30;

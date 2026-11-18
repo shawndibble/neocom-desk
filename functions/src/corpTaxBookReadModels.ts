@@ -17,6 +17,7 @@ import {
 } from './corpTaxBookEngine.js';
 import { READ_MODELS_SCHEMA } from './corpTaxBookVersionKeys.js';
 import { allocateMiner, minerIdsIn, type BookRecords } from './corpTaxBookMinerTotals.js';
+import { DAY_MS } from './timeConstants.js';
 
 export const READ_MODELS = 'readModels';
 export const MINER_LIST_DOC = 'minerList';
@@ -61,8 +62,6 @@ export interface ReadModels {
   [MINER_LIST_DOC]: MinerListDoc;
   [OVERVIEW_DOC]: OverviewDoc;
 }
-
-const DAY_MS = 86_400_000;
 
 /** Whether an Extraction is still worth listing at `now` (ms): not cancelled, expiry no more than a day gone. */
 function inWindow(

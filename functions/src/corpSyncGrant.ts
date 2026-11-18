@@ -75,6 +75,7 @@ import {
 } from './corpSyncStoppedAlert.js';
 import type { CorporationAllianceLookup } from './sharedPopsEsi.js';
 import { learnOwnRefineryNames, stampFailedRoleCheck } from './sharedPopsStore.js';
+import { HOUR_MS } from './timeConstants.js';
 
 export const CORP_SYNC_GRANTS_COLLECTION = 'corpTaxBookSyncGrants';
 export { SCHEDULED_SYNC_DOC };
@@ -561,7 +562,7 @@ export const SYNC_CORP_TAX_BOOKS_SCHEDULE = {
 } as const;
 
 /** A synced book rests this long; under the 2-hour tick spacing, so a late run never skips a slot. */
-export const SYNC_REST_MS = 3_600_000;
+export const SYNC_REST_MS = HOUR_MS;
 
 /** One doc: when the last `nextSyncAt` backfill scan ran. */
 const GRANT_BACKFILL_DOC = 'corpTaxBookSyncGrantMeta/nextSyncAtBackfill';

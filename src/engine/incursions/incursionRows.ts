@@ -9,8 +9,9 @@
  * influence and distance, never whether it is worth running.
  */
 
-export const INCURSION_STATES = ['mobilizing', 'established', 'withdrawing'] as const;
-export type IncursionState = (typeof INCURSION_STATES)[number];
+import { INCURSION_STATES, type IncursionState } from '../../../functions/src/incursionState';
+
+export { INCURSION_STATES, type IncursionState };
 
 /** One entry of ESI `GET /incursions`. */
 export interface IncursionEntry {
