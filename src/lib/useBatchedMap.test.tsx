@@ -1,14 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { useBatchedMap } from './useBatchedMap';
-
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((res) => {
-    resolve = res;
-  });
-  return { promise, resolve };
-}
+import { deferred } from '@/test/deferred';
 
 describe('useBatchedMap', () => {
   it('loads nothing for an empty key', () => {
