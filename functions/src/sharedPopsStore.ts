@@ -932,12 +932,21 @@ export async function linkSharedPopSurvey(
   const pop = (await sharedPopsFor(deps, [viewer])).find((p) => p.id === input.popId);
   if (!pop) throw new HttpsError('permission-denied', 'That pop is not shared with you');
   const share = await deps.db.collection('shares').doc(input.surveyId).get();
-  if (!share.exists || share.get('type') !== 'survey')
+  // A lapsed Survey (its TTL delete may lag) is as good as gone.
+  const expires = (share.get('expiresAt') as { toMillis?: () => number } | undefined)?.toMillis?.();
+  if (!share.exists || share.get('type') !== 'survey' || (expires ?? 0) <= deps.now())
     throw new HttpsError('failed-precondition', 'That Survey does not exist');
-  await corpDoc(deps.db, pop.corporationId)
+  const extraction = corpDoc(deps.db, pop.corporationId)
     .collection(EXTRACTIONS)
-    .doc(pop.extractionId)
-    .update({ popSurveyId: input.surveyId });
+    .doc(pop.extractionId);
+  // Already the pop's Survey: nothing to write or republish.
+  if (pop.surveyId === input.surveyId) return { linked: true };
+  try {
+    await extraction.update({ popSurveyId: input.surveyId });
+  } catch {
+    // The Extraction was purged after the pop was published.
+    throw new HttpsError('not-found', 'That pop is gone');
+  }
   await refreshSharedPops(deps, pop.corporationId);
   return { linked: true };
 }

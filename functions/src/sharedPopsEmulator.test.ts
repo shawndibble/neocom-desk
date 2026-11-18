@@ -1,6 +1,6 @@
 // Shared Pops against the Firestore emulator (#6223): publishing a book's pops and who may read
 // them. Runs only under `npm run test:rules` at the repo root; a plain `npm test` skips it.
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { beforeEach, expect, it } from 'vitest';
 import type { Caller } from './actorAuth.js';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
@@ -385,7 +385,10 @@ emulatorSuite('Shared Pops', () => {
   it('links a Survey started from a pop for its audience, and an officer link replaces it', async () => {
     await publishSharedPops(publishDeps(), BOOK);
     const popId = `${BOOK}_1000_${Date.parse(START)}`;
-    await db.collection('shares').doc('abc234').set({ type: 'survey' });
+    await db
+      .collection('shares')
+      .doc('abc234')
+      .set({ type: 'survey', expiresAt: Timestamp.fromMillis(now + 24 * H) });
     await expect(
       linkSharedPopSurvey(readDeps(), caller(STRANGER), { popId, surveyId: 'abc234' })
     ).rejects.toThrow(/not shared with you/);

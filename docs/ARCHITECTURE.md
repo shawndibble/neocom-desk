@@ -645,7 +645,10 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   change (`functions/src/sharedPopsStore.ts`; pure rules, Pop Time and lifetime in
   `functions/src/sharedPops.ts`). Pilots read them only through the `listSharedPopsCallable`
   action, which checks every proven Character's corporation, alliance (public ESI) and Communities
-  live; the client seam is `src/sync/sharedPops.ts` (`fetchSharedPops`). A Community share needs an
+  live; the client seam is `src/sync/sharedPops.ts` (`fetchSharedPops`). A pop carries its
+  Survey (`surveyId`, only where the ore make-up is shared): an officer's `linkSurvey` or a pilot's
+  `linkSharedPopSurveyCallable` (a Survey started from the pop's `pop=` start link; stored as
+  `popSurveyId` on the Extraction, newest wins). A Community share needs an
   officer of the book among its Members (`sharedPopSources/{corp}.editors`, stamped by
   `authorizeOfficer`); a Community admin blocks a corporation in `CommunityPopSharers.tsx`
   (`communities/{id}/popSharingBlocks`).
