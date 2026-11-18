@@ -83,6 +83,15 @@ describe('Modal', () => {
     expect(screen.queryByRole('button', { name: 'Inside' })).not.toBeInTheDocument();
   });
 
+  it('does not close when a press begins inside and its release lands on the backdrop', async () => {
+    const { dialog } = await open();
+
+    // Content reflowed away under the pointer: the click targets the dialog.
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Inside' }));
+    fireEvent.click(dialog);
+    expect(screen.getByRole('button', { name: 'Inside' })).toBeInTheDocument();
+  });
+
   it('ignores a backdrop click when dismissOnOutsidePress is off, but still closes on Escape', async () => {
     const onCloseSpy = vi.fn();
     const user = userEvent.setup();

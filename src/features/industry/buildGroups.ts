@@ -53,12 +53,12 @@
 
 import {
   FACILITY_PRESETS,
-  RIG_KIND_OPTIONS,
   type FacilityKind,
   type OwnedStockScope,
   type RigFit,
   type SecurityBand,
 } from '@/engine/industry/types';
+import { parseRigKind } from '@/engine/industry/rigScope';
 import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
 import { coerceArrayEntry, parseCharacterKeyedRecord } from '@/lib/characterKeyedRecord';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
@@ -177,7 +177,7 @@ function usableSnapshot(value: unknown): value is BuildGroupSnapshot {
     (rigFit === undefined ||
       (Array.isArray(rigFit) &&
         rigFit.length === 3 &&
-        rigFit.every((kind) => RIG_KIND_OPTIONS.includes(kind)))) &&
+        rigFit.every((kind) => kind === 'none' || parseRigKind(kind) !== null))) &&
     (facilityTaxPct === undefined || Number.isFinite(facilityTaxPct)) &&
     typeof appliedAt === 'number' &&
     Number.isFinite(appliedAt)

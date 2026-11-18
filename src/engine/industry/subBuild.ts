@@ -28,6 +28,7 @@ import { splitEffectiveMaterials } from '@/engine/industry/jobSplit';
 import { jobDurationSeconds } from '@/engine/industry/time';
 import { estimatedItemValue, jobFee } from '@/engine/industry/jobCost';
 import { sizeRuns } from '@/engine/industry/runSizing';
+import { rigKindsApplyingTo } from '@/engine/industry/rigScope';
 
 /** A planned sub-job: what to install, and what it eats. */
 export interface SubBuild {
@@ -57,6 +58,12 @@ export interface SubBuild {
   inputs: EffectiveMaterial[];
   /** The sub-job's own installation fee — a real cost of choosing to build. */
   jobFee: JobFeeBreakdown;
+  /**
+   * The fitted rigs that reach this job's product (issue #6392), for the
+   * Calculation Breakdown. Absent when the structure has no rig fitted, so a
+   * plan without rigs shows nothing; empty when rigs are fitted but none covers it.
+   */
+  rigs?: string[];
 }
 
 /** Where the sub-job would run, and what it costs to install there. */
@@ -108,7 +115,8 @@ export function planSubBuild(
         0,
         ctx.modifiers,
         ctx,
-        blueprint.skills
+        blueprint.skills,
+        blueprint.rigScope
       ),
       inputs,
       jobFee: jobFee(
@@ -118,6 +126,10 @@ export function planSubBuild(
         ctx.facilityTaxPct,
         ctx.regionalTaxPct
       ),
+      ...(ctx.facility.structure &&
+        ctx.rigFit.some((kind) => kind !== 'none') && {
+          rigs: rigKindsApplyingTo(ctx.rigFit, blueprint.rigScope),
+        }),
     };
   } catch {
     // The engine range-checks ME and runs. A blueprint or an owned-ME value

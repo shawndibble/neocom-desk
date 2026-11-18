@@ -57,6 +57,13 @@ import type { EngineAsset } from '../assetTree';
 import type { MaterialRecipe } from './makeOrBuy';
 import type { ResolvedMaterial } from './materialResolution';
 import type { CharacterModifiers } from './characterModifiers';
+import {
+  parseRigKind,
+  rigReaches,
+  type ProductRigScope,
+  type ScopedRigKind,
+  type UnscopedRigKind,
+} from './rigScope';
 import type { ResolvedStandings } from '@/engine/market/standings';
 
 export interface QuantityEntry {
@@ -100,6 +107,8 @@ export interface IndustryBlueprint {
   skills?: readonly BlueprintSkillRequirement[];
   /** Most runs one job may be installed for (the game's Runs cap); absent means no cap. */
   maxProductionLimit?: number;
+  /** Which engineering rigs reach this product (issue #6392), baked from its group; absent when no rig scope covers it. */
+  rigScope?: ProductRigScope;
 }
 
 /** `blueprint.activity`, defaulting to 'manufacturing' — the one place that owns what an unset activity means. */
@@ -129,7 +138,7 @@ export type RigLevel = 'none' | 't1' | 't2';
  * One specific rig a structure can fit (issue #609): which bonus line (ME or
  * TE) and which tier. `'none'` is an empty slot.
  */
-export type RigKind = 'none' | 'meT1' | 'meT2' | 'teT1' | 'teT2';
+export type RigKind = 'none' | UnscopedRigKind | ScopedRigKind;
 
 /** Every Upwell engineering complex and refinery has exactly 3 rig slots. */
 export const RIG_SLOT_COUNT = 3;
@@ -291,9 +300,7 @@ type RigBonusType = 'me' | 'te';
  * both rig lines. Only the security multiplier differs — see
  * `REACTION_RIG_SECURITY_MULTIPLIER` below.
  */
-const RIG_KIND_BONUS: Readonly<
-  Record<Exclude<RigKind, 'none'>, { type: RigBonusType; pct: number }>
-> = {
+const RIG_KIND_BONUS: Readonly<Record<UnscopedRigKind, { type: RigBonusType; pct: number }>> = {
   meT1: { type: 'me', pct: 2 },
   meT2: { type: 'me', pct: 2.4 },
   teT1: { type: 'te', pct: 20 },
@@ -345,14 +352,21 @@ export function rigSecurityMultiplierFor(activity: IndustryActivity): Record<Sec
  */
 const STACKING_PENALTY_MULTIPLIERS: readonly number[] = [1, 0.869, 0.571];
 
-function stackedRigBonusPct(fit: RigFit, bonusType: RigBonusType): number {
+function stackedRigBonusPct(
+  fit: RigFit,
+  bonusType: RigBonusType,
+  productScope: ProductRigScope | undefined
+): number {
   const contributions = fit
-    .map((kind) => (kind === 'none' ? null : RIG_KIND_BONUS[kind]))
-    .filter(
-      (spec): spec is { type: RigBonusType; pct: number } =>
-        spec !== null && spec.type === bonusType
-    )
-    .map((spec) => spec.pct)
+    .map((kind) => {
+      const parsed = parseRigKind(kind);
+      if (parsed === null || parsed.line !== bonusType) return null;
+      // Only rigs that reach this product share a stacking group (issue #6392).
+      return rigReaches(parsed.target, productScope)
+        ? RIG_KIND_BONUS[`${parsed.line}${parsed.tier}`].pct
+        : null;
+    })
+    .filter((pct): pct is number => pct !== null)
     .sort((a, b) => b - a);
   return contributions.reduce(
     (sum, pct, i) => sum + pct * (STACKING_PENALTY_MULTIPLIERS[i] ?? 0),
@@ -365,14 +379,21 @@ function stackedRigBonusPct(fit: RigFit, bonusType: RigBonusType): number {
  * to `bonusType`, EVE-stacking-penalized against each other, times the
  * facility's security-band multiplier for its activity. Callers still gate
  * this at 0 for a non-structure — rigs only fit on player structures.
+ *
+ * `productScope` is the job's product class (`IndustryBlueprint.rigScope`):
+ * an unscoped rig always counts, a scoped rig only when it reaches that scope
+ * (so a product with no known scope gets only the unscoped rigs).
  */
 export function rigBonusPct(
   fit: RigFit,
   bonusType: RigBonusType,
   activity: IndustryActivity,
-  security: SecurityBand
+  security: SecurityBand,
+  productScope?: ProductRigScope
 ): number {
-  return stackedRigBonusPct(fit, bonusType) * rigSecurityMultiplierFor(activity)[security];
+  return (
+    stackedRigBonusPct(fit, bonusType, productScope) * rigSecurityMultiplierFor(activity)[security]
+  );
 }
 
 /**
