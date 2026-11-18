@@ -190,6 +190,12 @@ function LibraryGroup({
   );
 }
 
+const NO_SYSTEM_IDS: ReadonlyMap<string, number> = new Map();
+const loadSystemIds = () =>
+  loadSolarSystemsById().then((systems) =>
+    systems ? systemIdsByName(systems.values()) : NO_SYSTEM_IDS
+  );
+
 /**
  * The Community Library (issue #3601), the Blueprints tab's Everyone view:
  * what the Members share. It opens on "Shared in the Community": each shared
@@ -201,12 +207,6 @@ function LibraryGroup({
  * stale Member is greyed and badged, never hidden. BPC Sourcing is one link
  * away, to source a copy.
  */
-const NO_SYSTEM_IDS: ReadonlyMap<string, number> = new Map();
-const loadSystemIds = () =>
-  loadSolarSystemsById().then((systems) =>
-    systems ? systemIdsByName(systems.values()) : NO_SYSTEM_IDS
-  );
-
 export function CommunityLibrary({
   communityId,
   characterId,

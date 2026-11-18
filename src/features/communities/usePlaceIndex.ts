@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { buildPlaceIndex, type PlaceIndex } from '@/engine/communities/requestPlaces';
 import { loadMarketRegions } from '@/sde/loadMarketSde';
@@ -25,7 +26,10 @@ function loadPlaceIndex(): Promise<PlaceIndex | null> {
 /** The place index, read once `enabled`. Shared by the compose picker and the distance filter. */
 export function usePlaceIndex(enabled = true): PlaceIndexState {
   const loaded = useKeyedLoad('places', loadPlaceIndex, !enabled);
-  if (loaded.status === 'ready')
-    return loaded.data ? { status: 'ready', index: loaded.data } : { status: 'failed' };
-  return loaded.status === 'failed' ? { status: 'failed' } : { status: 'loading' };
+  return useMemo<PlaceIndexState>(() => {
+    if (loaded.status === 'ready' && loaded.data) return { status: 'ready', index: loaded.data };
+    return loaded.status === 'failed' || loaded.status === 'ready'
+      ? { status: 'failed' }
+      : { status: 'loading' };
+  }, [loaded.status, loaded.data]);
 }
