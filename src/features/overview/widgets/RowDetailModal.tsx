@@ -123,10 +123,21 @@ export function RowDetailModal({
         hasActions && (
           <div className="flex flex-wrap items-center justify-between gap-3">
             {detail.place && <Place place={detail.place} />}
+            {detail.secondaryLink && (
+              <Link
+                to={detail.secondaryLink.to}
+                className={buttonClassName({ className: 'ml-auto' })}
+              >
+                {detail.secondaryLink.label}
+              </Link>
+            )}
             {detail.link && (
               <Link
                 to={detail.link.to}
-                className={buttonClassName({ variant: 'primary', className: 'ml-auto' })}
+                className={buttonClassName({
+                  variant: 'primary',
+                  className: detail.secondaryLink ? '' : 'ml-auto',
+                })}
               >
                 {detail.link.label}
               </Link>

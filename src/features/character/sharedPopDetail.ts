@@ -118,6 +118,14 @@ export function sharedPopDetail(
     ...(pop.solarSystemId === null
       ? {}
       : { place: { systemId: pop.solarSystemId, name: sharedPopTitle(entry) } }),
-    link: { label: t('calendar.sharedPop.startSurvey'), to: sharedPopStartLink(entry) },
+    ...(pop.surveyId
+      ? {
+          link: { label: t('calendar.sharedPop.openSurvey'), to: `/s/${pop.surveyId}` },
+          secondaryLink: {
+            label: t('calendar.sharedPop.startNewSurvey'),
+            to: sharedPopStartLink(entry),
+          },
+        }
+      : { link: { label: t('calendar.sharedPop.startSurvey'), to: sharedPopStartLink(entry) } }),
   };
 }
