@@ -19,6 +19,7 @@ describe('Improve engine seam lint guard', () => {
     ["import { x } from '@/engine/fittings/improve/improveKeys';", 'src/features/fittings/a.ts'],
     ["import { x } from '@/engine/fittings/improve/improve';", 'src/features/miningTax/a.ts'],
     ["import { x } from './improve/improveJob';", 'src/engine/fittings/hullCommonality.ts'],
+    ["import { x } from '../improve/improveJob';", 'src/engine/fittings/other/a.ts'],
   ])('fires on %s', async (source, filePath) => {
     expect(await deepErrors(`${source}\nexport const y = x;\n`, filePath)).toHaveLength(1);
   });

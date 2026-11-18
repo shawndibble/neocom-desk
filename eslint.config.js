@@ -146,7 +146,7 @@ const sortArrowMessage =
 // modules inside the folder are internal. Pinned by
 // scripts/lib/improveSeamLint.test.mjs.
 const improveDeepImportPattern = {
-  group: ['@/engine/fittings/improve/*', '**/engine/fittings/improve/*', './improve/*'],
+  group: ['**/improve/*'],
   message: "Import the Improve engine from '@/engine/fittings/improve', not a file inside it.",
 };
 const restrictedImportPaths = [
