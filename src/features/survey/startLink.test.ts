@@ -4,8 +4,10 @@ import {
   EMPTY_START_LINK,
   fromInfoFields,
   parseStartLink,
+  popOfStartLink,
   startLinkPath,
   toInfoFields,
+  withPop,
 } from './startLink';
 
 const FULL = {
@@ -123,5 +125,21 @@ describe('fromInfoFields', () => {
       rate: 10,
       notes: 'n',
     });
+  });
+});
+
+describe('a start link that names its pop', () => {
+  it('carries the pop and reads it back, beside the Survey fields', () => {
+    const path = withPop(startLinkPath(FULL), '98000001_1000_1762732800000');
+    expect(popOfStartLink(`?${queryOf(path)}`)).toBe('98000001_1000_1762732800000');
+    expect(parseStartLink(`?${queryOf(path)}`)).toEqual(
+      parseStartLink(`?${queryOf(startLinkPath(FULL))}`)
+    );
+  });
+
+  it('starts the query when there is none, and drops a pop that is not a pop id', () => {
+    expect(withPop('/survey', '1_x')).toBe('/survey?pop=1_x');
+    expect(popOfStartLink('?pop=nonsense')).toBeNull();
+    expect(popOfStartLink('')).toBeNull();
   });
 });

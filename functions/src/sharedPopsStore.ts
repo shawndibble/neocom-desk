@@ -102,6 +102,7 @@ function extractionOf(d: DocumentSnapshot): PopExtraction | undefined {
   const decay = str(x.naturalDecayTime);
   if (structureId === undefined || moonId === undefined || !start || !arrival || !decay)
     return undefined;
+  const survey = str(x.popSurveyId) ?? str(x.surveyId);
   const oreLines = Array.isArray(x.oreLines)
     ? (x.oreLines as Data[]).flatMap((l) =>
         num(l?.typeId) !== undefined && num(l?.quantity) !== undefined
@@ -122,7 +123,8 @@ function extractionOf(d: DocumentSnapshot): PopExtraction | undefined {
       ? { sourceCorporationId: x.sourceCorporationId as number }
       : {}),
     ...(oreLines ? { oreLines } : {}),
-    ...(str(x.surveyId) ? { surveyId: x.surveyId as string } : {}),
+    // A pilot's own link (a start from the pop) holds until an officer links again, which clears it.
+    ...(survey ? { surveyId: survey } : {}),
   };
 }
 
@@ -894,4 +896,48 @@ export async function setCommunityPopBlock(
   if (input.blocked) await ref.set({ by: signedInCharacter(caller), at: now });
   else await ref.delete();
   return { ok: true };
+}
+
+// --- Linking a Survey started from a pop -------------------------------------------------------
+
+const POP_ID = /^([1-9][0-9]{0,15})_.{1,100}$/;
+/** A `shares` id: the app's alphabet and length (see `shortStartLink.ts`). */
+const SHARE_ID = /^[2-9a-hj-kmnp-z]{6}$/;
+
+/** `linkSharedPopSurveyCallable` input: the pop's id and the Survey (a Share Link id) started from it. */
+export function parseLinkSharedPopSurveyInput(data: unknown): { popId: string; surveyId: string } {
+  const d = record(data);
+  if (typeof d.popId !== 'string' || !POP_ID.test(d.popId))
+    throw new HttpsError('invalid-argument', 'popId must be a Shared Pop id');
+  if (typeof d.surveyId !== 'string' || !SHARE_ID.test(d.surveyId))
+    throw new HttpsError('invalid-argument', 'surveyId must be a Share Link id');
+  return { popId: d.popId, surveyId: d.surveyId };
+}
+
+/**
+ * Links a Survey a pilot started from a Shared Pop's start link back to that pop, so everyone who
+ * sees the pop can open it. Only a viewer the pop reaches now may (`sharedPopsFor` is the one
+ * audience check); the newest link wins, and an officer's own `linkSurvey` clears it. The Survey
+ * must exist. Stored on the Extraction beside the officer's `surveyId`, which this never touches.
+ */
+export async function linkSharedPopSurvey(
+  deps: SharedPopsReadDeps,
+  caller: Caller,
+  input: { popId: string; surveyId: string }
+): Promise<{ linked: true }> {
+  const viewer: PopViewer = {
+    characterId: signedInCharacter(caller),
+    ownerHash: caller.ownerHash,
+  };
+  const pop = (await sharedPopsFor(deps, [viewer])).find((p) => p.id === input.popId);
+  if (!pop) throw new HttpsError('permission-denied', 'That pop is not shared with you');
+  const share = await deps.db.collection('shares').doc(input.surveyId).get();
+  if (!share.exists || share.get('type') !== 'survey')
+    throw new HttpsError('failed-precondition', 'That Survey does not exist');
+  await corpDoc(deps.db, pop.corporationId)
+    .collection(EXTRACTIONS)
+    .doc(pop.extractionId)
+    .update({ popSurveyId: input.surveyId });
+  await refreshSharedPops(deps, pop.corporationId);
+  return { linked: true };
 }

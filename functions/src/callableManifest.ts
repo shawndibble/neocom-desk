@@ -75,6 +75,7 @@ export const CALLABLE_ACTIONS = {
     'disputeCorpTaxBookFeederPayoutCallable',
     'setCorpTaxBookFeederPopSharingCallable',
     'listSharedPopsCallable',
+    'linkSharedPopSurveyCallable',
     'getCorpTaxBookPopSharingCommunitiesCallable',
     'listCorpTaxBookFeederInvitesCallable',
     'revokeCorpTaxBookSyncGrantCallable',

@@ -1579,7 +1579,11 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const ref = col(c, EXTRACTIONS).doc(action.extractionId);
       await mustGet(c, ref, 'Extraction');
       // The sync's merge-set never writes this field, so a later sync keeps the link.
-      tx.update(ref, { surveyId: action.surveyId ?? FieldValue.delete() });
+      // An officer's choice replaces a pilot's start-from-the-pop link (`popSurveyId`).
+      tx.update(ref, {
+        surveyId: action.surveyId ?? FieldValue.delete(),
+        popSurveyId: FieldValue.delete(),
+      });
       return { detail: { extractionId: action.extractionId, surveyId: action.surveyId } };
     }
     case 'setFullyMined': {

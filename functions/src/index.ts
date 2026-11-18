@@ -211,6 +211,8 @@ import {
   listCommunityPopSharers,
   parseCommunityPopBlockInput,
   parseListSharedPopsInput,
+  parseLinkSharedPopSurveyInput,
+  linkSharedPopSurvey,
   provenViewers,
   setCommunityPopBlock,
   settingsCommunityIds,
@@ -1118,6 +1120,15 @@ corpTaxBookAction('listSharedPopsCallable', async (request) => {
   });
   return { pops: await sharedPopsFor(sharedPopsReadDeps(), viewers) };
 });
+
+// A Survey started from a pop's start link, linked back to that pop for everyone who sees it.
+corpTaxBookAction('linkSharedPopSurveyCallable', (request) =>
+  linkSharedPopSurvey(
+    sharedPopsReadDeps(),
+    callerOf(request),
+    parseLinkSharedPopSurveyInput(request.data)
+  )
+);
 
 // The Sharing tab: for each Community the settings name, whether an officer of the book is a
 // Member there (else it shares nothing) and whether its admin blocked the book.
