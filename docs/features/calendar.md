@@ -14,7 +14,7 @@ Code: `src/routes/Calendar.tsx`; `src/features/character/{calendarBoardData,cale
 | Day select            | Click a day to filter the rail; click again or "Show all days" to clear                          | `Calendar.tsx:selectedDayMs`                |
 | Period nav            | Prev / Today / Next (month or fortnight; phone steps 14 days), URL `anchor=YYYY-MM-DD`           | `Calendar.tsx:step`                         |
 | Density toggle        | Month / Fortnight, device-local, desktop only                                                    | `useCalendarDensity`                        |
-| Event types filter    | Checkbox menu per kind with counts, legend swatches, "Show all types"                            | `CalendarKindFilterMenu.tsx`                |
+| Event types filter    | Checkbox menu per kind with counts, legend swatches, "Select all" / "Select none"                | `CalendarKindFilterMenu.tsx`                |
 | Skill plan projection | Choose one Skill Plan per Character to project its steps onto the board                          | `calendarSkillPlan.ts`                      |
 | Event detail modal    | Opens for calendar events: time, text, RSVP, export                                              | `EventDetailModal.tsx`                      |
 | RSVP                  | Accept / Decline / Tentative (ESI write)                                                         | `respondToCalendarEvent`                    |
@@ -102,7 +102,7 @@ Overdue rows show a kind-specific past label ("overdue" / "Started" / "ready to 
 - Hidden kinds are persisted in Dexie `calendarHiddenKinds` (stores what is hidden so new kinds default visible). Device-local.
 - "Skill plan to project" section: one checkbox per Skill Plan of the Character (select again to clear), "No Skill Plans for this character" empty note, error reason if scheduling fails. Choice stored per Character in `calendarSkillPlanByCharacter`; choosing triggers a reload.
 - "Corporation events" submenu, only when at least one corporation is readable: All corporations / one row per corporation (two or more only) / Hide corporation events. Applies to the four corp kinds only; the pilot's own events always show. Stored in `calendarCorpFilter`; a saved corporation that is no longer readable filters nothing. The filter button is `pressed` while it is not on All.
-- "Show all types" button (disabled when none hidden).
+- "Select all" (disabled when none hidden) and "Select none" (hides every listed kind; disabled when all are hidden).
 
 ## Event detail modal (calendar events only)
 

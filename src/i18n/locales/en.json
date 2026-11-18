@@ -9695,8 +9695,8 @@
       "open": "Filter event types",
       "openWithCount": "Filter event types ({{count}} hidden)",
       "notGranted": "Not granted",
-      "showAll": "All",
-      "hideAll": "None",
+      "showAll": "Select all",
+      "hideAll": "Select none",
       "unavailable": "Unavailable"
     },
     "map": {

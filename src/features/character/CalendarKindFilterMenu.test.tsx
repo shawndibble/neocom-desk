@@ -46,25 +46,28 @@ describe('CalendarKindFilterMenu keyboard access', () => {
     expect(stray).toEqual([]);
   });
 
-  it('End reaches "None"; Enter hides every listed kind and keeps the menu open', async () => {
+  it('End reaches "Select none"; Enter hides every listed kind and keeps the menu open', async () => {
     const first = CHARACTER_BOARD_ITEM_KINDS[0];
     const { user, onHideAll } = await openMenu([], vi.fn(), new Map([[first, 2]]));
     await user.keyboard('{End}');
-    expect(screen.getByRole('menuitem', { name: 'None' })).toHaveFocus();
+    expect(screen.getByRole('menuitem', { name: 'Select none' })).toHaveFocus();
     await user.keyboard('{Enter}');
     expect(onHideAll).toHaveBeenCalledWith([first]);
     expect(screen.getByRole('menu')).toBeInTheDocument();
   });
 
-  it('"All" runs onShowAll', async () => {
+  it('"Select all" runs onShowAll', async () => {
     const { user, onShowAll } = await openMenu([CHARACTER_BOARD_ITEM_KINDS[0]]);
-    await user.click(screen.getByRole('menuitem', { name: 'All' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Select all' }));
     expect(onShowAll).toHaveBeenCalledTimes(1);
   });
 
   it('is disabled when nothing is hidden', async () => {
     await openMenu([]);
-    expect(screen.getByRole('menuitem', { name: 'All' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('menuitem', { name: 'Select all' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   });
 });
 

@@ -220,6 +220,8 @@ export function CalendarKindFilterMenu({
     return (counts.get(kind) ?? 0) > 0;
   }
 
+  const listedKinds = CHARACTER_BOARD_ITEM_KINDS.filter(hasRow);
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -343,10 +345,10 @@ export function CalendarKindFilterMenu({
             {t('calendar.filter.showAll')}
           </DropdownMenuItem>
           <DropdownMenuItem
-            disabled={CHARACTER_BOARD_ITEM_KINDS.filter(hasRow).every((k) => hiddenSet.has(k))}
+            disabled={listedKinds.every((k) => hiddenSet.has(k))}
             onSelect={(event) => {
               event.preventDefault();
-              onHideAll(CHARACTER_BOARD_ITEM_KINDS.filter(hasRow));
+              onHideAll(listedKinds);
             }}
             className="flex-1 justify-center rounded-none border-l border-line touch:min-h-9"
           >
