@@ -28,6 +28,7 @@ import { clearNpcStationIndex } from '@/sde/npcStations';
 import { clearSolarSystemIndex } from '@/sde/solarSystems';
 import type { PublicCourierContractRow } from '@/engine/contracts/courierSearch';
 import { LocationProbe } from '@/test/LocationProbe';
+import { deferred } from '@/test/deferred';
 
 const loadPublicContractOffers = vi.fn();
 vi.mock('@/features/contractSearch/publicContractOffers', () => ({
@@ -2120,14 +2121,6 @@ describe('ContractSearchPanel — Courier reverse lane', () => {
 });
 
 describe('ContractSearchPanel — search first (issue #2921)', () => {
-  function deferred<T>() {
-    let settle!: (value: T) => void;
-    const promise = new Promise<T>((resolve) => {
-      settle = resolve;
-    });
-    return { promise, settle };
-  }
-
   it('asks for a search instead of listing offers when nothing is filtered', async () => {
     renderWithRouter(['/']);
 
@@ -2145,7 +2138,7 @@ describe('ContractSearchPanel — search first (issue #2921)', () => {
     expect(screen.getByText('Loading the offer index…')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Search item name…')).toBeEnabled();
 
-    offers.settle(cachedSnapshot([TRIT_FORGE]));
+    offers.resolve(cachedSnapshot([TRIT_FORGE]));
     await waitFor(() => expect(screen.queryByRole('progressbar')).not.toBeInTheDocument());
     expect(screen.getByText('Search to see contract offers')).toBeInTheDocument();
   });
@@ -2247,21 +2240,12 @@ describe('ContractSearchPanel — search first (issue #2921)', () => {
     ).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Search item name…')).toBeInTheDocument();
 
-    offers.settle(cachedSnapshot([TRIT_FORGE]));
+    offers.resolve(cachedSnapshot([TRIT_FORGE]));
     expect(await bodyRows()).toHaveLength(1);
   });
 });
 
 describe('ContractSearchPanel — progressive loading', () => {
-  /** A loader the test decides when, and whether, to settle. */
-  function deferred<T>() {
-    let settle!: (value: T) => void;
-    const promise = new Promise<T>((resolve) => {
-      settle = resolve;
-    });
-    return { promise, settle };
-  }
-
   it('renders the courier board while the offers snapshot is still in flight', async () => {
     const offers = deferred<R2SnapshotRead<PublicContractOfferRow>>();
     loadPublicContractOffers.mockReturnValue(offers.promise);
@@ -2274,7 +2258,7 @@ describe('ContractSearchPanel — progressive loading', () => {
     const [, ...rest] = within(table).getAllByRole('rowgroup');
     expect(within(rest[0]).getAllByRole('row')).toHaveLength(2);
     // Still pending — the hauls above did not wait for it.
-    offers.settle(cachedSnapshot([TRIT_FORGE]));
+    offers.resolve(cachedSnapshot([TRIT_FORGE]));
   });
 
   it('renders the item board while the courier snapshot is still in flight', async () => {
@@ -2283,7 +2267,7 @@ describe('ContractSearchPanel — progressive loading', () => {
     renderWithRouter();
 
     expect(await bodyRows()).toHaveLength(3);
-    courier.settle(cachedCourierSnapshot([JITA_TO_AMARR]));
+    courier.resolve(cachedCourierSnapshot([JITA_TO_AMARR]));
   });
 
   it('says which corpus it is loading rather than showing a bare spinner', async () => {
@@ -2296,7 +2280,7 @@ describe('ContractSearchPanel — progressive loading', () => {
         name: 'Loading public contracts, this may take a moment.',
       })
     ).toBeInTheDocument();
-    offers.settle(cachedSnapshot([TRIT_FORGE]));
+    offers.resolve(cachedSnapshot([TRIT_FORGE]));
   });
 
   it('never claims an empty corpus while that corpus is still loading', async () => {
@@ -2312,7 +2296,7 @@ describe('ContractSearchPanel — progressive loading', () => {
     });
     expect(screen.queryByText('No public contracts synced yet')).not.toBeInTheDocument();
 
-    offers.settle(cachedSnapshot([]));
+    offers.resolve(cachedSnapshot([]));
     expect(await screen.findByText('No public contracts synced yet')).toBeInTheDocument();
   });
 
@@ -2360,7 +2344,7 @@ describe('ContractSearchPanel — progressive loading', () => {
     expect(await screen.findByRole('status', { name: 'Loading item names…' })).toBeInTheDocument();
     expect(screen.queryByText('No contracts match your filters')).not.toBeInTheDocument();
 
-    catalog.settle(CATALOG);
+    catalog.resolve(CATALOG);
     // Named at last, and now the query has something to rank against.
     expect(await screen.findAllByText('Tritanium')).not.toHaveLength(0);
   });

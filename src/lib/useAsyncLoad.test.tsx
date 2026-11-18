@@ -2,16 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { useCallback } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { useAsyncLoad, useKeyedLoad } from './useAsyncLoad';
-
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-}
+import { deferred } from '@/test/deferred';
 
 describe('useAsyncLoad', () => {
   it('goes loading to ready with the data', async () => {
