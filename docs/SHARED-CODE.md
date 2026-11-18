@@ -192,9 +192,8 @@ UI primitives are not listed: `npm run ui:catalog` (see `docs/DESIGN.md`).
 ## Cloud Functions (`functions/src`)
 
 `firebase.json` deploys `functions/` alone, so a `../src` import cannot resolve
-at runtime — hence a mirrored copy, not an import. `src/functionsParity.test.ts`
-asserts the copies agree, so a change to one side that skips the other fails
-there. Mirrored so far: the guards below, `esiClient.ts`'s compatibility
+at runtime. A shared rule lives once here and `src` re-exports it (rows below say
+which). Still mirrored, with parity tests: the Corp Tax Book engines, the guards below, `esiClient.ts`'s compatibility
 date and User-Agent against `src/esi/`, and the open-prices R2 keys and shard
 count (`functions/src/openPricesKeys.ts` against `src/features/market/marketOpenPrices.ts`).
 

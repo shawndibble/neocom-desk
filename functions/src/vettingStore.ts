@@ -112,7 +112,6 @@ import {
   type VettingSubmitInput,
 } from './vettingParse.js';
 import {
-  HOUR_MS,
   VETTING_INPUTS,
   VETTING_MAX_READS,
   VETTING_RAW,
@@ -127,6 +126,7 @@ import {
   type StoredVettingSettings,
   type VettingActor,
 } from './vettingTypes.js';
+import { HOUR_MS } from './timeConstants.js';
 
 export interface VettingDeps extends SrpDeps {
   esi: VettingEsi;

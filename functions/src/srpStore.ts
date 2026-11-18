@@ -53,13 +53,14 @@ import {
 } from './srpTypes.js';
 import { takeFetchSlot } from './srpThrottle.js';
 import { requireLiveRoles, verifyCallerToken, fail, type Caller } from './actorAuth.js';
+import { HOUR_MS } from './timeConstants.js';
 
 /**
  * How long an officer record lets rules show the queue, claims, audit and settings. Short on
  * purpose: rules read only this record, so a demoted or removed officer keeps read access until
  * it expires. (ADR 0023 accepted 24h for the Tax Book; SRP holds every pilot's claims.)
  */
-export const SRP_OFFICER_TTL_MS = 3_600_000;
+export const SRP_OFFICER_TTL_MS = HOUR_MS;
 
 export interface SrpDeps extends Pick<BookDeps, 'db' | 'now' | 'verifyToken' | 'readIdentity'> {
   /** A Character's corporation from public ESI: no token, no scope. */
