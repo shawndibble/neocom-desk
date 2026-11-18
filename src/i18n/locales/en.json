@@ -11424,6 +11424,7 @@
     "runsColumn": "Runs",
     "qtyColumn": "Qty",
     "iskPerRunColumn": "ISK/run",
+    "vsPeersColumn": "vs peers",
     "priceColumn": "Price",
     "regionColumn": "Region",
     "expiresColumn": "Expires",
