@@ -48,6 +48,8 @@ Weak gaps noted, never filed: J-space class/effect/statics in Place Info
 wallet journal. Nothing in our code models it; verify the ESI journal ref type
 before pitching.
 
+**Moon-tax plugins (fully covered, no candidates):** aa-miningtaxes (Alliance Auth, live; per-rarity rates #4069, CSV export #4946, running account and reminders #6294, wallet payment matching; monthly interest rejected in `20261018-134402`; top-miners leaderboard = re-sort of miner totals, system/security filters moot for an observer-based book).
+
 **Dead or unreachable:** SeAT Mining Taxes (Pathel/mergederg `seat-mining-taxes`, last push 2018, never usable: ore-tier rates, per-player invoices across alts, wallet-journal paid detection; all built as Moon Mining Tax / Corp Tax Book, #523, #4055, #6308, `paymentLinks`), Evernus (archived 2019), EVE Panel, EVE GURU / Production Ledger,
 EveTerminal.io, Mining Timer Tool, EVE Hauling Advisor, EVE Market Pro (HTTP
 530), scan.eveonline.it (503). Reddit returns 403.
