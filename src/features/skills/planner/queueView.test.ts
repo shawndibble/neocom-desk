@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { afterAll, describe, expect, it } from 'vitest';
 import type { SkillQueueEntry } from '@/esi/endpoints';
 import type { WeekStart } from '@/lib/calendarGrid';
@@ -5,8 +6,7 @@ import { classifySkillQueue } from '@/engine/skills/queueStatus';
 import { buildQueueView, heroProgress, heroSpPerHour } from './queueView';
 
 const NOW = Date.parse('2026-10-14T12:00:00Z');
-const DAY = 86_400_000;
-const at = (days: number) => new Date(NOW + days * DAY).toISOString();
+const at = (days: number) => new Date(NOW + days * DAY_MS).toISOString();
 
 function entry(position: number, endDays: number, startDays: number | null = null) {
   return {

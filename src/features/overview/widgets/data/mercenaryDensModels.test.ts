@@ -1,10 +1,10 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import type { MercenaryDenRow, MercenaryDensWidgetData } from '@/features/character/mercenaryDens';
 import { mercenaryDens } from './mercenaryDensModels';
 import type { BuildContext, Feeds, TableCell } from './types';
 
-const HOUR = 3_600_000;
-const NOW = 1_000 * HOUR;
+const NOW = 1_000 * HOUR_MS;
 const t = (key: string, options?: Record<string, unknown>) =>
   options && Object.keys(options).length ? `${key}${JSON.stringify(options)}` : key;
 const ctx: BuildContext = {
@@ -62,12 +62,12 @@ describe('mercenaryDens', () => {
     const view = mercenaryDens(
       feeds({
         rows: [
-          den({ state: 'reinforced', reinforcedUntilMs: NOW + 14 * HOUR }),
+          den({ state: 'reinforced', reinforcedUntilMs: NOW + 14 * HOUR_MS }),
           den({
             key: '1:11',
             id: 11,
             planetName: 'X-7OMU IV',
-            operations: [{ state: 'available', expiresMs: NOW + 9 * HOUR }],
+            operations: [{ state: 'available', expiresMs: NOW + 9 * HOUR_MS }],
           }),
         ],
       }),
@@ -82,7 +82,9 @@ describe('mercenaryDens', () => {
 
   it('falls back to ready operations, then to the den count', () => {
     const ready = mercenaryDens(
-      feeds({ rows: [den({ operations: [{ state: 'available', expiresMs: NOW + 9 * HOUR }] })] }),
+      feeds({
+        rows: [den({ operations: [{ state: 'available', expiresMs: NOW + 9 * HOUR_MS }] })],
+      }),
       ctx
     );
     expect(ready.number.unit).toContain(`${W}.operationsUnit`);
@@ -153,7 +155,7 @@ describe('mercenaryDens', () => {
 
   it('reads a lapsed reinforcement as paused, and gives the Next chip no past clock', () => {
     const view = mercenaryDens(
-      feeds({ rows: [den({ state: 'reinforced', reinforcedUntilMs: NOW - HOUR })] }),
+      feeds({ rows: [den({ state: 'reinforced', reinforcedUntilMs: NOW - HOUR_MS })] }),
       ctx
     );
     expect(text(view.table?.rows[0].cells[1])).toBe(`${W}.state.paused`);
@@ -182,15 +184,15 @@ describe('mercenaryDens', () => {
         rows: [
           den({
             state: 'reinforced',
-            reinforcedUntilMs: NOW + 14 * HOUR,
-            operations: [{ state: 'available', expiresMs: NOW + 9 * HOUR }],
+            reinforcedUntilMs: NOW + 14 * HOUR_MS,
+            operations: [{ state: 'available', expiresMs: NOW + 9 * HOUR_MS }],
           }),
         ],
       }),
       ctx
     );
-    expect(view.deadlines.map((d) => d.at).sort()).toEqual([NOW + 9 * HOUR, NOW + 14 * HOUR]);
-    expect(view.deadlines.find((d) => d.at === NOW + 14 * HOUR)?.severity).toBe('critical');
+    expect(view.deadlines.map((d) => d.at).sort()).toEqual([NOW + 9 * HOUR_MS, NOW + 14 * HOUR_MS]);
+    expect(view.deadlines.find((d) => d.at === NOW + 14 * HOUR_MS)?.severity).toBe('critical');
   });
 
   describe('the row modal', () => {
@@ -198,7 +200,7 @@ describe('mercenaryDens', () => {
       mercenaryDens(feeds({ rows: [den(over)] }), ctx).table!.rows[0].detail!;
 
     it('leads with reinforcement and the shields note', () => {
-      const detail = detailOf({ state: 'reinforced', reinforcedUntilMs: NOW + 14 * HOUR });
+      const detail = detailOf({ state: 'reinforced', reinforcedUntilMs: NOW + 14 * HOUR_MS });
       expect(detail.status).toMatchObject({
         tone: 'danger',
         badge: `${W}.detail.state.reinforced`,
@@ -222,8 +224,8 @@ describe('mercenaryDens', () => {
     it('lists operations soonest first, and says None only when they were read', () => {
       const listed = detailOf({
         operations: [
-          { state: 'available', expiresMs: NOW + 9 * HOUR },
-          { state: 'started', expiresMs: NOW + 2 * HOUR },
+          { state: 'available', expiresMs: NOW + 9 * HOUR_MS },
+          { state: 'started', expiresMs: NOW + 2 * HOUR_MS },
         ],
       });
       expect(listed.list?.items.map((item) => item.badge)).toEqual([

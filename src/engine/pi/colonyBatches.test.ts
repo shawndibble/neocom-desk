@@ -1,9 +1,9 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, it, expect } from 'vitest';
 import { groupColoniesIntoBatches, BATCH_WINDOW_MS } from './colonyBatches';
 import type { ColonyStatus } from './types';
 
-const HOUR = 3_600_000;
-const NOW = 1_000 * HOUR;
+const NOW = 1_000 * HOUR_MS;
 
 interface TestColony {
   name: string;
@@ -15,7 +15,7 @@ function colony(name: string, status: Partial<ColonyStatus> = {}): TestColony {
 }
 
 function running(name: string, hoursFromNow: number) {
-  return colony(name, { soonestExpiryMs: NOW + hoursFromNow * HOUR });
+  return colony(name, { soonestExpiryMs: NOW + hoursFromNow * HOUR_MS });
 }
 
 describe('groupColoniesIntoBatches', () => {
@@ -63,14 +63,14 @@ describe('groupColoniesIntoBatches', () => {
     // Each within the window of the one before it: still one visit, even
     // though the first and last are further apart than the window.
     const spread = Array.from({ length: 6 }, (_, i) =>
-      running(`p${i}`, 3 + (i * BATCH_WINDOW_MS) / HOUR / 2)
+      running(`p${i}`, 3 + (i * BATCH_WINDOW_MS) / HOUR_MS / 2)
     );
     expect(groupColoniesIntoBatches(spread, (c) => c.status, NOW)).toHaveLength(1);
   });
 
   it('puts expired colonies in their own batch, ahead of every countdown', () => {
     const batches = groupColoniesIntoBatches(
-      [running('running', 3), colony('stopped', { idle: true, soonestExpiryMs: NOW - HOUR })],
+      [running('running', 3), colony('stopped', { idle: true, soonestExpiryMs: NOW - HOUR_MS })],
       (c) => c.status,
       NOW
     );
@@ -88,8 +88,8 @@ describe('groupColoniesIntoBatches', () => {
   it('keeps every expired colony together however long ago each stopped', () => {
     const batches = groupColoniesIntoBatches(
       [
-        colony('a', { idle: true, soonestExpiryMs: NOW - HOUR }),
-        colony('b', { idle: true, soonestExpiryMs: NOW - 400 * HOUR }),
+        colony('a', { idle: true, soonestExpiryMs: NOW - HOUR_MS }),
+        colony('b', { idle: true, soonestExpiryMs: NOW - 400 * HOUR_MS }),
       ],
       (c) => c.status,
       NOW
@@ -104,7 +104,7 @@ describe('groupColoniesIntoBatches', () => {
       (c) => c.status,
       NOW
     );
-    expect(batches[0].expiryMs).toBe(NOW + 3 * HOUR);
+    expect(batches[0].expiryMs).toBe(NOW + 3 * HOUR_MS);
   });
 
   it('collects colonies with no extractor at all into a last batch', () => {
@@ -120,7 +120,7 @@ describe('groupColoniesIntoBatches', () => {
   it('severities run from stopped, through the clock, to nothing to do', () => {
     const batches = groupColoniesIntoBatches(
       [
-        colony('stopped', { idle: true, soonestExpiryMs: NOW - HOUR }),
+        colony('stopped', { idle: true, soonestExpiryMs: NOW - HOUR_MS }),
         running('now', 3),
         running('later', 200),
         colony('bare'),

@@ -1,10 +1,10 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import type { CorpSovereigntyFeed, CorpSovereigntyRow } from './corpFeeds';
 import { corpSovereignty, toBoardHubFuel, toBoardSovereignty } from './corpSovereigntyModels';
 import type { BuildContext, Feeds } from './types';
 
-const HOUR = 3_600_000;
-const NOW = 1_000 * HOUR;
+const NOW = 1_000 * HOUR_MS;
 const GAS = 81143;
 const t = (key: string, options?: Record<string, unknown>) =>
   options && Object.keys(options).length ? `${key}${JSON.stringify(options)}` : key;
@@ -23,8 +23,8 @@ const row = (over: Partial<CorpSovereigntyRow> = {}): CorpSovereigntyRow => ({
   structureId: 1,
   systemId: 30000142,
   planetName: 'Jita IV',
-  windowStartMs: NOW + 6 * HOUR,
-  windowEndMs: NOW + 8 * HOUR,
+  windowStartMs: NOW + 6 * HOUR_MS,
+  windowEndMs: NOW + 8 * HOUR_MS,
   reagents: [{ typeId: GAS, secured: 800, unsecured: 400 }],
   state: 'ShieldVulnerable',
   hubBay: null,
@@ -40,7 +40,7 @@ const hub = (over: Partial<CorpSovereigntyRow> = {}): CorpSovereigntyRow =>
     planetName: null,
     reagents: null,
     state: null,
-    hubBay: { amount: 100, burningPerHour: 10, updatedMs: NOW - 2 * HOUR },
+    hubBay: { amount: 100, burningPerHour: 10, updatedMs: NOW - 2 * HOUR_MS },
     ...over,
   });
 
@@ -72,9 +72,17 @@ describe('corpSovereignty', () => {
       feeds({
         rows: [
           row(),
-          row({ key: 'skyhook:2', windowStartMs: NOW + 9 * HOUR, windowEndMs: NOW + 11 * HOUR }),
-          row({ key: 'skyhook:4', windowStartMs: NOW + 3 * HOUR, windowEndMs: NOW + 5 * HOUR }),
-          row({ key: 'skyhook:3', windowStartMs: NOW - 5 * HOUR, windowEndMs: NOW - HOUR }),
+          row({
+            key: 'skyhook:2',
+            windowStartMs: NOW + 9 * HOUR_MS,
+            windowEndMs: NOW + 11 * HOUR_MS,
+          }),
+          row({
+            key: 'skyhook:4',
+            windowStartMs: NOW + 3 * HOUR_MS,
+            windowEndMs: NOW + 5 * HOUR_MS,
+          }),
+          row({ key: 'skyhook:3', windowStartMs: NOW - 5 * HOUR_MS, windowEndMs: NOW - HOUR_MS }),
           hub(),
         ],
       }),
@@ -123,14 +131,14 @@ describe('corpSovereignty', () => {
   it('states an open or closed window once, and an unknown structure state as unknown', () => {
     const open = corpSovereignty(
       feeds({
-        rows: [row({ windowStartMs: NOW - HOUR, windowEndMs: NOW + 3 * HOUR, state: 'Odd' })],
+        rows: [row({ windowStartMs: NOW - HOUR_MS, windowEndMs: NOW + 3 * HOUR_MS, state: 'Odd' })],
       }),
       ctx
     ).table!.rows[0]!.detail!.facts;
     expect(open[0]!.value).toBe('overview.widgets.corpSovereignty.windowOpen{"duration":"3h 0m"}');
     expect(open[1]!.value).toBe('—');
     const closed = corpSovereignty(
-      feeds({ rows: [row({ windowStartMs: NOW - 3 * HOUR, windowEndMs: NOW - HOUR })] }),
+      feeds({ rows: [row({ windowStartMs: NOW - 3 * HOUR_MS, windowEndMs: NOW - HOUR_MS })] }),
       ctx
     ).table!.rows[0]!.detail!.facts;
     expect(closed[0]!.value).toBe('overview.widgets.corpSovereignty.windowClosed');
@@ -173,7 +181,7 @@ describe('corpSovereignty', () => {
 
   it('marks an open window critical and keeps it out of the next deadline', () => {
     const view = corpSovereignty(
-      feeds({ rows: [row({ windowStartMs: NOW - HOUR, windowEndMs: NOW + HOUR })] }),
+      feeds({ rows: [row({ windowStartMs: NOW - HOUR_MS, windowEndMs: NOW + HOUR_MS })] }),
       ctx
     );
     expect(view.table!.rows[0]!.tone).toBe('critical');
@@ -182,7 +190,7 @@ describe('corpSovereignty', () => {
 
   it('shows a closed skyhook as closed', () => {
     const view = corpSovereignty(
-      feeds({ rows: [row({ windowStartMs: NOW - 3 * HOUR, windowEndMs: NOW - HOUR })] }),
+      feeds({ rows: [row({ windowStartMs: NOW - 3 * HOUR_MS, windowEndMs: NOW - HOUR_MS })] }),
       ctx
     );
     expect(view.table!.rows[0]!.cells[1]).toBe('overview.widgets.corpSovereignty.windowClosed');
@@ -193,7 +201,11 @@ describe('corpSovereignty', () => {
       feeds({
         rows: [
           row(),
-          row({ key: 'skyhook:2', windowStartMs: NOW + 60 * HOUR, windowEndMs: NOW + 62 * HOUR }),
+          row({
+            key: 'skyhook:2',
+            windowStartMs: NOW + 60 * HOUR_MS,
+            windowEndMs: NOW + 62 * HOUR_MS,
+          }),
         ],
       }),
       ctx
@@ -201,16 +213,18 @@ describe('corpSovereignty', () => {
     const chart = view.chart;
     expect(chart?.kind).toBe('gantt');
     if (chart?.kind !== 'gantt') return;
-    expect(chart.axis).toEqual({ from: NOW, to: NOW + 48 * HOUR, now: NOW });
+    expect(chart.axis).toEqual({ from: NOW, to: NOW + 48 * HOUR_MS, now: NOW });
     expect(chart.rows.map((r) => [r.label, r.startMs, r.endMs])).toEqual([
-      ['Jita IV', NOW + 6 * HOUR, NOW + 8 * HOUR],
+      ['Jita IV', NOW + 6 * HOUR_MS, NOW + 8 * HOUR_MS],
     ]);
     expect(chart.fallback.rows).toHaveLength(1);
   });
 
   it('has no chart when no window opens in the next 48 hours', () => {
     const view = corpSovereignty(
-      feeds({ rows: [row({ windowStartMs: NOW + 60 * HOUR, windowEndMs: NOW + 62 * HOUR })] }),
+      feeds({
+        rows: [row({ windowStartMs: NOW + 60 * HOUR_MS, windowEndMs: NOW + 62 * HOUR_MS })],
+      }),
       ctx
     );
     expect(view.chart).toBeUndefined();
@@ -218,7 +232,7 @@ describe('corpSovereignty', () => {
 
   it('feeds the next window and the soonest hub run-out to the header Next button', () => {
     const view = corpSovereignty(feeds({ rows: [row(), hub()] }), ctx);
-    expect(view.deadlines.map((d) => d.at)).toEqual([NOW + 6 * HOUR, NOW + 8 * HOUR]);
+    expect(view.deadlines.map((d) => d.at)).toEqual([NOW + 6 * HOUR_MS, NOW + 8 * HOUR_MS]);
   });
 
   it('is empty when the corporation has no skyhooks', () => {
@@ -233,8 +247,8 @@ describe('toBoardSovereignty', () => {
         id: 'skyhook:1',
         name: 'Jita IV',
         kind: 'skyhook',
-        startMs: NOW + 6 * HOUR,
-        endMs: NOW + 8 * HOUR,
+        startMs: NOW + 6 * HOUR_MS,
+        endMs: NOW + 8 * HOUR_MS,
       },
     ]);
   });
@@ -243,7 +257,7 @@ describe('toBoardSovereignty', () => {
 describe('toBoardHubFuel', () => {
   it('lends Due soon when each hub reagent bay runs out', () => {
     expect(toBoardHubFuel(feedData({ rows: [row(), hub()] }))).toEqual([
-      { id: 'hub:9', name: 'Tama', runsOutMs: NOW + 8 * HOUR },
+      { id: 'hub:9', name: 'Tama', runsOutMs: NOW + 8 * HOUR_MS },
     ]);
   });
 

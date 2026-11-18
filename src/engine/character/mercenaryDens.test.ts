@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import {
   denHeadline,
@@ -12,7 +13,6 @@ import {
 } from './mercenaryDens';
 
 const NOW = Date.parse('2026-10-22T10:00:00Z');
-const HOUR = 3_600_000;
 
 const den = (over: Partial<Den> = {}): Den => ({
   id: 1,
@@ -46,7 +46,7 @@ describe('operationState', () => {
 });
 
 describe('a reinforcement timer already past', () => {
-  const lapsed = den({ state: 'reinforced', reinforcedUntilMs: NOW - HOUR });
+  const lapsed = den({ state: 'reinforced', reinforcedUntilMs: NOW - HOUR_MS });
 
   it('reads as paused, a warning, not critical', () => {
     expect(denStateAt(lapsed, NOW)).toBe('paused');
@@ -70,20 +70,20 @@ describe('openOperations', () => {
   it('keeps available and started operations that have not expired, soonest first', () => {
     const ops = openOperations(
       [
-        { state: 'available', expiresMs: NOW + 9 * HOUR },
-        { state: 'started', expiresMs: NOW + 2 * HOUR },
-        { state: 'available', expiresMs: NOW - HOUR },
-        { state: 'done', expiresMs: NOW + HOUR },
+        { state: 'available', expiresMs: NOW + 9 * HOUR_MS },
+        { state: 'started', expiresMs: NOW + 2 * HOUR_MS },
+        { state: 'available', expiresMs: NOW - HOUR_MS },
+        { state: 'done', expiresMs: NOW + HOUR_MS },
       ],
       NOW
     );
-    expect(ops.map((op) => op.expiresMs)).toEqual([NOW + 2 * HOUR, NOW + 9 * HOUR]);
+    expect(ops.map((op) => op.expiresMs)).toEqual([NOW + 2 * HOUR_MS, NOW + 9 * HOUR_MS]);
   });
 });
 
 describe('denSeverity', () => {
   it('is critical while reinforced', () => {
-    expect(denSeverity(den({ state: 'reinforced', reinforcedUntilMs: NOW + HOUR }), NOW)).toBe(
+    expect(denSeverity(den({ state: 'reinforced', reinforcedUntilMs: NOW + HOUR_MS }), NOW)).toBe(
       'critical'
     );
   });
@@ -93,14 +93,17 @@ describe('denSeverity', () => {
     expect(denSeverity(den({ state: 'disabled' }), NOW)).toBe('warning');
     expect(denSeverity(den({ state: 'paused' }), NOW)).toBe('warning');
     expect(
-      denSeverity(den({ operations: [{ state: 'available', expiresMs: NOW + 9 * HOUR }] }), NOW)
+      denSeverity(den({ operations: [{ state: 'available', expiresMs: NOW + 9 * HOUR_MS }] }), NOW)
     ).toBe('warning');
   });
 
   it('is clear for a running den with nothing pressing', () => {
     expect(
       denSeverity(
-        den({ anarchyLevel: 1, operations: [{ state: 'available', expiresMs: NOW + 30 * HOUR }] }),
+        den({
+          anarchyLevel: 1,
+          operations: [{ state: 'available', expiresMs: NOW + 30 * HOUR_MS }],
+        }),
         NOW
       )
     ).toBe('clear');
@@ -115,9 +118,9 @@ describe('denSeverity', () => {
 describe('sortDens', () => {
   it('puts the worst first, then the soonest clock', () => {
     const a = den({ id: 1 });
-    const b = den({ id: 2, state: 'reinforced', reinforcedUntilMs: NOW + 5 * HOUR });
-    const c = den({ id: 3, state: 'reinforced', reinforcedUntilMs: NOW + 2 * HOUR });
-    const d = den({ id: 4, operations: [{ state: 'available', expiresMs: NOW + 3 * HOUR }] });
+    const b = den({ id: 2, state: 'reinforced', reinforcedUntilMs: NOW + 5 * HOUR_MS });
+    const c = den({ id: 3, state: 'reinforced', reinforcedUntilMs: NOW + 2 * HOUR_MS });
+    const d = den({ id: 4, operations: [{ state: 'available', expiresMs: NOW + 3 * HOUR_MS }] });
     expect(sortDens([a, b, c, d], NOW).map((x) => x.id)).toEqual([3, 2, 4, 1]);
   });
 });
@@ -126,31 +129,31 @@ describe('denHeadline', () => {
   it('leads with reinforced dens and names the soonest out', () => {
     const headline = denHeadline(
       [
-        den({ id: 1, state: 'reinforced', reinforcedUntilMs: NOW + 14 * HOUR }),
-        den({ id: 2, state: 'reinforced', reinforcedUntilMs: NOW + 3 * HOUR }),
-        den({ id: 3, operations: [{ state: 'available', expiresMs: NOW + HOUR }] }),
+        den({ id: 1, state: 'reinforced', reinforcedUntilMs: NOW + 14 * HOUR_MS }),
+        den({ id: 2, state: 'reinforced', reinforcedUntilMs: NOW + 3 * HOUR_MS }),
+        den({ id: 3, operations: [{ state: 'available', expiresMs: NOW + HOUR_MS }] }),
       ],
       NOW
     );
-    expect(headline).toEqual({ kind: 'reinforced', count: 2, nextId: 2, remainingMs: 3 * HOUR });
+    expect(headline).toEqual({ kind: 'reinforced', count: 2, nextId: 2, remainingMs: 3 * HOUR_MS });
   });
 
   it('falls back to ready operations, then to the den count', () => {
     expect(
       denHeadline(
         [
-          den({ id: 1, operations: [{ state: 'available', expiresMs: NOW + 9 * HOUR }] }),
-          den({ id: 2, operations: [{ state: 'available', expiresMs: NOW + 2 * HOUR }] }),
+          den({ id: 1, operations: [{ state: 'available', expiresMs: NOW + 9 * HOUR_MS }] }),
+          den({ id: 2, operations: [{ state: 'available', expiresMs: NOW + 2 * HOUR_MS }] }),
         ],
         NOW
       )
-    ).toEqual({ kind: 'operations', count: 2, nextId: 2, remainingMs: 2 * HOUR });
+    ).toEqual({ kind: 'operations', count: 2, nextId: 2, remainingMs: 2 * HOUR_MS });
     expect(denHeadline([den(), den({ id: 2 })], NOW)).toEqual({ kind: 'dens', count: 2 });
   });
 
   it('counts started operations as open but only available ones as ready', () => {
     expect(
-      denHeadline([den({ operations: [{ state: 'started', expiresMs: NOW + HOUR }] })], NOW)
+      denHeadline([den({ operations: [{ state: 'started', expiresMs: NOW + HOUR_MS }] })], NOW)
     ).toEqual({ kind: 'dens', count: 1 });
   });
 });

@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import type { VettingFlag, VettingParty, VettingRawRow } from '@/engine/vetting';
 import {
@@ -13,7 +14,6 @@ import {
   type RawContext,
 } from './rawRowsView';
 
-const DAY = 86_400_000;
 const parties = new Map<number, VettingParty>([
   [10, { id: 10, name: 'Corvin Hale', category: 'character', corporationId: 20 }],
   [20, { id: 20, name: 'Black Kite Syndicate', category: 'corporation' }],
@@ -162,7 +162,7 @@ describe('tenureSeconds', () => {
       joined: '2026-11-04T00:00:00Z',
       left: null,
     };
-    expect(tenureSeconds(row, readAt)).toBe((10 * DAY) / 1000);
+    expect(tenureSeconds(row, readAt)).toBe((10 * DAY_MS) / 1000);
   });
   it('runs to the day left otherwise', () => {
     const row: VettingRawRow = {
@@ -172,7 +172,7 @@ describe('tenureSeconds', () => {
       joined: '2026-11-04T00:00:00Z',
       left: '2026-11-06T00:00:00Z',
     };
-    expect(tenureSeconds(row, readAt)).toBe((2 * DAY) / 1000);
+    expect(tenureSeconds(row, readAt)).toBe((2 * DAY_MS) / 1000);
   });
 });
 

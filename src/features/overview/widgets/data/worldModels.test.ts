@@ -1,3 +1,4 @@
+import { DAY_MS, HOUR_MS, MINUTE_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import type { BoardStructureSource } from '@/engine/corp/board';
 import { visibleColumns } from '../tableModel';
@@ -8,9 +9,6 @@ import { shortStructureName } from '@/features/corp/structures/structureRows';
 import type { BuildContext, FeedState, Feeds, KindView, TableCell } from './types';
 
 const NOW = Date.parse('2026-10-11T12:00:00Z');
-const MIN = 60_000;
-const HOUR = 3_600_000;
-const DAY = 24 * HOUR;
 const iso = (ms: number) => new Date(ms).toISOString();
 
 const t = (key: string, options?: Record<string, unknown>) =>
@@ -48,7 +46,7 @@ describe('industry', () => {
     blueprint_type_id: 5,
     product_type_id: 6,
     station_id: 60003760,
-    start_date: iso(NOW + endOffset - durationH * HOUR),
+    start_date: iso(NOW + endOffset - durationH * HOUR_MS),
     end_date: iso(NOW + endOffset),
     status: 'active',
     ...over,
@@ -68,10 +66,10 @@ describe('industry', () => {
     }) as never,
   });
   const jobs = () => [
-    job(1, 4 * HOUR, 8),
-    job(2, -25 * MIN, 10),
-    job(3, -3 * HOUR, 6),
-    job(4, 90 * MIN, 3),
+    job(1, 4 * HOUR_MS, 8),
+    job(2, -25 * MINUTE_MS, 10),
+    job(3, -3 * HOUR_MS, 6),
+    job(4, 90 * MINUTE_MS, 3),
   ];
 
   it('is a record per job: finished ones first (oldest first), then the soonest to finish', () => {
@@ -116,8 +114,8 @@ describe('industry', () => {
     expect(view.chart.rows[2]).toMatchObject({ color: 'accent' });
     // The earliest start is job 2 (10 h job that ended 25 min ago); the latest end is job 1.
     expect(view.chart.axis).toEqual({
-      from: NOW - 10 * HOUR - 25 * MIN,
-      to: NOW + 4 * HOUR,
+      from: NOW - 10 * HOUR_MS - 25 * MINUTE_MS,
+      to: NOW + 4 * HOUR_MS,
       now: NOW,
     });
     expect(view.chart.summary).toContain('overview.widgets.chart.industry.ganttJob');
@@ -169,10 +167,10 @@ describe('planetary', () => {
       loadedAt: NOW,
     }) as never,
   });
-  const soon = NOW + 2 * HOUR;
-  const later = NOW + 30 * HOUR;
+  const soon = NOW + 2 * HOUR_MS;
+  const later = NOW + 30 * HOUR_MS;
   const base = () => [
-    batch('running', 'warning', [colony(1, 'Efa I', soon), colony(2, 'Efa III', soon + MIN)]),
+    batch('running', 'warning', [colony(1, 'Efa I', soon), colony(2, 'Efa III', soon + MINUTE_MS)]),
     batch('running', 'clear', [colony(3, 'Efa IX', later)]),
     batch('idle', 'watch', [colony(4, 'Efa XI', null, 0)]),
   ];
@@ -220,7 +218,7 @@ describe('planetary', () => {
   it('keeps the chart when every colony has stopped, as empty bars saying so', () => {
     const view = buildView(
       'planetary',
-      feeds([batch('expired', 'critical', [colony(5, 'Efa V', NOW - HOUR)])]),
+      feeds([batch('expired', 'critical', [colony(5, 'Efa V', NOW - HOUR_MS)])]),
       ctx()
     );
     if (view.chart?.kind !== 'hbars') throw new Error('hbars');
@@ -237,14 +235,14 @@ describe('planetary', () => {
   it('names what has stopped before anything else, and leads with the count when nothing runs', () => {
     const stopped = buildView(
       'planetary',
-      feeds([batch('expired', 'critical', [colony(5, 'Efa V', NOW - HOUR)]), ...base()]),
+      feeds([batch('expired', 'critical', [colony(5, 'Efa V', NOW - HOUR_MS)]), ...base()]),
       ctx()
     );
     expect(stopped.number.secondary).toMatchObject({ tone: 'bad' });
     expect(stopped.number.secondary?.text).toContain('overview.widgets.planetary.stopped');
     const none = buildView(
       'planetary',
-      feeds([batch('expired', 'critical', [colony(5, 'Efa V', NOW - HOUR)])]),
+      feeds([batch('expired', 'critical', [colony(5, 'Efa V', NOW - HOUR_MS)])]),
       ctx()
     );
     expect(none.number.value).toBe('1');
@@ -260,7 +258,7 @@ describe('structures', () => {
   ): BoardStructureSource => ({
     structureId: id,
     name,
-    fuelExpiresMs: NOW + 20 * DAY,
+    fuelExpiresMs: NOW + 20 * DAY_MS,
     state: 'shield_vulnerable',
     stateTimerEndMs: null,
     unanchorsAtMs: null,
@@ -277,7 +275,7 @@ describe('structures', () => {
   });
   const fleet = () => [
     source(1, 'Efa - Helios Prime'),
-    source(2, 'Efa - Lowfuel Keepstar', { fuelExpiresMs: NOW + 2 * DAY }),
+    source(2, 'Efa - Lowfuel Keepstar', { fuelExpiresMs: NOW + 2 * DAY_MS }),
     source(3, 'Efa - Offline Athanor', { services: [{ name: 'Reprocessing', state: 'offline' }] }),
   ];
 
@@ -374,7 +372,7 @@ describe('structures', () => {
     const view = buildView(
       'structures',
       feeds([
-        source(1, 'Efa - Full', { fuelExpiresMs: NOW + 15 * DAY }),
+        source(1, 'Efa - Full', { fuelExpiresMs: NOW + 15 * DAY_MS }),
         source(2, 'Efa - Dry', { fuelExpiresMs: null }),
       ]),
       ctx()
@@ -384,7 +382,7 @@ describe('structures', () => {
       view.table!.rows.map((r) => [text(r.cells[0]), r.cells[col]])
     );
     expect(byName['Full']).toMatchObject({ bar: 15 / 30 });
-    expect(FUEL_BAR_HORIZON_MS).toBe(30 * DAY);
+    expect(FUEL_BAR_HORIZON_MS).toBe(30 * DAY_MS);
     expect(typeof byName['Dry']).toBe('string');
   });
 
@@ -403,9 +401,9 @@ describe('structures', () => {
     const problems = ctx({ show: 'problems' });
     const troubled = () => [
       ...fleet(),
-      source(4, 'Efa - Reinforced Fortizar', { stateTimerEndMs: NOW + 2 * HOUR }),
+      source(4, 'Efa - Reinforced Fortizar', { stateTimerEndMs: NOW + 2 * HOUR_MS }),
       // Five days of fuel is on the watch list, not low: the board calls low at three.
-      source(5, 'Efa - Watch Raitaru', { fuelExpiresMs: NOW + 5 * DAY }),
+      source(5, 'Efa - Watch Raitaru', { fuelExpiresMs: NOW + 5 * DAY_MS }),
     ];
 
     it('lists only structures with a timer, low fuel or an offline service', () => {
@@ -447,8 +445,8 @@ describe('structures', () => {
       const fleet = feeds([
         // Healthy, but its fuel runs out first and it is unanchoring: neither is a problem.
         source(1, 'Efa - Watch Raitaru', {
-          fuelExpiresMs: NOW + 5 * DAY,
-          unanchorsAtMs: NOW + 4 * DAY,
+          fuelExpiresMs: NOW + 5 * DAY_MS,
+          unanchorsAtMs: NOW + 4 * DAY_MS,
         }),
         source(2, 'Efa - Offline Athanor', {
           services: [{ name: 'Reprocessing', state: 'offline' }],
@@ -490,7 +488,7 @@ describe('moonChunks', () => {
   it('tells two chunks on one refinery apart by event and clock', () => {
     const view = buildView(
       'moonChunks',
-      feeds([chunk('a', 'arrival', NOW + DAY), chunk('b', 'arrival', NOW + 3 * DAY)]),
+      feeds([chunk('a', 'arrival', NOW + DAY_MS), chunk('b', 'arrival', NOW + 3 * DAY_MS)]),
       ctx()
     );
     const inAt = column(view, 'in');
@@ -501,7 +499,7 @@ describe('moonChunks', () => {
   it('shows the drill and the queue behind it as the fact the countdown lacks', () => {
     const view = buildView(
       'moonChunks',
-      feeds([chunk('a', 'arrival', NOW + DAY), chunk('b', 'arrival', NOW + 3 * DAY)]),
+      feeds([chunk('a', 'arrival', NOW + DAY_MS), chunk('b', 'arrival', NOW + 3 * DAY_MS)]),
       ctx()
     );
     expect(view.number.secondary?.text).toContain('overview.widgets.moonChunks.queued');
@@ -511,7 +509,7 @@ describe('moonChunks', () => {
   it('drops a chunk whose clock has passed so rows and Due soon agree', () => {
     const view = buildView(
       'moonChunks',
-      feeds([chunk('gone', 'arrival', NOW - 1000), chunk('a', 'arrival', NOW + DAY)]),
+      feeds([chunk('gone', 'arrival', NOW - 1000), chunk('a', 'arrival', NOW + DAY_MS)]),
       ctx()
     );
     expect(view.table!.rows).toHaveLength(1);
@@ -531,9 +529,9 @@ describe('moonChunks', () => {
       {
         moonChunks: ok({
           chunks: [
-            chunk('1', 'arrival', NOW + DAY),
-            chunk('2', 'arrival', NOW + 2 * DAY),
-            chunk('3', 'arrival', NOW + 3 * DAY),
+            chunk('1', 'arrival', NOW + DAY_MS),
+            chunk('2', 'arrival', NOW + 2 * DAY_MS),
+            chunk('3', 'arrival', NOW + 3 * DAY_MS),
           ],
           needsReauth: false,
           fetchedAt: new Date(NOW),
@@ -638,35 +636,35 @@ describe('profit (world)', () => {
   it('compares with the window before and says whether it is up or down', () => {
     const view = buildView(
       'profit',
-      feeds([run('a', DAY, 300), run('b', 40 * DAY, 100)]),
+      feeds([run('a', DAY_MS, 300), run('b', 40 * DAY_MS, 100)]),
       ctx({ range: 30 })
     );
     expect(view.number.secondary).toMatchObject({ direction: 'up', tone: 'good' });
     expect(view.number.secondary?.text).toContain('"count":30');
     const down = buildView(
       'profit',
-      feeds([run('a', DAY, 50), run('b', 40 * DAY, 100)]),
+      feeds([run('a', DAY_MS, 50), run('b', 40 * DAY_MS, 100)]),
       ctx({ range: 30 })
     );
     expect(down.number.secondary).toMatchObject({ direction: 'down', tone: 'bad' });
   });
 
   it('claims no change against a window with no runs', () => {
-    const view = buildView('profit', feeds([run('a', DAY, 300)]), ctx({ range: 30 }));
+    const view = buildView('profit', feeds([run('a', DAY_MS, 300)]), ctx({ range: 30 }));
     expect(view.number.secondary).toBeUndefined();
   });
 
   it('has per-unit profit and draws a loss below the axis', () => {
     const view = buildView(
       'profit',
-      feeds([run('a', DAY, 400, 1, 4), run('b', 10 * DAY, -100, 1, 1)]),
+      feeds([run('a', DAY_MS, 400, 1, 4), run('b', 10 * DAY_MS, -100, 1, 1)]),
       ctx({ range: 30 })
     );
     const row = view.table!.rows[0]!;
     expect(row.cells[column(view, 'built')]).toBe('5');
     expect(text(row.cells[column(view, 'perUnit')])).toBe('+60');
     expect(row.cells[column(view, 'perUnit')]).toMatchObject({ tone: 'good' });
-    const loss = buildView('profit', feeds([run('c', DAY, -100, 1, 2)]), ctx({ range: 30 }));
+    const loss = buildView('profit', feeds([run('c', DAY_MS, -100, 1, 2)]), ctx({ range: 30 }));
     expect(loss.table!.rows[0]!.cells[column(loss, 'perUnit')]).toMatchObject({
       text: '-50',
       tone: 'bad',
@@ -755,13 +753,13 @@ describe('industry job slots', () => {
     blueprint_type_id: 5,
     product_type_id: 6,
     station_id: 60003760,
-    start_date: iso(NOW + endOffset - HOUR),
+    start_date: iso(NOW + endOffset - HOUR_MS),
     end_date: iso(NOW + endOffset),
     status: 'active',
   });
   // Header Character 91: 2 Mfg slots, one busy. Character 92: base slots, nothing running.
-  const own = [job(1, 2 * HOUR)];
-  const other = [job(2, -10 * MIN)];
+  const own = [job(1, 2 * HOUR_MS)];
+  const other = [job(2, -10 * MINUTE_MS)];
   const feeds = (): Feeds => ({
     industry: ok({
       jobs: own,
@@ -775,7 +773,7 @@ describe('industry job slots', () => {
           characterId: 91,
           characterName: 'Kestrel Vane',
           skills: skills(1),
-          jobs: [{ activityId: 1, endMs: NOW + 2 * HOUR }],
+          jobs: [{ activityId: 1, endMs: NOW + 2 * HOUR_MS }],
         },
         { characterId: 92, characterName: 'Orsa Tellemar', skills: skills(0), jobs: [] },
       ],
@@ -834,8 +832,8 @@ describe('industry job slots', () => {
               characterName: 'Kestrel Vane',
               skills: skills(0),
               jobs: [
-                { activityId: 1, endMs: NOW + HOUR },
-                { activityId: 1, endMs: NOW + HOUR },
+                { activityId: 1, endMs: NOW + HOUR_MS },
+                { activityId: 1, endMs: NOW + HOUR_MS },
               ],
             },
           ],

@@ -1,9 +1,9 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import { holeBetween, holeNetwork, routeHoles, type RouteHoleSettings } from './routeHoles';
 import { HUB_SYSTEM_IDS, type TheraConnection } from './theraConnections';
 
 const NOW = Date.parse('2026-10-03T09:00:00Z');
-const HOUR = 3_600_000;
 const THERA = HUB_SYSTEM_IDS.thera;
 const TURNUR = HUB_SYSTEM_IDS.turnur;
 
@@ -19,7 +19,7 @@ function hole(overrides: Partial<TheraConnection> = {}): TheraConnection {
     exitRegionName: 'Heimatar',
     wormholeType: 'Q063',
     maxShipSize: 'medium',
-    expiresAt: NOW + 5 * HOUR,
+    expiresAt: NOW + 5 * HOUR_MS,
     ...overrides,
   };
 }
@@ -39,8 +39,8 @@ describe('routeHoles', () => {
 
   it('skips holes with under the minimum life left', () => {
     const holes = [
-      hole({ id: 'short', expiresAt: NOW + HOUR - 1 }),
-      hole({ id: 'exact', expiresAt: NOW + HOUR }),
+      hole({ id: 'short', expiresAt: NOW + HOUR_MS - 1 }),
+      hole({ id: 'exact', expiresAt: NOW + HOUR_MS }),
       hole({ id: 'gone', expiresAt: NOW - 1 }),
     ];
     expect(routeHoles(holes, SETTINGS, NOW).map((h) => h.id)).toEqual(['exact']);
@@ -78,8 +78,8 @@ describe('holeNetwork', () => {
 
 describe('holeBetween', () => {
   const holes = [
-    hole({ id: 'a', exitSystemId: 1, expiresAt: NOW + 3 * HOUR }),
-    hole({ id: 'b', exitSystemId: 1, expiresAt: NOW + 9 * HOUR }),
+    hole({ id: 'a', exitSystemId: 1, expiresAt: NOW + 3 * HOUR_MS }),
+    hole({ id: 'b', exitSystemId: 1, expiresAt: NOW + 9 * HOUR_MS }),
     hole({ id: 'u', hub: 'turnur', exitSystemId: 2 }),
   ];
 

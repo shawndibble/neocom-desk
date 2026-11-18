@@ -8,11 +8,12 @@
  *
  * The map is keyed by `alertGroupKey` and holds the epoch ms the snooze ends.
  */
+import { HOUR_MS } from '@/lib/age';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { alertGroupKey } from './alertGroups';
 import type { NotificationFeedRecord } from '@/db';
 
-export const SNOOZE_MS = 60 * 60 * 1000;
+export const SNOOZE_MS = HOUR_MS;
 
 export type SnoozeMap = Readonly<Record<string, number>>;
 

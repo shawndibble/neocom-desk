@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import {
   backwardBucketSums,
@@ -6,7 +7,6 @@ import {
   withinRange,
 } from './chartSeries';
 
-const DAY = 86_400_000;
 const NOW = Date.parse('2026-10-11T12:00:00Z');
 
 describe('dailyBalanceSeries', () => {
@@ -42,8 +42,8 @@ describe('dailyBalanceSeries', () => {
 describe('withinRange', () => {
   it('keeps entries from the last N days, by their own date', () => {
     const entries = [
-      { date: new Date(NOW - 2 * DAY).toISOString() },
-      { date: new Date(NOW - 10 * DAY).toISOString() },
+      { date: new Date(NOW - 2 * DAY_MS).toISOString() },
+      { date: new Date(NOW - 10 * DAY_MS).toISOString() },
     ];
     expect(withinRange(entries, NOW, 7)).toHaveLength(1);
     expect(withinRange(entries, NOW, 30)).toHaveLength(2);
@@ -52,7 +52,9 @@ describe('withinRange', () => {
 
 describe('journalCoverageDays', () => {
   it('is how far back the oldest entry reaches, in whole days', () => {
-    expect(journalCoverageDays([{ date: new Date(NOW - 29.5 * DAY).toISOString() }], NOW)).toBe(30);
+    expect(journalCoverageDays([{ date: new Date(NOW - 29.5 * DAY_MS).toISOString() }], NOW)).toBe(
+      30
+    );
   });
 
   it('is zero for an empty journal', () => {
@@ -63,17 +65,17 @@ describe('journalCoverageDays', () => {
 describe('backwardBucketSums', () => {
   it('sums into week buckets ending now, oldest first', () => {
     const items = [
-      { at: NOW - 1 * DAY, v: 10 },
-      { at: NOW - 3 * DAY, v: 5 },
-      { at: NOW - 8 * DAY, v: 7 },
-      { at: NOW - 40 * DAY, v: 99 },
+      { at: NOW - 1 * DAY_MS, v: 10 },
+      { at: NOW - 3 * DAY_MS, v: 5 },
+      { at: NOW - 8 * DAY_MS, v: 7 },
+      { at: NOW - 40 * DAY_MS, v: 99 },
     ];
     const sums = backwardBucketSums(
       items,
       (i) => i.at,
       (i) => i.v,
       NOW,
-      7 * DAY,
+      7 * DAY_MS,
       3
     );
     expect(sums).toEqual([0, 7, 15]);
@@ -81,11 +83,11 @@ describe('backwardBucketSums', () => {
 
   it('ignores anything in the future', () => {
     const sums = backwardBucketSums(
-      [{ at: NOW + DAY, v: 5 }],
+      [{ at: NOW + DAY_MS, v: 5 }],
       (i) => i.at,
       (i) => i.v,
       NOW,
-      7 * DAY,
+      7 * DAY_MS,
       2
     );
     expect(sums).toEqual([0, 0]);

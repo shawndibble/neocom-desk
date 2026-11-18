@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import {
   LEDGER_GRACE_MS,
@@ -11,7 +12,6 @@ import {
 } from './surveyConnection';
 import type { MiningLedgerEntry } from './types';
 
-const HOUR = 60 * 60 * 1000;
 const NOON = Date.UTC(2026, 9, 21, 12);
 const SYSTEM = 30000142;
 const OTHER_SYSTEM = 30002187;
@@ -29,9 +29,9 @@ function connection(overrides: Partial<SurveyConnection> = {}): SurveyConnection
     systemId: SYSTEM,
     typeIds: [BITUMENS, COBALTITE],
     fromDate: '2026-10-21',
-    untilMs: NOON + 2 * HOUR,
-    expiresAt: NOON + 7 * 24 * HOUR,
-    connectedAt: NOON - HOUR,
+    untilMs: NOON + 2 * HOUR_MS,
+    expiresAt: NOON + 7 * 24 * HOUR_MS,
+    connectedAt: NOON - HOUR_MS,
     ...overrides,
   };
 }
@@ -75,8 +75,8 @@ describe('connectionWindow', () => {
           etaAt: NOON,
           finished: false,
           finishedAt: null,
-          lastAt: NOON - HOUR,
-          expiresAt: NOON + 24 * HOUR,
+          lastAt: NOON - HOUR_MS,
+          expiresAt: NOON + 24 * HOUR_MS,
         },
         NOON
       )
@@ -87,12 +87,12 @@ describe('connectionWindow', () => {
     expect(
       connectionWindow(
         {
-          firstAt: NOON - 3 * HOUR,
+          firstAt: NOON - 3 * HOUR_MS,
           etaAt: null,
           finished: true,
           finishedAt: NOON,
           lastAt: NOON,
-          expiresAt: NOON + 24 * HOUR,
+          expiresAt: NOON + 24 * HOUR_MS,
         },
         NOON
       ).untilMs
@@ -108,11 +108,11 @@ describe('connectionWindow', () => {
           finished: false,
           finishedAt: null,
           lastAt: NOON,
-          expiresAt: NOON + 48 * HOUR,
+          expiresAt: NOON + 48 * HOUR_MS,
         },
-        NOON + HOUR
+        NOON + HOUR_MS
       ).untilMs
-    ).toBe(NOON + 13 * HOUR);
+    ).toBe(NOON + 13 * HOUR_MS);
   });
 
   it('never runs a no-ETA window past the survey’s expiry', () => {
@@ -124,11 +124,11 @@ describe('connectionWindow', () => {
           finished: false,
           finishedAt: null,
           lastAt: NOON,
-          expiresAt: NOON + 6 * HOUR,
+          expiresAt: NOON + 6 * HOUR_MS,
         },
         NOON
       ).untilMs
-    ).toBe(NOON + 6 * HOUR);
+    ).toBe(NOON + 6 * HOUR_MS);
   });
 
   it('never runs past the survey’s expiry', () => {
@@ -136,15 +136,15 @@ describe('connectionWindow', () => {
       connectionWindow(
         {
           firstAt: NOON,
-          etaAt: NOON + 48 * HOUR,
+          etaAt: NOON + 48 * HOUR_MS,
           finished: false,
           finishedAt: null,
           lastAt: NOON,
-          expiresAt: NOON + 24 * HOUR,
+          expiresAt: NOON + 24 * HOUR_MS,
         },
         NOON
       ).untilMs
-    ).toBe(NOON + 24 * HOUR);
+    ).toBe(NOON + 24 * HOUR_MS);
   });
 });
 
@@ -158,7 +158,7 @@ describe('isConnectionLive', () => {
 
 describe('updateSurveyConnection', () => {
   it('replaces the same survey for the same character and drops ones no longer live', () => {
-    const stale = connection({ surveyId: 'old', untilMs: NOON - 5 * HOUR });
+    const stale = connection({ surveyId: 'old', untilMs: NOON - 5 * HOUR_MS });
     const other = connection({ surveyId: 'other' });
     const first = connection({ taxPct: 5 });
     const next = connection({ taxPct: 10 });
@@ -305,8 +305,8 @@ describe('planSurveyAutoAssign', () => {
 
   it('gives shared ore to the moon still being mined over one in its grace period', () => {
     const e = entry([{ typeId: BITUMENS, quantity: 1000 }]);
-    const done = connection({ untilMs: NOON - HOUR / 2 });
-    const mining = connection({ surveyId: 'b', payeeId: 'p2', untilMs: NOON + HOUR });
+    const done = connection({ untilMs: NOON - HOUR_MS / 2 });
+    const mining = connection({ surveyId: 'b', payeeId: 'p2', untilMs: NOON + HOUR_MS });
     expect(planSurveyAutoAssign([e], [], [done, mining], NOON)[0]?.connection.payeeId).toBe('p2');
   });
 

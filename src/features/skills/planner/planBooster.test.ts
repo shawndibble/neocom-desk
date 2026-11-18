@@ -1,3 +1,4 @@
+import { MINUTE_MS } from '@/lib/age';
 import { describe, it, expect } from 'vitest';
 import {
   acceleratorBoosters,
@@ -35,15 +36,14 @@ describe('acceleratorBoosters', () => {
 
 describe('booster duration <-> days/hours/minutes', () => {
   const NOW = Date.UTC(2026, 8, 10, 12, 0, 0);
-  const MIN = 60 * 1000;
 
   it('splits the time left into the units EVE shows', () => {
-    const expiresAt = NOW + (2 * 24 * 60 + 5 * 60 + 7) * MIN;
+    const expiresAt = NOW + (2 * 24 * 60 + 5 * 60 + 7) * MINUTE_MS;
     expect(splitBoosterDuration(expiresAt, NOW)).toEqual({ days: 2, hours: 5, minutes: 7 });
   });
 
   it('rounds a part-minute up, so a just-set duration does not read one minute short', () => {
-    expect(splitBoosterDuration(NOW + 24 * 60 * MIN - 1000, NOW)).toEqual({
+    expect(splitBoosterDuration(NOW + 24 * 60 * MINUTE_MS - 1000, NOW)).toEqual({
       days: 1,
       hours: 0,
       minutes: 0,
@@ -51,7 +51,7 @@ describe('booster duration <-> days/hours/minutes', () => {
   });
 
   it('reads a lapsed expiry as zero', () => {
-    expect(splitBoosterDuration(NOW - 5 * MIN, NOW)).toEqual({
+    expect(splitBoosterDuration(NOW - 5 * MINUTE_MS, NOW)).toEqual({
       days: 0,
       hours: 0,
       minutes: 0,

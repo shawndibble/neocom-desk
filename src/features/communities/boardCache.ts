@@ -5,6 +5,7 @@
  * and merged in. A stamp whose `reset` moved (a Request or Pledge was deleted, which a delta cannot
  * show), a cache older than `BOARD_MAX_AGE_MS`, or a delta that fails, reads the whole board again.
  */
+import { MINUTE_MS } from '@/lib/age';
 import type {
   CommunityRequest,
   PledgesByRequest,
@@ -22,10 +23,10 @@ import {
  * A callable stamps `lastActivityAt` when it starts, not when it commits, so a retried one can land
  * behind a newer mark. The Request delta reads this far back from the mark (a re-read is a no-op).
  */
-export const REQUEST_DELTA_MARGIN_MS = 60 * 1000;
+export const REQUEST_DELTA_MARGIN_MS = MINUTE_MS;
 
 /** Backstop for a deletion made without a stamp (an older callable, a failed stamp write). */
-export const BOARD_MAX_AGE_MS = 15 * 60 * 1000;
+export const BOARD_MAX_AGE_MS = 15 * MINUTE_MS;
 
 interface CachedBoard {
   requests: Map<string, CommunityRequest>;

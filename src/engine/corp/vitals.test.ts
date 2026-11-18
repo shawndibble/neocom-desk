@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { describe, it, expect } from 'vitest';
 import {
   VITALS_WINDOW_DAYS,
@@ -9,8 +10,7 @@ import {
 } from './vitals';
 
 const NOW = Date.parse('2026-09-03T12:00:00Z');
-const DAY = 86_400_000;
-const daysAgo = (days: number) => NOW - days * DAY;
+const daysAgo = (days: number) => NOW - days * DAY_MS;
 
 const entry = (days: number, amount: number): VitalsJournalEntry => ({
   atMs: daysAgo(days),

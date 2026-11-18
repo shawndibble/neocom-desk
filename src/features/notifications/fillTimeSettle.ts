@@ -14,6 +14,7 @@
  * the row has aged past what the transactions endpoint returns. Leaving those
  * marked provisional would promise an update that is not coming.
  */
+import { DAY_MS } from '@/lib/age';
 import { db } from '@/db';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { inBackgroundLane } from '@/esi/lane';
@@ -26,7 +27,7 @@ import { isProvisionalFill, type ProvisionalFillRow } from './feed';
 const WALLET_SCOPE = ESI_REGISTRY.getCharacterWalletTransactions.scope;
 
 /** ESI's transactions endpoint reaches back about a month; a row older than that will never find its sale. */
-const SETTLE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+const SETTLE_WINDOW_MS = 30 * DAY_MS;
 
 /** What the wallet said, or why it can never say. */
 export type WalletReading =

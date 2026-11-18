@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, it, expect } from 'vitest';
 import {
   resolveFillTime,
@@ -6,20 +7,19 @@ import {
   type FillTransaction,
 } from './fillTime';
 
-const HOUR = 3_600_000;
 const OBSERVED = 1_700_000_000_000;
 
 const match: FillMatch = {
   typeId: 34,
   locationId: 60003760,
   price: 5.5,
-  issuedMs: OBSERVED - 10 * HOUR,
+  issuedMs: OBSERVED - 10 * HOUR_MS,
   quantity: 100,
 };
 
 function txn(overrides: Partial<FillTransaction> = {}): FillTransaction {
   return {
-    dateMs: OBSERVED - 2 * HOUR,
+    dateMs: OBSERVED - 2 * HOUR_MS,
     typeId: 34,
     locationId: 60003760,
     unitPrice: 5.5,
@@ -37,12 +37,12 @@ const FRESH_FETCH = OBSERVED + WALLET_TRANSACTIONS_LAG_MS;
 describe('resolveFillTime', () => {
   it('settles on the newest matching sale once the sales cover the whole order', () => {
     const rows = [
-      txn({ dateMs: OBSERVED - 5 * HOUR, quantity: 40 }),
-      txn({ dateMs: OBSERVED - 2 * HOUR, quantity: 60 }),
+      txn({ dateMs: OBSERVED - 5 * HOUR_MS, quantity: 40 }),
+      txn({ dateMs: OBSERVED - 2 * HOUR_MS, quantity: 60 }),
     ];
     expect(resolveFillTime(match, rows, OBSERVED, STALE_FETCH)).toEqual({
       status: 'settled',
-      fillMs: OBSERVED - 2 * HOUR,
+      fillMs: OBSERVED - 2 * HOUR_MS,
     });
   });
 
@@ -57,7 +57,7 @@ describe('resolveFillTime', () => {
     const rows = [txn({ quantity: 30 })];
     expect(resolveFillTime(match, rows, OBSERVED, FRESH_FETCH)).toEqual({
       status: 'settled',
-      fillMs: OBSERVED - 2 * HOUR,
+      fillMs: OBSERVED - 2 * HOUR_MS,
     });
   });
 
@@ -84,17 +84,17 @@ describe('resolveFillTime', () => {
   it('matches a price that differs only by floating-point noise', () => {
     expect(
       resolveFillTime(match, [txn({ unitPrice: 5.500000000001 })], OBSERVED, STALE_FETCH)
-    ).toEqual({ status: 'settled', fillMs: OBSERVED - 2 * HOUR });
+    ).toEqual({ status: 'settled', fillMs: OBSERVED - 2 * HOUR_MS });
   });
 
   it('ignores a sale after the fill was noticed — a relist at the same price, not this order', () => {
     const rows = [
-      txn({ dateMs: OBSERVED - 2 * HOUR, quantity: 100 }),
+      txn({ dateMs: OBSERVED - 2 * HOUR_MS, quantity: 100 }),
       txn({ dateMs: OBSERVED + 20 * 60_000, quantity: 10 }),
     ];
     expect(resolveFillTime(match, rows, OBSERVED, STALE_FETCH)).toEqual({
       status: 'settled',
-      fillMs: OBSERVED - 2 * HOUR,
+      fillMs: OBSERVED - 2 * HOUR_MS,
     });
   });
 
@@ -108,10 +108,10 @@ describe('resolveFillTime', () => {
     // Indistinguishable without an order id on the transaction: the twin's
     // sales count toward this order's quantity. The date is still a real
     // sale of this item at this price, so it is close, not wild.
-    const rows = [txn({ dateMs: OBSERVED - 3 * HOUR, quantity: 100 })];
+    const rows = [txn({ dateMs: OBSERVED - 3 * HOUR_MS, quantity: 100 })];
     expect(resolveFillTime(match, rows, OBSERVED, STALE_FETCH)).toEqual({
       status: 'settled',
-      fillMs: OBSERVED - 3 * HOUR,
+      fillMs: OBSERVED - 3 * HOUR_MS,
     });
   });
 });

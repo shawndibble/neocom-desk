@@ -1,10 +1,10 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from '@/esi/endpoints';
 import { withAcceptedCourierInProgress } from '@/engine/contracts/contractStatus';
 import { summarizeCorpContracts } from './corpContracts';
 
 const NOW = Date.parse('2026-10-20T12:00:00Z');
-const HOUR = 3_600_000;
 const iso = (ms: number) => new Date(ms).toISOString();
 
 const contract = (id: number, over: Partial<Contract> = {}): Contract => ({
@@ -17,8 +17,8 @@ const contract = (id: number, over: Partial<Contract> = {}): Contract => ({
   status: 'outstanding',
   for_corporation: true,
   availability: 'personal',
-  date_issued: iso(NOW - 24 * HOUR),
-  date_expired: iso(NOW + 72 * HOUR),
+  date_issued: iso(NOW - 24 * HOUR_MS),
+  date_expired: iso(NOW + 72 * HOUR_MS),
   ...over,
 });
 
@@ -46,7 +46,10 @@ describe('summarizeCorpContracts', () => {
   });
 
   it('drops an offer whose expiry has passed: stale, not outstanding', () => {
-    const summary = summarizeCorpContracts([contract(1, { date_expired: iso(NOW - HOUR) })], NOW);
+    const summary = summarizeCorpContracts(
+      [contract(1, { date_expired: iso(NOW - HOUR_MS) })],
+      NOW
+    );
     expect(summary.outstanding).toBe(0);
     expect(summary.rows).toEqual([]);
   });
@@ -54,12 +57,12 @@ describe('summarizeCorpContracts', () => {
   it('counts a contract expiring inside 24 h, and an overdue haul, as expiring soon', () => {
     const summary = summarizeCorpContracts(
       [
-        contract(1, { date_expired: iso(NOW + 5 * HOUR) }),
+        contract(1, { date_expired: iso(NOW + 5 * HOUR_MS) }),
         contract(2),
         accepted(3, {
           days_to_complete: 1,
-          date_accepted: iso(NOW - 48 * HOUR),
-          date_expired: iso(NOW + 100 * HOUR),
+          date_accepted: iso(NOW - 48 * HOUR_MS),
+          date_expired: iso(NOW + 100 * HOUR_MS),
         }),
       ],
       NOW

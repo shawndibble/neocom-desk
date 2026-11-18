@@ -4,6 +4,7 @@
  * names are kept (a Survey's content stays in its Share Link), and a link lives
  * 7 days, so an entry older than that is dead. Pure.
  */
+import { DAY_MS } from '@/lib/age';
 import { isShareId } from '../share/shareId';
 
 export interface SurveyHistoryEntry {
@@ -15,7 +16,7 @@ export interface SurveyHistoryEntry {
 }
 
 /** A Share Link's life: nothing older is worth listing. */
-export const HISTORY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+export const HISTORY_WINDOW_MS = 7 * DAY_MS;
 /** The list keeps the newest 8 by `addedAt`; older ones fall off the list only. */
 export const HISTORY_MAX = 8;
 /** A name is a short label, not a note. */

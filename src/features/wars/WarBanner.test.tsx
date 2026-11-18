@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -24,14 +25,12 @@ vi.mock('@/features/character/useEntityName', () => ({
     id === 100 ? 'Hostile Corp' : id === 200 ? 'Main Corp' : id === 201 ? 'Holding Corp' : null,
 }));
 
-const HOUR = 3_600_000;
-
 function war(over: Partial<StoredWar> = {}): StoredWar {
   const now = Date.now();
   return {
     id: 777,
-    declared: now - 30 * HOUR,
-    started: now - 6 * HOUR,
+    declared: now - 30 * HOUR_MS,
+    started: now - 6 * HOUR_MS,
     mutual: false,
     openForAllies: false,
     aggressor: { corporationId: 100, iskDestroyed: 2_500_000_000, shipsKilled: 4 },
@@ -89,13 +88,16 @@ describe('WarBanner', () => {
   });
 
   it('says how many more wars there are', async () => {
-    loadActiveWars.mockResolvedValue([war(), war({ id: 778, declared: Date.now() - 60 * HOUR })]);
+    loadActiveWars.mockResolvedValue([
+      war(),
+      war({ id: 778, declared: Date.now() - 60 * HOUR_MS }),
+    ]);
     renderBanner();
     expect(await screen.findByText('At war with Hostile Corp and 1 more')).toBeInTheDocument();
   });
 
   it('shows when a war not yet started will begin', async () => {
-    loadActiveWars.mockResolvedValue([war({ started: Date.now() + 5 * HOUR + 30_000 })]);
+    loadActiveWars.mockResolvedValue([war({ started: Date.now() + 5 * HOUR_MS + 30_000 })]);
     renderBanner();
     expect(await screen.findByText('Starts in 5h 0m')).toBeInTheDocument();
   });
@@ -130,7 +132,7 @@ describe('WarBanner', () => {
       eveType: 'WarDeclared',
       title: 'War declared',
       body: 'Hostile Corp declared war',
-      firedAt: Date.now() - HOUR,
+      firedAt: Date.now() - HOUR_MS,
     });
     loadActiveWars.mockResolvedValue([]);
     loadRecentWars.mockResolvedValue([war()]);

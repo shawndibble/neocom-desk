@@ -6,6 +6,7 @@
  * scan and the delete, and never by deserializing a cached value just to
  * learn its age.
  */
+import { DAY_MS } from '@/lib/age';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { db } from '@/db';
 import en from '@/i18n/locales/en.json';
@@ -30,8 +31,7 @@ import { GLOBAL_CACHE_CHARACTER_ID } from './cache';
 
 const CHAR = 91;
 const G = GLOBAL_CACHE_CHARACTER_ID;
-const DAY = 24 * 60 * 60_000;
-const NOW = 1_000 * DAY;
+const NOW = 1_000 * DAY_MS;
 
 async function seed(characterId: number, key: string, fetchedAt: number, value: unknown = 'v') {
   await db.esiCache.put({ characterId, key, value, fetchedAt });
@@ -126,7 +126,7 @@ describe('pruneRuleFor', () => {
   it('a mail body ages out after 7 days whether or not its mail is still listed', () => {
     const rule = pruneRuleFor('mail:12345');
     expect(rule?.maxAgeMs).toBe(MAIL_BODY_RETENTION_MS);
-    expect(MAIL_BODY_RETENTION_MS).toBe(7 * DAY);
+    expect(MAIL_BODY_RETENTION_MS).toBe(7 * DAY_MS);
     expect(rule?.referencedBy).toBeUndefined();
   });
 
@@ -165,13 +165,13 @@ describe('pruneRuleFor', () => {
 
 describe('share copies', () => {
   it('are pruned a day past the 7-day life of the share itself', () => {
-    expect(SHARE_COPY_RETENTION_MS).toBe(8 * DAY);
+    expect(SHARE_COPY_RETENTION_MS).toBe(8 * DAY_MS);
     expect(pruneRuleFor('share:abc123')?.maxAgeMs).toBe(SHARE_COPY_RETENTION_MS);
   });
 
   it('are found under the sentinel Character, old ones dropped and recent ones kept', async () => {
     await seed(G, 'share:old123', NOW - SHARE_COPY_RETENTION_MS - 1);
-    await seed(G, 'share:new123', NOW - 2 * DAY);
+    await seed(G, 'share:new123', NOW - 2 * DAY_MS);
 
     await pruneEsiCache({ now: NOW });
 
@@ -182,9 +182,9 @@ describe('share copies', () => {
 describe('pruneEsiCache', () => {
   it('deletes per-id rows older than their window and keeps younger ones', async () => {
     await seed(G, 'name:1', NOW - STATIC_RETENTION_MS - 1);
-    await seed(G, 'name:2', NOW - STATIC_RETENTION_MS + DAY);
+    await seed(G, 'name:2', NOW - STATIC_RETENTION_MS + DAY_MS);
     await seed(G, 'marketPrice:60003760:34', NOW - MARKET_RETENTION_MS - 1);
-    await seed(G, 'marketPrice:60003760:35', NOW - MARKET_RETENTION_MS + DAY);
+    await seed(G, 'marketPrice:60003760:35', NOW - MARKET_RETENTION_MS + DAY_MS);
     await seed(CHAR, 'structure:5:forbidden', NOW - STATIC_RETENTION_MS - 1);
 
     const deleted = await pruneEsiCache({ now: NOW });
@@ -202,7 +202,7 @@ describe('pruneEsiCache', () => {
   });
 
   it('keeps the rows a cache-only reader depends on, however old', async () => {
-    const ancient = NOW - 900 * DAY;
+    const ancient = NOW - 900 * DAY_MS;
     for (const key of ['system:30000142', 'planet:4', 'planet-info:4', 'structure:5']) {
       await seed(G, key, ancient);
     }
@@ -212,7 +212,7 @@ describe('pruneEsiCache', () => {
   });
 
   it('never deletes single-row-per-character keys, however old', async () => {
-    const ancient = NOW - 900 * DAY;
+    const ancient = NOW - 900 * DAY_MS;
     for (const key of ['skills', 'wallet', 'assets', 'mail:headers', 'calendar:seen', 'planet:4']) {
       await seed(CHAR, key, ancient);
     }
@@ -262,7 +262,7 @@ describe('pruneEsiCache', () => {
 
   it('scans meta across page boundaries', async () => {
     for (let i = 0; i < 7; i += 1) await seed(G, `name:${i}`, NOW - STATIC_RETENTION_MS - 1);
-    await seed(G, 'skills', NOW - 900 * DAY);
+    await seed(G, 'skills', NOW - 900 * DAY_MS);
 
     expect(await pruneEsiCache({ now: NOW, scanPageSize: 3 })).toBe(7);
     expect(await keys()).toEqual([`${G}|skills`]);
@@ -321,9 +321,9 @@ describe('pruneEsiCache', () => {
     it('are skipped until the first run is older than the window', async () => {
       await seedWithoutMeta(G, 'name:1', 0);
 
-      expect(await pruneEsiCache({ now: NOW, firstRunAt: NOW - STATIC_RETENTION_MS + DAY })).toBe(
-        0
-      );
+      expect(
+        await pruneEsiCache({ now: NOW, firstRunAt: NOW - STATIC_RETENTION_MS + DAY_MS })
+      ).toBe(0);
       expect(await pruneEsiCache({ now: NOW })).toBe(0);
       expect(await keys()).toEqual([`${G}|name:1`]);
     });
@@ -440,7 +440,7 @@ describe('mail bodies and drafts', () => {
   it('prunes a mail body past 7 days even while its mail is still in the header list, and keeps a fresh one', async () => {
     await seed(CHAR, 'mail:headers', NOW, [{ mail_id: 1 }, { mail_id: 2 }]);
     await seed(CHAR, 'mail:1', NOW - MAIL_BODY_RETENTION_MS - 1);
-    await seed(CHAR, 'mail:2', NOW - MAIL_BODY_RETENTION_MS + DAY);
+    await seed(CHAR, 'mail:2', NOW - MAIL_BODY_RETENTION_MS + DAY_MS);
 
     await pruneEsiCache({ now: NOW });
 
@@ -463,7 +463,7 @@ describe('mail bodies and drafts', () => {
     await db.mailDrafts.clear();
     await db.mailDrafts.bulkPut([
       draft('stale', NOW - MAIL_DRAFT_RETENTION_MS - 1),
-      draft('fresh', NOW - MAIL_DRAFT_RETENTION_MS + DAY),
+      draft('fresh', NOW - MAIL_DRAFT_RETENTION_MS + DAY_MS),
     ]);
 
     expect(await pruneStaleMailDrafts(NOW)).toBe(1);
@@ -475,8 +475,8 @@ describe('mail bodies and drafts', () => {
 describe('the retention copy in What we store', () => {
   const device = en.settings.faq.retention.device;
   it('states the mail body and draft windows the prune enforces', () => {
-    expect(device.mailBodiesKept).toContain(`${MAIL_BODY_RETENTION_MS / DAY} days`);
-    expect(device.mailDraftsKept).toContain(`${MAIL_DRAFT_RETENTION_MS / DAY} days`);
-    expect(device.lookupsKept).toContain(`${STATIC_RETENTION_MS / DAY} days`);
+    expect(device.mailBodiesKept).toContain(`${MAIL_BODY_RETENTION_MS / DAY_MS} days`);
+    expect(device.mailDraftsKept).toContain(`${MAIL_DRAFT_RETENTION_MS / DAY_MS} days`);
+    expect(device.lookupsKept).toContain(`${STATIC_RETENTION_MS / DAY_MS} days`);
   });
 });

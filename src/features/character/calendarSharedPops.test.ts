@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import { buildCharacterBoard } from '@/engine/character/board';
 import { filterByCorporation, filterBySharingCorporation } from '@/engine/character/deadlines';
@@ -6,7 +7,6 @@ import type { SharedPopView } from '@/sync/sharedPops';
 import { toSharedPopSources, type SharedPopEntry } from './calendarSharedPops';
 import { sharedPopDetail, sharedPopStartLink } from './sharedPopDetail';
 
-const HOUR = 3_600_000;
 const NOW = Date.parse('2026-11-15T12:00:00Z');
 const iso = (ms: number) => new Date(ms).toISOString();
 const t = (key: string, options?: Record<string, unknown>) =>
@@ -21,15 +21,15 @@ function pop(overrides: Partial<SharedPopView> = {}): SharedPopView {
     refineryName: 'Efa - Tatara',
     solarSystemId: 30_000_001,
     popTime: 'ready',
-    popAt: iso(NOW + 10 * HOUR),
+    popAt: iso(NOW + 10 * HOUR_MS),
     fractured: false,
-    startedAt: iso(NOW - 5 * 24 * HOUR),
-    expiresAt: iso(NOW + 61 * HOUR),
+    startedAt: iso(NOW - 5 * 24 * HOUR_MS),
+    expiresAt: iso(NOW + 61 * HOUR_MS),
     ore: [{ typeId: 45_490, quantity: 1_200_000 }],
     notes: 'Fleet forms in local.',
     ratePct: 10,
     corporationId: 98_000_001,
-    syncedAt: NOW - HOUR,
+    syncedAt: NOW - HOUR_MS,
     ...overrides,
   };
 }
@@ -53,7 +53,7 @@ describe('Shared Pops as Calendar clocks', () => {
       subject: 'Efa - Tatara',
       subtitle: 'Efa I - Moon 1',
       detail: 'ready',
-      deadlineMs: NOW + 10 * HOUR,
+      deadlineMs: NOW + 10 * HOUR_MS,
       sharedBy: CORP,
     });
     expect(
@@ -62,13 +62,13 @@ describe('Shared Pops as Calendar clocks', () => {
   });
 
   it('counts down to the expiry once popped, so a late fleet still sees the field', () => {
-    const [row] = toSharedPopSources([entry({ popAt: iso(NOW - HOUR) })], new Set(), NOW);
-    expect(row).toMatchObject({ detail: 'expires', deadlineMs: NOW + 61 * HOUR });
+    const [row] = toSharedPopSources([entry({ popAt: iso(NOW - HOUR_MS) })], new Set(), NOW);
+    expect(row).toMatchObject({ detail: 'expires', deadlineMs: NOW + 61 * HOUR_MS });
   });
 
   it('shows only from the Extraction start until it is Expired', () => {
-    const notStarted = entry({ startedAt: iso(NOW + HOUR) });
-    const expired = entry({ popAt: iso(NOW - 50 * HOUR), expiresAt: iso(NOW - 1) });
+    const notStarted = entry({ startedAt: iso(NOW + HOUR_MS) });
+    const expired = entry({ popAt: iso(NOW - 50 * HOUR_MS), expiresAt: iso(NOW - 1) });
     expect(toSharedPopSources([notStarted, expired], new Set(), NOW)).toEqual([]);
   });
 
@@ -157,12 +157,12 @@ describe('Shared Pop start link and detail', () => {
   });
 
   it("shows the data's age, flagged once the book has not synced for 12 hours", () => {
-    const fresh = sharedPopDetail(entry({ syncedAt: NOW - 3 * HOUR }), NOW, t, 'UTC');
+    const fresh = sharedPopDetail(entry({ syncedAt: NOW - 3 * HOUR_MS }), NOW, t, 'UTC');
     expect(fresh.facts).toContainEqual({
       label: 'calendar.sharedPop.synced',
       value: 'common.age.hours{"count":3}',
     });
-    const stale = sharedPopDetail(entry({ syncedAt: NOW - 13 * HOUR }), NOW, t, 'UTC');
+    const stale = sharedPopDetail(entry({ syncedAt: NOW - 13 * HOUR_MS }), NOW, t, 'UTC');
     expect(stale.facts).toContainEqual({
       label: 'calendar.sharedPop.synced',
       value: 'calendar.sharedPop.syncedStale{"age":"common.age.hours{\\"count\\":13}"}',

@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import {
   chunkLibrary,
@@ -12,7 +13,6 @@ import {
 } from './sharedLibrary';
 import type { BlueprintShare } from './shareMode';
 
-const DAY = 24 * 60 * 60 * 1000;
 const place = { locationName: 'Jita IV - Moon 4', systemName: 'Jita' };
 
 const bp = (over: Partial<SharedBlueprint> = {}): SharedBlueprint => ({
@@ -114,7 +114,7 @@ describe('chunkLibrary', () => {
 });
 
 describe('isLibraryStale', () => {
-  const now = 1_000 * DAY;
+  const now = 1_000 * DAY_MS;
   it('is stale after 30 days', () => {
     expect(isLibraryStale(now - LIBRARY_STALE_MS - 1, now)).toBe(true);
     expect(isLibraryStale(now - LIBRARY_STALE_MS, now)).toBe(false);
@@ -125,7 +125,7 @@ describe('isLibraryStale', () => {
 });
 
 describe('planPush', () => {
-  const now = 1_000 * DAY;
+  const now = 1_000 * DAY_MS;
   const items = [bp()];
   const hash = libraryHash(items);
 
@@ -138,7 +138,7 @@ describe('planPush', () => {
   });
 
   it('skips an unchanged, recently stamped list', () => {
-    expect(planPush({ hash, pushedAt: now - DAY }, hash, items.length, now)).toBe('skip');
+    expect(planPush({ hash, pushedAt: now - DAY_MS }, hash, items.length, now)).toBe('skip');
   });
 
   it('only refreshes the stamp on an unchanged list that is getting old', () => {

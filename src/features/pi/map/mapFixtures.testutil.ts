@@ -3,6 +3,7 @@
  * small colony set, built the way `planAdviceModel.test.ts` builds its own, so
  * a test can run the real `buildPlanAdvice` without fetching anything.
  */
+import { HOUR_MS } from '@/lib/age';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { CharacterPlanet, CharacterPlanetDetail, PlanetPin } from '@/esi/endpoints';
@@ -16,7 +17,6 @@ export const pi = JSON.parse(
 ) as PiData;
 
 const NOW = Date.parse('2026-10-01T00:00:00Z');
-const HOUR = 3_600_000;
 export const HIGHSEC_SYSTEM = 30000142;
 export const TEMPERATE_ID = 40000001;
 export const OCEANIC_ID = 40000002;
@@ -45,8 +45,8 @@ function ecuPin(pinId: number, product: number, qty: number): PlanetPin {
     type_id: 2848,
     latitude: 0.1 * pinId,
     longitude: 0.2,
-    install_time: new Date(NOW - 2 * HOUR).toISOString(),
-    expiry_time: new Date(NOW + 70 * HOUR).toISOString(),
+    install_time: new Date(NOW - 2 * HOUR_MS).toISOString(),
+    expiry_time: new Date(NOW + 70 * HOUR_MS).toISOString(),
     extractor_details: {
       heads: Array.from({ length: 7 }, (_, i) => ({ head_id: i, latitude: 0, longitude: 0 })),
       product_type_id: product,

@@ -1,3 +1,4 @@
+import { DAY_MS, HOUR_MS, MINUTE_MS } from '@/lib/age';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { BoardExtractionSource, BoardStructureSource } from '@/engine/corp/board';
 import type { CorporationIndustryJob } from '@/esi/endpoints';
@@ -16,9 +17,6 @@ import type { BuildContext, FeedState, Feeds } from './types';
 const t = (key: string, options?: Record<string, unknown>) =>
   options ? `${key}${JSON.stringify(options)}` : key;
 const NOW = Date.parse('2026-10-11T12:00:00Z');
-const MIN = 60_000;
-const HOUR = 3_600_000;
-const DAY = 24 * HOUR;
 
 const ctx: BuildContext = {
   t,
@@ -36,7 +34,7 @@ function structure(over: Partial<BoardStructureSource> = {}): BoardStructureSour
   return {
     structureId: 1,
     name: 'Efa - Helios Prime',
-    fuelExpiresMs: NOW + 20 * DAY,
+    fuelExpiresMs: NOW + 20 * DAY_MS,
     state: 'shield_vulnerable',
     stateTimerEndMs: null,
     unanchorsAtMs: null,
@@ -50,7 +48,7 @@ const structuresFeed = (list: BoardStructureSource[] | null, needsReauth = false
     structures: list,
     structureCount: list?.length ?? 0,
     needsReauth,
-    fetchedAt: new Date(NOW - HOUR),
+    fetchedAt: new Date(NOW - HOUR_MS),
   });
 
 /** A moon read: null is unreadable; each extraction arrives at `chunkArrivalMs`. */
@@ -59,7 +57,7 @@ const moonFeed = (extractions: BoardExtractionSource[] | null, needsReauth = fal
     chunks: extractions === null ? null : [],
     extractions: extractions ?? undefined,
     needsReauth,
-    fetchedAt: new Date(NOW - HOUR),
+    fetchedAt: new Date(NOW - HOUR_MS),
     loadedAt: NOW,
   });
 
@@ -75,8 +73,8 @@ function job(over: Partial<CorporationIndustryJob> = {}): CorporationIndustryJob
     facility_id: 1,
     location_id: 1,
     runs: 2,
-    start_date: new Date(NOW - 2 * HOUR).toISOString(),
-    end_date: new Date(NOW + 2 * HOUR).toISOString(),
+    start_date: new Date(NOW - 2 * HOUR_MS).toISOString(),
+    end_date: new Date(NOW + 2 * HOUR_MS).toISOString(),
     status: 'active',
     product_type_id: 600,
     ...over,
@@ -87,7 +85,7 @@ const jobsFeed = (jobs: CorporationIndustryJob[], over: Partial<CorpJobsFeed> = 
   ok<CorpJobsFeed>({
     readable: true,
     needsReauth: false,
-    fetchedAt: new Date(NOW - HOUR),
+    fetchedAt: new Date(NOW - HOUR_MS),
     fromCache: true,
     jobs,
     typeNames: new Map([
@@ -114,18 +112,20 @@ describe('corpDeadlines', () => {
   it('counts what is due in 24h across all three feeds and names the next one', () => {
     const feeds: Feeds = {
       structures: structuresFeed([
-        structure({ fuelExpiresMs: NOW + 5 * HOUR }),
-        structure({ structureId: 2, name: 'Efa - Second', fuelExpiresMs: NOW + 10 * DAY }),
+        structure({ fuelExpiresMs: NOW + 5 * HOUR_MS }),
+        structure({ structureId: 2, name: 'Efa - Second', fuelExpiresMs: NOW + 10 * DAY_MS }),
       ]),
       moonChunks: moonFeed([
         {
           structureId: 3,
           subject: 'Efa - Moon Drill',
-          chunkArrivalMs: NOW + 8 * HOUR,
-          naturalDecayMs: NOW + 11 * HOUR,
+          chunkArrivalMs: NOW + 8 * HOUR_MS,
+          naturalDecayMs: NOW + 11 * HOUR_MS,
         },
       ]),
-      corpJobs: jobsFeed([job({ status: 'ready', end_date: new Date(NOW - HOUR).toISOString() })]),
+      corpJobs: jobsFeed([
+        job({ status: 'ready', end_date: new Date(NOW - HOUR_MS).toISOString() }),
+      ]),
     };
     const view = corpDeadlines(feeds, ctx);
     // fuel in 5h, moon in 8h; a finished job is "Ready to deliver", not a deadline
@@ -144,14 +144,14 @@ describe('corpDeadlines', () => {
       {
         structures: structuresFeed([
           structure({ name: 'Dry - Athanor', fuelExpiresMs: null }),
-          structure({ structureId: 2, name: 'Efa - Second', fuelExpiresMs: NOW + 5 * HOUR }),
+          structure({ structureId: 2, name: 'Efa - Second', fuelExpiresMs: NOW + 5 * HOUR_MS }),
         ]),
         moonChunks: moonFeed([
           {
             structureId: 3,
             subject: 'Efa - Moon 2',
-            chunkArrivalMs: NOW - 4 * DAY,
-            naturalDecayMs: NOW - 3 * DAY,
+            chunkArrivalMs: NOW - 4 * DAY_MS,
+            naturalDecayMs: NOW - 3 * DAY_MS,
           },
         ]),
         corpJobs: jobsFeed([]),
@@ -200,7 +200,7 @@ describe('corpDeadlines', () => {
 
   it('surfaces a failed starbase read like any other failed feed', () => {
     const base: Feeds = {
-      structures: structuresFeed([structure({ fuelExpiresMs: NOW + 5 * HOUR })]),
+      structures: structuresFeed([structure({ fuelExpiresMs: NOW + 5 * HOUR_MS })]),
       moonChunks: moonFeed([]),
       corpJobs: jobsFeed([]),
     };
@@ -231,8 +231,8 @@ describe('corpDeadlines', () => {
           {
             structureId: 3,
             subject: 'Efa - Moon Drill',
-            chunkArrivalMs: NOW + 3 * HOUR,
-            naturalDecayMs: NOW + 6 * HOUR,
+            chunkArrivalMs: NOW + 3 * HOUR_MS,
+            naturalDecayMs: NOW + 6 * HOUR_MS,
           },
         ]),
         corpJobs: jobsFeed([]),
@@ -262,8 +262,8 @@ describe('corpDeadlines', () => {
       fetchedAt: new Date(NOW),
       fromCache: false,
       rows: [
-        hook('skyhook:1', NOW + 2 * HOUR, NOW + 4 * HOUR, 'X-7OMU IV'),
-        hook('skyhook:2', NOW + 5 * DAY, NOW + 5 * DAY + HOUR, 'Efa VI'),
+        hook('skyhook:1', NOW + 2 * HOUR_MS, NOW + 4 * HOUR_MS, 'X-7OMU IV'),
+        hook('skyhook:2', NOW + 5 * DAY_MS, NOW + 5 * DAY_MS + HOUR_MS, 'Efa VI'),
       ],
       systemNames: new Map(),
       typeNames: new Map(),
@@ -291,7 +291,7 @@ describe('corpDeadlines', () => {
 
   it('is not blocked by a starbase read this Character may not make', () => {
     const feeds: Feeds = {
-      structures: structuresFeed([structure({ fuelExpiresMs: NOW + 5 * HOUR })]),
+      structures: structuresFeed([structure({ fuelExpiresMs: NOW + 5 * HOUR_MS })]),
       moonChunks: moonFeed([]),
       corpJobs: jobsFeed([]),
       corpStarbases: ok<CorpStarbasesFeed>({
@@ -309,7 +309,7 @@ describe('corpDeadlines', () => {
 
   it('never prints a countdown shorter than the one-hour cache window', () => {
     const feeds: Feeds = {
-      structures: structuresFeed([structure({ stateTimerEndMs: NOW + 20 * MIN })]),
+      structures: structuresFeed([structure({ stateTimerEndMs: NOW + 20 * MINUTE_MS })]),
       moonChunks: moonFeed([]),
       corpJobs: jobsFeed([]),
     };
@@ -321,7 +321,7 @@ describe('corpDeadlines', () => {
 
   it('draws a day bar per day of the strip', () => {
     const feeds: Feeds = {
-      structures: structuresFeed([structure({ fuelExpiresMs: NOW + 5 * HOUR })]),
+      structures: structuresFeed([structure({ fuelExpiresMs: NOW + 5 * HOUR_MS })]),
       moonChunks: moonFeed([]),
       corpJobs: jobsFeed([]),
     };
@@ -341,7 +341,7 @@ describe('corpDeadlines', () => {
 
     // 05:00 UTC the next day is 22:00 tonight in Los Angeles: two days on two clocks.
     const feeds = (): Feeds => ({
-      structures: structuresFeed([structure({ fuelExpiresMs: NOW + 17 * HOUR })]),
+      structures: structuresFeed([structure({ fuelExpiresMs: NOW + 17 * HOUR_MS })]),
       moonChunks: moonFeed([]),
       corpJobs: jobsFeed([]),
     });
@@ -366,7 +366,7 @@ describe('corpDeadlines', () => {
 
   it('draws what it could read when one feed is unreadable', () => {
     const feeds: Feeds = {
-      structures: structuresFeed([structure({ fuelExpiresMs: NOW + 5 * HOUR })]),
+      structures: structuresFeed([structure({ fuelExpiresMs: NOW + 5 * HOUR_MS })]),
       moonChunks: moonFeed(null),
       corpJobs: unreadableJobs(),
     };
@@ -447,11 +447,11 @@ describe('corpDeadlines across corporations (All scope)', () => {
     const view = corpDeadlines(
       allFeed([
         slice(500, {
-          structures: structuresFeed([structure({ fuelExpiresMs: NOW + 9 * HOUR })]).data,
+          structures: structuresFeed([structure({ fuelExpiresMs: NOW + 9 * HOUR_MS })]).data,
         }),
         slice(600, {
           structures: structuresFeed([
-            structure({ structureId: 2, name: 'Amarr - Vault', fuelExpiresMs: NOW + 3 * HOUR }),
+            structure({ structureId: 2, name: 'Amarr - Vault', fuelExpiresMs: NOW + 3 * HOUR_MS }),
           ]).data,
         }),
       ]),
@@ -480,8 +480,8 @@ describe('corpDeadlines across corporations (All scope)', () => {
             {
               structureId: 7,
               subject: 'Amarr - Drill',
-              chunkArrivalMs: NOW + 2 * HOUR,
-              naturalDecayMs: NOW + 5 * HOUR,
+              chunkArrivalMs: NOW + 2 * HOUR_MS,
+              naturalDecayMs: NOW + 5 * HOUR_MS,
             },
           ]).data,
         }),
@@ -530,21 +530,21 @@ describe('corpDeadlines across corporations (All scope)', () => {
 describe('corpJobs', () => {
   const feeds = (): Feeds => ({
     corpJobs: jobsFeed([
-      job({ job_id: 1, end_date: new Date(NOW + 5 * HOUR).toISOString() }),
+      job({ job_id: 1, end_date: new Date(NOW + 5 * HOUR_MS).toISOString() }),
       job({
         job_id: 2,
         product_type_id: 601,
-        end_date: new Date(NOW + HOUR).toISOString(),
-        start_date: new Date(NOW - HOUR).toISOString(),
+        end_date: new Date(NOW + HOUR_MS).toISOString(),
+        start_date: new Date(NOW - HOUR_MS).toISOString(),
       }),
-      job({ job_id: 3, status: 'ready', end_date: new Date(NOW - 3 * HOUR).toISOString() }),
+      job({ job_id: 3, status: 'ready', end_date: new Date(NOW - 3 * HOUR_MS).toISOString() }),
       job({ job_id: 4, status: 'delivered' }),
     ]),
   });
 
   it('never ticks a job down inside the one-hour cache window', () => {
     const view = corpJobs(
-      { corpJobs: jobsFeed([job({ end_date: new Date(NOW + 20 * MIN).toISOString() })]) },
+      { corpJobs: jobsFeed([job({ end_date: new Date(NOW + 20 * MINUTE_MS).toISOString() })]) },
       ctx
     );
     expect(view.table?.rows[0]?.cells[1]).toMatchObject({ text: 'corp.board.underCacheWindow' });
@@ -560,7 +560,7 @@ describe('corpJobs', () => {
 
   it('names the next job to finish when nothing waits', () => {
     const view = corpJobs(
-      { corpJobs: jobsFeed([job({ end_date: new Date(NOW + HOUR).toISOString() })]) },
+      { corpJobs: jobsFeed([job({ end_date: new Date(NOW + HOUR_MS).toISOString() })]) },
       ctx
     );
     expect(view.number.secondary?.text).toContain('overview.widgets.corpJobs.next');
@@ -604,7 +604,7 @@ describe('corpJobs', () => {
 describe('corpJobs row detail', () => {
   it('names the product, activity, installer and when it ends', () => {
     const view = corpJobs(
-      { corpJobs: jobsFeed([job({ end_date: new Date(NOW + 5 * HOUR).toISOString() })]) },
+      { corpJobs: jobsFeed([job({ end_date: new Date(NOW + 5 * HOUR_MS).toISOString() })]) },
       ctx
     );
     const detail = view.table!.rows[0]!.detail!;
@@ -622,7 +622,7 @@ describe('corpJobs row detail', () => {
     const view = corpJobs(
       {
         corpJobs: jobsFeed([
-          job({ status: 'ready', end_date: new Date(NOW - HOUR).toISOString() }),
+          job({ status: 'ready', end_date: new Date(NOW - HOUR_MS).toISOString() }),
         ]),
       },
       ctx

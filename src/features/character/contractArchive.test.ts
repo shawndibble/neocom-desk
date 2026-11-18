@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '@/db';
 import type { Contract, ContractItem } from '@/esi/endpoints';
@@ -13,8 +14,7 @@ import {
 } from './contractArchive';
 
 const NOW = Date.parse('2026-10-30T12:00:00Z');
-const DAY = 86_400_000;
-const iso = (daysAgo: number) => `${new Date(NOW - daysAgo * DAY).toISOString().slice(0, 19)}Z`;
+const iso = (daysAgo: number) => `${new Date(NOW - daysAgo * DAY_MS).toISOString().slice(0, 19)}Z`;
 
 function contract(id: number, daysAgo: number, extra: Partial<Contract> = {}): Contract {
   return {
@@ -84,7 +84,7 @@ describe('contract archive', () => {
   });
 
   it('prunes rows past 365 days with their items, per Character', async () => {
-    await archiveContracts(7, live([contract(1, 400), contract(2, 100)]), NOW - 300 * DAY);
+    await archiveContracts(7, live([contract(1, 400), contract(2, 100)]), NOW - 300 * DAY_MS);
     await archiveContracts(8, live([contract(3, 5)]), NOW);
     await archiveContractItems(7, 1, [{ record_id: 1 } as ContractItem]);
     await archiveContracts(7, live([]), NOW);

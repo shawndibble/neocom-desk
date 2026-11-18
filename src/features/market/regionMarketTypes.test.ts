@@ -1,3 +1,4 @@
+import { MINUTE_MS } from '@/lib/age';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { mswServer } from '@/test/msw';
@@ -88,13 +89,14 @@ describe('loadRegionMarketTypes', () => {
 });
 
 describe('regionTypesReloadSlot', () => {
-  const MIN = 60_000;
   it('moves once per cache window, so a held list reloads after it', () => {
-    expect(regionTypesReloadSlot(0, false)).toBe(regionTypesReloadSlot(9 * MIN, false));
-    expect(regionTypesReloadSlot(10 * MIN, false)).not.toBe(regionTypesReloadSlot(9 * MIN, false));
+    expect(regionTypesReloadSlot(0, false)).toBe(regionTypesReloadSlot(9 * MINUTE_MS, false));
+    expect(regionTypesReloadSlot(10 * MINUTE_MS, false)).not.toBe(
+      regionTypesReloadSlot(9 * MINUTE_MS, false)
+    );
   });
 
   it('moves every minute while the last load came back empty, so a failed load retries', () => {
-    expect(regionTypesReloadSlot(MIN, true)).not.toBe(regionTypesReloadSlot(0, true));
+    expect(regionTypesReloadSlot(MINUTE_MS, true)).not.toBe(regionTypesReloadSlot(0, true));
   });
 });

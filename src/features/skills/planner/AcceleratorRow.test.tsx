@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -6,7 +7,6 @@ import '@/i18n';
 import { AcceleratorRow } from './AcceleratorRow';
 
 const NOW = Date.UTC(2026, 10, 14, 12);
-const HOUR = 3_600_000;
 
 function renderRow(props: Partial<Parameters<typeof AcceleratorRow>[0]> = {}) {
   // The sheet's market link is a router link.
@@ -45,7 +45,7 @@ describe('AcceleratorRow', () => {
         id: '1',
         characterId: 1,
         bonus: 13,
-        expiresAt: NOW + 26 * HOUR,
+        expiresAt: NOW + 26 * HOUR_MS,
         updatedAt: NOW,
       },
     });

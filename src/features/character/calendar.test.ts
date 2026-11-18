@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -33,7 +34,6 @@ afterAll(() => server.close());
 
 describe('prefetchCalendarEventDetails', () => {
   const NOW = Date.UTC(2026, 9, 16, 12);
-  const DAY = 24 * 60 * 60_000;
   const summary = (event_id: number, startMs: number) => ({
     event_id,
     event_date: new Date(startMs).toISOString(),
@@ -64,7 +64,7 @@ describe('prefetchCalendarEventDetails', () => {
 
     await prefetchCalendarEventDetails(
       CHAR_ID,
-      [summary(1, NOW + DAY), summary(2, NOW + 2 * DAY), summary(3, NOW + 30 * DAY)],
+      [summary(1, NOW + DAY_MS), summary(2, NOW + 2 * DAY_MS), summary(3, NOW + 30 * DAY_MS)],
       NOW
     );
 
@@ -74,7 +74,7 @@ describe('prefetchCalendarEventDetails', () => {
 
   it('does nothing while offline', async () => {
     vi.stubGlobal('navigator', { onLine: false });
-    await prefetchCalendarEventDetails(CHAR_ID, [summary(1, NOW + DAY)], NOW);
+    await prefetchCalendarEventDetails(CHAR_ID, [summary(1, NOW + DAY_MS)], NOW);
     expect(requested).toEqual([]);
   });
 
@@ -91,8 +91,8 @@ describe('prefetchCalendarEventDetails', () => {
         return HttpResponse.json({ error: 'forbidden' }, { status: 403 });
       })
     );
-    await prefetchCalendarEventDetails(CHAR_ID, [summary(1, NOW + DAY)], NOW);
-    await prefetchCalendarEventDetails(CHAR_ID, [summary(1, NOW + DAY)], NOW);
+    await prefetchCalendarEventDetails(CHAR_ID, [summary(1, NOW + DAY_MS)], NOW);
+    await prefetchCalendarEventDetails(CHAR_ID, [summary(1, NOW + DAY_MS)], NOW);
     expect(hits).toBe(1);
   });
 });

@@ -11,6 +11,7 @@
 //   mergeSettings — keyed by setting key; local tombstones never expire (only a
 //                   newer write to the key supersedes them). See issue #13.
 
+import { DAY_MS } from '@/lib/age';
 import type {
   BuildPlanRecord,
   PlanBooster,
@@ -31,7 +32,7 @@ import type {
 } from '@/db';
 import type { Attributes, PlanMilestone } from '@/engine/types';
 
-export const TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+export const TOMBSTONE_TTL_MS = 30 * DAY_MS;
 
 /** Minimum shape a locally stored syncable record must have. */
 export interface SyncRecord {

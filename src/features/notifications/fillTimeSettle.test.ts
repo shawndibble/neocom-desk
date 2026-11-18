@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, type NotificationFeedRecord } from '@/db';
 import { loadWalletTransactionsWithStatus } from '@/features/character/wallet';
@@ -10,7 +11,6 @@ const syncMock = vi.hoisted(() => ({ scheduleSync: vi.fn() }));
 vi.mock('@/sync', () => syncMock);
 vi.mock('@/features/character/wallet', () => ({ loadWalletTransactionsWithStatus: vi.fn() }));
 
-const HOUR = 3_600_000;
 const CHAR = 7;
 const OBSERVED = 1_700_000_000_000;
 const WALLET = new Set(['esi-wallet.read_character_wallet.v1']);
@@ -19,7 +19,7 @@ const fillMatch = {
   typeId: 34,
   locationId: 60003760,
   price: 5.5,
-  issuedMs: OBSERVED - 10 * HOUR,
+  issuedMs: OBSERVED - 10 * HOUR_MS,
   quantity: 100,
 };
 
@@ -37,7 +37,7 @@ function fillRow(overrides: Partial<NotificationFeedRecord> = {}): ProvisionalFi
 }
 
 const sale = {
-  dateMs: OBSERVED - 2 * HOUR,
+  dateMs: OBSERVED - 2 * HOUR_MS,
   typeId: 34,
   locationId: 60003760,
   unitPrice: 5.5,
@@ -48,7 +48,7 @@ const sale = {
 function esiSale(overrides: Partial<WalletTransaction> = {}): WalletTransaction {
   return {
     transaction_id: 1,
-    date: new Date(OBSERVED - 2 * HOUR).toISOString(),
+    date: new Date(OBSERVED - 2 * HOUR_MS).toISOString(),
     location_id: 60003760,
     type_id: 34,
     unit_price: 5.5,
@@ -83,7 +83,7 @@ describe('planFillSettlements', () => {
   it('re-dates a row to the sale once the wallet shows it', () => {
     const wallet = { kind: 'transactions' as const, rows: [sale], fetchedAtMs: now };
     expect(planFillSettlements([fillRow()], wallet, now)).toEqual([
-      { id: fillRow().id, firedAt: OBSERVED - 2 * HOUR },
+      { id: fillRow().id, firedAt: OBSERVED - 2 * HOUR_MS },
     ]);
   });
 
@@ -111,7 +111,7 @@ describe('planFillSettlements', () => {
   });
 
   it('settles a row older than the transactions endpoint reaches, at the noticed time', () => {
-    const later = OBSERVED + 31 * 24 * HOUR;
+    const later = OBSERVED + 31 * 24 * HOUR_MS;
     const wallet = { kind: 'transactions' as const, rows: [], fetchedAtMs: OBSERVED };
     expect(planFillSettlements([fillRow()], wallet, later)).toEqual([
       { id: fillRow().id, firedAt: OBSERVED },
@@ -134,7 +134,7 @@ describe('settleFillTimes', () => {
     await settleFillTimes(CHAR, WALLET, OBSERVED + 60_000);
 
     const row = await db.notificationFeed.get(fillRow().id);
-    expect(row?.firedAt).toBe(OBSERVED - 2 * HOUR);
+    expect(row?.firedAt).toBe(OBSERVED - 2 * HOUR_MS);
     expect(row?.fillSettledAt).toBe(OBSERVED + 60_000);
     expect(row).not.toHaveProperty('syncedAt');
     expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR, { collections: ['notificationFeed'] });

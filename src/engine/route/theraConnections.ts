@@ -9,6 +9,7 @@
  * Conditions, never verdicts (decision `20260912-172628`): a row carries the
  * exit's security, remaining life and ship size; nothing ranks a connection.
  */
+import { HOUR_MS } from '@/lib/age';
 import { classifySpace, isWormholeSystemName, SPACE_KINDS, type SpaceKind } from '@/engine/space';
 
 export type TheraHub = 'thera' | 'turnur';
@@ -76,7 +77,7 @@ export interface TheraConnectionRow extends TheraConnection {
 }
 
 /** Remaining life at or under this gets the warning styling. */
-export const LIFE_WARNING_MS = 2 * 60 * 60 * 1000;
+export const LIFE_WARNING_MS = 2 * HOUR_MS;
 
 const CLASS_SPACE: Readonly<Record<string, SpaceKind>> = {
   hs: 'highsec',

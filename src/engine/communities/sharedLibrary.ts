@@ -5,6 +5,7 @@
  * and when a published library reads as stale. Pure: the push itself is
  * `features/communities/libraryPush.ts`.
  */
+import { DAY_MS } from '@/lib/age';
 import { sharesBlueprint, type BlueprintShare } from './shareMode';
 
 /** What a Member shares of one blueprint. Never a container, hangar or item id. */
@@ -30,13 +31,13 @@ export const LIBRARY_CHUNK_SIZE = 500;
 export const LIBRARY_MAX_CHUNKS = 200;
 
 /** A library not refreshed for this long reads as stale: greyed and badged, never hidden. */
-export const LIBRARY_STALE_MS = 30 * 24 * 60 * 60 * 1000;
+export const LIBRARY_STALE_MS = 30 * DAY_MS;
 
 /**
  * An unchanged list is not rewritten, but its stamp is renewed after this
  * long so a Member who plays daily never reads stale. One tiny write a week.
  */
-export const LIBRARY_STAMP_REFRESH_MS = 7 * 24 * 60 * 60 * 1000;
+export const LIBRARY_STAMP_REFRESH_MS = 7 * DAY_MS;
 
 export interface ResolvedPlace {
   locationName: string;

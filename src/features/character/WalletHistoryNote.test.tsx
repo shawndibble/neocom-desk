@@ -1,9 +1,9 @@
+import { DAY_MS } from '@/lib/age';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import '@/i18n';
 import { WalletHistoryNote } from './WalletHistoryNote';
 
-const DAY = 86_400_000;
 const NOW = Date.UTC(2026, 9, 16, 12);
 
 describe('WalletHistoryNote', () => {
@@ -21,7 +21,7 @@ describe('WalletHistoryNote', () => {
   });
 
   it('states the reach and offers no range buttons', () => {
-    render(<WalletHistoryNote info={{ since: NOW - 30 * DAY, gaps: [], unconfirmed: false }} />);
+    render(<WalletHistoryNote info={{ since: NOW - 30 * DAY_MS, gaps: [], unconfirmed: false }} />);
     expect(
       screen.getByText(/History since 9\/16\/2026 · kept on this device only\./)
     ).toBeVisible();
@@ -32,8 +32,8 @@ describe('WalletHistoryNote', () => {
     render(
       <WalletHistoryNote
         info={{
-          since: NOW - 100 * DAY,
-          gaps: [[NOW - 60 * DAY, NOW - 30 * DAY]],
+          since: NOW - 100 * DAY_MS,
+          gaps: [[NOW - 60 * DAY_MS, NOW - 30 * DAY_MS]],
           unconfirmed: false,
         }}
       />
@@ -50,10 +50,10 @@ describe('WalletHistoryNote', () => {
     render(
       <WalletHistoryNote
         info={{
-          since: NOW - 100 * DAY,
+          since: NOW - 100 * DAY_MS,
           gaps: [
-            [NOW - 60 * DAY, NOW - 50 * DAY],
-            [NOW - 20 * DAY, NOW - 10 * DAY],
+            [NOW - 60 * DAY_MS, NOW - 50 * DAY_MS],
+            [NOW - 20 * DAY_MS, NOW - 10 * DAY_MS],
           ],
           unconfirmed: false,
         }}

@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import type { FindJumpRouteOptions, JumpGraph } from './jumpRoute';
 import type { AnsiblexGate } from './ansiblex';
@@ -63,7 +64,6 @@ const GRAPH: JumpGraph = new Map([
 ]);
 
 const NOW = 1_800_000_000_000;
-const HOUR = 3_600_000;
 
 function hole(overrides: Partial<TheraConnection> & Pick<TheraConnection, 'id'>): TheraConnection {
   return {
@@ -76,7 +76,7 @@ function hole(overrides: Partial<TheraConnection> & Pick<TheraConnection, 'id'>)
     exitRegionName: null,
     wormholeType: null,
     maxShipSize: 'large',
-    expiresAt: NOW + 10 * HOUR,
+    expiresAt: NOW + 10 * HOUR_MS,
     ...overrides,
   };
 }
@@ -397,7 +397,7 @@ describe('assembleRouteSafety', () => {
   });
 
   it('reads a pinned hole the filters allow as the qualifying one, matched by id', () => {
-    const relisted = { ...VIA_ENTRY, expiresAt: NOW + 20 * HOUR };
+    const relisted = { ...VIA_ENTRY, expiresAt: NOW + 20 * HOUR_MS };
     const state = route(
       plan({ holes: THERA_HOLES, listed: [relisted, VIA_EXIT], pins: ['1'] }).state
     );

@@ -1,3 +1,4 @@
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -55,8 +56,6 @@ const mocked = { ...vi.mocked(boardData), ...vi.mocked(corpMembers), ...vi.mocke
 const CHARACTER_ID = 42;
 const CORPORATION_ID = 98000001;
 const NOW = Date.parse('2026-09-03T12:00:00Z');
-const HOUR = 3_600_000;
-const DAY = 86_400_000;
 const ago = (ms: number) => new Date(NOW - ms).toISOString();
 
 function accessOf(state: CorpAccessState, capabilities: Partial<CorpCapabilities>): CorpAccess {
@@ -84,7 +83,7 @@ function cached<T>(data: T): StatusResult<T> {
 function savedCopy<T>(data: T): StatusResult<T> {
   const result = cached(data).cached!;
   return {
-    cached: { ...result, fromCache: true, fetchedAt: new Date(NOW - HOUR) },
+    cached: { ...result, fromCache: true, fetchedAt: new Date(NOW - HOUR_MS) },
     needsReauth: false,
   };
 }
@@ -93,9 +92,9 @@ function tracking(
   overrides: Partial<CorporationMemberTracking> & { character_id: number }
 ): CorporationMemberTracking {
   return {
-    logon_date: ago(2 * HOUR),
-    logoff_date: ago(HOUR),
-    start_date: ago(400 * DAY),
+    logon_date: ago(2 * HOUR_MS),
+    logoff_date: ago(HOUR_MS),
+    start_date: ago(400 * DAY_MS),
     ship_type_id: 587,
     location_id: 60003760,
     ...overrides,
@@ -274,7 +273,7 @@ describe('the roster table', () => {
           logoff_date: undefined,
           ship_type_id: undefined,
           location_id: undefined,
-          start_date: ago(3 * DAY),
+          start_date: ago(3 * DAY_MS),
         }),
       ])
     );
@@ -287,8 +286,12 @@ describe('the roster table', () => {
   it('opens with the most recently seen member first, under a down arrow', async () => {
     mocked.loadCorporationMemberTracking.mockResolvedValue(
       cached([
-        tracking({ character_id: 1001, logon_date: ago(HOUR), logoff_date: ago(HOUR) }),
-        tracking({ character_id: 1002, logon_date: ago(90 * DAY), logoff_date: ago(90 * DAY) }),
+        tracking({ character_id: 1001, logon_date: ago(HOUR_MS), logoff_date: ago(HOUR_MS) }),
+        tracking({
+          character_id: 1002,
+          logon_date: ago(90 * DAY_MS),
+          logoff_date: ago(90 * DAY_MS),
+        }),
       ])
     );
     const table = await rosterTable();
@@ -321,8 +324,12 @@ describe('the roster table', () => {
   it('tones a member past the dark threshold and counts them', async () => {
     mocked.loadCorporationMemberTracking.mockResolvedValue(
       cached([
-        tracking({ character_id: 1001, logon_date: ago(HOUR), logoff_date: ago(HOUR) }),
-        tracking({ character_id: 1002, logon_date: ago(90 * DAY), logoff_date: ago(90 * DAY) }),
+        tracking({ character_id: 1001, logon_date: ago(HOUR_MS), logoff_date: ago(HOUR_MS) }),
+        tracking({
+          character_id: 1002,
+          logon_date: ago(90 * DAY_MS),
+          logoff_date: ago(90 * DAY_MS),
+        }),
       ])
     );
     const table = await rosterTable();
@@ -340,8 +347,12 @@ describe('the roster table', () => {
     const user = userEvent.setup();
     mocked.loadCorporationMemberTracking.mockResolvedValue(
       cached([
-        tracking({ character_id: 1001, logon_date: ago(HOUR), logoff_date: ago(HOUR) }),
-        tracking({ character_id: 1002, logon_date: ago(90 * DAY), logoff_date: ago(90 * DAY) }),
+        tracking({ character_id: 1001, logon_date: ago(HOUR_MS), logoff_date: ago(HOUR_MS) }),
+        tracking({
+          character_id: 1002,
+          logon_date: ago(90 * DAY_MS),
+          logoff_date: ago(90 * DAY_MS),
+        }),
       ])
     );
     const table = await rosterTable();
@@ -517,8 +528,12 @@ describe('roster search (issue #421, AC2)', () => {
   it('composes with the dark-only toggle rather than replacing it (round 55 AND-stacking)', async () => {
     mocked.loadCorporationMemberTracking.mockResolvedValue(
       cached([
-        tracking({ character_id: 1001, logon_date: ago(HOUR), logoff_date: ago(HOUR) }),
-        tracking({ character_id: 1002, logon_date: ago(90 * DAY), logoff_date: ago(90 * DAY) }),
+        tracking({ character_id: 1001, logon_date: ago(HOUR_MS), logoff_date: ago(HOUR_MS) }),
+        tracking({
+          character_id: 1002,
+          logon_date: ago(90 * DAY_MS),
+          logoff_date: ago(90 * DAY_MS),
+        }),
       ])
     );
     await rosterTable();
@@ -540,8 +555,12 @@ describe('dark-only toggle (issue #421, AC3)', () => {
   it('filters the table to members past the dark threshold when toggled on', async () => {
     mocked.loadCorporationMemberTracking.mockResolvedValue(
       cached([
-        tracking({ character_id: 1001, logon_date: ago(HOUR), logoff_date: ago(HOUR) }),
-        tracking({ character_id: 1002, logon_date: ago(90 * DAY), logoff_date: ago(90 * DAY) }),
+        tracking({ character_id: 1001, logon_date: ago(HOUR_MS), logoff_date: ago(HOUR_MS) }),
+        tracking({
+          character_id: 1002,
+          logon_date: ago(90 * DAY_MS),
+          logoff_date: ago(90 * DAY_MS),
+        }),
       ])
     );
     const table = await rosterTable();
@@ -768,8 +787,12 @@ describe('filters and sort in the URL (issue #1306)', () => {
   beforeEach(() => {
     mocked.loadCorporationMemberTracking.mockResolvedValue(
       cached([
-        tracking({ character_id: 1001, logon_date: ago(HOUR), logoff_date: ago(HOUR) }),
-        tracking({ character_id: 1002, logon_date: ago(90 * DAY), logoff_date: ago(90 * DAY) }),
+        tracking({ character_id: 1001, logon_date: ago(HOUR_MS), logoff_date: ago(HOUR_MS) }),
+        tracking({
+          character_id: 1002,
+          logon_date: ago(90 * DAY_MS),
+          logoff_date: ago(90 * DAY_MS),
+        }),
       ])
     );
   });
@@ -843,14 +866,14 @@ describe('Roles tab (#4613)', () => {
         {
           characterId: 1001,
           issuerId: 1002,
-          changedAtMs: NOW - 2 * DAY,
+          changedAtMs: NOW - 2 * DAY_MS,
           granted: ['Trader'],
           removed: [],
         },
         {
           characterId: 1002,
           issuerId: 1001,
-          changedAtMs: NOW - 40 * DAY,
+          changedAtMs: NOW - 40 * DAY_MS,
           granted: [],
           removed: ['Accountant'],
         },

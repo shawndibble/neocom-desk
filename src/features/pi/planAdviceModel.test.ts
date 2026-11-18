@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -28,7 +29,6 @@ const AQUEOUS_LIQUIDS = 2268;
 const HIGHSEC_SYSTEM = 30000142;
 const NULLSEC_SYSTEM = 30004759;
 const NOW = Date.parse('2026-10-01T00:00:00Z');
-const HOUR = 3_600_000;
 
 const ECU = 2848;
 const LAUNCHPAD = 2256;
@@ -69,8 +69,8 @@ function ecuPin(
     type_id: ECU,
     latitude: 0.1 * pinId,
     longitude: 0.2,
-    install_time: new Date(NOW - 2 * HOUR).toISOString(),
-    expiry_time: new Date(NOW + expiresInHours * HOUR).toISOString(),
+    install_time: new Date(NOW - 2 * HOUR_MS).toISOString(),
+    expiry_time: new Date(NOW + expiresInHours * HOUR_MS).toISOString(),
     extractor_details: {
       heads: Array.from({ length: heads }, (_, i) => ({ head_id: i, latitude: 0, longitude: 0 })),
       product_type_id: product,

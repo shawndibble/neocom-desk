@@ -1,10 +1,9 @@
+import { DAY_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import type { KillRecord } from './killActivity';
 import { needsDangerRatio, needsLossHistory, threatVerdict } from './threatVerdict';
 
 const NOW = Date.parse('2026-10-08T12:00:00Z');
-const HOUR = 3_600_000;
-const DAY = 24 * HOUR;
 
 function kill(
   agoMs: number,
@@ -23,12 +22,12 @@ function kill(
 
 /** `count` kills, one per day starting `startDays` ago. */
 function kills(count: number, startDays = 1, space: KillRecord['space'] = 'nullsec'): KillRecord[] {
-  return Array.from({ length: count }, (_, i) => kill((startDays + i) * DAY, space));
+  return Array.from({ length: count }, (_, i) => kill((startDays + i) * DAY_MS, space));
 }
 
 describe('threatVerdict', () => {
   it('is inactive with no kill in the last 90 days, whatever the record says', () => {
-    const verdict = threatVerdict({ kills: [kill(91 * DAY)], dangerRatio: 80, nowMs: NOW });
+    const verdict = threatVerdict({ kills: [kill(91 * DAY_MS)], dangerRatio: 80, nowMs: NOW });
     expect(verdict.level).toBe('inactive');
     expect(verdict.recentKills).toBe(0);
   });
@@ -38,7 +37,7 @@ describe('threatVerdict', () => {
   });
 
   it('counts a kill exactly 90 days old as recent', () => {
-    expect(threatVerdict({ kills: [kill(90 * DAY)], dangerRatio: null, nowMs: NOW }).level).toBe(
+    expect(threatVerdict({ kills: [kill(90 * DAY_MS)], dangerRatio: null, nowMs: NOW }).level).toBe(
       'low'
     );
   });
@@ -87,39 +86,39 @@ describe('threatVerdict', () => {
 
   it('reports the newest kill, any age', () => {
     const verdict = threatVerdict({
-      kills: [kill(3 * DAY), kill(100 * DAY)],
+      kills: [kill(3 * DAY_MS), kill(100 * DAY_MS)],
       dangerRatio: null,
       nowMs: NOW,
     });
-    expect(verdict.lastKillMs).toBe(NOW - 3 * DAY);
+    expect(verdict.lastKillMs).toBe(NOW - 3 * DAY_MS);
     expect(
-      threatVerdict({ kills: [kill(100 * DAY)], dangerRatio: null, nowMs: NOW }).lastKillMs
-    ).toBe(NOW - 100 * DAY);
+      threatVerdict({ kills: [kill(100 * DAY_MS)], dangerRatio: null, nowMs: NOW }).lastKillMs
+    ).toBe(NOW - 100 * DAY_MS);
     expect(threatVerdict({ kills: [], dangerRatio: null, nowMs: NOW }).lastKillMs).toBeNull();
   });
 
   it('names the kind of space most recent kills happened in', () => {
-    const list = [...kills(2, 1, 'lowsec'), ...kills(4, 5, 'nullsec'), kill(DAY, null)];
+    const list = [...kills(2, 1, 'lowsec'), ...kills(4, 5, 'nullsec'), kill(DAY_MS, null)];
     expect(threatVerdict({ kills: list, dangerRatio: null, nowMs: NOW }).mainSpace).toBe('nullsec');
   });
 
   it('has no main space when no recent kill says where', () => {
     expect(
-      threatVerdict({ kills: [kill(DAY, null)], dangerRatio: null, nowMs: NOW }).mainSpace
+      threatVerdict({ kills: [kill(DAY_MS, null)], dangerRatio: null, nowMs: NOW }).mainSpace
     ).toBe(null);
   });
 
   it('breaks a space tie toward the more dangerous space', () => {
-    const list = [kill(DAY, 'highsec'), kill(2 * DAY, 'lowsec')];
+    const list = [kill(DAY_MS, 'highsec'), kill(2 * DAY_MS, 'lowsec')];
     expect(threatVerdict({ kills: list, dangerRatio: null, nowMs: NOW }).mainSpace).toBe('lowsec');
   });
 
   it('measures the share of recent kills that were capsules', () => {
     const list = [
-      kill(DAY, 'nullsec', { victimShipTypeId: 670 }),
-      kill(2 * DAY, 'nullsec', { victimShipTypeId: 33328 }),
-      kill(3 * DAY, 'nullsec', { victimShipTypeId: 587 }),
-      kill(4 * DAY, 'nullsec', { victimShipTypeId: null }),
+      kill(DAY_MS, 'nullsec', { victimShipTypeId: 670 }),
+      kill(2 * DAY_MS, 'nullsec', { victimShipTypeId: 33328 }),
+      kill(3 * DAY_MS, 'nullsec', { victimShipTypeId: 587 }),
+      kill(4 * DAY_MS, 'nullsec', { victimShipTypeId: null }),
     ];
     expect(threatVerdict({ kills: list, dangerRatio: null, nowMs: NOW }).podShare).toBe(0.5);
   });
@@ -147,8 +146,8 @@ describe('threatVerdict alsoSpaces', () => {
       ...kills(6, 1, 'nullsec'),
       ...kills(2, 10, 'highsec'),
       ...kills(2, 20, 'lowsec'),
-      kill(30 * DAY, null),
-      kill(100 * DAY, 'wormhole'),
+      kill(30 * DAY_MS, null),
+      kill(100 * DAY_MS, 'wormhole'),
     ];
     expect(threatVerdict({ kills: list, dangerRatio: null, nowMs: NOW }).alsoSpaces).toEqual([
       'lowsec',
@@ -158,7 +157,7 @@ describe('threatVerdict alsoSpaces', () => {
 
   it('has none when nothing says where', () => {
     expect(
-      threatVerdict({ kills: [kill(DAY, null)], dangerRatio: null, nowMs: NOW }).alsoSpaces
+      threatVerdict({ kills: [kill(DAY_MS, null)], dangerRatio: null, nowMs: NOW }).alsoSpaces
     ).toEqual([]);
   });
 });
@@ -214,31 +213,35 @@ describe('threatVerdict recent losses', () => {
     const verdict = threatVerdict({
       kills: none,
       dangerRatio: null,
-      lossTimesMs: [NOW - 3 * DAY, NOW - 10 * DAY],
+      lossTimesMs: [NOW - 3 * DAY_MS, NOW - 10 * DAY_MS],
       nowMs: NOW,
     });
     expect(verdict.level).toBe('low');
     expect(verdict.recentKills).toBe(0);
     expect(verdict.recentLosses).toBe(2);
-    expect(verdict.lastLossMs).toBe(NOW - 3 * DAY);
+    expect(verdict.lastLossMs).toBe(NOW - 3 * DAY_MS);
   });
 
   it('stays inactive when the losses are older than the window', () => {
     const verdict = threatVerdict({
       kills: none,
       dangerRatio: null,
-      lossTimesMs: [NOW - 100 * DAY],
+      lossTimesMs: [NOW - 100 * DAY_MS],
       nowMs: NOW,
     });
     expect(verdict.level).toBe('inactive');
     expect(verdict.recentLosses).toBe(0);
-    expect(verdict.lastLossMs).toBe(NOW - 100 * DAY);
+    expect(verdict.lastLossMs).toBe(NOW - 100 * DAY_MS);
   });
 
   it('counts a loss exactly 90 days old as recent', () => {
     expect(
-      threatVerdict({ kills: none, dangerRatio: null, lossTimesMs: [NOW - 90 * DAY], nowMs: NOW })
-        .level
+      threatVerdict({
+        kills: none,
+        dangerRatio: null,
+        lossTimesMs: [NOW - 90 * DAY_MS],
+        nowMs: NOW,
+      }).level
     ).toBe('low');
   });
 
@@ -258,7 +261,7 @@ describe('threatVerdict recent losses', () => {
     const verdict = threatVerdict({
       kills: kills(4),
       dangerRatio: null,
-      lossTimesMs: [NOW - DAY],
+      lossTimesMs: [NOW - DAY_MS],
       nowMs: NOW,
     });
     expect(verdict.level).toBe('active');
@@ -269,8 +272,8 @@ describe('threatVerdict recent losses', () => {
 describe('needsLossHistory', () => {
   it('is true only when there is no kill in the window to show activity already', () => {
     expect(needsLossHistory([], NOW)).toBe(true);
-    expect(needsLossHistory([kill(100 * DAY)], NOW)).toBe(true);
-    expect(needsLossHistory([kill(2 * DAY)], NOW)).toBe(false);
+    expect(needsLossHistory([kill(100 * DAY_MS)], NOW)).toBe(true);
+    expect(needsLossHistory([kill(2 * DAY_MS)], NOW)).toBe(false);
   });
 });
 
@@ -278,6 +281,6 @@ describe('needsDangerRatio', () => {
   it('is true only when the recent kill count could reach dangerous', () => {
     expect(needsDangerRatio(kills(9), NOW)).toBe(false);
     expect(needsDangerRatio(kills(10), NOW)).toBe(true);
-    expect(needsDangerRatio([...kills(9), kill(95 * DAY)], NOW)).toBe(false);
+    expect(needsDangerRatio([...kills(9), kill(95 * DAY_MS)], NOW)).toBe(false);
   });
 });

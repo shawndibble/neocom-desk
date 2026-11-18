@@ -1,10 +1,10 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import { resolveWidget } from '../state';
 import { buildView, feedsFor } from './models';
 import type { BuildContext, FeedState, Feeds } from './types';
 
 const NOW = Date.parse('2026-10-11T12:00:00Z');
-const HOUR = 3_600_000;
 
 const t = (key: string, options?: Record<string, unknown>) =>
   options ? `${key}${JSON.stringify(options)}` : key;
@@ -105,7 +105,7 @@ describe('wallet', () => {
       wallet: ok({
         result: {
           data: 3_820_000_000,
-          fetchedAt: new Date(NOW - HOUR),
+          fetchedAt: new Date(NOW - HOUR_MS),
           fromCache: true,
           truncated: false,
         },
@@ -120,7 +120,7 @@ describe('wallet', () => {
     expect(view.table).toBeUndefined();
     expect(view.number.secondary).toBeUndefined();
     expect(view.chart).toBeUndefined();
-    expect(view.fetchedAt?.getTime()).toBe(NOW - HOUR);
+    expect(view.fetchedAt?.getTime()).toBe(NOW - HOUR_MS);
     expect(view.fromCache).toBe(true);
     expect(view.to).toBe('/wallet');
   });
@@ -160,7 +160,7 @@ describe('mail', () => {
   const mail = (unread: number) =>
     ok({
       unread,
-      recent: [{ mailId: 1, subject: 'Hello', from: 'Aria', atMs: NOW - 2 * HOUR }],
+      recent: [{ mailId: 1, subject: 'Hello', from: 'Aria', atMs: NOW - 2 * HOUR_MS }],
       needsReauth: false,
       fetchedAt: new Date(NOW),
     });
@@ -208,10 +208,15 @@ describe('moon extractions widget with a Feeder from a Corp Tax Book (#6116)', (
     const feeds: Feeds = {
       moonChunks: ok({
         chunks: [
-          { id: '7001', subject: 'Efa - Tatara [ABCD]', detail: 'arrival', deadlineMs: NOW + HOUR },
+          {
+            id: '7001',
+            subject: 'Efa - Tatara [ABCD]',
+            detail: 'arrival',
+            deadlineMs: NOW + HOUR_MS,
+          },
         ],
         needsReauth: false,
-        fetchedAt: new Date(NOW - HOUR),
+        fetchedAt: new Date(NOW - HOUR_MS),
         loadedAt: NOW,
         fromBook: true,
       }),
@@ -229,7 +234,7 @@ describe('structures row link', () => {
         {
           structureId: 1,
           name: 'Efa - Helios Prime',
-          fuelExpiresMs: NOW + 20 * 24 * HOUR,
+          fuelExpiresMs: NOW + 20 * 24 * HOUR_MS,
           state: 'shield_vulnerable',
           stateTimerEndMs: null,
           unanchorsAtMs: null,
@@ -309,13 +314,13 @@ describe('training', () => {
     });
 
   it('counts down the skill training now and offers its finish as a deadline', () => {
-    const finish = NOW + 4 * HOUR;
+    const finish = NOW + 4 * HOUR_MS;
     const queue = [
       {
         skill_id: 3300,
         queue_position: 0,
         finished_level: 5,
-        start_date: new Date(NOW - HOUR).toISOString(),
+        start_date: new Date(NOW - HOUR_MS).toISOString(),
         finish_date: new Date(finish).toISOString(),
       },
     ];
@@ -330,20 +335,20 @@ describe('training', () => {
   });
 
   describe('accelerator', () => {
-    const finish = NOW + 4 * HOUR;
+    const finish = NOW + 4 * HOUR_MS;
     const queue = [
       {
         skill_id: 3300,
         queue_position: 0,
         finished_level: 5,
-        start_date: new Date(NOW - HOUR).toISOString(),
+        start_date: new Date(NOW - HOUR_MS).toISOString(),
         finish_date: new Date(finish).toISOString(),
       },
     ];
     const accelerators = (expiresAt: number) => ({
       accelerator: ok(new Map([[91, { bonus: 12, expiresAt }]])),
     });
-    const expiresAt = NOW + 20 * HOUR;
+    const expiresAt = NOW + 20 * HOUR_MS;
 
     it('places the accelerator among the skills by time left and offers its expiry as a deadline by default', () => {
       const view = buildView(
@@ -367,7 +372,7 @@ describe('training', () => {
     it('leads with an accelerator that runs out before the skill finishes', () => {
       const view = buildView(
         'training',
-        { skills: skills(queue) as never, ...accelerators(NOW + HOUR) },
+        { skills: skills(queue) as never, ...accelerators(NOW + HOUR_MS) },
         ctx()
       );
       expect(view.table?.rows[0]?.key).toBe('accelerator');
@@ -387,7 +392,7 @@ describe('training', () => {
     it("ignores an accelerator that has run out, and another Character's", () => {
       const feeds = { skills: skills(queue) as never };
       expect(
-        buildView('training', { ...feeds, ...accelerators(NOW - HOUR) }, ctx()).deadlines
+        buildView('training', { ...feeds, ...accelerators(NOW - HOUR_MS) }, ctx()).deadlines
       ).toHaveLength(1);
       expect(
         buildView(
@@ -435,7 +440,7 @@ describe('comingUp', () => {
       {
         event_id: 1,
         title: 'Fleet op',
-        event_date: new Date(NOW + 2 * HOUR).toISOString(),
+        event_date: new Date(NOW + 2 * HOUR_MS).toISOString(),
         event_response: 'accepted',
         importance: 1,
       },
@@ -446,7 +451,7 @@ describe('comingUp', () => {
     const view = buildView('comingUp', feeds, ctx());
     expect(view.number.value).toBe('2h 0m');
     expect(view.number.secondary?.text).toBe('Fleet op');
-    expect(view.deadlines[0].at).toBe(NOW + 2 * HOUR);
+    expect(view.deadlines[0].at).toBe(NOW + 2 * HOUR_MS);
   });
 
   it('lists unanswered events only when the widget asks for all events', () => {
@@ -454,7 +459,7 @@ describe('comingUp', () => {
       {
         event_id: 1,
         title: 'Mass op',
-        event_date: new Date(NOW + 2 * HOUR).toISOString(),
+        event_date: new Date(NOW + 2 * HOUR_MS).toISOString(),
         event_response: 'not_responded',
         importance: 1,
       },
@@ -473,7 +478,7 @@ describe('comingUp', () => {
       {
         event_id: 42,
         title: 'Fleet op',
-        event_date: new Date(NOW + 2 * HOUR).toISOString(),
+        event_date: new Date(NOW + 2 * HOUR_MS).toISOString(),
         event_response: 'accepted',
         importance: 1,
       },
@@ -548,7 +553,7 @@ describe('industry', () => {
         runs: 2,
         blueprint_type_id: 5,
         product_type_id: 6,
-        end_date: new Date(NOW - HOUR).toISOString(),
+        end_date: new Date(NOW - HOUR_MS).toISOString(),
         status: 'active',
       },
       {
@@ -557,7 +562,7 @@ describe('industry', () => {
         runs: 1,
         blueprint_type_id: 5,
         product_type_id: 6,
-        end_date: new Date(NOW + 5 * HOUR).toISOString(),
+        end_date: new Date(NOW + 5 * HOUR_MS).toISOString(),
         status: 'active',
       },
     ];
@@ -578,7 +583,7 @@ describe('industry', () => {
       '/industry?highlight=2',
     ]);
     // Only the running job is a clock still ahead.
-    expect(view.deadlines.map((d) => d.at)).toEqual([NOW + 5 * HOUR]);
+    expect(view.deadlines.map((d) => d.at)).toEqual([NOW + 5 * HOUR_MS]);
   });
 });
 
@@ -630,7 +635,7 @@ describe('the Number view says one new thing', () => {
     const feeds: Feeds = {
       mail: ok({
         unread: 3,
-        recent: [{ mailId: 1, subject: 'Hi', from: 'Aria', atMs: NOW - 2 * HOUR }],
+        recent: [{ mailId: 1, subject: 'Hi', from: 'Aria', atMs: NOW - 2 * HOUR_MS }],
         needsReauth: false,
         fetchedAt: new Date(NOW),
       }),
@@ -774,8 +779,8 @@ describe('the Number view says one new thing', () => {
 
   it('industry gives the next job to finish, not the ready count again', () => {
     const jobs = [
-      { job_id: 1, activity_id: 1, runs: 2, end_date: new Date(NOW - HOUR).toISOString() },
-      { job_id: 2, activity_id: 1, runs: 6, end_date: new Date(NOW + 5 * HOUR).toISOString() },
+      { job_id: 1, activity_id: 1, runs: 2, end_date: new Date(NOW - HOUR_MS).toISOString() },
+      { job_id: 2, activity_id: 1, runs: 6, end_date: new Date(NOW + 5 * HOUR_MS).toISOString() },
     ];
     const feeds: Feeds = {
       industry: ok({
@@ -817,10 +822,10 @@ describe('mail table', () => {
   it('tables the newest mail, read or not, with the unread ones marked', () => {
     const data = {
       unread: 1,
-      recent: [{ mailId: 1, subject: 'New', from: 'Aria', atMs: NOW - HOUR, unread: true }],
+      recent: [{ mailId: 1, subject: 'New', from: 'Aria', atMs: NOW - HOUR_MS, unread: true }],
       inbox: [
-        { mailId: 1, subject: 'New', from: 'Aria', atMs: NOW - HOUR, unread: true },
-        { mailId: 2, subject: 'Old', from: null, atMs: NOW - 5 * HOUR, unread: false },
+        { mailId: 1, subject: 'New', from: 'Aria', atMs: NOW - HOUR_MS, unread: true },
+        { mailId: 2, subject: 'Old', from: null, atMs: NOW - 5 * HOUR_MS, unread: false },
       ],
       needsReauth: false,
       fetchedAt: new Date(NOW),
@@ -837,7 +842,7 @@ describe('mail table', () => {
     const data = {
       unread: 1,
       recent: [],
-      inbox: [{ mailId: 7, subject: 'New', from: 'Aria', atMs: NOW - HOUR, unread: true }],
+      inbox: [{ mailId: 7, subject: 'New', from: 'Aria', atMs: NOW - HOUR_MS, unread: true }],
       needsReauth: false,
       fetchedAt: new Date(NOW),
     };
@@ -849,7 +854,7 @@ describe('mail table', () => {
   it('falls back to the unread mail when the read has no inbox', () => {
     const data = {
       unread: 1,
-      recent: [{ mailId: 1, subject: 'New', from: 'Aria', atMs: NOW - HOUR }],
+      recent: [{ mailId: 1, subject: 'New', from: 'Aria', atMs: NOW - HOUR_MS }],
       needsReauth: false,
       fetchedAt: new Date(NOW),
     };
@@ -880,7 +885,7 @@ describe('contracts table', () => {
     contractId: 1,
     kind: 'courier' as const,
     state: 'in_progress' as const,
-    atMs: NOW + 3 * HOUR,
+    atMs: NOW + 3 * HOUR_MS,
     overdue: false,
     title: null,
     reward: 2_000_000,
@@ -923,7 +928,7 @@ describe('contracts table', () => {
           data({
             inProgress: 0,
             outstanding: 1,
-            rows: [courier({ state: 'outstanding', atMs: NOW + 3 * HOUR })],
+            rows: [courier({ state: 'outstanding', atMs: NOW + 3 * HOUR_MS })],
           })
         ) as never,
       },
@@ -942,7 +947,7 @@ describe('contracts table', () => {
   });
 
   it('says overdue when the soonest courier is past its deliver-by', () => {
-    const soonest = courier({ atMs: NOW - HOUR, overdue: true });
+    const soonest = courier({ atMs: NOW - HOUR_MS, overdue: true });
     const feeds = { contracts: ok(data({ overdue: 1, soonest, items: [soonest] })) };
     const view = buildView('contracts', feeds as never, ctx());
     expect(view.number.tone).toBe('critical');
@@ -951,12 +956,12 @@ describe('contracts table', () => {
 
   it('tables each contract: route, expiry, status, reward and collateral', () => {
     const hauls = courier({ contractId: 1 });
-    const late = courier({ contractId: 2, atMs: NOW - HOUR, overdue: true, reward: null });
+    const late = courier({ contractId: 2, atMs: NOW - HOUR_MS, overdue: true, reward: null });
     const listing = courier({
       contractId: 3,
       kind: 'listing',
       state: 'outstanding',
-      atMs: NOW + 20 * HOUR,
+      atMs: NOW + 20 * HOUR_MS,
       title: 'Spare hulls',
       reward: null,
       collateral: null,
@@ -1013,8 +1018,8 @@ describe('training table', () => {
         skill_id: 3300,
         queue_position: 0,
         finished_level: 5,
-        start_date: new Date(NOW - HOUR).toISOString(),
-        finish_date: new Date(NOW + 3 * HOUR).toISOString(),
+        start_date: new Date(NOW - HOUR_MS).toISOString(),
+        finish_date: new Date(NOW + 3 * HOUR_MS).toISOString(),
         training_start_sp: 100_000,
         level_end_sp: 260_000,
       },
@@ -1022,7 +1027,7 @@ describe('training table', () => {
         skill_id: 3300,
         queue_position: 1,
         finished_level: 5,
-        finish_date: new Date(NOW + 5 * HOUR).toISOString(),
+        finish_date: new Date(NOW + 5 * HOUR_MS).toISOString(),
       },
     ];
     const view = buildView('training', { skills: skills(queue) as never }, ctx());
@@ -1100,7 +1105,7 @@ describe('comingUp table', () => {
     const ev = (id: number, hours: number, response: string) => ({
       event_id: id,
       title: `Event ${id}`,
-      event_date: new Date(NOW + hours * HOUR).toISOString(),
+      event_date: new Date(NOW + hours * HOUR_MS).toISOString(),
       event_response: response,
       importance: 1,
     });
@@ -1178,7 +1183,7 @@ describe('a lapsed grant over saved data', () => {
       price: 5,
       volume_remain: 10,
       volume_total: 10,
-      issued: new Date(NOW - HOUR).toISOString(),
+      issued: new Date(NOW - HOUR_MS).toISOString(),
       duration: 90,
       range: 'station',
     };
@@ -1252,7 +1257,7 @@ describe('orders widget', () => {
     price: 5,
     volume_remain: 10,
     volume_total: 10,
-    issued: new Date(NOW - HOUR).toISOString(),
+    issued: new Date(NOW - HOUR_MS).toISOString(),
     duration,
     range: 'station',
   });

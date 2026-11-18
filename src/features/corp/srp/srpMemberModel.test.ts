@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import type { HullRule } from '../srpTypes';
 import {
@@ -14,7 +15,6 @@ import {
   type LostLoss,
 } from './srpMemberModel';
 
-const DAY = 86_400_000;
 const NOW = Date.parse('2026-10-23T14:00:00Z');
 
 const claim = (over: Partial<MemberClaim> = {}): MemberClaim => ({
@@ -23,8 +23,8 @@ const claim = (over: Partial<MemberClaim> = {}): MemberClaim => ({
   hullTypeId: 100,
   classId: 10,
   solarSystemId: 30000142,
-  killedAt: NOW - DAY,
-  filedAt: NOW - DAY,
+  killedAt: NOW - DAY_MS,
+  filedAt: NOW - DAY_MS,
   state: 'pending',
   amount: null,
   rejectionReason: null,
@@ -37,7 +37,7 @@ const loss = (over: Partial<LostLoss> = {}): LostLoss => ({
   hullTypeId: 100,
   classId: 10,
   solarSystemId: 30000142,
-  killedAt: NOW - DAY,
+  killedAt: NOW - DAY_MS,
   ...over,
 });
 const ctx = (over: Partial<Parameters<typeof lostRowKind>[1]> = {}) => ({
@@ -57,7 +57,7 @@ describe('lostRowKind', () => {
     expect(lostRowKind(loss(), ctx({ claims }))).toBe('claimed');
   });
   it('is old past the corp window, and a longer window reopens it', () => {
-    const l = loss({ killedAt: NOW - 31 * DAY });
+    const l = loss({ killedAt: NOW - 31 * DAY_MS });
     expect(lostRowKind(l, ctx())).toBe('old');
     expect(lostRowKind(l, ctx({ windowDays: 60 }))).toBe('open');
   });
@@ -72,7 +72,7 @@ describe('lostRowKind', () => {
     expect(lostRowKind(loss(), ctx({ hullRules: [rule] }))).toBe('open');
   });
   it('claimed wins over old and notCovered', () => {
-    const l = loss({ killedAt: NOW - 90 * DAY });
+    const l = loss({ killedAt: NOW - 90 * DAY_MS });
     const rule: HullRule = { scope: 'hull', id: 100, kind: 'not-covered' };
     expect(lostRowKind(l, ctx({ claims: [claim()], hullRules: [rule] }))).toBe('claimed');
   });

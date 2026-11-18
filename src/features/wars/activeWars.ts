@@ -7,24 +7,25 @@
  * Never rejects: a failed read or a stale or missing list all come back as
  * "no wars", so the banner stays quiet rather than wrong.
  */
+import { DAY_MS, MINUTE_MS } from '@/lib/age';
 import { parseStoredWars, type StoredWar } from '@/engine/wars';
 
 export const ACTIVE_WARS_R2_URL = 'https://data.neocomdesk.com/active-wars/wars.json';
 const R2_READ_TIMEOUT_MS = 20_000;
 /** The sweep runs every 6 hours: reading more often only costs reads. */
-const ACTIVE_WARS_REREAD_MS = 55 * 60 * 1000;
+const ACTIVE_WARS_REREAD_MS = 55 * MINUTE_MS;
 /**
  * How often a mounted page asks. Shorter than the re-read window so a tick
  * never lands just inside it and waits another hour, and a failed read is
  * retried within minutes; most ticks are answered from the last read.
  */
-export const ACTIVE_WARS_POLL_MS = 15 * 60 * 1000;
+export const ACTIVE_WARS_POLL_MS = 15 * MINUTE_MS;
 /**
  * A list this old means the sweep has stopped, and an ended war would still be
  * listed (an early end moves `finished`, which only a sweep sees): hide it.
  * Four missed runs.
  */
-export const ACTIVE_WARS_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
+export const ACTIVE_WARS_STALE_AFTER_MS = DAY_MS;
 
 const NONE: readonly StoredWar[] = [];
 

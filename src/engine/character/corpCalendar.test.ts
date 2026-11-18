@@ -1,11 +1,10 @@
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import { buildCorpBoard, mergeCorpBoards, type CorpBoardSources } from '../corp/board';
 import { buildCharacterBoard } from './board';
 import { toCorpCalendarSources } from './corpCalendar';
 import { countsByDay, filterByCorporation } from './deadlines';
 
-const HOUR = 3_600_000;
-const DAY = 24 * HOUR;
 // 23:30 EVE time: a day later than the local day anywhere west of Greenwich.
 const NOW = Date.UTC(2026, 10, 12, 23, 30);
 
@@ -17,7 +16,7 @@ const LABELS = new Map([
 function corpBoard(sources: Omit<CorpBoardSources, 'nowMs' | 'staleWindowMs'>) {
   return buildCorpBoard({
     nowMs: NOW,
-    staleWindowMs: HOUR,
+    staleWindowMs: HOUR_MS,
     includeRunningJobs: true,
     ...sources,
   });
@@ -40,14 +39,14 @@ function twoCorporations() {
       items: corpBoard({
         structures: [
           {
-            ...structure(100, 'Jita - Main Fort', NOW + 2 * DAY),
+            ...structure(100, 'Jita - Main Fort', NOW + 2 * DAY_MS),
             state: 'armor_reinforce',
-            stateTimerEndMs: NOW + 3 * DAY,
+            stateTimerEndMs: NOW + 3 * DAY_MS,
           },
         ],
         jobs: [
-          { jobId: 7, subject: 'Rifter', endMs: NOW + 4 * DAY, status: 'active', typeId: 587 },
-          { jobId: 8, subject: 'Slasher', endMs: NOW - HOUR, status: 'active', typeId: 585 },
+          { jobId: 7, subject: 'Rifter', endMs: NOW + 4 * DAY_MS, status: 'active', typeId: 587 },
+          { jobId: 8, subject: 'Slasher', endMs: NOW - HOUR_MS, status: 'active', typeId: 585 },
         ],
       }),
     },
@@ -55,13 +54,13 @@ function twoCorporations() {
       corporationId: 2,
       items: corpBoard({
         // The same structure id in a second corporation's read must not collide.
-        structures: [structure(100, 'Perimeter - Holding Raitaru', NOW + 5 * DAY)],
+        structures: [structure(100, 'Perimeter - Holding Raitaru', NOW + 5 * DAY_MS)],
         extractions: [
           {
             structureId: 200,
             subject: 'Holding Athanor',
-            chunkArrivalMs: NOW + 6 * DAY,
-            naturalDecayMs: NOW + 9 * DAY,
+            chunkArrivalMs: NOW + 6 * DAY_MS,
+            naturalDecayMs: NOW + 9 * DAY_MS,
           },
         ],
       }),
@@ -78,14 +77,14 @@ describe('toCorpCalendarSources', () => {
         id: '1:fuel:100',
         subject: 'Jita - Main Fort',
         detail: '',
-        deadlineMs: NOW + 2 * DAY,
+        deadlineMs: NOW + 2 * DAY_MS,
         corporation: { id: 1, name: 'Main Corp', ticker: 'MAIN' },
       },
       {
         id: '2:fuel:100',
         subject: 'Perimeter - Holding Raitaru',
         detail: '',
-        deadlineMs: NOW + 5 * DAY,
+        deadlineMs: NOW + 5 * DAY_MS,
         corporation: { id: 2, name: 'Holding Two', ticker: 'HOLD2' },
       },
     ]);
@@ -94,7 +93,7 @@ describe('toCorpCalendarSources', () => {
         id: '1:state:100',
         subject: 'Jita - Main Fort',
         detail: 'armor_reinforce',
-        deadlineMs: NOW + 3 * DAY,
+        deadlineMs: NOW + 3 * DAY_MS,
         corporation: { id: 1, name: 'Main Corp', ticker: 'MAIN' },
       },
     ]);
@@ -103,7 +102,7 @@ describe('toCorpCalendarSources', () => {
         id: '2:moon:200',
         subject: 'Holding Athanor',
         detail: 'arrival',
-        deadlineMs: NOW + 6 * DAY,
+        deadlineMs: NOW + 6 * DAY_MS,
         corporation: { id: 2, name: 'Holding Two', ticker: 'HOLD2' },
       },
     ]);
@@ -114,8 +113,8 @@ describe('toCorpCalendarSources', () => {
     expect(
       corpJobs.map(({ subject, detail, deadlineMs }) => ({ subject, detail, deadlineMs }))
     ).toEqual([
-      { subject: 'Slasher', detail: 'ready', deadlineMs: NOW - HOUR },
-      { subject: 'Rifter', detail: 'active', deadlineMs: NOW + 4 * DAY },
+      { subject: 'Slasher', detail: 'ready', deadlineMs: NOW - HOUR_MS },
+      { subject: 'Rifter', detail: 'active', deadlineMs: NOW + 4 * DAY_MS },
     ]);
   });
 
@@ -143,9 +142,15 @@ describe('toCorpCalendarSources', () => {
         corporationId: 1,
         items: corpBoard({
           sovereignty: [
-            { id: 'hub:9', name: 'Hub', kind: 'hub', startMs: NOW + DAY, endMs: NOW + 2 * DAY },
+            {
+              id: 'hub:9',
+              name: 'Hub',
+              kind: 'hub',
+              startMs: NOW + DAY_MS,
+              endMs: NOW + 2 * DAY_MS,
+            },
           ],
-          hubFuel: [{ id: 'hub:9', name: 'Hub', runsOutMs: NOW + DAY }],
+          hubFuel: [{ id: 'hub:9', name: 'Hub', runsOutMs: NOW + DAY_MS }],
         }),
       },
     ]);
@@ -169,10 +174,10 @@ describe('corp events on the Calendar board', () => {
   });
 
   it.each([
-    ['structureFuel', NOW + 2 * DAY],
-    ['structureTimer', NOW + 3 * DAY],
-    ['corpJob', NOW + 4 * DAY],
-    ['moonChunk', NOW + 6 * DAY],
+    ['structureFuel', NOW + 2 * DAY_MS],
+    ['structureTimer', NOW + 3 * DAY_MS],
+    ['corpJob', NOW + 4 * DAY_MS],
+    ['moonChunk', NOW + 6 * DAY_MS],
   ] as const)('puts %s on its day in EVE time and in local time', (kind, deadlineMs) => {
     const at = new Date(deadlineMs);
     const eveDay = Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate());
@@ -184,7 +189,7 @@ describe('corp events on the Calendar board', () => {
 });
 
 describe('filterByCorporation', () => {
-  const personal = { id: '1', subject: 'Skill', detail: '', deadlineMs: NOW + DAY };
+  const personal = { id: '1', subject: 'Skill', detail: '', deadlineMs: NOW + DAY_MS };
   const board = buildCharacterBoard({
     nowMs: NOW,
     skillTraining: [personal],

@@ -2,6 +2,7 @@
  * The four Corp Board widgets read across every corporation (All scope, #6100): Moon
  * extractions, Corp wallet (balances), Corp industry jobs and Corp kills.
  */
+import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import type { CorporationIndustryJob } from '@/esi/endpoints';
 import type { PilotStats } from '@/lib/zkillboard';
@@ -22,8 +23,7 @@ import type { BuildContext, FeedState, TableCell } from './types';
 const t = (key: string, options?: Record<string, unknown>) =>
   options ? `${key}${JSON.stringify(options)}` : key;
 const NOW = Date.parse('2026-11-12T12:00:00Z');
-const HOUR = 3_600_000;
-const READ_AT = new Date(NOW - HOUR);
+const READ_AT = new Date(NOW - HOUR_MS);
 
 const ctx: BuildContext = {
   t,
@@ -135,8 +135,8 @@ function job(jobId: number, endInHours: number, status = 'active'): CorporationI
     facility_id: 1,
     location_id: 1,
     runs: 1,
-    start_date: new Date(NOW - 10 * HOUR).toISOString(),
-    end_date: new Date(NOW + endInHours * HOUR).toISOString(),
+    start_date: new Date(NOW - 10 * HOUR_MS).toISOString(),
+    end_date: new Date(NOW + endInHours * HOUR_MS).toISOString(),
     status,
   } as CorporationIndustryJob;
 }
@@ -260,7 +260,7 @@ const chunk = (id: string, inHours: number, corp: number) => ({
   id,
   subject: `Refinery ${id}`,
   detail: 'arrival',
-  deadlineMs: NOW + inHours * HOUR,
+  deadlineMs: NOW + inHours * HOUR_MS,
   corporation: { id: corp, ...LABELS.get(corp)! },
 });
 

@@ -18,13 +18,14 @@
  * served past {@link BOOK_CACHE_MAX_AGE_MS}, which bounds the cost of a stamp
  * the server failed to write.
  */
+import { DAY_MS } from '@/lib/age';
 import {
   BOOK_VERSION_FIELD,
   COLLECTION_VERSIONS_FIELD,
 } from '../../../../functions/src/corpTaxBookVersionKeys';
 
 /** The stamp already forces a reload on any change; the age only guards a stamp the server failed to write. */
-export const BOOK_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+export const BOOK_CACHE_MAX_AGE_MS = DAY_MS;
 
 /** The marker on `corps/{id}`. */
 export interface BookVersions {
