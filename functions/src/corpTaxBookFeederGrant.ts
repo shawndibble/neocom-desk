@@ -214,12 +214,16 @@ export function feederGrantReadsStructures(scopes: readonly string[]): boolean {
   if (scopes.some((s) => !(FEEDER_SYNC_SCOPES as readonly string[]).includes(s))) {
     fail(
       'permission-denied',
-      'Token must carry only the mining and structure scopes',
+      'Token must carry only the mining, structure and notification scopes',
       'wrong-scopes'
     );
   }
   return scopes.includes(structures);
 }
+
+/** Whether the grant also reads the holder's notifications (the ore of each chunk). */
+export const feederGrantReadsNotifications = (scopes: readonly string[]): boolean =>
+  scopes.includes('esi-characters.read_notifications.v1');
 
 /** The code Reconnect sends in place of an invite: rebind the grant of a corporation that already feeds a book. */
 export const RECONNECT_CODE = 'reconnect-existing';
@@ -389,6 +393,7 @@ export async function saveFeederGrant(
       fail('permission-denied', 'Refresh token belongs to another Character', 'token-mismatch');
     }
     const readsStructures = feederGrantReadsStructures(claims.scopes);
+    const readsNotifications = feederGrantReadsNotifications(claims.scopes);
     const feederCorp = await deps.lookupCorporation(claims.characterId);
     if (options.expectedFeederCorp !== undefined && feederCorp !== options.expectedFeederCorp) {
       fail('failed-precondition', 'That Character is in another corporation', 'wrong-corp');
@@ -431,6 +436,7 @@ export async function saveFeederGrant(
       collectorCorporationId: accepted.collectorCorporationId,
       grantedBy: callerId,
       readsStructures,
+      readsNotifications,
     };
     previousGrant = (await grantRef(deps.db, feederCorp).get()).data() as
       CorpSyncGrantDoc | undefined;

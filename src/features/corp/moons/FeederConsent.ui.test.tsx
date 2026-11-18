@@ -24,7 +24,11 @@ describe('FeederConsent', () => {
     expect(
       await screen.findByText('Brass Meridian Logistics will handle the tax on your moons.')
     ).toBeVisible();
-    expect(screen.getByText(/We also read your refineries' names and systems\./)).toBeVisible();
+    expect(
+      screen.getByText(
+        /We also read your refineries' names and systems, and the moon mining notifications/
+      )
+    ).toBeVisible();
     // The player-facing copy never uses the dev terms.
     expect(document.body.textContent).not.toMatch(/feeder|collector/i);
   });
