@@ -4003,6 +4003,7 @@
     "csvBlueprintTe": "Blueprint TE",
     "csvBlueprintSource": "Blueprint source",
     "csvBlueprintInvented": "Invented",
+    "csvBlueprintCopyOnly": "Copy-only, none owned",
     "csvBlueprintSourceStale": "Blueprint source stale",
     "csvDepthBest": "Buy-now price (ISK)",
     "csvDepthAvg": "Average fill price (ISK)",
