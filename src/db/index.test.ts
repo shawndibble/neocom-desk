@@ -226,7 +226,7 @@ describe('schema upgrade v6 -> v7', () => {
   });
 
   it('the shipped database is at its current version with v7’s index live', () => {
-    expect(db.verno).toBe(32);
+    expect(db.verno).toBe(33);
     expect(db.characters.schema.indexes.map((i) => i.name)).toContain('corporationId');
   });
 });
@@ -395,6 +395,8 @@ describe('schema upgrade v25 -> v26 (Corp Tax Book send queue)', () => {
       'corporationId',
       'batchId',
       'senderCharacterId',
+      'order',
+      'statementId',
     ]);
   });
 });
