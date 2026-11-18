@@ -4,8 +4,7 @@
  */
 import { parseRigKind } from '@/engine/industry/rigScope';
 import type { RigFit, RigKind } from '@/engine/industry/types';
-
-type Translate = (key: string, options?: Record<string, string>) => string;
+import type { Translate } from '@/lib/translate';
 
 /** One rig kind as the pilot reads it: "None", "ME II" (every product) or "Capital Ship ME II" (one rig group). */
 export function rigKindLabel(kind: RigKind, t: Translate): string {
