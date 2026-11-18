@@ -115,7 +115,6 @@ export async function loadCorpAssetsSnapshot(
       assets === null
         ? NO_ASSET_NAMES
         : loadCorporationAssetNames(characterId, corporationId, assets),
-    cancelled: false,
   });
   const [labels, volumeByTypeId, categoryByTypeId, copyValueByItemId, assetNames] =
     await Promise.all([

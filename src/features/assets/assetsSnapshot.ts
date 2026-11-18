@@ -39,11 +39,11 @@ export interface Snapshot {
   assetNames: AssetNameMap;
 }
 
-/** A Character's own blueprint copies valued from contract listings, ME/TE/runs from its blueprints read when that scope is granted. */
 function loadOwnBlueprints(characterId: number): LoadBlueprints {
   return async () => (await loadCharacterBlueprints(characterId)).cached?.data ?? null;
 }
 
+/** A Character's own blueprint copies valued from contract listings, ME/TE/runs from its blueprints read when that scope is granted. */
 function loadOwnCopyValues(
   characterId: number,
   assets: readonly CharacterAsset[]
@@ -93,13 +93,11 @@ export async function loadAssetsSnapshot(
     loadAssetNames: () => loadCharacterAssetNames(characterId, assets),
     cancelled: signal.cancelled,
   });
-  const copyValuesPromise = reads.copyValueByItemId;
-  void copyValuesPromise.then(
+  void reads.copyValueByItemId.then(
     (copyValueByItemId) => show({ copyValueByItemId }),
     () => {}
   );
-  const assetNamesPromise = reads.assetNames;
-  void assetNamesPromise.then((assetNames) => show({ assetNames }));
+  void reads.assetNames.then((assetNames) => show({ assetNames }));
   const [typeNames, volumeByTypeId] = await Promise.all([
     loadTypeNames(typeIds),
     reads.volumeByTypeId,
@@ -169,9 +167,9 @@ export async function loadAssetsSnapshot(
 
   show({ locationNames });
   const [copyValueByItemId, priceByTypeId, assetNames] = await Promise.all([
-    copyValuesPromise,
+    reads.copyValueByItemId,
     pricesPromise,
-    assetNamesPromise,
+    reads.assetNames,
   ]);
 
   return {

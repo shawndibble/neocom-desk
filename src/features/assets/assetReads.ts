@@ -23,7 +23,7 @@ interface AssetReadsInput {
   /** The owner's in-game ship/container names; must swallow its own failures. */
   loadAssetNames: () => Promise<AssetNameMap>;
   /** A superseded load: start nothing, resolve empty. */
-  cancelled: boolean;
+  cancelled?: boolean;
 }
 
 /**
@@ -38,7 +38,7 @@ export function startAssetReads({
   typeIds,
   loadBlueprints,
   loadAssetNames,
-  cancelled,
+  cancelled = false,
 }: AssetReadsInput): AssetReads {
   if (cancelled) {
     return {
