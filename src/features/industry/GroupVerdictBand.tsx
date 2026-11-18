@@ -54,6 +54,7 @@ export function GroupVerdictBand({ view, plans, catalog, groupVolume }: GroupVer
         {
           activity,
           seconds: member.result.seconds,
+          jobRuns: member.result.jobRuns,
           materials: member.result.materials,
           blueprintTypeID: plan?.blueprintTypeID,
         },

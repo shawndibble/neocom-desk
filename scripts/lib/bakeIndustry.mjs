@@ -82,6 +82,20 @@ export function bakeIndustry({ raw, types, groups, attrsByType, skills, ccpTypes
     }
   }
 
+  const maxProductionLimit = new Map();
+  {
+    const rows = raw['industryBlueprints.csv'];
+    const h = indexHeader(rows);
+    for (let i = 1; i < rows.length; i++) {
+      const limit = Number(rows[i][h.maxProductionLimit]);
+      // A renamed column or blank cell would otherwise bake as NaN/0.
+      if (!Number.isInteger(limit) || limit < 1) {
+        throw new Error(`industryBlueprints.csv row ${i}: 'maxProductionLimit' is not a run count`);
+      }
+      maxProductionLimit.set(Number(rows[i][h.typeID]), limit);
+    }
+  }
+
   const blueprints = {};
   for (const typeID of [...bpTime.keys()].sort((a, b) => a - b)) {
     const t = types.get(typeID);
@@ -95,6 +109,8 @@ export function bakeIndustry({ raw, types, groups, attrsByType, skills, ccpTypes
       products,
       skills: bpSkills.get(typeID) ?? [],
       activity: bpActivity.get(typeID),
+      // Absent means no cap (a row missing from the dump).
+      ...(maxProductionLimit.has(typeID) && { maxProductionLimit: maxProductionLimit.get(typeID) }),
     };
   }
 

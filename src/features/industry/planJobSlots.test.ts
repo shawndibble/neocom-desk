@@ -55,6 +55,32 @@ describe('planJobNodes', () => {
     ]);
   });
 
+  it('splits a job past its max production limit into sibling jobs on the same sub-jobs', () => {
+    const split = {
+      subBuild: { typeID: 1, seconds: 30, jobRuns: [20, 10], inputs: [sub(100, 5)] },
+    } as unknown as ResolvedMaterial;
+    expect(
+      planJobNodes(
+        { activity: 'manufacturing', seconds: 90, jobRuns: [3, 3, 2], materials: [split] },
+        catalog
+      )
+    ).toEqual([
+      { id: '0', seconds: 90, category: 'manufacturing', kind: 'final', deps: ['3', '4'] },
+      { id: '1', seconds: 90, category: 'manufacturing', kind: 'final', deps: ['3', '4'] },
+      { id: '2', seconds: 60, category: 'manufacturing', kind: 'final', deps: ['3', '4'] },
+      { id: '3', seconds: 30, category: 'manufacturing', kind: 'part', deps: ['5'] },
+      { id: '4', seconds: 15, category: 'manufacturing', kind: 'part', deps: ['5'] },
+      {
+        id: '5',
+        seconds: 5,
+        category: 'reaction',
+        kind: 'reaction',
+        deps: [],
+        activity: 'reaction',
+      },
+    ]);
+  });
+
   it('puts a reaction plan in the reaction pool and still calls it the final item', () => {
     const [root] = planJobNodes({ activity: 'reaction', seconds: 5, materials: [] }, catalog);
     expect(root).toMatchObject({ id: '0', category: 'reaction', kind: 'final' });

@@ -223,5 +223,6 @@ export function toIndustryBlueprint(blueprint: BlueprintType): IndustryBlueprint
     products: blueprint.products,
     activity: blueprint.activity,
     skills: blueprint.skills,
+    maxProductionLimit: blueprint.maxProductionLimit,
   };
 }

@@ -52,13 +52,16 @@ export interface PlanJobNode extends ScheduleNode {
  * One schedule node per job in a plan's tree: the plan's own job (id
  * `<prefix>0`) and every sub-build beneath it, each depending on the
  * sub-builds among its own inputs. A typeID built in two branches is two jobs,
- * as the cost engine prices it. `prefix` keeps ids apart across a group's
- * members.
+ * as the cost engine prices it. A node past its blueprint's max production
+ * limit is several sibling jobs (`jobRuns`, largest first; `seconds` is the
+ * largest one's), all consuming the same sub-jobs. `prefix` keeps ids apart
+ * across a group's members.
  */
 export function planJobNodes(
   plan: {
     activity: IndustryActivity;
     seconds: number;
+    jobRuns?: readonly number[];
     materials: readonly ResolvedMaterial[];
     blueprintTypeID?: number;
   },
@@ -70,18 +73,29 @@ export function planJobNodes(
   let next = 0;
   const add = (
     seconds: number,
+    jobRuns: readonly number[] | undefined,
     category: JobSlotCategory,
     kind: PlanJobKind,
     inputs: readonly ResolvedMaterial[],
     entry: Pick<BlueprintCatalogEntry, 'blueprintTypeID' | 'blueprint'> | undefined
-  ) => {
-    const node: PlanJobNode = { id: `${prefix}${next++}`, seconds, category, kind, deps: [] };
-    if (entry) {
-      node.blueprintTypeID = entry.blueprintTypeID;
-      node.activity = entry.blueprint.activity;
-      node.blueprintSkills = entry.blueprint.skills;
-    }
-    nodes.push(node);
+  ): string[] => {
+    const split = jobRuns !== undefined && jobRuns.length > 1;
+    const jobs = (split ? jobRuns : [undefined]).map((runs) => {
+      const node: PlanJobNode = {
+        id: `${prefix}${next++}`,
+        seconds: runs === undefined ? seconds : (seconds * runs) / jobRuns![0],
+        category,
+        kind,
+        deps: [],
+      };
+      if (entry) {
+        node.blueprintTypeID = entry.blueprintTypeID;
+        node.activity = entry.blueprint.activity;
+        node.blueprintSkills = entry.blueprint.skills;
+      }
+      nodes.push(node);
+      return node;
+    });
     const deps: string[] = [];
     for (const material of inputs) {
       const subBuild = material.subBuild;
@@ -90,8 +104,9 @@ export function planJobNodes(
       const activity = subEntry?.blueprint.activity;
       const subCategory = categoryForActivity(activity ?? 'manufacturing');
       deps.push(
-        add(
+        ...add(
           subBuild.seconds,
+          subBuild.jobRuns,
           subCategory,
           subCategory === 'reaction' ? 'reaction' : 'part',
           subBuild.inputs,
@@ -99,14 +114,21 @@ export function planJobNodes(
         )
       );
     }
-    node.deps = deps;
-    return node.id;
+    for (const node of jobs) node.deps = deps;
+    return jobs.map((node) => node.id);
   };
   const rootEntry =
     plan.blueprintTypeID === undefined
       ? undefined
       : catalog.byBlueprintTypeID?.get(plan.blueprintTypeID);
-  add(plan.seconds, categoryForActivity(plan.activity), 'final', plan.materials, rootEntry);
+  add(
+    plan.seconds,
+    plan.jobRuns,
+    categoryForActivity(plan.activity),
+    'final',
+    plan.materials,
+    rootEntry
+  );
   return nodes;
 }
 
