@@ -24,7 +24,7 @@ type Books = ReadonlyMap<number, readonly HubOrder[]>;
 const NO_DEPTH_PRICES: DepthPrices = new Map();
 
 /** Each type's region Order Book; a type whose book failed to load is absent. */
-async function loadBooks(regionId: number, typeIds: readonly number[]): Promise<Books> {
+export async function loadBooks(regionId: number, typeIds: readonly number[]): Promise<Books> {
   const books = new Map<number, readonly HubOrder[]>();
   await mapWithConcurrencyLimit(typeIds, ORDER_BOOK_FANOUT_CONCURRENCY, async (typeID) => {
     try {

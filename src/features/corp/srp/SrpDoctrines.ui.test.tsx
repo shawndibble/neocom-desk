@@ -25,6 +25,14 @@ vi.mock('@/features/character/typeNames', () => ({
 vi.mock('@/features/fittings/useSavedFittingRecords', () => ({
   useSavedFittingRecords: () => [],
 }));
+const coverageOf = vi.hoisted(() => vi.fn());
+vi.mock('./useDoctrineCoverage', () => ({
+  useDoctrineCoverage: () => ({
+    hub: { systemName: 'Jita' },
+    loading: false,
+    coverageOf,
+  }),
+}));
 const eft = vi.hoisted(() => vi.fn());
 const shareCode = vi.hoisted(() =>
   vi.fn(async (_fitting: unknown, name: string) => `code-${name}`)
@@ -76,7 +84,8 @@ const remove = vi.fn((id: string) => {
   fits = fits.filter((f) => f.id !== id);
 });
 
-function setup() {
+function setup(coverage: (f: DoctrineFit) => unknown = () => null) {
+  coverageOf.mockImplementation(coverage);
   fits = [fit('a', 'Thorax - brawl', 627), fit('b', 'Vexor - kite', 626)];
   setSrpDoctrineBackendOverride({ list: () => fits, save, remove });
   const onSave = vi.fn().mockResolvedValue(undefined);
@@ -105,6 +114,16 @@ describe('Doctrine Fits in SRP settings', () => {
     const table = await screen.findByRole('table', { name: 'Doctrine Fits' });
     expect(within(table).getByText('Thorax - brawl')).toBeTruthy();
     expect(within(table).getAllByRole('button', { name: /^Delete / })).toHaveLength(2);
+  });
+
+  it('shows hub coverage, and nothing when the hub has no data', async () => {
+    setup((f) =>
+      f.id === 'a' ? { ships: 12, shortOn: 2, unlisted: [], nextShipCost: 85_000_000 } : null
+    );
+    const table = await screen.findByRole('table', { name: 'Doctrine Fits' });
+    expect(within(table).getByRole('columnheader', { name: 'Hub coverage (Jita)' })).toBeTruthy();
+    expect(within(table).getByText(/12 complete ships; short on Item 2 · next ship/)).toBeTruthy();
+    expect(within(table).queryByText(/0 complete ships/)).toBeNull();
   });
 
   it('attaches a fit to its hull rule and saves the ids, offering only fits of that hull', async () => {
