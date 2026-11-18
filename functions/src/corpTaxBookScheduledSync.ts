@@ -59,12 +59,11 @@ import {
 import {
   detectGaps,
   donationsFromJournal,
-  MOON_NOTIFICATION_TYPES,
   SCHEDULED_STOP_REASONS,
   matchDonation,
   mergeGaps,
   observedRowsFromLedger,
-  parseMoonPayload,
+  moonNotificationsOf,
   placeObservedRows,
   noteUncounted,
   openBalances,
@@ -253,8 +252,6 @@ async function readBookStateFrom(snap: BookSnap, paidRead?: BookSnap): Promise<A
   };
 }
 
-const MOON_TYPES: ReadonlySet<string> = new Set(MOON_NOTIFICATION_TYPES);
-
 const paymentId = (d: JournalDonation) => `j${d.division}_${d.refId}`;
 
 interface Feed {
@@ -361,13 +358,7 @@ export async function runBookSync(
     const notes = await esi.notifications(access.characterId, accessToken);
     if (notes.kind === 'backoff') return { kind: 'skipped', reason: 'esi-budget' };
     if (notes.kind === 'ok') {
-      notifications = notes.data
-        .filter((n) => MOON_TYPES.has(n.type) && typeof n.text === 'string')
-        .map((n) => ({
-          type: n.type,
-          timestamp: n.timestamp,
-          payload: parseMoonPayload(n.text!),
-        }));
+      notifications = moonNotificationsOf(notes.data);
     }
   }
 

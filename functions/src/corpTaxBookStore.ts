@@ -116,7 +116,11 @@ import {
   type MirrorExtraction,
   type ObservedRow,
 } from './corpTaxBookEngine.js';
-import { billsDays, type FeederExtraction } from './corpTaxBookSyncEngine.js';
+import {
+  billsDays,
+  type FeederExtraction,
+  type StoredExtractionKey,
+} from './corpTaxBookSyncEngine.js';
 import { liveAccount } from './corpTaxBookAccounts.js';
 import type { IdentityReader } from './corpTaxBookEsi.js';
 import { SRP_COLLECTIONS } from './srpTypes.js';
@@ -690,6 +694,18 @@ async function cancelUnlistedFeederExtractions(
   });
   for (const d of gone) await d.ref.update({ cancelledAt: now });
   return gone.map((d) => d.id);
+}
+
+/** The key fields of a moon owner's stored Extractions: a notification keeps each one's own start. */
+export async function storedFeederExtractionKeys(
+  deps: BookDeps,
+  collectorCorporationId: number,
+  feederCorporationId: number
+): Promise<StoredExtractionKey[]> {
+  const stored = await sub(deps.db, collectorCorporationId, EXTRACTIONS)
+    .where('sourceCorporationId', '==', feederCorporationId)
+    .get();
+  return stored.docs.map((d) => d.data() as StoredExtractionKey);
 }
 
 /**

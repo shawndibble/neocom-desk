@@ -31,13 +31,17 @@ import {
   appendAudit,
   bookRef,
   feederRef,
+  storedFeederExtractionKeys,
   storeFeederExtractions,
   type BookDeps,
 } from './corpTaxBookStore.js';
 import {
+  moonNotificationsOf,
   observedRowsFromLedger,
   reconcileExtractions,
   type FeederExtraction,
+  type MoonNotification,
+  type StoredExtractionKey,
 } from './corpTaxBookSyncEngine.js';
 import type { SyncEsi } from './corpTaxBookSyncEsi.js';
 
@@ -188,13 +192,19 @@ export type FeederExtractionsRead =
 
 /**
  * A moon owner's current Extractions, tagged with its corporation id. The grant's mining scope
- * is the one the endpoint needs; the Extraction started notification is out of its reach, so the
- * ore comes from a linked Survey or stays unknown.
+ * is the one the endpoint needs. The ore of a chunk is in the Extraction started notification of
+ * the grant holder's own feed, read when the grant carries the notifications scope (`notes`:
+ * that feed's notifications and the Extractions already stored, so a chunk keeps its start). A
+ * grant without it leaves the ore to a linked Survey, else unknown.
  */
 export async function readFeederExtractions(
   esi: SyncEsi,
   feederCorporationId: number,
-  accessToken: string
+  accessToken: string,
+  notes: { notifications: readonly MoonNotification[]; stored: readonly StoredExtractionKey[] } = {
+    notifications: [],
+    stored: [],
+  }
 ): Promise<FeederExtractionsRead> {
   if (esi.budgetLow()) return { kind: 'none' };
   const read = await esi.extractions(feederCorporationId, accessToken);
@@ -202,7 +212,7 @@ export async function readFeederExtractions(
   if (read.kind !== 'ok') return { kind: 'none' };
   return {
     kind: 'ok',
-    extractions: reconcileExtractions(read.data, [], []).map((x) => ({
+    extractions: reconcileExtractions(read.data, notes.notifications, notes.stored).map((x) => ({
       ...x,
       sourceCorporationId: feederCorporationId,
     })),
@@ -221,11 +231,26 @@ export async function refreshFeederExtractions(
   esi: SyncEsi,
   collectorCorporationId: number,
   record: Pick<FeederRecord, 'corporationId' | 'extractionsRefusedAt'>,
-  accessToken: string
+  accessToken: string,
+  /** The grant holder, when the grant carries the notifications scope. */
+  notificationsOf?: number
 ): Promise<number[]> {
   const now = deps.now();
   if (!extractionsDue(record, now)) return [];
-  const read = await readFeederExtractions(esi, record.corporationId, accessToken);
+  const feed =
+    notificationsOf === undefined
+      ? undefined
+      : await esi.notifications(notificationsOf, accessToken);
+  // The feed is best effort: unread, the Extractions still land, with the ore they already hold.
+  const notifications = feed?.kind === 'ok' ? moonNotificationsOf(feed.data) : [];
+  const stored =
+    notifications.length > 0
+      ? await storedFeederExtractionKeys(deps, collectorCorporationId, record.corporationId)
+      : [];
+  const read = await readFeederExtractions(esi, record.corporationId, accessToken, {
+    notifications,
+    stored,
+  });
   if (read.kind === 'none') return [];
   const refineries = read.kind === 'ok' ? read.extractions.map((x) => x.structureId) : [];
   if (read.kind === 'ok') {

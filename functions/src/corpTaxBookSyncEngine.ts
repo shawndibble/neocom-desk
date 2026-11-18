@@ -483,6 +483,16 @@ export interface MoonNotification {
   payload: MoonPayload;
 }
 
+/** The moon drill notifications in a character's feed, parsed; every other type is left out. */
+export function moonNotificationsOf(
+  feed: readonly { type: string; timestamp: string; text?: string }[]
+): MoonNotification[] {
+  const kinds: readonly string[] = MOON_NOTIFICATION_TYPES;
+  return feed
+    .filter((n) => kinds.includes(n.type) && typeof n.text === 'string')
+    .map((n) => ({ type: n.type, timestamp: n.timestamp, payload: parseMoonPayload(n.text!) }));
+}
+
 export type StoredExtractionKey = Pick<
   SyncExtraction,
   'structureId' | 'moonId' | 'extractionStartTime' | 'chunkArrivalTime'
