@@ -116,7 +116,11 @@ import {
   type MirrorExtraction,
   type ObservedRow,
 } from './corpTaxBookEngine.js';
-import { billsDays, type FeederExtraction } from './corpTaxBookSyncEngine.js';
+import {
+  billsDays,
+  type FeederExtraction,
+  type StoredExtractionKey,
+} from './corpTaxBookSyncEngine.js';
 import { liveAccount } from './corpTaxBookAccounts.js';
 import type { IdentityReader } from './corpTaxBookEsi.js';
 import { SRP_COLLECTIONS } from './srpTypes.js';
@@ -670,8 +674,8 @@ async function writeExtractions(
 }
 
 /**
- * A moon owner's chunk that has not arrived and that ESI no longer lists was cancelled: its
- * grant cannot read the notification that says so. Returns the ids marked.
+ * A moon owner's chunk that has not arrived and that ESI no longer lists was cancelled: the
+ * notification that says so is read only by a grant with the notifications scope, and may be gone. Returns the ids marked.
  */
 async function cancelUnlistedFeederExtractions(
   deps: BookDeps,
@@ -690,6 +694,18 @@ async function cancelUnlistedFeederExtractions(
   });
   for (const d of gone) await d.ref.update({ cancelledAt: now });
   return gone.map((d) => d.id);
+}
+
+/** The key fields of a moon owner's stored Extractions: a notification keeps each one's own start. */
+export async function storedFeederExtractionKeys(
+  deps: BookDeps,
+  collectorCorporationId: number,
+  feederCorporationId: number
+): Promise<StoredExtractionKey[]> {
+  const stored = await sub(deps.db, collectorCorporationId, EXTRACTIONS)
+    .where('sourceCorporationId', '==', feederCorporationId)
+    .get();
+  return stored.docs.map((d) => d.data() as StoredExtractionKey);
 }
 
 /**
