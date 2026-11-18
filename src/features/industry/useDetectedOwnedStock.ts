@@ -22,6 +22,7 @@ import { NO_NAMES } from '@/lib/emptyCollections';
 import { useEffect, useMemo, useState } from 'react';
 import { ACCOUNT_SNAPSHOT_ID } from '@/lib/routeSnapshotCache';
 import { useWarmLoad } from '@/lib/useWarmLoad';
+import { subtractJobConsumption, type StockReduction } from '@/engine/industry/jobConsumedStock';
 import {
   detectOwnedStock,
   type DetectedOwnedStockMap,
@@ -38,7 +39,11 @@ import {
 const NO_STOCK: DetectedOwnedStockMap = new Map();
 
 export interface DetectedOwnedStockResult {
+  /** Detected stock less what jobs installed after the assets read consumed (issue #6386). */
   stock: DetectedOwnedStockMap;
+  /** `stock` before that subtraction, so a scope can tell how much of it reached the offer. */
+  stockBeforeJobs: DetectedOwnedStockMap;
+  reductions: readonly StockReduction[];
   characterNames: ReadonlyMap<number, string>;
   locationNames: ReadonlyMap<number, string>;
   /** Names of Characters whose asset list was short or unreadable. */
@@ -92,9 +97,17 @@ export function useDetectedOwnedStock(
     [snapshot, corpSource]
   );
 
-  const stock = useMemo(
+  const stockBeforeJobs = useMemo(
     () => (sources.length === 0 ? NO_STOCK : detectOwnedStock(sources, typeIDSet)),
     [sources, typeIDSet]
+  );
+  const { stock, reductions } = useMemo(
+    () =>
+      subtractJobConsumption(
+        stockBeforeJobs,
+        (snapshot.jobConsumption ?? []).filter((c) => typeIDSet.has(c.typeID))
+      ),
+    [stockBeforeJobs, snapshot.jobConsumption, typeIDSet]
   );
 
   useEffect(() => {
@@ -119,6 +132,8 @@ export function useDetectedOwnedStock(
 
   return {
     stock,
+    stockBeforeJobs,
+    reductions,
     characterNames: snapshot.characterNames,
     locationNames,
     incompleteCharacters: snapshot.incompleteCharacters,

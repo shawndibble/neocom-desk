@@ -10,6 +10,7 @@ import { idSetKey } from '@/lib/idSetKey';
  * contains or which rows a bulk action may touch.
  */
 import type { BuildPlanRecord } from '@/db';
+import type { StockReduction } from '@/engine/industry/jobConsumedStock';
 import { filterStockByScope, type DetectedOwnedStockMap } from '@/engine/industry/ownedStock';
 import type { OwnedStockChange } from '@/engine/industry/ownedStockOffer';
 import type { OwnedStockScope } from '@/engine/industry/types';
@@ -68,6 +69,9 @@ export function groupMaterialTypeIdKey(
 export interface OwnedStockViewInput {
   /** Galaxy-wide detection — the breakdown popover always shows all of it. */
   stock: DetectedOwnedStockMap;
+  /** `stock` before job consumption (issue #6386); with `reductions`, what the offer's note reports. Absent: no job reduced anything. */
+  stockBeforeJobs?: DetectedOwnedStockMap;
+  reductions?: readonly StockReduction[];
   /** The owned-stock scope (issue #454) "use detected" is narrowed to. */
   scope: OwnedStockScope | undefined;
   characterNames: ReadonlyMap<number, string>;
@@ -88,11 +92,25 @@ export interface OwnedStockView {
 
 export function ownedStockView(input: OwnedStockViewInput, t: Translate): OwnedStockView {
   const scopedStock = filterStockByScope(input.stock, input.scope);
+  const scopedBeforeJobs = input.stockBeforeJobs
+    ? filterStockByScope(input.stockBeforeJobs, input.scope)
+    : scopedStock;
   const incompleteCharacters = input.incompleteCorporation
     ? [...input.incompleteCharacters, input.incompleteCorporation]
     : input.incompleteCharacters;
   const detection: OwnedStockDetection = {
     scopedQuantityFor: (typeID) => scopedStock.get(typeID)?.quantity ?? 0,
+    reducedFor: (typeID) => {
+      const quantity =
+        (scopedBeforeJobs.get(typeID)?.quantity ?? 0) - (scopedStock.get(typeID)?.quantity ?? 0);
+      if (quantity <= 0) return null;
+      const blueprintNames = [
+        ...new Set(
+          (input.reductions ?? []).filter((r) => r.typeID === typeID).map((r) => r.blueprintName)
+        ),
+      ];
+      return { quantity, blueprintNames };
+    },
     lowerBound: incompleteCharacters.length > 0,
     incompleteCharacters,
     characterNameFor: (characterId) => input.characterNames.get(characterId) ?? t('common.unknown'),

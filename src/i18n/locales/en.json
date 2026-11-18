@@ -3538,6 +3538,7 @@
     "groupClaimedIn": "{{quantity}} in {{plan}}",
     "groupClaimedInPlans_one": "{{quantity}} in {{count}} group plan",
     "groupClaimedInPlans_other": "{{quantity}} in {{count}} group plans",
+    "jobReducedOffer": "{{quantity}} used by {{jobs}}, installed after your assets were read",
     "groupOverClaim": "Group plans claim {{quantity}} more than you own",
     "useAllOwned": "Use all",
     "useNoneOwned": "Use none",

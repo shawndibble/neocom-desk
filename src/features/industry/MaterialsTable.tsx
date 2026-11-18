@@ -547,6 +547,7 @@ export function MaterialsTable({
             materialName={nameFor(material.typeID)}
             suggestion={offer}
             claimedAhead={claims?.ahead}
+            reduction={detection.reducedFor?.(material.typeID) ?? null}
             onApply={() => commitOwned(material.typeID, offer)}
           />
         )}

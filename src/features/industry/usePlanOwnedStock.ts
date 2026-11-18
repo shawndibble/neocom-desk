@@ -49,6 +49,8 @@ export function usePlanOwnedStock(
   const includeCorpAssets = (plan.includeCorpAssets ?? false) && corpOwnedStock.available;
   const {
     stock: detectedStock,
+    stockBeforeJobs,
+    reductions,
     characterNames,
     locationNames,
     incompleteCharacters,
@@ -95,6 +97,8 @@ export function usePlanOwnedStock(
       ownedStockView(
         {
           stock: detectedStock,
+          stockBeforeJobs,
+          reductions,
           scope: plan.ownedStockScope,
           characterNames,
           locationNames,
@@ -111,6 +115,8 @@ export function usePlanOwnedStock(
       ),
     [
       detectedStock,
+      stockBeforeJobs,
+      reductions,
       plan.ownedStockScope,
       characterNames,
       locationNames,
