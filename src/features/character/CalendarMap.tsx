@@ -143,7 +143,7 @@ export function CalendarMap({
                       <Glyph
                         key={kind}
                         aria-hidden="true"
-                        className={`size-3 shrink-0 ${KIND_TEXT[kind]}`}
+                        className={`size-3.5 shrink-0 md:size-4 ${KIND_TEXT[kind]}`}
                       />
                     );
                   })}

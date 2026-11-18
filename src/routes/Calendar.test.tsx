@@ -368,7 +368,8 @@ describe('Calendar Shared Pops', () => {
     const rail = await screen.findByRole('list', { name: /coming up/i });
     expect(await within(rail).findByText('Efa - Shared Tatara')).toBeInTheDocument();
     expect(within(rail).getByText('Efa I - Moon 1')).toBeInTheDocument();
-    expect(within(rail).getByText(/Shared moon pops · ready · Sharing Corp/)).toBeInTheDocument();
+    expect(within(rail).getByText(/Shared moon pops · ready/)).toBeInTheDocument();
+    expect(screen.getByText('Shared by Sharing Corp')).toBeInTheDocument();
   });
 
   it('hides it when the pilot reads that moon from ESI', async () => {
@@ -494,7 +495,7 @@ describe('Calendar', () => {
     renderCalendarRoute();
 
     expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
-    expect(await screen.findByText(/industry jobs/i)).toBeInTheDocument();
+    expect((await screen.findAllByText(/industry jobs/i)).length).toBeGreaterThan(0);
   });
 
   /**
@@ -566,7 +567,7 @@ describe('Calendar', () => {
     renderCalendarRoute();
 
     // The industry job still arrives...
-    expect(await screen.findByText(/industry jobs/i)).toBeInTheDocument();
+    expect((await screen.findAllByText(/industry jobs/i)).length).toBeGreaterThan(0);
     // ...both panes are still on screen rather than replaced by a banner...
     expect(screen.getByRole('group', { name: /calendar map/i })).toBeInTheDocument();
     expect(screen.getByRole('list', { name: /coming up/i })).toBeInTheDocument();
@@ -635,7 +636,7 @@ describe('Calendar', () => {
   it('hides a kind from the filter menu and remembers it', async () => {
     server.use(http.get(`${ESI}/industry/jobs`, () => HttpResponse.json(jobs)));
     renderCalendarRoute();
-    expect(await screen.findByText(/industry jobs/i)).toBeInTheDocument();
+    expect((await screen.findAllByText(/industry jobs/i)).length).toBeGreaterThan(0);
 
     await userEvent.click(screen.getByRole('button', { name: /filter event types/i }));
     await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: /industry jobs/i }));

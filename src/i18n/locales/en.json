@@ -6160,7 +6160,6 @@
       "rowDetail": {
         "jumps_one": "{{count}} jump away",
         "jumps_other": "{{count}} jumps away",
-        "route": "Route safety",
         "routeLabel": "Open route safety to {{place}}"
       },
       "corpSovereignty": {
@@ -9690,6 +9689,7 @@
       "unknown": "Unknown",
       "note": "ESI does not send the silo's capacity, so this is the stock a raider could take, not a fill percentage."
     },
+    "week": { "title": "Next 7 days" },
     "filter": {
       "title": "Event types",
       "open": "Filter event types",
@@ -9718,6 +9718,7 @@
       "tomorrow": "Tomorrow · {{date}}"
     },
     "rail": {
+      "sharedBy": "Shared by {{name}}",
       "title": "Coming up",
       "longOverdue_one": "Overdue over {{windowDays}} days · oldest {{count}} day",
       "longOverdue_other": "Overdue over {{windowDays}} days · oldest {{count}} days",
