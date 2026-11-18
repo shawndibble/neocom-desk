@@ -55,4 +55,5 @@ export const loadSdeMock = () => ({
   loadBlueprints: vi.fn(async () => BLUEPRINTS),
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
   loadMarketWideTrees: vi.fn(async () => ({})),
+  loadCompressedGasTypeIds: vi.fn(async () => ({})),
 });

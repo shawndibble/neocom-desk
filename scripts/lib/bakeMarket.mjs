@@ -168,6 +168,17 @@ export async function bakeMarket({ raw, map, types, packagedVolumeByType, groups
     if (compressedTypeId !== undefined) compressedOreTypeIds[rawTypeId] = compressedTypeId;
   }
 
+  // --- compressedGasTypeIds.json: raw gas typeId -> its "Compressed " twin
+  // (issue #6395). `gasCloudTypeIds` holds both forms on purpose, so the raw
+  // ones are those without the prefix. Same name-match as the ore map above.
+  const compressedGasTypeIds = {};
+  for (const gasTypeId of gasCloudTypeIds) {
+    const gasName = types.get(gasTypeId)?.name;
+    if (!gasName || gasName.startsWith(COMPRESSED_NAME_PREFIX)) continue;
+    const compressedTypeId = typeIdByName.get(`${COMPRESSED_NAME_PREFIX}${gasName}`);
+    if (compressedTypeId !== undefined) compressedGasTypeIds[gasTypeId] = compressedTypeId;
+  }
+
   // Every mineable type carries its volume in types.json, so the Mining Yield
   // tab can report a day's m3 rather than a bare unit count. The reprocessing
   // keys above already cover almost all of them; this catches the handful
@@ -409,6 +420,7 @@ export async function bakeMarket({ raw, map, types, packagedVolumeByType, groups
     gasCloudMarketGroupIds,
     gasCloudTypeIds,
     compressedOreTypeIds,
+    compressedGasTypeIds,
     metaGroupNames,
     variationTypes,
     variations,
