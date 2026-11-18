@@ -5,7 +5,7 @@ import { db } from '@/db';
 import { encodeFittingShare } from '@/engine/fittings/fittingShare';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import type { Fitting, FittingModule } from '@/engine/fittings/types';
-import { setSrpDoctrineBackendOverride } from '@/features/corp/srpDoctrineBackendOverride';
+import { setSrpDoctrineBackendOverride } from '@/features/corp/srpBackendOverride';
 import type { MemberDoctrineFit } from '@/features/corp/srpTypes';
 import { FittingStartScreen } from '@/features/fittings/FittingStartScreen';
 import type { FittingLibrarySource } from '@/features/fittings/useFittingPicker';

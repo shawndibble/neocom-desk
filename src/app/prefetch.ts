@@ -65,6 +65,7 @@ import { loadEmploymentHistory } from '@/features/character/employmentHistory';
 import { KEY as BLUEPRINTS_KEY, loadCharacterBlueprints } from '@/features/industry/data';
 import { KEYS as JOB_KEYS, loadCharacterIndustryJobs } from '@/features/industry/jobs';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
+import { loadGrantedScopesByCharacter } from './grantedScopes';
 
 export interface PrefetchTask {
   /** Stable identifier — the unit of progress, and what a test names. */
@@ -323,12 +324,9 @@ export async function prefetchRosterDetails(
   try {
     // Calendar lists for other Characters are only worth loading for the sake of the prefetch.
     if (!detailPrefetchAllowed()) return;
-    const tokens = await db.tokens.toArray();
-    for (const token of tokens) {
+    for (const [characterId, held] of await loadGrantedScopesByCharacter()) {
       if (signal.cancelled) return;
-      if (token.characterId === activeCharacterId) continue;
-      const held = new Set(token.scopes);
-      const characterId = token.characterId;
+      if (characterId === activeCharacterId) continue;
       try {
         if (grantCovers(held, ['getCharacterCalendar', 'getCharacterCalendarEvent'])) {
           const result = await inBackgroundLane(() => loadCalendarEvents(characterId));

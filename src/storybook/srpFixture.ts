@@ -1,5 +1,7 @@
-import type { SrpBackendOverride } from '@/features/corp/srpBackendOverride';
-import type { SrpDoctrineBackendOverride } from '@/features/corp/srpDoctrineBackendOverride';
+import type {
+  SrpBackendOverride,
+  SrpDoctrineBackendOverride,
+} from '@/features/corp/srpBackendOverride';
 import type { DoctrineFit, SrpOfficerVerdict, SrpSettings } from '@/features/corp/srpTypes';
 import { SAMPLE_ACTIVE_CHARACTER } from './sampleData';
 import { DAY_MS } from '@/lib/age';

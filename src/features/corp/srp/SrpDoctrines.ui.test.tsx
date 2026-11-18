@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
-import { setSrpDoctrineBackendOverride } from '../srpDoctrineBackendOverride';
+import { setSrpDoctrineBackendOverride } from '../srpBackendOverride';
 import type { DoctrineFit, SrpOfficerVerdict, SrpSettings } from '../srpTypes';
 import { buildHullCatalog } from './hullCatalog';
 
