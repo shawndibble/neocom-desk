@@ -37,11 +37,13 @@ import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import { writeToClipboard } from '@/lib/clipboard';
 import { isTypingTarget } from '@/lib/shortcuts';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { linkSharedPopSurvey } from '@/sync/sharedPops';
 import { ScanFeedback } from './ScanFeedback';
 import { StartLinkHelp } from './StartLinkHelp';
 import { SurveyHowTo } from './SurveyHowTo';
 import {
   parseStartLink,
+  popOfStartLink,
   START_LINK_PATH,
   startLinkPath,
   toInfoFields,
@@ -85,6 +87,7 @@ export function SurveyStartScreen() {
   }, [hydrated]);
   const characterId = hydrated ? activeId : null;
 
+  const popId = useMemo(() => popOfStartLink(search), [search]);
   const [fields, setFields] = useState<StartLinkFields>(() => parseStartLink(search));
   const [rateText, setRateText] = useState(() => parseStartLink(search).rate?.toString() ?? '');
   const { copied, flash } = useCopyFeedback<'copied' | 'failed'>(2000);
@@ -153,6 +156,9 @@ export function SurveyStartScreen() {
         });
         noteSubmittedScan();
         noteStartedHere(started.id);
+        // Started from a pop's link: tell the app, so the pop opens this Survey. Never blocks the Survey.
+        if (popId !== null && ownerName !== undefined)
+          void linkSharedPopSurvey(popId, started.id).catch(() => undefined);
         if (ownerName !== undefined) {
           await noteSurvey(started.id).catch(() => undefined);
           void navigate(`/mining/survey?survey=${started.id}`, { replace: true });
@@ -164,7 +170,7 @@ export function SurveyStartScreen() {
         return scanFailure(error);
       }
     },
-    [characterId, navigate, info, fields]
+    [characterId, navigate, info, fields, popId]
   );
   const { trackedAdd, busy, error } = useScanFeedback(add);
 

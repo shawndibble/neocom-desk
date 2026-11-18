@@ -2,7 +2,7 @@ import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import { buildCharacterBoard } from '@/engine/character/board';
 import { filterByCorporation, filterBySharingCorporation } from '@/engine/character/deadlines';
-import { parseStartLink } from '@/features/survey/startLink';
+import { parseStartLink, popOfStartLink } from '@/features/survey/startLink';
 import type { SharedPopView } from '@/sync/sharedPops';
 import { toSharedPopSources, type SharedPopEntry } from './calendarSharedPops';
 import { sharedPopDetail, sharedPopStartLink } from './sharedPopDetail';
@@ -131,6 +131,11 @@ describe('Shared Pop start link and detail', () => {
     expect(detail.place).toEqual({ systemId: 30_000_001, name: 'Efa - Tatara' });
     expect(detail.link?.to).toBe(sharedPopStartLink(entry()));
     expect(JSON.stringify(detail)).not.toMatch(/isk/i);
+  });
+
+  it('names its pop in the start link, so the Survey it starts can be linked back', () => {
+    const path = sharedPopStartLink(entry());
+    expect(popOfStartLink(path.slice('/survey'.length))).toBe(entry().pop.id);
   });
 
   it('opens the linked Survey first and keeps starting a new one as the second action', () => {

@@ -1,6 +1,6 @@
 // Shared Pops against the Firestore emulator (#6223): publishing a book's pops and who may read
 // them. Runs only under `npm run test:rules` at the repo root; a plain `npm test` skips it.
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { beforeEach, expect, it } from 'vitest';
 import type { Caller } from './actorAuth.js';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
@@ -10,6 +10,7 @@ import { ROLES_SCOPE } from './corpTaxBookEsi.js';
 import type { OfficerAccess } from './corpTaxBook.js';
 import { authorizeOfficer, editBookAs, type BookDeps } from './corpTaxBookStore.js';
 import {
+  linkSharedPopSurvey,
   listCommunityPopSharers,
   publishSharedPops,
   setCommunityPopBlock,
@@ -379,6 +380,35 @@ emulatorSuite('Shared Pops', () => {
     now = Date.parse(DECAY) + 48 * H;
     expect(await seen(CORPMATE)).toEqual([]);
     expect(await publishSharedPops(publishDeps(), BOOK)).toBeNull();
+  });
+
+  it('links a Survey started from a pop for its audience, and an officer link replaces it', async () => {
+    await publishSharedPops(publishDeps(), BOOK);
+    const popId = `${BOOK}_1000_${Date.parse(START)}`;
+    await db
+      .collection('shares')
+      .doc('abc234')
+      .set({ type: 'survey', expiresAt: Timestamp.fromMillis(now + 24 * H) });
+    await expect(
+      linkSharedPopSurvey(readDeps(), caller(STRANGER), { popId, surveyId: 'abc234' })
+    ).rejects.toThrow(/not shared with you/);
+    await expect(
+      linkSharedPopSurvey(readDeps(), caller(CORPMATE), { popId, surveyId: 'zzz999' })
+    ).rejects.toThrow(/does not exist/);
+    await linkSharedPopSurvey(readDeps(), caller(CORPMATE), { popId, surveyId: 'abc234' });
+    const linked = (await sharedPopsFor(readDeps(), [viewer(CORPMATE)])).find(
+      (p) => p.id === popId
+    );
+    expect(linked?.surveyId).toBe('abc234');
+    // An officer's own link wins from then on, and clears the pilot's.
+    await editBookAs(
+      bookDeps(),
+      officerAccess({ canEdit: true }),
+      { corporationId: BOOK },
+      { action: 'linkSurvey', extractionId: `1000_${Date.parse(START)}`, surveyId: 'def567' }
+    );
+    const after = (await sharedPopsFor(readDeps(), [viewer(CORPMATE)])).find((p) => p.id === popId);
+    expect(after?.surveyId).toBe('def567');
   });
 
   it('republishes when an officer turns sharing off through the edit callable', async () => {

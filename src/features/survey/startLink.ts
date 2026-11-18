@@ -63,6 +63,20 @@ export function startLinkPath({ place, payee, rate, notes }: StartLinkFields): s
   return search === '' ? START_LINK_PATH : `${START_LINK_PATH}?${search}`;
 }
 
+/** A pop's start link names its pop in `pop` (`{corporationId}_{extractionId}`); a shape check only. */
+const POP_ID = /^[1-9][0-9]{0,15}_.{1,100}$/;
+
+/** The Shared Pop a start link came from, or null. Kept out of `StartLinkFields`: it is not a field of the Survey. */
+export function popOfStartLink(search: string): string | null {
+  const pop = new URLSearchParams(search).get('pop');
+  return pop !== null && POP_ID.test(pop) ? pop : null;
+}
+
+/** A start link path that also names its pop. */
+export function withPop(path: string, popId: string): string {
+  return `${path}${path.includes('?') ? '&' : '?'}pop=${encodeURIComponent(popId)}`;
+}
+
 function positiveInt(text: string | null): number | null {
   const value = Number(text);
   return text !== null && text.trim() !== '' && Number.isInteger(value) && value > 0 ? value : null;

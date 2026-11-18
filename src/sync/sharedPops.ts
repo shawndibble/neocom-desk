@@ -42,6 +42,21 @@ export async function fetchSharedPops(): Promise<SharedPopView[]> {
   return result.pops ?? [];
 }
 
+/**
+ * Links a Survey started from a pop's start link back to that pop, so everyone who sees the pop
+ * can open it. Best effort for the caller: the Survey works without it.
+ */
+export async function linkSharedPopSurvey(popId: string, surveyId: string): Promise<void> {
+  const [character] = await db.characters.toArray();
+  if (!character) return;
+  await ensureSignedIn(character.characterId);
+  await callRouted<{ popId: string; surveyId: string }, { linked: true }>(
+    'linkSharedPopSurveyCallable',
+    { popId, surveyId },
+    character.characterId
+  );
+}
+
 /** The pop a deep link names, if the viewer still sees it. */
 export function findSharedPop(
   pops: readonly SharedPopView[],
