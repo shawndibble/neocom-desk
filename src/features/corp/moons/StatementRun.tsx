@@ -54,7 +54,7 @@ function StepDot({
           'inline-flex size-6 items-center justify-center rounded-full border text-xs font-semibold',
           state === 'done' && 'border-success text-success',
           state === 'now' && 'border-text text-text',
-          state === 'next' && 'border-line text-text-faint'
+          state === 'next' && 'border-line text-text-dim'
         )}
       >
         {state === 'done' ? <Icon.Done size={Icon.ICON_SIZE.sm} aria-hidden="true" /> : n}

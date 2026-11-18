@@ -70,7 +70,7 @@ export function AbyssalEstimateLine({
             </span>
             <ExternalLink href={estimate.url}>{t('market.mutamarket.priceFrom')}</ExternalLink>
           </p>
-          <p className="text-[0.6875rem] text-text-faint">{t('market.mutamarket.estimateNote')}</p>
+          <p className="text-[0.6875rem] text-text-dim">{t('market.mutamarket.estimateNote')}</p>
         </div>
       );
     case 'not-imported':
