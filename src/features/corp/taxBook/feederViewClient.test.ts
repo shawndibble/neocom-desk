@@ -11,7 +11,7 @@ vi.mock('firebase/firestore/lite', () => ({
 }));
 vi.mock('@/auth/session', () => ({ getValidAccessToken: vi.fn() }));
 vi.mock('@/sync/firebaseApp', () => ({ getSyncFirestore: () => 'db' }));
-vi.mock('./bookClient', () => ({ call: vi.fn() }));
+vi.mock('@/sync/signedInCallable', () => ({ callSignedIn: vi.fn() }));
 
 import { clearFeederViewCache, readFeederView } from './feederViewClient';
 

@@ -8,7 +8,7 @@ import { getValidAccessToken } from '@/auth/session';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { srpBackendOverride } from './srpBackendOverride';
-import { call } from './taxBook/bookClient';
+import { callSignedIn } from '@/sync/signedInCallable';
 import type {
   FileSrpClaimInput,
   FiledSrpClaim,
@@ -64,10 +64,14 @@ export async function verifySrpOfficer(
   if (held?.verdict && Date.now() - held.at < SRP_VERIFY_TTL_MS) return held.verdict;
   const inflight = getValidAccessToken(characterId)
     .then((accessToken) =>
-      call<Record<string, unknown>, SrpOfficerVerdict>(characterId, 'verifySrpOfficerCallable', {
-        corporationId,
-        accessToken,
-      })
+      callSignedIn<Record<string, unknown>, SrpOfficerVerdict>(
+        characterId,
+        'verifySrpOfficerCallable',
+        {
+          corporationId,
+          accessToken,
+        }
+      )
     )
     .then(
       (verdict) => {
@@ -90,7 +94,7 @@ export async function getSrpStatus(characterId: number, corporationId: number): 
   const stand = srpBackendOverride();
   if (stand) return stand.status();
   const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'getSrpStatusCallable', { corporationId, accessToken });
+  return callSignedIn(characterId, 'getSrpStatusCallable', { corporationId, accessToken });
 }
 
 /** A Director turns SRP on (or back on, keeping the saved rules). */
@@ -99,7 +103,7 @@ export async function turnOnSrp(characterId: number, corporationId: number): Pro
   if (stand) return stand.turnOn();
   const accessToken = await getValidAccessToken(characterId);
   try {
-    await call(characterId, 'turnOnSrpCallable', { corporationId, accessToken });
+    await callSignedIn(characterId, 'turnOnSrpCallable', { corporationId, accessToken });
   } finally {
     invalidateSrpOfficer(characterId, corporationId);
   }
@@ -111,7 +115,7 @@ export async function turnOffSrp(characterId: number, corporationId: number): Pr
   if (stand) return stand.turnOff();
   const accessToken = await getValidAccessToken(characterId);
   try {
-    await call(characterId, 'turnOffSrpCallable', { corporationId, accessToken });
+    await callSignedIn(characterId, 'turnOffSrpCallable', { corporationId, accessToken });
   } finally {
     invalidateSrpOfficer(characterId, corporationId);
   }
@@ -127,7 +131,11 @@ export async function saveSrpSettings(
   if (stand) return stand.save(settings);
   const accessToken = await getValidAccessToken(characterId);
   try {
-    await call(characterId, 'saveSrpSettingsCallable', { corporationId, accessToken, settings });
+    await callSignedIn(characterId, 'saveSrpSettingsCallable', {
+      corporationId,
+      accessToken,
+      settings,
+    });
   } finally {
     invalidateSrpOfficer(characterId, corporationId);
   }
@@ -142,7 +150,7 @@ export async function reclaimSrp(
   if (stand) return stand.reclaim();
   const accessToken = await getValidAccessToken(characterId);
   try {
-    return await call(characterId, 'reclaimSrpCallable', { corporationId, accessToken });
+    return await callSignedIn(characterId, 'reclaimSrpCallable', { corporationId, accessToken });
   } finally {
     invalidateSrpOfficer(characterId, corporationId);
   }
@@ -160,5 +168,9 @@ export async function fileSrpClaim(
   claim: FileSrpClaimInput
 ): Promise<FiledSrpClaim> {
   const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'fileSrpClaimCallable', { corporationId, accessToken, ...claim });
+  return callSignedIn(characterId, 'fileSrpClaimCallable', {
+    corporationId,
+    accessToken,
+    ...claim,
+  });
 }
