@@ -1,5 +1,6 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { chunkRateFor } from '@/engine/corpTaxBook/extraction';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -122,32 +123,27 @@ function rateLabel(
   }
 }
 
+const NO_DIVISION_NAMES = new Map<number, string>();
+
 /**
  * The corporation's own names for its wallet divisions (the Corp Wallet's divisions read), by
  * number. Empty without the role to read them or until loaded: the checkboxes fall back to numbers.
  */
 function useWalletDivisionNames(characterId: number, corporationId: number): Map<number, string> {
   const canRead = useCorpAccess().capabilities.canReadDivisions;
-  const [names, setNames] = useState(() => new Map<number, string>());
-  useEffect(() => {
-    let cancelled = false;
-    loadCorporationDivisions(characterId, corporationId, canRead).then(
-      (result) => {
-        if (cancelled) return;
+  const load = useCallback(
+    () =>
+      loadCorporationDivisions(characterId, corporationId, canRead).then((result) => {
         const next = new Map<number, string>();
         for (const entry of result.cached?.data.wallet ?? []) {
           const name = entry.name?.trim();
           if (entry.division !== undefined && name) next.set(entry.division, name);
         }
-        setNames(next);
-      },
-      () => {}
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId, corporationId, canRead]);
-  return names;
+        return next;
+      }),
+    [characterId, corporationId, canRead]
+  );
+  return useKeyedLoad(`${characterId}:${corporationId}`, load).data ?? NO_DIVISION_NAMES;
 }
 
 /**

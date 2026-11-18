@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
+import { useAsyncLoad, useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useTranslation } from 'react-i18next';
 import {
   InfoTooltip,
@@ -65,32 +66,16 @@ function useRunDelta(
   compare: WeatherCompare | null,
   weatherTypeId: number | null
 ): RunDelta | 'failed' | null {
-  const [result, setResult] = useState<{
-    compare: WeatherCompare;
-    weatherTypeId: number;
-    delta: RunDelta | 'failed';
-  } | null>(null);
-  useEffect(() => {
-    if (compare === null || weatherTypeId === null) return;
-    let cancelled = false;
-    const settle = (delta: RunDelta | 'failed') => {
-      if (!cancelled) setResult({ compare, weatherTypeId, delta });
-    };
-    void compare(weatherTypeId).then(
-      ({ before, after }) =>
-        settle({
-          changes: diffFittingStats(before, after).changes,
-          reach: weaponReachChange(before, after),
-        }),
-      () => settle('failed')
-    );
-    return () => {
-      cancelled = true;
+  const load = useCallback(async (): Promise<RunDelta | null> => {
+    if (compare === null || weatherTypeId === null) return null;
+    const { before, after } = await compare(weatherTypeId);
+    return {
+      changes: diffFittingStats(before, after).changes,
+      reach: weaponReachChange(before, after),
     };
   }, [compare, weatherTypeId]);
-  return result !== null && result.compare === compare && result.weatherTypeId === weatherTypeId
-    ? result.delta
-    : null;
+  const delta = useAsyncLoad(load);
+  return delta.status === 'failed' ? 'failed' : (delta.data ?? null);
 }
 
 /**
@@ -100,25 +85,14 @@ function useRunDelta(
  * filament or hub is never shown.
  */
 function useFilamentPrice(typeId: number | null, hubId: string): number | null {
-  const [result, setResult] = useState<{ key: string; price: number | null } | null>(null);
-  const key = `${hubId}:${typeId}`;
-  useEffect(() => {
-    const hub = getTradeHub(hubId);
-    if (typeId === null || !hub) return;
-    let cancelled = false;
-    void getHubPrices(hub, [typeId]).then(
-      (prices) => {
-        if (!cancelled) setResult({ key, price: prices.get(typeId)?.sellMin ?? null });
-      },
-      () => {
-        if (!cancelled) setResult({ key, price: null });
-      }
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [typeId, hubId, key]);
-  return result?.key === key ? result.price : null;
+  const hub = getTradeHub(hubId);
+  const load = useCallback(async () => {
+    if (!hub || typeId === null) return null;
+    const prices = await getHubPrices(hub, [typeId]);
+    return prices.get(typeId)?.sellMin ?? null;
+  }, [hub, typeId]);
+  // A failed lookup reads as no price.
+  return useKeyedLoad(typeId === null || !hub ? null : `${hubId}:${typeId}`, load).data ?? null;
 }
 
 /** What the stats column's Abyssal row says closed: the session weather's name, else normal space. */

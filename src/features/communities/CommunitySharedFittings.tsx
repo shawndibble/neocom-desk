@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -8,17 +9,12 @@ import {
   rowInteractiveClassName,
   tappableRowClassName,
 } from '@/components/ui/controlStyles';
-import type { SharedFitting } from '@/engine/communities/sharedFittings';
 import { fittingEditLocation } from '@/features/fittings/fittingRoutes';
 import { uidForCharacter } from '@/sync/uid';
 import type { CommunityMember } from './communityStore';
 import { ROW_LIMIT } from './shareLists';
 import { loadCommunityFittings } from './sharedFittings';
-import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useReportMineCount } from './useTabSharing';
-
-type State =
-  { status: 'loading' } | { status: 'failed' } | { status: 'ready'; fittings: SharedFitting[] };
 
 /**
  * The Fittings tab's Everyone view: every Fitting the Community's Members
@@ -40,21 +36,14 @@ export function CommunitySharedFittings({
   onMineCount?: (count: number) => void;
 }) {
   const { t } = useTranslation();
-  const load = useCallback(
+  const loadFittings = useCallback(
     () => loadCommunityFittings(characterId, communityId),
     [characterId, communityId]
   );
-  const loaded = useKeyedLoad(`${characterId}:${communityId}`, load);
-  const state = useMemo<State>(
-    () =>
-      loaded.status === 'ready'
-        ? { status: 'ready', fittings: loaded.data }
-        : { status: loaded.status === 'failed' ? 'failed' : 'loading' },
-    [loaded.status, loaded.data]
-  );
+  const state = useAsyncLoad(loadFittings);
   const [query, setQuery] = useState('');
   const myUid = uidForCharacter(characterId);
-  useReportMineCount(state.status === 'ready' ? state.fittings : null, myUid, onMineCount);
+  useReportMineCount(state.status === 'ready' ? state.data : null, myUid, onMineCount);
 
   const names = useMemo(
     () => new Map((members ?? []).map((member) => [member.uid, member.characterName])),
@@ -71,7 +60,7 @@ export function CommunitySharedFittings({
   const needle = query.trim().toLowerCase();
   const shown = useMemo(() => {
     if (state.status !== 'ready') return [];
-    return state.fittings
+    return state.data
       .filter((fitting) =>
         [fitting.name, fitting.hull, sharerOf(fitting.ownerUid)].some((text) =>
           text.toLowerCase().includes(needle)
@@ -80,13 +69,13 @@ export function CommunitySharedFittings({
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [state, needle, sharerOf]);
 
-  if (state.status === 'loading') {
+  if (state.status !== 'ready' && state.status !== 'failed') {
     return <Spinner size="sm" label={t('communities.everyone.fittingsLoading')} />;
   }
   if (state.status === 'failed') {
     return <InlineError>{t('communities.everyone.fittingsFailed')}</InlineError>;
   }
-  if (state.fittings.length === 0) {
+  if (state.data.length === 0) {
     return (
       <EmptyState
         title={t('communities.everyone.noFittings')}

@@ -122,6 +122,7 @@ function extractionOf(d: DocumentSnapshot): PopExtraction | undefined {
       ? { sourceCorporationId: x.sourceCorporationId as number }
       : {}),
     ...(oreLines ? { oreLines } : {}),
+    ...(str(x.surveyId) ? { surveyId: x.surveyId as string } : {}),
   };
 }
 

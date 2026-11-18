@@ -1,5 +1,6 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { useTranslation } from 'react-i18next';
 import { Button, TextInput } from '@/components/ui';
 import { getCorporationPublicInfo } from '@/esi/endpoints/corp';
@@ -45,29 +46,21 @@ export function DeleteBookSection({ onDelete }: { onDelete: () => void }) {
 export function DeleteBookDialog({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const { characterId, corporationId, reload } = useBook();
-  const [expected, setExpected] = useState<string | null>(null);
   const [typed, setTyped] = useState('');
   const [exporting, setExporting] = useState(false);
   // The id stands in when the ticker is unreadable: the label then names it as the id.
-  const [isId, setIsId] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    getCorporationPublicInfo(corporationId).then(
-      (r) => {
-        if (cancelled) return;
-        setIsId(!r.data?.ticker);
-        setExpected(r.data?.ticker || String(corporationId));
-      },
-      () => {
-        if (cancelled) return;
-        setIsId(true);
-        setExpected(String(corporationId));
-      }
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [corporationId]);
+  const loadTicker = useCallback(
+    () =>
+      getCorporationPublicInfo(corporationId).then(
+        (r) => ({ isId: !r.data?.ticker, expected: r.data?.ticker || String(corporationId) }),
+        // Resolved, not failed: a retry landing mid-typing would swap the word being typed.
+        () => ({ isId: true, expected: String(corporationId) })
+      ),
+    [corporationId]
+  );
+  const ticker = useAsyncLoad(loadTicker).data;
+  const expected = ticker?.expected ?? null;
+  const isId = ticker?.isId ?? false;
 
   const remove = async () => {
     try {

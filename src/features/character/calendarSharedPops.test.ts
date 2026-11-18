@@ -133,6 +133,13 @@ describe('Shared Pop start link and detail', () => {
     expect(JSON.stringify(detail)).not.toMatch(/isk/i);
   });
 
+  it('opens the linked Survey first and keeps starting a new one as the second action', () => {
+    const detail = sharedPopDetail(entry({ surveyId: 'abc123' }), NOW, t, 'UTC');
+    expect(detail.link).toEqual({ label: 'calendar.sharedPop.openSurvey', to: '/s/abc123' });
+    expect(detail.secondaryLink?.to).toBe(sharedPopStartLink(entry()));
+    expect(sharedPopDetail(entry(), NOW, t, 'UTC').secondaryLink).toBeUndefined();
+  });
+
   it('leaves out the ore list and the notes when the book shares none', () => {
     const detail = sharedPopDetail({ ...entry({ notes: '' }), ore: null }, NOW, t, 'UTC');
     expect(detail.list).toBeUndefined();

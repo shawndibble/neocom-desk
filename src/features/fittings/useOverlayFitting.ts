@@ -4,7 +4,8 @@
  * same pilot and Damage Profile as the open one — cheap once the engine is
  * loaded. Needs a Character, so the Fitting Share Code view has no overlay.
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import type { AppliedDpsInputs } from '@/engine/fittings/appliedDps';
 import type { DamageProfile, PilotProfile } from '@/engine/fittings/types';
 import { useStatsConditions } from './statsConditions';
@@ -31,7 +32,6 @@ export function useOverlayFitting({
 }): OverlayFitting {
   const choices = useFittingChoices(characterId);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [result, setResult] = useState<OverlayFitting['result']>(null);
   const conditions = useStatsConditions();
 
   // A Fitting belongs to one Character.
@@ -44,25 +44,15 @@ export function useOverlayFitting({
   const choiceId = choices.all.find((c) => c.id === selectedId)?.id ?? null;
   const { resolve } = choices;
 
-  useEffect(() => {
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new selection, not a render-time derivation
-    setResult(null);
-    if (choiceId === null || profile === null) return;
-    void (async () => {
-      try {
-        const picked = await resolve(choiceId);
-        if (!picked || cancelled) return;
-        const stats = await evaluateFitting(picked.fitting, profile, damageProfile, conditions);
-        if (!cancelled) setResult({ name: picked.name, applied: stats.applied });
-      } catch {
-        // An overlay that won't calculate simply isn't drawn.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+  // An overlay that won't calculate simply isn't drawn.
+  const load = useCallback(async (): Promise<OverlayFitting['result']> => {
+    if (choiceId === null || profile === null) return null;
+    const picked = await resolve(choiceId);
+    if (!picked) return null;
+    const stats = await evaluateFitting(picked.fitting, profile, damageProfile, conditions);
+    return { name: picked.name, applied: stats.applied };
   }, [choiceId, resolve, profile, damageProfile, conditions]);
+  const result = useAsyncLoad(load).data ?? null;
 
   // A since-deleted Fitting reads as no overlay rather than a blank pick.
   return {

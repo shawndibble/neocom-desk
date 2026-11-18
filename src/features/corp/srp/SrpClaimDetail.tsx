@@ -3,10 +3,11 @@
  * reached, the audit trail, and the state's actions (pinned at the bottom on a phone). A row click
  * opens it, so the row itself carries nothing extra for it.
  */
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Eyebrow, SlideOver, Spinner, textActionClassName } from '@/components/ui';
 import { ExternalLink } from '@/components/ui/ExternalLink';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
@@ -34,26 +35,16 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function useClaimAudit(claim: SrpClaim, load: (killmailId: number) => Promise<SrpAuditEntry[]>) {
-  const [loaded, setLoaded] = useState<{
-    key: string;
-    entries: SrpAuditEntry[] | 'failed';
-  } | null>(null);
-  const key = `${claim.killmailId}:${claim.state}`;
   const loadRef = useRef(load);
   useEffect(() => {
     loadRef.current = load;
   });
-  useEffect(() => {
-    let cancelled = false;
-    loadRef
-      .current(claim.killmailId)
-      .then((entries) => !cancelled && setLoaded({ key, entries }))
-      .catch(() => !cancelled && setLoaded({ key, entries: 'failed' }));
-    return () => {
-      cancelled = true;
-    };
-  }, [claim.killmailId, key]);
-  return loaded?.key === key ? loaded.entries : null;
+  const id = claim.killmailId;
+  const read = useKeyedLoad(
+    `${id}:${claim.state}`,
+    useCallback(() => loadRef.current(id), [id])
+  );
+  return read.status === 'ready' ? read.data : read.status === 'failed' ? 'failed' : null;
 }
 
 /** The claim's Jita appraisals (the lost ship and the nearest Doctrine Fit, no cargo), read once per claim. */
@@ -61,22 +52,16 @@ function useClaimValues(
   claim: SrpClaim,
   load: (killmailId: number) => Promise<SrpClaimValues>
 ): Read<SrpClaimValues> {
-  const [loaded, setLoaded] = useState<{ id: number; value: Read<SrpClaimValues> } | null>(null);
   const loadRef = useRef(load);
   useEffect(() => {
     loadRef.current = load;
   });
-  useEffect(() => {
-    let cancelled = false;
-    loadRef
-      .current(claim.killmailId)
-      .then((value) => !cancelled && setLoaded({ id: claim.killmailId, value }))
-      .catch(() => !cancelled && setLoaded({ id: claim.killmailId, value: 'failed' }));
-    return () => {
-      cancelled = true;
-    };
-  }, [claim.killmailId]);
-  return loaded?.id === claim.killmailId ? loaded.value : 'loading';
+  const id = claim.killmailId;
+  const read = useKeyedLoad(
+    String(id),
+    useCallback(() => loadRef.current(id), [id])
+  );
+  return read.status === 'ready' ? read.data : read.status === 'failed' ? 'failed' : 'loading';
 }
 
 export function SrpClaimDetail({

@@ -5,7 +5,8 @@
  * and never the fit checks or the Missing Skills chip, which stay on the
  * Character's real skills.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -32,18 +33,7 @@ const LEVELS = [0, 1, 2, 3, 4, 5];
 const MATCHES_SHOWN = 12;
 
 function useSkillCatalogue(enabled: boolean): SkillType[] | null {
-  const [skills, setSkills] = useState<SkillType[] | null>(null);
-  useEffect(() => {
-    if (!enabled || skills !== null) return;
-    let cancelled = false;
-    void loadSkills().then((loaded) => {
-      if (!cancelled) setSkills(loaded);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [enabled, skills]);
-  return skills;
+  return useKeyedLoad('skills', loadSkills, !enabled).data ?? null;
 }
 
 function LevelSelect({

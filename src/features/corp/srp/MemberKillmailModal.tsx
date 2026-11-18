@@ -1,10 +1,11 @@
 /** A pilot's own loss, opened from "Or pick a lost ship": the payout, the facts, the fit checked against doctrine, File claim. */
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ErrorBoundary } from '@/app/ErrorBoundary';
 import { Button, Modal, Spinner } from '@/components/ui';
 import { Pill } from '@/components/ui/Pill';
 import { repaymentHidden, shipFitValue } from '@/engine/srpAppraisal';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { formatIsk } from '@/lib/isk';
 import { useIsPhone } from '@/lib/useIsPhone';
 import type { DoctrineCheckRecord, DoctrinePreview } from '../srpTypes';
@@ -33,21 +34,16 @@ function usePreview(
   previewDoctrine: Props['previewDoctrine']
 ): Read<DoctrinePreview> {
   const { killmailId, killmailHash } = subject;
-  const [read, setRead] = useState<{ id: number; value: Read<DoctrinePreview> } | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    previewDoctrine(esiKillmailLink(killmailId, killmailHash)).then(
-      (value) =>
-        !cancelled && setRead({ id: killmailId, value: isUsablePreview(value) ? value : 'failed' }),
-      () => !cancelled && setRead({ id: killmailId, value: 'failed' })
-    );
-    return () => {
-      cancelled = true;
-    };
+  const load = useCallback(
+    () => previewDoctrine(esiKillmailLink(killmailId, killmailHash)),
     // `previewDoctrine` is a stable callback of the page; the loss is the only input.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [killmailId, killmailHash]);
-  return read?.id === killmailId ? read.value : 'loading';
+    [killmailId, killmailHash]
+  );
+  const read = useKeyedLoad(String(killmailId), load);
+  if (read.status === 'failed') return 'failed';
+  if (read.status !== 'ready') return 'loading';
+  return isUsablePreview(read.data) ? read.data : 'failed';
 }
 
 function Payout({ preview }: { preview: Read<DoctrinePreview> }) {

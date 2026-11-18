@@ -46,6 +46,8 @@ export interface PopExtraction {
   sourceCorporationId?: number;
   /** The chunk's make-up in units, when known (the stored `oreLines`). */
   oreLines?: readonly OreLine[];
+  /** The Survey an officer linked as the chunk's ore source (a Share Link id). */
+  surveyId?: string;
 }
 
 /** One published pop. Never carries ISK. */
@@ -74,6 +76,11 @@ export interface SharedPop {
    */
   oreShared?: boolean;
   notes: string;
+  /**
+   * The Survey linked to this pop (a Share Link id); absent when none, and whenever the settings
+   * hide the ore make-up. The id is the Survey's only privacy, so it goes only where the ore does.
+   */
+  surveyId?: string;
   /** The start link's rate. */
   ratePct: number;
   /** `audienceKey`s of who may read it. */
@@ -213,6 +220,7 @@ export function buildSharedPops(input: BuildSharedPopsInput): SharedPopsDoc | nu
           : null,
       oreShared: settings.showOre,
       notes: settings.notes,
+      ...(x.surveyId && settings.showOre ? { surveyId: x.surveyId } : {}),
       ratePct: startLinkRatePct(settings, input.bookRatePct(x)),
       audiences: settings.audiences.map(audienceKey),
       ...(owner !== undefined && owner !== input.corporationId

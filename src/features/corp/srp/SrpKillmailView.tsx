@@ -4,7 +4,8 @@
  * pilot's payout, the officer's appraisal comparison). The modals around it are
  * `MemberKillmailModal` and `OfficerKillmailModal`.
  */
-import { useEffect, useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { useTranslation } from 'react-i18next';
 import { TypeIconLabel } from '@/components/TypeIconLabel';
 import { Spinner, Tooltip } from '@/components/ui';
@@ -137,17 +138,13 @@ function slotLabel(t: ReturnType<typeof useTranslation>['t'], slot: FitSlot): st
 
 /** The SDE's rack for each module type; null once a read failed (the list then shows every slot item). */
 function useRackLookup(): ((typeId: number) => string | undefined) | null | undefined {
-  const [slots, setSlots] = useState<Record<string, string> | null | undefined>(undefined);
-  useEffect(() => {
-    let cancelled = false;
-    loadFittingSlots().then(
-      (map) => !cancelled && setSlots(map as Record<string, string>),
-      () => !cancelled && setSlots(null)
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const load = useAsyncLoad(loadFittingSlots);
+  const slots =
+    load.status === 'ready'
+      ? (load.data as Record<string, string>)
+      : load.status === 'failed'
+        ? null
+        : undefined;
   if (slots === undefined || slots === null) return slots;
   return (typeId) => slots[String(typeId)];
 }
