@@ -62,6 +62,7 @@ describe('compareGasRoute', () => {
     expect(r).toEqual({
       rawUnits: 800,
       compressedUnits: 1000,
+      pricedRawUnits: 800,
       rawCost: 5_600_000,
       compressedCost: 8_000_000,
       rawVolume: 800,
@@ -73,6 +74,7 @@ describe('compareGasRoute', () => {
   it('is unpriced, not free, when a price is missing', () => {
     const r = compareGasRoute([line(RAW, 800)], MAP, 0.8, { [RAW]: 7000 }, volumes);
     expect(r?.priced).toBe(false);
+    expect(r?.pricedRawUnits).toBe(0);
   });
 
   it('is null when the list has no gas', () => {

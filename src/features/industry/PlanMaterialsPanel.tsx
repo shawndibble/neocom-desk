@@ -155,24 +155,26 @@ export function PlanMaterialsPanel({
             group={group}
             update={update}
           />
-          {shopping.compressedGas && shopping.gasComparison && (
-            <Well className="mb-2 text-xs text-text-dim" data-testid="compressed-gas-comparison">
-              {t('industry.compressedGasCompare', {
-                yield: `${Math.round(GAS_DECOMPRESSION_YIELD * 100)}%`,
-                rawCost: formatIsk(shopping.gasComparison.rawCost),
-                compressedCost: formatIsk(shopping.gasComparison.compressedCost),
-                rawPerUnit: formatIsk(
-                  shopping.gasComparison.rawCost / shopping.gasComparison.rawUnits
-                ),
-                compressedPerUnit: formatIsk(
-                  shopping.gasComparison.compressedCost / shopping.gasComparison.rawUnits
-                ),
-                rawVolume: formatVolume(shopping.gasComparison.rawVolume),
-                compressedVolume: formatVolume(shopping.gasComparison.compressedVolume),
-              })}
-              {!shopping.gasComparison.priced && ` ${t('industry.compressedGasPartial')}`}
-            </Well>
-          )}
+          {shopping.compressedGas &&
+            shopping.gasComparison &&
+            shopping.gasComparison.pricedRawUnits > 0 && (
+              <Well className="mb-2 text-xs text-text-dim" data-testid="compressed-gas-comparison">
+                {t('industry.compressedGasCompare', {
+                  yield: `${Math.round(GAS_DECOMPRESSION_YIELD * 100)}%`,
+                  rawCost: formatIsk(shopping.gasComparison.rawCost),
+                  compressedCost: formatIsk(shopping.gasComparison.compressedCost),
+                  rawPerUnit: formatIsk(
+                    shopping.gasComparison.rawCost / shopping.gasComparison.pricedRawUnits
+                  ),
+                  compressedPerUnit: formatIsk(
+                    shopping.gasComparison.compressedCost / shopping.gasComparison.pricedRawUnits
+                  ),
+                  rawVolume: formatVolume(shopping.gasComparison.rawVolume),
+                  compressedVolume: formatVolume(shopping.gasComparison.compressedVolume),
+                })}
+                {!shopping.gasComparison.priced && ` ${t('industry.compressedGasPartial')}`}
+              </Well>
+            )}
           <MaterialsTable
             exportProps={materialsExport.tableProps}
             itemMenuFor={itemMenuFor}

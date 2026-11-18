@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   GAS_DECOMPRESSION_YIELD,
   compareGasRoute,
@@ -30,7 +30,7 @@ import type { usePlanMaterials } from './usePlanMaterials';
  *
  * Buying gas compressed (issue #6395) is a per-visit toggle, off by default:
  * on, the copied list names the compressed gas, sized so decompressing it
- * returns the raw quantity the plan needs, and `gasRoute` carries the
+ * returns the raw quantity the plan needs, and `gasComparison` carries the
  * raw-versus-compressed price and haul the pilot is trading. `hasGas` says
  * whether the plan has any gas to offer the toggle for.
  */
@@ -69,10 +69,6 @@ export function useShoppingListCopy(
   }, [gasMap, shoppingMaterials, hub]);
   // Keyed on the hub: the comparison is only fetched while the toggle is on.
   const gasRoute = useKeyedLoad(compressedGas ? hub.id : null, loadGasRoute);
-  const comparison = useMemo(
-    () => (gasRoute.status === 'ready' ? gasRoute.data : null),
-    [gasRoute]
-  );
 
   /**
    * The rejection is caught and shown, not left to `void`: a browser that
@@ -112,7 +108,6 @@ export function useShoppingListCopy(
     hasGas,
     compressedGas,
     setCompressedGas,
-    gasComparison: comparison,
-    gasComparisonLoading: compressedGas && gasRoute.status === 'loading',
+    gasComparison: gasRoute.data ?? null,
   };
 }

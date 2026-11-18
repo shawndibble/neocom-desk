@@ -47,9 +47,11 @@ export function compressGasLines<T extends MaterialCostLine>(
 }
 
 export interface GasRouteComparison {
-  /** Raw units the plan needs. */
+  /** Raw units the plan needs, priced or not. */
   rawUnits: number;
   compressedUnits: number;
+  /** The raw units behind the cost and volume totals: the denominator for a per-raw-unit figure. */
+  pricedRawUnits: number;
   rawCost: number;
   compressedCost: number;
   /** m3 hauled either way. */
@@ -74,6 +76,7 @@ export function compareGasRoute(
   const out: GasRouteComparison = {
     rawUnits: 0,
     compressedUnits: 0,
+    pricedRawUnits: 0,
     rawCost: 0,
     compressedCost: 0,
     rawVolume: 0,
@@ -102,6 +105,7 @@ export function compareGasRoute(
       out.priced = false;
       continue;
     }
+    out.pricedRawUnits += raw;
     out.rawCost += raw * rawPrice;
     out.compressedCost += compressed * compressedPrice;
     out.rawVolume += raw * rawVolume;
