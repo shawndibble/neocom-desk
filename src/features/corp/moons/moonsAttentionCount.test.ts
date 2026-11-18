@@ -103,3 +103,14 @@ describe('loadNeedsYouCount', () => {
     expect(loadDatedUnitPricesByHub).toHaveBeenCalledTimes(3);
   });
 });
+
+describe('loadBookPrices on a refinery page', () => {
+  it('prices the ore its moon docs hold, though no ledger row was read', async () => {
+    const doc = { mined: [{ typeId: 45492, quantity: 5 }], miners: [] };
+    await loadBookPrices({
+      ...book([]),
+      refinery: { structureId: 1, docs: new Map([['x', doc as never]]) },
+    });
+    expect(loadDatedUnitPricesByHub.mock.calls[0]![0]).toEqual([45492]);
+  });
+});
