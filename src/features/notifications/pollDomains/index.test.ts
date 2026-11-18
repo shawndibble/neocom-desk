@@ -26,6 +26,7 @@ import { stockTargetDomain } from './stockTargets';
 import { SUBJECT_ROUTED_EVENT_IDS } from '../notificationOptions';
 import { useStockLists } from '@/features/stockTargets/stockListsStore';
 import { eventEntry } from '../eventEntries';
+import { isServerPushedEvent } from '../serverEvents';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { resolveNames } from '@/features/character/names';
 import { getHubPrices, getStationPrices } from '@/market/prices';
@@ -136,10 +137,18 @@ function marketOrderHistoryEntry(overrides: Partial<MarketOrderHistory> = {}): M
   return { ...marketOrder(), state: 'expired', ...overrides };
 }
 
+const POLLED_EVENT_IDS = NOTIFICATION_EVENT_IDS.filter((id) => eventEntry(id).source !== null);
+
 describe('POLL_DOMAINS', () => {
-  it('covers every notification event exactly once', () => {
+  it('covers every polled notification event exactly once', () => {
     const covered = POLL_DOMAINS.flatMap((domain) => domain.eventIds);
-    expect([...covered].sort()).toEqual([...NOTIFICATION_EVENT_IDS].sort());
+    expect([...covered].sort()).toEqual([...POLLED_EVENT_IDS].sort());
+  });
+
+  it('leaves only server-pushed events without a domain', () => {
+    const unpolled = NOTIFICATION_EVENT_IDS.filter((id) => !POLLED_EVENT_IDS.includes(id));
+    expect(unpolled).toEqual(['vettingShared', 'corpTaxBookSyncStopped']);
+    for (const id of unpolled) expect(isServerPushedEvent(id)).toBe(true);
   });
 
   it('gives every domain a distinct id', () => {
@@ -217,8 +226,6 @@ describe('domain.diff: events derived from their entries (issue #1285)', () => {
       mercenaryDens: ['mercenaryDenReinforced', 'mercenaryDenAnarchy'],
       skyhooks: ['skyhookRaidable'],
       communities: ['communityJoinRequest', 'communityMemberJoined', 'communityRequestPledged'],
-      vetting: ['vettingShared'],
-      corpTaxBookSync: ['corpTaxBookSyncStopped'],
       sharedMoonPops: ['sharedMoonPop'],
     });
   });
@@ -1421,8 +1428,8 @@ describe('copy wiring', () => {
     vi.mocked(resolveNames).mockReset();
   });
 
-  it('gives every Notification Event exactly one owning domain', () => {
-    for (const eventId of NOTIFICATION_EVENT_IDS) {
+  it('gives every polled Notification Event exactly one owning domain', () => {
+    for (const eventId of POLLED_EVENT_IDS) {
       const owners = POLL_DOMAINS.filter((domain) => domain.eventIds.includes(eventId));
       expect(owners, eventId).toHaveLength(1);
       expect(domainForEvent(eventId)).toBe(owners[0]);
@@ -1479,6 +1486,21 @@ describe('copy wiring', () => {
     );
     expect(vi.mocked(loadUniverseType)).toHaveBeenCalledWith(587);
     expect(copy.body).toEqual("Kestrel's industry job for Rifter is complete.");
+  });
+
+  it('renders a server-only fire through its entry copy, with no domain', async () => {
+    const copy = await renderNotification(
+      {
+        eventId: 'vettingShared',
+        characterId: 1,
+        corporationId: 2,
+        reviewId: 'r1',
+        kind: 'application',
+      },
+      'Kestrel'
+    );
+    expect(copy.title).not.toBe('');
+    expect(copy.body).not.toBe('');
   });
 
   it('falls back to the id when a planet name does not resolve', async () => {

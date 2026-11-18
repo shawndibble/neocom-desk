@@ -131,7 +131,7 @@ export function defineDomain<TRaw, TSnapshot, TFire extends AnyNotificationFire,
     isSnapshotWith<TSnapshot>(spec.entriesKey, spec.isEntry)
   );
   const eventIds = NOTIFICATION_EVENT_IDS.filter(
-    (eventId) => eventEntry(eventId).source.id === spec.source.id
+    (eventId) => eventEntry(eventId).source?.id === spec.source.id
   );
   return {
     id: spec.source.id,
@@ -149,7 +149,7 @@ export function defineDomain<TRaw, TSnapshot, TFire extends AnyNotificationFire,
       const fires: AnyNotificationFire[] = [];
       for (const eventId of eventIds) {
         if (!enabledEvents.has(eventId)) continue;
-        fires.push(...eventEntry(eventId).diff(characterId, prev, next));
+        fires.push(...(eventEntry(eventId).diff?.(characterId, prev, next) ?? []));
       }
       return fires;
     },

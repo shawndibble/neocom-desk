@@ -27,17 +27,3 @@ export interface CorpTaxBookSyncStoppedFire {
   /** The stored status's `stoppedAt`: a schedule turned on again and stopped again is another. */
   stoppedAt: number;
 }
-
-/**
- * The Foreground Poller's snapshot: always empty. The open app shows a stopped schedule on the
- * book itself; the event arrives by push.
- */
-export interface SyncStoppedAlertSnapshot {
-  entries: never[];
-  nowMs: number;
-}
-
-/** Never fires: `corpTaxBookSyncStopped` is the server's to raise. */
-export function diffCorpTaxBookSyncStopped(): CorpTaxBookSyncStoppedFire[] {
-  return [];
-}
