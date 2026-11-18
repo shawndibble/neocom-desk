@@ -19,6 +19,7 @@ import type { MaterialRecipe } from '@/engine/industry/makeOrBuy';
 import { MAX_SUB_BUILD_DEPTH, usable } from '@/engine/industry/materialResolution';
 import { effectiveMaterials } from '@/engine/industry/materials';
 import { clampMe } from '@/engine/industry/efficiency';
+import { isCopyOnlyBlueprint } from '@/engine/industry/copyOnlyBlueprints';
 import { sizeRuns } from '@/engine/industry/runSizing';
 import type { SubBuildContext } from '@/engine/industry/subBuild';
 import {
@@ -293,6 +294,7 @@ export function acquisitionForLookup(
       // A Member's reaction formula cannot be copied, so none is ever offered.
       communityOffers: isReaction ? [] : acquisitionSources.communityOffersFor?.(blueprintTypeID),
       bpoSellPrice: acquisitionSources.hubPrices[blueprintTypeID] ?? null,
+      copyOnly: isCopyOnlyBlueprint(blueprintTypeID),
       assumedMeForUnowned: sources.assumedMeForUnowned ?? 0,
     };
 
@@ -340,6 +342,7 @@ export function acquisitionForLookup(
       blueprintTypeID,
       line,
       coverage: resolved.coverage,
+      ...(resolved.copyOnly ? { copyOnly: true as const } : {}),
     };
   };
 }

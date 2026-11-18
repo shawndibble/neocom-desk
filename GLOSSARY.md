@@ -154,6 +154,7 @@ here — they go one per file in `docs/context/decisions/`.
   same snapshot unnarrowed, and from the History tab, which is one
   Character's own contracts read straight from ESI.
 - **Offer** (BPC Contract Search): one for-sale row of that snapshot — in BPC Sourcing, a single blueprint copy listing at a single price. Not a **copy**: one contract can offer `quantity: 3` copies at one price, so a count of offers is smaller than a count of copies. Every count on the search says "offers", because an offer is what a buyer chooses between.
+- **Copy-only blueprint**: A blueprint that exists only as fixed-run copies (a few Trig capital components and Spatial Attunement Unit). A plan never assumes an original for one; with no copy owned or offered its Blueprint Acquisition line reads "copy-only, none owned" at ME 0.
 - **BPO**: An owned Blueprint Original — an ESI blueprint instance with
   unlimited runs. Distinct from a **BPC**, which depletes. Unlike a BPC, a BPO
   is sometimes an ordinarily marketable item (mostly T1). The only acquisition

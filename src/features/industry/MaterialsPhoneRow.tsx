@@ -201,7 +201,12 @@ export function MaterialsPhoneRow({
       ) : tier ? (
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
           <span className="text-[0.6875rem] text-text-dim">
-            {t('industry.blueprintAcquisitionTier', tier)}
+            {t(
+              tier.copyOnly
+                ? 'industry.blueprintAcquisitionTierCopyOnly'
+                : 'industry.blueprintAcquisitionTier',
+              tier
+            )}
           </span>
           {!ownedBlueprint && price}
         </div>

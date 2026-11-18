@@ -126,6 +126,7 @@ export function materialsCsvColumns(
         const tier = material.acquisitionTier;
         if (!tier) return null;
         if (tier.community) return tier.community.memberName;
+        if (tier.copyOnly) return t('industry.csvBlueprintCopyOnly');
         return tier.invented ? t('industry.csvBlueprintInvented') : null;
       },
     },
