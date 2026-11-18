@@ -47,6 +47,27 @@ export function PlanRunsControl({
     runs: number;
     profit: number | null;
   } | null>(null);
+  const stockRunsText =
+    stockRuns &&
+    (stockRuns.runs > 0
+      ? t(
+          stockRuns.limitingName === null
+            ? 'industry.stockRuns.covers'
+            : 'industry.stockRuns.coversLimited',
+          {
+            count: stockRuns.runs,
+            runs: formatNumber(stockRuns.runs),
+            name: stockRuns.limitingName,
+          }
+        )
+      : t(
+          stockRuns.limitingName === null
+            ? 'industry.stockRuns.none'
+            : 'industry.stockRuns.noneLimited',
+          {
+            name: stockRuns.limitingName,
+          }
+        ));
   return (
     <span className="flex flex-wrap items-center gap-2 text-sm text-text-dim">
       <SourcingInput
@@ -80,16 +101,7 @@ export function PlanRunsControl({
       {stockRuns && (
         <span className="flex flex-wrap items-center gap-2" data-testid="stock-runs">
           <span aria-hidden="true">·</span>
-          <span className="text-xs">
-            {stockRuns.runs > 0
-              ? t('industry.stockRuns.covers', {
-                  count: stockRuns.runs,
-                  runs: formatNumber(stockRuns.runs),
-                })
-              : t('industry.stockRuns.none')}
-            {stockRuns.limitingName !== null &&
-              ` ${t('industry.stockRuns.limitedBy', { name: stockRuns.limitingName })}`}
-          </span>
+          <span className="text-xs">{stockRunsText}</span>
           {stockRuns.runs > 0 && stockRuns.runs !== runs && (
             <Button size="sm" onClick={() => onRunsChange(stockRuns.runs)}>
               {t('industry.stockRuns.set', { runs: formatNumber(stockRuns.runs) })}

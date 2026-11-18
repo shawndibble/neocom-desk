@@ -3,11 +3,11 @@ import { withoutOwnedQuantities } from '@/engine/industry/materialResolution';
 import { maxRunsFromStock, type MaxRunsFromStock } from '@/engine/industry/stockRuns';
 import { MAX_JOB_RUNS } from '@/engine/industry/types';
 import { materialTableRows } from './subBuildPlan';
-import type { useResolvedPlan } from './useResolvedPlan';
+import type { UseResolvedPlanResult } from './useResolvedPlan';
 
 interface PlanStockRunsInput {
   plan: BuildPlanRecord;
-  resolveQuantitiesAt: ReturnType<typeof useResolvedPlan>['resolveQuantitiesAt'];
+  resolveQuantitiesAt: UseResolvedPlanResult['resolveQuantitiesAt'];
   /** The Owned-Stock Offer's quantity per type (`offerableStock`). */
   availableFor: (typeID: number) => number;
 }

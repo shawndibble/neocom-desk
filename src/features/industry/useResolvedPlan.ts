@@ -130,7 +130,5 @@ export function useResolvedPlan({
     [resolveWith, walkDepth, depthNeedsOf]
   );
 
-  const resolveQuantitiesAt = resolveWith;
-
-  return { resolved, depth, resolveAt, resolveQuantitiesAt };
+  return { resolved, depth, resolveAt, resolveQuantitiesAt: resolveWith };
 }

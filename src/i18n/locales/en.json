@@ -3406,8 +3406,10 @@
     "stockRuns": {
       "covers_one": "Stock covers {{runs}} run.",
       "covers_other": "Stock covers {{runs}} runs.",
+      "coversLimited_one": "Stock covers {{runs}} run. Limited by {{name}}.",
+      "coversLimited_other": "Stock covers {{runs}} runs. Limited by {{name}}.",
       "none": "Stock covers no runs.",
-      "limitedBy": "Limited by {{name}}.",
+      "noneLimited": "Stock covers no runs. Limited by {{name}}.",
       "set": "Set to {{runs}}"
     },
     "facility": "Facility",
