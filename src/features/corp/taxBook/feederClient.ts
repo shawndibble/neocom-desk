@@ -8,7 +8,7 @@ import type { ArchiveReason } from '@/engine/corpTaxBook/moonOwnerRefineries';
 import type { FeederMode } from '@/engine/corpTaxBook/feederAccrual';
 import type { OutgoingDonation, Payee } from '@/engine/corpTaxBook/payouts';
 import { callableErrorReason } from '@/lib/callableError';
-import { call } from './bookClient';
+import { callSignedIn } from '@/sync/signedInCallable';
 import type { PayeeSetResult } from './feederViewClient';
 
 /** The query parameter an invite link carries its code in. */
@@ -71,7 +71,7 @@ export async function getFeederStatus(
 ): Promise<FeederSetupStatus> {
   const accessToken = await getValidAccessToken(characterId);
   try {
-    return await call<{ corporationId: number; accessToken: string }, FeederSetupStatus>(
+    return await callSignedIn<{ corporationId: number; accessToken: string }, FeederSetupStatus>(
       characterId,
       'getCorpTaxBookFeederStatusCallable',
       { corporationId, accessToken }
@@ -95,7 +95,7 @@ export function previewFeederInvite(
   characterId: number,
   code: string
 ): Promise<FeederInvitePreview> {
-  return call(characterId, 'previewCorpTaxBookFeederInviteCallable', { code });
+  return callSignedIn(characterId, 'previewCorpTaxBookFeederInviteCallable', { code });
 }
 
 /** Leave the accounting corporation: revokes the grant at SSO and deletes it. Immediate. */
@@ -104,7 +104,10 @@ export async function leaveFeeder(
   corporationId: number
 ): Promise<{ left: true; owedIsk: number | null }> {
   const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'leaveCorpTaxBookFeederCallable', { corporationId, accessToken });
+  return callSignedIn(characterId, 'leaveCorpTaxBookFeederCallable', {
+    corporationId,
+    accessToken,
+  });
 }
 
 /** A new invite link for a book that collects for others; `offeredOwnerRatePct` is optional. */
@@ -114,7 +117,7 @@ export async function createFeederInvite(
   offeredOwnerRatePct?: number
 ): Promise<{ code: string; inviteId: string }> {
   const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'createCorpTaxBookFeederInviteCallable', {
+  return callSignedIn(characterId, 'createCorpTaxBookFeederInviteCallable', {
     corporationId,
     accessToken,
     ...(offeredOwnerRatePct === undefined ? {} : { offeredOwnerRatePct }),
@@ -138,7 +141,7 @@ export async function setFeederRate(
   asOf?: string
 ): Promise<{ ok: true }> {
   const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'setCorpTaxBookFeederRateCallable', {
+  return callSignedIn(characterId, 'setCorpTaxBookFeederRateCallable', {
     corporationId,
     accessToken,
     feederCorporationId,
@@ -157,7 +160,7 @@ export async function setBookFeederPayee(
   notify: boolean
 ): Promise<PayeeSetResult> {
   const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'setCorpTaxBookFeederPayeeFromBookCallable', {
+  return callSignedIn(characterId, 'setCorpTaxBookFeederPayeeFromBookCallable', {
     corporationId,
     accessToken,
     feederCorporationId,
@@ -175,7 +178,7 @@ export async function setRefineryLabel(
   label: string | null
 ): Promise<{ ok: true }> {
   const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'setCorpTaxBookRefineryLabelCallable', {
+  return callSignedIn(characterId, 'setCorpTaxBookRefineryLabelCallable', {
     corporationId,
     accessToken,
     feederCorporationId,
@@ -197,7 +200,7 @@ export async function setRefineryArchive(
   reason: ArchiveReason = 'manual'
 ): Promise<{ ok: true }> {
   const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'setCorpTaxBookRefineryArchiveCallable', {
+  return callSignedIn(characterId, 'setCorpTaxBookRefineryArchiveCallable', {
     corporationId,
     accessToken,
     feederCorporationId,
@@ -216,7 +219,7 @@ export async function setFeederMode(
   note?: string
 ): Promise<{ ok: true }> {
   const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'setCorpTaxBookFeederModeCallable', {
+  return callSignedIn(characterId, 'setCorpTaxBookFeederModeCallable', {
     corporationId,
     accessToken,
     feederCorporationId,
@@ -233,7 +236,7 @@ export async function recordFeederPayout(
   payout: { amount: number; date: string; method: 'donation' | 'contract' | 'other' }
 ): Promise<{ id: string }> {
   const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'recordCorpTaxBookFeederPayoutCallable', {
+  return callSignedIn(characterId, 'recordCorpTaxBookFeederPayoutCallable', {
     corporationId,
     accessToken,
     feederCorporationId,
@@ -250,7 +253,7 @@ export async function markFeederPayout(
   notAPayout: boolean
 ): Promise<{ ok: true }> {
   const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'markCorpTaxBookFeederPayoutCallable', {
+  return callSignedIn(characterId, 'markCorpTaxBookFeederPayoutCallable', {
     corporationId,
     accessToken,
     feederCorporationId,
@@ -265,7 +268,7 @@ export async function reconcileFeederPayouts(
   corporationId: number,
   outgoing: readonly OutgoingDonation[]
 ): Promise<{ attached: number; recorded: number }> {
-  return call(characterId, 'reconcileCorpTaxBookFeederPayoutsCallable', {
+  return callSignedIn(characterId, 'reconcileCorpTaxBookFeederPayoutsCallable', {
     corporationId,
     accessToken: await getValidAccessToken(characterId),
     // Old servers require it; the new one reads the journal itself.
@@ -280,7 +283,7 @@ export async function revokeFeederInvite(
   inviteId: string
 ): Promise<{ revoked: true }> {
   const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'revokeCorpTaxBookFeederInviteCallable', {
+  return callSignedIn(characterId, 'revokeCorpTaxBookFeederInviteCallable', {
     corporationId,
     accessToken,
     inviteId,
@@ -292,7 +295,7 @@ export async function listFeederInvites(
   characterId: number,
   corporationId: number
 ): Promise<OpenInvite[]> {
-  const { invites } = await call<{ corporationId: number }, { invites: OpenInvite[] }>(
+  const { invites } = await callSignedIn<{ corporationId: number }, { invites: OpenInvite[] }>(
     characterId,
     'listCorpTaxBookFeederInvitesCallable',
     { corporationId }
@@ -321,7 +324,7 @@ export async function startFeederRemoval(
   feederCorporationId: number
 ): Promise<StartedRemoval> {
   const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'startCorpTaxBookFeederRemovalCallable', {
+  return callSignedIn(characterId, 'startCorpTaxBookFeederRemovalCallable', {
     corporationId,
     accessToken,
     feederCorporationId,
@@ -336,7 +339,7 @@ export async function recordFeederRemovalSent(
   sentAt?: number
 ): Promise<{ effectiveAt: number | null }> {
   const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'recordCorpTaxBookFeederRemovalSentCallable', {
+  return callSignedIn(characterId, 'recordCorpTaxBookFeederRemovalSentCallable', {
     corporationId,
     accessToken,
     feederCorporationId,
@@ -355,7 +358,7 @@ export async function claimFeederStaleMail(
 ): Promise<{ recipients: number[]; ownerRecipients: number[] }> {
   const accessToken = await getValidAccessToken(characterId);
   // This client's mail queue marks the mail sent, so an unsent claim may lapse to another officer.
-  return call(characterId, 'claimCorpTaxBookFeederStaleMailCallable', {
+  return callSignedIn(characterId, 'claimCorpTaxBookFeederStaleMailCallable', {
     corporationId,
     accessToken,
     feederCorporationId,
@@ -374,7 +377,7 @@ export async function markFeederStaleMailSent(
   staleSince: number
 ): Promise<void> {
   const accessToken = await getValidAccessToken(characterId);
-  await call(characterId, 'markCorpTaxBookFeederStaleMailSentCallable', {
+  await callSignedIn(characterId, 'markCorpTaxBookFeederStaleMailSentCallable', {
     corporationId,
     accessToken,
     feederCorporationId,
@@ -389,7 +392,7 @@ export async function cancelFeederRemoval(
   feederCorporationId: number
 ): Promise<{ recipients: number[] }> {
   const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'cancelCorpTaxBookFeederRemovalCallable', {
+  return callSignedIn(characterId, 'cancelCorpTaxBookFeederRemovalCallable', {
     corporationId,
     accessToken,
     feederCorporationId,
@@ -410,7 +413,7 @@ export type RemovalLinkState =
     };
 
 export function getRemovalLink(characterId: number, code: string): Promise<RemovalLinkState> {
-  return call(characterId, 'getCorpTaxBookRemovalLinkCallable', { code });
+  return callSignedIn(characterId, 'getCorpTaxBookRemovalLinkCallable', { code });
 }
 
 /** End the removal now, as the payee. `ended: false` is the same neutral answer as an expired link. */
@@ -418,5 +421,5 @@ export function forceRemoval(
   characterId: number,
   code: string
 ): Promise<{ ended: boolean; effectiveAt: number | null }> {
-  return call(characterId, 'forceCorpTaxBookRemovalCallable', { code });
+  return callSignedIn(characterId, 'forceCorpTaxBookRemovalCallable', { code });
 }

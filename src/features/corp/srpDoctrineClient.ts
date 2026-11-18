@@ -10,7 +10,7 @@ import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { srpDoctrineBackendOverride } from './srpDoctrineBackendOverride';
 import { invalidateSrpOfficer } from './srpClient';
-import { call } from './taxBook/bookClient';
+import { callSignedIn } from '@/sync/signedInCallable';
 import type {
   DoctrineFit,
   DoctrinePreview,
@@ -46,7 +46,7 @@ async function directorCall<Out>(
 ): Promise<Out> {
   const accessToken = await getValidAccessToken(characterId);
   try {
-    return await call<Record<string, unknown>, Out>(characterId, name, {
+    return await callSignedIn<Record<string, unknown>, Out>(characterId, name, {
       corporationId,
       accessToken,
       ...data,
@@ -89,7 +89,7 @@ export async function previewSrpDoctrineCheck(
   killmail: string
 ): Promise<DoctrinePreview> {
   const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'previewSrpDoctrineCheckCallable', {
+  return callSignedIn(characterId, 'previewSrpDoctrineCheckCallable', {
     corporationId,
     accessToken,
     killmail,
@@ -107,7 +107,7 @@ export async function listCorpDoctrineFits(
   const stand = srpDoctrineBackendOverride();
   if (stand) return stand.memberList?.() ?? [];
   const accessToken = await getValidAccessToken(characterId);
-  const { fits } = await call<Record<string, unknown>, { fits: MemberDoctrineFit[] }>(
+  const { fits } = await callSignedIn<Record<string, unknown>, { fits: MemberDoctrineFit[] }>(
     characterId,
     'listSrpDoctrineFitsCallable',
     { corporationId, accessToken }

@@ -12,6 +12,9 @@
  *   (`eventThresholdFields.ts`), or `null`,
  * - `rowHintKey` — a delivery caveat Settings shows under its row, or `null`.
  *
+ * A server-only event (`ServerOnlyEventEntry`: backend-pushed, never polled) has
+ * `source: null` and no `diff`, so no poll domain owns it.
+ *
  * Every field is required, and the catalog is keyed by `NotificationEventId`
  * (itself derived from `events.ts`'s catalog), so a new event that lacks any
  * part of this is a type error here rather than a silent gap. `projection` is
@@ -192,16 +195,8 @@ import {
   type CalendarNames,
   type MemberNames,
 } from './domainCopy';
-import {
-  diffVettingShared,
-  type VettingAlertSnapshot,
-  type VettingSharedFire,
-} from '@/engine/vettingAlert';
-import {
-  diffCorpTaxBookSyncStopped,
-  type CorpTaxBookSyncStoppedFire,
-  type SyncStoppedAlertSnapshot,
-} from '@/engine/corpTaxBook/syncStoppedAlert';
+import type { VettingSharedFire } from '@/engine/vettingAlert';
+import type { CorpTaxBookSyncStoppedFire } from '@/engine/corpTaxBook/syncStoppedAlert';
 import type { EveNotificationNames } from './eveNotificationText';
 import type { NotificationEventId } from './events';
 import { THRESHOLD_FIELDS, type ThresholdField } from './eventThresholdFields';
@@ -295,8 +290,6 @@ export const SNAPSHOT_SOURCES = {
   skyhooksNearby: source<SkyhookAlertSnapshot, SkyhookNames>('skyhooksNearby'),
   communities: source<CommunityAlertSnapshot>('communities'),
   signIn: source<SignInSnapshot>('signIn'),
-  vetting: source<VettingAlertSnapshot>('vetting'),
-  corpTaxBookSync: source<SyncStoppedAlertSnapshot>('corpTaxBookSync'),
   sharedMoonPops: source<SharedMoonPopSnapshot, SharedMoonPopNames>('sharedMoonPops'),
 } as const;
 
@@ -326,6 +319,15 @@ export interface EventThresholds {
   readonly hintKey: string | null;
   /** i18n key of the disclosure heading when the generic "Warn-ahead times" doesn't fit. */
   readonly headingKey?: string;
+}
+
+/** An event only the backend raises (ADR 0027): no snapshot to diff, so no poll domain. */
+export interface ServerOnlyEventEntry<TFire> {
+  readonly source: null;
+  readonly copy: DomainCopy<TFire, NoNames>;
+  readonly projection: null;
+  readonly thresholds: null;
+  readonly rowHintKey: string | null;
 }
 
 /** One Event Entry, as written. `defineEvent` checks it against its source's types. */
@@ -362,16 +364,24 @@ function defineEvent<
   return entry;
 }
 
+function defineServerOnlyEvent<TFire>(
+  entry: Pick<ServerOnlyEventEntry<TFire>, 'copy' | 'rowHintKey'>
+): ServerOnlyEventEntry<TFire> {
+  return { source: null, projection: null, thresholds: null, ...entry };
+}
+
 /**
  * An entry as the poll loop and Settings see it, its types erased. Method
  * syntax on purpose: method parameters compare bivariantly, which is what
  * lets every typed entry satisfy this one shape without a cast. The domain
  * only ever hands an entry its own source's snapshot and fires
- * (`pollDomains/`), which is what makes that sound in practice.
+ * (`pollDomains/`), which is what makes that sound in practice. A server-only
+ * entry has no domain: it has no `diff` and `source` is null.
  */
 export interface ErasedEventEntry {
-  readonly source: { readonly id: string };
-  diff(characterId: number, prev: unknown, next: unknown): AnyNotificationFire[];
+  /** Null for a server-only event: no poll domain fetches or diffs it. */
+  readonly source: { readonly id: string } | null;
+  diff?(characterId: number, prev: unknown, next: unknown): AnyNotificationFire[];
   readonly copy: {
     poll(fire: unknown, characterName: string, names: unknown): NotificationCopy;
     subjectOf?(fire: unknown): number | undefined;
@@ -789,22 +799,13 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     thresholds: null,
     rowHintKey: null,
   }),
-  // Raised by the backend alone (`pollDomains/vetting.ts`): the diff never fires.
-  vettingShared: defineEvent({
-    source: SNAPSHOT_SOURCES.vetting,
-    diff: diffVettingShared,
+  // Raised by the backend alone (ADR 0027): no poll domain, so no diff.
+  vettingShared: defineServerOnlyEvent<VettingSharedFire>({
     copy: vettingSharedCopy,
-    projection: null,
-    thresholds: null,
     rowHintKey: 'settings.notifications.vettingSharedHint',
   }),
-  // Raised by the backend alone (`pollDomains/corpTaxBookSync.ts`): the diff never fires.
-  corpTaxBookSyncStopped: defineEvent({
-    source: SNAPSHOT_SOURCES.corpTaxBookSync,
-    diff: diffCorpTaxBookSyncStopped,
+  corpTaxBookSyncStopped: defineServerOnlyEvent<CorpTaxBookSyncStoppedFire>({
     copy: corpTaxBookSyncStoppedCopy,
-    projection: null,
-    thresholds: null,
     rowHintKey: 'settings.notifications.corpTaxBookSyncStoppedHint',
   }),
 } satisfies { readonly [K in NotificationEventId]: ErasedEntryFor<K> };

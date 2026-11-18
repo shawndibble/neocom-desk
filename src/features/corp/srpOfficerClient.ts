@@ -29,7 +29,7 @@ import type {
 } from './srpClaimTypes';
 import { invalidateSrpOfficer } from './srpClient';
 import type { SrpClaimValues } from './srpTypes';
-import { call } from './taxBook/bookClient';
+import { callSignedIn } from '@/sync/signedInCallable';
 
 const corpDoc = (characterId: number, corporationId: number, name: string) =>
   collection(getSyncFirestore(characterId), 'corps', String(corporationId), name);
@@ -164,7 +164,7 @@ async function officerCall<Out>(
 ): Promise<Out> {
   const accessToken = await getValidAccessToken(characterId);
   try {
-    const out = await call<Record<string, unknown>, Out>(characterId, name, {
+    const out = await callSignedIn<Record<string, unknown>, Out>(characterId, name, {
       corporationId,
       accessToken,
       ...data,
