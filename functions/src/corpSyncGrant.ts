@@ -107,6 +107,12 @@ export interface CorpSyncGrantDoc {
    */
   readsStructures?: boolean;
   /**
+   * Feeder grants: the token also carries `esi-characters.read_notifications.v1`, so the sync
+   * reads the holder's Extraction started notifications for each chunk's ore. Absent on grants
+   * from before: their chunks' ore comes from a linked Survey or stays unknown.
+   */
+  readsNotifications?: boolean;
+  /**
    * Book grants: when the scheduled run next syncs this book (ms). The run queries `<= now`, so a
    * book synced within `SYNC_REST_MS` is not read at all. Feeder grants never carry it (the feeder
    * pass reads them). A book grant from before it is backfilled as due.
@@ -764,7 +770,8 @@ export async function syncOneFeeder(
       esi,
       collectorCorporationId,
       feederNow,
-      refreshed.accessToken
+      refreshed.accessToken,
+      live.readsNotifications === true ? live.characterId : undefined
     );
   } catch (err) {
     deps.log('Moon owner extractions read failed', {

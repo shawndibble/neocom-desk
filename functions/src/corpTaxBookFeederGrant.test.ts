@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { FEEDER_SYNC_SCOPES } from './corpSyncScopes.js';
 import {
   aggregateRefineries,
+  feederGrantReadsNotifications,
   feederGrantReadsStructures,
   parseFeederCall,
   parseSaveFeederGrantInput,
@@ -80,6 +82,8 @@ describe('feeder grant scopes (#4654)', () => {
 
   it('still takes a grant from before, with the mining scope only', () => {
     expect(feederGrantReadsStructures([MINING])).toBe(false);
+    expect(feederGrantReadsNotifications([MINING, STRUCTURES])).toBe(false);
+    expect(feederGrantReadsNotifications(FEEDER_SYNC_SCOPES)).toBe(true);
   });
 
   it('refuses a grant without the mining scope', () => {

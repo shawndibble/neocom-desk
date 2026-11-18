@@ -19137,7 +19137,7 @@
         "title": "Share your mining ledger",
         "sees": {
           "title": "They will see",
-          "body": "Who mined at your refineries, how much and what, and when. We also read your refineries' names and systems."
+          "body": "Who mined at your refineries, how much and what, and when. We also read your refineries' names and systems, and the moon mining notifications your Character receives (what is in each chunk). Its other notifications are ignored."
         },
         "cannot": {
           "title": "They cannot",
