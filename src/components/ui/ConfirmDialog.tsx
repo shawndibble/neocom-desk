@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from './Button';
 import { Modal } from './Modal';
-import { DialogFooter } from '@/components/ui/DialogFooter';
+import { DialogFooter } from './DialogFooter';
 
 /** A confirm for one action: body text, a danger or plain action, and its own failure line. */
 export function ConfirmDialog({
