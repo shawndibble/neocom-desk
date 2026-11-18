@@ -219,6 +219,43 @@ describe('ownedStockView', () => {
     expect(detection.lowerBound).toBe(false);
   });
 
+  it('reports what jobs took out of the scoped stock, and only what the scope saw', () => {
+    const elsewhere: OwnedStockPlacement = { ...placement(60), locationId: 60008494 };
+    const before = new Map([[34, { quantity: 100, placements: [placement(40), elsewhere] }]]);
+    const after = new Map([[34, { quantity: 90, placements: [placement(30), elsewhere] }]]);
+    const base = {
+      stock: after,
+      stockBeforeJobs: before,
+      reductions: [{ jobId: 1, blueprintName: 'Drake Blueprint', typeID: 34, quantity: 10 }],
+      characterNames: new Map<number, string>(),
+      locationNames: new Map<number, string>(),
+      incompleteCharacters: [],
+    };
+    const inScope = ownedStockView(
+      {
+        ...base,
+        scope: {
+          mode: 'selected',
+          locations: [{ characterId: 7, locationId: 60003760, locationType: 'station' }],
+        },
+      },
+      t
+    ).detection;
+    expect(inScope.reducedFor?.(34)).toEqual({ quantity: 10, blueprintNames: ['Drake Blueprint'] });
+    expect(inScope.reducedFor?.(35)).toBeNull();
+    const outOfScope = ownedStockView(
+      {
+        ...base,
+        scope: {
+          mode: 'selected',
+          locations: [{ characterId: 7, locationId: 60008494, locationType: 'station' }],
+        },
+      },
+      t
+    ).detection;
+    expect(outOfScope.reducedFor?.(34)).toBeNull();
+  });
+
   it.each([
     { name: 'no incomplete sources', incomplete: [], corp: undefined, expected: [] },
     { name: 'an incomplete Character', incomplete: ['Alt'], corp: undefined, expected: ['Alt'] },

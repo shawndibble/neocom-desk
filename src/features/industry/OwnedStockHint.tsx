@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Tooltip, textActionClassName } from '@/components/ui';
 import type { SiblingClaim } from '@/engine/industry/groupStockClaims';
-import type { OwnedStockDetection } from './ownedStockDetection';
+import type { JobReduction, OwnedStockDetection } from './ownedStockDetection';
 import { formatCount } from '@/lib/formatCount';
 
 interface OwnedStockHintProps {
@@ -19,6 +19,11 @@ interface OwnedStockHintProps {
    * #3992), already taken out of `suggestion`. Empty or absent: no claim.
    */
   claimedAhead?: readonly SiblingClaim[];
+  /**
+   * Stock jobs installed after the assets read already consumed (issue
+   * #6386), already taken out of `suggestion`. Absent or null: nothing reduced.
+   */
+  reduction?: JobReduction | null;
   onApply: () => void;
 }
 
@@ -68,6 +73,7 @@ export function OwnedStockHint({
   materialName,
   suggestion,
   claimedAhead = [],
+  reduction = null,
   onApply,
 }: OwnedStockHintProps) {
   const { t } = useTranslation();
@@ -92,6 +98,13 @@ export function OwnedStockHint({
             quantity: formatCount(claimedQuantity),
             count: claimedAhead.length,
           });
+  const reducedNote =
+    reduction === null
+      ? null
+      : t('industry.jobReducedOffer', {
+          quantity: formatCount(reduction.quantity),
+          jobs: reduction.blueprintNames.join(', '),
+        });
   const owned = claim === null ? detected : `${detected} · ${claim}`;
 
   const offer = (
@@ -109,17 +122,18 @@ export function OwnedStockHint({
         {/* Not the number: it made the Have column wrap, and Need beside the
             field plus this tooltip already say how much. The accessible name
             above still carries what a click will write. */}
-        {claim === null
+        {claim === null && reducedNote === null
           ? t('industry.useDetected')
           : t('industry.useDetectedQuantity', { quantity: formatCount(suggestion) })}
       </button>
     </Tooltip>
   );
-  if (claim === null) return offer;
+  const note = [claim, reducedNote].filter((part) => part !== null).join(' · ');
+  if (note === '') return offer;
   return (
     <span className="flex flex-wrap items-baseline justify-end gap-x-1">
       <span className="text-[0.6875rem] text-text-dim">
-        {claim}
+        {note}
         <span aria-hidden="true"> ·</span>
       </span>
       {offer}
