@@ -9078,6 +9078,9 @@
     "fetchTruncatedRetry": "Try again",
     "unknownValue": "-",
     "noEstimate": "No estimate",
+    "cost": {
+      "each": "each"
+    },
     "abyssal": {
       "estimated_one": "{{count}} abyssal module at MutaMarket's estimate",
       "estimated_other": "{{count}} abyssal modules at MutaMarket's estimate",
@@ -9263,6 +9266,7 @@
     "columns": {
       "quantity": "Qty",
       "volume": "m³",
+      "cost": "Cost basis",
       "asc": "ascending",
       "desc": "descending",
       "sortAria": "Sort by {{label}}",

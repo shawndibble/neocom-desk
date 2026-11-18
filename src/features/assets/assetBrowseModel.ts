@@ -76,6 +76,8 @@ export interface AssetItemActions {
   /** Material typeID -> the character's own Build Plan consuming it; null until the blueprint catalog has loaded. */
   materialPlanMap: ReadonlyMap<number, BuildPlanRecord> | null;
   onViewInIndustryAsMaterial: (typeId: number) => void;
+  /** Unit Stock Cost Basis of the types the Character holds that their history covers; null when none are offered (nothing covered, or the list spans Characters). */
+  stockCostByTypeId: ReadonlyMap<number, { unitCost: number }> | null;
   /** Blueprint typeIDs for the BPO badge; null until loaded, or when nothing listed can be a blueprint. */
   blueprintTypeIds: ReadonlySet<number> | null;
 }

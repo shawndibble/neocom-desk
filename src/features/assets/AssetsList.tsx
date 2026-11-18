@@ -501,7 +501,12 @@ export function AssetsList({
               className="min-h-0 flex-1 overflow-y-auto"
             >
               {showItemColumns && (
-                <ItemColumnLabels sort={levelSort} onSort={toggleLevelSort} t={t} />
+                <ItemColumnLabels
+                  showCost={assetItemActions.stockCostByTypeId !== null}
+                  sort={levelSort}
+                  onSort={toggleLevelSort}
+                  t={t}
+                />
               )}
               <div
                 role="presentation"

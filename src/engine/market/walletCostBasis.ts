@@ -25,8 +25,24 @@ export interface WalletTrade {
   isPersonal: boolean;
 }
 
+/**
+ * Units that entered stock without a wallet buy: a Production Run's output,
+ * priced at materials cost + job fee over quantity (issue #6381). They join
+ * the FIFO queue as lots, so a wallet sell consumes them like any other.
+ */
+export interface ProductionLot {
+  /** ISO timestamp the run was logged. */
+  date: string;
+  typeId: number;
+  quantity: number;
+  /** Total cost of the run over its quantity. */
+  unitCost: number;
+}
+
 export interface WalletCostBasisInput {
   transactions: readonly WalletTrade[];
+  /** Production Runs of this type, joining the buys as lots. */
+  productionLots?: readonly ProductionLot[];
   typeId: number;
   /** Units on the character's unlinked sell orders of this type. */
   pool: number;
@@ -66,13 +82,25 @@ export function walletCostBasis(input: WalletCostBasisInput): WalletCostBasisRes
   const truncated = input.truncated ?? false;
   if (!(pool > 0)) return null;
 
-  const trades = input.transactions
+  // A run sorts before a same-instant fill: it was delivered, then sold.
+  const fills = input.transactions
     .filter((t) => t.isPersonal && t.typeId === typeId && t.quantity > 0)
+    .map((t) => ({ ...t, id: t.transactionId }));
+  const runs = (input.productionLots ?? [])
+    .filter((l) => l.typeId === typeId && l.quantity > 0)
+    .map((l) => ({
+      id: -1,
+      date: l.date,
+      quantity: l.quantity,
+      unitPrice: l.unitCost,
+      isBuy: true,
+    }));
+  const trades = [...fills, ...runs]
     .flatMap((t) => {
       const at = parseInstant(t.date);
       return at === null ? [] : [{ t, at }];
     })
-    .sort((a, b) => a.at - b.at || a.t.transactionId - b.t.transactionId)
+    .sort((a, b) => a.at - b.at || a.t.id - b.t.id)
     .map(({ t }) => t);
 
   const lots: Lot[] = [];

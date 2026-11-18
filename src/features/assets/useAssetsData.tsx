@@ -60,6 +60,7 @@ import {
   loadCrossCharacterData,
 } from './assetsSnapshot';
 import { locationLabel, matchAssets } from './assetsLogic';
+import { loadStockCostBases } from './stockCostBasis';
 import { NO_ASSET_NAMES } from '@/engine/assetNames';
 
 /**
@@ -322,6 +323,31 @@ export function useAssetsData() {
     if (!activeCrossCharacterData) return own;
     return [...own, ...activeCrossCharacterData.entries.flatMap((entry) => entry.assets)];
   }, [assetsResult, activeCrossCharacterData]);
+  // Stock Cost Basis (issue #6381): the active Character's own holdings only,
+  // so it is withheld while the list spans Characters. Read once per asset list.
+  const ownAssets = assetsResult?.data;
+  const [stockCosts, setStockCosts] = useState<{
+    key: string;
+    costs: ReadonlyMap<number, { unitCost: number }>;
+  } | null>(null);
+  const stockCostKey =
+    activeCharacterId === null ? null : `${activeCharacterId}:${assetsResult?.fetchedAt.getTime()}`;
+  useEffect(() => {
+    if (activeCharacterId === null || !ownAssets || stockCostKey === null) return;
+    let cancelled = false;
+    void loadStockCostBases(activeCharacterId, ownAssets)
+      .catch(() => new Map<number, { unitCost: number }>())
+      .then((costs) => {
+        if (!cancelled) setStockCosts({ key: stockCostKey, costs });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCharacterId, ownAssets, stockCostKey]);
+  const stockCostByTypeId =
+    activeCrossCharacterData || stockCosts?.key !== stockCostKey || stockCosts.costs.size === 0
+      ? null
+      : stockCosts.costs;
   // Abyssal types leave the price map; their estimates join the per-item values.
   const abyssal = useAbyssalAssetEstimates(
     mergedAssets,
@@ -511,6 +537,7 @@ export function useAssetsData() {
       itemValueByItemId,
       abyssal,
       volumeByTypeId,
+      stockCostByTypeId,
       materialPlanMap,
       onViewInIndustryAsMaterial: handleViewInIndustryAsMaterial,
       blueprintTypeIds,
@@ -520,6 +547,7 @@ export function useAssetsData() {
       itemValueByItemId,
       abyssal,
       volumeByTypeId,
+      stockCostByTypeId,
       materialPlanMap,
       handleViewInIndustryAsMaterial,
       blueprintTypeIds,

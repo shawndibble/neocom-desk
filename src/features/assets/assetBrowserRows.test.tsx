@@ -38,6 +38,38 @@ describe('ItemRow volume', () => {
   });
 });
 
+describe('ItemRow stock cost', () => {
+  function renderCost(stockUnitCost: number | undefined, showStockCost = true) {
+    render(
+      <ItemRow
+        name="Test Item"
+        quantity={10}
+        unitVolume={1}
+        estimatedValue={1000}
+        stockUnitCost={stockUnitCost}
+        showStockCost={showStockCost}
+        characterBadge={null}
+        wrap={(children) => children}
+        selectMode={false}
+        selectionState="unchecked"
+        onToggleSelection={vi.fn()}
+        t={(key) => key}
+      />
+    );
+  }
+
+  it('shows the total and the unit cost of the held stack', () => {
+    renderCost(250);
+    expect(screen.getByText('assets.cost.each', { exact: false })).toBeInTheDocument();
+    expect(screen.getByText('2.5K')).toBeInTheDocument();
+  });
+
+  it('shows nothing for a row the history does not cover', () => {
+    renderCost(undefined);
+    expect(screen.queryByText('assets.cost.each', { exact: false })).not.toBeInTheDocument();
+  });
+});
+
 function LocationProbe() {
   const { pathname, search } = useLocation();
   return <output data-testid="loc">{`${pathname}${search}`}</output>;
