@@ -5,15 +5,8 @@
  * its moon is not known until one syncs (#6240). Book editors change the settings; read-only
  * officers see them.
  */
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react';
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -146,6 +139,8 @@ function SettingsSummary({
   );
 }
 
+const NO_COMMUNITIES: CommunityChoice[] = [];
+
 export function SharingTab({ onOpenSyncSettings }: { onOpenSyncSettings: () => void }) {
   const { t } = useTranslation();
   const { view, data, settings, names, canEdit, edit, characterId, corporationId } = useBook();
@@ -153,39 +148,30 @@ export function SharingTab({ onOpenSyncSettings }: { onOpenSyncSettings: () => v
   const communityStatus = usePopSharingCommunities(characterId, corporationId, load);
   // A moon's share mark elsewhere (the Extractions tab) links to its row here.
   const highlightedMoonId = useHighlightParam();
-  const [communities, setCommunities] = useState<CommunityChoice[]>([]);
   const [editing, setEditing] = useState<'default' | SharingMoonRow | null>(null);
   const [switching, setSwitching] = useState(false);
   const [switchError, setSwitchError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!canEdit) return;
-    let cancelled = false;
-    loadMyCommunitiesCached(characterId).then(
-      (list) =>
-        !cancelled && setCommunities(list.map((c) => ({ communityId: c.id, name: c.name }))),
-      () => undefined
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [canEdit, characterId]);
+  const loadCommunities = useCallback(
+    () =>
+      loadMyCommunitiesCached(characterId).then((list) =>
+        list.map((c): CommunityChoice => ({ communityId: c.id, name: c.name }))
+      ),
+    [characterId]
+  );
+  const communities =
+    useKeyedLoad(String(characterId), loadCommunities, !canEdit).data ?? NO_COMMUNITIES;
 
   // Alliance reaches nobody while the book's corporation is in none (#6223 publishes it unshared).
-  const [noAlliance, setNoAlliance] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    getCorporationPublicInfo(corporationId).then(
-      (r) => {
-        if (!cancelled && r.data) setNoAlliance(r.data.alliance_id === undefined);
-      },
-      // Unread: Alliance stays on offer; the server still publishes it to nobody.
-      () => undefined
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [corporationId]);
+  const loadNoAlliance = useCallback(
+    () =>
+      getCorporationPublicInfo(corporationId).then((r) =>
+        r.data ? r.data.alliance_id === undefined : false
+      ),
+    [corporationId]
+  );
+  // Unread: Alliance stays on offer; the server still publishes it to nobody.
+  const noAlliance = useKeyedLoad(String(corporationId), loadNoAlliance).data ?? false;
 
   // The book's own rate, at a moon when one is open (a moon, refinery or moon owner rate wins).
   const bookRateAt = useCallback(
