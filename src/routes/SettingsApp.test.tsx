@@ -46,9 +46,9 @@ describe('Settings', () => {
     await screen.findByRole('heading', { level: 1, name: /help & faq/i });
 
     expect(window.location.pathname).toBe('/help/shortcuts');
-    // FAQ first, the tab /help opens on (issue #5998).
+    // Shortcuts first, the tab /help opens on.
     const tabs = screen.getAllByRole('tab').map((tab) => tab.textContent);
-    expect(tabs).toEqual(['FAQ', 'Support', 'Shortcuts']);
+    expect(tabs).toEqual(['Shortcuts', 'FAQ', 'Support']);
     // The off switch lives in Settings › Display, not on Help.
     expect(
       screen.queryByRole('checkbox', { name: /single-key shortcuts/i })

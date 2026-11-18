@@ -129,9 +129,9 @@ describe('a tabbed page with its own nested detail routes (Industry)', () => {
 });
 
 describe('Help', () => {
-  it('opens on FAQ, so a new pilot meets the answers before the keyboard chords (issue #5998)', () => {
-    expect(HELP_TABS.defaultTab).toBe('faq');
-    expect(HELP_TABS.tabs.map((tab) => tab.id)).toEqual(['faq', 'support', 'shortcuts']);
+  it('opens on Shortcuts, the first tab', () => {
+    expect(HELP_TABS.defaultTab).toBe('shortcuts');
+    expect(HELP_TABS.tabs.map((tab) => tab.id)).toEqual(['shortcuts', 'faq', 'support']);
   });
 });
 
