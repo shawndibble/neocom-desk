@@ -2,6 +2,7 @@ import wasmInit, {
   beacon,
   calculate,
   load_sde,
+  type Calculation,
   type Fit,
   type FitItem,
   type Projection,
@@ -25,28 +26,17 @@ import { loadMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import type { SlotOf } from '@/engine/fittings/implantFinder';
 import { loadImplantMarketEntries } from './implantSlotLookup';
 import {
-  extractCapacitorBudget,
   extractCapBoosterFigures,
-  extractTank,
-  extractDroneLimits,
-  extractFittingStats,
-  extractLockedTargets,
-  extractFighterStats,
   extractModuleResult,
-  extractOffense,
-  extractOverheatedStats,
   isFiring,
   needsChargeToFire,
-  type OffenseItem,
 } from '@/engine/fittings/stats';
 import {
   APPLIED_DPS_ATTRIBUTE,
   chargeDamageSplit,
-  extractAppliedDpsInputs,
   weaponRange,
 } from '@/engine/fittings/appliedWeapons';
 import { chargesUsedPerMinute, type ChargeChoice } from '@/engine/fittings/chargeChoice';
-import { extractSupport } from '@/engine/fittings/support';
 import {
   affectedAttributes,
   type AffectedAttribute,
@@ -56,10 +46,9 @@ import {
 import { skillSourceTypeIds } from '@/engine/fittings/skillGains';
 import type { SkilledTarget } from '@/engine/fittings/skilledTarget';
 import { skilledSourcesOf, type SkilledSource } from '@/engine/fittings/skilledSources';
-import { COVERT_CLOAK_EFFECT, extractExplore } from '@/engine/fittings/explore';
-import { extractModuleFigures } from '@/engine/fittings/moduleFigures';
-import { extractCrystalFigures, extractMining, miningYield } from '@/engine/fittings/mining';
-import { extractFleetSupport } from '@/engine/fittings/fleetSupport';
+import { COVERT_CLOAK_EFFECT } from '@/engine/fittings/explore';
+import { extractCrystalFigures } from '@/engine/fittings/mining';
+import { assembleStats } from '@/engine/fittings/statsAssembly';
 import { projectsNothing } from '@/engine/fittings/projection';
 import {
   DOGMA_ATTRIBUTE,
@@ -483,132 +472,29 @@ export async function computeFittingStats(
   // The editor's state controls still read the unheated result — they show
   // what the pilot set, not the what-if.
   const allOverheated = overheatAll && heatedCalculation !== null;
-  if (allOverheated) {
-    const unheated = statsFrom(
+  const stats = (shown: Calculation, beside: Calculation | null) =>
+    assembleStats({
       fitting,
       dogmaFit,
       calculation,
-      calculation,
-      null,
+      shown,
+      beside,
       harmlessCharges,
-      ruleBreaks
-    );
+      ruleBreaks,
+      covertCloaks: readyCovertCloaks,
+    });
+  if (allOverheated) {
+    const unheated = stats(calculation, null);
     return {
-      ...statsFrom(
-        fitting,
-        dogmaFit,
-        calculation,
-        heatedCalculation,
-        null,
-        harmlessCharges,
-        ruleBreaks
-      ),
+      ...stats(heatedCalculation, null),
       allOverheated: true,
       unheated: { ...unheated, allOverheated: false, unheated: null },
     };
   }
   return {
-    ...statsFrom(
-      fitting,
-      dogmaFit,
-      calculation,
-      calculation,
-      withOverheated ? heatedCalculation : null,
-      harmlessCharges,
-      ruleBreaks
-    ),
+    ...stats(calculation, withOverheated ? heatedCalculation : null),
     allOverheated: false,
     unheated: null,
-  };
-}
-
-/**
- * Every figure off `shown`, with `beside`'s heated ones next to them (null
- * for none). The modules' own results always come off `calculation`, the fit
- * as the pilot set it.
- */
-function statsFrom(
-  fitting: Fitting,
-  dogmaFit: Fit,
-  calculation: ReturnType<typeof calculate>,
-  shown: ReturnType<typeof calculate>,
-  beside: ReturnType<typeof calculate> | null,
-  /** Module type ids none of whose charges deal damage (probe launchers). */
-  harmlessCharges: ReadonlySet<number>,
-  ruleBreaks: RuleBreak[]
-): Omit<FittingStats, 'allOverheated' | 'unheated'> {
-  const baseStats = extractFittingStats(dogmaFit.items, shown.ship.attributes, shown.items);
-
-  // Calibration and drone bandwidth have no single ship-level "used" id the
-  // way cpuFree/powerFree do (see types.ts's DOGMA_ATTRIBUTE doc comment) —
-  // summed here instead, since only this seam has both `dogmaFit.items`'
-  // slot types and `calculation.items`' per-item attribute values. A drone
-  // stack only draws bandwidth while deployed ('active'); one sitting in the
-  // bay ('online') draws none.
-  let calibrationUsed = 0;
-  let droneBandwidthUsed = 0;
-  dogmaFit.items.forEach((item, index) => {
-    const itemAttributes = shown.items[index]?.attributes;
-    if (!itemAttributes) return;
-    if (item.slot.type === 'rig') {
-      calibrationUsed += itemAttributes.get(ITEM_DOGMA_ATTRIBUTE.calibrationCost)?.value ?? 0;
-    } else if (item.slot.type === 'drone_bay' && item.state === 'active') {
-      const perDrone = itemAttributes.get(ITEM_DOGMA_ATTRIBUTE.droneBandwidthNeeded)?.value ?? 0;
-      droneBandwidthUsed += perDrone * (item.quantity ?? 1);
-    }
-  });
-
-  // `fittingToDogmaFit` puts the modules first, so module i is items[i].
-  const modules = fitting.modules.map((_, index) => extractModuleResult(calculation.items[index]));
-
-  // Drones follow the modules in `dogmaFit.items`.
-  const offenseItems: OffenseItem[] = [
-    ...fitting.modules.map((module) => ({
-      typeId: module.typeId,
-      chargeTypeId: module.chargeTypeId,
-      quantity: 1,
-      isDrone: false,
-      chargeDamages: !harmlessCharges.has(module.typeId),
-    })),
-    ...fitting.drones.map((drone) => ({
-      typeId: drone.typeId,
-      quantity: drone.quantity,
-      isDrone: true,
-    })),
-    // Fighters follow the drones.
-    ...(fitting.fighters ?? []).map((fighter) => ({
-      typeId: fighter.typeId,
-      quantity: fighter.quantity,
-      isDrone: true,
-      isFighter: true,
-    })),
-  ];
-  const offense = extractOffense(offenseItems, shown.items, beside?.items ?? null);
-  const overheated = beside ? extractOverheatedStats(beside.ship.attributes) : null;
-
-  const applied = extractAppliedDpsInputs(dogmaFit.items, shown.items, shown.character.attributes);
-  const lockedTargets = extractLockedTargets(shown.ship.attributes, shown.character.attributes);
-
-  return {
-    ...baseStats,
-    ruleBreaks,
-    targeting: { ...baseStats.targeting, maxLockedTargets: lockedTargets.effective },
-    ...extractDroneLimits(dogmaFit.items, shown.items, shown.character.attributes),
-    calibrationUsed,
-    droneBandwidthUsed,
-    modules,
-    offense,
-    overheated,
-    applied,
-    capacitorBudget: extractCapacitorBudget(dogmaFit.items, shown.items, shown.ship.attributes),
-    tank: extractTank(dogmaFit.items, shown.items, shown.ship.attributes, baseStats),
-    support: extractSupport(dogmaFit.items, shown.items),
-    mining: miningYield(extractMining(dogmaFit.items, shown.items)),
-    explore: extractExplore(dogmaFit.items, shown.items, readyCovertCloaks),
-    moduleFigures: extractModuleFigures(dogmaFit.items, shown.items),
-    fleetSupport: extractFleetSupport(dogmaFit.items, shown.items),
-    fighters: extractFighterStats(shown.ship.attributes),
-    lockedTargets,
   };
 }
 
