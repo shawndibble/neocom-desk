@@ -3,6 +3,7 @@ import {
   asContract,
   effectivePrice,
   iskPerRun,
+  type BpcContractRow,
   type BpcSearchRow,
 } from '@/engine/contracts/bpcSearch';
 import { auctionKindLabel } from '@/features/contractSearch/contractFlagText';
@@ -24,6 +25,8 @@ export interface BpcSourcingCsvContext {
   jumpsFor: (row: BpcSearchRow) => number | null;
   /** The row's solar system security, or null when it has no resolved system. */
   securityFor: (row: BpcSearchRow) => number | null;
+  /** The contract copy's percent from its similar copies' median per run; null with no comparison. */
+  peerDiffFor: (row: BpcContractRow) => number | null;
   /** The BPO the table's "BPO too" badge sits on, by row (see `bpoBadgeRows`); a row without one is absent. */
   bpoBadges: ReadonlyMap<BpcSearchRow, BpcBpoBadge>;
 }
@@ -96,6 +99,14 @@ export function bpcSourcingCsvColumns(
           contract.quantity,
           contract.isMultiType
         );
+      },
+    },
+    vsPeers: {
+      header: t('bpcContracts.vsPeersColumn'),
+      value: (row) => {
+        const contract = asContract(row);
+        const diff = contract ? context.peerDiffFor(contract) : null;
+        return diff === null ? null : Math.round(diff * 10) / 10;
       },
     },
     price: { header: t('bpcContracts.priceColumn'), value: priceOf },

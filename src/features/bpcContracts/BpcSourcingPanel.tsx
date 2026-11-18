@@ -51,6 +51,7 @@ import { type BlueprintSuggestion } from '@/features/bpcContracts/searchBpcOffer
 import { loadRegionName } from '@/features/bpcContracts/regionNames';
 import { BPC_SEARCH_COLUMN_IDS } from '@/features/bpcContracts/bpcSearchColumns';
 import { BpcContractModal } from '@/features/bpcContracts/BpcContractModal';
+import { bpcPeerDiffs } from '@/engine/contracts/bpcPerRunCheck';
 import { bpcSourcingCsvColumns, type BpcBpoBadge } from '@/features/bpcContracts/bpcSourcingCsv';
 import { HintText } from '@/components/ui/HintText';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -465,6 +466,13 @@ export function BpcSourcingPanel({
     loadedRegionNames.get(regionId) ??
     `#${regionId}`;
 
+  // Every listed copy, not the filtered board: a tight ME, price or region
+  // filter must not shrink the pool a copy's price is judged against.
+  const peerDiffOf = useMemo(
+    () => bpcPeerDiffs(sourceData.contractRows),
+    [sourceData.contractRows]
+  );
+
   const { bpcColumnsById, columns, shownRows, sortProps } = useBpcColumns({
     blueprintNames,
     regionNames,
@@ -472,6 +480,7 @@ export function BpcSourcingPanel({
     selectedTypeId,
     visibleColumns,
     displayRows,
+    peerDiffOf,
     bpoByType,
     bpcRowJumps,
     solarSystems,
@@ -508,9 +517,10 @@ export function BpcSourcingPanel({
         },
         securityFor: (row) =>
           row.systemId == null ? null : (solarSystems?.get(row.systemId)?.security ?? null),
+        peerDiffFor: peerDiffOf,
         bpoBadges,
       }),
-    [t, blueprintNames, regionNames, bpcRowJumps, solarSystems, bpoBadges]
+    [t, blueprintNames, regionNames, bpcRowJumps, solarSystems, bpoBadges, peerDiffOf]
   );
   const sourcingExport = useTableExport({
     surface: 'bpc-sourcing',

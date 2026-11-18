@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BpcContractRow } from './bpcSearch';
-import { bpcPerRunCheck } from './bpcPerRunCheck';
+import { bpcPeerDiffs, bpcPerRunCheck } from './bpcPerRunCheck';
 
 function row(overrides: Partial<BpcContractRow>): BpcContractRow {
   return {
@@ -61,5 +61,36 @@ describe('bpcPerRunCheck', () => {
   it('is null when this listing has no per-run rate of its own', () => {
     expect(bpcPerRunCheck(row({ price: 0 }), similar)).toBeNull();
     expect(bpcPerRunCheck(row({ isMultiType: true }), similar)).toBeNull();
+  });
+});
+
+describe('bpcPeerDiffs', () => {
+  const subject = row({ contractId: 1 });
+  const similar = [
+    row({ contractId: 2, price: 7_900_000 }),
+    row({ contractId: 3, price: 9_200_000 }),
+    row({ contractId: 4, price: 5_000_000, runs: 5, me: 9, te: 18 }),
+  ];
+
+  it('answers what bpcPerRunCheck says, for any row of the pool', () => {
+    const pool = [subject, ...similar];
+    const diffOf = bpcPeerDiffs(pool);
+    for (const r of pool) expect(diffOf(r)).toEqual(bpcPerRunCheck(r, pool)?.diff ?? null);
+    expect(diffOf(subject)).toBeCloseTo(-7.61, 2);
+  });
+
+  it('is null with fewer than three similar copies, never 0', () => {
+    expect(bpcPeerDiffs([subject, ...similar.slice(0, 2)])(subject)).toBeNull();
+  });
+
+  it('is null for a bundle, a barter and a blueprint with no peers at all', () => {
+    const diffOf = bpcPeerDiffs([subject, ...similar]);
+    expect(diffOf(row({ contractId: 50, isMultiType: true }))).toBeNull();
+    expect(diffOf(row({ contractId: 51, price: 0 }))).toBeNull();
+    expect(diffOf(row({ contractId: 52, typeId: 999 }))).toBeNull();
+  });
+
+  it('judges a row against the whole pool it was given, not a narrower list', () => {
+    expect(bpcPeerDiffs([...similar])(subject)).toBeCloseTo(-7.61, 2);
   });
 });

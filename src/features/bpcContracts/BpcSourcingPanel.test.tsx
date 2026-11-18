@@ -463,6 +463,41 @@ describe('BpcSourcingPanel', () => {
     expect(iskPerRunCell).toHaveTextContent('—');
   });
 
+  it('shows each copy’s percent from its similar copies’ median in an optional vs peers column, blank without three peers (issue #6358)', async () => {
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([
+        row({ contractId: 1, typeId: 638, price: 4_000_000 }),
+        row({ contractId: 2, typeId: 638, price: 5_000_000 }),
+        row({ contractId: 3, typeId: 638, price: 5_000_000 }),
+        row({ contractId: 4, typeId: 638, price: 6_000_000 }),
+        // Two copies of another blueprint: not a going rate, so blank.
+        row({ contractId: 5, typeId: 870, price: 1_000_000 }),
+        row({ contractId: 6, typeId: 870, price: 2_000_000 }),
+      ])
+    );
+    const user = userEvent.setup({ delay: null });
+    renderIndustry();
+
+    const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
+    await within(table).findAllByText('Rifter Blueprint');
+    // Hidden by default, like the other optional columns.
+    expect(table.querySelector('[data-label="vs peers"]')).toBeNull();
+
+    await user.click(await screen.findByRole('button', { name: 'Columns' }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'vs peers' }));
+    await user.keyboard('{Escape}');
+
+    const cells = Array.from(table.querySelectorAll('[data-label="vs peers"]')).map((cell) =>
+      cell.textContent?.trim()
+    );
+    // 4M against peers 5M, 5M, 6M (median 5M); 6M against 4M, 5M, 5M.
+    expect(cells).toContain('−20.0%');
+    expect(cells).toContain('+20.0%');
+    expect(cells.filter((text) => text === '')).toHaveLength(2);
+    // The 5M copies sit on the median: a level 0.0%, not blank.
+    expect(cells.filter((text) => text === '0.0%')).toHaveLength(2);
+  });
+
   it('takes ISK shorthand in max price (issue #2227)', async () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([

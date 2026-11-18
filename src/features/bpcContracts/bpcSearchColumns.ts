@@ -20,6 +20,7 @@ export const BPC_SEARCH_COLUMN_IDS = [
   'runs',
   'qty',
   'iskPerRun',
+  'vsPeers',
   'price',
   'region',
   'space',
@@ -31,7 +32,7 @@ export type BpcSearchColumnId = (typeof BPC_SEARCH_COLUMN_IDS)[number];
 /**
  * Location, Jumps, ME, TE and Price are what a pilot needs to judge whether a
  * copy is worth buying and worth the trip — everything else (Source, Runs,
- * Qty, ISK/run, Region, Space, Expires) starts hidden and is a toggle away
+ * Qty, ISK/run, vs peers, Region, Space, Expires) starts hidden and is a toggle away
  * via `ColumnPickerMenu`. ISK/run
  * sits after Runs and Qty, the two counts it divides by — the same placement
  * ISK/jump takes after Jumps on the Courier board: a rate shown without its
