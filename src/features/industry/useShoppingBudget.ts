@@ -10,9 +10,9 @@ import type { MaterialCostLine } from '@/engine/industry/types';
 export function useShoppingBudget<T extends MaterialCostLine>(materials: readonly T[]) {
   const [value, setValue] = useState('');
   const budget = value === '' ? null : Number(value);
-  const scaled: BudgetScaled | null = useMemo(
+  const scaled: BudgetScaled<T> | null = useMemo(
     () => (budget === null || !Number.isFinite(budget) ? null : scaleToBudget(materials, budget)),
     [materials, budget]
   );
-  return { value, setValue, scaled, materials: scaled ? (scaled.materials as T[]) : materials };
+  return { value, setValue, scaled, materials: scaled ? scaled.materials : materials };
 }

@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { IskInput } from '@/components/ui';
 import type { BudgetScaled } from '@/engine/industry/budgetScale';
+import type { MaterialCostLine } from '@/engine/industry/types';
 import type { useShoppingBudget } from './useShoppingBudget';
 
 interface ShoppingBudgetProps {
@@ -10,7 +11,7 @@ interface ShoppingBudgetProps {
 
 /** What the budget does to the list, as one muted line. */
 function coverageNote(
-  scaled: BudgetScaled,
+  scaled: BudgetScaled<MaterialCostLine>,
   nameFor: (typeID: number) => string,
   t: ReturnType<typeof useTranslation>['t']
 ) {

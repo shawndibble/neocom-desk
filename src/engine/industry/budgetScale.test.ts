@@ -55,4 +55,17 @@ describe('scaleToBudget', () => {
     const { materials } = scaleToBudget([line(1, 100, 10), line(2, 100, null)], 500);
     expect(materials.map((m) => m.remainingQuantity)).toEqual([50, 50]);
   });
+
+  it('empties an all-unpriced list at a zero budget', () => {
+    expect(scaleToBudget([line(1, 100, null)], 0).materials[0].remainingQuantity).toBe(0);
+  });
+
+  it('leaves a Blueprint Acquisition row out of the budget', () => {
+    const bp = {
+      ...line(9, 1, 1_000_000),
+      acquisitionTier: { me: 10, te: 20 },
+    } as MaterialCostLine;
+    const { materials } = scaleToBudget([line(1, 100, 10), bp], 500);
+    expect(materials.map((m) => m.remainingQuantity)).toEqual([50, 1]);
+  });
 });
