@@ -45,6 +45,7 @@ export function planBreakdownContext({
   return {
     hubName: hub.systemName,
     materialPriceBasis: materialPriceBasisOf(plan.materialPriceBasis),
+    productPriceOverridden: plan.productSalePrice !== undefined,
     me: resolvedMe,
     isReaction: activity === 'reaction',
     accountingLevel: modifiers.skills[SKILL_IDS.accounting] ?? 0,
