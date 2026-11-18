@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, DataAgeBadge, IconButton, LiveStatus } from '@/components/ui';
+import { cx } from '@/lib/cx';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -55,13 +56,11 @@ export function PlanMaterialsActions({
             : null}
       </LiveStatus>
       {compressedGas && (
-        <label className="flex items-center gap-1.5 text-xs text-text">
-          <span className={touchCheckboxLabelClassName}>
-            <Checkbox
-              checked={compressedGas.checked}
-              onChange={(event) => compressedGas.onChange(event.target.checked)}
-            />
-          </span>
+        <label className={cx(touchCheckboxLabelClassName, 'gap-1.5 text-xs text-text')}>
+          <Checkbox
+            checked={compressedGas.checked}
+            onChange={(event) => compressedGas.onChange(event.target.checked)}
+          />
           {t('industry.compressedGasToggle')}
         </label>
       )}
