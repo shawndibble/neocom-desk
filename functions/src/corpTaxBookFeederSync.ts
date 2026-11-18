@@ -247,12 +247,17 @@ export async function refreshFeederExtractions(
 ): Promise<number[]> {
   const now = deps.now();
   if (!extractionsDue(record, now)) return [];
-  const feed =
-    notificationsOf === undefined
-      ? undefined
-      : await esi.notifications(notificationsOf, accessToken);
-  // The feed is best effort: unread, the Extractions still land, with the ore they already hold.
-  const notifications = feed?.kind === 'ok' ? moonNotificationsOf(feed.data) : [];
+  // The feed is best effort: unread (or throwing), the Extractions still land, with the ore they
+  // already hold.
+  let notifications: MoonNotification[] = [];
+  if (notificationsOf !== undefined) {
+    try {
+      const feed = await esi.notifications(notificationsOf, accessToken);
+      if (feed.kind === 'ok') notifications = moonNotificationsOf(feed.data);
+    } catch {
+      // Nothing to add: the schedule asks again.
+    }
+  }
   const stored =
     notifications.length > 0
       ? await storedFeederExtractionKeys(deps, collectorCorporationId, record.corporationId)
