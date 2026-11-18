@@ -232,6 +232,8 @@ export interface RowDetailModel {
   place?: { systemId: number; name: string; jumps?: number };
   /** One in-app destination the record leads on to (a Shared Pop's Survey start link). */
   link?: { label: string; to: string };
+  /** A second, quieter destination beside `link` (a Shared Pop's "start a new Survey" next to "Open survey"). */
+  secondaryLink?: { label: string; to: string };
 }
 
 export interface TableModel {

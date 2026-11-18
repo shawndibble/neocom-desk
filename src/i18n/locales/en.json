@@ -9576,7 +9576,9 @@
       "unavailable": "This shared pop is no longer available",
       "units_one": "{{count, number}} unit",
       "units_other": "{{count, number}} units",
-      "startSurvey": "Start a Survey here"
+      "startSurvey": "Start a Survey here",
+      "openSurvey": "Open Survey",
+      "startNewSurvey": "Start a new Survey"
     },
     "downloadIcs": "Download .ics",
     "addToGoogleCalendar": "Add to Google Calendar",
