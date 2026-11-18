@@ -21179,7 +21179,7 @@
         "removeNamed": "Remove {{name}}",
         "emptyTitle": "Nobody on the watchlist",
         "emptyHint": "Add the corporations, alliances and characters the checks should look for.",
-        "addLabel": "Exact name of a character, corporation or alliance",
+        "addLabel": "Name of a character, corporation or alliance",
         "add": "Add",
         "full": "The watchlist holds {{count}} entries. Remove one to add another."
       }
