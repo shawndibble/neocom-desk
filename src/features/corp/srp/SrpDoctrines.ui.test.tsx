@@ -122,7 +122,10 @@ describe('Doctrine Fits in SRP settings', () => {
     );
     const table = await screen.findByRole('table', { name: 'Doctrine Fits' });
     expect(within(table).getByRole('columnheader', { name: 'Hub coverage (Jita)' })).toBeTruthy();
-    expect(within(table).getByText(/12 complete ships; short on Item 2 · next ship/)).toBeTruthy();
+    // Type names load after the table first renders, so wait for the resolved name.
+    expect(
+      await within(table).findByText(/12 complete ships; short on Item 2 · next ship/)
+    ).toBeTruthy();
     expect(within(table).queryByText(/0 complete ships/)).toBeNull();
   });
 
