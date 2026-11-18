@@ -450,9 +450,9 @@ async function deleteBilledByPointers(deps: BookDeps, corporationId: number): Pr
   const key = String(corporationId);
   const field = new FieldPath('books', key);
   const pointers = await deps.db.collection(BILLED_BY_COLLECTION).where(field, '>=', 0).get();
-  for (let i = 0; i < pointers.docs.length; i += CHUNK) {
+  for (const part of chunk(pointers.docs, CHUNK)) {
     await Promise.all(
-      pointers.docs.slice(i, i + CHUNK).map((pointer) =>
+      part.map((pointer) =>
         deps.db.runTransaction(async (tx) => {
           const books = (await tx.get(pointer.ref)).get('books') as
             Record<string, unknown> | undefined;
@@ -576,15 +576,14 @@ export async function mergeObservedInto(
   const rows = stampRows(incoming, await loadStampContext(deps.db, corporationId, extractions));
   let observedChanged = 0;
   const pulls = touched ?? new Set<string>();
-  for (let i = 0; i < rows.length; i += CHUNK) {
-    const chunk = rows.slice(i, i + CHUNK);
+  for (const part of chunk(rows, CHUNK)) {
     const col = sub(deps.db, corporationId, OBSERVED);
     observedChanged += await deps.db.runTransaction(async (tx) => {
-      const unique = [...new Map(chunk.map((r) => [obsId(r), r])).values()];
+      const unique = [...new Map(part.map((r) => [obsId(r), r])).values()];
       const refs = unique.map((r) => col.doc(obsId(r)));
       const snaps = refs.length > 0 ? await tx.getAll(...refs) : [];
       const existing = snaps.filter((s) => s.exists).map((s) => s.data() as ObservedRow);
-      const { changed } = mergeObservedRows(existing, chunk);
+      const { changed } = mergeObservedRows(existing, part);
       const last = new Map(changed.map((r) => [observedRowKey(r), r]));
       for (const r of last.values()) if (r.extractionId !== undefined) pulls.add(r.extractionId);
       for (const row of last.values()) {
@@ -622,9 +621,9 @@ export async function writeBilledByPointers(
 ): Promise<void> {
   const characterIds = [...new Set(rows.map((r) => r.characterId))];
   const at = Date.now();
-  for (let i = 0; i < characterIds.length; i += CHUNK) {
+  for (const part of chunk(characterIds, CHUNK)) {
     const batch = deps.db.batch();
-    for (const characterId of characterIds.slice(i, i + CHUNK)) {
+    for (const characterId of part) {
       batch.set(
         deps.db.collection(BILLED_BY_COLLECTION).doc(`char:${characterId}`),
         { books: { [String(corporationId)]: at } },
@@ -1515,10 +1514,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       }
       const already = new Set<string>();
       const wantedIds = [...wanted.keys()];
-      for (let i = 0; i < wantedIds.length; i += 30) {
-        const snap = await c.tx.get(
-          col(c, DISMISSALS).where('targetId', 'in', wantedIds.slice(i, i + 30))
-        );
+      for (const ids of chunk(wantedIds, 30)) {
+        const snap = await c.tx.get(col(c, DISMISSALS).where('targetId', 'in', ids));
         for (const d of snap.docs) {
           if (d.get('scope') === 'record' && !d.get('reversed')) already.add(d.get('targetId'));
         }

@@ -3,7 +3,8 @@
 // Shadow mode: nothing reads the docs, so a refresh failure is logged and swallowed, never
 // thrown into the sync or edit that caused it. The scheduled verifier repairs it.
 
-import { FieldValue, type Firestore } from 'firebase-admin/firestore';
+import { FieldValue, type Firestore, type WriteBatch } from 'firebase-admin/firestore';
+import { commitInBatches, type BatchOp } from './commitInBatches.js';
 import { extractionIdOf, moonOnDay, type ObservedRow } from './corpTaxBookEngine.js';
 import {
   MOON_DOCS,
@@ -59,29 +60,23 @@ export async function reconcileMoonDocs(
     minerOf: (characterId) => minerByCharacter.get(characterId) ?? `solo:${characterId}`,
   });
   if (options.repair) {
-    const ops = [
-      ...plan.writes.map((doc) => ({
-        ref: sub(db, corporationId, MOON_DOCS).doc(doc.extractionId),
+    const ops: BatchOp[] = [
+      ...plan.writes.map((doc) => {
+        const ref = sub(db, corporationId, MOON_DOCS).doc(doc.extractionId);
         // A legacy Extraction doc may lack a field; `set` throws on undefined and would fail the batch.
-        data: Object.fromEntries(
+        const data = Object.fromEntries(
           Object.entries({ ...doc, updatedAt: FieldValue.serverTimestamp() }).filter(
             ([, v]) => v !== undefined
           )
-        ) as Data,
-      })),
-      ...plan.deletes.map((id) => ({
-        ref: sub(db, corporationId, MOON_DOCS).doc(id),
-        data: undefined,
-      })),
+        ) as Data;
+        return (b: WriteBatch) => void b.set(ref, data);
+      }),
+      ...plan.deletes.map((id) => {
+        const ref = sub(db, corporationId, MOON_DOCS).doc(id);
+        return (b: WriteBatch) => void b.delete(ref);
+      }),
     ];
-    for (let i = 0; i < ops.length; i += 400) {
-      const batch = db.batch();
-      for (const op of ops.slice(i, i + 400)) {
-        if (op.data) batch.set(op.ref, op.data);
-        else batch.delete(op.ref);
-      }
-      await batch.commit();
-    }
+    await commitInBatches(db, ops);
   }
   return plan;
 }

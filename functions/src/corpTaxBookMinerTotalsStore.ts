@@ -4,7 +4,8 @@
 // a failure here is logged, the docs it left stale are deleted, and nothing is thrown into
 // the edit that caused it.
 
-import { FieldValue, type DocumentReference, type Firestore } from 'firebase-admin/firestore';
+import { FieldValue, type Firestore, type WriteBatch } from 'firebase-admin/firestore';
+import { commitInBatches, type BatchOp } from './commitInBatches.js';
 import {
   MINER_TOTALS,
   overlappingPulls,
@@ -15,6 +16,7 @@ import {
 } from './corpTaxBookMinerTotals.js';
 import { reconcileMoonDocs } from './corpTaxBookMoonDocsStore.js';
 import { invalidateReadModels, reconcileReadModels } from './corpTaxBookReadModelsStore.js';
+import { chunk } from './chunk.js';
 
 type Data = Record<string, unknown>;
 
@@ -59,10 +61,8 @@ async function byMiner(
   minerIds: readonly string[]
 ): Promise<Data[]> {
   const out: Data[] = [];
-  for (let i = 0; i < minerIds.length; i += IN_LIMIT) {
-    const snap = await sub(db, corporationId, collection)
-      .where('minerId', 'in', minerIds.slice(i, i + IN_LIMIT))
-      .get();
+  for (const ids of chunk(minerIds, IN_LIMIT)) {
+    const snap = await sub(db, corporationId, collection).where('minerId', 'in', ids).get();
     out.push(...snap.docs.map(withId));
   }
   return out;
@@ -126,21 +126,18 @@ async function apply(
   corporationId: number,
   plan: Pick<TotalsPlan, 'writes' | 'deletes'>
 ): Promise<void> {
-  const ops: { ref: DocumentReference; data?: Data }[] = [
-    ...plan.writes.map((t) => ({
-      ref: sub(db, corporationId, MINER_TOTALS).doc(t.minerId),
-      data: { ...t, updatedAt: FieldValue.serverTimestamp() },
-    })),
-    ...plan.deletes.map((id) => ({ ref: sub(db, corporationId, MINER_TOTALS).doc(id) })),
+  const ops: BatchOp[] = [
+    ...plan.writes.map((t) => {
+      const ref = sub(db, corporationId, MINER_TOTALS).doc(t.minerId);
+      const data = { ...t, updatedAt: FieldValue.serverTimestamp() };
+      return (b: WriteBatch) => void b.set(ref, data);
+    }),
+    ...plan.deletes.map((id) => {
+      const ref = sub(db, corporationId, MINER_TOTALS).doc(id);
+      return (b: WriteBatch) => void b.delete(ref);
+    }),
   ];
-  for (let i = 0; i < ops.length; i += 400) {
-    const batch = db.batch();
-    for (const op of ops.slice(i, i + 400)) {
-      if (op.data) batch.set(op.ref, op.data);
-      else batch.delete(op.ref);
-    }
-    await batch.commit();
-  }
+  await commitInBatches(db, ops);
 }
 
 /** Recomputes the totals of `scope` Miners and writes the docs that changed. */
