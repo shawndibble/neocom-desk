@@ -39,6 +39,7 @@ import {
 import { payeeSystemNames } from './payeeSystemNames';
 import { hubForPayee } from './pricing';
 import type { TrackedCharacter } from './snapshot';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 interface PayeeManagerDialogProps {
   open: boolean;
@@ -659,7 +660,7 @@ export function PayeeManagerDialog({
               <DefaultSystemTaken systemId={taken.systemId} holderName={taken.holderName} />
             )}
             {error && <InlineError>{error}</InlineError>}
-            <div className="flex justify-end gap-2">
+            <DialogFooter>
               {draft.id && (
                 <Button
                   variant="danger"
@@ -682,7 +683,7 @@ export function PayeeManagerDialog({
               <Button variant="primary" size="sm" onClick={() => void handleSave()}>
                 {t('common.save')}
               </Button>
-            </div>
+            </DialogFooter>
           </div>
         )}
       </div>
@@ -734,28 +735,28 @@ export function PayeeManagerDialog({
             <p className="text-[0.6875rem] text-text-dim">
               {t('miningTax.payees.deleteAnywayHint')}
             </p>
-            <div className="flex justify-end gap-2">
+            <DialogFooter>
               <Button size="sm" onClick={() => setDeletingPayee(null)}>
                 {t('filters.cancel')}
               </Button>
               <Button size="sm" onClick={() => confirmDelete(false)}>
                 {t('miningTax.payees.deleteAnyway')}
               </Button>
-            </div>
+            </DialogFooter>
           </div>
         ) : (
           <>
             <p className="text-xs text-text-dim">
               {t('miningTax.deletePayeeConfirm', { name: deletingPayee?.name ?? '' })}
             </p>
-            <div className="mt-3 flex justify-end gap-2">
+            <DialogFooter className="mt-3">
               <Button size="sm" onClick={() => setDeletingPayee(null)}>
                 {t('filters.cancel')}
               </Button>
               <Button variant="danger" size="sm" onClick={() => confirmDelete(false)}>
                 {t('miningTax.deletePayeeAction')}
               </Button>
-            </div>
+            </DialogFooter>
           </>
         )}
       </Modal>

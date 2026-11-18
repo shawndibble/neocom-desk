@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import {
   BUSY_KILLS,
@@ -7,13 +8,12 @@ import {
   summarizeRouteKills,
 } from './routeKillTrend';
 
-const HOUR = 3_600_000;
 const NOW = Date.UTC(2026, 9, 11, 12, 0, 0);
 
 describe('hourlyKillCounts', () => {
   it('buckets kill times into the last 24 hours, oldest first, the newest hour last', () => {
     const counts = hourlyKillCounts(
-      [NOW - 1, NOW - HOUR + 1, NOW - HOUR - 1, NOW - 23 * HOUR],
+      [NOW - 1, NOW - HOUR_MS + 1, NOW - HOUR_MS - 1, NOW - 23 * HOUR_MS],
       NOW
     );
     expect(counts).toHaveLength(KILL_WINDOW_HOURS);
@@ -23,7 +23,7 @@ describe('hourlyKillCounts', () => {
   });
 
   it('drops kills older than the window or in the future', () => {
-    const counts = hourlyKillCounts([NOW - 24 * HOUR - 1, NOW + 5], NOW);
+    const counts = hourlyKillCounts([NOW - 24 * HOUR_MS - 1, NOW + 5], NOW);
     expect(counts.every((n) => n === 0)).toBe(true);
   });
 });
@@ -41,7 +41,7 @@ describe('summarizeRouteKills', () => {
   const systems = [
     { systemId: 1, name: 'Jita', kills: [NOW - 10, NOW - 20, NOW - 30, NOW - 40, NOW - 50] },
     { systemId: 2, name: 'Perimeter', kills: [] },
-    { systemId: 3, name: 'Niarja', kills: [NOW - 2 * HOUR] },
+    { systemId: 3, name: 'Niarja', kills: [NOW - 2 * HOUR_MS] },
     { systemId: 4, name: 'Unread', kills: null },
   ];
 

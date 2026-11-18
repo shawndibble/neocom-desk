@@ -1,8 +1,9 @@
+// Lives in functions/src (deploy uploads functions/ alone); src re-exports it. Keep it import-free.
 /**
  * Runs `worker` over `items` with at most `concurrency` in flight, starting
  * them in list order. `shouldStop` is checked before each item is taken; the
  * ones already running finish. Every item is attempted even when one throws;
- * the first error is thrown once the pool drains. Same as `src/lib/asyncPool.ts`.
+ * the first error is thrown once the pool drains.
  */
 export async function runPool<T>(
   items: readonly T[],

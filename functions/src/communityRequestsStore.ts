@@ -33,7 +33,7 @@ import {
   type PostRequestInput,
   type OwnerActionDecision,
 } from './communityRequests.js';
-import { communityRef, loadCommunity, memberRef } from './communitiesStore.js';
+import { communityRef, loadCommunity, memberRef, requireMember } from './communitiesStore.js';
 
 const requestCollection = (db: Firestore, communityId: string) =>
   communityRef(db, communityId).collection(REQUESTS_COLLECTION);
@@ -61,20 +61,6 @@ function failRequestDecision(decision: OwnerActionDecision): never {
     default:
       throw new HttpsError('internal', decision);
   }
-}
-
-/** The caller's Member doc, only under the ownerHash it was joined with (a sold Character does not inherit it). */
-async function requireMember(
-  tx: Transaction,
-  db: Firestore,
-  communityId: string,
-  caller: Caller
-): Promise<{ characterName: string }> {
-  const member = await tx.get(memberRef(db, communityId, caller.uid));
-  if (!member.exists || member.get('ownerHash') !== caller.ownerHash) {
-    throw new HttpsError('not-found', 'Not a Member of this Community');
-  }
-  return { characterName: String(member.get('characterName') ?? '') };
 }
 
 /** A named buyer Character must itself be a Member, so contracts go to someone the Community knows. */

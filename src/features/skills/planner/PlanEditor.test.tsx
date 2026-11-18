@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { useEffect, useState, type ComponentProps } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { stubViewport } from '@/test/viewport';
@@ -1674,7 +1675,6 @@ describe('PlanEditor booster market link (issue #407)', () => {
  * control they already know, editable, and the one field the app cannot read —
  * the expiry — is called out rather than invented.
  */
-const DAY = 24 * 60 * 60 * 1000;
 
 const seedAccelerator = (bonus: number, expiresAt: number) =>
   db.characterAccelerators.put({
@@ -1825,15 +1825,15 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     // Character's accelerator now, not a plan row, so the Characters table sees it too.
     await waitFor(async () => {
       const saved = await db.characterAccelerators.get('1');
-      expect(saved?.expiresAt).toBeGreaterThanOrEqual(before + 3 * DAY);
+      expect(saved?.expiresAt).toBeGreaterThanOrEqual(before + 3 * DAY_MS);
     });
     const saved = await db.characterAccelerators.get('1');
-    expect(saved?.expiresAt).toBeLessThan(before + 3 * DAY + 10_000);
+    expect(saved?.expiresAt).toBeLessThan(before + 3 * DAY_MS + 10_000);
   });
 
   it('reopens on the Accelerator the Character was saved with', async () => {
     const user = userEvent.setup();
-    await seedAccelerator(6, Date.now() + 2 * DAY + 5 * 60 * 60 * 1000 + 30 * 60 * 1000);
+    await seedAccelerator(6, Date.now() + 2 * DAY_MS + 5 * 60 * 60 * 1000 + 30 * 60 * 1000);
     renderEditor();
     await openTools(user);
     await openAssumptions(user);
@@ -1848,7 +1848,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
   it('does not erase a saved expiry when a box is cleared to be retyped', async () => {
     // The data-loss path: emptying a box to retype it is not an answer.
     const user = userEvent.setup();
-    await seedAccelerator(3, Date.now() + 5 * DAY);
+    await seedAccelerator(3, Date.now() + 5 * DAY_MS);
     renderEditor();
     await openTools(user);
     await openAssumptions(user);
@@ -1863,7 +1863,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
 
   it('forgets the accelerator when every time box is emptied and focus leaves', async () => {
     const user = userEvent.setup();
-    await seedAccelerator(3, Date.now() + 5 * DAY);
+    await seedAccelerator(3, Date.now() + 5 * DAY_MS);
     renderEditor();
     await openTools(user);
     await openAssumptions(user);
@@ -1879,7 +1879,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
 
   it('replaces a saved expiry in one write, never through an expiry of zero in between', async () => {
     const user = userEvent.setup();
-    await seedAccelerator(3, Date.now() + 5 * DAY);
+    await seedAccelerator(3, Date.now() + 5 * DAY_MS);
     renderEditor();
     await openTools(user);
     await openAssumptions(user);
@@ -1892,16 +1892,16 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
 
     await waitFor(async () => {
       const saved = await db.characterAccelerators.get('1');
-      expect(saved?.expiresAt).toBeGreaterThan(Date.now() + 4 * DAY - 10_000);
+      expect(saved?.expiresAt).toBeGreaterThan(Date.now() + 4 * DAY_MS - 10_000);
     });
     const saved = await db.characterAccelerators.get('1');
-    expect(saved?.expiresAt).toBeLessThan(Date.now() + 4 * DAY + 10_000);
+    expect(saved?.expiresAt).toBeLessThan(Date.now() + 4 * DAY_MS + 10_000);
     expect(await db.characterAccelerators.count()).toBe(1);
   });
 
   it('clamps the bonus where it is written', async () => {
     const user = userEvent.setup();
-    await seedAccelerator(3, Date.now() + 5 * DAY);
+    await seedAccelerator(3, Date.now() + 5 * DAY_MS);
     renderEditor();
     await openTools(user);
     await openAssumptions(user);

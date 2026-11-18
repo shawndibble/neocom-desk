@@ -76,6 +76,13 @@ const HISTORY: [number, Record<string, string | null>][] = [
     },
   ],
   [32, { characterAccelerators: 'id, characterId' }],
+  [
+    33,
+    {
+      corpMailQueue: 'id, corporationId, batchId, senderCharacterId, order, statementId',
+      netWorthSnapshots: 'id, characterId, [characterId+day]',
+    },
+  ],
 ];
 
 /** The complete schema at `version`: every delta up to it, drops removed. */

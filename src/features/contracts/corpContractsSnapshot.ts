@@ -1,4 +1,3 @@
-import { db } from '@/db';
 import { ESI_REGISTRY } from '@/esi/registry';
 import type { CachedResult } from '@/esi/cache';
 import type { Contract } from '@/esi/endpoints';
@@ -7,6 +6,7 @@ import { loadCorporationContracts } from '@/features/corp/contracts';
 import { contractIssuer, contractReceiver } from '@/features/character/contractCounterparty';
 import { resolveCategories, resolveNames, type NameCategory } from '@/features/character/names';
 import type { RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
+import { loadGrantedScopes } from '@/app/grantedScopes';
 
 const SCOPE = ESI_REGISTRY.getCorporationContracts.scope;
 
@@ -38,8 +38,8 @@ export async function loadCorpContractsSnapshot(
     names: new Map(),
     receiverCategories: new Map(),
   };
-  const granted = (await db.tokens.get(characterId))?.scopes ?? [];
-  if (!granted.includes(SCOPE)) return { ...empty, needsReauth: true };
+  const granted = await loadGrantedScopes(characterId);
+  if (!granted.has(SCOPE)) return { ...empty, needsReauth: true };
   const corporationId = await loadCorporationId(characterId);
   if (corporationId === null) return empty;
   const { cached: contractsResult, needsReauth } = await loadCorporationContracts(

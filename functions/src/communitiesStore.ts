@@ -111,6 +111,25 @@ export async function isCurrentMember(db: Firestore, communityId: string, caller
   return member.exists && member.get('ownerHash') === caller.ownerHash;
 }
 
+const notAMember = () => new HttpsError('not-found', 'Not a Member of this Community');
+
+/** `isCurrentMember` or a not-found error. */
+export async function requireCurrentMember(db: Firestore, communityId: string, caller: Caller) {
+  if (!(await isCurrentMember(db, communityId, caller))) throw notAMember();
+}
+
+/** The caller's Member doc in a transaction, only under the ownerHash it was joined with. */
+export async function requireMember(
+  tx: FirebaseFirestore.Transaction,
+  db: Firestore,
+  communityId: string,
+  caller: Caller
+): Promise<{ characterName: string }> {
+  const member = await tx.get(memberRef(db, communityId, caller.uid));
+  if (!member.exists || member.get('ownerHash') !== caller.ownerHash) throw notAMember();
+  return { characterName: String(member.get('characterName') ?? '') };
+}
+
 export async function requireAdmin(db: Firestore, communityId: string, caller: Caller) {
   const snap = await loadCommunity(db, communityId);
   if (snap.get('adminUid') !== caller.uid || !(await isCurrentMember(db, communityId, caller))) {

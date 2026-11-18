@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 /**
  * Standing buyback Requests (issue #4780): the pure rules. A buyback is a
  * Request that stays open, pays a Rate (a % of a Trade Hub's buy or sell
@@ -10,7 +11,7 @@
 export const MIN_RATE = 1;
 export const MAX_RATE = 200;
 /** A buyback quote is held this long: buybacks sit a while before the contract is made. */
-export const QUOTE_HOLD_MS = 14 * 24 * 60 * 60 * 1000;
+export const QUOTE_HOLD_MS = 14 * DAY_MS;
 /** Priced lines one quote carries. */
 export const MAX_QUOTE_LINES = 50;
 /** Buy lines one standing Request holds: the callable's cap. */

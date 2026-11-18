@@ -24,13 +24,11 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { Panel, EmptyState, SearchInput } from '@/components/ui';
 import { NotificationsDelivery } from './NotificationsDelivery';
 import { NotificationEventList } from './NotificationEventList';
 import type { EventRowContext } from './eventRowSupport';
 import { MD_UP_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
-import { db } from '@/db';
 import { useCharacters } from '@/features/character/useCharacters';
 import { NOTIFICATION_EVENT_IDS, eventLabelKey, isCorpEventId } from './events';
 import { corpEventsApply } from './eventGroups';
@@ -50,9 +48,12 @@ import { corpCapabilities, type CorpCapabilities } from '@/engine/corpRoles';
 import { useUrlParam } from '@/lib/useUrlState';
 import { textParam } from '@/lib/urlState';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+import { useGrantedScopesByCharacter } from '@/app/grantedScopes';
 
 /** Module scope so `useUrlParam` sees a stable codec identity across renders. */
 const SEARCH_PARAM = textParam();
+
+const NO_SCOPES: ReadonlyMap<number, ReadonlySet<string>> = new Map();
 
 export function NotificationsPanel() {
   const { t } = useTranslation();
@@ -61,7 +62,8 @@ export function NotificationsPanel() {
     () => [...roster].sort((a, b) => a.characterId - b.characterId),
     [roster]
   );
-  const tokens = useLiveQuery(() => db.tokens.toArray());
+  const loadedScopes = useGrantedScopesByCharacter();
+  const scopesByCharacterId = loadedScopes ?? NO_SCOPES;
 
   const prefsValue = useNotificationPreferences((state) => state.value);
   // Types the server has seen for each Character (issue #3755): a toggle for
@@ -102,12 +104,6 @@ export function NotificationsPanel() {
   const [search, setSearch] = useUrlParam('search', SEARCH_PARAM);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const isDesktop = useMediaQuery(MD_UP_QUERY);
-
-  const scopesByCharacterId = useMemo(() => {
-    const map = new Map<number, ReadonlySet<string>>();
-    for (const token of tokens ?? []) map.set(token.characterId, new Set(token.scopes));
-    return map;
-  }, [tokens]);
 
   /**
    * Per-stored-character corp capability (issue #299) — a departure from
@@ -169,8 +165,8 @@ export function NotificationsPanel() {
   // separate ticks, and rendering Characters before their tokens arrive drew
   // every row scope-less for a frame.
   const characterList = useMemo(
-    () => (tokens !== undefined ? characters : []),
-    [characters, tokens]
+    () => (loadedScopes !== undefined ? characters : []),
+    [characters, loadedScopes]
   );
 
   /**

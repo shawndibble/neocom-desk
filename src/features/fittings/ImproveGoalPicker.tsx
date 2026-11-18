@@ -21,8 +21,8 @@ import {
   type ImproveGoal,
   type ImproveHold,
 } from '@/engine/fittings/improve';
-import { splitGoals } from '@/engine/fittings/improveGoalSplit';
-import { hullRoleOf } from '@/engine/fittings/improveRole';
+import { splitGoals } from '@/engine/fittings/improve';
+import { hullRoleOf } from '@/engine/fittings/improve';
 import { m3Format } from './improveLineText';
 import type { ImproveSettings } from './improveSettings';
 import type { ImproveSearch } from './useImprove';

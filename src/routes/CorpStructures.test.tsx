@@ -1,3 +1,4 @@
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -33,14 +34,12 @@ vi.mock('@/features/route/useSolarSystems', () => ({
 
 const mocked = vi.mocked(boardData);
 const mockedBays = vi.mocked(fuelBayData.loadStructureFuelBays);
-const HOUR = 3_600_000;
-const DAY = 24 * HOUR;
 const now = Date.now();
 
 function structure(over: Partial<BoardStructureSource> & { structureId: number }) {
   return {
     name: `Efa - Keep ${over.structureId}`,
-    fuelExpiresMs: now + 20 * DAY,
+    fuelExpiresMs: now + 20 * DAY_MS,
     state: 'shield_vulnerable',
     stateTimerEndMs: null,
     unanchorsAtMs: null,
@@ -62,7 +61,7 @@ const BETA = structure({
   name: 'Amarr - Beta',
   systemId: 30002,
   corporationId: 20,
-  fuelExpiresMs: now + 2 * HOUR,
+  fuelExpiresMs: now + 2 * HOUR_MS,
   services: [
     { name: 'Market', state: 'offline' },
     { name: 'Clone Bay', state: 'online' },
@@ -257,7 +256,7 @@ describe('CorpStructures', () => {
         structureId: 4,
         name: 'Efa - Done',
         corporationId: 10,
-        fuelExpiresMs: now + 90 * DAY,
+        fuelExpiresMs: now + 90 * DAY_MS,
       });
       feed(
         [ALPHA, GAMMA, done],

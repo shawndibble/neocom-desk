@@ -6,6 +6,7 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, TextInput } from '@/components/ui';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 interface CargoQuantityDialogProps {
   name: string;
@@ -54,12 +55,12 @@ export function CargoQuantityDialog({
           // Selected on focus, so typing replaces the count rather than appending to it.
           onFocus={(e) => e.currentTarget.select()}
         />
-        <div className="flex justify-end gap-2">
+        <DialogFooter>
           <Button onClick={onClose}>{t('fittings.myFittings.cancel')}</Button>
           <Button type="submit" variant="primary">
             {t('fittings.item.quantityConfirm')}
           </Button>
-        </div>
+        </DialogFooter>
       </form>
     </Modal>
   );

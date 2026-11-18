@@ -21,6 +21,11 @@ interface PlanRunsControlProps {
    * the page always carries.
    */
   findBreakEven: (() => number | null) | null;
+  /**
+   * The most runs the owned stock covers and the material that caps it
+   * (`limitingName`, null at the maximum job runs); `null` shows nothing.
+   */
+  stockRuns?: { runs: number; limitingName: string | null } | null;
 }
 
 /**
@@ -34,6 +39,7 @@ export function PlanRunsControl({
   seconds,
   profit,
   findBreakEven,
+  stockRuns = null,
 }: PlanRunsControlProps) {
   const { t } = useTranslation();
   // The runs and profit a failed search ran against: the note is stale once either moves.
@@ -41,6 +47,27 @@ export function PlanRunsControl({
     runs: number;
     profit: number | null;
   } | null>(null);
+  const stockRunsText =
+    stockRuns &&
+    (stockRuns.runs > 0
+      ? t(
+          stockRuns.limitingName === null
+            ? 'industry.stockRuns.covers'
+            : 'industry.stockRuns.coversLimited',
+          {
+            count: stockRuns.runs,
+            runs: formatNumber(stockRuns.runs),
+            name: stockRuns.limitingName,
+          }
+        )
+      : t(
+          stockRuns.limitingName === null
+            ? 'industry.stockRuns.none'
+            : 'industry.stockRuns.noneLimited',
+          {
+            name: stockRuns.limitingName,
+          }
+        ));
   return (
     <span className="flex flex-wrap items-center gap-2 text-sm text-text-dim">
       <SourcingInput
@@ -70,6 +97,17 @@ export function PlanRunsControl({
         >
           {t('industry.breakEvenRuns')}
         </Button>
+      )}
+      {stockRuns && (
+        <span className="flex flex-wrap items-center gap-2" data-testid="stock-runs">
+          <span aria-hidden="true">·</span>
+          <span className="text-xs">{stockRunsText}</span>
+          {stockRuns.runs > 0 && stockRuns.runs !== runs && (
+            <Button size="sm" onClick={() => onRunsChange(stockRuns.runs)}>
+              {t('industry.stockRuns.set', { runs: formatNumber(stockRuns.runs) })}
+            </Button>
+          )}
+        </span>
       )}
       {noBreakEvenAt?.runs === runs && noBreakEvenAt.profit === profit && (
         <span role="status" className="text-xs">

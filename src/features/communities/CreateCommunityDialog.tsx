@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, Field, Fields, Modal, TextInput } from '@/components/ui';
 import { createCommunity } from './communityStore';
 import { callableErrorCode } from './callableError';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 const MAX_NAME_LENGTH = 60;
 
@@ -74,7 +75,7 @@ export function CreateCommunityDialog({
             {t(error === 'tooMany' ? 'communities.tooMany' : 'communities.createFailed')}
           </p>
         )}
-        <div className="mt-3 flex justify-end gap-2">
+        <DialogFooter className="mt-3">
           <Button size="sm" disabled={working} onClick={onClose}>
             {t('communities.cancel')}
           </Button>
@@ -87,7 +88,7 @@ export function CreateCommunityDialog({
           >
             {t('communities.createAction')}
           </Button>
-        </div>
+        </DialogFooter>
       </form>
     </Modal>
   );

@@ -108,6 +108,8 @@ export function NodeItemRow({
   unitVolume,
   estimatedValue,
   valueHint,
+  stockUnitCost,
+  showStockCost,
   characterBadge,
   blueprintKind,
   itemId,
@@ -124,6 +126,8 @@ export function NodeItemRow({
   unitVolume: number | undefined;
   estimatedValue: number;
   valueHint?: string;
+  stockUnitCost: ComponentProps<typeof ItemRow>['stockUnitCost'];
+  showStockCost: boolean;
   characterBadge: string | null;
   blueprintKind: ComponentProps<typeof ItemRow>['blueprintKind'];
   /** Set for a Mutated module only. */
@@ -138,6 +142,8 @@ export function NodeItemRow({
       unitVolume={unitVolume}
       estimatedValue={estimatedValue}
       valueHint={valueHint}
+      stockUnitCost={stockUnitCost}
+      showStockCost={showStockCost}
       characterBadge={characterBadge}
       blueprintKind={blueprintKind}
       typeId={asset.type_id}
@@ -407,6 +413,8 @@ function NodeRowView({
       unitVolume={actions.volumeByTypeId.get(asset.type_id)}
       estimatedValue={estimatedValue}
       valueHint={valueHint}
+      stockUnitCost={actions.stockCostByTypeId?.get(asset.type_id)?.unitCost}
+      showStockCost={actions.stockCostByTypeId !== null}
       characterBadge={badge}
       blueprintKind={assetBlueprintKind(asset, actions.blueprintTypeIds)}
       itemId={itemId}

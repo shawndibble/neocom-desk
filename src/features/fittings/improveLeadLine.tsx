@@ -12,8 +12,8 @@ import {
   type ImproveOption,
   type ImproveResult,
 } from '@/engine/fittings/improve';
-import { alignOf, reachKm } from '@/engine/fittings/improveFigures';
-import { bestOption } from '@/engine/fittings/improveKeys';
+import { alignOf, reachKm } from '@/engine/fittings/improve';
+import { bestOption } from '@/engine/fittings/improve';
 import {
   overallTerms,
   activeTank,

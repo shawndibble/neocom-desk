@@ -1,4 +1,4 @@
-// Mirror of src/engine/skyhooks/skyhookAlert.ts (byte for byte below this line; nearbyAlerts.test.ts pins it). Edit the source, then copy.
+// Lives in functions/src (deploy uploads functions/ alone); src re-exports it. Keep it import-free.
 /**
  * The "raidable skyhook within N jumps" alert (issue #4784, raider half): fires
  * when a skyhook's theft window, read from the public raidable list, is open

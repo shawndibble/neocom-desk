@@ -11,6 +11,7 @@
  * memory-only. Concurrent asks for the same prices share one in-flight
  * request rather than each missing and fetching.
  */
+import { HOUR_MS, MINUTE_MS } from '@/lib/age';
 import {
   emitCacheRevalidated,
   GLOBAL_CACHE_CHARACTER_ID,
@@ -25,8 +26,8 @@ import type { TradeHub } from './hubs';
 
 export type { HubAggregate, AdjustedPrice };
 
-export const HUB_PRICE_TTL_MS = 15 * 60 * 1000;
-export const ADJUSTED_PRICE_TTL_MS = 60 * 60 * 1000;
+export const HUB_PRICE_TTL_MS = 15 * MINUTE_MS;
+export const ADJUSTED_PRICE_TTL_MS = HOUR_MS;
 
 /** Injectable so tests can move time without waiting on it. Defaults to wall-clock. */
 export type Clock = () => number;

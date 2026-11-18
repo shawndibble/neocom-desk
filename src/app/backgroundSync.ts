@@ -20,6 +20,7 @@
  * priority, so an edit-triggered sync overtakes the rest of the sweep
  * (`sync/planSync.ts` `SyncPriority`) instead of waiting behind every Character.
  */
+import { MINUTE_MS } from '@/lib/age';
 import { useEffect, useRef } from 'react';
 import { getSyncStatus, scheduleSync } from '@/sync';
 import { isSyncConfigured } from './syncStatus';
@@ -32,20 +33,20 @@ import { readLocal, writeLocal } from '@/lib/safeLocalStorage';
  * leaves the window", which is what a `visibilitychange` gate has to survive.
  * `sync/syncScheduler.ts`'s `PARTIAL_PASS_WINDOW_MS` must not exceed it.
  */
-export const BACKGROUND_SYNC_MIN_GAP_MS = 5 * 60 * 1000;
+export const BACKGROUND_SYNC_MIN_GAP_MS = 5 * MINUTE_MS;
 
 /**
  * The same gap for every *other* Character. Nobody is looking through them,
  * and each one costs a full pass of reads, so they can wait longer.
  */
-export const BACKGROUND_SYNC_NON_ACTIVE_GAP_MS = 20 * 60 * 1000;
+export const BACKGROUND_SYNC_NON_ACTIVE_GAP_MS = 20 * MINUTE_MS;
 
 /**
  * How often the gate is re-checked. Not the sync cadence —
  * {@link BACKGROUND_SYNC_MIN_GAP_MS} is that. Kept well under the gap so the
  * gap, rather than the boundary between two equal periods, decides.
  */
-export const BACKGROUND_SYNC_TICK_MS = 60 * 1000;
+export const BACKGROUND_SYNC_TICK_MS = MINUTE_MS;
 
 /**
  * How long after boot the first sweep waits. Boot already syncs the active

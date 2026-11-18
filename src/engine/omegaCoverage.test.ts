@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import {
   accountCost,
@@ -10,10 +11,9 @@ import {
   type IncomeRow,
 } from './omegaCoverage';
 
-const DAY = 86_400_000;
 const NOW = Date.parse('2026-10-16T12:00:00Z');
 const row = (daysAgo: number, amount: number, over: Partial<IncomeRow> = {}): IncomeRow => ({
-  date: new Date(NOW - daysAgo * DAY).toISOString(),
+  date: new Date(NOW - daysAgo * DAY_MS).toISOString(),
   amount,
   ...over,
 });
@@ -55,7 +55,7 @@ describe('accountsCovered and nextAccountGap', () => {
 });
 
 const since = (daysAgo: number, gaps: HistoryCoverage['gaps'] = []): HistoryCoverage => ({
-  since: NOW - daysAgo * DAY,
+  since: NOW - daysAgo * DAY_MS,
   gaps,
 });
 
@@ -89,19 +89,19 @@ describe('omegaPeriods', () => {
     const periods = omegaPeriods(rows, NOW, [since(59)]);
     expect(periods.map((p) => p.net)).toEqual([10, 150]);
     expect(periods[1]!.endMs).toBe(NOW);
-    expect(periods[1]!.startMs).toBe(NOW - 30 * DAY);
-    expect(periods[0]!.endMs).toBe(NOW - 30 * DAY);
+    expect(periods[1]!.startMs).toBe(NOW - 30 * DAY_MS);
+    expect(periods[0]!.endMs).toBe(NOW - 30 * DAY_MS);
   });
 
   it('buckets rolling windows of the chosen length', () => {
     const rows = [row(0, 100), row(6, 50), row(8, 7), row(20, 3)];
     const week = omegaPeriods(rows, NOW, [since(20)], 7);
     expect(week.map((p) => p.net)).toEqual([3, 7, 150]);
-    expect(week[2]!.startMs).toBe(NOW - 7 * DAY);
-    expect(week[1]!.endMs).toBe(NOW - 7 * DAY);
+    expect(week[2]!.startMs).toBe(NOW - 7 * DAY_MS);
+    expect(week[1]!.endMs).toBe(NOW - 7 * DAY_MS);
     const quarter = omegaPeriods(rows, NOW, [since(100)], 90);
     expect(quarter).toHaveLength(2);
-    expect(quarter[1]!.startMs).toBe(NOW - 90 * DAY);
+    expect(quarter[1]!.startMs).toBe(NOW - 90 * DAY_MS);
     expect(quarter[1]!.net).toBe(160);
   });
 
@@ -152,7 +152,7 @@ describe('omegaPeriods', () => {
   });
 
   it('marks a period overlapping any gap as partial', () => {
-    const gap: [number, number] = [NOW - 40 * DAY, NOW - 35 * DAY];
+    const gap: [number, number] = [NOW - 40 * DAY_MS, NOW - 35 * DAY_MS];
     const periods = omegaPeriods([], NOW, [since(80), since(80, [gap])]);
     expect(periods.map((p) => p.partial)).toEqual([true, true, false]);
   });

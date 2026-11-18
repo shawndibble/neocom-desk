@@ -69,3 +69,12 @@ describe('isBudgetLow', () => {
     expect(isBudgetLow(new Headers())).toBe(false);
   });
 });
+
+describe('fetch rejection', () => {
+  it('is an error result, not a throw', async () => {
+    const boom = (async () => {
+      throw new TypeError('network');
+    }) as unknown as typeof fetch;
+    expect(await fetchNotifications(1, 't', null, boom)).toEqual({ kind: 'error', status: 0 });
+  });
+});

@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { db } from '@/db';
@@ -38,8 +39,7 @@ import {
 } from './requestBadge';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
-const DAY = 86_400_000;
-const NOW = 100 * DAY;
+const NOW = 100 * DAY_MS;
 const request = (id: string, over: Partial<CommunityRequest> = {}): CommunityRequest => ({
   id,
   ownerUid: 'char:2',
@@ -49,7 +49,7 @@ const request = (id: string, over: Partial<CommunityRequest> = {}): CommunityReq
   lines: [{ typeId: 1, name: 'Tritanium', quantity: 1, kind: 'item' }],
   createdAt: NOW - 1000,
   lastActivityAt: NOW - 1000,
-  expiresAt: NOW + DAY,
+  expiresAt: NOW + DAY_MS,
   closed: false,
   notify: { app: true, mail: false },
   ...over,
@@ -100,12 +100,12 @@ describe('Communities nav badge', () => {
   it('asks each Community only for what was posted since it was last seen', async () => {
     await rememberCommunityWatch(1, [community('c1')]);
     await db.settings.bulkPut([
-      { key: 'communityRequestsSeen:1:c1', value: NOW - DAY },
+      { key: 'communityRequestsSeen:1:c1', value: NOW - DAY_MS },
       { key: 'communityRequestsSeen:1:c2', value: NOW - 5 },
     ]);
     await refreshRequestBadge(1, NOW);
     expect(requestStore.loadRequestsSince.mock.calls).toEqual([
-      [1, 'c1', NOW - DAY],
+      [1, 'c1', NOW - DAY_MS],
       [1, 'c2', NOW - 5],
     ]);
   });
@@ -113,8 +113,8 @@ describe('Communities nav badge', () => {
   it('clears a Community’s count when its Requests tab is looked at', async () => {
     await rememberCommunityWatch(1, [community('c1')]);
     await db.settings.bulkPut([
-      { key: 'communityRequestsSeen:1:c1', value: NOW - DAY },
-      { key: 'communityRequestsSeen:1:c2', value: NOW - DAY },
+      { key: 'communityRequestsSeen:1:c1', value: NOW - DAY_MS },
+      { key: 'communityRequestsSeen:1:c2', value: NOW - DAY_MS },
     ]);
     const { result } = renderHook(() => useNewRequestCount());
     await act(() => refreshRequestBadge(1, NOW));

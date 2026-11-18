@@ -7,7 +7,7 @@ import type { TFunction } from 'i18next';
 import { IskAmount, StatChangeList } from '@/components/ui';
 import { textActionClassName } from '@/components/ui/textActionClassName';
 import type { ImproveOption, RejectedOption } from '@/engine/fittings/improve';
-import { isResource } from '@/engine/fittings/improveFigures';
+import { isResource } from '@/engine/fittings/improve';
 import type { FittingStats } from '@/engine/fittings/types';
 import { roleSwapChanges } from '@/engine/fittings/skillGains';
 import {

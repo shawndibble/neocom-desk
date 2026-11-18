@@ -5,7 +5,7 @@
  * Shared by the Jump Range's Current System picker and Route Safety's From and
  * To (issue #2328). The snapshot is only fetched once the popover first opens.
  */
-import { useId, useMemo, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react';
+import { useMemo, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -18,7 +18,7 @@ import {
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import { activeOptionClassName } from '@/components/ui/controlStyles';
 import { SecurityStatus } from '@/components/SecurityStatus';
-import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
+import { useCombobox } from '@/lib/useCombobox';
 import { cx } from '@/lib/cx';
 import type { PickedStation } from '@/features/places/placeSearch';
 import { useKnownPlaces } from '@/features/places/useKnownPlaces';
@@ -26,8 +26,6 @@ import { buildPickerOptions, pickedStationOf, type PickerOption } from './picker
 import { useSolarSystemList, useSystemName } from './useSolarSystems';
 
 const MATCH_LIMIT = 8;
-
-const NAV_KEYS: readonly string[] = ['ArrowDown', 'ArrowUp', 'Home', 'End'];
 
 export interface SolarSystemPickerProps {
   value: number | null;
@@ -71,8 +69,6 @@ export function SolarSystemPicker({
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [highlight, setHighlight] = useState<number | null>(null);
-  const listId = useId();
   const { systems, failed: systemsFailed, retry: retrySystems } = useSolarSystemList(open);
   // Retry's notice unmounts when the read restarts: focus waits on the popover body.
   const [bodyRef, , holdRetryFocus] = useRetryFocus(
@@ -87,10 +83,12 @@ export function SolarSystemPicker({
     [systems, query, exclude, placeHits]
   );
 
+  const combo = useCombobox({ count: matches.length, open: matches.length > 0 });
+
   function close() {
     setOpen(false);
     setQuery('');
-    setHighlight(null);
+    combo.reset();
   }
 
   function choose(option: PickerOption) {
@@ -99,12 +97,10 @@ export function SolarSystemPicker({
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (NAV_KEYS.includes(event.key)) {
+    if (combo.handleNavKey(event)) return;
+    if (event.key === 'Enter' && combo.highlight !== null && matches[combo.highlight]) {
       event.preventDefault();
-      setHighlight(moveHighlight(event.key as ComboboxNavKey, highlight, matches.length));
-    } else if (event.key === 'Enter' && highlight !== null && matches[highlight]) {
-      event.preventDefault();
-      choose(matches[highlight]);
+      choose(matches[combo.highlight]);
     }
   }
 
@@ -133,16 +129,12 @@ export function SolarSystemPicker({
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
-              setHighlight(null);
+              combo.reset();
             }}
             onKeyDown={onKeyDown}
             placeholder={t('jumpRange.searchPlaceholder')}
             aria-label={t('jumpRange.searchPlaceholder')}
-            aria-controls={listId}
-            aria-activedescendant={highlight === null ? undefined : `${listId}-${highlight}`}
-            role="combobox"
-            aria-expanded={matches.length > 0}
-            aria-autocomplete="list"
+            {...combo.inputProps}
           />
           {systemsFailed && (
             // The list never loaded, so no result is a statement about any system.
@@ -160,16 +152,14 @@ export function SolarSystemPicker({
             </div>
           )}
           {matches.length > 0 && (
-            <ul id={listId} role="listbox" className="flex flex-col">
+            <ul {...combo.listboxProps} className="flex flex-col">
               {matches.map((option, index) => (
                 <li
                   key={option.key}
-                  id={`${listId}-${index}`}
-                  role="option"
-                  aria-selected={index === highlight}
+                  {...combo.optionProps(index)}
                   className={cx(
                     'cursor-pointer rounded-xs px-2 py-1 hover:bg-panel-2',
-                    index === highlight && `bg-panel-2 ${activeOptionClassName}`
+                    index === combo.activeIndex && `bg-panel-2 ${activeOptionClassName}`
                   )}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => choose(option)}

@@ -18,6 +18,8 @@ import { PlanScheduleLine } from './PlanScheduleLine';
 import { PlanSetupStrip } from './PlanSetupStrip';
 import { PlanSetupForm } from './PlanSetupForm';
 import { PlanRunsControl } from './PlanRunsControl';
+import { planStockRuns } from './planStockRuns';
+import { offerableStock } from '@/engine/industry/ownedStockOffer';
 import { PlanVerdictHero } from './PlanVerdictHero';
 import { ProductionRunsPanel } from './ProductionRunsPanel';
 import type { MaterialsTableHandle } from './MaterialsTable';
@@ -159,6 +161,7 @@ export function BuildPlanDetail({
     canBuildHere,
     resolved,
     resolveAt,
+    resolveQuantitiesAt,
     costMove,
     ownedSale,
     pricesUnreachable,
@@ -192,6 +195,19 @@ export function BuildPlanDetail({
     group,
     groupMembers
   );
+
+  // The most runs the owned stock covers, off the same stock the Owned-Stock
+  // Offer reads (scoped, less Group Stock Claims ahead of this plan).
+  const { groupClaimsFor, detection } = ownedStock;
+  const stockRuns = useMemo(() => {
+    if (!result) return null;
+    const found = planStockRuns({
+      plan,
+      resolveQuantitiesAt,
+      availableFor: (typeID) => offerableStock(typeID, groupClaimsFor, detection.scopedQuantityFor),
+    });
+    return found && { runs: found.runs, limitingTypeID: found.limiting };
+  }, [result, plan, resolveQuantitiesAt, groupClaimsFor, detection]);
 
   const { autoBuildMaxDepth, applyAutoBuild, strategyUndo, setStrategyUndo } = useAutoBuildPlan({
     plan,
@@ -353,6 +369,15 @@ export function BuildPlanDetail({
       onRunsChange={(runs) => update({ runs })}
       seconds={result ? (planSeconds ?? result.seconds) : null}
       profit={heroFigures?.profit ?? null}
+      stockRuns={
+        stockRuns && {
+          runs: stockRuns.runs,
+          limitingName:
+            stockRuns.limitingTypeID === null
+              ? null
+              : nameForType(catalog, stockRuns.limitingTypeID),
+        }
+      }
       findBreakEven={
         pricesReady && heroFigures?.profit != null && heroFigures.profit < 0
           ? findBreakEvenRuns

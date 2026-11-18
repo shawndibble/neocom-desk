@@ -1,3 +1,4 @@
+import { MINUTE_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import {
   buildOpenOrderRows,
@@ -589,12 +590,10 @@ describe('buildOpenOrderRows — structure market competition (issue #538)', () 
 });
 
 describe('buildOpenOrderRows — frequentlyUndercut (issue #1018)', () => {
-  const MINUTE = 60 * 1000;
-
   /** `count` samples ending 5 minutes before NOW, one every 5 minutes. */
   function samples(count: number, problem: OrderProblem) {
     return Array.from({ length: count }, (_, i) => ({
-      at: NOW - (count - i) * 5 * MINUTE,
+      at: NOW - (count - i) * 5 * MINUTE_MS,
       problem,
     }));
   }

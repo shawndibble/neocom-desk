@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -108,7 +109,6 @@ const mockedReadAccess = vi.mocked(corpReadAccess);
 const CHARACTER_ID = 42;
 const CORPORATION_ID = 98000001;
 const NOW = Date.parse('2026-09-03T12:00:00Z');
-const DAY = 86_400_000;
 const at = (ms: number) => new Date(NOW + ms).toISOString();
 
 function accessOf(state: CorpAccessState, capabilities: Partial<CorpCapabilities>): CorpAccess {
@@ -198,7 +198,7 @@ const STRUCTURE = {
   type_id: 1,
   profile_id: 1,
   name: 'Nakugard - Home',
-  fuel_expires: at(4 * DAY),
+  fuel_expires: at(4 * DAY_MS),
 };
 
 const widget = (name: string) => screen.findByRole('region', { name });

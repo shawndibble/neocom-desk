@@ -6,7 +6,7 @@
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import type { ImproveGoal, ImproveResult } from '@/engine/fittings/improve';
-import { optionKey } from '@/engine/fittings/improveKeys';
+import { optionKey } from '@/engine/fittings/improve';
 import type { FittingStats } from '@/engine/fittings/types';
 import { changeLine } from './improveChangeLines';
 import { brokeText, moveLine, oreLine } from './improveLineText';

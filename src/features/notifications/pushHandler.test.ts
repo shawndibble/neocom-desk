@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, it, expect, vi, afterAll } from 'vitest';
 import { handlePush, parsePushPayload, type PushEnv, type PushPayload } from './pushHandler';
 import { notificationTagFor } from './notificationOptions';
@@ -731,14 +732,13 @@ describe('server-pushed new mail (issue #5143)', () => {
 
 describe('server-pushed nearby alerts (issue #5122)', () => {
   const NOW = Date.parse('2026-10-25T12:00:00Z');
-  const HOUR = 3_600_000;
   const skyhook = {
     eventId: 'skyhookRaidableNearby' as const,
     characterId: 777,
     systemId: 30000142,
     planetId: 40009077,
-    startMs: NOW + HOUR,
-    endMs: NOW + 2 * HOUR,
+    startMs: NOW + HOUR_MS,
+    endMs: NOW + 2 * HOUR_MS,
     jumps: 2,
   };
   const incursion = {

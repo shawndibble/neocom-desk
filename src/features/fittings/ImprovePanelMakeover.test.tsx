@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { baseFittingStats } from '@/engine/fittings/__fixtures__/fittingStats';
 import type { ImproveOption, ImproveResult } from '@/engine/fittings/improve';
-import { optionKey } from '@/engine/fittings/improveKeys';
+import { optionKey } from '@/engine/fittings/improve';
 import type { Fitting } from '@/engine/fittings/types';
 import { MAKEOVER, MAKEOVER_KEYS } from './improveMakeoverFixture';
 import { makeoverOptionsOf } from './improveMakeoverTicks';

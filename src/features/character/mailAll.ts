@@ -9,11 +9,11 @@
  * that window reads Dexie instead, so mashing Refresh with four Characters
  * never means four mail fetches a second.
  */
-import { db } from '@/db';
 import { requiredScopesForEndpoints } from '@/esi/registry';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadMailOwner, loadMailOwnerCacheOnly, type MailOwnerLoad } from './mail';
 import { MINUTE_MS } from '@/lib/age';
+import { loadGrantedScopes } from '@/app/grantedScopes';
 
 export const MAIL_REFRESH_MIN_GAP_MS = MINUTE_MS;
 
@@ -51,7 +51,7 @@ export async function loadMailForCharacters(
   const skipped = new Map<number, SkippedMailCharacter>();
   await mapWithConcurrencyLimit(characters, ESI_FANOUT_CONCURRENCY, async (character) => {
     const { characterId, name } = character;
-    const held = new Set((await db.tokens.get(characterId))?.scopes ?? []);
+    const held = await loadGrantedScopes(characterId);
     if (!MAIL_READ_SCOPES.every((scope) => held.has(scope))) {
       skipped.set(characterId, { characterId, name, granted: false });
       return;

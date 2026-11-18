@@ -1,3 +1,4 @@
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '@/db';
 import type { CachedResult } from '@/esi/cache';
@@ -11,20 +12,18 @@ import {
 } from './walletArchive';
 
 const CHAR = 7;
-const DAY = 86_400_000;
-const HOUR = 3_600_000;
 const NOW = Date.now();
 
 const iso = (ms: number) => `${new Date(ms).toISOString().slice(0, 19)}Z`;
 const entry = (id: number, ageDays: number): WalletJournalEntry => ({
   id,
-  date: iso(NOW - ageDays * DAY),
+  date: iso(NOW - ageDays * DAY_MS),
   ref_type: 'bounty_prizes',
   description: `e${id}`,
 });
 const txn = (id: number, ageDays: number): WalletTransaction => ({
   transaction_id: id,
-  date: iso(NOW - ageDays * DAY),
+  date: iso(NOW - ageDays * DAY_MS),
   location_id: 1,
   type_id: 34,
   unit_price: 1,
@@ -76,10 +75,10 @@ describe('archiveResult', () => {
     await archiveResult(
       'journal',
       CHAR,
-      live([entry(1, 40)], { fetchedAt: new Date(NOW - 5 * DAY) })
+      live([entry(1, 40)], { fetchedAt: new Date(NOW - 5 * DAY_MS) })
     );
     const result = await journalWithArchive(CHAR, null);
-    expect(result?.fetchedAt.getTime()).toBe(NOW - 5 * DAY - HOUR);
+    expect(result?.fetchedAt.getTime()).toBe(NOW - 5 * DAY_MS - HOUR_MS);
     await db.walletArchiveCoverage.clear();
     const bare = await journalWithArchive(CHAR, null);
     expect(bare?.fetchedAt.getTime()).toBe(Date.parse(entry(1, 40).date));
@@ -118,7 +117,7 @@ describe('coverage', () => {
   it('a complete fetch covers ESI window up to one cache age before the fetch', async () => {
     await archiveResult('journal', CHAR, live([entry(1, 3)]));
     const info = await loadWalletArchiveInfo(CHAR, NOW);
-    expect(info.since).toBe(NOW - HOUR - 30 * DAY);
+    expect(info.since).toBe(NOW - HOUR_MS - 30 * DAY_MS);
     expect(info.gaps).toEqual([]);
   });
 
@@ -137,18 +136,22 @@ describe('coverage', () => {
     await db.walletArchiveCoverage.put({
       characterId: CHAR,
       kind: 'journal',
-      windows: [[NOW - 120 * DAY, NOW - 90 * DAY]],
+      windows: [[NOW - 120 * DAY_MS, NOW - 90 * DAY_MS]],
     });
     await archiveResult('journal', CHAR, live([entry(1, 3)]));
     const info = await loadWalletArchiveInfo(CHAR, NOW);
-    expect(info.gaps).toEqual([[NOW - 90 * DAY, NOW - HOUR - 30 * DAY]]);
+    expect(info.gaps).toEqual([[NOW - 90 * DAY_MS, NOW - HOUR_MS - 30 * DAY_MS]]);
   });
 });
 
 describe('coverage races and trailing gaps', () => {
   it('keeps both windows when two archives of different fetches overlap in time', async () => {
     await Promise.all([
-      archiveResult('journal', CHAR, live([entry(1, 3)], { fetchedAt: new Date(NOW - 200 * DAY) })),
+      archiveResult(
+        'journal',
+        CHAR,
+        live([entry(1, 3)], { fetchedAt: new Date(NOW - 200 * DAY_MS) })
+      ),
       archiveResult('journal', CHAR, live([entry(2, 3)], { fetchedAt: new Date(NOW) })),
     ]);
     const row = await db.walletArchiveCoverage.get([CHAR, 'journal']);
@@ -159,10 +162,10 @@ describe('coverage races and trailing gaps', () => {
     await archiveResult(
       'journal',
       CHAR,
-      live([entry(1, 3)], { fetchedAt: new Date(NOW - 5 * DAY) })
+      live([entry(1, 3)], { fetchedAt: new Date(NOW - 5 * DAY_MS) })
     );
     const info = await loadWalletArchiveInfo(CHAR, NOW);
-    expect(info.gaps).toEqual([[NOW - 5 * DAY - HOUR, NOW]]);
+    expect(info.gaps).toEqual([[NOW - 5 * DAY_MS - HOUR_MS, NOW]]);
   });
 
   it('says coverage is unconfirmed when rows exist but no complete fetch did', async () => {
@@ -187,8 +190,8 @@ describe('transactions', () => {
     await archiveResult('transactions', CHAR, live([txn(1, 3)], { truncated: true }));
     const row = await db.walletArchiveCoverage.get([CHAR, 'transactions']);
     expect(row?.windows).toHaveLength(1);
-    expect(NOW - row!.windows[0][0]).toBeGreaterThan(2.9 * DAY);
-    expect(NOW - row!.windows[0][0]).toBeLessThan(3.1 * DAY);
+    expect(NOW - row!.windows[0][0]).toBeGreaterThan(2.9 * DAY_MS);
+    expect(NOW - row!.windows[0][0]).toBeLessThan(3.1 * DAY_MS);
   });
 });
 

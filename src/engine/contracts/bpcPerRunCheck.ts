@@ -60,3 +60,28 @@ export function bpcPerRunCheck(
     diff: percentDifference(perRun, medianPerRun),
   };
 }
+
+/**
+ * `bpcPerRunCheck`'s `diff` for many rows against one pool: the pool is grouped
+ * by blueprint once and each row's answer is remembered, so sorting a whole
+ * board on it scans a blueprint's copies, not the snapshot, per row. `null`
+ * wherever the check is `null` or has no median to be a percent of.
+ */
+export function bpcPeerDiffs(
+  pool: readonly BpcContractRow[]
+): (row: BpcContractRow) => number | null {
+  const byType = new Map<number, BpcContractRow[]>();
+  for (const row of pool) {
+    const group = byType.get(row.typeId);
+    if (group) group.push(row);
+    else byType.set(row.typeId, [row]);
+  }
+  const answers = new Map<number, number | null>();
+  return (row) => {
+    const known = answers.get(row.contractId);
+    if (known !== undefined) return known;
+    const diff = bpcPerRunCheck(row, byType.get(row.typeId) ?? [])?.diff ?? null;
+    answers.set(row.contractId, diff);
+    return diff;
+  };
+}

@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import {
   HISTORY_MAX,
@@ -9,13 +10,12 @@ import {
 } from './history';
 
 const NOW = Date.UTC(2026, 9, 9, 12);
-const DAY = 24 * 60 * 60 * 1000;
 
 describe('parseSurveyHistory', () => {
   it('keeps well-formed entries, newest first', () => {
     const raw = [
-      { id: 'abc123XYZ', addedAt: NOW - 2 * DAY },
-      { id: 'def456UVW', addedAt: NOW - DAY },
+      { id: 'abc123XYZ', addedAt: NOW - 2 * DAY_MS },
+      { id: 'def456UVW', addedAt: NOW - DAY_MS },
     ];
     expect(parseSurveyHistory(raw, NOW)).toEqual([raw[1], raw[0]]);
   });
@@ -28,9 +28,9 @@ describe('parseSurveyHistory', () => {
       { id: 'ghi789RST' },
       null,
       7,
-      { id: 'jkl012OPQ', addedAt: NOW - DAY },
+      { id: 'jkl012OPQ', addedAt: NOW - DAY_MS },
     ];
-    expect(parseSurveyHistory(raw, NOW)).toEqual([{ id: 'jkl012OPQ', addedAt: NOW - DAY }]);
+    expect(parseSurveyHistory(raw, NOW)).toEqual([{ id: 'jkl012OPQ', addedAt: NOW - DAY_MS }]);
   });
 
   it('is empty for anything that is not a list', () => {
@@ -40,20 +40,20 @@ describe('parseSurveyHistory', () => {
 
   it('keeps one entry per id, the latest', () => {
     const raw = [
-      { id: 'abc123XYZ', addedAt: NOW - 2 * DAY },
-      { id: 'abc123XYZ', addedAt: NOW - DAY },
+      { id: 'abc123XYZ', addedAt: NOW - 2 * DAY_MS },
+      { id: 'abc123XYZ', addedAt: NOW - DAY_MS },
     ];
-    expect(parseSurveyHistory(raw, NOW)).toEqual([{ id: 'abc123XYZ', addedAt: NOW - DAY }]);
+    expect(parseSurveyHistory(raw, NOW)).toEqual([{ id: 'abc123XYZ', addedAt: NOW - DAY_MS }]);
   });
 });
 
 describe('recordSurvey', () => {
-  const list = [{ id: 'abc123XYZ', addedAt: NOW - DAY }];
+  const list = [{ id: 'abc123XYZ', addedAt: NOW - DAY_MS }];
 
   it('puts a new survey first', () => {
     expect(recordSurvey(list, 'def456UVW', NOW)).toEqual([
       { id: 'def456UVW', addedAt: NOW },
-      { id: 'abc123XYZ', addedAt: NOW - DAY },
+      { id: 'abc123XYZ', addedAt: NOW - DAY_MS },
     ]);
   });
 
@@ -107,29 +107,29 @@ describe('recordSurvey', () => {
 
 describe('survey names', () => {
   const list = [
-    { id: 'abc123XYZ', addedAt: NOW - DAY },
-    { id: 'def456UVW', addedAt: NOW - 2 * DAY },
+    { id: 'abc123XYZ', addedAt: NOW - DAY_MS },
+    { id: 'def456UVW', addedAt: NOW - 2 * DAY_MS },
   ];
 
   it('keeps a stored name, trimmed and capped, and drops a blank or non-string one', () => {
     const raw = [
-      { id: 'abc123XYZ', addedAt: NOW - DAY, name: '  Belt 3  ' },
-      { id: 'def456UVW', addedAt: NOW - 2 * DAY, name: '   ' },
-      { id: 'ghi789RST', addedAt: NOW - 3 * DAY, name: 42 },
-      { id: 'jkl012OPQ', addedAt: NOW - 4 * DAY, name: 'x'.repeat(SURVEY_NAME_MAX + 5) },
+      { id: 'abc123XYZ', addedAt: NOW - DAY_MS, name: '  Belt 3  ' },
+      { id: 'def456UVW', addedAt: NOW - 2 * DAY_MS, name: '   ' },
+      { id: 'ghi789RST', addedAt: NOW - 3 * DAY_MS, name: 42 },
+      { id: 'jkl012OPQ', addedAt: NOW - 4 * DAY_MS, name: 'x'.repeat(SURVEY_NAME_MAX + 5) },
     ];
     const parsed = parseSurveyHistory(raw, NOW);
-    expect(parsed[0]).toEqual({ id: 'abc123XYZ', addedAt: NOW - DAY, name: 'Belt 3' });
-    expect(parsed[1]).toEqual({ id: 'def456UVW', addedAt: NOW - 2 * DAY });
+    expect(parsed[0]).toEqual({ id: 'abc123XYZ', addedAt: NOW - DAY_MS, name: 'Belt 3' });
+    expect(parsed[1]).toEqual({ id: 'def456UVW', addedAt: NOW - 2 * DAY_MS });
     expect('name' in parsed[1]!).toBe(false);
-    expect(parsed[2]).toEqual({ id: 'ghi789RST', addedAt: NOW - 3 * DAY });
+    expect(parsed[2]).toEqual({ id: 'ghi789RST', addedAt: NOW - 3 * DAY_MS });
     expect(parsed[3]!.name).toHaveLength(SURVEY_NAME_MAX);
   });
 
   it('names one survey, trimmed and capped, leaving the order and the rest alone', () => {
     expect(nameSurvey(list, 'def456UVW', '  Moon ore  ')).toEqual([
       list[0],
-      { id: 'def456UVW', addedAt: NOW - 2 * DAY, name: 'Moon ore' },
+      { id: 'def456UVW', addedAt: NOW - 2 * DAY_MS, name: 'Moon ore' },
     ]);
     expect(nameSurvey(list, 'abc123XYZ', 'y'.repeat(SURVEY_NAME_MAX + 1))[0]!.name).toHaveLength(
       SURVEY_NAME_MAX
@@ -151,7 +151,7 @@ describe('survey names', () => {
     const named = nameSurvey(list, 'abc123XYZ', 'Belt 3');
     expect(recordSurvey(named, 'abc123XYZ', NOW)[0]).toEqual({
       id: 'abc123XYZ',
-      addedAt: NOW - DAY,
+      addedAt: NOW - DAY_MS,
       name: 'Belt 3',
     });
   });

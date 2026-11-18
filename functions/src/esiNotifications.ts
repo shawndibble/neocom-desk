@@ -4,7 +4,7 @@
 // 304 costs nothing, 403 is a dead grant, 420/429 stop the whole
 // run (the error budget is shared by every user of the client id).
 
-import { ESI_BASE, esiHeaders, isBudgetLow, retryAfterMs } from './esiClient.js';
+import { ESI_BASE, esiGet } from './esiClient.js';
 import { isRecord } from './guards.js';
 import type { EsiNotification } from './eveNotificationSelection.js';
 
@@ -36,24 +36,33 @@ export async function fetchNotifications(
   etag: string | null,
   fetchImpl: typeof fetch = fetch
 ): Promise<NotificationsResult> {
-  const res = await fetchImpl(`${ESI_BASE}/characters/${characterId}/notifications/`, {
-    headers: { ...esiHeaders(accessToken), ...(etag ? { 'If-None-Match': etag } : {}) },
-    signal: AbortSignal.timeout(15_000),
+  const got = await esiGet(`${ESI_BASE}/characters/${characterId}/notifications/`, {
+    token: accessToken,
+    ifNoneMatch: etag,
+    fetchImpl,
   });
-
-  if (res.status === 304) return { kind: 'not-modified', budgetLow: isBudgetLow(res.headers) };
-  if (res.status === 403) return { kind: 'forbidden' };
-  if (res.status === 420 || res.status === 429) {
-    return { kind: 'backoff', retryAfterMs: retryAfterMs(res.headers) };
+  switch (got.kind) {
+    case 'not-modified':
+      return { kind: 'not-modified', budgetLow: got.budgetLow };
+    case 'forbidden':
+      return { kind: 'forbidden' };
+    case 'backoff':
+      return { kind: 'backoff', retryAfterMs: got.retryAfterMs };
+    case 'error':
+      return { kind: 'error', status: got.status ?? 0 };
+    case 'expired':
+      return { kind: 'error', status: 401 };
+    case 'not-found':
+      return { kind: 'error', status: 404 };
+    case 'ok':
+      break;
   }
-  if (!res.ok) return { kind: 'error', status: res.status };
-
-  const body: unknown = await res.json().catch(() => null);
-  if (!Array.isArray(body)) return { kind: 'error', status: res.status };
+  const body = got.body;
+  if (!Array.isArray(body)) return { kind: 'error', status: 200 };
   return {
     kind: 'ok',
     notifications: body.filter(isNotification),
-    etag: res.headers.get('ETag'),
-    budgetLow: isBudgetLow(res.headers),
+    etag: got.headers.get('ETag'),
+    budgetLow: got.budgetLow,
   };
 }

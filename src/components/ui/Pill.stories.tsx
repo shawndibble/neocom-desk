@@ -39,3 +39,30 @@ export const Warning: Story = {
 export const Danger: Story = {
   args: { tone: 'danger', children: '3 lost' },
 };
+
+/** @summary `outlined`: an edged badge at a fixed 18px height, for tags in a dense row (PI verbs, "Estimate"). */
+export const Outlined: Story = {
+  args: { outlined: true, tone: 'warning', children: 'Estimate' },
+};
+
+/** @summary Every tone, outlined. */
+export const OutlinedTones: Story = {
+  args: { children: 'Rebuild', outlined: true },
+  render: () => (
+    <div className="flex gap-2">
+      <Pill outlined>Rebuild</Pill>
+      <Pill outlined tone="accent">
+        Add
+      </Pill>
+      <Pill outlined tone="success">
+        Done
+      </Pill>
+      <Pill outlined tone="warning">
+        Remove
+      </Pill>
+      <Pill outlined tone="danger">
+        Lost
+      </Pill>
+    </div>
+  ),
+};

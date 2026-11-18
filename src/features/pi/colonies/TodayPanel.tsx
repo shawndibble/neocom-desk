@@ -1,3 +1,4 @@
+import { Pill } from '@/components/ui/Pill';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { Link } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
@@ -253,15 +254,9 @@ function LoginNext({
                   className="flex items-center gap-2 py-1 text-xs"
                 >
                   <PlanetImage type={row.planetType} size={20} />
-                  <span
-                    className={`inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border px-1.5 text-[0.6875rem] font-semibold tracking-widest uppercase ${
-                      item.kind === 'restart'
-                        ? 'border-accent/45 bg-accent/10 text-accent'
-                        : 'border-warning/45 bg-warning/10 text-warning'
-                    }`}
-                  >
+                  <Pill outlined tone={item.kind === 'restart' ? 'accent' : 'warning'}>
                     {t(`piColonies.login.kind.${item.kind}`)}
-                  </span>
+                  </Pill>
                   <span className="min-w-0 flex-1 truncate">{nameOf(row)}</span>
                   {multi && (
                     <span className="inline-flex h-[1.125rem] shrink-0 items-center rounded-xs bg-panel-2 px-1.5 text-[0.6875rem] font-semibold text-text-dim">

@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import type { MemberActivity } from '@/engine/corp/members';
@@ -9,7 +10,6 @@ import type { BuildContext, FeedState, Feeds } from './types';
 const t = (key: string, options?: Record<string, unknown>) =>
   options ? `${key}${JSON.stringify(options)}` : key;
 const NOW = Date.parse('2026-10-20T12:00:00Z');
-const DAY = 86_400_000;
 
 const ctx = (range: WidgetRange = 30): BuildContext =>
   ({
@@ -96,15 +96,15 @@ describe('corpMembers', () => {
 
   it('charts joins by month over the last 12, only with join dates in the window', () => {
     const none = corpMembers(
-      membersFeed({ members: [member(1), member(2, { startMs: NOW - 800 * DAY })] }),
+      membersFeed({ members: [member(1), member(2, { startMs: NOW - 800 * DAY_MS })] }),
       ctx()
     );
     expect(none.chart).toBeUndefined();
     const view = corpMembers(
       membersFeed({
         members: [
-          member(1, { startMs: NOW - 2 * DAY }),
-          member(2, { startMs: NOW - 5 * DAY }),
+          member(1, { startMs: NOW - 2 * DAY_MS }),
+          member(2, { startMs: NOW - 5 * DAY_MS }),
           member(3, { startMs: Date.parse('2025-11-15T00:00:00Z') }),
           member(4, { startMs: Date.parse('2025-10-15T00:00:00Z') }),
         ],
@@ -125,10 +125,10 @@ describe('corpInactive', () => {
     const view = corpInactive(
       membersFeed({
         members: [
-          member(1, { logoffMs: NOW - 40 * DAY, logonMs: NOW - 45 * DAY }),
-          member(2, { logonMs: NOW - 5 * DAY }),
-          member(3, { startMs: NOW - 90 * DAY }),
-          member(4, { logoffMs: NOW - 31 * DAY, logonMs: NOW - 2 * DAY }),
+          member(1, { logoffMs: NOW - 40 * DAY_MS, logonMs: NOW - 45 * DAY_MS }),
+          member(2, { logonMs: NOW - 5 * DAY_MS }),
+          member(3, { startMs: NOW - 90 * DAY_MS }),
+          member(4, { logoffMs: NOW - 31 * DAY_MS, logonMs: NOW - 2 * DAY_MS }),
         ],
         names: new Map([[1, 'Ann']]),
       }),
@@ -150,7 +150,7 @@ describe('corpInactive', () => {
   });
 
   it('honours the pilot threshold and is empty with nobody dark', () => {
-    const members = [member(1, { logonMs: NOW - 10 * DAY })];
+    const members = [member(1, { logonMs: NOW - 10 * DAY_MS })];
     expect(corpInactive(membersFeed({ members, darkAfterDays: 7 }), ctx()).number.value).toBe('1');
     const view = corpInactive(membersFeed({ members }), ctx());
     expect(view.status.isEmpty).toBe(true);
@@ -165,7 +165,7 @@ const row = (characterId: number, typeId: number, daysAgo: number, quantity: num
     characterId,
     recordedCorporationId: 1,
     typeId,
-    date: new Date(NOW - daysAgo * DAY).toISOString().slice(0, 10),
+    date: new Date(NOW - daysAgo * DAY_MS).toISOString().slice(0, 10),
     quantity,
     cachedAt: '',
   }) as ObservedRow;

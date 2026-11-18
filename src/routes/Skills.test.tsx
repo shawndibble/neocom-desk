@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -305,7 +306,6 @@ describe('Skills', () => {
   });
 
   it('marks only the in-progress skill with a "Training → level · time" chip', async () => {
-    const day = 86_400_000;
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
         HttpResponse.json([
@@ -313,15 +313,15 @@ describe('Skills', () => {
             skill_id: 2,
             queue_position: 0,
             finished_level: 4,
-            start_date: new Date(Date.now() - day).toISOString(),
-            finish_date: new Date(Date.now() + 4 * day + 60_000).toISOString(),
+            start_date: new Date(Date.now() - DAY_MS).toISOString(),
+            finish_date: new Date(Date.now() + 4 * DAY_MS + 60_000).toISOString(),
           },
           {
             skill_id: 2,
             queue_position: 1,
             finished_level: 5,
-            start_date: new Date(Date.now() + 4 * day).toISOString(),
-            finish_date: new Date(Date.now() + 9 * day).toISOString(),
+            start_date: new Date(Date.now() + 4 * DAY_MS).toISOString(),
+            finish_date: new Date(Date.now() + 9 * DAY_MS).toISOString(),
           },
         ])
       )
@@ -337,7 +337,6 @@ describe('Skills', () => {
   });
 
   it('shows the training chip on the collapsed header of only the group holding it', async () => {
-    const day = 86_400_000;
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
         HttpResponse.json([
@@ -345,8 +344,8 @@ describe('Skills', () => {
             skill_id: 2,
             queue_position: 0,
             finished_level: 4,
-            start_date: new Date(Date.now() - day).toISOString(),
-            finish_date: new Date(Date.now() + 4 * day + 60_000).toISOString(),
+            start_date: new Date(Date.now() - DAY_MS).toISOString(),
+            finish_date: new Date(Date.now() + 4 * DAY_MS + 60_000).toISOString(),
           },
         ])
       )
@@ -591,7 +590,6 @@ describe('Skills', () => {
   });
 
   it('shows the queued level beside the trained one, and queued pips', async () => {
-    const day = 86_400_000;
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
         HttpResponse.json([
@@ -599,15 +597,15 @@ describe('Skills', () => {
             skill_id: 2,
             queue_position: 0,
             finished_level: 4,
-            start_date: new Date(Date.now() - day).toISOString(),
-            finish_date: new Date(Date.now() + 4 * day).toISOString(),
+            start_date: new Date(Date.now() - DAY_MS).toISOString(),
+            finish_date: new Date(Date.now() + 4 * DAY_MS).toISOString(),
           },
           {
             skill_id: 2,
             queue_position: 1,
             finished_level: 5,
-            start_date: new Date(Date.now() + 4 * day).toISOString(),
-            finish_date: new Date(Date.now() + 9 * day).toISOString(),
+            start_date: new Date(Date.now() + 4 * DAY_MS).toISOString(),
+            finish_date: new Date(Date.now() + 9 * DAY_MS).toISOString(),
           },
         ])
       )

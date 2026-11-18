@@ -1,13 +1,13 @@
+import { DAY_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import { oldestOwedMs, payeesOwed, type OwedBalance } from './miningTaxPayees';
 
 const NOW = Date.parse('2026-10-11T12:00:00Z');
-const DAY = 86_400_000;
 
 const balance = (id: string, name: string, owed: number, ...daysAgo: number[]): OwedBalance => ({
   payee: { id, name },
   owed,
-  members: daysAgo.map((d) => ({ assignment: { date: new Date(NOW - d * DAY).toISOString() } })),
+  members: daysAgo.map((d) => ({ assignment: { date: new Date(NOW - d * DAY_MS).toISOString() } })),
 });
 
 describe('payeesOwed', () => {
@@ -39,7 +39,9 @@ describe('payeesOwed', () => {
 
 describe('oldestOwedMs', () => {
   it('is the oldest owed entry across Payees, null when nothing is owed', () => {
-    expect(oldestOwedMs([balance('p1', 'A', 5, 1), balance('p2', 'B', 5, 4)])).toBe(NOW - 4 * DAY);
+    expect(oldestOwedMs([balance('p1', 'A', 5, 1), balance('p2', 'B', 5, 4)])).toBe(
+      NOW - 4 * DAY_MS
+    );
     expect(oldestOwedMs([balance('p1', 'A', 0, 9)])).toBeNull();
   });
 });

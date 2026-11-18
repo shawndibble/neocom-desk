@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
@@ -387,17 +388,20 @@ describe('PopularFitsPanel EVE Workbench guides', () => {
   });
 
   it('lists the newest first across both sources, and Most seen by losses', async () => {
-    const day = 86_400_000;
-    openWorkbench({ ok: true, fits: [wbFit('a', { dateAdded: Date.now() - 2 * day })] }, vi.fn(), {
-      popularFits: () =>
-        Promise.resolve({
-          ok: true,
-          fits: [
-            fit('many', 9, { lastSeen: new Date(Date.now() - 5 * day).toISOString() }),
-            fit('few', 2, { lastSeen: new Date(Date.now() - day).toISOString() }),
-          ],
-        }),
-    });
+    openWorkbench(
+      { ok: true, fits: [wbFit('a', { dateAdded: Date.now() - 2 * DAY_MS })] },
+      vi.fn(),
+      {
+        popularFits: () =>
+          Promise.resolve({
+            ok: true,
+            fits: [
+              fit('many', 9, { lastSeen: new Date(Date.now() - 5 * DAY_MS).toISOString() }),
+              fit('few', 2, { lastSeen: new Date(Date.now() - DAY_MS).toISOString() }),
+            ],
+          }),
+      }
+    );
     const list = await screen.findByRole('list', { name: 'Popular fits' });
     await within(list).findByText('Fit a');
     const titles = () =>

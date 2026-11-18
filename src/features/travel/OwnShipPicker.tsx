@@ -1,15 +1,17 @@
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TextInput } from '@/components/ui';
 import {
   focusRingClassName,
   rowInteractiveClassName,
+  suggestionOptionClassName,
+  suggestionPopupClassName,
   tappableRowClassName,
 } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { textActionClassName } from '@/components/ui/textActionClassName';
-import { moveHighlight, COMBOBOX_NAV_KEYS, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { cx } from '@/lib/cx';
+import { useCombobox } from '@/lib/useCombobox';
 import { listShipTypes, searchShips, type ShipType } from './ownShip';
 
 export interface OwnShipPickerProps {
@@ -28,7 +30,6 @@ export interface OwnShipPickerProps {
  */
 export function OwnShipPicker({ typeId, autoTypeId, onChange }: OwnShipPickerProps) {
   const { t } = useTranslation();
-  const listId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const editButtonRef = useRef<HTMLButtonElement>(null);
   // Escape and a pick hand focus back to the name; a blur must not steal it.
@@ -36,7 +37,6 @@ export function OwnShipPicker({ typeId, autoTypeId, onChange }: OwnShipPickerPro
   const [ships, setShips] = useState<ShipType[]>([]);
   // null = showing the name; a string = the field is open with that text.
   const [query, setQuery] = useState<string | null>(null);
-  const [highlight, setHighlight] = useState<number | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -65,10 +65,11 @@ export function OwnShipPicker({ typeId, autoTypeId, onChange }: OwnShipPickerPro
 
   const matches = useMemo(() => (query === null ? [] : searchShips(ships, query)), [ships, query]);
   const open = matches.length > 0;
+  const combo = useCombobox({ count: matches.length, open });
 
   function close() {
     setQuery(null);
-    setHighlight(null);
+    combo.reset();
   }
 
   function choose(ship: ShipType) {
@@ -78,12 +79,10 @@ export function OwnShipPicker({ typeId, autoTypeId, onChange }: OwnShipPickerPro
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (COMBOBOX_NAV_KEYS.includes(event.key)) {
+    if (combo.handleNavKey(event)) return;
+    if (event.key === 'Enter' && open) {
       event.preventDefault();
-      setHighlight(moveHighlight(event.key as ComboboxNavKey, highlight, matches.length));
-    } else if (event.key === 'Enter' && open) {
-      event.preventDefault();
-      choose(matches[highlight ?? 0]);
+      choose(matches[combo.highlight ?? 0]);
     } else if (event.key === 'Escape') {
       event.preventDefault();
       event.stopPropagation();
@@ -101,12 +100,8 @@ export function OwnShipPicker({ typeId, autoTypeId, onChange }: OwnShipPickerPro
         <div className="relative w-64 max-w-full">
           <TextInput
             ref={inputRef}
-            role="combobox"
+            {...combo.inputProps}
             aria-label={label}
-            aria-expanded={open}
-            aria-controls={listId}
-            aria-autocomplete="list"
-            aria-activedescendant={highlight === null ? undefined : `${listId}-${highlight}`}
             autoComplete="off"
             spellCheck={false}
             className="w-full"
@@ -114,31 +109,22 @@ export function OwnShipPicker({ typeId, autoTypeId, onChange }: OwnShipPickerPro
             placeholder={t('travel.pilot.dscan.ownShip.placeholder')}
             onChange={(event) => {
               setQuery(event.target.value);
-              setHighlight(null);
+              combo.reset();
             }}
             onBlur={close}
             onKeyDown={onKeyDown}
           />
           <ul
-            id={listId}
-            role="listbox"
+            {...combo.listboxProps}
             aria-label={label}
             hidden={!open}
-            className="absolute z-20 mt-1 w-full overflow-hidden rounded-xs border border-line-bright bg-panel shadow-lg"
+            className={suggestionPopupClassName}
           >
             {matches.map((ship, index) => (
               <li
                 key={ship.typeId}
-                id={`${listId}-${index}`}
-                role="option"
-                aria-selected={index === highlight}
-                className={cx(
-                  tappableRowClassName,
-                  'flex cursor-pointer items-center border-l-2 px-3 text-sm',
-                  index === highlight
-                    ? 'border-accent bg-panel-2 font-semibold'
-                    : 'border-transparent hover:bg-panel-2'
-                )}
+                {...combo.optionProps(index)}
+                className={suggestionOptionClassName(index === combo.activeIndex)}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => choose(ship)}
               >

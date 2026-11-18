@@ -15,6 +15,7 @@
  * (`firestore.indexes.json`), which can lag a day — so the read checks expiry
  * itself as well.
  */
+import { DAY_MS } from '@/lib/age';
 import {
   connectFirestoreEmulator,
   doc,
@@ -51,7 +52,7 @@ export function shareFirestore(characterId?: number): Firestore {
 }
 
 export const SHARES_COLLECTION = 'shares';
-export const SHARE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+export const SHARE_TTL_MS = 7 * DAY_MS;
 
 /**
  * Every page a Share Link can open. Mirrored by the `type in [...]` check in `firestore.rules`,
@@ -119,7 +120,7 @@ export async function saveShare(input: {
  * minting a second doc — "same appraisal, same link". Past this close to
  * expiry it isn't worth handing out: a fresh one is made instead.
  */
-const REUSE_MARGIN_MS = 24 * 60 * 60 * 1000;
+const REUSE_MARGIN_MS = DAY_MS;
 
 const madeThisSession = new Map<string, { url: string; expiresAt: number }>();
 

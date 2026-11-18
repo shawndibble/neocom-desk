@@ -12,7 +12,7 @@ import type {
 } from '@/engine/fittings/improve';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
-import type { UnloadedWeapons } from '@/engine/fittings/improveCharges';
+import type { UnloadedWeapons } from '@/engine/fittings/improve';
 import type { FittingStatsDelta } from '@/engine/fittings/variationDelta';
 import { ImprovePanel, type ImproveSettings } from './ImprovePanel';
 import { createPortal } from 'react-dom';

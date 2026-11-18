@@ -8,15 +8,11 @@ import {
   useCharacterIdsWithScopes,
   useEndpointsGranted,
 } from './useGrantedScopes';
-import { seedGrant as seedGrantFor } from '@/test/seed';
+import { seedGrant } from '@/test/seed';
 
 const CHARACTER_ID = 42;
 const OTHER_SCOPE = ESI_REGISTRY.getCharacterAssets.scope;
 const IMPLANTS_SCOPE = ESI_REGISTRY.getCharacterImplants.scope;
-
-async function seedGrant(scopes: readonly string[], characterId = CHARACTER_ID): Promise<void> {
-  await seedGrantFor(characterId, scopes);
-}
 
 beforeEach(async () => {
   await db.tokens.clear();
@@ -31,13 +27,13 @@ describe('useEndpointsGranted', () => {
   });
 
   it('is false when the endpoint’s scope is missing', async () => {
-    await seedGrant([OTHER_SCOPE]);
+    await seedGrant(CHARACTER_ID, [OTHER_SCOPE]);
     const { result } = renderHook(() => useEndpointsGranted(['getCharacterImplants']));
     await waitFor(() => expect(result.current).toBe(false));
   });
 
   it('is true once the endpoint’s scope is granted', async () => {
-    await seedGrant([IMPLANTS_SCOPE]);
+    await seedGrant(CHARACTER_ID, [IMPLANTS_SCOPE]);
     const { result } = renderHook(() => useEndpointsGranted(['getCharacterImplants']));
     await waitFor(() => expect(result.current).toBe(true));
   });
@@ -50,24 +46,24 @@ describe('useEndpointsGranted', () => {
 
 describe('characterIdsWithScopes', () => {
   it('lists the Characters whose grant covers every scope', async () => {
-    await seedGrant([OTHER_SCOPE, IMPLANTS_SCOPE], 1);
-    await seedGrant([OTHER_SCOPE], 2);
-    await seedGrant([OTHER_SCOPE, IMPLANTS_SCOPE], 3);
+    await seedGrant(1, [OTHER_SCOPE, IMPLANTS_SCOPE]);
+    await seedGrant(2, [OTHER_SCOPE]);
+    await seedGrant(3, [OTHER_SCOPE, IMPLANTS_SCOPE]);
     expect(await characterIdsWithScopes([OTHER_SCOPE, IMPLANTS_SCOPE])).toEqual([1, 3]);
     expect(await characterIdsWithScopes([OTHER_SCOPE])).toEqual([1, 2, 3]);
   });
 
   it('narrows to the given Characters and skips unknown ids', async () => {
-    await seedGrant([OTHER_SCOPE], 1);
-    await seedGrant([OTHER_SCOPE], 2);
+    await seedGrant(1, [OTHER_SCOPE]);
+    await seedGrant(2, [OTHER_SCOPE]);
     expect(await characterIdsWithScopes([OTHER_SCOPE], [2, 99])).toEqual([2]);
   });
 });
 
 describe('useCharacterIdsWithScopes', () => {
   it('is undefined until read, then the covered ids', async () => {
-    await seedGrant([OTHER_SCOPE], 1);
-    await seedGrant([], 2);
+    await seedGrant(1, [OTHER_SCOPE]);
+    await seedGrant(2, []);
     const { result } = renderHook(() => useCharacterIdsWithScopes([OTHER_SCOPE]));
     expect(result.current).toBeUndefined();
     await waitFor(() => expect([...(result.current ?? [])]).toEqual([1]));

@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -89,8 +90,7 @@ vi.mock('@/features/market/appraisalData', () => ({
 
 import { RequestsTab } from './RequestsTab';
 
-const DAY = 86_400_000;
-const NOW = 100 * DAY;
+const NOW = 100 * DAY_MS;
 const request = (over: Partial<CommunityRequest>): CommunityRequest => ({
   id: 'r1',
   ownerUid: 'char:2',
@@ -98,9 +98,9 @@ const request = (over: Partial<CommunityRequest>): CommunityRequest => ({
   location: 'Khanid',
   terms: 'Budget 300M',
   lines: [{ typeId: 34, name: 'Tritanium', quantity: 1000, kind: 'item' }],
-  createdAt: NOW - DAY,
-  lastActivityAt: NOW - DAY,
-  expiresAt: NOW + 29 * DAY,
+  createdAt: NOW - DAY_MS,
+  lastActivityAt: NOW - DAY_MS,
+  expiresAt: NOW + 29 * DAY_MS,
   closed: false,
   notify: { app: true, mail: false },
   ...over,
@@ -611,7 +611,7 @@ const pledgeOf = (
 ): RequestPledge => ({
   uid,
   lines: { 0: { quantity, delivered: 0, contractIds: [] } },
-  updatedAt: NOW - DAY,
+  updatedAt: NOW - DAY_MS,
   ...over,
 });
 
@@ -702,7 +702,7 @@ describe('Pledging', () => {
   it('greys out a Pledge with no delivery after 14 days and says so', async () => {
     const user = userEvent.setup();
     renderTab([request({})], vi.fn(), {
-      r1: [pledgeOf('char:1', 300, { updatedAt: NOW - 15 * DAY })],
+      r1: [pledgeOf('char:1', 300, { updatedAt: NOW - 15 * DAY_MS })],
     });
     const panel = await open(user);
     expect(within(panel).getByText(/No delivery in 14 days/)).toBeInTheDocument();
@@ -758,7 +758,7 @@ describe('My pledges', () => {
   it('counts Pledges in progress in the strip and lists them in a slide-out', async () => {
     const user = userEvent.setup();
     renderTab([request({})], vi.fn(), {
-      r1: [pledgeOf('char:1', 300, { updatedAt: NOW - 20 * DAY })],
+      r1: [pledgeOf('char:1', 300, { updatedAt: NOW - 20 * DAY_MS })],
     });
     expect(
       screen.getByText('You have no open Requests and 1 Pledge in progress.')

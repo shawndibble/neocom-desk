@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import type {
   CalendarEventSummary,
@@ -273,14 +274,13 @@ describe('toMoonChunkSources', () => {
 
 describe('toSkyhookRaidSources', () => {
   const NOW = Date.parse('2026-10-23T12:00:00Z');
-  const HOUR = 3_600_000;
   const raid = (overrides = {}) => ({
     id: 5,
     subject: 'X-7OMU IV',
     systemId: 30000001,
     systemName: 'X-7OMU',
-    windowStartMs: NOW + 2 * HOUR,
-    windowEndMs: NOW + 4 * HOUR,
+    windowStartMs: NOW + 2 * HOUR_MS,
+    windowEndMs: NOW + 4 * HOUR_MS,
     unsecuredUnits: 400,
     securedUnits: 800,
     ...overrides,
@@ -289,17 +289,17 @@ describe('toSkyhookRaidSources', () => {
   it('counts down to the window opening while it is still ahead', () => {
     const [source] = toSkyhookRaidSources([raid()], NOW);
     expect(source).toMatchObject({ id: '5', subject: 'X-7OMU IV', detail: 'upcoming' });
-    expect(source.deadlineMs).toBe(NOW + 2 * HOUR);
+    expect(source.deadlineMs).toBe(NOW + 2 * HOUR_MS);
   });
 
   it('counts down to the window closing once it is open', () => {
-    const [source] = toSkyhookRaidSources([raid()], NOW + 3 * HOUR);
+    const [source] = toSkyhookRaidSources([raid()], NOW + 3 * HOUR_MS);
     expect(source).toMatchObject({ detail: 'open' });
-    expect(source.deadlineMs).toBe(NOW + 4 * HOUR);
+    expect(source.deadlineMs).toBe(NOW + 4 * HOUR_MS);
   });
 
   it('drops a closed window and a skyhook with no readable window', () => {
-    expect(toSkyhookRaidSources([raid()], NOW + 5 * HOUR)).toEqual([]);
+    expect(toSkyhookRaidSources([raid()], NOW + 5 * HOUR_MS)).toEqual([]);
     expect(toSkyhookRaidSources([raid({ windowStartMs: null })], NOW)).toEqual([]);
   });
 });
@@ -482,7 +482,6 @@ describe('toOrderExpirySources', () => {
 
 describe('toMercenaryDenSources', () => {
   const NOW = Date.parse('2026-10-23T10:00:00Z');
-  const HOUR = 3_600_000;
   const den = (overrides = {}) => ({
     id: 10,
     planetId: 40000001,
@@ -496,13 +495,16 @@ describe('toMercenaryDenSources', () => {
 
   it('gives a reinforced den its reinforcement end', () => {
     expect(
-      toMercenaryDenSources([den({ state: 'reinforced', reinforcedUntilMs: NOW + 14 * HOUR })], NOW)
+      toMercenaryDenSources(
+        [den({ state: 'reinforced', reinforcedUntilMs: NOW + 14 * HOUR_MS })],
+        NOW
+      )
     ).toEqual([
       {
         id: '10:reinforcement',
         subject: 'Efa VII',
         detail: 'reinforcement',
-        deadlineMs: NOW + 14 * HOUR,
+        deadlineMs: NOW + 14 * HOUR_MS,
       },
     ]);
   });
@@ -512,31 +514,31 @@ describe('toMercenaryDenSources', () => {
       [
         den({
           operations: [
-            { state: 'available', expiresMs: NOW + 9 * HOUR },
-            { state: 'started', expiresMs: NOW + 2 * HOUR },
-            { state: 'done', expiresMs: NOW + 5 * HOUR },
-            { state: 'available', expiresMs: NOW - HOUR },
+            { state: 'available', expiresMs: NOW + 9 * HOUR_MS },
+            { state: 'started', expiresMs: NOW + 2 * HOUR_MS },
+            { state: 'done', expiresMs: NOW + 5 * HOUR_MS },
+            { state: 'available', expiresMs: NOW - HOUR_MS },
           ],
         }),
       ],
       NOW
     );
     expect(sources.map((s) => [s.detail, s.deadlineMs])).toEqual([
-      ['operation', NOW + 2 * HOUR],
-      ['operation', NOW + 9 * HOUR],
+      ['operation', NOW + 2 * HOUR_MS],
+      ['operation', NOW + 9 * HOUR_MS],
     ]);
     expect(new Set(sources.map((s) => s.id)).size).toBe(2);
   });
 
   it('drops a lapsed reinforcement timer from a stale read', () => {
     expect(
-      toMercenaryDenSources([den({ state: 'reinforced', reinforcedUntilMs: NOW - HOUR })], NOW)
+      toMercenaryDenSources([den({ state: 'reinforced', reinforcedUntilMs: NOW - HOUR_MS })], NOW)
     ).toEqual([]);
   });
 
   it('names an unnamed planet by its id', () => {
     const [source] = toMercenaryDenSources(
-      [den({ planetName: null, state: 'reinforced', reinforcedUntilMs: NOW + HOUR })],
+      [den({ planetName: null, state: 'reinforced', reinforcedUntilMs: NOW + HOUR_MS })],
       NOW
     );
     expect(source.subject).toBe('#40000001');

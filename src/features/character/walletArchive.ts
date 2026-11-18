@@ -182,13 +182,14 @@ export interface WalletArchiveInfo {
 /** What the Journal's history line states: reach and gaps. */
 export async function loadWalletArchiveInfo(
   characterId: number,
-  nowMs: number = Date.now()
+  nowMs: number = Date.now(),
+  kind: ArchiveKind = 'journal'
 ): Promise<WalletArchiveInfo> {
-  const row = await db.walletArchiveCoverage.get([characterId, 'journal']);
+  const row = await db.walletArchiveCoverage.get([characterId, kind]);
   const windows = row?.windows ?? [];
   const unconfirmed =
     windows.length === 0 &&
-    (await db.walletJournalArchive.where('characterId').equals(characterId).first()) !== undefined;
+    (await KINDS[kind].table().where('characterId').equals(characterId).first()) !== undefined;
   return {
     since: archiveSince(windows),
     gaps: archiveGaps(windows, nowMs),

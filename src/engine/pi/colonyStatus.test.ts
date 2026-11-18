@@ -1,3 +1,4 @@
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 import { describe, it, expect } from 'vitest';
 import {
   EFFICIENT_WINDOW_FRACTION,
@@ -10,8 +11,6 @@ import {
 } from './colonyStatus';
 import type { ExtractorYieldProgram, ColonyStatus } from './types';
 
-const HOUR = 3_600_000;
-const DAY = 24 * HOUR;
 const NOW = Date.parse('2026-09-01T00:00:00Z');
 
 /**
@@ -24,39 +23,39 @@ const NOW = Date.parse('2026-09-01T00:00:00Z');
 const decayingProgram: ExtractorYieldProgram = {
   pinId: 9,
   installTimeMs: NOW,
-  expiryTimeMs: NOW + 14 * DAY,
+  expiryTimeMs: NOW + 14 * DAY_MS,
   qtyPerCycle: 6965,
   cycleTimeMs: 1_800_000,
 };
 
 describe('extractorState', () => {
   it('is active when expiry is well beyond the warning window', () => {
-    expect(extractorState(NOW + 48 * HOUR, NOW)).toBe('active');
+    expect(extractorState(NOW + 48 * HOUR_MS, NOW)).toBe('active');
   });
 
   it('is expiring-soon inside the warning window (boundary inclusive)', () => {
     expect(extractorState(NOW + EXPIRING_SOON_WINDOW_MS, NOW)).toBe('expiring-soon');
-    expect(extractorState(NOW + HOUR, NOW)).toBe('expiring-soon');
+    expect(extractorState(NOW + HOUR_MS, NOW)).toBe('expiring-soon');
   });
 
   it('is expired once now reaches expiry (boundary inclusive, not just past it)', () => {
     expect(extractorState(NOW, NOW)).toBe('expired');
-    expect(extractorState(NOW - HOUR, NOW)).toBe('expired');
+    expect(extractorState(NOW - HOUR_MS, NOW)).toBe('expired');
   });
 
   it('takes the pilot’s own warning window when one is given', () => {
     // 36h out: inside a 48h window, outside the default 24h one.
-    expect(extractorState(NOW + 36 * HOUR, NOW, 48 * HOUR)).toBe('expiring-soon');
-    expect(extractorState(NOW + 36 * HOUR, NOW)).toBe('active');
+    expect(extractorState(NOW + 36 * HOUR_MS, NOW, 48 * HOUR_MS)).toBe('expiring-soon');
+    expect(extractorState(NOW + 36 * HOUR_MS, NOW)).toBe('active');
   });
 
   it('still reports expired regardless of how wide the window is', () => {
-    expect(extractorState(NOW - HOUR, NOW, 72 * HOUR)).toBe('expired');
+    expect(extractorState(NOW - HOUR_MS, NOW, 72 * HOUR_MS)).toBe('expired');
   });
 
   it('is deterministic under a fixed nowMs', () => {
-    const a = extractorState(NOW + HOUR, NOW);
-    const b = extractorState(NOW + HOUR, NOW);
+    const a = extractorState(NOW + HOUR_MS, NOW);
+    const b = extractorState(NOW + HOUR_MS, NOW);
     expect(a).toBe(b);
   });
 });
@@ -69,20 +68,20 @@ describe('colonyStatus', () => {
   it('reports the soonest expiry across multiple programs', () => {
     const status = colonyStatus(
       [
-        { pinId: 1, expiryTimeMs: NOW + 48 * HOUR },
-        { pinId: 2, expiryTimeMs: NOW + 12 * HOUR },
-        { pinId: 3, expiryTimeMs: NOW + 72 * HOUR },
+        { pinId: 1, expiryTimeMs: NOW + 48 * HOUR_MS },
+        { pinId: 2, expiryTimeMs: NOW + 12 * HOUR_MS },
+        { pinId: 3, expiryTimeMs: NOW + 72 * HOUR_MS },
       ],
       NOW
     );
-    expect(status.soonestExpiryMs).toBe(NOW + 12 * HOUR);
+    expect(status.soonestExpiryMs).toBe(NOW + 12 * HOUR_MS);
   });
 
   it('is idle when any single program has already expired, even if others have not', () => {
     const status = colonyStatus(
       [
-        { pinId: 1, expiryTimeMs: NOW - HOUR },
-        { pinId: 2, expiryTimeMs: NOW + 48 * HOUR },
+        { pinId: 1, expiryTimeMs: NOW - HOUR_MS },
+        { pinId: 2, expiryTimeMs: NOW + 48 * HOUR_MS },
       ],
       NOW
     );
@@ -92,23 +91,25 @@ describe('colonyStatus', () => {
 
 describe('colonyAttention', () => {
   it('is idle when the colony status is idle, regardless of soonest expiry', () => {
-    expect(colonyAttention({ idle: true, soonestExpiryMs: NOW + 48 * HOUR }, NOW)).toBe('idle');
+    expect(colonyAttention({ idle: true, soonestExpiryMs: NOW + 48 * HOUR_MS }, NOW)).toBe('idle');
   });
 
   it('is expiring-soon when not idle but the soonest expiry is inside the window', () => {
-    expect(colonyAttention({ idle: false, soonestExpiryMs: NOW + HOUR }, NOW)).toBe(
+    expect(colonyAttention({ idle: false, soonestExpiryMs: NOW + HOUR_MS }, NOW)).toBe(
       'expiring-soon'
     );
   });
 
   it('is healthy when not idle and either no extractors or expiry is far off', () => {
     expect(colonyAttention({ idle: false, soonestExpiryMs: null }, NOW)).toBe('healthy');
-    expect(colonyAttention({ idle: false, soonestExpiryMs: NOW + 48 * HOUR }, NOW)).toBe('healthy');
+    expect(colonyAttention({ idle: false, soonestExpiryMs: NOW + 48 * HOUR_MS }, NOW)).toBe(
+      'healthy'
+    );
   });
 
   it('takes the pilot’s own warning window when one is given', () => {
-    const status = { idle: false, soonestExpiryMs: NOW + 36 * HOUR };
-    expect(colonyAttention(status, NOW, 48 * HOUR)).toBe('expiring-soon');
+    const status = { idle: false, soonestExpiryMs: NOW + 36 * HOUR_MS };
+    expect(colonyAttention(status, NOW, 48 * HOUR_MS)).toBe('expiring-soon');
     expect(colonyAttention(status, NOW)).toBe('healthy');
   });
 });
@@ -116,10 +117,10 @@ describe('colonyAttention', () => {
 describe('sortColoniesByAttention', () => {
   it('orders idle first, then soonest expiry, then no-extractor colonies last', () => {
     const colonies = [
-      { id: 'healthy', status: { idle: false, soonestExpiryMs: NOW + 48 * HOUR } },
+      { id: 'healthy', status: { idle: false, soonestExpiryMs: NOW + 48 * HOUR_MS } },
       { id: 'none', status: { idle: false, soonestExpiryMs: null } },
-      { id: 'idle', status: { idle: true, soonestExpiryMs: NOW - HOUR } },
-      { id: 'soon', status: { idle: false, soonestExpiryMs: NOW + HOUR } },
+      { id: 'idle', status: { idle: true, soonestExpiryMs: NOW - HOUR_MS } },
+      { id: 'soon', status: { idle: false, soonestExpiryMs: NOW + HOUR_MS } },
     ];
     const sorted = sortColoniesByAttention(colonies, (c) => c.status, NOW);
     expect(sorted.map((c) => c.id)).toEqual(['idle', 'soon', 'healthy', 'none']);
@@ -127,10 +128,16 @@ describe('sortColoniesByAttention', () => {
 
   it('sorts a decayed colony above a healthy one and below an idle or expiring one', () => {
     const colonies = [
-      { id: 'healthy', status: { idle: false, soonestExpiryMs: NOW + 48 * HOUR, decayed: false } },
-      { id: 'decayed', status: { idle: false, soonestExpiryMs: NOW + 72 * HOUR, decayed: true } },
-      { id: 'idle', status: { idle: true, soonestExpiryMs: NOW - HOUR, decayed: true } },
-      { id: 'soon', status: { idle: false, soonestExpiryMs: NOW + HOUR, decayed: true } },
+      {
+        id: 'healthy',
+        status: { idle: false, soonestExpiryMs: NOW + 48 * HOUR_MS, decayed: false },
+      },
+      {
+        id: 'decayed',
+        status: { idle: false, soonestExpiryMs: NOW + 72 * HOUR_MS, decayed: true },
+      },
+      { id: 'idle', status: { idle: true, soonestExpiryMs: NOW - HOUR_MS, decayed: true } },
+      { id: 'soon', status: { idle: false, soonestExpiryMs: NOW + HOUR_MS, decayed: true } },
     ];
     const sorted = sortColoniesByAttention(colonies, (c) => c.status, NOW);
     expect(sorted.map((c) => c.id)).toEqual(['idle', 'soon', 'decayed', 'healthy']);
@@ -138,8 +145,11 @@ describe('sortColoniesByAttention', () => {
 
   it('re-ranks colonies when the pilot widens the warning window', () => {
     const colonies = [
-      { id: 'decayed', status: { idle: false, soonestExpiryMs: NOW + 72 * HOUR, decayed: true } },
-      { id: 'thirtySix', status: { idle: false, soonestExpiryMs: NOW + 36 * HOUR } },
+      {
+        id: 'decayed',
+        status: { idle: false, soonestExpiryMs: NOW + 72 * HOUR_MS, decayed: true },
+      },
+      { id: 'thirtySix', status: { idle: false, soonestExpiryMs: NOW + 36 * HOUR_MS } },
     ];
     // At 24h the 36-hour colony is merely healthy, so the decayed one outranks
     // it. At 48h it becomes expiring-soon and jumps the queue — the window
@@ -149,7 +159,7 @@ describe('sortColoniesByAttention', () => {
       'thirtySix',
     ]);
     expect(
-      sortColoniesByAttention(colonies, (c) => c.status, NOW, 48 * HOUR).map((c) => c.id)
+      sortColoniesByAttention(colonies, (c) => c.status, NOW, 48 * HOUR_MS).map((c) => c.id)
     ).toEqual(['thirtySix', 'decayed']);
   });
 });
@@ -162,7 +172,7 @@ describe('EFFICIENT_WINDOW_FRACTION', () => {
 
 describe('colonyStatus decay', () => {
   it('leaves decayed absent — not false — when no program carries a yield baseline', () => {
-    const status = colonyStatus([{ pinId: 1, expiryTimeMs: NOW + 48 * HOUR }], NOW);
+    const status = colonyStatus([{ pinId: 1, expiryTimeMs: NOW + 48 * HOUR_MS }], NOW);
     expect(status.decayed).toBeUndefined();
     expect('decayed' in status).toBe(false);
   });
@@ -174,56 +184,58 @@ describe('colonyStatus decay', () => {
   it('is not decayed four hours in, the regression this threshold exists for', () => {
     // On the old per-cycle read this fired here, with 6% of a fourteen-day
     // program banked — a badge on every colony, always.
-    expect(colonyStatus([decayingProgram], NOW + 4 * HOUR).decayed).toBe(false);
+    expect(colonyStatus([decayingProgram], NOW + 4 * HOUR_MS).decayed).toBe(false);
   });
 
   it('is not decayed before a full day has elapsed, when there is no rate to compare', () => {
-    expect(colonyStatus([decayingProgram], NOW + 20 * HOUR).decayed).toBe(false);
-    expect(colonyStatus([decayingProgram], NOW + DAY).decayed).toBe(false);
+    expect(colonyStatus([decayingProgram], NOW + 20 * HOUR_MS).decayed).toBe(false);
+    expect(colonyStatus([decayingProgram], NOW + DAY_MS).decayed).toBe(false);
   });
 
   it("is decayed by day four, once the trailing day falls under the program's window", () => {
     // Day 3 runs at 0.379 of the first day's rate, day 4 at 0.300.
-    expect(colonyStatus([decayingProgram], NOW + 3 * DAY).decayed).toBe(false);
-    expect(colonyStatus([decayingProgram], NOW + 4 * DAY).decayed).toBe(true);
+    expect(colonyStatus([decayingProgram], NOW + 3 * DAY_MS).decayed).toBe(false);
+    expect(colonyStatus([decayingProgram], NOW + 4 * DAY_MS).decayed).toBe(true);
   });
 
   it('is not decayed while any single projectable program is still inside its window', () => {
     const freshlyReset: ExtractorYieldProgram = {
       ...decayingProgram,
       pinId: 10,
-      installTimeMs: NOW + 2 * DAY,
-      expiryTimeMs: NOW + 2 * DAY + 14 * DAY,
+      installTimeMs: NOW + 2 * DAY_MS,
+      expiryTimeMs: NOW + 2 * DAY_MS + 14 * DAY_MS,
     };
     // Two days into its own program, `freshlyReset` is at 0.547 — inside the
     // window, so the colony stays off the flag even though the other is past.
-    expect(colonyStatus([decayingProgram, freshlyReset], NOW + 4 * DAY).decayed).toBe(false);
+    expect(colonyStatus([decayingProgram, freshlyReset], NOW + 4 * DAY_MS).decayed).toBe(false);
   });
 
   it('ignores programs with no baseline rather than counting them as fresh', () => {
-    const unprojectable = { pinId: 11, expiryTimeMs: NOW + 14 * DAY };
-    expect(colonyStatus([decayingProgram, unprojectable], NOW + 4 * DAY).decayed).toBe(true);
+    const unprojectable = { pinId: 11, expiryTimeMs: NOW + 14 * DAY_MS };
+    expect(colonyStatus([decayingProgram, unprojectable], NOW + 4 * DAY_MS).decayed).toBe(true);
   });
 });
 
 describe('colonyAttention decayed', () => {
   it('is decayed when a non-idle, not-expiring colony is past the efficient window', () => {
     expect(
-      colonyAttention({ idle: false, soonestExpiryMs: NOW + 48 * HOUR, decayed: true }, NOW)
+      colonyAttention({ idle: false, soonestExpiryMs: NOW + 48 * HOUR_MS, decayed: true }, NOW)
     ).toBe('decayed');
   });
 
   it('stays healthy when decay is unknowable, rather than guessing', () => {
-    expect(colonyAttention({ idle: false, soonestExpiryMs: NOW + 48 * HOUR }, NOW)).toBe('healthy');
+    expect(colonyAttention({ idle: false, soonestExpiryMs: NOW + 48 * HOUR_MS }, NOW)).toBe(
+      'healthy'
+    );
   });
 
   it('yields to idle and expiring-soon, which are the more urgent calls', () => {
     expect(
-      colonyAttention({ idle: true, soonestExpiryMs: NOW + 48 * HOUR, decayed: true }, NOW)
+      colonyAttention({ idle: true, soonestExpiryMs: NOW + 48 * HOUR_MS, decayed: true }, NOW)
     ).toBe('idle');
-    expect(colonyAttention({ idle: false, soonestExpiryMs: NOW + HOUR, decayed: true }, NOW)).toBe(
-      'expiring-soon'
-    );
+    expect(
+      colonyAttention({ idle: false, soonestExpiryMs: NOW + HOUR_MS, decayed: true }, NOW)
+    ).toBe('expiring-soon');
   });
 });
 
@@ -233,23 +245,23 @@ describe('altGroupSummary', () => {
   });
 
   it('counts idle colonies as stopped and ignores their expiry as "next"', () => {
-    const idle: ColonyStatus = { idle: true, soonestExpiryMs: NOW - HOUR };
-    const active: ColonyStatus = { idle: false, soonestExpiryMs: NOW + 48 * HOUR };
+    const idle: ColonyStatus = { idle: true, soonestExpiryMs: NOW - HOUR_MS };
+    const active: ColonyStatus = { idle: false, soonestExpiryMs: NOW + 48 * HOUR_MS };
     expect(altGroupSummary([idle, active])).toEqual({
       stoppedCount: 1,
-      nextExpiryMs: NOW + 48 * HOUR,
+      nextExpiryMs: NOW + 48 * HOUR_MS,
     });
   });
 
   it('picks the soonest expiry across every non-stopped colony, not the first', () => {
-    const soonest: ColonyStatus = { idle: false, soonestExpiryMs: NOW + HOUR };
-    const later: ColonyStatus = { idle: false, soonestExpiryMs: NOW + 48 * HOUR };
-    expect(altGroupSummary([later, soonest]).nextExpiryMs).toBe(NOW + HOUR);
+    const soonest: ColonyStatus = { idle: false, soonestExpiryMs: NOW + HOUR_MS };
+    const later: ColonyStatus = { idle: false, soonestExpiryMs: NOW + 48 * HOUR_MS };
+    expect(altGroupSummary([later, soonest]).nextExpiryMs).toBe(NOW + HOUR_MS);
   });
 
   it('reports no next expiry when every colony has already stopped', () => {
-    const idleA: ColonyStatus = { idle: true, soonestExpiryMs: NOW - HOUR };
-    const idleB: ColonyStatus = { idle: true, soonestExpiryMs: NOW - 2 * HOUR };
+    const idleA: ColonyStatus = { idle: true, soonestExpiryMs: NOW - HOUR_MS };
+    const idleB: ColonyStatus = { idle: true, soonestExpiryMs: NOW - 2 * HOUR_MS };
     expect(altGroupSummary([idleA, idleB])).toEqual({ stoppedCount: 2, nextExpiryMs: null });
   });
 

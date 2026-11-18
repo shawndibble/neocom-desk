@@ -19,6 +19,7 @@ import {
   type Transaction,
 } from 'firebase-admin/firestore';
 import { observedRowKey, type ObservedRow } from './corpTaxBookEngine.js';
+import { chunk } from './chunk.js';
 
 export const FEEDER_OBSERVED = 'feederObserved';
 const OBSERVED_COLLECTION = 'observed';
@@ -204,8 +205,7 @@ async function backfill(
     byDoc.set(id, [...(byDoc.get(id) ?? []), r]);
   }
   const ids = [...byDoc.keys()];
-  for (let i = 0; i < ids.length; i += BACKFILL_CHUNK) {
-    const part = ids.slice(i, i + BACKFILL_CHUNK);
+  for (const part of chunk(ids, BACKFILL_CHUNK)) {
     await db.runTransaction(async (tx) => {
       const snaps = await tx.getAll(...part.map((id) => mirror.doc(id)));
       // The scan is older than this transaction: a row may have left the feeder since, and its

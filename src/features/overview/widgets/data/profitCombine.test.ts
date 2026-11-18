@@ -1,9 +1,9 @@
+import { DAY_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import { combineProfit, profitBuckets, type SourceProfit } from './profitCombine';
 
-const DAY = 86_400_000;
 const NOW = Date.parse('2026-10-11T12:00:00Z');
-const ago = (days: number) => NOW - days * DAY;
+const ago = (days: number) => NOW - days * DAY_MS;
 
 const source = (over: Partial<SourceProfit> = {}): SourceProfit => ({
   total: 0,
@@ -15,9 +15,9 @@ const source = (over: Partial<SourceProfit> = {}): SourceProfit => ({
 
 describe('profitBuckets', () => {
   it('draws days for a week and weeks for anything longer', () => {
-    expect(profitBuckets(7)).toEqual({ daily: true, bucketMs: DAY, buckets: 7 });
-    expect(profitBuckets(30)).toEqual({ daily: false, bucketMs: 7 * DAY, buckets: 5 });
-    expect(profitBuckets(90)).toEqual({ daily: false, bucketMs: 7 * DAY, buckets: 13 });
+    expect(profitBuckets(7)).toEqual({ daily: true, bucketMs: DAY_MS, buckets: 7 });
+    expect(profitBuckets(30)).toEqual({ daily: false, bucketMs: 7 * DAY_MS, buckets: 5 });
+    expect(profitBuckets(90)).toEqual({ daily: false, bucketMs: 7 * DAY_MS, buckets: 13 });
   });
 });
 
@@ -87,7 +87,7 @@ describe('combineProfit', () => {
       NOW,
       7
     );
-    expect(out.buckets).toEqual({ daily: true, bucketMs: DAY, buckets: 7 });
+    expect(out.buckets).toEqual({ daily: true, bucketMs: DAY_MS, buckets: 7 });
     expect(out.series.builds).toEqual([0, 0, 0, 5, 0, 0, 10]);
     expect(out.series.trading).toEqual([7, 0, 0, 0, 0, 0, -4]);
     expect(out.series.total).toEqual([7, 0, 0, 5, 0, 0, 6]);

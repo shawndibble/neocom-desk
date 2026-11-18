@@ -1,3 +1,4 @@
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import { summarizeSurvey } from '@/engine/survey/series';
 import { formatDuration } from '@/lib/duration';
@@ -18,8 +19,6 @@ import type {
 import type { BuildContext, FeedState, Feeds } from './types';
 
 const NOW = Date.parse('2026-10-11T12:00:00Z');
-const HOUR = 3_600_000;
-const DAY = 24 * HOUR;
 
 const t = (key: string, options?: Record<string, unknown>) =>
   options ? `${key}${JSON.stringify(options)}` : key;
@@ -73,9 +72,9 @@ describe('wallet, Show Flow', () => {
   it('nets income against spending over the range, as net bars and a table by type', () => {
     const view = flowView(
       journal([
-        entry(1, DAY, 300, 'bounty_prize'),
-        entry(2, 2 * DAY, -100, 'market_fee'),
-        entry(3, 20 * DAY, 1000, 'market_transaction'),
+        entry(1, DAY_MS, 300, 'bounty_prize'),
+        entry(2, 2 * DAY_MS, -100, 'market_fee'),
+        entry(3, 20 * DAY_MS, 1000, 'market_transaction'),
       ]),
       ctx({ range: 7 })
     );
@@ -94,23 +93,27 @@ describe('wallet, Show Flow', () => {
 
   it('compares with the previous window when the journal is long enough, else names the top source', () => {
     const long = flowView(
-      journal([entry(1, DAY, 300, 'a'), entry(2, 9 * DAY, 100, 'a'), entry(3, 20 * DAY, 1, 'a')]),
+      journal([
+        entry(1, DAY_MS, 300, 'a'),
+        entry(2, 9 * DAY_MS, 100, 'a'),
+        entry(3, 20 * DAY_MS, 1, 'a'),
+      ]),
       ctx({ range: 7 })
     );
     expect(long.number.secondary).toMatchObject({ direction: 'up', tone: 'good' });
-    const short = flowView(journal([entry(1, DAY, 300, 'a')]), ctx({ range: 30 }));
+    const short = flowView(journal([entry(1, DAY_MS, 300, 'a')]), ctx({ range: 30 }));
     expect(short.number.secondary?.direction).toBeUndefined();
     expect(short.number.secondary?.text).toContain('walletFlow.top');
   });
 
   it('applies the widget range over the same data, not in the loader', () => {
-    const feeds = journal([entry(1, DAY, 300, 'a'), entry(2, 20 * DAY, 1000, 'b')]);
+    const feeds = journal([entry(1, DAY_MS, 300, 'a'), entry(2, 20 * DAY_MS, 1000, 'b')]);
     expect(flowView(feeds, ctx({ range: 7 })).number.iskAmount).toBe(300);
     expect(flowView(feeds, ctx({ range: 30 })).number.iskAmount).toBe(1300);
   });
 
   it('says how far the journal really reaches when the range asks for more', () => {
-    const view = flowView(journal([entry(1, 29 * DAY, 5, 'a')]), ctx({ range: 90 }));
+    const view = flowView(journal([entry(1, 29 * DAY_MS, 5, 'a')]), ctx({ range: 90 }));
     expect(view.chart?.note).toContain('noteCovered');
     expect(view.chart?.note).toContain('"covered":29');
   });
@@ -134,8 +137,8 @@ describe('wallet chart', () => {
       journal: ok({
         result: {
           data: [
-            { id: 1, date: iso(NOW - 3 * DAY), ref_type: 'x', description: '', balance: 100 },
-            { id: 2, date: iso(NOW - DAY), ref_type: 'x', description: '', balance: 500 },
+            { id: 1, date: iso(NOW - 3 * DAY_MS), ref_type: 'x', description: '', balance: 100 },
+            { id: 2, date: iso(NOW - DAY_MS), ref_type: 'x', description: '', balance: 500 },
           ],
           fetchedAt: new Date(NOW),
           fromCache: false,
@@ -298,7 +301,7 @@ describe('profit', () => {
   it('totals the range and buckets by week, newest last', () => {
     const view = buildView(
       'profit',
-      feeds([run('a', 1 * DAY, 100), run('b', 9 * DAY, 50), run('c', 60 * DAY, 999)]),
+      feeds([run('a', 1 * DAY_MS, 100), run('b', 9 * DAY_MS, 50), run('c', 60 * DAY_MS, 999)]),
       ctx({ range: 30 })
     );
     expect(view.number.iskAmount).toBe(150);
@@ -313,7 +316,7 @@ describe('profit', () => {
   it('is range-aware: a 7 day range reads by day and drops older runs from the total', () => {
     const view = buildView(
       'profit',
-      feeds([run('a', DAY, 100), run('b', 9 * DAY, 50)]),
+      feeds([run('a', DAY_MS, 100), run('b', 9 * DAY_MS, 50)]),
       ctx({ range: 7 })
     );
     expect(view.number.iskAmount).toBe(100);
@@ -323,7 +326,11 @@ describe('profit', () => {
   });
 
   it('lists products by profit and is empty only with no runs logged at all', () => {
-    const view = buildView('profit', feeds([run('a', DAY, 10, 1), run('b', DAY, 90, 2)]), ctx());
+    const view = buildView(
+      'profit',
+      feeds([run('a', DAY_MS, 10, 1), run('b', DAY_MS, 90, 2)]),
+      ctx()
+    );
     expect(view.rows.map((r) => r.title)).toEqual(['Drake', 'Raven']);
     expect(stateOf(buildView('profit', feeds([]), ctx()))).toBe('empty');
   });
@@ -579,15 +586,15 @@ describe('charts on the existing kinds', () => {
               skill_id: 3300,
               queue_position: 0,
               finished_level: 5,
-              start_date: iso(NOW - HOUR),
-              finish_date: iso(NOW + 4 * HOUR),
+              start_date: iso(NOW - HOUR_MS),
+              finish_date: iso(NOW + 4 * HOUR_MS),
             },
             {
               skill_id: 3300,
               queue_position: 1,
               finished_level: 5,
-              start_date: iso(NOW + 4 * HOUR),
-              finish_date: iso(NOW + 24 * HOUR),
+              start_date: iso(NOW + 4 * HOUR_MS),
+              finish_date: iso(NOW + 24 * HOUR_MS),
             },
           ],
           fetchedAt: new Date(NOW),
@@ -768,11 +775,11 @@ describe('survey', () => {
   // 1,500 m³ mined in the hour between the scans, 1,500 left: another hour from the last scan, 30 minutes ago.
   const summary = () =>
     summarizeSurvey([
-      scan(NOW - 1.5 * HOUR, [
+      scan(NOW - 1.5 * HOUR_MS, [
         ['Arkonor', 500],
         ['Veldspar', 2500],
       ]),
-      scan(NOW - HOUR / 2, [['Veldspar', 1500]]),
+      scan(NOW - HOUR_MS / 2, [['Veldspar', 1500]]),
     ]);
   const data = (over: Partial<SurveyWidgetData> = {}): SurveyWidgetData => ({
     hasSurvey: true,
@@ -808,7 +815,7 @@ describe('survey', () => {
   });
 
   it('says the field is due, not zero minutes, once its estimate has passed', () => {
-    const late = buildView('survey', { survey: ok(data()) }, ctx({ now: NOW + 5 * HOUR }));
+    const late = buildView('survey', { survey: ok(data()) }, ctx({ now: NOW + 5 * HOUR_MS }));
     expect(late.number.value).toBe('overview.widgets.data.survey.overdue');
     expect(late.number.unit).toBeUndefined();
   });
@@ -866,7 +873,7 @@ describe('routeSafety', () => {
     systems: [
       { systemId: 1, name: 'Efa', kills: [] },
       { systemId: 2, name: 'Niarja', kills: kills(6) },
-      { systemId: 3, name: 'Amarr', kills: kills(1, 5 * HOUR) },
+      { systemId: 3, name: 'Amarr', kills: kills(1, 5 * HOUR_MS) },
       { systemId: 4, name: 'Unread', kills: null },
     ],
     raidable: [],
@@ -881,21 +888,21 @@ describe('routeSafety', () => {
         systemId: 3,
         name: 'Amarr',
         jumps: 2,
-        window: { startMs: NOW + HOUR, endMs: NOW + 5 * HOUR },
+        window: { startMs: NOW + HOUR_MS, endMs: NOW + 5 * HOUR_MS },
       },
       {
         key: '2:8',
         systemId: 2,
         name: 'Niarja',
         jumps: 1,
-        window: { startMs: NOW - HOUR, endMs: NOW + HOUR },
+        window: { startMs: NOW - HOUR_MS, endMs: NOW + HOUR_MS },
       },
       {
         key: '1:7',
         systemId: 1,
         name: 'Efa',
         jumps: 0,
-        window: { startMs: NOW - 5 * HOUR, endMs: NOW - HOUR },
+        window: { startMs: NOW - 5 * HOUR_MS, endMs: NOW - HOUR_MS },
       },
     ];
     const view = buildView('routeSafety', { routeSafety: ok(data({ raidable })) }, ctx());
@@ -1090,10 +1097,9 @@ describe('belowMarket', () => {
 });
 
 describe('jumpTimers', () => {
-  const HOUR = 3_600_000;
   const data = (over: Partial<JumpTimersWidgetData> = {}): JumpTimersWidgetData => ({
-    clone: { state: 'read', endsAt: NOW + 3 * HOUR },
-    fatigue: { state: 'read', endsAt: NOW + 5 * HOUR },
+    clone: { state: 'read', endsAt: NOW + 3 * HOUR_MS },
+    fatigue: { state: 'read', endsAt: NOW + 5 * HOUR_MS },
     fetchedAt: new Date(NOW),
     ...over,
   });
@@ -1182,11 +1188,11 @@ describe('kills', () => {
   });
   const data = (over: Partial<KillsWidgetData> = {}): KillsWidgetData => ({
     entries: [
-      entry(1, HOUR),
-      entry(2, 2 * DAY, { side: 'loss', value: null }),
-      entry(3, 10 * DAY),
-      entry(4, 40 * DAY),
-      entry(5, HOUR, { characterId: 92 }),
+      entry(1, HOUR_MS),
+      entry(2, 2 * DAY_MS, { side: 'loss', value: null }),
+      entry(3, 10 * DAY_MS),
+      entry(4, 40 * DAY_MS),
+      entry(5, HOUR_MS, { characterId: 92 }),
     ],
     reach: { 91: null, 92: null },
     failedIds: [],
@@ -1213,9 +1219,9 @@ describe('kills', () => {
   it('counts every Character when scoped to all, and a shared killmail once', () => {
     const shared = data({
       entries: [
-        entry(1, HOUR),
-        entry(1, HOUR, { characterId: 92 }),
-        entry(2, HOUR, { characterId: 92 }),
+        entry(1, HOUR_MS),
+        entry(1, HOUR_MS, { characterId: 92 }),
+        entry(2, HOUR_MS, { characterId: 92 }),
       ],
     });
     const view = buildView('kills', { kills: ok(shared) }, ctx({ scopeAll: true }));
@@ -1269,7 +1275,7 @@ describe('kills', () => {
   it('says how far back zKillboard’s page reaches when it falls short of the range', () => {
     const view = buildView(
       'kills',
-      { kills: ok(data({ reach: { 91: NOW - 20 * DAY, 92: null } })) },
+      { kills: ok(data({ reach: { 91: NOW - 20 * DAY_MS, 92: null } })) },
       ctx({ range: 90 })
     );
     if (view.chart?.kind !== 'bars') throw new Error('bars');
@@ -1319,17 +1325,17 @@ describe('omega coverage', () => {
   const B = 1e9;
   const data = (over: Partial<OmegaWidgetData> = {}): OmegaWidgetData => ({
     rows: [
-      { characterId: 91, date: iso(NOW - DAY), amount: 1.2 * B },
-      { characterId: 91, date: iso(NOW - DAY), amount: 5 * B, internal: true },
-      { characterId: 91, date: iso(NOW - DAY), amount: -3 * B, refKey: 'plex_bought' },
-      { characterId: 92, date: iso(NOW - DAY), amount: 9 * B },
+      { characterId: 91, date: iso(NOW - DAY_MS), amount: 1.2 * B },
+      { characterId: 91, date: iso(NOW - DAY_MS), amount: 5 * B, internal: true },
+      { characterId: 91, date: iso(NOW - DAY_MS), amount: -3 * B, refKey: 'plex_bought' },
+      { characterId: 92, date: iso(NOW - DAY_MS), amount: 9 * B },
     ],
     coverage: {
-      91: { since: NOW - 40 * DAY, gaps: [] },
-      92: { since: NOW - 40 * DAY, gaps: [] },
+      91: { since: NOW - 40 * DAY_MS, gaps: [] },
+      92: { since: NOW - 40 * DAY_MS, gaps: [] },
     },
-    journalFetchedAt: { 91: NOW - HOUR, 92: NOW - HOUR },
-    plex: { price: 2_000_000, fetchedAt: NOW - 2 * HOUR },
+    journalFetchedAt: { 91: NOW - HOUR_MS, 92: NOW - HOUR_MS },
+    plex: { price: 2_000_000, fetchedAt: NOW - 2 * HOUR_MS },
     truncated: false,
     skippedCount: 0,
     loadedIds: [91, 92],
@@ -1398,10 +1404,10 @@ describe('omega coverage', () => {
   });
 
   it('dates the view by the older of the PLEX price and the in-scope journals', () => {
-    expect(build(data()).fetchedAt?.getTime()).toBe(NOW - 2 * HOUR);
-    const old = data({ journalFetchedAt: { 91: NOW - HOUR, 92: NOW - 9 * HOUR } });
-    expect(build(old).fetchedAt?.getTime()).toBe(NOW - 2 * HOUR);
-    expect(build(old, { scopeAll: true }).fetchedAt?.getTime()).toBe(NOW - 9 * HOUR);
+    expect(build(data()).fetchedAt?.getTime()).toBe(NOW - 2 * HOUR_MS);
+    const old = data({ journalFetchedAt: { 91: NOW - HOUR_MS, 92: NOW - 9 * HOUR_MS } });
+    expect(build(old).fetchedAt?.getTime()).toBe(NOW - 2 * HOUR_MS);
+    expect(build(old, { scopeAll: true }).fetchedAt?.getTime()).toBe(NOW - 9 * HOUR_MS);
   });
 
   it('keeps read ages and PLEX spent out of the number, chart and table text', () => {
@@ -1412,20 +1418,24 @@ describe('omega coverage', () => {
   });
 
   it('a gap in the newest period marks it partial', () => {
-    const gap: [number, number] = [NOW - 10 * DAY, NOW - 5 * DAY];
-    const view = build(data({ coverage: { 91: { since: NOW - 40 * DAY, gaps: [gap] } } }));
+    const gap: [number, number] = [NOW - 10 * DAY_MS, NOW - 5 * DAY_MS];
+    const view = build(data({ coverage: { 91: { since: NOW - 40 * DAY_MS, gaps: [gap] } } }));
     if (view.chart?.kind !== 'omega') throw new Error('omega');
     expect(view.chart.bars.map((b) => b.partial)).toEqual([true, true]);
   });
 
   it('states the shortfall when net is zero or negative', () => {
-    const view = build(data({ rows: [{ characterId: 91, date: iso(NOW - DAY), amount: -1 * B }] }));
+    const view = build(
+      data({ rows: [{ characterId: 91, date: iso(NOW - DAY_MS), amount: -1 * B }] })
+    );
     expect(view.number.value).toContain('coversNone');
     expect(view.number.unit).toContain('data.omega.shortBy{"days":30,"amount":"2B"}');
   });
 
   it('steps the reference lines when there are many accounts', () => {
-    const view = build(data({ rows: [{ characterId: 91, date: iso(NOW - DAY), amount: 40 * B }] }));
+    const view = build(
+      data({ rows: [{ characterId: 91, date: iso(NOW - DAY_MS), amount: 40 * B }] })
+    );
     if (view.chart?.kind !== 'omega') throw new Error('omega');
     expect(view.chart.lines.length).toBeLessThanOrEqual(6);
     expect(view.chart.lines[0]!.value).toBe(7 * B);
@@ -1435,7 +1445,7 @@ describe('omega coverage', () => {
 describe('profit on Trading', () => {
   const fill = (id: number, over: Record<string, unknown>) => ({
     transaction_id: id,
-    date: iso(NOW - 2 * DAY),
+    date: iso(NOW - 2 * DAY_MS),
     location_id: 1,
     type_id: 34,
     unit_price: 100,
@@ -1448,7 +1458,7 @@ describe('profit on Trading', () => {
   });
   const tax = (txn: number, amount: number) => ({
     id: 900 + txn,
-    date: iso(NOW - DAY),
+    date: iso(NOW - DAY_MS),
     ref_type: 'transaction_tax',
     description: '',
     amount,
@@ -1457,7 +1467,7 @@ describe('profit on Trading', () => {
   });
   const fee = {
     id: 777,
-    date: iso(NOW - DAY),
+    date: iso(NOW - DAY_MS),
     ref_type: 'brokers_fee',
     description: '',
     amount: -50,
@@ -1469,7 +1479,7 @@ describe('profit on Trading', () => {
         characterId: 91,
         name: 'Main',
         transactions: [
-          fill(1, { is_buy: false, date: iso(NOW - DAY), unit_price: 150, quantity: 4 }),
+          fill(1, { is_buy: false, date: iso(NOW - DAY_MS), unit_price: 150, quantity: 4 }),
         ],
         journal: [tax(1, -20), fee],
       },
@@ -1577,7 +1587,7 @@ describe('profit on Both', () => {
         characterId: 91,
         name: 'Main',
         transactions: [
-          ...sales.map((ago, i) => fill(100 + i, ago + DAY)),
+          ...sales.map((ago, i) => fill(100 + i, ago + DAY_MS)),
           ...sales.map((ago, i) => fill(200 + i, ago, { is_buy: false, unit_price: 150 })),
         ],
         journal: sales.map((ago, i) => ({
@@ -1602,8 +1612,8 @@ describe('profit on Both', () => {
 
   it('adds builds and trades into one figure', () => {
     const view = both({
-      profit: builds([run('a', DAY, 300)]),
-      tradingProfit: ok(trading([2 * DAY])),
+      profit: builds([run('a', DAY_MS, 300)]),
+      tradingProfit: ok(trading([2 * DAY_MS])),
     });
     expect(view.number.iskAmount).toBe(340);
     expect(view.number.unit).toBe('overview.isk');
@@ -1611,28 +1621,28 @@ describe('profit on Both', () => {
 
   it('compares with the window before when either source had one', () => {
     const view = both({
-      profit: builds([run('a', DAY, 300), run('b', 10 * DAY, 100)]),
-      tradingProfit: ok(trading([2 * DAY, 9 * DAY])),
+      profit: builds([run('a', DAY_MS, 300), run('b', 10 * DAY_MS, 100)]),
+      tradingProfit: ok(trading([2 * DAY_MS, 9 * DAY_MS])),
     });
     // 340 now against 140 before.
     expect(view.number.secondary?.text).toContain('"delta":"+200"');
     // No trades before: they count 0 there, so 340 against 100.
     const noTradesBefore = both({
-      profit: builds([run('a', DAY, 300), run('b', 10 * DAY, 100)]),
-      tradingProfit: ok(trading([2 * DAY])),
+      profit: builds([run('a', DAY_MS, 300), run('b', 10 * DAY_MS, 100)]),
+      tradingProfit: ok(trading([2 * DAY_MS])),
     });
     expect(noTradesBefore.number.secondary?.text).toContain('"delta":"+240"');
     const nothingBefore = both({
-      profit: builds([run('a', DAY, 300)]),
-      tradingProfit: ok(trading([2 * DAY])),
+      profit: builds([run('a', DAY_MS, 300)]),
+      tradingProfit: ok(trading([2 * DAY_MS])),
     });
     expect(nothingBefore.number.secondary).toBeUndefined();
   });
 
   it('tags each table row with its source, sorted by profit', () => {
     const view = both({
-      profit: builds([run('a', DAY, 30)]),
-      tradingProfit: ok(trading([2 * DAY])),
+      profit: builds([run('a', DAY_MS, 30)]),
+      tradingProfit: ok(trading([2 * DAY_MS])),
     });
     expect(view.table!.rows.map((r) => [r.cells[0], r.cells[2]])).toEqual([
       ['Tritanium', 'overview.widgets.profit.source.trading'],
@@ -1647,8 +1657,8 @@ describe('profit on Both', () => {
 
   it('draws builds and trades as two lines on the same days', () => {
     const view = both({
-      profit: builds([run('a', DAY / 2, 300)]),
-      tradingProfit: ok(trading([2.5 * DAY])),
+      profit: builds([run('a', DAY_MS / 2, 300)]),
+      tradingProfit: ok(trading([2.5 * DAY_MS])),
     });
     if (view.chart?.kind !== 'lines') throw new Error('lines');
     expect(view.chart.series.map((s) => s.key)).toEqual(['builds', 'trading']);
@@ -1663,7 +1673,7 @@ describe('profit on Both', () => {
 
   it('keeps showing the builds, with a grant, when the header Character has no wallet read', () => {
     const view = both(
-      { profit: builds([run('a', DAY, 300)]), tradingProfit: ok(trading([2 * DAY])) },
+      { profit: builds([run('a', DAY_MS, 300)]), tradingProfit: ok(trading([2 * DAY_MS])) },
       { activeCharacterId: 93 }
     );
     expect(stateOf(view)).toBe('ok');
@@ -1681,12 +1691,12 @@ describe('profit on Both', () => {
 
   it('waits for the trading read, and says when it failed', () => {
     const waiting = both({
-      profit: builds([run('a', DAY, 300)]),
+      profit: builds([run('a', DAY_MS, 300)]),
       tradingProfit: { data: null, error: false, loading: true },
     });
     expect(stateOf(waiting)).toBe('loading');
     const failed = both({
-      profit: builds([run('a', DAY, 300)]),
+      profit: builds([run('a', DAY_MS, 300)]),
       tradingProfit: { data: null, error: true, loading: false },
     });
     expect(stateOf(failed)).toBe('ok');

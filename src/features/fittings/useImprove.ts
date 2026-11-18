@@ -6,9 +6,9 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { searchableGoal, type ImproveGoal } from '@/engine/fittings/improve';
-import { mutatedKept, type MutatedKept } from '@/engine/fittings/improveMutated';
-import type { HullRef } from '@/engine/fittings/improveRole';
-import type { ChargeLoadStep } from '@/engine/fittings/improveCharges';
+import { mutatedKept, type MutatedKept } from '@/engine/fittings/improve';
+import type { HullRef } from '@/engine/fittings/improve';
+import type { ChargeLoadStep } from '@/engine/fittings/improve';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { useMarketHub } from '@/features/market/hub';

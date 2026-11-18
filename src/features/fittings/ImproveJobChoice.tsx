@@ -13,7 +13,7 @@ import {
   IMPROVE_JOBS,
   type ExploreSpace,
   type ImproveJob,
-} from '@/engine/fittings/improveJob';
+} from '@/engine/fittings/improve';
 
 interface Props {
   job: ImproveJob;

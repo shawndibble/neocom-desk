@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, Modal, TextInput } from '@/components/ui';
 import type { FittingRecord } from '@/db';
 import { deleteFitting, renameFitting } from './myFittings';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 interface SavedFittingModalProps {
   /** The saved Fitting acted on; the dialog is open while this is set. */
@@ -55,12 +56,12 @@ export function FittingNameModal({
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
-        <div className="flex justify-end gap-2">
+        <DialogFooter>
           <Button onClick={onClose}>{t('fittings.myFittings.cancel')}</Button>
           <Button type="submit" variant="primary" disabled={text.trim() === ''}>
             {t('fittings.myFittings.confirmRename')}
           </Button>
-        </div>
+        </DialogFooter>
       </form>
     </Modal>
   );
@@ -88,7 +89,7 @@ export function DeleteFittingModal({ record, onClose }: SavedFittingModalProps) 
         <p className="text-sm text-text">
           {t('fittings.myFittings.deleteConfirm', { name: record?.name ?? '' })}
         </p>
-        <div className="flex justify-end gap-2">
+        <DialogFooter>
           <Button onClick={onClose}>{t('fittings.myFittings.cancel')}</Button>
           <Button
             variant="danger"
@@ -99,7 +100,7 @@ export function DeleteFittingModal({ record, onClose }: SavedFittingModalProps) 
           >
             {t('fittings.myFittings.confirmDelete')}
           </Button>
-        </div>
+        </DialogFooter>
       </div>
     </Modal>
   );

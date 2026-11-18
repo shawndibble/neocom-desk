@@ -18,6 +18,7 @@ import { allocateOldestFirst } from './settleAllocation';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
 import { toggleInSet } from '@/lib/sets';
+import { DividedList } from '@/components/ui/DividedList';
 
 interface LinkWalletPaymentDialogProps {
   open: boolean;
@@ -273,7 +274,7 @@ export function LinkWalletPaymentDialog({
 
         <div className="space-y-1">
           <p className={FIELD_LABEL}>{t('miningTax.linkWallet.coversLabel')}</p>
-          <ul className="divide-y divide-line rounded-xs border border-line bg-panel-2">
+          <DividedList as="ul">
             {owed.map((m) => {
               const on = ticked.has(m.assignment.id);
               return (
@@ -302,7 +303,7 @@ export function LinkWalletPaymentDialog({
                 </li>
               );
             })}
-          </ul>
+          </DividedList>
         </div>
 
         {selected && selected.amount === null && (

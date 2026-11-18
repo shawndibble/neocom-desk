@@ -45,6 +45,7 @@ import {
   type RequestNotify,
 } from '@/engine/communities/requests';
 import { namedLike, needleOf } from './shareLists';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 /** What a caller may start the dialog with: Ask to copy (issue #3813) fills in its one blueprint line. */
 export interface ComposePrefill {
@@ -548,7 +549,7 @@ export function ComposeRequestDialog({
         {!standingMode && <RequestNotifyChoice value={notify} onChange={setNotify} />}
         {error && <InlineError>{error}</InlineError>}
         <LiveStatus announceKey={announce.key}>{announce.text}</LiveStatus>
-        <div className="flex justify-end gap-2">
+        <DialogFooter>
           <Button size="sm" variant="ghost" onClick={onClose}>
             {t('common.cancel')}
           </Button>
@@ -559,7 +560,7 @@ export function ComposeRequestDialog({
                   standingMode ? 'communities.board.buyback.post' : 'communities.board.compose.post'
                 )}
           </Button>
-        </div>
+        </DialogFooter>
       </form>
     </Modal>
   );

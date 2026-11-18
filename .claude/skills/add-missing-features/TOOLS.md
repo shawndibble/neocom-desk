@@ -12,7 +12,7 @@ Gap-analysed at least once; dedup before spending a slot. `(#n)` = ticket it
 surfaced.
 
 **Live, pipeline-relevant (all covered unless a ticket is named):**
-eve-exchange.com (#5002), Eve-Omnitool (#5134), EVE Motor Market / MoMa
+EVE Blue Desk (evebluedesk.com; blueprint contract-price estimator by runs/ME/TE with confidence, stability and sell-through bars, Deals tab, pins, bulk paste estimator, screen scanner; thread posts 1-16 + screenshots read; #6358; its history-based figures are killed 30), eve-exchange.com (#5002), Eve-Omnitool (#5134), EVE Motor Market / MoMa
 (#3985–#3995), EVE Ledger (#3908–#3910), EVE Farm (#5127, #5128), EVE Console
 (#4530, #5974; every release v0.9.7–0.9.18 read), EVE Market Tool, ForgeWire (#4550), JitaSpace, EVE-NAV, Missioneers'
 Atlas (LP finder = #718/#1050/#1068), IndustrialEVE (PI alerts: kill-tests 12,
@@ -25,7 +25,7 @@ EVE-HUB, RIFT (desktop; wallet Insights, asset filters, What's new list v2.2–6
 licence, data unusable), Quantum Anomaly (#1040), Uedama Scout (#1043), EQM
 (2.0/2.1 changelog + Local Scan/D-Scan docs read; repo n00bgames/eve-quartermaster, v1.0–1.0.7 industry/PI/PLEX/HyperNet notes re-read, post 51 is a UI-overhaul teaser; #5668, #5669), EVE Retroindustry (v0.11.27–41 release notes and the whole README/site inventory read; nothing newer than 0.11.41; #5797 rejected), Canopus (v1.0–1.2.1: PI calculator, LP store pricing, My trades, Doctrines multibuy, freelance board = all covered or killed), EVE Industry Scanner Tool (v0.7–1.1.8 read; #5853's sibling items all covered), Vyraj (madalinmiclea/vyraj, all-in-one web PWA; README + `src/data/changelog.ts` to 2026-11-10 read, Romanian strings in `src/i18n/en.ts`; PolyForm Strict, ideas only; #6199, #6200), EVE: Ore to ISK (RJPugsley/Ore-to-Isk, native macOS, MIT, v1.0 beta 2026-11-16; forum post + README + all 37 `Resources/Help/*.md` read; #6284).
 
-**Examined, nothing left:** EVE Blue Desk, SolCore Dynamics, EvE Blueprint, EVE
+**Examined, nothing left:** SolCore Dynamics, EvE Blueprint, EVE
 Courier, ISK.GG, EVE Miner Hub, EVE-Industry-Scanner,
 EVE TradeLooper, EVE Night Trade Tools, SquadB Excel workbooks (EVE Online
 Excel Workbook v1.6, EVE Market Analysis v1.1; CCP's Excel add-in), TradeRelay, EVEAIO, MONW, Mudoteve,
@@ -198,35 +198,36 @@ Numbering is stable; later runs cite these by number. Append, never renumber.
     `ownedStockSale`, `orderExits`; absent in `makeOrBuy`; wrong in #1050/#1051.
 28. **A stale code comment can send a run down a dead end**; check the fact.
 29. **Before "the SDE has no mapping", search `market/attributes.json`** (#1058).
-30. **Character coverage is a fault line**; resolve inputs per ROW (#1062).
-31. **Check the ACTION, not just the number, on another's row** (#1061).
-32. **"Already fetched" means the FETCH OPTIONS, not the endpoint.**
-33. **The ESI-boundary scan is SPENT** (#1065).
-34. **The i18n scan works only for keys that RENDER**; match `t('key')` (#1020).
-35. **The "read in exactly one place" scan is NOISE**; do not run it.
-36. **Industry/market CONSTANTS are verified; stop re-checking.** Structure
+30. **Contract-snapshot "sold" history is measurable but not worth a pipeline** (Blue Desk's core: sold counts, sell-through, trend). Measured 2026-11-17 on EVE Ref snapshots: the ARCHIVE carries `date_issued` and `issuer_id` (our snapshot rows drop them) and history is public every 30 min back to 2019, so no accumulation wait. Of single-copy listings, 8% leave before expiry in 24h; relists by the same issuer explain only 2-13%; cheap listings leave ~3x as often as dear ones (15% under 0.8x peer median vs 4-7%), from ~150 distinct issuers, so leaving tracks buying. Still killed on review: a 5-7% noise floor of cancels and scrape misses, "cleared at" biased low (leavers skew underpriced) and high (fast sales fall between snapshots), right-censored days-listed, too few events per blueprint, a niche audience, and sold vs cancelled is unseparable. "Listed N days" is dead: 91% of copy contracts run 28 days, so Expires already gives age, and age does not predict price. Re-open only with a use beyond a per-blueprint stat.
+31. **Character coverage is a fault line**; resolve inputs per ROW (#1062).
+32. **Check the ACTION, not just the number, on another's row** (#1061).
+33. **"Already fetched" means the FETCH OPTIONS, not the endpoint.**
+34. **The ESI-boundary scan is SPENT** (#1065).
+35. **The i18n scan works only for keys that RENDER**; match `t('key')` (#1020).
+36. **The "read in exactly one place" scan is NOISE**; do not run it.
+37. **Industry/market CONSTANTS are verified; stop re-checking.** Structure
     ME/TE/cost 2600/2602/2601 (Tatara 2721), rig ME 2594, TE 2593, security
     2355/2356/2357, reactor rigs 2714/2713. Un-checkable: SCC 4%, NPC facility
     tax 0.25%, 100 ISK broker minimum; the 50% refine base is disclosed.
-37. **Advanced Industry does NOT apply to reaction time**, rightly excluded.
-38. **Mining forum REPLIES isn't worth its own scan**; fold into bumped threads.
-39. **Mining `docs/context/decisions/` broadly is low-yield** (#537, #538).
-40. **`.out-of-scope/` reasons are re-checked; both files are done.**
-41. **A snapshot's per-row field can mean something other than the row**:
+38. **Advanced Industry does NOT apply to reaction time**, rightly excluded.
+39. **Mining forum REPLIES isn't worth its own scan**; fold into bumped threads.
+40. **Mining `docs/context/decisions/` broadly is low-yield** (#537, #538).
+41. **`.out-of-scope/` reasons are re-checked; both files are done.**
+42. **A snapshot's per-row field can mean something other than the row**:
     `price: contract.price` is the CONTRACT's; a min()/max() reduce makes the
     error systematic (#1076).
-42. **`functions/` (Firebase) is swept** (#1076/#1080).
-43. **Ask any publisher:** what does it DROP? which field is the PARENT's?
-44. **Ask for a COLD READ after your own small sweep** (#1080, #1084).
-45. **`scripts/` is swept**; `build-sde.mjs` defects (#1084, #1085) share one
+43. **`functions/` (Firebase) is swept** (#1076/#1080).
+44. **Ask any publisher:** what does it DROP? which field is the PARENT's?
+45. **Ask for a COLD READ after your own small sweep** (#1080, #1084).
+46. **`scripts/` is swept**; `build-sde.mjs` defects (#1084, #1085) share one
     shape: a baked field narrower than consumers assume.
-46. **A proxy is not a measurement**; name the property, then test it (#1085).
-47. **A rate divided by a guessed duration is a typed-in estimate**; show
+47. **A proxy is not a measurement**; name the property, then test it (#1085).
+48. **A rate divided by a guessed duration is a typed-in estimate**; show
     per-day totals (`20261006-085420`).
-48. **The public contract snapshot drops asked-for lines** (only PLEX survives
+49. **The public contract snapshot drops asked-for lines** (only PLEX survives
     as `requestedPlex`); value-vs-asking ranking ranks item-swap bait first
     until #3986's `requestsItems` flag lands.
-49. **A fee ESI reports is fixed at install time**; recomputing it today with
+50. **A fee ESI reports is fixed at install time**; recomputing it today with
     today's adjusted prices and cost index gives a gap that is drift, so an
     "implied facility tax" from a plan-vs-reported job fee is noise (killed).
 
@@ -472,3 +473,5 @@ The reason is what stops a re-pitch. Numbers are kill-tests.
   Tactician; Abyss timer already killed); spawn kill-order guidance (no NPC-
   per-spawn data, decision 20261016-085801 excludes it).
 - **EVE Console v0.9.7–0.9.18 leftovers:** Worklist/station levels/hauling plan (buffer management, second-account scale); Mercenary Dens, Corp Structures fuel/fit alerts, cost-index history, Stock cost column, slot-aware schedule, transaction dedupe (`uniqueTransactions`) = covered; moon notification reprocessed value (KILL: reach, kill-test 13); Indy Parks Compare / System Index (picture of data on screen, kill-test 3); custom colour themes (cosmetic, DESIGN.md owns tokens); mail store/web store/Discord posting (write-side, kill-test 2); plan-vs-reported rig bonus (49).
+
+51. **The board is already a pooled sample.** 91% of copy contracts run 28 days, so today's snapshot holds ~4 weeks of asking prices. Measured over ~46h of EVE Ref history: pooling adds 1.3 points of 3-peer coverage (87.5% to 88.8%) and leaves the peer median unchanged; the single-snapshot median moves 0% at the median, 13.5% at p90 per day. Killed: history to smooth or widen the median or cheapest price check. The cheapest peer sits at 0.74x the median (0.33x at p10), so a "best price" floor needs trimming against trolls.

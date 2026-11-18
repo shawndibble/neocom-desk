@@ -2,6 +2,7 @@
 // windowed open-days query, cold and warm (issue #5718). The windowed arm is a modelled
 // `date >= from` query over a fixture, not production code: it prices the alternative. Documents the measurement that
 // kept the delta: a window cannot ride the copy, so it re-reads every open row on every open.
+import { DAY_MS } from '@/lib/age';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Data = Record<string, unknown>;
@@ -37,12 +38,11 @@ import { readObservedRows } from './observedRead';
 const CORP = 98000001;
 const PATH = `corps/${CORP}/observed`;
 const T0 = 1_800_000_000_000;
-const DAY = 86_400_000;
 const DAYS = 30;
 const PER_DAY = 10;
 const OPEN_DAYS = 7;
 const ok = Promise.resolve();
-const dateOf = (i: number) => new Date(T0 - (DAYS - 1 - i) * DAY).toISOString().slice(0, 10);
+const dateOf = (i: number) => new Date(T0 - (DAYS - 1 - i) * DAY_MS).toISOString().slice(0, 10);
 
 const open = (version: string, now: number) =>
   readObservedRows({} as never, 7, CORP, version, ok, now);
@@ -70,7 +70,7 @@ beforeEach(async () => {
       store.docs.set(`${PATH}/o${d}_${r}`, {
         date: dateOf(d),
         quantity: 1,
-        updatedAt: { toMillis: () => T0 - (DAYS - d) * DAY },
+        updatedAt: { toMillis: () => T0 - (DAYS - d) * DAY_MS },
       });
 });
 

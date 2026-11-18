@@ -1,3 +1,4 @@
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import {
   DEADLINE_SEVERITIES,
@@ -7,9 +8,6 @@ import {
   type DeadlineSeverity,
 } from './severity';
 
-const HOUR = 3_600_000;
-const DAY = 86_400_000;
-
 describe('severityForRemaining', () => {
   /**
    * The boundaries, pinned exactly. This ladder is shared by the corp ops
@@ -18,19 +16,19 @@ describe('severityForRemaining', () => {
    * going red. These boundary cases are that alarm.
    */
   it('places each default threshold on the closed side of its band', () => {
-    expect(severityForRemaining(HOUR)).toBe('critical');
-    expect(severityForRemaining(HOUR + 1)).toBe('warning');
-    expect(severityForRemaining(24 * HOUR)).toBe('warning');
-    expect(severityForRemaining(24 * HOUR + 1)).toBe('clear');
+    expect(severityForRemaining(HOUR_MS)).toBe('critical');
+    expect(severityForRemaining(HOUR_MS + 1)).toBe('warning');
+    expect(severityForRemaining(24 * HOUR_MS)).toBe('warning');
+    expect(severityForRemaining(24 * HOUR_MS + 1)).toBe('clear');
   });
 
   it('keeps the longer lead for the logistics profile', () => {
-    expect(severityForRemaining(24 * HOUR, 'logistics')).toBe('critical');
-    expect(severityForRemaining(24 * HOUR + 1, 'logistics')).toBe('warning');
-    expect(severityForRemaining(3 * DAY, 'logistics')).toBe('warning');
-    expect(severityForRemaining(3 * DAY + 1, 'logistics')).toBe('watch');
-    expect(severityForRemaining(7 * DAY, 'logistics')).toBe('watch');
-    expect(severityForRemaining(7 * DAY + 1, 'logistics')).toBe('clear');
+    expect(severityForRemaining(24 * HOUR_MS, 'logistics')).toBe('critical');
+    expect(severityForRemaining(24 * HOUR_MS + 1, 'logistics')).toBe('warning');
+    expect(severityForRemaining(3 * DAY_MS, 'logistics')).toBe('warning');
+    expect(severityForRemaining(3 * DAY_MS + 1, 'logistics')).toBe('watch');
+    expect(severityForRemaining(7 * DAY_MS, 'logistics')).toBe('watch');
+    expect(severityForRemaining(7 * DAY_MS + 1, 'logistics')).toBe('clear');
   });
 
   /**
@@ -41,7 +39,7 @@ describe('severityForRemaining', () => {
   it('treats an elapsed deadline as critical', () => {
     expect(severityForRemaining(0)).toBe('critical');
     expect(severityForRemaining(-1)).toBe('critical');
-    expect(severityForRemaining(-30 * DAY)).toBe('critical');
+    expect(severityForRemaining(-30 * DAY_MS)).toBe('critical');
   });
 
   /**

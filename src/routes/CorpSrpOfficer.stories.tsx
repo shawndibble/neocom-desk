@@ -3,8 +3,10 @@ import type { Decorator, Meta, StoryObj } from '@storybook/react-vite';
 import { userEvent, within } from 'storybook/test';
 import { db } from '@/db';
 import { CORP_SCOPES_FOR_CAPABILITY } from '@/features/corp/corpScopes';
-import { setSrpBackendOverride } from '@/features/corp/srpBackendOverride';
-import { setSrpOfficerBackendOverride } from '@/features/corp/srpOfficerBackendOverride';
+import {
+  setSrpBackendOverride,
+  setSrpOfficerBackendOverride,
+} from '@/features/corp/srpBackendOverride';
 import type { FixtureRoute } from '@/storybook/fixtureFetch';
 import { SAMPLE_CHARACTERS } from '@/storybook/sampleData';
 import { createSrpFixture, type SrpFixtureRole } from '@/storybook/srpFixture';

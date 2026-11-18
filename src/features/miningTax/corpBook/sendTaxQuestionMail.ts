@@ -4,7 +4,6 @@
  * Sent straight from the member's own character, never through the officer mail queue: it is
  * one mail, to people who did not ask for it only because a member did.
  */
-import { db } from '@/db';
 import {
   composeTaxQuestionMail,
   type TaxQuestionMailInput,
@@ -16,6 +15,7 @@ import { loadCorporationCeoId } from '@/features/corp/members';
 import { sendMail, loadMailingLists } from '@/features/character/mail';
 import { canSendMail } from '@/features/corpTaxBook/officerMail';
 import { isDefiniteRejection } from '@/features/communities/mailSettle';
+import { loadGrantedScopes } from '@/app/grantedScopes';
 
 const READ_LISTS_SCOPES = requiredScopesForEndpoints(['getCharacterMailingLists']);
 
@@ -43,12 +43,12 @@ export async function sendTaxQuestionMail(args: {
   input: TaxQuestionMailInput;
 }): Promise<TaxQuestionMailOutcome> {
   const { characterId, corporationId, contact, input } = args;
-  const scopes = (await db.tokens.get(characterId))?.scopes;
+  const scopes = [...(await loadGrantedScopes(characterId))];
   if (!canSendMail(scopes)) return { status: 'no-scope' };
 
   const [ceoId, listIds] = await Promise.all([
     contact?.kind === 'characters' ? Promise.resolve(null) : loadCorporationCeoId(corporationId),
-    contact?.kind === 'mailingList' ? senderListIds(characterId, scopes ?? []) : [],
+    contact?.kind === 'mailingList' ? senderListIds(characterId, scopes) : [],
   ]);
   // Named officers all being the sender still falls back to the CEO, so look it up then too.
   const needsCeo = contact?.kind === 'characters' && contact.ids.every((id) => id === characterId);

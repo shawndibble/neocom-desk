@@ -24,4 +24,23 @@ describe('Pill', () => {
     render(<Pill className="shrink-0">Label</Pill>);
     expect(screen.getByText('Label').className).toContain('shrink-0');
   });
+
+  it('outlined: fixed height, border and tone edge instead of a flat fill', () => {
+    render(
+      <Pill outlined tone="warning">
+        Estimate
+      </Pill>
+    );
+    const c = screen.getByText('Estimate').className;
+    for (const k of ['h-[1.125rem]', 'shrink-0', 'border', 'border-warning/45', 'bg-warning/10'])
+      expect(c).toContain(k);
+    expect(c).not.toContain('py-0.5');
+  });
+
+  it('outlined neutral uses the bright line with no fill', () => {
+    render(<Pill outlined>Rebuild</Pill>);
+    const c = screen.getByText('Rebuild').className;
+    expect(c).toContain('border-line-bright');
+    expect(c).not.toContain('bg-panel-2');
+  });
 });

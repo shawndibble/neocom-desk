@@ -1,3 +1,4 @@
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import type { OpenOrderRow } from '@/features/market/openOrdersModel';
 import { ordersListed, ordersStateChart, ordersTable } from './ordersModels';
@@ -5,8 +6,6 @@ import { ordersListed, ordersStateChart, ordersTable } from './ordersModels';
 const t = (key: string, options?: Record<string, unknown>) =>
   options ? `${key}${JSON.stringify(options)}` : key;
 const NOW = Date.parse('2026-10-11T12:00:00Z');
-const HOUR = 3_600_000;
-const DAY = 24 * HOUR;
 
 function order(over: Partial<OpenOrderRow> & { orderId: number }): OpenOrderRow {
   return {
@@ -23,7 +22,7 @@ function order(over: Partial<OpenOrderRow> & { orderId: number }): OpenOrderRow 
     stationName: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant',
     issued: '2026-10-01T00:00:00Z',
     durationDays: 90,
-    expiry: { expiresAt: NOW + 3 * DAY, daysLeft: 3, expired: false },
+    expiry: { expiresAt: NOW + 3 * DAY_MS, daysLeft: 3, expired: false },
     floor: null,
     costBasis: null,
     station: { bestPrice: 100, beatsMe: false, gapIsk: 0, gapPct: 0 },
@@ -63,7 +62,7 @@ const expiring = order({
   orderId: 5,
   typeName: 'Isogen',
   problem: 'expiringOrStale',
-  expiry: { expiresAt: NOW + 5 * HOUR, daysLeft: 0, expired: false },
+  expiry: { expiresAt: NOW + 5 * HOUR_MS, daysLeft: 0, expired: false },
   station: { bestPrice: null, beatsMe: false, gapIsk: 0, gapPct: 0 },
 });
 
@@ -137,7 +136,7 @@ describe('ordersTable', () => {
   it('counts down to expiry and calls a lapsed order expired', () => {
     const lapsed = order({
       orderId: 6,
-      expiry: { expiresAt: NOW - HOUR, daysLeft: 0, expired: true },
+      expiry: { expiresAt: NOW - HOUR_MS, daysLeft: 0, expired: true },
     });
     const withLapsed = ordersTable(t, [expiring, healthy, lapsed], NOW, null);
     const expires = (key: string) => withLapsed.rows.find((r) => r.key === key)!.cells[4];
@@ -164,7 +163,7 @@ describe('ordersTable', () => {
     expect(side).toBe('overview.widgets.orders.sideSell');
     expect(price).toBe(1_000);
     expect(vsBest).toBe(5);
-    expect(expires).toBe(NOW + 3 * DAY);
+    expect(expires).toBe(NOW + 3 * DAY_MS);
     expect(station).toBe('Jita IV');
     expect(sortOf('3')[3]).toBe(-10);
   });

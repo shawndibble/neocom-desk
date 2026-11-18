@@ -1,9 +1,9 @@
+import { HOUR_MS } from '@/lib/age';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import { loadJumpTimersWidget } from './jumpTimers';
 
 const NOW = Date.parse('2026-10-11T12:00:00Z');
-const HOUR = 3_600_000;
 
 const mocks = vi.hoisted(() => ({
   clones: vi.fn(),
@@ -53,15 +53,15 @@ describe('loadJumpTimersWidget', () => {
   it('applies Infomorph Synchronizing to the clone cooldown and reads the fatigue expiry', async () => {
     await grant(CLONES, FATIGUE);
     mocks.clones.mockResolvedValue(
-      cached({ jump_clones: [], last_clone_jump_date: new Date(NOW - 2 * HOUR).toISOString() })
+      cached({ jump_clones: [], last_clone_jump_date: new Date(NOW - 2 * HOUR_MS).toISOString() })
     );
     mocks.fatigue.mockResolvedValue(
-      cached({ jump_fatigue_expire_date: new Date(NOW + 5 * HOUR).toISOString() })
+      cached({ jump_fatigue_expire_date: new Date(NOW + 5 * HOUR_MS).toISOString() })
     );
     const data = await loadJumpTimersWidget(7);
     // 24h - level 4 = 20h cooldown, 2h already spent.
-    expect(data.clone).toEqual({ state: 'read', endsAt: NOW + 18 * HOUR });
-    expect(data.fatigue).toEqual({ state: 'read', endsAt: NOW + 5 * HOUR });
+    expect(data.clone).toEqual({ state: 'read', endsAt: NOW + 18 * HOUR_MS });
+    expect(data.fatigue).toEqual({ state: 'read', endsAt: NOW + 5 * HOUR_MS });
   });
 
   it('reads a pilot with no jump history as nothing running', async () => {

@@ -97,6 +97,7 @@ import {
 } from './corpTaxBookEngine.js';
 import { refreshAfterEvent } from './corpTaxBookMinerTotalsStore.js';
 import { reconcileFeederPayouts } from './corpTaxBookFeederPayouts.js';
+import { chunk } from './chunk.js';
 
 /** Same bounds the officer's client uses against the callable's caps (corpTaxBook.ts MAX_SYNC_*). */
 export const OBSERVED_PER_CALL = 2000;
@@ -250,12 +251,6 @@ async function readBookStateFrom(snap: BookSnap, paidRead?: BookSnap): Promise<A
       return w && typeof d.minerId === 'string' ? [{ ...w, minerId: d.minerId }] : [];
     }),
   };
-}
-
-function chunks<T>(items: readonly T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
-  return out;
 }
 
 const MOON_TYPES: ReadonlySet<string> = new Set(MOON_NOTIFICATION_TYPES);
@@ -467,8 +462,8 @@ export async function runBookSync(
   const settled: ObservedRow[] = [];
   const toMerge: ObservedRow[] = [];
   for (const r of placed) (isSettledRow(r, before.observedThrough) ? settled : toMerge).push(r);
-  const batches = chunks(toMerge, OBSERVED_PER_CALL);
-  const extraCalls = chunks(extractions, EXTRACTIONS_PER_CALL);
+  const batches = chunk(toMerge, OBSERVED_PER_CALL);
+  const extraCalls = chunk(extractions, EXTRACTIONS_PER_CALL);
 
   if (!(await args.stillHeld())) return { kind: 'skipped', reason: 'esi-unavailable' };
 
@@ -547,7 +542,7 @@ export async function runBookSync(
           now: new Date(deps.now()).toISOString(),
         })
       : [];
-  for (const ids of chunks(toSettle, SETTLE_PER_CALL)) {
+  for (const ids of chunk(toSettle, SETTLE_PER_CALL)) {
     await edit({ action: 'settleStatements', statementIds: ids });
   }
 

@@ -5,7 +5,7 @@
  * this they would ask for a default set, and a grant missing a scope a ticked
  * event needs costs the player a second sign-in from Settings.
  */
-import { db } from '@/db';
+import { loadGrantedScopes } from '@/app/grantedScopes';
 import { alertsNeeds, planAlertsWalk, type AlertsWalkStep } from './alertsNeeds';
 import { readAlertsGrants, readAlertsMail, readAlertsNearby } from './alertsGrant';
 import { useNotificationPreferences } from './preferencesStore';
@@ -21,14 +21,13 @@ export async function planAlertsStepFor(
 ): Promise<AlertsWalkStep> {
   const prefsStore = useNotificationPreferences.getState();
   if (!prefsStore.hydrated) await prefsStore.hydrate();
-  const token = await db.tokens.get(characterId);
   const [need] = alertsNeeds({
     characters: [{ characterId }],
     prefs: useNotificationPreferences.getState().value,
     grants: await readAlertsGrants(),
     nearby: await readAlertsNearby(),
     mail: await readAlertsMail(),
-    deviceScopes: new Map([[characterId, new Set(token?.scopes ?? [])]]),
+    deviceScopes: new Map([[characterId, await loadGrantedScopes(characterId)]]),
   });
   const [step] = need ? planAlertsWalk([need], include) : [];
   // Nothing ticked needs more: notifications alone, as the first-run offer asks.

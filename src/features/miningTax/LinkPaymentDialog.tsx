@@ -15,6 +15,7 @@ import { linkTargetsWithin, type LinkSuggestion } from './paymentLinks';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
 import { toggleInSet } from '@/lib/sets';
+import { DividedList } from '@/components/ui/DividedList';
 
 interface LinkPaymentDialogProps {
   open: boolean;
@@ -154,7 +155,7 @@ export function LinkPaymentDialog({
       <div className="space-y-3 text-sm">
         <p className="text-xs text-text-dim">{t('miningTax.linkPaymentHint')}</p>
 
-        <ul className="divide-y divide-line rounded-xs border border-line bg-panel-2">
+        <DividedList as="ul">
           {suggestions.map((suggestion) => {
             const { payment } = suggestion;
             const on = payment.key === selectedKey;
@@ -191,7 +192,7 @@ export function LinkPaymentDialog({
               </li>
             );
           })}
-        </ul>
+        </DividedList>
 
         {selected && (
           <>
@@ -199,7 +200,7 @@ export function LinkPaymentDialog({
               <p className={eyebrowClassName}>
                 {t('miningTax.linkPaymentCoversLabel', { payee: selected.balance.payee.name })}
               </p>
-              <ul className="divide-y divide-line rounded-xs border border-line bg-panel-2">
+              <DividedList as="ul">
                 {selected.members.map((m) => {
                   const on = !excluded.has(m.assignment.id);
                   return (
@@ -230,7 +231,7 @@ export function LinkPaymentDialog({
                     </li>
                   );
                 })}
-              </ul>
+              </DividedList>
             </div>
 
             {selected.payment.amount === null && (

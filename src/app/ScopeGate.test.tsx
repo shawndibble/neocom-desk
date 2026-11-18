@@ -10,7 +10,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ScopeGate } from './ScopeGate';
 import { useGrantedScopes } from './useGrantedScopes';
 import type { AppRoutePath } from './routeScopes';
-import { seedGrant as seedGrantFor } from '@/test/seed';
+import { seedGrant } from '@/test/seed';
 
 vi.mock('./loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
 
@@ -31,10 +31,6 @@ function GrantProbe() {
   return (
     <p data-testid="grant">{granted === undefined ? 'pending' : `resolved:${granted.length}`}</p>
   );
-}
-
-async function seedGrant(scopes: readonly string[]): Promise<void> {
-  await seedGrantFor(CHARACTER_ID, scopes);
 }
 
 function renderGate(path: AppRoutePath = '/mail') {
@@ -60,7 +56,7 @@ beforeEach(async () => {
 
 describe('ScopeGate', () => {
   it('renders the view when the route’s scope is granted', async () => {
-    await seedGrant(['esi-mail.read_mail.v1']);
+    await seedGrant(CHARACTER_ID, ['esi-mail.read_mail.v1']);
     renderGate();
     await grantResolved();
 
@@ -69,7 +65,7 @@ describe('ScopeGate', () => {
   });
 
   it('renders the re-auth banner INSTEAD of the view when the scope is missing', async () => {
-    await seedGrant(['esi-assets.read_assets.v1']);
+    await seedGrant(CHARACTER_ID, ['esi-assets.read_assets.v1']);
     renderGate();
 
     expect(await screen.findByText(/: grant Mail$/)).toBeInTheDocument();
@@ -80,14 +76,14 @@ describe('ScopeGate', () => {
   });
 
   it('names a locked page with an h1, which the banner’s own <p> title cannot', async () => {
-    await seedGrant(['esi-assets.read_assets.v1']);
+    await seedGrant(CHARACTER_ID, ['esi-assets.read_assets.v1']);
     renderGate();
 
     expect(await screen.findByRole('heading', { level: 1, name: /mail/i })).toBeInTheDocument();
   });
 
   it('sizes the banner’s button at the touch tier — it is the locked route’s only control', async () => {
-    await seedGrant(['esi-assets.read_assets.v1']);
+    await seedGrant(CHARACTER_ID, ['esi-assets.read_assets.v1']);
     renderGate();
 
     const login = await screen.findByRole('button', { name: 'Grant in EVE' });
@@ -103,7 +99,7 @@ describe('ScopeGate', () => {
   });
 
   it('shows no banner on any gated route for a character holding every scope', async () => {
-    await seedGrant(SCOPES);
+    await seedGrant(CHARACTER_ID, SCOPES);
     for (const path of ['/assets', '/mail', '/calendar'] as const) {
       const { unmount } = renderGate(path);
       await grantResolved();
@@ -115,7 +111,7 @@ describe('ScopeGate', () => {
 
   it('presses the banner asking for exactly the route’s own Permission, not the whole Base Grant (AC 1)', async () => {
     const { beginEveLogin } = await import('./loginFlow');
-    await seedGrant(['esi-wallet.read_character_wallet.v1']);
+    await seedGrant(CHARACTER_ID, ['esi-wallet.read_character_wallet.v1']);
     const user = userEvent.setup();
     renderGate('/mail');
 
@@ -125,7 +121,7 @@ describe('ScopeGate', () => {
   });
 
   it('never gates an ungated route, even on an empty grant', async () => {
-    await seedGrant([]);
+    await seedGrant(CHARACTER_ID, []);
     // /contracts is in this list rather than the gated one above: its History
     // tab does need read_character_contracts, but it raises its own banner for
     // that, and the Search tab the page lands on reads a shared public

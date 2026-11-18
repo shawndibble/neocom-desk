@@ -333,3 +333,11 @@ db.version(31).stores({
 db.version(32).stores({
   characterAccelerators: 'id, characterId',
 });
+
+// Adds indexes for targeted reads: `corpMailQueue.order` (next queue position without loading the
+// queue) and `.statementId` (the already-queued check), and `netWorthSnapshots.[characterId+day]`
+// (each Character's newest snapshot). Index-only, local-only: no row or synced data changes.
+db.version(33).stores({
+  corpMailQueue: 'id, corporationId, batchId, senderCharacterId, order, statementId',
+  netWorthSnapshots: 'id, characterId, [characterId+day]',
+});

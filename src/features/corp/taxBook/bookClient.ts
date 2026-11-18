@@ -8,7 +8,6 @@
  * Firestore here is the `lite` build (no listeners), so callers refetch after
  * a change.
  */
-import type { CallableAction } from '../../../../functions/src/callableManifest';
 import { parseBookSettings, type BookSettings } from '@/engine/corpTaxBook/bookDocs';
 import type { DivisionNames } from '@/engine/corpTaxBook/divisionNames';
 import type { PayeeSetBy } from '@/engine/corpTaxBook/payeeChange';
@@ -56,7 +55,7 @@ import { getSyncFirestore } from '@/sync/firebaseApp';
 import type { FeederViewSummary } from './feederViewClient';
 import { openBook } from './openBook';
 import type { ReadModelDocs } from '@/engine/corpTaxBook/readModels';
-import { callRouted } from '@/sync/routedCallable';
+import { callSignedIn } from '@/sync/signedInCallable';
 import { clearNotFound } from '@/sync/notFoundCache';
 import { ensureSignedIn } from '@/sync/syncAuth';
 
@@ -117,17 +116,6 @@ export interface SyncReceipt {
   observedChanged: number;
   extractions: number;
   donationsAdded: number;
-}
-
-/** One Corp Tax Book callable, signed in as `characterId`; the other taxBook clients share it. */
-export async function call<In, Out>(
-  characterId: number,
-  name: CallableAction,
-  data: In
-): Promise<Out> {
-  await ensureSignedIn(characterId);
-  const result = await callRouted<In, Out>(name, data, characterId);
-  return result;
 }
 
 /**
@@ -258,11 +246,11 @@ export async function verifyOfficer(
   corporationId: number
 ): Promise<OfficerVerdict> {
   const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'verifyCorpOfficerCallable', { corporationId, accessToken });
+  return callSignedIn(characterId, 'verifyCorpOfficerCallable', { corporationId, accessToken });
 }
 
 export function uploadSync(characterId: number, upload: SyncUpload): Promise<SyncReceipt> {
-  return call(characterId, 'syncCorpTaxBookCallable', upload);
+  return callSignedIn(characterId, 'syncCorpTaxBookCallable', upload);
 }
 
 /**
@@ -303,7 +291,7 @@ export async function editBook<Out = Record<string, unknown>>(
     options.freshToken || needsLiveToken(action)
       ? await getValidAccessToken(characterId)
       : undefined;
-  return call(characterId, 'editCorpTaxBookCallable', {
+  return callSignedIn(characterId, 'editCorpTaxBookCallable', {
     ...action,
     corporationId,
     ...(accessToken !== undefined ? { accessToken } : {}),
@@ -639,7 +627,7 @@ export async function turnOnBook(
 ): Promise<void> {
   const accessToken = await getValidAccessToken(characterId);
   try {
-    await call(characterId, 'turnOnCorpTaxBookCallable', {
+    await callSignedIn(characterId, 'turnOnCorpTaxBookCallable', {
       corporationId,
       accessToken,
       startDate,
@@ -661,7 +649,7 @@ export async function reclaimBook(
   corporationId: number
 ): Promise<{ officersRevoked: number }> {
   const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'reclaimCorpTaxBookCallable', { corporationId, accessToken });
+  return callSignedIn(characterId, 'reclaimCorpTaxBookCallable', { corporationId, accessToken });
 }
 
 /**
@@ -670,7 +658,7 @@ export async function reclaimBook(
  */
 export async function deleteBook(characterId: number, corporationId: number): Promise<void> {
   const accessToken = await getValidAccessToken(characterId);
-  await call(characterId, 'deleteCorpTaxBookCallable', { corporationId, accessToken });
+  await callSignedIn(characterId, 'deleteCorpTaxBookCallable', { corporationId, accessToken });
 }
 
 /** The verify token for each Statement id; one with no link doc is left out. Editors only (rules). */

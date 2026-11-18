@@ -84,6 +84,7 @@ const context: BpcSourcingCsvContext = {
   regionName: (regionId) => (regionId === 10000002 ? 'The Forge' : `#${regionId}`),
   jumpsFor: (row) => (row.systemId === null ? null : 3),
   securityFor: (row) => (row.systemId === null ? null : 0.9),
+  peerDiffFor: () => -7.61,
   bpoBadges: new Map(),
 };
 
@@ -136,6 +137,7 @@ describe('bpcSourcingCsvColumns', () => {
       'bpcContracts.runsColumn': 10,
       'bpcContracts.qtyColumn': 1,
       'bpcContracts.iskPerRunColumn': 500_000,
+      'bpcContracts.vsPeersColumn': -7.6,
       'bpcContracts.priceColumn': 5_000_000,
       'bpcContracts.regionColumn': 'The Forge',
       'bpcContracts.spaceColumn': 'common.spaceOption.highsec',

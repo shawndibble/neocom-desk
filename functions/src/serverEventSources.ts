@@ -5,6 +5,7 @@
 
 import { ESI_USER_AGENT } from './esiClient.js';
 import { isRecord } from './guards.js';
+import { chunk } from './chunk.js';
 
 const FUZZWORK_AGGREGATES = 'https://market.fuzzwork.co.uk/aggregates/';
 /** Fuzzwork batches poorly past this many types per request (the app's own cap). */
@@ -29,8 +30,7 @@ export async function fetchFuzzworkPrices(
 ): Promise<Map<number, number | null> | null> {
   const prices = new Map<number, number | null>();
   try {
-    for (let i = 0; i < typeIds.length; i += FUZZWORK_MAX_TYPES) {
-      const batch = typeIds.slice(i, i + FUZZWORK_MAX_TYPES);
+    for (const batch of chunk(typeIds, FUZZWORK_MAX_TYPES)) {
       const res = await fetchImpl(
         `${FUZZWORK_AGGREGATES}?station=${stationId}&types=${batch.join(',')}`,
         { headers: HEADERS, signal: AbortSignal.timeout(TIMEOUT_MS) }

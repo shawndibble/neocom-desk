@@ -17,7 +17,7 @@ import {
   loadChargeIntoCompatible,
   type ModuleAt,
 } from '@/engine/fittings/fittingEdit';
-import type { ChargeLoadStep } from '@/engine/fittings/improveCharges';
+import type { ChargeLoadStep } from '@/engine/fittings/improve';
 import { moduleKey } from '@/engine/fittings/skillGaps';
 import type { Fitting, FittingModule, FittingModuleResult } from '@/engine/fittings/types';
 import type { FittingContext } from './fittingContext';

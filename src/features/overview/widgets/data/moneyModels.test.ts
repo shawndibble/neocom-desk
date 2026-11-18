@@ -1,3 +1,4 @@
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import type { WalletJournalEntry } from '@/esi/endpoints';
 import type { StockBoardMarket } from '@/features/stockTargets/stockBoard';
@@ -21,8 +22,6 @@ import {
 const t = (key: string, options?: Record<string, unknown>) =>
   options ? `${key}${JSON.stringify(options)}` : key;
 const NOW = Date.parse('2026-10-11T12:00:00Z');
-const HOUR = 3_600_000;
-const DAY = 24 * HOUR;
 
 describe('balanceChange', () => {
   it('is the rise or fall over the days the series covers, with the direction and whether it is good', () => {
@@ -45,7 +44,7 @@ describe('journalTable', () => {
   const entry = (id: number, hoursAgo: number, amount: number | undefined, balance?: number) =>
     ({
       id,
-      date: new Date(NOW - hoursAgo * HOUR).toISOString(),
+      date: new Date(NOW - hoursAgo * HOUR_MS).toISOString(),
       ref_type: 'bounty_prizes',
       description: '',
       amount,
@@ -97,7 +96,7 @@ describe('wallet flow', () => {
   const e = (daysAgo: number, amount: number, ref = 'bounty_prizes') =>
     ({
       id: Math.round(daysAgo * 1000 + Math.abs(amount)),
-      date: new Date(NOW - daysAgo * DAY).toISOString(),
+      date: new Date(NOW - daysAgo * DAY_MS).toISOString(),
       ref_type: ref,
       description: '',
       amount,

@@ -1,9 +1,9 @@
+import { DAY_MS } from '@/lib/age';
 import { describe, it, expect } from 'vitest';
 import { SIGNED_IN_SHELL_HINT_KEY } from '@/app/signedInShellHint';
 import { FIRST_SEEN_KEY, FIRST_SESSION_KEY, visitorTags } from './visitor';
 
-const DAY = 86_400_000;
-const NOW = 100 * DAY;
+const NOW = 100 * DAY_MS;
 
 function memoryStorage(entries: Record<string, string> = {}): Storage {
   const map = new Map(Object.entries(entries));
@@ -55,7 +55,7 @@ describe('visitorTags', () => {
       'visitor.age_days': '0',
     });
     // A later session (a new tab) is a return visit.
-    expect(visitorTags(() => storage, noSession, NOW + 2 * DAY)).toEqual({
+    expect(visitorTags(() => storage, noSession, NOW + 2 * DAY_MS)).toEqual({
       visitor: 'returning',
       'visitor.age_days': '1-7',
     });
@@ -69,19 +69,31 @@ describe('visitorTags', () => {
       'visitor.age_days': '0',
     });
     expect(
-      visitorTags(() => memoryStorage({ [FIRST_SEEN_KEY]: String(NOW - 3 * DAY) }), noSession, NOW)
+      visitorTags(
+        () => memoryStorage({ [FIRST_SEEN_KEY]: String(NOW - 3 * DAY_MS) }),
+        noSession,
+        NOW
+      )
     ).toEqual({
       visitor: 'returning',
       'visitor.age_days': '1-7',
     });
     expect(
-      visitorTags(() => memoryStorage({ [FIRST_SEEN_KEY]: String(NOW - 20 * DAY) }), noSession, NOW)
+      visitorTags(
+        () => memoryStorage({ [FIRST_SEEN_KEY]: String(NOW - 20 * DAY_MS) }),
+        noSession,
+        NOW
+      )
     ).toEqual({
       visitor: 'returning',
       'visitor.age_days': '8-30',
     });
     expect(
-      visitorTags(() => memoryStorage({ [FIRST_SEEN_KEY]: String(NOW - 90 * DAY) }), noSession, NOW)
+      visitorTags(
+        () => memoryStorage({ [FIRST_SEEN_KEY]: String(NOW - 90 * DAY_MS) }),
+        noSession,
+        NOW
+      )
     ).toEqual({
       visitor: 'returning',
       'visitor.age_days': '30+',
@@ -99,7 +111,7 @@ describe('visitorTags', () => {
     });
     expect(storage.getItem(FIRST_SEEN_KEY)).toBe(`legacy:${NOW}`);
     // Later loads keep saying "unknown" rather than counting from the stamp.
-    expect(visitorTags(() => storage, noSession, NOW + 40 * DAY)).toEqual({
+    expect(visitorTags(() => storage, noSession, NOW + 40 * DAY_MS)).toEqual({
       visitor: 'returning',
       'visitor.age_days': 'unknown',
     });

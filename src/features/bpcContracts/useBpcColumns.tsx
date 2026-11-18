@@ -13,8 +13,10 @@ import {
   asContract,
   effectivePrice,
   iskPerRun,
+  type BpcContractRow,
   type BpcSearchRow,
 } from '@/engine/contracts/bpcSearch';
+import { formatSignedPercent } from '@/lib/formatSignedPercent';
 import { auctionKindLabel } from '@/features/contractSearch/contractFlagText';
 import { canAskToCopy } from '@/engine/communities/askToCopy';
 import { BpoBadge } from '@/features/bpcContracts/BpoBadge';
@@ -49,6 +51,8 @@ interface BpcColumnsInput {
   selectedTypeId: number | null;
   visibleColumns: readonly BpcSearchColumnId[];
   displayRows: BpcSearchRow[];
+  /** A copy's percent from its similar copies' median, judged against every listed copy, not the filtered board. */
+  peerDiffOf: (row: BpcContractRow) => number | null;
   bpoByType: ReadonlyMap<number, BpoOffer>;
   bpcRowJumps: (row: BpcSearchRow) => JumpsCellValue;
   solarSystems: ReturnType<typeof useSolarSystemIndex>;
@@ -65,6 +69,7 @@ export function useBpcColumns({
   selectedTypeId,
   visibleColumns,
   displayRows,
+  peerDiffOf,
   bpoByType,
   bpcRowJumps,
   solarSystems,
@@ -346,6 +351,26 @@ export function useBpcColumns({
           return formatIskAuto(rate, CONTRACT_ISK_CENTS_BELOW);
         },
       },
+      vsPeers: {
+        id: 'vsPeers',
+        header: t('bpcContracts.vsPeersColumn'),
+        width: '12ch',
+        align: 'right',
+        className: 'tabular-nums whitespace-nowrap',
+        // No comparison (a bundle, a barter, under three similar copies, a
+        // non-contract source) sinks the row in either direction, as ISK/run
+        // does, and its cell is empty, never a 0%.
+        sortValue: (row) => {
+          const contract = asContract(row);
+          return contract ? (peerDiffOf(contract) ?? undefined) : undefined;
+        },
+        // Neutral text: the reader's side is unknown (contract price check).
+        render: (row) => {
+          const contract = asContract(row);
+          const diff = contract ? peerDiffOf(contract) : null;
+          return diff === null ? null : formatSignedPercent(diff);
+        },
+      },
       region: {
         id: 'region',
         header: t('bpcContracts.regionColumn'),
@@ -393,7 +418,7 @@ export function useBpcColumns({
         },
       },
     }),
-    [t, regionNames, timeZone, bpcRowJumps, solarSystems, blueprintPicked]
+    [t, regionNames, timeZone, bpcRowJumps, solarSystems, blueprintPicked, peerDiffOf]
   );
 
   const itemSortValue = useCallback(

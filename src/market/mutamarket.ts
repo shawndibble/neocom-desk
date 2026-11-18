@@ -22,6 +22,7 @@
  * `unavailable` (no Firebase config, function not deployed, MutaMarket down)
  * is held in memory only, briefly, so a list of modules doesn't retry each.
  */
+import { DAY_MS, HOUR_MS, MINUTE_MS } from '@/lib/age';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { createSemaphore } from '@/lib/concurrency';
 import { GLOBAL_CACHE_CHARACTER_ID, readCachedEntries, writeCachedMany } from '@/esi/cache';
@@ -29,13 +30,13 @@ import { GLOBAL_CACHE_CHARACTER_ID, readCachedEntries, writeCachedMany } from '@
 export const MUTAMARKET_SITE_URL = 'https://mutamarket.com';
 
 /** A priced estimate: MutaMarket retrains per type every few days. */
-export const ABYSSAL_ESTIMATE_TTL_MS = 6 * 60 * 60 * 1000;
+export const ABYSSAL_ESTIMATE_TTL_MS = 6 * HOUR_MS;
 /** `no-estimate` / `unknown`: asking again sooner won't change the answer. */
-export const ABYSSAL_NO_ESTIMATE_TTL_MS = 24 * 60 * 60 * 1000;
+export const ABYSSAL_NO_ESTIMATE_TTL_MS = DAY_MS;
 /** `not-imported`: someone may import it meanwhile. */
-export const ABYSSAL_NOT_IMPORTED_TTL_MS = 60 * 60 * 1000;
+export const ABYSSAL_NOT_IMPORTED_TTL_MS = HOUR_MS;
 /** `unavailable`, memory only. */
-export const ABYSSAL_UNAVAILABLE_RETRY_MS = 5 * 60 * 1000;
+export const ABYSSAL_UNAVAILABLE_RETRY_MS = 5 * MINUTE_MS;
 
 /**
  * - `priced`: `value` is MutaMarket's model estimate, ISK, > 0.

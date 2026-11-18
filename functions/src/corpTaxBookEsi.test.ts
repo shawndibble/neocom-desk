@@ -109,3 +109,14 @@ describe('esiCorporationLookup', () => {
     });
   });
 });
+
+describe('fetch rejection', () => {
+  it('surfaces as unavailable, not a raw error', async () => {
+    const boom = (async () => {
+      throw new TypeError('network');
+    }) as unknown as typeof fetch;
+    await expect(esiIdentityReader(boom)(1, 't')).rejects.toMatchObject({ code: 'unavailable' });
+    await expect(esiCorporationLookup(boom)(1)).rejects.toMatchObject({ code: 'unavailable' });
+    await expect(esiIdCategoryLookup(boom)(1)).rejects.toMatchObject({ code: 'unavailable' });
+  });
+});

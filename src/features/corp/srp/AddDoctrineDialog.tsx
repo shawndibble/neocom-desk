@@ -23,6 +23,7 @@ import { useSavedFittingRecords } from '@/features/fittings/useSavedFittingRecor
 import type { SaveDoctrineInput } from '../srpTypes';
 import { doctrineShareCode, snapshotFromEft, doctrineFromFitting } from './doctrineSources';
 import { useDoctrineTypeNames } from './useDoctrineTypeNames';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 export type DoctrineSource = 'fitting' | 'eft';
 
@@ -126,7 +127,7 @@ export function AddDoctrineDialog({ source, characterId, onAdd, onClose }: Props
       initialFocusRef={source === 'fitting' ? selectRef : areaRef}
       placement="center"
       footer={
-        <div className="flex justify-end gap-2">
+        <DialogFooter>
           <Button size="sm" disabled={busy} onClick={onClose}>
             {t('srp.settings.doctrines.dialog.cancel')}
           </Button>
@@ -141,7 +142,7 @@ export function AddDoctrineDialog({ source, characterId, onAdd, onClose }: Props
               ? t('srp.settings.doctrines.dialog.adding')
               : t('srp.settings.doctrines.dialog.add')}
           </Button>
-        </div>
+        </DialogFooter>
       }
     >
       <div className="grid gap-3">

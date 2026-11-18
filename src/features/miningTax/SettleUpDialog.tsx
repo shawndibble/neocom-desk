@@ -35,6 +35,7 @@ import { PayeeOpenInEveButton } from './PayeeOpenInEveButton';
 import { payerOptions } from './settlePayer';
 import type { SettleUpRecheck } from './useSettleUpRecheck';
 import { toggleInSet } from '@/lib/sets';
+import { DividedList } from '@/components/ui/DividedList';
 
 export interface SettleUpRow {
   assignment: MiningTaxAssignmentRecord;
@@ -503,7 +504,7 @@ export function SettleUpDialog({
         )}
 
         {perPayee.length === 1 && openInEveRow(perPayee[0])}
-        <div className="divide-y divide-line rounded-xs border border-line bg-panel-2">
+        <DividedList>
           {perPayee.length <= 1 ? (
             <>
               {perPayee.length === 1 &&
@@ -530,7 +531,7 @@ export function SettleUpDialog({
             ))
           )}
           {copyRow('reason', t('miningTax.settleUp.reasonLabel'), reason, reason, true)}
-        </div>
+        </DividedList>
         {typeof notice === 'function' ? notice(included, payer, amountToSend) : notice}
 
         <div className="space-y-1.5">

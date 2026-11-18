@@ -1,7 +1,6 @@
+import { DAY_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import { timeAxisTicks } from './timeTicks';
-
-const DAY = 24 * 60 * 60 * 1000;
 
 describe('timeAxisTicks', () => {
   it('returns unique ascending day-boundary ticks in the zone, capped at maxTicks', () => {
@@ -41,7 +40,7 @@ describe('timeAxisTicks', () => {
 
   it('uses time-of-day ticks for a span under two days', () => {
     const min = Date.parse('2026-09-21T01:00:00Z');
-    const max = min + DAY + 3 * 60 * 60 * 1000;
+    const max = min + DAY_MS + 3 * 60 * 60 * 1000;
     const { ticks, showTime } = timeAxisTicks(min, max, 'UTC', 5);
     expect(showTime).toBe(true);
     expect(ticks.length).toBeGreaterThan(1);

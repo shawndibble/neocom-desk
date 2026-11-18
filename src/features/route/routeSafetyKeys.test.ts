@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import type { AnsiblexGate } from '@/engine/route/ansiblex';
 import type { TheraConnection } from '@/engine/route/theraConnections';
@@ -11,7 +12,6 @@ import {
 } from './routeSafetyKeys';
 
 const NOW = Date.parse('2026-10-03T09:00:00Z');
-const HOUR = 3_600_000;
 
 function hole(overrides: Partial<TheraConnection> = {}): TheraConnection {
   return {
@@ -25,7 +25,7 @@ function hole(overrides: Partial<TheraConnection> = {}): TheraConnection {
     exitRegionName: 'Heimatar',
     wormholeType: 'Q063',
     maxShipSize: 'medium',
-    expiresAt: NOW + 10 * HOUR,
+    expiresAt: NOW + 10 * HOUR_MS,
     ...overrides,
   };
 }
@@ -34,7 +34,7 @@ describe('holeNetworkKey', () => {
   it('names the network, not the list: order, duplicates and life do not change it', () => {
     const a = [hole({ exitSystemId: 2 }), hole({ exitSystemId: 1, hub: 'turnur' })];
     const b = [
-      hole({ exitSystemId: 1, hub: 'turnur', expiresAt: NOW + HOUR }),
+      hole({ exitSystemId: 1, hub: 'turnur', expiresAt: NOW + HOUR_MS }),
       hole({ exitSystemId: 2 }),
       hole({ id: 'twin', exitSystemId: 2 }),
     ];
@@ -78,7 +78,7 @@ describe('pinsKey', () => {
     expect(key).toBe(
       pinsKey(
         ['abc', '', 'gates', 'gone', 'thera', 'ansiblex'],
-        new Map([['abc', { ...open, expiresAt: NOW + HOUR }]])
+        new Map([['abc', { ...open, expiresAt: NOW + HOUR_MS }]])
       )
     );
     expect(pinsFromKey(key)).toEqual({

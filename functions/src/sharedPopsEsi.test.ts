@@ -51,3 +51,13 @@ describe('esiCorporationAlliance', () => {
     ).toBeNull();
   });
 });
+
+describe('fetch rejection', () => {
+  it('surfaces as unavailable, not a raw error', async () => {
+    const boom = (async () => {
+      throw new TypeError('network');
+    }) as unknown as typeof fetch;
+    await expect(esiAffiliations(boom)([1])).rejects.toMatchObject({ code: 'unavailable' });
+    await expect(esiCorporationAlliance(boom)(1)).rejects.toMatchObject({ code: 'unavailable' });
+  });
+});

@@ -20,4 +20,4 @@ _Recorded 2026-10-02._
 
 > **Partly superseded** by `20261016-121137-shortcuts-become-g-sequences-with-an-off-switch`: page keys are `G` sequences and the Settings off switch is back. The move to Help and the removal of `/` stand.
 
-> **Partly superseded** by `20261106-215246-faq-is-helps-opening-tab`: `/help` opens on FAQ, and Shortcuts is Help's last tab.
+> **Superseded** by `20261106-215246-faq-is-helps-opening-tab` (FAQ first), itself reversed by `20261117-221444-shortcuts-is-helps-opening-tab`: `/help` opens on Shortcuts again.

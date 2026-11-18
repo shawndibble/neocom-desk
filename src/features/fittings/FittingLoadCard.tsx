@@ -8,6 +8,7 @@ import type { FittingXmlDocument } from '@/engine/import/eveFitXml';
 import { parseFittingXmlFile, type FittingXmlDocumentErrorCode } from './fittingXmlDocument';
 import { resolveFittingXmlOpenAction, type FittingXmlListItem } from './fittingXmlList';
 import type { ShareDecodeError } from '@/engine/fittings/fittingShare';
+import { Well } from '@/components/ui/Well';
 
 interface FittingLoadCardProps {
   onLoad: (text: string) => Promise<void>;
@@ -22,14 +23,14 @@ interface FittingLoadCardProps {
 
 function WarningList({ title, lines }: { title: string; lines: string[] }) {
   return (
-    <div className="rounded-xs border border-line bg-panel-2 p-2">
+    <Well>
       <p className="mb-1 text-xs font-semibold tracking-widest text-text-dim uppercase">{title}</p>
       <ul className="space-y-1 text-xs text-text-dim">
         {lines.map((line, index) => (
           <li key={index}>{line}</li>
         ))}
       </ul>
-    </div>
+    </Well>
   );
 }
 
@@ -205,7 +206,7 @@ export function FittingLoadCard({
           {xmlDocError && <InlineError>{t(`fittings.load.xml.error.${xmlDocError}`)}</InlineError>}
 
           {xmlList && (
-            <div className="rounded-xs border border-line bg-panel-2 p-2">
+            <Well>
               <p className="mb-1 text-xs font-semibold tracking-widest text-text-dim uppercase">
                 {t('fittings.load.xml.listTitle')}
               </p>
@@ -233,7 +234,7 @@ export function FittingLoadCard({
                   </li>
                 ))}
               </ul>
-            </div>
+            </Well>
           )}
         </div>
       </div>

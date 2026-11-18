@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import type { RoleAuditData } from '@/features/corp/roleAudit';
 import type { CorpRoleAuditFeed } from './corpFeeds';
@@ -5,7 +6,6 @@ import { corpRoleAudit } from './corpRoleAuditModels';
 import type { BuildContext, Feeds } from './types';
 
 const NOW = Date.parse('2026-10-20T00:00:00Z');
-const DAY = 86_400_000;
 const t = (key: string, options?: Record<string, unknown>) =>
   options && Object.keys(options).length ? `${key}${JSON.stringify(options)}` : key;
 const ctx: BuildContext = {
@@ -24,11 +24,17 @@ const audit = (over: Partial<RoleAuditData> = {}): RoleAuditData => ({
     { characterId: 1, roles: ['Director'], titles: [] },
   ],
   changes: [
-    { characterId: 3, issuerId: 1, changedAtMs: NOW - 2 * DAY, granted: ['Trader'], removed: [] },
+    {
+      characterId: 3,
+      issuerId: 1,
+      changedAtMs: NOW - 2 * DAY_MS,
+      granted: ['Trader'],
+      removed: [],
+    },
     {
       characterId: 2,
       issuerId: 1,
-      changedAtMs: NOW - 20 * DAY,
+      changedAtMs: NOW - 20 * DAY_MS,
       granted: ['Director'],
       removed: [],
     },

@@ -1,10 +1,11 @@
+import { HOUR_MS, MINUTE_MS } from '@/lib/age';
 /**
  * Whether the pilot's corp has SRP on, for the nav: `getSrpStatus` needs no role or scope.
  * Cached 1h per Character and corporation; unknown reads as hidden.
  */
-export const SRP_PROBE_TTL_MS = 60 * 60 * 1000;
+export const SRP_PROBE_TTL_MS = HOUR_MS;
 /** After a failed probe (dead token, offline) nothing re-asks for this long. */
-export const SRP_PROBE_FAILURE_BACKOFF_MS = 5 * 60 * 1000;
+export const SRP_PROBE_FAILURE_BACKOFF_MS = 5 * MINUTE_MS;
 const keyOf = (characterId: number, corporationId: number) =>
   `neocom:srp-on:${characterId}:${corporationId}`;
 

@@ -1,4 +1,4 @@
-// Mirror of src/engine/route/jumpRoute.ts (byte for byte below this line; jumpRoute.test.ts pins it). Edit the source, then copy.
+// Lives in functions/src (deploy uploads functions/ alone); src re-exports it. Keep it import-free.
 /**
  * Stargate pathfinding over the local jump graph (issue #942) — the free,
  * request-free answer to "how far apart are these two systems, and what does

@@ -1,10 +1,5 @@
-/**
- * Shared type guards for parsing untrusted (ESI / stored / callable-input)
- * values. Hand-mirrors `src/engine/guards.ts`: `firebase.json` deploys
- * `functions/` alone, so a `../src` import would not resolve at runtime (and
- * this package has no `@/` alias either). `src/functionsParity.test.ts` asserts
- * the two copies agree.
- */
+// Lives in functions/src (deploy uploads functions/ alone); src re-exports it. Keep it import-free.
+/** Shared type guards for parsing untrusted (synced / stored) values. Pure. */
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -14,7 +9,12 @@ export function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
-/** A non-null, non-array object: the shape an ESI object or a callable's input takes. */
+/** A positive integer: an EVE character, corporation or type id. */
+export function isId(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0;
+}
+
+/** A non-null, non-array object: the shape stored settings and synced maps take. */
 export function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return isRecord(value) && !Array.isArray(value);
 }

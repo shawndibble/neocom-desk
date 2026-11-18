@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import {
   diffSkyhookRaidableNearby,
@@ -7,14 +8,13 @@ import {
 
 const CHARACTER = 90000001;
 const HOME = 30000142;
-const HOUR = 3_600_000;
 
 function entry(overrides: Partial<SkyhookAlertEntry> = {}): SkyhookAlertEntry {
   return {
     systemId: 30000144,
     planetId: 40000001,
-    startMs: 10 * HOUR,
-    endMs: 14 * HOUR,
+    startMs: 10 * HOUR_MS,
+    endMs: 14 * HOUR_MS,
     jumps: 2,
     originSystemId: HOME,
     withinJumps: 3,
@@ -22,7 +22,7 @@ function entry(overrides: Partial<SkyhookAlertEntry> = {}): SkyhookAlertEntry {
   };
 }
 
-const snapshot = (entries: SkyhookAlertEntry[], nowMs = 9 * HOUR): SkyhookAlertSnapshot => ({
+const snapshot = (entries: SkyhookAlertEntry[], nowMs = 9 * HOUR_MS): SkyhookAlertSnapshot => ({
   entries,
   nowMs,
 });
@@ -40,8 +40,8 @@ describe('diffSkyhookRaidableNearby', () => {
         characterId: CHARACTER,
         systemId: 30000144,
         planetId: 40000001,
-        startMs: 10 * HOUR,
-        endMs: 14 * HOUR,
+        startMs: 10 * HOUR_MS,
+        endMs: 14 * HOUR_MS,
         jumps: 2,
       },
     ]);
@@ -62,12 +62,12 @@ describe('diffSkyhookRaidableNearby', () => {
 
   it('fires again for the same skyhook in a later window', () => {
     const prev = snapshot([entry()]);
-    const next = snapshot([entry({ startMs: 34 * HOUR, endMs: 38 * HOUR })]);
+    const next = snapshot([entry({ startMs: 34 * HOUR_MS, endMs: 38 * HOUR_MS })]);
     expect(diffSkyhookRaidableNearby(CHARACTER, prev, next)).toHaveLength(1);
   });
 
   it('does not fire for a window already over', () => {
-    const next = snapshot([entry()], 15 * HOUR);
+    const next = snapshot([entry()], 15 * HOUR_MS);
     expect(diffSkyhookRaidableNearby(CHARACTER, snapshot([]), next)).toEqual([]);
   });
 

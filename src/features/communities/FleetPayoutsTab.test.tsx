@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -20,8 +21,7 @@ vi.mock('@/features/market/appraisalData', () => market);
 
 import { FleetPayoutsTab } from './FleetPayoutsTab';
 
-const DAY = 86_400_000;
-const NOW = 100 * DAY;
+const NOW = 100 * DAY_MS;
 const payout = (over: Partial<FleetPayout>): FleetPayout => ({
   id: 'p1',
   ownerUid: 'char:1',
@@ -33,8 +33,8 @@ const payout = (over: Partial<FleetPayout>): FleetPayout => ({
   memberUids: [],
   shareCount: 3,
   paidCount: 1,
-  createdAt: NOW - DAY,
-  expiresAt: NOW + 29 * DAY,
+  createdAt: NOW - DAY_MS,
+  expiresAt: NOW + 29 * DAY_MS,
   ...over,
 });
 const share = (over: Partial<FleetShare>): FleetShare => ({

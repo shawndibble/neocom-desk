@@ -3403,6 +3403,15 @@
     "runs": "Runs",
     "breakEvenRuns": "Break Even",
     "breakEvenRunsNone": "No break even found up to {{max}} runs.",
+    "stockRuns": {
+      "covers_one": "Stock covers {{runs}} run.",
+      "covers_other": "Stock covers {{runs}} runs.",
+      "coversLimited_one": "Stock covers {{runs}} run. Limited by {{name}}.",
+      "coversLimited_other": "Stock covers {{runs}} runs. Limited by {{name}}.",
+      "none": "Stock covers no runs.",
+      "noneLimited": "Stock covers no runs. Limited by {{name}}.",
+      "set": "Set to {{runs}}"
+    },
     "facility": "Facility",
     "rigFitLabel": "Rigs",
     "rigSlotLabel": "Rig {{slot}}",
@@ -9078,6 +9087,9 @@
     "fetchTruncatedRetry": "Try again",
     "unknownValue": "-",
     "noEstimate": "No estimate",
+    "cost": {
+      "each": "each"
+    },
     "abyssal": {
       "estimated_one": "{{count}} abyssal module at MutaMarket's estimate",
       "estimated_other": "{{count}} abyssal modules at MutaMarket's estimate",
@@ -9263,6 +9275,7 @@
     "columns": {
       "quantity": "Qty",
       "volume": "m³",
+      "cost": "Cost basis",
       "asc": "ascending",
       "desc": "descending",
       "sortAria": "Sort by {{label}}",
@@ -11424,6 +11437,7 @@
     "runsColumn": "Runs",
     "qtyColumn": "Qty",
     "iskPerRunColumn": "ISK/run",
+    "vsPeersColumn": "vs peers",
     "priceColumn": "Price",
     "regionColumn": "Region",
     "expiresColumn": "Expires",

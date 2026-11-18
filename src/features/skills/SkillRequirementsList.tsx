@@ -6,6 +6,7 @@ import type { PlanEntry } from '@/engine/types';
 import { ItemInfoLink, SkillLink } from '@/features/entities';
 import type { PrereqRow, UnlockRow } from './skillRequirements';
 import { groupUnlocksByLevel, type ItemUnlockRow, type UnlockLevel } from './skillUnlockLevels';
+import { DividedList } from '@/components/ui/DividedList';
 
 /** At or under this many unlocks in all, every level starts expanded; over it, the levels start as a summary to open. */
 const EXPAND_ALL_UNLOCKS_AT_MOST = 12;
@@ -79,7 +80,7 @@ function UnlockLevels({ levels, trainedLevel, planEntries }: UnlockLevelsProps) 
     });
 
   return (
-    <div className="mt-1 divide-y divide-line rounded-xs border border-line">
+    <DividedList surface="none" className="mt-1">
       {levels.map(({ level, groups }) => (
         <Disclosure
           key={level}
@@ -116,7 +117,7 @@ function UnlockLevels({ levels, trainedLevel, planEntries }: UnlockLevelsProps) 
           ))}
         </Disclosure>
       ))}
-    </div>
+    </DividedList>
   );
 }
 

@@ -20,6 +20,7 @@
 
 import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, docId, record } from './communities.js';
+import { oneOf } from './inputParse.js';
 import {
   BOOK_DEFAULTS,
   DIVISION_NAME_MAX,
@@ -233,13 +234,6 @@ function list(value: unknown, field: string, max: number): unknown[] {
     throw new HttpsError('invalid-argument', `${field} must be a list of at most ${max}`);
   }
   return value;
-}
-
-function oneOf<T extends string>(value: unknown, field: string, allowed: readonly T[]): T {
-  if (typeof value !== 'string' || !allowed.includes(value as T)) {
-    throw new HttpsError('invalid-argument', `${field} must be one of ${allowed.join(', ')}`);
-  }
-  return value as T;
 }
 
 const CORP_ID_MAX = 2_147_483_647;

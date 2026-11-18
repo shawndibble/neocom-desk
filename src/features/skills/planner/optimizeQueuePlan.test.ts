@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import type { AttributeName, EngineSkill, PlanEntry } from '@/engine/types';
 import type { SkillCatalog } from '@/features/skills/skillMap';
@@ -6,7 +7,6 @@ import { schedulePlanWith, type PlanScheduleInputs } from './planSchedule';
 import type { RemapAvailability } from './remapAvailability';
 
 const NOW = Date.parse('2026-09-23T12:00:00Z');
-const DAY_MS = 86_400_000;
 
 const PAIRS: [AttributeName, AttributeName][] = [
   ['intelligence', 'memory'],

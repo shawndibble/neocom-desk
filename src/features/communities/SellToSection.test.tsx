@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -18,7 +19,6 @@ vi.mock('@/components/ui/NeedsConnection', () => ({
   NeedsConnection: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-const DAY = 86_400_000;
 const NOW = 1_700_000_000_000;
 const request: CommunityRequest = {
   id: 'r1',
@@ -43,8 +43,8 @@ const request: CommunityRequest = {
 const heldQuote = (over: Partial<NonNullable<RequestPledge['quote']>> = {}) => ({
   lines: [{ typeId: 1230, name: 'Veldspar', quantity: 1000, unitPrice: 10, total: 9000 }],
   total: 9000,
-  quotedAt: NOW - DAY,
-  expiresAt: NOW + 13 * DAY,
+  quotedAt: NOW - DAY_MS,
+  expiresAt: NOW + 13 * DAY_MS,
   ...over,
 });
 const pledge = (quote?: RequestPledge['quote']): RequestPledge => ({

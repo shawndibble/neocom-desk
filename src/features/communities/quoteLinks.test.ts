@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Contract } from '@/esi/endpoints';
 import type { CommunityRequest } from '@/engine/communities/requests';
@@ -15,7 +16,6 @@ vi.mock('@/features/character/contractItems', () => ({
 }));
 vi.mock('./requestStore', () => ({ saveQuoteLinks: mocks.saveQuoteLinks }));
 
-const DAY = 86_400_000;
 const NOW = Date.parse('2026-10-20T12:00:00Z');
 const SELLER = 100;
 const BUYER = 200;
@@ -44,8 +44,8 @@ const request = (over: Partial<CommunityRequest['standing']> = {}): CommunityReq
 const quote = (over: Partial<HeldQuote> = {}): HeldQuote => ({
   lines: [{ typeId: 1230, name: 'Veldspar', quantity: 1000, unitPrice: 10, total: 9000 }],
   total: 9000,
-  quotedAt: NOW - 3 * DAY,
-  expiresAt: NOW + 11 * DAY,
+  quotedAt: NOW - 3 * DAY_MS,
+  expiresAt: NOW + 11 * DAY_MS,
   ...over,
 });
 const contract = (over: Partial<Contract> = {}): Contract =>
@@ -59,8 +59,8 @@ const contract = (over: Partial<Contract> = {}): Contract =>
     status: 'outstanding',
     for_corporation: false,
     availability: 'personal',
-    date_issued: new Date(NOW - 2 * DAY).toISOString(),
-    date_expired: new Date(NOW + 5 * DAY).toISOString(),
+    date_issued: new Date(NOW - 2 * DAY_MS).toISOString(),
+    date_expired: new Date(NOW + 5 * DAY_MS).toISOString(),
     price: 9000,
     ...over,
   }) as Contract;
@@ -139,7 +139,7 @@ describe('syncQuoteLinks', () => {
       cached: {
         data: [
           contract({ contract_id: 21, assignee_id: 9 }),
-          contract({ contract_id: 22, date_issued: new Date(NOW - 9 * DAY).toISOString() }),
+          contract({ contract_id: 22, date_issued: new Date(NOW - 9 * DAY_MS).toISOString() }),
         ],
         truncated: false,
       },

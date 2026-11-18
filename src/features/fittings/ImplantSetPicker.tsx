@@ -19,7 +19,6 @@ import {
   lazy,
   Suspense,
   useEffect,
-  useId,
   useMemo,
   useRef,
   useState,
@@ -42,12 +41,16 @@ import {
 import { boosterSideEffects, withBoosters } from '@/engine/fittings/boosterSideEffects';
 import * as Icon from '@/components/ui/icons';
 import { ItemInfoLink } from '@/features/entities';
-import { tappableRowClassName } from '@/components/ui/controlStyles';
+import {
+  suggestionOptionClassName,
+  suggestionPopupClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
 import { cloneSeedSet, type ImplantBasis } from '@/engine/fittings/implantBasis';
 import { placeInSet, type ImplantEntry } from '@/engine/fittings/implantFinder';
-import { COMBOBOX_NAV_KEYS, moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { cx } from '@/lib/cx';
 import { rankedSearch } from '@/lib/rankedSearch';
+import { useCombobox } from '@/lib/useCombobox';
 import type { Fitting, FittingImplantSet, PilotProfile } from '@/engine/fittings/types';
 import { loadItemNameMap } from '@/features/skills/typeCatalog';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -145,9 +148,7 @@ const SUGGESTION_LIMIT = 8;
  */
 function AddItemForm({ onAdd, error }: { onAdd: (name: string) => void; error: string | null }) {
   const { t } = useTranslation();
-  const listId = `${useId()}-suggestions`;
   const [query, setQuery] = useState('');
-  const [highlight, setHighlight] = useState<number | null>(null);
   /** False once the list is dismissed (Escape, a pick, leaving the box); typing opens it again. */
   const [listOpen, setListOpen] = useState(true);
   const [entries, setEntries] = useState<readonly ImplantEntry[]>([]);
@@ -168,28 +169,27 @@ function AddItemForm({ onAdd, error }: { onAdd: (name: string) => void; error: s
     [entries, query]
   );
   const open = listOpen && matches.length > 0;
+  const combo = useCombobox({ count: matches.length, open });
 
   function choose(name: string) {
     onAdd(name);
     setQuery('');
-    setHighlight(null);
+    combo.reset();
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (!open) return;
-    if (COMBOBOX_NAV_KEYS.includes(event.key)) {
-      event.preventDefault();
-      setHighlight(moveHighlight(event.key as ComboboxNavKey, highlight, matches.length));
-    } else if (event.key === 'Enter') {
+    if (combo.handleNavKey(event)) return;
+    if (event.key === 'Enter') {
       // The top match when none is highlighted, so a part-typed name needs no arrow key.
       event.preventDefault();
-      choose(matches[highlight ?? 0]!.name);
+      choose(matches[combo.highlight ?? 0]!.name);
     } else if (event.key === 'Escape') {
       // Closes the list, not the dialog.
       event.preventDefault();
       event.stopPropagation();
       setListOpen(false);
-      setHighlight(null);
+      combo.reset();
     }
   }
 
@@ -202,21 +202,17 @@ function AddItemForm({ onAdd, error }: { onAdd: (name: string) => void; error: s
           if (query.trim() === '') return;
           onAdd(query.trim());
           setQuery('');
-          setHighlight(null);
+          combo.reset();
         }}
       >
         <SearchInput
-          role="combobox"
-          aria-expanded={open}
-          aria-controls={listId}
-          aria-autocomplete="list"
-          aria-activedescendant={highlight === null ? undefined : `${listId}-${highlight}`}
+          {...combo.inputProps}
           autoComplete="off"
           spellCheck={false}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
-            setHighlight(null);
+            combo.reset();
             setListOpen(true);
           }}
           onFocus={() => setListOpen(true)}
@@ -231,25 +227,16 @@ function AddItemForm({ onAdd, error }: { onAdd: (name: string) => void; error: s
       </form>
       {error && <p className="text-xs text-danger">{error}</p>}
       <ul
-        id={listId}
-        role="listbox"
+        {...combo.listboxProps}
         aria-label={t('fittings.implants.addLabel')}
         hidden={!open}
-        className="absolute z-20 w-full overflow-hidden rounded-xs border border-line-bright bg-panel shadow-lg"
+        className={suggestionPopupClassName}
       >
         {matches.map((entry, index) => (
           <li
             key={entry.typeId}
-            id={`${listId}-${index}`}
-            role="option"
-            aria-selected={index === highlight}
-            className={cx(
-              tappableRowClassName,
-              'flex cursor-pointer items-center gap-2 border-l-2 px-3 text-sm',
-              index === highlight
-                ? 'border-accent bg-panel-2 font-semibold'
-                : 'border-transparent hover:bg-panel-2'
-            )}
+            {...combo.optionProps(index)}
+            className={cx(suggestionOptionClassName(index === combo.activeIndex), 'gap-2')}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => choose(entry.name)}
           >

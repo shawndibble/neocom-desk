@@ -30,6 +30,7 @@
  * `stopTierSellRaw` / `stopTierSwitchRaw` split in `en.json`, which the old
  * card kept apart in words and this layout has to keep apart in colour.
  */
+import { Pill, type PillTone } from '@/components/ui/Pill';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
 import type { ReactNode } from 'react';
@@ -41,22 +42,24 @@ import * as Icon from '@/components/ui/icons';
 export type DirectiveVerb =
   'add' | 'remove' | 'swap' | 'rebuild' | 'asIs' | 'build' | 'start' | 'stop';
 
-const VERB_CLASS: Record<DirectiveVerb, string> = {
-  add: 'border-accent/45 bg-accent/10 text-accent',
-  build: 'border-accent/45 bg-accent/10 text-accent',
-  swap: 'border-accent/45 bg-accent/10 text-accent',
-  remove: 'border-warning/45 bg-warning/10 text-warning',
+const VERB_TONE: Record<Exclude<DirectiveVerb, 'asIs'>, PillTone> = {
+  add: 'accent',
+  build: 'accent',
+  swap: 'accent',
+  remove: 'warning',
   // The Goal Planner's change list: begin extracting on a colony that runs
   // none, or stop one P0 of what it runs.
-  start: 'border-accent/45 bg-accent/10 text-accent',
-  stop: 'border-warning/45 bg-warning/10 text-warning',
+  start: 'accent',
+  stop: 'warning',
   // Outlined: a course of action the pilot could take, and a real one.
-  rebuild: 'border-line-bright text-text-dim',
-  // Flat and borderless, because it is not an action at all. It shared
-  // `rebuild`'s outline once, which left the two rows differing only in their
-  // wording — the exact collapse this verb exists to prevent.
-  asIs: 'border-transparent bg-panel-2 text-text-dim',
+  rebuild: 'neutral',
 };
+
+// Flat and borderless, because `asIs` is not an action at all. It shared
+// `rebuild`'s outline once, which left the two rows differing only in their
+// wording — the exact collapse this verb exists to prevent.
+const AS_IS_CLASS =
+  'inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border border-transparent bg-panel-2 px-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 
 /** How the right-hand number reads: ISK earned, budget freed, or a quiet projection. */
 export type DirectiveTone = 'gain' | 'freed' | 'quiet' | 'muted';
@@ -75,12 +78,12 @@ const TONE_CLASS: Record<DirectiveTone, string> = {
 
 export function VerbTag({ verb, label }: { verb: DirectiveVerb; label?: string }) {
   const { t } = useTranslation();
+  const text = label ?? t(`piShared.verb.${verb}`);
+  if (verb === 'asIs') return <span className={AS_IS_CLASS}>{text}</span>;
   return (
-    <span
-      className={`inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border px-1.5 text-[0.6875rem] font-semibold tracking-widest uppercase ${VERB_CLASS[verb]}`}
-    >
-      {label ?? t(`piShared.verb.${verb}`)}
-    </span>
+    <Pill outlined tone={VERB_TONE[verb]}>
+      {text}
+    </Pill>
   );
 }
 
@@ -222,9 +225,9 @@ export function SectionLabel({ children }: { children: ReactNode }) {
 export function EstimateBadge() {
   const { t } = useTranslation();
   return (
-    <span className="inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border border-warning/60 px-1.5 text-[0.6875rem] font-semibold tracking-widest text-warning uppercase">
+    <Pill outlined tone="warning">
       {t('piShared.estimateBadge')}
-    </span>
+    </Pill>
   );
 }
 

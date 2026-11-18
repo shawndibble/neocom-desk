@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { useState } from 'react';
 import { db, type ProductionLossRecord } from '@/db';
 import { removeProductionLoss, scheduleSync } from '@/sync';
@@ -44,7 +45,7 @@ interface LossDialogState {
 }
 
 /** Wallet-journal insurance payouts are offered for this long after the fact. */
-const JOURNAL_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+const JOURNAL_WINDOW_MS = 30 * DAY_MS;
 const INSURANCE_REF_TYPE = 'insurance';
 
 function toDateInput(ms: number): string {

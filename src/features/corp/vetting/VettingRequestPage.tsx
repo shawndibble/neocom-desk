@@ -8,7 +8,6 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Button,
   EmptyState,
@@ -21,7 +20,6 @@ import {
 import { InlineError } from '@/components/ui/InlineError';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { getValidAccessToken } from '@/auth/session';
-import { db } from '@/db';
 import type { VettingStatus } from '@/engine/vetting';
 import { useCharacters } from '@/features/character/useCharacters';
 import { callableErrorReason } from '@/lib/callableError';
@@ -36,8 +34,9 @@ import { clearVettingHandle, readVettingHandle, writeVettingHandle } from './vet
 import type { VettingLoginOutcome } from './vettingLoginState';
 import { requestRows } from './vettingRows';
 import { isReviewGone, vettingErrorKey } from './vettingView';
+import { useGrantedScopesByCharacter } from '@/app/grantedScopes';
 
-const NO_SCOPES: ReadonlyMap<number, readonly string[]> = new Map();
+const NO_SCOPES: ReadonlyMap<number, ReadonlySet<string>> = new Map();
 
 type Load =
   { status: 'loading' } | { status: 'failed' } | { status: 'ready'; handle: VettingHandle | null };
@@ -54,14 +53,7 @@ export function VettingRequestPage({ login, onSignIn }: VettingRequestPageProps)
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const characters = useCharacters();
   // Only each Character's granted scopes leave the token read, never a token (ADR 0001).
-  const scopesById =
-    useLiveQuery(
-      async () =>
-        new Map(
-          (await db.tokens.toArray()).map((token) => [token.characterId, token.scopes ?? []])
-        ),
-      []
-    ) ?? NO_SCOPES;
+  const scopesById = useGrantedScopesByCharacter() ?? NO_SCOPES;
   const [load, setLoad] = useState<Load>({ status: 'loading' });
   const [status, setStatus] = useState<VettingStatus | null>(null);
   const [unticked, setUnticked] = useState<ReadonlySet<number>>(new Set());

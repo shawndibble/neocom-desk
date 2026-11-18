@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -6,8 +7,6 @@ import { db } from '@/db';
 import { AcceleratorCell } from './AcceleratorCell';
 
 vi.mock('@/sync', () => ({ scheduleSync: vi.fn() }));
-
-const HOUR = 3_600_000;
 
 function renderCell(
   record?: { bonus: number; expiresAt: number },
@@ -30,7 +29,7 @@ beforeEach(async () => {
 
 describe('AcceleratorCell', () => {
   it('shows the bonus and a countdown for an accelerator the pilot typed in', () => {
-    renderCell({ bonus: 12, expiresAt: Date.now() + 5 * HOUR + 30 * 60_000 });
+    renderCell({ bonus: 12, expiresAt: Date.now() + 5 * HOUR_MS + 30 * 60_000 });
     expect(screen.getByText(/^\+12 · 5h/)).toBeInTheDocument();
   });
 
@@ -59,13 +58,13 @@ describe('AcceleratorCell', () => {
     await waitFor(async () => {
       const row = await db.characterAccelerators.get('7');
       expect(row?.bonus).toBe(12);
-      expect(row?.expiresAt).toBeGreaterThan(Date.now() + 23 * HOUR);
+      expect(row?.expiresAt).toBeGreaterThan(Date.now() + 23 * HOUR_MS);
     });
   });
 
   it('opens on a set accelerator with focus in the first time box', async () => {
     const user = userEvent.setup();
-    renderCell({ bonus: 12, expiresAt: Date.now() + 5 * HOUR + 30 * 60_000 });
+    renderCell({ bonus: 12, expiresAt: Date.now() + 5 * HOUR_MS + 30 * 60_000 });
     await user.click(screen.getByRole('button', { name: 'Edit accelerator for Pilot Seven' }));
     expect(await screen.findByLabelText('Days')).toHaveFocus();
     expect(screen.getByLabelText('Hours')).toHaveValue('5');

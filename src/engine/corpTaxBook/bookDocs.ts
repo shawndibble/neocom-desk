@@ -86,8 +86,8 @@ export interface BookSettings {
 /** Every scope a stored rate can have — the engine's own list, so a new scope is never dropped. */
 export const RATE_SCOPES: ReadonlySet<RateScope> = new Set(SCOPE_ORDER);
 
-const num = (v: unknown): number | undefined => (isFiniteNumber(v) ? v : undefined);
-const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
+export const num = (v: unknown): number | undefined => (isFiniteNumber(v) ? v : undefined);
+export const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
 
 /** The field naming what a scoped rate targets, and whether it is a number or a string. */
 const TARGET: Partial<Record<RateScope, [field: string, kind: 'number' | 'string']>> = {

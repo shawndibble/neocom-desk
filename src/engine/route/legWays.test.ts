@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import { findJumpRoute, routeCost, routeSweepFrom, type JumpGraph } from './jumpRoute';
 import { holeNetwork } from './routeHoles';
@@ -55,7 +56,6 @@ const GRAPH: JumpGraph = new Map([
 ]);
 
 const NOW = 1_800_000_000_000;
-const HOUR = 3_600_000;
 
 function hole(overrides: Partial<TheraConnection> & Pick<TheraConnection, 'id'>): TheraConnection {
   return {
@@ -68,7 +68,7 @@ function hole(overrides: Partial<TheraConnection> & Pick<TheraConnection, 'id'>)
     exitRegionName: null,
     wormholeType: null,
     maxShipSize: 'large',
-    expiresAt: NOW + 10 * HOUR,
+    expiresAt: NOW + 10 * HOUR_MS,
     ...overrides,
   };
 }

@@ -20,6 +20,7 @@ import {
   type LinkTarget,
 } from '@/engine/mail/mailFormat';
 import { BASE_SIZE_PX, EVE_MAIL_SURFACE_CLASS } from '../MailBodyView';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 interface SheetProps {
   open: boolean;
@@ -281,7 +282,7 @@ function LinkDialogBody({
             <FieldError id="mail-link-url-error">{t('mail.format.linkInvalid')}</FieldError>
           )}
         </div>
-        <div className="flex justify-end gap-2">
+        <DialogFooter>
           {target.href !== null && canReset && onRemove && (
             <Button
               size="md"
@@ -296,7 +297,7 @@ function LinkDialogBody({
           <Button type="submit" variant="primary" size="md">
             {t('mail.format.linkApply')}
           </Button>
-        </div>
+        </DialogFooter>
       </form>
     </Modal>
   );

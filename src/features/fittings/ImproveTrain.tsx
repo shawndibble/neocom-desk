@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { Caret, textActionClassName, Toast } from '@/components/ui';
 import { ImproveSkillsSlotContext } from './improveSkillsSlot';
 import type { ImproveGoal } from '@/engine/fittings/improve';
-import { FREE_ROWS_SHOWN, TRAIN_SORT } from '@/engine/fittings/improveFree';
+import { FREE_ROWS_SHOWN, TRAIN_SORT } from '@/engine/fittings/improve';
 import { rankModuleUpgrades } from '@/engine/fittings/moduleUpgrades';
 import { rankSkillGains } from '@/engine/fittings/skillGains';
 import { hasSkillOverrides } from '@/engine/fittings/skillOverrides';

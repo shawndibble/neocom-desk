@@ -38,6 +38,8 @@ export interface UseResolvedPlanResult {
   depth: ReturnType<typeof useDepthPrices>['depth'];
   /** Resolves a candidate plan as the page would, walking its own Depth Prices. */
   resolveAt: (candidate: BuildPlanRecord) => ResolvedBuildPlan;
+  /** Resolves a candidate at the lowest sell, no Depth Prices walked: for what quantities need, which prices never move. */
+  resolveQuantitiesAt: (candidate: BuildPlanRecord) => ResolvedBuildPlan;
 }
 
 export function useResolvedPlan({
@@ -128,5 +130,5 @@ export function useResolvedPlan({
     [resolveWith, walkDepth, depthNeedsOf]
   );
 
-  return { resolved, depth, resolveAt };
+  return { resolved, depth, resolveAt, resolveQuantitiesAt: resolveWith };
 }

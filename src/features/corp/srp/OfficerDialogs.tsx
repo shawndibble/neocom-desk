@@ -12,6 +12,8 @@ import type { SrpClaim } from '../srpClaimTypes';
 import { claimBasisLine, failureText } from './srpClaimText';
 import { typedAmount } from './srpQueue';
 import type { SrpClaimNames } from './useSrpClaimNames';
+import { DialogFooter } from '@/components/ui/DialogFooter';
+import { Well } from '@/components/ui/Well';
 
 function Label({ text, children }: { text: ReactNode; children: ReactNode }) {
   return (
@@ -77,13 +79,7 @@ function Shell({
       title={title}
       placement={phone ? 'sheet' : 'center'}
       dismissOnOutsidePress={false}
-      footer={
-        phone ? (
-          <div className="flex flex-col-reverse gap-2 [&>button]:w-full">{buttons}</div>
-        ) : (
-          <div className="flex justify-end gap-2">{buttons}</div>
-        )
-      }
+      footer={<DialogFooter stacked={phone}>{buttons}</DialogFooter>}
     >
       <div className="space-y-3 text-sm">
         {children}
@@ -183,12 +179,12 @@ export function ChangeAmountDialog({
         />
       </Label>
       {differs && (
-        <p className="rounded-xs border border-line bg-panel-2 p-2 text-xs tabular-nums">
+        <Well as="p" className="text-xs tabular-nums">
           {t('srp.officer.change.effect', {
             from: formatIsk(claim.amount ?? 0),
             to: formatIsk(amount),
           })}
-        </p>
+        </Well>
       )}
     </Shell>
   );

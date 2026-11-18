@@ -6,6 +6,7 @@ import {
   resetRevalidationState,
   settleEsiCacheLoads,
 } from './cache';
+import { deferred } from '@/test/deferred';
 
 const CHAR_ID = 91;
 const KEY = 'settle-thing';
@@ -14,14 +15,6 @@ beforeEach(async () => {
   await db.esiCache.clear();
   resetRevalidationState();
 });
-
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((res) => {
-    resolve = res;
-  });
-  return { promise, resolve };
-}
 
 describe('settleEsiCacheLoads', () => {
   it('resolves at once when nothing is loading', async () => {

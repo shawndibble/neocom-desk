@@ -11,8 +11,8 @@ export function listQueue(corporationId?: number): Promise<MailQueueItem[]> {
 }
 
 export async function nextOrder(): Promise<number> {
-  const all = await db.corpMailQueue.toArray();
-  return all.reduce((max, i) => Math.max(max, i.order), 0) + 1;
+  const last = await db.corpMailQueue.orderBy('order').last();
+  return Math.max(last?.order ?? 0, 0) + 1;
 }
 
 /**
@@ -23,7 +23,10 @@ export async function addToQueue(
   items: readonly MailQueueItem[]
 ): Promise<{ added: MailQueueItem[]; skipped: MailQueueItem[] }> {
   return db.transaction('rw', db.corpMailQueue, async () => {
-    const existing = await db.corpMailQueue.toArray();
+    const existing = await db.corpMailQueue
+      .where('statementId')
+      .anyOf(items.map((i) => i.statementId))
+      .toArray();
     const added: MailQueueItem[] = [];
     const skipped: MailQueueItem[] = [];
     for (const item of items) {

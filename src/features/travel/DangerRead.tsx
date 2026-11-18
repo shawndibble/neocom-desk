@@ -11,6 +11,7 @@ import type {
 } from '@/engine/pilotList/dscanDanger';
 import { KILL_GANG_MIN, type Tone } from '@/engine/pilotList/dscanReadout';
 import { cx } from '@/lib/cx';
+import { Well } from '@/components/ui/Well';
 
 const P = 'travel.pilot.dscan.danger.';
 
@@ -253,10 +254,10 @@ export function WatchCard({
         {t(`${P}watch.${read.level === 'busy' ? 'titleBusy' : 'title'}`)}
       </h3>
       {rest.length === 0 ? (
-        <div className="mt-2 rounded-xs border border-line bg-panel-2 p-3 text-sm text-text-dim">
+        <Well size="lg" className="mt-2 text-sm text-text-dim">
           <p className="font-semibold text-text">{t(`${P}watch.none`)}</p>
           <p>{t(`${P}watch.noneHint`)}</p>
-        </div>
+        </Well>
       ) : (
         <>
           <ol className="mt-1">{rest.map(row)}</ol>

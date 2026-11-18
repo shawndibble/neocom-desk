@@ -10,9 +10,9 @@ import {
   type ImproveCandidate,
   type ImproveGoal,
 } from '@/engine/fittings/improve';
-import { compensationSwaps } from '@/engine/fittings/improveCompensation';
-import { TANK_GOALS } from '@/engine/fittings/improveGroups';
-import type { PropulsionStart } from '@/engine/fittings/improveMakeover';
+import { compensationSwaps } from '@/engine/fittings/improve';
+import { TANK_GOALS } from '@/engine/fittings/improve';
+import type { PropulsionStart } from '@/engine/fittings/improve';
 import type { JobCommonality } from '@/engine/fittings/hullCommonality';
 import type { FitSwap } from '@/engine/fittings/makeItFit';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';

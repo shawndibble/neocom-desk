@@ -8,10 +8,10 @@ import {
   propulsionStart,
   type MakeoverMoveOptions,
   type MakeoverSearch,
-} from '@/engine/fittings/improveMakeover';
+} from '@/engine/fittings/improve';
 import type { JobCommonality } from '@/engine/fittings/hullCommonality';
 import { damageOf, scoreOf, type ImproveGoal } from '@/engine/fittings/improve';
-import { jobSettingOf, type ExploreSpace, type ImproveJob } from '@/engine/fittings/improveJob';
+import { jobSettingOf, type ExploreSpace, type ImproveJob } from '@/engine/fittings/improve';
 import { fitsResourceBudget } from '@/engine/fittings/skillGaps';
 import {
   buildVariationIndex,

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -31,6 +31,7 @@ import {
   type InvitePreview,
 } from '@/features/communities/communityStore';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { useGrantedScopesByCharacter } from '@/app/grantedScopes';
 
 type PreviewState =
   | { status: 'loading' }
@@ -87,14 +88,17 @@ export function CommunityJoin() {
     (await db.characters.toArray()).sort((a, b) => a.addedAt - b.addedAt)
   );
   // Booleans only: a token never goes into React state (ADR 0001).
-  const withBlueprints = useLiveQuery(async () => {
-    const tokens = await db.tokens.toArray();
-    return new Set(
-      tokens
-        .filter((token) => grantCovers(new Set(token.scopes), BLUEPRINTS))
-        .map((token) => token.characterId)
-    );
-  });
+  const scopesByCharacter = useGrantedScopesByCharacter();
+  const withBlueprints = useMemo(
+    () =>
+      scopesByCharacter &&
+      new Set(
+        [...scopesByCharacter]
+          .filter(([, scopes]) => grantCovers(scopes, BLUEPRINTS))
+          .map(([id]) => id)
+      ),
+    [scopesByCharacter]
+  );
   const [unchecked, setUnchecked] = useState<ReadonlySet<number>>(new Set());
   const [results, setResults] = useState<Record<number, JoinResult>>({});
   // Per Character: the blueprint type ids to share. Nothing until chosen.

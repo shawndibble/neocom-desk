@@ -14,6 +14,7 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { mailSummary, type MailRun } from '@/features/corpTaxBook/officerMail';
 import { offersDecisionMail } from './vettingDecisionMail';
 import { askedByReviewer, signOffRows, vettingErrorKey, type SignOffRow } from './vettingView';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 const ROW_TONE: Record<SignOffRow['kind'], PillTone> = {
   yours: 'warning',
@@ -239,13 +240,7 @@ export function VettingDecision({
           title={t(`vetting.decision.refuse.${review.kind}`, { pilot: review.pilot.name })}
           placement={phone ? 'sheet' : 'center'}
           dismissOnOutsidePress={false}
-          footer={
-            phone ? (
-              <div className="flex flex-col-reverse gap-2 [&>button]:w-full">{refuseButtons}</div>
-            ) : (
-              <div className="flex justify-end gap-2">{refuseButtons}</div>
-            )
-          }
+          footer={<DialogFooter stacked={phone}>{refuseButtons}</DialogFooter>}
         >
           <div className="space-y-3 text-sm">
             <label className="block space-y-1">

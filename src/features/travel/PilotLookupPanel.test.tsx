@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEffect } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -169,11 +170,10 @@ describe('PilotLookupPanel', () => {
   });
 
   it('shows the Threat verdict once the kills and the danger ratio are in', async () => {
-    const day = 86_400_000;
     mocks.fetchPilotKillHistory.mockResolvedValue({
       ok: true,
       kills: Array.from({ length: 12 }, (_, i) => ({
-        timeMs: Date.now() - (i + 1) * day,
+        timeMs: Date.now() - (i + 1) * DAY_MS,
         space: 'nullsec',
         systemId: 1,
         victimShipTypeId: i < 4 ? 670 : 587,
@@ -199,11 +199,10 @@ describe('PilotLookupPanel', () => {
 
   it('reads a nullsec killer one level lower in highsec, and says why', async () => {
     mocks.hereSpace = 'highsec';
-    const day = 86_400_000;
     mocks.fetchPilotKillHistory.mockResolvedValue({
       ok: true,
       kills: Array.from({ length: 12 }, (_, i) => ({
-        timeMs: Date.now() - (i + 1) * day,
+        timeMs: Date.now() - (i + 1) * DAY_MS,
         space: 'nullsec',
         systemId: 1,
         victimShipTypeId: 587,
@@ -297,7 +296,6 @@ describe('PilotLookupPanel', () => {
   });
 
   it('counts a high share of kills as dangerous even with a low danger ratio', async () => {
-    const day = 86_400_000;
     mocks.fetchPilotStats.mockResolvedValue({
       kind: 'stats',
       stats: { ...STATS.stats, dangerRatio: 42, kills: 610, losses: 304 },
@@ -305,7 +303,7 @@ describe('PilotLookupPanel', () => {
     mocks.fetchPilotKillHistory.mockResolvedValue({
       ok: true,
       kills: Array.from({ length: 12 }, (_, i) => ({
-        timeMs: Date.now() - (i + 1) * day,
+        timeMs: Date.now() - (i + 1) * DAY_MS,
         space: 'nullsec',
         systemId: 1,
         victimShipTypeId: 587,

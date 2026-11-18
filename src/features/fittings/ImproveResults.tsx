@@ -16,8 +16,8 @@ import {
 } from '@/components/ui';
 import { CRYSTAL_FAMILY_ORES } from '@/engine/fittings/crystalChoice';
 import type { ImproveGoal, ImproveOption, RejectedOption } from '@/engine/fittings/improve';
-import { optionKey } from '@/engine/fittings/improveKeys';
-import { IMPROVE_SORTS, type ImproveSort } from '@/engine/fittings/improveRows';
+import { optionKey } from '@/engine/fittings/improve';
+import { IMPROVE_SORTS, type ImproveSort } from '@/engine/fittings/improve';
 import { ImproveBlockedRow } from './ImproveBlockedRow';
 import { ImproveCoverOffer } from './ImproveCoverOffer';
 import { ImproveFooter } from './ImproveFooter';

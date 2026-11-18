@@ -14,6 +14,7 @@
  * rule for an empty count, unchanged — and Undo is the same changes reversed.
  */
 
+import type { GroupStockClaims } from './groupStockClaims';
 import { suggestedOwnedQuantity } from './ownedStock';
 
 /**
@@ -36,6 +37,19 @@ export type OwnedQuantityFor = (typeID: number) => number | undefined;
  * `scopedQuantityFor` on both tables).
  */
 export type ScopedQuantityFor = (typeID: number) => number;
+
+/**
+ * The stock a row's offer, "Use all" and the plan's max runs may draw on: what
+ * is free after the **Group Stock Claims** ahead of the plan when it sits in a
+ * Build Group with claims, else the scoped stock. One rule so they agree.
+ */
+export function offerableStock(
+  typeID: number,
+  groupClaimsFor: ((typeID: number) => GroupStockClaims | null) | undefined,
+  scopedQuantityFor: ScopedQuantityFor | undefined
+): number {
+  return groupClaimsFor?.(typeID)?.free ?? scopedQuantityFor?.(typeID) ?? 0;
+}
 
 /** One row's owned quantity going from `from` to `to`; `undefined` is "nothing stored". */
 export interface OwnedStockChange {

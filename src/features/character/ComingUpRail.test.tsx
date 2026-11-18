@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -55,15 +56,14 @@ describe('ComingUpRail skyhook raids', () => {
 });
 
 describe('ComingUpRail long-overdue items', () => {
-  const DAY = 86_400_000;
   const extractor = (id: string, ageDays: number) => ({
     id: `planetExtraction:${id}`,
     sourceId: id,
     kind: 'planetExtraction' as const,
     subject: id,
     detail: '',
-    deadlineMs: base.nowMs - ageDays * DAY,
-    remainingMs: -ageDays * DAY,
+    deadlineMs: base.nowMs - ageDays * DAY_MS,
+    remainingMs: -ageDays * DAY_MS,
     response: null,
     important: false,
   });
@@ -82,7 +82,7 @@ describe('ComingUpRail long-overdue items', () => {
   });
 
   it('folds nothing on a picked day', async () => {
-    render(<ComingUpRail {...base} selectedDayMs={base.nowMs - 31 * DAY} items={items} />);
+    render(<ComingUpRail {...base} selectedDayMs={base.nowMs - 31 * DAY_MS} items={items} />);
     expect(await screen.findByText('Old A')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /oldest/i })).toBeNull();
   });

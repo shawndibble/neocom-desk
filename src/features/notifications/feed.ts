@@ -18,6 +18,7 @@
  * What that upsert must *not* take from the later sighting is the row's
  * `firedAt` or `dismissedAt` — see `mergeFeedRecord`.
  */
+import { DAY_MS } from '@/lib/age';
 import { db, type NotificationFeedRecord } from '@/db';
 import { refreshAppBadge } from './appBadge';
 
@@ -58,7 +59,7 @@ export const FEED_SYNC_WINDOW_MAX_ROWS = 100;
 // purge applies to the same collection (issue #595). `functions/` is a
 // separate package and cannot import this, so the two are held equal by this
 // note at each declaration — change one and change the other.
-export const FEED_SYNC_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+export const FEED_SYNC_WINDOW_MS = 30 * DAY_MS;
 
 /**
  * Events whose Feed rows never leave this device. A dead login
@@ -219,7 +220,7 @@ export async function dismissFeedEntries(ids: readonly string[]): Promise<void> 
  * for it. Past this, the occurrence is old news the Alerts page already
  * shows — a device coming back after days away should not toast it again.
  */
-export const TOAST_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
+export const TOAST_STALE_AFTER_MS = DAY_MS;
 
 /**
  * Whether an existing feed row means this device should not raise its own

@@ -16,15 +16,7 @@
  * earlier structures that still match stay listed, and Enter waits for the
  * answer rather than settling for the typed text as a manual location.
  */
-import {
-  useEffect,
-  useEffectEvent,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent,
-} from 'react';
+import { useEffect, useEffectEvent, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { SecurityStatus } from '@/components/SecurityStatus';
@@ -33,7 +25,7 @@ import { activeOptionClassName } from '@/components/ui/controlStyles';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { useSolarSystemList } from '@/features/route/useSolarSystems';
-import { moveHighlight, COMBOBOX_NAV_KEYS, type ComboboxNavKey } from '@/lib/comboboxNav';
+import { useCombobox } from '@/lib/useCombobox';
 import { cx } from '@/lib/cx';
 import { LOOKUP_DEBOUNCE_MS } from '@/lib/useDebouncedValue';
 import { loadNpcStations } from '@/sde/loadMarketSde';
@@ -65,12 +57,10 @@ export function SurveyLocationPicker({
   onPick: (place: SurveyPlace | null) => void;
 }) {
   const { t } = useTranslation();
-  const listId = useId();
   const granted = useGrantedScopes();
   // `null` shows the picked place's name; a typed string (even empty) is a search in progress.
   const [query, setQuery] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const [highlight, setHighlight] = useState<number | null>(null);
   const [stations, setStations] = useState<readonly NpcStationEntry[]>([]);
   const [knownStructures, setKnownStructures] = useState<(query: string) => SurveyPlace[]>(
     () => () => []
@@ -153,7 +143,13 @@ export function SurveyLocationPicker({
   const exact =
     lead !== undefined && lead.kind !== 'manual' && isExactPlace(lead, typed) ? lead : undefined;
   // The keyboard's choice, else the exact match: the option Enter takes.
-  const active = highlight ?? (exact === undefined ? null : 0);
+  const showList = open && (places.length > 0 || searching);
+  const combo = useCombobox({
+    count: places.length,
+    open: showList,
+    fallback: exact === undefined ? null : 0,
+  });
+  const active = combo.activeIndex;
 
   /** What Enter takes: the active option, or typed text nothing matched as a manual location. */
   function enterPick(): SurveyPlace | undefined {
@@ -165,7 +161,7 @@ export function SurveyLocationPicker({
     onPick(place);
     setQuery(null);
     setOpen(false);
-    setHighlight(null);
+    combo.reset();
     setHeldEnter(null);
     setPasted(null);
   }
@@ -185,12 +181,10 @@ export function SurveyLocationPicker({
   }, [pastedPick, heldAnswered]);
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (COMBOBOX_NAV_KEYS.includes(event.key)) {
-      event.preventDefault();
+    if (combo.handleNavKey(event)) {
       setOpen(true);
       // Moving the highlight takes back a held Enter: the pilot is choosing again.
       setHeldEnter(null);
-      setHighlight(moveHighlight(event.key as ComboboxNavKey, active, places.length));
     } else if (event.key === 'Enter') {
       const place = enterPick();
       if (active === null && searching && query !== null) {
@@ -208,8 +202,6 @@ export function SurveyLocationPicker({
     }
   }
 
-  const showList = open && (places.length > 0 || searching);
-
   return (
     <div
       ref={wrapRef}
@@ -220,12 +212,8 @@ export function SurveyLocationPicker({
       <TextInput
         size="sm"
         className="w-full"
-        role="combobox"
+        {...combo.inputProps}
         aria-label={t('survey.info.location')}
-        aria-expanded={showList}
-        aria-controls={listId}
-        aria-autocomplete="list"
-        aria-activedescendant={!showList || active === null ? undefined : `${listId}-${active}`}
         autoComplete="off"
         placeholder={t('survey.info.locationPlaceholder')}
         value={query ?? value?.name ?? ''}
@@ -235,7 +223,7 @@ export function SurveyLocationPicker({
         onChange={(event) => {
           setQuery(event.target.value);
           setOpen(true);
-          setHighlight(null);
+          combo.reset();
           setHeldEnter(null);
           setPasted(pasting.current ? event.target.value : null);
           pasting.current = false;
@@ -272,13 +260,11 @@ export function SurveyLocationPicker({
           onMouseDown={(event) => event.preventDefault()}
           className="absolute inset-x-0 top-full z-20 mt-1 flex max-h-72 flex-col overflow-auto rounded-xs border border-line bg-panel py-1 shadow-lg"
         >
-          <ul id={listId} role="listbox" className="flex flex-col">
+          <ul {...combo.listboxProps} className="flex flex-col">
             {places.map((place, index) => (
               <li
                 key={`${place.kind}-${place.id ?? place.name}`}
-                id={`${listId}-${index}`}
-                role="option"
-                aria-selected={index === active}
+                {...combo.optionProps(index)}
                 className={cx(
                   'flex cursor-pointer items-baseline justify-between gap-3 px-2 py-1 hover:bg-panel-2 touch:min-h-9 touch:items-center',
                   index === active && `bg-panel-2 ${activeOptionClassName}`

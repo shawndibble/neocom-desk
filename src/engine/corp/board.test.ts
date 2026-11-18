@@ -1,3 +1,4 @@
+import { DAY_MS, HOUR_MS, MINUTE_MS } from '@/lib/age';
 import { describe, it, expect } from 'vitest';
 import {
   CORP_BOARD_ITEM_KINDS,
@@ -14,12 +15,9 @@ import {
 } from './board';
 
 const NOW = Date.parse('2026-09-03T12:00:00Z');
-const MINUTE = 60_000;
-const HOUR = 3_600_000;
-const DAY = 86_400_000;
 
 /** The window corp reads are cached for — ESI's own ~1h on the structures endpoint. */
-const STALE_WINDOW = HOUR;
+const STALE_WINDOW = HOUR_MS;
 
 const at = (ms: number) => NOW + ms;
 
@@ -27,7 +25,7 @@ function structure(overrides: Partial<BoardStructureSource> = {}): BoardStructur
   return {
     structureId: 1000000000001,
     name: 'Nakugard - Home',
-    fuelExpiresMs: at(30 * DAY),
+    fuelExpiresMs: at(30 * DAY_MS),
     state: null,
     stateTimerEndMs: null,
     unanchorsAtMs: null,
@@ -53,21 +51,21 @@ describe('severityForRemaining', () => {
    * may enter into it.
    */
   it('derives urgency from time alone, identically for every source', () => {
-    expect(severityForRemaining(25 * DAY, 'logistics')).toBe('clear');
-    expect(severityForRemaining(2 * DAY, 'logistics')).toBe('warning');
+    expect(severityForRemaining(25 * DAY_MS, 'logistics')).toBe('clear');
+    expect(severityForRemaining(2 * DAY_MS, 'logistics')).toBe('warning');
   });
 
   it('climbs the ladder as the clock runs down', () => {
-    expect(severityForRemaining(30 * DAY, 'logistics')).toBe('clear');
-    expect(severityForRemaining(5 * DAY, 'logistics')).toBe('watch');
-    expect(severityForRemaining(2 * DAY, 'logistics')).toBe('warning');
-    expect(severityForRemaining(6 * HOUR, 'logistics')).toBe('critical');
+    expect(severityForRemaining(30 * DAY_MS, 'logistics')).toBe('clear');
+    expect(severityForRemaining(5 * DAY_MS, 'logistics')).toBe('watch');
+    expect(severityForRemaining(2 * DAY_MS, 'logistics')).toBe('warning');
+    expect(severityForRemaining(6 * HOUR_MS, 'logistics')).toBe('critical');
   });
 
   it('treats an elapsed clock as critical, however far past it is', () => {
     expect(severityForRemaining(0)).toBe('critical');
     expect(severityForRemaining(-1)).toBe('critical');
-    expect(severityForRemaining(-90 * DAY)).toBe('critical');
+    expect(severityForRemaining(-90 * DAY_MS)).toBe('critical');
   });
 
   /**
@@ -83,11 +81,11 @@ describe('severityForRemaining', () => {
 
 describe('structure fuel', () => {
   it('ranks a structure by when its fuel runs out', () => {
-    const [item] = fuelBoard([structure({ fuelExpiresMs: at(2 * DAY) })]);
+    const [item] = fuelBoard([structure({ fuelExpiresMs: at(2 * DAY_MS) })]);
     expect(item.kind).toBe('structureFuel');
     expect(item.subject).toBe('Nakugard - Home');
-    expect(item.deadlineMs).toBe(at(2 * DAY));
-    expect(item.remainingMs).toBe(2 * DAY);
+    expect(item.deadlineMs).toBe(at(2 * DAY_MS));
+    expect(item.remainingMs).toBe(2 * DAY_MS);
     expect(item.timing).toBe('timed');
     expect(item.severity).toBe('warning');
   });
@@ -107,7 +105,7 @@ describe('structure fuel', () => {
 
   it('puts a dry structure above every structure that still has fuel', () => {
     const items = fuelBoard([
-      structure({ structureId: 2, name: 'Fuelled', fuelExpiresMs: at(MINUTE) }),
+      structure({ structureId: 2, name: 'Fuelled', fuelExpiresMs: at(MINUTE_MS) }),
       structure({ structureId: 1, name: 'Dry', fuelExpiresMs: null }),
     ]);
     expect(items.map((item) => item.subject)).toEqual(['Dry', 'Fuelled']);
@@ -117,29 +115,29 @@ describe('structure fuel', () => {
 describe('structure state timers', () => {
   it('raises an item for a structure sitting in a reinforcement timer', () => {
     const items = fuelBoard([
-      structure({ state: 'armor_reinforce', stateTimerEndMs: at(20 * HOUR) }),
+      structure({ state: 'armor_reinforce', stateTimerEndMs: at(20 * HOUR_MS) }),
     ]);
     const timer = items.find((item) => item.kind === 'structureTimer');
     expect(timer).toBeDefined();
-    expect(timer?.deadlineMs).toBe(at(20 * HOUR));
+    expect(timer?.deadlineMs).toBe(at(20 * HOUR_MS));
     expect(timer?.detail).toBe('armor_reinforce');
     expect(timer?.severity).toBe('critical');
   });
 
   it('raises a separate item for an unanchoring structure', () => {
-    const items = fuelBoard([structure({ unanchorsAtMs: at(6 * DAY) })]);
+    const items = fuelBoard([structure({ unanchorsAtMs: at(6 * DAY_MS) })]);
     const unanchor = items.filter((item) => item.kind === 'structureTimer');
     expect(unanchor).toHaveLength(1);
     expect(unanchor[0].detail).toBe('unanchoring');
-    expect(unanchor[0].deadlineMs).toBe(at(6 * DAY));
+    expect(unanchor[0].deadlineMs).toBe(at(6 * DAY_MS));
   });
 
   it('raises both when a structure is unanchoring and reinforced at once', () => {
     const items = fuelBoard([
       structure({
         state: 'hull_reinforce',
-        stateTimerEndMs: at(2 * HOUR),
-        unanchorsAtMs: at(7 * DAY),
+        stateTimerEndMs: at(2 * HOUR_MS),
+        unanchorsAtMs: at(7 * DAY_MS),
       }),
     ]);
     expect(items.filter((item) => item.kind === 'structureTimer')).toHaveLength(2);
@@ -188,7 +186,7 @@ describe('offline services', () => {
       structure({
         structureId: 1,
         name: 'Home',
-        fuelExpiresMs: at(300 * DAY),
+        fuelExpiresMs: at(300 * DAY_MS),
         services: [{ name: 'Clone Bay', state: 'offline' }],
       }),
     ]);
@@ -200,8 +198,8 @@ describe('moon extractions', () => {
   const extraction = (overrides: Partial<BoardExtractionSource> = {}): BoardExtractionSource => ({
     structureId: 3000000000001,
     subject: 'M-OEE8 II - Moon 1 - Athanor',
-    chunkArrivalMs: at(5 * DAY),
-    naturalDecayMs: at(7 * DAY),
+    chunkArrivalMs: at(5 * DAY_MS),
+    naturalDecayMs: at(7 * DAY_MS),
     ...overrides,
   });
 
@@ -212,7 +210,7 @@ describe('moon extractions', () => {
       extractions: [extraction()],
     });
     expect(item.kind).toBe('moonExtraction');
-    expect(item.deadlineMs).toBe(at(5 * DAY));
+    expect(item.deadlineMs).toBe(at(5 * DAY_MS));
     expect(item.detail).toBe('arrival');
   });
 
@@ -226,9 +224,11 @@ describe('moon extractions', () => {
     const [item] = board({
       nowMs: NOW,
       staleWindowMs: STALE_WINDOW,
-      extractions: [extraction({ chunkArrivalMs: at(-1 * DAY), naturalDecayMs: at(2 * DAY) })],
+      extractions: [
+        extraction({ chunkArrivalMs: at(-1 * DAY_MS), naturalDecayMs: at(2 * DAY_MS) }),
+      ],
     });
-    expect(item.deadlineMs).toBe(at(2 * DAY));
+    expect(item.deadlineMs).toBe(at(2 * DAY_MS));
     expect(item.detail).toBe('decay');
     expect(item.severity).toBe('warning');
   });
@@ -237,7 +237,9 @@ describe('moon extractions', () => {
     const items = board({
       nowMs: NOW,
       staleWindowMs: STALE_WINDOW,
-      extractions: [extraction({ chunkArrivalMs: at(-9 * DAY), naturalDecayMs: at(-2 * DAY) })],
+      extractions: [
+        extraction({ chunkArrivalMs: at(-9 * DAY_MS), naturalDecayMs: at(-2 * DAY_MS) }),
+      ],
     });
     expect(items).toEqual([]);
   });
@@ -247,7 +249,7 @@ describe('industry jobs', () => {
   const job = (overrides: Partial<BoardJobSource> = {}): BoardJobSource => ({
     jobId: 500,
     subject: 'Hobgoblin II',
-    endMs: at(-3 * DAY),
+    endMs: at(-3 * DAY_MS),
     status: 'ready',
     typeId: null,
     ...overrides,
@@ -257,7 +259,7 @@ describe('industry jobs', () => {
     const [item] = board({ nowMs: NOW, staleWindowMs: STALE_WINDOW, jobs: [job()] });
     expect(item.kind).toBe('jobDelivery');
     expect(item.subject).toBe('Hobgoblin II');
-    expect(item.deadlineMs).toBe(at(-3 * DAY));
+    expect(item.deadlineMs).toBe(at(-3 * DAY_MS));
     expect(item.severity).toBe('critical');
   });
 
@@ -278,7 +280,7 @@ describe('industry jobs', () => {
     const [structureItem] = board({
       nowMs: NOW,
       staleWindowMs: STALE_WINDOW,
-      structures: [structure({ fuelExpiresMs: at(2 * DAY) })],
+      structures: [structure({ fuelExpiresMs: at(2 * DAY_MS) })],
     });
     expect(structureItem.typeId).toBeNull();
   });
@@ -288,7 +290,7 @@ describe('industry jobs', () => {
       nowMs: NOW,
       staleWindowMs: STALE_WINDOW,
       jobs: [
-        job({ jobId: 1, status: 'active', endMs: at(HOUR) }),
+        job({ jobId: 1, status: 'active', endMs: at(HOUR_MS) }),
         job({ jobId: 2, status: 'delivered' }),
         job({ jobId: 3, status: 'cancelled' }),
         job({ jobId: 4, status: 'paused' }),
@@ -308,10 +310,10 @@ describe('industry jobs', () => {
     const [item] = board({
       nowMs: NOW,
       staleWindowMs: STALE_WINDOW,
-      jobs: [job({ status: 'active', endMs: at(-HOUR) })],
+      jobs: [job({ status: 'active', endMs: at(-HOUR_MS) })],
     });
     expect(item.kind).toBe('jobDelivery');
-    expect(item.deadlineMs).toBe(at(-HOUR));
+    expect(item.deadlineMs).toBe(at(-HOUR_MS));
   });
 
   it('still ignores a delivered/cancelled/paused/reverted job even once its end time has passed', () => {
@@ -319,10 +321,10 @@ describe('industry jobs', () => {
       nowMs: NOW,
       staleWindowMs: STALE_WINDOW,
       jobs: [
-        job({ jobId: 2, status: 'delivered', endMs: at(-HOUR) }),
-        job({ jobId: 3, status: 'cancelled', endMs: at(-HOUR) }),
-        job({ jobId: 4, status: 'paused', endMs: at(-HOUR) }),
-        job({ jobId: 5, status: 'reverted', endMs: at(-HOUR) }),
+        job({ jobId: 2, status: 'delivered', endMs: at(-HOUR_MS) }),
+        job({ jobId: 3, status: 'cancelled', endMs: at(-HOUR_MS) }),
+        job({ jobId: 4, status: 'paused', endMs: at(-HOUR_MS) }),
+        job({ jobId: 5, status: 'reverted', endMs: at(-HOUR_MS) }),
       ],
     });
     expect(items).toEqual([]);
@@ -338,13 +340,13 @@ describe('industry jobs', () => {
       nowMs: NOW,
       staleWindowMs: STALE_WINDOW,
       jobs: [
-        job({ jobId: 1, subject: 'Recent', endMs: at(-1 * HOUR) }),
-        job({ jobId: 2, subject: 'Ancient', endMs: at(-40 * DAY) }),
-        job({ jobId: 3, subject: 'Middling', endMs: at(-2 * DAY) }),
+        job({ jobId: 1, subject: 'Recent', endMs: at(-1 * HOUR_MS) }),
+        job({ jobId: 2, subject: 'Ancient', endMs: at(-40 * DAY_MS) }),
+        job({ jobId: 3, subject: 'Middling', endMs: at(-2 * DAY_MS) }),
       ],
     });
     expect(items.map((item) => item.subject)).toEqual(['Ancient', 'Middling', 'Recent']);
-    expect(items[0].remainingMs).toBe(-40 * DAY);
+    expect(items[0].remainingMs).toBe(-40 * DAY_MS);
   });
 });
 
@@ -361,9 +363,9 @@ describe('the interleaved board', () => {
         structure({
           structureId: 1,
           name: 'Athanor',
-          fuelExpiresMs: at(4 * DAY),
+          fuelExpiresMs: at(4 * DAY_MS),
           state: 'armor_reinforce',
-          stateTimerEndMs: at(10 * HOUR),
+          stateTimerEndMs: at(10 * HOUR_MS),
           services: [{ name: 'Reprocessing', state: 'offline' }],
         }),
       ],
@@ -371,15 +373,15 @@ describe('the interleaved board', () => {
         {
           structureId: 1,
           subject: 'Athanor',
-          chunkArrivalMs: at(2 * DAY),
-          naturalDecayMs: at(4 * DAY),
+          chunkArrivalMs: at(2 * DAY_MS),
+          naturalDecayMs: at(4 * DAY_MS),
         },
       ],
       jobs: [
         {
           jobId: 9,
           subject: 'Nanite Repair Paste',
-          endMs: at(-6 * HOUR),
+          endMs: at(-6 * HOUR_MS),
           status: 'ready',
           typeId: null,
         },
@@ -402,7 +404,7 @@ describe('the interleaved board', () => {
    * decision. Ties resolve on kind, then on id.
    */
   it('breaks ties on kind order and then id, not on the order sources were passed', () => {
-    const sameInstant = at(3 * DAY);
+    const sameInstant = at(3 * DAY_MS);
     const items = board({
       nowMs: NOW,
       staleWindowMs: STALE_WINDOW,
@@ -418,8 +420,8 @@ describe('the interleaved board', () => {
 
   it('gives the same board whichever order the sources arrive in', () => {
     const structures = [
-      structure({ structureId: 1, name: 'A', fuelExpiresMs: at(DAY) }),
-      structure({ structureId: 2, name: 'B', fuelExpiresMs: at(DAY) }),
+      structure({ structureId: 1, name: 'A', fuelExpiresMs: at(DAY_MS) }),
+      structure({ structureId: 2, name: 'B', fuelExpiresMs: at(DAY_MS) }),
     ];
     const forwards = board({ nowMs: NOW, staleWindowMs: STALE_WINDOW, structures });
     const backwards = board({
@@ -435,7 +437,7 @@ describe('the interleaved board', () => {
   });
 
   it('does not mutate the sources it was handed', () => {
-    const structures = [structure({ structureId: 1, fuelExpiresMs: at(DAY) })];
+    const structures = [structure({ structureId: 1, fuelExpiresMs: at(DAY_MS) })];
     const snapshot = JSON.parse(JSON.stringify(structures)) as unknown;
     board({ nowMs: NOW, staleWindowMs: STALE_WINDOW, structures });
     expect(structures).toEqual(snapshot);
@@ -452,13 +454,13 @@ describe('short timers against an hour-stale cache', () => {
    */
   it('marks a clock shorter than the cache window as untrustworthy', () => {
     const timer = fuelBoard([
-      structure({ state: 'shield_vulnerable', stateTimerEndMs: at(12 * MINUTE) }),
+      structure({ state: 'shield_vulnerable', stateTimerEndMs: at(12 * MINUTE_MS) }),
     ]).find((entry) => entry.kind === 'structureTimer');
     expect(timer?.withinStaleWindow).toBe(true);
   });
 
   it('leaves a multi-day clock alone — hour-stale is honest at that window', () => {
-    const [item] = fuelBoard([structure({ fuelExpiresMs: at(3 * DAY) })]);
+    const [item] = fuelBoard([structure({ fuelExpiresMs: at(3 * DAY_MS) })]);
     expect(item.withinStaleWindow).toBe(false);
   });
 
@@ -471,7 +473,9 @@ describe('short timers against an hour-stale cache', () => {
     const items = board({
       nowMs: NOW,
       staleWindowMs: STALE_WINDOW,
-      jobs: [{ jobId: 1, subject: 'Done', endMs: at(-5 * MINUTE), status: 'ready', typeId: null }],
+      jobs: [
+        { jobId: 1, subject: 'Done', endMs: at(-5 * MINUTE_MS), status: 'ready', typeId: null },
+      ],
     });
     expect(items[0].withinStaleWindow).toBe(false);
   });
@@ -491,9 +495,9 @@ describe('CORP_BOARD_ITEM_KINDS', () => {
       staleWindowMs: STALE_WINDOW,
       structures: [
         structure({
-          fuelExpiresMs: at(DAY),
+          fuelExpiresMs: at(DAY_MS),
           state: 'armor_reinforce',
-          stateTimerEndMs: at(DAY),
+          stateTimerEndMs: at(DAY_MS),
           services: [{ name: 'Clone Bay', state: 'offline' }],
         }),
       ],
@@ -501,15 +505,21 @@ describe('CORP_BOARD_ITEM_KINDS', () => {
         {
           structureId: 1,
           subject: 'Athanor',
-          chunkArrivalMs: at(DAY),
-          naturalDecayMs: at(2 * DAY),
+          chunkArrivalMs: at(DAY_MS),
+          naturalDecayMs: at(2 * DAY_MS),
         },
       ],
-      jobs: [{ jobId: 1, subject: 'Job', endMs: at(DAY), status: 'ready', typeId: null }],
+      jobs: [{ jobId: 1, subject: 'Job', endMs: at(DAY_MS), status: 'ready', typeId: null }],
       sovereignty: [
-        { id: 'skyhook:1', name: 'Skyhook', kind: 'skyhook', startMs: at(DAY), endMs: at(2 * DAY) },
+        {
+          id: 'skyhook:1',
+          name: 'Skyhook',
+          kind: 'skyhook',
+          startMs: at(DAY_MS),
+          endMs: at(2 * DAY_MS),
+        },
       ],
-      hubFuel: [{ id: 'hub:9', name: 'Efa', runsOutMs: at(DAY) }],
+      hubFuel: [{ id: 'hub:9', name: 'Efa', runsOutMs: at(DAY_MS) }],
     });
     const produced = new Set(items.map((item) => item.kind));
     expect([...produced].sort()).toEqual([...CORP_BOARD_ITEM_KINDS].sort());
@@ -534,24 +544,24 @@ describe('starbases', () => {
   });
 
   it('ranks a fuel clock as structure fuel, like any other deadline', () => {
-    const [item] = sbBoard([starbase({ fuelExpiresMs: at(5 * HOUR) })]);
+    const [item] = sbBoard([starbase({ fuelExpiresMs: at(5 * HOUR_MS) })]);
     expect(item).toMatchObject({
       kind: 'structureFuel',
       subject: 'Efa - Moon 1',
-      deadlineMs: at(5 * HOUR),
+      deadlineMs: at(5 * HOUR_MS),
       timing: 'timed',
     });
   });
 
   it('shows an empty bay as an overdue clock, not an unknown one', () => {
-    const [item] = sbBoard([starbase({ fuelExpiresMs: at(-2 * HOUR) })]);
+    const [item] = sbBoard([starbase({ fuelExpiresMs: at(-2 * HOUR_MS) })]);
     expect(item!.severity).toBe('critical');
-    expect(item!.remainingMs).toBe(-2 * HOUR);
+    expect(item!.remainingMs).toBe(-2 * HOUR_MS);
   });
 
   it('adds reinforcement and unanchor timers as structure timers', () => {
     const items = sbBoard([
-      starbase({ reinforcedUntilMs: at(3 * DAY), unanchorsAtMs: at(4 * DAY) }),
+      starbase({ reinforcedUntilMs: at(3 * DAY_MS), unanchorsAtMs: at(4 * DAY_MS) }),
     ]);
     expect(items.map((i) => [i.kind, i.detail])).toEqual([
       ['structureTimer', 'reinforced'],
@@ -560,7 +570,7 @@ describe('starbases', () => {
   });
 
   it('does not tick a reinforcement shorter than the cache window', () => {
-    const [item] = sbBoard([starbase({ reinforcedUntilMs: at(20 * MINUTE) })]);
+    const [item] = sbBoard([starbase({ reinforcedUntilMs: at(20 * MINUTE_MS) })]);
     expect(item!.withinStaleWindow).toBe(true);
   });
 });
@@ -570,8 +580,8 @@ describe('sovereignty raid windows', () => {
     id: 'skyhook:5',
     name: 'Skyhook (X-7OMU)',
     kind: 'skyhook',
-    startMs: at(6 * HOUR),
-    endMs: at(8 * HOUR),
+    startMs: at(6 * HOUR_MS),
+    endMs: at(8 * HOUR_MS),
     ...over,
   });
 
@@ -584,23 +594,23 @@ describe('sovereignty raid windows', () => {
       kind: 'sovRaid',
       subject: 'Skyhook (X-7OMU)',
       detail: 'skyhook.upcoming',
-      deadlineMs: at(6 * HOUR),
+      deadlineMs: at(6 * HOUR_MS),
       timing: 'timed',
     });
   });
 
   it('ranks an open window by when it closes', () => {
-    const [item] = sovBoard([raid({ startMs: at(-HOUR), endMs: at(2 * HOUR) })]);
-    expect(item).toMatchObject({ detail: 'skyhook.open', deadlineMs: at(2 * HOUR) });
+    const [item] = sovBoard([raid({ startMs: at(-HOUR_MS), endMs: at(2 * HOUR_MS) })]);
+    expect(item).toMatchObject({ detail: 'skyhook.open', deadlineMs: at(2 * HOUR_MS) });
   });
 
   it('drops a window that already closed', () => {
-    expect(sovBoard([raid({ startMs: at(-3 * HOUR), endMs: at(-HOUR) })])).toEqual([]);
+    expect(sovBoard([raid({ startMs: at(-3 * HOUR_MS), endMs: at(-HOUR_MS) })])).toEqual([]);
   });
 
   it('keeps a hub past its window end as overtime, still vulnerable', () => {
     const items = sovBoard([
-      raid({ id: 'hub:9', kind: 'hub', startMs: at(-3 * HOUR), endMs: at(-HOUR) }),
+      raid({ id: 'hub:9', kind: 'hub', startMs: at(-3 * HOUR_MS), endMs: at(-HOUR_MS) }),
     ]);
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({ detail: 'hub.overtime', timing: 'timed' });
@@ -608,12 +618,12 @@ describe('sovereignty raid windows', () => {
   });
 
   it('takes severity from the time remaining until the ranked end of the window', () => {
-    const [far] = sovBoard([raid({ startMs: at(3 * DAY), endMs: at(3 * DAY + HOUR) })]);
-    const [soon] = sovBoard([raid({ startMs: at(HOUR), endMs: at(2 * HOUR) })]);
-    const [open] = sovBoard([raid({ startMs: at(-HOUR), endMs: at(20 * MINUTE) })]);
-    expect(far!.severity).toBe(severityForRemaining(3 * DAY, 'logistics'));
-    expect(soon!.severity).toBe(severityForRemaining(HOUR, 'logistics'));
-    expect(open!.severity).toBe(severityForRemaining(20 * MINUTE, 'logistics'));
+    const [far] = sovBoard([raid({ startMs: at(3 * DAY_MS), endMs: at(3 * DAY_MS + HOUR_MS) })]);
+    const [soon] = sovBoard([raid({ startMs: at(HOUR_MS), endMs: at(2 * HOUR_MS) })]);
+    const [open] = sovBoard([raid({ startMs: at(-HOUR_MS), endMs: at(20 * MINUTE_MS) })]);
+    expect(far!.severity).toBe(severityForRemaining(3 * DAY_MS, 'logistics'));
+    expect(soon!.severity).toBe(severityForRemaining(HOUR_MS, 'logistics'));
+    expect(open!.severity).toBe(severityForRemaining(20 * MINUTE_MS, 'logistics'));
     expect(open!.severity).not.toBe(far!.severity);
   });
 
@@ -628,37 +638,37 @@ describe('sov hub reagents', () => {
     board({ nowMs: NOW, staleWindowMs: STALE_WINDOW, hubFuel });
 
   it('is a fuel clock that runs out when the bay empties', () => {
-    const [item] = hubBoard([{ id: 'hub:9', name: 'Efa', runsOutMs: at(26 * HOUR) }]);
+    const [item] = hubBoard([{ id: 'hub:9', name: 'Efa', runsOutMs: at(26 * HOUR_MS) }]);
     expect(item).toMatchObject({
       id: 'fuel:hub:9',
       kind: 'sovHubFuel',
       subject: 'Efa',
-      deadlineMs: at(26 * HOUR),
+      deadlineMs: at(26 * HOUR_MS),
       timing: 'timed',
     });
   });
 
   it('stays on the board once the bay is empty, overdue', () => {
-    const [item] = hubBoard([{ id: 'hub:9', name: 'Efa', runsOutMs: at(-HOUR) }]);
+    const [item] = hubBoard([{ id: 'hub:9', name: 'Efa', runsOutMs: at(-HOUR_MS) }]);
     expect(item!.severity).toBe('critical');
   });
 });
 
 describe('mergeCorpBoards', () => {
   it("ranks two corporations' deadlines together, each row carrying its corporation", () => {
-    const a = fuelBoard([structure({ structureId: 1, fuelExpiresMs: at(5 * DAY) })]);
+    const a = fuelBoard([structure({ structureId: 1, fuelExpiresMs: at(5 * DAY_MS) })]);
     const b = fuelBoard([
-      structure({ structureId: 1, fuelExpiresMs: at(2 * DAY) }),
-      structure({ structureId: 2, fuelExpiresMs: at(9 * DAY) }),
+      structure({ structureId: 1, fuelExpiresMs: at(2 * DAY_MS) }),
+      structure({ structureId: 2, fuelExpiresMs: at(9 * DAY_MS) }),
     ]);
     const merged = mergeCorpBoards([
       { corporationId: 500, items: a },
       { corporationId: 600, items: b },
     ]);
     expect(merged.map((item) => [item.corporationId, item.deadlineMs])).toEqual([
-      [600, at(2 * DAY)],
-      [500, at(5 * DAY)],
-      [600, at(9 * DAY)],
+      [600, at(2 * DAY_MS)],
+      [500, at(5 * DAY_MS)],
+      [600, at(9 * DAY_MS)],
     ]);
     // The same structure id in two corporations stays two rows with distinct keys.
     expect(new Set(merged.map((item) => item.id)).size).toBe(3);

@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import i18n from '@/i18n';
 import { MAX_MAIL_SUBJECT } from '@/engine/communities/requestMail';
@@ -10,7 +11,6 @@ import {
 } from './vettingRequestMail';
 
 const t = i18n.t.bind(i18n);
-const HOUR = 3_600_000;
 
 const input = (over: Partial<VettingRequestMailInput> = {}): VettingRequestMailInput => ({
   pilot: 'Ren Halvard',
@@ -65,20 +65,20 @@ describe('requestMailInput', () => {
 });
 
 describe('requestMailCooldown', () => {
-  const now = 100 * HOUR;
+  const now = 100 * HOUR_MS;
   it('is free before any mail, and after a day', () => {
     expect(requestMailCooldown(undefined, now)).toBeNull();
-    expect(requestMailCooldown({ sentAt: now - 24 * HOUR }, now)).toBeNull();
+    expect(requestMailCooldown({ sentAt: now - 24 * HOUR_MS }, now)).toBeNull();
   });
   it('says how long is left within a day', () => {
-    expect(requestMailCooldown({ sentAt: now - 6 * HOUR }, now)).toEqual({
-      remainingMs: 18 * HOUR,
+    expect(requestMailCooldown({ sentAt: now - 6 * HOUR_MS }, now)).toEqual({
+      remainingMs: 18 * HOUR_MS,
     });
   });
 });
 
 describe('mailGate', () => {
-  const now = 100 * HOUR;
+  const now = 100 * HOUR_MS;
   const row = (over: Record<string, unknown> = {}) => ({
     id: 'r1',
     state: 'requested',
@@ -92,14 +92,14 @@ describe('mailGate', () => {
     expect(gate([row()])).toMatchObject({ ok: true, previousSentAt: 0 });
   });
   it('uses the server sentAt as the slot once a day has passed', () => {
-    const sentAt = now - 25 * HOUR;
+    const sentAt = now - 25 * HOUR_MS;
     expect(gate([row({ requestMail: { sentAt } })])).toMatchObject({
       ok: true,
       previousSentAt: sentAt,
     });
   });
   it('refuses within a day (another tab mailed it)', () => {
-    expect(gate([row({ requestMail: { sentAt: now - HOUR } })])).toEqual({
+    expect(gate([row({ requestMail: { sentAt: now - HOUR_MS } })])).toEqual({
       ok: false,
       reason: 'cooldown',
     });

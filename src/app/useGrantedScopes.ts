@@ -2,6 +2,7 @@
 import { useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
+import { loadGrantedScopes } from './grantedScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { requiredScopesForEndpoints, type EsiEndpointId } from '@/esi/registry';
 import { requiredScopesForNavPath } from './routeScopes';
@@ -78,7 +79,7 @@ export function useCharacterLacksEndpoints(
   const endpointsKey = endpoints.join(',');
   const answer = useLiveQuery(async () => {
     if (characterId === null) return undefined;
-    const held = new Set((await db.tokens.get(characterId))?.scopes ?? []);
+    const held = await loadGrantedScopes(characterId);
     const lacks = requiredScopesForEndpoints(endpoints).some((scope) => !held.has(scope));
     return { characterId, lacks };
   }, [characterId, endpointsKey]);

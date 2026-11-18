@@ -106,7 +106,7 @@ export function usePlanResolution({
    * claims share it, and a re-run of this memo starts from nothing rather
    * than re-claiming against copies a previous run already took.
    */
-  const { resolved, depth, resolveAt } = useResolvedPlan({
+  const { resolved, depth, resolveAt, resolveQuantitiesAt } = useResolvedPlan({
     plan,
     hub,
     sources: {
@@ -159,6 +159,7 @@ export function usePlanResolution({
     canBuildHere,
     resolved,
     resolveAt,
+    resolveQuantitiesAt,
     costMove,
     ownedSale,
     pricesUnreachable,

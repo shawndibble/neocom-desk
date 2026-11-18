@@ -1,3 +1,4 @@
+import { DAY_MS, HOUR_MS, MINUTE_MS } from '@/lib/age';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -32,7 +33,6 @@ import {
   type ViewerContext,
 } from './pilotListData';
 
-const HOUR = 3_600_000;
 const kill = (agoMs: number) => ({
   timeMs: Date.now() - agoMs,
   space: 'nullsec' as const,
@@ -69,7 +69,7 @@ describe('loadPilotList', () => {
       ])
     );
     mocks.fetchPilotKillHistory.mockImplementation((id: number) =>
-      Promise.resolve(id === 2 ? { ok: false } : { ok: true, kills: [kill(2 * HOUR)] })
+      Promise.resolve(id === 2 ? { ok: false } : { ok: true, kills: [kill(2 * HOUR_MS)] })
     );
   });
 
@@ -103,7 +103,6 @@ describe('loadPilotList', () => {
   });
 
   describe('what an earlier paste left behind (issue #5812)', () => {
-    const MIN = 60_000;
     const stored = (agoMs: number) => Date.now() - agoMs;
 
     it('pastes the same Local again without asking zKillboard or ESI for names', async () => {
@@ -130,11 +129,11 @@ describe('loadPilotList', () => {
     });
 
     it('shows a copy over 30 minutes old at once, marked stale, then replaces it', async () => {
-      const at = stored(2 * HOUR);
-      await storeKillHistory(1, [kill(5 * HOUR)], at);
+      const at = stored(2 * HOUR_MS);
+      await storeKillHistory(1, [kill(5 * HOUR_MS)], at);
       await storeCharacterIds([{ id: 1, name: 'Alpha' }], Date.now());
       const seen: PilotListRow[][] = [];
-      mocks.fetchPilotKillHistory.mockResolvedValue({ ok: true, kills: [kill(HOUR)] });
+      mocks.fetchPilotKillHistory.mockResolvedValue({ ok: true, kills: [kill(HOUR_MS)] });
       await loadPilotList(['Alpha'], {
         onRows: (rows) => seen.push(rows),
         viewer: Promise.resolve(viewer),
@@ -150,8 +149,8 @@ describe('loadPilotList', () => {
     });
 
     it('keeps the stale copy, never "unreachable", when the refresh fails', async () => {
-      const at = stored(2 * HOUR);
-      await storeKillHistory(1, [kill(5 * HOUR)], at);
+      const at = stored(2 * HOUR_MS);
+      await storeKillHistory(1, [kill(5 * HOUR_MS)], at);
       await storeCharacterIds([{ id: 1, name: 'Alpha' }], Date.now());
       mocks.fetchPilotKillHistory.mockResolvedValue({ ok: false, reason: 'rate-limited' });
       const rows = await run(['Alpha']);
@@ -159,7 +158,7 @@ describe('loadPilotList', () => {
     });
 
     it('does not show a copy older than a day: the pilot loads again', async () => {
-      await storeKillHistory(1, [kill(5 * HOUR)], stored(25 * HOUR));
+      await storeKillHistory(1, [kill(5 * HOUR_MS)], stored(25 * HOUR_MS));
       await storeCharacterIds([{ id: 1, name: 'Alpha' }], Date.now());
       mocks.fetchPilotKillHistory.mockResolvedValue({ ok: false, reason: 'offline' });
       const rows = await run(['Alpha']);
@@ -175,8 +174,8 @@ describe('loadPilotList', () => {
         ],
         Date.now()
       );
-      await storeKillHistory(1, [], stored(29 * MIN));
-      await storeKillHistory(2, [], stored(31 * MIN));
+      await storeKillHistory(1, [], stored(29 * MINUTE_MS));
+      await storeKillHistory(2, [], stored(31 * MINUTE_MS));
       mocks.fetchPilotKillHistory.mockResolvedValue({ ok: true, kills: [] });
       mocks.fetchPilotKillmails.mockResolvedValue({ ok: true, entries: [] });
       await run(['Alpha', 'Beta']);
@@ -209,12 +208,11 @@ describe('loadPilotList', () => {
   });
 
   describe('Threat verdict', () => {
-    const DAY = 24 * HOUR;
-    const busy = Array.from({ length: 12 }, (_, i) => kill((i + 1) * DAY));
+    const busy = Array.from({ length: 12 }, (_, i) => kill((i + 1) * DAY_MS));
 
     it('looks up stats only for a pilot with enough recent kills to be dangerous', async () => {
       mocks.fetchPilotKillHistory.mockImplementation((id: number) =>
-        Promise.resolve({ ok: true, kills: id === 1 ? busy : [kill(DAY), kill(2 * DAY)] })
+        Promise.resolve({ ok: true, kills: id === 1 ? busy : [kill(DAY_MS), kill(2 * DAY_MS)] })
       );
       mocks.fetchPilotStats.mockResolvedValue({
         kind: 'stats',
@@ -278,7 +276,7 @@ describe('loadPilotList', () => {
 
     it('reads the losses of a pilot with no recent kill, and not of anyone else', async () => {
       mocks.fetchPilotKillHistory.mockImplementation((id: number) =>
-        Promise.resolve({ ok: true, kills: id === 1 ? [kill(100 * DAY)] : [kill(2 * DAY)] })
+        Promise.resolve({ ok: true, kills: id === 1 ? [kill(100 * DAY_MS)] : [kill(2 * DAY_MS)] })
       );
       mocks.fetchPilotKillmails.mockResolvedValue({
         ok: true,
@@ -288,7 +286,7 @@ describe('loadPilotList', () => {
             hash: 'h',
             side: 'loss',
             value: null,
-            detail: { time: new Date(Date.now() - 3 * DAY).toISOString() },
+            detail: { time: new Date(Date.now() - 3 * DAY_MS).toISOString() },
           },
         ],
       });
@@ -301,14 +299,14 @@ describe('loadPilotList', () => {
     });
 
     it('is inactive when a pilot with no recent kill has no recent loss either', async () => {
-      mocks.fetchPilotKillHistory.mockResolvedValue({ ok: true, kills: [kill(100 * DAY)] });
+      mocks.fetchPilotKillHistory.mockResolvedValue({ ok: true, kills: [kill(100 * DAY_MS)] });
       mocks.fetchPilotKillmails.mockResolvedValue({ ok: true, entries: [] });
       const [alpha] = await run(['Alpha'], { ...viewer, contacts: new Map() });
       expect(rowThreat(alpha, Date.now())).toBe('inactive');
     });
 
     it('gives no verdict when the losses of a pilot with no recent kill could not be read or dated', async () => {
-      mocks.fetchPilotKillHistory.mockResolvedValue({ ok: true, kills: [kill(100 * DAY)] });
+      mocks.fetchPilotKillHistory.mockResolvedValue({ ok: true, kills: [kill(100 * DAY_MS)] });
       mocks.fetchPilotKillmails.mockResolvedValueOnce({ ok: false });
       mocks.fetchPilotKillmails.mockResolvedValueOnce({
         ok: true,

@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import { buildCharacterBoard, CHARACTER_BOARD_ITEM_KINDS, type BoardClockSource } from './board';
 import {
@@ -244,19 +245,17 @@ describe('countsByKind', () => {
 });
 
 describe('splitLongOverdue', () => {
-  const DAY = 86_400_000;
-
   it('takes out the items overdue for longer than the window, in board order, oldest first', () => {
     const board = buildCharacterBoard({
       nowMs: NOW,
       planetExtractions: [
-        clock('month-old', NOW - 31 * DAY),
-        clock('week-old', NOW - 7 * DAY),
-        clock('yesterday', NOW - DAY),
-        clock('soon', NOW + DAY),
+        clock('month-old', NOW - 31 * DAY_MS),
+        clock('week-old', NOW - 7 * DAY_MS),
+        clock('yesterday', NOW - DAY_MS),
+        clock('soon', NOW + DAY_MS),
       ],
     });
-    const { longOverdue, rest } = splitLongOverdue(board, NOW, 2 * DAY);
+    const { longOverdue, rest } = splitLongOverdue(board, NOW, 2 * DAY_MS);
     expect(longOverdue.map((i) => i.subject)).toEqual(['month-old', 'week-old']);
     expect(rest.map((i) => i.subject)).toEqual(['yesterday', 'soon']);
   });
@@ -264,8 +263,8 @@ describe('splitLongOverdue', () => {
   it('keeps everything when nothing is overdue for that long', () => {
     const board = buildCharacterBoard({
       nowMs: NOW,
-      planetExtractions: [clock('edge', NOW - 2 * DAY), clock('soon', NOW + DAY)],
+      planetExtractions: [clock('edge', NOW - 2 * DAY_MS), clock('soon', NOW + DAY_MS)],
     });
-    expect(splitLongOverdue(board, NOW, 2 * DAY)).toEqual({ longOverdue: [], rest: board });
+    expect(splitLongOverdue(board, NOW, 2 * DAY_MS)).toEqual({ longOverdue: [], rest: board });
   });
 });

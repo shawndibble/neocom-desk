@@ -46,6 +46,7 @@ import { OrderCostSection } from './OrderCostSection';
 import { OrderExitsSection } from './OrderExitsSection';
 import { WorkThroughModalNotes, WorkThroughNextButton } from './WorkThroughControls';
 import { useWalkCopyPrice } from './workThroughContext';
+import { DividedList } from '@/components/ui/DividedList';
 
 export interface OrderDetailModalProps {
   row: OpenOrderRow;
@@ -214,7 +215,7 @@ export function OrderDetailContent({
           )}
         </StatChips>
 
-        <div className="divide-y divide-line rounded-xs border border-line">
+        <DividedList surface="none">
           <OrderWhoCheaperSection
             row={row}
             station={station}
@@ -258,7 +259,7 @@ export function OrderDetailContent({
               onToggle={() => toggleSection('exits')}
             />
           )}
-        </div>
+        </DividedList>
       </div>
     </Modal>
   );

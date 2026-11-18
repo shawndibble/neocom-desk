@@ -1,3 +1,4 @@
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import type { CorpStarbaseRow, CorpStarbasesFeed } from './corpFeeds';
 import { corpStarbases, toBoardStarbases } from './corpStarbaseModels';
@@ -6,8 +7,6 @@ import type { BuildContext, FeedState } from './types';
 const t = (key: string, options?: Record<string, unknown>) =>
   options ? `${key}${JSON.stringify(options)}` : key;
 const NOW = Date.parse('2026-10-11T12:00:00Z');
-const HOUR = 3_600_000;
-const DAY = 24 * HOUR;
 const ctx: BuildContext = {
   t,
   now: NOW,
@@ -118,9 +117,9 @@ describe('corpStarbases', () => {
     const view = build(
       ok(
         feedOf(
-          [tower({ bay: { fuelBlocks: 40 * 10, strontium: 0 }, bayReadAtMs: NOW - 5 * HOUR })],
+          [tower({ bay: { fuelBlocks: 40 * 10, strontium: 0 }, bayReadAtMs: NOW - 5 * HOUR_MS })],
           {
-            fetchedAt: new Date(NOW - 5 * HOUR),
+            fetchedAt: new Date(NOW - 5 * HOUR_MS),
           }
         )
       )
@@ -145,7 +144,7 @@ describe('corpStarbases', () => {
 
   it('shows a reinforced tower with its timer and a warning tone', () => {
     const view = build(
-      ok(feedOf([tower({ state: 'reinforced', bay: null, reinforcedUntilMs: NOW + 3 * DAY })]))
+      ok(feedOf([tower({ state: 'reinforced', bay: null, reinforcedUntilMs: NOW + 3 * DAY_MS })]))
     );
     const row = view.table?.rows[0];
     expect(row?.cells[2]).toBe('overview.widgets.corpStarbases.state.reinforced');
@@ -159,21 +158,21 @@ describe('per-tower read time', () => {
     const feed = feedOf(
       [
         tower({ starbaseId: 1, bayReadAtMs: NOW }),
-        tower({ starbaseId: 2, bayReadAtMs: NOW - 2 * DAY }),
+        tower({ starbaseId: 2, bayReadAtMs: NOW - 2 * DAY_MS }),
       ],
-      { fetchedAt: new Date(NOW - 2 * DAY) }
+      { fetchedAt: new Date(NOW - 2 * DAY_MS) }
     );
     const [fresh, stale] = toBoardStarbases(feed, NOW);
     // 100 hours of fuel from each tower's own read.
-    expect(fresh?.fuelExpiresMs).toBe(NOW + 100 * HOUR);
-    expect(stale?.fuelExpiresMs).toBe(NOW - 2 * DAY + 100 * HOUR);
+    expect(fresh?.fuelExpiresMs).toBe(NOW + 100 * HOUR_MS);
+    expect(stale?.fuelExpiresMs).toBe(NOW - 2 * DAY_MS + 100 * HOUR_MS);
     const view = build(ok(feed));
     expect(view.table?.rows.find((r) => r.key === '1')?.tone).toBe('clear');
   });
 
   it('reads an ended reinforcement as ended, never as out of fuel', () => {
     const view = build(
-      ok(feedOf([tower({ state: 'reinforced', bay: null, reinforcedUntilMs: NOW - HOUR })]))
+      ok(feedOf([tower({ state: 'reinforced', bay: null, reinforcedUntilMs: NOW - HOUR_MS })]))
     );
     expect(view.table?.rows[0]?.cells[5]).toBe('overview.widgets.corpStarbases.reinforceEnded');
   });
@@ -184,7 +183,7 @@ describe('per-tower read time', () => {
         feedOf([
           tower({
             state: 'reinforced',
-            reinforcedUntilMs: NOW + DAY,
+            reinforcedUntilMs: NOW + DAY_MS,
             bay: { fuelBlocks: 0, strontium: 1234 },
           }),
         ])
@@ -201,12 +200,12 @@ describe('toBoardStarbases', () => {
         [
           tower({
             bay: { fuelBlocks: 400, strontium: 0 },
-            reinforcedUntilMs: NOW + DAY,
-            bayReadAtMs: NOW - HOUR,
+            reinforcedUntilMs: NOW + DAY_MS,
+            bayReadAtMs: NOW - HOUR_MS,
           }),
         ],
         {
-          fetchedAt: new Date(NOW - HOUR),
+          fetchedAt: new Date(NOW - HOUR_MS),
         }
       ),
       NOW
@@ -214,8 +213,8 @@ describe('toBoardStarbases', () => {
     expect(source).toEqual({
       starbaseId: 1,
       name: 'Caldari Control Tower (Efa)',
-      fuelExpiresMs: NOW - HOUR + 10 * HOUR,
-      reinforcedUntilMs: NOW + DAY,
+      fuelExpiresMs: NOW - HOUR_MS + 10 * HOUR_MS,
+      reinforcedUntilMs: NOW + DAY_MS,
       unanchorsAtMs: null,
     });
   });

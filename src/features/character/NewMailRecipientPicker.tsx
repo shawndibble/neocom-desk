@@ -4,15 +4,7 @@
  * picks (Forward's contacts) and ESI search hits for characters,
  * corporations and alliances.
  */
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantNote } from '@/app/GrantNote';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
@@ -23,7 +15,8 @@ import { isOfflineFailure } from '@/esi/client';
 import { cx } from '@/lib/cx';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { LOOKUP_DEBOUNCE_MS } from '@/lib/useDebouncedValue';
-import { moveHighlight } from '@/lib/comboboxNav';
+import { COMBOBOX_NAV_KEYS } from '@/lib/comboboxNav';
+import { useCombobox } from '@/lib/useCombobox';
 import { useOnline } from '@/stores/network';
 import {
   MAX_RECIPIENTS,
@@ -76,10 +69,8 @@ export function NewMailRecipientPicker({
   const lacksSearch = useCharacterLacksEndpoints(characterId, SEARCH_ENDPOINTS);
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
-  const [highlight, setHighlight] = useState<number | null>(null);
   const [hits, setHits] = useState<ComposeRecipient[]>([]);
   const [failure, setFailure] = useState<'offline' | 'error' | null>(null);
-  const listboxId = `${useId()}-recipients`;
   const latest = useRef(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const skipNextOpenRef = useRef(false);
@@ -142,11 +133,13 @@ export function NewMailRecipientPicker({
     return Array.from(new Map(merged.map((c) => [recipientKey(c), c])).values());
   }, [listsState.lists, hits, query, trimmed, recipients, searchable, quickPicks]);
 
+  const combo = useCombobox({ count: candidates.length, open: open && !full });
+
   function pick(candidate: ComposeRecipient) {
     onAdd(candidate);
     setQuery('');
     setHits([]);
-    setHighlight(null);
+    combo.reset();
     setOpen(false);
   }
 
@@ -161,13 +154,15 @@ export function NewMailRecipientPicker({
     }
     if (e.key === 'Enter') {
       e.preventDefault();
-      if (highlight !== null && candidates[highlight]) pick(candidates[highlight]);
+      if (combo.highlight !== null && candidates[combo.highlight])
+        pick(candidates[combo.highlight]);
       return;
     }
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Home' || e.key === 'End') {
+    if (combo.handleNavKey(e)) setOpen(true);
+    else if (COMBOBOX_NAV_KEYS.includes(e.key)) {
+      // An empty list still opens, to show why it is empty.
       e.preventDefault();
       setOpen(true);
-      setHighlight((cur) => moveHighlight(e.key as 'ArrowDown', cur, candidates.length));
     }
   }
 
@@ -214,13 +209,7 @@ export function NewMailRecipientPicker({
         <TextInput
           id={inputId}
           ref={inputRef}
-          role="combobox"
-          aria-autocomplete="list"
-          aria-expanded={open && !full}
-          aria-controls={listboxId}
-          aria-activedescendant={
-            highlight !== null ? `${listboxId}-option-${highlight}` : undefined
-          }
+          {...combo.inputProps}
           aria-invalid={invalid}
           aria-describedby={describedBy}
           placeholder={
@@ -234,7 +223,7 @@ export function NewMailRecipientPicker({
             setQuery(e.target.value);
             setFailure(null);
             setOpen(true);
-            setHighlight(null);
+            combo.reset();
           }}
           onFocus={() => {
             if (skipNextOpenRef.current) {
@@ -255,17 +244,16 @@ export function NewMailRecipientPicker({
           {open &&
             !full &&
             candidates.length > 0 &&
-            (highlight !== null && candidates[highlight]
+            (combo.highlight !== null && candidates[combo.highlight]
               ? t('mail.recipientHighlighted', {
                   count: candidates.length,
-                  name: candidates[highlight].name,
+                  name: candidates[combo.highlight].name,
                 })
               : t('mail.recipientResultsCount', { count: candidates.length }))}
         </span>
         {open && !full && (
           <ul
-            id={listboxId}
-            role="listbox"
+            {...combo.listboxProps}
             aria-label={t('mail.addRecipient')}
             className="absolute top-full right-0 left-0 z-10 mt-1 max-h-56 overflow-y-auto rounded-xs border border-line bg-panel shadow-lg"
           >
@@ -275,14 +263,14 @@ export function NewMailRecipientPicker({
               candidates.map((c, i) => (
                 <li
                   key={recipientKey(c)}
-                  id={`${listboxId}-option-${i}`}
-                  role="option"
-                  aria-selected={highlight === i}
+                  {...combo.optionProps(i)}
                   className={cx(
                     'flex min-h-9 cursor-pointer items-center gap-2 px-3 py-1 text-xs text-text md:min-h-0 touch:min-h-9',
-                    highlight === i ? `bg-panel-2 ${activeOptionClassName}` : 'hover:bg-panel-2'
+                    i === combo.activeIndex
+                      ? `bg-panel-2 ${activeOptionClassName}`
+                      : 'hover:bg-panel-2'
                   )}
-                  onMouseEnter={() => setHighlight(i)}
+                  onMouseEnter={() => combo.setHighlight(i)}
                   // Keeps the input focused; a click would blur it first and close the list.
                   onMouseDown={(e) => {
                     e.preventDefault();
