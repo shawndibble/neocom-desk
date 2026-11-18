@@ -7790,6 +7790,8 @@
     },
     "info": {
       "title": "Additional information",
+      "show": "Show additional information",
+      "hide": "Hide additional information",
       "location": "Location",
       "locationPlaceholder": "System, station or structure",
       "setWaypoint": "Set waypoint",

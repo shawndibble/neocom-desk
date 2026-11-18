@@ -83,6 +83,7 @@ const OTHER_ROUTE_TITLE_KEYS: Record<string, readonly string[]> = {
   '/error': ['error.title'],
   '/s/:shareId': ['share.title'],
   '/share/:shareId': ['share.title'],
+  '/survey': ['survey.start.title'],
   '/communities/join/:code': ['communities.join.title'],
   '/corp-tax-book/verify/:token': ['corpTaxBook.verify.title'],
   '/corp-tax-book/remove-now/:code': ['corpTaxBook.removeNow.title'],

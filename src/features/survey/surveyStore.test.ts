@@ -16,6 +16,7 @@ import {
   setSurveyTax,
   startSurvey,
 } from './surveyStore';
+import { ensureAnySession } from '@/sync/syncAuth';
 
 const { addDoc, updateDoc, getDocs, loadShare, saveShare, FakeTimestamp } = vi.hoisted(() => {
   class FakeTimestamp {
@@ -474,6 +475,21 @@ describe('ignored scans', () => {
         createdAt: 'SERVER_TIME',
         expiresAt: FakeTimestamp.fromMillis(EXPIRES),
       }
+    );
+  });
+
+  it('stores one for the visitor who started the survey with no account, asking for no session', async () => {
+    vi.mocked(ensureAnySession).mockClear();
+    await setSurveyScanIgnored({
+      id: 'abc123XYZ',
+      expiresAt: EXPIRES,
+      scanId: 'scan1',
+      ignored: true,
+    });
+    expect(ensureAnySession).not.toHaveBeenCalled();
+    expect(addDoc).toHaveBeenCalledWith(
+      { path: 'shares/abc123XYZ/surveyIgnores' },
+      expect.objectContaining({ scanId: 'scan1', ignored: true })
     );
   });
 
