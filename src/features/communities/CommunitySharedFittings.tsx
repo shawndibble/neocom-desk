@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -14,6 +14,7 @@ import { uidForCharacter } from '@/sync/uid';
 import type { CommunityMember } from './communityStore';
 import { ROW_LIMIT } from './shareLists';
 import { loadCommunityFittings } from './sharedFittings';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useReportMineCount } from './useTabSharing';
 
 type State =
@@ -39,25 +40,21 @@ export function CommunitySharedFittings({
   onMineCount?: (count: number) => void;
 }) {
   const { t } = useTranslation();
-  const [state, setState] = useState<State>({ status: 'loading' });
+  const load = useCallback(
+    () => loadCommunityFittings(characterId, communityId),
+    [characterId, communityId]
+  );
+  const loaded = useKeyedLoad(`${characterId}:${communityId}`, load);
+  const state = useMemo<State>(
+    () =>
+      loaded.status === 'ready'
+        ? { status: 'ready', fittings: loaded.data }
+        : { status: loaded.status === 'failed' ? 'failed' : 'loading' },
+    [loaded.status, loaded.data]
+  );
   const [query, setQuery] = useState('');
   const myUid = uidForCharacter(characterId);
   useReportMineCount(state.status === 'ready' ? state.fittings : null, myUid, onMineCount);
-
-  useEffect(() => {
-    let cancelled = false;
-    loadCommunityFittings(characterId, communityId).then(
-      (fittings) => {
-        if (!cancelled) setState({ status: 'ready', fittings });
-      },
-      () => {
-        if (!cancelled) setState({ status: 'failed' });
-      }
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId, communityId]);
 
   const names = useMemo(
     () => new Map((members ?? []).map((member) => [member.uid, member.characterName])),

@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import {
@@ -35,6 +35,7 @@ import {
 } from './buybackDraft';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { LocationPicker } from './LocationPicker';
 import { callableErrorReason } from './callableError';
 import { RequestNotifyChoice } from './RequestNotifyChoice';
@@ -153,8 +154,9 @@ export function ComposeRequestDialog({
   const [removed, setRemoved] = useState<ReadonlySet<string>>(new Set());
   const [search, setSearch] = useState('');
   const [announce, setAnnounce] = useState<{ text: string; key: number }>({ text: '', key: 0 });
-  const [catalogue, setCatalogue] = useState<AppraisalCatalogue | null>(null);
-  const [catalogueFailed, setCatalogueFailed] = useState(false);
+  const catalogueLoad = useAsyncLoad(loadAppraisalCatalogue);
+  const catalogue: AppraisalCatalogue | null = catalogueLoad.data ?? null;
+  const catalogueFailed = catalogueLoad.status === 'failed';
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notify, setNotify] = useState<RequestNotify>(editing?.request.notify ?? DEFAULT_NOTIFY);
@@ -165,17 +167,6 @@ export function ComposeRequestDialog({
     editing?.request.standing ? draftFromStanding(editing.request.standing) : emptyBuybackDraft()
   );
   const standing = standingMode ? draftToStanding(buyback) : null;
-
-  useEffect(() => {
-    let cancelled = false;
-    loadAppraisalCatalogue().then(
-      (loaded) => !cancelled && setCatalogue(loaded),
-      () => !cancelled && setCatalogueFailed(true)
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const matches = useMemo(
     () =>

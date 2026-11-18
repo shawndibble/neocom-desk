@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { buildPlaceIndex, type PlaceIndex } from '@/engine/communities/requestPlaces';
 import { loadMarketRegions } from '@/sde/loadMarketSde';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
@@ -24,16 +24,8 @@ function loadPlaceIndex(): Promise<PlaceIndex | null> {
 
 /** The place index, read once `enabled`. Shared by the compose picker and the distance filter. */
 export function usePlaceIndex(enabled = true): PlaceIndexState {
-  const [state, setState] = useState<PlaceIndexState>({ status: 'loading' });
-  useEffect(() => {
-    if (!enabled) return;
-    let cancelled = false;
-    loadPlaceIndex().then((index) => {
-      if (!cancelled) setState(index ? { status: 'ready', index } : { status: 'failed' });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [enabled]);
-  return state;
+  const loaded = useKeyedLoad('places', loadPlaceIndex, !enabled);
+  if (loaded.status === 'ready')
+    return loaded.data ? { status: 'ready', index: loaded.data } : { status: 'failed' };
+  return loaded.status === 'failed' ? { status: 'failed' } : { status: 'loading' };
 }
