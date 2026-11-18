@@ -152,6 +152,22 @@ export function selectTriggerClassName(size: ControlSize): string {
 export const tappableRowClassName = 'min-h-9 md:min-h-7 touch:min-h-9';
 
 /**
+ * The listbox surface of a typeahead picker that drops below its input
+ * (DESIGN.md §6c "Search picker"): an absolute card the width of the field.
+ * Pair it with `suggestionOptionClassName` rows.
+ */
+export const suggestionPopupClassName =
+  'absolute z-20 mt-1 w-full overflow-hidden rounded-xs border border-line-bright bg-panel shadow-lg';
+
+/** One plain-text row of that popup; the active row takes the accent edge and bold. */
+export const suggestionOptionClassName = (active: boolean) =>
+  cx(
+    tappableRowClassName,
+    'flex cursor-pointer items-center border-l-2 px-3 text-sm',
+    active ? 'border-accent bg-panel-2 font-semibold' : 'border-transparent hover:bg-panel-2'
+  );
+
+/**
  * A native checkbox or radio is 16px, and a pseudo-element on it is not an
  * option (Firefox draws none on native form controls). Its 36px touch target
  * is the label that wraps it instead: this is that label's class. Used where a

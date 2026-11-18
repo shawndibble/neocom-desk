@@ -9,10 +9,9 @@
 import { useEffect, useId, useMemo, useState, type KeyboardEvent, type Ref } from 'react';
 import { Button, LiveStatus, TextInput } from '@/components/ui';
 import { useTranslation } from 'react-i18next';
-import { tappableRowClassName } from '@/components/ui/controlStyles';
-import { COMBOBOX_NAV_KEYS, moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
-import { cx } from '@/lib/cx';
+import { suggestionOptionClassName, suggestionPopupClassName } from '@/components/ui/controlStyles';
 import { rankedSearch } from '@/lib/rankedSearch';
+import { useCombobox } from '@/lib/useCombobox';
 import { useRetryableLoad } from '@/lib/useRetryableLoad';
 import { loadMarketTypes } from '@/sde/loadMarketSde';
 import type { MarketTypeEntry } from '@/sde/marketTypes';
@@ -46,10 +45,8 @@ export function MarketTypePicker({
 }) {
   const { t } = useTranslation();
   const id = useId();
-  const listId = `${id}-results`;
   const [types, setTypes] = useState<readonly MarketTypeEntry[]>([]);
   const [query, setQuery] = useState('');
-  const [highlight, setHighlight] = useState<number | null>(null);
 
   // The catalogue is a lazy download, so offline it may be missing: say so.
   const {
@@ -75,14 +72,6 @@ export function MarketTypePicker({
     };
   }, [typesAttempt, failTypes, clearTypesFailure]);
 
-  // Start over when the caller bumps `resetKey` (adjusted during render, not in an effect).
-  const [seenResetKey, setSeenResetKey] = useState(resetKey);
-  if (seenResetKey !== resetKey) {
-    setSeenResetKey(resetKey);
-    setQuery('');
-    setHighlight(null);
-  }
-
   const matches = useMemo(
     () =>
       picked
@@ -91,20 +80,27 @@ export function MarketTypePicker({
     [types, query, picked]
   );
   const open = matches.length > 0;
+  const combo = useCombobox({ count: matches.length, open });
+
+  // Start over when the caller bumps `resetKey` (adjusted during render, not in an effect).
+  const [seenResetKey, setSeenResetKey] = useState(resetKey);
+  if (seenResetKey !== resetKey) {
+    setSeenResetKey(resetKey);
+    setQuery('');
+    combo.reset();
+  }
 
   function choose(type: MarketTypeEntry) {
     setQuery(type.name);
-    setHighlight(null);
+    combo.reset();
     onPick(type);
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (COMBOBOX_NAV_KEYS.includes(event.key)) {
+    if (combo.handleNavKey(event)) return;
+    if (event.key === 'Enter' && open) {
       event.preventDefault();
-      setHighlight(moveHighlight(event.key as ComboboxNavKey, highlight, matches.length));
-    } else if (event.key === 'Enter' && open) {
-      event.preventDefault();
-      choose(matches[highlight ?? 0]);
+      choose(matches[combo.highlight ?? 0]);
     } else if (event.key === 'Escape' && open) {
       // Closes the list, not the dialog.
       event.preventDefault();
@@ -121,11 +117,7 @@ export function MarketTypePicker({
       <TextInput
         ref={inputRef}
         id={`${id}-search`}
-        role="combobox"
-        aria-expanded={open}
-        aria-controls={listId}
-        aria-autocomplete="list"
-        aria-activedescendant={highlight === null ? undefined : `${listId}-${highlight}`}
+        {...combo.inputProps}
         autoComplete="off"
         spellCheck={false}
         aria-invalid={invalid || undefined}
@@ -135,7 +127,7 @@ export function MarketTypePicker({
         placeholder={placeholder}
         onChange={(event) => {
           setQuery(event.target.value);
-          setHighlight(null);
+          combo.reset();
           onPick(null);
         }}
         onKeyDown={onKeyDown}
@@ -158,25 +150,16 @@ export function MarketTypePicker({
       {/* Always mounted, so the failure is announced when it appears (DESIGN.md §7). */}
       <LiveStatus>{typesFailed ? unavailableText : null}</LiveStatus>
       <ul
-        id={listId}
-        role="listbox"
+        {...combo.listboxProps}
         aria-label={label}
         hidden={!open}
-        className="absolute z-20 mt-1 w-full overflow-hidden rounded-xs border border-line-bright bg-panel shadow-lg"
+        className={suggestionPopupClassName}
       >
         {matches.map((type, index) => (
           <li
             key={type.typeId}
-            id={`${listId}-${index}`}
-            role="option"
-            aria-selected={index === highlight}
-            className={cx(
-              tappableRowClassName,
-              'flex cursor-pointer items-center border-l-2 px-3 text-sm',
-              index === highlight
-                ? 'border-accent bg-panel-2 font-semibold'
-                : 'border-transparent hover:bg-panel-2'
-            )}
+            {...combo.optionProps(index)}
+            className={suggestionOptionClassName(index === combo.activeIndex)}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => choose(type)}
           >
