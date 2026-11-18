@@ -5,12 +5,13 @@ import { idSetKey } from '@/lib/idSetKey';
  * journal when the victim is the active Character. Sits in Pilot Lookup's
  * loss-row expansion.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { computeNetLoss, matchInsurance, type LossInsurance } from '@/engine/losses/netLoss';
 import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import { loadWalletJournal } from '@/features/character/wallet';
 import { formatIsk } from '@/lib/isk';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import type { KillmailDetail } from '@/lib/zkillboard';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
@@ -32,9 +33,6 @@ export function LossSummary({ detail, zkbValue }: LossSummaryProps) {
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const mutaplasmids = useMutaplasmidLookup();
-  const [prices, setPrices] = useState<ReadonlyMap<number, number | null> | null>(null);
-  const [pricesFailed, setPricesFailed] = useState(false);
-  const [payout, setPayout] = useState<Insurance>({ state: 'loading' });
 
   const typeKey = useMemo(() => {
     const ids = new Set([detail.victim.ship_type_id]);
@@ -42,44 +40,40 @@ export function LossSummary({ detail, zkbValue }: LossSummaryProps) {
     return idSetKey(ids);
   }, [detail]);
 
-  useEffect(() => {
-    let cancelled = false;
-    getHubPrices(hub, typeKey.split(',').map(Number))
-      .then((aggregates) => {
-        if (cancelled) return;
+  const loadPrices = useCallback(
+    () =>
+      getHubPrices(hub, typeKey.split(',').map(Number)).then((aggregates) => {
         const map = new Map<number, number | null>();
         for (const [id, aggregate] of aggregates) map.set(id, aggregate?.sellMin ?? null);
-        setPrices(map);
-      })
-      .catch(() => {
-        if (!cancelled) setPricesFailed(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [typeKey]);
+        return map as ReadonlyMap<number, number | null>;
+      }),
+    [typeKey]
+  );
+  const pricesLoad = useKeyedLoad(typeKey, loadPrices);
+  const prices = pricesLoad.data ?? null;
+  const pricesFailed = pricesLoad.status === 'failed';
 
   const isOwnLoss =
     activeCharacterId !== null && detail.victimParty?.characterId === activeCharacterId;
-  useEffect(() => {
-    if (!isOwnLoss || activeCharacterId === null || !detail.time) return;
-    let cancelled = false;
-    const killTime = Date.parse(detail.time);
-    loadWalletJournal(activeCharacterId)
-      .then((result) => {
-        if (cancelled) return;
-        setPayout({
-          state: 'done',
-          value: result === null ? null : matchInsurance(result.data, killTime),
-        });
-      })
-      .catch(() => {
-        if (!cancelled) setPayout({ state: 'failed' });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [isOwnLoss, activeCharacterId, detail.time]);
+  const loadPayout = useCallback(
+    () =>
+      loadWalletJournal(activeCharacterId ?? 0).then((result) =>
+        result === null ? null : matchInsurance(result.data, Date.parse(detail.time ?? ''))
+      ),
+    [activeCharacterId, detail.time]
+  );
+  const payoutLoad = useKeyedLoad(
+    isOwnLoss && activeCharacterId !== null && detail.time
+      ? `${activeCharacterId}:${detail.time}`
+      : null,
+    loadPayout
+  );
+  const payout: Insurance =
+    payoutLoad.status === 'ready'
+      ? { state: 'done', value: payoutLoad.data }
+      : payoutLoad.status === 'failed'
+        ? { state: 'failed' }
+        : { state: 'loading' };
 
   if (pricesFailed) {
     return (
