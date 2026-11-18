@@ -10,9 +10,9 @@ import {
   type ImproveOption,
   type RejectedOption,
 } from '@/engine/fittings/improve';
-import { mergeCandidates } from '@/engine/fittings/improveComplete';
-import { setKey } from '@/engine/fittings/improveKeys';
-import { summariseSelection } from '@/engine/fittings/improveSelection';
+import { mergeCandidates } from '@/engine/fittings/improve';
+import { setKey } from '@/engine/fittings/improve';
+import { summariseSelection } from '@/engine/fittings/improve';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import type { ImproveChoices } from './improveSettings';

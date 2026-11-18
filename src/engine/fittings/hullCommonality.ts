@@ -11,7 +11,7 @@
  * without it is removed or filtered by it. Pure: the caller loads the fits,
  * checks them against today's game data, and injects `groupOf`.
  */
-import { IMPROVE_JOBS as JOBS, type ImproveJob } from './improveJob';
+import { IMPROVE_JOBS as JOBS, type ImproveJob } from './improve';
 
 /** A fit that needs ten matching fits to say anything about the hull. */
 export const MIN_JOB_FITS = 10;

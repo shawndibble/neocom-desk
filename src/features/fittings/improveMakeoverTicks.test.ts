@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ImproveOption } from '@/engine/fittings/improve';
-import { optionKey, toggleTick } from '@/engine/fittings/improveKeys';
+import { optionKey, toggleTick } from '@/engine/fittings/improve';
 import {
   groupTick,
   groupToggleTarget,

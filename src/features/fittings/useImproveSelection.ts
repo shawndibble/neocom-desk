@@ -5,7 +5,7 @@
  */
 import { useMemo, useState } from 'react';
 import type { ImproveOption, ImproveResult } from '@/engine/fittings/improve';
-import { optionKey, toggleTick } from '@/engine/fittings/improveKeys';
+import { optionKey, toggleTick } from '@/engine/fittings/improve';
 import { tickMakeoverRows } from './improveMakeoverTicks';
 
 const NO_TICKS: ReadonlyMap<string, ImproveOption> = new Map();

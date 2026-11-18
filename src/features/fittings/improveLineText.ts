@@ -3,8 +3,8 @@
  * scores, before and after, and why a rejected swap was turned down.
  */
 import type { TFunction } from 'i18next';
-import { commandOf } from '@/engine/fittings/improveCommand';
-import { ewarOf, tackleOf } from '@/engine/fittings/improveTackle';
+import { commandOf } from '@/engine/fittings/improve';
+import { ewarOf, tackleOf } from '@/engine/fittings/improve';
 import {
   effectiveHold,
   remoteRepairOf,
@@ -13,7 +13,7 @@ import {
   type RejectedOption,
   type ImproveOption,
 } from '@/engine/fittings/improve';
-import { alignOf } from '@/engine/fittings/improveFigures';
+import { alignOf } from '@/engine/fittings/improve';
 import type { FittingStats } from '@/engine/fittings/types';
 import { formatIskCompact } from '@/lib/isk';
 import { createNumberFormat } from '@/lib/numberLocale';

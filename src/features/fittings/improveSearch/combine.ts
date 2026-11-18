@@ -4,7 +4,7 @@
  * own figure and the options on neither side.
  */
 import { onlyNeutral, onlySide, type ImproveResult } from '@/engine/fittings/improve';
-import type { DefenseSide } from '@/engine/fittings/improveGroups';
+import type { DefenseSide } from '@/engine/fittings/improve';
 import type { SideSet } from './plan';
 
 export interface Combined {

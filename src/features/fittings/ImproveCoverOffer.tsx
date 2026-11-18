@@ -11,7 +11,7 @@ import {
   tappableRowClassName,
 } from '@/components/ui/controlStyles';
 import type { ImproveOption, RejectedOption } from '@/engine/fittings/improve';
-import { optionKey } from '@/engine/fittings/improveKeys';
+import { optionKey } from '@/engine/fittings/improve';
 import { cx } from '@/lib/cx';
 import { iskLine } from './improveChangeLines';
 import type { ImproveLabels } from './useImproveLabels';

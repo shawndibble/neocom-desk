@@ -1,8 +1,8 @@
 /** A small Makeover for the component test and the stories: the PvE Drake from #5548. */
 import { baseFittingStats } from '@/engine/fittings/__fixtures__/fittingStats';
 import type { ImproveCandidate } from '@/engine/fittings/improve';
-import { moveKey } from '@/engine/fittings/improveKeys';
-import type { Makeover } from '@/engine/fittings/improveMakeover';
+import { moveKey } from '@/engine/fittings/improve';
+import type { Makeover } from '@/engine/fittings/improve';
 import type { Fitting, FittingSlotKind, FittingStats } from '@/engine/fittings/types';
 
 const NAMES: Record<number, string> = {

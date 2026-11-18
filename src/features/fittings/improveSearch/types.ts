@@ -7,10 +7,10 @@ import type {
   ImproveReach,
   ImproveResult,
 } from '@/engine/fittings/improve';
-import type { Makeover } from '@/engine/fittings/improveMakeover';
-import type { ChargeLoadStep } from '@/engine/fittings/improveCharges';
-import type { ExploreSpace, ImproveJob } from '@/engine/fittings/improveJob';
-import type { HullRef } from '@/engine/fittings/improveRole';
+import type { Makeover } from '@/engine/fittings/improve';
+import type { ChargeLoadStep } from '@/engine/fittings/improve';
+import type { ExploreSpace, ImproveJob } from '@/engine/fittings/improve';
+import type { HullRef } from '@/engine/fittings/improve';
 import type { HullCommonality } from '@/engine/fittings/hullCommonality';
 import type { FitSwap, Resource } from '@/engine/fittings/makeItFit';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';

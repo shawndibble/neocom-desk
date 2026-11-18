@@ -5,7 +5,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { applyImproveCandidate, type ImproveOption } from '@/engine/fittings/improve';
-import { optionKey, setKey, withHovered } from '@/engine/fittings/improveKeys';
+import { optionKey, setKey, withHovered } from '@/engine/fittings/improve';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { diffFittingStats, type FittingStatsDelta } from '@/engine/fittings/variationDelta';
 import type { ImproveSearch } from './useImprove';
