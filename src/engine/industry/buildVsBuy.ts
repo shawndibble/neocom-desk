@@ -99,7 +99,8 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
     te,
     modifiers,
     ctx,
-    blueprint.skills
+    blueprint.skills,
+    blueprint.rigScope
   );
   const fee = jobFee(
     estimatedItemValue(blueprint, runs, adjustedPrices),

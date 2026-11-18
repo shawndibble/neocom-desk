@@ -7,6 +7,7 @@
  */
 import type { BlueprintSkillRequirement, FacilityContext } from '@/engine/industry/types';
 import { rigBonusPct } from '@/engine/industry/types';
+import type { ProductRigScope } from '@/engine/industry/rigScope';
 import { jobTimeMultiplier, type CharacterModifiers } from '@/engine/industry/characterModifiers';
 
 /** Combined time multiplier for TE level + Character Modifiers + facility + rig. */
@@ -14,7 +15,8 @@ export function timeModifier(
   te: number,
   modifiers: CharacterModifiers,
   ctx: FacilityContext,
-  blueprintSkills?: readonly BlueprintSkillRequirement[]
+  blueprintSkills?: readonly BlueprintSkillRequirement[],
+  productScope?: ProductRigScope
 ): number {
   if (!Number.isInteger(te) || te < 0 || te > 20) {
     throw new RangeError(`TE must be an integer 0..20, got ${te}`);
@@ -22,7 +24,7 @@ export function timeModifier(
   // Reactor rigs scale by security band on a different table than
   // manufacturing rigs (issue #460); `rigBonusPct` picks it by activity.
   const rigPct = ctx.facility.structure
-    ? rigBonusPct(ctx.rigFit, 'te', ctx.facility.activity, ctx.security)
+    ? rigBonusPct(ctx.rigFit, 'te', ctx.facility.activity, ctx.security, productScope)
     : 0;
   return (
     (1 - te / 100) *
@@ -39,10 +41,11 @@ export function jobDurationSeconds(
   te: number,
   modifiers: CharacterModifiers,
   ctx: FacilityContext,
-  blueprintSkills?: readonly BlueprintSkillRequirement[]
+  blueprintSkills?: readonly BlueprintSkillRequirement[],
+  productScope?: ProductRigScope
 ): number {
   if (!Number.isInteger(runs) || runs < 1) {
     throw new RangeError(`runs must be an integer >= 1, got ${runs}`);
   }
-  return baseTimePerRun * runs * timeModifier(te, modifiers, ctx, blueprintSkills);
+  return baseTimePerRun * runs * timeModifier(te, modifiers, ctx, blueprintSkills, productScope);
 }
