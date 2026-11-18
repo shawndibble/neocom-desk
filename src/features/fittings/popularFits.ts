@@ -8,7 +8,8 @@
  * zKillboard" badges (#2486) ask for the same hull's losses as the zKillboard
  * tab, and must never fetch them a second time.
  */
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { groupPopularFits, type HullLoss, type PopularFit } from '@/engine/fittings/popularFits';
 import { getKillmail } from '@/esi/endpoints';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
@@ -101,15 +102,6 @@ export function usePopularFits(
   shipTypeId: number,
   load: (shipTypeId: number) => Promise<PopularFitsResult>
 ): PopularFitsResult | null {
-  const [state, setState] = useState<{ typeId: number; result: PopularFitsResult } | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    void load(shipTypeId).then((result) => {
-      if (!cancelled) setState({ typeId: shipTypeId, result });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [shipTypeId, load]);
-  return state?.typeId === shipTypeId ? state.result : null;
+  const loadFor = useCallback(() => load(shipTypeId), [load, shipTypeId]);
+  return useAsyncLoad(loadFor).data ?? null;
 }

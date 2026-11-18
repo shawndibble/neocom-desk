@@ -5,7 +5,8 @@
  * weather and what is projected on it — so a charge's figures match the
  * stats headline.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import type { DamageProfile, PilotProfile } from '@/engine/fittings/types';
 import type { ChargeBasis } from './dogmaFittingEngine';
 import { pilotUnder, statsOptions, type StatsConditions } from './statsConditions';
@@ -21,22 +22,12 @@ export function useChargeBasis(
     [pilot, conditions]
   );
   // All V loads the skill list first, so the pilot arrives a tick later.
-  const [loaded, setLoaded] = useState<{
-    source: Promise<PilotProfile>;
-    pilot: PilotProfile;
-  } | null>(null);
-  useEffect(() => {
-    if (!(under instanceof Promise)) return;
-    let cancelled = false;
-    void under.then((resolved) => {
-      if (!cancelled) setLoaded({ source: under, pilot: resolved });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [under]);
-  const underPilot =
-    under instanceof Promise ? (loaded?.source === under ? loaded.pilot : null) : under;
+  const loadUnder = useCallback(
+    () => (under instanceof Promise ? under : Promise.resolve(null)),
+    [under]
+  );
+  const loaded = useAsyncLoad(loadUnder).data ?? null;
+  const underPilot = under instanceof Promise ? loaded : under;
 
   return useMemo(() => {
     if (underPilot === null || damageProfile === null) return null;

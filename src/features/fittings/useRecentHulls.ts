@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { decodeFittingShare } from '@/engine/fittings/fittingShare';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { useSavedFittingRecords } from './useSavedFittingRecords';
+
+const NO_HULLS: number[] = [];
 
 /** Each hull once, by its most recent save, newest first; at most `limit`. */
 export function recentHullIds(
@@ -21,29 +24,19 @@ export function recentHullIds(
  */
 export function useRecentHullIds(characterId: number | null, limit = 5): number[] {
   const records = useSavedFittingRecords(characterId);
-  const [found, setFound] = useState<{ records: typeof records; ids: number[] }>({
-    records: undefined,
-    ids: [],
-  });
-  useEffect(() => {
-    if (!records) return;
-    let cancelled = false;
-    void (async () => {
-      // Newest first, decoding only until `limit` distinct hulls are found.
-      const saved: { hullTypeId: number; updatedAt: number }[] = [];
-      for (const record of [...records].sort((a, b) => b.updatedAt - a.updatedAt)) {
-        const decoded = await decodeFittingShare(record.code).catch(() => null);
-        if (decoded?.ok) {
-          saved.push({ hullTypeId: decoded.value.hullTypeId, updatedAt: record.updatedAt });
-          if (recentHullIds(saved, limit).length === limit) break;
-        }
+  const load = useCallback(async () => {
+    if (!records) return [];
+    // Newest first, decoding only until `limit` distinct hulls are found.
+    const saved: { hullTypeId: number; updatedAt: number }[] = [];
+    for (const record of [...records].sort((a, b) => b.updatedAt - a.updatedAt)) {
+      const decoded = await decodeFittingShare(record.code).catch(() => null);
+      if (decoded?.ok) {
+        saved.push({ hullTypeId: decoded.value.hullTypeId, updatedAt: record.updatedAt });
+        if (recentHullIds(saved, limit).length === limit) break;
       }
-      if (!cancelled) setFound({ records, ids: recentHullIds(saved, limit) });
-    })();
-    return () => {
-      cancelled = true;
-    };
+    }
+    return recentHullIds(saved, limit);
   }, [records, limit]);
   // Another Character's list, or a stale one, never shows while this one decodes.
-  return found.records === records ? found.ids : [];
+  return useAsyncLoad(load).data ?? NO_HULLS;
 }

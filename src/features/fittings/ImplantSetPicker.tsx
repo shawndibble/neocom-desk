@@ -55,6 +55,7 @@ import type { Fitting, FittingImplantSet, PilotProfile } from '@/engine/fittings
 import { loadItemNameMap } from '@/features/skills/typeCatalog';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { loadImplantMarketEntries } from './implantSlotLookup';
 import { loadImplantCatalog } from './useImplantFinder';
 import { guarded } from '@/app/routeChunks';
@@ -137,6 +138,11 @@ function SideEffectSwitches({
   );
 }
 
+const NO_ENTRIES: readonly ImplantEntry[] = [];
+
+const loadSuggestionEntries = () =>
+  loadImplantMarketEntries().then((loaded) => [...loaded.implants, ...loaded.boosters]);
+
 /** Suggestions shown under the box while typing. */
 const SUGGESTION_LIMIT = 8;
 
@@ -151,19 +157,8 @@ function AddItemForm({ onAdd, error }: { onAdd: (name: string) => void; error: s
   const [query, setQuery] = useState('');
   /** False once the list is dismissed (Escape, a pick, leaving the box); typing opens it again. */
   const [listOpen, setListOpen] = useState(true);
-  const [entries, setEntries] = useState<readonly ImplantEntry[]>([]);
-  useEffect(() => {
-    let live = true;
-    void loadImplantMarketEntries().then(
-      (loaded) => {
-        if (live) setEntries([...loaded.implants, ...loaded.boosters]);
-      },
-      () => undefined // no suggestions; a typed full name still adds
-    );
-    return () => {
-      live = false;
-    };
-  }, []);
+  // No suggestions on failure; a typed full name still adds.
+  const entries = useAsyncLoad(loadSuggestionEntries).data ?? NO_ENTRIES;
   const matches = useMemo(
     () => rankedSearch(entries, query, { primary: (entry) => entry.name, limit: SUGGESTION_LIMIT }),
     [entries, query]
