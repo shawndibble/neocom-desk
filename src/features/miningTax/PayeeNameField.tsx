@@ -1,9 +1,9 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
 import { TextInput } from '@/components/ui';
 import { activeOptionClassName } from '@/components/ui/controlStyles';
-import { moveHighlight } from '@/lib/comboboxNav';
+import { useCombobox } from '@/lib/useCombobox';
 import { cx } from '@/lib/cx';
 import { LOOKUP_DEBOUNCE_MS } from '@/lib/useDebouncedValue';
 import {
@@ -52,11 +52,9 @@ export function PayeeNameField({
   kinds?: readonly PayeeEntityKind[];
 }) {
   const { t } = useTranslation();
-  const listboxId = useId();
   const canSearch = useEndpointsGranted(SEARCH_ENDPOINTS) === true && characterId !== null;
   const [suggestions, setSuggestions] = useState<PayeeEntityMatch[]>([]);
   const [open, setOpen] = useState(false);
-  const [highlight, setHighlight] = useState<number | null>(null);
   // Only the user's typing asks ESI; a picked or seeded name is already settled.
   const typing = useRef(false);
   // Only the newest search may write results: ESI can answer out of order.
@@ -68,6 +66,8 @@ export function PayeeNameField({
       : kinds
         ? suggestions.filter((match) => kinds.includes(match.kind))
         : suggestions;
+  const listOpen = open && shown.length > 0;
+  const combo = useCombobox({ count: shown.length, open: listOpen });
 
   useEffect(() => {
     if (!typing.current || trimmed.length < MIN_PAYEE_SEARCH_LENGTH) return;
@@ -98,34 +98,26 @@ export function PayeeNameField({
     latest.current++;
     setSuggestions([]);
     setOpen(false);
-    setHighlight(null);
+    combo.reset();
     onPick(match);
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Escape') {
       setOpen(false);
-      setHighlight(null);
+      combo.reset();
       return;
     }
     if (e.key === 'Enter') {
-      const picked = highlight === null ? undefined : shown[highlight];
+      const picked = combo.highlight === null ? undefined : shown[combo.highlight];
       if (open && picked) {
         e.preventDefault();
         choose(picked);
       }
       return;
     }
-    const key = e.key;
-    if (key === 'ArrowDown' || key === 'ArrowUp' || key === 'Home' || key === 'End') {
-      if (shown.length === 0) return;
-      e.preventDefault();
-      setOpen(true);
-      setHighlight((current) => moveHighlight(key, current, shown.length));
-    }
+    if (combo.handleNavKey(e)) setOpen(true);
   }
-
-  const listOpen = open && shown.length > 0;
 
   return (
     <div className={cx('relative', className)}>
@@ -134,13 +126,7 @@ export function PayeeNameField({
         size={size}
         aria-label={ariaLabel}
         className="w-full"
-        role="combobox"
-        aria-autocomplete="list"
-        aria-expanded={listOpen}
-        aria-controls={listOpen ? listboxId : undefined}
-        aria-activedescendant={
-          listOpen && highlight !== null ? `${listboxId}-option-${highlight}` : undefined
-        }
+        {...combo.inputProps}
         autoComplete="off"
         value={value}
         placeholder={placeholder ?? t('miningTax.payeeNamePlaceholder')}
@@ -149,7 +135,7 @@ export function PayeeNameField({
           latest.current++;
           setSuggestions([]);
           setOpen(true);
-          setHighlight(null);
+          combo.reset();
           onChange(e.target.value);
         }}
         onFocus={() => setOpen(true)}
@@ -161,23 +147,20 @@ export function PayeeNameField({
       />
       {listOpen && (
         <ul
-          id={listboxId}
-          role="listbox"
+          {...combo.listboxProps}
           aria-label={t('miningTax.payees.verify.suggestionsLabel')}
           className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-xs border border-line bg-panel shadow-lg"
         >
           {shown.map((match, i) => (
             <li
               key={`${match.kind}-${match.id}`}
-              id={`${listboxId}-option-${i}`}
-              role="option"
-              aria-selected={highlight === i}
+              {...combo.optionProps(i)}
               className={cx(
                 'flex cursor-pointer items-baseline justify-between gap-2 px-3 py-1.5 text-xs text-text',
                 'hover:bg-panel-2',
-                highlight === i && `bg-panel-2 ${activeOptionClassName}`
+                i === combo.activeIndex && `bg-panel-2 ${activeOptionClassName}`
               )}
-              onMouseEnter={() => setHighlight(i)}
+              onMouseEnter={() => combo.setHighlight(i)}
               // Keeps the input focused — a plain click would blur it first and close the list.
               onMouseDown={(e) => {
                 e.preventDefault();

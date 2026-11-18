@@ -17,7 +17,7 @@ import { tappableRowClassName } from '@/components/ui/controlStyles';
 import type { StockTarget } from '@/engine/stockTargets/stockLists';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { MIN_STRUCTURE_SEARCH_LENGTH, searchStructures } from '@/features/survey/surveyPlaces';
-import { COMBOBOX_NAV_KEYS, moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
+import { useCombobox } from '@/lib/useCombobox';
 import { cx } from '@/lib/cx';
 import { LOOKUP_DEBOUNCE_MS } from '@/lib/useDebouncedValue';
 import { rankedSearch } from '@/lib/rankedSearch';
@@ -61,11 +61,9 @@ function MarketPlacePicker({
   onPick: (place: PlaceOption) => void;
 }) {
   const { t } = useTranslation();
-  const listId = useId();
   const granted = useGrantedScopes();
   const [query, setQuery] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const [highlight, setHighlight] = useState<number | null>(null);
   const [selling, setSelling] = useState<SellLocation[]>([]);
   const [stations, setStations] = useState<readonly NpcStationEntry[]>([]);
   const [structureHits, setStructureHits] = useState<{ key: string; places: PlaceOption[] } | null>(
@@ -141,19 +139,22 @@ function MarketPlacePicker({
     return { sellingNow, others };
   }, [selling, stations, typed, structureHits, searchKey]);
   const options = [...sellingNow, ...others];
+  const showList = open && options.length > 0;
+  // Enter picks what is highlighted, so something always is while the list shows.
+  const combo = useCombobox({ count: options.length, open: showList, fallback: 0 });
+  const active = combo.activeIndex;
+  const listId = combo.listboxProps.id;
 
   function choose(place: PlaceOption) {
     onPick(place);
     setQuery(null);
     setOpen(false);
-    setHighlight(null);
+    combo.reset();
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (COMBOBOX_NAV_KEYS.includes(event.key)) {
-      event.preventDefault();
+    if (combo.handleNavKey(event)) {
       setOpen(true);
-      setHighlight(moveHighlight(event.key as ComboboxNavKey, active, options.length));
     } else if (event.key === 'Enter' && active !== null) {
       event.preventDefault();
       choose(options[active]);
@@ -166,13 +167,11 @@ function MarketPlacePicker({
     }
   }
 
-  const showList = open && options.length > 0;
-  // Enter picks what is highlighted, so something always is while the list shows.
-  const active = showList ? Math.min(highlight ?? 0, options.length - 1) : null;
+  const activeId = active === null ? null : combo.optionId(active);
   useEffect(() => {
-    if (active === null) return;
-    document.getElementById(`${listId}-${active}`)?.scrollIntoView({ block: 'nearest' });
-  }, [active, listId]);
+    if (activeId === null) return;
+    document.getElementById(activeId)?.scrollIntoView({ block: 'nearest' });
+  }, [activeId]);
   const group = (key: string, text: string, places: PlaceOption[], offset: number) => (
     <li role="presentation">
       <ul role="group" aria-labelledby={`${listId}-${key}`}>
@@ -190,9 +189,7 @@ function MarketPlacePicker({
   const option = (place: PlaceOption, index: number) => (
     <li
       key={place.id}
-      id={`${listId}-${index}`}
-      role="option"
-      aria-selected={index === active}
+      {...combo.optionProps(index)}
       className={cx(
         tappableRowClassName,
         'flex cursor-pointer flex-col justify-center border-l-2 px-3 py-1 text-sm',
@@ -219,11 +216,7 @@ function MarketPlacePicker({
       <TextInput
         ref={inputRef}
         id={inputId}
-        role="combobox"
-        aria-expanded={showList}
-        aria-controls={listId}
-        aria-autocomplete="list"
-        aria-activedescendant={active === null ? undefined : `${listId}-${active}`}
+        {...combo.inputProps}
         aria-invalid={invalid || undefined}
         aria-describedby={describedBy}
         autoComplete="off"
@@ -234,7 +227,7 @@ function MarketPlacePicker({
         onChange={(event) => {
           setQuery(event.target.value);
           setOpen(true);
-          setHighlight(null);
+          combo.reset();
         }}
         onFocus={() => setOpen(true)}
         onBlur={() => {
@@ -244,8 +237,7 @@ function MarketPlacePicker({
         onKeyDown={onKeyDown}
       />
       <ul
-        id={listId}
-        role="listbox"
+        {...combo.listboxProps}
         aria-label={t('stockTargets.list.locationOptions')}
         hidden={!showList}
         // In flow, not a popover: the Modal body scrolls and would clip an absolute list.

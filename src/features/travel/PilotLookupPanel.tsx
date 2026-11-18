@@ -9,7 +9,6 @@
  */
 import {
   useEffect,
-  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -38,7 +37,7 @@ import {
 } from '@/features/character/mailRecipientSearch';
 import { isMultiLine, lineAt, namesOf, replaceLine } from '@/engine/pilotList/nameLines';
 import { classifyPilotPaste, type PilotPaste } from '@/engine/pilotList/parsePilotPaste';
-import { moveHighlight } from '@/lib/comboboxNav';
+import { useCombobox } from '@/lib/useCombobox';
 import { cx } from '@/lib/cx';
 import { LOOKUP_DEBOUNCE_MS } from '@/lib/useDebouncedValue';
 import { useRetryFocus } from '@/lib/useRetryFocus';
@@ -145,13 +144,11 @@ function PilotSearch({
 }) {
   const { t } = useTranslation();
   const touchCtx = useTouchContext();
-  const listboxId = useId();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const canSuggest = useEndpointsGranted(SEARCH_ENDPOINTS) === true && activeCharacterId !== null;
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<PilotSummary[]>([]);
   const [open, setOpen] = useState(false);
-  const [highlight, setHighlight] = useState<number | null>(null);
   const [resolve, setResolve] = useState<ResolveState>({ kind: 'idle' });
   // Only the newest search may write results: ESI can answer out of order.
   const latestSearch = useRef(0);
@@ -185,6 +182,8 @@ function PilotSearch({
   // The name being typed is the caret's line: it alone gets suggestions.
   const trimmed = lineAt(query, caret).text.trim();
   const shown = canSuggest && trimmed.length >= MIN_RECIPIENT_SEARCH_LENGTH ? suggestions : [];
+  const listOpen = open && shown.length > 0;
+  const combo = useCombobox({ count: shown.length, open: listOpen });
 
   useEffect(() => {
     if (!canSuggest || activeCharacterId === null) return;
@@ -228,14 +227,14 @@ function PilotSearch({
       setQuery(next.text);
       setSuggestions([]);
       setOpen(false);
-      setHighlight(null);
+      combo.reset();
       return;
     }
     setQuery(pilot.name);
     seededId.current = pilot.characterId;
     typing.current = false;
     setOpen(false);
-    setHighlight(null);
+    combo.reset();
     setResolve({ kind: 'idle' });
     onSelect(pilot);
   }
@@ -269,7 +268,7 @@ function PilotSearch({
       onList(pasted);
       return;
     }
-    const picked = highlight === null ? undefined : shown[highlight];
+    const picked = combo.highlight === null ? undefined : shown[combo.highlight];
     if (open && picked) choose(picked);
     else void lookUpExactName();
   }
@@ -282,11 +281,11 @@ function PilotSearch({
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Escape') {
       setOpen(false);
-      setHighlight(null);
+      combo.reset();
       return;
     }
     if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
-      const picked = highlight === null ? undefined : shown[highlight];
+      const picked = combo.highlight === null ? undefined : shown[combo.highlight];
       if (open && picked) {
         e.preventDefault();
         choose(picked);
@@ -299,16 +298,9 @@ function PilotSearch({
       }
       return;
     }
-    const key = e.key;
-    if (key === 'ArrowDown' || key === 'ArrowUp' || key === 'Home' || key === 'End') {
-      if (shown.length === 0) return;
-      e.preventDefault();
-      setOpen(true);
-      setHighlight((current) => moveHighlight(key, current, shown.length));
-    }
+    if (combo.handleNavKey(e)) setOpen(true);
   }
 
-  const listOpen = open && shown.length > 0;
   const label = t('travel.pilot.searchLabel');
 
   return (
@@ -320,13 +312,7 @@ function PilotSearch({
               <TextArea
                 ref={areaRef}
                 rows={Math.min(6, Math.max(1, query.split('\n').length))}
-                role="combobox"
-                aria-autocomplete="list"
-                aria-expanded={listOpen}
-                aria-controls={listOpen ? listboxId : undefined}
-                aria-activedescendant={
-                  listOpen && highlight !== null ? `${listboxId}-option-${highlight}` : undefined
-                }
+                {...combo.inputProps}
                 aria-label={label}
                 placeholder={t('travel.pilot.searchPlaceholder')}
                 autoComplete="off"
@@ -339,7 +325,7 @@ function PilotSearch({
                   setCaret(e.target.selectionStart);
                   setSuggestions([]);
                   setOpen(true);
-                  setHighlight(null);
+                  combo.reset();
                   setResolve({ kind: 'idle' });
                 }}
                 onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
@@ -360,23 +346,20 @@ function PilotSearch({
               />
               {listOpen && (
                 <ul
-                  id={listboxId}
-                  role="listbox"
+                  {...combo.listboxProps}
                   aria-label={t('travel.pilot.suggestionsLabel')}
                   className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-xs border border-line bg-panel shadow-lg"
                 >
                   {shown.map((pilot, i) => (
                     <li
                       key={pilot.characterId}
-                      id={`${listboxId}-option-${i}`}
-                      role="option"
-                      aria-selected={highlight === i}
+                      {...combo.optionProps(i)}
                       className={cx(
                         'cursor-pointer px-3 py-1.5 text-xs text-text',
                         'hover:bg-panel-2',
-                        highlight === i && `bg-panel-2 ${activeOptionClassName}`
+                        i === combo.activeIndex && `bg-panel-2 ${activeOptionClassName}`
                       )}
-                      onMouseEnter={() => setHighlight(i)}
+                      onMouseEnter={() => combo.setHighlight(i)}
                       // Keeps the input focused — a plain click would blur it first and close the list.
                       onMouseDown={(e) => {
                         e.preventDefault();
