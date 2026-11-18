@@ -1,5 +1,6 @@
 /**
- * Parity tests: `functions/src` hand-mirrors a few pieces of `src/` (it is a
+ * Parity tests: `functions/src` hand-mirrors a few remaining pieces of `src/`
+ * (the rest live once in `functions/src` and `src` re-exports them; it is a
  * separate package with its own tsconfig and no `@/` alias, so it cannot
  * import them). Each test imports BOTH copies and asserts equal behaviour, so
  * a change to one side that skips the other fails here instead of drifting
