@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from './Button';
 import { Modal } from './Modal';
+import { DialogFooter } from './DialogFooter';
 
 /** A confirm for one action: body text, a danger or plain action, and its own failure line. */
 export function ConfirmDialog({
@@ -62,7 +63,7 @@ export function ConfirmDialog({
           {failedLabel ?? t('communities.actionFailed')}
         </p>
       )}
-      <div className="mt-3 flex justify-end gap-2">
+      <DialogFooter className="mt-3">
         <Button size="sm" disabled={working} onClick={onClose}>
           {cancelLabel ?? t('communities.cancel')}
         </Button>
@@ -74,7 +75,7 @@ export function ConfirmDialog({
         >
           {actionLabel}
         </Button>
-      </div>
+      </DialogFooter>
     </Modal>
   );
 }

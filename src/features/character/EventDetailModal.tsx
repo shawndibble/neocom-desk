@@ -46,6 +46,7 @@ import type {
   CalendarEventSummary,
   CalendarRsvpResponse,
 } from '@/esi/endpoints';
+import { Well } from '@/components/ui/Well';
 
 const RSVP_ENDPOINTS = ['putCharacterCalendarResponse'] as const satisfies readonly EsiEndpointId[];
 
@@ -187,9 +188,9 @@ export function EventDetailModal({
             {formatCalendarTimestamp(new Date(state.detail.data.date), zone)}
             {state.detail.data.importance > 0 && <> · {t('calendar.important')}</>}
           </p>
-          <p className="rounded-xs border border-line bg-panel-2 p-2 whitespace-pre-wrap text-text-dim">
+          <Well as="p" className="whitespace-pre-wrap text-text-dim">
             {stripEveMarkup(state.detail.data.text)}
-          </p>
+          </Well>
           <div className="space-y-2 border-t border-line pt-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p id="rsvp-response-label" className={eyebrowClassName}>

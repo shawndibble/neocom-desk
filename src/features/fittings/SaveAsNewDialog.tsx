@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, TextInput } from '@/components/ui';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 interface SaveAsNewDialogProps {
   open: boolean;
@@ -40,12 +41,12 @@ export function SaveAsNewDialog({
           value={name}
           onChange={(e) => onNameChange(e.target.value)}
         />
-        <div className="flex justify-end gap-2">
+        <DialogFooter>
           <Button onClick={onClose}>{t('fittings.myFittings.cancel')}</Button>
           <Button type="submit" variant="primary" disabled={name.trim() === ''}>
             {t('fittings.myFittings.saveAsNewConfirm')}
           </Button>
-        </div>
+        </DialogFooter>
       </form>
     </Modal>
   );

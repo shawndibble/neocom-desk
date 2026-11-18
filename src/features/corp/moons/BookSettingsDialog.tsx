@@ -53,6 +53,7 @@ import {
   type NoticeAfter,
   type NoticeRules,
 } from '@/engine/corpTaxBook/notices';
+import { DividedList } from '@/components/ui/DividedList';
 
 const formatDecimal = createNumberFormat({ maximumFractionDigits: 3 });
 /** The "behind" days a book that notices by day of month starts from, if switched back. */
@@ -548,7 +549,7 @@ export function BookSettingsDialog({
               <p className="max-w-2xl text-xs text-text-dim">
                 {t('corpTaxBook.moons.settings.ratesHint')}
               </p>
-              <ul className="divide-y divide-line rounded-xs border border-line">
+              <DividedList surface="none" as="ul">
                 {rates.map((r) => {
                   const target = rateLabel(r, minerName, names.refinery, names.corporation);
                   const scheduled = r.effectiveFrom > today;
@@ -575,7 +576,7 @@ export function BookSettingsDialog({
                     </li>
                   );
                 })}
-              </ul>
+              </DividedList>
               {canEdit && (
                 <div className="space-y-3 rounded-xs bg-panel-2 p-3">
                   <h3 className={eyebrowClassName}>
@@ -710,7 +711,7 @@ export function BookSettingsDialog({
                       <h4 className={eyebrowClassName}>
                         {t('corpTaxBook.moons.settings.pendingTitle', { count: pending.length })}
                       </h4>
-                      <ul className="divide-y divide-line rounded-xs border border-line bg-panel">
+                      <DividedList surface="panel" as="ul">
                         {pending.map(({ id, rate }) => {
                           const target = rateLabel(
                             rate,
@@ -762,7 +763,7 @@ export function BookSettingsDialog({
                             </li>
                           );
                         })}
-                      </ul>
+                      </DividedList>
                     </div>
                   )}
                 </div>

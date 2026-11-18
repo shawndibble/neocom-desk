@@ -51,6 +51,7 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import type { CharacterAttributes, CharacterSkills } from '@/esi/endpoints';
 import type { Implants } from '@/engine/types';
 import { createNumberFormat, formatNumber } from '@/lib/numberLocale';
+import { DividedList } from '@/components/ui/DividedList';
 
 // Part-trained levels bank fractional SP; the old default printed up to 3 decimals.
 const formatSp = createNumberFormat({ maximumFractionDigits: 3 });
@@ -437,7 +438,7 @@ export function Skills() {
                       />
                     </h2>
                     {expanded && (
-                      <ul className="mt-1 divide-y divide-line rounded-xs border border-line bg-panel/85 px-3">
+                      <DividedList surface="none" as="ul" className="mt-1 bg-panel/85 px-3">
                         {skillsToShow.map((skill) => (
                           <SkillBoardRow
                             key={skill.skillTypeID}
@@ -448,7 +449,7 @@ export function Skills() {
                             }
                           />
                         ))}
-                      </ul>
+                      </DividedList>
                     )}
                   </section>
                 );

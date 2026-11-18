@@ -47,6 +47,7 @@ import { type WidgetKindDef, type WidgetSize, type WidgetView } from './kinds';
 import { MAX_WIDGETS, newWidget, type WidgetInit } from './layout';
 import { PRESET_KINDS, presetsOf, type GalleryPreset } from './galleryPresets';
 import { Widget } from './Widget';
+import { Well } from '@/components/ui/Well';
 
 interface GalleryProps {
   open: boolean;
@@ -235,7 +236,7 @@ function PresetItem({
   const { t } = useTranslation();
   const title = t(`overview.gallery.presets.${preset.id}.title`);
   return (
-    <li className="grid gap-2 rounded-xs border border-line bg-panel-2 p-3">
+    <Well size="lg" as="li" className="grid gap-2">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-sm font-semibold">{title}</div>
@@ -267,7 +268,7 @@ function PresetItem({
         {justAdded ? t('overview.gallery.added') : ''}
       </span>
       {showPreview && <Preview kind={kind} preset={preset} />}
-    </li>
+    </Well>
   );
 }
 

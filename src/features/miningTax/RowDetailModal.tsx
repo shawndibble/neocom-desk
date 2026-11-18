@@ -37,6 +37,7 @@ import type { MoonMiningTaxRow } from './snapshot';
 import type { PayeeSuggestion } from './suggestPayee';
 import { LedgerActionError } from './LedgerActionError';
 import { formatCount } from '@/lib/formatCount';
+import { Well } from '@/components/ui/Well';
 
 interface RowDetailModalProps {
   open: boolean;
@@ -357,7 +358,7 @@ export function RowDetailModal({
         )}
 
         {showOreCard && (
-          <div className="space-y-1 rounded-xs border border-line bg-panel-2 p-2">
+          <Well className="space-y-1">
             <p className={eyebrowClassName}>{t('miningTax.oreColumn')}</p>
             <ul className="divide-y divide-line text-xs">
               {oreLines.map((line) => (
@@ -382,7 +383,7 @@ export function RowDetailModal({
                 </li>
               ))}
             </ul>
-          </div>
+          </Well>
         )}
 
         {assigned && assignment && (

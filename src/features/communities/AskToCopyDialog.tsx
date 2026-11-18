@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, Modal, NativeSelect } from '@/components/ui';
 import { askToCopyPrefill, type AskToCopyOffer } from '@/engine/communities/askToCopy';
 import { ComposeRequestDialog } from './ComposeRequestDialog';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 /**
  * "Ask <name> to copy" from a Community Offer row of BPC Sourcing (issue
@@ -51,7 +52,7 @@ export function AskToCopyDialog({
             </option>
           ))}
         </NativeSelect>
-        <div className="mt-3 flex justify-end gap-2">
+        <DialogFooter className="mt-3">
           <Button size="sm" onClick={onClose}>
             {t('communities.cancel')}
           </Button>
@@ -63,7 +64,7 @@ export function AskToCopyDialog({
           >
             {t('communities.askToCopy.continue')}
           </Button>
-        </div>
+        </DialogFooter>
       </AskToCopyShell>
     );
   }

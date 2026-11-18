@@ -15,6 +15,7 @@ import {
   tappableRowClassName,
 } from '@/components/ui/controlStyles';
 import type { BuildPlanRecord } from '@/db';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 interface LogProductionFromJobDialogProps {
   /** The job's product/blueprint name, for the dialog's copy. */
@@ -74,7 +75,7 @@ export function LogProductionFromJobDialog({
               {t('industry.jobsLogProductionCreateFailed')}
             </p>
           )}
-          <div className="flex justify-end gap-2">
+          <DialogFooter>
             <Button size="sm" onClick={onClose} disabled={creating}>
               {t('industry.cancel')}
             </Button>
@@ -86,7 +87,7 @@ export function LogProductionFromJobDialog({
             >
               {t('industry.jobsLogProductionCreatePlan')}
             </Button>
-          </div>
+          </DialogFooter>
         </div>
       ) : (
         <div className="flex flex-col gap-3 text-xs">

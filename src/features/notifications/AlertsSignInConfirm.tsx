@@ -18,6 +18,7 @@ import {
   type AlertsPermission,
   type CharacterAlertsNeed,
 } from './alertsNeeds';
+import { DividedList } from '@/components/ui/DividedList';
 
 interface Props {
   /** The Characters this walk would sign in, in order. */
@@ -43,7 +44,7 @@ export function AlertsSignInConfirm({ needs, names, busy, onCancel, onContinue }
   return (
     <div className="space-y-3">
       <p className="text-xs text-text">{t(key('intro'), { count: steps.length })}</p>
-      <ul className="divide-y divide-line rounded-xs border border-line">
+      <DividedList surface="none" as="ul">
         {asked.map((permission) => {
           const optional = permission !== 'notifications';
           const who = forWhom(permission);
@@ -82,7 +83,7 @@ export function AlertsSignInConfirm({ needs, names, busy, onCancel, onContinue }
             </li>
           );
         })}
-      </ul>
+      </DividedList>
       <p className="text-[0.6875rem] text-text-dim">{t(key('tokenNote'))}</p>
       <div className="flex flex-wrap justify-end gap-2">
         <Button size="sm" variant="ghost" onClick={onCancel} disabled={busy}>

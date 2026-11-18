@@ -10,6 +10,7 @@ import { SettleCopyRow, SettleSentOnAndMethod } from '@/features/miningTax/Settl
 import { DialogShell, Effect } from './BookDialogs';
 import { isk } from './moonsFormat';
 import { utcDay } from '@/engine/localDay';
+import { DividedList } from '@/components/ui/DividedList';
 
 const k = (key: string) => `corpTaxBook.moons.moonOwners.pay.${key}`;
 
@@ -64,7 +65,7 @@ export function PayMoonOwnerDialog({
       run={() => onRecord({ amount, date: paidOn, method })}
     >
       <p className="text-sm">{t(k('intro'))}</p>
-      <div className="divide-y divide-line rounded-xs border border-line bg-panel-2">
+      <DividedList>
         <SettleCopyRow
           label={t('miningTax.settleUp.toLabel')}
           value={payee.name}
@@ -85,7 +86,7 @@ export function PayMoonOwnerDialog({
           onCopy={() => void copy('reason', reason)}
           dim
         />
-      </div>
+      </DividedList>
       {!manual && (
         <div className="space-y-1.5">
           <button

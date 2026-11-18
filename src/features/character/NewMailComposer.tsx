@@ -40,6 +40,7 @@ import { MailBodyEditor, type MailBodyEditorProps } from './MailBodyEditor';
 import { MailComposeFooter } from './MailComposeFooter';
 import { MailCounter } from './MailCounter';
 import { NewMailRecipientPicker } from './NewMailRecipientPicker';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 const DRAFT_SAVE_DEBOUNCE_MS = 500;
 
@@ -416,14 +417,14 @@ export function NewMailComposer({
       >
         <div className="space-y-4 text-sm">
           <p>{t('mail.discardBody')}</p>
-          <div className="flex justify-end gap-2">
+          <DialogFooter>
             <Button size="md" onClick={() => setConfirmingDiscard(false)}>
               {t('mail.discardKeep')}
             </Button>
             <Button variant="danger" size="md" onClick={() => void handleDiscard()}>
               {t('mail.discardConfirm')}
             </Button>
-          </div>
+          </DialogFooter>
         </div>
       </Modal>
     </section>

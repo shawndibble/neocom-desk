@@ -10,6 +10,7 @@ import { systemLabel } from './names';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
 import { toggleInSet } from '@/lib/sets';
+import { DividedList } from '@/components/ui/DividedList';
 
 interface BulkDismissDialogProps {
   open: boolean;
@@ -83,7 +84,7 @@ export function BulkDismissDialog({
       <div className="space-y-3 text-sm">
         <p className="text-xs text-text-dim">{t('miningTax.bulkDismissHint')}</p>
 
-        <ul className="divide-y divide-line rounded-xs border border-line bg-panel-2">
+        <DividedList as="ul">
           {rows.map((dr) => {
             const on = !excluded.has(dr.key);
             return (
@@ -113,7 +114,7 @@ export function BulkDismissDialog({
               </li>
             );
           })}
-        </ul>
+        </DividedList>
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-[0.6875rem] text-text-dim">

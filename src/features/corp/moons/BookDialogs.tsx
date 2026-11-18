@@ -25,6 +25,8 @@ import { useBook } from './useBook';
 import { dateWithYear, isk, newId, paidAtFor } from './moonsFormat';
 import { MinerPicker } from './MinerPicker';
 import { DonationPicker, PaymentOutcomePanel } from './RecordPaymentParts';
+import { DialogFooter } from '@/components/ui/DialogFooter';
+import { Well } from '@/components/ui/Well';
 
 export function Label({ text, children }: { text: ReactNode; children: ReactNode }) {
   return (
@@ -91,7 +93,7 @@ export function DialogShell({
       initialFocusRef={initialFocusRef}
       placement={phone ? 'sheet' : 'center'}
       footer={
-        <div className="flex justify-end gap-2">
+        <DialogFooter>
           <Button variant="ghost" onClick={onClose}>
             {t('common.cancel')}
           </Button>
@@ -102,7 +104,7 @@ export function DialogShell({
           >
             {confirmLabel}
           </Button>
-        </div>
+        </DialogFooter>
       }
     >
       <div className="space-y-3 text-sm">
@@ -128,7 +130,9 @@ export function DialogShell({
 
 export function Effect({ children }: { children: ReactNode }) {
   return (
-    <p className="rounded-xs border border-line bg-panel-2 p-2 text-xs tabular-nums">{children}</p>
+    <Well as="p" className="text-xs tabular-nums">
+      {children}
+    </Well>
   );
 }
 

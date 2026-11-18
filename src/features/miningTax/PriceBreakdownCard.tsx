@@ -4,6 +4,7 @@ import { formatIsk } from '@/lib/isk';
 import { usePriceBreakdown, type PriceBreakdownInput } from './usePriceBreakdown';
 import { OreLink } from './OreIcon';
 import { formatCount } from '@/lib/formatCount';
+import { Well } from '@/components/ui/Well';
 
 /**
  * What the estimate was built from — per-ore unit price and where it came
@@ -17,7 +18,7 @@ export function PriceBreakdownCard(props: PriceBreakdownInput) {
   const { breakdown, hub, form, name, sourceLabel, unitText, drifted } = usePriceBreakdown(props);
 
   return (
-    <div className="space-y-1 rounded-xs border border-line bg-panel-2 p-2">
+    <Well className="space-y-1">
       <p className={eyebrowClassName}>{t('miningTax.detail.breakdown.title')}</p>
       <p className="text-xs text-text-dim">
         {t('miningTax.detail.breakdown.summary', {
@@ -44,6 +45,6 @@ export function PriceBreakdownCard(props: PriceBreakdownInput) {
           ? t('miningTax.detail.breakdown.drift', { value: formatIsk(assignment.estimatedValue) })
           : t('miningTax.detail.breakdown.caveat')}
       </p>
-    </div>
+    </Well>
   );
 }

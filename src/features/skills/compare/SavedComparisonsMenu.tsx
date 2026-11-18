@@ -24,6 +24,7 @@ import {
   useSkillComparisons,
   type SavedComparison,
 } from '../comparisons';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 interface SavedComparisonRowProps {
   comparison: SavedComparison;
@@ -277,14 +278,14 @@ export function SavedComparisonsMenu({
         title={t('skillCompare.delete')}
       >
         <p className="text-xs text-text-dim">{t('skillCompare.deleteConfirm')}</p>
-        <div className="mt-3 flex justify-end gap-2">
+        <DialogFooter className="mt-3">
           <Button size="sm" onClick={() => setDeletingId(null)}>
             {t('skillCompare.cancel')}
           </Button>
           <Button variant="danger" size="sm" onClick={() => void handleConfirmDelete()}>
             {t('skillCompare.delete')}
           </Button>
-        </div>
+        </DialogFooter>
       </Modal>
     </>
   );

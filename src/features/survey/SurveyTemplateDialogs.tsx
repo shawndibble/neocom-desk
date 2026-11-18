@@ -22,6 +22,7 @@ import {
   saveSurveyTemplate,
 } from './surveyTemplates';
 import { useTemplateSummary } from './surveyTemplateText';
+import { DividedList } from '@/components/ui/DividedList';
 
 interface CurrentFields {
   fields: InfoFields;
@@ -177,7 +178,7 @@ export function ManageTemplatesDialog({ templates, fields, moon, onClose }: Mana
         {templates.length === 0 ? (
           <p className="text-text-dim">{t('survey.templates.emptyList')}</p>
         ) : (
-          <ul className="divide-y divide-line rounded-xs border border-line bg-panel-2">
+          <DividedList as="ul">
             {templates.map((template, index) => (
               <li key={template.id} className="flex flex-col gap-1 px-2 py-2">
                 {renaming?.id === template.id ? (
@@ -245,7 +246,7 @@ export function ManageTemplatesDialog({ templates, fields, moon, onClose }: Mana
                 )}
               </li>
             ))}
-          </ul>
+          </DividedList>
         )}
         <div className="pt-1">
           <Button size="sm" onClick={onClose}>

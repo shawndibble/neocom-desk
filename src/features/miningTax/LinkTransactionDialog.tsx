@@ -6,6 +6,7 @@ import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { exactAmountMatches, type MadePayment } from './paymentLinks';
 import { LedgerActionError } from './LedgerActionError';
+import { DividedList } from '@/components/ui/DividedList';
 
 interface LinkTransactionDialogProps {
   open: boolean;
@@ -90,7 +91,7 @@ export function LinkTransactionDialog({
         {filtered.length === 0 ? (
           <p className="text-xs text-text-dim">{t('miningTax.linkTransactionEmpty')}</p>
         ) : (
-          <ul className="max-h-72 divide-y divide-line overflow-y-auto rounded-xs border border-line bg-panel-2">
+          <DividedList as="ul" className="max-h-72 overflow-y-auto">
             {filtered.map((p) => {
               const on = p.key === selectedKey;
               return (
@@ -130,7 +131,7 @@ export function LinkTransactionDialog({
                 </li>
               );
             })}
-          </ul>
+          </DividedList>
         )}
 
         <LedgerActionError error={saveError} />

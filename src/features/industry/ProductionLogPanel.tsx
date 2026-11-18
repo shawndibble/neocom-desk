@@ -75,6 +75,7 @@ import { formatPercent } from './format';
 import { useUrlParam, useUrlParams } from '@/lib/useUrlState';
 import { isoDateParam, optionalSortParam, type UrlSort } from '@/lib/urlState';
 import { formatCount } from '@/lib/formatCount';
+import { DividedList } from '@/components/ui/DividedList';
 
 /**
  * Dynamic import, not a static one: `ProductionProfitChart.tsx` statically
@@ -615,7 +616,7 @@ export function ProductionLogPanel({
               hint={t('industry.productionLogAssumesBaseStandingsHint')}
             />
           )}
-          <div className="divide-y divide-line rounded-xs border border-line">
+          <DividedList surface="none">
             <TotalRow label={t('industry.totalCostLogged')} value={formatIsk(totalCostLogged)} />
             <TotalRow
               label={t('industry.totalRevenueLinked')}
@@ -629,7 +630,7 @@ export function ProductionLogPanel({
               label={t('industry.avgMargin')}
               value={avgMarginPct === null ? t('common.unknown') : formatPercent(avgMarginPct)}
             />
-          </div>
+          </DividedList>
         </div>
 
         {runRows.length > 0 && profitHistoryPoints.length >= 2 && (

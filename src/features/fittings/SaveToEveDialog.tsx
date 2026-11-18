@@ -28,6 +28,7 @@ import type { Fitting } from '@/engine/fittings/types';
 import { useOnline } from '@/stores/network';
 import { loadInGameFittings } from './inGameFittings';
 import { clampFittingName, IN_GAME_FITTING_NAME_MAX, saveFittingToEve } from './saveToEve';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 const NEW_TARGET = 'new';
 
@@ -273,7 +274,7 @@ export function SaveToEveDialog({
             {t('fittings.saveToEve.errorTitle')}: {errorMessage}
           </InlineError>
         )}
-        <div className="flex justify-end gap-2">
+        <DialogFooter>
           <Button type="button" onClick={onClose}>
             {t('fittings.saveToEve.cancel')}
           </Button>
@@ -292,7 +293,7 @@ export function SaveToEveDialog({
                   ? t('fittings.saveToEve.overwriteAction')
                   : t('fittings.saveToEve.saveAction')}
           </Button>
-        </div>
+        </DialogFooter>
       </form>
     </Modal>
   );

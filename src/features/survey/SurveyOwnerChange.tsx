@@ -17,6 +17,7 @@ import {
   type RecipientSearchHit,
 } from '@/features/character/mailRecipientSearch';
 import { setSurveyOwner } from './surveyStore';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 export function SurveyOwnerChange({
   characterId,
@@ -129,14 +130,14 @@ export function SurveyOwnerChange({
                 {t('survey.changeOwner.failed')}
               </p>
             )}
-            <div className="flex justify-end gap-2">
+            <DialogFooter>
               <Button variant="ghost" size="sm" onClick={() => setChosen(null)}>
                 {t('survey.changeOwner.back')}
               </Button>
               <Button variant="primary" size="sm" loading={busy} onClick={() => void confirm()}>
                 {t('survey.changeOwner.submit')}
               </Button>
-            </div>
+            </DialogFooter>
           </div>
         )}
       </Modal>

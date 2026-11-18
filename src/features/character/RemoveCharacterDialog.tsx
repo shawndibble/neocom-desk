@@ -7,6 +7,7 @@ import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { removeCharacterAfterSync } from '@/features/character/removeCharacter';
 import { UnsyncedChangesWarning } from '@/features/character/UnsyncedChangesWarning';
 import { RemoveSharedOption } from '@/features/communities/RemoveSharedOption';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 export interface RemoveTarget {
   id: number;
@@ -94,14 +95,14 @@ export function RemoveCharacterDialog({
       {target && (
         <UnsyncedChangesWarning characterIds={[target.id]} syncConfigured={isSyncConfigured()} />
       )}
-      <div className="mt-3 flex justify-end gap-2">
+      <DialogFooter className="mt-3">
         <Button ref={cancelRef} size="sm" disabled={removing} onClick={onClose}>
           {t('characters.cancel')}
         </Button>
         <Button variant="danger" size="sm" loading={removing} onClick={() => void confirm()}>
           {t('characters.remove')}
         </Button>
-      </div>
+      </DialogFooter>
     </Modal>
   );
 }

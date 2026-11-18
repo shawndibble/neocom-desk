@@ -22,6 +22,7 @@ import { formatIsk } from '@/lib/isk';
 import { unmaskNumber } from '@/lib/numberMask';
 import { useTimeZone } from '@/lib/timeFormat';
 import { formatDateOnly } from '@/lib/timestamp';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 /**
  * The "Sold" split button — primary action Link Past Sale, plus an attached
@@ -302,14 +303,14 @@ export function SaleLinkingModals({ sale }: { sale: SaleLinking }) {
         title={t('industry.deleteProductionRun')}
       >
         <p className="text-xs text-text-dim">{t('industry.deleteProductionRunConfirm')}</p>
-        <div className="mt-3 flex justify-end gap-2">
+        <DialogFooter className="mt-3">
           <Button size="sm" onClick={sale.cancelDeleteRun}>
             {t('industry.cancel')}
           </Button>
           <Button size="sm" variant="danger" onClick={() => void sale.deleteRun()}>
             {t('industry.deleteProductionRun')}
           </Button>
-        </div>
+        </DialogFooter>
       </Modal>
     </>
   );

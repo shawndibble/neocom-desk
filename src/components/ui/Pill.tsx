@@ -11,10 +11,25 @@ const PILL_TONE_CLASS: Record<PillTone, string> = {
   danger: 'bg-danger/15 text-danger',
 };
 
+/** Outlined badge: a 1px edge and a faint fill, for a tag that must hold up beside a name in a dense row. */
+const PILL_OUTLINED_CLASS: Record<PillTone, string> = {
+  neutral: 'border-line-bright text-text-dim',
+  accent: 'border-accent/45 bg-accent/10 text-accent',
+  success: 'border-success/45 bg-success/10 text-success',
+  warning: 'border-warning/45 bg-warning/10 text-warning',
+  danger: 'border-danger/45 bg-danger/10 text-danger',
+};
+
 interface PillProps {
   children: ReactNode;
   /** Tint of the fill and text; `neutral` is the quiet default. */
   tone?: PillTone;
+  /**
+   * An edged badge at a fixed 18px height that never shrinks in a flex row
+   * (the PI verb and flag tags). Still static: the edge is a tag's outline,
+   * not a control's box, so it carries no hover or focus state.
+   */
+  outlined?: boolean;
   /** Spacing and layout only; the type recipe and tint are fixed. */
   className?: string;
 }
@@ -25,12 +40,13 @@ interface PillProps {
  *
  * @summary A static tinted badge beside a name or status ("Done", "Closed", "Corp").
  */
-export function Pill({ children, tone = 'neutral', className }: PillProps) {
+export function Pill({ children, tone = 'neutral', outlined = false, className }: PillProps) {
   return (
     <span
       className={cx(
-        'inline-flex items-center rounded-xs px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest uppercase',
-        PILL_TONE_CLASS[tone],
+        'inline-flex items-center rounded-xs px-1.5 text-[0.6875rem] font-semibold tracking-widest uppercase',
+        outlined ? 'h-[1.125rem] shrink-0 border' : 'py-0.5',
+        outlined ? PILL_OUTLINED_CLASS[tone] : PILL_TONE_CLASS[tone],
         className
       )}
     >
