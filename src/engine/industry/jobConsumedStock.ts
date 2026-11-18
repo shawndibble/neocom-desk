@@ -24,7 +24,7 @@ export interface StockJob {
   runs: number;
   startMs: number;
   facilityId: number;
-  /** Material efficiency of the job's blueprint, resolved by the caller. */
+  /** Material efficiency of the job's blueprint, resolved by the caller; ignored for a reaction, which has none. */
   me: number;
 }
 
@@ -64,7 +64,12 @@ export function consumedByJobs(
     if (snapshotMs === undefined || job.startMs <= snapshotMs) continue;
     const blueprint = blueprintFor(job.blueprintTypeId);
     if (!blueprint || job.runs < 1) continue;
-    for (const material of effectiveMaterials(blueprint, job.runs, job.me, ctx)) {
+    for (const material of effectiveMaterials(
+      blueprint,
+      job.runs,
+      job.activityId === REACTION ? 0 : job.me,
+      ctx
+    )) {
       out.push({
         jobId: job.jobId,
         characterId: job.characterId,

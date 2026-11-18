@@ -105,7 +105,7 @@ export function OwnedStockHint({
           quantity: formatCount(reduction.quantity),
           jobs: reduction.blueprintNames.join(', '),
         });
-  const owned = claim === null ? detected : `${detected} · ${claim}`;
+  const owned = [detected, claim, reducedNote].filter((part) => part !== null).join(' · ');
 
   const offer = (
     <Tooltip content={owned}>

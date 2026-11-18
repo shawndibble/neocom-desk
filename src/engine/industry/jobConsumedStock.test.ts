@@ -90,6 +90,17 @@ describe('consumedByJobs', () => {
     expect(consumedByJobs([job({ characterId: 2 })], snapshots, blueprintFor, CTX)).toEqual([]);
   });
 
+  it('prices a reaction at base quantities whatever ME the caller passed', () => {
+    const reaction = consumedByJobs(
+      [job({ activityId: 11, me: 10 })],
+      snapshots,
+      blueprintFor,
+      CTX
+    );
+    const base = consumedByJobs([job({ activityId: 11, me: 0 })], snapshots, blueprintFor, CTX);
+    expect(reaction).toEqual(base);
+  });
+
   it('only manufacturing (1) and reactions (11) consume stock this way', () => {
     expect(consumedByJobs([job({ activityId: 3 })], snapshots, blueprintFor, CTX)).toEqual([]);
     expect(consumedByJobs([job({ activityId: 11 })], snapshots, blueprintFor, CTX)).not.toEqual([]);
