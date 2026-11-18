@@ -23,6 +23,7 @@ export function usePlanJobSchedule(
             {
               activity,
               seconds: result.seconds,
+              jobRuns: result.jobRuns,
               materials: result.materials,
               blueprintTypeID: plan.blueprintTypeID,
             },

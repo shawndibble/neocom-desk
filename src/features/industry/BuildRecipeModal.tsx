@@ -6,7 +6,7 @@ import { Button, Modal } from '@/components/ui';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import type { ItemMenuFor } from '@/features/market/ItemContextMenu';
-import type { BuildRecipe } from './subBuildPlan';
+import { jobsOfRuns, type BuildRecipe } from './subBuildPlan';
 
 interface BuildRecipeModalProps {
   /** The recipe to show; `null` closes the modal — the parent holds which material is open. */
@@ -76,6 +76,8 @@ export function BuildRecipeModal({
               made: formatCount(recipe.unitsMade),
               needed: formatCount(recipe.needed),
             })}{' '}
+            {recipe.split &&
+              t('industry.buildRecipe.split', { jobs: jobsOfRuns(t, recipe.jobRuns) })}{' '}
             {recipe.spare > 0 &&
               t('industry.buildRecipe.spare', { spare: formatCount(recipe.spare) })}
           </p>

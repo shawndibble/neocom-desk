@@ -98,6 +98,8 @@ export interface IndustryBlueprint {
    * never gated.
    */
   skills?: readonly BlueprintSkillRequirement[];
+  /** Most runs one job may be installed for (the game's Runs cap); absent means no cap. */
+  maxProductionLimit?: number;
 }
 
 /** `blueprint.activity`, defaulting to 'manufacturing' — the one place that owns what an unset activity means. */
@@ -784,7 +786,13 @@ export interface BuildResult {
    * recursively, rather than a market price.
    */
   materials: ResolvedMaterial[];
-  /** Job duration in seconds. */
+  /**
+   * Runs of each job, largest first: more than one when the runs exceed the
+   * blueprint's max production limit (the jobs run in parallel). Absent: one
+   * job of the plan's runs.
+   */
+  jobRuns?: number[];
+  /** Duration of the longest job in seconds. */
   seconds: number;
   jobFee: JobFeeBreakdown;
   /**

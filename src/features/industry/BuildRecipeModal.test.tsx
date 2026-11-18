@@ -18,6 +18,8 @@ const nameFor = (typeID: number) => NAMES[typeID] ?? `#${typeID}`;
 const RECIPE: BuildRecipe = {
   typeID: 9840,
   runs: 2,
+  jobRuns: [2],
+  split: false,
   outputPerRun: 1,
   unitsMade: 2,
   needed: 2,
@@ -97,6 +99,16 @@ describe('BuildRecipeModal', () => {
     expect(screen.getByText('Pyerite')).toBeInTheDocument();
     // The built input gets its own "Build it" link into that material's recipe.
     expect(screen.getByRole('button', { name: 'Build it' })).toBeInTheDocument();
+  });
+
+  it('says so when the blueprint caps runs and the build is split into several jobs', () => {
+    renderModal({ recipe: { ...RECIPE, runs: 90, jobRuns: [30, 30, 30], split: true } });
+    expect(screen.getByText(/built as 3 jobs of 30 runs/)).toBeInTheDocument();
+  });
+
+  it('says "up to" when the split jobs differ by a run', () => {
+    renderModal({ recipe: { ...RECIPE, runs: 100, jobRuns: [34, 33, 33], split: true } });
+    expect(screen.getByText(/built as 3 jobs of up to 34 runs/)).toBeInTheDocument();
   });
 
   it('opens the input’s own recipe when its "Build it" button is clicked', async () => {

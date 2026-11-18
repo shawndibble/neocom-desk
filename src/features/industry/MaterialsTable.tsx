@@ -58,7 +58,7 @@ import {
 import type { GroupStockClaims } from '@/engine/industry/groupStockClaims';
 import { OwnedStockHint } from './OwnedStockHint';
 import type { OwnedStockDetection } from './ownedStockDetection';
-import { buildRecipe, type MaterialTableRow } from './subBuildPlan';
+import { buildRecipe, jobsOfRuns, type MaterialTableRow } from './subBuildPlan';
 import { SkillGateMarker } from './SkillGateMarker';
 import { MATERIAL_ERRANDS, errandSubtotal, type MaterialErrand } from './materialErrands';
 import {
@@ -761,8 +761,9 @@ export function MaterialsTable({
   /** The line total — or, for a built row, its runs: its inputs carry the cost in their own rows. */
   function renderTotal(material: MaterialTableRow) {
     if (material.subBuilds.length > 0) {
-      const runs = buildRecipe(material)?.runs ?? 0;
-      return <span>{t('industry.subBuildRuns', { runs: formatCount(runs) })}</span>;
+      const recipe = buildRecipe(material);
+      if (recipe?.split) return <span>{jobsOfRuns(t, recipe.jobRuns)}</span>;
+      return <span>{t('industry.subBuildRuns', { runs: formatCount(recipe?.runs ?? 0) })}</span>;
     }
     const sellValue =
       material.remainingQuantity === 0 ? sellValueFor?.(material.typeID) : undefined;

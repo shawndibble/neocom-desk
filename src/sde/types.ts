@@ -128,6 +128,8 @@ export interface BlueprintType {
   products: BlueprintQuantity[];
   skills: BlueprintSkill[];
   activity: 'manufacturing' | 'reaction';
+  /** Most runs one job may be installed for (issue #6393); absent means no cap. */
+  maxProductionLimit?: number;
 }
 
 /** public/data/blueprints.json: blueprint/formula typeID -> BlueprintType */

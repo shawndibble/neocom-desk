@@ -15,7 +15,7 @@
 
 import type { BuildResult, IndustryInputs } from '@/engine/industry/types';
 import { SKILL_IDS } from '@/engine/industry/types';
-import { effectiveMaterials } from '@/engine/industry/materials';
+import { splitEffectiveMaterials } from '@/engine/industry/jobSplit';
 import {
   acquisitionMaterialFor,
   resolveMaterial,
@@ -64,7 +64,8 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
   // down into the same recursive input (e.g. two components both consuming
   // Tritanium), and owned stock of it exists once, not once per branch.
   const ownedPool = new Map<number, number>();
-  const resolvedMaterials = effectiveMaterials(blueprint, runs, me, ctx).map((material) =>
+  const split = splitEffectiveMaterials(blueprint, runs, me, ctx);
+  const resolvedMaterials = split.materials.map((material) =>
     resolveMaterial(material, {
       buildHere: new Set(inputs.buildHere ?? []),
       recipeFor: inputs.recipeFor ?? (() => null),
@@ -91,7 +92,15 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
     ? [acquisitionMaterial, ...resolvedMaterials]
     : resolvedMaterials;
 
-  const seconds = jobDurationSeconds(blueprint.time, runs, te, modifiers, ctx, blueprint.skills);
+  // Split jobs run in parallel, so the wait is the longest (the first) one.
+  const seconds = jobDurationSeconds(
+    blueprint.time,
+    split.jobRuns[0],
+    te,
+    modifiers,
+    ctx,
+    blueprint.skills
+  );
   const fee = jobFee(
     estimatedItemValue(blueprint, runs, adjustedPrices),
     systemCostIndex,
@@ -157,6 +166,7 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
 
   return {
     materials,
+    jobRuns: split.jobRuns,
     seconds,
     jobFee: fee,
     materialCost,
