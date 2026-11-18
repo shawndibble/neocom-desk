@@ -59,7 +59,7 @@ function StepDot({
       >
         {state === 'done' ? <Icon.Done size={Icon.ICON_SIZE.sm} aria-hidden="true" /> : n}
       </span>
-      <span className={cx('text-sm', state === 'next' ? 'text-text-faint' : 'text-text')}>
+      <span className={cx('text-sm', state === 'next' ? 'text-text-dim' : 'text-text')}>
         {label}
         {state === 'done' && <span className="sr-only"> {t('corpTaxBook.moons.run.done')}</span>}
       </span>

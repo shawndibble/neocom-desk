@@ -85,7 +85,7 @@ export function MailFormatBar({
         ),
         backgroundImage:
           state.color === 'mixed'
-            ? 'linear-gradient(135deg, transparent 45%, #bfbfbf 45%, #bfbfbf 55%, transparent 55%)'
+            ? 'linear-gradient(135deg, transparent 45%, var(--color-text-dim) 45%, var(--color-text-dim) 55%, transparent 55%)'
             : undefined,
       }}
     />
