@@ -3,6 +3,7 @@ import { blueprintsLeftOutCount, shoppingListText } from '@/engine/industry/shop
 import { writeToClipboard } from '@/lib/clipboard';
 import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import { nameForType, type BlueprintCatalog } from './blueprintCatalog';
+import { useShoppingBudget } from './useShoppingBudget';
 import type { usePlanMaterials } from './usePlanMaterials';
 
 /**
@@ -25,6 +26,7 @@ export function useShoppingListCopy(
 ) {
   const { copied: copyState, flash: flashCopy } = useCopyFeedback<'copied' | 'failed'>(2000);
   const [blueprintsLeftOut, setBlueprintsLeftOut] = useState(0);
+  const budget = useShoppingBudget(shoppingMaterials);
 
   /**
    * The rejection is caught and shown, not left to `void`: a browser that
@@ -38,7 +40,7 @@ export function useShoppingListCopy(
       // The flattened leaf list, not the plan's own: a material being
       // produced here is not something to order, and the recipe inputs that
       // replaced it are — however many levels down they sit.
-      await writeToClipboard(shoppingListText(shoppingMaterials, (id) => nameForType(catalog, id)));
+      await writeToClipboard(shoppingListText(budget.materials, (id) => nameForType(catalog, id)));
       flashCopy('copied');
       // Multibuy can't buy a blueprint (issue #1778) — shoppingListText already
       // dropped it; name the count so the pilot knows to buy it by contract.
@@ -48,5 +50,5 @@ export function useShoppingListCopy(
     }
   }
 
-  return { copyState, blueprintsLeftOut, copyShoppingList };
+  return { copyState, blueprintsLeftOut, copyShoppingList, budget };
 }

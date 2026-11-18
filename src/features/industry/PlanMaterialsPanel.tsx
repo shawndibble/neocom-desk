@@ -27,6 +27,7 @@ import type { usePlanEdits } from './usePlanEdits';
 import type { PlanGroup, usePlanOwnedStock } from './usePlanOwnedStock';
 import type { usePlanMaterials } from './usePlanMaterials';
 import type { useOwnedSale } from './useOwnedSale';
+import { ShoppingBudget } from './ShoppingBudget';
 import type { useShoppingListCopy } from './useShoppingListCopy';
 
 type Edits = ReturnType<typeof usePlanEdits>;
@@ -101,7 +102,6 @@ export function PlanMaterialsPanel({
   const { t } = useTranslation();
   const {
     visibleMaterials,
-    shoppingMaterials,
     boughtDepth,
     anySubBuilds,
     subBuildTimeSeconds,
@@ -117,7 +117,7 @@ export function PlanMaterialsPanel({
         <PlanMaterialsActions
           fetchedAt={fetchedAt}
           copyState={shopping.copyState}
-          copyDisabled={!!error || !result || !hasShoppingList(shoppingMaterials)}
+          copyDisabled={!!error || !result || !hasShoppingList(shopping.budget.materials)}
           onCopy={() => void shopping.copyShoppingList()}
           showExport={!error && !!result && visibleMaterials.length > 0}
           materialsExport={materialsExport}
@@ -129,6 +129,7 @@ export function PlanMaterialsPanel({
         <p className="text-xs text-danger">{error ?? t('industry.computeError')}</p>
       ) : (
         <>
+          <ShoppingBudget budget={shopping.budget} nameFor={(id) => nameForType(catalog, id)} />
           {/* Reactions are exempt from every time implant — nothing to assume. */}
           {activity !== 'reaction' && (
             <ImplantsAssumedNote hint={t('industry.assumesNoImplantsHint')} />
