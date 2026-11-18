@@ -75,6 +75,7 @@ vi.mock('./useBook', () => ({
         now: NOW,
         rates: [],
         entries: [],
+        miners: [],
         statements: [],
         extractions,
         pricesOn: () => ({ prices: new Map([[1, 10]]) }),

@@ -356,6 +356,8 @@ export function useCorpBook(
     let cancelled = false;
     const characterIds = new Set<number>();
     for (const m of view.miners) for (const id of m.characterIds) characterIds.add(id);
+    // A grouped Miner with no charge is in no view row; the book's record still names its main.
+    for (const m of view.input.miners) characterIds.add(m.mainCharacterId);
     for (const p of view.input.payments) characterIds.add(p.characterId);
     if (fetched.status === 'loaded') {
       for (const a of fetched.data.groupingAnswers ?? []) characterIds.add(a.characterId);

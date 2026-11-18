@@ -136,7 +136,7 @@ export function RefineryPage({ structureId }: { structureId: number }) {
   const { nextPopAt: nextPop, lastPopAt: lastPop } = popBounds(rows);
   const miners = refineryMiners(docs, priceOf);
   const minerName = (minerId: string) => {
-    const main = view.miners.find((m) => m.id === minerId)?.mainCharacterId;
+    const main = view.input.miners.find((m) => m.id === minerId)?.mainCharacterId;
     const solo = /^solo:(\d+)$/.exec(minerId);
     return names.character(main ?? (solo ? Number(solo[1]) : 0));
   };

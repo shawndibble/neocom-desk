@@ -17,7 +17,7 @@ import type { BookRead } from '../taxBook/bookRead';
 import type { BookData } from '../taxBook/bookClient';
 
 /** A book read: a refinery page's moon docs ride beside the book's data. */
-type PricedBook = BookData & Pick<BookRead, 'refinery'>;
+type BookWithRefinery = BookData & Pick<BookRead, 'refinery'>;
 
 export interface BookPrices {
   pricesOn: BookViewInput['pricesOn'];
@@ -82,7 +82,7 @@ registerTestReset(() => heldPrices.clear());
 
 const heldKey = (data: BookData) => `${data.settings.hubId}:${data.settings.oreForm}`;
 
-function typeIdsOf(data: PricedBook, priced: BookData['observed']): Set<number> {
+function typeIdsOf(data: BookWithRefinery, priced: BookData['observed']): Set<number> {
   const typeIds = new Set<number>(priced.map((r) => r.typeId));
   for (const x of data.state.extractions) for (const l of x.oreLines ?? []) typeIds.add(l.typeId);
   // A refinery page reads no ledger row: the ore its moon docs hold is priced all the same.
@@ -96,7 +96,7 @@ function typeIdsOf(data: PricedBook, priced: BookData['observed']): Set<number> 
  * hub and Ore Form when they price every ore and day it holds, else a load. The Moons page loads
  * its own, fresh.
  */
-export async function cachedBookPrices(data: PricedBook): Promise<BookPrices> {
+export async function cachedBookPrices(data: BookWithRefinery): Promise<BookPrices> {
   const held = heldPrices.get(heldKey(data));
   const covers =
     held !== undefined &&
@@ -107,7 +107,7 @@ export async function cachedBookPrices(data: PricedBook): Promise<BookPrices> {
 }
 
 /** The unit prices every loaded row and Extraction needs, as the view's two lookups. */
-export async function loadBookPrices(data: PricedBook, from?: string): Promise<BookPrices> {
+export async function loadBookPrices(data: BookWithRefinery, from?: string): Promise<BookPrices> {
   const priced = from !== undefined ? data.observed.filter((r) => r.date >= from) : data.observed;
   const typeIds = typeIdsOf(data, priced);
   const dates = new Set<string>(priced.map((r) => r.date));
