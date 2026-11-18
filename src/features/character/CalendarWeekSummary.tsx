@@ -7,7 +7,8 @@
 import { useTranslation } from 'react-i18next';
 import { Panel } from '@/components/ui';
 import { KIND_TEXT } from '@/components/ui/kindTone';
-import type { CharacterBoardItem } from '@/engine/character/board';
+import { CHARACTER_BOARD_ITEM_KINDS, type CharacterBoardItem } from '@/engine/character/board';
+import { countsByKind } from '@/engine/character/deadlines';
 import { DAY_MS } from '@/lib/age';
 import { KIND_ICON } from './calendarKindIcons';
 import { KIND_LABEL } from './calendarKindLabels';
@@ -22,16 +23,15 @@ export function CalendarWeekSummary({
   className?: string;
 }) {
   const { t } = useTranslation();
-  const counts = new Map<CharacterBoardItem['kind'], number>();
-  for (const item of items) {
-    if (item.deadlineMs >= nowMs && item.deadlineMs < nowMs + 7 * DAY_MS)
-      counts.set(item.kind, (counts.get(item.kind) ?? 0) + 1);
-  }
+  const counts = countsByKind(
+    items.filter((i) => i.deadlineMs >= nowMs && i.deadlineMs < nowMs + 7 * DAY_MS)
+  );
   if (counts.size === 0) return null;
   return (
     <Panel padded title={t('calendar.week.title')} className={className}>
       <ul className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
-        {[...counts].map(([kind, count]) => {
+        {CHARACTER_BOARD_ITEM_KINDS.filter((kind) => counts.has(kind)).map((kind) => {
+          const count = counts.get(kind);
           const Glyph = KIND_ICON[kind];
           return (
             <li key={kind} className="flex items-center gap-2 text-sm">
