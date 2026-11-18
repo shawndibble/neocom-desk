@@ -146,6 +146,9 @@ export function Modal({
 }: ModalProps) {
   const { t } = useTranslation();
   const dialogRef = useRef<HTMLDialogElement>(null);
+  // Whether the current press began on the backdrop. A press that began inside
+  // can end outside once the content reflows under it; that is not a dismissal.
+  const pressBeganOnBackdrop = useRef(false);
   const isSheet = placement.startsWith('sheet');
   useOverlayHistory(open, onClose, closeOnBack);
   const swipe = useSheetSwipe(dialogRef, onClose, isSheet, open);
@@ -224,10 +227,20 @@ export function Modal({
         event.stopPropagation();
         onClose();
       }}
+      onPointerDown={(event) => {
+        pressBeganOnBackdrop.current = event.target === dialogRef.current;
+      }}
       onClick={(event) => {
         // With `p-0`, the only clicks whose target is the dialog element are
-        // ones that landed on its ::backdrop.
-        if (dismissOnOutsidePress && event.target === dialogRef.current) onClose();
+        // ones that landed on its ::backdrop. The press must also have begun
+        // there: a press on content that reflows away lands its release on the
+        // backdrop, and the click then targets the dialog (their common ancestor).
+        if (
+          dismissOnOutsidePress &&
+          event.target === dialogRef.current &&
+          pressBeganOnBackdrop.current
+        )
+          onClose();
       }}
       className={`fixed inset-0 overflow-hidden rounded-xs border border-line bg-panel p-0 text-text shadow-lg shadow-black/50 backdrop:bg-black/60 ${heightClass} ${dialogClass}`}
     >
