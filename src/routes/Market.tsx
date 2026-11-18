@@ -1,14 +1,5 @@
 import { FromWalletCrumb } from '@/features/netWorth/FromWalletCrumb';
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactElement,
-} from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { named, preloadFrom } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
@@ -47,9 +38,6 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { industryTabHref } from '@/features/industry/industryTabs';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { useOrderFeeSkills } from '@/features/market/useOrderFeeSkills';
-import { ZERO_STANDINGS } from '@/engine/market/standings';
-import type { OrderFeeContext } from '@/engine/market/orderFees';
 import { useOnline } from '@/stores/network';
 import { orderBookFailedOffline } from '@/features/market/orderBookView';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
@@ -60,35 +48,25 @@ import {
   MARKET_TREE_MIN_QUERY_LENGTH,
 } from '@/features/market/marketTree';
 import { MarketGroupTree } from '@/features/market/MarketGroupTree';
-import { useNoOrdersCue } from '@/features/market/regionMarketTypes';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { useElementNarrowerThan } from '@/lib/useElementNarrowerThan';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useFocusHeading } from '@/lib/useFocusHeading';
 import { ItemPriceAlertBell } from '@/features/market/ItemPriceAlertBell';
-import { OrderRowContextMenu } from '@/features/market/OrderRowContextMenu';
 import { CompareDrawer } from '@/features/market/CompareDrawer';
 import { useCompareSet } from '@/features/market/compareSet';
-import type { QuickbarItem } from '@/db';
 import { QuickbarList } from '@/features/market/QuickbarList';
-import { useQuickbarVsPaid } from '@/features/market/useQuickbarVsPaid';
+import { useMarketQuickbar } from '@/features/market/useMarketQuickbar';
+import { useMarketOrderTables } from '@/features/market/useMarketOrderTables';
+import { useMarketOrderBookView } from '@/features/market/useMarketOrderBookView';
 import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
 import { VariationsTable } from '@/features/market/VariationsTable';
-import {
-  quickbarToPasteText,
-  removeQuickbarItem,
-  restoreQuickbarItem,
-  reorderQuickbarItems,
-} from '@/features/market/quickbar';
+import { quickbarToPasteText } from '@/features/market/quickbar';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { ALL_REGIONS } from '@/engine/market/locationMode';
-import type { RegionOrder } from '@/esi/endpoints';
 import type { MarketAppraiseState } from '@/lib/shortcuts';
 import { buttonClassName } from '@/components/ui/buttonClassName';
-import { useTableExport } from '@/components/ui/useTableExport';
-import { orderBookCsvColumns } from '@/features/market/orderBookCsv';
 import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
 import { AppraisalSettingsForm } from '@/features/market/AppraisalSettingsForm';
 import { usePageHeaderSlots } from '@/features/market/pageHeaderSlots';
@@ -104,11 +82,7 @@ import { useSharedAppraisalSeed } from '@/features/market/sharedAppraisalSeed';
 import { bpcSourcingHref } from '@/features/bpcContracts/bpcSourcingUrl';
 import { useMarketCatalogue } from '@/features/market/useMarketCatalogue';
 import { useMarketBrowser, type MarketItemTab } from '@/features/market/useMarketBrowser';
-import {
-  BrowserFilterBar,
-  OrderBookScopeBar,
-  type OrderBookScope,
-} from '@/features/market/OrderBookScopeBar';
+import { BrowserFilterBar, OrderBookScopeBar } from '@/features/market/OrderBookScopeBar';
 import {
   BookSideToggle,
   HubComparisonLine,
@@ -120,17 +94,8 @@ import { OrderRowDetail } from '@/features/market/OrderRowDetail';
 import { ItemSkillsDisclosure } from '@/features/market/ItemSkillsDisclosure';
 import { useOrderBookOrchestration } from '@/features/market/useOrderBookOrchestration';
 import { useOrderRowSkills } from '@/features/market/useOrderRowSkills';
-import { useMarketOrderColumns } from '@/features/market/useMarketOrderColumns';
 import { useRefiningSetup } from '@/features/refining/useRefiningSetup';
-import {
-  SELL_ORDER_COLUMN_IDS,
-  BUY_ORDER_COLUMN_IDS,
-  orderBookFigureChars,
-  orderBookWidthsRem,
-  isColumnWithheld,
-  type MarketOrderColumnId,
-  useVisibleMarketOrderColumns,
-} from '@/features/market/marketOrderColumns';
+import { SELL_ORDER_COLUMN_IDS, BUY_ORDER_COLUMN_IDS } from '@/features/market/marketOrderColumns';
 
 // One tab renders at a time: each panel loads on first visit, or as the
 // pilot reaches for its tab (`preloadTab`).
@@ -262,65 +227,11 @@ export function Market() {
     pinWithTarget: handlePinWithTarget,
   } = itemActions.quickbar;
 
-  // Remove keeps the row and its slot so the Undo toast can put it back.
-  const [quickbarUndo, setQuickbarUndo] = useState<{
-    item: QuickbarItem;
-    index: number;
-    characterId: number;
-  } | null>(null);
-  function handleRemoveFromQuickbar(typeId: number) {
-    const index = quickbarItems.findIndex((i) => i.typeId === typeId);
-    if (index === -1) return;
-    if (activeCharacterId !== null) {
-      setQuickbarUndo({ item: quickbarItems[index], index, characterId: activeCharacterId });
-    }
-    void writeQuickbar(removeQuickbarItem(quickbarItems, typeId));
-  }
-  function handleUndoQuickbarRemove() {
-    if (!quickbarUndo || quickbarUndo.characterId !== activeCharacterId) return;
-    void writeQuickbar(restoreQuickbarItem(quickbarItems, quickbarUndo.item, quickbarUndo.index));
-    setQuickbarUndo(null);
-  }
-  function handleReorderQuickbar(activeTypeId: number, overTypeId: number) {
-    void writeQuickbar(reorderQuickbarItems(quickbarItems, activeTypeId, overTypeId));
-  }
-
   // Issue #726: sends the Quickbar's contents into Appraisal, landing
   // directly on the multi-hub view (#689) rather than a collapsed one.
   function handleViewQuickbarInAppraisal() {
     appraisal.appraiseText(quickbarToPasteText(quickbarItems));
     changeTab('appraisal', true);
-  }
-
-  // Variations "Compare" (issue #146, folded into the Compare drawer's
-  // Attributes view by #1425): adds every row currently shown in the
-  // Variations table, plus the selected item itself, to the Compare Set and
-  // opens the drawer on Attributes — see CompareAttributesMatrix.
-  const addManyToCompare = useCompareSet((state) => state.addMany);
-  const removeManyFromCompare = useCompareSet((state) => state.removeMany);
-  const openCompareIn = useCompareSet((state) => state.openIn);
-  // Issue #1746: the merge can add ~19 rows with no cheap way back out, so
-  // the add is followed by an Undo toast that removes exactly those rows.
-  const [compareUndo, setCompareUndo] = useState<{
-    typeIds: number[];
-    count: number;
-    itemName: string;
-  } | null>(null);
-  function handleCompareVariations() {
-    if (!variationsResult || !selectedItem || selectedTypeId === null) return;
-    const added = addManyToCompare([
-      { typeId: selectedTypeId, itemName: selectedItem.name },
-      ...variationsResult.rows.map((row) => ({ typeId: row.typeId, itemName: row.name })),
-    ]);
-    openCompareIn('attributes');
-    setCompareUndo(
-      added.length > 0 ? { typeIds: added, count: added.length, itemName: selectedItem.name } : null
-    );
-  }
-  function handleUndoCompareVariations() {
-    if (!compareUndo) return;
-    removeManyFromCompare(compareUndo.typeIds);
-    setCompareUndo(null);
   }
 
   // Narrow screens show one column at a time (GLOSSARY.md round 8); matches
@@ -399,9 +310,6 @@ export function Market() {
   const selectedInCompare = useCompareSet((state) =>
     state.items.some((item) => item.typeId === selectedTypeId)
   );
-  // Issue #5333: each pinned item's hub price against what the wallet says was paid.
-  const quickbarTypeIds = useMemo(() => quickbarItems.map((i) => i.typeId), [quickbarItems]);
-  const quickbarVsPaid = useQuickbarVsPaid(activeCharacterId, quickbarTypeIds, effectiveHub);
   const selectedPinned = quickbarItems.some((item) => item.typeId === selectedTypeId);
 
   // The finder Panel's own root, so Back can look up the tree button the
@@ -514,6 +422,27 @@ export function Market() {
     setStationFilter(locationId);
   }
 
+  const {
+    quickbarUndo,
+    compareUndo,
+    quickbarVsPaid,
+    handleRemoveFromQuickbar,
+    handleUndoQuickbarRemove,
+    handleReorderQuickbar,
+    handleCompareVariations,
+    handleUndoCompareVariations,
+    dismissQuickbarUndo,
+    dismissCompareUndo,
+  } = useMarketQuickbar({
+    activeCharacterId,
+    quickbarItems,
+    writeQuickbar,
+    effectiveHub,
+    selectedTypeId,
+    selectedItem,
+    variationRows: variationsResult?.rows ?? null,
+  });
+
   const itemMenu = useOpenAfterMenu();
   const selectedBlueprintTypeId =
     selectedTypeId === null ? null : itemActions.actions.blueprintFor(selectedTypeId);
@@ -534,99 +463,10 @@ export function Market() {
   const sellRowCap = sellShowAll ? undefined : ROW_CAP;
   const buyRowCap = buyShowAll ? undefined : ROW_CAP;
 
-  const bookBestSell = loadedView?.summary.bestSell ?? null;
   // One station, already named by the scope bar: no Location column to repeat it.
   const singleStationBook =
     !(rangeAcross && browserFilterValue.jumps !== 'any') && effectiveLocation.mode === 'hub';
-  const feeSkills = useOrderFeeSkills(activeCharacterId);
-  // Broker fee standings come from the selected hub's station owner; a region
-  // or structure book has no single owner, so it prices with none.
-  const hubStanding =
-    effectiveLocation.mode === 'hub'
-      ? tradeHubStanding(tradeHubStandings, effectiveHub.id)
-      : ZERO_STANDINGS;
-  const feeContext = useMemo<OrderFeeContext | null>(
-    () => (feeSkills ? { ...feeSkills, standing: hubStanding } : null),
-    [feeSkills, hubStanding]
-  );
   const knownJumps = jumpRangeFilter.jumpsStatus === 'ready' ? jumpRangeFilter.jumps : null;
-  // A row's distance from the Current System, for the export: the Jumps column's own rule.
-  const exportJumpsFor = useCallback(
-    (systemId: number) => knownJumps?.get(systemId) ?? null,
-    [knownJumps]
-  );
-  // Every row, not the ROW_CAP the tables mount before "Show all"; every column, not the picker's.
-  const sellCsvColumns = useMemo(
-    () =>
-      orderBookCsvColumns(t, {
-        npcStations: npcStationMap,
-        solarSystems: solarSystemMap,
-        isBuy: false,
-        jumpsFor: exportJumpsFor,
-        feeContext,
-        myOrderIds,
-        best: bookBestSell,
-      }),
-    [t, npcStationMap, solarSystemMap, exportJumpsFor, feeContext, myOrderIds, bookBestSell]
-  );
-  const buyCsvColumns = useMemo(
-    () =>
-      orderBookCsvColumns(t, {
-        npcStations: npcStationMap,
-        solarSystems: solarSystemMap,
-        isBuy: true,
-        jumpsFor: exportJumpsFor,
-        feeContext,
-        myOrderIds,
-        best: loadedView?.summary.bestBuy ?? null,
-      }),
-    [
-      t,
-      npcStationMap,
-      solarSystemMap,
-      exportJumpsFor,
-      feeContext,
-      myOrderIds,
-      loadedView?.summary.bestBuy,
-    ]
-  );
-  const sellExport = useTableExport({
-    surface: 'market-sell',
-    rows: sortedSell,
-    columns: sellCsvColumns,
-    truncated: loadedView?.truncated ?? false,
-    source: 'sorted-rows',
-  });
-  const buyExport = useTableExport({
-    surface: 'market-buy',
-    rows: sortedBuy,
-    columns: buyCsvColumns,
-    truncated: loadedView?.truncated ?? false,
-    source: 'sorted-rows',
-  });
-
-  const pickedOrderColumns = useVisibleMarketOrderColumns((state) => state.value);
-  const withholding = { hideLocation: singleStationBook, feeContext };
-  // A held-back column can't be ticked, so the picker doesn't offer it.
-  const pickableColumns = (ids: readonly MarketOrderColumnId[]) =>
-    ids.filter((id) => !isColumnWithheld(id, withholding));
-  // The order book's own width picks columns or two-line cards: a phone,
-  // and a desktop whose finder column leaves the book too narrow for the
-  // columns the pilot has picked and the figures on screen, both get the
-  // card. Short of that, Location narrows first, so fewer widths need cards.
-  const orderBookWidths = orderBookWidthsRem(
-    pickedOrderColumns.filter((id) => !isColumnWithheld(id, withholding)),
-    orderBookFigureChars([...shownSell, ...sortedBuy], bookBestSell, myOrderIds)
-  );
-  const [orderBookRef, [orderLocationSqueezed = false, orderBookNarrow = false]] =
-    useElementNarrowerThan<HTMLDivElement>([orderBookWidths.roomy, orderBookWidths.cards]);
-  const orderCards = isPhone || orderBookNarrow;
-
-  const { itemSkills, trainedSkills, targetPlan } = useOrderRowSkills(
-    selectedTypeId,
-    activeCharacterId
-  );
-
   const {
     visibleOrderColumns,
     toggleOrderColumn,
@@ -635,55 +475,73 @@ export function Market() {
     buyColumns,
     sellHiddenColumns,
     buyHiddenColumns,
-  } = useMarketOrderColumns({
+    sellExport,
+    buyExport,
+    pickableColumns,
+    orderBookRef,
+    orderCards,
+  } = useMarketOrderTables({
     t,
+    activeCharacterId,
+    hubMode: effectiveLocation.mode === 'hub',
+    effectiveHubId: effectiveHub.id,
+    tradeHubStandings,
     npcStationMap,
     solarSystemMap,
     myOrderIds,
     jumpRangeFilter,
-    bestSell: loadedView?.summary.bestSell ?? null,
-    cards: orderCards,
-    locationSqueezed: orderLocationSqueezed,
-    hideLocation: singleStationBook,
-    feeContext,
+    singleStationBook,
+    loadedView,
+    sortedSell,
+    sortedBuy,
+    shownSell,
   });
+
+  const { itemSkills, trainedSkills, targetPlan } = useOrderRowSkills(
+    selectedTypeId,
+    activeCharacterId
+  );
+
+  const {
+    handleRefresh,
+    orderRowClassName,
+    orderRowContextMenu,
+    noOrders,
+    scopeLabel,
+    bookScope,
+    priceScopeName,
+    scopeNote,
+  } = useMarketOrderBookView({
+    t,
+    onBrowserTab: tab === 'browser',
+    onAppraisalTab: tab === 'appraisal',
+    refreshAppraisal: appraisal.refresh,
+    catalogueError,
+    retryCatalogue,
+    refreshOrderBook,
+    npcStationMap,
+    solarSystemMap,
+    marketRegions,
+    myOrderIds,
+    setStationFilter,
+    selectedTypeId,
+    selectedItemName: selectedItem?.name,
+    effectiveLocation,
+    effectiveHub,
+    allRegions,
+    chosenRegionId,
+    hubRegionName,
+    rangeAcross,
+    browserFilterValue,
+    singleRegionId,
+    globalMarkets,
+    sortedSell,
+    sortedBuy,
+    knownJumps,
+  });
+
   // A phone shows one side of the book at a time (`BookSideToggle`).
   const [phoneSide, setPhoneSide] = useState<BookSide>('sell');
-
-  function handleRefresh() {
-    // On Appraisal the button re-prices the pasted list instead, dropping the
-    // Fuzzwork TTL for those types only (`invalidateHubPrices`). Nothing
-    // below applies: there is no selected item and no order book on this tab.
-    if (tab === 'appraisal') {
-      appraisal.refresh();
-      return;
-    }
-    // A failed catalogue load leaves no item to select, so Refresh retries
-    // the catalogue itself, the one recovery this page has short of F5.
-    if (catalogueError) {
-      retryCatalogue();
-      return;
-    }
-    refreshOrderBook();
-  }
-
-  function orderRowClassName(order: RegionOrder) {
-    return myOrderIds.has(order.order_id) ? 'row-mine' : undefined;
-  }
-
-  function orderRowContextMenu(order: RegionOrder, tr: ReactElement) {
-    return (
-      <OrderRowContextMenu
-        order={order}
-        trigger={tr}
-        npcStations={npcStationMap}
-        solarSystems={solarSystemMap}
-        onFilterToStation={setStationFilter}
-        typeId={selectedTypeId ?? 0}
-        itemName={selectedItem?.name ?? ''}
-      />
-    );
-  }
 
   // Narrow screens only: on desktop the item finder is already on screen
   // beside the item, so there is nothing to go back to. It sits in the
@@ -700,25 +558,6 @@ export function Market() {
     />
   ) : undefined;
 
-  // The tree's "No orders in {Region}" cue (#6200) names the browser's one
-  // region; a region pick with no name yet shows no cue rather than a guess.
-  // Only the Browser tab draws the tree, so no other tab asks for the list.
-  const noOrders = useNoOrdersCue(
-    tab === 'browser' ? singleRegionId : null,
-    effectiveLocation.mode === 'hub'
-      ? effectiveHub.regionName
-      : (marketRegions?.find((region) => region.id === singleRegionId)?.name ?? null),
-    globalMarkets
-  );
-
-  // The header's hub or region, as the Distance select's "no range" option:
-  // with no range set, that is what the book reads.
-  const scopeLabel =
-    effectiveLocation.mode === 'hub'
-      ? effectiveHub.systemName
-      : allRegions
-        ? t('market.allRegions')
-        : (marketRegions?.find((region) => region.id === chosenRegionId)?.name ?? hubRegionName);
   const browserFilterBarProps = {
     value: browserFilterValue,
     onChange: handleBrowserFiltersChange,
@@ -727,32 +566,6 @@ export function Market() {
     scopeLabel,
     currentSystem,
   };
-
-  // What the scope bar says the book is reading. Distances are known at every
-  // range, so the hub's own distance shows even with no range set.
-  const bookStationCount = new Set([...sortedSell, ...sortedBuy].map((o) => o.location_id)).size;
-  const bookScope: OrderBookScope =
-    rangeAcross && browserFilterValue.jumps !== 'any'
-      ? { kind: 'range', jumps: browserFilterValue.jumps, stationCount: bookStationCount }
-      : effectiveLocation.mode === 'hub'
-        ? {
-            kind: 'station',
-            stationName: npcStationMap.get(effectiveHub.stationId)?.name ?? effectiveHub.systemName,
-            systemId: effectiveHub.systemId,
-            security: solarSystemMap.get(effectiveHub.systemId)?.security ?? null,
-            jumpsAway: knownJumps?.get(effectiveHub.systemId) ?? null,
-          }
-        : { kind: 'region', regionName: scopeLabel, stationCount: bookStationCount };
-  // Where the per-item prices beside the book (the hub comparison, the
-  // Variations rows) are read: `orderBookLocation`, which is one region even
-  // under All regions — the hub's — so it is named as that, not "All regions".
-  const priceScopeName = allRegions ? hubRegionName : scopeLabel;
-  // What still reads the header's hub or region while the book reaches past it.
-  const scopeNote = allRegions
-    ? t('market.allRegionsSecondaryNote', { regionName: hubRegionName })
-    : rangeAcross
-      ? t('market.rangeSecondaryNote', { scope: scopeLabel })
-      : null;
 
   const itemTabs = (
     <Tabs
@@ -1432,7 +1245,7 @@ export function Market() {
           <Toast
             message={t('market.quickbar.removed', { name: quickbarUndo.item.name })}
             undo={{ label: t('market.quickbar.undo'), onUndo: handleUndoQuickbarRemove }}
-            onClose={() => setQuickbarUndo(null)}
+            onClose={dismissQuickbarUndo}
           />
         )}
 
@@ -1443,7 +1256,7 @@ export function Market() {
               name: compareUndo.itemName,
             })}
             undo={{ label: t('market.compareUndo.undo'), onUndo: handleUndoCompareVariations }}
-            onClose={() => setCompareUndo(null)}
+            onClose={dismissCompareUndo}
           />
         )}
       </div>
