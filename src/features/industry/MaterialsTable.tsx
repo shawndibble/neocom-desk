@@ -49,6 +49,7 @@ import { DepthPriceLine } from './DepthPriceLine';
 import type { DepthPrice } from '@/engine/industry/depthPrice';
 import {
   clearEveryOwned,
+  offerableStock,
   ownedStockOffer,
   takeEveryOffer,
   undoOwnedStockChanges,
@@ -305,7 +306,7 @@ export function MaterialsTable({
   // The stock a row's offer and "Use all" may draw on: the scoped stock, less
   // what group members ahead of this plan already claimed.
   const offerQuantityFor = (typeID: number) =>
-    groupClaimsFor?.(typeID)?.free ?? detection?.scopedQuantityFor(typeID) ?? 0;
+    offerableStock(typeID, groupClaimsFor, detection?.scopedQuantityFor);
 
   // Owned-quantity writes the session makes (bulk, and every Undo) go out as
   // one batch where the caller takes one.
