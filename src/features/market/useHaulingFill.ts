@@ -27,6 +27,7 @@ import {
   type HaulingViewRow,
 } from './haulingView';
 import { useHaulingFillScan, type HaulingFillMeasure } from './useHaulingFillScan';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 
 const NO_IDS: ReadonlySet<number> = new Set();
 const NO_ROWS: readonly HaulingScanRow[] = [];
@@ -118,22 +119,24 @@ export function useHaulingFill({
   );
 
   // Category per found row, for "Fuel Blocks · 9,000 m³": the scan has just read the types file, so it is cached.
-  const [categoryOf, setCategoryOf] = useState<ReadonlyMap<number, number> | null>(null);
-  useEffect(() => {
-    if (scanned === null || scanned.length === 0 || groups === null) return;
-    let cancelled = false;
-    void loadMarketTypes()
-      .then((types) => {
-        const ids = scanned.map((r) => r.typeId);
-        if (!cancelled) setCategoryOf(haulingCategoryOf(ids, groups, types));
-      })
-      .catch(() => {
-        // The rows still show; only their category line is empty.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [scanned, groups]);
+  const loadCategoryOf = useCallback(
+    () =>
+      loadMarketTypes().then((types) =>
+        haulingCategoryOf(
+          (scanned ?? []).map((r) => r.typeId),
+          groups ?? [],
+          types
+        )
+      ),
+    [scanned, groups]
+  );
+  // The rows still show on a failed load; only their category line is empty.
+  const categoryOf =
+    useKeyedLoad(
+      'category',
+      loadCategoryOf,
+      scanned === null || scanned.length === 0 || groups === null
+    ).data ?? null;
 
   const { find: findFresh, more: findMore, reset: resetScan } = scan;
   const find = () => {

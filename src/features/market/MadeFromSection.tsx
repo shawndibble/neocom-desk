@@ -27,6 +27,7 @@ import { formatSignedPercent, savingTone } from '@/lib/formatSignedPercent';
 import { getHubPrices } from '@/market/prices';
 import type { TradeHub } from '@/market/hubs';
 import { marginOnBestSell, runInputCost } from './madeFromCost';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 
 export interface MadeFromPricing {
   /** Where the inputs are priced. */
@@ -44,23 +45,11 @@ export function MadeFromSection({
 }) {
   const { t } = useTranslation();
   const actions = useOptionalItemActions();
-  const [catalog, setCatalog] = useState<BlueprintCatalog | null>(actions?.blueprints ?? null);
   const [open, setOpen] = useState(true);
 
-  useEffect(() => {
-    if (catalog) return;
-    let cancelled = false;
-    loadBlueprintCatalog()
-      .then((loaded) => {
-        if (!cancelled) setCatalog(loaded);
-      })
-      .catch(() => {
-        // "Made from" is a bonus, not core item detail — a failed load renders nothing.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [catalog]);
+  // "Made from" is a bonus, not core item detail: a failed load renders nothing.
+  const loadedCatalog = useKeyedLoad('catalog', loadBlueprintCatalog, !!actions?.blueprints);
+  const catalog: BlueprintCatalog | null = actions?.blueprints ?? loadedCatalog.data ?? null;
 
   // Show info swaps the open modal to another item without remounting it.
   const [shownFor, setShownFor] = useState(typeId);

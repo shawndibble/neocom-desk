@@ -24,6 +24,7 @@ import { ItemInfoLink } from '@/features/entities';
 import { withoutEntityInfo } from '@/lib/entityInfo';
 import { useOptionalItemActions } from './itemActions';
 import { formatCount } from '@/lib/formatCount';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 
 /** Rows per page — the whole list for anything but a mineral or common component. */
 export const USED_IN_PAGE = 50;
@@ -45,27 +46,19 @@ export function UsedInSection({
 }) {
   const { t } = useTranslation();
   const actions = useOptionalItemActions();
-  const [catalog, setCatalog] = useState<BlueprintCatalog | null>(actions?.blueprints ?? null);
   const [query, setQuery] = useState('');
   const [pages, setPages] = useState(1);
   // null = the default: open for a short list, closed above the filter threshold.
   const [toggled, setToggled] = useState<boolean | null>(null);
 
   const hasActions = actions !== null;
-  useEffect(() => {
-    if (catalog || !hasActions) return;
-    let cancelled = false;
-    loadBlueprintCatalog()
-      .then((loaded) => {
-        if (!cancelled) setCatalog(loaded);
-      })
-      .catch(() => {
-        // "Used in" is a bonus, not core item detail — a failed load renders nothing.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [catalog, hasActions]);
+  // "Used in" is a bonus, not core item detail: a failed load renders nothing.
+  const loadedCatalog = useKeyedLoad(
+    'catalog',
+    loadBlueprintCatalog,
+    !hasActions || actions.blueprints !== null
+  );
+  const catalog: BlueprintCatalog | null = actions?.blueprints ?? loadedCatalog.data ?? null;
 
   // Show info on a row swaps the open modal to that item without remounting it.
   const [shownFor, setShownFor] = useState(typeId);

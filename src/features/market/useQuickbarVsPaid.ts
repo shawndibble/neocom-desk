@@ -5,12 +5,13 @@
  * hub-station sell price the Price History chart already reads, so no market
  * call is added. An item with no covered basis is simply absent from the map.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { hasWalletScope, loadWalletTransactions } from '@/features/character/wallet';
 import { paidBasis, percentVsPaid } from '@/engine/market/paidVsPrice';
 import type { TradeHub } from '@/market/hubs';
 import { toWalletTrade } from './orderCostBasis';
 import { loadStoredOpenPrices } from './marketOpenPrices';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 
 export interface VsPaid {
   percent: number;
@@ -40,51 +41,40 @@ export function useQuickbarVsPaid(
   typeIds: readonly number[],
   hub: TradeHub
 ): ReadonlyMap<number, VsPaid> {
-  const [loaded, setLoaded] = useState<{
-    scope: string;
-    map: ReadonlyMap<number, VsPaid>;
-  } | null>(null);
   // Sorted: a reorder must not reload the wallet.
   const key = [...typeIds].sort((a, b) => a - b).join(',');
   const ids = useMemo(() => (key === '' ? [] : key.split(',').map(Number)), [key]);
   const stationId = hub.stationId;
   const scope = `${characterId}:${stationId}:${key}`;
 
-  useEffect(() => {
-    let cancelled = false;
-    async function run() {
-      const out = new Map<number, VsPaid>();
-      try {
-        if (characterId !== null && ids.length > 0 && (await hasWalletScope(characterId))) {
-          const wallet = await loadWalletTransactions(characterId);
-          if (wallet) {
-            const transactions = wallet.data.map(toWalletTrade);
-            const truncated = wallet.truncated ?? false;
-            const bases = ids.flatMap((typeId) => {
-              const basis = paidBasis({ transactions, typeId, truncated });
-              return basis ? [{ typeId, basis }] : [];
-            });
-            const stored = await Promise.all(bases.map((b) => loadStoredOpenPrices(b.typeId)));
-            bases.forEach(({ typeId, basis }, i) => {
-              const price = latestSell(stored[i], stationId);
-              const percent = percentVsPaid(price, basis.unitCost);
-              if (price === null || percent === null) return;
-              out.set(typeId, { percent, paid: basis.unitCost, price, units: basis.units });
-            });
-          }
+  const load = useCallback(async (): Promise<ReadonlyMap<number, VsPaid>> => {
+    const out = new Map<number, VsPaid>();
+    try {
+      if (characterId !== null && ids.length > 0 && (await hasWalletScope(characterId))) {
+        const wallet = await loadWalletTransactions(characterId);
+        if (wallet) {
+          const transactions = wallet.data.map(toWalletTrade);
+          const truncated = wallet.truncated ?? false;
+          const bases = ids.flatMap((typeId) => {
+            const basis = paidBasis({ transactions, typeId, truncated });
+            return basis ? [{ typeId, basis }] : [];
+          });
+          const stored = await Promise.all(bases.map((b) => loadStoredOpenPrices(b.typeId)));
+          bases.forEach(({ typeId, basis }, i) => {
+            const price = latestSell(stored[i], stationId);
+            const percent = percentVsPaid(price, basis.unitCost);
+            if (price === null || percent === null) return;
+            out.set(typeId, { percent, paid: basis.unitCost, price, units: basis.units });
+          });
         }
-      } catch {
-        // A decoration: any read failure means no chip, never an error.
-        out.clear();
       }
-      if (!cancelled) setLoaded({ scope, map: out });
+    } catch {
+      // A decoration: any read failure means no chip, never an error.
+      out.clear();
     }
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId, ids, stationId, scope]);
+    return out;
+  }, [characterId, ids, stationId]);
 
-  // Never show the previous character's figures while this one loads.
-  return loaded?.scope === scope ? loaded.map : NONE;
+  // Keyed by scope: never show the previous character's figures while this one loads.
+  return useKeyedLoad(scope, load).data ?? NONE;
 }

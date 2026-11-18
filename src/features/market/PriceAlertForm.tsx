@@ -8,7 +8,7 @@
  * on close (Radix popovers and `Modal`'s children do) gets a fresh read of the
  * saved target each time it opens, with no sync effect.
  */
-import { useEffect, useId, useState } from 'react';
+import { useCallback, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -26,6 +26,7 @@ import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { useMarketHub } from './hub';
 import type { QuickbarTarget } from './quickbar';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
 
 export interface PriceAlertFormProps {
   typeId: number;
@@ -57,16 +58,11 @@ export function PriceAlertForm({
   useHydratedStore(useMarketHub);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
 
-  const [sellMin, setSellMin] = useState<number | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    void getHubPrices(hub, [typeId]).then((prices) => {
-      if (!cancelled) setSellMin(prices.get(typeId)?.sellMin ?? null);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [hub, typeId]);
+  const loadSellMin = useCallback(
+    () => getHubPrices(hub, [typeId]).then((prices) => prices.get(typeId)?.sellMin ?? null),
+    [hub, typeId]
+  );
+  const sellMin = useAsyncLoad(loadSellMin).data ?? null;
 
   function handleSave() {
     const amount = parseIskAmount(text);
