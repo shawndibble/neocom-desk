@@ -7,9 +7,9 @@
  * are these ids" (`#id` when a name is unknown) and "queue it after the change was saved, and
  * never undo that change if queueing fails".
  */
-import { db } from '@/db';
 import type { Translate } from '@/lib/translate';
 import { requiredScopesForEndpoints, SEND_MAIL_ENDPOINTS } from '@/esi/registry';
+import { loadGrantedScopes } from '@/app/grantedScopes';
 
 const SEND_MAIL_SCOPES = requiredScopesForEndpoints(SEND_MAIL_ENDPOINTS);
 
@@ -72,8 +72,7 @@ export interface OfficerMailInput {
  */
 export async function queueOfficerMail(input: OfficerMailInput): Promise<OfficerMailOutcome> {
   try {
-    const scopes =
-      input.grantedScopes ?? (await db.tokens.get(input.senderCharacterId))?.scopes ?? [];
+    const scopes = input.grantedScopes ?? [...(await loadGrantedScopes(input.senderCharacterId))];
     const { recipients } = input;
     if (typeof recipients !== 'function' && recipients.length === 0) return { status: 'none' };
     if (!canSendMail(scopes)) return { status: 'no-scope' };

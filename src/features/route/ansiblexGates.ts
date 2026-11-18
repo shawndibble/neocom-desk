@@ -24,6 +24,7 @@ import {
 import { getCharacterSearch } from '@/esi/endpoints';
 import { requiredScopesForEndpoints, type EsiEndpointId } from '@/esi/registry';
 import { loadStructureInfo } from '@/features/character/structures';
+import { loadGrantedScopes } from '@/app/grantedScopes';
 
 export type { AnsiblexGateRecord };
 
@@ -67,7 +68,7 @@ export async function findGatesWithCharacter(
   characterId: number,
   lookup: SystemLookup
 ): Promise<FindGatesOutcome> {
-  const held = new Set((await db.tokens.get(characterId))?.scopes ?? []);
+  const held = await loadGrantedScopes(characterId);
   if (requiredScopesForEndpoints(ANSIBLEX_SEARCH_ENDPOINTS).some((scope) => !held.has(scope))) {
     return { kind: 'no-scope' };
   }

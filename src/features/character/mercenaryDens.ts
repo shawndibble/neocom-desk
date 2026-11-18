@@ -31,7 +31,7 @@ import { resolveNames } from '@/features/character/names';
 import { loadPlanetInfoRow } from '@/features/pi/names';
 import { jumpsFromCurrent } from '@/features/route/jumpsFromCurrent';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
-import { db } from '@/db';
+import { loadGrantedScopes, loadGrantedScopesByCharacter } from '@/app/grantedScopes';
 
 export const DEN_SCOPE = ESI_REGISTRY.getCharacterMercenaryDens.scope;
 export const OPERATION_SCOPE = ESI_REGISTRY.getCharacterMercenaryOperations.scope;
@@ -266,9 +266,10 @@ export async function loadCharacterDenStates(characterId: number): Promise<Chara
 export async function loadMercenaryDensWidget(
   characterId: number
 ): Promise<MercenaryDensWidgetData> {
-  const tokens = await db.tokens.toArray();
   const operationScope = new Set(
-    tokens.filter((t) => t.scopes.includes(OPERATION_SCOPE)).map((t) => t.characterId)
+    [...(await loadGrantedScopesByCharacter())]
+      .filter(([, scopes]) => scopes.has(OPERATION_SCOPE))
+      .map(([id]) => id)
   );
   const { entries } = await fanOutAllCharacters<CharacterDens>({
     scope: DEN_SCOPE,
@@ -330,9 +331,9 @@ export async function loadMercenaryDensWidget(
 export async function loadCharacterDenRows(
   characterId: number
 ): Promise<StatusResult<MercenaryDenRow[]>> {
-  const scopes = (await db.tokens.get(characterId))?.scopes ?? [];
-  if (!scopes.includes(DEN_SCOPE)) return { cached: null, needsReauth: false };
-  const entry = await loadCharacterDens(characterId, '', scopes.includes(OPERATION_SCOPE)).catch(
+  const scopes = await loadGrantedScopes(characterId);
+  if (!scopes.has(DEN_SCOPE)) return { cached: null, needsReauth: false };
+  const entry = await loadCharacterDens(characterId, '', scopes.has(OPERATION_SCOPE)).catch(
     () => null
   );
   if (entry === null || entry.status !== 'read') {

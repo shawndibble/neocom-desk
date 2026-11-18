@@ -28,6 +28,7 @@ import { tradeHubIdFor } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getAveragePriceByType, getHubPrices } from '@/market/prices';
 import { scheduleSync } from '@/sync';
+import { loadGrantedScopes } from '@/app/grantedScopes';
 
 export const REQUIRED_SCOPES = [
   ESI_REGISTRY.getCharacterWallet.scope,
@@ -159,8 +160,8 @@ async function recordOne(
   const held = await db.netWorthSnapshots.get(snapshotId(characterId, utcDay(now)));
   // A row from before a layer existed is re-read once; a complete one is final for the day.
   if (held) {
-    const scopes = (await db.tokens.get(characterId))?.scopes ?? [];
-    const contracts = scopes.includes(ESI_REGISTRY.getCharacterContracts.scope);
+    const scopes = await loadGrantedScopes(characterId);
+    const contracts = scopes.has(ESI_REGISTRY.getCharacterContracts.scope);
     if (!lacksLayer(held, { contracts })) return 'already-recorded';
   }
   const fetched = await sources.fetch(characterId);

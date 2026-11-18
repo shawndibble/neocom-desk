@@ -8,6 +8,7 @@ import { beginGrant } from './grantAction';
 import { missingPermissions } from './missingPermissions';
 import { useReauthSlot, type SlotView } from './reauthSlots';
 import { useCharacterLacksEndpoints } from './useGrantedScopes';
+import { loadGrantedScopes } from './grantedScopes';
 
 interface GrantBannerProps {
   /** Whose grant the action extends — the Character whose data needs it. */
@@ -38,14 +39,14 @@ interface GrantBannerProps {
 function useGrantGap(characterId: number, endpoints: readonly EsiEndpointId[]) {
   const endpointsKey = endpoints.join(',');
   return useLiveQuery(async () => {
-    const [character, token] = await Promise.all([
+    const [character, scopes] = await Promise.all([
       db.characters.get(characterId),
-      db.tokens.get(characterId),
+      loadGrantedScopes(characterId),
     ]);
     return {
       characterId,
       name: character?.name,
-      missing: missingPermissions(endpoints, token?.scopes ?? []),
+      missing: missingPermissions(endpoints, [...scopes]),
     };
     // Keyed by value: callers may rebuild the array every render.
   }, [characterId, endpointsKey]);

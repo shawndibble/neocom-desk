@@ -29,10 +29,12 @@ export function applicationRows(
   return rows;
 }
 
+const NO_SCOPES: ReadonlySet<string> = new Set();
+
 /** The device's characters and anything already read, as the list draws them. */
 export function requestRows(
   characters: readonly { characterId: number; name: string }[],
-  scopesById: ReadonlyMap<number, readonly string[]>,
+  scopesById: ReadonlyMap<number, ReadonlySet<string>>,
   status: VettingStatus,
   readingId: number | null
 ): VettingCharacterRow[] {
@@ -51,7 +53,7 @@ export function requestRows(
         missing: done.missing,
       };
     }
-    const missing = missingSourcesFor(scopesById.get(character.characterId) ?? []);
+    const missing = missingSourcesFor(scopesById.get(character.characterId) ?? NO_SCOPES);
     return {
       characterId: character.characterId,
       name: character.name,

@@ -1,6 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { countGrantedPermissions, type CharacterPermissionCount } from './permissionCounts';
+import { loadGrantedScopesByCharacter } from '@/app/grantedScopes';
 
 /**
  * Every tracked Character with how many Permissions it has granted, live, in
@@ -10,14 +11,16 @@ import { countGrantedPermissions, type CharacterPermissionCount } from './permis
  */
 export function useCharacterPermissionCounts(): readonly CharacterPermissionCount[] | undefined {
   return useLiveQuery(async () => {
-    const [characters, tokens] = await Promise.all([db.characters.toArray(), db.tokens.toArray()]);
-    const scopesById = new Map(tokens.map((token) => [token.characterId, token.scopes ?? []]));
+    const [characters, scopesById] = await Promise.all([
+      db.characters.toArray(),
+      loadGrantedScopesByCharacter(),
+    ]);
     return [...characters]
       .sort((a, b) => a.addedAt - b.addedAt)
       .map((character) => ({
         characterId: character.characterId,
         name: character.name,
-        ...countGrantedPermissions(scopesById.get(character.characterId) ?? []),
+        ...countGrantedPermissions([...(scopesById.get(character.characterId) ?? [])]),
       }));
   });
 }

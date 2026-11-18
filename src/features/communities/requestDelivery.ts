@@ -10,7 +10,6 @@
  * What reaches Firestore: the Request, the line, a quantity and contract ids.
  * Never a price, the issuer or any other contract content.
  */
-import { db as localDb } from '@/db';
 import type { ContractItem } from '@/esi/endpoints';
 import { requiredScopesForEndpoints, type EsiEndpointId } from '@/esi/registry';
 import {
@@ -41,6 +40,7 @@ import { communityBackendOverride } from './backendOverride';
 import { pledgeEditVersion } from './pledgeWrites';
 import { loadMyPledges, loadRequestsById, updateMyPledge } from './requestStore';
 import { MINUTE_MS } from '@/lib/age';
+import { loadGrantedScopes } from '@/app/grantedScopes';
 
 /** The Permission delivery marking needs. */
 export const DELIVERY_ENDPOINTS: readonly EsiEndpointId[] = [
@@ -90,7 +90,7 @@ export function toDeliveryItem(item: ContractItem): DeliveryItem | null {
 }
 
 export async function hasDeliveryScope(characterId: number): Promise<boolean> {
-  const held = new Set((await localDb.tokens.get(characterId))?.scopes ?? []);
+  const held = await loadGrantedScopes(characterId);
   return requiredScopesForEndpoints(DELIVERY_ENDPOINTS).every((scope) => held.has(scope));
 }
 

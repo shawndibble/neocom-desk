@@ -11,7 +11,6 @@
 import type { CharacterSkills, SkillQueueEntry } from '@/esi/endpoints';
 import type { TrainedSkill } from '@/engine/types';
 import type { SkillLevels } from '@/engine/industry/types';
-import { db } from '@/db';
 import { ESI_REGISTRY } from '@/esi/registry';
 import type { StatusResult } from '@/esi/cache';
 import {
@@ -28,13 +27,13 @@ import {
   completedSpGain,
 } from '@/engine/skills/queueStatus';
 import type { CompletedLevel } from '@/engine/skills/queueStatus';
+import { loadGrantedScopes } from '@/app/grantedScopes';
 
 const QUEUE_SCOPE = ESI_REGISTRY.getCharacterSkillQueue.scope;
 
 /** Whether the character's stored token grants the /skillqueue scope. No token row means no grant. */
 async function hasQueueScope(characterId: number): Promise<boolean> {
-  const token = await db.tokens.get(characterId);
-  return (token?.scopes ?? []).includes(QUEUE_SCOPE);
+  return (await loadGrantedScopes(characterId)).has(QUEUE_SCOPE);
 }
 
 export interface CorrectedSkills {

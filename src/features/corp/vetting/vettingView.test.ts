@@ -340,13 +340,15 @@ describe('signOffRows', () => {
 describe('missingSourcesFor', () => {
   it('names what a device grant leaves out of a report', () => {
     expect(
-      missingSourcesFor([
-        'esi-wallet.read_character_wallet.v1',
-        'esi-skills.read_skills.v1',
-        'esi-assets.read_assets.v1',
-      ])
+      missingSourcesFor(
+        new Set([
+          'esi-wallet.read_character_wallet.v1',
+          'esi-skills.read_skills.v1',
+          'esi-assets.read_assets.v1',
+        ])
+      )
     ).toEqual(['contact', 'mail', 'contract']);
-    expect(missingSourcesFor([])).toHaveLength(5);
+    expect(missingSourcesFor(new Set())).toHaveLength(5);
   });
 });
 

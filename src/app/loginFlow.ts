@@ -12,12 +12,12 @@ import {
 import { clearLoginReturnTo, setLoginReturnTo, takeLoginReturnTo } from '@/auth/loginReturnTo';
 import { CORE_GRANT, DEFAULT_ON_GROUPS, SCOPES, scopesForGroup } from '@/esi/scopes';
 import type { ScopeGroup } from '@/esi/registry';
-import { db } from '@/db';
 import type { AlertsExtraState } from '@/features/notifications/alertsGrant';
 import { readCustomizeSelection } from '@/features/permissions/customizeSelection';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { assignLocation } from './navigation';
 import { currentRouterPath, isOnRoute } from './routerPath';
+import { loadGrantedScopes } from './grantedScopes';
 
 export interface EveLoginOptions {
   /**
@@ -62,11 +62,7 @@ async function requestedScopes(
   const named = [...CORE_GRANT, ...groups.flatMap((group) => [...scopesForGroup(group)])];
   const fill = await defaultOnFill();
   try {
-    const token = await db.tokens.get(characterId);
-    // `?? []` as everywhere else that reads a stored grant (app/prefetch.ts,
-    // app/useGrantedScopes.ts): `scopes` post-dates the table, so a record
-    // written before it exists has no such field however the type reads.
-    return [...new Set([...named, ...fill, ...(token?.scopes ?? [])])];
+    return [...new Set([...named, ...fill, ...(await loadGrantedScopes(characterId))])];
   } catch {
     // A broken Dexie may cost the user their cache; it must never cost them
     // their way back in — nor turn a Grant press into a plain re-auth, which
