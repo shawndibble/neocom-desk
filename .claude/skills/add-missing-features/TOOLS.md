@@ -48,7 +48,7 @@ Weak gaps noted, never filed: J-space class/effect/statics in Place Info
 wallet journal. Nothing in our code models it; verify the ESI journal ref type
 before pitching.
 
-**Dead or unreachable:** Evernus (archived 2019), EVE Panel, EVE GURU / Production Ledger,
+**Dead or unreachable:** SeAT Mining Taxes (Pathel/mergederg `seat-mining-taxes`, last push 2018, never usable: ore-tier rates, per-player invoices across alts, wallet-journal paid detection; all built as Moon Mining Tax / Corp Tax Book, #523, #4055, #6308, `paymentLinks`), Evernus (archived 2019), EVE Panel, EVE GURU / Production Ledger,
 EveTerminal.io, Mining Timer Tool, EVE Hauling Advisor, EVE Market Pro (HTTP
 530), scan.eveonline.it (503). Reddit returns 403.
 
