@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_NEARBY_ROUTE_RULES,
@@ -13,25 +12,6 @@ import {
   type NearbyLists,
   type StoredNearby,
 } from './nearbyAlerts.js';
-import { INCURSION_STATES } from './incursionState.js';
-
-const text = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
-
-describe('engine mirrors', () => {
-  it('incursionAlert.ts matches src/engine/incursions/incursionAlert.ts but for its import', () => {
-    const mirror = text('./incursionAlert.ts')
-      .split('\n')
-      .slice(1)
-      .join('\n')
-      .replace("from './incursionState.js'", "from './incursionRows'");
-    expect(mirror).toBe(text('../../src/engine/incursions/incursionAlert.ts'));
-  });
-  it('INCURSION_STATES matches src/engine/incursions/incursionRows.ts', () => {
-    expect(text('../../src/engine/incursions/incursionRows.ts')).toContain(
-      `export const INCURSION_STATES = ${JSON.stringify(INCURSION_STATES).replace(/"/g, "'").replace(/,/g, ', ')} as const;`
-    );
-  });
-});
 
 describe('Occurrence Keys', () => {
   // The literals are pinned on the client side too (src/engine/occurrenceKey.test.ts):

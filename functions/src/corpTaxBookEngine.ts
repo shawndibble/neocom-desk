@@ -7,6 +7,7 @@
 // purpose so that test can import it from the root package (`guards.ts` imports nothing).
 
 import { isPlainRecord } from './guards.js';
+import { DAY_MS, HOUR_MS } from './timeConstants.js';
 
 export interface ObservedRow {
   structureId: number;
@@ -348,7 +349,6 @@ export function allocatePayments(rawInput: {
 // for the verify read: which Statement lines an active record, Miner, moon or
 // Extraction dismissal waives. functionsMirror.test.ts keeps them in step.
 
-const HOUR_MS = 3_600_000;
 export const DEFAULT_EXPIRY_HOURS = 48;
 export const MAX_EXPIRY_HOURS = 96;
 
@@ -572,8 +572,6 @@ export function reconnectCoverageFrom(
 }
 
 // --- Feeder ledger health (#4509) --------------------------------------------
-
-const DAY_MS = 86_400_000;
 
 /** Engine `FEEDER_DISCONNECT_DAYS`. */
 export const FEEDER_DISCONNECT_DAYS = 30;

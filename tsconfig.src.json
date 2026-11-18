@@ -30,7 +30,11 @@
     "functions/src/asyncPool.ts",
     "functions/src/vettingEngine.ts",
     "functions/src/skyhookAlert.ts",
-    "functions/src/jumpRoute.ts"
+    "functions/src/jumpRoute.ts",
+    "functions/src/incursionAlert.ts",
+    "functions/src/incursionState.ts",
+    "functions/src/srpPricing.ts",
+    "functions/src/timeConstants.ts"
   ],
   "exclude": [
     "src/**/*.test.ts",

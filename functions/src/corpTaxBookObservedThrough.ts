@@ -16,7 +16,7 @@
 // scheduled reads of each day); the reads saved are the ~27 older days. A refinery with
 // no entry (a new one, a first run, a truncated read) is merged in full, as before.
 
-const DAY_MS = 24 * 3_600_000;
+import { DAY_MS } from './timeConstants.js';
 
 /** How long after a day closes its ledger rows are trusted to have stopped changing. */
 export const SETTLED_GRACE_MS = 3 * DAY_MS;

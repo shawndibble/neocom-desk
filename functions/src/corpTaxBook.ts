@@ -29,7 +29,7 @@ import {
   type ForfeitBasis,
   type StatementDays,
 } from './corpTaxBookEngine.js';
-import { DAY_MS } from './vettingTypes.js';
+import { DAY_MS } from './timeConstants.js';
 import { UNCOUNTED_LIMIT, type UncountedDonation } from './corpTaxBookSyncEngine.js';
 import {
   MAX_POP_AUDIENCES,

@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { HttpsError } from 'firebase-functions/v2/https';
 import {
@@ -149,14 +148,6 @@ describe('pricingInput', () => {
       kind: 'amount',
       isk: 8_000_000,
     });
-  });
-});
-
-describe('srpPricing mirror', () => {
-  it('matches src/engine/srpPricing.ts', () => {
-    const body = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
-    const mirror = body('./srpPricing.ts').split('\n').slice(1).join('\n');
-    expect(mirror).toBe(body('../../src/engine/srpPricing.ts'));
   });
 });
 

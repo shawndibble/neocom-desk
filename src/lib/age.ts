@@ -7,10 +7,9 @@
  */
 
 import type { Translate } from '@/lib/translate';
+import { DAY_MS, HOUR_MS, MINUTE_MS } from '../../functions/src/timeConstants';
 
-export const MINUTE_MS = 60_000;
-export const HOUR_MS = 3_600_000;
-export const DAY_MS = 86_400_000;
+export { DAY_MS, HOUR_MS, MINUTE_MS };
 
 export function formatAge(ms: number, t: Translate): string {
   if (ms < MINUTE_MS) return t('common.age.justNow');
