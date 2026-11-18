@@ -41,6 +41,8 @@ export interface CharacterBoardRowProps {
   onSelectSkyhook?: (skyhookId: number) => void;
   /** Shared Pops open their detail (the Survey start link); the source id is the pop's. */
   onSelectSharedPop?: (popId: string) => void;
+  /** The list already says who shares every pop (its header), so the row drops the repeat. */
+  hideSharedBy?: boolean;
 }
 
 export function CharacterBoardRow({
@@ -48,6 +50,7 @@ export function CharacterBoardRow({
   onSelectEvent,
   onSelectSkyhook,
   onSelectSharedPop,
+  hideSharedBy = false,
 }: CharacterBoardRowProps) {
   const { t } = useTranslation();
   const zone = useTimeZone();
@@ -86,7 +89,7 @@ export function CharacterBoardRow({
             no sr-only companion, because what the hue encodes is the kind, and
             the kind is already written out in words on the row's third line.
           */}
-          <span className={`text-xs font-semibold tabular-nums ${KIND_TEXT[item.kind]}`}>
+          <span className={`text-sm font-bold tabular-nums ${KIND_TEXT[item.kind]}`}>
             {countdown}
           </span>
           {isProjectedKind(item.kind) && (
@@ -113,7 +116,7 @@ export function CharacterBoardRow({
           {formatTimeOfDay(new Date(item.deadlineMs), zone)} · {t(KIND_LABEL[item.kind])}
           {item.detail && ` · ${t(`calendar.detail.${item.kind}.${item.detail}`, item.detail)}`}
           {item.corporation && ` · ${item.corporation.name}`}
-          {item.sharedBy && ` · ${item.sharedBy.name}`}
+          {item.sharedBy && !hideSharedBy && ` · ${item.sharedBy.name}`}
         </span>
       </span>
     </>

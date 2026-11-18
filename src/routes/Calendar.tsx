@@ -23,6 +23,7 @@ import { useSharedPopParam } from '@/features/character/sharedPopLink';
 import { sharedPopDeadlineMs } from '@/features/character/calendarSharedPops';
 import { RowDetailModal } from '@/features/overview/widgets/RowDetailModal';
 import { CalendarMap } from '@/features/character/CalendarMap';
+import { CalendarWeekSummary } from '@/features/character/CalendarWeekSummary';
 import { CalendarDayTicker } from '@/features/character/CalendarDayTicker';
 import { ComingUpRail } from '@/features/character/ComingUpRail';
 import { CalendarReauthNotice } from '@/features/character/CalendarReauthNotice';
@@ -469,6 +470,7 @@ export function Calendar() {
                 void setHiddenKinds(toggleHiddenKind(hiddenKinds, kind))
               }
               onShowAll={() => void setHiddenKinds([])}
+              onHideAll={(kinds) => void setHiddenKinds(kinds)}
               counts={counts}
               readableKinds={data?.readableKinds ?? []}
               reauthKinds={data?.reauthKinds ?? []}
@@ -536,21 +538,19 @@ export function Calendar() {
                 />
               </Panel>
             ) : (
-              <Panel
-                padded={false}
-                title={t('calendar.map.title')}
-                actions={periodControls}
-                className="w-full min-w-0 md:w-[38rem] xl:shrink-0"
-              >
-                <CalendarMap
-                  days={days}
-                  loads={loads}
-                  nowMs={nowMs}
-                  weekStart={weekStart}
-                  selectedDayMs={selectedDayMs}
-                  onSelectDay={setSelectedDayMs}
-                />
-              </Panel>
+              <div className="w-full min-w-0 space-y-3 md:w-[38rem] xl:shrink-0">
+                <Panel padded={false} title={t('calendar.map.title')} actions={periodControls}>
+                  <CalendarMap
+                    days={days}
+                    loads={loads}
+                    nowMs={nowMs}
+                    weekStart={weekStart}
+                    selectedDayMs={selectedDayMs}
+                    onSelectDay={setSelectedDayMs}
+                  />
+                </Panel>
+                <CalendarWeekSummary items={visible} nowMs={nowMs} />
+              </div>
             )}
 
             <ComingUpRail
