@@ -880,6 +880,7 @@ describe('every stored field of a plan reaches the remote doc and comes back', (
     buildLocationName: 'K2-18 R&D',
     facilityTaxPct: 1.5,
     costIndexOverridePct: 3.2,
+    productSalePrice: 1250.5,
     materialPriceBasis: 'buy',
     materialSourcing: { 34: { ownedQuantity: 500, overridePrice: 6.5 } },
     ownedStockScope: {
@@ -940,6 +941,7 @@ describe('every stored field of a plan reaches the remote doc and comes back', (
       'me',
       'name',
       'ownedStockScope',
+      'productSalePrice',
       'reactionBuildLocationId',
       'reactionBuildLocationName',
       'reactionBuildSystemId',

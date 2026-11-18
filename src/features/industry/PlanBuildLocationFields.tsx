@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import {
+  IconButton,
   InfoTooltip,
   Select,
   SelectContent,
@@ -16,6 +17,8 @@ import {
   type IndustryActivity,
 } from '@/engine/industry/types';
 import type { BuildPlanRecord } from '@/db';
+import * as Icon from '@/components/ui/icons';
+import { maskNumber, unmaskNumber } from '@/lib/numberMask';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import type { MarketSnapshot } from './marketData';
 import { materialPriceBasisOf } from './priceBasis';
@@ -250,6 +253,48 @@ export function PlanBuildLocationFields({
               <SelectItem value="buy">{t('industry.materialPriceBasisBuy')}</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+
+        {/* Blank = the hub's lowest sell. A number the pilot typed replaces
+            it everywhere the product is valued, with the accent as the "you
+            set this" cue and a revert beside it, like a material price. */}
+        <div className="flex flex-col gap-1 text-xs">
+          <span className="flex items-center gap-1">
+            <label htmlFor="build-plan-sale-price">{t('industry.salePrice')}</label>
+            <InfoTooltip
+              label={t('industry.salePriceTooltipLabel')}
+              content={t('industry.salePriceTooltip')}
+            />
+          </span>
+          <span className="flex items-center gap-1">
+            <SourcingInput
+              id="build-plan-sale-price"
+              value={plan.productSalePrice}
+              label={t('industry.salePrice')}
+              inputMode="decimal"
+              widthClassName="w-full"
+              placeholder={t('industry.salePricePlaceholder')}
+              mine={plan.productSalePrice !== undefined}
+              parse={(raw) => {
+                // Blank clears; unreadable or non-positive keeps what was there.
+                if (raw.trim() === '') return undefined;
+                const value = unmaskNumber(raw);
+                return value !== undefined && value > 0 ? value : plan.productSalePrice;
+              }}
+              onCommit={(productSalePrice) => update({ productSalePrice })}
+            />
+            {plan.productSalePrice !== undefined && (
+              <IconButton
+                size="sm"
+                variant="plain"
+                icon={<Icon.Revert size={Icon.ICON_SIZE.sm} />}
+                label={t('industry.resetSalePrice', {
+                  price: maskNumber(plan.productSalePrice),
+                })}
+                onClick={() => update({ productSalePrice: undefined })}
+              />
+            )}
+          </span>
         </div>
       </div>
     </>

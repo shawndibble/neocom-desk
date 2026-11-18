@@ -171,8 +171,9 @@ describe('restoring an existing-format backup file', () => {
     miningTaxAssignments: ['oreLineValues', 'rawOrePriced', 'label', 'override'],
     // sourceJobId (Job History, #2866) postdates this fixture.
     productionRuns: ['sourceJobId'],
-    // costIndexOverridePct (J-Space cost index, 2026-10-12) postdates this fixture.
-    buildPlans: ['costIndexOverridePct'],
+    // costIndexOverridePct (J-Space cost index, 2026-10-12) and productSalePrice
+    // (#6391) postdate this fixture.
+    buildPlans: ['costIndexOverridePct', 'productSalePrice'],
     // entityKind (Payee verification, 2026-10-14) and defaultSystems (Default Systems, 2026-11-03)
     // postdate this fixture.
     payees: ['entityKind', 'defaultSystems'],

@@ -125,6 +125,30 @@ describe('resolveBuildPlan', () => {
   const branchingPrices = snapshot({ 1: 1000, 300: 100, 310: 100, 400: 50, 34: 5 });
   const branchingPlan = plan({ buildHere: [300, 310, 400] });
 
+  describe('product sale price', () => {
+    const src = sources(catalogOf([entry(100, 1, [{ typeID: 34, quantity: 10 }])]), {
+      ownedBlueprints: [owned(100, 1)],
+    });
+    const prices = snapshot({ 1: 1000, 34: 5 });
+
+    it('values the product at the plan price instead of the hub price', () => {
+      const hub = resolveBuildPlan(plan(), src, { snapshot: prices }).result;
+      const own = resolveBuildPlan(plan({ productSalePrice: 3000 }), src, {
+        snapshot: prices,
+      }).result;
+      expect(own?.revenue).toBe((hub?.revenue ?? 0) * 3);
+      expect(own?.buyCost).toBe(own?.revenue);
+    });
+
+    it('prices a product the hub has no order for', () => {
+      const bare = snapshot({ 34: 5 });
+      expect(resolveBuildPlan(plan(), src, { snapshot: bare }).result?.revenue).toBeNull();
+      expect(
+        resolveBuildPlan(plan({ productSalePrice: 3000 }), src, { snapshot: bare }).result?.revenue
+      ).not.toBeNull();
+    });
+  });
+
   describe('cost index override', () => {
     const src = sources(catalogOf([entry(100, 1, [{ typeID: 34, quantity: 10 }])]), {
       ownedBlueprints: [owned(100, 1)],

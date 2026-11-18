@@ -303,10 +303,17 @@ export interface BuildPlanRecord {
    * same as `materialSourcing` below. Absent means `'sell'`, which is how
    * every plan priced materials before this existed.
    *
-   * Materials only. The product is always valued at the hub's lowest sell,
-   * because an Acquisition Verdict asks what buying it outright costs.
+   * Materials only. The product is valued at the hub's lowest sell unless
+   * `productSalePrice` is set.
    */
   materialPriceBasis?: MaterialPriceBasis;
+  /**
+   * The pilot's own sale price for the product, ISK per unit, replacing the
+   * hub's lowest sell in revenue, margin, break-even and the Acquisition
+   * Verdict. Additive and unindexed, so no schema version bump. Absent means
+   * the hub price, which is how every plan valued its product before this.
+   */
+  productSalePrice?: number;
   /**
    * Per-material sourcing overrides, keyed by material typeID: units already
    * owned (free) and/or a manual unit price for the rest. Additive and

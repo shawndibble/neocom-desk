@@ -276,6 +276,7 @@ export const BUILD_PLANS = defineEditableCollection<BuildPlanRecord, RemoteBuild
         ? { costIndexOverridePct: p.costIndexOverridePct }
         : {}),
       ...(p.materialPriceBasis !== undefined ? { materialPriceBasis: p.materialPriceBasis } : {}),
+      ...(p.productSalePrice !== undefined ? { productSalePrice: p.productSalePrice } : {}),
       ...(materialSourcing !== undefined ? { materialSourcing } : {}),
       ...(p.ownedStockScope !== undefined ? { ownedStockScope: p.ownedStockScope } : {}),
       ...(p.includeCorpAssets !== undefined ? { includeCorpAssets: p.includeCorpAssets } : {}),
@@ -343,6 +344,7 @@ export const BUILD_PLANS = defineEditableCollection<BuildPlanRecord, RemoteBuild
       ? { costIndexOverridePct: r.costIndexOverridePct }
       : {}),
     ...(r.materialPriceBasis !== undefined ? { materialPriceBasis: r.materialPriceBasis } : {}),
+    ...(r.productSalePrice !== undefined ? { productSalePrice: r.productSalePrice } : {}),
     ...(r.materialSourcing !== undefined ? { materialSourcing: r.materialSourcing } : {}),
     ...(r.ownedStockScope !== undefined ? { ownedStockScope: r.ownedStockScope } : {}),
     ...(r.includeCorpAssets !== undefined ? { includeCorpAssets: r.includeCorpAssets } : {}),

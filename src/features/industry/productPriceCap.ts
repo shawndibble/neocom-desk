@@ -36,3 +36,25 @@ export function capProductPrice<S extends MarketSnapshot | null>(
     capped,
   };
 }
+
+/**
+ * The snapshot with the plan's own sale price standing in for the product's
+ * hub price (a nullsec market, a contract). The pilot's number is not a troll
+ * price, so the product's average is dropped and `productSalePrice` cannot cap
+ * it. A blank or unusable price leaves the snapshot alone.
+ */
+export function applyProductSalePrice<S extends MarketSnapshot | null>(
+  snapshot: S,
+  productTypeID: number | null | undefined,
+  price: number | undefined
+): S {
+  if (!snapshot || productTypeID == null || price === undefined) return snapshot;
+  if (!Number.isFinite(price) || price <= 0) return snapshot;
+  const averagePrices = snapshot.averagePrices && { ...snapshot.averagePrices };
+  if (averagePrices) delete averagePrices[productTypeID];
+  return {
+    ...snapshot,
+    hubPrices: { ...snapshot.hubPrices, [productTypeID]: price },
+    averagePrices,
+  };
+}

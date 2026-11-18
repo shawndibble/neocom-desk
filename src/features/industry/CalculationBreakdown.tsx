@@ -24,6 +24,8 @@ export interface BreakdownContext {
   hubName: string;
   /** Which side of the hub's order book materials are costed at. */
   materialPriceBasis: MaterialPriceBasis;
+  /** The plan carries its own sale price instead of the hub's. */
+  productPriceOverridden?: boolean;
   /** ME the job ran at; ignored for a reaction, which has none. */
   me: number;
   isReaction: boolean;
@@ -133,10 +135,12 @@ export function CalculationBreakdown({
           <p>{t('industry.breakdown.pricesOwned')}</p>
           <p>{t('industry.breakdown.pricesBuilt')}</p>
           <p>
-            {t('industry.breakdown.pricesProduct', {
-              product: context.productName,
-              hub: context.hubName,
-            })}
+            {t(
+              context.productPriceOverridden
+                ? 'industry.breakdown.pricesProductOverride'
+                : 'industry.breakdown.pricesProduct',
+              { product: context.productName, hub: context.hubName }
+            )}
           </p>
         </Section>
 
@@ -244,7 +248,14 @@ export function CalculationBreakdown({
           context.productQuantity !== null &&
           context.productUnitPrice !== null && (
             <Section title={t('industry.breakdown.revenueTitle')}>
-              <p>{t('industry.breakdown.revenue', { hub: context.hubName })}</p>
+              <p>
+                {t(
+                  context.productPriceOverridden
+                    ? 'industry.breakdown.revenueOverride'
+                    : 'industry.breakdown.revenue',
+                  { hub: context.hubName }
+                )}
+              </p>
               <Formula>
                 {t('industry.breakdown.revenueFormula', {
                   quantity: formatCount(context.productQuantity),

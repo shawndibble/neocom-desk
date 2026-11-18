@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import type { IndustryActivity } from '@/engine/industry/types';
 import type { TradeHub } from '@/market/hubs';
 import { applyCostIndexOverride } from './costIndexOverride';
+import { applyProductSalePrice } from './productPriceCap';
 import { useMarketSnapshot } from './useMarketSnapshot';
 
 /**
@@ -15,6 +16,8 @@ export function usePlanMarketSnapshots(
   reactionBuildSystemId: number | undefined,
   activity: IndustryActivity,
   costIndexOverridePct: number | undefined,
+  productTypeID: number | null,
+  productSalePrice: number | undefined,
   refreshTick: number
 ) {
   // Distinct from `pricesReady`: that one collapses "still fetching"
@@ -30,8 +33,13 @@ export function usePlanMarketSnapshots(
   // J-Space. Everything reads this; `esiSnapshot` is for asking what ESI
   // itself could not supply.
   const snapshot = useMemo(
-    () => applyCostIndexOverride(esiSnapshot, costIndexOverridePct),
-    [esiSnapshot, costIndexOverridePct]
+    () =>
+      applyProductSalePrice(
+        applyCostIndexOverride(esiSnapshot, costIndexOverridePct),
+        productTypeID,
+        productSalePrice
+      ),
+    [esiSnapshot, costIndexOverridePct, productTypeID, productSalePrice]
   );
   const costIndexMissing = esiSnapshot?.systemCostIndexMissing === true;
 
