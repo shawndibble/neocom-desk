@@ -8,13 +8,14 @@ import type { CachedResult } from '@/esi/cache';
 import { loadStationName } from '@/features/character/stations';
 import { loadStructureName } from '@/features/character/structures';
 import { loadSystemName } from '@/features/character/systemSecurity';
-import { loadTypeNames, loadTypeVolumes } from '@/features/character/typeNames';
+import { loadTypeNames } from '@/features/character/typeNames';
 import { type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import type { CharacterAsset } from '@/esi/endpoints';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { NO_ASSET_NAMES, type AssetNameMap } from '@/engine/assetNames';
 import { loadCharacterAssetNames } from '@/features/assets/assetNames';
-import { loadAssetCopyValues } from '@/features/assets/assetCopyValues';
+import { loadAssetCopyValues, type LoadBlueprints } from '@/features/assets/assetCopyValues';
+import { startAssetReads } from '@/features/assets/assetReads';
 import { loadCharacterBlueprints } from '@/features/industry/data';
 import { getAveragePriceByType } from '@/market/prices';
 
@@ -39,15 +40,15 @@ export interface Snapshot {
 }
 
 /** A Character's own blueprint copies valued from contract listings, ME/TE/runs from its blueprints read when that scope is granted. */
+function loadOwnBlueprints(characterId: number): LoadBlueprints {
+  return async () => (await loadCharacterBlueprints(characterId)).cached?.data ?? null;
+}
+
 function loadOwnCopyValues(
   characterId: number,
   assets: readonly CharacterAsset[]
 ): Promise<Map<number, number>> {
-  return loadAssetCopyValues(
-    characterId,
-    assets,
-    async () => (await loadCharacterBlueprints(characterId)).cached?.data ?? null
-  );
+  return loadAssetCopyValues(characterId, assets, loadOwnBlueprints(characterId));
 }
 
 export async function loadAssetsSnapshot(
@@ -83,21 +84,25 @@ export async function loadAssetsSnapshot(
 
   // Already superseded: skip the ESI name resolves, their results would be discarded.
   const typeIds = signal.cancelled ? [] : [...new Set(assets.map((a) => a.type_id))];
-  const copyValuesPromise = signal.cancelled
-    ? Promise.resolve(new Map<number, number>())
-    : loadOwnCopyValues(characterId, assets);
+  const reads = startAssetReads({
+    characterId,
+    assets,
+    typeIds,
+    loadBlueprints: loadOwnBlueprints(characterId),
+    // Names fill in behind the rows, like prices; a failed read leaves type names.
+    loadAssetNames: () => loadCharacterAssetNames(characterId, assets),
+    cancelled: signal.cancelled,
+  });
+  const copyValuesPromise = reads.copyValueByItemId;
   void copyValuesPromise.then(
     (copyValueByItemId) => show({ copyValueByItemId }),
     () => {}
   );
-  // Names fill in behind the rows, like prices; a failed read leaves type names.
-  const assetNamesPromise = signal.cancelled
-    ? Promise.resolve(NO_ASSET_NAMES)
-    : loadCharacterAssetNames(characterId, assets);
+  const assetNamesPromise = reads.assetNames;
   void assetNamesPromise.then((assetNames) => show({ assetNames }));
   const [typeNames, volumeByTypeId] = await Promise.all([
     loadTypeNames(typeIds),
-    loadTypeVolumes(typeIds),
+    reads.volumeByTypeId,
   ]);
   show({ typeNames, volumeByTypeId });
 
