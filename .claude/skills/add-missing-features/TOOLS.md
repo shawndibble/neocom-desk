@@ -13,7 +13,7 @@ surfaced.
 
 **Live, pipeline-relevant (all covered unless a ticket is named):**
 EVE Blue Desk (evebluedesk.com; blueprint contract-price estimator by runs/ME/TE with confidence, stability and sell-through bars, Deals tab, pins, bulk paste estimator, screen scanner; thread posts 1-16 + screenshots read; #6358; its history-based figures are killed 30), eve-exchange.com (#5002), Eve-Omnitool (#5134), EVE Motor Market / MoMa
-(#3985–#3995), EVE Ledger (#3908–#3910), EVE Farm (#5127, #5128), EVE Console
+(#3985–#3995; 1.1.2–1.1.6 read: #6386–#6388), EVE Ledger (#3908–#3910), EVE Farm (#5127, #5128), EVE Console
 (#4530, #5974; every release v0.9.7–0.9.18 read), EVE Market Tool, ForgeWire (#4550), JitaSpace, EVE-NAV, Missioneers'
 Atlas (LP finder = #718/#1050/#1068), IndustrialEVE (PI alerts: kill-tests 12,
 17, #956), EWT PI Tools ("User Planets" = Advisor worklist), Pod Warden (ADR
@@ -233,6 +233,9 @@ Numbering is stable; later runs cite these by number. Append, never renumber.
 
 ## Filed candidates
 
+- #6386 SHIP Owned stock subtracts inputs of the Character's jobs installed after the assets snapshot (MoMa 1.1.5 Stock locations; ESI assets cache ~1h).
+- #6387 NARROW Doctrine Fit hub coverage: complete ships the hub's sell orders supply + gap cost (MoMa 1.1.6 Doctrines; freight, build profit, history, own tab cut).
+- #6388 NARROW Copy list scaled to a budget, whole units, 10% warning (MoMa 1.1.5 target budget).
 - #6282 NARROW Route Safety trip time: "warp to 0 ≈ N · autopilot ≈ M min" for the route ship (gate legs only, skills V, base hull; courier modal cut, no route ship there).
 - #6284 NARROW Build Plan "From ore you mine": which ores in the device's mining ledgers (every Character, 90 days) yield each short mineral, plus "Buy these" for the rest. Read-only; no units/m³ plan, Buy ore instead untouched (Ore to ISK's fewest-m³ Build Planner).
 - Vyraj: #6199 NARROW LP Store "Spend my LP" plan (instant only, top ~10 offers, shared consumable books, fixed 70% floor; amends `20261030-180139`). #6200 NARROW Market tree "No orders in {Region}" cue (`/markets/{region}/types/`, negative only, no hide toggle, single-region modes only).
@@ -407,6 +410,7 @@ The reason is what stops a re-pitch. Numbers are kill-tests.
   self-defeat `haulingMarket.ts`'s header argues against; spread/after-fees
   already ships (`compareMargin`, Compare drawer). Reopen only with per-minute
   books or a side-split fill series.
+- **MoMa 1.1.x kills:** per-material multi-hub purchase with freight (Move plan, Haul route, Appraisal multi-hub answer "cheaper elsewhere"; top-few-percent reach); T3 invention via relics (invention ships Tech II only, decision `20261016-193712` did not reject T3, killed on reach ~5%; reopen on demand); region market stats by ISK traded (Market browser all-regions view, Price History 4-region compare, per-region units/day object; structure volume not crawlable); daily-volume-over-trading-days bug (already divides by the whole window, `averageDailyVolume`); vs-1Y-low / falling-knife filter (`vs 90d` ships, no swing tab); contracts-to-accept row (not verified against the contracts poll domain; low reach).
 - **MoMa leftovers:** station-trading flip finder (no new tabs; Hauling's 3-pass
   scan if revived inline); compressed-ore buying as a facility-rate model
   (structure rates out, `20260906-180034`; #5134 is the narrowed shape); guided
