@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import type { DayCharge } from './charges';
 import {
@@ -198,17 +199,16 @@ describe('disputedTax on a rate dispute', () => {
 
 describe('disputeHold', () => {
   const at = '2026-11-03T00:00:00.000Z';
-  const day = 24 * 60 * 60 * 1000;
 
   it('holds an unanswered dispute until 14 days after it was raised', () => {
     const hold = disputeHold(dispute({ at }), '2026-11-05T00:00:00.000Z');
     expect(hold).toEqual({
-      until: new Date(Date.parse(at) + DISPUTE_HOLD_DAYS * day).toISOString(),
+      until: new Date(Date.parse(at) + DISPUTE_HOLD_DAYS * DAY_MS).toISOString(),
     });
   });
 
   it('lapses once the 14 days are up, so the day is owed as before', () => {
-    const late = new Date(Date.parse(at) + DISPUTE_HOLD_DAYS * day).toISOString();
+    const late = new Date(Date.parse(at) + DISPUTE_HOLD_DAYS * DAY_MS).toISOString();
     expect(disputeHold(dispute({ at }), late)).toBeUndefined();
   });
 

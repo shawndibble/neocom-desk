@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import { occurrenceKey } from '../occurrenceKey';
 import {
@@ -8,11 +9,10 @@ import {
   type AcceleratorSnapshot,
 } from './accelerator';
 
-const HOUR = 3_600_000;
 const NOW = 1_000_000_000_000;
 
 function entry(overrides: Partial<AcceleratorEntrySnapshot> = {}): AcceleratorEntrySnapshot {
-  return { expiresAtMs: NOW + 3 * HOUR, bonus: 10, leadMs: HOUR, ...overrides };
+  return { expiresAtMs: NOW + 3 * HOUR_MS, bonus: 10, leadMs: HOUR_MS, ...overrides };
 }
 
 function snap(nowMs: number, ...entries: AcceleratorEntrySnapshot[]): AcceleratorSnapshot {
@@ -28,15 +28,15 @@ describe('diffAcceleratorExpiring', () => {
 
   it('fires once when the expiry enters the lead window, not again inside it', () => {
     const before = snap(NOW, entry());
-    const inside = snap(NOW + 2.5 * HOUR, entry());
-    const later = snap(NOW + 2.75 * HOUR, entry());
+    const inside = snap(NOW + 2.5 * HOUR_MS, entry());
+    const later = snap(NOW + 2.75 * HOUR_MS, entry());
     expect(diffAcceleratorExpiring(7, before, inside)).toEqual([
       {
         eventId: 'acceleratorExpiring',
         characterId: 7,
-        expiresAtMs: NOW + 3 * HOUR,
+        expiresAtMs: NOW + 3 * HOUR_MS,
         bonus: 10,
-        thresholdMs: HOUR,
+        thresholdMs: HOUR_MS,
       },
     ]);
     expect(diffAcceleratorExpiring(7, inside, later)).toEqual([]);
@@ -46,28 +46,28 @@ describe('diffAcceleratorExpiring', () => {
     const fires = diffAcceleratorExpiring(
       7,
       snap(NOW),
-      snap(NOW + HOUR, entry({ expiresAtMs: NOW + HOUR + 30 * 60_000 }))
+      snap(NOW + HOUR_MS, entry({ expiresAtMs: NOW + HOUR_MS + 30 * 60_000 }))
     );
     expect(fires).toHaveLength(1);
   });
 
   it('fires nothing outside the window, for an expired record, or for none', () => {
-    expect(diffAcceleratorExpiring(7, snap(NOW), snap(NOW + HOUR, entry()))).toEqual([]);
-    expect(diffAcceleratorExpiring(7, snap(NOW, entry()), snap(NOW + 4 * HOUR, entry()))).toEqual(
-      []
-    );
-    expect(diffAcceleratorExpiring(7, snap(NOW, entry()), snap(NOW + HOUR))).toEqual([]);
+    expect(diffAcceleratorExpiring(7, snap(NOW), snap(NOW + HOUR_MS, entry()))).toEqual([]);
+    expect(
+      diffAcceleratorExpiring(7, snap(NOW, entry()), snap(NOW + 4 * HOUR_MS, entry()))
+    ).toEqual([]);
+    expect(diffAcceleratorExpiring(7, snap(NOW, entry()), snap(NOW + HOUR_MS))).toEqual([]);
   });
 
   it('fires again for a replaced accelerator (new expiry)', () => {
-    const prev = snap(NOW + 2.5 * HOUR, entry());
-    const next = snap(NOW + 2.6 * HOUR, entry({ expiresAtMs: NOW + 3.4 * HOUR }));
+    const prev = snap(NOW + 2.5 * HOUR_MS, entry());
+    const next = snap(NOW + 2.6 * HOUR_MS, entry({ expiresAtMs: NOW + 3.4 * HOUR_MS }));
     expect(diffAcceleratorExpiring(7, prev, next)).toHaveLength(1);
   });
 
   it('takes a raised lead time effect on the next poll', () => {
-    const prev = snap(NOW + 1.5 * HOUR, entry({ leadMs: HOUR }));
-    const next = snap(NOW + 1.6 * HOUR, entry({ leadMs: 2 * HOUR }));
+    const prev = snap(NOW + 1.5 * HOUR_MS, entry({ leadMs: HOUR_MS }));
+    const next = snap(NOW + 1.6 * HOUR_MS, entry({ leadMs: 2 * HOUR_MS }));
     expect(diffAcceleratorExpiring(7, prev, next)).toHaveLength(1);
   });
 });
@@ -93,54 +93,60 @@ describe('diffAcceleratorEnded', () => {
   });
 
   it('fires expired once a typed accelerator has run out, and only once', () => {
-    const before = presence(NOW, typed(NOW + HOUR));
-    const after = presence(NOW + 2 * HOUR, detected());
+    const before = presence(NOW, typed(NOW + HOUR_MS));
+    const after = presence(NOW + 2 * HOUR_MS, detected());
     expect(diffAcceleratorEnded(7, before, after)).toEqual([
-      { eventId: 'acceleratorEnded', characterId: 7, kind: 'expired', bonus: 12, atMs: NOW + HOUR },
+      {
+        eventId: 'acceleratorEnded',
+        characterId: 7,
+        kind: 'expired',
+        bonus: 12,
+        atMs: NOW + HOUR_MS,
+      },
     ]);
-    expect(diffAcceleratorEnded(7, after, presence(NOW + 3 * HOUR, detected()))).toEqual([]);
+    expect(diffAcceleratorEnded(7, after, presence(NOW + 3 * HOUR_MS, detected()))).toEqual([]);
   });
 
   it('does not fire when the pilot deletes or replaces a typed accelerator that was still running', () => {
-    const before = presence(NOW, typed(NOW + 5 * HOUR));
-    expect(diffAcceleratorEnded(7, before, presence(NOW + HOUR))).toEqual([]);
-    expect(diffAcceleratorEnded(7, before, presence(NOW + HOUR, typed(NOW + 9 * HOUR)))).toEqual(
-      []
-    );
+    const before = presence(NOW, typed(NOW + 5 * HOUR_MS));
+    expect(diffAcceleratorEnded(7, before, presence(NOW + HOUR_MS))).toEqual([]);
+    expect(
+      diffAcceleratorEnded(7, before, presence(NOW + HOUR_MS, typed(NOW + 9 * HOUR_MS)))
+    ).toEqual([]);
   });
 
   it('still fires expired when a replacement is typed in after the old one ran out', () => {
-    const before = presence(NOW, typed(NOW + HOUR));
-    const after = presence(NOW + 2 * HOUR, typed(NOW + 9 * HOUR));
+    const before = presence(NOW, typed(NOW + HOUR_MS));
+    const after = presence(NOW + 2 * HOUR_MS, typed(NOW + 9 * HOUR_MS));
     expect(diffAcceleratorEnded(7, before, after)).toHaveLength(1);
-    expect(diffAcceleratorEnded(7, after, presence(NOW + 3 * HOUR, typed(NOW + 9 * HOUR)))).toEqual(
-      []
-    );
+    expect(
+      diffAcceleratorEnded(7, after, presence(NOW + 3 * HOUR_MS, typed(NOW + 9 * HOUR_MS)))
+    ).toEqual([]);
   });
 
   it('fires lost when a detected accelerator goes away with no typed one', () => {
-    expect(diffAcceleratorEnded(7, presence(NOW, detected(8)), presence(NOW + HOUR))).toEqual([
-      { eventId: 'acceleratorEnded', characterId: 7, kind: 'lost', bonus: 8, atMs: NOW + HOUR },
+    expect(diffAcceleratorEnded(7, presence(NOW, detected(8)), presence(NOW + HOUR_MS))).toEqual([
+      { eventId: 'acceleratorEnded', characterId: 7, kind: 'lost', bonus: 8, atMs: NOW + HOUR_MS },
     ]);
   });
 
   it('does not fire lost while a typed accelerator is running, or while detection still sees one', () => {
     const before = presence(NOW, detected());
-    expect(diffAcceleratorEnded(7, before, presence(NOW + HOUR, typed(NOW + 9 * HOUR)))).toEqual(
-      []
-    );
-    expect(diffAcceleratorEnded(7, before, presence(NOW + HOUR, detected()))).toEqual([]);
+    expect(
+      diffAcceleratorEnded(7, before, presence(NOW + HOUR_MS, typed(NOW + 9 * HOUR_MS)))
+    ).toEqual([]);
+    expect(diffAcceleratorEnded(7, before, presence(NOW + HOUR_MS, detected()))).toEqual([]);
   });
 
   it('announces a typed expiry once even when the attribute sheet drops it a poll later', () => {
-    const typedLive = presence(NOW, typed(NOW + HOUR), detected());
-    const expired = presence(NOW + 2 * HOUR, detected());
-    const sheetCaughtUp = presence(NOW + 3 * HOUR);
+    const typedLive = presence(NOW, typed(NOW + HOUR_MS), detected());
+    const expired = presence(NOW + 2 * HOUR_MS, detected());
+    const sheetCaughtUp = presence(NOW + 3 * HOUR_MS);
     const first = diffAcceleratorEnded(7, typedLive, expired);
     const second = diffAcceleratorEnded(7, expired, sheetCaughtUp);
     expect(first).toHaveLength(1);
     // Two fires, but one occurrence: the key is per Character per UTC day.
-    const keys = [...first, ...second].map((fire) => occurrenceKey(fire, NOW + 3 * HOUR));
+    const keys = [...first, ...second].map((fire) => occurrenceKey(fire, NOW + 3 * HOUR_MS));
     expect(new Set(keys).size).toBe(1);
   });
 });

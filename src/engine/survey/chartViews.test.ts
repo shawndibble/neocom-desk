@@ -1,19 +1,19 @@
+import { MINUTE_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import { availableChartViews, depletionSeries, iskSeries, paceShareSeries } from './chartViews';
 import { summarizeSurvey, type SurveyScan } from './series';
 
-const MIN = 60_000;
 const T0 = Date.UTC(2026, 9, 8, 16, 40, 0);
 
 /** A scan whose rocks carry ISK: [ore, volume, isk]. */
 function iskScan(minutes: number, ...rocks: [string, number, number][]): SurveyScan {
   return {
-    at: T0 + minutes * MIN,
+    at: T0 + minutes * MINUTE_MS,
     rocks: rocks.map(([ore, volume, isk]) => ({ ore, volume, isk })),
   };
 }
 function scan(minutes: number, ...rocks: [string, number][]): SurveyScan {
-  return { at: T0 + minutes * MIN, rocks: rocks.map(([ore, volume]) => ({ ore, volume })) };
+  return { at: T0 + minutes * MINUTE_MS, rocks: rocks.map(([ore, volume]) => ({ ore, volume })) };
 }
 
 const PRICES = new Map([['A', 10]]);
@@ -40,7 +40,7 @@ describe('depletionSeries', () => {
     const s = summarizeSurvey([scan(0, ['A', 100], ['B', 300]), scan(5, ['A', 50], ['B', 300])])!;
     expect(depletionSeries(s)).toEqual([
       { at: T0, all: 100, A: 100, B: 100 },
-      { at: T0 + 5 * MIN, all: (350 / 400) * 100, A: 50, B: 100 },
+      { at: T0 + 5 * MINUTE_MS, all: (350 / 400) * 100, A: 50, B: 100 },
     ]);
   });
 
@@ -236,12 +236,12 @@ describe('paceShareSeries', () => {
     const { rows } = paceShareSeries(s);
     expect(rows).toEqual([
       { at: T0, interval: 0, idle: 0 },
-      { at: T0 + 5 * MIN, interval: 0, idle: 0 },
-      { at: T0 + 10 * MIN - 1, interval: 0, idle: 0 },
-      { at: T0 + 10 * MIN, interval: 1, idle: 0 },
-      { at: T0 + 15 * MIN, interval: 1, idle: 0 },
-      { at: T0 + 20 * MIN - 1, interval: 1, idle: 0 },
-      { at: T0 + 20 * MIN, interval: -1, idle: 0 },
+      { at: T0 + 5 * MINUTE_MS, interval: 0, idle: 0 },
+      { at: T0 + 10 * MINUTE_MS - 1, interval: 0, idle: 0 },
+      { at: T0 + 10 * MINUTE_MS, interval: 1, idle: 0 },
+      { at: T0 + 15 * MINUTE_MS, interval: 1, idle: 0 },
+      { at: T0 + 20 * MINUTE_MS - 1, interval: 1, idle: 0 },
+      { at: T0 + 20 * MINUTE_MS, interval: -1, idle: 0 },
     ]);
   });
 

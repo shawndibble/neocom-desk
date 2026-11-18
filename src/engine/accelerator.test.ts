@@ -39,13 +39,12 @@ describe('isAcceleratorLive', () => {
 });
 
 describe('acceleratorSeverity', () => {
-  const HOUR = HOUR_MS;
   it('stays clear until the last two hours', () => {
-    expect(acceleratorSeverity(3 * 24 * HOUR)).toBe('clear');
-    expect(acceleratorSeverity(2 * HOUR + 1)).toBe('clear');
+    expect(acceleratorSeverity(3 * 24 * HOUR_MS)).toBe('clear');
+    expect(acceleratorSeverity(2 * HOUR_MS + 1)).toBe('clear');
   });
   it('warns inside two hours', () => {
-    expect(acceleratorSeverity(2 * HOUR)).toBe('warning');
+    expect(acceleratorSeverity(2 * HOUR_MS)).toBe('warning');
     expect(acceleratorSeverity(1)).toBe('warning');
   });
 });

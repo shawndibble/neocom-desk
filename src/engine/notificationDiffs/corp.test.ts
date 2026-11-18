@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { describe, it, expect } from 'vitest';
 import {
   diffStructureFuelLow,
@@ -16,12 +17,11 @@ import {
 
 const T0 = 1_000_000;
 const FIVE_MIN = 5 * 60 * 1000;
-const DAY = 86_400_000;
 
 function fuelEntry(
   overrides: Partial<StructureFuelEntrySnapshot> & Pick<StructureFuelEntrySnapshot, 'structureId'>
 ): StructureFuelEntrySnapshot {
-  return { name: 'Fortizar', fuelExpiresMs: null, thresholdMs: 7 * DAY, ...overrides };
+  return { name: 'Fortizar', fuelExpiresMs: null, thresholdMs: 7 * DAY_MS, ...overrides };
 }
 
 function fuelSnapshot(
@@ -33,15 +33,15 @@ function fuelSnapshot(
 
 describe('diffStructureFuelLow', () => {
   it('fires nothing on the first-ever poll', () => {
-    const next = fuelSnapshot([fuelEntry({ structureId: 1, fuelExpiresMs: T0 + DAY })], T0);
+    const next = fuelSnapshot([fuelEntry({ structureId: 1, fuelExpiresMs: T0 + DAY_MS })], T0);
     expect(diffStructureFuelLow(1, undefined, next)).toEqual([]);
   });
 
   it('fires when remaining fuel newly crosses the threshold', () => {
-    const prev = fuelSnapshot([fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 8 * DAY })], T0);
+    const prev = fuelSnapshot([fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 8 * DAY_MS })], T0);
     const next = fuelSnapshot(
-      [fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 8 * DAY })],
-      T0 + 2 * DAY
+      [fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 8 * DAY_MS })],
+      T0 + 2 * DAY_MS
     );
     expect(diffStructureFuelLow(7, prev, next)).toEqual([
       {
@@ -49,25 +49,25 @@ describe('diffStructureFuelLow', () => {
         characterId: 7,
         structureId: 1,
         structureName: 'Fortizar',
-        thresholdMs: 7 * DAY,
-        fuelExpiresMs: T0 + 8 * DAY,
+        thresholdMs: 7 * DAY_MS,
+        fuelExpiresMs: T0 + 8 * DAY_MS,
       },
     ]);
   });
 
   it('does not fire while remaining fuel is still above the threshold', () => {
-    const prev = fuelSnapshot([fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 20 * DAY })], T0);
+    const prev = fuelSnapshot([fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 20 * DAY_MS })], T0);
     const next = fuelSnapshot(
-      [fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 20 * DAY })],
-      T0 + DAY
+      [fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 20 * DAY_MS })],
+      T0 + DAY_MS
     );
     expect(diffStructureFuelLow(7, prev, next)).toEqual([]);
   });
 
   it('does not re-fire for a structure already under threshold as of the previous poll', () => {
-    const prev = fuelSnapshot([fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 2 * DAY })], T0);
+    const prev = fuelSnapshot([fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 2 * DAY_MS })], T0);
     const next = fuelSnapshot(
-      [fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 2 * DAY })],
+      [fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 2 * DAY_MS })],
       T0 + FIVE_MIN
     );
     expect(diffStructureFuelLow(7, prev, next)).toEqual([]);
@@ -76,7 +76,7 @@ describe('diffStructureFuelLow', () => {
   it('fires for a structure discovered already under threshold (never seen active before)', () => {
     const prev = fuelSnapshot([], T0);
     const next = fuelSnapshot(
-      [fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 2 * DAY })],
+      [fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 2 * DAY_MS })],
       T0 + 2000
     );
     expect(diffStructureFuelLow(7, prev, next)).toEqual([
@@ -85,15 +85,18 @@ describe('diffStructureFuelLow', () => {
         characterId: 7,
         structureId: 1,
         structureName: 'Fortizar',
-        thresholdMs: 7 * DAY,
-        fuelExpiresMs: T0 + 2 * DAY,
+        thresholdMs: 7 * DAY_MS,
+        fuelExpiresMs: T0 + 2 * DAY_MS,
       },
     ]);
   });
 
   it('does not fire once a structure has already run fully dry (null fuelExpiresMs)', () => {
-    const prev = fuelSnapshot([fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 2 * DAY })], T0);
-    const next = fuelSnapshot([fuelEntry({ structureId: 1, fuelExpiresMs: null })], T0 + 3 * DAY);
+    const prev = fuelSnapshot([fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 2 * DAY_MS })], T0);
+    const next = fuelSnapshot(
+      [fuelEntry({ structureId: 1, fuelExpiresMs: null })],
+      T0 + 3 * DAY_MS
+    );
     expect(diffStructureFuelLow(7, prev, next)).toEqual([]);
   });
 
@@ -101,9 +104,9 @@ describe('diffStructureFuelLow', () => {
     // A refuel moves fuel_expires to a new, later instant — a different
     // countdown from the one `prev` observed, so it is judged fresh rather
     // than matched against the old identity and skipped as already seen.
-    const prev = fuelSnapshot([fuelEntry({ structureId: 1, fuelExpiresMs: T0 + DAY })], T0);
+    const prev = fuelSnapshot([fuelEntry({ structureId: 1, fuelExpiresMs: T0 + DAY_MS })], T0);
     const next = fuelSnapshot(
-      [fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 3 * DAY })],
+      [fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 3 * DAY_MS })],
       T0 + 10_000
     );
     expect(diffStructureFuelLow(7, prev, next)).toEqual([
@@ -112,8 +115,8 @@ describe('diffStructureFuelLow', () => {
         characterId: 7,
         structureId: 1,
         structureName: 'Fortizar',
-        thresholdMs: 7 * DAY,
-        fuelExpiresMs: T0 + 3 * DAY,
+        thresholdMs: 7 * DAY_MS,
+        fuelExpiresMs: T0 + 3 * DAY_MS,
       },
     ]);
   });
@@ -123,11 +126,11 @@ describe('diffStructureFuelLow', () => {
     // Character narrowed it to 1 day — narrowing must not manufacture a
     // second fire for a crossing already reported under the wider setting.
     const prev = fuelSnapshot(
-      [fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 12 * 3_600_000, thresholdMs: 7 * DAY })],
+      [fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 12 * 3_600_000, thresholdMs: 7 * DAY_MS })],
       T0
     );
     const next = fuelSnapshot(
-      [fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 12 * 3_600_000, thresholdMs: DAY })],
+      [fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 12 * 3_600_000, thresholdMs: DAY_MS })],
       T0 + FIVE_MIN
     );
     expect(diffStructureFuelLow(7, prev, next)).toEqual([]);
@@ -138,11 +141,11 @@ describe('diffStructureFuelLow', () => {
     // once the Character widens it to 7 days, that same 5 days is newly
     // inside — must fire on this poll, not wait for a fresh baseline.
     const prev = fuelSnapshot(
-      [fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 5 * DAY, thresholdMs: DAY })],
+      [fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 5 * DAY_MS, thresholdMs: DAY_MS })],
       T0
     );
     const next = fuelSnapshot(
-      [fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 5 * DAY, thresholdMs: 7 * DAY })],
+      [fuelEntry({ structureId: 1, fuelExpiresMs: T0 + 5 * DAY_MS, thresholdMs: 7 * DAY_MS })],
       T0 + FIVE_MIN
     );
     expect(diffStructureFuelLow(7, prev, next)).toEqual([
@@ -151,8 +154,8 @@ describe('diffStructureFuelLow', () => {
         characterId: 7,
         structureId: 1,
         structureName: 'Fortizar',
-        thresholdMs: 7 * DAY,
-        fuelExpiresMs: T0 + 5 * DAY,
+        thresholdMs: 7 * DAY_MS,
+        fuelExpiresMs: T0 + 5 * DAY_MS,
       },
     ]);
   });

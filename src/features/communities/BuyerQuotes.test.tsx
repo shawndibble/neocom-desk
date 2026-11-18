@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -14,7 +15,6 @@ vi.mock('@/features/character/names', () => ({
   resolveNames: vi.fn().mockResolvedValue(new Map()),
 }));
 
-const DAY = 86_400_000;
 const NOW = Date.parse('2026-10-20T12:00:00Z');
 const request: CommunityRequest = {
   id: 'r1',
@@ -45,8 +45,8 @@ const pledge = (
   quote: {
     lines: [{ typeId: 1230, name: 'Veldspar', quantity: 1000, unitPrice: 10, total: 9000 }],
     total: 9000,
-    quotedAt: NOW - DAY,
-    expiresAt: NOW + 13 * DAY,
+    quotedAt: NOW - DAY_MS,
+    expiresAt: NOW + 13 * DAY_MS,
     ...over,
   },
   updatedAt: NOW,
@@ -62,8 +62,8 @@ const contract = (over: Partial<Contract> = {}): Contract =>
     status: 'outstanding',
     for_corporation: false,
     availability: 'personal',
-    date_issued: new Date(NOW - DAY).toISOString(),
-    date_expired: new Date(NOW + 5 * DAY).toISOString(),
+    date_issued: new Date(NOW - DAY_MS).toISOString(),
+    date_expired: new Date(NOW + 5 * DAY_MS).toISOString(),
     price: 9000,
     ...over,
   }) as Contract;

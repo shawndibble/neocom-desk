@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import * as mirror from '../../../functions/src/corpTaxBookEngine';
 import * as calls from '../../../functions/src/corpTaxBookKinds';
@@ -892,10 +893,15 @@ describe('feeder view mirror', () => {
 });
 
 describe('removal mirror (#4520)', () => {
-  const H = 3_600_000;
   it('payeeMayForce agrees on the boundaries', () => {
-    const start = 1000 * H;
-    for (const changed of [undefined, start - 49 * H, start - 47 * H, start, start + H]) {
+    const start = 1000 * HOUR_MS;
+    for (const changed of [
+      undefined,
+      start - 49 * HOUR_MS,
+      start - 47 * HOUR_MS,
+      start,
+      start + HOUR_MS,
+    ]) {
       for (const payeeSetBy of [undefined, 'accounting', 'moon-owner'] as const) {
         const input = { payeeChangedAt: changed, removalStartedAt: start, payeeSetBy };
         expect(mirror.payeeMayForce(input)).toBe(removal.payeeMayForce(input));
@@ -909,7 +915,7 @@ describe('removal mirror (#4520)', () => {
     expect(mirror.startRemoval({ status: 'active' }, by, 5)).toEqual(pending);
     const sent = removal.recordRemovalNotice(pending, 9);
     expect(mirror.recordRemovalNotice(pending, 9)).toEqual(sent);
-    for (const now of [9, 9 + 24 * H, 9 + 25 * H]) {
+    for (const now of [9, 9 + 24 * HOUR_MS, 9 + 25 * HOUR_MS]) {
       expect(mirror.isRemovalDue(sent, now)).toBe(removal.isRemovalDue(sent, now));
     }
     const rec = {

@@ -1,17 +1,17 @@
+import { MINUTE_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import { countedScans, summarizeSurvey, type SurveyScan } from './series';
 
-const MIN = 60_000;
 const T0 = Date.UTC(2026, 9, 8, 16, 40, 0);
 
 function scan(minutes: number, ...rocks: [string, number][]): SurveyScan {
-  return { at: T0 + minutes * MIN, rocks: rocks.map(([ore, volume]) => ({ ore, volume })) };
+  return { at: T0 + minutes * MINUTE_MS, rocks: rocks.map(([ore, volume]) => ({ ore, volume })) };
 }
 
 /** A scan whose rocks carry the scanner's ISK value: [ore, volume, isk]. */
 function iskScan(minutes: number, ...rocks: [string, number, number][]): SurveyScan {
   return {
-    at: T0 + minutes * MIN,
+    at: T0 + minutes * MINUTE_MS,
     rocks: rocks.map(([ore, volume, isk]) => ({ ore, volume, isk })),
   };
 }
@@ -42,7 +42,7 @@ describe('summarizeSurvey', () => {
     expect(s.intervals).toEqual([
       {
         from: T0,
-        to: T0 + 5 * MIN,
+        to: T0 + 5 * MINUTE_MS,
         mined: 300,
         added: 0,
         rate: 1,
@@ -50,8 +50,8 @@ describe('summarizeSurvey', () => {
         minedByOre: { Sylvite: 300 },
       },
       {
-        from: T0 + 5 * MIN,
-        to: T0 + 10 * MIN,
+        from: T0 + 5 * MINUTE_MS,
+        to: T0 + 10 * MINUTE_MS,
         mined: 300,
         added: 0,
         rate: 1,
@@ -60,7 +60,7 @@ describe('summarizeSurvey', () => {
       },
     ]);
     expect(s.pace).toBe(1);
-    expect(s.etaAt).toBe(T0 + 10 * MIN + 400 * 1000);
+    expect(s.etaAt).toBe(T0 + 10 * MINUTE_MS + 400 * 1000);
   });
 
   it('pace is volume-weighted over the last two intervals only (three scans)', () => {
@@ -106,7 +106,7 @@ describe('summarizeSurvey', () => {
     const s = summarizeSurvey([scan(0, ['A', 500], ['B', 300]), scan(5, ['A', 400], ['B', 300])])!;
     expect(s.points).toEqual([
       { at: T0, total: 800, byOre: { A: 500, B: 300 }, iskByOre: { A: 0, B: 0 } },
-      { at: T0 + 5 * MIN, total: 700, byOre: { A: 400, B: 300 }, iskByOre: { A: 0, B: 0 } },
+      { at: T0 + 5 * MINUTE_MS, total: 700, byOre: { A: 400, B: 300 }, iskByOre: { A: 0, B: 0 } },
     ]);
     expect(s.oreNames).toEqual(['A', 'B']);
   });
@@ -161,7 +161,7 @@ describe('summarizeSurvey', () => {
     const s = summarizeSurvey([scan(0, ['A', 1000]), scan(5, ['A', 700]), scan(8, ['A', 700])])!;
     expect(s.intervals).toHaveLength(1);
     expect(s.points).toHaveLength(2);
-    expect(s.lastAt).toBe(T0 + 5 * MIN);
+    expect(s.lastAt).toBe(T0 + 5 * MINUTE_MS);
     expect(s.pace).toBe(1);
   });
 
@@ -177,7 +177,7 @@ describe('summarizeSurvey', () => {
     ];
     const s = summarizeSurvey([scan(0, ...a), scan(5, ...b), scan(9, ...a)])!;
     expect(s.points).toHaveLength(2);
-    expect(s.lastAt).toBe(T0 + 5 * MIN);
+    expect(s.lastAt).toBe(T0 + 5 * MINUTE_MS);
     expect(s.leftVolume).toBe(700);
     expect(s.intervals[0]).toMatchObject({ mined: 100, added: 0 });
   });
@@ -201,8 +201,8 @@ describe('summarizeSurvey', () => {
     expect(done.percent).toBe(100);
     expect(done.finished).toBe(true);
     expect(done.etaAt).toBeNull();
-    expect(done.finishedAt).toBe(T0 + 5 * MIN);
-    expect(done.elapsedMs).toBe(5 * MIN);
+    expect(done.finishedAt).toBe(T0 + 5 * MINUTE_MS);
+    expect(done.elapsedMs).toBe(5 * MINUTE_MS);
   });
 
   it('sorts ores and chart layers by market unit price, whatever volume or ISK is in the scans, a mined-out ore keeping its place', () => {

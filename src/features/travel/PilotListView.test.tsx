@@ -1,3 +1,4 @@
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -43,9 +44,6 @@ vi.mock('./useHereSpace', () => ({
 import { DscanShareControl, PilotListView } from './PilotListView';
 import { LOCAL_GROUP_MODE_KEY, useLocalGroupMode } from './localGroupMode';
 
-const HOUR = 3_600_000;
-const DAY = 24 * HOUR;
-
 function kill(agoMs: number, space: KillSpace) {
   return {
     timeMs: Date.now() - agoMs,
@@ -78,12 +76,12 @@ function ready(...kills: ReturnType<typeof kill>[]): PilotListRow['kills'] {
 }
 
 const ROWS: PilotListRow[] = [
-  row('Gankerton', { kills: ready(kill(26 * HOUR, 'highsec'), kill(30 * HOUR, 'highsec')) }),
-  row('Nullbear', { kills: ready(kill(2 * HOUR, 'nullsec'), kill(3 * DAY, 'nullsec')) }),
-  row('Sleeper', { kills: ready(kill(90 * DAY, 'lowsec')) }),
+  row('Gankerton', { kills: ready(kill(26 * HOUR_MS, 'highsec'), kill(30 * HOUR_MS, 'highsec')) }),
+  row('Nullbear', { kills: ready(kill(2 * HOUR_MS, 'nullsec'), kill(3 * DAY_MS, 'nullsec')) }),
+  row('Sleeper', { kills: ready(kill(90 * DAY_MS, 'lowsec')) }),
   row('Suspect', {
     standing: { band: 'orange', value: -5, via: 'corporation' },
-    kills: ready(kill(5 * DAY, 'lowsec')),
+    kills: ready(kill(5 * DAY_MS, 'lowsec')),
   }),
   row('Corpmate', { ownOrganization: 'corporation' }),
   row('Ally', { standing: { band: 'blue', value: 10, via: 'alliance' } }),
@@ -128,13 +126,13 @@ describe('PilotListView (Local list)', () => {
   });
 
   it('washes a Dangerous row red and fills its badge, and leaves a Quiet one plain', async () => {
-    const killedLately = Array.from({ length: 10 }, (_, i) => kill((i + 1) * HOUR, 'highsec'));
+    const killedLately = Array.from({ length: 10 }, (_, i) => kill((i + 1) * HOUR_MS, 'highsec'));
     const rows = [
       row('Reaper', {
         kills: ready(...killedLately),
         extras: { kind: 'ready', dangerRatio: 80, killerRatio: 80, lossTimesMs: null },
       }),
-      row('Sleeper', { kills: ready(kill(100 * DAY, 'lowsec')) }),
+      row('Sleeper', { kills: ready(kill(100 * DAY_MS, 'lowsec')) }),
     ];
     mocks.loadPilotList.mockImplementation(
       (_names: string[], { onRows }: { onRows: (rows: PilotListRow[]) => void }) => {
@@ -170,7 +168,7 @@ describe('PilotListView (Local list)', () => {
     const roamer = () =>
       row('Roamer', {
         kills: ready(
-          ...Array.from({ length: 6 }, (_, i) => kill((i + 1) * DAY, 'nullsec')).map((k) => ({
+          ...Array.from({ length: 6 }, (_, i) => kill((i + 1) * DAY_MS, 'nullsec')).map((k) => ({
             ...k,
             attackerCount: 1,
           }))
@@ -230,7 +228,7 @@ describe('PilotListView (Local list)', () => {
     const staleRows = () =>
       ROWS.map((r) =>
         r.name === 'Nullbear' && r.kills.kind === 'ready'
-          ? { ...r, kills: { ...r.kills, staleSinceMs: Date.now() - 5.5 * HOUR } }
+          ? { ...r, kills: { ...r.kills, staleSinceMs: Date.now() - 5.5 * HOUR_MS } }
           : r
       );
     const showStale = () =>
@@ -488,13 +486,13 @@ describe('PilotListView (Group by Organization, issue #5668)', () => {
       ...lotus,
       corporationId: 601,
       corporationName: 'Vanguard',
-      kills: ready(kill(2 * HOUR, 'highsec')),
+      kills: ready(kill(2 * HOUR_MS, 'highsec')),
     }),
     row('Mira', {
       ...lotus,
       corporationId: 601,
       corporationName: 'Vanguard',
-      kills: ready(kill(3 * HOUR, 'highsec')),
+      kills: ready(kill(3 * HOUR_MS, 'highsec')),
     }),
     row('Bram', { ...lotus, corporationId: 602, corporationName: 'Harbor', kills: ready() }),
     row('Wren', { corporationId: 701, corporationName: 'Ember', kills: ready() }),
@@ -612,8 +610,8 @@ describe('PilotListView (old kills)', () => {
 
   it('dates a kill up to six months old, and leaves an older one undated', async () => {
     const rows = [
-      row('Recent', { kills: ready(kill(100 * DAY, 'lowsec')) }),
-      row('Ancient', { kills: ready(kill(390 * DAY, 'nullsec')) }),
+      row('Recent', { kills: ready(kill(100 * DAY_MS, 'lowsec')) }),
+      row('Ancient', { kills: ready(kill(390 * DAY_MS, 'nullsec')) }),
     ];
     mocks.loadPilotList.mockImplementation(
       (_names: string[], { onRows }: { onRows: (rows: PilotListRow[]) => void }) => {

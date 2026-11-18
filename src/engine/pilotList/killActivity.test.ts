@@ -1,3 +1,4 @@
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import {
   ageTone,
@@ -10,8 +11,6 @@ import {
 } from './killActivity';
 
 const NOW = Date.parse('2026-10-08T12:00:00Z');
-const HOUR = 3_600_000;
-const DAY = 24 * HOUR;
 
 function kill(
   agoMs: number,
@@ -32,23 +31,23 @@ describe('summarizeKills', () => {
   it('counts the last 30 days per space and dates the latest kill in each', () => {
     const result = summarizeKills(
       [
-        kill(2 * HOUR, 'nullsec'),
-        kill(3 * DAY, 'nullsec'),
-        kill(5 * DAY, 'lowsec'),
-        kill(40 * DAY, 'highsec'),
+        kill(2 * HOUR_MS, 'nullsec'),
+        kill(3 * DAY_MS, 'nullsec'),
+        kill(5 * DAY_MS, 'lowsec'),
+        kill(40 * DAY_MS, 'highsec'),
       ],
       NOW
     );
-    expect(result.bySpace.nullsec).toEqual({ count: 2, lastMs: NOW - 2 * HOUR });
-    expect(result.bySpace.lowsec).toEqual({ count: 1, lastMs: NOW - 5 * DAY });
+    expect(result.bySpace.nullsec).toEqual({ count: 2, lastMs: NOW - 2 * HOUR_MS });
+    expect(result.bySpace.lowsec).toEqual({ count: 1, lastMs: NOW - 5 * DAY_MS });
     // Older than the window: not counted, but the date still says how stale it is.
-    expect(result.bySpace.highsec).toEqual({ count: 0, lastMs: NOW - 40 * DAY });
+    expect(result.bySpace.highsec).toEqual({ count: 0, lastMs: NOW - 40 * DAY_MS });
     expect(result.bySpace.wormhole).toEqual({ count: 0, lastMs: null });
     expect(result.recentCount).toBe(3);
   });
 
   it('leaves a kill with no space out of the per-space counts but in the total', () => {
-    const result = summarizeKills([kill(HOUR, null)], NOW);
+    const result = summarizeKills([kill(HOUR_MS, null)], NOW);
     expect(result.recentCount).toBe(1);
     expect(result.bySpace.nullsec.count).toBe(0);
   });
@@ -60,9 +59,9 @@ describe('summarizeKills', () => {
 
 describe('ageTone', () => {
   it('fades with age: today, this week, older', () => {
-    expect(ageTone(NOW - 2 * HOUR, NOW)).toBe('fresh');
-    expect(ageTone(NOW - 3 * DAY, NOW)).toBe('week');
-    expect(ageTone(NOW - 8 * DAY, NOW)).toBe('old');
+    expect(ageTone(NOW - 2 * HOUR_MS, NOW)).toBe('fresh');
+    expect(ageTone(NOW - 3 * DAY_MS, NOW)).toBe('week');
+    expect(ageTone(NOW - 8 * DAY_MS, NOW)).toBe('old');
     expect(ageTone(null, NOW)).toBe('none');
   });
 });
@@ -70,7 +69,7 @@ describe('ageTone', () => {
 describe('monthlyBySpace', () => {
   it('lists the last six calendar months oldest first, counting kills per space', () => {
     const months = monthlyBySpace(
-      [kill(1 * DAY, 'nullsec'), kill(1 * DAY, 'nullsec'), kill(20 * DAY, 'lowsec')],
+      [kill(1 * DAY_MS, 'nullsec'), kill(1 * DAY_MS, 'nullsec'), kill(20 * DAY_MS, 'lowsec')],
       NOW
     );
     expect(months).toHaveLength(6);
@@ -80,7 +79,7 @@ describe('monthlyBySpace', () => {
   });
 
   it('drops kills older than the six months', () => {
-    const months = monthlyBySpace([kill(400 * DAY, 'nullsec')], NOW);
+    const months = monthlyBySpace([kill(400 * DAY_MS, 'nullsec')], NOW);
     expect(months.every((m) => m.nullsec === 0)).toBe(true);
   });
 });
@@ -97,13 +96,13 @@ describe('topShips', () => {
 describe('shownLastKill', () => {
   it('keeps a kill up to six months old', () => {
     expect(LAST_KILL_SHOWN_DAYS).toBe(183);
-    expect(shownLastKill(NOW - 3 * DAY, NOW)).toBe(NOW - 3 * DAY);
-    expect(shownLastKill(NOW - 183 * DAY, NOW)).toBe(NOW - 183 * DAY);
+    expect(shownLastKill(NOW - 3 * DAY_MS, NOW)).toBe(NOW - 3 * DAY_MS);
+    expect(shownLastKill(NOW - 183 * DAY_MS, NOW)).toBe(NOW - 183 * DAY_MS);
   });
 
   it('drops a kill older than six months, so no age is drawn for it', () => {
-    expect(shownLastKill(NOW - 184 * DAY, NOW)).toBeNull();
-    expect(shownLastKill(NOW - 390 * DAY, NOW)).toBeNull();
+    expect(shownLastKill(NOW - 184 * DAY_MS, NOW)).toBeNull();
+    expect(shownLastKill(NOW - 390 * DAY_MS, NOW)).toBeNull();
   });
 
   it('has nothing to show for no kill', () => {

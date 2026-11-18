@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { beforeAll, beforeEach } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
@@ -31,7 +32,6 @@ import {
 export const CHAR_ID = 91;
 export const ESI = 'https://esi.evetech.net';
 
-export const HOUR = 3_600_000;
 export const TURNUR = 30002086;
 
 export function signature(overrides: Record<string, unknown>) {
@@ -46,7 +46,7 @@ export function signature(overrides: Record<string, unknown>) {
     in_region_name: 'The Forge',
     wh_type: 'Q063',
     max_ship_size: 'medium',
-    expires_at: new Date(Date.now() + 10 * HOUR).toISOString(),
+    expires_at: new Date(Date.now() + 10 * HOUR_MS).toISOString(),
     ...overrides,
   };
 }
@@ -66,7 +66,7 @@ export const SIGNATURES = [
     in_system_name: 'Perimeter',
     in_signature: 'PER-002',
     max_ship_size: 'capital',
-    expires_at: new Date(Date.now() + HOUR).toISOString(),
+    expires_at: new Date(Date.now() + HOUR_MS).toISOString(),
   }),
   signature({
     id: 'jspace',
@@ -79,7 +79,7 @@ export const SIGNATURES = [
     id: 'expired',
     in_system_id: JITA,
     in_system_name: 'Jita',
-    expires_at: new Date(Date.now() - HOUR).toISOString(),
+    expires_at: new Date(Date.now() - HOUR_MS).toISOString(),
   }),
 ];
 

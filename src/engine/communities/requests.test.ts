@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
@@ -38,7 +39,6 @@ import {
   type SharedItem,
 } from './requests';
 
-const DAY = 86_400_000;
 const line = (typeId: number, quantity: number, over: Partial<RequestLine> = {}): RequestLine => ({
   typeId,
   name: `Item ${typeId}`,
@@ -55,7 +55,7 @@ const request = (over: Partial<CommunityRequest> = {}): CommunityRequest => ({
   lines: [line(1, 100), line(2, 50)],
   createdAt: 0,
   lastActivityAt: 0,
-  expiresAt: 30 * DAY,
+  expiresAt: 30 * DAY_MS,
   closed: false,
   notify: { app: true, mail: false },
   ...over,
@@ -98,7 +98,7 @@ describe('lineProgress and requestProgress', () => {
 });
 
 describe('requestStatus', () => {
-  const now = 10 * DAY;
+  const now = 10 * DAY_MS;
   it('is Open with no Pledge', () => {
     expect(requestStatus(request(), [], now)).toBe('open');
   });
@@ -127,14 +127,14 @@ describe('requestStatus', () => {
 
 describe('isOpenRequest', () => {
   it('needs neither closed nor expired', () => {
-    expect(isOpenRequest(request(), 5 * DAY)).toBe(true);
-    expect(isOpenRequest(request({ closed: true }), 5 * DAY)).toBe(false);
-    expect(isOpenRequest(request({ expiresAt: 5 * DAY }), 5 * DAY)).toBe(false);
+    expect(isOpenRequest(request(), 5 * DAY_MS)).toBe(true);
+    expect(isOpenRequest(request({ closed: true }), 5 * DAY_MS)).toBe(false);
+    expect(isOpenRequest(request({ expiresAt: 5 * DAY_MS }), 5 * DAY_MS)).toBe(false);
   });
 });
 
 describe('filterRequests', () => {
-  const now = 5 * DAY;
+  const now = 5 * DAY_MS;
   const mine = request({ id: 'm', ownerUid: 'me', ownerName: 'Kestrel Vane', location: 'Efa' });
   const closedMine = request({ id: 'cm', ownerUid: 'me', closed: true });
   const other = request({ id: 'o' });
@@ -238,7 +238,7 @@ describe('constants shared with the callables', () => {
     // Neither is an app constant any more (a Request carries its own expiresAt); the FAQ and
     // the Communities copy state them, so a server change must come through here.
     expect(constant('MAX_OPEN_REQUESTS_PER_MEMBER')).toBe(10);
-    expect(constant('REQUEST_LIFETIME_MS')).toBe(30 * DAY);
+    expect(constant('REQUEST_LIFETIME_MS')).toBe(30 * DAY_MS);
   });
 
   it('matches the server default notification choice', () => {
@@ -283,7 +283,7 @@ describe('canFillRequest', () => {
 });
 
 describe('filterRequests: I can fill', () => {
-  const now = 5 * DAY;
+  const now = 5 * DAY_MS;
   const shared = [{ typeId: 11534, runs: -1 }];
   const bp = (id: string, over: Partial<CommunityRequest> = {}) =>
     request({ id, lines: [line(11534, 1, { kind: 'bpc' })], ...over });
@@ -350,7 +350,7 @@ describe('withinJumps', () => {
 });
 
 describe('canPledge', () => {
-  const now = 5 * DAY;
+  const now = 5 * DAY_MS;
   it('lets a Member Pledge on an open Request that is not theirs', () => {
     expect(canPledge(request(), 'char:2', now)).toBe(true);
   });
@@ -439,21 +439,21 @@ describe('withPledgeLine and withdrawPledgeLine', () => {
 
 describe('isStalePledge', () => {
   const entry = (delivered: number) => ({ quantity: 10, delivered });
-  const stamp = 3 * DAY;
+  const stamp = 3 * DAY_MS;
   it('is stale after 14 days with nothing delivered', () => {
     expect(STALE_PLEDGE_DAYS).toBe(14);
-    expect(isStalePledge(entry(0), stamp, stamp + 14 * DAY)).toBe(true);
+    expect(isStalePledge(entry(0), stamp, stamp + 14 * DAY_MS)).toBe(true);
   });
   it('is fresh before 14 days', () => {
-    expect(isStalePledge(entry(0), stamp, stamp + 14 * DAY - 1)).toBe(false);
+    expect(isStalePledge(entry(0), stamp, stamp + 14 * DAY_MS - 1)).toBe(false);
   });
   it('is never stale once anything is delivered', () => {
-    expect(isStalePledge(entry(1), stamp, stamp + 60 * DAY)).toBe(false);
+    expect(isStalePledge(entry(1), stamp, stamp + 60 * DAY_MS)).toBe(false);
   });
 });
 
 describe('myPledgeRows', () => {
-  const now = 20 * DAY;
+  const now = 20 * DAY_MS;
   it('lists my Pledges across Requests, newest Pledge first, with stale ones flagged', () => {
     const a = request({ id: 'a', lines: [line(1, 100), line(2, 50)] });
     const b = request({ id: 'b', ownerUid: 'char:3', lines: [line(3, 10)] });
@@ -461,11 +461,11 @@ describe('myPledgeRows', () => {
       [
         'a',
         [
-          pledge('me', { 1: { quantity: 5, delivered: 0 } }, 2 * DAY),
-          pledge('other', { 0: { quantity: 9, delivered: 0 } }, 19 * DAY),
+          pledge('me', { 1: { quantity: 5, delivered: 0 } }, 2 * DAY_MS),
+          pledge('other', { 0: { quantity: 9, delivered: 0 } }, 19 * DAY_MS),
         ],
       ],
-      ['b', [pledge('me', { 0: { quantity: 4, delivered: 4 } }, 19 * DAY)]],
+      ['b', [pledge('me', { 0: { quantity: 4, delivered: 4 } }, 19 * DAY_MS)]],
     ]);
     const rows = myPledgeRows([a, b], board, 'me', now);
     expect(rows.map((r) => [r.request.id, r.index, r.stale])).toEqual([
@@ -504,7 +504,7 @@ describe('request notification choice', () => {
 });
 
 describe('countNewRequests', () => {
-  const now = 10 * DAY;
+  const now = 10 * DAY_MS;
   const base = (over: Partial<CommunityRequest>): CommunityRequest => ({
     id: 'r',
     ownerUid: 'char:2',
@@ -512,9 +512,9 @@ describe('countNewRequests', () => {
     location: '',
     terms: '',
     lines: [line(1, 1)],
-    createdAt: 9 * DAY,
-    lastActivityAt: 9 * DAY,
-    expiresAt: now + DAY,
+    createdAt: 9 * DAY_MS,
+    lastActivityAt: 9 * DAY_MS,
+    expiresAt: now + DAY_MS,
     closed: false,
     notify: { app: true, mail: false },
     ...over,
@@ -523,12 +523,12 @@ describe('countNewRequests', () => {
   it('counts open Requests from others posted after the last look', () => {
     const requests = [
       base({ id: 'new' }),
-      base({ id: 'old', createdAt: 5 * DAY }),
+      base({ id: 'old', createdAt: 5 * DAY_MS }),
       base({ id: 'mine', ownerUid: 'char:1' }),
       base({ id: 'closed', closed: true }),
       base({ id: 'expired', expiresAt: now - 1 }),
     ];
-    expect(countNewRequests(requests, 'char:1', 8 * DAY, now)).toBe(1);
+    expect(countNewRequests(requests, 'char:1', 8 * DAY_MS, now)).toBe(1);
     expect(countNewRequests(requests, 'char:1', 0, now)).toBe(2);
     expect(countNewRequests([], 'char:1', 0, now)).toBe(0);
   });

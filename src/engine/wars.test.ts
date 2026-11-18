@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import {
   parseEsiWar,
@@ -8,14 +9,13 @@ import {
   type WarEntityIds,
 } from './wars';
 
-const HOUR = 3_600_000;
 const NOW = Date.UTC(2026, 9, 21, 12);
 
 function war(over: Partial<StoredWar> = {}): StoredWar {
   return {
     id: 1,
-    declared: NOW - 48 * HOUR,
-    started: NOW - 24 * HOUR,
+    declared: NOW - 48 * HOUR_MS,
+    started: NOW - 24 * HOUR_MS,
     mutual: false,
     openForAllies: false,
     aggressor: { corporationId: 100, iskDestroyed: 5e6, shipsKilled: 2 },
@@ -29,9 +29,9 @@ const me: WarEntityIds = { corporationId: 200 };
 
 describe('warStatus', () => {
   it('is pending before the war starts', () => {
-    expect(warStatus(war({ started: NOW + 5 * HOUR }), NOW)).toEqual({
+    expect(warStatus(war({ started: NOW + 5 * HOUR_MS }), NOW)).toEqual({
       kind: 'pending',
-      startsIn: 5 * HOUR,
+      startsIn: 5 * HOUR_MS,
     });
   });
 
@@ -40,9 +40,9 @@ describe('warStatus', () => {
   });
 
   it('is active until a future finish, and says when it ends', () => {
-    expect(warStatus(war({ finished: NOW + 3 * HOUR }), NOW)).toEqual({
+    expect(warStatus(war({ finished: NOW + 3 * HOUR_MS }), NOW)).toEqual({
       kind: 'active',
-      endsIn: 3 * HOUR,
+      endsIn: 3 * HOUR_MS,
     });
   });
 
@@ -51,7 +51,7 @@ describe('warStatus', () => {
   });
 
   it('is pending with no known start when ESI gives no started time', () => {
-    expect(warStatus(war({ started: undefined, declared: NOW - HOUR }), NOW)).toEqual({
+    expect(warStatus(war({ started: undefined, declared: NOW - HOUR_MS }), NOW)).toEqual({
       kind: 'pending',
       startsIn: null,
     });
@@ -86,7 +86,7 @@ describe('warsAgainst', () => {
   });
 
   it('ignores wars that are over', () => {
-    expect(warsAgainst([war({ finished: NOW - HOUR })], [me], NOW)).toEqual([]);
+    expect(warsAgainst([war({ finished: NOW - HOUR_MS })], [me], NOW)).toEqual([]);
   });
 
   it('ignores wars about someone else', () => {
@@ -98,9 +98,9 @@ describe('warsAgainst', () => {
   });
 
   it('puts the war already active before one still pending, then newest declared first', () => {
-    const pending = war({ id: 2, started: NOW + HOUR, declared: NOW - HOUR });
-    const old = war({ id: 3, declared: NOW - 100 * HOUR });
-    const recent = war({ id: 4, declared: NOW - 30 * HOUR });
+    const pending = war({ id: 2, started: NOW + HOUR_MS, declared: NOW - HOUR_MS });
+    const old = war({ id: 3, declared: NOW - 100 * HOUR_MS });
+    const recent = war({ id: 4, declared: NOW - 30 * HOUR_MS });
     expect(warsAgainst([pending, old, recent], [me], NOW).map((w) => w.war.id)).toEqual([4, 3, 2]);
   });
 
@@ -109,7 +109,7 @@ describe('warsAgainst', () => {
       id: 5,
       defender: { corporationId: 201, iskDestroyed: 0, shipsKilled: 0 },
     });
-    const onMine = war({ id: 6, declared: NOW - 100 * HOUR });
+    const onMine = war({ id: 6, declared: NOW - 100 * HOUR_MS });
     const hits = warsAgainst([onOther, onMine], [me, { corporationId: 201 }], NOW);
     expect(hits.map((h) => [h.war.id, h.against.corporationId])).toEqual([
       [6, 200],

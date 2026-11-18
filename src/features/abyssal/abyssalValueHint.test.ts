@@ -1,8 +1,8 @@
+import { DAY_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import type { AbyssalEstimate } from '@/market/mutamarket';
 import { abyssalValueHint } from './abyssalValueHint';
 
-const DAY = 86_400_000;
 const NOW = Date.parse('2026-10-16T12:00:00Z');
 const t = (key: string, opts?: Record<string, unknown>) =>
   opts ? `${key}(${String(opts.age ?? opts.count)})` : key;
@@ -22,7 +22,7 @@ function priced(over: Partial<AbyssalEstimate> = {}): AbyssalEstimate {
 describe('abyssalValueHint', () => {
   it('says how old a priced estimate is, by MutaMarket model run', () => {
     const hint = abyssalValueHint(
-      priced({ valueUpdatedAt: new Date(NOW - 3 * DAY).toISOString() }),
+      priced({ valueUpdatedAt: new Date(NOW - 3 * DAY_MS).toISOString() }),
       t,
       NOW
     );

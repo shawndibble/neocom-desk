@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -507,8 +508,6 @@ describe('SkillPlans editor: the same attributes, on the route they are costed o
 });
 
 describe('SkillPlans: cached data notice', () => {
-  const HOUR = 3_600_000;
-
   it('says nothing while every read is live', async () => {
     renderSkillsRoutes();
     expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
@@ -526,7 +525,7 @@ describe('SkillPlans: cached data notice', () => {
       key: 'skills',
       value: emptySkillsPayload,
       // A minute over, so the shared 30 s ticker being a little behind still reads 5 h.
-      fetchedAt: Date.now() - 5 * HOUR - 60_000,
+      fetchedAt: Date.now() - 5 * HOUR_MS - 60_000,
     });
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skills`, () => HttpResponse.error())

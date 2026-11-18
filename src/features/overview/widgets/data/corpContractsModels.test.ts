@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import type { Contract } from '@/esi/endpoints';
 import { withAcceptedCourierInProgress } from '@/engine/contracts/contractStatus';
@@ -8,7 +9,6 @@ import type { BuildContext, FeedState, Feeds } from './types';
 const t = (key: string, options?: Record<string, unknown>) =>
   options ? `${key}${JSON.stringify(options)}` : key;
 const NOW = Date.parse('2026-10-20T12:00:00Z');
-const HOUR = 3_600_000;
 const iso = (ms: number) => new Date(ms).toISOString();
 const ctx = { t, now: NOW, range: 30, activeCharacterId: 1 } as unknown as BuildContext;
 const ok = <T>(data: T): FeedState<T> => ({ data, error: false, loading: false });
@@ -23,8 +23,8 @@ const contract = (id: number, over: Partial<Contract> = {}): Contract => ({
   status: 'outstanding',
   for_corporation: true,
   availability: 'personal',
-  date_issued: iso(NOW - 24 * HOUR),
-  date_expired: iso(NOW + 72 * HOUR),
+  date_issued: iso(NOW - 24 * HOUR_MS),
+  date_expired: iso(NOW + 72 * HOUR_MS),
   ...over,
 });
 
@@ -67,7 +67,7 @@ describe('corpContracts', () => {
   it('counts outstanding, flags expiring soon and totals courier collateral', () => {
     const view = corpContracts(
       feed([
-        contract(1, { collateral: 2_000_000, date_expired: iso(NOW + 5 * HOUR) }),
+        contract(1, { collateral: 2_000_000, date_expired: iso(NOW + 5 * HOUR_MS) }),
         contract(2, { type: 'item_exchange', price: 10 }),
         contract(3, { status: 'finished' }),
       ]),
@@ -86,7 +86,7 @@ describe('corpContracts', () => {
     const view = corpContracts(
       feed([
         contract(2, { title: 'Stock' }),
-        contract(1, { collateral: 5_000_000, date_expired: iso(NOW + 5 * HOUR) }),
+        contract(1, { collateral: 5_000_000, date_expired: iso(NOW + 5 * HOUR_MS) }),
       ]),
       ctx
     );
@@ -102,7 +102,7 @@ describe('corpContracts', () => {
 
   it('opens each contract on the Corp contracts view, never also a modal', () => {
     const rows = corpContracts(
-      feed([contract(2), contract(1, { date_expired: iso(NOW + 5 * HOUR) })]),
+      feed([contract(2), contract(1, { date_expired: iso(NOW + 5 * HOUR_MS) })]),
       ctx
     ).table!.rows;
     expect(rows.map((r) => r.to)).toEqual([
@@ -118,7 +118,7 @@ describe('corpContracts', () => {
         contract(1, { date_expired: iso(NOW + 120_000) }),
         accepted(2, {
           days_to_complete: 1,
-          date_accepted: iso(NOW - 48 * HOUR),
+          date_accepted: iso(NOW - 48 * HOUR_MS),
         }),
       ]),
       ctx

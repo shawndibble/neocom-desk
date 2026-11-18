@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import type { CharacterSkill, SkillQueueEntry } from '@/esi/endpoints';
 import type { PlanEntry, TrainedSkill } from '@/engine/types';
 
@@ -241,7 +242,7 @@ export type QueueState = 'training' | 'idle' | 'paused' | 'endingSoon' | 'unknow
  * imports nothing at runtime (it is reachable from the service worker), so
  * that default stays its own literal `24` and a test is what keeps it honest.
  */
-export const ENDING_SOON_MS = 24 * 60 * 60 * 1000;
+export const ENDING_SOON_MS = DAY_MS;
 
 /**
  * Cache-only queue-state classification for one character, for roster-wide

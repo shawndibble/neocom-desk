@@ -3,6 +3,7 @@
  * merged feed's rows keep each widget's own sort, each names its corporation, totals sum,
  * and one corporation's failed read leaves the others drawn, flagged.
  */
+import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import type { Contract, CorporationCustomsOffice, CorporationOrder } from '@/esi/endpoints';
 import { corpContracts } from './corpContractsModels';
@@ -24,7 +25,6 @@ import type { BuildContext, FeedState, KindView, TableCell } from './types';
 
 const t = (key: string, options?: Record<string, unknown>) =>
   options && Object.keys(options).length ? `${key}${JSON.stringify(options)}` : key;
-const HOUR = 3_600_000;
 const NOW = Date.parse('2026-10-20T12:00:00Z');
 const ctx = {
   t,
@@ -173,8 +173,8 @@ const skyhook = (id: number, opensInHours: number): CorpSovereigntyRow => ({
   structureId: id,
   systemId: 30,
   planetName: `Tama ${id}`,
-  windowStartMs: NOW + opensInHours * HOUR,
-  windowEndMs: NOW + (opensInHours + 2) * HOUR,
+  windowStartMs: NOW + opensInHours * HOUR_MS,
+  windowEndMs: NOW + (opensInHours + 2) * HOUR_MS,
   reagents: null,
   state: null,
   hubBay: null,
@@ -208,8 +208,8 @@ describe('Sovereignty across corporations', () => {
     expect(column(view, 'corp')).toEqual(['HOLD2', 'HOLD1']);
     // The next window (corporation B's skyhook) and B's hub running dry in 10 h, together.
     expect(view.deadlines.map((deadline) => deadline.at)).toEqual([
-      NOW + 3 * HOUR,
-      NOW + 10 * HOUR,
+      NOW + 3 * HOUR_MS,
+      NOW + 10 * HOUR_MS,
     ]);
   });
 });
@@ -227,8 +227,8 @@ const contract = (id: number, expiresInHours: number, collateral?: number): Cont
   status: 'outstanding',
   for_corporation: true,
   availability: 'public',
-  date_issued: new Date(NOW - 24 * HOUR).toISOString(),
-  date_expired: new Date(NOW + expiresInHours * HOUR).toISOString(),
+  date_issued: new Date(NOW - 24 * HOUR_MS).toISOString(),
+  date_expired: new Date(NOW + expiresInHours * HOUR_MS).toISOString(),
 });
 
 describe('Corp contracts across corporations', () => {

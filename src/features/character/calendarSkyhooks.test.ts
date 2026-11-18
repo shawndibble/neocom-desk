@@ -1,7 +1,7 @@
+import { HOUR_MS } from '@/lib/age';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const NOW = Date.parse('2026-10-23T12:00:00Z');
-const HOUR = 3_600_000;
 const iso = (ms: number) => new Date(ms).toISOString();
 
 const access = vi.hoisted(() => ({ value: null as unknown }));
@@ -58,7 +58,7 @@ describe('loadSkyhookRaids', () => {
         [
           5,
           cached({
-            theft_vulnerability: { start: iso(NOW + 2 * HOUR), end: iso(NOW + 4 * HOUR) },
+            theft_vulnerability: { start: iso(NOW + 2 * HOUR_MS), end: iso(NOW + 4 * HOUR_MS) },
             reagents: [
               { type_id: 1, last_cycle: '', secured_stock: 800, unsecured_stock: 400 },
               { type_id: 2, last_cycle: '', secured_stock: 0, unsecured_stock: 100 },
@@ -69,7 +69,7 @@ describe('loadSkyhookRaids', () => {
     );
     const read = await loadSkyhookRaids(1, NOW);
     expect(read.sources).toEqual([
-      { id: '5', subject: 'X-7OMU IV', detail: 'upcoming', deadlineMs: NOW + 2 * HOUR },
+      { id: '5', subject: 'X-7OMU IV', detail: 'upcoming', deadlineMs: NOW + 2 * HOUR_MS },
     ]);
     expect(read.raids[0]).toMatchObject({
       systemId: 30000001,

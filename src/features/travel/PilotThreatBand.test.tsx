@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import '@/i18n';
@@ -5,13 +6,12 @@ import type { ThreatVerdict } from '@/engine/pilotList/threatVerdict';
 import { PilotThreatBand } from './PilotThreatBand';
 
 const NOW = Date.parse('2026-10-08T12:00:00Z');
-const DAY = 86_400_000;
 
 function verdict(over: Partial<ThreatVerdict> = {}): ThreatVerdict {
   return {
     level: 'dangerous',
     recentKills: 12,
-    lastKillMs: NOW - 3 * DAY,
+    lastKillMs: NOW - 3 * DAY_MS,
     mainSpace: 'nullsec',
     alsoSpaces: [],
     podShare: 0.1,
@@ -118,7 +118,7 @@ describe('PilotThreatBand', () => {
           mainSpace: null,
           podShare: null,
           recentLosses: 2,
-          lastLossMs: NOW - 3 * DAY,
+          lastLossMs: NOW - 3 * DAY_MS,
         })}
         gangRatio={null}
         nowMs={NOW}

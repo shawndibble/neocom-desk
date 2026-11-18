@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import {
   REMOVAL_WAIT_MS,
@@ -12,7 +13,6 @@ import {
   withPayee,
 } from './removal';
 
-const H = 3_600_000;
 const by = { characterId: 7, name: 'Kestrel' };
 
 describe('startRemoval', () => {
@@ -32,17 +32,17 @@ describe('startRemoval', () => {
 describe('the 24-hour clock', () => {
   const started = startRemoval({ status: 'active' }, by, 0);
   it('starts when the mail is sent, not at the click', () => {
-    const sent = recordRemovalNotice(started, 5 * H);
-    expect(sent.removal?.effectiveAt).toBe(5 * H + REMOVAL_WAIT_MS);
-    expect(isRemovalDue(sent, 24 * H)).toBe(false);
-    expect(isRemovalDue(sent, 29 * H)).toBe(true);
+    const sent = recordRemovalNotice(started, 5 * HOUR_MS);
+    expect(sent.removal?.effectiveAt).toBe(5 * HOUR_MS + REMOVAL_WAIT_MS);
+    expect(isRemovalDue(sent, 24 * HOUR_MS)).toBe(false);
+    expect(isRemovalDue(sent, 29 * HOUR_MS)).toBe(true);
   });
   it('never takes effect while the mail is unsent (the mail-failed path)', () => {
-    expect(isRemovalDue(started, 1000 * H)).toBe(false);
+    expect(isRemovalDue(started, 1000 * HOUR_MS)).toBe(false);
   });
   it('keeps the first notice time', () => {
-    const first = recordRemovalNotice(started, 2 * H);
-    expect(recordRemovalNotice(first, 9 * H)).toEqual(first);
+    const first = recordRemovalNotice(started, 2 * HOUR_MS);
+    expect(recordRemovalNotice(first, 9 * HOUR_MS)).toEqual(first);
   });
   it('ignores a notice for a removal that is not pending', () => {
     expect(recordRemovalNotice({ status: 'active' }, 1)).toEqual({ status: 'active' });
@@ -51,7 +51,7 @@ describe('the 24-hour clock', () => {
 
 describe('cancelRemoval', () => {
   it('returns to active and drops the removal', () => {
-    const pending = recordRemovalNotice(startRemoval({ status: 'active' }, by, 0), H);
+    const pending = recordRemovalNotice(startRemoval({ status: 'active' }, by, 0), HOUR_MS);
     expect(cancelRemoval(pending)).toEqual({ status: 'active' });
   });
   it('throws when nothing is pending', () => {
@@ -97,18 +97,22 @@ describe('removalRecipients', () => {
 });
 
 describe('payeeMayForce boundaries', () => {
-  const start = 1_000 * H;
+  const start = 1_000 * HOUR_MS;
   it('is open when the payee never changed', () => {
     expect(payeeMayForce({ payeeChangedAt: undefined, removalStartedAt: start })).toBe(true);
   });
   it('is blocked when changed 47 hours before the start', () => {
-    expect(payeeMayForce({ payeeChangedAt: start - 47 * H, removalStartedAt: start })).toBe(false);
+    expect(payeeMayForce({ payeeChangedAt: start - 47 * HOUR_MS, removalStartedAt: start })).toBe(
+      false
+    );
   });
   it('is open when changed 49 hours before the start', () => {
-    expect(payeeMayForce({ payeeChangedAt: start - 49 * H, removalStartedAt: start })).toBe(true);
+    expect(payeeMayForce({ payeeChangedAt: start - 49 * HOUR_MS, removalStartedAt: start })).toBe(
+      true
+    );
   });
   it('is blocked when changed after the start', () => {
-    expect(payeeMayForce({ payeeChangedAt: start + H, removalStartedAt: start })).toBe(false);
+    expect(payeeMayForce({ payeeChangedAt: start + HOUR_MS, removalStartedAt: start })).toBe(false);
   });
   it('is blocked when changed at the very start', () => {
     expect(payeeMayForce({ payeeChangedAt: start, removalStartedAt: start })).toBe(false);
@@ -116,7 +120,7 @@ describe('payeeMayForce boundaries', () => {
   it('is blocked when the accounting side set the payee, however long ago', () => {
     expect(
       payeeMayForce({
-        payeeChangedAt: start - 1_000 * H,
+        payeeChangedAt: start - 1_000 * HOUR_MS,
         removalStartedAt: start,
         payeeSetBy: 'accounting',
       })
@@ -125,7 +129,7 @@ describe('payeeMayForce boundaries', () => {
   it('is open when the moon owner set the payee long enough before', () => {
     expect(
       payeeMayForce({
-        payeeChangedAt: start - 49 * H,
+        payeeChangedAt: start - 49 * HOUR_MS,
         removalStartedAt: start,
         payeeSetBy: 'moon-owner',
       })

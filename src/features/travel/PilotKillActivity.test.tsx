@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -19,7 +20,6 @@ vi.mock('@/stores/activeCharacter', () => ({
 
 import { PilotKillActivity, PilotKillActivityView } from './PilotKillActivity';
 
-const DAY = 86_400_000;
 const kill = (agoMs: number, space: 'highsec' | 'lowsec' | 'nullsec' | 'wormhole') => ({
   timeMs: Date.now() - agoMs,
   space,
@@ -44,7 +44,11 @@ describe('PilotKillActivity', () => {
     vi.resetAllMocks();
     mocks.fetchPilotKillHistory.mockResolvedValue({
       ok: true,
-      kills: [kill(2 * DAY, 'nullsec'), kill(3 * DAY, 'nullsec'), kill(40 * DAY, 'wormhole')],
+      kills: [
+        kill(2 * DAY_MS, 'nullsec'),
+        kill(3 * DAY_MS, 'nullsec'),
+        kill(40 * DAY_MS, 'wormhole'),
+      ],
     });
   });
 

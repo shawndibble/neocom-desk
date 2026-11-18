@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import { render, screen, within } from '@testing-library/react';
@@ -10,7 +11,6 @@ import { CommunityLibrary } from './CommunityLibrary';
 
 const l = en.communities.library;
 const NOW = Date.UTC(2026, 9, 12);
-const DAY = 24 * 60 * 60 * 1000;
 
 vi.mock('@/sde/loadMarketSde', () => ({
   loadMarketGroups: async () => [{ id: 1, name: 'Ships', parentId: null }],
@@ -65,7 +65,7 @@ vi.mock('./communityStore', () => ({
 }));
 
 const members = [
-  { uid: 'ann', characterName: 'Ann', joinedAt: 1, libraryAsOf: NOW - 40 * DAY },
+  { uid: 'ann', characterName: 'Ann', joinedAt: 1, libraryAsOf: NOW - 40 * DAY_MS },
   { uid: uidForCharacter(1), characterName: 'Me', joinedAt: 2, libraryAsOf: null },
 ];
 

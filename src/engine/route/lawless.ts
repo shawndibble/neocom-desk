@@ -1,3 +1,4 @@
+import { HOUR_MS, MINUTE_MS } from '@/lib/age';
 /**
  * Lawless (insurgency) systems on a route (issue #2870): which stored ids may
  * still be shown. `updatedAt` means "last confirmed" (the job re-checks every
@@ -5,9 +6,9 @@
  * stale list must never read as current.
  */
 
-export const LAWLESS_STALE_AFTER_MS = 60 * 60 * 1000;
+export const LAWLESS_STALE_AFTER_MS = HOUR_MS;
 /** A client clock this far behind the function's still reads a just-written list. */
-const CLOCK_SKEW_MS = 5 * 60 * 1000;
+const CLOCK_SKEW_MS = 5 * MINUTE_MS;
 
 const NONE: ReadonlySet<number> = new Set();
 

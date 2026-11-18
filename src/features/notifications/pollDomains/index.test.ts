@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NOTIFICATION_EVENT_IDS, type NotificationEventId } from '../events';
 import { POLL_DOMAINS, domainForEvent, renderNotification, notificationSubjectId } from './index';
@@ -468,7 +469,6 @@ describe('marketOrderUndercutDomain', () => {
  */
 describe('projection wiring', () => {
   const T0 = 1_700_000_000_000;
-  const HOUR_MS = 3_600_000;
 
   function universeTypeResult(name: string) {
     return {
@@ -1285,7 +1285,6 @@ describe('corp domains', () => {
 });
 
 describe('cloneJumpDomain', () => {
-  const HOUR_MS = 3_600_000;
   const LAST_JUMP = '2026-09-01T00:00:00Z';
   const LAST_JUMP_MS = Date.parse(LAST_JUMP);
 

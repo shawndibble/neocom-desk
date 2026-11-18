@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Contract } from '@/esi/endpoints';
 import { summarizeCorpContracts } from '@/engine/contracts/corpContracts';
@@ -15,7 +16,6 @@ vi.mock('@/features/character/names', () => ({ resolveNames: async () => new Map
 import { loadCorpContracts } from './corpFeedLoaders';
 
 const NOW = Date.parse('2026-10-20T12:00:00Z');
-const HOUR = 3_600_000;
 const iso = (ms: number) => new Date(ms).toISOString();
 
 /** What ESI really sends on day 2: accepted courier stays `outstanding`, offer window long past. */
@@ -29,9 +29,9 @@ const acceptedCourier: Contract = {
   status: 'outstanding',
   for_corporation: true,
   availability: 'personal',
-  date_issued: iso(NOW - 72 * HOUR),
-  date_expired: iso(NOW - 24 * HOUR),
-  date_accepted: iso(NOW - 48 * HOUR),
+  date_issued: iso(NOW - 72 * HOUR_MS),
+  date_expired: iso(NOW - 24 * HOUR_MS),
+  date_accepted: iso(NOW - 48 * HOUR_MS),
   days_to_complete: 7,
   collateral: 900,
 };
@@ -52,12 +52,12 @@ describe('loadCorpContracts', () => {
     const summary = summarizeCorpContracts(feed.contracts, NOW);
     expect(summary.rows).toHaveLength(1);
     expect(summary.collateral).toBe(900);
-    expect(summary.rows[0]).toMatchObject({ atMs: NOW + 5 * 24 * HOUR, overdue: false });
+    expect(summary.rows[0]).toMatchObject({ atMs: NOW + 5 * 24 * HOUR_MS, overdue: false });
   });
 
   it('marks it overdue once the delivery deadline passes', async () => {
     const feed = await loadCorpContracts(1);
-    const summary = summarizeCorpContracts(feed.contracts, NOW + 6 * 24 * HOUR);
+    const summary = summarizeCorpContracts(feed.contracts, NOW + 6 * 24 * HOUR_MS);
     expect(summary.overdue).toBe(1);
   });
 });

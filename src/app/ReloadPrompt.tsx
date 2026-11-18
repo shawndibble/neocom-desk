@@ -1,3 +1,4 @@
+import { MINUTE_MS } from '@/lib/age';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useRegisterSW } from 'virtual:pwa-register/react';
@@ -7,11 +8,11 @@ import { isPublicRoute } from './routerPath';
 
 // Checking is cheap, so check often: a build found here is applied by the next
 // cold start or browser reload (see bootUpdate.ts), never by this component.
-const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+const UPDATE_CHECK_INTERVAL_MS = 5 * MINUTE_MS;
 // A tab coming back to the foreground checks at once (timers freeze while a
 // mobile PWA is backgrounded), but not more often than this, so going back and
 // forth between apps doesn't fire a request each time.
-const RESUME_CHECK_MIN_GAP_MS = 60 * 1000;
+const RESUME_CHECK_MIN_GAP_MS = MINUTE_MS;
 
 // React StrictMode double-invokes the useState lazy initializer that
 // registerSW runs on, so onRegisteredSW can fire twice on first mount in

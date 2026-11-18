@@ -3,6 +3,7 @@
  * CC level N" tag, Show me how's Command Center line and its CPU/Power meter
  * all read the same fit, the ranking's own.
  */
+import { HOUR_MS } from '@/lib/age';
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -19,7 +20,6 @@ const pi = JSON.parse(
 ) as PiData;
 
 const NOW = Date.parse('2026-10-01T00:00:00Z');
-const HOUR = 3_600_000;
 const NULLSEC_SYSTEM = 30004759;
 const ECU = 2848;
 const LAUNCHPAD = 2256;
@@ -49,8 +49,8 @@ function ecu(pinId: number, product: number, heads: number, qty: number): Planet
     type_id: ECU,
     latitude: 1.5 + 0.02 * pinId,
     longitude: 0.2,
-    install_time: new Date(NOW - 2 * HOUR).toISOString(),
-    expiry_time: new Date(NOW + 70 * HOUR).toISOString(),
+    install_time: new Date(NOW - 2 * HOUR_MS).toISOString(),
+    expiry_time: new Date(NOW + 70 * HOUR_MS).toISOString(),
     extractor_details: {
       heads: Array.from({ length: heads }, (_, i) => ({ head_id: i, latitude: 0, longitude: 0 })),
       product_type_id: product,

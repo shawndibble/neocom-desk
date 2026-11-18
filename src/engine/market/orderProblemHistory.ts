@@ -14,6 +14,7 @@
  * claim a precision the sampling does not have — and why `minSamples` sits
  * under it.
  */
+import { DAY_MS } from '@/lib/age';
 import { UNDERCUT_PROBLEMS, type OrderProblem } from './orderProblems';
 
 /** One observation of an order's `OrderProblem`, at the moment it was taken. */
@@ -48,7 +49,7 @@ export interface UndercutHistoryThresholds {
 
 /** Defaults, not laws. Each number is argued in the issue-1018 decision record. */
 export const DEFAULT_UNDERCUT_HISTORY_THRESHOLDS: UndercutHistoryThresholds = {
-  windowMs: 7 * 24 * 60 * 60 * 1000,
+  windowMs: 7 * DAY_MS,
   minSamples: 12,
   undercutRate: 0.5,
   minSpacingMs: 4 * 60 * 1000,

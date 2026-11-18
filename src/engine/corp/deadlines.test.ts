@@ -1,3 +1,4 @@
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 import { afterEach, describe, expect, it } from 'vitest';
 import { DEADLINE_STRIP_DAYS, deadlinesByDay, dueSoon } from './deadlines';
 import {
@@ -13,14 +14,12 @@ import {
  * the next day for half the planet.
  */
 const NOW = new Date(2026, 8, 7, 12, 0, 0).getTime();
-const DAY = 86_400_000;
-const HOUR = 3_600_000;
 
 function item(
   overrides: Partial<CorpBoardItem> & { id: string } & Record<string, unknown>
 ): CorpBoardItem {
   const timing = (overrides.timing ?? 'timed') as CorpBoardTiming;
-  const deadlineMs = overrides.deadlineMs ?? (timing === 'timed' ? NOW + HOUR : null);
+  const deadlineMs = overrides.deadlineMs ?? (timing === 'timed' ? NOW + HOUR_MS : null);
   return {
     kind: 'structureFuel' as CorpBoardItemKind,
     subject: 'Somewhere',
@@ -47,7 +46,7 @@ describe('deadlinesByDay', () => {
 
     expect(strip).toHaveLength(14);
     expect(strip[0].startMs).toBe(midnight(NOW));
-    expect(strip[13].startMs).toBe(midnight(NOW + 13 * DAY));
+    expect(strip[13].startMs).toBe(midnight(NOW + 13 * DAY_MS));
   });
 
   it('defaults to a fortnight', () => {
@@ -55,7 +54,7 @@ describe('deadlinesByDay', () => {
   });
 
   it('keeps empty days, counting zero', () => {
-    const strip = deadlinesByDay([item({ id: 'a', deadlineMs: NOW + 2 * DAY })], NOW, 5);
+    const strip = deadlinesByDay([item({ id: 'a', deadlineMs: NOW + 2 * DAY_MS })], NOW, 5);
 
     expect(strip.map((day) => day.count)).toEqual([0, 0, 1, 0, 0]);
     expect(strip[1].severity).toBeNull();
@@ -64,9 +63,9 @@ describe('deadlinesByDay', () => {
   it('buckets a timed item on the local calendar day its deadline falls in', () => {
     const strip = deadlinesByDay(
       [
-        item({ id: 'today', deadlineMs: NOW + 3 * HOUR }),
-        item({ id: 'tomorrow', deadlineMs: NOW + DAY }),
-        item({ id: 'last-day', deadlineMs: NOW + 13 * DAY }),
+        item({ id: 'today', deadlineMs: NOW + 3 * HOUR_MS }),
+        item({ id: 'tomorrow', deadlineMs: NOW + DAY_MS }),
+        item({ id: 'last-day', deadlineMs: NOW + 13 * DAY_MS }),
       ],
       NOW,
       14
@@ -80,8 +79,8 @@ describe('deadlinesByDay', () => {
   it('excludes an item beyond the window', () => {
     const strip = deadlinesByDay(
       [
-        item({ id: 'just-outside', deadlineMs: NOW + 14 * DAY }),
-        item({ id: 'far', deadlineMs: NOW + 25 * DAY }),
+        item({ id: 'just-outside', deadlineMs: NOW + 14 * DAY_MS }),
+        item({ id: 'far', deadlineMs: NOW + 25 * DAY_MS }),
       ],
       NOW,
       14
@@ -104,7 +103,7 @@ describe('deadlinesByDay', () => {
   });
 
   it('counts an overdue but still-timed item on day 0, not on the day it expired', () => {
-    const strip = deadlinesByDay([item({ id: 'late', deadlineMs: NOW - 2 * DAY })], NOW, 14);
+    const strip = deadlinesByDay([item({ id: 'late', deadlineMs: NOW - 2 * DAY_MS })], NOW, 14);
 
     expect(strip[0].count).toBe(1);
     expect(strip.slice(1).every((day) => day.count === 0)).toBe(true);
@@ -144,9 +143,9 @@ describe('deadlinesByDay', () => {
   it('gives a day the worst severity landing on it', () => {
     const strip = deadlinesByDay(
       [
-        item({ id: 'clear', deadlineMs: NOW + DAY, severity: 'clear' }),
-        item({ id: 'critical', deadlineMs: NOW + DAY, severity: 'critical' }),
-        item({ id: 'watch', deadlineMs: NOW + DAY, severity: 'watch' }),
+        item({ id: 'clear', deadlineMs: NOW + DAY_MS, severity: 'clear' }),
+        item({ id: 'critical', deadlineMs: NOW + DAY_MS, severity: 'critical' }),
+        item({ id: 'watch', deadlineMs: NOW + DAY_MS, severity: 'watch' }),
       ],
       NOW,
       14
@@ -159,8 +158,8 @@ describe('deadlinesByDay', () => {
   it('prefers warning over watch and clear', () => {
     const strip = deadlinesByDay(
       [
-        item({ id: 'watch', deadlineMs: NOW + DAY, severity: 'watch' }),
-        item({ id: 'warning', deadlineMs: NOW + DAY, severity: 'warning' }),
+        item({ id: 'watch', deadlineMs: NOW + DAY_MS, severity: 'watch' }),
+        item({ id: 'warning', deadlineMs: NOW + DAY_MS, severity: 'warning' }),
       ],
       NOW,
       14
@@ -178,10 +177,10 @@ describe('deadlinesByDay', () => {
   it('sums to the board items inside the window, not the whole board', () => {
     const items = [
       item({ id: 'dry', timing: 'passed', deadlineMs: null }),
-      item({ id: 'today', deadlineMs: NOW + 5 * HOUR }),
-      item({ id: 'tomorrow', deadlineMs: NOW + DAY }),
-      item({ id: 'day-8', deadlineMs: NOW + 8 * DAY }),
-      item({ id: 'beyond', deadlineMs: NOW + 25 * DAY }),
+      item({ id: 'today', deadlineMs: NOW + 5 * HOUR_MS }),
+      item({ id: 'tomorrow', deadlineMs: NOW + DAY_MS }),
+      item({ id: 'day-8', deadlineMs: NOW + 8 * DAY_MS }),
+      item({ id: 'beyond', deadlineMs: NOW + 25 * DAY_MS }),
       item({ id: 'offline', kind: 'serviceOffline', timing: 'untimed', deadlineMs: null }),
     ];
 
@@ -201,9 +200,9 @@ describe('dueSoon', () => {
   it('counts everything inside the window', () => {
     const result = dueSoon(
       [
-        item({ id: 'now-ish', deadlineMs: NOW + HOUR }),
-        item({ id: 'late-today', deadlineMs: NOW + 23 * HOUR }),
-        item({ id: 'tomorrow', deadlineMs: NOW + 30 * HOUR }),
+        item({ id: 'now-ish', deadlineMs: NOW + HOUR_MS }),
+        item({ id: 'late-today', deadlineMs: NOW + 23 * HOUR_MS }),
+        item({ id: 'tomorrow', deadlineMs: NOW + 30 * HOUR_MS }),
       ],
       NOW
     );
@@ -219,9 +218,9 @@ describe('dueSoon', () => {
   it('reports overdue items separately, and inside the total', () => {
     const result = dueSoon(
       [
-        item({ id: 'late', deadlineMs: NOW - 9 * HOUR }),
+        item({ id: 'late', deadlineMs: NOW - 9 * HOUR_MS }),
         item({ id: 'dry', timing: 'passed', deadlineMs: null }),
-        item({ id: 'soon', deadlineMs: NOW + 2 * HOUR }),
+        item({ id: 'soon', deadlineMs: NOW + 2 * HOUR_MS }),
       ],
       NOW
     );
@@ -240,10 +239,10 @@ describe('dueSoon', () => {
   });
 
   it('takes a custom window', () => {
-    const items = [item({ id: 'in-3h', deadlineMs: NOW + 3 * HOUR })];
+    const items = [item({ id: 'in-3h', deadlineMs: NOW + 3 * HOUR_MS })];
 
-    expect(dueSoon(items, NOW, 2 * HOUR).total).toBe(0);
-    expect(dueSoon(items, NOW, 4 * HOUR).total).toBe(1);
+    expect(dueSoon(items, NOW, 2 * HOUR_MS).total).toBe(0);
+    expect(dueSoon(items, NOW, 4 * HOUR_MS).total).toBe(1);
   });
 });
 
@@ -295,7 +294,7 @@ describe('deadlinesByDay on the Time format clock', () => {
 
   it('still lands an overdue or passed item on day 0 on either clock', () => {
     const passed = item({ id: 'p', timing: 'passed' });
-    const overdue = item({ id: 'o', deadlineMs: nowMs - 3 * DAY });
+    const overdue = item({ id: 'o', deadlineMs: nowMs - 3 * DAY_MS });
 
     expect(deadlinesByDay([passed, overdue], nowMs, 3, 'UTC')[0].count).toBe(2);
     expect(deadlinesByDay([passed, overdue], nowMs, 3)[0].count).toBe(2);

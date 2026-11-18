@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import {
   buildTheraConnectionRows,
@@ -11,7 +12,6 @@ import {
 } from './theraConnections';
 
 const NOW = Date.parse('2026-09-30T09:00:00Z');
-const HOUR = 3_600_000;
 
 function connection(overrides: Partial<TheraConnection> = {}): TheraConnection {
   return {
@@ -25,7 +25,7 @@ function connection(overrides: Partial<TheraConnection> = {}): TheraConnection {
     exitRegionName: 'Heimatar',
     wormholeType: 'Q063',
     maxShipSize: 'medium',
-    expiresAt: NOW + 5 * HOUR,
+    expiresAt: NOW + 5 * HOUR_MS,
     ...overrides,
   };
 }
@@ -52,14 +52,14 @@ describe('buildTheraConnectionRows', () => {
   it('flags remaining life of two hours or less, and not more', () => {
     const rows = buildTheraConnectionRows(
       [
-        connection({ id: 'two', expiresAt: NOW + 2 * HOUR }),
-        connection({ id: 'more', expiresAt: NOW + 2 * HOUR + 1 }),
+        connection({ id: 'two', expiresAt: NOW + 2 * HOUR_MS }),
+        connection({ id: 'more', expiresAt: NOW + 2 * HOUR_MS + 1 }),
       ],
       { now: NOW, systems: SYSTEMS, distances: NO_ORIGIN }
     );
     expect(rows.map((row) => [row.id, row.remainingMs, row.lifeWarning])).toEqual([
-      ['two', 2 * HOUR, true],
-      ['more', 2 * HOUR + 1, false],
+      ['two', 2 * HOUR_MS, true],
+      ['more', 2 * HOUR_MS + 1, false],
     ]);
   });
 
@@ -290,10 +290,10 @@ describe('longestLifeFirst', () => {
   it('orders rows by remaining life, longest first, then by exit name', () => {
     const rows = buildTheraConnectionRows(
       [
-        connection({ id: '3h', expiresAt: NOW + 3 * HOUR }),
-        connection({ id: '12h-b', exitSystemName: 'B', expiresAt: NOW + 12 * HOUR }),
-        connection({ id: '12h-a', exitSystemName: 'A', expiresAt: NOW + 12 * HOUR }),
-        connection({ id: '1h', expiresAt: NOW + HOUR }),
+        connection({ id: '3h', expiresAt: NOW + 3 * HOUR_MS }),
+        connection({ id: '12h-b', exitSystemName: 'B', expiresAt: NOW + 12 * HOUR_MS }),
+        connection({ id: '12h-a', exitSystemName: 'A', expiresAt: NOW + 12 * HOUR_MS }),
+        connection({ id: '1h', expiresAt: NOW + HOUR_MS }),
       ],
       { now: NOW, systems: SYSTEMS, distances: NO_ORIGIN }
     );

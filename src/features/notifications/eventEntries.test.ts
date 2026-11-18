@@ -4,6 +4,7 @@
  * one event at a time through its own entry — snapshot pair in, rendered copy
  * out — with no poll harness, no fetch and no Dexie.
  */
+import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import { PROJECTABLE_EVENT_IDS } from '@/engine/projection';
 import { NOTIFICATION_EVENT_IDS, type NotificationEventId } from './events';
@@ -371,15 +372,14 @@ describe('one event through its entry', () => {
   it('ordersLapsing: one batched fire with a count, pushes hedged, owns its lead-hours threshold', () => {
     const entry = NOTIFICATION_EVENT_ENTRIES.ordersLapsing;
     const now = 1_800_000_000_000;
-    const hour = 3_600_000;
     const orders = [1, 2, 3].map((orderId) => ({
       orderId,
-      expiresMs: now + 20 * hour,
-      leadMs: 24 * hour,
+      expiresMs: now + 20 * HOUR_MS,
+      leadMs: 24 * HOUR_MS,
     }));
     const fires = entry.diff(
       42,
-      { entries: orders, nowMs: now - 10 * hour },
+      { entries: orders, nowMs: now - 10 * HOUR_MS },
       { entries: orders, nowMs: now }
     );
     expect(fires).toHaveLength(1);

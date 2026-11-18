@@ -1,12 +1,11 @@
+import { HOUR_MS, MINUTE_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import type { SovRaidSkyhook, SovRaidsWidgetData } from './sovRaidsLoader';
 import { buildView, ensureBuilders } from './models';
 import { sovRaids } from './sovRaidsModel';
 import type { BuildContext, Feeds } from './types';
 
-const HOUR = 3_600_000;
-const MIN = 60_000;
-const NOW = 1_000 * HOUR;
+const NOW = 1_000 * HOUR_MS;
 const t = (key: string, options?: Record<string, unknown>) =>
   options && Object.keys(options).length ? `${key}${JSON.stringify(options)}` : key;
 const ctx: BuildContext = {
@@ -38,7 +37,7 @@ function data(over: Partial<SovRaidsWidgetData> = {}): SovRaidsWidgetData {
     jumps: new Map([[30001190, 7]]),
     fetchedAt: new Date(0),
     fromCache: false,
-    freshForMs: 10 * MIN,
+    freshForMs: 10 * MINUTE_MS,
     ...over,
   };
 }
@@ -52,9 +51,9 @@ describe('sovRaids', () => {
     const view = sovRaids(
       feeds({
         skyhooks: [
-          hook('Efa', 100 * MIN, 340 * MIN),
-          hook('X7', -2 * HOUR, 80 * MIN),
-          hook('Gone', -5 * HOUR, -HOUR),
+          hook('Efa', 100 * MINUTE_MS, 340 * MINUTE_MS),
+          hook('X7', -2 * HOUR_MS, 80 * MINUTE_MS),
+          hook('Gone', -5 * HOUR_MS, -HOUR_MS),
         ],
       }),
       ctx
@@ -72,7 +71,10 @@ describe('sovRaids', () => {
   it('lists the soonest first, open before upcoming, with short window and jump cells', () => {
     const view = sovRaids(
       feeds({
-        skyhooks: [hook('Efa', 100 * MIN, 340 * MIN), hook('X7', -2 * HOUR, 80 * MIN)],
+        skyhooks: [
+          hook('Efa', 100 * MINUTE_MS, 340 * MINUTE_MS),
+          hook('X7', -2 * HOUR_MS, 80 * MINUTE_MS),
+        ],
         jumps: new Map(),
       }),
       ctx
@@ -86,7 +88,7 @@ describe('sovRaids', () => {
 
   it('times an upcoming window, and drops the jumps when the origin is unknown', () => {
     const view = sovRaids(
-      feeds({ skyhooks: [hook('Efa', 100 * MIN, 340 * MIN)], jumps: new Map() }),
+      feeds({ skyhooks: [hook('Efa', 100 * MINUTE_MS, 340 * MINUTE_MS)], jumps: new Map() }),
       ctx
     );
     expect(view.number.secondary).toEqual({
@@ -97,7 +99,7 @@ describe('sovRaids', () => {
   });
 
   it('never times a window to the minute under the read window', () => {
-    const view = sovRaids(feeds({ skyhooks: [hook('Efa', 4 * MIN, 2 * HOUR)] }), ctx);
+    const view = sovRaids(feeds({ skyhooks: [hook('Efa', 4 * MINUTE_MS, 2 * HOUR_MS)] }), ctx);
     expect(view.table?.rows[0]?.cells[1]).toEqual({
       text: `${W}.windowIn{"duration":"${W}.underCacheWindow{\\"duration\\":\\"10m\\"}"}`,
       tone: 'caution',
@@ -106,7 +108,7 @@ describe('sovRaids', () => {
 
   it('names a skyhook by its system when the planet was not read', () => {
     const view = sovRaids(
-      feeds({ skyhooks: [hook('Efa', HOUR, 3 * HOUR, { planetName: null })] }),
+      feeds({ skyhooks: [hook('Efa', HOUR_MS, 3 * HOUR_MS, { planetName: null })] }),
       ctx
     );
     expect(view.table?.rows[0]?.cells[0]).toBe('X-7OMU');
@@ -114,7 +116,12 @@ describe('sovRaids', () => {
 
   it('opens a row modal with the window, who holds it, and where it is', () => {
     const view = sovRaids(
-      feeds({ skyhooks: [hook('X7', -HOUR, 80 * MIN), hook('Efa', 100 * MIN, 340 * MIN)] }),
+      feeds({
+        skyhooks: [
+          hook('X7', -HOUR_MS, 80 * MINUTE_MS),
+          hook('Efa', 100 * MINUTE_MS, 340 * MINUTE_MS),
+        ],
+      }),
       ctx
     );
     expect(view.table?.rows[0]?.detail).toEqual({
@@ -132,12 +139,14 @@ describe('sovRaids', () => {
 
   it('offers each upcoming window to the header Next, never one already open', () => {
     const view = sovRaids(
-      feeds({ skyhooks: [hook('X7', -HOUR, HOUR), hook('Efa', 100 * MIN, 340 * MIN)] }),
+      feeds({
+        skyhooks: [hook('X7', -HOUR_MS, HOUR_MS), hook('Efa', 100 * MINUTE_MS, 340 * MINUTE_MS)],
+      }),
       ctx
     );
     expect(view.deadlines).toEqual([
       {
-        at: NOW + 100 * MIN,
+        at: NOW + 100 * MINUTE_MS,
         note: `${W}.deadline{"subject":"Efa IV"}`,
         severity: 'warning',
         to: '/travel/route',
@@ -147,7 +156,9 @@ describe('sovRaids', () => {
 
   it('keeps a skyhook with no readable window as unknown, never safe', () => {
     const view = sovRaids(
-      feeds({ skyhooks: [{ ...hook('Efa', 0, 0), window: null }, hook('X7', HOUR, 3 * HOUR)] }),
+      feeds({
+        skyhooks: [{ ...hook('Efa', 0, 0), window: null }, hook('X7', HOUR_MS, 3 * HOUR_MS)],
+      }),
       ctx
     );
     expect(view.number.value).toBe('2');
@@ -161,7 +172,7 @@ describe('sovRaids', () => {
 
   it('keeps Set destination and jumps when only the system names are unread', () => {
     const view = sovRaids(
-      feeds({ skyhooks: [hook('X7', HOUR, 3 * HOUR)], systemNames: new Map() }),
+      feeds({ skyhooks: [hook('X7', HOUR_MS, 3 * HOUR_MS)], systemNames: new Map() }),
       ctx
     );
     expect(view.table?.rows[0]?.detail?.place).toEqual({
@@ -172,15 +183,15 @@ describe('sovRaids', () => {
   });
 
   it('says how old an empty answer is once the read is past its window', () => {
-    const fresh = sovRaids(feeds({ fetchedAt: new Date(NOW - 5 * MIN) }), ctx);
+    const fresh = sovRaids(feeds({ fetchedAt: new Date(NOW - 5 * MINUTE_MS) }), ctx);
     expect(fresh.emptyHint).toBeUndefined();
-    const old = sovRaids(feeds({ fetchedAt: new Date(NOW - 3 * HOUR) }), ctx);
+    const old = sovRaids(feeds({ fetchedAt: new Date(NOW - 3 * HOUR_MS) }), ctx);
     expect(old.status.isEmpty).toBe(true);
     expect(old.emptyHint).toMatch(/^travel\.sovRaids\.staleEmpty/);
   });
 
   it('is empty with nothing raidable, not a lock', () => {
-    const view = sovRaids(feeds({ skyhooks: [hook('Gone', -3 * HOUR, -HOUR)] }), ctx);
+    const view = sovRaids(feeds({ skyhooks: [hook('Gone', -3 * HOUR_MS, -HOUR_MS)] }), ctx);
     expect(view.status.isEmpty).toBe(true);
     expect(view.status.needsPermission).toBe(false);
     expect(view.number.value).toBe('0');
@@ -211,7 +222,10 @@ describe('sovRaids My alliance', () => {
   it("lists only the Character's alliance, whoever else is raidable", () => {
     const view = sovRaids(
       feeds({
-        skyhooks: [hook('Ours', HOUR, 3 * HOUR), hook('Theirs', HOUR, 3 * HOUR, { holderId: 77 })],
+        skyhooks: [
+          hook('Ours', HOUR_MS, 3 * HOUR_MS),
+          hook('Theirs', HOUR_MS, 3 * HOUR_MS, { holderId: 77 }),
+        ],
       }),
       ctx
     );
@@ -233,9 +247,9 @@ describe('sovRaids Near me', () => {
       feeds({
         jumps,
         skyhooks: [
-          hook('Soon', HOUR, 3 * HOUR, { holderId: 77 }),
-          hook('Open', -HOUR, 2 * HOUR, { holderId: 77 }),
-          hook('Mine', 2 * HOUR, 4 * HOUR),
+          hook('Soon', HOUR_MS, 3 * HOUR_MS, { holderId: 77 }),
+          hook('Open', -HOUR_MS, 2 * HOUR_MS, { holderId: 77 }),
+          hook('Mine', 2 * HOUR_MS, 4 * HOUR_MS),
         ],
       }),
       near
@@ -266,7 +280,7 @@ describe('sovRaids Near me', () => {
 
   it('turns an open window amber with under ten minutes left, with the words', () => {
     const view = sovRaids(
-      feeds({ jumps, skyhooks: [hook('Late', -HOUR, 9 * MIN, { holderId: 77 })] }),
+      feeds({ jumps, skyhooks: [hook('Late', -HOUR_MS, 9 * MINUTE_MS, { holderId: 77 })] }),
       near
     );
     expect(view.table?.rows[0]?.cells[1]).toEqual({
@@ -278,8 +292,8 @@ describe('sovRaids Near me', () => {
 
   it('says how many the radius cut, and honours a wider radius', () => {
     const skyhooks = [
-      hook('Near', HOUR, 3 * HOUR, { holderId: 77 }),
-      hook('Far', HOUR, 3 * HOUR, { holderId: 77, systemId: FAR }),
+      hook('Near', HOUR_MS, 3 * HOUR_MS, { holderId: 77 }),
+      hook('Far', HOUR_MS, 3 * HOUR_MS, { holderId: 77, systemId: FAR }),
     ];
     const cut = sovRaids(feeds({ jumps, skyhooks }), near);
     expect(cut.table?.footer).toBe(`${W}.near.beyond{"count":1,"radius":8}`);
@@ -295,7 +309,7 @@ describe('sovRaids Near me', () => {
         alliance: null,
         holdsSov: false,
         jumps,
-        skyhooks: [hook('Open', -HOUR, 2 * HOUR, { holderId: 77 })],
+        skyhooks: [hook('Open', -HOUR_MS, 2 * HOUR_MS, { holderId: 77 })],
       }),
       near
     );
@@ -308,8 +322,8 @@ describe('sovRaids Near me', () => {
       feeds({
         jumps,
         skyhooks: [
-          hook('Theirs', HOUR, 3 * HOUR, { holderId: 77 }),
-          hook('Mine', 2 * HOUR, 4 * HOUR),
+          hook('Theirs', HOUR_MS, 3 * HOUR_MS, { holderId: 77 }),
+          hook('Mine', 2 * HOUR_MS, 4 * HOUR_MS),
         ],
       }),
       near
@@ -319,7 +333,7 @@ describe('sovRaids Near me', () => {
 
   it('opens a row modal naming the holder', () => {
     const view = sovRaids(
-      feeds({ jumps, skyhooks: [hook('Theirs', HOUR, 3 * HOUR, { holderId: 77 })] }),
+      feeds({ jumps, skyhooks: [hook('Theirs', HOUR_MS, 3 * HOUR_MS, { holderId: 77 })] }),
       near
     );
     expect(view.table?.rows[0]?.detail?.facts[1]).toEqual({
@@ -333,8 +347,8 @@ describe('sovRaids Near me', () => {
     const fresh = sovRaids(
       feeds({
         jumps,
-        skyhooks: [hook('Far', HOUR, 3 * HOUR, { systemId: FAR })],
-        fetchedAt: new Date(NOW - MIN),
+        skyhooks: [hook('Far', HOUR_MS, 3 * HOUR_MS, { systemId: FAR })],
+        fetchedAt: new Date(NOW - MINUTE_MS),
       }),
       near
     );
@@ -342,13 +356,16 @@ describe('sovRaids Near me', () => {
     expect(fresh.emptyMessage).toBe(`${W}.near.none{"radius":8}`);
     expect(fresh.emptyHint).toBe(`${W}.near.noneHint`);
     expect(fresh.table?.footer).toBeUndefined();
-    const old = sovRaids(feeds({ jumps, fetchedAt: new Date(NOW - 3 * HOUR) }), near);
+    const old = sovRaids(feeds({ jumps, fetchedAt: new Date(NOW - 3 * HOUR_MS) }), near);
     expect(old.emptyHint).toMatch(/^travel\.sovRaids\.staleEmpty/);
   });
 
   it('says the location is unknown, guessing nothing, when no distance is known', () => {
     const view = sovRaids(
-      feeds({ jumps: new Map(), skyhooks: [hook('Open', -HOUR, 2 * HOUR, { holderId: 77 })] }),
+      feeds({
+        jumps: new Map(),
+        skyhooks: [hook('Open', -HOUR_MS, 2 * HOUR_MS, { holderId: 77 })],
+      }),
       near
     );
     expect(view.number.value).toBe('0');
@@ -359,7 +376,7 @@ describe('sovRaids Near me', () => {
 
 describe('the Overview stand-in', () => {
   it('reads as loading until the lazy builder lands, then draws the read', async () => {
-    const read = feeds({ skyhooks: [hook('X7', -HOUR, HOUR)] });
+    const read = feeds({ skyhooks: [hook('X7', -HOUR_MS, HOUR_MS)] });
     expect(buildView('sovRaids', read, ctx).status.loading).toBe(true);
     expect(
       buildView('sovRaids', { sovRaids: { loading: false, error: true, data: null } }, ctx).status

@@ -1,3 +1,4 @@
+import { MINUTE_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import {
   GROWTH_WAIT_MS,
@@ -9,7 +10,6 @@ import {
   type OreArrivalLog,
 } from './oreArrival';
 
-const MIN = 60_000;
 const at = (iso: string) => Date.parse(iso);
 const CHAR = 91;
 const SYSTEM = 30000142;
@@ -57,7 +57,7 @@ describe('recordLedgerFetch', () => {
       kind: 'arriving',
       arriving: 1,
       of: 1,
-      waitMs: 38 * MIN,
+      waitMs: 38 * MINUTE_MS,
     });
   });
 
@@ -71,7 +71,7 @@ describe('recordLedgerFetch', () => {
     log = recordLedgerFetch(log, CHAR, fetchOf(150), at('2026-10-04T12:10:00Z'));
     log = recordLedgerFetch(log, CHAR, fetchOf(150), at('2026-10-04T12:20:00Z'));
     const notice = arrivalNotice(settled(), log, at('2026-10-04T12:30:00Z'));
-    expect(notice).toMatchObject({ kind: 'arriving', waitMs: 30 * MIN });
+    expect(notice).toMatchObject({ kind: 'arriving', waitMs: 30 * MINUTE_MS });
   });
 
   it('counts an entry that first appears in a later fetch of the same day as growth', () => {
@@ -136,17 +136,17 @@ describe('arrivalNotice', () => {
   });
 
   it("never waits more than 50 minutes: grown ore was mined at least ESI's 10-minute minimum lag ago", () => {
-    expect(GROWTH_WAIT_MS).toBe(50 * MIN);
+    expect(GROWTH_WAIT_MS).toBe(50 * MINUTE_MS);
     expect(arrivalNotice(settled(), growing(), at('2026-10-04T12:10:00Z'))).toMatchObject({
       kind: 'arriving',
-      waitMs: 50 * MIN,
+      waitMs: 50 * MINUTE_MS,
     });
   });
 
   it('drops to quiet 50 minutes after the last growth', () => {
     expect(arrivalNotice(settled(), growing(), at('2026-10-04T12:59:00Z'))).toMatchObject({
       kind: 'arriving',
-      waitMs: MIN,
+      waitMs: MINUTE_MS,
     });
     expect(arrivalNotice(settled(), growing(), at('2026-10-04T13:00:00Z'))).toEqual({
       kind: 'quiet',
@@ -191,7 +191,7 @@ describe('arrivalNotice', () => {
         log,
         at('2026-10-04T12:20:00Z')
       )
-    ).toEqual({ kind: 'arriving', arriving: 1, of: 2, waitMs: GROWTH_WAIT_MS - 10 * MIN });
+    ).toEqual({ kind: 'arriving', arriving: 1, of: 2, waitMs: GROWTH_WAIT_MS - 10 * MINUTE_MS });
   });
 });
 

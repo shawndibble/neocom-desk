@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import {
   detectGaps,
@@ -24,7 +25,6 @@ import type { Statement } from './statements';
 import type { Dismissal } from './dismissals';
 import { resolveRate, type TaxRate } from './rates';
 
-const DAY = 86_400_000;
 const at = (iso: string) => Date.parse(iso);
 
 describe('placeObservedRows', () => {
@@ -254,14 +254,14 @@ describe('syncStatus', () => {
     expect(syncStatus(null, 0)).toEqual({ kind: 'never' });
   });
   it('is fresh up to three days and stale after', () => {
-    expect(syncStatus(last, last.at + 3 * DAY).kind).toBe('fresh');
-    const stale = syncStatus(last, last.at + 3 * DAY + 1);
+    expect(syncStatus(last, last.at + 3 * DAY_MS).kind).toBe('fresh');
+    const stale = syncStatus(last, last.at + 3 * DAY_MS + 1);
     expect(stale).toMatchObject({ kind: 'stale', byName: 'Ann', byCharacterId: 5 });
   });
   it('carries how long ago it was and any gaps', () => {
     const gaps = [{ structureId: 1, from: '2026-06-01', to: '2026-06-02' }];
-    expect(syncStatus({ ...last, gaps }, last.at + 2 * DAY)).toMatchObject({
-      ageMs: 2 * DAY,
+    expect(syncStatus({ ...last, gaps }, last.at + 2 * DAY_MS)).toMatchObject({
+      ageMs: 2 * DAY_MS,
       gaps,
     });
   });

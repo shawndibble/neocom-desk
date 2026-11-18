@@ -1,8 +1,8 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import { skyhookRaidDetail } from './skyhookRaidDetail';
 import type { SkyhookRaid } from './calendarBoardSources';
 
-const HOUR = 3_600_000;
 const NOW = Date.parse('2026-10-23T12:00:00Z');
 const t = (key: string, options?: Record<string, unknown>) =>
   options ? `${key}${JSON.stringify(options)}` : key;
@@ -12,8 +12,8 @@ const raid = (over: Partial<SkyhookRaid> = {}): SkyhookRaid => ({
   subject: 'X-7OMU IV',
   systemId: 30000001,
   systemName: 'X-7OMU',
-  windowStartMs: NOW + 2 * HOUR,
-  windowEndMs: NOW + 4 * HOUR,
+  windowStartMs: NOW + 2 * HOUR_MS,
+  windowEndMs: NOW + 4 * HOUR_MS,
   unsecuredUnits: 400,
   securedUnits: 800,
   ...over,
@@ -37,7 +37,7 @@ describe('skyhookRaidDetail', () => {
   });
 
   it('badges an open window as danger', () => {
-    const detail = skyhookRaidDetail(raid(), NOW + 3 * HOUR, t, 'UTC');
+    const detail = skyhookRaidDetail(raid(), NOW + 3 * HOUR_MS, t, 'UTC');
     expect(detail.status).toMatchObject({
       badge: 'calendar.skyhookRaid.state.open',
       tone: 'danger',

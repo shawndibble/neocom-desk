@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import type { HeldQuote } from './buyback';
 import {
@@ -9,8 +10,7 @@ import {
   type BuybackContract,
 } from './buybackContracts';
 
-const DAY = 86_400_000;
-const NOW = 10 * DAY;
+const NOW = 10 * DAY_MS;
 const SELLER = 100;
 const BUYER = 200;
 
@@ -20,8 +20,8 @@ const quote: HeldQuote = {
     { typeId: 34, name: 'Tritanium', quantity: 500, unitPrice: 4, total: 1800 },
   ],
   total: 10800,
-  quotedAt: 5 * DAY,
-  expiresAt: 19 * DAY,
+  quotedAt: 5 * DAY_MS,
+  expiresAt: 19 * DAY_MS,
 };
 
 const contract = (over: Partial<BuybackContract> = {}): BuybackContract => ({
@@ -31,8 +31,8 @@ const contract = (over: Partial<BuybackContract> = {}): BuybackContract => ({
   issuerId: SELLER,
   assigneeId: BUYER,
   acceptorId: 0,
-  dateIssued: 6 * DAY,
-  dateExpired: 20 * DAY,
+  dateIssued: 6 * DAY_MS,
+  dateExpired: 20 * DAY_MS,
   price: 10800,
   items: [
     { typeId: 1230, quantity: 1000 },
@@ -43,19 +43,19 @@ const contract = (over: Partial<BuybackContract> = {}): BuybackContract => ({
 
 describe('quoteContractStatus', () => {
   it('names the five states a buyer and seller see', () => {
-    expect(quoteContractStatus('outstanding', 20 * DAY, NOW)).toBe('outstanding');
-    expect(quoteContractStatus('in_progress', 20 * DAY, NOW)).toBe('inProgress');
-    expect(quoteContractStatus('finished', 20 * DAY, NOW)).toBe('finished');
-    expect(quoteContractStatus('finished_issuer', 20 * DAY, NOW)).toBe('finished');
-    expect(quoteContractStatus('finished_contractor', 20 * DAY, NOW)).toBe('finished');
-    expect(quoteContractStatus('rejected', 20 * DAY, NOW)).toBe('rejected');
+    expect(quoteContractStatus('outstanding', 20 * DAY_MS, NOW)).toBe('outstanding');
+    expect(quoteContractStatus('in_progress', 20 * DAY_MS, NOW)).toBe('inProgress');
+    expect(quoteContractStatus('finished', 20 * DAY_MS, NOW)).toBe('finished');
+    expect(quoteContractStatus('finished_issuer', 20 * DAY_MS, NOW)).toBe('finished');
+    expect(quoteContractStatus('finished_contractor', 20 * DAY_MS, NOW)).toBe('finished');
+    expect(quoteContractStatus('rejected', 20 * DAY_MS, NOW)).toBe('rejected');
   });
   it('reads an outstanding contract past its expiry as expired', () => {
     expect(quoteContractStatus('outstanding', NOW - 1, NOW)).toBe('expired');
   });
   it('is null for a contract that is gone: cancelled, deleted or failed', () => {
     for (const status of ['cancelled', 'deleted', 'failed']) {
-      expect(quoteContractStatus(status, 20 * DAY, NOW)).toBeNull();
+      expect(quoteContractStatus(status, 20 * DAY_MS, NOW)).toBeNull();
     }
   });
 });
@@ -89,7 +89,7 @@ describe('linkQuoteContracts', () => {
       contract({ contractId: 2, type: 'courier' }),
       contract({ contractId: 3, issuerId: 999 }),
       contract({ contractId: 4, assigneeId: 777 }),
-      contract({ contractId: 5, dateIssued: 4 * DAY }),
+      contract({ contractId: 5, dateIssued: 4 * DAY_MS }),
       contract({ contractId: 6, items: [{ typeId: 1230, quantity: 1000 }] }),
       contract({
         contractId: 7,
@@ -121,7 +121,7 @@ describe('linkQuoteContracts', () => {
 
   it('lists the newest contract first and keeps a few', () => {
     const many = Array.from({ length: MAX_LINKED_CONTRACTS + 2 }, (_, i) =>
-      contract({ contractId: 100 + i, dateIssued: 6 * DAY + i })
+      contract({ contractId: 100 + i, dateIssued: 6 * DAY_MS + i })
     );
     const links = linkQuoteContracts(quote, SELLER, BUYER, many, NOW);
     expect(links).toHaveLength(MAX_LINKED_CONTRACTS);

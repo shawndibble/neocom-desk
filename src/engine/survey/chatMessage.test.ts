@@ -1,3 +1,4 @@
+import { MINUTE_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import { textWidth } from './chatFont';
 import {
@@ -10,7 +11,6 @@ import {
 } from './chatMessage';
 import { summarizeSurvey, type SurveyScan } from './series';
 
-const MIN = 60_000;
 const T0 = Date.UTC(2026, 9, 8, 16, 40, 0);
 const URL = 'https://neocomdesk.test/survey/abc123XYZ';
 const CHARACTER_PX = textWidth('─');
@@ -31,7 +31,7 @@ const labels: SurveyMessageLabels = {
 };
 
 function scan(minutes: number, ...rocks: [string, number][]): SurveyScan {
-  return { at: T0 + minutes * MIN, rocks: rocks.map(([ore, volume]) => ({ ore, volume })) };
+  return { at: T0 + minutes * MINUTE_MS, rocks: rocks.map(([ore, volume]) => ({ ore, volume })) };
 }
 
 /** The message split into its heading and the rows of the box. */
@@ -67,7 +67,7 @@ describe('surveyChatMessage', () => {
     const summary = summarizeSurvey([scan(0, ['Veldspar', 2000]), scan(10, ['Veldspar', 1000])])!;
     const text = (now?: number) => surveyChatMessage(summary, URL, labels, now);
     expect(text()).toContain('(~10m)');
-    expect(text(T0 + 15 * MIN)).toContain('(~5m)');
+    expect(text(T0 + 15 * MINUTE_MS)).toContain('(~5m)');
   });
 
   it('opens with a heading line, then an ETA rail, the bar, the ore line and a link rail', () => {
@@ -380,7 +380,7 @@ describe('chat message options', () => {
 
   it('continues the Left line with the ores first, then value, then volume', () => {
     const rocks = (a: number, b: number) => ({
-      at: T0 + (a === 5 ? 0 : 5 * MIN),
+      at: T0 + (a === 5 ? 0 : 5 * MINUTE_MS),
       rocks: [
         { ore: 'A', volume: a, isk: a * 1_000_000 },
         { ore: 'B', volume: b, isk: b * 1_000_000 },

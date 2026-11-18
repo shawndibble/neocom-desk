@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import {
   allianceSpace,
@@ -9,25 +10,28 @@ import {
   raidState,
 } from './sovereignty';
 
-const HOUR = 3_600_000;
-const NOW = 1_000 * HOUR;
+const NOW = 1_000 * HOUR_MS;
 const at = (ms: number) => NOW + ms;
 
 describe('raidState', () => {
   it('is upcoming before the window opens', () => {
-    expect(raidState({ startMs: at(HOUR), endMs: at(3 * HOUR) }, NOW)).toBe('upcoming');
+    expect(raidState({ startMs: at(HOUR_MS), endMs: at(3 * HOUR_MS) }, NOW)).toBe('upcoming');
   });
   it('is open from the start until the end', () => {
-    expect(raidState({ startMs: NOW, endMs: at(HOUR) }, NOW)).toBe('open');
+    expect(raidState({ startMs: NOW, endMs: at(HOUR_MS) }, NOW)).toBe('open');
   });
   it('is closed at the end', () => {
-    expect(raidState({ startMs: at(-2 * HOUR), endMs: NOW }, NOW)).toBe('closed');
+    expect(raidState({ startMs: at(-2 * HOUR_MS), endMs: NOW }, NOW)).toBe('closed');
   });
   it('keeps a hub past its end in overtime, still vulnerable', () => {
-    expect(raidState({ startMs: at(-2 * HOUR), endMs: at(-HOUR) }, NOW, 'hub')).toBe('overtime');
+    expect(raidState({ startMs: at(-2 * HOUR_MS), endMs: at(-HOUR_MS) }, NOW, 'hub')).toBe(
+      'overtime'
+    );
   });
   it('still closes a skyhook past its end', () => {
-    expect(raidState({ startMs: at(-2 * HOUR), endMs: at(-HOUR) }, NOW, 'skyhook')).toBe('closed');
+    expect(raidState({ startMs: at(-2 * HOUR_MS), endMs: at(-HOUR_MS) }, NOW, 'skyhook')).toBe(
+      'closed'
+    );
   });
 });
 
@@ -36,16 +40,16 @@ describe('raidHeadline', () => {
     expect(
       raidHeadline(
         [
-          { startMs: at(6 * HOUR), endMs: at(8 * HOUR) },
-          { startMs: at(9 * HOUR), endMs: at(11 * HOUR) },
-          { startMs: at(-5 * HOUR), endMs: at(-HOUR) },
+          { startMs: at(6 * HOUR_MS), endMs: at(8 * HOUR_MS) },
+          { startMs: at(9 * HOUR_MS), endMs: at(11 * HOUR_MS) },
+          { startMs: at(-5 * HOUR_MS), endMs: at(-HOUR_MS) },
         ],
         NOW
       )
-    ).toEqual({ count: 2, untilMs: 6 * HOUR });
+    ).toEqual({ count: 2, untilMs: 6 * HOUR_MS });
   });
   it('says 0 until when a window is already open', () => {
-    expect(raidHeadline([{ startMs: at(-HOUR), endMs: at(HOUR) }], NOW)).toEqual({
+    expect(raidHeadline([{ startMs: at(-HOUR_MS), endMs: at(HOUR_MS) }], NOW)).toEqual({
       count: 1,
       untilMs: 0,
     });
@@ -57,25 +61,25 @@ describe('raidHeadline', () => {
     expect(
       raidHeadline(
         [
-          { startMs: at(-HOUR), endMs: at(HOUR) },
-          { startMs: at(5 * HOUR), endMs: at(7 * HOUR) },
-          { startMs: at(30 * HOUR), endMs: at(32 * HOUR) },
+          { startMs: at(-HOUR_MS), endMs: at(HOUR_MS) },
+          { startMs: at(5 * HOUR_MS), endMs: at(7 * HOUR_MS) },
+          { startMs: at(30 * HOUR_MS), endMs: at(32 * HOUR_MS) },
         ],
         NOW,
-        6 * HOUR
+        6 * HOUR_MS
       )
     ).toEqual({ count: 2, untilMs: 0 });
-    expect(raidHeadline([{ startMs: at(30 * HOUR), endMs: at(32 * HOUR) }], NOW, 6 * HOUR)).toEqual(
-      { count: 0, untilMs: 30 * HOUR }
-    );
+    expect(
+      raidHeadline([{ startMs: at(30 * HOUR_MS), endMs: at(32 * HOUR_MS) }], NOW, 6 * HOUR_MS)
+    ).toEqual({ count: 0, untilMs: 30 * HOUR_MS });
   });
 });
 
 describe('hubReagentsRunOutMs', () => {
   it('is when the bay empties at its burn rate, from its last update', () => {
-    expect(hubReagentsRunOutMs({ amount: 100, burningPerHour: 10, updatedMs: at(-2 * HOUR) })).toBe(
-      at(8 * HOUR)
-    );
+    expect(
+      hubReagentsRunOutMs({ amount: 100, burningPerHour: 10, updatedMs: at(-2 * HOUR_MS) })
+    ).toBe(at(8 * HOUR_MS));
   });
   it('is unknown when nothing burns', () => {
     expect(hubReagentsRunOutMs({ amount: 10, burningPerHour: 0, updatedMs: NOW })).toBeNull();
@@ -104,7 +108,7 @@ describe('allianceSpace', () => {
 describe('liveRaids', () => {
   const hook = (key: string, startH: number, endH: number) => ({
     key,
-    window: { startMs: at(startH * HOUR), endMs: at(endH * HOUR) },
+    window: { startMs: at(startH * HOUR_MS), endMs: at(endH * HOUR_MS) },
   });
 
   it('puts open windows first, closing soonest, then upcoming by opening', () => {
@@ -129,13 +133,13 @@ describe('liveRaids', () => {
 
 describe('closingSoon', () => {
   it('is true for an open window with under ten minutes left', () => {
-    expect(closingSoon({ startMs: at(-HOUR), endMs: at(9 * 60_000) }, NOW)).toBe(true);
+    expect(closingSoon({ startMs: at(-HOUR_MS), endMs: at(9 * 60_000) }, NOW)).toBe(true);
   });
   it('is false at ten minutes, with longer left, before opening, and once closed', () => {
-    expect(closingSoon({ startMs: at(-HOUR), endMs: at(10 * 60_000) }, NOW)).toBe(false);
-    expect(closingSoon({ startMs: at(-HOUR), endMs: at(HOUR) }, NOW)).toBe(false);
+    expect(closingSoon({ startMs: at(-HOUR_MS), endMs: at(10 * 60_000) }, NOW)).toBe(false);
+    expect(closingSoon({ startMs: at(-HOUR_MS), endMs: at(HOUR_MS) }, NOW)).toBe(false);
     expect(closingSoon({ startMs: at(60_000), endMs: at(5 * 60_000) }, NOW)).toBe(false);
-    expect(closingSoon({ startMs: at(-HOUR), endMs: NOW }, NOW)).toBe(false);
+    expect(closingSoon({ startMs: at(-HOUR_MS), endMs: NOW }, NOW)).toBe(false);
   });
 });
 
@@ -143,7 +147,7 @@ describe('nearRaids', () => {
   const hook = (key: string, startH: number, endH: number, systemId = 1) => ({
     key,
     systemId,
-    window: { startMs: at(startH * HOUR), endMs: at(endH * HOUR) } as {
+    window: { startMs: at(startH * HOUR_MS), endMs: at(endH * HOUR_MS) } as {
       startMs: number;
       endMs: number;
     } | null,

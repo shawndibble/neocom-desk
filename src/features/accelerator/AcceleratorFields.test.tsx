@@ -1,13 +1,10 @@
+import { DAY_MS, HOUR_MS, MINUTE_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import { useState } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { AcceleratorFields } from './AcceleratorFields';
-
-const MINUTE = 60_000;
-const HOUR = 60 * MINUTE;
-const DAY = 24 * HOUR;
 
 function Harness({ initial }: { initial: number | null }) {
   const [expiresAt, setExpiresAt] = useState(initial);
@@ -33,7 +30,7 @@ const timeText = () => screen.getByRole('button', { name: /^Edit time left/ });
 describe('AcceleratorFields once a time is set', () => {
   it('reads as text, and one click on the time opens all three boxes', async () => {
     const user = userEvent.setup();
-    render(<Harness initial={Date.now() + 23 * DAY + 2 * HOUR + 4 * MINUTE + 30_000} />);
+    render(<Harness initial={Date.now() + 23 * DAY_MS + 2 * HOUR_MS + 4 * MINUTE_MS + 30_000} />);
 
     expect(timeText()).toHaveTextContent('23d 2h 5m');
     expect(screen.getByRole('button', { name: /^Edit bonus/ })).toHaveTextContent('12');
@@ -70,7 +67,7 @@ describe('AcceleratorFields once a time is set', () => {
 
   it('Escape restores the value the field opened with and hands focus back', async () => {
     const user = userEvent.setup();
-    render(<Harness initial={Date.now() + DAY + 30_000} />);
+    render(<Harness initial={Date.now() + DAY_MS + 30_000} />);
 
     await user.click(screen.getByRole('button', { name: /^Edit bonus/ }));
     const field = screen.getByRole('spinbutton');

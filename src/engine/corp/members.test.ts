@@ -1,3 +1,4 @@
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 import { describe, it, expect } from 'vitest';
 import {
   DARK_AFTER_DAYS,
@@ -12,17 +13,15 @@ import {
 } from './members';
 
 const NOW = Date.parse('2026-09-03T12:00:00Z');
-const HOUR = 3_600_000;
-const DAY = 86_400_000;
 
 const ago = (ms: number) => NOW - ms;
 
 function member(overrides: Partial<MemberActivity> = {}): MemberActivity {
   return {
     characterId: 90000001,
-    logonMs: ago(2 * HOUR),
-    logoffMs: ago(HOUR),
-    startMs: ago(400 * DAY),
+    logonMs: ago(2 * HOUR_MS),
+    logoffMs: ago(HOUR_MS),
+    startMs: ago(400 * DAY_MS),
     shipTypeId: 587,
     locationId: 60003760,
     ...overrides,
@@ -31,24 +30,30 @@ function member(overrides: Partial<MemberActivity> = {}): MemberActivity {
 
 describe('DARK_AFTER_MS', () => {
   it('is DARK_AFTER_DAYS expressed in milliseconds', () => {
-    expect(DARK_AFTER_MS).toBe(DARK_AFTER_DAYS * DAY);
+    expect(DARK_AFTER_MS).toBe(DARK_AFTER_DAYS * DAY_MS);
   });
 });
 
 describe('memberStanding', () => {
   it('takes last seen as the later of logon and logoff', () => {
-    const standing = memberStanding(member({ logonMs: ago(2 * HOUR), logoffMs: ago(HOUR) }), NOW);
-    expect(standing.lastSeenMs).toBe(ago(HOUR));
+    const standing = memberStanding(
+      member({ logonMs: ago(2 * HOUR_MS), logoffMs: ago(HOUR_MS) }),
+      NOW
+    );
+    expect(standing.lastSeenMs).toBe(ago(HOUR_MS));
   });
 
   it('takes the logon when it is the later of the two — a member still online', () => {
-    const standing = memberStanding(member({ logonMs: ago(HOUR), logoffMs: ago(3 * HOUR) }), NOW);
-    expect(standing.lastSeenMs).toBe(ago(HOUR));
+    const standing = memberStanding(
+      member({ logonMs: ago(HOUR_MS), logoffMs: ago(3 * HOUR_MS) }),
+      NOW
+    );
+    expect(standing.lastSeenMs).toBe(ago(HOUR_MS));
   });
 
   it('falls back to the logon when ESI reported no logoff', () => {
-    const standing = memberStanding(member({ logonMs: ago(5 * HOUR), logoffMs: null }), NOW);
-    expect(standing.lastSeenMs).toBe(ago(5 * HOUR));
+    const standing = memberStanding(member({ logonMs: ago(5 * HOUR_MS), logoffMs: null }), NOW);
+    expect(standing.lastSeenMs).toBe(ago(5 * HOUR_MS));
     expect(standing.neverSeen).toBe(false);
   });
 
@@ -59,16 +64,19 @@ describe('memberStanding', () => {
   });
 
   it('measures the dark span from the last login', () => {
-    const standing = memberStanding(member({ logonMs: ago(9 * DAY), logoffMs: ago(9 * DAY) }), NOW);
-    expect(standing.darkForMs).toBe(9 * DAY);
+    const standing = memberStanding(
+      member({ logonMs: ago(9 * DAY_MS), logoffMs: ago(9 * DAY_MS) }),
+      NOW
+    );
+    expect(standing.darkForMs).toBe(9 * DAY_MS);
   });
 
   it('measures a never-logged-in member from the day they joined', () => {
     const standing = memberStanding(
-      member({ logonMs: null, logoffMs: null, startMs: ago(45 * DAY) }),
+      member({ logonMs: null, logoffMs: null, startMs: ago(45 * DAY_MS) }),
       NOW
     );
-    expect(standing.darkForMs).toBe(45 * DAY);
+    expect(standing.darkForMs).toBe(45 * DAY_MS);
     expect(standing.isDark).toBe(true);
   });
 
@@ -91,7 +99,7 @@ describe('memberStanding', () => {
   });
 
   it('honours a corp that writes its inactivity policy in a different span', () => {
-    const seen = ago(45 * DAY);
+    const seen = ago(45 * DAY_MS);
     // 45 days is dark to a 30-day corp and current to a 60-day one. Same
     // member, same instant — only the policy differs.
     expect(memberStanding(member({ logonMs: seen, logoffMs: seen }), NOW, 30).isDark).toBe(true);
@@ -99,7 +107,7 @@ describe('memberStanding', () => {
   });
 
   it('measures a never-logged-in member against the same chosen span', () => {
-    const joined = member({ logonMs: null, logoffMs: null, startMs: ago(45 * DAY) });
+    const joined = member({ logonMs: null, logoffMs: null, startMs: ago(45 * DAY_MS) });
     expect(memberStanding(joined, NOW, 60).isDark).toBe(false);
     expect(memberStanding(joined, NOW, 14).isDark).toBe(true);
   });
@@ -113,7 +121,7 @@ describe('memberStanding', () => {
 
   it('does not call a member who joined yesterday and has not logged in dark', () => {
     const standing = memberStanding(
-      member({ logonMs: null, logoffMs: null, startMs: ago(DAY) }),
+      member({ logonMs: null, logoffMs: null, startMs: ago(DAY_MS) }),
       NOW
     );
     expect(standing.neverSeen).toBe(true);
@@ -128,8 +136,11 @@ describe('memberStanding', () => {
     // Clock skew between the client and ESI. Clamping here would make every
     // skewed member tie at zero in the sort; display is where a negative span
     // is rounded away.
-    const standing = memberStanding(member({ logonMs: NOW + HOUR, logoffMs: NOW + HOUR }), NOW);
-    expect(standing.darkForMs).toBe(-HOUR);
+    const standing = memberStanding(
+      member({ logonMs: NOW + HOUR_MS, logoffMs: NOW + HOUR_MS }),
+      NOW
+    );
+    expect(standing.darkForMs).toBe(-HOUR_MS);
     expect(standing.isDark).toBe(false);
   });
 });

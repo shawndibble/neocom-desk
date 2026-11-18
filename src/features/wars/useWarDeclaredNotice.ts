@@ -1,3 +1,4 @@
+import { DAY_MS } from '@/lib/age';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { readFeed } from '@/features/notifications/feed';
 import { useNow } from '@/lib/useNow';
@@ -8,7 +9,7 @@ export const WAR_DECLARED_TYPES: ReadonlySet<string> = new Set([
   'AllWarDeclaredMsg',
 ]);
 /** How long a declaration notice keeps asking ESI for the war: past this, the sweep has long had it. */
-export const WAR_NOTICE_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
+export const WAR_NOTICE_WINDOW_MS = 3 * DAY_MS;
 
 /**
  * Whether any Character was recently told, by an Alert, that a war was

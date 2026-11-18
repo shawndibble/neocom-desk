@@ -15,13 +15,14 @@
  *
  * Pure: the caller loads entries and Assignments and writes what this plans.
  */
+import { HOUR_MS } from '@/lib/age';
 import { isDefaultAssigned, isUnpaidDefault } from './defaultSystems';
 import { growthCollector, type CoveringAssignment } from './ownership';
 import type { MiningLedgerEntry, OreLine } from './types';
 import { utcDay } from '@/engine/localDay';
 
 /** How long past its ETA a connection still claims ore: ESI's mining ledger runs a few minutes behind the game, sometimes more. */
-export const LEDGER_GRACE_MS = 60 * 60 * 1000;
+export const LEDGER_GRACE_MS = HOUR_MS;
 
 export interface SurveyConnection {
   surveyId: string;
@@ -48,7 +49,7 @@ export interface SurveyConnection {
 }
 
 /** How long a connection assigns when the Survey has one scan, so no pace and no ETA: the next 12 hours. */
-export const NO_ETA_WINDOW_MS = 12 * 60 * 60 * 1000;
+export const NO_ETA_WINDOW_MS = 12 * HOUR_MS;
 
 /** The summary fields a connection's window is read from (`SurveySummary`, engine/survey/series.ts). */
 export interface ConnectionWindowInput {

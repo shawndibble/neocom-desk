@@ -1,3 +1,4 @@
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import { buildCorpBoard, type BoardStructureSource } from '@/engine/corp/board';
 import type { BoardClockSource } from '@/engine/character/board';
@@ -13,8 +14,6 @@ import {
 import { moonChunksSummary, structuresSummary } from './boardSummary';
 
 const NOW = Date.parse('2026-01-01T00:00:00Z');
-const HOUR = 3_600_000;
-const DAY = 24 * HOUR;
 
 function t(key: string, options?: Record<string, unknown>): string {
   if (options === undefined) return key;
@@ -28,7 +27,7 @@ function structure(overrides: Partial<BoardStructureSource> = {}): BoardStructur
   return {
     structureId: 1,
     name: 'Home Astrahus',
-    fuelExpiresMs: NOW + 30 * DAY,
+    fuelExpiresMs: NOW + 30 * DAY_MS,
     state: 'shield_vulnerable',
     stateTimerEndMs: null,
     unanchorsAtMs: null,
@@ -38,7 +37,7 @@ function structure(overrides: Partial<BoardStructureSource> = {}): BoardStructur
 }
 
 function board(structures: BoardStructureSource[]) {
-  return buildCorpBoard({ nowMs: NOW, staleWindowMs: HOUR, structures });
+  return buildCorpBoard({ nowMs: NOW, staleWindowMs: HOUR_MS, structures });
 }
 
 const data = (structures: BoardStructureSource[], nowMs = NOW) =>
@@ -51,8 +50,12 @@ describe('structureCounts', () => {
   it('counts reinforcement timers, fuel within three days, and offline services', () => {
     const counts = structureCounts(
       board([
-        structure({ structureId: 1, state: 'armor_reinforce', stateTimerEndMs: NOW + 20 * HOUR }),
-        structure({ structureId: 2, fuelExpiresMs: NOW + 2 * DAY }),
+        structure({
+          structureId: 1,
+          state: 'armor_reinforce',
+          stateTimerEndMs: NOW + 20 * HOUR_MS,
+        }),
+        structure({ structureId: 2, fuelExpiresMs: NOW + 2 * DAY_MS }),
         structure({ structureId: 3, fuelExpiresMs: null }),
         structure({
           structureId: 4,
@@ -72,8 +75,8 @@ describe('structuresSeverity and structuresSummary', () => {
 
   it('lead with a reinforcement timer', () => {
     const d = data([
-      structure({ state: 'armor_reinforce', stateTimerEndMs: NOW + 20 * HOUR }),
-      structure({ structureId: 2, fuelExpiresMs: NOW + 2 * DAY }),
+      structure({ state: 'armor_reinforce', stateTimerEndMs: NOW + 20 * HOUR_MS }),
+      structure({ structureId: 2, fuelExpiresMs: NOW + 2 * DAY_MS }),
     ]);
     expect(structuresSeverity(d)).toBe('critical');
     expect(structuresSummary(t, d)).toBe('overview.board.structuresTimers(count=1)');
@@ -98,11 +101,11 @@ describe('structuresSeverity and structuresSummary', () => {
 describe('structuresDeadline', () => {
   it('offers the soonest timed clock the snapshot can honestly count down', () => {
     const items = board([
-      structure({ structureId: 1, fuelExpiresMs: NOW + 5 * DAY }),
-      structure({ structureId: 2, state: 'armor_reinforce', stateTimerEndMs: NOW + 20 * HOUR }),
+      structure({ structureId: 1, fuelExpiresMs: NOW + 5 * DAY_MS }),
+      structure({ structureId: 2, state: 'armor_reinforce', stateTimerEndMs: NOW + 20 * HOUR_MS }),
     ]);
     expect(structuresDeadline(items, NOW)).toMatchObject({
-      atMs: NOW + 20 * HOUR,
+      atMs: NOW + 20 * HOUR_MS,
       kind: 'structureTimer',
     });
   });
@@ -117,7 +120,7 @@ describe('structuresDeadline', () => {
       structure({ structureId: 1, state: 'hull_reinforce', stateTimerEndMs: NOW + 12 * 60_000 }),
       structure({ structureId: 2, fuelExpiresMs: null }),
     ]);
-    expect(structuresDeadline(items, NOW)?.atMs).toBe(NOW + 30 * DAY);
+    expect(structuresDeadline(items, NOW)?.atMs).toBe(NOW + 30 * DAY_MS);
   });
 });
 
@@ -144,7 +147,7 @@ describe('moon chunks', () => {
     id,
     subject: 'Refinery',
     detail,
-    deadlineMs: NOW + hours * HOUR,
+    deadlineMs: NOW + hours * HOUR_MS,
   });
   const moon = (chunks: BoardClockSource[] | null) => ({
     chunks,

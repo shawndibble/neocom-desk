@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@/lib/age';
 import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_UNDERCUT_HISTORY_THRESHOLDS,
@@ -9,12 +10,14 @@ import {
 } from './orderProblemHistory';
 import type { OrderProblem } from './orderProblems';
 
-const HOUR = 60 * 60 * 1000;
 const NOW = 1_700_000_000_000;
 
 /** `count` samples ending at `NOW`, one per hour, all of `problem`. */
 function run(count: number, problem: OrderProblem, from = NOW): OrderProblemSample[] {
-  return Array.from({ length: count }, (_, i) => ({ at: from - (count - 1 - i) * HOUR, problem }));
+  return Array.from({ length: count }, (_, i) => ({
+    at: from - (count - 1 - i) * HOUR_MS,
+    problem,
+  }));
 }
 
 describe('wasFrequentlyUndercut', () => {
@@ -28,13 +31,13 @@ describe('wasFrequentlyUndercut', () => {
   });
 
   it('is true once a majority of in-window samples were undercut', () => {
-    const samples = [...run(6, 'healthy', NOW - 7 * HOUR), ...run(7, 'undercutStation')];
+    const samples = [...run(6, 'healthy', NOW - 7 * HOUR_MS), ...run(7, 'undercutStation')];
     expect(samples.length).toBeGreaterThanOrEqual(DEFAULT_UNDERCUT_HISTORY_THRESHOLDS.minSamples);
     expect(wasFrequentlyUndercut(samples, NOW)).toBe(true);
   });
 
   it('is false when undercut samples are exactly half — a majority is required', () => {
-    const samples = [...run(6, 'healthy', NOW - 6 * HOUR), ...run(6, 'undercutRegion')];
+    const samples = [...run(6, 'healthy', NOW - 6 * HOUR_MS), ...run(6, 'undercutRegion')];
     expect(wasFrequentlyUndercut(samples, NOW)).toBe(false);
   });
 
@@ -48,7 +51,7 @@ describe('wasFrequentlyUndercut', () => {
   });
 
   it('ignores samples older than the window, and falls back to "too few" when that empties it', () => {
-    const old = DEFAULT_UNDERCUT_HISTORY_THRESHOLDS.windowMs + HOUR;
+    const old = DEFAULT_UNDERCUT_HISTORY_THRESHOLDS.windowMs + HOUR_MS;
     const samples = run(20, 'undercutStation', NOW - old);
     expect(wasFrequentlyUndercut(samples, NOW)).toBe(false);
   });
@@ -57,7 +60,7 @@ describe('wasFrequentlyUndercut', () => {
     const outside = run(
       20,
       'undercutStation',
-      NOW - DEFAULT_UNDERCUT_HISTORY_THRESHOLDS.windowMs - HOUR
+      NOW - DEFAULT_UNDERCUT_HISTORY_THRESHOLDS.windowMs - HOUR_MS
     );
     const inside = run(12, 'healthy');
     expect(wasFrequentlyUndercut([...outside, ...inside], NOW)).toBe(false);
@@ -91,11 +94,11 @@ describe('appendOrderProblemSample', () => {
 
   it('replaces the last sample when a re-read of the same load reclassifies it', () => {
     const existing: OrderProblemSample[] = [
-      { at: NOW - HOUR, problem: 'healthy' },
+      { at: NOW - HOUR_MS, problem: 'healthy' },
       { at: NOW, problem: 'healthy' },
     ];
     expect(appendOrderProblemSample(existing, { at: NOW, problem: 'undercutRegion' })).toEqual([
-      { at: NOW - HOUR, problem: 'healthy' },
+      { at: NOW - HOUR_MS, problem: 'healthy' },
       { at: NOW, problem: 'undercutRegion' },
     ]);
   });
@@ -122,11 +125,11 @@ describe('appendOrderProblemSample', () => {
 
   it('drops samples that have fallen out of the window', () => {
     const stale: OrderProblemSample[] = [
-      { at: NOW - DEFAULT_UNDERCUT_HISTORY_THRESHOLDS.windowMs - HOUR, problem: 'healthy' },
-      { at: NOW - HOUR, problem: 'healthy' },
+      { at: NOW - DEFAULT_UNDERCUT_HISTORY_THRESHOLDS.windowMs - HOUR_MS, problem: 'healthy' },
+      { at: NOW - HOUR_MS, problem: 'healthy' },
     ];
     expect(appendOrderProblemSample(stale, { at: NOW, problem: 'healthy' })).toEqual([
-      { at: NOW - HOUR, problem: 'healthy' },
+      { at: NOW - HOUR_MS, problem: 'healthy' },
       { at: NOW, problem: 'healthy' },
     ]);
   });

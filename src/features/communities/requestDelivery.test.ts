@@ -1,3 +1,4 @@
+import { DAY_MS, MINUTE_MS } from '@/lib/age';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CommunityRequest, PledgeEntry, RequestPledge } from '@/engine/communities/requests';
 
@@ -384,16 +385,15 @@ describe('syncRequestDeliveries', () => {
     mocks.update.mockImplementation(async (_c, _g, _r, change) => {
       stored = change(stored) as Record<number, PledgeEntry>;
     });
-    const MIN = 60_000;
     // Two 404s within a minute are a burst, not a verdict: what finished after 51 stays held back.
     await syncRequestDeliveries(ME, 'c1', NOW);
-    await syncRequestDeliveries(ME, 'c1', NOW + MIN);
+    await syncRequestDeliveries(ME, 'c1', NOW + MINUTE_MS);
     expect(stored[0]?.auto ?? 0).toBe(0);
     // Two failures spanning minutes: given up. Skipped for good, the three later ones
     // count once, `through` advances past it, and it is never read again.
-    await syncRequestDeliveries(ME, 'c1', NOW + 6 * MIN);
+    await syncRequestDeliveries(ME, 'c1', NOW + 6 * MINUTE_MS);
     expect(stored[0]).toMatchObject({ auto: 30, through: Date.parse('2026-10-14T00:00:00Z') });
-    await syncRequestDeliveries(ME, 'c1', NOW + 7 * MIN);
+    await syncRequestDeliveries(ME, 'c1', NOW + 7 * MINUTE_MS);
     expect(stored[0]?.auto).toBe(30);
     expect(mocks.items.mock.calls.filter((c) => c[1] === 51)).toHaveLength(2);
   });
@@ -405,14 +405,13 @@ describe('syncRequestDeliveries', () => {
     });
     mocks.failure.status = 403;
     mocks.items.mockResolvedValue(null);
-    const MIN = 60_000;
     expect((await syncRequestDeliveries(ME, 'c1', NOW)).status).toBe('needs-scope');
-    expect((await syncRequestDeliveries(ME, 'c1', NOW + 6 * MIN)).status).toBe('needs-scope');
+    expect((await syncRequestDeliveries(ME, 'c1', NOW + 6 * MINUTE_MS)).status).toBe('needs-scope');
     expect(mocks.update).not.toHaveBeenCalled();
     // Still tried each run: nothing was given up.
     mocks.failure.status = 0;
     mocks.items.mockClear();
-    await syncRequestDeliveries(ME, 'c1', NOW + 12 * MIN);
+    await syncRequestDeliveries(ME, 'c1', NOW + 12 * MINUTE_MS);
     expect(mocks.items.mock.calls[0]?.[1]).toBe(61);
   });
 
@@ -426,23 +425,21 @@ describe('syncRequestDeliveries', () => {
     const other = {
       data: [{ record_id: 1, type_id: 999, quantity: 5, is_included: true, is_singleton: false }],
     };
-    const MIN = 60_000;
     mocks.items
       .mockResolvedValueOnce(null) // fails once
       .mockResolvedValueOnce(other) // reads
       .mockResolvedValueOnce(null) // fails once more, much later
       .mockResolvedValue(null);
-    for (const at of [0, 1, 7, 8]) await syncRequestDeliveries(ME, 'c1', NOW + at * MIN);
+    for (const at of [0, 1, 7, 8]) await syncRequestDeliveries(ME, 'c1', NOW + at * MINUTE_MS);
     // One failure since the read: not given up, so the fourth run still tries it.
     expect(mocks.items).toHaveBeenCalledTimes(4);
   });
 
   it('reads only what could still change a result: 45 contracts take three runs, the second reads just the 5 left', async () => {
-    const DAYS = 86_400_000;
     // 45 contracts, newest first as ESI lists them; contract n finished n days after day 0.
     const all = Array.from({ length: 45 }, (_, i) => 45 - i).map((n) =>
       contract(1000 + n, {
-        date_completed: new Date(Date.parse('2026-09-01T00:00:00Z') + n * DAYS).toISOString(),
+        date_completed: new Date(Date.parse('2026-09-01T00:00:00Z') + n * DAY_MS).toISOString(),
       })
     );
     mocks.contracts.mockResolvedValue({
