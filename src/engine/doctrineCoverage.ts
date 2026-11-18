@@ -7,6 +7,7 @@
  * cargo and implants never count. Only orders placed at the hub station count, and only those
  * within `PRICE_CEILING` of the lowest sell, so a joke-priced order does not pass for stock.
  */
+import { sum } from './math';
 import { hubLadders, type HubOrder, type LadderLevel } from './market/haulingMarket';
 import type { DoctrineFitSnapshot } from './srpDoctrine';
 
@@ -22,7 +23,7 @@ export interface HubCoverage {
   unlisted: number[];
   /** ISK for the next ship's parts the book can still supply, walked past the units the
    *  complete ships use. Parts the book cannot supply (`shortOn` always is one) are not in it. */
-  nextShipCost: number;
+  nextShipListedCost: number;
 }
 
 /** Type id to units per ship. */
@@ -71,16 +72,16 @@ export function doctrineCoverage(
     const ladder = inRange(hubLadders(orders, stationId).sell);
     ladders.set(typeId, ladder);
     if (ladder.length === 0) unlisted.push(typeId);
-    const units = ladder.reduce((sum, level) => sum + level.units, 0);
+    const units = sum(ladder.map((level) => level.units));
     const fits = Math.floor(units / perShip);
     if (fits < ships) {
       ships = fits;
       shortOn = typeId;
     }
   }
-  let nextShipCost = 0;
+  let nextShipListedCost = 0;
   for (const [typeId, perShip] of parts) {
-    nextShipCost += costOfRange(ladders.get(typeId)!, ships * perShip, (ships + 1) * perShip);
+    nextShipListedCost += costOfRange(ladders.get(typeId)!, ships * perShip, (ships + 1) * perShip);
   }
-  return { ships, shortOn, unlisted, nextShipCost };
+  return { ships, shortOn, unlisted, nextShipListedCost };
 }

@@ -72,7 +72,7 @@ describe('doctrineCoverage', () => {
     );
     // Six units listed, one per ship: all six are complete ships.
     expect(result?.ships).toBe(6);
-    expect(result?.nextShipCost).toBe(0); // the book is spent: nothing left to price
+    expect(result?.nextShipListedCost).toBe(0); // the book is spent: nothing left to price
     expect(result?.shortOn).toBe(1);
   });
 
@@ -89,7 +89,7 @@ describe('doctrineCoverage', () => {
     );
     expect(result?.ships).toBe(1);
     // ship 2: hull 100; 2 x module 10 from the 10 level (units 3-4); module 11 at 8; rig has none left
-    expect(result?.nextShipCost).toBe(100 + 10 + 10 + 8);
+    expect(result?.nextShipListedCost).toBe(100 + 10 + 10 + 8);
     expect(result?.shortOn).toBe(20);
     expect(result?.unlisted).toEqual([]);
   });

@@ -55,10 +55,10 @@ export function DoctrineFitsPanel({
   const { hiddenIds } = pendingDeletes;
   const fits = hiddenIds.size === 0 ? allFits : allFits.filter((f) => !hiddenIds.has(f.id));
   const coverage = useDoctrineCoverage(fits);
-  const coverages = fits.map((f) => coverage.coverageOf(f));
+  const coverages = new Map(fits.map((f) => [f.id, coverage.coverageOf(f)]));
   const typeName = useDoctrineTypeNames([
     ...fits.map((f) => f.snapshot.hullTypeId),
-    ...coverages.flatMap((c) => (c ? [c.shortOn] : [])),
+    ...[...coverages.values()].flatMap((c) => (c ? [c.shortOn] : [])),
   ]);
 
   const open = (source: DoctrineSource, el: HTMLElement) => {
@@ -92,22 +92,25 @@ export function DoctrineFitsPanel({
       header: t('srp.settings.doctrines.coverage', { hub: coverage.hub.systemName }),
       className: 'text-text-dim',
       render: (f) => {
-        const c = coverage.coverageOf(f);
+        const c = coverages.get(f.id);
         // Loading or an unread book shows nothing: never a zero that was not measured.
         if (!c) return coverage.loading ? t('common.loading') : null;
-        return (
-          <>
-            {t('srp.settings.doctrines.coverageShips', { count: c.ships })}
-            {'; '}
-            {t(
-              c.unlisted.includes(c.shortOn)
-                ? 'srp.settings.doctrines.coverageUnlisted'
-                : 'srp.settings.doctrines.coverageShort',
-              { name: typeName(c.shortOn) }
-            )}
-            {c.nextShipCost > 0 &&
-              ` · ${t('srp.settings.doctrines.coverageNext', { isk: formatIskCompact(c.nextShipCost) })}`}
-          </>
+        const name = typeName(c.shortOn);
+        const args = {
+          ships: t('srp.settings.doctrines.coverageShips', { count: c.ships }),
+          short: t(
+            c.unlisted.includes(c.shortOn)
+              ? 'srp.settings.doctrines.coverageUnlisted'
+              : 'srp.settings.doctrines.coverageShort',
+            { name }
+          ),
+          isk: formatIskCompact(c.nextShipListedCost),
+        };
+        return t(
+          c.nextShipListedCost > 0
+            ? 'srp.settings.doctrines.coverageLineNext'
+            : 'srp.settings.doctrines.coverageLine',
+          args
         );
       },
     },

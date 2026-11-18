@@ -118,7 +118,7 @@ describe('Doctrine Fits in SRP settings', () => {
 
   it('shows hub coverage, and nothing when the hub has no data', async () => {
     setup((f) =>
-      f.id === 'a' ? { ships: 12, shortOn: 2, unlisted: [], nextShipCost: 85_000_000 } : null
+      f.id === 'a' ? { ships: 12, shortOn: 2, unlisted: [], nextShipListedCost: 85_000_000 } : null
     );
     const table = await screen.findByRole('table', { name: 'Doctrine Fits' });
     expect(within(table).getByRole('columnheader', { name: 'Hub coverage (Jita)' })).toBeTruthy();
