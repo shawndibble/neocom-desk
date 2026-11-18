@@ -747,9 +747,11 @@ export function MaterialsTable({
                   }
                 )
               : t(
-                  material.acquisitionTier.invented
-                    ? 'industry.blueprintAcquisitionTierInvented'
-                    : 'industry.blueprintAcquisitionTier',
+                  material.acquisitionTier.copyOnly
+                    ? 'industry.blueprintAcquisitionTierCopyOnly'
+                    : material.acquisitionTier.invented
+                      ? 'industry.blueprintAcquisitionTierInvented'
+                      : 'industry.blueprintAcquisitionTier',
                   material.acquisitionTier
                 )}
           </span>

@@ -17,6 +17,63 @@ function costAtMe(me: number): number | null {
 }
 
 describe('selectBlueprintTier', () => {
+  describe('copy-only blueprints (issue #6394)', () => {
+    const base = {
+      ownedCopies: [],
+      neededRuns: 5,
+      materialCostAtMe: costAtMe,
+      bpcOffers: [],
+      bpoSellPrice: null,
+      assumedMeForUnowned: 5,
+      copyOnly: true,
+    } as const;
+
+    it('flags the line and quotes ME 0 instead of the assumed ME when no copy is owned or offered', () => {
+      expect(selectBlueprintTier(base)).toEqual({
+        me: 0,
+        te: 0,
+        line: { unitPrice: null, owned: false },
+        copyOnly: true,
+      });
+    });
+
+    it('never assumes an original: a hub BPO price and original offers are ignored', () => {
+      const result = selectBlueprintTier({
+        ...base,
+        bpoSellPrice: 500_000,
+        bpcOffers: [{ me: 0, te: 0, runs: -1, quantity: 1, price: 400_000 }],
+        extraOffers: [{ me: 0, te: 0, runs: -1, quantity: 1, price: 300_000 }],
+        lastResortOffers: [{ me: 0, te: 0, runs: -1, quantity: 1, price: 200_000 }],
+        communityOffers: [{ me: 0, te: 0, runs: -1, quantity: 1, price: 0 }],
+      });
+      expect(result.copyOnly).toBe(true);
+      expect(result.line).toEqual({ unitPrice: null, owned: false });
+    });
+
+    it('an offered copy still prices the line and carries no flag', () => {
+      const result = selectBlueprintTier({
+        ...base,
+        bpcOffers: [{ me: 0, te: 0, runs: 10, quantity: 1, price: 1_000 }],
+      });
+      expect(result.copyOnly).toBeUndefined();
+      expect(result.line).toEqual({ unitPrice: 1_000, owned: false });
+    });
+
+    it('an owned copy covering the runs carries no flag', () => {
+      const result = selectBlueprintTier({
+        ...base,
+        ownedCopies: [{ me: 0, te: 0, runs: 10 }],
+      });
+      expect(result.copyOnly).toBeUndefined();
+      expect(result.line).toEqual({ unitPrice: 0, owned: true });
+    });
+
+    it('an ordinary blueprint with the same inputs still assumes an original', () => {
+      const result = selectBlueprintTier({ ...base, copyOnly: false, assumedMeForUnowned: 5 });
+      expect(result).toEqual({ me: 5, te: 0, line: { unitPrice: null, owned: false } });
+    });
+  });
+
   it('resolves to the assumed ME with an unpriceable line when nothing is owned and nothing can be bought', () => {
     const result = selectBlueprintTier({
       ownedCopies: [],

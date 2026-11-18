@@ -50,6 +50,8 @@ export type BlueprintTierResult = Omit<AcquisitionResolution, 'blueprintTypeID'>
    * the plan already paid for instead of buying it again.
    */
   purchasedRuns?: number;
+  /** Set when the blueprint exists only as fixed-run copies and nothing owned or offered covers it (issue #6394). */
+  copyOnly?: true;
 };
 
 export interface SelectBlueprintTierInputs {
@@ -88,6 +90,12 @@ export interface SelectBlueprintTierInputs {
    * reaction formula is never passed here — the caller drops it.
    */
   communityOffers?: readonly BpcOffer[];
+  /**
+   * The blueprint exists only as fixed-run copies (issue #6394): no original
+   * is ever assumed, so every original offer and the hub BPO price are dropped.
+   * With nothing owned or offered the result is flagged `copyOnly` at ME 0.
+   */
+  copyOnly?: boolean;
   /** ME to quote when nothing is owned and nothing can be bought — mirrors `assumedMeForUnowned`. */
   assumedMeForUnowned: number;
 }
@@ -202,9 +210,14 @@ function candidateCost(
  * contract's ISK side reads as 0, which must not win the cheapest-tier
  * candidate over a genuine, priced BPO.
  */
-function usableOffers(offers: readonly BpcOffer[], allowFree = false): BpcOffer[] {
+function usableOffers(
+  offers: readonly BpcOffer[],
+  allowFree = false,
+  copyOnly = false
+): BpcOffer[] {
   return offers.filter(
     (offer) =>
+      !(copyOnly && offer.runs === -1) &&
       (offer.runs === -1 || offer.runs > 0) &&
       offer.quantity > 0 &&
       !offer.isMultiType &&
@@ -277,18 +290,20 @@ function buildCandidates(
  */
 function primaryOffers(inputs: SelectBlueprintTierInputs): BpcOffer[] {
   const bpo: BpcOffer[] =
-    inputs.bpoSellPrice === null
+    inputs.bpoSellPrice === null || inputs.copyOnly
       ? []
       : [{ me: 0, te: 0, runs: -1, quantity: 1, price: inputs.bpoSellPrice }];
   // Shared first: a free tie at one tier goes to the Member, never a 0 ISK LP redemption.
-  const community = usableOffers(inputs.communityOffers ?? [], true).map((offer) => ({
-    ...offer,
-    price: 0,
-  }));
+  const community = usableOffers(inputs.communityOffers ?? [], true, inputs.copyOnly).map(
+    (offer) => ({
+      ...offer,
+      price: 0,
+    })
+  );
   return [
     ...community,
-    ...usableOffers([...inputs.bpcOffers, ...bpo]),
-    ...usableOffers(inputs.extraOffers ?? [], true),
+    ...usableOffers([...inputs.bpcOffers, ...bpo], false, inputs.copyOnly),
+    ...usableOffers(inputs.extraOffers ?? [], true, inputs.copyOnly),
   ];
 }
 
@@ -311,7 +326,7 @@ function priced(
 export function tierOptions(inputs: SelectBlueprintTierInputs): readonly TierOption[] {
   const primary = primaryOffers(inputs);
   const options = priced(inputs, primary);
-  const lastResort = usableOffers(inputs.lastResortOffers ?? []);
+  const lastResort = usableOffers(inputs.lastResortOffers ?? [], false, inputs.copyOnly);
   if (lastResort.length === 0 || options.some((o) => o.cost !== null)) return options;
   return priced(inputs, [...primary, ...lastResort]);
 }
@@ -429,6 +444,10 @@ export function selectBlueprintTier(inputs: SelectBlueprintTierInputs): Blueprin
   const options = tierOptions(inputs);
 
   if (options.length === 0) {
+    // A copy-only blueprint has no original to assume: say so, at ME 0 (issue #6394).
+    if (inputs.copyOnly) {
+      return { me: 0, te: 0, line: { unitPrice: null, owned: false }, copyOnly: true };
+    }
     return { me: inputs.assumedMeForUnowned, te: 0, line: { unitPrice: null, owned: false } };
   }
 
