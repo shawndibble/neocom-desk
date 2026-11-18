@@ -5,7 +5,7 @@ import { chunk } from './chunk.js';
 export type BatchOp = (batch: WriteBatch) => void;
 
 /** Firestore allows 500 ops per batch; 400 leaves headroom for transforms. */
-export const DEFAULT_BATCH_OPS = 400;
+const DEFAULT_BATCH_OPS = 400;
 
 /** Applies `ops` in sequential batches of at most `size`. */
 export async function commitInBatches(
