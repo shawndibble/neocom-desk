@@ -9,8 +9,10 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   EmptyState,
+  IconButton,
   LiveStatus,
   LoadFailedState,
+  Modal,
   PageHeader,
   Panel,
   SegmentedControl,
@@ -20,6 +22,7 @@ import {
   useTabPanelProps,
   useTabsId,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { GrantNote } from '@/app/GrantNote';
 import { SEND_MAIL_ENDPOINTS } from '@/esi/registry';
 import { ActionResult } from '@/features/settings/settingsFields';
@@ -28,6 +31,7 @@ import type { VettingReviewSummary } from '@/engine/vetting';
 import { writeToClipboard } from '@/lib/clipboard';
 import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { tabPath } from '@/lib/pageTabs';
 import { usePageTab } from '@/lib/usePageTab';
 import { ReviewMemberDialog } from './ReviewMemberDialog';
 import { markMembers } from './reviewRoster';
@@ -47,6 +51,7 @@ import {
   reviewIdFromPathname,
   reviewPath,
   settingsSectionFromPathname,
+  settingsSectionPath,
   type VettingTabId,
 } from './vettingTabs';
 import { applyLink, requestLink } from './vettingText';
@@ -74,7 +79,9 @@ export function VettingPage() {
   const reviewId = reviewIdFromPathname(pathname);
   const data = dataFromPathname(pathname);
   const canConfigure = state.status === 'ready' && state.overview.canConfigure;
-  const shown: VettingTabId = tab === 'settings' && !canConfigure ? 'open' : tab;
+  // Settings is a modal over the queue, so the queue is what the page shows beneath it.
+  const shown: VettingTabId = tab === 'settings' ? 'open' : tab;
+  const settingsOpen = tab === 'settings' && canConfigure;
   const panel = useTabPanelProps(phone ? null : tabsId, shown);
 
   if (data !== null && characterId !== null && corporationId !== null) {
@@ -108,9 +115,9 @@ export function VettingPage() {
     );
   }
 
-  const page = (body: React.ReactNode) => (
+  const page = (body: React.ReactNode, actions?: React.ReactNode) => (
     <div className="mx-auto max-w-page space-y-4 px-4 py-4">
-      <PageHeader title={t('vetting.title')} />
+      <PageHeader title={t('vetting.title')} actions={actions} />
       {body}
     </div>
   );
@@ -147,7 +154,6 @@ export function VettingPage() {
       countTone: yours > 0 ? 'warning' : undefined,
     },
     { id: 'decided', label: t('vetting.tabs.decided') },
-    ...(canConfigure ? [{ id: 'settings' as const, label: t('vetting.tabs.settings') }] : []),
   ];
 
   const copy = async () => {
@@ -180,6 +186,14 @@ export function VettingPage() {
       {t(copied ? 'vetting.copied' : 'vetting.copyLink')}
     </Button>
   );
+
+  const settingsGear = canConfigure ? (
+    <IconButton
+      icon={<Icon.Settings />}
+      label={t('pageSettings.open', { page: t('vetting.title') })}
+      onClick={() => navigate(settingsSectionPath(settingsSectionFromPathname(pathname)))}
+    />
+  ) : undefined;
 
   return page(
     <>
@@ -255,8 +269,27 @@ export function VettingPage() {
         </div>
       )}
       <div {...panel}>
-        {shown === 'settings' ? (
+        <VettingQueue
+          tab={shown}
+          rows={shown === 'open' ? open : decided}
+          onOpen={(review) => navigate(reviewPath(shown, review.id))}
+          reviewerId={characterId}
+          onRequestMail={(review) => void mailRow(review)}
+          onCopyRequestLink={() => void copyRequestLink()}
+        />
+      </div>
+      {settingsOpen && (
+        // The URL backs the modal (`/corp/vetting/settings/<section>`), so Back is the URL's job.
+        <Modal
+          open
+          onClose={() => navigate(tabPath(VETTING_TABS, 'open'))}
+          title={t('pageSettings.title', { page: t('vetting.title') })}
+          placement="page"
+          closeOnBack={false}
+          dismissOnOutsidePress={false}
+        >
           <VettingSettingsView
+            characterId={characterId}
             settings={overview.settings}
             section={settingsSectionFromPathname(pathname)}
             invites={overview.invites.length}
@@ -265,17 +298,8 @@ export function VettingPage() {
               replace(await vettingBackend().saveSettings(characterId, corporationId, patch));
             }}
           />
-        ) : (
-          <VettingQueue
-            tab={shown}
-            rows={shown === 'open' ? open : decided}
-            onOpen={(review) => navigate(reviewPath(shown, review.id))}
-            reviewerId={characterId}
-            onRequestMail={(review) => void mailRow(review)}
-            onCopyRequestLink={() => void copyRequestLink()}
-          />
-        )}
-      </div>
+        </Modal>
+      )}
       {invitesOpen !== null && (
         <VettingInvitesDialog
           mode={invitesOpen}
@@ -340,6 +364,7 @@ export function VettingPage() {
           }}
         />
       )}
-    </>
+    </>,
+    settingsGear
   );
 }

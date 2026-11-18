@@ -15,8 +15,14 @@ import {
   type VettingFixtureOptions,
 } from '@/storybook/vettingFixture';
 import type { VettingReviewSummary } from '@/engine/vetting';
+import { searchPayeeEntitiesPublic } from '@/features/miningTax/payeeEntitySearch';
 import { VettingPage } from './VettingPage';
 import { setVettingBackendOverride } from './vettingBackend';
+
+vi.mock('@/features/miningTax/payeeEntitySearch', async (original) => ({
+  ...(await original<typeof import('@/features/miningTax/payeeEntitySearch')>()),
+  searchPayeeEntitiesPublic: vi.fn(async () => []),
+}));
 
 const CHARACTER = 2119876543;
 let fixture: VettingFixture;
@@ -296,6 +302,34 @@ const saved = () => fixture.calls.filter((call) => call.method === 'saveSettings
 const lastPatch = () => saved().at(-1)?.args[2];
 
 describe('VettingPage settings', () => {
+  it('opens from the header gear as a modal over the queue, not as a tab', async () => {
+    await setup();
+    expect(await screen.findByText('Tamsin Vell')).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Settings' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Vetting settings' }));
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(await dialog.findByLabelText('Welcome message')).toBeInTheDocument();
+    await userEvent.click(dialog.getByRole('button', { name: /^Close/ }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.getByText('Tamsin Vell')).toBeInTheDocument();
+  });
+
+  it('suggests names for the watchlist and fills the one picked', async () => {
+    vi.mocked(searchPayeeEntitiesPublic).mockResolvedValue([
+      { id: 98000001, name: 'Grey Lantern Holdings', kind: 'corporation' },
+    ]);
+    await setup('/corp/vetting/settings/watchlist');
+    const field = await screen.findByLabelText(
+      'Exact name of a character, corporation or alliance'
+    );
+    await userEvent.type(field, 'Grey Lan');
+    await userEvent.click(await screen.findByRole('option', { name: /Grey Lantern Holdings/ }));
+    expect(field).toHaveValue('Grey Lantern Holdings');
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+    expect(await screen.findByRole('link', { name: 'Grey Lantern Holdings' })).toBeInTheDocument();
+    expect(saved().at(-1)?.args[2]).toMatchObject({ addWatchNames: ['Grey Lantern Holdings'] });
+  });
+
   it('shows a corp that set nothing its defaults, with nothing to save', async () => {
     await setup('/corp/vetting/settings');
     expect(await screen.findByLabelText('Welcome message')).toHaveValue('');

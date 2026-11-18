@@ -57,6 +57,7 @@ import { callableErrorReason } from '@/lib/callableError';
 import { cx } from '@/lib/cx';
 import { formatCount } from '@/lib/formatCount';
 import { useIsNarrow } from '@/lib/useIsNarrow';
+import { PayeeNameField } from '@/features/miningTax/PayeeNameField';
 import { VettingEntity } from './VettingEntity';
 import type { VettingSettingsPatch } from './vettingBackend';
 import {
@@ -92,6 +93,8 @@ function Counter({ used, max }: { used: number; max: number }) {
 }
 
 interface VettingSettingsViewProps {
+  /** Whose search permission the watchlist's name suggestions run under. */
+  characterId: number;
   settings: VettingSettings;
   /** The section a path below Settings names. A phone shows them all. */
   section: VettingSettingsSection;
@@ -104,6 +107,7 @@ interface VettingSettingsViewProps {
 }
 
 export function VettingSettingsView({
+  characterId,
   settings,
   section,
   invites,
@@ -584,17 +588,20 @@ export function VettingSettingsView({
               void add();
             }}
           >
-            <label className="block min-w-0 flex-1 space-y-1">
-              <span className="text-xs text-text-dim">
+            <div className="min-w-0 flex-1 space-y-1">
+              <label htmlFor={`${uid}-watch`} className="block text-xs text-text-dim">
                 {t('vetting.settings.watchlist.addLabel')}
-              </span>
-              <TextInput
+              </label>
+              {/* Picking a suggestion fills the name; the server still resolves it exactly. */}
+              <PayeeNameField
+                id={`${uid}-watch`}
+                characterId={characterId}
                 value={name}
-                onChange={(event) => setName(event.target.value)}
-                autoComplete="off"
-                spellCheck={false}
+                onChange={setName}
+                onPick={(match) => setName(match.name)}
+                placeholder=""
               />
-            </label>
+            </div>
             <Button
               type="submit"
               loading={busy === 'add'}
