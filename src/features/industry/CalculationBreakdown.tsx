@@ -12,6 +12,8 @@ import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { formatCostIndex, formatPercent } from './format';
+import { rigKindLabel } from './rigFitLabels';
+import type { RigKind } from '@/engine/industry/types';
 
 /**
  * Everything the breakdown needs that a `BuildResult` does not carry: the
@@ -53,6 +55,8 @@ export interface BreakdownContext {
    * basis; `null` when the hub has no buy order for it, absent when unknown.
    */
   sellNow?: ProductSellNow | null;
+  /** Names a material's typeID, for the rows that list per-sub-build rigs. */
+  nameOf?: (typeID: number) => string;
   /** Materials costed at a Depth Price, each with its book walk. */
   depthRows?: readonly { typeID: number; name: string; walk: DepthPrice }[];
 }
@@ -99,6 +103,9 @@ export function CalculationBreakdown({
   context,
 }: CalculationBreakdownProps) {
   const { t, i18n } = useTranslation();
+  const rigRows = result.materials.flatMap((material) =>
+    material.subBuild?.rigs ? [{ typeID: material.typeID, rigs: material.subBuild.rigs }] : []
+  );
   const taxPct = salesTaxPct(context.accountingLevel);
   const brokerPct = brokerFeePct(
     context.brokerRelationsLevel,
@@ -156,6 +163,25 @@ export function CalculationBreakdown({
             })}
           </Formula>
         </Section>
+
+        {rigRows.length > 0 && (
+          <Section title={t('industry.breakdown.rigsTitle')}>
+            <p>{t('industry.breakdown.rigsIntro')}</p>
+            <ul className={FORMULA_BOX}>
+              {rigRows.map(({ typeID, rigs }) => (
+                <li key={typeID}>
+                  {t('industry.breakdown.rigsRow', {
+                    material: context.nameOf?.(typeID) ?? String(typeID),
+                    rigs:
+                      rigs.length > 0
+                        ? rigs.map((kind) => rigKindLabel(kind as RigKind, t)).join(', ')
+                        : t('industry.breakdown.rigsNone'),
+                  })}
+                </li>
+              ))}
+            </ul>
+          </Section>
+        )}
 
         {context.depthRows && context.depthRows.length > 0 && (
           <Section title={t('industry.breakdown.depthTitle')}>

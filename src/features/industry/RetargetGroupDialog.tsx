@@ -29,7 +29,6 @@ import {
 } from '@/components/ui';
 import {
   FACILITY_PRESETS,
-  RIG_KIND_OPTIONS,
   resolveRigFit,
   setRigSlot,
   type FacilityKind,
@@ -41,7 +40,7 @@ import { BuildSystemInput } from './BuildSystemInput';
 import { BuildLocationPicker } from './BuildLocationPicker';
 import { clampPct } from '@/lib/clampPct';
 import { buildLocationLabel } from './buildLocationLabel';
-import { rigKindLabelKey } from './rigFitLabels';
+import { RigKindOptions } from './RigKindOptions';
 import { RigMatchHelper } from './RigMatchHelper';
 import type { BuildGroup, BuildGroupSnapshot } from './buildGroups';
 
@@ -269,11 +268,7 @@ export function RetargetGroupDialog({ group, plans, onApply, onClose }: Retarget
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {RIG_KIND_OPTIONS.map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {t(rigKindLabelKey(option))}
-                          </SelectItem>
-                        ))}
+                        <RigKindOptions />
                       </SelectContent>
                     </Select>
                   ))}

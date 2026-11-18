@@ -57,6 +57,7 @@ export function planBreakdownContext({
     productUnitPrice,
     standing,
     planSeconds,
+    nameOf: (typeID: number) => nameForType(catalog, typeID),
     depthRows: [...boughtDepth].map(([typeID, walk]) => ({
       typeID,
       name: nameForType(catalog, typeID),
