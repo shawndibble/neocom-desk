@@ -1,8 +1,8 @@
-// Mirror of src/engine/vetting.ts; vettingEngine.test.ts checks they match.
+// Lives in functions/src (deploy uploads functions/ alone); src re-exports it. Keep it import-free.
 /**
  * Vetting checks. Pure: no fetch/DOM/Dexie, and no imports, because
- * `functions/src/vettingEngine.ts` is a byte-for-byte mirror of this file (the
- * server runs the checks; the client only reads the result's types).
+ * `src/engine/vetting.ts` re-exports this file (the server runs the checks;
+ * the client only reads the result's types).
  *
  * `assessVetting` takes what one read of a pilot's declared characters
  * returned and says which checks raised a flag, which found nothing, and which
@@ -367,7 +367,7 @@ export function assessVetting(input: VettingInput): VettingAssessment {
 
 // ---------------------------------------------------------------- wire types
 // What the vetting callables return. They live here, not in a file of their
-// own, so the server mirror and the client share one definition.
+// own, so the server and the client share one definition.
 
 export type VettingKind = 'application' | 'promotion';
 

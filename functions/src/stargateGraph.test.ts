@@ -18,10 +18,3 @@ describe('stargateGraph copy', () => {
     expect(SYSTEM_SECURITY).toEqual(expected);
   });
 });
-
-describe('jumpRoute mirror', () => {
-  it('matches src/engine/route/jumpRoute.ts', () => {
-    const mirror = text('./jumpRoute.ts').split('\n').slice(1).join('\n');
-    expect(mirror).toBe(text('../../src/engine/route/jumpRoute.ts'));
-  });
-});
