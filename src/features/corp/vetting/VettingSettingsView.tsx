@@ -599,6 +599,7 @@ export function VettingSettingsView({
                 value={name}
                 onChange={setName}
                 onPick={(match) => setName(match.name)}
+                // The Payee form's default placeholder would mislead here.
                 placeholder=""
               />
             </div>

@@ -3,7 +3,7 @@
  * a Director) settings. A path below Open or Decided is one review's report, drawn as a page of
  * its own with a crumb back.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -69,6 +69,8 @@ export function VettingPage() {
   const { copied, flash } = useCopyFeedback(2000);
   const [requesting, setRequesting] = useState(false);
   const roster = useReviewRoster(requesting ? characterId : null, corporationId);
+  // The tab the settings gear was pressed on, which closing the modal returns to.
+  const settingsFrom = useRef<'open' | 'decided'>('open');
   const [invitesOpen, setInvitesOpen] = useState<'new' | 'list' | null>(null);
   const [rowMail, setRowMail] = useState<{ name: string; run: RequestMailRun } | null>(null);
   const names = useCharacterNames();
@@ -191,7 +193,10 @@ export function VettingPage() {
     <IconButton
       icon={<Icon.Settings />}
       label={t('pageSettings.open', { page: t('vetting.title') })}
-      onClick={() => navigate(settingsSectionPath(settingsSectionFromPathname(pathname)))}
+      onClick={() => {
+        settingsFrom.current = shown === 'decided' ? 'decided' : 'open';
+        navigate(settingsSectionPath(settingsSectionFromPathname(pathname)));
+      }}
     />
   ) : undefined;
 
@@ -282,7 +287,7 @@ export function VettingPage() {
         // The URL backs the modal (`/corp/vetting/settings/<section>`), so Back is the URL's job.
         <Modal
           open
-          onClose={() => navigate(tabPath(VETTING_TABS, 'open'))}
+          onClose={() => navigate(tabPath(VETTING_TABS, settingsFrom.current), { replace: true })}
           title={t('pageSettings.title', { page: t('vetting.title') })}
           placement="page"
           closeOnBack={false}

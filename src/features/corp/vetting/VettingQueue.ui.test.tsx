@@ -265,7 +265,7 @@ describe('VettingPage queue', () => {
     await setup('/corp/vetting/settings/watchlist');
     expect(await screen.findByText('Black Kite Syndicate')).toBeInTheDocument();
     await userEvent.type(
-      screen.getByLabelText('Exact name of a character, corporation or alliance'),
+      screen.getByLabelText('Name of a character, corporation or alliance'),
       'Grey Lantern'
     );
     await userEvent.click(screen.getByRole('button', { name: 'Add' }));
@@ -314,14 +314,23 @@ describe('VettingPage settings', () => {
     expect(screen.getByText('Tamsin Vell')).toBeInTheDocument();
   });
 
+  it('returns to the tab the gear was pressed on', async () => {
+    await setup('/corp/vetting/decided');
+    expect(await screen.findByText('Hesper Lune')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Vetting settings' }));
+    const dialog = within(await screen.findByRole('dialog'));
+    await userEvent.click(dialog.getByRole('button', { name: /^Close/ }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.getByText('Hesper Lune')).toBeInTheDocument();
+    expect(screen.queryByText('Tamsin Vell')).toBeNull();
+  });
+
   it('suggests names for the watchlist and fills the one picked', async () => {
     vi.mocked(searchPayeeEntitiesPublic).mockResolvedValue([
       { id: 98000001, name: 'Grey Lantern Holdings', kind: 'corporation' },
     ]);
     await setup('/corp/vetting/settings/watchlist');
-    const field = await screen.findByLabelText(
-      'Exact name of a character, corporation or alliance'
-    );
+    const field = await screen.findByLabelText('Name of a character, corporation or alliance');
     await userEvent.type(field, 'Grey Lan');
     await userEvent.click(await screen.findByRole('option', { name: /Grey Lantern Holdings/ }));
     expect(field).toHaveValue('Grey Lantern Holdings');
