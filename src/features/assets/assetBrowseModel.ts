@@ -1,3 +1,4 @@
+import type { HeldStockCost } from '@/features/assets/stockCostBasis';
 import { createContext, useContext } from 'react';
 import type { AssetTreeNode, AssetTreeStation } from '@/engine/assetTree';
 import { assetPathHref } from '@/engine/assetPath';
@@ -77,7 +78,7 @@ export interface AssetItemActions {
   materialPlanMap: ReadonlyMap<number, BuildPlanRecord> | null;
   onViewInIndustryAsMaterial: (typeId: number) => void;
   /** Unit Stock Cost Basis of the types the Character holds that their history covers; null when none are offered (nothing covered, or the list spans Characters). */
-  stockCostByTypeId: ReadonlyMap<number, { unitCost: number }> | null;
+  stockCostByTypeId: ReadonlyMap<number, HeldStockCost> | null;
   /** Blueprint typeIDs for the BPO badge; null until loaded, or when nothing listed can be a blueprint. */
   blueprintTypeIds: ReadonlySet<number> | null;
 }

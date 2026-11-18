@@ -60,7 +60,7 @@ import {
   loadCrossCharacterData,
 } from './assetsSnapshot';
 import { locationLabel, matchAssets } from './assetsLogic';
-import { loadStockCostBases } from './stockCostBasis';
+import { loadStockCostBases, type HeldStockCost } from './stockCostBasis';
 import { NO_ASSET_NAMES } from '@/engine/assetNames';
 
 /**
@@ -328,7 +328,7 @@ export function useAssetsData() {
   const ownAssets = assetsResult?.data;
   const [stockCosts, setStockCosts] = useState<{
     key: string;
-    costs: ReadonlyMap<number, { unitCost: number }>;
+    costs: ReadonlyMap<number, HeldStockCost>;
   } | null>(null);
   const stockCostKey =
     activeCharacterId === null ? null : `${activeCharacterId}:${assetsResult?.fetchedAt.getTime()}`;
@@ -336,7 +336,7 @@ export function useAssetsData() {
     if (activeCharacterId === null || !ownAssets || stockCostKey === null) return;
     let cancelled = false;
     void loadStockCostBases(activeCharacterId, ownAssets)
-      .catch(() => new Map<number, { unitCost: number }>())
+      .catch(() => new Map<number, HeldStockCost>())
       .then((costs) => {
         if (!cancelled) setStockCosts({ key: stockCostKey, costs });
       });

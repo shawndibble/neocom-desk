@@ -89,7 +89,7 @@ export function walletCostBasis(input: WalletCostBasisInput): WalletCostBasisRes
   const runs = (input.productionLots ?? [])
     .filter((l) => l.typeId === typeId && l.quantity > 0)
     .map((l) => ({
-      id: -1,
+      id: -1, // before any same-instant fill (ids are positive)
       date: l.date,
       quantity: l.quantity,
       unitPrice: l.unitCost,
