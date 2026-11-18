@@ -76,7 +76,10 @@ export interface SharedPop {
    */
   oreShared?: boolean;
   notes: string;
-  /** The Survey linked to this pop (a Share Link id); absent when none. Not a secret: its link is public. */
+  /**
+   * The Survey linked to this pop (a Share Link id); absent when none, and whenever the settings
+   * hide the ore make-up. The id is the Survey's only privacy, so it goes only where the ore does.
+   */
   surveyId?: string;
   /** The start link's rate. */
   ratePct: number;
@@ -217,7 +220,7 @@ export function buildSharedPops(input: BuildSharedPopsInput): SharedPopsDoc | nu
           : null,
       oreShared: settings.showOre,
       notes: settings.notes,
-      ...(x.surveyId ? { surveyId: x.surveyId } : {}),
+      ...(x.surveyId && settings.showOre ? { surveyId: x.surveyId } : {}),
       ratePct: startLinkRatePct(settings, input.bookRatePct(x)),
       audiences: settings.audiences.map(audienceKey),
       ...(owner !== undefined && owner !== input.corporationId

@@ -136,7 +136,7 @@ export function RowDetailModal({
                 to={detail.link.to}
                 className={buttonClassName({
                   variant: 'primary',
-                  className: detail.secondaryLink ? '' : 'ml-auto',
+                  className: detail.secondaryLink ? undefined : 'ml-auto',
                 })}
               >
                 {detail.link.label}
