@@ -9,7 +9,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { textActionClassName } from '@/components/ui';
 import type { ImproveGoal } from '@/engine/fittings/improve';
-import { IMPLANT_GOAL } from '@/engine/fittings/improveFree';
+import { IMPLANT_GOAL } from '@/engine/fittings/improve';
 import { cloneSeedSet } from '@/engine/fittings/implantBasis';
 import { goalById, goalGain, type ImplantGoalId } from '@/engine/fittings/implantFinder';
 import { useMarketHub } from '@/features/market/hub';

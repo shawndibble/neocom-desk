@@ -11,7 +11,7 @@ import {
   removedCommonGroups,
   type JobCommonality,
 } from '@/engine/fittings/hullCommonality';
-import type { ImproveJob } from '@/engine/fittings/improveJob';
+import type { ImproveJob } from '@/engine/fittings/improve';
 import type { FittingModule } from '@/engine/fittings/types';
 import type { FittingCatalogue } from './useFittingCatalogue';
 

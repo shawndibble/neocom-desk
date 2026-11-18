@@ -10,8 +10,8 @@ import { Collapse } from '@/components/ui/Collapse';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { textActionClassName } from '@/components/ui/textActionClassName';
 import type { ImproveOption } from '@/engine/fittings/improve';
-import { optionKey } from '@/engine/fittings/improveKeys';
-import { groupByModule, type ImproveSort } from '@/engine/fittings/improveRows';
+import { optionKey } from '@/engine/fittings/improve';
+import { groupByModule, type ImproveSort } from '@/engine/fittings/improve';
 import type { FittingStats } from '@/engine/fittings/types';
 import { cx } from '@/lib/cx';
 import {

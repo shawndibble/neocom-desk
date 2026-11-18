@@ -10,7 +10,7 @@ import { Collapse } from '@/components/ui/Collapse';
 import { textActionClassName } from '@/components/ui/textActionClassName';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { IMPROVE_REACHES, type DefenseChoice, type ImproveGoal } from '@/engine/fittings/improve';
-import { TANK_GOALS } from '@/engine/fittings/improveGroups';
+import { TANK_GOALS } from '@/engine/fittings/improve';
 import { formatIskCompact } from '@/lib/isk';
 import { cx } from '@/lib/cx';
 import {

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { ImproveJobChoice } from './ImproveJobChoice';
-import type { ExploreSpace, ImproveJob } from '@/engine/fittings/improveJob';
+import type { ExploreSpace, ImproveJob } from '@/engine/fittings/improve';
 
 /** @summary The Improve Job setting: PvE / PvP / Explore with a hint, and Explore's space choice. */
 const meta = {

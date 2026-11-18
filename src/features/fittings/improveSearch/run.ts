@@ -11,8 +11,8 @@ import {
   searchableGoal,
   type ImproveResult,
 } from '@/engine/fittings/improve';
-import { overBudgetResources } from '@/engine/fittings/improveFree';
-import { unloadedMiners } from '@/engine/fittings/improveMining';
+import { overBudgetResources } from '@/engine/fittings/improve';
+import { unloadedMiners } from '@/engine/fittings/improve';
 import { targetShareOf } from '@/engine/fittings/hullCommonality';
 import { communityHintsOf } from '../improveCommonHints';
 import { combineSides } from './combine';

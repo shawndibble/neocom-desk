@@ -142,6 +142,13 @@ const restrictedSyntax = [
 // scripts/lib/sortArrowLint.test.mjs.
 const sortArrowMessage =
   'Draw sort direction with Icon.Sort / Icon.Ascending / Icon.Descending, not a "↑" / "↓" character (DESIGN.md §5).';
+// The Improve engine's one door is `@/engine/fittings/improve` (its index.ts);
+// modules inside the folder are internal. Pinned by
+// scripts/lib/improveSeamLint.test.mjs.
+const improveDeepImportPattern = {
+  group: ['@/engine/fittings/improve/*', '**/engine/fittings/improve/*', './improve/*'],
+  message: "Import the Improve engine from '@/engine/fittings/improve', not a file inside it.",
+};
 const restrictedImportPaths = [
   {
     name: 'radix-ui',
@@ -259,7 +266,10 @@ export default tseslint.config(
     ignores: ['src/components/ui/**'],
     rules: {
       'no-restricted-syntax': ['error', ...restrictedSyntax],
-      'no-restricted-imports': ['error', { paths: restrictedImportPaths }],
+      'no-restricted-imports': [
+        'error',
+        { paths: restrictedImportPaths, patterns: [improveDeepImportPattern] },
+      ],
     },
   },
   {
@@ -283,6 +293,7 @@ export default tseslint.config(
         {
           paths: restrictedImportPaths,
           patterns: [
+            improveDeepImportPattern,
             {
               group: ['./assignments', '**/miningTax/assignments'],
               message: 'Write Mining Tax Assignments through ./ledgerActions, not the primitives.',

@@ -1,6 +1,6 @@
 import { iskDeltaOf, type ImproveOption } from '@/engine/fittings/improve';
-import { moveKey, optionKey, toggleTick } from '@/engine/fittings/improveKeys';
-import type { Makeover } from '@/engine/fittings/improveMakeover';
+import { moveKey, optionKey, toggleTick } from '@/engine/fittings/improve';
+import type { Makeover } from '@/engine/fittings/improve';
 
 /**
  * The Makeover group's tick logic: which of the group's rows are ticked, the

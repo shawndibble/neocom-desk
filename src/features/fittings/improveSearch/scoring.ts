@@ -4,13 +4,13 @@
  * best crystal, the baseline's too, so every row compares on the same load.
  */
 import type { ImproveGoal } from '@/engine/fittings/improve';
-import { assumeCharges } from '@/engine/fittings/improveCharges';
+import { assumeCharges } from '@/engine/fittings/improve';
 import {
   crystalPlan,
   loadCrystals,
   minerWithoutCrystal,
   type CrystalPlan,
-} from '@/engine/fittings/improveMining';
+} from '@/engine/fittings/improve';
 import type { Fitting, FittingSlotKind, FittingStats } from '@/engine/fittings/types';
 import type { SearchContext } from './context';
 

@@ -8,9 +8,9 @@
  */
 import { useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { UnloadedWeapons } from '@/engine/fittings/improveCharges';
+import type { UnloadedWeapons } from '@/engine/fittings/improve';
 import type { ImproveGoal, ImproveOption, RejectedOption } from '@/engine/fittings/improve';
-import { optionKey } from '@/engine/fittings/improveKeys';
+import { optionKey } from '@/engine/fittings/improve';
 import type { Resource } from '@/engine/fittings/makeItFit';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { Fitting } from '@/engine/fittings/types';

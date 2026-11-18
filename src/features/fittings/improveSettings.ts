@@ -1,6 +1,6 @@
 import type { DefenseChoice } from '@/engine/fittings/improve';
-import type { DefenseSide } from '@/engine/fittings/improveGroups';
-import type { ImproveSort } from '@/engine/fittings/improveRows';
+import type { DefenseSide } from '@/engine/fittings/improve';
+import type { ImproveSort } from '@/engine/fittings/improve';
 import type { ImproveConfig } from './improveSearch/types';
 
 /**
