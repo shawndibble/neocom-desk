@@ -714,6 +714,8 @@ export type AcquisitionTier = {
   /** The tier is an invented copy (issue #3990): its price is an expected cost. */
   invented?: true;
   pool?: BlueprintRunPool;
+  /** The blueprint exists only as fixed-run copies and none is owned or offered (issue #6394): no job can be installed from it. */
+  copyOnly?: true;
 };
 
 /** What a Blueprint Acquisition row (issue #838) reports, at whatever node resolved it. */
@@ -750,6 +752,8 @@ export interface AcquisitionResolution {
    * be started past `coveredRuns` (issue #1775).
    */
   coverage?: { coveredRuns: number; neededRuns: number };
+  /** Set for a copy-only blueprint nothing owned or offered covers (issue #6394). */
+  copyOnly?: true;
 }
 
 /** An effective material priced against its sourcing overrides + hub prices. */
