@@ -7,7 +7,7 @@
  * (`bookDocs.ts`), with this one.
  */
 import type { RecordedWriteOff, TaxPayment } from './allocation';
-import { parseBookSettings } from './bookDocs';
+import { num, parseBookSettings, str } from './bookDocs';
 import type { Miner } from './charges';
 import type { Dismissal } from './dismissals';
 import { readClaimEvidence, type Declaration } from './overdue';
@@ -53,10 +53,6 @@ export interface MemberFeederCoverage {
   coveragePeriods: { from: string; to?: string }[];
   lastReadWellAt?: string;
 }
-
-const num = (v: unknown): number | undefined =>
-  typeof v === 'number' && Number.isFinite(v) ? v : undefined;
-const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
 
 /** The book's settings doc; `null` when it is not an active book, or is still in its setup window (D24: then nothing changes). */
 export function readBookSettings(corporationId: number, d: Data | undefined, now = Date.now()) {

@@ -4,8 +4,8 @@
  * lines (`uid` / `uids`) — observed rows, payments, Statements, dismissals and
  * Miner groupings — in any corp's book, including after leaving the corp. This
  * module reads exactly those, as each tracked Character in turn (the Firebase
- * session is one Character at a time), and parses them defensively into the
- * engine's shapes. Every write is a callable; the only one a player makes is
+ * session is one Character at a time); `engine/corpTaxBook/docShapes.ts` parses them
+ * defensively into the engine's shapes. Every write is a callable; the only one a player makes is
  * claiming their own Unmatched donation.
  */
 import {
@@ -52,7 +52,7 @@ import type { Adjustment, Statement } from '@/engine/corpTaxBook/statements';
 import { loadStructureName } from '@/features/character/structures';
 import type { ObservedMiningEntry, ObservedRow } from '@/engine/corpTaxBook/types';
 import { getSyncFirestore } from '@/sync/firebaseApp';
-import { callRouted } from '@/sync/routedCallable';
+import { callSignedIn } from '@/sync/signedInCallable';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { getDocUnlessKnownMissing, NOT_FOUND_TTL_MS } from '@/sync/notFoundCache';
 import { underFirebaseSession } from '@/features/communities/pledgeWrites';
@@ -63,22 +63,8 @@ import { readMemberObserved } from './memberObservedRead';
 
 type Data = Record<string, unknown>;
 
-// The plain-doc parsers live in the engine (docShapes.ts); re-exported for existing importers.
-export {
-  readAdjustment,
-  readBookSettings,
-  readDismissal,
-  readFeederCoverage,
-  readMemberDeclaration,
-  readMiner,
-  readPayment,
-  readStatement,
-  readWriteOff,
-  type ClaimablePayment,
-  type HeldPayment,
-  type InReviewPayment,
-  type MemberFeederCoverage,
-};
+// Parsers live in the engine (docShapes.ts); these types keep their old import path.
+export type { ClaimablePayment, HeldPayment, InReviewPayment, MemberFeederCoverage };
 
 export interface LoadedCorpBook {
   corporationId: number;
@@ -494,15 +480,14 @@ export async function claimCorpTaxBookPayment(
   options: { inReview?: boolean } = {}
 ): Promise<{ minerId: string }> {
   return underFirebaseSession(async () => {
-    await ensureSignedIn(characterId);
-    return callRouted<
+    return callSignedIn<
       { corporationId: number; paymentId: string; inReview?: true },
       { minerId: string }
-    >(
-      'claimCorpTaxBookPaymentCallable',
-      { corporationId, paymentId, ...(options.inReview ? { inReview: true as const } : {}) },
-      characterId
-    );
+    >(characterId, 'claimCorpTaxBookPaymentCallable', {
+      corporationId,
+      paymentId,
+      ...(options.inReview ? { inReview: true as const } : {}),
+    });
   });
 }
 
@@ -522,11 +507,10 @@ export async function declareCorpTaxBookPayment(
   }
 ): Promise<{ declarationId: string; checks?: ClaimCheck[]; confirmed?: boolean }> {
   return underFirebaseSession(async () => {
-    await ensureSignedIn(characterId);
-    return callRouted<
+    return callSignedIn<
       typeof input,
       { declarationId: string; checks?: ClaimCheck[]; confirmed?: boolean }
-    >('declareCorpTaxBookPaymentCallable', input, characterId);
+    >(characterId, 'declareCorpTaxBookPaymentCallable', input);
   });
 }
 
@@ -548,11 +532,10 @@ export async function disputeCorpTaxBookConflict(
   }
 ): Promise<{ disputeId: string }> {
   return underFirebaseSession(async () => {
-    await ensureSignedIn(characterId);
-    return callRouted<typeof input, { disputeId: string }>(
+    return callSignedIn<typeof input, { disputeId: string }>(
+      characterId,
       'disputeCorpTaxBookConflictCallable',
-      input,
-      characterId
+      input
     );
   });
 }
@@ -563,11 +546,10 @@ export async function withdrawCorpTaxBookDispute(
   input: { corporationId: number; date: string }
 ): Promise<{ disputeId: string }> {
   return underFirebaseSession(async () => {
-    await ensureSignedIn(characterId);
-    return callRouted<typeof input, { disputeId: string }>(
+    return callSignedIn<typeof input, { disputeId: string }>(
+      characterId,
       'withdrawCorpTaxBookDisputeCallable',
-      input,
-      characterId
+      input
     );
   });
 }
@@ -605,11 +587,10 @@ export async function teachRefinerySystems(
       for (const [id] of fresh) reportedSystems.add(`${book.corporationId}:${id}`);
       try {
         await underFirebaseSession(async () => {
-          await ensureSignedIn(characterId);
-          await callRouted<{ corporationId: number; systems: Record<string, number> }, unknown>(
+          await callSignedIn<{ corporationId: number; systems: Record<string, number> }, unknown>(
+            characterId,
             'learnCorpTaxBookRefinerySystemsCallable',
-            { corporationId: book.corporationId, systems: Object.fromEntries(fresh) },
-            characterId
+            { corporationId: book.corporationId, systems: Object.fromEntries(fresh) }
           );
         });
       } catch {
