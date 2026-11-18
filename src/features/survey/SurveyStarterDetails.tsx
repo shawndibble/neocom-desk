@@ -83,7 +83,7 @@ export function SurveyStarterDetails({
       });
   }
 
-  const fold = useInfoFold(id, info?.location != null || (info?.notes ?? '') !== '' || tax != null);
+  const fold = useInfoFold(id, { info, tax });
 
   return (
     <CollapsiblePanel

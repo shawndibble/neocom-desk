@@ -103,12 +103,7 @@ export function SurveyInfoEditor({
       });
   }
 
-  const fold = useInfoFold(
-    survey?.id,
-    survey?.info?.location != null ||
-      (survey?.info?.notes ?? '') !== '' ||
-      survey?.published != null
-  );
+  const fold = useInfoFold(survey?.id, { info: survey?.info, tax: survey?.published });
   const taxPct = parseTaxPct(tax.pct);
   const fields: InfoFields = {
     location,

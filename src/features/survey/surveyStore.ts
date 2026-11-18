@@ -249,12 +249,12 @@ export async function setSurveyScanIgnored(input: {
   expiresAt: number;
   scanId: string;
   ignored: boolean;
-  /** The signed-in Character setting it aside. */
-  characterId: number;
+  /** The Character setting it aside; omitted for the visitor who started the survey with no account (the rules allow it). */
+  characterId?: number;
 }): Promise<void> {
-  await ensureAnySession(input.characterId);
+  if (input.characterId !== undefined) await ensureAnySession(input.characterId);
   await addDoc(
-    collection(getSyncFirestore(input.characterId), 'shares', input.id, SURVEY_IGNORES_COLLECTION),
+    collection(shareFirestore(input.characterId), 'shares', input.id, SURVEY_IGNORES_COLLECTION),
     {
       scanId: input.scanId,
       ignored: input.ignored,

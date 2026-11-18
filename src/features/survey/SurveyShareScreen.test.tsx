@@ -182,6 +182,40 @@ describe('SurveyShareScreen as its signed-in owner', () => {
     );
   });
 
+  it('lets the device that started the survey set a scan aside with no account', async () => {
+    useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
+    noteStartedHere(ID);
+    loadSurvey.mockResolvedValue(twoScans('Someone Else'));
+    setSurveyScanIgnored.mockResolvedValue(undefined);
+    renderScreen();
+    fireEvent.click(await screen.findByText('2 scans', { selector: 'summary' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
+    await waitFor(() =>
+      expect(setSurveyScanIgnored).toHaveBeenCalledWith({
+        id: ID,
+        expiresAt: EXPIRES,
+        scanId: 's2',
+        ignored: true,
+        characterId: undefined,
+      })
+    );
+  });
+
+  it('keeps that device in charge after signing in, before the survey names the pilot', async () => {
+    noteStartedHere(ID);
+    // Started with no account, so it names no owner for the signed-in Character to match.
+    loadSurvey.mockResolvedValue(twoScans(null as unknown as string));
+    setSurveyScanIgnored.mockResolvedValue(undefined);
+    renderScreen();
+    await openDetails();
+    expect(await screen.findByLabelText('Notes (markdown supported)')).toBeTruthy();
+    fireEvent.click(screen.getByText('2 scans', { selector: 'summary' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
+    await waitFor(() =>
+      expect(setSurveyScanIgnored).toHaveBeenCalledWith(expect.objectContaining({ characterId: 7 }))
+    );
+  });
+
   it("offers neither to a pilot who isn't the survey's owner", async () => {
     loadSurvey.mockResolvedValue(twoScans('Someone Else'));
     renderScreen();

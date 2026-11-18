@@ -59,6 +59,10 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
   const characterNames = useCharacters().map((c) => c.name);
   const owned =
     characterId !== null && state.status === 'ready' && ownsSurvey(state.owner, characterNames);
+  // The device that started the Survey (`startedHere.ts`) manages it too, whether or
+  // not anyone is signed in: a Survey started with no account has no owner name for
+  // `owned` to match, and the pilot may have signed in since.
+  const starter = !owned && hydrated && startedHere(shareId);
   const { setIgnored, failed: ignoreFailed } = useScanIgnore({
     id: shareId,
     expiresAt: state.status === 'ready' ? state.expiresAt : null,
@@ -190,7 +194,9 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
           <SurveyBoard
             scans={state.scans}
             ignored={state.ignored}
-            onSetIgnored={owned ? (scanId, ignored) => void setIgnored(scanId, ignored) : undefined}
+            onSetIgnored={
+              owned || starter ? (scanId, ignored) => void setIgnored(scanId, ignored) : undefined
+            }
             owned={owned}
             onFinish={finish}
             url={shareUrl(shareId)}
@@ -212,7 +218,7 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
                   }}
                   onStored={() => void refresh()}
                 />
-              ) : startedHere(shareId) && hydrated && characterId === null ? (
+              ) : starter ? (
                 <SurveyStarterDetails
                   key={shareId}
                   id={shareId}
