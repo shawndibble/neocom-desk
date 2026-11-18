@@ -15,6 +15,7 @@
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import type { CollectionReference, Firestore } from 'firebase-admin/firestore';
+import { commitInBatches } from './commitInBatches.js';
 import { FEEDER_VIEWS, STATEMENTS, utcDate } from './corpTaxBook.js';
 import {
   BOOK_DEFAULTS,
@@ -535,7 +536,6 @@ export function feederViewHash(view: FeederView): string {
 // --- Rebuild -----------------------------------------------------------------
 
 const PRICE_READ_CONCURRENCY = 16;
-const BATCH_SIZE = 400;
 
 /** Make `col` hold exactly `next`, writing only what differs. */
 async function syncDocs(
@@ -553,11 +553,7 @@ async function syncDocs(
     else if (!isDeepStrictEqual(d.data(), want)) ops.push((b) => b.set(d.ref, want));
   }
   for (const [id, data] of next) if (!seen.has(id)) ops.push((b) => b.set(col.doc(id), data));
-  for (let i = 0; i < ops.length; i += BATCH_SIZE) {
-    const batch = db.batch();
-    for (const op of ops.slice(i, i + BATCH_SIZE)) op(batch);
-    await batch.commit();
-  }
+  await commitInBatches(db, ops);
 }
 
 async function loadPrices(

@@ -6,6 +6,7 @@
 import type { Firestore } from 'firebase-admin/firestore';
 import { DEVICE_REGISTRATIONS_COLLECTION } from './projectionStore.js';
 import type { RunStats } from './runStats.js';
+import { chunk } from './chunk.js';
 
 /** Firestore's cap on `array-contains-any` values. */
 const ARRAY_CONTAINS_ANY_MAX = 30;
@@ -37,16 +38,15 @@ export function createRegistrationReader(db: Firestore, stats?: RunStats): Regis
   return {
     async holding(characterIds) {
       const missing = [...new Set(characterIds)].filter((id) => !queried.has(id));
-      for (let i = 0; i < missing.length; i += ARRAY_CONTAINS_ANY_MAX) {
-        const chunk = missing.slice(i, i + ARRAY_CONTAINS_ANY_MAX);
+      for (const ids of chunk(missing, ARRAY_CONTAINS_ANY_MAX)) {
         const snap = await db
           .collection(DEVICE_REGISTRATIONS_COLLECTION)
-          .where('characterIds', 'array-contains-any', chunk)
+          .where('characterIds', 'array-contains-any', ids)
           .get();
         // A billed query reads at least one document, even when it finds none.
         stats?.add('firestoreReads', Math.max(1, snap.docs.length));
         for (const doc of snap.docs) docs.set(doc.id, doc.data());
-        for (const id of chunk) queried.add(id);
+        for (const id of ids) queried.add(id);
       }
       const wanted = new Set(characterIds);
       return [...docs]

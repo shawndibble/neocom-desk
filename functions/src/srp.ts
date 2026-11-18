@@ -4,6 +4,7 @@
 
 import { HttpsError } from 'firebase-functions/v2/https';
 import { docId, record } from './communities.js';
+import { oneOf } from './inputParse.js';
 import { int } from './corpTaxBook.js';
 import {
   HULL_RULE_KINDS,
@@ -15,13 +16,6 @@ import {
   type HullRuleScope,
   type SrpSettingsPatch,
 } from './srpTypes.js';
-
-function oneOf<T extends string>(value: unknown, field: string, allowed: readonly T[]): T {
-  if (typeof value !== 'string' || !allowed.includes(value as T)) {
-    throw new HttpsError('invalid-argument', `${field} must be one of ${allowed.join(', ')}`);
-  }
-  return value as T;
-}
 
 /**
  * A hull rule's Doctrine Fits. Hull scope only: a fit is for one hull, and a class rule has no

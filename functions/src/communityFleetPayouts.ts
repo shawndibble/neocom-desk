@@ -8,6 +8,7 @@
 
 import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, docId, record } from './communities.js';
+import { intIn } from './inputParse.js';
 
 export const FLEET_PAYOUTS_COLLECTION = 'fleetPayouts';
 export const FLEET_SHARES_COLLECTION = 'shares';
@@ -54,16 +55,6 @@ export interface FleetPayoutIdInput {
 export interface SetFleetShareDoneInput extends FleetPayoutIdInput {
   shareId: string;
   paid: boolean;
-}
-
-function intIn(value: unknown, field: string, min: number, max: number): number {
-  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) {
-    throw new HttpsError(
-      'invalid-argument',
-      `${field} must be a whole number from ${min} to ${max}`
-    );
-  }
-  return value;
 }
 
 function parseShare(raw: unknown, index: number): FleetShareDraft {

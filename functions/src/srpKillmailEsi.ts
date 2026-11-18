@@ -9,6 +9,7 @@ import { ESI_BASE, ESI_USER_AGENT, esiGet } from './esiClient.js';
 import { throwForEsi } from './esiThrow.js';
 import { isFiniteNumber } from './guards.js';
 import type { EsiKillmail, KillmailItem, SrpKillmailSource, ZkillRecord } from './srpKillmail.js';
+import { chunk } from './chunk.js';
 
 const ZKILL_API = 'https://zkillboard.com/api/killID';
 const FUZZWORK_AGGREGATES = 'https://market.fuzzwork.co.uk/aggregates/';
@@ -129,8 +130,7 @@ export function srpKillmailSource(fetchImpl: typeof fetch = fetch): SrpKillmailS
       const typeIds = [...items.keys()];
       let total = 0;
       try {
-        for (let i = 0; i < typeIds.length; i += FUZZWORK_BATCH) {
-          const batch = typeIds.slice(i, i + FUZZWORK_BATCH);
+        for (const batch of chunk(typeIds, FUZZWORK_BATCH)) {
           const url = `${FUZZWORK_AGGREGATES}?station=${JITA_STATION_ID}&types=${batch.join(',')}`;
           const res = await fetchImpl(url, {
             headers: { 'User-Agent': ESI_USER_AGENT, Accept: 'application/json' },

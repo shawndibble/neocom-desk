@@ -31,6 +31,7 @@ import type { CharacterProjection } from './registerDevice.js';
 import { suppressPush, type QuietHours } from './quietHours.js';
 import { polledEventsOf, trimBaseline, type ServerEventInputs } from './serverEvents.js';
 import type { NearbyRouteRules } from './nearbyAlerts.js';
+import { commitInBatches } from './commitInBatches.js';
 
 export const PROJECTIONS_COLLECTION = 'projections';
 export const DEVICE_REGISTRATIONS_COLLECTION = 'deviceRegistrations';
@@ -127,14 +128,6 @@ function mapField<T>(raw: unknown): Record<string, T> {
 
 type Doc = QueryDocumentSnapshot;
 type Ref = DocumentReference;
-
-async function commitInChunks(db: Firestore, ops: ((batch: WriteBatch) => void)[]): Promise<void> {
-  for (let i = 0; i < ops.length; i += MAX_BATCH_OPS) {
-    const batch = db.batch();
-    for (const op of ops.slice(i, i + MAX_BATCH_OPS)) op(batch);
-    await batch.commit();
-  }
-}
 
 /** Same fields and values. */
 function sameRow(a: object, b: object): boolean {
@@ -312,13 +305,14 @@ export async function writeDeviceRegistration(
       for (const doc of own) {
         if (!kept.has(doc.id)) ops.push((b) => b.delete(doc.ref));
       }
-      await commitInChunks(db, ops);
+      await commitInBatches(db, ops, MAX_BATCH_OPS);
     }),
     ...droppedIds.map(async (characterId) => {
       const docs = await ownUnfired(characterId);
-      await commitInChunks(
+      await commitInBatches(
         db,
-        docs.map((doc) => (b) => b.delete(doc.ref))
+        docs.map((doc) => (b: WriteBatch) => b.delete(doc.ref)),
+        MAX_BATCH_OPS
       );
     }),
   ]);
@@ -528,9 +522,10 @@ export async function purgeFiredProjections(
   let deleted = 0;
   for (let pass = 0; pass < maxPasses; pass += 1) {
     const page = await query.get();
-    await commitInChunks(
+    await commitInBatches(
       db,
-      page.docs.map((doc) => (b) => b.delete(doc.ref))
+      page.docs.map((doc) => (b: WriteBatch) => b.delete(doc.ref)),
+      MAX_BATCH_OPS
     );
     deleted += page.docs.length;
     if (page.docs.length < pageSize) return { deleted, truncated: false };
