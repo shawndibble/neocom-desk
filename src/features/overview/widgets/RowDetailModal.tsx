@@ -19,15 +19,17 @@ function Place({ place }: { place: NonNullable<RowDetailModel['place']> }) {
     <SetDestinationButton
       locationId={place.systemId}
       placeName={place.name}
+      // With no jump count there is nothing to read out, so the default "View route" button
+      // (a sibling of Set destination) beats a bare text link; a count stays a readout link.
       routeLink={
-        <JumpsLink
-          systemId={place.systemId}
-          label={t('overview.widgets.rowDetail.routeLabel', { place: place.name })}
-        >
-          {place.jumps === undefined
-            ? t('overview.widgets.rowDetail.route')
-            : t('overview.widgets.rowDetail.jumps', { count: place.jumps })}
-        </JumpsLink>
+        place.jumps === undefined ? undefined : (
+          <JumpsLink
+            systemId={place.systemId}
+            label={t('overview.widgets.rowDetail.routeLabel', { place: place.name })}
+          >
+            {t('overview.widgets.rowDetail.jumps', { count: place.jumps })}
+          </JumpsLink>
+        )
       }
     />
   );
