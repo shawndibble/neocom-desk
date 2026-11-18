@@ -23,13 +23,13 @@ export async function addToQueue(
   items: readonly MailQueueItem[]
 ): Promise<{ added: MailQueueItem[]; skipped: MailQueueItem[] }> {
   return db.transaction('rw', db.corpMailQueue, async () => {
+    const existing = await db.corpMailQueue
+      .where('statementId')
+      .anyOf(items.map((i) => i.statementId))
+      .toArray();
     const added: MailQueueItem[] = [];
     const skipped: MailQueueItem[] = [];
     for (const item of items) {
-      const existing = await db.corpMailQueue
-        .where('statementId')
-        .equals(item.statementId)
-        .toArray();
       if (isAlreadyQueued([...existing, ...added], item.statementId, item.kind)) skipped.push(item);
       else added.push(item);
     }
