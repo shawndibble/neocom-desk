@@ -6,7 +6,7 @@
 // user of the client id), anything else is "try again next run". Nothing here
 // logs or returns a token.
 
-import { ESI_BASE, esiHeaders, isBudgetLow } from './esiClient.js';
+import { ESI_BASE, esiGet } from './esiClient.js';
 import type {
   EsiExtractionLike,
   JournalEntryLike,
@@ -69,28 +69,43 @@ export function esiSyncReader(fetchImpl: typeof fetch = fetch): SyncEsi {
     | { kind: 'ok'; body: unknown; pages: number }
     | { kind: 'fail'; read: EsiRead<never>; status?: number }
   > {
-    let res: Response;
-    try {
-      res = await fetchImpl(`${ESI_BASE}${path}`, {
-        headers: esiHeaders(accessToken),
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      });
-    } catch {
-      return { kind: 'fail', read: { kind: 'unavailable' } };
+    const got = await esiGet(`${ESI_BASE}${path}`, {
+      token: accessToken,
+      timeoutMs: TIMEOUT_MS,
+      fetchImpl,
+    });
+    if (got.budgetLow) low = true;
+    switch (got.kind) {
+      case 'forbidden':
+      case 'expired':
+        return {
+          kind: 'fail',
+          read: { kind: 'forbidden' },
+          status: got.kind === 'expired' ? 401 : 403,
+        };
+      case 'backoff':
+        low = true;
+        return { kind: 'fail', read: { kind: 'backoff' } };
+      case 'not-found':
+        return { kind: 'fail', read: { kind: 'unavailable' }, status: 404 };
+      case 'error':
+        return {
+          kind: 'fail',
+          read: { kind: 'unavailable' },
+          ...(got.status === null ? {} : { status: got.status }),
+        };
+      case 'not-modified':
+        return { kind: 'fail', read: { kind: 'unavailable' }, status: 304 };
+      case 'ok':
+        break;
     }
-    if (isBudgetLow(res.headers)) low = true;
-    if (res.status === 401 || res.status === 403) {
-      return { kind: 'fail', read: { kind: 'forbidden' }, status: res.status };
-    }
-    if (res.status === 420 || res.status === 429) {
-      low = true;
-      return { kind: 'fail', read: { kind: 'backoff' } };
-    }
-    if (!res.ok) return { kind: 'fail', read: { kind: 'unavailable' }, status: res.status };
-    const body: unknown = await res.json().catch(() => null);
-    if (body === null) return { kind: 'fail', read: { kind: 'unavailable' } };
-    const pages = Number(res.headers.get('X-Pages'));
-    return { kind: 'ok', body, pages: Number.isSafeInteger(pages) && pages > 1 ? pages : 1 };
+    if (got.body === null) return { kind: 'fail', read: { kind: 'unavailable' } };
+    const pages = Number(got.headers.get('X-Pages'));
+    return {
+      kind: 'ok',
+      body: got.body,
+      pages: Number.isSafeInteger(pages) && pages > 1 ? pages : 1,
+    };
   }
 
   async function paged<T>(path: string, accessToken: string): Promise<EsiRead<T[]>> {

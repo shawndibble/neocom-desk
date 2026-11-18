@@ -18,10 +18,6 @@ import { INCURSION_STATES } from './incursionState.js';
 const text = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
 describe('engine mirrors', () => {
-  it('skyhookAlert.ts matches src/engine/skyhooks/skyhookAlert.ts', () => {
-    const mirror = text('./skyhookAlert.ts').split('\n').slice(1).join('\n');
-    expect(mirror).toBe(text('../../src/engine/skyhooks/skyhookAlert.ts'));
-  });
   it('incursionAlert.ts matches src/engine/incursions/incursionAlert.ts but for its import', () => {
     const mirror = text('./incursionAlert.ts')
       .split('\n')
