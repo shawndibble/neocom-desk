@@ -9,7 +9,7 @@
 
 import { fail } from './actorAuth.js';
 import { chunk } from './chunk.js';
-import { ESI_BASE, esiHeaders, isBudgetLow, retryAfterMs } from './esiClient.js';
+import { ESI_BASE, esiGet } from './esiClient.js';
 import { isFiniteNumber, isPlainRecord } from './guards.js';
 import type {
   VettingDealing,
@@ -122,40 +122,37 @@ export function esiVettingReader(
 
   async function request(path: string, accessToken: string | null, body?: unknown): Promise<Got> {
     if (low || now() < notBefore) return { kind: 'backoff' };
-    let res: Response;
-    try {
-      res = await fetchImpl(`${ESI_BASE}${path}`, {
-        ...(body === undefined
-          ? { headers: esiHeaders(accessToken) }
-          : {
-              method: 'POST',
-              headers: { ...esiHeaders(accessToken), 'Content-Type': 'application/json' },
-              body: JSON.stringify(body),
-            }),
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      });
-    } catch {
-      return { kind: 'unavailable' };
+    const got = await esiGet(`${ESI_BASE}${path}`, {
+      token: accessToken,
+      timeoutMs: TIMEOUT_MS,
+      fetchImpl,
+      body,
+    });
+    if (got.budgetLow) low = true;
+    switch (got.kind) {
+      case 'backoff': {
+        low = true;
+        const wait = got.retryAfterMs ?? VETTING_BACKOFF_MS;
+        notBefore = Math.max(notBefore, now() + Math.min(wait, VETTING_BACKOFF_MAX_MS));
+        return { kind: 'backoff' };
+      }
+      // 403: this token may not read the source. 401: the token itself is dead, which must not
+      // pass for "not shared".
+      case 'forbidden':
+      case 'expired':
+      case 'not-found':
+        return { kind: got.kind };
+      case 'error':
+      case 'not-modified':
+        return { kind: 'unavailable' };
+      case 'ok':
+        break;
     }
-    if (isBudgetLow(res.headers)) low = true;
-    if (res.status === 420 || res.status === 429) {
-      low = true;
-      const wait = retryAfterMs(res.headers) ?? VETTING_BACKOFF_MS;
-      notBefore = Math.max(notBefore, now() + Math.min(wait, VETTING_BACKOFF_MAX_MS));
-      return { kind: 'backoff' };
-    }
-    // 403: this token may not read the source. 401: the token itself is dead, which must not
-    // pass for "not shared".
-    if (res.status === 403) return { kind: 'forbidden' };
-    if (res.status === 401) return { kind: 'expired' };
-    if (res.status === 404) return { kind: 'not-found' };
-    if (!res.ok) return { kind: 'unavailable' };
-    const parsed: unknown = await res.json().catch(() => null);
-    if (parsed === null) return { kind: 'unavailable' };
-    const pages = Number(res.headers.get('X-Pages'));
+    if (got.body === null) return { kind: 'unavailable' };
+    const pages = Number(got.headers.get('X-Pages'));
     return {
       kind: 'ok',
-      body: parsed,
+      body: got.body,
       pages: Number.isSafeInteger(pages) && pages > 1 ? pages : 1,
     };
   }

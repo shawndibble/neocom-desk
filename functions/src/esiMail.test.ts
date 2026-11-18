@@ -81,3 +81,12 @@ describe('fetchMailHeaders', () => {
     expect(low).toMatchObject({ kind: 'ok', budgetLow: true });
   });
 });
+
+describe('fetch rejection', () => {
+  it('is an error result, not a throw', async () => {
+    const boom = (async () => {
+      throw new TypeError('network');
+    }) as unknown as typeof fetch;
+    expect(await fetchMailHeaders(1, 't', null, boom)).toEqual({ kind: 'error', status: 0 });
+  });
+});
