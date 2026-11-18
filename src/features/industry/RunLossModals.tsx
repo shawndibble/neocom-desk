@@ -15,6 +15,7 @@ import { useTimeZone } from '@/lib/timeFormat';
 import { formatDateOnly } from '@/lib/timestamp';
 import { SourcingInput } from './SourcingInput';
 import type { LossInsuranceMode, RunLoss } from './useRunLoss';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 function todayInput(): string {
   const d = new Date();
@@ -178,14 +179,14 @@ export function RunLossModals({ loss }: { loss: RunLoss }) {
               </div>
             </dl>
 
-            <div className="flex justify-end gap-2">
+            <DialogFooter>
               <Button size="sm" onClick={loss.closeLoss}>
                 {t('industry.cancel')}
               </Button>
               <Button size="sm" variant="primary" onClick={() => void loss.saveLoss()}>
                 {dialog.lossId ? t('industry.saveLoss') : t('industry.markAsLost')}
               </Button>
-            </div>
+            </DialogFooter>
           </div>
         )}
       </Modal>
@@ -196,14 +197,14 @@ export function RunLossModals({ loss }: { loss: RunLoss }) {
         title={t('industry.removeLoss')}
       >
         <p className="text-xs text-text-dim">{t('industry.removeLossConfirm')}</p>
-        <div className="mt-3 flex justify-end gap-2">
+        <DialogFooter className="mt-3">
           <Button size="sm" onClick={loss.cancelRemoveLoss}>
             {t('industry.keepLoss')}
           </Button>
           <Button size="sm" variant="danger" onClick={() => void loss.removeLoss()}>
             {t('industry.removeLoss')}
           </Button>
-        </div>
+        </DialogFooter>
       </Modal>
     </>
   );

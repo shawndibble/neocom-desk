@@ -1,3 +1,4 @@
+import { Pill } from '@/components/ui/Pill';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -400,9 +401,9 @@ export function ColonyExpanded({
               const saving = isSaving(win.detail);
               return (
                 <li key={win.id} className="flex flex-wrap items-center gap-2 py-1.5 text-xs">
-                  <span className="inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border border-accent/45 bg-accent/10 px-1.5 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
+                  <Pill outlined tone="accent">
                     {t(`piColonies.fixVerb.${line.verb}`)}
-                  </span>
+                  </Pill>
                   <span className="min-w-0 flex-1">
                     <Sentence
                       text={line.text}

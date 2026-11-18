@@ -24,6 +24,7 @@ import { Button, Modal, Checkbox, NeedsConnection } from '@/components/ui';
 import { beginCustomizedAddCharacterLogin } from '@/app/loginFlow';
 import { PERMISSIONS, SCOPE_GROUPS, WRITE_GROUPS, type ScopeGroup } from '@/esi/registry';
 import { useCustomizePermissionsSelection } from './customizeSelection';
+import { DividedList } from '@/components/ui/DividedList';
 
 interface CustomizePermissionsDialogProps {
   open: boolean;
@@ -144,7 +145,7 @@ export function CustomizePermissionsDialog({
     >
       <div className="space-y-4 text-sm">
         <p className="text-text-dim">{t('permissions.customize.intro')}</p>
-        <ul className="divide-y divide-line rounded-xs border border-line bg-panel-2">
+        <DividedList as="ul">
           {CORE_ROWS.map((key) => (
             <li key={key} className="flex items-start gap-2 px-3 py-2">
               <CaptionedCheckbox
@@ -161,7 +162,7 @@ export function CustomizePermissionsDialog({
               />
             </li>
           ))}
-        </ul>
+        </DividedList>
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex gap-2">

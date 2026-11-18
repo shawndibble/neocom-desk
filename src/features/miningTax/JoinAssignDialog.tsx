@@ -22,6 +22,7 @@ import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
 import { toggleInSet } from '@/lib/sets';
 import { formatCount } from '@/lib/formatCount';
+import { Well } from '@/components/ui/Well';
 
 export interface JoinCandidate {
   row: MoonMiningTaxRow;
@@ -223,7 +224,7 @@ export function JoinAssignDialog({
         </div>
 
         {selected.length > 0 && (
-          <div className="space-y-1 rounded-xs border border-line bg-panel-2 p-2">
+          <Well className="space-y-1">
             <p className={eyebrowClassName}>{t('miningTax.oreColumn')}</p>
             <ul className="divide-y divide-line text-xs">
               {[primary, ...selected].flatMap((candidate) =>
@@ -249,7 +250,7 @@ export function JoinAssignDialog({
                 ))
               )}
             </ul>
-          </div>
+          </Well>
         )}
 
         {!agreed.ok ? (

@@ -58,6 +58,7 @@ import {
   type WidgetScope,
 } from './layout';
 import type { WidgetShow, WidgetView } from './kinds';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 function RenameDialog({
   widget,
@@ -107,14 +108,14 @@ function RenameDialog({
         <p id={hintId} className="text-xs text-text-dim">
           {t('overview.menu.renameHint', { title: fallbackTitle })}
         </p>
-        <div className="flex justify-end gap-2">
+        <DialogFooter>
           <Button type="button" onClick={onClose}>
             {t('overview.menu.renameCancel')}
           </Button>
           <Button type="submit" variant="primary">
             {t('overview.menu.renameSave')}
           </Button>
-        </div>
+        </DialogFooter>
       </form>
     </Modal>
   );
@@ -174,14 +175,14 @@ function PlexPlanDialog({
         <p id={hintId} className="text-xs text-text-dim">
           {t('overview.menu.plexPlanHint')}
         </p>
-        <div className="flex justify-end gap-2">
+        <DialogFooter>
           <Button type="button" onClick={onClose}>
             {t('overview.menu.plexPlanCancel')}
           </Button>
           <Button type="submit" variant="primary" disabled={!valid}>
             {t('overview.menu.plexPlanSave')}
           </Button>
-        </div>
+        </DialogFooter>
       </form>
     </Modal>
   );

@@ -11,6 +11,7 @@ import { matchAppraisalEntries, type AppraisalMatch } from '@/engine/market/appr
 import { loadAppraisalCatalogue } from '@/features/market/appraisalData';
 import type { MarketTypeEntry } from '@/sde/marketTypes';
 import { MarketTypePicker } from './MarketTypePicker';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 export function StockListNameDialog({
   title,
@@ -66,12 +67,12 @@ export function StockListNameDialog({
             {t('stockTargets.list.nameRequired')}
           </FieldError>
         )}
-        <div className="flex justify-end gap-2">
+        <DialogFooter>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button type="submit" variant="primary">
             {confirmLabel}
           </Button>
-        </div>
+        </DialogFooter>
       </form>
     </Modal>
   );
@@ -99,7 +100,7 @@ export function DeleteStockListDialog({
     >
       <div className="space-y-3">
         <p className="text-sm text-text">{t('stockTargets.list.deleteConfirm', { name })}</p>
-        <div className="flex justify-end gap-2">
+        <DialogFooter>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button
             variant="danger"
@@ -110,7 +111,7 @@ export function DeleteStockListDialog({
           >
             {t('stockTargets.list.deleteAction')}
           </Button>
-        </div>
+        </DialogFooter>
       </div>
     </Modal>
   );
@@ -214,12 +215,12 @@ export function AddStockItemDialog({
             {added && t('stockTargets.add.added', { name: added.name, count: added.quantity })}
           </LiveStatus>
         </p>
-        <div className="flex justify-end gap-2">
+        <DialogFooter>
           <Button onClick={onClose}>{t('stockTargets.add.done')}</Button>
           <Button type="submit" variant="primary">
             {t('stockTargets.add.confirm')}
           </Button>
-        </div>
+        </DialogFooter>
       </form>
     </Modal>
   );
@@ -324,12 +325,12 @@ export function PasteStockItemsDialog({
         <LiveStatus announceKey={submits}>
           {unmatched.length > 0 && t('stockTargets.add.unmatched', { count: unmatched.length })}
         </LiveStatus>
-        <div className="flex justify-end gap-2">
+        <DialogFooter>
           <Button onClick={onClose}>{t('common.cancel')}</Button>
           <Button type="submit" variant="primary" loading={busy}>
             {t('stockTargets.add.confirm')}
           </Button>
-        </div>
+        </DialogFooter>
       </form>
     </Modal>
   );

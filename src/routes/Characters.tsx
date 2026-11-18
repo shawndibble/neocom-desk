@@ -87,6 +87,7 @@ import { returnPathAfterSwitch } from '@/features/character/characterSwitchRetur
 import { useCharacterCorpStanding } from '@/features/corp/useCharacterCorpStanding';
 import { useAlertsGrants } from '@/features/notifications/alertsGrant';
 import { isSyncConfigured } from '@/app/syncStatus';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 const NO_CHARACTER_IDS: readonly number[] = [];
 
@@ -637,7 +638,7 @@ export function Characters() {
         title={t('characters.deleteGroup')}
       >
         <p className="text-xs text-text-dim">{t('characters.deleteGroupConfirm')}</p>
-        <div className="mt-3 flex justify-end gap-2">
+        <DialogFooter className="mt-3">
           <Button size="sm" onClick={() => setDeletingGroupId(null)}>
             {t('characters.cancel')}
           </Button>
@@ -648,7 +649,7 @@ export function Characters() {
           >
             {t('characters.deleteGroup')}
           </Button>
-        </div>
+        </DialogFooter>
       </Modal>
 
       <CustomizePermissionsDialog

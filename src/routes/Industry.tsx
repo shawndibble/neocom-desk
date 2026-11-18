@@ -84,6 +84,7 @@ import { boolParam } from '@/lib/urlState';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { loadMarketWideTrees } from '@/sde/loadSde';
 import type { MarketWideTreeMap } from '@/sde/types';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 // Only one of these renders at a time (per tab / on open): each loads on demand.
 const BuildPlanList = lazy(() =>
@@ -972,7 +973,7 @@ export function Industry() {
           title={t('industry.deleteGroup')}
         >
           <p className="text-xs text-text-dim">{t('industry.deleteGroupConfirm')}</p>
-          <div className="mt-3 flex justify-end gap-2">
+          <DialogFooter className="mt-3">
             <Button size="sm" onClick={() => setDeletingGroupId(null)}>
               {t('industry.cancel')}
             </Button>
@@ -983,7 +984,7 @@ export function Industry() {
             >
               {t('industry.deleteGroup')}
             </Button>
-          </div>
+          </DialogFooter>
         </Modal>
 
         {blueprintPasteNote && <Toast message={blueprintPasteNote} />}

@@ -45,6 +45,7 @@ import {
 import { ManageCustomProfilesModal } from './ManageCustomProfilesModal';
 import { StatField } from './StatFacts';
 import { STAT_FIELD_WIDTH } from './statKit';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 interface Draft {
   id: string | null;
@@ -198,14 +199,14 @@ function ProfileForm({
         </div>
       </fieldset>
       {error && <FieldError id={errorId}>{error}</FieldError>}
-      <div className="flex justify-end gap-2">
+      <DialogFooter>
         <Button size="sm" onClick={onCancel}>
           {t('fittings.targetProfile.cancel')}
         </Button>
         <Button size="sm" variant="primary" type="submit">
           {t('fittings.targetProfile.save')}
         </Button>
-      </div>
+      </DialogFooter>
     </form>
   );
 }

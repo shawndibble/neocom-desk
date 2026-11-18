@@ -15,6 +15,7 @@ import {
   purgeAllRemoteCharacterData,
   type CharacterCommunity,
 } from '@/features/character/deleteAllCharacterData';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 type Dialog = 'logout' | 'delete';
 
@@ -169,7 +170,7 @@ export function DevicePanel() {
             {t('settings.deviceLogoutFailed')}
           </ActionResult>
         )}
-        <div className="mt-3 flex justify-end gap-2">
+        <DialogFooter className="mt-3">
           <Button
             ref={cancelLogoutRef}
             size="sm"
@@ -181,7 +182,7 @@ export function DevicePanel() {
           <Button variant="danger" size="sm" loading={working} onClick={() => void confirmLogout()}>
             {t('settings.deviceLogoutAction')}
           </Button>
-        </div>
+        </DialogFooter>
       </Modal>
       <Modal
         open={dialog === 'delete'}
@@ -243,7 +244,7 @@ export function DevicePanel() {
             {t('settings.deviceDeleteFailed')}
           </ActionResult>
         )}
-        <div className="mt-3 flex justify-end gap-2">
+        <DialogFooter className="mt-3">
           {!unpurged && (
             <Button size="sm" disabled={working} onClick={() => setDialog(null)}>
               {t('characters.cancel')}
@@ -257,7 +258,7 @@ export function DevicePanel() {
           >
             {t(unpurged ? 'settings.deviceDeleteFinish' : 'settings.deviceDeleteAction')}
           </Button>
-        </div>
+        </DialogFooter>
       </Modal>
     </Panel>
   );

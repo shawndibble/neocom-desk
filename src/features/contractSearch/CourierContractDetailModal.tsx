@@ -66,6 +66,7 @@ import { endpointName, endpointSystemName } from '@/features/contractSearch/cour
 import { useCourierCollateralRatio } from '@/features/contractSearch/collateralThreshold';
 import { RISK_COPY, WARNING_RISKS } from '@/features/contractSearch/courierRiskLabels';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+import { Well } from '@/components/ui/Well';
 
 /**
  * This haul's distance, in the states the board itself has.
@@ -431,7 +432,7 @@ export function CourierContractDetailModal({
           </div>
         </div>
 
-        <section className="flex flex-col gap-2 rounded-xs border border-line bg-panel-2 p-3">
+        <Well size="lg" as="section" className="flex flex-col gap-2">
           <div className="flex flex-col gap-0.5">
             <span className={eyebrowClassName}>{t('contractSearch.pickUpLabel')}</span>
             {/* Wraps rather than truncates: the station name and its region
@@ -572,10 +573,10 @@ export function CourierContractDetailModal({
                 </span>
               )}
           </div>
-        </section>
+        </Well>
 
         {risks.length > 0 && (
-          <section className="flex flex-col gap-1.5 rounded-xs border border-line bg-panel-2 p-3">
+          <Well size="lg" as="section" className="flex flex-col gap-1.5">
             <h3
               className={`text-[0.6875rem] font-semibold tracking-widest uppercase ${
                 warns ? 'text-warning' : 'text-text-dim'
@@ -595,7 +596,7 @@ export function CourierContractDetailModal({
                 </li>
               ))}
             </ul>
-          </section>
+          </Well>
         )}
 
         {/*
@@ -605,7 +606,7 @@ export function CourierContractDetailModal({
           here can know that — the app cannot value a courier contract's cargo,
           which carries no item lines, or read anyone's intent.
         */}
-        <section className="flex flex-col gap-1.5 rounded-xs border border-line bg-panel-2 p-3">
+        <Well size="lg" as="section" className="flex flex-col gap-1.5">
           <h3 className={eyebrowClassName}>{t('contractSearch.goingRateBenchmarkLabel')}</h3>
           <ul className="flex flex-col gap-1.5 text-sm">
             <li>
@@ -674,7 +675,7 @@ export function CourierContractDetailModal({
             </li>
             <li>{t('contractSearch.expiresInHours', { hours: expiresIn })}</li>
           </ul>
-        </section>
+        </Well>
 
         {/*
          * Constraints rather than figures to weigh: whether the hold fits,

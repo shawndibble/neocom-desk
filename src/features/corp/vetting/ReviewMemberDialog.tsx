@@ -16,6 +16,7 @@ import type { ReviewRosterState } from './useReviewRoster';
 import type { RequestMailPreview } from './useVettingRequestMail';
 import { reviewKindLabel } from './vettingText';
 import { vettingErrorKey } from './vettingView';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 interface ReviewMemberDialogProps {
   onClose: () => void;
@@ -133,13 +134,7 @@ export function ReviewMemberDialog({
       placement={phone ? 'sheet' : 'center'}
       dismissOnOutsidePress={false}
       initialFocusRef={nameRef}
-      footer={
-        phone ? (
-          <div className="flex flex-col-reverse gap-2 [&>button]:w-full">{buttons}</div>
-        ) : (
-          <div className="flex justify-end gap-2">{buttons}</div>
-        )
-      }
+      footer={<DialogFooter stacked={phone}>{buttons}</DialogFooter>}
     >
       <form
         className="space-y-3 text-sm"

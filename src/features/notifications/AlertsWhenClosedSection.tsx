@@ -56,6 +56,7 @@ import {
 import { AlertsSignInConfirm } from './AlertsSignInConfirm';
 import { useNotificationPreferences } from './preferencesStore';
 import { QuietTimeRows } from './QuietTimeRows';
+import { DividedList } from '@/components/ui/DividedList';
 
 interface CharacterRef {
   characterId: number;
@@ -308,7 +309,7 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
                 {notice.text}
               </p>
             )}
-            <ul className="divide-y divide-line rounded-xs border border-line">
+            <DividedList surface="none" as="ul">
               {characters.map((character) => {
                 const state = alertsRowState(grants[character.characterId]);
                 const need = needOf(character.characterId);
@@ -386,7 +387,7 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
                   </li>
                 );
               })}
-            </ul>
+            </DividedList>
           </div>
         )}
       </Modal>

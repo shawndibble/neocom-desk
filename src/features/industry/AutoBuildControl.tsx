@@ -4,6 +4,7 @@ import { Button, Modal } from '@/components/ui';
 import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
 import type { MakeMethod } from '@/engine/industry/makeOrBuy';
 import { CraftScopeChips, BuildStrategySelect } from './autoBuildShared';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 interface AutoBuildControlProps {
   /**
@@ -89,7 +90,7 @@ export function AutoBuildControl({
         title={t('industry.autoBuildLabel')}
       >
         <p className="text-xs text-text-dim">{confirmMessage ?? t('industry.autoBuildConfirm')}</p>
-        <div className="mt-3 flex justify-end gap-2">
+        <DialogFooter className="mt-3">
           <Button size="sm" onClick={() => setConfirmOpen(false)}>
             {t('industry.cancel')}
           </Button>
@@ -103,7 +104,7 @@ export function AutoBuildControl({
           >
             {t('industry.autoBuildApply')}
           </Button>
-        </div>
+        </DialogFooter>
       </Modal>
     </div>
   );

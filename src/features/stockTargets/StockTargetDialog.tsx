@@ -21,6 +21,7 @@ import {
 import { removeStockTarget, setStockTarget } from '@/engine/stockTargets/stockLists';
 import { useSelectedStockList, useStockLists } from './stockListsStore';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 const STOCK_PATH = '/market/stock';
 
@@ -79,7 +80,7 @@ export function StockTargetDialog({
       {hydrated && lists.length === 0 && (
         <div className="space-y-3">
           <p className="text-sm text-text">{t('stockTargets.dialog.noMarkets')}</p>
-          <div className="flex justify-end gap-2">
+          <DialogFooter>
             <Button onClick={onClose}>{t('common.cancel')}</Button>
             <Button
               ref={openStockRef}
@@ -91,7 +92,7 @@ export function StockTargetDialog({
             >
               {t('stockTargets.dialog.openStock')}
             </Button>
-          </div>
+          </DialogFooter>
         </div>
       )}
       {hydrated && list && (

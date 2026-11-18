@@ -36,6 +36,7 @@ import { TRADE_HUBS, getTradeHub, type TradeHub } from '@/market/hubs';
 import { callableErrorReason } from './callableError';
 import { createFleetPayout } from './fleetPayoutStore';
 import { resolveFleetRoster, type RosterRow } from './fleetRoster';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 const DEBOUNCE_MS = 400;
 
@@ -485,14 +486,14 @@ export function ComposeFleetPayoutDialog({
         )}
 
         {error && <InlineError>{error}</InlineError>}
-        <div className="flex justify-end gap-2">
+        <DialogFooter>
           <Button size="sm" variant="ghost" onClick={onClose}>
             {t('common.cancel')}
           </Button>
           <Button size="sm" variant="primary" type="submit" loading={busy} disabled={!canSubmit}>
             {t('communities.payouts.compose.create')}
           </Button>
-        </div>
+        </DialogFooter>
       </form>
     </Modal>
   );

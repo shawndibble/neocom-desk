@@ -25,6 +25,7 @@ import {
   tellNotPaying,
   type MailContext,
 } from './resolveSubmit';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 const k = (key: string) => `miningTax.resolve.${key}`;
 
@@ -367,7 +368,7 @@ export function ResolveDialog({
       title={title}
       placement="medium"
       footer={
-        <div className="flex justify-end gap-2">
+        <DialogFooter>
           <Button variant="ghost" onClick={onClose}>
             {t('common.cancel')}
           </Button>
@@ -381,7 +382,7 @@ export function ResolveDialog({
                     : undefined,
             })}
           </Button>
-        </div>
+        </DialogFooter>
       }
     >
       <div className="space-y-4 text-sm">

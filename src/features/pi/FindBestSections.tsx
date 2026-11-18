@@ -9,6 +9,7 @@
  * caret and `aria-expanded`; what a what-if planet unlocks is labelled, never
  * colour alone.
  */
+import { Pill } from '@/components/ui/Pill';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { formatCount } from '@/lib/formatCount';
 import { type ReactNode } from 'react';
@@ -331,9 +332,9 @@ function RecipeCard({
             </PiProductLink>
             <TierChip tier={recipe.tier} />
             {card.isNew && (
-              <span className="inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border border-warning/60 px-1.5 whitespace-nowrap text-[0.6875rem] font-semibold tracking-widest text-warning uppercase">
+              <Pill outlined tone="warning" className="whitespace-nowrap">
                 {t('piPlan.find.newWithPlanet')}
-              </span>
+              </Pill>
             )}
             {recipe.needsCcLevel && <CcLevelTag level={recipe.needsCcLevel} />}
           </div>

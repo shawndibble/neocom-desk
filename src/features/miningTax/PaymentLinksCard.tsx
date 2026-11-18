@@ -8,6 +8,7 @@ import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import type { MiningTaxPaymentLinkSource } from '@/db';
 import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
 import { formatIsk } from '@/lib/isk';
+import { Well } from '@/components/ui/Well';
 
 /** One linked transaction, resolved for display — this card itself does no lookups. */
 export interface LinkedTransaction {
@@ -76,7 +77,7 @@ export function PaymentLinksCard({
   const links = linkedTransactions ?? [];
   const autoLinked = links.length > 0 && links.every((tx) => tx.source === 'auto');
   return (
-    <div className="space-y-1 rounded-xs border border-line bg-panel-2 p-2">
+    <Well className="space-y-1">
       <div className="flex items-center justify-between gap-2">
         <p className={cx(eyebrowClassName, 'min-w-0 truncate')}>
           {t('miningTax.paymentCardTitle')}
@@ -164,6 +165,6 @@ export function PaymentLinksCard({
       ) : (
         <p className="text-xs text-text-dim">{t('miningTax.noLinkedTransactions')}</p>
       )}
-    </div>
+    </Well>
   );
 }

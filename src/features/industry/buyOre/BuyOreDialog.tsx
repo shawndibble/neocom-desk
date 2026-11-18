@@ -43,6 +43,7 @@ import {
 import { loadDepthPrices } from '../depthPriceLoader';
 import type { DepthPrice } from '@/engine/industry/depthPrice';
 import { formatVolume } from '../format';
+import { Well } from '@/components/ui/Well';
 
 interface OreCandidate {
   typeId: number;
@@ -328,7 +329,7 @@ export function BuyOreDialog({
                 </div>
               )}
               {comparison && (
-                <div className="space-y-1 rounded-xs border border-line bg-panel-2 p-2.5">
+                <Well size="md" className="space-y-1">
                   <p className="flex justify-between gap-2">
                     <span>{t('industry.buyOre.oreRoute')}</span>
                     <IskAmount value={comparison.oreNet} decimals={0} />
@@ -346,7 +347,7 @@ export function BuyOreDialog({
                         ? t('industry.buyOre.underfilled')
                         : t('industry.buyOre.buyMineralsCheaper')}
                   </p>
-                </div>
+                </Well>
               )}
               {!walkSettled && <p className="text-text-dim">{t('industry.buyOre.pricingDepth')}</p>}
               {mineralsTotal === null && (

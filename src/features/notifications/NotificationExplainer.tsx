@@ -17,6 +17,7 @@ import { enableWebPush } from './webPush';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { beginAlertsLogin } from '@/app/loginFlow';
 import { useAlertsNearby } from './alertsGrant';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 /**
  * The one-time notification explainer (issue #171), drawn at the top of the
@@ -140,14 +141,14 @@ export function NotificationExplainer() {
     <div className="space-y-2 border-b border-line bg-panel-2 px-3.5 py-2.5">
       <p className="font-medium text-text">{copy.title}</p>
       <p className="text-xs text-text-dim">{copy.body}</p>
-      <div className="flex justify-end gap-2">
+      <DialogFooter>
         <Button size="sm" onClick={copy.onDismiss}>
           {copy.dismiss}
         </Button>
         {copy.enable &&
           // The Alerts offer starts a login (needs a connection); the plain push explainer does not.
           (offering ? <NeedsConnection>{enableButton}</NeedsConnection> : enableButton)}
-      </div>
+      </DialogFooter>
     </div>
   );
 }

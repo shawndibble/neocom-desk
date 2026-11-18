@@ -31,6 +31,7 @@ import {
 import { ManageCustomProfilesModal } from './ManageCustomProfilesModal';
 import { StatField } from './StatFacts';
 import { STAT_FIELD_WIDTH } from './statKit';
+import { DialogFooter } from '@/components/ui/DialogFooter';
 
 const DAMAGE_TYPES = ['em', 'thermal', 'kinetic', 'explosive'] as const;
 
@@ -126,14 +127,14 @@ function ProfileForm({
       </div>
       <p className="text-xs text-text-dim">{t('fittings.damageProfile.ratioHint')}</p>
       {error && <FieldError id={errorId}>{error}</FieldError>}
-      <div className="flex justify-end gap-2">
+      <DialogFooter>
         <Button size="sm" onClick={onCancel}>
           {t('fittings.damageProfile.cancel')}
         </Button>
         <Button size="sm" variant="primary" type="submit">
           {t('fittings.damageProfile.save')}
         </Button>
-      </div>
+      </DialogFooter>
     </form>
   );
 }

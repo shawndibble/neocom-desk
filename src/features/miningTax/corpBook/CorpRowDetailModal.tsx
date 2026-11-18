@@ -29,6 +29,7 @@ import {
 import type { CorpRowInfo } from './corpRows';
 import { formatCount } from '@/lib/formatCount';
 import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
+import { Well } from '@/components/ui/Well';
 
 interface Props {
   open: boolean;
@@ -197,7 +198,7 @@ export function CorpRowDetailModal({
 
           {conflict && notice}
 
-          <div className="space-y-1 rounded-xs border border-line bg-panel-2 p-2">
+          <Well className="space-y-1">
             <p className={eyebrowClassName}>{t('miningTax.oreColumn')}</p>
             <ul className="divide-y divide-line text-xs">
               {view.oreLines.map((line) => {
@@ -223,9 +224,9 @@ export function CorpRowDetailModal({
                 );
               })}
             </ul>
-          </div>
+          </Well>
 
-          <div className="space-y-1 rounded-xs border border-line bg-panel-2 p-2">
+          <Well className="space-y-1">
             <p className={eyebrowClassName}>{t('miningTax.detail.breakdown.title')}</p>
             <p className="text-xs text-text-dim">
               {t('miningTax.corpBook.detail.priced', {
@@ -253,7 +254,7 @@ export function CorpRowDetailModal({
                 </li>
               ))}
             </ul>
-          </div>
+          </Well>
 
           {/* On a Conflict with nothing else to say, the notice already names who to ask. */}
           {!(conflict && facts.length === 0) && (
