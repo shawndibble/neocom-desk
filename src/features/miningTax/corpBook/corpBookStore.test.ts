@@ -1,17 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import { readBilledByPointer, refineryNamesOf } from './corpBookStore';
 import {
   readAdjustment,
-  readWriteOff,
-  readBilledByPointer,
-  readFeederCoverage,
-  refineryNamesOf,
   readBookSettings,
   readDismissal,
+  readFeederCoverage,
   readMemberDeclaration,
   readMiner,
   readPayment,
   readStatement,
-} from './corpBookStore';
+  readWriteOff,
+} from '@/engine/corpTaxBook/docShapes';
 import { RUNNING_ACCOUNTS_FROM } from '@/engine/corpTaxBook/bookDocs';
 
 describe('readBookSettings', () => {

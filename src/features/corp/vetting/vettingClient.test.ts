@@ -5,7 +5,6 @@ const callRouted = vi.hoisted(() => vi.fn());
 
 vi.mock('@/app/syncStatus', () => ({ isSyncConfigured: () => syncConfigured.value }));
 vi.mock('@/sync/routedCallable', () => ({ callRouted }));
-vi.mock('@/features/corp/taxBook/bookClient', () => ({ call: callRouted }));
 vi.mock('@/auth/session', () => ({ getValidAccessToken: () => Promise.resolve('token') }));
 
 import { setVettingBackendOverride } from './vettingBackend';

@@ -11,7 +11,7 @@ import type { FeederMode } from '@/engine/corpTaxBook/feederAccrual';
 import type { PayeeSetBy } from '@/engine/corpTaxBook/payeeChange';
 import type { Payee } from '@/engine/corpTaxBook/payouts';
 import { getSyncFirestore } from '@/sync/firebaseApp';
-import { call } from './bookClient';
+import { callSignedIn } from '@/sync/signedInCallable';
 
 export interface FeederViewRateEntry {
   kind: 'requested' | 'agreed';
@@ -144,7 +144,7 @@ export async function getFeederViewAccess(
   collectorCorporationId?: number
 ): Promise<FeederViewAccess> {
   const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'getCorpTaxBookFeederViewAccessCallable', {
+  return callSignedIn(characterId, 'getCorpTaxBookFeederViewAccessCallable', {
     corporationId,
     accessToken,
     ...(collectorCorporationId !== undefined ? { collectorCorporationId } : {}),
@@ -159,7 +159,7 @@ export async function setOwnRefineryLabel(
   label: string | null
 ): Promise<{ ok: true }> {
   const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'setCorpTaxBookOwnRefineryLabelCallable', {
+  return callSignedIn(characterId, 'setCorpTaxBookOwnRefineryLabelCallable', {
     corporationId,
     accessToken,
     structureId,
@@ -174,7 +174,7 @@ export async function requestFeederRate(
   pct: number
 ): Promise<{ ok: true }> {
   const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'requestCorpTaxBookFeederRateCallable', {
+  return callSignedIn(characterId, 'requestCorpTaxBookFeederRateCallable', {
     corporationId,
     accessToken,
     pct,
@@ -189,7 +189,7 @@ export async function disputeFeederPayout(
   disputed: boolean
 ): Promise<{ ok: true }> {
   const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'disputeCorpTaxBookFeederPayoutCallable', {
+  return callSignedIn(characterId, 'disputeCorpTaxBookFeederPayoutCallable', {
     corporationId,
     accessToken,
     payoutId,
@@ -204,7 +204,7 @@ export async function setFeederPopSharing(
   share: boolean
 ): Promise<{ ok: true }> {
   const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'setCorpTaxBookFeederPopSharingCallable', {
+  return callSignedIn(characterId, 'setCorpTaxBookFeederPopSharingCallable', {
     corporationId,
     accessToken,
     share,
@@ -231,7 +231,7 @@ export async function setFeederPayee(
   notify: boolean
 ): Promise<PayeeSetResult> {
   const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'setCorpTaxBookFeederPayeeCallable', {
+  return callSignedIn(characterId, 'setCorpTaxBookFeederPayeeCallable', {
     corporationId,
     accessToken,
     payee,
@@ -246,7 +246,7 @@ export async function dismissFeederHistory(
   collectorCorporationId?: number
 ): Promise<{ ok: true }> {
   const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'dismissCorpTaxBookFeederHistoryCallable', {
+  return callSignedIn(characterId, 'dismissCorpTaxBookFeederHistoryCallable', {
     corporationId,
     accessToken,
     ...(collectorCorporationId !== undefined ? { collectorCorporationId } : {}),
