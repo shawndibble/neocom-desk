@@ -55,6 +55,16 @@ describe('srpKillmailSource', () => {
     }
   });
 
+  it('a fetch rejection is unavailable, a 404 is killmail-not-found', async () => {
+    const boom = srpKillmailSource((() =>
+      Promise.reject(new TypeError('network'))) as typeof fetch);
+    await expect(boom.killmail(1, 'c'.repeat(40))).rejects.toMatchObject({ code: 'unavailable' });
+    const gone = srpKillmailSource((() => json({}, 404)) as typeof fetch);
+    await expect(gone.killmail(1, 'c'.repeat(40))).rejects.toMatchObject({
+      code: 'not-found',
+    });
+  });
+
   it('asks ESI for each hull group once', async () => {
     let calls = 0;
     const source = srpKillmailSource((() => {

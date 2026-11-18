@@ -5,7 +5,8 @@
 // are never retried.
 
 import { HttpsError } from 'firebase-functions/v2/https';
-import { ESI_BASE, ESI_USER_AGENT, esiHeaders } from './esiClient.js';
+import { ESI_BASE, ESI_USER_AGENT, esiGet } from './esiClient.js';
+import { throwForEsi } from './esiThrow.js';
 import { isFiniteNumber } from './guards.js';
 import type { EsiKillmail, KillmailItem, SrpKillmailSource, ZkillRecord } from './srpKillmail.js';
 
@@ -16,22 +17,14 @@ export const JITA_STATION_ID = 60003760;
 const FUZZWORK_BATCH = 200;
 const MAX_APPRAISAL_TYPES = 1000;
 
-const headers = esiHeaders();
-
-async function esiGet(url: string, fetchImpl: typeof fetch): Promise<unknown> {
-  const res = await fetchImpl(url, { headers, signal: AbortSignal.timeout(15_000) });
-  if (res.status === 404 || res.status === 422) {
+async function esiKillmailGet(url: string, fetchImpl: typeof fetch): Promise<unknown> {
+  const got = await esiGet(url, { fetchImpl });
+  // ESI answers 422 for a malformed killmail hash: the same "no such killmail".
+  const missing = got.kind === 'not-found' || (got.kind === 'error' && got.status === 422);
+  if (missing) {
     throw new HttpsError('not-found', 'ESI has no such killmail', { reason: 'killmail-not-found' });
   }
-  if (res.status === 420 || res.status === 429) {
-    throw new HttpsError('resource-exhausted', 'ESI is rate limiting; try again shortly', {
-      reason: 'esi-backoff',
-    });
-  }
-  if (!res.ok) {
-    throw new HttpsError('unavailable', `ESI answered ${res.status}`, { reason: 'esi-error' });
-  }
-  return res.json().catch(() => null);
+  return throwForEsi(got).body;
 }
 
 const asNumber = (v: unknown): number | null => (isFiniteNumber(v) ? v : null);
@@ -113,14 +106,14 @@ export function srpKillmailSource(fetchImpl: typeof fetch = fetch): SrpKillmailS
     async killmail(killmailId, hash) {
       return parseEsiKillmail(
         killmailId,
-        await esiGet(`${ESI_BASE}/killmails/${killmailId}/${hash}/`, fetchImpl)
+        await esiKillmailGet(`${ESI_BASE}/killmails/${killmailId}/${hash}/`, fetchImpl)
       );
     },
 
     async shipGroupId(typeId) {
       const known = shipGroupByTypeId.get(typeId);
       if (known !== undefined) return known;
-      const body = await esiGet(`${ESI_BASE}/universe/types/${typeId}/`, fetchImpl);
+      const body = await esiKillmailGet(`${ESI_BASE}/universe/types/${typeId}/`, fetchImpl);
       const groupId = asNumber((body as { group_id?: unknown } | null)?.group_id);
       if (groupId === null) {
         throw new HttpsError('unavailable', 'ESI sent no group for that hull', {
