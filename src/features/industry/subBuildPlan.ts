@@ -27,6 +27,7 @@
  */
 
 import { formatCount } from '@/lib/formatCount';
+import type { Translate } from '@/lib/translate';
 import { mergeCostLines } from '@/engine/industry/mergeCostLines';
 import type { ResolvedMaterial, ResolvedSubBuild } from '@/engine/industry/materialResolution';
 import { resolvedSubBuildSeconds } from '@/engine/industry/materialResolution';
@@ -142,13 +143,11 @@ export interface BuildRecipeInput extends MaterialCostLine {
 }
 
 /** "3 jobs of 30 runs", or "up to" when the split jobs differ by a run. */
-export function jobsOfRuns(
-  t: (key: string, options: Record<string, string>) => string,
-  jobRuns: readonly number[]
-): string {
+export function jobsOfRuns(t: Translate, jobRuns: readonly number[]): string {
   const longest = Math.max(...jobRuns);
   const even = jobRuns.every((r) => r === longest);
   return t(even ? 'industry.jobsOfRuns' : 'industry.jobsOfUpToRuns', {
+    count: longest,
     jobs: formatCount(jobRuns.length),
     runs: formatCount(longest),
   });

@@ -46,8 +46,6 @@ export interface PlanJobNode extends ScheduleNode {
   blueprintTypeID?: number;
   activity?: IndustryActivity;
   blueprintSkills?: readonly BlueprintSkillRequirement[];
-  /** Runs of this job when its node was split past the blueprint's max production limit (issue #6393). */
-  runs?: number;
 }
 
 /**
@@ -95,7 +93,6 @@ export function planJobNodes(
         node.activity = entry.blueprint.activity;
         node.blueprintSkills = entry.blueprint.skills;
       }
-      if (runs !== undefined) node.runs = runs;
       nodes.push(node);
       return node;
     });

@@ -65,11 +65,11 @@ describe('planJobNodes', () => {
         catalog
       )
     ).toEqual([
-      { id: '0', seconds: 90, category: 'manufacturing', kind: 'final', deps: ['3', '4'], runs: 3 },
-      { id: '1', seconds: 90, category: 'manufacturing', kind: 'final', deps: ['3', '4'], runs: 3 },
-      { id: '2', seconds: 60, category: 'manufacturing', kind: 'final', deps: ['3', '4'], runs: 2 },
-      { id: '3', seconds: 30, category: 'manufacturing', kind: 'part', deps: ['5'], runs: 20 },
-      { id: '4', seconds: 15, category: 'manufacturing', kind: 'part', deps: ['5'], runs: 10 },
+      { id: '0', seconds: 90, category: 'manufacturing', kind: 'final', deps: ['3', '4'] },
+      { id: '1', seconds: 90, category: 'manufacturing', kind: 'final', deps: ['3', '4'] },
+      { id: '2', seconds: 60, category: 'manufacturing', kind: 'final', deps: ['3', '4'] },
+      { id: '3', seconds: 30, category: 'manufacturing', kind: 'part', deps: ['5'] },
+      { id: '4', seconds: 15, category: 'manufacturing', kind: 'part', deps: ['5'] },
       {
         id: '5',
         seconds: 5,

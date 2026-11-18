@@ -106,6 +106,11 @@ describe('BuildRecipeModal', () => {
     expect(screen.getByText(/built as 3 jobs of 30 runs/)).toBeInTheDocument();
   });
 
+  it('reads a one-run limit as singular', () => {
+    renderModal({ recipe: { ...RECIPE, runs: 5, jobRuns: [1, 1, 1, 1, 1], split: true } });
+    expect(screen.getByText(/built as 5 jobs of 1 run\./)).toBeInTheDocument();
+  });
+
   it('says "up to" when the split jobs differ by a run', () => {
     renderModal({ recipe: { ...RECIPE, runs: 100, jobRuns: [34, 33, 33], split: true } });
     expect(screen.getByText(/built as 3 jobs of up to 34 runs/)).toBeInTheDocument();
