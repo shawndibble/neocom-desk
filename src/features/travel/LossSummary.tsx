@@ -1,5 +1,4 @@
 import { idSetKey } from '@/lib/idSetKey';
-import { useKeyedLoad } from '@/lib/useAsyncLoad';
 /**
  * What a lost ship cost (issue #2852): hull, fitted modules and cargo priced at
  * Jita, minus the insurance payout found in the wallet
@@ -12,6 +11,7 @@ import { computeNetLoss, matchInsurance, type LossInsurance } from '@/engine/los
 import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import { loadWalletJournal } from '@/features/character/wallet';
 import { formatIsk } from '@/lib/isk';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import type { KillmailDetail } from '@/lib/zkillboard';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
@@ -63,9 +63,10 @@ export function LossSummary({ detail, zkbValue }: LossSummaryProps) {
     [activeCharacterId, detail.time]
   );
   const payoutLoad = useKeyedLoad(
-    `${activeCharacterId}:${detail.time}`,
-    loadPayout,
-    !isOwnLoss || activeCharacterId === null || !detail.time
+    isOwnLoss && activeCharacterId !== null && detail.time
+      ? `${activeCharacterId}:${detail.time}`
+      : null,
+    loadPayout
   );
   const payout: Insurance =
     payoutLoad.status === 'ready'
