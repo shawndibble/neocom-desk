@@ -14,20 +14,6 @@ export interface VettingSharedFire {
   kind: 'application' | 'promotion';
 }
 
-/**
- * The Foreground Poller's snapshot for vetting: always empty, because the open app does not read
- * the queue in the background (each read is a signed-in callable). The event arrives by push.
- */
-export interface VettingAlertSnapshot {
-  entries: never[];
-  nowMs: number;
-}
-
-/** Never fires: `vettingShared` is the server's to raise. */
-export function diffVettingShared(): VettingSharedFire[] {
-  return [];
-}
-
 /** The report a fire is about, as a router path. */
 export function vettingSharedPath(fire: Pick<VettingSharedFire, 'reviewId'>): string {
   return `/corp/vetting/open/${encodeURIComponent(fire.reviewId)}`;

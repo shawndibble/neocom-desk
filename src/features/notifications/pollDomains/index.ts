@@ -52,8 +52,6 @@ import { stockTargetDomain } from './stockTargets';
 import { incursionDomain } from './incursions';
 import { skyhookNearbyDomain } from './skyhooksNearby';
 import { communitiesDomain } from './communities';
-import { vettingDomain } from './vetting';
-import { corpTaxBookSyncDomain } from './corpTaxBookSync';
 import { killsDomain } from './kills';
 import { mercenaryDensDomain } from './mercenaryDens';
 import { acceleratorDomain } from './accelerator';
@@ -93,8 +91,6 @@ export const POLL_DOMAINS: readonly PollDomain[] = [
   incursionDomain,
   skyhookNearbyDomain,
   communitiesDomain,
-  vettingDomain,
-  corpTaxBookSyncDomain,
   killsDomain,
   mercenaryDensDomain,
   acceleratorDomain,
@@ -115,11 +111,14 @@ export function domainForEvent(eventId: NotificationEventId): PollDomain {
   return domain;
 }
 
-/** A fire's live copy, names looked up by its own domain. */
+/** A fire's live copy, names looked up by its own domain (a server-only event's copy names none). */
 export function renderNotification(
   fire: AnyNotificationFire,
   characterName: string
 ): Promise<NotificationCopy> {
+  const { source, copy } = eventEntry(fire.eventId);
+  // A server-only event has no domain to look names up through; its copy names none.
+  if (source === null) return Promise.resolve(copy.poll(fire, characterName, {}));
   return domainForEvent(fire.eventId).render(fire, characterName);
 }
 
