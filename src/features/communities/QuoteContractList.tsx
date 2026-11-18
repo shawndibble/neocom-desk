@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useTranslation } from 'react-i18next';
 import { Pill } from '@/components/ui/Pill';
 import { type PillTone } from '@/components/ui/Pill';
@@ -34,6 +35,8 @@ const TONE: Record<QuoteContractStatus, PillTone> = {
   rejected: 'danger',
 };
 
+const NO_NAMES: ReadonlyMap<number, string> = new Map();
+
 /**
  * The contracts linked to one Quote (issue #4780): each a row with its status,
  * price and age, and a click that opens the contract's own detail. A contract
@@ -56,20 +59,13 @@ export function QuoteContractList({
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState<Contract | null>(null);
-  const [names, setNames] = useState<ReadonlyMap<number, string>>(new Map());
-
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
+  const loadNames = useCallback(() => {
+    if (!open) return Promise.resolve(NO_NAMES);
     const receiver = contractReceiver(open, viewerCharacterId);
-    resolveNames([contractIssuer(open).id, ...(receiver ? [receiver.id] : [])]).then(
-      (found) => !cancelled && setNames(found),
-      () => undefined
-    );
-    return () => {
-      cancelled = true;
-    };
+    return resolveNames([contractIssuer(open).id, ...(receiver ? [receiver.id] : [])]);
   }, [open, viewerCharacterId]);
+  // A failed read leaves the `#id` fallbacks, silently.
+  const names = useKeyedLoad(open ? String(open.contract_id) : null, loadNames).data ?? NO_NAMES;
 
   if (rows.length === 0) return null;
   const receiver = open ? contractReceiver(open, viewerCharacterId) : null;

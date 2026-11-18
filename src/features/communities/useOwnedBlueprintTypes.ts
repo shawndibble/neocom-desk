@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import {
   blueprintGroupOfProductGroup,
   type BlueprintTypeInfo,
@@ -25,60 +26,49 @@ export type OwnedBlueprintTypes =
  * it is empty); the picker sorts them into the market-group tree.
  */
 export function useOwnedBlueprintTypes(characterId: number, enabled = true): OwnedBlueprintTypes {
-  const [loaded, setLoaded] = useState<{ characterId: number; value: OwnedBlueprintTypes } | null>(
-    null
-  );
-
-  useEffect(() => {
-    if (!enabled) return;
-    let cancelled = false;
-    (async () => {
-      let value: OwnedBlueprintTypes;
-      try {
-        const [result, groups, marketTypes, blueprintMap] = await Promise.all([
-          loadCharacterBlueprints(characterId),
-          loadMarketGroups(),
-          loadMarketTypes(),
-          loadBlueprints(),
-        ]);
-        if (result.needsReauth) {
-          value = { status: 'needsReauth' };
-        } else if (!result.cached) {
-          value = { status: 'failed' };
-        } else {
-          const groupByType = new Map(marketTypes.map((type) => [type.typeId, type.marketGroupId]));
-          const typeIds = [...new Set(result.cached.data.map((blueprint) => blueprint.type_id))];
-          const productGroupOf = (typeId: number) =>
-            groupByType.get(blueprintMap[typeId]?.products[0]?.typeID ?? 0) ?? null;
-          value = {
-            status: 'ready',
-            groups,
-            learned: blueprintGroupOfProductGroup(
-              Object.keys(blueprintMap).map((id) => ({
-                typeId: Number(id),
-                name: '',
-                marketGroupId: groupByType.get(Number(id)) ?? null,
-                productMarketGroupId: productGroupOf(Number(id)),
-              })),
-              groups
-            ),
-            owned: typeIds.map((typeId) => ({
-              typeId,
-              name: blueprintMap[typeId]?.name ?? `Type ${typeId}`,
-              marketGroupId: groupByType.get(typeId) ?? null,
-              productMarketGroupId: productGroupOf(typeId),
-            })),
-          };
-        }
-      } catch {
+  const load = useCallback(async (): Promise<OwnedBlueprintTypes> => {
+    let value: OwnedBlueprintTypes;
+    try {
+      const [result, groups, marketTypes, blueprintMap] = await Promise.all([
+        loadCharacterBlueprints(characterId),
+        loadMarketGroups(),
+        loadMarketTypes(),
+        loadBlueprints(),
+      ]);
+      if (result.needsReauth) {
+        value = { status: 'needsReauth' };
+      } else if (!result.cached) {
         value = { status: 'failed' };
+      } else {
+        const groupByType = new Map(marketTypes.map((type) => [type.typeId, type.marketGroupId]));
+        const typeIds = [...new Set(result.cached.data.map((blueprint) => blueprint.type_id))];
+        const productGroupOf = (typeId: number) =>
+          groupByType.get(blueprintMap[typeId]?.products[0]?.typeID ?? 0) ?? null;
+        value = {
+          status: 'ready',
+          groups,
+          learned: blueprintGroupOfProductGroup(
+            Object.keys(blueprintMap).map((id) => ({
+              typeId: Number(id),
+              name: '',
+              marketGroupId: groupByType.get(Number(id)) ?? null,
+              productMarketGroupId: productGroupOf(Number(id)),
+            })),
+            groups
+          ),
+          owned: typeIds.map((typeId) => ({
+            typeId,
+            name: blueprintMap[typeId]?.name ?? `Type ${typeId}`,
+            marketGroupId: groupByType.get(typeId) ?? null,
+            productMarketGroupId: productGroupOf(typeId),
+          })),
+        };
       }
-      if (!cancelled) setLoaded({ characterId, value });
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId, enabled]);
-
-  return loaded && loaded.characterId === characterId ? loaded.value : { status: 'loading' };
+    } catch {
+      value = { status: 'failed' };
+    }
+    return value;
+  }, [characterId]);
+  const loaded = useKeyedLoad(String(characterId), load, !enabled);
+  return loaded.status === 'ready' ? loaded.data : { status: 'loading' };
 }

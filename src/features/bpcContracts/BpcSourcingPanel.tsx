@@ -72,6 +72,7 @@ import { DEFAULT_JUMP_RANGE } from '@/engine/route/jumpRange';
 import { JumpRangeNote } from '@/features/route/JumpRangeControls';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { useRetryFocus } from '@/lib/useRetryFocus';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { cx } from '@/lib/cx';
 import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 
@@ -339,25 +340,21 @@ export function BpcSourcingPanel({
   );
 
   // The market region may hold no contract listing, so `regionNames` may not name it.
-  const [marketRegionName, setMarketRegionName] = useState<{ id: number; name: string } | null>(
-    null
+  const unnamedMarketRegionId =
+    marketRegionId === null || regionNames.has(marketRegionId) ? null : marketRegionId;
+  const loadMarketRegionName = useCallback(
+    () => loadRegionName(unnamedMarketRegionId ?? 0),
+    [unnamedMarketRegionId]
   );
-  useEffect(() => {
-    if (marketRegionId === null || regionNames.has(marketRegionId)) return;
-    let cancelled = false;
-    void loadRegionName(marketRegionId)
-      .then((name) => {
-        if (!cancelled && name) setMarketRegionName({ id: marketRegionId, name });
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [marketRegionId, regionNames]);
+  const marketRegionName = useKeyedLoad(
+    unnamedMarketRegionId === null ? null : String(unnamedMarketRegionId),
+    loadMarketRegionName
+  ).data;
   const regionLabel = useCallback(
     (id: number) =>
-      regionNames.get(id) ?? (marketRegionName?.id === id ? marketRegionName.name : `#${id}`),
-    [regionNames, marketRegionName]
+      regionNames.get(id) ??
+      (id === marketRegionId && marketRegionName ? marketRegionName : `#${id}`),
+    [regionNames, marketRegionId, marketRegionName]
   );
   const marketRegionLabel = marketRegionId === null ? null : regionLabel(marketRegionId);
 

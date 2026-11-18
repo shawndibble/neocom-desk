@@ -35,6 +35,7 @@ import {
   type ShareMarketGroup,
 } from '@/engine/communities/shareTree';
 import { formatAge } from '@/lib/age';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { loadMarketGroups, loadMarketTypes } from '@/sde/loadMarketSde';
 import { loadBlueprints } from '@/sde/loadSde';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
@@ -189,6 +190,12 @@ function LibraryGroup({
   );
 }
 
+const NO_SYSTEM_IDS: ReadonlyMap<string, number> = new Map();
+const loadSystemIds = () =>
+  loadSolarSystemsById().then((systems) =>
+    systems ? systemIdsByName(systems.values()) : NO_SYSTEM_IDS
+  );
+
 /**
  * The Community Library (issue #3601), the Blueprints tab's Everyone view:
  * what the Members share. It opens on "Shared in the Community": each shared
@@ -223,17 +230,14 @@ export function CommunityLibrary({
   const reconnects = useReconnectCount();
   // Apart from the Library's own load: only the Jumps column waits on it, and
   // an unreadable list leaves that column at its placeholder, nothing else.
-  const [systemIds, setSystemIds] = useState<ReadonlyMap<string, number> | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    void loadSolarSystemsById().then((systems) => {
-      // Unreadable: an empty lookup, so every Jumps cell settles on "—".
-      if (!cancelled) setSystemIds(systems ? systemIdsByName(systems.values()) : new Map());
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const systemIdsLoad = useAsyncLoad(loadSystemIds);
+  // Unreadable: an empty lookup, so every Jumps cell settles on "—".
+  const systemIds =
+    systemIdsLoad.status === 'ready'
+      ? systemIdsLoad.data
+      : systemIdsLoad.status === 'failed'
+        ? NO_SYSTEM_IDS
+        : null;
 
   // Each Member with the library stamp the roster carries: a new stamp is a new library.
   const memberKey = members

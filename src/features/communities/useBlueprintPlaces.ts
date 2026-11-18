@@ -1,6 +1,7 @@
 import { idSetKey } from '@/lib/idSetKey';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { db } from '@/db';
 import type { BlueprintCopy } from '@/engine/communities/shareMode';
 import { loadBlueprintLocation } from '@/features/bpcContracts/blueprintLocation';
@@ -41,34 +42,28 @@ export function useBlueprintCopies(characterId: number): BlueprintCopies {
     ]);
     return `${blueprints?.fetchedAt ?? ''}:${assets?.fetchedAt ?? ''}`;
   }, [characterId]);
-  const [loaded, setLoaded] = useState<{ characterId: number; value: BlueprintCopies } | null>(
-    null
-  );
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      let value: BlueprintCopies = { status: 'unavailable' };
-      try {
-        const placed = await loadPlacedBlueprints(characterId);
-        if (placed) {
-          value = {
-            status: 'ready',
-            copies: placed.blueprints.map((blueprint) => ({
-              typeId: blueprint.type_id,
-              placeId: placed.placeIdOf(blueprint),
-            })),
-          };
-        }
-      } catch {
-        // Unavailable: sharing by type still works.
+  const load = useCallback(async (): Promise<BlueprintCopies> => {
+    let value: BlueprintCopies = { status: 'unavailable' };
+    try {
+      const placed = await loadPlacedBlueprints(characterId);
+      if (placed) {
+        value = {
+          status: 'ready',
+          copies: placed.blueprints.map((blueprint) => ({
+            typeId: blueprint.type_id,
+            placeId: placed.placeIdOf(blueprint),
+          })),
+        };
       }
-      if (!cancelled) setLoaded({ characterId, value });
-    })();
-    return () => {
-      cancelled = true;
-    };
+    } catch {
+      // Unavailable: sharing by type still works.
+    }
+    return value;
+    // stamp only re-runs the load: the last answer stays up meanwhile
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [characterId, stamp]);
-  return loaded && loaded.characterId === characterId ? loaded.value : LOADING;
+  const loaded = useKeyedLoad(String(characterId), load);
+  return loaded.status === 'ready' ? loaded.data : LOADING;
 }
 
 /**

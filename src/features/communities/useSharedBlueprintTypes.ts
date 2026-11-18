@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import type { SharedItem } from '@/engine/communities/requests';
 import { loadMemberLibraries } from './communityStore';
 
@@ -17,29 +18,14 @@ export function useSharedBlueprintTypes(
   myUid: string,
   enabled: boolean
 ): SharedBlueprintTypes {
-  const [loaded, setLoaded] = useState<{
-    key: string;
-    value: SharedBlueprintTypes;
-  } | null>(null);
-  const key = `${characterId}:${communityId}:${myUid}`;
-  useEffect(() => {
-    if (!enabled) return;
-    let cancelled = false;
-    loadMemberLibraries(characterId, communityId, [myUid], { strict: true }).then(
-      (libraries) =>
-        !cancelled &&
-        setLoaded({
-          key,
-          value: {
-            status: 'ready',
-            items: libraries.flatMap((l) => l.items.map(({ typeId, runs }) => ({ typeId, runs }))),
-          },
-        }),
-      () => !cancelled && setLoaded({ key, value: { status: 'failed' } })
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId, communityId, myUid, enabled, key]);
-  return loaded?.key === key ? loaded.value : { status: 'loading' };
+  const load = useCallback(
+    async () =>
+      (await loadMemberLibraries(characterId, communityId, [myUid], { strict: true })).flatMap(
+        (l) => l.items.map(({ typeId, runs }) => ({ typeId, runs }))
+      ),
+    [characterId, communityId, myUid]
+  );
+  const loaded = useKeyedLoad(`${characterId}:${communityId}:${myUid}`, load, !enabled);
+  if (loaded.status === 'ready') return { status: 'ready', items: loaded.data };
+  return loaded.status === 'failed' ? { status: 'failed' } : { status: 'loading' };
 }
