@@ -52,27 +52,16 @@ import {
   TabPanel,
   Tabs,
   useTabsId,
-  type ActiveFilter,
   IncompleteNotice,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
 import { CorpRolesGate } from '@/features/corp/CorpRolesGate';
 import { CorpDenied } from '@/features/corp/CorpDenied';
-import { loadCorporationId, loadCorporationStructures } from '@/features/corp/boardData';
-import {
-  EMPTY_CORP_ASSET_LABELS,
-  assetPlaceIds,
-  loadCorporationAssets,
-  loadCorpAssetLabels,
-  structureNameMap,
-  resolveMissingLocationNames,
-  toCorpAssetInputs,
-  type CorpAssetLabels,
-} from '@/features/corp/assets';
-import { loadCorporationDivisions } from '@/features/corp/wallet';
-import { hangarDivisions } from '@/features/corp/divisions';
-import { HANGAR_DIVISIONS, type CorpAssetInput } from '@/engine/corp/assetDivisions';
+import { EMPTY_CORP_ASSET_LABELS, resolveMissingLocationNames } from '@/features/corp/assets';
+import {} from '@/features/corp/wallet';
+import {} from '@/features/corp/divisions';
+import { HANGAR_DIVISIONS } from '@/engine/corp/assetDivisions';
 import {
   buildItemLedger,
   buildLocationLedger,
@@ -91,12 +80,16 @@ import {
   type CorpAssetsPageTab,
   type CorpAssetTab,
 } from '@/features/corp/corpAssetsTabs';
+import {
+  loadCorpAssetsSnapshot,
+  type CorpAssetsSnapshot,
+} from '@/features/assets/corpAssetsSnapshot';
+import { activePlaceFilters, type PlaceFilter } from '@/features/corp/activePlaceFilters';
 import { MovePlanTab } from '@/features/assets/MovePlanTab';
 import { NO_MOVE_PLAN } from '@/features/assets/movePlanUrl';
-import { loadTypeCategories, type AssetCategory } from '@/features/corp/assetCategories';
+import { type AssetCategory } from '@/features/corp/assetCategories';
 import { AssetCategoryPicker, BlueprintKindSelect } from '@/features/assets/AssetCategoryPicker';
 import {
-  activeAssetKindFilters,
   assetPassesKindFilter,
   blueprintKindParam,
   blueprintsTicked,
@@ -104,9 +97,7 @@ import {
   expandLegacyCategoryIds,
   filterIsOpen,
   pickIsAll,
-  type AssetCategoryIndex,
   type AssetKindFilter,
-  type BlueprintKind,
   type CategoryPick,
 } from '@/features/assets/assetCategoryFilter';
 import { useAssetCategoryIndex } from '@/features/assets/useAssetCategoryIndex';
@@ -115,18 +106,17 @@ import {
   filterClassified,
   makeLedgerLabels,
   officeUsage,
-  type LedgerLabels,
   type LocationRow,
 } from '@/features/corp/assetLedgerView';
-import type { Translate } from '@/lib/translate';
+import type {} from '@/lib/translate';
 import { CorpAssetItemTable, type ItemTableRow } from '@/features/corp/CorpAssetItemTable';
 import { CorpAssetLocationTable } from '@/features/corp/CorpAssetLocationTable';
 import { useCorpStockTargets } from '@/features/corp/stockTargets';
 import { useTargetTypeInfo } from '@/features/corp/useTargetTypeInfo';
 import { StockTargetsDialog } from '@/features/corp/StockTargetsDialog';
-import { loadTypeVolumes } from '@/features/character/typeNames';
-import { NO_ASSET_NAMES, type AssetNameMap } from '@/engine/assetNames';
-import { loadCorporationAssetNames } from '@/features/assets/assetNames';
+import {} from '@/features/character/typeNames';
+import { NO_ASSET_NAMES } from '@/engine/assetNames';
+import {} from '@/features/assets/assetNames';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { addQuickbarItem } from '@/features/market/quickbar';
 import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
@@ -134,9 +124,9 @@ import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { useBlueprintTypeIds } from '@/features/character/useBlueprintTypeIds';
 import { useCompareSet } from '@/features/market/compareSet';
 import { writeToClipboard } from '@/lib/clipboard';
-import { getAveragePriceByType } from '@/market/prices';
-import { loadCorporationBlueprints } from '@/features/corp/blueprints';
-import { loadAssetCopyValues } from '@/features/assets/assetCopyValues';
+import {} from '@/market/prices';
+import {} from '@/features/corp/blueprints';
+import {} from '@/features/assets/assetCopyValues';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
@@ -175,190 +165,7 @@ const TAB_LABEL_KEY: Readonly<Record<CorpAssetTab, string>> = {
   capsuleerDeliveries: 'corp.assets.tab.capsuleerDeliveries',
 };
 
-interface AssetsSnapshot {
-  corporationId: number | null;
-  /**
-   * `null` means the assets read itself did not come back — offline,
-   * uncached, or a 403 the role gate swallowed — and is distinct from a
-   * corporation that was read successfully and genuinely owns nothing.
-   */
-  inputs: CorpAssetInput[] | null;
-  /** Division number -> the corp's own name for it, or null if unnamed/unresolved. */
-  divisionNames: ReadonlyMap<number, string | null>;
-  /** Type names, and the location names already on the device. The rest arrive after first paint (`resolveMissingLocationNames`). */
-  labels: CorpAssetLabels;
-  /** Every station/structure the assets sit in, named or not. */
-  placeIds: readonly number[];
-  /** In-game names of the corporation's ships and containers by item id (issue #5652); empty when none can be read. */
-  assetNames: AssetNameMap;
-  /** Global average market price per type, best-effort — an outage degrades ISK figures to 0 rather than the whole page. */
-  priceByTypeId: ReadonlyMap<number, number>;
-  /** Each blueprint copy's own value by item id (`engine/blueprintCopyValue.ts`) — a copy never takes its type's average price. */
-  copyValueByItemId: ReadonlyMap<number, number>;
-  /** Physical volume (m3, unpackaged) per type, best-effort from the slim SDE snapshot. */
-  volumeByTypeId: ReadonlyMap<number, number>;
-  /** Top-level market group per type, best-effort from the market catalogue. */
-  categoryByTypeId: ReadonlyMap<number, AssetCategory>;
-  /** The page cap was hit or a page was missing — corp holdings are the likelier of the two lists to hit it. */
-  truncated: boolean;
-  assetsShown: number;
-  /** Oldest `fetchedAt` across the reads — the badge speaks for the whole view. */
-  fetchedAt: Date | null;
-  /** Either read fell back to its saved copy. */
-  fromCache: boolean;
-}
-
-const EMPTY_SNAPSHOT: AssetsSnapshot = {
-  corporationId: null,
-  inputs: null,
-  divisionNames: new Map(),
-  labels: EMPTY_CORP_ASSET_LABELS,
-  placeIds: [],
-  assetNames: NO_ASSET_NAMES,
-  priceByTypeId: new Map(),
-  copyValueByItemId: new Map(),
-  volumeByTypeId: new Map(),
-  categoryByTypeId: new Map(),
-  truncated: false,
-  assetsShown: 0,
-  fetchedAt: null,
-  fromCache: false,
-};
-
-async function loadAssetsSnapshot(
-  characterId: number,
-  signal: RouteSnapshotSignal,
-  canReadBlueprints: boolean,
-  canReadStructures: boolean
-): Promise<AssetsSnapshot> {
-  const corporationId = await loadCorporationId(characterId);
-  if (corporationId === null || signal.cancelled) return { ...EMPTY_SNAPSHOT, corporationId };
-
-  const [assetsResult, divisionsResult, priceByTypeId] = await Promise.all([
-    loadCorporationAssets(characterId, corporationId),
-    // Assets are Director-only, so this read is always open here.
-    loadCorporationDivisions(characterId, corporationId, true),
-    getAveragePriceByType(),
-  ]);
-
-  // A character switch mid-load: skip the label fan-out for a snapshot about
-  // to be discarded rather than spending it on nothing.
-  if (signal.cancelled) return { ...EMPTY_SNAPSHOT, corporationId };
-
-  const assets = assetsResult.cached?.data ?? null;
-  const inputs = assets === null ? null : toCorpAssetInputs(assets);
-  const typeIds = inputs === null ? [] : [...new Set(inputs.map((i) => i.typeId))];
-  const placeIds = assets === null ? [] : assetPlaceIds(assets);
-  // The corporation's own structures list names every hangar's structure with
-  // no per-id lookup; a role gap or failed read falls back to
-  // `/universe/structures/{id}` after first paint.
-  const structureNames: Promise<Map<number, string>> = canReadStructures
-    ? loadCorporationStructures(characterId, corporationId)
-        .then((result) => structureNameMap(result.cached?.data))
-        .catch(() => new Map<number, string>())
-    : Promise.resolve(new Map<number, string>());
-  const [labels, volumeByTypeId, categoryByTypeId, copyValueByItemId, assetNames] =
-    await Promise.all([
-      assets === null
-        ? EMPTY_CORP_ASSET_LABELS
-        : loadCorpAssetLabels(assets, placeIds, structureNames),
-      loadTypeVolumes(typeIds),
-      loadTypeCategories(typeIds),
-      // Director-only endpoint: without the role a copy still prices, at ME0/TE0.
-      loadAssetCopyValues(characterId, assets ?? [], async () =>
-        canReadBlueprints
-          ? ((await loadCorporationBlueprints(characterId, corporationId)).cached?.data ?? null)
-          : null
-      ),
-      // Only past the Director-gated assets read above; swallows its own failures.
-      assets === null
-        ? NO_ASSET_NAMES
-        : loadCorporationAssetNames(characterId, corporationId, assets),
-    ]);
-  const divisionNames = new Map(
-    hangarDivisions(divisionsResult.cached?.data ?? null).map((d) => [d.division, d.name])
-  );
-
-  const fetchedAts = [assetsResult, divisionsResult]
-    .map((result) => result.cached?.fetchedAt)
-    .filter((date): date is Date => date !== undefined);
-  const fetchedAt =
-    fetchedAts.length === 0
-      ? null
-      : fetchedAts.reduce((oldest, date) => (date < oldest ? date : oldest));
-
-  return {
-    corporationId,
-    inputs,
-    divisionNames,
-    labels,
-    placeIds,
-    assetNames,
-    priceByTypeId,
-    copyValueByItemId,
-    volumeByTypeId,
-    categoryByTypeId,
-    truncated: assetsResult.cached?.truncated ?? false,
-    assetsShown: assets?.length ?? 0,
-    fetchedAt,
-    fromCache: [assetsResult, divisionsResult].some((result) => result.cached?.fromCache),
-  };
-}
-
 const rowKeyOf = (row: ItemLedgerRow) => `${row.typeId}:${row.isBlueprintCopy ? 'c' : 'o'}`;
-
-/** The by-item filters' draft: the three the funnel holds (search, group-by and Below target sit outside it). */
-interface PlaceFilter {
-  loc: number | null;
-  div: number | null;
-  cat: CategoryPick;
-  bp: BlueprintKind;
-}
-
-/**
- * The funnel's filters that are on, as `FilterBar` pills: where first, then
- * what. A place reads as its chip name ("Efa"), as the ledger's chips do, so a
- * long station name does not crowd out the other pills.
- */
-function activePlaceFilters(
-  filter: PlaceFilter,
-  {
-    labels,
-    categoryIndex,
-    showBlueprintSelect,
-  }: {
-    labels: LedgerLabels;
-    categoryIndex: AssetCategoryIndex | null;
-    showBlueprintSelect: boolean;
-  },
-  t: Translate
-): ActiveFilter<PlaceFilter>[] {
-  const active: ActiveFilter<PlaceFilter>[] = [];
-  if (filter.loc !== null)
-    active.push({
-      label: t('corp.assets.filter.location'),
-      value: labels.shortPlaceName(filter.loc) ?? labels.placeName(filter.loc),
-      clear: (next) => ({ ...next, loc: null }),
-    });
-  if (filter.div !== null)
-    active.push({
-      label: t('corp.assets.filter.division'),
-      value: labels.divisionName(filter.div),
-      clear: (next) => ({ ...next, div: null }),
-    });
-  active.push(
-    ...activeAssetKindFilters(
-      filter,
-      {
-        index: categoryIndex,
-        showBlueprintSelect,
-        categoryLabel: t('corp.assets.filter.category'),
-      },
-      t
-    )
-  );
-  return active;
-}
 
 /** Mounted only once Corp Access is `ready` — see the `/corp` loader note. */
 function CorpAssetsView({
@@ -382,10 +189,10 @@ function CorpAssetsView({
   // view (`key`) when `canReadBlueprints` flips instead.
   const loadSnapshot = useCallback(
     (characterId: number, signal: RouteSnapshotSignal) =>
-      loadAssetsSnapshot(characterId, signal, canReadBlueprints, canReadStructures),
+      loadCorpAssetsSnapshot(characterId, signal, canReadBlueprints, canReadStructures),
     [canReadBlueprints, canReadStructures]
   );
-  const snapshot = useRouteSnapshot<AssetsSnapshot>(loadSnapshot, undefined, {
+  const snapshot = useRouteSnapshot<CorpAssetsSnapshot>(loadSnapshot, undefined, {
     // Keeps the asset list on screen during a manual refresh (issue #418).
     staleWhileRevalidate: true,
     cacheKey: 'corp-assets',
