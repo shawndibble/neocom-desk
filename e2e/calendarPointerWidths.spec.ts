@@ -68,9 +68,10 @@ test('at 1024px the Coming Up rail stays readable and the Map does not clip', as
   expect(mapClipped).toBe(false);
 });
 
-test('at 1440px the Map keeps 38rem and the rail caps at 32rem', async ({ page }) => {
+test('at 1440px the Map keeps 38rem and the rail fills the rest', async ({ page }) => {
   const { rail, map } = await seedEventsAndOpen(page, { width: 1440, height: 900 });
 
   expect((await map.boundingBox())!.width).toBe(608);
-  expect((await rail.boundingBox())!.width).toBe(512);
+  // No width cap: the rail runs to the page edge, in line with the header actions.
+  expect((await rail.boundingBox())!.width).toBeGreaterThan(512);
 });
