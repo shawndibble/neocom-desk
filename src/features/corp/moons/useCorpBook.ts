@@ -356,9 +356,17 @@ export function useCorpBook(
     let cancelled = false;
     const characterIds = new Set<number>();
     for (const m of view.miners) for (const id of m.characterIds) characterIds.add(id);
+    // A grouped Miner with no charge is in no view row; the book's record still names its main.
+    for (const m of view.input.miners) characterIds.add(m.mainCharacterId);
     for (const p of view.input.payments) characterIds.add(p.characterId);
     if (fetched.status === 'loaded') {
       for (const a of fetched.data.groupingAnswers ?? []) characterIds.add(a.characterId);
+      // A refinery page reads no ledger row, so a Miner in no grouping is known only by the id in a moon doc.
+      for (const d of fetched.data.refinery?.docs.values() ?? [])
+        for (const m of d.miners) {
+          const solo = /^solo:(\d+)$/.exec(m.minerId);
+          if (solo) characterIds.add(Number(solo[1]));
+        }
       // Moon owners are corporations; the universe names lookup resolves both kinds.
       // A payee the moon owner named is a player or another corporation.
       // The book's own corporation is named beside a moon owner's on Extractions (#6097).
