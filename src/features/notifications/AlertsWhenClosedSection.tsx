@@ -32,7 +32,6 @@ import {
 } from '@/components/ui/controlStyles';
 import { MD_UP_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 import { beginAlertsLogin } from '@/app/loginFlow';
-import { db } from '@/db';
 import {
   alertsRowState,
   type AlertsCallbackState,
@@ -56,12 +55,14 @@ import {
 import { AlertsSignInConfirm } from './AlertsSignInConfirm';
 import { useNotificationPreferences } from './preferencesStore';
 import { QuietTimeRows } from './QuietTimeRows';
+import { useGrantedScopesByCharacter } from '@/app/grantedScopes';
 
 interface CharacterRef {
   characterId: number;
   name: string;
 }
 
+const NO_SCOPES: ReadonlyMap<number, ReadonlySet<string>> = new Map();
 const NO_GRANTS: Record<number, AlertsGrantRecord> = {};
 
 type Notice = { tone: 'info' | 'warning'; text: string } | null;
@@ -78,7 +79,7 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
   const nearby = useAlertsNearby();
   const mail = useAlertsMail();
   const prefs = useNotificationPreferences((state) => state.value);
-  const tokens = useLiveQuery(() => db.tokens.toArray(), []);
+  const deviceScopes = useGrantedScopesByCharacter();
   const needs = useMemo(
     () =>
       alertsNeeds({
@@ -87,11 +88,9 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
         grants,
         nearby,
         mail,
-        deviceScopes: new Map(
-          (tokens ?? []).map((token) => [token.characterId, new Set(token.scopes)])
-        ),
+        deviceScopes: deviceScopes ?? NO_SCOPES,
       }),
-    [characters, prefs, grants, nearby, mail, tokens]
+    [characters, prefs, grants, nearby, mail, deviceScopes]
   );
   const needOf = (characterId: number) => needs.find((need) => need.characterId === characterId);
   const permissionLabel = (permission: AlertsPermission) =>

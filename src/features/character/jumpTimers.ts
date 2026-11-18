@@ -9,12 +9,12 @@
  */
 import { cloneJumpCooldown, INFOMORPH_SYNCHRONIZING_SKILL_ID } from '@/engine/clone/cloneJump';
 import { fatigueEndsAt } from '@/engine/clone/jumpTimers';
-import { db } from '@/db';
 import { conditionalFetch, loadWithCacheStatus, type StatusResult } from '@/esi/cache';
 import { getCharacterFatigue, type CharacterFatigue } from '@/esi/endpoints';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { loadCharacterClones } from '@/features/character/clones';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+import { loadGrantedScopes } from '@/app/grantedScopes';
 
 export type JumpTimerRead =
   | { state: 'needsPermission' }
@@ -41,9 +41,9 @@ function loadCharacterFatigue(characterId: number): Promise<StatusResult<Charact
 
 /** A read that found nothing and had nothing to fall back on throws, so the widget keeps its last value and offers Retry. */
 export async function loadJumpTimersWidget(characterId: number): Promise<JumpTimersWidgetData> {
-  const scopes = (await db.tokens.get(characterId))?.scopes ?? [];
-  const cloneGranted = scopes.includes(ESI_REGISTRY.getCharacterClones.scope);
-  const fatigueGranted = scopes.includes(ESI_REGISTRY.getCharacterFatigue.scope);
+  const scopes = await loadGrantedScopes(characterId);
+  const cloneGranted = scopes.has(ESI_REGISTRY.getCharacterClones.scope);
+  const fatigueGranted = scopes.has(ESI_REGISTRY.getCharacterFatigue.scope);
   const now = Date.now();
   const stamps: number[] = [];
 

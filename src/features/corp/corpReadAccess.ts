@@ -8,7 +8,6 @@
  * every loader that reads corp data on a Character's behalf: the roles scope,
  * then the corporation, then the roles, then the capability's own scopes.
  */
-import { db } from '@/db';
 import { corpCapabilities, type CorpCapabilities } from '@/engine/corpRoles';
 import { isNpcCorporationId } from '@/esi/entityIds';
 import { ESI_REGISTRY } from '@/esi/registry';
@@ -16,6 +15,7 @@ import { fanOutAllCharacters } from '@/features/character/allCharactersFanOut';
 import { loadCorporationId } from './boardData';
 import { CORP_SCOPES_FOR_CAPABILITY } from './corpScopes';
 import { corpWideRoles, loadCharacterRoles } from './roles';
+import { loadGrantedScopes } from '@/app/grantedScopes';
 
 export type CorpCapability = keyof CorpCapabilities;
 
@@ -30,7 +30,7 @@ export interface CorpReadAccess {
  * granted, the corporation is unknown, or the roles read failed.
  */
 export async function resolveCorpReadAccess(characterId: number): Promise<CorpReadAccess | null> {
-  const granted = new Set((await db.tokens.get(characterId))?.scopes ?? []);
+  const granted = await loadGrantedScopes(characterId);
   // Without this scope the roles read is a guaranteed 403, and asking raises
   // the app-wide re-auth notice over a page that never needed corp data.
   if (!granted.has(ESI_REGISTRY.getCharacterRoles.scope)) return null;

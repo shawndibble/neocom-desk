@@ -284,10 +284,8 @@ const SCOPE_SOURCE: Record<VettingScope, VettingSource> = {
  * The sources a sign-in holding `scopes` could not share: what a device Character's own grant
  * leaves out of a report, so the page can ask for a vetting sign-in before reading it.
  */
-export function missingSourcesFor(scopes: readonly string[]): VettingSource[] {
-  return VETTING_SCOPES.filter((scope) => !scopes.includes(scope)).map(
-    (scope) => SCOPE_SOURCE[scope]
-  );
+export function missingSourcesFor(scopes: ReadonlySet<string>): VettingSource[] {
+  return VETTING_SCOPES.filter((scope) => !scopes.has(scope)).map((scope) => SCOPE_SOURCE[scope]);
 }
 
 /** The minimums a corp set above "none", in the order the apply page lists them. */
