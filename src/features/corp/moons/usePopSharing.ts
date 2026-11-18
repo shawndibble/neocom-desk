@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import type { PopSharingDoc } from '../../../../functions/src/popSharing';
 import {
   invalidatePopSharing,
@@ -45,6 +46,8 @@ export function usePopSharing(
   return { load, reload };
 }
 
+const NO_STATUS: Record<string, PopSharingCommunityStatus> = {};
+
 /**
  * Whether each Community the settings name carries the book's pops (#6223), read when the
  * settings load or change. Empty until read, or when the read fails: nothing is marked then.
@@ -54,16 +57,11 @@ export function usePopSharingCommunities(
   corporationId: number,
   settingsVersion: unknown
 ): Record<string, PopSharingCommunityStatus> {
-  const [status, setStatus] = useState<Record<string, PopSharingCommunityStatus>>({});
-  useEffect(() => {
-    let cancelled = false;
-    readPopSharingCommunities(characterId, corporationId).then(
-      (s) => !cancelled && setStatus(s),
-      () => undefined
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId, corporationId, settingsVersion]);
-  return status;
+  const load = useCallback(
+    () => readPopSharingCommunities(characterId, corporationId),
+    // A new settings version re-reads behind the status on screen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [characterId, corporationId, settingsVersion]
+  );
+  return useKeyedLoad(`${characterId}:${corporationId}`, load).data ?? NO_STATUS;
 }

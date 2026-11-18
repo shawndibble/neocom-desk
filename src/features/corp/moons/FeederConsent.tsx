@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Panel, TextInput } from '@/components/ui';
 import { useEntityName } from '@/features/character/useEntityName';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { callableErrorReason } from '@/lib/callableError';
 import { previewFeederInvite, type FeederInvitePreview } from '../taxBook/feederClient';
 
@@ -33,21 +34,15 @@ export function FeederConsent({
   const { t } = useTranslation();
   const [rate, setRate] = useState('');
   // Who the link is from and what it offers; a preview that cannot load leaves the screen as it was.
-  const [preview, setPreview] = useState<FeederInvitePreview | 'invalid' | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    loadPreview(characterId, code).then(
-      (p) => {
-        if (!cancelled) setPreview(p);
-      },
-      (e: unknown) => {
-        if (!cancelled && callableErrorReason(e) === 'invite-invalid') setPreview('invalid');
-      }
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId, code, loadPreview]);
+  const load = useCallback(
+    () =>
+      loadPreview(characterId, code).catch((e: unknown) => {
+        if (callableErrorReason(e) === 'invite-invalid') return 'invalid' as const;
+        throw e;
+      }),
+    [characterId, code, loadPreview]
+  );
+  const preview: FeederInvitePreview | 'invalid' | null = useAsyncLoad(load).data ?? null;
   const offer = preview !== null && preview !== 'invalid' ? preview : null;
   const publicName = useEntityName(
     offer && offer.collectorName === null ? offer.collectorCorporationId : undefined
