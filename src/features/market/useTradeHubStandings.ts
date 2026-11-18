@@ -48,6 +48,8 @@ export function useTradeHubStandings(characterId: number | null): TradeHubStandi
   return useWarmLoad('tradeHubStandings', characterId, loadTradeHubStandings, NO_STANDINGS);
 }
 
+const NO_STANDINGS_BY_CHARACTER: ReadonlyMap<number, TradeHubStandingsMap> = new Map();
+
 /**
  * Every given Character's `TradeHubStandingsMap`, fanned out and cached — for
  * Build Opportunities (issue #2055), which prices candidates owned by however
@@ -61,13 +63,11 @@ export function useTradeHubStandings(characterId: number | null): TradeHubStandi
  * set's real identity (order-independent), so an upstream caller that rebuilds
  * its id array on every render does not restart this fan-out.
  */
-const NO_STANDINGS_BY_CHARACTER: ReadonlyMap<number, TradeHubStandingsMap> = new Map();
-
 export function useTradeHubStandingsByCharacter(
   characterIds: readonly number[]
 ): ReadonlyMap<number, TradeHubStandingsMap> {
   const key = idSetKey(characterIds);
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<ReadonlyMap<number, TradeHubStandingsMap>> => {
     const byCharacter = new Map<number, TradeHubStandingsMap>();
     await mapWithConcurrencyLimit(characterIds, ESI_FANOUT_CONCURRENCY, async (characterId) => {
       const entries = await loadCharacterStandings(characterId);
@@ -76,7 +76,7 @@ export function useTradeHubStandingsByCharacter(
       );
       byCharacter.set(characterId, new Map(resolved));
     });
-    return byCharacter as ReadonlyMap<number, TradeHubStandingsMap>;
+    return byCharacter;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` is the id set's real identity; `characterIds` itself is intentionally not a dep (see the comment above `key`).
   }, [key]);
   return useKeyedLoad(key, load).data ?? NO_STANDINGS_BY_CHARACTER;

@@ -47,7 +47,7 @@ export function useQuickbarVsPaid(
   const stationId = hub.stationId;
   const scope = `${characterId}:${stationId}:${key}`;
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<ReadonlyMap<number, VsPaid>> => {
     const out = new Map<number, VsPaid>();
     try {
       if (characterId !== null && ids.length > 0 && (await hasWalletScope(characterId))) {
@@ -72,7 +72,7 @@ export function useQuickbarVsPaid(
       // A decoration: any read failure means no chip, never an error.
       out.clear();
     }
-    return out as ReadonlyMap<number, VsPaid>;
+    return out;
   }, [characterId, ids, stationId]);
 
   // Keyed by scope: never show the previous character's figures while this one loads.

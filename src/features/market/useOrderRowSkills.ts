@@ -28,7 +28,7 @@ export interface OrderRowSkills {
   targetPlan: TargetPlan;
 }
 
-const NO_TRAINED_SKILLS: ReadonlyMap<number, TrainedSkill> = new Map();
+export const NO_TRAINED_SKILLS: ReadonlyMap<number, TrainedSkill> = new Map();
 
 export function useOrderRowSkills(
   selectedTypeId: number | null,
