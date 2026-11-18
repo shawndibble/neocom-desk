@@ -585,7 +585,7 @@ function StockCostFigure({
   return (
     <span className={cx(ITEM_COST_CELL, 'whitespace-nowrap')}>
       <IskAmount value={unitCost * quantity} decimals={0} />{' '}
-      <span className="text-text-faint">
+      <span className="text-text-dim">
         (<IskAmount value={unitCost} decimals={0} /> {t('assets.cost.each')})
       </span>
     </span>

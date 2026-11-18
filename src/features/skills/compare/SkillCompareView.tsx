@@ -40,7 +40,7 @@ function Delta({ delta }: { delta: LevelDelta }) {
   switch (delta.kind) {
     case 'same':
       return (
-        <span className={cx(DELTA_TEXT_CLASS, 'text-text-faint')}>{t('skillCompare.same')}</span>
+        <span className={cx(DELTA_TEXT_CLASS, 'text-text-dim')}>{t('skillCompare.same')}</span>
       );
     case 'missing':
       return (

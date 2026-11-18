@@ -54,12 +54,12 @@ function StepDot({
           'inline-flex size-6 items-center justify-center rounded-full border text-xs font-semibold',
           state === 'done' && 'border-success text-success',
           state === 'now' && 'border-text text-text',
-          state === 'next' && 'border-line text-text-faint'
+          state === 'next' && 'border-line text-text-dim'
         )}
       >
         {state === 'done' ? <Icon.Done size={Icon.ICON_SIZE.sm} aria-hidden="true" /> : n}
       </span>
-      <span className={cx('text-sm', state === 'next' ? 'text-text-faint' : 'text-text')}>
+      <span className={cx('text-sm', state === 'next' ? 'text-text-dim' : 'text-text')}>
         {label}
         {state === 'done' && <span className="sr-only"> {t('corpTaxBook.moons.run.done')}</span>}
       </span>
