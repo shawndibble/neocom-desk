@@ -17,7 +17,6 @@ import {
   type CachedResult,
   type StatusResult,
 } from '@/esi/cache';
-import { db } from '@/db';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { fanOutAllCharacters } from '@/features/character/allCharactersFanOut';
 import {
@@ -25,6 +24,7 @@ import {
   journalWithArchive,
   transactionsWithArchive,
 } from '@/features/character/walletArchive';
+import { loadGrantedScopes } from '@/app/grantedScopes';
 
 export const KEYS = {
   balance: 'wallet:balance',
@@ -151,8 +151,7 @@ export async function loadWalletJournalHistory(
 
 /** Whether the character granted the wallet scope — checked up front so callers never provoke a live 403. */
 export async function hasWalletScope(characterId: number): Promise<boolean> {
-  const token = await db.tokens.get(characterId);
-  return (token?.scopes ?? []).includes(WALLET_SCOPE);
+  return (await loadGrantedScopes(characterId)).has(WALLET_SCOPE);
 }
 
 /** Transactions. `truncated` means the fetch stopped at the page cap. */

@@ -1,4 +1,4 @@
-// Its own module so pure loaders can use it without `useGrantedScopes`'s store imports.
+// Pure scope reads: no store imports, so data loaders can use it (see useGrantedScopes for the active Character).
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 

@@ -89,8 +89,3 @@ export function useCharacterLacksEndpoints(
 }
 
 export { characterIdsWithScopes, useCharacterIdsWithScopes } from './characterIdsWithScopes';
-export {
-  loadGrantedScopes,
-  loadGrantedScopesByCharacter,
-  useGrantedScopesByCharacter,
-} from './grantedScopes';

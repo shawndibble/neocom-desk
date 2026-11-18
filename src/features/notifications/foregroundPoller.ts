@@ -56,6 +56,7 @@ import {
 } from './foregroundPoller/pollCharacter';
 import { dispatchFires } from './foregroundPoller/dispatchFire';
 import { keepOneSharedFire } from './foregroundPoller/sharedWorldFires';
+import { loadGrantedScopes } from '@/app/grantedScopes';
 
 export type { AnyNotificationFire } from './pollDomains';
 export { reviseContractFeedRow };
@@ -347,10 +348,7 @@ export function liveDependencies(): PollDependencies {
     now: () => Date.now(),
     characters: async () =>
       (await db.characters.toArray()).map((c) => ({ characterId: c.characterId, name: c.name })),
-    grantedScopes: async (characterId) => {
-      const token = await db.tokens.get(characterId);
-      return new Set(token?.scopes ?? []);
-    },
+    grantedScopes: loadGrantedScopes,
     // Both per-domain seams delegate straight to the registry entry: no
     // domain is named here, so a ninth needs no line in this function.
     loadDomain: (domain, characterId) => domain.load(characterId),
