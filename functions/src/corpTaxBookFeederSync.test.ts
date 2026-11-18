@@ -13,6 +13,7 @@ import {
   structuresToLookUp,
   type FeederLedgerRead,
 } from './corpTaxBookFeederSync.js';
+import { moonNotificationsOf } from './corpTaxBookSyncEngine.js';
 import type { EsiRead, SyncEsi } from './corpTaxBookSyncEsi.js';
 
 const FEEDER = 98000002;
@@ -136,6 +137,83 @@ describe('readFeederExtractions (#6097)', () => {
       complete: true,
     });
     expect(calls).toEqual(['extractions']);
+  });
+
+  it("takes a chunk's ore from the holder's Extraction started notification, keeping the stored start", async () => {
+    const ticks = (iso: string) => (Date.parse(iso) + 11_644_473_600_000) * 10_000;
+    const notifications = moonNotificationsOf([
+      { type: 'LoginNotice', timestamp: '2026-10-10T00:00:30Z', text: 'x: 1' },
+      {
+        type: 'MoonminingExtractionStarted',
+        timestamp: '2026-10-10T00:00:30Z',
+        text: [
+          'structureID: 5001',
+          'moonID: 40000001',
+          `readyTime: ${ticks('2026-10-24T00:00:00Z')}`,
+          `autoTime: ${ticks('2026-10-24T03:00:00Z')}`,
+          'oreVolumeByType:',
+          '  45490: 1000000',
+        ].join('\n'),
+      },
+    ]);
+    const stored = [
+      {
+        structureId: 5001,
+        moonId: 40000001,
+        extractionStartTime: '2026-10-10T00:00:00.000Z',
+        chunkArrivalTime: '2026-10-24T00:00:00.000Z',
+      },
+    ];
+    const read = await readFeederExtractions(
+      fakeEsi({ extractions: ok([listed]) }).esi,
+      FEEDER,
+      'tok',
+      {
+        notifications,
+        stored,
+        now: Date.parse('2026-10-18T00:00:00Z'),
+      }
+    );
+    expect(read).toMatchObject({
+      kind: 'ok',
+      extractions: [
+        {
+          extractionStartTime: '2026-10-10T00:00:00.000Z',
+          oreLines: [{ typeId: 45490, quantity: 100000 }],
+          sourceCorporationId: FEEDER,
+        },
+      ],
+    });
+  });
+
+  it('does not revive a coming chunk ESI dropped, though its started notification is still in the feed', async () => {
+    const ticks = (iso: string) => (Date.parse(iso) + 11_644_473_600_000) * 10_000;
+    const started = (arrival: string) => ({
+      type: 'MoonminingExtractionStarted',
+      timestamp: '2026-10-12T00:00:00Z',
+      text: [
+        'structureID: 5001',
+        'moonID: 40000001',
+        `readyTime: ${ticks(arrival)}`,
+        `autoTime: ${ticks('2026-11-01T03:00:00Z')}`,
+        'oreVolumeByType:',
+        '  45490: 1000000',
+      ].join('\n'),
+    });
+    const read = await readFeederExtractions(fakeEsi({ extractions: ok([]) }).esi, FEEDER, 'tok', {
+      // One chunk still to come (cancelled, its notice lost), one already popped.
+      notifications: moonNotificationsOf([
+        started('2026-11-01T00:00:00Z'),
+        started('2026-10-15T00:00:00Z'),
+      ]),
+      stored: [],
+      now: Date.parse('2026-10-18T00:00:00Z'),
+    });
+    expect(read).toMatchObject({
+      kind: 'ok',
+      extractions: [{ chunkArrivalTime: '2026-10-15T00:00:00.000Z' }],
+    });
+    expect(read.kind === 'ok' && read.extractions).toHaveLength(1);
   });
 
   it('a 403 is a refusal; ESI trouble or a low budget is nothing to remember', async () => {
