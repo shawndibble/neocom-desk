@@ -12,6 +12,9 @@
  *   (`eventThresholdFields.ts`), or `null`,
  * - `rowHintKey` — a delivery caveat Settings shows under its row, or `null`.
  *
+ * A server-only event (`ServerOnlyEventEntry`: backend-pushed, never polled) has
+ * `source: null` and no `diff`, so no poll domain owns it.
+ *
  * Every field is required, and the catalog is keyed by `NotificationEventId`
  * (itself derived from `events.ts`'s catalog), so a new event that lacks any
  * part of this is a type error here rather than a silent gap. `projection` is
@@ -372,7 +375,8 @@ function defineServerOnlyEvent<TFire>(
  * syntax on purpose: method parameters compare bivariantly, which is what
  * lets every typed entry satisfy this one shape without a cast. The domain
  * only ever hands an entry its own source's snapshot and fires
- * (`pollDomains/`), which is what makes that sound in practice.
+ * (`pollDomains/`), which is what makes that sound in practice. A server-only
+ * entry has no domain: it has no `diff` and `source` is null.
  */
 export interface ErasedEventEntry {
   /** Null for a server-only event: no poll domain fetches or diffs it. */

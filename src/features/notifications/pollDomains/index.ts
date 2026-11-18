@@ -111,7 +111,7 @@ export function domainForEvent(eventId: NotificationEventId): PollDomain {
   return domain;
 }
 
-/** A fire's live copy, names looked up by its own domain. */
+/** A fire's live copy, names looked up by its own domain (a server-only event's copy names none). */
 export function renderNotification(
   fire: AnyNotificationFire,
   characterName: string

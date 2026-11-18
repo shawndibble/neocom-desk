@@ -1499,8 +1499,10 @@ describe('copy wiring', () => {
       },
       'Kestrel'
     );
-    expect(copy.title).not.toBe('');
-    expect(copy.body).not.toBe('');
+    expect(copy).toEqual({
+      title: 'New vetting report',
+      body: 'A pilot shared a report for review.',
+    });
   });
 
   it('falls back to the id when a planet name does not resolve', async () => {
