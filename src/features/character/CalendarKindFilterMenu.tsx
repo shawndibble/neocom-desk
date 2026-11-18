@@ -61,6 +61,8 @@ export interface CalendarKindFilterMenuProps {
   hidden: readonly CharacterBoardItemKind[];
   onToggle: (kind: CharacterBoardItemKind) => void;
   onShowAll: () => void;
+  /** Hides every kind that has a row, so one kind can then be ticked on. */
+  onHideAll: (kinds: readonly CharacterBoardItemKind[]) => void;
   /** How many of each kind the board holds. A kind that read fine with none due is absent. */
   counts: Map<CharacterBoardItemKind, number>;
   /**
@@ -165,6 +167,7 @@ export function CalendarKindFilterMenu({
   hidden,
   onToggle,
   onShowAll,
+  onHideAll,
   counts,
   readableKinds,
   reauthKinds,
@@ -325,19 +328,31 @@ export function CalendarKindFilterMenu({
             {t('calendar.skillPlan.errorReason', { reason: skillPlanError })}
           </p>
         )}
-        {/* A real menu item, not a raw button: Radix roving focus only visits
-            registered items, so a plain button here is unreachable by keyboard
-            (WCAG 2.1.1). `preventDefault` keeps the menu open, like the rows above. */}
-        <DropdownMenuItem
-          disabled={hidden.length === 0}
-          onSelect={(event) => {
-            event.preventDefault();
-            onShowAll();
-          }}
-          className="mt-1 rounded-none border-t border-line touch:min-h-9"
-        >
-          {t('calendar.filter.showAll')}
-        </DropdownMenuItem>
+        {/* Real menu items, not raw buttons: Radix roving focus only visits registered
+            items, so a plain button here is unreachable by keyboard (WCAG 2.1.1).
+            `preventDefault` keeps the menu open, like the rows above. */}
+        <div className="mt-1 flex border-t border-line">
+          <DropdownMenuItem
+            disabled={hidden.length === 0}
+            onSelect={(event) => {
+              event.preventDefault();
+              onShowAll();
+            }}
+            className="flex-1 justify-center rounded-none touch:min-h-9"
+          >
+            {t('calendar.filter.showAll')}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={CHARACTER_BOARD_ITEM_KINDS.filter(hasRow).every((k) => hiddenSet.has(k))}
+            onSelect={(event) => {
+              event.preventDefault();
+              onHideAll(CHARACTER_BOARD_ITEM_KINDS.filter(hasRow));
+            }}
+            className="flex-1 justify-center rounded-none border-l border-line touch:min-h-9"
+          >
+            {t('calendar.filter.hideAll')}
+          </DropdownMenuItem>
+        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   );

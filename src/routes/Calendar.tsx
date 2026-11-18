@@ -469,6 +469,7 @@ export function Calendar() {
                 void setHiddenKinds(toggleHiddenKind(hiddenKinds, kind))
               }
               onShowAll={() => void setHiddenKinds([])}
+              onHideAll={(kinds) => void setHiddenKinds(kinds)}
               counts={counts}
               readableKinds={data?.readableKinds ?? []}
               reauthKinds={data?.reauthKinds ?? []}

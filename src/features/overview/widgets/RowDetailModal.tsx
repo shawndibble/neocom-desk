@@ -5,7 +5,9 @@
  */
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Eyebrow, Modal, ProgressBar, StatChip, StatChips } from '@/components/ui';
+import { Eyebrow, Modal, ProgressBar } from '@/components/ui';
+import { Well } from '@/components/ui/Well';
+import { STAT_CHIP_TONE_TEXT_CLASS } from '@/components/ui/statChipTone';
 import { Pill } from '@/components/ui/Pill';
 import { buttonClassName } from '@/components/ui/buttonClassName';
 import { SetDestinationButton } from '@/features/market/SetDestinationButton';
@@ -34,13 +36,29 @@ function Place({ place }: { place: NonNullable<RowDetailModel['place']> }) {
 
 function Status({ status }: { status: NonNullable<RowDetailModel['status']> }) {
   return (
-    <div className="space-y-1">
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <Pill tone={status.tone}>{status.badge}</Pill>
-        {status.text && <span>{status.text}</span>}
-      </div>
+    <Well size="lg" className="space-y-1.5">
+      <Pill tone={status.tone}>{status.badge}</Pill>
+      {status.text && <p className="text-2xl font-semibold tabular-nums">{status.text}</p>}
       {status.note && <p className="text-xs text-text-dim">{status.note}</p>}
-    </div>
+    </Well>
+  );
+}
+
+/** Facts as a two-column grid: the label sits over its value, so nothing wraps beside a neighbour. */
+function Facts({ facts }: { facts: RowDetailModel['facts'] }) {
+  return (
+    <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
+      {facts.map((fact) => (
+        <div key={fact.label} className="min-w-0">
+          <dt>
+            <Eyebrow>{fact.label}</Eyebrow>
+          </dt>
+          <dd className={`mt-0.5 text-sm ${STAT_CHIP_TONE_TEXT_CLASS[fact.tone ?? 'default']}`}>
+            {fact.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
@@ -90,24 +108,32 @@ export function RowDetailModal({
   detail: RowDetailModel | null;
   onClose: () => void;
 }) {
+  const hasActions = detail !== null && (detail.place !== undefined || detail.link !== undefined);
   return (
-    <Modal open={detail !== null} onClose={onClose} title={detail?.title ?? ''}>
+    <Modal
+      open={detail !== null}
+      onClose={onClose}
+      title={detail?.title ?? ''}
+      placement="detail"
+      footer={
+        hasActions && (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {detail.place ? <Place place={detail.place} /> : <span />}
+            {detail.link && (
+              <Link to={detail.link.to} className={buttonClassName({ variant: 'primary' })}>
+                {detail.link.label}
+              </Link>
+            )}
+          </div>
+        )
+      }
+    >
       {detail && (
-        <div className="space-y-4">
+        <div className="space-y-5">
           {detail.status && <Status status={detail.status} />}
-          <StatChips>
-            {detail.facts.map((fact) => (
-              <StatChip key={fact.label} label={fact.label} value={fact.value} tone={fact.tone} />
-            ))}
-          </StatChips>
+          <Facts facts={detail.facts} />
           {detail.meters && <Meters meters={detail.meters} />}
           {detail.list && <List list={detail.list} />}
-          {detail.place && <Place place={detail.place} />}
-          {detail.link && (
-            <Link to={detail.link.to} className={buttonClassName({ variant: 'primary' })}>
-              {detail.link.label}
-            </Link>
-          )}
         </div>
       )}
     </Modal>

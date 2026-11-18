@@ -13,11 +13,13 @@ async function openMenu(
   reauthKinds: readonly CharacterBoardItemKind[] = []
 ) {
   const user = userEvent.setup();
+  const onHideAll = vi.fn();
   render(
     <CalendarKindFilterMenu
       hidden={hidden}
       onToggle={() => {}}
       onShowAll={onShowAll}
+      onHideAll={onHideAll}
       counts={counts}
       readableKinds={readableKinds}
       reauthKinds={reauthKinds}
@@ -28,7 +30,7 @@ async function openMenu(
     />
   );
   await user.click(screen.getByRole('button', { name: /filter event types/i }));
-  return { user, onShowAll };
+  return { user, onShowAll, onHideAll };
 }
 
 describe('CalendarKindFilterMenu keyboard access', () => {
@@ -44,21 +46,25 @@ describe('CalendarKindFilterMenu keyboard access', () => {
     expect(stray).toEqual([]);
   });
 
-  it('End reaches "Show all types"; Enter runs it and keeps the menu open', async () => {
-    const { user, onShowAll } = await openMenu([CHARACTER_BOARD_ITEM_KINDS[0]]);
+  it('End reaches "None"; Enter hides every listed kind and keeps the menu open', async () => {
+    const first = CHARACTER_BOARD_ITEM_KINDS[0];
+    const { user, onHideAll } = await openMenu([], vi.fn(), new Map([[first, 2]]));
     await user.keyboard('{End}');
-    expect(screen.getByRole('menuitem', { name: /show all/i })).toHaveFocus();
+    expect(screen.getByRole('menuitem', { name: 'None' })).toHaveFocus();
     await user.keyboard('{Enter}');
-    expect(onShowAll).toHaveBeenCalledTimes(1);
+    expect(onHideAll).toHaveBeenCalledWith([first]);
     expect(screen.getByRole('menu')).toBeInTheDocument();
+  });
+
+  it('"All" runs onShowAll', async () => {
+    const { user, onShowAll } = await openMenu([CHARACTER_BOARD_ITEM_KINDS[0]]);
+    await user.click(screen.getByRole('menuitem', { name: 'All' }));
+    expect(onShowAll).toHaveBeenCalledTimes(1);
   });
 
   it('is disabled when nothing is hidden', async () => {
     await openMenu([]);
-    expect(screen.getByRole('menuitem', { name: /show all/i })).toHaveAttribute(
-      'aria-disabled',
-      'true'
-    );
+    expect(screen.getByRole('menuitem', { name: 'All' })).toHaveAttribute('aria-disabled', 'true');
   });
 });
 
@@ -104,6 +110,7 @@ describe('CalendarKindFilterMenu corporation filter', () => {
         hidden={[]}
         onToggle={() => {}}
         onShowAll={() => {}}
+        onHideAll={() => {}}
         counts={new Map()}
         readableKinds={[]}
         reauthKinds={[]}
@@ -150,6 +157,7 @@ describe('CalendarKindFilterMenu sharing-corporation filter (#6224)', () => {
         hidden={[]}
         onToggle={() => {}}
         onShowAll={() => {}}
+        onHideAll={() => {}}
         counts={new Map([['sharedMoonPop', 2]])}
         readableKinds={['sharedMoonPop']}
         reauthKinds={[]}
