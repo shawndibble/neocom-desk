@@ -14,7 +14,7 @@ import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID, CORPORATION_ID, SCOPES } from './support/fixtureData';
 import { scopesForGroup } from '../src/esi/scopes';
 import type { setSrpBackendOverride } from '../src/features/corp/srpBackendOverride';
-import type { setSrpOfficerBackendOverride } from '../src/features/corp/srpOfficerBackendOverride';
+import type { setSrpOfficerBackendOverride } from '../src/features/corp/srpBackendOverride';
 import type { createSrpFixture } from '../src/storybook/srpFixture';
 import type { createSrpOfficerFixture } from '../src/storybook/srpOfficerFixture';
 import type { db } from '../src/db';
@@ -40,7 +40,7 @@ async function openQueue(page: Page): Promise<void> {
       const urls = {
         db: '/src/db/index.ts',
         srp: '/src/features/corp/srpBackendOverride.ts',
-        officer: '/src/features/corp/srpOfficerBackendOverride.ts',
+        officer: '/src/features/corp/srpBackendOverride.ts',
         srpFixture: '/src/storybook/srpFixture.ts',
         officerFixture: '/src/storybook/srpOfficerFixture.ts',
       };

@@ -17,7 +17,7 @@ import { encodeFittingShare } from '@/engine/fittings/fittingShare';
 import type { EftSlotLookup } from '@/engine/fittings/eftLoader';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import { fittingFromDoctrineSnapshot } from '@/engine/srpDoctrineFit';
-import { srpDoctrineBackendOverride } from '@/features/corp/srpDoctrineBackendOverride';
+import { srpDoctrineBackendOverride } from '@/features/corp/srpBackendOverride';
 import type { MemberDoctrineFit } from '@/features/corp/srpTypes';
 import { MINUTE_MS } from '@/lib/age';
 import { typeNameOr } from '@/lib/typeNameOr';

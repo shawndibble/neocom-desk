@@ -7,7 +7,7 @@ import type {
   SrpClaimOutcome,
   SrpMarkPaidItem,
 } from '@/features/corp/srpClaimTypes';
-import type { SrpOfficerBackendOverride } from '@/features/corp/srpOfficerBackendOverride';
+import type { SrpOfficerBackendOverride } from '@/features/corp/srpBackendOverride';
 import { SAMPLE_ACTIVE_CHARACTER } from './sampleData';
 
 /** 23 Oct 2026, 14:00 EVE. */
