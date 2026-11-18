@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { Button, DataAgeBadge, IconButton, LiveStatus } from '@/components/ui';
+import { Button, Checkbox, DataAgeBadge, IconButton, LiveStatus } from '@/components/ui';
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import type { UseTableExport } from '@/components/ui/useTableExport';
@@ -11,6 +12,8 @@ interface PlanMaterialsActionsProps {
   copyState: ReturnType<typeof useShoppingListCopy>['copyState'];
   copyDisabled: boolean;
   onCopy: () => void;
+  /** The compressed-gas toggle; absent when the plan has no gas to buy. */
+  compressedGas?: { checked: boolean; onChange: (checked: boolean) => void };
   /** Whether the Materials table has rows to export. */
   showExport: boolean;
   materialsExport: UseTableExport<MaterialTableRow>;
@@ -26,6 +29,7 @@ export function PlanMaterialsActions({
   copyState,
   copyDisabled,
   onCopy,
+  compressedGas,
   showExport,
   materialsExport,
   onRefresh,
@@ -50,6 +54,17 @@ export function PlanMaterialsActions({
             ? t('industry.copyShoppingListFailed')
             : null}
       </LiveStatus>
+      {compressedGas && (
+        <label className="flex items-center gap-1.5 text-xs text-text">
+          <span className={touchCheckboxLabelClassName}>
+            <Checkbox
+              checked={compressedGas.checked}
+              onChange={(event) => compressedGas.onChange(event.target.checked)}
+            />
+          </span>
+          {t('industry.compressedGasToggle')}
+        </label>
+      )}
       <Button size="sm" onClick={onCopy} disabled={copyDisabled}>
         {/* Both outcomes change the glyph as well as the words, so neither
             is carried by colour alone (docs/DESIGN.md §7). */}

@@ -263,7 +263,7 @@ export function BuildPlanDetail({
     snapshot?.systemCostIndex ?? null
   );
 
-  const shopping = useShoppingListCopy(!!result, shoppingMaterials, catalog);
+  const shopping = useShoppingListCopy(!!result, shoppingMaterials, catalog, hub);
 
   if (!entry || !blueprint) {
     return <EmptyState title={t('industry.blueprintMissing')} className="py-8" />;
