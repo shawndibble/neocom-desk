@@ -390,7 +390,7 @@ describe('Calendar Shared Pops', () => {
     expect(within(dialog).getByText('Fleet forms in local.')).toBeInTheDocument();
     const link = within(dialog).getByRole('link', { name: /start a survey here/i });
     expect(link.getAttribute('href')).toBe(
-      `/survey?place=Efa+-+Shared+Tatara&placeId=1001&payeeId=${SHARING_CORP_ID}&rate=12`
+      `/survey?place=Efa+-+Shared+Tatara&placeId=1001&payeeId=${SHARING_CORP_ID}&rate=12&pop=${SHARING_CORP_ID}_x1`
     );
     await waitFor(() => expect(window.location.search).not.toContain('pop='));
   });
