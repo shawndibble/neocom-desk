@@ -2,16 +2,9 @@ import { useId, useState, type KeyboardEvent } from 'react';
 import { COMBOBOX_NAV_KEYS, moveHighlight, type ComboboxNavKey } from './comboboxNav';
 
 /**
- * The shared half of a typeahead picker (DESIGN.md §6c "Search picker"): a
- * text input with `role="combobox"`, a listbox beside it, and an arrow-key
- * highlight that moves through `aria-activedescendant` while DOM focus stays
- * in the input. Callers keep what differs per picker: how the options are
- * found, what Enter and Escape do, when the list opens, and how options look.
- *
- * `open` is whether the list is showing. `fallback` is the active option
- * while the keyboard has not chosen one (a default Enter takes, an exact
- * match). The active index is clamped to the list, so a list that shrinks
- * under the highlight never leaves `aria-activedescendant` dangling.
+ * Shared typeahead behaviour: role=combobox input, listbox, aria-activedescendant
+ * highlight. Callers own option lookup, Enter/Escape, open timing and option look.
+ * The index is clamped so a shrinking list never leaves activedescendant dangling.
  */
 export function useCombobox({
   count,
@@ -37,8 +30,11 @@ export function useCombobox({
     return true;
   }
 
+  // Clamped like `activeIndex`, so Enter never reads past a list that shrank.
+  const keyed = highlight === null || count === 0 ? null : Math.min(highlight, count - 1);
+
   return {
-    highlight,
+    highlight: keyed,
     setHighlight,
     activeIndex,
     reset: () => setHighlight(null),
@@ -52,9 +48,7 @@ export function useCombobox({
       'aria-controls': open ? listboxId : undefined,
       'aria-activedescendant': activeIndex === null ? undefined : optionId(activeIndex),
     },
-    /** Spread on the listbox element; the caller adds its label and class. */
     listboxProps: { id: listboxId, role: 'listbox' as const },
-    /** Spread on option `index`; the caller adds its class and handlers. */
     optionProps: (index: number) => ({
       id: optionId(index),
       role: 'option' as const,

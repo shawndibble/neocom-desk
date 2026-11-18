@@ -151,11 +151,7 @@ export function selectTriggerClassName(size: ControlSize): string {
  */
 export const tappableRowClassName = 'min-h-9 md:min-h-7 touch:min-h-9';
 
-/**
- * The listbox surface of a typeahead picker that drops below its input
- * (DESIGN.md §6c "Search picker"): an absolute card the width of the field.
- * Pair it with `suggestionOptionClassName` rows.
- */
+/** Listbox surface for a typeahead dropping below its input; pair with `suggestionOptionClassName`. */
 export const suggestionPopupClassName =
   'absolute z-20 mt-1 w-full overflow-hidden rounded-xs border border-line-bright bg-panel shadow-lg';
 

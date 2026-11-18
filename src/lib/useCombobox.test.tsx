@@ -80,6 +80,7 @@ describe('useCombobox', () => {
     act(() => void result.current.handleNavKey(key('End').event));
     rerender({ count: 2 });
     expect(result.current.activeIndex).toBe(1);
+    expect(result.current.highlight).toBe(1);
     rerender({ count: 0 });
     expect(result.current.activeIndex).toBeNull();
   });

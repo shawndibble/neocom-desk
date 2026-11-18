@@ -1694,6 +1694,10 @@ Every interactive element takes its states from one shared recipe in
   list the nav keys are left to the input (a textarea still moves its caret).
   What Enter and Escape do, and when the list opens, stay with the picker
   (Escape closes the list before it closes a dialog).
+  Not on the hook, by design: pickers that key the highlight by record id
+  (`LpStorePicker`, `BuildLocationPicker`, `BpcSourcingPanel`), the in-flow
+  `MemberCombobox` (no Home/End, no wrap), `RegionSelect` and `MultiSelect`
+  (a trigger plus popover, one with a select-all row) and the command palette.
 - **Disabled:** `opacity-40` and `cursor-not-allowed`. When there's a reason
   to show, use `aria-disabled` plus a tooltip instead of the native
   attribute. A control that its own press puts to work (Refresh, Scan, Start
