@@ -4,13 +4,12 @@
  * one event at a time through its own entry — snapshot pair in, rendered copy
  * out — with no poll harness, no fetch and no Dexie.
  */
-import { HOUR_MS } from '@/lib/age';
+import { DAY_MS, HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import { PROJECTABLE_EVENT_IDS } from '@/engine/projection';
 import { NOTIFICATION_EVENT_IDS, type NotificationEventId } from './events';
 import { THRESHOLD_KEYS } from './eventThresholdFields';
 import { NOTIFICATION_EVENT_ENTRIES, eventEntry } from './eventEntries';
-import { DAY_MS } from '@/lib/age';
 
 const C = 1;
 const PILOT = 'Kestrel';
@@ -100,7 +99,7 @@ describe('one event through its entry', () => {
 
   it('cloneJumpReady: the cooldown ending between polls fires once and projects', () => {
     const entry = NOTIFICATION_EVENT_ENTRIES.cloneJumpReady;
-    const cooldown = { lastJumpMs: T0 - 20 * 3_600_000, readyAtMs: T0 + 1000 };
+    const cooldown = { lastJumpMs: T0 - 20 * HOUR_MS, readyAtMs: T0 + 1000 };
     const fires = entry.diff(
       C,
       { entries: [cooldown], nowMs: T0 },
@@ -194,8 +193,8 @@ describe('one event through its entry', () => {
     const hook = {
       skyhookId: 5,
       planetId: 40_000_001,
-      windowStartMs: T0 + 3_600_000 * 3,
-      windowEndMs: T0 + 3_600_000 * 7,
+      windowStartMs: T0 + HOUR_MS * 3,
+      windowEndMs: T0 + HOUR_MS * 7,
       unsecuredUnits: 10,
       leadMs: 7_200_000,
       minUnits: 0,
@@ -203,7 +202,7 @@ describe('one event through its entry', () => {
     const fires = entry.diff(
       C,
       { entries: [hook], nowMs: T0 },
-      { entries: [hook], nowMs: T0 + 3_600_000 * 1.5 }
+      { entries: [hook], nowMs: T0 + HOUR_MS * 1.5 }
     );
     expect(fires).toHaveLength(1);
     expect(entry.copy.poll(fires[0], PILOT, { planet: 'X-7OMU IV' }).body).toBe(
@@ -218,8 +217,8 @@ describe('one event through its entry', () => {
 
   it('acceleratorExpiring: warns inside the lead window, pushes hedged, owns the lead-hours threshold', () => {
     const entry = NOTIFICATION_EVENT_ENTRIES.acceleratorExpiring;
-    const record = { bonus: 10, leadMs: 3_600_000 };
-    const end = T0 + 3_600_000 * 3;
+    const record = { bonus: 10, leadMs: HOUR_MS };
+    const end = T0 + HOUR_MS * 3;
     const fires = entry.diff(
       C,
       { entries: [{ ...record, expiresAtMs: end }], nowMs: T0 },
@@ -271,10 +270,10 @@ describe('one event through its entry', () => {
       planetId: 40_000_001,
       anarchyAmount: null,
       anarchyLevel: null,
-      leadMs: 3_600_000,
+      leadMs: HOUR_MS,
       anarchyPct: 50,
     };
-    const end = T0 + 3_600_000 * 3;
+    const end = T0 + HOUR_MS * 3;
     const fires = entry.diff(
       C,
       { entries: [{ ...den, reinforcedUntilMs: end }], nowMs: T0 },
@@ -297,7 +296,7 @@ describe('one event through its entry', () => {
       planetId: 40_000_001,
       reinforcedUntilMs: null,
       anarchyLevel: 1,
-      leadMs: 3_600_000,
+      leadMs: HOUR_MS,
       anarchyPct: 50,
     };
     const fires = entry.diff(
@@ -314,7 +313,7 @@ describe('one event through its entry', () => {
 
   it('courierDeliveryDue: fires as the deadline crosses its lead time, pushes hedged, owns its own lead-hours threshold', () => {
     const entry = NOTIFICATION_EVENT_ENTRIES.courierDeliveryDue;
-    const LEAD = 6 * 3_600_000;
+    const LEAD = 6 * HOUR_MS;
     const contract = {
       contractId: 9,
       status: 'in_progress' as const,
@@ -348,12 +347,12 @@ describe('one event through its entry', () => {
       status: 'outstanding' as const,
       issuerId: 42,
       acceptorId: 0,
-      expiresMs: 1_800_000_000_000 + 20 * 3_600_000,
-      expiringLeadMs: 24 * 3_600_000,
+      expiresMs: 1_800_000_000_000 + 20 * HOUR_MS,
+      expiringLeadMs: 24 * HOUR_MS,
     };
     const fires = entry.diff(
       42,
-      { entries: [contract], nowMs: 1_800_000_000_000 - 10 * 3_600_000 * 4 },
+      { entries: [contract], nowMs: 1_800_000_000_000 - 10 * HOUR_MS * 4 },
       { entries: [contract], nowMs: 1_800_000_000_000 }
     );
     expect(fires).toHaveLength(1);
@@ -394,7 +393,7 @@ describe('one event through its entry', () => {
 
   it('skillQueueEnding: fires as the tail crosses its lead time, pushes hedged, owns its own lead-hours threshold', () => {
     const entry = NOTIFICATION_EVENT_ENTRIES.skillQueueEnding;
-    const LEAD = 6 * 3_600_000;
+    const LEAD = 6 * HOUR_MS;
     const tailEntry = {
       skillId: 3300,
       finishedLevel: 4,
