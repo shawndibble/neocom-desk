@@ -13,13 +13,14 @@ import { idSetKey } from '@/lib/idSetKey';
  * previous-character reading during the fetch is the same trade that state
  * already makes, not a new one.
  */
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { loadCharacterStandings } from '@/features/character/standings';
 import { resolveLocationStandings } from './locationStandings';
 import { ZERO_STANDINGS, type ResolvedStandings } from '@/engine/market/standings';
 import { getTradeHub, TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { useWarmLoad } from '@/lib/useWarmLoad';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 
 export type TradeHubStandingsMap = ReadonlyMap<TradeHub['id'], ResolvedStandings>;
 
@@ -60,33 +61,25 @@ export function useTradeHubStandings(characterId: number | null): TradeHubStandi
  * set's real identity (order-independent), so an upstream caller that rebuilds
  * its id array on every render does not restart this fan-out.
  */
+const NO_STANDINGS_BY_CHARACTER: ReadonlyMap<number, TradeHubStandingsMap> = new Map();
+
 export function useTradeHubStandingsByCharacter(
   characterIds: readonly number[]
 ): ReadonlyMap<number, TradeHubStandingsMap> {
-  const [standingsByCharacter, setStandingsByCharacter] = useState<
-    ReadonlyMap<number, TradeHubStandingsMap>
-  >(new Map());
   const key = idSetKey(characterIds);
-
-  useEffect(() => {
-    let cancelled = false;
+  const load = useCallback(async () => {
     const byCharacter = new Map<number, TradeHubStandingsMap>();
-    void mapWithConcurrencyLimit(characterIds, ESI_FANOUT_CONCURRENCY, async (characterId) => {
+    await mapWithConcurrencyLimit(characterIds, ESI_FANOUT_CONCURRENCY, async (characterId) => {
       const entries = await loadCharacterStandings(characterId);
       const resolved = await Promise.all(
         TRADE_HUBS.map(async (hub) => [hub.id, await resolveHubStandings(hub, entries)] as const)
       );
       byCharacter.set(characterId, new Map(resolved));
-    }).then(() => {
-      if (!cancelled) setStandingsByCharacter(byCharacter);
     });
-    return () => {
-      cancelled = true;
-    };
+    return byCharacter as ReadonlyMap<number, TradeHubStandingsMap>;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` is the id set's real identity; `characterIds` itself is intentionally not a dep (see the comment above `key`).
   }, [key]);
-
-  return standingsByCharacter;
+  return useKeyedLoad(key, load).data ?? NO_STANDINGS_BY_CHARACTER;
 }
 
 /** No standing at a hub, but still the hub's own Safety Tax: it is the market's, not the pilot's. */

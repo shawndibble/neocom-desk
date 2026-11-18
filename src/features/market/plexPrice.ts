@@ -9,7 +9,7 @@
  * wants. `null` when the book fails or is empty, which the price engine reads
  * as "PLEX-asking rows are unpriced", not as free PLEX.
  */
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { PLEX_TYPE_ID } from '@/engine/contracts/contractOffers';
 import {
   loadGlobalMarketOverrides,
@@ -17,6 +17,7 @@ import {
   orderBookLocationFor,
 } from '@/features/market/orderBookView';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 
 export interface PlexQuote {
   price: number;
@@ -42,18 +43,6 @@ export async function loadPlexPrice(): Promise<number | null> {
 
 /** `loadPlexPrice` as state: `null` until (and unless) a price arrives. */
 export function usePlexPrice(enabled = true): number | null {
-  const [price, setPrice] = useState<number | null>(null);
-  useEffect(() => {
-    if (!enabled) return;
-    let cancelled = false;
-    void loadPlexPrice()
-      .catch(() => null)
-      .then((next) => {
-        if (!cancelled) setPrice(next);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [enabled]);
-  return price;
+  const loader = useCallback(() => loadPlexPrice().catch(() => null), []);
+  return useKeyedLoad('plex', loader, !enabled).data ?? null;
 }

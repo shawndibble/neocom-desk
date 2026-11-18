@@ -12,7 +12,7 @@
  * own `'failed'` status — never an empty book, which would tell the pilot
  * nobody is trading the item when the truth is we couldn't ask.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import type { RegionOrder } from '@/esi/endpoints';
 import { isOfflineFailure } from '@/esi/client';
 import { passesOrderFilters } from '@/engine/market/orderBookFilters';
@@ -40,6 +40,7 @@ import {
   ORDER_BOOK_FANOUT_CONCURRENCY,
   type OrderBookResult,
 } from './orderBook';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 
 export interface OrderBookLocation {
   mode: LocationMode;
@@ -274,20 +275,7 @@ export async function loadGlobalMarketOverrides(): Promise<
 export function useGlobalMarketOverrides(
   enabled = true
 ): ReadonlyMap<number, GlobalMarketOverride> | null {
-  const [overrides, setOverrides] = useState<ReadonlyMap<number, GlobalMarketOverride> | null>(
-    null
-  );
-  useEffect(() => {
-    if (!enabled) return;
-    let cancelled = false;
-    void loadGlobalMarketOverrides().then((map) => {
-      if (!cancelled) setOverrides(map);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [enabled]);
-  return overrides;
+  return useKeyedLoad('overrides', loadGlobalMarketOverrides, !enabled).data ?? null;
 }
 
 /**

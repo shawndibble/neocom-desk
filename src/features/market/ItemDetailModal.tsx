@@ -156,6 +156,8 @@ type PriceState =
   { status: 'loading' } | { status: 'ready'; summary: OrderBookSummary } | { status: 'error' };
 
 /** Mounted only while open (ImportClipboardDialog's pattern) — mounting is the open signal. */
+const NO_TRAINED_SKILLS: ReadonlyMap<number, TrainedSkill> = new Map();
+
 export function ItemDetailModal({
   typeId,
   itemId,
@@ -177,7 +179,6 @@ export function ItemDetailModal({
   const [pi, setPi] = useState<PiData | null>(null);
   const [tab, setTab] = useState<'info' | 'market'>('info');
   const tabsId = useTabsId();
-  const [trainedSkills, setTrainedSkills] = useState<ReadonlyMap<number, TrainedSkill>>(new Map());
 
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const targetPlan = useTargetPlan(activeCharacterId);
@@ -223,25 +224,19 @@ export function ItemDetailModal({
   const mutation = useDynamicItemMutation(typeId, dynamic);
   const skilled = useSkilledAttributes(typeId, mutation ?? undefined);
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      if (activeCharacterId === null) {
-        if (!cancelled) setTrainedSkills(new Map());
-        return;
-      }
-      // Queue-corrected, like every other trained-level read (usePlanEditorData) —
-      // a level the queue just finished but /skills hasn't caught up to would
-      // otherwise show wrong here while everywhere else shows it trained.
-      const corrected = await loadCorrectedSkills(activeCharacterId, Date.now(), {
+  // Queue-corrected, like every other trained-level read (usePlanEditorData) —
+  // a level the queue just finished but /skills hasn't caught up to would
+  // otherwise show wrong here while everywhere else shows it trained.
+  const loadTrainedSkills = useCallback(
+    () =>
+      loadCorrectedSkills(activeCharacterId ?? 0, Date.now(), {
         skipQueueWithoutScope: true,
-      });
-      if (!cancelled) setTrainedSkills(corrected.trained);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [activeCharacterId]);
+      }).then((corrected) => corrected.trained),
+    [activeCharacterId]
+  );
+  const trainedSkills: ReadonlyMap<number, TrainedSkill> =
+    useKeyedLoad(activeCharacterId === null ? null : String(activeCharacterId), loadTrainedSkills)
+      .data ?? NO_TRAINED_SKILLS;
 
   useEffect(() => {
     // No order book for an Abyssal type: skip the fetch.

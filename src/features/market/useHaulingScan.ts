@@ -20,6 +20,7 @@ import type { HaulingEnd } from './haulingHubs';
 import { scanHaulingLane } from './haulingScanRun';
 import type { HaulingFeesAt } from './haulingView';
 import { tradeHubStanding, useTradeHubStandings, zeroStandingsAt } from './useTradeHubStandings';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 
 export type HaulingScanState =
   | { status: 'loading'; progress: HaulingProgress | null }
@@ -93,28 +94,16 @@ export interface HaulingFees {
  */
 export function useHaulingFees(characterId: number | null): HaulingFees {
   const standings = useTradeHubStandings(characterId);
-  const [levels, setLevels] = useState<{ accounting: number; brokerRelations: number } | null>(
-    null
+  const loadLevels = useCallback(
+    () =>
+      loadCharacterModifiers(characterId ?? 0, Date.now()).then((modifiers) => ({
+        accounting: modifiers?.skills[SKILL_IDS.accounting] ?? 0,
+        brokerRelations: modifiers?.skills[SKILL_IDS.brokerRelations] ?? 0,
+      })),
+    [characterId]
   );
-
-  useEffect(() => {
-    if (characterId === null) return;
-    let cancelled = false;
-    void loadCharacterModifiers(characterId, Date.now())
-      .then((modifiers) => {
-        if (cancelled || !modifiers) return;
-        setLevels({
-          accounting: modifiers.skills[SKILL_IDS.accounting] ?? 0,
-          brokerRelations: modifiers.skills[SKILL_IDS.brokerRelations] ?? 0,
-        });
-      })
-      .catch(() => {
-        // Stays at level 0: fees priced without skills read high, never low.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId]);
+  // Stays at level 0 on a failed load: fees priced without skills read high, never low.
+  const levels = useKeyedLoad(characterId === null ? null : String(characterId), loadLevels).data;
 
   const accountingLevel = characterId === null ? 0 : (levels?.accounting ?? 0);
   const brokerRelationsLevel = characterId === null ? 0 : (levels?.brokerRelations ?? 0);

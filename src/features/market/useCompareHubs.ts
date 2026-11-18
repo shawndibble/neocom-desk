@@ -9,13 +9,14 @@
  * Also counts the jumps from the pilot's Current System to each hub, for the
  * column headers.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CompareSetItem } from './compareSet';
 import type { HubAggregate } from '@/market/fuzzwork';
 import { COMPARED_HUBS, type ComparedHubId } from '@/market/hubs';
 import { getHubPricesWithStatus, invalidateHubPrices } from '@/market/prices';
 import { jumpsBetween, useJumpBasis } from '@/features/route/jumpBasis';
 import { useCurrentSystem } from '@/features/route/currentSystem';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 
 export type HubId = ComparedHubId;
 
@@ -92,35 +93,29 @@ export function useCompareHubs(
 
   const basis = useJumpBasis();
   const { systemId: originSystemId } = useCurrentSystem();
-  const [counted, setCounted] = useState<{
-    key: string;
-    jumps: Record<HubId, number | null>;
-  } | null>(null);
   const jumpsKey = `${basis.key}|${originSystemId}`;
-
-  useEffect(() => {
-    if (!enabled || !basis.hydrated || originSystemId === null) return;
-    let cancelled = false;
-    void Promise.all(
-      COMPARED_HUBS.map((hub) =>
-        jumpsBetween(originSystemId, hub.systemId, basis)
-          .then((result) => (result.kind === 'known' ? result.jumps : null))
-          .catch(() => null)
-      )
-    ).then((counts) => {
-      if (cancelled) return;
-      setCounted({
-        key: jumpsKey,
-        jumps: Object.fromEntries(COMPARED_HUBS.map((hub, i) => [hub.id, counts[i]])) as Record<
-          HubId,
-          number | null
-        >,
-      });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [enabled, basis, originSystemId, jumpsKey]);
+  const countJumps = useCallback(
+    () =>
+      Promise.all(
+        COMPARED_HUBS.map((hub) =>
+          jumpsBetween(originSystemId ?? 0, hub.systemId, basis)
+            .then((result) => (result.kind === 'known' ? result.jumps : null))
+            .catch(() => null)
+        )
+      ).then(
+        (counts) =>
+          Object.fromEntries(COMPARED_HUBS.map((hub, i) => [hub.id, counts[i]])) as Record<
+            HubId,
+            number | null
+          >
+      ),
+    [basis, originSystemId]
+  );
+  const counted = useKeyedLoad(
+    originSystemId === null ? null : jumpsKey,
+    countJumps,
+    !enabled || !basis.hydrated
+  );
 
   const hubs =
     fetched?.key === `${itemsKey}|${refreshTick}`
@@ -129,6 +124,6 @@ export function useCompareHubs(
 
   return {
     hubs,
-    jumps: counted?.key === jumpsKey ? counted.jumps : NO_JUMPS,
+    jumps: counted.data ?? NO_JUMPS,
   };
 }

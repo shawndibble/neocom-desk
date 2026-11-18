@@ -6,7 +6,7 @@
  * all of them. Bundled with the character's trained skills and the target
  * plan, since all three feed that one panel together.
  */
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { loadTypeDetail } from '@/features/skills/typeDetail';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import { loadAttributeReferenceNames } from '@/features/market/attributeReferenceNames';
@@ -14,6 +14,7 @@ import { extractRequiredSkills, type RequiredSkill } from '@/features/skills/dog
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { useTargetPlan, type TargetPlan } from '@/features/skills/useTargetPlan';
 import type { TrainedSkill } from '@/engine/types';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 
 export interface ItemSkills {
   typeId: number;
@@ -27,67 +28,43 @@ export interface OrderRowSkills {
   targetPlan: TargetPlan;
 }
 
+const NO_TRAINED_SKILLS: ReadonlyMap<number, TrainedSkill> = new Map();
+
 export function useOrderRowSkills(
   selectedTypeId: number | null,
   activeCharacterId: number | null
 ): OrderRowSkills {
-  const [itemSkills, setItemSkills] = useState<ItemSkills | null>(null);
-  useEffect(() => {
-    if (selectedTypeId === null) return;
-    let cancelled = false;
-    void (async () => {
-      // Never rejects: same as `ItemDetailModal`'s own `pi.catch(() => null)`
-      // — a nice-to-have fetch for a row-expand section that already renders
-      // nothing while `itemSkills` is null, so a failure just leaves it out
-      // rather than needing an error state of its own.
-      try {
-        const [type, dictionary] = await Promise.all([
-          loadTypeDetail(selectedTypeId),
-          loadAttributeDictionary(),
-        ]);
-        if (cancelled || !type) return;
-        const names = await loadAttributeReferenceNames([type.dogma_attributes], dictionary);
-        if (cancelled) return;
-        setItemSkills({
-          typeId: selectedTypeId,
-          requiredSkills: extractRequiredSkills(type.dogma_attributes),
-          skillNames: names.types ?? {},
-        });
-      } catch {
-        // Left null — see comment above.
-      }
-    })();
-    return () => {
-      cancelled = true;
+  // A nice-to-have fetch for a row-expand section that renders nothing while
+  // `itemSkills` is null, so a failure just leaves it out.
+  const loadItemSkills = useCallback(async (): Promise<ItemSkills | null> => {
+    const [type, dictionary] = await Promise.all([
+      loadTypeDetail(selectedTypeId ?? 0),
+      loadAttributeDictionary(),
+    ]);
+    if (!type) return null;
+    const names = await loadAttributeReferenceNames([type.dogma_attributes], dictionary);
+    return {
+      typeId: selectedTypeId ?? 0,
+      requiredSkills: extractRequiredSkills(type.dogma_attributes),
+      skillNames: names.types ?? {},
     };
   }, [selectedTypeId]);
+  const itemSkills =
+    useKeyedLoad(selectedTypeId === null ? null : String(selectedTypeId), loadItemSkills).data ??
+    null;
 
-  const [trainedSkills, setTrainedSkills] = useState<ReadonlyMap<number, TrainedSkill>>(new Map());
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      if (activeCharacterId === null) {
-        if (!cancelled) setTrainedSkills(new Map());
-        return;
-      }
-      // Queue-corrected, like every other trained-level read (ItemDetailModal,
-      // usePlanEditorData) — a level the queue just finished but /skills
-      // hasn't caught up to would otherwise show wrong here while everywhere
-      // else shows it trained.
-      try {
-        const corrected = await loadCorrectedSkills(activeCharacterId, Date.now(), {
-          skipQueueWithoutScope: true,
-        });
-        if (!cancelled) setTrainedSkills(corrected.trained);
-      } catch {
-        // Left at whatever it was — a nice-to-have read for the row-expand
-        // skills section, not something worth an error state of its own.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [activeCharacterId]);
+  // Queue-corrected, like every other trained-level read (ItemDetailModal,
+  // usePlanEditorData). A nice-to-have read, so a failure leaves no levels.
+  const loadTrainedSkills = useCallback(
+    () =>
+      loadCorrectedSkills(activeCharacterId ?? 0, Date.now(), {
+        skipQueueWithoutScope: true,
+      }).then((corrected) => corrected.trained),
+    [activeCharacterId]
+  );
+  const trainedSkills =
+    useKeyedLoad(activeCharacterId === null ? null : String(activeCharacterId), loadTrainedSkills)
+      .data ?? NO_TRAINED_SKILLS;
 
   const targetPlan = useTargetPlan(activeCharacterId);
 

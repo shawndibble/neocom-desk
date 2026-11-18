@@ -3,10 +3,11 @@
  * Character's fills and journal, plus where the local wallet archive starts
  * for the pool. Nothing is read until `enabled`.
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { loadAllCharactersJournals } from '@/features/character/walletJournalAll';
 import { loadWalletArchiveInfo } from '@/features/character/walletArchive';
 import type { CharacterFills } from './transactionMargins';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 
 export interface AllCharacterFills {
   fills: CharacterFills[];
@@ -70,18 +71,9 @@ export function useAllCharacterFills(
 
 /** Where one Character's local wallet archive starts; null while unread or empty. */
 export function useArchiveSince(characterId: number | null): number | null {
-  const [read, setRead] = useState<{ characterId: number; since: number | null } | null>(null);
-  useEffect(() => {
-    if (characterId === null) return;
-    let cancelled = false;
-    void loadWalletArchiveInfo(characterId)
-      .then((info) => {
-        if (!cancelled) setRead({ characterId, since: info.since });
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId]);
-  return read !== null && read.characterId === characterId ? read.since : null;
+  const loader = useCallback(
+    () => loadWalletArchiveInfo(characterId ?? 0).then((info) => info.since),
+    [characterId]
+  );
+  return useKeyedLoad(characterId === null ? null : String(characterId), loader).data ?? null;
 }

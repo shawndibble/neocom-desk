@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { loadMarketRegions } from '@/sde/loadMarketSde';
 import type { MarketRegionEntry } from '@/sde/marketTypes';
 import { PriceHistoryPanel } from './PriceHistoryPanel';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
 
 interface ItemMarketTabProps {
   typeId: number;
@@ -20,19 +21,7 @@ interface ItemMarketTabProps {
  */
 export function ItemMarketTab({ typeId, itemName, initialRegionId }: ItemMarketTabProps) {
   const [picked, setPicked] = useState<number[]>([initialRegionId]);
-  const [regions, setRegions] = useState<readonly MarketRegionEntry[] | undefined>();
-  useEffect(() => {
-    let cancelled = false;
-    loadMarketRegions().then(
-      (loaded) => {
-        if (!cancelled) setRegions(loaded);
-      },
-      () => undefined
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const regions: readonly MarketRegionEntry[] | undefined = useAsyncLoad(loadMarketRegions).data;
 
   return (
     <PriceHistoryPanel
