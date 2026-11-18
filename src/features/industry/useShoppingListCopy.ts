@@ -67,8 +67,14 @@ export function useShoppingListCopy(
       Object.fromEntries(volumes)
     );
   }, [gasMap, shoppingMaterials, hub]);
-  // Keyed on the hub: the comparison is only fetched while the toggle is on.
-  const gasRoute = useKeyedLoad(compressedGas ? hub.id : null, loadGasRoute);
+  // Keyed on the hub and the gas quantities: the comparison belongs to one
+  // shopping list, so a changed requirement must not keep the old totals on
+  // screen. Only fetched while the toggle is on.
+  const gasKey = shoppingMaterials
+    .filter((m) => gasMap?.[m.typeID])
+    .map((m) => `${m.typeID}:${m.remainingQuantity}`)
+    .join(',');
+  const gasRoute = useKeyedLoad(compressedGas ? `${hub.id}|${gasKey}` : null, loadGasRoute);
 
   /**
    * The rejection is caught and shown, not left to `void`: a browser that

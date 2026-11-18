@@ -76,6 +76,8 @@ vi.mock('@/sde/loadSde', () => ({
   loadMarketWideTrees: vi.fn(async () => ({})),
   // ItemDetailModal (opened via "Show info" below) loads this unconditionally.
   loadSkillAttributeModifiers: vi.fn(async () => ({})),
+  // The Materials copy action loads the raw-to-compressed gas map.
+  loadCompressedGasTypeIds: vi.fn(async () => ({})),
 }));
 // ItemDetailModal reads the baked type-info shard first. Mocked rather than
 // fetched (`onUnhandledRequest: 'error'`); null sends it to the ESI handlers below.

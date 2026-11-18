@@ -54,4 +54,23 @@ describe('useShoppingListCopy compressed gas', () => {
     expect(write).toHaveBeenLastCalledWith('Compressed Fullerite-C50\t1000\nTritanium\t5');
     await waitFor(() => expect(result.current.gasComparison?.compressedVolume).toBe(100));
   });
+
+  it('drops the comparison for old quantities while the new requirement loads', async () => {
+    const { result, rerender } = renderHook(
+      ({ list }) => useShoppingListCopy(true, list, catalog, hub),
+      { initialProps: { list: materials } }
+    );
+    await waitFor(() => expect(result.current.hasGas).toBe(true));
+    act(() => result.current.setCompressedGas(true));
+    await waitFor(() => expect(result.current.gasComparison?.compressedVolume).toBe(100));
+
+    rerender({
+      list: [
+        { typeID: 30370, remainingQuantity: 1600 },
+        { typeID: 34, remainingQuantity: 5 },
+      ] as unknown as MaterialCostLine[],
+    });
+    expect(result.current.gasComparison).toBeNull();
+    await waitFor(() => expect(result.current.gasComparison?.compressedVolume).toBe(200));
+  });
 });
