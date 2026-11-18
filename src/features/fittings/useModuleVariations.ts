@@ -12,7 +12,7 @@
  * switch by one recalculation.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useAsyncLoad } from '@/lib/useAsyncLoad';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { swapModuleType } from '@/engine/fittings/fittingEdit';
 import {
   firstResourceOverage,
@@ -151,7 +151,8 @@ export function useModuleVariations({
       typeIds.map((id) => [id, priceMap.get(id)?.sellMin ?? null])
     );
   }, [members]);
-  const freshPrices = useAsyncLoad(loadPrices).data;
+  // Same key: a new member list refreshes behind the prices showing (looked up per type, so never another type's).
+  const freshPrices = useKeyedLoad('prices', loadPrices).data;
 
   const fresh =
     computed &&

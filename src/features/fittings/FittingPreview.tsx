@@ -74,7 +74,7 @@ function useShareCode(row: LibraryRow, fitting: Fitting | null): string | null |
   );
   const encoded = useAsyncLoad(encode).data;
   if (!encodes) return libraryRowCode(row);
-  return fitting === null ? undefined : encoded;
+  return encoded;
 }
 
 /** "Shared by <name> in <Community>", for a Community's Fitting. */
