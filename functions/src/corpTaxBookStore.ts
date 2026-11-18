@@ -674,8 +674,8 @@ async function writeExtractions(
 }
 
 /**
- * A moon owner's chunk that has not arrived and that ESI no longer lists was cancelled: its
- * grant cannot read the notification that says so. Returns the ids marked.
+ * A moon owner's chunk that has not arrived and that ESI no longer lists was cancelled: the
+ * notification that says so is read only by a grant with the notifications scope, and may be gone. Returns the ids marked.
  */
 async function cancelUnlistedFeederExtractions(
   deps: BookDeps,

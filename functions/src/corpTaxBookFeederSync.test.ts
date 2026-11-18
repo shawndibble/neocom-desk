@@ -171,6 +171,7 @@ describe('readFeederExtractions (#6097)', () => {
       {
         notifications,
         stored,
+        now: Date.parse('2026-10-18T00:00:00Z'),
       }
     );
     expect(read).toMatchObject({
@@ -183,6 +184,36 @@ describe('readFeederExtractions (#6097)', () => {
         },
       ],
     });
+  });
+
+  it('does not revive a coming chunk ESI dropped, though its started notification is still in the feed', async () => {
+    const ticks = (iso: string) => (Date.parse(iso) + 11_644_473_600_000) * 10_000;
+    const started = (arrival: string) => ({
+      type: 'MoonminingExtractionStarted',
+      timestamp: '2026-10-12T00:00:00Z',
+      text: [
+        'structureID: 5001',
+        'moonID: 40000001',
+        `readyTime: ${ticks(arrival)}`,
+        `autoTime: ${ticks('2026-11-01T03:00:00Z')}`,
+        'oreVolumeByType:',
+        '  45490: 1000000',
+      ].join('\n'),
+    });
+    const read = await readFeederExtractions(fakeEsi({ extractions: ok([]) }).esi, FEEDER, 'tok', {
+      // One chunk still to come (cancelled, its notice lost), one already popped.
+      notifications: moonNotificationsOf([
+        started('2026-11-01T00:00:00Z'),
+        started('2026-10-15T00:00:00Z'),
+      ]),
+      stored: [],
+      now: Date.parse('2026-10-18T00:00:00Z'),
+    });
+    expect(read).toMatchObject({
+      kind: 'ok',
+      extractions: [{ chunkArrivalTime: '2026-10-15T00:00:00.000Z' }],
+    });
+    expect(read.kind === 'ok' && read.extractions).toHaveLength(1);
   });
 
   it('a 403 is a refusal; ESI trouble or a low budget is nothing to remember', async () => {

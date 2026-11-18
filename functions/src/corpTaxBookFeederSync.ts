@@ -201,10 +201,11 @@ export async function readFeederExtractions(
   esi: SyncEsi,
   feederCorporationId: number,
   accessToken: string,
-  notes: { notifications: readonly MoonNotification[]; stored: readonly StoredExtractionKey[] } = {
-    notifications: [],
-    stored: [],
-  }
+  notes: {
+    notifications: readonly MoonNotification[];
+    stored: readonly StoredExtractionKey[];
+    now: number;
+  } = { notifications: [], stored: [], now: 0 }
 ): Promise<FeederExtractionsRead> {
   if (esi.budgetLow()) return { kind: 'none' };
   const read = await esi.extractions(feederCorporationId, accessToken);
@@ -212,10 +213,19 @@ export async function readFeederExtractions(
   if (read.kind !== 'ok') return { kind: 'none' };
   return {
     kind: 'ok',
-    extractions: reconcileExtractions(read.data, notes.notifications, notes.stored).map((x) => ({
-      ...x,
-      sourceCorporationId: feederCorporationId,
-    })),
+    extractions: reconcileExtractions(read.data, notes.notifications, notes.stored)
+      // A chunk only a notification names is added once it has arrived: a coming one that ESI
+      // does not list was cancelled, and a missing cancel notification must not revive it.
+      .filter(
+        (x) =>
+          Date.parse(x.chunkArrivalTime) <= notes.now ||
+          read.data.some(
+            (e) =>
+              e.structure_id === x.structureId &&
+              Date.parse(e.chunk_arrival_time) === Date.parse(x.chunkArrivalTime)
+          )
+      )
+      .map((x) => ({ ...x, sourceCorporationId: feederCorporationId })),
     complete: !read.truncated,
   };
 }
@@ -250,6 +260,7 @@ export async function refreshFeederExtractions(
   const read = await readFeederExtractions(esi, record.corporationId, accessToken, {
     notifications,
     stored,
+    now,
   });
   if (read.kind === 'none') return [];
   const refineries = read.kind === 'ok' ? read.extractions.map((x) => x.structureId) : [];

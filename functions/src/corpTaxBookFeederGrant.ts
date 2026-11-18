@@ -223,7 +223,7 @@ export function feederGrantReadsStructures(scopes: readonly string[]): boolean {
 
 /** Whether the grant also reads the holder's notifications (the ore of each chunk). */
 export const feederGrantReadsNotifications = (scopes: readonly string[]): boolean =>
-  scopes.includes(FEEDER_SYNC_SCOPES[2]);
+  scopes.includes('esi-characters.read_notifications.v1');
 
 /** The code Reconnect sends in place of an invite: rebind the grant of a corporation that already feeds a book. */
 export const RECONNECT_CODE = 'reconnect-existing';
