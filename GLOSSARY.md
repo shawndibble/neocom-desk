@@ -32,6 +32,10 @@ here — they go one per file in `docs/context/decisions/`.
   than to buy outright at the trade hub. A personal-use comparison — no
   sales tax or broker fee applies, because nothing is being sold. Stated in
   Costs & revenue as "Buying <product> instead", not in the **Verdict Hero**.
+- **Sale price**: A Build Plan's own per-unit ISK price for its product, set in
+  Setup > Location & market. It replaces the trade hub's lowest sell in revenue,
+  margin, break-even and the **Acquisition Verdict**; blank means the hub price.
+  Distinct from a material's price override.
 - **Active Fit**: The ship a Character is flying, read as a **Fitting** off their assets: the hull from ESI's current-ship call, the modules, charges, drones and cargo from the assets inside that ship. ESI refreshes assets about hourly, so after a refit or a ship swap its modules can be up to an hour behind the game. Never stored. Distinct from an **In-game Fitting**, which is a fit the pilot saved in EVE.
 - **Agent access**: Which mission agent levels a pilot's NPC standings open, shown on an NPC faction's or corporation's info modal as five pips (levels 1 to 5, the standing each needs underneath) and what the next level takes. Level 1 is always open; levels 2 to 5 need 1.0, 3.0, 5.0 and 7.0 of the best effective standing in the **Standing chain**, and none of them is open while any link is at -2.0 or lower. On an agent's modal it answers "Can you use this agent?" for that agent's own level. Storyline, research and COSMOS agents follow other rules and are not covered.
 - **Agreed rate**: What the **Collector** set as a **Feeder**'s **Owner rate**. Only an agreed rate takes effect; the first one also counts back over the days before it. Player-facing: "your rate" or "their rate".

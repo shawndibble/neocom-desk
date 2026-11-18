@@ -276,8 +276,10 @@ export function PlanBuildLocationFields({
               placeholder={t('industry.salePricePlaceholder')}
               mine={plan.productSalePrice !== undefined}
               parse={(raw) => {
+                // Blank clears; unreadable or non-positive keeps what was there.
+                if (raw.trim() === '') return undefined;
                 const value = unmaskNumber(raw);
-                return value !== undefined && value > 0 ? value : undefined;
+                return value !== undefined && value > 0 ? value : plan.productSalePrice;
               }}
               onCommit={(productSalePrice) => update({ productSalePrice })}
             />
