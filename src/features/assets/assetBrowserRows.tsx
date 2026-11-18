@@ -434,11 +434,14 @@ const ITEM_CELL = 'md:shrink-0 md:truncate md:text-right';
 const ITEM_QUANTITY_CELL = cx(ITEM_CELL, 'md:w-24');
 const ITEM_VOLUME_CELL = cx(ITEM_CELL, 'md:w-28');
 const ITEM_VALUE_CELL = cx(ITEM_CELL, 'md:w-24');
+const ITEM_COST_CELL = cx(ITEM_CELL, 'md:w-44');
 /** The row menu button's md+ box (`IconButton` size `row`, `md:size-7`), reserved even when the row has no menu. */
 const ITEM_MENU_SLOT = 'md:ml-auto md:flex md:w-7 md:shrink-0 md:justify-end';
 const ITEM_MENU_SPACER = 'md:w-7 md:shrink-0';
 
 interface ItemColumnLabelsProps {
+  /** Adds the Stock Cost Basis column. */
+  showCost?: boolean;
   sort: DataTableSort | null;
   onSort: (column: LevelSortColumn) => void;
   t: Translate;
@@ -449,7 +452,7 @@ interface ItemColumnLabelsProps {
  * to the same cells `ItemRow` lays out; container rows in the same level keep
  * their own shape and simply have no figures under it.
  */
-export function ItemColumnLabels({ sort, onSort, t }: ItemColumnLabelsProps) {
+export function ItemColumnLabels({ showCost = false, sort, onSort, t }: ItemColumnLabelsProps) {
   const column = (id: LevelSortColumn, label: string, cellClass: string) => {
     const active = sort?.columnId === id;
     const SortGlyph = !active
@@ -497,6 +500,7 @@ export function ItemColumnLabels({ sort, onSort, t }: ItemColumnLabelsProps) {
       {column('quantity', t('assets.columns.quantity'), ITEM_QUANTITY_CELL)}
       {column('volume', t('assets.columns.volume'), ITEM_VOLUME_CELL)}
       {column('value', t('assets.sort.value'), ITEM_VALUE_CELL)}
+      {showCost && <span className={ITEM_COST_CELL}>{t('assets.columns.cost')}</span>}
       <span className={ITEM_MENU_SPACER} />
     </div>
   );
@@ -511,6 +515,10 @@ interface ItemRowProps {
   estimatedValue: number;
   /** Tooltip note on the value. */
   valueHint?: string;
+  /** Stock Cost Basis per unit; absent when the history does not cover every held unit. */
+  stockUnitCost?: number;
+  /** The level offers the Stock Cost Basis column, so a row without one keeps its cell. */
+  showStockCost?: boolean;
   characterBadge: string | null;
   /** Set on a blueprint stack: a BPO or BPC badge beside the name. */
   blueprintKind?: BlueprintKind | null;
@@ -562,6 +570,29 @@ function ValueFigure({
 }
 
 /**
+ * What the held stack cost: the total, then the unit cost it was averaged to.
+ * Only rendered when the history covers every held unit of the type.
+ */
+function StockCostFigure({
+  unitCost,
+  quantity,
+  t,
+}: {
+  unitCost: number;
+  quantity: number;
+  t: Translate;
+}) {
+  return (
+    <span className={cx(ITEM_COST_CELL, 'whitespace-nowrap')}>
+      <IskAmount value={unitCost * quantity} decimals={0} />{' '}
+      <span className="text-text-faint">
+        (<IskAmount value={unitCost} decimals={0} /> {t('assets.cost.each')})
+      </span>
+    </span>
+  );
+}
+
+/**
  * A leaf asset: name, then quantity/volume/value on one wrapping metadata
  * line. The fixed-width three-column layout this replaces (`Assets.tsx`'s
  * old `w-14`/`w-16`/`w-20` trio) is exactly what made the row unreadable
@@ -580,6 +611,8 @@ export function ItemRow({
   unitVolume,
   estimatedValue,
   valueHint,
+  stockUnitCost,
+  showStockCost = false,
   characterBadge,
   blueprintKind = null,
   typeId,
@@ -665,6 +698,17 @@ export function ItemRow({
               >
                 <ValueFigure value={estimatedValue} hint={valueHint} t={t} />
               </span>
+              {stockUnitCost !== undefined && (
+                <>
+                  <span aria-hidden="true" className="md:hidden">
+                    ·
+                  </span>
+                  <StockCostFigure unitCost={stockUnitCost} quantity={quantity} t={t} />
+                </>
+              )}
+              {stockUnitCost === undefined && showStockCost && (
+                <span className={cx(ITEM_COST_CELL, 'hidden md:block')} />
+              )}
             </span>
           </span>
           <span className={ITEM_MENU_SLOT}>
