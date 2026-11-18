@@ -172,7 +172,7 @@ type SrpOfficerBackend = typeof real;
 /** A story's in-memory stand-in, as the same backend: the queries' filtering and ordering live here. */
 const fromStandIn = (s: SrpOfficerBackendOverride): SrpOfficerBackend => ({
   openClaims: async () => s.claims().filter(isOpen),
-  history: async (_character, _corp, count) =>
+  history: async (_character, _corp, count = 100) =>
     s
       .claims()
       .filter((c) => !isOpen(c))

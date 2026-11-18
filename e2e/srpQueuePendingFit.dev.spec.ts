@@ -4,7 +4,7 @@
  * start off in the table's column picker to make the room.
  *
  * Dev server only: the page reads its claims from the Storybook stand-ins
- * (`srpBackendOverride.ts` + `srpOfficerBackendOverride.ts` and their
+ * (`srpBackendOverride.ts` and the srp
  * fixtures), installed by importing those `/src` modules into the running app
  * — the e2e build has no Firebase.
  */

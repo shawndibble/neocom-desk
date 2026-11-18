@@ -1,6 +1,5 @@
 /**
- * Binds a client's exported function to one op of its backend, picked at call time
- * (`override ?? real`), so the public signature is the op's own.
+ * Picks the backend (`override ?? real`) at call time so the public signature stays the op's own.
  */
 export const delegate =
   <B extends object>(backend: () => B) =>

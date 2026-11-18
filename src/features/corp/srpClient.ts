@@ -42,7 +42,7 @@ async function changeCall<Out = void>(
 ): Promise<Out> {
   const accessToken = await getValidAccessToken(characterId);
   try {
-    return await callSignedIn(characterId, name, { corporationId, accessToken, ...data });
+    return await callSignedIn(characterId, name, { ...data, corporationId, accessToken });
   } finally {
     invalidateSrpOfficer(characterId, corporationId);
   }
@@ -104,7 +104,6 @@ const real = {
 
 type SrpBackend = typeof real;
 
-/** A story's or test's in-memory stand-in, as the same backend. */
 const fromStandIn = (s: SrpBackendOverride): SrpBackend => ({
   readSettings: async () => s.readSettings(),
   verify: async () => s.verify(),

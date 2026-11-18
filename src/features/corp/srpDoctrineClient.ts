@@ -75,7 +75,6 @@ const real = {
 
 type SrpDoctrineBackend = typeof real;
 
-/** A story's or test's in-memory stand-in, as the same backend. */
 const fromStandIn = (s: SrpDoctrineBackendOverride): SrpDoctrineBackend => ({
   list: async () => s.list(),
   save: async (_character, _corp, input) => s.save(input),
@@ -117,7 +116,7 @@ export async function previewSrpDoctrineCheck(
 }
 
 /**
- * Any verified member: the corp's Doctrine Fits for the Fittings library (#6202). SRP off lists
+ * Any verified member: the corp's Doctrine Fits for the Fittings library. SRP off lists
  * none.
  */
 export const listCorpDoctrineFits = op('memberList');
