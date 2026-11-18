@@ -8,6 +8,7 @@
 
 import { FieldValue, type DocumentReference, type Firestore } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
+import { intIn, optionalIntIn } from './inputParse.js';
 import {
   BUYBACK_GROUP_KEYS,
   BUYBACK_HUB_IDS,
@@ -159,23 +160,7 @@ export interface SetClosedInput extends RequestIdInput {
   closed: boolean;
 }
 
-function positiveInt(value: unknown, field: string, max: number): number {
-  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1 || value > max) {
-    throw new HttpsError('invalid-argument', `${field} must be a whole number from 1 to ${max}`);
-  }
-  return value;
-}
-
-function optionalInt(value: unknown, field: string, min: number, max: number): number | undefined {
-  if (value === undefined || value === null) return undefined;
-  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) {
-    throw new HttpsError(
-      'invalid-argument',
-      `${field} must be a whole number from ${min} to ${max}`
-    );
-  }
-  return value;
-}
+const positiveInt = (value: unknown, field: string, max: number) => intIn(value, field, 1, max);
 
 /** Optional free text: trimmed, empty allowed, bounded. */
 function optionalText(value: unknown, field: string, max: number): string {
@@ -202,9 +187,9 @@ function parseLine(raw: unknown): RequestLine {
     quantity: positiveInt(d.quantity, 'quantity', MAX_LINE_QUANTITY),
     kind: kind as RequestLineKind,
   };
-  const runs = optionalInt(d.runs, 'runs', 1, 1_000_000);
-  const me = optionalInt(d.me, 'me', 0, 10);
-  const te = optionalInt(d.te, 'te', 0, 20);
+  const runs = optionalIntIn(d.runs, 'runs', 1, 1_000_000);
+  const me = optionalIntIn(d.me, 'me', 0, 10);
+  const te = optionalIntIn(d.te, 'te', 0, 20);
   if (kind === 'bpc') {
     if (runs !== undefined) line.runs = runs;
     if (me !== undefined) line.me = me;
@@ -274,7 +259,7 @@ function parseStanding(d: Record<string, unknown>): StandingTerms {
   if (new Set(buyLines.map(buyLineKey)).size !== buyLines.length) {
     throw new HttpsError('invalid-argument', 'a buy line is listed twice');
   }
-  const buyer = optionalInt(d.buyerCharacterId, 'buyerCharacterId', 1, 2_000_000_000_000);
+  const buyer = optionalIntIn(d.buyerCharacterId, 'buyerCharacterId', 1, 2_000_000_000_000);
   return {
     rate,
     rateBasis: d.rateBasis as RateBasis,

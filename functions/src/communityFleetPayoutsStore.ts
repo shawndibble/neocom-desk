@@ -7,7 +7,7 @@
 // memberUid is set only when the pilot's Character is a current Member.
 
 import type { Caller } from './actorAuth.js';
-import { type Firestore, type Transaction } from 'firebase-admin/firestore';
+import { type Firestore } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import {
   FLEET_PAYOUTS_COLLECTION,
@@ -20,7 +20,13 @@ import {
   type CreateFleetPayoutInput,
   type CreateDecision,
 } from './communityFleetPayouts.js';
-import { communityRef, loadCommunity, memberRef } from './communitiesStore.js';
+import {
+  communityRef,
+  loadCommunity,
+  memberRef,
+  requireCurrentMember,
+  requireMember,
+} from './communitiesStore.js';
 
 export const fleetPayoutCollection = (db: Firestore, communityId: string) =>
   communityRef(db, communityId).collection(FLEET_PAYOUTS_COLLECTION);
@@ -44,20 +50,6 @@ function failCreate(decision: Exclude<CreateDecision, 'ok'>): never {
         { reason: 'too-many-open-payouts' }
       );
   }
-}
-
-/** The caller's Member doc, only under the ownerHash it was joined with (a sold Character does not inherit it). */
-async function requireMember(
-  tx: Transaction,
-  db: Firestore,
-  communityId: string,
-  caller: Caller
-): Promise<{ characterName: string }> {
-  const member = await tx.get(memberRef(db, communityId, caller.uid));
-  if (!member.exists || member.get('ownerHash') !== caller.ownerHash) {
-    throw new HttpsError('not-found', 'Not a Member of this Community');
-  }
-  return { characterName: String(member.get('characterName') ?? '') };
 }
 
 /** Opens a Fleet Payout with its Shares. Returns its id; the client refetches. */
@@ -160,10 +152,7 @@ export async function removeFleetPayout(
   payoutId: string
 ): Promise<void> {
   const community = await loadCommunity(db, communityId);
-  const member = await memberRef(db, communityId, caller.uid).get();
-  if (!member.exists || member.get('ownerHash') !== caller.ownerHash) {
-    throw new HttpsError('not-found', 'Not a Member of this Community');
-  }
+  await requireCurrentMember(db, communityId, caller);
   const ref = fleetPayoutCollection(db, communityId).doc(payoutId);
   const payout = await ref.get();
   if (!payout.exists) return;
