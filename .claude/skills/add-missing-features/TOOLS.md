@@ -37,7 +37,7 @@ Alysii's PI Scheme, EVE Planetary Planner, Upwell Fuel Monitor, ETM v2,
 AllianceAuth Market Manager, EVE Tycoon MCP server, EVE Metro, EVE Omni (4.0.74–5.5.1 changelog re-read: wallet analysis, T2 planner, Upwell hold, gank systems, trade guards all built),
 Eve Deep Industry, SNOW//OPS, New Eden Command, eve-hub.ru,
 eve-gatecheck.space (basic checker = Route Safety; premium waypoints/ship types/finder/war intel read; #5929), Telescope, EVE Killmap, The Bounty Bid, PI Nexus, sde-deltas, Gatewatch, EVE
-PvP Corp Activity Search, Forge Ledger, New Eden Trade, Keystar, AstraCore,
+PvP Corp Activity Search, EVE Threat Checker (eve-threat-checker.netlify.app, logged-out zKill+EveWho PvP threat scorer; every screen is Pilot Lookup's local-list threat read or a leftover below), Forge Ledger, New Eden Trade, Keystar, AstraCore,
 OMIP (Wilm0rien/omip, Go desktop corp-director aggregator, last push 2024-04, README read in full; every pipeline screen is built, see leftovers), evehelper.pages.dev, eve-webtools PI, LedgerParser, IntelParser and Fitlab (roadmap.json and changelog.json per app; every item shipped here or killed: mining history = 90-day overview, PI alerts/forecast/ISK-hr = Advisor, Local threat/Pilot lookup, fit cost + Improve). EVE Crews (lore roleplay layer, no
 market endpoint) and Isktracker Incursions (non-pipeline) are out of remit.
 Weak gaps noted, never filed: J-space class/effect/statics in Place Info
@@ -436,7 +436,7 @@ The reason is what stops a re-pitch. Numbers are kill-tests.
   SDE-wide list, no decision value, collector minority); Hubs on route (thin
   filter over Hauling Trip Plan; cheap fix is hubs as optional Trip Plan
   stops); gate-camp check, D-Scan, live map (intel, kill-test 2).
-- **IntelParser leftover:** per-pilot cyno/hot-drop/bait/FC chips on Local rows from zKillboard stats (non-ISK, thin; only revive if intel gets asked for).
+- **IntelParser leftover:** per-pilot cyno/hot-drop/bait/FC chips on Local rows from zKillboard stats (non-ISK, thin; only revive if intel gets asked for; EVE Threat Checker re-pitches it with capital/Black Ops detection, Known Associates, last-3-loss fits, bling kills and EveWho corp/alliance expansion: same verdict, and EveWho is a third-party roster, not ESI).
 - **EQM 2.0 leftovers:** saved org red-list (a −10 contact on the corp/alliance
   does it, synced); typed-in recons on D-Scan (flips an evidence Read-out, 47);
   Local share link (Firestore cost, audience already sees Local); regroup Local
