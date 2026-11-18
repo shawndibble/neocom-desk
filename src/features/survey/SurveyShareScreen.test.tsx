@@ -2,22 +2,28 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
+import { db } from '@/db';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { takePendingScan } from './pendingScan';
 import { noteStartedHere } from './startedHere';
 
-const { addSurveyScan, loadSurvey, setSurveyInfo, setSurveyTax } = vi.hoisted(() => ({
-  addSurveyScan: vi.fn(),
-  loadSurvey: vi.fn(),
-  setSurveyInfo: vi.fn(),
-  setSurveyTax: vi.fn(),
-}));
+const { addSurveyScan, loadSurvey, setSurveyInfo, setSurveyTax, setSurveyScanIgnored } = vi.hoisted(
+  () => ({
+    addSurveyScan: vi.fn(),
+    loadSurvey: vi.fn(),
+    setSurveyInfo: vi.fn(),
+    setSurveyTax: vi.fn(),
+    setSurveyScanIgnored: vi.fn(),
+  })
+);
 vi.mock('./surveyStore', async () => ({
   ...(await vi.importActual<object>('./surveyStore')),
   addSurveyScan,
   loadSurvey,
   setSurveyInfo,
   setSurveyTax,
+  setSurveyScanIgnored,
 }));
 vi.mock('./submitterName', () => ({ submitterName: async () => null }));
 vi.mock('./SurveyCharts', () => ({ SurveyCharts: () => <div data-testid="charts" /> }));
@@ -57,10 +63,16 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
+/** The panel starts folded on a survey this device just started with no details: open it. */
+async function openDetails() {
+  fireEvent.click(await screen.findByRole('button', { name: 'Show additional information' }));
+}
+
 describe('SurveyShareScreen details', () => {
   it('lets the device that started the survey set its details, with no account', async () => {
     noteStartedHere(ID);
     renderScreen();
+    await openDetails();
     const notes = await screen.findByLabelText('Notes (markdown supported)');
     fireEvent.change(notes, { target: { value: 'Dock at the Athanor' } });
     fireEvent.blur(notes);
@@ -78,6 +90,7 @@ describe('SurveyShareScreen details', () => {
   it('stores the moon tax once it has a name and a rate', async () => {
     noteStartedHere(ID);
     renderScreen();
+    await openDetails();
     fireEvent.change(await screen.findByLabelText('Moon tax payee'), {
       target: { value: 'Bob Corp' },
     });
@@ -100,6 +113,81 @@ describe('SurveyShareScreen details', () => {
     renderScreen();
     await screen.findByText('0% mined');
     expect(screen.queryByLabelText('Moon tax payee')).toBeNull();
+  });
+
+  it('starts folded when this device just started the survey and no details are set', async () => {
+    noteStartedHere(ID);
+    renderScreen();
+    await screen.findByRole('button', { name: 'Show additional information' });
+    expect(screen.queryByLabelText('Notes (markdown supported)')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Show additional information' }));
+    expect(screen.getByLabelText('Notes (markdown supported)')).toBeTruthy();
+    // And the pilot can fold it again.
+    fireEvent.click(screen.getByRole('button', { name: 'Hide additional information' }));
+    expect(screen.queryByLabelText('Notes (markdown supported)')).toBeNull();
+  });
+
+  it('starts open when the survey already has details', async () => {
+    noteStartedHere(ID);
+    loadSurvey.mockResolvedValue({
+      ok: true,
+      ignored: new Set(),
+      expiresAt: EXPIRES,
+      info: { location: null, notes: 'Dock at the Athanor' },
+      scans: [{ at: Date.UTC(2026, 9, 8, 18), rocks: parseSurveyScan(SCAN)! }],
+    });
+    renderScreen();
+    expect(await screen.findByLabelText('Notes (markdown supported)')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Hide additional information' })).toBeTruthy();
+  });
+});
+
+describe('SurveyShareScreen as its signed-in owner', () => {
+  beforeEach(async () => {
+    await db.characters.put({ characterId: 7, name: 'Shawn Dibble', ownerHash: 'h', addedAt: 1 });
+    useActiveCharacter.setState({ activeCharacterId: 7, hydrated: true });
+  });
+  afterEach(async () => {
+    await db.characters.clear();
+    useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
+  });
+
+  const twoScans = (owner: string) => ({
+    ok: true,
+    owner,
+    ignored: new Set<string>(),
+    expiresAt: EXPIRES,
+    scans: [
+      { id: 's1', at: Date.UTC(2026, 9, 8, 18), rocks: parseSurveyScan(SCAN)! },
+      { id: 's2', at: Date.UTC(2026, 9, 8, 19), rocks: parseSurveyScan(SHRUNK)! },
+    ],
+  });
+
+  it('shows the details editor and lets the owner set a scan aside', async () => {
+    loadSurvey.mockResolvedValue(twoScans('Shawn Dibble'));
+    setSurveyScanIgnored.mockResolvedValue(undefined);
+    renderScreen();
+    expect(await screen.findByLabelText('Notes (markdown supported)')).toBeTruthy();
+    fireEvent.click(screen.getByText('2 scans', { selector: 'summary' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
+    await waitFor(() =>
+      expect(setSurveyScanIgnored).toHaveBeenCalledWith({
+        id: ID,
+        expiresAt: EXPIRES,
+        // The list is newest first.
+        scanId: 's2',
+        ignored: true,
+        characterId: 7,
+      })
+    );
+  });
+
+  it("offers neither to a pilot who isn't the survey's owner", async () => {
+    loadSurvey.mockResolvedValue(twoScans('Someone Else'));
+    renderScreen();
+    await screen.findByText(/mined/);
+    expect(screen.queryByLabelText('Notes (markdown supported)')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull();
   });
 });
 

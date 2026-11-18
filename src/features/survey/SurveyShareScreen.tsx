@@ -13,7 +13,9 @@ import { Link } from 'react-router-dom';
 import { EmptyState, Spinner } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
+import { ownsSurvey } from '@/engine/survey/owner';
 import { countedScans, type SurveySummary } from '@/engine/survey/series';
+import { useCharacters } from '@/features/character/useCharacters';
 import { classifyScan, lastSeenField, missingOres } from '@/engine/survey/scanUpdate';
 import { ShareShell } from '@/features/share/ShareShell';
 import { shareUrl } from '@/features/share/shareStore';
@@ -22,7 +24,9 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ScanFeedback } from './ScanFeedback';
 import { useScanFeedback } from './useScanFeedback';
 import { SurveyInfoReadout, type SurveyToConnect } from './SurveyInfoPanel';
+import { SurveyInfoLine } from './SurveyInfoLine';
 import { SurveyStarterDetails } from './SurveyStarterDetails';
+import { useScanIgnore } from './useScanIgnore';
 import { startedHere } from './startedHere';
 import { SurveyBoard } from './SurveyBoard';
 import { ExpandedCheck } from './ExpandedCheck';
@@ -50,6 +54,17 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
   // A first scan lacking an ore the survey shows, waiting for the pilot to
   // confirm every section was expanded.
   const [checking, setChecking] = useState<{ text: string; ores: string[] } | null>(null);
+  // A signed-in pilot whose Character started the Survey manages it here as in the
+  // app: the details panel and setting scans aside. Anyone else sees the plain page.
+  const characterNames = useCharacters().map((c) => c.name);
+  const owned =
+    characterId !== null && state.status === 'ready' && ownsSurvey(state.owner, characterNames);
+  const { setIgnored, failed: ignoreFailed } = useScanIgnore({
+    id: shareId,
+    expiresAt: state.status === 'ready' ? state.expiresAt : null,
+    characterId,
+    refresh,
+  });
 
   const add = useCallback(
     async (text: string, confirmed = false): Promise<AddScanResult> => {
@@ -167,15 +182,37 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
             />
           )}
           <ScanFeedback busy={busy} error={error} />
+          {ignoreFailed && (
+            <p role="alert" className="text-sm text-danger">
+              {t('survey.scanList.removeFailed')}
+            </p>
+          )}
           <SurveyBoard
             scans={state.scans}
             ignored={state.ignored}
+            onSetIgnored={owned ? (scanId, ignored) => void setIgnored(scanId, ignored) : undefined}
+            owned={owned}
             onFinish={finish}
             url={shareUrl(shareId)}
             location={state.info?.location?.name ?? null}
             expiresAt={state.expiresAt}
             afterPanel={(summary) =>
-              startedHere(shareId) && hydrated && characterId === null ? (
+              owned && characterId !== null ? (
+                <SurveyInfoLine
+                  characterId={characterId}
+                  summary={summary}
+                  owned
+                  tax={state.tax}
+                  info={state.info}
+                  survey={{
+                    id: shareId,
+                    expiresAt: state.expiresAt,
+                    published: state.tax,
+                    info: state.info,
+                  }}
+                  onStored={() => void refresh()}
+                />
+              ) : startedHere(shareId) && hydrated && characterId === null ? (
                 <SurveyStarterDetails
                   key={shareId}
                   id={shareId}

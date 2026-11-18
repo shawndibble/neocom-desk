@@ -15,7 +15,8 @@
  */
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Fields, Panel, TextArea } from '@/components/ui';
+import { Button, CollapsiblePanel, Fields, Panel, TextArea } from '@/components/ui';
+import { useInfoFold } from './useInfoFold';
 import { InfoRow } from './InfoRow';
 import { SurveyNotes } from './SurveyNotes';
 import {
@@ -102,6 +103,12 @@ export function SurveyInfoEditor({
       });
   }
 
+  const fold = useInfoFold(
+    survey?.id,
+    survey?.info?.location != null ||
+      (survey?.info?.notes ?? '') !== '' ||
+      survey?.published != null
+  );
   const taxPct = parseTaxPct(tax.pct);
   const fields: InfoFields = {
     location,
@@ -117,6 +124,8 @@ export function SurveyInfoEditor({
     setNotes(next.notes);
     if (moon && template.tax) setTax({ name: template.tax.name, pct: String(template.tax.pct) });
     setAppliedId(template.id);
+    // Open, so the rows are there to settle and show what the template filled in.
+    fold.open();
     // The tax goes up on its own once the row settles, as when it is typed.
     store(next.location, next.notes);
   }
@@ -130,78 +139,84 @@ export function SurveyInfoEditor({
   }
 
   return (
-    <Panel
-      title={t('survey.info.title')}
-      actions={
-        <SurveyTemplateMenu
-          templates={templates}
-          appliedId={applied?.id ?? null}
-          onApply={apply}
-          onSave={() => setDialog('save')}
-          onManage={() => setDialog('manage')}
-        />
-      }
-    >
-      {applied !== undefined && (
-        <p className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-          <span>{t('survey.templates.applied', { name: applied.name })}</span>
-          {edited && (
-            <>
-              <span className="text-text-dim">{t('survey.templates.edited')}</span>
-              <Button size="sm" onClick={() => updateApplied(applied)}>
-                {t('survey.templates.update')}
-              </Button>
-              <Button size="sm" onClick={() => setDialog('save')}>
-                {t('survey.templates.saveAsNew')}
-              </Button>
-            </>
-          )}
-        </p>
-      )}
-      <Fields variant="form">
-        <InfoRow label={t('survey.info.location')}>
-          <div className="flex min-w-0 flex-1 basis-64">
-            <SurveyLocationPicker
-              value={location}
-              characterId={characterId}
-              onPick={(place) => {
-                const next = place === null ? null : { id: place.id, name: place.name };
-                setLocation(next);
-                store(next, notes);
-              }}
-            />
-          </div>
-          {location?.id != null && (
-            <SurveyWaypointButton location={{ id: location.id, name: location.name }} />
-          )}
-        </InfoRow>
-        {moon && (
-          <MoonTaxRow
-            characterId={characterId}
-            survey={survey}
-            connectable={
-              connect && {
-                ...connect,
-                locationId: location?.id ?? null,
-                locationName: location?.name,
-              }
-            }
-            draft={tax}
-            onDraftChange={setTax}
+    <>
+      <CollapsiblePanel
+        title={t('survey.info.title')}
+        expanded={fold.expanded}
+        onToggle={fold.onToggle}
+        labels={{ show: t('survey.info.show'), hide: t('survey.info.hide') }}
+        actions={
+          <SurveyTemplateMenu
+            templates={templates}
+            appliedId={applied?.id ?? null}
+            onApply={apply}
+            onSave={() => setDialog('save')}
+            onManage={() => setDialog('manage')}
           />
+        }
+      >
+        {applied !== undefined && (
+          <p className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            <span>{t('survey.templates.applied', { name: applied.name })}</span>
+            {edited && (
+              <>
+                <span className="text-text-dim">{t('survey.templates.edited')}</span>
+                <Button size="sm" onClick={() => updateApplied(applied)}>
+                  {t('survey.templates.update')}
+                </Button>
+                <Button size="sm" onClick={() => setDialog('save')}>
+                  {t('survey.templates.saveAsNew')}
+                </Button>
+              </>
+            )}
+          </p>
         )}
-        <InfoRow label={t('survey.info.notesEditor')}>
-          <TextArea
-            rows={3}
-            maxLength={MAX_SURVEY_NOTES}
-            aria-label={t('survey.info.notesEditor')}
-            placeholder={t('survey.info.notesPlaceholder')}
-            value={notes}
-            onChange={(event) => setNotes(event.target.value)}
-            onBlur={() => store(location, notes)}
-          />
-        </InfoRow>
-      </Fields>
+        <Fields variant="form">
+          <InfoRow label={t('survey.info.location')}>
+            <div className="flex min-w-0 flex-1 basis-64">
+              <SurveyLocationPicker
+                value={location}
+                characterId={characterId}
+                onPick={(place) => {
+                  const next = place === null ? null : { id: place.id, name: place.name };
+                  setLocation(next);
+                  store(next, notes);
+                }}
+              />
+            </div>
+            {location?.id != null && (
+              <SurveyWaypointButton location={{ id: location.id, name: location.name }} />
+            )}
+          </InfoRow>
+          {moon && (
+            <MoonTaxRow
+              characterId={characterId}
+              survey={survey}
+              connectable={
+                connect && {
+                  ...connect,
+                  locationId: location?.id ?? null,
+                  locationName: location?.name,
+                }
+              }
+              draft={tax}
+              onDraftChange={setTax}
+            />
+          )}
+          <InfoRow label={t('survey.info.notesEditor')}>
+            <TextArea
+              rows={3}
+              maxLength={MAX_SURVEY_NOTES}
+              aria-label={t('survey.info.notesEditor')}
+              placeholder={t('survey.info.notesPlaceholder')}
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              onBlur={() => store(location, notes)}
+            />
+          </InfoRow>
+        </Fields>
+      </CollapsiblePanel>
+      {/* Outside the panel: the menu in its header opens these while the body is folded. */}
       {dialog === 'save' && (
         <SaveTemplateDialog
           fields={fields}
@@ -219,7 +234,7 @@ export function SurveyInfoEditor({
           onClose={() => setDialog(null)}
         />
       )}
-    </Panel>
+    </>
   );
 }
 
