@@ -4,7 +4,8 @@
  * other level on demand, when the pilot picks it, and is keyed on the
  * evaluator so a Fitting or Character change never shows the old fit's figures.
  */
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { levelGain, type LevelGain, type SkillGain } from '@/engine/fittings/skillGains';
 import type { SkillGainEvaluator } from './useFittingEvaluation';
 
@@ -20,36 +21,19 @@ export function useSkillLevelGain(
   gain: SkillGain,
   level: number
 ): SkillLevelGainState {
-  const [computed, setComputed] = useState<{
-    evaluator: SkillGainEvaluator;
-    skillTypeId: number;
-    level: number;
-    result: LevelGain | null;
-  } | null>(null);
   const ranked = level === gain.toLevel;
   const { skillTypeId } = gain;
-
-  useEffect(() => {
-    if (!evaluator || ranked) return;
-    let cancelled = false;
-    void evaluator
-      .compare(skillTypeId, level)
-      .then(({ before, after }) => levelGain(before, after))
-      .catch(() => null)
-      .then((result) => {
-        if (!cancelled) setComputed({ evaluator, skillTypeId, level, result });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [evaluator, skillTypeId, level, ranked]);
-
+  // Undefined: nothing to work out (no evaluator, or the ranked level already has its figures).
+  const load = useCallback(
+    () =>
+      !evaluator || ranked
+        ? Promise.resolve(undefined)
+        : evaluator
+            .compare(skillTypeId, level)
+            .then(({ before, after }) => levelGain(before, after)),
+    [evaluator, skillTypeId, level, ranked]
+  );
+  const computed = useAsyncLoad<LevelGain | undefined>(load);
   if (ranked) return { gain, failed: false };
-  const fresh =
-    computed?.evaluator === evaluator &&
-    computed?.skillTypeId === skillTypeId &&
-    computed?.level === level
-      ? computed
-      : null;
-  return { gain: fresh?.result ?? null, failed: fresh !== null && fresh.result === null };
+  return { gain: computed.data ?? null, failed: computed.status === 'failed' };
 }

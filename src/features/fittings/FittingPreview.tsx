@@ -1,9 +1,10 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { Button, Panel, Tooltip } from '@/components/ui';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { encodeFittingShare } from '@/engine/fittings/fittingShare';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';
@@ -61,20 +62,19 @@ function usePreviewFitting(row: LibraryRow): Fitting | null {
 
 /** The Fitting Share Code compare needs: a saved Fitting has one, an In-game or Active Fit one is encoded once; null when too large. */
 function useShareCode(row: LibraryRow, fitting: Fitting | null): string | null | undefined {
-  const [encoded, setEncoded] = useState<{ fitting: Fitting; code: string | null } | null>(null);
   const encodes = holdsFitting(row);
-  useEffect(() => {
-    if (!encodes || fitting === null) return;
-    let cancelled = false;
-    void encodeFittingShare(fittingToShareInput(fitting)).then((result) => {
-      if (!cancelled) setEncoded({ fitting, code: result.ok ? result.payload : null });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [encodes, fitting]);
+  const encode = useCallback(
+    () =>
+      encodes && fitting !== null
+        ? encodeFittingShare(fittingToShareInput(fitting)).then((result) =>
+            result.ok ? result.payload : null
+          )
+        : Promise.resolve(undefined),
+    [encodes, fitting]
+  );
+  const encoded = useAsyncLoad(encode).data;
   if (!encodes) return libraryRowCode(row);
-  return encoded?.fitting === fitting ? encoded.code : undefined;
+  return fitting === null ? undefined : encoded;
 }
 
 /** "Shared by <name> in <Community>", for a Community's Fitting. */

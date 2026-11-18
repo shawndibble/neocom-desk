@@ -4,16 +4,16 @@
  * says whether they already own it. A hull no blueprint makes (special
  * editions, rewards) says so instead.
  */
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
+import { useAsyncLoad, useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Button, buttonClassName, Spinner, TypeIcon } from '@/components/ui';
 import { marketItemUrl } from '@/engine/market/urlState';
 import { bpcSourcingHref } from '@/features/bpcContracts/bpcSourcingUrl';
-import { planTargetForItem, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
+import { planTargetForItem } from '@/features/industry/blueprintCatalog';
 import { loadCharacterBlueprints } from '@/features/industry/data';
 import { industryTabHref } from '@/features/industry/industryTabs';
-import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { ShipTreeShip } from '@/sde/types';
 import { shipTreeBlueprintCatalog } from './shipTreeCatalogs';
 import { ownedBlueprintSummary } from './shipTreeModel';
@@ -26,39 +26,17 @@ export function BlueprintTab({
   characterId: number | null;
 }) {
   const { t } = useTranslation();
-  const [catalog, setCatalog] = useState<BlueprintCatalog | 'failed' | null>(null);
-  const [owned, setOwned] = useState<{
-    characterId: number;
-    blueprints: readonly CharacterBlueprint[];
-  } | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    shipTreeBlueprintCatalog()
-      .then((c) => {
-        if (!cancelled) setCatalog(c);
-      })
-      .catch(() => {
-        if (!cancelled) setCatalog('failed');
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  useEffect(() => {
-    if (characterId === null) return;
-    let cancelled = false;
-    loadCharacterBlueprints(characterId)
-      .then((result) => {
-        const data = result.cached?.data;
-        if (!cancelled && data) setOwned({ characterId, blueprints: data });
-      })
-      // Ownership is a nicety here; an unreadable list just leaves it unsaid.
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId]);
+  const catalogLoad = useAsyncLoad(shipTreeBlueprintCatalog);
+  const catalog = catalogLoad.status === 'failed' ? 'failed' : (catalogLoad.data ?? null);
+  // Ownership is a nicety here; an unreadable list just leaves it unsaid.
+  const loadOwned = useCallback(
+    () => loadCharacterBlueprints(characterId ?? 0).then((result) => result.cached?.data ?? null),
+    [characterId]
+  );
+  const ownedBlueprints = useKeyedLoad(
+    characterId === null ? null : String(characterId),
+    loadOwned
+  ).data;
 
   if (!catalog) return <Spinner size="sm" />;
   if (catalog === 'failed')
@@ -68,10 +46,7 @@ export function BlueprintTab({
 
   const bpTypeID = planTarget.blueprintTypeID;
   const bpName = catalog.byBlueprintTypeID.get(bpTypeID)?.blueprint.name ?? '';
-  const mine =
-    owned && owned.characterId === characterId
-      ? ownedBlueprintSummary(owned.blueprints, bpTypeID)
-      : null;
+  const mine = ownedBlueprints ? ownedBlueprintSummary(ownedBlueprints, bpTypeID) : null;
 
   return (
     <div className="space-y-3 text-xs">
