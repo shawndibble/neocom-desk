@@ -84,7 +84,7 @@ export interface PaymentApplication {
   paymentId: string;
   /** The legacy Statements it settled, before any day. */
   statements: { statementId: string; amount: number }[];
-  /** The days it paid, oldest first; a payment never pays a held day or a day recorded paid. */
+  /** The days it paid, oldest first; a payment never pays a held day. */
   days: DayAmount[];
   /** What no Statement or day absorbed of this payment; the account's credit is this plus any left over from corrections. */
   credit: number;

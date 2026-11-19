@@ -18783,7 +18783,7 @@
           "date": "Date",
           "what": "What",
           "debit": "Tax",
-          "credit": "Paid",
+          "credit": "Credit",
           "balance": "Balance"
         },
         "what": {
