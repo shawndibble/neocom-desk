@@ -292,8 +292,11 @@ export function MinerDetail({ id }: { id: string }) {
           refinery={names.refinery(d.structureId)}
           undockable={names.undockable?.(d.structureId)}
           moon={dayMoon(d)}
-          refineryTo={refineryPath(d.structureId)}
-          to={d.extractionId === undefined ? undefined : extractionPath(d.extractionId)}
+          refineryTo={
+            d.extractionId === undefined
+              ? refineryPath(d.structureId)
+              : extractionPath(d.extractionId)
+          }
         />
       ),
       sortValue: (d) => names.refinery(d.structureId),
