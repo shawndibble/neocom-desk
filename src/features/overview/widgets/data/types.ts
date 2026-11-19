@@ -203,8 +203,8 @@ export type DetailTone = 'neutral' | 'success' | 'warning' | 'danger';
 
 export interface RowDetailModel {
   title: string;
-  /** A status line above the facts: a toned badge, then plain text, then an optional dim note. */
-  status?: { badge: string; tone: DetailTone; text?: string; note?: string };
+  /** A status line above the facts: an optional toned badge, then plain text, then an optional dim note. */
+  status?: { badge?: string; tone?: DetailTone; text?: string; note?: string };
   /**
    * Labelled facts, in reading order; each value is already formatted. `tone: 'warning'` flags
    * a value to doubt (stale data); the text says why, so colour is never the only signal.

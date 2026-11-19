@@ -362,10 +362,8 @@ describe('Shared Pop start link and detail', () => {
     expect(detail.title).toBe('Efa - Tatara');
     expect(detail.facts[0]).toEqual({ label: 'calendar.sharedPop.moon', value: 'Efa I - Moon 1' });
     expect(detail.facts.map((f) => f.label)).toContain('calendar.sharedPop.popTime.ready');
-    expect(detail.status).toMatchObject({
-      badge: 'calendar.sharedPop.popTime.ready',
-      note: 'Fleet forms in local.',
-    });
+    expect(detail.status?.badge).toBeUndefined();
+    expect(detail.status?.note).toBe('Fleet forms in local.');
     expect(detail.list?.items).toEqual([
       { key: 'Zeolites', text: 'Zeolites', value: 'calendar.sharedPop.units{"count":1200000}' },
     ]);
