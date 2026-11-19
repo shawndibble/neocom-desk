@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MiningTaxAssignmentRecord } from '@/db';
-import { labelSuggestions, normalizeLabel } from './assignmentLabel';
+import { labelSuggestions, labelWithoutSystem, normalizeLabel } from './assignmentLabel';
 
 function a(over: Partial<MiningTaxAssignmentRecord>): MiningTaxAssignmentRecord {
   return {
@@ -44,5 +44,17 @@ describe('labelSuggestions', () => {
       a({}),
     ];
     expect(labelSuggestions(rows, 'p1', 1)).toEqual([]);
+  });
+});
+
+describe('labelWithoutSystem', () => {
+  it("drops the row's own system prefix", () => {
+    expect(labelWithoutSystem('Ainsan - Foil Finish Foundry', 'Ainsan')).toBe(
+      'Foil Finish Foundry'
+    );
+  });
+  it('keeps a label that names another system or has no prefix', () => {
+    expect(labelWithoutSystem('Talidal - Spe-18', 'Ainsan')).toBe('Talidal - Spe-18');
+    expect(labelWithoutSystem('Coesite Collector', 'Ainsan')).toBe('Coesite Collector');
   });
 });

@@ -30,6 +30,7 @@ import { CorpStatusPill } from '@/features/miningTax/corpBook/CorpStatusPill';
 import { CorpCorrectedAmount, CorpOverlapMark } from '@/features/miningTax/corpBook/CorpLineMarks';
 import type { CorpRowInfo } from '@/features/miningTax/corpBook/corpRows';
 import { isBookRow } from '@/features/miningTax/corpBook/corpRows';
+import { labelWithoutSystem } from './assignmentLabel';
 import { OreIcon } from './OreIcon';
 import { formatCount } from '@/lib/formatCount';
 import type { TaxColumnId } from './taxColumns';
@@ -277,16 +278,13 @@ export function useTaxColumns({
         className: 'sm:truncate',
         render: (dr) => {
           const name = payeeDisplayName(dr);
+          const label = dr.assignment?.label
+            ? labelWithoutSystem(dr.assignment.label, systemName(dr))
+            : undefined;
           return (
-            <HintText
-              content={dr.assignment?.label ? `${name} · ${dr.assignment.label}` : name}
-              desktopOnly
-              onlyWhenTruncated
-            >
+            <HintText content={label ? `${name} · ${label}` : name} desktopOnly onlyWhenTruncated>
               {name}
-              {dr.assignment?.label && (
-                <span className="text-text-dim"> · {dr.assignment.label}</span>
-              )}
+              {label && <span className="text-text-dim"> · {label}</span>}
             </HintText>
           );
         },
