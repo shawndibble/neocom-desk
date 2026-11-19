@@ -197,6 +197,17 @@ export function RowDetailModal({
     )
   );
 
+  // What a split side's amount column says when ESI hasn't caught up with its claim.
+  const unreportedText = (typeId: number) => {
+    const claim = unreportedByType.get(typeId);
+    return claim
+      ? t('miningTax.detailUnreported', {
+          reported: formatCount(claim.reported),
+          claimed: formatCount(claim.claimed),
+        })
+      : undefined;
+  };
+
   // The breakdown card only shows for an assigned row; hooks can't be
   // conditional, so the one that builds its copy text takes a placeholder
   // assignment otherwise and the item is simply not offered.
@@ -348,19 +359,11 @@ export function RowDetailModal({
         {showOreCard && (
           <OrePricedCard
             title={t('miningTax.oreColumn')}
-            lines={oreLines.map((line) => {
-              const claim = unreportedByType.get(line.typeId);
-              return {
-                typeId: line.typeId,
-                name: typeNames.get(line.typeId) ?? `#${line.typeId}`,
-                quantity: claim
-                  ? t('miningTax.detailUnreported', {
-                      reported: formatCount(claim.reported),
-                      claimed: formatCount(claim.claimed),
-                    })
-                  : formatCount(line.quantity),
-              };
-            })}
+            lines={oreLines.map((line) => ({
+              typeId: line.typeId,
+              name: typeNames.get(line.typeId) ?? `#${line.typeId}`,
+              quantity: unreportedText(line.typeId) ?? formatCount(line.quantity),
+            }))}
           />
         )}
 
@@ -372,15 +375,7 @@ export function RowDetailModal({
             typeNames={typeNames}
             pricesFor={pricesFor}
             priceSourcesFor={priceSourcesFor}
-            quantityFor={(typeId) => {
-              const claim = unreportedByType.get(typeId);
-              return claim
-                ? t('miningTax.detailUnreported', {
-                    reported: formatCount(claim.reported),
-                    claimed: formatCount(claim.claimed),
-                  })
-                : undefined;
-            }}
+            quantityFor={unreportedText}
           />
         )}
 

@@ -234,6 +234,7 @@ export function CorpRowDetailModal({
             note={t('miningTax.corpBook.detail.priced', {
               hub: hub.name,
               form,
+              pct: view.taxPct,
               scope,
               from: view.rateEffectiveFrom ?? view.date,
             })}
