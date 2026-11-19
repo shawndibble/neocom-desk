@@ -46,6 +46,10 @@ export interface DataTableRowProps<T> {
   expanded: boolean;
   hideExpandIcon: boolean;
   leadingExpandIcon: boolean;
+  /** `expandableRow.trigger: 'button'`: the leading caret is a button with this label. */
+  toggleLabel: string | undefined;
+  /** Stable; flips this row's detail. */
+  onToggle: (key: string | number) => void;
   /** Only passed to the expanded row, so the caller's inline `expandableRow` object can't re-render the rest. */
   renderDetail: ((row: T) => ReactNode) | undefined;
   clickable: boolean;
@@ -106,6 +110,8 @@ function DataTableRowImpl<T>({
   expanded,
   hideExpandIcon,
   leadingExpandIcon,
+  toggleLabel,
+  onToggle,
   renderDetail,
   clickable,
   tapOpensRow,
@@ -260,16 +266,34 @@ function DataTableRowImpl<T>({
                     column.align === 'center' && 'justify-center'
                   )}
                 >
-                  <span
-                    className={cx(
-                      'dt-lead-caret inline-flex',
-                      // A right-aligned first column would otherwise leave the caret
-                      // hugging the figure; pin it to the cell's leading edge.
-                      column.align === 'right' && 'mr-auto'
-                    )}
-                  >
-                    <Caret expanded={expanded} />
-                  </span>
+                  {toggleLabel !== undefined ? (
+                    // The row itself opens a page, so the disclosure is a real control,
+                    // kept in the phone card too (the card's tap is the page).
+                    <button
+                      type="button"
+                      aria-label={toggleLabel}
+                      aria-expanded={expanded}
+                      onClick={() => onToggle(key)}
+                      className={cx(
+                        interactiveClassName,
+                        '-m-1 inline-flex min-h-6 min-w-6 items-center justify-center rounded',
+                        column.align === 'right' && 'mr-auto'
+                      )}
+                    >
+                      <Caret expanded={expanded} />
+                    </button>
+                  ) : (
+                    <span
+                      className={cx(
+                        'dt-lead-caret inline-flex',
+                        // A right-aligned first column would otherwise leave the caret
+                        // hugging the figure; pin it to the cell's leading edge.
+                        column.align === 'right' && 'mr-auto'
+                      )}
+                    >
+                      <Caret expanded={expanded} />
+                    </span>
+                  )}
                   {column.render(row)}
                 </span>
               ) : (

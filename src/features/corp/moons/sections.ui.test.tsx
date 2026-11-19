@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { readAudit } from '../taxBook/bookClient';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { BookProvider } from './BookContext';
 import { BOOK_CONTEXT, BOOK_VIEW, MOON_ID, VARRO_ID } from './corpBookFixture';
@@ -19,6 +19,10 @@ vi.mock('@/features/corpTaxBook/mailQueueStore', () => ({
   listQueue: vi.fn().mockResolvedValue([]),
 }));
 vi.mock('@/features/character/useEntityName', () => ({ useEntityName: () => 'Ore & Glory' }));
+
+function Where() {
+  return <span data-testid="where">{useLocation().pathname}</span>;
+}
 
 function renderBook(ui: React.ReactElement, context = BOOK_CONTEXT) {
   return render(
@@ -175,14 +179,22 @@ describe('Moon page', () => {
     expect(screen.queryByText('Ore from')).not.toBeInTheDocument();
   });
 
-  it('a Miner row opens to ore lines with one Open miner link and does not navigate', async () => {
-    renderBook(<MoonDetail id={MOON_ID} />);
-    expect(screen.queryByRole('link', { name: 'Open miner' })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByText('Varro Kestane'));
-    const link = await screen.findByRole('link', { name: 'Open miner' });
-    expect(link).toHaveAttribute('href', expect.stringContaining('/corp/moons/miners/'));
+  it('a Miner row opens the miner; only its caret opens the ore lines', async () => {
+    renderBook(
+      <>
+        <MoonDetail id={MOON_ID} />
+        <Where />
+      </>
+    );
+    expect(
+      screen.queryByRole('table', { name: /Ore mined by Varro Kestane/ })
+    ).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Ore mined by Varro Kestane/ }));
     expect(screen.getByRole('table', { name: /Ore mined by Varro Kestane/ })).toBeInTheDocument();
+    expect(screen.getByTestId('where')).toHaveTextContent('/corp/moons');
     // The clicked row already carries the totals.
     expect(screen.queryByText('Total')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByText('Varro Kestane'));
+    expect(screen.getByTestId('where')).toHaveTextContent('/corp/moons/miners/');
   });
 });

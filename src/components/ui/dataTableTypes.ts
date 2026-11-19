@@ -183,6 +183,14 @@ export interface DataTableExpandableRow<T> {
    * with a ⋮ keeps one trailing control.
    */
   leadingIcon?: boolean;
+  /**
+   * `'button'`: only the leading caret (needs `leadingIcon`, and `toggleLabel`)
+   * toggles the detail; a click on the row runs `onRowClick` alone. For a row
+   * that opens a page and still has an ore-style breakdown to peek at.
+   */
+  trigger?: 'row' | 'button';
+  /** Accessible name of the caret button under `trigger: 'button'`. */
+  toggleLabel?: (row: T) => string;
   /** Row open on first render; lets a page restore it after navigating away. */
   initialKey?: string | number | null;
   /** Told the open row's key (null when none) whenever it changes. */
@@ -329,8 +337,8 @@ export interface DataTableProps<T> {
   /**
    * Adds a per-row disclosure: clicking a row opens `renderDetail`'s content
    * in a full-width row beneath it. Independent of `onRowClick` — both fire
-   * on the same click when both are given, though no caller currently
-   * combines them. See `DataTableExpandableRow`.
+   * on the same click when both are given, unless `trigger: 'button'` hands
+   * the toggle to the caret. See `DataTableExpandableRow`.
    */
   expandableRow?: DataTableExpandableRow<T>;
   /**
