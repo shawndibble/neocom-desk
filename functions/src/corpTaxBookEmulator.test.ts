@@ -1,6 +1,7 @@
 // Corp Tax Book callables against the Firestore emulator (issue #4061). Runs
 // only under `npm run test:rules` at the repo root (which starts the emulator
 // and sets FIRESTORE_EMULATOR_HOST); a plain `npm test` skips it.
+import { applyRekeyBackfill, planRekeyBackfill } from './corpTaxBookRekeyBackfill.js';
 import type { Caller } from './actorAuth.js';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
@@ -857,6 +858,81 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       });
     });
 
+    it('regroup moves the absorbed Miners records onto the surviving id (#6450)', async () => {
+      await turnOn();
+      await edit(ACCOUNTANT, {
+        action: 'setMiner',
+        minerId: 'm-b',
+        characterIds: [62, 63],
+        mainCharacterId: 62,
+      });
+      const b = book();
+      await b
+        .collection('statements')
+        .doc('s-b')
+        .set(statement('s-b', { minerId: 'm-b', uids: ['char:62', 'char:63'] }));
+      await b
+        .collection('statements')
+        .doc('s-63')
+        .set(statement('s-63', { minerId: 'solo:63', uids: ['char:63'] }));
+      await b.collection('payments').doc('p-b').set({ id: 'p-b', minerId: 'm-b', amount: 5 });
+      await b
+        .collection('payments')
+        .doc('p-other')
+        .set({ id: 'p-other', minerId: 'solo:70', amount: 5 });
+      await b
+        .collection('disputes')
+        .doc('m-b_2026-10-05')
+        .set({ minerId: 'm-b', date: '2026-10-05', uids: ['char:62'] });
+      await b.collection('accounts').doc('m-b').set({ minerId: 'm-b' });
+      await b.collection('minerTotals').doc('solo:63').set({ minerId: 'solo:63' });
+      await edit(ACCOUNTANT, {
+        action: 'regroupMiner',
+        minerId: 'solo:60',
+        characterIds: [60, 62, 63],
+        mainCharacterId: 60,
+        absorbMinerIds: ['m-b'],
+      });
+      const readers = ['char:60', 'char:62', 'char:63'];
+      for (const id of ['s-b', 's-63'])
+        expect((await b.collection('statements').doc(id).get()).data()).toMatchObject({
+          minerId: 'solo:60',
+          uids: readers,
+        });
+      expect((await b.collection('payments').doc('p-b').get()).get('minerId')).toBe('solo:60');
+      expect((await b.collection('payments').doc('p-other').get()).get('minerId')).toBe('solo:70');
+      expect((await b.collection('disputes').doc('m-b_2026-10-05').get()).exists).toBe(false);
+      expect((await b.collection('disputes').doc('solo_60_2026-10-05').get()).data()).toMatchObject(
+        { minerId: 'solo:60', uids: readers }
+      );
+      expect((await b.collection('accounts').doc('m-b').get()).exists).toBe(false);
+      expect((await b.collection('minerTotals').doc('solo:63').get()).exists).toBe(false);
+    });
+
+    it('the backfill moves an older grouping alt records onto its group, and a re-run finds none (#6450)', async () => {
+      await turnOn();
+      await edit(ACCOUNTANT, {
+        action: 'setMiner',
+        minerId: 'm-b',
+        characterIds: [62, 63],
+        mainCharacterId: 62,
+        // grouped before the fix: records already sit under the alt's own id
+      });
+      const b = book();
+      await b
+        .collection('statements')
+        .doc('s-63')
+        .set(statement('s-63', { minerId: 'solo:63', uids: ['char:63'] }));
+      const plan = await planRekeyBackfill(db, CORP);
+      expect(plan.writes).toHaveLength(1);
+      await applyRekeyBackfill(db, plan);
+      expect((await b.collection('statements').doc('s-63').get()).data()).toMatchObject({
+        minerId: 'm-b',
+        uids: ['char:62', 'char:63'],
+      });
+      expect((await planRekeyBackfill(db, CORP)).writes).toEqual([]);
+    });
+
     it('holds a guest added by a regroup until they confirm', async () => {
       await turnOn();
       await syncBook(
@@ -1127,6 +1203,25 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
           answer: 'confirmed',
           via: 'character',
         });
+      });
+
+      it("keeps a pending guest's own records until they confirm, then moves them (#6450)", async () => {
+        await pendingGuest();
+        const b = book();
+        await b
+          .collection('payments')
+          .doc('p-guest')
+          .set({ id: 'p-guest', minerId: 'solo:61', amount: 5 });
+        await b
+          .collection('rebills')
+          .doc('r-guest')
+          .set({ id: 'r-guest', minerId: 'solo:61', fromDate: '2026-10-01' });
+        expect((await b.collection('payments').doc('p-guest').get()).get('minerId')).toBe(
+          'solo:61'
+        );
+        await confirmGrouping(deps(), who(61), CORP, 'm-a');
+        expect((await b.collection('payments').doc('p-guest').get()).get('minerId')).toBe('m-a');
+        expect((await b.collection('rebills').doc('r-guest').get()).get('minerId')).toBe('m-a');
       });
 
       it('lets the added character decline, which removes it and tells the officers', async () => {

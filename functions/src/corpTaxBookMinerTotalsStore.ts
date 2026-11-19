@@ -16,7 +16,7 @@ import {
 } from './corpTaxBookMinerTotals.js';
 import { reconcileMoonDocs } from './corpTaxBookMoonDocsStore.js';
 import { invalidateReadModels, reconcileReadModels } from './corpTaxBookReadModelsStore.js';
-import { chunk } from './chunk.js';
+import { chunk, IN_QUERY_LIMIT } from './chunk.js';
 
 type Data = Record<string, unknown>;
 
@@ -24,9 +24,6 @@ const book = (db: Firestore, corporationId: number) =>
   db.collection('corps').doc(String(corporationId));
 const sub = (db: Firestore, corporationId: number, name: string) =>
   book(db, corporationId).collection(name);
-
-/** Firestore's `in` operator takes at most 30 values. */
-const IN_LIMIT = 30;
 
 export const withId = (d: { id: string; data: () => Data | undefined }): Data => ({
   ...d.data(),
@@ -61,7 +58,7 @@ async function byMiner(
   minerIds: readonly string[]
 ): Promise<Data[]> {
   const out: Data[] = [];
-  for (const ids of chunk(minerIds, IN_LIMIT)) {
+  for (const ids of chunk(minerIds, IN_QUERY_LIMIT)) {
     const snap = await sub(db, corporationId, collection).where('minerId', 'in', ids).get();
     out.push(...snap.docs.map(withId));
   }
@@ -242,7 +239,7 @@ export async function refreshAfterEvent(
 }
 
 /** Removes the totals docs of `minerIds` (or every Miner's). */
-async function invalidateMinerTotals(
+export async function invalidateMinerTotals(
   db: Firestore,
   corporationId: number,
   minerIds: readonly string[] | 'all'

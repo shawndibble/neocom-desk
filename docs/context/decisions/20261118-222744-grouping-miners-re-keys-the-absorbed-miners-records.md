@@ -1,0 +1,5 @@
+# Scope decisions — Grouping Miners re-keys the absorbed Miners' records onto the group (issue #6450)
+
+_Recorded 2026-11-18 · issue #6450._
+
+- **Grouping moves the absorbed Miners' Statements, payments, write-offs, corrections, rebills, declarations, disputes and Miner dismissals onto the surviving id, in the same transaction, and drops their cached accounts and totals.** Before this, `regroupMiner` kept the target's id but left the old records under `solo:<alt>` or the dissolved group's id, and the Miners table lists every id a record names, so an alt that still owed or held credit kept its own row. Rejected: merging the ids only when reading (the Miner page and the table could disagree, and a dissolved group's id names no Character). A record's `uids` widen to the whole group, so each Character can still read it. A guest's character still waiting to confirm (D26b) is not folded in until it confirms; confirming moves its records, in the same transaction. Groups made earlier are moved by a one-off script that is a dry run unless `--apply`; a dissolved group's old id is listed, not moved.
