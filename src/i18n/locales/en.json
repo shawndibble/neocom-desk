@@ -9652,6 +9652,7 @@
     "important": "High",
     "overdue": "Overdue",
     "fullyMined": "Fully mined",
+    "popped": "Popped",
     "started": "Started",
     "due": "in {{duration}}",
     "prevFortnight": "Previous fortnight",

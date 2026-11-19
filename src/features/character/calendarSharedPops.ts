@@ -6,11 +6,10 @@
  * module reaches Firebase).
  *
  * A Shared Pop shows from its Extraction's start until its retention ends (three days past the
- * belt's expiry). Before the Pop Time the row counts down to it; after, to the belt's expiry, so
- * a late fleet still sees the field (the `moonChunk` arrival-then-decay pattern); past it the row
- * is overdue until someone marks the moon finished. A moon the pilot already reads as a corp
+ * belt's expiry), as two rows: one at the Pop Time, one (muted) at the belt's expiry, which
+ * reads overdue past it until someone marks the moon finished. A moon the pilot already reads as a corp
  * `moonChunk` row (ESI or their own book) is left out: that row wins. A Calendar event that is
- * the same fleet (`dropEventsOfSharedPops`) is left out instead, so the pop is the one row.
+ * the same fleet (`dropEventsOfSharedPops`) is left out instead, so the pop shows only as its own rows.
  */
 import type {
   BoardCalendarEventSource,
@@ -88,16 +87,14 @@ export function sharedPopShownAtMs(pop: SharedPopView, pref: SharedPopTimePref):
 }
 
 /**
- * The instant a Shared Pop's row is due: its Pop Time, or once popped the belt's expiry. The
- * day a `?pop=` deep link moves the map to (issue #6239). NaN when the Pop Time is unreadable.
+ * The instant a Shared Pop's pop row is due: its Pop Time under the viewer's setting. The day a
+ * `?pop=` deep link moves the map to (issue #6239). NaN when the Pop Time is unreadable.
  */
 export function sharedPopDeadlineMs(
   pop: SharedPopView,
-  nowMs: number,
   pref: SharedPopTimePref = 'asShared'
 ): number {
-  const shownAt = sharedPopShownAtMs(pop, pref);
-  return nowMs >= shownAt ? Date.parse(pop.expiresAt) : shownAt;
+  return sharedPopShownAtMs(pop, pref);
 }
 
 /**
@@ -113,8 +110,11 @@ export function sharedPopMiningState(
 }
 
 /**
- * The Calendar rows. `readableRefineries` are the refineries the pilot already reads as corp
- * moon chunks: those pops are left out. One refinery holds one moon's drill at a time.
+ * The Calendar rows: two per pop. The pop row sits on the Pop Time and stays there once popped
+ * ("Popped"); the muted expiry row sits on the belt's expiry (the `moonChunk` arrival-then-decay
+ * pattern). A fully mined moon has nothing left to expire, so it keeps only the pop row.
+ * `readableRefineries` are the refineries the pilot already reads as corp moon chunks: those pops
+ * are left out. One refinery holds one moon's drill at a time.
  */
 export function toSharedPopSources(
   entries: readonly SharedPopEntry[],
@@ -129,33 +129,35 @@ export function toSharedPopSources(
     const shownAtMs = sharedPopShownAtMs(pop, pref);
     if (Number.isNaN(shownAtMs)) continue;
     const popped = nowMs >= shownAtMs;
-    // A guess shows only once popped; it labels the row and never replaces the clock's detail.
+    // A guess shows only once popped; it labels the expiry row and never replaces the clock.
     const mining = sharedPopMiningState(entry);
     const fullyMined = mining === 'fullyMined';
     const likelyMinedOut = mining === 'likelyMinedOut' && popped;
     const key = shownKey(pop, pref);
     const otherKey: PopTimeKey = key === 'ready' ? 'autoFracture' : 'ready';
     const otherAtMs = popTimes(pop)[otherKey];
-    const detail = fullyMined
-      ? 'fullyMined'
-      : nowMs >= Date.parse(pop.expiresAt)
-        ? 'expired'
-        : popped
-          ? 'expires'
-          : key;
+    const base = { subject: sharedPopTitle(entry), sharedBy: entry.corporation };
     sources.push({
+      ...base,
       id: pop.id,
-      subject: sharedPopTitle(entry),
-      detail,
-      deadlineMs: sharedPopDeadlineMs(pop, nowMs, pref),
-      sharedBy: entry.corporation,
-      // The other Pop Time, until the pop pops: afterwards the belt's expiry is the news.
+      detail: fullyMined ? 'fullyMined' : key,
+      deadlineMs: shownAtMs,
+      // The other Pop Time, until the pop pops.
       ...(!popped && !pop.fractured && !Number.isNaN(otherAtMs) && otherAtMs !== shownAtMs
         ? { extra: { detail: otherKey, atMs: otherAtMs } }
-        : likelyMinedOut
-          ? { extra: { detail: 'likelyMinedOut' } }
-          : {}),
-      ...(fullyMined ? { pastLabelKey: 'calendar.fullyMined' } : {}),
+        : {}),
+      pastLabelKey: fullyMined ? 'calendar.fullyMined' : 'calendar.popped',
+    });
+    if (fullyMined) continue;
+    const expiresAtMs = Date.parse(pop.expiresAt);
+    sources.push({
+      ...base,
+      id: `${pop.id}:expires`,
+      detailId: pop.id,
+      detail: nowMs >= expiresAtMs ? 'expired' : 'expires',
+      deadlineMs: expiresAtMs,
+      muted: true,
+      ...(likelyMinedOut ? { extra: { detail: 'likelyMinedOut' } } : {}),
     });
   }
   return sources;
