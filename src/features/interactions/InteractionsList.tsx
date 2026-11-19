@@ -6,6 +6,7 @@
  */
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { ExternalLink } from '@/components/ui/ExternalLink';
 import { DividedList } from '@/components/ui/DividedList';
 import { Pill } from '@/components/ui/Pill';
 import { Eyebrow } from '@/components/ui';
@@ -71,9 +72,9 @@ function InteractionRow({ row }: { row: Interaction }) {
   if (/^https:\/\//.test(row.to)) {
     return (
       <li>
-        <a href={row.to} target="_blank" rel="noopener noreferrer" className={rowClassName}>
+        <ExternalLink href={row.to} variant="bare" mark="text" className={rowClassName}>
           <RowBody row={row} />
-        </a>
+        </ExternalLink>
       </li>
     );
   }
