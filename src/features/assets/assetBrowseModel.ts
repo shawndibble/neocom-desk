@@ -3,6 +3,7 @@ import { createContext, useContext } from 'react';
 import type { AssetTreeNode, AssetTreeStation } from '@/engine/assetTree';
 import { assetPathHref } from '@/engine/assetPath';
 import type { CharacterAsset } from '@/esi/endpoints';
+import type { ContractAskEstimate } from '@/engine/contracts/askEstimate';
 import type { AbyssalAssetEstimates } from '@/features/abyssal/useAbyssalAssetEstimates';
 import type { BuildPlanRecord } from '@/db';
 
@@ -73,6 +74,8 @@ export interface AssetItemActions {
   itemValueByItemId: ReadonlyMap<number, number>;
   /** Abyssal modules' MutaMarket estimates; a row on screen asks for its own. */
   abyssal: AbyssalAssetEstimates;
+  /** Ask medians of contract-only hulls with no market price (issue #6431); shown marked, never totalled. */
+  askEstimateByTypeId: ReadonlyMap<number, ContractAskEstimate>;
   volumeByTypeId: ReadonlyMap<number, number>;
   /** Material typeID -> the character's own Build Plan consuming it; null until the blueprint catalog has loaded. */
   materialPlanMap: ReadonlyMap<number, BuildPlanRecord> | null;

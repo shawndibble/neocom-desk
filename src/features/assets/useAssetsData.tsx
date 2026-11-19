@@ -43,6 +43,7 @@ import type { TableExport } from '@/components/ui/useTableExport';
 import { usePlaceNicknameMap } from '@/features/assets/placeNicknames';
 import { assetCsvRows, assetsCsvColumns, type AssetCsvRow } from '@/features/assets/assetsCsv';
 import { withoutAbyssalTypePrices } from '@/engine/market/abyssalValuation';
+import { useAssetAskEstimates } from '@/features/assets/useAssetAskEstimates';
 import { useAbyssalAssetEstimates } from '@/features/abyssal/useAbyssalAssetEstimates';
 import { formatIskCompact, parseIskAmount } from '@/lib/isk';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
@@ -362,6 +363,13 @@ export function useAssetsData() {
     [typePrices, abyssal.isAbyssalType]
   );
 
+  const askEstimateByTypeId = useAssetAskEstimates(
+    mergedAssets,
+    priceByTypeId,
+    data?.pricesReady !== false,
+    abyssal.isAbyssalType
+  );
+
   const itemValueByItemId = useMemo(() => {
     if (!activeCrossCharacterData && abyssal.values.size === 0) return ownCopyValues;
     return new Map([
@@ -536,6 +544,7 @@ export function useAssetsData() {
       priceByTypeId,
       itemValueByItemId,
       abyssal,
+      askEstimateByTypeId,
       volumeByTypeId,
       stockCostByTypeId,
       materialPlanMap,
@@ -546,6 +555,7 @@ export function useAssetsData() {
       priceByTypeId,
       itemValueByItemId,
       abyssal,
+      askEstimateByTypeId,
       volumeByTypeId,
       stockCostByTypeId,
       materialPlanMap,
@@ -618,6 +628,7 @@ export function useAssetsData() {
     assetNames,
     mergedAssets,
     abyssal,
+    askEstimateByTypeId,
     priceByTypeId,
     /** False only while the snapshot's market prices are still loading. */
     pricesReady: data?.pricesReady !== false,
