@@ -6,12 +6,9 @@ import {
   type PlannedRun,
   duePeriods,
   extractionDetail,
-  isIssuedPeriod,
   minerDetail,
   nextRunPeriod,
   paymentCode,
-  periodPreview,
-  periodRows,
   periodStatements,
   planStatementRun,
   planStatementRuns,
@@ -197,17 +194,6 @@ describe('buildBookView', () => {
     expect(issued.miners[0].unbilled).toBe(0);
     expect(issued.miners[0].overdueDays).toBe(null);
     expect(nextRunPeriod(issued)).toBeUndefined();
-    expect(periodRows(issued).find((r) => r.start === '2026-08-01')).toMatchObject({
-      status: 'issued',
-      billed: 100_000,
-      outstanding: 100_000,
-    });
-
-    const mailed = buildBookView({
-      ...base,
-      statements: [{ ...statement, mailsSent: 1 } as typeof statement],
-    });
-    expect(periodRows(mailed).find((r) => r.start === '2026-08-01')?.status).toBe('sent');
 
     const paid = buildBookView({
       ...base,
@@ -224,154 +210,8 @@ describe('buildBookView', () => {
       ],
     });
     expect(paid.miners[0].owed).toBe(0);
-    expect(periodRows(paid).find((r) => r.start === '2026-08-01')?.status).toBe('paid');
     expect(paid.miners[0].lastPaidAt).toBe('2026-09-02T00:00:00Z');
     expect(minerDetail(paid, 'solo:1')!.days[0].status).toBe('paid');
-  });
-
-  it('flags only the period whose own Statement is overdue, not a later one from the same Miner', () => {
-    const base = input({
-      entries: [entry(1, '2026-08-10', 1000), entry(1, '2026-09-10', 1000)],
-      now: '2026-09-30T00:00:00Z',
-      lastSyncedAt: '2026-09-30T00:00:00Z',
-    });
-    const augPlan = planStatementRun(buildBookView(base), {
-      start: '2026-08-01',
-      end: '2026-08-31',
-    });
-    const aug = {
-      ...statementForLine(buildBookView(base), augPlan, augPlan.lines[0]),
-      issuedAt: '2026-09-01T00:00:00Z',
-    };
-    const afterAug = buildBookView({ ...base, statements: [aug] });
-    const sepPlan = planStatementRun(afterAug, { start: '2026-09-01', end: '2026-09-30' });
-    const sep = {
-      ...statementForLine(afterAug, sepPlan, sepPlan.lines[0]),
-      issuedAt: '2026-09-29T00:00:00Z',
-    };
-    const rows = periodRows(buildBookView({ ...base, statements: [aug, sep] }));
-    expect(rows.find((r) => r.start === '2026-08-01')?.status).toBe('overdue');
-    expect(rows.find((r) => r.start === '2026-09-01')?.status).toBe('issued');
-  });
-
-  it('lists every closed period with its own billed figure, not a running total (CX-38)', () => {
-    const view = buildBookView(
-      input({
-        entries: [entry(1, '2026-08-10', 1000), entry(1, '2026-09-10', 1000)],
-        now: '2026-10-05T12:00:00Z',
-        lastSyncedAt: '2026-10-05T12:00:00Z',
-      })
-    );
-    const rows = periodRows(view);
-    expect(rows.find((r) => r.start === '2026-08-01')).toMatchObject({
-      status: 'ready',
-      billed: 100_000,
-      miners: 1,
-    });
-    expect(rows.find((r) => r.start === '2026-09-01')).toMatchObject({
-      status: 'closed',
-      billed: 100_000,
-      miners: 1,
-    });
-    expect(rows.find((r) => r.start === '2026-10-01')?.status).toBe('open');
-  });
-
-  it("lists the Miners behind a period that has no Statements, matching the row's total", () => {
-    const view = buildBookView(
-      input({
-        entries: [
-          entry(1, '2026-08-10', 1000),
-          entry(2, '2026-08-11', 3000),
-          entry(1, '2026-09-10', 1000),
-        ],
-        now: '2026-10-05T12:00:00Z',
-        lastSyncedAt: '2026-10-05T12:00:00Z',
-      })
-    );
-    const rows = periodRows(view);
-    for (const start of ['2026-08-01', '2026-09-01', '2026-10-01']) {
-      const row = rows.find((r) => r.start === start);
-      const lines = row && periodPreview(view, row);
-      if (!row || !lines) continue;
-      expect(lines.reduce((s, l) => s + l.amount, 0)).toBe(row.billed);
-      expect(lines.length).toBe(row.miners);
-    }
-    const aug = periodPreview(
-      view,
-      rows.find((r) => r.start === '2026-08-01')!
-    )!;
-    expect(aug.length).toBe(2);
-    expect(aug[0].amount).toBeGreaterThan(aug[1].amount);
-    expect(
-      periodPreview(view, rows.find((r) => r.statements > 0) ?? { ...rows[0], statements: 1 })
-    ).toBeUndefined();
-  });
-
-  it('keeps the ready row on the Send plan and labels a below-minimum closed period as rolling over (CX-38)', () => {
-    const view = buildBookView(
-      input({
-        minimumStatement: 150_000,
-        entries: [entry(1, '2026-08-10', 1000), entry(1, '2026-09-10', 1000)],
-        now: '2026-10-05T12:00:00Z',
-        lastSyncedAt: '2026-10-05T12:00:00Z',
-      })
-    );
-    const rows = periodRows(view);
-    // Aug's own 100,000 is under the minimum: it rolls into Sep's Statement, which the ready row carries.
-    expect(rows.find((r) => r.start === '2026-08-01')?.status).toBe('rollover');
-    const plan = planStatementRun(view, nextRunPeriod(view)!);
-    expect(rows.find((r) => r.status === 'ready')).toMatchObject({
-      start: '2026-09-01',
-      miners: plan.lines.length,
-      billed: 200_000,
-    });
-  });
-
-  it('anchors a 7-day cadence at the start date, so the days before the first 1st are billed (monthly to N-day switch)', () => {
-    const view = buildBookView(
-      input({
-        startDate: '2026-09-25',
-        cadence: { kind: 'days', days: 7, anchor: '2026-09-25' },
-        entries: [entry(1, '2026-09-27', 1000), entry(1, '2026-10-03', 1000)],
-        now: '2026-10-20T12:00:00Z',
-        lastSyncedAt: '2026-10-20T12:00:00Z',
-      })
-    );
-    const rows = periodRows(view);
-    expect(rows.find((r) => r.start === '2026-09-25')).toMatchObject({
-      end: '2026-10-01',
-      billed: 100_000,
-    });
-    expect(rows.find((r) => r.start === '2026-10-02')).toMatchObject({ end: '2026-10-08' });
-  });
-
-  it('puts days before a later anchor in a stub period from the start date (start 25 Sep, anchor 1 Oct)', () => {
-    const view = buildBookView(
-      input({
-        startDate: '2026-09-25',
-        cadence: { kind: 'days', days: 7, anchor: '2026-10-01' },
-        entries: [entry(1, '2026-09-27', 1000), entry(1, '2026-10-03', 1000)],
-        now: '2026-10-20T12:00:00Z',
-        lastSyncedAt: '2026-10-20T12:00:00Z',
-      })
-    );
-    const rows = periodRows(view);
-    expect(rows.find((r) => r.start === '2026-09-25')).toMatchObject({
-      end: '2026-09-30',
-      billed: 100_000,
-    });
-    expect(rows.find((r) => r.start === '2026-10-01')).toMatchObject({ end: '2026-10-07' });
-  });
-
-  it('bills the open period for its own days only (CX-38)', () => {
-    const view = buildBookView(
-      input({
-        entries: [entry(1, '2026-08-10', 1000), entry(1, '2026-09-10', 1000)],
-        now: '2026-09-18T14:00:00Z',
-      })
-    );
-    const open = periodRows(view).find((r) => r.status === 'open');
-    expect(open).toMatchObject({ start: '2026-09-01', billed: 100_000 });
   });
 
   it('counts a donation before the start date and lists it nowhere (#4505)', () => {
@@ -830,23 +670,6 @@ describe('period page rows (#5285)', () => {
     issuedAt: '2026-09-01T00:00:00Z',
   }));
 
-  it('counts mailed Statements and finds the earliest unpaid due date on the period row', () => {
-    const view = buildBookView({
-      ...base,
-      statements: [{ ...one, mailsSent: 1 } as typeof one, two],
-    });
-    expect(periodRows(view).find((r) => r.start === '2026-08-01')).toMatchObject({
-      statements: 2,
-      mailed: 1,
-      dueAt: '2026-09-15T00:00:00.000Z',
-    });
-    expect(periodRows(view).find((r) => r.status === 'open')).toMatchObject({
-      statements: 0,
-      mailed: 0,
-      dueAt: null,
-    });
-  });
-
   it('lists each miner Statement with billed, paid, outstanding, due and mail state', () => {
     const view = buildBookView({
       ...base,
@@ -989,7 +812,7 @@ describe('statementDetail (#5286)', () => {
   });
 });
 
-describe('Statement standings read as whole ISK and Due skips paused ones (#5247)', () => {
+describe('Statement standings read as whole ISK (#5247)', () => {
   const base = input({
     entries: [entry(1, '2026-08-10', 10_000), entry(2, '2026-08-11', 10_000)],
     now: '2026-09-30T00:00:00Z',
@@ -997,33 +820,10 @@ describe('Statement standings read as whole ISK and Due skips paused ones (#5247
   });
   const first = buildBookView(base);
   const plan = planStatementRun(first, { start: '2026-08-01', end: '2026-08-31' });
-  const [a, b] = plan.lines.map((l) => ({
+  const [a] = plan.lines.map((l) => ({
     ...statementForLine(first, plan, l),
     issuedAt: '2026-09-01T00:00:00Z',
   }));
-
-  it('a paused Statement does not set the period Due; the pause end shows when all are paused', () => {
-    const declare = (id: string) => ({
-      id: `d-${id}`,
-      statementId: id,
-      kind: 'contract' as const,
-      at: '2026-09-25T00:00:00Z',
-    });
-    const one = buildBookView({ ...base, statements: [a, b], declarations: [declare(a.id)] });
-    expect(periodRows(one).find((r) => r.start === '2026-08-01')).toMatchObject({
-      dueAt: '2026-09-15T00:00:00.000Z',
-      pausedUntil: null,
-    });
-    const both = buildBookView({
-      ...base,
-      statements: [a, b],
-      declarations: [declare(a.id), declare(b.id)],
-    });
-    expect(periodRows(both).find((r) => r.start === '2026-08-01')).toMatchObject({
-      dueAt: null,
-      pausedUntil: '2026-10-09T00:00:00.000Z',
-    });
-  });
 
   it('an unsettled Statement with no settlement still owes its whole amount', () => {
     const view = buildBookView({ ...base, statements: [a] });
@@ -1097,8 +897,6 @@ describe('Statement standings read as whole ISK and Due skips paused ones (#5247
       ],
     });
     expect(statementDetail(view, a.id)!.payments.map((p) => p.id)).toEqual(['p1']);
-    expect(isIssuedPeriod({ statements: 1 })).toBe(true);
-    expect(isIssuedPeriod({ statements: 0 })).toBe(false);
   });
 
   it('panel arithmetic: credited, forgiven and written off add up to billed minus remaining', () => {
@@ -1140,9 +938,6 @@ describe('Statement standings read as whole ISK and Due skips paused ones (#5247
       paid: 150_000,
       outstanding: left,
       settled: false,
-    });
-    expect(periodRows(view).find((r) => r.start === '2026-08-01')).toMatchObject({
-      outstanding: left,
     });
     const d = statementDetail(view, a.id)!;
     expect(d).toMatchObject({ forgiven: 150_000, writtenOff: 0, remaining: left });

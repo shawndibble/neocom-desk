@@ -26,6 +26,5 @@ describe('bookPartsFor', () => {
     expect(sorted('extractions', 'miner')).toEqual(['answers', 'core', 'ledger', 'observed']);
     expect(sorted('miners', 'extraction')).toEqual(['core', 'ledger', 'observed']);
     expect(sorted('miners', 'moonOwner')).toEqual(['core', 'observed']);
-    expect(sorted('moon-owners', 'statementPeriod')).toEqual(['core', 'ledger', 'observed']);
   });
 });

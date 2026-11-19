@@ -37,10 +37,10 @@ export type BookDetailKind =
   | 'extraction'
   | 'legacyMoon'
   | 'legacyRefinery'
+  | 'legacyStatementPeriod'
   | 'miner'
   | 'moonOwner'
-  | 'refinery'
-  | 'statementPeriod';
+  | 'refinery';
 
 /** The parts a page reads. No page: the whole book, as the export reads it. */
 export function bookPartsFor(tab?: string, detail: BookDetailKind | null = null): BookPartSet {
@@ -60,13 +60,13 @@ export function bookPartsFor(tab?: string, detail: BookDetailKind | null = null)
     case 'refinery':
     case 'legacyMoon':
     case 'legacyRefinery':
+    case 'legacyStatementPeriod':
       return new Set<BookPart>(['core']);
     // An Extraction's page says whether its days are billed, dismissed or in Today's mining.
     case 'moon-owners':
       return new Set<BookPart>(['core', 'owners']);
     case 'extraction':
     case 'statements':
-    case 'statementPeriod':
       return new Set<BookPart>(['core', 'observed', 'ledger']);
     default:
       return new Set<BookPart>(['core', 'observed']);

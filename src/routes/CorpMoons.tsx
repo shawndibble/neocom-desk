@@ -71,10 +71,10 @@ import {
   isSettingsTab,
   moonsDetail,
   refineriesTabPath,
+  statementsTabPath,
   type SettingsTab,
 } from '@/features/corp/moons/moonsPaths';
-import { StatementPeriodDetail } from '@/features/corp/moons/StatementPeriodDetail';
-import { StatementsTab } from '@/features/corp/moons/StatementsTab';
+import { LateNoticesTab } from '@/features/corp/moons/LateNoticesTab';
 import { MoonsSetup } from '@/features/corp/moons/MoonsSetup';
 import { useCorpBook } from '@/features/corp/moons/useCorpBook';
 import { useAddMyCorps } from '@/features/corp/moons/addCorps/useAddMyCorps';
@@ -243,7 +243,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
               {tab === 'refineries' && <RefineriesTab />}
               {tab === 'moons' && <Navigate replace to={refineriesTabPath} />}
               {tab === 'miners' && <MinersTab />}
-              {tab === 'statements' && <StatementsTab />}
+              {tab === 'statements' && <LateNoticesTab />}
               {tab === 'moon-owners' && (
                 <div className="space-y-4">
                   {addCorps.notices}
@@ -255,6 +255,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
           </>
         )}
         {detail?.kind === 'extraction' && <MoonDetail key={detail.id} id={detail.id} />}
+        {detail?.kind === 'legacyStatementPeriod' && <Navigate replace to={statementsTabPath} />}
         {detail?.kind === 'legacyMoon' && <LegacyRefineryRedirect moonId={Number(detail.id)} />}
         {detail?.kind === 'legacyRefinery' && (
           <LegacyRefineryRedirect structureId={detail.structureId} />
@@ -262,7 +263,6 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
         {detail?.kind === 'miner' && <MinerDetail key={detail.id} id={detail.id} />}
         {detail?.kind === 'moonOwner' && <MoonOwnerDetail id={detail.id} />}
         {detail?.kind === 'refinery' && <RefineryPage structureId={detail.structureId} />}
-        {detail?.kind === 'statementPeriod' && <StatementPeriodDetail periodStart={detail.id} />}
         {view && settingsDialog && (
           <BookSettingsDialog
             open
