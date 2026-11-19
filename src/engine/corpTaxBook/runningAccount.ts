@@ -86,7 +86,7 @@ export interface PaymentApplication {
   statements: { statementId: string; amount: number }[];
   /** The days it paid, oldest first; a payment never pays a held day or a day recorded paid. */
   days: DayAmount[];
-  /** What no day absorbed: the account's credit. */
+  /** What no Statement or day absorbed of this payment; the account's credit is this plus any left over from corrections. */
   credit: number;
 }
 
@@ -187,10 +187,15 @@ export function allocateRunningAccount(input: RunningAccountInput): RunningAccou
       if (isHeld(d) || st.tax <= 0 || st.pinned || isDone(st)) continue;
       const take = Math.min(available, st.tax - st.credited);
       st.credited += take;
-      if (kind === 'payment') st.paidIn += take;
-      if (kind === 'writeOff') st.forgiven += take;
-      if (kind === 'payment') attribute(d.date, take);
-      else (kind === 'correction' ? corrected : forgivenDays).push({ date: d.date, amount: take });
+      if (kind === 'payment') {
+        st.paidIn += take;
+        attribute(d.date, take);
+      } else if (kind === 'writeOff') {
+        st.forgiven += take;
+        forgivenDays.push({ date: d.date, amount: take });
+      } else {
+        corrected.push({ date: d.date, amount: take });
+      }
       available -= take;
     }
     return available;

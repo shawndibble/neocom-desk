@@ -329,7 +329,7 @@ describe('allocateRunningAccount applications', () => {
     expect(paymentOf(r, 'p2')?.days).toEqual([{ date: '2026-11-02', amount: 1_500_000 }]);
   });
 
-  it('keeps what no day absorbed as the payment’s credit, matching the account credit', () => {
+  it('keeps what no day absorbed as the payment’s credit', () => {
     const r = allocateRunningAccount({
       ...base,
       days: [day('2026-11-01', 1_000_000)],
@@ -418,6 +418,49 @@ describe('allocateRunningAccount applications', () => {
       { date: '2026-11-02', amount: 500_000 },
     ]);
     expect(r.applications.writeOffs).toEqual([]);
+  });
+
+  it('reports a dismissal’s leftover as a correction, not as any payment’s credit', () => {
+    const r = allocateRunningAccount({
+      ...base,
+      statements: [legacy('s1', 1_000_000, '2026-11-01T00:00:00Z')],
+      dismissalCredits: [
+        { statementId: 's1', dismissalId: 'd1', chargeKey: 'k1', amount: 1_500_000 },
+      ],
+      days: NOV,
+      payments: [payment('p1', 1_000_000, T(0))],
+    });
+    expect(r.applications.corrections).toEqual([{ date: '2026-11-01', amount: 500_000 }]);
+    expect(paymentOf(r, 'p1')?.days).toEqual([
+      { date: '2026-11-01', amount: 500_000 },
+      { date: '2026-11-02', amount: 500_000 },
+    ]);
+  });
+
+  it('applies nothing for a payment that carried no tax', () => {
+    const r = allocateRunningAccount({
+      ...base,
+      days: NOV,
+      payments: [payment('p1', 1_000_000, T(0), { notTaxAmount: 1_000_000 })],
+    });
+    expect(r.applications.payments).toEqual([]);
+    expect(r.byDay.get('2026-11-01')?.credited).toBe(0);
+  });
+
+  it('lets a payment a legacy Statement fully absorbed leave the next payment its own days', () => {
+    const r = allocateRunningAccount({
+      ...base,
+      statements: [legacy('s1', 1_000_000, '2026-11-01T00:00:00Z')],
+      days: NOV,
+      payments: [payment('p1', 1_000_000, T(0)), payment('p2', 500_000, T(1))],
+    });
+    expect(paymentOf(r, 'p1')).toEqual({
+      paymentId: 'p1',
+      statements: [{ statementId: 's1', amount: 1_000_000 }],
+      days: [],
+      credit: 0,
+    });
+    expect(paymentOf(r, 'p2')?.days).toEqual([{ date: '2026-11-01', amount: 500_000 }]);
   });
 
   it('reports an officer write-off with no Statement apart from payments, and drops its leftover', () => {
