@@ -3,8 +3,8 @@
  *
  * The Map panel used to hold a fixed 38rem from `md` up, so at 1024px the
  * Coming Up rail was squeezed to ~165px: due times wrapped to three lines and
- * the RSVP badge was clipped. From `md` the Map now gives up width so the rail
- * keeps at least 18rem; from `xl` up the Map keeps its 38rem.
+ * the RSVP badge was clipped. The rail now holds 30rem (at most 45% of the
+ * row, at least 18rem) and the Map takes the rest, so it grows on wide pages.
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
@@ -44,7 +44,7 @@ async function seedEventsAndOpen(page: Page, viewport: { width: number; height: 
   const rail = list.locator('xpath=ancestor::*[contains(@class,"min-w-72")][1]');
   const map = page
     .getByRole('group', { name: 'Calendar map' })
-    .locator('xpath=ancestor::*[contains(@class,"38rem")][1]');
+    .locator('xpath=ancestor::*[contains(@class,"md:flex-1")][1]');
   return { list, rail, map };
 }
 
@@ -68,10 +68,10 @@ test('at 1024px the Coming Up rail stays readable and the Map does not clip', as
   expect(mapClipped).toBe(false);
 });
 
-test('at 1440px the Map keeps 38rem and the rail fills the rest', async ({ page }) => {
+test('at 1440px the rail holds 30rem and the Map fills the rest', async ({ page }) => {
   const { rail, map } = await seedEventsAndOpen(page, { width: 1440, height: 900 });
 
-  expect((await map.boundingBox())!.width).toBe(608);
-  // No width cap: the rail runs to the page edge, in line with the header actions.
-  expect((await rail.boundingBox())!.width).toBeGreaterThan(512);
+  expect((await rail.boundingBox())!.width).toBe(480);
+  // The Map grows past its old fixed 38rem.
+  expect((await map.boundingBox())!.width).toBeGreaterThan(608);
 });

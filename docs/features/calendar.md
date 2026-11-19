@@ -53,7 +53,7 @@ Code: `src/routes/Calendar.tsx`; `src/features/character/{calendarBoardData,cale
 - From cache: amber offline line.
 - Sources refused (401/403 / `needsReauth`): single amber line "needs login: <kind names>" above the panes, and the filter menu marks each as "Not granted".
 - Rail empty states: no kinds selected ("no kinds" hint), nothing upcoming, nothing on the selected day.
-- Desktop (`md+`): Map panel (38rem wide, titled "Calendar", period controls in panel actions) + rail side by side. Phone (`isNarrow`): one panel with period label, controls and the Day Ticker; the rail below. Past-day hint caption under both.
+- Desktop (`md+`): Map panel (takes the remaining width, titled "Calendar", period controls in panel actions) + rail (30rem, capped at 45%) side by side; the Next 7 days panel goes 2/3/4 columns as it widens. Phone (`isNarrow`): one panel with period label, controls and the Day Ticker; the rail below. Past-day hint caption under both.
 
 ## Board sources (what lands on the map and rail)
 
