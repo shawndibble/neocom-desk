@@ -173,7 +173,9 @@ function MinedDay({
   // The day header already says the day, and the panel header says prices are the day's own:
   // an ore line only speaks up when its price came from somewhere else.
   const priceSource = (source: VerifyRow['ores'][number]['source']) =>
-    source && source !== 'saved' ? t(`miningTax.detail.breakdown.source.${source}`) : undefined;
+    source && source !== 'saved' && source !== 'historical'
+      ? t(`miningTax.detail.breakdown.source.${source}`)
+      : undefined;
   const many = day.rows.length > 1;
   return (
     <li className="px-3 py-2 text-sm">

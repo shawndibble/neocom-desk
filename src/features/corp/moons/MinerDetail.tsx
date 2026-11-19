@@ -24,17 +24,14 @@ import {
   DAY_RANGES,
   daysByPhase,
   inRange,
-  owedOf,
   rangeFigures,
   rangeStart,
   type DayRange,
-  minerMoons,
   statementAdjustment,
   moonByStructure,
   paymentLedger,
   type ActivityKind,
   type LedgerRow,
-  type MinerMoon,
 } from '@/engine/corpTaxBook/bookSections';
 import { minerDetail, type DayRow, type DayStatus } from '@/engine/corpTaxBook/bookView';
 import { wholeIsk } from '@/engine/corpTaxBook/wholeIsk';
@@ -46,20 +43,19 @@ import { ActivityRow, AuditLine } from './AuditFeed';
 import { useBookAudit } from './useBookAudit';
 import { useBook } from './useBook';
 import { CloseAccountDialog } from './CloseAccountDialog';
-import { AccountStatus } from './AccountStatus';
+import { OldestUnpaid } from './AccountStatus';
 import { AccountLedger } from './AccountLedger';
 import { MarkNotTaxDialog, ReasonDialog, RecordPaymentDialog } from './BookDialogs';
 import { isk, iskOrDash, periodLabel, shortDate, shortDateTime, signedIsk } from './moonsFormat';
 import type { AuditEntry } from '../taxBook/bookClient';
-import { extractionPath } from './moonsPaths';
+import { extractionPath, refineryPath } from './moonsPaths';
 import { Crumb, StandingWord } from './moonsParts';
 import { MinerCharacters } from './MinerCharacters';
 import { CorrectionsMenu } from './MinerCorrections';
-import { OreLinesTable } from './OreLinesTable';
 import { paymentWalletHref } from './paymentWalletHref';
 import { dayEndTime } from './dayEndTime';
 import { BookSection, EntityHeader, PlaceCell } from './sectionParts';
-import { moonLabel, tapTargetClassName } from './sectionHelpers';
+import { tapTargetClassName } from './sectionHelpers';
 import { StatementPanel } from './StatementPanel';
 import { useStatementParam } from './useStatementParam';
 import { oldestOpenStatement, useMinerReminder } from './statementMailing';
@@ -125,13 +121,22 @@ export function MinerDetail({ id }: { id: string }) {
   // The range narrows what happened (Earlier days, Payments); what is owed now always shows whole.
   const phases = useMemo(() => {
     const all = daysByPhase(detail?.days ?? []);
-    return { ...all, earlier: all.earlier.filter((d) => inRange(d.date, from)) };
-  }, [detail, from]);
+    // On a running account a day still on an unpaid older Statement is owed too, so it lists
+    // with the owed days rather than hiding under Earlier days.
+    const owedOnStatement = running ? all.earlier.filter((d) => d.status === 'on-statement') : [];
+    const nextStatement = [...all.nextStatement, ...owedOnStatement].sort(
+      (a, b) => b.date.localeCompare(a.date) || a.key.localeCompare(b.key)
+    );
+    return {
+      ...all,
+      nextStatement,
+      earlier: all.earlier.filter((d) => !owedOnStatement.includes(d) && inRange(d.date, from)),
+    };
+  }, [detail, from, running]);
   const rangeTax = useMemo(
     () => rangeFigures(detail?.days ?? [], detail?.payments ?? [], from),
     [detail, from]
   );
-  const moons = useMemo(() => minerMoons(view, id), [view, id]);
   const moonOf = useMemo(() => moonByStructure(view), [view]);
   const ledger = useMemo(
     () =>
@@ -280,17 +285,18 @@ export function MinerDetail({ id }: { id: string }) {
     {
       id: 'where',
       className: 'w-60',
-      header: t('corpTaxBook.moons.cols.moon'),
+      header: t('corpTaxBook.moons.cols.refinery'),
       primary: true,
       render: (d) => (
         <PlaceCell
           refinery={names.refinery(d.structureId)}
           undockable={names.undockable?.(d.structureId)}
           moon={dayMoon(d)}
+          refineryTo={refineryPath(d.structureId)}
           to={d.extractionId === undefined ? undefined : extractionPath(d.extractionId)}
         />
       ),
-      sortValue: (d) => dayMoon(d) ?? names.refinery(d.structureId),
+      sortValue: (d) => names.refinery(d.structureId),
     },
     // One character mined every day: a column repeating the page's own name is width for nothing.
     ...(row.characterIds.length > 1
@@ -382,9 +388,7 @@ export function MinerDetail({ id }: { id: string }) {
         startOpen={opts.startOpen}
         summary={t('corpTaxBook.moons.miner.daysSummary', {
           count: phases[key].length,
-          tax: isk(
-            key === 'nextStatement' && running ? owedOf(phases[key]) : sumTax(phases[key]) + adjust
-          ),
+          tax: isk(key === 'nextStatement' && running ? row.owed : sumTax(phases[key]) + adjust),
         })}
       >
         {(shown, table) => (
@@ -560,47 +564,6 @@ export function MinerDetail({ id }: { id: string }) {
       : []),
   ];
 
-  const moonColumns: DataTableColumn<MinerMoon>[] = [
-    {
-      id: 'moon',
-      header: t('corpTaxBook.moons.cols.moon'),
-      primary: true,
-      render: (m) => (
-        <PlaceCell
-          refinery={names.refinery(m.structureId)}
-          undockable={names.undockable?.(m.structureId)}
-          moon={m.moonId === undefined ? undefined : names.moon(m.moonId)}
-        />
-      ),
-      sortValue: (m) => moonLabel(names, m),
-    },
-    {
-      id: 'days',
-      header: t('corpTaxBook.moons.cols.days'),
-      align: 'right',
-      className: 'tabular-nums',
-      stackAffix: { after: t('corpTaxBook.moons.sections.affix.days') },
-      render: (m) => m.days,
-      sortValue: (m) => m.days,
-    },
-    {
-      id: 'last',
-      header: t('corpTaxBook.moons.cols.lastDay'),
-      stackAffix: { before: t('corpTaxBook.moons.sections.affix.last') },
-      render: (m) => shortDate(m.lastDate),
-      sortValue: (m) => m.lastDate,
-    },
-    {
-      id: 'tax',
-      header: t('corpTaxBook.moons.cols.tax'),
-      align: 'right',
-      className: 'w-36 tabular-nums',
-      cardCorner: true,
-      render: (m) => isk(m.tax),
-      sortValue: (m) => m.tax,
-    },
-  ];
-
   const guestOpen = row.standing === 'guest' && !closedAt;
   // The reason a disabled action is inert, printed under it: a menu item has no tooltip on touch.
   const remindItem = reminder.block ? (
@@ -709,8 +672,8 @@ export function MinerDetail({ id }: { id: string }) {
           { label: t('corpTaxBook.moons.miner.paid'), value: iskOrDash(paidTotal) },
           running && row.account
             ? {
-                label: t('corpTaxBook.moons.cols.account'),
-                value: <AccountStatus account={row.account} />,
+                label: t('corpTaxBook.moons.miner.oldestUnpaid'),
+                value: <OldestUnpaid account={row.account} />,
               }
             : {
                 label: t('corpTaxBook.moons.chips.unbilled'),
@@ -727,6 +690,10 @@ export function MinerDetail({ id }: { id: string }) {
                   </span>
                 ),
               },
+          {
+            label: t('corpTaxBook.moons.miner.lastPayment'),
+            value: row.lastPaidAt ? shortDate(row.lastPaidAt.slice(0, 10)) : '—',
+          },
           { label: t('corpTaxBook.moons.chips.pending'), value: iskOrDash(row.pending) },
           // Nothing written off, nothing to say: the fact would be a row of zeros.
           ...(toleranceTotal === 0 && detail.lateWriteOffs.length === 0
@@ -849,53 +816,6 @@ export function MinerDetail({ id }: { id: string }) {
               )}
             </p>
           </>
-        )}
-      </BookSection>
-      <BookSection
-        title={t('corpTaxBook.moons.miner.moons')}
-        noun={noun('moons')}
-        empty={t('corpTaxBook.moons.miner.empty.moons')}
-        rows={moons}
-        sortColumns={moonColumns}
-        meta={
-          <span className="text-xs text-text-dim">{t('corpTaxBook.moons.miner.moonsHint')}</span>
-        }
-        phone={phone}
-        startOpen={false}
-        summary={t('corpTaxBook.moons.miner.moonsSummary', {
-          count: moons.length,
-          tax: isk(moons.reduce((sum, m) => sum + m.tax, 0)),
-        })}
-      >
-        {(shown, table) => (
-          <DataTable
-            {...table}
-            label={t('corpTaxBook.moons.miner.moons')}
-            columns={moonColumns}
-            rows={[...shown]}
-            rowKey={(m) => m.key}
-            expandableRow={{
-              leadingIcon: true,
-              renderDetail: (m) => (
-                <OreLinesTable
-                  lines={m.lines}
-                  label={t('corpTaxBook.moons.miner.oreAt', { moon: moonLabel(names, m) })}
-                  foot={
-                    m.extractionId !== undefined && (
-                      <Link
-                        to={extractionPath(m.extractionId)}
-                        className={entityLinkClassName(tapTargetClassName)}
-                      >
-                        {t('corpTaxBook.moons.miner.openMoon')}
-                      </Link>
-                    )
-                  }
-                />
-              ),
-            }}
-            density="compact"
-            stackLayout="dense"
-          />
         )}
       </BookSection>
       <BookSection

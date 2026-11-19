@@ -67,9 +67,19 @@ export function PlaceCell({
           {place.station}
         </Link>
         {chip}
-        {place.moon !== undefined && (
-          <span className="block text-xs text-text-dim">{place.moon}</span>
-        )}
+        {place.moon !== undefined &&
+          (to ? (
+            <Link
+              to={to}
+              className={entityLinkClassName(
+                cx('block text-xs whitespace-nowrap', tapTargetClassName)
+              )}
+            >
+              {place.moon}
+            </Link>
+          ) : (
+            <span className="block text-xs text-text-dim">{place.moon}</span>
+          ))}
       </span>
     );
   }

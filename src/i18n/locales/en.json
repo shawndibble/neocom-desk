@@ -18096,6 +18096,8 @@
         "owes_one": "Owes {{amount}} ({{count}} day, oldest {{date}})",
         "owes_other": "Owes {{amount}} ({{count}} days, oldest {{date}})",
         "paidThrough": "Paid through {{date}}",
+        "oldestUnpaid_one": "{{date}} · {{count}} day ago",
+        "oldestUnpaid_other": "{{date}} · {{count}} days ago",
         "range": {
           "label": "Days shown",
           "all": "All",
@@ -18632,9 +18634,9 @@
           "balance": "Balance"
         },
         "what": {
-          "day_one": "Moon mining · {{count}} day",
-          "day_other": "Moon mining · {{count}} days",
+          "day": "Moon mining",
           "payment": "Payment",
+          "paymentFrom": "Payment from {{name}}",
           "correction": "Correction: {{reason}}",
           "writeOff": "Written off: {{reason}}",
           "adjustment": "Tolerance and Statement corrections"
@@ -18658,6 +18660,8 @@
         "dismissSelected_one": "Dismiss selected ({{count}})",
         "dismissSelected_other": "Dismiss selected ({{count}})",
         "daysHint": "Newest first",
+        "oldestUnpaid": "Oldest unpaid",
+        "lastPayment": "Last payment",
         "owedDaysHint": "Paid oldest first; a payment pays these as soon as the book holds it",
         "payments": "Payments",
         "paymentsHint": "Credited oldest debt first",
@@ -18677,10 +18681,6 @@
         "earlierHint": "On a Statement, paid, dismissed or written off",
         "daysSummary_one": "{{count}} day · {{tax}}",
         "daysSummary_other": "{{count}} days · {{tax}}",
-        "moons": "Moons",
-        "moonsHint": "A row opens to the ore mined there",
-        "moonsSummary_one": "{{count}} moon · {{tax}} tax",
-        "moonsSummary_other": "{{count}} moons · {{tax}} tax",
         "overduePausedNote": "Overdue paused",
         "dismissedFor": {
           "record": "dismissed tax for {{what}}",
@@ -18694,11 +18694,8 @@
           "stillAccruing": "Nothing in today's mining.",
           "earlier": "No earlier days.",
           "payments": "No payments yet.",
-          "moons": "No moons mined yet.",
           "activity": "Nothing has happened for this Miner yet."
         },
-        "openMoon": "Open moon",
-        "oreAt": "Ore mined at {{moon}}",
         "overdueNote_one": "Overdue {{count}} day",
         "overdueNote_other": "Overdue {{count}} days",
         "paid": "Paid",
