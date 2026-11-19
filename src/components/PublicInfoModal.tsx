@@ -54,6 +54,7 @@ import {
   type TabItem,
 } from '@/components/ui';
 import { isNpcCharacterId, isNpcCorporationId } from '@/esi/entityIds';
+import { useCharacters } from '@/features/character/useCharacters';
 import { useEntityName } from '@/features/character/useEntityName';
 import {
   loadPublicAllianceInfo,
@@ -69,6 +70,9 @@ const LazyEmploymentTab = lazy(() =>
 );
 const LazyCorporationTab = lazy(() =>
   guarded(() => import('@/features/character/PublicInfoCorporationTab'))
+);
+const LazyInteractionsTab = lazy(() =>
+  guarded(() => import('@/features/interactions/InteractionsTab'))
 );
 const LazyAllianceTab = lazy(() =>
   guarded(() => import('@/features/character/PublicInfoAllianceTab'))
@@ -100,12 +104,22 @@ export function PublicInfoModal() {
   const isPhone = useIsPhone();
   const request = usePublicInfoModalStore((state) => state.request);
   const close = usePublicInfoModalStore((state) => state.close);
+  const urlTab = usePublicInfoModalStore((state) => state.tab);
+  const setUrlTab = usePublicInfoModalStore((state) => state.setTab);
+  const characters = useCharacters();
 
-  const [activeTab, setActiveTab] = useState<PublicInfoKind | 'employment'>('character');
+  const [chosenTab, setActiveTab] = useState<PublicInfoKind | 'employment' | 'interactions'>(
+    'character'
+  );
+  // The URL's `infoTab` opens Interactions (so Back from a row's page lands here); no `infoTab`
+  // leaves the modal's own tab choice.
+  const activeTab =
+    urlTab === 'interactions' && request?.kind === 'character' ? 'interactions' : chosenTab;
   const focusAfterCommit = useFocusAfterCommit();
   // The pressed button lives in the tab we leave, so it unmounts: land on the tab we switched to.
   const openTab = (id: PublicInfoKind) => {
     setActiveTab(id);
+    if (urlTab !== null) setUrlTab(null);
     focusAfterCommit(() => document.getElementById(tabDomId(tabsId, id)));
   };
   const [character, setCharacter] = useState<CharacterState>(IDLE);
@@ -117,7 +131,10 @@ export function PublicInfoModal() {
     activeTab === 'character' ? character : activeTab === 'corporation' ? corporation : alliance;
   // Try again unmounts while the lookups re-run, so the always-mounted wrapper holds focus.
   const [resultRef, , holdFocus] = useRetryFocus<HTMLDivElement>(
-    activeTab === 'employment' || activeState.status === 'ready' || activeState.status === 'unknown'
+    activeTab === 'employment' ||
+      activeTab === 'interactions' ||
+      activeState.status === 'ready' ||
+      activeState.status === 'unknown'
       ? 'ok'
       : activeState.status === 'error'
         ? 'failed'
@@ -225,6 +242,16 @@ export function PublicInfoModal() {
     character.status !== 'unknown'
   )
     tabs.push({ id: 'employment', label: t('publicInfo.employmentTab') });
+  // Interactions: what this account has done with the pilot. Not for one of the viewer's own
+  // Characters (nothing is "between" them), and not without a Character to look from.
+  if (
+    request.kind === 'character' &&
+    !npcCharacter &&
+    character.status === 'ready' &&
+    characters.length > 0 &&
+    !characters.some((c) => c.characterId === request.id)
+  )
+    tabs.push({ id: 'interactions', label: t('interactions.tab') });
 
   const activeData =
     activeTab === 'corporation' ? corporation : activeTab === 'alliance' ? alliance : character;
@@ -262,7 +289,12 @@ export function PublicInfoModal() {
             tabsId={tabsId}
             tabs={tabs}
             value={activeTab}
-            onChange={(id) => setActiveTab(id as PublicInfoKind | 'employment')}
+            onChange={(id) => {
+              setActiveTab(id as PublicInfoKind | 'employment' | 'interactions');
+              // Only Interactions rides the URL; any other tab clears it.
+              if (id === 'interactions' || urlTab !== null)
+                setUrlTab(id === 'interactions' ? id : null);
+            }}
             label={t('publicInfo.tabsLabel')}
           />
         )}
@@ -289,6 +321,15 @@ export function PublicInfoModal() {
               />
             )}
             {activeTab === 'alliance' && <AllianceTab state={alliance} onRetry={retry} />}
+            {activeTab === 'interactions' && character.status === 'ready' && (
+              <Suspense fallback={<Spinner block="panel" label={t('common.loading')} />}>
+                <LazyInteractionsTab
+                  key={request.id}
+                  otherId={request.id}
+                  otherName={character.data.name}
+                />
+              </Suspense>
+            )}
             {activeTab === 'employment' && (
               <Suspense fallback={<Spinner block="panel" label={t('common.loading')} />}>
                 <LazyEmploymentTab characterId={request.id} />
