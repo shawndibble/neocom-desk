@@ -2,6 +2,7 @@ import { test } from '@playwright/test';
 import { signInAndGoto } from '../../e2e/support/authSeed';
 import { installEsiMock } from '../../e2e/support/mockEsi';
 import { installSsoMock } from '../../e2e/support/mockSso';
+import { installPersonalEsi } from './sandbox/personalEsi';
 import { CHARACTER_ID, CORPORATION_ID, OWNER_HASH, SCOPES } from '../../e2e/support/fixtureData';
 import { scopesForGroup } from '../../src/esi/scopes';
 
@@ -16,6 +17,7 @@ test('moons sandbox', async ({ page }) => {
   const scopes = [...SCOPES, ...scopesForGroup('corp')];
   await installSsoMock(page, scopes);
   await installEsiMock(page);
+  await installPersonalEsi(page);
   await page.route('https://esi.evetech.net/**/roles*', (route) =>
     route.fulfill({
       status: 200,
