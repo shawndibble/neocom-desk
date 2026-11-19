@@ -6,15 +6,13 @@
  *
  * Balance is debits less credits: positive is owed, negative is credit held with the book. The
  * last balance always equals the page's Owed less Credit held (`MinerRow`). A tolerance shortfall
- * forgiven is its own `tolerance` row, dated by the payment that closed the day. Only a difference
- * nothing above explains (a correction folded into a Statement, or a bug) is the one `adjustment`
- * row, so nothing is hidden and nothing is double counted.
+ * forgiven, or money taken back from a day already closed, is that day's own `tolerance` row, dated by
+ * the payment that closed it. The rows add up to the balance, so there is no catch-all row.
  */
 import type { Adjustment } from './statements';
 import type { MinerDetail } from './bookView';
 
-export type LedgerEntryKind =
-  'day' | 'payment' | 'correction' | 'writeOff' | 'tolerance' | 'adjustment';
+export type LedgerEntryKind = 'day' | 'payment' | 'correction' | 'writeOff' | 'tolerance';
 
 export interface LedgerEntry {
   /** Unique within the ledger. */
@@ -51,7 +49,6 @@ const ORDER: Record<LedgerEntryKind, number> = {
   payment: 2,
   writeOff: 2,
   tolerance: 3,
-  adjustment: 4,
 };
 
 const day = (iso: string) => iso.slice(0, 10);
@@ -173,20 +170,6 @@ export function accountLedger(
       a.at.localeCompare(b.at) ||
       a.key.localeCompare(b.key)
   );
-
-  // What the page states the account stands at; any gap is money the engine moved without a date.
-  const expected = detail.row.owed - detail.row.credit;
-  const summed = drafts.reduce((s, d) => s + d.debit - d.credit, 0);
-  const gap = expected - summed;
-  if (Math.abs(gap) >= 1)
-    drafts.push({
-      key: 'adjustment',
-      kind: 'adjustment',
-      date: drafts.at(-1)?.date ?? day(detail.row.lastPaidAt ?? new Date(0).toISOString()),
-      at: '',
-      debit: Math.max(0, gap),
-      credit: Math.max(0, -gap),
-    });
 
   let balance = 0;
   const entries = drafts.map((d): LedgerEntry => {

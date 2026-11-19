@@ -91,8 +91,6 @@ export function AccountLedger({
         return t('corpTaxBook.moons.ledger.what.writeOff', { reason: e.note });
       case 'tolerance':
         return t('corpTaxBook.moons.ledger.what.tolerance');
-      case 'adjustment':
-        return t('corpTaxBook.moons.ledger.what.adjustment');
     }
   };
 
@@ -125,11 +123,7 @@ export function AccountLedger({
     }
     return (
       <p className="px-3 py-2 text-sm text-text-dim">
-        {e.kind === 'adjustment'
-          ? t('corpTaxBook.moons.ledger.adjustmentNote')
-          : e.kind === 'tolerance'
-            ? t('corpTaxBook.moons.ledger.toleranceNote')
-            : e.note}
+        {e.kind === 'tolerance' ? t('corpTaxBook.moons.ledger.toleranceNote') : e.note}
       </p>
     );
   };
