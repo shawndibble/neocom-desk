@@ -18230,7 +18230,7 @@
           "mined": "Mined (est.)",
           "minedTip": "Ore mined here during each Extraction, from the fracture to the field's end. Mining outside those windows is not counted. Valued at today's hub prices.",
           "tax": "Tax billed",
-          "taxTip": "The tax Statements have already billed for these Extractions. Tax not yet on a Statement reads \"Not billed yet\" here; the Extraction's own page shows it so far."
+          "taxTip": "The tax Statements have already billed for these Extractions. Tax not yet on a Statement is not counted here; the Extraction's own page shows it so far."
         },
         "ore": {
           "title": "Ore in the chunk",

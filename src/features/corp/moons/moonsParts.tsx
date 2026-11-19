@@ -118,8 +118,10 @@ export function MinedBar({ pct, label }: { pct: number | null; label: string }) 
 export function Crumb({ to, label }: { to: string; label: string }) {
   const navigate = useNavigate();
   // Arrived by an in-app click (a router key, not the first load): Back is the page it came from,
-  // whichever that was. Modified clicks and a first load keep the link's own destination.
+  // whichever that was, so it reads "Back". Modified clicks and a first load keep the link's own
+  // destination and label.
   const cameFromApp = useLocation().key !== 'default';
+  const { t } = useTranslation();
   return (
     <Link
       to={to}
@@ -132,7 +134,7 @@ export function Crumb({ to, label }: { to: string; label: string }) {
       className={cx(inlineLinkClassName, 'gap-1 text-xs', tapTargetClassName)}
     >
       <Icon.Back size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-      {label}
+      {cameFromApp ? t('corpTaxBook.moons.setup.back') : label}
     </Link>
   );
 }
