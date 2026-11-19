@@ -227,7 +227,7 @@ export function CorpRowDetailModal({
                     <span className="min-w-0 flex-1 truncate">
                       <OreLink typeId={line.typeId}>{typeLabel(typeNames, line.typeId)}</OreLink>
                     </span>
-                    <span className="text-right text-text-dim tabular-nums">
+                    <span className="shrink-0 text-right whitespace-nowrap text-text-dim tabular-nums">
                       {you !== undefined && you !== line.quantity
                         ? t('miningTax.corpBook.detail.bookAndYou', {
                             book: formatCount(line.quantity),
@@ -236,8 +236,11 @@ export function CorpRowDetailModal({
                         : formatCount(line.quantity)}
                       {' × '}
                       {formatIsk(view.unitPrices[line.typeId] ?? 0)}
-                      {source !== 'saved' &&
-                        ` · ${t(`miningTax.detail.breakdown.source.${source}`)}`}
+                      {source !== 'saved' && (
+                        <span className="block text-[11px]">
+                          {t(`miningTax.detail.breakdown.source.${source}`)}
+                        </span>
+                      )}
                     </span>
                   </li>
                 );

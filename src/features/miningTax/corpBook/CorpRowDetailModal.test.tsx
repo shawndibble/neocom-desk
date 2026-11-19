@@ -150,6 +150,12 @@ describe('CorpRowDetailModal', () => {
     expect(screen.getAllByText(/15% per-moon rate from 2026-10-01/).length).toBeGreaterThan(0);
   });
 
+  it('prices each ore line inline and names a source only when it is not the saved snapshot', () => {
+    renderModal();
+    expect(screen.getByText(/× 148/)).toBeInTheDocument();
+    expect(screen.queryByText('Saved snapshot')).not.toBeInTheDocument();
+  });
+
   it('offers Settle up but no way to edit the book’s figures', () => {
     renderModal();
     expect(screen.getByRole('button', { name: /settle up/i })).toBeInTheDocument();
