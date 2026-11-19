@@ -40,27 +40,52 @@ test('moons sandbox', async ({ page }) => {
       body: JSON.stringify({ result: { token, uid, ownerHash: OWNER_HASH } }),
     });
   });
-  // The real officer check reads live ESI; answer it for the fake corp, pass everything else through.
+  // Officer checks read live ESI on the server, so answer them here for the fake corp and pass
+  // every other callable through to the emulator. SRP writes (approve, pay...) re-check ESI
+  // roles and so fail in the sandbox: the SRP pages are read-only here.
+  const officerAnswers: Record<string, unknown> = {
+    verifyCorpOfficerCallable: {
+      corporationId: CORPORATION_ID,
+      isCeo: true,
+      isDirector: true,
+      isStationManager: true,
+      canView: true,
+      canEdit: true,
+      bookActive: true,
+      expiresAt: Date.now() + 86_400_000,
+    },
+    verifySrpOfficerCallable: {
+      corporationId: CORPORATION_ID,
+      isCeo: true,
+      isDirector: true,
+      canManage: true,
+      srpEnabled: true,
+      settingsExist: true,
+      expiresAt: Date.now() + 86_400_000,
+    },
+    getSrpStatusCallable: {
+      corporationId: CORPORATION_ID,
+      enabled: true,
+      settings: {
+        killmailPct: 60,
+        appraisalPct: null,
+        hullRules: [],
+        windowDays: 30,
+        requireFleetOrFc: false,
+      },
+    },
+  };
   await page.route('**/corpTaxBookCall', async (route) => {
-    const req = route.request();
-    if (req.method() === 'OPTIONS' || !req.postData()?.includes('verifyCorpOfficerCallable'))
-      return route.fallback();
+    const request = route.request();
+    if (request.method() === 'OPTIONS') return route.fallback();
+    const action = (request.postDataJSON() as { data?: { action?: string } } | null)?.data?.action;
+    const answer = action === undefined ? undefined : officerAnswers[action];
+    if (answer === undefined) return route.fallback();
     await route.fulfill({
       status: 200,
       headers: CORS,
       contentType: 'application/json',
-      body: JSON.stringify({
-        result: {
-          corporationId: CORPORATION_ID,
-          isCeo: true,
-          isDirector: true,
-          isStationManager: true,
-          canView: true,
-          canEdit: true,
-          bookActive: true,
-          expiresAt: Date.now() + 86_400_000,
-        },
-      }),
+      body: JSON.stringify({ result: answer }),
     });
   });
   await signInAndGoto(page, './corp/moons', scopes);

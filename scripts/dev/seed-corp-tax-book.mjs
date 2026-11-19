@@ -368,6 +368,107 @@ REFINERIES.forEach((s, i) => {
   if (live === 3) extraction(s, 60, 8, 56); // Extracting, arriving soon
 });
 
+// --- SRP (ship replacement): settings, the officer's access record, claims, audit ------
+// Layout of functions/src/srpStore.ts and src/features/corp/srpClaimTypes.ts. Officers read
+// all of it under the rules; the officer record needs canEdit and the same ownerHash.
+const SRP_HULLS = [587, 24698, 638, 16240, 22544, 17476, 28606];
+put(book.collection('srp').doc('settings'), {
+  corporationId: CORP,
+  enabled: true,
+  killmailPct: 60,
+  appraisalPct: null,
+  hullRules: [
+    { scope: 'hull', id: 587, kind: 'pay-fixed', iskAmount: 4_000_000 },
+    { scope: 'hull', id: 24698, kind: 'pay-percent' },
+    { scope: 'hull', id: 28606, kind: 'officer-decides' },
+    { scope: 'hull', id: 16240, kind: 'not-covered' },
+  ],
+  windowDays: 30,
+  requireFleetOrFc: false,
+  createdBy: OFFICER,
+  createdAt: NOW - 30 * DAY,
+  ownerCharacterId: OFFICER,
+  updatedAt: NOW - 3 * DAY,
+  updatedBy: OFFICER,
+  schemaVersion: 1,
+});
+put(book.collection('srpOfficers').doc(`char:${OFFICER}`), {
+  canEdit: true,
+  canManage: true,
+  isCeo: true,
+  isDirector: true,
+  characterId: OFFICER,
+  characterName: args['officer-name'],
+  ownerHash: args['owner-hash'],
+  corporationId: CORP,
+  roles: ['Director'],
+  checkedAt: NOW,
+  expiresAt: NOW + 24 * HOUR,
+});
+const SRP_STATES = ['pending', 'pending', 'approved', 'paid', 'paid', 'rejected', 'pending'];
+for (let i = 0; i < 14; i++) {
+  const miner = MINERS[i % MINERS.length];
+  const state = SRP_STATES[i % SRP_STATES.length];
+  const hullTypeId = SRP_HULLS[i % SRP_HULLS.length];
+  const killmailId = 130_000_001 + i;
+  const filedAt = NOW - (i * 11 + 4) * HOUR;
+  const amount = state === 'pending' && i % 2 === 0 ? null : 3_000_000 + ((i * 7) % 9) * 2_500_000;
+  const decided = state === 'approved' || state === 'paid' || state === 'rejected';
+  const claim = {
+    killmailId,
+    killmailHash: `dev${String(killmailId).padStart(37, '0')}`,
+    corporationId: CORP,
+    characterId: miner.id,
+    characterName: miner.name,
+    uid: `char:${miner.id}`,
+    ownerHash: 'dev-owner-hash',
+    hullTypeId,
+    solarSystemId: SYSTEMS[i % SYSTEMS.length],
+    killedAt: filedAt - 2 * HOUR,
+    filedAt,
+    state,
+    amount,
+    basis: amount === null ? null : { step: 'killmail-percent', percent: 60 },
+    suggested:
+      amount === null ? { isk: 6_500_000, basis: { step: 'killmail-percent', percent: 60 } } : null,
+    fleetOrFc: i % 3 === 0 ? 'Dev FC' : null,
+    note: i % 4 === 0 ? 'Lost to a gate camp, solo' : null,
+    refileCount: 0,
+  };
+  if (decided) {
+    claim.decidedAt = filedAt + 2 * HOUR;
+    claim.decidedBy = OFFICER;
+    claim.decidedByName = args['officer-name'];
+  }
+  if (state === 'rejected') {
+    claim.rejectionReason = 'Not a doctrine fit';
+    claim.closedAt = filedAt + 2 * HOUR;
+  }
+  if (state === 'paid') {
+    claim.paidAt = filedAt + 6 * HOUR;
+    claim.paidBy = OFFICER;
+    claim.paidByName = args['officer-name'];
+    claim.closedAt = filedAt + 6 * HOUR;
+  }
+  put(book.collection('srpClaims').doc(String(killmailId)), claim);
+  const entry = (at, action) =>
+    put(
+      book
+        .collection('srpAudit')
+        .doc(`${String(at).padStart(15, '0')}~${randomBytes(6).toString('base64url')}`),
+      {
+        at,
+        by: action === 'file' ? miner.id : OFFICER,
+        byName: action === 'file' ? miner.name : args['officer-name'],
+        action,
+        detail: { killmailId, hullTypeId },
+      }
+    );
+  entry(filedAt, 'file');
+  if (decided) entry(filedAt + 2 * HOUR, state === 'rejected' ? 'reject' : 'approve');
+  if (state === 'paid') entry(filedAt + 6 * HOUR, 'markPaid');
+}
+
 // --- Audit trail (what turnOn and issueStatement append) ---------------------
 function audit(at, action, detail) {
   put(sub('audit').doc(`${String(at).padStart(15, '0')}~${randomBytes(6).toString('base64url')}`), {
