@@ -28,7 +28,6 @@ import { dateTimeUtc, extractionWindowLabel, isk, periodLabel } from './moonsFor
 import { extractionPath as extractionLink, minerPath } from './moonsPaths';
 import { caretColumn } from './caretColumn';
 import { Crumb, OreLine, StateWord } from './moonsParts';
-import { tapTargetClassName } from './sectionHelpers';
 import { OreLinesTable } from './OreLinesTable';
 import { BookSection, EntityHeader, UndockableChip } from './sectionParts';
 
@@ -276,22 +275,17 @@ export function MoonDetail({ id }: { id: string }) {
             rowKey={(m) => m.minerId}
             expandableRow={{
               leadingIcon: true,
+              trigger: 'button',
+              toggleLabel: (m) => t('corpTaxBook.moons.moon.oreOf', { name: minerName(m) }),
               renderDetail: (m) => (
                 <OreLinesTable
                   lines={m.lines}
                   showTotal={false}
                   label={t('corpTaxBook.moons.moon.oreOf', { name: minerName(m) })}
-                  foot={
-                    <Link
-                      to={minerPath(m.minerId)}
-                      className={entityLinkClassName(tapTargetClassName)}
-                    >
-                      {t('corpTaxBook.moons.moon.openMiner')}
-                    </Link>
-                  }
                 />
               ),
             }}
+            onRowClick={(m) => navigate(minerPath(m.minerId))}
             density="compact"
             stackLayout="dense"
           />

@@ -54,6 +54,7 @@ import {
   type TabItem,
 } from '@/components/ui';
 import { isNpcCharacterId, isNpcCorporationId } from '@/esi/entityIds';
+import { useCharacters } from '@/features/character/useCharacters';
 import { useEntityName } from '@/features/character/useEntityName';
 import {
   loadPublicAllianceInfo,
@@ -69,6 +70,9 @@ const LazyEmploymentTab = lazy(() =>
 );
 const LazyCorporationTab = lazy(() =>
   guarded(() => import('@/features/character/PublicInfoCorporationTab'))
+);
+const LazyInteractionsTab = lazy(() =>
+  guarded(() => import('@/features/interactions/InteractionsTab'))
 );
 const LazyAllianceTab = lazy(() =>
   guarded(() => import('@/features/character/PublicInfoAllianceTab'))
@@ -100,12 +104,20 @@ export function PublicInfoModal() {
   const isPhone = useIsPhone();
   const request = usePublicInfoModalStore((state) => state.request);
   const close = usePublicInfoModalStore((state) => state.close);
+  const urlTab = usePublicInfoModalStore((state) => state.tab);
+  const setUrlTab = usePublicInfoModalStore((state) => state.setTab);
+  const characters = useCharacters();
 
-  const [activeTab, setActiveTab] = useState<PublicInfoKind | 'employment'>('character');
+  const [chosenTab, setActiveTab] = useState<PublicInfoKind | 'employment' | 'interactions'>(
+    'character'
+  );
+  // The URL's `infoTab` opens Interactions (so Back from a row's page lands here); no `infoTab`
+  // leaves the modal's own tab choice.
   const focusAfterCommit = useFocusAfterCommit();
   // The pressed button lives in the tab we leave, so it unmounts: land on the tab we switched to.
   const openTab = (id: PublicInfoKind) => {
     setActiveTab(id);
+    if (urlTab !== null) setUrlTab(null);
     focusAfterCommit(() => document.getElementById(tabDomId(tabsId, id)));
   };
   const [character, setCharacter] = useState<CharacterState>(IDLE);
@@ -113,11 +125,23 @@ export function PublicInfoModal() {
   const [alliance, setAlliance] = useState<TabState<PublicAllianceInfo>>(IDLE);
   // Bumped by Try again on a failed tab, to run the lookups again in place.
   const [attempt, setAttempt] = useState(0);
+  // Interactions is offered for another pilot, to a viewer with a Character to look from. A URL
+  // naming the tab for anyone else (an NPC, your own Character) falls back to the chosen tab.
+  const interactionsOffered =
+    request?.kind === 'character' &&
+    !isNpcCharacterId(request.id) &&
+    character.status === 'ready' &&
+    characters.length > 0 &&
+    !characters.some((c) => c.characterId === request.id);
+  const activeTab = urlTab === 'interactions' && interactionsOffered ? 'interactions' : chosenTab;
   const activeState =
     activeTab === 'character' ? character : activeTab === 'corporation' ? corporation : alliance;
   // Try again unmounts while the lookups re-run, so the always-mounted wrapper holds focus.
   const [resultRef, , holdFocus] = useRetryFocus<HTMLDivElement>(
-    activeTab === 'employment' || activeState.status === 'ready' || activeState.status === 'unknown'
+    activeTab === 'employment' ||
+      activeTab === 'interactions' ||
+      activeState.status === 'ready' ||
+      activeState.status === 'unknown'
       ? 'ok'
       : activeState.status === 'error'
         ? 'failed'
@@ -225,6 +249,8 @@ export function PublicInfoModal() {
     character.status !== 'unknown'
   )
     tabs.push({ id: 'employment', label: t('publicInfo.employmentTab') });
+  // Interactions: what this account has done with the pilot.
+  if (interactionsOffered) tabs.push({ id: 'interactions', label: t('interactions.tab') });
 
   const activeData =
     activeTab === 'corporation' ? corporation : activeTab === 'alliance' ? alliance : character;
@@ -262,7 +288,12 @@ export function PublicInfoModal() {
             tabsId={tabsId}
             tabs={tabs}
             value={activeTab}
-            onChange={(id) => setActiveTab(id as PublicInfoKind | 'employment')}
+            onChange={(id) => {
+              setActiveTab(id as PublicInfoKind | 'employment' | 'interactions');
+              // Only Interactions rides the URL; any other tab clears it.
+              if (id === 'interactions' || urlTab !== null)
+                setUrlTab(id === 'interactions' ? id : null);
+            }}
             label={t('publicInfo.tabsLabel')}
           />
         )}
@@ -289,6 +320,15 @@ export function PublicInfoModal() {
               />
             )}
             {activeTab === 'alliance' && <AllianceTab state={alliance} onRetry={retry} />}
+            {activeTab === 'interactions' && character.status === 'ready' && (
+              <Suspense fallback={<Spinner block="panel" label={t('common.loading')} />}>
+                <LazyInteractionsTab
+                  key={request.id}
+                  otherId={request.id}
+                  otherName={character.data.name}
+                />
+              </Suspense>
+            )}
             {activeTab === 'employment' && (
               <Suspense fallback={<Spinner block="panel" label={t('common.loading')} />}>
                 <LazyEmploymentTab characterId={request.id} />

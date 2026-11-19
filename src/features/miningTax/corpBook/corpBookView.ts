@@ -7,6 +7,7 @@ import {
   inFlightDonations,
   overlayCorpBooks,
   type BookSummary,
+  type MadeDonation,
   type PersonalBook,
   type PersonalOverlay,
 } from '@/engine/corpTaxBook/personal';
@@ -21,6 +22,18 @@ import type { MoonMiningTaxRow } from '../snapshot';
 import type { ClaimablePayment, LoadedCorpBook } from './corpBookStore';
 import { payeesOfBookCorporation } from '@/engine/miningTax/payeeCorporation';
 import { corpPayee, personalEntriesOf } from './corpRows';
+
+/** A payment the member made, as the book's overlay reads it; only a journal entry carries a `refId`. */
+export function madeDonationOf(m: MadePayment): MadeDonation {
+  return {
+    characterId: m.characterId,
+    ...(m.counterpartyId !== undefined ? { counterpartyId: m.counterpartyId } : {}),
+    amount: m.amount,
+    date: m.date,
+    method: m.method,
+    ...(m.kind === 'journal' ? { refId: m.refId } : {}),
+  };
+}
 
 export interface CorpBookViewBook {
   loaded: LoadedCorpBook;
@@ -118,14 +131,7 @@ export function buildCorpBookView(
       }),
       inReviewRefs: (book.inReview ?? []).flatMap((d) => (d.refId === undefined ? [] : [d.refId])),
       inFlight: inFlightDonations(
-        input.made.map((m) => ({
-          characterId: m.characterId,
-          ...(m.counterpartyId !== undefined ? { counterpartyId: m.counterpartyId } : {}),
-          amount: m.amount,
-          date: m.date,
-          method: m.method,
-          ...(m.kind === 'journal' ? { refId: m.refId } : {}),
-        })),
+        input.made.map(madeDonationOf),
         book.held,
         book.corporationId,
         book.startDate

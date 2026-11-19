@@ -7,6 +7,7 @@ import type { BookRowView } from '@/engine/corpTaxBook/personal';
 import type { DisplayRow } from '../groupRows';
 import { CorpRowDetailModal } from './CorpRowDetailModal';
 import type { CorpRowInfo } from './corpRows';
+import type { CorpBookViewBook } from './corpBookView';
 
 const ZEO = 45490;
 
@@ -76,12 +77,83 @@ function renderModal(over: Partial<Parameters<typeof CorpRowDetailModal>[0]> = {
 }
 
 describe('CorpRowDetailModal', () => {
+  it('lists what paid a day, and nothing for a day nothing has paid', () => {
+    renderModal();
+    expect(screen.queryByText('Paid by')).not.toBeInTheDocument();
+  });
+
+  it('links a paid day’s donation to the member’s own wallet entry for it', () => {
+    const paid = {
+      ...view,
+      state: 'paid' as const,
+      taxOwed: 0,
+      settledBy: 'credit' as const,
+      paidBy: { payments: [{ paymentId: 'j1_900', amount: 957_001 }], inFlight: [] },
+    };
+    const book = {
+      summary: {},
+      payee: { name: 'Brass Meridian Logistics' },
+      loaded: {
+        payments: [
+          {
+            id: 'j1_900',
+            minerId: 'solo:1',
+            characterId: 1,
+            amount: 957_001,
+            at: '2026-10-18T13:10:00Z',
+            source: 'donation',
+          },
+        ],
+      },
+    } as unknown as CorpBookViewBook;
+    const madePayments = [
+      {
+        key: 'journal:5150',
+        kind: 'journal',
+        refId: 5150,
+        characterId: 1,
+        date: '2026-10-18T13:09:00Z',
+        amount: 957_001,
+        method: 'donation',
+        counterpartyId: paid.corporationId,
+        label: '',
+      },
+    ] as const;
+    renderModal({ corp: { ...corp, view: paid }, book, madePayments });
+    expect(screen.getByRole('link', { name: 'Open in wallet' })).toHaveAttribute(
+      'href',
+      '/wallet/journal?highlight=5150'
+    );
+  });
+
+  it('lists the money that paid a paid day', () => {
+    const paid = {
+      ...view,
+      state: 'paid' as const,
+      taxOwed: 0,
+      settledBy: 'donation' as const,
+      paidBy: {
+        payments: [],
+        inFlight: [{ amount: 957_001, at: '2026-10-18T13:10:00Z', refId: 5150 }],
+      },
+    };
+    renderModal({ corp: { ...corp, view: paid } });
+    expect(screen.getByText('Paid by')).toBeInTheDocument();
+    expect(screen.getByText(/not credited by Brass Meridian Logistics yet/)).toBeInTheDocument();
+  });
+
   it('shows what the book bills, with the book and your own quantity', () => {
     renderModal();
     expect(screen.getByText('957,001 ISK')).toBeInTheDocument();
     expect(screen.getByText('Billed')).toBeInTheDocument();
-    expect(screen.getByText('43,050 (book) · 41,200 (you)')).toBeInTheDocument();
+    expect(screen.getByText(/43,050 \(corp\) · 41,200 \(you\)/)).toBeInTheDocument();
     expect(screen.getAllByText(/15% per-moon rate from 2026-10-01/).length).toBeGreaterThan(0);
+  });
+
+  it('prices each ore line inline and names a source only when it is not the saved snapshot', () => {
+    renderModal();
+    expect(screen.getByText(/× 148/)).toBeInTheDocument();
+    expect(screen.queryByText('Saved snapshot')).not.toBeInTheDocument();
   });
 
   it('offers Settle up but no way to edit the book’s figures', () => {
@@ -175,7 +247,7 @@ describe('CorpRowDetailModal', () => {
     renderModal({ corp: { ...corp, view: paid } });
     expect(screen.getByText('957,001 ISK')).toBeInTheDocument();
     expect(
-      screen.getByText(/The book owns these figures, so they can't be edited here\./)
+      screen.getByText(/keeps these figures, so they can't be edited here\./)
     ).toBeInTheDocument();
     expect(screen.getByText('Statement')).toBeInTheDocument();
     expect(screen.getByText('Issued, final')).toBeInTheDocument();
@@ -220,7 +292,7 @@ describe('CorpRowDetailModal', () => {
   it('says a day was paid from credit the book already held', () => {
     const paid: BookRowView = { ...view, state: 'paid', taxOwed: 0, settledBy: 'credit' };
     renderModal({ corp: { ...corp, view: paid } });
-    expect(screen.getByText('Credit the book holds')).toBeInTheDocument();
+    expect(screen.getByText('Corp credit')).toBeInTheDocument();
     expect(
       screen.getByText(/already held credit from an earlier payment of yours/)
     ).toBeInTheDocument();
@@ -274,7 +346,7 @@ describe('CorpRowDetailModal', () => {
     renderModal({ onResolve, corp: { ...corp, view: marked } });
     expect(
       screen.getByText(
-        "Marked paid by you. Brass Meridian Logistics's book already holds that payment, but it pays your oldest open days first and spent it on 2026-11-01, so it still bills this day 10,242,021 ISK. Resolve says what you can do."
+        'Marked paid by you. Brass Meridian Logistics already holds that payment, but it pays your oldest open days first and spent it on 2026-11-01, so it still bills this day 10,242,021 ISK. Resolve says what you can do.'
       )
     ).toBeInTheDocument();
     await userEvent.click(screen.getAllByRole('button', { name: 'Resolve' }).at(-1)!);

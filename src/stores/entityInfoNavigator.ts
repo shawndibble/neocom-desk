@@ -12,6 +12,8 @@ import type { EntityInfoTarget } from '@/lib/entityInfo';
 export interface EntityInfoNavigator {
   open: (target: EntityInfoTarget) => void;
   close: () => void;
+  /** Sets or clears the open modal's `infoTab`, replacing the history entry (a tab is not a page). */
+  setTab: (tab: string | null) => void;
 }
 
 let current: EntityInfoNavigator | null = null;

@@ -1,6 +1,6 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { formatList } from '@/lib/listFormat';
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, InfoTooltip, Modal, ValueList, ValueRow } from '@/components/ui';
 import { SecurityValue } from '@/features/assets/assetBrowserRows';
@@ -10,14 +10,17 @@ import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { useTicker } from '@/lib/ticker';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { OreIcon, OreLink } from '../OreIcon';
+import { OrePricedCard } from '../OrePricedCard';
 import { bookRowTax } from './corpRows';
 import { typeLabel } from './typeLabel';
 import { hubForPayee } from '../pricing';
 import type { DisplayRow } from '../groupRows';
 import { CorpBookDiffModal } from './CorpBookDiffModal';
-import type { CorpBookViewBook } from './corpBookView';
+import { madeDonationOf, type CorpBookViewBook } from './corpBookView';
+import { pairWithMadePayments } from '@/engine/corpTaxBook/transferMatch';
+import type { MadePayment } from '../paymentLinks';
 import { CorpStatusPill } from './CorpStatusPill';
+import { PaidByList } from './PaidByList';
 import { CorpDeclareSlot } from './CorpDeclareAction';
 import {
   figureTarget,
@@ -29,7 +32,6 @@ import {
 import type { CorpRowInfo } from './corpRows';
 import { formatCount } from '@/lib/formatCount';
 import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
-import { Well } from '@/components/ui/Well';
 
 interface Props {
   open: boolean;
@@ -50,6 +52,8 @@ interface Props {
   onResolve?: (target: ResolveTarget) => void;
   /** Opens the member's own entry for this day, to fix their records. Absent: no entry lines up. */
   onFixRecords?: () => void;
+  /** The member's own outgoing payments, to find their wallet entry for each donation the book holds. */
+  madePayments?: readonly MadePayment[];
 }
 
 /**
@@ -73,12 +77,22 @@ export function CorpRowDetailModal({
   notice,
   onResolve,
   onFixRecords,
+  madePayments,
 }: Props) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   const now = useTicker(MINUTE_MS);
   const [comparing, setComparing] = useState(false);
   const { view } = corp;
+  const bookPayments = book?.loaded.payments;
+  // Best effort, on this device: a donation the member's own journal no longer holds has no link.
+  const walletRefs = useMemo(
+    () =>
+      bookPayments && madePayments && madePayments.length > 0
+        ? pairWithMadePayments(bookPayments, madePayments.map(madeDonationOf), view.corporationId)
+        : undefined,
+    [bookPayments, madePayments, view.corporationId]
+  );
   const hub = hubForPayee(view.hubId);
   const form = t(
     view.oreForm === 'compressed'
@@ -190,7 +204,6 @@ export function CorpRowDetailModal({
                 </>
               )}
               {' · '}
-              {view.taxPct}%{' · '}
               {t('miningTax.detail.valueLine', { value: formatIsk(view.estimatedValue) })}
             </span>
             <CorpStatusPill corp={corp} />
@@ -198,63 +211,34 @@ export function CorpRowDetailModal({
 
           {conflict && notice}
 
-          <Well className="space-y-1">
-            <p className={eyebrowClassName}>{t('miningTax.oreColumn')}</p>
-            <ul className="divide-y divide-line text-xs">
-              {view.oreLines.map((line) => {
-                const you = personal?.find((p) => p.typeId === line.typeId)?.quantity;
-                return (
-                  <li
-                    key={line.typeId}
-                    className="flex items-center gap-1.5 py-1 first:pt-0 last:pb-0"
-                  >
-                    <OreIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
-                    <span className="min-w-0 flex-1 truncate">
-                      <OreLink typeId={line.typeId}>{typeLabel(typeNames, line.typeId)}</OreLink>
-                    </span>
-                    <span className="text-text-dim tabular-nums">
-                      {you !== undefined && you !== line.quantity
-                        ? t('miningTax.corpBook.detail.bookAndYou', {
-                            book: formatCount(line.quantity),
-                            you: formatCount(you),
-                          })
-                        : formatCount(line.quantity)}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          </Well>
-
-          <Well className="space-y-1">
-            <p className={eyebrowClassName}>{t('miningTax.detail.breakdown.title')}</p>
-            <p className="text-xs text-text-dim">
-              {t('miningTax.corpBook.detail.priced', {
-                hub: hub.name,
-                form,
-                pct: view.taxPct,
-                scope,
-                from: view.rateEffectiveFrom ?? view.date,
-              })}
-            </p>
-            <ul className="divide-y divide-line text-xs">
-              {view.oreLines.map((line) => (
-                <li key={line.typeId} className="flex flex-wrap items-baseline gap-x-2 py-1">
-                  <span className="min-w-0 flex-1 truncate">
-                    <OreLink typeId={line.typeId}>{typeLabel(typeNames, line.typeId)}</OreLink>
-                  </span>
-                  <span className="text-text-dim tabular-nums">
-                    {formatCount(line.quantity)} × {formatIsk(view.unitPrices[line.typeId] ?? 0)}
-                  </span>
-                  <span className="text-text-dim">
-                    {t(
-                      `miningTax.detail.breakdown.source.${view.priceSources[line.typeId] ?? 'none'}`
-                    )}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </Well>
+          <OrePricedCard
+            title={t('miningTax.oreColumn')}
+            lines={view.oreLines.map((line) => {
+              const you = personal?.find((p) => p.typeId === line.typeId)?.quantity;
+              const source = view.priceSources[line.typeId] ?? 'none';
+              return {
+                typeId: line.typeId,
+                name: typeLabel(typeNames, line.typeId),
+                quantity:
+                  you !== undefined && you !== line.quantity
+                    ? t('miningTax.corpBook.detail.bookAndYou', {
+                        book: formatCount(line.quantity),
+                        you: formatCount(you),
+                      })
+                    : formatCount(line.quantity),
+                unit: formatIsk(view.unitPrices[line.typeId] ?? 0),
+                source:
+                  source === 'saved' ? undefined : t(`miningTax.detail.breakdown.source.${source}`),
+              };
+            })}
+            note={t('miningTax.corpBook.detail.priced', {
+              hub: hub.name,
+              form,
+              pct: view.taxPct,
+              scope,
+              from: view.rateEffectiveFrom ?? view.date,
+            })}
+          />
 
           {/* On a Conflict with nothing else to say, the notice already names who to ask. */}
           {!(conflict && facts.length === 0) && (
@@ -333,7 +317,9 @@ export function CorpRowDetailModal({
                 view.markedPaidIds.length > 0 && (
                   <p>{t('miningTax.corpBook.detail.settled.alsoMarked')}</p>
                 )}
-              <p className="text-text-dim">{t('miningTax.corpBook.detail.lockedShort')}</p>
+              <p className="text-text-dim">
+                {t('miningTax.corpBook.detail.lockedShort', { corp: corp.corpName })}
+              </p>
               {onResolve && resolvable && (
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-text-dim">
@@ -345,6 +331,15 @@ export function CorpRowDetailModal({
                 </div>
               )}
             </div>
+          )}
+
+          {view.paidBy && (
+            <PaidByList
+              paidBy={view.paidBy}
+              payments={book?.loaded.payments ?? []}
+              corpName={corp.corpName}
+              {...(walletRefs ? { walletRefs } : {})}
+            />
           )}
 
           {view.correction && (

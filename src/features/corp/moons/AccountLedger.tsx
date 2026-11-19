@@ -13,6 +13,7 @@ import type { MinerDetail } from '@/engine/corpTaxBook/bookView';
 import type { Adjustment } from '@/engine/corpTaxBook/statements';
 import { isk, shortDate } from './moonsFormat';
 import { OreLinesTable } from './OreLinesTable';
+import { extractionPath, refineryPath } from './moonsPaths';
 import { paymentWalletHref } from './paymentWalletHref';
 import { tapTargetClassName } from './sectionHelpers';
 import { BookSection } from './sectionParts';
@@ -44,16 +45,44 @@ export function AccountLedger({
 
   const what = (e: LedgerEntry) => {
     switch (e.kind) {
-      case 'day':
-        return t('corpTaxBook.moons.ledger.what.day', { count: e.days ?? 1 });
+      case 'day': {
+        const keys = new Set(e.dayKeys);
+        const places = new Map<number, string | undefined>();
+        for (const d of detail.days)
+          if (keys.has(d.key))
+            places.set(d.structureId, places.get(d.structureId) ?? d.extractionId);
+        return (
+          <span>
+            {t('corpTaxBook.moons.ledger.what.day')}
+            {[...places].map(([structureId, extractionId]) => (
+              <span key={structureId} className="block text-xs">
+                <Link
+                  to={
+                    extractionId === undefined
+                      ? refineryPath(structureId)
+                      : extractionPath(extractionId)
+                  }
+                  className={entityLinkClassName(tapTargetClassName)}
+                >
+                  {names.refinery(structureId)}
+                </Link>
+              </span>
+            ))}
+          </span>
+        );
+      }
       case 'payment': {
         const href = e.paymentId ? paymentWalletHref(e.paymentId) : null;
+        const p = detail.payments.find((x) => x.id === e.paymentId);
+        const label = p
+          ? t('corpTaxBook.moons.ledger.what.paymentFrom', { name: names.character(p.characterId) })
+          : t('corpTaxBook.moons.ledger.what.payment');
         return href ? (
           <Link to={href} className={entityLinkClassName(tapTargetClassName)}>
-            {t('corpTaxBook.moons.ledger.what.payment')}
+            {label}
           </Link>
         ) : (
-          t('corpTaxBook.moons.ledger.what.payment')
+          label
         );
       }
       case 'correction':
@@ -142,19 +171,14 @@ export function AccountLedger({
     },
   ];
 
+  // A minus is what the Miner owes; a plain figure is credit they hold with the book.
   const balanceText = (balance: number) =>
     Math.abs(balance) < 1 ? (
       <span className="text-text-dim">{isk(0)}</span>
     ) : balance > 0 ? (
-      <span className="text-isk-neg">
-        {isk(balance)}
-        <span className="ml-1 text-xs text-text-dim">{t('corpTaxBook.moons.ledger.owed')}</span>
-      </span>
+      <span className="text-isk-neg">{`\u2212${isk(balance)}`}</span>
     ) : (
-      <span className="text-isk-pos">
-        {isk(-balance)}
-        <span className="ml-1 text-xs text-text-dim">{t('corpTaxBook.moons.ledger.credit')}</span>
-      </span>
+      <span className="text-isk-pos">{isk(-balance)}</span>
     );
 
   return (

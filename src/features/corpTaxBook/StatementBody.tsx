@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Panel } from '@/components/ui';
 import {
@@ -7,9 +7,9 @@ import {
   type VerifyPayloadLine,
   type VerifyRow,
 } from '@/engine/corpTaxBook/verifyView';
-import { loadTypeNames } from '@/features/character/typeNames';
 import { formatCount } from '@/lib/formatCount';
 import { TRADE_HUBS } from '@/market/hubs';
+import { useOreNames } from './useOreNames';
 import { isk, shortDate } from './statementFormat';
 
 /** What the lines panel prints: a Statement as the verify page reads it, or the book holds it. */
@@ -36,21 +36,7 @@ export function StatementLines({
   const locale = i18n.language;
   const fmt: DateFormat = formatDate ?? ((v) => shortDate(v, locale));
   const rows = useMemo(() => verifyRows(statement.lines), [statement.lines]);
-  const [oreNames, setOreNames] = useState<ReadonlyMap<number, string>>(new Map());
-  useEffect(() => {
-    const ids = rows.flatMap((r) => r.ores.map((o) => o.typeId));
-    if (ids.length === 0) return;
-    let cancelled = false;
-    loadTypeNames(ids).then(
-      (names) => {
-        if (!cancelled) setOreNames(names);
-      },
-      () => undefined
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [rows]);
+  const oreNames = useOreNames(rows);
   const days = useMemo(() => groupByDay(rows), [rows]);
   const refinery = (id: number | undefined) =>
     id === undefined
@@ -173,7 +159,9 @@ function MinedDay({
   // The day header already says the day, and the panel header says prices are the day's own:
   // an ore line only speaks up when its price came from somewhere else.
   const priceSource = (source: VerifyRow['ores'][number]['source']) =>
-    source && source !== 'saved' ? t(`miningTax.detail.breakdown.source.${source}`) : undefined;
+    source && source !== 'saved' && source !== 'historical'
+      ? t(`miningTax.detail.breakdown.source.${source}`)
+      : undefined;
   const many = day.rows.length > 1;
   return (
     <li className="px-3 py-2 text-sm">

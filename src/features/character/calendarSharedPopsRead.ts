@@ -58,6 +58,13 @@ async function readSurveyStates(
         states.set(id, {
           finished: summary.finished,
           percentLeft: summary.finished ? 0 : Math.max(1, 100 - summary.percent),
+          ores: summary.ores
+            .filter((o) => o.startVolume > 0 && summary.startVolume > 0)
+            .map((o) => ({
+              name: o.ore,
+              percent: Math.max(1, Math.round((o.startVolume / summary.startVolume) * 100)),
+            }))
+            .sort((a, b) => b.percent - a.percent),
         });
       } catch {
         // No state for this one: the row falls back to the officer's flag.

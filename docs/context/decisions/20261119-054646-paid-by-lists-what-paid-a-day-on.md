@@ -1,0 +1,9 @@
+# Scope decisions — Paid by lists what paid a day on the member's Tax tab, with no corp wallet link
+
+_Recorded 2026-11-19._
+
+- **The member overlay records whose money paid each day (`BookRowView.paidBy`).** The Tax tab's rows are settled in `personal.ts` from one pooled credit per Miner, not by `allocateRunningAccount` (officer side), so attribution is added there as a queue of the pool's sources (`paidBy.ts`) and changes no result. Running two allocators for one answer was ruled out: a row could read Paid while its list showed something else.
+- **Money is spent oldest first, corrections before payments, and a member's own mark spends the front of the pool.** This mirrors `runningAccount.ts` and the `credit - mark` rule that already decides `settledBy`. The tolerance gap of a day has no payer, so a list can sum to a little under the day's bill.
+- **The list shows each payment's date, kind and amount, and links nowhere.** `/corp/wallet` is the corporation's own wallet page (Accountant role and corp grant), which a member usually cannot open. The link a member wants is to their own wallet entry, which needs pairing the book's payment with their journal (sender, amount, time): a later step. Credit corrections are listed apart and named as not a payment; a donation in flight is named as not credited yet.
+- **A payment with no tax (all coded not tax) has no entry, and a day nothing has paid has no list.**
+- **An officer's write-off is a line of its own, named as not a payment, and only on a day something paid.** It sits beside the payments that paid the rest; the existing "Corrected X to Y" note keeps the reason. A day an officer forgave in full has no list. A dismissal's credit is no line: the Statement's pool excludes it, so the payments the list names are exactly what paid the day.

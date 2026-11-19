@@ -23,3 +23,14 @@ export function labelSuggestions(
   }
   return [...latest].sort((x, y) => (x[1] < y[1] ? 1 : x[1] > y[1] ? -1 : 0)).map(([l]) => l);
 }
+
+/**
+ * A label shown beside its system: "Ainsan - Foil Finish Foundry" in Ainsan reads "Foil Finish
+ * Foundry", since the system is already on the row. Only that system's own prefix is dropped.
+ */
+export function labelWithoutSystem(label: string, systemName: string): string {
+  const prefix = `${systemName} - `;
+  return label.startsWith(prefix) && label.length > prefix.length
+    ? label.slice(prefix.length)
+    : label;
+}

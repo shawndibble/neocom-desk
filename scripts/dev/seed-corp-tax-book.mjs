@@ -32,6 +32,7 @@ const { values: args } = parseArgs({
     member: { type: 'string' },
     'member-name': { type: 'string', default: 'Dev Member' },
     guest: { type: 'string' },
+    extra: { type: 'string', default: '12' },
     project: { type: 'string', default: 'demo-neocom-desk' },
     port: { type: 'string', default: '5173' },
   },
@@ -71,10 +72,13 @@ const iso = (ms) => new Date(ms).toISOString();
 const day = (back) => iso(NOW - back * DAY).slice(0, 10);
 
 // --- Fixtures --------------------------------------------------------------
-const REFINERIES = [
-  { id: 1040000000001, name: 'Dev Athanor Alpha', solarSystemId: 30002187, moonId: 40139001 },
-  { id: 1040000000002, name: 'Dev Tatara Beta', solarSystemId: 30002187, moonId: 40139002 },
-];
+const SYSTEMS = [30002187, 30002053, 30000144];
+const REFINERIES = Array.from({ length: 6 }, (_, i) => ({
+  id: 1040000000001 + i,
+  name: `Dev ${i % 2 === 0 ? 'Athanor' : 'Tatara'} ${['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta'][i]}`,
+  solarSystemId: SYSTEMS[i % 3],
+  moonId: 40139001 + i,
+}));
 // R4 moon ores: Zeolites, Sylvite, Bitumens. Prices are per raw unit.
 const ORES = [
   { typeId: 45490, price: 1200 },
@@ -128,6 +132,39 @@ put(sub('officers').doc(`char:${OFFICER}`), {
   expiresAt: NOW + 24 * HOUR,
 });
 
+// --- Miners: the member, optional guest, the officer, and synthetic extras ----
+// Synthetic ids are made up, so ESI cannot name them; the app shows their ids.
+const EXTRA_MINERS = Number(args.extra);
+if (!Number.isInteger(EXTRA_MINERS) || EXTRA_MINERS < 0) {
+  console.error('--extra must be a whole number, 0 or more.');
+  process.exit(1);
+}
+const MINERS = [
+  {
+    id: MEMBER,
+    name: args['member-name'],
+    corp: CORP,
+    days: [...STATEMENT_DAYS, ...OPEN_DAYS],
+    pays: 'third',
+  },
+  ...(GUEST === null
+    ? []
+    : [{ id: GUEST, name: 'Dev Guest', corp: 98999999, days: [6, 5, 4, 3], pays: 'none' }]),
+  { id: OFFICER, name: args['officer-name'], corp: CORP, days: [4, 3, 2], pays: 'none' },
+  ...Array.from({ length: EXTRA_MINERS }, (_, i) => ({
+    id: 90_001_000 + i,
+    name: `Dev Miner ${i + 1}`,
+    corp: i % 5 === 4 ? 98_999_000 + i : CORP,
+    days:
+      i % 3 === 0
+        ? [...STATEMENT_DAYS, ...OPEN_DAYS]
+        : i % 3 === 1
+          ? [...STATEMENT_DAYS, 3, 2]
+          : [9, 8, 4, 3, 1],
+    pays: ['full', 'partial', 'none', 'over', 'full', 'none'][i % 6],
+  })),
+];
+
 // --- Observed Mining Entries -------------------------------------------------
 const minedQty = (charId, dayBack, ore, structure) =>
   8_000 + ((charId + dayBack * 7 + ore.typeId + structure.id) % 9) * 2_500;
@@ -135,7 +172,7 @@ const minedQty = (charId, dayBack, ore, structure) =>
 function observedRows(charId, corporationId, dayBacks) {
   const rows = [];
   for (const back of dayBacks) {
-    const structure = REFINERIES[back % REFINERIES.length];
+    const structure = REFINERIES[(back + charId) % REFINERIES.length];
     for (const ore of ORES) {
       rows.push({
         structureId: structure.id,
@@ -152,76 +189,84 @@ function observedRows(charId, corporationId, dayBacks) {
   }
   return rows;
 }
-const memberRows = observedRows(MEMBER, CORP, [...STATEMENT_DAYS, ...OPEN_DAYS]);
-const guestRows = GUEST === null ? [] : observedRows(GUEST, 98999999, [6, 5, 4, 3]);
-const officerRows = observedRows(OFFICER, CORP, [4, 3, 2]);
-for (const r of [...memberRows, ...guestRows, ...officerRows]) {
+for (const m of MINERS) m.rows = observedRows(m.id, m.corp, m.days);
+for (const r of MINERS.flatMap((m) => m.rows)) {
   put(sub('observed').doc(`${r.characterId}_${r.typeId}_${r.date}_${r.structureId}`), {
     ...r,
     uid: `char:${r.characterId}`,
   });
 }
 
-// --- An issued, unpaid Statement for the member (with verify link) -----------
-const statementId = `st-${MEMBER}-1`;
-const minerId = `solo:${MEMBER}`;
-const lines = [];
-for (const back of STATEMENT_DAYS) {
-  const structure = REFINERIES[back % REFINERIES.length];
-  const dayRows = memberRows.filter((r) => r.date === day(back));
-  const value = dayRows.reduce(
-    (sum, r) => sum + r.quantity * ORES.find((o) => o.typeId === r.typeId).price,
-    0
-  );
-  lines.push({
-    kind: 'mined',
-    date: day(back),
-    chargeKey: `${MEMBER}:${structure.id}:${day(back)}`,
-    characterId: MEMBER,
-    structureId: structure.id,
-    oreLines: dayRows.map((r) => ({ typeId: r.typeId, quantity: r.quantity })),
-    unitPrices: Object.fromEntries(ORES.map((o) => [o.typeId, o.price])),
-    priceSources: Object.fromEntries(ORES.map((o) => [o.typeId, 'historical'])),
-    taxPct: RATE_PCT,
-    rateEffectiveFrom: START,
-    estimatedValue: value,
-    tax: Math.round((value * RATE_PCT) / 100),
+// --- One issued Statement per Miner that has billed days; verify link for the member
+let statementSeq = 0;
+const statementOf = new Map(); // character id -> { statementId, minerId, amount }
+let token = '';
+for (const m of MINERS) {
+  const billed = STATEMENT_DAYS.filter((back) => m.days.includes(back));
+  if (billed.length === 0) continue;
+  statementSeq += 1;
+  const statementId = `st-${m.id}-1`;
+  const minerId = `solo:${m.id}`;
+  const lines = billed.map((back) => {
+    const dayRows = m.rows.filter((r) => r.date === day(back));
+    const structure = REFINERIES.find((s) => s.id === dayRows[0].structureId);
+    const value = dayRows.reduce(
+      (sum, r) => sum + r.quantity * ORES.find((o) => o.typeId === r.typeId).price,
+      0
+    );
+    return {
+      kind: 'mined',
+      date: day(back),
+      chargeKey: `${m.id}:${structure.id}:${day(back)}`,
+      characterId: m.id,
+      structureId: structure.id,
+      oreLines: dayRows.map((r) => ({ typeId: r.typeId, quantity: r.quantity })),
+      unitPrices: Object.fromEntries(ORES.map((o) => [o.typeId, o.price])),
+      priceSources: Object.fromEntries(ORES.map((o) => [o.typeId, 'historical'])),
+      taxPct: RATE_PCT,
+      rateEffectiveFrom: START,
+      estimatedValue: value,
+      tax: Math.round((value * RATE_PCT) / 100),
+    };
   });
+  const amount = lines.reduce((sum, l) => sum + l.tax, 0);
+  const code = `NTX-D${String(statementSeq).padStart(3, '0')}`;
+  put(sub('statements').doc(statementId), {
+    id: statementId,
+    minerId,
+    code,
+    periodStart: day(12),
+    periodEnd: day(8),
+    coversFrom: day(12),
+    coversThrough: day(8),
+    issuedAt: iso(NOW - 6 * DAY),
+    hubId: 'jita',
+    oreForm: 'compressed',
+    lines,
+    amount,
+    characterIds: [m.id],
+    corporationName: CORP_NAME,
+    minerName: m.name,
+    refineryNames: Object.fromEntries(REFINERIES.map((r) => [String(r.id), r.name])),
+    uids: [`char:${m.id}`],
+    remindersStopped: false,
+    manualRemindersSent: 0,
+    issuedBy: OFFICER,
+  });
+  const verifyToken = randomBytes(32).toString('base64url');
+  if (m.id === MEMBER) token = verifyToken;
+  put(sub('statementLinks').doc(statementId), { verifyToken });
+  put(db.collection('corpTaxBookTokens').doc(verifyToken), {
+    corporationId: CORP,
+    statementId,
+    minerId,
+    remindersStopped: false,
+    createdAt: NOW - 6 * DAY,
+  });
+  statementOf.set(m.id, { statementId, minerId, amount, code });
 }
-const amount = lines.reduce((sum, l) => sum + l.tax, 0);
-const token = randomBytes(32).toString('base64url');
-put(sub('statements').doc(statementId), {
-  id: statementId,
-  minerId,
-  code: 'NTX-D3V1',
-  periodStart: day(12),
-  periodEnd: day(8),
-  coversFrom: day(12),
-  coversThrough: day(8),
-  issuedAt: iso(NOW - 6 * DAY),
-  hubId: 'jita',
-  oreForm: 'compressed',
-  lines,
-  amount,
-  characterIds: [MEMBER],
-  corporationName: CORP_NAME,
-  minerName: args['member-name'],
-  refineryNames: Object.fromEntries(REFINERIES.map((r) => [String(r.id), r.name])),
-  uids: [`char:${MEMBER}`],
-  remindersStopped: false,
-  manualRemindersSent: 0,
-  issuedBy: OFFICER,
-});
-put(sub('statementLinks').doc(statementId), { verifyToken: token });
-put(db.collection('corpTaxBookTokens').doc(token), {
-  corporationId: CORP,
-  statementId,
-  minerId,
-  remindersStopped: false,
-  createdAt: NOW - 6 * DAY,
-});
 
-// --- Tax Payments: matched, Unmatched, not tax, manual ----------------------
+// --- Tax Payments: matched, partial, over, Unmatched, not tax, manual --------
 const donation = (refId, characterId, amountIsk, back, extra = {}) => ({
   id: `j1_${refId}`,
   source: 'donation',
@@ -232,43 +277,58 @@ const donation = (refId, characterId, amountIsk, back, extra = {}) => ({
   division: 1,
   ...extra,
 });
-const payments = [
-  // Matched: the member's code, pinned to the Statement.
-  donation(900001, MEMBER, Math.round(amount / 3), 4, {
-    reason: 'NTX-D3V1',
-    minerId,
-    statementId,
-  }),
-  // Unmatched: no code, no Miner (the guest's if given, else the officer's).
-  donation(900002, GUEST ?? OFFICER, 2_500_000, 3, { reason: 'moon tax' }),
-  // Not tax: the member's, an officer marked it as something else.
-  donation(900003, MEMBER, 40_000_000, 5, {
+const payments = [];
+let ref = 900_000;
+for (const m of MINERS) {
+  const st = statementOf.get(m.id);
+  if (!st) continue;
+  const pinned = (amt, back) =>
+    donation((ref += 1), m.id, amt, back, {
+      reason: st.code,
+      minerId: st.minerId,
+      statementId: st.statementId,
+    });
+  if (m.pays === 'third') payments.push(pinned(Math.round(st.amount / 3), 4));
+  if (m.pays === 'full') payments.push(pinned(st.amount, 5));
+  if (m.pays === 'partial') payments.push(pinned(Math.round(st.amount * 0.6), 4));
+  if (m.pays === 'over') payments.push(pinned(Math.round(st.amount * 1.2), 3));
+}
+// Unmatched: no code, no Miner.
+payments.push(donation((ref += 1), GUEST ?? OFFICER, 2_500_000, 3, { reason: 'moon tax' }));
+// Extra miners' ids start at 90_001_000; skip these when `--extra` is too small to have them.
+if (EXTRA_MINERS > 1)
+  payments.push(donation((ref += 1), 90_001_001, 1_750_000, 2, { reason: 'ty o7' }));
+if (EXTRA_MINERS > 7) payments.push(donation((ref += 1), 90_001_007, 3_100_000, 1));
+// Not tax: marked by an officer as something else.
+payments.push(
+  donation((ref += 1), MEMBER, 40_000_000, 5, {
     notTaxAmount: 40_000_000,
     notTaxReason: 'Contract payment, not moon tax',
     notTaxBy: OFFICER,
     notTaxAt: iso(NOW - 4 * DAY),
-  }),
-];
+  })
+);
 for (const p of payments) put(sub('payments').doc(p.id), p);
+const memberStatement = statementOf.get(MEMBER);
 put(sub('payments').doc('manual-dev-1'), {
   id: 'manual-dev-1',
   source: 'manual',
-  minerId,
+  minerId: memberStatement.minerId,
   characterId: MEMBER,
   uid: `char:${MEMBER}`,
   amount: 500_000,
   at: iso(NOW - 2 * DAY),
-  statementId,
+  statementId: memberStatement.statementId,
   note: 'Paid in person',
   recordedBy: OFFICER,
 });
 
-// --- A dismissal (one open day of the member's) and a declaration ------------
-const dismissedKey = `${MEMBER}:${REFINERIES[3 % REFINERIES.length].id}:${day(3)}`;
+// --- Dismissals and a declaration ----------------------------------------------
+const memberOpenRow = MINERS[0].rows.find((r) => r.date === day(3));
 put(sub('dismissals').doc('d-dev-1'), {
   id: 'd-dev-1',
   scope: 'record',
-  targetId: dismissedKey,
+  targetId: `${MEMBER}:${memberOpenRow.structureId}:${day(3)}`,
   by: OFFICER,
   at: iso(NOW - 2 * DAY),
   reason: 'Corp fleet op: tax waived',
@@ -277,14 +337,14 @@ put(sub('dismissals').doc('d-dev-1'), {
 });
 put(sub('declarations').doc('x-dev-1'), {
   id: 'x-dev-1',
-  statementId,
+  statementId: memberStatement.statementId,
   kind: 'contract',
   at: iso(NOW - 1 * DAY),
   recordedBy: OFFICER,
   note: 'Says it was paid by contract',
 });
 
-// --- Extractions: Extracting, Ready, Fractured, Expired ----------------------
+// --- Extractions: every refinery gets a spread of states ---------------------
 function extraction(structure, startedAgoH, arrivesInH, decaysInH, laserAgoH) {
   const start = NOW - startedAgoH * HOUR;
   const startIso = iso(start);
@@ -299,10 +359,118 @@ function extraction(structure, startedAgoH, arrivesInH, decaysInH, laserAgoH) {
   if (laserAgoH !== undefined) fields.laserFiredAt = iso(NOW - laserAgoH * HOUR);
   put(sub('extractions').doc(fields.id), fields);
 }
-extraction(REFINERIES[0], 24, 72, 120); // Extracting: chunk lands in 3 days
-extraction(REFINERIES[1], 120, -2, 46); // Ready: arrived, not yet fractured
-extraction(REFINERIES[0], 200, -80, -30, 30); // Fractured: laser 30h ago, expires after 48h
-extraction(REFINERIES[1], 400, -300, -250); // Expired: fractured 250h ago
+REFINERIES.forEach((s, i) => {
+  extraction(s, 400, -300, -250); // Expired: fractured 250h ago
+  const live = i % 4;
+  if (live === 0) extraction(s, 24, 72 + i * 10, 120 + i * 10); // Extracting
+  if (live === 1) extraction(s, 120, -2, 46); // Ready, not yet fractured
+  if (live === 2) extraction(s, 200, -80, -30, 30); // Fractured
+  if (live === 3) extraction(s, 60, 8, 56); // Extracting, arriving soon
+});
+
+// --- SRP (ship replacement): settings, the officer's access record, claims, audit ------
+// Layout of functions/src/srpStore.ts and src/features/corp/srpClaimTypes.ts. Officers read
+// all of it under the rules; the officer record needs canEdit and the same ownerHash.
+// Rifter, Drake, Raven, Catalyst, Hulk, Covetor, Orca (rules below: Rifter fixed, Drake percent, Catalyst not covered, Orca officer decides).
+const SRP_HULLS = [587, 24698, 638, 16240, 22544, 17476, 28606];
+put(book.collection('srp').doc('settings'), {
+  corporationId: CORP,
+  enabled: true,
+  killmailPct: 60,
+  appraisalPct: null,
+  hullRules: [
+    { scope: 'hull', id: 587, kind: 'pay-fixed', iskAmount: 4_000_000 },
+    { scope: 'hull', id: 24698, kind: 'pay-percent' },
+    { scope: 'hull', id: 28606, kind: 'officer-decides' },
+    { scope: 'hull', id: 16240, kind: 'not-covered' },
+  ],
+  windowDays: 30,
+  requireFleetOrFc: false,
+  createdBy: OFFICER,
+  createdAt: NOW - 30 * DAY,
+  ownerCharacterId: OFFICER,
+  updatedAt: NOW - 3 * DAY,
+  updatedBy: OFFICER,
+  schemaVersion: 1,
+});
+put(book.collection('srpOfficers').doc(`char:${OFFICER}`), {
+  canEdit: true,
+  canManage: true,
+  isCeo: true,
+  isDirector: true,
+  characterId: OFFICER,
+  characterName: args['officer-name'],
+  ownerHash: args['owner-hash'],
+  corporationId: CORP,
+  roles: ['Director'],
+  checkedAt: NOW,
+  expiresAt: NOW + 24 * HOUR,
+});
+const SRP_STATES = ['pending', 'pending', 'approved', 'paid', 'paid', 'rejected', 'pending'];
+for (let i = 0; i < 14; i++) {
+  const miner = MINERS[i % MINERS.length];
+  const state = SRP_STATES[i % SRP_STATES.length];
+  // A claim awaiting an officer-typed amount is on the hull whose rule is "officer decides".
+  const needsAmount = state === 'pending' && i % 2 === 0;
+  const hullTypeId = needsAmount ? 28606 : SRP_HULLS[i % SRP_HULLS.length];
+  const killmailId = 130_000_001 + i;
+  const filedAt = NOW - (i * 11 + 4) * HOUR;
+  const amount = needsAmount ? null : 3_000_000 + ((i * 7) % 9) * 2_500_000;
+  const decided = state === 'approved' || state === 'paid' || state === 'rejected';
+  const claim = {
+    killmailId,
+    killmailHash: `dev${String(killmailId).padStart(37, '0')}`,
+    corporationId: CORP,
+    characterId: miner.id,
+    characterName: miner.name,
+    uid: `char:${miner.id}`,
+    ownerHash: args['owner-hash'],
+    hullTypeId,
+    solarSystemId: SYSTEMS[i % SYSTEMS.length],
+    killedAt: filedAt - 2 * HOUR,
+    filedAt,
+    state,
+    amount,
+    basis: amount === null ? null : { step: 'killmail-percent', percent: 60 },
+    suggested:
+      amount === null ? { isk: 6_500_000, basis: { step: 'killmail-percent', percent: 60 } } : null,
+    fleetOrFc: i % 3 === 0 ? 'Dev FC' : null,
+    note: i % 4 === 0 ? 'Lost to a gate camp, solo' : null,
+    refileCount: 0,
+  };
+  if (decided) {
+    claim.decidedAt = filedAt + 2 * HOUR;
+    claim.decidedBy = OFFICER;
+    claim.decidedByName = args['officer-name'];
+  }
+  if (state === 'rejected') {
+    claim.rejectionReason = 'Not a doctrine fit';
+    claim.closedAt = filedAt + 2 * HOUR;
+  }
+  if (state === 'paid') {
+    claim.paidAt = filedAt + 6 * HOUR;
+    claim.paidBy = OFFICER;
+    claim.paidByName = args['officer-name'];
+    claim.closedAt = filedAt + 6 * HOUR;
+  }
+  put(book.collection('srpClaims').doc(String(killmailId)), claim);
+  const entry = (at, action) =>
+    put(
+      book
+        .collection('srpAudit')
+        .doc(`${String(at).padStart(15, '0')}~${randomBytes(6).toString('base64url')}`),
+      {
+        at,
+        by: action === 'fileClaim' ? miner.id : OFFICER,
+        byName: action === 'fileClaim' ? miner.name : args['officer-name'],
+        action,
+        detail: { killmailId, hullTypeId },
+      }
+    );
+  entry(filedAt, 'fileClaim');
+  if (decided) entry(filedAt + 2 * HOUR, state === 'rejected' ? 'rejectClaim' : 'approveClaim');
+  if (state === 'paid') entry(filedAt + 6 * HOUR, 'markClaimPaid');
+}
 
 // --- Audit trail (what turnOn and issueStatement append) ---------------------
 function audit(at, action, detail) {
@@ -315,7 +483,12 @@ function audit(at, action, detail) {
   });
 }
 audit(NOW - 40 * DAY, 'turnOn', { startDate: START, startRatePct: RATE_PCT });
-audit(NOW - 6 * DAY, 'issueStatement', { statementId, minerId, amount });
+for (const [, st] of statementOf)
+  audit(NOW - 6 * DAY, 'issueStatement', {
+    statementId: st.statementId,
+    minerId: st.minerId,
+    amount: st.amount,
+  });
 
 // --- Write ---------------------------------------------------------------------
 // Clear any earlier seed of this book through the emulator's own wipe endpoint.

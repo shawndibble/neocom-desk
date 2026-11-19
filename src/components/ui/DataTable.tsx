@@ -345,22 +345,31 @@ export function DataTable<T>({
   const trailingColumns = (expandableRow ? 1 : 0) + (rowMoreActions ? 1 : 0);
   const trailingRem =
     (expandableRow ? TRAILING_COL_EXPAND_REM : 0) + (rowMoreActions ? TRAILING_COL_ACTIONS_REM : 0);
+  // `trigger: 'button'`: the row's click is `onRowClick` alone; a caret button toggles the detail.
+  const buttonToggle = expandableRow?.trigger === 'button';
   const rowIsClickable = (row: T) =>
-    expandable || (Boolean(onRowClick) && (rowClickable ? rowClickable(row) : true));
+    (expandable && !buttonToggle) ||
+    (Boolean(onRowClick) && (rowClickable ? rowClickable(row) : true));
 
   // Rows get one stable activator rather than `onRowClick` itself, which
   // callers pass inline — only ever called from a click or key handler, so
   // reading the latest value through a ref can't render anything stale.
   const onRowClickRef = useRef(onRowClick);
-  const expandableRef = useRef(expandable);
+  const expandableRef = useRef(expandable && !buttonToggle);
   useLayoutEffect(() => {
     onRowClickRef.current = onRowClick;
-    expandableRef.current = expandable;
+    expandableRef.current = expandable && !buttonToggle;
   });
-  const activateRow = useCallback((row: T, key: string | number) => {
-    onRowClickRef.current?.(row);
-    if (expandableRef.current) setExpandedRowKey((current) => (current === key ? null : key));
+  const toggleRow = useCallback((key: string | number) => {
+    setExpandedRowKey((current) => (current === key ? null : key));
   }, []);
+  const activateRow = useCallback(
+    (row: T, key: string | number) => {
+      onRowClickRef.current?.(row);
+      if (expandableRef.current) toggleRow(key);
+    },
+    [toggleRow]
+  );
 
   function renderRow(row: T, index: number, member = false, windowIndex?: number) {
     const key = rowKey(row, index);
@@ -408,6 +417,8 @@ export function DataTable<T>({
         expanded={expanded}
         hideExpandIcon={(expandableRow?.hideIcon ?? false) || (expandableRow?.leadingIcon ?? false)}
         leadingExpandIcon={expandableRow?.leadingIcon ?? false}
+        toggleLabel={buttonToggle ? expandableRow?.toggleLabel?.(row) : undefined}
+        onToggle={toggleRow}
         renderDetail={expanded ? expandableRow?.renderDetail : undefined}
         clickable={rowIsClickable(row)}
         tapOpensRow={Boolean(onRowClick) && (rowClickable ? rowClickable(row) : true)}

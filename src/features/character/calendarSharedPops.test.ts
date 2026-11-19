@@ -202,9 +202,9 @@ describe('Shared Pops as Calendar clocks', () => {
     });
 
     it('is fully mined once its linked Survey is finished', () => {
-      const done = { ...entry(popped), survey: { finished: true, percentLeft: 0 } };
+      const done = { ...entry(popped), survey: { finished: true, percentLeft: 0, ores: [] } };
       expect(sharedPopMiningState(done)).toBe('fullyMined');
-      const running = { ...entry(popped), survey: { finished: false, percentLeft: 62 } };
+      const running = { ...entry(popped), survey: { finished: false, percentLeft: 62, ores: [] } };
       expect(sharedPopMiningState(running)).toBeNull();
     });
 
@@ -362,14 +362,16 @@ describe('Shared Pop start link and detail', () => {
     expect(detail.title).toBe('Efa - Tatara');
     expect(detail.facts[0]).toEqual({ label: 'calendar.sharedPop.moon', value: 'Efa I - Moon 1' });
     expect(detail.facts.map((f) => f.label)).toContain('calendar.sharedPop.popTime.ready');
-    expect(detail.status).toMatchObject({
-      badge: 'calendar.sharedPop.popTime.ready',
-      note: 'Fleet forms in local.',
-    });
+    expect(detail.status?.badge).toBeUndefined();
+    expect(detail.status?.note).toBe('Fleet forms in local.');
     expect(detail.list?.items).toEqual([
       { key: 'Zeolites', text: 'Zeolites', value: 'calendar.sharedPop.units{"count":1200000}' },
     ]);
-    expect(detail.place).toEqual({ systemId: 30_000_001, name: 'Efa - Tatara' });
+    expect(detail.place).toEqual({
+      systemId: 30_000_001,
+      name: 'Efa - Tatara',
+      structureId: 1_000_000_000_001,
+    });
     expect(detail.link?.to).toBe(sharedPopStartLink(entry()));
     expect(JSON.stringify(detail)).not.toMatch(/isk/i);
   });
@@ -404,15 +406,82 @@ describe('Shared Pop start link and detail', () => {
     );
     expect(flagged[0]!.value).toContain('calendar.sharedPop.fullyMinedBy');
     expect(flagged[0]!.value).toContain('Mina');
-    const running = mining({ ...entry(popped), survey: { finished: false, percentLeft: 62 } });
+    const running = mining({
+      ...entry(popped),
+      survey: { finished: false, percentLeft: 62, ores: [] },
+    });
     expect(running).toContainEqual({
       label: 'calendar.sharedPop.survey',
       value: 'calendar.sharedPop.surveyLeft{"percent":62}',
     });
-    const finished = mining({ ...entry(popped), survey: { finished: true, percentLeft: 0 } });
+    const finished = mining({
+      ...entry(popped),
+      survey: { finished: true, percentLeft: 0, ores: [] },
+    });
     expect(finished).toEqual([
       { label: 'calendar.sharedPop.survey', value: 'calendar.sharedPop.surveyFinished' },
     ]);
+  });
+
+  it('reads fractured once past the auto-fracture time, whatever the book last synced', () => {
+    const late = entry({
+      popTime: 'ready',
+      readyAt: iso(NOW - 12 * HOUR_MS),
+      autoFractureAt: iso(NOW - 8 * HOUR_MS),
+      popAt: iso(NOW - 12 * HOUR_MS),
+    });
+    const detail = sharedPopDetail(late, NOW, t, 'UTC');
+    expect(detail.status?.text).toBe('calendar.sharedPop.fractured');
+    expect(detail.facts.map((f) => f.label)).not.toContain(
+      'calendar.sharedPop.popTime.autoFracture'
+    );
+  });
+
+  it('says fully mined and offers no new Survey for a moon an officer marked', () => {
+    const marked = entry({
+      popAt: iso(NOW - 3 * HOUR_MS),
+      fullyMined: { byName: 'Mina', at: iso(NOW - HOUR_MS) },
+    });
+    expect(sharedPopDetail(marked, NOW, t, 'UTC').status?.text).toBe(
+      'calendar.sharedPop.fullyMined'
+    );
+    expect(sharedPopDetail(marked, NOW, t, 'UTC').link).toBeUndefined();
+    const linked = sharedPopDetail(
+      { ...marked, pop: { ...marked.pop, surveyId: 'abc' } },
+      NOW,
+      t,
+      'UTC'
+    );
+    expect(linked.link?.to).toBe('/s/abc');
+    expect(linked.secondaryLink).toBeUndefined();
+  });
+
+  it("falls back to the linked Survey's ores when the book has no make-up", () => {
+    const survey = {
+      finished: false,
+      percentLeft: 50,
+      ores: [{ name: 'Bright Spodumain', percent: 60 }],
+    };
+    const detail = sharedPopDetail(
+      { ...entry({ oreShared: true }), ore: null, survey },
+      NOW,
+      t,
+      'UTC'
+    );
+    expect(detail.list?.items).toEqual([
+      expect.objectContaining({
+        text: 'Bright Spodumain',
+        value: 'calendar.sharedPop.orePercent{"percent":60}',
+      }),
+    ]);
+    expect(detail.facts.map((f) => f.value)).not.toContain('calendar.sharedPop.oreUnknown');
+  });
+
+  it('sends the refinery itself as the destination, not only its system', () => {
+    expect(sharedPopDetail(entry({ solarSystemId: 30000142 }), NOW, t, 'UTC').place).toMatchObject({
+      systemId: 30000142,
+      structureId: entry().pop.structureId,
+    });
   });
 
   it('names its pop in the start link, so the Survey it starts can be linked back', () => {

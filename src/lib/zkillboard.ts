@@ -651,6 +651,62 @@ export async function fetchPilotKillHistory(characterId: number): Promise<PilotK
   return { ok: true, kills };
 }
 
+/** Who was on a killmail, from a `kills/` or `losses/characterID` entry: enough to say which side two pilots were on. */
+export interface KillInvolvement {
+  killmailId: number;
+  timeMs: number;
+  /** zKillboard's total value of the loss; null when absent. */
+  value: number | null;
+  victimCharacterId: number | null;
+  attackerCharacterIds: number[];
+}
+
+/** Reads a pilot-list body into involvements; entries with no id or readable time are dropped. */
+export function parseKillInvolvements(body: unknown): KillInvolvement[] {
+  if (!Array.isArray(body)) return [];
+  const out: KillInvolvement[] = [];
+  for (const entry of body) {
+    if (!isRecord(entry) || typeof entry.killmail_id !== 'number') continue;
+    const timeMs =
+      typeof entry.killmail_time === 'string' ? Date.parse(entry.killmail_time) : Number.NaN;
+    if (!Number.isFinite(timeMs)) continue;
+    const attackers = Array.isArray(entry.attackers) ? entry.attackers.filter(isRecord) : [];
+    out.push({
+      killmailId: entry.killmail_id,
+      timeMs,
+      value: isRecord(entry.zkb) ? finiteOrNull(entry.zkb.totalValue) : null,
+      victimCharacterId: isRecord(entry.victim) ? finiteOrNull(entry.victim.character_id) : null,
+      attackerCharacterIds: attackers.flatMap((a) => finiteOrNull(a.character_id) ?? []),
+    });
+  }
+  return out;
+}
+
+export type PilotInvolvementsResult =
+  | { ok: true; kills: KillInvolvement[]; losses: KillInvolvement[] }
+  | { ok: false; reason: ZkillFailureReason };
+
+/**
+ * A pilot's latest kills and losses (first page of each, up to 200) with who
+ * was on each side, for Show Info's Interactions. Both lists come through
+ * `fetchPilotList`, so nothing is requested that the profile has not already.
+ */
+export async function fetchPilotInvolvements(
+  characterId: number
+): Promise<PilotInvolvementsResult> {
+  try {
+    const [kills, losses] = await Promise.all([
+      fetchPilotList(characterId, 'kills'),
+      fetchPilotList(characterId, 'losses'),
+    ]);
+    if (kills === null) return { ok: false, reason: pilotListFailure(characterId, 'kills') };
+    if (losses === null) return { ok: false, reason: pilotListFailure(characterId, 'losses') };
+    return { ok: true, kills: parseKillInvolvements(kills), losses: parseKillInvolvements(losses) };
+  } catch {
+    return { ok: false, reason: 'parse' };
+  }
+}
+
 /** `ok: false` when zKillboard failed or rate-limited, so "no kills" and "couldn't load" differ. */
 export type SystemRecentKillsResult =
   { ok: true; kills: RecentKill[] } | { ok: false; reason: ZkillFailureReason };

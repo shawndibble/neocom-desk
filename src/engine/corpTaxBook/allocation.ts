@@ -164,14 +164,19 @@ export interface AllocationInput {
   held?: ReadonlyMap<string, number>;
 }
 
-export function allocatePayments(rawInput: AllocationInput): Allocation {
-  const { startDate } = rawInput;
-  const input = {
-    ...rawInput,
-    payments: startDate
-      ? rawInput.payments.filter((p) => p.source !== 'donation' || !isBeforeBook(p.at, startDate))
-      : rawInput.payments,
-  };
+/** What of a Tax Payment is tax: its amount less the part coded "not tax". */
+export function paymentNet(p: Pick<TaxPayment, 'amount' | 'notTaxAmount'>): number {
+  return p.amount - Math.min(p.notTaxAmount ?? 0, p.amount);
+}
+
+/** The Tax Payments the book counts, in the order they are applied: a donation before `startDate` drops out; oldest first. */
+export function countedPayments(payments: readonly TaxPayment[], startDate?: string): TaxPayment[] {
+  return payments
+    .filter((p) => !startDate || p.source !== 'donation' || !isBeforeBook(p.at, startDate))
+    .sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
+}
+
+export function allocatePayments(input: AllocationInput): Allocation {
   const ordered = [...input.statements].sort(
     (a, b) => a.issuedAt.localeCompare(b.issuedAt) || a.id.localeCompare(b.id)
   );
@@ -219,13 +224,9 @@ export function allocatePayments(rawInput: AllocationInput): Allocation {
     dismissed += d.amount;
     credit += applyOldestFirst(apply(d.statementId, d.amount, false), false);
   }
-  const payments = [...input.payments].sort(
-    (a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id)
-  );
   const paymentCredits: PaymentCredit[] = [];
-  for (const p of payments) {
-    const net = p.amount - Math.min(p.notTaxAmount ?? 0, p.amount);
-    let available = net;
+  for (const p of countedPayments(input.payments, input.startDate)) {
+    let available = paymentNet(p);
     paid += available;
     const before = new Map([...state].map(([id, st]) => [id, st.credited]));
     if (p.statementId) available = apply(p.statementId, available, true);

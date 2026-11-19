@@ -17,7 +17,7 @@ function Place({ place }: { place: NonNullable<RowDetailModel['place']> }) {
   const { t } = useTranslation();
   return (
     <SetDestinationButton
-      locationId={place.systemId}
+      locationId={place.structureId ?? place.systemId}
       placeName={place.name}
       // With no jump count there is nothing to read out, so the default "View route" button
       // (a sibling of Set destination) beats a bare text link; a count stays a readout link.
@@ -38,7 +38,7 @@ function Place({ place }: { place: NonNullable<RowDetailModel['place']> }) {
 function Status({ status }: { status: NonNullable<RowDetailModel['status']> }) {
   return (
     <Well size="lg" className="space-y-1.5">
-      <Pill tone={status.tone}>{status.badge}</Pill>
+      {status.badge && <Pill tone={status.tone}>{status.badge}</Pill>}
       {status.text && <p className="text-2xl font-semibold tabular-nums">{status.text}</p>}
       {status.note && <p className="text-xs text-text-dim">{status.note}</p>}
     </Well>

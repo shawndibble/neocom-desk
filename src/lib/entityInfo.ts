@@ -21,6 +21,9 @@ export interface EntityInfoTarget {
 }
 
 const ENTITY_INFO_PARAM = 'info';
+/** Which tab of a Show Info modal is open (`interactions`), so Back from a page it linked to returns to it. */
+const INFO_TAB_PARAM = 'infoTab';
+const INFO_TAB_PATTERN = /^[a-z]+$/;
 
 const INFO_PATTERN = /^(character|corporation|alliance|faction|skill|type|place)-(\d+)(?:-(\d+))?$/;
 
@@ -53,6 +56,7 @@ export function entityInfoHref(
 ): string {
   const params = new URLSearchParams(location.search);
   params.set(ENTITY_INFO_PARAM, formatEntityInfo(target));
+  params.delete(INFO_TAB_PARAM);
   return `${location.pathname}?${params.toString()}`;
 }
 
@@ -60,6 +64,25 @@ export function entityInfoHref(
 export function withoutEntityInfo(search: string): string {
   const params = new URLSearchParams(search);
   params.delete(ENTITY_INFO_PARAM);
+  params.delete(INFO_TAB_PARAM);
   const rest = params.toString();
   return rest === '' ? '' : `?${rest}`;
+}
+
+/** The open tab a search string names, or null when absent or unreadable. */
+export function parseInfoTab(search: string): string | null {
+  const raw = new URLSearchParams(search).get(INFO_TAB_PARAM);
+  return raw !== null && INFO_TAB_PATTERN.test(raw) ? raw : null;
+}
+
+/** `pathname + search` with `infoTab` set to `tab` (null removes it), every other param kept. */
+export function infoTabHref(
+  location: { pathname: string; search: string },
+  tab: string | null
+): string {
+  const params = new URLSearchParams(location.search);
+  if (tab === null) params.delete(INFO_TAB_PARAM);
+  else params.set(INFO_TAB_PARAM, tab);
+  const rest = params.toString();
+  return rest === '' ? location.pathname : `${location.pathname}?${rest}`;
 }

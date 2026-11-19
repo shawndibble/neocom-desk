@@ -1,6 +1,9 @@
 import { useTranslation } from 'react-i18next';
 import type { RunningAccountStatus } from '@/engine/corpTaxBook/bookView';
+import { daysBetween } from '@/engine/corpTaxBook/statements';
+import { utcDay } from '@/engine/localDay';
 import { isk, shortDate } from './moonsFormat';
+import { useBook } from './useBook';
 
 /**
  * A Miner's running account in words (#6294): "Owes X (N days, oldest D)" or "Paid through D";
@@ -25,4 +28,20 @@ export function AccountStatus({ account }: { account: RunningAccountStatus }) {
       </span>
     );
   return <>—</>;
+}
+
+/** The date of a Miner's oldest unpaid day and its age, or "Paid through D" when nothing is owed. */
+export function OldestUnpaid({ account }: { account: RunningAccountStatus }) {
+  const { t } = useTranslation();
+  const { view } = useBook();
+  if (account.owes)
+    return (
+      <span className="text-danger">
+        {t('corpTaxBook.moons.account.oldestUnpaid', {
+          date: shortDate(account.owes.oldest),
+          count: Math.max(0, daysBetween(account.owes.oldest, utcDay(Date.parse(view.input.now)))),
+        })}
+      </span>
+    );
+  return <AccountStatus account={account} />;
 }

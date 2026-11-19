@@ -294,6 +294,233 @@ describe('allocateRunningAccount', () => {
   });
 });
 
+describe('allocateRunningAccount applications', () => {
+  const T = (n: number) => `2026-11-04T10:0${n}:00Z`;
+  const paymentOf = (r: ReturnType<typeof allocateRunningAccount>, id: string) =>
+    r.applications.payments.find((p) => p.paymentId === id);
+
+  it('spreads one payment over the days it covered, oldest first', () => {
+    const r = allocateRunningAccount({
+      ...base,
+      days: NOV,
+      payments: [payment('p1', 2_000_000, T(0))],
+    });
+    expect(paymentOf(r, 'p1')).toEqual({
+      paymentId: 'p1',
+      statements: [],
+      days: [
+        { date: '2026-11-01', amount: 1_000_000 },
+        { date: '2026-11-02', amount: 1_000_000 },
+      ],
+      credit: 0,
+    });
+  });
+
+  it('gives each payment its own slice of a day, in payment order', () => {
+    const r = allocateRunningAccount({
+      ...base,
+      days: NOV,
+      payments: [payment('p2', 1_500_000, T(1)), payment('p1', 1_500_000, T(0))],
+    });
+    expect(paymentOf(r, 'p1')?.days).toEqual([
+      { date: '2026-11-01', amount: 1_000_000 },
+      { date: '2026-11-02', amount: 500_000 },
+    ]);
+    expect(paymentOf(r, 'p2')?.days).toEqual([{ date: '2026-11-02', amount: 1_500_000 }]);
+  });
+
+  it('keeps what no day absorbed as the payment’s credit', () => {
+    const r = allocateRunningAccount({
+      ...base,
+      days: [day('2026-11-01', 1_000_000)],
+      payments: [payment('p1', 3_000_000, T(0))],
+    });
+    expect(paymentOf(r, 'p1')).toMatchObject({
+      days: [{ date: '2026-11-01', amount: 1_000_000 }],
+      credit: 2_000_000,
+    });
+    expect(r.credit).toBe(2_000_000);
+  });
+
+  it('attributes exactly what the pooled allocation credits when the tolerance closes a day mid-run', () => {
+    const r = allocateRunningAccount({
+      ...base,
+      days: [day('2026-11-01', 10_000_000), day('2026-11-02', 5_000_000)],
+      payments: [payment('p1', 9_970_000, T(0)), payment('p2', 1_000_000, T(1))],
+    });
+    expect(r.byDay.get('2026-11-01')?.credited).toBe(10_000_000);
+    expect(paymentOf(r, 'p1')?.days).toEqual([{ date: '2026-11-01', amount: 9_970_000 }]);
+    expect(paymentOf(r, 'p2')?.days).toEqual([
+      { date: '2026-11-01', amount: 30_000 },
+      { date: '2026-11-02', amount: 970_000 },
+    ]);
+  });
+
+  it('leaves out the part of a payment that was not tax', () => {
+    const r = allocateRunningAccount({
+      ...base,
+      days: NOV,
+      payments: [payment('p1', 2_000_000, T(0), { notTaxAmount: 1_500_000 })],
+    });
+    expect(paymentOf(r, 'p1')?.days).toEqual([{ date: '2026-11-01', amount: 500_000 }]);
+  });
+
+  it('applies nothing for a donation dated before the book started', () => {
+    const r = allocateRunningAccount({
+      ...base,
+      startDate: '2026-11-02',
+      days: NOV,
+      payments: [payment('p1', 1_000_000, '2026-11-01T10:00:00Z')],
+    });
+    expect(r.applications.payments).toEqual([]);
+    expect(r.byDay.get('2026-11-01')?.credited).toBe(0);
+  });
+
+  it('names the legacy Statement a payment settled before the days', () => {
+    const r = allocateRunningAccount({
+      ...base,
+      statements: [legacy('s1', 1_000_000, '2026-11-01T00:00:00Z')],
+      days: NOV,
+      payments: [payment('p1', 1_500_000, T(0))],
+    });
+    expect(paymentOf(r, 'p1')).toMatchObject({
+      statements: [{ statementId: 's1', amount: 1_000_000 }],
+      days: [{ date: '2026-11-01', amount: 500_000 }],
+      credit: 0,
+    });
+  });
+
+  it('sends a payment coded to an already-paid Statement entirely to the days', () => {
+    const r = allocateRunningAccount({
+      ...base,
+      statements: [legacy('s1', 1_000_000, '2026-11-01T00:00:00Z')],
+      days: NOV,
+      payments: [
+        payment('p1', 1_000_000, T(0), { statementId: 's1' }),
+        payment('p2', 1_000_000, T(1), { statementId: 's1' }),
+      ],
+    });
+    expect(paymentOf(r, 'p2')).toMatchObject({
+      statements: [],
+      days: [{ date: '2026-11-01', amount: 1_000_000 }],
+    });
+  });
+
+  it('reports a credit correction apart from payments', () => {
+    const r = allocateRunningAccount({
+      ...base,
+      days: [day('2026-10-31', -500_000), ...NOV],
+      payments: [payment('p1', 1_000_000, T(0))],
+    });
+    expect(r.applications.corrections).toEqual([{ date: '2026-11-01', amount: 500_000 }]);
+    expect(paymentOf(r, 'p1')?.days).toEqual([
+      { date: '2026-11-01', amount: 500_000 },
+      { date: '2026-11-02', amount: 500_000 },
+    ]);
+    expect(r.applications.writeOffs).toEqual([]);
+  });
+
+  it('reports a dismissal’s leftover as a correction, not as any payment’s credit', () => {
+    const r = allocateRunningAccount({
+      ...base,
+      statements: [legacy('s1', 1_000_000, '2026-11-01T00:00:00Z')],
+      dismissalCredits: [
+        { statementId: 's1', dismissalId: 'd1', chargeKey: 'k1', amount: 1_500_000 },
+      ],
+      days: NOV,
+      payments: [payment('p1', 1_000_000, T(0))],
+    });
+    expect(r.applications.corrections).toEqual([{ date: '2026-11-01', amount: 500_000 }]);
+    expect(paymentOf(r, 'p1')?.days).toEqual([
+      { date: '2026-11-01', amount: 500_000 },
+      { date: '2026-11-02', amount: 500_000 },
+    ]);
+  });
+
+  it('applies nothing for a payment that carried no tax', () => {
+    const r = allocateRunningAccount({
+      ...base,
+      days: NOV,
+      payments: [payment('p1', 1_000_000, T(0), { notTaxAmount: 1_000_000 })],
+    });
+    expect(r.applications.payments).toEqual([]);
+    expect(r.byDay.get('2026-11-01')?.credited).toBe(0);
+  });
+
+  it('lets a payment a legacy Statement fully absorbed leave the next payment its own days', () => {
+    const r = allocateRunningAccount({
+      ...base,
+      statements: [legacy('s1', 1_000_000, '2026-11-01T00:00:00Z')],
+      days: NOV,
+      payments: [payment('p1', 1_000_000, T(0)), payment('p2', 500_000, T(1))],
+    });
+    expect(paymentOf(r, 'p1')).toEqual({
+      paymentId: 'p1',
+      statements: [{ statementId: 's1', amount: 1_000_000 }],
+      days: [],
+      credit: 0,
+    });
+    expect(paymentOf(r, 'p2')?.days).toEqual([{ date: '2026-11-01', amount: 500_000 }]);
+  });
+
+  it('reports an officer write-off with no Statement apart from payments, and drops its leftover', () => {
+    const r = allocateRunningAccount({
+      ...base,
+      days: NOV,
+      payments: [payment('p1', 1_000_000, T(0))],
+      officerWriteOffs: [{ id: 'w1', amount: 400_000, at: T(1) }],
+    });
+    expect(r.applications.writeOffs).toEqual([{ date: '2026-11-02', amount: 400_000 }]);
+    expect(paymentOf(r, 'p1')?.days).toEqual([{ date: '2026-11-01', amount: 1_000_000 }]);
+    expect(r.applications.corrections).toEqual([]);
+  });
+
+  it('applies nothing to a held day or a day recorded paid, and money passes over them', () => {
+    const held = allocateRunningAccount({
+      ...base,
+      days: NOV,
+      heldDays: new Set(['2026-11-01']),
+      payments: [payment('p1', 1_000_000, T(0))],
+    });
+    expect(paymentOf(held, 'p1')?.days).toEqual([{ date: '2026-11-02', amount: 1_000_000 }]);
+    const pinned = allocateRunningAccount({
+      ...base,
+      days: NOV,
+      storedPaidThrough: '2026-11-01',
+      payments: [payment('p1', 1_000_000, T(0))],
+    });
+    expect(paymentOf(pinned, 'p1')?.days).toEqual([{ date: '2026-11-02', amount: 1_000_000 }]);
+  });
+
+  it('accounts for every unit of a payment: statements, days and credit add up to its net amount', () => {
+    const r = allocateRunningAccount({
+      ...base,
+      statements: [legacy('s1', 700_000, '2026-11-01T00:00:00Z')],
+      days: [day('2026-10-31', -200_000), ...NOV],
+      payments: [
+        payment('p1', 2_000_000, T(0), { notTaxAmount: 100_000 }),
+        payment('p2', 9_000_000, T(1)),
+      ],
+      officerWriteOffs: [{ id: 'w1', amount: 300_000, at: T(2) }],
+    });
+    const nets: Record<string, number> = { p1: 1_900_000, p2: 9_000_000 };
+    for (const p of r.applications.payments) {
+      const sum =
+        p.statements.reduce((s, x) => s + x.amount, 0) +
+        p.days.reduce((s, x) => s + x.amount, 0) +
+        p.credit;
+      expect(sum).toBe(nets[p.paymentId]);
+    }
+    const dayTotal = (xs: { amount: number }[]) => xs.reduce((s, x) => s + x.amount, 0);
+    const credited = [...r.byDay.values()].reduce((s, d) => s + d.credited, 0);
+    expect(
+      dayTotal(r.applications.payments.flatMap((p) => p.days)) +
+        dayTotal(r.applications.corrections) +
+        dayTotal(r.applications.writeOffs)
+    ).toBe(credited);
+  });
+});
+
 describe('closableThrough', () => {
   const dayOf = (date: string, tax: number, savedPrices = true) => ({ date, tax, savedPrices });
   const paidDays = [dayOf('2026-11-01', 1_000_000), dayOf('2026-11-02', 2_000_000)];

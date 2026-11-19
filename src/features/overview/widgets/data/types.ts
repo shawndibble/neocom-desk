@@ -203,8 +203,8 @@ export type DetailTone = 'neutral' | 'success' | 'warning' | 'danger';
 
 export interface RowDetailModel {
   title: string;
-  /** A status line above the facts: a toned badge, then plain text, then an optional dim note. */
-  status?: { badge: string; tone: DetailTone; text?: string; note?: string };
+  /** A status line above the facts: an optional toned badge, then plain text, then an optional dim note. */
+  status?: { badge?: string; tone?: DetailTone; text?: string; note?: string };
   /**
    * Labelled facts, in reading order; each value is already formatted. `tone: 'warning'` flags
    * a value to doubt (stale data); the text says why, so colour is never the only signal.
@@ -229,7 +229,13 @@ export interface RowDetailModel {
     items: { key: string; badge?: string; tone?: DetailTone; text: string; value: string }[];
   };
   /** Where it is: Set destination, and the jump count as a link to Route Safety. */
-  place?: { systemId: number; name: string; jumps?: number };
+  place?: {
+    systemId: number;
+    name: string;
+    jumps?: number;
+    /** A player structure to send as the autopilot destination; absent, the system is sent. */
+    structureId?: number;
+  };
   /** One in-app destination the record leads on to (a Shared Pop's Survey start link). */
   link?: { label: string; to: string };
   /** A second, quieter destination beside `link` (a Shared Pop's "start a new Survey" next to "Open survey"). */
