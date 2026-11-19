@@ -1,9 +1,49 @@
 import { describe, expect, it } from 'vitest';
+import { createPortal } from 'react-dom';
 import { render, screen } from '@testing-library/react';
 import '@/i18n';
 import { PageHeader } from './PageHeader';
+import { usePageHeaderSlot } from './pageHeaderSlot';
+import { PageHeaderSlotProvider } from './PageHeaderSlotProvider';
+
+function SlotFill() {
+  const { element } = usePageHeaderSlot();
+  return element ? createPortal(<span>chip</span>, element) : <span>fallback</span>;
+}
 
 describe('PageHeader', () => {
+  describe("slot for the shell's chip", () => {
+    it('shows what the shell portals in, and falls back on a page with no header', () => {
+      const { unmount } = render(
+        <PageHeaderSlotProvider>
+          <PageHeader title="Moons" />
+          <SlotFill />
+        </PageHeaderSlotProvider>
+      );
+      expect(screen.getByText('chip')).toBeInTheDocument();
+      unmount();
+      render(
+        <PageHeaderSlotProvider>
+          <SlotFill />
+        </PageHeaderSlotProvider>
+      );
+      expect(screen.getByText('fallback')).toBeInTheDocument();
+    });
+
+    it('keeps the slot when a second header unmounts', () => {
+      const tree = (second: boolean) => (
+        <PageHeaderSlotProvider>
+          <PageHeader title="One" />
+          {second && <PageHeader title="Two" />}
+          <SlotFill />
+        </PageHeaderSlotProvider>
+      );
+      const { rerender } = render(tree(true));
+      rerender(tree(false));
+      expect(screen.getByText('chip')).toBeInTheDocument();
+    });
+  });
+
   it('renders the title as the route heading', () => {
     render(<PageHeader title="Wallet" />);
     expect(screen.getByRole('heading', { level: 1, name: 'Wallet' })).toBeInTheDocument();

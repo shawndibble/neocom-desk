@@ -18012,9 +18012,6 @@
       "minutes_one": "{{count}} minute",
       "minutes_other": "{{count}} minutes",
       "chip": {
-        "label": "Statements",
-        "progress": "{{sent}} of {{total}}",
-        "sent": "sent",
         "aria": "Statement mail: {{percent}}% sent",
         "ariaDone": "Statement mail: {{percent}}% sent, done",
         "ariaFailed": "{{count}} failed"
@@ -19597,8 +19594,7 @@
           "confirm": "Rebill",
           "effect": "Never reaches a paid Statement.",
           "director": "Rebilling a corporation member needs a Director."
-        },
-        "menu": "Corrections"
+        }
       },
       "dialogs": {
         "logged": "Logged under your name with the reason. Your role is checked again when you confirm.",
@@ -19937,9 +19933,7 @@
         "oreLine": "{{amount}} · {{value}} est. · tax {{tax}}",
         "affix": {
           "units": " units",
-          "est": " est.",
-          "days": " days",
-          "last": "last "
+          "est": " est."
         },
         "otherOre": "Other",
         "total": "Total",

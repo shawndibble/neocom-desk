@@ -13,7 +13,7 @@ import type { MinerDetail } from '@/engine/corpTaxBook/bookView';
 import type { Adjustment } from '@/engine/corpTaxBook/statements';
 import { isk, shortDate } from './moonsFormat';
 import { OreLinesTable } from './OreLinesTable';
-import { extractionPath } from './moonsPaths';
+import { extractionPath, refineryPath } from './moonsPaths';
 import { paymentWalletHref } from './paymentWalletHref';
 import { tapTargetClassName } from './sectionHelpers';
 import { BookSection } from './sectionParts';
@@ -56,16 +56,16 @@ export function AccountLedger({
             {t('corpTaxBook.moons.ledger.what.day')}
             {[...places].map(([structureId, extractionId]) => (
               <span key={structureId} className="block text-xs">
-                {extractionId === undefined ? (
-                  names.refinery(structureId)
-                ) : (
-                  <Link
-                    to={extractionPath(extractionId)}
-                    className={entityLinkClassName(tapTargetClassName)}
-                  >
-                    {names.refinery(structureId)}
-                  </Link>
-                )}
+                <Link
+                  to={
+                    extractionId === undefined
+                      ? refineryPath(structureId)
+                      : extractionPath(extractionId)
+                  }
+                  className={entityLinkClassName(tapTargetClassName)}
+                >
+                  {names.refinery(structureId)}
+                </Link>
               </span>
             ))}
           </span>

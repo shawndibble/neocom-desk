@@ -20,12 +20,14 @@ export const POPS_WINDOW_DAYS = 7;
  * Next Statement (Billable, not on a Statement yet), and every earlier one (on a Statement, paid, dismissed,
  * written off). Order within each is the input's.
  */
-export function daysByPhase(days: readonly DayRow[]) {
+export function daysByPhase(days: readonly DayRow[], opts: { running?: boolean } = {}) {
   const nextStatement: DayRow[] = [];
   const stillAccruing: DayRow[] = [];
   const earlier: DayRow[] = [];
   for (const d of days) {
-    if (d.status === 'unbilled') nextStatement.push(d);
+    // On a running account a day still on an unpaid older Statement is owed too.
+    if (d.status === 'unbilled' || (opts.running && d.status === 'on-statement'))
+      nextStatement.push(d);
     else if (d.status === 'not-billable') stillAccruing.push(d);
     else earlier.push(d);
   }

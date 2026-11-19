@@ -125,18 +125,8 @@ export function MinerDetail({ id }: { id: string }) {
   );
   // The range narrows what happened (Earlier days, Payments); what is owed now always shows whole.
   const phases = useMemo(() => {
-    const all = daysByPhase(detail?.days ?? []);
-    // On a running account a day still on an unpaid older Statement is owed too, so it lists
-    // with the owed days rather than hiding under Earlier days.
-    const owedOnStatement = running ? all.earlier.filter((d) => d.status === 'on-statement') : [];
-    const nextStatement = [...all.nextStatement, ...owedOnStatement].sort(
-      (a, b) => b.date.localeCompare(a.date) || a.key.localeCompare(b.key)
-    );
-    return {
-      ...all,
-      nextStatement,
-      earlier: all.earlier.filter((d) => !owedOnStatement.includes(d) && inRange(d.date, from)),
-    };
+    const all = daysByPhase(detail?.days ?? [], { running });
+    return { ...all, earlier: all.earlier.filter((d) => inRange(d.date, from)) };
   }, [detail, from, running]);
   const rangeTax = useMemo(
     () => rangeFigures(detail?.days ?? [], detail?.payments ?? [], from),
@@ -424,13 +414,13 @@ export function MinerDetail({ id }: { id: string }) {
   /** One day's actions (right-click, touch-and-hold, ⋮): only a day not yet on a Statement has them. */
   const dayMenu = (d: DayRow, tr: ReactElement) =>
     canSelect(d) ? (
-      <RowActionsMenu name={shortDate(d.date)} items={<DayMenuItems day={d} />}>
+      <RowActionsMenu name={shortDate(d.date)} items={dayMenuItems(d)}>
         {tr}
       </RowActionsMenu>
     ) : (
       tr
     );
-  const DayMenuItems = ({ day }: { day: DayRow }) => (
+  const dayMenuItems = (day: DayRow) => (
     <>
       <MenuItem onSelect={() => setDialog({ kind: 'rate', dayKey: day.key })}>
         {t('corpTaxBook.moons.corrections.rate.open')}

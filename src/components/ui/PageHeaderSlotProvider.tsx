@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { PageHeaderSlotContext } from './pageHeaderSlot';
 
 /**
@@ -8,10 +8,17 @@ import { PageHeaderSlotContext } from './pageHeaderSlot';
  * so the chip rides in the header on every page that has one.
  */
 export function PageHeaderSlotProvider({ children }: { children: ReactNode }) {
-  const [element, setElement] = useState<HTMLElement | null>(null);
-  return (
-    <PageHeaderSlotContext.Provider value={{ element, setElement }}>
-      {children}
-    </PageHeaderSlotContext.Provider>
+  // A stack: with two headers on a page the newest owns the slot, and when it goes the one
+  // under it takes the slot back.
+  const [stack, setStack] = useState<readonly HTMLElement[]>([]);
+  const register = useCallback((el: HTMLElement) => setStack((s) => [...s, el]), []);
+  const unregister = useCallback(
+    (el: HTMLElement) => setStack((s) => s.filter((x) => x !== el)),
+    []
   );
+  const value = useMemo(
+    () => ({ element: stack.at(-1) ?? null, register, unregister }),
+    [stack, register, unregister]
+  );
+  return <PageHeaderSlotContext.Provider value={value}>{children}</PageHeaderSlotContext.Provider>;
 }

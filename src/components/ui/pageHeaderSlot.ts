@@ -1,14 +1,17 @@
 import { createContext, useContext } from 'react';
 
 export interface PageHeaderSlot {
-  /** The header's slot element, once a `PageHeader` has mounted; null on a page without one. */
+  /** The newest mounted header's slot element; null on a page without a `PageHeader`. */
   element: HTMLElement | null;
-  setElement: (el: HTMLElement | null) => void;
+  /** A header registers its slot element on mount and unregisters it on unmount. */
+  register: (el: HTMLElement) => void;
+  unregister: (el: HTMLElement) => void;
 }
 
 export const PageHeaderSlotContext = createContext<PageHeaderSlot>({
   element: null,
-  setElement: () => undefined,
+  register: () => undefined,
+  unregister: () => undefined,
 });
 
 export const usePageHeaderSlot = () => useContext(PageHeaderSlotContext);

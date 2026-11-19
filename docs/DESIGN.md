@@ -1496,6 +1496,8 @@ A modal header's actions follow the same rule on a phone: a header with one acti
 
 **The alerts bell** (`AlertsBell`) sits last in the header's control cluster on every page (`PageHeader`, and `CharacterHeader` / `FittingHeader`, which stand in for it). It opens the alerts panel (a popover on desktop, a sheet on a phone; `/alerts` only redirects to the Overview with the panel open) and draws dim at zero on a desktop and on the Overview (`showWhenEmpty`), but is hidden at zero in a phone page header elsewhere, which is laid out with other icons and has no room for it, an accent count badge while alerts wait, a red one while an unacknowledged danger Alert is among them. It is not one of the three tiers: it opens a panel, it is not an action on the page.
 
+**The Corp Tax Book mail queue button** rides just before the bell, in a slot every `PageHeader` offers (`PageHeaderSlotProvider`; the shell portals the chip in, so the session-long sender keeps running whichever page is open). It is the send icon with one count badge (failures in warning, else mails still to send in accent, else the sent total in success), opening the queue as a popover on desktop and a sheet on a phone. A page with no `PageHeader` (`CharacterHeader`, `FittingHeader`) keeps the chip in a row above the page.
+
 ### Restraint: decide by what is already there
 
 The cues above say what a control means. They never say a row needs one.
