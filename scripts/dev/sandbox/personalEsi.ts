@@ -235,6 +235,7 @@ export async function installPersonalEsi(page: Page): Promise<void> {
     [`${c}/mining/`]: mining,
     [`${c}/orders`]: orders,
     [`${c}/skillqueue`]: skillQueue,
+    [`${c}/corporationhistory`]: social.corporationHistory,
     [`${c}/contracts`]: social.contracts,
     [`${c}/mail`]: social.mailHeaders,
     [`${c}/mail/labels`]: () => social.MAIL_LABELS,
