@@ -3,6 +3,7 @@
  * (`buildBookView`) from invented entries and handed to the real tabs and pages through
  * `BookProvider`, so the stories are the shipped components.
  */
+import { DEFAULT_NOTICE_RULES } from '@/engine/corpTaxBook/notices';
 import {
   buildBookView,
   nextRunPeriod,
@@ -288,4 +289,11 @@ export const BOOK_CONTEXT = {
   } as never,
   verdict,
   reload: () => {},
+};
+
+/** The same corporation on a running account that is behind: what the late notice run sends. */
+export const NOTICE_BOOK_CONTEXT = {
+  ...BOOK_CONTEXT,
+  view: buildBookView({ ...base, runningAccountFrom: '2026-08-01T00:00:00Z' }),
+  settings: { minimumStatement: 0, noticeRules: DEFAULT_NOTICE_RULES } as BookSettings,
 };

@@ -26,8 +26,8 @@ export function plannedNotices(view: BookView, rules: NoticeRules): NoticePlan[]
  * Everything the Overview's "Needs you" lists, and how many cards that is: the
  * book's own items (`needsYou`, the tabs projection's), tax noted in a division the
  * book does not read (#6207), a Miner's dispute of a Conflict day until it is dismissed
- * or rejected (#6206), and one card when late notices are due (#6294). The panel, the Moons visit and the Moons nav dot's
- * background poll all count it here.
+ * or rejected (#6206), and one card when late notices are due (#6294). The panel, the Moons
+ * visit and the Moons nav dot's background poll all count it here.
  */
 export function needsYouOf(
   view: BookView,
