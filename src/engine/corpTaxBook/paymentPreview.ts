@@ -9,6 +9,7 @@
  */
 import {
   allocatePayments,
+  paymentNet,
   type Allocation,
   type AllocationInput,
   type TaxPayment,
@@ -35,9 +36,7 @@ export interface PaymentOutcome {
 }
 
 /** What a payment can credit: its amount less any part an officer marked not tax. */
-export function netOf(p: { amount: number; notTaxAmount?: number }): number {
-  return p.amount - Math.min(p.notTaxAmount ?? 0, p.amount);
-}
+export const netOf = paymentNet;
 
 function owedOf(allocation: Allocation): number {
   let owed = 0;

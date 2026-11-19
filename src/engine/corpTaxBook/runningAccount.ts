@@ -14,6 +14,8 @@
  */
 import {
   allocatePayments,
+  countedPayments,
+  paymentNet,
   SETTLE_TOLERANCE_PCT,
   type Allocation,
   type AllocationInput,
@@ -68,10 +70,42 @@ export interface RunningAccountInput extends AllocationInput {
   dayTolerancePct?: number;
 }
 
+/** Money credited to one day. */
+export interface DayAmount {
+  date: string;
+  amount: number;
+}
+
+/**
+ * Where one Tax Payment's money went. `statements`, `days` and `credit` add up to the payment's
+ * tax (its amount less the part coded "not tax"). Money a tolerance wrote off is no payment's.
+ */
+export interface PaymentApplication {
+  paymentId: string;
+  /** The legacy Statements it settled, before any day. */
+  statements: { statementId: string; amount: number }[];
+  /** The days it paid, oldest first; a payment never pays a held day or a day recorded paid. */
+  days: DayAmount[];
+  /** What no Statement or day absorbed of this payment; the account's credit is this plus any left over from corrections. */
+  credit: number;
+}
+
+/** Who paid each day, by kind of money. Credit corrections and officer write-offs are not payments. */
+export interface RunningApplications {
+  /** Every counted payment that carried tax, in the order the book applies them (oldest first). */
+  payments: PaymentApplication[];
+  /** Credit that came from a negative day, a dismissal or a negative Statement. */
+  corrections: DayAmount[];
+  /** Officer write-offs with no Statement. */
+  writeOffs: DayAmount[];
+}
+
 export interface RunningAccount {
   /** The Statements issued before the switch-over, as `allocatePayments` settles them. */
   legacy: Allocation;
   byDay: Map<string, DaySettlement>;
+  /** The same money as `byDay.credited`, split by where it came from. */
+  applications: RunningApplications;
   /** Money ahead of every billed day. */
   credit: number;
   /** Everything billed less everything paid, forgiven or written off; negative is credit. */
@@ -116,6 +150,35 @@ export function allocateRunningAccount(input: RunningAccountInput): RunningAccou
     const remaining = st.tax - st.credited;
     return remaining <= 0 || (st.paidIn > 0 && remaining <= daySettleTolerance(st.tax, pct));
   };
+  // What each payment has left for the days once the legacy Statements took theirs, in the order
+  // `pay` draws on them. The pool is paid in one go (a day's tolerance can close mid-run, so
+  // payments are not applied one by one); the queue only says whose money each slice was.
+  const toStatements = new Map<string, { statementId: string; amount: number }[]>();
+  for (const c of legacy.paymentCredits) {
+    const list = toStatements.get(c.paymentId) ?? [];
+    list.push({ statementId: c.statementId, amount: c.amount });
+    toStatements.set(c.paymentId, list);
+  }
+  const queue = countedPayments(input.payments, input.startDate)
+    .filter((p) => paymentNet(p) > 0)
+    .map((p): PaymentApplication & { left: number } => {
+      const statements = toStatements.get(p.id) ?? [];
+      const left = paymentNet(p) - statements.reduce((sum, s) => sum + s.amount, 0);
+      return { paymentId: p.id, statements, days: [], credit: 0, left };
+    });
+  let head = 0;
+  const attribute = (date: string, amount: number) => {
+    while (amount > 0 && head < queue.length) {
+      const q = queue[head]!;
+      const slice = Math.min(amount, q.left);
+      if (slice > 0) q.days.push({ date, amount: slice });
+      q.left -= slice;
+      amount -= slice;
+      if (q.left <= 0) head += 1;
+    }
+  };
+  const corrected: DayAmount[] = [];
+  const forgivenDays: DayAmount[] = [];
   const pay = (available: number, kind: 'payment' | 'correction' | 'writeOff'): number => {
     for (const d of days) {
       if (available <= 0) break;
@@ -124,8 +187,15 @@ export function allocateRunningAccount(input: RunningAccountInput): RunningAccou
       if (isHeld(d) || st.tax <= 0 || st.pinned || isDone(st)) continue;
       const take = Math.min(available, st.tax - st.credited);
       st.credited += take;
-      if (kind === 'payment') st.paidIn += take;
-      if (kind === 'writeOff') st.forgiven += take;
+      if (kind === 'payment') {
+        st.paidIn += take;
+        attribute(d.date, take);
+      } else if (kind === 'writeOff') {
+        st.forgiven += take;
+        forgivenDays.push({ date: d.date, amount: take });
+      } else {
+        corrected.push({ date: d.date, amount: take });
+      }
       available -= take;
     }
     return available;
@@ -197,6 +267,12 @@ export function allocateRunningAccount(input: RunningAccountInput): RunningAccou
   return {
     legacy,
     byDay,
+    applications: {
+      // What is left in the queue is the credit: the payments after the last day they reached.
+      payments: queue.map(({ left, ...p }) => ({ ...p, credit: Math.max(0, left) })),
+      corrections: corrected,
+      writeOffs: forgivenDays,
+    },
     credit,
     balance: legacy.balance + billed - corrections - forgivenTotal - writtenOffTotal,
     paidThrough,
