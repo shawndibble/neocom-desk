@@ -12,8 +12,8 @@ import { CHARACTER_ID } from '../../../e2e/support/fixtureData';
 import { DAY_MS, HOUR_MS } from '../../../src/lib/age';
 import { utcDay } from '../../../src/engine/localDay';
 import * as social from './socialEsi';
+import { iso, mix } from './gen';
 
-const iso = (offsetMs: number) => new Date(Date.now() + offsetMs).toISOString();
 const day = (back: number) => utcDay(Date.now() - back * DAY_MS);
 
 export const JITA = {
@@ -49,8 +49,6 @@ const BLUEPRINTS: [number, number][] = [
   [17477, 17476],
 ];
 
-/** Small stable hash so rows differ without randomness. */
-const mix = (n: number) => ((n * 2654435761) >>> 0) % 1000;
 
 function assets() {
   const rows: unknown[] = [];

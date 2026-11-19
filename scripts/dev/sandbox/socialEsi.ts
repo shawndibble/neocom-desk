@@ -6,8 +6,7 @@
 import { CHARACTER_ID, CHARACTER_NAME, CORPORATION_ID, CORPORATION_NAME, ALLIANCE_ID, ALLIANCE_NAME } from '../../../e2e/support/fixtureData';
 import { DAY_MS, HOUR_MS } from '../../../src/lib/age';
 
-const iso = (offsetMs: number) => new Date(Date.now() + offsetMs).toISOString();
-const mix = (n: number) => ((n * 2654435761) >>> 0) % 1000;
+import { iso, mix } from './gen';
 
 const PILOTS = ['Aria Vance', 'Bram Okafor', 'Cato Reyes', 'Dara Lindqvist', 'Edda Voss', 'Finn Maru', 'Gale Idris', 'Hana Brandt', 'Ivo Takeda', 'Juno Castellan'];
 const CORPS = ['Hedion Haulers', 'Sebiestor Salvage', 'Pator Mining Co', 'Outer Ring Traders'];
@@ -91,8 +90,12 @@ export function mailHeaders() {
     subject: `${MAIL_SUBJECTS[i % MAIL_SUBJECTS.length]}${i >= 8 ? ` (${i})` : ''}`,
     timestamp: iso(-(i * 7 + 1) * HOUR_MS),
     is_read: i % 3 !== 0,
-    labels: [i % 5 === 0 ? 2 : 1],
-    recipients: [{ recipient_id: i % 4 === 0 ? PILOT_BASE : CHARACTER_ID, recipient_type: 'character' as const }],
+    // Real ESI system label ids: 1 Inbox, 2 Sent, 4 Corp, 8 Alliance.
+    labels: [i % 4 === 0 ? 2 : i % 5 === 0 ? 4 : 1],
+    recipients:
+      i % 6 === 5
+        ? [{ recipient_id: MAILING_LIST_ID, recipient_type: 'mailing_list' as const }]
+        : [{ recipient_id: i % 4 === 0 ? PILOT_BASE : CHARACTER_ID, recipient_type: 'character' as const }],
   }));
 }
 
@@ -112,12 +115,14 @@ export function mailBody(mailId: number) {
 export const MAIL_LABELS = {
   labels: [
     { label_id: 1, name: 'Inbox', color: '#ffffff', unread_count: 9 },
-    { label_id: 2, name: 'Corp', color: '#0000fe', unread_count: 2 },
-    { label_id: 4, name: 'Alliance', color: '#006634', unread_count: 0 },
+    { label_id: 2, name: 'Sent', color: '#ffffff', unread_count: 0 },
+    { label_id: 4, name: 'Corp', color: '#0000fe', unread_count: 2 },
+    { label_id: 8, name: 'Alliance', color: '#006634', unread_count: 0 },
   ],
   total_unread_count: 11,
 };
-export const MAILING_LISTS = [{ mailing_list_id: 93_000_001, name: 'Moon Miners' }];
+const MAILING_LIST_ID = 93_000_001;
+export const MAILING_LISTS = [{ mailing_list_id: MAILING_LIST_ID, name: 'Moon Miners' }];
 
 export function calendar() {
   return Array.from({ length: 9 }, (_, i) => ({
