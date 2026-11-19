@@ -19,7 +19,14 @@ import { type ReactElement, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { RENAME_PLACE_STATE } from './renamePlaceState';
 import { NicknamedName } from '@/features/assets/PlaceName';
-import { IskAmount, RowActionsMenu, RowMoreActions, Tooltip } from '@/components/ui';
+import {
+  InfoTooltip,
+  IskAmount,
+  RowActionsMenu,
+  RowMoreActions,
+  Tooltip,
+  TypeIcon,
+} from '@/components/ui';
 import type { AskEstimateFigure } from '@/features/assets/assetAskFigure';
 import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
@@ -323,6 +330,8 @@ interface ContainerRowProps {
   gameName?: string;
   itemCount: number;
   estimatedValue: number;
+  /** The ship's or container's type: its icon leads the row. Bays have none. */
+  typeId?: number;
   characterBadge: string | null;
   /** The station the container sits in: its menu sets a waypoint there. Null when unknown. */
   stationId: number | null;
@@ -343,6 +352,7 @@ export function ContainerRow({
   gameName,
   itemCount,
   estimatedValue,
+  typeId,
   characterBadge,
   stationId,
   extraItems,
@@ -375,7 +385,11 @@ export function ContainerRow({
           focusRingInsetClassName
         )}
       >
-        <Icon.Container size={Icon.ICON_SIZE.sm} className="shrink-0 text-text-faint" />
+        {typeId === undefined ? (
+          <Icon.Container size={Icon.ICON_SIZE.sm} className="shrink-0 text-text-faint" />
+        ) : (
+          <TypeIcon typeId={typeId} size={32} className="h-6 w-6 shrink-0" />
+        )}
         <span className="flex min-w-0 flex-1 items-center">
           {gameName !== undefined ? (
             <span className="flex min-w-0 flex-col">
@@ -430,12 +444,12 @@ export function ContainerRow({
  * screen away at the panel's far edge, but free to shrink when the panel is
  * narrower. The menu slot sits at the row's far right, past the blank space.
  */
-const ITEM_NAME_CELL = 'md:flex-[0_1_24rem]';
+const ITEM_NAME_CELL = 'md:min-w-40 md:flex-[0_1_24rem]';
 const ITEM_CELL = 'md:shrink-0 md:truncate md:text-right';
 const ITEM_QUANTITY_CELL = cx(ITEM_CELL, 'md:w-24');
 const ITEM_VOLUME_CELL = cx(ITEM_CELL, 'md:w-28');
 const ITEM_VALUE_CELL = cx(ITEM_CELL, 'md:w-24');
-const ITEM_COST_CELL = cx(ITEM_CELL, 'md:w-44');
+const ITEM_COST_CELL = cx(ITEM_CELL, 'md:hidden lg:block lg:w-44');
 /** The row menu button's md+ box (`IconButton` size `row`, `md:size-7`), reserved even when the row has no menu. */
 const ITEM_MENU_SLOT = 'md:ml-auto md:flex md:w-7 md:shrink-0 md:justify-end';
 const ITEM_MENU_SPACER = 'md:w-7 md:shrink-0';
@@ -501,7 +515,16 @@ export function ItemColumnLabels({ showCost = false, sort, onSort, t }: ItemColu
       {column('quantity', t('assets.columns.quantity'), ITEM_QUANTITY_CELL)}
       {column('volume', t('assets.columns.volume'), ITEM_VOLUME_CELL)}
       {column('value', t('assets.sort.value'), ITEM_VALUE_CELL)}
-      {showCost && <span className={ITEM_COST_CELL}>{t('assets.columns.cost')}</span>}
+      {showCost && (
+        <span className={cx(ITEM_COST_CELL, 'lg:flex lg:items-center lg:justify-end lg:gap-1.5')}>
+          <span className="truncate">{t('assets.columns.cost')}</span>
+          <InfoTooltip
+            label={t('assets.columns.costAria')}
+            content={t('assets.columns.costHelp')}
+            glyph="info"
+          />
+        </span>
+      )}
       <span className={ITEM_MENU_SPACER} />
     </div>
   );
@@ -658,7 +681,10 @@ export function ItemRow({
               two layouts (a stacked name + wrapping line below, a table row
               above). */}
           <span className="flex min-w-0 flex-1 flex-col gap-0.5 md:contents">
-            <span className={cx('flex min-w-0 items-center', ITEM_NAME_CELL)}>
+            <span className={cx('flex min-w-0 items-center gap-2', ITEM_NAME_CELL)}>
+              {typeId !== undefined && (
+                <TypeIcon typeId={typeId} size={32} className="h-6 w-6 shrink-0" />
+              )}
               {typeId === undefined ? (
                 <Tooltip content={name}>
                   {gameName === undefined ? (
@@ -721,7 +747,7 @@ export function ItemRow({
                 </>
               )}
               {stockUnitCost === undefined && showStockCost && (
-                <span className={cx(ITEM_COST_CELL, 'hidden md:block')} />
+                <span className={cx(ITEM_COST_CELL, 'hidden lg:block')} />
               )}
             </span>
           </span>

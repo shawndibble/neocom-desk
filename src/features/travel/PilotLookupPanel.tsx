@@ -5,7 +5,8 @@
  * Numbers, never verdicts (decision `20260912-172628`): the card states a
  * danger ratio of 68%, it never calls the pilot hostile or safe.
  *
- * The selected pilot lives in the URL (`?pilot=<id>`) so a lookup can be shared.
+ * One pilot opens Show Info (`?info=character-<id>`, shareable); an older
+ * `?pilot=<id>` link still renders the profile in the page.
  */
 import {
   useEffect,
@@ -46,6 +47,7 @@ import type { PilotListState } from '@/lib/shortcuts';
 import { optionalIdParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { openPublicInfoModal } from '@/stores/publicInfoModal';
 import {
   loadPilotProfile,
   resolvePilotByName,
@@ -64,6 +66,16 @@ export function PilotLookupPanel({ tabBar, tabsId }: TravelTabProps) {
   const { t } = useTranslation();
   const [params, setParams] = useUrlParams(PILOT_PARAMS);
   const [resolved, setResolved] = useState<PilotSummary | null>(null);
+  const [openAfterClear, setOpenAfterClear] = useState<number | null>(null);
+  useEffect(() => {
+    if (openAfterClear === null || params.pilot !== null) return;
+    // After the commit, so the info navigator has seen the cleared location.
+    const id = setTimeout(() => {
+      setOpenAfterClear(null);
+      openPublicInfoModal('character', openAfterClear);
+    }, 0);
+    return () => clearTimeout(id);
+  }, [openAfterClear, params.pilot]);
   const location = useLocation();
   // The pasted list lives here, not in the URL, so it survives a trip to one
   // pilot (`?pilot=`) and Back; the global paste router hands it over in route state.
@@ -101,7 +113,15 @@ export function PilotLookupPanel({ tabBar, tabsId }: TravelTabProps) {
             }}
             onSelect={(pilot) => {
               setList(null);
-              setParams({ pilot: pilot.characterId }, { push: true });
+              // One pilot opens Show Info (corp, alliance, history, interactions tabs).
+              // An older `?pilot=` link is cleared first, so its in-page profile doesn't
+              // sit behind the modal; the modal opens once that URL write has landed,
+              // because both write the query string from the location they last rendered.
+              if (params.pilot === null) openPublicInfoModal('character', pilot.characterId);
+              else {
+                setParams({ pilot: null });
+                setOpenAfterClear(pilot.characterId);
+              }
             }}
           />
         </Panel>

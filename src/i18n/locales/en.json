@@ -9332,6 +9332,8 @@
       "quantity": "Qty",
       "volume": "m³",
       "cost": "Cost basis",
+      "costAria": "About cost basis",
+      "costHelp": "What you paid for this item, counting the oldest units you bought as the first ones sold (first in, first out). Shown only when your wallet and production history covers every unit you hold.",
       "asc": "ascending",
       "desc": "descending",
       "sortAria": "Sort by {{label}}",

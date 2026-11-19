@@ -84,6 +84,7 @@ export function NodeContainerRow({
       href={href}
       label={label}
       gameName={gameName}
+      typeId={node.kind === 'bay' ? undefined : node.asset.type_id}
       itemCount={node.itemCount}
       estimatedValue={node.estimatedValue}
       characterBadge={characterBadge}
