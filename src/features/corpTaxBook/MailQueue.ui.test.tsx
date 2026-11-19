@@ -120,7 +120,8 @@ describe('MailQueueChip', () => {
       />
     );
     const chip = screen.getByRole('button', { name: 'Statement mail: 50% sent, 1 failed' });
-    expect(within(chip).getByText('Statements 1 of 4')).toBeInTheDocument();
+    // One badge: the failures come first, since they need someone.
+    expect(within(chip).getByText('1')).toBeInTheDocument();
     await userEvent.click(chip);
     expect(await screen.findByText('Statement mail queue')).toBeInTheDocument();
   });

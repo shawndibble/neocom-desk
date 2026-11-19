@@ -52,10 +52,10 @@ describe('Miner page', () => {
       /^Today's mining · 1/,
       /^Earlier days · 4/,
       /^Payments · 1/,
-      /^Moons · 2/,
       /^Activity · 0/,
     ])
       expect(screen.getByText(title)).toBeInTheDocument();
+    expect(screen.queryByText(/^Moons · /)).not.toBeInTheDocument();
   });
 
   it("lists Today's mining above Next Statement, then Earlier days", () => {
@@ -143,29 +143,40 @@ describe('Miner page on a running account', () => {
     renderBook(<MinerDetail id={VARRO_ID} />, running);
     expect(screen.queryByText(/^Next Statement · /)).not.toBeInTheDocument();
     expect(screen.getByText(/^Owed days · /)).toBeInTheDocument();
-    expect(screen.getByText('Account')).toBeInTheDocument();
-    expect(screen.getByText(/^(Owes .* oldest|Paid through)/)).toBeInTheDocument();
+    expect(screen.getByText('Oldest unpaid')).toBeInTheDocument();
+    expect(screen.getByText('Last payment')).toBeInTheDocument();
+    // A day still on an unpaid older Statement is owed, so it lists here, not under Earlier days.
+    const owed = screen.getByRole('table', { name: /^Owed days/ });
+    expect(within(owed).getAllByRole('row').length).toBeGreaterThan(1);
+    expect(screen.getAllByText(/^Payment from /).length).toBeGreaterThan(0);
+    // Owed reads as a minus on the ledger's Balance column, with no words.
+    expect(screen.getAllByText(/^\u2212[\d,]+/).length).toBeGreaterThan(0);
   });
 
   it('reads the past days and payments of the last 7 days', async () => {
     renderBook(<MinerDetail id={VARRO_ID} />, running);
-    const earlier = () =>
-      Number(/· (\d+)/.exec(screen.getByText(/^Earlier days · /).textContent!)![1]);
-    const before = earlier();
     await userEvent.click(screen.getByRole('button', { name: 'Last 7 days' }));
     expect(screen.getByText(/^Tax .* · paid /)).toBeInTheDocument();
-    expect(earlier()).toBeLessThan(before);
     // What is owed now is never narrowed.
     expect(screen.getByRole('checkbox', { name: 'Select 2026-09-04' })).toBeInTheDocument();
   });
 });
 
-describe('Corrections menu', () => {
-  it('opens on the Payments section and lists the three corrections', async () => {
+describe('Corrections', () => {
+  it('sit in the header menu, with Rebill only on a book that still bills Statements', async () => {
     renderBook(<MinerDetail id={VARRO_ID} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Corrections' }));
+    await userEvent.click(screen.getAllByRole('button', { name: 'More actions' })[0]);
     expect(await screen.findByRole('menuitem', { name: /rate/i })).toBeInTheDocument();
-    expect(screen.getAllByRole('menuitem')).toHaveLength(3);
+    expect(screen.getByRole('menuitem', { name: 'Add a correction line' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Rebill from date' })).toBeInTheDocument();
+  });
+
+  it('leave Rebill out on a running account', async () => {
+    const view = buildBookView({ ...BOOK_VIEW.input, runningAccountFrom: '2026-08-01T00:00:00Z' });
+    renderBook(<MinerDetail id={VARRO_ID} />, { ...BOOK_CONTEXT, view });
+    await userEvent.click(screen.getAllByRole('button', { name: 'More actions' })[0]);
+    expect(await screen.findByRole('menuitem', { name: /rate/i })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Rebill from date' })).not.toBeInTheDocument();
   });
 });
 

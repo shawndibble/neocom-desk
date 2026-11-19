@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { createPortal } from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { usePageHeaderSlot } from '@/components/ui/pageHeaderSlot';
 import { db } from '@/db';
 import {
   isStatementMail,
@@ -110,6 +112,7 @@ function liveDeps(sending: (id: string | undefined) => void): QueueDeps {
  */
 export default function MailQueueHost() {
   const { t } = useTranslation();
+  const { element: slot } = usePageHeaderSlot();
   const items = useLiveQuery(() => listQueue(), [], [] as MailQueueItem[]);
   const [sendingId, setSendingId] = useState<string | undefined>();
   const [now, setNow] = useState(() => Date.now());
@@ -161,16 +164,16 @@ export default function MailQueueHost() {
   );
 
   if (items.length === 0) return null;
-  return (
-    <div className="mb-2 flex justify-end">
-      <MailQueueChip
-        items={items}
-        now={now}
-        sendingId={sendingId}
-        onRetry={onRetry}
-        onOpenInEve={onOpenInEve}
-        onClearSent={() => void clearSent()}
-      />
-    </div>
+  const chip = (
+    <MailQueueChip
+      items={items}
+      now={now}
+      sendingId={sendingId}
+      onRetry={onRetry}
+      onOpenInEve={onOpenInEve}
+      onClearSent={() => void clearSent()}
+    />
   );
+  // In the page header's slot when the page has one; else the old row above the page.
+  return slot ? createPortal(chip, slot) : <div className="mb-2 flex justify-end">{chip}</div>;
 }

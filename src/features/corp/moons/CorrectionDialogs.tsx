@@ -31,15 +31,18 @@ export function RateOverrideDialog({
   open,
   onClose,
   days,
+  initialKey = '',
 }: {
   open: boolean;
   onClose: () => void;
   days: readonly DayRow[];
+  /** The day to start on, when the dialog opens from that day's row. */
+  initialKey?: string;
 }) {
   const { t } = useTranslation();
   const { edit, names } = useBook();
   const eligible = days.filter(canOverrideDay);
-  const [key, setKey] = useState('');
+  const [key, setKey] = useState(initialKey);
   const [pct, setPct] = useState('');
   const [reason, setReason] = useState('');
   const day = eligible.find((d) => d.key === key);

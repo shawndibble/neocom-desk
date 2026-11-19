@@ -63,6 +63,20 @@ describe('daysByPhase', () => {
   });
 });
 
+describe('daysByPhase on a running account', () => {
+  it('lists a day still on an unpaid older Statement with the owed days, in order', () => {
+    const days = [
+      day({ key: 'a', status: 'unbilled' }),
+      day({ key: 'b', status: 'on-statement' }),
+      day({ key: 'c', status: 'paid' }),
+      day({ key: 'd', status: 'unbilled' }),
+    ];
+    const split = daysByPhase(days, { running: true });
+    expect(split.nextStatement.map((d) => d.key)).toEqual(['a', 'b', 'd']);
+    expect(split.earlier.map((d) => d.key)).toEqual(['c']);
+  });
+});
+
 describe('rangeStart and inRange', () => {
   it('takes today and the N-1 days before it; all takes every day', () => {
     const now = '2026-11-17T03:00:00Z';

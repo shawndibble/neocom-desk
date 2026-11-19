@@ -50,6 +50,7 @@ import { useMoonsAttentionPoll } from '@/features/corp/moons/moonsNavAttention';
 import { useAlertBadge } from '@/features/notifications/useUnreadAlertCount';
 import { barTabs, NAV_LABEL_KEYS, useMobileTabs } from '@/lib/mobileTabs';
 import { CorpGrantPrompt } from '@/features/corp/CorpGrantPrompt';
+import { PageHeaderSlotProvider } from '@/components/ui/PageHeaderSlotProvider';
 import { MailQueueMount } from '@/features/corpTaxBook/MailQueueMount';
 import { InstallPrompt } from './InstallPrompt';
 import { CommandPaletteHost } from '@/features/commandPalette/CommandPaletteHost';
@@ -405,14 +406,16 @@ export const Layout = memo(function Layout() {
           </aside>
 
           <main className="min-w-0 flex-1 px-2 py-4 pb-[max(calc(5rem_+_env(safe-area-inset-bottom)),var(--compare-drawer-space,0px),calc(var(--sticky-clearance)_+_var(--bottom-nav-clearance)_+_1rem))] md:px-4 md:pb-[max(1rem,var(--compare-drawer-space,0px),calc(var(--sticky-clearance)_+_1rem))]">
-            {/* Corp Tax Book send queue (D16): only while mail is queued. */}
-            <MailQueueMount />
-            <OfflineBanner />
-            <AlertCharacterSwitch />
-            <AuthFailureNotice />
-            <StandingsScopeNotice />
-            <SyncErrorBanner />
-            <RouteOutlet />
+            <PageHeaderSlotProvider>
+              {/* Corp Tax Book send queue (D16): only while mail is queued. */}
+              <MailQueueMount />
+              <OfflineBanner />
+              <AlertCharacterSwitch />
+              <AuthFailureNotice />
+              <StandingsScopeNotice />
+              <SyncErrorBanner />
+              <RouteOutlet />
+            </PageHeaderSlotProvider>
           </main>
 
           {/* Mobile bottom tab bar: the pilot's four destinations (`lib/mobileTabs.ts`,
