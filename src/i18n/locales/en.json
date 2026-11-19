@@ -8858,8 +8858,7 @@
       "unassignAction": "Unassign",
       "valueLine": "Est. value {{value}} ISK on the day mined",
       "breakdown": {
-        "title": "How this was priced",
-        "summary": "{{hub}} buy · {{form}} ore · {{tax}}% tax",
+        "summary": "{{hub}} buy · {{form}} ore",
         "compressed": "Compressed",
         "raw": "Raw",
         "edited": "Edited by hand",
