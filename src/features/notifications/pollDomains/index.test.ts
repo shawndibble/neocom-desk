@@ -1618,6 +1618,7 @@ describe('stockTargetDomain (issue #3521)', () => {
         target: 40,
         listed: 7,
         inHangar: 12,
+        inJobs: 0,
       },
     ]);
   });

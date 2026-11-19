@@ -9,6 +9,7 @@ export const STOCK_COLUMN_IDS = [
   'target',
   'listed',
   'inHangar',
+  'inJobs',
   'fill',
   'restock',
   'cost',

@@ -22,6 +22,7 @@ const isStockAlertEntry = shapeGuard<StockAlertEntry>({
   target: is.number,
   listed: is.nullable(is.number),
   inHangar: is.number,
+  inJobs: is.optional(is.number),
 });
 
 /**

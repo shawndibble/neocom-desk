@@ -26,6 +26,8 @@ import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useRowSelection } from '@/lib/useRowSelection';
 import { StockFillBar, StockStatusPill } from './StockStatus';
 import { formatNumber } from '@/lib/numberLocale';
+import { formatDuration } from '@/lib/duration';
+import { useNow } from '@/lib/useNow';
 import { StockHolders } from './StockHolders';
 import { stockCsvColumns } from './stockCsv';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -202,6 +204,15 @@ export function StockManagerTable({
     ),
   };
 
+  const nowMs = useNow();
+  /** "first done in 3h", or ready once the soonest job's window has ended. */
+  function jobEndLabel(endDate: string): string {
+    const seconds = (Date.parse(endDate) - nowMs) / 1000;
+    return seconds > 0
+      ? t('stockTargets.table.inJobsEnds', { when: formatDuration(seconds) })
+      : t('stockTargets.table.inJobsReady');
+  }
+
   const columns: DataTableColumn<StockRow>[] = [
     selectColumn,
     {
@@ -286,6 +297,29 @@ export function StockManagerTable({
       sortValue: (row) => row.inHangar,
     },
     {
+      id: 'inJobs',
+      header: t('stockTargets.table.inJobs'),
+      headerTooltip: t('stockTargets.table.inJobsHint'),
+      align: 'right',
+      headerCellClassName: 'sm:w-28 whitespace-nowrap',
+      className: 'tabular-nums',
+      stackAffix: { after: ` ${t('stockTargets.table.inJobsAffix')}` },
+      render: (row) =>
+        row.inJobs > 0 ? (
+          <>
+            {formatNumber(row.inJobs)}
+            {row.nextJobEnd && (
+              <span className="block text-xs text-text-dim">{jobEndLabel(row.nextJobEnd)}</span>
+            )}
+          </>
+        ) : (
+          <span data-dense-omit className="text-text-dim">
+            0
+          </span>
+        ),
+      sortValue: (row) => row.inJobs,
+    },
+    {
       id: 'fill',
       header: t('stockTargets.table.fill'),
       // Between `sm` and `xl` the table is wider than its panel: the Status pill carries the bar's reading there (the card keeps it below `sm`).
@@ -297,6 +331,7 @@ export function StockManagerTable({
           status={row.status}
           fill={row.fill}
           hangarFill={row.fromHangar / row.target}
+          jobsFill={row.fromJobs / row.target}
         />
       ),
       sortValue: (row) => row.fill,
@@ -320,7 +355,15 @@ export function StockManagerTable({
                 {t('stockTargets.table.fromHangar', { n: formatNumber(row.fromHangar) })}
               </span>
             )}
-            {row.fromHangar > 0 && row.toSource > 0 && <span className="sm:hidden"> · </span>}
+            {row.fromHangar > 0 && row.fromJobs > 0 && <span className="sm:hidden"> · </span>}
+            {row.fromJobs > 0 && (
+              <span className="text-text-dim sm:whitespace-nowrap">
+                {t('stockTargets.table.fromJobs', { n: formatNumber(row.fromJobs) })}
+              </span>
+            )}
+            {row.fromHangar + row.fromJobs > 0 && row.toSource > 0 && (
+              <span className="sm:hidden"> · </span>
+            )}
             {row.toSource > 0 && (
               <span className="text-text-dim sm:whitespace-nowrap">
                 {t('stockTargets.table.toSource', { n: formatNumber(row.toSource) })}
@@ -375,9 +418,13 @@ export function StockManagerTable({
     StockColumnId,
     DataTableColumn<StockRow>
   >;
+  // No row has a running job: the column would be a wall of zeros, so it stays out until one does.
+  const anyJobs = rows.some((row) => row.inJobs > 0);
   const shownColumns = columns.filter(
     (column) =>
-      column.id === 'select' || column.id === 'item' || isVisible(column.id as StockColumnId)
+      column.id === 'select' ||
+      column.id === 'item' ||
+      (isVisible(column.id as StockColumnId) && (column.id !== 'inJobs' || anyJobs))
   );
 
   const stockColumns = useMemo(

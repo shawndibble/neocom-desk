@@ -12932,7 +12932,11 @@
         "outTitle": "{{item}} sold out",
         "body": "{{list}}: {{listed}} of {{target}} listed.",
         "bodyHangar_one": "{{list}}: {{listed}} of {{target}} listed. {{hangar}} is in your hangar there.",
-        "bodyHangar_other": "{{list}}: {{listed}} of {{target}} listed. {{hangar}} are in your hangar there."
+        "bodyHangar_other": "{{list}}: {{listed}} of {{target}} listed. {{hangar}} are in your hangar there.",
+        "bodyHangarJobs_one": "{{list}}: {{listed}} of {{target}} listed. {{hangar}} is in your hangar there and {{jobs}} in running jobs.",
+        "bodyHangarJobs_other": "{{list}}: {{listed}} of {{target}} listed. {{hangar}} are in your hangar there and {{jobs}} in running jobs.",
+        "bodyJobs_one": "{{list}}: {{listed}} of {{target}} listed. {{jobs}} is in running jobs for it.",
+        "bodyJobs_other": "{{list}}: {{listed}} of {{target}} listed. {{jobs}} are in running jobs for it."
       },
       "characterNeedsLogin": {
         "title": "Log in again",
@@ -17794,7 +17798,7 @@
     "summary": {
       "readyHint": "Items you can restock from your hangar at this station, with no hauling or building.",
       "toSource": "To buy or build",
-      "toSourceHint": "What your hangar here can't cover, at the buy-now price at {{hub}}. Items with no price there are left out."
+      "toSourceHint": "What your hangar here and your running jobs can't cover, at the buy-now price at {{hub}}. Items with no price there are left out."
     },
     "view": {
       "label": "View",
@@ -17813,6 +17817,15 @@
       "onContract": "of which {{count}} on contract",
       "inHangar": "In hangar",
       "inHangarAffix": "in hangar",
+      "inJobs": "In jobs",
+      "inJobsAffix": "in jobs",
+      "inJobsHint": "Units your running manufacturing and reaction jobs will deliver to this market. They shrink what is left to buy or build, not the status.",
+      "inJobsEnds": "first done in {{when}}",
+      "inJobsReady": "ready to deliver",
+      "jobsElsewhere_one": "{{count}} job delivers elsewhere and is not counted.",
+      "jobsElsewhere_other": "{{count}} jobs deliver elsewhere and are not counted.",
+      "fromJobs": "{{n}} in jobs",
+      "csvFromJobs": "In jobs (covering)",
       "restock": "Restock",
       "fromHangar": "List {{n}} from hangar",
       "toSource": "Buy or build {{n}}",
@@ -17824,7 +17837,7 @@
       "csvFromHangar": "List from hangar",
       "csvToSource": "Buy or build",
       "csvUnitPrice": "Unit price",
-      "costHint": "What the hangar cannot cover, at the hub buy-now price.",
+      "costHint": "What the hangar and running jobs cannot cover, at the hub buy-now price.",
       "noPrice": "No price",
       "status": "Status",
       "remove": "Remove from list",
@@ -17837,6 +17850,7 @@
       "removedMany_other": "Removed {{count}} items",
       "legendListed": "Listed (coloured by status)",
       "legendHangar": "In hangar, ready to list",
+      "legendJobs": "In running jobs",
       "fill": "Fill"
     },
     "holders": {

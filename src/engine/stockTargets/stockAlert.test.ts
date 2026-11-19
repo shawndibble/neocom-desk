@@ -33,6 +33,7 @@ describe('diffStockBelowTarget', () => {
         target: 40,
         listed: 10,
         inHangar: 0,
+        inJobs: 0,
         status: 'low',
       },
     ]);
@@ -66,6 +67,16 @@ describe('diffStockBelowTarget', () => {
   it('says how many are waiting in the hangar at the market', () => {
     const fires = diffStockBelowTarget(1, snap(entry()), snap(entry({ listed: 0, inHangar: 12 })));
     expect(fires[0]).toMatchObject({ status: 'out', inHangar: 12 });
+  });
+
+  it('says how many are in running jobs, and never lets them change the status', () => {
+    const fires = diffStockBelowTarget(1, snap(entry()), snap(entry({ listed: 0, inJobs: 20 })));
+    expect(fires[0]).toMatchObject({ status: 'out', inJobs: 20 });
+  });
+
+  it('reads a snapshot saved before jobs were counted as none in jobs', () => {
+    const fires = diffStockBelowTarget(1, snap(entry()), snap(entry({ listed: 0 })));
+    expect(fires[0]?.inJobs).toBe(0);
   });
 
   it('tells the same item on two lists apart', () => {

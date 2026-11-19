@@ -48,6 +48,7 @@ export async function loadStockBoard(): Promise<StockBoardData | null> {
               target: entry.target,
               listed: entry.listed ?? 0,
               inHangar: entry.inHangar,
+              inJobs: entry.inJobs,
               price: prices.get(entry.typeId)?.sellMin ?? null,
             }))
         )

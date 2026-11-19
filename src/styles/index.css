@@ -1218,6 +1218,12 @@
     );
   }
 
+  /* The running jobs' share of a Stock List row's bar: dotted, so it reads apart from the hangar's hatch. */
+  .stock-bar-jobs {
+    background-image: radial-gradient(circle, var(--color-line-bright) 0 1px, transparent 1.5px);
+    background-size: 4px 4px;
+  }
+
   /*
    * The one row a notification sent the reader to
    * (`features/market/TransactionsPanel.tsx`). Three slow washes of accent
