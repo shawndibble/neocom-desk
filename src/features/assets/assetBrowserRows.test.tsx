@@ -250,7 +250,7 @@ describe('contract ask estimate (issue #6431)', () => {
       estimatedValue: 0,
       askEstimate: { value: 90_000_000_000, hint: 'Ask median, 6 contracts.' },
     });
-    expect(screen.getByTestId('ask-estimate')).toHaveTextContent('≈');
+    expect(screen.getByTestId('ask-estimate')).toHaveTextContent('assets.askEstimate.marker');
     expect(screen.getByText('Ask median, 6 contracts.')).toBeInTheDocument();
     expect(container.querySelector('.text-text-faint')).not.toBeNull();
     expect(container.querySelector('.text-isk-pos')).toBeNull();

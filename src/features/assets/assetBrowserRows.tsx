@@ -20,6 +20,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { RENAME_PLACE_STATE } from './renamePlaceState';
 import { NicknamedName } from '@/features/assets/PlaceName';
 import { IskAmount, RowActionsMenu, RowMoreActions, Tooltip } from '@/components/ui';
+import type { AskEstimateFigure } from '@/features/assets/assetAskFigure';
 import { HintText } from '@/components/ui/HintText';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
@@ -544,14 +545,6 @@ interface ItemRowProps {
  * or gives the dash one; `inLink` keeps that dash tooltip reachable inside a
  * whole-row link (see JumpsAwayText).
  */
-/** What a contract-only hull's value cell shows in place of a dash. */
-export interface AskEstimateFigure {
-  /** ISK for the whole stack. */
-  value: number;
-  /** The tooltip: the median, N contracts, and that it is not in the total. */
-  hint: string;
-}
-
 function ValueFigure({
   value,
   hint,
@@ -568,9 +561,9 @@ function ValueFigure({
 }) {
   if (value !== 0) return <IskAmount value={value} decimals={0} note={hint} />;
   const tip = ask?.hint ?? hint;
-  const dash = ask ? (
+  const figure = ask ? (
     <span data-testid="ask-estimate">
-      <span aria-hidden="true">≈ </span>
+      <span aria-hidden="true">{t('assets.askEstimate.marker')} </span>
       <IskAmount value={ask.value} decimals={0} />
       <span className="sr-only">{ask.hint}</span>
     </span>
@@ -580,11 +573,11 @@ function ValueFigure({
       <span className="sr-only">{hint ?? t('assets.noEstimate')}</span>
     </>
   );
-  if (tip === undefined) return dash;
-  if (!inLink) return <HintText content={tip}>{dash}</HintText>;
+  if (tip === undefined) return figure;
+  if (!inLink) return <HintText content={tip}>{figure}</HintText>;
   return (
     <Tooltip content={tip}>
-      <span className="relative z-10">{dash}</span>
+      <span className="relative z-10">{figure}</span>
     </Tooltip>
   );
 }

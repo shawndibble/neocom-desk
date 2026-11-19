@@ -1,7 +1,14 @@
 import type { ContractAskEstimate } from '@/engine/contracts/askEstimate';
-import type { AskEstimateFigure } from '@/features/assets/assetBrowserRows';
 import { formatIsk } from '@/lib/isk';
 import type { Translate } from '@/lib/translate';
+
+/** What a contract-only hull's value cell shows in place of a dash. */
+export interface AskEstimateFigure {
+  /** ISK for the whole stack. */
+  value: number;
+  /** The tooltip: the median, N contracts, and that it is not in the total. */
+  hint: string;
+}
 
 /**
  * The marked ask estimate for one stack, or undefined: only a stack with no

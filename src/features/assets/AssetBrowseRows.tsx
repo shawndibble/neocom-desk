@@ -17,9 +17,8 @@ import type { CharacterAsset } from '@/esi/endpoints';
 import type { AbyssalAssetEstimates } from '@/features/abyssal/useAbyssalAssetEstimates';
 import { abyssalValueHint } from '@/features/abyssal/abyssalValueHint';
 import { OreItemMenu } from '@/features/assets/oreDecision/OreItemMenu';
-import { askEstimateFigure } from '@/features/assets/assetAskFigure';
+import { askEstimateFigure, type AskEstimateFigure } from '@/features/assets/assetAskFigure';
 import {
-  type AskEstimateFigure,
   ContainerRow,
   ItemRow,
   LocationRow,
