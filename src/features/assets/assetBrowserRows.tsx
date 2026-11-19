@@ -449,7 +449,7 @@ const ITEM_CELL = 'md:shrink-0 md:truncate md:text-right';
 const ITEM_QUANTITY_CELL = cx(ITEM_CELL, 'md:w-24');
 const ITEM_VOLUME_CELL = cx(ITEM_CELL, 'md:w-28');
 const ITEM_VALUE_CELL = cx(ITEM_CELL, 'md:w-24');
-const ITEM_COST_CELL = cx(ITEM_CELL, 'md:w-44 md:min-w-0 md:shrink');
+const ITEM_COST_CELL = cx(ITEM_CELL, 'md:hidden lg:block lg:w-44');
 /** The row menu button's md+ box (`IconButton` size `row`, `md:size-7`), reserved even when the row has no menu. */
 const ITEM_MENU_SLOT = 'md:ml-auto md:flex md:w-7 md:shrink-0 md:justify-end';
 const ITEM_MENU_SPACER = 'md:w-7 md:shrink-0';
@@ -516,7 +516,7 @@ export function ItemColumnLabels({ showCost = false, sort, onSort, t }: ItemColu
       {column('volume', t('assets.columns.volume'), ITEM_VOLUME_CELL)}
       {column('value', t('assets.sort.value'), ITEM_VALUE_CELL)}
       {showCost && (
-        <span className={cx(ITEM_COST_CELL, 'md:flex md:items-center md:gap-1.5 md:text-left')}>
+        <span className={cx(ITEM_COST_CELL, 'lg:flex lg:items-center lg:justify-end lg:gap-1.5')}>
           <span className="truncate">{t('assets.columns.cost')}</span>
           <InfoTooltip
             label={t('assets.columns.costAria')}
@@ -747,7 +747,7 @@ export function ItemRow({
                 </>
               )}
               {stockUnitCost === undefined && showStockCost && (
-                <span className={cx(ITEM_COST_CELL, 'hidden md:block')} />
+                <span className={cx(ITEM_COST_CELL, 'hidden lg:block')} />
               )}
             </span>
           </span>
