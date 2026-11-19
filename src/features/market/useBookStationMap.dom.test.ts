@@ -41,4 +41,15 @@ describe('useBookStationMap', () => {
     renderHook(() => useBookStationMap(sde, null, [order(STRUCTURE, 2)], []));
     expect(loadName).not.toHaveBeenCalled();
   });
+
+  it("does not carry one Character's names to the next", async () => {
+    loadName.mockResolvedValueOnce('Keepstar One').mockResolvedValue(null);
+    const sell = [order(STRUCTURE, 2)];
+    const { result, rerender } = renderHook(({ id }) => useBookStationMap(sde, id, sell, []), {
+      initialProps: { id: 7 },
+    });
+    await waitFor(() => expect(result.current.has(STRUCTURE)).toBe(true));
+    rerender({ id: 8 });
+    expect(result.current.has(STRUCTURE)).toBe(false);
+  });
 });
