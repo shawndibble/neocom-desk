@@ -17,6 +17,9 @@ vi.mock('@/features/skills/data', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/skills/data')>()),
   loadUniverseType: vi.fn(async () => null),
 }));
+// The colony domain's copy names the planet through `loadPlanetName`, a live ESI GET on a cache
+// miss. Unstubbed, the four colony cases waited on that request and timed out at 10 s on CI.
+vi.mock('@/features/pi/names', () => ({ loadPlanetName: vi.fn(async () => 'Amarr III') }));
 import type {
   IndustryJob,
   MailHeader,
