@@ -65,8 +65,13 @@ export function accountLedger(
   const billed = new Map<string, { debit: number; days: number }>();
   for (const d of detail.days) {
     if (d.tax <= 0) continue;
+    // A day an officer forgave off a Statement was billed first; the write-off is its credit.
+    const forgivenOnStatement = d.status === 'written-off' && d.statementId !== undefined;
     const owedNow =
-      d.status === 'paid' || d.status === 'on-statement' || (running && d.status === 'unbilled');
+      d.status === 'paid' ||
+      d.status === 'on-statement' ||
+      forgivenOnStatement ||
+      (running && d.status === 'unbilled');
     if (owedNow) {
       const held = billed.get(d.date) ?? { debit: 0, days: 0 };
       held.debit += d.tax;

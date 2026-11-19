@@ -118,7 +118,9 @@ export function AccountLedger({
       summary={t('corpTaxBook.moons.ledger.summary', {
         count: rows.length,
         balance: isk(Math.abs(ledger.balance)),
-        side: ledger.balance > 0.5 ? 'owed' : ledger.balance < -0.5 ? 'credit' : 'even',
+        side: t(
+          `corpTaxBook.moons.ledger.${ledger.balance > 0.5 ? 'owed' : ledger.balance < -0.5 ? 'credit' : 'even'}`
+        ),
       })}
     >
       {(shown, table) => (

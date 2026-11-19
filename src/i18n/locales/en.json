@@ -18657,6 +18657,7 @@
         "empty": "Nothing billed or paid yet.",
         "owed": "owed",
         "credit": "credit",
+        "even": "even",
         "summary_one": "{{count}} entry · {{balance}} ISK {{side}}",
         "summary_other": "{{count}} entries · {{balance}} ISK {{side}}",
         "notYetBilled_one": "Not in the balance yet: {{count}} day mined, {{amount}} ISK tax, not billable yet.",
