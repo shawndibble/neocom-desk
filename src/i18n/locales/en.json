@@ -4558,10 +4558,6 @@
     "craftScopeReactionsIncluded": "incl. reactions",
     "craftScopeReactionsExcluded": "no reactions",
     "copyShoppingListShort": "Copy shopping list",
-    "budgetLabel": "Shopping budget (ISK)",
-    "budgetPlaceholder": "Budget, e.g. 5b",
-    "budgetCoverage": "Covers {{percent}}% of the need",
-    "budgetCoverageHeavy": "Covers {{percent}}% of the need. Large share of the budget: {{items}}",
     "iskPerHourTooltip": "Profit divided by the main job's time (job-slot occupancy, not wall-clock wait), on the basis the figure above uses — an hourly rate to compare builds by.",
     "breakEvenPriceTooltip": "The price you must list one unit at for the sale to cover the whole job, once sales tax and broker fee are paid — and, on resale value, what your own materials would have fetched. Click for the full breakdown.",
     "costIndexTooltip": "<b>Can be slightly off:</b> ESI rounds it to 4 decimals. The build system's manufacturing activity level, which drives the job's cost-index fee. Read live from ESI for the build system named here — the trade hub sets material and product prices, never this."
