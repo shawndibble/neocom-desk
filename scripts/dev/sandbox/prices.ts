@@ -9,9 +9,13 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Page } from '@playwright/test';
+import { DAY_MS } from '../../../src/lib/age';
+import { roundIsk } from '../../../src/lib/isk';
+import { utcDay } from '../../../src/engine/localDay';
+import { TRADE_HUBS } from '../../../src/market/hubs';
 import { mix } from './gen';
 
-const HUB_STATIONS = [60003760, 60008494, 60011866, 60004588, 60005686, 60015249];
+const HUB_STATIONS = TRADE_HUBS.map((hub) => hub.stationId);
 const DAYS = 30;
 
 /** Rough base prices (ISK) for the type ids the sandbox data uses. */
@@ -45,7 +49,7 @@ const BASE_PRICE: Record<number, number> = {
 const readData = <T>(name: string): T =>
   JSON.parse(readFileSync(join(process.cwd(), 'public/data', name), 'utf8')) as T;
 const MOON_ORES = new Set(readData<number[]>('moonOreTypes.json'));
-/** Compressed type id -> raw ore type id. A Compressed unit is one raw unit, a hundredth of the volume, so it prices the same. */
+/** Compressed type id -> raw ore type id. The app prices raw quantity x the Compressed type's per-unit price, so the sandbox prices both alike. */
 const RAW_OF_COMPRESSED = new Map(
   Object.entries(readData<Record<string, number>>('compressedOreTypeIds.json')).map(
     ([raw, compressed]) => [compressed, Number(raw)]
@@ -63,18 +67,15 @@ function basePrice(typeId: number): number {
 
 function series(typeId: number, stationId: number) {
   const base = basePrice(typeId) * (0.96 + (stationId % 7) / 100);
-  const sell = Array.from(
-    { length: DAYS },
-    (_, d) => Math.round(base * (1 + (mix(typeId + d * 13) - 500) / 6_000) * 100) / 100
+  const sell = Array.from({ length: DAYS }, (_, d) =>
+    roundIsk(base * (1 + (mix(typeId + d * 13) - 500) / 6_000))
   );
-  const buy = sell.map((p) => Math.round(p * 0.93 * 100) / 100);
+  const buy = sell.map((p) => roundIsk(p * 0.93));
   return { buy, sell };
 }
 
 function entry(typeId: number) {
-  const dates = Array.from({ length: DAYS }, (_, d) =>
-    new Date(Date.now() - (DAYS - d) * 86_400_000).toISOString().slice(0, 10)
-  );
+  const dates = Array.from({ length: DAYS }, (_, d) => utcDay(Date.now() - (DAYS - d) * DAY_MS));
   return {
     dates,
     stations: Object.fromEntries(HUB_STATIONS.map((id) => [String(id), series(typeId, id)])),

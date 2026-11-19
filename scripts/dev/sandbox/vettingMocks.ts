@@ -13,9 +13,12 @@ import {
 import { DAY_MS, HOUR_MS } from '../../../src/lib/age';
 import { VETTING_CHECKS } from '../../../functions/src/vettingEngine';
 import type {
+  VettingAssessment,
   VettingCorpInfo,
+  VettingFlag,
   VettingOverview,
   VettingRawPage,
+  VettingRawRow,
   VettingReview,
   VettingReviewSummary,
   VettingSettings,
@@ -23,7 +26,8 @@ import type {
   VettingStatus,
 } from '../../../functions/src/vettingEngine';
 
-const now = () => Date.now();
+const NOW = Date.now();
+const now = () => NOW;
 
 const SETTINGS: VettingSettings = {
   on: true,
@@ -69,8 +73,8 @@ const STATES: VettingState[] = [
 
 const SUMMARIES: VettingReviewSummary[] = APPLICANTS.map((a, i) => ({
   id: `rev${i + 1}`,
-  kind: i === 6 ? 'promotion' : 'application',
-  role: i === 6 ? 'Director' : undefined,
+  kind: i === 6 || i === 3 ? 'promotion' : 'application',
+  role: i === 6 ? 'Director' : i === 3 ? 'Accountant' : undefined,
   state: STATES[i],
   pilot: {
     characterId: a.id,
@@ -120,7 +124,67 @@ const PARTIES = [
   { id: 93_100_001, name: 'Blackwater Reavers', category: 'corporation' as const },
   { id: 93_100_003, name: 'Kestrel Vane', category: 'character' as const },
   { id: 92_000_001, name: 'Hedion Haulers', category: 'corporation' as const },
+  { id: 92_000_002, name: 'Sebiestor Salvage', category: 'corporation' as const },
+  { id: 92_000_003, name: 'Pator Mining Co', category: 'corporation' as const },
 ];
+
+/** Flags in severity order; a review shows the first `flags` of them (warning-only ones skip the critical). */
+function flagsFor(summary: VettingReviewSummary, characterId: number): VettingFlag[] {
+  const catalog: VettingFlag[] = [
+    {
+      check: 'watchlistIsk',
+      severity: 'critical',
+      characterIds: [characterId],
+      facts: { received: 430_000_000, sent: 0, rows: 3, partyId: 93_100_003 },
+      evidence: [
+        {
+          characterId,
+          at: new Date(now() - 40 * DAY_MS).toISOString(),
+          partyId: 93_100_003,
+          what: 'player_donation',
+          amount: 250_000_000,
+        },
+        {
+          characterId,
+          at: new Date(now() - 22 * DAY_MS).toISOString(),
+          partyId: 93_100_001,
+          what: 'player_donation',
+          amount: 180_000_000,
+        },
+      ],
+      evidenceTotal: 3,
+    },
+    {
+      check: 'corpHopping',
+      severity: 'warning',
+      characterIds: [characterId],
+      facts: { joined: 5 },
+      evidence: [],
+      evidenceTotal: 0,
+    },
+    {
+      check: 'thinCharacter',
+      severity: 'warning',
+      characterIds: [characterId],
+      facts: { skillPoints: 4_200_000, ageDays: 400 },
+      evidence: [],
+      evidenceTotal: 0,
+    },
+  ];
+  return (summary.worst === 'critical' ? catalog : catalog.slice(1)).slice(0, summary.flags);
+}
+
+function assessmentFor(summary: VettingReviewSummary, characterId: number): VettingAssessment {
+  const flags = flagsFor(summary, characterId);
+  return {
+    flags,
+    checks: VETTING_CHECKS.map((check) => ({
+      check,
+      state: flags.some((flag) => flag.check === check) ? ('flag' as const) : ('clear' as const),
+      missingFor: [],
+    })),
+  };
+}
 
 function review(reviewId: string): VettingReview {
   const summary = SUMMARIES.find((s) => s.id === reviewId) ?? SUMMARIES[0];
@@ -151,46 +215,7 @@ function review(reviewId: string): VettingReview {
       },
     ],
     parties: PARTIES,
-    assessment: {
-      flags: [
-        {
-          check: 'watchlistIsk',
-          severity: 'critical',
-          characterIds: [pilot.characterId],
-          facts: { total: 480_000_000, count: 3 },
-          evidence: [
-            {
-              characterId: pilot.characterId,
-              at: new Date(now() - 40 * DAY_MS).toISOString(),
-              partyId: 93_100_003,
-              what: 'player_donation',
-              amount: 250_000_000,
-            },
-            {
-              characterId: pilot.characterId,
-              at: new Date(now() - 22 * DAY_MS).toISOString(),
-              partyId: 93_100_001,
-              what: 'player_donation',
-              amount: 180_000_000,
-            },
-          ],
-          evidenceTotal: 3,
-        },
-        {
-          check: 'corpHopping',
-          severity: 'warning',
-          characterIds: [pilot.characterId],
-          facts: { joins: 5, days: 180 },
-          evidence: [],
-          evidenceTotal: 0,
-        },
-      ].slice(0, Math.max(summary.flags, 1) > 1 ? 2 : 1),
-      checks: VETTING_CHECKS.map((check, i) => ({
-        check,
-        state: i < 2 && summary.flags > 0 ? ('flag' as const) : ('clear' as const),
-        missingFor: [],
-      })),
-    },
+    assessment: assessmentFor(summary, pilot.characterId),
     signOffs:
       summary.signed > 0
         ? [
@@ -224,29 +249,50 @@ function review(reviewId: string): VettingReview {
 
 function rawRows(reviewId: string, source: string): VettingRawPage {
   const pilot = (SUMMARIES.find((s) => s.id === reviewId) ?? SUMMARIES[0]).pilot.characterId;
-  const rows = Array.from({ length: 12 }, (_, i) => ({
-    characterId: pilot,
-    at: new Date(now() - (i * 9 + 2) * DAY_MS).toISOString(),
-    what:
-      source === 'wallet'
-        ? 'player_donation'
-        : source === 'mail'
-          ? 'Re: payment'
-          : source === 'contact'
-            ? 'contact'
-            : 'contract',
-    partyId: PARTIES[i % PARTIES.length].id,
-    amount: source === 'wallet' ? 5_000_000 * (i + 1) : undefined,
-    standing: source === 'contact' ? [10, -5, 5][i % 3] : undefined,
-    ...(source === 'skills' ? { skillId: 3380, level: 1 + (i % 5) } : {}),
-    ...(source === 'history'
-      ? {
+  const iso = (daysAgo: number) => new Date(now() - daysAgo * DAY_MS).toISOString();
+  const rows: VettingRawRow[] = Array.from({ length: 12 }, (_, i) => {
+    const partyId = PARTIES[i % PARTIES.length].id;
+    switch (source) {
+      case 'wallet':
+        return {
+          characterId: pilot,
+          at: iso(i * 9 + 2),
+          what: 'player_donation',
+          partyId,
+          amount: 5_000_000 * (i + 1),
+        };
+      case 'mail':
+        return {
+          characterId: pilot,
+          at: iso(i * 9 + 2),
+          what: i % 2 ? 'Sent' : 'Received',
+          partyId,
+          recipients: [partyId],
+        };
+      case 'contact':
+        return { characterId: pilot, at: null, what: '', partyId, standing: [10, -5, 5][i % 3] };
+      case 'contract':
+        return {
+          characterId: pilot,
+          at: iso(i * 9 + 2),
+          what: 'item_exchange',
+          partyId,
+          status: 'finished',
+          amount: 2_000_000 * (i + 1),
+        };
+      case 'skills':
+        return { characterId: pilot, at: null, what: '', skillId: 3380, level: 1 + (i % 5) };
+      default: // history
+        return {
+          characterId: pilot,
+          at: iso((i + 1) * 200),
+          what: '',
           corporationId: 92_000_001 + (i % 3),
-          joined: new Date(now() - (i + 1) * 200 * DAY_MS).toISOString(),
-          left: null,
-        }
-      : {}),
-  }));
+          joined: iso((i + 1) * 200),
+          left: i === 0 ? null : iso(i * 200),
+        };
+    }
+  });
   return {
     reviewId,
     source: source as VettingRawPage['source'],
@@ -274,7 +320,8 @@ function memberStatus(): VettingStatus {
     corporationId: CORPORATION_ID,
     corporationName: CORPORATION_NAME,
     corporationTicker: 'TEST',
-    kind: 'application',
+    kind: 'promotion',
+    role: 'Accountant',
     state: 'requested',
     requestedBy: { characterId: CHARACTER_ID, name: CHARACTER_NAME },
     characters: [],
