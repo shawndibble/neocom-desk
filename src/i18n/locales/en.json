@@ -18644,6 +18644,33 @@
         },
         "none": "Nothing needs you."
       },
+      "ledger": {
+        "title": "Account ledger",
+        "hint": "Moon tax and payments in date order, balance after each. Newest first.",
+        "empty": "Nothing billed or paid yet.",
+        "owed": "owed",
+        "credit": "credit",
+        "even": "even",
+        "summary_one": "{{count}} entry · {{balance}} ISK {{side}}",
+        "summary_other": "{{count}} entries · {{balance}} ISK {{side}}",
+        "notYetBilled_one": "Not in the balance yet: {{count}} day mined, {{amount}} ISK tax, not billable yet.",
+        "notYetBilled_other": "Not in the balance yet: {{count}} days mined, {{amount}} ISK tax, not billable yet.",
+        "cols": {
+          "date": "Date",
+          "what": "What",
+          "debit": "Tax",
+          "credit": "Paid",
+          "balance": "Balance"
+        },
+        "what": {
+          "day_one": "Moon mining · {{count}} day",
+          "day_other": "Moon mining · {{count}} days",
+          "payment": "Payment",
+          "correction": "Correction: {{reason}}",
+          "writeOff": "Written off: {{reason}}",
+          "adjustment": "Tolerance and Statement corrections"
+        }
+      },
       "miner": {
         "notFound": "This Miner is not in the book",
         "record": "Record payment",

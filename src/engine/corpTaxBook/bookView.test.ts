@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { accountLedger } from './accountLedger';
 import {
   buildBookView,
   type BookView,
@@ -1284,5 +1285,58 @@ describe('planStatementRuns: the same plan as re-planning every period from the 
   it('plans the first period on the view it was given', () => {
     const view = buildBookView(late);
     expect(planStatementRuns(view)[0].view).toBe(view);
+  });
+});
+
+describe('accountLedger', () => {
+  const pay = (id: string, amount: number, at: string) => ({
+    id,
+    minerId: 'solo:1',
+    characterId: 1,
+    amount,
+    at,
+    source: 'donation' as const,
+  });
+  const running = (payments: ReturnType<typeof pay>[]) =>
+    input({
+      runningAccountFrom: '2026-08-01T00:00:00Z',
+      entries: [
+        entry(1, '2026-09-15', 1000),
+        entry(1, '2026-09-16', 2000),
+        entry(1, '2026-09-18', 500),
+      ],
+      payments,
+    });
+  const ledgerOf = (v: BookView) => accountLedger(minerDetail(v, 'solo:1')!, [], true);
+
+  it('lists each day and payment oldest first with the balance after each', () => {
+    const l = ledgerOf(buildBookView(running([pay('a', 100_000, '2026-09-17T10:00:00Z')])));
+    expect(l.entries.map((e) => [e.kind, e.date, e.debit, e.credit, e.balance])).toEqual([
+      ['day', '2026-09-15', 100_000, 0, 100_000],
+      ['day', '2026-09-16', 200_000, 0, 300_000],
+      ['payment', '2026-09-17', 0, 100_000, 200_000],
+    ]);
+    expect(l.balance).toBe(200_000);
+  });
+
+  it('ends at the credit held when a payment is more than every billed day', () => {
+    const view = buildBookView(running([pay('a', 350_000, '2026-09-17T10:00:00Z')]));
+    const l = ledgerOf(view);
+    expect(l.balance).toBe(-50_000);
+    expect(view.miners[0].credit).toBe(50_000);
+  });
+
+  it('puts a payment after the day it lands on, and keeps today outside the balance', () => {
+    const l = ledgerOf(buildBookView(running([pay('a', 100_000, '2026-09-15T01:00:00Z')])));
+    expect(l.entries.slice(0, 2).map((e) => e.kind)).toEqual(['day', 'payment']);
+    expect(l.notYetBilled).toEqual({ tax: 50_000, days: 1 });
+  });
+
+  it('shows what the engine moved without a date as one adjustment row', () => {
+    const view = buildBookView(running([pay('a', 100_000, '2026-09-17T10:00:00Z')]));
+    const detail = minerDetail(view, 'solo:1')!;
+    const l = accountLedger({ ...detail, row: { ...detail.row, owed: 150_000 } }, [], true);
+    expect(l.entries.at(-1)).toMatchObject({ kind: 'adjustment', credit: 50_000 });
+    expect(l.balance).toBe(150_000);
   });
 });
