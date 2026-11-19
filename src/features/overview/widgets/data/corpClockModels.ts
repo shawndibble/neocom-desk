@@ -186,6 +186,8 @@ function deadlinesView(
         label: t('overview.widgets.corpDeadlines.col.what'),
         priority: 2,
         minWidth: 80,
+        // Truncates instead of squeezing the subject when the box is tight.
+        grow: true,
       },
       {
         key: 'when',
