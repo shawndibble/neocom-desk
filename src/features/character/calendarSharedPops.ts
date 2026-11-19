@@ -129,12 +129,20 @@ export function toSharedPopSources(
     const shownAtMs = sharedPopShownAtMs(pop, pref);
     if (Number.isNaN(shownAtMs)) continue;
     const popped = nowMs >= shownAtMs;
+    // A guess shows only once popped; it labels the row and never replaces the clock's detail.
     const mining = sharedPopMiningState(entry);
+    const fullyMined = mining === 'fullyMined';
+    const likelyMinedOut = mining === 'likelyMinedOut' && popped;
     const key = shownKey(pop, pref);
     const otherKey: PopTimeKey = key === 'ready' ? 'autoFracture' : 'ready';
     const otherAtMs = popTimes(pop)[otherKey];
-    const detail =
-      mining ?? (nowMs >= Date.parse(pop.expiresAt) ? 'expired' : popped ? 'expires' : key);
+    const detail = fullyMined
+      ? 'fullyMined'
+      : nowMs >= Date.parse(pop.expiresAt)
+        ? 'expired'
+        : popped
+          ? 'expires'
+          : key;
     sources.push({
       id: pop.id,
       subject: sharedPopTitle(entry),
@@ -144,8 +152,10 @@ export function toSharedPopSources(
       // The other Pop Time, until the pop pops: afterwards the belt's expiry is the news.
       ...(!popped && !pop.fractured && !Number.isNaN(otherAtMs) && otherAtMs !== shownAtMs
         ? { extra: { detail: otherKey, atMs: otherAtMs } }
-        : {}),
-      ...(mining === 'fullyMined' ? { pastLabelKey: 'calendar.fullyMined' } : {}),
+        : likelyMinedOut
+          ? { extra: { detail: 'likelyMinedOut' } }
+          : {}),
+      ...(fullyMined ? { pastLabelKey: 'calendar.fullyMined' } : {}),
     });
   }
   return sources;

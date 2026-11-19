@@ -53,6 +53,7 @@ import {
   visiblePops,
   type PopExtraction,
   type RateEntry,
+  type SharedPop,
   type SharedPopView,
   type SharedPopsDoc,
 } from './sharedPops.js';
@@ -158,7 +159,10 @@ async function minedQtyByExtraction(
   const ids = extractions
     .filter(
       (x) =>
-        !x.cancelledAt && (x.oreLines?.length ?? 0) > 0 && Date.parse(x.chunkArrivalTime) <= now
+        !x.cancelledAt &&
+        !x.fullyMined &&
+        (x.oreLines?.length ?? 0) > 0 &&
+        Date.parse(x.chunkArrivalTime) <= now
     )
     .map((x) => x.id);
   const mined = new Map(ids.map((id) => [id, 0]));
@@ -788,7 +792,11 @@ export async function sharedPopsFor(
       };
     });
     for (const pop of visiblePops(doc, { corporationIds, allianceIds, communityIds }, now)) {
-      const view: SharedPopView & { audiences?: string[]; ownerCorporationId?: number } = {
+      const view: SharedPopView &
+        Pick<SharedPop, 'minedPct' | 'minedQty' | 'minedChangedAt'> & {
+          audiences?: string[];
+          ownerCorporationId?: number;
+        } = {
         ...pop,
         corporationId: doc.corporationId,
         syncedAt: doc.syncedAt ?? null,
@@ -797,6 +805,10 @@ export async function sharedPopsFor(
       // Who else a pop is shared with, and whose moon it is, are the book's business.
       delete view.audiences;
       delete view.ownerCorporationId;
+      // The mined figures only feed the server's own quiet test: a viewer gets the verdict.
+      delete view.minedPct;
+      delete view.minedQty;
+      delete view.minedChangedAt;
       out.push(view);
     }
   }

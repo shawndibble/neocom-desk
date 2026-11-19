@@ -126,7 +126,10 @@ export interface SharedPop {
  * One Shared Pop as a viewer receives it (`listSharedPopsCallable`): no audience list, plus who
  * shares it and the data's age. The client's read seam is `src/sync/sharedPops.ts`.
  */
-export type SharedPopView = Omit<SharedPop, 'audiences' | 'ownerCorporationId'> & {
+export type SharedPopView = Omit<
+  SharedPop,
+  'audiences' | 'ownerCorporationId' | 'minedPct' | 'minedQty' | 'minedChangedAt'
+> & {
   /** The book's corporation: the start link's payee, and the filter by sharing corporation. */
   corporationId: number;
   syncedAt: number | null;

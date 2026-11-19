@@ -94,10 +94,11 @@ export interface BoardClockSource {
    */
   sharedBy?: BoardCorporation;
   /**
-   * A second time the row names after its detail, as `detail` plus a clock time (a Shared Pop's
-   * other Pop Time). `detail` is a data key, never a translated string.
+   * A second fact the row names after its detail, as `detail` plus a clock time when it has one
+   * (a Shared Pop's other Pop Time, or its "likely mined out" guess). `detail` is a data key,
+   * never a translated string.
    */
-  extra?: { detail: string; atMs: number };
+  extra?: { detail: string; atMs?: number };
   /** The i18n key the row reads once past its deadline, when it is not the kind's own word. */
   pastLabelKey?: string;
 }

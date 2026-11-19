@@ -80,7 +80,7 @@ function miningFacts(
         date: formatCalendarTimestamp(new Date(Date.parse(pop.fullyMined.at)), zone),
       }),
     });
-  } else if (sharedPopMiningState(entry) === 'likelyMinedOut') {
+  } else if (popped && sharedPopMiningState(entry) === 'likelyMinedOut') {
     facts.push({
       label: t('calendar.sharedPop.mining'),
       value: t('calendar.sharedPop.likelyMinedOut'),
@@ -118,11 +118,14 @@ export function sharedPopDetail(
   const popAtMs = sharedPopShownAtMs(pop, pref);
   const popped = nowMs >= popAtMs;
   // Both Pop Times once the server publishes them and the chunk has not fractured early.
+  const { readyAt, autoFractureAt } = pop;
   const bothTimes =
     !pop.fractured &&
-    pop.readyAt !== undefined &&
-    pop.autoFractureAt !== undefined &&
-    pop.readyAt !== pop.autoFractureAt;
+    readyAt !== undefined &&
+    autoFractureAt !== undefined &&
+    readyAt !== autoFractureAt
+      ? { ready: readyAt, auto: autoFractureAt }
+      : null;
   const synced = syncedFact(pop.syncedAt, nowMs, t);
   const facts: RowDetailModel['facts'] = [
     ...(entry.moonName === null
@@ -132,11 +135,11 @@ export function sharedPopDetail(
       ? [
           {
             label: t(POP_TIME_KEY.ready),
-            value: formatCalendarTimestamp(new Date(Date.parse(pop.readyAt!)), zone),
+            value: formatCalendarTimestamp(new Date(Date.parse(bothTimes.ready)), zone),
           },
           {
             label: t(POP_TIME_KEY['auto-fracture']),
-            value: formatCalendarTimestamp(new Date(Date.parse(pop.autoFractureAt!)), zone),
+            value: formatCalendarTimestamp(new Date(Date.parse(bothTimes.auto)), zone),
           },
         ]
       : [

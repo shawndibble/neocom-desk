@@ -115,7 +115,7 @@ export function CharacterBoardRow({
           {formatTimeOfDay(new Date(item.deadlineMs), zone)} · {t(KIND_LABEL[item.kind])}
           {item.detail && ` · ${t(`calendar.detail.${item.kind}.${item.detail}`, item.detail)}`}
           {item.extra &&
-            ` · ${t(`calendar.detail.${item.kind}.${item.extra.detail}`, item.extra.detail)} ${formatTimeOfDay(new Date(item.extra.atMs), zone)}`}
+            ` · ${t(`calendar.detail.${item.kind}.${item.extra.detail}`, item.extra.detail)}${item.extra.atMs === undefined ? '' : ` ${formatTimeOfDay(new Date(item.extra.atMs), zone)}`}`}
           {item.corporation && ` · ${item.corporation.name}`}
           {item.sharedBy && !hideSharedBy && ` · ${item.sharedBy.name}`}
         </span>

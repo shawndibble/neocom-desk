@@ -184,8 +184,36 @@ describe('Shared Pops as Calendar clocks', () => {
       const likely = entry({ ...popped, likelyMinedOut: true });
       expect(sharedPopMiningState(likely)).toBe('likelyMinedOut');
       const [row] = toSharedPopSources([likely], new Set(), NOW);
-      expect(row).toMatchObject({ detail: 'likelyMinedOut', deadlineMs: NOW + 61 * HOUR_MS });
+      expect(row).toMatchObject({
+        detail: 'expires',
+        deadlineMs: NOW + 61 * HOUR_MS,
+        extra: { detail: 'likelyMinedOut' },
+      });
       expect(row).not.toHaveProperty('pastLabelKey');
+      const expired = entry({
+        popAt: iso(NOW - 60 * HOUR_MS),
+        expiresAt: iso(NOW - 6 * HOUR_MS),
+        retainUntil: iso(NOW + 66 * HOUR_MS),
+        likelyMinedOut: true,
+      });
+      expect(toSharedPopSources([expired], new Set(), NOW)[0]).toMatchObject({
+        detail: 'expired',
+        extra: { detail: 'likelyMinedOut' },
+      });
+    });
+
+    it("does not guess before the pop pops on the pilot's own Pop Time", () => {
+      const early = entry({
+        likelyMinedOut: true,
+        readyAt: iso(NOW - HOUR_MS),
+        autoFractureAt: iso(NOW + 2 * HOUR_MS),
+        popAt: iso(NOW - HOUR_MS),
+      });
+      const [row] = toSharedPopSources([early], new Set(), NOW, 'autoFracture');
+      expect(row).toMatchObject({ detail: 'autoFracture' });
+      expect(row!.extra).toEqual({ detail: 'ready', atMs: NOW - HOUR_MS });
+      const facts = sharedPopDetail(early, NOW, t, 'UTC', 'autoFracture').facts.map((f) => f.value);
+      expect(facts).not.toContain('calendar.sharedPop.likelyMinedOut');
     });
 
     it('says nothing about a pop that is not popped yet, or one nobody flagged', () => {

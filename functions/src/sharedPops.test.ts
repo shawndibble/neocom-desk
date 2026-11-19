@@ -21,6 +21,7 @@ import {
   visiblePops,
   type BuildSharedPopsInput,
   type PopExtraction,
+  type SharedPopView,
   type ViewerAccess,
 } from './sharedPops.js';
 
@@ -138,6 +139,21 @@ describe('both Pop Times and retention (calendar dedupe, #pop-times)', () => {
     expect(visiblePops(doc, viewer, expiry + POP_RETAIN_MS)).toHaveLength(0);
     const old = { ...doc.pops[0], retainUntil: undefined };
     expect(visiblePops({ ...doc, pops: [old] }, viewer, expiry + H)).toHaveLength(0);
+  });
+});
+
+describe('what a viewer is sent of the mining figures', () => {
+  it('leaves the quantities out of the viewer type: they only feed the server quiet test', () => {
+    const pop = buildSharedPops(
+      input({
+        now: at('2026-11-15T07:00:00.000Z'),
+        extractions: [extraction({ laserFiredAt: '2026-11-15T01:00:00.000Z', minedQty: 9_500 })],
+      })
+    )!.pops[0];
+    expect(pop.minedPct).toBe(95);
+    // @ts-expect-error a viewer's pop carries no mined quantities
+    const leaked: SharedPopView['minedPct'] = pop.minedPct;
+    expect(leaked).toBe(95);
   });
 });
 
