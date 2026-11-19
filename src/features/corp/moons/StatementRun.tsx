@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Button,
+  Checkbox,
   Eyebrow,
   Panel,
   Select,
@@ -18,6 +19,8 @@ import { statementForLine } from '@/engine/corpTaxBook/bookView';
 import { mailableAfterClose } from '@/engine/corpTaxBook/closeAccount';
 import { composeStatementMail } from '@/engine/corpTaxBook/statementMail';
 import type { Statement } from '@/engine/corpTaxBook/statements';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { DAY_MS } from '@/lib/age';
 import { cx } from '@/lib/cx';
 import { MailLimitNotice } from '@/features/corpTaxBook/MailLimitNotice';
 import { MailQueueSummary } from '@/features/corpTaxBook/MailQueuePanel';
@@ -36,6 +39,9 @@ import { mailTarget, statementRefineryNames, useCorporationName } from './statem
 import { plannedNotices, plannedRuns } from './useNeedsYou';
 
 type Step = 'check' | 'send' | 'done';
+
+/** A Miner mailed a Statement within this long is left unticked in the run. */
+const RECENTLY_MAILED_MS = 7 * DAY_MS;
 
 function StepDot({
   n,
@@ -107,6 +113,8 @@ export function StatementRun() {
     return () => clearInterval(id);
   }, [step]);
   const queue = useLiveQuery(() => listQueue(corporationId), [corporationId], []);
+  /** The officer's own ticks; a Miner they have not touched follows the default (`recentlyMailed`). */
+  const [ticks, setTicks] = useState<ReadonlyMap<string, boolean>>(new Map());
 
   const runs = useMemo(() => plannedRuns(view), [view]);
   const notices = useMemo(
@@ -143,7 +151,6 @@ export function StatementRun() {
   );
 
   const nothingToDo = runs.length === 0 && notices.length === 0 && unmailed.length === 0;
-  const total = lines.length + notices.length + unmailed.length;
   const minerRow = (id: string) => view.miners.find((m) => m.id === id)!;
 
   /** Everything the run will send: newly drafted Statements, then earlier unmailed ones. */
@@ -188,6 +195,26 @@ export function StatementRun() {
     }
     return out;
   }, [view, lines, notices, unmailed]);
+
+  /** The last time any Statement of this Miner was mailed, if ever. */
+  const lastMailedAt = (minerId: string): number | null => {
+    let last: number | null = null;
+    for (const s of view.input.statements) {
+      if (s.minerId !== minerId || !s.lastMailedAt) continue;
+      const at = Date.parse(s.lastMailedAt);
+      if (!Number.isNaN(at) && (last === null || at > last)) last = at;
+    }
+    return last;
+  };
+  /** Mailed within the last 7 days: unticked unless the officer ticks them. */
+  const recentlyMailed = (minerId: string): boolean => {
+    const at = lastMailedAt(minerId);
+    return at !== null && now - at < RECENTLY_MAILED_MS;
+  };
+  const isChosen = (p: { key: string; minerId: string }): boolean =>
+    ticks.get(p.key) ?? !recentlyMailed(p.minerId);
+  const chosen = new Set(previews.filter(isChosen).map((p) => p.key));
+  const total = chosen.size;
 
   const previewFor = (item: (typeof previews)[number], corpName: string): MailPreviewContent => {
     const target = mailTarget(ctx, item.statement, minerRow(item.minerId), {
@@ -247,17 +274,20 @@ export function StatementRun() {
     try {
       // Earlier Statements whose mail never went out are the oldest; they go first.
       await queueTargets(
-        unmailed.map((s) => {
-          const row = minerRow(s.minerId);
-          return mailTarget(ctx, s as Statement, row, {
-            amountDue: row.owed,
-            carried: Math.max(0, row.owed - s.amount),
-          });
-        })
+        unmailed
+          .filter((s) => chosen.has(`statement:${s.id}`))
+          .map((s) => {
+            const row = minerRow(s.minerId);
+            return mailTarget(ctx, s as Statement, row, {
+              amountDue: row.owed,
+              carried: Math.max(0, row.owed - s.amount),
+            });
+          })
       );
       for (const run of runs) {
         const targets = [];
         for (const line of run.plan.lines) {
+          const mail = chosen.has(`line:${run.plan.period.start}:${line.minerId}`);
           const statement = statementForLine(run.view, run.plan, line);
           // A guest cannot look names up, so the verify page reads them off the Statement.
           const refineryNames = statementRefineryNames(statement, names);
@@ -270,18 +300,22 @@ export function StatementRun() {
               refineryNames,
             },
           });
-          targets.push(
-            mailTarget(ctx, statement, minerRow(line.minerId), {
-              amountDue: line.balanceDue,
-              carried: line.carried,
-            })
-          );
+          // An unticked Miner's Statement is issued but not mailed: it stays on the "never mailed" list.
+          if (mail)
+            targets.push(
+              mailTarget(ctx, statement, minerRow(line.minerId), {
+                amountDue: line.balanceDue,
+                carried: line.carried,
+              })
+            );
         }
         await queueTargets(targets);
       }
       // Late notices (#6294): each issued (which makes its verify link), then all queued.
       const noticeTargets = [];
       for (const n of notices) {
+        // A notice is rebuilt every run, so an unticked one is not issued at all.
+        if (!chosen.has(`notice:${n.minerId}`)) continue;
         const row = minerRow(n.minerId);
         await editBook(characterId, corporationId, {
           action: 'issueStatement',
@@ -438,6 +472,40 @@ export function StatementRun() {
                       </li>
                     )}
                   </ul>
+                  <fieldset className="space-y-1">
+                    <legend className="mb-1 text-text-dim">
+                      {t('corpTaxBook.moons.run.recipients')}
+                    </legend>
+                    {previews.map((p) => {
+                      const at = lastMailedAt(p.minerId);
+                      return (
+                        <label
+                          key={p.key}
+                          className={cx('flex items-start gap-2 text-text', tappableRowClassName)}
+                        >
+                          <Checkbox
+                            className="mt-0.5"
+                            checked={chosen.has(p.key)}
+                            onChange={(e) => {
+                              const checked = e.currentTarget.checked;
+                              setTicks((current) => new Map(current).set(p.key, checked));
+                            }}
+                          />
+                          <span className="min-w-0">
+                            {names.character(minerRow(p.minerId).mainCharacterId)}
+                            <span className="text-text-dim"> · {isk(p.amountDue)}</span>
+                            {at !== null && recentlyMailed(p.minerId) && (
+                              <span className="block text-xs text-text-dim">
+                                {t('corpTaxBook.moons.run.mailedRecently', {
+                                  count: Math.max(0, Math.floor((now - at) / DAY_MS)),
+                                })}
+                              </span>
+                            )}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </fieldset>
                   {!inline && minerPicker}
                   {corporationName === null && (
                     <p role="status" className="text-text-dim">
@@ -445,7 +513,11 @@ export function StatementRun() {
                     </p>
                   )}
                   <div className="flex flex-wrap gap-2">
-                    <Button variant="primary" onClick={() => setStep('send')} disabled={!canEdit}>
+                    <Button
+                      variant="primary"
+                      onClick={() => setStep('send')}
+                      disabled={!canEdit || total === 0}
+                    >
                       {t('corpTaxBook.moons.run.continue')}
                     </Button>
                     {previewItem && !inline && (
