@@ -76,6 +76,27 @@ function renderModal(over: Partial<Parameters<typeof CorpRowDetailModal>[0]> = {
 }
 
 describe('CorpRowDetailModal', () => {
+  it('lists what paid a day, and nothing for a day nothing has paid', () => {
+    renderModal();
+    expect(screen.queryByText('Paid by')).not.toBeInTheDocument();
+  });
+
+  it('lists the money that paid a paid day', () => {
+    const paid = {
+      ...view,
+      state: 'paid' as const,
+      taxOwed: 0,
+      settledBy: 'donation' as const,
+      paidBy: {
+        payments: [],
+        inFlight: [{ amount: 957_001, at: '2026-10-18T13:10:00Z', refId: 5150 }],
+      },
+    };
+    renderModal({ corp: { ...corp, view: paid } });
+    expect(screen.getByText('Paid by')).toBeInTheDocument();
+    expect(screen.getByText(/not credited by Brass Meridian Logistics yet/)).toBeInTheDocument();
+  });
+
   it('shows what the book bills, with the book and your own quantity', () => {
     renderModal();
     expect(screen.getByText('957,001 ISK')).toBeInTheDocument();

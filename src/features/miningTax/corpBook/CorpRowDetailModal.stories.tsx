@@ -118,6 +118,26 @@ export const Dismissed: S = {
   },
 };
 
+/** @summary A paid day: two book payments, a donation not credited yet, and credit from a correction. */
+export const PaidByMoney: S = {
+  args: {
+    view: {
+      ...base,
+      state: 'paid',
+      taxOwed: 0,
+      settledBy: 'credit',
+      paidBy: {
+        payments: [
+          { paymentId: 'p1', amount: 200_000 },
+          { paymentId: 'p2', amount: 60_000 },
+        ],
+        inFlight: [{ amount: 50_000, at: '2026-10-29T13:10:00Z', refId: 5150 }],
+        corrections: 9_000,
+      },
+    },
+  },
+};
+
 /** @summary A day two corporations' books both contest: one take-over does the split for both. */
 export const ConflictTwoBooks: S = {
   args: {

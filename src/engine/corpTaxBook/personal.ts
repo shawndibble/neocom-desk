@@ -25,6 +25,15 @@ import { computeAssignmentValue } from '../miningTax/valuation';
 import { entryKey, type OreLine } from '../miningTax/types';
 import { minusLines, priceMap } from '../miningTax/oreLines';
 import { type RecordedWriteOff, type TaxPayment } from './allocation';
+import {
+  creditSources,
+  hasMoney,
+  inFlightSources,
+  mergePaidBy,
+  moneyQueue,
+  type MoneySource,
+  type PaidBy,
+} from './paidBy';
 import { daySettleTolerance } from './runningAccount';
 import { splitAcrossBooks, resolveBookShare, type BookObservation } from './attribution';
 import { dayClosesAt, isDayBillable } from './billable';
@@ -327,6 +336,8 @@ export interface BookRowView {
   billed: number;
   /** How a Paid day was settled; absent while it is owed, dismissed or waived. */
   settledBy?: BookSettledBy;
+  /** Whose money paid the day, where the overlay settled it from the book's credit or a donation in flight. Absent while no money reached it. */
+  paidBy?: PaidBy;
   /**
    * Paid by the member's own mark while the day's Statement is still unsettled in the book: what
    * the book still shows owed for the day. The corporation has not credited the payment yet.
@@ -551,6 +562,8 @@ interface Prepared {
     {
       settled: boolean;
       pool: number;
+      /** The payments that credited the Statement, in the order they were applied. */
+      payments: MoneySource[];
       forgiven: number;
       forgivenReasons: string[];
       overdue: OverdueStatus | undefined;
@@ -558,6 +571,8 @@ interface Prepared {
   >;
   /** Credit the book holds per Miner: it pays only that Miner's days. */
   credit: Map<string, number>;
+  /** The same credit per Miner as its sources, in the order it is spent. */
+  creditSources: Map<string, MoneySource[]>;
   /** The latest Billable day; undefined with no sync after the grace. */
   billableThrough: string | undefined;
 }
@@ -629,9 +644,13 @@ function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: str
   // Payments credit each Miner's Statements, oldest first (D5/D15).
   const settlement: Prepared['settlement'] = new Map();
   const credit = new Map<string, number>();
+  const sources = new Map<string, MoneySource[]>();
   for (const [minerId, miner] of open.miners) {
     const { allocation } = miner;
-    if (allocation.credit > 0) credit.set(minerId, allocation.credit);
+    if (allocation.credit > 0) {
+      credit.set(minerId, allocation.credit);
+      sources.set(minerId, creditSources(miner.payments, allocation, book.startDate));
+    }
     const writeOffs = (book.writeOffs ?? []).filter((w) => w.minerId === minerId);
     for (const s of miner.statements) {
       const result = allocation.byStatement.get(s.id);
@@ -650,6 +669,9 @@ function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: str
       settlement.set(s.id, {
         settled: result?.settled ?? false,
         pool: Math.max(0, (result?.credited ?? 0) - dismissed - forgiven),
+        payments: allocation.paymentCredits
+          .filter((c) => c.statementId === s.id)
+          .map((c): MoneySource => ({ kind: 'payment', paymentId: c.paymentId, amount: c.amount })),
         forgiven,
         forgivenReasons,
         overdue: miner.overdue.get(s.id),
@@ -662,6 +684,7 @@ function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: str
     pending,
     settlement,
     credit,
+    creditSources: sources,
     billableThrough: open.billableThrough,
   };
 }
@@ -1330,6 +1353,7 @@ export function overlayCorpBooks(input: {
       if (!state) continue;
       let pool = state.pool;
       let forgive = state.forgiven;
+      const payers = moneyQueue(state.payments);
       for (const { row, part } of list.sort(
         (a, b) => a.row.date.localeCompare(b.row.date) || a.row.id.localeCompare(b.row.id)
       )) {
@@ -1337,6 +1361,7 @@ export function overlayCorpBooks(input: {
         settledParts.add(part);
         const fromPool = Math.min(pool, owed);
         pool = Math.max(0, pool - fromPool);
+        if (fromPool > 0) row.paidBy = mergePaidBy(row.paidBy, payers.draw(fromPool));
         const fromForgiven = Math.min(forgive, owed - fromPool);
         if (fromForgiven > 0) {
           forgive -= fromForgiven;
@@ -1352,6 +1377,13 @@ export function overlayCorpBooks(input: {
     }
     for (const [row, parts] of partsOf) {
       const forgiven = forgivenOf.get(row);
+      // What the officer forgave is listed beside the payments that paid the rest of the day.
+      if (forgiven && row.paidBy)
+        row.paidBy = mergePaidBy(row.paidBy, {
+          payments: [],
+          inFlight: [],
+          writtenOff: forgiven.amount,
+        });
       if (forgiven) {
         // Never silent (spec #4504): the old figure stays beside what the write-off left.
         const before = row.correction?.before ?? row.billed;
@@ -1491,6 +1523,23 @@ export function overlayCorpBooks(input: {
       const own = open.filter((r) => minerOf(r) === minerId);
       const days = own.map((r) => ({ id: r.id, date: r.date, taxOwed: r.taxOwed ?? 0 }));
       const paid = coverInFlight(days, Math.max(0, amount - mark));
+      // Whose money paid each day: the pool as a queue of its sources, the mark spending the front.
+      const queue = moneyQueue([
+        ...(p.creditSources.get(minerId) ?? []),
+        ...inFlightSources(
+          counting.filter((d) => minerIdFor(d.characterId, p.book.miners) === minerId)
+        ),
+      ]);
+      queue.skip(mark);
+      let toSpend = Math.max(0, amount - mark);
+      for (const row of [...own].sort(byDateThenId)) {
+        if (!paid.has(row.id)) continue;
+        // `coverInFlight` pays a day whole, or within the tolerance: what reached it is what was left.
+        const applied = Math.min(toSpend, row.taxOwed ?? 0);
+        toSpend -= applied;
+        const drawn = queue.draw(applied);
+        if (hasMoney(drawn)) row.paidBy = mergePaidBy(row.paidBy, drawn);
+      }
       // The same pooled allocation with the uncredited money still in it: the days it adds are
       // exactly the ones that went back to Billed when it stopped counting.
       const withLost = lostBy.has(minerId)
