@@ -1070,6 +1070,70 @@ describe('overlayCorpBooks', () => {
     });
   });
 
+  it('names the donation in flight that paid a day, and the amount it paid', () => {
+    const donation = {
+      characterId: ME,
+      amount: 1_000_000,
+      at: '2026-10-18T13:10:00Z',
+      refId: 5150,
+    };
+    const out = overlay([entry()], [book({ inFlight: [donation] })]);
+    const taxOwed = 43_050 * 148 * 0.15;
+    expect(out.rows[0].paidBy).toEqual({
+      payments: [],
+      inFlight: [{ amount: taxOwed, at: '2026-10-18T13:10:00Z', refId: 5150 }],
+    });
+  });
+
+  it('names the book payments that paid each day, one slice per day', () => {
+    const observed = ['2026-10-15', '2026-10-16'].map((date) => ({
+      characterId: ME,
+      recordedCorporationId: CORP,
+      structureId: 1000,
+      date,
+      solarSystemId: SYSTEM,
+      oreLines: [{ typeId: ZEO, quantity: 10_000 }],
+    }));
+    const entries = ['2026-10-15', '2026-10-16'].map((date) =>
+      entry({ date, oreLines: [{ typeId: ZEO, quantity: 10_000 }] })
+    );
+    const payment = (id: string, amount: number, at: string) => ({
+      id,
+      minerId: `solo:${ME}`,
+      characterId: ME,
+      amount,
+      at,
+      source: 'donation' as const,
+    });
+    const out = overlay(entries, [
+      book({
+        observed,
+        payments: [
+          payment('p1', 300_000, '2026-10-18T10:00:00Z'),
+          payment('p2', 144_000, '2026-10-18T11:00:00Z'),
+        ],
+      }),
+    ]);
+    const paidBy = Object.fromEntries(out.rows.map((r) => [r.date, r.paidBy]));
+    // A day is 222,000: p1 pays the first and 78,000 of the second, p2 the rest of the second.
+    expect(paidBy['2026-10-15']).toEqual({
+      payments: [{ paymentId: 'p1', amount: 222_000 }],
+      inFlight: [],
+    });
+    expect(paidBy['2026-10-16']).toEqual({
+      payments: [
+        { paymentId: 'p1', amount: 78_000 },
+        { paymentId: 'p2', amount: 144_000 },
+      ],
+      inFlight: [],
+    });
+  });
+
+  it('puts nothing on a day that is still billed', () => {
+    const out = overlay([entry()], [book()]);
+    expect(out.rows[0].paidBy).toBeUndefined();
+  });
+
   it('records a donation as how the day was settled', () => {
     const out = overlay(
       [entry()],
@@ -1848,6 +1912,36 @@ describe('overlayCorpBooks: corrections by the corporation (#4622)', () => {
     ).rows[0];
     expect(row).toMatchObject({ state: 'paid', taxOwed: 0, settledBy: 'statement' });
     expect(row.billed).toBe(900_000);
+  });
+
+  it('names the payments that settled a Statement’s day', () => {
+    const payment = (id: string, amount: number, at: string) => ({
+      id,
+      minerId: MINER,
+      characterId: ME,
+      amount,
+      at,
+      source: 'donation' as const,
+    });
+    const row = overlay(
+      [entry()],
+      [
+        book({
+          statements: [issued([mined])],
+          payments: [
+            payment('p1', 500_000, '2026-10-21T00:00:00Z'),
+            payment('p2', 400_000, '2026-10-22T00:00:00Z'),
+          ],
+        }),
+      ]
+    ).rows[0];
+    expect(row.paidBy).toEqual({
+      payments: [
+        { paymentId: 'p1', amount: 500_000 },
+        { paymentId: 'p2', amount: 400_000 },
+      ],
+      inFlight: [],
+    });
   });
 
   it("ignores another Miner's write-off (#4637)", () => {

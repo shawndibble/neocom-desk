@@ -8283,6 +8283,14 @@
           "credit": "Credit the book holds",
           "statement": "Statement payment"
         },
+        "paidBy": {
+          "title": "Paid by",
+          "donation": "Donation, {{time}}",
+          "manual": "Recorded by an officer, {{time}}",
+          "payment": "Payment",
+          "inFlight": "Your donation, {{time}}, not credited by {{corp}} yet",
+          "corrections": "Credit from corrections (not a payment)"
+        },
         "factOriginal": "Originally billed",
         "settled": {
           "alsoMarked": "You also marked this day paid. Unmark it if that was a mistake."

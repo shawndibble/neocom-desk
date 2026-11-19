@@ -18,6 +18,7 @@ import type { DisplayRow } from '../groupRows';
 import { CorpBookDiffModal } from './CorpBookDiffModal';
 import type { CorpBookViewBook } from './corpBookView';
 import { CorpStatusPill } from './CorpStatusPill';
+import { PaidByList } from './PaidByList';
 import { CorpDeclareSlot } from './CorpDeclareAction';
 import {
   figureTarget,
@@ -345,6 +346,14 @@ export function CorpRowDetailModal({
                 </div>
               )}
             </div>
+          )}
+
+          {view.paidBy && (
+            <PaidByList
+              paidBy={view.paidBy}
+              payments={book?.loaded.payments ?? []}
+              corpName={corp.corpName}
+            />
           )}
 
           {view.correction && (

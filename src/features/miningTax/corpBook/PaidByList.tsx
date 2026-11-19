@@ -1,0 +1,55 @@
+import { useTranslation } from 'react-i18next';
+import { Well } from '@/components/ui/Well';
+import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import type { TaxPayment } from '@/engine/corpTaxBook/allocation';
+import type { PaidBy } from '@/engine/corpTaxBook/paidBy';
+import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
+import { formatIsk } from '@/lib/isk';
+
+interface Props {
+  paidBy: PaidBy;
+  /** The book's Tax Payments, to say when and how each was made. */
+  payments: readonly TaxPayment[];
+  corpName: string;
+}
+
+/**
+ * What paid a day, read-only: each Tax Payment with what it put on this day, a donation the
+ * corporation has not credited yet, and credit from corrections, which is no payment. The book
+ * decides how money is applied (oldest day first), so there is nothing to link or undo here.
+ */
+export function PaidByList({ paidBy, payments, corpName }: Props) {
+  const { t } = useTranslation();
+  const k = (key: string) => `miningTax.corpBook.detail.paidBy.${key}`;
+  const row = (key: string, label: string, amount: number) => (
+    <li key={key} className="flex items-baseline justify-between gap-3 py-1">
+      <span>{label}</span>
+      <span className="tabular-nums">{formatIsk(amount, 0)} ISK</span>
+    </li>
+  );
+  return (
+    <Well className="space-y-1">
+      <p className={eyebrowClassName}>{t(k('title'))}</p>
+      <ul className="divide-y divide-line text-xs">
+        {paidBy.payments.map((p) => {
+          const made = payments.find((x) => x.id === p.paymentId);
+          const label = made
+            ? t(k(made.source === 'manual' ? 'manual' : 'donation'), {
+                time: eveTimeLabel(Date.parse(made.at)),
+              })
+            : t(k('payment'));
+          return row(p.paymentId, label, p.amount);
+        })}
+        {paidBy.inFlight.map((d, i) =>
+          row(
+            `in-flight-${d.refId ?? i}`,
+            t(k('inFlight'), { corp: corpName, time: eveTimeLabel(Date.parse(d.at)) }),
+            d.amount
+          )
+        )}
+        {paidBy.corrections !== undefined &&
+          row('corrections', t(k('corrections')), paidBy.corrections)}
+      </ul>
+    </Well>
+  );
+}
