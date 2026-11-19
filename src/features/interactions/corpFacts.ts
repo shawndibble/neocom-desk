@@ -16,7 +16,7 @@ import { bookPartsFor, readBook } from '@/features/corp/taxBook/bookRead';
 import { openBook } from '@/features/corp/taxBook/openBook';
 import { loadCorporationWalletJournal } from '@/features/corp/wallet';
 import { readSrpHistory } from '@/features/corp/srpOfficerClient';
-import { MINUTE_MS } from '@/lib/age';
+import { DAY_MS, MINUTE_MS } from '@/lib/age';
 import { fetchPilotInvolvements } from '@/lib/zkillboard';
 import type { BookFacts } from './corpBookInteractions';
 import { classifyCorpKills, type CorpJournalRow, type CorpKill } from './corpOtherInteractions';
@@ -25,7 +25,7 @@ import type { CorpQuery } from './sourceTypes';
 /** The seven corp wallet divisions. */
 const DIVISIONS = [1, 2, 3, 4, 5, 6, 7] as const;
 /** Only recent killmails are matched against the corp's roster: affiliations cost a request per 1000 ids. */
-const KILL_WINDOW_MS = 365 * 24 * 60 * 60 * 1000;
+const KILL_WINDOW_MS = 365 * DAY_MS;
 const FACTS_TTL_MS = 5 * MINUTE_MS;
 
 const settled = async <T>(work: () => Promise<T>, fallback: T): Promise<T> => {

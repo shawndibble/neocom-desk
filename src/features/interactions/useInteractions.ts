@@ -60,7 +60,7 @@ export function useInteractions(input: InteractionsInput | null) {
   const key =
     input === null
       ? null
-      : `${input.scope}:${input.otherId}:${input.characterIds.join(',')}:${input.corporationId}`;
+      : `${input.scope}:${input.otherId}:${input.otherName}:${input.characterIds.join(',')}:${input.corporationId}`;
   const loader = useCallback(() => loadInteractions(input!), [input]);
   return useKeyedLoad(key, loader);
 }

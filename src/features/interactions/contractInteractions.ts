@@ -107,7 +107,8 @@ export function contractInteractions(input: ContractInteractionsInput): Interact
       state: `interactions.state.${state}`,
       stateTone: STATE_TONE[state],
       characterId,
-      to: highlightHref('/contracts/history', c.contract_id),
+      // All Characters, so a contract of an alt is found, not only the active Character's.
+      to: `${highlightHref('/contracts/history', c.contract_id)}&history.chars=all`,
     });
   }
   return out;

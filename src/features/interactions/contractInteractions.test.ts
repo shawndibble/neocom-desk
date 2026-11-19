@@ -29,7 +29,7 @@ const run = (contracts: Contract[], locationNames = new Map<number, string>()) =
 describe('contractInteractions', () => {
   it('links to the History tab where ?highlight= opens the contract', () => {
     const [row] = run([contract({})]);
-    expect(row.to).toBe('/contracts/history?highlight=77');
+    expect(row.to).toBe('/contracts/history?highlight=77&history.chars=all');
     expect(row.id).toBe('contract-1-77');
     expect(row.kind).toBe('contract');
   });

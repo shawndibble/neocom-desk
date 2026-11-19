@@ -113,8 +113,6 @@ export function PublicInfoModal() {
   );
   // The URL's `infoTab` opens Interactions (so Back from a row's page lands here); no `infoTab`
   // leaves the modal's own tab choice.
-  const activeTab =
-    urlTab === 'interactions' && request?.kind === 'character' ? 'interactions' : chosenTab;
   const focusAfterCommit = useFocusAfterCommit();
   // The pressed button lives in the tab we leave, so it unmounts: land on the tab we switched to.
   const openTab = (id: PublicInfoKind) => {
@@ -127,6 +125,15 @@ export function PublicInfoModal() {
   const [alliance, setAlliance] = useState<TabState<PublicAllianceInfo>>(IDLE);
   // Bumped by Try again on a failed tab, to run the lookups again in place.
   const [attempt, setAttempt] = useState(0);
+  // Interactions is offered for another pilot, to a viewer with a Character to look from. A URL
+  // naming the tab for anyone else (an NPC, your own Character) falls back to the chosen tab.
+  const interactionsOffered =
+    request?.kind === 'character' &&
+    !isNpcCharacterId(request.id) &&
+    character.status === 'ready' &&
+    characters.length > 0 &&
+    !characters.some((c) => c.characterId === request.id);
+  const activeTab = urlTab === 'interactions' && interactionsOffered ? 'interactions' : chosenTab;
   const activeState =
     activeTab === 'character' ? character : activeTab === 'corporation' ? corporation : alliance;
   // Try again unmounts while the lookups re-run, so the always-mounted wrapper holds focus.
@@ -242,16 +249,8 @@ export function PublicInfoModal() {
     character.status !== 'unknown'
   )
     tabs.push({ id: 'employment', label: t('publicInfo.employmentTab') });
-  // Interactions: what this account has done with the pilot. Not for one of the viewer's own
-  // Characters (nothing is "between" them), and not without a Character to look from.
-  if (
-    request.kind === 'character' &&
-    !npcCharacter &&
-    character.status === 'ready' &&
-    characters.length > 0 &&
-    !characters.some((c) => c.characterId === request.id)
-  )
-    tabs.push({ id: 'interactions', label: t('interactions.tab') });
+  // Interactions: what this account has done with the pilot.
+  if (interactionsOffered) tabs.push({ id: 'interactions', label: t('interactions.tab') });
 
   const activeData =
     activeTab === 'corporation' ? corporation : activeTab === 'alliance' ? alliance : character;

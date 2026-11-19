@@ -6,7 +6,7 @@
  * this account can already see on those pages). Chips show only what has
  * something to say; a row opens the page that holds the interaction.
  */
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, FilterChip, Spinner, StatChip, StatChips } from '@/components/ui';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
@@ -20,7 +20,7 @@ import {
   type InteractionKind,
   type Interaction,
 } from '@/engine/interactions/interactions';
-import { formatIskCompactSigned } from '@/lib/isk';
+import { formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
 import { iskTone } from '@/lib/signedIsk';
 import { cx } from '@/lib/cx';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
@@ -73,8 +73,13 @@ function PersonalChips({ rows }: { rows: readonly Interaction[] }) {
 
 function CorpChips({ query }: { query: CorpQuery }) {
   const { t, i18n } = useTranslation();
-  const key = `${query.corporationId}:${query.otherId}`;
-  const { data } = useKeyedLoad(key, () => loadCorpSummary(query));
+  const { corporationId, otherId, otherName, characterIds, t: translate } = query;
+  const key = `${corporationId}:${otherId}:${characterIds.join(',')}`;
+  const loader = useCallback(
+    () => loadCorpSummary({ corporationId, otherId, otherName, characterIds, t: translate }),
+    [corporationId, otherId, otherName, characterIds, translate]
+  );
+  const { data } = useKeyedLoad(key, loader);
   if (!data) return null;
   const date = (ms: number) =>
     new Intl.DateTimeFormat(i18n.language, {
@@ -96,7 +101,7 @@ function CorpChips({ query }: { query: CorpQuery }) {
       {member?.taxPaid != null && (
         <StatChip
           label={t('interactions.chip.taxPaid')}
-          value={isk(member.taxPaid).replace('+', '')}
+          value={`${formatIskCompact(member.taxPaid)} ISK`}
         />
       )}
       {member?.statements != null && (
@@ -124,13 +129,13 @@ function CorpChips({ query }: { query: CorpQuery }) {
         <StatChip
           label={t('interactions.chip.ourLosses')}
           tone="danger"
-          value={`${outsider.ourLosses.count} · ${isk(outsider.ourLosses.isk).replace('+', '')}`}
+          value={`${outsider.ourLosses.count} · ${formatIskCompact(outsider.ourLosses.isk) + ' ISK'}`}
         />
       )}
       {outsider?.theirLosses != null && (
         <StatChip
           label={t('interactions.chip.theirLosses')}
-          value={`${outsider.theirLosses.count} · ${isk(outsider.theirLosses.isk).replace('+', '')}`}
+          value={`${outsider.theirLosses.count} · ${formatIskCompact(outsider.theirLosses.isk) + ' ISK'}`}
         />
       )}
       {outsider?.lastHostile != null && (
