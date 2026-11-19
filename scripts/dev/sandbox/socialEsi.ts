@@ -3,29 +3,53 @@
  * generated id read as a person or corporation instead of "Unknown 91000003". Plugged into
  * `installPersonalEsi` (personalEsi.ts), which owns the route registration.
  */
-import { CHARACTER_ID, CHARACTER_NAME, CORPORATION_ID, CORPORATION_NAME, ALLIANCE_ID, ALLIANCE_NAME } from '../../../e2e/support/fixtureData';
+import {
+  CHARACTER_ID,
+  CHARACTER_NAME,
+  CORPORATION_ID,
+  CORPORATION_NAME,
+  ALLIANCE_ID,
+  ALLIANCE_NAME,
+} from '../../../e2e/support/fixtureData';
 import { DAY_MS, HOUR_MS } from '../../../src/lib/age';
 
 import { iso, mix } from './gen';
 
-const PILOTS = ['Aria Vance', 'Bram Okafor', 'Cato Reyes', 'Dara Lindqvist', 'Edda Voss', 'Finn Maru', 'Gale Idris', 'Hana Brandt', 'Ivo Takeda', 'Juno Castellan'];
+const PILOTS = [
+  'Aria Vance',
+  'Bram Okafor',
+  'Cato Reyes',
+  'Dara Lindqvist',
+  'Edda Voss',
+  'Finn Maru',
+  'Gale Idris',
+  'Hana Brandt',
+  'Ivo Takeda',
+  'Juno Castellan',
+];
 const CORPS = ['Hedion Haulers', 'Sebiestor Salvage', 'Pator Mining Co', 'Outer Ring Traders'];
 /** First id of the generated pilots (the wallet journal's counterparties use the same range). */
 const PILOT_BASE = 91_000_000;
 const CORP_BASE = 92_000_000;
 
 /** id -> display name for POST /universe/names; every generated id the sandbox shows. */
-export function nameFor(id: number): { name: string; category: 'character' | 'corporation' | 'alliance' } | undefined {
+export function nameFor(
+  id: number
+): { name: string; category: 'character' | 'corporation' | 'alliance' } | undefined {
   if (id === CHARACTER_ID) return { name: CHARACTER_NAME, category: 'character' };
   if (id === CORPORATION_ID) return { name: CORPORATION_NAME, category: 'corporation' };
   if (id === ALLIANCE_ID) return { name: ALLIANCE_NAME, category: 'alliance' };
-  if (id >= PILOT_BASE && id < PILOT_BASE + PILOTS.length) return { name: PILOTS[id - PILOT_BASE], category: 'character' };
-  if (id >= CORP_BASE && id < CORP_BASE + CORPS.length) return { name: CORPS[id - CORP_BASE], category: 'corporation' };
+  if (id >= PILOT_BASE && id < PILOT_BASE + PILOTS.length)
+    return { name: PILOTS[id - PILOT_BASE], category: 'character' };
+  if (id >= CORP_BASE && id < CORP_BASE + CORPS.length)
+    return { name: CORPS[id - CORP_BASE], category: 'corporation' };
   // The Corp Tax Book seed's characters (scripts/dev/seed-corp-tax-book.mjs).
   if (id === 90_000_002) return { name: 'Dev Member', category: 'character' };
   if (id === 90_000_003) return { name: 'Dev Guest', category: 'character' };
-  if (id >= 90_001_000 && id < 90_001_100) return { name: `Dev Miner ${id - 90_001_000 + 1}`, category: 'character' };
-  if (id >= 98_999_000 && id < 98_999_100) return { name: `Guest Corp ${id - 98_999_000 + 1}`, category: 'corporation' };
+  if (id >= 90_001_000 && id < 90_001_100)
+    return { name: `Dev Miner ${id - 90_001_000 + 1}`, category: 'character' };
+  if (id >= 98_999_000 && id < 98_999_100)
+    return { name: `Guest Corp ${id - 98_999_000 + 1}`, category: 'corporation' };
   if (id === 98_999_999) return { name: 'Guest Corp', category: 'corporation' };
   return undefined;
 }
@@ -34,7 +58,15 @@ const STATIONS = [60003760, 60008494];
 
 export function contracts() {
   const types = ['item_exchange', 'courier', 'auction', 'item_exchange', 'courier'] as const;
-  const statuses = ['outstanding', 'finished', 'in_progress', 'outstanding', 'finished', 'cancelled', 'rejected'] as const;
+  const statuses = [
+    'outstanding',
+    'finished',
+    'in_progress',
+    'outstanding',
+    'finished',
+    'cancelled',
+    'rejected',
+  ] as const;
   return Array.from({ length: 24 }, (_, i) => {
     const type = types[i % types.length];
     const status = statuses[i % statuses.length];
@@ -53,13 +85,15 @@ export function contracts() {
       date_issued: iso(-(i * 11 + 2) * HOUR_MS),
       date_expired: iso((20 - i) * DAY_MS),
       title: type === 'courier' ? `Haul ${i}` : i % 4 === 0 ? 'Moon goo buyback' : '',
-      price: type === 'item_exchange' ? 5_000_000 + mix(i) * 90_000 : type === 'auction' ? 1_000_000 : 0,
+      price:
+        type === 'item_exchange' ? 5_000_000 + mix(i) * 90_000 : type === 'auction' ? 1_000_000 : 0,
       buyout: type === 'auction' ? 9_000_000 + mix(i) * 10_000 : undefined,
       reward: type === 'courier' ? 2_000_000 + mix(i) * 20_000 : 0,
       collateral: type === 'courier' ? 150_000_000 : undefined,
       volume: type === 'courier' ? 12_500 : 900,
       days_to_complete: type === 'courier' ? 7 : undefined,
-      date_accepted: status === 'finished' || status === 'in_progress' ? iso(-(i * 11) * HOUR_MS) : undefined,
+      date_accepted:
+        status === 'finished' || status === 'in_progress' ? iso(-(i * 11) * HOUR_MS) : undefined,
       date_completed: status === 'finished' ? iso(-(i * 9) * HOUR_MS) : undefined,
       start_location_id: STATIONS[i % 2],
       end_location_id: STATIONS[(i + 1) % 2],
@@ -79,8 +113,14 @@ export function contractItems(contractId: number) {
 }
 
 const MAIL_SUBJECTS = [
-  'Moon mining tax statement', 'Fleet op tonight 19:00', 'Re: Jita 4-4 buyback', 'Payment received, thanks!',
-  'Your contract was accepted', 'Welcome to the corp', 'Structure fuel running low', 'Ore for sale, bulk',
+  'Moon mining tax statement',
+  'Fleet op tonight 19:00',
+  'Re: Jita 4-4 buyback',
+  'Payment received, thanks!',
+  'Your contract was accepted',
+  'Welcome to the corp',
+  'Structure fuel running low',
+  'Ore for sale, bulk',
 ];
 
 export function mailHeaders() {
@@ -95,7 +135,12 @@ export function mailHeaders() {
     recipients:
       i % 6 === 5
         ? [{ recipient_id: MAILING_LIST_ID, recipient_type: 'mailing_list' as const }]
-        : [{ recipient_id: i % 4 === 0 ? PILOT_BASE : CHARACTER_ID, recipient_type: 'character' as const }],
+        : [
+            {
+              recipient_id: i % 4 === 0 ? PILOT_BASE : CHARACTER_ID,
+              recipient_type: 'character' as const,
+            },
+          ],
   }));
 }
 
@@ -128,7 +173,17 @@ export function calendar() {
   return Array.from({ length: 9 }, (_, i) => ({
     event_id: 500_000 + i,
     event_date: iso((i * 19 + 5) * HOUR_MS),
-    title: ['Mining fleet', 'Moon pop: Athanor Alpha', 'Corp meeting', 'Roam', 'Structure defense', 'PI reset', 'Hauling run', 'Capital op', 'Newbro night'][i],
+    title: [
+      'Mining fleet',
+      'Moon pop: Athanor Alpha',
+      'Corp meeting',
+      'Roam',
+      'Structure defense',
+      'PI reset',
+      'Hauling run',
+      'Capital op',
+      'Newbro night',
+    ][i],
     importance: i % 3,
     event_response: (['accepted', 'not_responded', 'tentative', 'declined'] as const)[i % 4],
   }));

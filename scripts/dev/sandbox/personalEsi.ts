@@ -49,7 +49,6 @@ const BLUEPRINTS: [number, number][] = [
   [17477, 17476],
 ];
 
-
 function assets() {
   const rows: unknown[] = [];
   let id = 2_000_000_000;
@@ -262,7 +261,12 @@ export async function installPersonalEsi(page: Page): Promise<void> {
     if (eventMatch) return json(social.calendarEvent(Number(eventMatch[1])));
     if (path === '/universe/names' && route.request().method() === 'POST') {
       const ids = route.request().postDataJSON() as number[];
-      return json(ids.map((id) => ({ id, ...(social.nameFor(id) ?? { name: `Unknown ${id}`, category: 'character' }) })));
+      return json(
+        ids.map((id) => ({
+          id,
+          ...(social.nameFor(id) ?? { name: `Unknown ${id}`, category: 'character' }),
+        }))
+      );
     }
     const system = /^\/universe\/systems\/(\d+)$/.exec(path);
     if (system && SYSTEM_NAMES[Number(system[1])]) {
