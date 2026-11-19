@@ -14,6 +14,8 @@ export interface PaidBy {
   inFlight: { amount: number; at: string; refId?: number }[];
   /** Credit that came from no payment (a negative Statement, a dismissal's leftover). */
   corrections?: number;
+  /** What an officer forgave of the day: no payment's, and nothing was paid for it. */
+  writtenOff?: number;
 }
 
 export type MoneySource =
@@ -49,6 +51,25 @@ export function creditSources(
   return other > DUST ? [{ kind: 'credit', amount: other }, ...out] : out;
 }
 
+/** Whether a draw reached the day at all. */
+export function hasMoney(p: PaidBy): boolean {
+  return p.payments.length > 0 || p.inFlight.length > 0 || (p.corrections ?? 0) > 0;
+}
+
+/** Donations the member sent that the book has not credited, as sources, oldest first. */
+export function inFlightSources(
+  donations: readonly { amount: number; at: string; refId?: number }[]
+): MoneySource[] {
+  return [...donations]
+    .sort((a, b) => a.at.localeCompare(b.at) || (a.refId ?? 0) - (b.refId ?? 0))
+    .map((d) => ({
+      kind: 'inFlight',
+      amount: d.amount,
+      at: d.at,
+      ...(d.refId !== undefined ? { refId: d.refId } : {}),
+    }));
+}
+
 /** Two draws on the same day (a day on two Statements) as one. */
 export function mergePaidBy(a: PaidBy | undefined, b: PaidBy): PaidBy {
   if (!a) return b;
@@ -59,10 +80,12 @@ export function mergePaidBy(a: PaidBy | undefined, b: PaidBy): PaidBy {
     else payments.push({ ...p });
   }
   const corrections = (a.corrections ?? 0) + (b.corrections ?? 0);
+  const writtenOff = (a.writtenOff ?? 0) + (b.writtenOff ?? 0);
   return {
     payments,
     inFlight: [...a.inFlight, ...b.inFlight],
     ...(corrections > 0 ? { corrections } : {}),
+    ...(writtenOff > 0 ? { writtenOff } : {}),
   };
 }
 

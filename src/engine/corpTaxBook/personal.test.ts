@@ -1944,6 +1944,34 @@ describe('overlayCorpBooks: corrections by the corporation (#4622)', () => {
     });
   });
 
+  it('lists what an officer forgave of a day apart from the payments that paid the rest', () => {
+    const row = overlay(
+      [entry()],
+      [
+        book({
+          statements: [issued([mined])],
+          payments: [
+            {
+              id: 'p1',
+              minerId: MINER,
+              characterId: ME,
+              amount: 500_000,
+              at: '2026-10-21T00:00:00Z',
+              source: 'donation' as const,
+            },
+          ],
+          writeOffs: [forgive(400_000, { statementId: 's1' })],
+        }),
+      ]
+    ).rows[0];
+    expect(row.state).toBe('paid');
+    expect(row.paidBy).toEqual({
+      payments: [{ paymentId: 'p1', amount: 500_000 }],
+      inFlight: [],
+      writtenOff: 400_000,
+    });
+  });
+
   it("ignores another Miner's write-off (#4637)", () => {
     const row = overlay(
       [entry()],

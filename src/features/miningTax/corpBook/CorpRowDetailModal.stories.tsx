@@ -118,8 +118,7 @@ export const Dismissed: S = {
   },
 };
 
-/** @summary A day two corporations' books both contest: one take-over does the split for both. */
-/** A paid day: two book payments, a donation not credited yet, and credit from a correction. */
+/** @summary A paid day: two book payments, a donation not credited yet, and credit from a correction. */
 export const PaidByMoney: S = {
   args: {
     view: {
@@ -139,6 +138,7 @@ export const PaidByMoney: S = {
   },
 };
 
+/** @summary A day two corporations' books both contest: one take-over does the split for both. */
 export const ConflictTwoBooks: S = {
   args: {
     view: {

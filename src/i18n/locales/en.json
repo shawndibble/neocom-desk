@@ -8289,7 +8289,8 @@
           "manual": "Recorded by an officer, {{time}}",
           "payment": "Payment",
           "inFlight": "Your donation, {{time}}, not credited by {{corp}} yet",
-          "corrections": "Credit from corrections (not a payment)"
+          "corrections": "Credit from corrections (not a payment)",
+          "writtenOff": "Forgiven by an officer (not a payment)"
         },
         "factOriginal": "Originally billed",
         "settled": {

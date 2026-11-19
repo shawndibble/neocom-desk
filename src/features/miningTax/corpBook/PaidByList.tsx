@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Well } from '@/components/ui/Well';
-import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { Eyebrow } from '@/components/ui/Eyebrow';
 import type { TaxPayment } from '@/engine/corpTaxBook/allocation';
 import type { PaidBy } from '@/engine/corpTaxBook/paidBy';
 import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
@@ -29,7 +29,7 @@ export function PaidByList({ paidBy, payments, corpName }: Props) {
   );
   return (
     <Well className="space-y-1">
-      <p className={eyebrowClassName}>{t(k('title'))}</p>
+      <Eyebrow>{t(k('title'))}</Eyebrow>
       <ul className="divide-y divide-line text-xs">
         {paidBy.payments.map((p) => {
           const made = payments.find((x) => x.id === p.paymentId);
@@ -49,6 +49,8 @@ export function PaidByList({ paidBy, payments, corpName }: Props) {
         )}
         {paidBy.corrections !== undefined &&
           row('corrections', t(k('corrections')), paidBy.corrections)}
+        {paidBy.writtenOff !== undefined &&
+          row('writtenOff', t(k('writtenOff')), paidBy.writtenOff)}
       </ul>
     </Well>
   );

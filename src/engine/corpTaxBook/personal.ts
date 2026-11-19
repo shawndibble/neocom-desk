@@ -25,7 +25,15 @@ import { computeAssignmentValue } from '../miningTax/valuation';
 import { entryKey, type OreLine } from '../miningTax/types';
 import { minusLines, priceMap } from '../miningTax/oreLines';
 import { type RecordedWriteOff, type TaxPayment } from './allocation';
-import { creditSources, mergePaidBy, moneyQueue, type MoneySource, type PaidBy } from './paidBy';
+import {
+  creditSources,
+  hasMoney,
+  inFlightSources,
+  mergePaidBy,
+  moneyQueue,
+  type MoneySource,
+  type PaidBy,
+} from './paidBy';
 import { daySettleTolerance } from './runningAccount';
 import { splitAcrossBooks, resolveBookShare, type BookObservation } from './attribution';
 import { dayClosesAt, isDayBillable } from './billable';
@@ -1369,6 +1377,13 @@ export function overlayCorpBooks(input: {
     }
     for (const [row, parts] of partsOf) {
       const forgiven = forgivenOf.get(row);
+      // What the officer forgave is listed beside the payments that paid the rest of the day.
+      if (forgiven && row.paidBy)
+        row.paidBy = mergePaidBy(row.paidBy, {
+          payments: [],
+          inFlight: [],
+          writtenOff: forgiven.amount,
+        });
       if (forgiven) {
         // Never silent (spec #4504): the old figure stays beside what the write-off left.
         const before = row.correction?.before ?? row.billed;
@@ -1511,28 +1526,19 @@ export function overlayCorpBooks(input: {
       // Whose money paid each day: the pool as a queue of its sources, the mark spending the front.
       const queue = moneyQueue([
         ...(p.creditSources.get(minerId) ?? []),
-        ...counting
-          .filter((d) => minerIdFor(d.characterId, p.book.miners) === minerId)
-          .sort((a, b) => a.at.localeCompare(b.at) || (a.refId ?? 0) - (b.refId ?? 0))
-          .map((d): MoneySource => ({
-            kind: 'inFlight',
-            amount: d.amount,
-            at: d.at,
-            ...(d.refId !== undefined ? { refId: d.refId } : {}),
-          })),
+        ...inFlightSources(
+          counting.filter((d) => minerIdFor(d.characterId, p.book.miners) === minerId)
+        ),
       ]);
       queue.skip(mark);
       let toSpend = Math.max(0, amount - mark);
-      for (const row of [...own].sort(
-        (a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id)
-      )) {
+      for (const row of [...own].sort(byDateThenId)) {
         if (!paid.has(row.id)) continue;
         // `coverInFlight` pays a day whole, or within the tolerance: what reached it is what was left.
         const applied = Math.min(toSpend, row.taxOwed ?? 0);
         toSpend -= applied;
         const drawn = queue.draw(applied);
-        if (drawn.payments.length > 0 || drawn.inFlight.length > 0 || drawn.corrections)
-          row.paidBy = mergePaidBy(row.paidBy, drawn);
+        if (hasMoney(drawn)) row.paidBy = mergePaidBy(row.paidBy, drawn);
       }
       // The same pooled allocation with the uncredited money still in it: the days it adds are
       // exactly the ones that went back to Billed when it stopped counting.

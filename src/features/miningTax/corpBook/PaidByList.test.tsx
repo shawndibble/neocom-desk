@@ -62,6 +62,19 @@ describe('PaidByList', () => {
     expect(screen.getByText('40,000 ISK')).toBeInTheDocument();
   });
 
+  it('lists what an officer forgave apart from the payments', () => {
+    renderList(
+      {
+        payments: [{ paymentId: 'p1', amount: 100_000 }],
+        inFlight: [],
+        writtenOff: 25_000,
+      },
+      [payment({ id: 'p1' })]
+    );
+    expect(screen.getByText(/forgiven by an officer \(not a payment\)/i)).toBeInTheDocument();
+    expect(screen.getByText('25,000 ISK')).toBeInTheDocument();
+  });
+
   it('shows a payment the book has not loaded by its amount alone', () => {
     renderList({ payments: [{ paymentId: 'gone', amount: 75_000 }], inFlight: [] });
     expect(screen.getByText('75,000 ISK')).toBeInTheDocument();
