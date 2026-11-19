@@ -5,14 +5,16 @@
  * re-adding two lists by hand.
  *
  * Balance is debits less credits: positive is owed, negative is credit held with the book. The
- * last balance always equals the page's Owed less Credit held (`MinerRow`). Money the engine
- * moves without a date of its own (a tolerance shortfall forgiven, a correction folded into a
- * Statement) is the one `adjustment` row, so nothing is hidden and nothing is double counted.
+ * last balance always equals the page's Owed less Credit held (`MinerRow`). A tolerance shortfall
+ * forgiven is its own `tolerance` row, dated by the payment that closed the day. Only a difference
+ * nothing above explains (a correction folded into a Statement, or a bug) is the one `adjustment`
+ * row, so nothing is hidden and nothing is double counted.
  */
 import type { Adjustment } from './statements';
 import type { MinerDetail } from './bookView';
 
-export type LedgerEntryKind = 'day' | 'payment' | 'correction' | 'writeOff' | 'adjustment';
+export type LedgerEntryKind =
+  'day' | 'payment' | 'correction' | 'writeOff' | 'tolerance' | 'adjustment';
 
 export interface LedgerEntry {
   /** Unique within the ledger. */
@@ -48,7 +50,8 @@ const ORDER: Record<LedgerEntryKind, number> = {
   correction: 1,
   payment: 2,
   writeOff: 2,
-  adjustment: 3,
+  tolerance: 3,
+  adjustment: 4,
 };
 
 const day = (iso: string) => iso.slice(0, 10);
@@ -130,6 +133,38 @@ export function accountLedger(
         credit: w.amount,
         note: w.reason,
       });
+
+  for (const w of detail.dayWriteOffs)
+    drafts.push({
+      key: `tolerance-${w.date}`,
+      kind: 'tolerance',
+      date: day(w.at),
+      at: w.at,
+      debit: 0,
+      credit: w.amount,
+      note: w.date,
+    });
+  // A Statement's tolerance is dated by the last payment that reached it, else its issue date.
+  const paidAt = new Map(detail.payments.map((p) => [p.id, p.at]));
+  for (const w of detail.toleranceWriteOffs) {
+    const at =
+      detail.paymentCredits
+        .filter((c) => c.statementId === w.statementId)
+        .map((c) => paidAt.get(c.paymentId) ?? '')
+        .sort()
+        .at(-1) ||
+      detail.statements.find((s) => s.id === w.statementId)?.issuedAt ||
+      '';
+    if (w.amount >= 1 && at)
+      drafts.push({
+        key: `tolerance-${w.statementId}`,
+        kind: 'tolerance',
+        date: day(at),
+        at,
+        debit: 0,
+        credit: w.amount,
+      });
+  }
 
   drafts.sort(
     (a, b) =>

@@ -1137,11 +1137,25 @@ describe('accountLedger', () => {
     expect(l.notYetBilled).toEqual({ tax: 50_000, days: 1 });
   });
 
-  it('shows what the engine moved without a date as one adjustment row', () => {
+  it('shows a difference nothing explains as one adjustment row', () => {
     const view = buildBookView(running([pay('a', 100_000, '2026-09-17T10:00:00Z')]));
     const detail = minerDetail(view, 'solo:1')!;
     const l = accountLedger({ ...detail, row: { ...detail.row, owed: 150_000 } }, [], true);
     expect(l.entries.at(-1)).toMatchObject({ kind: 'adjustment', credit: 50_000 });
     expect(l.balance).toBe(150_000);
+  });
+
+  it('gives each day a tolerance forgave its own dated row, and no adjustment', () => {
+    // Day 15 is 100,000 and day 16 is 200,000. Paying 299,000 leaves day 16 1,000 short (0.5%).
+    const view = buildBookView(running([pay('a', 299_000, '2026-09-17T10:00:00Z')]));
+    const l = ledgerOf(view);
+    expect(l.entries.map((e) => [e.kind, e.date, e.credit])).toEqual([
+      ['day', '2026-09-15', 0],
+      ['day', '2026-09-16', 0],
+      ['payment', '2026-09-17', 299_000],
+      ['tolerance', '2026-09-17', 1_000],
+    ]);
+    expect(l.entries.some((e) => e.kind === 'adjustment')).toBe(false);
+    expect(l.balance).toBe(0);
   });
 });

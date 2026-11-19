@@ -887,6 +887,11 @@ export interface MinerDetail {
   paymentCredits: PaymentCredit[];
   /** Tolerance write-offs, derived from `allocatePayments` (amounts are not stored). */
   toleranceWriteOffs: { statementId: string; amount: number }[];
+  /**
+   * A running account's days a tolerance (or money taken back from a day recorded paid) wrote off,
+   * each dated by the last payment that reached the day, oldest first.
+   */
+  dayWriteOffs: { date: string; amount: number; at: string }[];
   /** Lines recorded after payment, never billed (D22). */
   lateWriteOffs: { chargeKey: string; date: string; tax: number }[];
   /** Officer write-offs (#4637), oldest first; `amount` is what each forgave, 0 when nothing was left. */
@@ -894,6 +899,20 @@ export interface MinerDetail {
   dismissals: Dismissal[];
   declarations: Declaration[];
   credit: number;
+}
+
+function dayWriteOffsOf(inner: MinerInternals): MinerDetail['dayWriteOffs'] {
+  if (!inner.running) return [];
+  const paidAt = new Map(inner.payments.map((p) => [p.id, p.at]));
+  const closedAt = new Map<string, string>();
+  for (const p of inner.running.applications.payments) {
+    const at = paidAt.get(p.paymentId);
+    if (at) for (const d of p.days) closedAt.set(d.date, at);
+  }
+  const out: MinerDetail['dayWriteOffs'] = [];
+  for (const [date, d] of inner.running.byDay)
+    if (d.writtenOff >= 1) out.push({ date, amount: d.writtenOff, at: closedAt.get(date) ?? date });
+  return out.sort((a, b) => a.date.localeCompare(b.date));
 }
 
 export function minerDetail(view: BookView, minerId: string): MinerDetail | undefined {
@@ -918,6 +937,7 @@ export function minerDetail(view: BookView, minerId: string): MinerDetail | unde
     statements: [...inner.statements].sort((a, b) => b.issuedAt.localeCompare(a.issuedAt)),
     paymentCredits: inner.allocation.paymentCredits,
     toleranceWriteOffs: inner.allocation.writeOffs,
+    dayWriteOffs: dayWriteOffsOf(inner),
     lateWriteOffs: inner.draft.writtenOff.map((w) => ({
       chargeKey: w.chargeKey,
       date: w.date,
