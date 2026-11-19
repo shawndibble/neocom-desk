@@ -895,3 +895,117 @@ describe('ownOrderIdSet', () => {
     expect(ownOrderIdSet({ entries: [], skipped: [] }).size).toBe(0);
   });
 });
+
+describe('buildOpenOrderRows — own alt rivals', () => {
+  const alt = makeEntry({
+    characterId: 2,
+    characterName: 'Alt Two',
+    orders: [makeOrder({ order_id: 2, price: 900 })],
+  });
+  const mine = makeEntry({ orders: [makeOrder({ order_id: 1, price: 1000 })] });
+  const rowOf = (rows: OpenOrderRow[], id: number) => rows.find((r) => r.orderId === id)!;
+
+  it('station tier: a best price equal to an own alt order is healthy and names the alt', () => {
+    const rows = buildOpenOrderRows(
+      baseInput({
+        snapshot: makeSnapshot([mine, alt]),
+        skillsByCharacter: new Map([
+          [1, ZERO_SKILLS],
+          [2, ZERO_SKILLS],
+        ]),
+        stationPrices: new Map([
+          ['60003760:100', { sellMin: 900, buyMax: null, sellVolume: 5, buyVolume: 0 }],
+        ]),
+      })
+    );
+    const row = rowOf(rows, 1);
+    expect(row.station.beatsMe).toBe(false);
+    expect(row.problem).toBe('healthy');
+    expect(row.ownRival).toEqual({ characterName: 'Alt Two', price: 900 });
+  });
+
+  it('station tier: a best price below every own order still flags', () => {
+    const rows = buildOpenOrderRows(
+      baseInput({
+        snapshot: makeSnapshot([mine, alt]),
+        skillsByCharacter: new Map([
+          [1, ZERO_SKILLS],
+          [2, ZERO_SKILLS],
+        ]),
+        stationPrices: new Map([
+          ['60003760:100', { sellMin: 800, buyMax: null, sellVolume: 5, buyVolume: 0 }],
+        ]),
+      })
+    );
+    expect(rowOf(rows, 1).station.beatsMe).toBe(true);
+    expect(rowOf(rows, 1).ownRival).toBeUndefined();
+  });
+
+  it('deep tier: a cheaper order from a loaded alt is not a rival', () => {
+    const rows = buildOpenOrderRows(
+      baseInput({
+        snapshot: makeSnapshot([mine, alt]),
+        skillsByCharacter: new Map([
+          [1, ZERO_SKILLS],
+          [2, ZERO_SKILLS],
+        ]),
+        deepCompetition: new Map([
+          [
+            1,
+            deepEntry([
+              {
+                orderId: 2,
+                price: 900,
+                locationId: 60003760,
+                systemId: 30000142,
+                volumeRemain: 5,
+                isBuyOrder: false,
+              },
+            ]),
+          ],
+        ]),
+      })
+    );
+    const row = rowOf(rows, 1);
+    expect(row.deepUndercut?.worst).toBeNull();
+    expect(row.problem).toBe('healthy');
+    expect(row.ownRival).toEqual({ characterName: 'Alt Two', price: 900 });
+  });
+
+  it('deep tier: a real competitor still flags beside the alt', () => {
+    const rows = buildOpenOrderRows(
+      baseInput({
+        snapshot: makeSnapshot([mine, alt]),
+        skillsByCharacter: new Map([
+          [1, ZERO_SKILLS],
+          [2, ZERO_SKILLS],
+        ]),
+        deepCompetition: new Map([
+          [
+            1,
+            deepEntry([
+              {
+                orderId: 2,
+                price: 900,
+                locationId: 60003760,
+                systemId: 30000142,
+                volumeRemain: 5,
+                isBuyOrder: false,
+              },
+              {
+                orderId: 77,
+                price: 950,
+                locationId: 60003760,
+                systemId: 30000142,
+                volumeRemain: 5,
+                isBuyOrder: false,
+              },
+            ]),
+          ],
+        ]),
+      })
+    );
+    expect(rowOf(rows, 1).deepUndercut?.worst?.price).toBe(950);
+    expect(rowOf(rows, 1).problem).toBe('undercutStation');
+  });
+});
