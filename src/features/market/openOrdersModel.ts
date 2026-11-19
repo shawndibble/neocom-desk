@@ -265,7 +265,8 @@ interface OwnOrderIndex {
   ids: ReadonlySet<number>;
 }
 
-function ownSlotKey(locationId: number, typeId: number, isBuyOrder: boolean): string {
+/** The `(location, type, side)` slot an own order sits in; shared with the undercut notification. */
+export function ownSlotKey(locationId: number, typeId: number, isBuyOrder: boolean): string {
   return `${locationId}:${typeId}:${isBuyOrder ? 'buy' : 'sell'}`;
 }
 
