@@ -18617,7 +18617,7 @@
       },
       "ledger": {
         "title": "Account ledger",
-        "hint": "Moon tax and payments in date order, balance after each. Newest first.",
+        "hint": "Moon tax and payments in date order, balance after each (a minus is owed). Newest first.",
         "empty": "Nothing billed or paid yet.",
         "owed": "owed",
         "credit": "credit",

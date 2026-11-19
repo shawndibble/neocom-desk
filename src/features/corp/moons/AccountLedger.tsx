@@ -171,19 +171,14 @@ export function AccountLedger({
     },
   ];
 
+  // A minus is what the Miner owes; a plain figure is credit they hold with the book.
   const balanceText = (balance: number) =>
     Math.abs(balance) < 1 ? (
       <span className="text-text-dim">{isk(0)}</span>
     ) : balance > 0 ? (
-      <span className="text-isk-neg">
-        {isk(balance)}
-        <span className="ml-1 text-xs text-text-dim">{t('corpTaxBook.moons.ledger.owed')}</span>
-      </span>
+      <span className="text-isk-neg">{`\u2212${isk(balance)}`}</span>
     ) : (
-      <span className="text-isk-pos">
-        {isk(-balance)}
-        <span className="ml-1 text-xs text-text-dim">{t('corpTaxBook.moons.ledger.credit')}</span>
-      </span>
+      <span className="text-isk-pos">{isk(-balance)}</span>
     );
 
   return (
