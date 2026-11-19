@@ -23,6 +23,8 @@ export interface StockAlertEntry {
   listed: number | null;
   /** Units in the hangar at the market's station, for the alert to point at. */
   inHangar: number;
+  /** Units the market's running manufacturing and reaction jobs will deliver. Absent in snapshots saved before it existed. */
+  inJobs?: number;
 }
 
 export interface StockAlertSnapshot {
@@ -41,6 +43,7 @@ export interface StockBelowTargetFire {
   target: number;
   listed: number;
   inHangar: number;
+  inJobs: number;
   status: Extract<StockStatus, 'low' | 'out'>;
 }
 
@@ -74,6 +77,7 @@ export function diffStockBelowTarget(
       target: entry.target,
       listed: entry.listed,
       inHangar: entry.inHangar,
+      inJobs: entry.inJobs ?? 0,
       status,
     });
   }

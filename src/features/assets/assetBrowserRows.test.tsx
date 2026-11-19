@@ -244,6 +244,24 @@ describe('estimated value cell', () => {
   });
 });
 
+describe('contract ask estimate (issue #6431)', () => {
+  it('shows a marked figure with its note in place of the dash, in the dim colour', () => {
+    const { container } = renderItemRow({
+      estimatedValue: 0,
+      askEstimate: { value: 90_000_000_000, hint: 'Ask median, 6 contracts.' },
+    });
+    expect(screen.getByTestId('ask-estimate')).toHaveTextContent('assets.askEstimate.marker');
+    expect(screen.getByText('Ask median, 6 contracts.')).toBeInTheDocument();
+    expect(container.querySelector('.text-text-faint')).not.toBeNull();
+    expect(container.querySelector('.text-isk-pos')).toBeNull();
+  });
+
+  it('never replaces a real value', () => {
+    renderItemRow({ estimatedValue: 1000, askEstimate: { value: 5, hint: 'x' } });
+    expect(screen.queryByTestId('ask-estimate')).toBeNull();
+  });
+});
+
 describe('in-game names', () => {
   it('puts the in-game name first and the type dim beneath, on an item row', () => {
     renderItemRow({ name: 'Station Container', gameName: 'Loot can' });

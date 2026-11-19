@@ -89,6 +89,14 @@ export interface StationTier {
   gapIsk: number;
   /** `gapIsk` as a percentage of my own price. Same caveat as `gapIsk`. */
   gapPct: number;
+  /** Set when `bestPrice` beats me but equals one of the account's own other orders: an alt, not a competitor, so `beatsMe` is false. */
+  ownRival?: OwnRival;
+}
+
+/** The account's own Character holding the order that is cheaper than this one. */
+export interface OwnRival {
+  characterName: string;
+  price: number;
 }
 
 export interface OpenOrderRow {
@@ -113,6 +121,8 @@ export interface OpenOrderRow {
   /** Why the wallet could not supply a cost basis, when the order was eligible for one. */
   walletGap?: WalletBasisGap | null;
   station: StationTier;
+  /** Another Character of this account already lists this cheaper (deep book first, else the station tier). Never a problem, so it only explains an otherwise healthy row. */
+  ownRival?: OwnRival;
   /** Present only when the deep (system/region) check has been run for this order. */
   deepUndercut: UndercutResult | null;
   /** The tightest scope that beats me, from whichever tiers are known. */
@@ -217,16 +227,67 @@ export interface BuildRowsInput {
 function buildStationTier(
   price: number,
   isBuyOrder: boolean,
-  aggregate: HubAggregate | undefined
+  aggregate: HubAggregate | undefined,
+  ownAtStation: readonly OwnListing[]
 ): StationTier {
   const bestPrice = aggregate ? (isBuyOrder ? aggregate.buyMax : aggregate.sellMin) : null;
   if (bestPrice === null) {
     return { bestPrice: null, beatsMe: false, gapIsk: 0, gapPct: 0 };
   }
-  const beatsMe = isBuyOrder ? bestPrice > price : bestPrice < price;
+  const beatsPrice = isBuyOrder ? bestPrice > price : bestPrice < price;
   const gapIsk = Math.abs(bestPrice - price);
   const gapPct = price > 0 ? (gapIsk / price) * 100 : 0;
-  return { bestPrice, beatsMe, gapIsk, gapPct };
+  // A tie with one of the account's own orders reads as that alt (decision on #6432).
+  const alt = beatsPrice ? ownAtStation.find((o) => o.price === bestPrice) : undefined;
+  if (alt) {
+    return {
+      bestPrice,
+      beatsMe: false,
+      gapIsk,
+      gapPct,
+      ownRival: { characterName: alt.characterName, price: alt.price },
+    };
+  }
+  return { bestPrice, beatsMe: beatsPrice, gapIsk, gapPct };
+}
+
+/** One of the account's own loaded orders, with who holds it. */
+interface OwnListing {
+  orderId: number;
+  characterName: string;
+  price: number;
+}
+
+/** Own orders by `${locationId}:${typeId}:${side}` and by order id. */
+interface OwnOrderIndex {
+  byOrderId: ReadonlyMap<number, OwnListing>;
+  bySlot: ReadonlyMap<string, readonly OwnListing[]>;
+  ids: ReadonlySet<number>;
+}
+
+/** The `(location, type, side)` slot an own order sits in; shared with the undercut notification. */
+export function ownSlotKey(locationId: number, typeId: number, isBuyOrder: boolean): string {
+  return `${locationId}:${typeId}:${isBuyOrder ? 'buy' : 'sell'}`;
+}
+
+function buildOwnOrderIndex(snapshot: OpenOrdersSnapshot): OwnOrderIndex {
+  const byOrderId = new Map<number, OwnListing>();
+  const bySlot = new Map<string, OwnListing[]>();
+  for (const entry of snapshot.entries) {
+    for (const order of entry.orders) {
+      const listing: OwnListing = {
+        orderId: order.order_id,
+        characterName: entry.characterName,
+        price: order.price,
+      };
+      byOrderId.set(order.order_id, listing);
+      const key = ownSlotKey(order.location_id, order.type_id, order.is_buy_order ?? false);
+      const list = bySlot.get(key);
+      if (list) list.push(listing);
+      else bySlot.set(key, [listing]);
+    }
+  }
+  return { byOrderId, bySlot, ids: new Set(byOrderId.keys()) };
 }
 
 /**
@@ -253,7 +314,8 @@ function deriveSystemId(
 function buildDeepUndercut(
   order: MarketOrder,
   isBuyOrder: boolean,
-  competitors: readonly CompetingOrder[]
+  competitors: readonly CompetingOrder[],
+  ownOrderIds: ReadonlySet<number>
 ): UndercutResult {
   const systemId = deriveSystemId(order.order_id, order.location_id, competitors);
   const mine: MyOrder = {
@@ -266,13 +328,35 @@ function buildDeepUndercut(
   };
   const scopesChecked: UndercutScope[] =
     systemId !== null ? ['station', 'system', 'region'] : ['station', 'region'];
-  return findUndercut(mine, competitors, scopesChecked);
+  return findUndercut(mine, competitors, scopesChecked, ownOrderIds);
+}
+
+/** The cheapest (best for the rival) own other-Character order in the fetched books that beats this one. */
+function findOwnRival(
+  order: MarketOrder,
+  isBuyOrder: boolean,
+  own: OwnOrderIndex,
+  competitors: readonly CompetingOrder[]
+): OwnRival | undefined {
+  let best: OwnListing | undefined;
+  for (const c of competitors) {
+    if (c.orderId === order.order_id || c.isBuyOrder !== isBuyOrder) continue;
+    const listing = own.byOrderId.get(c.orderId);
+    if (!listing) continue;
+    const beats = isBuyOrder ? c.price > order.price : c.price < order.price;
+    if (!beats) continue;
+    if (!best || (isBuyOrder ? c.price > best.price : c.price < best.price)) {
+      best = { ...listing, price: c.price };
+    }
+  }
+  return best ? { characterName: best.characterName, price: best.price } : undefined;
 }
 
 function buildRow(
   entry: CharacterOpenOrders,
   order: MarketOrder,
-  input: BuildRowsInput
+  input: BuildRowsInput,
+  own: OwnOrderIndex
 ): OpenOrderRow {
   const {
     typeNames,
@@ -291,7 +375,10 @@ function buildRow(
 
   const isBuyOrder = order.is_buy_order ?? false;
   const aggregate = stationPrices.get(stationPriceKey(order.location_id, order.type_id));
-  const station = buildStationTier(order.price, isBuyOrder, aggregate);
+  const ownAtStation = (
+    own.bySlot.get(ownSlotKey(order.location_id, order.type_id, isBuyOrder)) ?? []
+  ).filter((o) => o.orderId !== order.order_id);
+  const station = buildStationTier(order.price, isBuyOrder, aggregate, ownAtStation);
 
   const deepEntry = deepCompetition?.get(order.order_id) ?? null;
   const structureEntry = structureCompetition?.get(order.location_id) ?? null;
@@ -302,11 +389,18 @@ function buildRow(
     : [];
   const deepUndercut =
     deepEntry || structureEntry
-      ? buildDeepUndercut(order, isBuyOrder, [
-          ...(deepEntry?.competitors ?? []),
-          ...structureCompetitors,
-        ])
+      ? buildDeepUndercut(
+          order,
+          isBuyOrder,
+          [...(deepEntry?.competitors ?? []), ...structureCompetitors],
+          own.ids
+        )
       : null;
+  const ownRival =
+    findOwnRival(order, isBuyOrder, own, [
+      ...(deepEntry?.competitors ?? []),
+      ...structureCompetitors,
+    ]) ?? station.ownRival;
   const deepTruncated = (deepEntry?.truncated ?? false) || (structureEntry?.truncated ?? false);
 
   // Deep check wins outright when it ran, even when it found nothing — it
@@ -376,6 +470,7 @@ function buildRow(
     costBasis,
     walletGap: costBasis ? null : (walletBasisGaps?.get(order.order_id) ?? null),
     station,
+    ...(ownRival ? { ownRival } : {}),
     deepUndercut,
     worstScope,
     problem,
@@ -411,9 +506,10 @@ export function compareOpenOrderRowsWorstFirst(a: OpenOrderRow, b: OpenOrderRow)
  */
 export function buildOpenOrderRows(input: BuildRowsInput): OpenOrderRow[] {
   const rows: OpenOrderRow[] = [];
+  const own = buildOwnOrderIndex(input.snapshot);
   for (const entry of input.snapshot.entries) {
     for (const order of entry.orders) {
-      rows.push(buildRow(entry, order, input));
+      rows.push(buildRow(entry, order, input, own));
     }
   }
   return rows.sort(compareOpenOrderRowsWorstFirst);

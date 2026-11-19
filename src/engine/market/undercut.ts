@@ -115,16 +115,19 @@ function buildRival(
  * Resolves the worst rival for `mine` within each requested scope, plus the
  * single tightest one. Returns `worst: null` (and an empty `byScope`) for a
  * non-positive `mine.price`, since `gapPct` has no sound value to divide by.
+ * `ownOrderIds` are orders held by the account's other Characters: never rivals.
  */
 export function findUndercut(
   mine: MyOrder,
   competitors: readonly CompetingOrder[],
-  scopesChecked: readonly UndercutScope[] = ALL_SCOPES
+  scopesChecked: readonly UndercutScope[] = ALL_SCOPES,
+  ownOrderIds: ReadonlySet<number> = new Set()
 ): UndercutResult {
   if (!(mine.price > 0)) return { worst: null, byScope: {} };
 
   const sameSideRivals = competitors.filter(
-    (c) => c.isBuyOrder === mine.isBuyOrder && c.orderId !== mine.orderId
+    (c) =>
+      c.isBuyOrder === mine.isBuyOrder && c.orderId !== mine.orderId && !ownOrderIds.has(c.orderId)
   );
   const beating = sameSideRivals.filter((c) =>
     mine.isBuyOrder ? c.price > mine.price : c.price < mine.price

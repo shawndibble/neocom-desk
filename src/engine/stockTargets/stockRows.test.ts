@@ -37,6 +37,32 @@ describe('stockStatus', () => {
   });
 });
 
+describe('buildStockRows with running jobs', () => {
+  it('takes jobs off To source after the hangar, and leaves status on Listed', () => {
+    const [row] = buildStockRows([
+      input({ typeId: 1, target: 100, listed: 0, inHangar: 30, inJobs: 50, price: 10 }),
+    ]);
+    expect(row).toMatchObject({
+      status: 'out',
+      shortfall: 100,
+      fromHangar: 30,
+      fromJobs: 50,
+      toSource: 20,
+      costToFill: 200,
+    });
+  });
+
+  it('never takes To source below zero when jobs overshoot', () => {
+    const [row] = buildStockRows([input({ typeId: 1, target: 10, inJobs: 500 })]);
+    expect(row).toMatchObject({ fromJobs: 10, toSource: 0, costToFill: 0 });
+  });
+
+  it('counts jobs only against the Shortfall, so a stocked row is untouched', () => {
+    const [row] = buildStockRows([input({ typeId: 1, target: 10, listed: 10, inJobs: 5 })]);
+    expect(row).toMatchObject({ shortfall: 0, fromJobs: 0, toSource: 0, status: 'ok' });
+  });
+});
+
 describe('buildStockRows', () => {
   it('splits the Shortfall into what the hangar covers and what must be bought or built', () => {
     const [row] = buildStockRows([
@@ -50,6 +76,8 @@ describe('buildStockRows', () => {
       price: 6000,
       shortfall: 680,
       fromHangar: 300,
+      inJobs: 0,
+      fromJobs: 0,
       toSource: 380,
       fill: 0.15,
       status: 'low',

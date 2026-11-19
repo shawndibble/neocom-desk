@@ -17,6 +17,7 @@ import type { CharacterAsset } from '@/esi/endpoints';
 import type { AbyssalAssetEstimates } from '@/features/abyssal/useAbyssalAssetEstimates';
 import { abyssalValueHint } from '@/features/abyssal/abyssalValueHint';
 import { OreItemMenu } from '@/features/assets/oreDecision/OreItemMenu';
+import { askEstimateFigure, type AskEstimateFigure } from '@/features/assets/assetAskFigure';
 import {
   ContainerRow,
   ItemRow,
@@ -108,6 +109,7 @@ export function NodeItemRow({
   unitVolume,
   estimatedValue,
   valueHint,
+  askEstimate,
   stockUnitCost,
   showStockCost,
   characterBadge,
@@ -126,6 +128,7 @@ export function NodeItemRow({
   unitVolume: number | undefined;
   estimatedValue: number;
   valueHint?: string;
+  askEstimate?: AskEstimateFigure;
   stockUnitCost: ComponentProps<typeof ItemRow>['stockUnitCost'];
   showStockCost: boolean;
   characterBadge: string | null;
@@ -142,6 +145,7 @@ export function NodeItemRow({
       unitVolume={unitVolume}
       estimatedValue={estimatedValue}
       valueHint={valueHint}
+      askEstimate={askEstimate}
       stockUnitCost={stockUnitCost}
       showStockCost={showStockCost}
       characterBadge={characterBadge}
@@ -264,6 +268,7 @@ function SearchMatchRow({
   const navigate = useNavigate();
   const { asset, name } = match;
   const valueHint = useAbyssalValueHint(asset, actions.abyssal, t);
+  const searchValue = assetStackValue(asset, actions.priceByTypeId, actions.itemValueByItemId);
   const rootStationId = rootStationIdFor(asset);
   // The trail's first segment is the station: its Place Nickname, display only.
   const trail = trailFor(asset);
@@ -298,7 +303,8 @@ function SearchMatchRow({
       name={name}
       gameName={match.gameName}
       quantity={asset.quantity}
-      estimatedValue={assetStackValue(asset, actions.priceByTypeId, actions.itemValueByItemId)}
+      estimatedValue={searchValue}
+      askEstimate={askEstimateFigure(asset, actions.askEstimateByTypeId, searchValue, t)}
       trail={trail}
       security={rootStationId === null ? undefined : securityForStation(rootStationId)}
       href={href}
@@ -413,6 +419,7 @@ function NodeRowView({
       unitVolume={actions.volumeByTypeId.get(asset.type_id)}
       estimatedValue={estimatedValue}
       valueHint={valueHint}
+      askEstimate={askEstimateFigure(asset, actions.askEstimateByTypeId, estimatedValue, t)}
       stockUnitCost={actions.stockCostByTypeId?.get(asset.type_id)?.unitCost}
       showStockCost={actions.stockCostByTypeId !== null}
       characterBadge={badge}

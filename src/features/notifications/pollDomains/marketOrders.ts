@@ -1,5 +1,7 @@
 import { orderExpiry } from '@/engine/market/orderHealth';
 import { loadOrders, loadOrderHistory } from '@/features/character/orders';
+import { loadAllCharactersOpenOrders } from '@/features/market/openOrdersData';
+import { ownSlotKey } from '@/features/market/openOrdersModel';
 import { UPWELL_STRUCTURE_ID_FLOOR } from '@/esi/locationIds';
 import { classifyStationUndercut } from '@/engine/market/stationUndercutState';
 import { getStationPrices, type HubAggregate } from '@/market/prices';
@@ -205,10 +207,28 @@ export const marketOrderUndercutDomain = defineDomain<
       }
     );
 
+    // Prices of the account's other orders, so an alt's cheaper listing is not a rival (#6432).
+    // Unreadable means no exclusion: a failed read must not hide a real undercut.
+    const ownSnapshot = await loadAllCharactersOpenOrders().catch(() => null);
+    const ownPricesBySlot = new Map<string, number[]>();
+    for (const entry of ownSnapshot?.entries ?? []) {
+      for (const own of entry.orders) {
+        const key = ownSlotKey(own.location_id, own.type_id, own.is_buy_order === true);
+        const list = ownPricesBySlot.get(key);
+        if (list) list.push(own.price);
+        else ownPricesBySlot.set(key, [own.price]);
+      }
+    }
+
     return npcOrders.map((order): OrderUndercutRawEntry => {
       const isBuyOrder = order.is_buy_order === true;
       const aggregate = pricesByStation.get(order.location_id)?.get(order.type_id) ?? null;
-      const { state, rivalPrice } = classifyStationUndercut(order.price, isBuyOrder, aggregate);
+      const { state, rivalPrice } = classifyStationUndercut(
+        order.price,
+        isBuyOrder,
+        aggregate,
+        ownPricesBySlot.get(ownSlotKey(order.location_id, order.type_id, isBuyOrder))
+      );
       return {
         orderId: order.order_id,
         typeId: order.type_id,

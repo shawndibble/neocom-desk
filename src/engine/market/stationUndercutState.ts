@@ -30,13 +30,15 @@ const UNKNOWN: StationUndercutResult = { state: 'unknown', rivalPrice: null };
 export function classifyStationUndercut(
   myPrice: number,
   isBuyOrder: boolean,
-  aggregate: StationSidePrices | null
+  aggregate: StationSidePrices | null,
+  /** Prices of the account's own OTHER orders for this type, side and station: a best price equal to one is an alt, not a rival. */
+  ownPrices: readonly number[] = []
 ): StationUndercutResult {
   if (!aggregate) return UNKNOWN;
   const bestPrice = isBuyOrder ? aggregate.buyMax : aggregate.sellMin;
   if (bestPrice === null) return UNKNOWN;
   const beatsMe = isBuyOrder ? bestPrice > myPrice : bestPrice < myPrice;
-  return beatsMe
+  return beatsMe && !ownPrices.includes(bestPrice)
     ? { state: 'beaten', rivalPrice: bestPrice }
     : { state: 'clear', rivalPrice: bestPrice };
 }

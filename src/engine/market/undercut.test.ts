@@ -211,3 +211,25 @@ describe('findUndercut — invalid input', () => {
     expect(result.worst).toBeNull();
   });
 });
+
+describe('findUndercut — ignored own orders', () => {
+  it('does not count a rival whose order id the account owns', () => {
+    const result = findUndercut(
+      mySell,
+      [rival({ orderId: 50, price: 90 })],
+      undefined,
+      new Set([50])
+    );
+    expect(result.worst).toBeNull();
+  });
+
+  it('still flags a genuine competitor beside an ignored alt order', () => {
+    const result = findUndercut(
+      mySell,
+      [rival({ orderId: 50, price: 80 }), rival({ orderId: 51, price: 95 })],
+      undefined,
+      new Set([50])
+    );
+    expect(result.worst?.price).toBe(95);
+  });
+});
