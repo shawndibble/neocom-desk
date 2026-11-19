@@ -594,55 +594,8 @@ describe('NeedsYouQueue (#6207)', () => {
   });
 });
 
-describe('NeedsYouQueue: a Statement run is due (#6208)', () => {
-  it('lists the closed periods nobody has billed and links to the Statements tab', async () => {
-    const { buildBookView } = await import('@/engine/corpTaxBook/bookView');
-    const view = buildBookView({
-      corporationId: 98000001,
-      now: '2026-10-18T14:00:00Z',
-      startDate: '2026-08-01',
-      graceHours: 6,
-      minimumStatement: 0,
-      overdueDays: 14,
-      cadence: { kind: 'monthly' },
-      hubId: 'jita',
-      oreForm: 'compressed',
-      structureExpiryHours: {},
-      lastSyncedAt: '2026-10-18T12:00:00Z',
-      rates: [{ scope: 'corp', pct: 10, effectiveFrom: '2026-08-01' }],
-      entries: ['2026-08-10', '2026-09-10'].map((date) => ({
-        characterId: 7,
-        recordedCorporationId: 98000001,
-        structureId: 1001,
-        date,
-        oreLines: [{ typeId: 45490, quantity: 1000 }],
-      })),
-      miners: [],
-      statements: [],
-      payments: [],
-      dismissals: [],
-      declarations: [],
-      adjustments: [],
-      extractions: [],
-      paidStatementIds: new Set(),
-      pricesOn: () => ({ prices: new Map([[45490, 1000]]), sources: new Map() }),
-    });
-    renderQueue([], { view });
-    expect(screen.getByRole('heading', { name: 'Needs you · 1' })).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: 'Statements ready for Aug 2026 and Sep 2026' })
-    ).toHaveAttribute('href', '/corp/moons/statements');
-    expect(screen.getByText(/One run sends them all, oldest first/)).toBeInTheDocument();
-  });
-
-  it('has no run card while every closed period is on a Statement', () => {
-    renderQueue([]);
-    expect(screen.queryByText(/Statements ready/)).not.toBeInTheDocument();
-  });
-});
-
-describe('NeedsYouQueue: late notices are due on a running account (#6294)', () => {
-  it('shows one notice card in place of the run, linking to the Statements tab', async () => {
+describe('NeedsYouQueue: late notices are due (#6294)', () => {
+  it('shows one notice card, linking to the Late notices tab', async () => {
     const { buildBookView } = await import('@/engine/corpTaxBook/bookView');
     const view = buildBookView({
       corporationId: 98000001,
@@ -683,6 +636,5 @@ describe('NeedsYouQueue: late notices are due on a running account (#6294)', () 
       '/corp/moons/statements'
     );
     expect(screen.getByText(/owe 20,000,000 between them/)).toBeInTheDocument();
-    expect(screen.queryByText(/Statements ready/)).not.toBeInTheDocument();
   });
 });

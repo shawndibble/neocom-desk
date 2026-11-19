@@ -1,7 +1,7 @@
 /**
  * The Moons nav dot (#6208): a Corp Tax Book editor sees it on the corp Moons
  * entry while "Needs you" has a card or Automatic sync has stopped, so a due
- * Statement run, an Overdue Miner, an Unmatched donation or a dead schedule
+ * late notice, an Overdue Miner, an Unmatched donation or a dead schedule
  * reaches them outside the Moons page.
  *
  * The Moons page publishes what it found (`useMoonsAttentionPublisher`) into Dexie, per
@@ -9,7 +9,7 @@
  * dot never shows for a viewer. While the app is open, a shell poll (`useMoonsAttentionPoll`)
  * recounts for a Character whose editor visit is on record: the schedule's status doc, and the
  * book's Needs you as the Overview counts it (`moonsAttentionCount.ts`), so a declaration,
- * dispute or due Statement run that arrives after the visit lights the dot, and one another
+ * dispute or due late notice that arrives after the visit lights the dot, and one another
  * officer handled clears it. The scheduled sync's own push alert covers a closed app.
  */
 import { useEffect } from 'react';

@@ -31,22 +31,6 @@ type LoadState =
   | { status: 'gone' }
   | { status: 'failed' };
 
-/** The cadence word for "Your weekly Statement still comes": from the book's setting, else the period's length. */
-function cadenceKey(
-  cadence: VerifyPayload['terms']['cadence'],
-  start: string,
-  end: string
-): 'monthly' | 'weekly' | 'fortnightly' | 'regular' {
-  if (cadence?.kind === 'monthly') return 'monthly';
-  const days =
-    cadence?.kind === 'days'
-      ? cadence.days
-      : Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 864e5) + 1;
-  if (days === 7) return 'weekly';
-  if (days === 14) return 'fortnightly';
-  return days >= 28 && days <= 31 ? 'monthly' : 'regular';
-}
-
 /**
  * The guest verify page (issue #4066, D27, mockup step 19 option B): a
  * Statement's lines with their pricing, its terms with dates and the payments
@@ -316,13 +300,6 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
                 days: overdueDays,
               })}
             </Term>
-            {terms.minimumStatement !== undefined && (
-              <Term label={t('corpTaxBook.verify.term.minimum')}>
-                {t('corpTaxBook.verify.minimumValue', {
-                  amount: isk(terms.minimumStatement),
-                })}
-              </Term>
-            )}
             <Term label={t('corpTaxBook.verify.term.paying')}>
               {t('corpTaxBook.verify.payingValue', { corp })}
             </Term>
@@ -330,11 +307,7 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
           </dl>
         </Panel>
         <div className="order-4 md:order-none md:col-start-2 md:row-start-3">
-          <StopReminders
-            token={token}
-            initial={payload.remindersStopped}
-            cadence={cadenceKey(terms.cadence, statement.periodStart, statement.periodEnd)}
-          />
+          <StopReminders token={token} initial={payload.remindersStopped} />
         </div>
       </div>
     </>
@@ -350,16 +323,8 @@ function Term({ label, children }: { label: string; children: React.ReactNode })
   );
 }
 
-/** The one thing a miner can change here: the next Statement still comes either way. */
-function StopReminders({
-  token,
-  initial,
-  cadence,
-}: {
-  token: string;
-  initial: boolean;
-  cadence: ReturnType<typeof cadenceKey>;
-}) {
+/** The one thing a miner can change here: a late notice still comes if they fall behind. */
+function StopReminders({ token, initial }: { token: string; initial: boolean }) {
   const { t } = useTranslation();
   const [stopped, setStopped] = useState(initial);
   const [saving, setSaving] = useState(false);
@@ -393,11 +358,7 @@ function StopReminders({
         />
         <span className="text-sm">
           {t('corpTaxBook.verify.stop.label')}
-          <span className="block text-xs text-text-dim">
-            {t('corpTaxBook.verify.stop.hint', {
-              cadence: t(`corpTaxBook.verify.cadence.${cadence}`),
-            })}
-          </span>
+          <span className="block text-xs text-text-dim">{t('corpTaxBook.verify.stop.hint')}</span>
         </span>
       </label>
       {failed && <InlineError>{t('corpTaxBook.verify.stop.failed')}</InlineError>}

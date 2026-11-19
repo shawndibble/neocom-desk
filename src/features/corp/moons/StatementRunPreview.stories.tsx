@@ -3,16 +3,16 @@ import { useState } from 'react';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { BookProvider } from './BookContext';
-import { BOOK_CONTEXT, CORP_ID } from './corpBookFixture';
+import { CORP_ID, NOTICE_BOOK_CONTEXT } from './corpBookFixture';
 import { StatementRun } from './StatementRun';
 
 /** The corporation's name the mail is signed with, so the preview renders instead of "Loading…". */
 function SeededRun() {
   useState(() => {
-    useActiveCharacter.setState({ activeCharacterId: BOOK_CONTEXT.characterId });
+    useActiveCharacter.setState({ activeCharacterId: NOTICE_BOOK_CONTEXT.characterId });
     usePublicInfo.setState({
       byCharacterId: {
-        [BOOK_CONTEXT.characterId]: {
+        [NOTICE_BOOK_CONTEXT.characterId]: {
           corporationName: 'Ore & Glory',
           allianceName: null,
           corporationId: CORP_ID,
@@ -22,7 +22,7 @@ function SeededRun() {
     return null;
   });
   return (
-    <BookProvider value={BOOK_CONTEXT}>
+    <BookProvider value={NOTICE_BOOK_CONTEXT}>
       <div className="mx-auto max-w-page px-4 py-4">
         <StatementRun />
       </div>
@@ -31,7 +31,7 @@ function SeededRun() {
 }
 
 /**
- * The Statement run on the sample book. On a desktop the chosen Miner's mail sits
+ * The late notice run on the sample book. On a desktop the chosen Miner's mail sits
  * beside the step, picked by a labelled "Preview for"; on a phone "Preview mail"
  * opens it in a dialog.
  */

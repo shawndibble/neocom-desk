@@ -4772,7 +4772,7 @@
         "tab": "Corporation",
         "board": "The Corp Board is a board of widgets you pick and size: deadlines, structure fuel, moon chunks, jobs, wallet, members and more.",
         "pages": "Members, Corp Wallet and Corp Assets each have their own page, with role audits and Stock Targets.",
-        "moons": "Moons keeps the Corp Tax Book: what each corp member mined at your refineries, their Statements, and what is paid.",
+        "moons": "Moons keeps the Corp Tax Book: what each corp member mined at your refineries, the late notices sent to them, and what is paid.",
         "access": "SRP lets a pilot file a claim from their own killmail. Officer pages appear only with a Corp Role, and corporation data is read only for the roles you hold."
       },
       "comms": {
@@ -17939,12 +17939,6 @@
       "theCorp": "the corporation",
       "refinery": "Refinery {{id}}",
       "eyebrow": "{{corp}} · Statement {{period}} · issued {{issued}}",
-      "cadence": {
-        "monthly": "monthly",
-        "weekly": "weekly",
-        "fortnightly": "fortnightly",
-        "regular": "next"
-      },
       "closed": "This account is closed. {{corp}} sent a final Statement and will not mail you again.",
       "mined": "What you mined",
       "minedMeta": "{{hub}} buy, {{form}} ore, priced on the day mined",
@@ -17986,7 +17980,6 @@
         "rate": "Rate",
         "price": "Price",
         "due": "Due",
-        "minimum": "Minimum Statement",
         "paying": "Paying",
         "account": "Account"
       },
@@ -17995,7 +17988,6 @@
       "rateOverride": "Some days carry an officer's logged rate correction.",
       "priceBasis": "{{hub}} buy, {{form}} ore, on the day mined",
       "dueValue": "{{date}} ({{days}} days after issue)",
-      "minimumValue": "{{amount}}; smaller balances roll into the next Statement",
       "payingValue": "Donate to {{corp}}; any of your characters counts",
       "grouping": {
         "title": "A character is waiting to join this account",
@@ -18010,7 +18002,7 @@
       },
       "stop": {
         "label": "Stop reminders",
-        "hint": "Your {{cadence}} Statement still comes. Officers can send you at most one reminder per Statement.",
+        "hint": "A late notice still comes if you fall behind. Officers can send you at most one reminder per notice.",
         "failed": "Couldn't save that. Try again."
       }
     },
@@ -18592,11 +18584,6 @@
           "assign": "Assign to a Miner",
           "notTax": "Mark not tax"
         },
-        "runDue": {
-          "title": "Statements ready for {{periods}}",
-          "body_one": "A closed period has Billable days on no Statement, so nobody is billed for it yet. Open Late notices to send the run.",
-          "body_other": "{{count}} closed periods have Billable days on no Statement, so nobody is billed for them yet. One run sends them all, oldest first."
-        },
         "noticesDue": {
           "title_one": "Late notice due for {{count}} Miner",
           "title_other": "Late notices due for {{count}} Miners",
@@ -18847,23 +18834,12 @@
         "showToMembers": "Show to members now"
       },
       "run": {
-        "title": "{{period}} Statements",
-        "titleNone": "Statements",
-        "nothing": "Nothing to send: every Billable day is on a Statement, or the period has not closed yet.",
         "check": "Check",
         "send": "Send",
         "doneStep": "Done",
         "done": "(done)",
-        "statements": "Statements",
         "toSend_one": "{{count}} to send",
         "toSend_other": "{{count}} to send",
-        "balances": "Balances due",
-        "balancesTip": "Carried from earlier Statements plus this period's lines, less credit",
-        "belowMinimum": "Below {{amount}}",
-        "rollIn_one": "{{count}} rolls into the next",
-        "rollIn_other": "{{count}} roll into the next",
-        "creditApplied": "Credit applied",
-        "billable": "Every day in the period is Billable and priced ({{hub}} buy, {{form}})",
         "unmailed_one": "{{count}} earlier Statement was issued but never mailed; it goes with this run",
         "unmailed_other": "{{count}} earlier Statements were issued but never mailed; they go with this run",
         "unmatched": "An Unmatched donation is not on anyone's Statement until it is assigned",
@@ -18877,11 +18853,7 @@
         "loadingCorporation": "Loading corporation name…",
         "sendIntro_one": "{{count}} mail from {{name}}, one per Miner.",
         "sendIntro_other": "{{count}} mails from {{name}}, one per Miner.",
-        "sendButton_one": "Send {{count}} Statement",
-        "sendButton_other": "Send {{count}} Statements",
         "back": "Back",
-        "queued_one": "{{count}} Statement is in the send queue.",
-        "queued_other": "{{count}} Statements are in the send queue.",
         "skipped_one": "{{count}} was already queued or sent.",
         "skipped_other": "{{count}} were already queued or sent.",
         "missingLink_one": "{{count}} has no verify link and was not queued.",

@@ -15,7 +15,6 @@ import {
   StatChips,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { statementForLine } from '@/engine/corpTaxBook/bookView';
 import { mailableAfterClose } from '@/engine/corpTaxBook/closeAccount';
 import { composeStatementMail } from '@/engine/corpTaxBook/statementMail';
 import type { Statement } from '@/engine/corpTaxBook/statements';
@@ -33,10 +32,10 @@ import {
 import { useIsBelowDesktop } from '@/lib/useIsBelowDesktop';
 import { editBook } from '../taxBook/bookClient';
 import { editErrorMessage, useBook } from './useBook';
-import { isk, periodsLabel } from './moonsFormat';
+import { isk } from './moonsFormat';
 import { TRADE_HUBS } from '@/market/hubs';
 import { mailTarget, statementRefineryNames, useCorporationName } from './statementMailing';
-import { plannedNotices, plannedRuns } from './useNeedsYou';
+import { plannedNotices } from './useNeedsYou';
 
 type Step = 'check' | 'send' | 'done';
 
@@ -74,19 +73,16 @@ function StepDot({
 }
 
 /**
- * Check → Send → Done (#4056 steps 10-12). Check shows what the run would
- * send: every closed period not on a Statement yet, oldest first, so a forgotten
- * month goes out with the next (#6208); Send issues each Statement (which creates its verify link, so it must
- * come first) and hands the mails to the queue (#4064), which paces them and
- * shows its own chip on every page. On a desktop the chosen Miner's mail shows
+ * Check → Send → Done (#4056 steps 10-12). Check shows the late notices the run would send
+ * (#6294), plus any earlier Statement whose mail never went out; Send issues each notice (which
+ * creates its verify link, so it must come first) and hands the mails to the queue (#4064), which
+ * paces them and shows its own chip on every page. On a desktop the chosen Miner's mail shows
  * beside Check and Send; below it, "Preview mail" opens it in a dialog.
  */
 export function StatementRun() {
   const { t } = useTranslation();
   const ctx = useBook();
   const { view, names, canEdit, corporationId, characterId, reload, settings } = ctx;
-  // A running account sends late notices instead of a calendar run (#6294).
-  const running = !!view.input.runningAccountFrom;
   const corporationName = useCorporationName();
   const [step, setStep] = useState<Step>('check');
   const [previewId, setPreviewId] = useState<string | null>(null);
@@ -116,22 +112,10 @@ export function StatementRun() {
   /** The officer's own ticks; a Miner they have not touched follows the default (`recentlyMailed`). */
   const [ticks, setTicks] = useState<ReadonlyMap<string, boolean>>(new Map());
 
-  const runs = useMemo(() => plannedRuns(view), [view]);
   const notices = useMemo(
     () => plannedNotices(view, settings.noticeRules),
     [view, settings.noticeRules]
   );
-  /** Every new Statement of the run, oldest period first, with the view it is issued from. */
-  const lines = useMemo(
-    () => runs.flatMap((run) => run.plan.lines.map((line) => ({ run, line }))),
-    [runs]
-  );
-  // A period under the minimum rolls into the next one in the run, so only the last one's count
-  // is still waiting; the balances and credit are the whole run's.
-  const latest = runs.at(-1)?.plan;
-  const totalDue = runs.reduce((sum, run) => sum + run.plan.totalDue, 0);
-  const creditApplied = runs.reduce((sum, run) => sum + run.plan.creditApplied, 0);
-
   // Statements issued earlier whose mail never went out (a closed tab, a refused enqueue).
   const unmailed = useMemo(
     () =>
@@ -150,10 +134,10 @@ export function StatementRun() {
     [view, queue]
   );
 
-  const nothingToDo = runs.length === 0 && notices.length === 0 && unmailed.length === 0;
+  const nothingToDo = notices.length === 0 && unmailed.length === 0;
   const minerRow = (id: string) => view.miners.find((m) => m.id === id)!;
 
-  /** Everything the run will send: newly drafted Statements, then earlier unmailed ones. */
+  /** Everything the run will send: the new late notices, then earlier unmailed Statements. */
   const previews = useMemo(() => {
     const out: {
       key: string;
@@ -162,15 +146,6 @@ export function StatementRun() {
       amountDue: number;
       carried: number;
     }[] = [];
-    for (const { run, line } of lines) {
-      out.push({
-        key: `line:${run.plan.period.start}:${line.minerId}`,
-        minerId: line.minerId,
-        statement: statementForLine(run.view, run.plan, line),
-        amountDue: line.balanceDue,
-        carried: line.carried,
-      });
-    }
     for (const n of notices) {
       out.push({
         key: `notice:${n.minerId}`,
@@ -194,7 +169,7 @@ export function StatementRun() {
       });
     }
     return out;
-  }, [view, lines, notices, unmailed]);
+  }, [view, notices, unmailed]);
 
   /** The last time any Statement of this Miner was mailed, if ever. */
   const lastMailedAt = (minerId: string): number | null => {
@@ -252,9 +227,8 @@ export function StatementRun() {
     if (corporationName === null) return;
     setBusy(true);
     setError(null);
-    // Each period is issued and then queued before the next one starts, so a
-    // failure part-way keeps what was issued (and queued); the next run bills
-    // the remaining periods and offers any Statement whose mail never left.
+    // A failure part-way keeps what was issued (and queued); the next run plans the
+    // remaining notices and offers any Statement whose mail never left.
     const sent = { queued: 0, skipped: 0, missingLink: 0 };
     const queueTargets = async (targets: ReturnType<typeof mailTarget>[]) => {
       if (targets.length === 0) return;
@@ -284,33 +258,6 @@ export function StatementRun() {
             });
           })
       );
-      for (const run of runs) {
-        const targets = [];
-        for (const line of run.plan.lines) {
-          const mail = chosen.has(`line:${run.plan.period.start}:${line.minerId}`);
-          const statement = statementForLine(run.view, run.plan, line);
-          // A guest cannot look names up, so the verify page reads them off the Statement.
-          const refineryNames = statementRefineryNames(statement, names);
-          await editBook(characterId, corporationId, {
-            action: 'issueStatement',
-            statement: {
-              ...statement,
-              corporationName,
-              minerName: names.character(minerRow(line.minerId).mainCharacterId),
-              refineryNames,
-            },
-          });
-          // An unticked Miner's Statement is issued but not mailed: it stays on the "never mailed" list.
-          if (mail)
-            targets.push(
-              mailTarget(ctx, statement, minerRow(line.minerId), {
-                amountDue: line.balanceDue,
-                carried: line.carried,
-              })
-            );
-        }
-        await queueTargets(targets);
-      }
       // Late notices (#6294): each issued (which makes its verify link), then all queued.
       const noticeTargets = [];
       for (const n of notices) {
@@ -365,20 +312,10 @@ export function StatementRun() {
     </div>
   );
 
-  const title = running
-    ? t('corpTaxBook.moons.run.noticesTitle')
-    : runs.length > 0
-      ? t('corpTaxBook.moons.run.title', {
-          period: periodsLabel(runs.map((run) => run.plan.period)),
-        })
-      : t('corpTaxBook.moons.run.titleNone');
-
   return (
-    <Panel title={title}>
+    <Panel title={t('corpTaxBook.moons.run.noticesTitle')}>
       {nothingToDo ? (
-        <p className="text-sm text-text-dim">
-          {t(running ? 'corpTaxBook.moons.run.noticesNothing' : 'corpTaxBook.moons.run.nothing')}
-        </p>
+        <p className="text-sm text-text-dim">{t('corpTaxBook.moons.run.noticesNothing')}</p>
       ) : (
         <>
           <ol className="mb-4 flex flex-wrap gap-x-6 gap-y-2">
@@ -401,11 +338,7 @@ export function StatementRun() {
                 <div className="space-y-3 text-sm">
                   <StatChips>
                     <StatChip
-                      label={t(
-                        running
-                          ? 'corpTaxBook.moons.run.notices'
-                          : 'corpTaxBook.moons.run.statements'
-                      )}
+                      label={t('corpTaxBook.moons.run.notices')}
                       value={t('corpTaxBook.moons.run.toSend', { count: total })}
                       emphasis
                     />
@@ -417,28 +350,6 @@ export function StatementRun() {
                         tooltipGlyph="info"
                       />
                     )}
-                    {latest && (
-                      <StatChip
-                        label={t('corpTaxBook.moons.run.balances')}
-                        value={isk(totalDue)}
-                        tooltip={t('corpTaxBook.moons.run.balancesTip')}
-                        tooltipGlyph="info"
-                      />
-                    )}
-                    {latest && (
-                      <StatChip
-                        label={t('corpTaxBook.moons.run.belowMinimum', {
-                          amount: isk(view.input.minimumStatement),
-                        })}
-                        value={t('corpTaxBook.moons.run.rollIn', { count: latest.belowMinimum })}
-                      />
-                    )}
-                    {latest && (
-                      <StatChip
-                        label={t('corpTaxBook.moons.run.creditApplied')}
-                        value={isk(creditApplied)}
-                      />
-                    )}
                   </StatChips>
                   <ul className="space-y-1">
                     <li className="flex items-center gap-2">
@@ -447,17 +358,12 @@ export function StatementRun() {
                         className="text-success"
                         aria-hidden
                       />
-                      {t(
-                        running
-                          ? 'corpTaxBook.moons.run.noticesBillable'
-                          : 'corpTaxBook.moons.run.billable',
-                        {
-                          hub:
-                            TRADE_HUBS.find((h) => h.id === view.input.hubId)?.systemName ??
-                            view.input.hubId,
-                          form: t(`corpTaxBook.moons.settings.form.${view.input.oreForm}`),
-                        }
-                      )}
+                      {t('corpTaxBook.moons.run.noticesBillable', {
+                        hub:
+                          TRADE_HUBS.find((h) => h.id === view.input.hubId)?.systemName ??
+                          view.input.hubId,
+                        form: t(`corpTaxBook.moons.settings.form.${view.input.oreForm}`),
+                      })}
                     </li>
                     {unmailed.length > 0 && (
                       <li className="flex items-center gap-2">
@@ -566,12 +472,7 @@ export function StatementRun() {
                       onClick={() => void send()}
                       disabled={busy || corporationName === null}
                     >
-                      {t(
-                        running
-                          ? 'corpTaxBook.moons.run.sendNotices'
-                          : 'corpTaxBook.moons.run.sendButton',
-                        { count: total }
-                      )}
+                      {t('corpTaxBook.moons.run.sendNotices', { count: total })}
                     </Button>
                     <Button variant="ghost" onClick={() => setStep('check')} disabled={busy}>
                       {t('corpTaxBook.moons.run.back')}
@@ -583,12 +484,7 @@ export function StatementRun() {
                 <div className="space-y-3 text-sm">
                   {result && (
                     <p>
-                      {t(
-                        running
-                          ? 'corpTaxBook.moons.run.noticesQueued'
-                          : 'corpTaxBook.moons.run.queued',
-                        { count: result.queued }
-                      )}
+                      {t('corpTaxBook.moons.run.noticesQueued', { count: result.queued })}
                       {result.skipped > 0 &&
                         ` ${t('corpTaxBook.moons.run.skipped', { count: result.skipped })}`}
                       {result.missingLink > 0 &&
