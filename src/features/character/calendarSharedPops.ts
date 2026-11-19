@@ -112,7 +112,7 @@ export function sharedPopMiningState(
 }
 
 /**
- * The Calendar rows: two per pop. The pop row sits on the Pop Time and stays there once popped
+ * The Calendar rows: up to two per pop. The pop row sits on the Pop Time and stays there once popped
  * ("Popped"); the muted expiry row sits on the belt's expiry (the `moonChunk` arrival-then-decay
  * pattern) and appears only once the moon is ready or popped. A fully mined moon keeps only the pop row.
  * `readableRefineries` are the refineries the pilot already reads as corp moon chunks: those pops
@@ -150,8 +150,11 @@ export function toSharedPopSources(
         : {}),
       pastLabelKey: fullyMined ? 'calendar.fullyMined' : 'calendar.popped',
     });
-    // The expiry row waits until the moon is ready (or popped): no point showing it before then.
-    const earliestPopMs = Math.min(shownAtMs, Number.isNaN(otherAtMs) ? Infinity : otherAtMs);
+    // The expiry row waits for the earliest Pop Time, whichever one the viewer's setting shows.
+    const earliestPopMs = Math.min(
+      shownAtMs,
+      ...Object.values(popTimes(pop)).filter((ms) => !Number.isNaN(ms))
+    );
     if (fullyMined || nowMs < earliestPopMs) continue;
     const expiresAtMs = Date.parse(pop.expiresAt);
     sources.push({

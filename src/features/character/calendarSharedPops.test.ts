@@ -126,6 +126,13 @@ describe('Shared Pops as Calendar clocks', () => {
         ...over,
       });
 
+    it('shows the expiry row from the earlier Pop Time, even when the viewer shows the later', () => {
+      const ids = (now: number) =>
+        toSharedPopSources([both()], new Set(), now, 'autoFracture').map((r) => r.id);
+      expect(ids(NOW + 9 * HOUR_MS)).toHaveLength(1);
+      expect(ids(NOW + 10 * HOUR_MS)).toHaveLength(2);
+    });
+
     it("shows the officer's choice by default, and names the other time on the row", () => {
       const [row] = toSharedPopSources([both()], new Set(), NOW, 'asShared');
       expect(row).toMatchObject({
