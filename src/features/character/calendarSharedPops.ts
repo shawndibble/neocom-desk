@@ -9,7 +9,7 @@
  * belt's expiry), as two rows: one at the Pop Time, one (muted) at the belt's expiry, which
  * reads overdue past it until someone marks the moon finished. A moon the pilot already reads as a corp
  * `moonChunk` row (ESI or their own book) is left out: that row wins. A Calendar event that is
- * the same fleet (`dropEventsOfSharedPops`) is left out instead, so the pop is the one row.
+ * the same fleet (`dropEventsOfSharedPops`) is left out instead, so the pop shows only as its own rows.
  */
 import type {
   BoardCalendarEventSource,

@@ -1,5 +1,7 @@
 # Scope decisions — Shared pops: one Calendar row, both Pop Times, finished state, three days kept
 
+_Row count superseded by `20261118-210000-shared-pops-two-calendar-rows`: a pop is two rows now._
+
 _Recorded 2026-11-18._
 
 - **A Calendar event the corp also made for a pop is dropped, and the pop row wins.** An event is that pop when it starts within five minutes of _either_ of the pop's Pop Times and every word of its title (letters and digits, case and punctuation ignored) is in the refinery's or the moon's name. Either time, not only the shown one, so the pilot's own Pop Time choice never brings a duplicate back. A pop the pilot already reads as a corp moon chunk, or one past its retention, is not on the board, so it drops nothing. The cost: the pop row has no RSVP chip. No toggle; an event further than five minutes away (a fleet that forms hours earlier) is a different thing and stays.
