@@ -14,6 +14,8 @@ import {
   popExpiresAt,
   popInstant,
   popIsLive,
+  popIsRetained,
+  POP_RETAIN_MS,
   qualifyingEditors,
   sharedPopsRepublishDue,
   visiblePops,
@@ -90,6 +92,114 @@ describe('pop lifetime', () => {
   });
 });
 
+describe('both Pop Times and retention (calendar dedupe, #pop-times)', () => {
+  it('publishes the Ready and Auto-fracture instants whatever the officer chose', () => {
+    const ready = buildSharedPops(input())!.pops[0];
+    expect(ready.readyAt).toBe(ARRIVAL);
+    expect(ready.autoFractureAt).toBe(DECAY);
+    expect(ready.popAt).toBe(ARRIVAL);
+    const auto = buildSharedPops(
+      input({ sharing: sharing({ defaults: { ...sharing().defaults, popTime: 'auto-fracture' } }) })
+    )!.pops[0];
+    expect(auto.readyAt).toBe(ARRIVAL);
+    expect(auto.autoFractureAt).toBe(DECAY);
+  });
+
+  it('collapses both to the actual fracture once the laser fired', () => {
+    const fired = '2026-11-15T01:00:00.000Z';
+    const pop = buildSharedPops(input({ extractions: [extraction({ laserFiredAt: fired })] }))!
+      .pops[0];
+    expect(pop.readyAt).toBe(fired);
+    expect(pop.autoFractureAt).toBe(fired);
+  });
+
+  it('keeps a pop three days past its belt expiry, and says until when', () => {
+    const x = extraction();
+    const expiry = at(DECAY, 48);
+    expect(popIsLive(x, {}, expiry)).toBe(false);
+    expect(popIsRetained(x, {}, expiry)).toBe(true);
+    expect(popIsRetained(x, {}, expiry + POP_RETAIN_MS - 1)).toBe(true);
+    expect(popIsRetained(x, {}, expiry + POP_RETAIN_MS)).toBe(false);
+    expect(popIsRetained(extraction({ cancelledAt: START }), {}, expiry)).toBe(false);
+    const doc = buildSharedPops(input({ now: expiry + H }))!;
+    expect(doc.pops[0].expiresAt).toBe(new Date(expiry).toISOString());
+    expect(doc.pops[0].retainUntil).toBe(new Date(expiry + POP_RETAIN_MS).toISOString());
+  });
+
+  it('shows a retained pop to a viewer until its retainUntil, and an old pop until its expiresAt', () => {
+    const expiry = at(DECAY, 48);
+    const doc = buildSharedPops(input({ now: expiry + H }))!;
+    const viewer: ViewerAccess = {
+      corporationIds: new Set([98000001]),
+      allianceIds: new Set(),
+      communityIds: new Set(),
+    };
+    expect(visiblePops(doc, viewer, expiry + 2 * H)).toHaveLength(1);
+    expect(visiblePops(doc, viewer, expiry + POP_RETAIN_MS)).toHaveLength(0);
+    const old = { ...doc.pops[0], retainUntil: undefined };
+    expect(visiblePops({ ...doc, pops: [old] }, viewer, expiry + H)).toHaveLength(0);
+  });
+});
+
+describe('mining state', () => {
+  const fired = '2026-11-15T01:00:00.000Z';
+  const done = (over: Partial<PopExtraction> = {}) => extraction({ laserFiredAt: fired, ...over });
+  const now = at(fired, 6);
+
+  it("carries an officer's Fully Mined flag", () => {
+    const flag = { byName: 'Mina', at: '2026-11-15T05:00:00.000Z' };
+    const pop = buildSharedPops(input({ now, extractions: [done({ fullyMined: flag })] }))!.pops[0];
+    expect(pop.fullyMined).toEqual(flag);
+    expect(buildSharedPops(input({ now, extractions: [done()] }))!.pops[0]).not.toHaveProperty(
+      'fullyMined'
+    );
+  });
+
+  it('reports the share of the chunk mined, and when the figure last moved', () => {
+    const first = buildSharedPops(input({ now, extractions: [done({ minedQty: 4_000 })] }))!
+      .pops[0];
+    expect(first.minedPct).toBe(40);
+    expect(first.minedChangedAt).toBe(now);
+    const unchanged = buildSharedPops(
+      input({ now: now + H, extractions: [done({ minedQty: 4_000 })], heldPops: [first] })
+    )!.pops[0];
+    expect(unchanged.minedChangedAt).toBe(now);
+    const moved = buildSharedPops(
+      input({ now: now + H, extractions: [done({ minedQty: 5_000 })], heldPops: [first] })
+    )!.pops[0];
+    expect(moved.minedChangedAt).toBe(now + H);
+  });
+
+  it('says likely mined out at 90% with no change for 30 minutes, never when flagged', () => {
+    const held = buildSharedPops(input({ now, extractions: [done({ minedQty: 9_200 })] }))!.pops[0];
+    expect(held.likelyMinedOut).toBeUndefined();
+    const later = (over: Partial<PopExtraction>, ms: number) =>
+      buildSharedPops(
+        input({
+          now: now + ms,
+          extractions: [done({ minedQty: 9_200, ...over })],
+          heldPops: [held],
+        })
+      )!.pops[0];
+    expect(later({}, 29 * 60_000).likelyMinedOut).toBeUndefined();
+    expect(later({}, 30 * 60_000).likelyMinedOut).toBe(true);
+    expect(
+      later({ fullyMined: { byName: 'Mina', at: fired } }, 30 * 60_000).likelyMinedOut
+    ).toBeUndefined();
+    expect(later({ minedQty: 8_000 }, 30 * 60_000).likelyMinedOut).toBeUndefined();
+  });
+
+  it('says nothing without a chunk make-up or ledger rows', () => {
+    const noOre = buildSharedPops(
+      input({ now, extractions: [done({ oreLines: undefined, minedQty: 5 })] })
+    )!.pops[0];
+    expect(noOre).not.toHaveProperty('minedPct');
+    expect(buildSharedPops(input({ now, extractions: [done()] }))!.pops[0]).not.toHaveProperty(
+      'minedPct'
+    );
+  });
+});
+
 describe('buildSharedPops', () => {
   it('carries the Survey an officer linked to the Extraction, and none when unlinked', () => {
     const linked = buildSharedPops(input({ extractions: [extraction({ surveyId: 'abc123' })] }));
@@ -132,9 +242,12 @@ describe('buildSharedPops', () => {
         solarSystemId: 30000142,
         popTime: 'ready',
         popAt: ARRIVAL,
+        readyAt: ARRIVAL,
+        autoFractureAt: DECAY,
         fractured: false,
         startedAt: START,
         expiresAt: new Date(at(DECAY, 48)).toISOString(),
+        retainUntil: new Date(at(DECAY, 48 + 72)).toISOString(),
         ore: [{ typeId: 45490, quantity: 10_000 }],
         oreShared: true,
         notes: 'Bring Orcas',
@@ -164,7 +277,7 @@ describe('buildSharedPops', () => {
     expect(
       buildSharedPops(input({ sharing: sharing({ moons: { '40001': { audiences: [] } } }) }))
     ).toBeNull();
-    expect(buildSharedPops(input({ now: at(DECAY, 49) }))).toBeNull();
+    expect(buildSharedPops(input({ now: at(DECAY, 48 + 72) }))).toBeNull();
   });
 
   it("drops an opted-out moon owner's pops and a moon owner the book no longer handles", () => {
@@ -302,8 +415,10 @@ describe('visiblePops', () => {
     expect(ids(viewer({ communityIds: new Set(['c1']) }))).toEqual(['x2']);
   });
 
-  it('drops a pop once it is Expired, even before the next publish', () => {
-    expect(ids(viewer({ corporationIds: new Set([98000001]) }), at(DECAY, 48))).toEqual([]);
+  it('drops a pop once its retention ends, even before the next publish', () => {
+    const corp = viewer({ corporationIds: new Set([98000001]) });
+    expect(ids(corp, at(DECAY, 48))).toEqual([`1000_${at(START)}`]);
+    expect(ids(corp, at(DECAY, 48 + 72))).toEqual([]);
   });
 
   it("names which of the viewer's Characters are in each pop's audience (issue #6225)", () => {

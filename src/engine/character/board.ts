@@ -93,8 +93,13 @@ export interface BoardClockSource {
    * nothing of it, so the Corporation events filter never touches it.
    */
   sharedBy?: BoardCorporation;
-  /** A second line under the subject, already named (a Shared Pop's moon). */
-  subtitle?: string;
+  /**
+   * A second time the row names after its detail, as `detail` plus a clock time (a Shared Pop's
+   * other Pop Time). `detail` is a data key, never a translated string.
+   */
+  extra?: { detail: string; atMs: number };
+  /** The i18n key the row reads once past its deadline, when it is not the kind's own word. */
+  pastLabelKey?: string;
 }
 
 /** A calendar event, which alone carries an RSVP state and an importance flag. */
@@ -243,7 +248,8 @@ function toItem(
     important: isCalendarEvent(source) ? source.important : false,
     ...(source.corporation ? { corporation: source.corporation } : {}),
     ...(source.sharedBy ? { sharedBy: source.sharedBy } : {}),
-    ...(source.subtitle ? { subtitle: source.subtitle } : {}),
+    ...(source.extra ? { extra: source.extra } : {}),
+    ...(source.pastLabelKey ? { pastLabelKey: source.pastLabelKey } : {}),
   };
 }
 
