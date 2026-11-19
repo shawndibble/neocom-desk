@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { cx } from '@/lib/cx';
 import { AlertsBell } from './AlertsBell';
 import { PageHeaderClusterContext } from './pageHeaderCluster';
+import { usePageHeaderSlot } from './pageHeaderSlot';
 
 interface PageHeaderProps {
   /**
@@ -106,6 +107,7 @@ export function PageHeader({
 }: PageHeaderProps) {
   // A scope picker locks the title row to one line (decision 20261022-123837): the
   // title and meta give way, the control cluster never does.
+  const { setElement } = usePageHeaderSlot();
   const singleLine = scope !== undefined && scope !== null && scope !== false;
   return (
     <header
@@ -168,6 +170,8 @@ export function PageHeader({
             {scope}
           </PageHeaderClusterContext.Provider>
           {actions}
+          {/* The shell portals the Corp Tax Book mail chip in here; empty it takes no room. */}
+          <span ref={setElement} className="contents" />
           <AlertsBell />
         </div>
       </div>

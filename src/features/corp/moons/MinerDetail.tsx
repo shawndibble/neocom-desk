@@ -634,6 +634,11 @@ export function MinerDetail({ id }: { id: string }) {
       {t('corpTaxBook.moons.corrections.rate.open')}
     </DropdownMenuItem>
   );
+  const adjustItem = (
+    <DropdownMenuItem onSelect={() => setDialog({ kind: 'adjust' })}>
+      {t('corpTaxBook.moons.corrections.adjust.open')}
+    </DropdownMenuItem>
+  );
   // A running account has no next Statement to rebill onto: late ore already changes the day's
   // owed amount, so Rebill from date stays only for a book still billing Statements.
   const rebillItem = running ? null : (
@@ -658,6 +663,7 @@ export function MinerDetail({ id }: { id: string }) {
           {remindItem}
           {dismissAllItem}
           {rateItem}
+          {adjustItem}
           {rebillItem}
           {closeItem}
         </HeaderMoreMenu>
@@ -679,6 +685,7 @@ export function MinerDetail({ id }: { id: string }) {
           </Button>
           <HeaderMoreMenu>
             {rateItem}
+            {adjustItem}
             {rebillItem}
             {closeItem}
           </HeaderMoreMenu>
@@ -837,13 +844,6 @@ export function MinerDetail({ id }: { id: string }) {
         sortColumns={paymentColumns}
         meta={
           <span className="text-xs text-text-dim">{t('corpTaxBook.moons.miner.paymentsHint')}</span>
-        }
-        actions={
-          canEdit ? (
-            <Button size="sm" onClick={() => setDialog({ kind: 'adjust' })}>
-              {t('corpTaxBook.moons.corrections.adjust.open')}
-            </Button>
-          ) : undefined
         }
         phone={phone}
         summary={t('corpTaxBook.moons.miner.paymentsSummary', {

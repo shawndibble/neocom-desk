@@ -159,9 +159,9 @@ describe('Miner page on a running account', () => {
 describe('Corrections', () => {
   it('sit in the header menu, with Rebill only on a book that still bills Statements', async () => {
     renderBook(<MinerDetail id={VARRO_ID} />);
-    expect(screen.getByRole('button', { name: 'Add a correction line' })).toBeInTheDocument();
     await userEvent.click(screen.getAllByRole('button', { name: 'More actions' })[0]);
     expect(await screen.findByRole('menuitem', { name: /rate/i })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Add a correction line' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Rebill from date' })).toBeInTheDocument();
   });
 
