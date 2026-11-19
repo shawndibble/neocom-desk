@@ -163,11 +163,9 @@ const rowKeyOf = (row: ItemLedgerRow) => `${row.typeId}:${row.isBlueprintCopy ? 
 function CorpAssetsView({
   pageTab,
   canReadBlueprints,
-  canReadStructures,
 }: {
   pageTab: CorpAssetsPageTab;
   canReadBlueprints: boolean;
-  canReadStructures: boolean;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -181,8 +179,8 @@ function CorpAssetsView({
   // view (`key`) when `canReadBlueprints` flips instead.
   const loadSnapshot = useCallback(
     (characterId: number, signal: RouteSnapshotSignal) =>
-      loadCorpAssetsSnapshot(characterId, signal, canReadBlueprints, canReadStructures),
-    [canReadBlueprints, canReadStructures]
+      loadCorpAssetsSnapshot(characterId, signal, canReadBlueprints),
+    [canReadBlueprints]
   );
   const snapshot = useRouteSnapshot<CorpAssetsSnapshot>(loadSnapshot, undefined, {
     // Keeps the asset list on screen during a manual refresh (issue #418).
@@ -854,24 +852,12 @@ function CorpAssetsView({
 }
 
 /** Reads the tab off the path; an unknown path (an old tree link) goes to `/corp/assets`, keeping the query. */
-function CorpAssetsRoute({
-  canReadBlueprints,
-  canReadStructures,
-}: {
-  canReadBlueprints: boolean;
-  canReadStructures: boolean;
-}) {
+function CorpAssetsRoute({ canReadBlueprints }: { canReadBlueprints: boolean }) {
   const wildcard = useParams()['*'] ?? '';
   const { search } = useLocation();
   const pageTab = corpAssetsPageTabFromPath(wildcard);
   if (pageTab === null) return <Navigate replace to={{ pathname: '/corp/assets', search }} />;
-  return (
-    <CorpAssetsView
-      pageTab={pageTab}
-      canReadBlueprints={canReadBlueprints}
-      canReadStructures={canReadStructures}
-    />
-  );
+  return <CorpAssetsView pageTab={pageTab} canReadBlueprints={canReadBlueprints} />;
 }
 
 export function CorpAssets() {
@@ -891,9 +877,8 @@ export function CorpAssets() {
       </div>
     ) : gate.status === 'ready' ? (
       <CorpAssetsRoute
-        key={`${gate.capabilities.canReadBlueprints}:${gate.capabilities.canReadStructures}`}
+        key={String(gate.capabilities.canReadBlueprints)}
         canReadBlueprints={gate.capabilities.canReadBlueprints}
-        canReadStructures={gate.capabilities.canReadStructures}
       />
     ) : null;
 
