@@ -1,5 +1,7 @@
 import { useState, type ReactElement } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import {
   DataTable,
   EmptyState,
@@ -13,8 +15,11 @@ import {
 } from '@/components/ui';
 import {
   isIssuedPeriod,
+  periodPreview,
   periodRows,
   periodStatements,
+  type PeriodMinerLine,
+  type PeriodRow,
   type PeriodStatementRow,
 } from '@/engine/corpTaxBook/bookView';
 import { tabPath } from '@/lib/pageTabs';
@@ -22,7 +27,7 @@ import { RecordPaymentDialog } from './BookDialogs';
 import { caretColumn } from './caretColumn';
 import { StatementRowMenu } from './StatementRowMenu';
 import { useBook } from './useBook';
-import { MOONS_TABS } from './moonsPaths';
+import { MOONS_TABS, minerPath } from './moonsPaths';
 import { isk, periodLabel, shortDate } from './moonsFormat';
 import { Crumb, DueWord } from './moonsParts';
 import { useCards } from './sectionHelpers';
@@ -54,8 +59,126 @@ function MailWord({ mail }: { mail: PeriodStatementRow['mail'] }) {
   );
 }
 
-/** An issued period's page (#5285): its totals, then one Statement per Miner. */
+/** A period's page: an issued one lists its Statements; any other lists the Miners it will bill. */
 export function StatementPeriodDetail({ periodStart }: { periodStart: string }) {
+  const { view } = useBook();
+  const issued = periodRows(view).some((r) => r.start === periodStart && isIssuedPeriod(r));
+  return issued ? (
+    <IssuedPeriodDetail periodStart={periodStart} />
+  ) : (
+    <PeriodPreviewDetail periodStart={periodStart} />
+  );
+}
+
+/** The one-line explanation of a period that has no Statements, by its status. */
+function previewNote(t: TFunction, status: PeriodRow['status']) {
+  switch (status) {
+    case 'ready':
+      return t('corpTaxBook.moons.statementPeriod.preview.ready');
+    case 'closed':
+      return t('corpTaxBook.moons.statementPeriod.preview.closed');
+    case 'rollover':
+      return t('corpTaxBook.moons.statementPeriod.preview.rollover');
+    default:
+      return t('corpTaxBook.moons.statementPeriod.preview.open');
+  }
+}
+
+/** A period with no Statements yet (open, ready, closed, rollover): each Miner's own days. */
+function PeriodPreviewDetail({ periodStart }: { periodStart: string }) {
+  const { t } = useTranslation();
+  const { view, names } = useBook();
+  const navigate = useNavigate();
+  const [tableRef, cards] = useCards();
+  const period = periodRows(view).find((r) => r.start === periodStart);
+  const lines = period ? periodPreview(view, period) : undefined;
+  if (!period || !lines) {
+    return (
+      <div className="space-y-4">
+        <Crumb to={STATEMENTS_PATH} label={t('corpTaxBook.moons.tabs.statements')} />
+        <EmptyState title={t('corpTaxBook.moons.statementPeriod.notFound')} />
+      </div>
+    );
+  }
+  const nameOf = (l: PeriodMinerLine) => {
+    const miner = view.miners.find((m) => m.id === l.minerId);
+    return miner ? names.character(miner.mainCharacterId) : l.minerId;
+  };
+  const columns: DataTableColumn<PeriodMinerLine>[] = [
+    {
+      id: 'miner',
+      header: t('corpTaxBook.moons.cols.miner'),
+      primary: true,
+      render: nameOf,
+      sortValue: nameOf,
+    },
+    {
+      id: 'billed',
+      header: t('corpTaxBook.moons.cols.billed'),
+      align: 'right',
+      className: 'tabular-nums',
+      cardCorner: true,
+      render: (l) => (l.amount ? isk(l.amount) : '—'),
+      sortValue: (l) => l.amount,
+    },
+    {
+      id: 'note',
+      header: t('corpTaxBook.moons.cols.status'),
+      render: (l) =>
+        l.rolledOver ? (
+          <span className="text-xs text-text-dim">
+            {t('corpTaxBook.moons.statementPeriod.preview.rolledOver')}
+          </span>
+        ) : null,
+      sortValue: (l) => (l.rolledOver ? 1 : 0),
+    },
+    ...(!cards ? [caretColumn<PeriodMinerLine>()] : []),
+  ];
+  return (
+    <div className="space-y-4">
+      <Crumb to={STATEMENTS_PATH} label={t('corpTaxBook.moons.tabs.statements')} />
+      <PageHeader
+        title={periodLabel(period.start, period.end)}
+        meta={
+          <span className="text-xs text-text-dim">
+            {[
+              t(`corpTaxBook.moons.periodStatus.${period.status}`),
+              t('corpTaxBook.moons.statementPeriod.miners', { count: lines.length }),
+            ].join(' · ')}
+          </span>
+        }
+      />
+      <StatChips>
+        <StatChip label={t('corpTaxBook.moons.cols.billed')} value={isk(period.billed)} emphasis />
+      </StatChips>
+      <p className="text-xs text-text-dim">{previewNote(t, period.status)}</p>
+      <Panel
+        title={t('corpTaxBook.moons.statementPeriod.preview.listTitle', { count: lines.length })}
+        padded={false}
+      >
+        <div ref={tableRef} className="@container overflow-x-auto">
+          <DataTable
+            label={t('corpTaxBook.moons.statementPeriod.preview.listTitle', {
+              count: lines.length,
+            })}
+            columns={columns}
+            rows={lines}
+            rowKey={(l) => l.minerId}
+            density="compact"
+            defaultSort={{ columnId: 'billed', direction: 'desc' }}
+            mobileSort
+            stacked={cards}
+            stackColumns={2}
+            onRowClick={(l) => navigate(minerPath(l.minerId))}
+          />
+        </div>
+      </Panel>
+    </div>
+  );
+}
+
+/** An issued period's page (#5285): its totals, then one Statement per Miner. */
+function IssuedPeriodDetail({ periodStart }: { periodStart: string }) {
   const { t } = useTranslation();
   const { view, names, canEdit } = useBook();
   const [recording, setRecording] = useState<PeriodStatementRow | null>(null);

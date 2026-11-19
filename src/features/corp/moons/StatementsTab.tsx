@@ -8,7 +8,7 @@ import {
   Panel,
   type DataTableColumn,
 } from '@/components/ui';
-import { isIssuedPeriod, periodRows, type PeriodRow } from '@/engine/corpTaxBook/bookView';
+import { periodRows, type PeriodRow } from '@/engine/corpTaxBook/bookView';
 import { wholeIsk } from '@/engine/corpTaxBook/wholeIsk';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import { useBook } from './useBook';
@@ -154,8 +154,7 @@ export function StatementsTab() {
     ...allColumns.filter(
       (c) => c.id === 'period' || columnVisibility.isVisible(c.id as StatementsColumnId)
     ),
-    // Only an issued period has Statements to open; the rest carry no caret (hidden = no caret).
-    ...(cards ? [] : [caretColumn<PeriodRow>((r) => !isIssuedPeriod(r))]),
+    ...(cards ? [] : [caretColumn<PeriodRow>()]),
   ];
 
   return (
@@ -193,7 +192,6 @@ export function StatementsTab() {
             rows={rows}
             rowKey={(r) => r.start}
             onRowClick={(r) => navigate(statementPeriodPath(r.start))}
-            rowClickable={isIssuedPeriod}
             density="compact"
             stacked={cards}
             stackColumns={2}
