@@ -30,8 +30,9 @@ import {
   summarizeAbyssal,
   type AbyssalSummary,
 } from '@/engine/market/abyssalValuation';
+import { summarizeAskEstimates } from '@/engine/contracts/askEstimate';
 import { AbyssalValueNote } from '@/features/abyssal/AbyssalValueNote';
-import { formatIsk } from '@/lib/isk';
+import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { collectItemIds, collectStationItemIds, type StationSortField } from '@/engine/assetTree';
 import { assetNodeSegment } from '@/engine/assetPath';
 import { ItemColumnLabels, JumpsAwayText, SecurityValue } from '@/features/assets/assetBrowserRows';
@@ -73,6 +74,8 @@ export function AssetsList({
     assetsNeedsReauth,
     mergedAssets,
     abyssal,
+    askEstimateByTypeId,
+    itemValueByItemId,
     mergedTypeNames,
     mergedLocationNames,
     characterBadges,
@@ -185,23 +188,22 @@ export function AssetsList({
 
   // How the abyssal modules in view are valued: every asset at the root, the
   // level's contents when drilled in, the matches in a flat list.
-  const abyssalSummary: AbyssalSummary | null = (() => {
-    const isAbyssalType = abyssal.isAbyssalType;
-    if (!isAbyssalType) return null;
-    let scope: readonly Pick<CharacterAsset, 'item_id' | 'type_id'>[];
-    if (flatModeActive) scope = flatMatches.map((match) => match.asset);
-    else if (pathStationId === null) scope = mergedAssets;
-    else if (!deepest) scope = [];
-    else {
-      const ids = 'kind' in deepest ? collectItemIds(deepest) : collectStationItemIds(deepest);
-      scope = ids.flatMap((id) => assetsByItemId.get(id) ?? []);
-    }
-    return summarizeAbyssal(
-      abyssalItemRefs(scope, isAbyssalType).map((item) => item.itemId),
-      abyssal.values,
-      abyssal.estimates
-    );
+  const scope: readonly CharacterAsset[] = (() => {
+    if (flatModeActive) return flatMatches.map((match) => match.asset);
+    if (pathStationId === null) return mergedAssets;
+    if (!deepest) return [];
+    const ids = 'kind' in deepest ? collectItemIds(deepest) : collectStationItemIds(deepest);
+    return ids.flatMap((id) => assetsByItemId.get(id) ?? []);
   })();
+  const abyssalSummary: AbyssalSummary | null = abyssal.isAbyssalType
+    ? summarizeAbyssal(
+        abyssalItemRefs(scope, abyssal.isAbyssalType).map((item) => item.itemId),
+        abyssal.values,
+        abyssal.estimates
+      )
+    : null;
+  // Contract-only hulls shown at their ask median: counted beside the total, never in it.
+  const askSummary = summarizeAskEstimates(scope, askEstimateByTypeId, itemValueByItemId);
 
   // Phone station header (#2989): security · ISK · jumps on a second line, so the
   // top line is the back button and the full-width station name. An absent item
@@ -458,6 +460,18 @@ export function AssetsList({
                 title={t('assets.jumpsAway.locationNotGrantedTitle')}
               />
             </>
+          )}
+
+          {askSummary.stacks > 0 && (
+            <p
+              data-testid="ask-estimate-note"
+              className="shrink-0 border-b border-line px-3 py-1.5 text-[0.6875rem] text-text-dim"
+            >
+              {t('assets.askEstimate.note', {
+                count: askSummary.stacks,
+                value: formatIskCompact(askSummary.value),
+              })}
+            </p>
           )}
 
           {abyssalSummary && (

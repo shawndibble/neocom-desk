@@ -515,6 +515,8 @@ interface ItemRowProps {
   estimatedValue: number;
   /** Tooltip note on the value. */
   valueHint?: string;
+  /** A contract ask estimate for a type with no market price; shown marked, not totalled. */
+  askEstimate?: AskEstimateFigure;
   /** Stock Cost Basis per unit; absent when the history does not cover every held unit. */
   stockUnitCost?: number;
   /** The level offers the Stock Cost Basis column, so a row without one keeps its cell. */
@@ -542,28 +544,46 @@ interface ItemRowProps {
  * or gives the dash one; `inLink` keeps that dash tooltip reachable inside a
  * whole-row link (see JumpsAwayText).
  */
+/** What a contract-only hull's value cell shows in place of a dash. */
+export interface AskEstimateFigure {
+  /** ISK for the whole stack. */
+  value: number;
+  /** The tooltip: the median, N contracts, and that it is not in the total. */
+  hint: string;
+}
+
 function ValueFigure({
   value,
   hint,
+  ask,
   inLink = false,
   t,
 }: {
   value: number;
   hint?: string;
+  /** A contract-only hull's ask median (issue #6431): shown marked, in place of the dash, never a total. */
+  ask?: AskEstimateFigure;
   inLink?: boolean;
   t: Translate;
 }) {
   if (value !== 0) return <IskAmount value={value} decimals={0} note={hint} />;
-  const dash = (
+  const tip = ask?.hint ?? hint;
+  const dash = ask ? (
+    <span data-testid="ask-estimate">
+      <span aria-hidden="true">≈ </span>
+      <IskAmount value={ask.value} decimals={0} />
+      <span className="sr-only">{ask.hint}</span>
+    </span>
+  ) : (
     <>
       <span aria-hidden="true">{t('assets.unknownValue')}</span>
       <span className="sr-only">{hint ?? t('assets.noEstimate')}</span>
     </>
   );
-  if (hint === undefined) return dash;
-  if (!inLink) return <HintText content={hint}>{dash}</HintText>;
+  if (tip === undefined) return dash;
+  if (!inLink) return <HintText content={tip}>{dash}</HintText>;
   return (
-    <Tooltip content={hint}>
+    <Tooltip content={tip}>
       <span className="relative z-10">{dash}</span>
     </Tooltip>
   );
@@ -611,6 +631,7 @@ export function ItemRow({
   unitVolume,
   estimatedValue,
   valueHint,
+  askEstimate,
   stockUnitCost,
   showStockCost = false,
   characterBadge,
@@ -696,7 +717,7 @@ export function ItemRow({
                   ITEM_VALUE_CELL
                 )}
               >
-                <ValueFigure value={estimatedValue} hint={valueHint} t={t} />
+                <ValueFigure value={estimatedValue} hint={valueHint} ask={askEstimate} t={t} />
               </span>
               {stockUnitCost !== undefined && (
                 <>
@@ -737,6 +758,8 @@ interface SearchResultRowProps {
   blueprintKind?: BlueprintKind | null;
   /** Tooltip note on the value. */
   valueHint?: string;
+  /** A contract ask estimate for a type with no market price; shown marked, not totalled. */
+  askEstimate?: AskEstimateFigure;
   /** Wraps the row in its item menu; its More actions button sits at the row's far right. */
   wrap: (children: ReactElement) => ReactElement;
   t: Translate;
@@ -761,6 +784,7 @@ export function SearchResultRow({
   characterBadge,
   blueprintKind = null,
   valueHint,
+  askEstimate,
   wrap,
   t,
 }: SearchResultRowProps) {
@@ -804,7 +828,13 @@ export function SearchResultRow({
                     estimatedValue === 0 ? 'text-text-faint' : 'text-isk-pos'
                   )}
                 >
-                  <ValueFigure value={estimatedValue} hint={valueHint} inLink t={t} />
+                  <ValueFigure
+                    value={estimatedValue}
+                    hint={valueHint}
+                    ask={askEstimate}
+                    inLink
+                    t={t}
+                  />
                 </span>
               </span>
             </span>

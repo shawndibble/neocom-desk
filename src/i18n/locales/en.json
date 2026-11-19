@@ -9147,6 +9147,11 @@
       "rowEstimatedAge": "Estimated {{age}}.",
       "rowNotImported": "MutaMarket hasn't priced this module yet. Show info can ask it to."
     },
+    "askEstimate": {
+      "rowHint": "Ask median, {{count}} contracts: {{price}} each. Public contract listings, not sales. Not in the total.",
+      "note_one": "{{count}} stack at ask median, about {{value}} ISK, not in the total",
+      "note_other": "{{count}} stacks at ask median, about {{value}} ISK, not in the total"
+    },
     "security": {
       "ariaLabel": "Security status: {{value}}"
     },
