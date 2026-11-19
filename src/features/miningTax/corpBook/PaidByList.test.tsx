@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { TaxPayment } from '@/engine/corpTaxBook/allocation';
 import type { PaidBy } from '@/engine/corpTaxBook/paidBy';
@@ -15,8 +16,22 @@ const payment = (over: Partial<TaxPayment>): TaxPayment => ({
   ...over,
 });
 
-function renderList(paidBy: PaidBy, payments: TaxPayment[] = [], corpName = 'Brass Meridian') {
-  render(<PaidByList paidBy={paidBy} payments={payments} corpName={corpName} />);
+function renderList(
+  paidBy: PaidBy,
+  payments: TaxPayment[] = [],
+  walletRefs?: ReadonlyMap<string, number>,
+  corpName = 'Brass Meridian'
+) {
+  render(
+    <MemoryRouter>
+      <PaidByList
+        paidBy={paidBy}
+        payments={payments}
+        corpName={corpName}
+        {...(walletRefs ? { walletRefs } : {})}
+      />
+    </MemoryRouter>
+  );
 }
 
 describe('PaidByList', () => {
@@ -78,6 +93,24 @@ describe('PaidByList', () => {
   it('shows a payment the book has not loaded by its amount alone', () => {
     renderList({ payments: [{ paymentId: 'gone', amount: 75_000 }], inFlight: [] });
     expect(screen.getByText('75,000 ISK')).toBeInTheDocument();
+  });
+
+  it('links a payment to the member’s own wallet entry when one was found, and only then', () => {
+    renderList(
+      {
+        payments: [
+          { paymentId: 'p1', amount: 600_000 },
+          { paymentId: 'p2', amount: 150_000 },
+        ],
+        inFlight: [],
+      },
+      [payment({ id: 'p1' }), payment({ id: 'p2' })],
+      new Map([['p1', 5150]])
+    );
+    const links = screen.getAllByRole('link', { name: 'Open in wallet' });
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAttribute('href', '/wallet/journal?highlight=5150');
+    expect(within(links[0]!.closest('li')!).getByText('600,000 ISK')).toBeInTheDocument();
   });
 
   it('is read-only: no links and no buttons', () => {

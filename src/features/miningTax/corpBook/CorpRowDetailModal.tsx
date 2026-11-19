@@ -1,6 +1,6 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { formatList } from '@/lib/listFormat';
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, InfoTooltip, Modal, ValueList, ValueRow } from '@/components/ui';
 import { SecurityValue } from '@/features/assets/assetBrowserRows';
@@ -16,7 +16,9 @@ import { typeLabel } from './typeLabel';
 import { hubForPayee } from '../pricing';
 import type { DisplayRow } from '../groupRows';
 import { CorpBookDiffModal } from './CorpBookDiffModal';
-import type { CorpBookViewBook } from './corpBookView';
+import { madeDonationOf, type CorpBookViewBook } from './corpBookView';
+import { pairWithMadePayments } from '@/engine/corpTaxBook/transferMatch';
+import type { MadePayment } from '../paymentLinks';
 import { CorpStatusPill } from './CorpStatusPill';
 import { PaidByList } from './PaidByList';
 import { CorpDeclareSlot } from './CorpDeclareAction';
@@ -51,6 +53,8 @@ interface Props {
   onResolve?: (target: ResolveTarget) => void;
   /** Opens the member's own entry for this day, to fix their records. Absent: no entry lines up. */
   onFixRecords?: () => void;
+  /** The member's own outgoing payments, to find their wallet entry for each donation the book holds. */
+  madePayments?: readonly MadePayment[];
 }
 
 /**
@@ -74,12 +78,22 @@ export function CorpRowDetailModal({
   notice,
   onResolve,
   onFixRecords,
+  madePayments,
 }: Props) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   const now = useTicker(MINUTE_MS);
   const [comparing, setComparing] = useState(false);
   const { view } = corp;
+  const bookPayments = book?.loaded.payments;
+  // Best effort, on this device: a donation the member's own journal no longer holds has no link.
+  const walletRefs = useMemo(
+    () =>
+      bookPayments && madePayments && madePayments.length > 0
+        ? pairWithMadePayments(bookPayments, madePayments.map(madeDonationOf), view.corporationId)
+        : undefined,
+    [bookPayments, madePayments, view.corporationId]
+  );
   const hub = hubForPayee(view.hubId);
   const form = t(
     view.oreForm === 'compressed'
@@ -353,6 +367,7 @@ export function CorpRowDetailModal({
               paidBy={view.paidBy}
               payments={book?.loaded.payments ?? []}
               corpName={corp.corpName}
+              {...(walletRefs ? { walletRefs } : {})}
             />
           )}
 
