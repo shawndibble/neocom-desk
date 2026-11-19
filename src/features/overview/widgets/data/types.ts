@@ -229,7 +229,13 @@ export interface RowDetailModel {
     items: { key: string; badge?: string; tone?: DetailTone; text: string; value: string }[];
   };
   /** Where it is: Set destination, and the jump count as a link to Route Safety. */
-  place?: { systemId: number; name: string; jumps?: number };
+  place?: {
+    systemId: number;
+    name: string;
+    jumps?: number;
+    /** A player structure to send as the autopilot destination; absent, the system is sent. */
+    structureId?: number;
+  };
   /** One in-app destination the record leads on to (a Shared Pop's Survey start link). */
   link?: { label: string; to: string };
   /** A second, quieter destination beside `link` (a Shared Pop's "start a new Survey" next to "Open survey"). */

@@ -117,15 +117,19 @@ export function sharedPopDetail(
   const { pop } = entry;
   const popAtMs = sharedPopShownAtMs(pop, pref);
   const popped = nowMs >= popAtMs;
+  // A chunk past its auto-fracture time has fractured whatever the book last synced.
+  const autoMs = pop.autoFractureAt === undefined ? NaN : Date.parse(pop.autoFractureAt);
+  const fractured = pop.fractured || nowMs >= autoMs;
   // Both Pop Times once the server publishes them and the chunk has not fractured early.
   const { readyAt, autoFractureAt } = pop;
   const bothTimes =
-    !pop.fractured &&
+    !fractured &&
     readyAt !== undefined &&
     autoFractureAt !== undefined &&
     readyAt !== autoFractureAt
       ? { ready: readyAt, auto: autoFractureAt }
       : null;
+  const fullyMined = sharedPopMiningState(entry) === 'fullyMined';
   const synced = syncedFact(pop.syncedAt, nowMs, t);
   const facts: RowDetailModel['facts'] = [
     ...(entry.moonName === null
@@ -161,46 +165,82 @@ export function sharedPopDetail(
     ...(synced ? [synced] : []),
   ];
   const oreKnown = entry.ore !== null && entry.ore.length > 0;
-  if (!oreKnown && pop.oreShared === true)
+  // No book make-up: the linked Survey's scans still show what the field held.
+  const surveyOres = !oreKnown ? (entry.survey?.ores ?? []) : [];
+  if (!oreKnown && surveyOres.length === 0 && pop.oreShared === true)
     facts.push({ label: t('calendar.sharedPop.ore'), value: t('calendar.sharedPop.oreUnknown') });
   return {
     title: sharedPopTitle(entry),
     status: {
       badge: t(POP_TIME_KEY[pop.popTime]),
-      tone: popped ? 'success' : 'neutral',
-      text: popped
-        ? t(
-            pop.fractured || pop.popTime === 'auto-fracture'
-              ? 'calendar.sharedPop.fractured'
-              : 'calendar.sharedPop.arrived'
-          )
-        : t('calendar.due', { duration: formatDuration((popAtMs - nowMs) / 1000) }),
+      tone: popped || fractured || fullyMined ? 'success' : 'neutral',
+      text: fullyMined
+        ? t('calendar.sharedPop.fullyMined')
+        : popped || fractured
+          ? t(
+              fractured || pop.popTime === 'auto-fracture'
+                ? 'calendar.sharedPop.fractured'
+                : 'calendar.sharedPop.arrived'
+            )
+          : t('calendar.due', { duration: formatDuration((popAtMs - nowMs) / 1000) }),
       ...(pop.notes.trim() === '' ? {} : { note: pop.notes }),
     },
     facts,
-    ...(entry.ore === null || entry.ore.length === 0
-      ? {}
-      : {
+    ...(surveyOres.length > 0
+      ? {
           list: {
-            title: t('calendar.sharedPop.ore'),
-            items: entry.ore.map((line) => ({
-              key: line.name,
-              text: line.name,
-              value: t('calendar.sharedPop.units', { count: line.quantity }),
+            title: t('calendar.sharedPop.oreFromSurvey'),
+            items: surveyOres.map((o) => ({
+              key: o.name,
+              text: o.name,
+              value: t('calendar.sharedPop.orePercent', { percent: o.percent }),
             })),
           },
-        }),
+        }
+      : entry.ore === null || entry.ore.length === 0
+        ? {}
+        : {
+            list: {
+              title: t('calendar.sharedPop.ore'),
+              items: entry.ore.map((line) => ({
+                key: line.name,
+                text: line.name,
+                value: t('calendar.sharedPop.units', { count: line.quantity }),
+              })),
+            },
+          }),
     ...(pop.solarSystemId === null
       ? {}
-      : { place: { systemId: pop.solarSystemId, name: sharedPopTitle(entry) } }),
-    ...(pop.surveyId
-      ? {
-          link: { label: t('calendar.sharedPop.openSurvey'), to: `/s/${pop.surveyId}` },
-          secondaryLink: {
-            label: t('calendar.sharedPop.startNewSurvey'),
-            to: sharedPopStartLink(entry),
+      : {
+          place: {
+            systemId: pop.solarSystemId,
+            structureId: pop.structureId,
+            name: sharedPopTitle(entry),
           },
-        }
-      : { link: { label: t('calendar.sharedPop.startSurvey'), to: sharedPopStartLink(entry) } }),
+        }),
+    ...surveyLinks(entry, fullyMined, t),
   };
+}
+
+/**
+ * The Survey links. A moon already fully mined (an officer's flag or a finished Survey) has
+ * nothing left to survey, so it offers no start link; a linked Survey stays openable.
+ */
+function surveyLinks(
+  entry: SharedPopEntry,
+  fullyMined: boolean,
+  t: Translate
+): Pick<RowDetailModel, 'link' | 'secondaryLink'> {
+  const { pop } = entry;
+  const start = { label: t('calendar.sharedPop.startSurvey'), to: sharedPopStartLink(entry) };
+  if (pop.surveyId) {
+    const open = { label: t('calendar.sharedPop.openSurvey'), to: `/s/${pop.surveyId}` };
+    return fullyMined
+      ? { link: open }
+      : {
+          link: open,
+          secondaryLink: { label: t('calendar.sharedPop.startNewSurvey'), to: start.to },
+        };
+  }
+  return fullyMined ? {} : { link: start };
 }
