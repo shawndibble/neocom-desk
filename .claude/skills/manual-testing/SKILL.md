@@ -35,3 +35,4 @@ Officer/character `90000001` "Test Pilot", corp `98000001` "Test Corp", owner ha
 - Do not kill other sessions' playwright/vite; port 5173 may be taken, so check before starting.
 - Do not edit `.env.local`: the sandbox sets `VITE_FIREBASE_EMULATORS` through the config's `webServer.env`.
 - Personal pages (Dexie / ESI-cache backed, e.g. Moon Mining Tax ledger) need no emulators: seed IndexedDB like `e2e/miningTaxNarrow.spec.ts` does instead.
+- Any page that reads live ESI needs a route in `moons-sandbox.local.ts`, or it shows "Something went wrong". Corp wallet (`/corp/wallet`, reached from a payment's ledger link) is mocked: divisions plus journal refs 900001+ matching the seeded donations. Playwright globs: `*` stops at `/`, so use `wallets**` to cover `/wallets/1/journal`. A new page that errors is usually an unmocked ESI route: find it with `page.on('requestfailed')` / a headless screenshot.
