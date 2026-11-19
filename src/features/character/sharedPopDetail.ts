@@ -173,10 +173,10 @@ export function sharedPopDetail(
     title: sharedPopTitle(entry),
     status: {
       badge: t(POP_TIME_KEY[pop.popTime]),
-      tone: popped ? 'success' : 'neutral',
+      tone: popped || fractured || fullyMined ? 'success' : 'neutral',
       text: fullyMined
         ? t('calendar.sharedPop.fullyMined')
-        : popped
+        : popped || fractured
           ? t(
               fractured || pop.popTime === 'auto-fracture'
                 ? 'calendar.sharedPop.fractured'
@@ -218,7 +218,7 @@ export function sharedPopDetail(
             name: sharedPopTitle(entry),
           },
         }),
-    ...surveyLinks(entry, t),
+    ...surveyLinks(entry, fullyMined, t),
   };
 }
 
@@ -228,19 +228,19 @@ export function sharedPopDetail(
  */
 function surveyLinks(
   entry: SharedPopEntry,
+  fullyMined: boolean,
   t: Translate
 ): Pick<RowDetailModel, 'link' | 'secondaryLink'> {
   const { pop } = entry;
-  const finished = sharedPopMiningState(entry) === 'fullyMined';
   const start = { label: t('calendar.sharedPop.startSurvey'), to: sharedPopStartLink(entry) };
   if (pop.surveyId) {
     const open = { label: t('calendar.sharedPop.openSurvey'), to: `/s/${pop.surveyId}` };
-    return finished
+    return fullyMined
       ? { link: open }
       : {
           link: open,
           secondaryLink: { label: t('calendar.sharedPop.startNewSurvey'), to: start.to },
         };
   }
-  return finished ? {} : { link: start };
+  return fullyMined ? {} : { link: start };
 }
