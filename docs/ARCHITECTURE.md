@@ -623,8 +623,7 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   moon, the place line, the merged Payments and Activity ledgers) is
   `src/engine/corpTaxBook/bookSections.ts`.
   The Overview tab is `OverviewTab.tsx` (totals chips, `NeedsYouQueue`, the
-  moon schedule); the Miners table opens a row in place with `MinerExpandedRow`
-  (a Miner's Statement days and one Open page link); `OreLinesTable` is the ore
+  moon schedule); a Miners table row opens that Miner's page; `OreLinesTable` is the ore
   make-up table the Miner and moon pages share. `corpBookFixture.ts` builds a
   whole book for the section pages' stories.
 - **Pop Sharing settings** (issue #6222; scope in
