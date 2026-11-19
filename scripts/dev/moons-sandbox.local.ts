@@ -3,8 +3,12 @@ import { signInAndGoto } from '../../e2e/support/authSeed';
 import { installEsiMock } from '../../e2e/support/mockEsi';
 import { installSsoMock } from '../../e2e/support/mockSso';
 import { installPersonalEsi } from './sandbox/personalEsi';
+import { installOpenPrices } from './sandbox/prices';
+import { mockPlannerColonies } from '../../e2e/support/piColonies';
+import { vettingAnswer } from './sandbox/vettingMocks';
 import { CHARACTER_ID, CORPORATION_ID, OWNER_HASH, SCOPES } from '../../e2e/support/fixtureData';
 import { scopesForGroup } from '../../src/esi/scopes';
+import { SCOPE_GROUPS } from '../../src/esi/registry';
 
 const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
 const CORS = {
@@ -14,10 +18,17 @@ const CORS = {
 };
 
 test('moons sandbox', async ({ page }) => {
-  const scopes = [...SCOPES, ...scopesForGroup('corp')];
+  // Every scope group, so no page stops on a "grant this scope" prompt.
+  const scopes = [
+    ...new Set([...SCOPES, ...SCOPE_GROUPS.flatMap((group) => scopesForGroup(group))]),
+  ];
   await installSsoMock(page, scopes);
   await installEsiMock(page);
+  // The e2e suite's PI operation (four colonies with extractor programs). Installed first so the
+  // sandbox's own system names, registered after, win over its generic ones.
+  await mockPlannerColonies(page);
   await installPersonalEsi(page);
+  await installOpenPrices(page);
   // The real mint verifies the token with CCP; the Auth emulator takes an unsigned custom token.
   await page.route('**/mintFirebaseToken', async (route) => {
     if (route.request().method() === 'OPTIONS')
@@ -85,6 +96,25 @@ test('moons sandbox', async ({ page }) => {
     if (request.method() === 'OPTIONS') return route.fallback();
     const action = (request.postDataJSON() as { data?: { action?: string } } | null)?.data?.action;
     const answer = action === undefined ? undefined : officerAnswers[action];
+    if (answer === undefined) return route.fallback();
+    await route.fulfill({
+      status: 200,
+      headers: CORS,
+      contentType: 'application/json',
+      body: JSON.stringify({ result: answer }),
+    });
+  });
+  // Vetting reads are server-computed behind the same EVE-token check, so they are answered here too.
+  await page.route('**/vettingCall', async (route) => {
+    const request = route.request();
+    if (request.method() === 'OPTIONS') return route.fallback();
+    const body = (
+      request.postDataJSON() as {
+        data?: { action?: string; data?: Record<string, unknown> };
+      } | null
+    )?.data;
+    const answer =
+      body?.action === undefined ? undefined : vettingAnswer(body.action, body.data ?? {});
     if (answer === undefined) return route.fallback();
     await route.fulfill({
       status: 200,

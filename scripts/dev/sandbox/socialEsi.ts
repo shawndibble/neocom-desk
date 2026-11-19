@@ -224,3 +224,13 @@ export function contacts() {
     };
   });
 }
+
+/** Newest first, as ESI returns it; the last entry is the corp the Character is in now. */
+export function corporationHistory() {
+  return [
+    { record_id: 400, corporation_id: CORPORATION_ID, start_date: iso(-120 * DAY_MS) },
+    { record_id: 300, corporation_id: CORP_BASE + 1, start_date: iso(-400 * DAY_MS) },
+    { record_id: 200, corporation_id: CORP_BASE + 2, start_date: iso(-900 * DAY_MS) },
+    { record_id: 100, corporation_id: 1_000_009, start_date: iso(-1400 * DAY_MS) },
+  ];
+}
