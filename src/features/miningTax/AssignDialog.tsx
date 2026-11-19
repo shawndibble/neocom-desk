@@ -19,7 +19,7 @@ import type { PayeeRecord } from '@/db';
 import { defaultPayeeForSystem } from '@/engine/miningTax/defaultSystems';
 import type { OreLine } from '@/engine/miningTax/types';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
-import { maskIsk } from '@/lib/isk';
+import { maskIsk, roundIsk } from '@/lib/isk';
 import { unmaskNumber } from '@/lib/numberMask';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { assign } from './ledgerActions';
@@ -70,11 +70,6 @@ interface AssignDialogProps {
   suggestion?: PayeeSuggestion;
 }
 
-/** Rounds to the cent — what the editable ISK fields below prefill and display, since a raw float in a number input reads as noise. */
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
 interface IskFieldProps {
   ariaLabel: string;
   computedDefault: number;
@@ -103,9 +98,9 @@ function IskField({ ariaLabel, computedDefault, override, onOverrideChange }: Is
       value={
         editing
           ? override === ''
-            ? String(round2(computedDefault))
+            ? String(roundIsk(computedDefault))
             : override
-          : maskIsk(round2(effectiveValue))
+          : maskIsk(roundIsk(effectiveValue))
       }
       onFocus={() => setEditing(true)}
       onChange={(e) => onOverrideChange(e.target.value)}
@@ -234,7 +229,7 @@ export function AssignDialog({
     setTaxPct(raw);
     const pct = Number(raw);
     if (Number.isFinite(pct)) {
-      setTaxOwedOverride(String(round2((estimatedValue * pct) / 100)));
+      setTaxOwedOverride(String(roundIsk((estimatedValue * pct) / 100)));
     }
   }
 
@@ -247,7 +242,7 @@ export function AssignDialog({
     }
     const newValue = unmaskNumber(raw);
     if (newValue !== undefined && Number.isFinite(pctValue)) {
-      setTaxOwedOverride(String(round2((newValue * pctValue) / 100)));
+      setTaxOwedOverride(String(roundIsk((newValue * pctValue) / 100)));
     }
   }
 
@@ -260,7 +255,7 @@ export function AssignDialog({
     }
     const newTaxOwed = unmaskNumber(raw);
     if (newTaxOwed !== undefined && Number.isFinite(pctValue) && pctValue !== 0) {
-      setEstimatedValueOverride(String(round2(newTaxOwed / (pctValue / 100))));
+      setEstimatedValueOverride(String(roundIsk(newTaxOwed / (pctValue / 100))));
     }
   }
 

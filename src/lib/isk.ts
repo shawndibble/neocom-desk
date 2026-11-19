@@ -80,6 +80,15 @@ export function formatMarketIsk(value: number): string {
 }
 
 /**
+ * An ISK amount to the cent: a derived price (ore per unit, a split) carries a float tail nobody can use.
+ * A positive amount never rounds to 0 (it reads as free); the market's own tick is 0.01.
+ */
+export function roundIsk(value: number): number {
+  const cents = Math.round(value * 100) / 100;
+  return value > 0 ? Math.max(cents, 0.01) : cents;
+}
+
+/**
  * Grouped digits for an editable ISK field at rest — commas, and up to 2
  * decimal places only if the value actually has them (`1,234` vs `1,234.56`,
  * never a padded `1,234.00`). Distinct from `numberMask.ts`'s `maskNumber`,

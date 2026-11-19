@@ -10,6 +10,7 @@ import {
   formatMarketIsk,
   marketIskDecimals,
   maskIskTyping,
+  roundIsk,
   parseIskAmount,
   parseNumeric,
 } from './isk';
@@ -206,5 +207,17 @@ describe('Swiss apostrophe style', () => {
     expect(maskIskTyping('1234.5')).toMatch(/^1['\u2019]234\.5$/);
     expect(parseIskAmount("1'234")).toBe(1234);
     expect(parseIskAmount('1\u2019234.5m')).toBe(1_234_500_000);
+  });
+});
+
+describe('roundIsk', () => {
+  it('drops a float tail to the cent', () => {
+    expect(roundIsk(3.5263578894124)).toBe(3.53);
+    expect(roundIsk(1400.7494944332)).toBe(1400.75);
+  });
+
+  it('never rounds a positive amount to free', () => {
+    expect(roundIsk(0.004)).toBe(0.01);
+    expect(roundIsk(0)).toBe(0);
   });
 });

@@ -19,11 +19,6 @@ import { createNumberFormat, getDecimalMark } from './numberLocale';
 /** `maximumFractionDigits` is capped at 20, which is also as far as a double carries. */
 const masker = createNumberFormat({ maximumFractionDigits: 20 });
 
-/** An ISK price to the cent: a derived price (ore per unit, a split) carries a float tail nobody can use. */
-export function roundIsk(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
 export function maskNumber(value: number): string {
   return masker(value);
 }
