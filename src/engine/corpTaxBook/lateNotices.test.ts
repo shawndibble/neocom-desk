@@ -118,6 +118,14 @@ describe('planNotices (#6294)', () => {
     expect(planNotices(paid, rules({ after: { kind: 'behind', days: 16 } }))).toHaveLength(1);
   });
 
+  it('is due early once the Miner owes the early amount, before the days rule', () => {
+    const view = buildBookView(input());
+    const young = rules({ after: { kind: 'behind', days: 18 } });
+    expect(planNotices(view, young)).toEqual([]);
+    expect(planNotices(view, { ...young, earlyAt: 30_000_001 })).toEqual([]);
+    expect(planNotices(view, { ...young, earlyAt: 30_000_000 })).toHaveLength(1);
+  });
+
   it('counts a Statement mailed just before the switch-over as the last bill, for the cooldown', () => {
     const legacy: Statement = {
       id: '2026-08-01_solo:1',
@@ -135,6 +143,8 @@ describe('planNotices (#6294)', () => {
     };
     const base = input({ statements: [legacy] });
     expect(planNotices(buildBookView(base), rules())).toEqual([]);
+    // The early amount never overrides the cooldown.
+    expect(planNotices(buildBookView(base), { ...rules(), earlyAt: 1 })).toEqual([]);
     const later = { ...base, now: '2026-09-22T14:00:00Z' };
     expect(planNotices(buildBookView(later), rules(), later.now)).toHaveLength(1);
   });

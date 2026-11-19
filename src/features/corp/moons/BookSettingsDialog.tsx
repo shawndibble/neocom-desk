@@ -225,6 +225,7 @@ export function BookSettingsDialog({
   );
   const [noticeMinimum, setNoticeMinimum] = useState(String(rules.minimum));
   const [cooldown, setCooldown] = useState(String(rules.cooldownDays));
+  const [earlyAt, setEarlyAt] = useState(rules.earlyAt === undefined ? '' : String(rules.earlyAt));
   const [tolerance, setTolerance] = useState(String(settings.dayTolerancePct));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -390,6 +391,7 @@ export function BookSettingsDialog({
             : { kind: 'dayOfMonth', day: Number(noticeDay) },
         minimum: Number(noticeMinimum),
         cooldownDays: Number(cooldown),
+        ...(Number(earlyAt) > 0 ? { earlyAt: Number(earlyAt) } : {}),
       };
       // Out-of-bounds or blank figures are never sent (the server would refuse the whole save):
       // `parseNoticeRules` puts back a default for any it cannot take, so they differ.
@@ -953,6 +955,16 @@ export function BookSettingsDialog({
                   value={noticeMinimum}
                   onChange={setNoticeMinimum}
                   aria-label={t('corpTaxBook.moons.settings.running.minimum')}
+                />
+              </Field>
+              <Field
+                label={t('corpTaxBook.moons.settings.running.earlyAt')}
+                note={t('corpTaxBook.moons.settings.running.earlyAtHint')}
+              >
+                <IskInput
+                  value={earlyAt}
+                  onChange={setEarlyAt}
+                  aria-label={t('corpTaxBook.moons.settings.running.earlyAt')}
                 />
               </Field>
               <Field

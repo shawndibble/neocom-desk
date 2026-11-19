@@ -14,6 +14,8 @@ export interface NoticeRules {
   minimum: number;
   /** Days after a notice before another may go. */
   cooldownDays: number;
+  /** A Miner (every Character of the group together) owing this much is due a notice before `after`. Absent: off. */
+  earlyAt?: number;
 }
 
 export const NOTICE_AFTER_KINDS = ['behind', 'dayOfMonth'] as const;
@@ -44,5 +46,6 @@ export function parseNoticeRules(raw: unknown): NoticeRules {
     cooldownDays: isWhole(d.cooldownDays, 1, 90)
       ? d.cooldownDays
       : DEFAULT_NOTICE_RULES.cooldownDays,
+    ...(isFiniteNumber(d.earlyAt) && d.earlyAt > 0 ? { earlyAt: d.earlyAt } : {}),
   };
 }

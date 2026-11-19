@@ -381,6 +381,8 @@ export interface NoticeRules {
   after: { kind: 'behind'; days: number } | { kind: 'dayOfMonth'; day: number };
   minimum: number;
   cooldownDays: number;
+  /** Owing this much is due a notice early; absent: off. */
+  earlyAt?: number;
 }
 
 function parseNoticeRules(raw: unknown): NoticeRules {
@@ -394,6 +396,9 @@ function parseNoticeRules(raw: unknown): NoticeRules {
         : { kind, day: int(a.day, 'noticeRules.after.day', 1, 28) },
     minimum: num(d.minimum, 'noticeRules.minimum', 0, 1e12),
     cooldownDays: int(d.cooldownDays, 'noticeRules.cooldownDays', 1, 90),
+    ...(d.earlyAt !== undefined && d.earlyAt !== null
+      ? { earlyAt: num(d.earlyAt, 'noticeRules.earlyAt', 1, 1e12) }
+      : {}),
   };
 }
 

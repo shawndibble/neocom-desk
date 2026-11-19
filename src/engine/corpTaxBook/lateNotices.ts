@@ -137,15 +137,21 @@ function lastAnchorDay(today: string, day: number): string {
   return utcDay(Date.UTC(y, d >= day ? m - 1 : m - 2, day));
 }
 
-/** Whether a Miner who owes since `oldest` is due a notice by the rules, after `lastIssued`. */
+/**
+ * Whether a Miner who owes `owed` since `oldest` is due a notice by the rules, after `lastIssued`.
+ * The cooldown holds first, so nobody is billed twice inside it; past it, owing `earlyAt` is due
+ * before the Miner is behind by the `after` rule.
+ */
 export function noticeDue(
   rules: NoticeRules,
   today: string,
   oldest: string,
-  lastIssued: string | undefined
+  lastIssued: string | undefined,
+  owed: number
 ): boolean {
   if (lastIssued !== undefined && daysBetween(lastIssued.slice(0, 10), today) < rules.cooldownDays)
     return false;
+  if (rules.earlyAt !== undefined && owed >= rules.earlyAt) return true;
   if (rules.after.kind === 'behind') return daysBetween(oldest, today) >= rules.after.days;
   const anchor = lastAnchorDay(today, rules.after.day);
   return oldest < anchor && (lastIssued === undefined || lastIssued.slice(0, 10) < anchor);
@@ -170,7 +176,7 @@ export function planNotices(
     // The last bill of any kind: a Statement mailed just before the switch-over counts as the
     // first reminder, so no notice follows it within the cooldown.
     const bills = view.internals.byMiner.get(row.id)?.statements ?? [];
-    if (!noticeDue(rules, today, owes.oldest, newest(bills)?.issuedAt)) continue;
+    if (!noticeDue(rules, today, owes.oldest, newest(bills)?.issuedAt, owes.amount)) continue;
     const plan = draftNotice(view, row.id, { now });
     if (plan) plans.push(plan);
   }
