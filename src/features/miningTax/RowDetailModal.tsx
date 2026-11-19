@@ -1,8 +1,7 @@
-import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState, type ReactNode } from 'react';
 import { NOTICE_MS, useTimedToast } from '@/components/ui/useTimedToast';
 import { writeToClipboard } from '@/lib/clipboard';
-import { OreIcon, OreLink } from './OreIcon';
+import { OreLink } from './OreIcon';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -30,6 +29,7 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { cx } from '@/lib/cx';
 import { AssignDialog } from './AssignDialog';
 import { PriceBreakdownCard } from './PriceBreakdownCard';
+import { OrePricedCard } from './OrePricedCard';
 import { usePriceBreakdown } from './usePriceBreakdown';
 import { PaymentLinksCard, type CoveredEntry, type LinkedTransaction } from './PaymentLinksCard';
 import { StatusPill } from './StatusPill';
@@ -38,7 +38,6 @@ import type { PayeeSuggestion } from './suggestPayee';
 import { LedgerActionError } from './LedgerActionError';
 import { labelWithoutSystem } from './assignmentLabel';
 import { formatCount } from '@/lib/formatCount';
-import { Well } from '@/components/ui/Well';
 
 interface RowDetailModalProps {
   open: boolean;
@@ -189,7 +188,7 @@ export function RowDetailModal({
   // The Assign form already lists the ore (with split checkboxes) when it is
   // creating across more than one line — showing it again above would be
   // pure duplication.
-  const showOreCard = !(status === 'unassigned' && oreLines.length > 1);
+  const showOreCard = !assigned && !(status === 'unassigned' && oreLines.length > 1);
   // A split side that claimed the client's figure ahead of ESI (issue #6180)
   // shows how much of it the ledger has caught up with.
   const unreportedByType = new Map(
@@ -337,18 +336,6 @@ export function RowDetailModal({
           <p className="rounded-xs border border-line p-2 text-xs text-text-dim">{corpNote}</p>
         )}
 
-        {status === 'paid' && (onLinkTransaction || assignment?.payment) && (
-          <PaymentLinksCard
-            linkedTransactions={linkedTransactions}
-            onLinkTransaction={onLinkTransaction}
-            onUnlinkTransaction={onUnlinkTransaction}
-            busy={busy}
-            alsoCovers={alsoCovers}
-            onOpenCovered={onOpenCovered}
-            paid={assignment?.payment}
-          />
-        )}
-
         {status === 'dismissed' && (
           <div className="flex flex-wrap gap-2">
             <StatChip
@@ -359,32 +346,22 @@ export function RowDetailModal({
         )}
 
         {showOreCard && (
-          <Well className="space-y-1">
-            <p className={eyebrowClassName}>{t('miningTax.oreColumn')}</p>
-            <ul className="divide-y divide-line text-xs">
-              {oreLines.map((line) => (
-                <li
-                  key={line.typeId}
-                  className="flex items-center gap-1.5 py-1 first:pt-0 last:pb-0"
-                >
-                  <OreIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
-                  <span className="min-w-0 flex-1 truncate">
-                    <OreLink typeId={line.typeId}>
-                      {typeNames.get(line.typeId) ?? `#${line.typeId}`}
-                    </OreLink>
-                  </span>
-                  <span className="tabular-nums text-text-dim">
-                    {unreportedByType.has(line.typeId)
-                      ? t('miningTax.detailUnreported', {
-                          reported: formatCount(unreportedByType.get(line.typeId)!.reported),
-                          claimed: formatCount(unreportedByType.get(line.typeId)!.claimed),
-                        })
-                      : formatCount(line.quantity)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </Well>
+          <OrePricedCard
+            title={t('miningTax.oreColumn')}
+            lines={oreLines.map((line) => {
+              const claim = unreportedByType.get(line.typeId);
+              return {
+                typeId: line.typeId,
+                name: typeNames.get(line.typeId) ?? `#${line.typeId}`,
+                quantity: claim
+                  ? t('miningTax.detailUnreported', {
+                      reported: formatCount(claim.reported),
+                      claimed: formatCount(claim.claimed),
+                    })
+                  : formatCount(line.quantity),
+              };
+            })}
+          />
         )}
 
         {assigned && assignment && (
@@ -395,6 +372,27 @@ export function RowDetailModal({
             typeNames={typeNames}
             pricesFor={pricesFor}
             priceSourcesFor={priceSourcesFor}
+            quantityFor={(typeId) => {
+              const claim = unreportedByType.get(typeId);
+              return claim
+                ? t('miningTax.detailUnreported', {
+                    reported: formatCount(claim.reported),
+                    claimed: formatCount(claim.claimed),
+                  })
+                : undefined;
+            }}
+          />
+        )}
+
+        {status === 'paid' && (onLinkTransaction || assignment?.payment) && (
+          <PaymentLinksCard
+            linkedTransactions={linkedTransactions}
+            onLinkTransaction={onLinkTransaction}
+            onUnlinkTransaction={onUnlinkTransaction}
+            busy={busy}
+            alsoCovers={alsoCovers}
+            onOpenCovered={onOpenCovered}
+            paid={assignment?.payment}
           />
         )}
 

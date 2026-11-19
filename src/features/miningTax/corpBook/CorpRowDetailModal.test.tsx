@@ -147,7 +147,7 @@ describe('CorpRowDetailModal', () => {
     expect(screen.getByText('957,001 ISK')).toBeInTheDocument();
     expect(screen.getByText('Billed')).toBeInTheDocument();
     expect(screen.getByText(/43,050 \(corp\) · 41,200 \(you\)/)).toBeInTheDocument();
-    expect(screen.getAllByText(/15% per-moon rate from 2026-10-01/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/per-moon rate from 2026-10-01/).length).toBeGreaterThan(0);
   });
 
   it('prices each ore line inline and names a source only when it is not the saved snapshot', () => {

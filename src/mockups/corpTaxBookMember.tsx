@@ -45,7 +45,7 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import { SecurityValue } from '@/features/assets/assetBrowserRows';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { AttentionStrip } from '@/features/miningTax/AttentionStrip';
-import { OreIcon, OreLink } from '@/features/miningTax/OreIcon';
+import { OreIcon } from '@/features/miningTax/OreIcon';
 import { OwedBalances } from '@/features/miningTax/OwedBalances';
 import { PriceBreakdownCard } from '@/features/miningTax/PriceBreakdownCard';
 import { StatusPill } from '@/features/miningTax/StatusPill';
@@ -572,20 +572,6 @@ function RowDetail({ open }: { open: boolean }) {
           </span>
           <CorpStatusPill row={BILLED} />
         </div>
-        <div className="space-y-1 rounded-xs border border-line bg-panel-2 p-2">
-          <p className={eyebrowClassName}>Ore</p>
-          <ul className="divide-y divide-line text-xs">
-            <li className="flex items-center gap-1.5 py-1 first:pt-0 last:pb-0">
-              <OreIcon typeId={45490} size={32} className="h-4 w-4 shrink-0" />
-              <span className="min-w-0 flex-1 truncate">
-                <OreLink typeId={45490}>Zeolites</OreLink>
-              </span>
-              <span className="text-text-dim tabular-nums">
-                {formatNumber(BILLED.units)} (book) · 41,200 (you)
-              </span>
-            </li>
-          </ul>
-        </div>
         <PriceBreakdownCard
           assignment={assignment}
           payee={CORP_PAYEE_RECORD}
@@ -593,6 +579,7 @@ function RowDetail({ open }: { open: boolean }) {
           typeNames={new Map([[45490, 'Zeolites']])}
           pricesFor={() => new Map([[45490, 148.2]])}
           priceSourcesFor={() => new Map([[45490, 'saved' as const]])}
+          quantityFor={() => `${formatNumber(BILLED.units)} (book) · 41,200 (you)`}
         />
         <p className="rounded-xs border border-line p-2 text-xs text-text-dim">
           The book decides this day: it is Billable (the corp synced {BOOK.lastSynced}, after its

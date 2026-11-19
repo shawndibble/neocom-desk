@@ -10,7 +10,7 @@ import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { useTicker } from '@/lib/ticker';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { OreIcon, OreLink } from '../OreIcon';
+import { OrePricedCard } from '../OrePricedCard';
 import { bookRowTax } from './corpRows';
 import { typeLabel } from './typeLabel';
 import { hubForPayee } from '../pricing';
@@ -32,7 +32,6 @@ import {
 import type { CorpRowInfo } from './corpRows';
 import { formatCount } from '@/lib/formatCount';
 import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
-import { Well } from '@/components/ui/Well';
 
 interface Props {
   open: boolean;
@@ -212,54 +211,33 @@ export function CorpRowDetailModal({
 
           {conflict && notice}
 
-          <Well className="space-y-1">
-            <p className={eyebrowClassName}>{t('miningTax.oreColumn')}</p>
-            <ul className="divide-y divide-line text-xs">
-              {view.oreLines.map((line) => {
-                const you = personal?.find((p) => p.typeId === line.typeId)?.quantity;
-                const source = view.priceSources[line.typeId] ?? 'none';
-                return (
-                  <li
-                    key={line.typeId}
-                    className="flex items-center gap-1.5 py-1 first:pt-0 last:pb-0"
-                  >
-                    <OreIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
-                    <span className="min-w-0 flex-1 truncate">
-                      <OreLink typeId={line.typeId}>{typeLabel(typeNames, line.typeId)}</OreLink>
-                    </span>
-                    <span className="shrink-0 text-right whitespace-nowrap text-text-dim tabular-nums">
-                      {you !== undefined && you !== line.quantity
-                        ? t('miningTax.corpBook.detail.bookAndYou', {
-                            book: formatCount(line.quantity),
-                            you: formatCount(you),
-                          })
-                        : formatCount(line.quantity)}
-                      {' × '}
-                      {formatIsk(view.unitPrices[line.typeId] ?? 0)}
-                      {source !== 'saved' && (
-                        <span className="block text-[11px]">
-                          {t(`miningTax.detail.breakdown.source.${source}`)}
-                        </span>
-                      )}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          </Well>
-
-          <Well className="space-y-1">
-            <p className={eyebrowClassName}>{t('miningTax.detail.breakdown.title')}</p>
-            <p className="text-xs text-text-dim">
-              {t('miningTax.corpBook.detail.priced', {
-                hub: hub.name,
-                form,
-                pct: view.taxPct,
-                scope,
-                from: view.rateEffectiveFrom ?? view.date,
-              })}
-            </p>
-          </Well>
+          <OrePricedCard
+            title={t('miningTax.oreColumn')}
+            lines={view.oreLines.map((line) => {
+              const you = personal?.find((p) => p.typeId === line.typeId)?.quantity;
+              const source = view.priceSources[line.typeId] ?? 'none';
+              return {
+                typeId: line.typeId,
+                name: typeLabel(typeNames, line.typeId),
+                quantity:
+                  you !== undefined && you !== line.quantity
+                    ? t('miningTax.corpBook.detail.bookAndYou', {
+                        book: formatCount(line.quantity),
+                        you: formatCount(you),
+                      })
+                    : formatCount(line.quantity),
+                unit: formatIsk(view.unitPrices[line.typeId] ?? 0),
+                source:
+                  source === 'saved' ? undefined : t(`miningTax.detail.breakdown.source.${source}`),
+              };
+            })}
+            note={t('miningTax.corpBook.detail.priced', {
+              hub: hub.name,
+              form,
+              scope,
+              from: view.rateEffectiveFrom ?? view.date,
+            })}
+          />
 
           {/* On a Conflict with nothing else to say, the notice already names who to ask. */}
           {!(conflict && facts.length === 0) && (

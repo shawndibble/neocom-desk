@@ -8263,7 +8263,7 @@
       "detail": {
         "lockedResolve": "Think one is wrong? Resolve it with {{corp}}.",
         "bookAndYou": "{{book}} (corp) · {{you}} (you)",
-        "priced": "{{hub}} buy · {{form}} ore · {{pct}}% {{scope}} from {{from}}",
+        "priced": "{{hub}} buy · {{form}} ore · {{scope}} from {{from}}",
         "bookTitle": "Corp Tax Book",
         "lockedShort": "{{corp}} keeps these figures, so they can't be edited here.",
         "unlinkedDonation": "Your {{amount}} ISK donation sent {{time}} paid this day, but {{corp}} never credited it, so it's owed again. Resolve it to send {{corp}} that transfer from your wallet journal.",
@@ -8858,8 +8858,7 @@
       "unassignAction": "Unassign",
       "valueLine": "Est. value {{value}} ISK on the day mined",
       "breakdown": {
-        "title": "How this was priced",
-        "summary": "{{hub}} buy · {{form}} ore · {{tax}}% tax",
+        "summary": "{{hub}} buy · {{form}} ore",
         "compressed": "Compressed",
         "raw": "Raw",
         "edited": "Edited by hand",

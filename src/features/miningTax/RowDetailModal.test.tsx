@@ -414,8 +414,10 @@ describe('RowDetailModal — price breakdown', () => {
       pricesFor: () => new Map([[VELDSPAR, 10]]),
       priceSourcesFor: () => new Map([[VELDSPAR, 'saved' as const]]),
     });
-    expect(screen.getByText('Saved snapshot')).toBeInTheDocument();
-    expect(screen.getByText(/buy · .* ore · 10% tax/)).toBeInTheDocument();
+    // The day's own saved snapshot is the norm, so it is not repeated on every ore line.
+    expect(screen.queryByText('Saved snapshot')).not.toBeInTheDocument();
+    expect(screen.getByText(/× 10/)).toBeInTheDocument();
+    expect(screen.getByText(/buy · .* ore$/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Copy pricing as text' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'More actions for this entry' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Copy pricing as text' }));
