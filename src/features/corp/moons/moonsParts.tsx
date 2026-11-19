@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
@@ -116,8 +116,21 @@ export function MinedBar({ pct, label }: { pct: number | null; label: string }) 
 
 /** A labelled way up from a drill-down page (§6c: never a bare CaretLeft). */
 export function Crumb({ to, label }: { to: string; label: string }) {
+  const navigate = useNavigate();
+  // Arrived by an in-app click (a router key, not the first load): Back is the page it came from,
+  // whichever that was. Modified clicks and a first load keep the link's own destination.
+  const cameFromApp = useLocation().key !== 'default';
   return (
-    <Link to={to} className={cx(inlineLinkClassName, 'gap-1 text-xs', tapTargetClassName)}>
+    <Link
+      to={to}
+      onClick={(e) => {
+        if (!cameFromApp || e.defaultPrevented || e.button !== 0) return;
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        e.preventDefault();
+        navigate(-1);
+      }}
+      className={cx(inlineLinkClassName, 'gap-1 text-xs', tapTargetClassName)}
+    >
       <Icon.Back size={Icon.ICON_SIZE.sm} aria-hidden="true" />
       {label}
     </Link>

@@ -18230,7 +18230,7 @@
           "mined": "Mined (est.)",
           "minedTip": "Ore mined here during each Extraction, from the fracture to the field's end. Mining outside those windows is not counted. Valued at today's hub prices.",
           "tax": "Tax billed",
-          "taxTip": "The tax Statements have already billed for these Extractions. Tax for days not yet billed shows on the Extraction's own page."
+          "taxTip": "The tax Statements have already billed for these Extractions. Tax not yet on a Statement reads \"Not billed yet\" here; the Extraction's own page shows it so far."
         },
         "ore": {
           "title": "Ore in the chunk",
@@ -18257,7 +18257,8 @@
           "minedPct": "{{pct}}% mined · {{isk}} ISK",
           "minedIsk": "{{isk}} ISK",
           "fullyMined": "Fully mined",
-          "tax": "Tax billed"
+          "tax": "Tax billed",
+          "notBilled": "Not billed yet"
         },
         "miners": {
           "title": "Miners · {{count}}",
