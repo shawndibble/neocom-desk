@@ -1,30 +1,10 @@
 /**
- * Device-local visible-columns preferences for the Corp Tax Book's Statements
- * and Miners tables. Period and Miner (each table's identity column) are not
- * in the catalogs: a table that can lose the column naming its rows has lost
+ * Device-local visible-columns preferences for the Corp Tax Book's Miners
+ * table. Miner (the table's identity column) is not
+ * in the catalog: a table that can lose the column naming its rows has lost
  * its rows.
  */
 import { createColumnVisibilitySetting } from '@/lib/columnVisibility';
-
-export const STATEMENTS_COLUMN_IDS = [
-  'status',
-  'miners',
-  'billed',
-  'paid',
-  'outstanding',
-  'mailed',
-  'due',
-  'issued',
-] as const;
-
-export type StatementsColumnId = (typeof STATEMENTS_COLUMN_IDS)[number];
-
-export const useVisibleStatementsColumns = createColumnVisibilitySetting({
-  key: 'corpMoonsStatementsVisibleColumns',
-  ids: STATEMENTS_COLUMN_IDS,
-  // Period alone is a fair table: honour a pick of nothing instead of restoring everything on reload.
-  allowEmpty: true,
-});
 
 export const MINERS_COLUMN_IDS = [
   'standing',

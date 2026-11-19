@@ -9,8 +9,7 @@ import { MinersTab } from './MinersTab';
 import { MoonDetail } from './MoonDetail';
 import { RefineryPage } from './RefineryPage';
 import { OverviewTab } from './OverviewTab';
-import { StatementPeriodDetail } from './StatementPeriodDetail';
-import { StatementsTab } from './StatementsTab';
+import { LateNoticesTab } from './LateNoticesTab';
 import { MOONS_TABS } from './moonsPaths';
 import { tabBarTabs } from '@/lib/pageTabs';
 import { useTranslation } from 'react-i18next';
@@ -22,7 +21,6 @@ import { useTranslation } from 'react-i18next';
  * route's own.
  */
 type SectionTab = 'overview' | 'extractions' | 'miners' | 'statements';
-const ISSUED_PERIOD = BOOK_VIEW.input.statements[0]?.periodStart ?? '2026-08-01';
 
 function Page({ children, tab }: { children: ReactNode; tab?: SectionTab }) {
   const { t } = useTranslation();
@@ -141,27 +139,16 @@ export const Extractions: Story = {
 /** @summary Extractions tab, phone. */
 export const ExtractionsPhone: Story = { ...Extractions, ...phone };
 
-/** @summary Statements tab: issued periods and the next run. */
+/** @summary Late notices tab: the next run and the notices sent. */
 export const Statements: Story = {
   render: () => (
     <Page tab="statements">
-      <StatementsTab />
+      <LateNoticesTab />
     </Page>
   ),
 };
-/** @summary Statements tab, phone. */
+/** @summary Late notices tab, phone. */
 export const StatementsPhone: Story = { ...Statements, ...phone };
-
-/** @summary Statement period page: one issued period's Statements and what each paid. */
-export const StatementPeriodPage: Story = {
-  render: () => (
-    <Page>
-      <StatementPeriodDetail periodStart={ISSUED_PERIOD} />
-    </Page>
-  ),
-};
-/** @summary Statement period page, phone. */
-export const StatementPeriodPagePhone: Story = { ...StatementPeriodPage, ...phone };
 
 /** @summary Miners list as the Overdue total's link opens it: `?balance=overdue`, a Balance pill. */
 export const MinersOverdue: Story = {

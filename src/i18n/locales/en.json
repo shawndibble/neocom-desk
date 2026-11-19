@@ -17995,7 +17995,6 @@
         "rate": "Rate",
         "price": "Price",
         "due": "Due",
-        "minimum": "Minimum Statement",
         "paying": "Paying",
         "account": "Account"
       },
@@ -18126,12 +18125,19 @@
         "body": "Payments now go to {{payee}}. {{by}} changed this on {{date}}.",
         "dismiss": "Dismiss"
       },
+      "notices": {
+        "title": "Notices sent",
+        "sent": "Sent",
+        "unmailed": "{{count}} of {{total}} not mailed",
+        "last": "Last notice",
+        "owed": "Owed now"
+      },
       "tabs": {
         "overview": "Overview",
         "extractions": "Extractions",
         "refineries": "Refineries",
         "miners": "Miners",
-        "statements": "Statements",
+        "statements": "Late notices",
         "moonOwners": "Moon owners"
       },
       "sharing": {
@@ -18327,16 +18333,6 @@
         "held": "Waiting for {{owner}}'s ledger",
         "dismissed": "Dismissed",
         "written-off": "Written off"
-      },
-      "periodStatus": {
-        "issued": "Issued",
-        "sent": "Sent",
-        "overdue": "Overdue",
-        "paid": "Paid",
-        "ready": "Ready to send",
-        "closed": "Closed",
-        "rollover": "Rolls over",
-        "open": "Open"
       },
       "payment": {
         "donation": "Donation",
@@ -18938,46 +18934,13 @@
         "openMiner": "Open Miner page"
       },
       "statementPeriod": {
-        "notFound": "Nothing was mined or billed in this period.",
-        "preview": {
-          "listTitle": "Miners · {{count}}",
-          "rolledOver": "Under the minimum · rolls over",
-          "open": "This period is still open. Amounts are what each Miner owes so far; no Statement has been issued.",
-          "ready": "Ready to send. These Miners get a Statement when you send this period.",
-          "closed": "Closed, not sent yet. A Statement for this period also covers any earlier unbilled days.",
-          "rollover": "Every Miner here is under the minimum Statement, so these amounts roll into a later period."
-        },
-        "issued": "Issued {{date}}",
-        "miners_one": "{{count}} Miner",
-        "miners_other": "{{count}} Miners",
-        "mailSent": "Sent",
-        "mailSentTimes": "Sent ×{{count}}",
         "notMailed": "Not mailed",
-        "stopped": "Stopped",
         "statementNotFound": "Statement not found.",
-        "listTitle": "Statements · {{count}}",
-        "unpaidOf": "{{unpaid}} of {{total}} unpaid",
-        "overdueCount": "{{count}} overdue",
-        "pausedCount": "{{count}} paused by a declaration",
-        "stoppedTip_one": "This Miner stopped reminders. {{count}} mail sent.",
-        "stoppedTip_other": "This Miner stopped reminders. {{count}} mails sent.",
         "alreadyPaid": "Statement already paid",
         "reminderCap": "Reminders stopped; one already sent",
         "pausedUntil": "Paused · until {{date}}",
         "dueLate_one": "{{date}} · {{count}} day late",
         "dueLate_other": "{{date}} · {{count}} days late"
-      },
-      "periods": {
-        "title": "All periods",
-        "mailedOf": "{{sent}}/{{total}}",
-        "mailedTip": "Statements mailed at least once, of the Statements issued for the period.",
-        "meta": "{{cadence}} · minimum {{minimum}}",
-        "writeOffsTolerance_one": "{{tolerance}} left over by {{count}} payment within tolerance, written off.",
-        "writeOffsTolerance_other": "{{tolerance}} left over by {{count}} payments within tolerance, written off.",
-        "writeOffsLate_one": "{{count}} line recorded after payment, never billed.",
-        "writeOffsLate_other": "{{count}} lines recorded after payment, never billed.",
-        "writeOffsLabel": "About write-offs",
-        "writeOffsTip": "Both are logged and shown on each Miner's page."
       },
       "scope": {
         "title": "Allow the refinery ledger",
@@ -19511,15 +19474,7 @@
         },
         "startDate": "Start date (EVE time)",
         "grace": "Grace after day end (hours)",
-        "overdue": "Overdue after (days)",
         "minimum": "Minimum Statement",
-        "issuedBeforeNote": "Applies only to Statements issued before the running account.",
-        "cadenceLabel": "Statements",
-        "cadence": {
-          "monthly": "Monthly",
-          "days": "Every N days"
-        },
-        "cadenceDays": "Days per period",
         "divisions": "Wallet divisions donations are read from",
         "division": "Division {{n}}",
         "extractions": "Extractions",
@@ -19581,9 +19536,9 @@
         },
         "scheduled": "Scheduled",
         "addRateTitle": "Add a rate",
-        "statements": "Statements",
+        "billingDays": "Billing days and wallets",
         "sections": "Settings sections",
-        "startHint": "Mining before this day owes nothing. Earlier is always allowed; later only while no Statement covers the days in between.",
+        "startHint": "Mining before this day owes nothing. Earlier is always allowed; later only while no late notice lists the days in between.",
         "saved": "Settings saved",
         "rateIncomplete": "Finish the rate in the form, or clear its percent, to save.",
         "addRate": "Add rate",
@@ -19606,7 +19561,7 @@
         "running": {
           "heading": "Running account and late notices",
           "billing": "Billing",
-          "summary": "Each day is owed as it closes, payments pay the oldest day first, and a Miner who falls behind gets a late notice. Statements issued before stay as they are.",
+          "summary": "Each day is owed as it closes, payments pay the oldest day first, and a Miner who falls behind gets a late notice.",
           "noticeWhen": "Late notice when",
           "behind": "Behind",
           "dayOfMonth": "Day of month",

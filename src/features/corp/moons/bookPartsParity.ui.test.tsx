@@ -27,8 +27,7 @@ import { MoonDetail } from './MoonDetail';
 import { MoonOwnerDetail } from './MoonOwnerDetail';
 import { MoonOwnersTab } from './MoonOwnersTab';
 import { OverviewTab } from './OverviewTab';
-import { StatementPeriodDetail } from './StatementPeriodDetail';
-import { StatementsTab } from './StatementsTab';
+import { LateNoticesTab } from './LateNoticesTab';
 
 type BookPartSet = ReadonlySet<BookPart>;
 type BookDetailKind = NonNullable<Parameters<typeof bookPartsFor>[1]>;
@@ -368,7 +367,7 @@ const ROUTES: Route[] = [
   { name: 'overview', tab: 'overview', detail: null, ui: <OverviewTab /> },
   { name: 'extractions', tab: 'extractions', detail: null, ui: <ExtractionsTab /> },
   { name: 'miners', tab: 'miners', detail: null, ui: <MinersTab /> },
-  { name: 'statements', tab: 'statements', detail: null, ui: <StatementsTab /> },
+  { name: 'statements', tab: 'statements', detail: null, ui: <LateNoticesTab /> },
   { name: 'moon-owners', tab: 'moon-owners', detail: null, ui: <MoonOwnersTab /> },
   { name: 'miner', tab: 'miners', detail: 'miner', ui: <MinerDetail id="g1" /> },
   {
@@ -388,12 +387,6 @@ const ROUTES: Route[] = [
     tab: 'extractions',
     detail: 'extraction',
     ui: <MoonDetail id={AUG_ID} />,
-  },
-  {
-    name: 'statement period',
-    tab: 'statements',
-    detail: 'statementPeriod',
-    ui: <StatementPeriodDetail periodStart="2026-08-01" />,
   },
   {
     name: 'moon owner',
