@@ -182,14 +182,23 @@ describe('Statements drill-down (#5285)', () => {
     expect(within(table).getByText('Aug 2026')).toBeInTheDocument();
   });
 
-  it('open and ready rows do not click through', async () => {
-    renderAt('/corp/moons/statements');
+  it('an open period opens a page listing the Miners it bills so far', async () => {
+    renderAt('/corp/moons/statements', false, {
+      extra: {
+        entries: [
+          entry(1, '2026-08-10', 1000),
+          entry(2, '2026-08-11', 2000),
+          entry(1, '2026-09-20', 1000),
+        ],
+      },
+    });
     const table = screen.getByRole('table', { name: 'All periods' });
     const sep = within(table).getByText('Sep 2026').closest('tr')!;
     await userEvent.click(within(sep).getByText('Sep 2026'));
-    expect(screen.getByRole('table', { name: 'All periods' })).toBeInTheDocument();
     expect(screen.queryByRole('table', { name: 'Statements' })).toBeNull();
-    expect(within(sep).queryByText('Aug 2026')).toBeNull();
+    const miners = await screen.findByRole('table', { name: /^Miners/ });
+    expect(within(miners).getByText('Pilot 1')).toBeInTheDocument();
+    expect(screen.getByText(/still open/)).toBeInTheDocument();
   });
 
   it('the period page lists each miner with mail state; Stopped hides the sent mark', () => {
@@ -206,7 +215,7 @@ describe('Statements drill-down (#5285)', () => {
 
   it('a period without Statements says so', () => {
     renderAt('/corp/moons/statements/2020-01-01');
-    expect(screen.getByText('No Statements were issued for this period.')).toBeInTheDocument();
+    expect(screen.getByText('Nothing was mined or billed in this period.')).toBeInTheDocument();
   });
 
   describe('row actions (#5287)', () => {

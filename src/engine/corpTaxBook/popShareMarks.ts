@@ -5,6 +5,10 @@
  * Built from the Sharing tab's own rows (`sharingMoons`), so a mark never disagrees
  * with the settings. Keyed by moon, by refinery (the Moon extractions widget's rows name a
  * refinery, not a moon) and by moon owner. Plain records, so a widget read can carry them.
+ *
+ * A mark flags an exception. When every moon the book handles is shared with the same audiences,
+ * the shared mark would sit on every row and say nothing, so it is left off (#6226 follow-up);
+ * an opted-out mark always stays.
  */
 import {
   audienceKey,
@@ -40,9 +44,21 @@ export function popShareMarks(
   // A book that shares nothing marks nothing: an opted-out mark there would only be noise.
   if (!doc.enabled) return marks;
   const ownerAudiences = new Map<number, Map<string, PopAudience>>();
-  for (const row of sharingMoons(extractions, feeders, doc)) {
+  const rows = sharingMoons(extractions, feeders, doc);
+  // Opt-outs are exceptions themselves, so they never stop the rest reading as alike.
+  const audienceSets = new Set<string>();
+  for (const row of rows) {
     const mark = popShareMark(row);
-    if (!mark) continue;
+    if (mark?.kind === 'opted-out') continue;
+    audienceSets.add(
+      mark ? mark.audiences.map(audienceKey).sort().join('|') || 'shared' : 'unshared'
+    );
+  }
+  // Every moon shared alike: nothing to tell apart.
+  const uniform = audienceSets.size === 1 && !audienceSets.has('unshared');
+  for (const row of rows) {
+    const mark = popShareMark(row);
+    if (!mark || (uniform && mark.kind === 'shared')) continue;
     marks.moons[String(row.moonId)] = mark;
     marks.structures[String(row.structureId)] = mark;
     if (mark.kind !== 'shared' || row.ownerCorporationId === undefined) continue;

@@ -18908,7 +18908,15 @@
         "openMiner": "Open Miner page"
       },
       "statementPeriod": {
-        "notFound": "No Statements were issued for this period.",
+        "notFound": "Nothing was mined or billed in this period.",
+        "preview": {
+          "listTitle": "Miners · {{count}}",
+          "rolledOver": "Under the minimum · rolls over",
+          "open": "This period is still open. Amounts are what each Miner owes so far; no Statement has been issued.",
+          "ready": "Ready to send. These Miners get a Statement when you send this period.",
+          "closed": "Closed, not sent yet. A Statement for this period also covers any earlier unbilled days.",
+          "rollover": "Every Miner here is under the minimum Statement, so these amounts roll into a later period."
+        },
         "issued": "Issued {{date}}",
         "miners_one": "{{count}} Miner",
         "miners_other": "{{count}} Miners",

@@ -1289,6 +1289,7 @@ function ownPeriodBilling(
   let billed = 0;
   let rolled = 0;
   let rolledAmount = 0;
+  const lines: PeriodMinerLine[] = [];
   const closed = new Set(view.input.miners.filter((m) => m.closedAt).map((m) => m.id));
   const adjustments = view.input.adjustments.filter((a) => a.date >= period.start);
   for (const m of view.miners) {
@@ -1308,12 +1309,49 @@ function ownPeriodBilling(
     if (draft.kind === 'rolled-over') {
       rolled += 1;
       rolledAmount += draft.amount;
+      lines.push({ minerId: m.id, amount: draft.amount, rolledOver: true });
     }
     if (draft.kind !== 'statement') continue;
     miners += 1;
     billed += draft.amount;
+    lines.push({ minerId: m.id, amount: draft.amount, rolledOver: false });
   }
-  return { miners, billed, rolled, rolledAmount };
+  return { miners, billed, rolled, rolledAmount, lines };
+}
+
+/** One Miner's own days in a period that has no Statement yet. */
+export interface PeriodMinerLine {
+  minerId: string;
+  amount: number;
+  /** Below the book's minimum Statement: the amount rolls into a later one. */
+  rolledOver: boolean;
+}
+
+/**
+ * The Miners behind a period row that has no Statements (open, ready, closed or rollover): what
+ * each owes for the period's own days, largest first. Undefined for an issued or unknown period.
+ */
+export function periodPreview(view: BookView, periodStart: string): PeriodMinerLine[] | undefined {
+  const row = periodRows(view).find((r) => r.start === periodStart);
+  if (!row || isIssuedPeriod(row)) return undefined;
+  const period = statementPeriod(periodStart, view.input.cadence, view.input.startDate);
+  const chargesByMiner = new Map<string, BookView['charges']>();
+  for (const c of view.charges) {
+    chargesByMiner.set(c.minerId, [...(chargesByMiner.get(c.minerId) ?? []), c]);
+  }
+  const minimum =
+    row.status === 'ready' || row.status === 'closed' || row.status === 'rollover'
+      ? view.input.minimumStatement
+      : 0;
+  const own =
+    row.status === 'ready'
+      ? planStatementRun(view, period).lines.map((l) => ({
+          minerId: l.minerId,
+          amount: l.draft.amount,
+          rolledOver: false,
+        }))
+      : ownPeriodBilling(view, chargesByMiner, period, minimum).lines;
+  return own.sort((a, b) => b.amount - a.amount || a.minerId.localeCompare(b.minerId));
 }
 
 /** The Statement issued last, if any. */
