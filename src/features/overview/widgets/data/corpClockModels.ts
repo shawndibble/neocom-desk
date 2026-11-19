@@ -169,12 +169,24 @@ function deadlinesView(
     : undefined;
 
   const table: TableModel = {
+    // Fits the box rather than the size budget, so the chart's narrow side keeps "What" when it fits.
+    fitWidth: true,
     columns: [
-      { key: 'subject', label: t('overview.widgets.corpDeadlines.col.subject'), priority: 0 },
+      {
+        key: 'subject',
+        label: t('overview.widgets.corpDeadlines.col.subject'),
+        priority: 0,
+        minWidth: 120,
+      },
       ...(labels
         ? [{ key: 'corp', label: t('overview.widgets.corpDeadlines.col.corp'), priority: 3 }]
         : []),
-      { key: 'what', label: t('overview.widgets.corpDeadlines.col.what'), priority: 2 },
+      {
+        key: 'what',
+        label: t('overview.widgets.corpDeadlines.col.what'),
+        priority: 2,
+        minWidth: 80,
+      },
       {
         key: 'when',
         label: t('overview.widgets.corpDeadlines.col.when'),
