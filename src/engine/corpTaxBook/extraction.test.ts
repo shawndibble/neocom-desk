@@ -48,6 +48,24 @@ describe('extractionStatus', () => {
     expect(extractionStatus(ex, '2026-07-09T03:00:00Z').state).toBe('expired');
   });
 
+  it('ends the field at the Fully Mined flag when that comes before the clock expiry', () => {
+    const opts = { fullyMinedAt: '2026-07-08T05:00:00Z' };
+    expect(extractionStatus(ex, '2026-07-08T06:00:00Z', opts)).toMatchObject({
+      state: 'expired',
+      expiresAt: '2026-07-08T05:00:00.000Z',
+    });
+    expect(extractionStatus(ex, '2026-07-08T04:00:00Z', opts).state).toBe('fractured');
+  });
+
+  it('ignores a Fully Mined flag set after the clock expiry, and never ends before the fracture', () => {
+    expect(
+      extractionStatus(ex, '2026-07-09T02:00:00Z', { fullyMinedAt: '2026-07-20T00:00:00Z' })
+    ).toMatchObject({ state: 'fractured', expiresAt: '2026-07-09T03:00:00.000Z' });
+    expect(
+      extractionStatus(ex, '2026-07-07T03:00:00Z', { fullyMinedAt: '2026-07-01T00:00:00Z' })
+    ).toMatchObject({ state: 'expired', expiresAt: '2026-07-07T03:00:00.000Z' });
+  });
+
   it('fractures when the laser is fired', () => {
     const fired = { ...ex, laserFiredAt: '2026-07-07T01:00:00Z' };
     expect(extractionStatus(fired, '2026-07-07T01:30:00Z')).toMatchObject({

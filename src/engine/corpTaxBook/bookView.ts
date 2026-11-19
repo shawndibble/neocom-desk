@@ -762,7 +762,10 @@ export function extractionRowBase(
 ): ExtractionRowBase & { fracturedAt?: string } {
   const ex = toEngineExtraction(x);
   const expiryHours = input.structureExpiryHours[String(x.structureId)];
-  const status = extractionStatus(ex, input.now, { expiryHours });
+  const status = extractionStatus(ex, input.now, {
+    expiryHours,
+    ...(x.fullyMined ? { fullyMinedAt: x.fullyMined.at } : {}),
+  });
   const planned = fractureAndExpiry(ex, expiryHours);
   // Source order (D13): the ExtractionStarted notification, then a linked Survey.
   const notified = x.oreLines ?? [];
