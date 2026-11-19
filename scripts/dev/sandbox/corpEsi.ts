@@ -54,10 +54,6 @@ const ROLE_SETS: string[][] = [
   [],
 ];
 
-function members() {
-  return MEMBER_IDS;
-}
-
 function roles() {
   return MEMBER_IDS.map((id, i) => ({
     character_id: id,
@@ -225,7 +221,7 @@ const CORP = `/corporations/${CORPORATION_ID}`;
 
 /** Static corp reads, by exact path. */
 const LISTS: Record<string, () => unknown> = {
-  [`${CORP}/members`]: members,
+  [`${CORP}/members`]: () => MEMBER_IDS,
   [`${CORP}/roles`]: roles,
   [`${CORP}/membertracking`]: memberTracking,
   [`${CORP}/titles`]: () => TITLES,

@@ -254,7 +254,12 @@ export async function installPersonalEsi(page: Page): Promise<void> {
       });
     const list = lists[path];
     if (list) return json(list());
-    const corp = corpAnswer(path, route.request().method(), route.request().postDataJSON());
+    const method = route.request().method();
+    const corp = corpAnswer(
+      path,
+      method,
+      method === 'POST' ? route.request().postDataJSON() : null
+    );
     if (corp !== undefined) return json(corp);
     if (path === `${c}/roles`) return json({ roles: ['Director'] });
     const itemsMatch = /^\/characters\/\d+\/contracts\/(\d+)\/items$/.exec(path);
