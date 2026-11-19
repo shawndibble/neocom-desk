@@ -290,15 +290,20 @@ describe('buildBookView', () => {
     const rows = periodRows(view);
     for (const start of ['2026-08-01', '2026-09-01', '2026-10-01']) {
       const row = rows.find((r) => r.start === start);
-      const lines = periodPreview(view, start);
+      const lines = row && periodPreview(view, row);
       if (!row || !lines) continue;
       expect(lines.reduce((s, l) => s + l.amount, 0)).toBe(row.billed);
       expect(lines.length).toBe(row.miners);
     }
-    const aug = periodPreview(view, '2026-08-01')!;
+    const aug = periodPreview(
+      view,
+      rows.find((r) => r.start === '2026-08-01')!
+    )!;
     expect(aug.length).toBe(2);
     expect(aug[0].amount).toBeGreaterThan(aug[1].amount);
-    expect(periodPreview(view, '2030-01-01')).toBeUndefined();
+    expect(
+      periodPreview(view, rows.find((r) => r.statements > 0) ?? { ...rows[0], statements: 1 })
+    ).toBeUndefined();
   });
 
   it('keeps the ready row on the Send plan and labels a below-minimum closed period as rolling over (CX-38)', () => {

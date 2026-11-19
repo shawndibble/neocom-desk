@@ -1,6 +1,7 @@
 import { useState, type ReactElement } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import {
   DataTable,
   EmptyState,
@@ -18,6 +19,7 @@ import {
   periodRows,
   periodStatements,
   type PeriodMinerLine,
+  type PeriodRow,
   type PeriodStatementRow,
 } from '@/engine/corpTaxBook/bookView';
 import { tabPath } from '@/lib/pageTabs';
@@ -68,6 +70,20 @@ export function StatementPeriodDetail({ periodStart }: { periodStart: string }) 
   );
 }
 
+/** The one-line explanation of a period that has no Statements, by its status. */
+function previewNote(t: TFunction, status: PeriodRow['status']) {
+  switch (status) {
+    case 'ready':
+      return t('corpTaxBook.moons.statementPeriod.preview.ready');
+    case 'closed':
+      return t('corpTaxBook.moons.statementPeriod.preview.closed');
+    case 'rollover':
+      return t('corpTaxBook.moons.statementPeriod.preview.rollover');
+    default:
+      return t('corpTaxBook.moons.statementPeriod.preview.open');
+  }
+}
+
 /** A period with no Statements yet (open, ready, closed, rollover): each Miner's own days. */
 function PeriodPreviewDetail({ periodStart }: { periodStart: string }) {
   const { t } = useTranslation();
@@ -75,7 +91,7 @@ function PeriodPreviewDetail({ periodStart }: { periodStart: string }) {
   const navigate = useNavigate();
   const [tableRef, cards] = useCards();
   const period = periodRows(view).find((r) => r.start === periodStart);
-  const lines = periodPreview(view, periodStart);
+  const lines = period ? periodPreview(view, period) : undefined;
   if (!period || !lines) {
     return (
       <div className="space-y-4">
@@ -135,9 +151,7 @@ function PeriodPreviewDetail({ periodStart }: { periodStart: string }) {
       <StatChips>
         <StatChip label={t('corpTaxBook.moons.cols.billed')} value={isk(period.billed)} emphasis />
       </StatChips>
-      <p className="text-xs text-text-dim">
-        {t(`corpTaxBook.moons.statementPeriod.preview.${period.status as 'open'}`)}
-      </p>
+      <p className="text-xs text-text-dim">{previewNote(t, period.status)}</p>
       <Panel
         title={t('corpTaxBook.moons.statementPeriod.preview.listTitle', { count: lines.length })}
         padded={false}

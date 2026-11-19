@@ -1329,12 +1329,11 @@ export interface PeriodMinerLine {
 
 /**
  * The Miners behind a period row that has no Statements (open, ready, closed or rollover): what
- * each owes for the period's own days, largest first. Undefined for an issued or unknown period.
+ * each owes for the period's own days, largest first. Undefined for an issued period.
  */
-export function periodPreview(view: BookView, periodStart: string): PeriodMinerLine[] | undefined {
-  const row = periodRows(view).find((r) => r.start === periodStart);
-  if (!row || isIssuedPeriod(row)) return undefined;
-  const period = statementPeriod(periodStart, view.input.cadence, view.input.startDate);
+export function periodPreview(view: BookView, row: PeriodRow): PeriodMinerLine[] | undefined {
+  if (isIssuedPeriod(row)) return undefined;
+  const period = statementPeriod(row.start, view.input.cadence, view.input.startDate);
   const chargesByMiner = new Map<string, BookView['charges']>();
   for (const c of view.charges) {
     chargesByMiner.set(c.minerId, [...(chargesByMiner.get(c.minerId) ?? []), c]);
@@ -1351,7 +1350,9 @@ export function periodPreview(view: BookView, periodStart: string): PeriodMinerL
           rolledOver: false,
         }))
       : ownPeriodBilling(view, chargesByMiner, period, minimum).lines;
-  return own.sort((a, b) => b.amount - a.amount || a.minerId.localeCompare(b.minerId));
+  // A closed row counts only the Miners it bills; the ones under the minimum roll into a later Statement.
+  const listed = row.status === 'closed' ? own.filter((l) => !l.rolledOver) : own;
+  return listed.sort((a, b) => b.amount - a.amount || a.minerId.localeCompare(b.minerId));
 }
 
 /** The Statement issued last, if any. */
