@@ -20,7 +20,6 @@ export const OVERVIEW_COLUMN_IDS = [
   'refineValue',
   'oreBreakdown',
   'units',
-  'pricing',
 ] as const;
 
 export type OverviewColumnId = (typeof OVERVIEW_COLUMN_IDS)[number];
@@ -32,7 +31,6 @@ export const DEFAULT_VISIBLE_OVERVIEW_COLUMNS: readonly OverviewColumnId[] = [
   'volume',
   'rawValue',
   'refineValue',
-  'pricing',
 ];
 
 export const VISIBLE_OVERVIEW_COLUMNS_KEY = 'miningYieldOverviewVisibleColumns';

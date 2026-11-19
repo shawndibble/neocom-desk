@@ -76,7 +76,6 @@ describe('yieldOverviewCsvColumns', () => {
       'miningTax.csvUnpricedOres',
       'miningTax.overview.oreBreakdownColumn',
       'miningTax.overview.unitsColumn',
-      'miningTax.overview.pricingColumn',
     ]);
   });
 
@@ -155,7 +154,6 @@ describe('yieldOverviewCsvColumns', () => {
       'Veldspar × 1000; Scordite × 500'
     );
     expect(byHeader['miningTax.overview.unitsColumn']).toBe(1500);
-    expect(byHeader['miningTax.overview.pricingColumn']).toBe('miningTax.overview.pricingFull');
   });
 
   it('leaves volume blank when no type in the row has a known volume', () => {
@@ -163,16 +161,6 @@ describe('yieldOverviewCsvColumns', () => {
       (c) => c.header === 'miningTax.overview.volumeColumn'
     )!;
     expect(volume.value(yieldRow())).toBeNull();
-  });
-
-  it('marks partial pricing in the pricing cell', () => {
-    const pricing = yieldOverviewCsvColumns(t, context).find(
-      (c) => c.header === 'miningTax.overview.pricingColumn'
-    )!;
-    const row = yieldRow({
-      valuation: { rawValue: 1, refineValue: 1, pricedAll: false, lines: [] },
-    } as unknown as Partial<MiningYieldRow>);
-    expect(pricing.value(row)).toBe('miningTax.overview.pricingPartial');
   });
 
   it('falls back to the system id for an unresolved system', () => {

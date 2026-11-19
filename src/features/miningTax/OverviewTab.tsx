@@ -464,19 +464,6 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
       sortValue: (row) => sumUnits(row.entry.oreLines),
       stackAffix: { after: ` ${t('miningTax.overview.unitsColumn').toLowerCase()}` },
     },
-    pricing: {
-      id: 'pricing',
-      header: t('miningTax.overview.pricingColumn'),
-      className: 'whitespace-nowrap',
-      render: (row) =>
-        // Only a gap is worth a mark; a fully priced row says nothing.
-        !row.valuation.pricedAll && (
-          <span className="text-[0.6875rem] text-warning">
-            {t('miningTax.overview.pricingPartial')}
-          </span>
-        ),
-      sortValue: (row) => (row.valuation.pricedAll ? 1 : 0),
-    },
   };
 
   const columns: DataTableColumn<MiningYieldRow>[] = [
