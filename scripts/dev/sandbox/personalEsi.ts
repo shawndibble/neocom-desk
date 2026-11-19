@@ -12,20 +12,21 @@ import { CHARACTER_ID } from '../../../e2e/support/fixtureData';
 import { DAY_MS, HOUR_MS } from '../../../src/lib/age';
 import { utcDay } from '../../../src/engine/localDay';
 import * as social from './socialEsi';
-import { iso, mix } from './gen';
+import { iso, mix, STATION_NAMES } from './gen';
+import { corpAnswer } from './corpEsi';
 
 const day = (back: number) => utcDay(Date.now() - back * DAY_MS);
 
 export const JITA = {
   systemId: 30000142,
   stationId: 60003760,
-  name: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant',
+  name: STATION_NAMES[60003760],
   system: 'Jita',
 };
 export const AMARR = {
   systemId: 30002187,
   stationId: 60008494,
-  name: 'Amarr VIII (Oris) - Emperor Family Academy',
+  name: STATION_NAMES[60008494],
   system: 'Amarr',
 };
 const SYSTEM_NAMES: Record<number, string> = {
@@ -253,6 +254,14 @@ export async function installPersonalEsi(page: Page): Promise<void> {
       });
     const list = lists[path];
     if (list) return json(list());
+    const method = route.request().method();
+    const corp = corpAnswer(
+      path,
+      method,
+      method === 'POST' ? route.request().postDataJSON() : null
+    );
+    if (corp !== undefined) return json(corp);
+    if (path === `${c}/roles`) return json({ roles: ['Director'] });
     const itemsMatch = /^\/characters\/\d+\/contracts\/(\d+)\/items$/.exec(path);
     if (itemsMatch) return json(social.contractItems(Number(itemsMatch[1])));
     const mailMatch = /^\/characters\/\d+\/mail\/(\d+)$/.exec(path);

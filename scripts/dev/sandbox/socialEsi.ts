@@ -13,7 +13,7 @@ import {
 } from '../../../e2e/support/fixtureData';
 import { DAY_MS, HOUR_MS } from '../../../src/lib/age';
 
-import { iso, mix } from './gen';
+import { iso, mix, STATION_NAMES } from './gen';
 
 const PILOTS = [
   'Aria Vance',
@@ -35,7 +35,8 @@ const CORP_BASE = 92_000_000;
 /** id -> display name for POST /universe/names; every generated id the sandbox shows. */
 export function nameFor(
   id: number
-): { name: string; category: 'character' | 'corporation' | 'alliance' } | undefined {
+): { name: string; category: 'character' | 'corporation' | 'alliance' | 'station' } | undefined {
+  if (STATION_NAMES[id]) return { name: STATION_NAMES[id], category: 'station' };
   if (id === CHARACTER_ID) return { name: CHARACTER_NAME, category: 'character' };
   if (id === CORPORATION_ID) return { name: CORPORATION_NAME, category: 'corporation' };
   if (id === ALLIANCE_ID) return { name: ALLIANCE_NAME, category: 'alliance' };
