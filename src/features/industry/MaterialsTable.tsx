@@ -32,7 +32,7 @@ import type { MaterialSourcing, MaterialSourcingMap } from '@/engine/industry/ty
 import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 import { cx } from '@/lib/cx';
 import { formatIskCompact } from '@/lib/isk';
-import { maskNumber, unmaskCount, unmaskNumber } from '@/lib/numberMask';
+import { maskNumber, roundIsk, unmaskCount, unmaskNumber } from '@/lib/numberMask';
 import { ItemInfoLink } from '@/features/entities';
 import type { ItemMenuFor } from '@/features/market/ItemContextMenu';
 import { buildMaterialsColumns } from './MaterialsColumns';
@@ -690,12 +690,12 @@ export function MaterialsTable({
               overridden ? 'text-accent' : state.fullyOwned ? 'text-text-dim' : 'text-text'
             }
           >
-            {maskNumber(state.unitPrice)}
+            {maskNumber(roundIsk(state.unitPrice))}
           </EditableValue>
         ) : (
           <span onBlur={inline ? undefined : whenFocusLeaves(() => editPrice(null))}>
             <SourcingInput
-              value={state.unitPrice ?? undefined}
+              value={state.unitPrice === null ? undefined : roundIsk(state.unitPrice)}
               label={t('industry.priceFor', { material: name })}
               inputMode="decimal"
               widthClassName="w-24"

@@ -4,7 +4,7 @@ import type { DepthPrice } from '@/engine/industry/depthPrice';
 import type { MaterialSourcingMap } from '@/engine/industry/types';
 import { cx } from '@/lib/cx';
 import { formatIskCompact } from '@/lib/isk';
-import { maskNumber } from '@/lib/numberMask';
+import { maskNumber, roundIsk } from '@/lib/numberMask';
 import { formatCount } from '@/lib/formatCount';
 import { DepthPriceLine } from './DepthPriceLine';
 import { EditableValue } from '@/components/ui';
@@ -63,7 +63,7 @@ function PhonePrice({
         onFocused={onRefocused}
         className={cx('text-xs', overridden ? 'text-accent' : 'text-text')}
       >
-        {t('industry.errands.atPrice', { price: maskNumber(state.unitPrice) })}
+        {t('industry.errands.atPrice', { price: maskNumber(roundIsk(state.unitPrice)) })}
         {overridden && (
           <span className="ml-1.5 text-[0.6875rem]">{t('industry.priceSourceOverride')}</span>
         )}
