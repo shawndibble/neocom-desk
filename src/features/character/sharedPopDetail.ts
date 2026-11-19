@@ -172,8 +172,6 @@ export function sharedPopDetail(
   return {
     title: sharedPopTitle(entry),
     status: {
-      badge: t(POP_TIME_KEY[pop.popTime]),
-      tone: popped || fractured || fullyMined ? 'success' : 'neutral',
       text: fullyMined
         ? t('calendar.sharedPop.fullyMined')
         : popped || fractured
