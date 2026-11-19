@@ -25,5 +25,4 @@ export const KIND_ICON: Record<CharacterBoardItemKind, typeof Icon.Skills> = {
   skyhookRaid: Icon.PiSkyhook,
   contractExpiry: Icon.Contracts,
   orderExpiry: Icon.Orders,
-  skillPlan: Icon.FlatList,
 };

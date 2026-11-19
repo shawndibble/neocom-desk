@@ -24,7 +24,7 @@
  * need to carry alone: the closest pair under deuteranopia is industry/orders
  * at ΔE 12, which is a weak *reinforcement* rather than a lost signal.
  */
-import { isProjectedKind, type CharacterBoardItemKind } from '@/engine/character/board';
+import type { CharacterBoardItemKind } from '@/engine/character/board';
 
 /** Background fill — flat, per DESIGN.md §6. Map dots, ticker segments, menu swatches. */
 export const KIND_FILL: Record<CharacterBoardItemKind, string> = {
@@ -42,7 +42,6 @@ export const KIND_FILL: Record<CharacterBoardItemKind, string> = {
   skyhookRaid: 'bg-kind-skyhook-raid',
   contractExpiry: 'bg-kind-contract-expiry',
   orderExpiry: 'bg-kind-order-expiry',
-  skillPlan: 'bg-kind-skill-plan',
 };
 
 /** Text tone — the rail's countdown and the glyph beside it. */
@@ -61,12 +60,9 @@ export const KIND_TEXT: Record<CharacterBoardItemKind, string> = {
   skyhookRaid: 'text-kind-skyhook-raid',
   contractExpiry: 'text-kind-contract-expiry',
   orderExpiry: 'text-kind-order-expiry',
-  skillPlan: 'text-kind-skill-plan',
 };
 
-/** A ticker segment (2px tall): solid for a real clock, a dashed line for a projected one. */
+/** A ticker segment (2px tall). */
 export function kindSegmentClassName(kind: CharacterBoardItemKind): string {
-  return isProjectedKind(kind)
-    ? 'flex-1 border-t-2 border-dashed border-kind-skill-plan'
-    : `flex-1 ${KIND_FILL[kind]}`;
+  return `flex-1 ${KIND_FILL[kind]}`;
 }

@@ -33,7 +33,6 @@ describe('calendarCsvColumns', () => {
       'calendar.csvCorporation',
       'calendar.csvResponse',
       'calendar.csvImportant',
-      'calendar.csvProjected',
       'calendar.csvId',
     ]);
   });
@@ -47,7 +46,6 @@ describe('calendarCsvColumns', () => {
       'calendar.csvCorporation': undefined,
       'calendar.csvResponse': 'calendar.responseDeclined',
       'calendar.csvImportant': 'common.exportFlagYes',
-      'calendar.csvProjected': 'common.exportFlagNo',
       'calendar.csvId': 9001,
     });
   });

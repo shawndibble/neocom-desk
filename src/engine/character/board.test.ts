@@ -2,7 +2,6 @@ import { DAY_MS, HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import {
   buildCharacterBoard,
-  isProjectedKind,
   pastDeadlineLabelKey,
   type BoardCalendarEventSource,
   type BoardClockSource,
@@ -91,21 +90,6 @@ describe('buildCharacterBoard', () => {
     });
 
     expect(board.map((item) => item.sourceId)).toEqual(['z', 'a', 'aa', 'b']);
-  });
-
-  it('ranks a Skill Plan step last at an exact tie, and treats an absent plan as empty', () => {
-    const sameInstant = at(4 * HOUR_MS);
-    const board = build({
-      skillPlan: [clock({ id: '1:1', deadlineMs: sameInstant })],
-      orderExpiries: [clock({ id: 'o', deadlineMs: sameInstant })],
-    });
-    expect(board.map((item) => item.kind)).toEqual(['orderExpiry', 'skillPlan']);
-    expect(build({ skillPlan: [] })).toEqual(build({}));
-  });
-
-  it('names Skill Plan steps, and only them, as projected', () => {
-    expect(isProjectedKind('skillPlan')).toBe(true);
-    expect(isProjectedKind('skillTraining')).toBe(false);
   });
 
   /**

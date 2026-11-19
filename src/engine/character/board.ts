@@ -8,7 +8,7 @@
  * training time, a job sitting undelivered, an extractor program running out,
  * a Mercenary Den leaving reinforcement or an operation about to expire, a
  * contract about to expire with collateral on it, a sell order about to
- * lapse, and the steps of a Skill Plan projected past the queue. Six of those
+ * lapse. Six of those
  * live in ESI endpoints and, before this, on five separate routes. Merging them
  * into one deadline-ordered list *is* the feature.
  *
@@ -54,7 +54,6 @@ export const CHARACTER_BOARD_ITEM_KINDS = [
   'skyhookRaid',
   'contractExpiry',
   'orderExpiry',
-  'skillPlan',
 ] as const;
 
 export type CharacterBoardItemKind = (typeof CHARACTER_BOARD_ITEM_KINDS)[number];
@@ -163,7 +162,6 @@ export interface CharacterBoardSources {
   contractExpiries?: readonly BoardClockSource[];
   orderExpiries?: readonly BoardClockSource[];
   /** Projected Skill Plan steps — a forecast, not an ESI clock. */
-  skillPlan?: readonly BoardClockSource[];
   /** The pilot's typed-in cerebral accelerator running out — their own answer, not an ESI clock. */
   accelerator?: readonly BoardClockSource[];
 }
@@ -184,7 +182,6 @@ const SOURCE_KEY = {
   skyhookRaid: 'skyhookRaids',
   contractExpiry: 'contractExpiries',
   orderExpiry: 'orderExpiries',
-  skillPlan: 'skillPlan',
 } as const satisfies Record<CharacterBoardItemKind, keyof CharacterBoardSources>;
 
 const KIND_RANK = new Map<CharacterBoardItemKind, number>(
@@ -215,16 +212,6 @@ export function pastDeadlineLabelKey(kind: CharacterBoardItemKind): string {
   if (kind === 'industryJob') return 'calendar.detail.industryJob.ready';
   if (kind === 'corpJob') return 'calendar.detail.corpJob.ready';
   return 'calendar.overdue';
-}
-
-/**
- * Kinds whose deadlines are forecasts rather than ESI clocks. A Skill Plan
- * step lands when the plan says it would, which moves with the queue, the
- * attributes and the Clone State — so every surface marks it as projected
- * (a hollow dot, a word), never by colour alone.
- */
-export function isProjectedKind(kind: CharacterBoardItemKind): boolean {
-  return kind === 'skillPlan';
 }
 
 function isCalendarEvent(source: BoardClockSource): source is BoardCalendarEventSource {

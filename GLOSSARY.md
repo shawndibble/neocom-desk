@@ -227,11 +227,10 @@ here — they go one per file in `docs/context/decisions/`.
   an ordinary **Skill Plan** from it, minus what the Character has already
   trained, with no link back to the original.
 - **Character**: One EVE Online character. The unit of login (EVE SSO) and of API data. App supports many Characters side by side from day one.
-- **Character Board Item**: One clock on the calendar board, from any of eight
+- **Character Board Item**: One clock on the calendar board, from any of seven
   sources — a calendar event, a skill-queue completion, an industry job
   delivery, a PI extractor program end, a moon chunk arrival or decay, a
-  contract expiry, a market-order expiry, or a projected step of the chosen
-  Skill Plan (a forecast). The character-side counterpart of a **Corp Board
+  contract expiry or a market-order expiry. The character-side counterpart of a **Corp Board
   Item**. A source that could not be read contributes nothing _and says so_; a
   source that read fine with nothing due shows a zero — the two must never
   look alike.

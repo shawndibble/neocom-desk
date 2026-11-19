@@ -22,5 +22,4 @@ export const KIND_LABEL: Record<CharacterBoardItemKind, string> = {
   skyhookRaid: 'calendar.kind.skyhookRaid',
   contractExpiry: 'calendar.kind.contractExpiry',
   orderExpiry: 'calendar.kind.orderExpiry',
-  skillPlan: 'calendar.kind.skillPlan',
 };

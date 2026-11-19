@@ -17,6 +17,6 @@ export const CHART_COLOR: Record<ChartColor, string> = {
   s1: 'var(--color-kind-calendar-event)',
   s2: 'var(--color-kind-skill-training)',
   s3: 'var(--color-kind-planet-extraction)',
-  s4: 'var(--color-kind-skill-plan)',
+  s4: 'var(--color-kind-shared-moon-pop)',
   s5: 'var(--color-kind-order-expiry)',
 };

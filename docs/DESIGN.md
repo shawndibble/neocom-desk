@@ -122,12 +122,11 @@ Never a status, never interactive. A fifth location reuses the first hue, so the
 | `kind-structure-timer`   | `#88b078` | Corp structure timers ending.                            |
 | `kind-structure-fuel`    | `#b8a858` | Corp structures running out of fuel.                     |
 | `kind-moon-chunk`        | `#a0a8b8` | Moon chunk arrivals and decays.                          |
-| `kind-shared-moon-pop`   | `#8880b8` | Shared Pops: other corporations' moon pops.              |
+| `kind-shared-moon-pop`   | `#e0d0a8` | Shared Pops: other corporations' moon pops.              |
 | `kind-corp-job`          | `#c0e0d8` | Corp industry jobs finishing.                            |
 | `kind-skyhook-raid`      | `#d9a7a0` | Corp skyhook raid windows opening and closing.           |
 | `kind-contract-expiry`   | `#f2879f` | Contract expiries.                                       |
 | `kind-order-expiry`      | `#c9d96a` | Market-order expiries.                                   |
-| `kind-skill-plan`        | `#e0d0a8` | Projected Skill Plan steps (outlined).                   |
 
 Every other color scale in this app is **ordinal or semantic** — `securityStatusColor`
 is a position on a numeric scale, `STANDING_TONE` and the severity ladder are
@@ -1763,12 +1762,11 @@ surfaces — `bg` / `panel` / `panel-2`:
 | `kind-structure-timer`   | 7.85 / 7.38 / 6.88    |
 | `kind-structure-fuel`    | 8.09 / 7.59 / 7.09    |
 | `kind-moon-chunk`        | 8.09 / 7.60 / 7.09    |
-| `kind-shared-moon-pop`   | 5.37 / 5.04 / 4.70    |
+| `kind-shared-moon-pop`   | 12.67 / 11.90 / 11.10 |
 | `kind-corp-job`          | 13.72 / 12.88 / 12.02 |
 | `kind-skyhook-raid`      | 9.20 / 8.64 / 8.06    |
 | `kind-contract-expiry`   | 8.05 / 7.56 / 7.05    |
 | `kind-order-expiry`      | 12.54 / 11.78 / 10.99 |
-| `kind-skill-plan`        | 12.67 / 11.90 / 11.10 |
 | `space-nullsec`          | 7.42 / 6.97 / 6.51    |
 | `space-wormhole`         | 11.72 / 11.01 / 10.27 |
 

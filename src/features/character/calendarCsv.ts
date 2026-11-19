@@ -1,9 +1,5 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
-import {
-  isProjectedKind,
-  type CalendarResponse,
-  type CharacterBoardItem,
-} from '@/engine/character/board';
+import { type CalendarResponse, type CharacterBoardItem } from '@/engine/character/board';
 import { KIND_LABEL } from './calendarKindLabels';
 import { exportFlag } from '@/lib/exportFlag';
 import { isoTime } from '@/lib/exportSheets';
@@ -40,10 +36,6 @@ export function calendarCsvColumns(t: CsvTranslate): CsvColumn<CharacterBoardIte
     {
       header: t('calendar.csvImportant'),
       value: (item) => (item.kind === 'calendarEvent' ? exportFlag(t, item.important) : null),
-    },
-    {
-      header: t('calendar.csvProjected'),
-      value: (item) => exportFlag(t, isProjectedKind(item.kind)),
     },
     // The source's own id: an ESI event id for calendar events, a job or contract id otherwise.
     {

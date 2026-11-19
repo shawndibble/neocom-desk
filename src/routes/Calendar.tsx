@@ -33,10 +33,6 @@ import { CalendarDayTicker } from '@/features/character/CalendarDayTicker';
 import { ComingUpRail } from '@/features/character/ComingUpRail';
 import { CalendarReauthNotice } from '@/features/character/CalendarReauthNotice';
 import { CalendarKindFilterMenu } from '@/features/character/CalendarKindFilterMenu';
-import {
-  useCalendarSkillPlans,
-  withCalendarSkillPlan,
-} from '@/features/character/calendarSkillPlan';
 import { useCalendarDensity } from '@/features/character/calendarViewPref';
 import { useCalendarWeekStart } from '@/features/character/calendarWeekStart';
 import {
@@ -157,8 +153,6 @@ export function Calendar() {
   const setDensity = useCalendarDensity((state) => state.setValue);
   const hiddenKinds = useCalendarHiddenKinds((state) => state.value);
   const setHiddenKinds = useCalendarHiddenKinds((state) => state.setValue);
-  const skillPlanChoices = useCalendarSkillPlans((state) => state.value);
-  const setSkillPlanChoices = useCalendarSkillPlans((state) => state.setValue);
   const weekStart = useCalendarWeekStart((state) => state.value);
   const sharedPopTime = useSharedPopTime((state) => state.value);
   const savedCorpFilter = useCalendarCorpFilter((state) => state.value);
@@ -170,18 +164,9 @@ export function Calendar() {
     useCalendarHiddenKinds,
     useCalendarCorpFilter,
     useCalendarSharingCorpFilter,
-    useCalendarSkillPlans,
     useCalendarWeekStart,
     useSharedPopTime
   );
-
-  // The loader reads the choice from Dexie itself, so the write must land
-  // before the reload that reads it.
-  async function chooseSkillPlan(planId: string | null) {
-    if (activeCharacterId === null) return;
-    await setSkillPlanChoices(withCalendarSkillPlan(skillPlanChoices, activeCharacterId, planId));
-    refresh();
-  }
 
   // "Today" at mount, stable for this visit's codec identity (see `anchorParam`).
   const [defaultAnchorKey] = useState(() => dayKey(cellOf(Date.now(), zone)));
@@ -493,10 +478,6 @@ export function Calendar() {
               counts={counts}
               readableKinds={data?.readableKinds ?? []}
               reauthKinds={data?.reauthKinds ?? []}
-              skillPlanChoices={data?.skillPlanChoices ?? []}
-              chosenSkillPlanId={data?.chosenSkillPlanId ?? null}
-              skillPlanError={data?.skillPlanError ?? null}
-              onChooseSkillPlan={(planId) => void chooseSkillPlan(planId)}
               corporations={data?.corporations}
               corpFilter={corpFilter}
               onCorpFilter={(filter) => void setCorpFilter(filter)}

@@ -20,6 +20,5 @@ export const KIND_ENDPOINTS: Record<CharacterBoardItemKind, readonly EsiEndpoint
   skyhookRaid: ['getCorporationSkyhooks'],
   contractExpiry: ['getCharacterContracts'],
   orderExpiry: ['getCharacterOrders'],
-  skillPlan: [],
   accelerator: [],
 };
