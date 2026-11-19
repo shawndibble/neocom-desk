@@ -117,7 +117,7 @@ export function OwnedStockHint({
           material: materialName,
           detected: owned,
         })}
-        className={textActionClassName('justify-end')}
+        className={textActionClassName('justify-end whitespace-nowrap')}
       >
         {/* Not the number: it made the Have column wrap, and Need beside the
             field plus this tooltip already say how much. The accessible name
