@@ -22,6 +22,7 @@ import type { ActiveFilter } from '@/components/ui';
 import { useBrowserFilters, type BrowserFilterValue } from '@/features/market/useBrowserFilters';
 import { useOrderBookFetch } from '@/features/market/useOrderBookFetch';
 import { useVariations } from '@/features/market/useVariations';
+import { useBookStationMap } from '@/features/market/useBookStationMap';
 import {
   buildOrderBookView,
   clearOrderBookViewCache,
@@ -42,7 +43,11 @@ import {
   type ResolvedOrderBookRegion,
 } from '@/engine/market/locationMode';
 import type { VariationsResult } from '@/features/market/variations';
-import { resolveOrderLocation, type OrderBookSummary } from '@/engine/market/orderBook';
+import {
+  resolveOrderLocation,
+  type NpcStationLookup,
+  type OrderBookSummary,
+} from '@/engine/market/orderBook';
 import {
   bookDepth,
   sortBookSide,
@@ -80,6 +85,8 @@ export interface UseOrderBookOrchestrationArgs {
   hubHydrated: boolean;
   locationModeHydrated: boolean;
   catalogue: MarketCatalogue;
+  /** Names the book's player structures; null signed out. */
+  activeCharacterId: number | null;
   ensureBlueprintCatalog: () => void;
   t: (key: string, opts?: Record<string, unknown>) => string;
 }
@@ -109,6 +116,8 @@ export interface OrderBookOrchestration {
   stationFilter: number | null;
   setStationFilter: (next: number | null) => void;
   stationFilterLabel: string | null;
+  /** The SDE's NPC stations plus the book's resolved player structures: what every location cell reads. */
+  npcStationMap: ReadonlyMap<number, NpcStationLookup>;
 
   browserFilterValue: BrowserFilterValue;
   handleBrowserFiltersChange: (next: BrowserFilterValue) => void;
@@ -163,6 +172,7 @@ export function useOrderBookOrchestration({
   hubHydrated,
   locationModeHydrated,
   catalogue,
+  activeCharacterId,
   ensureBlueprintCatalog,
   t,
 }: UseOrderBookOrchestrationArgs): OrderBookOrchestration {
@@ -176,7 +186,7 @@ export function useOrderBookOrchestration({
     typesByGroup,
     typesById,
     variationIndex,
-    npcStationMap,
+    npcStationMap: sdeStationMap,
     solarSystemMap,
   } = catalogue;
 
@@ -358,6 +368,7 @@ export function useOrderBookOrchestration({
     () => sortBookSide(loadedView?.buy ?? [], 'buy', distanceOf),
     [loadedView, distanceOf]
   );
+  const npcStationMap = useBookStationMap(sdeStationMap, activeCharacterId, sortedSell, sortedBuy);
   const depthByOrder = useMemo(
     () => new Map([...bookDepth(sortedSell), ...bookDepth(sortedBuy)]),
     [sortedSell, sortedBuy]
@@ -464,6 +475,7 @@ export function useOrderBookOrchestration({
       stationFilter,
       setStationFilter,
       stationFilterLabel,
+      npcStationMap,
       browserFilterValue: filters.browserFilterValue,
       handleBrowserFiltersChange: filters.handleBrowserFiltersChange,
       activeFilters: filters.activeFilters,
@@ -504,6 +516,7 @@ export function useOrderBookOrchestration({
       stationFilter,
       setStationFilter,
       stationFilterLabel,
+      npcStationMap,
       filters.browserFilterValue,
       filters.handleBrowserFiltersChange,
       filters.activeFilters,
