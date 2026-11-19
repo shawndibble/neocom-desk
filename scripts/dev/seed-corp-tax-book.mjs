@@ -75,7 +75,7 @@ const day = (back) => iso(NOW - back * DAY).slice(0, 10);
 const SYSTEMS = [30002187, 30002053, 30000144];
 const REFINERIES = Array.from({ length: 6 }, (_, i) => ({
   id: 1040000000001 + i,
-  name: `Dev ${['Athanor', 'Tatara', 'Athanor', 'Tatara', 'Athanor', 'Tatara'][i]} ${['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta'][i]}`,
+  name: `Dev ${i % 2 === 0 ? 'Athanor' : 'Tatara'} ${['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta'][i]}`,
   solarSystemId: SYSTEMS[i % 3],
   moonId: 40139001 + i,
 }));
@@ -135,6 +135,10 @@ put(sub('officers').doc(`char:${OFFICER}`), {
 // --- Miners: the member, optional guest, the officer, and synthetic extras ----
 // Synthetic ids are made up, so ESI cannot name them; the app shows their ids.
 const EXTRA_MINERS = Number(args.extra);
+if (!Number.isInteger(EXTRA_MINERS) || EXTRA_MINERS < 0) {
+  console.error('--extra must be a whole number, 0 or more.');
+  process.exit(1);
+}
 const MINERS = [
   {
     id: MEMBER,
@@ -291,8 +295,10 @@ for (const m of MINERS) {
 }
 // Unmatched: no code, no Miner.
 payments.push(donation((ref += 1), GUEST ?? OFFICER, 2_500_000, 3, { reason: 'moon tax' }));
-payments.push(donation((ref += 1), 90_001_001, 1_750_000, 2, { reason: 'ty o7' }));
-payments.push(donation((ref += 1), 90_001_007, 3_100_000, 1));
+// Extra miners' ids start at 90_001_000; skip these when `--extra` is too small to have them.
+if (EXTRA_MINERS > 1)
+  payments.push(donation((ref += 1), 90_001_001, 1_750_000, 2, { reason: 'ty o7' }));
+if (EXTRA_MINERS > 7) payments.push(donation((ref += 1), 90_001_007, 3_100_000, 1));
 // Not tax: marked by an officer as something else.
 payments.push(
   donation((ref += 1), MEMBER, 40_000_000, 5, {
