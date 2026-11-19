@@ -16181,6 +16181,143 @@
       "failed": "Couldn't build the file. Try again."
     }
   },
+  "interactions": {
+    "tab": "Interactions",
+    "wallet": {
+      "received": "ISK received",
+      "sent": "ISK sent",
+      "marketSold": "Sold {{quantity}} × {{item}}",
+      "marketBought": "Bought {{quantity}} × {{item}}"
+    },
+    "contract": {
+      "courierTitle": "{{from}} → {{to}}, {{volume}} m³",
+      "itemExchangeTitle": "Item exchange",
+      "auctionTitle": "Auction",
+      "issuedByYou": "You issued it",
+      "issuedByThem": "They issued it"
+    },
+    "scopeCurrent": "This character",
+    "title": {
+      "personal": "Between you and {{name}}",
+      "personalCharacter": "Between {{character}} and {{name}}",
+      "corp": "{{name}} and {{corporation}}"
+    },
+    "emptyTitle": "Nothing between you and {{name}} yet",
+    "emptyHint": "Contracts, mail, wallet trades and killmails with them show here once there are any.",
+    "mail": {
+      "from": "From {{name}}",
+      "to": "Sent to {{name}}",
+      "noSubject": "(no subject)"
+    },
+    "kill": {
+      "title": {
+        "theyKilledYou": "Killed your character",
+        "youKilled": "Your character was on the killmail",
+        "sameSide": "Fought on the same side"
+      },
+      "value": "Killmail value {{value}}"
+    },
+    "corp": {
+      "mining": {
+        "title": "Mined on {{date}}",
+        "detail": "Tax {{tax}}"
+      },
+      "statement": {
+        "title": "Statement for {{from}} to {{to}}",
+        "detail": "{{amount}} tax, {{mailed}}",
+        "mailed_one": "mailed once",
+        "mailed_other": "mailed {{count}} times",
+        "notMailed": "not mailed"
+      },
+      "notice": {
+        "title": "Late notice for {{from}} to {{to}}"
+      },
+      "payment": {
+        "title": "Tax payment",
+        "matched": "Matched to a statement",
+        "unmatched": "Not matched to a statement"
+      },
+      "adjustment": {
+        "title": "Tax correction for {{date}}",
+        "detail": "{{amount}}: {{reason}}"
+      },
+      "wallet": {
+        "received": "Paid into the corp wallet",
+        "sent": "Paid from the corp wallet"
+      },
+      "contract": {
+        "theyIssued": "Contract they issued",
+        "toThem": "Contract issued to them"
+      },
+      "kill": {
+        "weLost": "A corp pilot died with them on the killmail",
+        "weKilled": "A corp pilot was on the killmail that killed them"
+      }
+    },
+    "loadFailedTitle": "Some interactions could not load",
+    "loadFailedHint": "Showing what loaded. Try again to fetch the rest.",
+    "filterLabel": "Show",
+    "filterAll": "All",
+    "chip": {
+      "net": "Net with them",
+      "contracts": "Contracts",
+      "mails": "Mails",
+      "youKilled": "You killed",
+      "theyKilledYou": "They killed you",
+      "firstContact": "First contact",
+      "owed": "Owed now",
+      "taxPaid": "Tax paid, all time",
+      "statements": "Statements",
+      "lateNotices": "Late notices",
+      "memberSince": "In the corp since",
+      "standing": "Standing with the corp",
+      "hostile": "Hostile",
+      "ourLosses": "Our losses to them",
+      "theirLosses": "Their losses to us",
+      "lastHostile": "Last hostile"
+    },
+    "items_one": "{{count}} item",
+    "items_other": "{{count}} items",
+    "net": "net",
+    "kind": {
+      "wallet": "Wallet",
+      "contract": "Contracts",
+      "mail": "Mail",
+      "kill": "Killmails",
+      "book": "Corp book"
+    },
+    "type": {
+      "donation": "Donation",
+      "trade": "Player trade",
+      "market": "Market",
+      "bounty": "Bounty",
+      "payment": "Payment",
+      "other": "Wallet",
+      "courier": "Courier",
+      "itemExchange": "Item exchange",
+      "auction": "Auction",
+      "mail": "Mail",
+      "statement": "Statement",
+      "lateNotice": "Late notice",
+      "mining": "Mining",
+      "adjustment": "Adjustment",
+      "sameSide": "Same side",
+      "youKilled": "You killed",
+      "theyKilledYou": "They killed you",
+      "weLost": "We lost",
+      "weKilled": "We killed"
+    },
+    "state": {
+      "completed": "Completed",
+      "outstanding": "Outstanding",
+      "rejected": "Rejected",
+      "failed": "Failed",
+      "expired": "Expired",
+      "unpaid": "Unpaid",
+      "settled": "Settled",
+      "srpPaid": "SRP paid"
+    }
+  },
   "publicInfo": {
     "loadFailedHint": "Couldn't look this up. Check your connection, then try again.",
     "title": "Public info",

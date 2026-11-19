@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useEffect } from 'react';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, useNavigate } from 'react-router-dom';
+import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import { mswServer } from '@/test/msw';
 import '@/i18n';
@@ -20,6 +20,13 @@ vi.mock('@/esi/endpoints', async (importOriginal) => ({
   postOpenWindowInformation: openInfoMock,
 }));
 vi.mock('@/sde/loadSde', () => ({ loadTypes: vi.fn(async () => ({})) }));
+vi.mock('@/features/interactions/InteractionsTab', () => ({
+  default: ({ otherId, otherName }: { otherId: number; otherName: string }) => (
+    <p>
+      Interactions with {otherName} ({otherId})
+    </p>
+  ),
+}));
 import { ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
 import { PublicInfoModal } from './PublicInfoModal';
@@ -31,6 +38,7 @@ const server = mswServer();
 
 beforeEach(async () => {
   await db.esiCache.clear();
+  await db.characters.clear();
   usePublicInfoModalStore.setState({ request: null });
   // No live affiliation by default, so a character's public record decides its corp and alliance.
   server.use(
@@ -59,6 +67,14 @@ function NavigateProbe() {
   return null;
 }
 const navigateTo = (path: string) => probe.navigate(path);
+const locationProbe = { search: '' };
+function LocationProbe() {
+  const location = useLocation();
+  useEffect(() => {
+    locationProbe.search = location.search;
+  });
+  return null;
+}
 
 function renderModal() {
   render(
@@ -66,6 +82,7 @@ function renderModal() {
       <EntityInfoRoute />
       <PublicInfoModal />
       <NavigateProbe />
+      <LocationProbe />
     </MemoryRouter>
   );
 }
@@ -607,6 +624,58 @@ describe('PublicInfoModal', () => {
     act(() => navigateTo('/fittings/edit'));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(usePublicInfoModalStore.getState().request).toBeNull();
+  });
+
+  describe('Interactions tab', () => {
+    const pilot = {
+      name: 'Mira Vell',
+      corporation_id: 2,
+      birthday: '2020-01-01T00:00:00Z',
+      bloodline_id: 1,
+      gender: 'female',
+      race_id: 1,
+      security_status: 0,
+    };
+    const corp = { name: 'Some Corp', ticker: 'SOME', ceo_id: 99, creator_id: 99, member_count: 4 };
+
+    async function openPilot(id: number) {
+      mockCharacter(id, pilot);
+      mockCorporation(2, corp);
+      renderModal();
+      act(() => usePublicInfoModalStore.getState().open('character', id));
+      return within(await screen.findByRole('dialog'));
+    }
+
+    it('is offered for another pilot once a Character is signed in, and rides the URL', async () => {
+      await db.characters.put({ characterId: 5, name: 'Me', ownerHash: 'oh', addedAt: 1 });
+      const dialog = await openPilot(91);
+      const tab = await dialog.findByRole('tab', { name: 'Interactions' });
+      tab.click();
+      expect(await dialog.findByText('Interactions with Mira Vell (91)')).toBeInTheDocument();
+      await waitFor(() => expect(locationProbe.search).toContain('infoTab=interactions'));
+      dialog.getByRole('tab', { name: 'Employment' }).click();
+      await waitFor(() => expect(locationProbe.search).not.toContain('infoTab'));
+    });
+
+    it('opens on the tab a URL names, so Back from a row lands here', async () => {
+      await db.characters.put({ characterId: 5, name: 'Me', ownerHash: 'oh', addedAt: 1 });
+      mockCharacter(91, pilot);
+      mockCorporation(2, corp);
+      render(
+        <MemoryRouter initialEntries={['/contacts?info=character-91&infoTab=interactions']}>
+          <EntityInfoRoute />
+          <PublicInfoModal />
+        </MemoryRouter>
+      );
+      expect(await screen.findByText('Interactions with Mira Vell (91)')).toBeInTheDocument();
+    });
+
+    it('is not offered for one of your own Characters, or with no Character signed in', async () => {
+      await db.characters.put({ characterId: 91, name: 'Mira Vell', ownerHash: 'oh', addedAt: 1 });
+      const own = await openPilot(91);
+      await own.findByRole('tab', { name: 'Employment' });
+      expect(own.queryByRole('tab', { name: 'Interactions' })).toBeNull();
+    });
   });
 
   describe('Employment tab', () => {

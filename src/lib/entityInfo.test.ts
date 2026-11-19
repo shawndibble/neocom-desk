@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { entityInfoHref, formatEntityInfo, parseEntityInfo } from './entityInfo';
+import {
+  entityInfoHref,
+  formatEntityInfo,
+  infoTabHref,
+  parseEntityInfo,
+  parseInfoTab,
+  withoutEntityInfo,
+} from './entityInfo';
 
 describe('formatEntityInfo', () => {
   it('writes kind-id', () => {
@@ -95,5 +102,34 @@ describe('entityInfoHref', () => {
         { kind: 'corporation', id: 2 }
       )
     ).toBe('/x?info=corporation-2&a=b');
+  });
+});
+
+describe('the infoTab param', () => {
+  it('reads the tab a Show Info modal has open', () => {
+    expect(parseInfoTab('?info=character-1&infoTab=interactions')).toBe('interactions');
+    expect(parseInfoTab('?info=character-1')).toBeNull();
+    expect(parseInfoTab('?infoTab=')).toBeNull();
+    expect(parseInfoTab('?infoTab=a%20b')).toBeNull();
+  });
+
+  it('sets and clears it, keeping the other params', () => {
+    const here = { pathname: '/contacts', search: '?info=character-1&a=b' };
+    expect(infoTabHref(here, 'interactions')).toBe(
+      '/contacts?info=character-1&a=b&infoTab=interactions'
+    );
+    expect(infoTabHref({ ...here, search: '?info=character-1&infoTab=x' }, null)).toBe(
+      '/contacts?info=character-1'
+    );
+  });
+
+  it('is dropped when another entity opens, and when info is removed', () => {
+    expect(
+      entityInfoHref(
+        { pathname: '/x', search: '?info=character-1&infoTab=interactions' },
+        { kind: 'corporation', id: 2 }
+      )
+    ).toBe('/x?info=corporation-2');
+    expect(withoutEntityInfo('?info=character-1&infoTab=interactions&a=b')).toBe('?a=b');
   });
 });

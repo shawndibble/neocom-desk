@@ -20,7 +20,13 @@
  */
 import { useCallback, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useNavigationType, type Location } from 'react-router-dom';
-import { entityInfoHref, parseEntityInfo, withoutEntityInfo } from '@/lib/entityInfo';
+import {
+  entityInfoHref,
+  infoTabHref,
+  parseEntityInfo,
+  parseInfoTab,
+  withoutEntityInfo,
+} from '@/lib/entityInfo';
 import { usePageLeave } from '@/lib/usePageLeave';
 import { registerEntityInfoNavigator } from '@/stores/entityInfoNavigator';
 import { useItemInfoModalStore } from '@/stores/itemInfoModal';
@@ -48,6 +54,11 @@ export function EntityInfoRoute() {
           } else {
             navigate(href);
           }
+        },
+        setTab: (tab) => {
+          const here = locationRef.current;
+          if (parseEntityInfo(here.search) === null) return;
+          navigate(infoTabHref(here, tab), { replace: true, state: here.state });
         },
         close: () => {
           const here = locationRef.current;
@@ -89,6 +100,10 @@ export function EntityInfoRoute() {
   const kind = info?.kind ?? null;
   const id = info?.id ?? null;
   const itemId = info?.itemId;
+  const infoTab = parseInfoTab(location.search);
+  useEffect(() => {
+    usePublicInfoModalStore.getState().showTab(kind === null ? null : infoTab);
+  }, [kind, id, infoTab]);
   useEffect(() => {
     const publicInfo = usePublicInfoModalStore.getState();
     const skill = useSkillDetailModalStore.getState();

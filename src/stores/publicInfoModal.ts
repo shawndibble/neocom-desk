@@ -17,17 +17,23 @@ export interface PublicInfoRequest {
 
 interface PublicInfoModalState {
   request: PublicInfoRequest | null;
+  /** The `infoTab` the URL names (`interactions`), or null for the modal's default tab. */
+  tab: string | null;
   /** Moves the URL to `?info=<kind>-<id>` (`EntityInfoRoute` then shows it). */
   open: (kind: PublicInfoKind, id: number) => void;
   /** Takes `info` off the URL. */
   close: () => void;
+  /** Opens a tab by moving `infoTab` on the URL, so Back from a page it linked to returns here. */
+  setTab: (tab: string | null) => void;
   /** Raw setters for `EntityInfoRoute` and the modal's own cleanup: state only, no navigation. */
   show: (request: PublicInfoRequest) => void;
+  showTab: (tab: string | null) => void;
   clear: () => void;
 }
 
 export const usePublicInfoModalStore = create<PublicInfoModalState>((set) => ({
   request: null,
+  tab: null,
   open: (kind, id) => {
     const navigator = getEntityInfoNavigator();
     if (navigator) navigator.open({ kind, id });
@@ -38,8 +44,14 @@ export const usePublicInfoModalStore = create<PublicInfoModalState>((set) => ({
     if (navigator) navigator.close();
     else set({ request: null });
   },
+  setTab: (tab) => {
+    const navigator = getEntityInfoNavigator();
+    if (navigator) navigator.setTab(tab);
+    else set({ tab });
+  },
   show: (request) => set({ request }),
-  clear: () => set({ request: null }),
+  showTab: (tab) => set({ tab }),
+  clear: () => set({ request: null, tab: null }),
 }));
 
 /** Hook for call sites inside a component: `const { open } = usePublicInfoModal();` */
