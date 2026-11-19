@@ -84,7 +84,7 @@ export interface PaymentApplication {
   paymentId: string;
   /** The legacy Statements it settled, before any day. */
   statements: { statementId: string; amount: number }[];
-  /** The days it paid, oldest first; a payment never pays a held day or a day recorded paid. */
+  /** The days it paid, oldest first; a payment never pays a held day. */
   days: DayAmount[];
   /** What no Statement or day absorbed of this payment; the account's credit is this plus any left over from corrections. */
   credit: number;
@@ -183,8 +183,9 @@ export function allocateRunningAccount(input: RunningAccountInput): RunningAccou
     for (const d of days) {
       if (available <= 0) break;
       const st = state.get(d.date)!;
-      // A day already recorded paid is closed: money goes on to the oldest day still owed.
-      if (isHeld(d) || st.tax <= 0 || st.pinned || isDone(st)) continue;
+      // A held day is skipped. A day recorded paid still takes its payment (oldest first), or that
+      // money would be left over as credit on top of the day's own tax.
+      if (isHeld(d) || st.tax <= 0 || isDone(st)) continue;
       const take = Math.min(available, st.tax - st.credited);
       st.credited += take;
       if (kind === 'payment') {

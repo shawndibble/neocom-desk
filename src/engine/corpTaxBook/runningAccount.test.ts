@@ -244,16 +244,17 @@ describe('allocateRunningAccount', () => {
     expect(r.balance).toBe(1_000_000);
   });
 
-  it('gives a day already recorded paid no more money: the next payment pays the oldest owed day', () => {
+  it('pays a day already recorded paid first, then the next owed day, so no payment is counted twice', () => {
     const r = allocateRunningAccount({
       ...base,
       days: NOV,
       storedPaidThrough: '2026-11-01',
-      payments: [payment('p1', 2_000_000, '2026-11-04T10:00:00Z')],
+      payments: [payment('p1', 3_000_000, '2026-11-04T10:00:00Z')],
     });
-    expect(r.byDay.get('2026-11-01')).toMatchObject({ settled: true, credited: 0 });
+    expect(r.byDay.get('2026-11-01')).toMatchObject({ settled: true, credited: 1_000_000 });
     expect(r.byDay.get('2026-11-02')).toMatchObject({ settled: true, credited: 2_000_000 });
     expect(r.paidThrough).toBe('2026-11-02');
+    expect(r.credit).toBe(0);
   });
 
   it('keeps the stored paid-through when there are no days', () => {
@@ -475,7 +476,7 @@ describe('allocateRunningAccount applications', () => {
     expect(r.applications.corrections).toEqual([]);
   });
 
-  it('applies nothing to a held day or a day recorded paid, and money passes over them', () => {
+  it('applies nothing to a held day, and money passes over it', () => {
     const held = allocateRunningAccount({
       ...base,
       days: NOV,
@@ -483,13 +484,23 @@ describe('allocateRunningAccount applications', () => {
       payments: [payment('p1', 1_000_000, T(0))],
     });
     expect(paymentOf(held, 'p1')?.days).toEqual([{ date: '2026-11-02', amount: 1_000_000 }]);
-    const pinned = allocateRunningAccount({
+  });
+
+  it('a day recorded paid still takes the payment that paid it, so that money is not credit too', () => {
+    const r = allocateRunningAccount({
       ...base,
       days: NOV,
-      storedPaidThrough: '2026-11-01',
-      payments: [payment('p1', 1_000_000, T(0))],
+      storedPaidThrough: '2026-11-03',
+      payments: [payment('p1', 10_000_000, T(0))],
     });
-    expect(paymentOf(pinned, 'p1')?.days).toEqual([{ date: '2026-11-02', amount: 1_000_000 }]);
+    expect(paymentOf(r, 'p1')?.days).toEqual([
+      { date: '2026-11-01', amount: 1_000_000 },
+      { date: '2026-11-02', amount: 2_000_000 },
+      { date: '2026-11-03', amount: 3_000_000 },
+    ]);
+    expect(r.credit).toBe(4_000_000);
+    expect(r.balance).toBe(-4_000_000);
+    expect(r.owes).toBeNull();
   });
 
   it('accounts for every unit of a payment: statements, days and credit add up to its net amount', () => {
