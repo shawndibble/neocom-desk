@@ -100,6 +100,10 @@ export interface BoardClockSource {
   extra?: { detail: string; atMs?: number };
   /** The i18n key the row reads once past its deadline, when it is not the kind's own word. */
   pastLabelKey?: string;
+  /** The row marks an end rather than a start: drawn in the muted tone, not the kind's. */
+  muted?: boolean;
+  /** The id a row's detail opens, when it is not the row's own `sourceId` (a pop's second row). */
+  detailId?: string;
 }
 
 /** A calendar event, which alone carries an RSVP state and an importance flag. */
@@ -237,6 +241,8 @@ function toItem(
     ...(source.sharedBy ? { sharedBy: source.sharedBy } : {}),
     ...(source.extra ? { extra: source.extra } : {}),
     ...(source.pastLabelKey ? { pastLabelKey: source.pastLabelKey } : {}),
+    ...(source.muted ? { muted: true } : {}),
+    ...(source.detailId ? { detailId: source.detailId } : {}),
   };
 }
 

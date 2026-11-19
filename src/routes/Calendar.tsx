@@ -379,7 +379,7 @@ export function Calendar() {
       }
     } else {
       setPopDayPending(false);
-      const deadlineMs = sharedPopDeadlineMs(entry.pop, data.loadedAtMs, sharedPopTime);
+      const deadlineMs = sharedPopDeadlineMs(entry.pop, sharedPopTime);
       if (!Number.isNaN(deadlineMs)) {
         setSelectedDay({ zone, ms: dayStart(deadlineMs, zone) });
         setPopAnchorKey(dayKey(cellOf(deadlineMs, zone)));

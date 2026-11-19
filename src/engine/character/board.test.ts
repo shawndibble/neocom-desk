@@ -33,6 +33,17 @@ function build(sources: Partial<CharacterBoardSources> = {}) {
 }
 
 describe('buildCharacterBoard', () => {
+  it('carries a muted row and the id its detail opens through to the item', () => {
+    const [item] = buildCharacterBoard({
+      nowMs: NOW,
+      sharedMoonPops: [clock({ id: 'p:expires', muted: true, detailId: 'p' })],
+    });
+    expect(item).toMatchObject({ sourceId: 'p:expires', muted: true, detailId: 'p' });
+    const [plain] = buildCharacterBoard({ nowMs: NOW, sharedMoonPops: [clock()] });
+    expect(plain).not.toHaveProperty('muted');
+    expect(plain).not.toHaveProperty('detailId');
+  });
+
   it('merges every source into one deadline-ordered list', () => {
     const board = build({
       calendarEvents: [event({ id: 'e', deadlineMs: at(5 * HOUR_MS) })],

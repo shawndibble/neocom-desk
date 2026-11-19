@@ -55,6 +55,8 @@ export function CharacterBoardRow({
   const { t } = useTranslation();
   const zone = useTimeZone();
   const KindIcon = KIND_ICON[item.kind];
+  // A muted row (a pop's belt expiry) keeps the kind's glyph in grey: an end, not a start.
+  const tone = item.muted ? 'text-text-dim' : KIND_TEXT[item.kind];
   const overdue = item.remainingMs <= 0;
 
   // Clamped here and only here: the engine keeps `remainingMs` signed so
@@ -81,7 +83,7 @@ export function CharacterBoardRow({
         to it at the start of every row rather than living only in the
         countdown's four characters.
       */}
-      <KindIcon className={`size-4 shrink-0 ${KIND_TEXT[item.kind]}`} aria-hidden="true" />
+      <KindIcon className={`size-4 shrink-0 ${tone}`} aria-hidden="true" />
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-2">
           {/*
@@ -89,9 +91,7 @@ export function CharacterBoardRow({
             no sr-only companion, because what the hue encodes is the kind, and
             the kind is already written out in words on the row's third line.
           */}
-          <span className={`text-sm font-bold tabular-nums ${KIND_TEXT[item.kind]}`}>
-            {countdown}
-          </span>
+          <span className={`text-sm font-bold tabular-nums ${tone}`}>{countdown}</span>
           {item.important && (
             <span className="text-[0.6875rem] font-semibold tracking-widest text-text uppercase">
               {t('calendar.important')}
@@ -142,7 +142,7 @@ export function CharacterBoardRow({
     item.kind === 'skyhookRaid' && onSelectSkyhook !== undefined
       ? () => onSelectSkyhook(Number(item.sourceId))
       : item.kind === 'sharedMoonPop' && onSelectSharedPop !== undefined
-        ? () => onSelectSharedPop(item.sourceId)
+        ? () => onSelectSharedPop(item.detailId ?? item.sourceId)
         : undefined;
 
   if (onSelectDetail !== undefined) {

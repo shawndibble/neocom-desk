@@ -61,15 +61,35 @@ describe('Shared Pops as Calendar clocks', () => {
       detail: 'ready',
       deadlineMs: NOW + 10 * HOUR_MS,
       sharedBy: CORP,
+      pastLabelKey: 'calendar.popped',
     });
     expect(
       toSharedPopSources([entry({ popTime: 'auto-fracture' })], new Set(), NOW)[0]!.detail
     ).toBe('autoFracture');
   });
 
-  it('counts down to the expiry once popped, so a late fleet still sees the field', () => {
-    const [row] = toSharedPopSources([entry({ popAt: iso(NOW - HOUR_MS) })], new Set(), NOW);
-    expect(row).toMatchObject({ detail: 'expires', deadlineMs: NOW + 61 * HOUR_MS });
+  it('is two rows: the pop stays on its Pop Time, a muted one counts to the belt expiry', () => {
+    const rows = toSharedPopSources([entry({ popAt: iso(NOW - HOUR_MS) })], new Set(), NOW);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({
+      id: '98000001_x1',
+      detail: 'ready',
+      deadlineMs: NOW - HOUR_MS,
+      pastLabelKey: 'calendar.popped',
+    });
+    expect(rows[0]).not.toHaveProperty('muted');
+    expect(rows[1]).toMatchObject({
+      id: '98000001_x1:expires',
+      detailId: '98000001_x1',
+      detail: 'expires',
+      deadlineMs: NOW + 61 * HOUR_MS,
+      muted: true,
+    });
+  });
+
+  it('has the expiry row before the pop too, so the belt end is on the map from the start', () => {
+    const rows = toSharedPopSources([entry()], new Set(), NOW);
+    expect(rows.map((r) => r.id)).toEqual(['98000001_x1', '98000001_x1:expires']);
   });
 
   it('shows only from the Extraction start until its retention ends', () => {
@@ -92,7 +112,7 @@ describe('Shared Pops as Calendar clocks', () => {
       expiresAt: iso(NOW - 6 * HOUR_MS),
       retainUntil: iso(NOW + 66 * HOUR_MS),
     });
-    const [row] = toSharedPopSources([expired], new Set(), NOW);
+    const row = toSharedPopSources([expired], new Set(), NOW)[1];
     expect(row).toMatchObject({ detail: 'expired', deadlineMs: NOW - 6 * HOUR_MS });
     expect(row).not.toHaveProperty('pastLabelKey');
   });
@@ -140,17 +160,22 @@ describe('Shared Pops as Calendar clocks', () => {
 
     it('counts to the chosen time, so a pop is popped only once that time passes', () => {
       const between = NOW + 11 * HOUR_MS;
-      const [ready] = toSharedPopSources([both()], new Set(), between, 'ready');
-      const [auto] = toSharedPopSources([both()], new Set(), between, 'autoFracture');
-      expect(ready).toMatchObject({ detail: 'expires', deadlineMs: NOW + 61 * HOUR_MS });
-      expect(auto).toMatchObject({ detail: 'autoFracture', deadlineMs: NOW + 13 * HOUR_MS });
+      const ready = toSharedPopSources([both()], new Set(), between, 'ready');
+      const auto = toSharedPopSources([both()], new Set(), between, 'autoFracture');
+      expect(ready[0]).toMatchObject({ detail: 'ready', deadlineMs: NOW + 10 * HOUR_MS });
+      expect(ready[0]).not.toHaveProperty('extra');
+      expect(auto[0]).toMatchObject({
+        detail: 'autoFracture',
+        deadlineMs: NOW + 13 * HOUR_MS,
+        extra: { detail: 'ready', atMs: NOW + 10 * HOUR_MS },
+      });
     });
 
     it('keeps the actual time once fractured early, with no second time to name', () => {
       const fired = iso(NOW - HOUR_MS);
       const early = both({ fractured: true, popAt: fired, readyAt: fired, autoFractureAt: fired });
       const [row] = toSharedPopSources([early], new Set(), NOW, 'autoFracture');
-      expect(row).toMatchObject({ detail: 'expires' });
+      expect(row).toMatchObject({ detail: 'ready', deadlineMs: NOW - HOUR_MS });
       expect(row).not.toHaveProperty('extra');
     });
 
@@ -167,10 +192,13 @@ describe('Shared Pops as Calendar clocks', () => {
     it("is fully mined when an officer flagged it, and then reads that, not 'overdue'", () => {
       const flagged = entry({ ...popped, fullyMined: { byName: 'Mina', at: iso(NOW - HOUR_MS) } });
       expect(sharedPopMiningState(flagged)).toBe('fullyMined');
-      expect(toSharedPopSources([flagged], new Set(), NOW)[0]).toMatchObject({
+      const rows = toSharedPopSources([flagged], new Set(), NOW);
+      expect(rows[0]).toMatchObject({
         detail: 'fullyMined',
         pastLabelKey: 'calendar.fullyMined',
       });
+      // Nothing left to expire: the muted expiry row goes.
+      expect(rows).toHaveLength(1);
     });
 
     it('is fully mined once its linked Survey is finished', () => {
@@ -183,7 +211,7 @@ describe('Shared Pops as Calendar clocks', () => {
     it('is likely mined out only as a muted guess that never overrides the clock', () => {
       const likely = entry({ ...popped, likelyMinedOut: true });
       expect(sharedPopMiningState(likely)).toBe('likelyMinedOut');
-      const [row] = toSharedPopSources([likely], new Set(), NOW);
+      const row = toSharedPopSources([likely], new Set(), NOW)[1];
       expect(row).toMatchObject({
         detail: 'expires',
         deadlineMs: NOW + 61 * HOUR_MS,
@@ -196,7 +224,7 @@ describe('Shared Pops as Calendar clocks', () => {
         retainUntil: iso(NOW + 66 * HOUR_MS),
         likelyMinedOut: true,
       });
-      expect(toSharedPopSources([expired], new Set(), NOW)[0]).toMatchObject({
+      expect(toSharedPopSources([expired], new Set(), NOW)[1]).toMatchObject({
         detail: 'expired',
         extra: { detail: 'likelyMinedOut' },
       });
@@ -245,13 +273,14 @@ describe('Shared Pops as Calendar clocks', () => {
       nowMs: NOW,
       sharedMoonPops: toSharedPopSources([entry(), other], new Set(), NOW),
     });
-    expect(board.map((item) => item.kind)).toEqual(['sharedMoonPop', 'sharedMoonPop']);
+    expect(board.map((item) => item.kind)).toEqual(Array(4).fill('sharedMoonPop'));
     expect(board[0]!.sharedBy).toEqual(CORP);
-    expect(filterByCorporation(board, 'none')).toHaveLength(2);
+    expect(filterByCorporation(board, 'none')).toHaveLength(4);
     expect(filterBySharingCorporation(board, 98_000_002).map((i) => i.sourceId)).toEqual([
       '98000002_x2',
+      '98000002_x2:expires',
     ]);
-    expect(filterBySharingCorporation(board, 'all')).toHaveLength(2);
+    expect(filterBySharingCorporation(board, 'all')).toHaveLength(4);
   });
 });
 
