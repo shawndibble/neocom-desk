@@ -8,6 +8,7 @@ import {
   toCorpAssetInputs,
   type CorpAssetLabels,
 } from '@/features/corp/assets';
+import { accountCorpReaders } from '@/features/corp/corpReadAccess';
 import { loadCorporationDivisions } from '@/features/corp/wallet';
 import { hangarDivisions } from '@/features/corp/divisions';
 import { loadCorporationBlueprints } from '@/features/corp/blueprints';
@@ -72,8 +73,7 @@ const EMPTY_SNAPSHOT: CorpAssetsSnapshot = {
 export async function loadCorpAssetsSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal,
-  canReadBlueprints: boolean,
-  canReadStructures: boolean
+  canReadBlueprints: boolean
 ): Promise<CorpAssetsSnapshot> {
   const corporationId = await loadCorporationId(characterId);
   if (corporationId === null || signal.cancelled) return { ...EMPTY_SNAPSHOT, corporationId };
@@ -94,13 +94,22 @@ export async function loadCorpAssetsSnapshot(
   const typeIds = inputs === null ? [] : [...new Set(inputs.map((i) => i.typeId))];
   const placeIds = assets === null ? [] : assetPlaceIds(assets);
   // The corporation's own structures list names every hangar's structure with
-  // no per-id lookup; a role gap or failed read falls back to
-  // `/universe/structures/{id}` after first paint.
-  const structureNames: Promise<Map<number, string>> = canReadStructures
-    ? loadCorporationStructures(characterId, corporationId)
-        .then((result) => structureNameMap(result.cached?.data))
-        .catch(() => new Map<number, string>())
-    : Promise.resolve(new Map<number, string>());
+  // no per-id lookup. Any Character on the account that can read it will do,
+  // not just the active one (who may lack Station_Manager); a failed read
+  // falls back to `/universe/structures/{id}` after first paint.
+  const structureNames: Promise<Map<number, string>> = accountCorpReaders(
+    'canReadStructures',
+    characterId
+  )
+    .then((readers) => readers.get(corporationId))
+    .then((reader) =>
+      reader === undefined
+        ? new Map<number, string>()
+        : loadCorporationStructures(reader, corporationId).then((result) =>
+            structureNameMap(result.cached?.data)
+          )
+    )
+    .catch(() => new Map<number, string>());
   const reads = startAssetReads({
     characterId,
     assets: assets ?? [],
