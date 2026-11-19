@@ -17,7 +17,6 @@ import type { TradeHub } from '@/market/hubs';
 import { nameForType, volumeForType, type BlueprintCatalog } from './blueprintCatalog';
 import type { buildItemMenuProps } from './buildItemMenuProps';
 import type { CorpOwnedStockState } from './corpOwnedStock';
-import { MinedOreNote } from './MinedOreNote';
 import { MaterialsTable, type MaterialsTableHandle } from './MaterialsTable';
 import { PlanMaterialModals } from './PlanMaterialModals';
 import { PlanMaterialsActions } from './PlanMaterialsActions';
@@ -210,12 +209,6 @@ export function PlanMaterialsPanel({
             characterNameFor={ownedStock.detection.characterNameFor}
             depthFor={(typeID) => boughtDepth.get(typeID)}
           />
-          {modals.hasShortfall && (
-            <MinedOreNote
-              shortMinerals={Object.keys(modals.shortfall.needs).map(Number)}
-              onBuyOre={() => modals.setBuyOreOpen(true)}
-            />
-          )}
           <PlanMaterialModals
             modals={modals}
             result={result}
