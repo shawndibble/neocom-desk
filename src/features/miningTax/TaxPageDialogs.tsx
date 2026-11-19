@@ -4,9 +4,8 @@ import { guarded } from '@/app/routeChunks';
 import { PageSettingsModal } from '@/features/settings/PageSettingsModal';
 import { MiningTaxSettingsForm } from '@/features/settings/MiningTaxSettingsForm';
 import type { PayeeRecord } from '@/db';
-import type { PayeeOwed } from '@/features/miningTax/PayeeManagerDialog';
+import type { BookCorporation, PayeeOwed } from '@/features/miningTax/PayeeManagerDialog';
 import type { TrackedCharacter } from '@/features/miningTax/snapshot';
-import type { NamedCorporation } from '@/engine/miningTax/payeeCorporation';
 import { TypeOverridesDialog } from '@/features/miningTax/TypeOverridesDialog';
 
 const PayeeManagerDialog = lazy(() =>
@@ -32,7 +31,7 @@ interface TaxPageDialogsProps {
   systemsByPayee: ReadonlyMap<string, ReadonlySet<number>>;
   systemNames: ReadonlyMap<number, string>;
   /** The Corp Tax Books' corporations, offered as links for a Payee named for one. */
-  bookCorporations: readonly NamedCorporation[];
+  bookCorporations: readonly BookCorporation[];
   refresh: () => void;
 }
 

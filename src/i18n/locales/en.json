@@ -4418,11 +4418,6 @@
     "skillGateFilterChipCount_other": "{{count}} rows hidden",
     "assumesBaseStandingsHint": "Broker fees in these profit figures are calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings.",
     "productionLogAssumesBaseStandingsHint": "Broker fees on watched sell orders are calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings.",
-    "minedOre": {
-      "title": "From ore you mine (last 90 days)",
-      "empty": "No mining history on this device. Grant the mining Permission, or mine, and it fills in.",
-      "buyThese": "Buy these: {{minerals}}."
-    },
     "buyOre": {
       "action": "Buy ore instead",
       "title": "Buy ore instead of minerals",
@@ -4563,10 +4558,6 @@
     "craftScopeReactionsIncluded": "incl. reactions",
     "craftScopeReactionsExcluded": "no reactions",
     "copyShoppingListShort": "Copy shopping list",
-    "budgetLabel": "Shopping budget (ISK)",
-    "budgetPlaceholder": "Budget, e.g. 5b",
-    "budgetCoverage": "Covers {{percent}}% of the need",
-    "budgetCoverageHeavy": "Covers {{percent}}% of the need. Large share of the budget: {{items}}",
     "iskPerHourTooltip": "Profit divided by the main job's time (job-slot occupancy, not wall-clock wait), on the basis the figure above uses — an hourly rate to compare builds by.",
     "breakEvenPriceTooltip": "The price you must list one unit at for the sale to cover the whole job, once sales tax and broker fee are paid — and, on resale value, what your own materials would have fetched. Click for the full breakdown.",
     "costIndexTooltip": "<b>Can be slightly off:</b> ESI rounds it to 4 decimals. The build system's manufacturing activity level, which drives the job's cost-index fee. Read live from ESI for the build system named here — the trade hub sets material and product prices, never this."
@@ -4781,7 +4772,7 @@
         "tab": "Corporation",
         "board": "The Corp Board is a board of widgets you pick and size: deadlines, structure fuel, moon chunks, jobs, wallet, members and more.",
         "pages": "Members, Corp Wallet and Corp Assets each have their own page, with role audits and Stock Targets.",
-        "moons": "Moons keeps the Corp Tax Book: what each corp member mined at your refineries, their Statements, and what is paid.",
+        "moons": "Moons keeps the Corp Tax Book: what each corp member mined at your refineries, the late notices sent to them, and what is paid.",
         "access": "SRP lets a pilot file a claim from their own killmail. Officer pages appear only with a Corp Role, and corporation data is read only for the roles you hold."
       },
       "comms": {
@@ -8282,12 +8273,14 @@
         "factStatement": "Statement",
         "factStatementFinal": "Issued, final",
         "factSettledBy": "Settled by",
+        "creditAppliedNote": "{{corp}} already held credit from an earlier payment of yours, and applied {{amount}} ISK of it to this day.",
         "yourMarkNote": "The corporation confirms your mark against its wallet.",
         "markedPaidNote": "Marked paid by you — {{corp}} still shows {{owed}} ISK owed. It confirms your mark against its wallet.",
         "markedPaidSpentNote": "Marked paid by you. {{corp}}'s book already holds that payment, but it pays your oldest open days first and spent it on {{days}}, so it still bills this day {{owed}} ISK. Resolve says what you can do.",
         "settledBy": {
           "yourMark": "Your mark",
           "donation": "Donation",
+          "credit": "Credit the book holds",
           "statement": "Statement payment"
         },
         "factOriginal": "Originally billed",
@@ -8659,6 +8652,7 @@
       "detailWithSystems": "{{pct}}% · {{hub}} · {{systems}}",
       "owed": "{{amount}} ISK",
       "settled": "Settled",
+      "credit": "{{amount}} ISK credit",
       "sharedByCharacters_one": "Used by {{count}} character",
       "sharedByCharacters_other": "Used by {{count}} characters",
       "termsDiffer": "Your characters bill this Payee differently.",
@@ -9597,7 +9591,6 @@
     "csvDetail": "Detail",
     "csvResponse": "Response",
     "csvImportant": "Important",
-    "csvProjected": "Projected",
     "csvId": "ID",
     "csvCorporation": "Corporation",
     "corpFilter": {
@@ -9630,7 +9623,14 @@
       "units_other": "{{count, number}} units",
       "startSurvey": "Start a Survey here",
       "openSurvey": "Open Survey",
-      "startNewSurvey": "Start a new Survey"
+      "startNewSurvey": "Start a new Survey",
+      "mining": "Mining",
+      "fullyMinedBy": "Fully mined by {{name}} on {{date}}",
+      "likelyMinedOut": "Likely mined out: most of the chunk is logged and mining has gone quiet",
+      "notMarkedFullyMined": "Not marked fully mined",
+      "survey": "Survey",
+      "surveyFinished": "Finished",
+      "surveyLeft": "{{percent}}% left"
     },
     "downloadIcs": "Download .ics",
     "addToGoogleCalendar": "Add to Google Calendar",
@@ -9645,20 +9645,13 @@
     "export": "Export",
     "important": "High",
     "overdue": "Overdue",
+    "fullyMined": "Fully mined",
+    "popped": "Popped",
     "started": "Started",
     "due": "in {{duration}}",
     "prevFortnight": "Previous fortnight",
     "nextFortnight": "Next fortnight",
-    "projected": "Projected",
-    "projectedKind": "{{kind}} (projected)",
     "acceleratorSubject": "Cerebral accelerator +{{bonus}}",
-    "skillPlan": {
-      "title": "Skill plan to project",
-      "none": "No Skill Plans for this character",
-      "choose": "Choose a plan",
-      "error": "Could not be scheduled",
-      "errorReason": "Could not be scheduled: {{reason}}"
-    },
     "kind": {
       "calendarEvent": "Calendar events",
       "skillTraining": "Skill queue",
@@ -9673,8 +9666,7 @@
       "corpJob": "Corp industry jobs",
       "skyhookRaid": "Skyhook raids",
       "contractExpiry": "Contracts",
-      "orderExpiry": "Market orders",
-      "skillPlan": "Skill plan"
+      "orderExpiry": "Market orders"
     },
     "detail": {
       "moonChunk": {
@@ -9684,7 +9676,10 @@
       "sharedMoonPop": {
         "ready": "ready",
         "autoFracture": "auto-fractures",
-        "expires": "belt expires"
+        "expires": "belt expires",
+        "expired": "belt expired",
+        "fullyMined": "fully mined",
+        "likelyMinedOut": "likely mined out"
       },
       "structureTimer": {
         "anchor_vulnerable": "anchor vulnerability ends",
@@ -15502,6 +15497,13 @@
       "monday": "Monday",
       "sunday": "Sunday"
     },
+    "sharedPopTimeLabel": "Shared moon pop time",
+    "sharedPopTimeHint": "Which time a corp's shared moon pop shows at on the Calendar. Notifications keep the time the corporation chose.",
+    "sharedPopTime": {
+      "asShared": "As shared",
+      "ready": "Ready",
+      "autoFracture": "Auto-fracture"
+    },
     "mobileTabs": {
       "title": "Phone tab bar",
       "hint": "Pick the four links the bottom bar shows on a phone.",
@@ -17937,12 +17939,6 @@
       "theCorp": "the corporation",
       "refinery": "Refinery {{id}}",
       "eyebrow": "{{corp}} · Statement {{period}} · issued {{issued}}",
-      "cadence": {
-        "monthly": "monthly",
-        "weekly": "weekly",
-        "fortnightly": "fortnightly",
-        "regular": "next"
-      },
       "closed": "This account is closed. {{corp}} sent a final Statement and will not mail you again.",
       "mined": "What you mined",
       "minedMeta": "{{hub}} buy, {{form}} ore, priced on the day mined",
@@ -17984,7 +17980,6 @@
         "rate": "Rate",
         "price": "Price",
         "due": "Due",
-        "minimum": "Minimum Statement",
         "paying": "Paying",
         "account": "Account"
       },
@@ -17993,7 +17988,6 @@
       "rateOverride": "Some days carry an officer's logged rate correction.",
       "priceBasis": "{{hub}} buy, {{form}} ore, on the day mined",
       "dueValue": "{{date}} ({{days}} days after issue)",
-      "minimumValue": "{{amount}}; smaller balances roll into the next Statement",
       "payingValue": "Donate to {{corp}}; any of your characters counts",
       "grouping": {
         "title": "A character is waiting to join this account",
@@ -18008,7 +18002,7 @@
       },
       "stop": {
         "label": "Stop reminders",
-        "hint": "Your {{cadence}} Statement still comes. Officers can send you at most one reminder per Statement.",
+        "hint": "A late notice still comes if you fall behind. Officers can send you at most one reminder per notice.",
         "failed": "Couldn't save that. Try again."
       }
     },
@@ -18115,12 +18109,20 @@
         "body": "Payments now go to {{payee}}. {{by}} changed this on {{date}}.",
         "dismiss": "Dismiss"
       },
+      "notices": {
+        "title": "Notices sent",
+        "empty": "No late notice has been sent yet.",
+        "sent": "Sent",
+        "unmailed": "{{count}} of {{total}} not mailed",
+        "last": "Last notice",
+        "owed": "Owed now"
+      },
       "tabs": {
         "overview": "Overview",
         "extractions": "Extractions",
         "refineries": "Refineries",
         "miners": "Miners",
-        "statements": "Statements",
+        "statements": "Late notices",
         "moonOwners": "Moon owners"
       },
       "sharing": {
@@ -18222,7 +18224,7 @@
           "mined": "Mined (est.)",
           "minedTip": "Ore mined here during each Extraction, from the fracture to the field's end. Mining outside those windows is not counted. Valued at today's hub prices.",
           "tax": "Tax billed",
-          "taxTip": "The tax Statements have already billed for these Extractions. Tax for days not yet billed shows on the Extraction's own page."
+          "taxTip": "The tax Statements have already billed for these Extractions. Tax not yet on a Statement is not counted here; the Extraction's own page shows it so far."
         },
         "ore": {
           "title": "Ore in the chunk",
@@ -18249,7 +18251,8 @@
           "minedPct": "{{pct}}% mined · {{isk}} ISK",
           "minedIsk": "{{isk}} ISK",
           "fullyMined": "Fully mined",
-          "tax": "Tax billed"
+          "tax": "Tax billed",
+          "notBilled": "Not billed yet"
         },
         "miners": {
           "title": "Miners · {{count}}",
@@ -18316,16 +18319,6 @@
         "held": "Waiting for {{owner}}'s ledger",
         "dismissed": "Dismissed",
         "written-off": "Written off"
-      },
-      "periodStatus": {
-        "issued": "Issued",
-        "sent": "Sent",
-        "overdue": "Overdue",
-        "paid": "Paid",
-        "ready": "Ready to send",
-        "closed": "Closed",
-        "rollover": "Rolls over",
-        "open": "Open"
       },
       "payment": {
         "donation": "Donation",
@@ -18490,14 +18483,6 @@
         "nonMembersHidden_other": "{{count}} non-members hidden · {{amount}} owed",
         "hidden_one": "{{count}} other Miner owes nothing and has no credit.",
         "hidden_other": "{{count}} other Miners owe nothing and have no credit.",
-        "accruing": "{{amount}} in today's mining",
-        "statementAdjust": "Corrections and late ore: {{amount}}",
-        "lastPayments": "Last payments",
-        "moreDays_one": "and {{count}} more day",
-        "moreDays_other": "and {{count}} more days",
-        "moreMoons_one": "and {{count}} more moon",
-        "moreMoons_other": "and {{count}} more moons",
-        "openPage": "Open page",
         "empty": "No Miner owes tax, is owed credit or has days waiting.",
         "emptyFiltered": "No Miner matches these filters.",
         "balance": {
@@ -18599,15 +18584,10 @@
           "assign": "Assign to a Miner",
           "notTax": "Mark not tax"
         },
-        "runDue": {
-          "title": "Statements ready for {{periods}}",
-          "body_one": "A closed period has Billable days on no Statement, so nobody is billed for it yet. Open Statements to send the run.",
-          "body_other": "{{count}} closed periods have Billable days on no Statement, so nobody is billed for them yet. One run sends them all, oldest first."
-        },
         "noticesDue": {
           "title_one": "Late notice due for {{count}} Miner",
           "title_other": "Late notices due for {{count}} Miners",
-          "body": "They are behind by the book's notice rules and owe {{amount}} between them. Open Statements to send the notices from your Character."
+          "body": "They are behind by the book's notice rules and owe {{amount}} between them. Open Late notices to send the notices from your Character."
         },
         "uncounted": {
           "title": "Donation of {{amount}} from {{name}} into {{division}} — not counted",
@@ -18633,8 +18613,40 @@
         },
         "none": "Nothing needs you."
       },
+      "ledger": {
+        "title": "Account ledger",
+        "hint": "Moon tax and payments in date order, balance after each. Newest first.",
+        "empty": "Nothing billed or paid yet.",
+        "owed": "owed",
+        "credit": "credit",
+        "even": "even",
+        "summary_one": "{{count}} entry · {{balance}} ISK {{side}}",
+        "summary_other": "{{count}} entries · {{balance}} ISK {{side}}",
+        "notYetBilled_one": "Not in the balance yet: {{count}} day mined, {{amount}} ISK tax, not billable yet.",
+        "notYetBilled_other": "Not in the balance yet: {{count}} days mined, {{amount}} ISK tax, not billable yet.",
+        "cols": {
+          "date": "Date",
+          "what": "What",
+          "debit": "Tax",
+          "credit": "Paid",
+          "balance": "Balance"
+        },
+        "what": {
+          "day_one": "Moon mining · {{count}} day",
+          "day_other": "Moon mining · {{count}} days",
+          "payment": "Payment",
+          "correction": "Correction: {{reason}}",
+          "writeOff": "Written off: {{reason}}",
+          "adjustment": "Tolerance and Statement corrections"
+        },
+        "oreOf": "Ore mined {{date}}",
+        "paidBy": "{{name}} · {{source}}",
+        "noWalletEntry": "An officer recorded this by hand, so it has no corp wallet entry.",
+        "adjustmentNote": "ISK the book moved without a date of its own: a tolerance shortfall forgiven, or a correction folded into a Statement."
+      },
       "miner": {
         "notFound": "This Miner is not in the book",
+        "credit": "Credit",
         "record": "Record payment",
         "remind": "Send reminder",
         "remindNone": "No Statement issued yet",
@@ -18822,38 +18834,26 @@
         "showToMembers": "Show to members now"
       },
       "run": {
-        "title": "{{period}} Statements",
-        "titleNone": "Statements",
-        "nothing": "Nothing to send: every Billable day is on a Statement, or the period has not closed yet.",
         "check": "Check",
         "send": "Send",
         "doneStep": "Done",
         "done": "(done)",
-        "statements": "Statements",
         "toSend_one": "{{count}} to send",
         "toSend_other": "{{count}} to send",
-        "balances": "Balances due",
-        "balancesTip": "Carried from earlier Statements plus this period's lines, less credit",
-        "belowMinimum": "Below {{amount}}",
-        "rollIn_one": "{{count}} rolls into the next",
-        "rollIn_other": "{{count}} roll into the next",
-        "creditApplied": "Credit applied",
-        "billable": "Every day in the period is Billable and priced ({{hub}} buy, {{form}})",
         "unmailed_one": "{{count}} earlier Statement was issued but never mailed; it goes with this run",
         "unmailed_other": "{{count}} earlier Statements were issued but never mailed; they go with this run",
         "unmatched": "An Unmatched donation is not on anyone's Statement until it is assigned",
         "previewFor": "Preview for",
+        "recipients": "Mail to",
+        "mailedRecently_one": "Mailed {{count}} day ago, so unticked",
+        "mailedRecently_other": "Mailed {{count}} days ago, so unticked",
         "mailPreview": "Mail preview",
         "continue": "Continue to send",
         "preview": "Preview mail",
         "loadingCorporation": "Loading corporation name…",
         "sendIntro_one": "{{count}} mail from {{name}}, one per Miner.",
         "sendIntro_other": "{{count}} mails from {{name}}, one per Miner.",
-        "sendButton_one": "Send {{count}} Statement",
-        "sendButton_other": "Send {{count}} Statements",
         "back": "Back",
-        "queued_one": "{{count}} Statement is in the send queue.",
-        "queued_other": "{{count}} Statements are in the send queue.",
         "skipped_one": "{{count}} was already queued or sent.",
         "skipped_other": "{{count}} were already queued or sent.",
         "missingLink_one": "{{count}} has no verify link and was not queued.",
@@ -18900,38 +18900,13 @@
         "openMiner": "Open Miner page"
       },
       "statementPeriod": {
-        "notFound": "No Statements were issued for this period.",
-        "issued": "Issued {{date}}",
-        "miners_one": "{{count}} Miner",
-        "miners_other": "{{count}} Miners",
-        "mailSent": "Sent",
-        "mailSentTimes": "Sent ×{{count}}",
         "notMailed": "Not mailed",
-        "stopped": "Stopped",
         "statementNotFound": "Statement not found.",
-        "listTitle": "Statements · {{count}}",
-        "unpaidOf": "{{unpaid}} of {{total}} unpaid",
-        "overdueCount": "{{count}} overdue",
-        "pausedCount": "{{count}} paused by a declaration",
-        "stoppedTip_one": "This Miner stopped reminders. {{count}} mail sent.",
-        "stoppedTip_other": "This Miner stopped reminders. {{count}} mails sent.",
         "alreadyPaid": "Statement already paid",
         "reminderCap": "Reminders stopped; one already sent",
         "pausedUntil": "Paused · until {{date}}",
         "dueLate_one": "{{date}} · {{count}} day late",
         "dueLate_other": "{{date}} · {{count}} days late"
-      },
-      "periods": {
-        "title": "All periods",
-        "mailedOf": "{{sent}}/{{total}}",
-        "mailedTip": "Statements mailed at least once, of the Statements issued for the period.",
-        "meta": "{{cadence}} · minimum {{minimum}}",
-        "writeOffsTolerance_one": "{{tolerance}} left over by {{count}} payment within tolerance, written off.",
-        "writeOffsTolerance_other": "{{tolerance}} left over by {{count}} payments within tolerance, written off.",
-        "writeOffsLate_one": "{{count}} line recorded after payment, never billed.",
-        "writeOffsLate_other": "{{count}} lines recorded after payment, never billed.",
-        "writeOffsLabel": "About write-offs",
-        "writeOffsTip": "Both are logged and shown on each Miner's page."
       },
       "scope": {
         "title": "Allow the refinery ledger",
@@ -19465,15 +19440,6 @@
         },
         "startDate": "Start date (EVE time)",
         "grace": "Grace after day end (hours)",
-        "overdue": "Overdue after (days)",
-        "minimum": "Minimum Statement",
-        "issuedBeforeNote": "Applies only to Statements issued before the running account.",
-        "cadenceLabel": "Statements",
-        "cadence": {
-          "monthly": "Monthly",
-          "days": "Every N days"
-        },
-        "cadenceDays": "Days per period",
         "divisions": "Wallet divisions donations are read from",
         "division": "Division {{n}}",
         "extractions": "Extractions",
@@ -19535,9 +19501,9 @@
         },
         "scheduled": "Scheduled",
         "addRateTitle": "Add a rate",
-        "statements": "Statements",
+        "billingDays": "Billing days and wallets",
         "sections": "Settings sections",
-        "startHint": "Mining before this day owes nothing. Earlier is always allowed; later only while no Statement covers the days in between.",
+        "startHint": "Mining before this day owes nothing. Earlier is always allowed; later only while no late notice lists the days in between.",
         "saved": "Settings saved",
         "rateIncomplete": "Finish the rate in the form, or clear its percent, to save.",
         "addRate": "Add rate",
@@ -19560,7 +19526,7 @@
         "running": {
           "heading": "Running account and late notices",
           "billing": "Billing",
-          "summary": "Each day is owed as it closes, payments pay the oldest day first, and a Miner who falls behind gets a late notice. Statements issued before stay as they are.",
+          "summary": "Each day is owed as it closes, payments pay the oldest day first, and a Miner who falls behind gets a late notice.",
           "noticeWhen": "Late notice when",
           "behind": "Behind",
           "dayOfMonth": "Day of month",
@@ -19569,6 +19535,8 @@
           "noticeHint": "Behind: once a Miner's oldest unpaid day is this many days old. Day of month: on that day each month, to every Miner who owes from before it.",
           "minimum": "Late notice minimum",
           "minimumHint": "No notice goes to a Miner who owes less than this.",
+          "earlyAt": "Send a notice early at",
+          "earlyAtHint": "A Miner owing this much, all their Characters together, gets a notice before they are behind by the rule above. Blank: off. Never inside the days between notices.",
           "cooldown": "Days between notices",
           "tolerance": "Day tolerance (%)",
           "toleranceHint": "A day a payment reaches counts as paid when it falls short of the day's tax by no more than this; the gap is written off. 0 to 5."

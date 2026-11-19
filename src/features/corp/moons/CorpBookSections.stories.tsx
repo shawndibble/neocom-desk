@@ -9,20 +9,18 @@ import { MinersTab } from './MinersTab';
 import { MoonDetail } from './MoonDetail';
 import { RefineryPage } from './RefineryPage';
 import { OverviewTab } from './OverviewTab';
-import { StatementPeriodDetail } from './StatementPeriodDetail';
-import { StatementsTab } from './StatementsTab';
+import { LateNoticesTab } from './LateNoticesTab';
 import { MOONS_TABS } from './moonsPaths';
 import { tabBarTabs } from '@/lib/pageTabs';
 import { useTranslation } from 'react-i18next';
 
 /**
  * The Corp Tax Book's section pages on a sample book the real engine built: the
- * Overview, Extractions, Miners (a row opened in place) and Statements tabs, and the Miner,
+ * Overview, Extractions, Miners (a row opens the Miner's page) and Statements tabs, and the Miner,
  * moon and Statement period pages, each at desktop and phone width. The components are the
  * route's own.
  */
 type SectionTab = 'overview' | 'extractions' | 'miners' | 'statements';
-const ISSUED_PERIOD = BOOK_VIEW.input.statements[0]?.periodStart ?? '2026-08-01';
 
 function Page({ children, tab }: { children: ReactNode; tab?: SectionTab }) {
   const { t } = useTranslation();
@@ -61,13 +59,6 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 const phone = { globals: { viewport: { value: 'mobile1', isRotated: false } } };
 
-/** Opens Varro's row, so the expanded state is on screen. */
-const openFirstRow: Story['play'] = async ({ canvasElement }) => {
-  await new Promise((r) => setTimeout(r, 400));
-  const rows = [...canvasElement.querySelectorAll<HTMLElement>('tbody tr, [role="row"]')];
-  rows.find((r) => r.textContent?.includes('Varro Kestane'))?.click();
-};
-
 /** @summary Overview: totals, Needs you, and the moons by Fractured, Ready and Pops in the next 7 days. */
 export const Overview: Story = {
   render: () => (
@@ -79,7 +70,7 @@ export const Overview: Story = {
 /** @summary Overview, phone. */
 export const OverviewPhone: Story = { ...Overview, ...phone };
 
-/** @summary Miners list: a row opens in place; the ⋮ holds three actions. */
+/** @summary Miners list: a row opens that Miner's page; the ⋮ holds three actions. */
 export const Miners: Story = {
   render: () => (
     <Page tab="miners">
@@ -89,11 +80,6 @@ export const Miners: Story = {
 };
 /** @summary Miners list, phone. */
 export const MinersPhone: Story = { ...Miners, ...phone };
-
-/** @summary Miners list with a row open. */
-export const MinersOpen: Story = { ...Miners, play: openFirstRow };
-/** @summary Miners list with a row open, phone. */
-export const MinersOpenPhone: Story = { ...MinersOpen, ...phone };
 
 /** @summary Miner page: header facts, then one scroll of sections. */
 export const MinerPage: Story = {
@@ -141,27 +127,16 @@ export const Extractions: Story = {
 /** @summary Extractions tab, phone. */
 export const ExtractionsPhone: Story = { ...Extractions, ...phone };
 
-/** @summary Statements tab: issued periods and the next run. */
+/** @summary Late notices tab: the next run and the notices sent. */
 export const Statements: Story = {
   render: () => (
     <Page tab="statements">
-      <StatementsTab />
+      <LateNoticesTab />
     </Page>
   ),
 };
-/** @summary Statements tab, phone. */
+/** @summary Late notices tab, phone. */
 export const StatementsPhone: Story = { ...Statements, ...phone };
-
-/** @summary Statement period page: one issued period's Statements and what each paid. */
-export const StatementPeriodPage: Story = {
-  render: () => (
-    <Page>
-      <StatementPeriodDetail periodStart={ISSUED_PERIOD} />
-    </Page>
-  ),
-};
-/** @summary Statement period page, phone. */
-export const StatementPeriodPagePhone: Story = { ...StatementPeriodPage, ...phone };
 
 /** @summary Miners list as the Overdue total's link opens it: `?balance=overdue`, a Balance pill. */
 export const MinersOverdue: Story = {

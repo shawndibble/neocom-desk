@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Button,
+  Checkbox,
   Eyebrow,
   Panel,
   Select,
@@ -14,10 +15,11 @@ import {
   StatChips,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { statementForLine } from '@/engine/corpTaxBook/bookView';
 import { mailableAfterClose } from '@/engine/corpTaxBook/closeAccount';
 import { composeStatementMail } from '@/engine/corpTaxBook/statementMail';
 import type { Statement } from '@/engine/corpTaxBook/statements';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { DAY_MS } from '@/lib/age';
 import { cx } from '@/lib/cx';
 import { MailLimitNotice } from '@/features/corpTaxBook/MailLimitNotice';
 import { MailQueueSummary } from '@/features/corpTaxBook/MailQueuePanel';
@@ -30,12 +32,15 @@ import {
 import { useIsBelowDesktop } from '@/lib/useIsBelowDesktop';
 import { editBook } from '../taxBook/bookClient';
 import { editErrorMessage, useBook } from './useBook';
-import { isk, periodsLabel } from './moonsFormat';
+import { isk } from './moonsFormat';
 import { TRADE_HUBS } from '@/market/hubs';
 import { mailTarget, statementRefineryNames, useCorporationName } from './statementMailing';
-import { plannedNotices, plannedRuns } from './useNeedsYou';
+import { plannedNotices } from './useNeedsYou';
 
 type Step = 'check' | 'send' | 'done';
+
+/** A Miner mailed a Statement within this long is left unticked in the run. */
+const RECENTLY_MAILED_MS = 7 * DAY_MS;
 
 function StepDot({
   n,
@@ -68,19 +73,16 @@ function StepDot({
 }
 
 /**
- * Check → Send → Done (#4056 steps 10-12). Check shows what the run would
- * send: every closed period not on a Statement yet, oldest first, so a forgotten
- * month goes out with the next (#6208); Send issues each Statement (which creates its verify link, so it must
- * come first) and hands the mails to the queue (#4064), which paces them and
- * shows its own chip on every page. On a desktop the chosen Miner's mail shows
+ * Check → Send → Done (#4056 steps 10-12). Check shows the late notices the run would send
+ * (#6294), plus any earlier Statement whose mail never went out; Send issues each notice (which
+ * creates its verify link, so it must come first) and hands the mails to the queue (#4064), which
+ * paces them and shows its own chip on every page. On a desktop the chosen Miner's mail shows
  * beside Check and Send; below it, "Preview mail" opens it in a dialog.
  */
 export function StatementRun() {
   const { t } = useTranslation();
   const ctx = useBook();
   const { view, names, canEdit, corporationId, characterId, reload, settings } = ctx;
-  // A running account sends late notices instead of a calendar run (#6294).
-  const running = !!view.input.runningAccountFrom;
   const corporationName = useCorporationName();
   const [step, setStep] = useState<Step>('check');
   const [previewId, setPreviewId] = useState<string | null>(null);
@@ -107,23 +109,13 @@ export function StatementRun() {
     return () => clearInterval(id);
   }, [step]);
   const queue = useLiveQuery(() => listQueue(corporationId), [corporationId], []);
+  /** The officer's own ticks; a Miner they have not touched follows the default (`recentlyMailed`). */
+  const [ticks, setTicks] = useState<ReadonlyMap<string, boolean>>(new Map());
 
-  const runs = useMemo(() => plannedRuns(view), [view]);
   const notices = useMemo(
     () => plannedNotices(view, settings.noticeRules),
     [view, settings.noticeRules]
   );
-  /** Every new Statement of the run, oldest period first, with the view it is issued from. */
-  const lines = useMemo(
-    () => runs.flatMap((run) => run.plan.lines.map((line) => ({ run, line }))),
-    [runs]
-  );
-  // A period under the minimum rolls into the next one in the run, so only the last one's count
-  // is still waiting; the balances and credit are the whole run's.
-  const latest = runs.at(-1)?.plan;
-  const totalDue = runs.reduce((sum, run) => sum + run.plan.totalDue, 0);
-  const creditApplied = runs.reduce((sum, run) => sum + run.plan.creditApplied, 0);
-
   // Statements issued earlier whose mail never went out (a closed tab, a refused enqueue).
   const unmailed = useMemo(
     () =>
@@ -142,11 +134,10 @@ export function StatementRun() {
     [view, queue]
   );
 
-  const nothingToDo = runs.length === 0 && notices.length === 0 && unmailed.length === 0;
-  const total = lines.length + notices.length + unmailed.length;
+  const nothingToDo = notices.length === 0 && unmailed.length === 0;
   const minerRow = (id: string) => view.miners.find((m) => m.id === id)!;
 
-  /** Everything the run will send: newly drafted Statements, then earlier unmailed ones. */
+  /** Everything the run will send: the new late notices, then earlier unmailed Statements. */
   const previews = useMemo(() => {
     const out: {
       key: string;
@@ -155,15 +146,6 @@ export function StatementRun() {
       amountDue: number;
       carried: number;
     }[] = [];
-    for (const { run, line } of lines) {
-      out.push({
-        key: `line:${run.plan.period.start}:${line.minerId}`,
-        minerId: line.minerId,
-        statement: statementForLine(run.view, run.plan, line),
-        amountDue: line.balanceDue,
-        carried: line.carried,
-      });
-    }
     for (const n of notices) {
       out.push({
         key: `notice:${n.minerId}`,
@@ -187,7 +169,27 @@ export function StatementRun() {
       });
     }
     return out;
-  }, [view, lines, notices, unmailed]);
+  }, [view, notices, unmailed]);
+
+  /** The last time any Statement of this Miner was mailed, if ever. */
+  const lastMailedAt = (minerId: string): number | null => {
+    let last: number | null = null;
+    for (const s of view.input.statements) {
+      if (s.minerId !== minerId || !s.lastMailedAt) continue;
+      const at = Date.parse(s.lastMailedAt);
+      if (!Number.isNaN(at) && (last === null || at > last)) last = at;
+    }
+    return last;
+  };
+  /** Mailed within the last 7 days: unticked unless the officer ticks them. */
+  const recentlyMailed = (minerId: string): boolean => {
+    const at = lastMailedAt(minerId);
+    return at !== null && now - at < RECENTLY_MAILED_MS;
+  };
+  const isChosen = (p: { key: string; minerId: string }): boolean =>
+    ticks.get(p.key) ?? !recentlyMailed(p.minerId);
+  const chosen = new Set(previews.filter(isChosen).map((p) => p.key));
+  const total = chosen.size;
 
   const previewFor = (item: (typeof previews)[number], corpName: string): MailPreviewContent => {
     const target = mailTarget(ctx, item.statement, minerRow(item.minerId), {
@@ -225,9 +227,8 @@ export function StatementRun() {
     if (corporationName === null) return;
     setBusy(true);
     setError(null);
-    // Each period is issued and then queued before the next one starts, so a
-    // failure part-way keeps what was issued (and queued); the next run bills
-    // the remaining periods and offers any Statement whose mail never left.
+    // A failure part-way keeps what was issued (and queued); the next run plans the
+    // remaining notices and offers any Statement whose mail never left.
     const sent = { queued: 0, skipped: 0, missingLink: 0 };
     const queueTargets = async (targets: ReturnType<typeof mailTarget>[]) => {
       if (targets.length === 0) return;
@@ -247,41 +248,21 @@ export function StatementRun() {
     try {
       // Earlier Statements whose mail never went out are the oldest; they go first.
       await queueTargets(
-        unmailed.map((s) => {
-          const row = minerRow(s.minerId);
-          return mailTarget(ctx, s as Statement, row, {
-            amountDue: row.owed,
-            carried: Math.max(0, row.owed - s.amount),
-          });
-        })
+        unmailed
+          .filter((s) => chosen.has(`statement:${s.id}`))
+          .map((s) => {
+            const row = minerRow(s.minerId);
+            return mailTarget(ctx, s as Statement, row, {
+              amountDue: row.owed,
+              carried: Math.max(0, row.owed - s.amount),
+            });
+          })
       );
-      for (const run of runs) {
-        const targets = [];
-        for (const line of run.plan.lines) {
-          const statement = statementForLine(run.view, run.plan, line);
-          // A guest cannot look names up, so the verify page reads them off the Statement.
-          const refineryNames = statementRefineryNames(statement, names);
-          await editBook(characterId, corporationId, {
-            action: 'issueStatement',
-            statement: {
-              ...statement,
-              corporationName,
-              minerName: names.character(minerRow(line.minerId).mainCharacterId),
-              refineryNames,
-            },
-          });
-          targets.push(
-            mailTarget(ctx, statement, minerRow(line.minerId), {
-              amountDue: line.balanceDue,
-              carried: line.carried,
-            })
-          );
-        }
-        await queueTargets(targets);
-      }
       // Late notices (#6294): each issued (which makes its verify link), then all queued.
       const noticeTargets = [];
       for (const n of notices) {
+        // A notice is rebuilt every run, so an unticked one is not issued at all.
+        if (!chosen.has(`notice:${n.minerId}`)) continue;
         const row = minerRow(n.minerId);
         await editBook(characterId, corporationId, {
           action: 'issueStatement',
@@ -331,20 +312,10 @@ export function StatementRun() {
     </div>
   );
 
-  const title = running
-    ? t('corpTaxBook.moons.run.noticesTitle')
-    : runs.length > 0
-      ? t('corpTaxBook.moons.run.title', {
-          period: periodsLabel(runs.map((run) => run.plan.period)),
-        })
-      : t('corpTaxBook.moons.run.titleNone');
-
   return (
-    <Panel title={title}>
+    <Panel title={t('corpTaxBook.moons.run.noticesTitle')}>
       {nothingToDo ? (
-        <p className="text-sm text-text-dim">
-          {t(running ? 'corpTaxBook.moons.run.noticesNothing' : 'corpTaxBook.moons.run.nothing')}
-        </p>
+        <p className="text-sm text-text-dim">{t('corpTaxBook.moons.run.noticesNothing')}</p>
       ) : (
         <>
           <ol className="mb-4 flex flex-wrap gap-x-6 gap-y-2">
@@ -367,11 +338,7 @@ export function StatementRun() {
                 <div className="space-y-3 text-sm">
                   <StatChips>
                     <StatChip
-                      label={t(
-                        running
-                          ? 'corpTaxBook.moons.run.notices'
-                          : 'corpTaxBook.moons.run.statements'
-                      )}
+                      label={t('corpTaxBook.moons.run.notices')}
                       value={t('corpTaxBook.moons.run.toSend', { count: total })}
                       emphasis
                     />
@@ -383,28 +350,6 @@ export function StatementRun() {
                         tooltipGlyph="info"
                       />
                     )}
-                    {latest && (
-                      <StatChip
-                        label={t('corpTaxBook.moons.run.balances')}
-                        value={isk(totalDue)}
-                        tooltip={t('corpTaxBook.moons.run.balancesTip')}
-                        tooltipGlyph="info"
-                      />
-                    )}
-                    {latest && (
-                      <StatChip
-                        label={t('corpTaxBook.moons.run.belowMinimum', {
-                          amount: isk(view.input.minimumStatement),
-                        })}
-                        value={t('corpTaxBook.moons.run.rollIn', { count: latest.belowMinimum })}
-                      />
-                    )}
-                    {latest && (
-                      <StatChip
-                        label={t('corpTaxBook.moons.run.creditApplied')}
-                        value={isk(creditApplied)}
-                      />
-                    )}
                   </StatChips>
                   <ul className="space-y-1">
                     <li className="flex items-center gap-2">
@@ -413,17 +358,12 @@ export function StatementRun() {
                         className="text-success"
                         aria-hidden
                       />
-                      {t(
-                        running
-                          ? 'corpTaxBook.moons.run.noticesBillable'
-                          : 'corpTaxBook.moons.run.billable',
-                        {
-                          hub:
-                            TRADE_HUBS.find((h) => h.id === view.input.hubId)?.systemName ??
-                            view.input.hubId,
-                          form: t(`corpTaxBook.moons.settings.form.${view.input.oreForm}`),
-                        }
-                      )}
+                      {t('corpTaxBook.moons.run.noticesBillable', {
+                        hub:
+                          TRADE_HUBS.find((h) => h.id === view.input.hubId)?.systemName ??
+                          view.input.hubId,
+                        form: t(`corpTaxBook.moons.settings.form.${view.input.oreForm}`),
+                      })}
                     </li>
                     {unmailed.length > 0 && (
                       <li className="flex items-center gap-2">
@@ -438,6 +378,40 @@ export function StatementRun() {
                       </li>
                     )}
                   </ul>
+                  <fieldset className="space-y-1">
+                    <legend className="mb-1 text-text-dim">
+                      {t('corpTaxBook.moons.run.recipients')}
+                    </legend>
+                    {previews.map((p) => {
+                      const at = lastMailedAt(p.minerId);
+                      return (
+                        <label
+                          key={p.key}
+                          className={cx('flex items-start gap-2 text-text', tappableRowClassName)}
+                        >
+                          <Checkbox
+                            className="mt-0.5"
+                            checked={chosen.has(p.key)}
+                            onChange={(e) => {
+                              const checked = e.currentTarget.checked;
+                              setTicks((current) => new Map(current).set(p.key, checked));
+                            }}
+                          />
+                          <span className="min-w-0">
+                            {names.character(minerRow(p.minerId).mainCharacterId)}
+                            <span className="text-text-dim"> · {isk(p.amountDue)}</span>
+                            {at !== null && recentlyMailed(p.minerId) && (
+                              <span className="block text-xs text-text-dim">
+                                {t('corpTaxBook.moons.run.mailedRecently', {
+                                  count: Math.max(0, Math.floor((now - at) / DAY_MS)),
+                                })}
+                              </span>
+                            )}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </fieldset>
                   {!inline && minerPicker}
                   {corporationName === null && (
                     <p role="status" className="text-text-dim">
@@ -445,7 +419,11 @@ export function StatementRun() {
                     </p>
                   )}
                   <div className="flex flex-wrap gap-2">
-                    <Button variant="primary" onClick={() => setStep('send')} disabled={!canEdit}>
+                    <Button
+                      variant="primary"
+                      onClick={() => setStep('send')}
+                      disabled={!canEdit || total === 0}
+                    >
                       {t('corpTaxBook.moons.run.continue')}
                     </Button>
                     {previewItem && !inline && (
@@ -494,12 +472,7 @@ export function StatementRun() {
                       onClick={() => void send()}
                       disabled={busy || corporationName === null}
                     >
-                      {t(
-                        running
-                          ? 'corpTaxBook.moons.run.sendNotices'
-                          : 'corpTaxBook.moons.run.sendButton',
-                        { count: total }
-                      )}
+                      {t('corpTaxBook.moons.run.sendNotices', { count: total })}
                     </Button>
                     <Button variant="ghost" onClick={() => setStep('check')} disabled={busy}>
                       {t('corpTaxBook.moons.run.back')}
@@ -511,12 +484,7 @@ export function StatementRun() {
                 <div className="space-y-3 text-sm">
                   {result && (
                     <p>
-                      {t(
-                        running
-                          ? 'corpTaxBook.moons.run.noticesQueued'
-                          : 'corpTaxBook.moons.run.queued',
-                        { count: result.queued }
-                      )}
+                      {t('corpTaxBook.moons.run.noticesQueued', { count: result.queued })}
                       {result.skipped > 0 &&
                         ` ${t('corpTaxBook.moons.run.skipped', { count: result.skipped })}`}
                       {result.missingLink > 0 &&

@@ -28,6 +28,23 @@ describe('popShareMarks', () => {
     expect(marks.structures['1001']).toEqual(marks.moons['8']);
   });
 
+  it('leaves the shared mark off when every moon is shared alike, keeping opt-outs', () => {
+    const marks = popShareMarks(
+      [pull(7, 1000), pull(8, 1001), pull(9, 2000, 55)],
+      [{ corporationId: 55, popSharingOptOut: OPTED_OUT }],
+      popSharingFrom({ enabled: true })
+    );
+    expect(marks.moons['7']).toBeUndefined();
+    expect(marks.moons['8']).toBeUndefined();
+    expect(marks.moons['9']).toEqual({ kind: 'opted-out' });
+    const alike = popShareMarks(
+      [pull(7, 1000), pull(8, 1001)],
+      [],
+      popSharingFrom({ enabled: true })
+    );
+    expect(alike).toEqual({ moons: {}, structures: {}, owners: {} });
+  });
+
   it('marks nothing while sharing is off or a moon has no audience left', () => {
     expect(popShareMarks([pull(7, 1000)], [], popSharingFrom({ enabled: false })).moons).toEqual(
       {}

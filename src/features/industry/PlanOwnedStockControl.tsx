@@ -1,11 +1,8 @@
-import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip } from '@/components/ui';
-import { fieldBaseClassName, fieldSizeClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover';
 import type { DetectedOwnedStockMap, OwnedStockScope } from '@/engine/industry/ownedStock';
-import { cx } from '@/lib/cx';
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import type { OwnedStockDetection } from './ownedStockDetection';
 
@@ -43,35 +40,14 @@ export function PlanOwnedStockControl({
   onClearAll,
 }: PlanOwnedStockControlProps) {
   const { t } = useTranslation();
-  const labelId = useId();
-  const valueId = useId();
-  const scopeLabel =
-    scope?.mode === 'selected'
-      ? t('industry.ownedStockScopeSelected')
-      : t('industry.ownedStockScopeEverywhere');
   return (
-    <div className="flex items-center gap-2 text-xs">
-      <span id={labelId} className="whitespace-nowrap">
-        {t('industry.ownedControl.label')}
-      </span>
+    <div className="flex items-center text-xs">
       <Popover>
         <PopoverTrigger asChild>
-          <button
-            type="button"
-            aria-labelledby={`${labelId} ${valueId}`}
-            className={cx(
-              fieldBaseClassName,
-              fieldSizeClassName.sm,
-              'inline-flex items-center gap-2'
-            )}
-          >
-            <span id={valueId}>
-              {includeCorpAssets
-                ? t('industry.ownedControl.withCorp', { scope: scopeLabel })
-                : scopeLabel}
-            </span>
+          <Button size="sm" aria-haspopup="dialog">
+            {t('industry.ownedControl.label')}
             <Icon.Expanded size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-          </button>
+          </Button>
         </PopoverTrigger>
         <PopoverContent
           align="start"

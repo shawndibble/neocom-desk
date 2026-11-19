@@ -623,8 +623,7 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   moon, the place line, the merged Payments and Activity ledgers) is
   `src/engine/corpTaxBook/bookSections.ts`.
   The Overview tab is `OverviewTab.tsx` (totals chips, `NeedsYouQueue`, the
-  moon schedule); the Miners table opens a row in place with `MinerExpandedRow`
-  (a Miner's Statement days and one Open page link); `OreLinesTable` is the ore
+  moon schedule); a Miners table row opens that Miner's page; `OreLinesTable` is the ore
   make-up table the Miner and moon pages share. `corpBookFixture.ts` builds a
   whole book for the section pages' stories.
 - **Pop Sharing settings** (issue #6222; scope in
@@ -648,7 +647,13 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   live; the client seam is `src/sync/sharedPops.ts` (`fetchSharedPops`). A pop carries its
   Survey (`surveyId`, only where the ore make-up is shared): an officer's `linkSurvey` or a pilot's
   `linkSharedPopSurveyCallable` (a Survey started from the pop's `pop=` start link; stored as
-  `popSurveyId` on the Extraction, newest wins). A Community share needs an
+  `popSurveyId` on the Extraction, newest wins). A pop also carries both Pop Times (`readyAt`,
+  `autoFractureAt`), `retainUntil` (three days past `expiresAt`), the officer's `fullyMined` flag
+  and the ledger's `minedPct` / `likelyMinedOut` (`minedQtyByExtraction` sums the `observed` rows
+  stamped with the Extraction; `minedChangedAt` carries over from the held doc). The Calendar
+  applies the viewer's Pop Time (`calendarSharedPopTime.ts`), drops a Calendar event the pop
+  already shows (`dropEventsOfSharedPops`) and reads each linked Survey's state
+  (`calendarSharedPopsRead.ts`). A Community share needs an
   officer of the book among its Members (`sharedPopSources/{corp}.editors`, stamped by
   `authorizeOfficer`); a Community admin blocks a corporation in `CommunityPopSharers.tsx`
   (`communities/{id}/popSharingBlocks`).

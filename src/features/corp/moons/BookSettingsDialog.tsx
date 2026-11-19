@@ -149,7 +149,7 @@ function useWalletDivisionNames(characterId: number, corporationId: number): Map
 /**
  * The book's settings (D21: from the page header's gear): the dated rates
  * (corp default, Guest default, per-Miner, per-moon, per-refinery, per-moon-owner), hub and Ore Form, grace,
- * minimum Statement, Overdue days, divisions, cadence, chunk rate, per-structure
+ * divisions, late-notice rules, chunk rate, per-structure
  * expiry and the dismissal approval limit. A rate is never retroactive, so a
  * new one starts today or later; everything else saves as one patch.
  */
@@ -191,17 +191,11 @@ export function BookSettingsDialog({
   const [hubId, setHubId] = useState(settings.hubId);
   const [oreForm, setOreForm] = useState(settings.oreForm);
   const [grace, setGrace] = useState(String(settings.graceHours));
-  const [minimum, setMinimum] = useState(String(settings.minimumStatement));
-  const [overdue, setOverdue] = useState(String(settings.overdueDays));
   const [divisions, setDivisions] = useState<number[]>(settings.divisions);
   // The list the dialog opened on: a save that changes the divisions sends it, so the server
   // refuses it rather than drop another officer's change made meanwhile.
   const divisionsBase = useRef(settings.divisions).current;
   const [startDate, setStartDate] = useState(settings.startDate);
-  const [cadence, setCadence] = useState(settings.cadence.kind);
-  const [cadenceDays, setCadenceDays] = useState(
-    settings.cadence.kind === 'days' ? String(settings.cadence.days) : '14'
-  );
   const [chunk, setChunk] = useState(
     settings.chunkM3PerHour ? String(settings.chunkM3PerHour) : ''
   );
@@ -225,6 +219,7 @@ export function BookSettingsDialog({
   );
   const [noticeMinimum, setNoticeMinimum] = useState(String(rules.minimum));
   const [cooldown, setCooldown] = useState(String(rules.cooldownDays));
+  const [earlyAt, setEarlyAt] = useState(rules.earlyAt === undefined ? '' : String(rules.earlyAt));
   const [tolerance, setTolerance] = useState(String(settings.dayTolerancePct));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -341,14 +336,6 @@ export function BookSettingsDialog({
     else onClose();
   };
 
-  // The N-day anchor is the start date being saved, unless the officer kept a custom one:
-  // a stored anchor that is not the old start date stays.
-  const cadenceAnchor = () => {
-    const stored = settings.cadence.kind === 'days' ? settings.cadence.anchor : undefined;
-    const newStart = verdict.isDirector ? startDate : settings.startDate;
-    return stored !== undefined && stored !== settings.startDate ? stored : newStart;
-  };
-
   const save = () =>
     run(async () => {
       if (problem || rateIsDuplicate) return;
@@ -369,12 +356,6 @@ export function BookSettingsDialog({
         hubId,
         oreForm,
         graceHours: Number(grace.replace(',', '.')),
-        minimumStatement: Number(minimum),
-        overdueDays: Number(overdue),
-        cadence:
-          cadence === 'monthly'
-            ? { kind: 'monthly' }
-            : { kind: 'days', days: Number(cadenceDays), anchor: cadenceAnchor() },
         structureExpiryHours: Object.fromEntries(
           Object.entries(expiry)
             .filter(([, v]) => v !== '' && Number(v) > 0)
@@ -390,6 +371,7 @@ export function BookSettingsDialog({
             : { kind: 'dayOfMonth', day: Number(noticeDay) },
         minimum: Number(noticeMinimum),
         cooldownDays: Number(cooldown),
+        ...(Number(earlyAt) > 0 ? { earlyAt: Number(earlyAt) } : {}),
       };
       // Out-of-bounds or blank figures are never sent (the server would refuse the whole save):
       // `parseNoticeRules` puts back a default for any it cannot take, so they differ.
@@ -800,7 +782,7 @@ export function BookSettingsDialog({
                   uppercase={false}
                 />
               </Field>
-              <FieldsHeading>{t('corpTaxBook.moons.settings.statements')}</FieldsHeading>
+              <FieldsHeading>{t('corpTaxBook.moons.settings.billingDays')}</FieldsHeading>
               <Field label={t('corpTaxBook.moons.settings.startDate')} htmlFor={`${fieldId}-start`}>
                 <span className="flex items-center gap-1.5">
                   {verdict.isDirector ? (
@@ -822,43 +804,6 @@ export function BookSettingsDialog({
                   />
                 </span>
               </Field>
-              <Field
-                note={t('corpTaxBook.moons.settings.issuedBeforeNote')}
-                label={t('corpTaxBook.moons.settings.cadenceLabel')}
-              >
-                <SegmentedControl
-                  label={t('corpTaxBook.moons.settings.cadenceLabel')}
-                  value={cadence}
-                  onChange={setCadence}
-                  options={[
-                    {
-                      value: 'monthly',
-                      label: t('corpTaxBook.moons.settings.cadence.monthly'),
-                    },
-                    { value: 'days', label: t('corpTaxBook.moons.settings.cadence.days') },
-                  ]}
-                  uppercase={false}
-                />
-                {cadence === 'days' && (
-                  <TextInput
-                    className="w-20"
-                    inputMode="numeric"
-                    aria-label={t('corpTaxBook.moons.settings.cadenceDays')}
-                    value={cadenceDays}
-                    onChange={(e) => setCadenceDays(e.target.value)}
-                  />
-                )}
-              </Field>
-              <Field
-                note={t('corpTaxBook.moons.settings.issuedBeforeNote')}
-                label={t('corpTaxBook.moons.settings.minimum')}
-              >
-                <IskInput
-                  value={minimum}
-                  onChange={setMinimum}
-                  aria-label={t('corpTaxBook.moons.settings.minimum')}
-                />
-              </Field>
               <Field label={t('corpTaxBook.moons.settings.grace')} htmlFor={`${fieldId}-grace`}>
                 <TextInput
                   className="w-20"
@@ -866,19 +811,6 @@ export function BookSettingsDialog({
                   id={`${fieldId}-grace`}
                   value={grace}
                   onChange={(e) => setGrace(e.target.value)}
-                />
-              </Field>
-              <Field
-                note={t('corpTaxBook.moons.settings.issuedBeforeNote')}
-                label={t('corpTaxBook.moons.settings.overdue')}
-                htmlFor={`${fieldId}-overdue`}
-              >
-                <TextInput
-                  className="w-20"
-                  inputMode="numeric"
-                  id={`${fieldId}-overdue`}
-                  value={overdue}
-                  onChange={(e) => setOverdue(e.target.value)}
                 />
               </Field>
               <Field label={t('corpTaxBook.moons.settings.divisions')}>
@@ -953,6 +885,16 @@ export function BookSettingsDialog({
                   value={noticeMinimum}
                   onChange={setNoticeMinimum}
                   aria-label={t('corpTaxBook.moons.settings.running.minimum')}
+                />
+              </Field>
+              <Field
+                label={t('corpTaxBook.moons.settings.running.earlyAt')}
+                note={t('corpTaxBook.moons.settings.running.earlyAtHint')}
+              >
+                <IskInput
+                  value={earlyAt}
+                  onChange={setEarlyAt}
+                  aria-label={t('corpTaxBook.moons.settings.running.earlyAt')}
                 />
               </Field>
               <Field

@@ -14,7 +14,14 @@ import {
 import { HttpsError } from 'firebase-functions/v2/https';
 import { signedInCharacter, type Caller } from './actorAuth.js';
 import { chunk } from './chunk.js';
-import { BOOKS_COLLECTION, EXTRACTIONS, FEEDERS, META, SCHEDULED_SYNC_DOC } from './corpTaxBook.js';
+import {
+  BOOKS_COLLECTION,
+  EXTRACTIONS,
+  FEEDERS,
+  META,
+  OBSERVED,
+  SCHEDULED_SYNC_DOC,
+} from './corpTaxBook.js';
 import { MAX_EXPIRY_HOURS } from './corpTaxBookEngine.js';
 import {
   CHARACTER_COMMUNITIES_COLLECTION,
@@ -29,6 +36,7 @@ import { DAY_MS, HOUR_MS } from './timeConstants.js';
 import { POP_SHARING_DOC, popSharingFrom } from './popSharing.js';
 import {
   ALLIANCE_RECHECK_MS,
+  POP_RETAIN_MS,
   POP_SHARING_BLOCKS,
   SHARED_POPS,
   SHARED_POP_SOURCES,
@@ -45,6 +53,7 @@ import {
   visiblePops,
   type PopExtraction,
   type RateEntry,
+  type SharedPop,
   type SharedPopView,
   type SharedPopsDoc,
 } from './sharedPops.js';
@@ -103,6 +112,11 @@ function extractionOf(d: DocumentSnapshot): PopExtraction | undefined {
   if (structureId === undefined || moonId === undefined || !start || !arrival || !decay)
     return undefined;
   const survey = str(x.popSurveyId) ?? str(x.surveyId);
+  const flag = recordOf(x.fullyMined);
+  const fullyMined =
+    str(flag.byName) && str(flag.at)
+      ? { byName: flag.byName as string, at: flag.at as string }
+      : undefined;
   const oreLines = Array.isArray(x.oreLines)
     ? (x.oreLines as Data[]).flatMap((l) =>
         num(l?.typeId) !== undefined && num(l?.quantity) !== undefined
@@ -125,7 +139,47 @@ function extractionOf(d: DocumentSnapshot): PopExtraction | undefined {
     ...(oreLines ? { oreLines } : {}),
     // A pilot's own link (a start from the pop) holds until an officer links again, which clears it.
     ...(survey ? { surveyId: survey } : {}),
+    ...(fullyMined ? { fullyMined } : {}),
   };
+}
+
+/** `in` queries take at most 30 values. */
+const IN_QUERY_MAX = 30;
+
+/**
+ * Ore units the book's ledger rows show mined for each Extraction that has a chunk make-up and
+ * has arrived: the quantity of every `observed` row stamped with its id. An Extraction with no
+ * rows reads 0 (a pop with ore and nothing mined yet), one with no make-up is left out.
+ */
+async function minedQtyByExtraction(
+  book: DocumentReference,
+  extractions: readonly PopExtraction[],
+  now: number
+): Promise<Map<string, number>> {
+  const ids = extractions
+    .filter(
+      (x) =>
+        !x.cancelledAt &&
+        !x.fullyMined &&
+        (x.oreLines?.length ?? 0) > 0 &&
+        Date.parse(x.chunkArrivalTime) <= now
+    )
+    .map((x) => x.id);
+  const mined = new Map(ids.map((id) => [id, 0]));
+  const snaps = await Promise.all(
+    chunk(ids, IN_QUERY_MAX).map((part) =>
+      book.collection(OBSERVED).where('extractionId', 'in', part).get()
+    )
+  );
+  for (const snap of snaps) {
+    for (const d of snap.docs) {
+      const id = str(d.get('extractionId'));
+      const quantity = num(d.get('quantity'));
+      if (id !== undefined && quantity !== undefined)
+        mined.set(id, (mined.get(id) ?? 0) + quantity);
+    }
+  }
+  return mined;
 }
 
 /** Refinery names and systems the book holds: a moon owner's label or structure, its own looked-up names. */
@@ -213,7 +267,7 @@ export async function publishSharedPops(
     if (held.exists) await ref.delete();
     return null;
   }
-  const since = new Date(now - MAX_EXPIRY_HOURS * HOUR_MS).toISOString();
+  const since = new Date(now - MAX_EXPIRY_HOURS * HOUR_MS - POP_RETAIN_MS).toISOString();
   const [extractionSnap, feederSnap] = await Promise.all([
     book.collection(EXTRACTIONS).where('naturalDecayTime', '>=', since).get(),
     book.collection(FEEDERS).get(),
@@ -243,11 +297,20 @@ export async function publishSharedPops(
     recordOf(sourcesSnap.get('refineries')),
     recordOf(syncSnap.get('systemIds'))
   );
+  const extractions = extractionSnap.docs.flatMap((d) => extractionOf(d) ?? []);
+  const heldPops = held.exists
+    ? (held.get('pops') as SharedPopsDoc['pops'] | undefined)
+    : undefined;
+  const minedQty = await minedQtyByExtraction(book, extractions, now);
   const doc = buildSharedPops({
     corporationId,
     allianceId,
     sharing,
-    extractions: extractionSnap.docs.flatMap((d) => extractionOf(d) ?? []),
+    extractions: extractions.map((x) => {
+      const mined = minedQty.get(x.id);
+      return mined === undefined ? x : { ...x, minedQty: mined };
+    }),
+    heldPops,
     owners,
     expiryHours: recordOf(bookData.structureExpiryHours) as Record<string, number>,
     bookRatePct: (x) => bookRatePctFor(rates, x, today),
@@ -260,9 +323,6 @@ export async function publishSharedPops(
     return null;
   }
   await ref.set({ ...doc, allianceCheckedAt, updatedAt: FieldValue.serverTimestamp() });
-  const heldPops = held.exists
-    ? (held.get('pops') as SharedPopsDoc['pops'] | undefined)
-    : undefined;
   await cancelStalePopPushes(db, movedPops(heldPops, doc.pops));
   return doc;
 }
@@ -732,7 +792,11 @@ export async function sharedPopsFor(
       };
     });
     for (const pop of visiblePops(doc, { corporationIds, allianceIds, communityIds }, now)) {
-      const view: SharedPopView & { audiences?: string[]; ownerCorporationId?: number } = {
+      const view: SharedPopView &
+        Pick<SharedPop, 'minedPct' | 'minedQty' | 'minedChangedAt'> & {
+          audiences?: string[];
+          ownerCorporationId?: number;
+        } = {
         ...pop,
         corporationId: doc.corporationId,
         syncedAt: doc.syncedAt ?? null,
@@ -741,6 +805,10 @@ export async function sharedPopsFor(
       // Who else a pop is shared with, and whose moon it is, are the book's business.
       delete view.audiences;
       delete view.ownerCorporationId;
+      // The mined figures only feed the server's own quiet test: a viewer gets the verdict.
+      delete view.minedPct;
+      delete view.minedQty;
+      delete view.minedChangedAt;
       out.push(view);
     }
   }

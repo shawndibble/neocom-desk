@@ -143,8 +143,11 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   // Offered by Manage Payees as the link for a Payee named for one (#6205).
   const bookCorporations = useMemo(
     () =>
-      corpView?.books.map((b) => ({ corporationId: b.loaded.corporationId, name: b.corpName })) ??
-      [],
+      corpView?.books.map((b) => ({
+        corporationId: b.loaded.corporationId,
+        name: b.corpName,
+        credit: b.summary.credit,
+      })) ?? [],
     [corpView]
   );
   const corpStateLabel = useCorpStateLabel();

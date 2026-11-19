@@ -325,8 +325,8 @@ emulatorSuite('Shared Pops', () => {
     expect(await sharers()).toEqual([{ corporationId: BOOK, sharing: false, blocked: false }]);
     await join('c1', OFFICER);
     await stampEditorUse(db, BOOK, viewer(OFFICER), now - H);
-    // Every pop Expired: the published doc goes, the sharer stays listed and blockable.
-    now = Date.parse(DECAY) + 48 * H;
+    // Every pop past its retention: the published doc goes, the sharer stays listed and blockable.
+    now = Date.parse(DECAY) + 48 * H + 72 * H;
     expect(await publishSharedPops(publishDeps(), BOOK)).toBeNull();
     expect((await sharedPopsRef(db, BOOK).get()).exists).toBe(false);
     expect(await sharers()).toEqual([{ corporationId: BOOK, sharing: true, blocked: false }]);
@@ -375,9 +375,12 @@ emulatorSuite('Shared Pops', () => {
     expect(left).toEqual(['dev1:fired', 'dev1:other']);
   });
 
-  it('drops an Expired pop and publishes nothing once all are', async () => {
+  it('keeps an Expired pop three days, then drops it and publishes nothing once all are', async () => {
     await publishSharedPops(publishDeps(), BOOK);
     now = Date.parse(DECAY) + 48 * H;
+    expect(await seen(CORPMATE)).toEqual([40001, 40002]);
+    expect(await publishSharedPops(publishDeps(), BOOK)).not.toBeNull();
+    now = Date.parse(DECAY) + 48 * H + 72 * H;
     expect(await seen(CORPMATE)).toEqual([]);
     expect(await publishSharedPops(publishDeps(), BOOK)).toBeNull();
   });

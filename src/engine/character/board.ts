@@ -8,7 +8,7 @@
  * training time, a job sitting undelivered, an extractor program running out,
  * a Mercenary Den leaving reinforcement or an operation about to expire, a
  * contract about to expire with collateral on it, a sell order about to
- * lapse, and the steps of a Skill Plan projected past the queue. Six of those
+ * lapse. Six of those
  * live in ESI endpoints and, before this, on five separate routes. Merging them
  * into one deadline-ordered list *is* the feature.
  *
@@ -54,7 +54,6 @@ export const CHARACTER_BOARD_ITEM_KINDS = [
   'skyhookRaid',
   'contractExpiry',
   'orderExpiry',
-  'skillPlan',
 ] as const;
 
 export type CharacterBoardItemKind = (typeof CHARACTER_BOARD_ITEM_KINDS)[number];
@@ -93,8 +92,18 @@ export interface BoardClockSource {
    * nothing of it, so the Corporation events filter never touches it.
    */
   sharedBy?: BoardCorporation;
-  /** A second line under the subject, already named (a Shared Pop's moon). */
-  subtitle?: string;
+  /**
+   * A second fact the row names after its detail, as `detail` plus a clock time when it has one
+   * (a Shared Pop's other Pop Time, or its "likely mined out" guess). `detail` is a data key,
+   * never a translated string.
+   */
+  extra?: { detail: string; atMs?: number };
+  /** The i18n key the row reads once past its deadline, when it is not the kind's own word. */
+  pastLabelKey?: string;
+  /** The row marks an end rather than a start: drawn in the muted tone, not the kind's. */
+  muted?: boolean;
+  /** The id a row's detail opens, when it is not the row's own `sourceId` (a pop's second row). */
+  detailId?: string;
 }
 
 /** A calendar event, which alone carries an RSVP state and an importance flag. */
@@ -156,8 +165,6 @@ export interface CharacterBoardSources {
   skyhookRaids?: readonly BoardClockSource[];
   contractExpiries?: readonly BoardClockSource[];
   orderExpiries?: readonly BoardClockSource[];
-  /** Projected Skill Plan steps — a forecast, not an ESI clock. */
-  skillPlan?: readonly BoardClockSource[];
   /** The pilot's typed-in cerebral accelerator running out — their own answer, not an ESI clock. */
   accelerator?: readonly BoardClockSource[];
 }
@@ -178,7 +185,6 @@ const SOURCE_KEY = {
   skyhookRaid: 'skyhookRaids',
   contractExpiry: 'contractExpiries',
   orderExpiry: 'orderExpiries',
-  skillPlan: 'skillPlan',
 } as const satisfies Record<CharacterBoardItemKind, keyof CharacterBoardSources>;
 
 const KIND_RANK = new Map<CharacterBoardItemKind, number>(
@@ -211,16 +217,6 @@ export function pastDeadlineLabelKey(kind: CharacterBoardItemKind): string {
   return 'calendar.overdue';
 }
 
-/**
- * Kinds whose deadlines are forecasts rather than ESI clocks. A Skill Plan
- * step lands when the plan says it would, which moves with the queue, the
- * attributes and the Clone State — so every surface marks it as projected
- * (a hollow dot, a word), never by colour alone.
- */
-export function isProjectedKind(kind: CharacterBoardItemKind): boolean {
-  return kind === 'skillPlan';
-}
-
 function isCalendarEvent(source: BoardClockSource): source is BoardCalendarEventSource {
   return 'response' in source;
 }
@@ -243,7 +239,10 @@ function toItem(
     important: isCalendarEvent(source) ? source.important : false,
     ...(source.corporation ? { corporation: source.corporation } : {}),
     ...(source.sharedBy ? { sharedBy: source.sharedBy } : {}),
-    ...(source.subtitle ? { subtitle: source.subtitle } : {}),
+    ...(source.extra ? { extra: source.extra } : {}),
+    ...(source.pastLabelKey ? { pastLabelKey: source.pastLabelKey } : {}),
+    ...(source.muted ? { muted: true } : {}),
+    ...(source.detailId ? { detailId: source.detailId } : {}),
   };
 }
 

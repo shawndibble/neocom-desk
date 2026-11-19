@@ -47,6 +47,7 @@ import { useBookAudit } from './useBookAudit';
 import { useBook } from './useBook';
 import { CloseAccountDialog } from './CloseAccountDialog';
 import { AccountStatus } from './AccountStatus';
+import { AccountLedger } from './AccountLedger';
 import { MarkNotTaxDialog, ReasonDialog, RecordPaymentDialog } from './BookDialogs';
 import { isk, iskOrDash, periodLabel, shortDate, shortDateTime, signedIsk } from './moonsFormat';
 import type { AuditEntry } from '../taxBook/bookClient';
@@ -55,6 +56,7 @@ import { Crumb, StandingWord } from './moonsParts';
 import { MinerCharacters } from './MinerCharacters';
 import { CorrectionsMenu } from './MinerCorrections';
 import { OreLinesTable } from './OreLinesTable';
+import { paymentWalletHref } from './paymentWalletHref';
 import { dayEndTime } from './dayEndTime';
 import { BookSection, EntityHeader, PlaceCell } from './sectionParts';
 import { moonLabel, tapTargetClassName } from './sectionHelpers';
@@ -454,7 +456,16 @@ export function MinerDetail({ id }: { id: string }) {
     {
       id: 'at',
       header: t('corpTaxBook.moons.cols.when'),
-      render: (r) => shortDateTime(r.at),
+      render: (r) => {
+        const href = r.kind === 'payment' ? paymentWalletHref(r.payment.id) : null;
+        return href ? (
+          <Link to={href} className={entityLinkClassName(tapTargetClassName)}>
+            {shortDateTime(r.at)}
+          </Link>
+        ) : (
+          shortDateTime(r.at)
+        );
+      },
       sortValue: (r) => r.at,
       sortFirst: 'desc',
     },
@@ -682,11 +693,13 @@ export function MinerDetail({ id }: { id: string }) {
         </p>
       )}
       <EntityHeader
-        label={t('corpTaxBook.moons.chips.owed')}
-        value={isk(row.owed)}
-        tone={row.owed ? 'danger' : undefined}
+        label={t(
+          row.credit > row.owed ? 'corpTaxBook.moons.miner.credit' : 'corpTaxBook.moons.chips.owed'
+        )}
+        value={isk(Math.abs(row.owed - row.credit))}
+        tone={row.credit > row.owed ? 'success' : row.owed ? 'danger' : undefined}
         note={
-          row.overdueDays !== null
+          row.credit <= row.owed && row.overdueDays !== null
             ? t('corpTaxBook.moons.miner.overdueNote', { count: row.overdueDays })
             : row.paused
               ? t('corpTaxBook.moons.miner.overduePausedNote')
@@ -694,7 +707,6 @@ export function MinerDetail({ id }: { id: string }) {
         }
         facts={[
           { label: t('corpTaxBook.moons.miner.paid'), value: iskOrDash(paidTotal) },
-          { label: t('corpTaxBook.moons.chips.credit'), value: iskOrDash(row.credit) },
           running && row.account
             ? {
                 label: t('corpTaxBook.moons.cols.account'),
@@ -742,6 +754,12 @@ export function MinerDetail({ id }: { id: string }) {
                 },
               ]),
         ]}
+      />
+      <AccountLedger
+        detail={detail}
+        corrections={data.adjustments.filter((a) => a.minerId === id)}
+        running={running}
+        phone={phone}
       />
       {daysSection(
         t('corpTaxBook.moons.sections.stillAccruing'),

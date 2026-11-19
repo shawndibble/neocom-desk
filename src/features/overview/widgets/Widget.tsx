@@ -234,7 +234,7 @@ function ChartBody({
         {beside && (
           <TableBody
             table={table}
-            columnsFor={size === 'F' ? 'M' : 'S'}
+            columnsFor={size === 'F' || table.fitWidth ? 'M' : 'S'}
             rowLimit={size === 'F' ? 8 : 5}
             ariaLabel={title}
             className="border-t border-line md:min-w-0 md:flex-1 md:border-t-0 md:border-l"

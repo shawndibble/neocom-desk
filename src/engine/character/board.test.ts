@@ -2,7 +2,6 @@ import { DAY_MS, HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import {
   buildCharacterBoard,
-  isProjectedKind,
   pastDeadlineLabelKey,
   type BoardCalendarEventSource,
   type BoardClockSource,
@@ -34,6 +33,17 @@ function build(sources: Partial<CharacterBoardSources> = {}) {
 }
 
 describe('buildCharacterBoard', () => {
+  it('carries a muted row and the id its detail opens through to the item', () => {
+    const [item] = buildCharacterBoard({
+      nowMs: NOW,
+      sharedMoonPops: [clock({ id: 'p:expires', muted: true, detailId: 'p' })],
+    });
+    expect(item).toMatchObject({ sourceId: 'p:expires', muted: true, detailId: 'p' });
+    const [plain] = buildCharacterBoard({ nowMs: NOW, sharedMoonPops: [clock()] });
+    expect(plain).not.toHaveProperty('muted');
+    expect(plain).not.toHaveProperty('detailId');
+  });
+
   it('merges every source into one deadline-ordered list', () => {
     const board = build({
       calendarEvents: [event({ id: 'e', deadlineMs: at(5 * HOUR_MS) })],
@@ -91,21 +101,6 @@ describe('buildCharacterBoard', () => {
     });
 
     expect(board.map((item) => item.sourceId)).toEqual(['z', 'a', 'aa', 'b']);
-  });
-
-  it('ranks a Skill Plan step last at an exact tie, and treats an absent plan as empty', () => {
-    const sameInstant = at(4 * HOUR_MS);
-    const board = build({
-      skillPlan: [clock({ id: '1:1', deadlineMs: sameInstant })],
-      orderExpiries: [clock({ id: 'o', deadlineMs: sameInstant })],
-    });
-    expect(board.map((item) => item.kind)).toEqual(['orderExpiry', 'skillPlan']);
-    expect(build({ skillPlan: [] })).toEqual(build({}));
-  });
-
-  it('names Skill Plan steps, and only them, as projected', () => {
-    expect(isProjectedKind('skillPlan')).toBe(true);
-    expect(isProjectedKind('skillTraining')).toBe(false);
   });
 
   /**

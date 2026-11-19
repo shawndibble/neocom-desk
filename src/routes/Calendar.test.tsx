@@ -366,10 +366,31 @@ describe('Calendar Shared Pops', () => {
     renderCalendarRoute();
 
     const rail = await screen.findByRole('list', { name: /coming up/i });
-    expect(await within(rail).findByText('Efa - Shared Tatara')).toBeInTheDocument();
-    expect(within(rail).getByText('Efa I - Moon 1')).toBeInTheDocument();
+    // Two rows: the pop, and its belt expiry.
+    expect(await within(rail).findAllByText('Efa - Shared Tatara')).toHaveLength(2);
+    // The moon is in the detail, not on the row.
+    expect(within(rail).queryByText('Efa I - Moon 1')).toBeNull();
     expect(within(rail).getByText(/Shared moon pops · ready/)).toBeInTheDocument();
-    expect(screen.getByText('Shared by Sharing Corp')).toBeInTheDocument();
+    expect(within(rail).getByText(/Shared moon pops · belt expires/)).toBeInTheDocument();
+    expect(screen.getAllByText('Shared by Sharing Corp').length).toBeGreaterThan(0);
+  });
+
+  it('shows only the pop rows when the corp also put the pop in the in-game calendar', async () => {
+    sharePop();
+    const duplicate = {
+      event_id: 2,
+      event_date: new Date(inHours(8).getTime() - 60_000).toISOString(),
+      title: 'Efa Shared Tatara',
+      importance: 0,
+      event_response: 'not_responded' as const,
+    };
+    server.use(http.get(`${ESI}/calendar`, () => HttpResponse.json([...events, duplicate])));
+    renderCalendarRoute();
+
+    const rail = await screen.findByRole('list', { name: /coming up/i });
+    expect(await within(rail).findAllByText('Efa - Shared Tatara')).toHaveLength(2);
+    expect(within(rail).getByText('Fleet Op')).toBeInTheDocument();
+    expect(within(rail).queryByText('Efa Shared Tatara')).toBeNull();
   });
 
   it('hides it when the pilot reads that moon from ESI', async () => {

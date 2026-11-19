@@ -46,4 +46,10 @@ describe('a refinery page', () => {
       structureId: 1001,
     });
   });
+
+  it('knows the retired Statements period URL, which redirects to the Late notices tab', () => {
+    expect(moonsDetail('/corp/moons/statements/2026-08-01')).toEqual({
+      kind: 'legacyStatementPeriod',
+    });
+  });
 });

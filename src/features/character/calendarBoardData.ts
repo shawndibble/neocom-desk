@@ -44,7 +44,6 @@ import { loadCharacterPlanets, readCachedColonyDetails } from '@/features/pi/dat
 import { readCachedPlanetNames } from '@/features/pi/names';
 import { db } from '@/db';
 import { acceleratorId } from '@/features/accelerator/characterAccelerators';
-import { loadSkillPlanBoard, type SkillPlanChoice } from './calendarSkillPlan';
 import { loadCorpCalendar } from './calendarCorpDeadlines';
 import { loadSkyhookRaids } from './calendarSkyhooks';
 import { loadSharedPopsRead } from './calendarSharedPopsRead';
@@ -59,7 +58,6 @@ import {
   toOrderExpirySources,
   toAcceleratorSources,
   toPlanetExtractionSources,
-  toSkillPlanSources,
   toSkillTrainingSources,
   type ColonyPins,
 } from './calendarBoardSources';
@@ -81,6 +79,8 @@ export interface CalendarBoardData {
   sharedMoonPops?: BoardClockSource[];
   /** Every live Shared Pop with its names, for the detail and the `?pop=` deep link. */
   sharedPops: SharedPopEntry[];
+  /** Refineries the pilot already reads as corp moon chunks: their Shared Pops, and the Calendar events that match them, stay as they are. */
+  readableRefineries: number[];
   /** The corporations sharing pops: the sharing-corporation filter's choices. */
   sharingCorporations: BoardCorporation[];
   /** Corp skyhook raid windows. Left `undefined` unless the Character holds the corp role and scope to read them. */
@@ -91,14 +91,6 @@ export interface CalendarBoardData {
   orderExpiries?: BoardClockSource[];
   /** The pilot's typed-in accelerator running out; empty when none is running. */
   accelerator?: BoardClockSource[];
-  /** Projected steps of the chosen Skill Plan. Left `undefined` when none is chosen or it could not be costed. */
-  skillPlan?: BoardClockSource[];
-  /** The Character's Skill Plans, for the picker under the filter menu. */
-  skillPlanChoices: SkillPlanChoice[];
-  /** The plan the board is projecting, or null. */
-  chosenSkillPlanId: string | null;
-  /** Why the chosen plan has no rows — set only when the scheduler could not cost it. */
-  skillPlanError: string | null;
   /**
    * Kinds whose source was read at all — empty or not.
    *
@@ -188,7 +180,6 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     planetsResult,
     contractsResult,
     ordersResult,
-    skillPlanBoard,
     corpRead,
     skyhookRead,
     densResult,
@@ -201,7 +192,6 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     loadCharacterPlanets(characterId),
     loadContracts(characterId),
     loadOrders(characterId),
-    loadSkillPlanBoard(characterId, loadedAtMs),
     loadCorpCalendar(loadedAtMs),
     loadSkyhookRaids(characterId, loadedAtMs),
     loadCharacterDenRows(characterId),
@@ -258,10 +248,7 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
 
   // One name resolution for every id the board will show, rather than one per
   // source: `loadTypeNames` is a single SDE read either way.
-  const planSchedule =
-    skillPlanBoard.outcome.status === 'ready' ? skillPlanBoard.outcome.schedule : undefined;
   const typeIds = new Set<number>();
-  for (const step of planSchedule?.scheduled ?? []) typeIds.add(step.skillTypeID);
   for (const entry of queue ?? []) typeIds.add(entry.skill_id);
   for (const job of jobs ?? []) typeIds.add(job.product_type_id ?? job.blueprint_type_id);
   for (const order of orders ?? []) typeIds.add(order.type_id);
@@ -310,8 +297,6 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     { kind: 'skyhookRaid', result: skyhookRead.result, rows: skyhookRead.sources },
     { kind: 'contractExpiry', result: contractsResult, rows: contracts },
     { kind: 'orderExpiry', result: ordersResult, rows: orders },
-    // Not an ESI read.
-    { kind: 'skillPlan', result: NO_CACHE, rows: planSchedule?.scheduled },
   ] satisfies {
     kind: CharacterBoardItemKind;
     result: StatusResult<unknown[]>;
@@ -340,6 +325,7 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     corporations: corpRead.corporations,
     sharedMoonPops,
     sharedPops: sharedPopsRead.entries ?? [],
+    readableRefineries: corpRead.refineryIds,
     sharingCorporations: sharedPopsRead.corporations,
     skyhookRaids: skyhookRead.sources,
     skyhookRaidDetails: skyhookRead.raids,
@@ -347,11 +333,6 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
       contracts && toContractExpirySources(contracts, contractTypeLabel, contractRouteName),
     orderExpiries: orders && toOrderExpirySources(orders, typeName),
     accelerator: acceleratorSources,
-    skillPlan: planSchedule && toSkillPlanSources(planSchedule, queue ?? [], typeName),
-    skillPlanChoices: skillPlanBoard.choices,
-    chosenSkillPlanId: skillPlanBoard.chosenId,
-    skillPlanError:
-      skillPlanBoard.outcome.status === 'error' ? skillPlanBoard.outcome.reason : null,
     readableKinds: sources.filter((s) => s.rows !== undefined).map((s) => s.kind),
     reauthKinds: sources.filter((s) => s.result.needsReauth).map((s) => s.kind),
     oldestFetchedAt: fetchedAt.length > 0 ? new Date(Math.min(...fetchedAt)) : null,

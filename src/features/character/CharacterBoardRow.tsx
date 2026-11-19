@@ -20,7 +20,7 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { CharacterBoardItem } from '@/engine/character/board';
-import { isProjectedKind, pastDeadlineLabelKey } from '@/engine/character/board';
+import { pastDeadlineLabelKey } from '@/engine/character/board';
 import { formatDuration } from '@/lib/duration';
 import { formatTimeOfDay } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -55,6 +55,8 @@ export function CharacterBoardRow({
   const { t } = useTranslation();
   const zone = useTimeZone();
   const KindIcon = KIND_ICON[item.kind];
+  // A muted row (a pop's belt expiry) keeps the kind's glyph in grey: an end, not a start.
+  const tone = item.muted ? 'text-text-dim' : KIND_TEXT[item.kind];
   const overdue = item.remainingMs <= 0;
 
   // Clamped here and only here: the engine keeps `remainingMs` signed so
@@ -64,7 +66,7 @@ export function CharacterBoardRow({
   // *late* for every other — a job sat undelivered, an order lapsed. Which
   // kinds are which is `board.ts`'s to say; this only picks the word.
   const countdown = overdue
-    ? t(pastDeadlineLabelKey(item.kind))
+    ? t(item.pastLabelKey ?? pastDeadlineLabelKey(item.kind))
     : t('calendar.due', { duration: formatDuration(item.remainingMs / 1000) });
 
   const openable = item.kind === 'calendarEvent' && onSelectEvent !== undefined;
@@ -81,7 +83,7 @@ export function CharacterBoardRow({
         to it at the start of every row rather than living only in the
         countdown's four characters.
       */}
-      <KindIcon className={`size-4 shrink-0 ${KIND_TEXT[item.kind]}`} aria-hidden="true" />
+      <KindIcon className={`size-4 shrink-0 ${tone}`} aria-hidden="true" />
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-2">
           {/*
@@ -89,14 +91,7 @@ export function CharacterBoardRow({
             no sr-only companion, because what the hue encodes is the kind, and
             the kind is already written out in words on the row's third line.
           */}
-          <span className={`text-sm font-bold tabular-nums ${KIND_TEXT[item.kind]}`}>
-            {countdown}
-          </span>
-          {isProjectedKind(item.kind) && (
-            <span className="text-[0.6875rem] font-semibold tracking-widest text-text uppercase">
-              {t('calendar.projected')}
-            </span>
-          )}
+          <span className={`text-sm font-bold tabular-nums ${tone}`}>{countdown}</span>
           {item.important && (
             <span className="text-[0.6875rem] font-semibold tracking-widest text-text uppercase">
               {t('calendar.important')}
@@ -111,10 +106,11 @@ export function CharacterBoardRow({
           )}
         </span>
         <span className="mt-0.5 block truncate text-sm font-semibold">{item.subject}</span>
-        {item.subtitle && <span className="block truncate text-xs">{item.subtitle}</span>}
         <span className="mt-0.5 block truncate text-xs text-text-dim">
           {formatTimeOfDay(new Date(item.deadlineMs), zone)} · {t(KIND_LABEL[item.kind])}
           {item.detail && ` · ${t(`calendar.detail.${item.kind}.${item.detail}`, item.detail)}`}
+          {item.extra &&
+            ` · ${t(`calendar.detail.${item.kind}.${item.extra.detail}`, item.extra.detail)}${item.extra.atMs === undefined ? '' : ` ${formatTimeOfDay(new Date(item.extra.atMs), zone)}`}`}
           {item.corporation && ` · ${item.corporation.name}`}
           {item.sharedBy && !hideSharedBy && ` · ${item.sharedBy.name}`}
         </span>
@@ -146,7 +142,7 @@ export function CharacterBoardRow({
     item.kind === 'skyhookRaid' && onSelectSkyhook !== undefined
       ? () => onSelectSkyhook(Number(item.sourceId))
       : item.kind === 'sharedMoonPop' && onSelectSharedPop !== undefined
-        ? () => onSelectSharedPop(item.sourceId)
+        ? () => onSelectSharedPop(item.detailId ?? item.sourceId)
         : undefined;
 
   if (onSelectDetail !== undefined) {

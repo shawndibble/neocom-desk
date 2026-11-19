@@ -13,7 +13,6 @@ import type { TradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
 import { loadCompressedGasTypeIds } from '@/sde/loadSde';
 import { nameForType, type BlueprintCatalog } from './blueprintCatalog';
-import { useShoppingBudget } from './useShoppingBudget';
 import type { usePlanMaterials } from './usePlanMaterials';
 
 /**
@@ -76,7 +75,6 @@ export function useShoppingListCopy(
     .map((m) => `${m.typeID}:${m.remainingQuantity}`)
     .join(',');
   const gasRoute = useKeyedLoad(compressedGas ? `${hub.id}|${gasKey}` : null, loadGasRoute);
-  const budget = useShoppingBudget(shoppingMaterials);
 
   /**
    * The rejection is caught and shown, not left to `void`: a browser that
@@ -90,7 +88,7 @@ export function useShoppingListCopy(
       // The flattened leaf list, not the plan's own: a material being
       // produced here is not something to order, and the recipe inputs that
       // replaced it are — however many levels down they sit.
-      let materials = budget.materials;
+      let materials = shoppingMaterials;
       let nameFor = (id: number) => nameForType(catalog, id);
       if (compressedGas && gasMap) {
         materials = compressGasLines(materials, gasMap, GAS_DECOMPRESSION_YIELD);
@@ -117,6 +115,6 @@ export function useShoppingListCopy(
     compressedGas,
     setCompressedGas,
     gasComparison: gasRoute.data ?? null,
-    budget,
+    shoppingMaterials,
   };
 }

@@ -13,7 +13,6 @@
  */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { isProjectedKind } from '@/engine/character/board';
 import type { DayLoad } from '@/engine/character/deadlines';
 import { KIND_LABEL } from './calendarKindLabels';
 
@@ -47,13 +46,7 @@ export function useDayLoadLabel(): (
           ? t('calendar.map.dayWithLoad', {
               date: fullDate.format(date),
               count: load.count,
-              kinds: kindList.format(
-                load.kinds.map((kind) =>
-                  isProjectedKind(kind)
-                    ? t('calendar.projectedKind', { kind: t(KIND_LABEL[kind]) })
-                    : t(KIND_LABEL[kind])
-                )
-              ),
+              kinds: kindList.format(load.kinds.map((kind) => t(KIND_LABEL[kind]))),
             })
           : t('calendar.map.dayEmpty', { date: fullDate.format(date) }),
         isToday

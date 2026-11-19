@@ -24,8 +24,6 @@ import type { DepthPrice } from '@/engine/industry/depthPrice';
 import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
 import type { OwnedStockScope } from '@/engine/industry/ownedStock';
 import type { MaterialCostLine } from '@/engine/industry/types';
-import { ShoppingBudget } from './ShoppingBudget';
-import { useShoppingBudget } from './useShoppingBudget';
 import { hasShoppingList, shoppingListText } from '@/engine/industry/shoppingList';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -167,11 +165,8 @@ export function BuildGroupPanel({
     return hubs;
   }, [members, plans]);
 
-  // A budget is one pool of ISK, so it scales the whole-group list only: a
-  // mixed-hub group is bought at several stops and keeps its lists unscaled.
-  const budget = useShoppingBudget(rollup.shoppingMaterials);
   const canCopy =
-    rollup.singleHub && incompleteHubs.size === 0 && hasShoppingList(budget.materials);
+    rollup.singleHub && incompleteHubs.size === 0 && hasShoppingList(rollup.shoppingMaterials);
 
   // The rejection is caught and shown, not left to `void`, exactly as the
   // single plan's copy does it: a browser that denies clipboard access, or a
@@ -267,7 +262,7 @@ export function BuildGroupPanel({
                     ? t('industry.copyShoppingListFailed')
                     : t('industry.copyShoppingList')
               }
-              onClick={() => void handleCopy(GROUP_COPY, budget.materials)}
+              onClick={() => void handleCopy(GROUP_COPY, rollup.shoppingMaterials)}
               disabled={!canCopy}
             />
           </>
@@ -286,10 +281,6 @@ export function BuildGroupPanel({
           );
         }}
       />
-
-      {rollup.singleHub && (
-        <ShoppingBudget budget={budget} nameFor={(id) => nameForType(catalog, id)} />
-      )}
 
       {/* Shown as a line rather than as the button's own label: the message
           is about the clipboard, not about which list, and it is a sentence

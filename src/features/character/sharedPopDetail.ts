@@ -9,7 +9,13 @@ import { HOUR_MS, formatAge } from '@/lib/age';
 import { formatDuration } from '@/lib/duration';
 import { formatCalendarTimestamp } from '@/lib/timestamp';
 import type { Translate } from '@/lib/translate';
-import { sharedPopTitle, type SharedPopEntry } from './calendarSharedPops';
+import {
+  sharedPopMiningState,
+  sharedPopShownAtMs,
+  sharedPopTitle,
+  type SharedPopEntry,
+  type SharedPopTimePref,
+} from './calendarSharedPops';
 
 /**
  * The Survey start link: the refinery as location, the sharing corporation as payee, the
@@ -55,31 +61,98 @@ const POP_TIME_KEY = {
 } as const;
 
 /**
- * The detail modal: refinery, moon, Pop Time and countdown, data age, ore make-up, notes, start link. Ore
- * make-up shared but not known (a moon owner's moon) reads "Unknown"; not shared, it is absent.
+ * What is known of the moon being mined out: an officer's flag, the likely-done guess, or, once
+ * popped, plainly that nobody has marked it. The Survey's own state is its own fact.
+ */
+function miningFacts(
+  entry: SharedPopEntry,
+  popped: boolean,
+  t: Translate,
+  zone: string | undefined
+): RowDetailModel['facts'] {
+  const { pop, survey } = entry;
+  const facts: RowDetailModel['facts'] = [];
+  if (pop.fullyMined) {
+    facts.push({
+      label: t('calendar.sharedPop.mining'),
+      value: t('calendar.sharedPop.fullyMinedBy', {
+        name: pop.fullyMined.byName,
+        date: formatCalendarTimestamp(new Date(Date.parse(pop.fullyMined.at)), zone),
+      }),
+    });
+  } else if (popped && sharedPopMiningState(entry) === 'likelyMinedOut') {
+    facts.push({
+      label: t('calendar.sharedPop.mining'),
+      value: t('calendar.sharedPop.likelyMinedOut'),
+    });
+  } else if (popped && !survey?.finished) {
+    facts.push({
+      label: t('calendar.sharedPop.mining'),
+      value: t('calendar.sharedPop.notMarkedFullyMined'),
+    });
+  }
+  if (survey) {
+    facts.push({
+      label: t('calendar.sharedPop.survey'),
+      value: survey.finished
+        ? t('calendar.sharedPop.surveyFinished')
+        : t('calendar.sharedPop.surveyLeft', { percent: survey.percentLeft }),
+    });
+  }
+  return facts;
+}
+
+/**
+ * The detail modal: refinery, moon, both Pop Times and the countdown, mining state, data age,
+ * ore make-up, notes, start link. Ore make-up shared but not known (a moon owner's moon) reads
+ * "Unknown"; not shared, it is absent.
  */
 export function sharedPopDetail(
   entry: SharedPopEntry,
   nowMs: number,
   t: Translate,
-  zone: string | undefined
+  zone: string | undefined,
+  pref: SharedPopTimePref = 'asShared'
 ): RowDetailModel {
   const { pop } = entry;
-  const popAtMs = Date.parse(pop.popAt);
+  const popAtMs = sharedPopShownAtMs(pop, pref);
   const popped = nowMs >= popAtMs;
+  // Both Pop Times once the server publishes them and the chunk has not fractured early.
+  const { readyAt, autoFractureAt } = pop;
+  const bothTimes =
+    !pop.fractured &&
+    readyAt !== undefined &&
+    autoFractureAt !== undefined &&
+    readyAt !== autoFractureAt
+      ? { ready: readyAt, auto: autoFractureAt }
+      : null;
   const synced = syncedFact(pop.syncedAt, nowMs, t);
   const facts: RowDetailModel['facts'] = [
     ...(entry.moonName === null
       ? []
       : [{ label: t('calendar.sharedPop.moon'), value: entry.moonName }]),
-    {
-      label: t(POP_TIME_KEY[pop.popTime]),
-      value: formatCalendarTimestamp(new Date(popAtMs), zone),
-    },
+    ...(bothTimes
+      ? [
+          {
+            label: t(POP_TIME_KEY.ready),
+            value: formatCalendarTimestamp(new Date(Date.parse(bothTimes.ready)), zone),
+          },
+          {
+            label: t(POP_TIME_KEY['auto-fracture']),
+            value: formatCalendarTimestamp(new Date(Date.parse(bothTimes.auto)), zone),
+          },
+        ]
+      : [
+          {
+            label: t(POP_TIME_KEY[pop.popTime]),
+            value: formatCalendarTimestamp(new Date(popAtMs), zone),
+          },
+        ]),
     {
       label: t('calendar.sharedPop.expires'),
       value: formatCalendarTimestamp(new Date(Date.parse(pop.expiresAt)), zone),
     },
+    ...miningFacts(entry, popped, t, zone),
     { label: t('calendar.sharedPop.taxedBy'), value: entry.corporation.name },
     {
       label: t('calendar.sharedPop.rate'),

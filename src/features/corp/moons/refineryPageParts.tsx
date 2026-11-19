@@ -239,7 +239,14 @@ export function ExtractionsPanel({
       align: 'right',
       className: 'tabular-nums',
       cardCorner: true,
-      render: ({ row }) => (row.tax ? isk(row.tax) : NONE),
+      render: ({ row }) =>
+        row.tax ? (
+          isk(row.tax)
+        ) : row.minerCount ? (
+          <span className="text-text-dim">{t(kp('ext.notBilled'))}</span>
+        ) : (
+          NONE
+        ),
       sortValue: ({ row }) => row.tax,
     },
     {

@@ -41,6 +41,12 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 export const payoutId = (d: Pick<OutgoingDonation, 'division' | 'refId'>) =>
   `j${d.division}_${d.refId}`;
 
+/** The division and journal entry a `payoutId` / donation payment id names; null for any other id. */
+export function parsePaymentId(id: string): { division: number; refId: number } | null {
+  const m = /^j(\d+)_(\d+)$/.exec(id);
+  return m ? { division: Number(m[1]), refId: Number(m[2]) } : null;
+}
+
 const dayIndex = (date: string) =>
   Math.floor(Date.parse(`${date.slice(0, 10)}T00:00:00Z`) / DAY_MS);
 

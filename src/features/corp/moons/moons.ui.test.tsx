@@ -14,6 +14,7 @@ import {
   statementForLine,
   type BookViewInput,
 } from '@/engine/corpTaxBook/bookView';
+import { DEFAULT_NOTICE_RULES } from '@/engine/corpTaxBook/notices';
 import type { ObservedMiningEntry } from '@/engine/corpTaxBook/types';
 import { BookProvider } from './BookContext';
 import { MinersTab } from './MinersTab';
@@ -115,7 +116,7 @@ function renderBook(
             moon: (id) => `Moon ${id}`,
             ore: () => 'Sylvite',
           },
-          settings: { minimumStatement: 0 } as BookSettings,
+          settings: { minimumStatement: 0, noticeRules: DEFAULT_NOTICE_RULES } as BookSettings,
           data: {} as never,
           verdict,
           reload,
@@ -216,8 +217,8 @@ describe('MinersTab', () => {
     for (const name of ['Show info', 'Record payment', 'Dismiss tax']) {
       expect(within(menu).getByRole('menuitem', { name })).toBeInTheDocument();
     }
-    // Show info, then the three real actions: nothing else.
-    expect(within(menu).getAllByRole('menuitem')).toHaveLength(4);
+    // Show info, Open in new tab (the row opens a page), then the three real actions: nothing else.
+    expect(within(menu).getAllByRole('menuitem')).toHaveLength(5);
     // No payment in this book: the item stays, inert.
     expect(within(menu).getByRole('menuitem', { name: 'Mark not tax' })).toHaveAttribute(
       'aria-disabled',
@@ -226,13 +227,16 @@ describe('MinersTab', () => {
     expect(within(menu).queryByRole('menuitem', { name: 'Send reminder' })).not.toBeInTheDocument();
   });
 
-  it('a row opens in place to its Statement days with one Open page link; the click does not navigate', async () => {
-    renderBook(<MinersTab />);
-    expect(screen.queryByRole('link', { name: 'Open page' })).not.toBeInTheDocument();
+  it("a row click opens that Miner's page instead of expanding in place", async () => {
+    renderBook(
+      <>
+        <MinersTab />
+        <LocationProbe />
+      </>
+    );
     await userEvent.click(screen.getByText('Pilot 1'));
-    const link = await screen.findByRole('link', { name: 'Open page' });
-    expect(link).toHaveAttribute('href', '/corp/moons/miners/solo%3A1');
-    expect(screen.getByText(/Next Statement · 1/)).toBeInTheDocument();
+    expect(screen.getByTestId('location')).toHaveTextContent('/corp/moons/miners/solo%3A1');
+    expect(screen.queryByText(/Next Statement · 1/)).not.toBeInTheDocument();
   });
 });
 
@@ -289,11 +293,19 @@ describe('Mark not tax dialog', () => {
   });
 });
 
-describe('StatementRun', () => {
+describe('StatementRun (late notices, #6294)', () => {
+  /** Two Miners 60 days behind, each owing at least the default notice minimum. */
+  const behind = {
+    runningAccountFrom: '2026-08-01T00:00:00Z',
+    now: '2026-10-18T14:00:00Z',
+    lastSyncedAt: '2026-10-18T12:00:00Z',
+    entries: [entry(1, '2026-08-10', 100_000), entry(2, '2026-08-11', 200_000)],
+  };
+
   it("on a desktop shows the chosen Miner's mail beside the step, picked by a labelled select", async () => {
-    renderBook(<StatementRun />);
+    renderBook(<StatementRun />, behind);
     const preview = screen.getByRole('region', { name: 'Mail preview' });
-    expect(within(preview).getByText(/moon tax Statement, Aug 2026/)).toBeInTheDocument();
+    expect(within(preview).getByText(/moon tax: late notice/)).toBeInTheDocument();
     expect(within(preview).getByRole('combobox', { name: 'Preview for' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Preview mail' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
@@ -304,25 +316,25 @@ describe('StatementRun', () => {
   it('keeps Send disabled until the corporation name resolves, then previews with it', async () => {
     stubViewport(BELOW_DESKTOP_QUERY);
     corpName.value = null;
-    const first = renderBook(<StatementRun />);
+    const first = renderBook(<StatementRun />, behind);
     await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
     expect(screen.getByText('Loading corporation name…')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Send 2 Statements' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Send 2 late notices' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Preview mail' })).toBeDisabled();
     expect(editBook).not.toHaveBeenCalled();
     first.unmount();
 
     corpName.value = 'Ore & Glory';
-    renderBook(<StatementRun />);
+    renderBook(<StatementRun />, behind);
     await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
-    expect(screen.getByRole('button', { name: 'Send 2 Statements' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Send 2 late notices' })).toBeEnabled();
     await userEvent.click(screen.getByRole('button', { name: 'Preview mail' }));
-    expect(await screen.findByText(/Ore & Glory moon tax Statement, Aug 2026/)).toBeInTheDocument();
+    expect(await screen.findByText(/Ore & Glory moon tax: late notice/)).toBeInTheDocument();
   });
 
   it('previews the mail of each Miner from the Send step, before sending', async () => {
     stubViewport(BELOW_DESKTOP_QUERY);
-    renderBook(<StatementRun />);
+    renderBook(<StatementRun />, behind);
     await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
     await userEvent.click(screen.getByRole('button', { name: 'Preview mail' }));
     expect(await screen.findByText('1 of 2')).toBeInTheDocument();
@@ -331,28 +343,14 @@ describe('StatementRun', () => {
     expect(enqueueStatements).not.toHaveBeenCalled();
   });
 
-  it('previews the mail of an earlier issued Statement the run will still send', async () => {
-    stubViewport(BELOW_DESKTOP_QUERY);
-    const first = buildBookView(input());
-    const plan = planStatementRun(first, nextRunPeriod(first)!);
-    const issued = plan.lines.map((l) => statementForLine(first, plan, l));
-    renderBook(<StatementRun />, { statements: issued });
-    expect(screen.getByText('2 to send')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Preview mail' }));
-    expect(await screen.findByText('1 of 2')).toBeInTheDocument();
-    expect(screen.getByText(/moon tax Statement, Aug 2026/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Next Miner' }));
-    expect(screen.getByText('2 of 2')).toBeInTheDocument();
-  });
-
-  it('checks, then issues each Statement before handing the mails to the queue', async () => {
-    const { reload } = renderBook(<StatementRun />);
-    expect(screen.getByText('Aug 2026 Statements')).toBeInTheDocument();
+  it('checks, then issues each notice before handing the mails to the queue', async () => {
+    const { reload } = renderBook(<StatementRun />, behind);
+    expect(screen.getByRole('heading', { name: 'Late notices' })).toBeInTheDocument();
     expect(screen.getByText('2 to send')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
     expect(screen.getByText(/about \d+ minute/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Send 2 Statements' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Send 2 late notices' }));
 
     await waitFor(() => expect(enqueueStatements).toHaveBeenCalledTimes(1));
     const issued = editBook.mock.calls.map((c) => (c[2] as { action: string }).action);
@@ -366,53 +364,41 @@ describe('StatementRun', () => {
     expect(corporationId).toBe(CORP);
     expect(senderCharacterId).toBe(7);
     expect(statements.map((s: { amountDue: number }) => s.amountDue).sort()).toEqual([
-      100_000, 200_000,
+      10_000_000, 20_000_000,
     ]);
-    expect(await screen.findByText('1 Statement is in the send queue.')).toBeInTheDocument();
+    expect(await screen.findByText('1 late notice is in the send queue.')).toBeInTheDocument();
     expect(reload).toHaveBeenCalled();
   });
 
-  /** Aug and Sep both closed and unbilled: one run sends both, oldest first (#6208). */
-  const twoMonths = {
-    now: '2026-10-18T14:00:00Z',
-    lastSyncedAt: '2026-10-18T12:00:00Z',
-    entries: [entry(1, '2026-08-10', 1000), entry(1, '2026-09-10', 2000)],
-  };
+  it('mails and issues only the ticked Miners', async () => {
+    renderBook(<StatementRun />, behind);
+    const boxes = screen.getAllByRole('checkbox');
+    expect(boxes).toHaveLength(2);
+    expect(boxes.every((b) => (b as HTMLInputElement).checked)).toBe(true);
+    await userEvent.click(boxes[0]);
+    expect(screen.getByText('1 to send')).toBeInTheDocument();
 
-  it('sends every missed period in one run, issuing and queueing Aug before Sep', async () => {
-    renderBook(<StatementRun />, twoMonths);
-    expect(screen.getByText('Aug 2026 and Sep 2026 Statements')).toBeInTheDocument();
-    expect(screen.getByText('2 to send')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Send 2 Statements' }));
-    await waitFor(() => expect(enqueueStatements).toHaveBeenCalledTimes(2));
-    const ids = editBook.mock.calls.map(
-      (c) => (c[2] as { statement: { id: string } }).statement.id
-    );
-    expect(ids).toEqual(['2026-08-01_solo:1', '2026-09-01_solo:1']);
-    const due = enqueueStatements.mock.calls.map(
-      ([arg]) => (arg as { statements: { amountDue: number }[] }).statements[0].amountDue
-    );
-    expect(due).toEqual([100_000, 300_000]);
+    await userEvent.click(screen.getByRole('button', { name: 'Send 1 late notice' }));
+
+    await waitFor(() => expect(enqueueStatements).toHaveBeenCalledTimes(1));
+    // A notice is rebuilt every run, so an unticked one is not issued at all.
+    const issued = editBook.mock.calls.map((c) => (c[2] as { action: string }).action);
+    expect(issued).toEqual(['issueStatement']);
+    expect(enqueueStatements.mock.calls[0][0].statements).toHaveLength(1);
   });
 
-  it('keeps the periods already issued and queued when a later one is refused', async () => {
-    editBook.mockResolvedValueOnce({}).mockRejectedValueOnce(new Error('Offline'));
-    renderBook(<StatementRun />, twoMonths);
-    await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Send 2 Statements' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Offline');
-    expect(enqueueStatements).toHaveBeenCalledTimes(1);
-    expect(
-      (enqueueStatements.mock.calls[0][0] as { statements: unknown[] }).statements
-    ).toHaveLength(1);
+  it('leaves Send off until at least one Miner is ticked', async () => {
+    renderBook(<StatementRun />, behind);
+    for (const box of screen.getAllByRole('checkbox')) await userEvent.click(box);
+    expect(screen.getByRole('button', { name: 'Continue to send' })).toBeDisabled();
   });
 
   it('shows a refused issue instead of queueing mail', async () => {
     editBook.mockRejectedValueOnce(new Error('An issued Statement never changes'));
-    renderBook(<StatementRun />);
+    renderBook(<StatementRun />, behind);
     await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Send 2 Statements' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Send 2 late notices' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('An issued Statement never changes');
     expect(enqueueStatements).not.toHaveBeenCalled();
   });

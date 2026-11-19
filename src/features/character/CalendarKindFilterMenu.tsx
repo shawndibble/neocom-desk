@@ -55,7 +55,6 @@ import { corpLabelText } from '@/features/corp/corpTicker';
 import { KIND_LABEL } from './calendarKindLabels';
 import { KIND_TEXT } from '@/components/ui/kindTone';
 import { KIND_ICON } from './calendarKindIcons';
-import type { SkillPlanChoice } from './calendarSkillPlan';
 
 export interface CalendarKindFilterMenuProps {
   hidden: readonly CharacterBoardItemKind[];
@@ -73,13 +72,6 @@ export interface CalendarKindFilterMenuProps {
   readableKinds: readonly CharacterBoardItemKind[];
   /** Kinds whose read came back 401/403 — named as such rather than shown as a zero. */
   reauthKinds: readonly CharacterBoardItemKind[];
-  /** The Character's Skill Plans — one may be projected onto the board at a time. */
-  skillPlanChoices: readonly SkillPlanChoice[];
-  chosenSkillPlanId: string | null;
-  /** Why the chosen plan could not be scheduled, or null. */
-  skillPlanError: string | null;
-  /** Picks a plan, or null to stop projecting one. */
-  onChooseSkillPlan: (planId: string | null) => void;
   /** The corporations with corp events. Empty hides the corporation filter. */
   corporations?: readonly BoardCorporation[];
   corpFilter?: CorpEventFilter;
@@ -171,10 +163,6 @@ export function CalendarKindFilterMenu({
   counts,
   readableKinds,
   reauthKinds,
-  skillPlanChoices,
-  chosenSkillPlanId,
-  skillPlanError,
-  onChooseSkillPlan,
   corporations = NO_CORPORATIONS,
   corpFilter = 'all',
   onCorpFilter,
@@ -195,11 +183,6 @@ export function CalendarKindFilterMenu({
    */
   function countLabel(kind: CharacterBoardItemKind) {
     if (needsReauth.has(kind)) return t('calendar.filter.notGranted');
-    if (kind === 'skillPlan' && !readable.has(kind)) {
-      // Not an ESI read, so "unavailable" would blame the network. Say what is
-      // actually missing: a choice, or a plan the scheduler could not cost.
-      return t(skillPlanError === null ? 'calendar.skillPlan.choose' : 'calendar.skillPlan.error');
-    }
     if (!readable.has(kind)) return t('calendar.filter.unavailable');
     return counts.get(kind) ?? 0;
   }
@@ -208,8 +191,7 @@ export function CalendarKindFilterMenu({
    * A kind with nothing coming up is not worth a row. Three cases stay: one
    * the pilot hid (the row is how they turn it back on — their choice is
    * remembered, so it must stay reachable), one that could not be read or
-   * needs a scope (the row says why, and absence would hide that), and the
-   * Skill plan row while no plan is chosen. The opt-in kinds (moon chunks,
+   * needs a scope (the row says why, and absence would hide that). The opt-in kinds (moon chunks,
    * skyhook raids, mercenary dens) are the exception: unreadable usually means
    * the Permission is off, and an "Unavailable" row would blame the network for
    * a choice the pilot never made.
@@ -295,40 +277,6 @@ export function CalendarKindFilterMenu({
             allLabel={t('calendar.sharingCorpFilter.all')}
             onChange={(filter) => onSharingCorpFilter?.(filter)}
           />
-        )}
-        {/* One plan per Character, so a radio group in a submenu rather than a
-            section of its own in the kinds list. Picking the chosen plan again
-            stops projecting it (see `onValueChange`'s empty-string case). */}
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger>{t('calendar.skillPlan.title')}</DropdownMenuSubTrigger>
-          <DropdownMenuSubContent>
-            {skillPlanChoices.length === 0 ? (
-              <p className="px-2 py-1.5 text-xs text-text-dim">{t('calendar.skillPlan.none')}</p>
-            ) : (
-              <DropdownMenuRadioGroup
-                value={chosenSkillPlanId ?? ''}
-                onValueChange={(id) => onChooseSkillPlan(id === '' ? null : id)}
-              >
-                {skillPlanChoices.map((plan) => (
-                  <DropdownMenuRadioItem
-                    key={plan.id}
-                    value={plan.id}
-                    onSelect={(event) => {
-                      event.preventDefault();
-                      if (plan.id === chosenSkillPlanId) onChooseSkillPlan(null);
-                    }}
-                  >
-                    <span className="flex-1 truncate">{plan.name}</span>
-                  </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
-            )}
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-        {skillPlanError !== null && (
-          <p className="px-2 py-1.5 text-xs text-text-dim">
-            {t('calendar.skillPlan.errorReason', { reason: skillPlanError })}
-          </p>
         )}
         {/* Real menu items, not raw buttons: Radix roving focus only visits registered
             items, so a plain button here is unreachable by keyboard (WCAG 2.1.1).

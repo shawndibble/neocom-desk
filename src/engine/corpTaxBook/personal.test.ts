@@ -1106,6 +1106,8 @@ describe('overlayCorpBooks', () => {
       '2026-10-16': ['billed', 222_000],
     });
     expect(out.books[0].credit).toBe(222_000);
+    // Money the book already holds is a credit, not a donation the member just sent.
+    expect(out.rows.find((r) => r.date === '2026-10-15')?.settledBy).toBe('credit');
   });
 
   describe('on a running account', () => {

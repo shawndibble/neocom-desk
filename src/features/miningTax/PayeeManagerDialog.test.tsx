@@ -781,6 +781,25 @@ describe('PayeeManagerDialog — a Payee is someone in EVE', () => {
 describe('PayeeManagerDialog — linking a Payee named for a Corp Tax Book corporation (#6205)', () => {
   const bookCorporations = [{ corporationId: 98_000_007, name: 'Corp A' }];
 
+  it('shows the credit the book holds where a settled Payee would read Settled', async () => {
+    const stored: PayeeRecord = {
+      id: 'corp-a',
+      characterId: CHAR,
+      name: 'Corp A',
+      defaultTaxPct: 8,
+      entityId: 98_000_007,
+      entityKind: 'corporation',
+      updatedAt: 1,
+    };
+    await db.payees.bulkPut([stored]);
+    renderDialog([stored], {
+      owedByPayee: new Map(),
+      bookCorporations: [{ ...bookCorporations[0], credit: 1_250_000 }],
+    });
+    expect(await screen.findByText('1,250,000 ISK credit')).toBeInTheDocument();
+    expect(screen.queryByText('Settled')).not.toBeInTheDocument();
+  });
+
   it('suggests the link on create, and saving stores it as the corporation', async () => {
     searchMock.resolvePayeeName.mockResolvedValue([]);
     renderDialog([], { bookCorporations });

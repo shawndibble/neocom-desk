@@ -140,12 +140,11 @@ describe('countsByDay', () => {
       skyhookRaids: [clock('skyhook', day)],
       contractExpiries: [clock('contract', day)],
       orderExpiries: [clock('order', day)],
-      skillPlan: [clock('plan', day)],
       accelerator: [clock('accelerator', day)],
     });
 
     expect(countsByDay(board).get(local(2026, 9, 11, 0, 0))).toEqual({
-      count: 15,
+      count: 14,
       kinds: [...CHARACTER_BOARD_ITEM_KINDS],
     });
   });

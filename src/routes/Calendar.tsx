@@ -20,7 +20,12 @@ import { EventDetailModal } from '@/features/character/EventDetailModal';
 import { skyhookRaidDetail } from '@/features/character/skyhookRaidDetail';
 import { sharedPopDetail } from '@/features/character/sharedPopDetail';
 import { useSharedPopParam } from '@/features/character/sharedPopLink';
-import { sharedPopDeadlineMs } from '@/features/character/calendarSharedPops';
+import {
+  dropEventsOfSharedPops,
+  sharedPopDeadlineMs,
+  toSharedPopSources,
+} from '@/features/character/calendarSharedPops';
+import { useSharedPopTime } from '@/features/character/calendarSharedPopTime';
 import { RowDetailModal } from '@/features/overview/widgets/RowDetailModal';
 import { CalendarMap } from '@/features/character/CalendarMap';
 import { CalendarWeekSummary } from '@/features/character/CalendarWeekSummary';
@@ -28,10 +33,6 @@ import { CalendarDayTicker } from '@/features/character/CalendarDayTicker';
 import { ComingUpRail } from '@/features/character/ComingUpRail';
 import { CalendarReauthNotice } from '@/features/character/CalendarReauthNotice';
 import { CalendarKindFilterMenu } from '@/features/character/CalendarKindFilterMenu';
-import {
-  useCalendarSkillPlans,
-  withCalendarSkillPlan,
-} from '@/features/character/calendarSkillPlan';
 import { useCalendarDensity } from '@/features/character/calendarViewPref';
 import { useCalendarWeekStart } from '@/features/character/calendarWeekStart';
 import {
@@ -152,9 +153,8 @@ export function Calendar() {
   const setDensity = useCalendarDensity((state) => state.setValue);
   const hiddenKinds = useCalendarHiddenKinds((state) => state.value);
   const setHiddenKinds = useCalendarHiddenKinds((state) => state.setValue);
-  const skillPlanChoices = useCalendarSkillPlans((state) => state.value);
-  const setSkillPlanChoices = useCalendarSkillPlans((state) => state.setValue);
   const weekStart = useCalendarWeekStart((state) => state.value);
+  const sharedPopTime = useSharedPopTime((state) => state.value);
   const savedCorpFilter = useCalendarCorpFilter((state) => state.value);
   const setCorpFilter = useCalendarCorpFilter((state) => state.setValue);
   const savedSharingCorpFilter = useCalendarSharingCorpFilter((state) => state.value);
@@ -164,17 +164,9 @@ export function Calendar() {
     useCalendarHiddenKinds,
     useCalendarCorpFilter,
     useCalendarSharingCorpFilter,
-    useCalendarSkillPlans,
-    useCalendarWeekStart
+    useCalendarWeekStart,
+    useSharedPopTime
   );
-
-  // The loader reads the choice from Dexie itself, so the write must land
-  // before the reload that reads it.
-  async function chooseSkillPlan(planId: string | null) {
-    if (activeCharacterId === null) return;
-    await setSkillPlanChoices(withCalendarSkillPlan(skillPlanChoices, activeCharacterId, planId));
-    refresh();
-  }
 
   // "Today" at mount, stable for this visit's codec identity (see `anchorParam`).
   const [defaultAnchorKey] = useState(() => dayKey(cellOf(Date.now(), zone)));
@@ -282,16 +274,28 @@ export function Calendar() {
    */
   const boardSources = useMemo(() => {
     if (!data) return undefined;
+    const readable = new Set(data.readableRefineries);
+    // A pop the corp also put in the in-game calendar is one row: the pop, at the Pop Time the
+    // viewer picked, and not the event (calendarSharedPops.ts).
     const calendarEvents = data.calendarEvents
-      ? applyResponseOverrides(
-          data.calendarEvents,
-          activeOverrides,
-          (source) => Number(source.id),
-          (source, response) => ({ ...source, response })
+      ? dropEventsOfSharedPops(
+          applyResponseOverrides(
+            data.calendarEvents,
+            activeOverrides,
+            (source) => Number(source.id),
+            (source, response) => ({ ...source, response })
+          ),
+          data.sharedPops,
+          readable,
+          data.loadedAtMs,
+          sharedPopTime
         )
       : undefined;
-    return { ...data, calendarEvents };
-  }, [data, activeOverrides]);
+    const sharedMoonPops =
+      data.sharedMoonPops &&
+      toSharedPopSources(data.sharedPops, readable, data.loadedAtMs, sharedPopTime);
+    return { ...data, calendarEvents, sharedMoonPops };
+  }, [data, activeOverrides, sharedPopTime]);
 
   const board = useMemo(
     () => (boardSources ? buildCharacterBoard({ nowMs, ...boardSources }) : []),
@@ -353,8 +357,8 @@ export function Calendar() {
   // Looked up in every live pop, not only the rows: a link still opens one hidden as a duplicate.
   const popDetail = useMemo(() => {
     const entry = data?.sharedPops.find((e) => e.pop.id === selectedPopId);
-    return entry === undefined ? null : sharedPopDetail(entry, nowMs, t, zone);
-  }, [data, selectedPopId, nowMs, t, zone]);
+    return entry === undefined ? null : sharedPopDetail(entry, nowMs, t, zone, sharedPopTime);
+  }, [data, selectedPopId, nowMs, t, zone, sharedPopTime]);
   // `?pop=` also moves the map to the pop's day and scopes the rail to it (issue #6239), once:
   // the first snapshot that holds the pop. A later reload must not pull the pilot back.
   // Adjusted during render, not an effect (`react-hooks/set-state-in-effect`); only the URL
@@ -375,7 +379,7 @@ export function Calendar() {
       }
     } else {
       setPopDayPending(false);
-      const deadlineMs = sharedPopDeadlineMs(entry.pop, data.loadedAtMs);
+      const deadlineMs = sharedPopDeadlineMs(entry.pop, sharedPopTime);
       if (!Number.isNaN(deadlineMs)) {
         setSelectedDay({ zone, ms: dayStart(deadlineMs, zone) });
         setPopAnchorKey(dayKey(cellOf(deadlineMs, zone)));
@@ -474,10 +478,6 @@ export function Calendar() {
               counts={counts}
               readableKinds={data?.readableKinds ?? []}
               reauthKinds={data?.reauthKinds ?? []}
-              skillPlanChoices={data?.skillPlanChoices ?? []}
-              chosenSkillPlanId={data?.chosenSkillPlanId ?? null}
-              skillPlanError={data?.skillPlanError ?? null}
-              onChooseSkillPlan={(planId) => void chooseSkillPlan(planId)}
               corporations={data?.corporations}
               corpFilter={corpFilter}
               onCorpFilter={(filter) => void setCorpFilter(filter)}
@@ -538,7 +538,7 @@ export function Calendar() {
                 />
               </Panel>
             ) : (
-              <div className="w-full min-w-0 space-y-3 md:w-[38rem] xl:shrink-0">
+              <div className="w-full min-w-0 space-y-3 md:flex-1">
                 <Panel padded={false} title={t('calendar.map.title')} actions={periodControls}>
                   <CalendarMap
                     days={days}

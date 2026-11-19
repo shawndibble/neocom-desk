@@ -56,8 +56,8 @@ export function buildMaterialsColumns({
       id: 'owned',
       header: t('industry.errands.haveColumn'),
       align: 'right',
-      // The field's own width plus the compact cell padding, and no more.
-      headerCellClassName: 'w-24',
+      // Wide enough that the "Use assets" offer under the field stays on one line.
+      headerCellClassName: 'w-32',
       // A Blueprint Acquisition row owns nothing by typed quantity, so it sinks rather than sorting as zero.
       sortValue: (material) =>
         material.acquisitionTier ? undefined : (sourcing?.[material.typeID]?.ownedQuantity ?? 0),

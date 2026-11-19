@@ -17,7 +17,6 @@ import type { TradeHub } from '@/market/hubs';
 import { nameForType, volumeForType, type BlueprintCatalog } from './blueprintCatalog';
 import type { buildItemMenuProps } from './buildItemMenuProps';
 import type { CorpOwnedStockState } from './corpOwnedStock';
-import { MinedOreNote } from './MinedOreNote';
 import { MaterialsTable, type MaterialsTableHandle } from './MaterialsTable';
 import { PlanMaterialModals } from './PlanMaterialModals';
 import { PlanMaterialsActions } from './PlanMaterialsActions';
@@ -30,7 +29,6 @@ import type { usePlanEdits } from './usePlanEdits';
 import type { PlanGroup, usePlanOwnedStock } from './usePlanOwnedStock';
 import type { usePlanMaterials } from './usePlanMaterials';
 import type { useOwnedSale } from './useOwnedSale';
-import { ShoppingBudget } from './ShoppingBudget';
 import type { useShoppingListCopy } from './useShoppingListCopy';
 
 type Edits = ReturnType<typeof usePlanEdits>;
@@ -120,7 +118,7 @@ export function PlanMaterialsPanel({
         <PlanMaterialsActions
           fetchedAt={fetchedAt}
           copyState={shopping.copyState}
-          copyDisabled={!!error || !result || !hasShoppingList(shopping.budget.materials)}
+          copyDisabled={!!error || !result || !hasShoppingList(shopping.shoppingMaterials)}
           onCopy={() => void shopping.copyShoppingList()}
           compressedGas={
             shopping.hasGas
@@ -137,7 +135,6 @@ export function PlanMaterialsPanel({
         <p className="text-xs text-danger">{error ?? t('industry.computeError')}</p>
       ) : (
         <>
-          <ShoppingBudget budget={shopping.budget} nameFor={(id) => nameForType(catalog, id)} />
           {/* Reactions are exempt from every time implant — nothing to assume. */}
           {activity !== 'reaction' && (
             <ImplantsAssumedNote hint={t('industry.assumesNoImplantsHint')} />
@@ -210,12 +207,6 @@ export function PlanMaterialsPanel({
             characterNameFor={ownedStock.detection.characterNameFor}
             depthFor={(typeID) => boughtDepth.get(typeID)}
           />
-          {modals.hasShortfall && (
-            <MinedOreNote
-              shortMinerals={Object.keys(modals.shortfall.needs).map(Number)}
-              onBuyOre={() => modals.setBuyOreOpen(true)}
-            />
-          )}
           <PlanMaterialModals
             modals={modals}
             result={result}
