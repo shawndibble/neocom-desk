@@ -19720,7 +19720,7 @@
         "rate": {
           "open": "Change a day's rate",
           "title": "Change one day's rate",
-          "intro": "Only for a day not yet on a Statement. The change is logged and the day is repriced at once.",
+          "intro": "Reprices one Miner's mining at one refinery on one day; 0% taxes it nothing. Not for a day already on a Statement. A day already paid is repriced too, and any payment it no longer needs becomes credit. The change is logged.",
           "day": "Day",
           "pickDay": "Pick a day",
           "pct": "Rate for that day (%)",
