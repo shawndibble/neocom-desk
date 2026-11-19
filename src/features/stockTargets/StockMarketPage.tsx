@@ -539,7 +539,12 @@ export function StockMarketPage({
                   onRemoveMany={removeMany}
                 />
               </Panel>
-              <BarLegend />
+              <BarLegend showJobs={rows.some((row) => row.fromJobs > 0)} />
+              {data && data.jobsElsewhere > 0 && (
+                <p className="text-xs text-text-dim">
+                  {t('stockTargets.table.jobsElsewhere', { count: data.jobsElsewhere })}
+                </p>
+              )}
             </>
           )
         ) : (
@@ -567,7 +572,7 @@ export function StockMarketPage({
 }
 
 /** What the bar's two fills mean: the bar itself is hidden from assistive tech, the numbers say it. */
-function BarLegend() {
+function BarLegend({ showJobs }: { showJobs: boolean }) {
   const { t } = useTranslation();
   return (
     <p
@@ -582,6 +587,12 @@ function BarLegend() {
         <span className="stock-bar-hangar inline-block h-1.5 w-4 rounded-xs border border-line" />
         {t('stockTargets.table.legendHangar')}
       </span>
+      {showJobs && (
+        <span className="flex items-center gap-1.5">
+          <span className="stock-bar-jobs inline-block h-1.5 w-4 rounded-xs border border-line" />
+          {t('stockTargets.table.legendJobs')}
+        </span>
+      )}
     </p>
   );
 }

@@ -88,6 +88,8 @@ export interface IndustryJob {
   blueprint_type_id: number;
   facility_id: number;
   station_id: number;
+  /** Where the output is delivered: a station or structure id for a hangar delivery. ESI always sends it, a cache written before it was modeled may not hold it. */
+  output_location_id?: number;
   runs: number;
   start_date: string;
   end_date: string;

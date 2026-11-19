@@ -49,12 +49,14 @@ export function StockNeedPill({ need, children }: { need: MarketNeed; children: 
 
 /**
  * Solid for what is listed, hatched after it for the hangar stock at the
- * market that would cover the rest of the Stock Target.
+ * market that would cover the rest of the Stock Target, then dotted for what
+ * running jobs will deliver.
  */
 export function StockFillBar({
   status,
   fill,
   hangarFill = 0,
+  jobsFill = 0,
   className,
 }: {
   status: StockStatus;
@@ -62,10 +64,13 @@ export function StockFillBar({
   fill: number;
   /** The hangar's share of the Stock Target that listing would cover. */
   hangarFill?: number;
+  /** The running jobs' share of the Stock Target they would cover after the hangar's. */
+  jobsFill?: number;
   className?: string;
 }) {
   const listed = Math.min(100, Math.round(fill * 100));
   const hangar = Math.max(0, Math.min(100 - listed, Math.round(hangarFill * 100)));
+  const jobs = Math.max(0, Math.min(100 - listed - hangar, Math.round(jobsFill * 100)));
   return (
     <span
       aria-hidden="true"
@@ -82,6 +87,12 @@ export function StockFillBar({
         <span
           className="stock-bar-hangar absolute inset-y-0"
           style={{ left: `${listed}%`, width: `${hangar}%` }}
+        />
+      )}
+      {jobs > 0 && (
+        <span
+          className="stock-bar-jobs absolute inset-y-0"
+          style={{ left: `${listed + hangar}%`, width: `${jobs}%` }}
         />
       )}
     </span>

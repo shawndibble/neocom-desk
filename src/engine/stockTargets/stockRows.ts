@@ -1,7 +1,7 @@
 /**
  * The rows of a **Stock List**: each **Stock Target** against what the pilot
  * has listed at the market, its **Shortfall**, how much of that the hangar there
- * covers, the cost to source the rest, and a status word (GLOSSARY.md).
+ * covers, the cost to source the rest, and a status word (GLOSSARY.md). Running jobs shrink the part still to source, never the status.
  *
  * Pure: quantities and prices are read by the feature layer and passed
  * in, so the same rows drive the Stock tab, the Overview card and the
@@ -33,6 +33,10 @@ export interface StockRowInput {
   inHangarBy?: readonly HolderCount[];
   /** Units on own Item Exchange contracts at the market, already inside `listed`: shown apart, not added again. */
   onContract?: number;
+  /** Units the pilot's running manufacturing and reaction jobs will deliver to the market (issue #6429). */
+  inJobs?: number;
+  /** When the soonest of those jobs ends, ISO. */
+  nextJobEnd?: string;
 }
 
 export interface StockRow extends StockRowInput {
@@ -40,6 +44,10 @@ export interface StockRow extends StockRowInput {
   shortfall: number;
   /** The part of the Shortfall the hangar at the market covers. */
   fromHangar: number;
+  /** In jobs, normalized: what is already being made for the market. */
+  inJobs: number;
+  /** The part of the Shortfall the running jobs cover once the hangar has covered its share. */
+  fromJobs: number;
   /** The rest of the Shortfall: to buy, build or haul in. */
   toSource: number;
   /** Listed over Stock Target; above 1 when over. */
@@ -73,7 +81,9 @@ function toRow(input: StockRowInput): StockRow {
   const inHangar = Math.max(0, input.inHangar);
   const shortfall = Math.max(0, input.target - listed);
   const fromHangar = Math.min(shortfall, inHangar);
-  const toSource = shortfall - fromHangar;
+  const inJobs = Math.max(0, input.inJobs ?? 0);
+  const fromJobs = Math.min(shortfall - fromHangar, inJobs);
+  const toSource = shortfall - fromHangar - fromJobs;
   let costToFill: number | null = 0;
   if (toSource > 0) costToFill = input.price === null ? null : toSource * input.price;
   return {
@@ -82,6 +92,8 @@ function toRow(input: StockRowInput): StockRow {
     inHangar,
     shortfall,
     fromHangar,
+    inJobs,
+    fromJobs,
     toSource,
     fill: listed / input.target,
     status: stockStatus(listed, input.target),
