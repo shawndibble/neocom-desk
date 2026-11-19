@@ -49,7 +49,7 @@ import { disputeHold, disputeKindOf, type DisputeKind, type OreDispute } from '.
 import { DAY_MS, MINUTE_MS } from '@/lib/age';
 
 /** What made a day Paid: the member's own mark, the corporation's settled Statement, or a donation. */
-export type BookSettledBy = 'yourMark' | 'statement' | 'donation';
+export type BookSettledBy = 'yourMark' | 'statement' | 'donation' | 'credit';
 
 export type BookRowState = 'billed' | 'conflict' | 'dismissed' | 'waived' | 'paid';
 /**
@@ -1503,10 +1503,13 @@ export function overlayCorpBooks(input: {
         p.book.corporationId,
         (aheadByBook.get(p.book.corporationId) ?? 0) + Math.min(p.credit.get(minerId) ?? 0, left)
       );
+      // Days the book's own credit reaches are settled by that credit; only the rest is a
+      // donation the member sent that the book has not credited yet.
+      const byCredit = coverInFlight(days, Math.max(0, (p.credit.get(minerId) ?? 0) - mark));
       for (const row of own) {
         if (paid.has(row.id)) {
           row.state = 'paid';
-          row.settledBy = 'donation';
+          row.settledBy = byCredit.has(row.id) ? 'credit' : 'donation';
           row.taxOwed = 0;
         }
       }

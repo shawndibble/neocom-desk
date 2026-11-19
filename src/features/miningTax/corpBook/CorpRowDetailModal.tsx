@@ -283,6 +283,14 @@ export function CorpRowDetailModal({
                     : t('miningTax.corpBook.detail.yourMarkNote')}
                 </p>
               )}
+              {view.state === 'paid' && view.settledBy === 'credit' && (
+                <p>
+                  {t('miningTax.corpBook.detail.creditAppliedNote', {
+                    corp: corp.corpName,
+                    amount: formatIsk(view.billed, 0),
+                  })}
+                </p>
+              )}
               {/* Why a day the member saw Paid is Billed again, and the transfer to dispute. */}
               {view.unlinkedDonation && (
                 <div className="space-y-1.5">

@@ -21,7 +21,11 @@ import type { PayeeRecord } from '@/db';
 import { formatIsk } from '@/lib/isk';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { useSystemName } from '@/features/route/useSolarSystems';
-import { corporationNamed, type NamedCorporation } from '@/engine/miningTax/payeeCorporation';
+import {
+  corporationNamed,
+  payeesOfBookCorporation,
+  type NamedCorporation,
+} from '@/engine/miningTax/payeeCorporation';
 import { DefaultSystemsField } from './DefaultSystemsField';
 import { deletePayee } from './ledgerActions';
 import { PayeeNameField } from './PayeeNameField';
@@ -70,7 +74,7 @@ interface PayeeManagerDialogProps {
    * one is offered the link to it (#6205): the book counts a Payee linked to its
    * corporation as its own (`payeesOfBookCorporation`).
    */
-  bookCorporations?: readonly NamedCorporation[];
+  bookCorporations?: readonly BookCorporation[];
 }
 
 export interface PayeeOwed {
@@ -118,7 +122,12 @@ function DefaultSystemTaken({ systemId, holderName }: { systemId: number; holder
   );
 }
 
-const NO_BOOK_CORPORATIONS: readonly NamedCorporation[] = [];
+/** A Corp Tax Book's corporation, with the ISK the member has paid it beyond every open day. */
+export interface BookCorporation extends NamedCorporation {
+  credit?: number;
+}
+
+const NO_BOOK_CORPORATIONS: readonly BookCorporation[] = [];
 
 const EMPTY_DRAFT: DraftPayee = {
   id: null,
@@ -415,6 +424,18 @@ export function PayeeManagerDialog({
     }));
   }
 
+  /** What the member has paid a group's Corp Tax Book beyond what it bills: its credit. */
+  function creditOfGroup(group: PayeeGroup): number {
+    const ids = new Set(group.members.map((m) => m.id));
+    return bookCorporations.reduce(
+      (sum, corp) =>
+        (corp.credit ?? 0) > 0 && payeesOfBookCorporation(payees, corp).some((p) => ids.has(p.id))
+          ? sum + (corp.credit ?? 0)
+          : sum,
+      0
+    );
+  }
+
   /** The pilot's pick of which terms a merged Payee's records all bill with. */
   async function applyVariant(group: PayeeGroup, variant: PayeeVariant) {
     await applyPayeeTerms(variant.members[0], group.members);
@@ -455,6 +476,7 @@ export function PayeeManagerDialog({
             {groups.map((group) => {
               const payee = group.primary;
               const owed = owedOfGroup(group);
+              const credit = creditOfGroup(group);
               const systems = payeeSystemNames(
                 new Set(group.members.flatMap((m) => [...(systemsByPayee?.get(m.id) ?? [])])),
                 systemNames
@@ -470,6 +492,10 @@ export function PayeeManagerDialog({
                       {owed && owed.amount > 0 ? (
                         <span className="shrink-0 text-xs text-isk-neg tabular-nums">
                           {t('miningTax.payees.owed', { amount: formatIsk(owed.amount, 0) })}
+                        </span>
+                      ) : credit > 0 ? (
+                        <span className="shrink-0 text-xs text-isk-pos tabular-nums">
+                          {t('miningTax.payees.credit', { amount: formatIsk(credit, 0) })}
                         </span>
                       ) : owedByPayee ? (
                         <span className="shrink-0 text-xs text-text-dim">
