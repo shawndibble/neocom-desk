@@ -230,6 +230,9 @@ touches a real Firebase project: the project id is `demo-neocom-desk`.
    Characters see their own lines on the personal tab; the verify page needs no
    sign-in.
 
+Without a real EVE login (a fake officer, mocked SSO/ESI, a larger seed of six refineries and
+fifteen miners), use the `manual-testing` skill: `.claude/skills/manual-testing/SKILL.md`.
+
 **Known emulator noise.** The Firestore emulator logs `Cannot find field:
 structuredQuery in message Document` when a query runs under a parent document
 whose id has a colon (`characters/char:<id>`). Its REST adapter mis-routes
