@@ -251,7 +251,6 @@ export function Market() {
     groupsById,
     childrenByParent,
     typesByGroup,
-    npcStationMap,
     solarSystemMap,
   } = catalogue;
 
@@ -381,6 +380,7 @@ export function Market() {
     stationFilter,
     setStationFilter,
     stationFilterLabel,
+    npcStationMap,
     browserFilterValue,
     handleBrowserFiltersChange,
     activeFilters,
@@ -414,6 +414,7 @@ export function Market() {
     hubHydrated,
     locationModeHydrated,
     catalogue,
+    activeCharacterId,
     ensureBlueprintCatalog: itemActions.actions.requestBlueprints,
     t,
   });
