@@ -18,7 +18,7 @@ export const LAYER_COLOR: Record<LayerId, string> = {
   isk: 'var(--color-kind-planet-extraction)',
   assets: 'var(--color-kind-calendar-event)',
   escrow: 'var(--color-kind-skill-training)',
-  sellOrders: 'var(--color-kind-skill-plan)',
+  sellOrders: 'var(--color-kind-shared-moon-pop)',
   contracts: 'var(--color-kind-order-expiry)',
 };
 
@@ -26,7 +26,7 @@ export const LAYER_SWATCH: Record<LayerId, string> = {
   isk: 'bg-kind-planet-extraction',
   assets: 'bg-kind-calendar-event',
   escrow: 'bg-kind-skill-training',
-  sellOrders: 'bg-kind-skill-plan',
+  sellOrders: 'bg-kind-shared-moon-pop',
   contracts: 'bg-kind-order-expiry',
 };
 

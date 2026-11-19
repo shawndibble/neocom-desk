@@ -135,12 +135,11 @@
   --color-kind-structure-timer: #88b078;
   --color-kind-structure-fuel: #b8a858;
   --color-kind-moon-chunk: #a0a8b8;
-  --color-kind-shared-moon-pop: #8880b8;
+  --color-kind-shared-moon-pop: #e0d0a8;
   --color-kind-corp-job: #c0e0d8;
   --color-kind-skyhook-raid: #d9a7a0;
   --color-kind-contract-expiry: #f2879f;
   --color-kind-order-expiry: #c9d96a;
-  --color-kind-skill-plan: #e0d0a8;
   --color-kind-accelerator: #e48ad0;
   /*
    * Kind of space on a pilot's kill activity and the Local list. Highsec and

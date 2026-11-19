@@ -23,10 +23,6 @@ async function openMenu(
       counts={counts}
       readableKinds={readableKinds}
       reauthKinds={reauthKinds}
-      skillPlanChoices={[]}
-      chosenSkillPlanId={null}
-      skillPlanError={null}
-      onChooseSkillPlan={() => {}}
     />
   );
   await user.click(screen.getByRole('button', { name: /filter event types/i }));
@@ -117,10 +113,6 @@ describe('CalendarKindFilterMenu corporation filter', () => {
         counts={new Map()}
         readableKinds={[]}
         reauthKinds={[]}
-        skillPlanChoices={[]}
-        chosenSkillPlanId={null}
-        skillPlanError={null}
-        onChooseSkillPlan={() => {}}
         corporations={list}
         corpFilter="all"
         onCorpFilter={onCorpFilter}
@@ -164,10 +156,6 @@ describe('CalendarKindFilterMenu sharing-corporation filter (#6224)', () => {
         counts={new Map([['sharedMoonPop', 2]])}
         readableKinds={['sharedMoonPop']}
         reauthKinds={[]}
-        skillPlanChoices={[]}
-        chosenSkillPlanId={null}
-        skillPlanError={null}
-        onChooseSkillPlan={() => {}}
         sharingCorporations={list}
         sharingCorpFilter="all"
         onSharingCorpFilter={onSharingCorpFilter}

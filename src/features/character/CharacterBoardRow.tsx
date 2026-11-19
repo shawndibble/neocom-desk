@@ -20,7 +20,7 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { CharacterBoardItem } from '@/engine/character/board';
-import { isProjectedKind, pastDeadlineLabelKey } from '@/engine/character/board';
+import { pastDeadlineLabelKey } from '@/engine/character/board';
 import { formatDuration } from '@/lib/duration';
 import { formatTimeOfDay } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -92,11 +92,6 @@ export function CharacterBoardRow({
           <span className={`text-sm font-bold tabular-nums ${KIND_TEXT[item.kind]}`}>
             {countdown}
           </span>
-          {isProjectedKind(item.kind) && (
-            <span className="text-[0.6875rem] font-semibold tracking-widest text-text uppercase">
-              {t('calendar.projected')}
-            </span>
-          )}
           {item.important && (
             <span className="text-[0.6875rem] font-semibold tracking-widest text-text uppercase">
               {t('calendar.important')}

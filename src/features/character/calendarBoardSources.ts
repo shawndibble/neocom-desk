@@ -33,7 +33,6 @@ import { parseInstant } from '@/engine/esiInstant';
 import { raidState } from '@/engine/corp/sovereignty';
 import type { BoardCalendarEventSource, BoardClockSource } from '@/engine/character/board';
 import type { BoardExtractionSource } from '@/engine/corp/board';
-import { stepKey, type SkillPlanSchedule } from '@/engine/skills/skillPlanSchedule';
 import { DAY_MS } from '@/lib/age';
 import type { CharacterAcceleratorRecord } from '@/db';
 import { isAcceleratorLive } from '@/engine/accelerator';
@@ -86,37 +85,6 @@ export function toSkillTrainingSources(
       subject: `${typeName(entry.skill_id)} ${level}`,
       detail: '',
       deadlineMs,
-    });
-  }
-  return sources;
-}
-
-/**
- * Every step the plan still has to train, dated where the schedule says it
- * lands. A forecast, not an ESI clock — `isProjectedKind` is what tells the
- * surfaces to say so.
- *
- * A step the live queue already carries is dropped: the queue row is the
- * real clock and wins. `projectQueueEnd` leaves every queued level from the
- * first one the plan lists onward to the plan, so shared levels land here.
- */
-export function toSkillPlanSources(
-  schedule: Pick<SkillPlanSchedule, 'scheduled' | 'startDate'>,
-  queue: readonly SkillQueueEntry[],
-  typeName: TypeNamer
-): BoardClockSource[] {
-  const queued = new Set(queue.map((entry) => `${entry.skill_id}:${entry.finished_level}`));
-  const startMs = schedule.startDate.getTime();
-  const sources: BoardClockSource[] = [];
-  for (const step of schedule.scheduled) {
-    const id = stepKey(step);
-    if (queued.has(id)) continue;
-    const level = romanLevel(step.level);
-    sources.push({
-      id,
-      subject: `${typeName(step.skillTypeID)} ${level}`,
-      detail: '',
-      deadlineMs: startMs + step.cumulativeSeconds * 1000,
     });
   }
   return sources;

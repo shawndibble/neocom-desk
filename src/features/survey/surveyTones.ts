@@ -13,7 +13,7 @@ const ORE_TONES = [
   'var(--color-kind-skill-training)',
   'var(--color-kind-order-expiry)',
   'var(--color-kind-contract-expiry)',
-  'var(--color-kind-skill-plan)',
+  'var(--color-kind-shared-moon-pop)',
   'var(--color-kind-moon-chunk)',
 ];
 

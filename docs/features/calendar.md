@@ -1,28 +1,27 @@
 # Calendar
 
-`/calendar` (nav: Social group, phone tab). The Character's "Coming Up" surface: the in-game calendar events plus every other clock the Character can read (skill queue, industry jobs, PI extractors, contracts, market orders, optional projected skill plan), plus corporation deadlines (structure fuel, structure timers, moon chunks, corp jobs) for every corporation the account can read, shown as a **Calendar Map** (grid) beside the **Coming Up Rail** (list). Replaced the old Month/Week/Agenda tabs (scope decision `20260907-123312-calendar-becomes-the-characters-coming-up-surface`).
+`/calendar` (nav: Social group, phone tab). The Character's "Coming Up" surface: the in-game calendar events plus every other clock the Character can read (skill queue, industry jobs, PI extractors, contracts, market orders), plus corporation deadlines (structure fuel, structure timers, moon chunks, corp jobs) for every corporation the account can read, shown as a **Calendar Map** (grid) beside the **Coming Up Rail** (list). Replaced the old Month/Week/Agenda tabs (scope decision `20260907-123312-calendar-becomes-the-characters-coming-up-surface`).
 
-Code: `src/routes/Calendar.tsx`; `src/features/character/{calendarBoardData,calendarBoardSources,calendar,calendarCorpDeadlines,calendarCorpFilter,calendarSkillPlan,calendarKindFilter,calendarKindLabels,calendarViewPref,calendarWeekStart,calendarCsv,calendarResponseTone}.ts`; components `CalendarMap`, `CalendarDayTicker`, `ComingUpRail`, `CharacterBoardRow`, `CalendarKindFilterMenu`, `EventDetailModal`; engine `src/engine/character/{board,deadlines,corpCalendar,calendarRetention}.ts`; grid math `src/lib/calendarGrid.ts`; export `src/lib/calendarExport.ts`.
+Code: `src/routes/Calendar.tsx`; `src/features/character/{calendarBoardData,calendarBoardSources,calendar,calendarCorpDeadlines,calendarCorpFilter,calendarKindFilter,calendarKindLabels,calendarViewPref,calendarWeekStart,calendarCsv,calendarResponseTone}.ts`; components `CalendarMap`, `CalendarDayTicker`, `ComingUpRail`, `CharacterBoardRow`, `CalendarKindFilterMenu`, `EventDetailModal`; engine `src/engine/character/{board,deadlines,corpCalendar,calendarRetention}.ts`; grid math `src/lib/calendarGrid.ts`; export `src/lib/calendarExport.ts`.
 
 ## Summary
 
-| Feature               | What                                                                                             | Where                                       |
-| --------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------- |
-| Calendar Map          | 7-col grid of day buttons, count + kind dots per day; Month (42 cells) or Fortnight (14) density | `CalendarMap.tsx`, `Calendar.tsx:~330`      |
-| Day Ticker            | Phone replacement: horizontally scrolling rolling 14 days from anchor                            | `CalendarDayTicker.tsx`                     |
-| Coming Up Rail        | List grouped by day (sticky headings, Today/Tomorrow), sorted by deadline                        | `ComingUpRail.tsx`                          |
-| Day select            | Click a day to filter the rail; click again or "Show all days" to clear                          | `Calendar.tsx:selectedDayMs`                |
-| Period nav            | Prev / Today / Next (month or fortnight; phone steps 14 days), URL `anchor=YYYY-MM-DD`           | `Calendar.tsx:step`                         |
-| Density toggle        | Month / Fortnight, device-local, desktop only                                                    | `useCalendarDensity`                        |
-| Event types filter    | Checkbox menu per kind with counts, legend swatches, "Select all" / "Select none"                | `CalendarKindFilterMenu.tsx`                |
-| Skill plan projection | Choose one Skill Plan per Character to project its steps onto the board                          | `calendarSkillPlan.ts`                      |
-| Event detail modal    | Opens for calendar events: time, text, RSVP, export                                              | `EventDetailModal.tsx`                      |
-| RSVP                  | Accept / Decline / Tentative (ESI write)                                                         | `respondToCalendarEvent`                    |
-| Add to calendar       | `.ics` download, Google Calendar URL                                                             | `EventDetailModal.tsx`, `calendarExport.ts` |
-| CSV export            | Calendar events only: date, title, response                                                      | `calendarCsv.ts`, `TableActionsMenu`        |
-| Contract row link     | Contract expiry rows link to `/contracts/history?highlight=<id>`                                 | `CharacterBoardRow.tsx`                     |
-| Week start            | Monday or Sunday, Settings > Display                                                             | `calendarWeekStart.ts`, `Settings.tsx:1057` |
-| Refresh / Data Age    | Header refresh icon; badge = oldest source fetch time                                            | `Calendar.tsx:~355`                         |
+| Feature            | What                                                                                             | Where                                       |
+| ------------------ | ------------------------------------------------------------------------------------------------ | ------------------------------------------- |
+| Calendar Map       | 7-col grid of day buttons, count + kind dots per day; Month (42 cells) or Fortnight (14) density | `CalendarMap.tsx`, `Calendar.tsx:~330`      |
+| Day Ticker         | Phone replacement: horizontally scrolling rolling 14 days from anchor                            | `CalendarDayTicker.tsx`                     |
+| Coming Up Rail     | List grouped by day (sticky headings, Today/Tomorrow), sorted by deadline                        | `ComingUpRail.tsx`                          |
+| Day select         | Click a day to filter the rail; click again or "Show all days" to clear                          | `Calendar.tsx:selectedDayMs`                |
+| Period nav         | Prev / Today / Next (month or fortnight; phone steps 14 days), URL `anchor=YYYY-MM-DD`           | `Calendar.tsx:step`                         |
+| Density toggle     | Month / Fortnight, device-local, desktop only                                                    | `useCalendarDensity`                        |
+| Event types filter | Checkbox menu per kind with counts, legend swatches, "Select all" / "Select none"                | `CalendarKindFilterMenu.tsx`                |
+| Event detail modal | Opens for calendar events: time, text, RSVP, export                                              | `EventDetailModal.tsx`                      |
+| RSVP               | Accept / Decline / Tentative (ESI write)                                                         | `respondToCalendarEvent`                    |
+| Add to calendar    | `.ics` download, Google Calendar URL                                                             | `EventDetailModal.tsx`, `calendarExport.ts` |
+| CSV export         | Calendar events only: date, title, response                                                      | `calendarCsv.ts`, `TableActionsMenu`        |
+| Contract row link  | Contract expiry rows link to `/contracts/history?highlight=<id>`                                 | `CharacterBoardRow.tsx`                     |
+| Week start         | Monday or Sunday, Settings > Display                                                             | `calendarWeekStart.ts`, `Settings.tsx:1057` |
+| Refresh / Data Age | Header refresh icon; badge = oldest source fetch time                                            | `Calendar.tsx:~355`                         |
 
 ## Purpose and user goal
 
@@ -73,7 +72,6 @@ Fourteen kinds, sorted by deadline then kind rank then id (`buildCharacterBoard`
 | `contractExpiry` Contracts        | active contracts: courier delivery deadline, else `date_expired`; type + route detail | contracts (+ location names for untitled couriers)                           | `esi-contracts.read_character_contracts.v1`                                                                                              |
 | `orderExpiry` Market orders       | `issued + duration` days; buy/sell detail                                             | orders                                                                       | `esi-markets.read_character_orders.v1`                                                                                                   |
 | `accelerator` Accelerator expires | the pilot's typed-in cerebral accelerator running out (active Character)              | `characterAccelerators` from Dexie                                           | none (local)                                                                                                                             |
-| `skillPlan` Skill plan            | projected completion of un-queued plan steps; tagged "Projected"                      | chosen Skill Plan from Dexie + schedule                                      | none (local)                                                                                                                             |
 
 Overdue rows show a kind-specific past label ("overdue" / "Started" / "ready to deliver") instead of a countdown. Countdown reads "due in <duration>".
 
@@ -91,16 +89,15 @@ Overdue rows show a kind-specific past label ("overdue" / "Started" / "ready to 
 
 - Title "Coming Up", count in meta, "Show all days" when a day is selected.
 - Day groups: heading "Today · Tue 6 Oct" / "Tomorrow · ..." / short date, with item count; `ul aria-label`.
-- Row (`CharacterBoardRow`): kind glyph, countdown, optional "Projected"/"Important" tags, response label (calendar events: accepted/declined/tentative/not responded, colour-toned), subject, time of day, kind label, detail.
+- Row (`CharacterBoardRow`): kind glyph, countdown, optional "Important" tag, response label (calendar events: accepted/declined/tentative/not responded, colour-toned), subject, time of day, kind label, detail.
 - Only calendar-event rows are buttons (open detail modal). Contract rows are links to the contract history row. Every other kind is read-only text.
 - **Corporation events** (`calendarCorpDeadlines.ts`): the four corp kinds are Due soon's own deadline rows (`loadCorpDeadlinesAll` → `buildCorpBoard` with running jobs → `mergeCorpBoards` → `engine/character/corpCalendar.ts`), read for every corporation `corpReadersFor` returns, one reader Character per corporation and source, gated before any fetch. Each row names its corporation on the third line. Personal kinds and skyhook raids stay on the active Character. Starbases and sovereignty windows are not read. A corporation that cannot be read (or needs a new login) is left out; corp kinds never raise the re-auth notice. Scope decision `20261112-062106-calendar-shows-corporation-deadlines-for-every-readable-corporation`.
 - No forward window cap: everything each source returns is on the board.
 
 ## Event types filter menu
 
-- Filter icon button in header; label shows "(N hidden)" and `pressed` when any are hidden. Menu: heading "Event types", one `DropdownMenuCheckboxItem` per kind (swatch legend + label + count), counts come from the unfiltered board; replaced by "Not granted" / "Unavailable" / "Choose a plan" / "Could not be scheduled" where applicable. Menu stays open on toggle.
+- Filter icon button in header; label shows "(N hidden)" and `pressed` when any are hidden. Menu: heading "Event types", one `DropdownMenuCheckboxItem` per kind (swatch legend + label + count), counts come from the unfiltered board; replaced by "Not granted" / "Unavailable" where applicable. Menu stays open on toggle.
 - Hidden kinds are persisted in Dexie `calendarHiddenKinds` (stores what is hidden so new kinds default visible). Device-local.
-- "Skill plan to project" section: one checkbox per Skill Plan of the Character (select again to clear), "No Skill Plans for this character" empty note, error reason if scheduling fails. Choice stored per Character in `calendarSkillPlanByCharacter`; choosing triggers a reload.
 - "Corporation events" submenu, only when at least one corporation is readable: All corporations / one row per corporation (two or more only) / Hide corporation events. Applies to the four corp kinds only; the pilot's own events always show. Stored in `calendarCorpFilter`; a saved corporation that is no longer readable filters nothing. The filter button is `pressed` while it is not on All.
 - "Select all" (disabled when none hidden) and "Select none" (hides every listed kind; disabled when all are hidden).
 
@@ -129,7 +126,6 @@ Corp kinds follow the same rules as every non-event kind: nothing is retained pa
 | `calendarView` (`month`/`fortnight`; legacy `week`->fortnight, `agenda`->month) | density icon button                 |
 | `calendarHiddenKinds`                                                           | filter menu                         |
 | `calendarCorpFilter` (`all`/`none`/corporation id)                              | filter menu                         |
-| `calendarSkillPlanByCharacter`                                                  | filter menu                         |
 | `calendarWeekStart` (`monday`/`sunday`)                                         | Settings > Display "Week starts on" |
 
 ## Related
@@ -153,12 +149,12 @@ Corp kinds follow the same rules as every non-event kind: nothing is retained pa
 
 ## Persistence and sync
 
-| State                                                              | Storage                                                            | Synced?                                                                                 |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| `anchor` (shown month/fortnight start)                             | URL query, omitted when = today at mount (ADR 0015)                | no                                                                                      |
-| Density, hidden kinds, week start, skill-plan choice per Character | Dexie `settings` keys listed above                                 | no (device-local; decision `20260926-204446-calendar-week-start-day-is-a-device-local`) |
-| Selected day, open event, RSVP overrides                           | React state                                                        | no                                                                                      |
-| Events, seen events, event detail                                  | Dexie `esiCache` rows `calendar`, `calendar:seen`, `calendar:<id>` | no                                                                                      |
+| State                                    | Storage                                                            | Synced?                                                                                 |
+| ---------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| `anchor` (shown month/fortnight start)   | URL query, omitted when = today at mount (ADR 0015)                | no                                                                                      |
+| Density, hidden kinds, week start        | Dexie `settings` keys listed above                                 | no (device-local; decision `20260926-204446-calendar-week-start-day-is-a-device-local`) |
+| Selected day, open event, RSVP overrides | React state                                                        | no                                                                                      |
+| Events, seen events, event detail        | Dexie `esiCache` rows `calendar`, `calendar:seen`, `calendar:<id>` | no                                                                                      |
 
 ## Test-covered behaviours
 
@@ -166,24 +162,23 @@ Corp kinds follow the same rules as every non-event kind: nothing is retained pa
 
 `features/character/calendar.test.ts` (loader, RSVP): fetch+cache (:29); offline cache fallback (:47); needsReauth on 403 with nothing cached (:63); event ESI dropped after start kept until its local day ends (:86); unparseable-date event kept (:116); seen row not rewritten when unchanged (:132); late-evening op carried past midnight then dropped after its run (:153); event vanished before start dropped as cancellation (:178); re-login state left alone when nothing readable (:196); `calendarEventStarting` fires for an event ESI dropped as it began (:228); retained event not re-announced as new (:269); event detail cached per-event key (:308); detail needsReauth on 403 (:330) vs plain failure offline (:340); RSVP PUTs `{response}` (:350), resolves true (:364), resolves false on failure (:375), signals reauth banner on 401/403 (:385) but not on network error (:402); patches list + seen caches (:417) and detail cache (:462); leaves caches alone when write fails (:494).
 
-`calendarBoardSources.test.ts`: skill-plan rows dated startDate+cumulative seconds (:40), queued steps dropped (:52), empty list not undefined (:61); calendar sources carry RSVP and importance flag (:76), any non-zero importance important (:92), unparseable date dropped (:97); skill training names skill+level (:112), paused queue dropped (:124), keyed by queue position (:129); jobs name product else blueprint (:159), only active/ready kept (:171), detail cleared once past (:192) else status (:197); PI one program per extractor pin (:215), non-extractors ignored (:222), no program ignored (:231); moon chunk counts to arrival (:249) then decay (:255), drills distinct (:261); contract title/type label/route precedence (:289-307), only open contracts (:312), accepted courier = acceptance+allowed days (:329), may outrun offer expiry (:346), unaccepted courier uses offer expiry (:362), non-courier uses offer expiry (:371); orders expire at issued+duration days (:428), buy/sell detail (:433), bad issue date dropped (:438).
+`calendarBoardSources.test.ts`: calendar sources carry RSVP and importance flag (:76), any non-zero importance important (:92), unparseable date dropped (:97); skill training names skill+level (:112), paused queue dropped (:124), keyed by queue position (:129); jobs name product else blueprint (:159), only active/ready kept (:171), detail cleared once past (:192) else status (:197); PI one program per extractor pin (:215), non-extractors ignored (:222), no program ignored (:231); moon chunk counts to arrival (:249) then decay (:255), drills distinct (:261); contract title/type label/route precedence (:289-307), only open contracts (:312), accepted courier = acceptance+allowed days (:329), may outrun offer expiry (:346), unaccepted courier uses offer expiry (:362), non-courier uses offer expiry (:371); orders expire at issued+duration days (:428), buy/sell detail (:433), bad issue date dropped (:438).
 
 `calendarCsv.test.ts`: column order date/title/response (:19); `event_date` raw ISO (:28); response uses the list's translations (:36). `calendarKindFilter.test.ts`: shows all when none hidden, complement of hidden, unopinionated kind shown, can show nothing, toggle hide/show (:6-42). `calendarWeekStart.test.ts`: default monday, persists under `calendarWeekStart`, applies on hydrate, invalid stored value falls back (:15-31).
 
-`engine/character/board.test.ts`: merges sources by deadline (:38); absent = empty source (:56); signed remaining time orders overdue (:65); ties by kind then id (:83); plan step last at tie (:97); only plan steps projected (:107); past-deadline word per kind (:119); RSVP/importance only on calendar events (:127); ids namespaced by kind (:142). `calendarRetention.test.ts`: keep started-today (:13), drop after local day (:18), late-evening kept at 01:00 (:30) and dropped after run (:36), early event not extended (:42), pre-midnight start dropped (:53), still-listed never retained (:60), not-yet-started vanished = cancellation (:65), starting exactly now kept (:71), ids once in seen order (:75), nothing when none seen (:84). `deadlines.test.ts`: local-day floor incl. non-24h day (:27,:38); counts per day (:47); kinds once in board order (:70); all kinds per day (:95); day grouping keeps order (:126); empty board (:145); Today/Tomorrow only (:151), calendar days not rolling 24h (:162); kind filter keeps order (:186), none selected -> nothing (:197); counts per kind (:203).
+`engine/character/board.test.ts`: merges sources by deadline (:38); absent = empty source (:56); signed remaining time orders overdue (:65); ties by kind then id (:83); past-deadline word per kind (:119); RSVP/importance only on calendar events (:127); ids namespaced by kind (:142). `calendarRetention.test.ts`: keep started-today (:13), drop after local day (:18), late-evening kept at 01:00 (:30) and dropped after run (:36), early event not extended (:42), pre-midnight start dropped (:53), still-listed never retained (:60), not-yet-started vanished = cancellation (:65), starting exactly now kept (:71), ids once in seen order (:75), nothing when none seen (:84). `deadlines.test.ts`: local-day floor incl. non-24h day (:27,:38); counts per day (:47); kinds once in board order (:70); all kinds per day (:95); day grouping keeps order (:126); empty board (:145); Today/Tomorrow only (:151), calendar days not rolling 24h (:162); kind filter keeps order (:186), none selected -> nothing (:197); counts per kind (:203).
 
 ## Interview Q&A
 
 1. **Why a map + rail instead of month/week/agenda tabs?** ESI returns up to 50 events from now only and the cache replaces its row, so month grids spent most cells on days that cannot hold anything and paging back always said "No events"; grid became a map, list always beside it (`Calendar.tsx` header comment, decision `20260907-123312`).
-2. **How are items ordered?** Deadline ascending, then `KIND_RANK` (order of `CHARACTER_BOARD_ITEM_KINDS`: calendarEvent, skillTraining, accelerator, industryJob, planetExtraction, moonChunk, contractExpiry, orderExpiry, skillPlan), then id string compare (`engine/character/board.ts:140,212-226`).
+2. **How are items ordered?** Deadline ascending, then `KIND_RANK` (order of `CHARACTER_BOARD_ITEM_KINDS`: calendarEvent, skillTraining, accelerator, industryJob, planetExtraction, moonChunk, contractExpiry, orderExpiry), then id string compare (`engine/character/board.ts:140,212-226`).
 3. **Why doesn't the page show a page-level re-login banner?** Eight independent sources; one revoked scope must not blank the others. Route is `UNGATED` (`routeScopes.ts:212`); refused sources are listed in an amber line and marked "Not granted" in the filter menu (`calendarBoardData.ts` `reauthKinds`).
 4. **What happens to an event the moment it starts?** ESI drops it; `withStartedEventsRetained` keeps it from the `calendar:seen` row until start + 14 days (`calendarRetention.ts` `RETENTION_MS`, `calendar.ts` merge); upcoming events missing from a fresh read are treated as deleted. Summary freshness 2 min (`calendar.ts:135`).
 5. **How does RSVP avoid flicker or being overwritten by a stale snapshot?** After the PUT it patches caches and records `{response, atMs}`; an override applies while `data.loadedAtMs <= atMs`, i.e. any snapshot that began loading before the RSVP; a later snapshot is trusted (`Calendar.tsx:~190-205`).
 6. **Why store hidden kinds instead of shown ones?** A new kind added later would be absent from existing stored "shown" arrays and arrive switched off; as exclusions it shows on day one; unknown stored kinds are dropped (`calendarKindFilter.ts`).
 7. **Why does the phone use a 14-day ticker?** A month grid on a phone puts six weeks of scroll before today; the ticker is a rolling 14 days from the anchor (`Calendar.tsx:102`, `buildDaysFrom`); density toggle exists only for the wide grid.
-8. **What is "Projected"?** Un-queued steps of the chosen Skill Plan scheduled from `startDate + cumulativeSeconds`, excluding steps already in the queue (`calendarBoardSources.ts` `toSkillPlanSources`); tagged `Projected` via `isProjectedKind`; plan error surfaces in the menu, not as a page error.
-9. **How are contract deadlines computed?** Active contracts only; courier uses `courierDeliveryDeadlineMs` (accepted + days to complete) else `date_expired`; untitled couriers named "start -> end" via location lookups (`calendarBoardSources.ts`, `calendarBoardData.ts:loadCourierRouteNames`).
-10. **When does a moon chunk show?** When some Character of the account can read extractions for that corporation (`corpReadersFor`, `canReadMoonExtractions`); before arrival the deadline is chunk arrival with detail "arrives", after it natural decay with "decays if not fractured" (`calendarCorpDeadlines.ts`, `engine/corp/board.ts` `extractionItem`).
+8. **How are contract deadlines computed?** Active contracts only; courier uses `courierDeliveryDeadlineMs` (accepted + days to complete) else `date_expired`; untitled couriers named "start -> end" via location lookups (`calendarBoardSources.ts`, `calendarBoardData.ts:loadCourierRouteNames`).
+9. **When does a moon chunk show?** When some Character of the account can read extractions for that corporation (`corpReadersFor`, `canReadMoonExtractions`); before arrival the deadline is chunk arrival with detail "arrives", after it natural decay with "decays if not fractured" (`calendarCorpDeadlines.ts`, `engine/corp/board.ts` `extractionItem`).
 
 ## Improvement ideas
 
