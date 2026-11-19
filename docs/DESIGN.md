@@ -1810,8 +1810,8 @@ Ship Tree golds (§1), also used as text, on `bg` / `panel` / `panel-2`:
   the four status tones under normal vision, and likewise leans on its glyph and name.
   `kind-structure-timer` (sage), `kind-structure-fuel` (olive gold) and `kind-corp-job`
   (pale mint) are each ΔE ≥ 23 from every other clock kind and ≥ 27 from the status
-  tones, normal vision only. `kind-shared-moon-pop` (slate violet) is ΔE ≥ 25 from every
-  other clock kind and ≥ 39 from the status tones, normal vision only; its glyph
+  tones, normal vision only. `kind-shared-moon-pop` (sand) is ΔE ≥ 23 from every
+  other clock kind and ≥ 42 from the status tones, normal vision only; its glyph
   (`Icon.SharedMoonPop`, a moon with stars) sets it apart from `moonChunk`'s plain moon.
 - Tabs: full `role="tablist"` semantics + arrow-key navigation.
 - Status messages go through `LiveStatus` (§4). Never mount a `role="status"` node together with its text. Never add it as the last child of a `space-y-*` / `divide-y` container.

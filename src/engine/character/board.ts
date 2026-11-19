@@ -161,7 +161,6 @@ export interface CharacterBoardSources {
   skyhookRaids?: readonly BoardClockSource[];
   contractExpiries?: readonly BoardClockSource[];
   orderExpiries?: readonly BoardClockSource[];
-  /** Projected Skill Plan steps — a forecast, not an ESI clock. */
   /** The pilot's typed-in cerebral accelerator running out — their own answer, not an ESI clock. */
   accelerator?: readonly BoardClockSource[];
 }

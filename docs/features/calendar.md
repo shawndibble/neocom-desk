@@ -2,7 +2,7 @@
 
 `/calendar` (nav: Social group, phone tab). The Character's "Coming Up" surface: the in-game calendar events plus every other clock the Character can read (skill queue, industry jobs, PI extractors, contracts, market orders), plus corporation deadlines (structure fuel, structure timers, moon chunks, corp jobs) for every corporation the account can read, shown as a **Calendar Map** (grid) beside the **Coming Up Rail** (list). Replaced the old Month/Week/Agenda tabs (scope decision `20260907-123312-calendar-becomes-the-characters-coming-up-surface`).
 
-Code: `src/routes/Calendar.tsx`; `src/features/character/{calendarBoardData,calendarBoardSources,calendar,calendarCorpDeadlines,calendarCorpFilter,calendarSkillPlan,calendarKindFilter,calendarKindLabels,calendarViewPref,calendarWeekStart,calendarCsv,calendarResponseTone}.ts`; components `CalendarMap`, `CalendarDayTicker`, `ComingUpRail`, `CharacterBoardRow`, `CalendarKindFilterMenu`, `EventDetailModal`; engine `src/engine/character/{board,deadlines,corpCalendar,calendarRetention}.ts`; grid math `src/lib/calendarGrid.ts`; export `src/lib/calendarExport.ts`.
+Code: `src/routes/Calendar.tsx`; `src/features/character/{calendarBoardData,calendarBoardSources,calendar,calendarCorpDeadlines,calendarCorpFilter,calendarKindFilter,calendarKindLabels,calendarViewPref,calendarWeekStart,calendarCsv,calendarResponseTone}.ts`; components `CalendarMap`, `CalendarDayTicker`, `ComingUpRail`, `CharacterBoardRow`, `CalendarKindFilterMenu`, `EventDetailModal`; engine `src/engine/character/{board,deadlines,corpCalendar,calendarRetention}.ts`; grid math `src/lib/calendarGrid.ts`; export `src/lib/calendarExport.ts`.
 
 ## Summary
 
@@ -96,7 +96,7 @@ Overdue rows show a kind-specific past label ("overdue" / "Started" / "ready to 
 
 ## Event types filter menu
 
-- Filter icon button in header; label shows "(N hidden)" and `pressed` when any are hidden. Menu: heading "Event types", one `DropdownMenuCheckboxItem` per kind (swatch legend + label + count), counts come from the unfiltered board; replaced by "Not granted" / "Unavailable" / "Choose a plan" / "Could not be scheduled" where applicable. Menu stays open on toggle.
+- Filter icon button in header; label shows "(N hidden)" and `pressed` when any are hidden. Menu: heading "Event types", one `DropdownMenuCheckboxItem` per kind (swatch legend + label + count), counts come from the unfiltered board; replaced by "Not granted" / "Unavailable" where applicable. Menu stays open on toggle.
 - Hidden kinds are persisted in Dexie `calendarHiddenKinds` (stores what is hidden so new kinds default visible). Device-local.
 - "Corporation events" submenu, only when at least one corporation is readable: All corporations / one row per corporation (two or more only) / Hide corporation events. Applies to the four corp kinds only; the pilot's own events always show. Stored in `calendarCorpFilter`; a saved corporation that is no longer readable filters nothing. The filter button is `pressed` while it is not on All.
 - "Select all" (disabled when none hidden) and "Select none" (hides every listed kind; disabled when all are hidden).
