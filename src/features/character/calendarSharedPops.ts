@@ -34,6 +34,8 @@ export interface SharedPopSurvey {
   finished: boolean;
   /** Whole percent of the field still unmined. */
   percentLeft: number;
+  /** The field's make-up as the scans showed it: each ore's whole percent of the volume, largest first. */
+  ores: { name: string; percent: number }[];
 }
 
 /** Which Pop Time the viewer's Calendar shows: the officer's choice, or one of the two. */
