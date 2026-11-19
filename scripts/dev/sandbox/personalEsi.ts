@@ -9,11 +9,11 @@
  */
 import type { Page } from '@playwright/test';
 import { CHARACTER_ID } from '../../../e2e/support/fixtureData';
+import { DAY_MS, HOUR_MS } from '../../../src/lib/age';
+import { utcDay } from '../../../src/engine/localDay';
 
-const DAY = 86_400_000;
-const HOUR = 3_600_000;
 const iso = (offsetMs: number) => new Date(Date.now() + offsetMs).toISOString();
-const day = (back: number) => iso(-back * DAY).slice(0, 10);
+const day = (back: number) => utcDay(Date.now() - back * DAY_MS);
 
 export const JITA = {
   systemId: 30000142,
@@ -122,7 +122,7 @@ function journal() {
     balance -= amount;
     return {
       id: 5_000_000_000 + i,
-      date: iso(-(i * 9 + 2) * HOUR),
+      date: iso(-(i * 9 + 2) * HOUR_MS),
       ref_type: ref,
       description: ref.replace(/_/g, ' '),
       amount,
@@ -136,7 +136,7 @@ function journal() {
 function transactions() {
   return Array.from({ length: 40 }, (_, i) => ({
     transaction_id: 6_000_000_000 + i,
-    date: iso(-(i * 14 + 3) * HOUR),
+    date: iso(-(i * 14 + 3) * HOUR_MS),
     location_id: STATIONS[i % 2].stationId,
     type_id: [...MINERALS, ...SHIPS][i % (MINERALS.length + SHIPS.length)],
     unit_price: 5 + mix(i) * 12_000,
@@ -163,9 +163,9 @@ function industryJobs() {
       station_id: station.stationId,
       output_location_id: station.stationId,
       runs: 1 + (i % 6),
-      start_date: iso(-(i * 5 + 4) * HOUR),
+      start_date: iso(-(i * 5 + 4) * HOUR_MS),
       end_date: iso(
-        status === 'delivered' || status === 'ready' ? -(i + 1) * HOUR : (i * 7 + 3) * HOUR
+        status === 'delivered' || status === 'ready' ? -(i + 1) * HOUR_MS : (i * 7 + 3) * HOUR_MS
       ),
       status,
       cost: 150_000 + mix(i) * 5_000,
@@ -200,10 +200,11 @@ function orders() {
     region_id: 10000002,
     location_id: STATIONS[i % 2].stationId,
     is_buy_order: i % 3 === 0,
+    is_corporation: false,
     price: 4.9 + mix(i) * 3_000,
     volume_total: 1_000 + i * 500,
     volume_remain: 400 + i * 120,
-    issued: iso(-(i * 20 + 5) * HOUR),
+    issued: iso(-(i * 20 + 5) * HOUR_MS),
     duration: 90,
     range: 'region',
     escrow: i % 3 === 0 ? 1_000_000 : undefined,
@@ -216,8 +217,8 @@ function skillQueue() {
     skill_id: skillId,
     queue_position: i,
     finished_level: 3 + i,
-    start_date: iso(i * 14 * HOUR),
-    finish_date: iso((i + 1) * 14 * HOUR),
+    start_date: iso(i * 14 * HOUR_MS),
+    finish_date: iso((i + 1) * 14 * HOUR_MS),
     level_start_sp: 8000,
     level_end_sp: 45_255,
     training_start_sp: 8000,
