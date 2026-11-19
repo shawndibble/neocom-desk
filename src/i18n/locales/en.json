@@ -18660,6 +18660,7 @@
         "dismissSelected_one": "Dismiss selected ({{count}})",
         "dismissSelected_other": "Dismiss selected ({{count}})",
         "daysHint": "Newest first",
+        "dismissDay": "Dismiss this day",
         "oldestUnpaid": "Oldest unpaid",
         "lastPayment": "Last payment",
         "owedDaysHint": "Paid oldest first; a payment pays these as soon as the book holds it",

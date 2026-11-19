@@ -156,12 +156,21 @@ describe('Miner page on a running account', () => {
   });
 });
 
-describe('Corrections menu', () => {
-  it('opens on the Payments section and lists the three corrections', async () => {
+describe('Corrections', () => {
+  it('sit in the header menu, with Rebill only on a book that still bills Statements', async () => {
     renderBook(<MinerDetail id={VARRO_ID} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Corrections' }));
+    expect(screen.getByRole('button', { name: 'Add a correction line' })).toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole('button', { name: 'More actions' })[0]);
     expect(await screen.findByRole('menuitem', { name: /rate/i })).toBeInTheDocument();
-    expect(screen.getAllByRole('menuitem')).toHaveLength(3);
+    expect(screen.getByRole('menuitem', { name: 'Rebill from date' })).toBeInTheDocument();
+  });
+
+  it('leave Rebill out on a running account', async () => {
+    const view = buildBookView({ ...BOOK_VIEW.input, runningAccountFrom: '2026-08-01T00:00:00Z' });
+    renderBook(<MinerDetail id={VARRO_ID} />, { ...BOOK_CONTEXT, view });
+    await userEvent.click(screen.getAllByRole('button', { name: 'More actions' })[0]);
+    expect(await screen.findByRole('menuitem', { name: /rate/i })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Rebill from date' })).not.toBeInTheDocument();
   });
 });
 

@@ -1,5 +1,5 @@
 import { formatCount } from '@/lib/formatCount';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -12,6 +12,8 @@ import {
   HeaderMoreMenu,
   InfoTooltip,
   DropdownMenuItem,
+  MenuItem,
+  RowActionsMenu,
   PageHeader,
   SegmentedControl,
   Tooltip,
@@ -51,7 +53,7 @@ import type { AuditEntry } from '../taxBook/bookClient';
 import { extractionPath, refineryPath } from './moonsPaths';
 import { Crumb, StandingWord } from './moonsParts';
 import { MinerCharacters } from './MinerCharacters';
-import { CorrectionsMenu } from './MinerCorrections';
+import { AdjustmentDialog, RateOverrideDialog, RebillDialog } from './CorrectionDialogs';
 import { paymentWalletHref } from './paymentWalletHref';
 import { dayEndTime } from './dayEndTime';
 import { BookSection, EntityHeader, PlaceCell } from './sectionParts';
@@ -97,6 +99,9 @@ export function MinerDetail({ id }: { id: string }) {
     | { kind: 'dismiss' }
     | { kind: 'dismissAll' }
     | { kind: 'close' }
+    | { kind: 'rate'; dayKey?: string }
+    | { kind: 'adjust'; date?: string }
+    | { kind: 'rebill' }
     | { kind: 'notTax'; payment: Payment }
     | { kind: 'reverse'; dismissalId: string }
     | null
@@ -371,7 +376,7 @@ export function MinerDetail({ id }: { id: string }) {
     title: string,
     key: 'nextStatement' | 'stillAccruing' | 'earlier',
     meta: ReactNode,
-    opts: { select: boolean; status: boolean; startOpen: boolean }
+    opts: { select: boolean; status: boolean; startOpen: boolean; rowMenu?: boolean }
   ) => {
     const columns = dayColumns(opts.select, opts.status, phone);
     const adjust =
@@ -403,12 +408,46 @@ export function MinerDetail({ id }: { id: string }) {
             density="compact"
             stackLayout="dense"
             mobileSort
+            {...(opts.rowMenu && canEdit
+              ? {
+                  rowMoreActions: true,
+                  rowContextMenu: (d: DayRow, tr: ReactElement) => dayMenu(d, tr),
+                }
+              : {})}
             {...table}
           />
         )}
       </BookSection>
     );
   };
+
+  /** One day's actions (right-click, touch-and-hold, ⋮): only a day not yet on a Statement has them. */
+  const dayMenu = (d: DayRow, tr: ReactElement) =>
+    canSelect(d) ? (
+      <RowActionsMenu name={shortDate(d.date)} items={<DayMenuItems day={d} />}>
+        {tr}
+      </RowActionsMenu>
+    ) : (
+      tr
+    );
+  const DayMenuItems = ({ day }: { day: DayRow }) => (
+    <>
+      <MenuItem onSelect={() => setDialog({ kind: 'rate', dayKey: day.key })}>
+        {t('corpTaxBook.moons.corrections.rate.open')}
+      </MenuItem>
+      <MenuItem
+        onSelect={() => {
+          setSelected(new Set([day.key]));
+          setDialog({ kind: 'dismiss' });
+        }}
+      >
+        {t('corpTaxBook.moons.miner.dismissDay')}
+      </MenuItem>
+      <MenuItem onSelect={() => setDialog({ kind: 'adjust', date: day.date })}>
+        {t('corpTaxBook.moons.corrections.adjust.open')}
+      </MenuItem>
+    </>
+  );
 
   /** The Statement a correction line was billed on; undefined while it waits for the next one. */
   const billedOn = (adjustmentId: string) =>
@@ -590,13 +629,25 @@ export function MinerDetail({ id }: { id: string }) {
       {t('corpTaxBook.moons.miner.dismissAll')}
     </DropdownMenuItem>
   );
+  const rateItem = (
+    <DropdownMenuItem onSelect={() => setDialog({ kind: 'rate' })}>
+      {t('corpTaxBook.moons.corrections.rate.open')}
+    </DropdownMenuItem>
+  );
+  // A running account has no next Statement to rebill onto: late ore already changes the day's
+  // owed amount, so Rebill from date stays only for a book still billing Statements.
+  const rebillItem = running ? null : (
+    <DropdownMenuItem onSelect={() => setDialog({ kind: 'rebill' })}>
+      {t('corpTaxBook.moons.corrections.rebill.open')}
+    </DropdownMenuItem>
+  );
   const closeItem = guestOpen ? (
     <DropdownMenuItem onSelect={() => setDialog({ kind: 'close' })}>
       {t('corpTaxBook.moons.miner.closeAccount')}
     </DropdownMenuItem>
   ) : null;
   // A phone's header is one row: the primary action and a ⋮ holding the rest. Wider, the first
-  // three buttons never move: Close account, for a guest, is a fourth after them.
+  // three buttons never move and the ⋮ after them holds the corrections and Close account.
   const headerActions = canEdit ? (
     <span className="flex items-center gap-1">
       <Button onClick={() => setDialog({ kind: 'record' })}>
@@ -606,6 +657,8 @@ export function MinerDetail({ id }: { id: string }) {
         <HeaderMoreMenu>
           {remindItem}
           {dismissAllItem}
+          {rateItem}
+          {rebillItem}
           {closeItem}
         </HeaderMoreMenu>
       ) : (
@@ -624,11 +677,11 @@ export function MinerDetail({ id }: { id: string }) {
           <Button variant="ghost" onClick={() => setDialog({ kind: 'dismissAll' })}>
             {t('corpTaxBook.moons.miner.dismissAll')}
           </Button>
-          {guestOpen && (
-            <Button variant="ghost" onClick={() => setDialog({ kind: 'close' })}>
-              {t('corpTaxBook.moons.miner.closeAccount')}
-            </Button>
-          )}
+          <HeaderMoreMenu>
+            {rateItem}
+            {rebillItem}
+            {closeItem}
+          </HeaderMoreMenu>
         </>
       )}
     </span>
@@ -741,7 +794,7 @@ export function MinerDetail({ id }: { id: string }) {
           })}
           glyph="info"
         />,
-        { select: true, status: false, startOpen: false }
+        { select: true, status: false, startOpen: false, rowMenu: true }
       )}
       {daysSection(
         t(`corpTaxBook.moons.sections.${running ? 'owedDays' : 'nextStatement'}`),
@@ -749,7 +802,7 @@ export function MinerDetail({ id }: { id: string }) {
         <span className="text-xs text-text-dim">
           {t(running ? 'corpTaxBook.moons.miner.owedDaysHint' : 'corpTaxBook.moons.miner.daysHint')}
         </span>,
-        { select: true, status: false, startOpen: true }
+        { select: true, status: false, startOpen: true, rowMenu: true }
       )}
       <div className="flex flex-wrap items-center gap-3">
         <SegmentedControl
@@ -785,7 +838,13 @@ export function MinerDetail({ id }: { id: string }) {
         meta={
           <span className="text-xs text-text-dim">{t('corpTaxBook.moons.miner.paymentsHint')}</span>
         }
-        actions={<CorrectionsMenu miner={row} days={detail.days} statements={detail.statements} />}
+        actions={
+          canEdit ? (
+            <Button size="sm" onClick={() => setDialog({ kind: 'adjust' })}>
+              {t('corpTaxBook.moons.corrections.adjust.open')}
+            </Button>
+          ) : undefined
+        }
         phone={phone}
         summary={t('corpTaxBook.moons.miner.paymentsSummary', {
           count: ledger.length,
@@ -970,6 +1029,32 @@ export function MinerDetail({ id }: { id: string }) {
           statementId={statementParam.openId}
           onClose={statementParam.close}
           showMinerLink={false}
+        />
+      )}
+      {dialog?.kind === 'rate' && (
+        <RateOverrideDialog
+          open
+          onClose={() => setDialog(null)}
+          days={detail.days}
+          initialKey={dialog.dayKey}
+        />
+      )}
+      {dialog?.kind === 'adjust' && (
+        <AdjustmentDialog
+          open
+          onClose={() => setDialog(null)}
+          miner={row}
+          minerName={name}
+          defaultDate={dialog.date ?? view.billableThrough ?? data.settings.startDate}
+        />
+      )}
+      {dialog?.kind === 'rebill' && (
+        <RebillDialog
+          open
+          onClose={() => setDialog(null)}
+          miner={row}
+          minerName={name}
+          statements={detail.statements as Statement[]}
         />
       )}
       {dialog?.kind === 'close' && (
