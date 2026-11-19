@@ -1114,6 +1114,16 @@ describe('accountLedger', () => {
     expect(l.balance).toBe(200_000);
   });
 
+  it('names the mined days behind each day entry, so a row can open onto them', () => {
+    const v = buildBookView(running([]));
+    const l = ledgerOf(v);
+    const keys = minerDetail(v, 'solo:1')!.days.map((d) => d.key);
+    const days = l.entries.filter((e) => e.kind === 'day');
+    expect(days.length).toBeGreaterThan(0);
+    expect(days.flatMap((e) => e.dayKeys ?? []).every((k) => keys.includes(k))).toBe(true);
+    expect(days.every((e) => e.dayKeys?.length === e.days)).toBe(true);
+  });
+
   it('ends at the credit held when a payment is more than every billed day', () => {
     const view = buildBookView(running([pay('a', 350_000, '2026-09-17T10:00:00Z')]));
     const l = ledgerOf(view);

@@ -10,6 +10,7 @@ import type { RecordedWriteOff, TaxPayment } from './allocation';
 import { num, parseBookSettings, str } from './bookDocs';
 import type { Miner } from './charges';
 import type { Dismissal } from './dismissals';
+import { parsePaymentId } from './payouts';
 import { readClaimEvidence, type Declaration } from './overdue';
 import type { Adjustment, Statement } from './statements';
 
@@ -118,7 +119,7 @@ export function readPayment(
     const claimable =
       tax && d.reviewReason === undefined ? { id, characterId, amount, at } : undefined;
     if (tax && d.reviewReason === 'no-open-balance') {
-      const refId = Number(/^j\d+_(\d+)$/.exec(id)?.[1]);
+      const refId = parsePaymentId(id)?.refId ?? NaN;
       const reason = str(d.reason);
       const inReview: InReviewPayment = {
         id,
