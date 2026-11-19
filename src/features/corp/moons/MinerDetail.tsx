@@ -47,6 +47,7 @@ import { useBookAudit } from './useBookAudit';
 import { useBook } from './useBook';
 import { CloseAccountDialog } from './CloseAccountDialog';
 import { AccountStatus } from './AccountStatus';
+import { AccountLedger } from './AccountLedger';
 import { MarkNotTaxDialog, ReasonDialog, RecordPaymentDialog } from './BookDialogs';
 import { isk, iskOrDash, periodLabel, shortDate, shortDateTime, signedIsk } from './moonsFormat';
 import type { AuditEntry } from '../taxBook/bookClient';
@@ -742,6 +743,12 @@ export function MinerDetail({ id }: { id: string }) {
                 },
               ]),
         ]}
+      />
+      <AccountLedger
+        detail={detail}
+        corrections={data.adjustments.filter((a) => a.minerId === id)}
+        running={running}
+        phone={phone}
       />
       {daysSection(
         t('corpTaxBook.moons.sections.stillAccruing'),
