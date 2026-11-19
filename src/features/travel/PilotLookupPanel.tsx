@@ -46,6 +46,7 @@ import type { PilotListState } from '@/lib/shortcuts';
 import { optionalIdParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { openPublicInfoModal } from '@/stores/publicInfoModal';
 import {
   loadPilotProfile,
   resolvePilotByName,
@@ -101,7 +102,9 @@ export function PilotLookupPanel({ tabBar, tabsId }: TravelTabProps) {
             }}
             onSelect={(pilot) => {
               setList(null);
-              setParams({ pilot: pilot.characterId }, { push: true });
+              // One pilot opens Show Info (corp, alliance, history, interactions tabs).
+              if (params.pilot !== null) setParams({ pilot: null });
+              openPublicInfoModal('character', pilot.characterId);
             }}
           />
         </Panel>
