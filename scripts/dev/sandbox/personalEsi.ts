@@ -11,8 +11,9 @@ import type { Page } from '@playwright/test';
 import { CHARACTER_ID } from '../../../e2e/support/fixtureData';
 import { DAY_MS, HOUR_MS } from '../../../src/lib/age';
 import { utcDay } from '../../../src/engine/localDay';
+import * as social from './socialEsi';
+import { iso, mix } from './gen';
 
-const iso = (offsetMs: number) => new Date(Date.now() + offsetMs).toISOString();
 const day = (back: number) => utcDay(Date.now() - back * DAY_MS);
 
 export const JITA = {
@@ -47,9 +48,6 @@ const BLUEPRINTS: [number, number][] = [
   [22545, 22544],
   [17477, 17476],
 ];
-
-/** Small stable hash so rows differ without randomness. */
-const mix = (n: number) => ((n * 2654435761) >>> 0) % 1000;
 
 function assets() {
   const rows: unknown[] = [];
@@ -236,6 +234,13 @@ export async function installPersonalEsi(page: Page): Promise<void> {
     [`${c}/mining/`]: mining,
     [`${c}/orders`]: orders,
     [`${c}/skillqueue`]: skillQueue,
+    [`${c}/contracts`]: social.contracts,
+    [`${c}/mail`]: social.mailHeaders,
+    [`${c}/mail/labels`]: () => social.MAIL_LABELS,
+    [`${c}/mail/lists`]: () => social.MAILING_LISTS,
+    [`${c}/calendar`]: social.calendar,
+    [`${c}/contacts`]: social.contacts,
+    [`${c}/contacts/labels`]: () => social.CONTACT_LABELS,
   };
   await page.route('https://esi.evetech.net/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
@@ -248,6 +253,21 @@ export async function installPersonalEsi(page: Page): Promise<void> {
       });
     const list = lists[path];
     if (list) return json(list());
+    const itemsMatch = /^\/characters\/\d+\/contracts\/(\d+)\/items$/.exec(path);
+    if (itemsMatch) return json(social.contractItems(Number(itemsMatch[1])));
+    const mailMatch = /^\/characters\/\d+\/mail\/(\d+)$/.exec(path);
+    if (mailMatch) return json(social.mailBody(Number(mailMatch[1])));
+    const eventMatch = /^\/characters\/\d+\/calendar\/(\d+)$/.exec(path);
+    if (eventMatch) return json(social.calendarEvent(Number(eventMatch[1])));
+    if (path === '/universe/names' && route.request().method() === 'POST') {
+      const ids = route.request().postDataJSON() as number[];
+      return json(
+        ids.map((id) => ({
+          id,
+          ...(social.nameFor(id) ?? { name: `Unknown ${id}`, category: 'character' }),
+        }))
+      );
+    }
     const system = /^\/universe\/systems\/(\d+)$/.exec(path);
     if (system && SYSTEM_NAMES[Number(system[1])]) {
       const id = Number(system[1]);
