@@ -81,6 +81,8 @@ export interface CalendarBoardData {
   sharedMoonPops?: BoardClockSource[];
   /** Every live Shared Pop with its names, for the detail and the `?pop=` deep link. */
   sharedPops: SharedPopEntry[];
+  /** Refineries the pilot already reads as corp moon chunks: their Shared Pops, and the Calendar events that match them, stay as they are. */
+  readableRefineries: number[];
   /** The corporations sharing pops: the sharing-corporation filter's choices. */
   sharingCorporations: BoardCorporation[];
   /** Corp skyhook raid windows. Left `undefined` unless the Character holds the corp role and scope to read them. */
@@ -340,6 +342,7 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     corporations: corpRead.corporations,
     sharedMoonPops,
     sharedPops: sharedPopsRead.entries ?? [],
+    readableRefineries: corpRead.refineryIds,
     sharingCorporations: sharedPopsRead.corporations,
     skyhookRaids: skyhookRead.sources,
     skyhookRaidDetails: skyhookRead.raids,

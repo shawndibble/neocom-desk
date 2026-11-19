@@ -1,10 +1,17 @@
-import { HOUR_MS } from '@/lib/age';
+import { DAY_MS, HOUR_MS, MINUTE_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import { buildCharacterBoard } from '@/engine/character/board';
 import { filterByCorporation, filterBySharingCorporation } from '@/engine/character/deadlines';
 import { parseStartLink, popOfStartLink } from '@/features/survey/startLink';
 import type { SharedPopView } from '@/sync/sharedPops';
-import { toSharedPopSources, type SharedPopEntry } from './calendarSharedPops';
+import type { BoardCalendarEventSource } from '@/engine/character/board';
+import {
+  dropEventsOfSharedPops,
+  sharedPopIsShown,
+  sharedPopMiningState,
+  toSharedPopSources,
+  type SharedPopEntry,
+} from './calendarSharedPops';
 import { sharedPopDetail, sharedPopStartLink } from './sharedPopDetail';
 
 const NOW = Date.parse('2026-11-15T12:00:00Z');
@@ -46,12 +53,11 @@ function entry(overrides: Partial<SharedPopView> = {}): SharedPopEntry {
 }
 
 describe('Shared Pops as Calendar clocks', () => {
-  it('counts down to the Pop Time, named by refinery with the moon as a second line', () => {
+  it('counts down to the Pop Time, named by refinery alone: the moon lives in the detail', () => {
     const [row] = toSharedPopSources([entry()], new Set(), NOW);
     expect(row).toEqual({
       id: '98000001_x1',
       subject: 'Efa - Tatara',
-      subtitle: 'Efa I - Moon 1',
       detail: 'ready',
       deadlineMs: NOW + 10 * HOUR_MS,
       sharedBy: CORP,
@@ -66,10 +72,156 @@ describe('Shared Pops as Calendar clocks', () => {
     expect(row).toMatchObject({ detail: 'expires', deadlineMs: NOW + 61 * HOUR_MS });
   });
 
-  it('shows only from the Extraction start until it is Expired', () => {
+  it('shows only from the Extraction start until its retention ends', () => {
     const notStarted = entry({ startedAt: iso(NOW + HOUR_MS) });
-    const expired = entry({ popAt: iso(NOW - 50 * HOUR_MS), expiresAt: iso(NOW - 1) });
-    expect(toSharedPopSources([notStarted, expired], new Set(), NOW)).toEqual([]);
+    const gone = entry({
+      popAt: iso(NOW - 50 * HOUR_MS),
+      expiresAt: iso(NOW - 4 * DAY_MS),
+      retainUntil: iso(NOW - 1),
+    });
+    const oldDoc = entry({ popAt: iso(NOW - 50 * HOUR_MS), expiresAt: iso(NOW - 1) });
+    expect(toSharedPopSources([notStarted, gone, oldDoc], new Set(), NOW)).toEqual([]);
+    expect(
+      sharedPopIsShown(pop({ retainUntil: iso(NOW + 1), expiresAt: iso(NOW - DAY_MS) }), NOW)
+    ).toBe(true);
+  });
+
+  it('keeps an expired pop as an overdue row, "belt expired", until its retention ends', () => {
+    const expired = entry({
+      popAt: iso(NOW - 60 * HOUR_MS),
+      expiresAt: iso(NOW - 6 * HOUR_MS),
+      retainUntil: iso(NOW + 66 * HOUR_MS),
+    });
+    const [row] = toSharedPopSources([expired], new Set(), NOW);
+    expect(row).toMatchObject({ detail: 'expired', deadlineMs: NOW - 6 * HOUR_MS });
+    expect(row).not.toHaveProperty('pastLabelKey');
+  });
+
+  describe("the viewer's Pop Time", () => {
+    const both = (over: Partial<SharedPopView> = {}) =>
+      entry({
+        readyAt: iso(NOW + 10 * HOUR_MS),
+        autoFractureAt: iso(NOW + 13 * HOUR_MS),
+        ...over,
+      });
+
+    it("shows the officer's choice by default, and names the other time on the row", () => {
+      const [row] = toSharedPopSources([both()], new Set(), NOW, 'asShared');
+      expect(row).toMatchObject({
+        detail: 'ready',
+        deadlineMs: NOW + 10 * HOUR_MS,
+        extra: { detail: 'autoFracture', atMs: NOW + 13 * HOUR_MS },
+      });
+      const [auto] = toSharedPopSources(
+        [both({ popTime: 'auto-fracture', popAt: iso(NOW + 13 * HOUR_MS) })],
+        new Set(),
+        NOW,
+        'asShared'
+      );
+      expect(auto).toMatchObject({
+        detail: 'autoFracture',
+        deadlineMs: NOW + 13 * HOUR_MS,
+        extra: { detail: 'ready', atMs: NOW + 10 * HOUR_MS },
+      });
+    });
+
+    it('overrides it with Ready or Auto-fracture', () => {
+      expect(toSharedPopSources([both()], new Set(), NOW, 'autoFracture')[0]).toMatchObject({
+        detail: 'autoFracture',
+        deadlineMs: NOW + 13 * HOUR_MS,
+        extra: { detail: 'ready', atMs: NOW + 10 * HOUR_MS },
+      });
+      const auto = both({ popTime: 'auto-fracture', popAt: iso(NOW + 13 * HOUR_MS) });
+      expect(toSharedPopSources([auto], new Set(), NOW, 'ready')[0]).toMatchObject({
+        detail: 'ready',
+        deadlineMs: NOW + 10 * HOUR_MS,
+      });
+    });
+
+    it('counts to the chosen time, so a pop is popped only once that time passes', () => {
+      const between = NOW + 11 * HOUR_MS;
+      const [ready] = toSharedPopSources([both()], new Set(), between, 'ready');
+      const [auto] = toSharedPopSources([both()], new Set(), between, 'autoFracture');
+      expect(ready).toMatchObject({ detail: 'expires', deadlineMs: NOW + 61 * HOUR_MS });
+      expect(auto).toMatchObject({ detail: 'autoFracture', deadlineMs: NOW + 13 * HOUR_MS });
+    });
+
+    it('keeps the actual time once fractured early, with no second time to name', () => {
+      const fired = iso(NOW - HOUR_MS);
+      const early = both({ fractured: true, popAt: fired, readyAt: fired, autoFractureAt: fired });
+      const [row] = toSharedPopSources([early], new Set(), NOW, 'autoFracture');
+      expect(row).toMatchObject({ detail: 'expires' });
+      expect(row).not.toHaveProperty('extra');
+    });
+
+    it('reads a pop published before both times existed as its single time', () => {
+      const [row] = toSharedPopSources([entry()], new Set(), NOW, 'autoFracture');
+      expect(row).toMatchObject({ deadlineMs: NOW + 10 * HOUR_MS });
+      expect(row).not.toHaveProperty('extra');
+    });
+  });
+
+  describe('finished or ongoing', () => {
+    const popped = { popAt: iso(NOW - 3 * HOUR_MS) };
+
+    it("is fully mined when an officer flagged it, and then reads that, not 'overdue'", () => {
+      const flagged = entry({ ...popped, fullyMined: { byName: 'Mina', at: iso(NOW - HOUR_MS) } });
+      expect(sharedPopMiningState(flagged)).toBe('fullyMined');
+      expect(toSharedPopSources([flagged], new Set(), NOW)[0]).toMatchObject({
+        detail: 'fullyMined',
+        pastLabelKey: 'calendar.fullyMined',
+      });
+    });
+
+    it('is fully mined once its linked Survey is finished', () => {
+      const done = { ...entry(popped), survey: { finished: true, percentLeft: 0 } };
+      expect(sharedPopMiningState(done)).toBe('fullyMined');
+      const running = { ...entry(popped), survey: { finished: false, percentLeft: 62 } };
+      expect(sharedPopMiningState(running)).toBeNull();
+    });
+
+    it('is likely mined out only as a muted guess that never overrides the clock', () => {
+      const likely = entry({ ...popped, likelyMinedOut: true });
+      expect(sharedPopMiningState(likely)).toBe('likelyMinedOut');
+      const [row] = toSharedPopSources([likely], new Set(), NOW);
+      expect(row).toMatchObject({
+        detail: 'expires',
+        deadlineMs: NOW + 61 * HOUR_MS,
+        extra: { detail: 'likelyMinedOut' },
+      });
+      expect(row).not.toHaveProperty('pastLabelKey');
+      const expired = entry({
+        popAt: iso(NOW - 60 * HOUR_MS),
+        expiresAt: iso(NOW - 6 * HOUR_MS),
+        retainUntil: iso(NOW + 66 * HOUR_MS),
+        likelyMinedOut: true,
+      });
+      expect(toSharedPopSources([expired], new Set(), NOW)[0]).toMatchObject({
+        detail: 'expired',
+        extra: { detail: 'likelyMinedOut' },
+      });
+    });
+
+    it("does not guess before the pop pops on the pilot's own Pop Time", () => {
+      const early = entry({
+        likelyMinedOut: true,
+        readyAt: iso(NOW - HOUR_MS),
+        autoFractureAt: iso(NOW + 2 * HOUR_MS),
+        popAt: iso(NOW - HOUR_MS),
+      });
+      const [row] = toSharedPopSources([early], new Set(), NOW, 'autoFracture');
+      expect(row).toMatchObject({ detail: 'autoFracture' });
+      expect(row!.extra).toEqual({ detail: 'ready', atMs: NOW - HOUR_MS });
+      const facts = sharedPopDetail(early, NOW, t, 'UTC', 'autoFracture').facts.map((f) => f.value);
+      expect(facts).not.toContain('calendar.sharedPop.likelyMinedOut');
+    });
+
+    it('says nothing about a pop that is not popped yet, or one nobody flagged', () => {
+      expect(sharedPopMiningState(entry({ fullyMined: { byName: 'M', at: iso(NOW) } }))).toBe(
+        'fullyMined'
+      );
+      expect(sharedPopMiningState(entry(popped))).toBeNull();
+    });
   });
 
   it('is hidden when the pilot already reads that refinery as a corp moon chunk', () => {
@@ -82,7 +234,6 @@ describe('Shared Pops as Calendar clocks', () => {
     expect(toSharedPopSources([unnamed], new Set(), NOW)[0]).toMatchObject({
       subject: 'Efa I - Moon 1',
     });
-    expect(toSharedPopSources([unnamed], new Set(), NOW)[0]!.subtitle).toBeUndefined();
     expect(toSharedPopSources([{ ...unnamed, moonName: null }], new Set(), NOW)[0]!.subject).toBe(
       '#1000000000001'
     );
@@ -101,6 +252,67 @@ describe('Shared Pops as Calendar clocks', () => {
       '98000002_x2',
     ]);
     expect(filterBySharingCorporation(board, 'all')).toHaveLength(2);
+  });
+});
+
+describe('Calendar events a Shared Pop already shows', () => {
+  const event = (title: string, atMs: number, id = '1'): BoardCalendarEventSource => ({
+    id,
+    subject: title,
+    detail: '',
+    deadlineMs: atMs,
+    response: 'not_responded',
+    important: false,
+  });
+  const popAt = NOW + 10 * HOUR_MS;
+  const named = entry({ refineryName: 'Ainsan - Foil Finish Foundry', popAt: iso(popAt) });
+  const drop = (
+    events: BoardCalendarEventSource[],
+    entries = [named],
+    readable = new Set<number>()
+  ) => dropEventsOfSharedPops(events, entries, readable, NOW, 'asShared').map((e) => e.id);
+
+  it('drops an event a minute before the pop whose title words are all in its name', () => {
+    expect(drop([event('Ainsan Foil Finish', popAt - MINUTE_MS)])).toEqual([]);
+    expect(drop([event('ainsan: FOIL finish!', popAt + 5 * MINUTE_MS)])).toEqual([]);
+  });
+
+  it('matches against the moon name too', () => {
+    const e = entry({ refineryName: null, popAt: iso(popAt) });
+    expect(drop([event('Efa I Moon 1', popAt)], [e])).toEqual([]);
+  });
+
+  it('keeps an event further than five minutes from the pop, or with a word the pop lacks', () => {
+    expect(drop([event('Ainsan Foil Finish', popAt - 6 * MINUTE_MS)])).toEqual(['1']);
+    expect(drop([event('Ainsan Qpef', popAt)])).toEqual(['1']);
+    expect(drop([event('Ainsan Foil Finish Party', popAt)])).toEqual(['1']);
+  });
+
+  it('keeps an event with no usable title words', () => {
+    expect(drop([event('  --  ', popAt)])).toEqual(['1']);
+  });
+
+  it("matches either Pop Time, so the viewer's choice never brings a duplicate back", () => {
+    const both = entry({
+      refineryName: 'Ainsan - Foil Finish Foundry',
+      popAt: iso(popAt),
+      readyAt: iso(popAt),
+      autoFractureAt: iso(popAt + 3 * HOUR_MS),
+    });
+    expect(drop([event('Ainsan Foil Finish', popAt + 3 * HOUR_MS - MINUTE_MS)], [both])).toEqual(
+      []
+    );
+  });
+
+  it('keeps the event when its pop is not on the board (hidden by a corp read, or gone)', () => {
+    const e = event('Ainsan Foil Finish', popAt);
+    expect(drop([e], [named], new Set([named.pop.structureId]))).toEqual(['1']);
+    const gone = entry({
+      refineryName: 'Ainsan - Foil Finish Foundry',
+      popAt: iso(popAt),
+      retainUntil: iso(NOW - 1),
+    });
+    expect(drop([e], [gone])).toEqual(['1']);
   });
 });
 
@@ -131,6 +343,47 @@ describe('Shared Pop start link and detail', () => {
     expect(detail.place).toEqual({ systemId: 30_000_001, name: 'Efa - Tatara' });
     expect(detail.link?.to).toBe(sharedPopStartLink(entry()));
     expect(JSON.stringify(detail)).not.toMatch(/isk/i);
+  });
+
+  it('lists both Pop Times in the detail once the server publishes them', () => {
+    const both = entry({
+      readyAt: iso(NOW + 10 * HOUR_MS),
+      autoFractureAt: iso(NOW + 13 * HOUR_MS),
+    });
+    const labels = sharedPopDetail(both, NOW, t, 'UTC').facts.map((f) => f.label);
+    expect(labels).toContain('calendar.sharedPop.popTime.ready');
+    expect(labels).toContain('calendar.sharedPop.popTime.autoFracture');
+    const single = sharedPopDetail(entry(), NOW, t, 'UTC').facts.map((f) => f.label);
+    expect(single).not.toContain('calendar.sharedPop.popTime.autoFracture');
+  });
+
+  it('says whether the moon is mined out, and never claims it is not when it only is not marked', () => {
+    const popped = { popAt: iso(NOW - 3 * HOUR_MS) };
+    const mining = (e: SharedPopEntry) =>
+      sharedPopDetail(e, NOW, t, 'UTC').facts.filter((f) =>
+        ['calendar.sharedPop.mining', 'calendar.sharedPop.survey'].includes(f.label)
+      );
+    expect(mining(entry(popped))).toEqual([
+      { label: 'calendar.sharedPop.mining', value: 'calendar.sharedPop.notMarkedFullyMined' },
+    ]);
+    expect(mining(entry())).toEqual([]);
+    expect(mining(entry({ ...popped, likelyMinedOut: true }))[0]!.value).toBe(
+      'calendar.sharedPop.likelyMinedOut'
+    );
+    const flagged = mining(
+      entry({ ...popped, fullyMined: { byName: 'Mina', at: iso(NOW - HOUR_MS) } })
+    );
+    expect(flagged[0]!.value).toContain('calendar.sharedPop.fullyMinedBy');
+    expect(flagged[0]!.value).toContain('Mina');
+    const running = mining({ ...entry(popped), survey: { finished: false, percentLeft: 62 } });
+    expect(running).toContainEqual({
+      label: 'calendar.sharedPop.survey',
+      value: 'calendar.sharedPop.surveyLeft{"percent":62}',
+    });
+    const finished = mining({ ...entry(popped), survey: { finished: true, percentLeft: 0 } });
+    expect(finished).toEqual([
+      { label: 'calendar.sharedPop.survey', value: 'calendar.sharedPop.surveyFinished' },
+    ]);
   });
 
   it('names its pop in the start link, so the Survey it starts can be linked back', () => {

@@ -9630,7 +9630,14 @@
       "units_other": "{{count, number}} units",
       "startSurvey": "Start a Survey here",
       "openSurvey": "Open Survey",
-      "startNewSurvey": "Start a new Survey"
+      "startNewSurvey": "Start a new Survey",
+      "mining": "Mining",
+      "fullyMinedBy": "Fully mined by {{name}} on {{date}}",
+      "likelyMinedOut": "Likely mined out: most of the chunk is logged and mining has gone quiet",
+      "notMarkedFullyMined": "Not marked fully mined",
+      "survey": "Survey",
+      "surveyFinished": "Finished",
+      "surveyLeft": "{{percent}}% left"
     },
     "downloadIcs": "Download .ics",
     "addToGoogleCalendar": "Add to Google Calendar",
@@ -9645,6 +9652,7 @@
     "export": "Export",
     "important": "High",
     "overdue": "Overdue",
+    "fullyMined": "Fully mined",
     "started": "Started",
     "due": "in {{duration}}",
     "prevFortnight": "Previous fortnight",
@@ -9684,7 +9692,10 @@
       "sharedMoonPop": {
         "ready": "ready",
         "autoFracture": "auto-fractures",
-        "expires": "belt expires"
+        "expires": "belt expires",
+        "expired": "belt expired",
+        "fullyMined": "fully mined",
+        "likelyMinedOut": "likely mined out"
       },
       "structureTimer": {
         "anchor_vulnerable": "anchor vulnerability ends",
@@ -15501,6 +15512,13 @@
     "weekStart": {
       "monday": "Monday",
       "sunday": "Sunday"
+    },
+    "sharedPopTimeLabel": "Shared moon pop time",
+    "sharedPopTimeHint": "Which time a corp's shared moon pop shows at on the Calendar. Notifications keep the time the corporation chose.",
+    "sharedPopTime": {
+      "asShared": "As shared",
+      "ready": "Ready",
+      "autoFracture": "Auto-fracture"
     },
     "mobileTabs": {
       "title": "Phone tab bar",

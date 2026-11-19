@@ -12,7 +12,7 @@ import {
   type PopSharingDoc,
   type PopTime,
 } from './popSharing.js';
-import { DAY_MS, HOUR_MS } from './timeConstants.js';
+import { DAY_MS, HOUR_MS, MINUTE_MS } from './timeConstants.js';
 
 /** `sharedPops/{corporationId}`: one server-only doc per sharing book. */
 export const SHARED_POPS = 'sharedPops';
@@ -23,6 +23,13 @@ export const SHARED_POPS = 'sharedPops';
 export const SHARED_POP_SOURCES = 'sharedPopSources';
 /** `communities/{id}/popSharingBlocks/{corporationId}`: a Community admin's block. */
 export const POP_SHARING_BLOCKS = 'popSharingBlocks';
+
+/** A pop stays listed this long past its belt expiry, so a moon nobody marked finished still nags. */
+export const POP_RETAIN_MS = 3 * DAY_MS;
+/** Share of the chunk the ledger must show mined before the pop reads "likely mined out". */
+export const LIKELY_MINED_OUT_PCT = 90;
+/** How long the mined figure must hold still before the pop reads "likely mined out". */
+export const MINED_QUIET_MS = 30 * MINUTE_MS;
 
 /** An officer counts for a Community share this long after their last editing use of the book. */
 export const OFFICER_WINDOW_MS = 30 * DAY_MS;
@@ -48,6 +55,10 @@ export interface PopExtraction {
   oreLines?: readonly OreLine[];
   /** The Survey an officer linked as the chunk's ore source (a Share Link id). */
   surveyId?: string;
+  /** An officer's Fully Mined flag on the Extraction. */
+  fullyMined?: { byName: string; at: string };
+  /** Ore units the book's ledger rows stamped with this Extraction show mined. */
+  minedQty?: number;
 }
 
 /** One published pop. Never carries ISK. */
@@ -63,11 +74,29 @@ export interface SharedPop {
   popTime: PopTime;
   /** ISO instant the pop shows: the chunk's arrival or its natural decay, or the actual fracture. */
   popAt: string;
+  /**
+   * Both instants whatever the officer chose, so each viewer picks theirs. After an early
+   * fracture both are the actual time. Absent from a doc published before they existed: read
+   * `popAt`.
+   */
+  readyAt?: string;
+  autoFractureAt?: string;
   /** Whether the chunk was already fractured (popAt is then the actual time). */
   fractured: boolean;
   startedAt: string;
   /** ISO instant the belt is Expired: the pop is dropped then. */
   expiresAt: string;
+  /** ISO instant the pop is dropped: `POP_RETAIN_MS` past `expiresAt`. Absent: `expiresAt`. */
+  retainUntil?: string;
+  /** The officer's Fully Mined flag, when set. */
+  fullyMined?: { byName: string; at: string };
+  /** Share of the chunk's ore the ledger shows mined, whole percent; absent without both. */
+  minedPct?: number;
+  /** The ledger's mined ore units and when that figure last changed (epoch ms): the quiet test. */
+  minedQty?: number;
+  minedChangedAt?: number;
+  /** At least 90% mined and quiet for 30 minutes. A guess, never set once flagged. */
+  likelyMinedOut?: boolean;
   /** Null when the settings hide the ore make-up, or the book does not know it. */
   ore: OreLine[] | null;
   /**
@@ -97,7 +126,10 @@ export interface SharedPop {
  * One Shared Pop as a viewer receives it (`listSharedPopsCallable`): no audience list, plus who
  * shares it and the data's age. The client's read seam is `src/sync/sharedPops.ts`.
  */
-export type SharedPopView = Omit<SharedPop, 'audiences' | 'ownerCorporationId'> & {
+export type SharedPopView = Omit<
+  SharedPop,
+  'audiences' | 'ownerCorporationId' | 'minedPct' | 'minedQty' | 'minedChangedAt'
+> & {
   /** The book's corporation: the start link's payee, and the filter by sharing corporation. */
   corporationId: number;
   syncedAt: number | null;
@@ -140,6 +172,8 @@ export interface BuildSharedPopsInput {
   bookRatePct: (x: PopExtraction) => number;
   refinery: (structureId: number) => { name: string | null; solarSystemId: number | null };
   syncedAt: number | null;
+  /** The pops last published, which carry when each mined figure last moved. */
+  heldPops?: readonly SharedPop[];
   /** Epoch ms. */
   now: number;
 }
@@ -181,6 +215,40 @@ export function popIsLive(
   return start <= now && now < end;
 }
 
+/** A pop is kept from the Extraction's start until `POP_RETAIN_MS` past its expiry. */
+export function popIsRetained(
+  x: PopExtraction,
+  expiryHours: Readonly<Record<string, number>>,
+  now: number
+): boolean {
+  if (x.cancelledAt) return false;
+  const start = Date.parse(x.extractionStartTime);
+  const end = Date.parse(popExpiresAt(x, expiryHours));
+  if (Number.isNaN(start) || Number.isNaN(end)) return false;
+  return start <= now && now < end + POP_RETAIN_MS;
+}
+
+/** What the ledger says of one chunk: share mined, when it last moved, and the likely-done guess. */
+function miningState(
+  x: PopExtraction,
+  held: SharedPop | undefined,
+  now: number
+): Pick<SharedPop, 'minedPct' | 'minedQty' | 'minedChangedAt' | 'likelyMinedOut'> {
+  const chunk = (x.oreLines ?? []).reduce((sum, l) => sum + l.quantity, 0);
+  if (x.minedQty === undefined || chunk <= 0) return {};
+  const minedPct = Math.round((x.minedQty / chunk) * 100);
+  const minedChangedAt =
+    held?.minedQty === x.minedQty && held.minedChangedAt !== undefined ? held.minedChangedAt : now;
+  const likely =
+    !x.fullyMined && minedPct >= LIKELY_MINED_OUT_PCT && now - minedChangedAt >= MINED_QUIET_MS;
+  return {
+    minedPct,
+    minedQty: x.minedQty,
+    minedChangedAt,
+    ...(likely ? { likelyMinedOut: true } : {}),
+  };
+}
+
 /**
  * The book's Shared Pops at `now`, or null when it publishes none (sharing off, every moon
  * blocked, nothing live): the store deletes the doc then, so a pop goes the moment it stops.
@@ -198,12 +266,13 @@ export function buildSharedPops(input: BuildSharedPopsInput): SharedPopsDoc | nu
     const { settings, shared } = effectivePopSharing(input.sharing, x.moonId, {
       ownerOptedOut: optedOut,
     });
-    if (!shared || !popIsLive(x, input.expiryHours, input.now)) continue;
+    if (!shared || !popIsRetained(x, input.expiryHours, input.now)) continue;
     for (const a of settings.audiences)
       if (a.kind === 'community') communityNames[a.communityId] = a.name;
     const refinery = input.refinery(x.structureId);
+    const id = sharedPopId(input.corporationId, x.id);
     pops.push({
-      id: sharedPopId(input.corporationId, x.id),
+      id,
       extractionId: x.id,
       moonId: x.moonId,
       structureId: x.structureId,
@@ -211,9 +280,20 @@ export function buildSharedPops(input: BuildSharedPopsInput): SharedPopsDoc | nu
       solarSystemId: refinery.solarSystemId,
       popTime: settings.popTime,
       popAt: popInstant(x, settings.popTime),
+      readyAt: popInstant(x, 'ready'),
+      autoFractureAt: popInstant(x, 'auto-fracture'),
       fractured: x.laserFiredAt !== undefined,
       startedAt: x.extractionStartTime,
       expiresAt: popExpiresAt(x, input.expiryHours),
+      retainUntil: new Date(
+        Date.parse(popExpiresAt(x, input.expiryHours)) + POP_RETAIN_MS
+      ).toISOString(),
+      ...(x.fullyMined ? { fullyMined: x.fullyMined } : {}),
+      ...miningState(
+        x,
+        input.heldPops?.find((p) => p.id === id),
+        input.now
+      ),
       ore:
         settings.showOre && x.oreLines && x.oreLines.length > 0
           ? x.oreLines.map((o) => ({ typeId: o.typeId, quantity: o.quantity }))
@@ -307,7 +387,9 @@ export function audienceCharacters(
 
 /** The pops of one book a viewer may read, still live at `now`. */
 export function visiblePops(doc: SharedPopsDoc, viewer: ViewerAccess, now: number): SharedPop[] {
-  return doc.pops.filter((p) => Date.parse(p.expiresAt) > now && inAudience(doc, p, viewer));
+  return doc.pops.filter(
+    (p) => Date.parse(p.retainUntil ?? p.expiresAt) > now && inAudience(doc, p, viewer)
+  );
 }
 
 /** One officer's last editing use of a book, and their last failed role check. */

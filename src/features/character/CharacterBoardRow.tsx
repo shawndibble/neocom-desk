@@ -64,7 +64,7 @@ export function CharacterBoardRow({
   // *late* for every other — a job sat undelivered, an order lapsed. Which
   // kinds are which is `board.ts`'s to say; this only picks the word.
   const countdown = overdue
-    ? t(pastDeadlineLabelKey(item.kind))
+    ? t(item.pastLabelKey ?? pastDeadlineLabelKey(item.kind))
     : t('calendar.due', { duration: formatDuration(item.remainingMs / 1000) });
 
   const openable = item.kind === 'calendarEvent' && onSelectEvent !== undefined;
@@ -111,10 +111,11 @@ export function CharacterBoardRow({
           )}
         </span>
         <span className="mt-0.5 block truncate text-sm font-semibold">{item.subject}</span>
-        {item.subtitle && <span className="block truncate text-xs">{item.subtitle}</span>}
         <span className="mt-0.5 block truncate text-xs text-text-dim">
           {formatTimeOfDay(new Date(item.deadlineMs), zone)} · {t(KIND_LABEL[item.kind])}
           {item.detail && ` · ${t(`calendar.detail.${item.kind}.${item.detail}`, item.detail)}`}
+          {item.extra &&
+            ` · ${t(`calendar.detail.${item.kind}.${item.extra.detail}`, item.extra.detail)}${item.extra.atMs === undefined ? '' : ` ${formatTimeOfDay(new Date(item.extra.atMs), zone)}`}`}
           {item.corporation && ` · ${item.corporation.name}`}
           {item.sharedBy && !hideSharedBy && ` · ${item.sharedBy.name}`}
         </span>

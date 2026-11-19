@@ -4,15 +4,18 @@ import {
   CALENDAR_WEEK_START_DAYS,
   useCalendarWeekStart,
 } from '@/features/character/calendarWeekStart';
+import {
+  SHARED_POP_TIME_CHOICES,
+  useSharedPopTime,
+} from '@/features/character/calendarSharedPopTime';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { TIME_FORMATS, useTimeFormat } from '@/lib/timeFormat';
 import { ChipRow, SettingsFormLoading } from './settingsFields';
 
 /**
- * The two Display settings the Calendar leans on, time format and which day
- * the week starts on: the Calendar page's settings modal. They are the same
- * stores Settings → Display edits (`useTimeFormat`, `useCalendarWeekStart`),
- * so the two surfaces can never disagree.
+ * The Calendar page's settings modal: time format and which day the week starts on (the same
+ * stores Settings → Display edits, `useTimeFormat` and `useCalendarWeekStart`, so the two
+ * surfaces can never disagree), and which Pop Time a shared moon pop shows at (Calendar only).
  */
 export function CalendarSettingsForm() {
   const { t } = useTranslation();
@@ -20,7 +23,9 @@ export function CalendarSettingsForm() {
   const setTimeFormat = useTimeFormat((state) => state.setValue);
   const weekStart = useCalendarWeekStart((state) => state.value);
   const setWeekStart = useCalendarWeekStart((state) => state.setValue);
-  const hydrated = useHydratedStore(useCalendarWeekStart);
+  const sharedPopTime = useSharedPopTime((state) => state.value);
+  const setSharedPopTime = useSharedPopTime((state) => state.setValue);
+  const hydrated = useHydratedStore(useCalendarWeekStart, useSharedPopTime);
   if (!hydrated) return <SettingsFormLoading />;
   return (
     <Fields variant="form">
@@ -39,6 +44,14 @@ export function CalendarSettingsForm() {
         selected={weekStart}
         onSelect={(day) => void setWeekStart(day)}
         labelFor={(day) => t(`settings.weekStart.${day}`)}
+      />
+      <ChipRow
+        label={t('settings.sharedPopTimeLabel')}
+        hint={t('settings.sharedPopTimeHint')}
+        options={SHARED_POP_TIME_CHOICES}
+        selected={sharedPopTime}
+        onSelect={(choice) => void setSharedPopTime(choice)}
+        labelFor={(choice) => t(`settings.sharedPopTime.${choice}`)}
       />
     </Fields>
   );
