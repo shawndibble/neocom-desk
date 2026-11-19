@@ -34,7 +34,13 @@ export const ALL_BOOK_PART_SET: BookPartSet = new Set(ALL_BOOK_PARTS);
 
 /** What a page asks for: a tab id, or a detail page below it. */
 export type BookDetailKind =
-  'extraction' | 'legacyMoon' | 'legacyRefinery' | 'miner' | 'moonOwner' | 'refinery';
+  | 'extraction'
+  | 'legacyMoon'
+  | 'legacyRefinery'
+  | 'legacyStatementPeriod'
+  | 'miner'
+  | 'moonOwner'
+  | 'refinery';
 
 /** The parts a page reads. No page: the whole book, as the export reads it. */
 export function bookPartsFor(tab?: string, detail: BookDetailKind | null = null): BookPartSet {
@@ -54,6 +60,7 @@ export function bookPartsFor(tab?: string, detail: BookDetailKind | null = null)
     case 'refinery':
     case 'legacyMoon':
     case 'legacyRefinery':
+    case 'legacyStatementPeriod':
       return new Set<BookPart>(['core']);
     // An Extraction's page says whether its days are billed, dismissed or in Today's mining.
     case 'moon-owners':

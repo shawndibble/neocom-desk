@@ -71,6 +71,7 @@ import {
   isSettingsTab,
   moonsDetail,
   refineriesTabPath,
+  statementsTabPath,
   type SettingsTab,
 } from '@/features/corp/moons/moonsPaths';
 import { LateNoticesTab } from '@/features/corp/moons/LateNoticesTab';
@@ -254,6 +255,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
           </>
         )}
         {detail?.kind === 'extraction' && <MoonDetail key={detail.id} id={detail.id} />}
+        {detail?.kind === 'legacyStatementPeriod' && <Navigate replace to={statementsTabPath} />}
         {detail?.kind === 'legacyMoon' && <LegacyRefineryRedirect moonId={Number(detail.id)} />}
         {detail?.kind === 'legacyRefinery' && (
           <LegacyRefineryRedirect structureId={detail.structureId} />

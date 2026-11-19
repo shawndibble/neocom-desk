@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { DataTable, Panel, type DataTableColumn } from '@/components/ui';
+import { DataTable, EmptyState, Panel, type DataTableColumn } from '@/components/ui';
 import { useBook } from './useBook';
 import { caretColumn } from './caretColumn';
 import { minerPath } from './moonsPaths';
@@ -27,9 +27,10 @@ export function LateNoticesTab() {
 
   const rows = useMemo(() => {
     const byMiner = new Map<string, NoticeRow>();
+    const minerById = new Map(view.miners.map((m) => [m.id, m]));
     for (const s of view.input.statements) {
       if (s.kind !== 'notice') continue;
-      const miner = view.miners.find((m) => m.id === s.minerId);
+      const miner = minerById.get(s.minerId);
       if (!miner) continue;
       const row = byMiner.get(s.minerId) ?? {
         minerId: s.minerId,
@@ -44,7 +45,7 @@ export function LateNoticesTab() {
       if (s.issuedAt > row.lastIssuedAt) row.lastIssuedAt = s.issuedAt;
       byMiner.set(s.minerId, row);
     }
-    return [...byMiner.values()];
+    return [...byMiner.values()].sort((a, b) => b.lastIssuedAt.localeCompare(a.lastIssuedAt));
   }, [view, names]);
 
   const columns: DataTableColumn<NoticeRow>[] = [
@@ -94,19 +95,26 @@ export function LateNoticesTab() {
     <div className="space-y-4">
       <StatementRun />
       <Panel title={t('corpTaxBook.moons.notices.title')} padded={false}>
-        <div ref={tableRef} className="@container overflow-x-auto">
-          <DataTable
-            label={t('corpTaxBook.moons.notices.title')}
-            columns={columns}
-            rows={rows}
-            rowKey={(r) => r.minerId}
-            onRowClick={(r) => navigate(minerPath(r.minerId))}
-            density="compact"
-            stacked={cards}
-            stackColumns={2}
-            mobileSort
+        {rows.length === 0 ? (
+          <EmptyState
+            title={t('corpTaxBook.moons.notices.empty')}
+            className="border-t border-line py-8"
           />
-        </div>
+        ) : (
+          <div ref={tableRef} className="@container overflow-x-auto">
+            <DataTable
+              label={t('corpTaxBook.moons.notices.title')}
+              columns={columns}
+              rows={rows}
+              rowKey={(r) => r.minerId}
+              onRowClick={(r) => navigate(minerPath(r.minerId))}
+              density="compact"
+              stacked={cards}
+              stackColumns={2}
+              mobileSort
+            />
+          </div>
+        )}
       </Panel>
     </div>
   );

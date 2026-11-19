@@ -18127,6 +18127,7 @@
       },
       "notices": {
         "title": "Notices sent",
+        "empty": "No late notice has been sent yet.",
         "sent": "Sent",
         "unmailed": "{{count}} of {{total}} not mailed",
         "last": "Last notice",
@@ -18608,13 +18609,13 @@
         },
         "runDue": {
           "title": "Statements ready for {{periods}}",
-          "body_one": "A closed period has Billable days on no Statement, so nobody is billed for it yet. Open Statements to send the run.",
+          "body_one": "A closed period has Billable days on no Statement, so nobody is billed for it yet. Open Late notices to send the run.",
           "body_other": "{{count}} closed periods have Billable days on no Statement, so nobody is billed for them yet. One run sends them all, oldest first."
         },
         "noticesDue": {
           "title_one": "Late notice due for {{count}} Miner",
           "title_other": "Late notices due for {{count}} Miners",
-          "body": "They are behind by the book's notice rules and owe {{amount}} between them. Open Statements to send the notices from your Character."
+          "body": "They are behind by the book's notice rules and owe {{amount}} between them. Open Late notices to send the notices from your Character."
         },
         "uncounted": {
           "title": "Donation of {{amount}} from {{name}} into {{division}} — not counted",
