@@ -14,7 +14,7 @@ surfaced.
 **Live, pipeline-relevant (all covered unless a ticket is named):**
 EVE Blue Desk (evebluedesk.com; blueprint contract-price estimator by runs/ME/TE with confidence, stability and sell-through bars, Deals tab, pins, bulk paste estimator, screen scanner; thread posts 1-16 + screenshots read; #6358; its history-based figures are killed 30), eve-exchange.com (#5002), Eve-Omnitool (#5134), EVE Motor Market / MoMa
 (#3985–#3995; 1.1.2–1.1.6 read: #6386–#6388), EVE Ledger (#3908–#3910), EVE Farm (#5127, #5128), EVE Console
-(#4530, #5974; every release v0.9.7–0.9.18 read), EVE Market Tool, ForgeWire (#4550), JitaSpace, EVE-NAV, Missioneers'
+(#4530, #5974, #6429; every release v0.9.7–0.9.19 read), EVE Market Tool, ForgeWire (#4550), JitaSpace, EVE-NAV, Missioneers'
 Atlas (LP finder = #718/#1050/#1068), IndustrialEVE (PI alerts: kill-tests 12,
 17, #956), EWT PI Tools ("User Planets" = Advisor worklist), Pod Warden (ADR
 0020), EVE Nexus (mobile; EVE Empire/Pod-shaped, cleared item by item),
@@ -36,7 +36,7 @@ CLI Metenox Calculator, Eden Buyback, Lazy Blacksmith, EVE Orchestra,
 Alysii's PI Scheme, EVE Planetary Planner, Upwell Fuel Monitor, ETM v2,
 AllianceAuth Market Manager, EVE Tycoon MCP server, EVE Metro, EVE Omni (4.0.74–5.5.1 changelog re-read: wallet analysis, T2 planner, Upwell hold, gank systems, trade guards all built),
 Eve Deep Industry, SNOW//OPS, New Eden Command, eve-hub.ru,
-eve-gatecheck.space (basic checker = Route Safety; premium waypoints/ship types/finder/war intel read; #5929), Telescope, EVE Killmap, The Bounty Bid, PI Nexus, sde-deltas, Gatewatch, EVE
+eve-gatecheck.space (basic checker = Route Safety; premium waypoints/ship types/finder/war intel read; #5929), Telescope, EVE HUD (danisxlab/eve-hud, GPL-3 Electron second-screen dashboard; thin views of covered data, log-reading extras: kill-test 2), EveSynapse (evesynapse.app, Go all-in-one, 23 modules, repo natemsz/evesynapse, ideas only; own server-side hub sweeps so market-wide features die on 1 and 14; CHANGELOG to v0.8.7.6 + wiki read; #6431, #6432; roadmap PI simulator, moon tax, mining dashboard, item compare unassigned), EVE Killmap, The Bounty Bid, PI Nexus, sde-deltas, Gatewatch, EVE
 PvP Corp Activity Search, EVE Threat Checker (eve-threat-checker.netlify.app, logged-out zKill+EveWho PvP threat scorer; every screen is Pilot Lookup's local-list threat read or a leftover below), Forge Ledger, New Eden Trade, Keystar, AstraCore,
 OMIP (Wilm0rien/omip, Go desktop corp-director aggregator, last push 2024-04, README read in full; every pipeline screen is built, see leftovers), evehelper.pages.dev, eve-webtools PI, LedgerParser, IntelParser and Fitlab (roadmap.json and changelog.json per app; every item shipped here or killed: mining history = 90-day overview, PI alerts/forecast/ISK-hr = Advisor, Local threat/Pilot lookup, fit cost + Improve). EVE Crews (lore roleplay layer, no
 market endpoint) and Isktracker Incursions (non-pipeline) are out of remit.
@@ -235,6 +235,9 @@ Numbering is stable; later runs cite these by number. Append, never renumber.
 
 ## Filed candidates
 
+- #6429 NARROW Stock counts units in running manufacturing and reaction jobs (output location must resolve to the market; status pill and alert stay Listed-based; EVE Console Inventory Levels "In Build").
+- #6431 NARROW Assets estimate for types with no ESI average price, from the public-contract ask median (N>=5 single-item, shown apart from totals, out of Net worth history; EveSynapse true values).
+- #6432 SHIP Open Orders and the undercut notification ignore rivals that are the account's own other Characters' orders (EveSynapse beaten-order).
 - #6386 SHIP Owned stock subtracts inputs of the Character's jobs installed after the assets snapshot (MoMa 1.1.5 Stock locations; ESI assets cache ~1h).
 - #6387 NARROW Doctrine Fit hub coverage: complete ships the hub's sell orders supply + gap cost (MoMa 1.1.6 Doctrines; freight, build profit, history, own tab cut).
 - #6388 NARROW Copy list scaled to a budget, whole units, 10% warning (MoMa 1.1.5 target budget).
@@ -479,6 +482,10 @@ The reason is what stops a re-pitch. Numbers are kill-tests.
   filters (ADR 0013); run logging / ISK per hour (Abyss Tracker, Abyssal
   Tactician; Abyss timer already killed); spawn kill-order guidance (no NPC-
   per-spawn data, decision 20261016-085801 excludes it).
-- **EVE Console v0.9.7–0.9.18 leftovers:** Worklist/station levels/hauling plan (buffer management, second-account scale); Mercenary Dens, Corp Structures fuel/fit alerts, cost-index history, Stock cost column, slot-aware schedule, transaction dedupe (`uniqueTransactions`) = covered; moon notification reprocessed value (KILL: reach, kill-test 13); Indy Parks Compare / System Index (picture of data on screen, kill-test 3); custom colour themes (cosmetic, DESIGN.md owns tokens); mail store/web store/Discord posting (write-side, kill-test 2); plan-vs-reported rig bonus (49).
+- **EVE Console v0.9.7–0.9.19 leftovers:** 0.9.19: intel tool/alarms, gate camps, Battle Report, map marks (kill-test 2); layouts, chat clients, themes; Scheduler/Slack/web-store posting (write-side); worklist priority and per-rule tasks (buffer scale); "Since poll" assets (#6386 input, #6429 output); copy/research job ME/TE (not on the ESI job). Earlier: Worklist/station levels/hauling plan (buffer management, second-account scale); Mercenary Dens, Corp Structures fuel/fit alerts, cost-index history, Stock cost column, slot-aware schedule, transaction dedupe (`uniqueTransactions`) = covered; moon notification reprocessed value (KILL: reach, kill-test 13); Indy Parks Compare / System Index (picture of data on screen, kill-test 3); custom colour themes (cosmetic, DESIGN.md owns tokens); mail store/web store/Discord posting (write-side, kill-test 2); plan-vs-reported rig bonus (49).
+
+- **EVE HUD and EveSynapse leftovers:** HUD jobs-ready/order-expiry alerts (job-ready notifications, #3797), 7-day order average, per-day wallet by source, mining by ore/system, assets by ship, modular second-screen grid (kill-test 3), chat/Local/combat flash/autopilot (2). EveSynapse: wormhole-effect fit picker (KILL: niche, hand-kept id table), startable-from-hangar blueprints (#2847, #6382), Run Loss from killmails (manual Run Loss `20261008-000350`), Spread Scanner/Tradefinder/Top Stations/Trends (1, 14), Baskets (Quickbar), intel/killboard/sov/corp groups (non-ISK or 1).
 
 51. **The board is already a pooled sample.** 91% of copy contracts run 28 days, so today's snapshot holds ~4 weeks of asking prices. Measured over ~46h of EVE Ref history: pooling adds 1.3 points of 3-peer coverage (87.5% to 88.8%) and leaves the peer median unchanged; the single-snapshot median moves 0% at the median, 13.5% at p90 per day. Killed: history to smooth or widen the median or cheapest price check. The cheapest peer sits at 0.74x the median (0.33x at p10), so a "best price" floor needs trimming against trolls.
+52. **Check ESI `/markets/prices` before a capital valuation**: Avatar, Ragnarok, Erebus and ~350 types over 100M have no `average_price`, so Assets shows a dash; an ask-median estimate stays out of Net worth history (`20261016-105151`, #6431).
+53. **Own-alt blind spots**: grep the own-account set (`ownOrderIdSet`) against the grading code, not just the UI (#6432).
