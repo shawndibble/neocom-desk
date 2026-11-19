@@ -217,6 +217,15 @@ describe('CorpRowDetailModal', () => {
     expect(onUnmarkPaid).toHaveBeenCalledOnce();
   });
 
+  it('says a day was paid from credit the book already held', () => {
+    const paid: BookRowView = { ...view, state: 'paid', taxOwed: 0, settledBy: 'credit' };
+    renderModal({ corp: { ...corp, view: paid } });
+    expect(screen.getByText('Credit the book holds')).toBeInTheDocument();
+    expect(
+      screen.getByText(/already held credit from an earlier payment of yours/)
+    ).toBeInTheDocument();
+  });
+
   it('names the donation that paid a day until the corporation never credited it', () => {
     const unlinked: BookRowView = {
       ...view,

@@ -8282,12 +8282,14 @@
         "factStatement": "Statement",
         "factStatementFinal": "Issued, final",
         "factSettledBy": "Settled by",
+        "creditAppliedNote": "{{corp}} already held credit from an earlier payment of yours, and applied {{amount}} ISK of it to this day.",
         "yourMarkNote": "The corporation confirms your mark against its wallet.",
         "markedPaidNote": "Marked paid by you — {{corp}} still shows {{owed}} ISK owed. It confirms your mark against its wallet.",
         "markedPaidSpentNote": "Marked paid by you. {{corp}}'s book already holds that payment, but it pays your oldest open days first and spent it on {{days}}, so it still bills this day {{owed}} ISK. Resolve says what you can do.",
         "settledBy": {
           "yourMark": "Your mark",
           "donation": "Donation",
+          "credit": "Credit the book holds",
           "statement": "Statement payment"
         },
         "factOriginal": "Originally billed",
@@ -8659,6 +8661,7 @@
       "detailWithSystems": "{{pct}}% · {{hub}} · {{systems}}",
       "owed": "{{amount}} ISK",
       "settled": "Settled",
+      "credit": "{{amount}} ISK credit",
       "sharedByCharacters_one": "Used by {{count}} character",
       "sharedByCharacters_other": "Used by {{count}} characters",
       "termsDiffer": "Your characters bill this Payee differently.",
