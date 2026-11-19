@@ -122,7 +122,7 @@ import {
   type FeederExtraction,
   type StoredExtractionKey,
 } from './corpTaxBookSyncEngine.js';
-import { liveAccount } from './corpTaxBookAccounts.js';
+import { ledgerDays, ledgerPayments, liveAccount } from './corpTaxBookAccounts.js';
 import type { IdentityReader } from './corpTaxBookEsi.js';
 import { SRP_COLLECTIONS } from './srpTypes.js';
 import { VETTING_COLLECTIONS } from './vettingTypes.js';
@@ -1249,7 +1249,11 @@ function sameAccount(
   stored: FirebaseFirestore.DocumentData | undefined,
   next: Record<string, unknown>
 ): boolean {
-  return !!stored && ACCOUNT_FIGURES.every((k) => stored[k] === next[k]);
+  return (
+    !!stored &&
+    ACCOUNT_FIGURES.every((k) => stored[k] === next[k]) &&
+    JSON.stringify(stored.owedDays ?? null) === JSON.stringify(next.owedDays ?? null)
+  );
 }
 
 /**
@@ -3082,6 +3086,14 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
           payments.docs.map((d) => d.data())
         )
       : null,
+    // The Miner's whole history for the ledger: every mined day once, and every payment.
+    ledger: {
+      days: ledgerDays(statements.docs.map((d) => d.data())),
+      payments: ledgerPayments(
+        payments.docs.map((d) => ({ id: d.id, data: d.data() })),
+        b.startDate as string | undefined
+      ),
+    },
     remindersStopped: s.remindersStopped === true,
     // A guest's closed account (epic): set by the `closeAccount` edit (#4184).
     accountClosed: miner.exists && miner.get('closedAt') != null,

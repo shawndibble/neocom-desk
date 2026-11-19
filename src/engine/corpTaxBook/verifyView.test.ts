@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  dueDate,
-  hasRecordOverride,
-  ratesUsed,
-  verifyRows,
-  type VerifyPayloadLine,
-} from './verifyView';
+import { hasRecordOverride, ratesUsed, verifyRows, type VerifyPayloadLine } from './verifyView';
 
 const mined: VerifyPayloadLine = {
   kind: 'mined',
@@ -45,13 +39,6 @@ describe('verifyRows', () => {
       },
     ]);
     expect(row).toMatchObject({ kind: 'correction', ores: [], reason: 'rounding', tax: -5 });
-  });
-});
-
-describe('dueDate', () => {
-  it('is the overdue window after the issue date, in UTC', () => {
-    expect(dueDate('2026-09-01T00:00:00.000Z', 14)).toBe('2026-09-15');
-    expect(dueDate('2026-09-25T23:59:00.000Z', 14)).toBe('2026-10-09');
   });
 });
 

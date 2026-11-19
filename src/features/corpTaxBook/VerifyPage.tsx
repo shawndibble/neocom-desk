@@ -1,26 +1,27 @@
 import { useEffect, useMemo, useState } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
-import { Button, Checkbox, EmptyState, Panel, Spinner, StatChip, StatChips } from '@/components/ui';
+import { Button, Checkbox, EmptyState, Panel, Spinner } from '@/components/ui';
+import { STAT_CHIP_TONE_TEXT_CLASS } from '@/components/ui/statChipTone';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import {
-  dueDate,
   hasRecordOverride,
   ratesUsed,
   verifyRows,
   type VerifyPayload,
 } from '@/engine/corpTaxBook/verifyView';
 import { getCorporationPublicInfo } from '@/esi/endpoints/corp';
-import { DEFAULT_OVERDUE_DAYS } from '@/engine/corpTaxBook/overdue';
 import { callableErrorCode } from '@/features/communities/callableError';
 import { cx } from '@/lib/cx';
 import { readDivisionNames } from '@/engine/corpTaxBook/divisionNames';
 import { corpPayAccounts } from '@/features/miningTax/corpBook/corpPayAccount';
-
-import { TRADE_HUBS } from '@/market/hubs';
+import { writeToClipboard } from '@/lib/clipboard';
+import { ShareShell } from '@/features/share/ShareShell';
 import { GroupingQuestions } from './GroupingQuestions';
+import { OwedDayList } from './OwedDayList';
 import { StatementLines, StatementPayments } from './StatementBody';
+import { VerifyLedger } from './VerifyLedger';
 import { isk, shortDate } from './statementFormat';
 import { verifyPeriodLabel as periodLabel } from './verifyPeriodLabel';
 import { readVerifyStatement, setVerifyRemindersStopped } from './verifyApi';
@@ -64,52 +65,37 @@ export function VerifyPage({ token }: { token: string }) {
   }, [token, attempt]);
 
   return (
-    <div className="min-h-screen bg-bg text-text">
-      <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
-        <span className="text-sm font-semibold">{t('share.brand')}</span>
-        <span className="inline-flex items-center gap-1 text-xs text-text-dim">
-          <Icon.ReadOnly size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-          {t('corpTaxBook.verify.readOnly')}
-        </span>
-      </div>
-      <main className="mx-auto max-w-6xl space-y-4 px-4 py-6">
-        {state.status === 'loading' && (
-          <div className="flex justify-center py-10">
-            <Spinner label={t('common.loading')} />
-          </div>
-        )}
-        {state.status === 'gone' && (
-          <>
-            <h1 className="sr-only">{t('corpTaxBook.verify.title')}</h1>
-            <EmptyState
-              title={t('corpTaxBook.verify.goneTitle')}
-              hint={t('corpTaxBook.verify.goneHint')}
-            />
-          </>
-        )}
-        {state.status === 'failed' && (
-          <>
-            <h1 className="sr-only">{t('corpTaxBook.verify.title')}</h1>
-            <EmptyState
-              title={t('corpTaxBook.verify.failedTitle')}
-              hint={t('corpTaxBook.verify.failedHint')}
-              action={
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setState({ status: 'loading' });
-                    setAttempt((n) => n + 1);
-                  }}
-                >
-                  {t('common.retry')}
-                </Button>
-              }
-            />
-          </>
-        )}
-        {state.status === 'ok' && <VerifyStatement token={token} payload={state.payload} />}
-      </main>
-    </div>
+    <ShareShell title={t('corpTaxBook.verify.title')} wide>
+      {state.status === 'loading' && (
+        <div className="flex justify-center py-10">
+          <Spinner label={t('common.loading')} />
+        </div>
+      )}
+      {state.status === 'gone' && (
+        <EmptyState
+          title={t('corpTaxBook.verify.goneTitle')}
+          hint={t('corpTaxBook.verify.goneHint')}
+        />
+      )}
+      {state.status === 'failed' && (
+        <EmptyState
+          title={t('corpTaxBook.verify.failedTitle')}
+          hint={t('corpTaxBook.verify.failedHint')}
+          action={
+            <Button
+              size="sm"
+              onClick={() => {
+                setState({ status: 'loading' });
+                setAttempt((n) => n + 1);
+              }}
+            >
+              {t('common.retry')}
+            </Button>
+          }
+        />
+      )}
+      {state.status === 'ok' && <VerifyStatement token={token} payload={state.payload} />}
+    </ShareShell>
   );
 }
 
@@ -135,9 +121,6 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
   }, [payload.corporationId, statement.corporationName]);
   const corp = corpName ?? t('corpTaxBook.verify.theCorp');
 
-  const hub = TRADE_HUBS.find((h) => h.id === statement.hubId)?.systemName ?? statement.hubId;
-  const overdueDays = terms.overdueDays ?? DEFAULT_OVERDUE_DAYS;
-  const due = dueDate(statement.issuedAt, overdueDays);
   const credited = payload.payments.reduce((sum, p) => sum + p.amount, 0);
   const remaining = settlement?.remaining ?? Math.max(0, statement.amount - credited);
   // A running account (#6294): the notice's own balance, and everything owed now beside it.
@@ -148,28 +131,45 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
   const forgiven = settlement?.forgiven ?? 0;
   const dismissed = settlement ? settlement.credited - credited - forgiven : 0;
   const rates = ratesUsed(rows);
+  // The page leads with one figure: the account's total on a notice or a counted account, else
+  // this Statement's own balance.
+  const byAccount = Boolean(account) || notice;
+  const owing = byAccount ? owedNow : remaining;
+  // The days still owed, when the officer's client recorded them: the page then lists those and
+  // keeps everything paid in the ledger, instead of every line of this Statement.
+  const owedDays = account?.owedDays;
+  const earlier = owedDays
+    ? Math.max(0, owedNow - owedDays.reduce((sum, d) => sum + d.owed, 0))
+    : 0;
 
   const lastDeclaration = payload.declarations.at(-1);
   // The wallet divisions the book reads (#6204); an older server sends none, and then the page
-  // names none rather than guess.
+  // names none rather than guess. Only a book that reads past the Master Wallet has a choice to
+  // name: a donation from outside the corporation has no division to pick.
   const divisionNames = readDivisionNames(terms.divisionNames);
-  const accounts = terms.divisions?.length
-    ? corpPayAccounts(terms.divisions, divisionNames, t).join(', ')
-    : null;
+  const wallet =
+    terms.divisions?.length && !(terms.divisions.length === 1 && terms.divisions[0] === 1)
+      ? corpPayAccounts(terms.divisions, divisionNames, t).join(', ')
+      : null;
 
   return (
     <>
       <header>
         <p className="text-xs tracking-widest text-text-dim uppercase">
-          {t('corpTaxBook.verify.eyebrow', {
-            corp,
-            period: periodLabel(statement.periodStart, statement.periodEnd, locale),
-            issued: shortDate(statement.issuedAt, locale),
-          })}
+          {notice
+            ? t('corpTaxBook.verify.eyebrowNotice', {
+                corp,
+                issued: shortDate(statement.issuedAt, locale),
+              })
+            : t('corpTaxBook.verify.eyebrow', {
+                corp,
+                period: periodLabel(statement.periodStart, statement.periodEnd, locale),
+                issued: shortDate(statement.issuedAt, locale),
+              })}
         </p>
-        <h1 className="text-xl font-semibold">
+        <p className="text-xl font-semibold">
           {statement.minerName ?? t('corpTaxBook.verify.title')}
-        </h1>
+        </p>
       </header>
       {payload.accountClosed && (
         <p className="rounded-xs border border-line p-3 text-sm" role="status">
@@ -184,39 +184,24 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
           characterIds={payload.pendingCharacterIds}
         />
       )}
-      <div className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,1fr)_22rem] md:grid-rows-[auto_auto_minmax(0,1fr)] md:items-start">
-        <div className="order-3 min-w-0 space-y-4 md:order-none md:col-start-1 md:row-span-3 md:row-start-1">
-          <StatementLines statement={statement} />
-          {/* A notice is paid by the account, oldest day first: no payment is its own. */}
-          {!notice && <StatementPayments payments={payload.payments} />}
-        </div>
-        <Panel className="order-1 md:order-none md:col-start-2 md:row-start-1">
-          <StatChips>
-            {(account || notice) && (
-              <StatChip
-                label={t(account ? 'corpTaxBook.verify.owedNow' : 'corpTaxBook.verify.onNotice')}
-                value={isk(owedNow)}
-                tone={owedNow > 0 ? 'danger' : 'success'}
-                emphasis
-              />
+      <div className={cx('grid gap-4', owing > 0 && 'md:grid-cols-2')}>
+        <Panel
+          title={t(byAccount ? 'corpTaxBook.verify.owedNow' : 'corpTaxBook.verify.balanceDue')}
+        >
+          <p
+            className={cx(
+              'text-3xl font-semibold tabular-nums',
+              STAT_CHIP_TONE_TEXT_CLASS[owing > 0 ? 'danger' : 'success']
             )}
-            {!notice && (
-              <StatChip
-                label={t('corpTaxBook.verify.balanceDue')}
-                value={isk(remaining)}
-                tone={remaining > 0 ? 'danger' : 'success'}
-                emphasis={!account}
-              />
-            )}
-          </StatChips>
+          >
+            {isk(owing)}
+          </p>
           {account && (
-            <p className="mt-2 text-sm">
+            <p className="mt-1 text-sm text-text-dim">
               {account.owed > 0 && account.oldest
-                ? t('corpTaxBook.verify.owedNowLine', {
-                    corp,
+                ? t('corpTaxBook.verify.owedDays', {
                     count: account.days,
                     date: shortDate(account.oldest, locale),
-                    asOf: shortDate(account.asOf, locale),
                   })
                 : account.paidThrough
                   ? t('corpTaxBook.verify.paidUpThrough', {
@@ -226,8 +211,9 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
                   : t('corpTaxBook.verify.paidUp', { corp })}
             </p>
           )}
-          {!notice && (
-            <p className="mt-2 text-sm tabular-nums">
+          {/* Without the days still owed the page lists this Statement whole, so its sum stays. */}
+          {!notice && !owedDays && (
+            <p className="mt-2 text-sm text-text-dim tabular-nums">
               {t('corpTaxBook.verify.balanceSum', {
                 billed: isk(statement.amount),
                 paid: isk(credited),
@@ -239,16 +225,6 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
               {settlement && settlement.writtenOff > 0 && (
                 <> {t('corpTaxBook.verify.writtenOff', { amount: isk(settlement.writtenOff) })}</>
               )}
-            </p>
-          )}
-          {(account || notice ? owedNow : remaining) > 0 && (
-            <p className="mt-2 text-sm">
-              {t('corpTaxBook.verify.howToPay', { corp })} {t('corpTaxBook.verify.payCodeLead')}{' '}
-              <span className="font-mono">{statement.code}</span>{' '}
-              {t(
-                notice ? 'corpTaxBook.verify.payCodeTailNotice' : 'corpTaxBook.verify.payCodeTail'
-              )}
-              {accounts && <> {t('corpTaxBook.verify.payAccount', { accounts })}</>}
             </p>
           )}
           {!notice && payload.settled && remaining === 0 && (
@@ -264,62 +240,130 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
             </p>
           )}
         </Panel>
-        <Panel
-          title={t('corpTaxBook.verify.termsTitle')}
-          className="order-2 md:order-none md:col-start-2 md:row-start-2"
-        >
-          <dl className="space-y-2 text-sm">
-            <Term label={t('corpTaxBook.verify.term.rate')}>
-              {rates.length === 0
-                ? '—'
-                : rates.map((r) => (
-                    <span key={`${r.pct}${r.effectiveFrom}`} className="block">
-                      {r.effectiveFrom
-                        ? t('corpTaxBook.verify.rateFrom', {
-                            pct: r.pct,
-                            date: shortDate(r.effectiveFrom, locale),
-                          })
-                        : t('corpTaxBook.verify.rateNoDate', { pct: r.pct })}
+        {owing > 0 && (
+          <Panel title={t('corpTaxBook.verify.payTitle')}>
+            <dl className="space-y-2 text-sm">
+              <PayField
+                label={t('corpTaxBook.verify.payTo')}
+                value={corp}
+                copyable={Boolean(corpName)}
+              />
+              {wallet && (
+                <div>
+                  <dt className="text-xs text-text-dim">{t('corpTaxBook.verify.payWallet')}</dt>
+                  <dd>
+                    {wallet}
+                    <span className="block text-xs text-text-dim">
+                      {t('corpTaxBook.verify.payWalletHint')}
                     </span>
-                  ))}
-              {hasRecordOverride(rows) && (
-                <span className="block text-xs text-text-dim">
-                  {t('corpTaxBook.verify.rateOverride')}
-                </span>
+                  </dd>
+                </div>
               )}
-            </Term>
-            <Term label={t('corpTaxBook.verify.term.price')}>
-              {t('corpTaxBook.verify.priceBasis', {
-                hub,
-                form: t(`corpTaxBook.verify.oreForm.${statement.oreForm}`),
-              })}
-            </Term>
-            <Term label={t('corpTaxBook.verify.term.due')}>
-              {t('corpTaxBook.verify.dueValue', {
-                date: shortDate(due, locale),
-                days: overdueDays,
-              })}
-            </Term>
-            <Term label={t('corpTaxBook.verify.term.paying')}>
-              {t('corpTaxBook.verify.payingValue', { corp })}
-            </Term>
-            {accounts && <Term label={t('corpTaxBook.verify.term.account')}>{accounts}</Term>}
-          </dl>
-        </Panel>
-        <div className="order-4 md:order-none md:col-start-2 md:row-start-3">
-          <StopReminders token={token} initial={payload.remindersStopped} />
-        </div>
+              <PayField
+                label={t('corpTaxBook.verify.payReason')}
+                value={statement.code}
+                mono
+                copyable
+              />
+            </dl>
+            <p className="mt-3 text-xs text-text-dim">
+              {t(notice ? 'corpTaxBook.verify.payNoteNotice' : 'corpTaxBook.verify.payNote')}
+            </p>
+          </Panel>
+        )}
       </div>
+      {owedDays ? (
+        <>
+          {owing > 0 && (
+            <Panel
+              title={t('corpTaxBook.verify.stillOwed')}
+              meta={
+                <span className="text-xs text-text-dim">{t('corpTaxBook.verify.oldestFirst')}</span>
+              }
+              padded={false}
+            >
+              <OwedDayList days={owedDays} statement={statement} earlier={earlier} />
+            </Panel>
+          )}
+          {payload.ledger && <VerifyLedger ledger={payload.ledger} />}
+        </>
+      ) : (
+        <>
+          <StatementLines statement={statement} />
+          {rates.length > 0 && (
+            <p className="text-xs text-text-dim">
+              {t('corpTaxBook.verify.rate')}:{' '}
+              {rates
+                .map((r) =>
+                  r.effectiveFrom
+                    ? t('corpTaxBook.verify.rateFrom', {
+                        pct: r.pct,
+                        date: shortDate(r.effectiveFrom, locale),
+                      })
+                    : t('corpTaxBook.verify.rateNoDate', { pct: r.pct })
+                )
+                .join(' · ')}
+              {hasRecordOverride(rows) && <> {t('corpTaxBook.verify.rateOverride')}</>}
+            </p>
+          )}
+          {/* A notice is paid by the account, oldest day first: no payment is its own. */}
+          {!notice && <StatementPayments payments={payload.payments} />}
+        </>
+      )}
+      <StopReminders token={token} initial={payload.remindersStopped} />
     </>
   );
 }
 
-function Term({ label, children }: { label: string; children: React.ReactNode }) {
+/** A label and its value, with a Copy button so the pilot can paste it into EVE's transfer window. */
+function PayField({
+  label,
+  value,
+  mono = false,
+  copyable,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  copyable: boolean;
+}) {
   return (
-    <div>
-      <dt className="text-xs text-text-dim">{label}</dt>
-      <dd>{children}</dd>
+    <div className="flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <dt className="text-xs text-text-dim">{label}</dt>
+        <dd className={cx('break-words', mono && 'font-mono')}>{value}</dd>
+      </div>
+      {copyable && <CopyButton text={value} label={label} />}
     </div>
+  );
+}
+
+function CopyButton({ text, label }: { text: string; label: string }) {
+  const { t } = useTranslation();
+  const [outcome, setOutcome] = useState<'copied' | 'failed' | null>(null);
+  useEffect(() => {
+    if (outcome === null) return;
+    const timer = setTimeout(() => setOutcome(null), 2000);
+    return () => clearTimeout(timer);
+  }, [outcome]);
+  return (
+    <Button
+      size="sm"
+      aria-label={`${t('corpTaxBook.verify.copy')} ${label}`}
+      onClick={() =>
+        writeToClipboard(text).then(
+          () => setOutcome('copied'),
+          () => setOutcome('failed')
+        )
+      }
+    >
+      {outcome === null && <Icon.CopyToClipboard aria-hidden />}
+      {outcome === 'copied'
+        ? t('corpTaxBook.verify.copied')
+        : outcome === 'failed'
+          ? t('corpTaxBook.verify.copyFailed')
+          : t('corpTaxBook.verify.copy')}
+    </Button>
   );
 }
 
