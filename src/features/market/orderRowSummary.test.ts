@@ -188,3 +188,14 @@ describe('orderRowSummary — buy orders (#1733)', () => {
     expect(orderRowSummary(row)).toEqual({ kind: 'topBid' });
   });
 });
+
+describe('orderRowSummary — own alt rival (#6432)', () => {
+  it('names the alt on a healthy row whose cheaper order is the account own', () => {
+    const row: OpenOrderRow = { ...BASE_ROW, ownRival: { characterName: 'Alt Two', price: 900 } };
+    expect(orderRowSummary(row)).toEqual({
+      kind: 'ownRival',
+      characterName: 'Alt Two',
+      price: 900,
+    });
+  });
+});

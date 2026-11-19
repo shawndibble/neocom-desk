@@ -31,6 +31,7 @@ import { isServerPushedEvent } from '../serverEvents';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { resolveNames } from '@/features/character/names';
 import { getHubPrices, getStationPrices } from '@/market/prices';
+import { loadAllCharactersOpenOrders } from '@/features/market/openOrdersData';
 import { useMarketHub } from '@/features/market/hub';
 import { getTradeHub } from '@/market/hubs';
 import {
@@ -104,6 +105,7 @@ vi.mock('@/features/pi/data', () => ({
   loadCharacterPlanets: vi.fn(),
   loadAllColonyDetails: vi.fn(),
 }));
+vi.mock('@/features/market/openOrdersData', () => ({ loadAllCharactersOpenOrders: vi.fn() }));
 vi.mock('@/market/prices', () => ({ getHubPrices: vi.fn(), getStationPrices: vi.fn() }));
 vi.mock('@/features/character/typeNames', () => ({ loadTypeNames: vi.fn() }));
 vi.mock('@/features/character/names', () => ({ resolveNames: vi.fn() }));
@@ -334,6 +336,35 @@ describe('marketOrderUndercutDomain', () => {
   beforeEach(() => {
     vi.mocked(loadOrders).mockReset();
     vi.mocked(getStationPrices).mockReset();
+    vi.mocked(loadAllCharactersOpenOrders).mockReset();
+    vi.mocked(loadAllCharactersOpenOrders).mockResolvedValue({ entries: [], skipped: [] });
+  });
+
+  it('reads a cheaper station price held by another Character of the account as clear (#6432)', async () => {
+    vi.mocked(loadOrders).mockResolvedValue(
+      statusResult(
+        [marketOrder({ order_id: 1, location_id: 60003760, type_id: 34, price: 100 })],
+        false
+      )
+    );
+    vi.mocked(loadAllCharactersOpenOrders).mockResolvedValue({
+      entries: [
+        {
+          characterId: 2,
+          characterName: 'Alt',
+          orders: [marketOrder({ order_id: 9, location_id: 60003760, type_id: 34, price: 95 })],
+          fetchedAt: 0,
+          fromCache: false,
+          needsReauth: false,
+        },
+      ],
+      skipped: [],
+    });
+    vi.mocked(getStationPrices).mockResolvedValue(
+      new Map([[34, { sellMin: 95, buyMax: null, sellVolume: 1, buyVolume: 0 }]])
+    );
+    const entries = await marketOrderUndercutDomain.load(1);
+    expect(entries?.[0]).toMatchObject({ state: 'clear', rivalPrice: 95 });
   });
 
   it('returns null (skip this poll) on reauth or no cache, same as marketOrderDomain', async () => {

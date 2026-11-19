@@ -135,6 +135,15 @@ export function OrderRowSummaryText({
           {relistNode}
         </span>
       );
+    case 'ownRival':
+      return (
+        <span className="text-xs text-text-dim">
+          {t('market.orders.rowSummary.ownRival', {
+            character: summary.characterName,
+            price: formatIskAuto(summary.price),
+          })}
+        </span>
+      );
     case 'noCostBasis':
       return (
         <span className="text-xs text-text-dim">{t('market.orders.rowSummary.noCostBasis')}</span>

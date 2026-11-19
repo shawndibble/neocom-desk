@@ -62,3 +62,19 @@ describe('classifyStationUndercut', () => {
     });
   });
 });
+
+describe('classifyStationUndercut — own orders', () => {
+  it('reads a beaten price held by one of my own other orders as clear', () => {
+    expect(classifyStationUndercut(100, false, { sellMin: 90, buyMax: null }, [90])).toEqual({
+      state: 'clear',
+      rivalPrice: 90,
+    });
+  });
+
+  it('still reads beaten when the best price matches none of my own orders', () => {
+    expect(classifyStationUndercut(100, false, { sellMin: 90, buyMax: null }, [95])).toEqual({
+      state: 'beaten',
+      rivalPrice: 90,
+    });
+  });
+});

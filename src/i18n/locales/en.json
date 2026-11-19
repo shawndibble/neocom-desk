@@ -14189,6 +14189,7 @@
         "expiringUnknown": "{{units}} still unsold",
         "outbid": "A rival bids {{price}} ISK, {{gap}} over you",
         "noCostBasis": "Link a build or buy with this character and we can work out your lowest safe price",
+        "ownRival": "Your {{character}} already lists this at {{price}} ISK",
         "best": "Nobody is cheaper where this order sits",
         "topBid": "Nobody bids higher where this order sits"
       },

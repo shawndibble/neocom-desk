@@ -26,6 +26,7 @@ export type OrderAdviceInput = Pick<
   | 'problem'
   | 'floor'
   | 'station'
+  | 'ownRival'
   | 'deepUndercut'
   | 'worstScope'
   | 'expiry'
@@ -66,6 +67,7 @@ export type OrderRowSummary =
       /** One legal tick over `rivalPrice` — the suggested bid to take the lead. */
       suggestedPrice: number | null;
     }
+  | { kind: 'ownRival'; characterName: string; price: number }
   | { kind: 'noCostBasis' }
   | { kind: 'best' }
   | { kind: 'topBid' };
@@ -142,6 +144,13 @@ export function orderRowSummary(row: OrderAdviceInput): OrderRowSummary | null {
     }
     case 'healthy':
     default:
+      if (row.ownRival) {
+        return {
+          kind: 'ownRival',
+          characterName: row.ownRival.characterName,
+          price: row.ownRival.price,
+        };
+      }
       if (!row.isBuyOrder && row.costBasis === null) return { kind: 'noCostBasis' };
       if (row.station.bestPrice !== null) return { kind: row.isBuyOrder ? 'topBid' : 'best' };
       return null;
