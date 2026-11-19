@@ -168,7 +168,7 @@ function DataTableRowImpl<T>({
       // Header row is 1; tells AT where this row sits in the whole set.
       aria-rowindex={ariaRowIndex}
       ref={attachRow}
-      aria-expanded={expandable ? expanded : undefined}
+      aria-expanded={expandable && toggleLabel === undefined ? expanded : undefined}
       aria-current={selected ? 'true' : undefined}
       className={cx(
         'hover:bg-panel-2',
