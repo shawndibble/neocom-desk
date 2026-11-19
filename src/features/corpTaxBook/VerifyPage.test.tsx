@@ -283,7 +283,7 @@ describe('VerifyPage', () => {
           oldest: '2026-08-13',
           paidThrough: null,
           asOf: '2026-10-20T10:00:00Z',
-          owedDays: [
+          unpaidDays: [
             { date: '2026-08-13', owed: 1_000_000, tax: 2_000_000 },
             { date: '2026-08-27', owed: 2_000_000, tax: 2_000_000 },
           ],
@@ -322,7 +322,7 @@ describe('VerifyPage', () => {
           oldest: '2026-08-27',
           paidThrough: null,
           asOf: '2026-10-20T10:00:00Z',
-          owedDays: [{ date: '2026-08-27', owed: 2_000_000, tax: 2_000_000 }],
+          unpaidDays: [{ date: '2026-08-27', owed: 2_000_000, tax: 2_000_000 }],
         },
         ledger: {
           days: [{ date: '2026-08-13', tax: 500_000 }],
@@ -337,8 +337,49 @@ describe('VerifyPage', () => {
     expect(screen.queryByRole('list', { name: 'Ledger' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Show ledger' }));
     const rows = within(screen.getByRole('list', { name: 'Ledger' })).getAllByRole('listitem');
-    expect(rows[0]).toHaveTextContent('+1,000,000 ISK');
-    expect(rows[1]).toHaveTextContent('500,000 ISK');
+    // The day still owed (mined since the last notice) is the newest row.
+    expect(rows[0]).toHaveTextContent('2,000,000 ISK');
+    expect(rows[1]).toHaveTextContent('+1,000,000 ISK');
+    expect(rows[2]).toHaveTextContent('500,000 ISK');
+  });
+
+  it('keeps every line of the Statement when older Statements still owe beyond the recorded days', async () => {
+    api.read.mockResolvedValue(
+      payload({
+        account: {
+          owed: 6_000_000,
+          days: 2,
+          oldest: '2026-08-13',
+          paidThrough: null,
+          asOf: '2026-10-20T10:00:00Z',
+          unpaidDays: [{ date: '2026-08-27', owed: 1_000_000, tax: 1_000_000 }],
+        },
+      })
+    );
+    renderPage();
+    expect(await screen.findByText(/Zeolites × 70,200/)).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Still owed' })).not.toBeInTheDocument();
+  });
+
+  it('puts a day mined since the last notice in the ledger too', async () => {
+    api.read.mockResolvedValue(
+      payload({
+        account: {
+          owed: 2_000_000,
+          days: 1,
+          oldest: '2026-08-27',
+          paidThrough: null,
+          asOf: '2026-10-20T10:00:00Z',
+          unpaidDays: [{ date: '2026-08-27', owed: 2_000_000, tax: 2_000_000 }],
+        },
+        ledger: { days: [{ date: '2026-08-13', tax: 500_000 }], payments: [] },
+      })
+    );
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Show ledger' }));
+    const rows = within(screen.getByRole('list', { name: 'Ledger' })).getAllByRole('listitem');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent('2,000,000 ISK');
   });
 
   it('shows no days list and no Pay panel once the account is paid up', async () => {
@@ -350,7 +391,7 @@ describe('VerifyPage', () => {
           oldest: null,
           paidThrough: '2026-08-27',
           asOf: '2026-10-20T10:00:00Z',
-          owedDays: [],
+          unpaidDays: [],
         },
       })
     );

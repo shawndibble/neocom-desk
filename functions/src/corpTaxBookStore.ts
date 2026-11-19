@@ -1252,7 +1252,7 @@ function sameAccount(
   return (
     !!stored &&
     ACCOUNT_FIGURES.every((k) => stored[k] === next[k]) &&
-    JSON.stringify(stored.owedDays ?? null) === JSON.stringify(next.owedDays ?? null)
+    JSON.stringify(stored.unpaidDays ?? null) === JSON.stringify(next.unpaidDays ?? null)
   );
 }
 

@@ -1,27 +1,33 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Caret } from '@/components/ui';
-import { verifyRows, type VerifyPayload, type VerifyRow } from '@/engine/corpTaxBook/verifyView';
+import {
+  focusRingInsetClassName,
+  rowInteractiveClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
+import {
+  verifyRows,
+  type UnpaidDay,
+  type VerifyPayload,
+  type VerifyRow,
+} from '@/engine/corpTaxBook/verifyView';
 import { formatCount } from '@/lib/formatCount';
 import { useOreNames } from './useOreNames';
 import { isk, shortDate } from './statementFormat';
 
-type OwedDay = NonNullable<NonNullable<VerifyPayload['account']>['owedDays']>[number];
-
 /**
  * The days a Miner still owes, oldest first, one line each: the day, its refinery, what is left
  * of it (with the day's whole tax when part is paid). A day whose ore the Statement lists opens
- * to it; a day mined since has no lines to show and is a plain line. `earlier` is what older
- * Statements still owe beyond these days.
+ * to it; a day mined since has no lines to show and is a plain line.
  */
 export function OwedDayList({
   days,
   statement,
-  earlier,
 }: {
-  days: readonly OwedDay[];
+  days: readonly UnpaidDay[];
   statement: Pick<VerifyPayload['statement'], 'lines' | 'refineryNames'>;
-  earlier: number;
 }) {
   const { t, i18n } = useTranslation();
   const rows = useMemo(() => verifyRows(statement.lines), [statement.lines]);
@@ -58,7 +64,12 @@ export function OwedDayList({
                 type="button"
                 aria-expanded={expanded}
                 onClick={() => setOpen(expanded ? null : d.date)}
-                className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-panel-2"
+                className={cx(
+                  'flex w-full items-center gap-3 px-3 py-2 text-left text-sm',
+                  rowInteractiveClassName,
+                  focusRingInsetClassName,
+                  tappableRowClassName
+                )}
               >
                 {head}
               </button>
@@ -69,12 +80,6 @@ export function OwedDayList({
           </li>
         );
       })}
-      {earlier > 0 && (
-        <li className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-          <span className="pl-7 text-text-dim">{t('corpTaxBook.verify.earlierStatements')}</span>
-          <span className="font-semibold tabular-nums">{isk(earlier)}</span>
-        </li>
-      )}
     </ul>
   );
 }

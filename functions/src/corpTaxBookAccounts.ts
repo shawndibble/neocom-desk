@@ -28,7 +28,7 @@ export function liveAccount(
   paidThrough: string | null;
   asOf: string;
   /** The running days still owed after those payments; absent when the client recorded none. */
-  owedDays?: OwedDay[];
+  unpaidDays?: OwedDay[];
 } {
   const net = (p: Data) => {
     const amount = Number(p.amount) || 0;
@@ -37,26 +37,28 @@ export function liveAccount(
   const paidNow = payments.reduce((sum, p) => sum + net(p), 0);
   const since = Math.max(0, paidNow - (Number(recorded.paid) || 0));
   const owed = Math.max(0, (Number(recorded.owed) || 0) - since);
-  const recordedDays = Array.isArray(recorded.owedDays)
-    ? (recorded.owedDays as OwedDay[])
+  const recordedDays = Array.isArray(recorded.unpaidDays)
+    ? (recorded.unpaidDays as OwedDay[])
     : undefined;
-  let owedDays: OwedDay[] | undefined;
+  let unpaidDays: OwedDay[] | undefined;
   let days = Number(recorded.days) || 0;
   let oldest = (recorded.oldest as string | undefined) ?? null;
   if (recordedDays) {
     const covered = recordedDays.reduce((sum, d) => sum + d.owed, 0);
     // What older Statements owe: they take the new money before any running day.
-    const olderStatements = Math.max(0, (Number(recorded.owed) || 0) - covered);
+    // A few ISK of per-day rounding is no Statement debt.
+    const gap = Math.max(0, (Number(recorded.owed) || 0) - covered);
+    const olderStatements = gap <= recordedDays.length + 1 ? 0 : gap;
     let left = Math.max(0, since - olderStatements);
-    owedDays = [];
+    unpaidDays = [];
     for (const d of recordedDays) {
       const take = Math.min(d.owed, left);
       left -= take;
-      if (d.owed - take > 0) owedDays.push({ ...d, owed: d.owed - take });
+      if (d.owed - take > 0) unpaidDays.push({ ...d, owed: d.owed - take });
     }
-    days = Math.max(0, days - (recordedDays.length - owedDays.length));
+    days = Math.max(0, days - (recordedDays.length - unpaidDays.length));
     // The oldest owed day moves on once the days before it are paid; older Statements keep theirs.
-    if (olderStatements - since <= 0 && owedDays.length > 0) oldest = owedDays[0].date;
+    if (olderStatements - since <= 0 && unpaidDays.length > 0) oldest = unpaidDays[0].date;
   }
   return {
     owed,
@@ -64,7 +66,7 @@ export function liveAccount(
     oldest: owed > 0 ? oldest : null,
     paidThrough: (recorded.paidThrough as string | undefined) ?? null,
     asOf: recorded.at as string,
-    ...(owedDays ? { owedDays } : {}),
+    ...(unpaidDays ? { unpaidDays } : {}),
   };
 }
 

@@ -66,13 +66,23 @@ export interface VerifyPayload {
      * The running days still owed, oldest first, after what was paid since: what the page lists.
      * Absent from a server or officer client that does not send it.
      */
-    owedDays?: { date: string; owed: number; tax: number }[];
+    unpaidDays?: UnpaidDay[];
   } | null;
   /** The Miner's whole history, for the ledger; absent from an older server. */
-  ledger?: {
-    days: { date: string; tax: number }[];
-    payments: { id: string; at: string; amount: number; source: 'donation' | 'manual' }[];
-  };
+  ledger?: VerifyLedgerData;
+}
+
+/** A running day still owed: what remains of it and its whole tax. */
+export interface UnpaidDay {
+  date: string;
+  owed: number;
+  tax: number;
+}
+
+/** The Miner's whole history for the verify page's ledger. */
+export interface VerifyLedgerData {
+  days: { date: string; tax: number }[];
+  payments: { id: string; at: string; amount: number; source: 'donation' | 'manual' }[];
 }
 
 export interface VerifyPayloadLine {

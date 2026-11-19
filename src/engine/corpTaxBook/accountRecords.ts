@@ -19,7 +19,7 @@ export interface AccountRecord {
    * The running days still owed, oldest first, with what remains of each: what the verify page
    * lists as "Still owed". Absent from an older client, and then the page reads the notice's lines.
    */
-  owedDays?: { date: string; owed: number; tax: number }[];
+  unpaidDays?: { date: string; owed: number; tax: number }[];
   /**
    * The newest day to store as paid for good (`meta/paid`), when every day up to it is paid and
    * saved-price: only the officer's client can know, the server has no prices.
@@ -40,7 +40,7 @@ export function accountRecords(view: BookView, only?: string): AccountRecord[] {
   return view.miners.flatMap((m) => {
     if (!m.account || (only !== undefined && m.id !== only)) return [];
     const { owes, paidThrough, closableThrough } = m.account;
-    const owedDays = [...(view.internals.byMiner.get(m.id)?.running?.byDay ?? [])]
+    const unpaidDays = [...(view.internals.byMiner.get(m.id)?.running?.byDay ?? [])]
       .filter(([, d]) => !d.settled && !d.held && Math.round(d.remaining) > 0)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, d]) => ({
@@ -56,7 +56,7 @@ export function accountRecords(view: BookView, only?: string): AccountRecord[] {
         days: owes?.days ?? 0,
         ...(owes ? { oldest: owes.oldest } : {}),
         ...(paidThrough ? { paidThrough } : {}),
-        owedDays,
+        unpaidDays,
         ...(closableThrough ? { settledThrough: closableThrough } : {}),
       },
     ];

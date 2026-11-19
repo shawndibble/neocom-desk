@@ -729,7 +729,7 @@ export interface RecordedAccount {
   oldest?: string;
   paidThrough?: string;
   /** The running days still owed, oldest first (what the verify page lists); absent from an older client. */
-  owedDays?: { date: string; owed: number; tax: number }[];
+  unpaidDays?: { date: string; owed: number; tax: number }[];
   /**
    * The newest day the officer's client says is paid for good (D22), stored in `meta/paid`. Only
    * ever moves forward. The server has no prices, so it can't check the day was priced at a saved
@@ -1090,14 +1090,14 @@ export function parseEditAction(data: unknown): EditAction {
             ...(a.paidThrough !== undefined
               ? { paidThrough: dateString(a.paidThrough, 'paidThrough') }
               : {}),
-            ...(a.owedDays !== undefined
+            ...(a.unpaidDays !== undefined
               ? {
-                  owedDays: list(a.owedDays, 'owedDays', 1000).map((rawDay) => {
+                  unpaidDays: list(a.unpaidDays, 'unpaidDays', 1000).map((rawDay) => {
                     const day = record(rawDay);
                     return {
-                      date: dateString(day.date, 'owedDays.date'),
-                      owed: num(day.owed, 'owedDays.owed', 0, 1e13),
-                      tax: num(day.tax, 'owedDays.tax', 0, 1e13),
+                      date: dateString(day.date, 'unpaidDays.date'),
+                      owed: num(day.owed, 'unpaidDays.owed', 0, 1e13),
+                      tax: num(day.tax, 'unpaidDays.tax', 0, 1e13),
                     };
                   }),
                 }

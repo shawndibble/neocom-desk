@@ -61,13 +61,13 @@ describe('accountRecords', () => {
         days: 2,
         oldest: '2026-11-03',
         paidThrough: '2026-11-02',
-        owedDays: [
+        unpaidDays: [
           { date: '2026-11-03', owed: 900, tax: 900 },
           { date: '2026-11-04', owed: 400, tax: 1000 },
         ],
         settledThrough: '2026-11-02',
       },
-      { minerId: 'm2', owed: 0, paid: 0, days: 0, owedDays: [] },
+      { minerId: 'm2', owed: 0, paid: 0, days: 0, unpaidDays: [] },
     ]);
   });
 

@@ -1,16 +1,14 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CollapsiblePanel } from '@/components/ui';
-import type { VerifyPayload } from '@/engine/corpTaxBook/verifyView';
+import type { VerifyLedgerData } from '@/engine/corpTaxBook/verifyView';
 import { isk, shortDate } from './statementFormat';
-
-type Ledger = NonNullable<VerifyPayload['ledger']>;
 
 /**
  * The Miner's whole history, closed until asked for: every mined day (its tax) and every payment
  * (its net amount), newest first. What the page lists above as still owed is a part of this.
  */
-export function VerifyLedger({ ledger }: { ledger: Ledger }) {
+export function VerifyLedger({ ledger }: { ledger: VerifyLedgerData }) {
   const { t, i18n } = useTranslation();
   const [open, setOpen] = useState(false);
   const rows = useMemo(

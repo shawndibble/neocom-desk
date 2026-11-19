@@ -33,12 +33,11 @@ type LoadState =
   | { status: 'failed' };
 
 /**
- * The guest verify page (issue #4066, D27, mockup step 19 option B): a
- * Statement's lines with their pricing, its terms with dates and the payments
- * credited, read with the link's token alone, no login and no Character. The
- * mail is minimal on purpose; this is where a miner checks every line.
- * Desktop: lines and payments left, Balance due / Terms / Stop reminders right.
- * Phone: Balance due, Terms, What you mined, Payments credited, Stop reminders.
+ * The guest verify page (issue #4066, D27): a Statement or late notice read with the link's token
+ * alone, no login and no Character. It leads with what is owed now and how to pay, lists only the
+ * days still owed (one line each, opening to its ore), and keeps every day and payment in a
+ * Ledger that stays closed until asked for. A Statement whose days the officer's client did not
+ * record, or that older Statements still owe on, lists every line and its payments instead.
  */
 export function VerifyPage({ token }: { token: string }) {
   const { t } = useTranslation();
@@ -136,11 +135,25 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
   const byAccount = Boolean(account) || notice;
   const owing = byAccount ? owedNow : remaining;
   // The days still owed, when the officer's client recorded them: the page then lists those and
-  // keeps everything paid in the ledger, instead of every line of this Statement.
-  const owedDays = account?.owedDays;
-  const earlier = owedDays
-    ? Math.max(0, owedNow - owedDays.reduce((sum, d) => sum + d.owed, 0))
-    : 0;
+  // keeps everything paid in the ledger, instead of every line of this Statement. Money older
+  // Statements still owe has no day to list (a few ISK of rounding aside), so the page keeps
+  // every line of the Statement then and the miner can still check them.
+  const recordedDays = account?.unpaidDays;
+  const unpaidSum = recordedDays?.reduce((sum, d) => sum + d.owed, 0) ?? 0;
+  const unpaidDays =
+    recordedDays && owedNow - unpaidSum <= recordedDays.length + 1 ? recordedDays : undefined;
+  // Days mined since the last notice are in no Statement: the recorded days add them to the ledger.
+  const ledger = useMemo(() => {
+    if (!payload.ledger) return undefined;
+    const known = new Set(payload.ledger.days.map((d) => d.date));
+    const days = [
+      ...payload.ledger.days,
+      ...(unpaidDays ?? [])
+        .filter((d) => !known.has(d.date))
+        .map((d) => ({ date: d.date, tax: d.tax })),
+    ];
+    return { ...payload.ledger, days };
+  }, [payload.ledger, unpaidDays]);
 
   const lastDeclaration = payload.declarations.at(-1);
   // The wallet divisions the book reads (#6204); an older server sends none, and then the page
@@ -212,7 +225,7 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
             </p>
           )}
           {/* Without the days still owed the page lists this Statement whole, so its sum stays. */}
-          {!notice && !owedDays && (
+          {!notice && !unpaidDays && (
             <p className="mt-2 text-sm text-text-dim tabular-nums">
               {t('corpTaxBook.verify.balanceSum', {
                 billed: isk(statement.amount),
@@ -272,7 +285,7 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
           </Panel>
         )}
       </div>
-      {owedDays ? (
+      {unpaidDays ? (
         <>
           {owing > 0 && (
             <Panel
@@ -282,10 +295,10 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
               }
               padded={false}
             >
-              <OwedDayList days={owedDays} statement={statement} earlier={earlier} />
+              <OwedDayList days={unpaidDays} statement={statement} />
             </Panel>
           )}
-          {payload.ledger && <VerifyLedger ledger={payload.ledger} />}
+          {ledger && <VerifyLedger ledger={ledger} />}
         </>
       ) : (
         <>

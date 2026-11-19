@@ -38,7 +38,7 @@ describe('liveAccount with the days still owed', () => {
     days: 3,
     oldest: '2026-11-08',
     at: '2026-11-19T10:00:00.000Z',
-    owedDays: [
+    unpaidDays: [
       { date: '2026-11-08', owed: 1_000_000, tax: 2_000_000 },
       { date: '2026-11-09', owed: 3_000_000, tax: 3_000_000 },
       { date: '2026-11-10', owed: 3_000_000, tax: 3_000_000 },
@@ -49,7 +49,7 @@ describe('liveAccount with the days still owed', () => {
     expect(liveAccount(recorded, [])).toMatchObject({
       owed: 7_000_000,
       days: 3,
-      owedDays: recorded.owedDays,
+      unpaidDays: recorded.unpaidDays,
     });
   });
 
@@ -58,7 +58,7 @@ describe('liveAccount with the days still owed', () => {
       owed: 5_500_000,
       days: 2,
       oldest: '2026-11-09',
-      owedDays: [
+      unpaidDays: [
         { date: '2026-11-09', owed: 2_500_000, tax: 3_000_000 },
         { date: '2026-11-10', owed: 3_000_000, tax: 3_000_000 },
       ],
@@ -70,7 +70,18 @@ describe('liveAccount with the days still owed', () => {
     expect(liveAccount(withLegacy, [{ amount: 500_000 }])).toMatchObject({
       owed: 7_500_000,
       oldest: '2026-10-01',
-      owedDays: recorded.owedDays,
+      unpaidDays: recorded.unpaidDays,
+    });
+  });
+
+  it('does not take a few ISK of per-day rounding for Statement debt', () => {
+    const rounded = { ...recorded, owed: 7_000_002 };
+    expect(liveAccount(rounded, [{ amount: 1_500_000 }])).toMatchObject({
+      oldest: '2026-11-09',
+      unpaidDays: [
+        { date: '2026-11-09', owed: 2_500_000, tax: 3_000_000 },
+        { date: '2026-11-10', owed: 3_000_000, tax: 3_000_000 },
+      ],
     });
   });
 
@@ -79,7 +90,7 @@ describe('liveAccount with the days still owed', () => {
       owed: 0,
       days: 0,
       oldest: null,
-      owedDays: [],
+      unpaidDays: [],
     });
   });
 });
