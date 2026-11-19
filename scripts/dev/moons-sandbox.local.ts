@@ -69,7 +69,12 @@ test('moons sandbox', async ({ page }) => {
       settings: {
         killmailPct: 60,
         appraisalPct: null,
-        hullRules: [],
+        hullRules: [
+          { scope: 'hull', id: 587, kind: 'pay-fixed', iskAmount: 4_000_000 },
+          { scope: 'hull', id: 24698, kind: 'pay-percent' },
+          { scope: 'hull', id: 28606, kind: 'officer-decides' },
+          { scope: 'hull', id: 16240, kind: 'not-covered' },
+        ],
         windowDays: 30,
         requireFleetOrFc: false,
       },

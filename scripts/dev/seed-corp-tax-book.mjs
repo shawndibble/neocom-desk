@@ -371,6 +371,7 @@ REFINERIES.forEach((s, i) => {
 // --- SRP (ship replacement): settings, the officer's access record, claims, audit ------
 // Layout of functions/src/srpStore.ts and src/features/corp/srpClaimTypes.ts. Officers read
 // all of it under the rules; the officer record needs canEdit and the same ownerHash.
+// Rifter, Drake, Raven, Catalyst, Hulk, Covetor, Orca (rules below: Rifter fixed, Drake percent, Catalyst not covered, Orca officer decides).
 const SRP_HULLS = [587, 24698, 638, 16240, 22544, 17476, 28606];
 put(book.collection('srp').doc('settings'), {
   corporationId: CORP,
@@ -409,10 +410,12 @@ const SRP_STATES = ['pending', 'pending', 'approved', 'paid', 'paid', 'rejected'
 for (let i = 0; i < 14; i++) {
   const miner = MINERS[i % MINERS.length];
   const state = SRP_STATES[i % SRP_STATES.length];
-  const hullTypeId = SRP_HULLS[i % SRP_HULLS.length];
+  // A claim awaiting an officer-typed amount is on the hull whose rule is "officer decides".
+  const needsAmount = state === 'pending' && i % 2 === 0;
+  const hullTypeId = needsAmount ? 28606 : SRP_HULLS[i % SRP_HULLS.length];
   const killmailId = 130_000_001 + i;
   const filedAt = NOW - (i * 11 + 4) * HOUR;
-  const amount = state === 'pending' && i % 2 === 0 ? null : 3_000_000 + ((i * 7) % 9) * 2_500_000;
+  const amount = needsAmount ? null : 3_000_000 + ((i * 7) % 9) * 2_500_000;
   const decided = state === 'approved' || state === 'paid' || state === 'rejected';
   const claim = {
     killmailId,
@@ -421,7 +424,7 @@ for (let i = 0; i < 14; i++) {
     characterId: miner.id,
     characterName: miner.name,
     uid: `char:${miner.id}`,
-    ownerHash: 'dev-owner-hash',
+    ownerHash: args['owner-hash'],
     hullTypeId,
     solarSystemId: SYSTEMS[i % SYSTEMS.length],
     killedAt: filedAt - 2 * HOUR,
@@ -458,15 +461,15 @@ for (let i = 0; i < 14; i++) {
         .doc(`${String(at).padStart(15, '0')}~${randomBytes(6).toString('base64url')}`),
       {
         at,
-        by: action === 'file' ? miner.id : OFFICER,
-        byName: action === 'file' ? miner.name : args['officer-name'],
+        by: action === 'fileClaim' ? miner.id : OFFICER,
+        byName: action === 'fileClaim' ? miner.name : args['officer-name'],
         action,
         detail: { killmailId, hullTypeId },
       }
     );
-  entry(filedAt, 'file');
-  if (decided) entry(filedAt + 2 * HOUR, state === 'rejected' ? 'reject' : 'approve');
-  if (state === 'paid') entry(filedAt + 6 * HOUR, 'markPaid');
+  entry(filedAt, 'fileClaim');
+  if (decided) entry(filedAt + 2 * HOUR, state === 'rejected' ? 'rejectClaim' : 'approveClaim');
+  if (state === 'paid') entry(filedAt + 6 * HOUR, 'markClaimPaid');
 }
 
 // --- Audit trail (what turnOn and issueStatement append) ---------------------
