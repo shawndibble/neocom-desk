@@ -108,7 +108,7 @@ describe('the rail', () => {
     expect(names).toEqual(expect.arrayContaining(['Corp Board', 'Corp Wallet', 'Moons']));
     expect(names).not.toContain('Corp Assets');
     expect(names).not.toContain('Members');
-    expect(within(group).getByRole('link', { name: 'Statements' })).toBeInTheDocument();
+    expect(within(group).getByRole('link', { name: 'Late notices' })).toBeInTheDocument();
   });
 
   it('marks only Corp Wallet current on /corp/wallet, not Corp Board above it', async () => {
