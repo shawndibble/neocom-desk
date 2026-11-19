@@ -8262,10 +8262,10 @@
       },
       "detail": {
         "lockedResolve": "Think one is wrong? Resolve it with {{corp}}.",
-        "bookAndYou": "{{book}} (book) · {{you}} (you)",
+        "bookAndYou": "{{book}} (corp) · {{you}} (you)",
         "priced": "{{hub}} buy · {{form}} ore · {{pct}}% {{scope}} from {{from}}",
         "bookTitle": "Corp Tax Book",
-        "lockedShort": "The book owns these figures, so they can't be edited here.",
+        "lockedShort": "{{corp}} keeps these figures, so they can't be edited here.",
         "unlinkedDonation": "Your {{amount}} ISK donation sent {{time}} paid this day, but {{corp}} never credited it, so it's owed again. Resolve it to send {{corp}} that transfer from your wallet journal.",
         "factBilling": "Billing",
         "factBillingNext": "On its date",
@@ -8276,11 +8276,11 @@
         "creditAppliedNote": "{{corp}} already held credit from an earlier payment of yours, and applied {{amount}} ISK of it to this day.",
         "yourMarkNote": "The corporation confirms your mark against its wallet.",
         "markedPaidNote": "Marked paid by you — {{corp}} still shows {{owed}} ISK owed. It confirms your mark against its wallet.",
-        "markedPaidSpentNote": "Marked paid by you. {{corp}}'s book already holds that payment, but it pays your oldest open days first and spent it on {{days}}, so it still bills this day {{owed}} ISK. Resolve says what you can do.",
+        "markedPaidSpentNote": "Marked paid by you. {{corp}} already holds that payment, but it pays your oldest open days first and spent it on {{days}}, so it still bills this day {{owed}} ISK. Resolve says what you can do.",
         "settledBy": {
           "yourMark": "Your mark",
           "donation": "Donation",
-          "credit": "Credit the book holds",
+          "credit": "Corp credit",
           "statement": "Statement payment"
         },
         "paidBy": {
@@ -8297,7 +8297,7 @@
         "settled": {
           "alsoMarked": "You also marked this day paid. Unmark it if that was a mistake."
         },
-        "disputeHint": "Your own record differs from the book.",
+        "disputeHint": "Your own record differs from the corp's records.",
         "corrected": "Corrected by the corporation: {{before}} → {{after}}.",
         "reason": "Their reason: {{reasons}}"
       },

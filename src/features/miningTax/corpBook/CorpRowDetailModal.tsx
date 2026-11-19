@@ -205,7 +205,6 @@ export function CorpRowDetailModal({
                 </>
               )}
               {' · '}
-              {view.taxPct}%{' · '}
               {t('miningTax.detail.valueLine', { value: formatIsk(view.estimatedValue) })}
             </span>
             <CorpStatusPill corp={corp} />
@@ -218,6 +217,7 @@ export function CorpRowDetailModal({
             <ul className="divide-y divide-line text-xs">
               {view.oreLines.map((line) => {
                 const you = personal?.find((p) => p.typeId === line.typeId)?.quantity;
+                const source = view.priceSources[line.typeId] ?? 'none';
                 return (
                   <li
                     key={line.typeId}
@@ -227,13 +227,20 @@ export function CorpRowDetailModal({
                     <span className="min-w-0 flex-1 truncate">
                       <OreLink typeId={line.typeId}>{typeLabel(typeNames, line.typeId)}</OreLink>
                     </span>
-                    <span className="text-text-dim tabular-nums">
+                    <span className="shrink-0 text-right whitespace-nowrap text-text-dim tabular-nums">
                       {you !== undefined && you !== line.quantity
                         ? t('miningTax.corpBook.detail.bookAndYou', {
                             book: formatCount(line.quantity),
                             you: formatCount(you),
                           })
                         : formatCount(line.quantity)}
+                      {' × '}
+                      {formatIsk(view.unitPrices[line.typeId] ?? 0)}
+                      {source !== 'saved' && (
+                        <span className="block text-[11px]">
+                          {t(`miningTax.detail.breakdown.source.${source}`)}
+                        </span>
+                      )}
                     </span>
                   </li>
                 );
@@ -252,23 +259,6 @@ export function CorpRowDetailModal({
                 from: view.rateEffectiveFrom ?? view.date,
               })}
             </p>
-            <ul className="divide-y divide-line text-xs">
-              {view.oreLines.map((line) => (
-                <li key={line.typeId} className="flex flex-wrap items-baseline gap-x-2 py-1">
-                  <span className="min-w-0 flex-1 truncate">
-                    <OreLink typeId={line.typeId}>{typeLabel(typeNames, line.typeId)}</OreLink>
-                  </span>
-                  <span className="text-text-dim tabular-nums">
-                    {formatCount(line.quantity)} × {formatIsk(view.unitPrices[line.typeId] ?? 0)}
-                  </span>
-                  <span className="text-text-dim">
-                    {t(
-                      `miningTax.detail.breakdown.source.${view.priceSources[line.typeId] ?? 'none'}`
-                    )}
-                  </span>
-                </li>
-              ))}
-            </ul>
           </Well>
 
           {/* On a Conflict with nothing else to say, the notice already names who to ask. */}
@@ -348,7 +338,9 @@ export function CorpRowDetailModal({
                 view.markedPaidIds.length > 0 && (
                   <p>{t('miningTax.corpBook.detail.settled.alsoMarked')}</p>
                 )}
-              <p className="text-text-dim">{t('miningTax.corpBook.detail.lockedShort')}</p>
+              <p className="text-text-dim">
+                {t('miningTax.corpBook.detail.lockedShort', { corp: corp.corpName })}
+              </p>
               {onResolve && resolvable && (
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-text-dim">
