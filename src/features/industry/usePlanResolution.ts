@@ -74,6 +74,8 @@ export function usePlanResolution({
       reactionBuildSystemId,
       activity,
       plan.costIndexOverridePct,
+      productTypeID,
+      plan.productSalePrice,
       refreshTick
     );
 

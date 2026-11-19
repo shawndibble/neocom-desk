@@ -38,6 +38,28 @@ function parent(typeID: number, quantity: number, owned = 0): MaterialCostLine {
   )[0];
 }
 
+describe('planSubBuild past the max production limit', () => {
+  it('splits into even jobs, rounds each, and quotes the longest job', () => {
+    const limited = recipe({ maxProductionLimit: 20 });
+    const sub = planSubBuild(parent(57478, 150), limited, 10, CTX);
+
+    expect(sub?.runs).toBe(50);
+    expect(sub?.jobRuns).toEqual([17, 17, 16]);
+    const perJob = [17, 17, 16].map(
+      (r) => planSubBuild(parent(57478, r * 3), recipe(), 10, CTX)!.inputs[0].quantity
+    );
+    expect(sub?.inputs[0].quantity).toBe(perJob.reduce((a, b) => a + b, 0));
+    expect(sub?.seconds).toBe(planSubBuild(parent(57478, 51), recipe(), 10, CTX)!.seconds);
+  });
+
+  it('leaves a job within the limit as it was', () => {
+    const sub = planSubBuild(parent(57478, 150), recipe({ maxProductionLimit: 50 }), 0, CTX);
+    const plain = planSubBuild(parent(57478, 150), recipe(), 0, CTX);
+    expect(sub).toEqual(plain);
+    expect(sub?.jobRuns).toEqual([50]);
+  });
+});
+
 describe('planSubBuild', () => {
   it('sizes the job in runs, not units — a recipe that yields three per run needs a third of the runs', () => {
     const sub = planSubBuild(parent(57478, 150), recipe(), 0, CTX);

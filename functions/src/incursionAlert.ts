@@ -1,4 +1,4 @@
-// Mirror of src/engine/incursions/incursionAlert.ts (byte for byte below this line except the import; nearbyAlerts.test.ts pins it). Edit the source, then copy.
+// Lives in functions/src (deploy uploads functions/ alone); src re-exports it. Keep it import-free.
 /**
  * The "Incursion within N jumps" alert (issue #3542): fires when an Incursion
  * comes within the pilot's chosen number of jumps of their Current System,

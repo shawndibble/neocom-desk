@@ -15,6 +15,7 @@ import { Readable, pipeline } from 'node:stream';
 import { parse } from 'csv-parse';
 import unbzip2Stream from 'unbzip2-stream';
 import { MARKET_OPEN_PRICES_REGION_IDS, addDays } from './marketOpenPrices.js';
+import { DAY_MS } from './timeConstants.js';
 
 const EVEREF_HISTORY_BASE = 'https://data.everef.net/market-history';
 export const LP_VOLUME_WINDOW_DAYS = 30;
@@ -23,7 +24,6 @@ const REQUIRED_COLUMNS = ['region_id', 'type_id', 'volume'] as const;
 /** Read when present, for the hauling demand fold (issue #5344); a file without them still feeds `perDay`. */
 const DEMAND_COLUMNS = ['date', 'highest', 'lowest', 'order_count'] as const;
 const RECENT_PRICE_DAYS = 7;
-const DAY_MS = 86_400_000;
 
 export function historyDayUrl(date: string): string {
   return `${EVEREF_HISTORY_BASE}/${date.slice(0, 4)}/market-history-${date}.csv.bz2`;

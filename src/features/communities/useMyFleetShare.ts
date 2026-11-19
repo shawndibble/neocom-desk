@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import type { FleetShare } from '@/engine/communities/fleetPayouts';
 import { loadMyFleetShare } from './fleetPayoutStore';
 
@@ -11,17 +12,11 @@ export function useMyFleetShare(
   communityId: string,
   payoutId: string
 ): MyFleetShare {
-  const [loaded, setLoaded] = useState<{ key: string; result: MyFleetShare } | null>(null);
-  const key = `${characterId}:${communityId}:${payoutId}`;
-  useEffect(() => {
-    let cancelled = false;
-    loadMyFleetShare(characterId, communityId, payoutId).then(
-      (share) => !cancelled && setLoaded({ key, result: { status: 'ready', share } }),
-      () => !cancelled && setLoaded({ key, result: { status: 'failed' } })
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId, communityId, payoutId, key]);
-  return loaded?.key === key ? loaded.result : { status: 'loading' };
+  const load = useCallback(
+    () => loadMyFleetShare(characterId, communityId, payoutId),
+    [characterId, communityId, payoutId]
+  );
+  const loaded = useKeyedLoad(`${characterId}:${communityId}:${payoutId}`, load);
+  if (loaded.status === 'ready') return { status: 'ready', share: loaded.data };
+  return loaded.status === 'failed' ? { status: 'failed' } : { status: 'loading' };
 }

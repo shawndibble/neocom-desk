@@ -8,7 +8,17 @@
  * of truth, so nothing here can change a saved plan's cost.
  */
 
+import {
+  consumedByJobs,
+  type JobConsumption,
+  type StockJob,
+} from '@/engine/industry/jobConsumedStock';
+import { ME_MAX } from '@/engine/industry/efficiency';
 import type { OwnedStockPlacement, OwnedStockSource } from '@/engine/industry/ownedStock';
+import { EMPTY_RIG_FIT, FACILITY_PRESETS, type FacilityContext } from '@/engine/industry/types';
+import { loadAllCharactersIndustryJobs } from './jobs';
+import { loadCharacterBlueprints } from './data';
+import { loadBlueprintCatalog, toIndustryBlueprint } from './blueprintCatalog';
 import { loadAllCharactersAssets } from '@/features/assets/assets';
 import { loadStationName } from '@/features/character/stations';
 import { loadStructureName } from '@/features/character/structures';
@@ -27,12 +37,18 @@ export interface OwnedStockSnapshot {
    * must never be presented as exact.
    */
   incompleteCharacters: string[];
+  /**
+   * What the Characters' manufacturing and reaction jobs installed after their
+   * assets were read consumed (issue #6386): still in `sources`, already gone.
+   */
+  jobConsumption?: JobConsumption[];
 }
 
 export const EMPTY_OWNED_STOCK_SNAPSHOT: OwnedStockSnapshot = {
   sources: [],
   characterNames: new Map(),
   incompleteCharacters: [],
+  jobConsumption: [],
 };
 
 /** Cache-first per `loadCharacterAssets`: the common case costs no ESI call at all. */
@@ -47,7 +63,76 @@ export async function loadOwnedStockSnapshot(): Promise<OwnedStockSnapshot> {
     ...entries.filter((entry) => entry.truncated).map((entry) => entry.name),
     ...skipped.map((character) => character.name),
   ].sort((a, b) => a.localeCompare(b));
-  return { sources, characterNames, incompleteCharacters };
+  const snapshotMsByCharacter = new Map<number, number>();
+  for (const entry of entries) {
+    if (entry.fetchedAt) snapshotMsByCharacter.set(entry.characterId, entry.fetchedAt.getTime());
+  }
+  const jobConsumption = await loadJobConsumption(snapshotMsByCharacter);
+  return { sources, characterNames, incompleteCharacters, jobConsumption };
+}
+
+/**
+ * The job's real facility bonuses are not on the job record, so its materials
+ * are priced at a neutral facility: a structure bonus makes the true figure at
+ * most a few percent lower.
+ */
+const NEUTRAL_FACILITY: FacilityContext = {
+  facility: FACILITY_PRESETS.npcStation,
+  rigFit: EMPTY_RIG_FIT,
+  security: 'highsec',
+};
+
+/**
+ * Jobs newer than their Character's assets read, as consumed materials. A job
+ * record carries no ME: it is read from the Character's blueprint of that item,
+ * and a blueprint that cannot be found (a consumed copy, no blueprints scope)
+ * counts as ME 10 — the least it could have consumed, so the failure is an
+ * unchanged offer. Never throws: this only ever refines the offer.
+ */
+async function loadJobConsumption(
+  snapshotMsByCharacter: ReadonlyMap<number, number>
+): Promise<JobConsumption[]> {
+  if (snapshotMsByCharacter.size === 0) return [];
+  try {
+    const [{ entries }, catalog] = await Promise.all([
+      loadAllCharactersIndustryJobs(),
+      loadBlueprintCatalog(),
+    ]);
+    const stockJobs: StockJob[] = [];
+    for (const entry of entries) {
+      const snapshotMs = snapshotMsByCharacter.get(entry.characterId);
+      const fresh = (entry.result.cached?.data ?? []).filter(
+        (job) => snapshotMs !== undefined && Date.parse(job.start_date) > snapshotMs
+      );
+      if (fresh.length === 0) continue;
+      const blueprints = (await loadCharacterBlueprints(entry.characterId)).cached?.data ?? [];
+      const meByItem = new Map(blueprints.map((b) => [b.item_id, b.material_efficiency]));
+      for (const job of fresh) {
+        const knownMe = job.blueprint_id === undefined ? undefined : meByItem.get(job.blueprint_id);
+        stockJobs.push({
+          jobId: job.job_id,
+          characterId: entry.characterId,
+          activityId: job.activity_id,
+          blueprintTypeId: job.blueprint_type_id,
+          runs: job.runs,
+          startMs: Date.parse(job.start_date),
+          facilityId: job.facility_id,
+          me: knownMe ?? ME_MAX,
+        });
+      }
+    }
+    return consumedByJobs(
+      stockJobs,
+      snapshotMsByCharacter,
+      (id) => {
+        const entry = catalog.byBlueprintTypeID.get(id);
+        return entry ? toIndustryBlueprint(entry.blueprint) : undefined;
+      },
+      NEUTRAL_FACILITY
+    );
+  } catch {
+    return [];
+  }
 }
 
 /** A name lookup that fails is a missing label, not a failed detection. */
@@ -162,4 +247,12 @@ export interface OwnedStockDetection {
   /** For a corp-owned placement (issue #798's Corp Assets toggle) — labels it by corporation, not the reading Director. */
   corporationNameFor: (corporationId: number) => string;
   locationLabelFor: (placement: Pick<OwnedStockPlacement, 'locationId' | 'locationType'>) => string;
+  /** What jobs installed after the assets read took out of this material's scoped stock (issue #6386); absent or `null` when nothing. */
+  reducedFor?: (typeID: number) => JobReduction | null;
+}
+
+/** The note on a reduced offer: how much, and the blueprints of the jobs behind it. */
+export interface JobReduction {
+  quantity: number;
+  blueprintNames: readonly string[];
 }

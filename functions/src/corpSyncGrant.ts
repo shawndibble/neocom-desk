@@ -75,6 +75,7 @@ import {
 } from './corpSyncStoppedAlert.js';
 import type { CorporationAllianceLookup } from './sharedPopsEsi.js';
 import { learnOwnRefineryNames, stampFailedRoleCheck } from './sharedPopsStore.js';
+import { HOUR_MS } from './timeConstants.js';
 
 export const CORP_SYNC_GRANTS_COLLECTION = 'corpTaxBookSyncGrants';
 export { SCHEDULED_SYNC_DOC };
@@ -105,6 +106,12 @@ export interface CorpSyncGrantDoc {
    * its refineries' names and systems (#4654). Absent on grants from before: never looked up.
    */
   readsStructures?: boolean;
+  /**
+   * Feeder grants: the token also carries `esi-characters.read_notifications.v1`, so the sync
+   * reads the holder's Extraction started notifications for each chunk's ore. Absent on grants
+   * from before: their chunks' ore comes from a linked Survey or stays unknown.
+   */
+  readsNotifications?: boolean;
   /**
    * Book grants: when the scheduled run next syncs this book (ms). The run queries `<= now`, so a
    * book synced within `SYNC_REST_MS` is not read at all. Feeder grants never carry it (the feeder
@@ -561,7 +568,7 @@ export const SYNC_CORP_TAX_BOOKS_SCHEDULE = {
 } as const;
 
 /** A synced book rests this long; under the 2-hour tick spacing, so a late run never skips a slot. */
-export const SYNC_REST_MS = 3_600_000;
+export const SYNC_REST_MS = HOUR_MS;
 
 /** One doc: when the last `nextSyncAt` backfill scan ran. */
 const GRANT_BACKFILL_DOC = 'corpTaxBookSyncGrantMeta/nextSyncAtBackfill';
@@ -763,7 +770,8 @@ export async function syncOneFeeder(
       esi,
       collectorCorporationId,
       feederNow,
-      refreshed.accessToken
+      refreshed.accessToken,
+      live.readsNotifications === true ? live.characterId : undefined
     );
   } catch (err) {
     deps.log('Moon owner extractions read failed', {

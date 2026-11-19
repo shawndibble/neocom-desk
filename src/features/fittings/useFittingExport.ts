@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MARKET_TABS } from '@/app/pageTabs';
@@ -47,16 +48,8 @@ export function useFittingExport(fitting: Fitting, cloneImplants: readonly numbe
   // This Fitting's Fitting Share Code, encoded as it changes rather than on
   // the click — encoding awaits a compressor, and a copy after that await can
   // fall outside the click on Safari.
-  const [encoded, setEncoded] = useState<{ fitting: Fitting; code: string | null } | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    void fittingShareCode(fitting).then((code) => {
-      if (!cancelled) setEncoded({ fitting, code });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [fitting]);
+  const encode = useCallback(() => fittingShareCode(fitting), [fitting]);
+  const encoded = useAsyncLoad(encode);
 
   useTimedToast(notice, () => setNotice(null), NOTICE_MS);
 
@@ -129,7 +122,7 @@ export function useFittingExport(fitting: Fitting, cloneImplants: readonly numbe
   async function copyShareLink() {
     // The code encoded ahead of time keeps a reused link's copy free of any
     // await, so it stays inside the click — which is the whole retry path.
-    const code = encoded?.fitting === fitting ? encoded.code : await fittingShareCode(fitting);
+    const code = encoded.status === 'ready' ? encoded.data : await fittingShareCode(fitting);
     if (code === null) {
       setNotice(t('fittings.export.tooLarge'));
       return;

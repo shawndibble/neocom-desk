@@ -287,6 +287,7 @@ export function acquisitionMaterialFor(
       te: acquisition.te,
       ...(acquisition.line.community ? { community: acquisition.line.community } : {}),
       ...(acquisition.line.invented ? { invented: true as const } : {}),
+      ...(acquisition.copyOnly ? { copyOnly: true as const } : {}),
       ...(acquisition.line.pool
         ? {
             pool: {

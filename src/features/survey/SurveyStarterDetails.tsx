@@ -8,8 +8,9 @@
  */
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Panel } from '@/components/ui';
+import { CollapsiblePanel } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { useInfoFold } from './useInfoFold';
 import { SurveyDetailsFields } from './SurveyDetailsFields';
 import { parseTaxPct } from './moonTaxPayee';
 import {
@@ -82,8 +83,15 @@ export function SurveyStarterDetails({
       });
   }
 
+  const fold = useInfoFold(id, { info, tax });
+
   return (
-    <Panel title={t('survey.info.title')}>
+    <CollapsiblePanel
+      title={t('survey.info.title')}
+      expanded={fold.expanded}
+      onToggle={fold.onToggle}
+      labels={{ show: t('survey.info.show'), hide: t('survey.info.hide') }}
+    >
       <SurveyDetailsFields
         place={place}
         payeeName={payeeName}
@@ -105,6 +113,6 @@ export function SurveyStarterDetails({
         onNotes={setNotes}
         onCommit={commit}
       />
-    </Panel>
+    </CollapsiblePanel>
   );
 }

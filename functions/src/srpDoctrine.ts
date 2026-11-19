@@ -1,7 +1,7 @@
-// Mirror of src/engine/srpDoctrine.ts; srpDoctrine.test.ts checks they match.
+// Lives in functions/src (deploy uploads functions/ alone); src re-exports it. Keep it import-free.
 /**
- * SRP doctrine-fit match. Pure, self-contained (no imports) so
- * functions/src/srpDoctrine.ts can mirror it byte for byte.
+ * SRP doctrine-fit match. Pure, self-contained (no imports): it lives once in
+ * functions/src and src/engine re-exports it.
  *
  * Compares what a killmail's ship was fitted with to a hull's Doctrine Fits:
  * hull, modules (high/mid/low/subsystem) and rigs, by exact type, order ignored.

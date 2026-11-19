@@ -26,6 +26,8 @@ export const FILES = [
   'industryActivity.csv',
   'industryActivityMaterials.csv',
   'industryActivityProducts.csv',
+  // Most runs one job may be installed for (issue #6393); see `maxProductionLimit`.
+  'industryBlueprints.csv',
   'industryActivitySkills.csv',
   // Invention success chance per product (issue #3987); see `invention.json`.
   'industryActivityProbabilities.csv',

@@ -4,7 +4,7 @@
  * `calendarBoardData.ts` sits in must not (`bootImportGraph.test.ts`).
  */
 import type { RowDetailModel } from '@/features/overview/widgets/data/types';
-import { startLinkPath } from '@/features/survey/startLink';
+import { startLinkPath, withPop } from '@/features/survey/startLink';
 import { HOUR_MS, formatAge } from '@/lib/age';
 import { formatDuration } from '@/lib/duration';
 import { formatCalendarTimestamp } from '@/lib/timestamp';
@@ -17,7 +17,7 @@ import { sharedPopTitle, type SharedPopEntry } from './calendarSharedPops';
  */
 export function sharedPopStartLink(entry: SharedPopEntry): string {
   const { pop } = entry;
-  return startLinkPath({
+  const path = startLinkPath({
     place: {
       id: pop.structureId,
       name: pop.refineryName ?? entry.moonName ?? '',
@@ -27,6 +27,8 @@ export function sharedPopStartLink(entry: SharedPopEntry): string {
     rate: pop.ratePct,
     notes: '',
   });
+  // The pop rides along so the Survey this link starts is linked back to it (`SurveyStartScreen`).
+  return withPop(path, pop.id);
 }
 
 /** A book that has not synced for this long may have missed a laser shot or a cancel. */
@@ -118,6 +120,14 @@ export function sharedPopDetail(
     ...(pop.solarSystemId === null
       ? {}
       : { place: { systemId: pop.solarSystemId, name: sharedPopTitle(entry) } }),
-    link: { label: t('calendar.sharedPop.startSurvey'), to: sharedPopStartLink(entry) },
+    ...(pop.surveyId
+      ? {
+          link: { label: t('calendar.sharedPop.openSurvey'), to: `/s/${pop.surveyId}` },
+          secondaryLink: {
+            label: t('calendar.sharedPop.startNewSurvey'),
+            to: sharedPopStartLink(entry),
+          },
+        }
+      : { link: { label: t('calendar.sharedPop.startSurvey'), to: sharedPopStartLink(entry) } }),
   };
 }

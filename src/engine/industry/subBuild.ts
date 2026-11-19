@@ -24,10 +24,11 @@ import type {
   MaterialCostLine,
 } from '@/engine/industry/types';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
-import { effectiveMaterials } from '@/engine/industry/materials';
+import { splitEffectiveMaterials } from '@/engine/industry/jobSplit';
 import { jobDurationSeconds } from '@/engine/industry/time';
 import { estimatedItemValue, jobFee } from '@/engine/industry/jobCost';
 import { sizeRuns } from '@/engine/industry/runSizing';
+import { rigKindsApplyingTo } from '@/engine/industry/rigScope';
 
 /** A planned sub-job: what to install, and what it eats. */
 export interface SubBuild {
@@ -37,6 +38,8 @@ export interface SubBuild {
   runs: number;
   /** Units the recipe yields per run — why `runs` is not simply `needed`. */
   outputPerRun: number;
+  /** Runs of each job, largest first; several when `runs` exceeds the blueprint's max production limit. */
+  jobRuns: number[];
   /** runs x outputPerRun. */
   unitsMade: number;
   /** Units the job has to cover: the parent's remaining (non-owned) quantity. */
@@ -46,7 +49,7 @@ export interface SubBuild {
   /** ME the job is quoted at — the best copy the character owns, else 0. */
   me: number;
   /**
-   * Job duration. Quoted at TE 0, matching `makeOrBuy`'s manufacturing quote:
+   * Duration of the longest job. Quoted at TE 0, matching `makeOrBuy`'s manufacturing quote:
    * the recipe lookup carries the owned copy's ME but not its TE, and an
    * assumed TE would understate the wait.
    */
@@ -55,6 +58,12 @@ export interface SubBuild {
   inputs: EffectiveMaterial[];
   /** The sub-job's own installation fee — a real cost of choosing to build. */
   jobFee: JobFeeBreakdown;
+  /**
+   * The fitted rigs that reach this job's product (issue #6392), for the
+   * Calculation Breakdown. Absent when the structure has no rig fitted, so a
+   * plan without rigs shows nothing; empty when rigs are fitted but none covers it.
+   */
+  rigs?: string[];
 }
 
 /** Where the sub-job would run, and what it costs to install there. */
@@ -90,16 +99,25 @@ export function planSubBuild(
   const outputPerRun = product.quantity;
 
   try {
-    const inputs = effectiveMaterials(blueprint, runs, me, ctx);
+    const { jobRuns, materials: inputs } = splitEffectiveMaterials(blueprint, runs, me, ctx);
     return {
       typeID: material.typeID,
       runs,
+      jobRuns,
       outputPerRun,
       unitsMade,
       needed,
       spare,
       me,
-      seconds: jobDurationSeconds(blueprint.time, runs, 0, ctx.modifiers, ctx, blueprint.skills),
+      seconds: jobDurationSeconds(
+        blueprint.time,
+        jobRuns[0],
+        0,
+        ctx.modifiers,
+        ctx,
+        blueprint.skills,
+        blueprint.rigScope
+      ),
       inputs,
       jobFee: jobFee(
         estimatedItemValue(blueprint, runs, ctx.adjustedPrices),
@@ -108,6 +126,10 @@ export function planSubBuild(
         ctx.facilityTaxPct,
         ctx.regionalTaxPct
       ),
+      ...(ctx.facility.structure &&
+        ctx.rigFit.some((kind) => kind !== 'none') && {
+          rigs: rigKindsApplyingTo(ctx.rigFit, blueprint.rigScope),
+        }),
     };
   } catch {
     // The engine range-checks ME and runs. A blueprint or an owned-ME value

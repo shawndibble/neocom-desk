@@ -19,6 +19,10 @@ describe('documentTitleFor', () => {
     expect(documentTitleFor('/corp/moons', t)).toBe('Moons — Neocom Desk');
   });
 
+  it('titles the public Survey start page, not as a missing page', () => {
+    expect(documentTitleFor('/survey', t)).toBe('Start a mining survey — Neocom Desk');
+  });
+
   it('changes between two routes', () => {
     expect(documentTitleFor('/overview', t)).not.toBe(documentTitleFor('/assets', t));
   });

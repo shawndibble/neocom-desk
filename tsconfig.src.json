@@ -14,8 +14,8 @@
   "include": [
     "src",
     "src/**/*.json",
-    // Imported across the boundary by `src` (the callable manifest and the
-    // Corp Tax Book engine are shared; so are the import-free rules that live once here with the Cloud Functions).
+    // Imported across the boundary by `src`: the callable manifest, the Corp Tax
+    // Book engine, and the import-free rules that live once here.
     "functions/src/callableManifest.ts",
     "functions/src/corpTaxBookEngine.ts",
     "functions/src/corpTaxBookMinerTotals.ts",
@@ -30,7 +30,12 @@
     "functions/src/asyncPool.ts",
     "functions/src/vettingEngine.ts",
     "functions/src/skyhookAlert.ts",
-    "functions/src/jumpRoute.ts"
+    "functions/src/jumpRoute.ts",
+    "functions/src/incursionAlert.ts",
+    "functions/src/incursionState.ts",
+    "functions/src/srpPricing.ts",
+    "functions/src/srpDoctrine.ts",
+    "functions/src/timeConstants.ts"
   ],
   "exclude": [
     "src/**/*.test.ts",

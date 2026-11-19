@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { loadHubJumps } from './hubJumps';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 
 /**
  * Plain stargate jumps from one system to every other, for deciding which buy
@@ -9,16 +10,7 @@ import { loadHubJumps } from './hubJumps';
  * cannot be read.
  */
 export function useBuyJumps(systemId: number): ReadonlyMap<number, number> | undefined {
-  const [loaded, setLoaded] = useState<{ systemId: number; jumps: ReadonlyMap<number, number> }>();
-  useEffect(() => {
-    if (systemId === 0) return;
-    let cancelled = false;
-    void loadHubJumps(systemId).then((jumps) => {
-      if (!cancelled && jumps) setLoaded({ systemId, jumps });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [systemId]);
-  return loaded?.systemId === systemId ? loaded.jumps : undefined;
+  const loader = useCallback(() => loadHubJumps(systemId), [systemId]);
+  // A system with no readable graph loads null: no jumps.
+  return useKeyedLoad(systemId === 0 ? null : String(systemId), loader).data ?? undefined;
 }

@@ -83,6 +83,8 @@ export function getIndustryFacilities(
 export interface IndustryJob {
   job_id: number;
   activity_id: number;
+  /** The blueprint item, whose ME lives on `CharacterBlueprint.item_id`; ESI always sends it, a cache written before it was modeled may not hold it. */
+  blueprint_id?: number;
   blueprint_type_id: number;
   facility_id: number;
   station_id: number;

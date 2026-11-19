@@ -74,6 +74,7 @@ export function runSanityChecks({
   gasCloudMarketGroupIds,
   GAS_CLOUDS_GROUP_NAME,
   compressedOreTypeIds,
+  compressedGasTypeIds,
   piSchematics,
   piRaw,
   piUnpublished,
@@ -280,6 +281,15 @@ export function runSanityChecks({
   if (Object.keys(compressedOreTypeIds).length < moonOreTypeIds.length) {
     console.error(
       '  FAIL: fewer compressed-ore pairs than moon ore types alone — the "Compressed " naming convention may have changed'
+    );
+    process.exitCode = 1;
+  }
+  console.log(`  compressed-gas type id pairs: ${Object.keys(compressedGasTypeIds).length}`);
+  // 25 raw gas types today, each with a "Compressed " twin. A lower count means
+  // a pair went missing or the naming convention changed.
+  if (Object.keys(compressedGasTypeIds).length < 25) {
+    console.error(
+      '  FAIL: fewer than 25 compressed-gas pairs — the "Compressed " naming convention may have changed'
     );
     process.exitCode = 1;
   }

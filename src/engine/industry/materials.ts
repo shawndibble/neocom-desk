@@ -14,6 +14,7 @@ import type {
 } from '@/engine/industry/types';
 import { ME_MAX } from '@/engine/industry/efficiency';
 import { rigBonusPct } from '@/engine/industry/types';
+import type { ProductRigScope } from '@/engine/industry/rigScope';
 
 function round2(x: number): number {
   return Math.round((x + Number.EPSILON) * 100) / 100;
@@ -26,7 +27,11 @@ function assertRuns(runs: number): void {
 }
 
 /** Combined material multiplier for ME level + facility + rig. */
-export function materialModifier(me: number, ctx: FacilityContext): number {
+export function materialModifier(
+  me: number,
+  ctx: FacilityContext,
+  productScope?: ProductRigScope
+): number {
   if (!Number.isInteger(me) || me < 0 || me > ME_MAX) {
     throw new RangeError(`ME must be an integer 0..${ME_MAX}, got ${me}`);
   }
@@ -34,7 +39,7 @@ export function materialModifier(me: number, ctx: FacilityContext): number {
   // Rigs only work on player structures. Reactor rigs scale by security band
   // on a different table than manufacturing rigs (issue #460).
   const rigPct = ctx.facility.structure
-    ? rigBonusPct(ctx.rigFit, 'me', ctx.facility.activity, ctx.security)
+    ? rigBonusPct(ctx.rigFit, 'me', ctx.facility.activity, ctx.security, productScope)
     : 0;
   return (1 - me / 100) * (1 - structurePct / 100) * (1 - rigPct / 100);
 }
@@ -52,7 +57,7 @@ export function effectiveMaterials(
   me: number,
   ctx: FacilityContext
 ): EffectiveMaterial[] {
-  const modifier = materialModifier(me, ctx);
+  const modifier = materialModifier(me, ctx, blueprint.rigScope);
   return blueprint.materials.map(({ typeID, quantity }) => ({
     typeID,
     baseQuantity: quantity * runs,

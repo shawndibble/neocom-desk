@@ -70,6 +70,11 @@ export function ComingUpRail({
         : { longOverdue: [], rest: [...items] },
     [items, nowMs, selectedDayMs]
   );
+  // One sharing corporation across the list: name it once in the header, not on every row.
+  const soleSharer = useMemo(() => {
+    const names = new Set(items.flatMap((i) => (i.sharedBy ? [i.sharedBy.name] : [])));
+    return names.size === 1 ? [...names][0] : null;
+  }, [items]);
   const groups = useMemo(() => groupByDay(rest, zone), [rest, zone]);
   const longOverdueGroups = useMemo(() => groupByDay(longOverdue, zone), [longOverdue, zone]);
 
@@ -108,6 +113,7 @@ export function ComingUpRail({
               onSelectEvent={onSelectEvent}
               onSelectSkyhook={onSelectSkyhook}
               onSelectSharedPop={onSelectSharedPop}
+              hideSharedBy={soleSharer !== null}
             />
           </li>
         ))}
@@ -174,11 +180,16 @@ export function ComingUpRail({
           </button>
         )
       }
-      className="min-w-0 flex-1 md:max-w-lg md:min-w-72"
+      className="min-w-0 flex-1 md:min-w-72"
     >
       <div className="border-b border-line px-3 py-2">
         <CalendarClocks />
         <LiveStatus announceKey={selectedDayMs ?? 'all'}>{status}</LiveStatus>
+        {soleSharer !== null && (
+          <p className="mt-1 text-xs text-text-dim">
+            {t('calendar.rail.sharedBy', { name: soleSharer })}
+          </p>
+        )}
       </div>
       {content}
     </Panel>

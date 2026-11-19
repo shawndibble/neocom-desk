@@ -2,8 +2,8 @@
  * Slot-aware job schedule for a build tree: when each job starts and finishes
  * on the Characters' real job slots, sub-jobs in parallel, a parent waiting on
  * every sub-job it consumes. One job per node: a node's runs are never split
- * across slots (the cost engine prices one job per node, and splitting would
- * change per-job ME rounding and job fees).
+ * across slots here. A job past its blueprint's max production limit is
+ * already several nodes by the time it arrives (`planJobNodes`).
  *
  * Greedy list scheduling: repeatedly take the ready job (every dependency
  * scheduled) that can start earliest, ties going to the longest remaining path

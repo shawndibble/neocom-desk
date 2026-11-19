@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useRememberedUrlParams } from '@/lib/useUrlState';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
@@ -200,23 +201,9 @@ export function useBpcSourcingData() {
   // An LP row's system is its corporation's nearest station: the station list loads
   // lazily (outside the install precache) and never blocks the table.
   const lpRowsFound = lpOffers.rows.length > 0;
-  const [npcStations, setNpcStations] = useState<readonly NpcStationEntry[] | null>(null);
-  const [npcStationsFailed, setNpcStationsFailed] = useState(false);
-  useEffect(() => {
-    if (!lpRowsFound) return;
-    let cancelled = false;
-    loadNpcStations().then(
-      (list) => {
-        if (!cancelled) setNpcStations(list);
-      },
-      () => {
-        if (!cancelled) setNpcStationsFailed(true);
-      }
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [lpRowsFound]);
+  const npcLoad = useKeyedLoad('npc-stations', loadNpcStations, !lpRowsFound);
+  const npcStations: readonly NpcStationEntry[] | null = npcLoad.data ?? null;
+  const npcStationsFailed = npcLoad.status === 'failed';
   const lpRows = useMemo(
     () => placeLpRows(lpOffers.rows, npcStations, jumpFilter.jumps),
     [lpOffers.rows, npcStations, jumpFilter.jumps]

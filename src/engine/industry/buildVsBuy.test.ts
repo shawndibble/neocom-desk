@@ -38,6 +38,27 @@ const baseInputs: IndustryInputs = {
   }),
 };
 
+describe('buildVsBuy past the max production limit', () => {
+  it('rounds materials per job, prices one fee for the total runs, and times the longest job', () => {
+    const plain = buildVsBuy(baseInputs);
+    const split = buildVsBuy({ ...baseInputs, blueprint: { ...bp, maxProductionLimit: 4 } });
+
+    expect(plain.jobRuns).toEqual([10]);
+    expect(split.jobRuns).toEqual([4, 3, 3]);
+    const perJob = [4, 3, 3].map(
+      (runs) => buildVsBuy({ ...baseInputs, runs }).materials[1].quantity
+    );
+    expect(split.materials[1].quantity).toBe(perJob.reduce((a, b) => a + b, 0));
+    expect(split.jobFee).toEqual(plain.jobFee);
+    expect(split.seconds).toBe(buildVsBuy({ ...baseInputs, runs: 4 }).seconds);
+  });
+
+  it('is identical to today for a plan within the limit', () => {
+    const within = buildVsBuy({ ...baseInputs, blueprint: { ...bp, maxProductionLimit: 10 } });
+    expect(within).toEqual(buildVsBuy(baseInputs));
+  });
+});
+
 describe('buildVsBuy', () => {
   it('computes the full hand-checked scenario', () => {
     const r = buildVsBuy(baseInputs);

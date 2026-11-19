@@ -28,6 +28,7 @@ export async function writeOutputs({
   oreAndIceTypeIds,
   gasCloudTypeIds,
   compressedOreTypeIds,
+  compressedGasTypeIds,
   shipTree,
   typeNames,
   typeEffects,
@@ -105,6 +106,7 @@ export async function writeOutputs({
     ['oreAndIceTypeIds.json', oreAndIceTypeIds],
     ['gasCloudTypeIds.json', gasCloudTypeIds],
     ['compressedOreTypeIds.json', compressedOreTypeIds],
+    ['compressedGasTypeIds.json', compressedGasTypeIds],
     ['shipTree.json', shipTree],
     // Only the Workbench's out-of-date check reads it (~1.7 MB), so it loads on demand.
     ['typeNames.json', typeNames],

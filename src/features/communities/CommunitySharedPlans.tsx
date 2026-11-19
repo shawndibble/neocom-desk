@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -13,6 +13,7 @@ import { uidForCharacter } from '@/sync/uid';
 import type { CommunityMember } from './communityStore';
 import { loadCommunityPlans } from './sharedPlans';
 import { SharedPlanList, type SharedPlanRow } from './SharedPlanList';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useReportMineCount } from './useTabSharing';
 
 type State =
@@ -39,26 +40,22 @@ export function CommunitySharedPlans({
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [state, setState] = useState<State>({ status: 'loading' });
+  const load = useCallback(
+    () => loadCommunityPlans(characterId, communityId),
+    [characterId, communityId]
+  );
+  const loaded = useKeyedLoad(`${characterId}:${communityId}`, load);
+  const state = useMemo<State>(
+    () =>
+      loaded.status === 'ready'
+        ? { status: 'ready', plans: loaded.data }
+        : { status: loaded.status === 'failed' ? 'failed' : 'loading' },
+    [loaded.status, loaded.data]
+  );
   const copying = useRef(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const myUid = uidForCharacter(characterId);
   useReportMineCount(state.status === 'ready' ? state.plans : null, myUid, onMineCount);
-
-  useEffect(() => {
-    let cancelled = false;
-    loadCommunityPlans(characterId, communityId).then(
-      (plans) => {
-        if (!cancelled) setState({ status: 'ready', plans });
-      },
-      () => {
-        if (!cancelled) setState({ status: 'failed' });
-      }
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId, communityId]);
 
   const rows = useMemo<SharedPlanRow[]>(() => {
     if (state.status !== 'ready') return [];

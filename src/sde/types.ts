@@ -1,6 +1,7 @@
 // Shapes of the slim SDE JSON emitted by scripts/build-sde.mjs.
 
 import type { PlanetType } from '@/esi/endpoints';
+import type { ProductRigScope } from '@/engine/industry/rigScope';
 
 export type CharacterAttribute =
   'charisma' | 'intelligence' | 'memory' | 'perception' | 'willpower';
@@ -128,6 +129,10 @@ export interface BlueprintType {
   products: BlueprintQuantity[];
   skills: BlueprintSkill[];
   activity: 'manufacturing' | 'reaction';
+  /** Most runs one job may be installed for (issue #6393); absent means no cap. */
+  maxProductionLimit?: number;
+  /** Which Standup engineering rigs reach this product (issue #6392); absent when none does. */
+  rigScope?: ProductRigScope;
 }
 
 /** public/data/blueprints.json: blueprint/formula typeID -> BlueprintType */

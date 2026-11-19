@@ -83,6 +83,7 @@ jobs:
         if: steps.check.outputs.update == 'true' && steps.branch.outputs.exists != 'true'
         run: |
           node scripts/build-sde.mjs
+          node scripts/build-srp-doctrine-data.mjs
           npx prettier --write functions/src/data
       - name: Open an auto-merging PR
         if: steps.check.outputs.update == 'true' && steps.branch.outputs.exists != 'true'

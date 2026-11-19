@@ -1,4 +1,4 @@
-// Mirror of src/engine/srpPricing.ts; srpKillmail.test.ts checks they match.
+// Lives in functions/src (deploy uploads functions/ alone); src re-exports it. Keep it import-free.
 /**
  * SRP Reimbursement chain (ADR 0026). Pure: no fetch/DOM/Dexie.
  *

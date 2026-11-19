@@ -10,6 +10,7 @@ import { indexHeader, isRefinable, packagedVolumesFrom } from './bakeCsv.mjs';
 import { fitTypeIds } from './fitTypeIds.mjs';
 import { MARKET_WIDE_MAX_DEPTH, flattenMarketWideTree } from './flattenMarketWideTree.mjs';
 import { bakeDecryptors, bakeInvention } from './invention.mjs';
+import { productRigScope, verifyRigScopeAttributes } from './rigScope.mjs';
 
 export function bakeIndustry({ raw, types, groups, attrsByType, skills, ccpTypes }) {
   // --- blueprints.json (manufacturing + reaction, published items only) ---
@@ -82,12 +83,55 @@ export function bakeIndustry({ raw, types, groups, attrsByType, skills, ccpTypes
     }
   }
 
+  const maxProductionLimit = new Map();
+  {
+    const rows = raw['industryBlueprints.csv'];
+    const h = indexHeader(rows);
+    for (let i = 1; i < rows.length; i++) {
+      const limit = Number(rows[i][h.maxProductionLimit]);
+      // A renamed column or blank cell would otherwise bake as NaN/0.
+      if (!Number.isInteger(limit) || limit < 1) {
+        throw new Error(`industryBlueprints.csv row ${i}: 'maxProductionLimit' is not a run count`);
+      }
+      maxProductionLimit.set(Number(rows[i][h.typeID]), limit);
+    }
+  }
+
+  // Which engineering rigs reach each manufactured product (issue #6392). The
+  // pinned dogma descriptions fail the bake if CCP re-scopes an attribute.
+  {
+    const rows = raw['dgmAttributeTypes.csv'];
+    const h = indexHeader(rows);
+    verifyRigScopeAttributes(
+      rows.slice(1).map((r) => ({ attributeID: r[h.attributeID], description: r[h.description] }))
+    );
+  }
+  const metaGroupByType = new Map();
+  {
+    const rows = raw['invMetaTypes.csv'];
+    const h = indexHeader(rows);
+    for (let i = 1; i < rows.length; i++) {
+      metaGroupByType.set(Number(rows[i][h.typeID]), Number(rows[i][h.metaGroupID]));
+    }
+  }
+  const rigScopeOf = (productTypeID) => {
+    const product = types.get(productTypeID);
+    if (!product) return undefined;
+    return productRigScope({
+      categoryID: groups.get(product.groupID)?.categoryID,
+      groupID: product.groupID,
+      metaGroupID: metaGroupByType.get(productTypeID),
+    });
+  };
+
   const blueprints = {};
   for (const typeID of [...bpTime.keys()].sort((a, b) => a - b)) {
     const t = types.get(typeID);
     if (!t || !t.published) continue; // strip unpublished blueprints/formulas
     const products = bpProducts.get(typeID);
     if (!products || products.length === 0) continue; // nothing made
+    const rigScope =
+      bpActivity.get(typeID) === 'manufacturing' ? rigScopeOf(products[0].typeID) : undefined;
     blueprints[typeID] = {
       name: t.name,
       time: bpTime.get(typeID),
@@ -95,6 +139,9 @@ export function bakeIndustry({ raw, types, groups, attrsByType, skills, ccpTypes
       products,
       skills: bpSkills.get(typeID) ?? [],
       activity: bpActivity.get(typeID),
+      // Absent means no cap (a row missing from the dump).
+      ...(maxProductionLimit.has(typeID) && { maxProductionLimit: maxProductionLimit.get(typeID) }),
+      ...(rigScope && { rigScope }),
     };
   }
 

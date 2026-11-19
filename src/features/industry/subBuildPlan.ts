@@ -26,6 +26,8 @@
  * "Build it" modal renders.
  */
 
+import { formatCount } from '@/lib/formatCount';
+import type { Translate } from '@/lib/translate';
 import { mergeCostLines } from '@/engine/industry/mergeCostLines';
 import type { ResolvedMaterial, ResolvedSubBuild } from '@/engine/industry/materialResolution';
 import { resolvedSubBuildSeconds } from '@/engine/industry/materialResolution';
@@ -140,11 +142,30 @@ export interface BuildRecipeInput extends MaterialCostLine {
   built: boolean;
 }
 
+/** "3 jobs of 30 runs", or "up to" when the split jobs differ by a run. */
+export function jobsOfRuns(t: Translate, jobRuns: readonly number[]): string {
+  const longest = Math.max(...jobRuns);
+  const even = jobRuns.every((r) => r === longest);
+  return t(even ? 'industry.jobsOfRuns' : 'industry.jobsOfUpToRuns', {
+    count: longest,
+    jobs: formatCount(jobRuns.length),
+    runs: formatCount(longest),
+  });
+}
+
 /** What producing one material actually takes — the whole content of its "Build it" modal. */
 export interface BuildRecipe {
   typeID: number;
   /** Job runs to install, summed over every job in the tree that makes this material. */
   runs: number;
+  /**
+   * Runs of every job making this material, largest first within a job. More
+   * entries than the tree has jobs when one was split past its blueprint's max
+   * production limit (`split`).
+   */
+  jobRuns: number[];
+  /** True when at least one job was split past the blueprint's max production limit. */
+  split: boolean;
   /** Units one run yields — why `runs` is not simply the quantity needed. */
   outputPerRun: number;
   unitsMade: number;
@@ -191,6 +212,8 @@ export function buildRecipe(row: MaterialTableRow): BuildRecipe | null {
   return {
     typeID: row.typeID,
     runs: sum((job) => job.runs),
+    jobRuns: row.subBuilds.flatMap((job) => job.jobRuns),
+    split: row.subBuilds.some((job) => job.jobRuns.length > 1),
     // `outputPerRun` and `me` come off the first job alone because they are
     // properties of the blueprint and of the copy the character owns — the
     // same for every job producing this material, whichever branch asked.

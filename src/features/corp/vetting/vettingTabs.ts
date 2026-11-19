@@ -5,13 +5,15 @@ import { VETTING_SETTINGS_SECTIONS, type VettingSettingsSection } from './vettin
 /**
  * `/corp/vetting`'s tabs (ADR 0015), in bar order. Open and Decided each own the path below
  * them: `/corp/vetting/open/<reviewId>` is that review's report, which `VettingPage` draws as a
- * page of its own. Settings is listed only for a Director (`canConfigure`); the path below it
- * names one of its sections (`/corp/vetting/settings/applicants`), so a section can be linked.
+ * page of its own. Settings is a gear and a modal, for a Director only (`canConfigure`); the
+ * path below it names one of its sections (`/corp/vetting/settings/applicants`), so a section
+ * can be linked.
  */
 export const VETTING_TABS = definePageTabs('/corp/vetting', [
   { id: 'open', labelKey: 'vetting.tabs.open', deep: true },
   { id: 'decided', labelKey: 'vetting.tabs.decided', deep: true },
-  { id: 'settings', labelKey: 'vetting.tabs.settings', deep: true },
+  // Not a bar tab: the header's gear opens it as a modal over the queue, at a URL of its own.
+  { id: 'settings', labelKey: 'vetting.tabs.settings', deep: true, standalone: true },
 ]);
 
 export type VettingTabId = (typeof VETTING_TABS.tabs)[number]['id'];

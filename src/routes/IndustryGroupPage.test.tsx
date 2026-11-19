@@ -57,6 +57,8 @@ vi.mock('@/sde/loadSde', () => ({
   // A stale group id redirects to `/industry`, which loads this
   // unconditionally for its Opportunities tab.
   loadMarketWideTrees: vi.fn(async () => ({})),
+  // The plan page's Materials panel reads this to offer the compressed-gas toggle.
+  loadCompressedGasTypeIds: vi.fn(async () => ({})),
 }));
 
 const CHAR_ID = 91;

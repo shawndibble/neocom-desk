@@ -11,7 +11,8 @@
  * than trusting the workspace's `stats`, which lag an edit or Character
  * switch by one recalculation.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { swapModuleType } from '@/engine/fittings/fittingEdit';
 import {
   firstResourceOverage,
@@ -89,11 +90,6 @@ export function useModuleVariations({
     byTypeId: ReadonlyMap<number, ComputedEntry>;
   } | null>(null);
 
-  const [prices, setPrices] = useState<{
-    typeIds: readonly number[];
-    byTypeId: ReadonlyMap<number, number | null>;
-  } | null>(null);
-
   useEffect(() => {
     if (!variants || members.length === 0) return;
     let cancelled = false;
@@ -145,26 +141,18 @@ export function useModuleVariations({
     };
   }, [variants, members, slot, slotIndex]);
 
-  useEffect(() => {
-    if (members.length === 0) return;
-    let cancelled = false;
+  // Left null on failure: rows show "no sell orders", the same degrade a hub
+  // with no orders at all produces, rather than a broken loading state.
+  const loadPrices = useCallback(async () => {
     const typeIds = members.map((member) => member.typeId);
-    void getHubPrices(DEFAULT_TRADE_HUB, typeIds)
-      .then((priceMap) => {
-        if (cancelled) return;
-        const byTypeId = new Map<number, number | null>(
-          typeIds.map((id) => [id, priceMap.get(id)?.sellMin ?? null])
-        );
-        setPrices({ typeIds, byTypeId });
-      })
-      .catch(() => {
-        // Left null: rows show "no sell orders", the same degrade a hub
-        // with no orders at all produces, rather than a broken loading state.
-      });
-    return () => {
-      cancelled = true;
-    };
+    if (typeIds.length === 0) return new Map<number, number | null>();
+    const priceMap = await getHubPrices(DEFAULT_TRADE_HUB, typeIds);
+    return new Map<number, number | null>(
+      typeIds.map((id) => [id, priceMap.get(id)?.sellMin ?? null])
+    );
   }, [members]);
+  // Same key: a new member list refreshes behind the prices showing (looked up per type, so never another type's).
+  const freshPrices = useKeyedLoad('prices', loadPrices).data;
 
   const fresh =
     computed &&
@@ -173,8 +161,6 @@ export function useModuleVariations({
     computed.slotIndex === slotIndex
       ? computed
       : null;
-  const freshPrices =
-    prices && members.every((member) => prices.typeIds.includes(member.typeId)) ? prices : null;
 
   const rows: VariationRow[] = members.map((member) => ({
     typeId: member.typeId,
@@ -184,7 +170,7 @@ export function useModuleVariations({
     fits: fresh?.byTypeId.get(member.typeId)?.fits ?? null,
     overage: fresh?.byTypeId.get(member.typeId)?.overage ?? null,
     canFly: fresh?.byTypeId.get(member.typeId)?.canFly ?? null,
-    price: freshPrices?.byTypeId.get(member.typeId) ?? null,
+    price: freshPrices?.get(member.typeId) ?? null,
   }));
 
   return { rows, loading: members.length > 0 && fresh === null };

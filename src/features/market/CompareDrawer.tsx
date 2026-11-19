@@ -70,6 +70,7 @@ import { SKILL_IDS } from '@/engine/industry/types';
 import { loadCharacterModifiers } from '@/features/character/characterModifiers';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { marketIskDecimals } from '@/lib/isk';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 
 const DRAWER_ID = 'compare-drawer';
 const MIN_HEIGHT = 160;
@@ -198,34 +199,24 @@ export function CompareDrawer({
     location,
     refreshTick,
   });
-  const [skillLevels, setSkillLevels] = useState<{
-    characterId: number;
-    accountingLevel: number;
-    brokerRelationsLevel: number;
-  } | null>(null);
-  useEffect(() => {
-    if (characterId === null || mode === 'closed') return;
-    let cancelled = false;
-    void loadCharacterModifiers(characterId, Date.now()).then((modifiers) => {
-      if (cancelled) return;
-      setSkillLevels({
-        characterId,
+  const loadSkillLevels = useCallback(
+    () =>
+      loadCharacterModifiers(characterId ?? 0, Date.now()).then((modifiers) => ({
         accountingLevel: modifiers.skills[SKILL_IDS.accounting] ?? 0,
         brokerRelationsLevel: modifiers.skills[SKILL_IDS.brokerRelations] ?? 0,
-      });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId, mode]);
+      })),
+    [characterId]
+  );
+  const skillLevels = useKeyedLoad(
+    characterId === null ? null : String(characterId),
+    loadSkillLevels,
+    mode === 'closed'
+  ).data;
   // Null with no Character, or until *their* skills load — a stale
   // previous Character's levels never price this one.
   const fees = useMemo<AppraisalNetFees | null>(
-    () =>
-      skillLevels !== null && skillLevels.characterId === characterId
-        ? { ...skillLevels, standing }
-        : null,
-    [skillLevels, characterId, standing]
+    () => (skillLevels !== undefined ? { ...skillLevels, standing } : null),
+    [skillLevels, standing]
   );
   const attributes = useCompareAttributes(items, mode !== 'closed' && view === 'attributes');
   const attributesExport = useCompareAttributesExport(rows, attributes.data);

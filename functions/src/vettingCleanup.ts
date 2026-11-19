@@ -13,12 +13,12 @@ import { warn as logWarn } from 'firebase-functions/logger';
 import { pruneRaw } from './vettingRawStore.js';
 import { decideVettingSweep, requestExpiry } from './vettingDecide.js';
 import {
-  DAY_MS,
   VETTING_INPUTS,
   VETTING_REVIEWS,
   VETTING_THROTTLE,
   type StoredVettingReview,
 } from './vettingTypes.js';
+import { DAY_MS } from './timeConstants.js';
 
 export const VETTING_SWEEP_PAGE_SIZE = 100;
 /** Reviews deleted per run across all corps; a larger backlog continues on the next tick. */

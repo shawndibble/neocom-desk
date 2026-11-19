@@ -21,6 +21,7 @@ import {
   type SharedFittingRow,
 } from '@/engine/communities/sharedFittings';
 import type { CommunitySummary } from '@/features/communities/communityStore';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { uidForCharacter } from '@/sync/uid';
 import { decodeFittingShare } from '@/engine/fittings/fittingShare';
 import type { MyFittingRow } from '@/engine/fittings/myFittings';
@@ -60,32 +61,27 @@ export type LibraryRow = MyFittingRow &
 /** A saved Fitting's row, for callers that only list those. */
 export type SavedRow = Extract<LibraryRow, { source: 'saved' }>;
 
+const NO_HULLS: Map<string, string | null> = new Map();
+
 /** Each saved code's hull name; null when the code no longer decodes. */
 function useHullNames(records: readonly FittingRecord[] | undefined): Map<string, string | null> {
   const { t } = useTranslation();
-  const [hulls, setHulls] = useState<Map<string, string | null>>(new Map());
-  useEffect(() => {
-    if (!records) return;
-    let cancelled = false;
-    void (async () => {
-      const types = await loadTypes();
-      const next = new Map<string, string | null>();
-      for (const record of records) {
-        const decoded = await decodeFittingShare(record.code);
-        next.set(
-          record.id,
-          decoded.ok
-            ? typeNameOr(t, types[String(decoded.value.hullTypeId)]?.name, decoded.value.hullTypeId)
-            : null
-        );
-      }
-      if (!cancelled) setHulls(next);
-    })();
-    return () => {
-      cancelled = true;
-    };
+  const load = useCallback(async () => {
+    const types = await loadTypes();
+    const next = new Map<string, string | null>();
+    for (const record of records ?? []) {
+      const decoded = await decodeFittingShare(record.code);
+      next.set(
+        record.id,
+        decoded.ok
+          ? typeNameOr(t, types[String(decoded.value.hullTypeId)]?.name, decoded.value.hullTypeId)
+          : null
+      );
+    }
+    return next;
   }, [records, t]);
-  return hulls;
+  // Same key: a new list refreshes behind the names already showing.
+  return useKeyedLoad(records ? 'hulls' : null, load).data ?? NO_HULLS;
 }
 
 /** The Character's saved Fittings and each one's hull name (absent while it decodes). */

@@ -16,8 +16,8 @@ const STATE_TONE: Record<ExtractionState, string> = {
   extracting: 'text-text-dim',
   ready: 'text-success',
   fractured: 'text-warning',
-  expired: 'text-text-faint',
-  cancelled: 'text-text-faint',
+  expired: 'text-text-dim',
+  cancelled: 'text-text-dim',
 };
 
 /** An Extraction's state as a word (D14): readable without its colour. */

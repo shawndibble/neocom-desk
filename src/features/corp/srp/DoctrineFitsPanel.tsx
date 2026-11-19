@@ -22,6 +22,8 @@ import {
 import { textActionClassName } from '@/components/ui';
 import type { DoctrineFit, SaveDoctrineInput } from '../srpTypes';
 import { AddDoctrineDialog, type DoctrineSource } from './AddDoctrineDialog';
+import { formatIskCompact } from '@/lib/isk';
+import { useDoctrineCoverage } from './useDoctrineCoverage';
 import { useDoctrineTypeNames } from './useDoctrineTypeNames';
 import type { DoctrinesState } from './useSrpDoctrines';
 
@@ -52,7 +54,12 @@ export function DoctrineFitsPanel({
   const allFits = state.status === 'ready' ? state.fits : [];
   const { hiddenIds } = pendingDeletes;
   const fits = hiddenIds.size === 0 ? allFits : allFits.filter((f) => !hiddenIds.has(f.id));
-  const hullName = useDoctrineTypeNames(fits.map((f) => f.snapshot.hullTypeId));
+  const coverage = useDoctrineCoverage(fits);
+  const coverages = new Map(fits.map((f) => [f.id, coverage.coverageOf(f)]));
+  const typeName = useDoctrineTypeNames([
+    ...fits.map((f) => f.snapshot.hullTypeId),
+    ...[...coverages.values()].flatMap((c) => (c ? [c.shortOn] : [])),
+  ]);
 
   const open = (source: DoctrineSource, el: HTMLElement) => {
     triggerRef.current = el;
@@ -68,7 +75,7 @@ export function DoctrineFitsPanel({
     {
       id: 'hull',
       header: t('srp.settings.doctrines.hull'),
-      render: (f) => hullName(f.snapshot.hullTypeId),
+      render: (f) => typeName(f.snapshot.hullTypeId),
     },
     {
       id: 'contents',
@@ -79,6 +86,33 @@ export function DoctrineFitsPanel({
           modules: f.snapshot.modules.length,
           rigs: f.snapshot.rigs.length,
         }),
+    },
+    {
+      id: 'coverage',
+      header: t('srp.settings.doctrines.coverage', { hub: coverage.hub.systemName }),
+      className: 'text-text-dim',
+      render: (f) => {
+        const c = coverages.get(f.id);
+        // Loading or an unread book shows nothing: never a zero that was not measured.
+        if (!c) return coverage.loading ? t('common.loading') : null;
+        const name = typeName(c.shortOn);
+        const args = {
+          ships: t('srp.settings.doctrines.coverageShips', { count: c.ships }),
+          short: t(
+            c.unlisted.includes(c.shortOn)
+              ? 'srp.settings.doctrines.coverageUnlisted'
+              : 'srp.settings.doctrines.coverageShort',
+            { name }
+          ),
+          isk: formatIskCompact(c.nextShipListedCost),
+        };
+        return t(
+          c.nextShipListedCost > 0
+            ? 'srp.settings.doctrines.coverageLineNext'
+            : 'srp.settings.doctrines.coverageLine',
+          args
+        );
+      },
     },
     {
       id: 'delete',

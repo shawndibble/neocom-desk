@@ -32,6 +32,10 @@ here — they go one per file in `docs/context/decisions/`.
   than to buy outright at the trade hub. A personal-use comparison — no
   sales tax or broker fee applies, because nothing is being sold. Stated in
   Costs & revenue as "Buying <product> instead", not in the **Verdict Hero**.
+- **Sale price**: A Build Plan's own per-unit ISK price for its product, set in
+  Setup > Location & market. It replaces the trade hub's lowest sell in revenue,
+  margin, break-even and the **Acquisition Verdict**; blank means the hub price.
+  Distinct from a material's price override.
 - **Active Fit**: The ship a Character is flying, read as a **Fitting** off their assets: the hull from ESI's current-ship call, the modules, charges, drones and cargo from the assets inside that ship. ESI refreshes assets about hourly, so after a refit or a ship swap its modules can be up to an hour behind the game. Never stored. Distinct from an **In-game Fitting**, which is a fit the pilot saved in EVE.
 - **Agent access**: Which mission agent levels a pilot's NPC standings open, shown on an NPC faction's or corporation's info modal as five pips (levels 1 to 5, the standing each needs underneath) and what the next level takes. Level 1 is always open; levels 2 to 5 need 1.0, 3.0, 5.0 and 7.0 of the best effective standing in the **Standing chain**, and none of them is open while any link is at -2.0 or lower. On an agent's modal it answers "Can you use this agent?" for that agent's own level. Storyline, research and COSMOS agents follow other rules and are not covered.
 - **Agreed rate**: What the **Collector** set as a **Feeder**'s **Owner rate**. Only an agreed rate takes effect; the first one also counts back over the days before it. Player-facing: "your rate" or "their rate".
@@ -150,6 +154,7 @@ here — they go one per file in `docs/context/decisions/`.
   same snapshot unnarrowed, and from the History tab, which is one
   Character's own contracts read straight from ESI.
 - **Offer** (BPC Contract Search): one for-sale row of that snapshot — in BPC Sourcing, a single blueprint copy listing at a single price. Not a **copy**: one contract can offer `quantity: 3` copies at one price, so a count of offers is smaller than a count of copies. Every count on the search says "offers", because an offer is what a buyer chooses between.
+- **Copy-only blueprint**: A blueprint that exists only as fixed-run copies (a few Trig capital components and Spatial Attunement Unit). A plan never assumes an original for one; with no copy owned or offered its Blueprint Acquisition line reads "copy-only, none owned" at ME 0.
 - **BPO**: An owned Blueprint Original — an ESI blueprint instance with
   unlimited runs. Distinct from a **BPC**, which depletes. Unlike a BPC, a BPO
   is sometimes an ordinarily marketable item (mostly T1). The only acquisition
@@ -577,6 +582,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Travel Settings**: The in-game autopilot's route options, for planning: the default **Route Preference**, the security penalty, and what to avoid (the **Avoided Systems**, EDENCOM and Triglavian minor-victory systems, and systems over a pod-kill count in ESI's last-hour report).
 - **Safety Tax**: Exordium's extra market charge, 5% of an order's value, paid when a non-instant buy or sell order is placed. Its own line beside the broker fee and sales tax; instant trades and relists pay none, and the broker fee's 100 ISK minimum does not absorb it (`TradeHub.safetyTaxPct`).
 - **Job Fee**: The ISK ESI charges to install a manufacturing job, separate from material cost. Sized from EIV, the system's **Cost Index**, a fixed SCC surcharge, the facility's tax, and, in Exordium, the region's own Exordium Industrial Tax (5% of EIV).
+- **Max Production Limit**: The most runs one job may be installed for, a property of the blueprint (`maxProductionLimit`; absent means no cap). A Build Plan node past it is built as several jobs of near-equal runs that run in parallel. Distinct from `MAX_JOB_RUNS`, the app's own clamp on a plan's runs.
 - **Journal Party**: The other side of a wallet journal line: the player, corporation or NPC (CONCORD, Secure Commerce Commission) that paid or was paid, never the user's own Character. A transfer between the user's own Characters has none; it is netted away. Distinct from a corp journal's **player**, the member who made the line.
 - **Jump Basis**: The one set of rules every jump count in the app is worked out under: the Travel Settings plus Route Safety's saved Thera / Turnur hole and Ansiblex jump-bridge settings. It is how Assets, Market, BPC Sourcing, Contract Search and Courier agree with the route Route Safety draws.
 - **Jump Range**: The distance filter on Market Browser, Contract Search's Items and **BPC Sourcing**: Any, the **Current System** only, or within a set number of stargate jumps of it. Counted on the local stargate graph under the **Jump Basis**. A row the app cannot place (a player structure) drops out once a range is set.
@@ -598,6 +604,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Material Price Basis**: Which side of a Build Plan's **Trade Hub** order book its materials are costed at: **Buy now** (the lowest sell orders) or **Buy order** (the highest buy orders: place orders and wait, plus the broker fee for placing them once, at the plan Character's rate and the hub's **Safety Tax**). Stored per plan as `sell`/`buy`; absent reads as `sell`. Materials only: the product is always valued at the hub's lowest sell order. A material the chosen side cannot price is unpriceable, never re-quoted at the other side.
 - **Manual Ore Tag**: A pilot's hand-classification of an ore type the SDE-derived allowlists don't recognise: "Tag as moon ore" (group it into **Mining Ledger Entries**) or "Ignore" (treat it as ordinary ore/ice). Device-local and never synced; a stop-gap until the next SDE build. Reversible.
 - **Max price per item**: A Hauling filter: the highest origin unit price (the Buy column) worth buying at. Hides rows whose cheapest origin offer is dearer, and stops the **Trip Plan** buying any origin offer above it — in the table and in the fill alike. Blank is no limit.
+- **Shopping Budget**: An optional ISK amount on a Build Plan's or single-hub Build Group's material copy list. Scales every line by one factor, rounded down to whole units, priced at the plan's **Material Price Basis**; the list says what share of the need it covers and names lines at 10% or more of the budget. Blank is no budget. Not the Hauling **Max spend**.
 - **Max spend**: A Hauling filter: the **Trip Plan**'s ISK budget for the whole trip. Limits what the plan buys; hides no rows. Blank is no limit.
 - **Member**: One Character that has joined a **Community**, never a person:
   an account's alts join separately and appear separately. EVE exposes no

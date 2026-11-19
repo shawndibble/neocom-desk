@@ -111,6 +111,7 @@ export const loadGasCloudTypeIds = cached<number[]>('gasCloudTypeIds.json');
  * (rare, but real) and prices as itself.
  */
 export const loadCompressedOreTypeIds = cached<Record<string, number>>('compressedOreTypeIds.json');
+export const loadCompressedGasTypeIds = cached<Record<string, number>>('compressedGasTypeIds.json');
 /**
  * Every manufacturing blueprint's flattened material tree, precomputed at SDE
  * build time (issue #819) — the market-wide Build Opportunities scan's input,

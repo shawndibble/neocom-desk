@@ -19,6 +19,7 @@ export type PlanPatch = Partial<
     | 'facilityTaxPct'
     | 'costIndexOverridePct'
     | 'materialPriceBasis'
+    | 'productSalePrice'
     | 'ownedStockScope'
     | 'includeCorpAssets'
     | 'buildHere'

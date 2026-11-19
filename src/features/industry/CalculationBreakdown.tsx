@@ -12,6 +12,8 @@ import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { formatCostIndex, formatPercent } from './format';
+import { rigKindLabel } from './rigFitLabels';
+import type { RigKind } from '@/engine/industry/types';
 
 /**
  * Everything the breakdown needs that a `BuildResult` does not carry: the
@@ -24,6 +26,8 @@ export interface BreakdownContext {
   hubName: string;
   /** Which side of the hub's order book materials are costed at. */
   materialPriceBasis: MaterialPriceBasis;
+  /** The plan carries its own sale price instead of the hub's. */
+  productPriceOverridden?: boolean;
   /** ME the job ran at; ignored for a reaction, which has none. */
   me: number;
   isReaction: boolean;
@@ -51,6 +55,8 @@ export interface BreakdownContext {
    * basis; `null` when the hub has no buy order for it, absent when unknown.
    */
   sellNow?: ProductSellNow | null;
+  /** Names a material's typeID, for the rows that list per-sub-build rigs. */
+  nameOf?: (typeID: number) => string;
   /** Materials costed at a Depth Price, each with its book walk. */
   depthRows?: readonly { typeID: number; name: string; walk: DepthPrice }[];
 }
@@ -97,6 +103,9 @@ export function CalculationBreakdown({
   context,
 }: CalculationBreakdownProps) {
   const { t, i18n } = useTranslation();
+  const rigRows = result.materials.flatMap((material) =>
+    material.subBuild?.rigs ? [{ typeID: material.typeID, rigs: material.subBuild.rigs }] : []
+  );
   const taxPct = salesTaxPct(context.accountingLevel);
   const brokerPct = brokerFeePct(
     context.brokerRelationsLevel,
@@ -133,10 +142,12 @@ export function CalculationBreakdown({
           <p>{t('industry.breakdown.pricesOwned')}</p>
           <p>{t('industry.breakdown.pricesBuilt')}</p>
           <p>
-            {t('industry.breakdown.pricesProduct', {
-              product: context.productName,
-              hub: context.hubName,
-            })}
+            {t(
+              context.productPriceOverridden
+                ? 'industry.breakdown.pricesProductOverride'
+                : 'industry.breakdown.pricesProduct',
+              { product: context.productName, hub: context.hubName }
+            )}
           </p>
         </Section>
 
@@ -152,6 +163,25 @@ export function CalculationBreakdown({
             })}
           </Formula>
         </Section>
+
+        {rigRows.length > 0 && (
+          <Section title={t('industry.breakdown.rigsTitle')}>
+            <p>{t('industry.breakdown.rigsIntro')}</p>
+            <ul className={FORMULA_BOX}>
+              {rigRows.map(({ typeID, rigs }) => (
+                <li key={typeID}>
+                  {t('industry.breakdown.rigsRow', {
+                    material: context.nameOf?.(typeID) ?? String(typeID),
+                    rigs:
+                      rigs.length > 0
+                        ? rigs.map((kind) => rigKindLabel(kind as RigKind, t)).join(', ')
+                        : t('industry.breakdown.rigsNone'),
+                  })}
+                </li>
+              ))}
+            </ul>
+          </Section>
+        )}
 
         {context.depthRows && context.depthRows.length > 0 && (
           <Section title={t('industry.breakdown.depthTitle')}>
@@ -244,7 +274,14 @@ export function CalculationBreakdown({
           context.productQuantity !== null &&
           context.productUnitPrice !== null && (
             <Section title={t('industry.breakdown.revenueTitle')}>
-              <p>{t('industry.breakdown.revenue', { hub: context.hubName })}</p>
+              <p>
+                {t(
+                  context.productPriceOverridden
+                    ? 'industry.breakdown.revenueOverride'
+                    : 'industry.breakdown.revenue',
+                  { hub: context.hubName }
+                )}
+              </p>
               <Formula>
                 {t('industry.breakdown.revenueFormula', {
                   quantity: formatCount(context.productQuantity),

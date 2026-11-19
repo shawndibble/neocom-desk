@@ -19,7 +19,7 @@ import { useCharacters } from '@/features/character/useCharacters';
 import { Button, EmptyState, PageHeader, TabPanel, textActionClassName } from '@/components/ui';
 import { isShareId } from '@/engine/share/shareId';
 import { ownsSurvey } from '@/engine/survey/owner';
-import { countedScans, type SurveySummary } from '@/engine/survey/series';
+import { countedScans } from '@/engine/survey/series';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
 import { classifyScan, lastSeenField, missingOres } from '@/engine/survey/scanUpdate';
 import { shareUrl } from '@/features/share/shareStore';
@@ -32,7 +32,8 @@ import { SurveyBoard } from './SurveyBoard';
 import { SurveyNameTitle } from './SurveyNameTitle';
 import { SurveyPicker } from './SurveyPicker';
 import { SurveyOwnerChange } from './SurveyOwnerChange';
-import { SurveyInfoEditor, SurveyInfoReadout, type InfoSurvey } from './SurveyInfoPanel';
+import { SurveyInfoLine } from './SurveyInfoLine';
+import { useScanIgnore } from './useScanIgnore';
 import { SurveyStartTemplates } from './SurveyStartTemplates';
 import { StartLinkHelp } from './StartLinkHelp';
 import { fromInfoFields, startLinkPath } from './startLink';
@@ -45,19 +46,10 @@ import { EMPTY_START_DRAFT, draftFromTemplate, draftToInfo, type StartDraft } fr
 import { stashPendingScan, takePendingScan } from './pendingScan';
 import { hasSubmittedScan, noteSubmittedScan } from './submitted';
 import { submitterName } from './submitterName';
-import { useHasMoonOre } from './useHasMoonOre';
 import { rejectScanText, scanFailure, type AddScanResult } from './scanResult';
 import { noteSurvey } from './surveyHistory';
 import { useCurrentSurveyId } from './surveyPref';
-import {
-  addSurveyScan,
-  finishSurvey,
-  loadSurvey,
-  setSurveyScanIgnored,
-  startSurvey,
-  type SurveyInfoShare,
-  type SurveyTaxShare,
-} from './surveyStore';
+import { addSurveyScan, finishSurvey, loadSurvey, startSurvey } from './surveyStore';
 import { useSurvey } from './useSurvey';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
@@ -263,26 +255,12 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
         }
       : draftToInfo(startDraft);
   // Only the owner sets a scan aside; the rules can't tell who that is, so this is the guard.
-  const [ignoreFailed, setIgnoreFailed] = useState(false);
-  const setIgnored = useCallback(
-    async (scanId: string, ignored: boolean) => {
-      if (currentId === null || state.status !== 'ready' || characterId === null) return;
-      setIgnoreFailed(false);
-      try {
-        await setSurveyScanIgnored({
-          id: currentId,
-          expiresAt: state.expiresAt,
-          scanId,
-          ignored,
-          characterId,
-        });
-        await refresh();
-      } catch {
-        setIgnoreFailed(true);
-      }
-    },
-    [currentId, state, characterId, refresh]
-  );
+  const { setIgnored, failed: ignoreFailed } = useScanIgnore({
+    id: currentId,
+    expiresAt: state.status === 'ready' ? state.expiresAt : null,
+    characterId,
+    refresh,
+  });
   const finish = useCallback(async (): Promise<boolean> => {
     if (currentId === null || state.status !== 'ready') return false;
     try {
@@ -434,44 +412,4 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
       </TabPanel>
     </div>
   );
-}
-
-/**
- * The Additional information panel: location, the moon tax (only once the Survey
- * shows a moon ore) and notes. The pilot who started the Survey edits it and
- * stores it on the Survey; anyone else opening it in the app sees what the owner
- * stored, read-only, so their own saved tax can't overwrite it.
- */
-function SurveyInfoLine({
-  characterId,
-  summary,
-  owned,
-  tax,
-  info,
-  survey,
-  onStored,
-}: {
-  characterId: number;
-  summary: SurveySummary;
-  owned: boolean;
-  tax: SurveyTaxShare | null;
-  info: SurveyInfoShare | null;
-  survey?: InfoSurvey;
-  onStored: () => void;
-}) {
-  const moon = useHasMoonOre(summary.oreNames);
-  const connect = survey && { id: survey.id, expiresAt: survey.expiresAt, summary };
-  if (owned) {
-    return (
-      <SurveyInfoEditor
-        key={survey?.id}
-        characterId={characterId}
-        survey={survey}
-        connect={connect}
-        moon={moon}
-        onStored={onStored}
-      />
-    );
-  }
-  return <SurveyInfoReadout info={info} tax={moon ? tax : null} connect={connect} />;
 }

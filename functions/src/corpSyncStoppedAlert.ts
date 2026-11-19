@@ -3,7 +3,7 @@
 // officer docs and pushes, after the stop has committed.
 
 import { isPlainRecord } from './guards.js';
-import { DAY_MS } from './vettingTypes.js';
+import { DAY_MS } from './timeConstants.js';
 import type { CorpTaxBookSyncStoppedFire, SyncStoppedAlertReason } from './serverEvents.js';
 import type { StopReason } from './corpTaxBookScheduledSync.js';
 

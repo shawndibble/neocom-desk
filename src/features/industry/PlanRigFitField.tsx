@@ -1,13 +1,12 @@
 import { useTranslation } from 'react-i18next';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
+import { Select, SelectContent, SelectTrigger, SelectValue } from '@/components/ui';
 import {
-  RIG_KIND_OPTIONS,
   type FacilityKind,
   type RigFit,
   type RigKind,
   type SecurityBand,
 } from '@/engine/industry/types';
-import { rigKindLabelKey } from './rigFitLabels';
+import { RigKindOptions } from './RigKindOptions';
 import { RigMatchHelper } from './RigMatchHelper';
 
 interface PlanRigFitFieldProps {
@@ -42,11 +41,7 @@ export function PlanRigFitField({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {RIG_KIND_OPTIONS.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {t(rigKindLabelKey(option))}
-                  </SelectItem>
-                ))}
+                <RigKindOptions />
               </SelectContent>
             </Select>
           </label>

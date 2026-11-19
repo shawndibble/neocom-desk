@@ -8,7 +8,8 @@
  * (a launcher's 0 HP damage — the charge carries it) and a source that isn't
  * running are left out.
  */
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { useTranslation } from 'react-i18next';
 import type { AffectedAttribute, AffectedSource } from '@/engine/fittings/affectedBy';
 import { displaySourceValue } from '@/engine/fittings/attributeUnits';
@@ -66,28 +67,15 @@ export function FittingAffectedByPanel({
   typeName: (typeId: number) => string;
 }) {
   const { t } = useTranslation();
-  const [rows, setRows] = useState<AffectedAttribute[] | null>(null);
-  const [failed, setFailed] = useState(false);
   const dictionary = useAttributeDictionary();
-
-  useEffect(() => {
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new module or calculation, not a render-time derivation
-    setRows(null);
-    setFailed(false);
-    if (explain === null) return;
-    explain(moduleIndex).then(
-      (result) => {
-        if (!cancelled) setRows(result);
-      },
-      () => {
-        if (!cancelled) setFailed(true);
-      }
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [explain, moduleIndex]);
+  // Null `explain`: nothing to ask yet, so it reads as loading.
+  const load = useCallback(
+    () => (explain === null ? Promise.resolve(null) : explain(moduleIndex)),
+    [explain, moduleIndex]
+  );
+  const explained = useAsyncLoad(load);
+  const failed = explained.status === 'failed';
+  const rows = explained.data ?? null;
 
   if (failed) return <p className="text-xs text-danger">{t('fittings.affectedBy.failed')}</p>;
   if (rows === null || dictionary === null)

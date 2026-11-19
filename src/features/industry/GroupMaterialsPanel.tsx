@@ -227,6 +227,7 @@ export function GroupMaterialsPanel({
                   detection={detection}
                   materialName={nameForType(catalog, material.typeID)}
                   suggestion={offer}
+                  reduction={detection.reducedFor?.(material.typeID) ?? null}
                   onApply={() => setOwnedQuantity(material.typeID, offer)}
                 />
               )}

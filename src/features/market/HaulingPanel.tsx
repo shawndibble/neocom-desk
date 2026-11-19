@@ -118,6 +118,7 @@ import {
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { TABLE_WIDTHS } from './haulingTableWidths';
 import { VIRTUALIZE_THRESHOLD } from '@/components/ui/DataTable';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
 const DAY_CHOICES = [7, 14, 30, 0] as const;
 
 /** Rail 20rem + 1rem gap. */
@@ -325,20 +326,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   const cards = isPhone || tableCards;
   const compact = isPhone || tableNarrow;
 
-  const [groups, setGroups] = useState<MarketGroupNode[] | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    void loadMarketGroups()
-      .then((loaded) => {
-        if (!cancelled) setGroups(loaded);
-      })
-      .catch(() => {
-        // Category names fall back to their ids' English names below.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // Category names fall back to their ids' English names while this loads or if it fails.
+  const groups: MarketGroupNode[] | null = useAsyncLoad(loadMarketGroups).data ?? null;
   const categoryName = useCallback(
     (id: number) =>
       id === EVERYTHING_CATEGORY_ID

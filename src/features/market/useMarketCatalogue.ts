@@ -29,6 +29,7 @@ import type {
 } from '@/sde/marketTypes';
 import { useRetryOnReconnect } from '@/lib/useRetryOnReconnect';
 import { buildVariationIndex, type VariationIndex } from '@/engine/market/variations';
+import { useAsyncLoad } from '@/lib/useAsyncLoad';
 
 /**
  * Stands in for variationIndex before variations.json resolves (or if it
@@ -70,7 +71,6 @@ export function useMarketCatalogue(): MarketCatalogue {
   const [npcStations, setNpcStations] = useState<NpcStationEntry[] | null>(null);
   const [solarSystems, setSolarSystems] = useState<SolarSystemEntry[] | null>(null);
   const [marketRegions, setMarketRegions] = useState<MarketRegionEntry[] | null>(null);
-  const [variationData, setVariationData] = useState<VariationData | null>(null);
   const [catalogueError, setCatalogueError] = useState(false);
   // Bumped by Refresh after a failed catalogue load to re-run the load effect.
   const [catalogueTick, setCatalogueTick] = useState(0);
@@ -101,20 +101,8 @@ export function useMarketCatalogue(): MarketCatalogue {
   }, [catalogueTick]);
 
   // Fetched independently of the catalogue load above (see `EMPTY_VARIATION_INDEX`).
-  useEffect(() => {
-    let cancelled = false;
-    void loadVariations()
-      .then((variations) => {
-        if (!cancelled) setVariationData(variations);
-      })
-      .catch(() => {
-        // Leaves variationData null — variationIndex below already treats
-        // that the same as "no variation data for this item".
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // A failed load leaves variationData null: variationIndex below treats that as "no variation data for this item".
+  const variationData: VariationData | null = useAsyncLoad(loadVariations).data ?? null;
 
   const retry = useCallback(() => {
     setCatalogueError(false);

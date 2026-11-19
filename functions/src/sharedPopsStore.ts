@@ -25,7 +25,7 @@ import {
 } from './communities.js';
 import { requireAdmin } from './communitiesStore.js';
 import { isFiniteNumber, isPlainRecord } from './guards.js';
-import { DAY_MS, HOUR_MS } from './vettingTypes.js';
+import { DAY_MS, HOUR_MS } from './timeConstants.js';
 import { POP_SHARING_DOC, popSharingFrom } from './popSharing.js';
 import {
   ALLIANCE_RECHECK_MS,
@@ -102,6 +102,7 @@ function extractionOf(d: DocumentSnapshot): PopExtraction | undefined {
   const decay = str(x.naturalDecayTime);
   if (structureId === undefined || moonId === undefined || !start || !arrival || !decay)
     return undefined;
+  const survey = str(x.popSurveyId) ?? str(x.surveyId);
   const oreLines = Array.isArray(x.oreLines)
     ? (x.oreLines as Data[]).flatMap((l) =>
         num(l?.typeId) !== undefined && num(l?.quantity) !== undefined
@@ -122,6 +123,8 @@ function extractionOf(d: DocumentSnapshot): PopExtraction | undefined {
       ? { sourceCorporationId: x.sourceCorporationId as number }
       : {}),
     ...(oreLines ? { oreLines } : {}),
+    // A pilot's own link (a start from the pop) holds until an officer links again, which clears it.
+    ...(survey ? { surveyId: survey } : {}),
   };
 }
 
@@ -893,4 +896,57 @@ export async function setCommunityPopBlock(
   if (input.blocked) await ref.set({ by: signedInCharacter(caller), at: now });
   else await ref.delete();
   return { ok: true };
+}
+
+// --- Linking a Survey started from a pop -------------------------------------------------------
+
+const POP_ID = /^([1-9][0-9]{0,15})_.{1,100}$/;
+/** A `shares` id: the app's alphabet and length (see `shortStartLink.ts`). */
+const SHARE_ID = /^[2-9a-hj-kmnp-z]{6}$/;
+
+/** `linkSharedPopSurveyCallable` input: the pop's id and the Survey (a Share Link id) started from it. */
+export function parseLinkSharedPopSurveyInput(data: unknown): { popId: string; surveyId: string } {
+  const d = record(data);
+  if (typeof d.popId !== 'string' || !POP_ID.test(d.popId))
+    throw new HttpsError('invalid-argument', 'popId must be a Shared Pop id');
+  if (typeof d.surveyId !== 'string' || !SHARE_ID.test(d.surveyId))
+    throw new HttpsError('invalid-argument', 'surveyId must be a Share Link id');
+  return { popId: d.popId, surveyId: d.surveyId };
+}
+
+/**
+ * Links a Survey a pilot started from a Shared Pop's start link back to that pop, so everyone who
+ * sees the pop can open it. Only a viewer the pop reaches now may (`sharedPopsFor` is the one
+ * audience check); the newest link wins, and an officer's own `linkSurvey` clears it. The Survey
+ * must exist. Stored on the Extraction beside the officer's `surveyId`, which this never touches.
+ */
+export async function linkSharedPopSurvey(
+  deps: SharedPopsReadDeps,
+  caller: Caller,
+  input: { popId: string; surveyId: string }
+): Promise<{ linked: true }> {
+  const viewer: PopViewer = {
+    characterId: signedInCharacter(caller),
+    ownerHash: caller.ownerHash,
+  };
+  const pop = (await sharedPopsFor(deps, [viewer])).find((p) => p.id === input.popId);
+  if (!pop) throw new HttpsError('permission-denied', 'That pop is not shared with you');
+  const share = await deps.db.collection('shares').doc(input.surveyId).get();
+  // A lapsed Survey (its TTL delete may lag) is as good as gone.
+  const expires = (share.get('expiresAt') as { toMillis?: () => number } | undefined)?.toMillis?.();
+  if (!share.exists || share.get('type') !== 'survey' || (expires ?? 0) <= deps.now())
+    throw new HttpsError('failed-precondition', 'That Survey does not exist');
+  const extraction = corpDoc(deps.db, pop.corporationId)
+    .collection(EXTRACTIONS)
+    .doc(pop.extractionId);
+  // Already the pop's Survey: nothing to write or republish.
+  if (pop.surveyId === input.surveyId) return { linked: true };
+  try {
+    await extraction.update({ popSurveyId: input.surveyId });
+  } catch {
+    // The Extraction was purged after the pop was published.
+    throw new HttpsError('not-found', 'That pop is gone');
+  }
+  await refreshSharedPops(deps, pop.corporationId);
+  return { linked: true };
 }

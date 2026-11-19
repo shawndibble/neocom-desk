@@ -9,7 +9,8 @@ import { idSetKey } from '@/lib/idSetKey';
  * Drones are not covered: a mutated drone is its own one-drone stack, and
  * the drone rows have no dialog to hold this.
  */
-import { lazy, Suspense, useEffect, useId, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useId, useState, type ReactNode } from 'react';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -58,19 +59,11 @@ const STEPS = 100;
 
 /** The base module's own attribute values; null while they load (or for no base), 'failed' when unreadable. */
 function useBaseValues(typeId: number | null): BaseValue | 'failed' | null {
-  const [loaded, setLoaded] = useState<{ typeId: number; value: BaseValue | null } | null>(null);
-  useEffect(() => {
-    if (typeId === null) return;
-    let live = true;
-    void loadBaseValues(typeId, { retry: true }).then((value) => {
-      if (live) setLoaded({ typeId, value });
-    });
-    return () => {
-      live = false;
-    };
-  }, [typeId]);
-  if (typeId === null || loaded?.typeId !== typeId) return null;
-  return loaded.value ?? 'failed';
+  const load = useCallback(() => loadBaseValues(typeId ?? 0, { retry: true }), [typeId]);
+  const loaded = useKeyedLoad(typeId === null ? null : String(typeId), load);
+  if (loaded.status === 'failed') return 'failed';
+  if (loaded.status !== 'ready') return null;
+  return loaded.data ?? 'failed';
 }
 
 export interface FittingMutationPanelProps {

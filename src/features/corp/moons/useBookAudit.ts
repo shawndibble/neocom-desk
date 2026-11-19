@@ -1,23 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { readAudit, type AuditEntry } from '../taxBook/bookClient';
 import { useBook } from './useBook';
+
+const NONE: AuditEntry[] = [];
 
 /** The newest audit-log entries (D7), re-read whenever the book reloads. */
 export function useBookAudit(count = 100): { entries: AuditEntry[]; loading: boolean } {
   const { characterId, corporationId, data } = useBook();
-  const [state, setState] = useState<{ entries: AuditEntry[]; loading: boolean }>({
-    entries: [],
-    loading: true,
-  });
-  useEffect(() => {
-    let cancelled = false;
-    readAudit(characterId, corporationId, count).then(
-      (entries) => !cancelled && setState({ entries, loading: false }),
-      () => !cancelled && setState({ entries: [], loading: false })
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId, corporationId, count, data]);
-  return state;
+  const load = useCallback(
+    () => readAudit(characterId, corporationId, count),
+    // `data` is the re-read trigger: a book reload refreshes behind the entries on screen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [characterId, corporationId, count, data]
+  );
+  const read = useKeyedLoad(`${characterId}:${corporationId}:${count}`, load);
+  return {
+    entries: read.status === 'ready' ? read.data : NONE,
+    loading: read.status === 'idle' || read.status === 'loading',
+  };
 }

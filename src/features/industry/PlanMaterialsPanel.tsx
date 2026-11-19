@@ -1,6 +1,8 @@
 import type { RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Panel } from '@/components/ui';
+import { Well } from '@/components/ui/Well';
+import { GAS_DECOMPRESSION_YIELD } from '@/engine/industry/compressedGas';
 import type { UseTableExport } from '@/components/ui/useTableExport';
 import type { BuildPlanRecord } from '@/db';
 import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
@@ -10,6 +12,7 @@ import type { BuildResult, IndustryActivity } from '@/engine/industry/types';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
+import { formatVolume } from './format';
 import type { TradeHub } from '@/market/hubs';
 import { nameForType, volumeForType, type BlueprintCatalog } from './blueprintCatalog';
 import type { buildItemMenuProps } from './buildItemMenuProps';
@@ -27,6 +30,7 @@ import type { usePlanEdits } from './usePlanEdits';
 import type { PlanGroup, usePlanOwnedStock } from './usePlanOwnedStock';
 import type { usePlanMaterials } from './usePlanMaterials';
 import type { useOwnedSale } from './useOwnedSale';
+import { ShoppingBudget } from './ShoppingBudget';
 import type { useShoppingListCopy } from './useShoppingListCopy';
 
 type Edits = ReturnType<typeof usePlanEdits>;
@@ -101,7 +105,6 @@ export function PlanMaterialsPanel({
   const { t } = useTranslation();
   const {
     visibleMaterials,
-    shoppingMaterials,
     boughtDepth,
     anySubBuilds,
     subBuildTimeSeconds,
@@ -117,8 +120,13 @@ export function PlanMaterialsPanel({
         <PlanMaterialsActions
           fetchedAt={fetchedAt}
           copyState={shopping.copyState}
-          copyDisabled={!!error || !result || !hasShoppingList(shoppingMaterials)}
+          copyDisabled={!!error || !result || !hasShoppingList(shopping.budget.materials)}
           onCopy={() => void shopping.copyShoppingList()}
+          compressedGas={
+            shopping.hasGas
+              ? { checked: shopping.compressedGas, onChange: shopping.setCompressedGas }
+              : undefined
+          }
           showExport={!error && !!result && visibleMaterials.length > 0}
           materialsExport={materialsExport}
           onRefresh={onRefresh}
@@ -129,6 +137,7 @@ export function PlanMaterialsPanel({
         <p className="text-xs text-danger">{error ?? t('industry.computeError')}</p>
       ) : (
         <>
+          <ShoppingBudget budget={shopping.budget} nameFor={(id) => nameForType(catalog, id)} />
           {/* Reactions are exempt from every time implant — nothing to assume. */}
           {activity !== 'reaction' && (
             <ImplantsAssumedNote hint={t('industry.assumesNoImplantsHint')} />
@@ -147,6 +156,30 @@ export function PlanMaterialsPanel({
             group={group}
             update={update}
           />
+          {shopping.compressedGas && (
+            <Well className="mb-2 text-xs text-text-dim" data-testid="compressed-gas-comparison">
+              {shopping.gasComparison && shopping.gasComparison.pricedRawUnits > 0
+                ? t('industry.compressedGasCompare', {
+                    yield: `${Math.round(GAS_DECOMPRESSION_YIELD * 100)}%`,
+                    rawCost: formatIsk(shopping.gasComparison.rawCost),
+                    compressedCost: formatIsk(shopping.gasComparison.compressedCost),
+                    rawPerUnit: formatIsk(
+                      shopping.gasComparison.rawCost / shopping.gasComparison.pricedRawUnits
+                    ),
+                    compressedPerUnit: formatIsk(
+                      shopping.gasComparison.compressedCost / shopping.gasComparison.pricedRawUnits
+                    ),
+                    rawVolume: formatVolume(shopping.gasComparison.rawVolume),
+                    compressedVolume: formatVolume(shopping.gasComparison.compressedVolume),
+                  })
+                : t('industry.compressedGasYieldOnly', {
+                    yield: `${Math.round(GAS_DECOMPRESSION_YIELD * 100)}%`,
+                  })}
+              {shopping.gasComparison &&
+                !shopping.gasComparison.priced &&
+                ` ${t('industry.compressedGasPartial')}`}
+            </Well>
+          )}
           <MaterialsTable
             exportProps={materialsExport.tableProps}
             itemMenuFor={itemMenuFor}

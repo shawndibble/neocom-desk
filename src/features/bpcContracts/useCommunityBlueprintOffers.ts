@@ -5,7 +5,8 @@
  * not per search; the panel narrows what is shown. Best-effort like the LP
  * source: no sync, no network or no Communities is no rows, never an error.
  */
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import {
   buildCommunityOffers,
   type CommunityOfferSource,
@@ -75,23 +76,15 @@ export function useCommunityBlueprintOffers({
   characterId: number | null;
   enabled: boolean;
 }): { rows: readonly BpcSearchRow[]; loading: boolean } {
-  const [state, setState] = useState<{ key: number; rows: readonly BpcSearchRow[] } | null>(null);
   const active = enabled && characterId !== null;
-
-  useEffect(() => {
-    if (!active || characterId === null) return;
-    let cancelled = false;
-    void (async () => {
-      const rows = await loadCommunityOfferRows(characterId).catch(() => NONE);
-      if (!cancelled) setState({ key: characterId, rows });
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [active, characterId]);
+  const load = useCallback(
+    () => loadCommunityOfferRows(characterId ?? 0).catch(() => NONE),
+    [characterId]
+  );
+  const loaded = useKeyedLoad(active ? String(characterId) : null, load);
 
   if (!active) return { rows: NONE, loading: false };
-  return state?.key === characterId
-    ? { rows: state.rows, loading: false }
+  return loaded.status === 'ready'
+    ? { rows: loaded.data, loading: false }
     : { rows: NONE, loading: true };
 }
