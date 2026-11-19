@@ -8288,7 +8288,7 @@
           "donation": "Donation, {{time}}",
           "manual": "Recorded by an officer, {{time}}",
           "payment": "Payment",
-          "openInWallet": "Your wallet",
+          "openInWallet": "Open in wallet",
           "inFlight": "Your donation, {{time}}, not credited by {{corp}} yet",
           "corrections": "Credit from corrections (not a payment)",
           "writtenOff": "Forgiven by an officer (not a payment)"

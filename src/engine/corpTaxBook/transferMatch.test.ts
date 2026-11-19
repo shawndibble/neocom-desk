@@ -107,6 +107,63 @@ describe('pairWithMadePayments', () => {
     expect(pairs).toEqual(new Map([['p', 2]]));
   });
 
+  it('draws no link when three entries tie, or the two nearest tie with a farther third', () => {
+    const at = '2026-11-10T12:00:00Z';
+    expect(
+      pairWithMadePayments(
+        [payment('p', at)],
+        [journal(1, at), journal(2, at), journal(3, at)],
+        CORP
+      ).size
+    ).toBe(0);
+    expect(
+      pairWithMadePayments(
+        [payment('p', at)],
+        [
+          journal(1, '2026-11-10T12:02:00Z'),
+          journal(2, '2026-11-10T11:58:00Z'),
+          journal(3, '2026-11-10T12:07:00Z'),
+        ],
+        CORP
+      ).size
+    ).toBe(0);
+  });
+
+  it('pairs on the donation’s gross amount, whatever part an officer coded not tax', () => {
+    const pairs = pairWithMadePayments(
+      [payment('p', '2026-11-10T12:00:00Z', { notTaxAmount: 400_000 })],
+      [journal(1, '2026-11-10T12:00:20Z')],
+      CORP
+    );
+    expect(pairs).toEqual(new Map([['p', 1]]));
+  });
+
+  it('ignores an entry with no amount or no money out', () => {
+    const at = '2026-11-10T12:00:00Z';
+    expect(
+      pairWithMadePayments(
+        [payment('p', at)],
+        [journal(1, at, { amount: null }), journal(2, at, { amount: 0 })],
+        CORP
+      ).size
+    ).toBe(0);
+  });
+
+  it('keeps a link another donation could not take: only the entry both chose is dropped', () => {
+    const pairs = pairWithMadePayments(
+      [payment('a', '2026-11-10T12:00:00Z'), payment('b', '2026-11-10T12:08:00Z')],
+      [journal(1, '2026-11-10T12:04:00Z'), journal(2, '2026-11-10T12:09:00Z')],
+      CORP
+    );
+    // a: only entry 1 is near enough (4 min); b: entry 2 is nearer (1 min) than entry 1 (4 min).
+    expect(pairs).toEqual(
+      new Map([
+        ['a', 1],
+        ['b', 2],
+      ])
+    );
+  });
+
   it('draws no link for two identical donations that share one entry', () => {
     const pairs = pairWithMadePayments(
       [payment('a', '2026-11-10T12:00:00Z'), payment('b', '2026-11-10T12:05:00Z')],

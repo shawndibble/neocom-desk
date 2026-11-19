@@ -18,6 +18,10 @@ import {
   type DatedUnitPrices,
 } from '@/features/miningTax/pricing';
 import type { MadePayment } from '../paymentLinks';
+import type { MoonMiningTaxRow } from '../snapshot';
+import type { ClaimablePayment, LoadedCorpBook } from './corpBookStore';
+import { payeesOfBookCorporation } from '@/engine/miningTax/payeeCorporation';
+import { corpPayee, personalEntriesOf } from './corpRows';
 
 /** A payment the member made, as the book's overlay reads it; only a journal entry carries a `refId`. */
 export function madeDonationOf(m: MadePayment): MadeDonation {
@@ -30,10 +34,6 @@ export function madeDonationOf(m: MadePayment): MadeDonation {
     ...(m.kind === 'journal' ? { refId: m.refId } : {}),
   };
 }
-import type { MoonMiningTaxRow } from '../snapshot';
-import type { ClaimablePayment, LoadedCorpBook } from './corpBookStore';
-import { payeesOfBookCorporation } from '@/engine/miningTax/payeeCorporation';
-import { corpPayee, personalEntriesOf } from './corpRows';
 
 export interface CorpBookViewBook {
   loaded: LoadedCorpBook;

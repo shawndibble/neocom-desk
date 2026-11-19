@@ -21,7 +21,8 @@ interface Props {
 /**
  * What paid a day, read-only: each Tax Payment with what it put on this day, a donation the
  * corporation has not credited yet, and credit from corrections, which is no payment. The book
- * decides how money is applied (oldest day first), so there is nothing to link or undo here.
+ * decides how money is applied (oldest day first), so there is nothing to undo here: the only link
+ * is to the member's own wallet entry for a donation, where one was found.
  */
 export function PaidByList({ paidBy, payments, corpName, walletRefs }: Props) {
   const { t } = useTranslation();

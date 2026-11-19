@@ -120,7 +120,7 @@ describe('CorpRowDetailModal', () => {
       },
     ] as const;
     renderModal({ corp: { ...corp, view: paid }, book, madePayments });
-    expect(screen.getByRole('link', { name: 'Your wallet' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Open in wallet' })).toHaveAttribute(
       'href',
       '/wallet/journal?highlight=5150'
     );

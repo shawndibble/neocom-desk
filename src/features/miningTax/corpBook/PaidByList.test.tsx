@@ -107,7 +107,7 @@ describe('PaidByList', () => {
       [payment({ id: 'p1' }), payment({ id: 'p2' })],
       new Map([['p1', 5150]])
     );
-    const links = screen.getAllByRole('link', { name: 'Your wallet' });
+    const links = screen.getAllByRole('link', { name: 'Open in wallet' });
     expect(links).toHaveLength(1);
     expect(links[0]).toHaveAttribute('href', '/wallet/journal?highlight=5150');
     expect(within(links[0]!.closest('li')!).getByText('600,000 ISK')).toBeInTheDocument();
