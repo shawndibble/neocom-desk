@@ -2,7 +2,12 @@
 // (`npm run test:emulator`); a plain `npm test` skips it.
 import type { Caller } from './actorAuth.js';
 import { afterAll, beforeEach, expect, it, vi } from 'vitest';
-import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
+import {
+  clearEmulator,
+  emulatorDb as db,
+  emulatorSuite,
+  staggerTransactionRetries,
+} from './testSupport/emulator.js';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { parseBookCall } from './corpTaxBook.js';
 import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
@@ -608,11 +613,12 @@ emulatorSuite('vetting (emulator)', () => {
 
     // The slot is taken before the read: two adds side by side cannot both have the last one.
     await reviewDoc(last.handle.reviewId).update({ reads: 29 });
+    const restore = staggerTransactionRetries();
     const both = await Promise.allSettled(
       [APPLICANT_ALT, STRANGER].map((id) =>
         addVettingCharacter(deps(), { ...last.handle, accessToken: tok(id) })
       )
-    );
+    ).finally(restore);
     expect(both.map((out) => out.status).sort()).toEqual(['fulfilled', 'rejected']);
     expect(esiCalls.length).toBe(reads + 1);
     expect(await stored(last.handle.reviewId)).toMatchObject({ reads: 30 });

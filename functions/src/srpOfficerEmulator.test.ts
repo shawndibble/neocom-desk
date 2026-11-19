@@ -2,7 +2,12 @@
 // emulator (`npm run test:emulator`); a plain `npm test` skips it.
 import type { Caller } from './actorAuth.js';
 import { afterAll, beforeEach, expect, it } from 'vitest';
-import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
+import {
+  clearEmulator,
+  emulatorDb as db,
+  emulatorSuite,
+  staggerTransactionRetries,
+} from './testSupport/emulator.js';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { parseBookCall } from './corpTaxBook.js';
 import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
@@ -302,9 +307,15 @@ emulatorSuite('SRP officer actions (emulator)', () => {
 
   it('two racing approvals: exactly one wins', async () => {
     await seed(1);
-    const results = await Promise.allSettled([approve(1), approve(1, ACCOUNTANT)]);
-    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
-    expect((await audit()).filter((e) => e.action === 'approveClaim')).toHaveLength(1);
+    // Both transactions deadlock and abort; staggered, the retries no longer deadlock again.
+    const restore = staggerTransactionRetries();
+    try {
+      const results = await Promise.allSettled([approve(1), approve(1, ACCOUNTANT)]);
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+      expect((await audit()).filter((e) => e.action === 'approveClaim')).toHaveLength(1);
+    } finally {
+      restore();
+    }
   });
 
   it('rejects with a reason, sets closedAt and audits the reason; no reason is refused at parse', async () => {

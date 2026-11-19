@@ -8,6 +8,7 @@
  * `ignore` keeps it out of the upload, so it never reaches a deploy.
  */
 import { describe } from 'vitest';
+import { setTimeoutHandler } from '@google-cloud/firestore/build/src/backoff.js';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 
@@ -39,4 +40,28 @@ export async function clearEmulator(): Promise<void> {
     `http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/${PROJECT_ID}/databases/(default)/documents`,
     { method: 'DELETE' }
   );
+}
+
+/**
+ * Staggers the Admin SDK's retries of aborted transactions, for a test that races two of them on
+ * one document. Both read the document, then both write it, so the emulator aborts them
+ * (`Transaction lock timeout` in its log). The SDK then waits 1 s, give or take half, growing 1.5x
+ * per retry (observed: the racing test took about 3.3 s, and past vitest's 5 s limit on a slow
+ * runner), and retrying both at once would deadlock them again. Here the Nth retry waits
+ * `N * stepMs`, so the first one commits before the second one reads, and the second then finds
+ * the claim already decided. Uses the SDK's own test hook (`setTimeoutHandler`, marked test-only),
+ * so every `delayExecution` wait is replaced while it is installed. Returns the restore; call it
+ * in a `finally`.
+ *
+ * Recheck after a `firebase-admin` or `@google-cloud/firestore` bump: if the SDK stops routing
+ * retries through that hook this becomes a silent no-op, and the two race tests (srpOfficer,
+ * vetting) go back to about 3 s and flaky. The import is a deep path into a transitive dependency.
+ */
+export function staggerTransactionRetries(stepMs = 25): () => void {
+  let retries = 0;
+  setTimeoutHandler((fn) => {
+    retries += 1;
+    setTimeout(fn, stepMs * retries);
+  });
+  return () => setTimeoutHandler((fn, ms) => void setTimeout(fn, ms));
 }
