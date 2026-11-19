@@ -538,7 +538,7 @@ export function Calendar() {
                 />
               </Panel>
             ) : (
-              <div className="w-full min-w-0 space-y-3 md:w-[38rem] xl:shrink-0">
+              <div className="w-full min-w-0 space-y-3 md:flex-1">
                 <Panel padded={false} title={t('calendar.map.title')} actions={periodControls}>
                   <CalendarMap
                     days={days}
