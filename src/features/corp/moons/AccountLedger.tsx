@@ -1,5 +1,8 @@
 import { useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
+import { oreTaxLines } from '@/engine/corpTaxBook/bookSections';
 import { DataTable, type DataTableColumn } from '@/components/ui';
 import {
   accountLedger,
@@ -9,7 +12,11 @@ import {
 import type { MinerDetail } from '@/engine/corpTaxBook/bookView';
 import type { Adjustment } from '@/engine/corpTaxBook/statements';
 import { isk, shortDate } from './moonsFormat';
+import { OreLinesTable } from './OreLinesTable';
+import { paymentWalletHref } from './paymentWalletHref';
+import { tapTargetClassName } from './sectionHelpers';
 import { BookSection } from './sectionParts';
+import { useBook } from './useBook';
 
 /**
  * A Miner's account in one list (an accountant's view): every day's tax and every payment,
@@ -28,6 +35,7 @@ export function AccountLedger({
   phone: boolean;
 }) {
   const { t } = useTranslation();
+  const { names } = useBook();
   const ledger: Ledger = useMemo(
     () => accountLedger(detail, corrections, running),
     [detail, corrections, running]
@@ -38,8 +46,16 @@ export function AccountLedger({
     switch (e.kind) {
       case 'day':
         return t('corpTaxBook.moons.ledger.what.day', { count: e.days ?? 1 });
-      case 'payment':
-        return t('corpTaxBook.moons.ledger.what.payment');
+      case 'payment': {
+        const href = e.paymentId ? paymentWalletHref(e.paymentId) : null;
+        return href ? (
+          <Link to={href} className={entityLinkClassName(tapTargetClassName)}>
+            {t('corpTaxBook.moons.ledger.what.payment')}
+          </Link>
+        ) : (
+          t('corpTaxBook.moons.ledger.what.payment')
+        );
+      }
       case 'correction':
         return t('corpTaxBook.moons.ledger.what.correction', { reason: e.note });
       case 'writeOff':
@@ -47,6 +63,46 @@ export function AccountLedger({
       case 'adjustment':
         return t('corpTaxBook.moons.ledger.what.adjustment');
     }
+  };
+
+  const detailOf = (e: LedgerEntry) => {
+    if (e.kind === 'day') {
+      const keys = new Set(e.dayKeys);
+      return (
+        <OreLinesTable
+          lines={oreTaxLines(detail.days.filter((d) => keys.has(d.key)))}
+          label={t('corpTaxBook.moons.ledger.oreOf', { date: shortDate(e.date) })}
+        />
+      );
+    }
+    if (e.kind === 'payment') {
+      const p = detail.payments.find((x) => x.id === e.paymentId);
+      const href = e.paymentId ? paymentWalletHref(e.paymentId) : null;
+      return (
+        <div className="space-y-1 px-3 py-2 text-sm">
+          {p && (
+            <p>
+              {t('corpTaxBook.moons.ledger.paidBy', {
+                name: names.character(p.characterId),
+                source: t(`corpTaxBook.moons.payment.${p.source}`),
+              })}
+            </p>
+          )}
+          {href ? (
+            <Link to={href} className={entityLinkClassName(tapTargetClassName)}>
+              {t('corpTaxBook.moons.ledger.openWallet')}
+            </Link>
+          ) : (
+            <p className="text-text-dim">{t('corpTaxBook.moons.ledger.noWalletEntry')}</p>
+          )}
+        </div>
+      );
+    }
+    return (
+      <p className="px-3 py-2 text-sm text-text-dim">
+        {e.kind === 'adjustment' ? t('corpTaxBook.moons.ledger.adjustmentNote') : e.note}
+      </p>
+    );
   };
 
   const columns: DataTableColumn<LedgerEntry>[] = [
@@ -130,6 +186,7 @@ export function AccountLedger({
             columns={columns}
             rows={[...shown]}
             rowKey={(e) => e.key}
+            expandableRow={{ leadingIcon: true, renderDetail: detailOf }}
             density="compact"
             stackLayout="dense"
             {...table}

@@ -26,6 +26,8 @@ export interface LedgerEntry {
   balance: number;
   /** A `day` entry: how many mined days (a moon each) it adds up. */
   days?: number;
+  /** A `day` entry: the mined days (`DayRow.key`) behind it, for the row to open onto. */
+  dayKeys?: string[];
   /** A `payment`, `correction` or `writeOff` entry: what the member or officer recorded. */
   note?: string;
   /** A `payment` entry: who sent it and how the book learned of it. */
@@ -62,7 +64,7 @@ export function accountLedger(
 
   // A running account owes every billable day not yet on a Statement; a Statement-era book waits
   // for the Statement to bill it.
-  const billed = new Map<string, { debit: number; days: number }>();
+  const billed = new Map<string, { debit: number; days: number; keys: string[] }>();
   for (const d of detail.days) {
     if (d.tax <= 0) continue;
     // A day an officer forgave off a Statement was billed first; the write-off is its credit.
@@ -73,9 +75,10 @@ export function accountLedger(
       forgivenOnStatement ||
       (running && d.status === 'unbilled');
     if (owedNow) {
-      const held = billed.get(d.date) ?? { debit: 0, days: 0 };
+      const held = billed.get(d.date) ?? { debit: 0, days: 0, keys: [] };
       held.debit += d.tax;
       held.days += 1;
+      held.keys.push(d.key);
       billed.set(d.date, held);
     } else if (d.status === 'unbilled' || d.status === 'not-billable') {
       notYetBilled.tax += d.tax;
@@ -91,6 +94,7 @@ export function accountLedger(
       debit: v.debit,
       credit: 0,
       days: v.days,
+      dayKeys: v.keys,
     });
 
   for (const p of detail.payments)
@@ -160,6 +164,7 @@ export function accountLedger(
       credit: d.credit,
       balance,
       ...(d.days !== undefined ? { days: d.days } : {}),
+      ...(d.dayKeys !== undefined ? { dayKeys: d.dayKeys } : {}),
       ...(d.note !== undefined ? { note: d.note } : {}),
       ...(d.paymentId !== undefined ? { paymentId: d.paymentId } : {}),
     };

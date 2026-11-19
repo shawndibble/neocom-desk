@@ -94,6 +94,7 @@ import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { formatIsk } from '@/lib/isk';
 import { intParam } from '@/lib/urlState';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { useHighlightParam } from '@/lib/useHighlightParam';
 import { useUrlFilter, useUrlParam, useUrlSort } from '@/lib/useUrlState';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
@@ -327,6 +328,8 @@ interface CorpJournalPanelProps {
   /** "Where the ISK went" side panel; its state lives on the page, which shifts aside for it. */
   iskPanelOpen: boolean;
   onIskPanelOpenChange: (open: boolean) => void;
+  /** The journal entry a `?highlight=` link (a Corp Tax Book payment) points at: scrolled to and pulsed. */
+  highlightRowKey: number | null;
 }
 
 function CorpJournalPanel({
@@ -347,6 +350,7 @@ function CorpJournalPanel({
   refreshFailed,
   iskPanelOpen,
   onIskPanelOpenChange,
+  highlightRowKey,
 }: CorpJournalPanelProps) {
   const { t } = useTranslation();
   const { filteredJournal, breakdownJournal, chartJournal, refTypeOptions } =
@@ -417,6 +421,7 @@ function CorpJournalPanel({
             chartJournal={chartJournal}
             journalColumns={journalColumns}
             label={t('wallet.journalTab')}
+            highlightRowKey={highlightRowKey}
             sort={sort}
             onSortChange={onSortChange}
             tableExport={journalExport}
@@ -478,6 +483,7 @@ function CorpWalletView({ canReadDivisions }: { canReadDivisions: boolean }) {
   // chosen one isn't in this corporation's list — which is exactly what a corp
   // change looks like, and also what a `?division=` deep link (issue #419)
   // naming a division this corporation doesn't have looks like.
+  const highlightedEntry = useHighlightParam();
   const [division, setDivision] = useUrlParam('division', DIVISION_PARAM);
   const effectiveDivision = divisions.some((entry) => entry.division === division)
     ? division
@@ -631,6 +637,7 @@ function CorpWalletView({ canReadDivisions }: { canReadDivisions: boolean }) {
           refreshFailed={corpJournal.refreshCount > 0}
           iskPanelOpen={iskPanelOpen}
           onIskPanelOpenChange={setIskPanelOpen}
+          highlightRowKey={highlightedEntry}
         />
       </div>
     </ItemActionsProvider>

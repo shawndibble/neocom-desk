@@ -112,7 +112,7 @@ export function EntityHeader({
 }: {
   label: string;
   value: string;
-  tone?: 'danger';
+  tone?: 'danger' | 'success';
   note?: ReactNode;
   facts: { label: string; value: ReactNode }[];
 }) {
@@ -123,7 +123,7 @@ export function EntityHeader({
         <p
           className={cx(
             'text-3xl font-semibold tabular-nums',
-            tone === 'danger' ? 'text-danger' : 'text-text'
+            tone === 'danger' ? 'text-danger' : tone === 'success' ? 'text-isk-pos' : 'text-text'
           )}
         >
           {value}
