@@ -36,6 +36,7 @@ import { StatusPill } from './StatusPill';
 import type { MoonMiningTaxRow } from './snapshot';
 import type { PayeeSuggestion } from './suggestPayee';
 import { LedgerActionError } from './LedgerActionError';
+import { labelWithoutSystem } from './assignmentLabel';
 import { formatCount } from '@/lib/formatCount';
 import { Well } from '@/components/ui/Well';
 
@@ -322,7 +323,7 @@ export function RowDetailModal({
               <>
                 {' · '}
                 {assignment.taxPct}%{' · '}
-                {assignment.label && `${assignment.label} · `}
+                {assignment.label && `${labelWithoutSystem(assignment.label, systemName)} · `}
                 {t('miningTax.detail.valueLine', { value: formatIsk(estimatedValue) })}
               </>
             )}
