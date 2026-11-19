@@ -119,4 +119,10 @@ describe('soloTargets', () => {
       ])
     );
   });
+
+  it('leaves out a guest Character still waiting to confirm', () => {
+    expect(soloTargets([{ id: 'g1', characterIds: [1, 2], pendingConfirmation: [2] }])).toEqual(
+      new Map([['solo:1', 'g1']])
+    );
+  });
 });

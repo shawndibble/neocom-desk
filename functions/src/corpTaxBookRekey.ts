@@ -1,4 +1,17 @@
-import { disputeIdFor } from './corpTaxBook.js';
+import { chunk, IN_QUERY_LIMIT } from './chunk.js';
+import {
+  ACCOUNTS,
+  ADJUSTMENTS,
+  DECLARATIONS,
+  DISMISSALS,
+  disputeIdFor,
+  DISPUTES,
+  PAYMENTS,
+  REBILLS,
+  STATEMENTS,
+  WRITE_OFFS,
+} from './corpTaxBook.js';
+import { MINER_TOTALS } from './corpTaxBookMinerTotals.js';
 
 /**
  * Grouping Characters into one Miner (#6450): everything the absorbed Miners were billed, paid
@@ -24,9 +37,9 @@ export type RekeyWrite =
   | { kind: 'delete'; collection: string; id: string };
 
 /** Collections whose records carry `minerId`. */
-export const MINER_KEYED = ['statements', 'payments', 'writeOffs', 'adjustments', 'declarations'];
+export const MINER_KEYED = [STATEMENTS, PAYMENTS, WRITE_OFFS, ADJUSTMENTS, DECLARATIONS, REBILLS];
 /** Collections keyed by the Miner id itself (`accounts/{minerId}`, `minerTotals/{minerId}`): only caches. */
-export const MINER_CACHES = ['accounts', 'minerTotals'];
+export const MINER_CACHES = [ACCOUNTS, MINER_TOTALS];
 
 /** The Miner ids a grouping absorbs: the groups dissolved, and a `solo:` id per Character folded in. */
 export function absorbedMinerIds(
@@ -56,7 +69,7 @@ export function planRekey(input: {
   for (const { collection, id, data } of input.records) {
     if (MINER_CACHES.includes(collection)) {
       writes.push({ kind: 'delete', collection, id });
-    } else if (collection === 'dismissals') {
+    } else if (collection === DISMISSALS) {
       if (data.scope === 'miner')
         writes.push({
           kind: 'update',
@@ -64,7 +77,7 @@ export function planRekey(input: {
           id,
           fields: { targetId: target, ...readers(data) },
         });
-    } else if (collection === 'disputes') {
+    } else if (collection === DISPUTES) {
       const fields = { minerId: target, ...readers(data) };
       const toId = disputeIdFor(target, String(data.date));
       if (claimed.has(toId)) {
@@ -85,12 +98,54 @@ export function planRekey(input: {
   return writes;
 }
 
-/** For the backfill: each grouped Character's `solo:` id, mapped to the group it belongs to now. */
+/** For the backfill: each confirmed grouped Character's `solo:` id, mapped to the group it belongs to now. */
 export function soloTargets(
-  miners: readonly { id: string; characterIds: readonly number[] }[]
+  miners: readonly {
+    id: string;
+    characterIds: readonly number[];
+    /** A guest's Character not yet confirmed keeps its own Miner (D26b). */
+    pendingConfirmation?: readonly number[];
+  }[]
 ): Map<string, string> {
   const out = new Map<string, string>();
   for (const m of miners)
-    for (const c of m.characterIds) if (`solo:${c}` !== m.id) out.set(`solo:${c}`, m.id);
+    for (const c of m.characterIds)
+      if (`solo:${c}` !== m.id && !m.pendingConfirmation?.includes(c)) out.set(`solo:${c}`, m.id);
   return out;
+}
+
+/** What the records of a Miner id are read through: a transaction in the store, a plain query in the backfill. */
+export interface RekeyIo {
+  read(
+    collection: string,
+    field: string,
+    ids: string[],
+    also?: [string, string]
+  ): Promise<RekeyRecord[]>;
+  exists(collection: string, id: string): Promise<boolean>;
+}
+
+/** Every record the absorbed Miners hold, and the dispute ids the target already has. */
+export async function loadRekeyRecords(
+  io: RekeyIo,
+  target: string,
+  absorbed: readonly string[]
+): Promise<{ records: RekeyRecord[]; existingDisputeIds: Set<string> }> {
+  const records: RekeyRecord[] = [];
+  const read = async (collection: string, field: string, also?: [string, string]) => {
+    for (const ids of chunk(absorbed, IN_QUERY_LIMIT))
+      records.push(...(await io.read(collection, field, ids, also)));
+  };
+  for (const collection of [...MINER_KEYED, DISPUTES]) await read(collection, 'minerId');
+  await read(DISMISSALS, 'targetId', ['scope', 'miner']);
+  // Caches are keyed by the Miner id itself.
+  for (const id of absorbed)
+    for (const collection of MINER_CACHES)
+      if (await io.exists(collection, id)) records.push({ collection, id, data: {} });
+  const existingDisputeIds = new Set<string>();
+  for (const r of records.filter((x) => x.collection === DISPUTES)) {
+    const id = disputeIdFor(target, String(r.data.date));
+    if (await io.exists(DISPUTES, id)) existingDisputeIds.add(id);
+  }
+  return { records, existingDisputeIds };
 }

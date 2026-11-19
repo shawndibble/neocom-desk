@@ -18,13 +18,7 @@ import {
 } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { chunk } from './chunk.js';
-import {
-  absorbedMinerIds,
-  MINER_CACHES,
-  MINER_KEYED,
-  planRekey,
-  type RekeyRecord,
-} from './corpTaxBookRekey.js';
+import { absorbedMinerIds, loadRekeyRecords, planRekey } from './corpTaxBookRekey.js';
 import {
   loadStampContext,
   restampStructures,
@@ -1101,56 +1095,57 @@ async function latestRecordedCorpOf(c: EditCtx, characterId: number): Promise<nu
 
 /**
  * Grouping moves what the absorbed Miners were billed, paid and disputed onto the surviving id
- * (#6450), so the Miners table lists one row. A guest's character still waiting to confirm
- * (D26b) stays out: its own Miner keeps its records until it joins. Every read happens here,
- * before the caller's first write.
+ * (#6450), so the Miners table lists one row. Every read happens here, before the caller's
+ * first write; the returned function stages the writes.
  */
 async function rekeyAbsorbed(
-  c: EditCtx,
+  tx: Transaction,
+  db: Firestore,
+  corporationId: number,
+  target: string,
+  targetUids: readonly string[],
+  absorbed: readonly string[]
+): Promise<() => void> {
+  if (absorbed.length === 0) return () => undefined;
+  const at = (name: string) => sub(db, corporationId, name);
+  const { records, existingDisputeIds } = await loadRekeyRecords(
+    {
+      read: async (collection, field, ids, also) => {
+        let q = at(collection).where(field, 'in', ids);
+        if (also) q = q.where(also[0], '==', also[1]);
+        return (await tx.get(q)).docs.map((d) => ({ collection, id: d.id, data: d.data() }));
+      },
+      exists: async (collection, id) => (await tx.get(at(collection).doc(id))).exists,
+    },
+    target,
+    absorbed
+  );
+  const writes = planRekey({ target, targetUids, records, existingDisputeIds });
+  // A transaction holds 500 writes; a move is two. Refuse, rather than fail half-way.
+  if (writes.length > 450)
+    fail('failed-precondition', 'Too many records to move in one grouping', 'regroup-too-large');
+  return () => {
+    for (const w of writes) {
+      if (w.kind === 'update') tx.update(at(w.collection).doc(w.id), w.fields);
+      else if (w.kind === 'delete') tx.delete(at(w.collection).doc(w.id));
+      else {
+        tx.set(at(w.collection).doc(w.toId), w.data);
+        tx.delete(at(w.collection).doc(w.fromId));
+      }
+    }
+  };
+}
+
+/** What a grouping folds in and who can read it: a guest's character still waiting to confirm (D26b) stays out. */
+function rekeyScope(
   action: { minerId: string; characterIds: number[] },
   absorbMinerIds: readonly string[],
   pending: readonly number[]
-): Promise<() => void> {
-  const absorbed = absorbedMinerIds(
-    action.minerId,
-    action.characterIds.filter((x) => !pending.includes(x)),
-    absorbMinerIds
-  );
-  if (absorbed.length === 0) return () => undefined;
-  const IN_LIMIT = 30;
-  const records: RekeyRecord[] = [];
-  const read = async (collection: string, field: string, extra?: [string, string]) => {
-    for (const ids of chunk(absorbed, IN_LIMIT)) {
-      let q = col(c, collection).where(field, 'in', ids);
-      if (extra) q = q.where(extra[0], '==', extra[1]);
-      for (const d of (await c.tx.get(q)).docs)
-        records.push({ collection, id: d.id, data: d.data() });
-    }
-  };
-  for (const collection of [...MINER_KEYED, 'disputes']) await read(collection, 'minerId');
-  await read('dismissals', 'targetId', ['scope', 'miner']);
-  for (const id of absorbed)
-    for (const collection of MINER_CACHES) records.push({ collection, id, data: {} });
-  const existingDisputeIds = new Set<string>();
-  for (const r of records.filter((x) => x.collection === 'disputes')) {
-    const id = disputeIdFor(action.minerId, String(r.data.date));
-    if ((await c.tx.get(col(c, DISPUTES).doc(id))).exists) existingDisputeIds.add(id);
-  }
-  const writes = planRekey({
-    target: action.minerId,
-    targetUids: action.characterIds.filter((x) => !pending.includes(x)).map((x) => `char:${x}`),
-    records,
-    existingDisputeIds,
-  });
-  return () => {
-    for (const w of writes) {
-      if (w.kind === 'update') c.tx.update(col(c, w.collection).doc(w.id), w.fields);
-      else if (w.kind === 'delete') c.tx.delete(col(c, w.collection).doc(w.id));
-      else {
-        c.tx.set(col(c, w.collection).doc(w.toId), w.data);
-        c.tx.delete(col(c, w.collection).doc(w.fromId));
-      }
-    }
+) {
+  const joined = action.characterIds.filter((x) => !pending.includes(x));
+  return {
+    absorbed: absorbedMinerIds(action.minerId, joined, absorbMinerIds),
+    uids: joined.map((x) => `char:${x}`),
   };
 }
 
@@ -1678,7 +1673,15 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     case 'setMiner': {
       const miners = await tx.get(col(c, MINERS));
       const out = await planMiner(c, miners.docs, action, new Set());
-      const rekey = await rekeyAbsorbed(c, action, [], out.pending);
+      const scope = rekeyScope(action, [], out.pending);
+      const rekey = await rekeyAbsorbed(
+        tx,
+        c.deps.db,
+        c.corporationId,
+        action.minerId,
+        scope.uids,
+        scope.absorbed
+      );
       writeMiner(c, action, out);
       rekey();
       keepInGroup(c, action.characterIds);
@@ -1707,7 +1710,15 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         }
       }
       const out = await planMiner(c, miners.docs, action, absorbed);
-      const rekey = await rekeyAbsorbed(c, action, action.absorbMinerIds, out.pending);
+      const scope = rekeyScope(action, action.absorbMinerIds, out.pending);
+      const rekey = await rekeyAbsorbed(
+        tx,
+        c.deps.db,
+        c.corporationId,
+        action.minerId,
+        scope.uids,
+        scope.absorbed
+      );
       for (const id of absorbed) tx.delete(col(c, MINERS).doc(id));
       writeMiner(c, action, out);
       rekey();
@@ -2428,11 +2439,21 @@ export async function confirmGrouping(
     if (!miner || !(miner.pendingConfirmation as number[]).includes(characterId)) {
       fail('not-found', 'Nothing to confirm', 'nothing-pending');
     }
+    // Joining is when the guest's own records follow it into the group (#6450).
+    const rekey = await rekeyAbsorbed(
+      tx,
+      deps.db,
+      corporationId,
+      minerId,
+      [...new Set([...((miner.uids as string[] | undefined) ?? []), caller.uid])],
+      [`solo:${characterId}`]
+    );
     tx.update(ref, {
       pendingConfirmation: (miner.pendingConfirmation as number[]).filter((x) => x !== characterId),
       confirmedCharacterIds: FieldValue.arrayUnion(characterId),
       uids: FieldValue.arrayUnion(caller.uid),
     });
+    rekey();
     recordAnswer(tx, deps, corporationId, characterId, {
       minerId,
       answer: 'confirmed',

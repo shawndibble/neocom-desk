@@ -1205,6 +1205,25 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         });
       });
 
+      it("keeps a pending guest's own records until they confirm, then moves them (#6450)", async () => {
+        await pendingGuest();
+        const b = book();
+        await b
+          .collection('payments')
+          .doc('p-guest')
+          .set({ id: 'p-guest', minerId: 'solo:61', amount: 5 });
+        await b
+          .collection('rebills')
+          .doc('r-guest')
+          .set({ id: 'r-guest', minerId: 'solo:61', fromDate: '2026-10-01' });
+        expect((await b.collection('payments').doc('p-guest').get()).get('minerId')).toBe(
+          'solo:61'
+        );
+        await confirmGrouping(deps(), who(61), CORP, 'm-a');
+        expect((await b.collection('payments').doc('p-guest').get()).get('minerId')).toBe('m-a');
+        expect((await b.collection('rebills').doc('r-guest').get()).get('minerId')).toBe('m-a');
+      });
+
       it('lets the added character decline, which removes it and tells the officers', async () => {
         await pendingGuest();
         await declineGrouping(deps(), who(61), CORP, 'm-a');
