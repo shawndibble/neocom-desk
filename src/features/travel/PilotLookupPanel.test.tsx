@@ -6,6 +6,7 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import en from '@/i18n/locales/en.json';
 import type { PilotProfile } from './pilotLookup';
+import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 
 const mocks = vi.hoisted(() => ({
   granted: undefined as boolean | undefined,
@@ -126,6 +127,7 @@ function renderTab(url = '/travel/pilot') {
 
 describe('PilotLookupPanel', () => {
   beforeEach(() => {
+    usePublicInfoModalStore.getState().clear();
     vi.resetAllMocks();
     mocks.hereSpace = null;
     mocks.granted = false;
@@ -149,7 +151,7 @@ describe('PilotLookupPanel', () => {
     mocks.encodeFittingShare.mockResolvedValue({ ok: true, payload: 'CODE' });
   });
 
-  it('resolves an exact name without the search scope and shows the stats card', async () => {
+  it('resolves an exact name without the search scope and opens Show Info', async () => {
     mocks.resolvePilotByName.mockResolvedValue({ characterId: 42, name: 'Some Pilot' });
     renderTab();
     fireEvent.change(screen.getByRole('combobox', { name: 'Pilot' }), {
@@ -157,16 +159,13 @@ describe('PilotLookupPanel', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Look up' }));
 
-    expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
+    await waitFor(() =>
+      expect(usePublicInfoModalStore.getState().request).toEqual({ kind: 'character', id: 42 })
+    );
     expect(mocks.resolvePilotByName).toHaveBeenCalledWith('some pilot');
     expect(mocks.searchMailRecipients).not.toHaveBeenCalled();
-    // The heading can render a tick before the router's search param lands.
-    await waitFor(() => expect(probe.search).toBe('?pilot=42'));
-    expect(await screen.findByText('1,043 kills')).toBeTruthy();
-    expect(screen.queryByText('99.2%')).toBeNull();
-    expect(screen.getByRole('meter', { name: 'Danger' })).toHaveAttribute('aria-valuenow', '68');
-    expect(await screen.findByText('Kronos')).toBeTruthy();
-    expect(screen.getByText('317')).toBeTruthy();
+    // Show Info carries the profile; the page itself stays on the search box.
+    expect(probe.search).toBe('');
   });
 
   it('shows the Threat verdict once the kills and the danger ratio are in', async () => {
@@ -181,11 +180,7 @@ describe('PilotLookupPanel', () => {
       })),
     });
     mocks.resolvePilotByName.mockResolvedValue({ characterId: 42, name: 'Some Pilot' });
-    renderTab();
-    fireEvent.change(screen.getByRole('combobox', { name: 'Pilot' }), {
-      target: { value: 'some pilot' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Look up' }));
+    renderTab('/travel/pilot?pilot=42');
 
     await screen.findByRole('heading', { name: 'Some Pilot' });
     // "Dangerous" is also the danger meter's high end: the verdict is the one in the Threat band.
@@ -211,11 +206,7 @@ describe('PilotLookupPanel', () => {
       })),
     });
     mocks.resolvePilotByName.mockResolvedValue({ characterId: 42, name: 'Some Pilot' });
-    renderTab();
-    fireEvent.change(screen.getByRole('combobox', { name: 'Pilot' }), {
-      target: { value: 'some pilot' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Look up' }));
+    renderTab('/travel/pilot?pilot=42');
     const band = await screen.findByRole('region', { name: 'Threat' });
     expect(await within(band).findByText('Active')).toBeTruthy();
     expect(
@@ -242,11 +233,7 @@ describe('PilotLookupPanel', () => {
 
     async function lookUp() {
       mocks.resolvePilotByName.mockResolvedValue({ characterId: 42, name: 'Some Pilot' });
-      renderTab();
-      fireEvent.change(screen.getByRole('combobox', { name: 'Pilot' }), {
-        target: { value: 'some pilot' },
-      });
-      fireEvent.click(screen.getByRole('button', { name: 'Look up' }));
+      renderTab('/travel/pilot?pilot=42');
       return screen.findByRole('heading', { name: 'Some Pilot' });
     }
 
@@ -311,11 +298,7 @@ describe('PilotLookupPanel', () => {
       })),
     });
     mocks.resolvePilotByName.mockResolvedValue({ characterId: 42, name: 'Some Pilot' });
-    renderTab();
-    fireEvent.change(screen.getByRole('combobox', { name: 'Pilot' }), {
-      target: { value: 'some pilot' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Look up' }));
+    renderTab('/travel/pilot?pilot=42');
     await screen.findByRole('heading', { name: 'Some Pilot' });
     expect(
       await within(await screen.findByRole('region', { name: 'Threat' })).findByText('Dangerous')
@@ -325,11 +308,7 @@ describe('PilotLookupPanel', () => {
   it('shows no verdict band when the kill history could not be read', async () => {
     mocks.fetchPilotKillHistory.mockResolvedValue({ ok: false });
     mocks.resolvePilotByName.mockResolvedValue({ characterId: 42, name: 'Some Pilot' });
-    renderTab();
-    fireEvent.change(screen.getByRole('combobox', { name: 'Pilot' }), {
-      target: { value: 'some pilot' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Look up' }));
+    renderTab('/travel/pilot?pilot=42');
 
     expect(await screen.findByText('1,043 kills')).toBeTruthy();
     expect(screen.queryByRole('region', { name: 'Threat' })).toBeNull();
@@ -349,9 +328,24 @@ describe('PilotLookupPanel', () => {
     const option = await screen.findByRole('option', { name: 'Some Pilot' }, { timeout: 2000 });
     expect(mocks.searchMailRecipients).toHaveBeenCalledWith(1, 'some', expect.any(AbortSignal));
     fireEvent.mouseDown(option);
+    await waitFor(() =>
+      expect(usePublicInfoModalStore.getState().request).toEqual({ kind: 'character', id: 42 })
+    );
+  });
+
+  it('clears an older ?pilot= link, then opens Show Info for the newly chosen pilot', async () => {
+    mocks.resolvePilotByName.mockResolvedValue({ characterId: 77, name: 'Other Pilot' });
+    renderTab('/travel/pilot?pilot=42');
     expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
-    // The heading can render a tick before the router's search param lands.
-    await waitFor(() => expect(probe.search).toBe('?pilot=42'));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Pilot' }), {
+      target: { value: 'other pilot' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Look up' }));
+
+    await waitFor(() =>
+      expect(usePublicInfoModalStore.getState().request).toEqual({ kind: 'character', id: 77 })
+    );
+    expect(probe.search).toBe('');
   });
 
   it('tells an empty page that a Local list or D-Scan can be pasted', () => {
@@ -373,10 +367,10 @@ describe('PilotLookupPanel', () => {
     fireEvent.change(box, { target: { value: 'some pilot' } });
     fireEvent.click(screen.getByRole('button', { name: 'Look up' }));
 
-    expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
+    await waitFor(() =>
+      expect(usePublicInfoModalStore.getState().request).toEqual({ kind: 'character', id: 42 })
+    );
     expect(screen.queryByText('3 names, Local list')).toBeNull();
-    // The heading can render a tick before the router's search param lands.
-    await waitFor(() => expect(probe.search).toBe('?pilot=42'));
   });
 
   describe('a name box with one name per line', () => {
@@ -388,7 +382,9 @@ describe('PilotLookupPanel', () => {
       const box = screen.getByRole('combobox', { name: 'Pilot' });
       fireEvent.change(box, { target: { value: 'some pilot' } });
       fireEvent.keyDown(box, { key: 'Enter' });
-      expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
+      await waitFor(() =>
+        expect(usePublicInfoModalStore.getState().request).toEqual({ kind: 'character', id: 42 })
+      );
     });
 
     it('keeps Enter for a new line once there is a list, and Ctrl+Enter looks it up', async () => {
