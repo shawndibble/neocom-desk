@@ -157,6 +157,10 @@ describe('parsers', () => {
       parseSettingsPatch({ noticeRules: { ...rules, after: { kind: 'weekly' } } })
     ).toThrow();
     expect(() => parseSettingsPatch({ noticeRules: { ...rules, cooldownDays: 0 } })).toThrow();
+    expect(parseSettingsPatch({ noticeRules: { ...rules, earlyAt: 50_000_000 } })).toEqual({
+      noticeRules: { ...rules, earlyAt: 50_000_000 },
+    });
+    expect(() => parseSettingsPatch({ noticeRules: { ...rules, earlyAt: -1 } })).toThrow();
     expect(() => parseSettingsPatch({ dayTolerancePct: 6 })).toThrow();
   });
 

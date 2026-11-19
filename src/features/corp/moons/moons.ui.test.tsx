@@ -372,6 +372,29 @@ describe('StatementRun', () => {
     expect(reload).toHaveBeenCalled();
   });
 
+  it('issues every Statement but mails only the ticked Miners', async () => {
+    renderBook(<StatementRun />);
+    const boxes = screen.getAllByRole('checkbox');
+    expect(boxes).toHaveLength(2);
+    expect(boxes.every((b) => (b as HTMLInputElement).checked)).toBe(true);
+    await userEvent.click(boxes[0]);
+    expect(screen.getByText('1 to send')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Send 1 Statement' }));
+
+    await waitFor(() => expect(enqueueStatements).toHaveBeenCalledTimes(1));
+    const issued = editBook.mock.calls.map((c) => (c[2] as { action: string }).action);
+    expect(issued).toEqual(['issueStatement', 'issueStatement']);
+    expect(enqueueStatements.mock.calls[0][0].statements).toHaveLength(1);
+  });
+
+  it('leaves Send off until at least one Miner is ticked', async () => {
+    renderBook(<StatementRun />);
+    for (const box of screen.getAllByRole('checkbox')) await userEvent.click(box);
+    expect(screen.getByRole('button', { name: 'Continue to send' })).toBeDisabled();
+  });
+
   /** Aug and Sep both closed and unbilled: one run sends both, oldest first (#6208). */
   const twoMonths = {
     now: '2026-10-18T14:00:00Z',

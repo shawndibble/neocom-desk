@@ -18882,6 +18882,9 @@
         "unmailed_other": "{{count}} earlier Statements were issued but never mailed; they go with this run",
         "unmatched": "An Unmatched donation is not on anyone's Statement until it is assigned",
         "previewFor": "Preview for",
+        "recipients": "Mail to",
+        "mailedRecently_one": "Mailed {{count}} day ago, so unticked",
+        "mailedRecently_other": "Mailed {{count}} days ago, so unticked",
         "mailPreview": "Mail preview",
         "continue": "Continue to send",
         "preview": "Preview mail",
@@ -19616,6 +19619,8 @@
           "noticeHint": "Behind: once a Miner's oldest unpaid day is this many days old. Day of month: on that day each month, to every Miner who owes from before it.",
           "minimum": "Late notice minimum",
           "minimumHint": "No notice goes to a Miner who owes less than this.",
+          "earlyAt": "Send a notice early at",
+          "earlyAtHint": "A Miner owing this much, all their Characters together, gets a notice before they are behind by the rule above. Blank: off. Never inside the days between notices.",
           "cooldown": "Days between notices",
           "tolerance": "Day tolerance (%)",
           "toleranceHint": "A day a payment reaches counts as paid when it falls short of the day's tax by no more than this; the gap is written off. 0 to 5."
