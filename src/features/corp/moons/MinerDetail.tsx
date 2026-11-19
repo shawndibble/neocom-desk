@@ -699,7 +699,7 @@ export function MinerDetail({ id }: { id: string }) {
         value={isk(Math.abs(row.owed - row.credit))}
         tone={row.credit > row.owed ? 'success' : row.owed ? 'danger' : undefined}
         note={
-          row.overdueDays !== null
+          row.credit <= row.owed && row.overdueDays !== null
             ? t('corpTaxBook.moons.miner.overdueNote', { count: row.overdueDays })
             : row.paused
               ? t('corpTaxBook.moons.miner.overduePausedNote')

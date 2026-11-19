@@ -6,6 +6,7 @@ import {
   buildRecordedPayout,
   carriesPayoutReference,
   outgoingDonationsFromJournal,
+  parsePaymentId,
   payoutId,
   payoutPeriod,
   payoutReason,
@@ -447,5 +448,17 @@ describe('balanceAfter / payoutPeriod / payoutReason', () => {
     expect(payoutReason('Moon mining payout', { from: '2026-10-01', to: '2026-10-17' })).toBe(
       'Moon mining payout, 2026-10-01 to 2026-10-17'
     );
+  });
+});
+
+describe('parsePaymentId', () => {
+  it('reads the division and journal entry a donation payment id names', () => {
+    expect(parsePaymentId(payoutId({ division: 3, refId: 5550123 }))).toEqual({
+      division: 3,
+      refId: 5550123,
+    });
+  });
+  it('is null for an id an officer recorded by hand', () => {
+    expect(parsePaymentId('manual-1')).toBeNull();
   });
 });

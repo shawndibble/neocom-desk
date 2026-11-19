@@ -88,13 +88,7 @@ export function AccountLedger({
               })}
             </p>
           )}
-          {href ? (
-            <Link to={href} className={entityLinkClassName(tapTargetClassName)}>
-              {t('corpTaxBook.moons.ledger.openWallet')}
-            </Link>
-          ) : (
-            <p className="text-text-dim">{t('corpTaxBook.moons.ledger.noWalletEntry')}</p>
-          )}
+          {!href && <p className="text-text-dim">{t('corpTaxBook.moons.ledger.noWalletEntry')}</p>}
         </div>
       );
     }

@@ -18665,7 +18665,6 @@
         },
         "oreOf": "Ore mined {{date}}",
         "paidBy": "{{name}} · {{source}}",
-        "openWallet": "Open in the corp wallet",
         "noWalletEntry": "An officer recorded this by hand, so it has no corp wallet entry.",
         "adjustmentNote": "ISK the book moved without a date of its own: a tolerance shortfall forgiven, or a correction folded into a Statement."
       },
