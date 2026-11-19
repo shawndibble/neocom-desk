@@ -22,6 +22,12 @@ Officer/character `90000001` "Test Pilot", corp `98000001` "Test Corp", owner ha
 4. **Browser.** `npx playwright test -c scripts/dev/playwright.sandbox.config.ts` in the background. It starts Vite on 5173 with `VITE_FIREBASE_EMULATORS=1`, opens a headed Chromium at `/corp/moons`, and stays open until the user closes the window. `scripts/dev/moons-sandbox.local.ts` fakes EVE SSO and ESI, answers `mintFirebaseToken` with an unsigned custom token the Auth emulator accepts, and answers `verifyCorpOfficerCallable` with a Director verdict (the real one reads live ESI). To land on another page, change the `signInAndGoto` path.
 5. **Verify.** You cannot see the WSLg window. Prove it rendered with a headless copy of the config (viewport 1440x900, `page.screenshot`, wait ~40 s: the first Vite compile is slow), then Read the PNG.
 
+## Personal pages (stage 1: wallet, assets, industry, mining, skills, orders)
+
+`scripts/dev/sandbox/personalEsi.ts` generates ESI data for the Character: skill queue, 80 journal rows, 40 transactions, assets in Jita and Amarr (ships, minerals, ore, blueprints), 14 industry jobs, a 25-day mining ledger and 12 market orders. `moons-sandbox.local.ts` registers it after `installEsiMock`, so it wins over the empty defaults. No emulator is needed for these pages. To seed another endpoint, add a generator and a `lists` entry there (shapes: `src/esi/endpoints/*.ts`; use real type ids from `public/data/types.json`). Still empty: contracts, mail, calendar, contacts, corp assets/structures/members, SRP, vetting.
+
+The Ships page has no dedicated data: hulls come from the hangar assets. Skill-queue levels may not match the trained levels the Skills page shows (`/skills` is still the e2e fixture). Page URLs: `/wallet`, `/assets`, `/industry`, `/mining`, `/skills/trained`, `/ships`. Free industry slots read negative: the fake Character has no industry skills.
+
 ## Expect
 
 - A "Log in again / sync error" banner: the fake token cannot refresh. Harmless.
