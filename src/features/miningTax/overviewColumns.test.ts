@@ -16,7 +16,6 @@ describe('availableOverviewColumns', () => {
       'refineValue',
       'oreBreakdown',
       'units',
-      'pricing',
     ]);
   });
 
@@ -31,8 +30,8 @@ describe('availableOverviewColumns', () => {
 
 describe('visibleAvailableColumns', () => {
   it('narrows the stored preference to what is actually offered right now', () => {
-    const visible = ['character', 'refineValue', 'pricing'] as const;
-    expect(visibleAvailableColumns(visible, false, true)).toEqual(['character', 'pricing']);
+    const visible = ['character', 'refineValue', 'volume'] as const;
+    expect(visibleAvailableColumns(visible, false, true)).toEqual(['character', 'volume']);
   });
 
   it('leaves the stored preference untouched when everything is available', () => {

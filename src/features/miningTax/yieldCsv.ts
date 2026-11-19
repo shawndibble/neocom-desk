@@ -107,11 +107,6 @@ export function yieldOverviewCsvColumns(
       header: t('miningTax.overview.unitsColumn'),
       value: (row) => sumUnits(row.entry.oreLines),
     },
-    {
-      header: t('miningTax.overview.pricingColumn'),
-      value: (row) =>
-        t(`miningTax.overview.${row.valuation.pricedAll ? 'pricingFull' : 'pricingPartial'}`),
-    },
   ];
   return columns.filter((c): c is CsvColumn<MiningYieldRow> => c !== false);
 }
