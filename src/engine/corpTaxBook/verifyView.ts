@@ -4,8 +4,6 @@
  * names (ore, refinery, corporation) and number formatting stay in the page.
  */
 import type { TaxPriceSource } from '../miningTax/priceBasis';
-import { DAY_MS } from '@/lib/age';
-import { utcDay } from '@/engine/localDay';
 
 /** What `readCorpTaxBookStatementCallable` returns (functions/src/corpTaxBookStore.ts). */
 export interface VerifyPayload {
@@ -64,7 +62,27 @@ export interface VerifyPayload {
     paidThrough: string | null;
     /** When it was counted. */
     asOf: string;
+    /**
+     * The running days still owed, oldest first, after what was paid since: what the page lists.
+     * Absent from a server or officer client that does not send it.
+     */
+    unpaidDays?: UnpaidDay[];
   } | null;
+  /** The Miner's whole history, for the ledger; absent from an older server. */
+  ledger?: VerifyLedgerData;
+}
+
+/** A running day still owed: what remains of it and its whole tax. */
+export interface UnpaidDay {
+  date: string;
+  owed: number;
+  tax: number;
+}
+
+/** The Miner's whole history for the verify page's ledger. */
+export interface VerifyLedgerData {
+  days: { date: string; tax: number }[];
+  payments: { id: string; at: string; amount: number; source: 'donation' | 'manual' }[];
 }
 
 export interface VerifyPayloadLine {
@@ -119,11 +137,6 @@ export function verifyRows(lines: readonly VerifyPayloadLine[]): VerifyRow[] {
     tax: line.tax,
     reason: line.reason,
   }));
-}
-
-/** The UTC date a Statement is due: `overdueDays` after it was issued (D19). */
-export function dueDate(issuedAt: string, overdueDays: number): string {
-  return utcDay(Date.parse(issuedAt) + overdueDays * DAY_MS);
 }
 
 /** The distinct rates the lines billed, each with its effective-from date, in line order (D28). */
