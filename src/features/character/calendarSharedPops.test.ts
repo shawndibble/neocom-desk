@@ -87,9 +87,10 @@ describe('Shared Pops as Calendar clocks', () => {
     });
   });
 
-  it('has the expiry row before the pop too, so the belt end is on the map from the start', () => {
-    const rows = toSharedPopSources([entry()], new Set(), NOW);
-    expect(rows.map((r) => r.id)).toEqual(['98000001_x1', '98000001_x1:expires']);
+  it('holds the expiry row back until the moon is ready', () => {
+    expect(toSharedPopSources([entry()], new Set(), NOW).map((r) => r.id)).toEqual(['98000001_x1']);
+    const ready = toSharedPopSources([entry()], new Set(), NOW + 10 * HOUR_MS);
+    expect(ready.map((r) => r.id)).toEqual(['98000001_x1', '98000001_x1:expires']);
   });
 
   it('shows only from the Extraction start until its retention ends', () => {
@@ -270,8 +271,8 @@ describe('Shared Pops as Calendar clocks', () => {
   it('rides the board as its own kind, filtered by sharing corporation and never by Corporation events', () => {
     const other = { ...entry({ id: '98000002_x2' }), corporation: { ...CORP, id: 98_000_002 } };
     const board = buildCharacterBoard({
-      nowMs: NOW,
-      sharedMoonPops: toSharedPopSources([entry(), other], new Set(), NOW),
+      nowMs: NOW + 10 * HOUR_MS,
+      sharedMoonPops: toSharedPopSources([entry(), other], new Set(), NOW + 10 * HOUR_MS),
     });
     expect(board.map((item) => item.kind)).toEqual(Array(4).fill('sharedMoonPop'));
     expect(board[0]!.sharedBy).toEqual(CORP);
