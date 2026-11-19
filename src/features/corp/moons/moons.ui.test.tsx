@@ -216,8 +216,8 @@ describe('MinersTab', () => {
     for (const name of ['Show info', 'Record payment', 'Dismiss tax']) {
       expect(within(menu).getByRole('menuitem', { name })).toBeInTheDocument();
     }
-    // Show info, then the three real actions: nothing else.
-    expect(within(menu).getAllByRole('menuitem')).toHaveLength(4);
+    // Show info, Open in new tab (the row opens a page), then the three real actions: nothing else.
+    expect(within(menu).getAllByRole('menuitem')).toHaveLength(5);
     // No payment in this book: the item stays, inert.
     expect(within(menu).getByRole('menuitem', { name: 'Mark not tax' })).toHaveAttribute(
       'aria-disabled',
@@ -226,13 +226,16 @@ describe('MinersTab', () => {
     expect(within(menu).queryByRole('menuitem', { name: 'Send reminder' })).not.toBeInTheDocument();
   });
 
-  it('a row opens in place to its Statement days with one Open page link; the click does not navigate', async () => {
-    renderBook(<MinersTab />);
-    expect(screen.queryByRole('link', { name: 'Open page' })).not.toBeInTheDocument();
+  it("a row click opens that Miner's page instead of expanding in place", async () => {
+    renderBook(
+      <>
+        <MinersTab />
+        <LocationProbe />
+      </>
+    );
     await userEvent.click(screen.getByText('Pilot 1'));
-    const link = await screen.findByRole('link', { name: 'Open page' });
-    expect(link).toHaveAttribute('href', '/corp/moons/miners/solo%3A1');
-    expect(screen.getByText(/Next Statement · 1/)).toBeInTheDocument();
+    expect(screen.getByTestId('location')).toHaveTextContent('/corp/moons/miners/solo%3A1');
+    expect(screen.queryByText(/Next Statement · 1/)).not.toBeInTheDocument();
   });
 });
 

@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import {
   Button,
   clearFilters,
@@ -51,7 +52,7 @@ import {
   type MinersColumnId,
 } from './moonsColumns';
 import { OverdueWord, StandingWord } from './moonsParts';
-import { MinerExpandedRow } from './MinerExpandedRow';
+import { minerPath } from './moonsPaths';
 import { MinerRowMenu } from './MinerRowMenu';
 import { useCards } from './sectionHelpers';
 import { MarkNotTaxDialog, ReasonDialog, RecordPaymentDialog } from './BookDialogs';
@@ -84,29 +85,9 @@ interface MinersFilter {
   balance: MinerBalance | null;
 }
 
-const OPEN_MINER_KEY = 'corpTaxBook.minersTab.openMiner.';
-
-/** Keeps the open row across Open page then Back; sessionStorage, best-effort. */
-function readOpenMiner(corporationId: number): string | null {
-  try {
-    return sessionStorage.getItem(OPEN_MINER_KEY + corporationId);
-  } catch {
-    return null;
-  }
-}
-
-function writeOpenMiner(corporationId: number, id: string | null) {
-  try {
-    if (id === null) sessionStorage.removeItem(OPEN_MINER_KEY + corporationId);
-    else sessionStorage.setItem(OPEN_MINER_KEY + corporationId, id);
-  } catch {
-    // Blocked storage: the row just closes after a visit elsewhere.
-  }
-}
-
 export function MinersTab() {
   const { t } = useTranslation();
-  const { view, names, edit, canEdit, corporationId } = useBook();
+  const { view, names, edit, canEdit } = useBook();
   const { miners, donationsBeforeBook } = useTabsProjection();
   const [dialog, setDialog] = useState<
     | { kind: 'record' | 'dismiss'; miner: MinerRow }
@@ -116,11 +97,7 @@ export function MinersTab() {
   const { run, onCloseAutoFocus } = useOpenAfterMenu();
   const [tableRef, cards, compact] = useCards(MINERS_CARDS_BELOW_REM);
   const phone = useIsPhone();
-  // Read once; a stored miner the list no longer holds opens nothing and is cleared on mount.
-  const [openMiner] = useState(() => {
-    const id = readOpenMiner(corporationId);
-    return id !== null && miners.some((m) => m.id === id) ? id : null;
-  });
+  const navigate = useNavigate();
   const rowContextMenu = useCallback(
     (m: MinerRow, tr: ReactElement) => (
       <MinerRowMenu
@@ -409,13 +386,8 @@ export function MinersTab() {
               columns={columns}
               rows={sortedRows}
               rowKey={(m) => m.id}
-              expandableRow={{
-                renderDetail: (m) => <MinerExpandedRow miner={m} />,
-                leadingIcon: true,
-                initialKey: openMiner,
-                onExpandedChange: (key) =>
-                  writeOpenMiner(corporationId, key === null ? null : String(key)),
-              }}
+              onRowClick={(m) => navigate(minerPath(m.id))}
+              rowHref={(m) => minerPath(m.id)}
               stacked={cards}
               rowClassName={() => 'group'}
               rowContextMenu={rowContextMenu}
