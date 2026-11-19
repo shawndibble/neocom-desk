@@ -366,16 +366,16 @@ describe('Calendar Shared Pops', () => {
     renderCalendarRoute();
 
     const rail = await screen.findByRole('list', { name: /coming up/i });
-    // Two rows: the pop, and its belt expiry.
-    expect(await within(rail).findAllByText('Efa - Shared Tatara')).toHaveLength(2);
+    // One row: the belt expiry waits until the moon is ready.
+    expect(await within(rail).findAllByText('Efa - Shared Tatara')).toHaveLength(1);
     // The moon is in the detail, not on the row.
     expect(within(rail).queryByText('Efa I - Moon 1')).toBeNull();
     expect(within(rail).getByText(/Shared moon pops · ready/)).toBeInTheDocument();
-    expect(within(rail).getByText(/Shared moon pops · belt expires/)).toBeInTheDocument();
+    expect(within(rail).queryByText(/belt expires/)).toBeNull();
     expect(screen.getAllByText('Shared by Sharing Corp').length).toBeGreaterThan(0);
   });
 
-  it('shows only the pop rows when the corp also put the pop in the in-game calendar', async () => {
+  it('shows only the pop row when the corp also put the pop in the in-game calendar', async () => {
     sharePop();
     const duplicate = {
       event_id: 2,
@@ -388,7 +388,7 @@ describe('Calendar Shared Pops', () => {
     renderCalendarRoute();
 
     const rail = await screen.findByRole('list', { name: /coming up/i });
-    expect(await within(rail).findAllByText('Efa - Shared Tatara')).toHaveLength(2);
+    expect(await within(rail).findAllByText('Efa - Shared Tatara')).toHaveLength(1);
     expect(within(rail).getByText('Fleet Op')).toBeInTheDocument();
     expect(within(rail).queryByText('Efa Shared Tatara')).toBeNull();
   });
