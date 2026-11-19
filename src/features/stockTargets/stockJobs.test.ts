@@ -34,20 +34,23 @@ describe('readCachedStockJobs', () => {
     await db.esiCache.put({
       characterId: 1,
       key: 'industryJobs',
-      value: [job({}), job({ job_id: 2, status: 'delivered' })],
+      value: [
+        job({}),
+        job({ job_id: 2, status: 'delivered' }),
+        job({ job_id: 3, status: 'ready', runs: 1 }),
+      ],
       fetchedAt: 5,
     });
     const read = await readCachedStockJobs([1]);
-    expect(read.jobs).toEqual([
-      {
-        activityId: 1,
-        productTypeId: 100,
-        runs: 4,
-        unitsPerRun: 3,
-        outputLocationId: 60003760,
-        endDate: '2026-11-19T00:00:00Z',
-      },
-    ]);
+    expect(read.jobs.map((j) => j.runs)).toEqual([4, 1]);
+    expect(read.jobs[0]).toEqual({
+      activityId: 1,
+      productTypeId: 100,
+      runs: 4,
+      unitsPerRun: 3,
+      outputLocationId: 60003760,
+      endDate: '2026-11-19T00:00:00Z',
+    });
     expect(read.oldestFetchedAt?.getTime()).toBe(5);
   });
 

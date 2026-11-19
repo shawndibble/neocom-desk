@@ -11,6 +11,7 @@ import type { IndustryJob } from '@/esi/endpoints';
 import { readCachedRows } from '@/esi/cache';
 import type { StockJobInput } from '@/engine/stockTargets/inJobs';
 import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
+import { isOpenJob } from '@/features/industry/jobHistory';
 import { KEYS as JOB_KEYS, loadAllCharactersIndustryJobs } from '@/features/industry/jobs';
 
 export interface StockJobsRead {
@@ -27,16 +28,14 @@ function unitsPerRun(catalog: BlueprintCatalog, job: IndustryJob): number | unde
 }
 
 function adapt(jobs: readonly IndustryJob[], catalog: BlueprintCatalog): StockJobInput[] {
-  return jobs
-    .filter((job) => job.status === 'active')
-    .map((job) => ({
-      activityId: job.activity_id,
-      productTypeId: job.product_type_id,
-      runs: job.runs,
-      unitsPerRun: unitsPerRun(catalog, job),
-      outputLocationId: job.output_location_id,
-      endDate: job.end_date,
-    }));
+  return jobs.filter(isOpenJob).map((job) => ({
+    activityId: job.activity_id,
+    productTypeId: job.product_type_id,
+    runs: job.runs,
+    unitsPerRun: unitsPerRun(catalog, job),
+    outputLocationId: job.output_location_id,
+    endDate: job.end_date,
+  }));
 }
 
 function oldest(times: readonly number[]): Date | null {

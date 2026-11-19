@@ -17819,7 +17819,7 @@
       "inHangarAffix": "in hangar",
       "inJobs": "In jobs",
       "inJobsAffix": "in jobs",
-      "inJobsHint": "Units your running manufacturing and reaction jobs will deliver to this market. They shrink what is left to buy or build, not the status.",
+      "inJobsHint": "Units your own running manufacturing and reaction jobs will deliver to this market; corporation jobs are not counted. They shrink what is left to buy or build, not the status.",
       "inJobsEnds": "first done in {{when}}",
       "inJobsReady": "ready to deliver",
       "jobsElsewhere_one": "{{count}} job delivers elsewhere and is not counted.",
