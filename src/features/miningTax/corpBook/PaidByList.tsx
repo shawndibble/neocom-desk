@@ -1,4 +1,7 @@
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { highlightHref } from '@/lib/highlightParam';
 import { Well } from '@/components/ui/Well';
 import { Eyebrow } from '@/components/ui/Eyebrow';
 import type { TaxPayment } from '@/engine/corpTaxBook/allocation';
@@ -11,6 +14,8 @@ interface Props {
   /** The book's Tax Payments, to say when and how each was made. */
   payments: readonly TaxPayment[];
   corpName: string;
+  /** Payment id → the member's own wallet journal entry for it, where one was found on this device. */
+  walletRefs?: ReadonlyMap<string, number>;
 }
 
 /**
@@ -18,12 +23,22 @@ interface Props {
  * corporation has not credited yet, and credit from corrections, which is no payment. The book
  * decides how money is applied (oldest day first), so there is nothing to link or undo here.
  */
-export function PaidByList({ paidBy, payments, corpName }: Props) {
+export function PaidByList({ paidBy, payments, corpName, walletRefs }: Props) {
   const { t } = useTranslation();
   const k = (key: string) => `miningTax.corpBook.detail.paidBy.${key}`;
-  const row = (key: string, label: string, amount: number) => (
+  const row = (key: string, label: string, amount: number, walletRef?: number) => (
     <li key={key} className="flex items-baseline justify-between gap-3 py-1">
-      <span>{label}</span>
+      <span>
+        {label}
+        {walletRef !== undefined && (
+          <>
+            {' · '}
+            <Link to={highlightHref('/wallet/journal', walletRef)} className={inlineLinkClassName}>
+              {t(k('openInWallet'))}
+            </Link>
+          </>
+        )}
+      </span>
       <span className="tabular-nums">{formatIsk(amount, 0)} ISK</span>
     </li>
   );
@@ -38,7 +53,7 @@ export function PaidByList({ paidBy, payments, corpName }: Props) {
                 time: eveTimeLabel(Date.parse(made.at)),
               })
             : t(k('payment'));
-          return row(p.paymentId, label, p.amount);
+          return row(p.paymentId, label, p.amount, walletRefs?.get(p.paymentId));
         })}
         {paidBy.inFlight.map((d, i) =>
           row(

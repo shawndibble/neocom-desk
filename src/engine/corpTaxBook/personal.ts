@@ -34,6 +34,7 @@ import {
   type MoneySource,
   type PaidBy,
 } from './paidBy';
+import { isSameTransfer } from './transferMatch';
 import { daySettleTolerance } from './runningAccount';
 import { splitAcrossBooks, resolveBookShare, type BookObservation } from './attribution';
 import { dayClosesAt, isDayBillable } from './billable';
@@ -55,7 +56,7 @@ import type { DayPrices } from './valuation';
 import type { ObservedMiningEntry } from './types';
 import type { ClaimCheck, ClaimedTransfer, Declaration, OverdueStatus } from './overdue';
 import { disputeHold, disputeKindOf, type DisputeKind, type OreDispute } from './disputes';
-import { DAY_MS, MINUTE_MS } from '@/lib/age';
+import { DAY_MS } from '@/lib/age';
 
 /** What made a day Paid: the member's own mark, the corporation's settled Statement, or a donation. */
 export type BookSettledBy = 'yourMark' | 'statement' | 'donation' | 'credit';
@@ -1938,9 +1939,6 @@ export interface HeldPayment {
   notTaxAmount?: number;
 }
 
-/** The corp's journal stamps the same ISK transfer within the same minute or two. */
-const SAME_TRANSFER_MS = 10 * MINUTE_MS;
-
 /**
  * Donations the member sent to the corp (their own journal) that the book does
  * not hold yet; the days they cover read as paid. The corp's journal ids differ
@@ -1963,11 +1961,8 @@ export function inFlightDonations(
     )
     .filter(
       (m) =>
-        !held.some(
-          (h) =>
-            h.characterId === m.characterId &&
-            Math.abs(h.amount - (m.amount ?? 0)) < 1 &&
-            Math.abs(Date.parse(h.at) - Date.parse(m.date)) <= SAME_TRANSFER_MS
+        !held.some((h) =>
+          isSameTransfer(h, { characterId: m.characterId, amount: m.amount ?? 0, date: m.date })
         )
     )
     .map((m) => ({

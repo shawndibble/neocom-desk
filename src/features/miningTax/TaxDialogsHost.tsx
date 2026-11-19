@@ -737,6 +737,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
           onClose={() => actions.openDetail(null)}
           dr={detailTarget}
           corp={corpDetail}
+          madePayments={madePayments}
           book={corpView?.books.find(
             (b) => b.loaded.corporationId === corpDetail.view.corporationId
           )}

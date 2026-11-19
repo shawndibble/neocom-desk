@@ -7,6 +7,7 @@ import type { BookRowView } from '@/engine/corpTaxBook/personal';
 import type { DisplayRow } from '../groupRows';
 import { CorpRowDetailModal } from './CorpRowDetailModal';
 import type { CorpRowInfo } from './corpRows';
+import type { CorpBookViewBook } from './corpBookView';
 
 const ZEO = 45490;
 
@@ -79,6 +80,50 @@ describe('CorpRowDetailModal', () => {
   it('lists what paid a day, and nothing for a day nothing has paid', () => {
     renderModal();
     expect(screen.queryByText('Paid by')).not.toBeInTheDocument();
+  });
+
+  it('links a paid day’s donation to the member’s own wallet entry for it', () => {
+    const paid = {
+      ...view,
+      state: 'paid' as const,
+      taxOwed: 0,
+      settledBy: 'credit' as const,
+      paidBy: { payments: [{ paymentId: 'j1_900', amount: 957_001 }], inFlight: [] },
+    };
+    const book = {
+      summary: {},
+      payee: { name: 'Brass Meridian Logistics' },
+      loaded: {
+        payments: [
+          {
+            id: 'j1_900',
+            minerId: 'solo:1',
+            characterId: 1,
+            amount: 957_001,
+            at: '2026-10-18T13:10:00Z',
+            source: 'donation',
+          },
+        ],
+      },
+    } as unknown as CorpBookViewBook;
+    const madePayments = [
+      {
+        key: 'journal:5150',
+        kind: 'journal',
+        refId: 5150,
+        characterId: 1,
+        date: '2026-10-18T13:09:00Z',
+        amount: 957_001,
+        method: 'donation',
+        counterpartyId: paid.corporationId,
+        label: '',
+      },
+    ] as const;
+    renderModal({ corp: { ...corp, view: paid }, book, madePayments });
+    expect(screen.getByRole('link', { name: 'Your wallet' })).toHaveAttribute(
+      'href',
+      '/wallet/journal?highlight=5150'
+    );
   });
 
   it('lists the money that paid a paid day', () => {
