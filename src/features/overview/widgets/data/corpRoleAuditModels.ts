@@ -88,7 +88,7 @@ export const corpRoleAudit: Builder = (feeds, { t, now }) => {
   const table: TableModel = {
     columns: [
       { key: 'member', label: t(`${K}.col.member`), priority: 0 },
-      { key: 'roles', label: t(`${K}.col.roles`), priority: 1 },
+      { key: 'roles', label: t(`${K}.col.roles`), priority: 1, grow: true },
       { key: 'change', label: t(`${K}.col.change`), align: 'end', priority: 2 },
     ],
     rows: sorted.map((holder) => ({
