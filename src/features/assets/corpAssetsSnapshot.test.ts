@@ -144,7 +144,14 @@ describe('loadCorpAssetsSnapshot', () => {
     expect(mocks.loadCorporationStructures).toHaveBeenCalledWith(77, 98000001);
   });
 
-  it('does not read blueprints or structures without the roles', async () => {
+  it('falls back to no structure names when the structures read fails', async () => {
+    mocks.accountCorpReaders.mockResolvedValue(new Map([[98000001, 77]]));
+    mocks.loadCorporationStructures.mockRejectedValue(new Error('403'));
+    const snap = await loadCorpAssetsSnapshot(42, signal(), true);
+    expect(snap.inputs).not.toBeNull();
+  });
+
+  it('reads no structures when no Character can, and no blueprints without the role', async () => {
     mocks.loadAssetCopyValues.mockImplementation(async (_c, _a, loadBlueprints) => {
       expect(await loadBlueprints()).toBeNull();
       return new Map();
