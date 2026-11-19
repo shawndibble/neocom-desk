@@ -30,7 +30,7 @@ import {
   RecordPaymentDialog,
   ReasonDialog,
 } from './BookDialogs';
-import { isk, periodLabel, periodsLabel, shortDate, shortDateTime } from './moonsFormat';
+import { isk, periodLabel, shortDate, shortDateTime } from './moonsFormat';
 import { autoCredited, paidToOwn, transferStatus, type TransferStatus } from './claimWalletCheck';
 import { useOwnWalletJournals } from './useOwnWalletJournals';
 import { MOONS_TABS, minerPath } from './moonsPaths';
@@ -171,7 +171,7 @@ export function NeedsYouQueue() {
   const ctx = useBook();
   const { view, names, edit, canEdit, characterId, corporationId, settings } = ctx;
   const { miners } = useTabsProjection();
-  const { needsYou, uncounted, disputes, runDue, noticesDue, count } = useNeedsYou();
+  const { needsYou, uncounted, disputes, noticesDue, count } = useNeedsYou();
   // The officer's own Characters on this device: a transfer paid to one is checked in its journal.
   const ownIds = new Set(useCharacters().map((c) => c.characterId));
   const journals = useOwnWalletJournals(
@@ -315,26 +315,9 @@ export function NeedsYouQueue() {
         </p>
       ))}
       <ul className="divide-y divide-line">
-        {runDue.length > 0 && (
-          // #6208: closed periods nobody has billed. Overdue counts from issue, so a forgotten
-          // run would otherwise bill no one; the run sends every listed period, oldest first.
-          <QueueCard
-            tone="warning"
-            title={
-              <Link
-                to={tabPath(MOONS_TABS, 'statements')}
-                className={entityLinkClassName('inline-block py-0.5')}
-              >
-                {t('corpTaxBook.moons.needs.runDue.title', { periods: periodsLabel(runDue) })}
-              </Link>
-            }
-            body={t('corpTaxBook.moons.needs.runDue.body', { count: runDue.length })}
-            actions={null}
-          />
-        )}
         {noticesDue.length > 0 && (
-          // #6294: on a running account a Miner who is behind gets a late notice, mailed from an
-          // officer's Character like the run; automatic sync never sends one.
+          // #6294: a Miner who is behind gets a late notice, mailed from an officer's Character;
+          // automatic sync never sends one.
           <QueueCard
             tone="warning"
             title={
