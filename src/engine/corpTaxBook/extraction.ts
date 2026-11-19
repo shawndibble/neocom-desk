@@ -63,7 +63,7 @@ export function extractionStatus(
   const planned = fractureAndExpiry(ex, opts.expiryHours);
   const { fracturedAt, fracturedBy } = planned;
   if (t < fracturedAt) return { state: 'ready' };
-  // An officer's Fully Mined flag ends the field when it was set, not 48 hours after the fracture.
+  // An officer's Fully Mined flag ends the field when it was set, not at the clock expiry.
   const flaggedAt = opts.fullyMinedAt ? Date.parse(opts.fullyMinedAt) : NaN;
   const expiresAt = Number.isNaN(flaggedAt)
     ? planned.expiresAt
