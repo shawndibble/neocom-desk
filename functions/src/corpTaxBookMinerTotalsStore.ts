@@ -242,7 +242,7 @@ export async function refreshAfterEvent(
 }
 
 /** Removes the totals docs of `minerIds` (or every Miner's). */
-async function invalidateMinerTotals(
+export async function invalidateMinerTotals(
   db: Firestore,
   corporationId: number,
   minerIds: readonly string[] | 'all'

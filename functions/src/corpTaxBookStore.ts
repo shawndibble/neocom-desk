@@ -19,6 +19,13 @@ import {
 import { HttpsError } from 'firebase-functions/v2/https';
 import { chunk } from './chunk.js';
 import {
+  absorbedMinerIds,
+  MINER_CACHES,
+  MINER_KEYED,
+  planRekey,
+  type RekeyRecord,
+} from './corpTaxBookRekey.js';
+import {
   loadStampContext,
   restampStructures,
   stampBook,
@@ -1092,6 +1099,61 @@ async function latestRecordedCorpOf(c: EditCtx, characterId: number): Promise<nu
   return latestRecordedCorp(days.map((d) => d.data() as CorpRecord)).get(characterId)?.corp;
 }
 
+/**
+ * Grouping moves what the absorbed Miners were billed, paid and disputed onto the surviving id
+ * (#6450), so the Miners table lists one row. A guest's character still waiting to confirm
+ * (D26b) stays out: its own Miner keeps its records until it joins. Every read happens here,
+ * before the caller's first write.
+ */
+async function rekeyAbsorbed(
+  c: EditCtx,
+  action: { minerId: string; characterIds: number[] },
+  absorbMinerIds: readonly string[],
+  pending: readonly number[]
+): Promise<() => void> {
+  const absorbed = absorbedMinerIds(
+    action.minerId,
+    action.characterIds.filter((x) => !pending.includes(x)),
+    absorbMinerIds
+  );
+  if (absorbed.length === 0) return () => undefined;
+  const IN_LIMIT = 30;
+  const records: RekeyRecord[] = [];
+  const read = async (collection: string, field: string, extra?: [string, string]) => {
+    for (const ids of chunk(absorbed, IN_LIMIT)) {
+      let q = col(c, collection).where(field, 'in', ids);
+      if (extra) q = q.where(extra[0], '==', extra[1]);
+      for (const d of (await c.tx.get(q)).docs)
+        records.push({ collection, id: d.id, data: d.data() });
+    }
+  };
+  for (const collection of [...MINER_KEYED, 'disputes']) await read(collection, 'minerId');
+  await read('dismissals', 'targetId', ['scope', 'miner']);
+  for (const id of absorbed)
+    for (const collection of MINER_CACHES) records.push({ collection, id, data: {} });
+  const existingDisputeIds = new Set<string>();
+  for (const r of records.filter((x) => x.collection === 'disputes')) {
+    const id = disputeIdFor(action.minerId, String(r.data.date));
+    if ((await c.tx.get(col(c, DISPUTES).doc(id))).exists) existingDisputeIds.add(id);
+  }
+  const writes = planRekey({
+    target: action.minerId,
+    targetUids: action.characterIds.filter((x) => !pending.includes(x)).map((x) => `char:${x}`),
+    records,
+    existingDisputeIds,
+  });
+  return () => {
+    for (const w of writes) {
+      if (w.kind === 'update') c.tx.update(col(c, w.collection).doc(w.id), w.fields);
+      else if (w.kind === 'delete') c.tx.delete(col(c, w.collection).doc(w.id));
+      else {
+        c.tx.set(col(c, w.collection).doc(w.toId), w.data);
+        c.tx.delete(col(c, w.collection).doc(w.fromId));
+      }
+    }
+  };
+}
+
 function writeMiner(
   c: EditCtx,
   action: { minerId: string; characterIds: number[]; mainCharacterId: number },
@@ -1616,7 +1678,9 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     case 'setMiner': {
       const miners = await tx.get(col(c, MINERS));
       const out = await planMiner(c, miners.docs, action, new Set());
+      const rekey = await rekeyAbsorbed(c, action, [], out.pending);
       writeMiner(c, action, out);
+      rekey();
       keepInGroup(c, action.characterIds);
       return {
         detail: {
@@ -1643,8 +1707,10 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         }
       }
       const out = await planMiner(c, miners.docs, action, absorbed);
+      const rekey = await rekeyAbsorbed(c, action, action.absorbMinerIds, out.pending);
       for (const id of absorbed) tx.delete(col(c, MINERS).doc(id));
       writeMiner(c, action, out);
+      rekey();
       // A confirmation still stands for a character the Miner already held.
       clearAnswers(
         c,
