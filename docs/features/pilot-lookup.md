@@ -78,7 +78,7 @@ zKillboard calls are plain browser fetches with no custom headers (decision `202
 - Typing clears suggestions, resets state, cancels an exact lookup in flight (ticket counters make stale answers drop; aborts the search request).
 - Search failure silently falls back to exact-name lookup (suggestions emptied).
 - Status line (`role=status`, polite): resolving; not found ("No pilot is named X. Check the spelling - the name must match exactly."); couldn't reach EVE.
-- Choosing a pilot sets input to the name and pushes `?pilot=<id>` (`setParams({ pilot }, { push: true })`).
+- Choosing a pilot sets input to the name and opens Show Info for that pilot (`openPublicInfoModal('character', id)`); a legacy `?pilot=` is cleared first.
 
 ## Result states (`PilotResult`, keyed by id)
 
@@ -162,7 +162,7 @@ Folder is `features/travel/`, where the tab lives.
 
 | State                      | Where                                                                                 | Notes                                |
 | -------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------ |
-| Selected pilot             | URL `?pilot=<characterId>` (`optionalIdParam`), `push` on select                      | only durable state; shareable        |
+| Selected pilot             | URL `?pilot=<characterId>` (`optionalIdParam`), legacy link only                      | only durable state; shareable        |
 | Stats, killmail list       | memory, 10 min per `kind:id` / per id (`PILOT_STATS_CACHE_MS`); failures never cached | lost on reload                       |
 | Public info                | ESI cache (Dexie, `STALE_AFTER.static`)                                               | via `loadPublicCharacterInfo`        |
 | Expanded rows, loaded fits | component state, kept for the mounted pilot                                           | lost on pilot change (keyed remount) |
@@ -241,7 +241,7 @@ Folder is `features/travel/`, where the tab lives.
 8. When is a killmail body fetched? Only when a row is expanded; inline zKillboard body else ESI `GET /killmails/{id}/{hash}`; result kept once landed or in flight (ref guard), failed read retries on the next expand (`PilotKillmailsSection.tsx:106-126`, `pilotKillmailFit.ts:20-40`).
 9. What does Open in Fittings do? Encodes the victim's fit as a share payload (`encodeFittingShare`) and navigates to the Fittings editor via `fittingEditLocation`; busy/failed states local (`PilotKillmailsSection.tsx:296-310`).
 10. How do suggestions avoid stale results? Ticket counters (`latestSearch`, `latestLookup`), 300 ms debounce, `AbortController` on cleanup; typing clears suggestions and cancels exact lookup in flight (`PilotLookupPanel.tsx:82-110`).
-11. What happens to the previous result while typing a new name? It stays: typing resets only the search status and suggestions; the result changes only when a pilot is chosen and `?pilot=` is pushed (`PilotLookupPanel.tsx:177-190`, `:51-56`).
+11. What happens to the previous result while typing a new name? It stays: typing resets only the search status and suggestions; the result changes only when a pilot is chosen and Show Info opens (`PilotLookupPanel.tsx:177-190`, `:51-56`).
 12. Who else reuses this? `PublicInfoModal`'s Character tab lazy-loads `PilotProfileView` and the stat parts for corporation/alliance (`PublicInfoModal.tsx:53,268`); corp/alliance links there switch tabs instead of opening Show Info.
 13. How is a kill row's "ship" chosen? The victim's hull (`detail.victim.ship_type_id`) on both kills and losses; the party column is the other side: victim for kills, final blow for losses (`PilotKillmailsSection.tsx:204-208`).
 14. Why are zKillboard requests plain `fetch` with no headers? A custom header would force a CORS preflight; decision `20260924-195833`; hence also no `X-User-Agent` (the CLAUDE.md ESI header rule covers ESI calls only).

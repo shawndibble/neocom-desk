@@ -333,6 +333,21 @@ describe('PilotLookupPanel', () => {
     );
   });
 
+  it('clears an older ?pilot= link, then opens Show Info for the newly chosen pilot', async () => {
+    mocks.resolvePilotByName.mockResolvedValue({ characterId: 77, name: 'Other Pilot' });
+    renderTab('/travel/pilot?pilot=42');
+    expect(await screen.findByRole('heading', { name: 'Some Pilot' })).toBeTruthy();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Pilot' }), {
+      target: { value: 'other pilot' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Look up' }));
+
+    await waitFor(() =>
+      expect(usePublicInfoModalStore.getState().request).toEqual({ kind: 'character', id: 77 })
+    );
+    expect(probe.search).toBe('');
+  });
+
   it('tells an empty page that a Local list or D-Scan can be pasted', () => {
     renderTab();
     expect(screen.getByText(/paste a Local list or a D-Scan/i)).toBeTruthy();
