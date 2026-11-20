@@ -16,6 +16,7 @@ import type { DayRow, MinerRow } from '@/engine/corpTaxBook/bookView';
 import { accountBalance, balanceAdjustment } from '@/engine/corpTaxBook/balanceAdjustment';
 import { canRebillFrom, type Adjustment } from '@/engine/corpTaxBook/statements';
 import { DialogShell, Effect, Label } from './BookDialogs';
+import { canOverrideDay } from './dayEligibility';
 import { dateWithYear, isk, shortDate } from './moonsFormat';
 import { useBook } from './useBook';
 
@@ -23,13 +24,6 @@ import { useBook } from './useBook';
 function DateReadback({ date }: { date: string }) {
   return <span className="block text-xs text-text-dim">{dateWithYear(date)}</span>;
 }
-
-/**
- * A day's rate can be overridden until it is on a Statement (D31). A running account's day that
- * is already paid is one: the override reprices it and the payment it no longer needs becomes credit.
- */
-const canOverrideDay = (d: DayRow) =>
-  d.statementId === undefined && d.status !== 'dismissed' && d.status !== 'written-off';
 
 /** Per-record rate override (D31): a logged officer correction on a day not yet on a Statement. */
 export function RateOverrideDialog({

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -181,6 +181,14 @@ describe('the account ledger row menus', () => {
     expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
   });
 
+  it('offers a mined day only what its status allows: a paid day can be repriced, not dismissed', async () => {
+    const calls = renderLedger(running());
+    fireEvent.contextMenu(rowOf(/^Moon mining/));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Change rate…' }));
+    await vi.waitFor(() => expect(calls[0]).toMatch(/^rate:/));
+    expect(screen.queryByRole('menuitem', { name: 'Dismiss tax…' })).toBeNull();
+  });
+
   it('has no menu without edit rights', () => {
     renderLedger(running({ adjustments: [correction] }), false);
     fireEvent.contextMenu(rowOf(/Correction: Auth rollover/));
@@ -239,7 +247,8 @@ describe('the account ledger row menus', () => {
     fireEvent.contextMenu(rowOf(/Correction: Auth rollover/));
     const item = await screen.findByRole('menuitem', { name: /Reverse correction/ });
     expect(item).toHaveAttribute('aria-disabled', 'true');
-    expect(within(item).queryByText(/Edit correction/)).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: /Edit correction/ })).toBeNull();
+    await userEvent.click(item);
     expect(calls).toEqual([]);
   });
 });

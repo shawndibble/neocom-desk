@@ -28,11 +28,17 @@ export function LedgerRowMenu({
   entry,
   actions,
   name,
+  rateDays = [],
+  dismissDays = [],
   onCloseAutoFocus,
   children,
 }: {
   entry: LedgerEntry;
   actions: LedgerActions;
+  /** Of a mined-day row's days, the ones whose rate can still be changed. */
+  rateDays?: readonly string[];
+  /** Of a mined-day row's days, the ones whose tax can still be dismissed (none paid or on a Statement). */
+  dismissDays?: readonly string[];
   /** What the menu is named for assistive tech: the row's date and kind. */
   name: string;
   onCloseAutoFocus: (event: Event) => void;
@@ -72,12 +78,9 @@ export function LedgerRowMenu({
   } else if (entry.kind === 'payment' && entry.paymentId) {
     const id = entry.paymentId;
     items.push(item('notTax', () => actions.markNotTax(id)));
-  } else if (entry.kind === 'day' && entry.dayKeys?.length) {
-    const keys = entry.dayKeys;
-    items.push(
-      item('rate', () => actions.changeRate(keys[0]!)),
-      item('dismiss', () => actions.dismissDays(keys))
-    );
+  } else if (entry.kind === 'day') {
+    if (rateDays.length > 0) items.push(item('rate', () => actions.changeRate(rateDays[0]!)));
+    if (dismissDays.length > 0) items.push(item('dismiss', () => actions.dismissDays(dismissDays)));
   }
   if (items.length === 0) return children;
   return (

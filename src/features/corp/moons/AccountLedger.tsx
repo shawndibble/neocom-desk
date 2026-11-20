@@ -11,6 +11,7 @@ import {
 } from '@/engine/corpTaxBook/accountLedger';
 import type { MinerDetail } from '@/engine/corpTaxBook/bookView';
 import type { Adjustment } from '@/engine/corpTaxBook/statements';
+import { canOverrideDay } from './dayEligibility';
 import { LedgerRowMenu, type LedgerActions } from './LedgerRowMenu';
 import { isk, shortDate } from './moonsFormat';
 import { OreLinesTable } from './OreLinesTable';
@@ -58,6 +59,12 @@ export function AccountLedger({
     [detail, corrections, running]
   );
   const rows = useMemo(() => [...ledger.entries].reverse(), [ledger]);
+
+  /** The mined days behind a day row, with their status: what can still be changed on them. */
+  const daysOf = (e: LedgerEntry) => {
+    const keys = new Set(e.dayKeys);
+    return detail.days.filter((d) => keys.has(d.key));
+  };
 
   /** A record an officer undid keeps its row, struck through and tagged; its reversal says why. */
   const undone = (e: LedgerEntry, label: string) =>
@@ -251,11 +258,18 @@ export function AccountLedger({
             expandableRow={{ leadingIcon: true, renderDetail: detailOf }}
             {...(opened
               ? {
+                  rowMoreActions: true,
                   rowContextMenu: (e: LedgerEntry, tr: ReactElement) => (
                     <LedgerRowMenu
                       entry={e}
                       actions={opened}
                       name={`${shortDate(e.date)} ${e.kind}`}
+                      rateDays={daysOf(e)
+                        .filter(canOverrideDay)
+                        .map((d) => d.key)}
+                      dismissDays={daysOf(e)
+                        .filter((d) => d.status === 'unbilled' || d.status === 'not-billable')
+                        .map((d) => d.key)}
                       onCloseAutoFocus={onCloseAutoFocus}
                     >
                       {tr}
