@@ -55,13 +55,19 @@ export function fractureAndExpiry(ex: Extraction, expiryHours: number | undefine
 export function extractionStatus(
   ex: Extraction,
   now: string,
-  opts: { expiryHours?: number } = {}
+  opts: { expiryHours?: number; fullyMinedAt?: string } = {}
 ): ExtractionStatus {
   if (ex.cancelledAt) return { state: 'cancelled' };
   const t = Date.parse(now);
   if (t < Date.parse(ex.chunkArrivalAt)) return { state: 'extracting' };
-  const { fracturedAt, fracturedBy, expiresAt } = fractureAndExpiry(ex, opts.expiryHours);
+  const planned = fractureAndExpiry(ex, opts.expiryHours);
+  const { fracturedAt, fracturedBy } = planned;
   if (t < fracturedAt) return { state: 'ready' };
+  // An officer's Fully Mined flag ends the field when it was set, not at the clock expiry.
+  const flaggedAt = opts.fullyMinedAt ? Date.parse(opts.fullyMinedAt) : NaN;
+  const expiresAt = Number.isNaN(flaggedAt)
+    ? planned.expiresAt
+    : Math.min(planned.expiresAt, Math.max(fracturedAt, flaggedAt));
   return {
     state: t < expiresAt ? 'fractured' : 'expired',
     fracturedAt: iso(fracturedAt),

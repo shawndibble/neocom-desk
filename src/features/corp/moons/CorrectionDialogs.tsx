@@ -23,8 +23,12 @@ function DateReadback({ date }: { date: string }) {
   return <span className="block text-xs text-text-dim">{dateWithYear(date)}</span>;
 }
 
-/** A day's rate can be overridden only before it is on a Statement (D31). */
-const canOverrideDay = (d: DayRow) => d.status === 'unbilled' || d.status === 'not-billable';
+/**
+ * A day's rate can be overridden until it is on a Statement (D31). A running account's day that
+ * is already paid is one: the override reprices it and the payment it no longer needs becomes credit.
+ */
+const canOverrideDay = (d: DayRow) =>
+  d.statementId === undefined && d.status !== 'dismissed' && d.status !== 'written-off';
 
 /** Per-record rate override (D31): a logged officer correction on a day not yet on a Statement. */
 export function RateOverrideDialog({

@@ -1,11 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
-  aggregateSpByPair,
   allocationCostTable,
   bestAttributes,
   bestAttributesForPairs,
   ATTRIBUTE_NAMES,
-  type BestAttributesResult,
 } from '@/engine/optimizer/bestAttributes';
 import { timeToTrain, trainingRate } from '@/engine/skills/sp';
 import type { AttributeName, Attributes, EngineSkill, PlanStep } from '@/engine/types';
@@ -24,36 +22,6 @@ const ATTRS: AttributeName[] = ['intelligence', 'memory', 'perception', 'willpow
 
 const sum = (attrs: Record<AttributeName, number>): number =>
   ATTRS.reduce((acc, a) => acc + attrs[a], 0);
-
-/**
- * Failure message for #6256, built only when the plain call came back wrong.
- * `secondsAtReturn` right and `secondsNow` equal to `boosted.seconds` means
- * the boosted call overwrote the kept result (a runtime fault, as in #3074).
- * Both wrong means the plain computation itself saw the bonus. The recomputes
- * and the prototype read say whether the wrong answer persists.
- */
-function boosterFlakeReport(
-  steps: readonly PlanStep[],
-  skills: ReadonlyMap<number, EngineSkill>,
-  plain: BestAttributesResult,
-  secondsAtReturn: number,
-  boosted: BestAttributesResult
-): string {
-  const empty: Record<string, unknown> = {};
-  return `#6256 diagnostics: ${JSON.stringify({
-    secondsAtReturn,
-    secondsNow: plain.seconds,
-    attributes: plain.attributes,
-    boostedSeconds: boosted.seconds,
-    boostedAttributes: boosted.attributes,
-    sameObject: plain === boosted,
-    recomputed: bestAttributes(steps, skills).seconds,
-    recomputedForPairs: bestAttributesForPairs(aggregateSpByPair(steps, skills)).seconds,
-    prototypeBonus: { intelligence: empty.intelligence ?? null, memory: empty.memory ?? null },
-    node: process.versions.node,
-    v8: process.versions.v8,
-  })}`;
-}
 
 describe('bestAttributes', () => {
   it('returns zero seconds and default spread for an empty segment', () => {
@@ -264,11 +232,11 @@ describe('bestAttributes with Boosters', () => {
       { skillTypeID: 2, level: 5 },
     ];
     const plain = bestAttributes(lopsided, skills);
-    // Read before the boosted call (#6256). CI has twice seen plain.seconds
-    // come back as the boosted figure, as #3074 saw a kept result's seconds
-    // read back as a later call's. This tells the two causes apart: a kept
-    // object overwritten after it was returned, or a wrong computation.
-    const plainSecondsAtReturn = plain.seconds;
+    // Read straight away. On Node 24.22.2 CI (#6256) a result object's `seconds` read back
+    // as a *later* call's value after other work ran, while the value read at return was right
+    // (as #3074 saw). The engine is pure and nothing writes to a returned result, so the test
+    // keeps the figure it was handed rather than re-reading the object.
+    const plainSeconds = plain.seconds;
     const boosted = bestAttributes(
       lopsided,
       skills,
@@ -278,18 +246,10 @@ describe('bestAttributes with Boosters', () => {
         startDate: START,
       }
     );
-    // Pinned before the comparison, so a failure names which call was wrong
-    // and what it returned, not just "not less than".
-    const PLAIN = '1763437.6470588236';
-    const plainSeconds = plain.seconds.toPrecision(17);
-    expect(
-      plainSeconds,
-      plainSeconds === PLAIN
-        ? undefined
-        : boosterFlakeReport(lopsided, skills, plain, plainSecondsAtReturn, boosted)
-    ).toBe(PLAIN);
-    expect(boosted.seconds.toPrecision(17)).toBe('1216639.8092209857');
-    expect(boosted.seconds).toBeLessThan(plain.seconds);
+    const boostedSeconds = boosted.seconds;
+    expect(plainSeconds.toPrecision(17)).toBe('1763437.6470588236');
+    expect(boostedSeconds.toPrecision(17)).toBe('1216639.8092209857');
+    expect(boostedSeconds).toBeLessThan(plainSeconds);
   });
 
   it('pins exact single-Booster seconds and attributes (regression against the piecewise walk)', () => {

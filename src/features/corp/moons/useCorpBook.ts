@@ -359,6 +359,8 @@ export function useCorpBook(
     // A grouped Miner with no charge is in no view row; the book's record still names its main.
     for (const m of view.input.miners) characterIds.add(m.mainCharacterId);
     for (const p of view.input.payments) characterIds.add(p.characterId);
+    // Whoever recorded a correction is named beside it, not shown as an ID.
+    for (const a of view.input.adjustments) characterIds.add(a.by);
     if (fetched.status === 'loaded') {
       for (const a of fetched.data.groupingAnswers ?? []) characterIds.add(a.characterId);
       // A refinery page reads no ledger row, so a Miner in no grouping is known only by the id in a moon doc.

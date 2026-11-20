@@ -15,6 +15,10 @@ const mocks = vi.hoisted(() => ({
   loadTypeVolumes: vi.fn(),
   loadTypeCategories: vi.fn(),
   getAveragePriceByType: vi.fn(),
+  accountCorpReaders: vi.fn(),
+}));
+vi.mock('@/features/corp/corpReadAccess', () => ({
+  accountCorpReaders: mocks.accountCorpReaders,
 }));
 vi.mock('@/features/corp/boardData', () => ({
   loadCorporationId: mocks.loadCorporationId,
@@ -83,6 +87,7 @@ beforeEach(() => {
   );
   mocks.getAveragePriceByType.mockResolvedValue(new Map([[34, 5]]));
   mocks.loadCorporationStructures.mockResolvedValue(ok([], NEW));
+  mocks.accountCorpReaders.mockResolvedValue(new Map());
   mocks.loadCorpAssetLabels.mockResolvedValue({
     types: new Map([[34, 'Trit']]),
     locations: new Map(),
@@ -96,7 +101,7 @@ beforeEach(() => {
 describe('loadCorpAssetsSnapshot', () => {
   it('returns an empty snapshot when the character has no corporation', async () => {
     mocks.loadCorporationId.mockResolvedValue(null);
-    const snap = await loadCorpAssetsSnapshot(42, signal(), true, true);
+    const snap = await loadCorpAssetsSnapshot(42, signal(), true);
     expect(snap.corporationId).toBeNull();
     expect(snap.inputs).toBeNull();
     expect(mocks.loadCorporationAssets).not.toHaveBeenCalled();
@@ -108,14 +113,14 @@ describe('loadCorpAssetsSnapshot', () => {
       live.cancelled = true;
       return ok(ASSETS, NEW);
     });
-    const snap = await loadCorpAssetsSnapshot(42, live, true, true);
+    const snap = await loadCorpAssetsSnapshot(42, live, true);
     expect(snap.inputs).toBeNull();
     expect(mocks.loadCorpAssetLabels).not.toHaveBeenCalled();
     expect(mocks.loadTypeVolumes).not.toHaveBeenCalled();
   });
 
   it('assembles rows, reads, division names and the oldest fetchedAt', async () => {
-    const snap = await loadCorpAssetsSnapshot(42, signal(), true, true);
+    const snap = await loadCorpAssetsSnapshot(42, signal(), true);
     expect(snap.corporationId).toBe(98000001);
     expect(snap.inputs?.map((i) => i.itemId)).toEqual([1, 2]);
     expect(snap.placeIds).toEqual([60003760]);
@@ -132,12 +137,26 @@ describe('loadCorpAssetsSnapshot', () => {
     expect(mocks.loadTypeCategories).toHaveBeenCalledWith([34, 35]);
   });
 
-  it('does not read blueprints or structures without the roles', async () => {
+  it('reads structure names through whichever Character can read them', async () => {
+    mocks.accountCorpReaders.mockResolvedValue(new Map([[98000001, 77]]));
+    mocks.loadCorporationStructures.mockResolvedValue(ok([], NEW));
+    await loadCorpAssetsSnapshot(42, signal(), true);
+    expect(mocks.loadCorporationStructures).toHaveBeenCalledWith(77, 98000001);
+  });
+
+  it('falls back to no structure names when the structures read fails', async () => {
+    mocks.accountCorpReaders.mockResolvedValue(new Map([[98000001, 77]]));
+    mocks.loadCorporationStructures.mockRejectedValue(new Error('403'));
+    const snap = await loadCorpAssetsSnapshot(42, signal(), true);
+    expect(snap.inputs).not.toBeNull();
+  });
+
+  it('reads no structures when no Character can, and no blueprints without the role', async () => {
     mocks.loadAssetCopyValues.mockImplementation(async (_c, _a, loadBlueprints) => {
       expect(await loadBlueprints()).toBeNull();
       return new Map();
     });
-    await loadCorpAssetsSnapshot(42, signal(), false, false);
+    await loadCorpAssetsSnapshot(42, signal(), false);
     expect(mocks.loadCorporationBlueprints).not.toHaveBeenCalled();
     expect(mocks.loadCorporationStructures).not.toHaveBeenCalled();
   });
@@ -149,14 +168,14 @@ describe('loadCorpAssetsSnapshot', () => {
       expect(await loadBlueprints()).toBe(blueprints);
       return new Map();
     });
-    await loadCorpAssetsSnapshot(42, signal(), true, true);
+    await loadCorpAssetsSnapshot(42, signal(), true);
     expect(mocks.loadCorporationBlueprints).toHaveBeenCalledWith(42, 98000001);
   });
 
   it('keeps null inputs and skips names/labels when the assets read failed', async () => {
     mocks.loadCorporationAssets.mockResolvedValue({ cached: null, needsReauth: false });
     mocks.loadCorporationDivisions.mockResolvedValue({ cached: null, needsReauth: false });
-    const snap = await loadCorpAssetsSnapshot(42, signal(), true, true);
+    const snap = await loadCorpAssetsSnapshot(42, signal(), true);
     expect(snap.inputs).toBeNull();
     expect(snap.assetsShown).toBe(0);
     expect(snap.fetchedAt).toBeNull();
