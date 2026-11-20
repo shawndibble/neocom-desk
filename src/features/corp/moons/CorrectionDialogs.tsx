@@ -237,7 +237,6 @@ export function AdjustmentDialog({
       <Label text={t('corpTaxBook.moons.corrections.adjust.label')}>
         <TextArea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
       </Label>
-      <Effect>{t('corpTaxBook.moons.corrections.adjust.effect')}</Effect>
     </DialogShell>
   );
 }
