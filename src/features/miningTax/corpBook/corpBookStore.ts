@@ -20,6 +20,7 @@ import {
 import { db as localDb } from '@/db';
 import {
   readAdjustment,
+  readToleranceExemption,
   readBookSettings,
   readDismissal,
   readFeederCoverage,
@@ -49,6 +50,7 @@ import { ownerRefinerySystemsToLearn } from '@/engine/corpTaxBook/refinery';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 import type { TaxRate } from '@/engine/corpTaxBook/rates';
 import type { Adjustment, Statement } from '@/engine/corpTaxBook/statements';
+import type { ToleranceExemption } from '@/engine/corpTaxBook/toleranceExemptions';
 import { loadStructureName } from '@/features/character/structures';
 import type { ObservedMiningEntry, ObservedRow } from '@/engine/corpTaxBook/types';
 import { getSyncFirestore } from '@/sync/firebaseApp';
@@ -110,6 +112,10 @@ export interface LoadedCorpBook {
   declarations?: Declaration[];
   /** Their own Conflict disputes (#6206). */
   disputes?: OreDispute[];
+  /** Officers' per-day limits on what a shortfall of theirs may forgive. */
+  toleranceExemptions?: ToleranceExemption[];
+  /** Each of their Miners' paid-through day, as the book recorded it. */
+  minerPaidThrough?: Map<string, string>;
   /** Refinery names, where a Statement or ESI gave one (#4622). */
   structureNames?: Record<number, string>;
 }
@@ -343,6 +349,8 @@ async function readOneBook(
   const writeOffs: RecordedWriteOff[][] = [];
   const declarations: Declaration[][] = [];
   const disputes: OreDispute[][] = [];
+  const exemptions: ToleranceExemption[][] = [];
+  const paidThrough = new Map<string, string>();
   let feeders: MemberFeederCoverage[] | null = null;
   for (const characterId of characterIds) {
     const uid = await ensureSignedIn(characterId);
@@ -388,6 +396,8 @@ async function readOneBook(
       coverageDocs,
       declarationDocs,
       disputeDocs,
+      exemptionDocs,
+      paidDocs,
     ] = await Promise.all([
       readMemberObserved({
         db: memberFs,
@@ -408,11 +418,22 @@ async function readOneBook(
       // #6206. A collection no write ever stamped holds nothing: no read.
       written('declarations') ? orNone(part('declarations', 'uids')) : Promise.resolve(null),
       written('disputes') ? orNone(part('disputes', 'uids')) : Promise.resolve(null),
+      written('toleranceExemptions')
+        ? orNone(part('toleranceExemptions', 'uids'))
+        : Promise.resolve(null),
+      written('minerPaid') ? orNone(part('minerPaid', 'uids')) : Promise.resolve(null),
     ]);
     declarations.push(
       declarationDocs?.flatMap((d) => readMemberDeclaration(d.id, d.data) ?? []) ?? []
     );
     disputes.push(readDisputes(disputeDocs?.map((d) => ({ id: d.id, ...d.data })) ?? []));
+    for (const d of paidDocs ?? []) {
+      const day = typeof d.data.paidThrough === 'string' ? d.data.paidThrough : undefined;
+      if (day && day > (paidThrough.get(d.id) ?? '')) paidThrough.set(d.id, day);
+    }
+    exemptions.push(
+      exemptionDocs?.flatMap((d) => readToleranceExemption(d.id, d.data) ?? []) ?? []
+    );
     adjustments.push(adjustmentDocs?.flatMap((d) => readAdjustment(d.id, d.data) ?? []) ?? []);
     writeOffs.push(writeOffDocs?.flatMap((d) => readWriteOff(d.id, d.data) ?? []) ?? []);
     if (coverageDocs) {
@@ -444,6 +465,8 @@ async function readOneBook(
     writeOffs: mergeById(writeOffs),
     declarations: mergeById(declarations),
     disputes: mergeById(disputes),
+    toleranceExemptions: mergeById(exemptions),
+    ...(paidThrough.size > 0 ? { minerPaidThrough: paidThrough } : {}),
     structureNames,
     payments: mergeById([payments]),
     held,

@@ -173,6 +173,8 @@ export interface PersonalBook {
   writeOffs?: readonly RecordedWriteOff[];
   /** Officers' per-day limits on what a shortfall may forgive (`toleranceExemptions`). */
   toleranceExemptions?: readonly ToleranceExemption[];
+  /** Each of the member's Miners' paid-through day (`minerPaid`), when the book recorded one. */
+  minerPaidThrough?: ReadonlyMap<string, string>;
 }
 
 /** A donation in the member's own wallet journal that the book does not hold yet. */
