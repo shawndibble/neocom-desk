@@ -3,7 +3,6 @@
     "name": "Neocom Desk",
     "tagline": "Skill plans, build margins, market orders, colonies and mining tax — every character you fly, all in one place.",
     "shortcuts": {
-      "alerts": "Alerts",
       "mail": "Mail",
       "wallet": "Wallet",
       "orders": "Open orders"
@@ -66,7 +65,6 @@
     "pilotLookup": "Pilot Lookup",
     "settings": "Settings",
     "help": "Help & FAQ",
-    "soon": "Soon",
     "switchCharacter": "Switch character",
     "characterSwitcher": "Characters",
     "characterActive": "Active",
@@ -288,7 +286,6 @@
       "update": "Update",
       "saveDestination": "Save to My Fittings",
       "updateDestination": "Update in My Fittings",
-      "saved": "Saved",
       "saveAsNew": "Save as new",
       "saveAsNewTitle": "Save as new",
       "saveAsNewLabel": "Fitting name",
@@ -414,7 +411,13 @@
         "rig": "Rigs",
         "subsystem": "Subsystems"
       },
-      "rackShort": { "high": "H", "medium": "M", "low": "L", "rig": "R", "subsystem": "S" },
+      "rackShort": {
+        "high": "H",
+        "medium": "M",
+        "low": "L",
+        "rig": "R",
+        "subsystem": "S"
+      },
       "moduleState": {
         "offline": "offline",
         "online": "online",
@@ -463,8 +466,6 @@
           "overload": "Overloaded"
         },
         "unload": "Unload {{name}}",
-        "info": "Show info",
-        "variations": "Swap for a variation",
         "remove": "Remove {{name}}"
       },
       "hardpoints": {
@@ -733,7 +734,11 @@
       "value": "~<isk/> ISK",
       "fitName": "{{hullName}} popular fit {{rank}}",
       "sourceLabel": "Fit source",
-      "filter": { "all": "All {{n}}", "loss": "Seen in losses {{n}}", "guide": "Guides {{n}}" },
+      "filter": {
+        "all": "All {{n}}",
+        "loss": "Seen in losses {{n}}",
+        "guide": "Guides {{n}}"
+      },
       "canFlyNow": "Can fly now",
       "canFlyCount": "{{flyable}}/{{total}}",
       "sortLabel": "Sort",
@@ -743,7 +748,10 @@
         "training": "Least training",
         "cheapest": "Cheapest"
       },
-      "tag": { "loss": "Loss", "guide": "Guide" },
+      "tag": {
+        "loss": "Loss",
+        "guide": "Guide"
+      },
       "training_one": "{{count}} skill · {{time}}",
       "training_other": "{{count}} skills · {{time}}",
       "listLabel": "Popular fits",
@@ -854,7 +862,6 @@
         "ammo": "Ammo",
         "speed": "Max speed",
         "capacitor": "Capacitor",
-        "speedValue": "{{value}} m/s",
         "capStable": "Stable at {{pct}}%",
         "capDepletes": "Empty in {{time}}",
         "signature": "Signature",
@@ -1439,8 +1446,16 @@
       "landsFits": "fits",
       "tagCheapest": "Cheapest",
       "tagRecommended": "Recommended",
-      "unit": { "cpu": "tf", "powergrid": "MW", "calibration": "points" },
-      "resourceName": { "cpu": "CPU", "powergrid": "Powergrid", "calibration": "Calibration" },
+      "unit": {
+        "cpu": "tf",
+        "powergrid": "MW",
+        "calibration": "points"
+      },
+      "resourceName": {
+        "cpu": "CPU",
+        "powergrid": "Powergrid",
+        "calibration": "Calibration"
+      },
       "frees": "Frees {{amount}} {{unit}}",
       "adds": "Adds {{amount}} {{unit}}",
       "sectionHint": {
@@ -1546,7 +1561,11 @@
         "thisSet": "this set"
       },
       "flyableShort": "{{amount}} more {{resource}}",
-      "resource": { "cpu": "CPU", "powergrid": "powergrid", "calibration": "calibration" },
+      "resource": {
+        "cpu": "CPU",
+        "powergrid": "powergrid",
+        "calibration": "calibration"
+      },
       "flyableNoCover": "Needs {{short}}, and no module or rig swap frees it.",
       "noPrice": "No price",
       "gain": "+{{percent}}%",
@@ -1555,7 +1574,11 @@
       "moreOptions_other": "{{count}} more options",
       "bestFound": "Now → best found",
       "sortLabel": "Sort by",
-      "sort": { "gain": "Biggest gain", "value": "Best value", "cheapest": "Cheapest" },
+      "sort": {
+        "gain": "Biggest gain",
+        "value": "Best value",
+        "cheapest": "Cheapest"
+      },
       "reachLine": "Reach {{before}} → {{after}} km",
       "fixFirst": "This fit is over a budget, so there is nothing to improve yet. Fix it first, then come back.",
       "section": {
@@ -1600,7 +1623,11 @@
         "rework": "Only the module groups that can move this goal are tried."
       },
       "reachLabel": "Improve Reach",
-      "reach": { "upgrade": "Upgrade", "rebalance": "Rebalance", "rework": "Rework" },
+      "reach": {
+        "upgrade": "Upgrade",
+        "rebalance": "Rebalance",
+        "rework": "Rework"
+      },
       "reachHint": {
         "upgrade": "Turns a fitted module into a variation of itself.",
         "rebalance": "Also tries a different module doing the same job.",
@@ -1608,7 +1635,12 @@
       },
       "cap": "Total budget (ISK)",
       "defenseLabel": "Defense Choice",
-      "defense": { "keep": "Keep as is", "shield": "Shield", "armor": "Armor", "either": "Either" },
+      "defense": {
+        "keep": "Keep as is",
+        "shield": "Shield",
+        "armor": "Armor",
+        "either": "Either"
+      },
       "defenseUpgrade": "Pick Rebalance or Rework to change tank side",
       "sideResult": "{{side}}: {{result}}",
       "sideNone": "no gain",
@@ -1652,7 +1684,10 @@
           "dangerous": "Tank stays.",
           "safe": "Tank may go; each drop says what it gives up."
         },
-        "spaceShort": { "dangerous": "dangerous", "safe": "safe" },
+        "spaceShort": {
+          "dangerous": "dangerous",
+          "safe": "safe"
+        },
         "summaryExplore": "Explore, {{space}}",
         "noPropulsion": "No propulsion needed"
       },
@@ -1731,7 +1766,11 @@
         "ehp": "EHP {{before}} → {{after}}",
         "checking": "Checking the ticked changes together…",
         "failed": "Couldn't check the ticked changes together. They may not fit together.",
-        "resource": { "cpu": "CPU", "powergrid": "powergrid", "calibration": "calibration" },
+        "resource": {
+          "cpu": "CPU",
+          "powergrid": "powergrid",
+          "calibration": "calibration"
+        },
         "problem": {
           "over": "Together these over-run the {{resource}}.",
           "capStable": "Together these leave the capacitor unstable.",
@@ -2639,10 +2678,6 @@
       "missing": "Not trained"
     },
     "fitCheck": {
-      "pasteLabel": "Paste an EFT fit",
-      "pastePlaceholder": "[Vexor, PvE Ratting]\nDrone Damage Amplifier II\n...",
-      "checkButton": "Check Fit",
-      "notEftFit": "That doesn't look like an EFT fit — paste one starting with [Ship Name, Fit Name].",
       "addAllToPlan": "Add all to Skill Plan",
       "createPlanAndAdd": "Create Skill Plan and add",
       "add": "Add",
@@ -2848,12 +2883,10 @@
     "optimizeQueueOptimal": "Your attributes already suit your skill queue: no remap makes it faster, so no plan was made.",
     "optimizeQueueUndo": "Undo",
     "copySuffix": "{{name}} (copy)",
-    "namePlaceholder": "Plan name",
     "duplicate": "Duplicate",
     "copyToCharacter": "Copy to character",
     "deleteMenu": "Delete",
     "copyToCharacterHint": "Copy \"{{name}}\" to another character on this account.",
-    "delete": "Delete",
     "deleted": "Deleted \"{{name}}\"",
     "undo": "Undo",
     "cancel": "Cancel",
@@ -2911,8 +2944,6 @@
     "attributesImpossible": "These attributes don't add up to a legal sheet, so estimates use a default spread.",
     "attributesCopyDiagnostics": "Copy diagnostics",
     "attributesDiagnosticsCopied": "Copied",
-    "attributesDiagnosticsCopyFailed": "Copy failed",
-    "importExport": "Import / Export",
     "export": "Export",
     "addSkill": "Add skill",
     "searchPlaceholder": "Search skills…",
@@ -2930,7 +2961,6 @@
     "exportCopied": "Copied to clipboard",
     "optimizeRemaps": "Optimize remaps",
     "optimize": "Optimize",
-    "optimizeForMe": "Optimize for me",
     "optimizeForMeItem": "Optimize for me",
     "optimizeForMeHint": "Fastest order and remaps, high priority first",
     "optimizeModeReorder": "Reorder only",
@@ -2981,8 +3011,6 @@
     "segmentRemap": "Before {{skill}}, remap to {{attributes}}",
     "reorderPreviewTitle": "Suggested reorder",
     "sortShortestPreviewTitle": "Suggested shortest-first sort",
-    "reorderAccept": "Accept",
-    "reorderReject": "Reject",
     "remapAccept": "Accept",
     "remapReject": "Reject",
     "remapDismiss": "Dismiss",
@@ -3122,12 +3150,9 @@
     "csvSeconds": "Seconds",
     "csvCumulativeSeconds": "Cumulative seconds",
     "csvPrereq": "Prerequisite",
-    "queueTrainingBadge": "Training",
     "queueDoneBadge": "Done",
     "queuePausedBadge": "Paused",
-    "queueRemaining": "{{duration}} left",
     "queuePausedNote": "Training is paused, so EVE reports no completion times.",
-    "queueFinishes": "Finishes {{date}}",
     "boosterAffects": "Booster speeds this skill up",
     "alphaCapped": "Above the Alpha skill cap",
     "remapCapNote_one": "Evaluated with {{count}} remap. This plan allows more; placement beyond that is not available yet.",
@@ -3372,7 +3397,11 @@
         "fixLocation": "Fix location"
       },
       "activity": "Activity",
-      "activities": { "any": "Any", "manufacturing": "Manufacturing", "reaction": "Reactions" },
+      "activities": {
+        "any": "Any",
+        "manufacturing": "Manufacturing",
+        "reaction": "Reactions"
+      },
       "group": "Group",
       "groupAny": "Any",
       "groupNone": "Ungrouped",
@@ -5140,10 +5169,8 @@
     "title": "Overview",
     "wallet": "Wallet",
     "isk": "ISK",
-    "timeLeft": "{{duration}} left",
     "board": {
       "open": "Open",
-      "refresh": "Refresh",
       "structures": "Structures",
       "structuresTimers_one": "{{count}} timer running",
       "structuresTimers_other": "{{count}} timers running",
@@ -5166,15 +5193,10 @@
         "structureTimer": "{{subject}} timer ends",
         "structureFuel": "{{subject}} runs out of fuel"
       },
-      "moonChunks": "Moon extractions",
       "moonChunksReady_one": "{{count}} chunk ready",
       "moonChunksReady_other": "{{count}} chunks ready",
       "moonChunksNext": "Next chunk in {{when}}",
       "moonChunksNone": "No extractions scheduled",
-      "chunk": {
-        "arrival": "Chunk arrives",
-        "decay": "Chunk ready — decays"
-      },
       "chunkDeadline": {
         "arrival": "{{subject}} chunk arrives",
         "decay": "{{subject}} chunk decays"
@@ -5188,7 +5210,6 @@
         "declined": "Declined",
         "not_responded": "No response"
       },
-      "spExtraction": "SP extraction",
       "spareSp": "Spare SP",
       "extractors": "Extractors",
       "spExtractable": "{{sp}} spare SP",
@@ -5200,12 +5221,9 @@
       "mailNone": "No unread mail",
       "mailNoSubject": "(no subject)",
       "stock": "Stock",
-      "stockOut": "Out",
       "stockSummary": "{{out}} out · {{low}} low",
       "stockAllStocked": "Every market is stocked",
       "stockNotCounted": "Waiting for your orders to load",
-      "stockReady_one": "{{count}} ready to list",
-      "stockReady_other": "{{count}} ready to list",
       "stockToSource": "{{isk}} ISK to buy or build",
       "priceAlerts": "Price alerts",
       "priceAlertsCrossed_one": "{{count}} target hit",
@@ -5214,7 +5232,6 @@
       "priceAlertsWatching_other": "Watching {{count}} items",
       "priceAlertsNone": "No price targets set",
       "priceAlertsHit": "Target hit",
-      "incursions": "Incursions",
       "incursionsJumps_one": "{{count}} jump",
       "incursionsJumps_other": "{{count}} jumps",
       "incursionsNoRoute": "No route",
@@ -5224,36 +5241,20 @@
       "incursionsActive_other": "{{count}} active in total",
       "incursionsNoOrigin_one": "{{count}} active · set your current system for jumps",
       "incursionsNoOrigin_other": "{{count}} active · set your current system for jumps",
-      "incursionsDetail": "<state>{{state}}</state> · {{constellation}}",
       "incursionsDetailLabel": "{{state}} · {{constellation}}",
       "incursionsNone": "No incursions active",
       "incursionsFailed": "Incursion feed unreadable",
-      "priceAlertTarget": {
-        "above": "Target ≥ <isk/>",
-        "below": "Target ≤ <isk/>"
-      },
-      "nextDeadline": "Next deadline",
-      "trainingNow": "Training now",
       "notTraining": "Nothing in training",
       "nextJob": "Next industry job finishes",
       "nextSkill": "Next skill finishes",
       "acceleratorEnds": "Cerebral accelerator runs out",
-      "queued_one": "{{count}} skill queued",
-      "queued_other": "{{count}} skills queued",
-      "priceAlertTargetLabel": {
-        "above": "Target at least {{isk}}",
-        "below": "Target at most {{isk}}"
-      },
       "orders": "Open orders",
       "ordersMeta_one": "{{count}} needs work",
       "ordersMeta_other": "{{count}} need work",
       "undercut": "Undercut",
-      "outbid": "Outbid",
-      "relist": "Relist",
       "belowFloor_one": "{{count}} below your cost floor",
       "belowFloor_other": "{{count}} below your cost floor",
       "iskUnpaid": "ISK unpaid",
-      "unassigned": "Unassigned",
       "miningSettled": "Nothing outstanding",
       "stopped": "Stopped",
       "noProgram": "Unbuilt",
@@ -5269,17 +5270,11 @@
       "ready": "Ready",
       "jobsReady_one": "{{count}} job ready to deliver",
       "jobsReady_other": "{{count}} jobs ready to deliver",
-      "oldestFinished": "Oldest finished {{age}} ago",
-      "alerts": "Alerts",
-      "alertsUnread_one": "{{count}} unread",
-      "alertsUnread_other": "{{count}} unread",
-      "alertsEmpty": "Nothing new.",
       "jobSubject_one": "{{name}} ×{{count}}",
       "jobSubject_other": "{{name}} ×{{count}}",
       "unknownProduct": "Unnamed job",
       "checking": "Checking…",
       "reauth": "Log in again to see this.",
-      "slotsUsed": "{{used}} of {{total}} slots used",
       "industryRunning_one": "{{count}} running",
       "industryRunning_other": "{{count}} running",
       "industryIdle": "Nothing running",
@@ -5290,8 +5285,6 @@
       "miningUnassigned_one": "{{count}} entry unassigned",
       "miningUnassigned_other": "{{count}} entries unassigned",
       "noColonies": "No colonies",
-      "alertTypes_one": "{{count}} type",
-      "alertTypes_other": "{{count}} types",
       "contracts": "Contracts",
       "contractsInProgress_one": "{{count}} haul in progress",
       "contractsInProgress_other": "{{count}} hauls in progress",
@@ -6636,7 +6629,6 @@
     },
     "customize": {
       "title": "Customizing",
-      "barLabel": "Customize the Overview",
       "count": "{{count}} of {{max}} widgets",
       "add": "Add widget",
       "roles": "Start from a role",
@@ -6653,12 +6645,6 @@
         "L": "L",
         "F": "Full"
       },
-      "sizeName": {
-        "S": "Small",
-        "M": "Medium",
-        "L": "Large",
-        "F": "Full width"
-      },
       "moveEarlier": "Move {{title}} earlier",
       "moveLater": "Move {{title}} later",
       "remove": "Remove {{title}}",
@@ -6668,8 +6654,6 @@
       "dragOver": "{{name}} is at position {{position}} of {{total}}.",
       "dragEnd": "{{name}} dropped at position {{position}} of {{total}}.",
       "dragCancel": "Moving {{name}} cancelled.",
-      "emptyTitle": "Your Overview is empty",
-      "emptyBody": "Add widgets, or start from a role.",
       "undo": {
         "action": "Undo",
         "added": "Widget added",
@@ -6715,12 +6699,10 @@
       "addAnotherLabel": "Add another {{title}}",
       "limit": "Limit reached",
       "comingSoon": "Coming soon",
-      "subtitle": "{{total}} widgets · {{onBoard}} on your Overview",
       "chipCount_one": "{{count}} widget",
       "chipCount_other": "{{count}} widgets",
       "facts": "Views and default size",
       "sizeBadge": "Size {{size}}",
-      "onBoard": "On your Overview ×{{count}}",
       "added": "Added",
       "presets": {
         "plex": {
@@ -7031,21 +7013,11 @@
     "title": "Alerts",
     "switchedTo": "Switched to {{name}}",
     "settings": "Notification settings",
-    "byType": "By type",
-    "muted": "Muted",
-    "mute": "Stop showing {{type}} in this list",
     "fillTimeProvisional": {
-      "label": "Approximate time",
-      "content": "This is when the fill was noticed, not when it happened. The exact time comes from your wallet transactions, which EVE updates once an hour."
+      "label": "Approximate time"
     },
-    "newest": "newest {{age}}",
-    "searchLabel": "Search alerts",
-    "searchPlaceholder": "Search alerts…",
     "empty": "No alerts yet",
     "emptyHint": "Events you have enabled appear here while the app is open.",
-    "noMatches": "No alerts match these filters",
-    "noMatchesHint": "Clear the search, pick All characters, clear the severity filters, or turn on Muted types to see every alert.",
-    "retention": "This device keeps the last 300 alerts, and syncs 30 days of them between your devices.",
     "panel": {
       "title": "Alerts",
       "bellNone": "Alerts, none waiting",
@@ -7255,10 +7227,8 @@
     "transactionsTab": "Transactions",
     "transactionsLink": "Transactions",
     "refresh": "Refresh",
-    "isk": "ISK",
     "balanceEmpty": "No wallet data cached. Couldn't load it yet. Try again shortly.",
     "balanceByCharacter": "Balance by character",
-    "totalBalance": "Total",
     "balanceCharacterColumn": "Character",
     "playerColumn": "Player",
     "playerFilterLabel": "Player",
@@ -8072,7 +8042,6 @@
     "payeeNameRequired": "Enter a name for this Payee.",
     "payeeTaxPctInvalid": "Tax % must be between 0 and 100.",
     "addPayee": "Add Payee",
-    "assignTitle": "Assign — {{date}} in {{system}}",
     "payeeLabel": "Payee",
     "payeePlaceholder": "Choose a Payee…",
     "noPayeesHint": "Add a Payee first, from Manage Payees, before assigning this entry.",
@@ -8091,7 +8060,6 @@
     "dismissAction": "Dismiss",
     "undismissAction": "Undo",
     "unassignAction": "Unassign",
-    "splitAction": "Split",
     "splitTitle": "Split — {{date}} — {{system}}",
     "splitDialogHint": "One EVE day can hold two of your local sessions at different moons. Type what the first Payee keeps or what moves to a second one. Keeps can go above what ESI reports yet, when the game already shows more.",
     "splitNoOtherPayeeHint": "Add a Payee first, from Manage Payees, before splitting this entry.",
@@ -8967,12 +8935,6 @@
       "characters_other": "Characters",
       "ships_one": "Ship to fly",
       "ships_other": "Ships to fly",
-      "trips": "Trips",
-      "suggested_one": "Suggested: {{hull}} · {{count}} trip",
-      "suggested_other": "Suggested: {{hull}} · {{count}} trips",
-      "compare": "Compare haulers",
-      "tripCount_one": "{{count}} trip",
-      "tripCount_other": "{{count}} trips",
       "noHauler": "No hauler you can fly could be sized for this load.",
       "haulerSizingLoading": "Hauler data is still loading. Show the plan again in a moment.",
       "haulerSizingUnavailable": "Hauler sizing needs data that isn't downloaded yet, or your skills couldn't be read. Connect once, then plan again.",
@@ -8993,7 +8955,6 @@
         "tripCount_one": "{{count}} trip",
         "tripCount_other": "{{count}} trips",
         "legsLabel": "Legs",
-        "legTitle": "{{from}} → {{to}}",
         "startUnknown": "Start",
         "noGateRoute": "no gate route",
         "stopLoad": "Load {{volume}} m³",
@@ -9159,10 +9120,6 @@
       "note_one": "{{count}} stack at ask median, about {{value}} ISK, not in the total",
       "note_other": "{{count}} stacks at ask median, about {{value}} ISK, not in the total"
     },
-    "security": {
-      "ariaLabel": "Security status: {{value}}"
-    },
-    "crossCharacterBadge": "From {{character}}",
     "blueprintBadge": {
       "original": {
         "label": "BPO",
@@ -9491,8 +9448,6 @@
     "senderNotRemovable": "The sender can't be removed — remove every other recipient and this still sends as a reply.",
     "addRecipient": "Add recipient",
     "recipientSearchHint": "Type at least {{min}} characters to search.",
-    "contactsHeading": "Contacts",
-    "searchResultsHeading": "Search results",
     "recipientResultsCount_one": "{{count}} result",
     "recipientResultsCount_other": "{{count}} results",
     "recipientHighlighted_one": "{{count}} result. {{name}} highlighted.",
@@ -9592,7 +9547,6 @@
   "calendar": {
     "title": "Calendar",
     "refresh": "Refresh",
-    "importance": "Importance {{value}}",
     "responseAccepted": "Accepted",
     "responseDeclined": "Declined",
     "responseTentative": "Tentative",
@@ -9755,7 +9709,9 @@
       "unknown": "Unknown",
       "note": "ESI does not send the silo's capacity, so this is the stock a raider could take, not a fill percentage."
     },
-    "week": { "title": "Next 7 days" },
+    "week": {
+      "title": "Next 7 days"
+    },
     "filter": {
       "title": "Event types",
       "open": "Filter event types",
@@ -9870,7 +9826,6 @@
     "noImplants": "No implants",
     "stationLabel": "Station #{{id}}",
     "structureLabel": "Structure #{{id}}",
-    "homeLocation": "Home Clone",
     "lastStationChange": "Last moved {{date}}",
     "cooldown": "Jump Cooldown",
     "cooldownShared": "Jump cooldown · shared by every clone",
@@ -9887,7 +9842,6 @@
     "unpriced_other": "{{count}} unpriced",
     "cooldownReadyValue": "Ready",
     "cooldownOnCooldownValue": "Until {{date}} ({{duration}} left)",
-    "jumpsAway": "Jumps away",
     "rename": "Rename",
     "renameNamed": "Rename clone {{name}}",
     "renamePlace": "Rename clone in {{place}}",
@@ -9904,11 +9858,9 @@
     "emptyHint": "Couldn't load this character's planetary colonies yet. Try again shortly.",
     "emptyFetchedTitle": "No planetary colonies",
     "stalenessLabel": "About colony data freshness",
-    "stalenessHint": "ESI only recalculates a colony's data when it's opened in the EVE client.",
     "stalenessTooltip": "Extractor expiry times are fixed at install and always accurate. Stored quantities and the last extraction cycle only update once you open the colony in the game client, so this app never shows those.",
     "lastUpdate": "Last Update",
     "lastUpdateTooltip": "When CCP last recalculated this colony — only changes when the colony is opened in the EVE client.",
-    "attentionLabel": "Status",
     "attention": {
       "idle": "Stopped",
       "expiring-soon": "Expiring soon",
@@ -9916,7 +9868,6 @@
       "healthy": "Healthy",
       "unknown": "Unknown"
     },
-    "attentionUnknownTooltip": "This colony's detail couldn't be loaded from ESI, so its status can't be shown with confidence. Try Refresh — if you revoked this app's planetary access, log in again.",
     "planetType": {
       "temperate": "Temperate",
       "barren": "Barren",
@@ -9927,9 +9878,6 @@
       "storm": "Storm",
       "plasma": "Plasma"
     },
-    "upgradeLevel": "Upgrade level {{level}}",
-    "pinCount_one": "{{count}} pin",
-    "pinCount_other": "{{count}} pins",
     "planetLabel": "Planet #{{id}}",
     "characterLabel": "Character #{{id}}",
     "noOwnColoniesTitle": "This character has no colonies",
@@ -9941,27 +9889,17 @@
       "expiring-soon": "Expiring soon",
       "expired": "Stopped"
     },
-    "programDataUnavailable": "Program data unavailable",
     "unknownProduct": "Unknown product",
     "unknownSchematic": "Unknown schematic",
-    "expired": "Stopped",
-    "expiresIn": "in {{duration}}",
-    "extraction": {
-      "statusLabel": "Status",
-      "expiresLabel": "Expires"
-    },
     "production": {
-      "title": "Production",
-      "facilitiesRunning": "{{count}} facilities running"
+      "title": "Production"
     },
     "infrastructure": {
       "title": "Infrastructure"
     },
     "colonies": {
       "panelTitle_one": "{{count}} colony",
-      "panelTitle_other": "{{count}} colonies",
-      "fillTimeSoon": "Storage full in {{span}}",
-      "fillTimeUnknown": "Storage full in: unknown"
+      "panelTitle_other": "{{count}} colonies"
     },
     "summary": {
       "expiryLine": "{{product}} · {{duration}}",
@@ -10142,7 +10080,6 @@
       "ownNone": "None of your colonies makes anything in this chain yet."
     },
     "add": {
-      "panelTitle": "Where to put a new colony",
       "panelTitleFor_one": "Where to put a new {{type}} colony",
       "panelTitleFor_other": "Where to put new {{type}} colonies",
       "title": "Add {{aType}} planet",
@@ -11195,8 +11132,6 @@
     "systemLabel": "System #{{id}}",
     "budgetBarLabel": "{{axis}} used",
     "roomForItem": "{{count}}x {{pin}}",
-    "hoursShort": "{{count}} h",
-    "daysShort": "{{count}} d",
     "estimateBadge": "Est.",
     "chain": {
       "typeCount": "{{count}}× {{type}}",
@@ -11231,7 +11166,6 @@
     },
     "cadenceDays_one": "{{count}} day",
     "cadenceDays_other": "{{count}} days",
-    "customsRate": "Customs rate",
     "customsRateSource": {
       "highsec-skill": "The 10% highsec NPC base, less 1% per level of your Customs Code Expertise (level {{level}}). A POCO owner’s own tax is on top and is not in ESI.",
       "highsec-unknown-skill": "No skill data for this character yet, so the untrained 10% highsec base is assumed. Your real rate is lower at every trained level.",
@@ -11338,21 +11272,14 @@
     "availabilityPersonal": "Private",
     "availabilityCorporation": "Corporation",
     "availabilityAlliance": "Alliance",
-    "detailType": "Type",
-    "detailStatus": "Status",
     "detailIssuedBy": "Issued By",
     "detailDescription": "Description",
     "detailReceivedBy": "Received By",
-    "detailAvailability": "Availability",
     "detailLocation": "Location",
     "detailRouteTo": "to",
-    "detailDateIssued": "Date Issued",
-    "detailDateExpired": "Date Expires",
-    "detailDateAccepted": "Date Accepted",
     "detailDeliverBy": "Deliver By",
     "deliverDue": "Due {{time}} · in {{duration}}",
     "deliverOverdue": "Overdue · was due {{time}}",
-    "detailDateCompleted": "Date Completed",
     "detailDaysToComplete": "Days To Complete",
     "detailPrice": "Acceptor Pays",
     "detailReward": "Acceptor Receives",
@@ -11638,8 +11565,7 @@
       "title": "Ask {{name}} to copy",
       "pickHint": "{{name}} shares {{blueprint}} in more than one of your Communities. Pick the one to post your Request in.",
       "community": "Community",
-      "continue": "Continue",
-      "close": "Close"
+      "continue": "Continue"
     },
     "title": "Communities",
     "intro": "Pool blueprints, Fittings and Skill Plans with the people you play with. Each Character joins on its own, and shares only what it picks.",
@@ -11817,7 +11743,6 @@
     },
     "deleteAction": "Delete",
     "actionFailed": "That did not work. Try again.",
-    "notAdmin": "Only the admin can do that.",
     "mailInvite": {
       "title": "Invite by mail",
       "hint": "Sends the invite link to a Character as an in-game mail from your admin Character. Regenerating or revoking the link voids every mail already sent.",
@@ -11880,7 +11805,6 @@
       "paidOf": "{{paid}} of {{total}} paid",
       "done": "All paid",
       "expired": "Expired",
-      "myShare": "Your share: {{isk}} ISK",
       "myShareLoading": "Loading your share…",
       "myShareFailed": "Couldn't load your share.",
       "youPaid": "Paid",
@@ -12295,7 +12219,6 @@
         "addLabel": "Add an item",
         "addPlaceholder": "Or add a single item…",
         "typesLabel": "Items bought",
-        "needBuy": "Pick at least one group or item.",
         "post": "Post buyback",
         "standing": "Standing",
         "rateLine": "{{rate}}% of {{hub}} {{basis}}",
@@ -12315,13 +12238,11 @@
         },
         "priceDiffers": "Price differs from quote · {{quoted}} ISK quoted",
         "contractsLabel": "Your contracts for this quote",
-        "quotesLabel": "Quotes",
         "quotesTitle": "Quotes from Members",
         "noQuotes": "No quotes held yet.",
         "contractNeedsPermission": "Reading contracts needs a Permission you have not granted, so this quote shows no contract status.",
         "contractReadFailed": "Contracts could not be read, so the status shown may be old.",
         "contractIssued": "Issued {{age}}",
-        "noContracts": "No contract to {{name}} for these items yet.",
         "linked": "Contract {{id}}",
         "unverified": "Not confirmed in your contracts"
       },
@@ -12457,7 +12378,6 @@
     "acrossMissingOn": "Not a contact of: {{names}}",
     "acrossHeldBy": "A contact of: {{names}}",
     "acrossDisagreementsOnly": "Only disagreements",
-    "acrossDisagreementsHint": "Contacts your characters do not all hold, or hold at different standings.",
     "acrossEmptyTitle": "No contacts cached for any character",
     "acrossEmptyHint": "Couldn't load contacts yet. Try again shortly, or add another character.",
     "acrossFetchAll": "Fetch every character",
@@ -12467,12 +12387,7 @@
   },
   "loyalty": {
     "title": "Loyalty Points",
-    "refresh": "Refresh",
-    "emptyTitle": "No loyalty points cached",
     "emptyHint": "Couldn't load loyalty point balances yet. Try again shortly.",
-    "noneLine": "Loyalty Points: none ·",
-    "corporation": "Corporation",
-    "points": "Loyalty Points",
     "browseStores": "Browse LP Stores"
   },
   "loyaltyStore": {
@@ -12548,7 +12463,7 @@
     "colProfit": "Profit",
     "colCost": "Cost",
     "lowVolumeTag": "Low volume",
-    "needMoreLp": "need {{lp}} more LP",
+    "needMoreLp": "Needs {{amount}} more LP",
     "perDayAffix": "/day",
     "profitAffix": " profit",
     "iskPerLpUnit": "ISK/LP",
@@ -12572,8 +12487,6 @@
     "pickerHighlighted_one": "{{count}} store. {{name}} highlighted.",
     "pickerHighlighted_other": "{{count}} stores. {{name}} highlighted.",
     "pickerNoResults": "No LP Store matches that name.",
-    "landingTitle": "Pick a corporation",
-    "landingHint": "Search any NPC corporation's LP Store to browse its offers — you don't need LP with it first.",
     "landing": {
       "viewLabel": "Show",
       "viewStores": "Stores",
@@ -12660,7 +12573,6 @@
       "noOrigin": "Set your location to see the nearest station",
       "noStation": "No station of this corporation is reachable from your system"
     },
-    "needMoreLp": "Needs {{amount}} more LP",
     "sellPriceAt": "Sell order price ({{hub}})",
     "buyPriceAt": "Sell now price ({{hub}})",
     "storeCost": "LP store cost",
@@ -12699,7 +12611,6 @@
     "sell": "Sell",
     "price": "Price",
     "remaining": "Remaining",
-    "total": "Total",
     "issued": "Issued",
     "expires": "Expires",
     "viewInMarket": "View in Market",
@@ -12727,7 +12638,6 @@
       "title": "Turn on notifications?",
       "body": "Neocom can notify you about skill training, mail, industry jobs, and more. You choose exactly what, per character, in Settings.",
       "installRequiredBody": "On iPhone and iPad, notifications only work once Neocom is installed to your home screen — Safari's Share menu, then \"Add to Home Screen.\" Open it from there and come back to turn them on.",
-      "installRequiredLink": "Show install steps",
       "enable": "Enable",
       "dismiss": "Not now"
     },
@@ -13632,7 +13542,6 @@
       "pasteFolded_other": "{{count}} lines · Edit list",
       "pasteFoldedMeta": "{{hub}} · {{percent}}%",
       "pricePercentLabel": "Price %",
-      "pricePercentHint": "of market",
       "appraise": "Appraise",
       "clear": "Clear",
       "resultTitle": "Appraisal",
@@ -13856,8 +13765,7 @@
       "copyCardSecond": "Copy {{title}}: {{label}}, {{amount}}",
       "copiedAmount": "Copied {{amount}}",
       "totalFull": "{{full}} ISK ({{short}})",
-      "copiedToClipboard": "Copied to clipboard",
-      "columnHub": "Hub"
+      "copiedToClipboard": "Copied to clipboard"
     },
     "priceHistory": {
       "chartLabel": "Daily price range, average, traded volume and order count for {{item}}",
@@ -15171,7 +15079,6 @@
         "manage": "Manage",
         "manageFor": "Manage Alerts when closed",
         "summary": "{{on}} of {{total}} characters",
-        "more": "+{{count}} more",
         "hint": "Get alerts while the app is closed. Tick Device on an event, then sign each Character in to EVE once: that one login asks for exactly what the Character's ticked events need. Turn off deletes our encrypted token.",
         "covers": {
           "line": "Our server holds an encrypted token that reads only {{list}}.",
@@ -15335,7 +15242,6 @@
       "mercenaryDenAnarchyPercentOption_one": "{{count}}%",
       "mercenaryDenAnarchyPercentOption_other": "{{count}}%",
       "marketOrderUndercutStationOnlyHint": "Checks your order's own station only, and only while the app is open.",
-      "corpGroup": "Corp notifications",
       "corpEventBestEffortHint": "Best effort: fires only while the app is open. Not a substitute for in-game alerts.",
       "scheduledPushBadge": "Arrives even with the app closed. Needs notification permission; on iPhone and iPad, the installed app.",
       "serverPushBadge": "Arrives even with the app closed. Needs notification permission; on iPhone and iPad, the installed app.",
@@ -15816,29 +15722,19 @@
     "rolesUnavailable": "Can't check your corporation roles right now",
     "rolesUnavailableHint": "Neocom Desk reads your roles from EVE, and none are saved on this device yet. Try again, or connect if you're offline. It will retry when you're back online.",
     "title": "Corporation",
-    "overviewTab": "Overview",
-    "membersTab": "Members",
-    "assetsTab": "Assets",
-    "walletTab": "Wallet",
-    "refresh": "Refresh corp data",
-    "boardTitle": "Ops board",
     "dataAgeNote": "EVE caches corporation data for about an hour, so anything due sooner than that may already have happened — check the game client before acting on a short timer.",
     "officerPagesTitle": "Corp officer pages",
     "notGrantedHint": "{{roles}} If that's you, grant corporation access for this character:",
     "notGrantedAction": "Grant corporation access",
     "npcCorporation": "You're in {{corporation}}, an NPC corporation. These pages are for officers (Director, Accountant…) of a player-run corporation.",
-    "npcCorporationUnnamed": "You're in an NPC corporation. These pages are for officers (Director, Accountant…) of a player-run corporation.",
     "roleLine": "Corp pages are for officers: Director, Accountant, Station Manager and others.",
     "noAccessTitle": "No corporation access",
     "noAccessHint": "This character's in-game corporation roles do not open any corp data. Roles can only be changed in game.",
-    "vitalsTitle": "Vitals",
-    "peopleTitle": "People",
     "board": {
       "noTimer": "No timer",
       "dry": "Out of fuel",
       "overdueFor": "{{duration}} late",
       "underCacheWindow": "Under 1h",
-      "underCacheWindowHint": "Less time remains than this view's refresh window, so the exact figure cannot be trusted. Check the game client.",
       "detail": {
         "fuel": "Fuel runs out",
         "fuelDry": "Fuel bay is empty",
@@ -15870,26 +15766,12 @@
     },
     "vitals": {
       "division": "Division {{division}}",
-      "total": "Total",
-      "net": "{{days}}-day net",
       "runway": "Runway",
-      "runwayDays_one": "{{count}} day",
-      "runwayDays_other": "{{count}} days",
-      "runwayUnknown": "Unknown",
-      "runwayHint": "How long division {{division}} lasts: its own balance divided by its own average daily spending over the last {{days}} days. EVE publishes no all-divisions journal, so this covers that one wallet. Income is ignored, so this is what is already banked.",
-      "viewInWallet": "View {{division}} in Corp wallet"
+      "runwayUnknown": "Unknown"
     },
     "people": {
-      "viewRoster": "Roster",
       "joined": "Joined",
-      "left": "Left",
-      "changeHint": "Members who joined or left since this device last opened the Members page. It keeps saying so until you open it, which is what clears the count.",
-      "darkList": "Dark {{days}} days or more",
-      "darkForDays_one": "{{count}}d",
-      "darkForDays_other": "{{count}}d",
-      "changeList": "Since you last looked",
-      "joinedName": "Joined ·",
-      "leftName": "Left ·"
+      "left": "Left"
     },
     "members": {
       "darkState": ", dark",
@@ -16137,44 +16019,18 @@
       "dueSoonOverdue_one": "{{count}} already overdue",
       "dueSoonOverdue_other": "{{count}} already overdue",
       "dueSoonNoneLate": "Nothing overdue",
-      "runwayUnit_one": "day",
-      "runwayUnit_other": "days",
-      "runwayNote": "At the master wallet spend rate",
-      "heldNote_one": "held in {{count}} division",
-      "heldNote_other": "held across {{count}} divisions",
       "strip": {
         "title": "Deadlines per day — next {{days}} days",
         "today": "Today",
         "describe": "Deadlines per day for the next {{days}} days: {{detail}}.",
-        "describeEmpty": "Nothing falls due in the next {{days}} days.",
         "describeDay": "{{day}}, {{count}} due, worst {{severity}}"
       }
     },
     "cards": {
       "fuel": "Fuel",
-      "loadFailedAnnounce_one": "{{count}} corp card couldn't load",
-      "loadFailedAnnounce_other": "{{count}} corp cards couldn't load",
-      "fuelEmpty": "Every structure is fuelled.",
-      "timers": "Structure timers",
-      "timersEmpty": "No structure is on a timer.",
       "moons": "Moon chunks",
-      "moonsEmpty": "No moon drill is running.",
-      "openMoons": "Open Moons",
-      "jobs": "Industry jobs",
-      "jobsEmpty": "No job is waiting.",
-      "nothingDue": "Nothing due: {{kinds}}",
-      "services": "Offline services",
-      "servicesCount_one": "{{count}} offline",
-      "servicesCount_other": "{{count}} offline",
-      "criticalCount_one": "{{count}} critical",
-      "criticalCount_other": "{{count}} critical",
-      "total_one": "{{count}} total",
-      "total_other": "{{count}} total",
-      "showMore_one": "Show {{count}} more",
-      "showMore_other": "Show {{count}} more",
-      "showFewer": "Show fewer"
+      "services": "Offline services"
     },
-    "moonsTab": "Moons",
     "moons": {
       "title": "Moons",
       "noAccessTitle": "Moons need the Accountant role",
@@ -16252,7 +16108,6 @@
       "issuedByYou": "You issued it",
       "issuedByThem": "They issued it"
     },
-    "scopeCurrent": "This character",
     "title": {
       "personal": "Between you and {{name}}",
       "personalCharacter": "Between {{character}} and {{name}}",
@@ -16386,11 +16241,8 @@
     "employmentEmptyHint": "This character has no public corporation history to show.",
     "characterUnknownTitle": "This character couldn't be found",
     "characterUnknownHint": "EVE has no character with this id.",
-    "alliance": "Alliance",
-    "ticker": "Ticker",
     "memberCount": "Members",
     "ceo": "CEO",
-    "killboard": "Killboard",
     "zkillboard": "zKillboard",
     "age": "Age",
     "ageValue": "{{years}}y {{months}}m",
@@ -16608,7 +16460,6 @@
     "rewardColumn": "Reward",
     "collateralColumn": "Collateral",
     "volumeColumn": "Volume",
-    "daysColumn": "Days",
     "jumpsColumn": "Jumps",
     "jumpsLinkLabel_one": "{{count}} jump — open route safety",
     "jumpsLinkLabel_other": "{{count}} jumps — open route safety",
@@ -16902,7 +16753,6 @@
     },
     "title": "Travel",
     "routeTab": "Route Safety",
-    "pilotTab": "Pilot Lookup",
     "pilot": {
       "pickTitle": "Look up a pilot by name",
       "pickHint": "See their corporation, alliance, character age, and the kills and losses zKillboard has recorded. Or paste a Local list or a D-Scan to size up a whole system at once. You can also press Ctrl+V anywhere in the app.",
@@ -17940,9 +17790,6 @@
       "none": "None",
       "back": "All markets",
       "gone": "That market no longer exists",
-      "readyCard_one": "{{count}} ready to list from hangar",
-      "readyCard_other": "{{count}} ready to list from hangar",
-      "toSourceCard": "{{isk}} ISK to buy or build",
       "liveSummary_one": "{{count}} market needs restocking",
       "liveSummary_other": "{{count}} markets need restocking"
     },
@@ -18192,7 +18039,6 @@
       "copy": "Copy",
       "copied": "Copied",
       "copyFailed": "Couldn't copy",
-      "onNotice": "On this notice",
       "eyebrowNotice": "{{corp}} · Late notice · {{issued}}",
       "settled": "This Statement is settled.",
       "declaration": "You told {{corp}} on {{date}} that you paid another way.",
@@ -18308,10 +18154,10 @@
         "oldestUnpaid_one": "{{date}} · {{count}} day ago",
         "oldestUnpaid_other": "{{date}} · {{count}} days ago",
         "range": {
-          "label": "Days shown",
-          "all": "All",
           "7": "Last 7 days",
           "30": "Last 30 days",
+          "label": "Days shown",
+          "all": "All",
           "summary": "Tax {{tax}} · paid {{paid}}"
         }
       },
@@ -18420,7 +18266,10 @@
       "moons": {
         "nextPop": "Next pop {{date}}",
         "lastPop": "Last pop {{date}}",
-        "by": { "laser": "By laser", "auto": "Broke on its own" }
+        "by": {
+          "laser": "By laser",
+          "auto": "Broke on its own"
+        }
       },
       "refineries": {
         "none": "No refineries yet. A refinery shows once the book has synced its first Extraction.",
@@ -19223,11 +19072,11 @@
           "yours": "Because you own these corps, they are marked <pill>Yours</pill>: no owner rate and no payouts between them. You can stop any corp later from its row.",
           "how": "How far back should we count mining?",
           "back": {
-            "label": "How far back",
-            "today": "From today",
             "7": "The last 7 days",
             "14": "The last 14 days",
-            "30": "The last 30 days"
+            "30": "The last 30 days",
+            "label": "How far back",
+            "today": "From today"
           },
           "backHint": "Applies to all {{count}} corps. EVE only keeps about 30 days of mining, so anything older can't be recovered; you would have to record it yourself. Mining already taxed by a previous owner would be counted again if you go back.",
           "batch": "Corps in this batch ({{count}})",
@@ -19494,7 +19343,9 @@
         "hintIdleNever": "No Extraction here in {{count}} days and nothing ever mined. If it is gone, archive it. Everything stays.",
         "archivedBanner": "Archived {{date}} by {{name}} ({{why}}). It is off the Refineries list. Its Extractions, mining and label are all still here. Restore brings it back, and so does mining here again.",
         "extractionsNone": "No Extraction was recorded at this refinery.",
-        "cols": { "ore": "Ore make-up" },
+        "cols": {
+          "ore": "Ore make-up"
+        },
         "confirm": {
           "title": "Archive {{name}}?",
           "body": "It leaves the Refineries list. Its Extractions, mining rows, label and Statements stay, and every figure still counts them. Restore it any time, or mine there again.",
@@ -20321,7 +20172,6 @@
         "time": "Time (UTC)",
         "notTax": "Not tax (ISK)",
         "source": "Source",
-        "adjustmentId": "Adjustment ID",
         "reason": "Reason",
         "by": "Officer",
         "byId": "Officer ID",
@@ -20528,7 +20378,6 @@
     },
     "npcTitle": "No ship replacement (SRP) in an NPC corporation",
     "npcCorporation": "{{corporation}} is an NPC corporation. Ship replacement (SRP) is run by player corporations to pay back ships lost on corp operations.",
-    "npcCorporationUnnamed": "You're in an NPC corporation. Ship replacement (SRP) is run by player corporations to pay back ships lost on corp operations.",
     "loadFailed": "Couldn't load SRP",
     "file": {
       "title": "File a claim",
@@ -20878,8 +20727,7 @@
         "title": "Reject {{pilot}}'s claim?",
         "body": "{{hull}} lost at {{system}}, {{isk}} ISK. The claim moves to History as Rejected.",
         "reason": "Reason (required, sent to the pilot)",
-        "confirm": "Reject claim",
-        "mailNote": "The pilot reads this reason with the result."
+        "confirm": "Reject claim"
       },
       "change": {
         "title": "Change amount for {{pilot}}",
@@ -21405,7 +21253,7 @@
       "loading": "Reading the member list…",
       "countAll": "{{count}} members. Type to narrow.",
       "countShown": "{{shown}} of {{count}} members",
-      "noMatch": "No member named \u201c{{name}}\u201d in the corporation",
+      "noMatch": "No member named “{{name}}” in the corporation",
       "noMatchHint": "Check the spelling. Someone who left, or has not joined yet, cannot be reviewed. For someone applying, send them the apply link instead.",
       "waiting": "Review waiting",
       "waitingBy": "Review asked by {{name}}, {{ago}}",
@@ -21817,8 +21665,15 @@
         "skills": "Skill group"
       },
       "allKinds": "All {{kind}}s",
-      "direction": { "Sent": "Sent", "Received": "Received" },
-      "standing": { "hostile": "Hostile", "neutral": "Neutral", "friendly": "Friendly" },
+      "direction": {
+        "Sent": "Sent",
+        "Received": "Received"
+      },
+      "standing": {
+        "hostile": "Hostile",
+        "neutral": "Neutral",
+        "friendly": "Friendly"
+      },
       "contactKind": {
         "character": "Character",
         "corporation": "Corporation",
@@ -22104,7 +21959,6 @@
       "queued": "Mail queued for {{name}}. It goes out in about a minute.",
       "already": "Already queued from this device.",
       "send": "Send mail to {{name}}",
-      "resend": "Resend mail to {{name}}",
       "preview": "Preview mail",
       "copyLink": "Copy link",
       "linkCopied": "Link copied",
