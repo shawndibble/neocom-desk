@@ -209,9 +209,9 @@ describe('Settings', () => {
     renderSettingsPage();
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
-    await user.click(screen.getByRole('button', { name: /clear cached esi data/i }));
+    await user.click(screen.getByRole('button', { name: /clear cached eve data/i }));
     // Asks first: nothing is cleared until the dialog is confirmed.
-    const dialog = await screen.findByRole('dialog', { name: /clear cached esi data\?/i });
+    const dialog = await screen.findByRole('dialog', { name: /clear cached eve data\?/i });
     expect(await db.esiCache.count()).toBe(1);
     expect(within(dialog).queryByText(/only copy you have/i)).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: 'Clear cache' }));
@@ -232,8 +232,8 @@ describe('Settings', () => {
     renderSettingsPage();
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
-    await user.click(screen.getByRole('button', { name: /clear cached esi data/i }));
-    const dialog = await screen.findByRole('dialog', { name: /clear cached esi data\?/i });
+    await user.click(screen.getByRole('button', { name: /clear cached eve data/i }));
+    const dialog = await screen.findByRole('dialog', { name: /clear cached eve data\?/i });
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
 
     expect(await db.esiCache.count()).toBe(1);
@@ -249,8 +249,8 @@ describe('Settings', () => {
     renderSettingsPage();
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
-    await user.click(screen.getByRole('button', { name: /clear cached esi data/i }));
-    const dialog = await screen.findByRole('dialog', { name: /clear cached esi data\?/i });
+    await user.click(screen.getByRole('button', { name: /clear cached eve data/i }));
+    const dialog = await screen.findByRole('dialog', { name: /clear cached eve data\?/i });
 
     expect(within(dialog).getByText(/only copy you have/i)).toBeInTheDocument();
   });
@@ -261,7 +261,7 @@ describe('Settings', () => {
     await openTab(user, /^cached data$/i);
 
     expect(screen.getByRole('heading', { name: /data age/i })).toBeInTheDocument();
-    expect(screen.getByText(/nothing fetched yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/no data loaded yet/i)).toBeInTheDocument();
     // Nothing to fold, so no caret.
     expect(screen.queryByRole('button', { name: /show data age/i })).not.toBeInTheDocument();
   });
@@ -828,7 +828,7 @@ describe('Settings — review follow-ups', () => {
     renderSettingsPage();
 
     expect(
-      await screen.findByRole('button', { name: /clear cached esi data/i })
+      await screen.findByRole('button', { name: /clear cached eve data/i })
     ).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /data credit/i })).not.toBeInTheDocument();
   });

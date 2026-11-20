@@ -61,7 +61,6 @@ export function HaulingHowItWorks({ open, onClose, instant, scan }: HaulingHowIt
   return (
     <Modal open={open} onClose={onClose} title={t('market.hauling.how.title')}>
       <div className="flex flex-col gap-3 text-sm text-text">
-        <p className="text-text-dim">{t('market.hauling.how.intro')}</p>
         <ol className="flex flex-col gap-3">
           {steps.map((step) => (
             <li key={step.key}>

@@ -153,7 +153,7 @@ export function ComingUpRail({
       {groups.map(dayGroup)}
     </ul>
   ) : selectedDayMs === null ? (
-    <EmptyState title={t('calendar.rail.empty')} hint={t('calendar.rail.emptyHint')} />
+    <EmptyState title={t('calendar.rail.empty')} />
   ) : (
     <EmptyState title={t('calendar.rail.emptyForDay')} />
   );

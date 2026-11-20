@@ -162,7 +162,7 @@ describe('Contacts', () => {
       await showAllCharacters();
 
       expect(await screen.findByText(/last saved/)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Fetch every character' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Refresh every character' })).toBeInTheDocument();
     });
 
     it('says what fills the comparison when every character was read and none has contacts', async () => {

@@ -101,7 +101,7 @@ describe('ProjectedEffectsPanel', () => {
     render(<ProjectedEffectsPanel />);
     expect(
       screen.getByText(
-        'Save fittings to My Fittings, or grant In-game Fittings access, to project them onto this one.'
+        'Save fittings to My Fittings, or allow In-game Fittings access, to project them onto this one.'
       )
     ).toBeInTheDocument();
   });

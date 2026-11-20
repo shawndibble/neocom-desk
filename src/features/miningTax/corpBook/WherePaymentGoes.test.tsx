@@ -31,7 +31,7 @@ describe('WherePaymentGoes', () => {
     expect(screen.getByText('Held')).toBeInTheDocument();
     expect(screen.getAllByText('Paid by this')).toHaveLength(2);
     expect(
-      screen.getByText('Not paying — waiting on Bureau; no payment lands here')
+      screen.getByText('Not paying. Waiting on Bureau, so no payment lands here.')
     ).toBeInTheDocument();
   });
 

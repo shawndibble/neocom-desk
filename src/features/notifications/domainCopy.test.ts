@@ -367,7 +367,7 @@ describe('poll copy', () => {
         ),
       expected: {
         title: 'Order undercut',
-        body: "Kestrel's Tritanium sell order at 100.00 ISK was undercut at its station (95.00 ISK).",
+        body: "Kestrel's Tritanium sell order at 100.00 ISK was undercut. Lowest price at its station: 95.00 ISK.",
       },
     },
     {
@@ -388,7 +388,7 @@ describe('poll copy', () => {
         ),
       expected: {
         title: 'Order undercut',
-        body: "Kestrel's Tritanium buy order at 50.00 ISK was outbid at its station (55.00 ISK).",
+        body: "Kestrel's Tritanium buy order at 50.00 ISK was outbid. Highest bid at its station: 55.00 ISK.",
       },
     },
     {
@@ -409,7 +409,7 @@ describe('poll copy', () => {
         ),
       expected: {
         title: 'Order undercut',
-        body: "Kestrel's #99 sell order at 10.00 ISK was undercut at its station (9.00 ISK).",
+        body: "Kestrel's #99 sell order at 10.00 ISK was undercut. Lowest price at its station: 9.00 ISK.",
       },
     },
     {
@@ -494,7 +494,7 @@ describe('poll copy', () => {
           {}
         ),
       expected: {
-        title: 'Corp wallet threshold',
+        title: 'Corp wallet alert',
         body: 'Kestrel: corp wallet division 2 dropped to 5,000,000.00 ISK.',
       },
     },
@@ -515,7 +515,7 @@ describe('poll copy', () => {
           {}
         ),
       expected: {
-        title: 'Corp wallet threshold',
+        title: 'Corp wallet alert',
         body: 'Kestrel: a 250,000,000.50 ISK transaction posted to corp wallet division 1.',
       },
     },

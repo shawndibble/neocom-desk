@@ -614,7 +614,9 @@ describe('BuildPlanDetail profit if sold now (issue #5007)', () => {
     expect(await screen.findByText('Profit if sold now')).toBeInTheDocument();
     await user.click(screen.getAllByRole('button', { name: 'Calculations?' })[0]!);
     expect(
-      await screen.findByText('Priced at the highest buy order; a large quantity may fill lower.')
+      await screen.findByText(
+        'Priced at the highest buy order. A large quantity may sell for less.'
+      )
     ).toBeInTheDocument();
   });
 

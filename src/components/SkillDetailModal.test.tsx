@@ -307,7 +307,7 @@ describe('SkillDetailModal', () => {
 
     const dialog = await screen.findByRole('dialog');
     expect(await within(dialog).findByText('Skill not found')).toBeInTheDocument();
-    expect(within(dialog).getByText("This skill isn't in the skill catalog.")).toBeInTheDocument();
+    expect(within(dialog).getByText('We have no data for this skill.')).toBeInTheDocument();
     expect(within(dialog).queryByText('Could not load')).not.toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
   });

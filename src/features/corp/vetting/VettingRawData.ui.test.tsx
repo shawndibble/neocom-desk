@@ -204,7 +204,7 @@ describe('the data page', () => {
   it('shows an empty source as a result, apart from "no rows match"', async () => {
     await setup(dataPage('contact'));
     expect(await screen.findByText('No contacts rows')).toBeInTheDocument();
-    expect(screen.getByText(/The source was read; it was just empty/)).toBeInTheDocument();
+    expect(screen.getByText(/We read this source and found nothing/)).toBeInTheDocument();
     expect(screen.queryByText('No rows match')).toBeNull();
   });
 

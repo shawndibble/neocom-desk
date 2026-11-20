@@ -149,8 +149,8 @@ describe('WalletWaitingGoal', () => {
     expect(within(goals).getByText('Nyx fund')).toBeInTheDocument();
     expect(within(goals).getByText('600M')).toBeInTheDocument();
     expect(within(goals).getByText('1.3B')).toBeInTheDocument();
-    expect(within(goals).getByText(/30 day avg:/)).toHaveTextContent(/30 day avg: 30M/);
-    expect(within(goals).getByText(/^ETA: /)).toBeInTheDocument();
+    expect(within(goals).getByText(/30-day average:/)).toHaveTextContent(/30-day average: 30M/);
+    expect(within(goals).getByText(/^At this pace: /)).toBeInTheDocument();
 
     await addGoal(user, { name: 'Second', amount: '2b' });
     expect(await within(goals).findByText('Second')).toBeInTheDocument();

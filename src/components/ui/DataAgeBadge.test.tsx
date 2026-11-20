@@ -96,14 +96,16 @@ describe('DataAgeBadge', () => {
       render(<DataAgeBadge date={date} expiresAt={expiresAt} />);
       fireEvent.focus(screen.getByText('1m ago'));
       expect(screen.getByRole('tooltip')).toHaveTextContent(
-        `ESI updates this in 23 min (${formatTimeOfDay(expiresAt)})`
+        `EVE refreshes this in 23 min (${formatTimeOfDay(expiresAt)})`
       );
     });
 
     it('says newer data may exist once the expiry has passed', () => {
       render(<DataAgeBadge date={date} expiresAt={new Date(NOW.getTime() - 60_000)} />);
       fireEvent.focus(screen.getByText('1m ago'));
-      expect(screen.getByRole('tooltip')).toHaveTextContent('ESI may have newer data; refresh');
+      expect(screen.getByRole('tooltip')).toHaveTextContent(
+        'EVE may have newer data. Refresh to check.'
+      );
     });
 
     it('adds nothing without an expiry, and leaves the badge text alone', () => {

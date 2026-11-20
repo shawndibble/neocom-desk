@@ -316,7 +316,7 @@ export function PlayersView({
   );
 
   if (rows.length === 0) {
-    return <EmptyState title={t('corp.members.empty')} hint={t('corp.members.emptyHint')} />;
+    return <EmptyState title={t('corp.members.empty')} />;
   }
 
   if (lines.length === 0) {

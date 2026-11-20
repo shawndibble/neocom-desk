@@ -201,7 +201,9 @@ test.describe('Travel at 390px', () => {
   test("Route Safety's unread last-hour figures note is 14px", async ({ page }) => {
     await mockUniverseStats(page, true);
     await signInAndGoto(page, `./travel/route?stops=${AMARR}`);
-    const note = page.getByRole('status').filter({ hasText: "last-hour figures couldn't be read" });
+    const note = page
+      .getByRole('status')
+      .filter({ hasText: "last-hour figures couldn't be loaded" });
     await expect(note).toBeVisible(COLD_LOAD);
     await expectFontSize(note, 14);
   });

@@ -481,7 +481,7 @@ describe('AlertsPanel', () => {
     expect(onClose).toHaveBeenCalled();
 
     expect(screen.queryByRole('link', { name: /Older alerts/ })).toBeNull();
-    expect(screen.getByRole('link', { name: 'Manage Notification Settings' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Manage notification settings' })).toHaveAttribute(
       'href',
       '/settings/notifications'
     );

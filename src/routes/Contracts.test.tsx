@@ -281,7 +281,7 @@ describe('Contracts', () => {
     await screen.findByText('Rifter fit');
     const table = screen.getByRole('table', { name: 'Contracts' });
     const row = within(table).getByText('Lapsed offer').closest('tr') as HTMLElement;
-    const lapsed = within(row).getByText(/lapsed and unclaimed/i);
+    const lapsed = within(row).getByText(/past its deadline/i);
     expect(lapsed.parentElement).toHaveAttribute('tabindex', '0');
   });
 
@@ -323,7 +323,7 @@ describe('Contracts', () => {
     expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(
-      screen.getByText('This contract is older than 30 days and EVE no longer sends it.')
+      screen.getByText('This contract is older than 30 days, so EVE no longer lists it.')
     ).toBeInTheDocument();
   });
 
@@ -348,7 +348,7 @@ describe('Contracts', () => {
     renderContracts();
     expect(await screen.findByRole('dialog', { name: /Item Exchange/ })).toBeInTheDocument();
     expect(
-      screen.queryByText('This contract is older than 30 days and EVE no longer sends it.')
+      screen.queryByText('This contract is older than 30 days, so EVE no longer lists it.')
     ).not.toBeInTheDocument();
   });
 
@@ -520,9 +520,6 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
     );
 
     expect(await screen.findByText('No contracts match your filters.')).toBeInTheDocument();
-    expect(
-      screen.getByText('No contract matches the current search and filters.')
-    ).toBeInTheDocument();
     expect(
       screen.queryByText('Clear the search or reset the status/type filters to see every contract.')
     ).not.toBeInTheDocument();
@@ -986,7 +983,7 @@ describe('Contracts row right-click (issue #676)', () => {
 
 describe('Contracts tab strip (issue #908)', () => {
   // The loaders are mocked to read nothing, so the Search tab says R2 was unreachable.
-  const SEARCH_UNAVAILABLE = "Couldn't reach the contract index — nothing cached yet";
+  const SEARCH_UNAVAILABLE = "Can't reach contract search, and nothing is saved yet";
 
   it('lands on Item search with no tab in the URL', async () => {
     window.history.pushState({}, '', '/contracts');

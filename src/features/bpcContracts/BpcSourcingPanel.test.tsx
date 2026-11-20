@@ -581,7 +581,7 @@ describe('BpcSourcingPanel', () => {
     loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([]));
     renderIndustry();
 
-    expect(await screen.findByText('No public BPC listings synced yet')).toBeInTheDocument();
+    expect(await screen.findByText('No public BPC listings yet')).toBeInTheDocument();
   });
 
   it('says the index could not be reached, not "synced yet", when the read returned nothing', async () => {
@@ -589,9 +589,9 @@ describe('BpcSourcingPanel', () => {
     renderIndustry();
 
     expect(
-      await screen.findAllByText("Couldn't reach the contract index — nothing cached yet")
+      await screen.findAllByText("Can't reach contract search, and nothing is saved yet")
     ).not.toHaveLength(0);
-    expect(screen.queryByText('No public BPC listings synced yet')).not.toBeInTheDocument();
+    expect(screen.queryByText('No public BPC listings yet')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
 

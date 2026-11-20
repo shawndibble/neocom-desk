@@ -109,7 +109,7 @@ describe('CurrentQueuePanel', () => {
     expect(screen.queryByRole('region', { name: 'Training now' })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Paused' })).toBeInTheDocument();
     expect(
-      screen.getByText('Training is paused, so EVE reports no completion times.')
+      screen.getByText('Training is paused, so EVE shows no finish times.')
     ).toBeInTheDocument();
   });
 

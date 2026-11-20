@@ -251,7 +251,6 @@ export function VettingRequestPage({ login, onSignIn }: VettingRequestPageProps)
           {t('vetting.request.share', { count: sharing })}
         </Button>
         <Button onClick={() => setDeclining(true)}>{t('vetting.request.decline')}</Button>
-        <span className="text-xs text-text-dim">{t('vetting.request.declineHint')}</span>
       </div>
       <ConfirmDialog
         open={declining}

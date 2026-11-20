@@ -64,9 +64,7 @@ export function CargoTab({
       </label>
       {catalogue === null ? (
         <CatalogueLoadingNote />
-      ) : trimmed === '' ? (
-        <p className="text-xs text-text-dim">{t('fittings.add.cargoHint')}</p>
-      ) : results.length === 0 ? (
+      ) : trimmed === '' ? null : results.length === 0 ? (
         <p className="text-xs text-text-dim">{t('fittings.add.noResults')}</p>
       ) : (
         <ul>

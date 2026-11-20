@@ -143,7 +143,9 @@ describe('VerifyPage', () => {
       })
     );
     renderPage();
-    expect(await screen.findByText(/Pick this in EVE's transfer window/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Choose this wallet division in EVE's transfer window/)
+    ).toBeInTheDocument();
     expect(screen.getByText('Master Wallet, MOON TAXES')).toBeInTheDocument();
   });
 
@@ -270,7 +272,7 @@ describe('VerifyPage', () => {
     renderPage();
     expect(await screen.findByText('Owed now')).toBeInTheDocument();
     expect(screen.queryByText('Balance due')).not.toBeInTheDocument();
-    expect(screen.getByText(/matches the payment to you/)).toBeInTheDocument();
+    expect(screen.getByText(/links the payment to you/)).toBeInTheDocument();
   });
 
   it('lists only the days still owed, one line each, and opens a day to its ore', async () => {

@@ -367,7 +367,6 @@ export function CorpRoleAudit({ tabs }: { tabs: MembersTabsSlot }) {
               ) : shownHistory.length === 0 ? (
                 <EmptyState
                   title={t('corp.roles.historyEmpty', { days: HISTORY_DAYS })}
-                  hint={t('corp.roles.historyEmptyHint')}
                   className="py-8"
                 />
               ) : (

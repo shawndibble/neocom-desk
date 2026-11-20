@@ -244,7 +244,7 @@ describe('PilotListView (Local list)', () => {
       renderList();
       const table = await screen.findByRole('table', { name: 'Killed in highsec, last 30 days' });
       const headers = within(table).getAllByRole('columnheader');
-      expect(headers[headers.length - 1].textContent).toContain('Kills read');
+      expect(headers[headers.length - 1].textContent).toContain('Kills checked');
       const nullbear = screen.getAllByText('Nullbear')[0].closest('tr') as HTMLElement;
       expect(within(nullbear).getByText('5h ago')).toBeTruthy();
       expect(screen.getAllByText('5h ago')).toHaveLength(1);
@@ -255,7 +255,7 @@ describe('PilotListView (Local list)', () => {
       showStale();
       renderList();
       const card = (await screen.findAllByText('Nullbear'))[0].closest('li') as HTMLElement;
-      expect(within(card).getByText('Kills read')).toBeTruthy();
+      expect(within(card).getByText('Kills checked')).toBeTruthy();
       expect(within(card).getByText('5h ago')).toBeTruthy();
     });
   });
@@ -296,7 +296,7 @@ describe('PilotListView (Local list)', () => {
     for (const table of tables) {
       // Fixed layout, so the pinned widths hold whatever the group's content.
       expect(table.className).toContain('table-fixed');
-      // Pilot and Flew on stay flexible; Standing, Highsec, Lowsec, Nullsec and Kills read are pinned.
+      // Pilot and Flew on stay flexible; Standing, Highsec, Lowsec, Nullsec and Kills checked are pinned.
       expect(widthsOf(table)).toEqual(widthsOf(tables[0]));
       expect(widthsOf(table).filter((w) => w !== null)).toHaveLength(5);
     }
@@ -358,7 +358,7 @@ describe('PilotListView (Local list)', () => {
   it('names the system it reads from, and lets you change it', async () => {
     renderList();
     expect(await screen.findByRole('button', { name: /Change your system/ })).toBeTruthy();
-    expect(screen.getByText('Last API system')).toBeTruthy();
+    expect(screen.getByText('Last known system')).toBeTruthy();
   });
 });
 

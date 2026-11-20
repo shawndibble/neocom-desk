@@ -143,7 +143,7 @@ describe('SpendPlanPanel', () => {
     const onSelectOffer = vi.fn();
     renderPlan(view({}), onSelectOffer);
     expect(
-      screen.getByText(/the 50 LP left is short of the next one, Caldari Navy Hookbill/)
+      screen.getByText(/the 50 LP left isn't enough for the next offer, Caldari Navy Hookbill/)
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('cell', { name: 'Caldari Navy Hookbill' }));
     expect(onSelectOffer).toHaveBeenCalledWith(hookbill);
@@ -202,7 +202,9 @@ describe('SpendPlanPanel', () => {
     expect(
       screen.getByText('Nothing in this store earns ISK on instant sell right now.')
     ).toBeInTheDocument();
-    expect(screen.getByText(/Caldari Navy Hookbill, would lose ISK/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/the next offer, Caldari Navy Hookbill, would lose ISK/)
+    ).toBeInTheDocument();
   });
 
   it('reads a stop before the first step as no plan, not as nothing profitable', () => {
@@ -226,7 +228,7 @@ describe('SpendPlanPanel', () => {
     });
     expect(screen.getByText('No redemption to plan right now.')).toBeInTheDocument();
     expect(screen.getByText(/Clear the filters or search/)).toBeInTheDocument();
-    expect(screen.queryByText(/order books can't price/)).toBeNull();
+    expect(screen.queryByText(/none of these offers have a market price/)).toBeNull();
   });
 
   it('lists the turn-ins to buy and the owned ones used', () => {

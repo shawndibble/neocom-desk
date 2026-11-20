@@ -85,7 +85,6 @@ function ExportBlock({
         build={build}
         onBusyChange={onBusyChange}
       />
-      <p className="text-xs text-text-dim">{t('corpTaxBook.export.sheetList')}</p>
     </section>
   );
 }

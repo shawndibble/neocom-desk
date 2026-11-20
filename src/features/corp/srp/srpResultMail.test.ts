@@ -187,7 +187,7 @@ describe('summary', () => {
       'Mail queued for 1 pilot.'
     );
     expect(mailSummary(t, { queued: [], failed: [], missingScope: true })).toBe(
-      'No mail sent: mail permission missing.'
+      'No mail sent: your character has not allowed sending EVE mail.'
     );
   });
   it('plural count from the real number queued', () => {

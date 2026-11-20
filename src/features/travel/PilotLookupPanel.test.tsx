@@ -350,7 +350,7 @@ describe('PilotLookupPanel', () => {
 
   it('tells an empty page that a Local list or D-Scan can be pasted', () => {
     renderTab();
-    expect(screen.getByText(/paste a Local list or a D-Scan/i)).toBeTruthy();
+    expect(screen.getByText(/paste a Local list or D-Scan/i)).toBeTruthy();
   });
 
   it('keeps the search box beside the list strip, so one pilot needs no Clear first', async () => {

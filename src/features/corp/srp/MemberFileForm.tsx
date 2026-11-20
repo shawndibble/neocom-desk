@@ -91,9 +91,7 @@ export function MemberFileForm({
               <FieldError id={fleetErr}>{errors.fleet}</FieldError>
             ) : fleetRequired ? (
               t('srpMember.file.fleetNoteRequired')
-            ) : (
-              t('srpMember.file.fleetNote')
-            )
+            ) : undefined
           }
         >
           <TextInput

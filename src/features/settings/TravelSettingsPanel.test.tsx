@@ -98,7 +98,7 @@ describe('TravelSettingsPanel', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Systems with recent pod kills' }));
 
     // Scoped to the warning's text: the rule fields also hold an always-mounted live region.
-    expect(await screen.findByText(/kill report can't be read/)).toBeInTheDocument();
+    expect(await screen.findByText(/kill report isn't available right now/)).toBeInTheDocument();
     expect(threshold).toBeEnabled();
   });
 });

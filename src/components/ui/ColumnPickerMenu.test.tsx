@@ -6,7 +6,7 @@ import { claimSessionHint, hintSeenCount, resetSessionHints, useHintCounts } fro
 import { ColumnPickerMenu } from './ColumnPickerMenu';
 
 vi.mock('@/features/character/useCharacters', () => ({ useCharacterCount: () => 1 }));
-const HINT = 'Toggle columns here. Some are hidden by default.';
+const HINT = 'Turn columns on or off here. Some start hidden.';
 const columnsById = { a: { header: 'Alpha' }, b: { header: 'Beta' } } as never;
 
 const picker = (

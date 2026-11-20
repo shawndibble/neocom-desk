@@ -72,7 +72,7 @@ describe('CashFlowPanel', () => {
     load([line(0, 1500), line(40, 1000), line(59, 0)]);
     renderPanel();
     expect(
-      await screen.findByText(/Earned is \+50% on the 30 days before \(1,000\)/)
+      await screen.findByText(/Earned: \+50% vs the 30 days before \(1,000\)/)
     ).toBeInTheDocument();
   });
 

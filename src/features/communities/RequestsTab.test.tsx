@@ -201,7 +201,7 @@ describe('RequestsTab board', () => {
     ]);
     expect(screen.getByText('Aria Voss · Khanid')).toBeInTheDocument();
     expect(screen.getByText('Budget 300M')).toBeInTheDocument();
-    expect(screen.getByText('0 delivered · 0 pledged · 1 needed lines')).toBeInTheDocument();
+    expect(screen.getByText('0 delivered · 0 pledged · 1 lines needed')).toBeInTheDocument();
     expect(screen.queryByText('Bo Tanner · Khanid')).not.toBeInTheDocument();
   });
 
@@ -327,7 +327,7 @@ describe('Request panel', () => {
     await chooseFilter(user, /^Mine/);
     await user.click(screen.getByText('Tritanium'));
     await user.click(screen.getByRole('button', { name: 'Reopen request' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent(/most open Requests/);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/limit of open Requests/);
   });
 });
 
@@ -414,7 +414,7 @@ describe('New request dialog', () => {
     await user.paste('Tritanium 5');
     await screen.findByLabelText('Tritanium quantity');
     await postFromDialog(user);
-    expect(await screen.findByRole('alert')).toHaveTextContent(/most open Requests/);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/limit of open Requests/);
   });
 
   it('refuses to post when a paste goes over the line cap, until enough lines are removed', async () => {
@@ -423,7 +423,7 @@ describe('New request dialog', () => {
     await user.click(screen.getByRole('button', { name: 'New request' }));
     await user.click(await screen.findByLabelText(/Paste a list/));
     await user.paste(Array.from({ length: 51 }, (_, i) => `Bulk ${i + 1} 5`).join('\n'));
-    expect(await screen.findByText(/1 more than the 50-line limit/)).toBeInTheDocument();
+    expect(await screen.findByText(/Over the 50-line limit by 1/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Post request' })).toBeDisabled();
     await user.click(screen.getByRole('button', { name: 'Remove Bulk 1' }));
     expect(screen.queryByText(/-line limit/)).not.toBeInTheDocument();
@@ -515,9 +515,7 @@ describe('distance', () => {
     expect(rowNames()).toHaveLength(3);
     await pick(user, 'Within 5 jumps');
     expect(
-      await screen.findByText(
-        '1 Request with no place to measure from isn’t listed.'.replace('’', "'")
-      )
+      await screen.findByText("1 Request with no known location isn't listed.")
     ).toBeInTheDocument();
     expect(rowNames()).toHaveLength(1);
     expect(rowNames()[0]).toContain('near one');
@@ -525,7 +523,7 @@ describe('distance', () => {
     await waitFor(() => expect(rowNames()).toHaveLength(2));
     await pick(user, 'Any distance');
     await waitFor(() => expect(rowNames()).toHaveLength(3));
-    expect(screen.queryByText(/no place to measure from/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/no known location/)).not.toBeInTheDocument();
   });
 
   it('offers the same From system picker as every other Jump Range filter', async () => {
@@ -712,7 +710,7 @@ describe('Pledging', () => {
 describe('Board from Pledges', () => {
   it('derives progress and status from the Pledges, not from the Request alone', () => {
     renderTab([request({})], vi.fn(), { r1: [pledgeOf('char:3', 1000)] });
-    expect(screen.getByText('0 delivered · 1 pledged · 1 needed lines')).toBeInTheDocument();
+    expect(screen.getByText('0 delivered · 1 pledged · 1 lines needed')).toBeInTheDocument();
     expect(screen.getByText('Pledged', { selector: 'span' })).toBeInTheDocument();
   });
 
@@ -849,7 +847,6 @@ describe('Telling the requester about a Pledge', () => {
     const group = await screen.findByRole('group', { name: 'Tell me when someone Pledges' });
     expect(within(group).getByRole('checkbox', { name: 'In the app' })).toBeChecked();
     expect(within(group).getByRole('checkbox', { name: 'By in-game mail' })).not.toBeChecked();
-    expect(group).toHaveAccessibleDescription(/Send mail Permission/);
     expect(screen.queryByText('Mail to (optional)')).toBeNull();
   });
 

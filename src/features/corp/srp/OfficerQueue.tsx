@@ -299,7 +299,7 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
     { id: 'history', label: t('srp.officer.tabs.history') },
   ];
   const empty = {
-    pending: [t('srp.officer.empty.pendingTitle'), t('srp.officer.empty.pendingHint')],
+    pending: [t('srp.officer.empty.pendingTitle'), undefined],
     owed: [t('srp.officer.empty.owedTitle'), t('srp.officer.empty.owedHint')],
     history: [t('srp.officer.empty.historyTitle'), t('srp.officer.empty.historyHint')],
   }[tab];

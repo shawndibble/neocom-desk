@@ -235,7 +235,7 @@ describe('Add my other corps on the page', () => {
     );
     expect(await screen.findByText('Needs you (2)')).toBeInTheDocument();
     await userEvent.click(
-      screen.getByRole('button', { name: 'Grant again for Cobalt Drift Syndicate' })
+      screen.getByRole('button', { name: 'Allow again for Cobalt Drift Syndicate' })
     );
     expect(
       await screen.findByRole('heading', { name: 'Logging in: corp 1 of 2' })

@@ -304,7 +304,7 @@ describe('EmploymentHistory', () => {
       )
     );
     renderEmploymentHistoryRoute();
-    expect(await screen.findByText(/no employment history cached/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no employment history yet/i)).toBeInTheDocument();
     // The panel's toolbar outlives its rows, so there is still a way back.
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
   });

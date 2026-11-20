@@ -419,7 +419,9 @@ describe('CommandPalette', () => {
     await user.type(await screen.findByRole('combobox'), 'settings');
     const items = await screen.findByRole('group', { name: 'Market items' });
     expect(
-      await within(items).findByText('Item search needs a one-time download — connect once.')
+      await within(items).findByText(
+        'Item search needs a one-time download. Connect once to get it.'
+      )
     ).toBeInTheDocument();
   });
 

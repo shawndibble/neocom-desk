@@ -748,7 +748,7 @@ describe('ContractSearchPanel', () => {
     renderWithRouter();
 
     expect(
-      await screen.findAllByText("Couldn't reach the contract index — nothing cached yet")
+      await screen.findAllByText("Can't reach contract search, and nothing is saved yet")
     ).not.toHaveLength(0);
     expect(screen.queryByText('No public contracts synced yet')).not.toBeInTheDocument();
 
@@ -1604,7 +1604,7 @@ describe('ContractSearchPanel — Courier endpoint space', () => {
 
     // Not the generic "nothing matched": the board excluded these itself, and
     // must say so rather than presenting its own exclusion as an absence.
-    expect(await screen.findByText(/can.t place/i)).toBeInTheDocument();
+    expect(await screen.findByText(/can't locate/i)).toBeInTheDocument();
   });
 
   it('does not blame unplaceable destinations for an emptiness another filter caused', async () => {
@@ -1617,7 +1617,7 @@ describe('ContractSearchPanel — Courier endpoint space', () => {
     await user.type(screen.getByLabelText('Min reward'), '999999999999');
 
     expect(await screen.findByText(/match your filters/i)).toBeInTheDocument();
-    expect(screen.queryByText(/can.t place/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/can't locate/i)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Reset filters' }));
 
@@ -2004,7 +2004,7 @@ describe('ContractSearchPanel — Courier reverse lane', () => {
 
     expect(
       within(dialog).getByText(
-        "No haul we can place runs the reverse lane. 1 leaves Domain for a drop-off we can't place."
+        "No known haul runs the reverse lane. 1 leaves Domain for a drop-off we can't locate."
       )
     ).toBeInTheDocument();
     // One sentence, not two. "No outstanding haul runs the reverse lane."
@@ -2032,7 +2032,7 @@ describe('ContractSearchPanel — Courier reverse lane', () => {
       within(dialog).getByRole('button', { name: '1 haul runs the reverse lane' })
     ).toBeInTheDocument();
     expect(
-      within(dialog).getByText("1 more leaves Domain for a drop-off we can't place.")
+      within(dialog).getByText("1 more leaves Domain for a drop-off we can't locate.")
     ).toBeInTheDocument();
   });
 
@@ -2086,7 +2086,7 @@ describe('ContractSearchPanel — Courier reverse lane', () => {
 
     expect(
       within(dialog).getByText(
-        "We can't place one end of this haul, so there is no return lane to look up."
+        "We can't locate one end of this haul, so we can't look for a return haul."
       )
     ).toBeInTheDocument();
     // Not a count of zero, which would read as an answer.
@@ -2135,7 +2135,7 @@ describe('ContractSearchPanel — search first (issue #2921)', () => {
     renderWithRouter(['/']);
 
     expect(await screen.findByRole('progressbar')).not.toHaveAttribute('aria-valuenow');
-    expect(screen.getByText('Loading the offer index…')).toBeInTheDocument();
+    expect(screen.getByText('Loading contract offers…')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Search item name…')).toBeEnabled();
 
     offers.resolve(cachedSnapshot([TRIT_FORGE]));
@@ -2203,7 +2203,7 @@ describe('ContractSearchPanel — search first (issue #2921)', () => {
         await screen.findByText('Loading public contracts, this may take a moment.')
       ).toBeInTheDocument();
       expect(
-        await screen.findAllByText("Couldn't reach the contract index — nothing cached yet")
+        await screen.findAllByText("Can't reach contract search, and nothing is saved yet")
       ).not.toHaveLength(0);
       expect(
         screen.queryByText('Loading public contracts, this may take a moment.')
@@ -2430,7 +2430,7 @@ describe('ContractSearchPanel — Below market (#3989)', () => {
     expect(rows[0]).not.toHaveTextContent('priced');
     expect(rows[1]).toHaveTextContent('Tritanium');
     expect(rows[1]).toHaveTextContent('300,000');
-    expect(screen.getByText(/lowest sell order, no fees taken off/)).toBeInTheDocument();
+    expect(screen.getByText(/lowest sell order, before fees/)).toBeInTheDocument();
   });
 
   it('prices the buy side when Buy orders is picked', async () => {
@@ -2452,7 +2452,7 @@ describe('ContractSearchPanel — Below market (#3989)', () => {
       const table = screen.getByRole('table', { name: 'Below-market contracts' });
       expect(within(table).queryByText(/Tritanium/)).not.toBeInTheDocument();
     });
-    expect(screen.getByText(/best buy order, no fees taken off/)).toBeInTheDocument();
+    expect(screen.getByText(/best buy order, before fees/)).toBeInTheDocument();
   });
 
   describe('contracts valued from other contracts (#5427)', () => {
@@ -2474,7 +2474,7 @@ describe('ContractSearchPanel — Below market (#3989)', () => {
       );
       const user = userEvent.setup();
       renderWithRouter(['/?items.belowMarket=1']);
-      await screen.findByText(/Contract snapshot from/);
+      await screen.findByText(/Contracts as of/);
       await waitFor(() =>
         expect(screen.queryByRole('status', { name: /Pricing/ })).not.toBeInTheDocument()
       );

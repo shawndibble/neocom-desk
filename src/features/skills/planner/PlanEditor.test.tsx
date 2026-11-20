@@ -688,7 +688,7 @@ describe('PlanEditor tools pane', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'Optimize remaps' });
     expect(
-      within(dialog).getByText('This plan has 0 remaps to spend, so nothing was placed.')
+      within(dialog).getByText('This plan has no remaps to spend, so none were placed.')
     ).toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: 'Accept' })).toBeNull();
 
@@ -1711,7 +1711,7 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
     await openAssumptions(user);
 
     expect(screen.getByLabelText<HTMLInputElement>('Days').value).toBe('');
-    expect(screen.getByText(/include it in training times/i)).toBeInTheDocument();
+    expect(screen.getByText(/count it in training times/i)).toBeInTheDocument();
   });
 
   it('shows whatever tier was detected, not a fixed number', async () => {
@@ -1744,7 +1744,7 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
 
     await user.type(screen.getByLabelText('Days'), '5');
 
-    await waitFor(() => expect(screen.queryByText(/include it in training times/i)).toBeNull());
+    await waitFor(() => expect(screen.queryByText(/count it in training times/i)).toBeNull());
   });
 });
 
@@ -1932,7 +1932,7 @@ describe('a character with no accelerator', () => {
 
     expect(screen.getByRole('button', { name: 'Add accelerator' })).toBeInTheDocument();
     expect(screen.queryByText(/cerebral accelerator/i)).toBeNull();
-    expect(screen.queryByText(/include it in training times/i)).toBeNull();
+    expect(screen.queryByText(/count it in training times/i)).toBeNull();
     expect(screen.queryByText(/cannot be read/i)).toBeNull();
   });
 });
@@ -1950,8 +1950,8 @@ describe('an attribute sheet nothing explains', () => {
     await openTools(user);
     await openAssumptions(user);
 
-    expect(screen.getByText(/attributes can't be right/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Copy diagnostics' })).toBeInTheDocument();
+    expect(screen.getByText(/attributes look wrong/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy debug info' })).toBeInTheDocument();
     // No accelerator was recovered, so nothing is prefilled either — the
     // list stays empty, same as the no-accelerator case above.
   });
@@ -2073,7 +2073,7 @@ describe('derived remap budget summary, no manual override (#1412)', () => {
     renderEditor(vi.fn(), { plan: { ...PLAN, remapCount: 5 }, remapInfo });
     await openTools(user);
 
-    expect(screen.getByText('Remaps: 1 bonus now · yearly ready')).toBeInTheDocument();
+    expect(screen.getByText('Remaps: 1 bonus · yearly remap ready')).toBeInTheDocument();
     expect(screen.queryByRole('spinbutton', { name: /remap/i })).toBeNull();
   });
 
@@ -2088,7 +2088,7 @@ describe('derived remap budget summary, no manual override (#1412)', () => {
     renderEditor(vi.fn(), { plan: { ...PLAN, remapCount: 5 }, remapInfo });
     await openTools(user);
 
-    expect(screen.getByText(/^Remaps: 1 bonus now · yearly from /)).toBeInTheDocument();
+    expect(screen.getByText(/^Remaps: 1 bonus · yearly remap from /)).toBeInTheDocument();
   });
 });
 
