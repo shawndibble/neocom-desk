@@ -967,15 +967,16 @@ function minerCharacters(minerId: string, miner: Data | undefined): number[] {
 }
 
 /** The sign-ins that read a Miner's own lines (`uids`): read in the transaction, before any write. */
-/** Most Miners whose own paid-through copy one `recordAccounts` writes (a transaction holds 500 writes). */
-const MINER_PAID_BATCH = 150;
-
 /** The Director gate dismissals use (D6), for an act that undoes or reprices money of these sizes. */
 function requireDirectorAbove(c: EditCtx, amounts: readonly number[]): void {
+  // A change of nothing (a new date or label only) moves no money: the gate counts size, and the
+  // dismissal helper reads a zero as "unknown, so over the limit".
+  const sized = amounts.filter((a) => a > 0);
+  if (sized.length === 0) return;
   if (
     dismissalNeedsDirector(
       c.book.dismissApprovalAboveIsk as number | null | undefined,
-      amounts,
+      sized,
       c.access.isDirector
     )
   ) {
@@ -1892,6 +1893,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       // shortfall (0) only raises what is owed.
       if (action.forgive > 0) requireDirectorAbove(c, [action.forgive]);
       const uids = await minerUids(c, action.minerId);
+      if (uids.length === 0) fail('not-found', 'Unknown Miner', 'unknown-miner');
       const id = `x${now}_${rand(4)}`;
       tx.create(col(c, TOLERANCE_EXEMPTIONS).doc(id), {
         id,
@@ -2200,22 +2202,10 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       // written again, so a second tab adds no write and no newer `at`/`by`.
       const refs = action.accounts.map((a) => col(c, ACCOUNTS).doc(a.minerId));
       const stored = refs.length > 0 ? await c.tx.getAll(...refs) : [];
-      // The Miner's own copy of the paid-through day (the marker itself is officer-only). Any
-      // Miner whose copy is missing or behind is written, a bounded batch per call, so books that
-      // predate the copy catch up as accounts are recorded. Reads first: a transaction refuses
-      // one after a write.
-      const paidNow = ((await c.tx.get(paidRef)).data()?.minerPaidThrough ?? {}) as Record<
-        string,
-        string
-      >;
-      const wanted = { ...paidNow, ...settled };
-      const wantedIds = Object.keys(wanted);
-      const copyRefs = wantedIds.map((id) => col(c, MINER_PAID).doc(id));
-      const copies = copyRefs.length > 0 ? await c.tx.getAll(...copyRefs) : [];
-      const behind = wantedIds
-        .filter((id, i) => copies[i].data()?.paidThrough !== wanted[id])
-        .slice(0, MINER_PAID_BATCH);
-      const behindUids = await Promise.all(behind.map((id) => minerUids(c, id)));
+      // The Miner's own copy of the paid-through day (the marker itself is officer-only), for each
+      // Miner it advanced now. Reads first: a transaction refuses one after a write.
+      const advanced = Object.keys(settled);
+      const advancedUids = await Promise.all(advanced.map((id) => minerUids(c, id)));
       action.accounts.forEach((account, i) => {
         const a = { ...account };
         delete a.settledThrough; // the pay page's record; the marker lives in `meta/paid`
@@ -2225,8 +2215,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       // Only ever grown: a day recorded paid stays paid, even if money is later taken back (D22).
       if (Object.keys(settled).length > 0)
         tx.set(paidRef, { minerPaidThrough: settled }, { merge: true });
-      behind.forEach((id, i) =>
-        tx.set(col(c, MINER_PAID).doc(id), { id, paidThrough: wanted[id], uids: behindUids[i] })
+      advanced.forEach((id, i) =>
+        tx.set(col(c, MINER_PAID).doc(id), { id, paidThrough: settled[id], uids: advancedUids[i] })
       );
       // The figures as recorded, so the audit says what the pay page was told.
       return { detail: { count: action.accounts.length, accounts: action.accounts } };

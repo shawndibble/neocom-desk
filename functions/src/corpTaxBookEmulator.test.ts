@@ -2155,6 +2155,43 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect(audit).toContain('setToleranceExemption');
     });
 
+    it('lets a non-Director change only the date or label of a correction under a limit', async () => {
+      await turnOn();
+      await edit(DIRECTOR, { action: 'updateSettings', patch: { dismissApprovalAboveIsk: 100 } });
+      const id = await addCorrection(-500);
+      const out = await edit(
+        ACCOUNTANT,
+        {
+          action: 'editAdjustment',
+          adjustmentId: id,
+          date: '2026-10-07',
+          amount: -500,
+          reason: 'moved',
+        },
+        true
+      );
+      expect((await adjustment(String(out.adjustmentId)))?.date).toBe('2026-10-07');
+    });
+
+    it('refuses an exemption for a Miner that does not exist', async () => {
+      await turnOn();
+      expect(
+        await reason(
+          edit(
+            ACCOUNTANT,
+            {
+              action: 'setToleranceExemption',
+              minerId: 'grp:nobody',
+              date: '2026-10-05',
+              forgive: 0,
+              reason: 'x',
+            },
+            true
+          )
+        )
+      ).toBe('unknown-miner');
+    });
+
     it('asks a Director for a change above the approval limit, but not for charging a shortfall', async () => {
       await turnOn();
       await edit(DIRECTOR, { action: 'updateSettings', patch: { dismissApprovalAboveIsk: 100 } });
