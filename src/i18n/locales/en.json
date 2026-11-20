@@ -18645,9 +18645,7 @@
         "summary": "{{shown}} of {{total}} Miners",
         "nonMembersHidden_one": "{{count}} non-member hidden · {{amount}} owed",
         "nonMembersHidden_other": "{{count}} non-members hidden · {{amount}} owed",
-        "hidden_one": "{{count}} other Miner owes nothing and has no credit.",
-        "hidden_other": "{{count}} other Miners owe nothing and have no credit.",
-        "empty": "No Miner owes tax, is owed credit or has days waiting.",
+        "empty": "No Miners yet.",
         "emptyFiltered": "No Miner matches these filters.",
         "balance": {
           "label": "Balance",
