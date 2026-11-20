@@ -18798,15 +18798,15 @@
           "reversal": "Reversal: {{reason}}"
         },
         "menu": {
-          "correctionEdit": "Edit correction…",
-          "correctionReverse": "Reverse correction…",
+          "correctionEdit": "Edit correction",
+          "correctionReverse": "Reverse correction",
           "correctionLocked": "A Statement already billed this correction. Add an opposite correction instead.",
-          "writeOffReverse": "Reverse write-off…",
-          "marketCharge": "Charge this shortfall…",
-          "marketEdit": "Change amount forgiven…",
-          "notTax": "Mark part not tax…",
-          "rate": "Change rate…",
-          "dismiss": "Dismiss tax…"
+          "writeOffReverse": "Reverse write-off",
+          "marketCharge": "Charge this shortfall",
+          "marketEdit": "Change amount forgiven",
+          "notTax": "Mark part not tax",
+          "rate": "Change rate",
+          "dismiss": "Dismiss tax"
         },
         "dialogs": {
           "reasonLabel": "Why",

@@ -161,8 +161,8 @@ describe('the account ledger row menus', () => {
   it('offers edit and reverse on a correction, and reverse opens the dialog it names', async () => {
     const calls = renderLedger(running({ adjustments: [correction] }));
     fireEvent.contextMenu(rowOf(/Correction: Auth rollover/));
-    expect(await screen.findByRole('menuitem', { name: 'Edit correction…' })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Reverse correction…' }));
+    expect(await screen.findByRole('menuitem', { name: 'Edit correction' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Reverse correction' }));
     await vi.waitFor(() => expect(calls).toEqual(['reverse:c1']));
   });
 
@@ -173,7 +173,7 @@ describe('the account ledger row menus', () => {
     };
     const calls = renderLedger(running({ adjustments: [reversed] }), true, [reversed]);
     fireEvent.contextMenu(rowOf(/Market adjustment/));
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Charge this shortfall…' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Charge this shortfall' }));
     await vi.waitFor(() => expect(calls).toEqual(['charge:2026-08-11']));
     // The struck-through original and its reversal carry no menu.
     expect(screen.getByText('reversed')).toBeInTheDocument();
@@ -184,9 +184,9 @@ describe('the account ledger row menus', () => {
   it('offers a mined day only what its status allows: a paid day can be repriced, not dismissed', async () => {
     const calls = renderLedger(running());
     fireEvent.contextMenu(rowOf(/^Moon mining/));
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Change rate…' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Change rate' }));
     await vi.waitFor(() => expect(calls[0]).toMatch(/^rate:/));
-    expect(screen.queryByRole('menuitem', { name: 'Dismiss tax…' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: 'Dismiss tax' })).toBeNull();
   });
 
   it('has no menu without edit rights', () => {
