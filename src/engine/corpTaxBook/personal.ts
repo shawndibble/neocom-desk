@@ -1516,6 +1516,7 @@ export function overlayCorpBooks(input: {
       lostBy.set(minerId, (lostBy.get(minerId) ?? 0) + d.amount);
     }
     const open = openNow();
+    const reductions: [BookRowView, number][] = [];
     /** Per Miner: the days the uncredited money paid while it counted, oldest first. */
     const unlinked = new Map<string, BookRowView[]>();
     for (const minerId of new Set([...ahead.keys(), ...lostBy.keys()])) {
@@ -1552,13 +1553,14 @@ export function overlayCorpBooks(input: {
       let spare = Math.min(p.credit.get(minerId) ?? 0, left);
       // On a running account the book's money reduces the oldest unpaid day, as its allocator
       // does, so only a true overpayment is left as credit.
+      // Applied after the uncredited donations below, which read the days' original amounts.
       if (p.book.runningAccountFrom !== undefined) {
         for (const row of [...own].sort(byDateThenId)) {
           if (spare <= 0) break;
           if (paid.has(row.id) || row.held) continue;
           const take = Math.min(spare, row.taxOwed ?? 0);
           if (take <= 0) continue;
-          row.taxOwed = (row.taxOwed ?? 0) - take;
+          reductions.push([row, take]);
           spare -= take;
         }
       }
@@ -1603,6 +1605,15 @@ export function overlayCorpBooks(input: {
       return { ...d, covered: rows.map((r) => r.date) };
     });
     uncreditedByBook.set(p.book.corporationId, uncredited);
+    for (const [row, take] of reductions) {
+      row.taxOwed = (row.taxOwed ?? 0) - take;
+      // A day the book's money covers to the last ISK is Paid, not a Billed row owing nothing.
+      if (row.taxOwed < 0.01) {
+        row.taxOwed = 0;
+        row.state = 'paid';
+        row.settledBy = 'credit';
+      }
+    }
     // Whatever settled the day, the member's own paid mark under the corporation's Payee stays
     // theirs to undo: the book row hides it, so the row has to carry it.
     const markedIds = memberPaidIds.get(p.book.corporationId);
