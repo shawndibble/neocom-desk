@@ -191,6 +191,22 @@ describe('PlayersView', () => {
     expect(screen.getByRole('menuitem', { name: 'Remove from Player' })).toBeInTheDocument();
   });
 
+  it('every character row menu carries Show info: Player, alt, outside character and loose member', async () => {
+    renderView();
+    await menuOf('Lena Voss');
+    expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    await menuOf('Kestrel Vane');
+    expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(rowOf('Kestrel Vane'));
+    await menuOf('Vane Hauler');
+    expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    await menuOf('Outer Rim Vane');
+    expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+  });
+
   it('a loose member keeps Group with…', async () => {
     renderView();
     await menuOf('Lena Voss');
