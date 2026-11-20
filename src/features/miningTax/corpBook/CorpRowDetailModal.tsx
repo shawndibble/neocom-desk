@@ -355,6 +355,31 @@ export function CorpRowDetailModal({
             </p>
           )}
 
+          {view.paidIsk !== undefined && view.paidIsk >= 1 && (view.taxOwed ?? 0) > 0 && (
+            <p className="text-xs text-text-dim tabular-nums">
+              {t('miningTax.corpBook.detail.partPaid', {
+                billed: formatIsk(view.billed),
+                paid: formatIsk(view.paidIsk),
+                owes: formatIsk(view.taxOwed ?? 0),
+              })}
+            </p>
+          )}
+
+          {view.forgivenIsk !== undefined && view.forgivenIsk >= 1 && (
+            <p className="text-xs text-text-dim tabular-nums">
+              {t('miningTax.corpBook.detail.forgiven', { amount: formatIsk(view.forgivenIsk) })}
+            </p>
+          )}
+
+          {view.reversedCorrections?.map((r, i) => (
+            <p key={i} className="rounded-xs border border-line p-2 text-xs text-text-dim">
+              <span className="line-through decoration-text-faint">
+                {formatIsk(r.amount)} ({r.reason})
+              </span>{' '}
+              {t('miningTax.corpBook.detail.reversedTag')}: {r.reversedReason}
+            </p>
+          ))}
+
           {!conflict && notice}
 
           {view.dispute && (

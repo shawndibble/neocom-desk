@@ -71,7 +71,8 @@ const exempt = (date: string, forgive: number): ToleranceExemption => ({
 function both(
   payments: ReturnType<typeof pay>[],
   adjustments: Adjustment[],
-  toleranceExemptions: ToleranceExemption[] = []
+  toleranceExemptions: ToleranceExemption[] = [],
+  paidThrough?: string
 ) {
   const corp = buildBookView({
     corporationId: CORP,
@@ -98,6 +99,7 @@ function both(
     paidStatementIds: new Set(),
     pricesOn,
     runningAccountFrom,
+    ...(paidThrough ? { minerPaidThrough: new Map([[MINER, paidThrough]]) } : {}),
   }).miners[0];
   const personal: PersonalBook = {
     corporationId: CORP,
@@ -117,6 +119,7 @@ function both(
     pricesOn,
     inFlight: [],
     runningAccountFrom,
+    ...(paidThrough ? { minerPaidThrough: new Map([[MINER, paidThrough]]) } : {}),
   };
   const mine = overlayCorpBooks({ entries, books: [personal], now: NOW }).books[0];
   return {
@@ -165,6 +168,51 @@ describe('reversals and exemptions, on both pages', () => {
   it('forgives only what an officer names, and owes the rest', () => {
     const { corp, personal } = both([pay(221_500)], [], [exempt('2026-10-15', 200)]);
     expect(corp).toEqual({ owed: 222_300, credit: 0 });
+    expect(personal).toEqual(corp);
+  });
+});
+
+describe('a day the book recorded paid, on both pages', () => {
+  const through = '2026-10-16';
+  it('forgives late shortfall on recorded-paid days', () => {
+    const { corp, personal } = both([], [], [], through);
+    expect(corp).toEqual({ owed: 0, credit: 0 });
+    expect(personal).toEqual(corp);
+  });
+  it('pays a recorded-paid day from the payment that paid it, so nothing is left over as credit', () => {
+    const { corp, personal } = both([pay(444_000)], [], [], through);
+    expect(corp).toEqual({ owed: 0, credit: 0 });
+    expect(personal).toEqual(corp);
+  });
+  it('keeps an officer charge on a recorded-paid day owed', () => {
+    const { corp, personal } = both([], [adjust('a', '2026-10-15', 300_000)], [], through);
+    expect(corp).toEqual({ owed: 300_000, credit: 0 });
+    expect(personal).toEqual(corp);
+  });
+  it('keeps the charge pooled when the day that carried it was paid and a later day is short', () => {
+    // 15 Oct is 222,000 plus a 300,000 charge, paid in full; 16 Oct is unpaid and recorded paid.
+    const { corp, personal } = both(
+      [pay(522_000)],
+      [adjust('a', '2026-10-15', 300_000)],
+      [],
+      through
+    );
+    expect(corp).toEqual({ owed: 222_000, credit: 0 });
+    expect(personal).toEqual(corp);
+  });
+  it('spreads a charge over the recorded-paid days that ended short', () => {
+    const { corp, personal } = both(
+      [pay(400_000)],
+      [adjust('a', '2026-10-15', 300_000)],
+      [],
+      through
+    );
+    expect(corp).toEqual({ owed: 300_000, credit: 0 });
+    expect(personal).toEqual(corp);
+  });
+  it('lets an exemption override the recorded-paid day', () => {
+    const { corp, personal } = both([pay(221_500)], [], [exempt('2026-10-15', 0)], through);
+    expect(corp).toEqual({ owed: 500, credit: 0 });
     expect(personal).toEqual(corp);
   });
 });

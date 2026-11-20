@@ -9,6 +9,7 @@ import {
   readMiner,
   readPayment,
   readStatement,
+  readToleranceExemption,
   readWriteOff,
 } from '@/engine/corpTaxBook/docShapes';
 import { RUNNING_ACCOUNTS_FROM } from '@/engine/corpTaxBook/bookDocs';
@@ -304,5 +305,54 @@ describe('the miner-side copies (#4622)', () => {
         {},
       ])
     ).toEqual({ 1000: 'Ikao - Moon Drill', 3000: 'Ikao - Second Drill' });
+  });
+});
+
+describe('reversals, opening balances, exemptions and paid-through', () => {
+  const adjustment = {
+    minerId: 'solo:1',
+    date: '2026-10-05',
+    amount: 5,
+    reason: 'x',
+    by: 2,
+    at: 't',
+  };
+  it('reads an Adjustment’s reversal, opening kind and replacement, and ignores a malformed stamp', () => {
+    expect(
+      readAdjustment('a1', {
+        ...adjustment,
+        reversed: { by: 2, at: '2026-10-06T00:00:00Z', reason: 'Twice' },
+        kind: 'opening',
+        replaces: 'a0',
+      })
+    ).toMatchObject({
+      reversed: { by: 2, at: '2026-10-06T00:00:00Z', reason: 'Twice' },
+      kind: 'opening',
+      replaces: 'a0',
+    });
+    expect(readAdjustment('a1', { ...adjustment, reversed: {} })).not.toHaveProperty('reversed');
+    expect(readAdjustment('a1', { ...adjustment, kind: 'other' })).not.toHaveProperty('kind');
+  });
+
+  it('reads a write-off’s reversal', () => {
+    const base = { minerId: 'solo:1', amount: 5, at: 't', reason: 'x' };
+    expect(
+      readWriteOff('w1', { ...base, reversed: { by: 2, at: 'u', reason: 'Back' } })
+    ).toMatchObject({ reversed: { by: 2, at: 'u', reason: 'Back' } });
+    expect(readWriteOff('w1', base)).not.toHaveProperty('reversed');
+  });
+
+  it('reads a tolerance exemption, and skips a malformed one', () => {
+    const doc = { minerId: 'solo:1', date: '2026-10-05', forgive: 0, reason: 'x', by: 2, at: 't' };
+    expect(readToleranceExemption('x1', doc)).toMatchObject({ forgive: 0, date: '2026-10-05' });
+    expect(readToleranceExemption('x1', { ...doc, forgive: -1 })).toBeNull();
+    expect(readToleranceExemption('x1', { ...doc, date: undefined })).toBeNull();
+  });
+
+  it('reads a Miner’s paid-through day when present', () => {
+    expect(readMiner('m1', { characterIds: [1], paidThrough: '2026-10-10' })?.paidThrough).toBe(
+      '2026-10-10'
+    );
+    expect(readMiner('m1', { characterIds: [1] })).not.toHaveProperty('paidThrough');
   });
 });
