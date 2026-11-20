@@ -697,6 +697,56 @@ describe('recordCorpPayment', () => {
     expect(paid.map((a) => [a.date, a.status])).toEqual([['2026-09-04', 'paid']]);
   });
 
+  it('records only the share of the day a short payment pays, so the rest stays owed', async () => {
+    const result = await recordCorpPayment(CORP, [bookRow()], { ...PAYMENT, amount: 60 });
+
+    expect(result.ok).toBe(true);
+    const [part] = await db.miningTaxAssignments.toArray();
+    expect(part).toMatchObject({
+      status: 'paid',
+      oreLines: [{ typeId: ORE, quantity: 60 }],
+      taxOwed: 60,
+    });
+  });
+
+  it("counts a payment within the book's day tolerance as paying the whole day", async () => {
+    const row = bookRow({ taxOwed: 1_000_000, billed: 1_000_000 });
+    await recordCorpPayment(CORP, [row], { ...PAYMENT, amount: 999_900 });
+
+    const [paid] = await db.miningTaxAssignments.toArray();
+    expect(paid).toMatchObject({ status: 'paid', oreLines: [{ typeId: ORE, quantity: 100 }] });
+  });
+
+  it('spends no payment on a row that never lined up with a ledger entry', async () => {
+    await recordCorpPayment(
+      CORP,
+      [
+        bookRow({ id: 'book:0', date: '2026-09-03', solarSystemId: 0 }),
+        bookRow({ id: 'book:1', date: '2026-09-04' }),
+      ],
+      { ...PAYMENT, amount: 100 }
+    );
+
+    const all = await db.miningTaxAssignments.toArray();
+    expect(all).toHaveLength(1);
+    expect(all[0]).toMatchObject({ date: '2026-09-04', taxOwed: 100, status: 'paid' });
+  });
+
+  it('pays the covered days whole and part-pays the next one with what is left', async () => {
+    await recordCorpPayment(
+      CORP,
+      [
+        bookRow({ id: 'book:1', date: '2026-09-04' }),
+        bookRow({ id: 'book:2', date: '2026-09-05' }),
+      ],
+      { ...PAYMENT, amount: 130 }
+    );
+
+    const byDate = new Map((await db.miningTaxAssignments.toArray()).map((a) => [a.date, a]));
+    expect(byDate.get('2026-09-04')).toMatchObject({ taxOwed: 100, status: 'paid' });
+    expect(byDate.get('2026-09-05')).toMatchObject({ taxOwed: 30, status: 'paid' });
+  });
+
   it('records two rows on one entry (two refineries, same ore) in full, each once', async () => {
     const result = await recordCorpPayment(CORP, [
       bookRow({
