@@ -123,6 +123,6 @@ test('moons sandbox', async ({ page }) => {
       body: JSON.stringify({ result: answer }),
     });
   });
-  await signInAndGoto(page, './corp/moons', scopes);
+  await signInAndGoto(page, './corp/members', scopes);
   await page.waitForEvent('close', { timeout: 0 });
 });
