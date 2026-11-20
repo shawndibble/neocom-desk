@@ -25,6 +25,45 @@ const book = (over: Partial<CorpBookViewBook['summary']> = {}, rest = {}): CorpB
     ...rest,
   }) as unknown as CorpBookViewBook;
 
+describe('CorpBookSyncNote opening balance', () => {
+  const opening = (amount: number, reversed = false) =>
+    ({
+      id: 'o1',
+      minerId: 'solo:1',
+      date: '2026-10-01',
+      amount,
+      reason: 'x',
+      by: 1,
+      at: '2026-10-02T00:00:00Z',
+      kind: 'opening',
+      ...(reversed ? { reversed: { by: 1, at: '2026-10-03T00:00:00Z', reason: 'x' } } : {}),
+    }) as never;
+  const withOpening = (amount: number, reversed = false) =>
+    book({}, { loaded: { graceHours: 6, adjustments: [opening(amount, reversed)] } });
+
+  it('says the balance rolled over from the old system, owing or credit', () => {
+    const { rerender } = render(
+      <CorpBookSyncNote book={withOpening(4_200_000)} owedNow={0} now={NOW} />
+    );
+    expect(
+      screen.getByText(
+        'Opening balance from the old system: you owe Brass Meridian Logistics 4,200,000 ISK.'
+      )
+    ).toBeInTheDocument();
+    rerender(<CorpBookSyncNote book={withOpening(-900_000)} owedNow={0} now={NOW} />);
+    expect(
+      screen.getByText(
+        'Opening balance from the old system: Brass Meridian Logistics holds 900,000 ISK credit for you.'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('leaves out one an officer reversed', () => {
+    render(<CorpBookSyncNote book={withOpening(4_200_000, true)} owedNow={0} now={NOW} />);
+    expect(screen.queryByText(/Opening balance from the old system/)).not.toBeInTheDocument();
+  });
+});
+
 describe('CorpBookSyncNote', () => {
   it('says Safe to pay with the closed day once a sync after the grace period closed it', () => {
     render(<CorpBookSyncNote book={book()} owedNow={957_001} now={NOW} />);

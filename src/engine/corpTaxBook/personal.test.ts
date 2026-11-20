@@ -1215,6 +1215,48 @@ describe('overlayCorpBooks', () => {
           book({ observed, adjustments, runningAccountFrom: '2026-10-01T00:00:00Z' }),
         ]).books[0];
 
+      it('explains a part-paid day, a forgiven shortfall and a reversed correction on its row', () => {
+        const rowsOf = (payments: ReturnType<typeof withPayments>, adjustments = [] as never[]) =>
+          overlay(entries, [
+            book({
+              observed,
+              payments,
+              adjustments,
+              runningAccountFrom: '2026-10-01T00:00:00Z',
+            }),
+          ]).rows;
+        const pay = (amount: number) => ({
+          id: 'p1',
+          minerId: `solo:${ME}`,
+          characterId: ME,
+          amount,
+          at: '2026-10-18T13:10:00Z',
+          source: 'donation' as const,
+        });
+        const withPayments = (amount: number) => [pay(amount)];
+        // 100,000 of the oldest 222,000 day: part paid.
+        const part = rowsOf(withPayments(100_000)).find((r) => r.date === '2026-10-15')!;
+        expect(part).toMatchObject({ paidIsk: 100_000, taxOwed: 122_000, billed: 222_000 });
+        // 221,500 pays it within tolerance: 500 forgiven.
+        const closed = rowsOf(withPayments(221_500)).find((r) => r.date === '2026-10-15')!;
+        expect(closed).toMatchObject({ state: 'paid', forgivenIsk: 500 });
+        // A reversed correction changes nothing and stays on the day.
+        const reversed = adjust('a', '2026-10-15', 300_000);
+        const day = rowsOf(
+          [],
+          [
+            {
+              ...reversed,
+              reversed: { by: 2, at: '2026-10-18T13:20:00Z', reason: 'Twice' },
+            } as never,
+          ]
+        ).find((r) => r.date === '2026-10-15')!;
+        expect(day.taxOwed).toBe(222_000);
+        expect(day.reversedCorrections).toEqual([
+          { amount: 300_000, reason: 'Rolled over', reversedReason: 'Twice' },
+        ]);
+      });
+
       it('owes a charge dated on a day the member did not mine', () => {
         expect(withAdjustments(adjust('a', '2026-10-05', 1_000_000))).toMatchObject({
           credit: 0,

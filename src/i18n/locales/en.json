@@ -8224,7 +8224,9 @@
         "openDay": "{{date}}: safe to pay once it is closed, after {{time}} UTC on {{closeDate}} and {{corp}}'s next sync.",
         "credit": "{{amount}} ISK credit with {{corp}} goes on your next Statement.",
         "behind_one": "You owe {{corp}} {{amount}} ISK: {{count}} day, oldest {{date}}.",
-        "behind_other": "You owe {{corp}} {{amount}} ISK: {{count}} days, oldest {{date}}."
+        "behind_other": "You owe {{corp}} {{amount}} ISK: {{count}} days, oldest {{date}}.",
+        "openingOwes": "Opening balance from the old system: you owe {{corp}} {{amount}} ISK.",
+        "openingCredit": "Opening balance from the old system: {{corp}} holds {{amount}} ISK credit for you."
       },
       "diff": {
         "fixRecords": "Fix my records",
@@ -8299,7 +8301,10 @@
         },
         "disputeHint": "Your own record differs from the corp's records.",
         "corrected": "Corrected by the corporation: {{before}} → {{after}}.",
-        "reason": "Their reason: {{reasons}}"
+        "reason": "Their reason: {{reasons}}",
+        "partPaid": "Billed {{billed}} ISK · paid {{paid}} ISK · owes {{owes}} ISK.",
+        "forgiven": "{{amount}} ISK forgiven: a small shortfall the corporation closed out (a Market adjustment).",
+        "reversedTag": "Reversed by an officer"
       },
       "line": {
         "corrected": "Corrected by the corporation, was {{before}}.",

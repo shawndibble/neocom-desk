@@ -381,6 +381,39 @@ describe('CorpRowDetailModal', () => {
     expect(screen.queryByRole('button', { name: /mark as unpaid/i })).not.toBeInTheDocument();
   });
 
+  it('breaks a part-paid day into billed, paid and owes', () => {
+    renderModal({
+      corp: {
+        ...corp,
+        view: { ...view, billed: 222_000, paidIsk: 100_000, taxOwed: 122_000 },
+      },
+    });
+    expect(
+      screen.getByText('Billed 222,000 ISK · paid 100,000 ISK · owes 122,000 ISK.')
+    ).toBeInTheDocument();
+  });
+
+  it('says what a Market adjustment forgave', () => {
+    renderModal({ corp: { ...corp, view: { ...view, forgivenIsk: 1_000 } } });
+    expect(screen.getByText(/1,000 ISK forgiven: a small shortfall/)).toBeInTheDocument();
+  });
+
+  it('keeps a reversed correction in view, struck through and tagged', () => {
+    renderModal({
+      corp: {
+        ...corp,
+        view: {
+          ...view,
+          reversedCorrections: [
+            { amount: 300_000, reason: 'Auth rollover', reversedReason: 'Entered twice' },
+          ],
+        },
+      },
+    });
+    expect(screen.getByText(/300,000 \(Auth rollover\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Reversed by an officer: Entered twice/)).toBeInTheDocument();
+  });
+
   it("gives the corporation's reason for a correction (#4622)", () => {
     const corrected = {
       ...corp,
