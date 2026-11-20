@@ -106,7 +106,7 @@ async function readBookFacts(
       statementId: p.statementId ?? creditedTo.get(p.id),
     })),
     adjustments: view.input.adjustments
-      .filter((a) => a.minerId === minerId)
+      .filter((a) => a.minerId === minerId && !a.reversed)
       .map((a) => ({ id: a.id, date: a.date, at: a.at, amount: a.amount, reason: a.reason })),
     days: detail.days
       .filter((d) => d.status !== 'dismissed' && d.status !== 'not-billable')

@@ -14,7 +14,7 @@ import {
 } from '@/components/ui';
 import type { DayRow, MinerRow } from '@/engine/corpTaxBook/bookView';
 import { accountBalance, balanceAdjustment } from '@/engine/corpTaxBook/balanceAdjustment';
-import { canRebillFrom } from '@/engine/corpTaxBook/statements';
+import { canRebillFrom, type Adjustment } from '@/engine/corpTaxBook/statements';
 import { DialogShell, Effect, Label } from './BookDialogs';
 import { dateWithYear, isk, shortDate } from './moonsFormat';
 import { useBook } from './useBook';
@@ -108,12 +108,15 @@ export function AdjustmentDialog({
   miner,
   minerName,
   defaultDate,
+  openingDate,
 }: {
   open: boolean;
   onClose: () => void;
   miner: MinerRow;
   minerName: string;
   defaultDate: string;
+  /** Where a rolled-over balance is dated unless the officer picks another day: the book's start. */
+  openingDate?: string;
 }) {
   const { t } = useTranslation();
   const { edit } = useBook();
@@ -154,6 +157,7 @@ export function AdjustmentDialog({
           date,
           amount: signed,
           reason: reason.trim(),
+          ...(kind === 'set' ? { kind: 'opening' } : {}),
         });
       }}
     >
@@ -162,7 +166,15 @@ export function AdjustmentDialog({
         <SegmentedControl
           label={t('corpTaxBook.moons.corrections.adjust.kind')}
           value={kind}
-          onChange={setKind}
+          onChange={(next) => {
+            setKind(next);
+            // A rolled-over balance is an opening balance: dated at the book's start, and labelled so.
+            if (next === 'set') {
+              if (openingDate && date === defaultDate) setDate(openingDate);
+              if (reason.trim() === '')
+                setReason(t('corpTaxBook.moons.corrections.adjust.openingLabel'));
+            }
+          }}
           options={[
             { value: 'credit', label: t('corpTaxBook.moons.corrections.adjust.credit') },
             { value: 'charge', label: t('corpTaxBook.moons.corrections.adjust.charge') },
@@ -232,6 +244,133 @@ export function AdjustmentDialog({
         <TextArea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
       </Label>
       <Effect>{t('corpTaxBook.moons.corrections.adjust.effect')}</Effect>
+    </DialogShell>
+  );
+}
+
+/** Edits a correction: reverses it and adds the new one, the old staying on the record (struck through). */
+export function EditCorrectionDialog({
+  open,
+  onClose,
+  adjustment,
+  minerName,
+}: {
+  open: boolean;
+  onClose: () => void;
+  adjustment: Adjustment;
+  minerName: string;
+}) {
+  const { t } = useTranslation();
+  const { edit } = useBook();
+  const [kind, setKind] = useState<'charge' | 'credit'>(
+    adjustment.amount < 0 ? 'credit' : 'charge'
+  );
+  const [amount, setAmount] = useState(String(Math.abs(adjustment.amount)));
+  const [date, setDate] = useState(adjustment.date);
+  const [reason, setReason] = useState(adjustment.reason);
+  const value = Number(amount);
+  return (
+    <DialogShell
+      open={open}
+      onClose={onClose}
+      title={t('corpTaxBook.moons.ledger.dialogs.editCorrection.title', { name: minerName })}
+      confirmLabel={t('corpTaxBook.moons.ledger.dialogs.editCorrection.confirm')}
+      canConfirm={value > 0 && date !== '' && reason.trim().length > 0}
+      run={async () => {
+        await edit({
+          action: 'editAdjustment',
+          adjustmentId: adjustment.id,
+          date,
+          amount: kind === 'credit' ? -value : value,
+          reason: reason.trim(),
+        });
+      }}
+    >
+      <p className="text-text-dim">{t('corpTaxBook.moons.ledger.dialogs.editCorrection.intro')}</p>
+      <Label text={t('corpTaxBook.moons.corrections.adjust.kind')}>
+        <SegmentedControl
+          label={t('corpTaxBook.moons.corrections.adjust.kind')}
+          value={kind}
+          onChange={setKind}
+          options={[
+            { value: 'credit', label: t('corpTaxBook.moons.corrections.adjust.credit') },
+            { value: 'charge', label: t('corpTaxBook.moons.corrections.adjust.charge') },
+          ]}
+          uppercase={false}
+        />
+      </Label>
+      <Label text={t('corpTaxBook.moons.corrections.adjust.amount')}>
+        <IskInput
+          value={amount}
+          onChange={setAmount}
+          aria-label={t('corpTaxBook.moons.corrections.adjust.amount')}
+        />
+      </Label>
+      <Label text={t('corpTaxBook.moons.corrections.adjust.date')}>
+        <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        {date !== '' && <DateReadback date={date} />}
+      </Label>
+      <Label text={t('corpTaxBook.moons.corrections.adjust.label')}>
+        <TextArea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
+      </Label>
+    </DialogShell>
+  );
+}
+
+/** Changes how much of a Miner's one day shortfall the book forgives (a Market adjustment). */
+export function MarketAdjustmentDialog({
+  open,
+  onClose,
+  minerId,
+  date,
+  forgiven,
+}: {
+  open: boolean;
+  onClose: () => void;
+  minerId: string;
+  /** The mined day whose shortfall it governs. */
+  date: string;
+  /** What the book forgave of it. */
+  forgiven: number;
+}) {
+  const { t } = useTranslation();
+  const { edit } = useBook();
+  const [amount, setAmount] = useState(String(Math.round(forgiven)));
+  const [reason, setReason] = useState('');
+  const value = Number(amount);
+  return (
+    <DialogShell
+      open={open}
+      onClose={onClose}
+      title={t('corpTaxBook.moons.ledger.dialogs.marketEdit.title')}
+      confirmLabel={t('corpTaxBook.moons.ledger.dialogs.marketEdit.confirm')}
+      canConfirm={amount.trim() !== '' && value >= 0 && reason.trim().length > 0}
+      run={async () => {
+        await edit({
+          action: 'setToleranceExemption',
+          minerId,
+          date,
+          forgive: value,
+          reason: reason.trim(),
+        });
+      }}
+    >
+      <p className="text-text-dim">
+        {t('corpTaxBook.moons.ledger.dialogs.marketEdit.intro', {
+          date: dateWithYear(date),
+          amount: isk(forgiven),
+        })}
+      </p>
+      <Label text={t('corpTaxBook.moons.ledger.dialogs.marketEdit.amount')}>
+        <IskInput
+          value={amount}
+          onChange={setAmount}
+          aria-label={t('corpTaxBook.moons.ledger.dialogs.marketEdit.amount')}
+        />
+      </Label>
+      <Label text={t('corpTaxBook.moons.ledger.dialogs.reasonLabel')}>
+        <TextArea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
+      </Label>
     </DialogShell>
   );
 }
