@@ -1156,6 +1156,54 @@ describe('accountLedger', () => {
     expect(l.balance).toBe(0);
   });
 
+  it('ties out when an officer writes off a running account with no Statement', () => {
+    const view = buildBookView({
+      ...running([pay('a', 100_000, '2026-09-17T10:00:00Z')]),
+      writeOffs: [
+        {
+          id: 'w1',
+          minerId: 'solo:1',
+          amount: 200_000,
+          reason: 'Left the corp',
+          at: '2026-09-18T10:00:00Z',
+        },
+      ],
+    });
+    const l = ledgerOf(view);
+    expect(l.entries.some((e) => e.kind === 'writeOff')).toBe(true);
+    expect(l.balance).toBe(view.miners[0].owed - view.miners[0].credit);
+  });
+
+  it('keeps a day an open dispute holds out of the ledger balance', () => {
+    const view = buildBookView({
+      ...running([]),
+      disputes: [
+        {
+          id: 'd1',
+          kind: 'notPaying',
+          reason: 'x',
+          minerId: 'solo:1',
+          date: '2026-09-16',
+          lines: [{ recordKey: '1:1001:2026-09-16', typeId: ORE, quantity: 1, payeeName: 'x' }],
+          by: 1,
+          at: '2026-09-17T00:00:00Z',
+        },
+      ],
+    });
+    const l = ledgerOf(view);
+    expect(l.entries.some((e) => e.date === '2026-09-16')).toBe(false);
+    expect(l.balance).toBe(view.miners[0].owed - view.miners[0].credit);
+  });
+
+  it('ties out when a day is recorded paid with no payment behind it', () => {
+    const view = buildBookView({
+      ...running([]),
+      minerPaidThrough: new Map([['solo:1', '2026-09-16']]),
+    });
+    const l = ledgerOf(view);
+    expect(l.balance).toBe(view.miners[0].owed - view.miners[0].credit);
+  });
+
   it('gives each day a tolerance forgave its own dated row, tying out to the account', () => {
     // Day 15 is 100,000 and day 16 is 200,000. Paying 299,000 leaves day 16 1,000 short (0.5%).
     const view = buildBookView(running([pay('a', 299_000, '2026-09-17T10:00:00Z')]));

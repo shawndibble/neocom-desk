@@ -65,6 +65,8 @@ export function accountLedger(
   // A running account owes every billable day not yet on a Statement; a Statement-era book waits
   // for the Statement to bill it.
   const billed = new Map<string, { debit: number; days: number; keys: string[] }>();
+  // A date an open dispute holds is not billed yet, so it stays out of the balance.
+  const held = new Set(detail.heldDays);
   for (const d of detail.days) {
     if (d.tax <= 0) continue;
     // A day an officer forgave off a Statement was billed first; the write-off is its credit.
@@ -73,7 +75,7 @@ export function accountLedger(
       d.status === 'paid' ||
       d.status === 'on-statement' ||
       forgivenOnStatement ||
-      (running && d.status === 'unbilled');
+      (running && d.status === 'unbilled' && !held.has(d.date));
     if (owedNow) {
       const held = billed.get(d.date) ?? { debit: 0, days: 0, keys: [] };
       held.debit += d.tax;

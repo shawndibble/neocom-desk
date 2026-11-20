@@ -125,9 +125,11 @@ export function AccountLedger({
       <p className="px-3 py-2 text-sm text-text-dim">
         {e.kind === 'tolerance'
           ? t(
-              e.note !== undefined && e.date > e.note
-                ? 'corpTaxBook.moons.ledger.toleranceNoteLater'
-                : 'corpTaxBook.moons.ledger.toleranceNote'
+              // `note` is the mined day a running account's row closes; a Statement's has none and
+              // is always paid after it is issued.
+              e.note !== undefined && e.date <= e.note
+                ? 'corpTaxBook.moons.ledger.toleranceNote'
+                : 'corpTaxBook.moons.ledger.toleranceNoteLater'
             )
           : e.note}
       </p>

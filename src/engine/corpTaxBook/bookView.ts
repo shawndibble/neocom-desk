@@ -892,6 +892,8 @@ export interface MinerDetail {
    * each dated by the last payment that reached the day, oldest first.
    */
   dayWriteOffs: { date: string; amount: number; at: string }[];
+  /** A running account's dates an open dispute holds: not billed yet, so not in the balance. */
+  heldDays: string[];
   /** Lines recorded after payment, never billed (D22). */
   lateWriteOffs: { chargeKey: string; date: string; tax: number }[];
   /** Officer write-offs (#4637), oldest first; `amount` is what each forgave, 0 when nothing was left. */
@@ -913,6 +915,30 @@ function dayWriteOffsOf(inner: MinerInternals): MinerDetail['dayWriteOffs'] {
   for (const [date, d] of inner.running.byDay)
     if (d.writtenOff >= 1) out.push({ date, amount: d.writtenOff, at: closedAt.get(date) ?? date });
   return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * Each officer write-off with what it forgave: of Statements (`writeOffCredits`), then, on a running
+ * account, of days when it names no Statement. The days' total is shared out oldest write-off first,
+ * each up to what it had left, as the allocator draws on them.
+ */
+function officerWriteOffsOf(
+  view: BookView,
+  minerId: string,
+  inner: MinerInternals
+): MinerDetail['officerWriteOffs'] {
+  const mine = (view.input.writeOffs ?? [])
+    .filter((w) => w.minerId === minerId)
+    .sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
+  let onDays = (inner.running?.applications.writeOffs ?? []).reduce((s, d) => s + d.amount, 0);
+  return mine.map((w) => {
+    const onStatements = inner.allocation.writeOffCredits
+      .filter((c) => c.writeOffId === w.id)
+      .reduce((s, c) => s + c.amount, 0);
+    const forDays = w.statementId ? 0 : Math.min(onDays, Math.max(0, w.amount - onStatements));
+    onDays -= forDays;
+    return { id: w.id, amount: onStatements + forDays, reason: w.reason, at: w.at };
+  });
 }
 
 export function minerDetail(view: BookView, minerId: string): MinerDetail | undefined {
@@ -938,22 +964,13 @@ export function minerDetail(view: BookView, minerId: string): MinerDetail | unde
     paymentCredits: inner.allocation.paymentCredits,
     toleranceWriteOffs: inner.allocation.writeOffs,
     dayWriteOffs: dayWriteOffsOf(inner),
+    heldDays: [...(inner.running?.byDay ?? [])].filter(([, d]) => d.held).map(([date]) => date),
     lateWriteOffs: inner.draft.writtenOff.map((w) => ({
       chargeKey: w.chargeKey,
       date: w.date,
       tax: w.tax,
     })),
-    officerWriteOffs: (view.input.writeOffs ?? [])
-      .filter((w) => w.minerId === minerId)
-      .sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id))
-      .map((w) => ({
-        id: w.id,
-        amount: inner.allocation.writeOffCredits
-          .filter((c) => c.writeOffId === w.id)
-          .reduce((s, c) => s + c.amount, 0),
-        reason: w.reason,
-        at: w.at,
-      })),
+    officerWriteOffs: officerWriteOffsOf(view, minerId, inner),
     dismissals,
     declarations: view.input.declarations.filter((d) => statementIds.has(d.statementId)),
     credit: inner.allocation.credit,
