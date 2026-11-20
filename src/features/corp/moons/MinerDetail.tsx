@@ -53,7 +53,14 @@ import type { AuditEntry } from '../taxBook/bookClient';
 import { extractionPath, refineryPath } from './moonsPaths';
 import { Crumb, StandingWord } from './moonsParts';
 import { MinerCharacters } from './MinerCharacters';
-import { AdjustmentDialog, RateOverrideDialog, RebillDialog } from './CorrectionDialogs';
+import {
+  AdjustmentDialog,
+  EditCorrectionDialog,
+  MarketAdjustmentDialog,
+  RateOverrideDialog,
+  RebillDialog,
+} from './CorrectionDialogs';
+import type { LedgerActions } from './LedgerRowMenu';
 import { paymentWalletHref } from './paymentWalletHref';
 import { dayEndTime } from './dayEndTime';
 import { BookSection, EntityHeader, PlaceCell } from './sectionParts';
@@ -104,6 +111,11 @@ export function MinerDetail({ id }: { id: string }) {
     | { kind: 'rebill' }
     | { kind: 'notTax'; payment: Payment }
     | { kind: 'reverse'; dismissalId: string }
+    | { kind: 'editCorrection'; adjustmentId: string }
+    | { kind: 'reverseCorrection'; adjustmentId: string }
+    | { kind: 'reverseWriteOff'; writeOffId: string }
+    | { kind: 'marketCharge'; date: string; amount: number }
+    | { kind: 'marketEdit'; date: string; amount: number }
     | null
   >(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -137,7 +149,7 @@ export function MinerDetail({ id }: { id: string }) {
     () =>
       paymentLedger(
         (detail?.payments ?? []).filter((p) => inRange(p.at, from)),
-        data.adjustments.filter((a) => a.minerId === id && inRange(a.at, from))
+        data.adjustments.filter((a) => a.minerId === id && !a.reversed && inRange(a.at, from))
       ),
     [detail, data.adjustments, id, from]
   );
@@ -355,6 +367,24 @@ export function MinerDetail({ id }: { id: string }) {
     },
   ];
 
+  const ledgerActions: LedgerActions = {
+    editCorrection: (adjustmentId) => setDialog({ kind: 'editCorrection', adjustmentId }),
+    reverseCorrection: (adjustmentId) => setDialog({ kind: 'reverseCorrection', adjustmentId }),
+    reverseWriteOff: (writeOffId) => setDialog({ kind: 'reverseWriteOff', writeOffId }),
+    chargeShortfall: (e) =>
+      e.forDate && setDialog({ kind: 'marketCharge', date: e.forDate, amount: e.credit }),
+    changeForgiven: (e) =>
+      e.forDate && setDialog({ kind: 'marketEdit', date: e.forDate, amount: e.credit }),
+    markNotTax: (paymentId) => {
+      const payment = detail?.payments.find((p) => p.id === paymentId);
+      if (payment) setDialog({ kind: 'notTax', payment });
+    },
+    changeRate: (dayKey) => setDialog({ kind: 'rate', dayKey }),
+    dismissDays: (keys) => {
+      setSelected(new Set(keys));
+      setDialog({ kind: 'dismiss' });
+    },
+  };
   const dismissSelected =
     canEdit && selectedDays.length > 0 ? (
       <Button size="sm" onClick={() => setDialog({ kind: 'dismiss' })}>
@@ -780,6 +810,7 @@ export function MinerDetail({ id }: { id: string }) {
         corrections={data.adjustments.filter((a) => a.minerId === id)}
         running={running}
         phone={phone}
+        actions={ledgerActions}
       />
       {daysSection(
         t('corpTaxBook.moons.sections.stillAccruing'),
@@ -1036,6 +1067,7 @@ export function MinerDetail({ id }: { id: string }) {
           miner={row}
           minerName={name}
           defaultDate={dialog.date ?? view.billableThrough ?? data.settings.startDate}
+          openingDate={data.settings.startDate}
         />
       )}
       {dialog?.kind === 'rebill' && (
@@ -1056,6 +1088,88 @@ export function MinerDetail({ id }: { id: string }) {
           onClose={() => setDialog(null)}
           payment={dialog.payment}
           fromName={names.character(dialog.payment.characterId)}
+        />
+      )}
+      {dialog?.kind === 'editCorrection' &&
+        (() => {
+          const adjustment = data.adjustments.find((a) => a.id === dialog.adjustmentId);
+          return adjustment ? (
+            <EditCorrectionDialog
+              open
+              onClose={() => setDialog(null)}
+              adjustment={adjustment}
+              minerName={name}
+            />
+          ) : null;
+        })()}
+      {dialog?.kind === 'reverseCorrection' &&
+        (() => {
+          const adjustment = data.adjustments.find((a) => a.id === dialog.adjustmentId);
+          return adjustment ? (
+            <ReasonDialog
+              open
+              onClose={() => setDialog(null)}
+              title={t('corpTaxBook.moons.ledger.dialogs.reverseCorrection.title')}
+              intro={t('corpTaxBook.moons.ledger.dialogs.reverseCorrection.intro', {
+                amount: signedIsk(adjustment.amount),
+                date: shortDate(adjustment.date),
+              })}
+              reasonLabel={t('corpTaxBook.moons.ledger.dialogs.reasonLabel')}
+              confirmLabel={t('corpTaxBook.moons.ledger.dialogs.reverseCorrection.confirm')}
+              run={async (reason) => {
+                await edit({ action: 'reverseAdjustment', adjustmentId: adjustment.id, reason });
+              }}
+            />
+          ) : null;
+        })()}
+      {dialog?.kind === 'reverseWriteOff' &&
+        (() => {
+          const writeOff = detail.officerWriteOffs.find((w) => w.id === dialog.writeOffId);
+          return writeOff ? (
+            <ReasonDialog
+              open
+              onClose={() => setDialog(null)}
+              title={t('corpTaxBook.moons.ledger.dialogs.reverseWriteOff.title')}
+              intro={t('corpTaxBook.moons.ledger.dialogs.reverseWriteOff.intro', {
+                amount: isk(writeOff.amount),
+              })}
+              reasonLabel={t('corpTaxBook.moons.ledger.dialogs.reasonLabel')}
+              confirmLabel={t('corpTaxBook.moons.ledger.dialogs.reverseWriteOff.confirm')}
+              run={async (reason) => {
+                await edit({ action: 'reverseWriteOff', writeOffId: writeOff.id, reason });
+              }}
+            />
+          ) : null;
+        })()}
+      {dialog?.kind === 'marketCharge' && (
+        <ReasonDialog
+          open
+          onClose={() => setDialog(null)}
+          title={t('corpTaxBook.moons.ledger.dialogs.marketCharge.title')}
+          intro={t('corpTaxBook.moons.ledger.dialogs.marketCharge.intro', {
+            amount: isk(dialog.amount),
+            date: shortDate(dialog.date),
+          })}
+          reasonLabel={t('corpTaxBook.moons.ledger.dialogs.reasonLabel')}
+          confirmLabel={t('corpTaxBook.moons.ledger.dialogs.marketCharge.confirm')}
+          run={async (reason) => {
+            await edit({
+              action: 'setToleranceExemption',
+              minerId: id,
+              date: dialog.date,
+              forgive: 0,
+              reason,
+            });
+          }}
+        />
+      )}
+      {dialog?.kind === 'marketEdit' && (
+        <MarketAdjustmentDialog
+          open
+          onClose={() => setDialog(null)}
+          minerId={id}
+          date={dialog.date}
+          forgiven={dialog.amount}
         />
       )}
       {dialog?.kind === 'reverse' && (

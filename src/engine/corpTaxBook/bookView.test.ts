@@ -1200,6 +1200,39 @@ describe('accountLedger', () => {
     expect(l.balance).toBe(view.miners[0].owed - view.miners[0].credit);
   });
 
+  it('tells each row what record it is, so a menu can act on it', () => {
+    const adjustment = {
+      id: 'c1',
+      minerId: 'solo:1',
+      date: '2026-09-16',
+      amount: 300_000,
+      reason: 'Rolled over',
+      by: 2,
+      at: '2026-09-20T10:00:00Z',
+      kind: 'opening' as const,
+    };
+    const view = buildBookView({
+      ...running([pay('a', 99_700, '2026-09-15T10:00:00Z')]),
+      adjustments: [adjustment],
+    });
+    const detail = minerDetail(view, 'solo:1')!;
+    const rows = accountLedger(detail, [adjustment], true).entries;
+    expect(rows.find((e) => e.kind === 'correction')).toMatchObject({
+      refId: 'c1',
+      opening: true,
+    });
+    expect(rows.find((e) => e.kind === 'correction')?.locked).toBeUndefined();
+    expect(rows.find((e) => e.kind === 'tolerance')?.forDate).toBe('2026-09-15');
+    // A Statement that billed the correction freezes it.
+    const billed = {
+      ...detail,
+      statements: [{ id: 's1', lines: [{ kind: 'correction', adjustmentId: 'c1' }] } as never],
+    };
+    expect(
+      accountLedger(billed, [adjustment], true).entries.find((e) => e.kind === 'correction')?.locked
+    ).toBe(true);
+  });
+
   it('does not let a reversed write-off take the forgiveness of a live one after it', () => {
     const base = { minerId: 'solo:1', amount: 100_000, reason: 'Left the corp' };
     const reversed = {

@@ -18792,7 +18792,50 @@
           "paymentFrom": "Payment from {{name}}",
           "correction": "Correction: {{reason}}",
           "writeOff": "Written off: {{reason}}",
-          "tolerance": "Market adjustment"
+          "tolerance": "Market adjustment",
+          "opening": "Opening balance: {{reason}}",
+          "reversedTag": "reversed",
+          "reversal": "Reversal: {{reason}}"
+        },
+        "menu": {
+          "correctionEdit": "Edit correction",
+          "correctionReverse": "Reverse correction",
+          "correctionLocked": "A Statement already billed this correction. Add an opposite correction instead.",
+          "writeOffReverse": "Reverse write-off",
+          "marketCharge": "Charge this shortfall",
+          "marketEdit": "Change amount forgiven",
+          "notTax": "Mark part not tax",
+          "rate": "Change rate",
+          "dismiss": "Dismiss tax"
+        },
+        "dialogs": {
+          "reasonLabel": "Why",
+          "reverseCorrection": {
+            "title": "Reverse this correction?",
+            "intro": "{{amount}} dated {{date}}. It stays on the record, struck through, and stops counting.",
+            "confirm": "Reverse correction"
+          },
+          "reverseWriteOff": {
+            "title": "Reverse this write-off?",
+            "intro": "{{amount}} was written off. It stays on the record, struck through, and the Miner owes it again.",
+            "confirm": "Reverse write-off"
+          },
+          "marketCharge": {
+            "title": "Charge this shortfall?",
+            "intro": "{{amount}} of {{date}}'s tax was forgiven. Charging it means the Miner owes it again; it is not forgiven again.",
+            "confirm": "Charge it"
+          },
+          "marketEdit": {
+            "title": "Change what is forgiven",
+            "intro": "{{date}} closed {{amount}} short. Set the most the book may forgive; the rest is owed.",
+            "amount": "Forgive up to",
+            "confirm": "Save"
+          },
+          "editCorrection": {
+            "title": "Edit {{name}}'s correction",
+            "intro": "Reverses this correction and adds the new one. The old one stays, struck through.",
+            "confirm": "Save changes"
+          }
         },
         "oreOf": "Ore mined {{date}}",
         "paidBy": "{{name}} · {{source}}",
@@ -19740,6 +19783,7 @@
           "credit": "Credit them",
           "charge": "Charge them",
           "set": "Set balance",
+          "openingLabel": "Opening balance from the old system",
           "setSide": "They",
           "owes": "Owe",
           "holdsCredit": "Hold credit",
@@ -20204,6 +20248,7 @@
         "target": "Target",
         "reversedBy": "Reversed by",
         "reversedAt": "Reversed at",
+        "reversedReason": "Reversal reason",
         "mainCharacter": "Main character",
         "mainCharacterId": "Main character ID",
         "characters": "Characters",

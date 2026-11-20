@@ -1,9 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, type ReactElement } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { oreTaxLines } from '@/engine/corpTaxBook/bookSections';
-import { DataTable, type DataTableColumn } from '@/components/ui';
+import { DataTable, useOpenAfterMenu, type DataTableColumn } from '@/components/ui';
 import {
   accountLedger,
   type LedgerEntry,
@@ -11,6 +11,8 @@ import {
 } from '@/engine/corpTaxBook/accountLedger';
 import type { MinerDetail } from '@/engine/corpTaxBook/bookView';
 import type { Adjustment } from '@/engine/corpTaxBook/statements';
+import { canOverrideDay } from './dayEligibility';
+import { LedgerRowMenu, type LedgerActions } from './LedgerRowMenu';
 import { isk, shortDate } from './moonsFormat';
 import { OreLinesTable } from './OreLinesTable';
 import { extractionPath, refineryPath } from './moonsPaths';
@@ -29,19 +31,55 @@ export function AccountLedger({
   corrections,
   running,
   phone,
+  actions,
 }: {
   detail: MinerDetail;
   corrections: readonly Adjustment[];
   running: boolean;
   phone: boolean;
+  /** What a row's menu opens; without it the rows have no menu. */
+  actions?: LedgerActions;
 }) {
   const { t } = useTranslation();
   const { names } = useBook();
+  const { run, onCloseAutoFocus } = useOpenAfterMenu();
+  // Each opens its dialog once the menu has closed, so focus lands in the dialog.
+  const opened: LedgerActions | undefined = actions && {
+    editCorrection: (id) => run(() => actions.editCorrection(id)),
+    reverseCorrection: (id) => run(() => actions.reverseCorrection(id)),
+    reverseWriteOff: (id) => run(() => actions.reverseWriteOff(id)),
+    chargeShortfall: (e) => run(() => actions.chargeShortfall(e)),
+    changeForgiven: (e) => run(() => actions.changeForgiven(e)),
+    markNotTax: (id) => run(() => actions.markNotTax(id)),
+    changeRate: (key) => run(() => actions.changeRate(key)),
+    dismissDays: (keys) => run(() => actions.dismissDays(keys)),
+  };
   const ledger: Ledger = useMemo(
     () => accountLedger(detail, corrections, running),
     [detail, corrections, running]
   );
   const rows = useMemo(() => [...ledger.entries].reverse(), [ledger]);
+
+  /** The mined days behind a day row, with their status: what can still be changed on them. */
+  const daysOf = (e: LedgerEntry) => {
+    const keys = new Set(e.dayKeys);
+    return detail.days.filter((d) => keys.has(d.key));
+  };
+
+  /** A record an officer undid keeps its row, struck through and tagged; its reversal says why. */
+  const undone = (e: LedgerEntry, label: string) =>
+    e.reversal ? (
+      t('corpTaxBook.moons.ledger.what.reversal', { reason: e.note })
+    ) : e.reversed ? (
+      <span>
+        <span className="text-text-dim line-through decoration-text-faint">{label}</span>{' '}
+        <span className="text-xs text-text-dim">
+          {t('corpTaxBook.moons.ledger.what.reversedTag')}
+        </span>
+      </span>
+    ) : (
+      label
+    );
 
   const what = (e: LedgerEntry) => {
     switch (e.kind) {
@@ -86,9 +124,14 @@ export function AccountLedger({
         );
       }
       case 'correction':
-        return t('corpTaxBook.moons.ledger.what.correction', { reason: e.note });
+        return undone(
+          e,
+          e.opening
+            ? t('corpTaxBook.moons.ledger.what.opening', { reason: e.note })
+            : t('corpTaxBook.moons.ledger.what.correction', { reason: e.note })
+        );
       case 'writeOff':
-        return t('corpTaxBook.moons.ledger.what.writeOff', { reason: e.note });
+        return undone(e, t('corpTaxBook.moons.ledger.what.writeOff', { reason: e.note }));
       case 'tolerance':
         return t('corpTaxBook.moons.ledger.what.tolerance');
     }
@@ -213,6 +256,27 @@ export function AccountLedger({
             rows={[...shown]}
             rowKey={(e) => e.key}
             expandableRow={{ leadingIcon: true, renderDetail: detailOf }}
+            {...(opened
+              ? {
+                  rowMoreActions: true,
+                  rowContextMenu: (e: LedgerEntry, tr: ReactElement) => (
+                    <LedgerRowMenu
+                      entry={e}
+                      actions={opened}
+                      name={`${shortDate(e.date)} ${e.kind}`}
+                      rateDays={daysOf(e)
+                        .filter(canOverrideDay)
+                        .map((d) => d.key)}
+                      dismissDays={daysOf(e)
+                        .filter((d) => d.status === 'unbilled' || d.status === 'not-billable')
+                        .map((d) => d.key)}
+                      onCloseAutoFocus={onCloseAutoFocus}
+                    >
+                      {tr}
+                    </LedgerRowMenu>
+                  ),
+                }
+              : {})}
             density="compact"
             stackLayout="dense"
             {...table}
