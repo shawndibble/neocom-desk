@@ -1516,6 +1516,7 @@ export function overlayCorpBooks(input: {
       lostBy.set(minerId, (lostBy.get(minerId) ?? 0) + d.amount);
     }
     const open = openNow();
+    const reductions: [BookRowView, number][] = [];
     /** Per Miner: the days the uncredited money paid while it counted, oldest first. */
     const unlinked = new Map<string, BookRowView[]>();
     for (const minerId of new Set([...ahead.keys(), ...lostBy.keys()])) {
@@ -1549,10 +1550,21 @@ export function overlayCorpBooks(input: {
       // What the money left once the days it paid were paid: only the book's own credit counts.
       const spent = own.filter((r) => paid.has(r.id)).reduce((s, r) => s + (r.taxOwed ?? 0), 0);
       const left = Math.max(0, amount - mark - spent);
-      aheadByBook.set(
-        p.book.corporationId,
-        (aheadByBook.get(p.book.corporationId) ?? 0) + Math.min(p.credit.get(minerId) ?? 0, left)
-      );
+      let spare = Math.min(p.credit.get(minerId) ?? 0, left);
+      // On a running account the book's money reduces the oldest unpaid day, as its allocator
+      // does, so only a true overpayment is left as credit.
+      // Applied after the uncredited donations below, which read the days' original amounts.
+      if (p.book.runningAccountFrom !== undefined) {
+        for (const row of [...own].sort(byDateThenId)) {
+          if (spare <= 0) break;
+          if (paid.has(row.id) || row.held) continue;
+          const take = Math.min(spare, row.taxOwed ?? 0);
+          if (take <= 0) continue;
+          reductions.push([row, take]);
+          spare -= take;
+        }
+      }
+      aheadByBook.set(p.book.corporationId, (aheadByBook.get(p.book.corporationId) ?? 0) + spare);
       // Days the book's own credit reaches are settled by that credit; only the rest is a
       // donation the member sent that the book has not credited yet.
       const byCredit = coverInFlight(days, Math.max(0, (p.credit.get(minerId) ?? 0) - mark));
@@ -1593,6 +1605,15 @@ export function overlayCorpBooks(input: {
       return { ...d, covered: rows.map((r) => r.date) };
     });
     uncreditedByBook.set(p.book.corporationId, uncredited);
+    for (const [row, take] of reductions) {
+      row.taxOwed = (row.taxOwed ?? 0) - take;
+      // A day the book's money covers to the last ISK is Paid, not a Billed row owing nothing.
+      if (row.taxOwed < 0.01) {
+        row.taxOwed = 0;
+        row.state = 'paid';
+        row.settledBy = 'credit';
+      }
+    }
     // Whatever settled the day, the member's own paid mark under the corporation's Payee stays
     // theirs to undo: the book row hides it, so the row has to carry it.
     const markedIds = memberPaidIds.get(p.book.corporationId);
@@ -1871,7 +1892,10 @@ function applyAdjustments(
     if (p.settlement.get(s.id)?.settled)
       for (const day of statementDays(s)) paidDays.add(`${s.minerId}|${day}`);
   }
-  const byDay = new Map<string, { amount: number; reasons: string[]; parts: OwedPart[] }>();
+  const byDay = new Map<
+    string,
+    { minerId: string; date: string; amount: number; reasons: string[]; parts: OwedPart[] }
+  >();
   const seen = new Set<string>();
   const add = (
     id: string,
@@ -1885,7 +1909,7 @@ function applyAdjustments(
     seen.add(id);
     const key = `${minerId}|${date}`;
     if (statementId === undefined && amount > 0 && paidDays.has(key)) return;
-    const held = byDay.get(key) ?? { amount: 0, reasons: [], parts: [] };
+    const held = byDay.get(key) ?? { minerId, date, amount: 0, reasons: [], parts: [] };
     held.amount += amount;
     if (reason) held.reasons.push(reason);
     held.parts.push({ ...(statementId !== undefined ? { statementId } : {}), owed: amount });
@@ -1902,11 +1926,28 @@ function applyAdjustments(
     add(a.id, a.minerId, a.date, a.amount, a.reason, undefined);
   if (byDay.size === 0) return;
   const billed = rows.filter((r) => r.state === 'billed').sort(byDateThenId);
+  // A running account owes every correction, whatever day it is dated: one with no mined day to
+  // sit on is placed on the nearest billed day, and a credit no day can absorb pays the oldest
+  // days (as the book's allocator does) and then stays as credit.
+  const running = p.book.runningAccountFrom !== undefined;
+  const unplaced: { minerId: string; date: string; amount: number; reasons: string[] }[] = [];
+  const credit = new Map<string, { amount: number; reasons: string[] }>();
+  const addCredit = (minerId: string, amount: number, reasons: readonly string[]) => {
+    const held = credit.get(minerId) ?? { amount: 0, reasons: [] };
+    held.amount += amount;
+    held.reasons.push(...reasons);
+    credit.set(minerId, held);
+  };
   for (const [key, adjustment] of byDay) {
     const row = billed.find((r) => `${r.minerId}|${r.date}` === key);
-    if (!row) continue;
+    if (!row) {
+      if (running) unplaced.push(adjustment);
+      continue;
+    }
     const before = row.taxOwed ?? 0;
     const after = Math.max(0, before + adjustment.amount);
+    if (running && before + adjustment.amount < 0)
+      addCredit(adjustment.minerId, -(before + adjustment.amount), adjustment.reasons);
     row.correction = { before, after, reasons: adjustment.reasons };
     row.taxOwed = after;
     row.billed = after;
@@ -1915,6 +1956,36 @@ function applyAdjustments(
       (part) => part.owed > 0 && part.statementId !== row.statementId
     );
     if (apart.length > 0) extras.set(row, apart);
+  }
+  if (!running) return;
+  const shift = (row: BookRowView, by: number, reasons: readonly string[]) => {
+    const now = row.taxOwed ?? 0;
+    row.correction = {
+      before: row.correction?.before ?? now,
+      after: now + by,
+      reasons: [...(row.correction?.reasons ?? []), ...reasons],
+    };
+    row.taxOwed = now + by;
+    row.billed = now + by;
+  };
+  const daysOf = (minerId: string) => billed.filter((r) => r.minerId === minerId && !r.held);
+  for (const o of unplaced) {
+    const days = daysOf(o.minerId);
+    if (o.amount < 0 || days.length === 0) {
+      if (o.amount < 0) addCredit(o.minerId, -o.amount, o.reasons);
+      continue;
+    }
+    shift(days.find((r) => r.date >= o.date) ?? days.at(-1)!, o.amount, o.reasons);
+  }
+  for (const [minerId, { amount, reasons }] of credit) {
+    let left = amount;
+    for (const row of daysOf(minerId)) {
+      const take = Math.min(left, row.taxOwed ?? 0);
+      if (take <= 0) continue;
+      shift(row, -take, reasons);
+      left -= take;
+    }
+    if (left > 0) p.credit.set(minerId, (p.credit.get(minerId) ?? 0) + left);
   }
 }
 
