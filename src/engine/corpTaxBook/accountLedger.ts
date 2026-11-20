@@ -115,7 +115,7 @@ export function accountLedger(
       drafts.push({
         key: `correction-${a.id}`,
         kind: 'correction',
-        date: day(a.at),
+        date: a.date,
         at: a.at,
         debit: Math.max(0, a.amount),
         credit: Math.max(0, -a.amount),

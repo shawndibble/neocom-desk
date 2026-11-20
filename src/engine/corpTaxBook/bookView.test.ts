@@ -1195,6 +1195,29 @@ describe('accountLedger', () => {
     expect(l.balance).toBe(view.miners[0].owed - view.miners[0].credit);
   });
 
+  it('dates an officer charge by the day picked, and keeps it owed on a day recorded paid', () => {
+    const adjustments = [
+      {
+        id: 'c1',
+        minerId: 'solo:1',
+        date: '2026-09-15',
+        amount: 500_000,
+        reason: 'Auth rollover',
+        by: 2,
+        at: '2026-09-20T10:00:00Z',
+      },
+    ];
+    const view = buildBookView({
+      ...running([pay('a', 400_000, '2026-09-17T10:00:00Z')]),
+      adjustments,
+      minerPaidThrough: new Map([['solo:1', '2026-09-16']]),
+    });
+    const l = accountLedger(minerDetail(view, 'solo:1')!, adjustments, true);
+    expect(l.entries.find((e) => e.kind === 'correction')?.date).toBe('2026-09-15');
+    expect(view.miners[0].owed).toBeGreaterThan(0);
+    expect(l.balance).toBe(view.miners[0].owed - view.miners[0].credit);
+  });
+
   it('ties out when a day is recorded paid with no payment behind it', () => {
     const view = buildBookView({
       ...running([]),
