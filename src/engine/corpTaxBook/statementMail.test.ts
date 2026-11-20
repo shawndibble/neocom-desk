@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { composeStatementMail, type StatementMailInput } from './statementMail';
+import {
+  PREVIEW_VERIFY_TOKEN,
+  composeStatementMail,
+  editedMailLength,
+  fillVerifyLink,
+  type StatementMailInput,
+} from './statementMail';
 
 const names: Record<number, string> = { 1: 'Efa - Brass Anvil', 2: 'Amarr - Tower' };
 
@@ -186,5 +192,35 @@ describe('composeStatementMail: a late notice (#6294)', () => {
     expect(body.length).toBeLessThanOrEqual(10_000);
     expect(body).toContain('You owe 400,000,000 ISK');
     expect(body).toContain('MT-4F2K');
+  });
+});
+
+describe('fillVerifyLink: an edited preview gets the real link', () => {
+  const preview = `https://app.test/corp-tax-book/verify/${PREVIEW_VERIFY_TOKEN}`;
+  const real = 'https://app.test/corp-tax-book/verify/tok123';
+
+  it('swaps every copy of the preview link, the href and its text', () => {
+    const { body } = composeStatementMail(input({ verifyUrl: preview }));
+    const filled = fillVerifyLink(`Edited intro\n${body}`, preview, real);
+    expect(filled).not.toContain(PREVIEW_VERIFY_TOKEN);
+    expect(filled).toContain(`<a href="${real}">${real}</a>`);
+    expect(filled.startsWith('Edited intro\n')).toBe(true);
+  });
+
+  it('swaps a percent-encoded copy too, as an editor may write the href', () => {
+    const filled = fillVerifyLink(`<a href="${encodeURI(preview)}">here</a>`, preview, real);
+    expect(filled).toBe(`<a href="${real}">here</a>`);
+  });
+
+  it('leaves a body the officer took the link out of as it is', () => {
+    expect(fillVerifyLink('Pay up.', preview, real)).toBe('Pay up.');
+  });
+
+  it('counts an edited body as it will be sent, the real link being longer than the preview one', () => {
+    const body = `Pay: <a href="${preview}">${preview}</a>`;
+    expect(editedMailLength(body, preview)).toBe(
+      fillVerifyLink(body, preview, real).length + 2 * (43 - 6)
+    );
+    expect(editedMailLength('Pay up.', preview)).toBe(7);
   });
 });

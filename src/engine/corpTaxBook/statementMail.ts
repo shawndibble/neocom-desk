@@ -231,6 +231,29 @@ function buildNotice(input: StatementMailInput, notice: NoticeMail, detail: Mail
 }
 
 /**
+ * The token a preview's verify link carries before the Statement is issued and its real link
+ * exists: "Preview mail" shows `…/verify/…`.
+ */
+export const PREVIEW_VERIFY_TOKEN = '…';
+
+/**
+ * A mail the officer edited in its preview, with the preview's verify link swapped for the real
+ * one: the href and the link text alike, and the percent-encoded form an editor may write.
+ */
+export function fillVerifyLink(body: string, previewUrl: string, url: string): string {
+  return body.replaceAll(previewUrl, url).replaceAll(encodeURI(previewUrl), url);
+}
+
+/** A verify token's length: 32 random bytes as base64url (`functions/src/corpTaxBookStore.ts`). */
+const VERIFY_TOKEN_LENGTH = 43;
+
+/** An edited body's length as it will be sent, once its preview link becomes the real one. */
+export function editedMailLength(body: string, previewUrl: string): number {
+  const real = previewUrl.slice(0, -PREVIEW_VERIFY_TOKEN.length) + 'x'.repeat(VERIFY_TOKEN_LENGTH);
+  return fillVerifyLink(body, previewUrl, real).length;
+}
+
+/**
  * The mail, with every line when it fits; past the 10,000-character cap one
  * line per day per refinery, then one per refinery for the period. The total,
  * amount due, code and link are never cut.

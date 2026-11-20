@@ -1,0 +1,7 @@
+# Scope decisions — An officer can edit a late notice's mail before it is sent
+
+_Recorded 2026-11-20._
+
+- **The run's mail preview is editable, one mail at a time.** In the Statements run (late notices, and any earlier Statement whose mail never went out), Edit mail swaps the preview for a subject field and the rich mail editor; Save makes the officer's text the mail the queue sends to that one Miner. The standard mail (`20261018-161107-corp-tax-book-statement-mail-stays-simple.md`) stays the default and comes back with Use the standard mail. An edit is per recipient, not a template: each Miner's mail names their own days and total, so one edit never rewrites another Miner's mail.
+- **The verify link is filled in when the mail is queued.** The preview shows a placeholder link (`…/verify/…`) because the real one exists only once the notice is issued; the queue swaps every copy of it, href and text, for the real link (`fillVerifyLink`). An officer who takes the link out is warned, not stopped. The counter counts the body as sent, with the real link's length, and Save is off past 10,000 characters or with an empty subject or message.
+- **Edits live only for the run.** They are held in the run's state, never stored in the book or on Firebase, and are cleared once the run sends. Leaving the page drops them; nothing else changes.

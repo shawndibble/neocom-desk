@@ -85,6 +85,29 @@ describe('enqueueStatements', () => {
     expect(await db.corpMailQueue.count()).toBe(1);
   });
 
+  it('sends an officer-edited subject and body, with the real verify link filled in', async () => {
+    readVerifyTokens.mockResolvedValue(new Map([['s1', 'tok1']]));
+    const preview = 'https://app.test/v/…';
+    await enqueueStatements({
+      ...base,
+      statements: [
+        {
+          ...statement(1),
+          edited: {
+            subject: 'Please pay your moon tax',
+            body: `Hi, you are late.\n<a href="${preview}">${preview}</a>`,
+            previewUrl: preview,
+          },
+        },
+      ],
+    });
+    const [row] = await db.corpMailQueue.toArray();
+    expect(row.subject).toBe('Please pay your moon tax');
+    expect(row.body).toBe(
+      'Hi, you are late.\n<a href="https://app.test/v/tok1">https://app.test/v/tok1</a>'
+    );
+  });
+
   it('continues numbering after what is already queued', async () => {
     readVerifyTokens.mockResolvedValue(
       new Map([
