@@ -60,9 +60,9 @@ import {
 import { recordDefaultOptOuts } from './defaultOptOuts';
 import type { GroupMember } from './groupRows';
 import { payeesOfBookCorporation } from '@/engine/miningTax/payeeCorporation';
-import { linkTargetsWithin } from './paymentLinks';
 import { removePayeeRecord, withCorporationLink } from './payees';
 import { amountSlack } from './paymentMatches';
+import { wherePaymentGoes } from './corpBook/paymentLanding';
 import { allocateOldestFirst } from './settleAllocation';
 import type { SessionContinuation } from './sessionContinuation';
 
@@ -546,8 +546,9 @@ async function owedCombinedSiblings(
  * already holds elsewhere fails the whole action with `held-elsewhere`, naming every such row.
  * An owed Assignment that is one day of a Combined Entry pays the entry's other owed days with it
  * (`owedCombinedSiblings`). With a payment, only what its amount covers is marked, oldest first:
- * the ticked rows (`linkTargetsWithin`), then the Combined Entry days the rest still reaches. A
- * payment is never marked against a day it cannot pay.
+ * the ticked rows, then the Combined Entry days the rest still reaches. What is left once whole
+ * days are covered part-pays the next day: only that share of its ore is recorded, so the day
+ * owes the rest. A payment is never marked against a day it cannot pay.
  */
 export function recordCorpPayment(
   corp: { corporationId: number; name: string },
@@ -559,13 +560,33 @@ export function recordCorpPayment(
     const entries = new Map<string, EntryClaims>();
     const recorded = new Map<string, MiningTaxAssignmentRecord>();
     const heldElsewhere: { id: string; date: string }[] = [];
-    // A payment marks only the days its amount covers, oldest first, as the book spends it.
-    const owedOf = (r: BookRowView) => ({ id: r.id, date: r.date, taxOwed: r.taxOwed ?? 0 });
-    const paying = payment
-      ? new Set(linkTargetsWithin(rows.map(owedOf), payment.amount).map((r) => r.id))
+    // A payment marks the days its amount covers, oldest first, by the book's own rule (what the
+    // dialog previewed, `wherePaymentGoes`); what is left over part-pays the next day, so that
+    // day owes only the rest until the book verifies.
+    const landing = payment
+      ? wherePaymentGoes(
+          rows.map((r) => ({
+            id: r.id,
+            date: r.date,
+            taxOwed: r.taxOwed ?? 0,
+            ...(r.held ? { held: r.held } : {}),
+          })),
+          payment.amount
+        )
+      : null;
+    const landed = new Map(landing?.days.map((d) => [d.id, d]));
+    const part = rows.find((r) => landed.get(r.id)?.result === 'part');
+    const partShare = part
+      ? Math.min(1, (landed.get(part.id)?.partAmount ?? 0) / Math.max(1, part.taxOwed ?? 1))
+      : 0;
+    const paying = landing
+      ? new Set(
+          landing.days.filter((d) => d.result === 'paid' || d.result === 'part').map((d) => d.id)
+        )
       : null;
     for (const row of rows) {
       if (row.solarSystemId === 0 || (paying && !paying.has(row.id))) continue;
+      const isPart = row === part;
       let payeeIds = payeesOf.get(row.characterId);
       if (!payeeIds) {
         payeeIds = await corpEntityPayeeIds(row.characterId, corp, row.taxPct);
@@ -592,9 +613,15 @@ export function recordCorpPayment(
         for (const a of all) addClaims(claims.claimed, a.oreLines);
         entries.set(key, claims);
       }
-      for (const a of claims.owedOwn) recorded.set(a.id, a);
-      const oreLines = minusLines(row.oreLines, claims.ownPool);
+      // A part-paid day leaves the member's own owed Assignments owed: they are the rest of it.
+      if (!isPart) for (const a of claims.owedOwn) recorded.set(a.id, a);
+      const unpaidLines = minusLines(row.oreLines, claims.ownPool);
       claims.ownPool = minusLines(claims.ownPool, row.oreLines);
+      const oreLines = isPart
+        ? unpaidLines
+            .map((l) => ({ ...l, quantity: Math.floor(l.quantity * partShare) }))
+            .filter((l) => l.quantity > 0)
+        : unpaidLines;
       if (oreLines.length === 0) continue;
       if (!fitsEntry(claims, oreLines, row.personalOreLines)) {
         heldElsewhere.push({ id: row.id, date: row.date });
@@ -620,10 +647,7 @@ export function recordCorpPayment(
     if (heldElsewhere.length > 0) throw new HeldElsewhereError(heldElsewhere);
     const siblings = await owedCombinedSiblings([...recorded.values()]);
     // A Combined Entry's other days ride along only as far as the ISK left after the rows reaches.
-    const left = payment
-      ? payment.amount -
-        rows.filter((r) => paying?.has(r.id)).reduce((sum, r) => sum + (r.taxOwed ?? 0), 0)
-      : Infinity;
+    const left = landing ? landing.credit : Infinity;
     const reached = payment
       ? new Set(
           allocateOldestFirst(
