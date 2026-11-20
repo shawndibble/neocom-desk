@@ -135,7 +135,7 @@ export function AdjustmentDialog({
     kind === 'set' ? balanceAdjustment(current, side === 'owes' ? entered : -entered) : 0;
   const value = kind === 'set' ? Math.abs(delta) : entered;
   const signed = kind === 'set' ? delta : kind === 'credit' ? -entered : entered;
-  const ready = kind === 'set' ? amount.trim() !== '' && delta !== 0 : value > 0;
+  const ready = kind === 'set' ? amount.trim() !== '' && entered >= 0 && delta !== 0 : value > 0;
   return (
     <DialogShell
       open={open}
@@ -205,6 +205,13 @@ export function AdjustmentDialog({
           aria-label={t('corpTaxBook.moons.corrections.adjust.amount')}
         />
       </Label>
+      {kind === 'set' && date > defaultDate && (
+        <p className="text-warning">
+          {t('corpTaxBook.moons.corrections.adjust.setNotBillable', {
+            date: dateWithYear(defaultDate),
+          })}
+        </p>
+      )}
       {kind === 'set' && amount.trim() !== '' && (
         <p className="text-text-dim">
           {delta === 0

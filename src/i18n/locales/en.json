@@ -19747,6 +19747,7 @@
           "setWillCharge": "Adds a charge of {{amount}} so the balance matches.",
           "setWillCredit": "Adds a credit of {{amount}} so the balance matches.",
           "setNothing": "Their balance already matches.",
+          "setNotBillable": "Days after {{date}} are not billable yet, so the balance will not move until they are. Pick that day or an earlier one.",
           "amount": "Amount",
           "date": "Day it corrects",
           "label": "Label on the line",
