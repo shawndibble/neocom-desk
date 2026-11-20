@@ -658,4 +658,63 @@ describe('syncCorpTaxBook', () => {
       autoGroupError: 'refused',
     });
   });
+
+  it('merges two stored Miners of the account by regroup and counts the characters', async () => {
+    const d = deps({
+      readBookState: vi.fn(async () =>
+        emptyState({
+          miners: [
+            { id: 'a', mainCharacterId: 5, characterIds: [5, 1] },
+            { id: 'b', mainCharacterId: 6, characterIds: [6, 2] },
+          ] as BookState['miners'],
+        })
+      ),
+      loadAccountCharacters: async () => [
+        { characterId: 5, corporationId: CORP },
+        { characterId: 6, corporationId: CORP },
+      ],
+    });
+    const out = await run(d);
+    expect(d.applyGrouping).toHaveBeenCalledWith(
+      5,
+      CORP,
+      expect.objectContaining({ action: 'regroupMiner', absorbMinerIds: ['b'] })
+    );
+    expect(out).toMatchObject({ autoGrouped: 4 });
+  });
+
+  it('surfaces a merge prompt for a character two groups claim, and applies nothing for it', async () => {
+    const d = deps({
+      readBookState: vi.fn(async () =>
+        emptyState({
+          miners: [
+            { id: 'a', mainCharacterId: 1, characterIds: [1, 6] },
+            { id: 'b', mainCharacterId: 2, characterIds: [2, 6] },
+          ] as BookState['miners'],
+        })
+      ),
+      loadAccountCharacters: async () => [
+        { characterId: 5, corporationId: CORP },
+        { characterId: 6, corporationId: CORP },
+      ],
+    });
+    const out = await run(d);
+    expect(d.applyGrouping).not.toHaveBeenCalled();
+    expect(out).toMatchObject({
+      groupPrompts: [{ reason: 'conflict', characterIds: [6], minerIds: ['a', 'b'] }],
+    });
+  });
+
+  it('reports a declined character as flagged, never added', async () => {
+    const d = deps({
+      loadAccountCharacters: async () => [
+        { characterId: 5, corporationId: CORP },
+        { characterId: 8, corporationId: CORP },
+      ],
+      declinedGrouping: vi.fn(async () => new Set([8])),
+    });
+    const out = await run(d);
+    expect(d.applyGrouping).not.toHaveBeenCalled();
+    expect(out).toMatchObject({ groupFlagged: [8] });
+  });
 });

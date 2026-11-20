@@ -27,6 +27,8 @@ import {
   confirmGrouping,
   declineGrouping,
   declineGroupingByToken,
+  declineLink,
+  promoteProvenClaims,
   editBook,
   listPendingGroupings,
   readStatementByToken,
@@ -946,7 +948,7 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect((await planRekeyBackfill(db, CORP)).writes).toEqual([]);
     });
 
-    it('holds a guest added by a regroup until they confirm', async () => {
+    it('adds an outsider by a regroup as an officer claim that cannot read yet', async () => {
       await turnOn();
       await syncBook(
         deps(),
@@ -968,8 +970,11 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         mainCharacterId: 60,
         absorbMinerIds: [],
       });
-      expect(out.pendingConfirmation).toEqual([61]);
-      expect((await book().collection('miners').doc('m-a').get()).get('uids')).toEqual(['char:60']);
+      expect(out.pendingConfirmation).toEqual([]);
+      expect(out.officerClaimed).toEqual([61]);
+      const stored = await book().collection('miners').doc('m-a').get();
+      expect(stored.get('uids')).toEqual(['char:60']);
+      expect(stored.get('officerClaimed')).toEqual([61]);
     });
 
     it('records an unlinked character in the book so every sync leaves it alone', async () => {
@@ -1135,7 +1140,7 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect(await reason(claimPayment(deps(), who(77), CORP, 'j1_7'))).toBe('no-book');
     });
 
-    it('groups characters, holds a guest until they confirm, and unlinks', async () => {
+    it('groups characters, keeps an outsider an officer claim, and unlinks', async () => {
       await turnOn();
       await syncBook(
         deps(),
@@ -1156,7 +1161,8 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         characterIds: [60, 61],
         mainCharacterId: 60,
       });
-      expect(out.pendingConfirmation).toEqual([61]);
+      expect(out.pendingConfirmation).toEqual([]);
+      expect(out.officerClaimed).toEqual([61]);
       expect((await book().collection('miners').doc('m-a').get()).get('uids')).toEqual(['char:60']);
       expect(
         await reason(
@@ -1168,17 +1174,75 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
           })
         )
       ).toBe('already-grouped');
-      await confirmGrouping(deps(), who(61), CORP, 'm-a');
-      expect((await book().collection('miners').doc('m-a').get()).get('uids').sort()).toEqual([
-        'char:60',
-        'char:61',
-      ]);
-      expect((await book().collection('miners').doc('m-a').get()).data()).toMatchObject({
-        pendingConfirmation: [],
-        confirmedCharacterIds: [61],
-      });
+      // The claim is not a reader until its owner signs in as it; nothing waits on a confirm.
+      expect(await reason(confirmGrouping(deps(), who(61), CORP, 'm-a'))).toBe('nothing-pending');
       await edit(ACCOUNTANT, { action: 'unlink', minerId: 'm-a', characterId: 61 });
       expect((await book().collection('miners').doc('m-a').get()).exists).toBe(false);
+    });
+
+    describe('officer claims (Player slice)', () => {
+      const outsider = async () => {
+        await turnOn();
+        await syncBook(
+          deps(),
+          who(ACCOUNTANT),
+          parseSyncInput(
+            {
+              corporationId: CORP,
+              observed: [
+                row(10, '2026-10-18T10:00:00Z', { characterId: 61, recordedCorporationId: 555 }),
+              ],
+            },
+            now
+          )
+        );
+      };
+      const group = () =>
+        edit(ACCOUNTANT, {
+          action: 'setMiner',
+          minerId: 'm-a',
+          characterIds: [60, 61],
+          mainCharacterId: 60,
+        });
+
+      it('refuses an outsider as the main of a group that has a corp member', async () => {
+        await outsider();
+        expect(
+          await reason(
+            edit(ACCOUNTANT, {
+              action: 'setMiner',
+              minerId: 'm-a',
+              characterIds: [60, 61],
+              mainCharacterId: 61,
+            })
+          )
+        ).toBe('outsider-main');
+      });
+
+      it('lets the added character decline its link, and records the removal', async () => {
+        await outsider();
+        await group();
+        expect(await declineLink(deps(), who(61), CORP, 'm-a')).toEqual({ declined: true });
+        expect((await book().collection('miners').doc('m-a').get()).exists).toBe(false);
+        const declined = await book().collection('meta').doc('declinedAutoGroup').get();
+        expect(declined.get('ids')).toEqual([61]);
+      });
+
+      it('promotes a claim once its owner has a Self-proven link', async () => {
+        await outsider();
+        await group();
+        await db.collection('playerCharacters').doc('61').set({
+          characterId: 61,
+          playerId: '60',
+          ownerHash: 'h',
+          provenAt: '2026-10-19T00:00:00Z',
+        });
+        expect(await promoteProvenClaims(deps(), CORP)).toEqual({ promoted: 1 });
+        const stored = await book().collection('miners').doc('m-a').get();
+        expect(stored.get('officerClaimed')).toEqual([]);
+        expect(stored.get('provenCharacterIds')).toEqual([61]);
+        expect([...stored.get('uids')].sort()).toEqual(['char:60', 'char:61']);
+      });
     });
 
     describe('a guest answering a hand-made grouping (#4210)', () => {
@@ -1203,6 +1267,11 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
           characterIds: [60, 61],
           mainCharacterId: 60,
         });
+        // A group made before the Player slice still waits on the guest: keep that path covered.
+        await book()
+          .collection('miners')
+          .doc('m-a')
+          .update({ pendingConfirmation: [61], officerClaimed: [] });
       };
       const answers = async () =>
         (await book().collection('meta').doc('groupingAnswers').get()).get('answers');

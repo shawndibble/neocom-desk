@@ -37,6 +37,17 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
   }
   // ADR 0025: a schedule that stopped is a warning that says why, because the book
   // quietly goes back to being as fresh as the last officer visit.
+  // Characters two groups claim: the earlier group was kept (never last-writer-wins).
+  for (const c of data.groupConflicts ?? []) {
+    items.push({
+      id: `conflict-${c.characterId}`,
+      tone: 'warning',
+      title: t('corpTaxBook.moons.grouping.conflictItem', {
+        name: names.character(c.characterId),
+        groups: c.minerIds.join(', '),
+      }),
+    });
+  }
   const scheduled = data.scheduledSync;
   if (scheduled?.status === 'stopped') {
     items.push({
@@ -126,6 +137,28 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
     });
   }
   if (sync.run.phase === 'done' && sync.run.outcome.kind === 'synced') {
+    // Officers decide a merge the sync would not make: too large, or a character two groups claim.
+    for (const p of sync.run.outcome.groupPrompts ?? []) {
+      items.push({
+        id: `merge-${p.reason}-${p.minerIds.join('+')}`,
+        tone: 'warning',
+        title: t(
+          p.reason === 'too-large'
+            ? 'corpTaxBook.moons.grouping.mergeTooLarge'
+            : 'corpTaxBook.moons.grouping.mergeConflict',
+          { names: p.characterIds.map((id) => names.character(id)).join(', ') }
+        ),
+      });
+    }
+    if ((sync.run.outcome.groupFlagged ?? []).length > 0) {
+      items.push({
+        id: 'groupFlagged',
+        tone: 'info',
+        title: t('corpTaxBook.moons.grouping.flagged', {
+          names: (sync.run.outcome.groupFlagged ?? []).map((id) => names.character(id)).join(', '),
+        }),
+      });
+    }
     if (sync.run.outcome.autoGroupError) {
       items.push({
         id: 'autoGroupFailed',

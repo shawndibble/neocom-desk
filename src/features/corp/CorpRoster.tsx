@@ -10,10 +10,12 @@
  * most recently seen first under a down arrow, like any date column. The
  * silent members are the amber ones and the "dark only" filter, not the order.
  */
-import { Fragment, useMemo, type ReactElement } from 'react';
+import { Fragment, useCallback, useMemo, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
 import { Pill } from '@/components/ui/Pill';
+import { Tooltip } from '@/components/ui/Tooltip';
+import { MenuItem } from '@/components/ui';
 import { CharacterLink, SystemLink } from '@/features/entities';
 import { ItemInfoLink } from '@/features/entities';
 import { useHighlightParam } from '@/lib/useHighlightParam';
@@ -65,6 +67,8 @@ export interface RosterRow {
   isSelf: boolean;
   /** The corporation's CEO (its `ceo_id`). */
   isCeo: boolean;
+  /** Set for an officer when this member is grouped: the group's size and the other characters' names. */
+  group?: { size: number; names: readonly string[] };
 }
 
 export function CorpRosterSummary({
@@ -159,6 +163,18 @@ function useRosterColumns(): DataTableColumn<RosterRow>[] {
               </span>
             )}
             {row.isCeo && <Pill className="shrink-0">{t('corp.members.ceo')}</Pill>}
+            {row.group && (
+              // A non-interactive badge (§6c): the word shows, the tooltip only names who.
+              <Tooltip
+                content={t('corpTaxBook.moons.grouping.badgeTip', {
+                  names: row.group.names.join(', '),
+                })}
+              >
+                <span tabIndex={0} className="inline-flex shrink-0">
+                  <Pill>{t('corpTaxBook.moons.grouping.badge', { count: row.group.size })}</Pill>
+                </span>
+              </Tooltip>
+            )}
           </span>
         ),
         sortValue: (row) => row.name ?? undefined,
@@ -283,24 +299,40 @@ export function CorpRosterColumnPicker() {
   );
 }
 
-/** Module-level so the table's windowing and row memo see one stable function. */
-const rosterRowMenu = (row: RosterRow, tr: ReactElement) => (
-  <CharacterRowMenu characterId={row.characterId} name={row.name}>
-    {tr}
-  </CharacterRowMenu>
-);
 const rosterRowKey = (row: RosterRow) => row.characterId;
 
 export function CorpRosterTable({
   rows,
   tableProps,
+  onGroupWith,
 }: {
   rows: readonly RosterRow[];
+  /** Officers only: opens the group dialog for this member ("Group with…" in the row menu). */
+  onGroupWith?: (row: RosterRow) => void;
   /** `useTableExport(...).tableProps` — feeds the header's Export menu. */
   tableProps?: UseTableExport<RosterRow>['tableProps'];
 }) {
   const { t } = useTranslation();
   const columns = useRosterColumns();
+  // Stable while the wiring is, so the table's windowing and row memo see one function.
+  const rosterRowMenu = useCallback(
+    (row: RosterRow, tr: ReactElement) => (
+      <CharacterRowMenu
+        characterId={row.characterId}
+        name={row.name}
+        extraItems={
+          onGroupWith && (
+            <MenuItem onSelect={() => onGroupWith(row)}>
+              {t('corpTaxBook.moons.grouping.menu')}
+            </MenuItem>
+          )
+        }
+      >
+        {tr}
+      </CharacterRowMenu>
+    ),
+    [onGroupWith, t]
+  );
   const { isVisible } = useColumnVisibility(
     useVisibleCorpRosterColumns,
     CORP_ROSTER_DEFAULT_COLUMNS

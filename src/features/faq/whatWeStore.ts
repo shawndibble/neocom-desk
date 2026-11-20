@@ -24,7 +24,9 @@
  *
  * Corporation records are a further group: SRP Claims (ADR 0026) and the
  * Corp Tax Book (ADR 0023) live under `corps/{id}`, belong to the corporation
- * rather than to one Character, and so outlive Delete all data. Same typed-map
+ * rather than to one Character, and so outlive Delete all data. The global Player layer
+ * (`players/{id}` and `playerCharacters/{charId}`: character ids, an owner hash and a proof time,
+ * readable only by the Player's own Characters) is disclosed in the `corpTaxBook` line. Same typed-map
  * guard ({@link CORP_COLLECTION_FAQ_ITEM}), checked against the `corps` rules.
  *
  * Deliberately honest about the four places where something EVE-derived, or

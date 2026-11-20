@@ -22,6 +22,8 @@ import type { MoonDoc } from '../../../../../functions/src/corpTaxBookMoonDocs';
 import {
   bookFeederFrom,
   groupingAnswersFrom,
+  groupConflictsFrom,
+  type GroupConflict,
   settingsFrom,
   type BookData,
   type BookDeclaration,
@@ -180,6 +182,12 @@ const SLICES = {
   answers: {
     groupingAnswers: field<GroupingAnswer[]>(none, async (c) =>
       groupingAnswersFrom(await meta(c, 'groupingAnswers', 'meta:answers'))
+    ),
+    // Best effort: a book that never had a conflict has no doc, and a denied read is none.
+    groupConflicts: field<GroupConflict[]>(none, async (c) =>
+      groupConflictsFrom(
+        await meta(c, 'groupConflicts', 'meta:groupConflicts').catch(() => undefined)
+      )
     ),
   },
   owners: {

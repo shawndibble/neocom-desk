@@ -6,6 +6,8 @@
 import { callerFromAuth, signedInCharacter, verifyAccessToken, type Caller } from './actorAuth.js';
 import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
 import { createActionGroup, type CallableHandler } from './callableRouter.js';
+import { claimPlayerCharactersHandler } from './playerLayer.js';
+import { firestorePlayerLayerStore } from './playerLayerStore.js';
 import type { CallableAction } from './callableManifest.js';
 import { runDailyHousekeeping } from './dailyHousekeeping.js';
 import {
@@ -193,6 +195,7 @@ import {
   withdrawDispute,
   confirmGrouping,
   declineGrouping,
+  declineLink,
   declineGroupingByToken,
   listPendingGroupings,
   editBook,
@@ -1497,6 +1500,21 @@ corpTaxBookAction('declineCorpTaxBookGroupingCallable', (request) => {
   const { corporationId, minerId } = parseConfirmGroupingInput(request.data);
   return declineGrouping(corpTaxBookDeps(), callerOf(request), corporationId, minerId);
 });
+
+corpTaxBookAction('declineCorpTaxBookLinkCallable', (request) => {
+  const { corporationId, minerId } = parseConfirmGroupingInput(request.data);
+  return declineLink(corpTaxBookDeps(), callerOf(request), corporationId, minerId);
+});
+
+// Each access token proves its own character (Self-proven link); the handler verifies, never logs them.
+corpTaxBookAction('claimPlayerCharactersCallable', (request) =>
+  claimPlayerCharactersHandler({
+    store: firestorePlayerLayerStore(firestore()),
+    verify: (accessToken) => verifyEveAccessToken(accessToken, verifyOptions),
+    now: () => Date.now(),
+    log: (message, data) => logWarn(message, data),
+  })(request)
+);
 
 corpTaxBookAction('listPendingCorpTaxBookGroupingsCallable', (request) =>
   listPendingGroupings(corpTaxBookDeps(), callerOf(request))

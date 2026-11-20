@@ -18,7 +18,7 @@
  * The `unknown` / `ready` asymmetry and the mount-on-`ready` split are
  * `useCorpRouteGate`'s, shared with `/corp` and `/corp/assets` — see that hook.
  */
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useDarkThreshold } from '@/features/corp/darkThreshold';
@@ -62,6 +62,8 @@ import {
   CorpRosterTable,
   type RosterRow,
 } from '@/features/corp/CorpRoster';
+import { useRosterGrouping } from '@/features/corp/useRosterGrouping';
+import { GroupMinersView } from '@/features/corp/moons/GroupMinersDialog';
 import { membersCsvColumns } from '@/features/corp/membersCsv';
 import { loadCorporationId } from '@/features/corp/boardData';
 import {
@@ -288,9 +290,27 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
   const data = snapshot.data;
   const activeCharacterId = useActiveCharacter((s) => s.activeCharacterId);
 
+  // Officers with an active book can group characters from here (the Player's corp layer).
+  const grouping = useRosterGrouping(activeCharacterId, data?.corporationId ?? null);
+  const [groupingFor, setGroupingFor] = useState<number | null>(null);
+  const onGroupWith = useCallback((row: RosterRow) => setGroupingFor(row.characterId), []);
+
   const rows = useMemo<RosterRow[]>(() => {
     if (data === null || data.members === null) return [];
     return data.members.map((member) => ({
+      ...(() => {
+        const g = grouping.groupOf(member.characterId);
+        return g
+          ? {
+              group: {
+                size: g.characterIds.length,
+                names: g.characterIds
+                  .filter((id) => id !== member.characterId)
+                  .map((id) => grouping.names.get(id) ?? `#${id}`),
+              },
+            }
+          : {};
+      })(),
       characterId: member.characterId,
       name: data.labels.characters.get(member.characterId) ?? null,
       standing: memberStanding(member, data.loadedAt, darkAfterDays),
@@ -305,7 +325,7 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
       isSelf: member.characterId === activeCharacterId,
       isCeo: member.characterId === data.ceoId,
     }));
-  }, [data, darkAfterDays, activeCharacterId]);
+  }, [data, darkAfterDays, activeCharacterId, grouping]);
 
   // Search + dark-only/ship/location filters (issue #421, AC2/AC3):
   // AND-composed, same stacking rule as Mail's search-and-label filters
@@ -515,9 +535,27 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
                   }
                 />
               ) : (
-                <CorpRosterTable rows={visibleRows} tableProps={membersExport.tableProps} />
+                <CorpRosterTable
+                  rows={visibleRows}
+                  tableProps={membersExport.tableProps}
+                  {...(grouping.canGroup ? { onGroupWith } : {})}
+                />
               )}
             </Panel>
+            {groupingFor !== null && grouping.canGroup && (
+              <GroupMinersView
+                open
+                onClose={() => setGroupingFor(null)}
+                miner={
+                  grouping.groupOf(groupingFor) ?? {
+                    id: `solo:${groupingFor}`,
+                    mainCharacterId: groupingFor,
+                    characterIds: [groupingFor],
+                  }
+                }
+                source={grouping.source}
+              />
+            )}
           </div>
         </DataGate>
       </MembersTabPanel>
