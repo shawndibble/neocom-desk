@@ -1,0 +1,176 @@
+{
+  "corp": [
+    {
+      "id": 90002001,
+      "name": "Kestrel Vane",
+      "hoursAgo": 2,
+      "shipTypeId": 28606,
+      "locationId": 60003760,
+      "joined": "2024-03-12",
+      "roles": ["Director"]
+    },
+    {
+      "id": 90002002,
+      "name": "Vane Hauler",
+      "hoursAgo": 24,
+      "shipTypeId": 20185,
+      "locationId": 60000358,
+      "joined": "2024-04-02",
+      "roles": []
+    },
+    {
+      "id": 90002003,
+      "name": "Vane Miner Two",
+      "hoursAgo": 216,
+      "shipTypeId": 17480,
+      "locationId": 1040000000101,
+      "joined": "2024-06-18",
+      "roles": []
+    },
+    {
+      "id": 90002004,
+      "name": "Sora Tenn",
+      "hoursAgo": 5,
+      "shipTypeId": 17478,
+      "locationId": 1040000000101,
+      "joined": "2024-09-01",
+      "roles": ["Accountant"]
+    },
+    {
+      "id": 90002005,
+      "name": "Tenn Industrial",
+      "hoursAgo": 72,
+      "shipTypeId": 12731,
+      "locationId": 60008494,
+      "joined": "2024-09-20",
+      "roles": []
+    },
+    {
+      "id": 90002006,
+      "name": "Dax Orlov",
+      "hoursAgo": 1,
+      "shipTypeId": 24702,
+      "locationId": 60004516,
+      "joined": "2025-01-15",
+      "roles": []
+    },
+    {
+      "id": 90002007,
+      "name": "Orlov Scout",
+      "hoursAgo": 288,
+      "shipTypeId": 585,
+      "locationId": 60004588,
+      "joined": "2025-02-03",
+      "roles": []
+    },
+    {
+      "id": 90002008,
+      "name": "Mira Quill",
+      "hoursAgo": 6,
+      "shipTypeId": 24698,
+      "locationId": 60001864,
+      "joined": "2024-11-30",
+      "roles": []
+    },
+    {
+      "id": 90002009,
+      "name": "Quill Alt",
+      "hoursAgo": 30,
+      "shipTypeId": 19744,
+      "locationId": 60001864,
+      "joined": "2025-03-09",
+      "roles": []
+    },
+    {
+      "id": 90002010,
+      "name": "Lena Voss",
+      "hoursAgo": 0.33,
+      "shipTypeId": 28352,
+      "locationId": 1040000000101,
+      "joined": "2023-05-01",
+      "roles": ["Director"]
+    },
+    {
+      "id": 90002011,
+      "name": "Bram Holt",
+      "hoursAgo": 50,
+      "shipTypeId": 29984,
+      "locationId": 60008494,
+      "joined": "2024-12-12",
+      "roles": []
+    },
+    {
+      "id": 90002012,
+      "name": "Nyx Arden",
+      "hoursAgo": 100,
+      "shipTypeId": 16240,
+      "locationId": 60003760,
+      "joined": "2025-04-04",
+      "roles": []
+    },
+    {
+      "id": 90002013,
+      "name": "Ravi Kade",
+      "hoursAgo": 744,
+      "shipTypeId": 603,
+      "locationId": 60004516,
+      "joined": "2024-02-02",
+      "roles": []
+    },
+    {
+      "id": 90002014,
+      "name": "Ingrid Sol",
+      "hoursAgo": null,
+      "shipTypeId": null,
+      "locationId": null,
+      "joined": "2025-05-20",
+      "roles": []
+    },
+    {
+      "id": 90002015,
+      "name": "Tomas Reed",
+      "hoursAgo": 48,
+      "shipTypeId": 589,
+      "locationId": 60004588,
+      "joined": "2025-06-01",
+      "roles": []
+    },
+    {
+      "id": 90002016,
+      "name": "Hana Bright",
+      "hoursAgo": 7,
+      "shipTypeId": 605,
+      "locationId": 1040000000101,
+      "joined": "2025-06-14",
+      "roles": []
+    },
+    {
+      "id": 90002017,
+      "name": "Otto Brandt",
+      "hoursAgo": 336,
+      "shipTypeId": 22548,
+      "locationId": 60000358,
+      "joined": "2024-10-10",
+      "roles": []
+    },
+    {
+      "id": 90000001,
+      "name": "Test Pilot",
+      "hoursAgo": 0,
+      "shipTypeId": 32880,
+      "locationId": 1040000000101,
+      "joined": "2024-08-08",
+      "roles": ["Director"]
+    }
+  ],
+  "outside": [
+    {
+      "id": 93000001,
+      "name": "Outer Rim Vane"
+    },
+    {
+      "id": 93000002,
+      "name": "Sora Of Elsewhere"
+    }
+  ]
+}

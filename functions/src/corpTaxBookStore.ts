@@ -18,7 +18,7 @@ import {
 } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { chunk } from './chunk.js';
-import { absorbedMinerIds, loadRekeyRecords, planRekey } from './corpTaxBookRekey.js';
+import { absorbedMinerIds, loadRekeyRecords, MINER_KEYED, planRekey } from './corpTaxBookRekey.js';
 import {
   loadStampContext,
   restampStructures,
@@ -156,6 +156,15 @@ import {
   type Caller,
 } from './actorAuth.js';
 import type { AuditAction } from './corpTaxBookKinds.js';
+import { provenCharacterIds } from './playerLayerStore.js';
+import {
+  classifyGroup,
+  groupConflicts,
+  minerReaderIds,
+  promoteClaims,
+  type ClaimMiner,
+  type GroupConflict,
+} from './corpTaxBookClaims.js';
 import type { EveTokenClaims } from './verifyEveToken.js';
 
 /** One type's parsed R2 open-prices object (`readOpenPricesFromR2`), or null when R2 has none. Throws on a failed read. */
@@ -872,6 +881,10 @@ export async function syncBookAs(
   // learned. So it republishes a doc that old, or one whose alliance the corporation has left.
   const republish = await sharedPopsRepublish(deps, input.corporationId, !quiet);
   if (republish) await refreshSharedPops(deps, input.corporationId, republish);
+  // A sign-in may have proven a claim since the last look. Best effort: the next sync retries.
+  await promoteProvenClaims(deps, input.corporationId).catch((e) =>
+    console.error('claim promotion failed', e instanceof Error ? e.message : e)
+  );
   return { observedChanged, extractions: input.extractions.length, donationsAdded };
 }
 
@@ -967,6 +980,16 @@ function minerCharacters(minerId: string, miner: Data | undefined): number[] {
   return solo ? [Number(solo[1])] : [];
 }
 
+/** The characters that may read a Miner: an Officer claim and a legacy unconfirmed guest may not. */
+function minerReaders(minerId: string, miner: Data | undefined): number[] {
+  if (!miner) return minerCharacters(minerId, miner);
+  return minerReaderIds({
+    characterIds: miner.characterIds as number[],
+    officerClaimed: (miner.officerClaimed as number[] | undefined) ?? [],
+    pendingConfirmation: (miner.pendingConfirmation as number[] | undefined) ?? [],
+  });
+}
+
 /** The sign-ins that read a Miner's own lines (`uids`): read in the transaction, before any write. */
 /** The Director gate dismissals use (D6), for an act that undoes or reprices money of these sizes. */
 function requireDirectorAbove(c: EditCtx, amounts: readonly number[]): void {
@@ -1014,7 +1037,7 @@ async function assertAdjustmentReversible(
 
 async function minerUids(c: EditCtx, minerId: string): Promise<string[]> {
   const miner = (await c.tx.get(col(c, MINERS).doc(minerId))).data();
-  return minerCharacters(minerId, miner).map((id) => `char:${id}`);
+  return minerReaders(minerId, miner).map((id) => `char:${id}`);
 }
 
 /**
@@ -1048,16 +1071,54 @@ async function confirmDeclaration(
 /** The characters an officer unlinked: automatic grouping (D26) leaves them alone. */
 const DECLINED_DOC = 'declinedAutoGroup';
 
+/** `playerCharacters/{characterId}`: a Self-proven link, written only by the claim callable. */
+const PLAYER_CHARACTERS = 'playerCharacters';
+
+/** What a grouping decided about who reads it, from facts read before any write. */
+interface GroupPlan {
+  officerClaimed: number[];
+  /** Legacy guests still awaiting the old confirmation; never newly created. */
+  pendingConfirmation: number[];
+  provenCharacterIds: number[];
+  readers: number[];
+  confirmed: Set<number>;
+  createdAt: string;
+  conflicts: GroupConflict[];
+}
+
+const claimMinerOf = (id: string, d: Data): ClaimMiner => ({
+  id,
+  characterIds: (d.characterIds as number[]) ?? [],
+  officerClaimed: [...((d.officerClaimed as number[] | undefined) ?? [])],
+  provenCharacterIds: (d.provenCharacterIds as number[] | undefined) ?? [],
+  ...(typeof d.createdAt === 'string' ? { createdAt: d.createdAt } : {}),
+});
+
+/** The characters with a Self-proven link, read in the transaction. */
+async function provenAmong(
+  tx: Transaction,
+  db: Firestore,
+  characterIds: readonly number[]
+): Promise<Set<number>> {
+  if (characterIds.length === 0) return new Set();
+  const docs = await tx.getAll(
+    ...characterIds.map((id) => db.collection(PLAYER_CHARACTERS).doc(String(id)))
+  );
+  return new Set(docs.filter((d) => d.exists).map((d) => Number(d.id)));
+}
+
 /**
- * Checks a grouping against the other Miners and the guest rule, reading only.
- * `ignore` are Miners being dissolved in the same transaction.
+ * Checks a grouping against the other Miners, reading only, and decides who reads it. A
+ * character outside the corporation, or one that never mined here, is an Officer claim: billed
+ * with the group, left out of its readers until its owner signs in as it. `ignore` are Miners
+ * being dissolved in the same transaction.
  */
 async function planMiner(
   c: EditCtx,
   miners: readonly QueryDocumentSnapshot[],
   action: { minerId: string; characterIds: number[]; mainCharacterId: number },
   ignore: ReadonlySet<string>
-): Promise<{ pending: number[]; confirmed: Set<number> }> {
+): Promise<GroupPlan> {
   const mine = miners.find((d) => d.id === action.minerId)?.data();
   if (mine?.closedAt != null)
     fail('failed-precondition', "This Miner's account is closed", 'account-closed');
@@ -1069,13 +1130,55 @@ async function planMiner(
   );
   if (clash)
     fail('failed-precondition', 'A character is already in another Miner', 'already-grouped');
-  // Characters outside the corp are not linked until they confirm (D26b).
+  // Who already reads the group stays a reader: the Miner's own and a dissolved Miner's.
   const confirmed = new Set<number>((mine?.confirmedCharacterIds as number[] | undefined) ?? []);
-  const outsiders = new Set<number>();
+  const retained = new Set<number>(confirmed);
+  for (const d of miners)
+    if (d.id === action.minerId || ignore.has(d.id))
+      for (const x of minerReaders(d.id, d.data())) retained.add(x);
+  const outside = new Set<number>();
+  const minedHere = new Set<number>();
   for (const characterId of action.characterIds) {
-    if (await recordedOutside(c, characterId)) outsiders.add(characterId);
+    if (await recordedOutside(c, characterId)) outside.add(characterId);
+    if (await recordedHereSince(c, characterId, '')) minedHere.add(characterId);
   }
-  return { pending: [...outsiders].filter((x) => !confirmed.has(x)), confirmed };
+  const proven = await provenAmong(c.tx, c.deps.db, action.characterIds);
+  const group = classifyGroup({
+    characterIds: action.characterIds,
+    mainCharacterId: action.mainCharacterId,
+    retained,
+    pending: new Set<number>((mine?.pendingConfirmation as number[] | undefined) ?? []),
+    proven,
+    outside,
+    minedHere,
+  });
+  if (group.outsiderMain)
+    fail(
+      'failed-precondition',
+      'The main must be a corporation member when the group has one',
+      'outsider-main'
+    );
+  const createdAt =
+    typeof mine?.createdAt === 'string' ? mine.createdAt : new Date(c.now).toISOString();
+  const after: ClaimMiner[] = miners
+    .filter((d) => d.id !== action.minerId && !ignore.has(d.id))
+    .map((d) => claimMinerOf(d.id, d.data()));
+  after.push({
+    id: action.minerId,
+    characterIds: action.characterIds,
+    officerClaimed: group.officerClaimed,
+    provenCharacterIds: group.provenCharacterIds,
+    createdAt,
+  });
+  return {
+    officerClaimed: group.officerClaimed,
+    pendingConfirmation: group.pendingConfirmation,
+    provenCharacterIds: group.provenCharacterIds,
+    readers: group.readers,
+    confirmed,
+    createdAt,
+    conflicts: groupConflicts(after, new Date(c.now).toISOString()),
+  };
 }
 
 /**
@@ -1183,34 +1286,49 @@ async function rekeyAbsorbed(
   };
 }
 
-/** What a grouping folds in and who can read it: a guest's character still waiting to confirm (D26b) stays out. */
+/**
+ * What a grouping folds in and who can read it. An Officer claim is billed with the group, so
+ * its own records are folded in too, but it is no reader until its owner signs in as it.
+ */
 function rekeyScope(
   action: { minerId: string; characterIds: number[] },
   absorbMinerIds: readonly string[],
-  pending: readonly number[]
+  readers: readonly number[]
 ) {
-  const joined = action.characterIds.filter((x) => !pending.includes(x));
   return {
-    absorbed: absorbedMinerIds(action.minerId, joined, absorbMinerIds),
-    uids: joined.map((x) => `char:${x}`),
+    absorbed: absorbedMinerIds(action.minerId, action.characterIds, absorbMinerIds),
+    uids: readers.map((x) => `char:${x}`),
+  };
+}
+
+/** What setMiner and regroupMiner answer: nothing waits on a confirmation any more. */
+function groupResult(plan: GroupPlan) {
+  return {
+    pendingConfirmation: plan.pendingConfirmation,
+    officerClaimed: plan.officerClaimed,
+    conflicts: plan.conflicts,
   };
 }
 
 function writeMiner(
   c: EditCtx,
   action: { minerId: string; characterIds: number[]; mainCharacterId: number },
-  { pending, confirmed }: { pending: number[]; confirmed: Set<number> }
+  plan: GroupPlan
 ): void {
   // An officer asking again starts a fresh question: the old answer no longer stands.
-  clearAnswers(c, pending);
+  clearAnswers(c, plan.officerClaimed);
   c.tx.set(col(c, MINERS).doc(action.minerId), {
     id: action.minerId,
     characterIds: action.characterIds,
     mainCharacterId: action.mainCharacterId,
-    pendingConfirmation: pending,
-    confirmedCharacterIds: [...confirmed].filter((x) => action.characterIds.includes(x)),
-    // A guest's character stays out of the readable grouping until it confirms (D26b).
-    uids: action.characterIds.filter((x) => !pending.includes(x)).map((x) => `char:${x}`),
+    // Legacy field: only guests already pending stay so; new ones are Officer claims.
+    pendingConfirmation: plan.pendingConfirmation,
+    officerClaimed: plan.officerClaimed,
+    provenCharacterIds: plan.provenCharacterIds,
+    confirmedCharacterIds: [...plan.confirmed].filter((x) => action.characterIds.includes(x)),
+    createdAt: plan.createdAt,
+    // An Officer claim stays out of the readable grouping until its owner signs in as it.
+    uids: plan.readers.map((x) => `char:${x}`),
   });
 }
 
@@ -1237,10 +1355,20 @@ function removeFromMiner(
         ? miner.mainCharacterId
         : characterIds[0],
       pendingConfirmation: (miner.pendingConfirmation as number[]).filter((x) => x !== characterId),
+      officerClaimed: ((miner.officerClaimed as number[] | undefined) ?? []).filter(
+        (x) => x !== characterId
+      ),
+      provenCharacterIds: ((miner.provenCharacterIds as number[] | undefined) ?? []).filter(
+        (x) => x !== characterId
+      ),
       confirmedCharacterIds: (miner.confirmedCharacterIds as number[]).filter(
         (x) => x !== characterId
       ),
-      uids: characterIds.map((x) => `char:${x}`),
+      uids: minerReaderIds({
+        characterIds,
+        officerClaimed: miner.officerClaimed as number[] | undefined,
+        pendingConfirmation: miner.pendingConfirmation as number[] | undefined,
+      }).map((x) => `char:${x}`),
     });
   }
   // D26: every officer's sync must leave this character out of an automatic group.
@@ -1620,7 +1748,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         uids = Number.isSafeInteger(characterId) ? [`char:${characterId}`] : [];
       } else if (action.scope === 'miner') {
         const miner = (await tx.get(col(c, MINERS).doc(action.targetId))).data();
-        uids = minerCharacters(action.targetId, miner).map((id2) => `char:${id2}`);
+        uids = minerReaders(action.targetId, miner).map((id2) => `char:${id2}`);
       }
       tx.create(col(c, DISMISSALS).doc(id), {
         id,
@@ -1737,7 +1865,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     case 'setMiner': {
       const miners = await tx.get(col(c, MINERS));
       const out = await planMiner(c, miners.docs, action, new Set());
-      const scope = rekeyScope(action, [], out.pending);
+      const scope = rekeyScope(action, [], out.readers);
       const rekey = await rekeyAbsorbed(
         tx,
         c.deps.db,
@@ -1753,9 +1881,9 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         detail: {
           minerId: action.minerId,
           characterIds: action.characterIds,
-          pending: out.pending,
+          officerClaimed: out.officerClaimed,
         },
-        result: { pendingConfirmation: out.pending },
+        result: groupResult(out),
       };
     }
     case 'regroupMiner': {
@@ -1774,7 +1902,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         }
       }
       const out = await planMiner(c, miners.docs, action, absorbed);
-      const scope = rekeyScope(action, action.absorbMinerIds, out.pending);
+      const scope = rekeyScope(action, action.absorbMinerIds, out.readers);
       const rekey = await rekeyAbsorbed(
         tx,
         c.deps.db,
@@ -1797,9 +1925,9 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
           minerId: action.minerId,
           characterIds: action.characterIds,
           absorbed: action.absorbMinerIds,
-          pending: out.pending,
+          officerClaimed: out.officerClaimed,
         },
-        result: { pendingConfirmation: out.pending },
+        result: groupResult(out),
       };
     }
     case 'unlink': {
@@ -2035,7 +2163,11 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       if (miner.exists && miner.get('closedAt') != null)
         fail('failed-precondition', "This Miner's account is closed", 'account-closed');
       refuseCalendarStatement(c, statement);
-      const token = await issueStatementDoc(c, statement);
+      const token = await issueStatementDoc(
+        c,
+        statement,
+        miner.exists ? minerReaders(statement.minerId, miner.data()) : statement.characterIds
+      );
       return {
         detail: { statementId: statement.id, minerId: statement.minerId, amount: statement.amount },
         result: { statementId: statement.id, verifyToken: token },
@@ -2312,7 +2444,11 @@ async function applyPopSharingEdit(
 }
 
 /** Stores an issued Statement and its verify link; returns the link's token. Reads nothing: callers check first. */
-async function issueStatementDoc(c: EditCtx, statement: StoredStatement): Promise<string> {
+async function issueStatementDoc(
+  c: EditCtx,
+  statement: StoredStatement,
+  readers: readonly number[] = statement.characterIds
+): Promise<string> {
   const { tx, now } = c;
   const ref = col(c, STATEMENTS).doc(statement.id);
   if ((await tx.get(ref)).exists)
@@ -2320,7 +2456,7 @@ async function issueStatementDoc(c: EditCtx, statement: StoredStatement): Promis
   const token = randomBytes(32).toString('base64url');
   tx.create(ref, {
     ...statement,
-    uids: statement.characterIds.map((x) => `char:${x}`),
+    uids: readers.map((x) => `char:${x}`),
     remindersStopped: false,
     manualRemindersSent: 0,
     issuedBy: c.access.characterId,
@@ -2428,7 +2564,8 @@ async function closeAccount(
     .reduce((sum, s) => sum + s.remaining, 0);
 
   let token: string | undefined;
-  if (statement) token = await issueStatementDoc(c, statement);
+  if (statement)
+    token = await issueStatementDoc(c, statement, minerReaders(action.minerId, minerSnap.data()));
   const closeFields = {
     closedAt: iso,
     closedBy: c.access.characterId,
@@ -2449,6 +2586,8 @@ async function closeAccount(
       characterIds,
       mainCharacterId: characterIds[0],
       pendingConfirmation: [],
+      officerClaimed: [],
+      provenCharacterIds: [],
       confirmedCharacterIds: [],
       uids: characterIds.map((x) => `char:${x}`),
       ...closeFields,
@@ -2574,6 +2713,11 @@ export async function editBookAs(
   }
   // Settings, a rate, an expiry or a survey change what the book's Shared Pops say (#6223).
   if (SHARED_POP_EDITS.has(action.action)) await refreshSharedPops(deps, call.corporationId);
+  // A regroup may add a character that already signed in as itself: it reads at once.
+  if (action.action === 'setMiner' || action.action === 'regroupMiner')
+    await promoteProvenClaims(deps, call.corporationId).catch((e) =>
+      console.error('claim promotion failed', e instanceof Error ? e.message : e)
+    );
   return result;
 }
 
@@ -2669,6 +2813,117 @@ export async function declineGrouping(
 ) {
   const characterId = signedInCharacter(caller);
   await declinePending(deps, corporationId, minerId, characterId, { characterId, name: '' });
+}
+
+/**
+ * The added character declines its link to a corporation's Miner, signed in as itself. It
+ * works for an Officer claim and a legacy pending guest alike; the removal is sticky for this
+ * corporation only (`declinedAutoGroup`), so sign-in never re-adds it.
+ */
+export async function declineLink(
+  deps: BookDeps,
+  caller: Caller,
+  corporationId: number,
+  minerId: string
+) {
+  const characterId = signedInCharacter(caller);
+  const ref = sub(deps.db, corporationId, MINERS).doc(minerId);
+  await deps.db.runTransaction(async (tx) => {
+    const miner = (await tx.get(ref)).data();
+    if (!miner || !(miner.characterIds as number[]).includes(characterId))
+      fail('not-found', 'Nothing to decline', 'nothing-to-decline');
+    if (miner.closedAt != null)
+      fail('failed-precondition', "This Miner's account is closed", 'account-closed');
+    removeFromMiner(tx, ref, miner, characterId);
+    recordAnswer(tx, deps, corporationId, characterId, {
+      minerId,
+      answer: 'declined',
+      via: 'character',
+    });
+    appendAudit(tx, deps, corporationId, { characterId, name: '' }, 'declineGrouping', {
+      minerId,
+      characterId,
+      link: true,
+    });
+  });
+  await refreshAfterEvent(deps.db, corporationId, [minerId, `solo:${characterId}`], deps.now);
+  await refreshReadModels(deps.db, corporationId, deps.now());
+  return { declined: true as const };
+}
+
+const PROMOTE_WRITE_CAP = 450;
+const GROUP_CONFLICTS_DOC = 'groupConflicts';
+
+/**
+ * Moves each officer claim whose owner has signed in as it (a Self-proven link) into the
+ * group's readers: `officerClaimed` to `provenCharacterIds`, `uids` widened on the Miner and on
+ * every record it holds. A character in two groups is promoted only in the earlier one and
+ * listed in `meta/groupConflicts` for an officer. Called where the officer's book is already
+ * open (an edit, a sync); a group too large to widen in one transaction is left claimed.
+ */
+export async function promoteProvenClaims(
+  deps: BookDeps,
+  corporationId: number
+): Promise<{ promoted: number }> {
+  const minersCol = sub(deps.db, corporationId, MINERS);
+  // Cheap pre-check outside a transaction: most syncs have nothing claimed or proven.
+  const before = await minersCol.get();
+  const claimed = [
+    ...new Set(before.docs.flatMap((d) => (d.get('officerClaimed') as number[] | undefined) ?? [])),
+  ];
+  const stored = groupConflicts(
+    before.docs.map((d) => claimMinerOf(d.id, d.data())),
+    ''
+  );
+  if (claimed.length === 0 && stored.length === 0) return { promoted: 0 };
+  const provenNow =
+    claimed.length > 0 ? await provenCharacterIds(deps.db, claimed) : new Set<number>();
+  if (provenNow.size === 0 && stored.length === 0) return { promoted: 0 };
+  const conflictsRef = sub(deps.db, corporationId, META).doc(GROUP_CONFLICTS_DOC);
+  let promoted = 0;
+  await deps.db.runTransaction(async (tx) => {
+    promoted = 0;
+    const miners = (await tx.get(minersCol)).docs;
+    const group = miners.map((d) => claimMinerOf(d.id, d.data()));
+    const proven = await provenAmong(tx, deps.db, [...provenNow]);
+    const plans = promoteClaims(group, proven);
+    const held = (await tx.get(conflictsRef)).data();
+    // Read every record a widened Miner holds before the first write.
+    const widen: { ref: DocumentReference; uids: string[] }[][] = [];
+    for (const p of plans) {
+      const uids = p.characterIds.map((x) => `char:${x}`);
+      const refs: { ref: DocumentReference; uids: string[] }[] = [];
+      for (const name of [...MINER_KEYED, DISPUTES]) {
+        const snap = await tx.get(
+          sub(deps.db, corporationId, name).where('minerId', '==', p.minerId)
+        );
+        for (const d of snap.docs) if ('uids' in d.data()) refs.push({ ref: d.ref, uids });
+      }
+      widen.push(refs);
+    }
+    let budget = PROMOTE_WRITE_CAP;
+    plans.forEach((p, i) => {
+      if (widen[i].length + 1 > budget) return; // stays an officer claim until it fits
+      budget -= widen[i].length + 1;
+      const uids = p.characterIds.map((x) => `char:${x}`);
+      tx.update(minersCol.doc(p.minerId), {
+        officerClaimed: p.officerClaimed,
+        provenCharacterIds: p.provenCharacterIds,
+        uids: FieldValue.arrayUnion(...uids),
+      });
+      for (const w of widen[i]) tx.update(w.ref, { uids: FieldValue.arrayUnion(...w.uids) });
+      promoted += p.characterIds.length;
+    });
+    const items = groupConflicts(group, new Date(deps.now()).toISOString()).map((x) => {
+      const old = ((held?.items as GroupConflict[] | undefined) ?? []).find(
+        (o) => o.characterId === x.characterId && o.minerIds.join() === x.minerIds.join()
+      );
+      return old ?? x;
+    });
+    const same = JSON.stringify(items) === JSON.stringify(held?.items ?? []);
+    if (!same && (items.length > 0 || held)) tx.set(conflictsRef, { items });
+  });
+  return { promoted };
 }
 
 /**

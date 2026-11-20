@@ -1,4 +1,4 @@
-import { afterEach, describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -51,6 +51,67 @@ describe('CorpRosterTable', () => {
     expect(screen.getByRole('menuitem', { name: /Open in EVE/ })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /zKillboard/ })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
+  });
+
+  describe('player groups', () => {
+    it('shows a quiet group badge, with the other characters in its tooltip', async () => {
+      render(
+        <MemoryRouter>
+          <CorpRosterTable
+            rows={[
+              { ...row(1, false), group: { size: 3, names: ['Alt A', 'Alt B'] } },
+              row(2, false),
+            ]}
+          />
+        </MemoryRouter>
+      );
+      const badge = screen.getByText('Group of 3');
+      expect(badge.closest('button, a')).toBeNull();
+      expect(screen.queryAllByText(/^Group of/)).toHaveLength(1);
+      await userEvent.tab();
+      badge.parentElement?.focus();
+      expect(await screen.findByRole('tooltip')).toHaveTextContent('Alt A, Alt B');
+    });
+
+    it('offers Group with to officers, in the row menu only when wired', async () => {
+      const onGroupWith = vi.fn();
+      const { rerender } = render(
+        <MemoryRouter>
+          <CorpRosterTable rows={[row(1, false)]} />
+        </MemoryRouter>
+      );
+      await userEvent.click(screen.getByRole('button', { name: /More actions for Member 1/ }));
+      expect(screen.queryByRole('menuitem', { name: /Group with/ })).not.toBeInTheDocument();
+      await userEvent.keyboard('{Escape}');
+      rerender(
+        <MemoryRouter>
+          <CorpRosterTable rows={[row(1, false)]} onGroupWith={onGroupWith} />
+        </MemoryRouter>
+      );
+      await userEvent.click(screen.getByRole('button', { name: /More actions for Member 1/ }));
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'Group with' }));
+      expect(onGroupWith).toHaveBeenCalledWith(expect.objectContaining({ characterId: 1 }));
+    });
+  });
+
+  it('offers Show in Players view only on a grouped row, when wired', async () => {
+    const onShow = vi.fn();
+    const grouped = { ...row(1, false), group: { size: 2, names: ['Alt A'] } };
+    render(
+      <MemoryRouter>
+        <CorpRosterTable
+          rows={[grouped, row(2, false)]}
+          onGroupWith={vi.fn()}
+          onShowInPlayers={onShow}
+        />
+      </MemoryRouter>
+    );
+    await userEvent.click(screen.getByRole('button', { name: /More actions for Member 2/ }));
+    expect(screen.queryByRole('menuitem', { name: 'Show in Players view' })).toBeNull();
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(screen.getByRole('button', { name: /More actions for Member 1/ }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Show in Players view' }));
+    expect(onShow).toHaveBeenCalledWith(expect.objectContaining({ characterId: 1 }));
   });
 
   describe('Joined date follows the Time format setting', () => {

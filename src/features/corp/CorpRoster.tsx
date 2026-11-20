@@ -10,12 +10,10 @@
  * most recently seen first under a down arrow, like any date column. The
  * silent members are the amber ones and the "dark only" filter, not the order.
  */
-import { Fragment, useMemo, type ReactElement } from 'react';
+import { Fragment, useCallback, useMemo, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import * as Icon from '@/components/ui/icons';
-import { Pill } from '@/components/ui/Pill';
-import { CharacterLink, SystemLink } from '@/features/entities';
-import { ItemInfoLink } from '@/features/entities';
+import { MenuItem } from '@/components/ui';
+import { CharacterLink } from '@/features/entities';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { useUrlSort } from '@/lib/useUrlState';
 import {
@@ -28,22 +26,14 @@ import {
 } from '@/components/ui';
 import type { UseTableExport } from '@/components/ui/useTableExport';
 import { useColumnVisibility } from '@/lib/columnVisibility';
-import { formatAge } from '@/lib/age';
-import { useTimeZone } from '@/lib/timeFormat';
-import { formatDateOnly } from '@/lib/timestamp';
-import {
-  DASH,
-  isEmptyRosterDiff,
-  label,
-  type MemberStanding,
-  type RosterDiff,
-} from '@/engine/corp/members';
+import { isEmptyRosterDiff, type MemberStanding, type RosterDiff } from '@/engine/corp/members';
 import { useDarkThreshold } from './darkThreshold';
 import { CharacterRowMenu } from './corpRowMenus';
-import { rolesText } from './roles';
+import { useRosterColumns } from './useRosterColumns';
 import {
   CORP_ROSTER_COLUMN_IDS,
   CORP_ROSTER_DEFAULT_COLUMNS,
+  ROSTER_SORT,
   useVisibleCorpRosterColumns,
   type CorpRosterColumnId,
 } from './corpRosterColumns';
@@ -65,6 +55,8 @@ export interface RosterRow {
   isSelf: boolean;
   /** The corporation's CEO (its `ceo_id`). */
   isCeo: boolean;
+  /** Set for an officer when this member is grouped: the group's size and the other characters' names. */
+  group?: { size: number; names: readonly string[] };
 }
 
 export function CorpRosterSummary({
@@ -128,128 +120,6 @@ export function CorpRosterStats({ rows }: { rows: readonly RosterRow[] }) {
   );
 }
 
-/** Solar system ids sit in 30,000,000-32,000,000; stations and structures do not. */
-const isSolarSystemId = (id: number) => id >= 30_000_000 && id < 32_000_000;
-
-/** Most recently seen first, under a down arrow (see the module note). */
-const ROSTER_SORT = { columnId: 'lastSeen', direction: 'desc' } as const;
-
-/** Every roster column, hidden or not — the table and its column picker both read it. */
-function useRosterColumns(): DataTableColumn<RosterRow>[] {
-  const { t } = useTranslation();
-  const timeZone = useTimeZone();
-  return useMemo<DataTableColumn<RosterRow>[]>(
-    () => [
-      {
-        id: 'member',
-        header: t('corp.members.columnMember'),
-        // Pinned while the other columns scroll sideways on a phone.
-        stickyStart: true,
-        stickyStartOnPanel: true,
-        className: 'truncate',
-        // The name truncates, the tag does not: a long name must not ellipsize it away.
-        render: (row) => (
-          <span className="flex min-w-0 items-center gap-1.5">
-            <CharacterLink id={row.characterId} className="truncate">
-              {label(row.name, row.characterId)}
-            </CharacterLink>
-            {row.isSelf && (
-              <span className="shrink-0 rounded-xs bg-panel-2 px-1 py-0.5 text-[0.6875rem] text-text-dim">
-                {t('corp.members.you')}
-              </span>
-            )}
-            {row.isCeo && <Pill className="shrink-0">{t('corp.members.ceo')}</Pill>}
-          </span>
-        ),
-        sortValue: (row) => row.name ?? undefined,
-      },
-      {
-        id: 'lastSeen',
-        header: t('corp.members.columnLastSeen'),
-        align: 'right',
-        width: '16ch',
-        className: 'whitespace-nowrap tabular-nums',
-        // The one tone on the table: a member past the dark threshold. Applied
-        // to this cell rather than the whole row, so the amber reads as a
-        // statement about the silence and not about the person.
-        cellClassName: (row) => (row.standing.isDark ? 'text-warning' : undefined),
-        render: (row) => {
-          const age = row.standing.neverSeen
-            ? t('corp.members.never')
-            : // Clamped here, not in the engine: a negative span is clock skew,
-              // and "just now" is the honest rendering of it.
-              formatAge(Math.max(0, row.standing.darkForMs ?? 0), t);
-          // Amber alone is the only signal otherwise (WCAG 1.4.1); the glyph
-          // is decorative, the age text beside it is what is read.
-          return row.standing.isDark ? (
-            <span className="inline-flex items-center gap-1">
-              <Icon.Warn aria-hidden="true" size={Icon.ICON_SIZE.sm} className="shrink-0" />
-              {age}
-              <span className="sr-only">{t('corp.members.darkState')}</span>
-            </span>
-          ) : (
-            age
-          );
-        },
-        // Sorted on the span, matching what the cell prints — see the module
-        // note. `undefined` for a member with no date at all sinks them to the
-        // end in either direction, which is right: nothing is known about them.
-        sortValue: (row) => (row.standing.darkForMs === null ? undefined : -row.standing.darkForMs),
-      },
-      {
-        id: 'ship',
-        header: t('corp.members.columnShip'),
-        width: '24ch',
-        className: 'truncate',
-        render: (row) =>
-          row.shipTypeId === null ? (
-            label(row.shipName, row.shipTypeId)
-          ) : (
-            <ItemInfoLink typeId={row.shipTypeId}>
-              {label(row.shipName, row.shipTypeId)}
-            </ItemInfoLink>
-          ),
-        sortValue: (row) => row.shipName ?? undefined,
-      },
-      {
-        id: 'location',
-        header: t('corp.members.columnLocation'),
-        className: 'truncate',
-        // A solar system links to Route Safety / Travel, where waypoints are
-        // set; a station or structure id is not a system, so stays text.
-        render: (row) =>
-          row.locationId !== null &&
-          row.locationName !== null &&
-          isSolarSystemId(row.locationId) ? (
-            <SystemLink systemId={row.locationId}>{row.locationName}</SystemLink>
-          ) : (
-            label(row.locationName, row.locationId)
-          ),
-        sortValue: (row) => row.locationName ?? undefined,
-      },
-      {
-        id: 'joined',
-        header: t('corp.members.columnJoined'),
-        // `formatDateOnly` on one line: "10/23/2026".
-        width: '12ch',
-        className: 'whitespace-nowrap tabular-nums text-text-dim',
-        render: (row) =>
-          row.startMs === null ? DASH : formatDateOnly(new Date(row.startMs), timeZone),
-        sortValue: (row) => row.startMs ?? undefined,
-      },
-      {
-        id: 'roles',
-        header: t('corp.members.columnRoles'),
-        width: '24ch',
-        className: 'truncate',
-        render: (row) => rolesText(row.roles) ?? DASH,
-        sortValue: (row) => rolesText(row.roles) ?? undefined,
-      },
-    ],
-    [t, timeZone]
-  );
-}
-
 /**
  * The roster's column picker, for the page's filter row. Reads the same store
  * as `CorpRosterTable`, so the two agree without the page threading state.
@@ -283,24 +153,50 @@ export function CorpRosterColumnPicker() {
   );
 }
 
-/** Module-level so the table's windowing and row memo see one stable function. */
-const rosterRowMenu = (row: RosterRow, tr: ReactElement) => (
-  <CharacterRowMenu characterId={row.characterId} name={row.name}>
-    {tr}
-  </CharacterRowMenu>
-);
 const rosterRowKey = (row: RosterRow) => row.characterId;
 
 export function CorpRosterTable({
   rows,
   tableProps,
+  onGroupWith,
+  onShowInPlayers,
 }: {
   rows: readonly RosterRow[];
+  /** Officers only: jumps to this member's Player in the Players view (grouped rows only). */
+  onShowInPlayers?: (row: RosterRow) => void;
+  /** Officers only: opens the group dialog for this member ("Group with" in the row menu). */
+  onGroupWith?: (row: RosterRow) => void;
   /** `useTableExport(...).tableProps` — feeds the header's Export menu. */
   tableProps?: UseTableExport<RosterRow>['tableProps'];
 }) {
   const { t } = useTranslation();
   const columns = useRosterColumns();
+  // Stable while the wiring is, so the table's windowing and row memo see one function.
+  const rosterRowMenu = useCallback(
+    (row: RosterRow, tr: ReactElement) => (
+      <CharacterRowMenu
+        characterId={row.characterId}
+        name={row.name}
+        extraItems={
+          onGroupWith && (
+            <>
+              <MenuItem onSelect={() => onGroupWith(row)}>
+                {t('corpTaxBook.moons.grouping.menu')}
+              </MenuItem>
+              {onShowInPlayers && row.group && (
+                <MenuItem onSelect={() => onShowInPlayers(row)}>
+                  {t('corp.members.players.showInPlayers')}
+                </MenuItem>
+              )}
+            </>
+          )
+        }
+      >
+        {tr}
+      </CharacterRowMenu>
+    ),
+    [onGroupWith, onShowInPlayers, t]
+  );
   const { isVisible } = useColumnVisibility(
     useVisibleCorpRosterColumns,
     CORP_ROSTER_DEFAULT_COLUMNS

@@ -66,16 +66,31 @@ export function noticeMailOf(
   return { days, oldest: miner.account?.owes?.oldest ?? days[0]?.date ?? fallbackOldest };
 }
 
+/**
+ * Who a Miner's mail goes to: its main when that is in the corporation, else the lowest-id group
+ * member that is, and a character outside the corporation only when none of the group is in it
+ * (or membership is unknown). A character in no group is its own recipient.
+ */
+export function mailRecipientOf(
+  miner: Pick<MinerRow, 'mainCharacterId' | 'characterIds'>,
+  memberIds: ReadonlySet<number> | undefined
+): number {
+  if (!memberIds || memberIds.has(miner.mainCharacterId)) return miner.mainCharacterId;
+  const inCorp = miner.characterIds.filter((id) => memberIds.has(id)).sort((a, b) => a - b);
+  return inCorp[0] ?? miner.mainCharacterId;
+}
+
 export function mailTarget(
   ctx: Pick<BookContextValue, 'names' | 'view'> & Partial<Pick<BookContextValue, 'settings'>>,
   statement: Statement,
   miner: MinerRow,
   balance: { amountDue: number; carried: number }
 ): StatementToMail {
+  const recipientId = mailRecipientOf(miner, ctx.view.input.memberIds);
   return {
     statementId: statement.id,
-    recipientId: miner.mainCharacterId,
-    recipientName: ctx.names.character(miner.mainCharacterId),
+    recipientId,
+    recipientName: ctx.names.character(recipientId),
     amountDue: balance.amountDue,
     carried: balance.carried,
     periodLabel: periodLabel(statement.periodStart, statement.periodEnd),

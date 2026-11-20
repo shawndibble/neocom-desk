@@ -14,6 +14,9 @@ export const CORP_ROSTER_COLUMN_IDS = ['lastSeen', 'ship', 'location', 'joined',
 
 export type CorpRosterColumnId = (typeof CORP_ROSTER_COLUMN_IDS)[number];
 
+/** Most recently seen first, under a down arrow (see CorpRoster's module note). */
+export const ROSTER_SORT = { columnId: 'lastSeen', direction: 'desc' } as const;
+
 /** Shown until the pilot picks, and what "Reset to default" restores. */
 export const CORP_ROSTER_DEFAULT_COLUMNS: readonly CorpRosterColumnId[] =
   CORP_ROSTER_COLUMN_IDS.filter((id) => id !== 'roles');

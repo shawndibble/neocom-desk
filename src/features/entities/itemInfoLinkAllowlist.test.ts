@@ -19,7 +19,8 @@ const REVIEWED = new Set<string>([
   'src/features/character/walletTransactionColumns.tsx',
   'src/features/communities/SharedBlueprintTable.tsx',
   'src/features/contracts/PublicContractDetailModal.tsx',
-  'src/features/corp/CorpRoster.tsx',
+  // The roster's Ship cell (shared by the Characters table and Players view). A Player's expandable parent row prints it as plain text (PlayersView); every other row has no primary action.
+  'src/features/corp/useRosterColumns.tsx',
   'src/features/fittings/AbyssalRunPlanner.tsx',
   'src/features/fittings/FittingFightersPanel.tsx',
   'src/features/fittings/FittingModuleList.tsx',

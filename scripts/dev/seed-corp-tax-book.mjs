@@ -12,6 +12,7 @@
 // emulator port in firebase.json; it can never reach production Firestore.
 
 import { randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -35,6 +36,9 @@ const { values: args } = parseArgs({
     extra: { type: 'string', default: '12' },
     project: { type: 'string', default: 'demo-neocom-desk' },
     port: { type: 'string', default: '5173' },
+    // Player groups for the Members page (see the block before "Write"). The ids and names are
+    // the sandbox ESI roster's (scripts/dev/sandbox/playerGroups.json), so the two always agree.
+    players: { type: 'boolean', default: false },
   },
 });
 
@@ -490,6 +494,121 @@ for (const [, st] of statementOf)
     amount: st.amount,
   });
 
+// --- Player groups (--players): Miner groups, Self-proven links, conflicts, declines ----------
+// Layout of writeMiner / promoteProvenClaims / recordAnswer in functions/src/corpTaxBookStore.ts
+// and playerLayer.ts. Names, ids and last-seen times come from sandbox/playerGroups.json, which
+// the sandbox's fake ESI roster serves too. Outside-corp characters get no roster row there.
+if (args.players) {
+  const fixture = JSON.parse(
+    readFileSync(new URL('./sandbox/playerGroups.json', import.meta.url), 'utf8')
+  );
+  const byName = new Map([...fixture.corp, ...fixture.outside].map((f) => [f.name, f.id]));
+  const idOf = (name) => {
+    const id = byName.get(name);
+    if (id === undefined) throw new Error(`playerGroups.json has no character "${name}"`);
+    return id;
+  };
+  const hash = args['owner-hash'];
+  const MINED = [
+    ['Vane Hauler', [9, 8, 6, 5, 3, 2]],
+    ['Vane Miner Two', [7, 5, 4, 2, 1]],
+    ['Sora Tenn', [...STATEMENT_DAYS, 4, 3, 1]],
+    ['Tenn Industrial', [10, 9, 6, 2]],
+    ['Dax Orlov', [11, 9, 7, 5, 2, 1]],
+    ['Orlov Scout', [12, 8]],
+    ['Mira Quill', [10, 7, 5, 3]],
+    ['Quill Alt', [6, 4, 2]],
+  ];
+  // Observed Mining Entries so the book has real rows for them (never for Kestrel Vane).
+  for (const [name, days] of MINED) {
+    for (const r of observedRows(idOf(name), CORP, days)) {
+      put(sub('observed').doc(`${r.characterId}_${r.typeId}_${r.date}_${r.structureId}`), {
+        ...r,
+        uid: `char:${r.characterId}`,
+      });
+    }
+  }
+  // [group id, main, characters, officerClaimed, provenCharacterIds, pendingConfirmation, daysAgo]
+  const GROUPS = [
+    [
+      'kestrel',
+      'Kestrel Vane',
+      ['Kestrel Vane', 'Vane Hauler', 'Vane Miner Two', 'Outer Rim Vane'],
+      ['Outer Rim Vane'],
+      [],
+      [],
+      40,
+    ],
+    [
+      'sora',
+      'Sora Tenn',
+      ['Sora Tenn', 'Tenn Industrial', 'Sora Of Elsewhere'],
+      [],
+      ['Sora Of Elsewhere'],
+      [],
+      35,
+    ],
+    ['dax', 'Dax Orlov', ['Dax Orlov', 'Orlov Scout'], [], [], [], 30],
+    ['mira', 'Mira Quill', ['Mira Quill', 'Quill Alt'], [], [], ['Quill Alt'], 25],
+    // Bram Holt sits in two groups: a conflict an officer sees in meta/groupConflicts.
+    ['bram-a', 'Tomas Reed', ['Tomas Reed', 'Bram Holt'], [], [], [], 20],
+    ['bram-b', 'Hana Bright', ['Hana Bright', 'Bram Holt'], [], [], [], 10],
+  ];
+  const stored = [];
+  for (const [key, main, names, claimed, proven, pending, ago] of GROUPS) {
+    const characterIds = names.map(idOf);
+    const held = new Set([...claimed, ...pending].map(idOf));
+    const doc = {
+      id: `m-${key}`,
+      characterIds,
+      mainCharacterId: idOf(main),
+      pendingConfirmation: pending.map(idOf),
+      officerClaimed: claimed.map(idOf),
+      provenCharacterIds: proven.map(idOf),
+      confirmedCharacterIds: [],
+      createdAt: iso(NOW - ago * DAY),
+      uids: characterIds.filter((x) => !held.has(x)).map((x) => `char:${x}`),
+    };
+    put(sub('miners').doc(doc.id), doc);
+    stored.push(doc);
+  }
+  const bram = idOf('Bram Holt');
+  put(sub('meta').doc('groupConflicts'), {
+    items: [
+      {
+        characterId: bram,
+        minerIds: stored.filter((m) => m.characterIds.includes(bram)).map((m) => m.id),
+        at: iso(NOW - 2 * DAY),
+      },
+    ],
+  });
+  // Self-proven links: Sora Tenn signed in as her outside alt (players/ + playerCharacters/).
+  const provenIds = [idOf('Sora Of Elsewhere'), idOf('Sora Tenn')].sort((a, b) => a - b);
+  const playerId = String(provenIds[0]);
+  put(db.collection('players').doc(playerId), {
+    id: playerId,
+    characterIds: provenIds,
+    uids: provenIds.map((x) => `char:${x}`),
+    updatedAt: iso(NOW - 3 * DAY),
+  });
+  for (const characterId of provenIds) {
+    put(db.collection('playerCharacters').doc(String(characterId)), {
+      characterId,
+      playerId,
+      ownerHash: hash,
+      provenAt: iso(NOW - 3 * DAY),
+    });
+  }
+  // Nyx Arden was unlinked by an officer: automatic grouping leaves them alone.
+  const nyx = idOf('Nyx Arden');
+  put(sub('meta').doc('declinedAutoGroup'), { ids: [nyx] });
+  put(sub('meta').doc('groupingAnswers'), {
+    answers: {
+      [String(nyx)]: { minerId: 'm-dax', answer: 'declined', via: 'character', at: iso(NOW - DAY) },
+    },
+  });
+}
+
 // --- Write ---------------------------------------------------------------------
 // Clear any earlier seed of this book through the emulator's own wipe endpoint.
 await fetch(`http://${host}/emulator/v1/projects/${args.project}/databases/(default)/documents`, {
@@ -503,4 +622,8 @@ for (let i = 0; i < writes.length; i += 400) {
 
 console.log(`Seeded corp ${CORP} (${CORP_NAME}) into ${host}: ${writes.length} documents.`);
 console.log(`Officer ${OFFICER}, member ${MEMBER}${GUEST === null ? '' : `, guest ${GUEST}`}.`);
+if (args.players)
+  console.log(
+    'Seeded Player groups (--players): 6 Miner groups, 1 Player, 1 conflict, 1 declined.'
+  );
 console.log(`Verify URL: http://localhost:${args.port}/corp-tax-book/verify/${token}`);

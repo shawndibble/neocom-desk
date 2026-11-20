@@ -113,6 +113,8 @@ export const CALLABLE_ACTIONS = {
     'readCorpTaxBookStatementCallable',
     'declineCorpTaxBookGroupingByTokenCallable',
     'stopCorpTaxBookRemindersCallable',
+    'claimPlayerCharactersCallable',
+    'declineCorpTaxBookLinkCallable',
   ],
   vetting: [
     'getVettingCorpCallable',

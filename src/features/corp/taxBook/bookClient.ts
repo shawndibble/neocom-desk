@@ -332,6 +332,31 @@ export async function readDeclinedAutoGroup(
   return new Set(Array.isArray(ids) ? (ids as number[]) : []);
 }
 
+/**
+ * What the Members page flags beside a character: ones two groups claim (`meta/groupConflicts`)
+ * and ones that said no to a link (`meta/groupingAnswers`). Best effort: a book that never had
+ * either has no document, and a denied read is none. Officer-only.
+ */
+export async function readGroupingFlags(
+  characterId: number,
+  corporationId: number
+): Promise<{ conflictIds: Set<number>; declinedIds: Set<number> }> {
+  await ensureSignedIn(characterId);
+  const meta = (id: string) =>
+    getDoc(doc(getSyncFirestore(characterId), 'corps', String(corporationId), 'meta', id))
+      .then((snap) => snap.data())
+      .catch(() => undefined);
+  const [conflicts, answers] = await Promise.all([meta('groupConflicts'), meta('groupingAnswers')]);
+  return {
+    conflictIds: new Set(groupConflictsFrom(conflicts).map((c) => c.characterId)),
+    declinedIds: new Set(
+      groupingAnswersFrom(answers)
+        .filter((a) => a.answer === 'declined')
+        .map((a) => a.characterId)
+    ),
+  };
+}
+
 /** The book's settings and the collections the sync needs. Officer-only: verify first. */
 export async function readBookState(
   characterId: number,
@@ -416,6 +441,31 @@ export function groupingAnswersFrom(d: Record<string, unknown> | undefined): Gro
         answer: a.answer,
         at: String(a.at ?? ''),
         via: a.via === 'verify-link' ? ('verify-link' as const) : ('character' as const),
+      },
+    ];
+  });
+}
+
+/** A character two groups claim (`meta/groupConflicts`): the earlier group was kept, an officer settles it. */
+export interface GroupConflict {
+  characterId: number;
+  minerIds: string[];
+  /** ISO instant. */
+  at: string;
+}
+
+/** Reads `meta/groupConflicts`, dropping anything malformed. */
+export function groupConflictsFrom(d: Record<string, unknown> | undefined): GroupConflict[] {
+  const raw = d?.items;
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((c: unknown) => {
+    const x = c as Record<string, unknown> | null;
+    if (!x || !Number.isSafeInteger(x.characterId) || !Array.isArray(x.minerIds)) return [];
+    return [
+      {
+        characterId: x.characterId as number,
+        minerIds: x.minerIds.map(String),
+        at: String(x.at ?? ''),
       },
     ];
   });
@@ -508,6 +558,8 @@ export interface BookData {
   /** Each feeder's last good ledger read (#4509); a feeder's days are Billable only after one. */
   feeders?: BookFeeder[];
   groupingAnswers?: GroupingAnswer[];
+  /** Characters two groups claim, for the officers to settle (`meta/groupConflicts`). */
+  groupConflicts?: GroupConflict[];
   /** The scheduled sync's public status (ADR 0025); null when it was never turned on or was revoked. */
   scheduledSync?: ScheduledSyncStatus | null;
   /** #6207: donations a sync noted in divisions the book does not read (`meta/uncounted`). */

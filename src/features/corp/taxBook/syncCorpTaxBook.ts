@@ -25,7 +25,12 @@ import {
 } from '@/engine/corpTaxBook/sync';
 import { matchDonation } from '@/engine/corpTaxBook/allocation';
 import { noteUncounted, otherDivisions } from '@/engine/corpTaxBook/uncounted';
-import { planAutoGroups, type GroupingEdit } from '@/engine/corpTaxBook/grouping';
+import {
+  planSignInGroups,
+  type GroupingEdit,
+  type MergePrompt,
+  type RegroupEdit,
+} from '@/engine/corpTaxBook/grouping';
 import type { Statement } from '@/engine/corpTaxBook/statements';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import type { FeederCoverage } from '@/engine/corpTaxBook/coverage';
@@ -102,7 +107,7 @@ export interface SyncDeps {
   applyGrouping: (
     characterId: number,
     corporationId: number,
-    edit: GroupingEdit
+    edit: GroupingEdit | RegroupEdit
   ) => Promise<unknown>;
   /**
    * The book's stored observer rows and its moon owners' coverage: the mining it bills at moon
@@ -184,6 +189,10 @@ export type SyncOutcome =
       autoGrouped: number;
       /** Why grouping failed this visit, if it did (the sync itself still succeeded). */
       autoGroupError?: string;
+      /** Merges an officer is asked to decide: too large for one write, or two groups claim one character. */
+      groupPrompts?: MergePrompt[];
+      /** Account characters an officer removed or a character declined: never re-added. */
+      groupFlagged?: number[];
       /** Why re-matching stored Unmatched payments failed this visit, if it did (the sync itself still succeeded). */
       reassignError?: string;
     };
@@ -320,12 +329,12 @@ export async function syncCorpTaxBook(
   }
 
   // D26: this account's own Characters in the corporation share one Miner, so one payment covers them.
-  const { grouped: autoGrouped, error: autoGroupError } = await autoGroup(
-    deps,
-    characterId,
-    corporationId,
-    before.miners
-  );
+  const {
+    grouped: autoGrouped,
+    error: autoGroupError,
+    prompts: groupPrompts,
+    flagged: groupFlagged,
+  } = await autoGroup(deps, characterId, corporationId, before.miners, recordCounts(before));
 
   // A donation stored Unmatched stays so forever unless re-matched: its sender may have joined a
   // Miner (or mined here) since. Assign the ones that match now; the officer's queue keeps the rest.
@@ -376,6 +385,8 @@ export async function syncCorpTaxBook(
     ...(noRefineries ? { noRefineries: true as const } : {}),
     autoGrouped,
     ...(autoGroupError ? { autoGroupError } : {}),
+    ...(groupPrompts.length > 0 ? { groupPrompts } : {}),
+    ...(groupFlagged.length > 0 ? { groupFlagged } : {}),
     ...(reassignError ? { reassignError } : {}),
   };
 }
@@ -510,31 +521,52 @@ async function reassignUnmatched(
 }
 
 /**
- * Groups the app account's Characters that are in the corporation and not in a
- * Miner yet. A failure here must not fail the sync that already uploaded, so
- * it is reported in the outcome (the page shows it) and the next visit tries again.
+ * Groups the app account's Characters (proven by this very login) that are in the corporation
+ * (`planSignInGroups`): free ones into one Miner, Miners they touch merged by regroup while the
+ * records moved fit one write, else a prompt for an officer. A failure here must not fail the sync
+ * that already uploaded, so it is reported in the outcome and the next visit tries again.
  */
 async function autoGroup(
   deps: SyncDeps,
   characterId: number,
   corporationId: number,
-  miners: BookState['miners']
-): Promise<{ grouped: number; error?: string }> {
+  miners: BookState['miners'],
+  records: ReadonlyMap<string, number>
+): Promise<{ grouped: number; error?: string; prompts: MergePrompt[]; flagged: number[] }> {
   try {
-    const edits = planAutoGroups({
+    const { edits, prompts, flagged } = planSignInGroups({
       corporationId,
-      accountCharacters: await deps.loadAccountCharacters(),
+      proven: await deps.loadAccountCharacters(),
       miners,
       declined: await deps.declinedGrouping(characterId, corporationId),
       preferredMain: characterId,
+      recordCountByMiner: records,
     });
     for (const edit of edits) await deps.applyGrouping(characterId, corporationId, edit);
     const grouped = edits.reduce(
-      (n, e) => n + (e.action === 'setMiner' ? e.characterIds.length : 0),
+      (n, e) => n + (e.action === 'unlink' ? 0 : e.characterIds.length),
       0
     );
-    return { grouped };
+    return { grouped, prompts, flagged };
   } catch (e) {
-    return { grouped: 0, error: e instanceof Error ? e.message : String(e) };
+    return {
+      grouped: 0,
+      error: e instanceof Error ? e.message : String(e),
+      prompts: [],
+      flagged: [],
+    };
   }
+}
+
+/** What a merge would move per Miner: its Statements and payments (the records the re-key rewrites). */
+function recordCounts(book: BookState): Map<string, number> {
+  const counts = new Map<string, number>();
+  const bump = (id: string | undefined) => {
+    if (id !== undefined) counts.set(id, (counts.get(id) ?? 0) + 1);
+  };
+  for (const s of book.statements as { minerId?: string }[]) bump(s.minerId);
+  for (const p of book.payments) bump(p.minerId);
+  for (const d of book.dismissals as { minerId?: string }[]) bump(d.minerId);
+  for (const w of book.writeOffs ?? []) bump((w as { minerId?: string }).minerId);
+  return counts;
 }
