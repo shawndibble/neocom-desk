@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { Button, Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
+import { useCorporationName } from './statementMailing';
 import { GroupMinersDialog } from './GroupMinersDialog';
 import { callableErrorText } from './feederErrorText';
 import { useBook } from './useBook';
@@ -12,7 +14,10 @@ import { tapTargetClassName } from './sectionHelpers';
 /** The stored grouping carries the guest-confirmation state the engine's Miner shape leaves out (D26b). */
 interface StoredGrouping {
   id: string;
+  /** LEGACY: old docs still carry a character waiting to confirm; new writes never do. */
   pendingConfirmation?: number[];
+  /** Officer claims: billed with the group, not signed in as themselves yet. */
+  officerClaimed?: number[];
 }
 
 /**
@@ -23,7 +28,9 @@ interface StoredGrouping {
  */
 export function MinerCharacters({ miner }: { miner: MinerRow }) {
   const { t } = useTranslation();
-  const { names, edit, canEdit, data } = useBook();
+  const { names, edit, canEdit, data, characterId, corporationId } = useBook();
+  const [declining, setDeclining] = useState(false);
+  const corpName = useCorporationName();
   const [grouping, setGrouping] = useState(false);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +48,9 @@ export function MinerCharacters({ miner }: { miner: MinerRow }) {
       .map((a) => a.characterId)
   );
   const pending = new Set(stored?.pendingConfirmation ?? []);
+  const claimed = new Set(stored?.officerClaimed ?? []);
+  // The added character itself may say no; it is the viewer only when it is also an officer here.
+  const canDecline = stored !== undefined && claimed.has(characterId);
   const isStored = stored !== undefined;
 
   const run = async (action: () => Promise<unknown>) => {
@@ -96,6 +106,12 @@ export function MinerCharacters({ miner }: { miner: MinerRow }) {
                       · {t('corpTaxBook.moons.grouping.pending')}
                     </span>
                   )}
+                  {canEdit && claimed.has(characterId) && (
+                    <span className="text-xs text-text-dim" data-testid="officer-claim">
+                      {' '}
+                      · {t('corpTaxBook.moons.grouping.officerClaim')}
+                    </span>
+                  )}
                   {confirmed.has(characterId) && !pending.has(characterId) && (
                     <span className="text-xs text-success">
                       {' '}
@@ -142,7 +158,24 @@ export function MinerCharacters({ miner }: { miner: MinerRow }) {
               </li>
             ))}
           </ul>
+          {canEdit && claimed.size > 0 && (
+            <p className="text-xs text-text-dim">
+              {t('corpTaxBook.moons.grouping.officerClaimHint')}
+            </p>
+          )}
           {error && <InlineError>{error}</InlineError>}
+          {canDecline && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setDeclining(true);
+                setOpen(false);
+              }}
+            >
+              {t('corpTaxBook.moons.grouping.declineLink')}
+            </Button>
+          )}
           {canEdit && (
             <Button
               size="sm"
@@ -157,6 +190,24 @@ export function MinerCharacters({ miner }: { miner: MinerRow }) {
           )}
         </PopoverContent>
       </Popover>
+      {declining && (
+        <ConfirmDialog
+          open
+          title={t('corpTaxBook.moons.grouping.declineTitle')}
+          body={t('corpTaxBook.moons.grouping.declineBody', {
+            name: names.character(characterId),
+            corp: corpName ?? String(corporationId),
+          })}
+          actionLabel={t('corpTaxBook.moons.grouping.declineLink')}
+          failedLabel={t('corpTaxBook.moons.grouping.declineFailed')}
+          onClose={() => setDeclining(false)}
+          onConfirm={async () => {
+            const { declineLink } = await import('@/features/corpTaxBook/playerApi');
+            await declineLink(characterId, { corporationId, minerId: miner.id });
+            setDeclining(false);
+          }}
+        />
+      )}
       {grouping && <GroupMinersDialog open onClose={() => setGrouping(false)} miner={miner} />}
     </>
   );

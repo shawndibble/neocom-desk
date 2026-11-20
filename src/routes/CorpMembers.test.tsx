@@ -25,6 +25,7 @@ import {
   CORP_ROSTER_DEFAULT_COLUMNS,
   useVisibleCorpRosterColumns,
 } from '@/features/corp/corpRosterColumns';
+import { useRosterGrouping, type RosterGrouping } from '@/features/corp/useRosterGrouping';
 import { CorpMembers } from './CorpMembers';
 import { LocationProbe } from '@/test/LocationProbe';
 
@@ -41,6 +42,7 @@ vi.mock('@/features/corp/members', async (importOriginal) => ({
   loadCorporationMemberTracking: vi.fn(),
   loadMemberLabels: vi.fn(),
 }));
+vi.mock('@/features/corp/useRosterGrouping', () => ({ useRosterGrouping: vi.fn() }));
 vi.mock('@/features/corp/roleAudit', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/corp/roleAudit')>()),
   loadRoleAudit: vi.fn(),
@@ -51,6 +53,26 @@ vi.mock('@/features/corp/rosterState', () => ({
 }));
 
 const mockedAccess = vi.mocked(useCorpAccess);
+const mockedGrouping = vi.mocked(useRosterGrouping);
+
+/** What a Character that cannot edit a book gets: no grouping at all. */
+const NO_GROUPING: RosterGrouping = {
+  canGroup: false,
+  groupOf: () => undefined,
+  names: new Map(),
+  groups: [],
+  conflictIds: new Set(),
+  declinedIds: new Set(),
+  reload: () => {},
+  source: {
+    status: 'loading',
+    choices: [],
+    stored: [],
+    name: (id) => `#${id}`,
+    edit: async () => ({}),
+    searchAs: 0,
+  },
+};
 const mocked = { ...vi.mocked(boardData), ...vi.mocked(corpMembers), ...vi.mocked(rosterState) };
 
 const CHARACTER_ID = 42;
@@ -155,6 +177,7 @@ beforeEach(async () => {
   useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
   usePublicInfoModalStore.setState({ request: null });
 
+  mockedGrouping.mockReturnValue(NO_GROUPING);
   mocked.loadCorporationId.mockResolvedValue(CORPORATION_ID);
   mocked.loadCorporationMemberIds.mockResolvedValue(cached([1001, 1002]));
   mocked.loadCorporationMemberTracking.mockResolvedValue(
@@ -935,5 +958,81 @@ describe('Roles tab (#4613)', () => {
     await screen.findByRole('table', { name: 'Corporation members' });
     expect(currentLocation()).toBe('/corp/members/roster');
     expect(roleAudit.loadRoleAudit).not.toHaveBeenCalled();
+  });
+});
+
+describe('the Players view', () => {
+  const officer: RosterGrouping = {
+    ...NO_GROUPING,
+    canGroup: true,
+    names: new Map([[7, 'Outer Rim Alt']]),
+    groups: [{ id: 'solo:1001', mainCharacterId: 1001, characterIds: [1001, 1002, 7] }],
+  };
+  beforeEach(() => {
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([tracking({ character_id: 1001 }), tracking({ character_id: 1002 })])
+    );
+  });
+
+  it('offers no View switch to a Character that cannot edit a book', async () => {
+    await rosterTable();
+    expect(screen.queryByRole('group', { name: 'View' })).not.toBeInTheDocument();
+  });
+
+  it('switches to Players through ?view=, and back', async () => {
+    mockedGrouping.mockReturnValue(officer);
+    const user = userEvent.setup();
+    await rosterTable();
+    expect(screen.getByRole('table', { name: 'Corporation members' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Players' }));
+    const players = await screen.findByRole('table', { name: 'Corporation members by Player' });
+    expect(currentLocation()).toContain('view=players');
+    expect(within(players).getByText('3 characters · 1 outside corp')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Characters' }));
+    expect(await screen.findByRole('table', { name: 'Corporation members' })).toBeInTheDocument();
+  });
+
+  it('Show in Players view jumps to the Players view with that Player open', async () => {
+    mockedGrouping.mockReturnValue({
+      ...officer,
+      groupOf: (id: number) =>
+        id === 1002 ? ({ characterIds: [1001, 1002, 7] } as never) : undefined,
+    });
+    const user = userEvent.setup();
+    await rosterTable();
+    const menus = screen.getAllByRole('button', { name: /More actions for/ });
+    // Only the grouped row (character 1002) carries the item.
+    for (const menu of menus) {
+      await user.click(menu);
+      const item = screen.queryByRole('menuitem', { name: 'Show in Players view' });
+      if (item) {
+        await user.click(item);
+        break;
+      }
+      await user.keyboard('{Escape}');
+    }
+    const players = await screen.findByRole('table', { name: 'Corporation members by Player' });
+    expect(currentLocation()).toContain('view=players');
+    // The Player opened itself for the highlighted alt, and the one-shot param was spent.
+    expect(await within(players).findAllByText('Outer Rim Alt')).not.toHaveLength(0);
+    await waitFor(() => expect(currentLocation()).not.toContain('highlight='));
+  });
+
+  it('a cold ?view=players&highlight=<alt> link still opens that alt once the groups load', async () => {
+    let loaded = false;
+    mockedGrouping.mockImplementation(() => (loaded ? officer : NO_GROUPING));
+    const user = userEvent.setup();
+    renderMembers('/corp/members?view=players&highlight=7');
+    await screen.findByRole('table', { name: 'Corporation members' });
+    loaded = true;
+    // Any state change re-renders the page, which now reads the groups.
+    await user.click(screen.getByRole('button', { name: /^Ship/ }));
+    const players = await screen.findByRole('table', { name: 'Corporation members by Player' });
+    expect(await within(players).findAllByText('Outer Rim Alt')).not.toHaveLength(0);
+  });
+
+  it('ignores ?view=players for a Character that cannot group', async () => {
+    renderMembers('/corp/members?view=players');
+    await screen.findByRole('table', { name: 'Corporation members' });
   });
 });

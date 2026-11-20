@@ -112,6 +112,8 @@ const WIRE_NAMES = [
   'corpTaxBook:readCorpTaxBookStatementCallable',
   'corpTaxBook:declineCorpTaxBookGroupingByTokenCallable',
   'corpTaxBook:stopCorpTaxBookRemindersCallable',
+  'corpTaxBook:claimPlayerCharactersCallable',
+  'corpTaxBook:declineCorpTaxBookLinkCallable',
   'vetting:getVettingCorpCallable',
   'vetting:startVettingCallable',
   'vetting:addVettingCharacterCallable',

@@ -13,6 +13,7 @@ import { useSyncRequestDeliveries } from '@/features/communities/useSyncRequestD
 import { db } from '@/db';
 import { isSyncConfigured } from './syncStatus';
 import { useBackgroundSync } from './backgroundSync';
+import { usePlayerClaim } from './usePlayerClaim';
 import { scheduleBootPrefetch, scheduleCachePrune, scheduleLazySdeWarm } from './bootPrefetch';
 import { scheduleBootSync } from './bootSync';
 import { startReconnectRecovery } from './reconnectRecovery';
@@ -295,6 +296,8 @@ function AppEffects() {
   const readIds = useLiveQuery(() => db.characters.toCollection().primaryKeys());
   const characterIds = readIds ?? NO_CHARACTER_IDS;
   useBackgroundSync(characterIds, activeCharacterId);
+  // Proves the stored Characters as one Player for corporations' grouping (once per load).
+  usePlayerClaim(characterIds);
   // Keeps what Characters share with their Communities current (issue #3600).
   usePublishSharedLibraries(characterIds, activeCharacterId);
   // Marks Request Pledges delivered from finished contracts (issue #3809).

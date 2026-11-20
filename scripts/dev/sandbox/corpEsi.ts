@@ -8,6 +8,24 @@
 import { CHARACTER_ID, CORPORATION_ID } from '../../../e2e/support/fixtureData';
 import { DAY_MS, HOUR_MS } from '../../../src/lib/age';
 import { iso, mix } from './gen';
+import playerGroups from './playerGroups.json' with { type: 'json' };
+
+/**
+ * The Player-groups fixture (playerGroups.json, same ids as `seed-corp-tax-book.mjs --players`):
+ * corp members that override or extend the generic roster. Characters outside the corp
+ * (`playerGroups.outside`) are deliberately absent from every roster read.
+ */
+interface FixtureMember {
+  id: number;
+  name: string;
+  hoursAgo: number | null;
+  shipTypeId: number | null;
+  locationId: number | null;
+  joined: string;
+  roles: string[];
+}
+const FIXTURE: FixtureMember[] = playerGroups.corp;
+const FIXTURE_BY_ID = new Map(FIXTURE.map((f) => [f.id, f]));
 
 const SYSTEMS = [30002187, 30002053, 30000144];
 const STATIONS = [60003760, 60008494];
@@ -44,6 +62,7 @@ const MEMBER_IDS = [
   90_000_003,
   ...Array.from({ length: 12 }, (_, i) => 90_001_000 + i),
   ...Array.from({ length: 10 }, (_, i) => 91_000_000 + i),
+  ...FIXTURE.map((f) => f.id).filter((id) => id !== CHARACTER_ID),
 ];
 
 const ROLE_SETS: string[][] = [
@@ -55,22 +74,49 @@ const ROLE_SETS: string[][] = [
 ];
 
 function roles() {
-  return MEMBER_IDS.map((id, i) => ({
-    character_id: id,
-    roles: ROLE_SETS[i === 0 ? 0 : 1 + ((i - 1) % (ROLE_SETS.length - 1))],
-    grantable_roles: i === 0 ? ['Director'] : [],
-  }));
+  return MEMBER_IDS.map((id, i) => {
+    const fixture = FIXTURE_BY_ID.get(id);
+    if (fixture)
+      return {
+        character_id: id,
+        roles: fixture.roles,
+        grantable_roles: fixture.roles.includes('Director') ? ['Director'] : [],
+      };
+    return {
+      character_id: id,
+      roles: ROLE_SETS[i === 0 ? 0 : 1 + ((i - 1) % (ROLE_SETS.length - 1))],
+      grantable_roles: i === 0 ? ['Director'] : [],
+    };
+  });
 }
 
 function memberTracking() {
-  return MEMBER_IDS.map((id, i) => ({
-    character_id: id,
-    location_id: STATIONS[i % 2],
-    ship_type_id: SHIPS[i % SHIPS.length],
-    start_date: iso(-(200 + i * 13) * DAY_MS),
-    logon_date: iso(-(i * 7 + 1) * HOUR_MS),
-    logoff_date: iso(-(i * 7 + 3) * HOUR_MS),
-  }));
+  return MEMBER_IDS.map((id, i) => {
+    const fixture = FIXTURE_BY_ID.get(id);
+    if (fixture) {
+      return {
+        character_id: id,
+        start_date: new Date(`${fixture.joined}T00:00:00Z`).toISOString(),
+        // Never seen: ESI omits the session dates, ship and location.
+        ...(fixture.hoursAgo === null
+          ? {}
+          : {
+              location_id: fixture.locationId,
+              ship_type_id: fixture.shipTypeId,
+              logon_date: iso(-fixture.hoursAgo * HOUR_MS),
+              logoff_date: iso(-(fixture.hoursAgo + 0.5) * HOUR_MS),
+            }),
+      };
+    }
+    return {
+      character_id: id,
+      location_id: STATIONS[i % 2],
+      ship_type_id: SHIPS[i % SHIPS.length],
+      start_date: iso(-(200 + i * 13) * DAY_MS),
+      logon_date: iso(-(i * 7 + 1) * HOUR_MS),
+      logoff_date: iso(-(i * 7 + 3) * HOUR_MS),
+    };
+  });
 }
 
 const TITLES = [

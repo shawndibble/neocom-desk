@@ -3,6 +3,7 @@
  * generated id read as a person or corporation instead of "Unknown 91000003". Plugged into
  * `installPersonalEsi` (personalEsi.ts), which owns the route registration.
  */
+import playerGroups from './playerGroups.json' with { type: 'json' };
 import {
   CHARACTER_ID,
   CHARACTER_NAME,
@@ -44,6 +45,9 @@ export function nameFor(
     return { name: PILOTS[id - PILOT_BASE], category: 'character' };
   if (id >= CORP_BASE && id < CORP_BASE + CORPS.length)
     return { name: CORPS[id - CORP_BASE], category: 'corporation' };
+  // The Player-groups fixture (playerGroups.json), corp members and outside alts alike.
+  const grouped = [...playerGroups.corp, ...playerGroups.outside].find((f) => f.id === id);
+  if (grouped) return { name: grouped.name, category: 'character' };
   // The Corp Tax Book seed's characters (scripts/dev/seed-corp-tax-book.mjs).
   if (id === 90_000_002) return { name: 'Dev Member', category: 'character' };
   if (id === 90_000_003) return { name: 'Dev Guest', category: 'character' };

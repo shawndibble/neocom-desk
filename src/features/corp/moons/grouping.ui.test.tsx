@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -21,6 +21,16 @@ vi.mock('../currentMembers', () => ({
 }));
 vi.mock('@/features/character/names', () => ({
   resolveNames: vi.fn(async (ids: number[]) => new Map(ids.map((id) => [id, `Pilot ${id}`]))),
+}));
+
+const declineLink = vi.fn();
+vi.mock('@/features/corpTaxBook/playerApi', () => ({
+  declineLink: (...a: unknown[]) => declineLink(...a),
+}));
+const searchPayeeEntities = vi.fn();
+vi.mock('@/features/miningTax/payeeEntitySearch', () => ({
+  MIN_PAYEE_SEARCH_LENGTH: 3,
+  searchPayeeEntities: (...a: unknown[]) => searchPayeeEntities(...a),
 }));
 
 const CORP = 98000001;
@@ -105,7 +115,11 @@ function renderPanel(
   );
 }
 
-beforeEach(() => editBook.mockReset().mockResolvedValue({}));
+beforeEach(() => {
+  editBook.mockReset().mockResolvedValue({});
+  declineLink.mockReset().mockResolvedValue(undefined);
+  searchPayeeEntities.mockReset().mockResolvedValue([]);
+});
 
 /** The characters are behind the "N characters" link (#5247). */
 const openCharacters = () => userEvent.click(screen.getByRole('button', { name: /characters?$/ }));
@@ -222,5 +236,67 @@ describe('MinerCharacters', () => {
     await openCharacters();
     await userEvent.click(screen.getByRole('button', { name: 'Group with' }));
     expect(await screen.findByText(/Couldn't load the other Miners/)).toBeInTheDocument();
+  });
+
+  it('notes an Officer claim to officers, with no confirmation wait', async () => {
+    renderPanel(
+      [
+        {
+          id: 'g1',
+          characterIds: [1, 3],
+          mainCharacterId: 1,
+          pendingConfirmation: [],
+          officerClaimed: [3],
+        } as Miner,
+      ],
+      'g1',
+      (row) => <MinerCharacters miner={row} />
+    );
+    await openCharacters();
+    expect(screen.getByText(/Officer claim — not logged in yet/)).toBeInTheDocument();
+    expect(screen.queryByText(/waiting for their confirmation/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Decline link' })).not.toBeInTheDocument();
+  });
+
+  it('lets the added character decline the link, after a confirm', async () => {
+    renderPanel(
+      [
+        {
+          id: 'g1',
+          characterIds: [1, 7],
+          mainCharacterId: 1,
+          pendingConfirmation: [],
+          officerClaimed: [7],
+        } as Miner,
+      ],
+      'g1',
+      (row) => <MinerCharacters miner={row} />
+    );
+    await openCharacters();
+    await userEvent.click(screen.getByRole('button', { name: 'Decline link' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Decline link' }));
+    await waitFor(() =>
+      expect(declineLink).toHaveBeenCalledWith(7, { corporationId: CORP, minerId: 'g1' })
+    );
+  });
+
+  it('adds a character found by name as an officer claim in the regroup', async () => {
+    searchPayeeEntities.mockResolvedValue([{ id: 99, name: 'Outsider Nine', kind: 'character' }]);
+    renderPanel([], 'solo:1', (row) => <MinerCharacters miner={row} />);
+    await openCharacters();
+    await userEvent.click(screen.getByRole('button', { name: 'Group with' }));
+    await userEvent.type(await screen.findByLabelText('Add a character by name'), 'Outs');
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Outsider Nine' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Group 1 Miner' }));
+    await waitFor(() =>
+      expect(editBook).toHaveBeenCalledWith(7, CORP, {
+        action: 'regroupMiner',
+        minerId: 'solo:1',
+        characterIds: [1, 99],
+        mainCharacterId: 1,
+        absorbMinerIds: [],
+      })
+    );
   });
 });

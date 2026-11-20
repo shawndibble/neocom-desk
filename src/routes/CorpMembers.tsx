@@ -18,14 +18,22 @@
  * The `unknown` / `ready` asymmetry and the mount-on-`ready` split are
  * `useCorpRouteGate`'s, shared with `/corp` and `/corp/assets` — see that hook.
  */
-import { useMemo } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { useCallback, useMemo, useState } from 'react';
+import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+import { useIsPhone } from '@/lib/useIsPhone';
+import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
+import { parsePositiveInt } from '@/engine/market/urlState';
 import { useDarkThreshold } from '@/features/corp/darkThreshold';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
   DataAgeBadge,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
   EmptyState,
   FilterBar,
   FilterChip,
@@ -34,6 +42,7 @@ import {
   PageHeader,
   Panel,
   SearchInput,
+  SegmentedControl,
   Select,
   SelectContent,
   SelectItem,
@@ -62,6 +71,9 @@ import {
   CorpRosterTable,
   type RosterRow,
 } from '@/features/corp/CorpRoster';
+import { useRosterGrouping } from '@/features/corp/useRosterGrouping';
+import { PlayersView } from '@/features/corp/PlayersView';
+import { GroupMinersView } from '@/features/corp/moons/GroupMinersDialog';
 import { membersCsvColumns } from '@/features/corp/membersCsv';
 import { loadCorporationId } from '@/features/corp/boardData';
 import {
@@ -91,7 +103,7 @@ import { DataGate } from '@/components/DataGate';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useUrlParams } from '@/lib/useUrlState';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
-import { boolParam, optionalIdParam, textParam } from '@/lib/urlState';
+import { boolParam, enumParam, optionalIdParam, textParam } from '@/lib/urlState';
 import { tabPath } from '@/lib/pageTabs';
 import { usePageTab } from '@/lib/usePageTab';
 import { CORP_MEMBERS_TABS } from '@/features/corp/corpMembersTabs';
@@ -102,6 +114,8 @@ const FILTER_PARAMS = {
   dark: boolParam(),
   ship: optionalIdParam(),
   loc: optionalIdParam(),
+  /** Characters (today's flat table) or Players (officers with an active book). */
+  view: enumParam(['characters', 'players'] as const, 'characters'),
 };
 
 /** The funnel's share of the filters — everything but the search box, which acts immediately. */
@@ -272,6 +286,59 @@ async function loadMembersSnapshot(
   return { corporationId, ceoId, members, roles, labels, diff, fetchedAt, fromCache, loadedAt };
 }
 
+/**
+ * Characters | Players. From `sm` a labelled two-segment control; below it that control cannot
+ * share the search box's line with the column picker and funnel (§4b), so an icon menu opens the
+ * same choices and its name carries the current one (§6c Header controls, decision 20261104-064915).
+ */
+function ViewSwitch({
+  value,
+  onChange,
+}: {
+  value: 'characters' | 'players';
+  onChange: (view: 'characters' | 'players') => void;
+}) {
+  const { t } = useTranslation();
+  const phone = useIsPhone();
+  const options = [
+    { value: 'characters' as const, label: t('corp.members.players.viewCharacters') },
+    { value: 'players' as const, label: t('corp.members.players.viewPlayers') },
+  ];
+  if (!phone)
+    return (
+      <SegmentedControl
+        label={t('corp.members.players.viewLabel')}
+        value={value}
+        onChange={onChange}
+        uppercase={false}
+        options={options}
+      />
+    );
+  const current = options.find((o) => o.value === value)?.label ?? '';
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <IconButton
+          icon={<Icon.AllCharacters />}
+          label={t('corp.members.players.viewWithValue', { value: current })}
+        />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuRadioGroup
+          value={value}
+          onValueChange={(v) => onChange(v as 'characters' | 'players')}
+        >
+          {options.map((o) => (
+            <DropdownMenuRadioItem key={o.value} value={o.value}>
+              {o.label}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 /** Mounted only once Corp Access is `ready` — see the `/corp` loader note. */
 function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
   const { t } = useTranslation();
@@ -288,9 +355,47 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
   const data = snapshot.data;
   const activeCharacterId = useActiveCharacter((s) => s.activeCharacterId);
 
+  // Officers with an active book can group characters from here (the Player's corp layer).
+  const grouping = useRosterGrouping(activeCharacterId, data?.corporationId ?? null);
+  const [groupingFor, setGroupingFor] = useState<number | null>(null);
+  const onGroupWith = useCallback((row: RosterRow) => setGroupingFor(row.characterId), []);
+  // One navigation sets both params; the Players table mounts with `?highlight` still in the URL
+  // (the Characters table latched null on its own mount), so it is the one that spends it.
+  const [searchParams, setSearchParams] = useSearchParams();
+  // A cold `?view=players&highlight=` link shows the Characters table until the groups load, and
+  // that table spends the param on mount. Latch it here so the Players table still gets it.
+  const [coldHighlight, setColdHighlight] = useState<number | null>(() =>
+    searchParams.get('view') === 'players'
+      ? parsePositiveInt(searchParams.get(HIGHLIGHT_PARAM))
+      : null
+  );
+  const onShowInPlayers = useCallback(
+    (row: RosterRow) =>
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('view', 'players');
+        next.set('highlight', String(row.characterId));
+        return next;
+      }),
+    [setSearchParams]
+  );
+
   const rows = useMemo<RosterRow[]>(() => {
     if (data === null || data.members === null) return [];
     return data.members.map((member) => ({
+      ...(() => {
+        const g = grouping.groupOf(member.characterId);
+        return g
+          ? {
+              group: {
+                size: g.characterIds.length,
+                names: g.characterIds
+                  .filter((id) => id !== member.characterId)
+                  .map((id) => grouping.source.name(id)),
+              },
+            }
+          : {};
+      })(),
       characterId: member.characterId,
       name: data.labels.characters.get(member.characterId) ?? null,
       standing: memberStanding(member, data.loadedAt, darkAfterDays),
@@ -305,7 +410,7 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
       isSelf: member.characterId === activeCharacterId,
       isCeo: member.characterId === data.ceoId,
     }));
-  }, [data, darkAfterDays, activeCharacterId]);
+  }, [data, darkAfterDays, activeCharacterId, grouping]);
 
   // Search + dark-only/ship/location filters (issue #421, AC2/AC3):
   // AND-composed, same stacking rule as Mail's search-and-label filters
@@ -317,6 +422,9 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
   const search = filterParams.q;
   const darkOnly = filterParams.dark;
   const { ship, loc } = filterParams;
+  // Players groups characters by stored group, which only an officer with an active book can read.
+  const playersView = grouping.canGroup && filterParams.view === 'players';
+  const rosterIds = useMemo(() => new Set(rows.map((r) => r.characterId)), [rows]);
   const rosterFilter = useMemo<RosterFilter>(
     () => ({ dark: darkOnly, ship, loc }),
     [darkOnly, ship, loc]
@@ -425,7 +533,17 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
                   className="min-w-48 flex-1"
                 />
               }
-              actions={<CorpRosterColumnPicker />}
+              actions={
+                <>
+                  {grouping.canGroup && (
+                    <ViewSwitch
+                      value={filterParams.view}
+                      onChange={(view) => setFilterParams({ view })}
+                    />
+                  )}
+                  <CorpRosterColumnPicker />
+                </>
+              }
             >
               {(draft, setDraft) => (
                 <>
@@ -498,7 +616,21 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
                   names={data?.labels.characters ?? EMPTY_MEMBER_LABELS.characters}
                 />
               </div>
-              {rows.length > 0 && visibleRows.length === 0 ? (
+              {playersView ? (
+                <PlayersView
+                  rows={rows}
+                  visibleRows={visibleRows}
+                  grouping={grouping}
+                  search={debouncedSearch}
+                  otherFilters={darkOnly || ship !== null || loc !== null}
+                  onGroupWith={setGroupingFor}
+                  highlightId={coldHighlight}
+                  onHighlightSeen={() => setColdHighlight(null)}
+                  onResetFilters={() =>
+                    setFilterParams({ q: '', dark: false, ship: null, loc: null })
+                  }
+                />
+              ) : rows.length > 0 && visibleRows.length === 0 ? (
                 // The roster has members; the search/filters hid them all. The
                 // table's own empty state says EVE sent nothing, which would be wrong here.
                 <EmptyState
@@ -515,9 +647,29 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
                   }
                 />
               ) : (
-                <CorpRosterTable rows={visibleRows} tableProps={membersExport.tableProps} />
+                <CorpRosterTable
+                  rows={visibleRows}
+                  tableProps={membersExport.tableProps}
+                  {...(grouping.canGroup ? { onGroupWith, onShowInPlayers } : {})}
+                />
               )}
             </Panel>
+            {groupingFor !== null && grouping.canGroup && (
+              <GroupMinersView
+                open
+                onClose={() => setGroupingFor(null)}
+                miner={
+                  grouping.groupOf(groupingFor) ?? {
+                    id: `solo:${groupingFor}`,
+                    mainCharacterId: groupingFor,
+                    characterIds: [groupingFor],
+                  }
+                }
+                source={grouping.source}
+                wording="player"
+                rosterIds={rosterIds}
+              />
+            )}
           </div>
         </DataGate>
       </MembersTabPanel>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
 import type { Statement } from '@/engine/corpTaxBook/statements';
-import { mailTarget } from './statementMailing';
+import { mailRecipientOf, mailTarget } from './statementMailing';
 
 const statement = {
   id: 's1',
@@ -40,5 +40,24 @@ describe('mailTarget (#6204)', () => {
     expect(
       mailTarget(ctx(), statement, miner, { amountDue: 1, carried: 0 }).accounts
     ).toBeUndefined();
+  });
+});
+
+describe('mailRecipientOf (Player groups)', () => {
+  const group = { mainCharacterId: 9, characterIds: [9, 4, 2] } as MinerRow;
+  it('mails the main when it is in the corporation', () => {
+    expect(mailRecipientOf(group, new Set([9, 4]))).toBe(9);
+  });
+  it('never mails an outsider main while a group member is in the corporation', () => {
+    expect(mailRecipientOf(group, new Set([4, 2]))).toBe(2);
+  });
+  it('falls back to the main when no member is in the corporation, or membership is unknown', () => {
+    expect(mailRecipientOf(group, new Set([77]))).toBe(9);
+    expect(mailRecipientOf(group, undefined)).toBe(9);
+  });
+  it('mails a character in no group as itself', () => {
+    expect(mailRecipientOf({ mainCharacterId: 5, characterIds: [5] } as MinerRow, new Set())).toBe(
+      5
+    );
   });
 });
