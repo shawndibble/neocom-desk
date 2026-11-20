@@ -72,7 +72,7 @@ describe('SkillPlans editor: plan header (#21)', () => {
     // and the "no remaps" state was reached deliberately, so the header has
     // had its chance to render a badge and chose not to.
     await screen.findByText(
-      "Remaps: 0 (from this plan's saved value — ESI attributes unavailable)"
+      "Remaps: 0 (from this plan's saved value, your attributes could not be loaded)"
     );
 
     expect(within(header()).queryByText('Remap savings')).not.toBeInTheDocument();

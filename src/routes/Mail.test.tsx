@@ -274,7 +274,7 @@ describe('Mail', () => {
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () => HttpResponse.error())
     );
     renderMailRoute();
-    expect(await screen.findByText(/no mail cached/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no mail saved yet/i)).toBeInTheDocument();
   });
 
   it('says what fills the page when the character really has no mail', async () => {
@@ -313,7 +313,7 @@ describe('Mail', () => {
     );
     renderMailRoute();
     expect(await screen.findByText(/: log in again$/)).toBeInTheDocument();
-    expect(screen.queryByText(/no mail cached/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/no mail saved yet/i)).not.toBeInTheDocument();
   });
 
   it('shows an Inbox/Corp/Alliance/Sent toggle group, all on, with unread counts from /mail/labels', async () => {
@@ -375,7 +375,7 @@ describe('Mail', () => {
     const search = screen.getByRole('searchbox', { name: /search/i });
     await user.type(search, 'zzzznotamatch');
     expect(await screen.findByText('No mail matches your search')).toBeInTheDocument();
-    expect(screen.queryByText('No mail cached')).not.toBeInTheDocument();
+    expect(screen.queryByText('No mail saved yet')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Clear search' }));
     expect(await screen.findByText('Fleet up!')).toBeInTheDocument();

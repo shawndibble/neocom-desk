@@ -1604,7 +1604,7 @@ describe('ContractSearchPanel — Courier endpoint space', () => {
 
     // Not the generic "nothing matched": the board excluded these itself, and
     // must say so rather than presenting its own exclusion as an absence.
-    expect(await screen.findByText(/cannot place/i)).toBeInTheDocument();
+    expect(await screen.findByText(/can.t place/i)).toBeInTheDocument();
   });
 
   it('does not blame unplaceable destinations for an emptiness another filter caused', async () => {
@@ -1617,7 +1617,7 @@ describe('ContractSearchPanel — Courier endpoint space', () => {
     await user.type(screen.getByLabelText('Min reward'), '999999999999');
 
     expect(await screen.findByText(/match your filters/i)).toBeInTheDocument();
-    expect(screen.queryByText(/cannot place/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/can.t place/i)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Reset filters' }));
 
@@ -2004,7 +2004,7 @@ describe('ContractSearchPanel — Courier reverse lane', () => {
 
     expect(
       within(dialog).getByText(
-        'No haul we can place runs the reverse lane. 1 leaves Domain for a drop-off nothing local places.'
+        "No haul we can place runs the reverse lane. 1 leaves Domain for a drop-off we can't place."
       )
     ).toBeInTheDocument();
     // One sentence, not two. "No outstanding haul runs the reverse lane."
@@ -2032,7 +2032,7 @@ describe('ContractSearchPanel — Courier reverse lane', () => {
       within(dialog).getByRole('button', { name: '1 haul runs the reverse lane' })
     ).toBeInTheDocument();
     expect(
-      within(dialog).getByText('1 more leaves Domain for a drop-off nothing local places.')
+      within(dialog).getByText("1 more leaves Domain for a drop-off we can't place.")
     ).toBeInTheDocument();
   });
 
@@ -2086,7 +2086,7 @@ describe('ContractSearchPanel — Courier reverse lane', () => {
 
     expect(
       within(dialog).getByText(
-        'Nothing local places one end of this haul, so there is no return lane to look up.'
+        "We can't place one end of this haul, so there is no return lane to look up."
       )
     ).toBeInTheDocument();
     // Not a count of zero, which would read as an answer.

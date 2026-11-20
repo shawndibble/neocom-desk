@@ -554,7 +554,7 @@ describe('truncation', () => {
   it('surfaces truncation with the count fetched', async () => {
     mocked.loadCorporationAssets.mockResolvedValue(cached(ledgerFixture(), { truncated: true }));
     await ledger();
-    expect(await screen.findByText(/Only the first 7 assets were fetched/)).toBeInTheDocument();
+    expect(await screen.findByText(/Showing the first 7 assets/)).toBeInTheDocument();
   });
 });
 

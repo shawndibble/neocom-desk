@@ -154,7 +154,7 @@ test.describe('Refresh all on a touch device', () => {
   test.use({ hasTouch: true });
 
   const REFRESH_ALL_HINT =
-    'Refresh all. Pulls live data for every character. This may take a moment for a large roster.';
+    'Refresh all. Loads fresh data for every character. A big roster can take a moment.';
 
   test('touch-and-hold reveals the Refresh all hint at 390px', async ({ page }) => {
     await landOnCharactersAtPhoneWidth(page);

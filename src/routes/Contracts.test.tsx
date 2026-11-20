@@ -421,7 +421,7 @@ describe('Contracts', () => {
       )
     );
     renderContracts();
-    expect(await screen.findByText(/no contracts cached/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no contracts saved yet/i)).toBeInTheDocument();
   });
 
   it('says what fills the page when the character really has no contracts', async () => {
@@ -447,7 +447,7 @@ describe('Contracts', () => {
     );
     renderContracts();
     expect(await screen.findByText(/: log in again$/)).toBeInTheDocument();
-    expect(screen.queryByText(/no contracts cached/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/no contracts saved yet/i)).not.toBeInTheDocument();
   });
 });
 

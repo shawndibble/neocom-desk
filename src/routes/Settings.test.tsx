@@ -904,7 +904,7 @@ describe('Settings — update state', () => {
     expect((await screen.findAllByText('Checking for updates…')).length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: 'Update now' })).not.toBeInTheDocument();
     finish();
-    expect((await screen.findAllByText('No updates at this time')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('Up to date')).length).toBeGreaterThan(0);
   });
 
   it("phone index: says so when the check can't run", async () => {
@@ -925,7 +925,7 @@ describe('Settings — update state', () => {
 
     await userEvent.click(within(settingsNav()).getByRole('link', { name: /^display/i }));
     await userEvent.click(within(settingsNav()).getByRole('link', { name: /^app & backup/i }));
-    await screen.findAllByText('No updates at this time');
+    await screen.findAllByText('Up to date');
     expect(reg.update).toHaveBeenCalledTimes(1);
   });
 
@@ -944,6 +944,6 @@ describe('Settings — update state', () => {
 
     act(() => useUpdateStatus.setState({ status: 'current' }));
     expect(within(nav).queryByRole('img', { name: 'Update available' })).not.toBeInTheDocument();
-    expect(panel).toHaveTextContent('No updates at this time');
+    expect(panel).toHaveTextContent('Up to date');
   });
 });

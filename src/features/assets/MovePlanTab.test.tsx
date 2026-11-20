@@ -236,7 +236,7 @@ describe('MovePlanTab', () => {
         <MovePlanTab onClose={() => {}} characterIds={[1]} activeCharacterId={1} />
       </MemoryRouter>
     );
-    expect(await screen.findByText(/assets aren't saved on this device yet/)).toBeInTheDocument();
+    expect(await screen.findByText(/assets haven't loaded yet/)).toBeInTheDocument();
     expect(screen.queryByText('No loose stock or ships to move.')).not.toBeInTheDocument();
   });
 
@@ -306,18 +306,14 @@ describe('MovePlanTab', () => {
   it('blames the missing hauler data, not the pilot, when the catalogue could not be loaded', async () => {
     hullData.catalogueFailed = true;
     await planAmarr();
-    expect(
-      await screen.findByText(/Hauler sizing needs data that isn't downloaded yet/)
-    ).toBeTruthy();
+    expect(await screen.findByText(/Hauler sizes need data that hasn't loaded yet/)).toBeTruthy();
     expect(screen.queryByText('No hauler you can fly could be sized for this load.')).toBeNull();
   });
 
   it('blames the missing data too when the pilot skills could not be read', async () => {
     hullData.skillsKnown = false;
     await planAmarr();
-    expect(
-      await screen.findByText(/Hauler sizing needs data that isn't downloaded yet/)
-    ).toBeTruthy();
+    expect(await screen.findByText(/Hauler sizes need data that hasn't loaded yet/)).toBeTruthy();
   });
 
   it('says the data is still loading, not "connect once", while the catalogue is merely loading', async () => {

@@ -234,7 +234,7 @@ describe('Contacts', () => {
   it('shows the empty state when there is no data at all', async () => {
     server.use(http.get(`${ESI}/characters/${CHAR_ID}/contacts`, () => HttpResponse.error()));
     renderContactsRoute();
-    expect(await screen.findByText(/no contacts cached/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no contacts saved yet/i)).toBeInTheDocument();
   });
 
   it('says what fills the page when the character really has no contacts', async () => {
@@ -256,7 +256,7 @@ describe('Contacts', () => {
     );
     renderContactsRoute();
     expect(await screen.findByText(/: log in again$/)).toBeInTheDocument();
-    expect(screen.queryByText(/no contacts cached/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/no contacts saved yet/i)).not.toBeInTheDocument();
   });
 });
 

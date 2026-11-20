@@ -212,8 +212,7 @@ describe('PlayersView', () => {
     await menuOf('Vane Hauler');
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Remove from Player' }));
     const confirm = await screen.findByRole('dialog');
-    expect(confirm).toHaveTextContent('sticks');
-    expect(confirm).toHaveTextContent('will not add it back');
+    expect(confirm).toHaveTextContent("won't add it back");
     expect(edit).toHaveBeenCalledTimes(1);
     await userEvent.click(within(confirm).getByRole('button', { name: 'Remove' }));
     await waitFor(() =>

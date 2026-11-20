@@ -310,7 +310,7 @@ describe('SkillPlans editor: remap markers', () => {
 
     expect(
       await screen.findByText(
-        'Every remap marker sits at the end of the plan, so nothing follows it to remap for — drag a marker in front of the skills it should speed up.'
+        'Every remap marker is at the end of the plan, so it speeds up nothing. Drag a marker above the skills it should speed up.'
       )
     ).toBeInTheDocument();
     expect(await within(toolbar).findByText('No marker splits the plan')).toBeInTheDocument();

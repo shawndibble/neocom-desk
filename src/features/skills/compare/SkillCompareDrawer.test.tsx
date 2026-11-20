@@ -437,7 +437,7 @@ describe('SkillCompareDrawer', () => {
     await seedCharacter(CHAR_C, 'Pilot Three');
     renderDrawer(`?ids=${CHAR_C}`);
 
-    expect(await screen.findByText('No skill data cached')).toBeInTheDocument();
+    expect(await screen.findByText('No skill data yet')).toBeInTheDocument();
     expect(screen.queryByRole('table', { name: 'Skill comparison' })).not.toBeInTheDocument();
   });
 

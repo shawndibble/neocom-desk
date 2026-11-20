@@ -490,9 +490,7 @@ describe('Corp Wallet: divisions and the journal (AC 2, AC 3)', () => {
     renderCorpWalletRoute();
 
     expect(
-      await screen.findByText(
-        "No corporation wallet data cached. Couldn't load it yet. Try again shortly."
-      )
+      await screen.findByText("Couldn't load the corporation wallet yet. Try again shortly.")
     ).toBeInTheDocument();
     expect(screen.queryByText('Log in again to see your wallet')).toBeNull();
   });

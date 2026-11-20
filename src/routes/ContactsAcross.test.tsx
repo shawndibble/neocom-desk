@@ -153,7 +153,7 @@ describe('Contacts', () => {
       expect(table.getAllByRole('img', { name: 'Terrible standing (-10)' }).length).toBe(2);
     });
 
-    it('says the comparison is built from what each character last cached', async () => {
+    it('says the comparison is built from what each character last saved', async () => {
       await addSecondCharacter();
       await cacheSecondCharacterContacts([contactsPayload[0]]);
       renderContactsRoute();
@@ -161,7 +161,7 @@ describe('Contacts', () => {
 
       await showAllCharacters();
 
-      expect(await screen.findByText(/last cached/)).toBeInTheDocument();
+      expect(await screen.findByText(/last saved/)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Fetch every character' })).toBeInTheDocument();
     });
 
@@ -178,7 +178,7 @@ describe('Contacts', () => {
         )
       ).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /^All characters · 2$/ })).toBeInTheDocument();
-      expect(screen.queryByText('No contacts cached for any character')).not.toBeInTheDocument();
+      expect(screen.queryByText('No contacts saved for any character')).not.toBeInTheDocument();
     });
 
     it('keeps the not-loaded copy while a character has never been read', async () => {
@@ -187,7 +187,7 @@ describe('Contacts', () => {
       window.history.replaceState({}, '', '/contacts/across');
       renderContactsRoute();
 
-      expect(await screen.findByText('No contacts cached for any character')).toBeInTheDocument();
+      expect(await screen.findByText('No contacts saved for any character')).toBeInTheDocument();
     });
   });
 });

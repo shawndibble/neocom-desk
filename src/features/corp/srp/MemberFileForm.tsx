@@ -132,9 +132,6 @@ export function MemberFileForm({
         >
           {busy ? t('srpMember.file.filing') : t('srpMember.file.submit')}
         </Button>
-        {fullWidth ? null : (
-          <span className="text-xs text-text-dim">{t('srpMember.file.hint')}</span>
-        )}
       </div>
     </form>
   );

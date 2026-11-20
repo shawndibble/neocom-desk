@@ -392,7 +392,7 @@ describe('ActiveHaulView', () => {
 
   it('warns that stock may look stale once every leg is done', () => {
     renderView(undefined, {}, [0, 1, 2]);
-    expect(screen.getByText(/may show the old stock until ESI refreshes/)).toBeTruthy();
+    expect(screen.getByText(/may show the old stock for a while/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Replan from here' })).toBeNull();
   });
 

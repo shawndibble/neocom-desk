@@ -815,7 +815,7 @@ describe('PlanEditor tools pane', () => {
     const dialog = screen.getByRole('dialog', { name: 'Optimize at my markers' });
     expect(
       within(dialog).getByText(
-        'Every remap marker sits at the end of the plan, so nothing follows it to remap for — drag a marker in front of the skills it should speed up.'
+        'Every remap marker is at the end of the plan, so it speeds up nothing. Drag a marker above the skills it should speed up.'
       )
     ).toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: 'Accept' })).toBeNull();
@@ -1950,7 +1950,7 @@ describe('an attribute sheet nothing explains', () => {
     await openTools(user);
     await openAssumptions(user);
 
-    expect(screen.getByText(/don't add up to a legal sheet/i)).toBeInTheDocument();
+    expect(screen.getByText(/attributes can't be right/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Copy diagnostics' })).toBeInTheDocument();
     // No accelerator was recovered, so nothing is prefilled either — the
     // list stays empty, same as the no-accelerator case above.

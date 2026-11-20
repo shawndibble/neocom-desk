@@ -204,7 +204,7 @@ describe('the data page', () => {
   it('shows an empty source as a result, apart from "no rows match"', async () => {
     await setup(dataPage('contact'));
     expect(await screen.findByText('No contacts rows')).toBeInTheDocument();
-    expect(screen.getByText(/Empty is a result: the source was read/)).toBeInTheDocument();
+    expect(screen.getByText(/The source was read; it was just empty/)).toBeInTheDocument();
     expect(screen.queryByText('No rows match')).toBeNull();
   });
 
@@ -351,7 +351,7 @@ describe('the consent terms', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('You can delete it at any time')).toBeInTheDocument();
     expect(screen.getByText('The subject or text of your mail')).toBeInTheDocument();
-    expect(screen.getByText('No key is kept. We do not keep your login')).toBeInTheDocument();
+    expect(screen.getByText('We do not keep your login')).toBeInTheDocument();
     expect(screen.queryByText(/Nothing is read again/)).toBeNull();
     expect(screen.queryByText(/when you withdraw/)).toBeNull();
   });

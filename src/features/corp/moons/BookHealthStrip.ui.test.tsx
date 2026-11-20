@@ -103,7 +103,7 @@ describe('BookHealthStrip, scheduled sync', () => {
     ['token-revoked', "Pilot 9's EVE authorization was revoked or expired"],
     ['esi-refused', "EVE no longer lets Pilot 9's authorization read the mining ledger"],
     ['book-off', 'the Corp Tax Book was turned off'],
-    ['grant-unreadable', "the saved grant can't be read — turn it on again"],
+    ['grant-unreadable', "its saved login can't be read. Turn it on again"],
   ] as const)('says why a stopped schedule stopped (%s)', (stoppedReason, why) => {
     renderStrip({
       status: 'stopped',

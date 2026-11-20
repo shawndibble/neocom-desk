@@ -101,7 +101,7 @@ describe('CurrentQueuePanel', () => {
 
   it('says so when ESI reports no queue', () => {
     renderPanel([]);
-    expect(screen.getByText('No active in-game training queue cached.')).toBeInTheDocument();
+    expect(screen.getByText('No skill is training in game.')).toBeInTheDocument();
   });
 
   it('lists a paused queue under Paused, with no training card', () => {
