@@ -43,19 +43,33 @@ describe('CorpBookSyncNote opening balance', () => {
 
   it('says the balance rolled over from the old system, owing or credit', () => {
     const { rerender } = render(
-      <CorpBookSyncNote book={withOpening(4_200_000)} owedNow={0} now={NOW} />
+      <CorpBookSyncNote book={withOpening(4_200_000)} owedNow={4_200_000} now={NOW} />
     );
     expect(
       screen.getByText(
         'Opening balance from the old system: you owe Brass Meridian Logistics 4,200,000 ISK.'
       )
     ).toBeInTheDocument();
-    rerender(<CorpBookSyncNote book={withOpening(-900_000)} owedNow={0} now={NOW} />);
+    rerender(
+      <CorpBookSyncNote
+        book={{
+          ...withOpening(-900_000),
+          summary: { ...withOpening(-900_000).summary, credit: 900_000 },
+        }}
+        owedNow={0}
+        now={NOW}
+      />
+    );
     expect(
       screen.getByText(
         'Opening balance from the old system: Brass Meridian Logistics holds 900,000 ISK credit for you.'
       )
     ).toBeInTheDocument();
+  });
+
+  it('says nothing once the balance rolled over has been paid', () => {
+    render(<CorpBookSyncNote book={withOpening(4_200_000)} owedNow={0} now={NOW} />);
+    expect(screen.queryByText(/Opening balance from the old system/)).not.toBeInTheDocument();
   });
 
   it('leaves out one an officer reversed', () => {

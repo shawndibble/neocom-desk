@@ -60,7 +60,7 @@ import { disputeHold, disputeKindOf, type DisputeKind, type OreDispute } from '.
 import { DAY_MS } from '@/lib/age';
 
 /** What made a day Paid: the member's own mark, the corporation's settled Statement, or a donation. */
-export type BookSettledBy = 'yourMark' | 'statement' | 'donation' | 'credit';
+export type BookSettledBy = 'yourMark' | 'statement' | 'donation' | 'credit' | 'closed';
 
 export type BookRowState = 'billed' | 'conflict' | 'dismissed' | 'waived' | 'paid';
 /**
@@ -393,6 +393,8 @@ export interface BookRowView {
   correction?: BookCorrection;
   /** Of what the day owes, the part officers' corrections charged: a recorded-paid day never forgives it. */
   officerCharge?: number;
+  /** The day's tax with officers' charges and before any credit correction took from it. */
+  pinBase?: number;
   /** What the book's money paid of the day while it still owes the rest (a part-paid day). */
   paidIsk?: number;
   /** What the book forgave of the day's shortfall (a Market adjustment, or a day recorded paid). */
@@ -1668,10 +1670,14 @@ export function overlayCorpBooks(input: {
               !limits.has(r.date)
           )
           .sort(byDateThenId);
-        let charges = pinned.reduce(
-          (sum, r) => sum + Math.min(r.officerCharge ?? 0, Math.max(0, r.billed)),
-          0
-        );
+        // The book pools every recorded-paid day's charge, whatever became of the day (paid, held,
+        // limited): the charge is owed on the oldest such day that still ended short.
+        let charges = mine
+          .filter((r) => minerOf(r) === minerId && r.date <= through)
+          .reduce(
+            (sum, r) => sum + Math.min(r.officerCharge ?? 0, Math.max(0, r.pinBase ?? r.billed)),
+            0
+          );
         for (const row of pinned) {
           const owed = row.taxOwed ?? 0;
           if (owed <= 0) continue;
@@ -1682,7 +1688,7 @@ export function overlayCorpBooks(input: {
           if (stays < 0.01) {
             row.taxOwed = 0;
             row.state = 'paid';
-            row.settledBy = 'credit';
+            row.settledBy = 'closed';
           }
         }
       }
@@ -2030,6 +2036,7 @@ function applyAdjustments(
     minerId: string;
     date: string;
     amount: number;
+    charge: number;
     reasons: string[];
   }[] = [];
   const credit = new Map<string, { amount: number; reasons: string[] }>();
@@ -2052,6 +2059,7 @@ function applyAdjustments(
     row.correction = { before, after, reasons: adjustment.reasons };
     row.taxOwed = after;
     row.billed = after;
+    row.pinBase = before + adjustment.charge;
     if (adjustment.charge > 0) row.officerCharge = (row.officerCharge ?? 0) + adjustment.charge;
     // A credit lowers the day as a whole; only a raise is owed apart from the day's Statement.
     const apart = adjustment.parts.filter(
@@ -2078,8 +2086,9 @@ function applyAdjustments(
       continue;
     }
     const target = days.find((r) => r.date >= o.date) ?? days.at(-1)!;
+    target.pinBase = (target.pinBase ?? target.billed) + o.charge;
     shift(target, o.amount, o.reasons);
-    target.officerCharge = (target.officerCharge ?? 0) + o.amount;
+    target.officerCharge = (target.officerCharge ?? 0) + o.charge;
   }
   for (const [minerId, { amount, reasons }] of credit) {
     let left = amount;

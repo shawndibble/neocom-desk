@@ -395,7 +395,9 @@ describe('CorpRowDetailModal', () => {
 
   it('says what a Market adjustment forgave', () => {
     renderModal({ corp: { ...corp, view: { ...view, forgivenIsk: 1_000 } } });
-    expect(screen.getByText(/1,000 ISK forgiven: a small shortfall/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/1,000 ISK forgiven by the corporation: a small shortfall/)
+    ).toBeInTheDocument();
   });
 
   it('keeps a reversed correction in view, struck through and tagged', () => {

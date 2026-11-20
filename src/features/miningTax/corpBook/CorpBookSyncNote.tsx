@@ -55,9 +55,13 @@ export function CorpBookSyncNote({
       })
     : null;
   // The balance an officer rolled over from another system, until they reverse it.
-  const opening = (loaded.adjustments ?? [])
+  // A note of where the account started, so it shows only while a balance is open: owing it, or
+  // holding credit.
+  const rolled = (loaded.adjustments ?? [])
     .filter((a) => a.kind === 'opening' && !a.reversed)
     .reduce((sum, a) => sum + a.amount, 0);
+  const opening =
+    (rolled > 0 && (owedNow > 0 || account?.owes)) || (rolled < 0 && credit) ? rolled : 0;
   const hasWords =
     owedNow > 0 ||
     book.pendingFrom !== undefined ||

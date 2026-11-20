@@ -189,6 +189,27 @@ describe('a day the book recorded paid, on both pages', () => {
     expect(corp).toEqual({ owed: 300_000, credit: 0 });
     expect(personal).toEqual(corp);
   });
+  it('keeps the charge pooled when the day that carried it was paid and a later day is short', () => {
+    // 15 Oct is 222,000 plus a 300,000 charge, paid in full; 16 Oct is unpaid and recorded paid.
+    const { corp, personal } = both(
+      [pay(522_000)],
+      [adjust('a', '2026-10-15', 300_000)],
+      [],
+      through
+    );
+    expect(corp).toEqual({ owed: 222_000, credit: 0 });
+    expect(personal).toEqual(corp);
+  });
+  it('spreads a charge over the recorded-paid days that ended short', () => {
+    const { corp, personal } = both(
+      [pay(400_000)],
+      [adjust('a', '2026-10-15', 300_000)],
+      [],
+      through
+    );
+    expect(corp).toEqual({ owed: 300_000, credit: 0 });
+    expect(personal).toEqual(corp);
+  });
   it('lets an exemption override the recorded-paid day', () => {
     const { corp, personal } = both([pay(221_500)], [], [exempt('2026-10-15', 0)], through);
     expect(corp).toEqual({ owed: 500, credit: 0 });
