@@ -54,11 +54,24 @@ describe('ExtractionTimeline', () => {
     expect(within(label).getByText('Ready').className).not.toContain('truncate');
   });
 
+  it('drops a chunk that expired more than 2 days ago, and a cancelled one', () => {
+    const old = { ...row('x', 9), state: 'expired' as const, expiresAt: '2026-10-15T00:00:00Z' };
+    const cancelled = { ...row('y', 8), state: 'cancelled' as const };
+    render(
+      <MemoryRouter>
+        <ExtractionTimeline rows={[row('a', 1), old, cancelled]} states={DEFAULT_STATES} />
+      </MemoryRouter>
+    );
+    expect(screen.getByText('Refinery 1')).toBeInTheDocument();
+    expect(screen.queryByText('Refinery 9')).not.toBeInTheDocument();
+    expect(screen.queryByText('Refinery 8')).not.toBeInTheDocument();
+  });
+
   it('shows Expired by default and hides it when its state is off', () => {
     const expired = {
       ...row('x', 9),
       state: 'expired' as const,
-      expiresAt: '2026-10-16T00:00:00Z',
+      expiresAt: '2026-10-17T00:00:00Z',
     };
     const { rerender } = render(
       <MemoryRouter>

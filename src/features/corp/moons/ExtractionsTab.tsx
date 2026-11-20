@@ -19,12 +19,13 @@ import { caretColumn } from './caretColumn';
 import { ReasonDialog } from './BookDialogs';
 import { LinkSurveyDialog } from './LinkSurveyDialog';
 import { ExtractionStateFilter, ExtractionTimeline } from './ExtractionTimeline';
-import { DEFAULT_STATES, FILTER_STATES } from './extractionStates';
+import { DEFAULT_STATES, FILTER_STATES, isPastExtraction } from './extractionStates';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { isk, shortDate, shortDateTime } from './moonsFormat';
 import { extractionPath, refineryPath, sharingMoonPath } from './moonsPaths';
 import { PopShareIcon } from './PopShareIcon';
 import { usePopShareMarks } from './usePopShareMarks';
-import { PlaceCell } from './sectionParts';
+import { BookSection, PlaceCell } from './sectionParts';
 import { MinedBar, OreLine, StateWord } from './moonsParts';
 
 export function ExtractionsTab() {
@@ -74,7 +75,17 @@ export function ExtractionsTab() {
   const rows = view.extractions;
   // A book that reads a moon owner's Extractions names each row's corporation (#6097).
   const namesCorporations = rows.some((r) => r.sourceCorporationId !== undefined);
-  const listed = rows.filter((r) => states.has(r.state));
+  const now = Date.parse(view.input.now);
+  const phone = useIsPhone();
+  const inStates = rows.filter((r) => states.has(r.state));
+  const listed = inStates.filter((r) => !isPastExtraction(r, now));
+  // Newest expiry first, so "Load older" walks back through history.
+  const past = inStates
+    .filter((r) => isPastExtraction(r, now))
+    .sort((a, b) =>
+      (b.expiresAt ?? b.chunkArrivalAt).localeCompare(a.expiresAt ?? a.chunkArrivalAt)
+    );
+  const allPast = rows.every((r) => isPastExtraction(r, now));
   const inChunks = rows
     .filter((r) => r.state !== 'expired' && r.state !== 'cancelled')
     .reduce((sum, r) => sum + (r.estimatedValue ?? 0), 0);
@@ -173,7 +184,9 @@ export function ExtractionsTab() {
             title={t(
               rows.length === 0
                 ? 'corpTaxBook.moons.extractionsNone'
-                : 'corpTaxBook.moons.extractionsNoneShown'
+                : allPast
+                  ? 'corpTaxBook.moons.extractionsNoneCurrent'
+                  : 'corpTaxBook.moons.extractionsNoneShown'
             )}
           />
         ) : (
@@ -195,6 +208,40 @@ export function ExtractionsTab() {
           </div>
         )}
       </Panel>
+      {past.length > 0 && (
+        <BookSection
+          title={t('corpTaxBook.moons.pastExtractions')}
+          noun={t('corpTaxBook.moons.sections.nouns.extractions')}
+          rows={past}
+          sortColumns={columns}
+          meta={
+            <span className="text-xs text-text-dim">
+              {t('corpTaxBook.moons.pastExtractionsHint')}
+            </span>
+          }
+          phone={phone}
+          startOpen={false}
+          summary={t('corpTaxBook.moons.extractionsSummary', { count: past.length })}
+        >
+          {(shown, table) => (
+            <div className="overflow-x-auto">
+              <DataTable
+                label={t('corpTaxBook.moons.pastExtractions')}
+                columns={columns}
+                rows={[...shown]}
+                rowKey={(row) => row.id}
+                onRowClick={(row) => navigate(extractionPath(row.id))}
+                rowClassName={() => 'group'}
+                rowContextMenu={rowContextMenu}
+                rowMoreActions={canEdit}
+                mobileSort
+                stackColumns={2}
+                {...table}
+              />
+            </div>
+          )}
+        </BookSection>
+      )}
       {dismissing && (
         <ReasonDialog
           open

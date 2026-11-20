@@ -50,6 +50,7 @@ vi.mock('./useBook', () => ({
   useBook: () => ({
     corporationId: 98000001,
     view: {
+      input: { now: '2026-09-03T00:00:00Z' },
       extractions: book.rows ?? [
         ex('a', 'survey', 100),
         ex('b', 'unknown', 0),
@@ -225,5 +226,29 @@ describe('ExtractionsTab Pop Sharing marks (#6226)', () => {
       book.rows = null;
       shareMarks.value = null;
     }
+  });
+});
+
+describe('ExtractionsTab past extractions', () => {
+  it('lists a chunk expired over 2 days ago apart, under Past extractions, not in the main list', () => {
+    real.table = true;
+    book.rows = [
+      ex('live', 'unknown', 0),
+      {
+        ...ex('old', 'unknown', 0),
+        state: 'expired',
+        moonId: 2,
+        expiresAt: '2026-08-20T00:00:00Z',
+      },
+    ];
+    render(
+      <MemoryRouter>
+        <ExtractionsTab />
+      </MemoryRouter>
+    );
+    expect(screen.getByText(/Past extractions/)).toBeInTheDocument();
+    expect(screen.getAllByRole('table')).toHaveLength(2);
+    real.table = false;
+    book.rows = null;
   });
 });
