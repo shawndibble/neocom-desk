@@ -96,6 +96,8 @@ export interface OfficerWriteOff {
 export interface RecordedWriteOff extends OfficerWriteOff {
   minerId: string;
   reason: string;
+  /** An officer undid it: the record stays, struck through, and no longer counts. */
+  reversed?: { by: number; at: string; reason: string };
 }
 
 /** The part of one officer write-off that reduced one Statement. */

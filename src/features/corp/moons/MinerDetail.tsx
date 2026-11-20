@@ -195,7 +195,7 @@ export function MinerDetail({ id }: { id: string }) {
   // Tolerance shortfalls and officer write-offs (#4637) both come off what is owed.
   const toleranceTotal =
     detail.toleranceWriteOffs.reduce((s, w) => s + w.amount, 0) +
-    detail.officerWriteOffs.reduce((s, w) => s + w.amount, 0);
+    detail.officerWriteOffs.reduce((s, w) => s + (w.reversed ? 0 : w.amount), 0);
   const lateTotal = detail.lateWriteOffs.reduce((s, w) => s + w.tax, 0);
   const paidTotal = detail.payments.reduce((s, p) => s + p.credited, 0);
   const billedTotal = detail.statements.reduce((s, x) => s + x.amount, 0);

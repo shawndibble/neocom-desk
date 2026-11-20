@@ -13,6 +13,7 @@ import type { Dismissal } from './dismissals';
 import { parsePaymentId } from './payouts';
 import { readClaimEvidence, type Declaration } from './overdue';
 import type { Adjustment, Statement } from './statements';
+import type { ToleranceExemption } from './toleranceExemptions';
 
 type Data = Record<string, unknown>;
 
@@ -225,7 +226,13 @@ export function readMiner(id: string, d: Data): Miner | null {
     ? d.characterIds.filter((x): x is number => typeof x === 'number')
     : [];
   if (characterIds.length === 0) return null;
-  return { id, characterIds, mainCharacterId: num(d.mainCharacterId) ?? characterIds[0] };
+  const paidThrough = str(d.paidThrough);
+  return {
+    id,
+    characterIds,
+    mainCharacterId: num(d.mainCharacterId) ?? characterIds[0],
+    ...(paidThrough ? { paidThrough } : {}),
+  };
 }
 
 /** `corps/{book}/feederCoverage/{corp}`, written by the server (#4622). */
@@ -260,7 +267,18 @@ export function readAdjustment(id: string, d: Data): Adjustment | null {
     reason: str(d.reason) ?? '',
     by: num(d.by) ?? 0,
     at: str(d.at) ?? '',
+    ...reversedOf(d.reversed),
+    ...(d.kind === 'opening' ? { kind: 'opening' as const } : {}),
+    ...(str(d.replaces) ? { replaces: str(d.replaces) } : {}),
   };
+}
+
+/** The `reversed` stamp an officer's undo leaves on a record: who, when and why. */
+function reversedOf(raw: unknown): { reversed?: { by: number; at: string; reason: string } } {
+  if (typeof raw !== 'object' || raw === null) return {};
+  const r = raw as Data;
+  const at = str(r.at);
+  return at ? { reversed: { by: num(r.by) ?? 0, at, reason: str(r.reason) ?? '' } } : {};
 }
 
 export function readWriteOff(id: string, d: Data): RecordedWriteOff | null {
@@ -276,5 +294,23 @@ export function readWriteOff(id: string, d: Data): RecordedWriteOff | null {
     at,
     reason: str(d.reason) ?? '',
     ...(statementId ? { statementId } : {}),
+    ...reversedOf(d.reversed),
+  };
+}
+
+/** `toleranceExemptions`: an officer set how much of one Miner's day shortfall the book forgives. */
+export function readToleranceExemption(id: string, d: Data): ToleranceExemption | null {
+  const minerId = str(d.minerId);
+  const date = str(d.date);
+  const forgive = num(d.forgive);
+  if (!minerId || !date || forgive === undefined || forgive < 0) return null;
+  return {
+    id,
+    minerId,
+    date,
+    forgive,
+    reason: str(d.reason) ?? '',
+    by: num(d.by) ?? 0,
+    at: str(d.at) ?? '',
   };
 }

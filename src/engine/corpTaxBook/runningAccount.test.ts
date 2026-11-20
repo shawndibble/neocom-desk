@@ -275,6 +275,63 @@ describe('allocateRunningAccount', () => {
     expect(r.balance).toBe(500_000);
   });
 
+  describe('an officer’s tolerance exemption for a day', () => {
+    const tenMillion = [day('2026-11-01', 10_000_000)];
+    const shortBy = (shortfall: number, exempt: number | undefined) =>
+      allocateRunningAccount({
+        ...base,
+        days: tenMillion,
+        payments: [payment('p1', 10_000_000 - shortfall, '2026-11-04T10:00:00Z')],
+        ...(exempt !== undefined ? { toleranceExemptions: new Map([['2026-11-01', exempt]]) } : {}),
+      });
+
+    it('forgives a shortfall within the book’s tolerance when there is none', () => {
+      expect(shortBy(30_000, undefined).byDay.get('2026-11-01')).toMatchObject({
+        settled: true,
+        writtenOff: 30_000,
+      });
+    });
+
+    it('owes the whole shortfall when the exemption forgives nothing', () => {
+      const r = shortBy(30_000, 0);
+      expect(r.byDay.get('2026-11-01')).toMatchObject({
+        settled: false,
+        writtenOff: 0,
+        remaining: 30_000,
+      });
+      expect(r.owes).toEqual({ amount: 30_000, days: 1, oldest: '2026-11-01' });
+    });
+
+    it('applies to a day recorded paid too: reversing its tolerance charges the shortfall', () => {
+      const r = allocateRunningAccount({
+        ...base,
+        days: tenMillion,
+        storedPaidThrough: '2026-11-01',
+        payments: [payment('p1', 9_970_000, '2026-11-04T10:00:00Z')],
+        toleranceExemptions: new Map([['2026-11-01', 0]]),
+      });
+      expect(r.byDay.get('2026-11-01')).toMatchObject({ settled: false, remaining: 30_000 });
+      expect(r.owes?.amount).toBe(30_000);
+    });
+
+    it('forgives up to the amount set and leaves the rest owed', () => {
+      const r = shortBy(300_000, 100_000);
+      expect(r.byDay.get('2026-11-01')).toMatchObject({
+        settled: false,
+        writtenOff: 100_000,
+        remaining: 200_000,
+      });
+      expect(r.owes?.amount).toBe(200_000);
+    });
+
+    it('forgives all of a shortfall that is within the amount set, even past the tolerance', () => {
+      expect(shortBy(300_000, 400_000).byDay.get('2026-11-01')).toMatchObject({
+        settled: true,
+        writtenOff: 300_000,
+      });
+    });
+  });
+
   it('does not owe a charge on a recorded-paid day that is paid to within tolerance', () => {
     const r = allocateRunningAccount({
       ...base,

@@ -80,6 +80,11 @@ export interface RunningAccountInput extends AllocationInput {
   storedPaidThrough?: string;
   /** The book's per-day tolerance, in percent. */
   dayTolerancePct?: number;
+  /**
+   * Per date, the most of that day's shortfall an officer lets the book forgive, instead of the
+   * tolerance (`exemptionsOf`): 0 forgives nothing.
+   */
+  toleranceExemptions?: ReadonlyMap<string, number>;
 }
 
 /** Money credited to one day. */
@@ -138,6 +143,8 @@ type Running = {
   paidIn: number;
   forgiven: number;
   pinned: boolean;
+  /** An officer's limit on what this day may forgive; none uses the book's tolerance. */
+  exempt?: number;
 };
 
 export function allocateRunningAccount(input: RunningAccountInput): RunningAccount {
@@ -162,13 +169,17 @@ export function allocateRunningAccount(input: RunningAccountInput): RunningAccou
         paidIn: 0,
         forgiven: 0,
         pinned: stored !== undefined && d.date <= stored,
+        ...(input.toleranceExemptions?.has(d.date)
+          ? { exempt: input.toleranceExemptions.get(d.date)! }
+          : {}),
       },
     ])
   );
   const isHeld = (d: RunningDay) => held.has(d.date) && d.tax > 0;
   const isDone = (st: Running) => {
     const remaining = st.tax - st.credited;
-    return remaining <= 0 || (st.paidIn > 0 && remaining <= daySettleTolerance(st.tax, pct));
+    const limit = st.exempt ?? daySettleTolerance(st.tax, pct);
+    return remaining <= 0 || (st.paidIn > 0 && remaining <= limit);
   };
   // What each payment has left for the days once the legacy Statements took theirs, in the order
   // `pay` draws on them. The pool is paid in one go (a day's tolerance can close mid-run, so
@@ -250,14 +261,19 @@ export function allocateRunningAccount(input: RunningAccountInput): RunningAccou
   for (const d of days) {
     const st = state.get(d.date)!;
     const dayHeld = isHeld(d);
+    // A day recorded paid stays closed, unless an officer set a limit on what it may forgive.
+    const pinned = st.pinned && st.exempt === undefined;
     const shortfall = Math.max(0, st.tax - st.credited);
     // A day recorded paid stays closed, but officers' charges on recorded-paid days are owed, not
     // forgiven: they stay on the oldest such day that ended short, wherever the money fell.
     // Not on a held day (not due yet) nor one paid to within tolerance (closed, as an unrecorded day).
-    const chargeOwed = st.pinned && !dayHeld && !isDone(st) ? Math.min(chargePool, shortfall) : 0;
+    const chargeOwed = pinned && !dayHeld && !isDone(st) ? Math.min(chargePool, shortfall) : 0;
     chargePool -= chargeOwed;
-    const settled = st.tax <= 0 || (st.pinned && chargeOwed <= 0) || (!dayHeld && isDone(st));
-    const writtenOff = settled ? shortfall : st.pinned ? shortfall - chargeOwed : 0;
+    const settled = st.tax <= 0 || (pinned && chargeOwed <= 0) || (!dayHeld && isDone(st));
+    let writtenOff = settled ? shortfall : pinned ? shortfall - chargeOwed : 0;
+    // An exemption that forgives less than the whole shortfall still forgives what it names.
+    if (!settled && !dayHeld && st.paidIn > 0 && st.exempt)
+      writtenOff = Math.max(writtenOff, Math.min(st.exempt, shortfall - chargeOwed));
     const remaining = shortfall - writtenOff;
     // A held day is not due, as `allocatePayments` leaves a held amount out of what is billed.
     if (!dayHeld) billed += Math.max(0, st.tax);

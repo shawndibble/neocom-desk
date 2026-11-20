@@ -66,7 +66,7 @@ export function settleMiner(
     statements: billed,
     payments,
     dismissalCredits: credits,
-    officerWriteOffs: (input.writeOffs ?? []).filter((w) => w.minerId === minerId),
+    officerWriteOffs: (input.writeOffs ?? []).filter((w) => w.minerId === minerId && !w.reversed),
     startDate: input.startDate,
     ...(held.size > 0 ? { held } : {}),
   };

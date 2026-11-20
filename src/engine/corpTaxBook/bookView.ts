@@ -60,6 +60,7 @@ import {
   runningDaysFromLines,
   type RunningAccount,
 } from './runningAccount';
+import { exemptionsOf, type ToleranceExemption } from './toleranceExemptions';
 import { settleOpenSet, type OpenSet, type OpenSetInput } from './openSet';
 
 export interface BookViewInput {
@@ -90,6 +91,8 @@ export interface BookViewInput {
   adjustments: readonly Adjustment[];
   /** Officer write-offs (#4637): each reduces what its Miner owes. */
   writeOffs?: readonly RecordedWriteOff[];
+  /** Officers' per-day limits on what a shortfall may forgive (`toleranceExemptions`). */
+  toleranceExemptions?: readonly ToleranceExemption[];
   /**
    * Feeders' last good ledger reads. A feeder's refinery days are withheld until
    * one lands after the day's grace (#4509), and a day outside its coverage owes
@@ -497,6 +500,7 @@ export function buildBookView(input: BookViewInput): BookView {
           heldDays,
           dayTolerancePct: input.dayTolerancePct,
           storedPaidThrough: input.minerPaidThrough?.get(id),
+          toleranceExemptions: exemptionsOf(input.toleranceExemptions, id),
         })
       : undefined;
     // A notice takes no payment: what its days were credited is its standing.
@@ -897,7 +901,14 @@ export interface MinerDetail {
   /** Lines recorded after payment, never billed (D22). */
   lateWriteOffs: { chargeKey: string; date: string; tax: number }[];
   /** Officer write-offs (#4637), oldest first; `amount` is what each forgave, 0 when nothing was left. */
-  officerWriteOffs: { id: string; amount: number; reason: string; at: string }[];
+  officerWriteOffs: {
+    id: string;
+    amount: number;
+    reason: string;
+    at: string;
+    /** Undone by an officer: `amount` is what it forgave while it stood. */
+    reversed?: { by: number; at: string; reason: string };
+  }[];
   dismissals: Dismissal[];
   declarations: Declaration[];
   credit: number;
@@ -932,6 +943,9 @@ function officerWriteOffsOf(
     .sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
   let onDays = (inner.running?.applications.writeOffs ?? []).reduce((s, d) => s + d.amount, 0);
   return mine.map((w) => {
+    // A reversed write-off forgave nothing: it takes no share of the days' forgiveness.
+    if (w.reversed)
+      return { id: w.id, amount: w.amount, reason: w.reason, at: w.at, reversed: w.reversed };
     const onStatements = inner.allocation.writeOffCredits
       .filter((c) => c.writeOffId === w.id)
       .reduce((s, c) => s + c.amount, 0);
