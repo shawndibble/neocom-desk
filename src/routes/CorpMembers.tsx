@@ -21,11 +21,19 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+import { useIsPhone } from '@/lib/useIsPhone';
+import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
+import { parsePositiveInt } from '@/engine/market/urlState';
 import { useDarkThreshold } from '@/features/corp/darkThreshold';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
   DataAgeBadge,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
   EmptyState,
   FilterBar,
   FilterChip,
@@ -279,6 +287,59 @@ async function loadMembersSnapshot(
 }
 
 /** Mounted only once Corp Access is `ready` — see the `/corp` loader note. */
+/**
+ * Characters | Players. From `sm` a labelled two-segment control; below it that control cannot
+ * share the search box's line with the column picker and funnel (§4b), so an icon menu opens the
+ * same choices and its name carries the current one (§6c Header controls, decision 20261104-064915).
+ */
+function ViewSwitch({
+  value,
+  onChange,
+}: {
+  value: 'characters' | 'players';
+  onChange: (view: 'characters' | 'players') => void;
+}) {
+  const { t } = useTranslation();
+  const phone = useIsPhone();
+  const options = [
+    { value: 'characters' as const, label: t('corp.members.players.viewCharacters') },
+    { value: 'players' as const, label: t('corp.members.players.viewPlayers') },
+  ];
+  if (!phone)
+    return (
+      <SegmentedControl
+        label={t('corp.members.players.viewLabel')}
+        value={value}
+        onChange={onChange}
+        uppercase={false}
+        options={options}
+      />
+    );
+  const current = options.find((o) => o.value === value)?.label ?? '';
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <IconButton
+          icon={<Icon.AllCharacters />}
+          label={t('corp.members.players.viewWithValue', { value: current })}
+        />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuRadioGroup
+          value={value}
+          onValueChange={(v) => onChange(v as 'characters' | 'players')}
+        >
+          {options.map((o) => (
+            <DropdownMenuRadioItem key={o.value} value={o.value}>
+              {o.label}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
   const { t } = useTranslation();
   // The corp's own inactivity policy. Feeds `memberStanding` here so the
@@ -300,7 +361,14 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
   const onGroupWith = useCallback((row: RosterRow) => setGroupingFor(row.characterId), []);
   // One navigation sets both params; the Players table mounts with `?highlight` still in the URL
   // (the Characters table latched null on its own mount), so it is the one that spends it.
-  const [, setSearchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  // A cold `?view=players&highlight=` link shows the Characters table until the groups load, and
+  // that table spends the param on mount. Latch it here so the Players table still gets it.
+  const [coldHighlight] = useState<number | null>(() =>
+    searchParams.get('view') === 'players'
+      ? parsePositiveInt(searchParams.get(HIGHLIGHT_PARAM))
+      : null
+  );
   const onShowInPlayers = useCallback(
     (row: RosterRow) =>
       setSearchParams((prev) => {
@@ -356,6 +424,7 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
   const { ship, loc } = filterParams;
   // Players groups characters by stored group, which only an officer with an active book can read.
   const playersView = grouping.canGroup && filterParams.view === 'players';
+  const rosterIds = useMemo(() => new Set(rows.map((r) => r.characterId)), [rows]);
   const rosterFilter = useMemo<RosterFilter>(
     () => ({ dark: darkOnly, ship, loc }),
     [darkOnly, ship, loc]
@@ -467,15 +536,9 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
               actions={
                 <>
                   {grouping.canGroup && (
-                    <SegmentedControl
-                      label={t('corp.members.players.viewLabel')}
+                    <ViewSwitch
                       value={filterParams.view}
                       onChange={(view) => setFilterParams({ view })}
-                      uppercase={false}
-                      options={[
-                        { value: 'characters', label: t('corp.members.players.viewCharacters') },
-                        { value: 'players', label: t('corp.members.players.viewPlayers') },
-                      ]}
                     />
                   )}
                   <CorpRosterColumnPicker />
@@ -561,6 +624,7 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
                   search={debouncedSearch}
                   otherFilters={darkOnly || ship !== null || loc !== null}
                   onGroupWith={setGroupingFor}
+                  highlightId={coldHighlight}
                   onResetFilters={() =>
                     setFilterParams({ q: '', dark: false, ship: null, loc: null })
                   }
@@ -601,6 +665,8 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
                   }
                 }
                 source={grouping.source}
+                wording="player"
+                rosterIds={rosterIds}
               />
             )}
           </div>

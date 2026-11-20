@@ -26,7 +26,6 @@ import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { CharacterLink } from '@/features/entities';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import { useHighlightParam } from '@/lib/useHighlightParam';
-import { useIsPhone } from '@/lib/useIsPhone';
 import { useUrlSort } from '@/lib/useUrlState';
 import { DialogShell } from './moons/BookDialogs';
 import { callableErrorText } from './moons/feederErrorText';
@@ -57,7 +56,7 @@ const CHIP_KEYS: Record<CharacterChip, { word: string; tip: string }> = {
 function Tag({ tip, children, warn }: { tip: string; children: ReactNode; warn?: boolean }) {
   return (
     <Tooltip content={tip}>
-      <span tabIndex={0} className="inline-flex shrink-0">
+      <span tabIndex={0} className="inline-flex shrink-0 max-sm:hidden">
         <Pill tone={warn ? 'warning' : 'neutral'} outlined={warn}>
           {children}
         </Pill>
@@ -90,6 +89,11 @@ export interface PlayersViewProps {
   /** Opens the page's group dialog for the Player holding this character (or the lone member). */
   onGroupWith: (characterId: number) => void;
   onResetFilters: () => void;
+  /**
+   * A `?highlight` character id the page latched before this view mounted (a cold link reaches the
+   * Characters table first, which spends the param while the groups are still loading).
+   */
+  highlightId?: number | null;
 }
 
 export function PlayersView({
@@ -100,13 +104,14 @@ export function PlayersView({
   otherFilters,
   onGroupWith,
   onResetFilters,
+  highlightId: latchedHighlight = null,
 }: PlayersViewProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [removing, setRemoving] = useState<Line | null>(null);
   const [changingMain, setChangingMain] = useState<Line | null>(null);
-  const highlightId = useHighlightParam();
+  const highlightId = useHighlightParam() ?? latchedHighlight;
 
   const query = search.trim().toLowerCase();
   const filtering = query !== '' || otherFilters;
@@ -181,7 +186,6 @@ export function PlayersView({
     [grouping.source, t]
   );
 
-  const phone = useIsPhone();
   const { isVisible } = useColumnVisibility(
     useVisibleCorpRosterColumns,
     CORP_ROSTER_DEFAULT_COLUMNS
@@ -196,7 +200,7 @@ export function PlayersView({
       className: 'whitespace-nowrap',
       ...PASS_THROUGH_SORT,
       sortFirst: 'asc',
-      render: (line) => <MemberCell line={line} phone={phone} />,
+      render: (line) => <MemberCell line={line} />,
     };
     const wrapped = baseColumns
       .filter((c) => c.id !== 'member' && isVisible(c.id as CorpRosterColumnId))
@@ -226,7 +230,7 @@ export function PlayersView({
         };
       });
     return [member, ...wrapped];
-  }, [baseColumns, isVisible, phone, t]);
+  }, [baseColumns, isVisible, t]);
 
   const rowMenu = useCallback(
     (line: Line, tr: ReactElement) =>
@@ -333,34 +337,33 @@ export function PlayersView({
   );
 }
 
-/** The member cell: a Player's caret, main's name and counts; an alt's name and chips. */
-function MemberCell({ line, phone }: { line: Line; phone: boolean }) {
+/**
+ * The member cell. Below `sm` the pinned column is ~120px, so the NAME is all it keeps: the Main
+ * pill, counts and chips drop (CSS, one DOM) and an alt's chips shrink to one amber dot whose
+ * label names them. Rows never wrap.
+ */
+function MemberCell({ line }: { line: Line }) {
   const { t } = useTranslation();
   if (line.kind === 'player') {
     const Caret = line.expanded ? Icon.Expanded : Icon.Descend;
     return (
-      <span className="flex min-w-0 items-center gap-1.5">
+      <span className="flex min-w-0 items-center gap-1 sm:gap-1.5">
         <Caret aria-hidden="true" size={Icon.ICON_SIZE.sm} className="shrink-0 text-text-dim" />
         <span className="sr-only">
           {line.expanded ? t('corp.members.players.collapse') : t('corp.members.players.expand')}
         </span>
         {/* The row click is the expand, so the name is plain accent text, not a link (§6c restraint). */}
-        <span className={entityLinkClassName('max-w-[12rem] truncate font-medium sm:max-w-none')}>
-          {line.name}
-        </span>
-        <Pill tone="accent" className="shrink-0">
+        <span className={entityLinkClassName('min-w-0 truncate font-medium')}>{line.name}</span>
+        <Pill tone="accent" className="shrink-0 max-sm:hidden">
           {t('corp.members.players.main')}
         </Pill>
-        <span className="shrink-0 text-xs text-text-dim">
-          {phone
-            ? t('corp.members.players.charactersShort', { count: line.characterCount })
-            : t('corp.members.players.characters', { count: line.characterCount })}
-          {!phone &&
-            line.outsideCount > 0 &&
+        <span className="shrink-0 text-xs text-text-dim max-sm:hidden">
+          {t('corp.members.players.characters', { count: line.characterCount })}
+          {line.outsideCount > 0 &&
             ` · ${t('corp.members.players.outsideCount', { count: line.outsideCount })}`}
         </span>
-        {!phone && line.unsignedCount > 0 && (
-          <span className="shrink-0 text-xs text-text-faint">
+        {line.unsignedCount > 0 && (
+          <span className="shrink-0 text-xs text-text-faint max-sm:hidden">
             · {t('corp.members.players.unsignedCount', { count: line.unsignedCount })}
           </span>
         )}
@@ -368,22 +371,28 @@ function MemberCell({ line, phone }: { line: Line; phone: boolean }) {
     );
   }
   const row = line.member;
+  const flags = [
+    ...(line.outside ? [t('corp.members.players.outsideChip')] : []),
+    ...line.chips.map((chip) => t(CHIP_KEYS[chip].word)),
+  ];
   return (
-    <span className={`flex min-w-0 items-center gap-1.5 ${line.kind === 'alt' ? 'pl-7' : ''}`}>
+    <span
+      className={`flex min-w-0 items-center gap-1.5 ${line.kind === 'alt' ? 'pl-2 sm:pl-7' : ''}`}
+    >
       {line.kind === 'loose' && <span aria-hidden="true" className="inline-block w-3.5 shrink-0" />}
       {line.outside ? (
-        <span className="truncate text-text-dim">{line.name}</span>
+        <span className="min-w-0 truncate text-text-dim">{line.name}</span>
       ) : (
-        <CharacterLink id={line.characterId} className="truncate">
+        <CharacterLink id={line.characterId} className="min-w-0 truncate">
           {line.name}
         </CharacterLink>
       )}
       {row?.isSelf && (
-        <span className="shrink-0 rounded-xs bg-panel-2 px-1 py-0.5 text-[0.6875rem] text-text-dim">
+        <span className="shrink-0 rounded-xs bg-panel-2 px-1 py-0.5 text-[0.6875rem] text-text-dim max-sm:hidden">
           {t('corp.members.you')}
         </span>
       )}
-      {row?.isCeo && <Pill className="shrink-0">{t('corp.members.ceo')}</Pill>}
+      {row?.isCeo && <Pill className="shrink-0 max-sm:hidden">{t('corp.members.ceo')}</Pill>}
       {line.outside && (
         <Tag tip={t('corp.members.players.outsideTip')}>
           {t('corp.members.players.outsideChip')}
@@ -394,6 +403,13 @@ function MemberCell({ line, phone }: { line: Line; phone: boolean }) {
           {t(CHIP_KEYS[chip].word)}
         </Tag>
       ))}
+      {flags.length > 0 && (
+        <span
+          role="img"
+          aria-label={flags.join(', ')}
+          className="size-1.5 shrink-0 rounded-full bg-warning sm:hidden"
+        />
+      )}
     </span>
   );
 }

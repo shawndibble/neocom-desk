@@ -1018,6 +1018,19 @@ describe('the Players view', () => {
     await waitFor(() => expect(currentLocation()).not.toContain('highlight='));
   });
 
+  it('a cold ?view=players&highlight=<alt> link still opens that alt once the groups load', async () => {
+    let loaded = false;
+    mockedGrouping.mockImplementation(() => (loaded ? officer : NO_GROUPING));
+    const user = userEvent.setup();
+    renderMembers('/corp/members?view=players&highlight=7');
+    await screen.findByRole('table', { name: 'Corporation members' });
+    loaded = true;
+    // Any state change re-renders the page, which now reads the groups.
+    await user.click(screen.getByRole('button', { name: /^Ship/ }));
+    const players = await screen.findByRole('table', { name: 'Corporation members by Player' });
+    expect(await within(players).findAllByText('Outer Rim Alt')).not.toHaveLength(0);
+  });
+
   it('ignores ?view=players for a Character that cannot group', async () => {
     renderMembers('/corp/members?view=players');
     await screen.findByRole('table', { name: 'Corporation members' });

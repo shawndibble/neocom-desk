@@ -41,11 +41,20 @@ export function GroupMinersView({
   onClose,
   miner,
   source,
+  wording = 'miner',
+  rosterIds,
 }: {
   open: boolean;
   onClose: () => void;
   miner: Target;
   source: GroupSource;
+  /** `'player'` is the Members page's words (a Player's characters); `'miner'` the Moons page's. */
+  wording?: 'miner' | 'player';
+  /**
+   * The corporation roster's character ids. When given, a character is labelled "not in the
+   * corporation" only if the roster lacks it; without it the label follows the choice's standing.
+   */
+  rosterIds?: ReadonlySet<number>;
 }) {
   const { t } = useTranslation();
   const { status, choices, stored, name, edit, searchAs } = source;
@@ -95,13 +104,18 @@ export function GroupMinersView({
     (f) => !characterIds.includes(f.id) && !stored.some((m) => m.characterIds.includes(f.id))
   );
   const nameOf = (id: number) => added.find((a) => a.id === id)?.name ?? name(id);
+  const player = wording === 'player';
+  const k = (miner_: string, player_: string) =>
+    player ? `corp.members.players.group.${player_}` : `corpTaxBook.moons.${miner_}`;
+  const outsideCorp = (m: MinerChoice) =>
+    rosterIds ? !m.characterIds.some((c) => rosterIds.has(c)) : m.standing === 'guest';
 
   return (
     <DialogShell
       open={open}
       onClose={onClose}
-      title={t('corpTaxBook.moons.grouping.dialogTitle', { name: name(miner.mainCharacterId) })}
-      confirmLabel={t('corpTaxBook.moons.grouping.confirm', {
+      title={t(k('grouping.dialogTitle', 'title'), { name: name(miner.mainCharacterId) })}
+      confirmLabel={t(k('grouping.confirm', 'confirm'), {
         count: absorb.length + claimed.length,
       })}
       canConfirm={changed && mainValid}
@@ -117,12 +131,12 @@ export function GroupMinersView({
         );
       }}
     >
-      <p className="text-text-dim">{t('corpTaxBook.moons.grouping.dialogIntro')}</p>
+      <p className="text-text-dim">{t(k('grouping.dialogIntro', 'intro'))}</p>
       <SearchInput
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder={t('corpTaxBook.moons.miners.search')}
-        aria-label={t('corpTaxBook.moons.miners.searchLabel')}
+        placeholder={t(k('miners.search', 'search'))}
+        aria-label={t(k('miners.searchLabel', 'searchLabel'))}
       />
       {status === 'loading' && <Spinner block="panel" delayMs={200} label={t('common.loading')} />}
       {status === 'failed' && (
@@ -146,7 +160,7 @@ export function GroupMinersView({
                 {name(m.mainCharacterId)}
                 {m.characterIds.length > 1 &&
                   ` ${t('corpTaxBook.moons.moreCharacters', { count: m.characterIds.length - 1 })}`}
-                {m.standing === 'guest' && (
+                {outsideCorp(m) && (
                   <span className="text-xs text-text-dim">
                     {' '}
                     · {t('corpTaxBook.moons.grouping.outsideCorp')}
@@ -212,8 +226,8 @@ export function GroupMinersView({
         </Label>
       )}
       <Effect>
-        {t('corpTaxBook.moons.grouping.effect')}
-        {claimed.length > 0 && ` ${t('corpTaxBook.moons.grouping.claimEffect')}`}
+        {t(k('grouping.effect', 'effect'))}
+        {claimed.length > 0 && ` ${t(k('grouping.claimEffect', 'claimEffect'))}`}
       </Effect>
     </DialogShell>
   );

@@ -93,6 +93,27 @@ beforeEach(() => {
 });
 
 describe('PlayersView', () => {
+  it('opens the Player holding a latched highlight alt and marks the row (groups loaded late)', () => {
+    const { rerender } = renderView({ grouping: grouping({ groups: [] }), highlightId: 4 });
+    expect(screen.queryByText('Outer Rim Vane')).not.toBeInTheDocument();
+    rerender(
+      <MemoryRouter>
+        <PlayersView
+          rows={rows}
+          visibleRows={rows}
+          grouping={grouping()}
+          search=""
+          otherFilters={false}
+          onGroupWith={onGroupWith}
+          onResetFilters={vi.fn()}
+          highlightId={4}
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getByText('Outer Rim Vane')).toBeInTheDocument();
+    expect(screen.getByText('Vane Hauler')).toBeInTheDocument();
+  });
+
   it('lists Players folded, with counts, and loose members as plain rows', () => {
     renderView();
     const kestrel = rowOf('Kestrel Vane');
