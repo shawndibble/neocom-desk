@@ -591,6 +591,18 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // A Miner's own copy of their paid-through day (`meta/paid` is officer-only).
+      match /minerPaid/{minerId} {
+        allow get, list: if isOfficer() || isOnOwnLine();
+        allow write: if false;
+      }
+
+      // An officer's per-day limit on forgiving a shortfall: the Miner's own Tax tab reads it.
+      match /toleranceExemptions/{exemptionId} {
+        allow get, list: if isOfficer() || isOnOwnLine();
+        allow write: if false;
+      }
+
       // A Miner's declarations ("I paid this another way") and Conflict disputes (#6206): the Miner
       // sees each one's answer. A declaration written before #6206 has no `uids`: officers only.
       match /declarations/{declarationId} {

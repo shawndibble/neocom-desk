@@ -123,6 +123,8 @@ export const CORP_COLLECTION_FAQ_ITEM = {
   feederViews: 'corpTaxBook',
   adjustments: 'corpTaxBook',
   writeOffs: 'corpTaxBook',
+  toleranceExemptions: 'corpTaxBook',
+  minerPaid: 'corpTaxBook',
   feederCoverage: 'corpTaxBook',
   extractions: 'corpTaxBook',
   declarations: 'corpTaxBook',

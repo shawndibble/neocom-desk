@@ -71,6 +71,13 @@ export const DECLARATIONS = 'declarations';
 export const DISPUTES = 'disputes';
 export const ADJUSTMENTS = 'adjustments';
 export const WRITE_OFFS = 'writeOffs';
+/** `toleranceExemptions/{id}`: an officer's limit on what one Miner-day shortfall may forgive. */
+export const TOLERANCE_EXEMPTIONS = 'toleranceExemptions';
+/**
+ * `minerPaid/{minerId}`: a copy of the Miner's paid-through day from `meta/paid` (officer-only),
+ * readable by that Miner so their own Tax tab can close the same days the book does.
+ */
+export const MINER_PAID = 'minerPaid';
 export const REBILLS = 'rebills';
 export const STATEMENTS = 'statements';
 /** `statementLinks/{statementId}`: the verify token, readable by editors only. */
@@ -653,7 +660,34 @@ export type EditAction =
       mainCharacterId: number;
       absorbMinerIds: string[];
     }
-  | { action: 'addAdjustment'; minerId: string; date: string; amount: number; reason: string }
+  | {
+      action: 'addAdjustment';
+      minerId: string;
+      date: string;
+      amount: number;
+      reason: string;
+      /** `opening`: the balance rolled over from another system. */
+      kind?: 'opening';
+    }
+  /** Undoes a correction: the record stays, marked reversed. Refused once a Statement billed it. */
+  | { action: 'reverseAdjustment'; adjustmentId: string; reason: string }
+  /** Reverses a correction and adds its replacement in one step. */
+  | {
+      action: 'editAdjustment';
+      adjustmentId: string;
+      date: string;
+      amount: number;
+      reason: string;
+    }
+  | { action: 'reverseWriteOff'; writeOffId: string; reason: string }
+  /** How much of one Miner-day's shortfall the book forgives (0 charges it all). */
+  | {
+      action: 'setToleranceExemption';
+      minerId: string;
+      date: string;
+      forgive: number;
+      reason: string;
+    }
   | { action: 'writeOff'; minerId: string; statementId?: string; amount: number; reason: string }
   | { action: 'rebill'; minerId: string; fromDate: string; reason: string }
   | {
@@ -746,6 +780,10 @@ export const LIVE_CHECK_ACTIONS: ReadonlySet<EditAction['action']> = new Set([
   'dismissRecords',
   'dismissDispute',
   'reverseDismissal',
+  'reverseAdjustment',
+  'editAdjustment',
+  'reverseWriteOff',
+  'setToleranceExemption',
   'writeOff',
   'rebill',
   'markNotTax',
@@ -818,6 +856,10 @@ export function parseEditAction(data: unknown): EditAction {
     'unlink',
     'regroupMiner',
     'addAdjustment',
+    'reverseAdjustment',
+    'editAdjustment',
+    'reverseWriteOff',
+    'setToleranceExemption',
     'writeOff',
     'rebill',
     'closeAccount',
@@ -958,6 +1000,35 @@ export function parseEditAction(data: unknown): EditAction {
         minerId: docId(d.minerId, 'minerId'),
         date: dateString(d.date, 'date'),
         amount: num(d.amount, 'amount', -1e13, 1e13),
+        reason: reason(d.reason),
+        ...(d.kind === 'opening' ? { kind: 'opening' as const } : {}),
+      };
+    case 'reverseAdjustment':
+      return {
+        action,
+        adjustmentId: docId(d.adjustmentId, 'adjustmentId'),
+        reason: reason(d.reason),
+      };
+    case 'editAdjustment':
+      return {
+        action,
+        adjustmentId: docId(d.adjustmentId, 'adjustmentId'),
+        date: dateString(d.date, 'date'),
+        amount: num(d.amount, 'amount', -1e13, 1e13),
+        reason: reason(d.reason),
+      };
+    case 'reverseWriteOff':
+      return {
+        action,
+        writeOffId: docId(d.writeOffId, 'writeOffId'),
+        reason: reason(d.reason),
+      };
+    case 'setToleranceExemption':
+      return {
+        action,
+        minerId: docId(d.minerId, 'minerId'),
+        date: dateString(d.date, 'date'),
+        forgive: num(d.forgive, 'forgive', 0, 1e13),
         reason: reason(d.reason),
       };
     case 'writeOff':

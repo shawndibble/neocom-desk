@@ -28,7 +28,14 @@ const MINER = 3; // billed by the book
 const STRANGER = 4; // never mined there
 const OFFICER = 1;
 // #6206: declarations and disputes join them, so the Miner sees each one's answer.
-const OWN_KINDS = ['adjustments', 'writeOffs', 'declarations', 'disputes'];
+const OWN_KINDS = [
+  'adjustments',
+  'writeOffs',
+  'declarations',
+  'disputes',
+  'toleranceExemptions',
+  'minerPaid',
+];
 
 beforeAll(async () => {
   env = await createRulesEnv();

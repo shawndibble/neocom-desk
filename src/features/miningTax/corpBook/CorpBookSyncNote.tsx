@@ -54,8 +54,20 @@ export function CorpBookSyncNote({
         corp: corpName,
       })
     : null;
+  // The balance an officer rolled over from another system, until they reverse it.
+  // A note of where the account started, so it shows only while a balance is open: owing it, or
+  // holding credit.
+  const rolled = (loaded.adjustments ?? [])
+    .filter((a) => a.kind === 'opening' && !a.reversed)
+    .reduce((sum, a) => sum + a.amount, 0);
+  const opening =
+    (rolled > 0 && (owedNow > 0 || account?.owes)) || (rolled < 0 && credit) ? rolled : 0;
   const hasWords =
-    owedNow > 0 || book.pendingFrom !== undefined || (credit && !account) || standing !== null;
+    owedNow > 0 ||
+    book.pendingFrom !== undefined ||
+    (credit && !account) ||
+    standing !== null ||
+    Math.abs(opening) >= 1;
   if (!hasWords) return null;
 
   const safe =
@@ -92,6 +104,19 @@ export function CorpBookSyncNote({
       )}
       {standing && (
         <span className={account?.owes ? 'text-text' : 'text-text-dim'}>{standing}</span>
+      )}
+      {Math.abs(opening) >= 1 && (
+        <span className="text-text-dim">
+          {t(
+            opening > 0
+              ? 'miningTax.corpBook.sync.openingOwes'
+              : 'miningTax.corpBook.sync.openingCredit',
+            {
+              amount: formatIsk(Math.abs(opening), 0),
+              corp: corpName,
+            }
+          )}
+        </span>
       )}
       {credit && !account && (
         <span className="text-text-dim">

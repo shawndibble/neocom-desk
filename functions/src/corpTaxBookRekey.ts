@@ -6,9 +6,11 @@ import {
   DISMISSALS,
   disputeIdFor,
   DISPUTES,
+  MINER_PAID,
   PAYMENTS,
   REBILLS,
   STATEMENTS,
+  TOLERANCE_EXEMPTIONS,
   WRITE_OFFS,
 } from './corpTaxBook.js';
 import { MINER_TOTALS } from './corpTaxBookMinerTotals.js';
@@ -37,9 +39,20 @@ export type RekeyWrite =
   | { kind: 'delete'; collection: string; id: string };
 
 /** Collections whose records carry `minerId`. */
-export const MINER_KEYED = [STATEMENTS, PAYMENTS, WRITE_OFFS, ADJUSTMENTS, DECLARATIONS, REBILLS];
-/** Collections keyed by the Miner id itself (`accounts/{minerId}`, `minerTotals/{minerId}`): only caches. */
-export const MINER_CACHES = [ACCOUNTS, MINER_TOTALS];
+export const MINER_KEYED = [
+  STATEMENTS,
+  PAYMENTS,
+  WRITE_OFFS,
+  ADJUSTMENTS,
+  DECLARATIONS,
+  REBILLS,
+  TOLERANCE_EXEMPTIONS,
+];
+/**
+ * Collections keyed by the Miner id itself (`accounts/{minerId}`, `minerTotals/{minerId}`,
+ * `minerPaid/{minerId}`): only caches, rebuilt on the next read or record.
+ */
+export const MINER_CACHES = [ACCOUNTS, MINER_TOTALS, MINER_PAID];
 
 /** The Miner ids a grouping absorbs: the groups dissolved, and a `solo:` id per Character folded in. */
 export function absorbedMinerIds(

@@ -67,6 +67,12 @@ export interface Adjustment {
   reason: string;
   by: number;
   at: string;
+  /** An officer undid it: the record stays, struck through, and no longer counts. */
+  reversed?: { by: number; at: string; reason: string };
+  /** `opening`: the balance rolled over from another system, not a correction of a mined day. */
+  kind?: 'opening';
+  /** The reversed Adjustment this one replaces (an edit is a reversal plus a new Adjustment). */
+  replaces?: string;
 }
 
 export type StatementLineKind = 'mined' | 'late-ore' | 'correction';
@@ -332,7 +338,7 @@ export function draftStatement(input: StatementDraftInput): StatementDraft {
     });
   }
   for (const adj of input.adjustments) {
-    if (adj.minerId !== input.minerId || billedAdjustments.has(adj.id)) continue;
+    if (adj.minerId !== input.minerId || billedAdjustments.has(adj.id) || adj.reversed) continue;
     if (adj.date > coversThrough) continue;
     if (adj.amount > 0 && paidDay.has(adj.date)) {
       blockedCorrections.push(adj);

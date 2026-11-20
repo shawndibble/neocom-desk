@@ -55,6 +55,7 @@ export function bookViewInputOf(
     declarations: data.declarations,
     ...(data.disputes ? { disputes: data.disputes } : {}),
     adjustments: data.adjustments,
+    ...(data.toleranceExemptions ? { toleranceExemptions: data.toleranceExemptions } : {}),
     ...(data.state.writeOffs ? { writeOffs: data.state.writeOffs } : {}),
     feeders: data.feeders,
     extractions: data.state.extractions,

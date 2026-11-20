@@ -335,6 +335,9 @@ export function bookExportSheets(
         ['by', (a) => character(a.by)],
         ['byId', (a) => a.by],
         ['time', (a) => a.at],
+        ['reversedBy', (a) => character(a.reversed?.by)],
+        ['reversedAt', (a) => a.reversed?.at],
+        ['reversedReason', (a) => a.reversed?.reason],
       ]
     ),
     sheet(
@@ -354,6 +357,9 @@ export function bookExportSheets(
         ['reason', (w) => w.reason],
         ['statementId', (w) => w.statementId],
         ['time', (w) => w.at],
+        ['reversedBy', (w) => character(w.reversed?.by)],
+        ['reversedAt', (w) => w.reversed?.at],
+        ['reversedReason', (w) => w.reversed?.reason],
       ]
     ),
     sheet(

@@ -98,6 +98,7 @@ function renderDialog(overrides: Partial<BookViewInput> = {}) {
           miner={view.miners.find((m) => m.id === 'solo:2')!}
           minerName="Pilot 2"
           defaultDate="2026-08-11"
+          openingDate="2026-08-01"
         />
       </BookProvider>
     </MemoryRouter>
@@ -123,15 +124,19 @@ describe('AdjustmentDialog set balance', () => {
     expect(screen.getByText(/Their balance now: holds .* credit\./)).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Amount'), '300000');
     expect(screen.getByText(/Adds a charge of .*1,?100,?000/)).toBeInTheDocument();
-    await userEvent.type(screen.getByLabelText(/Label on the line/), 'Moved from the old system');
+    // A rolled-over balance is an opening balance: dated at the book's start and labelled so.
+    expect(screen.getByLabelText(/Label on the line/)).toHaveValue(
+      'Opening balance from the old system'
+    );
     await userEvent.click(screen.getByRole('button', { name: /^Add/ }));
     expect(editBook).toHaveBeenCalledTimes(1);
     expect(editBook.mock.calls[0][2]).toMatchObject({
       action: 'addAdjustment',
       minerId: 'solo:2',
-      date: '2026-08-11',
+      date: '2026-08-01',
       amount: 1_100_000,
-      reason: 'Moved from the old system',
+      reason: 'Opening balance from the old system',
+      kind: 'opening',
     });
   });
 

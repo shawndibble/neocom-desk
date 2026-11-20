@@ -32,6 +32,18 @@ export interface LedgerEntry {
   note?: string;
   /** A `payment` entry: who sent it and how the book learned of it. */
   paymentId?: string;
+  /** The record behind a `correction` (its Adjustment id) or `writeOff` (the write-off id) row. */
+  refId?: string;
+  /** A `correction` row that is the balance rolled over from another system. */
+  opening?: boolean;
+  /** A `correction` row an issued Statement billed: it cannot be undone, only offset. */
+  locked?: boolean;
+  /** A `tolerance` row of a running account: the mined day whose shortfall it closed. */
+  forDate?: string;
+  /** A correction or write-off an officer undid: this row is the original, shown struck through. */
+  reversed?: boolean;
+  /** This row undoes the one before it (same record), dated the day the officer undid it. */
+  reversal?: boolean;
 }
 
 export interface AccountLedger {
@@ -110,28 +122,70 @@ export function accountLedger(
         credit: p.credited,
         paymentId: p.id,
       });
-  for (const a of corrections)
-    if (a.amount !== 0)
+  // A correction a Statement billed is frozen with it (D22): undoing it is an opposite correction.
+  const billedCorrections = new Set(
+    detail.statements.flatMap((s) =>
+      s.lines.flatMap((l) => (l.adjustmentId ? [l.adjustmentId] : []))
+    )
+  );
+  for (const a of corrections) {
+    if (a.amount === 0) continue;
+    const debit = Math.max(0, a.amount);
+    const credit = Math.max(0, -a.amount);
+    drafts.push({
+      key: `correction-${a.id}`,
+      kind: 'correction',
+      date: a.date,
+      at: a.at,
+      debit,
+      credit,
+      note: a.reason,
+      refId: a.id,
+      ...(a.kind === 'opening' ? { opening: true } : {}),
+      ...(billedCorrections.has(a.id) ? { locked: true } : {}),
+      ...(a.reversed ? { reversed: true } : {}),
+    });
+    // An undone correction stays, with an offsetting row on the day it was undone.
+    if (a.reversed)
       drafts.push({
-        key: `correction-${a.id}`,
+        key: `correction-${a.id}-reversal`,
         kind: 'correction',
-        date: a.date,
-        at: a.at,
-        debit: Math.max(0, a.amount),
-        credit: Math.max(0, -a.amount),
-        note: a.reason,
+        date: day(a.reversed.at),
+        at: a.reversed.at,
+        debit: credit,
+        credit: debit,
+        note: a.reversed.reason,
+        refId: a.id,
+        ...(a.kind === 'opening' ? { opening: true } : {}),
+        reversal: true,
       });
-  for (const w of detail.officerWriteOffs)
-    if (w.amount > 0)
+  }
+  for (const w of detail.officerWriteOffs) {
+    if (w.amount <= 0) continue;
+    drafts.push({
+      key: `writeOff-${w.id}`,
+      kind: 'writeOff',
+      date: day(w.at),
+      at: w.at,
+      debit: 0,
+      credit: w.amount,
+      note: w.reason,
+      refId: w.id,
+      ...(w.reversed ? { reversed: true } : {}),
+    });
+    if (w.reversed)
       drafts.push({
-        key: `writeOff-${w.id}`,
+        key: `writeOff-${w.id}-reversal`,
         kind: 'writeOff',
-        date: day(w.at),
-        at: w.at,
-        debit: 0,
-        credit: w.amount,
-        note: w.reason,
+        date: day(w.reversed.at),
+        at: w.reversed.at,
+        debit: w.amount,
+        credit: 0,
+        note: w.reversed.reason,
+        refId: w.id,
+        reversal: true,
       });
+  }
 
   for (const w of detail.dayWriteOffs)
     drafts.push({
@@ -142,6 +196,7 @@ export function accountLedger(
       debit: 0,
       credit: w.amount,
       note: w.date,
+      forDate: w.date,
     });
   // A Statement's tolerance is dated by the last payment that reached it, else its issue date.
   const paidAt = new Map(detail.payments.map((p) => [p.id, p.at]));
@@ -187,6 +242,12 @@ export function accountLedger(
       ...(d.dayKeys !== undefined ? { dayKeys: d.dayKeys } : {}),
       ...(d.note !== undefined ? { note: d.note } : {}),
       ...(d.paymentId !== undefined ? { paymentId: d.paymentId } : {}),
+      ...(d.reversed ? { reversed: true } : {}),
+      ...(d.reversal ? { reversal: true } : {}),
+      ...(d.refId !== undefined ? { refId: d.refId } : {}),
+      ...(d.opening ? { opening: true } : {}),
+      ...(d.locked ? { locked: true } : {}),
+      ...(d.forDate !== undefined ? { forDate: d.forDate } : {}),
     };
   });
   return { entries, balance, notYetBilled };
