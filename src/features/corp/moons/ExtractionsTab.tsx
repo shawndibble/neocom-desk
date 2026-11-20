@@ -19,7 +19,13 @@ import { caretColumn } from './caretColumn';
 import { ReasonDialog } from './BookDialogs';
 import { LinkSurveyDialog } from './LinkSurveyDialog';
 import { ExtractionStateFilter, ExtractionTimeline } from './ExtractionTimeline';
-import { DEFAULT_STATES, FILTER_STATES, isPastExtraction } from './extractionStates';
+import {
+  DEFAULT_STATES,
+  EXPIRED_KEEP_DAYS,
+  expiryOf,
+  FILTER_STATES,
+  isPastExtraction,
+} from './extractionStates';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { isk, shortDate, shortDateTime } from './moonsFormat';
 import { extractionPath, refineryPath, sharingMoonPath } from './moonsPaths';
@@ -82,9 +88,7 @@ export function ExtractionsTab() {
   // Newest expiry first, so "Load older" walks back through history.
   const past = inStates
     .filter((r) => isPastExtraction(r, now))
-    .sort((a, b) =>
-      (b.expiresAt ?? b.chunkArrivalAt).localeCompare(a.expiresAt ?? a.chunkArrivalAt)
-    );
+    .sort((a, b) => expiryOf(b).localeCompare(expiryOf(a)));
   const allPast = rows.every((r) => isPastExtraction(r, now));
   const inChunks = rows
     .filter((r) => r.state !== 'expired' && r.state !== 'cancelled')
@@ -216,7 +220,7 @@ export function ExtractionsTab() {
           sortColumns={columns}
           meta={
             <span className="text-xs text-text-dim">
-              {t('corpTaxBook.moons.pastExtractionsHint')}
+              {t('corpTaxBook.moons.pastExtractionsHint', { days: EXPIRED_KEEP_DAYS })}
             </span>
           }
           phone={phone}

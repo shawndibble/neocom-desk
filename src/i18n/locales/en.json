@@ -18364,8 +18364,8 @@
       "extractionsNone": "No Extractions yet",
       "extractionsNoneShown": "No Extraction matches the states shown",
       "extractionsNoneCurrent": "No current Extraction",
-      "pastExtractions": "Past extractions",
-      "pastExtractionsHint": "Expired more than 2 days ago, or cancelled",
+      "pastExtractions": "Past Extractions",
+      "pastExtractionsHint": "Expired more than {{days}} days ago, or cancelled",
       "extractionsSummary_one": "{{count}} Extraction",
       "extractionsSummary_other": "{{count}} Extractions",
       "moons": {

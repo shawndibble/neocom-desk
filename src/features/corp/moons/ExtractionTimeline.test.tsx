@@ -67,6 +67,16 @@ describe('ExtractionTimeline', () => {
     expect(screen.queryByText('Refinery 8')).not.toBeInTheDocument();
   });
 
+  it('keeps a chunk that expired exactly 2 days ago', () => {
+    const edge = { ...row('x', 9), state: 'expired' as const, expiresAt: '2026-10-16T12:00:00Z' };
+    render(
+      <MemoryRouter>
+        <ExtractionTimeline rows={[edge]} states={DEFAULT_STATES} />
+      </MemoryRouter>
+    );
+    expect(screen.getByText('Refinery 9')).toBeInTheDocument();
+  });
+
   it('shows Expired by default and hides it when its state is off', () => {
     const expired = {
       ...row('x', 9),

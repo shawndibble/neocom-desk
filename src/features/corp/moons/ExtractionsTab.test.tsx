@@ -246,7 +246,7 @@ describe('ExtractionsTab past extractions', () => {
         <ExtractionsTab />
       </MemoryRouter>
     );
-    expect(screen.getByText(/Past extractions/)).toBeInTheDocument();
+    expect(screen.getByText(/Past Extractions/)).toBeInTheDocument();
     expect(screen.getAllByRole('table')).toHaveLength(2);
     real.table = false;
     book.rows = null;

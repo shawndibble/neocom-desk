@@ -16,14 +16,14 @@ export const DEFAULT_STATES: ReadonlySet<ExtractionState> = new Set(FILTER_STATE
 /** How long an expired chunk stays on the timeline and in the main list before it is history. */
 export const EXPIRED_KEEP_DAYS = 2;
 
+/** When the chunk expired, or is planned to. */
+export const expiryOf = (row: ExtractionRow): string => row.expiresAt ?? row.plannedExpiresAt;
+
 /**
  * History: cancelled, or expired more than `EXPIRED_KEEP_DAYS` ago. The timeline drops it and the
  * Extractions tab lists it apart, under "Past extractions", so the live list never grows without end.
  */
 export function isPastExtraction(row: ExtractionRow, now: number): boolean {
   if (row.state === 'cancelled') return true;
-  return (
-    row.state === 'expired' &&
-    now - Date.parse(row.expiresAt ?? row.chunkArrivalAt) > EXPIRED_KEEP_DAYS * DAY_MS
-  );
+  return row.state === 'expired' && now - Date.parse(expiryOf(row)) > EXPIRED_KEEP_DAYS * DAY_MS;
 }

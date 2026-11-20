@@ -16,7 +16,6 @@ import { extractionPath } from './moonsPaths';
 import { StateWord } from './moonsParts';
 import { DAY_MS } from '@/lib/age';
 
-const BEFORE_DAYS = EXPIRED_KEEP_DAYS;
 const AFTER_DAYS = 27;
 
 /** The label column and what lines up with it: widens with the viewport so a long moon name keeps its room. */
@@ -152,8 +151,8 @@ export function ExtractionTimeline({
 function TimelineBody({ shown, now }: { shown: readonly ExtractionRow[]; now: number }) {
   const { t } = useTranslation();
   const { names } = useBook();
-  const from = now - BEFORE_DAYS * DAY_MS;
-  const span = (BEFORE_DAYS + AFTER_DAYS) * DAY_MS;
+  const from = now - EXPIRED_KEEP_DAYS * DAY_MS;
+  const span = (EXPIRED_KEEP_DAYS + AFTER_DAYS) * DAY_MS;
   const pct = (ms: number) => `${(Math.min(Math.max(ms - from, 0), span) / span) * 100}%`;
   const width = (a: number, b: number) =>
     `${((Math.min(Math.max(b, from), from + span) - Math.min(Math.max(a, from), from + span)) / span) * 100}%`;
