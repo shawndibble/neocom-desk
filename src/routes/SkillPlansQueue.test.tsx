@@ -262,7 +262,7 @@ describe('CurrentQueuePanel: what ESI knows that /skills does not', () => {
     expect(await within(panel).findByRole('heading', { name: 'Paused' })).toBeInTheDocument();
     expect(within(panel).getAllByText('Paused')).toHaveLength(3);
     expect(
-      within(panel).getByText(/Training is paused, so EVE reports no completion times\./i)
+      within(panel).getByText(/Training is paused, so EVE shows no finish times\./i)
     ).toBeInTheDocument();
     expect(within(panel).queryByText(/left/i)).not.toBeInTheDocument();
   });

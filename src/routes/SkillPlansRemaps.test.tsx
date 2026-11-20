@@ -132,7 +132,7 @@ describe('SkillPlans editor: optimize remaps', () => {
     await clickOptimizeMode(user, 'Place remaps only');
 
     expect(
-      await screen.findByText('This plan has 0 remaps to spend, so nothing was placed.')
+      await screen.findByText('This plan has no remaps to spend, so none were placed.')
     ).toBeInTheDocument();
     expect(await within(toolbar).findByRole('status')).toHaveTextContent('No remaps to spend');
     // Not the order-blaming verdict, and not the generic inline confirmation.

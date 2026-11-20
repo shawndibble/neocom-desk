@@ -106,12 +106,12 @@ describe('CorpStatusPanel', () => {
     expect(screen.getByText('Needs you (1)')).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Refinery names aren't shown. Brightwater Holdings's CEO or an officer can allow them again from that corp's Moons page."
+        "Refinery names aren't shown. Brightwater Holdings's CEO or an officer can grant them again from that corp's Moons page."
       )
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Brightwater Holdings/ })).toBeNull();
     await userEvent.click(
-      screen.getByRole('button', { name: 'Allow again for Sable Ridge Extraction' })
+      screen.getByRole('button', { name: 'Grant again for Sable Ridge Extraction' })
     );
     expect(onGrantAgain).toHaveBeenCalledWith(30);
   });

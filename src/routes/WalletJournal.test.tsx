@@ -329,7 +329,7 @@ describe('Wallet', () => {
     renderWalletRoute();
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     expect(await screen.findByText(/: log in again$/)).toBeInTheDocument();
-    expect(screen.queryByText('No journal entries cached')).not.toBeInTheDocument();
+    expect(screen.queryByText('No journal entries loaded')).not.toBeInTheDocument();
   });
 
   it('shows no re-login banner when the journal loads normally', async () => {

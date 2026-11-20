@@ -2359,7 +2359,7 @@
       "hint": "Effects from another Fitting landing on this one: command bursts, remote repair, webs, neutralizers and the like. Each is worked out with all skills at V.",
       "add": "Project a fitting",
       "addPlaceholder": "Pick a fitting…",
-      "needsCharacter": "Save fittings to My Fittings, or allow In-game Fittings access, to project them onto this one.",
+      "needsCharacter": "Save fittings to My Fittings, or grant In-game Fittings access, to project them onto this one.",
       "none": "Nothing projected.",
       "nothing": "Projects nothing (no running burst or remote module)",
       "count_one": "{{count}} ship",
@@ -3056,7 +3056,7 @@
     "importFileTooLarge": "That file is too large to import.",
     "importFileReadFailed": "Couldn't read that file. Try picking it again.",
     "importFileDecompressFailed": "Couldn't unzip that file. It may be damaged.",
-    "importFileUnsupportedFormat": "That file isn't a skill plan we can read.",
+    "importFileUnsupportedFormat": "That file isn't a Skill Plan we can read.",
     "importFileBrowserUnsupported": "Your browser can't unzip this file. Try updating it.",
     "importFileMalformedXml": "That file looks damaged or cut off.",
     "importFileMultiPlanUnsupported": "This looks like a multi-plan backup file, not a single plan.",
@@ -4586,7 +4586,7 @@
     "craftScopeReactionsIncluded": "incl. reactions",
     "craftScopeReactionsExcluded": "no reactions",
     "copyShoppingListShort": "Copy shopping list",
-    "iskPerHourTooltip": "Profit divided by the main job's time (how long it holds a job slot, not how long you wait to sell). Use it to compare builds.",
+    "iskPerHourTooltip": "Profit divided by the main job's time (how long it holds a job slot, not how long you wait to sell), using the same price basis as the profit figure above. Use it to compare builds.",
     "breakEvenPriceTooltip": "The lowest price you can list one unit at and still cover the whole job after sales tax and broker fee. On resale value, it also covers what your own materials would have sold for. Click for the full breakdown.",
     "costIndexTooltip": "<b>Can be slightly off:</b> EVE rounds it to 4 decimals. This is the build system's manufacturing activity level, which sets the job cost index fee. It is the live value for the build system named here. The trade hub never changes it."
   },
@@ -6667,7 +6667,10 @@
         "moveUp": "Move {{title}} up",
         "moveDown": "Move {{title}} down",
         "remove": "Remove {{title}}"
-      }
+      },
+      "barLabel": "Customize the Overview",
+      "emptyTitle": "Your Overview is empty",
+      "emptyBody": "Add widgets, or start from a role."
     },
     "gallery": {
       "title": "Add a widget",
@@ -6884,7 +6887,9 @@
         "belowMarket": {
           "note": "From your last Below market view"
         }
-      }
+      },
+      "subtitle": "{{total}} widgets · {{onBoard}} on your Overview",
+      "onBoard": "On your Overview ×{{count}}"
     },
     "roles": {
       "title": "What do you do in EVE?",
@@ -9115,8 +9120,8 @@
     "askEstimate": {
       "marker": "≈",
       "rowHint": "Median asking price in {{count}} public contracts: {{price}} each. Listings, not sales. Not counted in the total.",
-      "note_one": "{{count}} stack priced by contract asking price, about {{value}} ISK, not counted in the total",
-      "note_other": "{{count}} stacks priced by contract asking price, about {{value}} ISK, not counted in the total"
+      "note_one": "{{count}} stack priced at the median asking price, about {{value}} ISK, not counted in the total",
+      "note_other": "{{count}} stacks priced at the median asking price, about {{value}} ISK, not counted in the total"
     },
     "blueprintBadge": {
       "original": {
@@ -9906,7 +9911,7 @@
       "bankedValue": "{{amount}} ({{percent}}%)",
       "resetGainColumn": "Reset now",
       "resetGainValue": "+{{amount}} units/day",
-      "decayedTooltip": "Every extractor here is now below 35% of its first-day output. Extractors slow down over time, and a restart brings them back to full speed. The Reset now column shows the extra units a day you would get."
+      "decayedTooltip": "Every extractor here is now below 35% of its first-day output. Extractors slow down over time, and a reset brings them back to the starting rate. The Reset now column shows the extra units a day you would get."
     },
     "altColonies": {
       "toggleLabel_one": "Show {{count}} alt's colonies",
@@ -12335,7 +12340,7 @@
       "csvDivision": "Agent division",
       "csvAgentAccess": "Agent access",
       "columnBase": "Base",
-      "columnBaseTooltip": "The standing EVE reports, before skill bonuses. Broker fees use this one.",
+      "columnBaseTooltip": "The standing EVE reports. Broker fees are worked out from this one: skills do not lower them.",
       "columnEffective": "Standing",
       "columnEffectiveTooltip": "Your standing with Connections, Criminal Connections or Diplomacy skill bonuses added. This is the number the game shows and uses for agents.",
       "columnJumps": "Jumps",
@@ -12591,7 +12596,7 @@
     "unsoldUnits": "{{count}} units no buy order will take",
     "viewInMarket": "View in Market",
     "planInIndustry": "Plan in Industry",
-    "assumesBaseStandingsHint": "Broker fees on sell-order profits assume 0 standing. Allow Character details to use this character's real faction and corporation standings."
+    "assumesBaseStandingsHint": "Broker fees on sell-order profits assume 0 standing. Grant Character details to use this character's real faction and corporation standings."
   },
   "orders": {
     "emptyTitle": "No open orders loaded yet",
@@ -14752,7 +14757,7 @@
     "deviceCharacters_other": "{{count}} characters are logged in on this device.",
     "deviceCharactersNone": "No characters are logged in on this device.",
     "deviceLogoutLabel": "Log out of all characters",
-    "deviceLogoutHint": "Removes all logins and local data from this device, and turns off Alerts when closed. Synced data stays and returns when you log in.",
+    "deviceLogoutHint": "Removes all logins and local data from this device, and deletes your Alerts when closed registration from our server, so those alerts stop. Synced data stays and returns when you log in.",
     "deviceLogoutHintLocalOnly": "Removes all logins and local data from this device, including plans and data stored only here.",
     "deviceLogoutAction": "Log out",
     "deviceLogoutOpen": "Log out",
@@ -15445,8 +15450,8 @@
     "bpcMarketHubHint": "Where BPC Sourcing checks BPO prices and LP offers. Same as the active character’s Trade Hub in Settings › Market defaults.",
     "bpcHideAuctionsLabel": "Hide auctions",
     "bpcHidePlexLabel": "Hide PLEX contracts",
-    "bpcHideAuctionsHint": "Sets the starting filter. Change it per search in the filter bar.",
-    "bpcHideHint": "Sets the starting filter. Change it per search in the filter bar.",
+    "bpcHideAuctionsHint": "Hides auction contracts when BPC Sourcing opens. You can change it per search in the filter bar.",
+    "bpcHideHint": "Hides PLEX contracts when BPC Sourcing opens. You can change it per search in the filter bar.",
     "tradeHubHint": "Used for LP offer prices and item lookups, and as the starting hub in Hauling Opportunities. Moon mining tax uses each payee’s own hub.",
     "reprocessingYieldLabel": "Reprocessing yield",
     "reprocessingYieldHint": "Type the yield your EVE client shows in its Reprocessing window. We divide out your skills (x{{multiplier}}: Reprocessing, Reprocessing Efficiency and the average of your ore skills) to get the facility's base yield, now {{base}}. For an exact figure for the ores you paste, type it in the Refine breakdown.",
@@ -15795,7 +15800,7 @@
       "noFilterMatches": "No members match your search or filters.",
       "noFilterMatchesHint": "Clear the search or reset the dark-only, ship and location filters to see every member.",
       "noAccessTitle": "Member tracking needs Director",
-      "noAccessHint": "EVE shows the member list and last-login dates only to a Director. Granting access here won't change that.",
+      "noAccessHint": "EVE shows the member list and last-login dates only to a Director. No other corporation role can see them, and granting access here won't change that.",
       "roleLine": "Member tracking needs Director.",
       "searchPlaceholder": "Search name, ship, location…",
       "shipFilterLabel": "Ship",
@@ -15830,7 +15835,7 @@
         "conflictTip": "Two groups claim this character. An officer has to pick one.",
         "group": {
           "title": "Add characters to {{name}}'s Player",
-          "intro": "Pick characters to add to this Player. Search by name to find characters outside the corporation; they are added as an Officer claim.",
+          "intro": "Pick characters to add to this Player. Search by name to find characters outside the corporation; they are added as an Officer claim: billed with the Player, and nothing is read from them until they log in.",
           "search": "Search characters…",
           "searchLabel": "Search characters",
           "confirm_one": "Add {{count}}",
@@ -15898,7 +15903,7 @@
       "empty": "No corporation assets",
       "fetchTruncatedNotice": "Showing the first {{shown}} assets. This corporation has more.",
       "noAccessTitle": "Corp assets need Director",
-      "noAccessHint": "EVE shows the corporation asset list only to a Director. Granting access here won't change that.",
+      "noAccessHint": "EVE shows the corporation asset list only to a Director. No other corporation role can see it, and granting access here won't change that.",
       "roleLine": "The corporation asset list needs Director.",
       "loadFailedTitle": "Could not load corp assets",
       "loadFailedHint": "Couldn't read the corporation's assets. Try refreshing.",
@@ -19136,12 +19141,12 @@
           },
           "needs-names": {
             "text": "Refinery names aren't shown: this corp was connected before names were read. Log in again as its CEO to fix it. Coverage and billing don't change.",
-            "action": "Allow again"
+            "action": "Grant again"
           },
           "names-not-shared": {
-            "text": "Refinery names aren't shown. {{name}}'s CEO or an officer can allow them again from that corp's Moons page."
+            "text": "Refinery names aren't shown. {{name}}'s CEO or an officer can grant them again from that corp's Moons page."
           },
-          "grantNamed": "Allow again for {{name}}",
+          "grantNamed": "Grant again for {{name}}",
           "removeNamed": "Remove {{name}}",
           "signInNamed": "Log in again for {{name}}",
           "removeFailed": "Could not remove this corp. Try again."
@@ -19364,8 +19369,8 @@
         },
         "refineryNames": {
           "title": "Refinery names not shared",
-          "hint": "Allow again to show your refinery names.",
-          "action": "Allow again"
+          "hint": "Grant again to show your refinery names.",
+          "action": "Grant again"
         },
         "removal": {
           "title": "Removal pending, takes effect {{time}}",
@@ -20649,7 +20654,7 @@
         "owedTitle": "Nothing owed",
         "owedHint": "Approved claims wait here until you pay them in game and mark them paid.",
         "historyTitle": "No paid or rejected claims yet",
-        "historyHint": "Paid and rejected claims are kept for a while, then deleted."
+        "historyHint": "Closed claims stay here for a while, then are deleted."
       },
       "columns": {
         "pilot": "Pilot",
@@ -20726,7 +20731,7 @@
         "title": "Mark as paid",
         "body": "Mark {{isk}} ISK to {{pilot}} as paid?"
       },
-      "logged": "Your name and reason are saved in the audit trail.",
+      "logged": "Your name and reason are saved in the audit trail. Your role is checked again when you confirm.",
       "detail": {
         "title": "{{pilot}} · {{hull}}",
         "subtitle": "Lost at {{system}}",

@@ -83,7 +83,7 @@ describe('MoonOwnerPanel', () => {
     ready({ refineryNamesGranted: false });
     mount();
     expect(await screen.findByText('Refinery names not shared')).toBeVisible();
-    await userEvent.click(screen.getByRole('button', { name: 'Allow again' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Grant again' }));
     await waitFor(() =>
       expect(beginFeederGrantLogin).toHaveBeenCalledWith(7, 'reconnect-existing')
     );
@@ -98,7 +98,7 @@ describe('MoonOwnerPanel', () => {
       ready(over);
       const { unmount } = mount();
       expect(await screen.findByText('Varro Kestane')).toBeVisible();
-      expect(screen.queryByRole('button', { name: 'Allow again' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Grant again' })).toBeNull();
       unmount();
     }
   });

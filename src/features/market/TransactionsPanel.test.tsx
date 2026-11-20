@@ -288,9 +288,7 @@ describe('TransactionsPanel — desktop filter and totals', () => {
     load(FILLS, true);
     renderPanel();
 
-    expect(
-      await screen.findByText(/Only the most recent transactions were fetched/)
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Only the most recent transactions loaded/)).toBeInTheDocument();
   });
 
   it('offers the Wallet Permission grant, not the reconnect empty state, when the read needs re-auth', async () => {
@@ -299,7 +297,7 @@ describe('TransactionsPanel — desktop filter and totals', () => {
 
     expect(await screen.findByText('This character: grant Wallet')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Grant in EVE' })).toBeInTheDocument();
-    expect(screen.queryByText('No transactions cached')).toBeNull();
+    expect(screen.queryByText('No transactions loaded')).toBeNull();
   });
 
   it('exports the filtered rows', async () => {
@@ -442,7 +440,9 @@ describe('TransactionsPanel — margin', () => {
     expect(strip).not.toHaveTextContent('sales matched');
     expect(strip).toHaveTextContent('-8,104,550');
     await userEvent.hover(within(strip).getByText('Margin'));
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('1 of 2 sales matched');
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'Margin worked out for 1 of 2 sales'
+    );
   });
 });
 
@@ -499,9 +499,7 @@ describe('TransactionsPanel — phone', () => {
     load([transaction()], true);
     renderPanel();
 
-    expect(
-      await screen.findByText(/Only the most recent transactions were fetched/)
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Only the most recent transactions loaded/)).toBeInTheDocument();
   });
 
   it('pulses the fill a notification pointed at', async () => {

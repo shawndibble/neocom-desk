@@ -847,6 +847,7 @@ describe('Telling the requester about a Pledge', () => {
     const group = await screen.findByRole('group', { name: 'Tell me when someone Pledges' });
     expect(within(group).getByRole('checkbox', { name: 'In the app' })).toBeChecked();
     expect(within(group).getByRole('checkbox', { name: 'By in-game mail' })).not.toBeChecked();
+    expect(group).toHaveAccessibleDescription(/allow mail/);
     expect(screen.queryByText('Mail to (optional)')).toBeNull();
   });
 
