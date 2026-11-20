@@ -56,6 +56,10 @@ export const VERSIONED_COLLECTIONS = [
   'declarations',
   'adjustments',
   'writeOffs',
+  // An officer's per-day limit on forgiving a shortfall; a Miner reads their own.
+  'toleranceExemptions',
+  // A Miner's own copy of their paid-through day (`meta/paid` is officer-only).
+  'minerPaid',
   'feeders',
   'meta',
   // Server-built running totals per Miner (#5255, ADR 0032); the Miner page reads one (#5258).

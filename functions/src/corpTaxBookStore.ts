@@ -65,6 +65,8 @@ import {
   STATEMENT_LINKS,
   TOKENS_COLLECTION,
   WRITE_OFFS,
+  TOLERANCE_EXEMPTIONS,
+  MINER_PAID,
   needsLiveCheck,
   dismissalNeedsDirector,
   defaultSettings,
@@ -965,6 +967,49 @@ function minerCharacters(minerId: string, miner: Data | undefined): number[] {
 }
 
 /** The sign-ins that read a Miner's own lines (`uids`): read in the transaction, before any write. */
+/** Most Miners whose own paid-through copy one `recordAccounts` writes (a transaction holds 500 writes). */
+const MINER_PAID_BATCH = 150;
+
+/** The Director gate dismissals use (D6), for an act that undoes or reprices money of these sizes. */
+function requireDirectorAbove(c: EditCtx, amounts: readonly number[]): void {
+  if (
+    dismissalNeedsDirector(
+      c.book.dismissApprovalAboveIsk as number | null | undefined,
+      amounts,
+      c.access.isDirector
+    )
+  ) {
+    throw new HttpsError('permission-denied', 'A Director must approve this size of change', {
+      reason: 'director-approval',
+    });
+  }
+}
+
+/**
+ * A correction can be undone only while no issued Statement has billed it (D22: a Statement is
+ * frozen): after that the officer adds an opposite correction.
+ */
+async function assertAdjustmentReversible(
+  c: EditCtx,
+  adjustmentId: string,
+  adjustment: Record<string, unknown>
+): Promise<void> {
+  if (adjustment.reversed) fail('failed-precondition', 'Already reversed', 'already-reversed');
+  const billed = (
+    await c.tx.get(col(c, STATEMENTS).where('minerId', '==', adjustment.minerId))
+  ).docs.some((d) =>
+    ((d.data().lines as { adjustmentId?: string }[] | undefined) ?? []).some(
+      (l) => l.adjustmentId === adjustmentId
+    )
+  );
+  if (billed)
+    fail(
+      'failed-precondition',
+      'A Statement already billed this correction: add an opposite correction instead',
+      'billed-on-statement'
+    );
+}
+
 async function minerUids(c: EditCtx, minerId: string): Promise<string[]> {
   const miner = (await c.tx.get(col(c, MINERS).doc(minerId))).data();
   return minerCharacters(minerId, miner).map((id) => `char:${id}`);
@@ -1764,6 +1809,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         by,
         at: iso,
         uids,
+        ...(action.kind === 'opening' ? { kind: 'opening' } : {}),
       });
       return {
         detail: {
@@ -1771,8 +1817,101 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
           minerId: action.minerId,
           amount: action.amount,
           reason: action.reason,
+          ...(action.kind === 'opening' ? { kind: 'opening' } : {}),
         },
         result: { adjustmentId: id },
+      };
+    }
+    case 'reverseAdjustment': {
+      const ref = col(c, ADJUSTMENTS).doc(action.adjustmentId);
+      const adjustment = await mustGet(c, ref, 'Adjustment');
+      await assertAdjustmentReversible(c, action.adjustmentId, adjustment);
+      requireDirectorAbove(c, [Math.abs(Number(adjustment.amount))]);
+      tx.update(ref, { reversed: { by, at: iso, reason: action.reason } });
+      return {
+        detail: {
+          adjustmentId: action.adjustmentId,
+          minerId: adjustment.minerId,
+          amount: adjustment.amount,
+          reason: action.reason,
+        },
+      };
+    }
+    case 'editAdjustment': {
+      const ref = col(c, ADJUSTMENTS).doc(action.adjustmentId);
+      const adjustment = await mustGet(c, ref, 'Adjustment');
+      await assertAdjustmentReversible(c, action.adjustmentId, adjustment);
+      // What the edit changes for the Miner: the gate sees that difference, not the whole line.
+      requireDirectorAbove(c, [Math.abs(action.amount - Number(adjustment.amount))]);
+      const minerId = adjustment.minerId as string;
+      const uids = await minerUids(c, minerId);
+      const id = `a${now}_${rand(4)}`;
+      tx.update(ref, { reversed: { by, at: iso, reason: `Edited: ${action.reason}` } });
+      tx.create(col(c, ADJUSTMENTS).doc(id), {
+        id,
+        minerId,
+        date: action.date,
+        amount: action.amount,
+        reason: action.reason,
+        by,
+        at: iso,
+        uids,
+        replaces: action.adjustmentId,
+        ...(adjustment.kind === 'opening' ? { kind: 'opening' } : {}),
+      });
+      return {
+        detail: {
+          adjustmentId: id,
+          replaces: action.adjustmentId,
+          minerId,
+          amount: action.amount,
+          was: adjustment.amount,
+          reason: action.reason,
+        },
+        result: { adjustmentId: id },
+      };
+    }
+    case 'reverseWriteOff': {
+      const ref = col(c, WRITE_OFFS).doc(action.writeOffId);
+      const writeOff = await mustGet(c, ref, 'Write-off');
+      if (writeOff.reversed) fail('failed-precondition', 'Already reversed', 'already-reversed');
+      requireDirectorAbove(c, [Math.abs(Number(writeOff.amount))]);
+      // A dispute this write-off answered stays answered: only the forgiveness is undone.
+      tx.update(ref, { reversed: { by, at: iso, reason: action.reason } });
+      return {
+        detail: {
+          writeOffId: action.writeOffId,
+          minerId: writeOff.minerId,
+          amount: writeOff.amount,
+          reason: action.reason,
+        },
+      };
+    }
+    case 'setToleranceExemption': {
+      // Forgiving more than the book would is a write-off, so it meets the same gate; charging a
+      // shortfall (0) only raises what is owed.
+      if (action.forgive > 0) requireDirectorAbove(c, [action.forgive]);
+      const uids = await minerUids(c, action.minerId);
+      const id = `x${now}_${rand(4)}`;
+      tx.create(col(c, TOLERANCE_EXEMPTIONS).doc(id), {
+        id,
+        minerId: action.minerId,
+        date: action.date,
+        forgive: action.forgive,
+        reason: action.reason,
+        by,
+        at: iso,
+        uids,
+      });
+      return {
+        detail: {
+          exemptionId: id,
+          minerId: action.minerId,
+          date: action.date,
+          forgive: action.forgive,
+          reason: action.reason,
+        },
+        result: { exemptionId: id },
       };
     }
     case 'writeOff': {
@@ -2061,6 +2200,22 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       // written again, so a second tab adds no write and no newer `at`/`by`.
       const refs = action.accounts.map((a) => col(c, ACCOUNTS).doc(a.minerId));
       const stored = refs.length > 0 ? await c.tx.getAll(...refs) : [];
+      // The Miner's own copy of the paid-through day (the marker itself is officer-only). Any
+      // Miner whose copy is missing or behind is written, a bounded batch per call, so books that
+      // predate the copy catch up as accounts are recorded. Reads first: a transaction refuses
+      // one after a write.
+      const paidNow = ((await c.tx.get(paidRef)).data()?.minerPaidThrough ?? {}) as Record<
+        string,
+        string
+      >;
+      const wanted = { ...paidNow, ...settled };
+      const wantedIds = Object.keys(wanted);
+      const copyRefs = wantedIds.map((id) => col(c, MINER_PAID).doc(id));
+      const copies = copyRefs.length > 0 ? await c.tx.getAll(...copyRefs) : [];
+      const behind = wantedIds
+        .filter((id, i) => copies[i].data()?.paidThrough !== wanted[id])
+        .slice(0, MINER_PAID_BATCH);
+      const behindUids = await Promise.all(behind.map((id) => minerUids(c, id)));
       action.accounts.forEach((account, i) => {
         const a = { ...account };
         delete a.settledThrough; // the pay page's record; the marker lives in `meta/paid`
@@ -2070,6 +2225,9 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       // Only ever grown: a day recorded paid stays paid, even if money is later taken back (D22).
       if (Object.keys(settled).length > 0)
         tx.set(paidRef, { minerPaidThrough: settled }, { merge: true });
+      behind.forEach((id, i) =>
+        tx.set(col(c, MINER_PAID).doc(id), { id, paidThrough: wanted[id], uids: behindUids[i] })
+      );
       // The figures as recorded, so the audit says what the pay page was told.
       return { detail: { count: action.accounts.length, accounts: action.accounts } };
     }

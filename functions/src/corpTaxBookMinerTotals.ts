@@ -361,6 +361,7 @@ export function editScope(action: { action: string } & Data): Scope {
     }
     case 'recordPayment':
     case 'addAdjustment':
+    case 'setToleranceExemption':
     case 'dismissDispute':
     case 'writeOff':
     case 'rebill':
@@ -382,6 +383,9 @@ export function editScope(action: { action: string } & Data): Scope {
       break;
     case 'dismissRecords':
     case 'reverseDismissal':
+    case 'reverseAdjustment':
+    case 'editAdjustment':
+    case 'reverseWriteOff':
     case 'linkSurvey':
       s.all = true;
       break;

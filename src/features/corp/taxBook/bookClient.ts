@@ -29,6 +29,7 @@ import type { Miner } from '@/engine/corpTaxBook/charges';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
 import type { Declaration } from '@/engine/corpTaxBook/overdue';
 import type { Adjustment, Statement } from '@/engine/corpTaxBook/statements';
+import type { ToleranceExemption } from '@/engine/corpTaxBook/toleranceExemptions';
 import type {
   JournalDonation,
   LastSync,
@@ -262,6 +263,10 @@ export const LIVE_CHECK_ACTIONS: ReadonlySet<string> = new Set([
   'dismissRecords',
   'dismissDispute',
   'reverseDismissal',
+  'reverseAdjustment',
+  'editAdjustment',
+  'reverseWriteOff',
+  'setToleranceExemption',
   'writeOff',
   'rebill',
   'markNotTax',
@@ -498,6 +503,8 @@ export interface BookData {
   observed: ObservedRow[];
   declarations: BookDeclaration[];
   adjustments: Adjustment[];
+  /** Officers' per-day limits on what a shortfall may forgive (the newest per day decides). */
+  toleranceExemptions?: ToleranceExemption[];
   /** Each feeder's last good ledger read (#4509); a feeder's days are Billable only after one. */
   feeders?: BookFeeder[];
   groupingAnswers?: GroupingAnswer[];

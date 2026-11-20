@@ -2030,6 +2030,169 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
     });
   });
 
+  describe('reversals and exemptions', () => {
+    const addCorrection = async (amount = -100) =>
+      String(
+        (
+          await edit(ACCOUNTANT, {
+            action: 'addAdjustment',
+            minerId: 'solo:50',
+            date: '2026-10-05',
+            amount,
+            reason: 'rounding',
+          })
+        ).adjustmentId
+      );
+    const adjustment = async (id: string) =>
+      (await book().collection('adjustments').doc(id).get()).data();
+
+    it('reverses a correction, keeps the record, and refuses a second reversal', async () => {
+      await turnOn();
+      const id = await addCorrection();
+      expect(
+        await reason(
+          edit(ACCOUNTANT, { action: 'reverseAdjustment', adjustmentId: id, reason: 'x' })
+        )
+      ).toBe('live-check-required');
+      await edit(
+        ACCOUNTANT,
+        { action: 'reverseAdjustment', adjustmentId: id, reason: 'twice' },
+        true
+      );
+      expect(await adjustment(id)).toMatchObject({
+        amount: -100,
+        uids: ['char:50'],
+        reversed: { by: ACCOUNTANT, reason: 'twice' },
+      });
+      expect(
+        await reason(
+          edit(ACCOUNTANT, { action: 'reverseAdjustment', adjustmentId: id, reason: 'again' }, true)
+        )
+      ).toBe('already-reversed');
+    });
+
+    it('edits a correction as a reversal plus a replacement', async () => {
+      await turnOn();
+      const id = await addCorrection();
+      const out = await edit(
+        ACCOUNTANT,
+        {
+          action: 'editAdjustment',
+          adjustmentId: id,
+          date: '2026-10-06',
+          amount: -250,
+          reason: 'fixed',
+        },
+        true
+      );
+      expect((await adjustment(id))?.reversed).toMatchObject({ by: ACCOUNTANT });
+      expect(await adjustment(String(out.adjustmentId))).toMatchObject({
+        amount: -250,
+        date: '2026-10-06',
+        replaces: id,
+        uids: ['char:50'],
+      });
+    });
+
+    it('refuses to reverse a correction an issued Statement billed', async () => {
+      await turnOn();
+      const id = await addCorrection(500);
+      await book()
+        .collection('statements')
+        .doc('s9')
+        .set({ id: 's9', minerId: 'solo:50', lines: [{ kind: 'correction', adjustmentId: id }] });
+      expect(
+        await reason(
+          edit(ACCOUNTANT, { action: 'reverseAdjustment', adjustmentId: id, reason: 'x' }, true)
+        )
+      ).toBe('billed-on-statement');
+      expect((await adjustment(id))?.reversed).toBeUndefined();
+    });
+
+    it('reverses a write-off and keeps it', async () => {
+      await turnOn();
+      const out = await edit(
+        ACCOUNTANT,
+        { action: 'writeOff', minerId: 'solo:50', amount: 5, reason: 'left' },
+        true
+      );
+      const id = String(out.writeOffId);
+      await edit(
+        ACCOUNTANT,
+        { action: 'reverseWriteOff', writeOffId: id, reason: 'came back' },
+        true
+      );
+      expect((await book().collection('writeOffs').doc(id).get()).data()).toMatchObject({
+        amount: 5,
+        reversed: { by: ACCOUNTANT, reason: 'came back' },
+      });
+      expect(
+        await reason(
+          edit(ACCOUNTANT, { action: 'reverseWriteOff', writeOffId: id, reason: 'again' }, true)
+        )
+      ).toBe('already-reversed');
+    });
+
+    it('records a tolerance exemption the Miner can read, and audits it', async () => {
+      await turnOn();
+      const out = await edit(
+        ACCOUNTANT,
+        {
+          action: 'setToleranceExemption',
+          minerId: 'solo:50',
+          date: '2026-10-05',
+          forgive: 0,
+          reason: 'charge it',
+        },
+        true
+      );
+      expect(
+        (await book().collection('toleranceExemptions').doc(String(out.exemptionId)).get()).data()
+      ).toMatchObject({ minerId: 'solo:50', date: '2026-10-05', forgive: 0, uids: ['char:50'] });
+      const audit = (await book().collection('audit').orderBy('at').get()).docs.map((d) =>
+        d.get('action')
+      );
+      expect(audit).toContain('setToleranceExemption');
+    });
+
+    it('asks a Director for a change above the approval limit, but not for charging a shortfall', async () => {
+      await turnOn();
+      await edit(DIRECTOR, { action: 'updateSettings', patch: { dismissApprovalAboveIsk: 100 } });
+      const id = await addCorrection(-500);
+      expect(
+        await reason(
+          edit(ACCOUNTANT, { action: 'reverseAdjustment', adjustmentId: id, reason: 'x' }, true)
+        )
+      ).toBe('director-approval');
+      expect(
+        await reason(
+          edit(
+            ACCOUNTANT,
+            {
+              action: 'setToleranceExemption',
+              minerId: 'solo:50',
+              date: '2026-10-05',
+              forgive: 5000,
+              reason: 'x',
+            },
+            true
+          )
+        )
+      ).toBe('director-approval');
+      await edit(
+        ACCOUNTANT,
+        {
+          action: 'setToleranceExemption',
+          minerId: 'solo:50',
+          date: '2026-10-05',
+          forgive: 0,
+          reason: 'x',
+        },
+        true
+      );
+    });
+  });
+
   describe('CEO reclaim', () => {
     it('lets only the CEO reclaim, and makes the other officers re-verify', async () => {
       await turnOn();
@@ -2194,6 +2357,17 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         expect(await stored()).toEqual({ 'solo:50': '2026-10-10' });
         await record('2026-10-17');
         expect(await stored()).toEqual({ 'solo:50': '2026-10-17' });
+      });
+
+      it('copies each Miner’s paid-through day to a record that Miner can read', async () => {
+        await turnOn();
+        await record('2026-10-10');
+        const copy = (await book().collection('minerPaid').doc('solo:50').get()).data();
+        expect(copy).toMatchObject({ id: 'solo:50', paidThrough: '2026-10-10', uids: ['char:50'] });
+        await record('2026-10-17');
+        expect((await book().collection('minerPaid').doc('solo:50').get()).get('paidThrough')).toBe(
+          '2026-10-17'
+        );
       });
 
       it('stops before a day an open dispute holds', async () => {

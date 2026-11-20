@@ -14,6 +14,7 @@ import type { HeaderTotals } from '@/engine/corpTaxBook/minerScope';
 import type { ReadModelDocs } from '@/engine/corpTaxBook/readModels';
 import { scheduledSyncFrom, type ScheduledSyncStatus } from '@/engine/corpTaxBook/scheduledSync';
 import type { Adjustment, Statement } from '@/engine/corpTaxBook/statements';
+import type { ToleranceExemption } from '@/engine/corpTaxBook/toleranceExemptions';
 import type { SettlePayment, SyncExtraction } from '@/engine/corpTaxBook/sync';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import { readUncounted, type UncountedDonation } from '@/engine/corpTaxBook/uncounted';
@@ -163,6 +164,12 @@ const SLICES = {
     writeOffs: field<RecordedWriteOff[]>(none, (c) => c.book.list('writeOffs')),
     declarations: field<BookDeclaration[]>(none, (c) => c.book.list('declarations')),
     adjustments: field<Adjustment[]>(none, (c) => c.book.list('adjustments')),
+    // Best effort, like disputes: nothing is read until a write stamped it, and a denied read is none.
+    toleranceExemptions: field<ToleranceExemption[]>(none, async (c) =>
+      c.book.written('toleranceExemptions')
+        ? await c.book.list<ToleranceExemption>('toleranceExemptions').catch(none)
+        : []
+    ),
     // #6206: best effort, so a book whose rules predate disputes still opens.
     disputes: field<OreDispute[]>(none, async (c) =>
       readDisputes(
