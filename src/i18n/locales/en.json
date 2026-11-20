@@ -19364,6 +19364,8 @@
           "start-over-billed": "A Statement already covers days before that date.",
           "start-in-future": "The start date can't be in the future.",
           "director-only": "Only a Director can do that.",
+          "rate-too-old": "A rate can start at most 30 days back.",
+          "day-on-statement": "That day is already on an issued Statement, so a rate cannot start on or before it.",
           "running-account": "This book bills a running account now, so it sends late notices instead of Statements. Reload the page to get the current version.",
           "needs-automatic-sync": "Turn on Automatic sync before sharing pops: the server publishes them from its sync.",
           "unknown-moon": "This book has no Extraction at that moon."
@@ -19624,7 +19626,7 @@
       "settings": {
         "open": "Corp Tax Book settings",
         "title": "Corp Tax Book settings",
-        "ratesHint": "The most specific rate wins: Miner, then moon, then refinery, then moon owner, then Guest default, then the corp default. A rate starts on its date and never reaches back.",
+        "ratesHint": "The most specific rate wins: Miner, then moon, then refinery, then moon owner, then Guest default, then the corp default. A rate starts on its date, which may be up to 30 days back but never on a day an issued Statement bills.",
         "rateScope": {
           "corp": "Corp default",
           "guest": "Guest default",
@@ -19721,7 +19723,7 @@
         "pendingTitle_other": "Pending rates ({{count}})",
         "pendingBlocked": "Fix or remove the marked pending rates in Rates to save.",
         "pendingProblem": {
-          "past": "This day has passed. A rate cannot start before today.",
+          "past": "A rate can start at most 30 days back.",
           "start": "This day is before the book start date.",
           "duplicate": "Another pending rate has the same scope, target and day."
         },

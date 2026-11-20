@@ -99,9 +99,18 @@ export function latestRecordedCorp(
   );
 }
 
-/** Engine `isRetroactiveRate`. The start-date rate at book creation skips it. */
-export function isRetroactiveRate(effectiveFrom: string, today: string): boolean {
-  return effectiveFrom < today;
+/** Engine `MAX_RATE_BACKDATE_DAYS`. */
+export const MAX_RATE_BACKDATE_DAYS = 30;
+
+/** Engine `rateStartRefusal`. The start-date rate at book creation skips it. */
+export function rateStartRefusal(
+  effectiveFrom: string,
+  today: string,
+  lastStatementDay: string | null
+): 'too-old' | 'on-statement' | null {
+  if (effectiveFrom < shiftDate(today, -MAX_RATE_BACKDATE_DAYS)) return 'too-old';
+  if (lastStatementDay !== null && effectiveFrom <= lastStatementDay) return 'on-statement';
+  return null;
 }
 
 /** The fields of a stored Statement the date rules read. */
@@ -118,6 +127,14 @@ export function statementDays(statement: StatementDays): Set<string> {
   for (let d = statement.coversFrom; d <= statement.coversThrough; d = shiftDate(d, 1)) days.add(d);
   for (const line of statement.lines) if (line.kind !== 'correction') days.add(line.date);
   return days;
+}
+
+/** The latest day any of `statements` bills, or null with none (engine `daysOnStatements`, maxed). */
+export function lastStatementDay(statements: readonly StatementDays[]): string | null {
+  let last: string | null = null;
+  for (const s of statements)
+    for (const d of statementDays(s)) if (last === null || d > last) last = d;
+  return last;
 }
 
 /** Engine `canOverrideRecordRate` over `daysOnStatements`. */

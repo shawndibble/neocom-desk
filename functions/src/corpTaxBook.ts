@@ -1523,7 +1523,7 @@ export function defaultSettings(startDate: string, startRatePct: number) {
     cadence: { ...BOOK_DEFAULTS.cadence },
     startDate,
     structureExpiryHours: {} as Record<string, number>,
-    // The start-date rate is not retroactive-checked: it is dated at the start itself (#4059 hand-off).
+    // The start-date rate skips the backdate check (`rateStartRefusal`): it is dated at the start itself (#4059 hand-off).
     rates: [{ scope: 'corp', pct: startRatePct, effectiveFrom: startDate }] as StoredRate[],
   };
 }

@@ -102,7 +102,8 @@ import {
   forfeitAllowed,
   canOverrideRecordRate,
   canRebillFrom,
-  isRetroactiveRate,
+  lastStatementDay,
+  rateStartRefusal,
   latestRecordedCorp,
   creditedLines,
   disputeHolds,
@@ -1347,6 +1348,24 @@ async function storableSettledThrough(
   return out;
 }
 
+/**
+ * A new rate may start up to 30 days back but never on a day an issued Statement bills: that
+ * Statement never changes. Statements are read only when a rate is backdated.
+ */
+async function checkRateStarts(c: EditCtx, newRates: readonly { effectiveFrom: string }[]) {
+  const today = utcDate(c.now);
+  if (!newRates.some((r) => r.effectiveFrom < today)) return;
+  const statements = await c.tx.get(col(c, STATEMENTS));
+  const last = lastStatementDay(statements.docs.map((d) => d.data() as never));
+  for (const r of newRates) {
+    const why = rateStartRefusal(r.effectiveFrom, today, last);
+    if (why === 'too-old')
+      fail('failed-precondition', 'A rate cannot start more than 30 days back', 'rate-too-old');
+    if (why === 'on-statement')
+      fail('failed-precondition', 'That day is already on a Statement', 'day-on-statement');
+  }
+}
+
 async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
   const { tx, now } = c;
   const iso = new Date(now).toISOString();
@@ -1356,19 +1375,14 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
 
   switch (action.action) {
     case 'addRate': {
-      if (isRetroactiveRate(action.rate.effectiveFrom, utcDate(now))) {
-        fail('failed-precondition', 'A rate cannot start before today', 'retroactive-rate');
-      }
+      await checkRateStarts(c, [action.rate]);
       const next = [...rates.filter((r) => rateKey(r) !== rateKey(action.rate)), action.rate];
       if (next.length > 500) fail('resource-exhausted', 'Too many rates', 'too-many-rates');
       tx.update(bookDoc, { rates: next });
       return { detail: { rate: action.rate } };
     }
     case 'addRates': {
-      const today = utcDate(now);
-      if (action.rates.some((r) => isRetroactiveRate(r.effectiveFrom, today))) {
-        fail('failed-precondition', 'A rate cannot start before today', 'retroactive-rate');
-      }
+      await checkRateStarts(c, action.rates);
       const keys = new Set(action.rates.map(rateKey));
       if (keys.size !== action.rates.length)
         fail('invalid-argument', 'Two of the rates are the same', 'duplicate-rate');

@@ -6,11 +6,13 @@
  * that corporation's own members at its refineries, who are otherwise Guests; the
  * per-refinery tier (`structure`, #4621) prices one refinery by its structure
  * id, which a moon owner's ledger-only row always has and a moon id never. Every rate but a per-record one
- * carries an effective-from date and applies only to days on or after it, so a
- * rate change never reaches back over days already mined. A per-record
+ * carries an effective-from date and applies only to days on or after it. A new rate may start up to
+ * 30 days back, never on a day an issued Statement bills (`rateStartRefusal`). A per-record
  * override is an officer's logged correction to one Observed Mining Entry,
  * allowed only on a day not yet on a Statement.
  */
+
+import { shiftUtcDate } from '../localDay';
 
 interface DatedRate {
   pct: number;
@@ -114,9 +116,27 @@ export function resolveRate(rates: readonly TaxRate[], ctx: RateContext): Resolv
   return undefined;
 }
 
-/** A new rate dated before today would reprice days already mined. */
-export function isRetroactiveRate(effectiveFrom: string, today: string): boolean {
-  return effectiveFrom < today;
+/** How far back a new rate may start. Mirrored in `functions/`. */
+export const MAX_RATE_BACKDATE_DAYS = 30;
+
+/** The earliest day a new rate may start: `MAX_RATE_BACKDATE_DAYS` before `today`. */
+export function earliestRateStart(today: string): string {
+  return shiftUtcDate(today, -MAX_RATE_BACKDATE_DAYS);
+}
+
+/**
+ * Why a new rate may not start on `effectiveFrom`, or null. A backdated rate reprices days already
+ * mined, so it may reach back 30 days but never onto a day an issued Statement already bills
+ * (`lastStatementDay`, null with none): an issued Statement never changes.
+ */
+export function rateStartRefusal(
+  effectiveFrom: string,
+  today: string,
+  lastStatementDay: string | null
+): 'too-old' | 'on-statement' | null {
+  if (effectiveFrom < earliestRateStart(today)) return 'too-old';
+  if (lastStatementDay !== null && effectiveFrom <= lastStatementDay) return 'on-statement';
+  return null;
 }
 
 /** A per-record override is allowed only on a day not yet on any of the Miner's Statements. */

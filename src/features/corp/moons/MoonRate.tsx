@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, TextInput } from '@/components/ui';
-import { resolveRate, type RateContext, type TaxRate } from '@/engine/corpTaxBook/rates';
+import {
+  earliestRateStart,
+  resolveRate,
+  type RateContext,
+  type TaxRate,
+} from '@/engine/corpTaxBook/rates';
 import { utcDay } from '@/engine/localDay';
 import { DialogShell, Effect, Label } from './BookDialogs';
 import { dateWithYear } from './moonsFormat';
@@ -155,7 +160,7 @@ function ChangeRateDialog({
         <TextInput
           className="w-full"
           type="date"
-          min={today}
+          min={earliestRateStart(today)}
           value={from}
           onChange={(e) => setFrom(e.target.value)}
         />
