@@ -18363,6 +18363,9 @@
       "windowDays_other": "{{count}} days",
       "extractionsNone": "No Extractions yet",
       "extractionsNoneShown": "No Extraction matches the states shown",
+      "extractionsNoneCurrent": "No current Extraction",
+      "pastExtractions": "Past Extractions",
+      "pastExtractionsHint": "Expired more than {{days}} days ago, or cancelled",
       "extractionsSummary_one": "{{count}} Extraction",
       "extractionsSummary_other": "{{count}} Extractions",
       "moons": {
@@ -20166,7 +20169,8 @@
           "moons": "moons",
           "activity": "entries",
           "miners": "miners",
-          "cycles": "cycles"
+          "cycles": "cycles",
+          "extractions": "extractions"
         }
       }
     },
