@@ -257,6 +257,35 @@ describe('allocateRunningAccount', () => {
     expect(r.credit).toBe(0);
   });
 
+  it('keeps an officer charge on a day recorded paid owed, instead of forgiving it', () => {
+    const r = allocateRunningAccount({
+      ...base,
+      days: [{ date: '2026-11-01', tax: 1_500_000, charge: 500_000 }, day('2026-11-02', 2_000_000)],
+      storedPaidThrough: '2026-11-02',
+      payments: [payment('p1', 3_000_000, '2026-11-04T10:00:00Z')],
+    });
+    // Oldest first: the payment fills 1 Nov, so the 500,000 charge is what 2 Nov ends short.
+    expect(r.byDay.get('2026-11-01')).toMatchObject({ settled: true, credited: 1_500_000 });
+    expect(r.byDay.get('2026-11-02')).toMatchObject({
+      settled: false,
+      writtenOff: 0,
+      remaining: 500_000,
+    });
+    expect(r.owes).toEqual({ amount: 500_000, days: 1, oldest: '2026-11-02' });
+    expect(r.balance).toBe(500_000);
+  });
+
+  it('still closes the rest of a day recorded paid when money is taken back from it', () => {
+    const r = allocateRunningAccount({
+      ...base,
+      days: [{ date: '2026-11-01', tax: 1_500_000, charge: 500_000 }],
+      storedPaidThrough: '2026-11-01',
+      payments: [payment('p1', 400_000, '2026-11-04T10:00:00Z')],
+    });
+    // 1,100,000 short: the 500,000 charge stays owed, the rest of the old day is closed out.
+    expect(r.byDay.get('2026-11-01')).toMatchObject({ writtenOff: 600_000, remaining: 500_000 });
+  });
+
   it('keeps the stored paid-through when there are no days', () => {
     const r = allocateRunningAccount({ ...base, days: [], storedPaidThrough: '2026-11-03' });
     expect(r.paidThrough).toBe('2026-11-03');

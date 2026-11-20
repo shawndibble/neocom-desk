@@ -34,15 +34,27 @@ export function daySettleTolerance(tax: number, pct: number = DAY_SETTLE_TOLERAN
 export interface RunningDay {
   date: string;
   tax: number;
+  /** Of `tax`, what officer corrections charged: never forgiven by a day being recorded paid. */
+  charge?: number;
 }
 
 /** The running days a Miner's unbilled lines make: one per date, oldest first. */
 export function runningDaysFromLines(
-  lines: readonly Pick<StatementLine, 'date' | 'tax'>[]
+  lines: readonly (Pick<StatementLine, 'date' | 'tax'> & {
+    kind?: StatementLine['kind'];
+    charge?: number;
+  })[]
 ): RunningDay[] {
-  const byDate = new Map<string, number>();
-  for (const l of lines) byDate.set(l.date, (byDate.get(l.date) ?? 0) + l.tax);
-  return [...byDate].sort(([a], [b]) => a.localeCompare(b)).map(([date, tax]) => ({ date, tax }));
+  const byDate = new Map<string, { tax: number; charge: number }>();
+  for (const l of lines) {
+    const held = byDate.get(l.date) ?? { tax: 0, charge: 0 };
+    held.tax += l.tax;
+    held.charge += l.charge ?? (l.kind === 'correction' && l.tax > 0 ? l.tax : 0);
+    byDate.set(l.date, held);
+  }
+  return [...byDate]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, v]) => ({ date, tax: v.tax, ...(v.charge > 0 ? { charge: v.charge } : {}) }));
 }
 
 export interface DaySettlement {
@@ -119,7 +131,14 @@ export interface RunningAccount {
   owes: { amount: number; days: number; oldest: string } | null;
 }
 
-type Running = { tax: number; credited: number; paidIn: number; forgiven: number; pinned: boolean };
+type Running = {
+  tax: number;
+  charge: number;
+  credited: number;
+  paidIn: number;
+  forgiven: number;
+  pinned: boolean;
+};
 
 export function allocateRunningAccount(input: RunningAccountInput): RunningAccount {
   const legacy = allocatePayments(input);
@@ -138,6 +157,7 @@ export function allocateRunningAccount(input: RunningAccountInput): RunningAccou
       d.date,
       {
         tax: d.tax,
+        charge: d.charge ?? 0,
         credited: 0,
         paidIn: 0,
         forgiven: 0,
@@ -224,12 +244,18 @@ export function allocateRunningAccount(input: RunningAccountInput): RunningAccou
   const owedDates = new Set<string>();
   let paidThrough: string | null = stored ?? null;
   let gap = false;
+  let chargePool = 0;
+  for (const st of state.values()) if (st.pinned) chargePool += st.charge;
   for (const d of days) {
     const st = state.get(d.date)!;
     const dayHeld = isHeld(d);
-    const settled = st.tax <= 0 || st.pinned || (!dayHeld && isDone(st));
     const shortfall = Math.max(0, st.tax - st.credited);
-    const writtenOff = settled ? shortfall : 0;
+    // A day recorded paid stays closed, but officers' charges on recorded-paid days are owed, not
+    // forgiven: they stay on the oldest such day that ended short, wherever the money fell.
+    const chargeOwed = st.pinned ? Math.min(chargePool, shortfall) : 0;
+    chargePool -= chargeOwed;
+    const settled = st.tax <= 0 || (st.pinned && chargeOwed <= 0) || (!dayHeld && isDone(st));
+    const writtenOff = settled ? shortfall : st.pinned ? shortfall - chargeOwed : 0;
     const remaining = shortfall - writtenOff;
     // A held day is not due, as `allocatePayments` leaves a held amount out of what is billed.
     if (!dayHeld) billed += Math.max(0, st.tax);
