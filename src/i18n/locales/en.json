@@ -18363,6 +18363,9 @@
       "windowDays_other": "{{count}} days",
       "extractionsNone": "No Extractions yet",
       "extractionsNoneShown": "No Extraction matches the states shown",
+      "extractionsNoneCurrent": "No current Extraction",
+      "pastExtractions": "Past Extractions",
+      "pastExtractionsHint": "Expired more than {{days}} days ago, or cancelled",
       "extractionsSummary_one": "{{count}} Extraction",
       "extractionsSummary_other": "{{count}} Extractions",
       "moons": {
@@ -18642,9 +18645,9 @@
         "summary": "{{shown}} of {{total}} Miners",
         "nonMembersHidden_one": "{{count}} non-member hidden · {{amount}} owed",
         "nonMembersHidden_other": "{{count}} non-members hidden · {{amount}} owed",
-        "hidden_one": "{{count}} other Miner owes nothing and has no credit.",
-        "hidden_other": "{{count}} other Miners owe nothing and have no credit.",
-        "empty": "No Miner owes tax, is owed credit or has days waiting.",
+        "closedAccounts": "Closed accounts",
+        "closedOn": "Closed {{date}}",
+        "empty": "No Miners yet.",
         "emptyFiltered": "No Miner matches these filters.",
         "balance": {
           "label": "Balance",
@@ -18858,7 +18861,7 @@
         "remindNothingOwed": "Nothing owed",
         "dismissAll": "Dismiss tax",
         "closeAccount": "Close account",
-        "closedNote": "Account closed on {{date}}. Statement mail has stopped; the final Statement and any earlier ones still go out.",
+        "closedNote": "Account closed on {{date}}. No more late notices go out; the final one and any earlier ones still do.",
         "selectDay": "Select {{date}}",
         "dismissSelected_one": "Dismiss selected ({{count}})",
         "dismissSelected_other": "Dismiss selected ({{count}})",
@@ -19361,6 +19364,8 @@
           "start-over-billed": "A Statement already covers days before that date.",
           "start-in-future": "The start date can't be in the future.",
           "director-only": "Only a Director can do that.",
+          "rate-too-old": "A rate can start at most 30 days back.",
+          "day-on-statement": "That day is already on an issued Statement, so a rate cannot start on or before it.",
           "running-account": "This book bills a running account now, so it sends late notices instead of Statements. Reload the page to get the current version.",
           "needs-automatic-sync": "Turn on Automatic sync before sharing pops: the server publishes them from its sync.",
           "unknown-moon": "This book has no Extraction at that moon."
@@ -19621,7 +19626,7 @@
       "settings": {
         "open": "Corp Tax Book settings",
         "title": "Corp Tax Book settings",
-        "ratesHint": "The most specific rate wins: Miner, then moon, then refinery, then moon owner, then Guest default, then the corp default. A rate starts on its date and never reaches back.",
+        "ratesHint": "The most specific rate wins: Miner, then moon, then refinery, then moon owner, then Guest default, then the corp default. A rate starts on its date, which may be up to 30 days back but never on a day an issued Statement bills.",
         "rateScope": {
           "corp": "Corp default",
           "guest": "Guest default",
@@ -19718,7 +19723,7 @@
         "pendingTitle_other": "Pending rates ({{count}})",
         "pendingBlocked": "Fix or remove the marked pending rates in Rates to save.",
         "pendingProblem": {
-          "past": "This day has passed. A rate cannot start before today.",
+          "past": "A rate can start at most 30 days back.",
           "start": "This day is before the book start date.",
           "duplicate": "Another pending rate has the same scope, target and day."
         },
@@ -19806,8 +19811,7 @@
           "date": "Day it corrects",
           "label": "Label on the line",
           "confirm": "Add {{amount}}",
-          "confirmEmpty": "Add",
-          "effect": "A line dated after the next Statement's last day waits for the one after."
+          "confirmEmpty": "Add"
         },
         "rebill": {
           "open": "Rebill from date",
@@ -19821,8 +19825,8 @@
         }
       },
       "dialogs": {
-        "logged": "Logged under your name with the reason. Your role is checked again when you confirm.",
-        "loggedPlain": "Logged under your name. Your role is checked again when you confirm.",
+        "logged": "Logged under your name with the reason.",
+        "loggedPlain": "Logged under your name.",
         "reasonShown": "Reason (shown to the Miner)",
         "dismissConfirm": "Dismiss {{amount}}",
         "dismissDays": {
@@ -19833,9 +19837,13 @@
         "close": {
           "title": "Close {{name}}'s account?",
           "confirm": "Close account",
-          "intro": "A final Statement bills everything that is Billable, then Statement mail stops for this guest. Their record stays in the book.",
-          "finalStatement": "Final Statement: {{amount}} through {{through}}.",
-          "noStatement": "Nothing left to bill, so there is no final Statement.",
+          "intro": "Closing writes off this guest's record: it leaves the Miners table and no more late notices go out for them. It stays under Closed accounts.",
+          "settleLabel": "What they still owe",
+          "settleNotice": "Send a final notice",
+          "settleDismiss": "Dismiss the tax",
+          "dismissing": "Dismisses {{amount}} of tax, owed and waiting, so no final notice is sent. It stays on the record as dismissed.",
+          "finalStatement": "A final late notice lists {{amount}} through {{through}}.",
+          "noStatement": "Nothing left to bill, so there is no final late notice.",
           "owedAfter": "Still owed afterwards: {{amount}}.",
           "pending": "{{amount}} of tax on days that are not Billable yet will never be billed.",
           "creditLabel": "Credit of {{amount}}",
@@ -19849,7 +19857,7 @@
           "askedAt": "When you asked where to refund it (at least {{days}} days ago)",
           "notYet": "Credit can be forfeited only with the guest's recorded consent, or once the refund offer has gone unanswered for {{days}} days.",
           "reason": "Reason (kept in the activity log)",
-          "sendHint": "The final Statement is mailed from the Statements tab."
+          "sendHint": "The final late notice is mailed from the Late notices tab."
         },
         "dispute": {
           "dismissTitle": "Waive {{name}}'s disputed ore for {{date}}?",
@@ -20167,7 +20175,8 @@
           "moons": "moons",
           "activity": "entries",
           "miners": "miners",
-          "cycles": "cycles"
+          "cycles": "cycles",
+          "extractions": "extractions"
         }
       }
     },

@@ -546,16 +546,20 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect((await book().collection('statements').doc('s1').get()).get('kind')).toBe('notice');
     });
 
-    it('never makes a rate retroactive, and only on a day not yet on a Statement for a record rate', async () => {
+    it('lets a rate start up to 30 days back, and only on a day not yet on a Statement for a record rate', async () => {
       await turnOn();
       expect(
         await reason(
           edit(ACCOUNTANT, {
             action: 'addRate',
-            rate: { scope: 'corp', pct: 20, effectiveFrom: '2026-10-17' },
+            rate: { scope: 'corp', pct: 20, effectiveFrom: '2026-09-17' },
           })
         )
-      ).toBe('retroactive-rate');
+      ).toBe('rate-too-old');
+      await edit(ACCOUNTANT, {
+        action: 'addRate',
+        rate: { scope: 'corp', pct: 20, effectiveFrom: '2026-09-18' },
+      });
       await edit(ACCOUNTANT, {
         action: 'addRate',
         rate: { scope: 'guest', pct: 25, effectiveFrom: '2026-10-18' },
@@ -577,7 +581,16 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
           })
         )
       ).toBe('day-on-statement');
-      expect((await book().get()).get('rates')).toHaveLength(3);
+      // A backdated rate may not start on a day the issued Statement bills.
+      expect(
+        await reason(
+          edit(ACCOUNTANT, {
+            action: 'addRate',
+            rate: { scope: 'corp', pct: 0, effectiveFrom: '2026-10-17' },
+          })
+        )
+      ).toBe('day-on-statement');
+      expect((await book().get()).get('rates')).toHaveLength(4);
     });
 
     it('keeps a per-refinery rate for each refinery on one day (#4621)', async () => {
@@ -606,18 +619,18 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect(await auditCount()).toBe(before + 2);
       const stored = (await book().get()).get('rates') as unknown[];
       expect(stored).toEqual(expect.arrayContaining(rates));
-      // One retroactive rate refuses the whole batch: nothing written, nothing audited.
+      // One rate dated too far back refuses the whole batch: nothing written, nothing audited.
       expect(
         await reason(
           edit(ACCOUNTANT, {
             action: 'addRates',
             rates: [
               { scope: 'guest', pct: 30, effectiveFrom: '2026-10-20' },
-              { scope: 'corp', pct: 20, effectiveFrom: '2026-10-17' },
+              { scope: 'corp', pct: 20, effectiveFrom: '2026-09-17' },
             ],
           })
         )
-      ).toBe('retroactive-rate');
+      ).toBe('rate-too-old');
       expect((await book().get()).get('rates')).toHaveLength(stored.length);
       expect(await auditCount()).toBe(before + 2);
     });

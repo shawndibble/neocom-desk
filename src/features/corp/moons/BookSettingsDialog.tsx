@@ -25,7 +25,7 @@ import {
   useTabsId,
   type TabItem,
 } from '@/components/ui';
-import type { TaxRate } from '@/engine/corpTaxBook/rates';
+import { earliestRateStart, type TaxRate } from '@/engine/corpTaxBook/rates';
 import { Pill } from '@/components/ui/Pill';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
@@ -150,8 +150,8 @@ function useWalletDivisionNames(characterId: number, corporationId: number): Map
  * The book's settings (D21: from the page header's gear): the dated rates
  * (corp default, Guest default, per-Miner, per-moon, per-refinery, per-moon-owner), hub and Ore Form, grace,
  * divisions, late-notice rules, chunk rate, per-structure
- * expiry and the dismissal approval limit. A rate is never retroactive, so a
- * new one starts today or later; everything else saves as one patch.
+ * expiry and the dismissal approval limit. A rate may start up to 30 days back, so a
+ * new one can fix recent days; everything else saves as one patch.
  */
 export function BookSettingsDialog({
   open,
@@ -307,7 +307,7 @@ export function BookSettingsDialog({
     const out = new Map<number, 'start' | 'past' | 'duplicate'>();
     for (const { id, rate } of pending) {
       const key = pendingKey(rate);
-      if (rate.effectiveFrom < today) out.set(id, 'past');
+      if (rate.effectiveFrom < earliestRateStart(today)) out.set(id, 'past');
       else if (rate.effectiveFrom < settings.startDate) out.set(id, 'start');
       else if (seen.has(key)) out.set(id, 'duplicate');
       seen.add(key);
@@ -671,7 +671,7 @@ export function BookSettingsDialog({
                       <TextInput
                         className="w-full"
                         type="date"
-                        min={today}
+                        min={earliestRateStart(today)}
                         value={rateFrom}
                         onChange={(e) => setRateFrom(e.target.value)}
                       />

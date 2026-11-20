@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Button,
   clearFilters,
+  Disclosure,
   ColumnPickerMenu,
   DataTable,
   EmptyState,
@@ -35,6 +36,7 @@ import {
   matchesMinerBalance,
   type MinerBalance,
 } from '@/engine/corpTaxBook/overdueAging';
+import { rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { boolParam, optionalEnumParam, textParam } from '@/lib/urlState';
@@ -69,9 +71,6 @@ const PARAMS = {
 
 /** The Balance select's "no narrowing" item; Radix Select cannot hold an empty value. */
 const ANY_BALANCE = 'any';
-
-/** A Miner is listed while it owes, is owed, or has days waiting; the rest are only counted. */
-const isActive = (m: MinerRow) => m.owed > 0 || m.unbilled > 0 || m.pending > 0 || m.credit > 0;
 
 /** Standings in the order the Standing column sorts them. */
 const STANDING_RANK: readonly MinerStanding[] = ['member', 'guest', 'left'];
@@ -113,20 +112,35 @@ export function MinersTab() {
     [run, onCloseAutoFocus]
   );
   const [params, setParams] = useUrlParams(PARAMS);
+  const [closedOpen, setClosedOpen] = useState(false);
   const nameOf = (m: MinerRow) => names.character(m.mainCharacterId);
+
+  // A closed account is written off: it leaves the table and waits under Closed accounts.
+  const closedAtById = useMemo(
+    () => new Map(view.input.miners.flatMap((m) => (m.closedAt ? [[m.id, m.closedAt]] : []))),
+    [view.input.miners]
+  );
+  const openMiners = useMemo(
+    () => miners.filter((m) => !closedAtById.has(m.id)),
+    [miners, closedAtById]
+  );
+  const closed = useMemo(
+    () => miners.filter((m) => closedAtById.has(m.id)),
+    [miners, closedAtById]
+  );
 
   const counts = useMemo(
     () => ({
-      members: miners.filter((m) => m.standing !== 'guest' && isActive(m)).length,
-      guests: miners.filter((m) => m.standing === 'guest' && isActive(m)).length,
+      members: openMiners.filter((m) => m.standing !== 'guest').length,
+      guests: openMiners.filter((m) => m.standing === 'guest').length,
     }),
-    [miners]
+    [openMiners]
   );
   const rows = useMemo(() => {
     const q = params.q.trim().toLowerCase();
-    return miners.filter((m) => {
+    return openMiners.filter((m) => {
       const inGroup = m.standing === 'guest' ? params.guests : params.members;
-      if (!inGroup || !isActive(m)) return false;
+      if (!inGroup) return false;
       if (params.balance && !matchesMinerBalance(m, params.balance)) return false;
       if (!q) return true;
       return [nameOf(m), ...m.characterIds.map(names.character)].some((n) =>
@@ -134,13 +148,10 @@ export function MinersTab() {
       );
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `names` identity changes as names resolve
-  }, [miners, params, names]);
+  }, [openMiners, params, names]);
   // What the Non-members chip being off keeps out of the table.
-  const hiddenGuests = params.guests
-    ? []
-    : miners.filter((m) => m.standing === 'guest' && isActive(m));
+  const hiddenGuests = params.guests ? [] : openMiners.filter((m) => m.standing === 'guest');
   const hiddenGuestOwed = hiddenGuests.reduce((sum, m) => sum + m.owed, 0);
-  const hidden = miners.length - miners.filter(isActive).length;
 
   const columnVisibility = useColumnVisibility(
     useVisibleMinersColumns,
@@ -397,7 +408,7 @@ export function MinersTab() {
               mobileSort
               stackSummary={t('corpTaxBook.moons.miners.summary', {
                 shown: rows.length,
-                total: miners.length,
+                total: openMiners.length,
               })}
             />
           </div>
@@ -410,12 +421,32 @@ export function MinersTab() {
             })}
           </p>
         )}
-        {hidden > 0 && (
-          <p className="border-t border-line px-3 py-2 text-xs text-text-dim">
-            {t('corpTaxBook.moons.miners.hidden', { count: hidden })}
-          </p>
-        )}
       </Panel>
+      {closed.length > 0 && (
+        <Panel padded={false}>
+          <Disclosure
+            label={t('corpTaxBook.moons.miners.closedAccounts')}
+            trailing={closed.length}
+            expanded={closedOpen}
+            onToggle={() => setClosedOpen((v) => !v)}
+          >
+            {closed.map((m) => (
+              <Link
+                key={m.id}
+                to={minerPath(m.id)}
+                className={`flex items-center justify-between gap-3 px-3 py-2 text-sm ${rowInteractiveClassName}`}
+              >
+                <span className="min-w-0 truncate font-semibold">{nameOf(m)}</span>
+                <span className="shrink-0 text-xs text-text-dim">
+                  {t('corpTaxBook.moons.miners.closedOn', {
+                    date: shortDate((closedAtById.get(m.id) ?? '').slice(0, 10)),
+                  })}
+                </span>
+              </Link>
+            ))}
+          </Disclosure>
+        </Panel>
+      )}
       {dialog?.kind === 'record' && (
         <RecordPaymentDialog
           open

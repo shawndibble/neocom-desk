@@ -8,7 +8,7 @@ import type { ExtractionState } from '@/engine/corpTaxBook/extraction';
 import { cx } from '@/lib/cx';
 import { splitPlace } from '@/engine/corpTaxBook/bookSections';
 import { useBook } from './useBook';
-import { FILTER_STATES } from './extractionStates';
+import { EXPIRED_KEEP_DAYS, FILTER_STATES, isPastExtraction } from './extractionStates';
 import { extractionWindowLabel, shortDate } from './moonsFormat';
 import { formatCountdown } from '@/lib/duration';
 import { formatLocalDateTime } from '@/lib/localDate';
@@ -16,7 +16,6 @@ import { extractionPath } from './moonsPaths';
 import { StateWord } from './moonsParts';
 import { DAY_MS } from '@/lib/age';
 
-const BEFORE_DAYS = 20;
 const AFTER_DAYS = 27;
 
 /** The label column and what lines up with it: widens with the viewport so a long moon name keeps its room. */
@@ -122,10 +121,7 @@ export function ExtractionTimeline({
   const { t } = useTranslation();
   const { view } = useBook();
   const now = Date.parse(view.input.now);
-  const from = now - BEFORE_DAYS * DAY_MS;
-  const inWindow = rows.filter(
-    (r) => r.state !== 'cancelled' && Date.parse(r.expiresAt ?? r.chunkArrivalAt) >= from
-  );
+  const inWindow = rows.filter((r) => !isPastExtraction(r, now));
   const shown = inWindow.filter((r) => states.has(r.state));
   return (
     <Panel
@@ -155,12 +151,12 @@ export function ExtractionTimeline({
 function TimelineBody({ shown, now }: { shown: readonly ExtractionRow[]; now: number }) {
   const { t } = useTranslation();
   const { names } = useBook();
-  const from = now - BEFORE_DAYS * DAY_MS;
-  const span = (BEFORE_DAYS + AFTER_DAYS) * DAY_MS;
+  const from = now - EXPIRED_KEEP_DAYS * DAY_MS;
+  const span = (EXPIRED_KEEP_DAYS + AFTER_DAYS) * DAY_MS;
   const pct = (ms: number) => `${(Math.min(Math.max(ms - from, 0), span) / span) * 100}%`;
   const width = (a: number, b: number) =>
     `${((Math.min(Math.max(b, from), from + span) - Math.min(Math.max(a, from), from + span)) / span) * 100}%`;
-  const ticks = [-BEFORE_DAYS + 1, 0, 7, 14, 21].map((d) => now + d * DAY_MS);
+  const ticks = [0, 7, 14, 21].map((d) => now + d * DAY_MS);
   return (
     <div className="space-y-3">
       <div
@@ -169,7 +165,7 @@ function TimelineBody({ shown, now }: { shown: readonly ExtractionRow[]; now: nu
       >
         {ticks.map((ms, i) => (
           <span key={ms} className="absolute -translate-x-1/2" style={{ left: pct(ms) }}>
-            {i === 1 ? t('corpTaxBook.moons.timeline.now') : shortDate(new Date(ms).toISOString())}
+            {i === 0 ? t('corpTaxBook.moons.timeline.now') : shortDate(new Date(ms).toISOString())}
           </span>
         ))}
       </div>
