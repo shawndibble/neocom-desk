@@ -20,6 +20,7 @@
     "functions/src/corpTaxBookEngine.ts",
     "functions/src/corpTaxBookMinerTotals.ts",
     "functions/src/corpTaxBookMoonDocs.ts",
+    "functions/src/corpTaxBookNotice.ts",
     "functions/src/corpTaxBookReadModels.ts",
     "functions/src/corpTaxBookSchedule.ts",
     "functions/src/corpTaxBookVersionKeys.ts",

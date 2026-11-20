@@ -16,82 +16,28 @@ import {
   allocatePayments,
   countedPayments,
   paymentNet,
-  SETTLE_TOLERANCE_PCT,
   type Allocation,
   type AllocationInput,
 } from './allocation';
-import type { StatementLine } from './statements';
+import {
+  settleDays,
+  type AccountInput,
+  type DayAmount,
+  type DaySettlement,
+  type RunningDay,
+} from './account';
 
-/** The default per-day tolerance: the Statement tolerance's percent, without its ISK floor. */
-export const DAY_SETTLE_TOLERANCE_PCT = SETTLE_TOLERANCE_PCT;
+export {
+  DAY_SETTLE_TOLERANCE_PCT,
+  daySettleTolerance,
+  runningDaysFromLines,
+  type DayAmount,
+  type DaySettlement,
+  type RunningDay,
+} from './account';
 
-/** How short of one day's tax a payment may fall and still pay it: a percent, never an ISK floor. */
-export function daySettleTolerance(tax: number, pct: number = DAY_SETTLE_TOLERANCE_PCT): number {
-  return (Math.max(0, tax) * pct) / 100;
-}
-
-/** One closed day on a Miner's running account: the tax of every line that day. */
-export interface RunningDay {
-  date: string;
-  tax: number;
-  /** Of `tax`, what officer corrections charged: never forgiven by a day being recorded paid. */
-  charge?: number;
-}
-
-/** The running days a Miner's unbilled lines make: one per date, oldest first. */
-export function runningDaysFromLines(
-  lines: readonly (Pick<StatementLine, 'date' | 'tax'> & {
-    kind?: StatementLine['kind'];
-    charge?: number;
-  })[]
-): RunningDay[] {
-  const byDate = new Map<string, { tax: number; charge: number }>();
-  for (const l of lines) {
-    const held = byDate.get(l.date) ?? { tax: 0, charge: 0 };
-    held.tax += l.tax;
-    held.charge += l.charge ?? (l.kind === 'correction' && l.tax > 0 ? l.tax : 0);
-    byDate.set(l.date, held);
-  }
-  return [...byDate]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, v]) => ({ date, tax: v.tax, ...(v.charge > 0 ? { charge: v.charge } : {}) }));
-}
-
-export interface DaySettlement {
-  tax: number;
-  /** Held by an open dispute: not due, and money passes over it. */
-  held: boolean;
-  /** Payments, credit corrections and officer write-offs credited to it. */
-  credited: number;
-  /** What officer write-offs forgave of it (part of `credited`). */
-  forgiven: number;
-  /** The shortfall the tolerance, or a stored paid-through, wrote off. */
-  writtenOff: number;
-  remaining: number;
-  settled: boolean;
-}
-
-export interface RunningAccountInput extends AllocationInput {
-  /** The Miner's closed days not on any Statement, in any order; several entries for a date add up. */
-  days: readonly RunningDay[];
-  /** Dates an open dispute holds (unlike `held`, which is by Statement). */
-  heldDays?: ReadonlySet<string>;
-  /** The newest day the book has recorded as paid (`meta/paid`): it and every day before it stay closed. */
-  storedPaidThrough?: string;
-  /** The book's per-day tolerance, in percent. */
-  dayTolerancePct?: number;
-  /**
-   * Per date, the most of that day's shortfall an officer lets the book forgive, instead of the
-   * tolerance (`exemptionsOf`): 0 forgives nothing.
-   */
-  toleranceExemptions?: ReadonlyMap<string, number>;
-}
-
-/** Money credited to one day. */
-export interface DayAmount {
-  date: string;
-  amount: number;
-}
+export interface RunningAccountInput
+  extends AllocationInput, Omit<AccountInput, 'payments' | 'startDate' | 'writeOffs'> {}
 
 /**
  * Where one Tax Payment's money went. `statements`, `days` and `credit` add up to the payment's
@@ -136,17 +82,11 @@ export interface RunningAccount {
   owes: { amount: number; days: number; oldest: string } | null;
 }
 
-type Running = {
-  tax: number;
-  charge: number;
-  credited: number;
-  paidIn: number;
-  forgiven: number;
-  pinned: boolean;
-  /** An officer's limit on what this day may forgive; none uses the book's tolerance. */
-  exempt?: number;
-};
-
+/**
+ * The running account with calendar Statements paid first (`allocatePayments`). Production holds
+ * no calendar Statement, so this is `buildAccount` (`account.ts`) plus a pass that finds nothing;
+ * it goes when the calendar Statement code does.
+ */
 export function allocateRunningAccount(input: RunningAccountInput): RunningAccount {
   const legacy = allocatePayments(input);
   // Money that is not a payment (negative Statements, dismissals) reaches days without the tolerance.
@@ -154,149 +94,35 @@ export function allocateRunningAccount(input: RunningAccountInput): RunningAccou
     legacy.credit,
     allocatePayments({ ...input, payments: [] }).credit
   );
-  const pct = input.dayTolerancePct ?? DAY_SETTLE_TOLERANCE_PCT;
-  const held = input.heldDays ?? new Set<string>();
-  const stored = input.storedPaidThrough;
-  // One unit per date, whatever the caller passed.
-  const days = runningDaysFromLines(input.days);
-  const state = new Map<string, Running>(
-    days.map((d) => [
-      d.date,
-      {
-        tax: d.tax,
-        charge: d.charge ?? 0,
-        credited: 0,
-        paidIn: 0,
-        forgiven: 0,
-        pinned: stored !== undefined && d.date <= stored,
-        ...(input.toleranceExemptions?.has(d.date)
-          ? { exempt: input.toleranceExemptions.get(d.date)! }
-          : {}),
-      },
-    ])
-  );
-  const isHeld = (d: RunningDay) => held.has(d.date) && d.tax > 0;
-  const isDone = (st: Running) => {
-    const remaining = st.tax - st.credited;
-    const limit = st.exempt ?? daySettleTolerance(st.tax, pct);
-    return remaining <= 0 || (st.paidIn > 0 && remaining <= limit);
-  };
-  // What each payment has left for the days once the legacy Statements took theirs, in the order
-  // `pay` draws on them. The pool is paid in one go (a day's tolerance can close mid-run, so
-  // payments are not applied one by one); the queue only says whose money each slice was.
+  // What each payment has left for the days once the legacy Statements took theirs.
   const toStatements = new Map<string, { statementId: string; amount: number }[]>();
   for (const c of legacy.paymentCredits) {
     const list = toStatements.get(c.paymentId) ?? [];
     list.push({ statementId: c.statementId, amount: c.amount });
     toStatements.set(c.paymentId, list);
   }
-  const queue = countedPayments(input.payments, input.startDate)
-    .filter((p) => paymentNet(p) > 0)
-    .map((p): PaymentApplication & { left: number } => {
-      const statements = toStatements.get(p.id) ?? [];
-      const left = paymentNet(p) - statements.reduce((sum, s) => sum + s.amount, 0);
-      return { paymentId: p.id, statements, days: [], credit: 0, left };
-    });
-  let head = 0;
-  const attribute = (date: string, amount: number) => {
-    while (amount > 0 && head < queue.length) {
-      const q = queue[head]!;
-      const slice = Math.min(amount, q.left);
-      if (slice > 0) q.days.push({ date, amount: slice });
-      q.left -= slice;
-      amount -= slice;
-      if (q.left <= 0) head += 1;
-    }
-  };
-  const corrected: DayAmount[] = [];
-  const forgivenDays: DayAmount[] = [];
-  const pay = (available: number, kind: 'payment' | 'correction' | 'writeOff'): number => {
-    for (const d of days) {
-      if (available <= 0) break;
-      const st = state.get(d.date)!;
-      // A held day is skipped. A day recorded paid still takes its payment (oldest first), or that
-      // money would be left over as credit on top of the day's own tax.
-      if (isHeld(d) || st.tax <= 0 || isDone(st)) continue;
-      const take = Math.min(available, st.tax - st.credited);
-      st.credited += take;
-      if (kind === 'payment') {
-        st.paidIn += take;
-        attribute(d.date, take);
-      } else if (kind === 'writeOff') {
-        st.forgiven += take;
-        forgivenDays.push({ date: d.date, amount: take });
-      } else {
-        corrected.push({ date: d.date, amount: take });
-      }
-      available -= take;
-    }
-    return available;
-  };
-
-  // A day that came out negative (credit corrections) pays the oldest owed days, as a dismissal would.
-  const corrections = days.reduce((sum, d) => sum + Math.max(0, -d.tax), 0);
-  let credit = pay(corrections + legacyNonPayment, 'correction');
-  credit += pay(legacy.credit - legacyNonPayment, 'payment');
-
+  const counted = countedPayments(input.payments, input.startDate).filter((p) => paymentNet(p) > 0);
+  const statementsOf = (id: string) => toStatements.get(id) ?? [];
   // What an officer write-off with no Statement left over, after every Statement it could reduce.
   const usedByWriteOff = new Map<string, number>();
   for (const c of legacy.writeOffCredits)
     usedByWriteOff.set(c.writeOffId, (usedByWriteOff.get(c.writeOffId) ?? 0) + c.amount);
-  const writeOffLeft = (input.officerWriteOffs ?? [])
+  const writeOffPool = (input.officerWriteOffs ?? [])
     .filter((w) => !w.statementId)
     .reduce((sum, w) => sum + Math.max(0, w.amount - (usedByWriteOff.get(w.id) ?? 0)), 0);
-  pay(writeOffLeft, 'writeOff'); // a leftover is dropped, never credit
 
-  const byDay = new Map<string, DaySettlement>();
-  let billed = 0;
-  let forgivenTotal = 0;
-  let writtenOffTotal = 0;
-  let owedAmount = 0;
+  const days = settleDays(input, {
+    extraCorrections: legacyNonPayment,
+    paymentPool: legacy.credit - legacyNonPayment,
+    payments: counted.map((p) => ({
+      paymentId: p.id,
+      left: paymentNet(p) - statementsOf(p.id).reduce((sum, s) => sum + s.amount, 0),
+    })),
+    writeOffPool,
+  });
+
   const owedDates = new Set<string>();
-  let paidThrough: string | null = stored ?? null;
-  let gap = false;
-  let chargePool = 0;
-  for (const st of state.values())
-    if (st.pinned) chargePool += Math.min(st.charge, Math.max(0, st.tax));
-  for (const d of days) {
-    const st = state.get(d.date)!;
-    const dayHeld = isHeld(d);
-    // A day recorded paid stays closed, unless an officer set a limit on what it may forgive.
-    const pinned = st.pinned && st.exempt === undefined;
-    const shortfall = Math.max(0, st.tax - st.credited);
-    // A day recorded paid stays closed, but officers' charges on recorded-paid days are owed, not
-    // forgiven: they stay on the oldest such day that ended short, wherever the money fell.
-    // Not on a held day (not due yet) nor one paid to within tolerance (closed, as an unrecorded day).
-    const chargeOwed = pinned && !dayHeld && !isDone(st) ? Math.min(chargePool, shortfall) : 0;
-    chargePool -= chargeOwed;
-    const settled = st.tax <= 0 || (pinned && chargeOwed <= 0) || (!dayHeld && isDone(st));
-    let writtenOff = settled ? shortfall : pinned ? shortfall - chargeOwed : 0;
-    // An exemption that forgives less than the whole shortfall still forgives what it names.
-    if (!settled && !dayHeld && st.paidIn > 0 && st.exempt)
-      writtenOff = Math.max(writtenOff, Math.min(st.exempt, shortfall - chargeOwed));
-    const remaining = shortfall - writtenOff;
-    // A held day is not due, as `allocatePayments` leaves a held amount out of what is billed.
-    if (!dayHeld) billed += Math.max(0, st.tax);
-    forgivenTotal += st.forgiven;
-    writtenOffTotal += writtenOff;
-    if (!settled && !dayHeld) {
-      owedAmount += remaining;
-      owedDates.add(d.date);
-      gap = true;
-    }
-    // A held day neither stops nor advances "paid through".
-    if (!gap && settled && (!paidThrough || d.date > paidThrough)) paidThrough = d.date;
-    byDay.set(d.date, {
-      tax: st.tax,
-      held: dayHeld,
-      credited: st.credited,
-      forgiven: st.forgiven,
-      writtenOff,
-      remaining,
-      settled,
-    });
-  }
-
+  for (const [date, d] of days.byDay) if (!d.settled && !d.held) owedDates.add(date);
   let legacyOwed = 0;
   for (const s of input.statements) {
     const st = legacy.byStatement.get(s.id);
@@ -305,22 +131,23 @@ export function allocateRunningAccount(input: RunningAccountInput): RunningAccou
     const dates = s.lines.filter((l) => l.tax > 0).map((l) => l.date);
     for (const date of dates.length > 0 ? dates : [s.coversFrom]) owedDates.add(date);
   }
-  if (legacyOwed > 0) paidThrough = null;
-
-  const amount = legacyOwed + owedAmount;
+  const amount = legacyOwed + (days.owes?.amount ?? 0);
   const oldest = [...owedDates].sort()[0];
   return {
     legacy,
-    byDay,
+    byDay: days.byDay,
     applications: {
-      // What is left in the queue is the credit: the payments after the last day they reached.
-      payments: queue.map(({ left, ...p }) => ({ ...p, credit: Math.max(0, left) })),
-      corrections: corrected,
-      writeOffs: forgivenDays,
+      ...days.applications,
+      payments: days.applications.payments.map((p) => ({
+        paymentId: p.paymentId,
+        statements: statementsOf(p.paymentId),
+        days: p.days,
+        credit: p.credit,
+      })),
     },
-    credit,
-    balance: legacy.balance + billed - corrections - forgivenTotal - writtenOffTotal,
-    paidThrough,
+    credit: days.credit,
+    balance: legacy.balance + days.balance,
+    paidThrough: legacyOwed > 0 ? null : days.paidThrough,
     owes: amount > 0 && oldest ? { amount, days: owedDates.size, oldest } : null,
   };
 }
