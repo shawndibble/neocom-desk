@@ -110,6 +110,7 @@ beforeEach(() => {
 });
 
 describe('AdjustmentDialog set balance', () => {
+  // 1,000,000 paid against 200,000 of billable days not yet on a Statement: a balance of -800,000.
   const credit1m = {
     payments: [
       { id: 'p', minerId: 'solo:2', amount: 1_000_000, at: '2026-09-01T00:00:00Z' } as never,
@@ -121,7 +122,7 @@ describe('AdjustmentDialog set balance', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Set balance' }));
     expect(screen.getByText(/Their balance now: holds .* credit\./)).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Amount'), '300000');
-    expect(screen.getByText(/Adds a charge of .*1,?300,?000/)).toBeInTheDocument();
+    expect(screen.getByText(/Adds a charge of .*1,?100,?000/)).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText(/Label on the line/), 'Moved from the old system');
     await userEvent.click(screen.getByRole('button', { name: /^Add/ }));
     expect(editBook).toHaveBeenCalledTimes(1);
@@ -129,7 +130,7 @@ describe('AdjustmentDialog set balance', () => {
       action: 'addAdjustment',
       minerId: 'solo:2',
       date: '2026-08-11',
-      amount: 1_300_000,
+      amount: 1_100_000,
       reason: 'Moved from the old system',
     });
   });
@@ -139,9 +140,9 @@ describe('AdjustmentDialog set balance', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Set balance' }));
     await userEvent.click(screen.getByRole('button', { name: 'Hold credit' }));
     await userEvent.type(screen.getByLabelText('Amount'), '1500000');
-    expect(screen.getByText(/Adds a credit of .*500,?000/)).toBeInTheDocument();
+    expect(screen.getByText(/Adds a credit of .*700,?000/)).toBeInTheDocument();
     await userEvent.clear(screen.getByLabelText('Amount'));
-    await userEvent.type(screen.getByLabelText('Amount'), '1000000');
+    await userEvent.type(screen.getByLabelText('Amount'), '800000');
     expect(screen.getByText('Their balance already matches.')).toBeInTheDocument();
   });
 });
