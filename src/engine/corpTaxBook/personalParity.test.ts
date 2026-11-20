@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildBookView } from './bookView';
 import { overlayCorpBooks, type PersonalBook, type PersonalEntry } from './personal';
 import type { Adjustment } from './statements';
+import type { ToleranceExemption } from './toleranceExemptions';
 
 /**
  * The corp book's Miner page and the member's own Tax tab read the same records; for a running
@@ -57,7 +58,21 @@ const pay = (amount: number) => ({
   source: 'donation' as const,
 });
 
-function both(payments: ReturnType<typeof pay>[], adjustments: Adjustment[]) {
+const exempt = (date: string, forgive: number): ToleranceExemption => ({
+  id: `x-${date}`,
+  minerId: MINER,
+  date,
+  forgive,
+  reason: 'Officer',
+  by: 1,
+  at: '2026-10-18T13:30:00Z',
+});
+
+function both(
+  payments: ReturnType<typeof pay>[],
+  adjustments: Adjustment[],
+  toleranceExemptions: ToleranceExemption[] = []
+) {
   const corp = buildBookView({
     corporationId: CORP,
     now: NOW,
@@ -78,6 +93,7 @@ function both(payments: ReturnType<typeof pay>[], adjustments: Adjustment[]) {
     dismissals: [],
     declarations: [],
     adjustments,
+    toleranceExemptions,
     extractions: [],
     paidStatementIds: new Set(),
     pricesOn,
@@ -95,6 +111,7 @@ function both(payments: ReturnType<typeof pay>[], adjustments: Adjustment[]) {
     statements: [],
     payments,
     adjustments,
+    toleranceExemptions,
     hubId: 'jita',
     oreForm: 'compressed',
     pricesOn,
@@ -121,6 +138,33 @@ describe('the Tax tab matches the corp book for a running account', () => {
     ['a charge on a mined day, paid in full', [pay(744_000)], [adjust('a', '2026-10-15', 300_000)]],
   ])('%s', (_name, payments, adjustments) => {
     const { corp, personal } = both(payments, adjustments);
+    expect(personal).toEqual(corp);
+  });
+});
+
+describe('reversals and exemptions, on both pages', () => {
+  const reversed = (a: Adjustment): Adjustment => ({
+    ...a,
+    reversed: { by: 2, at: '2026-10-18T13:20:00Z', reason: 'Entered twice' },
+  });
+  it('ignores a reversed charge', () => {
+    const { corp, personal } = both([], [reversed(adjust('a', '2026-10-15', 300_000))]);
+    expect(corp).toEqual({ owed: 444_000, credit: 0 });
+    expect(personal).toEqual(corp);
+  });
+  it('forgives 500 short of a day by default', () => {
+    const { corp, personal } = both([pay(221_500 + 222_000)], []);
+    expect(corp).toEqual({ owed: 0, credit: 0 });
+    expect(personal).toEqual(corp);
+  });
+  it('owes the 500 again when an officer exempts the day', () => {
+    const { corp, personal } = both([pay(221_500)], [], [exempt('2026-10-15', 0)]);
+    expect(corp).toEqual({ owed: 222_500, credit: 0 });
+    expect(personal).toEqual(corp);
+  });
+  it('forgives only what an officer names, and owes the rest', () => {
+    const { corp, personal } = both([pay(221_500)], [], [exempt('2026-10-15', 200)]);
+    expect(corp).toEqual({ owed: 222_300, credit: 0 });
     expect(personal).toEqual(corp);
   });
 });

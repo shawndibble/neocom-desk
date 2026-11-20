@@ -185,10 +185,11 @@ export interface AllocWriteOff {
   statementId?: string;
 }
 
-/** A `writeOffs` doc as allocation reads it; null when malformed. */
+/** A `writeOffs` doc as allocation reads it; null when malformed or reversed by an officer. */
 export function writeOffForAllocation(d: Record<string, unknown>): AllocWriteOff | null {
   if (typeof d.id !== 'string' || typeof d.amount !== 'number' || typeof d.at !== 'string')
     return null;
+  if (typeof d.reversed === 'object' && d.reversed !== null) return null;
   return {
     id: d.id,
     amount: d.amount,

@@ -20,6 +20,8 @@ export interface Miner {
   closedAt?: string;
   /** The final Statement the close issued, if anything was left to bill. */
   finalStatementId?: string;
+  /** The newest day the book has recorded as paid for this Miner (copied from `meta/paid` so the Miner can read it). */
+  paidThrough?: string;
 }
 
 /** The characters a Miner bills: its grouping's, or the one character of a Miner of its own. */

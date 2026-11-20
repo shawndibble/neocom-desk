@@ -32,6 +32,10 @@ export interface LedgerEntry {
   note?: string;
   /** A `payment` entry: who sent it and how the book learned of it. */
   paymentId?: string;
+  /** A correction or write-off an officer undid: this row is the original, shown struck through. */
+  reversed?: boolean;
+  /** This row undoes the one before it (same record), dated the day the officer undid it. */
+  reversal?: boolean;
 }
 
 export interface AccountLedger {
@@ -110,28 +114,57 @@ export function accountLedger(
         credit: p.credited,
         paymentId: p.id,
       });
-  for (const a of corrections)
-    if (a.amount !== 0)
+  for (const a of corrections) {
+    if (a.amount === 0) continue;
+    const debit = Math.max(0, a.amount);
+    const credit = Math.max(0, -a.amount);
+    drafts.push({
+      key: `correction-${a.id}`,
+      kind: 'correction',
+      date: a.date,
+      at: a.at,
+      debit,
+      credit,
+      note: a.reason,
+      ...(a.reversed ? { reversed: true } : {}),
+    });
+    // An undone correction stays, with an offsetting row on the day it was undone.
+    if (a.reversed)
       drafts.push({
-        key: `correction-${a.id}`,
+        key: `correction-${a.id}-reversal`,
         kind: 'correction',
-        date: a.date,
-        at: a.at,
-        debit: Math.max(0, a.amount),
-        credit: Math.max(0, -a.amount),
-        note: a.reason,
+        date: day(a.reversed.at),
+        at: a.reversed.at,
+        debit: credit,
+        credit: debit,
+        note: a.reversed.reason,
+        reversal: true,
       });
-  for (const w of detail.officerWriteOffs)
-    if (w.amount > 0)
+  }
+  for (const w of detail.officerWriteOffs) {
+    if (w.amount <= 0) continue;
+    drafts.push({
+      key: `writeOff-${w.id}`,
+      kind: 'writeOff',
+      date: day(w.at),
+      at: w.at,
+      debit: 0,
+      credit: w.amount,
+      note: w.reason,
+      ...(w.reversed ? { reversed: true } : {}),
+    });
+    if (w.reversed)
       drafts.push({
-        key: `writeOff-${w.id}`,
+        key: `writeOff-${w.id}-reversal`,
         kind: 'writeOff',
-        date: day(w.at),
-        at: w.at,
-        debit: 0,
-        credit: w.amount,
-        note: w.reason,
+        date: day(w.reversed.at),
+        at: w.reversed.at,
+        debit: w.amount,
+        credit: 0,
+        note: w.reversed.reason,
+        reversal: true,
       });
+  }
 
   for (const w of detail.dayWriteOffs)
     drafts.push({
@@ -187,6 +220,8 @@ export function accountLedger(
       ...(d.dayKeys !== undefined ? { dayKeys: d.dayKeys } : {}),
       ...(d.note !== undefined ? { note: d.note } : {}),
       ...(d.paymentId !== undefined ? { paymentId: d.paymentId } : {}),
+      ...(d.reversed ? { reversed: true } : {}),
+      ...(d.reversal ? { reversal: true } : {}),
     };
   });
   return { entries, balance, notYetBilled };

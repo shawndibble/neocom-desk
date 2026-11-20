@@ -36,6 +36,7 @@ import {
 } from './paidBy';
 import { isSameTransfer } from './transferMatch';
 import { daySettleTolerance } from './runningAccount';
+import { exemptionsOf, type ToleranceExemption } from './toleranceExemptions';
 import { splitAcrossBooks, resolveBookShare, type BookObservation } from './attribution';
 import { dayClosesAt, isDayBillable } from './billable';
 import { minerIdFor, type DayCharge, type Miner } from './charges';
@@ -170,6 +171,8 @@ export interface PersonalBook {
   adjustments?: readonly Adjustment[];
   /** The member's own officer write-offs the book lets them read (#4637). */
   writeOffs?: readonly RecordedWriteOff[];
+  /** Officers' per-day limits on what a shortfall may forgive (`toleranceExemptions`). */
+  toleranceExemptions?: readonly ToleranceExemption[];
 }
 
 /** A donation in the member's own wallet journal that the book does not hold yet. */
@@ -1516,14 +1519,25 @@ export function overlayCorpBooks(input: {
       lostBy.set(minerId, (lostBy.get(minerId) ?? 0) + d.amount);
     }
     const open = openNow();
-    const reductions: [BookRowView, number][] = [];
+    const reductions: [BookRowView, number, number | undefined][] = [];
+    // A day an officer set a limit on forgives up to that, not the book's tolerance.
+    const toleranceOf = (minerId: string, r: BookRowView) => {
+      const limits = exemptionsOf(p.book.toleranceExemptions, minerId);
+      return limits.has(r.date) ? { tolerance: limits.get(r.date)! } : {};
+    };
     /** Per Miner: the days the uncredited money paid while it counted, oldest first. */
     const unlinked = new Map<string, BookRowView[]>();
     for (const minerId of new Set([...ahead.keys(), ...lostBy.keys()])) {
       const amount = ahead.get(minerId) ?? 0;
       const mark = creditedByMark.get(minerId) ?? 0;
       const own = open.filter((r) => minerOf(r) === minerId);
-      const days = own.map((r) => ({ id: r.id, date: r.date, taxOwed: r.taxOwed ?? 0 }));
+      const limits = exemptionsOf(p.book.toleranceExemptions, minerId);
+      const days = own.map((r) => ({
+        id: r.id,
+        date: r.date,
+        taxOwed: r.taxOwed ?? 0,
+        ...toleranceOf(minerId, r),
+      }));
       const paid = coverInFlight(days, Math.max(0, amount - mark));
       // Whose money paid each day: the pool as a queue of its sources, the mark spending the front.
       const queue = moneyQueue([
@@ -1560,7 +1574,7 @@ export function overlayCorpBooks(input: {
           if (paid.has(row.id) || row.held) continue;
           const take = Math.min(spare, row.taxOwed ?? 0);
           if (take <= 0) continue;
-          reductions.push([row, take]);
+          reductions.push([row, take, limits.get(row.date)]);
           spare -= take;
         }
       }
@@ -1593,7 +1607,12 @@ export function overlayCorpBooks(input: {
       const ids = lastOfMiner
         ? new Set(left.map((r) => r.id))
         : coverInFlight(
-            left.map((r) => ({ id: r.id, date: r.date, taxOwed: r.taxOwed ?? 0 })),
+            left.map((r) => ({
+              id: r.id,
+              date: r.date,
+              taxOwed: r.taxOwed ?? 0,
+              ...toleranceOf(minerId, r),
+            })),
             d.amount
           );
       const rows = left.filter((r) => ids.has(r.id));
@@ -1605,8 +1624,10 @@ export function overlayCorpBooks(input: {
       return { ...d, covered: rows.map((r) => r.date) };
     });
     uncreditedByBook.set(p.book.corporationId, uncredited);
-    for (const [row, take] of reductions) {
+    for (const [row, take, limit] of reductions) {
       row.taxOwed = (row.taxOwed ?? 0) - take;
+      // A day an officer let forgive up to an amount: money reached it, so it forgives what it names.
+      if (limit && row.taxOwed > 0) row.taxOwed = Math.max(0, row.taxOwed - limit);
       // A day the book's money covers to the last ISK is Paid, not a Billed row owing nothing.
       if (row.taxOwed < 0.01) {
         row.taxOwed = 0;
@@ -1923,7 +1944,7 @@ function applyAdjustments(
     }
   }
   for (const a of p.book.adjustments ?? [])
-    add(a.id, a.minerId, a.date, a.amount, a.reason, undefined);
+    if (!a.reversed) add(a.id, a.minerId, a.date, a.amount, a.reason, undefined);
   if (byDay.size === 0) return;
   const billed = rows.filter((r) => r.state === 'billed').sort(byDateThenId);
   // A running account owes every correction, whatever day it is dated: one with no mined day to
@@ -2046,7 +2067,7 @@ export function inFlightDonations(
 
 /** Which rows an in-flight sum covers: whole days, oldest first, within the settle tolerance. */
 export function coverInFlight(
-  rows: readonly { id: string; date: string; taxOwed: number }[],
+  rows: readonly { id: string; date: string; taxOwed: number; tolerance?: number }[],
   total: number
 ): Set<string> {
   const covered = new Set<string>();
@@ -2055,7 +2076,7 @@ export function coverInFlight(
     (a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id)
   )) {
     // A day smaller than the tolerance is still not covered by nothing.
-    if (left <= 0 || left < row.taxOwed - daySettleTolerance(row.taxOwed)) break;
+    if (left <= 0 || left < row.taxOwed - (row.tolerance ?? daySettleTolerance(row.taxOwed))) break;
     covered.add(row.id);
     left = Math.max(0, left - row.taxOwed);
   }

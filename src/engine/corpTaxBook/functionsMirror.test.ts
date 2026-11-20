@@ -397,6 +397,15 @@ describe('functions mirror of the Corp Tax Book engine', () => {
       mirror.writeOffForAllocation({ id: 'w1', amount: 5, at: 'x', statementId: 's1', uids: [] })
     ).toEqual({ id: 'w1', amount: 5, at: 'x', statementId: 's1' });
     expect(mirror.writeOffForAllocation({ id: 'w1', amount: 5 })).toBeNull();
+    // An officer's reversal takes the write-off out of every allocation.
+    expect(
+      mirror.writeOffForAllocation({
+        id: 'w1',
+        amount: 5,
+        at: 'x',
+        reversed: { by: 1, at: 'y', reason: 'z' },
+      })
+    ).toBeNull();
   });
 
   it('allocatePayments drops a donation before the start date the same way (#4505)', () => {
