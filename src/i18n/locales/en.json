@@ -19806,8 +19806,7 @@
           "date": "Day it corrects",
           "label": "Label on the line",
           "confirm": "Add {{amount}}",
-          "confirmEmpty": "Add",
-          "effect": "A line dated after the next Statement's last day waits for the one after."
+          "confirmEmpty": "Add"
         },
         "rebill": {
           "open": "Rebill from date",
@@ -19821,8 +19820,8 @@
         }
       },
       "dialogs": {
-        "logged": "Logged under your name with the reason. Your role is checked again when you confirm.",
-        "loggedPlain": "Logged under your name. Your role is checked again when you confirm.",
+        "logged": "Logged under your name with the reason.",
+        "loggedPlain": "Logged under your name.",
         "reasonShown": "Reason (shown to the Miner)",
         "dismissConfirm": "Dismiss {{amount}}",
         "dismissDays": {
