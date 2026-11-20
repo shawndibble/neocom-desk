@@ -46,6 +46,7 @@ import { rolesText } from './roles';
 import {
   CORP_ROSTER_COLUMN_IDS,
   CORP_ROSTER_DEFAULT_COLUMNS,
+  ROSTER_SORT,
   useVisibleCorpRosterColumns,
   type CorpRosterColumnId,
 } from './corpRosterColumns';
@@ -134,9 +135,6 @@ export function CorpRosterStats({ rows }: { rows: readonly RosterRow[] }) {
 
 /** Solar system ids sit in 30,000,000-32,000,000; stations and structures do not. */
 const isSolarSystemId = (id: number) => id >= 30_000_000 && id < 32_000_000;
-
-/** Most recently seen first, under a down arrow (see the module note). */
-const ROSTER_SORT = { columnId: 'lastSeen', direction: 'desc' } as const;
 
 /** Every roster column, hidden or not — the table and its column picker both read it. */
 // Shared with the Players view, which reuses every column but Member.
@@ -307,8 +305,11 @@ export function CorpRosterTable({
   rows,
   tableProps,
   onGroupWith,
+  onShowInPlayers,
 }: {
   rows: readonly RosterRow[];
+  /** Officers only: jumps to this member's Player in the Players view (grouped rows only). */
+  onShowInPlayers?: (row: RosterRow) => void;
   /** Officers only: opens the group dialog for this member ("Group with…" in the row menu). */
   onGroupWith?: (row: RosterRow) => void;
   /** `useTableExport(...).tableProps` — feeds the header's Export menu. */
@@ -324,16 +325,23 @@ export function CorpRosterTable({
         name={row.name}
         extraItems={
           onGroupWith && (
-            <MenuItem onSelect={() => onGroupWith(row)}>
-              {t('corpTaxBook.moons.grouping.menu')}
-            </MenuItem>
+            <>
+              <MenuItem onSelect={() => onGroupWith(row)}>
+                {t('corpTaxBook.moons.grouping.menu')}
+              </MenuItem>
+              {onShowInPlayers && row.group && (
+                <MenuItem onSelect={() => onShowInPlayers(row)}>
+                  {t('corp.members.players.showInPlayers')}
+                </MenuItem>
+              )}
+            </>
           )
         }
       >
         {tr}
       </CharacterRowMenu>
     ),
-    [onGroupWith, t]
+    [onGroupWith, onShowInPlayers, t]
   );
   const { isVisible } = useColumnVisibility(
     useVisibleCorpRosterColumns,

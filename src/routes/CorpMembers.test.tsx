@@ -992,6 +992,32 @@ describe('the Players view', () => {
     expect(await screen.findByRole('table', { name: 'Corporation members' })).toBeInTheDocument();
   });
 
+  it('Show in Players view jumps to the Players view with that Player open', async () => {
+    mockedGrouping.mockReturnValue({
+      ...officer,
+      groupOf: (id: number) =>
+        id === 1002 ? ({ characterIds: [1001, 1002, 7] } as never) : undefined,
+    });
+    const user = userEvent.setup();
+    await rosterTable();
+    const menus = screen.getAllByRole('button', { name: /More actions for/ });
+    // Only the grouped row (character 1002) carries the item.
+    for (const menu of menus) {
+      await user.click(menu);
+      const item = screen.queryByRole('menuitem', { name: 'Show in Players view' });
+      if (item) {
+        await user.click(item);
+        break;
+      }
+      await user.keyboard('{Escape}');
+    }
+    const players = await screen.findByRole('table', { name: 'Corporation members by Player' });
+    expect(currentLocation()).toContain('view=players');
+    // The Player opened itself for the highlighted alt, and the one-shot param was spent.
+    expect(await within(players).findAllByText('Outer Rim Alt')).not.toHaveLength(0);
+    await waitFor(() => expect(currentLocation()).not.toContain('highlight='));
+  });
+
   it('ignores ?view=players for a Character that cannot group', async () => {
     renderMembers('/corp/members?view=players');
     await screen.findByRole('table', { name: 'Corporation members' });

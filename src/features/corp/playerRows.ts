@@ -5,8 +5,13 @@
  *
  * A Player's "last seen" is the latest of its characters that are in the corporation: a character
  * outside it has no activity here, so it is excluded from the aggregate and shown as "No data".
+ *
+ * Sorting is per Player: a column orders the Player rows and loose members by what the row shows
+ * (Member: the main's name; Last seen: the latest in-corp sighting; any other column: the main's own
+ * value). Alts stay under their parent in a fixed order, and an outside character never drives it.
  */
 import type { MemberStanding } from '@/engine/corp/members';
+import { sortRowsBy } from '@/components/ui/dataTableSort';
 
 /** A stored Miner group as the roster reads it (the optional lists are the Player-slice claim state). */
 export interface PlayerGroup {
@@ -72,6 +77,10 @@ export interface PlayerLinesInput<R extends PlayerSourceRow> {
   highlightId: number | null;
   conflictIds?: ReadonlySet<number>;
   declinedIds?: ReadonlySet<number>;
+  /** Column and direction; default Last seen, most recent first (the roster's `?sort=`). */
+  sort?: { columnId: string; direction: 'asc' | 'desc' };
+  /** A column's sort value for a roster row (every column but Member and Last seen). */
+  columnValue?: (columnId: string, row: R) => string | number | undefined;
 }
 
 /** Most recently seen first: an unknown span sorts last. */
@@ -105,7 +114,12 @@ export function buildPlayerLines<R extends PlayerSourceRow>(
     players.push({ group, ids });
   }
 
-  const entries: { sort: R | null; name: string; lines: PlayerLine<R>[] }[] = [];
+  const entries: {
+    sort: R | null;
+    name: string;
+    main: R | null;
+    lines: PlayerLine<R>[];
+  }[] = [];
   let highlightKey: string | null = null;
 
   for (const { group, ids } of players) {
@@ -171,7 +185,7 @@ export function buildPlayerLines<R extends PlayerSourceRow>(
     if (input.highlightId === main) highlightKey = key;
     else if (input.highlightId !== null && ids.includes(input.highlightId))
       highlightKey = `${key}:${input.highlightId}`;
-    entries.push({ sort: seen, name: nameOf(main), lines });
+    entries.push({ sort: seen, name: nameOf(main), main: byId.get(main) ?? null, lines });
   }
 
   for (const r of input.rows) {
@@ -182,6 +196,7 @@ export function buildPlayerLines<R extends PlayerSourceRow>(
     entries.push({
       sort: r,
       name: nameOf(r.characterId),
+      main: r,
       lines: [
         {
           key,
@@ -204,6 +219,17 @@ export function buildPlayerLines<R extends PlayerSourceRow>(
     });
   }
 
+  // Recency then name is the tie order; the column sort is stable on top of it.
   entries.sort((a, b) => byRecency(a.sort, b.sort) || a.name.localeCompare(b.name));
-  return { lines: entries.flatMap((e) => e.lines), highlightKey };
+  const { columnId, direction } = input.sort ?? { columnId: 'lastSeen', direction: 'desc' };
+  const valueOf = (e: (typeof entries)[number]): string | number | undefined => {
+    if (columnId === 'member') return e.name;
+    if (columnId === 'lastSeen') {
+      const ms = e.sort?.standing.darkForMs;
+      return ms === null || ms === undefined ? undefined : -ms;
+    }
+    return e.main ? input.columnValue?.(columnId, e.main) : undefined;
+  };
+  const sorted = sortRowsBy(entries, valueOf, direction);
+  return { lines: sorted.flatMap((e) => e.lines), highlightKey };
 }

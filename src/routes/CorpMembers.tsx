@@ -19,7 +19,7 @@
  * `useCorpRouteGate`'s, shared with `/corp` and `/corp/assets` — see that hook.
  */
 import { useCallback, useMemo, useState } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useDarkThreshold } from '@/features/corp/darkThreshold';
 import { useTranslation } from 'react-i18next';
@@ -298,6 +298,19 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
   const grouping = useRosterGrouping(activeCharacterId, data?.corporationId ?? null);
   const [groupingFor, setGroupingFor] = useState<number | null>(null);
   const onGroupWith = useCallback((row: RosterRow) => setGroupingFor(row.characterId), []);
+  // One navigation sets both params; the Players table mounts with `?highlight` still in the URL
+  // (the Characters table latched null on its own mount), so it is the one that spends it.
+  const [, setSearchParams] = useSearchParams();
+  const onShowInPlayers = useCallback(
+    (row: RosterRow) =>
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('view', 'players');
+        next.set('highlight', String(row.characterId));
+        return next;
+      }),
+    [setSearchParams]
+  );
 
   const rows = useMemo<RosterRow[]>(() => {
     if (data === null || data.members === null) return [];
@@ -572,7 +585,7 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
                 <CorpRosterTable
                   rows={visibleRows}
                   tableProps={membersExport.tableProps}
-                  {...(grouping.canGroup ? { onGroupWith } : {})}
+                  {...(grouping.canGroup ? { onGroupWith, onShowInPlayers } : {})}
                 />
               )}
             </Panel>

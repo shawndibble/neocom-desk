@@ -27,11 +27,13 @@ import { CharacterLink } from '@/features/entities';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { useUrlSort } from '@/lib/useUrlState';
 import { DialogShell } from './moons/BookDialogs';
 import { callableErrorText } from './moons/feederErrorText';
 import { CharacterMenuItems, CharacterRowMenu } from './corpRowMenus';
 import {
   CORP_ROSTER_DEFAULT_COLUMNS,
+  ROSTER_SORT,
   useVisibleCorpRosterColumns,
   type CorpRosterColumnId,
 } from './corpRosterColumns';
@@ -63,6 +65,16 @@ function Tag({ tip, children, warn }: { tip: string; children: ReactNode; warn?:
     </Tooltip>
   );
 }
+
+/**
+ * The builder orders the rows (a sort must keep each Player's alts under it), so DataTable's own
+ * sort must not move them: a constant `sortValue` makes a column sortable (header button, active
+ * arrow, `?sort=`) while its stable sort leaves the builder's order alone.
+ */
+const PASS_THROUGH_SORT = { sortValue: () => 0 } as const;
+/** A first click sorts text A-Z and dates / spans most recent first, as the Characters table does. */
+const firstDirection = (id: string): 'asc' | 'desc' =>
+  id === 'lastSeen' || id === 'joined' ? 'desc' : 'asc';
 
 const lineKey = (line: Line) => line.key;
 
@@ -103,6 +115,17 @@ export function PlayersView({
     (name: string) => query !== '' && !otherFilters && name.toLowerCase().includes(query),
     [query, otherFilters]
   );
+  const baseColumns = useRosterColumns();
+  // The same `?sort=` and column ids as the Characters table, so the two views behave alike.
+  const sortProps = useUrlSort(
+    'sort',
+    ROSTER_SORT,
+    baseColumns.map((c) => c.id)
+  );
+  const columnValue = useCallback(
+    (id: string, row: RosterRow) => baseColumns.find((c) => c.id === id)?.sortValue?.(row),
+    [baseColumns]
+  );
   const { lines, highlightKey } = useMemo(
     () =>
       buildPlayerLines<RosterRow>({
@@ -116,8 +139,20 @@ export function PlayersView({
         highlightId,
         conflictIds: grouping.conflictIds,
         declinedIds: grouping.declinedIds,
+        sort: sortProps.sort,
+        columnValue,
       }),
-    [rows, grouping, matchedIds, outsideMatches, filtering, open, highlightId]
+    [
+      rows,
+      grouping,
+      matchedIds,
+      outsideMatches,
+      filtering,
+      open,
+      highlightId,
+      sortProps.sort,
+      columnValue,
+    ]
   );
 
   const toggle = useCallback((line: Line) => {
@@ -146,7 +181,6 @@ export function PlayersView({
     [grouping.source, t]
   );
 
-  const baseColumns = useRosterColumns();
   const phone = useIsPhone();
   const { isVisible } = useColumnVisibility(
     useVisibleCorpRosterColumns,
@@ -160,6 +194,8 @@ export function PlayersView({
       stickyStart: true,
       stickyStartOnPanel: true,
       className: 'whitespace-nowrap',
+      ...PASS_THROUGH_SORT,
+      sortFirst: 'asc',
       render: (line) => <MemberCell line={line} phone={phone} />,
     };
     const wrapped = baseColumns
@@ -170,7 +206,8 @@ export function PlayersView({
           c.id === 'lastSeen' && line.kind === 'player' ? line.seen : line.member;
         return {
           ...c,
-          sortValue: undefined,
+          ...PASS_THROUGH_SORT,
+          sortFirst: c.sortFirst ?? firstDirection(c.id),
           cellClassName: (line) => {
             const row = source(line);
             return row ? c.cellClassName?.(row) : undefined;
@@ -260,6 +297,7 @@ export function PlayersView({
           rowClassName={(line) => (line.kind === 'alt' ? 'bg-panel-2/40' : undefined)}
           rowContextMenu={rowMenu}
           rowMoreActions
+          {...sortProps}
         />
       </div>
       {removing?.group && (

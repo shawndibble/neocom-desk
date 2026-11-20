@@ -174,4 +174,83 @@ describe('buildPlayerLines', () => {
     const { lines } = build({ groups: [{ id: 'x', mainCharacterId: 6, characterIds: [6, 7] }] });
     expect(lines.every((l) => l.groupId === null)).toBe(true);
   });
+
+  describe('sorting', () => {
+    const ships: Record<number, string> = { 1: 'Zeta', 2: 'Alpha', 5: 'Mid', 10: 'Beta' };
+    const columnValue = (id: string, r: Row) => (id === 'ship' ? ships[r.characterId] : undefined);
+    const names = (over: Partial<PlayerLinesInput<Row>>) => build(over).lines.map((l) => l.name);
+
+    it('sorts by the Player name (the main) and flips with the direction', () => {
+      const asc = names({ sort: { columnId: 'member', direction: 'asc' } });
+      expect(asc).toEqual(['Ingrid Sol', 'Kestrel Vane', 'Lena Voss', 'Ravi Kade', 'Sora Tenn']);
+      expect(names({ sort: { columnId: 'member', direction: 'desc' } })).toEqual(
+        [...asc].reverse()
+      );
+    });
+
+    it('Last seen ascending puts the longest-silent first; an unknown span sorts last both ways', () => {
+      const asc = names({ sort: { columnId: 'lastSeen', direction: 'asc' } });
+      expect(asc).toEqual(['Ingrid Sol', 'Ravi Kade', 'Sora Tenn', 'Kestrel Vane', 'Lena Voss']);
+      const unknown = row(20, 'Unknown One', 1);
+      unknown.standing = { ...unknown.standing, darkForMs: null as unknown as number };
+      for (const direction of ['asc', 'desc'] as const) {
+        const out = names({ rows: [...rows, unknown], sort: { columnId: 'lastSeen', direction } });
+        expect(out.at(-1)).toBe('Unknown One');
+      }
+    });
+
+    it('a Player sorts on its latest in-corp sighting, not its main', () => {
+      const { lines } = build({
+        rows: [row(1, 'Kestrel Vane', 40 * 24), row(2, 'Vane Hauler', 1), row(10, 'Lena Voss', 5)],
+        groups: [{ id: 'g', mainCharacterId: 1, characterIds: [1, 2] }],
+        sort: { columnId: 'lastSeen', direction: 'desc' },
+      });
+      expect(lines.map((l) => l.name)).toEqual(['Kestrel Vane', 'Lena Voss']);
+    });
+
+    it('an outside character never drives the sort', () => {
+      const out = names({
+        rows: [row(1, 'Kestrel Vane', 50), row(10, 'Lena Voss', 20)],
+        groups: [{ id: 'g', mainCharacterId: 1, characterIds: [1, 4] }],
+        sort: { columnId: 'lastSeen', direction: 'desc' },
+      });
+      expect(out).toEqual(['Lena Voss', 'Kestrel Vane']);
+    });
+
+    it('other columns use the main row value; missing values sort last both ways', () => {
+      const sort = (direction: 'asc' | 'desc') => ({ columnId: 'ship', direction });
+      // Kestrel's main is 1 (Zeta); Ravi and Ingrid have no ship value.
+      expect(names({ columnValue, sort: sort('asc') }).slice(0, 3)).toEqual([
+        'Lena Voss',
+        'Sora Tenn',
+        'Kestrel Vane',
+      ]);
+      expect(names({ columnValue, sort: sort('desc') }).slice(0, 3)).toEqual([
+        'Kestrel Vane',
+        'Sora Tenn',
+        'Lena Voss',
+      ]);
+      expect(
+        names({ columnValue, sort: sort('desc') })
+          .slice(3)
+          .sort()
+      ).toEqual(['Ingrid Sol', 'Ravi Kade']);
+    });
+
+    it('alts stay directly under their parent in main-then-recency order whatever the sort', () => {
+      for (const direction of ['asc', 'desc'] as const) {
+        const { lines } = build({
+          expanded: new Set(['p:solo:1']),
+          sort: { columnId: 'member', direction },
+        });
+        const i = lines.findIndex((l) => l.key === 'p:solo:1');
+        expect(lines.slice(i, i + 4).map((l) => l.name)).toEqual([
+          'Kestrel Vane',
+          'Vane Hauler',
+          'Vane Miner Two',
+          'Outer Rim Vane',
+        ]);
+      }
+    });
+  });
 });

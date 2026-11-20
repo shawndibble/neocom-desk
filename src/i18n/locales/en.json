@@ -15930,6 +15930,7 @@
       "locationFilterLabel": "Location",
       "locationFilterAll": "Any location",
       "players": {
+        "showInPlayers": "Show in Players view",
         "viewLabel": "View",
         "viewCharacters": "Characters",
         "viewPlayers": "Players",

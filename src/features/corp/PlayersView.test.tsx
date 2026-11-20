@@ -213,4 +213,35 @@ describe('PlayersView', () => {
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Group with…' }));
     expect(onGroupWith).toHaveBeenCalledWith(10);
   });
+
+  const order = () =>
+    screen
+      .getAllByRole('row')
+      .slice(1)
+      .map((r) => r.textContent ?? '');
+
+  it('sorts Players by a header click, flipping on the second; default is Last seen newest first', async () => {
+    renderView();
+    const names = () =>
+      ['Lena Voss', 'Kestrel Vane', 'Sora Tenn'].sort(
+        (a, b) => order().findIndex((t) => t.includes(a)) - order().findIndex((t) => t.includes(b))
+      );
+    expect(names()).toEqual(['Lena Voss', 'Kestrel Vane', 'Sora Tenn']);
+    await userEvent.click(screen.getByRole('button', { name: /^Member/ }));
+    expect(names()).toEqual(['Kestrel Vane', 'Lena Voss', 'Sora Tenn']);
+    await userEvent.click(screen.getByRole('button', { name: /^Member/ }));
+    expect(names()).toEqual(['Sora Tenn', 'Lena Voss', 'Kestrel Vane']);
+  });
+
+  it('keeps alts directly under their Player when the sort changes', async () => {
+    renderView();
+    await userEvent.click(rowOf('Kestrel Vane'));
+    await userEvent.click(screen.getByRole('button', { name: /^Member/ }));
+    await userEvent.click(screen.getByRole('button', { name: /^Member/ }));
+    const text = order();
+    const at = text.findIndex((t) => t.includes('Kestrel Vane'));
+    expect(text[at + 1]).toContain('Vane Hauler');
+    expect(text[at + 2]).toContain('Outer Rim Vane');
+    expect(text.findIndex((t) => t.includes('Sora Tenn'))).toBeLessThan(at);
+  });
 });

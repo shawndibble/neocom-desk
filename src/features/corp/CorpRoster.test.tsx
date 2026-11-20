@@ -94,6 +94,26 @@ describe('CorpRosterTable', () => {
     });
   });
 
+  it('offers Show in Players view only on a grouped row, when wired', async () => {
+    const onShow = vi.fn();
+    const grouped = { ...row(1, false), group: { size: 2, names: ['Alt A'] } };
+    render(
+      <MemoryRouter>
+        <CorpRosterTable
+          rows={[grouped, row(2, false)]}
+          onGroupWith={vi.fn()}
+          onShowInPlayers={onShow}
+        />
+      </MemoryRouter>
+    );
+    await userEvent.click(screen.getByRole('button', { name: /More actions for Member 2/ }));
+    expect(screen.queryByRole('menuitem', { name: 'Show in Players view' })).toBeNull();
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(screen.getByRole('button', { name: /More actions for Member 1/ }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Show in Players view' }));
+    expect(onShow).toHaveBeenCalledWith(expect.objectContaining({ characterId: 1 }));
+  });
+
   describe('Joined date follows the Time format setting', () => {
     const JOINED = Date.UTC(2026, 2, 10, 23, 30);
     const zone = process.env.TZ;
