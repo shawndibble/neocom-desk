@@ -717,6 +717,21 @@ describe('recordCorpPayment', () => {
     expect(paid).toMatchObject({ status: 'paid', oreLines: [{ typeId: ORE, quantity: 100 }] });
   });
 
+  it('spends no payment on a row that never lined up with a ledger entry', async () => {
+    await recordCorpPayment(
+      CORP,
+      [
+        bookRow({ id: 'book:0', date: '2026-09-03', solarSystemId: 0 }),
+        bookRow({ id: 'book:1', date: '2026-09-04' }),
+      ],
+      { ...PAYMENT, amount: 100 }
+    );
+
+    const all = await db.miningTaxAssignments.toArray();
+    expect(all).toHaveLength(1);
+    expect(all[0]).toMatchObject({ date: '2026-09-04', taxOwed: 100, status: 'paid' });
+  });
+
   it('pays the covered days whole and part-pays the next one with what is left', async () => {
     await recordCorpPayment(
       CORP,

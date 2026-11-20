@@ -565,12 +565,15 @@ export function recordCorpPayment(
     // day owes only the rest until the book verifies.
     const landing = payment
       ? wherePaymentGoes(
-          rows.map((r) => ({
-            id: r.id,
-            date: r.date,
-            taxOwed: r.taxOwed ?? 0,
-            ...(r.held ? { held: r.held } : {}),
-          })),
+          // A row that never lined up with a ledger entry records nothing, so it takes no ISK.
+          rows
+            .filter((r) => r.solarSystemId !== 0)
+            .map((r) => ({
+              id: r.id,
+              date: r.date,
+              taxOwed: r.taxOwed ?? 0,
+              ...(r.held ? { held: r.held } : {}),
+            })),
           payment.amount
         )
       : null;
