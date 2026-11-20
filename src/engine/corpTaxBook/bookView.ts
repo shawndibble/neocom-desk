@@ -943,13 +943,14 @@ function officerWriteOffsOf(
     .sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
   let onDays = (inner.running?.applications.writeOffs ?? []).reduce((s, d) => s + d.amount, 0);
   return mine.map((w) => {
+    // A reversed write-off forgave nothing: it takes no share of the days' forgiveness.
+    if (w.reversed)
+      return { id: w.id, amount: w.amount, reason: w.reason, at: w.at, reversed: w.reversed };
     const onStatements = inner.allocation.writeOffCredits
       .filter((c) => c.writeOffId === w.id)
       .reduce((s, c) => s + c.amount, 0);
     const forDays = w.statementId ? 0 : Math.min(onDays, Math.max(0, w.amount - onStatements));
     onDays -= forDays;
-    if (w.reversed)
-      return { id: w.id, amount: w.amount, reason: w.reason, at: w.at, reversed: w.reversed };
     return { id: w.id, amount: onStatements + forDays, reason: w.reason, at: w.at };
   });
 }

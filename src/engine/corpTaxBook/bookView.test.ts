@@ -1200,6 +1200,25 @@ describe('accountLedger', () => {
     expect(l.balance).toBe(view.miners[0].owed - view.miners[0].credit);
   });
 
+  it('does not let a reversed write-off take the forgiveness of a live one after it', () => {
+    const base = { minerId: 'solo:1', amount: 100_000, reason: 'Left the corp' };
+    const reversed = {
+      ...base,
+      id: 'w1',
+      at: '2026-09-18T10:00:00Z',
+      reversed: { by: 2, at: '2026-09-19T10:00:00Z', reason: 'Came back' },
+    };
+    const live = { ...base, id: 'w2', at: '2026-09-20T10:00:00Z' };
+    const view = buildBookView({ ...running([]), writeOffs: [reversed, live] });
+    const l = accountLedger(minerDetail(view, 'solo:1')!, [], true);
+    expect(
+      l.entries
+        .filter((e) => e.kind === 'writeOff' && !e.reversed && !e.reversal)
+        .map((e) => e.credit)
+    ).toEqual([100_000]);
+    expect(l.balance).toBe(view.miners[0].owed - view.miners[0].credit);
+  });
+
   it('ignores a reversed officer write-off and shows it beside its reversal', () => {
     const writeOff = {
       id: 'w1',

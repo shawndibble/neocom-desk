@@ -302,6 +302,18 @@ describe('allocateRunningAccount', () => {
       expect(r.owes).toEqual({ amount: 30_000, days: 1, oldest: '2026-11-01' });
     });
 
+    it('applies to a day recorded paid too: reversing its tolerance charges the shortfall', () => {
+      const r = allocateRunningAccount({
+        ...base,
+        days: tenMillion,
+        storedPaidThrough: '2026-11-01',
+        payments: [payment('p1', 9_970_000, '2026-11-04T10:00:00Z')],
+        toleranceExemptions: new Map([['2026-11-01', 0]]),
+      });
+      expect(r.byDay.get('2026-11-01')).toMatchObject({ settled: false, remaining: 30_000 });
+      expect(r.owes?.amount).toBe(30_000);
+    });
+
     it('forgives up to the amount set and leaves the rest owed', () => {
       const r = shortBy(300_000, 100_000);
       expect(r.byDay.get('2026-11-01')).toMatchObject({
