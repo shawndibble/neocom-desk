@@ -70,9 +70,6 @@ const PARAMS = {
 /** The Balance select's "no narrowing" item; Radix Select cannot hold an empty value. */
 const ANY_BALANCE = 'any';
 
-/** A Miner is listed while it owes, is owed, or has days waiting; the rest are only counted. */
-const isActive = (m: MinerRow) => m.owed > 0 || m.unbilled > 0 || m.pending > 0 || m.credit > 0;
-
 /** Standings in the order the Standing column sorts them. */
 const STANDING_RANK: readonly MinerStanding[] = ['member', 'guest', 'left'];
 
@@ -117,8 +114,8 @@ export function MinersTab() {
 
   const counts = useMemo(
     () => ({
-      members: miners.filter((m) => m.standing !== 'guest' && isActive(m)).length,
-      guests: miners.filter((m) => m.standing === 'guest' && isActive(m)).length,
+      members: miners.filter((m) => m.standing !== 'guest').length,
+      guests: miners.filter((m) => m.standing === 'guest').length,
     }),
     [miners]
   );
@@ -126,7 +123,7 @@ export function MinersTab() {
     const q = params.q.trim().toLowerCase();
     return miners.filter((m) => {
       const inGroup = m.standing === 'guest' ? params.guests : params.members;
-      if (!inGroup || !isActive(m)) return false;
+      if (!inGroup) return false;
       if (params.balance && !matchesMinerBalance(m, params.balance)) return false;
       if (!q) return true;
       return [nameOf(m), ...m.characterIds.map(names.character)].some((n) =>
@@ -136,11 +133,8 @@ export function MinersTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `names` identity changes as names resolve
   }, [miners, params, names]);
   // What the Non-members chip being off keeps out of the table.
-  const hiddenGuests = params.guests
-    ? []
-    : miners.filter((m) => m.standing === 'guest' && isActive(m));
+  const hiddenGuests = params.guests ? [] : miners.filter((m) => m.standing === 'guest');
   const hiddenGuestOwed = hiddenGuests.reduce((sum, m) => sum + m.owed, 0);
-  const hidden = miners.length - miners.filter(isActive).length;
 
   const columnVisibility = useColumnVisibility(
     useVisibleMinersColumns,
@@ -408,11 +402,6 @@ export function MinersTab() {
               count: hiddenGuests.length,
               amount: isk(hiddenGuestOwed),
             })}
-          </p>
-        )}
-        {hidden > 0 && (
-          <p className="border-t border-line px-3 py-2 text-xs text-text-dim">
-            {t('corpTaxBook.moons.miners.hidden', { count: hidden })}
           </p>
         )}
       </Panel>
