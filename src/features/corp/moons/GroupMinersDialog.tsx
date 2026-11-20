@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Checkbox, SearchInput, SegmentedControl, Spinner } from '@/components/ui';
 import { InlineError } from '@/components/ui/InlineError';
-import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
 import { planRegroup } from '@/engine/corpTaxBook/grouping';
 import { DialogShell, Effect, Label } from './BookDialogs';
@@ -78,7 +79,7 @@ export function GroupMinersDialog({
       <ul className="max-h-56 space-y-1 overflow-auto">
         {others.map((m) => (
           <li key={m.id}>
-            <label className={touchCheckboxLabelClassName}>
+            <label className={cx('flex cursor-pointer items-center gap-3', tappableRowClassName)}>
               <Checkbox
                 checked={picked.has(m.id)}
                 onChange={() =>
