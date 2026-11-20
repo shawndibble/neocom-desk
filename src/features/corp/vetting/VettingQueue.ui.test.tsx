@@ -209,7 +209,7 @@ describe('VettingPage queue', () => {
     await setup(`/corp/vetting/open/${VETTING_FIXTURE_REVIEWS.nothing}`);
     expect(await screen.findAllByText('Nothing found in 9 checks')).toHaveLength(2);
     expect(
-      screen.getByText('Not a verdict. An undeclared character cannot be checked.')
+      screen.getByText('Not a verdict. A character the pilot did not declare cannot be checked.')
     ).toBeInTheDocument();
     expect(screen.queryByText('Flags')).toBeNull();
     expect(screen.getByText('Corporation history against the watchlist')).toBeInTheDocument();

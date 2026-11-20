@@ -322,7 +322,7 @@ describe('NotificationEventList on desktop', () => {
       />
     );
     expect(screen.getByText(/1 character hasn't granted/)).toBeInTheDocument();
-    expect(screen.getByText(/delivered up to 72 hours ahead/i)).toBeInTheDocument();
+    expect(screen.getByText(/arrives up to 72 hours ahead/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Planetary extractor expiring' })).toHaveAttribute(
       'aria-expanded',
       'false'

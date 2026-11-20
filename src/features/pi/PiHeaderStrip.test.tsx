@@ -105,7 +105,7 @@ describe('PiHeaderStrip', () => {
     const chip = within(strip).getByRole('button', { name: 'Estimated prices' });
     expect(chip).toHaveTextContent(/est\./i);
     await userEvent.hover(chip);
-    expect(await screen.findByRole('tooltip')).toHaveTextContent(/projection from current market/i);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(/estimate from current prices/i);
   });
 
   it('shows EVE time where asked (Colonies), and only there', async () => {

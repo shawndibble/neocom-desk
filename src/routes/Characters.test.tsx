@@ -1353,7 +1353,7 @@ describe('Characters table view', () => {
     fireEvent.focus(refreshAll);
     const tooltip = await screen.findByRole('tooltip');
     expect(tooltip).toHaveTextContent(
-      'Pulls live data for every character. This may take a moment for a large roster.'
+      'Loads fresh data for every character. A big roster can take a moment.'
     );
     expect(refreshAll).toHaveAttribute('aria-describedby', tooltip.id);
   });

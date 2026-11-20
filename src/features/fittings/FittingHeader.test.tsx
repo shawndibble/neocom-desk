@@ -147,9 +147,7 @@ describe('FittingHeader below desktop', () => {
 
     await user.click(screen.getByRole('button', { name: 'Fitting actions' }));
     expect(await screen.findByText('Alpha OK')).toBeTruthy();
-    expect(
-      screen.getByText('By skill caps: an Alpha clone can train every skill this fit needs.')
-    ).toBeTruthy();
+    expect(screen.getByText('An Alpha clone can train every skill this fit needs.')).toBeTruthy();
     expect(screen.getByRole('menuitem', { name: 'Mastery skills' })).toBeTruthy();
     expect(screen.getByRole('menuitem', { name: 'Compare' })).toBeTruthy();
     expect(screen.getByRole('menuitem', { name: 'Copy stats' })).toBeTruthy();

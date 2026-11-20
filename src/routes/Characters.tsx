@@ -574,10 +574,7 @@ export function Characters() {
           </div>
 
           {noMatches ? (
-            <EmptyState
-              title={t('characters.noSearchMatches')}
-              hint={t('characters.noSearchMatchesHint')}
-            />
+            <EmptyState title={t('characters.noSearchMatches')} />
           ) : viewMode === 'table' ? (
             // One flat table over the whole roster, not one per group section
             // (decision 20260927-071415) — the `group` column carries

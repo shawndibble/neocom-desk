@@ -21,7 +21,7 @@ describe('AttributesPane remap availability (#1726)', () => {
     };
     render(<AttributesPane result={null} implantBonuses={{}} remapInfo={remapInfo} />);
 
-    expect(screen.getByText('Remaps: 1 bonus now · yearly ready')).toBeInTheDocument();
+    expect(screen.getByText('Remaps: 1 bonus · yearly remap ready')).toBeInTheDocument();
   });
 
   it('shows the cooldown date when the yearly remap is not ready yet', () => {
@@ -33,7 +33,7 @@ describe('AttributesPane remap availability (#1726)', () => {
     };
     render(<AttributesPane result={null} implantBonuses={{}} remapInfo={remapInfo} />);
 
-    expect(screen.getByText(/^Remaps: 1 bonus now · yearly from /)).toBeInTheDocument();
+    expect(screen.getByText(/^Remaps: 1 bonus · yearly remap from /)).toBeInTheDocument();
   });
 });
 

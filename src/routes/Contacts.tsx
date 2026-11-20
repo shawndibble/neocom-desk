@@ -396,7 +396,6 @@ export function Contacts() {
                 {filteredContacts.length === 0 ? (
                   <EmptyState
                     title={t('contacts.noResults')}
-                    hint={t('contacts.noResultsHint')}
                     className="py-8"
                     action={
                       activeContactsFilterCount(filter) > 0 ? (

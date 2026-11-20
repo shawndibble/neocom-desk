@@ -395,8 +395,7 @@ describe('Travel › Route Safety › Incursions near you', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Show incursions' }));
     expect(
-      (await screen.findAllByText('The incursion feed could not be read. Try again in a moment.'))
-        .length
+      (await screen.findAllByText("Couldn't load incursions. Try again in a moment.")).length
     ).toBeGreaterThan(0);
     travelState.incursions = [incursion(20000020, UEDAMA, 'established')];
     await user.click(screen.getByRole('button', { name: en.common.retry }));

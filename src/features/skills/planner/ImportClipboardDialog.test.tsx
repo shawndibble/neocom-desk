@@ -128,7 +128,7 @@ describe('ImportClipboardDialog', () => {
       warnings: [],
       errors: [],
     });
-    expect(screen.getByRole('alert')).toHaveTextContent(/nothing to import/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/No skills found to import/i);
     expect(onApply).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
   });
@@ -170,7 +170,7 @@ describe('ImportClipboardDialog', () => {
     );
     await user.upload(input, truncated);
 
-    expect(await screen.findByText(/malformed or truncated/i)).toBeInTheDocument();
+    expect(await screen.findByText(/damaged or cut off/i)).toBeInTheDocument();
     expect(onApply).not.toHaveBeenCalled();
   });
 });

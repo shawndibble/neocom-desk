@@ -311,7 +311,6 @@ export function TripwireCard({
       <h3 id="dscan-tripwire-title" className="text-lg font-semibold text-text">
         {t(`${P}tripwire.title`)}
       </h3>
-      <p className="text-sm text-text-dim">{t(`${P}tripwire.hint`)}</p>
       <ul className="mt-1">
         {tripwires.map((w) => {
           const key = TRIPWIRE_KEY[w.kind];

@@ -49,13 +49,13 @@ describe('OreDecisionDialog', () => {
     renderDialog();
 
     expect(
-      (await screen.findAllByText("Reprocessing data isn't downloaded yet")).length
+      (await screen.findAllByText("Reprocessing data hasn't loaded yet")).length
     ).toBeGreaterThan(0);
     expect(screen.queryByText('Pricing this ore…')).toBeNull();
 
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
     await vi.waitFor(() =>
-      expect(screen.queryByText("Reprocessing data isn't downloaded yet")).toBeNull()
+      expect(screen.queryByText("Reprocessing data hasn't loaded yet")).toBeNull()
     );
     expect(loadReprocessing).toHaveBeenCalledTimes(2);
   });

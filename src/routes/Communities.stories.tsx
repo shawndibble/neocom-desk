@@ -245,7 +245,9 @@ export const RequestsPanelNoContractsGrant: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(await canvas.findByText(/^Reactive Metals/));
-    await canvas.findByText(/Delivery can't be marked without the Contracts Permission/);
+    await canvas.findByText(
+      /Without the Contracts Permission, deliveries aren't counted automatically/
+    );
   },
 };
 

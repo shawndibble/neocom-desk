@@ -88,7 +88,6 @@ export function ContractsHistoryTable({
         isContractsFilterActive(filter) ? (
           <EmptyState
             title={t('contracts.noFilterMatches')}
-            hint={t('contracts.noFilterMatchesResetHint')}
             className="py-8"
             action={
               <Button size="sm" onClick={() => onFilterChange(EMPTY_CONTRACTS_FILTER)}>

@@ -617,9 +617,9 @@ describe('Paying a moon owner', () => {
       ],
       `/corp/moons/moon-owners/${ASH}`
     );
-    expect(screen.getByText('To confirm: not counted yet')).toBeInTheDocument();
+    expect(screen.getByText('Needs confirming, not counted yet')).toBeInTheDocument();
     expect(screen.getByText('They dispute this payment')).toBeInTheDocument();
-    const row = screen.getByText('To confirm: not counted yet').closest('tr')!;
+    const row = screen.getByText('Needs confirming, not counted yet').closest('tr')!;
     await userEvent.click(within(row).getByRole('button', { name: 'Count it' }));
     expect(markFeederPayout).toHaveBeenCalledWith(7, BOOK, ASH, 'j1_9', false);
     await userEvent.click(within(row).getByRole('button', { name: 'Not a payout' }));

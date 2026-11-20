@@ -132,7 +132,7 @@ describe('AbyssalRunPlanner', () => {
   it('marks an Interdictor as unconfirmed', async () => {
     useAbyssalWeather.setState({ weatherTypeId: 47382 });
     setup(541);
-    expect(screen.getByText(/No source names this hull type/)).toBeTruthy();
+    expect(screen.getByText(/We don't know this hull's rule/)).toBeTruthy();
   });
 
   describe('Buy row', () => {

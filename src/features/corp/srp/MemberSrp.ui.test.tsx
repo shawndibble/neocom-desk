@@ -75,7 +75,7 @@ describe('MemberSrp', () => {
     expect(within(claims).getByText('Pending')).toBeTruthy();
     expect(within(claims).getAllByText('Officer sets amount').length).toBeGreaterThan(0);
     expect(within(claims).getByText(/no FC listed/)).toBeTruthy();
-    expect(within(claims).getByText('Re-filed once, final.')).toBeTruthy();
+    expect(within(claims).getByText('Re-filed once. This is final.')).toBeTruthy();
   });
 
   describe('killmail modal', () => {

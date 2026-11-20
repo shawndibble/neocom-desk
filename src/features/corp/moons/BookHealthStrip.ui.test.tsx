@@ -100,10 +100,10 @@ describe('BookHealthStrip, scheduled sync', () => {
   it.each([
     ['role-lost', 'Pilot 9 no longer has the Accountant, Director or CEO role'],
     ['left-corp', 'Pilot 9 left the corporation'],
-    ['token-revoked', "Pilot 9's EVE authorization was revoked or expired"],
-    ['esi-refused', "EVE no longer lets Pilot 9's authorization read the mining ledger"],
+    ['token-revoked', "Pilot 9's EVE access was removed or expired"],
+    ['esi-refused', "EVE no longer lets Pilot 9's access read the mining ledger"],
     ['book-off', 'the Corp Tax Book was turned off'],
-    ['grant-unreadable', "the saved grant can't be read — turn it on again"],
+    ['grant-unreadable', "its saved login can't be read. Turn it on again"],
   ] as const)('says why a stopped schedule stopped (%s)', (stoppedReason, why) => {
     renderStrip({
       status: 'stopped',

@@ -255,7 +255,7 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
 
     await user.type(await screen.findByRole('searchbox'), 'rifetr');
     expect(await screen.findByText('Rifter')).toBeInTheDocument();
-    expect(screen.getByText(/close spellings/i)).toBeInTheDocument();
+    expect(screen.getByText(/similar names/i)).toBeInTheDocument();
   });
 
   it('selecting an item and changing location updates the query string', async () => {

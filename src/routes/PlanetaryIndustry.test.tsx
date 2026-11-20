@@ -660,10 +660,8 @@ describe('PlanetaryIndustry', () => {
     );
     await renderIndustryRoutes();
     const panel = await colonyPanelFor(/Jita IV/);
-    expect(within(panel).getByText('No pin data cached for this colony')).toBeInTheDocument();
-    expect(
-      within(panel).getByText("Refresh to fetch this colony's deployed pins.")
-    ).toBeInTheDocument();
+    expect(within(panel).getByText('No buildings loaded for this colony')).toBeInTheDocument();
+    expect(within(panel).getByText("Refresh to load this colony's buildings.")).toBeInTheDocument();
   });
 
   it("lists an alt's cached programs beside the active character's, without fetching for it", async () => {
@@ -897,7 +895,7 @@ describe('PlanetaryIndustry', () => {
       .setup({ delay: null })
       .click(await screen.findByRole('button', { name: 'Show colonies' }));
     expect(
-      await screen.findByText(/Left out: no link on any of your colonies/)
+      await screen.findByText(/Left out: we couldn't measure the building links/)
     ).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: /^Jita IV/ })).toBeDisabled();
   });

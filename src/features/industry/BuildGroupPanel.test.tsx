@@ -411,7 +411,7 @@ describe('BuildGroupPanel — Auto Build (issue #696)', () => {
     const dialog = await screen.findByRole('dialog');
     expect(
       within(dialog).getByText(
-        'This will overwrite craft/buy choices on 1 plan in this group — continue?'
+        'This will overwrite build/buy choices on 1 plan in this group. Continue?'
       )
     ).toBeTruthy();
     await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
@@ -444,7 +444,7 @@ describe('BuildGroupPanel — Auto Build (issue #696)', () => {
     const dialog = await screen.findByRole('dialog');
     expect(
       within(dialog).getByText(
-        'This will overwrite craft/buy choices on 1 plan in this group — continue?'
+        'This will overwrite build/buy choices on 1 plan in this group. Continue?'
       )
     ).toBeTruthy();
   });

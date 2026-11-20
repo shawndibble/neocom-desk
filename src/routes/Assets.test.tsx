@@ -320,7 +320,7 @@ describe('Assets', () => {
       )
     );
     renderAssetsRoute();
-    expect(await screen.findByText(/Location unresolved/)).toBeInTheDocument();
+    expect(await screen.findByText(/Unknown location/)).toBeInTheDocument();
     expect(screen.getByText('Container')).toBeInTheDocument();
   });
 
@@ -353,7 +353,7 @@ describe('Assets', () => {
     );
     renderAssetsRoute();
     expect(await screen.findByText(HANGAR_STRUCTURE)).toBeInTheDocument();
-    expect(screen.queryByText(/Location unresolved/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Unknown location/)).not.toBeInTheDocument();
     expect(screen.queryByText('Container')).not.toBeInTheDocument();
   });
 
@@ -449,7 +449,7 @@ describe('Assets', () => {
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () => HttpResponse.error())
     );
     renderAssetsRoute();
-    expect(await screen.findByText(/no assets cached/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no assets loaded/i)).toBeInTheDocument();
     expect(screen.queryByText('Total value')).not.toBeInTheDocument();
   });
 
@@ -477,7 +477,7 @@ describe('Assets', () => {
     expect(await screen.findByText('Pilot One: log in again')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument();
     expect(screen.queryByText('Showing saved data.')).not.toBeInTheDocument();
-    expect(screen.queryByText(/no assets cached/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/no assets loaded/i)).not.toBeInTheDocument();
   });
 
   it('notes inline that jumps away are unavailable when the location scope was never granted (#1590)', async () => {
@@ -514,7 +514,7 @@ describe('Assets', () => {
       })
     );
     renderAssetsRoute();
-    expect(await screen.findByText(/only the first 25 assets were fetched/i)).toBeInTheDocument();
+    expect(await screen.findByText(/only the first 25 assets loaded/i)).toBeInTheDocument();
   });
 
   it('the truncation notice has a retry action, not just a bare notice (issue #415)', async () => {
@@ -530,7 +530,7 @@ describe('Assets', () => {
     );
     const user = userEvent.setup({ delay: null });
     renderAssetsRoute();
-    await screen.findByText(/only the first 25 assets were fetched/i);
+    await screen.findByText(/only the first 25 assets loaded/i);
     // The notice shows with the rows, before names and values finish; the
     // button is disabled until that load settles.
     const retry = screen.getByRole('button', { name: 'Try again' });
@@ -580,7 +580,7 @@ describe('Assets', () => {
       })
     );
     renderAssetsRoute();
-    expect(await screen.findByText(/only the first 1250 assets were fetched/i)).toBeInTheDocument();
+    expect(await screen.findByText(/only the first 1250 assets loaded/i)).toBeInTheDocument();
     expect(screen.queryByText(/^Showing \d+ of \d+ assets\.$/)).not.toBeInTheDocument();
   });
 

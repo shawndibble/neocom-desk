@@ -95,7 +95,7 @@ describe('FittingShared', () => {
     renderAt(`/share/fitting?f=${encodeURIComponent(encoded.payload)}`);
 
     expect(
-      await screen.findByText('Shown with skill level V - login to see with your skills.')
+      await screen.findByText('Shown with all skills at V. Log in to see it with your skills.')
     ).toBeInTheDocument();
     expect(await screen.findByText('125mm Gatling AutoCannon I')).toBeInTheDocument();
     // The ring's slot tile is named by item, not `#id`.

@@ -205,7 +205,7 @@ describe('AuthFailureNotice', () => {
       </MemoryRouter>
     );
     expect(screen.getByText('This character: log in again')).toBeInTheDocument();
-    expect(screen.getByText('EVE refused the saved login.')).toBeInTheDocument();
+    expect(screen.getByText('EVE no longer accepts the saved login.')).toBeInTheDocument();
   });
 });
 

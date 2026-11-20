@@ -293,7 +293,7 @@ describe('Widget states', () => {
     );
     const region = screen.getByRole('region', { name: 'Mail' });
     expect(within(region).getByRole('alert')).toHaveTextContent('Could not load');
-    expect(within(region).getByText(/Last good value 5m ago/)).toBeInTheDocument();
+    expect(within(region).getByText(/Last updated 5m ago/)).toBeInTheDocument();
     expect(within(region).getByText('7').closest('.opacity-45')).not.toBeNull();
     await user.click(within(region).getByRole('button', { name: 'Retry' }));
     expect(refresh).toHaveBeenCalledTimes(1);
@@ -304,7 +304,7 @@ describe('Widget states', () => {
       store.set('mail', { data: null, error: true, loading: false })
     );
     const region = screen.getByRole('region', { name: 'Mail' });
-    expect(within(region).getByText('Nothing was saved to show.')).toBeInTheDocument();
+    expect(within(region).getByText('Nothing saved to show yet.')).toBeInTheDocument();
   });
 
   it('says what the kind has nothing of and what it is for, with no Remove widget button', () => {

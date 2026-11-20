@@ -143,7 +143,7 @@ describe('RemoveMoonOwnerDialog', () => {
     open(true);
     const dialog = screen.getByRole('dialog');
     expect(dialog).toHaveTextContent('Remove Ostrava Salvage from this book?');
-    expect(dialog).toHaveTextContent('takes effect in 24 hours');
+    expect(dialog).toHaveTextContent('It takes effect 24 hours after the mail below is sent');
     expect(dialog).toHaveTextContent("Brass Meridian Logistics's other officers");
     expect(dialog).toHaveTextContent("Ostrava Salvage's CEO");
     expect(dialog).toHaveTextContent("Ostrava Salvage's payee");

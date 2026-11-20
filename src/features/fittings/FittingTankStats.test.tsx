@@ -49,7 +49,7 @@ describe('TankFacts', () => {
       screen.getByText('Cap-limited: repairers get 50% of the capacitor they need')
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/cap boosters and ancillary repairers averaged over their reloads/)
+      screen.getByText(/Cap boosters and ancillary repairers are averaged over their reloads/)
     ).toBeInTheDocument();
   });
 

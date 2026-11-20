@@ -307,7 +307,7 @@ describe('Market Browser: All regions', () => {
       .setup({ delay: null })
       .hover(screen.getByRole('button', { name: 'What else this covers' }));
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
-      /use Jita — only the order book reaches/
+      /use Jita\. Only the order book reaches/
     );
   });
 

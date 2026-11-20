@@ -26,7 +26,7 @@ describe('FeederConsent', () => {
     ).toBeVisible();
     expect(
       screen.getByText(
-        /We also read your refineries' names and systems, and the moon mining notifications/
+        /They also see your refineries' names and systems, and the moon mining notifications/
       )
     ).toBeVisible();
     // The player-facing copy never uses the dev terms.

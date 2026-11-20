@@ -633,7 +633,7 @@ describe('FittingStatsSections — Applied DPS', () => {
     );
     expect(fact('Raw DPS')).toBe('100.0');
     expect(applied()).not.toBe(againstCruiser);
-    expect(screen.getByText(/Our own calculation/)).toBeInTheDocument();
+    expect(screen.getByText(/Our own estimate/)).toBeInTheDocument();
   });
 
   it('draws both graphs, with an accessible table for each', async () => {

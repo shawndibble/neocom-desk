@@ -53,7 +53,7 @@ describe('WhoIsClosest', () => {
     expect(items[1]).toHaveTextContent('Plan owner');
     expect(screen.queryByText('Pilot 3', { exact: false })).toBeNull();
     await userEvent.click(screen.getByText('1 unavailable'));
-    expect(screen.getByText(/Pilot 4 — skills permission not granted/)).toBeInTheDocument();
+    expect(screen.getByText(/Pilot 4 — no skills access/)).toBeInTheDocument();
   });
 
   it('waits to be opened with more than five Characters', async () => {

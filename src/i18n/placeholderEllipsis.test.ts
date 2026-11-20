@@ -5,7 +5,7 @@ import en from './locales/en.json';
 const ALLOWED_BARE = ['settings.notifications.searchPlaceholder'];
 
 /** Hold "..." as example fit text, not as a truncation mark. */
-const EXAMPLE_TEXT = ['fittings.load.pastePlaceholder', 'skills.fitCheck.pastePlaceholder'];
+const EXAMPLE_TEXT = ['fittings.load.pastePlaceholder'];
 
 function collectStrings(node: unknown, path: string, out: [string, string][]) {
   if (typeof node === 'string') {

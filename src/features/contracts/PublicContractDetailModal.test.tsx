@@ -558,7 +558,7 @@ describe('PublicContractDetailModal — flag sentences (#4773)', () => {
 
     expect(
       await screen.findByText(
-        'The price pays for 1 other line, and some lines have no Jita price, so how it compares is unknown.'
+        "The price pays for 1 other line, and some lines have no Jita price, so we can't tell if it's a good deal."
       )
     ).toBeInTheDocument();
     expect(screen.queryByText(/Your search is/)).not.toBeInTheDocument();

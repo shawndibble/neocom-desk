@@ -445,7 +445,7 @@ describe('ContractDetailModal', () => {
       issuerName: 'Mero Otichoda',
       onClose: () => {},
     });
-    expect(await screen.findByText('Items not kept for this contract')).toBeInTheDocument();
+    expect(await screen.findByText("Items aren't available for this contract")).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
     expect(screen.queryByText(/Couldn't load/)).not.toBeInTheDocument();
   });
@@ -478,7 +478,7 @@ describe('ContractDetailModal', () => {
       onClose: () => {},
     });
     expect(await screen.findByText('Included')).toBeInTheDocument();
-    expect(screen.queryByText('Items not kept for this contract')).not.toBeInTheDocument();
+    expect(screen.queryByText("Items aren't available for this contract")).not.toBeInTheDocument();
   });
 
   /*

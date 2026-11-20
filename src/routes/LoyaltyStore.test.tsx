@@ -800,8 +800,8 @@ describe('LoyaltyStore required items breakdown (issue #1068)', () => {
 
     await user.click(screen.getByText('Scourge Fury Heavy Missile').closest('tr')!);
 
-    expect(screen.getByText(/Counted at recent trades/)).toHaveTextContent(
-      'Counted at recent trades, 17,300,000 ISK each: the cheapest listing asks 1,000,000,000 ISK, 57.8× that.'
+    expect(screen.getByText(/Valued at the recent trade price/)).toHaveTextContent(
+      'Valued at the recent trade price, 17,300,000 ISK each, because the cheapest sell order asks 1,000,000,000 ISK, 57.8× that.'
     );
   });
 

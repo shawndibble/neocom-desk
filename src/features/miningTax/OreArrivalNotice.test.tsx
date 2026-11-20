@@ -62,7 +62,7 @@ describe('OreArrivalNotice', () => {
   it('keeps to small print once an entry that could still grow has gone quiet', () => {
     seedLog(false);
     render(<OreArrivalNotice entries={[today]} checking={false} pullStartedAt={null} />);
-    expect(screen.getByRole('status')).toHaveTextContent('ESI can lag up to 1 h');
+    expect(screen.getByRole('status')).toHaveTextContent('Mining data can lag up to 1 h');
   });
 
   it('says nothing about entries from a day that can no longer grow', () => {
@@ -78,11 +78,11 @@ describe('OreArrivalNotice', () => {
     const { rerender } = render(
       <OreArrivalNotice entries={[today]} checking pullStartedAt={NOW} />
     );
-    expect(screen.getByRole('status')).toHaveTextContent('Checking ESI…');
+    expect(screen.getByRole('status')).toHaveTextContent('Checking for new ore…');
 
     rerender(<OreArrivalNotice entries={[today]} checking={false} pullStartedAt={NOW} />);
     expect(screen.getByRole('status')).toHaveTextContent(
-      "Couldn't check ESI · it can lag up to 1 h"
+      "Couldn't check for new ore · it can lag up to 1 h"
     );
   });
 });

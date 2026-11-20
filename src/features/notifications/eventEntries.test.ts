@@ -148,7 +148,7 @@ describe('one event through its entry', () => {
     ]);
     expect(entry.copy.subjectOf?.(fires[0])).toBe(42);
     expect(entry.copy.poll(fires[0], PILOT, { item: 'Tritanium' }).body).toBe(
-      "Kestrel's Tritanium sell order at 100.00 ISK was undercut at its station (95.00 ISK)."
+      "Kestrel's Tritanium sell order at 100.00 ISK was undercut. Lowest price at its station: 95.00 ISK."
     );
     expect(entry.projection).toBeNull();
     expect(entry.thresholds).toBeNull();

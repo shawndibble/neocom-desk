@@ -69,7 +69,7 @@ describe('ReviewMemberDialog', () => {
 
   it('falls back to the exact-name field with the reason when the roster is unreadable', async () => {
     const { dialog, onRequest } = setup({ status: 'unreadable' });
-    expect(dialog.getByText(/member list could not be read/)).toBeInTheDocument();
+    expect(dialog.getByText(/Could not load the member list/)).toBeInTheDocument();
     await userEvent.type(dialog.getByLabelText('Character name, exactly as in game'), 'Sio Tane');
     await userEvent.type(dialog.getByLabelText('Role they are up for'), 'Accountant');
     await userEvent.click(dialog.getByRole('button', { name: 'Ask for a review' }));

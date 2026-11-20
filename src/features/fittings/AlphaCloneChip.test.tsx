@@ -14,7 +14,7 @@ describe('AlphaCloneChip', () => {
     const chip = screen.getByRole('button', { name: 'Alpha OK' });
     await userEvent.hover(chip);
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
-      'By skill caps: an Alpha clone can train every skill this fit needs.'
+      'An Alpha clone can train every skill this fit needs.'
     );
   });
 
@@ -66,7 +66,7 @@ describe('AlphaCloneChip', () => {
       touches: [{ clientX: 0, clientY: 0 }],
     });
     fireEvent.touchEnd(screen.getByRole('button', { name: 'Alpha OK' }), { touches: [] });
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('By skill caps');
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Alpha clone can train');
   });
 
   it("holds the badge's place, silently, while the requirements load", () => {

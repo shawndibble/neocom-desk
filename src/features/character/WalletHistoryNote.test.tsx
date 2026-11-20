@@ -38,12 +38,12 @@ describe('WalletHistoryNote', () => {
         }}
       />
     );
-    expect(screen.getByText(/Not recorded: 8\/17\/2026 – 9\/16\/2026/)).toBeVisible();
+    expect(screen.getByText(/Missing: 8\/17\/2026 – 9\/16\/2026/)).toBeVisible();
   });
 
   it('says coverage is not confirmed when only rows exist', () => {
     render(<WalletHistoryNote info={{ since: null, gaps: [], unconfirmed: true }} />);
-    expect(screen.getByText(/not confirmed yet/)).toBeVisible();
+    expect(screen.getByText(/don.t know yet how far back/)).toBeVisible();
   });
 
   it('joins several gaps with a list', () => {

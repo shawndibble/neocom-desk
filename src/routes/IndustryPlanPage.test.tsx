@@ -698,7 +698,7 @@ describe('IndustryPlanPage: owned-stock scope (#454)', () => {
     // No Characters are authenticated in this test, so there is no detected
     // stock to choose locations from yet.
     expect(
-      screen.getByText('No detected owned stock yet to choose locations from.')
+      screen.getByText('No owned stock found yet, so there are no locations to choose.')
     ).toBeInTheDocument();
 
     await waitFor(async () => {

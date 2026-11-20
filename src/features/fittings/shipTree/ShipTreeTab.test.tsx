@@ -87,9 +87,9 @@ function renderTab(path = '/ships/tree') {
 
 /** The fly-state tabs, behind the funnel: opens the filter box if it's shut. */
 async function flyGroup(user: ReturnType<typeof userEvent.setup>) {
-  if (!screen.queryByRole('group', { name: 'Fly state' }))
+  if (!screen.queryByRole('group', { name: 'Can you fly it?' }))
     await user.click(screen.getByRole('button', { name: /^Filters/ }));
-  return screen.getByRole('group', { name: 'Fly state' });
+  return screen.getByRole('group', { name: 'Can you fly it?' });
 }
 
 const tile = (container: HTMLElement, typeID: number) =>

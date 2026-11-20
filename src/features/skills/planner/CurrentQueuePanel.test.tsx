@@ -101,7 +101,7 @@ describe('CurrentQueuePanel', () => {
 
   it('says so when ESI reports no queue', () => {
     renderPanel([]);
-    expect(screen.getByText('No active in-game training queue cached.')).toBeInTheDocument();
+    expect(screen.getByText('No skill is training in game.')).toBeInTheDocument();
   });
 
   it('lists a paused queue under Paused, with no training card', () => {
@@ -109,7 +109,7 @@ describe('CurrentQueuePanel', () => {
     expect(screen.queryByRole('region', { name: 'Training now' })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Paused' })).toBeInTheDocument();
     expect(
-      screen.getByText('Training is paused, so EVE reports no completion times.')
+      screen.getByText('Training is paused, so EVE shows no finish times.')
     ).toBeInTheDocument();
   });
 

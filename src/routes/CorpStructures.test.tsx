@@ -244,7 +244,7 @@ describe('CorpStructures', () => {
       expect(column(tableEl, 'Needed')[gamma]).toBe('—');
       expect(column(tableEl, 'Fuel')[gamma]).toMatch(/\d/);
       expect(column(tableEl, 'Fuel blocks')[alpha]).toBe('40020/day');
-      expect(screen.getByText(/EVE opens them only to a Director/)).toBeInTheDocument();
+      expect(screen.getByText(/which only a Director can see/)).toBeInTheDocument();
     });
 
     it('totals the visible rows and copies the same list', async () => {

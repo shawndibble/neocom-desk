@@ -445,6 +445,6 @@ describe('Market History tab (Transactions)', () => {
     );
     window.history.pushState({}, '', '/market/history');
     renderMarketRoute();
-    expect(await screen.findByText(/no transactions cached/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no transactions loaded/i)).toBeInTheDocument();
   });
 });

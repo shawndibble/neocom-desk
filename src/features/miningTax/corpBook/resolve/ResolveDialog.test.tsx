@@ -134,7 +134,7 @@ describe('ResolveDialog', () => {
     expect(screen.getByRole('radio', { name: /Pay it/ })).toBeChecked();
     await userEvent.click(screen.getByRole('radio', { name: /I already paid/ }));
     expect(
-      screen.getByText(/Bureau's book already credited your payment, to 2026-11-01/)
+      screen.getByText(/Bureau's book already used your payment on 2026-11-01/)
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send proof' })).toBeDisabled();
   });

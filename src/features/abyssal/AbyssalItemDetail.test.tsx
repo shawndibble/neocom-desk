@@ -204,7 +204,9 @@ describe('AbyssalItemDetail', () => {
 
   it('falls back to the type’s ranges when the owned module’s rolls can’t be read', async () => {
     renderDetail(ABYSSAL_NEUT, { status: 'failed' });
-    expect(await screen.findByText(/Couldn't read this module's own rolls/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Couldn't read this module's rolls from EVE/)
+    ).toBeInTheDocument();
     expect(await screen.findByRole('table')).toBeInTheDocument();
   });
 

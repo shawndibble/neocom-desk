@@ -410,11 +410,7 @@ export function Skills() {
           )}
 
           {searching && filterResult.visibleGroupNames.size === 0 ? (
-            <EmptyState
-              title={t('skills.noResults')}
-              hint={t('skills.noResultsHint')}
-              className="py-8"
-            />
+            <EmptyState title={t('skills.noResults')} className="py-8" />
           ) : (
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {groups.map((group) => {

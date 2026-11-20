@@ -304,7 +304,7 @@ describe('SetWaypoints', () => {
     await userEvent.click(button);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Waypoints not set: ESI gave no reason. Is the character logged in to the game?'
+      'Waypoints not set: EVE gave no reason. Is the character logged in to the game?'
     );
   });
 
@@ -319,7 +319,7 @@ describe('SetWaypoints', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent("You're offline — waypoints weren't set.");
-    expect(alert).not.toHaveTextContent('ESI gave no reason');
+    expect(alert).not.toHaveTextContent('EVE gave no reason');
   });
 
   it('says how many were set when the connection drops partway', async () => {

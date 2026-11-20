@@ -148,7 +148,6 @@ describe('Contacts', () => {
     for (const chip of within(chips).getAllByRole('button')) fireEvent.click(chip);
 
     expect(await screen.findByText('No contacts match the selected filters')).toBeInTheDocument();
-    expect(screen.getByText('Widen the filters above to see contacts.')).toBeInTheDocument();
   });
 
   it('offers Reset filters when the filters leave no contacts, and restores the list', async () => {
@@ -234,7 +233,7 @@ describe('Contacts', () => {
   it('shows the empty state when there is no data at all', async () => {
     server.use(http.get(`${ESI}/characters/${CHAR_ID}/contacts`, () => HttpResponse.error()));
     renderContactsRoute();
-    expect(await screen.findByText(/no contacts cached/i)).toBeInTheDocument();
+    expect(await screen.findByText(/contacts not loaded yet/i)).toBeInTheDocument();
   });
 
   it('says what fills the page when the character really has no contacts', async () => {
@@ -256,7 +255,7 @@ describe('Contacts', () => {
     );
     renderContactsRoute();
     expect(await screen.findByText(/: log in again$/)).toBeInTheDocument();
-    expect(screen.queryByText(/no contacts cached/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/contacts not loaded yet/i)).not.toBeInTheDocument();
   });
 });
 

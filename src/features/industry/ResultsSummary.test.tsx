@@ -266,14 +266,14 @@ describe('ResultsSummary: owned materials', () => {
 describe('ResultsSummary: fetching vs. unavailable prices (#409)', () => {
   it('shows a distinct fetching state while pricesLoading, not the unavailable warning', () => {
     renderSummary({ pricesReady: false, pricesLoading: true });
-    expect(screen.getByRole('status', { name: 'Fetching prices…' })).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Loading prices…' })).toBeInTheDocument();
     expect(screen.queryByText('Price data unavailable')).not.toBeInTheDocument();
   });
 
   it('shows the unavailable warning once loading has finished and prices are genuinely missing', () => {
     renderSummary({ pricesReady: false, pricesLoading: false });
     expect(screen.getByText('Price data unavailable')).toBeInTheDocument();
-    expect(screen.queryByText('Fetching prices…')).not.toBeInTheDocument();
+    expect(screen.queryByText('Loading prices…')).not.toBeInTheDocument();
   });
 });
 
@@ -293,7 +293,7 @@ describe('ResultsSummary: unpriced-product Market link (#409)', () => {
       result: { ...RESULT, buyCost: null, unpriceable: true, unpricedMaterials: [] },
       productTypeID: 587,
     });
-    const link = screen.getByRole('link', { name: /Rifter has no hub buy-now price/ });
+    const link = screen.getByRole('link', { name: /Rifter has no buy-now price/ });
     expect(link).toHaveAttribute('href', expect.stringContaining('/market/browser'));
     await userEvent.click(link);
     expect(screen.getByText('Market Browser')).toBeInTheDocument();
@@ -305,9 +305,9 @@ describe('ResultsSummary: unpriced-product Market link (#409)', () => {
       productTypeID: null,
     });
     expect(
-      screen.queryByRole('link', { name: /Rifter has no hub buy-now price/ })
+      screen.queryByRole('link', { name: /Rifter has no buy-now price/ })
     ).not.toBeInTheDocument();
-    expect(screen.getByText(/Rifter has no hub buy-now price/)).toBeInTheDocument();
+    expect(screen.getByText(/Rifter has no buy-now price/)).toBeInTheDocument();
   });
 });
 

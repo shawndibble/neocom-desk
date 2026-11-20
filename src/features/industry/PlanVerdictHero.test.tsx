@@ -315,7 +315,9 @@ describe('PlanVerdictHero: calculation breakdown', () => {
 
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText(/Sell now: fills standing buy orders/i)).toBeTruthy();
-    expect(within(dialog).getByText(/No order on the chosen side means no verdict/i)).toBeTruthy();
+    expect(
+      within(dialog).getByText(/the chosen side has no order, you get no verdict/i)
+    ).toBeTruthy();
   });
 
   it('drops the material-efficiency wording for a reaction, which has none', async () => {
