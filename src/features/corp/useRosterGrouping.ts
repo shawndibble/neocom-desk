@@ -10,7 +10,7 @@ import {
   verifyOfficer,
 } from './taxBook/bookClient';
 import type { GroupSource } from './moons/GroupMinersDialog';
-import type { PlayerGroup } from './playerRows';
+import { unknownCharacterName, type PlayerGroup } from './playerRows';
 
 const NO_IDS: ReadonlySet<number> = new Set();
 
@@ -117,7 +117,7 @@ export function useRosterGrouping(
         status: held?.status ?? 'loading',
         choices: held?.choices ?? [],
         stored: miners,
-        name: (id) => names.get(id) ?? `#${id}`,
+        name: (id) => names.get(id) ?? unknownCharacterName(id),
         edit: async (action) => {
           try {
             return await editBook(characterId ?? 0, corporationId ?? 0, action);

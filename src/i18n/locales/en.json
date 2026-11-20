@@ -15967,6 +15967,7 @@
         },
         "addCharacter": "Add character…",
         "changeMain": "Change main…",
+        "mainConflict": "Resolve the conflict first — {{name}} is claimed by two groups",
         "makeMainOutside": "Outside the corp — a corp member stays main",
         "remove": "Remove from Player",
         "removeTitle": "Remove {{name}} from {{main}}'s Player?",
@@ -19818,7 +19819,6 @@
         "confirm_one": "Group {{count}} Miner",
         "confirm_other": "Group {{count}} Miners",
         "effect": "Their days, Statements and payments are billed as one Miner from now on.",
-        "pendingEffect": "A character outside the corporation is not linked until that player confirms it.",
         "claimEffect": "A character added by name is billed with the group, but cannot see it until its owner signs in as that character.",
         "count_one": "{{count}} character",
         "count_other": "{{count}} characters",
@@ -19838,7 +19838,6 @@
         "badgeTip": "Grouped with {{names}}",
         "conflictsTitle": "Characters claimed by two groups",
         "conflictItem": "{{name}} is in {{groups}}. The earlier group was kept; ungroup one to settle it.",
-        "mergeTitle": "Groups to merge",
         "mergeTooLarge": "{{names}} belong together, but merging holds too many records for one step. Group them from a Miner page.",
         "mergeConflict": "{{names}} is claimed by two groups. Nothing was changed.",
         "flagged": "{{names}} was removed from a group earlier and was not added again."

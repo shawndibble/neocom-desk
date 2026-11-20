@@ -151,10 +151,16 @@ describe('buildPlayerLines', () => {
     expect(lines.map((l) => l.name)).toEqual(['Sora Tenn', 'Sora Of Elsewhere']);
   });
 
-  it('a highlight inside a collapsed Player opens it and keys the alt row', () => {
-    const { lines, highlightKey } = build({ highlightId: 3 });
+  it('a highlight inside a collapsed Player keys the alt row and names its Player, but does not open it', () => {
+    const { lines, highlightKey, highlightPlayerKey } = build({ highlightId: 3 });
     expect(highlightKey).toBe('p:solo:1:3');
-    expect(lines.some((l) => l.key === 'p:solo:1:3')).toBe(true);
+    expect(highlightPlayerKey).toBe('p:solo:1');
+    expect(lines.some((l) => l.key === 'p:solo:1:3')).toBe(false);
+  });
+
+  it('a highlight leaves a Player the reader collapsed collapsed', () => {
+    const { lines } = build({ highlightId: 3, expanded: new Set() });
+    expect(lines.find((l) => l.key === 'p:solo:1')?.expanded).toBe(false);
   });
 
   it('a highlight on a Player main or a loose member keys that row', () => {

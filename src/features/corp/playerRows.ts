@@ -73,7 +73,7 @@ export interface PlayerLinesInput<R extends PlayerSourceRow> {
   filtering: boolean;
   /** Group-row keys the reader opened. */
   expanded: ReadonlySet<string>;
-  /** A `?highlight` character id. */
+  /** A `?highlight` character id (it keys the row; opening its Player is the view's job). */
   highlightId: number | null;
   conflictIds?: ReadonlySet<number>;
   declinedIds?: ReadonlySet<number>;
@@ -82,6 +82,9 @@ export interface PlayerLinesInput<R extends PlayerSourceRow> {
   /** A column's sort value for a roster row (every column but Member and Last seen). */
   columnValue?: (columnId: string, row: R) => string | number | undefined;
 }
+
+/** The label for a character nobody has named yet. The one fallback every roster name lookup shares. */
+export const unknownCharacterName = (id: number): string => `#${id}`;
 
 /** Most recently seen first: an unknown span sorts last. */
 const byRecency = (a: PlayerSourceRow | null, b: PlayerSourceRow | null): number => {
@@ -92,9 +95,10 @@ const byRecency = (a: PlayerSourceRow | null, b: PlayerSourceRow | null): number
 
 export function buildPlayerLines<R extends PlayerSourceRow>(
   input: PlayerLinesInput<R>
-): { lines: PlayerLine<R>[]; highlightKey: string | null } {
+): { lines: PlayerLine<R>[]; highlightKey: string | null; highlightPlayerKey: string | null } {
   const byId = new Map(input.rows.map((r) => [r.characterId, r]));
-  const nameOf = (id: number) => byId.get(id)?.name ?? input.names.get(id) ?? `#${id}`;
+  const nameOf = (id: number) =>
+    byId.get(id)?.name ?? input.names.get(id) ?? unknownCharacterName(id);
   const chipsOf = (g: PlayerGroup | null, id: number): CharacterChip[] => {
     const chips: CharacterChip[] = [];
     if (g?.officerClaimed?.includes(id)) chips.push('unsigned');
@@ -121,6 +125,7 @@ export function buildPlayerLines<R extends PlayerSourceRow>(
     lines: PlayerLine<R>[];
   }[] = [];
   let highlightKey: string | null = null;
+  let highlightPlayerKey: string | null = null;
 
   for (const { group, ids } of players) {
     const main = ids.includes(group.mainCharacterId) ? group.mainCharacterId : ids[0];
@@ -132,10 +137,9 @@ export function buildPlayerLines<R extends PlayerSourceRow>(
     if (input.filtering && !hit) continue;
 
     const key = `p:${group.id}`;
-    const open =
-      input.filtering ||
-      input.expanded.has(key) ||
-      (input.highlightId !== null && ids.includes(input.highlightId) && input.highlightId !== main);
+    // A highlight does not force the Player open (that would pin it): it is reported in
+    // `highlightPlayerKey` so the view can seed the reader's own expansion once.
+    const open = input.filtering || input.expanded.has(key);
 
     const base = {
       groupId: group.id,
@@ -183,8 +187,10 @@ export function buildPlayerLines<R extends PlayerSourceRow>(
       }
     }
     if (input.highlightId === main) highlightKey = key;
-    else if (input.highlightId !== null && ids.includes(input.highlightId))
+    else if (input.highlightId !== null && ids.includes(input.highlightId)) {
       highlightKey = `${key}:${input.highlightId}`;
+      highlightPlayerKey = key;
+    }
     entries.push({ sort: seen, name: nameOf(main), main: byId.get(main) ?? null, lines });
   }
 
@@ -231,5 +237,5 @@ export function buildPlayerLines<R extends PlayerSourceRow>(
     return e.main ? input.columnValue?.(columnId, e.main) : undefined;
   };
   const sorted = sortRowsBy(entries, valueOf, direction);
-  return { lines: sorted.flatMap((e) => e.lines), highlightKey };
+  return { lines: sorted.flatMap((e) => e.lines), highlightKey, highlightPlayerKey };
 }

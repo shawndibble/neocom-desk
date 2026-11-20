@@ -92,6 +92,12 @@ beforeEach(() => {
   onGroupWith.mockReset();
 });
 
+const order = () =>
+  screen
+    .getAllByRole('row')
+    .slice(1)
+    .map((r) => r.textContent ?? '');
+
 describe('PlayersView', () => {
   it('opens the Player holding a latched highlight alt and marks the row (groups loaded late)', () => {
     const { rerender } = renderView({ grouping: grouping({ groups: [] }), highlightId: 4 });
@@ -112,6 +118,25 @@ describe('PlayersView', () => {
     );
     expect(screen.getByText('Outer Rim Vane')).toBeInTheDocument();
     expect(screen.getByText('Vane Hauler')).toBeInTheDocument();
+  });
+
+  it('a highlight opens its Player once; the parent click then collapses it and it stays collapsed', async () => {
+    renderView({ highlightId: 4 });
+    expect(screen.getByText('Outer Rim Vane')).toBeInTheDocument();
+    await userEvent.click(rowOf('Kestrel Vane'));
+    expect(screen.queryByText('Outer Rim Vane')).not.toBeInTheDocument();
+    await userEvent.click(rowOf('Lena Voss'));
+    expect(screen.queryByText('Outer Rim Vane')).not.toBeInTheDocument();
+  });
+
+  it('hands the page latch back once, so leaving and returning does not replay it', () => {
+    const seen = vi.fn();
+    const { unmount } = renderView({ highlightId: 4, onHighlightSeen: seen });
+    expect(seen).toHaveBeenCalledTimes(1);
+    unmount();
+    renderView({ highlightId: null, onHighlightSeen: seen });
+    expect(screen.queryByText('Outer Rim Vane')).not.toBeInTheDocument();
+    expect(seen).toHaveBeenCalledTimes(1);
   });
 
   it('lists Players folded, with counts, and loose members as plain rows', () => {
@@ -212,6 +237,39 @@ describe('PlayersView', () => {
     expect(screen.getByRole('menuitem', { name: 'Remove from Player' })).toBeInTheDocument();
   });
 
+  it('a group holding a conflicted character cannot change main; Remove stays', async () => {
+    renderView({ grouping: grouping({ conflictIds: new Set([4]) }) });
+    await menuOf('Kestrel Vane');
+    const change = await screen.findByRole('menuitem', { name: /Change main/ });
+    expect(change).toHaveAttribute('aria-disabled', 'true');
+    expect(change).toHaveTextContent(
+      'Resolve the conflict first — Outer Rim Vane is claimed by two groups'
+    );
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(rowOf('Kestrel Vane'));
+    await menuOf('Vane Hauler');
+    const make = await screen.findByRole('menuitem', { name: /Make main/ });
+    expect(make).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(make);
+    expect(edit).not.toHaveBeenCalled();
+    expect(screen.getByRole('menuitem', { name: 'Remove from Player' })).toBeInTheDocument();
+  });
+
+  it('ignores a second Make main while the first edit runs, and clears an old error after a later edit', async () => {
+    let release: () => void = () => {};
+    edit.mockReset().mockImplementationOnce(() => new Promise((res) => (release = () => res({}))));
+    renderView();
+    await userEvent.click(rowOf('Kestrel Vane'));
+    await menuOf('Vane Hauler');
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Make main' }));
+    await menuOf('Vane Hauler');
+    const again = await screen.findByRole('menuitem', { name: 'Make main' });
+    await userEvent.click(again);
+    expect(edit).toHaveBeenCalledTimes(1);
+    release();
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+  });
+
   it('every character row menu carries Show info: Player, alt, outside character and loose member', async () => {
     renderView();
     await menuOf('Lena Voss');
@@ -235,12 +293,6 @@ describe('PlayersView', () => {
     expect(onGroupWith).toHaveBeenCalledWith(10);
   });
 
-  const order = () =>
-    screen
-      .getAllByRole('row')
-      .slice(1)
-      .map((r) => r.textContent ?? '');
-
   it('sorts Players by a header click, flipping on the second; default is Last seen newest first', async () => {
     renderView();
     const names = () =>
@@ -254,7 +306,7 @@ describe('PlayersView', () => {
     expect(names()).toEqual(['Sora Tenn', 'Lena Voss', 'Kestrel Vane']);
   });
 
-  it('keeps alts directly under their Player when the sort changes', async () => {
+  it('keeps alts directly under their Player when the sort changes (pins PASS_THROUGH_SORT: equal keys keep builder order)', async () => {
     renderView();
     await userEvent.click(rowOf('Kestrel Vane'));
     await userEvent.click(screen.getByRole('button', { name: /^Member/ }));

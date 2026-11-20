@@ -4,7 +4,15 @@
  * it; right-click, touch-and-hold and the ⋮ share one menu (DESIGN.md §6c). Officer-only: the
  * page offers the view only where it can edit a book.
  */
-import { useCallback, useMemo, useState, type ReactElement, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -36,7 +44,8 @@ import {
   useVisibleCorpRosterColumns,
   type CorpRosterColumnId,
 } from './corpRosterColumns';
-import { useRosterColumns, type RosterRow } from './CorpRoster';
+import type { RosterRow } from './CorpRoster';
+import { useRosterColumns } from './useRosterColumns';
 import { buildPlayerLines, type CharacterChip, type PlayerLine } from './playerRows';
 import type { RosterGrouping } from './useRosterGrouping';
 
@@ -94,6 +103,8 @@ export interface PlayersViewProps {
    * Characters table first, which spends the param while the groups are still loading).
    */
   highlightId?: number | null;
+  /** Called once this view has taken the latched `highlightId`, so the page can drop it. */
+  onHighlightSeen?: () => void;
 }
 
 export function PlayersView({
@@ -104,14 +115,25 @@ export function PlayersView({
   otherFilters,
   onGroupWith,
   onResetFilters,
-  highlightId: latchedHighlight = null,
+  highlightId: pageHighlight = null,
+  onHighlightSeen,
 }: PlayersViewProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [removing, setRemoving] = useState<Line | null>(null);
   const [changingMain, setChangingMain] = useState<Line | null>(null);
-  const highlightId = useHighlightParam() ?? latchedHighlight;
+  const urlHighlight = useHighlightParam();
+  // The page's latch is taken once at mount and handed back, so leaving this view and returning
+  // does not replay it.
+  const [latchedHighlight] = useState(pageHighlight);
+  useEffect(() => {
+    if (pageHighlight !== null) onHighlightSeen?.();
+  }, [pageHighlight, onHighlightSeen]);
+  const highlightId = urlHighlight ?? latchedHighlight;
+  const seeded = useRef(false);
+  const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
 
   const query = search.trim().toLowerCase();
   const filtering = query !== '' || otherFilters;
@@ -131,7 +153,7 @@ export function PlayersView({
     (id: string, row: RosterRow) => baseColumns.find((c) => c.id === id)?.sortValue?.(row),
     [baseColumns]
   );
-  const { lines, highlightKey } = useMemo(
+  const { lines, highlightKey, highlightPlayerKey } = useMemo(
     () =>
       buildPlayerLines<RosterRow>({
         rows,
@@ -160,6 +182,13 @@ export function PlayersView({
     ]
   );
 
+  // A highlight opens its Player once, as if the reader had; after that the row click collapses it.
+  useEffect(() => {
+    if (seeded.current || highlightPlayerKey === null) return;
+    seeded.current = true;
+    setOpen((prev) => new Set(prev).add(highlightPlayerKey));
+  }, [highlightPlayerKey]);
+
   const toggle = useCallback((line: Line) => {
     setOpen((prev) => {
       const next = new Set(prev);
@@ -170,7 +199,9 @@ export function PlayersView({
 
   const makeMain = useCallback(
     async (line: Line) => {
-      if (!line.group) return;
+      if (!line.group || busyRef.current) return;
+      busyRef.current = true;
+      setBusy(true);
       setError(null);
       try {
         await grouping.source.edit({
@@ -181,9 +212,27 @@ export function PlayersView({
         });
       } catch (e) {
         setError(callableErrorText(t, e, 'corpTaxBook.moons.dialogs.failed'));
+      } finally {
+        busyRef.current = false;
+        setBusy(false);
       }
     },
     [grouping.source, t]
+  );
+  // The other edits (Remove, Change main) clear a stale page error when they succeed.
+  const editAndClear = useCallback(
+    async (action: Parameters<RosterGrouping['source']['edit']>[0]) => {
+      await grouping.source.edit(action);
+      setError(null);
+    },
+    [grouping.source]
+  );
+  const conflictedName = useCallback(
+    (line: Line): string | null => {
+      const id = line.group?.characterIds.find((c) => grouping.conflictIds.has(c));
+      return id === undefined ? null : grouping.source.name(id);
+    },
+    [grouping.conflictIds, grouping.source]
   );
 
   const { isVisible } = useColumnVisibility(
@@ -250,6 +299,8 @@ export function PlayersView({
         <PlayerLineMenu
           line={line}
           onAdd={(l) => onGroupWith(l.characterId)}
+          conflictedName={conflictedName(line)}
+          busy={busy}
           onChangeMain={setChangingMain}
           onMakeMain={(l) => void makeMain(l)}
           onRemove={setRemoving}
@@ -257,7 +308,7 @@ export function PlayersView({
           {tr}
         </PlayerLineMenu>
       ),
-    [onGroupWith, makeMain, t]
+    [onGroupWith, makeMain, conflictedName, busy, t]
   );
 
   if (rows.length === 0) {
@@ -317,7 +368,7 @@ export function PlayersView({
           failedLabel={t('corp.members.players.removeFailed')}
           onClose={() => setRemoving(null)}
           onConfirm={async () => {
-            await grouping.source.edit({
+            await editAndClear({
               action: 'unlink',
               minerId: removing.group!.id,
               characterId: removing.characterId,
@@ -328,8 +379,9 @@ export function PlayersView({
       {changingMain && (
         <ChangeMainDialog
           line={changingMain}
-          rosterIds={rows}
+          rows={rows}
           grouping={grouping}
+          edit={editAndClear}
           onClose={() => setChangingMain(null)}
         />
       )}
@@ -423,12 +475,18 @@ function MemberCell({ line }: { line: Line }) {
 function PlayerLineMenu({
   line,
   onAdd,
+  conflictedName,
+  busy,
   onChangeMain,
   onMakeMain,
   onRemove,
   children,
 }: {
   line: Line;
+  /** The group holds a character two groups claim (the server cannot move its main yet): that character's name. */
+  conflictedName: string | null;
+  /** A Make main is running; a second click waits. */
+  busy: boolean;
   onAdd: (line: Line) => void;
   onChangeMain: (line: Line) => void;
   onMakeMain: (line: Line) => void;
@@ -439,6 +497,20 @@ function PlayerLineMenu({
   const { run, onCloseAutoFocus } = useOpenAfterMenu();
   const isPlayer = line.kind === 'player';
   const blocked = line.outside && line.groupHasMember;
+  const conflicted = conflictedName !== null;
+  const inert = (label: string, reason: string) => (
+    <MenuItem
+      aria-disabled
+      onSelect={(event) => event.preventDefault()}
+      className="cursor-default aria-disabled:opacity-100"
+    >
+      <span className="flex flex-col">
+        <span className="text-text-dim">{label}</span>
+        <span className="text-xs text-text-dim">{reason}</span>
+      </span>
+    </MenuItem>
+  );
+  const conflictReason = t('corp.members.players.mainConflict', { name: conflictedName });
   const items = (
     <>
       <MenuGroup id="primary">
@@ -447,25 +519,20 @@ function PlayerLineMenu({
             <MenuItem onSelect={() => run(() => onAdd(line))}>
               {t('corp.members.players.addCharacter')}
             </MenuItem>
-            <MenuItem onSelect={() => run(() => onChangeMain(line))}>
-              {t('corp.members.players.changeMain')}
-            </MenuItem>
+            {conflicted ? (
+              inert(t('corp.members.players.changeMain'), conflictReason)
+            ) : (
+              <MenuItem onSelect={() => run(() => onChangeMain(line))}>
+                {t('corp.members.players.changeMain')}
+              </MenuItem>
+            )}
           </>
+        ) : conflicted ? (
+          inert(t('corpTaxBook.moons.grouping.makeMain'), conflictReason)
         ) : blocked ? (
-          <MenuItem
-            aria-disabled
-            onSelect={(event) => event.preventDefault()}
-            className="cursor-default aria-disabled:opacity-100"
-          >
-            <span className="flex flex-col">
-              <span className="text-text-dim">{t('corpTaxBook.moons.grouping.makeMain')}</span>
-              <span className="text-xs text-text-dim">
-                {t('corp.members.players.makeMainOutside')}
-              </span>
-            </span>
-          </MenuItem>
+          inert(t('corpTaxBook.moons.grouping.makeMain'), t('corp.members.players.makeMainOutside'))
         ) : (
-          <MenuItem onSelect={() => onMakeMain(line)}>
+          <MenuItem disabled={busy} onSelect={() => onMakeMain(line)}>
             {t('corpTaxBook.moons.grouping.makeMain')}
           </MenuItem>
         )}
@@ -495,13 +562,16 @@ function PlayerLineMenu({
 /** Pick the character that gets the mail: a corp member while the Player has one. */
 function ChangeMainDialog({
   line,
-  rosterIds,
+  rows,
   grouping,
+  edit,
   onClose,
 }: {
   line: Line;
-  rosterIds: readonly RosterRow[];
+  /** The corporation's roster rows: who counts as a corp member. */
+  rows: readonly RosterRow[];
   grouping: RosterGrouping;
+  edit: (action: Parameters<RosterGrouping['source']['edit']>[0]) => Promise<void>;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -513,7 +583,7 @@ function ChangeMainDialog({
     : line.characterId;
   const [main, setMain] = useState(String(current));
   if (!group) return null;
-  const inCorp = new Set(rosterIds.map((r) => r.characterId));
+  const inCorp = new Set(rows.map((r) => r.characterId));
   const eligible = group.characterIds.filter((id) => !line.groupHasMember || inCorp.has(id));
   return (
     <DialogShell
@@ -523,7 +593,7 @@ function ChangeMainDialog({
       confirmLabel={t('corp.members.players.changeMainConfirm')}
       canConfirm={Number(main) !== current}
       run={async () => {
-        await grouping.source.edit({
+        await edit({
           action: 'setMiner',
           minerId: group.id,
           characterIds: [...group.characterIds],

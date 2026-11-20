@@ -286,7 +286,6 @@ async function loadMembersSnapshot(
   return { corporationId, ceoId, members, roles, labels, diff, fetchedAt, fromCache, loadedAt };
 }
 
-/** Mounted only once Corp Access is `ready` — see the `/corp` loader note. */
 /**
  * Characters | Players. From `sm` a labelled two-segment control; below it that control cannot
  * share the search box's line with the column picker and funnel (§4b), so an icon menu opens the
@@ -340,6 +339,7 @@ function ViewSwitch({
   );
 }
 
+/** Mounted only once Corp Access is `ready` — see the `/corp` loader note. */
 function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
   const { t } = useTranslation();
   // The corp's own inactivity policy. Feeds `memberStanding` here so the
@@ -364,7 +364,7 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
   const [searchParams, setSearchParams] = useSearchParams();
   // A cold `?view=players&highlight=` link shows the Characters table until the groups load, and
   // that table spends the param on mount. Latch it here so the Players table still gets it.
-  const [coldHighlight] = useState<number | null>(() =>
+  const [coldHighlight, setColdHighlight] = useState<number | null>(() =>
     searchParams.get('view') === 'players'
       ? parsePositiveInt(searchParams.get(HIGHLIGHT_PARAM))
       : null
@@ -391,7 +391,7 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
                 size: g.characterIds.length,
                 names: g.characterIds
                   .filter((id) => id !== member.characterId)
-                  .map((id) => grouping.names.get(id) ?? `#${id}`),
+                  .map((id) => grouping.source.name(id)),
               },
             }
           : {};
@@ -625,6 +625,7 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
                   otherFilters={darkOnly || ship !== null || loc !== null}
                   onGroupWith={setGroupingFor}
                   highlightId={coldHighlight}
+                  onHighlightSeen={() => setColdHighlight(null)}
                   onResetFilters={() =>
                     setFilterParams({ q: '', dark: false, ship: null, loc: null })
                   }
