@@ -13,6 +13,7 @@ import {
   TextInput,
 } from '@/components/ui';
 import type { DayRow, MinerRow } from '@/engine/corpTaxBook/bookView';
+import { accountBalance, balanceAdjustment } from '@/engine/corpTaxBook/balanceAdjustment';
 import { canRebillFrom } from '@/engine/corpTaxBook/statements';
 import { DialogShell, Effect, Label } from './BookDialogs';
 import { dateWithYear, isk, shortDate } from './moonsFormat';
@@ -116,11 +117,25 @@ export function AdjustmentDialog({
 }) {
   const { t } = useTranslation();
   const { edit } = useBook();
-  const [kind, setKind] = useState<'charge' | 'credit'>('credit');
+  const balanceText = (balance: number) =>
+    balance > 0
+      ? t('corpTaxBook.moons.corrections.adjust.owesAmount', { amount: isk(balance) })
+      : balance < 0
+        ? t('corpTaxBook.moons.corrections.adjust.creditAmount', { amount: isk(-balance) })
+        : t('corpTaxBook.moons.corrections.adjust.squareBalance');
+  const [kind, setKind] = useState<'charge' | 'credit' | 'set'>('credit');
+  const [side, setSide] = useState<'owes' | 'credit'>('owes');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(defaultDate);
   const [reason, setReason] = useState('');
-  const value = Number(amount);
+  const entered = Number(amount);
+  // "Set balance": the amount that moves their balance to the one typed, and which way it goes.
+  const current = accountBalance(miner);
+  const delta =
+    kind === 'set' ? balanceAdjustment(current, side === 'owes' ? entered : -entered) : 0;
+  const value = kind === 'set' ? Math.abs(delta) : entered;
+  const signed = kind === 'set' ? delta : kind === 'credit' ? -entered : entered;
+  const ready = kind === 'set' ? amount.trim() !== '' && entered >= 0 && delta !== 0 : value > 0;
   return (
     <DialogShell
       open={open}
@@ -131,13 +146,13 @@ export function AdjustmentDialog({
           ? t('corpTaxBook.moons.corrections.adjust.confirm', { amount: isk(value) })
           : t('corpTaxBook.moons.corrections.adjust.confirmEmpty')
       }
-      canConfirm={value > 0 && date !== '' && reason.trim().length > 0}
+      canConfirm={ready && date !== '' && reason.trim().length > 0}
       run={async () => {
         await edit({
           action: 'addAdjustment',
           minerId: miner.id,
           date,
-          amount: kind === 'credit' ? -value : value,
+          amount: signed,
           reason: reason.trim(),
         });
       }}
@@ -151,17 +166,64 @@ export function AdjustmentDialog({
           options={[
             { value: 'credit', label: t('corpTaxBook.moons.corrections.adjust.credit') },
             { value: 'charge', label: t('corpTaxBook.moons.corrections.adjust.charge') },
+            { value: 'set', label: t('corpTaxBook.moons.corrections.adjust.set') },
           ]}
           uppercase={false}
         />
       </Label>
-      <Label text={t('corpTaxBook.moons.corrections.adjust.amount')}>
+      {kind === 'set' && (
+        <>
+          <p className="text-text-dim">
+            {t('corpTaxBook.moons.corrections.adjust.currentBalance', {
+              balance: balanceText(current),
+            })}
+          </p>
+          <Label text={t('corpTaxBook.moons.corrections.adjust.setSide')}>
+            <SegmentedControl
+              label={t('corpTaxBook.moons.corrections.adjust.setSide')}
+              value={side}
+              onChange={setSide}
+              options={[
+                { value: 'owes', label: t('corpTaxBook.moons.corrections.adjust.owes') },
+                { value: 'credit', label: t('corpTaxBook.moons.corrections.adjust.holdsCredit') },
+              ]}
+              uppercase={false}
+            />
+          </Label>
+        </>
+      )}
+      <Label
+        text={t(
+          kind === 'set'
+            ? 'corpTaxBook.moons.corrections.adjust.setAmount'
+            : 'corpTaxBook.moons.corrections.adjust.amount'
+        )}
+      >
         <IskInput
           value={amount}
           onChange={setAmount}
           aria-label={t('corpTaxBook.moons.corrections.adjust.amount')}
         />
       </Label>
+      {kind === 'set' && date > defaultDate && (
+        <p className="text-warning">
+          {t('corpTaxBook.moons.corrections.adjust.setNotBillable', {
+            date: dateWithYear(defaultDate),
+          })}
+        </p>
+      )}
+      {kind === 'set' && amount.trim() !== '' && (
+        <p className="text-text-dim">
+          {delta === 0
+            ? t('corpTaxBook.moons.corrections.adjust.setNothing')
+            : t(
+                delta > 0
+                  ? 'corpTaxBook.moons.corrections.adjust.setWillCharge'
+                  : 'corpTaxBook.moons.corrections.adjust.setWillCredit',
+                { amount: isk(Math.abs(delta)) }
+              )}
+        </p>
+      )}
       <Label text={t('corpTaxBook.moons.corrections.adjust.date')}>
         <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         {date !== '' && <DateReadback date={date} />}
