@@ -36,6 +36,7 @@ import {
   matchesMinerBalance,
   type MinerBalance,
 } from '@/engine/corpTaxBook/overdueAging';
+import { rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { boolParam, optionalEnumParam, textParam } from '@/lib/urlState';
@@ -430,7 +431,7 @@ export function MinersTab() {
               <Link
                 key={m.id}
                 to={minerPath(m.id)}
-                className="flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-panel"
+                className={`flex items-center justify-between gap-3 px-3 py-2 text-sm ${rowInteractiveClassName}`}
               >
                 <span className="min-w-0 truncate font-semibold">{nameOf(m)}</span>
                 <span className="shrink-0 text-xs text-text-dim">
