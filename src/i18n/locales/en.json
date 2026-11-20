@@ -19623,7 +19623,7 @@
       "settings": {
         "open": "Corp Tax Book settings",
         "title": "Corp Tax Book settings",
-        "ratesHint": "The most specific rate wins: Miner, then moon, then refinery, then moon owner, then Guest default, then the corp default. A rate starts on its date and never reaches back.",
+        "ratesHint": "The most specific rate wins: Miner, then moon, then refinery, then moon owner, then Guest default, then the corp default. A rate starts on its date, which may be up to 30 days back but never on a day an issued Statement bills.",
         "rateScope": {
           "corp": "Corp default",
           "guest": "Guest default",

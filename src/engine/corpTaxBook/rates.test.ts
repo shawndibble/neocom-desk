@@ -64,7 +64,7 @@ describe('resolveRate', () => {
     expect(resolveRate(rates, ctx)?.pct).toBe(10);
   });
 
-  it('is never retroactive: a rate applies from its effective-from date, earlier days keep the old one', () => {
+  it('applies a rate from its effective-from date, earlier days keep the old one', () => {
     const rates: TaxRate[] = [CORP, { scope: 'corp', pct: 12, effectiveFrom: '2026-07-13' }];
     expect(resolveRate(rates, ctx)?.pct).toBe(10);
     expect(resolveRate(rates, { ...ctx, date: '2026-07-13' })?.pct).toBe(12);
