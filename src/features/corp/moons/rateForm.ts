@@ -1,7 +1,9 @@
+import { earliestRateStart } from '@/engine/corpTaxBook/rates';
+
 /**
  * The rule a new dated rate must meet, shared by every place an officer sets one (Settings >
- * Rates, a moon's page): a percentage from 0 to 100, starting today or later, since a rate
- * never reaches back over days already mined (`isRetroactiveRate`).
+ * Rates, a moon's page): a percentage from 0 to 100, starting no more than 30 days back
+ * (`earliestRateStart`). The server also refuses a day an issued Statement already bills.
  */
 export function datedRateReady(pct: string, effectiveFrom: string, today: string): boolean {
   return (
@@ -9,6 +11,6 @@ export function datedRateReady(pct: string, effectiveFrom: string, today: string
     Number(pct) >= 0 &&
     Number(pct) <= 100 &&
     effectiveFrom !== '' &&
-    effectiveFrom >= today
+    effectiveFrom >= earliestRateStart(today)
   );
 }

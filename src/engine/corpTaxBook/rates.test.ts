@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { canOverrideRecordRate, isRetroactiveRate, resolveRate, type TaxRate } from './rates';
+import { canOverrideRecordRate, rateStartRefusal, resolveRate, type TaxRate } from './rates';
 
 const CORP: TaxRate = { scope: 'corp', pct: 10, effectiveFrom: '2026-01-01' };
 const ctx = {
@@ -171,11 +171,18 @@ describe('per-refinery (structure) tier (#4621)', () => {
   });
 });
 
-describe('isRetroactiveRate', () => {
-  it('flags a new rate dated before today', () => {
-    expect(isRetroactiveRate('2026-07-11', '2026-07-12')).toBe(true);
-    expect(isRetroactiveRate('2026-07-12', '2026-07-12')).toBe(false);
-    expect(isRetroactiveRate('2026-08-01', '2026-07-12')).toBe(false);
+describe('rateStartRefusal', () => {
+  it('lets a rate start today, later, or up to 30 days back', () => {
+    expect(rateStartRefusal('2026-07-12', '2026-07-12', null)).toBeNull();
+    expect(rateStartRefusal('2026-08-01', '2026-07-12', null)).toBeNull();
+    expect(rateStartRefusal('2026-06-12', '2026-07-12', null)).toBeNull();
+  });
+  it('refuses a start more than 30 days back', () => {
+    expect(rateStartRefusal('2026-06-11', '2026-07-12', null)).toBe('too-old');
+  });
+  it('refuses a start on or before a day an issued Statement bills', () => {
+    expect(rateStartRefusal('2026-07-05', '2026-07-12', '2026-07-05')).toBe('on-statement');
+    expect(rateStartRefusal('2026-07-06', '2026-07-12', '2026-07-05')).toBeNull();
   });
 });
 

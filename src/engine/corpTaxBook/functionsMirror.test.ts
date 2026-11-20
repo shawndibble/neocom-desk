@@ -65,7 +65,7 @@ import { DEFAULT_OVERDUE_DAYS } from './overdue';
 import { DIVISION_NAME_MAX } from './divisionNames';
 import { mergeObservedRows, observedRowKey } from './observed';
 import { latestRecordedCorp } from './bookDocs';
-import { canOverrideRecordRate, isRetroactiveRate } from './rates';
+import { canOverrideRecordRate, rateStartRefusal } from './rates';
 import {
   DEFAULT_MINIMUM_STATEMENT,
   canRebillFrom,
@@ -136,12 +136,16 @@ describe('functions mirror of the Corp Tax Book engine', () => {
   });
 
   it('agrees on dates and rate rules', () => {
-    expect(mirror.isRetroactiveRate('2026-07-11', '2026-07-12')).toBe(
-      isRetroactiveRate('2026-07-11', '2026-07-12')
-    );
-    expect(mirror.isRetroactiveRate('2026-07-12', '2026-07-12')).toBe(
-      isRetroactiveRate('2026-07-12', '2026-07-12')
-    );
+    for (const [from, last] of [
+      ['2026-06-12', null],
+      ['2026-06-11', null],
+      ['2026-07-12', null],
+      ['2026-07-05', '2026-07-05'],
+      ['2026-07-06', '2026-07-05'],
+    ] as const)
+      expect(mirror.rateStartRefusal(from, '2026-07-12', last)).toBe(
+        rateStartRefusal(from, '2026-07-12', last)
+      );
     const statements = [
       statement('a', '2026-07-01', '2026-07-31', '2026-06-20'),
       statement('b', '2026-08-01', '2026-08-10'),
