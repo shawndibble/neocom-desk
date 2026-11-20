@@ -245,14 +245,16 @@ export function allocateRunningAccount(input: RunningAccountInput): RunningAccou
   let paidThrough: string | null = stored ?? null;
   let gap = false;
   let chargePool = 0;
-  for (const st of state.values()) if (st.pinned) chargePool += st.charge;
+  for (const st of state.values())
+    if (st.pinned) chargePool += Math.min(st.charge, Math.max(0, st.tax));
   for (const d of days) {
     const st = state.get(d.date)!;
     const dayHeld = isHeld(d);
     const shortfall = Math.max(0, st.tax - st.credited);
     // A day recorded paid stays closed, but officers' charges on recorded-paid days are owed, not
     // forgiven: they stay on the oldest such day that ended short, wherever the money fell.
-    const chargeOwed = st.pinned ? Math.min(chargePool, shortfall) : 0;
+    // Not on a held day (not due yet) nor one paid to within tolerance (closed, as an unrecorded day).
+    const chargeOwed = st.pinned && !dayHeld && !isDone(st) ? Math.min(chargePool, shortfall) : 0;
     chargePool -= chargeOwed;
     const settled = st.tax <= 0 || (st.pinned && chargeOwed <= 0) || (!dayHeld && isDone(st));
     const writtenOff = settled ? shortfall : st.pinned ? shortfall - chargeOwed : 0;

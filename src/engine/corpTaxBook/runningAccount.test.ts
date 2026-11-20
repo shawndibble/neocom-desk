@@ -275,6 +275,31 @@ describe('allocateRunningAccount', () => {
     expect(r.balance).toBe(500_000);
   });
 
+  it('does not owe a charge on a recorded-paid day that is paid to within tolerance', () => {
+    const r = allocateRunningAccount({
+      ...base,
+      days: [{ date: '2026-11-01', tax: 10_000_000, charge: 4_000_000 }],
+      storedPaidThrough: '2026-11-01',
+      payments: [payment('p1', 9_970_000, '2026-11-04T10:00:00Z')],
+    });
+    expect(r.byDay.get('2026-11-01')).toMatchObject({ settled: true, remaining: 0 });
+    expect(r.owes).toBeNull();
+  });
+
+  it('does not let a held recorded-paid day use up the pool of an officer charge', () => {
+    const r = allocateRunningAccount({
+      ...base,
+      days: [
+        { date: '2026-11-01', tax: 1_000_000 },
+        { date: '2026-11-02', tax: 1_000_000, charge: 400_000 },
+      ],
+      heldDays: new Set(['2026-11-01']),
+      storedPaidThrough: '2026-11-02',
+      payments: [payment('p1', 600_000, '2026-11-04T10:00:00Z')],
+    });
+    expect(r.byDay.get('2026-11-02')).toMatchObject({ remaining: 400_000, settled: false });
+  });
+
   it('still closes the rest of a day recorded paid when money is taken back from it', () => {
     const r = allocateRunningAccount({
       ...base,
