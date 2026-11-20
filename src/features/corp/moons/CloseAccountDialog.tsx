@@ -20,6 +20,8 @@ import { useBook } from './useBook';
 import { statementRefineryNames, useCorporationName } from './statementMailing';
 
 type Basis = 'consent' | 'no-reply';
+/** What happens to what is still owed: a final late notice goes out, or the tax is waived. */
+type Settle = 'notice' | 'dismiss';
 
 export function CloseAccountDialog({
   open,
@@ -39,13 +41,16 @@ export function CloseAccountDialog({
   const corporationName = useCorporationName();
   const plan = useMemo(() => planCloseAccount(view, miner.id), [view, miner.id]);
   const [reason, setReason] = useState('');
+  const [settle, setSettle] = useState<Settle>('notice');
   const [forfeit, setForfeit] = useState(false);
   const [basis, setBasis] = useState<Basis>('consent');
   const [note, setNote] = useState('');
   const [askedAt, setAskedAt] = useState('');
 
   const today = view.input.now.slice(0, 10);
-  const credit = plan?.creditAfter ?? miner.credit;
+  const waivable = miner.owed + miner.unbilled;
+  const dismissing = settle === 'dismiss' && waivable > 0;
+  const credit = dismissing ? miner.credit : (plan?.creditAfter ?? miner.credit);
   const disposition: CreditDisposition = !forfeit
     ? { kind: 'refund' }
     : {
@@ -61,20 +66,33 @@ export function CloseAccountDialog({
       title={t('corpTaxBook.moons.dialogs.close.title', { name: minerName })}
       confirmLabel={t('corpTaxBook.moons.dialogs.close.confirm')}
       canConfirm={
-        reason.trim().length > 0 && forfeitOk && (!plan?.statement || corporationName !== null)
+        reason.trim().length > 0 &&
+        forfeitOk &&
+        (dismissing || !plan?.statement || corporationName !== null)
       }
       run={async () => {
-        if (plan?.statement && corporationName === null) return;
-        const statement = plan?.statement
-          ? {
-              ...plan.statement,
-              corporationName,
-              minerName,
-              refineryNames: statementRefineryNames(plan.statement, names),
-              // A running account issues only late notices (#6294); its final bill is one.
-              ...(view.input.runningAccountFrom ? { kind: 'notice' as const } : {}),
-            }
-          : undefined;
+        if (!dismissing && plan?.statement && corporationName === null) return;
+        const statement =
+          !dismissing && plan?.statement
+            ? {
+                ...plan.statement,
+                corporationName,
+                minerName,
+                refineryNames: statementRefineryNames(plan.statement, names),
+                // A running account issues only late notices (#6294); its final bill is one.
+                ...(view.input.runningAccountFrom ? { kind: 'notice' as const } : {}),
+              }
+            : undefined;
+        // Waive first, so the close finds nothing to bill; a failed close can be retried.
+        if (dismissing) {
+          await edit({
+            action: 'dismiss',
+            scope: 'miner',
+            targetId: miner.id,
+            reason: reason.trim(),
+            amountIsk: waivable,
+          });
+        }
         await edit({
           action: 'closeAccount',
           minerId: miner.id,
@@ -82,7 +100,7 @@ export function CloseAccountDialog({
           credit: disposition,
           ...(statement ? { statement } : {}),
           // A running account's credit only this client can price (#6294).
-          ...(view.input.runningAccountFrom && plan
+          ...(view.input.runningAccountFrom && plan && !dismissing
             ? { runningCredit: Math.round(plan.creditAfter) }
             : {}),
         });
@@ -90,17 +108,38 @@ export function CloseAccountDialog({
       }}
     >
       <p className="text-text-dim">{t('corpTaxBook.moons.dialogs.close.intro')}</p>
+      {waivable > 0 && (
+        <Label text={t('corpTaxBook.moons.dialogs.close.settleLabel')}>
+          <SegmentedControl
+            label={t('corpTaxBook.moons.dialogs.close.settleLabel')}
+            value={settle}
+            onChange={(v) => setSettle(v as Settle)}
+            options={[
+              { value: 'notice', label: t('corpTaxBook.moons.dialogs.close.settleNotice') },
+              { value: 'dismiss', label: t('corpTaxBook.moons.dialogs.close.settleDismiss') },
+            ]}
+            uppercase={false}
+          />
+        </Label>
+      )}
       <Effect>
-        {plan?.statement
-          ? t('corpTaxBook.moons.dialogs.close.finalStatement', {
-              amount: isk(plan.statement.amount),
-              through: dateWithYear(plan.statement.coversThrough),
-            })
-          : t('corpTaxBook.moons.dialogs.close.noStatement')}{' '}
-        {t('corpTaxBook.moons.dialogs.close.owedAfter', {
-          amount: isk(plan?.owedAfter ?? miner.owed),
-        })}
-        {(plan?.pendingTax ?? 0) > 0 && (
+        {dismissing
+          ? t('corpTaxBook.moons.dialogs.close.dismissing', { amount: isk(waivable) })
+          : plan?.statement
+            ? t('corpTaxBook.moons.dialogs.close.finalStatement', {
+                amount: isk(plan.statement.amount),
+                through: dateWithYear(plan.statement.coversThrough),
+              })
+            : t('corpTaxBook.moons.dialogs.close.noStatement')}
+        {!dismissing && (
+          <>
+            {' '}
+            {t('corpTaxBook.moons.dialogs.close.owedAfter', {
+              amount: isk(plan?.owedAfter ?? miner.owed),
+            })}
+          </>
+        )}
+        {!dismissing && (plan?.pendingTax ?? 0) > 0 && (
           <>
             {' '}
             {t('corpTaxBook.moons.dialogs.close.pending', { amount: isk(plan?.pendingTax ?? 0) })}
@@ -174,7 +213,9 @@ export function CloseAccountDialog({
       <Label text={t('corpTaxBook.moons.dialogs.close.reason')}>
         <TextArea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
       </Label>
-      <p className="text-xs text-text-dim">{t('corpTaxBook.moons.dialogs.close.sendHint')}</p>
+      {!dismissing && (
+        <p className="text-xs text-text-dim">{t('corpTaxBook.moons.dialogs.close.sendHint')}</p>
+      )}
     </DialogShell>
   );
 }

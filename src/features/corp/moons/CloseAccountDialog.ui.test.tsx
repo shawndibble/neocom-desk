@@ -109,9 +109,11 @@ beforeEach(() => {
 });
 
 describe('CloseAccountDialog', () => {
-  it('shows the final Statement and closes the account with the reason', async () => {
+  it('shows the final late notice and closes the account with the reason', async () => {
     const { onClose } = renderDialog();
-    expect(screen.getByText(/Final Statement: .* through 17 Sep( 2026)?\./)).toBeInTheDocument();
+    expect(
+      screen.getByText(/A final late notice lists .* through 17 Sep( 2026)?\./)
+    ).toBeInTheDocument();
     const confirm = screen.getByRole('button', { name: 'Close account' });
     expect(confirm).toBeDisabled();
     await userEvent.type(screen.getByLabelText(/Reason/), 'Left the area');
@@ -126,6 +128,23 @@ describe('CloseAccountDialog', () => {
       statement: { id: 'final_solo:2', minerId: 'solo:2', amount: 200_000, characterIds: [2] },
     });
     await vi.waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+
+  it('can dismiss the tax instead of sending a final notice', async () => {
+    renderDialog();
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss the tax' }));
+    await userEvent.type(screen.getByLabelText(/Reason/), 'Left the area');
+    await userEvent.click(screen.getByRole('button', { name: 'Close account' }));
+    await vi.waitFor(() => expect(editBook).toHaveBeenCalledTimes(2));
+    expect(editBook.mock.calls[0][2]).toMatchObject({
+      action: 'dismiss',
+      scope: 'miner',
+      targetId: 'solo:2',
+      reason: 'Left the area',
+    });
+    const close = editBook.mock.calls[1][2];
+    expect(close).toMatchObject({ action: 'closeAccount', minerId: 'solo:2' });
+    expect(close).not.toHaveProperty('statement');
   });
 
   it('offers a forfeit only when there is credit, and holds it until the basis is valid', async () => {
