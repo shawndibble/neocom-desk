@@ -190,7 +190,7 @@ describe('MailFormatBar', () => {
     await user.click(screen.getByRole('button', { name: 'Link' }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByLabelText('Text')).toBeDisabled();
-    expect(within(dialog).getByText(/spans paragraphs/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/covers several paragraphs/)).toBeInTheDocument();
     await user.type(within(dialog).getByLabelText('Web address'), 'example.com{Enter}');
     expect(c.setLink).toHaveBeenCalledWith(expect.objectContaining({ markOnly: true }), {
       text: 'https://example.com',

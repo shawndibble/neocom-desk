@@ -91,7 +91,7 @@ describe('OpenInEveButton', () => {
     // wait for the disabled state, not just the button (it flaked on a busy CI runner).
     const button = await screen.findByRole('button', { name: 'Open in EVE' });
     await vi.waitFor(() => expect(button).toHaveAttribute('aria-disabled', 'true'));
-    expect(button).toHaveAccessibleDescription(/Pilot hasn't granted Open in EVE\./);
+    expect(button).toHaveAccessibleDescription(/Pilot hasn't allowed Open in EVE\./);
     await userEvent.click(button);
     expect(info).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: 'Switch to Alt Pilot' }));
@@ -180,7 +180,7 @@ describe('OpenInEveButton from a fixed Character', () => {
     const button = await screen.findByRole('button', { name: 'Open in EVE' });
     // Enabled until the stored grants load, as above.
     await vi.waitFor(() => expect(button).toHaveAttribute('aria-disabled', 'true'));
-    expect(await screen.findByText(/Payer hasn't granted Open in EVE/)).toBeInTheDocument();
+    expect(await screen.findByText(/Payer hasn't allowed Open in EVE/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Switch to/ })).not.toBeInTheDocument();
     await userEvent.click(button);
     expect(info).not.toHaveBeenCalled();

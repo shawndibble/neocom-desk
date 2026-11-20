@@ -132,8 +132,8 @@ describe('PlanMap: the picks note says what is shared with Plan', () => {
   });
 
   it.each([
-    ['isk', 'ranked by most ISK'],
-    ['haul', 'ranked by least hauling'],
+    ['isk', 'Ranked by most ISK'],
+    ['haul', 'Ranked by least hauling'],
   ] as const)('names the %s preference', async (preference, text) => {
     const user = userEvent.setup({ delay: null });
     await usePlanPreference.getState().setValue(preference);

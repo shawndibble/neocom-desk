@@ -69,9 +69,9 @@ describe('PriceMark', () => {
     const { container, rerender } = render(<PriceMark state="live" />);
     expect(container).toBeEmptyDOMElement();
     rerender(<PriceMark state="cached" />);
-    expect(screen.getByText(/Cached price/)).toBeInTheDocument();
+    expect(screen.getByText(/Saved price/)).toBeInTheDocument();
     rerender(<PriceMark state="cached" silent />);
-    expect(screen.queryByText(/Cached price/)).toBeNull();
+    expect(screen.queryByText(/Saved price/)).toBeNull();
     rerender(<PriceMark state="failed" />);
     expect(screen.getByText(/Fuzzwork price/)).toBeInTheDocument();
   });

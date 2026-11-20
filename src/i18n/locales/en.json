@@ -4592,7 +4592,7 @@
   },
   "login": {
     "button": "Log in with EVE Online",
-    "permissionsHint": "Logging in lets Neocom Desk read the data below. Open a group to see each permission and why it is needed.",
+    "permissionsHint": "Logging in lets it read the data below, grouped by area. Open an area to see each permission and what it is used for.",
     "header": {
       "nav": "Page sections",
       "answers": "Answers",
@@ -4604,8 +4604,8 @@
       "github": "View the source on GitHub"
     },
     "eyebrow": "Free · Open source · Runs on your device",
-    "heading": "Answers, not raw data.",
-    "previewLabel": "Example of the logged-in view",
+    "heading": "Answers, not API dumps.",
+    "previewLabel": "Example — logged-in view",
     "previewCorp": "Deep Space Transport",
     "demo": {
       "alerts": {
@@ -4634,30 +4634,30 @@
     },
     "answersHeading": "The questions it exists to answer",
     "answersPhoneEyebrow": "On your phone",
-    "answersLead": "Each picture is a real screen filled with sample data. Select one to enlarge it.",
+    "answersLead": "Each of these is a screen from the app, filled with sample data. Select a picture to enlarge it.",
     "answers": {
       "orders": {
         "eyebrow": "Orders",
         "question": "Which order is quietly losing ISK?",
-        "answer": "Open Orders sorts every order by its biggest problem, worst first, across all your characters. Open one to see what each way out would net after fees."
+        "answer": "Open Orders files each order under the worst thing wrong with it, worst first, across every character. Open one to see what each exit would net after fees."
       },
       "build": {
         "eyebrow": "Industry",
         "question": "Is this blueprint worth building?",
-        "answer": "A Build Plan prices materials, job cost and taxes at live hub prices. It then says whether building beats buying and still makes a profit."
+        "answer": "A Build Plan costs materials, job cost and taxes at live hub prices, then says whether building beats buying and still profits."
       },
       "journal": {
         "eyebrow": "Wallet",
         "question": "Where did this ISK come from?",
-        "answer": "Each Wallet journal line links to the contract or item behind it, so you can trace a payment back to its source."
+        "answer": "Each Wallet journal line links to the contract or item behind it, so a payment can be followed back to its source."
       },
       "marketJumps": {
         "question": "What is for sale within 15 jumps?",
-        "answer": "Market lists every order for an item and how many jumps away it is from the system you pick, so you know what a trip is worth before you go."
+        "answer": "Market shows every order for an item with its jump count from the system you pick, so you can see what a trip is worth before you make it."
       },
       "routeSafety": {
         "question": "Is this route safe right now?",
-        "answer": "Route Safety checks the route between two systems and flags the gank chokepoints on the way."
+        "answer": "Route Safety checks the route between two systems and flags the chokepoints on the way."
       },
       "pilot": {
         "question": "Who is this pilot?",
@@ -4666,7 +4666,7 @@
       "flyNext": {
         "eyebrow": "Ships",
         "question": "Which ship can I fly next?",
-        "answer": "The Ship Tree marks every hull “can fly” or shows the training time you still need, along with its Mastery tiers."
+        "answer": "The Ship Tree marks every hull “can fly” or the training time it still needs, with its Mastery tiers and what you still need to train."
       },
       "fitting": {
         "eyebrow": "Fitting",
@@ -4676,12 +4676,12 @@
       "survey": {
         "eyebrow": "Mining",
         "question": "When is this belt mined out?",
-        "answer": "Survey tracks your scans of a belt: how much is mined, a chart of it, and when it will run out."
+        "answer": "Survey tracks a belt’s scans: how much is mined, a chart of it, and when it will finish."
       },
       "courier": {
         "eyebrow": "Contracts",
         "question": "Which haul pays best per jump?",
-        "answer": "The Courier board ranks every public courier contract by ISK per jump on your own route preference, and flags any that pays far above the usual rate."
+        "answer": "The Courier board ranks every public courier contract by ISK per jump on your own route preference, and flags any that pays far above the going rate."
       },
       "assets": {
         "eyebrow": "Assets",
@@ -4772,7 +4772,7 @@
         "tab": "Industry",
         "costs": "A Build Plan costs materials, job cost and taxes at live hub prices.",
         "verdict": "It says whether building beats buying, and whether it still profits after fees.",
-        "setup": "Search for a blueprint and pick a facility preset to set the assumptions. Sub-builds roll up into the plan.",
+        "setup": "Blueprint search and facility presets set the assumptions; sub-builds roll up into the plan.",
         "jobs": "Your active industry jobs sit on the same page."
       },
       "market": {
@@ -4780,7 +4780,7 @@
         "orders": "Open Orders files each order under the worst thing wrong with it, worst first, across every character.",
         "market": "Market shows every order for an item with its jump count from the system you pick, on a phone too.",
         "wallet": "Each Wallet journal line links to the contract or item behind it.",
-        "assets": "Assets finds any item and opens up stations, ships and containers."
+        "assets": "Assets finds a thing and drills into stations, ships and containers."
       },
       "skills": {
         "tab": "Skills",
@@ -4793,8 +4793,8 @@
         "tab": "Planetary & mining",
         "colonies": "Colonies leads with the next thing to do and ranks every colony by what needs you first.",
         "logIn": "Log in next says when you need to be back, so one login covers everything due.",
-        "plan": "Plan sets daily goals for your colonies, then lists the shortfalls and the changes that close them.",
-        "mining": "Mining tracks what you mined and what it is worth. The Tax ledger shows who you owe rent to and what is paid. Survey says when a belt will be mined out."
+        "plan": "Plan sets goals per day over your colonies and lists the shortfalls and the changes that close them.",
+        "mining": "Mining tracks what you mined and what it is worth; the Tax ledger shows who you owe rent to and what is paid, and Survey says when a belt will be mined out."
       },
       "corp": {
         "tab": "Corporation",
@@ -4806,16 +4806,16 @@
       "comms": {
         "tab": "Mail",
         "mail": "Mail is a two-pane client: read what came in, then reply or forward.",
-        "calendar": "Calendar puts every deadline a character has in one list, soonest first, beside a day-by-day calendar. It also sends your reply to an invite.",
+        "calendar": "Calendar lists every clock a character can read in one deadline-ordered list beside a map of days, and sends your response to an invite.",
         "contracts": "Contracts searches public offers for an item, lists courier jobs and keeps your history.",
-        "contacts": "Contacts shows your in-game contact list, compares your characters’ standings, and shows the NPC standings that set broker fees."
+        "contacts": "Contacts mirrors your in-game contact list, compares your characters’ standings, and shows the NPC standings that set broker fees."
       },
       "alerts": {
         "tab": "Alerts",
         "bell": "The bell collects what fired: undercut orders, finished jobs and skills, extractors running out, new mail.",
         "record": "Alerts keeps the record of everything that fired, for every character, grouped by type.",
-        "choose": "Notifications lets you pick which events alert you, for which character, as a device pop-up or in the app’s list.",
-        "closed": "Alerts when closed is off until you turn it on for a character. It lets alerts reach you when the app is shut."
+        "choose": "Notifications lets you pick which events fire, for which character, as a device pop-up or in the in-app list.",
+        "closed": "Alerts when closed is opt-in per character, and is how an alert reaches you with the app shut."
       }
     },
     "features": {
@@ -4884,15 +4884,15 @@
     "trust": {
       "readOnly": {
         "name": "Six writes, and nothing else",
-        "desc": "Opening a mail marks it as read in EVE. Answering a calendar invite sends your response. A reply or forward you write, a Community invite you send by mail, and the result of an SRP claim you approve or reject all go out through your account. Saving a Fitting to EVE recreates it on the game's side. Setting a route's waypoints replaces your autopilot waypoints in the client. Open in EVE opens a window in the client. Nothing else in the app writes to EVE."
+        "desc": "Opening a mail flags it as read in EVE, answering a calendar invite sends your response, a reply or forward you write, a Community invite you send by mail, or the result of an SRP claim you approve or reject, goes out through your account, saving a Fitting to EVE recreates it on the game's side, setting a route's waypoints replaces your autopilot waypoints in the client, and Open in EVE opens a window in the client. Nothing else in the app writes to EVE."
       },
       "token": {
         "name": "Your login stays on this device",
-        "desc": "Your login's refresh token lives in this device's own storage, never on a server and never in a log. Logging in to sync sends only a short-lived access token, never the refresh token. Remove a character and its token goes with it. There are two opt-in exceptions. If you turn on Alerts when closed for a character, our server keeps a separate, encrypted token that can read only that character's notifications and, if you add them, its location (nearby alerts) and its mail headers (new-mail alerts). Turn it off, or remove the character, and it is deleted. If a CEO, Director or Accountant turns on Automatic sync for a corporation's Corp Tax Book, our server keeps a separate, encrypted token for that officer's character, limited to the book's reads, until they or the CEO turn it off."
+        "desc": "Your login's refresh token lives in this device's own storage — never on a server, never in a log. Logging in to sync exchanges one short-lived access token and never the refresh token. Remove a character and it goes with it. One opt-in exception: if you turn on Alerts when closed for a character, our server keeps a separate, encrypted token that can read only that character's notifications and, if you add them, its location (nearby alerts) and its mail headers (new-mail alerts). Turn it off, or remove the character, and it is deleted. The other: if a CEO, Director or Accountant turns on Automatic sync for a corporation's Corp Tax Book, our server keeps a separate, encrypted token for that officer's character, limited to the book's reads, until they or the CEO turn it off."
       },
       "offline": {
         "name": "Your data stays when the signal goes",
-        "desc": "Install it like an app. Your characters and skill plans open from this device without a connection, marked as saved copies, and your plans sync across your devices. Live market and killboard data need a connection."
+        "desc": "Install it like an app. Your characters and skill plans open from this device without a connection, marked as cached, and your plans sync across your devices. Live market and killboard data need a connection."
       },
       "openSource": {
         "name": "Free, and open to read",
@@ -4912,8 +4912,8 @@
         "structures": "Structures",
         "write": "Write to EVE"
       },
-      "planetsNote": "EVE's consent screen words the planetary permission as \"manage your planetary installations\". Neocom Desk only reads that data and never changes it.",
-      "oneLoginNote": "Logging in asks for every read above at once, so no page sends you back to EVE's login later. Corporation data is read only as far as your in-game corporation roles allow. Want less? Log in with custom permissions and untick what you don't want.",
+      "planetsNote": "EVE's consent screen lists the planetary scope as \"manage your planetary installations\". Neocom Desk only reads that data and never writes to it.",
+      "oneLoginNote": "Logging in asks for every read above at once, so no page sends you back to EVE's login later. Corporation data is read only as far as your in-game corporation roles allow. Want less? Log in with custom permissions and untick it.",
       "revoke": "You can take access back at any time:",
       "revokeLink": "EVE's authorized apps page"
     },
@@ -4927,7 +4927,7 @@
       "readMore": "Read more in the privacy policy",
       "writes": {
         "q": "Can it move ISK or change anything in EVE?",
-        "a": "It cannot move ISK. It writes to EVE only when you act. Opening a mail marks it read. Answering a calendar invite sends your reply. Mail sends what you wrote through your account, and so do Community invite mails and Pledge mails once you press Send, and the result mail an SRP officer's Approve or Reject sends the pilot. Saving a Fitting to EVE creates or replaces it there. Route Safety's Set waypoints in game replaces your autopilot waypoints. Open in EVE opens a window in your client. Nothing else is ever written."
+        "a": "It cannot move ISK. It writes to EVE only when you act: opening a mail marks it read, answering a calendar invite sends your reply, Mail sends what you wrote through your account (so do Community invite mails and Pledge mails, once you press Send, and the result mail an SRP officer's Approve or Reject sends the pilot), saving a Fitting to EVE creates or replaces it there, Route Safety's Set waypoints in game replaces your autopilot waypoints, and Open in EVE opens a window in your client. Nothing else is ever written."
       },
       "free": {
         "q": "Is it free?",
@@ -4935,7 +4935,7 @@
       },
       "stores": {
         "q": "What does it store, and where?",
-        "a": "What it reads from EVE stays on this device. What you make in the app, such as Skill Plans and Build Plans, syncs between your devices under your character's EVE ID, never a name or an email address. The exceptions: alerts you have seen, push and Alerts when closed if you turn them on (your login token stays on this device, apart from Alerts when closed and a Corp Tax Book's Automatic sync), anything you choose to share with a Community, Share Links you create (readable by anyone with the link, for 7 days), and your corporation's own records: SRP Claims and its Corp Tax Book, which its officers can read."
+        "a": "What it reads from EVE stays on this device. What you make in the app, such as Skill Plans and Build Plans, syncs between your devices filed under your character's EVE ID, never a name or an email address. The exceptions: alerts you have seen, push and Alerts when closed if you turn them on (your login token stays on this device, apart from Alerts when closed and a Corp Tax Book's Automatic sync), anything you choose to share with a Community, Share Links you create (readable by anyone with the link, for 7 days), and your corporation's own records: SRP Claims and its Corp Tax Book, which its officers can read."
       },
       "delete": {
         "q": "Can I leave and delete my data?",
@@ -4951,7 +4951,7 @@
       }
     },
     "bottomCtaHeading": "Undock into your dashboard.",
-    "bottomCtaBody": "One EVE login to start. Add as many characters as you fly, and they all sit side by side.",
+    "bottomCtaBody": "One EVE SSO login to start. Add as many characters as you fly — they all sit side by side.",
     "footerOpenSource": "Free & open source",
     "footerPrivacy": "Privacy policy",
     "footerDataCredit": "Data credit",
@@ -15724,6 +15724,7 @@
     "notGrantedHint": "{{roles}} If that's you, grant corporation access for this character:",
     "notGrantedAction": "Grant corporation access",
     "npcCorporation": "You're in {{corporation}}, an NPC corporation. These pages are for officers (Director, Accountant…) of a player-run corporation.",
+    "npcCorporationUnnamed": "You're in an NPC corporation. These pages are for officers (Director, Accountant…) of a player-run corporation.",
     "roleLine": "Corp pages are for officers: Director, Accountant, Station Manager and others.",
     "noAccessTitle": "No corporation access",
     "noAccessHint": "Your corporation roles in game don't open any corp pages here. Only the game can change roles.",
@@ -20369,6 +20370,7 @@
     },
     "npcTitle": "No ship replacement (SRP) in an NPC corporation",
     "npcCorporation": "{{corporation}} is an NPC corporation. Ship replacement (SRP) is run by player corporations to pay back ships lost on corp operations.",
+    "npcCorporationUnnamed": "You're in an NPC corporation. Ship replacement (SRP) is run by player corporations to pay back ships lost on corp operations.",
     "loadFailed": "Couldn't load SRP",
     "file": {
       "title": "File a claim",

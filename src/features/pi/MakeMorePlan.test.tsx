@@ -464,7 +464,9 @@ describe('MakeMorePlan', () => {
     mockState = ready(fixtureAdvice, 'Amarr');
     renderPlan();
     await userEvent.setup().hover(screen.getByRole('button', { name: 'About these figures' }));
-    expect(await screen.findByText(/at Amarr prices\. Estimates\./)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/using Amarr prices\. These are estimates\./)
+    ).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent(/Jita/);
   });
 
@@ -475,7 +477,9 @@ describe('MakeMorePlan', () => {
     });
     renderPlan();
     await userEvent.setup().hover(screen.getByRole('button', { name: 'About these figures' }));
-    expect(await screen.findByText(/at your corp buyback rate\. Estimates\./)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/using your corp buyback rate\. These are estimates\./)
+    ).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent(/Jita/);
   });
 

@@ -431,7 +431,7 @@ describe('BlueprintAcquisitionModal — Market', () => {
     await waitFor(() => expect(mockedGetOrderBook).toHaveBeenCalledWith(GPMR, ASTERO_BP));
     expect(mockedGetOrderBook).not.toHaveBeenCalledWith(THE_FORGE, ASTERO_BP);
     expect(
-      await within(section('Market (incl. NPC-seeded)')).findByText(/Reading from GPMR-01/)
+      await within(section('Market (incl. NPC-seeded)')).findByText(/Showing GPMR-01/)
     ).toBeInTheDocument();
   });
 
@@ -461,7 +461,7 @@ describe('BlueprintAcquisitionModal — LP Store', () => {
     renderModal();
     const lp = section('LP Store');
     expect(
-      await within(lp).findByText(/No LP Store your characters have LP with/)
+      await within(lp).findByText(/No LP Store you have LP with offers this blueprint/)
     ).toBeInTheDocument();
     expect(within(lp).queryByRole('textbox', { name: /Your LP value/ })).not.toBeInTheDocument();
     expect(within(lp).queryByText(/Prices an LP Store pick/)).not.toBeInTheDocument();

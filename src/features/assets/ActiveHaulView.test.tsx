@@ -139,7 +139,7 @@ describe('ActiveHaulView', () => {
       },
     });
     expect(
-      screen.getByText(/Rens VI \(Alice\): 4 m³ has units worth more than your ISK limit/)
+      screen.getByText(/Rens VI \(Alice\): 4 m³ has single units worth more than your ISK limit/)
     ).toBeTruthy();
   });
 

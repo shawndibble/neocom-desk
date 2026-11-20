@@ -36,7 +36,7 @@ for (const [label, viewport] of VIEWPORTS) {
     await expect(page.getByRole('group', { name: /^Planet map|^Planets$/ }).first()).toBeVisible();
     // The notice itself names ISK; nothing else may.
     await expect(
-      page.getByText(/\bISK\b/).filter({ hasNotText: 'hidden until they load' })
+      page.getByText(/\bISK\b/).filter({ hasNotText: 'stay hidden until they do' })
     ).toHaveCount(0);
     await shot(page, `prices-down-map-${label}`);
   });
