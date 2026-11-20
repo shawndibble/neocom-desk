@@ -27,6 +27,7 @@ import {
 } from './corpTaxBookExtractionStamp.js';
 import { backfillObservedUpdatedAt } from './corpTaxBookObservedBackfill.js';
 import { cacheOfficer, readOfficerCache, revokeOfficer } from './officerCache.js';
+import { VERIFY_TOKEN_BYTES } from './verifyToken.js';
 import {
   ACCESS_TTL_MS,
   ADJUSTMENTS,
@@ -2453,7 +2454,7 @@ async function issueStatementDoc(
   const ref = col(c, STATEMENTS).doc(statement.id);
   if ((await tx.get(ref)).exists)
     fail('already-exists', 'An issued Statement never changes', 'statement-exists');
-  const token = randomBytes(32).toString('base64url');
+  const token = randomBytes(VERIFY_TOKEN_BYTES).toString('base64url');
   tx.create(ref, {
     ...statement,
     uids: readers.map((x) => `char:${x}`),

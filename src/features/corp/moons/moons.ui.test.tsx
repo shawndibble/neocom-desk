@@ -430,16 +430,39 @@ describe('StatementRun (late notices, #6294)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Send 2 late notices' }));
     await waitFor(() => expect(enqueueStatements).toHaveBeenCalledTimes(1));
     const { statements } = enqueueStatements.mock.calls[0][0] as {
-      statements: { edited?: { subject: string; body: string; previewUrl: string } }[];
+      statements: { edited?: { subject: string; body: string } }[];
     };
     const edited = statements.filter((s) => s.edited);
     expect(edited).toHaveLength(1);
     expect(edited[0].edited).toEqual({
       subject: 'Your moon tax is late',
       body: `Please pay today. ${link}`,
-      previewUrl: `${window.location.origin}/corp-tax-book/verify/…`,
     });
-    expect(link).toContain(edited[0].edited!.previewUrl);
+    expect(link).toContain(`${window.location.origin}/corp-tax-book/verify/…`);
+  });
+
+  it('edits the mail in the Preview mail dialog below desktop, and sends it', async () => {
+    stubViewport(BELOW_DESKTOP_QUERY);
+    renderBook(<StatementRun />, behind);
+    await userEvent.click(screen.getByRole('button', { name: 'Preview mail' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Edit mail' }));
+    const subject = within(dialog).getByRole('textbox', { name: 'Subject' });
+    await userEvent.clear(subject);
+    await userEvent.type(subject, 'Late tax');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save mail' }));
+    expect(within(dialog).getByText('Edited')).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    expect(screen.getByText('Edited mail')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Send 2 late notices' }));
+    await waitFor(() => expect(enqueueStatements).toHaveBeenCalledTimes(1));
+    const { statements } = enqueueStatements.mock.calls[0][0] as {
+      statements: { edited?: { subject: string } }[];
+    };
+    expect(statements.map((s) => s.edited?.subject).filter(Boolean)).toEqual(['Late tax']);
   });
 
   it('keeps the standard mail on Cancel, and goes back to it on Use the standard mail', async () => {

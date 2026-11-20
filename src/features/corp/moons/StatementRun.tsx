@@ -16,7 +16,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { mailableAfterClose } from '@/engine/corpTaxBook/closeAccount';
-import { PREVIEW_VERIFY_TOKEN, composeStatementMail } from '@/engine/corpTaxBook/statementMail';
+import { composeStatementMail, previewVerifyUrl } from '@/engine/corpTaxBook/statementMail';
 import type { Statement } from '@/engine/corpTaxBook/statements';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { DAY_MS } from '@/lib/age';
@@ -112,10 +112,11 @@ export function StatementRun() {
   const queue = useLiveQuery(() => listQueue(corporationId), [corporationId], []);
   /** The officer's own ticks; a Miner they have not touched follows the default (`recentlyMailed`). */
   const [ticks, setTicks] = useState<ReadonlyMap<string, boolean>>(new Map());
-  /** The officer's own wording for a mail, by preview key: what the queue sends instead. */
-  const [edits, setEdits] = useState<ReadonlyMap<string, MailEdit>>(new Map());
-  // The verify link exists once the Statement is issued; the queue swaps this one for it.
-  const previewUrl = `${window.location.origin}/corp-tax-book/verify/${PREVIEW_VERIFY_TOKEN}`;
+  /**
+   * The officer's own wording for a mail, by preview key: what the queue sends instead. `basis`
+   * is the standard body it was edited from, so a later change to the figures is flagged.
+   */
+  const [edits, setEdits] = useState<ReadonlyMap<string, MailEdit & { basis: string }>>(new Map());
 
   const notices = useMemo(
     () => plannedNotices(view, settings.noticeRules),
@@ -196,7 +197,8 @@ export function StatementRun() {
   const chosen = new Set(previews.filter(isChosen).map((p) => p.key));
   const total = chosen.size;
 
-  const previewFor = (item: (typeof previews)[number], corpName: string): MailPreviewContent => {
+  /** The mail the run would send unedited, its verify link the preview one (`previewVerifyUrl`). */
+  const standardMail = (item: (typeof previews)[number], corpName: string): MailPreviewContent => {
     const target = mailTarget(ctx, item.statement, minerRow(item.minerId), {
       amountDue: item.amountDue,
       carried: item.carried,
@@ -206,20 +208,35 @@ export function StatementRun() {
       kind: 'statement',
       corporationName: corpName,
       refineryName: (id) => names.refinery(id),
-      verifyUrl: previewUrl,
+      verifyUrl: previewVerifyUrl(window.location.origin),
     });
-    const edit = edits.get(item.key);
     return {
       to: target.recipientName,
-      subject: edit?.subject ?? mail.subject,
-      body: edit?.body ?? mail.body,
-      summarised: !edit && mail.detail !== 'lines',
+      subject: mail.subject,
+      body: mail.body,
+      summarised: mail.detail !== 'lines',
     };
+  };
+  /** The officer's edit was made from a standard mail that has since changed. */
+  const isStale = (item: (typeof previews)[number]): boolean => {
+    const edit = edits.get(item.key);
+    return (
+      edit !== undefined &&
+      corporationName !== null &&
+      standardMail(item, corporationName).body !== edit.basis
+    );
+  };
+  const previewFor = (item: (typeof previews)[number], corpName: string): MailPreviewContent => {
+    const standard = standardMail(item, corpName);
+    const edit = edits.get(item.key);
+    return edit
+      ? { to: standard.to, subject: edit.subject, body: edit.body, summarised: false }
+      : standard;
   };
   /** A mail's target for the queue, carrying the officer's edit when there is one. */
   const withEdit = (key: string, target: ReturnType<typeof mailTarget>) => {
     const edit = edits.get(key);
-    return edit ? { ...target, edited: { ...edit, previewUrl } } : target;
+    return edit ? { ...target, edited: { subject: edit.subject, body: edit.body } } : target;
   };
   const previewItem = previews.find((p) => p.key === previewId) ?? previews[0];
   const showInline = inline && previewItem !== undefined && step !== 'done';
@@ -241,6 +258,8 @@ export function StatementRun() {
     // A failure part-way keeps what was issued (and queued); the next run plans the
     // remaining notices and offers any Statement whose mail never left.
     const sent = { queued: 0, skipped: 0, missingLink: 0 };
+    /** Each notice issued this run: its preview key, then the key of the Statement it became. */
+    const issued: { from: string; to: string }[] = [];
     const queueTargets = async (targets: ReturnType<typeof mailTarget>[]) => {
       if (targets.length === 0) return;
       // Inside `try`: a chunk that will not load is an error shown, not a run stuck busy.
@@ -287,6 +306,7 @@ export function StatementRun() {
             refineryNames: statementRefineryNames(n.statement, names),
           },
         });
+        issued.push({ from: `notice:${n.minerId}`, to: `statement:${n.statement.id}` });
         noticeTargets.push(
           withEdit(
             `notice:${n.minerId}`,
@@ -299,6 +319,17 @@ export function StatementRun() {
       setEdits(new Map());
       setStep('done');
     } catch (e) {
+      // A notice issued before the failure comes back as an unmailed Statement: its edit follows.
+      setEdits((current) => {
+        const next = new Map(current);
+        for (const { from, to } of issued) {
+          const edit = next.get(from);
+          if (!edit) continue;
+          next.delete(from);
+          next.set(to, edit);
+        }
+        return next;
+      });
       setError(editErrorMessage(e));
     } finally {
       reload();
@@ -315,8 +346,16 @@ export function StatementRun() {
       key={previewItem.key}
       mail={mail}
       edited={edits.has(previewItem.key)}
-      previewUrl={previewUrl}
-      onSave={(edit) => setEdits((current) => new Map(current).set(previewItem.key, edit))}
+      stale={isStale(previewItem)}
+      onSave={(edit) =>
+        corporationName !== null &&
+        setEdits((current) =>
+          new Map(current).set(previewItem.key, {
+            ...edit,
+            basis: standardMail(previewItem, corporationName).body,
+          })
+        )
+      }
       onReset={() =>
         setEdits((current) => {
           const next = new Map(current);
@@ -437,8 +476,17 @@ export function StatementRun() {
                             {names.character(minerRow(p.minerId).mainCharacterId)}
                             <span className="text-text-dim"> · {isk(p.amountDue)}</span>
                             {edits.has(p.key) && (
-                              <span className="block text-xs text-accent">
-                                {t('corpTaxBook.moons.run.edited')}
+                              <span
+                                className={cx(
+                                  'block text-xs',
+                                  isStale(p) ? 'text-warning' : 'text-accent'
+                                )}
+                              >
+                                {t(
+                                  isStale(p)
+                                    ? 'corpTaxBook.moons.run.editedStale'
+                                    : 'corpTaxBook.moons.run.edited'
+                                )}
                               </span>
                             )}
                             {at !== null && recentlyMailed(p.minerId) && (

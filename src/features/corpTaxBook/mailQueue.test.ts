@@ -17,7 +17,6 @@ const editCorpTaxBook = vi.fn();
 vi.mock('@/features/corp/taxBook/bookClient', () => ({
   readVerifyTokens: (...a: unknown[]) => readVerifyTokens(...a),
   editBook: (...a: unknown[]) => editCorpTaxBook(...a),
-  verifyUrl: (origin: string, token: string) => `${origin}/v/${token}`,
 }));
 
 function statement(n: number): StatementToMail {
@@ -72,7 +71,7 @@ describe('enqueueStatements', () => {
       ['s1', 101, 'waiting', 'statement'],
       ['s2', 102, 'waiting', 'statement'],
     ]);
-    expect(rows[0].body).toContain('https://app.test/v/tok1');
+    expect(rows[0].body).toContain('https://app.test/corp-tax-book/verify/tok1');
     expect(rows[0].batchId).toBe(rows[1].batchId);
   });
 
@@ -87,7 +86,7 @@ describe('enqueueStatements', () => {
 
   it('sends an officer-edited subject and body, with the real verify link filled in', async () => {
     readVerifyTokens.mockResolvedValue(new Map([['s1', 'tok1']]));
-    const preview = 'https://app.test/v/…';
+    const preview = 'https://app.test/corp-tax-book/verify/…';
     await enqueueStatements({
       ...base,
       statements: [
@@ -96,7 +95,6 @@ describe('enqueueStatements', () => {
           edited: {
             subject: 'Please pay your moon tax',
             body: `Hi, you are late.\n<a href="${preview}">${preview}</a>`,
-            previewUrl: preview,
           },
         },
       ],
@@ -104,7 +102,7 @@ describe('enqueueStatements', () => {
     const [row] = await db.corpMailQueue.toArray();
     expect(row.subject).toBe('Please pay your moon tax');
     expect(row.body).toBe(
-      'Hi, you are late.\n<a href="https://app.test/v/tok1">https://app.test/v/tok1</a>'
+      'Hi, you are late.\n<a href="https://app.test/corp-tax-book/verify/tok1">https://app.test/corp-tax-book/verify/tok1</a>'
     );
   });
 

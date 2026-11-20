@@ -10,13 +10,17 @@
 import {
   EVE_MARKUP_LIMIT,
   markupBr as br,
+  markupPlainText,
   markupText as text,
+  parseEveMarkup,
   serializeEveMarkup,
   type MarkupNode,
 } from '../mail/eveMarkup';
+import { MAX_SUBJECT_LENGTH } from '../mail/mailCompose';
 import { formatIsk } from '../../lib/isk';
 import type { MailKind } from './mailQueue';
 import type { StatementLine } from './statements';
+import { VERIFY_TOKEN_LENGTH } from './verifyToken';
 
 export interface StatementMailInput {
   kind: MailKind;
@@ -230,28 +234,57 @@ function buildNotice(input: StatementMailInput, notice: NoticeMail, detail: Mail
   };
 }
 
+/** A Statement's verify page, where a mail's link takes the Miner. */
+export function verifyUrl(origin: string, token: string): string {
+  return `${origin}/corp-tax-book/verify/${token}`;
+}
+
 /**
  * The token a preview's verify link carries before the Statement is issued and its real link
  * exists: "Preview mail" shows `…/verify/…`.
  */
 export const PREVIEW_VERIFY_TOKEN = '…';
 
+/** The verify link a preview shows in place of the real one. */
+export const previewVerifyUrl = (origin: string): string => verifyUrl(origin, PREVIEW_VERIFY_TOKEN);
+
 /**
  * A mail the officer edited in its preview, with the preview's verify link swapped for the real
  * one: the href and the link text alike, and the percent-encoded form an editor may write.
  */
-export function fillVerifyLink(body: string, previewUrl: string, url: string): string {
-  return body.replaceAll(previewUrl, url).replaceAll(encodeURI(previewUrl), url);
+export function fillVerifyLink(body: string, origin: string, url: string): string {
+  const preview = previewVerifyUrl(origin);
+  return body.replaceAll(preview, url).replaceAll(encodeURI(preview), url);
 }
-
-/** A verify token's length: 32 random bytes as base64url (`functions/src/corpTaxBookStore.ts`). */
-const VERIFY_TOKEN_LENGTH = 43;
 
 /** An edited body's length as it will be sent, once its preview link becomes the real one. */
-export function editedMailLength(body: string, previewUrl: string): number {
-  const real = previewUrl.slice(0, -PREVIEW_VERIFY_TOKEN.length) + 'x'.repeat(VERIFY_TOKEN_LENGTH);
-  return fillVerifyLink(body, previewUrl, real).length;
+export function editedMailLength(body: string, origin: string): number {
+  return fillVerifyLink(body, origin, verifyUrl(origin, 'x'.repeat(VERIFY_TOKEN_LENGTH))).length;
 }
+
+/**
+ * What stops an edited mail going out (`empty`, `subjectTooLong`, `bodyTooLong`), and the one
+ * thing only warned about: the verify link was taken out (`noLink`).
+ */
+export type EditedMailProblem = 'empty' | 'subjectTooLong' | 'bodyTooLong' | 'noLink';
+
+/** The officer's edit of a preview, checked against EVE's limits with the real link counted. */
+export function checkEditedMail(
+  edit: { subject: string; body: string },
+  origin: string
+): EditedMailProblem[] {
+  const problems: EditedMailProblem[] = [];
+  const message = markupPlainText(parseEveMarkup(edit.body)).trim();
+  if (edit.subject.trim() === '' || message === '') problems.push('empty');
+  if (edit.subject.length > MAX_SUBJECT_LENGTH) problems.push('subjectTooLong');
+  if (editedMailLength(edit.body, origin) > EVE_MARKUP_LIMIT) problems.push('bodyTooLong');
+  if (fillVerifyLink(edit.body, origin, '') === edit.body) problems.push('noLink');
+  return problems;
+}
+
+/** Whether the problems keep Save off: all but a missing link do. */
+export const editedMailBlocked = (problems: readonly EditedMailProblem[]): boolean =>
+  problems.some((p) => p !== 'noLink');
 
 /**
  * The mail, with every line when it fits; past the 10,000-character cap one

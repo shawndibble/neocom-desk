@@ -18134,14 +18134,17 @@
         "next": "Next Miner",
         "position": "{{position}} of {{count}}",
         "summarised": "This mail is shortened to fit EVE’s 10,000-character limit. The link in it shows every line.",
-        "body": "Message",
         "edit": "Edit mail",
         "edited": "Edited",
         "save": "Save mail",
-        "cancel": "Cancel",
         "reset": "Use the standard mail",
-        "empty": "A mail needs a subject and a message.",
-        "noLink": "This mail no longer has the verify link. Without it the Miner can't see their days, payments or live total."
+        "stale": "The amounts in the standard mail changed after you edited this one. Check your figures, or use the standard mail.",
+        "problem": {
+          "empty": "A mail needs a subject and a message.",
+          "subjectTooLong": "The subject is over EVE’s {{max}}-character limit.",
+          "bodyTooLong": "The message is over EVE’s 10,000-character limit.",
+          "noLink": "This mail no longer has the verify link. Without it the Miner can't see their days, payments or live total."
+        }
       },
       "panelTitle": "Statement mail queue"
     },
@@ -18953,6 +18956,7 @@
         "previewFor": "Preview for",
         "recipients": "Mail to",
         "edited": "Edited mail",
+        "editedStale": "Edited mail · amounts changed since",
         "mailedRecently_one": "Mailed {{count}} day ago, so unticked",
         "mailedRecently_other": "Mailed {{count}} days ago, so unticked",
         "mailPreview": "Mail preview",

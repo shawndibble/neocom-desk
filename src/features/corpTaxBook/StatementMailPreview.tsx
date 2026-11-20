@@ -2,8 +2,15 @@ import { useId, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, TextInput } from '@/components/ui';
 import { Pill } from '@/components/ui/Pill';
-import { editedMailLength, fillVerifyLink } from '@/engine/corpTaxBook/statementMail';
+import { stackedLabelClassName } from '@/components/ui/controlStyles';
+import {
+  checkEditedMail,
+  editedMailBlocked,
+  editedMailLength,
+} from '@/engine/corpTaxBook/statementMail';
 import { EVE_MARKUP_LIMIT, markupPlainText, parseEveMarkup } from '@/engine/mail/eveMarkup';
+import { MAX_SUBJECT_LENGTH } from '@/engine/mail/mailCompose';
+import { cx } from '@/lib/cx';
 import { MailBodyEditor } from '@/features/character/MailBodyEditor';
 import { MailBodyView } from '@/features/character/MailBodyView';
 import { MailCounter } from '@/features/character/MailCounter';
@@ -43,13 +50,13 @@ export interface MailEdit {
 
 /**
  * The mail with Edit: what the officer writes is what the queue sends to this one Miner. The
- * preview's verify link (`previewUrl`) is swapped for the real one when the mail is queued.
+ * preview's verify link (`previewVerifyUrl`) is swapped for the real one when the mail is queued.
  * Nothing changes until Save; Use the standard mail drops the edit.
  */
 export function EditableMailPreview({
   mail,
   edited,
-  previewUrl,
+  stale,
   onSave,
   onReset,
   disabled,
@@ -57,7 +64,8 @@ export function EditableMailPreview({
   /** The mail as it will go: the edit when there is one, else the standard mail. */
   mail: MailPreviewContent;
   edited: boolean;
-  previewUrl: string;
+  /** The standard mail changed since the edit was saved (a payment, a new day). */
+  stale?: boolean;
   onSave: (edit: MailEdit) => void;
   onReset: () => void;
   disabled?: boolean;
@@ -67,10 +75,14 @@ export function EditableMailPreview({
   const subjectId = useId();
   const bodyId = useId();
   const countId = useId();
+  const origin = window.location.origin;
   if (draft === null) {
     return (
       <div className="space-y-3">
         {edited && <Pill tone="accent">{t('corpTaxBook.mailQueue.preview.edited')}</Pill>}
+        {stale && (
+          <p className="text-xs text-warning">{t('corpTaxBook.mailQueue.preview.stale')}</p>
+        )}
         <StatementMailPreview {...mail} />
         <div className="flex flex-wrap gap-2">
           <Button
@@ -89,19 +101,14 @@ export function EditableMailPreview({
       </div>
     );
   }
-  const length = editedMailLength(draft.body, previewUrl);
-  const over = length > EVE_MARKUP_LIMIT;
-  const empty =
-    draft.subject.trim() === '' || markupPlainText(parseEveMarkup(draft.body)).trim() === '';
-  const noLink = fillVerifyLink(draft.body, previewUrl, '') === draft.body;
-  const labelClass = 'block text-[0.6875rem] text-text-dim';
+  const problems = checkEditedMail(draft, origin);
   return (
     <div className="space-y-3">
       <p className="text-sm">
         <span className="text-text-dim">{t('corpTaxBook.mailQueue.preview.to')}:</span> {mail.to}
       </p>
       <div className="space-y-1">
-        <label htmlFor={subjectId} className={labelClass}>
+        <label htmlFor={subjectId} className={stackedLabelClassName}>
           {t('corpTaxBook.mailQueue.preview.subject')}
         </label>
         <TextInput
@@ -109,43 +116,49 @@ export function EditableMailPreview({
           size="sm"
           value={draft.subject}
           onChange={(e) => setDraft({ ...draft, subject: e.target.value })}
+          aria-invalid={problems.includes('subjectTooLong')}
           className="w-full"
         />
       </div>
       <div className="space-y-1">
-        <label htmlFor={bodyId} className={labelClass}>
-          {t('corpTaxBook.mailQueue.preview.body')}
+        <label htmlFor={bodyId} className={stackedLabelClassName}>
+          {t('mail.bodyLabel')}
         </label>
         <MailBodyEditor
           id={bodyId}
           value={draft.body}
           onChange={(body) => setDraft((current) => (current ? { ...current, body } : current))}
           aria-describedby={countId}
-          aria-invalid={over}
+          aria-invalid={problems.includes('bodyTooLong')}
           counter={
-            <MailCounter id={countId} count={length} max={EVE_MARKUP_LIMIT} warnFrom={0.9} />
+            <MailCounter
+              id={countId}
+              count={editedMailLength(draft.body, origin)}
+              max={EVE_MARKUP_LIMIT}
+              warnFrom={0.9}
+            />
           }
           className="min-h-48"
         />
       </div>
-      {noLink && (
-        <p className="text-xs text-warning">{t('corpTaxBook.mailQueue.preview.noLink')}</p>
-      )}
-      {empty && <p className="text-xs text-text-dim">{t('corpTaxBook.mailQueue.preview.empty')}</p>}
+      {problems.map((p) => (
+        <p key={p} className={cx('text-xs', p === 'noLink' ? 'text-warning' : 'text-text-dim')}>
+          {t(`corpTaxBook.mailQueue.preview.problem.${p}`, { max: MAX_SUBJECT_LENGTH })}
+        </p>
+      ))}
       <div className="flex flex-wrap gap-2">
         <Button
           size="sm"
-          variant="accent"
           onClick={() => {
             onSave(draft);
             setDraft(null);
           }}
-          disabled={disabled || over || empty}
+          disabled={disabled || editedMailBlocked(problems)}
         >
           {t('corpTaxBook.mailQueue.preview.save')}
         </Button>
         <Button size="sm" onClick={() => setDraft(null)}>
-          {t('corpTaxBook.mailQueue.preview.cancel')}
+          {t('common.cancel')}
         </Button>
       </div>
     </div>
@@ -163,8 +176,8 @@ export function StatementMailPreviewDialog({
   open: boolean;
   onClose: () => void;
   mail: MailPreviewContent | null;
-  /** The dialog's body in place of the plain preview (the run's `EditableMailPreview`). */
-  children?: ReactNode;
+  /** The dialog's body: the run's `EditableMailPreview` for `mail`. */
+  children: ReactNode;
   /** With several Miners in the run: which one this is and how to step between them. */
   nav?: { position: number; count: number; onPrevious: () => void; onNext: () => void };
 }) {
@@ -197,7 +210,7 @@ export function StatementMailPreviewDialog({
         </>
       }
     >
-      {mail && (children ?? <StatementMailPreview {...mail} />)}
+      {mail && children}
     </Modal>
   );
 }

@@ -24,6 +24,7 @@ import type { OwnerRateChange } from '@/engine/corpTaxBook/ownerRate';
 import {
   composeStatementMail,
   fillVerifyLink,
+  verifyUrl,
   type StatementMailInput,
 } from '@/engine/corpTaxBook/statementMail';
 import { db } from '@/db';
@@ -41,9 +42,9 @@ export interface StatementToMail extends Omit<
   amountDue: number;
   /**
    * The mail as the officer edited it in the run's preview: sent as written, except that the
-   * preview's verify link (`previewUrl`) becomes this Statement's real one.
+   * preview's verify link (`previewVerifyUrl`) becomes this Statement's real one.
    */
-  edited?: { subject: string; body: string; previewUrl: string };
+  edited?: { subject: string; body: string };
 }
 
 export interface EnqueueInput {
@@ -71,7 +72,7 @@ async function buildItems(
   kind: MailKind,
   batchId: string
 ): Promise<{ items: MailQueueItem[]; missingLink: string[] }> {
-  const { readVerifyTokens, verifyUrl } = await import('@/features/corp/taxBook/bookClient');
+  const { readVerifyTokens } = await import('@/features/corp/taxBook/bookClient');
   const tokens = await readVerifyTokens(
     input.senderCharacterId,
     input.corporationId,
@@ -91,7 +92,7 @@ async function buildItems(
     const mail = s.edited
       ? {
           subject: s.edited.subject,
-          body: fillVerifyLink(s.edited.body, s.edited.previewUrl, link),
+          body: fillVerifyLink(s.edited.body, origin, link),
         }
       : composeStatementMail({
           ...s,
