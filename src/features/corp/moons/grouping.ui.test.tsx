@@ -253,7 +253,7 @@ describe('MinerCharacters', () => {
       (row) => <MinerCharacters miner={row} />
     );
     await openCharacters();
-    expect(screen.getByText(/Officer claim — not signed in yet/)).toBeInTheDocument();
+    expect(screen.getByText(/Officer claim — not logged in yet/)).toBeInTheDocument();
     expect(screen.queryByText(/waiting for their confirmation/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Decline link' })).not.toBeInTheDocument();
   });

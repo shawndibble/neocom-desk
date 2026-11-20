@@ -159,6 +159,24 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
     }
   }
 
+  // A character that mined here is a corporation member the book has seen, so a grouping reads
+  // it at once; one that never mined here is an Officer claim (Player slice).
+  async function minedHere(...characterIds: number[]) {
+    await syncBook(
+      deps(),
+      who(ACCOUNTANT),
+      parseSyncInput(
+        {
+          corporationId: CORP,
+          observed: characterIds.map((characterId) =>
+            row(5, '2026-10-18T09:00:00Z', { characterId, date: '2026-10-16' })
+          ),
+        },
+        now
+      )
+    );
+  }
+
   describe('verifyOfficer', () => {
     it('records access for 24h and stores no token', async () => {
       await turnOn();
@@ -875,6 +893,7 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
 
     it('regroup moves the absorbed Miners records onto the surviving id (#6450)', async () => {
       await turnOn();
+      await minedHere(60, 62, 63);
       await edit(ACCOUNTANT, {
         action: 'setMiner',
         minerId: 'm-b',
@@ -926,6 +945,7 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
 
     it('the backfill moves an older grouping alt records onto its group, and a re-run finds none (#6450)', async () => {
       await turnOn();
+      await minedHere(62, 63);
       await edit(ACCOUNTANT, {
         action: 'setMiner',
         minerId: 'm-b',
@@ -950,6 +970,7 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
 
     it('adds an outsider by a regroup as an officer claim that cannot read yet', async () => {
       await turnOn();
+      await minedHere(60);
       await syncBook(
         deps(),
         who(ACCOUNTANT),
@@ -1114,6 +1135,7 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
 
     it('credits a claim to the Miner the character is grouped into', async () => {
       await turnOn();
+      await minedHere(60, 77);
       await edit(ACCOUNTANT, {
         action: 'setMiner',
         minerId: 'm-a',
@@ -1136,12 +1158,48 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect(await claimPayment(deps(), who(77), CORP, 'j1_8')).toEqual({ minerId: 'm-a' });
     });
 
+    it('credits a claim from a never-mined character to its own Miner until its link is proven', async () => {
+      await turnOn();
+      await minedHere(60);
+      await edit(ACCOUNTANT, {
+        action: 'setMiner',
+        minerId: 'm-a',
+        characterIds: [60, 77],
+        mainCharacterId: 60,
+      });
+      await syncBook(
+        deps(),
+        who(ACCOUNTANT),
+        parseSyncInput(
+          {
+            corporationId: CORP,
+            donations: [
+              { refId: 8, division: 1, characterId: 77, amount: 10, at: '2026-10-18T00:00:00Z' },
+              { refId: 9, division: 1, characterId: 77, amount: 10, at: '2026-10-18T00:00:00Z' },
+            ],
+          },
+          now
+        )
+      );
+      // An officer claim is no reader of the group, so it is its own Miner for now.
+      expect(await claimPayment(deps(), who(77), CORP, 'j1_8')).toEqual({ minerId: 'solo:77' });
+      await db.collection('playerCharacters').doc('77').set({
+        characterId: 77,
+        playerId: '60',
+        ownerHash: 'h',
+        provenAt: '2026-10-19T00:00:00Z',
+      });
+      expect(await promoteProvenClaims(deps(), CORP)).toEqual({ promoted: 1 });
+      expect(await claimPayment(deps(), who(77), CORP, 'j1_9')).toEqual({ minerId: 'm-a' });
+    });
+
     it('refuses a claim when the corporation has no book', async () => {
       expect(await reason(claimPayment(deps(), who(77), CORP, 'j1_7'))).toBe('no-book');
     });
 
     it('groups characters, keeps an outsider an officer claim, and unlinks', async () => {
       await turnOn();
+      await minedHere(60);
       await syncBook(
         deps(),
         who(ACCOUNTANT),
@@ -1183,6 +1241,7 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
     describe('officer claims (Player slice)', () => {
       const outsider = async () => {
         await turnOn();
+        await minedHere(60);
         await syncBook(
           deps(),
           who(ACCOUNTANT),
@@ -1246,8 +1305,9 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
     });
 
     describe('a guest answering a hand-made grouping (#4210)', () => {
-      const pendingGuest = async () => {
+      const pendingGuest = async (opts: { mainMined?: boolean } = {}) => {
         await turnOn();
+        if (opts.mainMined !== false) await minedHere(60);
         await syncBook(
           deps(),
           who(ACCOUNTANT),
@@ -1364,7 +1424,8 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       });
 
       it('refuses a decline once the Miner account is closed, and keeps the Miner', async () => {
-        await pendingGuest();
+        await // A closed account is a guest's: nobody in it mined here.
+        await pendingGuest({ mainMined: false });
         await edit(ACCOUNTANT, {
           action: 'closeAccount',
           minerId: 'm-a',
@@ -1420,6 +1481,20 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         expect((await miner()).get('pendingConfirmation')).toEqual([61]);
         expect((await miner()).get('uids')).toEqual(['char:60']);
         expect(await answers()).toBeUndefined();
+      });
+
+      it('keeps a legacy pending guest pending when an officer edits the group again', async () => {
+        await pendingGuest();
+        const out = await edit(ACCOUNTANT, {
+          action: 'setMiner',
+          minerId: 'm-a',
+          characterIds: [60, 61],
+          mainCharacterId: 60,
+        });
+        expect(out.pendingConfirmation).toEqual([61]);
+        expect(out.officerClaimed).toEqual([]);
+        expect((await miner()).get('pendingConfirmation')).toEqual([61]);
+        expect((await miner()).get('uids')).toEqual(['char:60']);
       });
 
       it('lists the groupings waiting for the signed-in character only', async () => {
@@ -1679,13 +1754,13 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
 
     it('keeps one dispute per Miner and day, for the caller’s own characters only', async () => {
       await turnOn();
+      await recordOre([60], [77, 45491], [50], [99]);
       await edit(ACCOUNTANT, {
         action: 'setMiner',
         minerId: 'm-a',
         characterIds: [60, 77],
         mainCharacterId: 60,
       });
-      await recordOre([60], [77, 45491], [50], [99]);
       await pastSetup();
       // A Miner's character disputes for its grouped alt; never for a stranger.
       expect(await reason(dispute(60, [line(99)]))).toBe('not-your-record');

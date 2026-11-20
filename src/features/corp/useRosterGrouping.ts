@@ -15,7 +15,7 @@ import { unknownCharacterName, type PlayerGroup } from './playerRows';
 const NO_IDS: ReadonlySet<number> = new Set();
 
 export interface RosterGrouping {
-  /** An officer who can edit an active book: the roster offers "Group with…". */
+  /** An officer who can edit an active book: the roster offers "Group with". */
   canGroup: boolean;
   /** The stored group a character is in, if it is in one. */
   groupOf: (characterId: number) => Miner | undefined;

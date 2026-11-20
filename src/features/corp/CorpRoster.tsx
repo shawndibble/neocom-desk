@@ -164,7 +164,7 @@ export function CorpRosterTable({
   rows: readonly RosterRow[];
   /** Officers only: jumps to this member's Player in the Players view (grouped rows only). */
   onShowInPlayers?: (row: RosterRow) => void;
-  /** Officers only: opens the group dialog for this member ("Group with…" in the row menu). */
+  /** Officers only: opens the group dialog for this member ("Group with" in the row menu). */
   onGroupWith?: (row: RosterRow) => void;
   /** `useTableExport(...).tableProps` — feeds the header's Export menu. */
   tableProps?: UseTableExport<RosterRow>['tableProps'];

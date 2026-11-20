@@ -32,6 +32,7 @@ import { Pill } from '@/components/ui/Pill';
 import { useOpenAfterMenu } from '@/components/ui/useOpenAfterMenu';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { CharacterLink } from '@/features/entities';
+import { label } from '@/engine/corp/members';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { useUrlSort } from '@/lib/useUrlState';
@@ -268,6 +269,9 @@ export function PlayersView({
           render: (line) => {
             const row = source(line);
             if (!row) return noData;
+            // A Player row's click expands it, so its ship is plain text (DESIGN.md §6c primary action).
+            if (c.id === 'ship' && line.kind === 'player')
+              return label(row.shipName, row.shipTypeId);
             const cell = c.render(row);
             if (c.id !== 'lastSeen' || line.kind !== 'player') return cell;
             return (
@@ -468,7 +472,7 @@ function MemberCell({ line }: { line: Line }) {
 
 /**
  * A Player or alt row's menu. Groups fold by id (§6c); a dialog opens after the menu closes
- * (`useOpenAfterMenu`). A Player's: Add character…, Change main…. An alt's: Make main (inert
+ * (`useOpenAfterMenu`). A Player's: Add character, Change main. An alt's: Make main (inert
  * with its reason for an outside character while the group has a corp member) and the danger
  * Remove from Player.
  */

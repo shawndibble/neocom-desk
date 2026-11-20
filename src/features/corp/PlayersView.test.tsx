@@ -143,7 +143,7 @@ describe('PlayersView', () => {
     renderView();
     const kestrel = rowOf('Kestrel Vane');
     expect(within(kestrel).getByText('3 characters · 1 outside corp')).toBeInTheDocument();
-    expect(within(kestrel).getByText('· 1 not signed in')).toBeInTheDocument();
+    expect(within(kestrel).getByText('· 1 not logged in')).toBeInTheDocument();
     expect(screen.queryByText('Vane Hauler')).not.toBeInTheDocument();
     expect(rowOf('Lena Voss')).toBeInTheDocument();
   });
@@ -156,7 +156,7 @@ describe('PlayersView', () => {
     expect(within(outside).getAllByText('No data').length).toBeGreaterThan(0);
     expect(within(outside).queryByText('Never')).not.toBeInTheDocument();
     expect(within(outside).getByText('Outside corp')).toBeInTheDocument();
-    expect(within(outside).getByText('Not signed in yet')).toBeInTheDocument();
+    expect(within(outside).getByText('Not logged in yet')).toBeInTheDocument();
     await userEvent.click(rowOf('Kestrel Vane'));
     expect(screen.queryByText('Vane Hauler')).not.toBeInTheDocument();
   });
@@ -167,19 +167,19 @@ describe('PlayersView', () => {
     expect(screen.queryByText('Lena Voss')).not.toBeInTheDocument();
   });
 
-  it('Player menu: Add character… and Change main…', async () => {
+  it('Player menu: Add character and Change main', async () => {
     renderView();
     await menuOf('Kestrel Vane');
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Add character…' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Add character' }));
     await waitFor(() => expect(onGroupWith).toHaveBeenCalledWith(1));
     await menuOf('Kestrel Vane');
-    expect(await screen.findByRole('menuitem', { name: 'Change main…' })).toBeInTheDocument();
+    expect(await screen.findByRole('menuitem', { name: 'Change main' })).toBeInTheDocument();
   });
 
   it('Change main saves a setMiner with the same characters', async () => {
     renderView();
     await menuOf('Kestrel Vane');
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Change main…' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Change main' }));
     // Outside characters are not offered while the Player has a corp member.
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).queryByText('Outer Rim Vane')).not.toBeInTheDocument();
@@ -286,10 +286,10 @@ describe('PlayersView', () => {
     expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
   });
 
-  it('a loose member keeps Group with…', async () => {
+  it('a loose member keeps Group with', async () => {
     renderView();
     await menuOf('Lena Voss');
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Group with…' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Group with' }));
     expect(onGroupWith).toHaveBeenCalledWith(10);
   });
 

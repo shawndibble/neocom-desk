@@ -73,7 +73,7 @@ describe('CorpRosterTable', () => {
       expect(await screen.findByRole('tooltip')).toHaveTextContent('Alt A, Alt B');
     });
 
-    it('offers Group with… to officers, in the row menu only when wired', async () => {
+    it('offers Group with to officers, in the row menu only when wired', async () => {
       const onGroupWith = vi.fn();
       const { rerender } = render(
         <MemoryRouter>
@@ -89,7 +89,7 @@ describe('CorpRosterTable', () => {
         </MemoryRouter>
       );
       await userEvent.click(screen.getByRole('button', { name: /More actions for Member 1/ }));
-      await userEvent.click(await screen.findByRole('menuitem', { name: 'Group with…' }));
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'Group with' }));
       expect(onGroupWith).toHaveBeenCalledWith(expect.objectContaining({ characterId: 1 }));
     });
   });
