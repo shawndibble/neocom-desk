@@ -332,6 +332,31 @@ export async function readDeclinedAutoGroup(
   return new Set(Array.isArray(ids) ? (ids as number[]) : []);
 }
 
+/**
+ * What the Members page flags beside a character: ones two groups claim (`meta/groupConflicts`)
+ * and ones that said no to a link (`meta/groupingAnswers`). Best effort: a book that never had
+ * either has no document, and a denied read is none. Officer-only.
+ */
+export async function readGroupingFlags(
+  characterId: number,
+  corporationId: number
+): Promise<{ conflictIds: Set<number>; declinedIds: Set<number> }> {
+  await ensureSignedIn(characterId);
+  const meta = (id: string) =>
+    getDoc(doc(getSyncFirestore(characterId), 'corps', String(corporationId), 'meta', id))
+      .then((snap) => snap.data())
+      .catch(() => undefined);
+  const [conflicts, answers] = await Promise.all([meta('groupConflicts'), meta('groupingAnswers')]);
+  return {
+    conflictIds: new Set(groupConflictsFrom(conflicts).map((c) => c.characterId)),
+    declinedIds: new Set(
+      groupingAnswersFrom(answers)
+        .filter((a) => a.answer === 'declined')
+        .map((a) => a.characterId)
+    ),
+  };
+}
+
 /** The book's settings and the collections the sync needs. Officer-only: verify first. */
 export async function readBookState(
   characterId: number,

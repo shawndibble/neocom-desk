@@ -139,7 +139,9 @@ const isSolarSystemId = (id: number) => id >= 30_000_000 && id < 32_000_000;
 const ROSTER_SORT = { columnId: 'lastSeen', direction: 'desc' } as const;
 
 /** Every roster column, hidden or not — the table and its column picker both read it. */
-function useRosterColumns(): DataTableColumn<RosterRow>[] {
+// Shared with the Players view, which reuses every column but Member.
+// eslint-disable-next-line react-refresh/only-export-components
+export function useRosterColumns(): DataTableColumn<RosterRow>[] {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   return useMemo<DataTableColumn<RosterRow>[]>(

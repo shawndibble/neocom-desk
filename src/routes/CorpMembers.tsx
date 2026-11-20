@@ -34,6 +34,7 @@ import {
   PageHeader,
   Panel,
   SearchInput,
+  SegmentedControl,
   Select,
   SelectContent,
   SelectItem,
@@ -63,6 +64,7 @@ import {
   type RosterRow,
 } from '@/features/corp/CorpRoster';
 import { useRosterGrouping } from '@/features/corp/useRosterGrouping';
+import { PlayersView } from '@/features/corp/PlayersView';
 import { GroupMinersView } from '@/features/corp/moons/GroupMinersDialog';
 import { membersCsvColumns } from '@/features/corp/membersCsv';
 import { loadCorporationId } from '@/features/corp/boardData';
@@ -93,7 +95,7 @@ import { DataGate } from '@/components/DataGate';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useUrlParams } from '@/lib/useUrlState';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
-import { boolParam, optionalIdParam, textParam } from '@/lib/urlState';
+import { boolParam, enumParam, optionalIdParam, textParam } from '@/lib/urlState';
 import { tabPath } from '@/lib/pageTabs';
 import { usePageTab } from '@/lib/usePageTab';
 import { CORP_MEMBERS_TABS } from '@/features/corp/corpMembersTabs';
@@ -104,6 +106,8 @@ const FILTER_PARAMS = {
   dark: boolParam(),
   ship: optionalIdParam(),
   loc: optionalIdParam(),
+  /** Characters (today's flat table) or Players (officers with an active book). */
+  view: enumParam(['characters', 'players'] as const, 'characters'),
 };
 
 /** The funnel's share of the filters — everything but the search box, which acts immediately. */
@@ -337,6 +341,8 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
   const search = filterParams.q;
   const darkOnly = filterParams.dark;
   const { ship, loc } = filterParams;
+  // Players groups characters by stored group, which only an officer with an active book can read.
+  const playersView = grouping.canGroup && filterParams.view === 'players';
   const rosterFilter = useMemo<RosterFilter>(
     () => ({ dark: darkOnly, ship, loc }),
     [darkOnly, ship, loc]
@@ -445,7 +451,23 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
                   className="min-w-48 flex-1"
                 />
               }
-              actions={<CorpRosterColumnPicker />}
+              actions={
+                <>
+                  {grouping.canGroup && (
+                    <SegmentedControl
+                      label={t('corp.members.players.viewLabel')}
+                      value={filterParams.view}
+                      onChange={(view) => setFilterParams({ view })}
+                      uppercase={false}
+                      options={[
+                        { value: 'characters', label: t('corp.members.players.viewCharacters') },
+                        { value: 'players', label: t('corp.members.players.viewPlayers') },
+                      ]}
+                    />
+                  )}
+                  <CorpRosterColumnPicker />
+                </>
+              }
             >
               {(draft, setDraft) => (
                 <>
@@ -518,7 +540,19 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
                   names={data?.labels.characters ?? EMPTY_MEMBER_LABELS.characters}
                 />
               </div>
-              {rows.length > 0 && visibleRows.length === 0 ? (
+              {playersView ? (
+                <PlayersView
+                  rows={rows}
+                  visibleRows={visibleRows}
+                  grouping={grouping}
+                  search={debouncedSearch}
+                  otherFilters={darkOnly || ship !== null || loc !== null}
+                  onGroupWith={setGroupingFor}
+                  onResetFilters={() =>
+                    setFilterParams({ q: '', dark: false, ship: null, loc: null })
+                  }
+                />
+              ) : rows.length > 0 && visibleRows.length === 0 ? (
                 // The roster has members; the search/filters hid them all. The
                 // table's own empty state says EVE sent nothing, which would be wrong here.
                 <EmptyState

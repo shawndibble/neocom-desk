@@ -5,10 +5,14 @@ import { resolveNames } from '@/features/character/names';
 import {
   editBook,
   readBookSummary,
+  readGroupingFlags,
   readGroupingSources,
   verifyOfficer,
 } from './taxBook/bookClient';
 import type { GroupSource } from './moons/GroupMinersDialog';
+import type { PlayerGroup } from './playerRows';
+
+const NO_IDS: ReadonlySet<number> = new Set();
 
 export interface RosterGrouping {
   /** An officer who can edit an active book: the roster offers "Group with…". */
@@ -19,6 +23,11 @@ export interface RosterGrouping {
   names: ReadonlyMap<number, string>;
   /** The dialog's data, for the Miner of `characterId` (a stored group or the character alone). */
   source: GroupSource;
+  /** Every stored group with its claim state, for the Players view. */
+  groups: readonly PlayerGroup[];
+  /** Characters two groups claim, and ones that declined a link. */
+  conflictIds: ReadonlySet<number>;
+  declinedIds: ReadonlySet<number>;
   reload: () => void;
 }
 
@@ -36,6 +45,8 @@ export function useRosterGrouping(
     miners: Miner[];
     choices: MinerChoice[];
     names: Map<number, string>;
+    conflictIds: ReadonlySet<number>;
+    declinedIds: ReadonlySet<number>;
     status: 'loading' | 'ready' | 'failed';
   } | null>(null);
   const [tick, setTick] = useState(0);
@@ -48,9 +59,13 @@ export function useRosterGrouping(
     (async () => {
       const verdict = await verifyOfficer(characterId, corporationId);
       if (!verdict.canEdit || !verdict.bookActive) return;
-      const [sources, summary] = await Promise.all([
+      const [sources, summary, flags] = await Promise.all([
         readGroupingSources(characterId, corporationId),
         readBookSummary(characterId, corporationId),
+        readGroupingFlags(characterId, corporationId).catch(() => ({
+          conflictIds: NO_IDS,
+          declinedIds: NO_IDS,
+        })),
       ]);
       if (!sources) return;
       const choices = minerChoices({
@@ -59,9 +74,24 @@ export function useRosterGrouping(
         miners: sources.miners,
         entries: sources.observed,
       });
-      const ids = [...new Set(choices.flatMap((c) => c.characterIds))];
+      const ids = [
+        ...new Set([
+          ...choices.flatMap((c) => c.characterIds),
+          ...flags.declinedIds,
+          ...flags.conflictIds,
+        ]),
+      ];
       const names = await resolveNames(ids).catch(() => new Map<number, string>());
-      if (!cancelled) setState({ key, miners: sources.miners, choices, names, status: 'ready' });
+      if (!cancelled)
+        setState({
+          key,
+          miners: sources.miners,
+          choices,
+          names,
+          conflictIds: flags.conflictIds,
+          declinedIds: flags.declinedIds,
+          status: 'ready',
+        });
     })().catch(() => {
       // Not an officer, or the book is unreadable: no grouping on the roster.
     });
@@ -78,6 +108,10 @@ export function useRosterGrouping(
       canGroup: held !== null,
       groupOf: (id) => miners.find((m) => m.characterIds.includes(id) && m.characterIds.length > 1),
       names,
+      // The stored docs carry the claim lists the engine's `Miner` leaves out.
+      groups: miners as readonly PlayerGroup[],
+      conflictIds: held?.conflictIds ?? NO_IDS,
+      declinedIds: held?.declinedIds ?? NO_IDS,
       reload,
       source: {
         status: held?.status ?? 'loading',
