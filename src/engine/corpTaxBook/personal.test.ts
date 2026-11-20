@@ -1199,6 +1199,44 @@ describe('overlayCorpBooks', () => {
         book({ observed, payments: [paid(amount)], runningAccountFrom: '2026-10-01T00:00:00Z' }),
       ]).books[0];
 
+    describe('with an officer correction, as the corp book counts it', () => {
+      // Each day is 10,000 × 148 × 15% = 222,000.
+      const adjust = (id: string, date: string, amount: number) => ({
+        id,
+        minerId: `solo:${ME}`,
+        date,
+        amount,
+        reason: 'Rolled over',
+        by: 1,
+        at: '2026-10-18T13:00:00Z',
+      });
+      const withAdjustments = (...adjustments: ReturnType<typeof adjust>[]) =>
+        overlay(entries, [
+          book({ observed, adjustments, runningAccountFrom: '2026-10-01T00:00:00Z' }),
+        ]).books[0];
+
+      it('owes a charge dated on a day the member did not mine', () => {
+        expect(withAdjustments(adjust('a', '2026-10-05', 1_000_000))).toMatchObject({
+          credit: 0,
+          account: { owes: { amount: 1_444_000, days: 2, oldest: '2026-10-15' } },
+        });
+      });
+
+      it('pays the oldest days with a credit dated on a day the member did not mine, then keeps the rest', () => {
+        expect(withAdjustments(adjust('a', '2026-10-05', -500_000))).toMatchObject({
+          credit: 56_000,
+          account: { owes: null },
+        });
+      });
+
+      it('carries a credit bigger than its own day on to the next days instead of dropping it', () => {
+        expect(withAdjustments(adjust('a', '2026-10-15', -1_000_000))).toMatchObject({
+          credit: 556_000,
+          account: { owes: null },
+        });
+      });
+    });
+
     it('shows no credit for money that paid a day, and says what is still owed', () => {
       expect(running(222_000)).toMatchObject({
         credit: 0,
