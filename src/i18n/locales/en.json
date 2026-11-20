@@ -18792,12 +18792,13 @@
           "paymentFrom": "Payment from {{name}}",
           "correction": "Correction: {{reason}}",
           "writeOff": "Written off: {{reason}}",
-          "adjustment": "Tolerance and Statement corrections"
+          "tolerance": "Market adjustment"
         },
         "oreOf": "Ore mined {{date}}",
         "paidBy": "{{name}} · {{source}}",
         "noWalletEntry": "An officer recorded this by hand, so it has no corp wallet entry.",
-        "adjustmentNote": "ISK the book moved without a date of its own: a tolerance shortfall forgiven, or a correction folded into a Statement."
+        "toleranceNote": "The small unpaid part of a day's tax: the Miner paid on the day it was mined, before the close-of-day price it is billed at was known. It is within the book's per-day tolerance, so the day counts as paid and the Miner is not charged.",
+        "toleranceNoteLater": "Paid after this day closed, so the Miner and the book used the same close-of-day price and the payment should have matched. The shortfall is within the book's per-day tolerance, so the day counts as paid and the Miner is not charged."
       },
       "miner": {
         "notFound": "This Miner is not in the book",

@@ -5,14 +5,14 @@
  * re-adding two lists by hand.
  *
  * Balance is debits less credits: positive is owed, negative is credit held with the book. The
- * last balance always equals the page's Owed less Credit held (`MinerRow`). Money the engine
- * moves without a date of its own (a tolerance shortfall forgiven, a correction folded into a
- * Statement) is the one `adjustment` row, so nothing is hidden and nothing is double counted.
+ * last balance always equals the page's Owed less Credit held (`MinerRow`). A tolerance shortfall
+ * forgiven, or money taken back from a day already closed, is that day's own `tolerance` row, dated by
+ * the payment that closed it. The rows add up to the balance, so there is no catch-all row.
  */
 import type { Adjustment } from './statements';
 import type { MinerDetail } from './bookView';
 
-export type LedgerEntryKind = 'day' | 'payment' | 'correction' | 'writeOff' | 'adjustment';
+export type LedgerEntryKind = 'day' | 'payment' | 'correction' | 'writeOff' | 'tolerance';
 
 export interface LedgerEntry {
   /** Unique within the ledger. */
@@ -48,7 +48,7 @@ const ORDER: Record<LedgerEntryKind, number> = {
   correction: 1,
   payment: 2,
   writeOff: 2,
-  adjustment: 3,
+  tolerance: 3,
 };
 
 const day = (iso: string) => iso.slice(0, 10);
@@ -65,6 +65,8 @@ export function accountLedger(
   // A running account owes every billable day not yet on a Statement; a Statement-era book waits
   // for the Statement to bill it.
   const billed = new Map<string, { debit: number; days: number; keys: string[] }>();
+  // A date an open dispute holds is not billed yet, so it stays out of the balance.
+  const held = new Set(detail.heldDays);
   for (const d of detail.days) {
     if (d.tax <= 0) continue;
     // A day an officer forgave off a Statement was billed first; the write-off is its credit.
@@ -73,7 +75,7 @@ export function accountLedger(
       d.status === 'paid' ||
       d.status === 'on-statement' ||
       forgivenOnStatement ||
-      (running && d.status === 'unbilled');
+      (running && d.status === 'unbilled' && !held.has(d.date));
     if (owedNow) {
       const held = billed.get(d.date) ?? { debit: 0, days: 0, keys: [] };
       held.debit += d.tax;
@@ -131,6 +133,38 @@ export function accountLedger(
         note: w.reason,
       });
 
+  for (const w of detail.dayWriteOffs)
+    drafts.push({
+      key: `tolerance-${w.date}`,
+      kind: 'tolerance',
+      date: day(w.at),
+      at: w.at,
+      debit: 0,
+      credit: w.amount,
+      note: w.date,
+    });
+  // A Statement's tolerance is dated by the last payment that reached it, else its issue date.
+  const paidAt = new Map(detail.payments.map((p) => [p.id, p.at]));
+  for (const w of detail.toleranceWriteOffs) {
+    const at =
+      detail.paymentCredits
+        .filter((c) => c.statementId === w.statementId)
+        .map((c) => paidAt.get(c.paymentId) ?? '')
+        .sort()
+        .at(-1) ||
+      detail.statements.find((s) => s.id === w.statementId)?.issuedAt ||
+      '';
+    if (w.amount >= 1 && at)
+      drafts.push({
+        key: `tolerance-${w.statementId}`,
+        kind: 'tolerance',
+        date: day(at),
+        at,
+        debit: 0,
+        credit: w.amount,
+      });
+  }
+
   drafts.sort(
     (a, b) =>
       a.date.localeCompare(b.date) ||
@@ -138,20 +172,6 @@ export function accountLedger(
       a.at.localeCompare(b.at) ||
       a.key.localeCompare(b.key)
   );
-
-  // What the page states the account stands at; any gap is money the engine moved without a date.
-  const expected = detail.row.owed - detail.row.credit;
-  const summed = drafts.reduce((s, d) => s + d.debit - d.credit, 0);
-  const gap = expected - summed;
-  if (Math.abs(gap) >= 1)
-    drafts.push({
-      key: 'adjustment',
-      kind: 'adjustment',
-      date: drafts.at(-1)?.date ?? day(detail.row.lastPaidAt ?? new Date(0).toISOString()),
-      at: '',
-      debit: Math.max(0, gap),
-      credit: Math.max(0, -gap),
-    });
 
   let balance = 0;
   const entries = drafts.map((d): LedgerEntry => {

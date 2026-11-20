@@ -89,8 +89,8 @@ export function AccountLedger({
         return t('corpTaxBook.moons.ledger.what.correction', { reason: e.note });
       case 'writeOff':
         return t('corpTaxBook.moons.ledger.what.writeOff', { reason: e.note });
-      case 'adjustment':
-        return t('corpTaxBook.moons.ledger.what.adjustment');
+      case 'tolerance':
+        return t('corpTaxBook.moons.ledger.what.tolerance');
     }
   };
 
@@ -123,7 +123,15 @@ export function AccountLedger({
     }
     return (
       <p className="px-3 py-2 text-sm text-text-dim">
-        {e.kind === 'adjustment' ? t('corpTaxBook.moons.ledger.adjustmentNote') : e.note}
+        {e.kind === 'tolerance'
+          ? t(
+              // `note` is the mined day a running account's row closes; a Statement's has none and
+              // is always paid after it is issued.
+              e.note !== undefined && e.date <= e.note
+                ? 'corpTaxBook.moons.ledger.toleranceNote'
+                : 'corpTaxBook.moons.ledger.toleranceNoteLater'
+            )
+          : e.note}
       </p>
     );
   };
