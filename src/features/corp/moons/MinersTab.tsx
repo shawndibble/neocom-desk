@@ -120,7 +120,10 @@ export function MinersTab() {
     () => new Map(view.input.miners.flatMap((m) => (m.closedAt ? [[m.id, m.closedAt]] : []))),
     [view.input.miners]
   );
-  const openMiners = useMemo(() => miners.filter((m) => !closedAtById.has(m.id)), [miners, closedAtById]);
+  const openMiners = useMemo(
+    () => miners.filter((m) => !closedAtById.has(m.id)),
+    [miners, closedAtById]
+  );
   const closed = useMemo(
     () => miners.filter((m) => closedAtById.has(m.id)),
     [miners, closedAtById]
