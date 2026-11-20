@@ -123,7 +123,13 @@ export function AccountLedger({
     }
     return (
       <p className="px-3 py-2 text-sm text-text-dim">
-        {e.kind === 'tolerance' ? t('corpTaxBook.moons.ledger.toleranceNote') : e.note}
+        {e.kind === 'tolerance'
+          ? t(
+              e.note !== undefined && e.date > e.note
+                ? 'corpTaxBook.moons.ledger.toleranceNoteLater'
+                : 'corpTaxBook.moons.ledger.toleranceNote'
+            )
+          : e.note}
       </p>
     );
   };
