@@ -21,6 +21,8 @@ const BASE_URL = `http://localhost:${PORT}/`;
 export default defineConfig({
   testDir: './e2e',
   testMatch: /\.book\.spec\.ts$/,
+  // Pays the cold servers' first compile and function load before the first test does.
+  globalSetup: './e2e/support/taxBook/warmUp.ts',
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,
@@ -43,6 +45,9 @@ export default defineConfig({
       timeout: 240_000,
       stdout: 'ignore',
       env: { E2E_BOOK_KEY_DIR: KEY_DIR, EVE_CLIENT_ID },
+      // The Firestore emulator is a JVM the Firebase CLI starts in its own process group: only
+      // the CLI's own shutdown (on SIGINT) stops it, so a kill would leave it holding 8080.
+      gracefulShutdown: { signal: 'SIGINT', timeout: 15_000 },
     },
     {
       command: `npm run dev -- --port ${PORT} --strictPort`,

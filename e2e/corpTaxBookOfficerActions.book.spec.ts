@@ -5,7 +5,7 @@
  * account the book then shows.
  */
 import type { Page } from '@playwright/test';
-import { expect, minerUrl, openMiner, signInAsOfficer, test } from './support/taxBook/bookTest';
+import { expect, openMiner, signInAsOfficer, test } from './support/taxBook/bookTest';
 import { officerBook } from './support/taxBook/bookScenarios';
 import { DAY_TAX, isk, shortDay } from './support/taxBook/bookSeed';
 import { MINER } from './support/taxBook/identities';
@@ -26,6 +26,19 @@ const card = (page: Page, title: string | RegExp) =>
     .or(page.getByRole('main'))
     .getByRole('listitem')
     .filter({ hasText: title });
+
+/**
+ * Opens a Miner's page through the app (the Moons nav's Miners, then their row): the book this
+ * tab already holds is read again, without a reload of the whole app.
+ */
+async function openMinerInApp(page: Page, name: string) {
+  await page.getByRole('list', { name: 'Moons' }).getByRole('link', { name: 'Miners' }).click();
+  await page
+    .getByRole('table', { name: 'Miners' })
+    .getByRole('row', { name: new RegExp(name) })
+    .click();
+  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+}
 
 /** The officer's words, in the book's Activity log (the page header's Activity panel). */
 async function expectInActivity(page: Page, words: string) {
@@ -78,8 +91,7 @@ test.fixme('an officer moves a payment to another Miner', async ({ page }) => {
   await expect(dialog).toBeHidden();
   await owed(page, book.bram.paid);
 
-  await page.goto(minerUrl(book.id('cora')));
-  await expect(page.getByRole('heading', { level: 1, name: MINER.cora.name })).toBeVisible();
+  await openMinerInApp(page, MINER.cora.name);
   await owed(page, book.cora.owed - book.bram.paid);
 });
 
@@ -128,7 +140,7 @@ test("a write-off forgives a leaver's oldest days, with the officer's reason", a
   await expect(dialog).toBeHidden();
   await expect(leaver).toHaveCount(0);
 
-  await page.goto(minerUrl(book.id('lev')));
+  await openMinerInApp(page, MINER.lev.name);
   await owed(page, 0);
   await expect(
     page.getByRole('table', { name: 'Account ledger' }).getByRole('row', {
@@ -146,7 +158,7 @@ test('a disputed day is held: payments skip it and pay the next days', async ({ 
     )
   ).toContainText(`${isk(DAY_TAX)} is held until`);
 
-  await page.goto(minerUrl(book.id('dax')));
+  await openMinerInApp(page, MINER.dax.name);
   // His 2,000,000 paid the days either side; the held day is the one left.
   await expect(page.getByRole('table', { name: 'Payments' })).toContainText(
     `Paid 2 days, from ${shortDay(book.dax.heldBack + 1)}`
@@ -181,7 +193,7 @@ test("waiving a dispute credits the disputed ore's tax", async ({ page }) => {
   await expect(dialog).toBeHidden();
   await expect(dispute).toHaveCount(0);
 
-  await page.goto(minerUrl(book.id('dax')));
+  await openMinerInApp(page, MINER.dax.name);
   await owed(page, DAY_TAX - book.dax.disputedTax);
 });
 
@@ -213,7 +225,7 @@ test('confirming a declaration records the payment the Miner declared', async ({
   await expect(dialog).toBeHidden();
   await expect(declaration).toHaveCount(0);
 
-  await page.goto(minerUrl(book.id('ada')));
+  await openMinerInApp(page, MINER.ada.name);
   await owed(page, book.ada.owed - book.ada.declared);
 });
 
@@ -251,7 +263,7 @@ test.fixme("the officer's answer to a declaration is on the Miner's own activity
     .fill('Donate with your code');
   await dialog.getByRole('button', { name: 'Keep the bill' }).click();
   await expect(dialog).toBeHidden();
-  await page.goto(minerUrl(book.id('ada')));
+  await openMinerInApp(page, MINER.ada.name);
   await expect(page.getByRole('heading', { name: /^Activity · [1-9]/ })).toBeVisible();
   await expect(page.getByRole('main')).toContainText('No contract reached the CEO');
 });
