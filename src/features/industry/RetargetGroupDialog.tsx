@@ -36,6 +36,7 @@ import {
 } from '@/engine/industry/types';
 import type { BuildPlanRecord } from '@/db';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
+import { newPlanHubId } from './newBuildPlan';
 import { BuildSystemInput } from './BuildSystemInput';
 import { BuildLocationPicker } from './BuildLocationPicker';
 import { clampPct } from '@/lib/clampPct';
@@ -71,11 +72,8 @@ function initialTarget(group: BuildGroup): RetargetTarget {
     void appliedAt;
     return target;
   }
-  return {
-    hubId: DEFAULT_TRADE_HUB.id,
-    facility: 'npcStation',
-    security: DEFAULT_TRADE_HUB.security,
-  };
+  const hub = getTradeHub(newPlanHubId()) ?? DEFAULT_TRADE_HUB;
+  return { hubId: hub.id, facility: 'npcStation', security: hub.security };
 }
 
 export function RetargetGroupDialog({ group, plans, onApply, onClose }: RetargetGroupDialogProps) {

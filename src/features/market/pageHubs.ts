@@ -21,7 +21,14 @@ import type { HubId } from './characterHubs';
  * them one slice at a time), so Settings never offers an entry that does
  * nothing; an entry for an area this build does not list is dropped on parse.
  */
-export const PAGE_HUB_AREAS = ['fittings', 'skills', 'contracts'] as const;
+export const PAGE_HUB_AREAS = [
+  'fittings',
+  'skills',
+  'contracts',
+  'industry',
+  'lpStore',
+  'corpSrp',
+] as const;
 
 export type PageHubArea = (typeof PAGE_HUB_AREAS)[number];
 
@@ -30,6 +37,9 @@ const AREA_NAME_KEYS = {
   fittings: 'pageHubs.area.fittings',
   skills: 'pageHubs.area.skills',
   contracts: 'pageHubs.area.contracts',
+  industry: 'pageHubs.area.industry',
+  lpStore: 'pageHubs.area.lpStore',
+  corpSrp: 'pageHubs.area.corpSrp',
 } as const satisfies Record<PageHubArea, string>;
 
 export function pageHubAreaName(t: TFunction, area: PageHubArea): string {
@@ -77,4 +87,12 @@ export function dropPageHub(map: PageHubMap, area: PageHubArea): PageHubMap {
   const rest = { ...map };
   delete rest[area];
   return rest;
+}
+
+/**
+ * `area`'s own entry right now, `undefined` on Global (or before page hubs
+ * are read): for non-React code that only differs from today with an entry.
+ */
+export function pageHubEntry(area: PageHubArea): HubId | undefined {
+  return usePageHubs.getState().value[area];
 }

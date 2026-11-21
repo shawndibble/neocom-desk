@@ -11329,7 +11329,10 @@
     "area": {
       "fittings": "Ship Fit Costs",
       "skills": "Skills",
-      "contracts": "Contracts"
+      "contracts": "Contracts",
+      "industry": "Industry",
+      "lpStore": "LP Store",
+      "corpSrp": "Corp SRP"
     }
   },
   "contractDetail": {

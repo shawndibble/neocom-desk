@@ -43,7 +43,13 @@ describe('PageHubsField', () => {
   });
 
   it('with one page left to add, a plain button names it', async () => {
-    await usePageHubs.getState().setValue({ fittings: 'jita', skills: 'jita' });
+    await usePageHubs.getState().setValue({
+      fittings: 'jita',
+      skills: 'jita',
+      industry: 'jita',
+      lpStore: 'jita',
+      corpSrp: 'jita',
+    });
     render(<PageHubsField />);
     await userEvent.click(screen.getByRole('button', { name: 'Add Contracts hub' }));
     await waitFor(() => expect(usePageHubs.getState().value.contracts).toBe('amarr'));

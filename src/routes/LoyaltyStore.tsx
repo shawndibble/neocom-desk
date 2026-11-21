@@ -51,7 +51,8 @@ import { loyaltyOfferCsvColumns } from '@/features/loyalty/loyaltyStoreCsv';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, optionalBoolParam, optionalIdParam, textParam } from '@/lib/urlState';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
-import { useMarketHub } from '@/features/market/hub';
+import { pickHubFor, useHubFor, useMarketHub } from '@/features/market/hub';
+import { usePageHubs } from '@/features/market/pageHubs';
 import { usePriceBasis } from '@/features/loyalty/priceBasis';
 import { useLpBasis } from '@/features/loyalty/lpBasis';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
@@ -128,9 +129,8 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   const location = useLocation();
   const [arrivedState] = useState(() => location.state as Partial<LpSearchCrumbState> | null);
 
-  const hubId = useMarketHub((s) => s.value);
-  const setHubId = useMarketHub((s) => s.setValue);
-  useHydratedStore(useMarketHub, usePriceBasis, useLpBasis);
+  const { hubId } = useHubFor('lpStore');
+  useHydratedStore(usePageHubs, useMarketHub, usePriceBasis, useLpBasis);
 
   const priceBasis = usePriceBasis((s) => s.value);
   const setPriceBasis = usePriceBasis((s) => s.setValue);
@@ -512,7 +512,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
                 // Persisted preferences (hub, price basis) are written here and only
                 // here, so a Cancel in the mobile sheet never has a store write to
                 // roll back — the draft was local until this point.
-                if (next.hubId !== hubId) void setHubId(next.hubId);
+                if (next.hubId !== hubId) void pickHubFor('lpStore', next.hubId);
                 if (next.priceBasis !== priceBasis) void setPriceBasis(next.priceBasis);
                 if (next.lpBasis !== lpBasis) void setLpBasis(next.lpBasis);
                 setFilterParams({

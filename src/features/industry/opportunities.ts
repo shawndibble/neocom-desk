@@ -8,7 +8,12 @@
  * formula a set of characters owns" into the inputs those already-tested
  * pieces need.
  */
-import { mostRecentlyUpdatedPlan, newBuildPlan, startingLocation } from './newBuildPlan';
+import {
+  mostRecentlyUpdatedPlan,
+  newBuildPlan,
+  newPlanHubId,
+  startingLocation,
+} from './newBuildPlan';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { computeBuildPlan } from './computeBuildPlan';
 import type { BuildPlanRecord } from '@/db';
@@ -94,7 +99,7 @@ export function buildOpportunityCandidates(
 
 /**
  * The Trade Hub a fresh Build Plan for this Character would default to —
- * `newBuildPlan`'s own `defaultsFrom?.hubId ?? DEFAULT_TRADE_HUB.id` rule,
+ * `newBuildPlan`'s own rule (`newPlanHubId`: the Industry page hub, else the latest plan's),
  * reused here so a candidate's row prices at the same hub "Add to Compare"
  * would seed the plan at (issue #2055), not a hard-coded default.
  */
@@ -103,7 +108,7 @@ export function hubForCharacter(
   plansByCharacter: ReadonlyMap<number, readonly BuildPlanRecord[]>
 ): TradeHub {
   const plan = mostRecentlyUpdatedPlan(plansByCharacter.get(characterId));
-  return (plan && getTradeHub(plan.hubId)) ?? DEFAULT_TRADE_HUB;
+  return getTradeHub(newPlanHubId(plan)) ?? DEFAULT_TRADE_HUB;
 }
 
 export interface OpportunityHubGroup {
