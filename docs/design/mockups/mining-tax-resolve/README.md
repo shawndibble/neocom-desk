@@ -14,7 +14,7 @@ Every problem the Tax tab reports has the same five possible outcomes, split by 
 
 Today the tab leads every warning with "ask an officer" — the slowest, least certain outcome — and offers no control for it. After an answer, the problem leaves the attention strip for one quiet line and comes back only when an officer hands it back, with what to do next. Hiding is never "resolved": the row reads "Not paying — {corp} still bills this".
 
-New components: `ResolveOptions` (A), `ResolveDialog` (B), `QuietStatusLine`, `LeftCorpNotice`, `QueueCard: won't pay`, `RequiredNextStep`, `TaxContactSetting`, `WalletCheck`, `AutoCreditedLine`, `WherePaymentGoes`. Everything else is the real `AttentionStrip`, `OwedBalances`, `DataTable`, `Modal` and `src/components/ui` primitives.
+New components: `ResolveOptions` (A), `ResolveDialog` (B), `QuietStatusLine`, `LeftCorpNotice`, `QueueCard: won't pay`, `RequiredNextStep`, `TaxContactSetting`, `WalletCheck`, `AutoCreditedLine`. Everything else is the real `AttentionStrip`, `OwedBalances`, `DataTable`, `Modal` and `src/components/ui` primitives.
 
 ## Today
 
