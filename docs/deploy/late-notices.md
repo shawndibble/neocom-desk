@@ -37,7 +37,9 @@ order below.
     grouping); a stranger is named by a Miner's or a notice's code, else by the Miner their earlier
     payments named; one that could be two Miners' is stored for review (`reviewReason:
 'ambiguous'`). A hand record of a transfer the book already holds is refused; one noted in an
-    unread division is linked to it and never counted again. `reassignPayment` moves a payment.
+    unread division is linked to it and never counted again. `reassignPayment` moves a payment;
+    moving one off a Miner, or marking more of it not tax, drops that Miner's recorded paid-through
+    day (`meta/paid`, `minerPaid`) so the days it paid reopen (decision 20261121-093000).
     Every payment write stores `uids`: its Miner's readers and its sender. A grouping, an unlink
     and a promoted claim bring its Miner's payments' `uids` level with who reads the Miner. Every
     `observed` row a sync writes stores `uids` too: its Character's Miner's readers and itself.

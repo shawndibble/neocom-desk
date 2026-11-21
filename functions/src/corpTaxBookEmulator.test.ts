@@ -2650,6 +2650,54 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         expect(await stored()).toEqual({ 'solo:50': '2026-10-17' });
       });
 
+      it('is dropped when an officer takes money off the Miner, and only then', async () => {
+        await turnOn();
+        await minedHere(50, 51);
+        const pay = (paymentId: string, minerId: string) =>
+          edit(ACCOUNTANT, {
+            action: 'recordPayment',
+            paymentId,
+            minerId,
+            characterId: 50,
+            amount: 5,
+            at: '2026-10-09T00:00:00.000Z',
+          });
+        const minerPaid = async (id: string) =>
+          (await book().collection('minerPaid').doc(id).get()).exists;
+        await pay('p1', 'solo:50');
+        await pay('p2', 'solo:50');
+        await record('2026-10-10');
+        await record('2026-10-10', 'solo:51');
+        // Money added keeps the day: the new Miner's marker stands.
+        await edit(
+          ACCOUNTANT,
+          { action: 'reassignPayment', paymentId: 'p1', minerId: 'solo:51' },
+          true
+        );
+        expect(await stored()).toEqual({ 'solo:51': '2026-10-10' });
+        expect(await minerPaid('solo:50')).toBe(false);
+        expect(await minerPaid('solo:51')).toBe(true);
+        // Marking part of a payment not tax takes money off its Miner too.
+        await record('2026-10-10');
+        await edit(
+          ACCOUNTANT,
+          { action: 'markNotTax', paymentId: 'p2', notTaxAmount: 2, reason: 'buyback' },
+          true
+        );
+        expect(await stored()).toEqual({ 'solo:51': '2026-10-10' });
+        // Taking it off to Unmatched, as well.
+        await edit(ACCOUNTANT, { action: 'reassignPayment', paymentId: 'p1', minerId: null }, true);
+        expect(await stored()).toEqual({});
+        // Marking less of it not tax gives money back: the day stands.
+        await record('2026-10-10');
+        await edit(
+          ACCOUNTANT,
+          { action: 'markNotTax', paymentId: 'p2', notTaxAmount: 1, reason: 'buyback' },
+          true
+        );
+        expect(await stored()).toEqual({ 'solo:50': '2026-10-10' });
+      });
+
       it('copies each Miner’s paid-through day to a record that Miner can read', async () => {
         await turnOn();
         await record('2026-10-10');
