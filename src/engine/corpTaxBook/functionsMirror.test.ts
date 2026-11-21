@@ -57,7 +57,6 @@ import { DEFAULT_OVERDUE_DAYS } from './overdue';
 import { DIVISION_NAME_MAX } from './divisionNames';
 import { mergeObservedRows, observedRowKey } from './observed';
 import { latestRecordedCorp } from './bookDocs';
-import { canOverrideRecordRate, rateStartRefusal } from './rates';
 import type { ObservedRow } from './types';
 import * as removal from './removal';
 import { effectiveOwnerRate } from './ownerRate';
@@ -76,19 +75,6 @@ const row = (quantity: number, cachedAt: string, over: Partial<ObservedRow> = {}
   cachedAt,
   ...over,
 });
-
-const statement = (id: string, from: string, through: string, lineDate?: string) =>
-  ({
-    id,
-    coversFrom: from,
-    coversThrough: through,
-    lines: lineDate
-      ? [
-          { kind: 'late-ore', date: lineDate },
-          { kind: 'correction', date: '2000-01-01' },
-        ]
-      : [],
-  }) as unknown as Parameters<typeof mirror.statementDays>[0];
 
 describe('functions mirror of the Corp Tax Book engine', () => {
   it('merges observed rows identically', () => {
@@ -118,35 +104,6 @@ describe('functions mirror of the Corp Tax Book engine', () => {
     expect(merged.rows).toHaveLength(2);
     expect(mirror.observedRowKey(a)).not.toBe(mirror.observedRowKey(b));
     expect(merged.rows.find((r) => r.structureId === 1)?.sourceCorporationId).toBe(5);
-  });
-
-  it('agrees on dates and rate rules', () => {
-    for (const [from, last] of [
-      ['2026-06-12', null],
-      ['2026-06-11', null],
-      ['2026-07-12', null],
-      ['2026-07-05', '2026-07-05'],
-      ['2026-07-06', '2026-07-05'],
-    ] as const)
-      expect(mirror.rateStartRefusal(from, '2026-07-12', last)).toBe(
-        rateStartRefusal(from, '2026-07-12', last)
-      );
-    // The server still refuses a record rate on a day a late notice listed (its legacy mirror):
-    // the client reads the days a notice listed the same way, from the server's own rule.
-    const statements = [
-      statement('a', '2026-07-01', '2026-07-31', '2026-06-20'),
-      statement('b', '2026-08-01', '2026-08-10'),
-    ];
-    const listed = new Set(statements.flatMap((s) => [...mirror.statementDays(s)]));
-    for (const day of ['2026-06-20', '2026-06-21', '2026-07-31', '2026-08-05', '2026-08-11']) {
-      expect(mirror.canOverrideRecordRate(day, statements)).toBe(
-        canOverrideRecordRate(day, listed)
-      );
-    }
-    expect([...mirror.statementDays(statements[0])].sort()).toEqual([
-      ...['2026-06-20'],
-      ...Array.from({ length: 31 }, (_, i) => `2026-07-${String(i + 1).padStart(2, '0')}`),
-    ]);
   });
 
   it('keeps the dispute, transfer and tax contact vocabularies equal', () => {

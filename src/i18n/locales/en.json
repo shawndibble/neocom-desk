@@ -19284,6 +19284,7 @@
           "director-only": "Only a Director can do that.",
           "rate-too-old": "A rate can start at most 30 days back.",
           "day-on-statement": "That day is already billed on an issued notice, so a rate cannot start on or before it.",
+          "day-on-notice": "That day is already billed on an issued notice, so a rate cannot start on or before it.",
           "billed-on-notice": "A late notice already listed this correction, so it can't be changed. Add an opposite correction instead.",
           "running-account": "This book bills a Running account, so it sends late notices. Reload the page to get the current version.",
           "transfer-in-book": "That transfer is already in the book, so recording it would count it twice. Assign the donation the sync stored instead: Needs you lists it while no Miner has it.",
