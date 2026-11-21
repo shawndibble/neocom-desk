@@ -17,7 +17,7 @@ import {
   type Transaction,
 } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
-import { chunk } from './chunk.js';
+import { chunk, IN_QUERY_LIMIT } from './chunk.js';
 import { absorbedMinerIds, loadRekeyRecords, MINER_KEYED, planRekey } from './corpTaxBookRekey.js';
 import {
   loadStampContext,
@@ -74,6 +74,7 @@ import {
   billedDisputeTax,
   disputesClosedByWriteOff,
   checkpointRefusal,
+  handRecordMatch,
   type RecordedCheckpoint,
   mergeDisputeLines,
   type RecordedOre,
@@ -147,6 +148,13 @@ import {
   stampFailedRoleCheck,
 } from './sharedPopsStore.js';
 import { refreshMoonDocs } from './corpTaxBookMoonDocsStore.js';
+import {
+  currentMinerOf,
+  ownerFields,
+  type MatchBook,
+  type UncountedDonation,
+} from './corpTaxBookDonationMatch.js';
+import { loadMatchBook } from './corpTaxBookDonationMatchStore.js';
 import { refreshReadModels } from './corpTaxBookReadModelsStore.js';
 import { movesReadModels } from './corpTaxBookReadModels.js';
 import {
@@ -786,7 +794,7 @@ export async function syncBookAs(
   deps: BookDeps,
   access: OfficerAccess,
   input: SyncInput,
-  options: { scheduled?: boolean } = {}
+  options: { scheduled?: boolean; matchBook?: MatchBook } = {}
 ) {
   const book = bookRef(deps.db, input.corporationId);
   const held = await book.get();
@@ -819,10 +827,24 @@ export async function syncBookAs(
 
   const payments = sub(deps.db, input.corporationId, PAYMENTS);
   let donationsAdded = 0;
-  /** Miners a new donation was matched to: their totals move (ADR 0032). */
-  const paidMiners = new Set<string>();
+  // Whose money each donation is, the server decides, whichever sync sent it.
+  const matchBook =
+    input.donations.length === 0
+      ? undefined
+      : (options.matchBook ?? (await loadMatchBook(deps.db, input.corporationId, input.donations)));
+  // A donation an officer already recorded by hand from another division (`transferId`) is
+  // counted once: the hand record stands.
+  const linked = await handRecordedTransfers(
+    deps,
+    input.corporationId,
+    input.donations.map((dn) => `j${dn.division}_${dn.refId}`)
+  );
   for (const dn of input.donations) {
     const id = `j${dn.division}_${dn.refId}`;
+    if (linked.has(id)) continue;
+    const owner = ownerFields(dn, matchBook!);
+    // The client's hold on a known sender whose Miner owed nothing stands (#6207): it prices days.
+    const held = dn.reviewReason !== undefined && 'minerId' in owner;
     const data: Data = {
       id,
       source: 'donation',
@@ -832,15 +854,12 @@ export async function syncBookAs(
       at: dn.at,
       division: dn.division,
       ...(dn.reason !== undefined ? { reason: dn.reason } : {}),
-      ...(dn.minerId !== undefined ? { minerId: dn.minerId } : {}),
-      ...(dn.statementId !== undefined ? { statementId: dn.statementId } : {}),
-      ...(dn.reviewReason !== undefined ? { reviewReason: dn.reviewReason } : {}),
+      ...(held ? { reviewReason: dn.reviewReason } : owner),
     };
     try {
       // create(): a re-synced donation never overwrites an officer's "not tax" mark.
       await payments.doc(id).create(data);
       donationsAdded += 1;
-      if (dn.minerId !== undefined) paidMiners.add(dn.minerId);
     } catch (err) {
       if ((err as { code?: number }).code !== 6) throw err;
     }
@@ -911,6 +930,23 @@ export async function syncBookAs(
   return { observedChanged, extractions: input.extractions.length, donationsAdded };
 }
 
+/** The donation ids among `ids` an officer's hand record already counts (`transferId`). */
+async function handRecordedTransfers(
+  deps: BookDeps,
+  corporationId: number,
+  ids: readonly string[]
+): Promise<Set<string>> {
+  const out = new Set<string>();
+  for (const part of chunk([...new Set(ids)], IN_QUERY_LIMIT)) {
+    const snap = await sub(deps.db, corporationId, PAYMENTS)
+      .where('transferId', 'in', part)
+      .select('transferId')
+      .get();
+    for (const d of snap.docs) out.add(d.get('transferId') as string);
+  }
+  return out;
+}
+
 /**
  * #6207: replaces the noted donations into divisions the book does not read, leaving out the
  * ones an officer already called not tax. Officers-only (`meta`): it names donors and amounts.
@@ -949,6 +985,12 @@ interface EditOutcome {
   audits?: { action: AuditAction; detail: Data }[];
   result?: Data;
 }
+
+/** The fields that end a payment's wait for review, once an officer places it. */
+const reviewDone = (payment: Data): Data => ({
+  ...(payment.reviewReason !== undefined ? { reviewReason: FieldValue.delete() } : {}),
+  ...(payment.ambiguousMinerIds !== undefined ? { ambiguousMinerIds: FieldValue.delete() } : {}),
+});
 
 /** A dispute doc that still names ore; a withdrawn day's tombstone has none. */
 const hasLines = (d: Data) => Array.isArray(d.lines) && d.lines.length > 0;
@@ -1722,6 +1764,22 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const ref = col(c, PAYMENTS).doc(action.paymentId);
       if ((await tx.get(ref)).exists)
         fail('already-exists', 'A payment with that id exists', 'payment-exists');
+      // The same ISK is never counted twice: a donation the book holds is assigned, not recorded
+      // again; one noted in a division it does not read is linked, so it is not stored later.
+      const [fromSender, uncountedDoc] = await Promise.all([
+        tx.get(col(c, PAYMENTS).where('characterId', '==', action.characterId)),
+        tx.get(col(c, META).doc(UNCOUNTED_DOC)),
+      ]);
+      const sent: (Data & { id: string })[] = fromSender.docs.map((d) => ({
+        ...d.data(),
+        id: d.id,
+      }));
+      const same = handRecordMatch(action, {
+        held: sent.filter((p) => p.source === 'donation') as never[],
+        uncounted: (uncountedDoc.data()?.donations as UncountedDonation[] | undefined) ?? [],
+      });
+      if (same?.kind === 'held' || (same && sent.some((p) => p.transferId === same.id)))
+        fail('already-exists', 'That transfer is already in the book', 'transfer-in-book');
       await confirmDeclaration(c, action.declarationId, action.minerId, action.paymentId);
       tx.create(ref, {
         id: action.paymentId,
@@ -1731,7 +1789,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         uid: `char:${action.characterId}`,
         amount: action.amount,
         at: action.at,
-        ...(action.statementId ? { statementId: action.statementId } : {}),
+        ...(same ? { transferId: same.id } : {}),
         ...(action.note ? { note: action.note } : {}),
         recordedBy: by,
       });
@@ -1740,6 +1798,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
           paymentId: action.paymentId,
           minerId: action.minerId,
           amount: action.amount,
+          ...(same ? { transferId: same.id } : {}),
           ...(action.declarationId ? { declarationId: action.declarationId } : {}),
         },
       };
@@ -1786,17 +1845,32 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         fail('failed-precondition', 'Already assigned', 'already-assigned');
       await confirmDeclaration(c, action.declarationId, action.minerId, action.paymentId);
       // An officer placed a held donation: the review it waited for is done (#6207).
-      tx.update(ref, {
-        minerId: action.minerId,
-        assignedBy: by,
-        ...(payment.reviewReason !== undefined ? { reviewReason: FieldValue.delete() } : {}),
-      });
+      tx.update(ref, { minerId: action.minerId, assignedBy: by, ...reviewDone(payment) });
       return {
         detail: {
           paymentId: action.paymentId,
           minerId: action.minerId,
           ...(action.declarationId ? { declarationId: action.declarationId } : {}),
         },
+      };
+    }
+    case 'reassignPayment': {
+      // An officer's own placement: it stands over whatever the book matched (decision
+      // 20261120-235011). Moving it where it already is writes nothing.
+      const ref = col(c, PAYMENTS).doc(action.paymentId);
+      const payment = await mustGet(c, ref, 'Payment');
+      const from = typeof payment.minerId === 'string' ? payment.minerId : null;
+      if (from === action.minerId)
+        return { detail: { paymentId: action.paymentId, from, to: from } };
+      tx.update(ref, {
+        minerId: action.minerId ?? FieldValue.delete(),
+        assignedBy: by,
+        assignedAt: iso,
+        ...reviewDone(payment),
+      });
+      return {
+        detail: { paymentId: action.paymentId, from, to: action.minerId },
+        result: { minerId: action.minerId },
       };
     }
     case 'dismiss': {
@@ -3202,6 +3276,19 @@ export async function declareOwnPayment(deps: BookDeps, caller: Caller, input: D
     const notice = (await readLateNotice(tx, bookRef(deps.db, corporationId), noticeId))?.notice;
     if (!notice || !notice.uids.includes(caller.uid))
       fail('not-found', 'Late notice not found', 'not-found');
+    // The notice's Miner as the book groups it now: what a found transfer is credited to, and
+    // whose Characters may have sent it.
+    const grouping = (await tx.get(sub(deps.db, corporationId, MINERS))).docs.map((d) => ({
+      id: d.id,
+      characterIds: (d.get('characterIds') as number[] | undefined) ?? [],
+      ...(Array.isArray(d.get('aliases')) ? { aliases: d.get('aliases') as string[] } : {}),
+      ...(typeof d.get('createdAt') === 'string'
+        ? { createdAt: d.get('createdAt') as string }
+        : {}),
+    }));
+    const minerId = currentMinerOf(notice.minerId, grouping);
+    const senderIds =
+      grouping.find((m) => m.id === minerId)?.characterIds ?? minerCharacters(minerId, undefined);
     const open = await tx.get(
       sub(deps.db, corporationId, DECLARATIONS).where(NOTICE_ID_FIELD, '==', noticeId)
     );
@@ -3212,7 +3299,7 @@ export async function declareOwnPayment(deps: BookDeps, caller: Caller, input: D
     const transfers = input.transfers ?? [];
     const checks =
       transfers.length > 0
-        ? await checkTransfers(tx, deps, corporationId, notice.uids, transfers)
+        ? await checkTransfers(tx, deps, corporationId, senderIds, transfers)
         : ([] as ClaimCheck[]);
     // Every transfer found in the book: confirmed at once, nobody had to look.
     const allFound = checks.length > 0 && checks.every((c) => c.result === 'found');
@@ -3224,7 +3311,7 @@ export async function declareOwnPayment(deps: BookDeps, caller: Caller, input: D
     for (const c of checks) {
       if (c.result === 'found' && c.paymentId)
         tx.update(sub(deps.db, corporationId, PAYMENTS).doc(c.paymentId), {
-          minerId: notice.minerId,
+          minerId,
           claimedBy: characterId,
           claimedAt: iso,
           reviewReason: FieldValue.delete(),
@@ -3238,7 +3325,7 @@ export async function declareOwnPayment(deps: BookDeps, caller: Caller, input: D
       at: iso,
       recordedBy: characterId,
       via: 'player',
-      minerId: notice.minerId,
+      minerId,
       uids: notice.uids,
       ...(input.amount !== undefined ? { amount: input.amount } : {}),
       ...(input.note !== undefined ? { note: input.note } : {}),
@@ -3268,7 +3355,7 @@ export async function declareOwnPayment(deps: BookDeps, caller: Caller, input: D
         ...(input.amount !== undefined ? { amount: input.amount } : {}),
       }
     );
-    return { declarationId: id, minerId: notice.minerId, checks, confirmed: allFound };
+    return { declarationId: id, minerId, checks, confirmed: allFound };
   });
   await refreshReadModels(deps.db, corporationId, deps.now());
   return {
@@ -3287,19 +3374,18 @@ async function checkTransfers(
   tx: Transaction,
   deps: BookDeps,
   corporationId: number,
-  uids: readonly string[],
+  senderIds: readonly number[],
   transfers: readonly ClaimTransfer[]
 ): Promise<ClaimCheck[]> {
-  const senderIds = uids.flatMap((u) => (u.startsWith('char:') ? [Number(u.slice(5))] : []));
   const book = (await tx.get(bookRef(deps.db, corporationId))).data() ?? {};
-  const payments =
-    senderIds.length === 0
-      ? []
-      : (
-          await tx.get(
-            sub(deps.db, corporationId, PAYMENTS).where('characterId', 'in', senderIds.slice(0, 30))
-          )
-        ).docs.map((d): Data & { id: string } => ({ ...(d.data() as Data), id: d.id }));
+  // Every Character of the Miner may have sent it, officer-claimed alts too: a page of senders at a time.
+  const payments: (Data & { id: string })[] = [];
+  for (const ids of chunk([...senderIds], IN_QUERY_LIMIT)) {
+    const snap = await tx.get(
+      sub(deps.db, corporationId, PAYMENTS).where('characterId', 'in', ids)
+    );
+    payments.push(...snap.docs.map((d) => ({ ...(d.data() as Data), id: d.id })));
+  }
   const uncounted =
     ((await tx.get(sub(deps.db, corporationId, META).doc(UNCOUNTED_DOC))).data()?.donations as
       { characterId: number; amount: number; at: string; division: number }[] | undefined) ?? [];

@@ -32,6 +32,7 @@ import {
   type StatementDays,
 } from './corpTaxBookEngine.js';
 import { DAY_MS } from './timeConstants.js';
+import { matchesStatedTransfer } from './corpTaxBookTransferMatch.js';
 import {
   NOTICE_ID_FIELD,
   isFinalNoticeId,
@@ -645,7 +646,6 @@ export type EditAction =
       characterId: number;
       amount: number;
       at: string;
-      statementId?: string;
       note?: string;
       /** The Declaration this payment confirms, in the same write (one resolution per declaration). */
       declarationId?: string;
@@ -658,6 +658,8 @@ export type EditAction =
       /** The Declaration this donation match confirms, in the same write. */
       declarationId?: string;
     }
+  /** An officer moves a payment to another Miner, or back to Unmatched with `null`. */
+  | { action: 'reassignPayment'; paymentId: string; minerId: string | null }
   /** #6207: an officer says a donation into a division the book does not read is not tax. */
   | { action: 'ignoreUncounted'; uncountedId: string }
   | {
@@ -831,6 +833,7 @@ export const LIVE_CHECK_ACTIONS: ReadonlySet<EditAction['action']> = new Set([
   'rebill',
   'markNotTax',
   'resetCheckpoint',
+  'reassignPayment',
 ]);
 
 /** A close that forfeits credit writes value off, so it re-checks the role live too (#4184). */
@@ -867,7 +870,6 @@ const optReason = (v: unknown) =>
 const optNote = (v: unknown) => (v === undefined ? undefined : boundedString(v, 'note', 500));
 const optNextStep = (v: unknown) =>
   v === undefined ? undefined : boundedString(v, 'nextStep', 500);
-const optId = (v: unknown, f: string) => (v === undefined ? undefined : docId(v, f));
 /** A Late notice's id, as `noticeId` or by the old name an older client still sends. */
 const noticeIdOf = (d: Record<string, unknown>) =>
   docId(d.noticeId ?? d[NOTICE_ID_FIELD], 'noticeId');
@@ -893,6 +895,7 @@ export function parseEditAction(data: unknown): EditAction {
     'recordPayment',
     'markNotTax',
     'assignPayment',
+    'reassignPayment',
     'ignoreUncounted',
     'dismiss',
     'dismissRecords',
@@ -951,7 +954,7 @@ export function parseEditAction(data: unknown): EditAction {
         characterId: int(d.characterId, 'characterId'),
         amount: money(d.amount, 'amount'),
         at: instant(d.at, 'at'),
-        statementId: optId(d.statementId, 'statementId'),
+        // An older tab may still name a notice: money pays the oldest day, so it is not stored.
         note: optNote(d.note),
         ...(d.declarationId !== undefined
           ? { declarationId: docId(d.declarationId, 'declarationId') }
@@ -974,6 +977,12 @@ export function parseEditAction(data: unknown): EditAction {
         ...(d.declarationId !== undefined
           ? { declarationId: docId(d.declarationId, 'declarationId') }
           : {}),
+      };
+    case 'reassignPayment':
+      return {
+        action,
+        paymentId: docId(d.paymentId, 'paymentId'),
+        minerId: d.minerId === null ? null : docId(d.minerId, 'minerId'),
       };
     case 'ignoreUncounted':
       return { action, uncountedId: docId(d.uncountedId, 'uncountedId') };
@@ -1575,8 +1584,7 @@ export interface SyncInput extends BookCall {
     amount: number;
     at: string;
     reason?: string;
-    minerId?: string;
-    statementId?: string;
+    /** A client's hint that a known sender's Miner owed nothing, so it waits for review (#6207). */
     reviewReason?: 'no-open-balance';
   }[];
   gaps: { structureId: number; from: string; to: string }[];
@@ -1663,9 +1671,9 @@ export function parseSyncInput(data: unknown, nowMs: number): SyncInput {
       amount: money(x.amount, 'amount'),
       at: instant(x.at, 'at'),
       reason: x.reason === undefined ? undefined : String(x.reason).slice(0, 200),
-      minerId: optId(x.minerId, 'minerId'),
-      statementId: optId(x.statementId, 'statementId'),
-      // #6207: a known sender's donation held for review; only on one with no Miner.
+      // Whose money it is, the server decides (corpTaxBookDonationMatch.ts): a client's Miner or
+      // notice is not read. #6207: a known sender's donation held for review; only on one the
+      // client matched to no Miner.
       reviewReason:
         x.reviewReason === 'no-open-balance' && x.minerId === undefined
           ? ('no-open-balance' as const)
@@ -1832,10 +1840,10 @@ export interface ClaimCheck {
   paymentId?: string;
   /** `division`: the wallet division it sits in, which the book does not read. */
   division?: number;
+  /** `credited`: the Miner the book already credited the payment to. */
+  minerId?: string;
 }
 
-/** How far apart the member's and the corporation's journals may stamp one transfer. */
-const CLAIM_MATCH_MS = 2 * DAY_MS;
 /** ESI's wallet journal window: older than this before a sync, the sync could not have read it. */
 const JOURNAL_WINDOW_MS = 30 * DAY_MS;
 
@@ -1893,11 +1901,11 @@ export function checkClaimedTransfer(t: ClaimTransfer, ctx: ClaimCheckContext): 
   if (t.recipient === 'character') return { result: 'person' };
   if (t.recipient === 'otherCorporation') return { result: 'otherCorp' };
   const at = Date.parse(t.at);
+  // The claim names no sender: any of the Miner's Characters may have sent it.
   const same = (x: { characterId?: number; amount: number; at: string }) =>
     x.characterId !== undefined &&
     ctx.senderIds.includes(x.characterId) &&
-    Math.abs(x.amount - t.amount) < 1 &&
-    Math.abs(Date.parse(x.at) - at) <= CLAIM_MATCH_MS;
+    matchesStatedTransfer({ ...t, characterId: x.characterId }, x);
   const payments = ctx.payments.filter(
     (p) => same(p) && creditable(p, ctx.startDate) && !ctx.taken?.has(p.id)
   );
@@ -1908,6 +1916,9 @@ export function checkClaimedTransfer(t: ClaimTransfer, ctx: ClaimCheckContext): 
     return { result: 'found', paymentId: payments[0].id };
   }
   if (uncounted[0]) return { result: 'division', division: uncounted[0].division };
+  // Already placed by the book: say whose, rather than that it was never seen.
+  const placed = ctx.payments.find((p) => same(p) && p.minerId !== undefined);
+  if (placed) return { result: 'credited', paymentId: placed.id, minerId: placed.minerId };
   if (ctx.lastSyncAt === undefined || at > ctx.lastSyncAt) return { result: 'notSynced' };
   if (at < ctx.lastSyncAt - JOURNAL_WINDOW_MS) return { result: 'tooOld' };
   if (ctx.startDate !== undefined && utcDate(at) < ctx.startDate) return { result: 'tooOld' };
@@ -2148,6 +2159,31 @@ export function disputesClosedByWriteOff(
   return open
     .filter((d) => typeof d.date === 'string' && forgiven.has(d.date))
     .map((d) => d.id as string);
+}
+
+/**
+ * What a hand-recorded payment is, among the transfers the book already knows of from the same
+ * sender (`matchesStatedTransfer`): a donation it holds (`held`: assign that one instead, never
+ * count it twice), one noted in a division the book does not read (`uncounted`: the hand record
+ * stands for it, so the donation is not stored again if that division is later read), or neither.
+ * The nearest in time wins.
+ */
+export function handRecordMatch(
+  stated: { characterId: number; amount: number; at: string },
+  known: {
+    held: readonly { id: string; characterId?: number; amount: number; at: string }[];
+    uncounted: readonly { id: string; characterId: number; amount: number; at: string }[];
+  }
+): { kind: 'held' | 'uncounted'; id: string } | null {
+  const gap = (x: { at: string }) => Math.abs(Date.parse(x.at) - Date.parse(stated.at));
+  const candidates = [
+    ...known.held.map((x) => ({ kind: 'held' as const, x })),
+    ...known.uncounted.map((x) => ({ kind: 'uncounted' as const, x })),
+  ]
+    .filter(({ x }) => matchesStatedTransfer(stated, x))
+    .sort((a, b) => gap(a.x) - gap(b.x));
+  const best = candidates[0];
+  return best ? { kind: best.kind, id: best.x.id } : null;
 }
 
 /** One dispute per Miner and day: `solo:7` has a colon, which a doc id avoids. */

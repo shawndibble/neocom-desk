@@ -13,6 +13,8 @@ export const TRANSFER_RECIPIENTS = ['corporation', 'character', 'otherCorporatio
 /** What checking one claimed transfer against the book found. */
 export const CLAIM_CHECK_RESULTS = [
   'found',
+  /** The book already credited the payment, to the Miner it names. */
+  'credited',
   'division',
   'notSynced',
   'tooOld',
@@ -62,6 +64,7 @@ export const AUDIT_ACTIONS = [
   'recordPayment',
   'markNotTax',
   'assignPayment',
+  'reassignPayment',
   'ignoreUncounted',
   'dismiss',
   'dismissRecords',

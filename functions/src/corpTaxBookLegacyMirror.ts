@@ -2,6 +2,10 @@
 // open tabs read notices from `statements`, their links from `statementLinks`, so every write to
 // a notice is copied there. Step 5 ends the mirror by deleting this file and its calls; nothing
 // else in the server writes a notice to the legacy collections.
+//
+// Legacy fields no write sets any more, still readable on old docs: a payment's `statementId`
+// (the notice an old client or the old matcher pinned a donation to; money pays the Miner's oldest
+// day, so it pins nothing) and a write-off's `statementId`.
 
 import type { DocumentReference, Transaction } from 'firebase-admin/firestore';
 import { FieldValue } from 'firebase-admin/firestore';

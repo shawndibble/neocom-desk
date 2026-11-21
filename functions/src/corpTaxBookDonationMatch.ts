@@ -1,20 +1,33 @@
 // Whose money a donation is (decision 20261120-235011): the one matching rule for the client and
 // the Cloud Functions (decision 20261117-230113), dependency-free so both import it.
 //
-// A sender the book knows pays their own Miner, whatever code the reason names. A stranger's
-// donation is named by the Reason codes it carries: each Miner's own code (`minerPaymentCode`, for
-// the Miner, each id folded into it and each of its Characters' solo ids) and every code a Late
-// notice printed. A code held by two Miners, or a reason naming two Miners, is no one's: it stays
-// unmatched for an officer. A code only says whose money it is; it pays that Miner's oldest day.
+// A sender the book knows (grouped, or seen mining: never "has paid before") pays their own
+// Miner, whatever code the reason names. Any other donation is named by the Reason codes it
+// carries: each Miner's own code (`minerPaymentCode`, for the Miner, each id folded into it and
+// each of its Characters' solo ids) and every code a Late notice printed. With no code, a payer
+// known only by an earlier payment keeps the Miner that payment named. A code held by two Miners,
+// a reason naming two, or a payer whose payments named two, is ambiguous: it goes to an officer's
+// review and is never claimed automatically. A code only says whose money it is; it pays that
+// Miner's oldest day.
 
 import { minerPaymentCode, paymentCode } from './corpTaxBookLateNotice.js';
 
-/** A Miner grouping, with the ids folded into it (`aliases`). */
+/** A Miner grouping, with the ids folded into it (`aliases`) and when it was first made. */
 export interface MatchMiner {
   id: string;
   characterIds: readonly number[];
   aliases?: readonly string[];
+  createdAt?: string;
 }
+
+/**
+ * The order groupings are ranked in when a Character is stored in more than one: the earliest
+ * made wins (one made before `createdAt` existed counts as earliest), then the lower id.
+ */
+export const earlierGrouping = (
+  a: Pick<MatchMiner, 'id' | 'createdAt'>,
+  b: Pick<MatchMiner, 'id' | 'createdAt'>
+): number => (a.createdAt ?? '').localeCompare(b.createdAt ?? '') || a.id.localeCompare(b.id);
 
 /** A Reason code: `MT` and six base-36 characters, standing on its own. */
 const CODE_TOKEN = /(?<![0-9A-Za-z])MT[0-9A-Z]{6}(?![0-9A-Za-z])/gi;
@@ -24,9 +37,15 @@ export function codesIn(reason: string | undefined): string[] {
   return [...new Set((reason ?? '').match(CODE_TOKEN)?.map((c) => c.toUpperCase()) ?? [])];
 }
 
-/** The Miner a Character is billed under: its grouping, else a Miner of its own. */
-export function minerIdFor(characterId: number, miners: readonly MatchMiner[]): string {
-  return miners.find((m) => m.characterIds.includes(characterId))?.id ?? `solo:${characterId}`;
+/** The Miner a Character is billed under: its earliest grouping, else a Miner of its own. */
+export function minerIdFor(
+  characterId: number,
+  miners: readonly Pick<MatchMiner, 'id' | 'characterIds' | 'createdAt'>[]
+): string {
+  let best: Pick<MatchMiner, 'id' | 'createdAt'> | undefined;
+  for (const m of miners)
+    if (m.characterIds.includes(characterId) && (!best || earlierGrouping(m, best) < 0)) best = m;
+  return best?.id ?? `solo:${characterId}`;
 }
 
 /** Where a stored Miner id lives now: its grouping, the group a solo id or an absorbed id folded into. */
@@ -38,8 +57,8 @@ export function currentMinerOf(minerId: string, miners: readonly MatchMiner[]): 
   return solo ? minerIdFor(Number(solo[1]), miners) : minerId;
 }
 
-/** Code → the Miner it names, or null when two Miners hold it. */
-export type CodeOwners = ReadonlyMap<string, string | null>;
+/** Code → the Miners that hold it: one is whose money it is, more is ambiguous. */
+export type CodeOwners = ReadonlyMap<string, readonly string[]>;
 
 /**
  * Every code the book recognises and whose it is: each notice's printed code (or the one its id
@@ -51,11 +70,11 @@ export function codeOwners(
   miners: readonly MatchMiner[],
   knownMinerIds: Iterable<string>
 ): CodeOwners {
-  const owners = new Map<string, string | null>();
+  const owners = new Map<string, string[]>();
   const add = (code: string, minerId: string) => {
     const owner = currentMinerOf(minerId, miners);
-    const held = owners.get(code);
-    owners.set(code, held === undefined || held === owner ? owner : null);
+    const held = owners.get(code) ?? [];
+    if (!held.includes(owner)) owners.set(code, [...held, owner].sort());
   };
   for (const n of notices) add((n.code ?? paymentCode(n.id)).toUpperCase(), n.minerId);
   const ids = new Set<string>(knownMinerIds);
@@ -71,14 +90,25 @@ export function codeOwners(
 export interface MatchBook {
   miners: readonly MatchMiner[];
   codes: CodeOwners;
-  /** Characters the book has seen mine or pay. */
-  knownCharacterIds: ReadonlySet<number>;
+  /** Characters the book has seen mine: a sender among them is their own Miner. */
+  minedCharacterIds: ReadonlySet<number>;
+  /** Per payer, the Miner ids their earlier payments named. */
+  paidBefore?: ReadonlyMap<number, readonly string[]>;
 }
 
 export type DonationOwner =
-  | { kind: 'miner'; minerId: string; by: 'sender' | 'code' }
-  | { kind: 'ambiguous' }
+  | { kind: 'miner'; minerId: string; by: 'sender' | 'code' | 'payer' }
+  | { kind: 'ambiguous'; minerIds: string[] }
   | { kind: 'unmatched' };
+
+/** One Miner, or the Miners it could be. */
+function oneOf(named: ReadonlySet<string>, by: 'code' | 'payer'): DonationOwner | undefined {
+  const ids = [...named].sort();
+  if (ids.length === 0) return undefined;
+  return ids.length === 1
+    ? { kind: 'miner', minerId: ids[0], by }
+    : { kind: 'ambiguous', minerIds: ids };
+}
 
 /** Whose money one donation is. */
 export function donationOwner(
@@ -86,29 +116,39 @@ export function donationOwner(
   book: MatchBook
 ): DonationOwner {
   const grouped = book.miners.some((m) => m.characterIds.includes(donation.characterId));
-  if (grouped || book.knownCharacterIds.has(donation.characterId))
+  if (grouped || book.minedCharacterIds.has(donation.characterId))
     return { kind: 'miner', minerId: minerIdFor(donation.characterId, book.miners), by: 'sender' };
-  const named = new Set<string | null>();
-  for (const code of codesIn(donation.reason)) {
-    const owner = book.codes.get(code);
-    if (owner !== undefined) named.add(owner);
-  }
-  if (named.size === 0) return { kind: 'unmatched' };
-  const [only] = named;
-  return named.size === 1 && only !== null
-    ? { kind: 'miner', minerId: only, by: 'code' }
-    : { kind: 'ambiguous' };
+  const coded = new Set(codesIn(donation.reason).flatMap((code) => book.codes.get(code) ?? []));
+  const payer = new Set(
+    (book.paidBefore?.get(donation.characterId) ?? []).map((id) => currentMinerOf(id, book.miners))
+  );
+  return oneOf(coded, 'code') ?? oneOf(payer, 'payer') ?? { kind: 'unmatched' };
 }
 
-/** Each donation with the Miner it pays, when it has one; an ambiguous one is left for review. */
+/** What resolving puts on a stored donation: its Miner, or the review an ambiguous one waits for. */
+export type ResolvedOwner =
+  | { minerId: string }
+  | { reviewReason: 'ambiguous'; ambiguousMinerIds: string[] }
+  | Record<string, never>;
+
+/** What resolving puts on one stored donation: its Miner, or the review it waits for. */
+export function ownerFields(
+  donation: { characterId: number; reason?: string },
+  book: MatchBook
+): ResolvedOwner {
+  const owner = donationOwner(donation, book);
+  if (owner.kind === 'miner') return { minerId: owner.minerId };
+  if (owner.kind === 'ambiguous')
+    return { reviewReason: 'ambiguous', ambiguousMinerIds: owner.minerIds };
+  return {};
+}
+
+/** Each donation with the Miner it pays, or held for review when it could be several Miners'. */
 export function resolveDonationOwners<T extends { characterId: number; reason?: string }>(
   donations: readonly T[],
   book: MatchBook
-): (T & { minerId?: string })[] {
-  return donations.map((d) => {
-    const owner = donationOwner(d, book);
-    return owner.kind === 'miner' ? { ...d, minerId: owner.minerId } : d;
-  });
+): (T & ResolvedOwner)[] {
+  return donations.map((d) => ({ ...d, ...ownerFields(d, book) }));
 }
 
 /** The most donations into other divisions a sync notes (#6207). */
@@ -150,6 +190,7 @@ export function uncountedDonations(
   return donations
     .filter((d) => {
       const owner = donationOwner(d, book);
+      // A code says it was tax; so does a donation an officer has to place.
       if (owner.kind === 'ambiguous' || (owner.kind === 'miner' && owner.by === 'code'))
         return true;
       return (

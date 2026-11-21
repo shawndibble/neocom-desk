@@ -10,6 +10,7 @@ import { FieldValue, type Firestore, type WriteBatch } from 'firebase-admin/fire
 import { commitInBatches, type BatchOp } from './commitInBatches.js';
 import { extractionIdOf, type ObservedRow } from './corpTaxBookEngine.js';
 import { isBookStamped } from './corpTaxBookExtractionStamp.js';
+import { minerIdFor } from './corpTaxBookDonationMatch.js';
 import {
   MOON_DOCS,
   moonDocsToCheck,
@@ -87,16 +88,17 @@ export async function reconcileMoonDocs(
       : [],
   ]);
   const existing = new Map(held.filter((d) => d.exists).map((d) => [d.id, d.data() as Data]));
-  const minerByCharacter = new Map<number, string>();
-  for (const m of minerSnap.docs)
-    for (const id of (m.get('characterIds') as number[] | undefined) ?? [])
-      minerByCharacter.set(id, m.id);
+  const miners = minerSnap.docs.map((m) => ({
+    id: m.id,
+    characterIds: (m.get('characterIds') as number[] | undefined) ?? [],
+    ...(typeof m.get('createdAt') === 'string' ? { createdAt: m.get('createdAt') as string } : {}),
+  }));
 
   const wanted = extractions.filter((x) => scope.has(extractionIdOf(x)));
   const rowsOf = await rowsOfPulls(db, corporationId, wanted);
   const plan = planMoonDocs(extractions, existing, scope, rowsOf, {
     expiryHours,
-    minerOf: (characterId) => minerByCharacter.get(characterId) ?? `solo:${characterId}`,
+    minerOf: (characterId) => minerIdFor(characterId, miners),
   });
   if (options.repair) {
     const ops: BatchOp[] = [

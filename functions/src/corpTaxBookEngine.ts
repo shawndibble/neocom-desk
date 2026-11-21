@@ -8,6 +8,7 @@
 
 import { isPlainRecord } from './guards.js';
 import { DAY_MS, HOUR_MS } from './timeConstants.js';
+import { PAYOUT_LINK_WINDOW_DAYS } from './corpTaxBookTransferMatch.js';
 
 export interface ObservedRow {
   structureId: number;
@@ -1021,8 +1022,8 @@ export interface JournalEntryOut {
   reason?: string;
 }
 
-/** How far a recorded date may sit from the journal's day and still be the same payment. */
-export const PAYOUT_LINK_WINDOW_DAYS = 3;
+/** How far a recorded date may sit from the journal's day and still be the same payment (one copy). */
+export { PAYOUT_LINK_WINDOW_DAYS };
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
