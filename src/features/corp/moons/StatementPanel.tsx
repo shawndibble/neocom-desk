@@ -17,6 +17,7 @@ import {
   iskOrDash,
   periodLabel,
   shortDate,
+  atDate,
 } from './moonsFormat';
 import { DueWord } from './moonsParts';
 import { minerPath } from './moonsPaths';
@@ -173,7 +174,7 @@ export function StatementPanel({
             {detail.settled ? (
               t(k('paid'))
             ) : detail.state === 'paused' && detail.pausedUntil ? (
-              t(k('paused'), { date: shortDate(detail.pausedUntil) })
+              t(k('paused'), { date: atDate(detail.pausedUntil, zone) })
             ) : (
               <DueWord dueAt={detail.dueAt} now={view.input.now} />
             )}

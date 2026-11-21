@@ -23,7 +23,7 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { callableErrorReason } from '@/lib/callableError';
 import { callableErrorText } from './feederErrorText';
 import { useBook } from './useBook';
-import { dateWithYear, isk, newId, paidAtFor, wallClock } from './moonsFormat';
+import { dateWithYear, isk, newId, paidAtFor, wallClock, dateTimeAt } from './moonsFormat';
 import { MinerPicker } from './MinerPicker';
 import { DonationPicker, PaymentOutcomePanel } from './RecordPaymentParts';
 import { DialogFooter } from '@/components/ui/DialogFooter';
@@ -429,7 +429,7 @@ export function MarkNotTaxDialog({
         {t('corpTaxBook.moons.dialogs.notTax.intro', {
           name: fromName,
           amount: isk(payment.amount),
-          at: wallClock(payment.at, zone).replace('T', ' '),
+          at: dateTimeAt(payment.at, zone),
         })}
       </p>
       <div className="space-y-1">
@@ -487,6 +487,7 @@ export function AssignDonationDialog({
   payment: { id: string; amount: number; at: string; reason?: string };
   fromName: string;
 }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const { edit, view, names } = useBook();
   const [minerId, setMinerId] = useState('');
@@ -508,7 +509,7 @@ export function AssignDonationDialog({
         {t('corpTaxBook.moons.dialogs.assign.intro', {
           amount: isk(payment.amount),
           name: fromName,
-          date: payment.at.slice(0, 10),
+          date: wallClock(payment.at, zone).slice(0, 10),
           reason: payment.reason ?? '—',
         })}
       </p>

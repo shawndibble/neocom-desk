@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom';
+import { useTimeZone } from '@/lib/timeFormat';
+import { dateTimeAt } from '@/features/corp/moons/moonsFormat';
 import { useTranslation } from 'react-i18next';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { highlightHref } from '@/lib/highlightParam';
@@ -6,7 +8,6 @@ import { Well } from '@/components/ui/Well';
 import { Eyebrow } from '@/components/ui/Eyebrow';
 import type { TaxPayment } from '@/engine/corpTaxBook/allocation';
 import type { PaidBy } from '@/engine/corpTaxBook/paidBy';
-import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
 import { formatIsk } from '@/lib/isk';
 
 interface Props {
@@ -25,6 +26,7 @@ interface Props {
  * is to the member's own wallet entry for a donation, where one was found.
  */
 export function PaidByList({ paidBy, payments, corpName, walletRefs }: Props) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const k = (key: string) => `miningTax.corpBook.detail.paidBy.${key}`;
   const row = (key: string, label: string, amount: number, walletRef?: number) => (
@@ -51,7 +53,7 @@ export function PaidByList({ paidBy, payments, corpName, walletRefs }: Props) {
           const made = payments.find((x) => x.id === p.paymentId);
           const label = made
             ? t(k(made.source === 'manual' ? 'manual' : 'donation'), {
-                time: eveTimeLabel(Date.parse(made.at)),
+                time: dateTimeAt(made.at, zone),
               })
             : t(k('payment'));
           return row(p.paymentId, label, p.amount, walletRefs?.get(p.paymentId));
@@ -59,7 +61,7 @@ export function PaidByList({ paidBy, payments, corpName, walletRefs }: Props) {
         {paidBy.inFlight.map((d, i) =>
           row(
             `in-flight-${d.refId ?? i}`,
-            t(k('inFlight'), { corp: corpName, time: eveTimeLabel(Date.parse(d.at)) }),
+            t(k('inFlight'), { corp: corpName, time: dateTimeAt(d.at, zone) }),
             d.amount
           )
         )}

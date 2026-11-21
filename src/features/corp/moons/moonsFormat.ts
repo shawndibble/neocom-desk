@@ -24,7 +24,7 @@ export const refineryUnreadable = (id: number | string) => `Unknown/Undockable (
 export const isRefineryPlaceholder = (name: string, id: number | string) =>
   name === refineryPlaceholder(id) || name === refineryUnreadable(id);
 
-/** "18 Oct" from a UTC date or instant. */
+/** "18 Oct" from a `YYYY-MM-DD` ledger day (an EVE day). An instant goes through `atDate`. */
 export function shortDate(value: string): string {
   const [, m, d] = value.slice(0, 10).split('-').map(Number);
   return `${d} ${MONTHS[m - 1]}`;
@@ -65,8 +65,17 @@ export const atDate = (value: string | number, zone: ClockZone) =>
   shortDate(wallClock(value, zone));
 
 /** "18 Oct", or "18 Oct 2025" off this year, from an instant on the Time format's clock. */
-export const atDateWithYear = (value: string | number, zone: ClockZone, now: Date = new Date()) =>
-  dateWithYear(wallClock(value, zone), now);
+export function atDateWithYear(
+  value: string | number,
+  zone: ClockZone,
+  now: Date = new Date()
+): string {
+  const at = wallClock(value, zone);
+  const year = at.slice(0, 4);
+  return year === wallClock(now.getTime(), zone).slice(0, 4)
+    ? shortDate(at)
+    : `${shortDate(at)} ${year}`;
+}
 
 /** "14:00" from an instant on the Time format's clock. */
 export const atTime = (value: string | number, zone: ClockZone) =>
@@ -75,12 +84,16 @@ export const atTime = (value: string | number, zone: ClockZone) =>
 const utcMark = (zone: ClockZone) => (zone === 'UTC' ? '\u00a0UTC' : '');
 
 /** "18 Oct 14:00 UTC" (EVE time) or "18 Oct 16:00" (local), with the year when it is not this one. */
-export function dateTimeAt(value: string, zone: ClockZone, now: Date = new Date()): string {
+export function dateTimeAt(
+  value: string | number,
+  zone: ClockZone,
+  now: Date = new Date()
+): string {
   return `${atDateWithYear(value, zone, now)} ${atTime(value, zone)}${utcMark(zone)}`;
 }
 
 /** "12:35 UTC" or "14:35" from an instant: a time later today or tomorrow, where the date adds nothing. */
-export function clockAt(ms: number, zone: ClockZone): string {
+export function clockAt(ms: string | number, zone: ClockZone): string {
   return `${atTime(ms, zone)}${utcMark(zone)}`;
 }
 
@@ -90,7 +103,7 @@ export function signedIsk(value: number): string {
 }
 
 /** "18 Oct 14:00" from an instant, on the Time format's clock. */
-export function shortDateTime(value: string, zone: ClockZone): string {
+export function shortDateTime(value: string | number, zone: ClockZone): string {
   return `${atDate(value, zone)} ${atTime(value, zone)}`;
 }
 

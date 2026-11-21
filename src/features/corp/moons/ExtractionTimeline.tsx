@@ -72,16 +72,17 @@ export function ExtractionStateFilter({
   );
 }
 
-/** The dates an officer plans around, in local time, with the time left where one is still ahead. */
+/** The dates an officer plans around, on the Time format's clock, with the time left where one is still ahead. */
 function PlanTip({ row, now }: { row: ExtractionRow; now: number }) {
   const { t } = useTranslation();
+  const zone = useTimeZone();
   const line = (label: string, iso: string) => {
     const ms = Date.parse(iso);
     return (
       <div>
         <div className="text-text-dim">{label}</div>
         <div className="tabular-nums">
-          {formatLocalDateTime(new Date(ms))}
+          {formatLocalDateTime(new Date(ms), zone)}
           {ms > now && (
             <span className="text-text-dim">
               {' · '}

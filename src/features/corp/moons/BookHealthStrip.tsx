@@ -206,7 +206,7 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
       {held && (
         <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-text-dim" role="note">
           {t('corpTaxBook.moons.health.hiddenFromMembers', {
-            date: shortDateTime(new Date(seeFrom).toISOString(), zone),
+            date: shortDateTime(seeFrom, zone),
           })}
           <InfoTooltip
             label={t('common.aboutLabel', {

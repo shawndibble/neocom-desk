@@ -13,7 +13,7 @@ import { netOf, type PaymentOutcome } from '@/engine/corpTaxBook/paymentPreview'
 import type { Statement } from '@/engine/corpTaxBook/statements';
 import type { SettlePayment } from '@/engine/corpTaxBook/sync';
 import { cx } from '@/lib/cx';
-import { atDate, atTime, isk, periodLabel } from './moonsFormat';
+import { atDate, isk, periodLabel, clockAt } from './moonsFormat';
 
 /** A picker over this many donations gets a search box; fewer read at a glance. */
 const DONATION_SEARCH_FROM = 4;
@@ -147,7 +147,7 @@ export function DonationPicker({
                     })}
                   </span>
                   <span className="text-text-dim">
-                    {t(`${k}.donationAt`, { date: atDate(d.at, zone), time: atTime(d.at, zone) })}
+                    {t(`${k}.donationAt`, { date: atDate(d.at, zone), time: clockAt(d.at, zone) })}
                   </span>
                 </span>
               </label>

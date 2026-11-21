@@ -19817,7 +19817,7 @@
           "findDonation": "Find by pilot or amount",
           "noDonationMatch": "No donation matches.",
           "donationRow": "{{amount}} from {{name}}",
-          "donationAt": "{{date}} {{time}} EVE time",
+          "donationAt": "{{date}} {{time}}",
           "confirmMatch": "Assign {{amount}}",
           "outcomeTitle": "After this payment",
           "enterAmount": "Enter an amount to see which Statements it pays.",
@@ -19831,7 +19831,7 @@
         "notTax": {
           "title": "Mark part of a donation as not tax",
           "confirm": "Mark {{amount}} not tax",
-          "intro": "Donation from {{name}}, {{at}} EVE time, {{amount}}.",
+          "intro": "Donation from {{name}}, {{at}}, {{amount}}.",
           "how": "How much of it is not tax",
           "all": "All",
           "part": "Part",

@@ -441,7 +441,7 @@ export function MinersTab() {
                 <span className="min-w-0 truncate font-semibold">{nameOf(m)}</span>
                 <span className="shrink-0 text-xs text-text-dim">
                   {t('corpTaxBook.moons.miners.closedOn', {
-                    date: atDate(closedAtById.get(m.id) ?? '', zone),
+                    date: atDate(closedAtById.get(m.id)!, zone),
                   })}
                 </span>
               </Link>

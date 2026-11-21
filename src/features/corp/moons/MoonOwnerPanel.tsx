@@ -15,7 +15,6 @@ import {
   setOwnRefineryLabel,
 } from '../taxBook/feederViewClient';
 import { isStale, owedOnLeaving } from '../taxBook/feederViewModel';
-import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
 import { feederErrorText } from './feederErrorText';
 import { LeaveMoonOwnerDialog } from './LeaveMoonOwnerDialog';
 import { MoonOwnerPrevious } from './MoonOwnerPrevious';
@@ -24,7 +23,7 @@ import { OwnerStaleBanner } from './OwnerStaleBanner';
 import { daysUntilOreLost, staleLedgerClock } from '@/engine/corpTaxBook/feederHealth';
 import { RefineryNamesBanner } from './RefineryNamesBanner';
 import { OwnerStatusStrip } from './OwnerStatusStrip';
-import { atDate } from './moonsFormat';
+import { atDate, dateTimeAt } from './moonsFormat';
 import { enqueuePayeeChangeMail } from '@/features/corpTaxBook/mailQueue';
 import { canSendMail, queueOfficerMail } from '@/features/corpTaxBook/officerMail';
 import { useFeederView } from './useFeederView';
@@ -170,7 +169,7 @@ export function MoonOwnerPanel({
                 title={
                   typeof view.summary.removalEffectiveAt === 'number'
                     ? t('corpTaxBook.moons.ownerView.removal.title', {
-                        time: eveTimeLabel(view.summary.removalEffectiveAt),
+                        time: dateTimeAt(view.summary.removalEffectiveAt, zone),
                       })
                     : t('corpTaxBook.moons.ownerView.removal.titleNoTime')
                 }
