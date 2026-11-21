@@ -125,6 +125,26 @@ describe('computePayeeBalances', () => {
     expect(balances.every((b) => b.payee.id !== 'gone')).toBe(true);
   });
 
+  it("holds a Payee's credit off its account, even with nothing outstanding in view", () => {
+    const rows = [
+      displayRow(assignment({ id: 'a1', payeeId: 'p1', taxOwed: 100, status: 'paid' })),
+    ];
+    const balances = computePayeeBalances(rows, payees, accountsOf(rows, payees, [['p1', 150]]));
+    expect(balances.find((b) => b.payee.id === 'p1')).toMatchObject({ owed: 0, credit: 50 });
+  });
+
+  it("reads a Corp Tax Book Payee's credit off its Miners' accounts", () => {
+    const corp = payee('corp-book:98000001', 'Brass Meridian');
+    const [balance] = computePayeeBalances(
+      [],
+      [corp],
+      accountsOf([], []),
+      new Map(),
+      new Map([[corp.id, 2_000]])
+    );
+    expect(balance).toMatchObject({ owed: 0, credit: 2_000 });
+  });
+
   it("owes a Corp Tax Book's Payee what its rows still owe", () => {
     const corp = payee('corp-book:98000001', 'Brass Meridian');
     const rows = [displayRow(assignment({ id: 'b1', payeeId: corp.id, taxOwed: 70 }))];

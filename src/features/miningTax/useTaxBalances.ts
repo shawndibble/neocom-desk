@@ -27,6 +27,8 @@ interface Args {
   alsoBilled?: PersonalOverlay['alsoBilled'];
   /** The corporations of the member's Corp Tax Books: a donation to one is the book's. */
   bookCorporations: ReadonlySet<number>;
+  /** Each Corp Tax Book Payee's credit, by its id (`bookCreditsOf`). */
+  bookCredits?: ReadonlyMap<string, number>;
 }
 
 /**
@@ -45,6 +47,7 @@ export function useTaxBalances({
   checkpoints,
   alsoBilled,
   bookCorporations,
+  bookCredits,
 }: Args) {
   // Every Character's rows: a merged Payee's oldest day may be an alt's, whatever the filter.
   // Ore a Corp Tax Book bills is owed to the corporation, not to the member's own Payee too.
@@ -63,8 +66,8 @@ export function useTaxBalances({
   // filter: narrowing the ledger to one Payee must not change a balance. The Overview's Mining
   // tax card reads the same figure (`loadOwedBalances`).
   const balances = useMemo(
-    () => owedBalances(characterFiltered, ledgerPayees, accounts, duplicateAliases),
-    [characterFiltered, ledgerPayees, accounts, duplicateAliases]
+    () => owedBalances(characterFiltered, ledgerPayees, accounts, duplicateAliases, bookCredits),
+    [characterFiltered, ledgerPayees, accounts, duplicateAliases, bookCredits]
   );
   const unassigned = useMemo(
     () => unassignedSummary(characterFiltered, estimatedValueOf),

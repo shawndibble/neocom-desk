@@ -16,7 +16,7 @@ import {
   type UnassignedSummary,
 } from './balances';
 import { loadBookPrices, loadCorpNames, loadTrackedCorpBooks } from './corpBook/corpBookSources';
-import { buildCorpBookView } from './corpBook/corpBookView';
+import { buildCorpBookView, type CorpBookView } from './corpBook/corpBookView';
 import { buildDisplayRows } from './corpBook/corpRows';
 import { allMembers, type DisplayRow } from './groupRows';
 import { PayeeAccounts, withPaidStatus } from './payeeAccounts';
@@ -62,15 +62,22 @@ export function payeeAccountsOf(input: {
   });
 }
 
+/** Each Corp Tax Book Payee's credit, by its id: what its Miners' accounts hold over what they bill. */
+export function bookCreditsOf(corpView: CorpBookView | null | undefined): Map<string, number> {
+  return new Map(corpView?.books.map((b) => [b.payee.id, b.summary.credit]) ?? []);
+}
+
 /** Per Payee, what is owed now over `rows` (display rows, a book's overlay applied). */
 export function owedBalances(
   rows: readonly DisplayRow[],
   ledgerPayees: readonly PayeeRecord[],
   accounts: PayeeAccounts,
   /** Duplicate records of one Payee mapped to the primary (`payeeDuplicateAliases`). */
-  aliases?: ReadonlyMap<string, string>
+  aliases?: ReadonlyMap<string, string>,
+  /** Each Corp Tax Book Payee's credit, by its id (`BookSummary.credit`). */
+  bookCredits?: ReadonlyMap<string, number>
 ): PayeeBalance[] {
-  return computePayeeBalances(rows, ledgerPayees, accounts, aliases);
+  return computePayeeBalances(rows, ledgerPayees, accounts, aliases, bookCredits);
 }
 
 /**
@@ -156,7 +163,8 @@ export async function loadOwedBalances(
       rows,
       [...payees, ...(corpView?.payees ?? [])],
       accounts,
-      payeeDuplicateAliases(groupPayees(payees))
+      payeeDuplicateAliases(groupPayees(payees)),
+      bookCreditsOf(corpView)
     ),
     unassignedCount: unassignedSummary(rows, () => 0).entryCount,
   };

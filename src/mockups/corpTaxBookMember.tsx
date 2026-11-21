@@ -148,6 +148,7 @@ const BILLED_ROW = member(
 const CORP_BALANCE: PayeeBalance = {
   payee: CORP_PAYEE_RECORD,
   owed: (BILLED.tax ?? 0) + (WAITING.tax ?? 0),
+  credit: 0,
   members: [
     BILLED_ROW,
     member(WAITING.date, ORE_TYPE[WAITING.ore], WAITING.units, 10, WAITING.value, WAITING.tax ?? 0),

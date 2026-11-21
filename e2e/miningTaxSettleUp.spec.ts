@@ -85,9 +85,7 @@ test('an over settle up pays every day, and the link holds all of it', async ({ 
   expect(links.map((l) => l.amount)).toEqual([3.5 * DAY_TAX]);
 });
 
-// Manage Payees shows credit only for a Corp Tax Book (`creditOfGroup`, PayeeManagerDialog.tsx
-// ~428 reads `corp.credit`): a personal Payee's 500,000 credit reads "Settled" there.
-test.fixme("a personal Payee's credit shows in Manage Payees", async ({ page }) => {
+test("a personal Payee's credit shows in Manage Payees", async ({ page }) => {
   await openTaxTab(page);
   await settleUp(page, 3.5 * DAY_TAX);
   await page.getByRole('button', { name: 'Payees', exact: true }).click();
@@ -96,9 +94,7 @@ test.fixme("a personal Payee's credit shows in Manage Payees", async ({ page }) 
   );
 });
 
-// The ledger opens only from a Payee card's owed figure (TaxTab.tsx `onOpenLedger`), and a Payee
-// owing nothing has no card: a Payee in credit has no way into its own ledger.
-test.fixme('a Payee in credit still opens its ledger, with the credit as its balance', async ({
+test('a Payee in credit still opens its ledger, with the credit as its balance', async ({
   page,
 }) => {
   await openTaxTab(page);

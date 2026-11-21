@@ -55,6 +55,7 @@ import { useEntryDeepLink } from './useEntryDeepLink';
 import { useTaxAttentionItems } from './useTaxAttentionItems';
 import { useAutoLinkPayees } from './payeeAutoLink';
 import { useTaxBalances } from './useTaxBalances';
+import { bookCreditsOf } from './owedNow';
 import { corpPayAccounts, readsEveryDivision } from './corpBook/corpPayAccount';
 import { sum } from '@/engine/math';
 import { useTaxCorpBooks } from './useTaxCorpBooks';
@@ -154,6 +155,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
       })) ?? [],
     [corpView]
   );
+  const bookCredits = useMemo(() => bookCreditsOf(corpView), [corpView]);
   const corpStateLabel = useCorpStateLabel();
   const corpStateHint = useCorpStateHint();
 
@@ -273,6 +275,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     ...(data ? { checkpoints: data.payeeCheckpoints } : {}),
     alsoBilled: corpView?.overlay.alsoBilled,
     bookCorporations: bookCorporationIds,
+    bookCredits,
   });
 
   // A Corp Tax Book row is the corp's to continue, not the member's.
@@ -660,6 +663,11 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
           systemsByPayee={payeeSystems}
           systemNames={systemNames}
           bookCorporations={bookCorporations}
+          accountOf={(id) => accounts.of(id)}
+          onOpenLedger={(payeeId) => {
+            closePayeeManager();
+            actions.openLedger({ kind: 'personal', payeeId });
+          }}
           refresh={refresh}
         />
 
