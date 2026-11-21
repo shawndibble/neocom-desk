@@ -374,7 +374,31 @@ export class BookSeed {
     return this.sub(collection, id, data);
   }
 
+  /**
+   * The docs to write. The settings doc carries the version stamps every server write leaves
+   * (`bookVersion`, and `collectionVersions` naming each collection written): a reader skips a
+   * collection the stamps never name, so a seed without them would read as a book whose first
+   * real write hid every seeded collection but the one it touched.
+   */
   docs(): SeedDoc[] {
-    return [...this.out].map(([path, data]) => ({ path, data }));
+    const root = `corps/${CORP}`;
+    const stamp = `seed-${this.now}`;
+    const collections = new Set(
+      [...this.out.keys()]
+        .filter((path) => path.startsWith(`${root}/`))
+        .map((path) => path.split('/')[2])
+    );
+    return [...this.out].map(([path, data]) =>
+      path === root
+        ? {
+            path,
+            data: {
+              ...data,
+              bookVersion: stamp,
+              collectionVersions: Object.fromEntries([...collections].map((c) => [c, stamp])),
+            },
+          }
+        : { path, data }
+    );
   }
 }
