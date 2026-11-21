@@ -31,7 +31,7 @@ import { AssignDialog } from './AssignDialog';
 import { PriceBreakdownCard } from './PriceBreakdownCard';
 import { OrePricedCard } from './OrePricedCard';
 import { usePriceBreakdown } from './usePriceBreakdown';
-import { PaymentLinksCard, type CoveredEntry, type LinkedTransaction } from './PaymentLinksCard';
+import { PaymentLinksCard, type PaidByLink } from './PaymentLinksCard';
 import { StatusPill } from './StatusPill';
 import type { MoonMiningTaxRow } from './snapshot';
 import type { PayeeSuggestion } from './suggestPayee';
@@ -73,9 +73,6 @@ interface RowDetailModalProps {
   /** Opens `EntryEditDialog` for this entry — the same edit form a combined entry uses, owed or paid. */
   onEdit: () => void;
   onDismiss: () => void;
-  onMarkPaid: () => void;
-  /** Takes a Paid row back to owed, dropping its payment record. */
-  onUnmarkPaid?: () => void;
   onResolve: () => void;
   /** Deletes the Assignment outright — "Undo" on a Dismissed row, "Unassign" on any other assigned one, so a wrong Payee or a mis-split can always be taken back to Unassigned. */
   onUndo: () => void;
@@ -86,19 +83,12 @@ interface RowDetailModalProps {
   /** Opens the Payee manager over this modal when the pilot has no Payees yet. */
   onAddPayee?: () => void;
   /**
-   * The Assignment's payment, resolved for display — present only once
-   * `status` is `paid` (or was, before a later needs-review clears it) and a
-   * `payment` record exists. Absent entirely (rather than an empty list)
-   * when there is no payment to show, so the section renders nothing.
+   * The linked payments whose money reached this entry's day, off its Payee's account. Absent
+   * while nothing reached it, so the section renders nothing.
    */
-  linkedTransactions?: readonly LinkedTransaction[];
-  /** The other entries this entry's payment also settled. */
-  alsoCovers?: readonly CoveredEntry[];
-  /** Opens one of the `alsoCovers` entries in place of this one. */
-  onOpenCovered?: (id: string) => void;
-  /** Opens the manual "Link transaction" picker (issue #540 follow-up) — offered whenever there is a payment to link against, paid or not. */
-  onLinkTransaction?: () => void;
-  onUnlinkTransaction?: (transaction: LinkedTransaction) => void;
+  paidBy?: readonly PaidByLink[];
+  /** Unlinks one of `paidBy`. */
+  onUnlinkPayment?: (key: string) => void;
   /** The Payee to pre-select for an unassigned entry — see `AssignDialog.suggestion`. */
   suggestion?: PayeeSuggestion;
   /** Settles this entry's whole Payee balance — the usual next step for an owed entry. */
@@ -155,18 +145,13 @@ export function RowDetailModal({
   onAssigned,
   onEdit,
   onDismiss,
-  onMarkPaid,
-  onUnmarkPaid,
   onResolve,
   onUndo,
   onJoin,
   onSplit,
   onAddPayee,
-  linkedTransactions,
-  alsoCovers,
-  onOpenCovered,
-  onLinkTransaction,
-  onUnlinkTransaction,
+  paidBy,
+  onUnlinkPayment,
   suggestion,
   onSettleUp,
   onLinkWalletPayment,
@@ -221,24 +206,9 @@ export function RowDetailModal({
   });
 
   const moreItems = [
-    onLinkWalletPayment && status === 'outstanding' && (
+    onLinkWalletPayment && (status === 'outstanding' || status === 'paid') && (
       <DropdownMenuItem key="wallet" onSelect={onLinkWalletPayment}>
         {t('miningTax.detail.linkWalletPayment')}
-      </DropdownMenuItem>
-    ),
-    onLinkTransaction && (
-      <DropdownMenuItem key="transaction" onSelect={onLinkTransaction}>
-        {t('miningTax.linkTransactionAction')}
-      </DropdownMenuItem>
-    ),
-    status === 'outstanding' && (
-      <DropdownMenuItem key="mark-paid" onSelect={onMarkPaid}>
-        {t('miningTax.markPaidAction')}
-      </DropdownMenuItem>
-    ),
-    onUnmarkPaid && status === 'paid' && (
-      <DropdownMenuItem key="unmark-paid" onSelect={onUnmarkPaid}>
-        {t('miningTax.unmarkPaidAction')}
       </DropdownMenuItem>
     ),
     onJoin && status === 'outstanding' && (
@@ -379,15 +349,11 @@ export function RowDetailModal({
           />
         )}
 
-        {status === 'paid' && (onLinkTransaction || assignment?.payment) && (
+        {paidBy && paidBy.length > 0 && (
           <PaymentLinksCard
-            linkedTransactions={linkedTransactions}
-            onLinkTransaction={onLinkTransaction}
-            onUnlinkTransaction={onUnlinkTransaction}
+            paidBy={paidBy}
+            {...(onUnlinkPayment ? { onUnlink: onUnlinkPayment } : {})}
             busy={busy}
-            alsoCovers={alsoCovers}
-            onOpenCovered={onOpenCovered}
-            paid={assignment?.payment}
           />
         )}
 

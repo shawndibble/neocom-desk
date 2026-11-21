@@ -20,7 +20,7 @@ import { STATUS_LABEL_KEY } from '@/engine/miningTax/rowStatus';
 import { formatIsk } from '@/lib/isk';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { formatDateRange } from './groupRows';
-import { PaymentLinksCard, type CoveredEntry, type LinkedTransaction } from './PaymentLinksCard';
+import { PaymentLinksCard, type PaidByLink } from './PaymentLinksCard';
 import { STATUS_TONE } from './statusTone';
 import type { MoonMiningTaxRow } from './snapshot';
 import { LedgerActionError } from './LedgerActionError';
@@ -47,7 +47,6 @@ interface GroupSummaryModalProps {
   onEdit: () => void;
   /** Settles this Payee's whole balance — offered while any day is still owed. */
   onSettleUp?: () => void;
-  onMarkAllPaid: () => void;
   /** "Take out of combined": that day keeps its Assignment and becomes its own row. */
   onTakeOut: (member: GroupMember) => void;
   /** "Uncombine all": every day keeps its Assignment and becomes its own row. */
@@ -58,20 +57,10 @@ interface GroupSummaryModalProps {
   onLinkWalletPayment?: () => void;
   /** Deletes every day's Assignment — asked first. */
   onUnassignAll: () => void;
-  /**
-   * Every linked transaction across the whole group's members, deduplicated
-   * — present only once every member is Paid. Absent entirely (rather than
-   * an empty list) when there is nothing to show, so the section renders
-   * nothing.
-   */
-  linkedTransactions?: readonly LinkedTransaction[];
-  /** Entries outside this group that its payment also settled. */
-  alsoCovers?: readonly CoveredEntry[];
-  /** Opens one of the `alsoCovers` entries in place of this group. */
-  onOpenCovered?: (id: string) => void;
-  /** Opens the manual "Link transaction" picker, scoped to every member of this group at once — offered whenever the whole group is Paid. */
-  onLinkTransaction?: () => void;
-  onUnlinkTransaction?: (transaction: LinkedTransaction) => void;
+  /** The linked payments whose money reached any of its days, off its Payee's account. */
+  paidBy?: readonly PaidByLink[];
+  /** Unlinks one of `paidBy`. */
+  onUnlinkPayment?: (key: string) => void;
   /** Opens with the "unassign all days?" question showing — the row menu's Unassign. */
   startWithUnassignConfirm?: boolean;
 }
@@ -97,17 +86,13 @@ export function GroupSummaryModal({
   saveError,
   onEdit,
   onSettleUp,
-  onMarkAllPaid,
   onTakeOut,
   onUncombine,
   onResolve,
   onLinkWalletPayment,
   onUnassignAll,
-  linkedTransactions,
-  alsoCovers,
-  onOpenCovered,
-  onLinkTransaction,
-  onUnlinkTransaction,
+  paidBy,
+  onUnlinkPayment,
   startWithUnassignConfirm = false,
 }: GroupSummaryModalProps) {
   const { t } = useTranslation();
@@ -119,9 +104,7 @@ export function GroupSummaryModal({
   const totalValue = members.reduce((sum, m) => sum + m.assignment.estimatedValue, 0);
   const anyOutstanding = members.some((m) => m.assignment.status === 'outstanding');
   const anyGrown = members.some((m) => m.assignment.status === 'needs-review');
-  const allPaid = members.every((m) => m.assignment.status === 'paid');
   const taxPct = members[0]?.assignment.taxPct;
-  const payment = members.find((m) => m.assignment.payment)?.assignment.payment;
 
   const moreMenu = (
     <DropdownMenu>
@@ -188,20 +171,13 @@ export function GroupSummaryModal({
           </span>
         </div>
 
-        {allPaid &&
-          (payment ||
-            onLinkTransaction ||
-            (linkedTransactions && linkedTransactions.length > 0)) && (
-            <PaymentLinksCard
-              linkedTransactions={linkedTransactions}
-              alsoCovers={alsoCovers}
-              onOpenCovered={onOpenCovered}
-              onLinkTransaction={onLinkTransaction}
-              onUnlinkTransaction={onUnlinkTransaction}
-              busy={busy}
-              paid={payment}
-            />
-          )}
+        {paidBy && paidBy.length > 0 && (
+          <PaymentLinksCard
+            paidBy={paidBy}
+            {...(onUnlinkPayment ? { onUnlink: onUnlinkPayment } : {})}
+            busy={busy}
+          />
+        )}
 
         <ul className="space-y-2">
           {sorted.map((member) => (
@@ -272,11 +248,6 @@ export function GroupSummaryModal({
                 {t('miningTax.settleUpAction')}
               </Button>
             )
-          )}
-          {anyOutstanding && (
-            <Button disabled={busy} onClick={onMarkAllPaid}>
-              {t('miningTax.markGroupPaidAction')}
-            </Button>
           )}
           <div className="flex">
             <Button disabled={busy} onClick={onEdit} className="rounded-r-none">

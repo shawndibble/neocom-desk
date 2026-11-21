@@ -14,22 +14,13 @@
  * can run inside that transaction.
  */
 import { normalizeLabel } from './assignmentLabel';
-import {
-  db,
-  type MiningTaxAssignmentRecord,
-  type MiningTaxOreLine,
-  type MiningTaxPaymentInfo,
-  type MiningTaxPaymentLink,
-  type MiningTaxPaymentLinkSource,
-  type MiningTaxPaymentMethod,
-} from '@/db';
+import { db, type MiningTaxAssignmentRecord, type MiningTaxOreLine } from '@/db';
 import { appendTombstones, tombstoneKey } from '@/sync/localBookkeeping';
 import { MINING_TAX_ASSIGNMENTS } from '@/sync/syncedCollections';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { growthCollector, linesOwnedBy } from '@/engine/miningTax/ownership';
 import { planSplit } from '@/engine/miningTax/split';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
-import { normalizePaymentInfo } from './paymentLinks';
 import { loadPayees } from './payees';
 import { hubForPayee, loadUnitPricesOnDate } from './pricing';
 import { currentCompressedOre, withOreFormMarker } from './oreForm';
@@ -110,13 +101,14 @@ function entryAssignments(
 async function claimNewOre(
   record: MiningTaxAssignmentRecord,
   entryOreLines?: readonly MiningTaxOreLine[],
-  takesGrowth = false
+  takesGrowth = false,
+  isPaid: (a: MiningTaxAssignmentRecord) => boolean = (a) => a.status === 'paid'
 ): Promise<MiningTaxAssignmentRecord[]> {
   const covering = await entryAssignments(record);
   assertUnclaimed(covering, record.oreLines, entryOreLines);
   if (covering.length === 0) return [record];
   const collector = growthCollector(covering);
-  if (!takesGrowth && collector?.status !== 'paid') return [record];
+  if (!takesGrowth && !(collector && isPaid(collector))) return [record];
   record.collectsGrowth = true;
   if (!collector?.collectsGrowth) return [record];
   const handedOver: MiningTaxAssignmentRecord = { ...collector, updatedAt: record.updatedAt };
@@ -124,10 +116,8 @@ async function claimNewOre(
   return [record, handedOver];
 }
 
-/** Normalizes each record's `payment` on the way out — see `normalizePaymentInfo`. */
-export async function loadAssignments(characterId: number): Promise<MiningTaxAssignmentRecord[]> {
-  const records = await db.miningTaxAssignments.where('characterId').equals(characterId).toArray();
-  return records.map((r) => (r.payment ? { ...r, payment: normalizePaymentInfo(r.payment) } : r));
+export function loadAssignments(characterId: number): Promise<MiningTaxAssignmentRecord[]> {
+  return db.miningTaxAssignments.where('characterId').equals(characterId).toArray();
 }
 
 export interface AssignInput {
@@ -149,8 +139,6 @@ export interface AssignInput {
    */
   estimatedValue: number;
   taxOwed: number;
-  /** "I already paid this" — the Assign dialog's checkbox, unchecked by default. */
-  markPaid: boolean;
   /** Optional "Moon / structure" note; metadata only. */
   label?: string;
   /**
@@ -159,6 +147,11 @@ export interface AssignInput {
    * now being mined rather than growing into an earlier moon's Assignment.
    */
   takesGrowth?: boolean;
+  /**
+   * Whether an Assignment's day is paid on its Payee's account (`PayeeAccounts.isPaid`), read
+   * before the write: a paid growth collector hands the flag to the new Assignment.
+   */
+  isPaid?: (a: MiningTaxAssignmentRecord) => boolean;
   /**
    * A Payee's Default Systems made this, not the pilot: the row is written with `override: false`
    * (`MiningTaxAssignmentRecord.override`), so a Survey connection or the Corp Tax Book can still
@@ -191,8 +184,7 @@ export async function createAssignment(input: AssignInput): Promise<MiningTaxAss
     taxPct: input.taxPct,
     estimatedValue: input.estimatedValue,
     taxOwed: input.taxOwed,
-    status: input.markPaid ? 'paid' : 'outstanding',
-    ...(input.markPaid ? { paidAt: now } : {}),
+    status: 'outstanding',
     ...(normalizeLabel(input.label) ? { label: normalizeLabel(input.label) } : {}),
     ...(input.byDefault ? { override: false } : {}),
     ...oreFormMarker(),
@@ -202,7 +194,7 @@ export async function createAssignment(input: AssignInput): Promise<MiningTaxAss
   // (under a ledger action this joins the action's own transaction).
   await db.transaction('rw', db.miningTaxAssignments, async () => {
     await db.miningTaxAssignments.bulkPut(
-      await claimNewOre(record, input.entryOreLines, input.takesGrowth)
+      await claimNewOre(record, input.entryOreLines, input.takesGrowth, input.isPaid)
     );
   });
   return record;
@@ -418,207 +410,6 @@ export async function joinAssignments(
     await db.miningTaxAssignments.bulkPut([...records, ...handedOver]);
   });
   return records;
-}
-
-/** Everything about a settle-up but the shared id, which `markAssignmentsPaid` mints. `amount` is the whole-ISK figure actually sent in game, so it matches the journal entry it may be linked to. */
-export type PaymentInput = Omit<MiningTaxPaymentInfo, 'paymentId'>;
-
-/**
- * Marks several Assignments paid at once — the itemized Settle-up dialog
- * commits through this. Never a single blind "mark all paid": the caller is
- * responsible for having shown the itemized list (payee/character/date
- * range/total) before calling this.
- *
- * With `payment`, every Assignment additionally records how it was settled
- * under one shared `paymentId` and the lump-sum `amount` actually sent — the
- * Settle-up flow's "record it" step. Without it, only `status`/`paidAt`
- * move, as before.
- */
-export async function markAssignmentsPaid(
-  assignments: readonly MiningTaxAssignmentRecord[],
-  payment?: PaymentInput
-): Promise<void> {
-  if (assignments.length === 0) return;
-  const now = Date.now();
-  const paymentInfo: MiningTaxPaymentInfo | undefined = payment && {
-    paymentId: crypto.randomUUID(),
-    ...payment,
-  };
-  const updated = assignments.map((a): MiningTaxAssignmentRecord =>
-    asPilotAct({
-      ...a,
-      status: 'paid',
-      paidAt: now,
-      ...(paymentInfo ? { payment: paymentInfo } : {}),
-      updatedAt: now,
-    })
-  );
-  await db.miningTaxAssignments.bulkPut(updated);
-}
-
-/**
- * Takes Paid Assignments back to `outstanding` — the undo for "mark paid" (a
- * wrong click, or a payment that was recorded against the wrong days). The
- * payment record goes with the status: an owed row carrying a payment would
- * keep its linked transaction claimed, so the wallet picker could never offer
- * it to the right days. Only the rows passed in revert; the rest of a shared
- * `paymentId` stays Paid. A row that isn't `paid` is left exactly as it is.
- */
-export async function unmarkAssignmentsPaid(
-  assignments: readonly MiningTaxAssignmentRecord[]
-): Promise<void> {
-  const now = Date.now();
-  const updated = assignments
-    .filter((a) => a.status === 'paid')
-    .map((a): MiningTaxAssignmentRecord => {
-      const next = { ...a, status: 'outstanding' as const, updatedAt: now };
-      delete next.paidAt;
-      delete next.payment;
-      return next;
-    });
-  if (updated.length === 0) return;
-  await db.miningTaxAssignments.bulkPut(updated);
-}
-
-/** Which linked-transaction array a call targets — a wallet-journal entry id or a contract id, never both. */
-export type PaymentTransactionRef = { journalRefId: number } | { contractId: number };
-
-/** Every Assignment settled by the same lump sum as `assignment` — linking or unlinking a transaction applies to the whole group, not just one row. Falls back to the row alone when there is no `payment` yet. */
-export function assignmentsSharingPayment(
-  assignment: MiningTaxAssignmentRecord,
-  all: readonly MiningTaxAssignmentRecord[]
-): MiningTaxAssignmentRecord[] {
-  const paymentId = assignment.payment?.paymentId;
-  if (paymentId === undefined) return [assignment];
-  return all.filter((a) => a.payment?.paymentId === paymentId);
-}
-
-/** Appends one link onto whichever array `ref` names, normalizing the payment's legacy shape first. */
-function withLink(
-  payment: MiningTaxPaymentInfo,
-  ref: PaymentTransactionRef,
-  source: MiningTaxPaymentLinkSource
-): MiningTaxPaymentInfo {
-  const normalized = normalizePaymentInfo(payment);
-  const link: MiningTaxPaymentLink = {
-    refId: 'journalRefId' in ref ? ref.journalRefId : ref.contractId,
-    source,
-  };
-  return 'journalRefId' in ref
-    ? { ...normalized, journalLinks: [...(normalized.journalLinks ?? []), link] }
-    : { ...normalized, contractLinks: [...(normalized.contractLinks ?? []), link] };
-}
-
-/**
- * Attaches a real wallet-journal or contract id to an already-recorded
- * Settle-up payment (`paymentLinks.ts`'s `autoMatchRecordedPayments`) — every
- * other field of `payment` is left exactly as the pilot recorded it, and this
- * always *adds* a link rather than replacing one, since a lump sum can be
- * paid in installments. Never called for the itemized settle-up link; that
- * path goes through `markAssignmentsPaid` instead, since it may also change
- * which Assignments a payment covers.
- */
-export async function linkRecordedPayment(
-  assignments: readonly MiningTaxAssignmentRecord[],
-  ref: PaymentTransactionRef
-): Promise<void> {
-  if (assignments.length === 0) return;
-  const now = Date.now();
-  // Two matchers (the journal's and Moon Mining Tax's) can race to the same
-  // payment: re-read inside the transaction and skip what already carries the
-  // link, so it is attached once.
-  await db.transaction('rw', db.miningTaxAssignments, async () => {
-    const current = await db.miningTaxAssignments.bulkGet(assignments.map((a) => a.id));
-    const updated = current.flatMap((a): MiningTaxAssignmentRecord[] => {
-      if (!a?.payment || hasLink(a.payment, ref)) return [];
-      return [{ ...a, payment: withLink(a.payment, ref, 'auto'), updatedAt: now }];
-    });
-    await db.miningTaxAssignments.bulkPut(updated);
-  });
-}
-
-function hasLink(payment: MiningTaxPaymentInfo, ref: PaymentTransactionRef): boolean {
-  const normalized = normalizePaymentInfo(payment);
-  return 'journalRefId' in ref
-    ? (normalized.journalLinks ?? []).some((l) => l.refId === ref.journalRefId)
-    : (normalized.contractLinks ?? []).some((l) => l.refId === ref.contractId);
-}
-
-/** A minimal payment to create from the transaction's own data, when the target Assignment(s) have no `payment` yet — see `linkPaymentTransaction`. */
-export interface FallbackPaymentInput {
-  paidOn: string;
-  amount: number;
-  method: MiningTaxPaymentMethod;
-}
-
-/**
- * The manual "Link transaction" action (issue #540 follow-up): attaches a
- * wallet-journal or contract id to every Assignment in `assignments` — every
- * member of one payment's `paymentId` group, so linking from one row settles
- * the whole lump sum it belongs to. Purely informational: it never touches
- * `status`, `taxOwed`, or any other field, and — unlike `linkRecordedPayment`
- * — it is reachable from an already-Paid row that was settled before ESI had
- * posted the transaction, which is the gap this fills.
- *
- * When an Assignment has no `payment` at all yet (a bare "mark paid" with no
- * Settle-up record), `fallbackPayment` seeds a minimal one from the
- * transaction's own date/amount/method, rather than forcing a separate
- * "record payment" step first — the transaction already carries what a
- * payment record needs.
- */
-export async function linkPaymentTransaction(
-  assignments: readonly MiningTaxAssignmentRecord[],
-  ref: PaymentTransactionRef,
-  source: MiningTaxPaymentLinkSource,
-  fallbackPayment: FallbackPaymentInput
-): Promise<void> {
-  if (assignments.length === 0) return;
-  const now = Date.now();
-  // Minted once, not per assignment: several bare-paid Assignments (a joined
-  // group's "mark all paid", which records no payment at all) must land on
-  // one shared payment, the same as if they'd gone through Settle-up
-  // together — never one independent payment per member. An Assignment that
-  // already has its own `payment` keeps its own paymentId regardless.
-  const sharedPaymentId = crypto.randomUUID();
-  const updated = assignments.map((a): MiningTaxAssignmentRecord => {
-    const base: MiningTaxPaymentInfo = a.payment ?? {
-      paymentId: sharedPaymentId,
-      ...fallbackPayment,
-    };
-    return { ...a, payment: withLink(base, ref, source), updatedAt: now };
-  });
-  await db.miningTaxAssignments.bulkPut(updated);
-}
-
-/** Removes one linked transaction from every Assignment in `assignments` (a mistaken pick) — the mirror of `linkPaymentTransaction`. A no-op for an Assignment with no `payment` or without that link. */
-export async function unlinkPaymentTransaction(
-  assignments: readonly MiningTaxAssignmentRecord[],
-  ref: PaymentTransactionRef
-): Promise<void> {
-  if (assignments.length === 0) return;
-  const now = Date.now();
-  const updated = assignments
-    .filter((a): a is MiningTaxAssignmentRecord & { payment: MiningTaxPaymentInfo } => !!a.payment)
-    .map((a): MiningTaxAssignmentRecord => {
-      const normalized = normalizePaymentInfo(a.payment);
-      const payment =
-        'journalRefId' in ref
-          ? {
-              ...normalized,
-              journalLinks: (normalized.journalLinks ?? []).filter(
-                (l) => l.refId !== ref.journalRefId
-              ),
-            }
-          : {
-              ...normalized,
-              contractLinks: (normalized.contractLinks ?? []).filter(
-                (l) => l.refId !== ref.contractId
-              ),
-            };
-      return { ...a, payment, updatedAt: now };
-    });
-  if (updated.length === 0) return;
-  await db.miningTaxAssignments.bulkPut(updated);
 }
 
 /** Which side of a split becomes the Growth Collector. */

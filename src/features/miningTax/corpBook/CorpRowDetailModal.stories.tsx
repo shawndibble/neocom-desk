@@ -76,7 +76,6 @@ function Story({
               others={twoBooks ? [{ corpName: 'Ashfall Prospecting', billAmount: 120_000 }] : []}
               previews={[]}
               typeNames={new Map()}
-              onUnmarkPaid={() => {}}
               onTakeOver={() => {}}
             />
           ) : undefined
@@ -108,7 +107,7 @@ export const Conflict: S = {
   },
 };
 
-/** @summary A Billable day not yet on a Statement: what bills it and when the book last synced. */
+/** @summary A Billable day no Late notice asked for yet: what bills it and when the book last synced. */
 export const Billed: S = { args: { view: base } };
 
 /** @summary A dismissed day: what was originally billed and the corporation's reason. */

@@ -54,13 +54,13 @@ export function CorpDeclareSlot({
 }: {
   view: Pick<
     BookRowView,
-    'corporationId' | 'corpName' | 'statementId' | 'characterId' | 'declaration' | 'date'
+    'corporationId' | 'corpName' | 'noticeId' | 'characterId' | 'declaration' | 'date'
   >;
   onResolve: (target: ResolveTarget) => void;
 }) {
   const { t } = useTranslation();
-  if (view.statementId === undefined) return null;
-  const statementId = view.statementId;
+  if (view.noticeId === undefined) return null;
+  const noticeId = view.noticeId;
   return (
     <div className="space-y-1.5">
       {view.declaration && (
@@ -75,7 +75,7 @@ export function CorpDeclareSlot({
                 overdueTarget({
                   corporationId: view.corporationId,
                   corpName: view.corpName,
-                  statementId,
+                  noticeId,
                   characterId: view.characterId,
                   periodStart: view.date,
                   period: view.date,

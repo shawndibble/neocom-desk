@@ -55,7 +55,12 @@ export function isDefaultAssigned(assignment: { override?: boolean }): boolean {
   return assignment.override === false;
 }
 
-/** A default's Assignment still unpaid: the only kind a Survey connection or a Corp Tax Book may take over. */
+/**
+ * A default's Assignment still unpaid: the only kind a Survey connection or a Corp Tax Book may
+ * take over. `status` is as its Payee's account reads it (decision 20261120-235011): `paid` once
+ * its day is on or before the Payee's paid-through, so a Default System only ever gives up a day
+ * after it.
+ */
 export function isUnpaidDefault(assignment: { override?: boolean; status?: string }): boolean {
   return isDefaultAssigned(assignment) && assignment.status === 'outstanding';
 }

@@ -57,7 +57,6 @@ export async function applyDefaultSystems(
           taxPct: payee.defaultTaxPct,
           estimatedValue: value.estimatedValue,
           taxOwed: value.taxOwed,
-          markPaid: false,
           byDefault: true,
         });
         if (result.ok) created.push(result.value);

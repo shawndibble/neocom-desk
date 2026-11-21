@@ -20,6 +20,8 @@ import {
   type StoredPayeeCheckpoint,
 } from '@/engine/miningTax/payeeAccount';
 import { groupPayees } from './payeeGroups';
+import type { LinkablePayee } from './paymentLinks';
+import type { MoonMiningTaxRow } from './snapshot';
 
 /** The Assignment fields an account reads. */
 export type BilledAssignment = Pick<
@@ -102,6 +104,23 @@ export class PayeeAccounts {
     return this.byPrimary.entries();
   }
 
+  /**
+   * Every merged Payee a payment may be linked to, with what its account owes: what a suggestion
+   * is weighed against (`paymentLinks.ts`).
+   */
+  linkable(payees: readonly PayeeRecord[]): LinkablePayee[] {
+    return groupPayees(payees).map((g) => {
+      const account = this.byPrimary.get(g.primary.id);
+      return {
+        id: g.primary.id,
+        name: g.primary.name,
+        members: g.members,
+        owed: account?.owes?.amount ?? 0,
+        billed: (account?.charges.length ?? 0) > 0,
+      };
+    });
+  }
+
   /** The newest day a Payee has nothing owed on or before; null while none is paid. */
   paidThroughOf(payeeId: string): string | null {
     return this.of(payeeId)?.paidThrough ?? null;
@@ -147,4 +166,25 @@ export function linkOf(record: MiningTaxPaymentLinkRecord): PayeePaymentLink {
     paidOn: record.paidOn,
     source: record.source,
   };
+}
+
+/**
+ * The ledger's entries as the tab reads them: each Assignment viewed through its Payee's account
+ * (`PayeeAccounts.view`), built from the stored Assignments as they are. The Tax tab and the
+ * Overview read the same.
+ */
+export function withPaidStatus(
+  entries: readonly MoonMiningTaxRow[],
+  payees: readonly PayeeRecord[],
+  links: readonly PayeePaymentLink[]
+): MoonMiningTaxRow[] {
+  const accounts = PayeeAccounts.build({
+    assignments: entries.flatMap((row) => row.assignments),
+    payees,
+    links,
+  });
+  return entries.map((row) => {
+    const assignments = row.assignments.map((a) => accounts.view(a));
+    return assignments.every((a, i) => a === row.assignments[i]) ? row : { ...row, assignments };
+  });
 }

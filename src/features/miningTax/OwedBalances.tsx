@@ -3,15 +3,17 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Panel } from '@/components/ui';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
+import { plainTextActionClassName } from '@/components/ui/plainTextActionClassName';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import type { PayeeBalance, UnassignedSummary } from './balances';
 import type { ConflictSummary } from './corpBook/conflictSummary';
 import { DAY_MS } from '@/lib/age';
 
-/** Whole EVE days between the oldest owed entry and today (UTC) — how long this Payee has been waiting. */
+/** Whole EVE days between the oldest unpaid day and today (UTC) — how long this Payee has been waiting. */
 function owedForDays(balance: PayeeBalance, today: Date = new Date()): number {
-  const oldest = balance.members.map((m) => m.assignment.date).sort()[0];
+  const oldest =
+    balance.account?.owes?.oldest ?? balance.members.map((m) => m.assignment.date).sort()[0];
   if (!oldest) return 0;
   const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
   return Math.max(0, Math.round((todayUtc - Date.parse(`${oldest}T00:00:00Z`)) / DAY_MS));
@@ -29,6 +31,8 @@ interface OwedBalancesProps {
   onFilterPayee: (payeeId: string) => void;
   onSettleUp: (balance: PayeeBalance) => void;
   onLinkPayment: (balance: PayeeBalance) => void;
+  /** Opens the Payee's ledger (`PayeeLedgerPanel`): its owed figure is the way in. */
+  onOpenLedger?: (balance: PayeeBalance) => void;
   /**
    * A Corp Tax Book's balance credits itself from the corp's wallet journal, so there is no
    * payment of the member's own to link to it (#4065).
@@ -77,6 +81,7 @@ export function OwedBalances({
   onFilterPayee,
   onSettleUp,
   onLinkPayment,
+  onOpenLedger,
   hideLinkPayment,
   uncreditedOf,
   unlinkedOf,
@@ -127,6 +132,22 @@ export function OwedBalances({
       <span className="ml-1 text-xs font-normal text-text-dim">ISK</span>
     </span>
   );
+
+  // The owed figure is the readout of the Payee's ledger, so it opens it (DESIGN §6c: a solid
+  // underline on a readout that opens its own detail). The name keeps the filter.
+  const owedFigure = (balance: PayeeBalance) =>
+    onOpenLedger ? (
+      <button
+        type="button"
+        onClick={() => onOpenLedger(balance)}
+        aria-label={t('miningTax.ledger.openFor', { payee: balance.payee.name })}
+        className={plainTextActionClassName('shrink-0')}
+      >
+        {amount(balance.owed, 'text-isk-neg')}
+      </button>
+    ) : (
+      amount(balance.owed, 'text-isk-neg')
+    );
 
   const promptRow = (
     key: string,
@@ -294,11 +315,11 @@ export function OwedBalances({
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex items-center gap-2">
                         {nameButton(balance)}
-                        <span className="sm:hidden">{amount(balance.owed, 'text-isk-neg')}</span>
+                        <span className="sm:hidden">{owedFigure(balance)}</span>
                       </div>
                       {meta}
                     </div>
-                    <span className="max-sm:hidden">{amount(balance.owed, 'text-isk-neg')}</span>
+                    <span className="max-sm:hidden">{owedFigure(balance)}</span>
                     {actions}
                   </div>
                 ) : (
@@ -308,7 +329,7 @@ export function OwedBalances({
                   <div className="flex flex-1 flex-col gap-2 p-3">
                     <div className="flex items-start gap-2">
                       {nameButton(balance)}
-                      {amount(balance.owed, 'text-isk-neg')}
+                      {owedFigure(balance)}
                     </div>
                     <div className="mt-auto space-y-2">
                       {meta}

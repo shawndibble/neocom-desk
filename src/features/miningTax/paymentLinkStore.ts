@@ -8,11 +8,16 @@
  * replaces takes its marks with it, so the next read does not bring it back.
  */
 import { db, type MiningTaxAssignmentRecord, type MiningTaxPaymentLinkRecord } from '@/db';
-import { paymentLinkKey, type PayeePaymentLink } from '@/engine/miningTax/payeeAccount';
+import {
+  paymentLinkKey,
+  type PayeePaymentLink,
+  type StoredPayeeCheckpoint,
+} from '@/engine/miningTax/payeeAccount';
 import { scheduleSync } from '@/sync';
 import { appendTombstones, tombstoneKey } from '@/sync/localBookkeeping';
 import { MINING_TAX_PAYMENT_LINKS } from '@/sync/syncedCollections';
 import { legacyPaymentLinks, unreadLegacyLinks } from './legacyPaidMarks';
+import { linkOf, PayeeAccounts } from './payeeAccounts';
 
 /** Every stored link, every Character's: a merged Payee's money can come from any of them. */
 export function loadPaymentLinks(): Promise<MiningTaxPaymentLinkRecord[]> {
@@ -144,4 +149,68 @@ export async function readLegacyPaidMarks(): Promise<void> {
   );
   for (const characterId of new Set(created.map((l) => l.characterId)))
     scheduleSync(characterId, { collections: ['miningTaxPaymentLinks'] });
+}
+
+/**
+ * Every personal Payee's account as Dexie holds it now, from the stored Assignments as they are:
+ * what the ledger's load (Survey connections, coalescing, growth) reads a day's Paid from.
+ */
+export async function loadPayeeAccounts(): Promise<PayeeAccounts> {
+  const [assignments, payees, links] = await Promise.all([
+    db.miningTaxAssignments.toArray(),
+    db.payees.toArray(),
+    loadPaymentLinks(),
+  ]);
+  return PayeeAccounts.build({ assignments, payees, links: links.map(linkOf) });
+}
+
+/** Where the device keeps each personal Payee's closed-through checkpoint: never synced. */
+const CHECKPOINTS_KEY = 'miningTaxPayeeCheckpoints';
+
+/** The device's checkpoints, by a merged Payee's primary id. */
+export async function loadPayeeCheckpoints(): Promise<Map<string, StoredPayeeCheckpoint>> {
+  const row = await db.settings.get(CHECKPOINTS_KEY);
+  const value = row?.value;
+  if (!value || typeof value !== 'object') return new Map();
+  return new Map(Object.entries(value as Record<string, StoredPayeeCheckpoint>));
+}
+
+/** Stores the checkpoints that moved forward; the rest are kept. */
+export async function savePayeeCheckpoints(
+  next: ReadonlyMap<string, StoredPayeeCheckpoint>
+): Promise<void> {
+  if (next.size === 0) return;
+  await db.transaction('rw', db.settings, async () => {
+    const held = await loadPayeeCheckpoints();
+    for (const [id, cp] of next) held.set(id, cp);
+    await db.settings.put({ key: CHECKPOINTS_KEY, value: Object.fromEntries(held) });
+  });
+}
+
+/** One day a linked payment's money reached, for the wallet journal's "paid" link. */
+export interface LinkedDay {
+  /** The Assignment billed that day, to open. */
+  id: string;
+  date: string;
+  taxOwed: number;
+}
+
+/**
+ * Per linked payment (`paymentLinkKey`), the Assignments on the days its money paid, oldest first:
+ * read off each Payee's account, so the journal says what the ledger does.
+ */
+export async function loadLinkedDays(): Promise<Map<string, LinkedDay[]>> {
+  const accounts = await loadPayeeAccounts();
+  const out = new Map<string, LinkedDay[]>();
+  for (const [, account] of accounts.entries()) {
+    for (const applied of account.account.applications.payments) {
+      const dates = new Set(applied.days.map((d) => d.date));
+      const days = account.charges
+        .filter((c) => dates.has(c.date))
+        .map((c) => ({ id: c.id, date: c.date, taxOwed: c.tax }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+      if (days.length > 0) out.set(applied.paymentId, days);
+    }
+  }
+  return out;
 }

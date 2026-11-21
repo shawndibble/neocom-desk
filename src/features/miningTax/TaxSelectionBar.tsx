@@ -1,6 +1,6 @@
 import type { RefObject } from 'react';
 import type { DisplayRow } from '@/features/miningTax/groupRows';
-import { settleUpMembers, type combineEligibility } from '@/features/miningTax/selection';
+import type { combineEligibility } from '@/features/miningTax/selection';
 import { SelectionToolbar } from '@/features/miningTax/SelectionToolbar';
 import type { SettleUpRow } from '@/features/miningTax/SettleUpDialog';
 import type { TaxDialogActions } from '@/features/miningTax/useTaxDialogs';
@@ -50,7 +50,8 @@ export function TaxSelectionBar({
         canSelectAll={selectableVisible.some((dr) => !selection.has(dr.key))}
         onSelectAll={() => onSelectAll(new Set(selectableVisible.map((dr) => dr.key)))}
         onClear={onClear}
-        settleUpCount={selectedSettleUpRows.length}
+        // One Payee at a time: a payment pays one Payee's oldest days.
+        settleUpCount={selectedPayeeIds.length === 1 ? selectedSettleUpRows.length : 0}
         onSettleUp={() => onSettleUp(selectedSettleUpRows)}
         combine={combine}
         onCombine={onCombine}
@@ -60,10 +61,7 @@ export function TaxSelectionBar({
         onLinkPayment={() => {
           const payeeId = selectedPayeeIds[0];
           if (!payeeId) return;
-          actions.openLinkWallet({
-            payeeId,
-            members: settleUpMembers(selectedRows),
-          });
+          actions.openLinkWallet({ payeeId });
         }}
       />
     </div>

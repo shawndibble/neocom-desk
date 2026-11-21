@@ -55,7 +55,6 @@ function renderGroup(overrides: Partial<Parameters<typeof GroupSummaryModal>[0]>
         payeeDisplayName="Corp One"
         busy={false}
         onEdit={noop}
-        onMarkAllPaid={noop}
         onTakeOut={noop}
         onUncombine={noop}
         onResolve={noop}
@@ -67,84 +66,37 @@ function renderGroup(overrides: Partial<Parameters<typeof GroupSummaryModal>[0]>
 }
 
 describe('GroupSummaryModal payment', () => {
-  it('never shows the payment card while any member is still outstanding', () => {
+  it('shows no payment card while no payment reached its days', () => {
     renderGroup({
       members: [member('2026-09-08', { status: 'outstanding' }), member('2026-09-09')],
-      onLinkTransaction: vi.fn(),
     });
-    expect(screen.queryByText('Payment')).not.toBeInTheDocument();
+    expect(screen.queryByText('Paid by')).not.toBeInTheDocument();
   });
 
-  it('offers Link transaction once every member is paid', async () => {
-    const onLink = vi.fn();
-    renderGroup({ onLinkTransaction: onLink });
-    await userEvent.click(screen.getByRole('button', { name: 'Link transaction' }));
-    expect(onLink).toHaveBeenCalledTimes(1);
-  });
-
-  it('reads the recorded payment as one line', () => {
+  it('lists the payments that paid its days, each opening its wallet entry, and unlinks one', async () => {
+    const onUnlinkPayment = vi.fn();
     renderGroup({
-      members: [
-        member('2026-09-08', {
-          payment: { paymentId: 'p', paidOn: '2026-09-10', method: 'donation', amount: 200 },
-        }),
-        member('2026-09-09'),
-      ],
-    });
-    expect(screen.getByText('Paid 200 ISK · 2026-09-10')).toBeInTheDocument();
-  });
-
-  it('lists entries outside the group that its payment also settled, and opens one', async () => {
-    const onOpenCovered = vi.fn();
-    renderGroup({
-      members: [
-        member('2026-09-08', {
-          payment: { paymentId: 'p', paidOn: '2026-09-10', method: 'donation', amount: 200 },
-        }),
-        member('2026-09-09'),
-      ],
-      alsoCovers: [{ id: 'out', date: '2026-09-01', taxOwed: 750_000 }],
-      onOpenCovered,
-    });
-    await userEvent.click(screen.getByRole('button', { name: '2026-09-01 · 750,000 ISK' }));
-    expect(onOpenCovered).toHaveBeenCalledWith('out');
-  });
-
-  it('links a transaction to the Wallet Journal, highlighting it', () => {
-    renderGroup({
-      linkedTransactions: [
+      paidBy: [
         {
-          kind: 'journal',
-          refId: 42,
-          source: 'manual',
-          label: '100 ISK · 2026-09-10 — Player donation',
+          key: 'journal:42',
+          link: {
+            payeeId: 'p1',
+            kind: 'journal',
+            refId: 42,
+            amount: 200,
+            paidOn: '2026-09-10',
+            source: 'manual',
+          },
+          amount: 200,
+          label: '200 ISK · 2026-09-10 — Player donation',
         },
       ],
+      onUnlinkPayment,
     });
     const link = screen.getByRole('link', { name: /Player donation/ });
     expect(link.getAttribute('href')).toBe('/wallet/journal?highlight=42');
-  });
-
-  it('flags an auto-matched link without claiming the pilot verified it', () => {
-    renderGroup({
-      linkedTransactions: [
-        { kind: 'journal', refId: 42, source: 'auto', label: '100 ISK · 2026-09-10 — donation' },
-      ],
-    });
-    expect(screen.getByText(/auto-linked/)).toBeInTheDocument();
-  });
-
-  it('calls onUnlinkTransaction with the clicked transaction', async () => {
-    const onUnlink = vi.fn();
-    const transaction = {
-      kind: 'journal' as const,
-      refId: 42,
-      source: 'manual' as const,
-      label: '100 ISK · 2026-09-10 — Player donation',
-    };
-    renderGroup({ linkedTransactions: [transaction], onUnlinkTransaction: onUnlink });
     await userEvent.click(screen.getByRole('button', { name: 'Unlink transaction #42' }));
-    expect(onUnlink).toHaveBeenCalledWith(transaction);
+    expect(onUnlinkPayment).toHaveBeenCalledWith('journal:42');
   });
 });
 

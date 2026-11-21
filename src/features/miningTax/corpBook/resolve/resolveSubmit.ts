@@ -125,7 +125,7 @@ export function mailNotOwed(
  */
 export async function sendProof(
   ctx: MailContext,
-  statementId: string,
+  noticeId: string,
   transfers: ClaimedTransfer[],
   note: string,
   days: string
@@ -133,7 +133,7 @@ export async function sendProof(
   const amount = transfers.reduce((sum, t) => sum + t.amount, 0);
   const result = await declareCorpTaxBookPayment(ctx.characterId, {
     corporationId: ctx.corporationId,
-    statementId,
+    noticeId,
     ...(amount > 0 ? { amount } : {}),
     ...(note ? { note } : {}),
     ...(transfers.length > 0 ? { transfers } : {}),
@@ -154,7 +154,7 @@ export async function sendProof(
 }
 
 /**
- * "I already paid" for donations the book holds for review (#6207) with no Statement to declare
+ * "I already paid" for donations the book holds for review (#6207) with no Late notice to declare
  * on: each is claimed by its donor as tax (`claimCorpTaxBookPayment` with `inReview`), which the
  * server audits and credits at once. Nothing is asked of an officer, so no mail goes.
  */

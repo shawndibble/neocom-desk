@@ -7,7 +7,7 @@ import {
   type BookOverlap,
   type BookRowView,
 } from '@/engine/corpTaxBook/personal';
-import { releaseOre, unsettle } from '../ledgerActions';
+import { releaseOre } from '../ledgerActions';
 import { useLedgerAction } from '../useLedgerAction';
 import { ConflictNotice } from './ConflictNotice';
 import { CorpDeclareSlot } from './CorpDeclareAction';
@@ -177,9 +177,6 @@ export function CorpOverlapNotice({
         typeNames={typeNames}
         busy={pending}
         error={error}
-        onUnmarkPaid={() =>
-          void run(() => unsettle(mine.filter((a) => a.status === 'paid')), onChanged)
-        }
         onTakeOver={takeOver}
         onResolve={resolveConflict}
         tell={
@@ -197,10 +194,10 @@ export function CorpOverlapNotice({
     );
   }
   const declare =
-    // Only while the Statement still bills the day: a settled one has nothing to declare.
+    // Only while the day a Late notice asked for is still owed: a paid one has nothing to declare.
     onResolve &&
-    view.statementId !== undefined &&
-    (view.state === 'billed' || view.bookOwed !== undefined || view.declaration !== undefined) ? (
+    view.noticeId !== undefined &&
+    (view.state === 'billed' || view.declaration !== undefined) ? (
       <CorpDeclareSlot view={view} onResolve={onResolve} />
     ) : undefined;
   // A declaration goes to the corporation, so the device's own note no longer hides the notice.

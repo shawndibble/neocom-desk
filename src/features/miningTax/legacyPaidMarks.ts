@@ -6,10 +6,28 @@
  * stands for (`readLegacyPaidMarks`), under a key derived from the mark itself, so reading it
  * again finds the link already there. Pure.
  */
-import type { MiningTaxAssignmentRecord } from '@/db';
+import type { MiningTaxAssignmentRecord, MiningTaxPaymentInfo } from '@/db';
 import { utcDay } from '@/engine/localDay';
 import { paymentLinkKey, type PayeePaymentLink } from '@/engine/miningTax/payeeAccount';
-import { normalizePaymentInfo } from './paymentLinks';
+
+/**
+ * A mark's payment as the newest legacy shape: the oldest stored a bare `journalRefId` /
+ * `contractId`, sourced `auto` since the silent matcher wrote every such link.
+ */
+function normalizePaymentInfo(payment: MiningTaxPaymentInfo): MiningTaxPaymentInfo {
+  const legacy = payment as MiningTaxPaymentInfo & { journalRefId?: number; contractId?: number };
+  if (legacy.journalRefId === undefined && legacy.contractId === undefined) return payment;
+  const { journalRefId, contractId, ...rest } = legacy;
+  return {
+    ...rest,
+    journalLinks:
+      rest.journalLinks ??
+      (journalRefId === undefined ? undefined : [{ refId: journalRefId, source: 'auto' }]),
+    contractLinks:
+      rest.contractLinks ??
+      (contractId === undefined ? undefined : [{ refId: contractId, source: 'auto' }]),
+  };
+}
 
 /** A link read from paid marks, with the Character whose Payee record it names. */
 export interface LegacyLink extends PayeePaymentLink {

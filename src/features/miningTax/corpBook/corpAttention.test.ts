@@ -10,8 +10,9 @@ const summary = (over: Partial<BookSummary> = {}): BookSummary => ({
   corpName: 'Brass Meridian',
   startDate: '2026-10-01',
   credit: 0,
-  openStatements: [],
-  overdue: [],
+  account: { paidThrough: null, owes: null },
+  miners: [],
+  notices: [],
   uncredited: [],
   hubId: 'jita',
   oreForm: 'compressed',
@@ -34,7 +35,7 @@ const view = (rows: BookRowView[], s: BookSummary): CorpBookView =>
       {
         corpName: 'Brass Meridian',
         summary: s,
-        loaded: { corporationId: CORP, characterIds: [], statements: [] },
+        loaded: { corporationId: CORP, characterIds: [], notices: [] },
       },
     ],
   }) as unknown as CorpBookView;
@@ -49,14 +50,15 @@ describe('corpBookAttention', () => {
     });
   });
 
-  it("names each book's Overdue Statements and the donations it never credited", () => {
+  it("names each book's unpaid Late notices and the donations it never credited", () => {
     const overdue = {
-      statementId: 's1',
+      noticeId: 'n1',
       minerId: 'solo:1',
       code: 'ABC',
-      periodStart: '2026-10-01',
-      periodEnd: '2026-10-31',
-      overdueAt: '2026-11-14T00:00:00.000Z',
+      issuedAt: '2026-11-01T00:00:00.000Z',
+      from: '2026-10-01',
+      through: '2026-10-31',
+      remaining: 100,
     };
     const donation = {
       characterId: 1,
@@ -65,7 +67,7 @@ describe('corpBookAttention', () => {
       covered: ['2026-10-30'],
     };
     const out = corpBookAttention(
-      view([], summary({ overdue: [overdue], uncredited: [donation] }))
+      view([], summary({ notices: [overdue], uncredited: [donation] }))
     );
     expect(out.overdue).toEqual([{ corporationId: CORP, corpName: 'Brass Meridian', ...overdue }]);
     expect(out.uncredited).toEqual([
@@ -91,7 +93,7 @@ describe('corpBookAttention', () => {
               corporationId: CORP,
               startDate: '2026-11-01',
               characterIds: [1, 2],
-              statements: [],
+              notices: [],
               miners: [],
               inReview,
             },
@@ -125,27 +127,28 @@ describe('corpBookAttention', () => {
       ).toEqual([]);
     });
 
-    // Counted at once, each to its own Miner: never tied to one Statement a waiting
+    // Counted at once, each to its own Miner: never tied to one Late notice a waiting
     // declaration could block.
-    it('names no Statement, even when the donor Miner has one open', () => {
+    it('names no Late notice, even when the donor Miner has one unpaid', () => {
       const out = corpBookAttention(
         withHeld(
           [held('j5_1', '2026-11-02T22:38:44.000Z')],
           summary({
-            openStatements: [
+            notices: [
               {
-                statementId: 's1',
+                noticeId: 'n1',
                 minerId: 'solo:1',
-                code: 's1',
-                periodStart: '2026-11-01',
-                periodEnd: '2026-11-07',
+                code: 'n1',
                 issuedAt: '2026-11-08T00:00:00Z',
+                from: '2026-11-01',
+                through: '2026-11-07',
+                remaining: 100,
               },
             ],
           })
         )
       );
-      expect(out.inReview[0]).not.toHaveProperty('statementId');
+      expect(out.inReview[0]).not.toHaveProperty('noticeId');
     });
   });
 
@@ -168,18 +171,16 @@ describe('corpBookAttention', () => {
   });
 
   describe('with a Character filter', () => {
-    const overdue = (statementId: string) => ({
-      statementId,
+    const overdue = (noticeId: string) => ({
+      noticeId,
       minerId: 'solo:1',
-      code: statementId,
-      periodStart: '2026-10-01',
-      periodEnd: '2026-10-31',
-      overdueAt: '2026-11-14T00:00:00.000Z',
+      code: noticeId,
+      issuedAt: '2026-11-01T00:00:00.000Z',
+      from: '2026-10-01',
+      through: '2026-10-31',
+      remaining: 100,
     });
-    const statement = (id: string, characterIds: (number | undefined)[]) => ({
-      id,
-      lines: characterIds.map((characterId) => ({ characterId })),
-    });
+    const notice = (id: string, characterIds: number[]) => ({ id, characterIds });
     const filteredView = (rows: BookRowView[], s: BookSummary): CorpBookView =>
       ({
         overlay: { rows },
@@ -190,7 +191,7 @@ describe('corpBookAttention', () => {
             loaded: {
               corporationId: CORP,
               characterIds: [1, 2],
-              statements: [statement('s1', [1]), statement('s2', [2, 1]), statement('s3', [])],
+              notices: [notice('s1', [1]), notice('s2', [2, 1]), notice('s3', [])],
             },
           },
         ],
@@ -202,7 +203,7 @@ describe('corpBookAttention', () => {
         row({ id: 'b', characterId: 2, overlap: overlap(['p2']) }),
       ],
       summary({
-        overdue: [overdue('s1'), overdue('s2'), overdue('s3')],
+        notices: [overdue('s1'), overdue('s2'), overdue('s3')],
         uncredited: [
           { characterId: 1, amount: 1, at: '2026-11-01T10:00:00Z', covered: [] },
           { characterId: 2, amount: 2, at: '2026-11-01T10:00:00Z', covered: [] },
@@ -212,7 +213,7 @@ describe('corpBookAttention', () => {
 
     it('keeps only what the Characters in view mined, paid or are billed for', () => {
       const out = corpBookAttention(books, new Set([2]));
-      expect(out.overdue.map((o) => [o.statementId, o.declarerId])).toEqual([['s2', 2]]);
+      expect(out.overdue.map((o) => [o.noticeId, o.declarerId])).toEqual([['s2', 2]]);
       expect(out.uncredited.map((u) => u.characterId)).toEqual([2]);
       expect(out.alsoBilled).toEqual([
         { corporationId: CORP, corpName: 'Brass Meridian', payeeIds: ['p2'], rowId: 'b' },
@@ -221,7 +222,7 @@ describe('corpBookAttention', () => {
 
     it('keeps everything, with the first tracked declarer, for all Characters', () => {
       const out = corpBookAttention(books, 'all');
-      expect(out.overdue.map((o) => [o.statementId, o.declarerId])).toEqual([
+      expect(out.overdue.map((o) => [o.noticeId, o.declarerId])).toEqual([
         ['s1', 1],
         ['s2', 2],
         ['s3', undefined],
