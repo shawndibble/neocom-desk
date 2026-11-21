@@ -524,8 +524,10 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // A payment is its sender's (`uid`) and its Miner's readers' (`uids`), so a main reads an
+      // alt's donation. One stored before `uids` reads by its sender alone.
       match /payments/{paymentId} {
-        allow get, list: if isOfficer() || isOwnLine();
+        allow get, list: if isOfficer() || isOwnLine() || isOnOwnLine();
         allow write: if false;
       }
 

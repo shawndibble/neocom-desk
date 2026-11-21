@@ -139,6 +139,7 @@ import { refreshMoonDocs } from './corpTaxBookMoonDocsStore.js';
 import {
   currentMinerOf,
   ownerFields,
+  soloCharacterId,
   soloMinerId,
   type MatchBook,
   type UncountedDonation,
@@ -159,6 +160,8 @@ import {
   classifyGroup,
   groupConflicts,
   minerReaderIds,
+  minerUidsOf,
+  paymentUids,
   promoteClaims,
   type ClaimMiner,
   type GroupConflict,
@@ -832,10 +835,16 @@ export async function syncBookAs(
     input.corporationId,
     input.donations.map((dn) => `j${dn.division}_${dn.refId}`)
   );
-  for (const dn of input.donations) {
+  const owners = input.donations.map((dn) => ownerFields(dn, matchBook!));
+  const readers = await readersOfMiners(
+    deps.db,
+    input.corporationId,
+    owners.flatMap((o) => ('minerId' in o ? [o.minerId] : []))
+  );
+  for (const [i, dn] of input.donations.entries()) {
     const id = `j${dn.division}_${dn.refId}`;
     if (linked.has(id)) continue;
-    const owner = ownerFields(dn, matchBook!);
+    const owner = owners[i];
     // The client's hold on a known sender whose Miner owed nothing stands (#6207): it prices days.
     const held = dn.reviewReason !== undefined && 'minerId' in owner;
     const data: Data = {
@@ -843,6 +852,11 @@ export async function syncBookAs(
       source: 'donation',
       characterId: dn.characterId,
       uid: `char:${dn.characterId}`,
+      // Its Miner's readers too, so a main reads an alt's donation; a held one only its sender.
+      uids: paymentUids(
+        !held && 'minerId' in owner ? (readers.get(owner.minerId) ?? []) : [],
+        `char:${dn.characterId}`
+      ),
       amount: dn.amount,
       at: dn.at,
       division: dn.division,
@@ -921,6 +935,22 @@ export async function syncBookAs(
     console.error('claim promotion failed', e instanceof Error ? e.message : e)
   );
   return { observedChanged, extractions: input.extractions.length, donationsAdded };
+}
+
+/** Each of these Miners' readers (`minerUidsOf`), reading the groupings among them. */
+async function readersOfMiners(
+  db: Firestore,
+  corporationId: number,
+  minerIds: readonly string[]
+): Promise<Map<string, string[]>> {
+  const ids = [...new Set(minerIds)];
+  const grouped = ids.filter((id) => soloCharacterId(id) === undefined);
+  const docs =
+    grouped.length === 0
+      ? []
+      : await db.getAll(...grouped.map((id) => sub(db, corporationId, MINERS).doc(id)));
+  const byId = new Map(docs.map((d) => [d.id, d.data()]));
+  return new Map(ids.map((id) => [id, minerUidsOf(id, minerDocOf(byId.get(id)))]));
 }
 
 /** The donation ids among `ids` an officer's hand record already counts (`transferId`). */
@@ -1156,9 +1186,16 @@ async function mustGetNotice(c: EditCtx, id: string): Promise<LoadedNotice> {
 }
 
 async function minerUids(c: EditCtx, minerId: string): Promise<string[]> {
-  const miner = (await c.tx.get(col(c, MINERS).doc(minerId))).data();
-  return minerReaders(minerId, miner).map((id) => `char:${id}`);
+  return minerUidsOf(minerId, minerDocOf((await c.tx.get(col(c, MINERS).doc(minerId))).data()));
 }
+
+/** A stored Miner doc, as `minerUidsOf` reads it. */
+const minerDocOf = (miner: Data | undefined) =>
+  miner && {
+    characterIds: (miner.characterIds as number[] | undefined) ?? [],
+    officerClaimed: miner.officerClaimed as number[] | undefined,
+    pendingConfirmation: miner.pendingConfirmation as number[] | undefined,
+  };
 
 /**
  * Confirms the Declaration a payment is for, in the payment's own transaction: it must be this
@@ -1376,7 +1413,12 @@ async function rekeyAbsorbed(
   targetUids: readonly string[],
   absorbed: readonly string[]
 ): Promise<() => void> {
-  if (absorbed.length === 0) return () => undefined;
+  // The target's own payments are read by its readers as they are after the grouping.
+  const own = await paymentReadersFor(tx, db, corporationId, target, targetUids);
+  if (absorbed.length === 0) {
+    if (own.length > REGROUP_WRITE_CAP) tooManyToRegroup();
+    return () => own.forEach((w) => tx.update(w.ref, { uids: w.uids }));
+  }
   const at = (name: string) => sub(db, corporationId, name);
   const { records, existingDisputeIds } = await loadRekeyRecords(
     {
@@ -1394,10 +1436,13 @@ async function rekeyAbsorbed(
   // A transaction holds 500 writes: a move is two, and each Miner's checkpoint goes too (the
   // caller drops them, as every change of a Miner's characters does). Refuse, rather than fail
   // half-way.
-  const ops = writes.reduce((n, w) => n + (w.kind === 'move' ? 2 : 1), absorbed.length + 1);
-  if (ops > 450)
-    fail('failed-precondition', 'Too many records to move in one grouping', 'regroup-too-large');
+  const ops = writes.reduce(
+    (n, w) => n + (w.kind === 'move' ? 2 : 1),
+    absorbed.length + 1 + own.length
+  );
+  if (ops > REGROUP_WRITE_CAP) tooManyToRegroup();
   return () => {
+    for (const w of own) tx.update(w.ref, { uids: w.uids });
     for (const w of writes) {
       if (w.kind === 'update') tx.update(at(w.collection).doc(w.id), w.fields);
       else if (w.kind === 'delete') tx.delete(at(w.collection).doc(w.id));
@@ -1407,6 +1452,32 @@ async function rekeyAbsorbed(
       }
     }
   };
+}
+
+/** A transaction holds 500 writes: a grouping or unlink needing more is refused, not half-done. */
+const REGROUP_WRITE_CAP = 450;
+const tooManyToRegroup = (): never =>
+  fail('failed-precondition', 'Too many records to move in one grouping', 'regroup-too-large');
+
+/**
+ * A Miner's payments whose readers (`uids`) are not `minerUids` and their sender, with the ones
+ * they should be: read in the transaction, before any write. One already right is left alone.
+ */
+async function paymentReadersFor(
+  tx: Transaction,
+  db: Firestore,
+  corporationId: number,
+  minerId: string,
+  minerUids: readonly string[]
+): Promise<{ ref: DocumentReference; uids: string[] }[]> {
+  const snap = await tx.get(sub(db, corporationId, PAYMENTS).where('minerId', '==', minerId));
+  return snap.docs.flatMap((d) => {
+    const uids = paymentUids(minerUids, d.get('uid'));
+    const held = d.get('uids') as unknown;
+    const same =
+      Array.isArray(held) && held.length === uids.length && uids.every((u) => held.includes(u));
+    return same ? [] : [{ ref: d.ref, uids }];
+  });
 }
 
 /**
@@ -1504,6 +1575,15 @@ function aliasesAfter(
   );
 }
 
+/** Who reads a grouping once a Character leaves it: the Characters left, claims aside. */
+function readersAfterUnlink(miner: Data, characterId: number): string[] {
+  return minerReaderIds({
+    characterIds: (miner.characterIds as number[]).filter((x) => x !== characterId),
+    officerClaimed: miner.officerClaimed as number[] | undefined,
+    pendingConfirmation: miner.pendingConfirmation as number[] | undefined,
+  }).map((x) => `char:${x}`);
+}
+
 /**
  * Takes a character out of a Miner grouping (or deletes the Miner when one character is left)
  * and records it in the book so no officer's sync puts it straight back (D26). False when the
@@ -1536,11 +1616,7 @@ function removeFromMiner(
       confirmedCharacterIds: (miner.confirmedCharacterIds as number[]).filter(
         (x) => x !== characterId
       ),
-      uids: minerReaderIds({
-        characterIds,
-        officerClaimed: miner.officerClaimed as number[] | undefined,
-        pendingConfirmation: miner.pendingConfirmation as number[] | undefined,
-      }).map((x) => `char:${x}`),
+      uids: readersAfterUnlink(miner, characterId),
     });
   }
   // D26: every officer's sync must leave this character out of an automatic group.
@@ -1836,6 +1912,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       });
       if (same?.kind === 'held' || (same && sent.some((p) => p.transferId === same.id)))
         fail('already-exists', 'That transfer is already in the book', 'transfer-in-book');
+      const uid = `char:${action.characterId}`;
+      const uids = paymentUids(await minerUids(c, action.minerId), uid);
       await confirmDeclaration(c, action.declarationId, action.minerId, action.paymentId);
       staleCheckpoints(c, [action.minerId], earliestDay(action.at));
       tx.create(ref, {
@@ -1843,7 +1921,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         source: 'manual',
         minerId: action.minerId,
         characterId: action.characterId,
-        uid: `char:${action.characterId}`,
+        uid,
+        uids,
         amount: action.amount,
         at: action.at,
         ...(same ? { transferId: same.id } : {}),
@@ -1901,10 +1980,11 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const payment = await mustGet(c, ref, 'Payment');
       if (payment.minerId !== undefined)
         fail('failed-precondition', 'Already assigned', 'already-assigned');
+      const uids = paymentUids(await minerUids(c, action.minerId), payment.uid);
       await confirmDeclaration(c, action.declarationId, action.minerId, action.paymentId);
       staleCheckpoints(c, [action.minerId], earliestDay(payment.at));
       // An officer placed a held donation: the review it waited for is done (#6207).
-      tx.update(ref, { minerId: action.minerId, assignedBy: by, ...reviewDone(payment) });
+      tx.update(ref, { minerId: action.minerId, uids, assignedBy: by, ...reviewDone(payment) });
       return {
         detail: {
           paymentId: action.paymentId,
@@ -1921,9 +2001,11 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const from = typeof payment.minerId === 'string' ? payment.minerId : null;
       if (from === action.minerId)
         return { detail: { paymentId: action.paymentId, from, to: from } };
+      const readers = action.minerId === null ? [] : await minerUids(c, action.minerId);
       staleCheckpoints(c, [from, action.minerId], earliestDay(payment.at));
       tx.update(ref, {
         minerId: action.minerId ?? FieldValue.delete(),
+        uids: paymentUids(readers, payment.uid),
         assignedBy: by,
         assignedAt: iso,
         ...reviewDone(payment),
@@ -2160,8 +2242,19 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     case 'unlink': {
       const ref = col(c, MINERS).doc(action.minerId);
       const miner = await mustGet(c, ref, 'Miner');
+      // Its payments are read by who reads the grouping after: the unlinked Character keeps only
+      // its own sends (`paymentUids`).
+      const narrowed = await paymentReadersFor(
+        tx,
+        c.deps.db,
+        c.corporationId,
+        action.minerId,
+        readersAfterUnlink(miner, action.characterId)
+      );
+      if (narrowed.length > REGROUP_WRITE_CAP) tooManyToRegroup();
       if (!removeFromMiner(c.tx, ref, miner, action.characterId))
         fail('not-found', 'Not in that Miner', 'not-in-miner');
+      for (const w of narrowed) tx.update(w.ref, { uids: w.uids });
       staleCheckpoints(c, unlinkChange(action.minerId, miner, action.characterId), null);
       // The grouping the answer was about is gone, so the answer must not outlive it.
       clearAnswers(c, [action.characterId]);
@@ -3158,12 +3251,20 @@ export async function promoteProvenClaims(
     for (const p of plans) {
       const uids = p.characterIds.map((x) => `char:${x}`);
       const refs: { ref: DocumentReference; uids: string[] }[] = [];
+      // A payment stored before its `uids` gets the whole group's (`paymentUids`).
+      const minerUids = [
+        ...((miners.find((d) => d.id === p.minerId)?.get('uids') as string[] | undefined) ?? []),
+        ...uids,
+      ];
       // A checkpoint carries the Miner's readers too, as notices do.
       for (const name of [...MINER_KEYED, DISPUTES, ACCOUNT_CHECKPOINTS]) {
         const snap = await tx.get(
           sub(deps.db, corporationId, name).where('minerId', '==', p.minerId)
         );
-        for (const d of snap.docs) if ('uids' in d.data()) refs.push({ ref: d.ref, uids });
+        for (const d of snap.docs)
+          if ('uids' in d.data()) refs.push({ ref: d.ref, uids });
+          else if (name === PAYMENTS)
+            refs.push({ ref: d.ref, uids: paymentUids(minerUids, d.get('uid')) });
       }
       widen.push(refs);
     }
@@ -3291,9 +3392,10 @@ async function claimPaymentTx(
       fail('failed-precondition', 'Paid before the book started', 'before-start');
     // A guest's character stays unlinked until they confirm (D26b): `callerMiner` counts only a
     // Miner that lists this character in its readable `uids`.
-    const { minerId } = await callerMiner(tx, deps, corporationId, caller, characterId);
+    const { minerId, uids } = await callerMiner(tx, deps, corporationId, caller, characterId);
     tx.update(paymentRef, {
       minerId,
+      uids: paymentUids(uids, payment.uid),
       claimedBy: characterId,
       claimedAt: new Date(deps.now()).toISOString(),
       ...(inReview ? { reviewReason: FieldValue.delete() } : {}),
@@ -3362,7 +3464,8 @@ export async function declareOwnPayment(deps: BookDeps, caller: Caller, input: D
       fail('not-found', 'Late notice not found', 'not-found');
     // The notice's Miner as the book groups it now: what a found transfer is credited to, and
     // whose Characters may have sent it.
-    const grouping = (await tx.get(sub(deps.db, corporationId, MINERS))).docs.map((d) => ({
+    const minerDocs = (await tx.get(sub(deps.db, corporationId, MINERS))).docs;
+    const grouping = minerDocs.map((d) => ({
       id: d.id,
       characterIds: (d.get('characterIds') as number[] | undefined) ?? [],
       ...(Array.isArray(d.get('aliases')) ? { aliases: d.get('aliases') as string[] } : {}),
@@ -3381,10 +3484,14 @@ export async function declareOwnPayment(deps: BookDeps, caller: Caller, input: D
     // Resolving in the app: the transfers are checked against what the book synced of the
     // corporation's wallet before any officer sees them.
     const transfers = input.transfers ?? [];
-    const checks =
+    const { checks, senders } =
       transfers.length > 0
         ? await checkTransfers(tx, deps, corporationId, senderIds, transfers)
-        : ([] as ClaimCheck[]);
+        : { checks: [] as ClaimCheck[], senders: new Map<string, unknown>() };
+    const readers = minerUidsOf(
+      minerId,
+      minerDocOf(minerDocs.find((d) => d.id === minerId)?.data())
+    );
     // A transfer credited now pays the Miner's days, closed ones too.
     if (checks.some((x) => x.result === 'found'))
       dropCheckpoints(tx, deps.db, corporationId, [minerId], null, deps.now());
@@ -3399,6 +3506,7 @@ export async function declareOwnPayment(deps: BookDeps, caller: Caller, input: D
       if (c.result === 'found' && c.paymentId)
         tx.update(sub(deps.db, corporationId, PAYMENTS).doc(c.paymentId), {
           minerId,
+          uids: paymentUids(readers, senders.get(c.paymentId)),
           claimedBy: characterId,
           claimedAt: iso,
           reviewReason: FieldValue.delete(),
@@ -3463,7 +3571,7 @@ async function checkTransfers(
   corporationId: number,
   senderIds: readonly number[],
   transfers: readonly ClaimTransfer[]
-): Promise<ClaimCheck[]> {
+): Promise<{ checks: ClaimCheck[]; senders: Map<string, unknown> }> {
   const book = (await tx.get(bookRef(deps.db, corporationId))).data() ?? {};
   // Every Character of the Miner may have sent it, officer-claimed alts too: a page of senders at a time.
   const payments: (Data & { id: string })[] = [];
@@ -3477,7 +3585,7 @@ async function checkTransfers(
     ((await tx.get(sub(deps.db, corporationId, META).doc(UNCOUNTED_DOC))).data()?.donations as
       { characterId: number; amount: number; at: string; division: number }[] | undefined) ?? [];
   const lastSyncAt = (book.lastSync as { at?: number } | null | undefined)?.at;
-  return checkClaimedTransfers(transfers, {
+  const checks = checkClaimedTransfers(transfers, {
     senderIds,
     payments: payments.map((p) => ({
       id: p.id,
@@ -3492,6 +3600,8 @@ async function checkTransfers(
     lastSyncAt: typeof lastSyncAt === 'number' ? lastSyncAt : undefined,
     ...(typeof book.startDate === 'string' ? { startDate: book.startDate } : {}),
   });
+  // Each payment's sender, who keeps reading it once it is credited.
+  return { checks, senders: new Map(payments.map((p) => [p.id, p.uid])) };
 }
 
 /**

@@ -9,7 +9,8 @@
 //     officers/{uid}                            officer access record (24h) written by verifyOfficer
 //     observed/{char_type_date_structure}       Observed Mining Entry rows, upserted monotonically
 //     extractions/{structure_start}             Extractions, kept after ESI stops listing them
-//     payments/{id}                             Tax Payments (donations found in the journal, manual)
+//     payments/{id}                             Tax Payments (donations found in the journal, manual);
+//                                               read by the sender (`uid`) and its Miner (`uids`)
 //     dismissals/{id}  declarations/{id}  adjustments/{id}  writeOffs/{id}  rebills/{id}
 //     lateNotices/{id}  lateNoticeLinks/{id}    Late notices and their verify tokens (decision 20261120-235011)
 //     statements/{id}  statementLinks/{id}      the legacy mirror of every Late notice, for older tabs

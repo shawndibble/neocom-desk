@@ -10,7 +10,10 @@ deployed now keep working at each point, so the steps can run before the PR merg
   - `lateNotices/{noticeId}`: officers read every one; a Miner reads their own (`uids`).
   - `lateNoticeLinks/{noticeId}`: `{ token }`, editors only (as `statementLinks`).
   - `accountCheckpoints/{minerId}`: officers read every one; a Miner reads their own (`uids`).
-- **Indexes:** none. Every new query is on a single field (`minerId`, `characterIds`,
+  - `payments/{paymentId}`: also readable by its Miner's readers (`uids`), so a main reads an
+    alt's donation. A payment without `uids` still reads by its sender (`uid`) alone.
+- **Indexes:** none. Every new query is on a single field (`minerId`, `characterIds`, `uids` on
+  `payments`,
   `issuedAt`, `extractionId`, `chunkArrivalTime`, `transferId`, and `books.<corporationId>` on
   `corpTaxBookBilledBy`, which Firestore indexes as a map field by default).
 - **Functions:**
@@ -26,6 +29,8 @@ deployed now keep working at each point, so the steps can run before the PR merg
     payments named; one that could be two Miners' is stored for review (`reviewReason:
 'ambiguous'`). A hand record of a transfer the book already holds is refused; one noted in an
     unread division is linked to it and never counted again. `reassignPayment` moves a payment.
+    Every payment write stores `uids`: its Miner's readers and its sender. A grouping, an unlink
+    and a promoted claim bring its Miner's payments' `uids` level with who reads the Miner.
   - `dailyHousekeeping` (job `verifyBookDocs`): the nightly pass rebuilds moon docs (schema 2, no
     frozen tax) and the tab read models (schema 2, from recorded accounts), and deletes the
     retired `minerTotals` docs.
@@ -51,9 +56,11 @@ deployed now keep working at each point, so the steps can run before the PR merg
    `statements`). Count first, then copy. It creates missing copies, brings each existing copy's
    mail state level with its legacy doc, and then marks the book (`meta/lateNoticesBackfilled`):
    from then on reads look at `lateNotices` alone. Until a book is marked, every read also reads
-   the ids of its legacy docs and fetches those with no copy. It can run again safely; a book
-   that fails (a notice issued during its run) is reported, the run goes on, and the script exits
-   non-zero: re-run it with those corporation ids.
+   the ids of its legacy docs and fetches those with no copy. It also gives each payment stored
+   without `uids` its Miner's readers and its sender (`payment readers` in its output); until it
+   has, a main does not see an alt's older donations. It can run again safely; a book that fails
+   (a notice issued, or a payment written, during its run) is reported, the run goes on, and the
+   script exits non-zero: re-run it with those corporation ids.
 
    ```sh
    cd functions && npm run build
@@ -84,7 +91,8 @@ deployed now keep working at each point, so the steps can run before the PR merg
   - delete every `corps/{id}/meta/lateNoticesBackfilled` doc, or a marked book's list reads
     (the Miners list, codes, guards) miss the notices issued meanwhile;
   - re-run the backfill (step 3): it copies those notices and brings their mail state across
-    (until then the verify page and mail already read both docs and merge their mail state);
+    (until then the verify page and mail already read both docs and merge their mail state), and
+    gives the payments written meanwhile their `uids`;
   - the next nightly pass rewrites the moon docs and read models and deletes `minerTotals`.
-- An older tab that still issues a calendar Statement on a book that never switched removes the
-  book's backfilled marker, so reads look at the legacy docs again until the next backfill.
+- An older tab that still issues a calendar Statement is refused on every book (the backfill
+  lists the books with no `runningAccountFrom`, whose older tabs see that refusal).

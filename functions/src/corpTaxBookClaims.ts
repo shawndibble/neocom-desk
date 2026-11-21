@@ -3,7 +3,7 @@
  * group but cannot read it until its owner signs in as it (a Self-proven link). Pure: the store
  * reads the facts, this decides who reads, who is claimed and what a sign-in promotes.
  */
-import { earlierGrouping } from './corpTaxBookDonationMatch.js';
+import { earlierGrouping, soloCharacterId } from './corpTaxBookDonationMatch.js';
 
 export interface GroupConflict {
   characterId: number;
@@ -64,6 +64,33 @@ export function minerReaderIds(m: {
 }): number[] {
   const held = new Set([...(m.officerClaimed ?? []), ...(m.pendingConfirmation ?? [])]);
   return m.characterIds.filter((id) => !held.has(id));
+}
+
+/**
+ * The sign-ins (`uids`) that read a Miner's own records: its reader Characters', or a solo Miner's
+ * own Character's. A grouping not read (`undefined`) that is no solo id has none.
+ */
+export function minerUidsOf(
+  minerId: string,
+  miner:
+    | {
+        characterIds: readonly number[];
+        officerClaimed?: readonly number[];
+        pendingConfirmation?: readonly number[];
+      }
+    | undefined
+): string[] {
+  const solo = soloCharacterId(minerId);
+  const ids = miner ? minerReaderIds(miner) : solo === undefined ? [] : [solo];
+  return ids.map((id) => `char:${id}`);
+}
+
+/**
+ * A payment's readers (`uids`): its Miner's, so a main reads an alt's donation, and its sender,
+ * who always reads their own (an Unmatched one too). Its `uid` stays the sender's alone.
+ */
+export function paymentUids(minerUids: readonly string[], sender: unknown): string[] {
+  return [...new Set([...minerUids, ...(typeof sender === 'string' ? [sender] : [])])];
 }
 
 export interface ClaimMiner {

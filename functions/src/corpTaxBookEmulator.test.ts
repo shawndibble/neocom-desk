@@ -4,7 +4,9 @@
 import { applyRekeyBackfill, planRekeyBackfill } from './corpTaxBookRekeyBackfill.js';
 import {
   applyLateNoticeBackfill,
+  applyPaymentReadersBackfill,
   planLateNoticeBackfill,
+  planPaymentReadersBackfill,
 } from './corpTaxBookLateNoticeBackfill.js';
 import { minerPaymentCode, paymentCode } from './corpTaxBookLateNotice.js';
 import type { Caller } from './actorAuth.js';
@@ -2141,7 +2143,7 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         expect(out.checks.map((c) => c.result)).toEqual(['found', 'notFound']);
         expect(out.confirmed).toBe(false);
         const p1 = (await book().collection('payments').doc('j1_1').get()).data();
-        expect(p1).toMatchObject({ minerId: 'solo:50', claimedBy: 50 });
+        expect(p1).toMatchObject({ minerId: 'solo:50', claimedBy: 50, uids: ['char:50'] });
         expect((await book().collection('payments').doc('j1_2').get()).get('minerId')).toBe(
           undefined
         );
@@ -3374,6 +3376,143 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
           edit(JUNIOR, { action: 'reassignPayment', paymentId: 'j1_5', minerId: null }, true)
         )
       ).toBe('role-required');
+    });
+
+    describe("a payment is read by its Miner's readers (`uids`) and its sender", () => {
+      const readers = async (id: string) =>
+        [...(((await payment(id))?.uids as string[] | undefined) ?? [])].sort();
+      const group = (characterIds: number[]) =>
+        edit(ACCOUNTANT, {
+          action: 'setMiner',
+          minerId: 'g',
+          characterIds,
+          mainCharacterId: characterIds[0],
+        });
+
+      it("an alt's donation, a hand record and an assignment are the whole group's", async () => {
+        await turnOn();
+        await minedHere(50, 51);
+        await group([50, 51]);
+        await donate(6, 51);
+        expect(await payment('j1_6')).toMatchObject({ minerId: 'g', uid: 'char:51' });
+        expect(await readers('j1_6')).toEqual(['char:50', 'char:51']);
+        await edit(ACCOUNTANT, {
+          action: 'recordPayment',
+          paymentId: 'm1',
+          minerId: 'g',
+          characterId: 51,
+          amount: 3,
+          at: '2026-10-18T00:00:00.000Z',
+        });
+        expect(await readers('m1')).toEqual(['char:50', 'char:51']);
+        await donate(7, 777);
+        expect(await readers('j1_7')).toEqual(['char:777']);
+        await edit(ACCOUNTANT, { action: 'assignPayment', paymentId: 'j1_7', minerId: 'g' });
+        expect(await readers('j1_7')).toEqual(['char:50', 'char:51', 'char:777']);
+        await edit(
+          ACCOUNTANT,
+          { action: 'reassignPayment', paymentId: 'j1_7', minerId: null },
+          true
+        );
+        expect(await readers('j1_7')).toEqual(['char:777']);
+      });
+
+      it('a held donation the member claims becomes the group’s to read', async () => {
+        await turnOn();
+        await minedHere(50, 51);
+        await group([50, 51]);
+        await donate(8, 51, { reviewReason: 'no-open-balance' });
+        expect(await readers('j1_8')).toEqual(['char:51']);
+        await claimPayment(deps(), who(51), CORP, 'j1_8', { inReview: true });
+        expect(await readers('j1_8')).toEqual(['char:50', 'char:51']);
+      });
+
+      it('a regroup widens the payments the Miner and the absorbed Miners hold', async () => {
+        await turnOn();
+        await minedHere(50, 51, 52);
+        await donate(9, 52);
+        expect(await readers('j1_9')).toEqual(['char:52']);
+        await group([50, 51]);
+        await donate(10, 50);
+        await group([50, 51, 52]);
+        expect(await readers('j1_10')).toEqual(['char:50', 'char:51', 'char:52']);
+        expect(await payment('j1_9')).toMatchObject({ minerId: 'g' });
+        expect(await readers('j1_9')).toEqual(['char:50', 'char:51', 'char:52']);
+      });
+
+      it('an unlink narrows them: the Character keeps only its own sends', async () => {
+        await turnOn();
+        await minedHere(50, 51, 52);
+        await group([50, 51, 52]);
+        await donate(11, 50);
+        await donate(12, 51);
+        await edit(ACCOUNTANT, { action: 'unlink', minerId: 'g', characterId: 51 });
+        expect(await readers('j1_11')).toEqual(['char:50', 'char:52']);
+        expect(await readers('j1_12')).toEqual(['char:50', 'char:51', 'char:52']);
+      });
+
+      it('a promoted claim widens a payment stored before `uids`, with the whole group', async () => {
+        await turnOn();
+        await minedHere(60);
+        await syncBook(
+          deps(),
+          who(ACCOUNTANT),
+          parseSyncInput(
+            {
+              corporationId: CORP,
+              observed: [
+                row(10, '2026-10-18T10:00:00Z', { characterId: 61, recordedCorporationId: 555 }),
+              ],
+            },
+            now
+          )
+        );
+        await edit(ACCOUNTANT, {
+          action: 'setMiner',
+          minerId: 'm-a',
+          characterIds: [60, 61],
+          mainCharacterId: 60,
+        });
+        await book()
+          .collection('payments')
+          .doc('old')
+          .set({ minerId: 'm-a', characterId: 61, uid: 'char:61', amount: 1, at: '2026-10-18' });
+        await db.collection('playerCharacters').doc('61').set({
+          characterId: 61,
+          playerId: '60',
+          ownerHash: 'h',
+          provenAt: '2026-10-19T00:00:00Z',
+        });
+        expect(await promoteProvenClaims(deps(), CORP)).toEqual({ promoted: 1 });
+        expect(await readers('old')).toEqual(['char:60', 'char:61']);
+      });
+
+      it('the backfill gives older payments their readers once, never over a newer write', async () => {
+        await turnOn();
+        await minedHere(50, 51);
+        await group([50, 51]);
+        const old = (id: string, data: Record<string, unknown>) =>
+          book()
+            .collection('payments')
+            .doc(id)
+            .set({ amount: 1, at: '2026-10-18', ...data });
+        await old('o1', { minerId: 'g', uid: 'char:51', characterId: 51 });
+        await old('o2', { uid: 'char:777', characterId: 777 });
+        const plan = await planPaymentReadersBackfill(db, CORP);
+        expect(plan.map((p) => [p.id, p.uids])).toEqual([
+          ['o1', ['char:50', 'char:51']],
+          ['o2', ['char:777']],
+        ]);
+        await applyPaymentReadersBackfill(db, CORP, plan);
+        expect(await readers('o1')).toEqual(['char:50', 'char:51']);
+        expect(await planPaymentReadersBackfill(db, CORP)).toEqual([]);
+        // A payment written after the plan was read is not overwritten: a re-run plans it again.
+        await old('o3', { uid: 'char:777', characterId: 777 });
+        const stale = await planPaymentReadersBackfill(db, CORP);
+        await old('o3', { uid: 'char:777', characterId: 777, minerId: 'g' });
+        await expect(applyPaymentReadersBackfill(db, CORP, stale)).rejects.toThrow();
+        expect(await payment('o3')).not.toHaveProperty('uids');
+      });
     });
   });
 
