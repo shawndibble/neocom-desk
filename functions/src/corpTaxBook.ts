@@ -72,6 +72,28 @@ import {
 
 export { CLAIM_CHECK_RESULTS, DISPUTE_KINDS, TAX_CONTACT_MAX_CHARACTERS, TRANSFER_RECIPIENTS };
 
+// The book's subcollection names, declared once for both sides (corpTaxBookVersionKeys.ts).
+export {
+  OBSERVED,
+  EXTRACTIONS,
+  PAYMENTS,
+  DISMISSALS,
+  DECLARATIONS,
+  DISPUTES,
+  ADJUSTMENTS,
+  WRITE_OFFS,
+  TOLERANCE_EXEMPTIONS,
+  MINER_PAID,
+  REBILLS,
+  STATEMENTS,
+  STATEMENT_LINKS,
+  LATE_NOTICES,
+  LATE_NOTICE_LINKS,
+  ACCOUNT_CHECKPOINTS,
+  MINERS,
+  META,
+} from './corpTaxBookVersionKeys.js';
+
 /** The Tax Book lives under the `corps/{id}` umbrella (issue #4858, ADR 0026). */
 export const BOOKS_COLLECTION = 'corps';
 export const TOKENS_COLLECTION = 'corpTaxBookTokens';
@@ -83,45 +105,11 @@ export const TOKENS_COLLECTION = 'corpTaxBookTokens';
  */
 export const MEMBER_SETUP_MS = 72 * 60 * 60 * 1000;
 export const OFFICERS = 'officers';
-export const OBSERVED = 'observed';
-export const EXTRACTIONS = 'extractions';
-export const PAYMENTS = 'payments';
-export const DISMISSALS = 'dismissals';
-export const DECLARATIONS = 'declarations';
-/** `disputes/{minerId_date}`: a Miner says a Conflict day's ore went to another Payee (#6206). */
-export const DISPUTES = 'disputes';
-export const ADJUSTMENTS = 'adjustments';
-export const WRITE_OFFS = 'writeOffs';
-/** `toleranceExemptions/{id}`: an officer's limit on what one Miner-day shortfall may forgive. */
-export const TOLERANCE_EXEMPTIONS = 'toleranceExemptions';
-/**
- * `minerPaid/{minerId}`: a copy of the Miner's paid-through day from `meta/paid` (officer-only),
- * readable by that Miner so their own Tax tab can close the same days the book does.
- */
-export const MINER_PAID = 'minerPaid';
-export const REBILLS = 'rebills';
-export const STATEMENTS = 'statements';
-/** `statementLinks/{statementId}`: the verify token, readable by editors only. */
-export const STATEMENT_LINKS = 'statementLinks';
-/**
- * `lateNotices/{noticeId}`: a `LateNotice` and a server `updatedAt` (decision 20261120-235011).
- * Officers read every one; a Miner reads their own (`uids`).
- */
-export const LATE_NOTICES = 'lateNotices';
-/** `lateNoticeLinks/{noticeId}`: `{ token }`, the verify link's token. Editors only. */
-export const LATE_NOTICE_LINKS = 'lateNoticeLinks';
-/**
- * `accountCheckpoints/{minerId}`: a `RunningAccountCheckpoint`, its Miner's readers (`uids`) and a
- * server `updatedAt`. Officers read every one; a Miner reads their own.
- */
-export const ACCOUNT_CHECKPOINTS = 'accountCheckpoints';
-export const MINERS = 'miners';
 /**
  * `accounts/{minerId}` (#6294): a running account's figures as an officer's client last worked
  * them out (the server cannot price days), for the pay page's live total. Function-only.
  */
 export const ACCOUNTS = 'accounts';
-export const META = 'meta';
 export const PAID_DOC = 'paid';
 /** Doc under `meta`: the scheduled sync's public status (ADR 0025); `status: 'active'` is Automatic sync on. */
 export const SCHEDULED_SYNC_DOC = 'scheduledSync';
