@@ -5,7 +5,7 @@
  * A pull's window is at most 5 dates at one refinery. The page reads the window rows of the
  * shown pull and of the moon's other cycles, so every figure, tax included, comes from the
  * engine exactly as the whole-book path computes it: a moon doc carries no tax (its frozen tax
- * counted calendar Statements, and is 0 since schema 2). The docs still give a refinery page
+ * counted the retired calendar bills, and is 0 since schema 2). The docs still give a refinery page
  * that reads no row its mined share and Miner count. One doc missing or on another schema sends
  * the moon page back to the whole-book path.
  */

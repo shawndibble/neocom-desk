@@ -201,7 +201,7 @@ describe('Stop reminders (D27)', () => {
 });
 
 describe('isAlreadyQueued', () => {
-  it('never queues a Statement mail twice, whatever its state', () => {
+  it('never queues a late notice mail twice, whatever its state', () => {
     expect(isAlreadyQueued([item(1, { status: 'sent' })], 's1', 'notice')).toBe(true);
     expect(isAlreadyQueued([item(1)], 's2', 'notice')).toBe(false);
   });

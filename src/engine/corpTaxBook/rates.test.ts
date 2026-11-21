@@ -180,14 +180,14 @@ describe('rateStartRefusal', () => {
   it('refuses a start more than 30 days back', () => {
     expect(rateStartRefusal('2026-06-11', '2026-07-12', null)).toBe('too-old');
   });
-  it('refuses a start on or before a day an issued Statement bills', () => {
+  it('refuses a start on or before a day an issued late notice bills', () => {
     expect(rateStartRefusal('2026-07-05', '2026-07-12', '2026-07-05')).toBe('on-statement');
     expect(rateStartRefusal('2026-07-06', '2026-07-12', '2026-07-05')).toBeNull();
   });
 });
 
 describe('canOverrideRecordRate', () => {
-  it('allows a per-record override only on a day not yet on a Statement', () => {
+  it('allows a per-record override only on a day not yet on a late notice', () => {
     const onStatement = new Set(['2026-07-01', '2026-07-12']);
     expect(canOverrideRecordRate('2026-07-12', onStatement)).toBe(false);
     expect(canOverrideRecordRate('2026-07-13', onStatement)).toBe(true);
