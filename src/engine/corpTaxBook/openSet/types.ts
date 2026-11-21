@@ -45,6 +45,7 @@ export interface OpenSetInput {
   payments: readonly SettlePayment[];
   dismissals: readonly Dismissal[];
   adjustments?: readonly Adjustment[];
+  /** Officer write-offs (#4637): each forgives the Miner's oldest unpaid days. */
   writeOffs?: readonly RecordedWriteOff[];
   /** Members' disputes: an open one holds its day out of what is due. */
   disputes?: readonly OreDispute[];
@@ -56,7 +57,10 @@ export interface OpenSetInput {
   minerPaidThrough?: ReadonlyMap<string, string>;
   /** Each Miner's closed-through checkpoint, by Miner id. */
   checkpoints?: ReadonlyMap<string, RunningAccountCheckpoint>;
-  /** Moon owners' coverage and read clock; absent means none. */
+  /**
+   * Feeders' last good ledger reads. A feeder's refinery days are withheld until one lands after
+   * the day's grace (#4509), and a day outside its coverage owes nothing (#4618); absent means none.
+   */
   feeders?: readonly (FeederCoverage & FeederReadClock)[];
   pricesOn: (date: string) => Pick<DayPrices, 'prices' | 'sources'>;
   placement: Placement;

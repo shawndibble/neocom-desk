@@ -10,6 +10,7 @@ import type { Firestore, WriteBatch } from 'firebase-admin/firestore';
 import { commitInBatches } from './commitInBatches.js';
 import { verifyMoonDocs } from './corpTaxBookMoonDocsStore.js';
 import { invalidateReadModels, reconcileReadModels } from './corpTaxBookReadModelsStore.js';
+import { drainReadersSafely } from './corpTaxBookReaders.js';
 import { DAY_MS } from './timeConstants.js';
 
 const book = (db: Firestore, corporationId: number) =>
@@ -51,6 +52,8 @@ export async function verifyBook(
   await retireMinerTotals(db, corporationId).catch((e) =>
     console.error('miner totals retire failed', e instanceof Error ? e.message : e)
   );
+  // Whatever readers drain the actions and syncs left; a larger budget than theirs.
+  await drainReadersSafely(db, corporationId, 20_000);
   const moon = await verifyMoonDocs(db, corporationId, now()).catch((e) => {
     console.error('moon docs verify failed', e instanceof Error ? e.message : e);
     return undefined;

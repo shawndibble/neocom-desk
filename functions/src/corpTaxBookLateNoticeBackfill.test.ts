@@ -93,17 +93,23 @@ describe('planPaymentReaders', () => {
     ]);
   });
 
-  it('leaves a payment that has `uids` alone, so a re-run plans nothing', () => {
+  it('repairs a payment whose `uids` are stale, and leaves a right one alone', () => {
     expect(
-      planPaymentReaders([{ id: 'p1', data: { minerId: 'g', uid: 'char:2', uids: [] } }], miners)
-    ).toEqual([]);
+      planPaymentReaders(
+        [
+          { id: 'p1', data: { minerId: 'g', uid: 'char:2', uids: ['char:2', 'char:9'] } },
+          { id: 'p2', data: { minerId: 'g', uid: 'char:2', uids: ['char:2', 'char:1'] } },
+        ],
+        miners
+      )
+    ).toEqual([{ id: 'p1', uids: ['char:1', 'char:2'] }]);
   });
 });
 
 describe('planObservedReaders', () => {
   const miners = [{ id: 'g', data: { characterIds: [1, 2, 3], officerClaimed: [3] } }];
 
-  it("gives each row stored without `uids` its Character's Miner's readers and itself", () => {
+  it("gives each row its Character's Miner's readers and itself, where missing or stale", () => {
     expect(
       planObservedReaders(
         [
@@ -111,6 +117,7 @@ describe('planObservedReaders', () => {
           { id: 'r2', data: { characterId: 3 } },
           { id: 'r3', data: { characterId: 9 } },
           { id: 'r4', data: { characterId: 1, uids: ['char:1'] } },
+          { id: 'r5', data: { characterId: 1, uids: ['char:2', 'char:1'] } },
         ],
         miners
       )
@@ -118,6 +125,7 @@ describe('planObservedReaders', () => {
       { id: 'r1', uids: ['char:1', 'char:2'] },
       { id: 'r2', uids: ['char:1', 'char:2', 'char:3'] },
       { id: 'r3', uids: ['char:9'] },
+      { id: 'r4', uids: ['char:1', 'char:2'] },
     ]);
   });
 });

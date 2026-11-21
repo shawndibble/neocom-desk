@@ -59,7 +59,6 @@ const miner = (id: string, characterId: number, over: Partial<MinerRow> = {}): M
   credit: 0,
   lastPaidAt: null,
   paused: false,
-  account: { paidThrough: null, owes: null, closableThrough: null },
   ...over,
 });
 

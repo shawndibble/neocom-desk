@@ -94,10 +94,9 @@ describe('accountSortValue', () => {
     const owes = (oldest: string) => ({
       paidThrough: null,
       owes: { amount: 1, days: 1, oldest },
-      closableThrough: null,
     });
     const sorted = [
-      { paidThrough: '2026-11-10', owes: null, closableThrough: null },
+      { paidThrough: '2026-11-10', owes: null },
       owes('2026-11-05'),
       owes('2026-10-01'),
     ]

@@ -9,7 +9,7 @@
  * code it carries, and a notice is settled once its days are; what earlier notices still ask is
  * `carried`.
  */
-import { newest, type BookView } from './bookView';
+import { bookMiner, newest, type BookView } from './bookView';
 import {
   listedKeys,
   mergeNoticeDocs,
@@ -81,11 +81,10 @@ export function draftNotice(
   minerId: string,
   opts: { now?: string; id?: string; kind?: LateNoticeKind } = {}
 ): NoticePlan | undefined {
-  const inner = view.internals.byMiner.get(minerId);
-  const row = view.miners.find((m) => m.id === minerId);
-  const owes = row?.account.owes;
-  if (!inner || !row || !owes) return undefined;
-  const { account } = inner;
+  const miner = bookMiner(view, minerId);
+  const owes = miner?.account.owes;
+  if (!miner || !owes) return undefined;
+  const { row, settlement: inner, account } = miner;
   const now = opts.now ?? view.input.now;
 
   const listed = listedKeys(inner.notices);
@@ -159,9 +158,10 @@ export function planNotices(
   const today = now.slice(0, 10);
   const plans: NoticePlan[] = [];
   for (const row of view.miners) {
-    const owes = row.account.owes;
+    const inner = view.internals.byMiner.get(row.id);
+    const owes = inner?.account.owes;
     if (closed.has(row.id) || !owes || owes.amount < rules.minimum) continue;
-    const notices = view.internals.byMiner.get(row.id)?.notices ?? [];
+    const notices = inner?.notices ?? [];
     if (!noticeDue(rules, today, owes.oldest, newest(notices)?.issuedAt, owes.amount)) continue;
     const plan = draftNotice(view, row.id, { now });
     if (plan) plans.push(plan);
