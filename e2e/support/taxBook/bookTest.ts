@@ -71,6 +71,17 @@ function defaultCorpEsi(path: string, route: Route): unknown {
       };
     }
   }
+  const system = /^\/universe\/systems\/(\d+)$/.exec(path);
+  const named = system && Object.values(REFINERY).find((r) => r.systemId === Number(system[1]));
+  if (named) {
+    return {
+      system_id: named.systemId,
+      name: named.systemName,
+      security_status: -0.2,
+      constellation_id: 20000001,
+      star_id: 40000001,
+    };
+  }
   const corp = new RegExp(`^/corporations?/${CORP}/`);
   if (corp.test(path)) {
     if (path.endsWith('/divisions')) return { wallet: [{ division: 1, name: 'Master Wallet' }] };

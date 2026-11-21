@@ -30,8 +30,20 @@ export { minerPaymentCode };
 export const ORE_TYPE = 45490;
 
 export const REFINERY = {
-  alpha: { id: 1_040_000_000_001, name: 'E2E Athanor Alpha', systemId: 30002187, moonId: 40139001 },
-  beta: { id: 1_040_000_000_002, name: 'E2E Tatara Beta', systemId: 30002053, moonId: 40139002 },
+  alpha: {
+    id: 1_040_000_000_001,
+    name: 'E2E Athanor Alpha',
+    systemId: 30002187,
+    systemName: 'Amamake',
+    moonId: 40139001,
+  },
+  beta: {
+    id: 1_040_000_000_002,
+    name: 'E2E Tatara Beta',
+    systemId: 30002053,
+    systemName: 'Hek',
+    moonId: 40139002,
+  },
 } as const;
 export type RefineryKey = keyof typeof REFINERY;
 
