@@ -8,6 +8,7 @@ import type { VerifyPayloadLine } from '@/engine/corpTaxBook/verifyView';
 import { NoticeLines } from '@/features/corpTaxBook/NoticeLines';
 import { writeToClipboard } from '@/lib/clipboard';
 import { readVerifyTokens, verifyUrl } from '../taxBook/bookClient';
+import { minerPaymentCode } from '../../../../functions/src/corpTaxBookLateNotice';
 import { useBook } from './useBook';
 import {
   type ClockZone,
@@ -168,11 +169,10 @@ export function LateNoticePanel({
             )}
           </Fact>
           <Fact label={t(k('mail'))}>{mailText(detail, t, zone)}</Fact>
-          {notice.code && (
-            <Fact label={t(k('code'))}>
-              <span className="font-mono">{notice.code}</span>
-            </Fact>
-          )}
+          {/* The Miner's one code, which the mail asks for; an older notice's own still matches. */}
+          <Fact label={t(k('code'))}>
+            <span className="font-mono">{minerPaymentCode(notice.minerId)}</span>
+          </Fact>
         </dl>
         <NoticeLines
           notice={{

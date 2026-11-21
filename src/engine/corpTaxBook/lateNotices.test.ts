@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildBookView, noticeDetail, type BookViewInput } from './bookView';
-import { paymentCode, type LateNotice } from '../../../functions/src/corpTaxBookLateNotice';
+import { minerPaymentCode, type LateNotice } from '../../../functions/src/corpTaxBookLateNotice';
 import { draftNotice, owedDays, planNotices } from './lateNotices';
 import { DEFAULT_NOTICE_RULES, type NoticeRules } from './notices';
 import { planCloseAccount } from './closeAccount';
@@ -85,8 +85,8 @@ describe('planNotices (#6294)', () => {
       pricing: { hubId: 'jita', oreForm: 'compressed' },
       mail: { sent: 0, manualSent: 0, remindersStopped: false },
     });
-    // The server sets a notice's code itself, as this, and refuses any other.
-    expect(plan.notice.code).toBe(paymentCode(plan.notice.id));
+    // The server sets a notice's code itself, as this, and refuses any other. One code per Miner: the one the mail asks for, whichever notice it is.
+    expect(plan.notice.code).toBe(minerPaymentCode(plan.notice.minerId));
     expect(plan.notice.lines.map((l) => [l.date, l.tax])).toEqual([
       ['2026-09-01', 10_000_000],
       ['2026-09-02', 10_000_000],

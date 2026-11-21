@@ -36,7 +36,7 @@ import { matchesStatedTransfer } from './corpTaxBookTransferMatch.js';
 import {
   NOTICE_ID_FIELD,
   isFinalNoticeId,
-  paymentCode,
+  minerPaymentCode,
   type LateNotice,
   type LateNoticeLine,
 } from './corpTaxBookLateNotice.js';
@@ -1447,7 +1447,8 @@ function parseNoticeLine(raw: unknown): LateNoticeLine {
 
 /**
  * A Late notice from an officer's tab (decision 20261120-235011). What it listed is summed here
- * from its lines, and its Reason code is the one its id hashes to; who may read it, who issued it
+ * from its lines, and its Reason code is the Miner's one code (`minerPaymentCode`), as the mail
+ * asks for; who may read it, who issued it
  * and its mail state are the server's to set, so they start empty. A final notice is never issued
  * here: only closing the account sends one.
  */
@@ -1457,7 +1458,7 @@ export function parseLateNotice(raw: Record<string, unknown>): LateNotice {
   oneOf(raw.kind, 'notice.kind', ['late'] as const);
   if (isFinalNoticeId(id))
     throw new HttpsError('invalid-argument', 'only closing an account sends a final notice');
-  const code = paymentCode(id);
+  const code = minerPaymentCode(minerId);
   if (raw.code !== undefined && raw.code !== code)
     throw new HttpsError('invalid-argument', `notice.code must be ${code}`);
   const lines = list(raw.lines, 'notice.lines', 5000).map(parseNoticeLine);

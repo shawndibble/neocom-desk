@@ -14,7 +14,7 @@ import {
   lateNoticeFromStatementDoc,
   listedKeys,
   noticeDocId,
-  paymentCode,
+  minerPaymentCode,
   type LateNotice,
   type LateNoticeKind,
 } from '../../../functions/src/corpTaxBookLateNotice';
@@ -99,8 +99,8 @@ export function draftNotice(
       characterIds: row.characterIds,
       kind: opts.kind ?? 'late',
       issuedAt: now,
-      // The server sets a notice's code itself, as this, and refuses any other.
-      code: paymentCode(id),
+      // The Miner's one code, which the mail asks for: the server sets it as this, and refuses any other.
+      code: minerPaymentCode(minerId),
       pricing: { hubId: view.input.hubId, oreForm: view.input.oreForm },
       uids: row.characterIds.map((c) => `char:${c}`),
       lines,

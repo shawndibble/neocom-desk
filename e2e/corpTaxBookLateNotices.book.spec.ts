@@ -107,9 +107,8 @@ test('the verify link shows what the Miner owes now, without a login', async ({ 
   await expect(page.getByRole('main')).toContainText(isk(book.ada.owed));
 });
 
-// The mail asks for the Miner's code (`minerPaymentCode`, lateNoticeMailing.ts), but the verify
-// page's Pay section prints the notice's own code (`notice.code`, VerifyPage.tsx): two codes.
-test.fixme('the pay section gives the Miner the same code the mail did', async ({ page }) => {
+// One code per Miner: the mail asks for `minerPaymentCode`, and the server stores it on the notice.
+test('the pay section gives the Miner the same code the mail did', async ({ page }) => {
   const notice = await issueCorasNotice(page);
   await page.goto(`./corp-tax-book/verify/${notice.token}`);
   await expect(page.getByRole('main')).toContainText(
