@@ -9,8 +9,9 @@ import type { RecordedWriteOff } from '@/engine/corpTaxBook/payments';
 import type { PayeeAccount } from '@/engine/miningTax/payeeAccount';
 import type { PayeeLedgerSource } from '@/engine/miningTax/payeeLedger';
 import type { MiningTaxAssignmentRecord } from '@/db';
+import { madePaymentHref } from '../madePaymentHref';
 
-/** A personal Payee's ledger: each charge an Assignment, each payment a link. */
+/** A personal Payee's ledger: each charge an Assignment, each payment a link to its transaction. */
 export function personalLedgerSource(
   account: PayeeAccount,
   assignmentOf: (id: string) => MiningTaxAssignmentRecord | undefined,
@@ -29,7 +30,12 @@ export function personalLedgerSource(
     },
     payment: (l) => {
       const from = payerOf(l);
-      return { at: `${l.paidOn}T00:00:00.000Z`, ...(from ? { from } : {}) };
+      const href = madePaymentHref(l);
+      return {
+        at: `${l.paidOn}T00:00:00.000Z`,
+        ...(from ? { from } : {}),
+        ...(href ? { href } : {}),
+      };
     },
   });
 }

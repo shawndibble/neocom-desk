@@ -8881,7 +8881,8 @@
         "noticeSettled": "Every day it listed is paid.",
         "noticeRemaining": "{{amount}} still owed on its days.",
         "opening": "Every day up to here is summed into this one balance: ledger syncs can no longer change those days, so a fix to one shows as a new entry today.",
-        "note": "The officer noted: {{note}}"
+        "note": "The officer noted: {{note}}",
+        "viewPayment": "View the payment"
       },
       "emptyTitle": "Nothing on this ledger yet",
       "emptyHint": "A day shows here once it is billed.",
