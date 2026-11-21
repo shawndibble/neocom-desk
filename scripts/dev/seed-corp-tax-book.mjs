@@ -104,7 +104,6 @@ put(book, {
   hubId: 'jita',
   oreForm: 'compressed',
   graceHours: 6,
-  minimumStatement: 5_000_000,
   overdueDays: 14,
   divisions: [1],
   cadence: { kind: 'monthly' },

@@ -103,18 +103,24 @@ export function latestRecordedCorp(
 /** Engine `MAX_RATE_BACKDATE_DAYS`. */
 export const MAX_RATE_BACKDATE_DAYS = 30;
 
-/** Engine `rateStartRefusal`. The start-date rate at book creation skips it. */
+/**
+ * Engine `rateStartRefusal`: never more than 30 days back, never on or before the last day a Late
+ * notice listed (`lastNoticedDay`). The start-date rate at book creation skips it.
+ */
 export function rateStartRefusal(
   effectiveFrom: string,
   today: string,
-  lastStatementDay: string | null
+  lastNoticed: string | null
 ): 'too-old' | 'on-statement' | null {
   if (effectiveFrom < shiftDate(today, -MAX_RATE_BACKDATE_DAYS)) return 'too-old';
-  if (lastStatementDay !== null && effectiveFrom <= lastStatementDay) return 'on-statement';
+  if (lastNoticed !== null && effectiveFrom <= lastNoticed) return 'on-statement';
   return null;
 }
 
-/** The fields of a stored Statement the date rules read. */
+/**
+ * @deprecated The server reads the days a Late notice listed (`noticedDates`); kept only while the
+ * client's mirror test imports it. A legacy Statement's covered days.
+ */
 export interface StatementDays {
   id: string;
   coversFrom: string;
@@ -122,7 +128,7 @@ export interface StatementDays {
   lines: { kind: string; date: string }[];
 }
 
-/** Engine `statementDays`. */
+/** @deprecated See `StatementDays`. Engine `statementDays`. */
 export function statementDays(statement: StatementDays): Set<string> {
   const days = new Set<string>();
   for (let d = statement.coversFrom; d <= statement.coversThrough; d = shiftDate(d, 1)) days.add(d);
@@ -130,26 +136,9 @@ export function statementDays(statement: StatementDays): Set<string> {
   return days;
 }
 
-/** The latest day any of `statements` bills, or null with none (engine `daysOnStatements`, maxed). */
-export function lastStatementDay(statements: readonly StatementDays[]): string | null {
-  let last: string | null = null;
-  for (const s of statements)
-    for (const d of statementDays(s)) if (last === null || d > last) last = d;
-  return last;
-}
-
-/** Engine `canOverrideRecordRate` over `daysOnStatements`. */
+/** @deprecated The server checks `noticedDates(...).has(date)`. Engine `canOverrideRecordRate`. */
 export function canOverrideRecordRate(date: string, statements: readonly StatementDays[]): boolean {
   return !statements.some((s) => statementDays(s).has(date));
-}
-
-/** Engine `canRebillFrom` (D22): never reaches a day a paid Statement covered. */
-export function canRebillFrom(
-  date: string,
-  statements: readonly StatementDays[],
-  paidStatementIds: ReadonlySet<string>
-): boolean {
-  return statements.every((s) => !paidStatementIds.has(s.id) || date > s.coversThrough);
 }
 
 // Book defaults (hand-off from #4059: they live in the backend, not the engine).

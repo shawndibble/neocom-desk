@@ -1032,11 +1032,8 @@ describe('moveStartRate', () => {
 });
 
 describe('startDateMoveReason (CX-23)', () => {
-  const st = (coversFrom: string, coversThrough: string) => ({
-    id: 's',
-    coversFrom,
-    coversThrough,
-    lines: [],
+  const st = (...dates: string[]) => ({
+    lines: dates.map((date) => ({ kind: 'mined' as const, date })),
   });
   const today = '2026-10-23';
   it('allows moving earlier, never into the future or before the leave day', () => {
@@ -1048,7 +1045,7 @@ describe('startDateMoveReason (CX-23)', () => {
       'start-before-leave'
     );
   });
-  it('allows moving later only when no Statement covers the gap', () => {
+  it('allows moving later only when no Late notice listed a day in the gap', () => {
     expect(startDateMoveReason('2026-10-01', '2026-10-10', today, null, [])).toBeNull();
     expect(
       startDateMoveReason('2026-10-01', '2026-10-10', today, null, [st('2026-10-10', '2026-10-15')])
@@ -1056,6 +1053,10 @@ describe('startDateMoveReason (CX-23)', () => {
     expect(
       startDateMoveReason('2026-10-01', '2026-10-10', today, null, [st('2026-10-05', '2026-10-12')])
     ).toBe('start-over-billed');
+    // The days between two listed days were not listed.
+    expect(
+      startDateMoveReason('2026-10-01', '2026-10-10', today, null, [st('2026-09-30', '2026-10-12')])
+    ).toBeNull();
   });
 });
 

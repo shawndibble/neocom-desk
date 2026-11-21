@@ -16,12 +16,7 @@ import {
   type Transaction,
 } from 'firebase-admin/firestore';
 import { LATE_NOTICES, LATE_NOTICE_LINKS, META, TOKENS_COLLECTION } from './corpTaxBook.js';
-import {
-  NOTICE_ID_FIELD,
-  legacyStatementDocOf,
-  mergeNoticeDocs,
-  type LateNotice,
-} from './corpTaxBookLateNotice.js';
+import { NOTICE_ID_FIELD, mergeNoticeDocs, type LateNotice } from './corpTaxBookLateNotice.js';
 import {
   legacyNoticeRef,
   legacyNotices,
@@ -124,33 +119,6 @@ export async function readNotices(
 ): Promise<LateNotice[]> {
   const { current, legacy } = await readBoth(reader, book, where);
   return mergeNoticeDocs(current.map(withId), legacy.map(withId));
-}
-
-/**
- * The same notices in their legacy shape, for the guards that still read Statement fields
- * (`coversThrough`, `amount`): a calendar Statement an older tab issued is kept as stored.
- */
-export async function readNoticeDocs(
-  reader: DocReader,
-  book: DocumentReference,
-  where: NoticeFilter = everything
-): Promise<Data[]> {
-  const { current, legacy } = await readBoth(reader, book, where);
-  return [
-    ...mergeNoticeDocs(current.map(withId), []).map(legacyStatementDocOf),
-    ...legacy.map((d) => d.data() ?? {}),
-  ];
-}
-
-/** One notice in its legacy shape (`readNoticeDocs`), by id. */
-export async function readNoticeDocById(
-  reader: Pick<DocReader, 'getAll'>,
-  book: DocumentReference,
-  id: string
-): Promise<Data | undefined> {
-  const [current, legacy] = await reader.getAll(noticeRef(book, id), legacyNoticeRef(book, id));
-  if (current.exists) return mergeNoticeDocs([withId(current)], []).map(legacyStatementDocOf)[0];
-  return legacy.exists ? legacy.data() : undefined;
 }
 
 /** A fresh verify-link token: `VERIFY_TOKEN_BYTES` random bytes, url-safe. */
