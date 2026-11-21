@@ -32,7 +32,12 @@ export function useComparePrice(
   fittings: readonly (Fitting | null)[],
   profile: PilotProfile | null
 ): CompareAsyncResult<FittingPriceTotals> {
-  const { hubId } = useHubFor('fittings');
-  // The hub is the cache's context: a new hub re-prices every slot.
-  return useCompareAsync(fittings, profile, computeOne, getTradeHub(hubId) ?? DEFAULT_TRADE_HUB);
+  const { hubId, hydrated } = useHubFor('fittings');
+  // The hub is the cache's context: a new hub re-prices every slot. Nothing is priced until it is read.
+  return useCompareAsync(
+    fittings,
+    hydrated ? profile : null,
+    computeOne,
+    getTradeHub(hubId) ?? DEFAULT_TRADE_HUB
+  );
 }

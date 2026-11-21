@@ -11323,6 +11323,7 @@
   },
   "pageHubs": {
     "global": "Global",
+    "fieldLabel": "{{hub}}, {{label}}",
     "scopeLabel": "Hub used here",
     "hubLabel": "Trade Hub",
     "area": {

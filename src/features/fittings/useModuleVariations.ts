@@ -145,7 +145,7 @@ export function useModuleVariations({
   // Left null on failure: rows show "no sell orders", the same degrade a hub
   // with no orders at all produces, rather than a broken loading state.
   // The Fittings hub, as the rest of the fit's prices.
-  const { hubId } = useHubFor('fittings');
+  const { hubId, hydrated: hubHydrated } = useHubFor('fittings');
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   const loadPrices = useCallback(async () => {
     const typeIds = members.map((member) => member.typeId);
@@ -155,8 +155,9 @@ export function useModuleVariations({
       typeIds.map((id) => [id, priceMap.get(id)?.sellMin ?? null])
     );
   }, [members, hub]);
-  // Same key: a new member list refreshes behind the prices showing (looked up per type, so never another type's).
-  const freshPrices = useKeyedLoad('prices', loadPrices).data;
+  // Same hub: a new member list refreshes behind the prices showing (looked up per type, so never another type's).
+  // Keyed on the hub: another hub's prices never show under this one; null until the hub is read.
+  const freshPrices = useKeyedLoad(hubHydrated ? `prices:${hub.id}` : null, loadPrices).data;
 
   const fresh =
     computed &&

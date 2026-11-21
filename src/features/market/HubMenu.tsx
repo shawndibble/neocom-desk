@@ -91,18 +91,19 @@ export function HubField({
   className,
 }: {
   area: PageHubArea;
-  /** What the field picks ("Price hub"); the trigger is named "<label>: <hub>". */
+  /** What the field picks ("Priced at"); the trigger is named "<hub>, <label>" so it starts with what shows. */
   label: string;
   size?: ControlSize;
   className?: string;
 }) {
+  const { t } = useTranslation();
   const { hubId } = useHubFor(area);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   return (
     <HubMenu
       area={area}
       triggerClassName={cx(selectTriggerClassName(size), className)}
-      triggerLabel={`${hub.systemName}, ${label}`}
+      triggerLabel={t('pageHubs.fieldLabel', { hub: hub.systemName, label })}
     >
       <span>{hub.systemName}</span>
       <SelectChevron size={size} />

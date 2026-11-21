@@ -55,7 +55,8 @@ export function FittingExportItems({
   share?: ReactNode;
 }) {
   const { t } = useTranslation();
-  const hub = getTradeHub(useHubFor('fittings').hubId) ?? DEFAULT_TRADE_HUB;
+  const { hubId } = useHubFor('fittings');
+  const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   return (
     <>
       <DropdownMenuItem onSelect={() => void copyShareLink()}>

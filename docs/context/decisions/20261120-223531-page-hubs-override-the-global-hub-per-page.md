@@ -48,4 +48,5 @@ _Recorded 2026-11-20. Issue #6523._
   value, which is an injector price. A field-chrome `HubField` (the
   `HubMenu` behind a select-shaped trigger) replaces the hub `Select` on
   both pages. The Fittings export's "minus owned" station still falls back
-  to the Global hub: it is the Appraisal's pick and moves with Appraisal.
+  to the Global hub on purpose: it is the station the Appraisal tab's Minus
+  owned uses, so it moves with the Appraisal area, not with Ship Fit Costs.
