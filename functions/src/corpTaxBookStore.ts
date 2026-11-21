@@ -5,6 +5,7 @@
 // EVE access token is verified and used for ESI reads, then dropped: it is
 // never written to Firestore or to the audit log.
 
+import { utcDay } from './timeConstants.js';
 import { randomBytes } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import {
@@ -82,7 +83,6 @@ import {
   rateKey,
   startDateMoveReason,
   satisfies,
-  utcDate,
   type BookCall,
   type EditAction,
   type Need,
@@ -398,7 +398,7 @@ const actorOf = (access: OfficerAccess, via?: string): Actor => ({
 export async function turnOnBook(deps: BookDeps, caller: Caller, input: TurnOnInput) {
   const access = await authorizeOfficer(deps, caller, input, 'director', { live: true });
   const now = deps.now();
-  if (input.startDate > utcDate(now))
+  if (input.startDate > utcDay(now))
     fail('invalid-argument', 'The start date cannot be in the future', 'start-in-future');
   const ref = bookRef(deps.db, input.corporationId);
   // A pointer a past delete missed (it failed, or a late sync) must not grant this book's reads.
@@ -459,7 +459,7 @@ export async function ownBookFloor(
       return shiftDate((ends as string[]).sort().at(-1)!, 1);
     }
   }
-  return utcDate(leftAt);
+  return utcDay(leftAt);
 }
 
 /** The `corps/{id}` subcollections that are not the book's: deleting the book leaves them. */
@@ -1066,7 +1066,7 @@ const bookOf = (c: EditCtx) => bookRef(c.deps.db, c.corporationId);
  * known (absent) locks nothing. An officer fixes an old mistake with an edit dated today.
  */
 function refuseLocked(now: number, ...dates: unknown[]): void {
-  const today = utcDate(now);
+  const today = utcDay(now);
   if (dates.some((d) => typeof d === 'string' && isLocked(d, today)))
     fail('failed-precondition', 'History before the lock date is read-only', 'locked');
 }
@@ -1618,6 +1618,10 @@ async function removeFromMiner(
   return true;
 }
 
+/** The Characters a Miner holds besides one: who stays grouped when it declines. */
+const othersOf = (miner: Data, characterId: number): number[] =>
+  (miner.characterIds as number[]).filter((x) => x !== characterId);
+
 /** What a character answered to a pending grouping, kept for the officers (D26b, #4210). */
 const ANSWERS_DOC = 'groupingAnswers';
 
@@ -1626,7 +1630,16 @@ function recordAnswer(
   deps: BookDeps,
   corporationId: number,
   characterId: number,
-  entry: { minerId: string; answer: 'confirmed' | 'declined'; via: 'character' | 'verify-link' }
+  entry: {
+    minerId: string;
+    answer: 'confirmed' | 'declined';
+    via: 'character' | 'verify-link';
+    /**
+     * A decline: the Characters the Miner held besides the decliner then. The grouping is often
+     * dissolved by it, so this is how the officers' Needs you item still names who was grouped.
+     */
+    otherCharacterIds?: number[];
+  }
 ): void {
   tx.set(
     sub(deps.db, corporationId, META).doc(ANSWERS_DOC),
@@ -1635,6 +1648,8 @@ function recordAnswer(
         // A new answer is a new Needs you item: an officer's earlier dismissal does not carry over.
         [String(characterId)]: {
           ...entry,
+          // A new answer replaces the earlier one's list (the merge is per field).
+          otherCharacterIds: entry.otherCharacterIds ?? FieldValue.delete(),
           at: new Date(deps.now()).toISOString(),
           dismissedAt: FieldValue.delete(),
         },
@@ -1764,7 +1779,7 @@ const DAY_ON_NOTICE = 'day-on-statement';
  * listed: what it asked never changes. Notices are read only when a rate is backdated.
  */
 async function checkRateStarts(c: EditCtx, newRates: readonly { effectiveFrom: string }[]) {
-  const today = utcDate(c.now);
+  const today = utcDay(c.now);
   if (!newRates.some((r) => r.effectiveFrom < today)) return;
   const last = lastNoticedDay(await readNotices(c.tx, bookOf(c)));
   for (const r of newRates) {
@@ -1874,13 +1889,14 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       if (showToMembers) update.membersSeeFrom = now;
       const oldStart = c.book.startDate as string | undefined;
       if (startDate !== undefined && startDate !== oldStart) {
-        // Days before the lock date are never billed or unbilled again.
-        refuseLocked(now, startDate);
+        // Days before the lock date are never billed or unbilled again: the start date neither
+        // moves before it nor moves later across it.
+        refuseLocked(now, startDate, oldStart);
         const notices = await readNotices(tx, bookOf(c));
         const reason = startDateMoveReason(
           oldStart ?? startDate,
           startDate,
-          utcDate(now),
+          utcDay(now),
           await ownBookFloor((r) => tx.get(r), c.deps.db, c.corporationId),
           notices
         );
@@ -2051,7 +2067,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       }
       // A record's day is locked before the lock date. A Miner, moon or Extraction dismissal waives
       // only days from the lock date on (`from`), and an Extraction wholly before it is locked.
-      const lockDate = lockDateFor(utcDate(now));
+      const lockDate = lockDateFor(utcDay(now));
       if (action.scope === 'record') refuseLocked(now, parseRecordKey(action.targetId).date);
       if (action.scope === 'extraction') {
         const x = (await tx.get(col(c, EXTRACTIONS).doc(action.targetId))).data();
@@ -2170,7 +2186,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
           by,
           at: iso,
           reason: action.reason,
-          ...(wide ? { from: lockDateFor(utcDate(now)) } : {}),
+          ...(wide ? { from: lockDateFor(utcDay(now)) } : {}),
         },
       });
       return { detail: { dismissalId: action.dismissalId, reason: action.reason } };
@@ -2669,7 +2685,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const advancedUids = await Promise.all(advanced.map((id) => minerUids(c, id)));
       // One snapshot per Miner per lock date (decision 20261120-235011, "a lock date"), stored with
       // its Miner's readers: one not due or not adding up is skipped and reported.
-      const today = utcDate(now);
+      const today = utcDay(now);
       const fresh = new Map<number, { snapshot: Data; uids: string[] }>();
       const skipped: { minerId: string; through: string; reason: string }[] = [];
       for (const [i, { minerId, snapshot: k }] of action.accounts.entries()) {
@@ -2686,11 +2702,13 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         if (reason) skipped.push({ minerId, through: k.through, reason });
         else fresh.set(i, { snapshot: { ...k, at: iso, by }, uids: await minerUids(c, minerId) });
       }
+      const written: string[] = [];
       action.accounts.forEach((account, i) => {
         const a = { ...account };
         delete a.settledThrough; // the pay page's record; the marker lives in `meta/paid`
         delete a.snapshot;
         if (!fresh.has(i) && sameRunningAccount(stored[i].data(), a)) return;
+        written.push(account.minerId);
         // A stored snapshot and its readers stay until a newer one or a change of characters.
         const { snapshot, uids }: Data = fresh.get(i) ?? stored[i].data() ?? {};
         const write = () =>
@@ -2706,12 +2724,17 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       advanced.forEach((id, i) =>
         tx.set(col(c, MINER_PAID).doc(id), { id, paidThrough: settled[id], uids: advancedUids[i] })
       );
-      // The figures as recorded: what the pay page was told, and each snapshot in full.
+      // The audit entry names which accounts were stored and which snapshots were refused, never the
+      // figures: a whole book's payload can pass Firestore's 1 MiB document limit. A call that
+      // changed nothing leaves no entry.
+      const skippedIds = skipped.map(({ minerId, reason }) => ({ minerId, reason }));
+      const changed = written.length > 0 || skipped.length > 0 || advanced.length > 0;
       return {
-        detail: { count: action.accounts.length, accounts: action.accounts, skipped },
+        detail: { count: action.accounts.length, recorded: written, skipped: skippedIds },
+        ...(changed ? {} : { audits: [] }),
         result: {
           recorded: [...fresh.keys()].map((i) => action.accounts[i].minerId),
-          skipped: skipped.map(({ minerId, reason }) => ({ minerId, reason })),
+          skipped: skippedIds,
         },
       };
     }
@@ -2808,7 +2831,7 @@ async function closeAccount(
     fail('failed-precondition', 'This account is already closed', 'already-closed');
   const characterIds = minerCharacters(action.minerId, minerSnap.data());
   if (characterIds.length === 0) fail('not-found', 'Miner not found', 'not-found');
-  if (action.credit.kind === 'forfeit' && !forfeitAllowed(action.credit.basis, utcDate(now))) {
+  if (action.credit.kind === 'forfeit' && !forfeitAllowed(action.credit.basis, utcDay(now))) {
     fail(
       'failed-precondition',
       "Credit is forfeited only with the guest's consent or after 90 days with no reply",
@@ -3045,11 +3068,13 @@ async function declinePending(
     // Removing the last other character deletes the Miner doc, which would erase `closedAt`.
     if (miner.closedAt != null)
       fail('failed-precondition', "This Miner's account is closed", 'account-closed');
+    const otherCharacterIds = othersOf(miner, characterId);
     await removeFromMiner(tx, ref, miner, characterId);
     recordAnswer(tx, deps, corporationId, characterId, {
       minerId,
       answer: 'declined',
       via: actor.via === 'verify-link' ? 'verify-link' : 'character',
+      otherCharacterIds,
     });
     appendAudit(tx, deps, corporationId, actor, 'declineGrouping', { minerId, characterId });
   });
@@ -3085,11 +3110,13 @@ export async function declineLink(
       fail('not-found', 'Nothing to decline', 'nothing-to-decline');
     if (miner.closedAt != null)
       fail('failed-precondition', "This Miner's account is closed", 'account-closed');
+    const otherCharacterIds = othersOf(miner, characterId);
     await removeFromMiner(tx, ref, miner, characterId);
     recordAnswer(tx, deps, corporationId, characterId, {
       minerId,
       answer: 'declined',
       via: 'character',
+      otherCharacterIds,
     });
     appendAudit(tx, deps, corporationId, { characterId, name: '' }, 'declineGrouping', {
       minerId,
@@ -3454,7 +3481,7 @@ async function checkTransfers(
     ((await tx.get(sub(deps.db, corporationId, META).doc(UNCOUNTED_DOC))).data()?.donations as
       { characterId: number; amount: number; at: string; division: number }[] | undefined) ?? [];
   const lastSyncAt = (book.lastSync as { at?: number } | null | undefined)?.at;
-  const today = utcDate(deps.now());
+  const today = utcDay(deps.now());
   return checkClaimedTransfers(transfers, {
     senderIds,
     // One no one holds from before the lock date is locked history: never credited now.

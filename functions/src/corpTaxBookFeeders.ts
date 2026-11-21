@@ -11,6 +11,7 @@
 // feeder sync ticket. Failures carry stable `reason` codes the UI maps later;
 // no player-facing text lives here.
 
+import { utcDay } from './timeConstants.js';
 import { createHash } from 'node:crypto';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, newInviteCode, record } from './communities.js';
@@ -19,7 +20,6 @@ import {
   FEEDER_OF_COLLECTION,
   parseBookCall,
   pctField,
-  utcDate,
   type BookCall,
 } from './corpTaxBook.js';
 import {
@@ -485,7 +485,7 @@ export async function acceptInviteCore(
   const extra = input.recordExtra ?? {};
   const inviteId = hashInviteCode(input.code);
   const now = deps.now();
-  const today = utcDate(now);
+  const today = utcDay(now);
 
   return deps.db.runTransaction(async (tx) => {
     const invite = (await tx.get(inviteRef(deps.db, inviteId))).data() as
@@ -526,7 +526,7 @@ export async function acceptInviteCore(
         ? reconnectCoverageFrom(
             held?.coveragePeriods ?? [],
             today,
-            held ? utcDate(held.joinedAt) : undefined
+            held ? utcDay(held.joinedAt) : undefined
           )
         : clampCoverageFrom(held?.coveragePeriods ?? [], invite.coverageFrom, today);
     if (typeof startDate === 'string' && startDate > from && startDate <= today) from = startDate;

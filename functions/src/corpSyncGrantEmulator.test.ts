@@ -3,7 +3,8 @@
 // repo root (which starts the emulator and sets FIRESTORE_EMULATOR_HOST); a plain
 // `npm test` skips it.
 import type { Caller } from './actorAuth.js';
-import { lateNoticeFromStatementDoc, minerPaymentCode } from './corpTaxBookLateNotice.js';
+import { minerPaymentCode } from './corpTaxBookLateNotice.js';
+import { lateNoticeFromStatementDoc } from './corpTaxBookLateNoticeBackfill.js';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
 import { FieldValue } from 'firebase-admin/firestore';

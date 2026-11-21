@@ -12,6 +12,7 @@
 // `ScheduledAction`, the only edits it can ask for. It also does not group the
 // officer's own Characters (that needs the officer's device).
 
+import { utcDay } from './timeConstants.js';
 import { isDeepStrictEqual } from 'node:util';
 import type { DocumentSnapshot, Firestore } from 'firebase-admin/firestore';
 import { parseEditAction, parseSyncInput, type OfficerAccess } from './corpTaxBook.js';
@@ -478,7 +479,7 @@ export async function runBookSync(
   // --- Re-match Unmatched donations -----------------------------------------
   // Quiet: the quiet run re-matched nothing, and no Unmatched donation or known Character is new.
   const { assigned, error: reassignError } = book
-    ? await reassignUnmatched(edit, before, book)
+    ? await reassignUnmatched(edit, before, book, utcDay(deps.now()))
     : { assigned: new Map<string, string>(), error: undefined };
 
   // --- Quiet marker ---------------------------------------------------------
@@ -640,24 +641,28 @@ async function billedStoredRows(
 async function reassignUnmatched(
   edit: (action: ScheduledAction) => Promise<unknown>,
   before: AdminBookState,
-  book: MatchBook
+  book: MatchBook,
+  today: string
 ): Promise<{ assigned: Map<string, string>; error?: string }> {
   // A sender the book knows credits their Miner, owing or not (#6300); a donation held under #6207
   // clears here; one an officer has to place (ambiguous) waits for them (`rematchUnmatched`).
   const assigned = new Map<string, string>();
-  try {
-    for (const { paymentId, minerId } of rematchUnmatched(
-      before.payments as UnmatchedCandidate[],
-      book
-    )) {
+  let error: string | undefined;
+  for (const { paymentId, minerId } of rematchUnmatched(
+    before.payments as UnmatchedCandidate[],
+    book,
+    today
+  )) {
+    try {
       await edit({ action: 'assignPayment', paymentId, minerId });
       assigned.set(paymentId, minerId);
+    } catch (e) {
+      // A refused assignment is not the sync's, and never stops the next one: report the first,
+      // the next run tries again.
+      error ??= e instanceof Error ? e.message : String(e);
     }
-    return { assigned };
-  } catch (e) {
-    // A failed re-match is not the sync's: report it, the next run tries again.
-    return { assigned, error: e instanceof Error ? e.message : String(e) };
   }
+  return { assigned, ...(error !== undefined ? { error } : {}) };
 }
 
 /** Whether the book holds any moon owner record, current or past (payouts to a past one still reconcile). */

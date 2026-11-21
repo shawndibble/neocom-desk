@@ -8,7 +8,7 @@ import {
   matchBookOf,
   minerIdFor,
   rematchUnmatched,
-  resolveDonationOwners,
+  ownerFields,
   noteUncountedDonations,
 } from './corpTaxBookDonationMatch.js';
 
@@ -143,26 +143,6 @@ describe('donationOwner', () => {
     });
   });
 
-  it('resolves a batch: only a Miner, never a notice, goes on the payment', () => {
-    const out = resolveDonationOwners(
-      [
-        { characterId: 99, reason: 'MTOLD001', amount: 1 },
-        { characterId: 99, reason: 'MTSAME01', amount: 2 },
-      ],
-      book
-    );
-    expect(out).toEqual([
-      { characterId: 99, reason: 'MTOLD001', amount: 1, minerId: 'g2' },
-      {
-        characterId: 99,
-        reason: 'MTSAME01',
-        amount: 2,
-        reviewReason: 'ambiguous',
-        ambiguousMinerIds: ['g1', 'g2'],
-      },
-    ]);
-  });
-
   it('notes a donation into an unread division that carries a code, or whose sender owes', () => {
     const d = (characterId: number, reason?: string, refId = characterId) => ({
       refId,
@@ -200,6 +180,8 @@ describe('matchBookOf: the book the resolver reads, from what either side loaded
   });
 });
 
+const TODAY = '2026-11-21';
+
 describe('rematchUnmatched: which Unmatched payments now have a Miner', () => {
   const book = matchBookOf({ miners, notices: [], minedCharacterIds: [20] });
   const p = (id: string, characterId: number, extra: Record<string, unknown> = {}) => ({
@@ -211,7 +193,7 @@ describe('rematchUnmatched: which Unmatched payments now have a Miner', () => {
   });
 
   it('places each one a known sender sent, oldest first', () => {
-    expect(rematchUnmatched([p('bb', 20), p('a', 10), p('ccc', 99)], book)).toEqual([
+    expect(rematchUnmatched([p('bb', 20), p('a', 10), p('ccc', 99)], book, TODAY)).toEqual([
       { paymentId: 'a', minerId: 'g1' },
       { paymentId: 'bb', minerId: 'g2' },
     ]);
@@ -225,8 +207,46 @@ describe('rematchUnmatched: which Unmatched payments now have a Miner', () => {
           p('b', 10, { notTaxAmount: 1 }),
           p('c', 10, { reviewReason: 'ambiguous' }),
         ],
-        book
+        book,
+        TODAY
       )
     ).toEqual([]);
+  });
+
+  it('skips a payment dated before the lock date: assigning it is refused for good', () => {
+    // On 2026-11-21 the lock date is 2026-09-01.
+    expect(
+      rematchUnmatched(
+        [
+          p('old', 10, { at: '2026-08-31T23:59:59Z' }),
+          p('edge', 10, { at: '2026-09-01T00:00:00Z' }),
+        ],
+        book,
+        TODAY
+      )
+    ).toEqual([{ paymentId: 'edge', minerId: 'g1' }]);
+  });
+
+  it('skips a payment whose Miner is closed, and places the rest', () => {
+    const closed = matchBookOf({
+      miners: [{ id: 'g1', characterIds: [10, 11], closedAt: '2026-11-10T00:00:00Z' }, miners[1]],
+      notices: [],
+      minedCharacterIds: [],
+    });
+    expect(rematchUnmatched([p('a', 10), p('bb', 20)], closed, TODAY)).toEqual([
+      { paymentId: 'bb', minerId: 'g2' },
+    ]);
+  });
+});
+
+describe('ownerFields: a donation is never placed on a closed Miner', () => {
+  it('holds it for review as account-closed, with no Miner', () => {
+    const book = matchBookOf({
+      miners: [{ id: 'g1', characterIds: [10], closedAt: '2026-11-10T00:00:00Z' }, miners[1]],
+      notices: [],
+      minedCharacterIds: [],
+    });
+    expect(ownerFields({ characterId: 10 }, book)).toEqual({ reviewReason: 'account-closed' });
+    expect(ownerFields({ characterId: 20 }, book)).toEqual({ minerId: 'g2' });
   });
 });

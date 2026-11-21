@@ -18,9 +18,6 @@ export function oneOf<T extends string>(
   return value as T;
 }
 
-/** The `reason` for an action or sub-action this server does not know (callableManifest.ts). */
-export { UNKNOWN_ACTION } from './callableManifest.js';
-
 /** A safe integer in [min, max]. */
 export function intIn(value: unknown, field: string, min: number, max: number): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) {

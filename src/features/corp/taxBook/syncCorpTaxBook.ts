@@ -26,6 +26,7 @@ import {
   rematchUnmatched,
   type UnmatchedCandidate,
 } from '../../../../functions/src/corpTaxBookDonationMatch';
+import { utcDay } from '@/engine/localDay';
 import { noteUncountedDonations, otherDivisions } from '@/engine/corpTaxBook/uncounted';
 import {
   planSignInGroups,
@@ -429,6 +430,7 @@ async function reassignUnmatched(
   const open = args.before.payments.filter((p) => p.minerId === undefined);
   if (open.length === 0) return { assigned: 0 };
   let assigned = 0;
+  let error: string | undefined;
   try {
     const book = args.regrouped
       ? ((await deps.readBookState(characterId, corporationId)) ?? args.before)
@@ -443,15 +445,21 @@ async function reassignUnmatched(
     });
     for (const { paymentId, minerId } of rematchUnmatched(
       open as readonly UnmatchedCandidate[],
-      matchBook
+      matchBook,
+      utcDay(deps.now())
     )) {
-      await deps.assignPayment(characterId, corporationId, paymentId, minerId);
-      assigned += 1;
+      try {
+        await deps.assignPayment(characterId, corporationId, paymentId, minerId);
+        assigned += 1;
+      } catch (e) {
+        // A refused assignment never stops the next one: report the first, the next sync retries.
+        error ??= e instanceof Error ? e.message : String(e);
+      }
     }
-    return { assigned };
   } catch (e) {
-    return { assigned, error: e instanceof Error ? e.message : String(e) };
+    error ??= e instanceof Error ? e.message : String(e);
   }
+  return { assigned, ...(error !== undefined ? { error } : {}) };
 }
 
 /**

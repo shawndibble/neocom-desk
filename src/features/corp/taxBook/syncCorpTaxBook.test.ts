@@ -493,6 +493,40 @@ describe('syncCorpTaxBook', () => {
     expect(await run(d)).toMatchObject({ kind: 'synced', reassignError: 'assign refused' });
   });
 
+  it('keeps placing the rest when one assignment is refused, and skips locked and closed ones', async () => {
+    const pay = (id: string, characterId: number, at: string) => ({
+      id,
+      characterId,
+      amount: 5,
+      at,
+      source: 'donation' as const,
+    });
+    const d = deps({
+      readBookState: async () =>
+        emptyState({
+          miners: [
+            { id: 'm1', mainCharacterId: 7, characterIds: [7, 8] },
+            { id: 'm2', mainCharacterId: 9, characterIds: [9], closedAt: '2026-07-10T00:00:00Z' },
+          ] as BookState['miners'],
+          notices: [owing('m1')],
+          payments: [
+            pay('j1_1', 8, '2026-07-01T00:00:00Z'),
+            pay('j1_2', 8, '2026-07-02T00:00:00Z'),
+            // Before the lock date on 2026-07-20 (2026-05-01): assigning it is refused for good.
+            pay('j1_0', 8, '2026-04-30T00:00:00Z'),
+            // Its Miner's account is closed.
+            pay('j1_3', 9, '2026-07-03T00:00:00Z'),
+          ],
+        }),
+      assignPayment: vi.fn(async (_c, _o, paymentId) => {
+        if (paymentId === 'j1_1') throw new Error('assign refused');
+        return {};
+      }),
+    });
+    expect(await run(d)).toMatchObject({ kind: 'synced', reassignError: 'assign refused' });
+    expect(vi.mocked(d.assignPayment).mock.calls.map((c) => c[2])).toEqual(['j1_1', 'j1_2']);
+  });
+
   it('hands the wallet to moon owner payouts once it read, and a refusal never fails the sync', async () => {
     const reconcilePayouts = vi.fn(async () => {
       throw new Error('refused');

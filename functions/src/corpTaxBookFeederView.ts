@@ -12,11 +12,12 @@
 // request, leave and dismissal (and later payouts and agreed rates: call
 // `rebuildFeederView` / `tryRebuildFeederView` from those writers).
 
+import { utcDay } from './timeConstants.js';
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import type { CollectionReference, Firestore } from 'firebase-admin/firestore';
 import { commitInBatches } from './commitInBatches.js';
-import { FEEDER_VIEWS, utcDate } from './corpTaxBook.js';
+import { FEEDER_VIEWS } from './corpTaxBook.js';
 import { dbReader, readNotices } from './corpTaxBookLateNoticeStore.js';
 import {
   BOOK_DEFAULTS,
@@ -304,10 +305,7 @@ export function appendRequestedRate(
   const lastRequest = [...history].reverse().find((e) => e.kind === 'requested');
   // Re-sending the standing request adds nothing to the history.
   if (lastRequest?.pct === pct) return history;
-  return [
-    ...history,
-    { kind: 'requested', pct, effectiveFrom: utcDate(now), recordedAt: iso(now) },
-  ];
+  return [...history, { kind: 'requested', pct, effectiveFrom: utcDay(now), recordedAt: iso(now) }];
 }
 
 export interface FeederViewRow {
@@ -360,7 +358,7 @@ const chargeKeyOf = (r: Pick<FeederViewRow, 'characterId' | 'structureId' | 'dat
 
 export function buildFeederView(input: FeederViewInput): FeederView {
   const { record, now } = input;
-  const today = utcDate(now);
+  const today = utcDay(now);
   const history = deriveOwnerRateHistory(record);
   const modeChanges = deriveModeChanges(record);
   const compressed = input.oreForm === 'compressed';

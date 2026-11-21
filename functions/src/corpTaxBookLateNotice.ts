@@ -5,13 +5,13 @@
  * settled once every day it listed is. A notice lists only the days no earlier notice listed.
  *
  * Shared by the client and the Cloud Functions (decision 20261117-230113): dependency-free, and
- * `src/engine/corpTaxBook/notice.ts` re-exports it.
+ * `src/engine/corpTaxBook/lateNotices.ts` re-exports it.
  *
  * Notices are stored as `corps/{id}/lateNotices` docs in this shape. A legacy `statements` doc
- * (`kind: 'notice'`) is no longer written; `lateNoticeFromStatementDoc` reads one into a
+ * (`kind: 'notice'`) is no longer written; `corpTaxBookLateNoticeBackfill.ts` reads one into a
  * `LateNotice` for the one-time backfill.
  */
-import { isFiniteNumber, isRecord } from './guards.js';
+import { isRecord } from './guards.js';
 import { DAY_MS, utcDayOf } from './timeConstants.js';
 
 /** `late`: the Miner is behind. `final`: their account was closed, so it is the last one. */
@@ -114,8 +114,9 @@ export interface LateNoticeDayState {
 }
 
 /**
- * The field a declaration and a verify token name their Late notice by: the wire name they had
- * when notices were stored as Statements, which every deployed client reads.
+ * The field a declaration and a verify token name their Late notice by. It keeps the wire name it
+ * had when notices were stored as Statements, by decision 20261121-154806 (no rename, and no
+ * support for older clients either way).
  */
 export const NOTICE_ID_FIELD = 'statementId';
 
@@ -140,23 +141,6 @@ export function finalNoticeId(minerId: string): string {
   return noticeDocId(`${FINAL_PREFIX}${minerId}`);
 }
 
-const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
-const num = (v: unknown): number | undefined => (isFiniteNumber(v) ? v : undefined);
-/** A stored `{ key: string }` map, or undefined when there is none. */
-function stringRecord(v: unknown): Record<string, string> | undefined {
-  if (!isRecord(v)) return undefined;
-  return Object.fromEntries(
-    Object.entries(v).filter((e): e is [string, string] => typeof e[1] === 'string')
-  );
-}
-/** A stored `{ typeId: number }` map, or undefined when there is none. */
-function numberRecord(v: unknown): Record<number, number> | undefined {
-  if (!isRecord(v)) return undefined;
-  return Object.fromEntries(
-    Object.entries(v).filter((e): e is [string, number] => isFiniteNumber(e[1]))
-  );
-}
-
 /** The key a stored line names: its day charge, else its Adjustment, else its date. */
 export function lineKey(line: { chargeKey?: string; adjustmentId?: string; date: string }): string {
   return line.chargeKey ?? adjustmentLineKey(line.adjustmentId ?? line.date);
@@ -173,78 +157,6 @@ export function noticeSpan(notice: { lines: readonly { date: string }[]; issuedA
 } {
   const first = notice.lines[0]?.date ?? utcDayOf(notice.issuedAt);
   return { first, last: notice.lines.at(-1)?.date ?? first };
-}
-
-/**
- * Reads a `statements` doc that holds a late notice. Undefined for anything else: a calendar
- * Statement is not a notice, and production holds none.
- */
-export function lateNoticeFromStatementDoc(raw: Record<string, unknown>): LateNotice | undefined {
-  if (raw.kind !== 'notice') return undefined;
-  const id = str(raw.id) ?? '';
-  const lines: LateNoticeLine[] = (Array.isArray(raw.lines) ? raw.lines : [])
-    .filter(isRecord)
-    .flatMap((l): LateNoticeLine[] => {
-      const date = str(l.date);
-      if (!date) return [];
-      const kind: LateNoticeLineKind =
-        l.kind === 'late-ore' || l.kind === 'correction' ? l.kind : 'mined';
-      const opt = <K extends string, V>(key: K, value: V | undefined) =>
-        (value === undefined ? {} : { [key]: value }) as Partial<Record<K, V>>;
-      return [
-        {
-          kind,
-          date,
-          key: lineKey({ chargeKey: str(l.chargeKey), adjustmentId: str(l.adjustmentId), date }),
-          ...opt('characterId', num(l.characterId)),
-          ...opt('structureId', num(l.structureId)),
-          oreLines: (Array.isArray(l.oreLines) ? l.oreLines : []).filter(isRecord).flatMap((o) => {
-            const typeId = num(o.typeId);
-            const quantity = num(o.quantity);
-            return typeId !== undefined && quantity !== undefined ? [{ typeId, quantity }] : [];
-          }),
-          ...opt('unitPrices', numberRecord(l.unitPrices)),
-          ...opt('priceSources', stringRecord(l.priceSources)),
-          estimatedValue: num(l.estimatedValue) ?? 0,
-          ...opt('taxPct', num(l.taxPct)),
-          ...opt('rateEffectiveFrom', str(l.rateEffectiveFrom)),
-          ...opt('reason', str(l.reason)),
-          tax: num(l.tax) ?? 0,
-        },
-      ];
-    });
-  const lastAt = str(raw.lastMailedAt);
-  const issuedBy = num(raw.issuedBy);
-  const names: LateNoticeNames = {
-    ...(str(raw.minerName) ? { minerName: str(raw.minerName) } : {}),
-    ...(str(raw.corporationName) ? { corporationName: str(raw.corporationName) } : {}),
-    ...(stringRecord(raw.refineryNames) ? { refineryNames: stringRecord(raw.refineryNames) } : {}),
-  };
-  return {
-    id,
-    minerId: str(raw.minerId) ?? '',
-    characterIds: (Array.isArray(raw.characterIds) ? raw.characterIds : []).filter(isFiniteNumber),
-    kind: isFinalNoticeId(id) ? 'final' : 'late',
-    issuedAt: str(raw.issuedAt) ?? '',
-    ...(issuedBy !== undefined ? { issuedBy } : {}),
-    // An empty code would match every donation's reason: no code is printed instead.
-    ...(str(raw.code) ? { code: str(raw.code) } : {}),
-    ...(typeof raw.hubId === 'string' && (raw.oreForm === 'compressed' || raw.oreForm === 'raw')
-      ? { pricing: { hubId: raw.hubId, oreForm: raw.oreForm } }
-      : {}),
-    uids: (Array.isArray(raw.uids) ? raw.uids : []).filter(
-      (u): u is string => typeof u === 'string'
-    ),
-    lines,
-    listed: lines.reduce((sum, l) => sum + l.tax, 0),
-    mail: {
-      sent: num(raw.mailsSent) ?? 0,
-      ...(lastAt ? { lastAt } : {}),
-      manualSent: num(raw.manualRemindersSent) ?? 0,
-      remindersStopped: raw.remindersStopped === true,
-    },
-    ...(Object.keys(names).length > 0 ? { names } : {}),
-  };
 }
 
 /**
@@ -348,6 +260,8 @@ export function lateNoticeStanding(
     const share = Math.min(1, tax / day.tax);
     if (day.held) {
       out.held += tax;
+      // A held day is left out of what is due, but it is not paid: the notice is not settled.
+      if (!day.settled) settled = false;
       continue;
     }
     out.due += tax;

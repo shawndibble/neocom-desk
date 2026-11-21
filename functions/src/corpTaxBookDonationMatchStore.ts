@@ -51,6 +51,7 @@ export async function loadMatchBook(
     characterIds: (d.get('characterIds') as number[] | undefined) ?? [],
     ...(Array.isArray(d.get('aliases')) ? { aliases: d.get('aliases') as string[] } : {}),
     ...(typeof d.get('createdAt') === 'string' ? { createdAt: d.get('createdAt') as string } : {}),
+    ...(d.get('closedAt') != null ? { closedAt: d.get('closedAt') as string } : {}),
   }));
   const grouped = new Set(miners.flatMap((m) => m.characterIds));
   const minedCharacterIds = new Set(mined);

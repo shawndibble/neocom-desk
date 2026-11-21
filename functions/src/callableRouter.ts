@@ -10,7 +10,6 @@
 // callable's export name, and `data` is exactly what that callable received.
 
 import { HttpsError, type CallableRequest } from 'firebase-functions/v2/https';
-import { UNKNOWN_ACTION } from './inputParse.js';
 
 export type CallableHandler = (request: CallableRequest<unknown>) => unknown;
 
@@ -34,8 +33,7 @@ export function createActionGroup(): ActionGroup {
       const action =
         typeof body === 'object' && body !== null ? (body as { action?: unknown }).action : null;
       const handler = typeof action === 'string' ? handlers.get(action) : undefined;
-      if (!handler)
-        throw new HttpsError('invalid-argument', 'Unknown action', { reason: UNKNOWN_ACTION });
+      if (!handler) throw new HttpsError('invalid-argument', 'Unknown action');
       return handler({ ...request, data: (body as { data?: unknown }).data });
     },
   };

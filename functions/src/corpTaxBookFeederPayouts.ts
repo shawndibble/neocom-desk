@@ -4,6 +4,7 @@
 // moon owner writes. Failures carry a stable `reason`; no player-facing text lives here.
 // Payouts never touch Tax Payment matching or Statements.
 
+import { utcDay } from './timeConstants.js';
 import { FieldValue } from 'firebase-admin/firestore';
 import { fail, type Caller } from './actorAuth.js';
 import { HttpsError } from 'firebase-functions/v2/https';
@@ -12,7 +13,6 @@ import {
   FEEDERS,
   parseBookCall,
   parseFeederTarget,
-  utcDate,
   type BookCall,
   type FeederTargetCall,
 } from './corpTaxBook.js';
@@ -330,7 +330,7 @@ export async function planFeederPayouts(
         ...(rec.payee ? { payee: rec.payee } : {}),
         ...(rec.payeeHistory ? { payeeHistory: rec.payeeHistory } : {}),
         payouts,
-        since: rec.coveragePeriods.map((p) => p.from).sort()[0] ?? utcDate(rec.joinedAt),
+        since: rec.coveragePeriods.map((p) => p.from).sort()[0] ?? utcDay(rec.joinedAt),
       };
     })
   );

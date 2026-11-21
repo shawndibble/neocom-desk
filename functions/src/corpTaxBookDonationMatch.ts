@@ -10,6 +10,7 @@
 // review and is never claimed automatically. A code only says whose money it is; it pays that
 // Miner's oldest day.
 
+import { isLocked } from './corpTaxBookCheckpoint.js';
 import { minerPaymentCode, paymentCode } from './corpTaxBookLateNotice.js';
 
 /** A Miner grouping, with the ids folded into it (`aliases`) and when it was first made. */
@@ -18,7 +19,13 @@ export interface MatchMiner {
   characterIds: readonly number[];
   aliases?: readonly string[];
   createdAt?: string;
+  /** Set once an officer closed the Miner's account: it takes no more money. */
+  closedAt?: string | null;
 }
+
+/** Whether the book holds this Miner as closed: money is never placed on one. */
+const isClosed = (minerId: string, miners: readonly MatchMiner[]): boolean =>
+  miners.some((m) => m.id === minerId && m.closedAt != null);
 
 /**
  * The order groupings are ranked in when a Character is stored in more than one: the earliest
@@ -111,7 +118,7 @@ export type DonationOwner =
   | { kind: 'unmatched' };
 
 /** One Miner, or the Miners it could be. */
-function oneOf(named: ReadonlySet<string>, by: 'code' | 'payer'): DonationOwner | undefined {
+function ownerOfNamed(named: ReadonlySet<string>, by: 'code' | 'payer'): DonationOwner | undefined {
   const ids = [...named].sort();
   if (ids.length === 0) return undefined;
   return ids.length === 1
@@ -131,13 +138,14 @@ export function donationOwner(
   const payer = new Set(
     (book.paidBefore?.get(donation.characterId) ?? []).map((id) => currentMinerOf(id, book.miners))
   );
-  return oneOf(coded, 'code') ?? oneOf(payer, 'payer') ?? { kind: 'unmatched' };
+  return ownerOfNamed(coded, 'code') ?? ownerOfNamed(payer, 'payer') ?? { kind: 'unmatched' };
 }
 
 /** What resolving puts on a stored donation: its Miner, or the review an ambiguous one waits for. */
 export type ResolvedOwner =
   | { minerId: string }
   | { reviewReason: 'ambiguous'; ambiguousMinerIds: string[] }
+  | { reviewReason: 'account-closed' }
   | Record<string, never>;
 
 /**
@@ -177,11 +185,14 @@ export interface UnmatchedCandidate {
 
 /**
  * The Unmatched payments that now have a Miner, oldest first: a sender or code the book has come
- * to know since. One already placed, marked not tax, or held for an officer as ambiguous is left.
+ * to know since. One already placed, marked not tax, or held for an officer as ambiguous is left,
+ * and so is one assigning would refuse for good: dated before the lock date on `today`, or whose
+ * Miner's account is closed. So a caller's loop never meets a refusal it can only repeat.
  */
 export function rematchUnmatched(
   payments: readonly UnmatchedCandidate[],
-  book: MatchBook
+  book: MatchBook,
+  today: string
 ): { paymentId: string; minerId: string }[] {
   return [...payments]
     .filter(
@@ -189,33 +200,34 @@ export function rematchUnmatched(
         p.minerId === undefined &&
         typeof p.characterId === 'number' &&
         !(p.notTaxAmount && p.notTaxAmount > 0) &&
-        p.reviewReason !== 'ambiguous'
+        p.reviewReason !== 'ambiguous' &&
+        !isLocked(p.at, today)
     )
     .sort((a, b) => a.at.localeCompare(b.at))
     .flatMap((p) => {
       const owner = donationOwner({ characterId: p.characterId!, reason: p.reason }, book);
-      return owner.kind === 'miner' ? [{ paymentId: p.id, minerId: owner.minerId }] : [];
+      return owner.kind === 'miner' && !isClosed(owner.minerId, book.miners)
+        ? [{ paymentId: p.id, minerId: owner.minerId }]
+        : [];
     });
 }
 
-/** What resolving puts on one stored donation: its Miner, or the review it waits for. */
+/**
+ * What resolving puts on one stored donation: its Miner, or the review it waits for. A Miner whose
+ * account is closed takes no money: the donation waits as `account-closed` for an officer.
+ */
 export function ownerFields(
   donation: { characterId: number; reason?: string },
   book: MatchBook
 ): ResolvedOwner {
   const owner = donationOwner(donation, book);
-  if (owner.kind === 'miner') return { minerId: owner.minerId };
+  if (owner.kind === 'miner')
+    return isClosed(owner.minerId, book.miners)
+      ? { reviewReason: 'account-closed' }
+      : { minerId: owner.minerId };
   if (owner.kind === 'ambiguous')
     return { reviewReason: 'ambiguous', ambiguousMinerIds: owner.minerIds };
   return {};
-}
-
-/** Each donation with the Miner it pays, or held for review when it could be several Miners'. */
-export function resolveDonationOwners<T extends { characterId: number; reason?: string }>(
-  donations: readonly T[],
-  book: MatchBook
-): (T & ResolvedOwner)[] {
-  return donations.map((d) => ({ ...d, ...ownerFields(d, book) }));
 }
 
 /** The most donations into other divisions a sync notes (#6207). */

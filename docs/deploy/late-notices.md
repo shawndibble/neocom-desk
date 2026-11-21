@@ -25,22 +25,27 @@ an open tab older than it must be reloaded.
   Corp Tax Book query is on a single field.
 - **Functions:**
   - `corpTaxBookCall` (the book's router): `issueLateNotice`, `recordLateNoticeMail`, and
-    `recordAccounts` taking each Miner's snapshot with its figures; `closeAccount` issues its final notice from `notice`. Notices are
+    `recordAccounts` taking each Miner's snapshot with its figures; its audit entry lists only the Miners stored and the snapshots refused (no figures), and none is written when nothing changed; `closeAccount` issues its final notice from `notice`. Notices are
     written to `lateNotices` / `lateNoticeLinks` only, and every read (the verify page, Stop
     reminders, declarations, the date guards) reads only those. `issueStatement`,
     `settleStatements`, `recordMail` and `resetCheckpoint` are gone.
   - **The lock date.** Anything dated before the 1st of the month two months back is read-only:
     a payment recorded or moved, "not tax", an adjustment, a dismissal of a day, a rate or record
     rate, a tolerance exemption, a rebill, a write-off's reversal, and a dispute filed or
-    withdrawn are refused with reason `locked`. A correction or a write-off dated today is how
+    withdrawn are refused with reason `locked`. So is moving the book's start date when either the old or the new date is before the lock date. A correction or a write-off dated today is how
     an old mistake is put right, and an officer still answers an open dispute on a locked day. An officer's tab records one snapshot per Miner per lock date;
     only a change to a Miner's characters deletes it.
   - `syncCorpTaxBooks` (scheduled sync) and every officer sync: the server decides whose money
     each stored donation is (`corpTaxBookDonationMatch.ts`). A donation that matches an unlinked
     hand record from the same sender is linked to it (`transferId`), not stored again. Money is
     placed only on a known, open Miner, and a Miner doc deleted takes its `accounts` doc with it.
+    A donation whose Miner is closed is stored for review (`reviewReason: 'account-closed'`, no
+    `minerId`), and the re-match of Unmatched payments skips one dated before the lock date or
+    whose Miner is closed, so one refused assignment never blocks the rest.
     Moving a payment off a Miner, or marking more of it not tax, drops that Miner's recorded
     paid-through day (decision 20261121-093000).
+  - A Character declining a grouping records `otherCharacterIds` (who else the Miner held) on its
+    answer in `meta/groupingAnswers`, so the officers' item still names the group once it is gone.
   - `dailyHousekeeping` (job `verifyBookDocs`): the nightly pass rebuilds moon docs (schema 2)
     and the tab read models (schema 2).
   - Other functions share the same store code, so deploy every function rather than a list.

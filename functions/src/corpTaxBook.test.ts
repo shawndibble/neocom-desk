@@ -657,9 +657,9 @@ describe('parsers', () => {
     expect(parseEditAction(payment)).not.toHaveProperty('statementId');
   });
 
-  it('names an edit it does not know as an unknown action, so a newer client can tell', () => {
+  it('refuses an edit it does not know', () => {
     expect(() => parseEditAction({ action: 'fromTheFuture' })).toThrow(
-      expect.objectContaining({ code: 'invalid-argument', details: { reason: 'unknown-action' } })
+      expect.objectContaining({ code: 'invalid-argument' })
     );
   });
 

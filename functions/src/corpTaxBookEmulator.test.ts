@@ -615,6 +615,21 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect((await book().get()).get('startDate')).toBe('2026-08-01');
     });
 
+    it('never moves a start date that is before the lock date later, across it', async () => {
+      await turnOn();
+      // A book started before the lock date (1 Aug, on 18 Oct).
+      await book().update({ startDate: '2026-07-15' });
+      expect(
+        await reason(
+          edit(DIRECTOR, { action: 'updateSettings', patch: { startDate: '2026-09-01' } })
+        )
+      ).toBe('locked');
+      expect((await book().get()).get('startDate')).toBe('2026-07-15');
+      // Leaving it where it is changes nothing.
+      await edit(DIRECTOR, { action: 'updateSettings', patch: { startDate: '2026-07-15' } });
+      expect((await book().get()).get('startDate')).toBe('2026-07-15');
+    });
+
     it('lets a rate start up to 30 days back, and only on a day not yet on a Statement for a record rate', async () => {
       await turnOn();
       expect(
@@ -1450,6 +1465,7 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
           answer: 'confirmed',
           via: 'character',
         });
+        expect((await answers())['61']).not.toHaveProperty('otherCharacterIds');
       });
 
       it("keeps a pending guest's own records until they confirm, then moves them (#6450)", async () => {
@@ -1475,7 +1491,12 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         await pendingGuest();
         await declineGrouping(deps(), who(61), CORP, 'm-a');
         expect((await miner()).exists).toBe(false);
-        expect((await answers())['61']).toMatchObject({ answer: 'declined', via: 'character' });
+        // The Miner is gone, so the answer keeps who else was in it.
+        expect((await answers())['61']).toMatchObject({
+          answer: 'declined',
+          via: 'character',
+          otherCharacterIds: [60],
+        });
         const declined = await book().collection('meta').doc('declinedAutoGroup').get();
         expect(declined.get('ids')).toEqual([61]);
         const audit = (await book().collection('audit').get()).docs.map((d) => d.get('action'));
@@ -3063,22 +3084,18 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
           recorded: ['solo:52'],
         });
         expect((await stored('solo:404'))?.snapshot).toBeUndefined();
-        // The audit holds the full figures of what it stored, and why each other was skipped.
+        // The audit names what it stored and why each other was skipped: never the figures, which
+        // can pass a document's size limit.
         const entries = (
           await book().collection('audit').where('action', '==', 'recordAccounts').get()
         ).docs.map((d) => d.data().detail);
         expect(entries).toContainEqual(
           expect.objectContaining({
-            skipped: expect.arrayContaining([
-              { minerId: 'solo:404', through: '2026-07-31', reason: 'unknown-miner' },
-            ]),
+            skipped: expect.arrayContaining([{ minerId: 'solo:404', reason: 'unknown-miner' }]),
           })
         );
-        expect(entries).toContainEqual(
-          expect.objectContaining({
-            accounts: [account('solo:52', { snapshot: checkpoint('solo:52', '2026-07-31') })],
-          })
-        );
+        expect(entries).toContainEqual({ count: 1, recorded: ['solo:52'], skipped: [] });
+        expect(JSON.stringify(entries)).not.toContain('"owed"');
         // New figures keep the stored snapshot and its readers.
         await edit(ACCOUNTANT, {
           action: 'recordAccounts',
@@ -3089,6 +3106,15 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
           uids: ['char:50'],
           snapshot: { through: '2026-07-31' },
         });
+        // The same figures again change nothing, and leave no audit entry.
+        const audited = async () =>
+          (await book().collection('audit').where('action', '==', 'recordAccounts').get()).size;
+        const before = await audited();
+        await edit(ACCOUNTANT, {
+          action: 'recordAccounts',
+          accounts: [account('solo:50', { owed: 9 })],
+        });
+        expect(await audited()).toBe(before);
       });
 
       it('replaces one the strict cache recorded through days still open then', async () => {
@@ -3121,9 +3147,9 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
           { action: 'resetCheckpoint', minerId: 'solo:50' },
           { action: 'recordCheckpoints', checkpoints: [checkpoint('solo:50', '2026-07-31')] },
         ])
-          expect(await reason(Promise.resolve().then(() => edit(DIRECTOR, action, true)))).toBe(
-            'unknown-action'
-          );
+          await expect(
+            Promise.resolve().then(() => edit(DIRECTOR, action, true))
+          ).rejects.toMatchObject({ code: 'invalid-argument' });
       });
 
       describe('a change to a Miner’s characters drops its snapshot, nothing else does', () => {
@@ -3585,6 +3611,21 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
           edit(JUNIOR, { action: 'reassignPayment', paymentId: 'j1_5', minerId: null }, true)
         )
       ).toBe('role-required');
+    });
+
+    it('holds a synced donation of a closed Miner for review instead of placing it', async () => {
+      await turnOn();
+      await minedHere(50, 51);
+      await book()
+        .collection('miners')
+        .doc('solo:50')
+        .set({ id: 'solo:50', characterIds: [50], closedAt: '2026-10-10T00:00:00Z' });
+      await donate(7, 50);
+      expect(await payment('j1_7')).toMatchObject({ reviewReason: 'account-closed' });
+      expect(await payment('j1_7')).not.toHaveProperty('minerId');
+      // An open Miner's donation is placed as before.
+      await donate(8, 51);
+      expect(await payment('j1_8')).toMatchObject({ minerId: 'solo:51' });
     });
 
     it('places money only on a Miner the book knows whose account is open (M7)', async () => {

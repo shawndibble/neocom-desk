@@ -7,7 +7,6 @@ import {
   listedKeys,
   paymentCode,
   minerPaymentCode,
-  lateNoticeFromStatementDoc,
   lateNoticeStanding,
   type LateNoticeDayState,
   lastNoticedDay,
@@ -17,6 +16,7 @@ import {
   lineKey,
   noticeSpan,
 } from './corpTaxBookLateNotice.js';
+import { lateNoticeFromStatementDoc } from './corpTaxBookLateNoticeBackfill.js';
 
 /** A late notice as `issueStatement` stores it today, in `corps/{id}/statements`. */
 const storedNotice = {
@@ -191,6 +191,23 @@ describe('lateNoticeStanding', () => {
       remaining: 500_000,
       settled: false,
     });
+  });
+
+  it('is never settled while a day it listed is held and unpaid', () => {
+    const byDay = new Map([
+      ['2026-11-01', day({ credited: 1_000_000, remaining: 0, settled: true })],
+      ['2026-11-03', day({ tax: 2_000_000, held: true, remaining: 2_000_000 })],
+    ]);
+    expect(lateNoticeStanding(notice, byDay)).toMatchObject({ held: 2_000_000, settled: false });
+    // Every listed day held: nothing is due, yet nothing is paid.
+    const allHeld = new Map([
+      ['2026-11-01', day({ held: true })],
+      ['2026-11-03', day({ tax: 2_000_000, held: true, remaining: 2_000_000 })],
+    ]);
+    expect(lateNoticeStanding(notice, allHeld)).toMatchObject({ due: 0, settled: false });
+    // A held day that is paid anyway does not stand in the way.
+    byDay.set('2026-11-03', day({ tax: 2_000_000, held: true, remaining: 0, settled: true }));
+    expect(lateNoticeStanding(notice, byDay).settled).toBe(true);
   });
 
   it('reads a day that no longer bills anything as paid', () => {

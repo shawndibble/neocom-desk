@@ -6,6 +6,7 @@
 // Reads stay bounded (decision 20261120-235011): a pull is rebuilt from its own rows (each row
 // carries its `extractionId`), and the nightly pass rebuilds only the pulls that can still change.
 
+import { utcDay } from './timeConstants.js';
 import { FieldValue, type Firestore, type WriteBatch } from 'firebase-admin/firestore';
 import { commitInBatches, type BatchOp } from './commitInBatches.js';
 import { extractionIdOf, type ObservedRow } from './corpTaxBookEngine.js';
@@ -19,7 +20,6 @@ import {
   type MoonDocPlan,
   type StoredExtraction,
 } from './corpTaxBookMoonDocs.js';
-import { utcDate } from './corpTaxBook.js';
 
 type Data = Record<string, unknown>;
 
@@ -137,7 +137,7 @@ export async function verifyMoonDocs(
     sub(db, corporationId, MOON_DOCS).select('schema').get(),
   ]);
   const held = new Map(docs.docs.map((d) => [d.id, d.get('schema') as unknown]));
-  const scope = moonDocsToCheck(pulls.extractions, held, pulls.expiryHours, utcDate(now));
+  const scope = moonDocsToCheck(pulls.extractions, held, pulls.expiryHours, utcDay(now));
   const plan = await reconcileMoonDocs(db, corporationId, scope, { repair: true, pulls });
   return { plan, overlaps: overlappingPulls(pulls.extractions, pulls.expiryHours) };
 }

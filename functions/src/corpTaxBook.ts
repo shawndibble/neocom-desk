@@ -23,7 +23,7 @@
 
 import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, docId, record } from './communities.js';
-import { UNKNOWN_ACTION, oneOf } from './inputParse.js';
+import { oneOf } from './inputParse.js';
 import {
   BOOK_DEFAULTS,
   DIVISION_NAME_MAX,
@@ -212,9 +212,6 @@ export function isCacheFresh(checkedAt: number, now: number): boolean {
 }
 
 // --- Input parsing --------------------------------------------------------
-
-/** `YYYY-MM-DD` of a UTC instant in ms: `utcDay`, under the name the callables use. */
-export const utcDate = utcDay;
 
 export function int(value: unknown, field: string, min = 1, max = Number.MAX_SAFE_INTEGER): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) {
@@ -817,49 +814,43 @@ function parseCloseCredit(raw: unknown): CloseCredit {
 
 export function parseEditAction(data: unknown): EditAction {
   const d = record(data);
-  const action = oneOf(
-    d.action,
-    'action',
-    [
-      'addRate',
-      'addRates',
-      'setRecordRate',
-      'updateSettings',
-      'recordPayment',
-      'markNotTax',
-      'assignPayment',
-      'reassignPayment',
-      'ignoreUncounted',
-      'dismiss',
-      'dismissRecords',
-      'reverseDismissal',
-      'linkSurvey',
-      'setFullyMined',
-      'setMiner',
-      'unlink',
-      'regroupMiner',
-      'addAdjustment',
-      'reverseAdjustment',
-      'editAdjustment',
-      'reverseWriteOff',
-      'setToleranceExemption',
-      'writeOff',
-      'rebill',
-      'closeAccount',
-      'issueLateNotice',
-      'declare',
-      'resolveDeclaration',
-      'rejectDispute',
-      'dismissDispute',
-      'recordReminder',
-      'recordLateNoticeMail',
-      'recordAccounts',
-      'setPopSharing',
-      'setPopSharingMoon',
-    ] as const,
-    // A sub-action this server does not know: the client is newer than it.
-    { reason: UNKNOWN_ACTION }
-  );
+  const action = oneOf(d.action, 'action', [
+    'addRate',
+    'addRates',
+    'setRecordRate',
+    'updateSettings',
+    'recordPayment',
+    'markNotTax',
+    'assignPayment',
+    'reassignPayment',
+    'ignoreUncounted',
+    'dismiss',
+    'dismissRecords',
+    'reverseDismissal',
+    'linkSurvey',
+    'setFullyMined',
+    'setMiner',
+    'unlink',
+    'regroupMiner',
+    'addAdjustment',
+    'reverseAdjustment',
+    'editAdjustment',
+    'reverseWriteOff',
+    'setToleranceExemption',
+    'writeOff',
+    'rebill',
+    'closeAccount',
+    'issueLateNotice',
+    'declare',
+    'resolveDeclaration',
+    'rejectDispute',
+    'dismissDispute',
+    'recordReminder',
+    'recordLateNoticeMail',
+    'recordAccounts',
+    'setPopSharing',
+    'setPopSharingMoon',
+  ] as const);
   switch (action) {
     case 'addRate':
       return { action, rate: parseDatedRate(d.rate) };
@@ -1470,7 +1461,7 @@ export interface SyncInput extends BookCall {
 
 export function parseSyncInput(data: unknown, nowMs: number): SyncInput {
   const d = record(data);
-  const today = utcDate(nowMs);
+  const today = utcDay(nowMs);
   const observed = list(d.observed ?? [], 'observed', MAX_SYNC_OBSERVED).map((r) => {
     const row = record(r);
     const date = dateString(row.date, 'date');
@@ -1789,7 +1780,7 @@ export function checkClaimedTransfer(t: ClaimTransfer, ctx: ClaimCheckContext): 
   if (placed) return { result: 'credited', paymentId: placed.id, minerId: placed.minerId };
   if (ctx.lastSyncAt === undefined || at > ctx.lastSyncAt) return { result: 'notSynced' };
   if (at < ctx.lastSyncAt - JOURNAL_WINDOW_MS) return { result: 'tooOld' };
-  if (ctx.startDate !== undefined && utcDate(at) < ctx.startDate) return { result: 'tooOld' };
+  if (ctx.startDate !== undefined && utcDay(at) < ctx.startDate) return { result: 'tooOld' };
   return { result: 'notFound' };
 }
 
