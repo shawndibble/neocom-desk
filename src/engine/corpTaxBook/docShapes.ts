@@ -86,7 +86,6 @@ export function readBookSettings(corporationId: number, d: Data | undefined, now
     startDate: settings.startDate,
     graceHours: settings.graceHours,
     overdueDays: settings.overdueDays,
-    ...(settings.runningAccountFrom ? { runningAccountFrom: settings.runningAccountFrom } : {}),
     hubId: settings.hubId,
     oreForm: settings.oreForm,
     divisions: settings.divisions,

@@ -41,9 +41,6 @@ export function parseTaxContact(v: unknown): TaxContact | undefined {
   return undefined;
 }
 
-/** When every Corp Tax Book became a running account: the switch-over of a book that stored none. */
-export const RUNNING_ACCOUNTS_FROM = '2026-11-17T06:00:00.000Z';
-
 /** Every setting the book document stores, every default filled in. */
 export interface BookSettings {
   active: boolean;
@@ -69,11 +66,6 @@ export interface BookSettings {
   membersSeeFrom?: number;
   /** Who gets the EVE mail when a member asks about tax. Absent → the corporation's CEO. */
   taxContact?: TaxContact;
-  /**
-   * The instant the book switched to a running account (#6294). Every book is one: a book that
-   * stored no instant reads `RUNNING_ACCOUNTS_FROM` (decision 20261117-060555).
-   */
-  runningAccountFrom: string;
   /** A running account's late notices. */
   noticeRules: NoticeRules;
   /** A running account's per-day tolerance, in percent. */
@@ -140,7 +132,6 @@ export function parseBookSettings(d: Data): BookSettings {
     createdBy: num(d.createdBy) ?? null,
     ...(membersSeeFrom !== undefined ? { membersSeeFrom } : {}),
     ...(taxContact ? { taxContact } : {}),
-    runningAccountFrom: str(d.runningAccountFrom) ?? RUNNING_ACCOUNTS_FROM,
     noticeRules: parseNoticeRules(d.noticeRules),
     dayTolerancePct: num(d.dayTolerancePct) ?? DAY_SETTLE_TOLERANCE_PCT,
   };

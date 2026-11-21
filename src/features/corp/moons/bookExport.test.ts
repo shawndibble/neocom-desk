@@ -24,7 +24,6 @@ const settings: BookSettings = {
   oreForm: 'compressed',
   graceHours: 6,
   overdueDays: 14,
-  runningAccountFrom: '2026-01-01T00:00:00.000Z',
   noticeRules: DEFAULT_NOTICE_RULES,
   dayTolerancePct: 0.5,
   chunkM3PerHour: null,
