@@ -59,6 +59,13 @@ export const focusRingInsetClassName =
   'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent';
 
 /**
+ * A small dim label stacked over its field (a mail's Subject and Message). Plain stacked labels,
+ * not the `Fields`/`Field` label-column primitive: a side label column would take width from the
+ * message box in a narrow pane (the reading pane, the Statements run). Don't "fix" these to `Fields`.
+ */
+export const stackedLabelClassName = 'block text-[0.6875rem] text-text-dim';
+
+/**
  * A full-width row or list item that is itself the control: the `panel-2` hover
  * fill, a step darker while pressed, and the shared transition. Compose the
  * focus ring (inset for rows) separately.

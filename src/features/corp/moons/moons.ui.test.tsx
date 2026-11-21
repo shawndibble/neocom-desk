@@ -35,6 +35,20 @@ vi.mock('@/features/corpTaxBook/mailQueue', () => ({
   enqueueReminder: vi.fn(),
 }));
 
+// The rich editor is its own chunk (Tiptap); a plain field stands in for it here.
+vi.mock('@/features/character/MailBodyEditor', async () => {
+  const { TextArea } = await import('@/components/ui');
+  return {
+    MailBodyEditor: (props: { id: string; value: string; onChange: (v: string) => void }) => (
+      <TextArea
+        id={props.id}
+        value={props.value}
+        onChange={(e) => props.onChange(e.target.value)}
+      />
+    ),
+  };
+});
+
 const corpName = vi.hoisted(() => ({ value: 'Ore & Glory' as string | null }));
 vi.mock('@/features/character/useEntityName', () => ({
   useEntityName: () => corpName.value,
@@ -392,6 +406,85 @@ describe('StatementRun (late notices, #6294)', () => {
     renderBook(<StatementRun />, behind);
     for (const box of screen.getAllByRole('checkbox')) await userEvent.click(box);
     expect(screen.getByRole('button', { name: 'Continue to send' })).toBeDisabled();
+  });
+
+  it("sends the officer's edit of one Miner's mail, the other mail as standard", async () => {
+    renderBook(<StatementRun />, behind);
+    const preview = screen.getByRole('region', { name: 'Mail preview' });
+    await userEvent.click(within(preview).getByRole('button', { name: 'Edit mail' }));
+    const subject = within(preview).getByRole('textbox', { name: 'Subject' });
+    await userEvent.clear(subject);
+    await userEvent.type(subject, 'Your moon tax is late');
+    const body = within(preview).getByRole('textbox', { name: 'Message' });
+    const link = (body as HTMLTextAreaElement).value.match(/<a href="[^"]+">[^<]+<\/a>/)![0];
+    await userEvent.clear(body);
+    await userEvent.click(body);
+    await userEvent.paste(`Please pay today. ${link}`);
+    await userEvent.click(within(preview).getByRole('button', { name: 'Save mail' }));
+
+    expect(within(preview).getByText('Edited')).toBeInTheDocument();
+    expect(within(preview).getByText(/Your moon tax is late/)).toBeInTheDocument();
+    expect(screen.getAllByText('Edited mail')).toHaveLength(1);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Send 2 late notices' }));
+    await waitFor(() => expect(enqueueStatements).toHaveBeenCalledTimes(1));
+    const { statements } = enqueueStatements.mock.calls[0][0] as {
+      statements: { edited?: { subject: string; body: string } }[];
+    };
+    const edited = statements.filter((s) => s.edited);
+    expect(edited).toHaveLength(1);
+    expect(edited[0].edited).toEqual({
+      subject: 'Your moon tax is late',
+      body: `Please pay today. ${link}`,
+    });
+    expect(link).toContain(`${window.location.origin}/corp-tax-book/verify/…`);
+  });
+
+  it('edits the mail in the Preview mail dialog below desktop, and sends it', async () => {
+    stubViewport(BELOW_DESKTOP_QUERY);
+    renderBook(<StatementRun />, behind);
+    await userEvent.click(screen.getByRole('button', { name: 'Preview mail' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Edit mail' }));
+    const subject = within(dialog).getByRole('textbox', { name: 'Subject' });
+    await userEvent.clear(subject);
+    await userEvent.type(subject, 'Late tax');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save mail' }));
+    expect(within(dialog).getByText('Edited')).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    expect(screen.getByText('Edited mail')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Send 2 late notices' }));
+    await waitFor(() => expect(enqueueStatements).toHaveBeenCalledTimes(1));
+    const { statements } = enqueueStatements.mock.calls[0][0] as {
+      statements: { edited?: { subject: string } }[];
+    };
+    expect(statements.map((s) => s.edited?.subject).filter(Boolean)).toEqual(['Late tax']);
+  });
+
+  it('keeps the standard mail on Cancel, and goes back to it on Use the standard mail', async () => {
+    renderBook(<StatementRun />, behind);
+    const preview = screen.getByRole('region', { name: 'Mail preview' });
+    await userEvent.click(within(preview).getByRole('button', { name: 'Edit mail' }));
+    await userEvent.type(within(preview).getByRole('textbox', { name: 'Subject' }), ' now');
+    await userEvent.click(within(preview).getByRole('button', { name: 'Cancel' }));
+    expect(within(preview).queryByText('Edited')).not.toBeInTheDocument();
+
+    await userEvent.click(within(preview).getByRole('button', { name: 'Edit mail' }));
+    const body = within(preview).getByRole('textbox', { name: 'Message' });
+    await userEvent.clear(body);
+    expect(within(preview).getByRole('button', { name: 'Save mail' })).toBeDisabled();
+    await userEvent.type(body, 'Pay up.');
+    expect(within(preview).getByText(/no longer has the verify link/)).toBeInTheDocument();
+    await userEvent.click(within(preview).getByRole('button', { name: 'Save mail' }));
+    expect(within(preview).getByText('Edited')).toBeInTheDocument();
+
+    await userEvent.click(within(preview).getByRole('button', { name: 'Use the standard mail' }));
+    expect(within(preview).queryByText('Edited')).not.toBeInTheDocument();
+    expect(within(preview).getByText(/moon tax: late notice/)).toBeInTheDocument();
   });
 
   it('shows a refused issue instead of queueing mail', async () => {

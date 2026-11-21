@@ -16,7 +16,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { mailableAfterClose } from '@/engine/corpTaxBook/closeAccount';
-import { composeStatementMail } from '@/engine/corpTaxBook/statementMail';
+import { composeStatementMail, previewVerifyUrl } from '@/engine/corpTaxBook/statementMail';
 import type { Statement } from '@/engine/corpTaxBook/statements';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { DAY_MS } from '@/lib/age';
@@ -25,8 +25,9 @@ import { MailLimitNotice } from '@/features/corpTaxBook/MailLimitNotice';
 import { MailQueueSummary } from '@/features/corpTaxBook/MailQueuePanel';
 import { listQueue } from '@/features/corpTaxBook/mailQueueStore';
 import {
-  StatementMailPreview,
+  EditableMailPreview,
   StatementMailPreviewDialog,
+  type MailEdit,
   type MailPreviewContent,
 } from '@/features/corpTaxBook/StatementMailPreview';
 import { useIsBelowDesktop } from '@/lib/useIsBelowDesktop';
@@ -111,6 +112,11 @@ export function StatementRun() {
   const queue = useLiveQuery(() => listQueue(corporationId), [corporationId], []);
   /** The officer's own ticks; a Miner they have not touched follows the default (`recentlyMailed`). */
   const [ticks, setTicks] = useState<ReadonlyMap<string, boolean>>(new Map());
+  /**
+   * The officer's own wording for a mail, by preview key: what the queue sends instead. `basis`
+   * is the standard body it was edited from, so a later change to the figures is flagged.
+   */
+  const [edits, setEdits] = useState<ReadonlyMap<string, MailEdit>>(new Map());
 
   const notices = useMemo(
     () => plannedNotices(view, settings.noticeRules),
@@ -191,7 +197,8 @@ export function StatementRun() {
   const chosen = new Set(previews.filter(isChosen).map((p) => p.key));
   const total = chosen.size;
 
-  const previewFor = (item: (typeof previews)[number], corpName: string): MailPreviewContent => {
+  /** The mail the run would send unedited, its verify link the preview one (`previewVerifyUrl`). */
+  const standardMail = (item: (typeof previews)[number], corpName: string): MailPreviewContent => {
     const target = mailTarget(ctx, item.statement, minerRow(item.minerId), {
       amountDue: item.amountDue,
       carried: item.carried,
@@ -201,7 +208,7 @@ export function StatementRun() {
       kind: 'statement',
       corporationName: corpName,
       refineryName: (id) => names.refinery(id),
-      verifyUrl: `${window.location.origin}/corp-tax-book/verify/…`,
+      verifyUrl: previewVerifyUrl(window.location.origin),
     });
     return {
       to: target.recipientName,
@@ -209,6 +216,27 @@ export function StatementRun() {
       body: mail.body,
       summarised: mail.detail !== 'lines',
     };
+  };
+  /** The officer's edit was made from a standard mail that has since changed. */
+  const isStale = (item: (typeof previews)[number]): boolean => {
+    const edit = edits.get(item.key);
+    return (
+      edit !== undefined &&
+      corporationName !== null &&
+      standardMail(item, corporationName).body !== edit.basis
+    );
+  };
+  const previewFor = (item: (typeof previews)[number], corpName: string): MailPreviewContent => {
+    const standard = standardMail(item, corpName);
+    const edit = edits.get(item.key);
+    return edit
+      ? { to: standard.to, subject: edit.subject, body: edit.body, summarised: false }
+      : standard;
+  };
+  /** A mail's target for the queue, carrying the officer's edit when there is one. */
+  const withEdit = (key: string, target: ReturnType<typeof mailTarget>) => {
+    const edit = edits.get(key);
+    return edit ? { ...target, edited: { subject: edit.subject, body: edit.body } } : target;
   };
   const previewItem = previews.find((p) => p.key === previewId) ?? previews[0];
   const showInline = inline && previewItem !== undefined && step !== 'done';
@@ -230,6 +258,27 @@ export function StatementRun() {
     // A failure part-way keeps what was issued (and queued); the next run plans the
     // remaining notices and offers any Statement whose mail never left.
     const sent = { queued: 0, skipped: 0, missingLink: 0 };
+    /** Each notice issued this run: its preview key, then the key of the Statement it became. */
+    const issued: { from: string; to: string }[] = [];
+    /** Statements the queue refused for want of a verify link: they come back unmailed. */
+    const notQueued: string[] = [];
+    /**
+     * The edits still wanted after this send: an issued notice's edit follows its Statement, and
+     * after a send that finished only the Statements left unmailed (`keep`) keep theirs.
+     */
+    const carryEdits = (keep?: readonly string[]) =>
+      setEdits((current) => {
+        const next = new Map(current);
+        for (const { from, to } of issued) {
+          const edit = next.get(from);
+          if (!edit) continue;
+          next.delete(from);
+          next.set(to, edit);
+        }
+        if (!keep) return next;
+        const wanted = new Set(keep.map((id) => `statement:${id}`));
+        return new Map([...next].filter(([key]) => wanted.has(key)));
+      });
     const queueTargets = async (targets: ReturnType<typeof mailTarget>[]) => {
       if (targets.length === 0) return;
       // Inside `try`: a chunk that will not load is an error shown, not a run stuck busy.
@@ -244,6 +293,7 @@ export function StatementRun() {
       sent.queued += queued.queued;
       sent.skipped += queued.skipped;
       sent.missingLink += queued.missingLink.length;
+      notQueued.push(...queued.missingLink);
     };
     try {
       // Earlier Statements whose mail never went out are the oldest; they go first.
@@ -252,10 +302,13 @@ export function StatementRun() {
           .filter((s) => chosen.has(`statement:${s.id}`))
           .map((s) => {
             const row = minerRow(s.minerId);
-            return mailTarget(ctx, s as Statement, row, {
-              amountDue: row.owed,
-              carried: Math.max(0, row.owed - s.amount),
-            });
+            return withEdit(
+              `statement:${s.id}`,
+              mailTarget(ctx, s as Statement, row, {
+                amountDue: row.owed,
+                carried: Math.max(0, row.owed - s.amount),
+              })
+            );
           })
       );
       // Late notices (#6294): each issued (which makes its verify link), then all queued.
@@ -273,14 +326,21 @@ export function StatementRun() {
             refineryNames: statementRefineryNames(n.statement, names),
           },
         });
+        issued.push({ from: `notice:${n.minerId}`, to: `statement:${n.statement.id}` });
         noticeTargets.push(
-          mailTarget(ctx, n.statement, row, { amountDue: n.owed, carried: n.carried })
+          withEdit(
+            `notice:${n.minerId}`,
+            mailTarget(ctx, n.statement, row, { amountDue: n.owed, carried: n.carried })
+          )
         );
       }
       await queueTargets(noticeTargets);
       setResult(sent);
+      carryEdits(notQueued);
       setStep('done');
     } catch (e) {
+      // A notice issued before the failure comes back as an unmailed Statement: its edit follows.
+      carryEdits();
       setError(editErrorMessage(e));
     } finally {
       reload();
@@ -291,6 +351,25 @@ export function StatementRun() {
   const order: Step[] = ['check', 'send', 'done'];
   const at = order.indexOf(step);
   const stateOf = (i: number) => (at > i ? 'done' : at === i ? 'now' : 'next');
+  /** The previewed mail with Edit; keyed by Miner, so an unsaved draft never moves to another. */
+  const editablePreview = mail && previewItem && (
+    <EditableMailPreview
+      key={previewItem.key}
+      mail={mail}
+      edited={edits.has(previewItem.key)}
+      stale={isStale(previewItem)}
+      basis={edits.get(previewItem.key)?.basis ?? mail.body}
+      onSave={(edit) => setEdits((current) => new Map(current).set(previewItem.key, edit))}
+      onReset={() =>
+        setEdits((current) => {
+          const next = new Map(current);
+          next.delete(previewItem.key);
+          return next;
+        })
+      }
+      disabled={busy || !canEdit}
+    />
+  );
   /** Whose mail the preview shows, with a visible label: the run's Miners by main Character. */
   const minerPicker = previews.length > 1 && previewItem && (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
@@ -400,6 +479,20 @@ export function StatementRun() {
                           <span className="min-w-0">
                             {names.character(minerRow(p.minerId).mainCharacterId)}
                             <span className="text-text-dim"> · {isk(p.amountDue)}</span>
+                            {edits.has(p.key) && (
+                              <span
+                                className={cx(
+                                  'block text-xs',
+                                  isStale(p) ? 'text-warning' : 'text-accent'
+                                )}
+                              >
+                                {t(
+                                  isStale(p)
+                                    ? 'corpTaxBook.moons.run.editedStale'
+                                    : 'corpTaxBook.moons.run.edited'
+                                )}
+                              </span>
+                            )}
                             {at !== null && recentlyMailed(p.minerId) && (
                               <span className="block text-xs text-text-dim">
                                 {t('corpTaxBook.moons.run.mailedRecently', {
@@ -506,10 +599,8 @@ export function StatementRun() {
               >
                 <Eyebrow as="h3">{t('corpTaxBook.moons.run.mailPreview')}</Eyebrow>
                 {minerPicker}
-                {mail ? (
-                  <div className="max-h-[36rem] overflow-y-auto">
-                    <StatementMailPreview {...mail} />
-                  </div>
+                {editablePreview ? (
+                  <div className="max-h-[36rem] overflow-y-auto">{editablePreview}</div>
                 ) : (
                   <p className="text-sm text-text-dim">
                     {t('corpTaxBook.moons.run.loadingCorporation')}
@@ -534,7 +625,9 @@ export function StatementRun() {
               },
             }
           : {})}
-      />
+      >
+        {editablePreview}
+      </StatementMailPreviewDialog>
     </Panel>
   );
 }

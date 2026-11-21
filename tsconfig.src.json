@@ -35,7 +35,8 @@
     "functions/src/incursionState.ts",
     "functions/src/srpPricing.ts",
     "functions/src/srpDoctrine.ts",
-    "functions/src/timeConstants.ts"
+    "functions/src/timeConstants.ts",
+    "functions/src/verifyToken.ts"
   ],
   "exclude": [
     "src/**/*.test.ts",

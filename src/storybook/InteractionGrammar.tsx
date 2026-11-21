@@ -1,5 +1,6 @@
 import { figureOpenerClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { Pill } from '@/components/ui/Pill';
 import { AddPreviewReadout } from '@/features/fittings/AddPreviewReadout';
 import { NeedsLoginAction } from '@/features/character/NeedsLoginAction';
 import { useNeedsLogin } from '@/stores/authFailure';
@@ -301,6 +302,13 @@ export function InteractionGrammar() {
           <span className="inline-flex items-center gap-1">
             {k('samples.editableValue')}
             <Icon.Rename size={Icon.ICON_SIZE.sm} className="text-text-faint" aria-hidden="true" />
+          </span>
+        </Cue>
+        <Cue rule={k('rules.editGenerated')}>
+          <span className="flex flex-wrap items-center gap-2">
+            <Pill tone="accent">{k('samples.edited')}</Pill>
+            <Button size="sm">{k('samples.editMail')}</Button>
+            <Button size="sm">{k('samples.standardMail')}</Button>
           </span>
         </Cue>
         <Cue rule={k('rules.assumed')}>

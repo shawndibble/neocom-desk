@@ -21,7 +21,12 @@ import {
 } from '@/engine/corpTaxBook/ownerRateMail';
 import { composePayeeChangeMail } from '@/engine/corpTaxBook/payeeChange';
 import type { OwnerRateChange } from '@/engine/corpTaxBook/ownerRate';
-import { composeStatementMail, type StatementMailInput } from '@/engine/corpTaxBook/statementMail';
+import {
+  composeStatementMail,
+  fillVerifyLink,
+  verifyUrl,
+  type StatementMailInput,
+} from '@/engine/corpTaxBook/statementMail';
 import { db } from '@/db';
 import { addToQueue, listQueue, nextOrder, saveItem, saveItems } from './mailQueueStore';
 
@@ -35,6 +40,11 @@ export interface StatementToMail extends Omit<
   recipientId: number;
   /** Balance due, shown on the queue row. */
   amountDue: number;
+  /**
+   * The mail as the officer edited it in the run's preview: sent as written, except that the
+   * preview's verify link (`previewVerifyUrl`) becomes this Statement's real one.
+   */
+  edited?: { subject: string; body: string };
 }
 
 export interface EnqueueInput {
@@ -62,7 +72,7 @@ async function buildItems(
   kind: MailKind,
   batchId: string
 ): Promise<{ items: MailQueueItem[]; missingLink: string[] }> {
-  const { readVerifyTokens, verifyUrl } = await import('@/features/corp/taxBook/bookClient');
+  const { readVerifyTokens } = await import('@/features/corp/taxBook/bookClient');
   const tokens = await readVerifyTokens(
     input.senderCharacterId,
     input.corporationId,
@@ -78,13 +88,19 @@ async function buildItems(
       missingLink.push(s.statementId);
       continue;
     }
-    const mail = composeStatementMail({
-      ...s,
-      kind,
-      corporationName: input.corporationName,
-      refineryName: input.refineryName,
-      verifyUrl: verifyUrl(origin, token),
-    });
+    const link = verifyUrl(origin, token);
+    const mail = s.edited
+      ? {
+          subject: s.edited.subject,
+          body: fillVerifyLink(s.edited.body, origin, link),
+        }
+      : composeStatementMail({
+          ...s,
+          kind,
+          corporationName: input.corporationName,
+          refineryName: input.refineryName,
+          verifyUrl: link,
+        });
     items.push({
       id: crypto.randomUUID(),
       batchId,

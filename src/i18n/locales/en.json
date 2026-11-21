@@ -18133,7 +18133,18 @@
         "previous": "Previous Miner",
         "next": "Next Miner",
         "position": "{{position}} of {{count}}",
-        "summarised": "This mail is shortened to fit EVE’s 10,000-character limit. The link in it shows every line."
+        "summarised": "This mail is shortened to fit EVE’s 10,000-character limit. The link in it shows every line.",
+        "edit": "Edit mail",
+        "edited": "Edited",
+        "save": "Save mail",
+        "reset": "Use the standard mail",
+        "stale": "The amounts in the standard mail changed after you edited this one. Check your figures, or use the standard mail.",
+        "problem": {
+          "empty": "A mail needs a subject and a message.",
+          "subjectTooLong": "The subject is over EVE’s {{max}}-character limit.",
+          "bodyTooLong": "The message is over EVE’s 10,000-character limit.",
+          "noLink": "This mail no longer has the verify link. Without it the Miner can't see their days, payments or live total."
+        }
       },
       "panelTitle": "Statement mail queue"
     },
@@ -18944,6 +18955,8 @@
         "unmatched": "An Unmatched donation is on nobody's Statement until you assign it.",
         "previewFor": "Preview for",
         "recipients": "Mail to",
+        "edited": "Edited mail",
+        "editedStale": "Edited mail · amounts changed since",
         "mailedRecently_one": "Mailed {{count}} day ago, so unticked",
         "mailedRecently_other": "Mailed {{count}} days ago, so unticked",
         "mailPreview": "Mail preview",
@@ -20506,6 +20519,7 @@
       "addPreview": "Readout under the Add panel list: hover or keyboard-focus a module row to see what adding it changes (never on touch)",
       "infoButton": "ⓘ IconButton: opens Show Info or an explanation modal",
       "pencil": "Faint pencil after a value: edit in place",
+      "editGenerated": "Edit under text the app wrote (a mail preview): Save makes yours the one sent; an Edited tag and Use the standard mail go back",
       "assumed": "Amber warning mark: a default you have not confirmed",
       "myOrder": "Person glyph left of a price: an order of yours",
       "iskAmount": "IskAmount: B/M/K suffix, exact value on hover or tap",
@@ -20585,6 +20599,9 @@
       "showInfo": "Show info",
       "addPreviewName": "Damage Control II",
       "editableValue": "Fleet name",
+      "edited": "Edited",
+      "editMail": "Edit mail",
+      "standardMail": "Use the standard mail",
       "assumedFee": "Assuming NPC station fees",
       "myOrder": "5.50",
       "rowLink": "Open the page",
