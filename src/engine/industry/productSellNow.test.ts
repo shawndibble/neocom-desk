@@ -74,4 +74,17 @@ describe('productSellNow', () => {
       })
     ).toBeNull();
   });
+
+  it('halves the sales tax at a hub with a fee discount', () => {
+    const sale = productSellNow({
+      productTypeID: PRODUCT,
+      productQuantity: 10,
+      hubBuyPrices: { [PRODUCT]: 1_000 },
+      skills: {},
+      standing: { factionStanding: 0, corpStanding: 0, feeDiscountFactor: 0.5 },
+      totalCost: 5_000,
+    });
+    expect(sale?.salesTax).toBeCloseTo(375);
+    expect(sale?.profit).toBeCloseTo(4_625);
+  });
 });

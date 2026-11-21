@@ -142,6 +142,7 @@ export function planVerdictOf<R extends Pick<ResolvedBuildPlan, 'result'>>(
           productQuantity,
           hubBuyPrices: snapshot.hubBuyPrices,
           skills,
+          standing,
           totalCost: result.totalCost,
           forgone,
         })
