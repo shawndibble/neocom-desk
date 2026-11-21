@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { setPageHubEntry, useHubFor } from '@/features/market/hub';
-import { usePricePercentFor } from '@/features/market/pagePricePercents';
+import { PRICE_PERCENT_STORES, usePricePercentFor } from '@/features/market/pagePricePercents';
 import { DEFAULT_PRICE_PERCENT } from '@/features/market/pricePercent';
 import { seedPageHubsOnce, useSeededOnce } from '@/features/market/pageHubSeed';
 import { usePiSettings, type PiBuyTier } from './piSettings';
@@ -58,6 +58,8 @@ export function useSellHub(): SellHub {
   const { hubId, hydrated: hubHydrated } = useHubFor('pi');
   // PI's percent (`pagePricePercents.ts`): below or above 100 is a buyback at that rate.
   const percent = usePricePercentFor('pi');
+  // Priced before the percent is read, a buyback would show at the market, with tax and a route.
+  const percentHydrated = useHydratedStore(...PRICE_PERCENT_STORES);
   const picked = useCallback(
     (id: TradeHub['id']) =>
       void setSettings({
@@ -69,7 +71,7 @@ export function useSellHub(): SellHub {
   );
   return {
     hub: getTradeHub(hubId) ?? DEFAULT_TRADE_HUB,
-    hydrated: settingsHydrated && seeded && hubHydrated,
+    hydrated: settingsHydrated && seeded && hubHydrated && percentHydrated,
     buybackPct: percent === DEFAULT_PRICE_PERCENT ? null : percent,
     buyTiers: settings.buyTiers,
     hubChosen: settings.hubChosen === true,

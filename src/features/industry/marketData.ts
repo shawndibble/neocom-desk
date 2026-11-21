@@ -35,7 +35,7 @@ import type { TradeHub } from '@/market/hubs';
 import type { AdjustedPrices, HubPrices, IndustryActivity } from '@/engine/industry/types';
 import { DEFAULT_PRICE_PERCENT } from '@/features/market/pricePercent';
 import { atPercent } from '@/features/market/pagePricePercents';
-import { hubPricesAtPercent } from './priceBasis';
+import { hubPricesAtPercent } from '@/features/market/hubPricesAtPercent';
 
 export interface MarketSnapshot {
   /** Lowest sell at the hub, materials + product. Missing key = unpriceable at this hub. */

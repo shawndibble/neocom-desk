@@ -21,6 +21,7 @@ import {
 import type { PriceSide } from '@/engine/miningTax/priceBasis';
 import type { PageHubArea } from '@/features/market/pageHubs';
 import { atPercent, usePricePercentFor } from '@/features/market/pagePricePercents';
+import { DEFAULT_PRICE_PERCENT } from '@/features/market/pricePercent';
 import type { TradeHub } from '@/market/hubs';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { formatSignedPercent, percentDirection, savingTone } from '@/lib/formatSignedPercent';
@@ -108,7 +109,7 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
   const [side, setSide] = useState<PriceSide>(defaultSide);
   // The page's Buy/Sell percent (#6531) scales the hub's prices; without a hub menu there is no percent to set.
   const pagePercent = usePricePercentFor(hubArea ?? 'contracts');
-  const percent = hubArea ? pagePercent : 100;
+  const percent = hubArea ? pagePercent : DEFAULT_PRICE_PERCENT;
 
   const swap = requested.length > 0;
   const typeIds = [...new Set([...included, ...requested].map((line) => line.typeId))].sort(
@@ -154,7 +155,7 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
 
   const { unreachable } = load.data;
   const prices =
-    percent === 100
+    percent === DEFAULT_PRICE_PERCENT
       ? load.data.prices
       : new Map(
           [...load.data.prices].map(([typeId, p]) => [

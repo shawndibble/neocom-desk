@@ -150,7 +150,7 @@ function HeadingWithHubMenu({ heading, menu }: { heading: string; menu: PriceChe
     ? t('pageHubs.closestFound', { hub: menu.hub.stationLabel })
     : menu.hub.stationLabel;
   // The prices are at the page's percent, so the heading says so (#6531).
-  const shown = menu.side ? withPercent(hubText, percent) : hubText;
+  const shown = menu.side ? withPercent(t, hubText, percent) : hubText;
   return (
     <p className="text-[0.6875rem] text-text-dim">
       <span className={eyebrowClassName}>{heading.slice(0, at)}</span>

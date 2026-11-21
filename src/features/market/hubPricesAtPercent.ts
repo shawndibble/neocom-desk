@@ -11,6 +11,7 @@ import {
   type PricesWithStatus,
 } from '@/market/prices';
 import type { TradeHub } from '@/market/hubs';
+import type { HubPrices } from '@/engine/industry/types';
 import { atPercent } from './pagePricePercents';
 import { DEFAULT_PRICE_PERCENT } from './pricePercent';
 
@@ -27,6 +28,16 @@ function scaled<T extends Sides>(prices: ReadonlyMap<number, T>, percent: number
       sellMin: sides.sellMin === null ? null : atPercent(sides.sellMin, percent),
       buyMax: sides.buyMax === null ? null : atPercent(sides.buyMax, percent),
     });
+  }
+  return out;
+}
+
+/** A `typeId -> price` record at `percent` (a snapshot's hub maps, walked Depth Prices). */
+export function hubPricesAtPercent(prices: HubPrices, percent: number): HubPrices {
+  if (percent === DEFAULT_PRICE_PERCENT) return prices;
+  const out: HubPrices = {};
+  for (const [typeId, price] of Object.entries(prices)) {
+    out[Number(typeId)] = atPercent(price, percent);
   }
   return out;
 }

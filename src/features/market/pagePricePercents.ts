@@ -19,7 +19,9 @@
  * reads, applied where the page reads it: the price lookups are cached per
  * station and shared by every page, so they are never scaled centrally.
  */
+import type { TFunction } from 'i18next';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import { usePiSettings } from '@/features/pi/piSettings';
 import type { PageHubArea } from './pageHubs';
 import { DEFAULT_PRICE_PERCENT, isValidPricePercent, useMarketPricePercent } from './pricePercent';
@@ -77,8 +79,16 @@ export function percentFrom(
   return DEFAULT_PRICE_PERCENT;
 }
 
-/** `area`'s percent, live. Reads 100 until the stores are read, as an empty map does. */
+/** The stores a page's percent is read from, for a caller that waits on them (`useHydratedStore`). */
+export const PRICE_PERCENT_STORES = [
+  usePagePricePercents,
+  useMarketPricePercent,
+  usePiSettings,
+] as const;
+
+/** `area`'s percent, live; it reads its stores itself. 100 until they are read, as an empty map is. */
 export function usePricePercentFor(area: PageHubArea): number {
+  useHydratedStore(...PRICE_PERCENT_STORES);
   const map = usePagePricePercents((state) => state.value);
   const appraisal = useMarketPricePercent((state) => state.value);
   const buyback = usePiSettings((state) => state.value.buybackPct);
@@ -117,8 +127,10 @@ export async function setPricePercentFor(area: PageHubArea, percent: number): Pr
 }
 
 /** "Amarr", or "Amarr · 90%" when the page's percent is not 100. */
-export function withPercent(hubText: string, percent: number): string {
-  return percent === DEFAULT_PRICE_PERCENT ? hubText : `${hubText} · ${percent}%`;
+export function withPercent(t: TFunction, hubText: string, percent: number): string {
+  return percent === DEFAULT_PRICE_PERCENT
+    ? hubText
+    : t('pageHubs.withPercent', { hub: hubText, percent });
 }
 
 /** `price` at `percent` of market. */

@@ -11,6 +11,8 @@
 import { useCallback, useMemo } from 'react';
 import type { BuildPlanRecord } from '@/db';
 import { depthPriceMap } from '@/engine/industry/depthPrice';
+import { hubPricesAtPercent } from '@/features/market/hubPricesAtPercent';
+import { usePricePercentFor } from '@/features/market/pagePricePercents';
 import type { HubPrices } from '@/engine/industry/types';
 import type { TradeHub } from '@/market/hubs';
 import { planDepthNeeds, useDepthPrices } from './depthPriceLoader';
@@ -113,21 +115,29 @@ export function useResolvedPlan({
       planDepthNeeds(candidate, lowestSell.result, snapshot?.hubSellVolumes ?? {}),
     [snapshot?.hubSellVolumes]
   );
+  // Walked prices at the Industry percent (#6531), as the snapshot's top-of-book prices already are.
+  const pricePercent = usePricePercentFor('industry');
+  const depthAt = useCallback(
+    (prices: HubPrices) => hubPricesAtPercent(prices, pricePercent),
+    [pricePercent]
+  );
   const topOfBook = useMemo(() => resolveWith(plan), [resolveWith, plan]);
   const depthNeeds = useMemo(() => depthNeedsOf(plan, topOfBook), [depthNeedsOf, plan, topOfBook]);
   const { depth, walk: walkDepth } = useDepthPrices(hub, depthNeeds, fetchedAtMs);
   const resolved = useMemo(
-    () => (depth.size > 0 ? resolveWith(plan, depthPriceMap(depth)) : topOfBook),
-    [depth, resolveWith, plan, topOfBook]
+    () => (depth.size > 0 ? resolveWith(plan, depthAt(depthPriceMap(depth))) : topOfBook),
+    [depth, resolveWith, plan, topOfBook, depthAt]
   );
   // Break Even's trials walk the books for their own run count, as the page would at that count.
   const resolveAt = useCallback(
     (candidate: BuildPlanRecord) => {
       const lowestSell = resolveWith(candidate);
       const trialDepth = walkDepth(depthNeedsOf(candidate, lowestSell));
-      return trialDepth.size > 0 ? resolveWith(candidate, depthPriceMap(trialDepth)) : lowestSell;
+      return trialDepth.size > 0
+        ? resolveWith(candidate, depthAt(depthPriceMap(trialDepth)))
+        : lowestSell;
     },
-    [resolveWith, walkDepth, depthNeedsOf]
+    [resolveWith, walkDepth, depthNeedsOf, depthAt]
   );
 
   return { resolved, depth, resolveAt, resolveQuantitiesAt: resolveWith };

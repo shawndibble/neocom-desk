@@ -11329,6 +11329,7 @@
     "hubLabel": "Market hub",
     "buyPercent": "Buy percent",
     "sellPercent": "Sell percent",
+    "withPercent": "{{hub}} · {{percent}}%",
     "area": {
       "fittings": "Ship Fit Costs",
       "skills": "Skills",

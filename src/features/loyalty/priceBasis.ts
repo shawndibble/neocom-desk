@@ -15,6 +15,7 @@ import type { LiquidationBasis } from '@/engine/industry/ownedStockSale';
 import type { TradedPrices } from '@/engine/market/tradedPriceCheck';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { atPercent } from '@/features/market/pagePricePercents';
+import { hubPricesAtPercent } from '@/features/market/hubPricesAtPercent';
 import { DEFAULT_PRICE_PERCENT } from '@/features/market/pricePercent';
 
 export type PriceBasis = 'sell' | 'buy';
@@ -41,13 +42,6 @@ export function revenuePricing(
   return basis === 'buy'
     ? { revenueHubPrices: snapshot.hubBuyPrices, liquidationBasis: 'instant' }
     : { revenueHubPrices: snapshot.hubPrices, liquidationBasis: 'order' };
-}
-
-function mapAtPercent(prices: HubPrices, percent: number): HubPrices {
-  const out: HubPrices = {};
-  for (const [typeId, price] of Object.entries(prices))
-    out[Number(typeId)] = atPercent(price, percent);
-  return out;
 }
 
 function tradedAtPercent(traded: TradedPrices, percent: number): TradedPrices {
@@ -79,8 +73,8 @@ export function lpPricesAtPercent<S extends { hubPrices: HubPrices; hubBuyPrices
   return {
     snapshot: {
       ...snapshot,
-      hubPrices: mapAtPercent(snapshot.hubPrices, percent),
-      hubBuyPrices: mapAtPercent(snapshot.hubBuyPrices, percent),
+      hubPrices: hubPricesAtPercent(snapshot.hubPrices, percent),
+      hubBuyPrices: hubPricesAtPercent(snapshot.hubBuyPrices, percent),
     },
     tradedPrices:
       tradedPrices &&

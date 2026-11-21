@@ -108,18 +108,33 @@ describe('HubMenu', () => {
 describe('HubField percent', () => {
   beforeEach(() => reset({}));
 
-  it('names the field by side, writes the page’s percent as typed, and shows it on the trigger', async () => {
+  it('names the field by side, writes the page’s percent on Enter, and shows it on the trigger', async () => {
     const user = userEvent.setup();
     render(<HubField area="fittings" side="buy" label="Priced at" />);
     await user.click(await screen.findByRole('button', { name: 'Jita, Priced at' }));
     const box = screen.getByRole('spinbutton', { name: 'Buy percent' });
     expect(box).toHaveValue(100);
     await user.clear(box);
-    await user.type(box, '90');
+    await user.type(box, '9');
+    // Not written mid-typing: the page would re-price at each partial value.
+    expect(usePagePricePercents.getState().value).toEqual({});
+    await user.type(box, '0{Enter}');
     await waitFor(() => expect(usePagePricePercents.getState().value).toEqual({ fittings: 90 }));
     // The percent belongs to the page: the Global hub is untouched.
     expect(useMarketHub.getState().value).toBe('jita');
     expect(screen.getByRole('button', { name: 'Jita · 90%, Priced at' })).toBeInTheDocument();
+  });
+
+  it('writes what was typed when the popover closes without Enter', async () => {
+    const user = userEvent.setup();
+    render(<HubField area="mining" side="sell" label="Priced at" />);
+    await user.click(await screen.findByRole('button', { name: 'Jita, Priced at' }));
+    await user.type(
+      screen.getByRole('spinbutton', { name: 'Sell percent' }),
+      '{Backspace}{Backspace}{Backspace}85'
+    );
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(usePagePricePercents.getState().value).toEqual({ mining: 85 }));
   });
 
   it('labels a selling page Sell percent', async () => {

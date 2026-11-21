@@ -57,6 +57,7 @@ test.describe('PI phone layout', () => {
     await picker.click();
     const percent = page.getByRole('spinbutton', { name: 'Sell percent' });
     await percent.fill('90');
+    await percent.press('Enter');
     await page.keyboard.press('Escape');
     await expect(picker).toHaveText(/· 90%/);
     const clipped = await picker.evaluate((el) => {

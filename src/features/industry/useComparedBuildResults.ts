@@ -48,7 +48,7 @@ import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
 import { loadDepthPrices, type DepthPrices } from './depthPriceLoader';
 import { loadPlanSnapshots, type PlanSnapshots } from './planSnapshots';
-import { hubPricesAtPercent } from './priceBasis';
+import { hubPricesAtPercent } from '@/features/market/hubPricesAtPercent';
 import { usePricePercentFor } from '@/features/market/pagePricePercents';
 import { createYielder } from './yieldToMain';
 import { shoppingListMaterials } from './subBuildPlan';
@@ -132,6 +132,7 @@ async function computeRow(
   sources: Omit<BuildPlanSources, 'catalog' | keyof HubPricingSources>,
   pricing: HubPricingSourceArgs,
   computeGroupResult: boolean,
+  pricePercent: number,
   depthPrices?: HubPrices
 ): Promise<ComparedBuildRow> {
   const base = {
@@ -165,6 +166,7 @@ async function computeRow(
         depth: depthPrices ? null : loadDepthPrices,
         profitBasis: pricing.profitBasis,
         withGroupResult: computeGroupResult,
+        pricePercent,
       }
     );
     // The group pass's own error surfaces on the row too (only reachable
@@ -295,6 +297,7 @@ export function useComparedBuildResults({
           communityRows,
         },
         computeGroupResult,
+        pricePercent,
         depthPrices
       );
     const show = (row: ComparedBuildRow) => {

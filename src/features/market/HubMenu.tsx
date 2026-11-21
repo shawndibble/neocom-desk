@@ -16,7 +16,7 @@
  * is a popover rather than a menu because it holds a text field, whose own
  * keys a menu's typeahead would take (DESIGN.md `Popover`).
  */
-import { useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Popover,
@@ -112,7 +112,10 @@ export function HubMenu({
       </PopoverTrigger>
       <PopoverContent align="start" aria-label={triggerLabel} className="w-72 space-y-3 p-3">
         <section className="space-y-1.5">
-          <h3 className={eyebrowClassName}>{t('pageHubs.settingsLabel')}</h3>
+          {/* The group carries the name; the heading is what shows. */}
+          <p aria-hidden="true" className={eyebrowClassName}>
+            {t('pageHubs.settingsLabel')}
+          </p>
           <SegmentedControl<HubScope>
             label={t('pageHubs.settingsLabel')}
             size="sm"
@@ -132,7 +135,9 @@ export function HubMenu({
           />
         </section>
         <section className="space-y-1.5">
-          <h3 className={eyebrowClassName}>{t('pageHubs.hubLabel')}</h3>
+          <p aria-hidden="true" className={eyebrowClassName}>
+            {t('pageHubs.hubLabel')}
+          </p>
           <div
             role="group"
             aria-label={t('pageHubs.hubLabel')}
@@ -165,7 +170,21 @@ export function HubMenu({
   );
 }
 
-/** The page's percent: a number box written as it is typed, an unreadable value left unwritten. */
+/** Writes a typed percent once, if it reads as one. */
+function commitPending(area: PageHubArea, pending: { current: string | null }) {
+  const raw = pending.current;
+  pending.current = null;
+  if (raw === null || raw.trim() === '') return;
+  const value = Number(raw);
+  if (isValidPricePercent(value)) void setPricePercentFor(area, value);
+}
+
+/**
+ * The page's percent: a number box written when the pilot is done with it
+ * (Enter, leaving the box, or the popover closing), not on every keystroke,
+ * which would re-price the page at each partial value ("8" on the way to 85).
+ * An unreadable value is left unwritten.
+ */
 function PercentRow({ area, side }: { area: PageHubArea; side: PriceSide }) {
   const { t } = useTranslation();
   const id = useId();
@@ -177,6 +196,10 @@ function PercentRow({ area, side }: { area: PageHubArea; side: PriceSide }) {
     setSeen(percent);
     if (Number(text) !== percent) setText(String(percent));
   }
+  const pending = useRef<string | null>(null);
+  const commit = () => commitPending(area, pending);
+  // The popover closing unmounts the box, often without a blur: write what was typed.
+  useEffect(() => () => commitPending(area, pending), [area]);
   return (
     <div className="flex items-center justify-between gap-3 border-t border-line pt-3">
       <label htmlFor={id} className="text-sm">
@@ -194,13 +217,16 @@ function PercentRow({ area, side }: { area: PageHubArea; side: PriceSide }) {
           value={text}
           onChange={(event) => {
             setText(event.target.value);
-            const value = Number(event.target.value);
-            if (event.target.value.trim() !== '' && isValidPricePercent(value)) {
-              void setPricePercentFor(area, value);
-            }
+            pending.current = event.target.value;
+          }}
+          onBlur={commit}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') commit();
           }}
         />
-        <span className="text-sm text-text-dim">%</span>
+        <span aria-hidden="true" className="text-sm text-text-dim">
+          %
+        </span>
       </div>
     </div>
   );
@@ -242,7 +268,7 @@ export function HubField({
       ? t('pageHubs.closestFound', { hub: hub.systemName })
       : hub.systemName;
   const shown =
-    side !== undefined && hasPercentField(area) ? withPercent(hubText, percent) : hubText;
+    side !== undefined && hasPercentField(area) ? withPercent(t, hubText, percent) : hubText;
   return (
     <HubMenu
       area={area}
