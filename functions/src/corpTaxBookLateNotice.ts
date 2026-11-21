@@ -8,25 +8,40 @@
  * `src/engine/corpTaxBook/notice.ts` re-exports it.
  *
  * Notices are stored today as `corps/{id}/statements` docs with `kind: 'notice'`, in the shape of
- * the calendar Statement they replaced; `noticeFromStatementDoc` reads one into a `Notice`.
+ * the calendar Statement they replaced; `lateNoticeFromStatementDoc` reads one into a `LateNotice`.
  */
 import { isFiniteNumber, isRecord } from './guards.js';
 
 /** `late`: the Miner is behind. `final`: their account was closed, so it is the last one. */
-export type NoticeKind = 'late' | 'final';
+export type LateNoticeKind = 'late' | 'final';
 
-/** One line of one day a notice asked for. */
-export interface NoticeLine {
+/** `mined` and `late-ore` bill a day charge's ore; `correction` bills an officer's Adjustment. */
+export type LateNoticeLineKind = 'mined' | 'late-ore' | 'correction';
+
+/** One line of one day a notice asked for, as it was priced when the notice went out. */
+export interface LateNoticeLine {
+  kind: LateNoticeLineKind;
   date: string;
   /** The day charge, or `adjustment:<id>`, the line names: a later notice never lists it again. */
   key: string;
   characterId?: number;
   structureId?: number;
+  /** The ore it billed (for late ore, only the growth). */
+  oreLines: { typeId: number; quantity: number }[];
+  /** Per-unit price by raw type id, and which price tier priced each: printed on the verify page. */
+  unitPrices?: Record<number, number>;
+  priceSources?: Record<number, string>;
+  estimatedValue: number;
+  taxPct?: number;
+  /** The rate's effective-from date (D28); absent for a per-record override. */
+  rateEffectiveFrom?: string;
+  /** A correction's reason. */
+  reason?: string;
   /** What the line billed when the notice went out. */
   tax: number;
 }
 
-export interface NoticeMail {
+export interface LateNoticeMail {
   /** Mails the book recorded for it. */
   sent: number;
   lastAt?: string;
@@ -37,33 +52,37 @@ export interface NoticeMail {
 }
 
 /** The names a guest's notice page prints: a guest cannot look a structure's name up (#4066). */
-export interface NoticeNames {
+export interface LateNoticeNames {
   corporationName?: string;
   minerName?: string;
   refineryNames?: Record<string, string>;
 }
 
-export interface Notice {
+export interface LateNotice {
   id: string;
   minerId: string;
   /** The Miner's characters when it went out: whose own lines it is. */
   characterIds: number[];
-  kind: NoticeKind;
+  kind: LateNoticeKind;
   issuedAt: string;
   /** The Character whose tab issued it. */
   issuedBy?: number;
-  /** The Reason code the mail printed: a donation carrying it is this Miner's. */
-  code: string;
+  /** The Reason code the mail printed, when it printed one: a donation carrying it is this Miner's. */
+  code?: string;
+  /** The book's trade hub and Ore Form its lines were priced at (D11). */
+  pricing?: { hubId: string; oreForm: 'compressed' | 'raw' };
+  /** Who may read it (`char:<id>`): the Miner's characters and anyone claiming them. */
+  uids: string[];
   /** The new days it asked for, oldest first. */
-  lines: NoticeLine[];
+  lines: LateNoticeLine[];
   /** What its lines billed when it went out (Σ line tax). */
   listed: number;
-  mail: NoticeMail;
-  names?: NoticeNames;
+  mail: LateNoticeMail;
+  names?: LateNoticeNames;
 }
 
 /** What a notice's days stand at, read off the Miner's account. */
-export interface NoticeStanding {
+export interface LateNoticeStanding {
   /** What its days still bill, less what open disputes hold. */
   due: number;
   /** What open disputes hold of its days; absent when nothing is held. */
@@ -76,8 +95,8 @@ export interface NoticeStanding {
   settled: boolean;
 }
 
-/** The part of one account day `noticeStanding` reads (`DaySettlement` on the client). */
-export interface NoticeDayState {
+/** The part of one account day `lateNoticeStanding` reads (`DaySettlement` on the client). */
+export interface LateNoticeDayState {
   tax: number;
   held: boolean;
   credited: number;
@@ -90,8 +109,32 @@ export interface NoticeDayState {
 /** The id a closing account's last notice is stored under (`closeAccount`). */
 const FINAL_PREFIX = 'final_';
 
+/** A notice id made safe for a Firestore doc id: a Miner id may carry any character. */
+export function noticeDocId(id: string): string {
+  return id.replace(/[^A-Za-z0-9_:-]/g, '_');
+}
+
+/** The id of the final notice closing `minerId`'s account sends. */
+export function finalNoticeId(minerId: string): string {
+  return noticeDocId(`${FINAL_PREFIX}${minerId}`);
+}
+
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
 const num = (v: unknown): number | undefined => (isFiniteNumber(v) ? v : undefined);
+/** A stored `{ key: string }` map, or undefined when there is none. */
+function stringRecord(v: unknown): Record<string, string> | undefined {
+  if (!isRecord(v)) return undefined;
+  return Object.fromEntries(
+    Object.entries(v).filter((e): e is [string, string] => typeof e[1] === 'string')
+  );
+}
+/** A stored `{ typeId: number }` map, or undefined when there is none. */
+function numberRecord(v: unknown): Record<number, number> | undefined {
+  if (!isRecord(v)) return undefined;
+  return Object.fromEntries(
+    Object.entries(v).filter((e): e is [string, number] => isFiniteNumber(e[1]))
+  );
+}
 
 /** The key a stored line names: its day charge, else its Adjustment, else its date. */
 export function lineKey(line: { chargeKey?: string; adjustmentId?: string; date: string }): string {
@@ -102,40 +145,46 @@ export function lineKey(line: { chargeKey?: string; adjustmentId?: string; date:
  * Reads a `statements` doc that holds a late notice. Undefined for anything else: a calendar
  * Statement is not a notice, and production holds none.
  */
-export function noticeFromStatementDoc(raw: Record<string, unknown>): Notice | undefined {
+export function lateNoticeFromStatementDoc(raw: Record<string, unknown>): LateNotice | undefined {
   if (raw.kind !== 'notice') return undefined;
   const id = str(raw.id) ?? '';
-  const lines: NoticeLine[] = (Array.isArray(raw.lines) ? raw.lines : [])
+  const lines: LateNoticeLine[] = (Array.isArray(raw.lines) ? raw.lines : [])
     .filter(isRecord)
-    .flatMap((l) => {
+    .flatMap((l): LateNoticeLine[] => {
       const date = str(l.date);
       if (!date) return [];
-      const characterId = num(l.characterId);
-      const structureId = num(l.structureId);
+      const kind: LateNoticeLineKind =
+        l.kind === 'late-ore' || l.kind === 'correction' ? l.kind : 'mined';
+      const opt = <K extends string, V>(key: K, value: V | undefined) =>
+        (value === undefined ? {} : { [key]: value }) as Partial<Record<K, V>>;
       return [
         {
+          kind,
           date,
           key: lineKey({ chargeKey: str(l.chargeKey), adjustmentId: str(l.adjustmentId), date }),
-          ...(characterId !== undefined ? { characterId } : {}),
-          ...(structureId !== undefined ? { structureId } : {}),
+          ...opt('characterId', num(l.characterId)),
+          ...opt('structureId', num(l.structureId)),
+          oreLines: (Array.isArray(l.oreLines) ? l.oreLines : []).filter(isRecord).flatMap((o) => {
+            const typeId = num(o.typeId);
+            const quantity = num(o.quantity);
+            return typeId !== undefined && quantity !== undefined ? [{ typeId, quantity }] : [];
+          }),
+          ...opt('unitPrices', numberRecord(l.unitPrices)),
+          ...opt('priceSources', stringRecord(l.priceSources)),
+          estimatedValue: num(l.estimatedValue) ?? 0,
+          ...opt('taxPct', num(l.taxPct)),
+          ...opt('rateEffectiveFrom', str(l.rateEffectiveFrom)),
+          ...opt('reason', str(l.reason)),
           tax: num(l.tax) ?? 0,
         },
       ];
     });
   const lastAt = str(raw.lastMailedAt);
   const issuedBy = num(raw.issuedBy);
-  const names: NoticeNames = {
+  const names: LateNoticeNames = {
     ...(str(raw.minerName) ? { minerName: str(raw.minerName) } : {}),
     ...(str(raw.corporationName) ? { corporationName: str(raw.corporationName) } : {}),
-    ...(isRecord(raw.refineryNames)
-      ? {
-          refineryNames: Object.fromEntries(
-            Object.entries(raw.refineryNames).filter(
-              (e): e is [string, string] => typeof e[1] === 'string'
-            )
-          ),
-        }
-      : {}),
+    ...(stringRecord(raw.refineryNames) ? { refineryNames: stringRecord(raw.refineryNames) } : {}),
   };
   return {
     id,
@@ -144,7 +193,14 @@ export function noticeFromStatementDoc(raw: Record<string, unknown>): Notice | u
     kind: id.startsWith(FINAL_PREFIX) ? 'final' : 'late',
     issuedAt: str(raw.issuedAt) ?? '',
     ...(issuedBy !== undefined ? { issuedBy } : {}),
-    code: str(raw.code) ?? '',
+    // An empty code would match every donation's reason: no code is printed instead.
+    ...(str(raw.code) ? { code: str(raw.code) } : {}),
+    ...(typeof raw.hubId === 'string' && (raw.oreForm === 'compressed' || raw.oreForm === 'raw')
+      ? { pricing: { hubId: raw.hubId, oreForm: raw.oreForm } }
+      : {}),
+    uids: (Array.isArray(raw.uids) ? raw.uids : []).filter(
+      (u): u is string => typeof u === 'string'
+    ),
     lines,
     listed: lines.reduce((sum, l) => sum + l.tax, 0),
     mail: {
@@ -158,7 +214,9 @@ export function noticeFromStatementDoc(raw: Record<string, unknown>): Notice | u
 }
 
 /** Every line key any of these notices listed. */
-export function listedKeys(notices: readonly Pick<Notice, 'lines'>[]): Set<string> {
+export function listedKeys(
+  notices: readonly { lines: readonly Pick<LateNoticeLine, 'key'>[] }[]
+): Set<string> {
   const out = new Set<string>();
   for (const n of notices) for (const l of n.lines) out.add(l.key);
   return out;
@@ -169,10 +227,10 @@ export function listedKeys(notices: readonly Pick<Notice, 'lines'>[]): Set<strin
  * day's tax its lines named (a day can grow after the notice went out); a held day is left out
  * of what is due, and a day that no longer bills anything reads as paid.
  */
-export function noticeStanding(
-  notice: Pick<Notice, 'lines'>,
-  byDay: ReadonlyMap<string, NoticeDayState>
-): NoticeStanding {
+export function lateNoticeStanding(
+  notice: { lines: readonly Pick<LateNoticeLine, 'date' | 'tax'>[] },
+  byDay: ReadonlyMap<string, LateNoticeDayState>
+): LateNoticeStanding {
   const byDate = new Map<string, number>();
   for (const l of notice.lines) byDate.set(l.date, (byDate.get(l.date) ?? 0) + l.tax);
   const out = { due: 0, held: 0, credited: 0, forgiven: 0, writtenOff: 0, remaining: 0 };
@@ -201,12 +259,17 @@ export function noticeStanding(
   return { ...rest, ...(held > 0 ? { held } : {}), settled };
 }
 
+/** A short Reason code, `MT` and six characters, hashed from `seed` (FNV-1a). */
+export function paymentCode(seed: string): string {
+  let h = 2166136261;
+  for (const ch of seed) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
+  return `MT${h.toString(36).toUpperCase().padStart(7, '0').slice(-6)}`;
+}
+
 /**
  * The Reason code a Miner puts on a donation: one per Miner, since money pays their oldest day
- * whatever it names. The same hash and `MT` format as the codes notices already printed.
+ * whatever it names. Codes printed on notices already mailed were `paymentCode(notice id)`.
  */
 export function minerPaymentCode(minerId: string): string {
-  let h = 2166136261;
-  for (const ch of `miner:${minerId}`) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
-  return `MT${h.toString(36).toUpperCase().padStart(7, '0').slice(-6)}`;
+  return paymentCode(`miner:${minerId}`);
 }

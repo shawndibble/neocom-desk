@@ -11,9 +11,15 @@
  * `carried`. On this client a notice's days stay running days (`buildBookView`): money pays the
  * Miner's oldest day whatever code it carries, and a notice is settled once its days are.
  */
-import { newest, paymentCode, type BookView } from './bookView';
+import { newest, type BookView } from './bookView';
+import {
+  lineKey,
+  listedKeys,
+  noticeDocId,
+  paymentCode,
+} from '../../../functions/src/corpTaxBookLateNotice';
 import type { NoticeRules } from './notices';
-import { daysBetween, type Statement, type StatementLine } from './statements';
+import { daysBetween, type Statement } from './statements';
 import { utcDay } from '@/engine/localDay';
 
 export interface NoticePlan {
@@ -35,10 +41,6 @@ export interface OwedDay {
   /** A Statement from before the switch-over, owed as one: its first day stands for it. */
   statementId?: string;
 }
-
-const safeId = (id: string) => id.replace(/[^A-Za-z0-9_:-]/g, '_');
-const lineKey = (l: Pick<StatementLine, 'chargeKey' | 'adjustmentId' | 'date'>) =>
-  l.chargeKey ?? `adjustment:${l.adjustmentId ?? l.date}`;
 
 /** Every day a Miner owes, oldest first: running days by place, then any unpaid older Statement. */
 export function owedDays(view: BookView, minerId: string): OwedDay[] {
@@ -86,9 +88,11 @@ export function draftNotice(
   if (!inner || !row || !running || !owes) return undefined;
   const now = opts.now ?? view.input.now;
 
-  const listed = new Set<string>();
-  for (const s of inner.statements)
-    if (s.kind === 'notice') for (const l of s.lines) listed.add(lineKey(l));
+  const listed = listedKeys(
+    inner.statements
+      .filter((s) => s.kind === 'notice')
+      .map((s) => ({ lines: s.lines.map((l) => ({ key: lineKey(l) })) }))
+  );
   const draftLines = inner.draft.kind === 'nothing' ? [] : inner.draft.lines;
   const lines = draftLines.filter((l) => {
     const day = running.byDay.get(l.date);
@@ -107,7 +111,7 @@ export function draftNotice(
   const owing = owedDays(view, minerId);
   const first = lines[0]?.date ?? owes.oldest;
   const last = lines.at(-1)?.date ?? owing.at(-1)?.date ?? first;
-  const id = safeId(opts.id ?? `notice_${first}_${minerId}_${now.slice(0, 10)}`);
+  const id = noticeDocId(opts.id ?? `notice_${first}_${minerId}_${now.slice(0, 10)}`);
   return {
     minerId,
     statement: {

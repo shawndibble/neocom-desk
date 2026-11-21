@@ -2,7 +2,7 @@
  * A Miner's account (#6294, decisions 20261117-033049 and 20261117-060555): the one record of what
  * a Miner owes. Every closed day is billed as it closes, and the Miner's money pays the oldest
  * unpaid day first, by amount (a donation cannot name a day or a moon). Credit is only money
- * ahead of every billed day. Late notices only say what was asked (`notice.ts`): they take no
+ * ahead of every billed day. Late notices only say what was asked (`LateNotice`): they take no
  * money and settle nothing.
  *
  * A day a payment reaches is paid when the money falls short of its tax by no more than the
@@ -13,6 +13,11 @@
  * paid even when money is later taken back (D22), and takes no more money. Days are settled a
  * date at a time: what one date's lines owe together.
  */
+import {
+  lateNoticeStanding,
+  type LateNoticeLine,
+  type LateNoticeStanding,
+} from '../../../functions/src/corpTaxBookLateNotice';
 import { countedPayments, paymentNet, SETTLE_TOLERANCE_PCT, type TaxPayment } from './allocation';
 
 /** The default per-day tolerance, in percent of the day's tax. */
@@ -53,21 +58,19 @@ export interface DayAmount {
 }
 
 /** An officer's write-off: the corporation forgave this much of what the Miner owes. */
-export interface AccountWriteOff {
+export interface RunningAccountWriteOff {
   id: string;
   amount: number;
-  /** ISO instant it was recorded. */
-  at: string;
 }
 
 /** Everything one Miner's account is built from. */
-export interface AccountInput {
+export interface MinerRunningAccountInput {
   /** The Miner's closed days, in any order; several entries for a date add up. */
   days: readonly RunningDay[];
   /** The Miner's Tax Payments. */
   payments: readonly TaxPayment[];
   /** Officer write-offs not reversed. They apply after every payment; a leftover is dropped. */
-  writeOffs?: readonly AccountWriteOff[];
+  writeOffs?: readonly RunningAccountWriteOff[];
   /** The book's start date: a donation dated before it credits nothing. Hand-recorded payments always count. */
   startDate?: string;
   /** Dates an open dispute holds. */
@@ -84,7 +87,7 @@ export interface AccountInput {
 }
 
 /** Where one Tax Payment's money went: `days` and `credit` add up to the payment's tax. */
-export interface AccountPayment {
+export interface RunningAccountPayment {
   paymentId: string;
   /** The days it paid, oldest first; a payment never pays a held day. */
   days: DayAmount[];
@@ -92,29 +95,86 @@ export interface AccountPayment {
   credit: number;
 }
 
-/** A Miner's account: what every screen, notice and total reads. */
-export interface MinerAccount {
-  byDay: Map<string, DaySettlement>;
-  /** The same money as `byDay.credited`, split by where it came from. Money a tolerance wrote off is no payment's. */
-  applications: {
-    /** Every counted payment that carried tax, oldest first. */
-    payments: AccountPayment[];
-    /** Credit that came from a negative day. */
-    corrections: DayAmount[];
-    /** What officer write-offs forgave, by day. */
-    writeOffs: DayAmount[];
-  };
-  /** Money ahead of every billed day. */
-  credit: number;
-  /** Everything billed less everything paid, forgiven or written off; negative is credit. */
-  balance: number;
-  /**
-   * The newest day with nothing owed on or before it (days an open dispute holds neither stop nor
-   * advance it), never before the stored one; null while no day is paid yet.
-   */
-  paidThrough: string | null;
-  /** What is owed now: the amount, how many dates it covers, the oldest. */
-  owes: { amount: number; days: number; oldest: string } | null;
+/** What became of each kind of money. Money a tolerance wrote off is no payment's. */
+export interface RunningAccountApplications {
+  /** Every counted payment that carried tax, oldest first. */
+  payments: RunningAccountPayment[];
+  /** Credit that came from a negative day. */
+  corrections: DayAmount[];
+  /** What officer write-offs forgave, by day. */
+  writeOffs: DayAmount[];
+}
+
+/** What is owed now: the amount, how many dates it covers, the oldest. */
+export interface RunningAccountOwes {
+  amount: number;
+  days: number;
+  oldest: string;
+}
+
+/**
+ * A Miner's Running account: what every screen, late notice and total reads for what a Miner
+ * owes. Built from plain data (`build`) and never stored: the book stores only its inputs, and
+ * what it records of an account (paid through, the figures a pay page was told) is plain JSON.
+ */
+export class MinerRunningAccount {
+  private constructor(
+    /** What became of each closed day. */
+    readonly byDay: ReadonlyMap<string, DaySettlement>,
+    /** The same money as `byDay`'s `credited`, split by where it came from. */
+    readonly applications: RunningAccountApplications,
+    /** Money ahead of every billed day. */
+    readonly credit: number,
+    /** Everything billed less everything paid, forgiven or written off; negative is credit. */
+    readonly balance: number,
+    /**
+     * The newest day with nothing owed on or before it (days an open dispute holds neither stop
+     * nor advance it), never before the stored one; null while no day is paid yet.
+     */
+    readonly paidThrough: string | null,
+    readonly owes: RunningAccountOwes | null
+  ) {}
+
+  static build(input: MinerRunningAccountInput): MinerRunningAccount {
+    const counted = countedPayments(input.payments, input.startDate);
+    const paid = counted.reduce((sum, p) => sum + paymentNet(p), 0);
+    const settled = settleDays(input, {
+      extraCorrections: 0,
+      paymentPool: paid,
+      payments: counted
+        .filter((p) => paymentNet(p) > 0)
+        .map((p) => ({ paymentId: p.id, left: paymentNet(p) })),
+      writeOffPool: (input.writeOffs ?? []).reduce((sum, w) => sum + Math.max(0, w.amount), 0),
+    });
+    return new MinerRunningAccount(
+      settled.byDay,
+      settled.applications,
+      settled.credit,
+      settled.balanceBeforePayments - paid,
+      settled.paidThrough,
+      settled.owes
+    );
+  }
+
+  /** What became of one closed day; undefined for a day the account does not bill. */
+  day(date: string): DaySettlement | undefined {
+    return this.byDay.get(date);
+  }
+
+  /** The dates still owed, oldest first: neither settled nor held by an open dispute. */
+  owedDates(): string[] {
+    return [...this.byDay]
+      .filter(([, d]) => !d.settled && !d.held)
+      .map(([date]) => date)
+      .sort();
+  }
+
+  /** Where a late notice's days stand on this account. */
+  standingOf(notice: {
+    lines: readonly Pick<LateNoticeLine, 'date' | 'tax'>[];
+  }): LateNoticeStanding {
+    return lateNoticeStanding(notice, this.byDay);
+  }
 }
 
 /** The running days a Miner's unbilled lines make: one per date, oldest first. */
@@ -122,7 +182,8 @@ export function runningDaysFromLines(
   lines: readonly {
     date: string;
     tax: number;
-    kind?: 'mined' | 'late-ore' | 'correction';
+    /** A `correction` line's positive tax is an officer's charge. */
+    kind?: string;
     charge?: number;
   }[]
 ): RunningDay[] {
@@ -138,27 +199,6 @@ export function runningDaysFromLines(
     .map(([date, v]) => ({ date, tax: v.tax, ...(v.charge > 0 ? { charge: v.charge } : {}) }));
 }
 
-export function buildAccount(input: AccountInput): MinerAccount {
-  const counted = countedPayments(input.payments, input.startDate);
-  const paid = counted.reduce((sum, p) => sum + paymentNet(p), 0);
-  const settled = settleDays(input, {
-    extraCorrections: 0,
-    paymentPool: paid,
-    payments: counted
-      .filter((p) => paymentNet(p) > 0)
-      .map((p) => ({ paymentId: p.id, left: paymentNet(p) })),
-    writeOffPool: (input.writeOffs ?? []).reduce((sum, w) => sum + Math.max(0, w.amount), 0),
-  });
-  return {
-    byDay: settled.byDay,
-    applications: settled.applications,
-    credit: settled.credit,
-    balance: settled.balance - paid,
-    paidThrough: settled.paidThrough,
-    owes: settled.owes,
-  };
-}
-
 /** The money `settleDays` spreads over the days, oldest day first. */
 export interface DayPools {
   /** Credit from outside the days that is not a payment: it pays days without the tolerance. */
@@ -169,6 +209,23 @@ export interface DayPools {
   payments: readonly { paymentId: string; left: number }[];
   /** What officer write-offs may forgive, after every payment; a leftover is dropped. */
   writeOffPool: number;
+}
+
+/** The part of the input that says how days settle; the money comes in `DayPools`. */
+export type DaysInput = Pick<
+  MinerRunningAccountInput,
+  'days' | 'heldDays' | 'storedPaidThrough' | 'dayTolerancePct' | 'toleranceExemptions'
+>;
+
+/** What `settleDays` makes of the days, before the caller takes the payments off the balance. */
+export interface SettledDays {
+  byDay: Map<string, DaySettlement>;
+  applications: RunningAccountApplications;
+  credit: number;
+  /** Billed less what corrections, write-offs and the tolerance took: no payment is off it yet. */
+  balanceBeforePayments: number;
+  paidThrough: string | null;
+  owes: RunningAccountOwes | null;
 }
 
 type Running = {
@@ -184,11 +241,10 @@ type Running = {
 
 /**
  * Settles the days from the given pools: corrections first, then payments, then officer
- * write-offs. Its `balance` is billed less what corrections, write-offs and the tolerance took,
- * before any payment: the caller takes the payments off. Shared by `buildAccount` and the legacy
- * `allocateRunningAccount` until the calendar Statement code is removed.
+ * write-offs. Shared by `MinerRunningAccount.build` and the legacy `allocateRunningAccount` until
+ * the calendar Statement code is removed.
  */
-export function settleDays(input: AccountInput, pools: DayPools): MinerAccount {
+export function settleDays(input: DaysInput, pools: DayPools): SettledDays {
   const pct = input.dayTolerancePct ?? DAY_SETTLE_TOLERANCE_PCT;
   const held = input.heldDays ?? new Set<string>();
   const stored = input.storedPaidThrough;
@@ -323,7 +379,7 @@ export function settleDays(input: AccountInput, pools: DayPools): MinerAccount {
       writeOffs: forgivenDays,
     },
     credit,
-    balance: billed - corrections - forgivenTotal - writtenOffTotal,
+    balanceBeforePayments: billed - corrections - forgivenTotal - writtenOffTotal,
     paidThrough,
     owes: owedAmount > 0 && oldest ? { amount: owedAmount, days: owedDates.size, oldest } : null,
   };

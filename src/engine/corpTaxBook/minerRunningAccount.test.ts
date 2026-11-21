@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { buildAccount, type AccountInput, type RunningDay } from './account';
+import {
+  MinerRunningAccount,
+  type MinerRunningAccountInput,
+  type RunningDay,
+} from './minerRunningAccount';
 import { allocateRunningAccount } from './runningAccount';
 import type { TaxPayment } from './allocation';
 
@@ -7,9 +11,9 @@ const day = (date: string, tax: number): RunningDay => ({ date, tax });
 const payment = (id: string, amount: number, at: string, extra: Partial<TaxPayment> = {}) =>
   ({ id, minerId: 'm1', characterId: 90000001, amount, at, source: 'donation', ...extra }) as const;
 
-describe('buildAccount', () => {
+describe('MinerRunningAccount.build', () => {
   it('pays the oldest day first and carries the rest as credit', () => {
-    const account = buildAccount({
+    const account = MinerRunningAccount.build({
       days: [day('2026-11-02', 2_000_000), day('2026-11-01', 1_000_000)],
       payments: [payment('p1', 4_000_000, '2026-11-03T10:00:00Z')],
     });
@@ -32,7 +36,7 @@ describe('buildAccount', () => {
   });
 
   it('owes the unpaid days, from the oldest', () => {
-    const account = buildAccount({
+    const account = MinerRunningAccount.build({
       days: [day('2026-11-01', 1_000_000), day('2026-11-02', 2_000_000), day('2026-11-03', 3e6)],
       payments: [payment('p1', 1_500_000, '2026-11-04T10:00:00Z')],
     });
@@ -41,7 +45,7 @@ describe('buildAccount', () => {
   });
 
   it('ignores a donation from before the book, but not a hand-recorded payment', () => {
-    const account = buildAccount({
+    const account = MinerRunningAccount.build({
       days: [day('2026-11-01', 1_000_000)],
       payments: [
         payment('early', 1_000_000, '2026-10-30T10:00:00Z'),
@@ -52,11 +56,46 @@ describe('buildAccount', () => {
     expect(account.owes?.amount).toBe(600_000);
   });
 
+  it('lists the dates still owed oldest first, leaving out a day a dispute holds', () => {
+    const account = MinerRunningAccount.build({
+      days: [day('2026-11-03', 3e6), day('2026-11-01', 1e6), day('2026-11-02', 2e6)],
+      payments: [],
+      heldDays: new Set(['2026-11-02']),
+    });
+    expect(account.owedDates()).toEqual(['2026-11-01', '2026-11-03']);
+    expect(account.day('2026-11-02')?.held).toBe(true);
+    expect(account.day('2026-11-09')).toBeUndefined();
+  });
+
+  it('reads a late notice’s standing off its days', () => {
+    const account = MinerRunningAccount.build({
+      days: [day('2026-11-01', 1e6), day('2026-11-02', 2e6)],
+      payments: [payment('p1', 1e6, '2026-11-03T10:00:00Z')],
+    });
+    const notice = {
+      lines: [
+        { date: '2026-11-01', key: 'c1', tax: 1e6 },
+        { date: '2026-11-02', key: 'c2', tax: 2e6 },
+      ],
+    };
+    expect(account.standingOf(notice)).toMatchObject({ due: 3e6, remaining: 2e6, settled: false });
+  });
+
+  it('forgives with every write-off, oldest day first: a late notice is no bill to pin one to', () => {
+    // The legacy pass dropped a write-off naming a notice; decision 20261120-235011.
+    const account = MinerRunningAccount.build({
+      days: [day('2026-11-01', 1e6), day('2026-11-02', 1e6)],
+      payments: [],
+      writeOffs: [{ id: 'w1', amount: 1e6 }],
+    });
+    expect(account.owes).toEqual({ amount: 1e6, days: 1, oldest: '2026-11-02' });
+  });
+
   it('applies officer write-offs after every payment, and drops what they find nothing to forgive', () => {
-    const account = buildAccount({
+    const account = MinerRunningAccount.build({
       days: [day('2026-11-01', 1_000_000), day('2026-11-02', 1_000_000)],
       payments: [payment('p1', 1_000_000, '2026-11-03T10:00:00Z')],
-      writeOffs: [{ id: 'w1', amount: 5_000_000, at: '2026-11-03T09:00:00Z' }],
+      writeOffs: [{ id: 'w1', amount: 5_000_000 }],
     });
     expect(account.applications.writeOffs).toEqual([{ date: '2026-11-02', amount: 1_000_000 }]);
     expect(account.owes).toBeNull();
@@ -80,12 +119,15 @@ function rng(seed: number) {
   };
 }
 
-function randomInput(seed: number): AccountInput {
+function randomInput(seed: number): MinerRunningAccountInput {
   const r = rng(seed);
   const date = (n: number) => `2026-11-${String(n).padStart(2, '0')}`;
-  const days = Array.from({ length: r.int(0, 8) }, () =>
-    day(date(r.int(1, 20)), r.pick([-500_000, 0, 90_000, 1_000_000, 2_345_678, 10_000_000]))
-  );
+  const days = Array.from({ length: r.int(0, 8) }, (): RunningDay => {
+    const tax = r.pick([-500_000, 0, 90_000, 1_000_000, 2_345_678, 10_000_000]);
+    // An officer's charge on the day (a positive correction line), which a recorded-paid day keeps owed.
+    const charge = tax > 0 && r.next() < 0.3 ? r.pick([50_000, tax]) : undefined;
+    return { ...day(date(r.int(1, 20)), tax), ...(charge !== undefined ? { charge } : {}) };
+  });
   const payments = Array.from({ length: r.int(0, 5) }, (_, i) =>
     payment(
       `p${i}`,
@@ -93,6 +135,8 @@ function randomInput(seed: number): AccountInput {
       `${date(r.int(1, 25))}T0${i}:00:00Z`,
       {
         source: r.pick(['donation', 'manual'] as const),
+        // A code pins a donation to a mailed notice; with no Statement to settle it pays days alike.
+        ...(r.next() < 0.3 ? { statementId: 'notice_x' } : {}),
         ...(r.next() < 0.3 ? { notTaxAmount: r.pick([1, 500_000, 50_000_000]) } : {}),
       }
     )
@@ -100,7 +144,6 @@ function randomInput(seed: number): AccountInput {
   const writeOffs = Array.from({ length: r.int(0, 2) }, (_, i) => ({
     id: `w${i}`,
     amount: r.pick([1_000, 500_000, 4_000_000]),
-    at: `${date(r.int(1, 25))}T12:00:00Z`,
   }));
   const dates = [...new Set(days.map((d) => d.date))];
   return {
@@ -108,8 +151,11 @@ function randomInput(seed: number): AccountInput {
     payments,
     writeOffs,
     ...(r.next() < 0.5 ? { startDate: date(r.int(1, 10)) } : {}),
-    ...(r.next() < 0.3 && dates.length > 0 ? { heldDays: new Set([r.pick(dates)]) } : {}),
-    ...(r.next() < 0.3 && dates.length > 0 ? { storedPaidThrough: r.pick(dates) } : {}),
+    ...(r.next() < 0.3 && dates.length > 0
+      ? { heldDays: new Set(dates.filter(() => r.next() < 0.5)) }
+      : {}),
+    // Any date: on a day, between days, before or after them all.
+    ...(r.next() < 0.3 ? { storedPaidThrough: date(r.int(1, 22)) } : {}),
     ...(r.next() < 0.3 ? { dayTolerancePct: r.pick([0, 0.5, 2]) } : {}),
     ...(r.next() < 0.2 && dates.length > 0
       ? { toleranceExemptions: new Map([[r.pick(dates), r.pick([0, 10_000])]]) }
@@ -117,8 +163,9 @@ function randomInput(seed: number): AccountInput {
   };
 }
 
-describe('buildAccount matches the running account it replaces', () => {
-  // Production holds no calendar Statements: every Miner's account is running days only.
+describe('MinerRunningAccount.build is wired as allocateRunningAccount with no Statements', () => {
+  // Both run the same day-settling core (`settleDays`); this pins the money each feeds it. Production
+  // holds no calendar Statement, so the legacy pass in `allocateRunningAccount` must find nothing.
   it('on 500 random books with no Statements', () => {
     for (let seed = 1; seed <= 500; seed += 1) {
       const input = randomInput(seed);
@@ -126,9 +173,9 @@ describe('buildAccount matches the running account it replaces', () => {
         ...input,
         statements: [],
         dismissalCredits: [],
-        officerWriteOffs: input.writeOffs,
+        officerWriteOffs: input.writeOffs?.map((w) => ({ ...w, at: '2026-11-01T00:00:00Z' })),
       });
-      const after = buildAccount(input);
+      const after = MinerRunningAccount.build(input);
       const context = `seed ${seed}`;
       expect(after.byDay, context).toEqual(before.byDay);
       expect(after.credit, context).toBeCloseTo(before.credit, 6);

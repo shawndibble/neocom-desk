@@ -21,11 +21,11 @@ import {
 } from './allocation';
 import {
   settleDays,
-  type AccountInput,
+  type MinerRunningAccountInput,
   type DayAmount,
   type DaySettlement,
   type RunningDay,
-} from './account';
+} from './minerRunningAccount';
 
 export {
   DAY_SETTLE_TOLERANCE_PCT,
@@ -34,10 +34,10 @@ export {
   type DayAmount,
   type DaySettlement,
   type RunningDay,
-} from './account';
+} from './minerRunningAccount';
 
 export interface RunningAccountInput
-  extends AllocationInput, Omit<AccountInput, 'payments' | 'startDate' | 'writeOffs'> {}
+  extends AllocationInput, Omit<MinerRunningAccountInput, 'payments' | 'startDate' | 'writeOffs'> {}
 
 /**
  * Where one Tax Payment's money went. `statements`, `days` and `credit` add up to the payment's
@@ -84,7 +84,7 @@ export interface RunningAccount {
 
 /**
  * The running account with calendar Statements paid first (`allocatePayments`). Production holds
- * no calendar Statement, so this is `buildAccount` (`account.ts`) plus a pass that finds nothing;
+ * no calendar Statement, so this is `MinerRunningAccount.build` (`minerRunningAccount.ts`) plus a pass that finds nothing;
  * it goes when the calendar Statement code does.
  */
 export function allocateRunningAccount(input: RunningAccountInput): RunningAccount {
@@ -111,7 +111,7 @@ export function allocateRunningAccount(input: RunningAccountInput): RunningAccou
     .filter((w) => !w.statementId)
     .reduce((sum, w) => sum + Math.max(0, w.amount - (usedByWriteOff.get(w.id) ?? 0)), 0);
 
-  const days = settleDays(input, {
+  const settled = settleDays(input, {
     extraCorrections: legacyNonPayment,
     paymentPool: legacy.credit - legacyNonPayment,
     payments: counted.map((p) => ({
@@ -122,7 +122,7 @@ export function allocateRunningAccount(input: RunningAccountInput): RunningAccou
   });
 
   const owedDates = new Set<string>();
-  for (const [date, d] of days.byDay) if (!d.settled && !d.held) owedDates.add(date);
+  for (const [date, d] of settled.byDay) if (!d.settled && !d.held) owedDates.add(date);
   let legacyOwed = 0;
   for (const s of input.statements) {
     const st = legacy.byStatement.get(s.id);
@@ -131,23 +131,23 @@ export function allocateRunningAccount(input: RunningAccountInput): RunningAccou
     const dates = s.lines.filter((l) => l.tax > 0).map((l) => l.date);
     for (const date of dates.length > 0 ? dates : [s.coversFrom]) owedDates.add(date);
   }
-  const amount = legacyOwed + (days.owes?.amount ?? 0);
+  const amount = legacyOwed + (settled.owes?.amount ?? 0);
   const oldest = [...owedDates].sort()[0];
   return {
     legacy,
-    byDay: days.byDay,
+    byDay: settled.byDay,
     applications: {
-      ...days.applications,
-      payments: days.applications.payments.map((p) => ({
+      ...settled.applications,
+      payments: settled.applications.payments.map((p) => ({
         paymentId: p.paymentId,
         statements: statementsOf(p.paymentId),
         days: p.days,
         credit: p.credit,
       })),
     },
-    credit: days.credit,
-    balance: legacy.balance + days.balance,
-    paidThrough: legacyOwed > 0 ? null : days.paidThrough,
+    credit: settled.credit,
+    balance: legacy.balance + settled.balanceBeforePayments,
+    paidThrough: legacyOwed > 0 ? null : settled.paidThrough,
     owes: amount > 0 && oldest ? { amount, days: owedDates.size, oldest } : null,
   };
 }

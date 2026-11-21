@@ -60,6 +60,7 @@ import {
   runningDaysFromLines,
   type RunningAccount,
 } from './runningAccount';
+import { lateNoticeStanding, paymentCode } from '../../../functions/src/corpTaxBookLateNotice';
 import { exemptionsOf, type ToleranceExemption } from './toleranceExemptions';
 import { settleOpenSet, type OpenSet, type OpenSetInput } from './openSet';
 
@@ -303,32 +304,8 @@ export function noticeSettlement(
   notice: Pick<Statement, 'lines'>,
   running: Pick<RunningAccount, 'byDay'>
 ): StatementSettlement {
-  const byDate = new Map<string, number>();
-  for (const l of notice.lines) byDate.set(l.date, (byDate.get(l.date) ?? 0) + l.tax);
-  const out = { amount: 0, held: 0, credited: 0, forgiven: 0, writtenOff: 0, remaining: 0 };
-  let settled = true;
-  for (const [date, tax] of byDate) {
-    if (tax <= 0) continue;
-    const day = running.byDay.get(date);
-    if (!day || day.tax <= 0) {
-      out.amount += tax;
-      out.credited += tax;
-      continue;
-    }
-    const share = Math.min(1, tax / day.tax);
-    if (day.held) {
-      out.held += tax;
-      continue;
-    }
-    out.amount += tax;
-    out.credited += day.credited * share;
-    out.forgiven += day.forgiven * share;
-    out.writtenOff += day.writtenOff * share;
-    out.remaining += day.remaining * share;
-    if (!day.settled) settled = false;
-  }
-  const { held, ...rest } = out;
-  return { ...rest, ...(held > 0 ? { held } : {}), settled };
+  const { due, ...standing } = lateNoticeStanding(notice, running.byDay);
+  return { amount: due, ...standing };
 }
 
 /**
@@ -1166,12 +1143,8 @@ export function duePeriods(view: BookView): StatementPeriod[] {
   return planStatementRuns(view).map((run) => run.plan.period);
 }
 
-/** A short code the miner can put in a donation's reason to pin it to a Statement (D15). */
-export function paymentCode(statementId: string): string {
-  let h = 2166136261;
-  for (const ch of statementId) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
-  return `MT${h.toString(36).toUpperCase().padStart(7, '0').slice(-6)}`;
-}
+/** A short code the miner can put in a donation's reason (D15); the rule lives once, shared. */
+export { paymentCode };
 
 /** Freezes one run line into the Statement document the `issueStatement` edit stores. */
 export function statementForLine(

@@ -10,6 +10,7 @@ import { shiftDate } from '../miningTax/yieldRange';
 import type { Miner } from './charges';
 import type { BookView } from './bookView';
 import { paymentCode } from './bookView';
+import { finalNoticeId } from '../../../functions/src/corpTaxBookLateNotice';
 import { draftNotice } from './lateNotices';
 import { issueStatement, type Statement } from './statements';
 
@@ -62,7 +63,7 @@ export function planCloseAccount(view: BookView, minerId: string): ClosePlan | u
   if (view.input.runningAccountFrom) {
     // A running account owes its days already (#6294): the final bill is a late notice of the
     // unpaid days no notice listed, and it changes neither what is owed nor the credit.
-    const notice = draftNotice(view, minerId, { id: `final_${minerId}` });
+    const notice = draftNotice(view, minerId, { id: finalNoticeId(minerId) });
     return {
       ...base,
       ...(notice && notice.statement.lines.length > 0 ? { statement: notice.statement } : {}),
@@ -73,7 +74,7 @@ export function planCloseAccount(view: BookView, minerId: string): ClosePlan | u
   if (draft.kind !== 'statement') {
     return { ...base, owedAfter: row.owed, creditAfter: row.credit };
   }
-  const id = `final_${minerId}`.replace(/[^A-Za-z0-9_:-]/g, '_');
+  const id = finalNoticeId(minerId);
   const statement = issueStatement(draft, {
     id,
     code: paymentCode(id),
