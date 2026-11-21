@@ -32,7 +32,7 @@ describe('reclaimBook', () => {
 });
 
 describe('editBook', () => {
-  it.each(['reassignPayment', 'writeOff'])(
+  it.each(['reassignPayment', 'markNotTax', 'writeOff'])(
     'sends the access token with %s, which the server re-checks live',
     async (action) => {
       fns.callable.mockResolvedValue({ data: {} });

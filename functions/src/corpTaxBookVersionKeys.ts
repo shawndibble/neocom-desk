@@ -35,7 +35,7 @@ export const MINER_PAID = 'minerPaid';
 export const REBILLS = 'rebills';
 /** `corpTaxBookTokens/{token}`: a verify link's token, naming its corporation and notice. */
 export const TOKENS_COLLECTION = 'corpTaxBookTokens';
-/** The legacy mirror of every Late notice, for older tabs until the soak ends. */
+/** Legacy Late notices, read once by the one-time copy into `lateNotices`. */
 export const STATEMENTS = 'statements';
 /** `statementLinks/{statementId}`: the verify token, readable by editors only. */
 export const STATEMENT_LINKS = 'statementLinks';
@@ -53,8 +53,6 @@ export const LATE_NOTICE_LINKS = 'lateNoticeLinks';
 export const RUNNING_ACCOUNT_CHECKPOINTS = 'accountCheckpoints';
 export const MINERS = 'miners';
 export const META = 'meta';
-/** `readersQueue/pending`: the copies of readers (`uids`) still to rewrite. Function-only. */
-export const READERS_QUEUE = 'readersQueue';
 
 /**
  * Subcollections whose writes never change what a client caches, so they move
@@ -81,8 +79,6 @@ export const UNVERSIONED_COLLECTIONS: ReadonlySet<string> = new Set([
   'feederObserved',
   // A running account's figures for the pay page (#6294); only the verify link reads them.
   'accounts',
-  // The readers drain's own queue (corpTaxBookReaders.ts); no client reads it.
-  'readersQueue',
 ]);
 
 /**

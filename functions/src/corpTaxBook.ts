@@ -10,11 +10,11 @@
 //     observed/{char_type_date_structure}       Observed Mining Entry rows, upserted monotonically
 //     extractions/{structure_start}             Extractions, kept after ESI stops listing them
 //     payments/{id}                             Tax Payments (donations found in the journal, manual);
-//                                               read by the sender (`uid`) and its Miner (`uids`)
+//                                               read by its sender (`uid`)
 //     dismissals/{id}  declarations/{id}  adjustments/{id}  writeOffs/{id}  rebills/{id}
 //     lateNotices/{id}  lateNoticeLinks/{id}    Late notices and their verify tokens (decision 20261120-235011)
-//     statements/{id}  statementLinks/{id}      the legacy mirror of every Late notice, for older tabs
-//     accountCheckpoints/{minerId}              a Running account's closed-through checkpoint
+//     statements/{id}  statementLinks/{id}      legacy notices, read once by the one-time copy
+//     accountCheckpoints/{minerId}              a Running account's snapshot for the lock date
 //     miners/{minerId}                          Miner groupings
 //     meta/paid                                 each Miner's paid-through day, only ever grown (D22)
 //     meta/uncounted                            donations into divisions the book does not read (#6207)
@@ -35,6 +35,7 @@ import { payOldestFirst, type OwedDay } from './corpTaxBookRunningAccounts.js';
 import { matchesStatedTransfer } from './corpTaxBookTransferMatch.js';
 import {
   NOTICE_ID_FIELD,
+  finalNoticeId,
   isFinalNoticeId,
   minerPaymentCode,
   noticedDates,
@@ -42,9 +43,10 @@ import {
   type LateNoticeLine,
 } from './corpTaxBookLateNotice.js';
 import {
-  canAdvanceCheckpoint,
   checkpointFits,
   checkpointProblems,
+  isSnapshot,
+  snapshotThroughFor,
   type CheckpointProblem,
   type RunningAccountCheckpoint,
 } from './corpTaxBookCheckpoint.js';
@@ -362,7 +364,6 @@ export interface SettingsPatch {
   hubId?: string;
   oreForm?: 'compressed' | 'raw';
   graceHours?: number;
-  minimumStatement?: number;
   overdueDays?: number;
   divisions?: number[];
   /**
@@ -384,7 +385,6 @@ export interface SettingsPatch {
    * name the Account to pick. Replaces the stored map whole; `{}` clears it.
    */
   divisionNames?: Record<string, string>;
-  cadence?: { kind: 'monthly' } | { kind: 'days'; days: number; anchor: string };
   chunkM3PerHour?: number;
   structureExpiryHours?: Record<string, number>;
   dismissApprovalAboveIsk?: number | null;
@@ -394,11 +394,6 @@ export interface SettingsPatch {
   startDate?: string;
   /** End the member setup window now (Director): `membersSeeFrom` becomes the call time. */
   showToMembers?: true;
-  /**
-   * Stamps a running account's switch-over (Director, #6294). Every book is one now (decision
-   * 20261117-060555); kept so an older client's call still succeeds.
-   */
-  switchToRunningAccount?: true;
   /** A running account's late notices. */
   noticeRules?: NoticeRules;
   /** A running account's per-day tolerance, in percent. */
@@ -487,9 +482,6 @@ export function parseSettingsPatch(data: unknown): SettingsPatch {
   if (d.oreForm !== undefined)
     patch.oreForm = oneOf(d.oreForm, 'oreForm', ['compressed', 'raw'] as const);
   if (d.graceHours !== undefined) patch.graceHours = num(d.graceHours, 'graceHours', 0, 72);
-  if (d.minimumStatement !== undefined) {
-    patch.minimumStatement = num(d.minimumStatement, 'minimumStatement', 0, 1e12);
-  }
   if (d.overdueDays !== undefined) patch.overdueDays = int(d.overdueDays, 'overdueDays', 1, 365);
   if (d.divisions !== undefined) {
     patch.divisions = parseDivisions(d.divisions, 'divisions');
@@ -507,17 +499,6 @@ export function parseSettingsPatch(data: unknown): SettingsPatch {
     patch.addDivision = int(d.addDivision, 'addDivision', 1, 7);
   }
   if (d.divisionNames !== undefined) patch.divisionNames = parseDivisionNames(d.divisionNames);
-  if (d.cadence !== undefined) {
-    const c = record(d.cadence);
-    patch.cadence =
-      oneOf(c.kind, 'cadence.kind', ['monthly', 'days'] as const) === 'monthly'
-        ? { kind: 'monthly' }
-        : {
-            kind: 'days',
-            days: int(c.days, 'cadence.days', 1, 366),
-            anchor: dateString(c.anchor, 'cadence.anchor'),
-          };
-  }
   if (d.chunkM3PerHour !== undefined) {
     patch.chunkM3PerHour = num(d.chunkM3PerHour, 'chunkM3PerHour', 1, 1e7);
   }
@@ -549,11 +530,6 @@ export function parseSettingsPatch(data: unknown): SettingsPatch {
     if (d.showToMembers !== true)
       throw new HttpsError('invalid-argument', 'showToMembers must be true');
     patch.showToMembers = true;
-  }
-  if (d.switchToRunningAccount !== undefined) {
-    if (d.switchToRunningAccount !== true)
-      throw new HttpsError('invalid-argument', 'switchToRunningAccount must be true');
-    patch.switchToRunningAccount = true;
   }
   if (d.noticeRules !== undefined) patch.noticeRules = parseNoticeRules(d.noticeRules);
   if (d.dayTolerancePct !== undefined)
@@ -701,8 +677,8 @@ export type EditAction =
       action: 'closeAccount';
       minerId: string;
       reason: string;
-      /** The final Statement, issued in the same write. Absent when nothing is left to bill. */
-      statement?: Record<string, unknown>;
+      /** The final Late notice, issued in the same write. Absent when nothing is left to bill. */
+      notice?: LateNotice;
       /** Credit is refunded unless the guest consented or went 90 days without replying. */
       credit: CloseCredit;
       /**
@@ -711,9 +687,7 @@ export type EditAction =
        */
       runningCredit?: number;
     }
-  | { action: 'issueStatement'; statement: Record<string, unknown> }
   | { action: 'issueLateNotice'; notice: LateNotice }
-  | { action: 'settleStatements'; statementIds: string[] }
   /** An officer-recorded declaration. It carries the Miner's `uids`, so its note is theirs to read. */
   | {
       action: 'declare';
@@ -752,19 +726,11 @@ export type EditAction =
   | { action: 'setPopSharing'; enabled?: boolean; defaults?: Partial<PopSharingSettings> }
   /** One moon's overrides; null returns a setting to the Sharing default. */
   | { action: 'setPopSharingMoon'; moonId: number; override: PopSharingOverridePatch }
-  | {
-      action: 'recordMail';
-      statementId: string;
-      mailId: number;
-      kind: 'statement' | 'reminder';
-    }
   | { action: 'recordLateNoticeMail'; noticeId: string; mailId: number; kind: LateNoticeMailKind }
   /** A running account's figures per Miner, as the officer's client works them out (#6294). */
   | { action: 'recordAccounts'; accounts: RecordedRunningAccount[] }
-  /** Each Miner's closed-through checkpoint; the server sets who recorded it, when, and its readers. */
-  | { action: 'recordCheckpoints'; checkpoints: RecordedCheckpoint[] }
-  /** A Director drops a Miner's checkpoint: the next load works it out again from the history. */
-  | { action: 'resetCheckpoint'; minerId: string };
+  /** Each Miner's snapshot for the lock date; the server sets who recorded it, when, and its readers. */
+  | { action: 'recordCheckpoints'; checkpoints: RecordedCheckpoint[] };
 
 /** A Late notice's first mail, or a reminder of it. */
 export type LateNoticeMailKind = 'notice' | 'reminder';
@@ -881,19 +847,15 @@ export function parseEditAction(data: unknown): EditAction {
       'writeOff',
       'rebill',
       'closeAccount',
-      'issueStatement',
       'issueLateNotice',
-      'settleStatements',
       'declare',
       'resolveDeclaration',
       'rejectDispute',
       'dismissDispute',
       'recordReminder',
-      'recordMail',
       'recordLateNoticeMail',
       'recordAccounts',
       'recordCheckpoints',
-      'resetCheckpoint',
       'setPopSharing',
       'setPopSharingMoon',
     ] as const,
@@ -1063,12 +1025,6 @@ export function parseEditAction(data: unknown): EditAction {
         reason: reason(d.reason),
       };
     case 'writeOff':
-      // A write-off forgives the oldest days: an older tab that names a Statement meant something
-      // else, so it is refused rather than read another way.
-      if (d.statementId !== undefined)
-        throw new HttpsError('failed-precondition', 'This page is out of date: reload it', {
-          reason: 'reload',
-        });
       return {
         action,
         minerId: docId(d.minerId, 'minerId'),
@@ -1082,13 +1038,6 @@ export function parseEditAction(data: unknown): EditAction {
         fromDate: dateString(d.fromDate, 'fromDate'),
         reason: reason(d.reason),
       };
-    case 'issueStatement': {
-      const statement = record(d.statement);
-      if (JSON.stringify(statement).length > MAX_NOTICE_JSON) {
-        throw new HttpsError('invalid-argument', 'statement is too large');
-      }
-      return { action, statement };
-    }
     case 'issueLateNotice': {
       const notice = record(d.notice);
       if (JSON.stringify(notice).length > MAX_NOTICE_JSON)
@@ -1096,26 +1045,21 @@ export function parseEditAction(data: unknown): EditAction {
       return { action, notice: parseLateNotice(notice) };
     }
     case 'closeAccount': {
-      const statement = d.statement === undefined ? undefined : record(d.statement);
-      if (statement && JSON.stringify(statement).length > MAX_NOTICE_JSON) {
-        throw new HttpsError('invalid-argument', 'statement is too large');
+      const notice = d.notice === undefined ? undefined : record(d.notice);
+      if (notice && JSON.stringify(notice).length > MAX_NOTICE_JSON) {
+        throw new HttpsError('invalid-argument', 'notice is too large');
       }
       return {
         action,
         minerId: docId(d.minerId, 'minerId'),
         reason: reason(d.reason),
-        ...(statement ? { statement } : {}),
+        ...(notice ? { notice: parseLateNotice(notice, 'final') } : {}),
         credit: parseCloseCredit(d.credit),
         ...(d.runningCredit !== undefined
           ? { runningCredit: num(d.runningCredit, 'runningCredit', 0, 1e13) }
           : {}),
       };
     }
-    case 'settleStatements':
-      return {
-        action,
-        statementIds: list(d.statementIds, 'statementIds', 200).map((x) => docId(x, 'statementId')),
-      };
     case 'declare':
       return {
         action,
@@ -1182,26 +1126,13 @@ export function parseEditAction(data: unknown): EditAction {
         throw new HttpsError('invalid-argument', 'a setting cannot be set and cleared');
       return { action, moonId: int(d.moonId, 'moonId'), override: { set, clear } };
     }
-    case 'recordMail':
-      return {
-        action,
-        statementId: docId(d.statementId, 'statementId'),
-        mailId: int(d.mailId, 'mailId', 1, Number.MAX_SAFE_INTEGER),
-        kind: oneOf(d.kind, 'kind', ['statement', 'reminder'] as const),
-      };
     case 'recordLateNoticeMail':
       return {
         action,
         noticeId: docId(d.noticeId, 'noticeId'),
         mailId: int(d.mailId, 'mailId', 1, Number.MAX_SAFE_INTEGER),
-        // An older client names a notice's first mail as it named a Statement's.
-        kind:
-          d.kind === 'statement'
-            ? 'notice'
-            : oneOf(d.kind, 'kind', ['notice', 'reminder'] as const),
+        kind: oneOf(d.kind, 'kind', ['notice', 'reminder'] as const),
       };
-    case 'resetCheckpoint':
-      return { action, minerId: docId(d.minerId, 'minerId') };
     case 'recordCheckpoints':
       return {
         action,
@@ -1300,26 +1231,6 @@ function popSettingsPatch(raw: unknown, allowEmpty: boolean): Partial<PopSharing
   return out as Partial<PopSharingSettings>;
 }
 
-/** The Statement fields the book relies on; the rest of the engine's shape is stored as given. */
-export interface StoredStatement {
-  id: string;
-  minerId: string;
-  code: string;
-  periodStart: string;
-  periodEnd: string;
-  coversFrom: string;
-  coversThrough: string;
-  issuedAt: string;
-  hubId: string;
-  oreForm: string;
-  /** A running account's late notice (#6294); absent on a calendar Statement. */
-  kind?: 'notice';
-  lines: { kind: string; date: string; characterId?: number }[];
-  amount: number;
-  /** Characters of the Miner, for the own-lines rule. */
-  characterIds: number[];
-}
-
 /**
  * The names the guest verify page prints (#4066): a guest cannot look up a
  * structure's name, so the officer's client stores them on the Statement.
@@ -1347,39 +1258,6 @@ function displayNames(raw: Record<string, unknown>) {
     }
   }
   return out;
-}
-
-export function parseStatement(raw: Record<string, unknown>): StoredStatement {
-  const lines = list(raw.lines, 'statement.lines', 5000).map((l) => {
-    const line = record(l);
-    return {
-      ...line,
-      kind: oneOf(line.kind, 'line.kind', ['mined', 'late-ore', 'correction'] as const),
-      date: dateString(line.date, 'line.date'),
-    } as StoredStatement['lines'][number];
-  });
-  return {
-    ...(raw as object),
-    ...(raw.kind !== undefined
-      ? { kind: oneOf(raw.kind, 'statement.kind', ['notice'] as const) }
-      : {}),
-    id: docId(raw.id, 'statement.id'),
-    minerId: docId(raw.minerId, 'statement.minerId'),
-    code: boundedString(raw.code, 'statement.code', 64),
-    periodStart: dateString(raw.periodStart, 'periodStart'),
-    periodEnd: dateString(raw.periodEnd, 'periodEnd'),
-    coversFrom: dateString(raw.coversFrom, 'coversFrom'),
-    coversThrough: dateString(raw.coversThrough, 'coversThrough'),
-    issuedAt: instant(raw.issuedAt, 'issuedAt'),
-    hubId: oneOf(raw.hubId, 'hubId', HUBS),
-    oreForm: oneOf(raw.oreForm, 'oreForm', ['compressed', 'raw'] as const),
-    lines,
-    amount: num(raw.amount, 'statement.amount', 0, 1e13),
-    characterIds: list(raw.characterIds, 'statement.characterIds', 50).map((x) =>
-      int(x, 'characterId')
-    ),
-    ...displayNames(raw),
-  } as StoredStatement;
 }
 
 const LINE_KINDS = ['mined', 'late-ore', 'correction'] as const;
@@ -1431,15 +1309,20 @@ function parseNoticeLine(raw: unknown): LateNoticeLine {
  * A Late notice from an officer's tab (decision 20261120-235011). What it listed is summed here
  * from its lines, and its Reason code is the Miner's one code (`minerPaymentCode`), as the mail
  * asks for; who may read it, who issued it
- * and its mail state are the server's to set, so they start empty. A final notice is never issued
- * here: only closing the account sends one.
+ * and its mail state are the server's to set, so they start empty. A final notice is issued only
+ * by closing the account (`kind` 'final'), under the Miner's final id (`finalNoticeId`).
  */
-export function parseLateNotice(raw: Record<string, unknown>): LateNotice {
+export function parseLateNotice(
+  raw: Record<string, unknown>,
+  kind: LateNotice['kind'] = 'late'
+): LateNotice {
   const id = docId(raw.id, 'notice.id');
   const minerId = docId(raw.minerId, 'notice.minerId');
-  oneOf(raw.kind, 'notice.kind', ['late'] as const);
-  if (isFinalNoticeId(id))
+  oneOf(raw.kind, 'notice.kind', [kind]);
+  if (kind === 'late' && isFinalNoticeId(id))
     throw new HttpsError('invalid-argument', 'only closing an account sends a final notice');
+  if (kind === 'final' && id !== finalNoticeId(minerId))
+    throw new HttpsError('invalid-argument', `notice.id must be ${finalNoticeId(minerId)}`);
   const code = minerPaymentCode(minerId);
   if (raw.code !== undefined && raw.code !== code)
     throw new HttpsError('invalid-argument', `notice.code must be ${code}`);
@@ -1461,7 +1344,7 @@ export function parseLateNotice(raw: Record<string, unknown>): LateNotice {
     characterIds: list(raw.characterIds, 'notice.characterIds', 50).map((x) =>
       int(x, 'characterId')
     ),
-    kind: 'late',
+    kind,
     issuedAt: instant(raw.issuedAt, 'notice.issuedAt'),
     code,
     ...(pricing !== undefined ? { pricing } : {}),
@@ -1475,39 +1358,41 @@ export function parseLateNotice(raw: Record<string, unknown>): LateNotice {
 
 /** Why a checkpoint from a tab is not stored. */
 export type CheckpointRefusal =
-  CheckpointProblem | 'not-forward' | 'unknown-miner' | 'characters-changed' | 'director-approval';
+  'wrong-date' | 'exists' | CheckpointProblem | 'unknown-miner' | 'characters-changed';
 
 /**
- * Every reason a checkpoint is not stored, none when it is (B1): a checkpoint is a strict cache of
- * history the book keeps for good, so one that cannot be trusted is skipped and the next load works
- * the account out again. It must move forward (`canAdvanceCheckpoint`), add up
- * (`checkpointProblems`), name a Miner the book knows, and have summed that Miner's characters as
- * they are now (`checkpointFits`); one that owes less through its date than the Miner's recorded
- * account (`live`, after the payments since) would forgive days, so it needs a Director.
+ * Why a snapshot is not stored, undefined when it is (decision 20261120-235011, "a lock date"):
+ * one per Miner per lock date, through `snapshotThroughFor(today)` (`wrong-date`), unless a stored
+ * snapshot already covers that day (`exists`). It must add up (`checkpointProblems`), name a Miner
+ * the book knows, and have summed that Miner's characters as they are now (`checkpointFits`).
+ * A stored checkpoint for other characters, or one the strict cache recorded through days still
+ * open (`isSnapshot`), is no snapshot: it is replaced.
  */
 export function checkpointRefusal(
   k: RecordedCheckpoint,
   ctx: {
-    stored?: Pick<RunningAccountCheckpoint, 'through'>;
+    stored?: Pick<RunningAccountCheckpoint, 'through' | 'at' | 'characterIds'>;
     today: string;
     known: boolean;
     /** The Miner's characters now. */
     characterIds: readonly number[];
-    live?: { unpaidDays?: readonly Pick<OwedDay, 'date' | 'owed'>[] };
-    isDirector: boolean;
   }
-): CheckpointRefusal[] {
-  const out: CheckpointRefusal[] = [];
-  if (!canAdvanceCheckpoint(ctx.stored, k, ctx.today)) out.push('not-forward');
-  out.push(...checkpointProblems(k));
-  if (!ctx.known) out.push('unknown-miner');
-  else if (!checkpointFits(k, ctx.characterIds)) out.push('characters-changed');
-  const recorded = (ctx.live?.unpaidDays ?? [])
-    .filter((d) => d.date <= k.through)
-    .reduce((sum, d) => sum + d.owed, 0);
-  const owes = k.owed.reduce((sum, d) => sum + d.remaining, 0);
-  if (owes < recorded - 1 && !ctx.isDirector) out.push('director-approval');
-  return out;
+): CheckpointRefusal | undefined {
+  if (k.through !== snapshotThroughFor(ctx.today)) return 'wrong-date';
+  const { stored } = ctx;
+  if (
+    stored &&
+    stored.through >= k.through &&
+    typeof stored.at === 'string' &&
+    isSnapshot(stored) &&
+    checkpointFits(stored, ctx.characterIds)
+  )
+    return 'exists';
+  const problem = checkpointProblems(k)[0];
+  if (problem) return problem;
+  if (!ctx.known) return 'unknown-miner';
+  if (!checkpointFits(k, ctx.characterIds)) return 'characters-changed';
+  return undefined;
 }
 
 /** A checkpoint from an officer's tab; `checkpointRefusal` decides whether it is stored. */

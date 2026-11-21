@@ -5,12 +5,13 @@ import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/em
 import { MOON_DOC_SCHEMA } from './corpTaxBookMoonDocs.js';
 import { READ_MODELS_SCHEMA } from './corpTaxBookReadModels.js';
 import { verifyBook } from './corpTaxBookNightlyVerify.js';
+import { retireMinerTotals } from './corpTaxBookLateNoticeBackfill.js';
 
 const CORP = 98000001;
-const NOW = Date.parse('2026-10-18T12:00:00Z');
+const NOW = Date.parse('2026-11-18T12:00:00Z');
 const book = () => db.collection('corps').doc(String(CORP));
 
-// Closed: fractured 2 Aug, over by 4 Aug, before the 31 Aug the book is closed through on 18 Oct.
+// Locked: fractured 2 Aug, over by 4 Aug, before the 1 Sep lock date on 18 Nov.
 const closed = {
   structureId: 1000,
   moonId: 7,
@@ -49,16 +50,12 @@ emulatorSuite('the nightly pass (emulator)', () => {
     await row('r2', '2026-10-11', idOf(open));
   });
 
-  it('deletes the retired Miner totals and their health doc', async () => {
+  it('the one-time copy deletes the retired Miner totals and their health doc', async () => {
     await book().collection('minerTotals').doc('solo:50').set({ owed: 5 });
     await book().collection('meta').doc('minerTotalsHealth').set({ status: 'ok' });
-    await verifyBook(db, CORP, () => NOW);
+    expect(await retireMinerTotals(db, CORP)).toBe(1);
     expect((await book().collection('minerTotals').get()).empty).toBe(true);
     expect((await book().collection('meta').doc('minerTotalsHealth').get()).exists).toBe(false);
-    expect((await book().collection('meta').doc('verifierHealth').get()).data()).toMatchObject({
-      status: 'ok',
-      overlapCount: 0,
-    });
   });
 
   it('builds every missing moon doc from its own rows, then re-reads only the open pull', async () => {

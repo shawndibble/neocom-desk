@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  planLateNoticeCopies,
-  planObservedReaders,
-  planPaymentReaders,
-} from './corpTaxBookLateNoticeBackfill.js';
+import { planLateNoticeCopies } from './corpTaxBookLateNoticeBackfill.js';
 
 const notice = (id: string, kind?: string, mail: Record<string, unknown> = {}) => ({
   id,
@@ -16,7 +12,6 @@ const notice = (id: string, kind?: string, mail: Record<string, unknown> = {}) =
   uids: ['char:5'],
   ...mail,
 });
-const quiet = { sent: 0, manualSent: 0, remindersStopped: false };
 
 describe('planLateNoticeCopies', () => {
   it('copies each legacy notice and each link that has no copy yet', () => {
@@ -29,22 +24,10 @@ describe('planLateNoticeCopies', () => {
         { id: 'n1', data: { verifyToken: 't1' } },
         { id: 'n2', data: { verifyToken: 't2' } },
       ],
-      { notices: new Map([['n2', quiet]]), links: new Set(['n2']) }
+      { notices: new Set(['n2']), links: new Set(['n2']) }
     );
     expect(plan.notices.map((n) => [n.id, n.listed, n.uids])).toEqual([['n1', 9, ['char:5']]]);
     expect(plan.links).toEqual([{ id: 'n1', token: 't1' }]);
-    expect(plan.mail).toEqual([]);
-  });
-
-  it('brings a copy’s mail state level with its legacy doc', () => {
-    const plan = planLateNoticeCopies(
-      [{ id: 'n1', data: notice('n1', 'notice', { mailsSent: 2, remindersStopped: true }) }],
-      [],
-      { notices: new Map([['n1', { ...quiet, sent: 1, manualSent: 1 }]]), links: new Set() }
-    );
-    expect(plan.mail).toEqual([
-      { id: 'n1', mail: { sent: 2, manualSent: 1, remindersStopped: true } },
-    ]);
   });
 
   it('leaves a calendar Statement and a link with no token alone', () => {
@@ -52,80 +35,18 @@ describe('planLateNoticeCopies', () => {
       [{ id: 's1', data: notice('s1') }],
       [{ id: 's1', data: {} }],
       {
-        notices: new Map(),
+        notices: new Set(),
         links: new Set(),
       }
     );
-    expect(plan).toEqual({ notices: [], links: [], mail: [] });
+    expect(plan).toEqual({ notices: [], links: [] });
   });
 
   it('plans nothing on a re-run', () => {
     const statements = [{ id: 'n1', data: notice('n1', 'notice') }];
     const links = [{ id: 'n1', data: { verifyToken: 't1' } }];
     expect(
-      planLateNoticeCopies(statements, links, {
-        notices: new Map([['n1', quiet]]),
-        links: new Set(['n1']),
-      })
-    ).toEqual({ notices: [], links: [], mail: [] });
-  });
-});
-
-describe('planPaymentReaders', () => {
-  const miners = [{ id: 'g', data: { characterIds: [1, 2, 3], officerClaimed: [3] } }];
-
-  it("gives each payment stored without `uids` its Miner's readers and its sender", () => {
-    expect(
-      planPaymentReaders(
-        [
-          { id: 'p1', data: { minerId: 'g', uid: 'char:2' } },
-          { id: 'p2', data: { minerId: 'solo:7', uid: 'char:7' } },
-          { id: 'p3', data: { uid: 'char:9' } },
-          { id: 'p4', data: { minerId: 'g', uid: 'char:3' } },
-        ],
-        miners
-      )
-    ).toEqual([
-      { id: 'p1', uids: ['char:1', 'char:2'] },
-      { id: 'p2', uids: ['char:7'] },
-      { id: 'p3', uids: ['char:9'] },
-      { id: 'p4', uids: ['char:1', 'char:2', 'char:3'] },
-    ]);
-  });
-
-  it('repairs a payment whose `uids` are stale, and leaves a right one alone', () => {
-    expect(
-      planPaymentReaders(
-        [
-          { id: 'p1', data: { minerId: 'g', uid: 'char:2', uids: ['char:2', 'char:9'] } },
-          { id: 'p2', data: { minerId: 'g', uid: 'char:2', uids: ['char:2', 'char:1'] } },
-        ],
-        miners
-      )
-    ).toEqual([{ id: 'p1', uids: ['char:1', 'char:2'] }]);
-  });
-});
-
-describe('planObservedReaders', () => {
-  const miners = [{ id: 'g', data: { characterIds: [1, 2, 3], officerClaimed: [3] } }];
-
-  it("gives each row its Character's Miner's readers and itself, where missing or stale", () => {
-    expect(
-      planObservedReaders(
-        [
-          { id: 'r1', data: { characterId: 2 } },
-          { id: 'r2', data: { characterId: 3 } },
-          { id: 'r3', data: { characterId: 9 } },
-          { id: 'r4', data: { characterId: 1, uids: ['char:1'] } },
-          { id: 'r5', data: { characterId: 1, uids: ['char:2', 'char:1'] } },
-        ],
-        miners
-      )
-    ).toEqual([
-      { id: 'r1', uids: ['char:1', 'char:2'] },
-      { id: 'r2', uids: ['char:1', 'char:2', 'char:3'] },
-      { id: 'r3', uids: ['char:9'] },
-      { id: 'r4', uids: ['char:1', 'char:2'] },
-    ]);
+      planLateNoticeCopies(statements, links, { notices: new Set(['n1']), links: new Set(['n1']) })
+    ).toEqual({ notices: [], links: [] });
   });
 });

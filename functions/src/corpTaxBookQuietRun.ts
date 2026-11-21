@@ -21,7 +21,7 @@
 
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
-import { MINERS, PAYMENTS, STATEMENTS } from './corpTaxBook.js';
+import { MINERS, PAYMENTS } from './corpTaxBook.js';
 import { DAY_MS, HOUR_MS } from './timeConstants.js';
 import { COLLECTION_VERSIONS_FIELD } from './corpTaxBookVersionKeys.js';
 
@@ -55,11 +55,10 @@ export const QUIET_MAX_AGE_MS = 24 * HOUR_MS;
 /**
  * What `readBookStateAdmin` reads that a quiet run does not. Not `meta`: every
  * run writes its status there, so its stamp always moves, and a run reads none of it. A quiet run
- * compares the extractions it reads instead. `lateNotices` is not listed: every notice written there is mirrored to
- * `statements` (corpTaxBookLegacyMirror.ts), whose stamp moves with it, and a book that never
- * wrote one has no stamp for it. Swap it in when the mirror goes.
+ * compares the extractions it reads instead. `lateNotices` is not listed: a book that never wrote
+ * one has no stamp for it, and a notice changes no donation's match (its code is its Miner's).
  */
-export const QUIET_COLLECTIONS = [MINERS, STATEMENTS, PAYMENTS] as const;
+export const QUIET_COLLECTIONS = [MINERS, PAYMENTS] as const;
 
 export interface QuietMarker {
   /** When the quiet run started. */

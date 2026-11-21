@@ -1,13 +1,11 @@
 /**
- * A Running account's closed-through checkpoint (decision 20261120-235011): what a Miner's account
- * stood at through a date no sync can change any more, so a load reads the checkpoint and only
- * the days after it instead of the whole history.
+ * A Running account's snapshot (decision 20261120-235011, "a lock date"): what a Miner's account
+ * stood at through the day before the lock date, so a load reads the snapshot and only the days
+ * after it instead of the whole history.
  *
- * ESI's mining ledgers reach back about 30 days, so a day more than 31 days old cannot gain ore.
- * The checkpoint rolls forward a month at a time, to the end of the last month that ended at
- * least `CLOSE_AFTER_DAYS` days ago. It is a strict cache, never a record: any edit dated on or
- * before it, or any change to the Miner's characters, deletes it, and the next load recomputes
- * from the full history (decision 20261120-235011, "the checkpoint is a strict cache").
+ * History before the lock date is read-only (`isLocked`): the server refuses any edit dated before
+ * it, so a snapshot never goes stale. An officer's tab records one per Miner per lock date, through
+ * `snapshotThroughFor(today)`; only a change to the Miner's characters deletes it.
  *
  * Shared by the client and the Cloud Functions (decision 20261117-230113): dependency-free.
  * Stored at `corps/{id}/accountCheckpoints/{minerId}` for a Corp Tax Book (written by an
@@ -15,9 +13,6 @@
  * personal Payee.
  */
 import { DAY_MS, utcDay } from './timeConstants.js';
-
-/** How old the end of a month must be before it closes: past ESI's ~30-day ledger window. */
-export const CLOSE_AFTER_DAYS = 31;
 
 /**
  * A day still owed at the checkpoint, with what was left of it. `remaining` is the day's whole
@@ -76,10 +71,6 @@ export function checkpointFits(
 }
 
 /**
- * The newest date an account may be closed through on `today` (`YYYY-MM-DD`, UTC): the end of the
- * last month that ended at least `CLOSE_AFTER_DAYS` days before today.
- */
-/**
  * The lock date on `today` (`YYYY-MM-DD`, UTC): the 1st of the month two months back. Nothing
  * dated before it can be added, changed or removed, and a snapshot covers every day before it
  * (decision 20261120-235011, "a lock date"). On Dec 1 and on Dec 15 alike it is Oct 1.
@@ -94,23 +85,21 @@ export function snapshotThroughFor(today: string): string {
   return utcDay(Date.parse(`${lockDateFor(today)}T00:00:00Z`) - DAY_MS);
 }
 
-export function closedThroughFor(today: string): string {
-  const cutoff = Date.parse(`${today}T00:00:00Z`) - CLOSE_AFTER_DAYS * DAY_MS;
-  const c = new Date(cutoff);
-  // The last day of the month before the cutoff's, unless the cutoff is itself a month's last day.
-  const endOfCutoffMonth = Date.UTC(c.getUTCFullYear(), c.getUTCMonth() + 1, 0);
-  return utcDay(
-    endOfCutoffMonth === cutoff ? cutoff : Date.UTC(c.getUTCFullYear(), c.getUTCMonth(), 0)
-  );
+/**
+ * Whether an edit dated `date` (a day or an instant) falls before the lock date on `today`, so the
+ * server refuses it. An undated one is never locked.
+ */
+export function isLocked(date: string | undefined, today: string): boolean {
+  return !!date && date.slice(0, 10) < lockDateFor(today);
 }
 
-/** Whether `next` may replace `stored`: it only ever moves forward, and never past what may close. */
-export function canAdvanceCheckpoint(
-  stored: Pick<RunningAccountCheckpoint, 'through'> | undefined,
-  next: Pick<RunningAccountCheckpoint, 'through'>,
-  today: string
-): boolean {
-  return next.through <= closedThroughFor(today) && (!stored || next.through > stored.through);
+/**
+ * Whether a stored checkpoint is a snapshot: through a day already locked on the day it was
+ * recorded, so nothing it summed can have changed since. One recorded through days still open
+ * then (the strict cache it replaced) is not, and is recorded again.
+ */
+export function isSnapshot(checkpoint: Pick<RunningAccountCheckpoint, 'through' | 'at'>): boolean {
+  return checkpoint.through <= snapshotThroughFor(checkpoint.at.slice(0, 10));
 }
 
 /** Why a checkpoint does not add up. */
@@ -178,6 +167,34 @@ export function checkpointProblems(
       (c.paidThrough > c.through || (syncOwed !== undefined && c.paidThrough >= syncOwed.date))
   );
   return out;
+}
+
+// --- The strict cache's dates, still imported by the client until it follows the lock date. ---
+
+/** How old the end of a month must be before it closes: past ESI's ~30-day ledger window. */
+export const CLOSE_AFTER_DAYS = 31;
+
+/**
+ * The newest date an account may be closed through on `today` (`YYYY-MM-DD`, UTC): the end of the
+ * last month that ended at least `CLOSE_AFTER_DAYS` days before today.
+ */
+export function closedThroughFor(today: string): string {
+  const cutoff = Date.parse(`${today}T00:00:00Z`) - CLOSE_AFTER_DAYS * DAY_MS;
+  const c = new Date(cutoff);
+  // The last day of the month before the cutoff's, unless the cutoff is itself a month's last day.
+  const endOfCutoffMonth = Date.UTC(c.getUTCFullYear(), c.getUTCMonth() + 1, 0);
+  return utcDay(
+    endOfCutoffMonth === cutoff ? cutoff : Date.UTC(c.getUTCFullYear(), c.getUTCMonth(), 0)
+  );
+}
+
+/** Whether `next` may replace `stored`: it only ever moves forward, and never past what may close. */
+export function canAdvanceCheckpoint(
+  stored: Pick<RunningAccountCheckpoint, 'through'> | undefined,
+  next: Pick<RunningAccountCheckpoint, 'through'>,
+  today: string
+): boolean {
+  return next.through <= closedThroughFor(today) && (!stored || next.through > stored.through);
 }
 
 /**

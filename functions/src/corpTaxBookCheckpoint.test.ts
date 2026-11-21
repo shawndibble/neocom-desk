@@ -7,6 +7,8 @@ import {
   checkpointProblems,
   closedThroughFor,
   editReachesCheckpoint,
+  isLocked,
+  isSnapshot,
 } from './corpTaxBookCheckpoint.js';
 
 describe('closedThroughFor', () => {
@@ -159,5 +161,32 @@ describe('lockDateFor', () => {
   it('makes a snapshot cover every day before it', () => {
     expect(snapshotThroughFor('2026-12-15')).toBe('2026-09-30');
     expect(snapshotThroughFor('2028-05-02')).toBe('2028-02-29');
+  });
+});
+
+describe('isLocked: history before the lock date is read-only', () => {
+  // On 15 Dec the lock date is 1 Oct.
+  const today = '2026-12-15';
+  it('locks a day or an instant before the lock date, and nothing from it on', () => {
+    expect(isLocked('2026-09-30', today)).toBe(true);
+    expect(isLocked('2026-09-30T23:59:59.000Z', today)).toBe(true);
+    expect(isLocked('2026-10-01', today)).toBe(false);
+    expect(isLocked('2026-10-01T00:00:00.000Z', today)).toBe(false);
+    expect(isLocked(today, today)).toBe(false);
+  });
+  it('locks nothing it cannot date', () => {
+    expect(isLocked(undefined, today)).toBe(false);
+    expect(isLocked('', today)).toBe(false);
+  });
+});
+
+describe('isSnapshot: a checkpoint covers only days locked when it was recorded', () => {
+  it('is one through a day before the lock date on the day it was recorded', () => {
+    expect(isSnapshot({ through: '2026-09-30', at: '2026-12-01T10:00:00.000Z' })).toBe(true);
+    expect(isSnapshot({ through: '2026-08-31', at: '2026-12-01T10:00:00.000Z' })).toBe(true);
+  });
+  it('is not one recorded through days still open then (the old strict cache)', () => {
+    expect(isSnapshot({ through: '2026-10-31', at: '2026-12-01T10:00:00.000Z' })).toBe(false);
+    expect(isSnapshot({ through: '2026-09-30', at: '2026-11-21T10:00:00.000Z' })).toBe(false);
   });
 });

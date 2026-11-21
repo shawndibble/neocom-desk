@@ -42,27 +42,7 @@ describe('planRekey', () => {
         id: 's1',
         fields: { minerId: 'g1', uids: ['char:1', 'char:2'] },
       },
-      {
-        kind: 'update',
-        collection: 'payments',
-        id: 'p1',
-        fields: { minerId: 'g1', uids: ['char:1', 'char:2'] },
-      },
-    ]);
-  });
-
-  it("gives every payment the group's readers and its sender, one stored without uids too", () => {
-    const writes = planRekey({
-      ...base,
-      records: [rec('payments', 'p2', { minerId: 'solo:9', uid: 'char:9' })],
-    });
-    expect(writes).toEqual([
-      {
-        kind: 'update',
-        collection: 'payments',
-        id: 'p2',
-        fields: { minerId: 'g1', uids: ['char:1', 'char:2', 'char:9'] },
-      },
+      { kind: 'update', collection: 'payments', id: 'p1', fields: { minerId: 'g1' } },
     ]);
   });
 

@@ -135,7 +135,6 @@ export interface JournalDonation {
   at: string;
   reason?: string;
   minerId?: string;
-  statementId?: string;
   /** Set when a known sender's Miner owed nothing, so it stays Unmatched for review (#6207). */
   reviewReason?: 'no-open-balance';
 }
@@ -496,7 +495,6 @@ export interface SettlePayment {
   minerId?: string;
   amount: number;
   at: string;
-  statementId?: string;
   notTaxAmount?: number;
   source?: 'donation' | 'manual';
   /** Held for an officer's review (#6207): never re-matched by a sync. */

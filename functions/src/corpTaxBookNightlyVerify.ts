@@ -1,41 +1,18 @@
 // The nightly pass over every active book's server-built docs (ADR 0032, decision
 // 20261120-235011): rebuilds the moon docs that can still change and both tab read models,
 // repairs any drift, flags pulls that overlap, and records how it went in `meta/verifierHealth`.
-//
-// The Statement-built Miner totals (`minerTotals`, #5255) are retired: every book is a Running
-// account, which only an officer's tab can price, and no client reads them on one. Each pass
-// deletes what is left of them, so a tab that still reads one falls back to its own figures.
 
-import type { Firestore, WriteBatch } from 'firebase-admin/firestore';
-import { commitInBatches } from './commitInBatches.js';
+import type { Firestore } from 'firebase-admin/firestore';
 import { verifyMoonDocs } from './corpTaxBookMoonDocsStore.js';
 import { invalidateReadModels, reconcileReadModels } from './corpTaxBookReadModelsStore.js';
-import { drainReadersSafely } from './corpTaxBookReaders.js';
 import { DAY_MS } from './timeConstants.js';
 
 const book = (db: Firestore, corporationId: number) =>
   db.collection('corps').doc(String(corporationId));
 
 export const HEALTH_DOC = 'verifierHealth';
-/** The retired Statement-built totals (#5255), one doc per Miner. */
-const RETIRED_MINER_TOTALS = 'minerTotals';
-/** The retired totals' health doc, deleted with them. */
-const RETIRED_HEALTH_DOC = 'minerTotalsHealth';
 const MAX_LISTED = 25;
 const VERIFIER_ACTOR = 'Nightly verifier';
-
-/** Deletes every retired `minerTotals` doc and their health doc; none are left after the first pass. */
-export async function retireMinerTotals(db: Firestore, corporationId: number): Promise<number> {
-  const refs = [
-    ...(await book(db, corporationId).collection(RETIRED_MINER_TOTALS).listDocuments()),
-    book(db, corporationId).collection('meta').doc(RETIRED_HEALTH_DOC),
-  ];
-  await commitInBatches(
-    db,
-    refs.map((ref) => (b: WriteBatch) => void b.delete(ref))
-  );
-  return refs.length - 1;
-}
 
 export interface VerifyOutcome {
   moonDocMismatches: number;
@@ -49,11 +26,6 @@ export async function verifyBook(
   corporationId: number,
   now: () => number
 ): Promise<VerifyOutcome> {
-  await retireMinerTotals(db, corporationId).catch((e) =>
-    console.error('miner totals retire failed', e instanceof Error ? e.message : e)
-  );
-  // Whatever readers drain the actions and syncs left; a larger budget than theirs.
-  await drainReadersSafely(db, corporationId, 20_000);
   const moon = await verifyMoonDocs(db, corporationId, now()).catch((e) => {
     console.error('moon docs verify failed', e instanceof Error ? e.message : e);
     return undefined;
