@@ -39,7 +39,7 @@ vi.mock('@/features/character/names', () => ({
   resolveNames: vi.fn().mockResolvedValue(new Map([[61, 'Quiet Alt']])),
 }));
 vi.mock('./verifyApi', () => ({
-  readVerifyStatement: api.read,
+  readVerifyNotice: api.read,
   setVerifyRemindersStopped: api.stop,
 }));
 vi.mock('@/esi/endpoints/corp', () => ({

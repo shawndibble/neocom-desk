@@ -24,7 +24,7 @@ function DateReadback({ date }: { date: string }) {
   return <span className="block text-xs text-text-dim">{dateWithYear(date)}</span>;
 }
 
-/** Per-record rate override (D31): a logged officer correction on a day not yet on a Statement. */
+/** Per-record rate override (D31): a logged officer correction on one day. */
 export function RateOverrideDialog({
   open,
   onClose,
@@ -94,7 +94,7 @@ export function RateOverrideDialog({
   );
 }
 
-/** A correction line (`addAdjustment`): billed on the next Statement as a labelled line. */
+/** A correction line (`addAdjustment`): billed on the Running account as a labelled line. */
 export function AdjustmentDialog({
   open,
   onClose,

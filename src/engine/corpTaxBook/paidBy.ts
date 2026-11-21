@@ -36,13 +36,13 @@ export function creditSources(
   allocation: { paymentCredits: readonly { paymentId: string; amount: number }[]; credit: number },
   startDate?: string
 ): MoneySource[] {
-  const toStatements = new Map<string, number>();
+  const toDays = new Map<string, number>();
   for (const c of allocation.paymentCredits)
-    toStatements.set(c.paymentId, (toStatements.get(c.paymentId) ?? 0) + c.amount);
+    toDays.set(c.paymentId, (toDays.get(c.paymentId) ?? 0) + c.amount);
   const out: MoneySource[] = [];
   let fromPayments = 0;
   for (const p of countedPayments(payments, startDate)) {
-    const amount = paymentNet(p) - (toStatements.get(p.id) ?? 0);
+    const amount = paymentNet(p) - (toDays.get(p.id) ?? 0);
     if (amount <= DUST) continue;
     out.push({ kind: 'payment', paymentId: p.id, amount });
     fromPayments += amount;

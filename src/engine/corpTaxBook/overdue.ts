@@ -1,7 +1,7 @@
 import { isPlainRecord } from '@/engine/guards';
 import { DAY_MS } from '@/lib/age';
 /**
- * Overdue (D19, D29): an unsettled Statement goes Overdue N days (14 by
+ * Overdue (D19, D29): an unsettled Late notice goes Overdue N days (14 by
  * default) after it is issued; no interest, reminders are manual. A miner's
  * declaration ("paid by contract / other division / wrong corp") pauses the
  * clock for at most 14 days, after which it resumes on its own with a note.
@@ -10,7 +10,7 @@ import { DAY_MS } from '@/lib/age';
  */
 
 export const DEFAULT_OVERDUE_DAYS = 14;
-/** The most a Statement's Overdue clock pauses for declarations, in total. */
+/** The most a Late notice's Overdue clock pauses for declarations, in total. */
 export const DECLARATION_PAUSE_DAYS = 14;
 
 /** `another-way`: the Miner's own "I paid this another way" (#6206). */
@@ -153,10 +153,10 @@ export interface OverdueStatus {
 
 export interface OverdueInput {
   issuedAt: string;
-  /** From `allocatePayments`. */
+  /** Every day the notice listed is paid (`lateNoticeStanding`). */
   settled: boolean;
   now: string;
-  /** This Statement's declarations. */
+  /** This notice's declarations. */
   declarations: readonly Declaration[];
   overdueDays?: number;
 }

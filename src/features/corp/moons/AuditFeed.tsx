@@ -44,7 +44,7 @@ export function AuditLine({
 }: {
   entry: AuditEntry;
   subject?: AuditSubject;
-  /** What the entry is about, when the page does not already say it (a Statement's period and amount). */
+  /** What the entry is about, when the page does not already say it (a Late notice's days and amount). */
   context?: ReactNode;
   /** Called when a Miner link is followed (the panel showing the feed closes). */
   onOpen?: () => void;

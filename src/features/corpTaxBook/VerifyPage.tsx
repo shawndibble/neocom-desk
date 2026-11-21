@@ -23,7 +23,7 @@ import { OwedDayList } from './OwedDayList';
 import { NoticeLines } from './NoticeLines';
 import { VerifyLedger } from './VerifyLedger';
 import { isk, shortDate } from './noticeFormat';
-import { readVerifyStatement, setVerifyRemindersStopped } from './verifyApi';
+import { readVerifyNotice, setVerifyRemindersStopped } from './verifyApi';
 
 type LoadState =
   | { status: 'loading' }
@@ -45,7 +45,7 @@ export function VerifyPage({ token }: { token: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    readVerifyStatement(token).then(
+    readVerifyNotice(token).then(
       (payload) => {
         if (!cancelled) setState({ status: 'ok', payload });
       },
@@ -92,12 +92,12 @@ export function VerifyPage({ token }: { token: string }) {
           }
         />
       )}
-      {state.status === 'ok' && <VerifyStatement token={token} payload={state.payload} />}
+      {state.status === 'ok' && <VerifyNotice token={token} payload={state.payload} />}
     </ShareShell>
   );
 }
 
-function VerifyStatement({ token, payload }: { token: string; payload: VerifyPayload }) {
+function VerifyNotice({ token, payload }: { token: string; payload: VerifyPayload }) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   // The wire still names the late notice `statement`, in the shape older servers stored it.

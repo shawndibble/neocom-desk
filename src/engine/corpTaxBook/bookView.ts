@@ -591,11 +591,6 @@ function buildExtractionRows(
     .sort((a, b) => a.chunkArrivalAt.localeCompare(b.chunkArrivalAt));
 }
 
-/**
- * The Statement days an officer write-off forgave in full (#4637). Mirrors the order the
- * allocation credits a Statement in: payments cover its oldest days, the write-off the next.
- */
-
 // --- Drill-downs -----------------------------------------------------------
 
 export interface MinerDetail {

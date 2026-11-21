@@ -10,7 +10,7 @@
  *   tab reads them except Moon owners, whose figures come from the `owners` summaries (#5717);
  *   that tab asks for them only when a summary cannot stand in (`needsRowsFallback`).
  * - `ledger`: payments, dismissals, declarations, adjustments, write-offs and disputes (#6206).
- *   A Miner's balance, a Statement's state and an Extraction page's per-day billing read them.
+ *   A Miner's Running account, a Late notice's standing and an Extraction page's per-day billing read them.
  * - `answers`: guests' answers to a hand-made grouping, shown beside a Miner.
  * - `owners`: each moon owner's server-built view summary (one doc per moon owner), which the
  *   Moon owners tab shows in place of accrual worked from every ledger row (#5717). Not in

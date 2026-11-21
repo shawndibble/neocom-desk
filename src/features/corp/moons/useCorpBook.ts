@@ -228,7 +228,7 @@ export function useCorpBook(
           return;
         }
         // Prices for every ore on every day it was mined, at the book's hub and Ore Form. A Miner's
-        // slice prices only its open window: a day on a Statement is frozen and needs no price.
+        // slice prices only its open window: a day before its checkpoint is closed and needs no price.
         const { pricesOn, moonOwnerPricesOn } = await loadBookPrices(data, data.minerScope?.from);
         if (cancelled) return;
         setFetched({
