@@ -263,34 +263,35 @@ export async function pickGlobalHub(choice: HubChoice): Promise<void> {
  * Remove forgets a page's hub.
  */
 export async function setHubScope(area: PageHubArea, scope: HubScope): Promise<void> {
-  if (
-    !usePageHubs.getState().hydrated ||
-    !useMarketHub.getState().hydrated ||
-    !useGlobalClosest.getState().hydrated
-  ) {
-    await Promise.all([
-      usePageHubs.getState().hydrate(),
-      useMarketHub.getState().hydrate(),
-      useGlobalClosest.getState().hydrate(),
-    ]);
+  const stores = [usePageHubs, useParkedPageHubs, useMarketHub, useGlobalClosest] as const;
+  // Skipped when settled: the press must apply in the same tick, as every setting store's does.
+  if (stores.some((store) => !store.getState().hydrated)) {
+    await Promise.all(stores.map((store) => store.getState().hydrate()));
   }
-  const parked = useParkedPageHubs.getState();
-  if (!parked.hydrated) await parked.hydrate();
+  // Both maps are read and written in one tick, never across an await: a second
+  // press, a hub pick or a sync pull in between would otherwise be overwritten.
+  // Each `setValue` updates its store at once; only the persisting is awaited.
   const map = usePageHubs.getState().value;
   const parkedMap = useParkedPageHubs.getState().value;
   if (scope === 'global') {
     const own = ownChoice(map, area);
     if (!own) return;
-    // Set aside first: a failure between the writes leaves the hub in both, never in neither.
-    await parked.setValue(setPageHub(parkedMap, area, own));
-    return usePageHubs.getState().setValue(dropPageHub(map, area));
+    await Promise.all([
+      useParkedPageHubs.getState().setValue(setPageHub(parkedMap, area, own)),
+      usePageHubs.getState().setValue(dropPageHub(map, area)),
+    ]);
+    return;
   }
   if (ownChoice(map, area)) return;
   const start: HubChoice =
     ownChoice(parkedMap, area) ??
     (useGlobalClosest.getState().value ? CLOSEST : useMarketHub.getState().value);
-  await usePageHubs.getState().setValue(setPageHub(map, area, start));
-  if (area in parkedMap) await parked.setValue(dropPageHub(parkedMap, area));
+  await Promise.all([
+    usePageHubs.getState().setValue(setPageHub(map, area, start)),
+    area in parkedMap
+      ? useParkedPageHubs.getState().setValue(dropPageHub(parkedMap, area))
+      : undefined,
+  ]);
 }
 
 /**
@@ -299,8 +300,18 @@ export async function setHubScope(area: PageHubArea, scope: HubScope): Promise<v
  * must never move the pages on Global.
  */
 export async function setPageHubEntry(area: PageHubArea, hub: TradeHub['id']): Promise<void> {
-  if (!usePageHubs.getState().hydrated) await usePageHubs.getState().hydrate();
+  if (!usePageHubs.getState().hydrated || !useParkedPageHubs.getState().hydrated) {
+    await Promise.all([usePageHubs.getState().hydrate(), useParkedPageHubs.getState().hydrate()]);
+  }
   const map = usePageHubs.getState().value;
-  if (ownChoice(map, area) === hub) return;
-  return usePageHubs.getState().setValue(setPageHub(map, area, hub));
+  const parkedMap = useParkedPageHubs.getState().value;
+  // A hub set aside is superseded: the page has its own again, so no stale copy is kept.
+  await Promise.all([
+    ownChoice(map, area) === hub
+      ? undefined
+      : usePageHubs.getState().setValue(setPageHub(map, area, hub)),
+    area in parkedMap
+      ? useParkedPageHubs.getState().setValue(dropPageHub(parkedMap, area))
+      : undefined,
+  ]);
 }

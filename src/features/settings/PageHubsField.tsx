@@ -152,7 +152,9 @@ export function PageHubsField() {
       </div>
       {removed !== null && (
         <Toast
-          message={t('settings.pageHubRemoved', { page: name(removed.area) })}
+          message={t(removed.parked ? 'settings.pageHubRemovedParked' : 'settings.pageHubRemoved', {
+            page: name(removed.area),
+          })}
           undo={{
             label: t('settings.pageHubUndo'),
             onUndo: () => {

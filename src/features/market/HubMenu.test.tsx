@@ -5,7 +5,7 @@ import '@/i18n';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { resetHubStores } from '@/test/hubStores';
-import { useMarketHub } from './hub';
+import { setPageHubEntry, useMarketHub } from './hub';
 import { HubField, HubMenu } from './HubMenu';
 import { usePageHubs, useParkedPageHubs } from './pageHubs';
 import { usePagePricePercents } from './pagePricePercents';
@@ -88,6 +88,13 @@ describe('HubMenu', () => {
       'aria-pressed',
       'true'
     );
+  });
+
+  it('a hub given straight to the page replaces one set aside, so no stale copy is kept', async () => {
+    await useParkedPageHubs.getState().setValue({ contracts: 'rens' });
+    await setPageHubEntry('contracts', 'amarr');
+    expect(usePageHubs.getState().value).toEqual({ contracts: 'amarr' });
+    expect(useParkedPageHubs.getState().value).toEqual({});
   });
 
   it('has no percent field unless the page says which side it prices', async () => {

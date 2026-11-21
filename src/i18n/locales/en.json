@@ -15481,6 +15481,7 @@
     "pageHubParked": "Using your Trade Hub for now",
     "pageHubRemoveFor": "Remove {{page}} hub",
     "pageHubRemoved": "{{page}} uses your Trade Hub again",
+    "pageHubRemovedParked": "{{page}} hub removed",
     "pageHubUndo": "Undo",
     "courierCollateralLabel": "Flag courier collateral at",
     "courierCollateralHint": "Shows a High collateral warning when a courier contract's collateral is this many times its reward or more.",
