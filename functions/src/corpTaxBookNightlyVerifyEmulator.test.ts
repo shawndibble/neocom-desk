@@ -82,32 +82,15 @@ emulatorSuite('the nightly pass (emulator)', () => {
     ).toBe(1);
   });
 
-  it('builds the Miners list from recorded accounts and Late notices', async () => {
+  it('builds the Overview from the Extractions alone, and deletes the retired Miners list', async () => {
     await book()
-      .collection('accounts')
-      .doc('solo:50')
-      .set({
-        owed: 100,
-        paid: 0,
-        days: 1,
-        unpaidDays: [{ date: '2026-10-11', owed: 100, tax: 100 }],
-        at: '2026-10-12T00:00:00Z',
-      });
-    await book()
-      .collection('lateNotices')
-      .doc('n1')
-      .set({
-        id: 'n1',
-        minerId: 'solo:50',
-        issuedAt: '2026-10-15T00:00:00Z',
-        lines: [{ date: '2026-10-11', tax: 100 }],
-        mail: { sent: 0, manualSent: 0, remindersStopped: false },
-      });
+      .collection('readModels')
+      .doc('minerList')
+      .set({ schema: READ_MODELS_SCHEMA, miners: [] });
     await verifyBook(db, CORP, () => NOW);
-    const list = (await book().collection('readModels').doc('minerList').get()).data();
-    expect(list).toMatchObject({
-      schema: READ_MODELS_SCHEMA,
-      miners: [{ minerId: 'solo:50', owed: 100, unsettled: [{ id: 'n1' }] }],
-    });
+    expect((await book().collection('readModels').doc('minerList').get()).exists).toBe(false);
+    const overview = (await book().collection('readModels').doc('overview').get()).data();
+    expect(Object.keys(overview ?? {}).sort()).toEqual(['extractions', 'schema', 'updatedAt']);
+    expect(overview?.extractions).toEqual([]);
   });
 });
