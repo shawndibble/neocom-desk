@@ -220,7 +220,7 @@ touches a real Firebase project: the project id is `demo-neocom-desk`.
    It wipes the Firestore emulator and writes a sample book (settings, officer
    access, Observed Mining Entries, Extractions in every state, matched /
    Unmatched / not-tax / manual Tax Payments, a dismissal, a declaration and an
-   issued, unpaid Statement with its verify token) in the schema of
+   issued notice for unpaid days, with its verify token) in the schema of
    `functions/src/corpTaxBookStore.ts`, then prints the verify URL. The officer
    record carries `--owner-hash`; the Firestore rules compare it to the signed-in
    token's `ownerHash` claim. The seeded value is a placeholder, and opening

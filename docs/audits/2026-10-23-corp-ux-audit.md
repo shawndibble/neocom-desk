@@ -2,6 +2,8 @@
 
 _Recorded 2026-10-23. Branch `audit/corp-ux-2026-10`._
 
+The calendar bill this audit tested (periods, a run per period, a bill per Miner) has since been replaced by Late notices and each Miner's Running account (decision 20261120-235011). Findings about it are kept as history, with "bill" standing for the old name in quoted copy.
+
 **Goal.** Can a Director or CEO who has never used Neocom Desk find the corporation pages, set up Mining Tax (the Corp Tax Book) and SRP, and read the other corp pages without getting lost? Every finding below records what was expected, what the app did, and how it could be better, so each can become one ticket.
 
 **How it was tested.** The real app (`npm run dev` on this branch) against the Firebase emulators, with a mocked EVE SSO, a mocked ESI and mocked zKillboard/Fuzzwork/Open Prices, driven by a headless Chromium. One corporation (Test Corp, 12 members, 2 Athanors, 1 Fortizar, moon mining ledger, wallet journal, assets, killmails). Personas: Test Pilot (Director, the audit persona), Aria Vance (CEO), Bram Okonkwo (Accountant), Dax Ferrin (no roles). Widths 1280, 1024, 768 and 390. Screenshots and the harness are in `.audit/corp-ux/` in this worktree (not committed). Fixture-caused oddities (wrong ore names, fake prices) are left out.
@@ -24,7 +26,7 @@ Severity: **High** blocks or misleads a new officer; **Medium** costs time or tr
 ## What worked well
 
 - Role gating is clear: an Accountant sees Corp Board, Corp Wallet, Moons and SRP; `/corp/members` as an Accountant explains that EVE only opens member tracking to a Director; a no-role member gets a plain "No corporation access" page.
-- The Corp Tax Book statement flow (Check, Send, Done) with mail preview, progress chip and verify link works end to end.
+- The Corp Tax Book billing run (Check, Send, Done) with mail preview, progress chip and verify link works end to end.
 - SRP: filing from the lost-ships list, fixed Hull Rule, killmail-percent chain, approve and reject toasts with mail, History and Activity all behave.
 - No page scrolls sideways on a phone (390px); tables switch to cards or their own scroller.
 
@@ -190,7 +192,7 @@ Severity: **High** blocks or misleads a new officer; **Medium** costs time or tr
 
 ### CX-28 · Medium · Tabs are offered before the book exists
 
-- **Got:** the rail and page show Extractions, Miners, Statements and Moon owners before setup; each opens the same three-way choice screen, and the page title reads "Extractions — Moons".
+- **Got:** the rail and page show Extractions, Miners, the bills tab and Moon owners before setup; each opens the same three-way choice screen, and the page title reads "Extractions — Moons".
 - **Better:** hide the tabs until a mode is chosen; title the page "Moons".
 - **Evidence:** `40-moons-first.png`.
 
@@ -236,7 +238,7 @@ Severity: **High** blocks or misleads a new officer; **Medium** costs time or tr
 
 ### CX-36 · Medium · Miners filter hides the biggest debtor by default
 
-- **Got:** "Members" is on and "Non-members" off; the Guest miner owing 43.5M (85M not on a Statement) is not in the list until the chip is pressed. With a start date of today the table is empty under a pressed "Members 3" chip and a footnote "3 other Miners owe nothing".
+- **Got:** "Members" is on and "Non-members" off; the Guest miner owing 43.5M (85M not billed yet) is not in the list until the chip is pressed. With a start date of today the table is empty under a pressed "Members 3" chip and a footnote "3 other Miners owe nothing".
 - **Better:** default both chips on, or show "1 non-member hidden · 43.5M owed" under the table.
 - **Evidence:** `50-miners-data.png`, `62-non-members.png`.
 
@@ -256,17 +258,17 @@ Severity: **High** blocks or misleads a new officer; **Medium** costs time or tr
 - **Got:** "Written off: 0 left over by 0 payments within tolerance (logged), and 0 lines recorded after payment, never billed. Both are on each Miner's page."
 - **Better:** hide when zero; otherwise two short lines.
 
-### CX-40 · Low · Verify page calls a weekly Statement monthly
+### CX-40 · Low · Verify page calls a weekly bill monthly
 
 - **Page:** `/corp-tax-book/verify/<token>`.
-- **Got:** "Test Corp · Statement Oct 2026" and "Your monthly Statement still comes" for a 2–8 Oct Statement; price lines read "Saved snapshot".
-- **Better:** "Statement 2–8 Oct 2026", cadence word from the setting, and "price saved on the day" instead of "Saved snapshot".
+- **Got:** "Test Corp · bill Oct 2026" and "Your monthly bill still comes" for a 2–8 Oct bill; price lines read "Saved snapshot".
+- **Better:** "bill 2–8 Oct 2026", cadence word from the setting, and "price saved on the day" instead of "Saved snapshot".
 - **Evidence:** `92-verify-page.png`.
 
 ### CX-41 · Low · Miner detail: duplicated moon name and an unexplained disabled button
 
 - **Got:** Refinery cell "Jita IV - Moon 2 - Test Corp Second Athanor / Jita IV - Moon 2" on some rows and only the name on others; "Send reminder" is natively disabled with no reason.
-- **Better:** drop the moon subtitle when the structure name contains it; `aria-disabled` with "No Statement issued yet".
+- **Better:** drop the moon subtitle when the structure name contains it; `aria-disabled` with "No bill issued yet".
 - **Evidence:** `51-miner-detail.png`.
 
 ### CX-42 · Low · "Dismiss tax for this extraction…" offered with nothing to dismiss
@@ -297,8 +299,8 @@ Severity: **High** blocks or misleads a new officer; **Medium** costs time or tr
 
 ### CX-47 · Low · Activity entries carry no subject
 
-- **Got:** seven lines "Test Pilot issued a Statement" and two "Test Pilot mailed a Statement" with no miner or amount.
-- **Better:** "issued a Statement to Dax Ferrin, 28,390,765 ISK".
+- **Got:** seven lines "Test Pilot issued a bill" and two "Test Pilot mailed a bill" with no miner or amount.
+- **Better:** "issued a bill to Dax Ferrin, 28,390,765 ISK".
 - **Evidence:** `60-activity.png`.
 
 ### CX-48 · Low · An officer cannot preview the member's Tax tab
@@ -364,22 +366,22 @@ The harness lives in `.audit/corp-ux/harness/` (uncommitted): `world.mjs` is the
 
 Fixes landed on `develop` in PRs #4897 (Assets), #4899 (Corp Board + permission tooltips), #4900 (Members + Wallet), #4904 (Moons setup/settings), #4906 + #4911 (Moons ledger), #4910 (SRP), #4912 (review follow-ups), #4909 (CI flake). Each PR had a read-only review; its follow-ups went into #4912 and a second polish PR. Re-walked on `develop` with the same harness and personas.
 
-| Finding                                         | Result                                                                                                                                                                                                                                                                                                                                                                                     |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| CX-01, CX-03                                    | Not done by decision: corp access stays opt-in; the character switcher and Settings › Permissions are the way in.                                                                                                                                                                                                                                                                          |
-| CX-02, CX-04..CX-13, CX-15, CX-16, CX-18..CX-21 | Verified in browser. Due soon lists only upcoming items, widget links fixed, CEO pill, `/corp/members/roster`, EVE-time days, structure names in Where and Location groups, Fuel bay tab, trimmed row menu, no page-level overflow at 768px on any corp page.                                                                                                                              |
-| CX-14                                           | Code-reviewed only (zKillboard failure path not reproducible with the mock).                                                                                                                                                                                                                                                                                                               |
-| CX-23..CX-28, CX-31..CX-39, CX-40, CX-42..CX-47 | Verified in browser. Start date labelled EVE time, defaults to the 1st, editable later; Back link; first sync runs on creation; plain health status; "Show to members now"; tabs hidden before setup; single Save with toast; division names; per-period Statement rows; verify page reads "Statement 1–7 Oct 2026", "weekly", "price saved on the day"; Activity names the Miner and ISK. |
-| CX-29, CX-30, CX-41                             | Code-reviewed only (401 path, raw SDK error and the disabled-reminder reason were not reachable in the re-walk).                                                                                                                                                                                                                                                                           |
-| CX-48                                           | Covered by "Show to members now" (CX-27) instead of a preview mode.                                                                                                                                                                                                                                                                                                                        |
-| CX-49..CX-57                                    | Verified in browser. Turn on lands on Settings; off-doctrine filing opens a dialog with File anyway; Approve/Reject disabled with a reason on the officer's own claim; Mark paid confirms and toasts; Activity reads "Added Doctrine Fit …"; Killmail link replaces the raw id; Accountant sees no Settings tab.                                                                           |
+| Finding                                         | Result                                                                                                                                                                                                                                                                                                                                                                           |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CX-01, CX-03                                    | Not done by decision: corp access stays opt-in; the character switcher and Settings › Permissions are the way in.                                                                                                                                                                                                                                                                |
+| CX-02, CX-04..CX-13, CX-15, CX-16, CX-18..CX-21 | Verified in browser. Due soon lists only upcoming items, widget links fixed, CEO pill, `/corp/members/roster`, EVE-time days, structure names in Where and Location groups, Fuel bay tab, trimmed row menu, no page-level overflow at 768px on any corp page.                                                                                                                    |
+| CX-14                                           | Code-reviewed only (zKillboard failure path not reproducible with the mock).                                                                                                                                                                                                                                                                                                     |
+| CX-23..CX-28, CX-31..CX-39, CX-40, CX-42..CX-47 | Verified in browser. Start date labelled EVE time, defaults to the 1st, editable later; Back link; first sync runs on creation; plain health status; "Show to members now"; tabs hidden before setup; single Save with toast; division names; per-period bill rows; verify page reads "bill 1–7 Oct 2026", "weekly", "price saved on the day"; Activity names the Miner and ISK. |
+| CX-29, CX-30, CX-41                             | Code-reviewed only (401 path, raw SDK error and the disabled-reminder reason were not reachable in the re-walk).                                                                                                                                                                                                                                                                 |
+| CX-48                                           | Covered by "Show to members now" (CX-27) instead of a preview mode.                                                                                                                                                                                                                                                                                                              |
+| CX-49..CX-57                                    | Verified in browser. Turn on lands on Settings; off-doctrine filing opens a dialog with File anyway; Approve/Reject disabled with a reason on the officer's own claim; Mark paid confirms and toasts; Activity reads "Added Doctrine Fit …"; Killmail link replaces the raw id; Accountant sees no Settings tab.                                                                 |
 
 New in the re-walk:
 
-- R1 · Medium · Statements "All periods": after switching cadence from Monthly to Every 7 days, the Ready to send row is labelled "Oct 2026" while the Closed and Open rows read "8 Oct – 14 Oct" and so on. The verify page for the same Statement correctly reads "1–7 Oct 2026". The table label must follow the period actually covered. Evidence: `v43-statements.png`.
+- R1 · Medium · Bills "All periods": after switching cadence from Monthly to Every 7 days, the Ready to send row is labelled "Oct 2026" while the Closed and Open rows read "8 Oct – 14 Oct" and so on. The verify page for the same bill correctly reads "1–7 Oct 2026". The table label must follow the period actually covered. Evidence: the v43 bills screenshot.
 
 ### Follow-up round, 2026-10-24
 
 - R1 fixed in #4917: period labels now follow the covered days ("1–7 Oct 2026", "25–30 Sep 2026"); moving the start date also moves an N-day anchor that sat on the old start, client and server; days before a later anchor form a stub period.
-- Row context menus (#4915 + #4919, decision `20261023-223827-corp-tables-carry-row-context-menus.md`): ⋮ plus right-click on Members roster and Roles tables, Corp Wallet journal (corp lines with a Player) and transactions, Moons Miners (officers), Moons Extractions (officers, survey ore with tax only), SRP officer Pending/Owed (claims with an amount). No menu where a row has fewer than two real actions (Statements, SRP History, `/srp` member tables). Verified in browser: the ⋮ is the last cell at the table's right edge; on phone cards it is a 36px button pinned top-right, centred on the title line (button y 0–36, title cell y 8–33), down from the old 44px block.
+- Row context menus (#4915 + #4919, decision `20261023-223827-corp-tables-carry-row-context-menus.md`): ⋮ plus right-click on Members roster and Roles tables, Corp Wallet journal (corp lines with a Player) and transactions, Moons Miners (officers), Moons Extractions (officers, survey ore with tax only), SRP officer Pending/Owed (claims with an amount). No menu where a row has fewer than two real actions (the bills tab, SRP History, `/srp` member tables). Verified in browser: the ⋮ is the last cell at the table's right edge; on phone cards it is a 36px button pinned top-right, centred on the title line (button y 0–36, title cell y 8–33), down from the old 44px block.
 - Review follow-ups F1–F27 landed in #4912 and #4914; F25 (CEO without the Director role seeing SRP Settings) left as a note.

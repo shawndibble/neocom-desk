@@ -40,9 +40,9 @@ police through callables.
 
 - **The Corp Tax Book lives in Firestore, keyed by corporation, shared by
   every officer.** It holds the book's settings (start date, trade hub, Ore
-  Form, rates with effective-from dates, grace, minimum Statement, divisions),
+  Form, rates with effective-from dates, grace, late-notice minimum, divisions),
   every **Observed Mining Entry**, **Extraction**, **Tax Payment**,
-  dismissal, declaration and sent **Statement**, Miner groupings, and who did
+  dismissal, declaration and sent **Late notice**, Miner groupings, and who did
   each. This is a second deliberate exception to the **API-Derived Data**
   rule, alongside ADR 0018's, not a change to the rule.
 - **Officer access is verified by a Cloud Function from a short-lived access
@@ -70,9 +70,10 @@ police through callables.
   book, including after leaving the corp. A book only knows characters that
   mined at its refineries; characters an account holds outside the corp are
   never revealed or linked unless the player adds them.
-- **The verify link is an unguessable token** carried in each Statement mail.
-  It resolves, without login, to a read-only view of that one Statement: its
-  lines, its terms with dates, and the payments credited. Its one write, the
+- **The verify link is an unguessable token** carried in each Late notice
+  mail. It resolves, without login, to a read-only view of that one notice and
+  the Miner's account: the days it listed, its terms with dates, and what the
+  Miner owes now. Its one write, the
   miner's "Stop reminders" toggle, is a callable authorised by the same token
   and audited like every other write.
 - **Sync stays client-driven.** Any officer's client syncs the observers,

@@ -12,7 +12,7 @@ _Recorded 2026-10-23._
   - SRP officer Pending and Owed (claims with a figure): Change amount…, Show info, Open in EVE, zKillboard, Copy name. The ⋮ is a separate trailing cell after the row's Approve / Reject cluster, a trade-off accepted so the row's visible buttons stay one tap.
 - **Accepted:** Open in EVE is inert without the Permission, so a user without it sees one real action (zKillboard) in the roster menu.
 - **No menu, and why.**
-  - Moons › Statements: no row click, and "Send this period" is already the visible run control above the table.
+  - Moons › Late notices: no row click, and the run is already the visible control above the table.
   - SRP officer History: only the pilot's actions, one real action.
   - SRP officer Approve, Reject, Mark paid, Copy amount and the killmail link: visible buttons on every row and card, so a menu would duplicate them (own-claim aria-disabled and the Mark paid confirm stay where they are).
   - /srp member claims and lost ships: Open detail is the row click, Re-file and File are visible buttons, Killmail link is the only extra.
