@@ -116,6 +116,25 @@ describe('CorpStatusPanel', () => {
     expect(onGrantAgain).toHaveBeenCalledWith(30);
   });
 
+  it('offers Grant again for an own corp read without each chunk’s ore', async () => {
+    const onGrantAgain = vi.fn();
+    render(
+      <CorpStatusPanel
+        items={[{ corporationId: 32, name: 'Sable Ridge Extraction', state: 'needs-ore' }]}
+        onSignInAgain={() => {}}
+        onGrantAgain={onGrantAgain}
+        onRemove={() => Promise.resolve(true)}
+      />
+    );
+    expect(screen.getByText('Needs you (1)')).toBeInTheDocument();
+    expect(screen.getByText('No chunk ore')).toBeInTheDocument();
+    expect(screen.getByText(/Each chunk's ore isn't shown/)).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Grant again for Sable Ridge Extraction' })
+    );
+    expect(onGrantAgain).toHaveBeenCalledWith(32);
+  });
+
   it("titles a list of only other officers' corps without a count", () => {
     render(
       <CorpStatusPanel

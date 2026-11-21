@@ -4,7 +4,7 @@ import { HandledByCard } from './HandledByCard';
 import { MoonOwnerView } from './MoonOwnerView';
 import { OwnerStaleBanner } from './OwnerStaleBanner';
 import { OwnerStatusStrip } from './OwnerStatusStrip';
-import { RefineryNamesBanner } from './RefineryNamesBanner';
+import { GrantAgainBanner } from './GrantAgainBanner';
 import { fixtureView, nameOf } from './ownerViewFixtures';
 
 const noop = async () => undefined;
@@ -104,7 +104,7 @@ export const PayeeSetByYou: Story = {
 export const RefineryNamesNotGranted: Story = {
   args: {
     view: fixtureView({ refineryNamesGranted: false }),
-    banner: <RefineryNamesBanner onGrant={() => {}} />,
+    banner: <GrantAgainBanner lacks="names" onGrant={() => {}} />,
   },
 };
 

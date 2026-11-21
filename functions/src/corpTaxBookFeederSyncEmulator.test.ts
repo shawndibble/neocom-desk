@@ -203,7 +203,17 @@ emulatorSuite('scheduled feeder pass (emulator)', () => {
     expect(rec?.lastSyncResult?.outcome).toBe('synced');
     expect(rec?.refineryStructures).toBeUndefined();
     expect(rec?.readsStructureNames).toBe(false);
+    expect(rec?.readsNotifications).toBe(false);
     expect(esiState.calls.filter((c) => c.startsWith('structure'))).toEqual([]);
+  });
+
+  it('mirrors whether the grant reads the Extraction started notifications onto the record', async () => {
+    await addFeeder(98000002, {}, true, { readsStructures: true, readsNotifications: true });
+    await run();
+    expect(await feederRecord(98000002)).toMatchObject({
+      readsStructureNames: true,
+      readsNotifications: true,
+    });
   });
 
   it('a grant with the structure scope keeps each refinery name and system on the record (#4654)', async () => {

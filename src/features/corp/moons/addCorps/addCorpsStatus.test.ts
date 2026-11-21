@@ -86,4 +86,27 @@ describe('needsYou', () => {
     ]);
     expect(items.filter(needsThePlayer).map((i) => i.corporationId)).toEqual([10, 15]);
   });
+
+  it('asks an own corp whose grant reads no Extraction notices to grant again for the ore', () => {
+    const own = { status: 'active', sameOwner: true, readsStructureNames: true };
+    const rows = [
+      { ...own, corporationId: 20, readsNotifications: false },
+      // Names lacking too: the one Grant again covers both, listed once as names.
+      { ...own, corporationId: 21, readsStructureNames: false, readsNotifications: false },
+      // Unknown until its next read, or already granted: nothing to ask.
+      { ...own, corporationId: 22 },
+      { ...own, corporationId: 23, readsNotifications: true },
+      // Not the player's to grant (another officer's, or no CEO character): the chunks say why.
+      { corporationId: 24, status: 'active', readsNotifications: false },
+      { ...own, corporationId: 25, readsNotifications: false },
+      // A removal in progress is not asked about.
+      { ...own, corporationId: 26, status: 'removal-pending', readsNotifications: false },
+    ];
+    const items = needsYou(null, rows, corpName, new Set([20, 21, 22, 23, 26]));
+    expect(items.map((i) => [i.corporationId, i.state])).toEqual([
+      [20, 'needs-ore'],
+      [21, 'needs-names'],
+    ]);
+    expect(items.every(needsThePlayer)).toBe(true);
+  });
 });

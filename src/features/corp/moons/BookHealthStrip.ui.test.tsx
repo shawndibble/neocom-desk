@@ -128,7 +128,7 @@ describe('BookHealthStrip, sources a sync could not read', () => {
       ...sync,
       run: { phase: 'done', outcome: { kind: 'synced', missing } },
     }) as unknown as CorpTaxBookSync;
-  const active = (missing?: ('extractions' | 'donations')[]) =>
+  const active = (missing?: ('extractions' | 'donations' | 'ore')[]) =>
     ({
       status: 'active',
       characterId: 9,
@@ -154,6 +154,20 @@ describe('BookHealthStrip, sources a sync could not read', () => {
 
   it('lets this visit’s read clear an older scheduled miss', () => {
     renderStrip(active(['donations']), visit([]));
+    expect(screen.queryByText(/could not read/)).not.toBeInTheDocument();
+  });
+
+  it('says the automatic sync reads no chunk ore without the Station Manager role', () => {
+    renderStrip(active(['ore']), visit(['ore']));
+    expect(
+      screen.getByText(/The last sync could not read Extractions and each chunk's ore/)
+    ).toBeInTheDocument();
+  });
+
+  it('never flags the ore for this visit alone: an officer without the role is not nagged', () => {
+    renderStrip(null, visit(['ore']));
+    expect(screen.queryByText(/could not read/)).not.toBeInTheDocument();
+    renderStrip(active(['ore']), visit([]));
     expect(screen.queryByText(/could not read/)).not.toBeInTheDocument();
   });
 });

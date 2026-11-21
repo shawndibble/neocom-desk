@@ -136,8 +136,9 @@ export async function lookUpRefineryStructures(
 
 /**
  * After a good ledger read: look up the refineries that need it (only when the grant carries the
- * structure scope) and keep them on the record, with whether the grant reads names at all. Best
- * effort: a failure here is logged by the caller and never fails the read.
+ * structure scope) and keep them on the record, with whether the grant reads names and the
+ * Extraction started notifications at all. Best effort: a failure here is logged by the caller
+ * and never fails the read.
  */
 export async function refreshRefineryStructures(
   deps: BookDeps,
@@ -146,7 +147,8 @@ export async function refreshRefineryStructures(
   feederCorporationId: number,
   structureIds: Iterable<number>,
   accessToken: string,
-  readsStructures: boolean
+  readsStructures: boolean,
+  readsNotifications: boolean
 ): Promise<void> {
   const ref = feederRef(deps.db, collectorCorporationId, feederCorporationId);
   const record = (await ref.get()).data() as FeederRecord | undefined;
@@ -161,13 +163,26 @@ export async function refreshRefineryStructures(
       )
     : {};
   const fields = Object.entries(found);
-  if (fields.length === 0 && record.readsStructureNames === readsStructures) return;
+  if (
+    fields.length === 0 &&
+    record.readsStructureNames === readsStructures &&
+    record.readsNotifications === readsNotifications
+  ) {
+    return;
+  }
   await deps.db.runTransaction(async (tx) => {
     const latest = (await tx.get(ref)).data() as FeederRecord | undefined;
     if (!latest || !READABLE_FEEDER_STATUSES.includes(latest.status)) return;
     const pairs: unknown[] = [];
     for (const [id, doc] of fields) pairs.push(new FieldPath('refineryStructures', id), doc);
-    tx.update(ref, 'readsStructureNames', readsStructures, ...pairs);
+    tx.update(
+      ref,
+      'readsStructureNames',
+      readsStructures,
+      'readsNotifications',
+      readsNotifications,
+      ...pairs
+    );
   });
 }
 

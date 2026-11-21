@@ -960,6 +960,15 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       expect(esiState.calls).not.toContain('extractions');
       expect((await book().collection('observed').get()).size).toBe(1);
       expect((await status())?.status).toBe('active');
+      // Nor the Extraction started notifications: the book's Needs you says so.
+      expect(esiState.calls).not.toContain('notifications');
+      expect((await status())?.lastRun).toMatchObject({ outcome: 'synced', missing: ['ore'] });
+    });
+
+    it('a holder with Station_Manager reads the ore and flags nothing', async () => {
+      await optIn(ACCOUNTANT);
+      await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+      expect((await status())?.lastRun).toMatchObject({ outcome: 'synced', missing: [] });
     });
 
     it('stops the schedule when the holder lost the role, and says why', async () => {

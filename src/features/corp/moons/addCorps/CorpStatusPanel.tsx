@@ -14,7 +14,8 @@ const k = (key: string) => `corpTaxBook.moons.addCorps.needs.${key}`;
  * here; sign-in problems start that corp's sign-in again; a corp with its own
  * book has only the instruction, because moving a book is not built yet. A moon
  * owner read without refinery names offers Grant again when it is the player's
- * own, and otherwise only says whose officer can; that one is not counted.
+ * own, and otherwise only says whose officer can; that one is not counted. One of
+ * the player's own read without each chunk's ore offers Grant again too.
  * Renders nothing when the list is empty.
  */
 export function CorpStatusPanel({
@@ -30,7 +31,7 @@ export function CorpStatusPanel({
   connected?: number;
   total?: number;
   onSignInAgain: (corporationId: number) => void;
-  /** Sign in again as the CEO so the grant reads refinery names. */
+  /** Sign in again as the CEO so the grant reads refinery names and each chunk's ore. */
   onGrantAgain: (corporationId: number) => void;
   /** Resolves `false` when the removal was refused. */
   onRemove: (corporationId: number) => Promise<boolean>;
@@ -73,14 +74,14 @@ export function CorpStatusPanel({
                 >
                   {t(k('gone-quiet.action'))}
                 </Button>
-              ) : item.state === 'needs-names' ? (
+              ) : item.state === 'needs-names' || item.state === 'needs-ore' ? (
                 <Button
                   size="sm"
                   variant="ghost"
                   aria-label={t(k('grantNamed'), { name: item.name })}
                   onClick={() => onGrantAgain(item.corporationId)}
                 >
-                  {t(k('needs-names.action'))}
+                  {t(k(`${item.state}.action`))}
                 </Button>
               ) : item.state === 'own-book' || item.state === 'names-not-shared' ? null : (
                 <Button

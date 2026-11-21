@@ -89,11 +89,31 @@ describe('MoonOwnerPanel', () => {
     );
   });
 
+  it('offers to grant again for the chunk ore on a grant without the extraction notices', async () => {
+    ready({ refineryNamesGranted: true, chunkOreGranted: false });
+    mount();
+    expect(await screen.findByText('Chunk ore not shared')).toBeVisible();
+    expect(screen.getByText(/doesn't include extraction notices/)).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: 'Grant again' }));
+    await waitFor(() =>
+      expect(beginFeederGrantLogin).toHaveBeenCalledWith(7, 'reconnect-existing')
+    );
+  });
+
+  it('asks once for both when the grant lacks names and the chunk ore', async () => {
+    ready({ refineryNamesGranted: false, chunkOreGranted: false });
+    mount();
+    expect(await screen.findByText('Refinery names and chunk ore not shared')).toBeVisible();
+    expect(screen.getAllByRole('button', { name: 'Grant again' })).toHaveLength(1);
+  });
+
   it('asks nothing when the grant reads names, the view predates it, or the ledger is stale (#4654)', async () => {
     for (const over of [
       { refineryNamesGranted: true },
+      { refineryNamesGranted: true, chunkOreGranted: true },
       {},
       { refineryNamesGranted: false, staleSince: Date.UTC(2026, 9, 11) },
+      { refineryNamesGranted: true, chunkOreGranted: false, staleSince: Date.UTC(2026, 9, 11) },
     ]) {
       ready(over);
       const { unmount } = mount();
