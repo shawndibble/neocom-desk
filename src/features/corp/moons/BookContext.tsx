@@ -4,7 +4,7 @@
  * `edit` — one action through `editBook` (ADR 0023), then a reload.
  */
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
-import { noteDirectorHeld } from './checkpointHolds';
+import { noteCheckpointSkips } from './checkpointHolds';
 import { accountRecords, dueCheckpoints } from '@/engine/corpTaxBook/accountRecords';
 import { chunk } from '@/lib/chunk';
 import { editBook, recordCheckpoints } from '../taxBook/bookClient';
@@ -115,10 +115,7 @@ function useRecordAccounts(value: Omit<BookContextValue, 'edit' | 'canEdit'>, ca
       dueCheckpoints(view, at),
       async (checkpoints) => {
         const { skipped } = await recordCheckpoints(characterId, corporationId, checkpoints);
-        noteDirectorHeld(
-          corporationId,
-          skipped.filter((x) => x.reason === 'director-approval').map((x) => x.minerId)
-        );
+        noteCheckpointSkips(corporationId, skipped);
       },
       // When it was worked out is no change to send again; a stored one that went (a regroup, a
       // Director's reset) is.

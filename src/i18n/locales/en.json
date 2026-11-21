@@ -18999,7 +18999,9 @@
         "billableHint": "A day becomes billable {{hours}} h after it ends, once a sync has read it. The book warns here when nobody has synced for about 3 days.",
         "hiddenLabel": "hidden from members",
         "hiddenHint": "A new book stays out of members' Mining Tax pages for 3 days, so officers can set it up first.",
-        "showToMembers": "Show to members now"
+        "showToMembers": "Show to members now",
+        "checkpointSkipped_one": "The server did not store {{count}} Miner's closed months ({{reasons}}). Their account is read in full meanwhile.",
+        "checkpointSkipped_other": "The server did not store {{count}} Miners' closed months ({{reasons}}). Their accounts are read in full meanwhile."
       },
       "run": {
         "check": "Check",

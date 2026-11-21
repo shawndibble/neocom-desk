@@ -6,6 +6,7 @@ import '@/i18n';
 import type { ScheduledSyncStatus } from '@/engine/corpTaxBook/scheduledSync';
 import { BookProvider } from './BookContext';
 import { BookHealthStrip } from './BookHealthStrip';
+import { noteCheckpointSkips } from './checkpointHolds';
 import type { BookContextValue } from './bookContextValue';
 import type { CorpTaxBookSync } from '../taxBook/useCorpTaxBook';
 
@@ -273,5 +274,23 @@ describe('BookHealthStrip, unrated days (#5717)', () => {
   it('says nothing about them on a tab that reads no rows, rather than counting none', () => {
     renderWith(new Set(['core', 'owners']));
     expect(screen.queryByText(/2 days/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('BookHealthStrip, checkpoints the server skipped (M5)', () => {
+  it('notes every reason but a Director approval, which Needs you asks for', () => {
+    noteCheckpointSkips(98000001, [
+      { minerId: 'solo:1', reason: 'balance' },
+      { minerId: 'solo:2', reason: 'not-forward' },
+      { minerId: 'solo:3', reason: 'director-approval' },
+    ]);
+    try {
+      renderStrip(null);
+      expect(
+        screen.getByText(/did not store 2 Miners' closed months \(balance, not-forward\)/)
+      ).toBeInTheDocument();
+    } finally {
+      noteCheckpointSkips(98000001, []);
+    }
   });
 });
