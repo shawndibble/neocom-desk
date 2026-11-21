@@ -307,12 +307,11 @@ export const newest = <T extends Pick<LateNotice, 'issuedAt' | 'id'>>(notices: r
 /** A late notice's Overdue clock: it starts at its issue and runs until every day it listed is paid. */
 export function noticeOverdue(
   view: Pick<BookView, 'input'>,
-  notice: Pick<LateNotice, 'id' | 'issuedAt'>,
-  settled: boolean
+  notice: Pick<LateNotice, 'id' | 'issuedAt'>
 ) {
   return overdueStatus({
     issuedAt: notice.issuedAt,
-    settled,
+    settled: false,
     now: view.input.now,
     declarations: view.input.declarations.filter((d) => d[NOTICE_ID_FIELD] === notice.id),
     overdueDays: view.input.overdueDays,
@@ -404,7 +403,7 @@ export function buildBookView(input: BookViewInput): BookView {
     // A late notice's Overdue clock starts at its issue, until its days are paid.
     for (const n of notices) {
       if (account.standingOf(n).settled) continue;
-      const status = noticeOverdue({ input }, n, false);
+      const status = noticeOverdue({ input }, n);
       if (status.state === 'paused') paused = true;
       if (status.state === 'overdue') {
         const days = Math.max(1, Math.floor((nowMs - Date.parse(status.overdueAt)) / DAY_MS));
@@ -747,12 +746,6 @@ export function extractionDetail(view: BookView, id: string): ExtractionDetail |
 
 // --- Late notices ----------------------------------------------------------
 
-/** What the book recorded about a late notice's mail; `stopped` wins over the sent count. */
-export interface NoticeMailState {
-  kind: 'sent' | 'not-mailed' | 'stopped';
-  count: number;
-}
-
 /** One late notice as its panel reads it, its figures read off the Miner's Running account. */
 export interface NoticeDetail {
   notice: LateNotice;
@@ -774,7 +767,6 @@ export interface NoticeDetail {
   state: OverdueState;
   /** While paused: when the pause ends on its own. */
   pausedUntil?: string;
-  mail: NoticeMailState;
 }
 
 /**
@@ -794,7 +786,7 @@ export function noticeDetail(view: BookView, noticeId: string): NoticeDetail | u
   const account = view.internals.byMiner.get(notice.minerId)?.account;
   const standing = account?.standingOf(notice);
   const settled = standing?.settled ?? false;
-  const status = settled ? undefined : noticeOverdue(view, notice, false);
+  const status = settled ? undefined : noticeOverdue(view, notice);
   const shown = settled
     ? shownFigures(standing!.due, 0, standing!.due)
     : shownFigures(
@@ -802,7 +794,6 @@ export function noticeDetail(view: BookView, noticeId: string): NoticeDetail | u
         standing?.remaining ?? notice.listed,
         standing?.credited ?? 0
       );
-  const { sent, remindersStopped } = notice.mail;
   return {
     notice,
     ...shown,
@@ -814,6 +805,5 @@ export function noticeDetail(view: BookView, noticeId: string): NoticeDetail | u
     dueAt: status?.overdueAt ?? null,
     state: status?.state ?? 'settled',
     ...(status?.pausedUntil ? { pausedUntil: status.pausedUntil } : {}),
-    mail: { kind: remindersStopped ? 'stopped' : sent > 0 ? 'sent' : 'not-mailed', count: sent },
   };
 }

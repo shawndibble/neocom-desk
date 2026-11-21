@@ -393,13 +393,3 @@ export function activityFeed<
   ];
   return rows.sort((a, b) => b.at - a.at || a.id.localeCompare(b.id));
 }
-
-/** The oldest late notice that is not settled: the one an overdue Miner is reminded of first. */
-export function oldestUnsettled<S extends { id: string; issuedAt: string }>(
-  statements: readonly S[],
-  isSettled: (id: string) => boolean
-): S | undefined {
-  return statements
-    .filter((s) => !isSettled(s.id))
-    .sort((a, b) => a.issuedAt.localeCompare(b.issuedAt))[0];
-}

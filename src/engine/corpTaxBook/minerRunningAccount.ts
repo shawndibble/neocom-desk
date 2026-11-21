@@ -197,7 +197,6 @@ export class MinerRunningAccount {
     const settled = settleDays(
       { ...input, days },
       {
-        extraCorrections: 0,
         paymentPool: opening + paid,
         payments: [
           ...(opening > 0 ? [{ paymentId: OPENING_CREDIT, left: opening }] : []),
@@ -397,8 +396,6 @@ export function runningDaysFromLines(
 
 /** The money `settleDays` spreads over the days, oldest day first. */
 interface DayPools {
-  /** Credit from outside the days that is not a payment: it pays days without the tolerance. */
-  extraCorrections: number;
   /** The payments' money for the days, paid in one go (a day's tolerance can close mid-run). */
   paymentPool: number;
   /** Each payment's share of `paymentPool`, oldest first: only says whose money each slice was. */
@@ -523,7 +520,7 @@ function settleDays(input: DaysInput, pools: DayPools): SettledDays {
 
   // A day that came out negative (credit corrections) pays the oldest owed days, as a dismissal would.
   const corrections = days.reduce((sum, d) => sum + Math.max(0, -d.tax), 0);
-  let credit = pay(corrections + pools.extraCorrections, 'correction');
+  let credit = pay(corrections, 'correction');
   credit += pay(pools.paymentPool, 'payment');
   pay(pools.writeOffPool, 'writeOff'); // a leftover is dropped, never credit
 
