@@ -1,8 +1,9 @@
 import { characterIdsOfMiner, type DayCharge } from '../charges';
 import { minerBillableLines } from '../billableLines';
-import { disputeHold, disputesToShow } from '../disputes';
+import { disputeHold, disputesToShow, isMinersDispute } from '../disputes';
 import { heldBillableThrough, type StaleHold } from '../feederHealth';
 import { MinerRunningAccount } from '../minerRunningAccount';
+import type { RunningAccountCheckpoint } from '../../../../functions/src/corpTaxBookCheckpoint';
 import { isBeforeBook, type TaxPayment } from '../payments';
 import { exemptionsOf } from '../toleranceExemptions';
 import type { MinerSettlement, OpenSetInput } from './types';
@@ -14,6 +15,22 @@ export function minerIdsOf(input: OpenSetInput, charges: readonly DayCharge[]): 
   for (const n of input.notices) ids.add(n.minerId);
   for (const p of input.payments) if (p.minerId) ids.add(p.minerId);
   return [...ids];
+}
+
+/**
+ * A stored checkpoint, unless it was recorded for other characters than the Miner has now (a
+ * regroup the server has not caught up with): then the account is read whole, as without one (B3).
+ */
+function currentCheckpoint(
+  checkpoint: RunningAccountCheckpoint | undefined,
+  characterIds: readonly number[]
+): RunningAccountCheckpoint | undefined {
+  const recordedFor = (checkpoint as { characterIds?: unknown } | undefined)?.characterIds;
+  if (!checkpoint || !Array.isArray(recordedFor)) return checkpoint;
+  const now = new Set(characterIds);
+  return recordedFor.length === now.size && recordedFor.every((c) => now.has(c as number))
+    ? checkpoint
+    : undefined;
 }
 
 /**
@@ -50,10 +67,10 @@ export function settleMiner(
   // An open dispute nobody has dismissed yet holds its date (`disputesToShow`).
   const heldDays = new Set(
     disputesToShow(input.disputes ?? [], input.dismissals)
-      .filter((d) => d.minerId === minerId && disputeHold(d, input.now))
+      .filter((d) => isMinersDispute(d, minerId, characterIds) && disputeHold(d, input.now))
       .map((d) => d.date)
   );
-  const checkpoint = input.checkpoints?.get(minerId);
+  const checkpoint = currentCheckpoint(input.checkpoints?.get(minerId), characterIds);
   const storedPaidThrough = input.minerPaidThrough?.get(minerId);
   const account = MinerRunningAccount.build({
     days: billable.lines,

@@ -90,7 +90,7 @@ function useRecordAccounts(value: Omit<BookContextValue, 'edit' | 'canEdit'>, ca
   // The page rebuilds its view every minute for its clocks; the accounts and checkpoints change
   // only with the book read or the UTC day, so they are worked out once per read or per day (M10).
   // (A context built by hand, a story or a test, may carry no clock.)
-  const today = (view.input?.now as string | undefined)?.slice(0, 10);
+  const today = (view as typeof view | undefined)?.input?.now?.slice(0, 10);
   const latest = useRef(view);
   useEffect(() => {
     latest.current = view;
