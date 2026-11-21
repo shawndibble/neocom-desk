@@ -3,7 +3,7 @@
  * group but cannot read it until its owner signs in as it (a Self-proven link). Pure: the store
  * reads the facts, this decides who reads, who is claimed and what a sign-in promotes.
  */
-import { earlierGrouping, soloCharacterId } from './corpTaxBookDonationMatch.js';
+import { earlierGrouping, minerIdFor, soloCharacterId } from './corpTaxBookDonationMatch.js';
 
 export interface GroupConflict {
   characterId: number;
@@ -91,6 +91,33 @@ export function minerUidsOf(
  */
 export function paymentUids(minerUids: readonly string[], sender: unknown): string[] {
   return [...new Set([...minerUids, ...(typeof sender === 'string' ? [sender] : [])])];
+}
+
+/** A stored grouping, as the readers of its Characters' rows are worked out from it. */
+export interface ReaderMiner {
+  id: string;
+  characterIds: readonly number[];
+  officerClaimed?: readonly number[];
+  pendingConfirmation?: readonly number[];
+  createdAt?: string;
+}
+
+/**
+ * Who reads a Character's own records (`observed` rows' `uids`): the readers of the Miner it is
+ * billed under (`minerIdFor`, its earliest grouping), so a main reads an alt's mined days, and
+ * itself, an Officer claim included. A guest still waiting to confirm is its own reader alone.
+ */
+export function characterUids(characterId: number, miners: readonly ReaderMiner[]): string[] {
+  // A legacy guest not yet confirmed keeps its own Miner (D26b): its records join on confirming.
+  const billing = miners.filter((m) => !m.pendingConfirmation?.includes(characterId));
+  const minerId = minerIdFor(characterId, billing);
+  return paymentUids(
+    minerUidsOf(
+      minerId,
+      miners.find((m) => m.id === minerId)
+    ),
+    `char:${characterId}`
+  );
 }
 
 export interface ClaimMiner {

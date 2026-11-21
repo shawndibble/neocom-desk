@@ -13,13 +13,17 @@ order below.
   - `accountCheckpoints/{minerId}`: officers read every one; a Miner reads their own (`uids`).
   - `payments/{paymentId}`: also readable by its Miner's readers (`uids`), so a main reads an
     alt's donation. A payment without `uids` still reads by its sender (`uid`) alone.
+  - `observed/{rowId}`: also readable by its Character's Miner's readers (`uids`), so a main
+    reads an alt's mined days. A row without `uids` still reads by its Character (`uid`) alone.
+    **Added after the first rules deploy: redeploy the rules** (step 1).
   - Under `users/{uid}`, a pilot's own `miningTaxPaymentLinks/{linkId}` (a Made Payment's link
     to one Payee), with the same owner and hash rules as `miningTaxAssignments`. Older clients
     never read or write it.
-- **Indexes:** for the synced `miningTaxPaymentLinks` collection only (`ownerHash` + `updatedAt`,
-  and its single-field `ownerHash` override), the same pair every synced collection has. Corp Tax
-  Book queries need none: each is on a single field (`minerId`, `characterIds`, `uids` on
-  `payments`, `issuedAt`, `extractionId`, `chunkArrivalTime`, `transferId`, and
+- **Indexes:** for the synced `miningTaxPaymentLinks` collection (`ownerHash` + `updatedAt`, and
+  its single-field `ownerHash` override), the same pair every synced collection has; and
+  `observed` `uids` (array-contains) + `updatedAt`, for a member's delta read of their Miner's
+  rows (step 1). Every other Corp Tax Book query is on a single field (`minerId`, `characterIds`,
+  `uids` on `payments`, `issuedAt`, `extractionId`, `chunkArrivalTime`, `transferId`, and
   `books.<corporationId>` on `corpTaxBookBilledBy`, indexed as a map field by default).
 - **Functions:**
   - `corpTaxBookCall` (the book's router): `issueLateNotice`, `recordLateNoticeMail`,
@@ -35,7 +39,11 @@ order below.
 'ambiguous'`). A hand record of a transfer the book already holds is refused; one noted in an
     unread division is linked to it and never counted again. `reassignPayment` moves a payment.
     Every payment write stores `uids`: its Miner's readers and its sender. A grouping, an unlink
-    and a promoted claim bring its Miner's payments' `uids` level with who reads the Miner.
+    and a promoted claim bring its Miner's payments' `uids` level with who reads the Miner. Every
+    `observed` row a sync writes stores `uids` too: its Character's Miner's readers and itself.
+    After a grouping, an unlink, a guest's answer or a promoted claim commits, the rows of every
+    Character it touched are brought level a page at a time (best effort, with a fresh
+    `updatedAt`), since one Character can hold more rows than a transaction writes.
   - `dailyHousekeeping` (job `verifyBookDocs`): the nightly pass rebuilds moon docs (schema 2, no
     frozen tax) and the Overview read model (schema 2, its Extractions alone), and deletes the
     retired `minerTotals` docs and `readModels/minerList` doc (nothing reads it).
@@ -64,21 +72,27 @@ actions (`issueStatement`, `recordMail`) and reads the legacy `statements` docs 
    firebase deploy --only firestore:rules,firestore:indexes
    ```
 
+   **Already deployed? Run it again.** The `observed` rule and its `uids` + `updatedAt` index (an
+   alt's mined rows) came after the first rules deploy. Additive: a row without `uids` reads as
+   before.
+
 2. **Functions**, which start writing `lateNotices` (and still mirror every notice to
    `statements`/`statementLinks`, so older tabs keep reading them):
 
-   ```sh
-   firebase deploy --only functions
-   ```
+```sh
+firebase deploy --only functions
+```
 
 3. **Backfill**, once the functions are live (a notice issued before step 2 exists only in
    `statements`). Count first, then copy. It creates missing copies, brings each existing copy's
    mail state level with its legacy doc, and then marks the book (`meta/lateNoticesBackfilled`):
    from then on reads look at `lateNotices` alone. Until a book is marked, every read also reads
    the ids of its legacy docs and fetches those with no copy. It also gives each payment stored
-   without `uids` its Miner's readers and its sender (`payment readers` in its output); until it
-   has, a main does not see an alt's older donations. It can run again safely; a book that fails
-   (a notice issued, or a payment written, during its run) is reported, the run goes on, and the
+   without `uids` its Miner's readers and its sender (`payment readers` in its output), and each
+   `observed` row without `uids` its Character's Miner's readers and itself (`row readers`, a
+   page of 1000 rows at a time, without moving `updatedAt`); until it has, a main does not see an
+   alt's older donations or mined days. It can run again safely; a book that fails (a notice
+   issued, or a payment or row written, during its run) is reported, the run goes on, and the
    script exits non-zero: re-run it with those corporation ids.
 
    ```sh

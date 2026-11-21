@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { planLateNoticeCopies, planPaymentReaders } from './corpTaxBookLateNoticeBackfill.js';
+import {
+  planLateNoticeCopies,
+  planObservedReaders,
+  planPaymentReaders,
+} from './corpTaxBookLateNoticeBackfill.js';
 
 const notice = (id: string, kind?: string, mail: Record<string, unknown> = {}) => ({
   id,
@@ -93,5 +97,27 @@ describe('planPaymentReaders', () => {
     expect(
       planPaymentReaders([{ id: 'p1', data: { minerId: 'g', uid: 'char:2', uids: [] } }], miners)
     ).toEqual([]);
+  });
+});
+
+describe('planObservedReaders', () => {
+  const miners = [{ id: 'g', data: { characterIds: [1, 2, 3], officerClaimed: [3] } }];
+
+  it("gives each row stored without `uids` its Character's Miner's readers and itself", () => {
+    expect(
+      planObservedReaders(
+        [
+          { id: 'r1', data: { characterId: 2 } },
+          { id: 'r2', data: { characterId: 3 } },
+          { id: 'r3', data: { characterId: 9 } },
+          { id: 'r4', data: { characterId: 1, uids: ['char:1'] } },
+        ],
+        miners
+      )
+    ).toEqual([
+      { id: 'r1', uids: ['char:1', 'char:2'] },
+      { id: 'r2', uids: ['char:1', 'char:2', 'char:3'] },
+      { id: 'r3', uids: ['char:9'] },
+    ]);
   });
 });
