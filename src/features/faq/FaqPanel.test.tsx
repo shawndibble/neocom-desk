@@ -60,6 +60,7 @@ const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.pageHubs': /trade hub of each page/i,
   'sync.marketHubClosest': /closest trade hub/i,
   'sync.marketPricePercent': /appraisal price %/i,
+  'sync.pagePricePercents': /price percent of each page/i,
   'sync.industryFacilityDefaults': /industry facility/i,
   'sync.industryReactionFacilityDefaults': /reaction facility/i,
   'sync.industryAssumedMe': /assumed ME\/TE/,

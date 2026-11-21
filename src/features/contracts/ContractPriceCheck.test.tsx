@@ -44,8 +44,11 @@ describe('ContractPriceCheck', () => {
     // The heading still reads whole around the trigger.
     expect(screen.getByRole('region', { name: 'Is it fair? · Jita 4-4 right now' })).toBeVisible();
     await userEvent.click(screen.getByRole('button', { name: /^Jita 4-4, choose another/ }));
-    expect(screen.getByRole('menuitemradio', { name: 'Contracts' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitemradio', { name: 'Jita 4-4' })).toBeChecked();
+    expect(screen.getByRole('button', { name: 'Contracts' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Jita 4-4' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
   });
 
   it('indents a part of the line above, and keeps it in the same list', () => {

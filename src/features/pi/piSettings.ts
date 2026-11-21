@@ -42,10 +42,6 @@ const LEGACY_GOAL_PLANNER_KEY = 'piGoalPlanner';
 export const PI_BUY_TIERS = [1, 2, 3] as const;
 export type PiBuyTier = (typeof PI_BUY_TIERS)[number];
 
-/** The buyback rates offered, as a percent of the hub's price. */
-export const PI_BUYBACK_PCT_OPTIONS = [80, 85, 90, 95] as const;
-export const DEFAULT_BUYBACK_PCT = 90;
-
 export interface PiSettings {
   hub: TradeHub['id'];
   buybackPct: number | null;

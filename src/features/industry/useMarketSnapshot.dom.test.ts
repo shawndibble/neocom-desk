@@ -47,7 +47,13 @@ describe('useMarketSnapshot', () => {
     await waitFor(() => expect(result.current.snapshot).toEqual(snap));
     expect(result.current.loading).toBe(false);
     expect(result.current.fetchedAt).toBeInstanceOf(Date);
-    expect(mockedLoad).toHaveBeenCalledWith(DEFAULT_TRADE_HUB, [34], undefined, 'manufacturing');
+    expect(mockedLoad).toHaveBeenCalledWith(
+      DEFAULT_TRADE_HUB,
+      [34],
+      undefined,
+      'manufacturing',
+      undefined
+    );
   });
 
   it('passes costIndexSystemId and activity through to the loader', async () => {
@@ -57,7 +63,13 @@ describe('useMarketSnapshot', () => {
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    expect(mockedLoad).toHaveBeenCalledWith(DEFAULT_TRADE_HUB, [34], 30000144, 'reaction');
+    expect(mockedLoad).toHaveBeenCalledWith(
+      DEFAULT_TRADE_HUB,
+      [34],
+      30000144,
+      'reaction',
+      undefined
+    );
   });
 
   it('re-enters loading the instant the key changes, in the same render — no stale "ready" frame', async () => {
@@ -154,6 +166,26 @@ describe('useMarketSnapshot', () => {
 
     rerender({ hub: amarr });
     await waitFor(() => expect(mockedLoad).toHaveBeenCalledTimes(2));
-    expect(mockedLoad).toHaveBeenLastCalledWith(amarr, [34], undefined, 'manufacturing');
+    expect(mockedLoad).toHaveBeenLastCalledWith(amarr, [34], undefined, 'manufacturing', undefined);
+  });
+
+  it('re-fetches at a changed Industry price percent (issue #6531)', async () => {
+    mockedLoad.mockResolvedValue(snapshot());
+    const { rerender } = renderHook(
+      ({ percent }) =>
+        useMarketSnapshot(DEFAULT_TRADE_HUB, [34], undefined, 'manufacturing', 0, percent),
+      { initialProps: { percent: 100 } }
+    );
+    await waitFor(() => expect(mockedLoad).toHaveBeenCalledTimes(1));
+
+    rerender({ percent: 90 });
+    await waitFor(() => expect(mockedLoad).toHaveBeenCalledTimes(2));
+    expect(mockedLoad).toHaveBeenLastCalledWith(
+      DEFAULT_TRADE_HUB,
+      [34],
+      undefined,
+      'manufacturing',
+      90
+    );
   });
 });

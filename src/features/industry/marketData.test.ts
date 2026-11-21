@@ -85,6 +85,20 @@ describe('loadMarketSnapshot', () => {
     expect(snapshot.hubPricesUnreachable).toBe(false);
   });
 
+  it('prices at the Industry percent (issue #6531): hub sell, hub buy and the troll-cap average scale; volumes and EIV do not', async () => {
+    server.use(fuzzworkHandler(), adjustedPricesHandler(), costIndexHandler());
+
+    const [snapshot] = await Promise.all(
+      loadMarketSnapshots([{ hub: DEFAULT_TRADE_HUB, typeIds: [34], pricePercent: 90 }])
+    );
+
+    expect(snapshot!.hubPrices[34]).toBeCloseTo(4.95);
+    expect(snapshot!.hubBuyPrices[34]).toBeCloseTo(4.32);
+    expect(snapshot!.averagePrices?.[34]).toBeCloseTo(4.05);
+    expect(snapshot!.hubSellVolumes).toEqual({ 34: 100 });
+    expect(snapshot!.adjustedPrices).toEqual({ 34: 4.2 });
+  });
+
   it('flags hubPricesUnreachable when Fuzzwork cannot be reached, so "no price" is not read as "no orders"', async () => {
     server.use(
       http.get(FUZZWORK_AGGREGATES_URL, () => HttpResponse.error()),

@@ -75,7 +75,7 @@ function renderAt(entry: string) {
 async function pickHub(name: string) {
   const user = userEvent.setup({ delay: null });
   await user.click(screen.getByRole('button', { name: /Trade Hub/i }));
-  await user.click(await screen.findByRole('menuitemradio', { name }));
+  await user.click(await screen.findByRole('button', { name }));
 }
 
 beforeEach(async () => {

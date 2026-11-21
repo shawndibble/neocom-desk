@@ -77,6 +77,12 @@
 // map without it, never by deleting the key, so the tombstone edge does not
 // bite it.
 //
+// sync.pagePricePercents (issue #6531): one map of page area -> percent of
+// market that page prices at (features/market/pagePricePercents.ts), beside
+// sync.pageHubs and a blob for the same reason. Appraisal keeps
+// sync.marketPricePercent and PI its device-local buyback rate, so neither
+// page ever has two. Entries are set, never removed (100 is a value).
+//
 // sync.defaultCharacterFilter (issue #607): a sixth Defaults-panel preference,
 // added later than the five above and with no device-local life to seed from
 // (no `legacyKey`). Which Character a cross-character view (Wallet Balance,
@@ -386,6 +392,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.pageHubs',
   'sync.marketHubClosest',
   'sync.marketPricePercent',
+  'sync.pagePricePercents',
   'sync.miningTaxDefaultOptOuts',
   'sync.miningTaxManualIgnoredTypeIds',
   'sync.miningTaxCompressedOre',

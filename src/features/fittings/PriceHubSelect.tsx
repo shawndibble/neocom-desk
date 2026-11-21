@@ -6,6 +6,7 @@ import { STAT_FIELD_WIDTH } from './statKit';
 /**
  * The Trade Hub a Fittings or Skills price section quotes: its page area's
  * hub (`HubField`), Global unless the pilot gave the area a hub of its own.
+ * Both pages price what the pilot buys, so the popover's percent is a Buy percent.
  */
 export function PriceHubSelect({
   area = 'fittings',
@@ -22,6 +23,7 @@ export function PriceHubSelect({
     <HubField
       area={area}
       size={size}
+      side="buy"
       label={t('fittings.stats.priceHub')}
       className={bare ? STAT_FIELD_WIDTH : 'min-w-0'}
     />

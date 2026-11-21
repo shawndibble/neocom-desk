@@ -36,7 +36,9 @@ export interface PlanSnapshots {
 /** Returns one entry per `members` item, in order. */
 export function loadPlanSnapshots(
   members: readonly { plan: BuildPlanRecord; blueprint: IndustryBlueprint }[],
-  sources: RecipeCatalog
+  sources: RecipeCatalog,
+  /** The Industry percent (issue #6531): each plan keeps its own hub but prices at this. Absent is 100. */
+  pricePercent?: number
 ): PlanSnapshots[] {
   const requests: MarketSnapshotRequest[] = [];
   const offerGroups = new Map<string, { characterId: number; hub: TradeHub; ids: Set<number> }>();
@@ -57,6 +59,7 @@ export function loadPlanSnapshots(
         typeIds,
         costIndexSystemId: plan.buildSystemId,
         activity: industryActivityOf(blueprint),
+        pricePercent,
       }) - 1;
     const reaction =
       reactionPlanFacilityContextFor(plan) !== null
@@ -65,6 +68,7 @@ export function loadPlanSnapshots(
             typeIds,
             costIndexSystemId: plan.reactionBuildSystemId,
             activity: 'reaction',
+            pricePercent,
           }) - 1
         : null;
     return { primary, reaction, offerKey };
@@ -79,7 +83,7 @@ export function loadPlanSnapshots(
         () => NO_BLUEPRINT_PURCHASE_OFFERS
       )
     );
-    inventionMarkets.set(key, loadInventionMarket(group.hub, [...group.ids]));
+    inventionMarkets.set(key, loadInventionMarket(group.hub, [...group.ids], pricePercent));
   }
   return indexes.map(({ primary, reaction, offerKey }) => ({
     snapshot: snapshots[primary]!,

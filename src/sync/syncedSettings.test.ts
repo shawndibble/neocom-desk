@@ -40,6 +40,7 @@ const PINNED_SYNCED_SETTING_KEYS: string[] = [
   'sync.pageHubs',
   'sync.marketHubClosest',
   'sync.marketPricePercent',
+  'sync.pagePricePercents',
   'sync.miningTaxDefaultOptOuts',
   'sync.miningTaxManualIgnoredTypeIds',
   'sync.miningTaxCompressedOre',

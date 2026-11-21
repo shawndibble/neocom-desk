@@ -21,6 +21,7 @@ import { applyImplantBasis, type ImplantBasis } from '@/engine/fittings/implantB
 import type { Fitting, FittingStats, PilotProfile } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
 import { useHubFor } from '@/features/market/hub';
+import { usePricePercentFor } from '@/features/market/pagePricePercents';
 import { getTradeHub, DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { useStatsConditions } from './statsConditions';
 import { useChargeBasis } from './useChargeBasis';
@@ -169,14 +170,15 @@ export function useFittingEvaluation({
 
   // Priced at the pilot's Trade Hub (Settings, or the Price section's select).
   const { hubId, hydrated: hubHydrated } = useHubFor('fittings');
+  const percent = usePricePercentFor('fittings');
 
   // The clone's implants are already bought: priced like the multibuy list, without them.
   const cloneImplants = profile?.implantTypeIds;
   // Keyed by hull: a different hull drops the old price, an edit refreshes behind it.
   const loadPrice = useCallback(async () => {
     const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
-    return loadFittingPrice(fitting!, hub, cloneImplants);
-  }, [fitting, hubId, cloneImplants]);
+    return loadFittingPrice(fitting!, hub, cloneImplants, percent);
+  }, [fitting, hubId, cloneImplants, percent]);
   const price: Appraisal | null =
     useKeyedLoad(fitting === null ? null : String(fitting.shipTypeId), loadPrice, !hubHydrated)
       .data ?? null;

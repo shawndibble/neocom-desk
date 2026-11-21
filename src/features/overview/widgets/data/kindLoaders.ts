@@ -402,12 +402,17 @@ export async function loadSurveyWidget(): Promise<SurveyWidgetData> {
     import('@/sde/loadSde'),
   ]);
   await migrateSurveyPriceHub().catch(() => undefined);
-  const { loadHubFor } = await import('@/features/market/hub');
-  const hub = getTradeHub(await loadHubFor('mining')) ?? DEFAULT_TRADE_HUB;
+  const [{ loadHubFor }, { loadPricePercentFor }] = await Promise.all([
+    import('@/features/market/hub'),
+    import('@/features/market/pagePricePercents'),
+  ]);
+  const [hubId, percent] = await Promise.all([loadHubFor('mining'), loadPricePercentFor('mining')]);
+  const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   const scans = countedScans(survey.scans, survey.ignored);
   const { prices } = await loadOrePrices(
     scans.flatMap((s) => s.rocks.map((r) => r.ore)),
-    hub
+    hub,
+    percent
   );
   const [types, oreIds] = await Promise.all([loadTypes(), loadOreAndIceTypeIds()]);
   const oreTypeIds = new Map<string, number>();

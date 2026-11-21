@@ -1,6 +1,8 @@
 import { useCallback } from 'react';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { setPageHubEntry, useHubFor } from '@/features/market/hub';
+import { PRICE_PERCENT_STORES, usePricePercentFor } from '@/features/market/pagePricePercents';
+import { DEFAULT_PRICE_PERCENT } from '@/features/market/pricePercent';
 import { seedPageHubsOnce, useSeededOnce } from '@/features/market/pageHubSeed';
 import { usePiSettings, type PiBuyTier } from './piSettings';
 import { useHydratedStore } from '@/lib/useHydratedStore';
@@ -10,7 +12,7 @@ export interface SellHub {
   hub: TradeHub;
   /** False until the hub is read: a figure priced before then would be priced at the wrong hub. */
   hydrated: boolean;
-  /** The corp buyback's percent of the hub's price, or null when selling on the hub's market. */
+  /** PI's Sell percent when it is not 100 (a corp buyback paying that percent of the hub's price), else null: the hub's market. */
   buybackPct: number | null;
   buyTiers: readonly PiBuyTier[];
   /** Sell at the hub the nudge found nearest: PI's own entry, since nearest is a fact about the colonies. */
@@ -23,8 +25,6 @@ export interface SellHub {
   hubChosen: boolean;
   /** Keep the current hub and stop suggesting another. */
   keepHub: () => void;
-  /** Sell to a corp buyback at this percent of the hub's price; null returns to the market. */
-  setBuyback: (pct: number | null) => void;
 }
 
 /** Local only: this device's PI hub has been folded into the PI page hub. */
@@ -56,20 +56,23 @@ export function useSellHub(): SellHub {
   const settingsHydrated = useHydratedStore(usePiSettings);
   const seeded = useSeededOnce(migratePiHub);
   const { hubId, hydrated: hubHydrated } = useHubFor('pi');
+  // PI's percent (`pagePricePercents.ts`): below or above 100 is a buyback at that rate.
+  const percent = usePricePercentFor('pi');
+  // Priced before the percent is read, a buyback would show at the market, with tax and a route.
+  const percentHydrated = useHydratedStore(...PRICE_PERCENT_STORES);
   const picked = useCallback(
     (id: TradeHub['id']) =>
       void setSettings({
         ...usePiSettings.getState().value,
         hub: id,
-        buybackPct: null,
         hubChosen: true,
       }),
     [setSettings]
   );
   return {
     hub: getTradeHub(hubId) ?? DEFAULT_TRADE_HUB,
-    hydrated: settingsHydrated && seeded && hubHydrated,
-    buybackPct: settings.buybackPct,
+    hydrated: settingsHydrated && seeded && hubHydrated && percentHydrated,
+    buybackPct: percent === DEFAULT_PRICE_PERCENT ? null : percent,
     buyTiers: settings.buyTiers,
     hubChosen: settings.hubChosen === true,
     keepHub: () => void setSettings({ ...usePiSettings.getState().value, hubChosen: true }),
@@ -79,11 +82,5 @@ export function useSellHub(): SellHub {
     },
     hubPicked: picked,
     hubSwitched: (id) => void setSettings({ ...usePiSettings.getState().value, hub: id }),
-    setBuyback: (pct) =>
-      void setSettings({
-        ...usePiSettings.getState().value,
-        buybackPct: pct === null ? null : pct,
-        ...(pct === null ? {} : { hubChosen: true as const }),
-      }),
   };
 }

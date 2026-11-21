@@ -1243,7 +1243,7 @@ describe('PlanetaryIndustry', () => {
     ).toBeInTheDocument();
   });
 
-  it('lets the Sell at picker grow past its minimum, so "My corp buyback" is not cut off', async () => {
+  it('lets the Sell at picker grow past its minimum, so a hub with its percent is not cut off', async () => {
     await renderIndustryRoutes();
     await colonyPanelFor(/Jita IV/);
     const picker = within(screen.getByTestId('pi-header-strip')).getByRole('button', {

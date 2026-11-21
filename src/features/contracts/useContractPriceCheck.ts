@@ -20,6 +20,8 @@ import {
 } from '@/engine/contracts/contractPriceCheck';
 import type { PriceSide } from '@/engine/miningTax/priceBasis';
 import type { PageHubArea } from '@/features/market/pageHubs';
+import { atPercent, usePricePercentFor } from '@/features/market/pagePricePercents';
+import { DEFAULT_PRICE_PERCENT } from '@/features/market/pricePercent';
 import type { TradeHub } from '@/market/hubs';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { formatSignedPercent, percentDirection, savingTone } from '@/lib/formatSignedPercent';
@@ -105,6 +107,9 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
   const { t } = useTranslation();
   const unavailableLabel = usePricesUnavailableLabel();
   const [side, setSide] = useState<PriceSide>(defaultSide);
+  // The page's Buy/Sell percent (#6531) scales the hub's prices; without a hub menu there is no percent to set.
+  const pagePercent = usePricePercentFor(hubArea ?? 'contracts');
+  const percent = hubArea ? pagePercent : DEFAULT_PRICE_PERCENT;
 
   const swap = requested.length > 0;
   const typeIds = [...new Set([...included, ...requested].map((line) => line.typeId))].sort(
@@ -139,7 +144,7 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
       showOther: t('contractDetail.priceCheckShowSide', { side: wordOf(other).toLowerCase() }),
       onFlip: () => setSide(other),
     },
-    hubMenu: hubArea && { hub, area: hubArea },
+    hubMenu: hubArea && { hub, area: hubArea, side },
   };
 
   if (load.status !== 'ready') {
@@ -148,7 +153,19 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
       : { ...view, rows: [], busy: true };
   }
 
-  const { prices, unreachable } = load.data;
+  const { unreachable } = load.data;
+  const prices =
+    percent === DEFAULT_PRICE_PERCENT
+      ? load.data.prices
+      : new Map(
+          [...load.data.prices].map(([typeId, p]) => [
+            typeId,
+            {
+              buy: p.buy === null ? null : atPercent(p.buy, percent),
+              sell: p.sell === null ? null : atPercent(p.sell, percent),
+            },
+          ])
+        );
   const check = swap
     ? itemSwapPriceCheck({ included, requested, prices, side })
     : iskPriceCheck({ asking, included, prices, side });

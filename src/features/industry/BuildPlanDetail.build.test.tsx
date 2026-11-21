@@ -265,7 +265,8 @@ describe('BuildPlanDetail build system', () => {
       expect.objectContaining({ id: 'jita' }),
       expect.anything(),
       30003888,
-      'manufacturing'
+      'manufacturing',
+      100
     );
   });
 
@@ -343,7 +344,8 @@ describe('BuildPlanDetail build system', () => {
       expect.objectContaining({ id: 'jita' }),
       expect.anything(),
       undefined,
-      'manufacturing'
+      'manufacturing',
+      100
     );
   });
 

@@ -9,11 +9,6 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   StatChip,
   Tooltip,
 } from '@/components/ui';
@@ -29,11 +24,8 @@ import { getTradeHub, TRADE_HUBS } from '@/market/hubs';
 import { eveClock } from './colonies/coloniesFormat';
 import { EstimateBadge } from './DirectiveRow';
 import { homeSystemId, nearestHub, routeFigures, type RouteFigures } from './sellRoute';
-import { DEFAULT_BUYBACK_PCT, PI_BUYBACK_PCT_OPTIONS } from './piSettings';
 import { useSellHub } from './sellHub';
 import { HubField } from '@/features/market/HubMenu';
-
-const BUYBACK = 'buyback';
 
 interface Props {
   /** The solar system of each of the active Character's colonies. */
@@ -75,7 +67,7 @@ export function PiHeaderStrip({
   eveTime = false,
 }: Props) {
   const { t } = useTranslation();
-  const { hub, buybackPct, hubChosen, hubPicked, hubSwitched, sellAtNearest, setBuyback, keepHub } =
+  const { hub, buybackPct, hubChosen, hubPicked, hubSwitched, sellAtNearest, keepHub } =
     useSellHub();
   const basis = useSharedJumpBasis();
   const colonyHome = homeSystemId(colonySystemIds);
@@ -198,36 +190,9 @@ export function PiHeaderStrip({
           size="sm"
           className="w-auto min-w-40"
           label={t('piPlan.strip.sellAt')}
+          side="sell"
           onPicked={(id, kind) => (kind === 'hub' ? hubPicked(id) : hubSwitched(id))}
-          extraOptions={[
-            {
-              value: BUYBACK,
-              label: t('piPlan.strip.corpBuyback'),
-              onSelect: () => setBuyback(DEFAULT_BUYBACK_PCT),
-            },
-          ]}
-          selectedOption={buybackPct === null ? undefined : BUYBACK}
         />
-        {buybackPct !== null && (
-          <Select value={String(buybackPct)} onValueChange={(pct) => setBuyback(Number(pct))}>
-            <SelectTrigger
-              size="sm"
-              className="w-auto min-w-40"
-              aria-label={t('piPlan.strip.buybackRate')}
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {[...new Set([...PI_BUYBACK_PCT_OPTIONS, buybackPct])]
-                .sort((x, y) => x - y)
-                .map((pct) => (
-                  <SelectItem key={pct} value={String(pct)}>
-                    {t('piPlan.strip.buybackPct', { pct, hub: hub.systemName })}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-        )}
       </div>
       {nearest && nearestOption && buybackPct === null && (
         <div
