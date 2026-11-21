@@ -31,7 +31,7 @@ import {
   type ForfeitBasis,
 } from './corpTaxBookEngine.js';
 import { DAY_MS, HOUR_MS, MINUTE_MS, utcDay } from './timeConstants.js';
-import { payOldestFirst, type OwedDay } from './corpTaxBookAccounts.js';
+import { payOldestFirst, type OwedDay } from './corpTaxBookRunningAccounts.js';
 import { matchesStatedTransfer } from './corpTaxBookTransferMatch.js';
 import {
   NOTICE_ID_FIELD,
@@ -89,7 +89,7 @@ export {
   STATEMENT_LINKS,
   LATE_NOTICES,
   LATE_NOTICE_LINKS,
-  ACCOUNT_CHECKPOINTS,
+  RUNNING_ACCOUNT_CHECKPOINTS,
   MINERS,
   META,
 } from './corpTaxBookVersionKeys.js';
@@ -109,7 +109,7 @@ export const OFFICERS = 'officers';
  * `accounts/{minerId}` (#6294): a running account's figures as an officer's client last worked
  * them out (the server cannot price days), for the pay page's live total. Function-only.
  */
-export const ACCOUNTS = 'accounts';
+export const RUNNING_ACCOUNTS = 'accounts';
 export const PAID_DOC = 'paid';
 /** Doc under `meta`: the scheduled sync's public status (ADR 0025); `status: 'active'` is Automatic sync on. */
 export const SCHEDULED_SYNC_DOC = 'scheduledSync';
@@ -759,7 +759,7 @@ export type EditAction =
     }
   | { action: 'recordLateNoticeMail'; noticeId: string; mailId: number; kind: LateNoticeMailKind }
   /** A running account's figures per Miner, as the officer's client works them out (#6294). */
-  | { action: 'recordAccounts'; accounts: RecordedAccount[] }
+  | { action: 'recordAccounts'; accounts: RecordedRunningAccount[] }
   /** Each Miner's closed-through checkpoint; the server sets who recorded it, when, and its readers. */
   | { action: 'recordCheckpoints'; checkpoints: RecordedCheckpoint[] }
   /** A Director drops a Miner's checkpoint: the next load works it out again from the history. */
@@ -772,7 +772,7 @@ export type LateNoticeMailKind = 'notice' | 'reminder';
 export type RecordedCheckpoint = Omit<RunningAccountCheckpoint, 'at' | 'by'>;
 
 /** What a Miner owes on a running account, as one officer's client worked it out. */
-export interface RecordedAccount {
+export interface RecordedRunningAccount {
   minerId: string;
   owed: number;
   /** The Miner's net payments (less "not tax") the client counted: later ones come off `owed`. */
@@ -2122,7 +2122,7 @@ export function billedDisputeTax(
 /**
  * The ids of a Miner's open disputes an officer write-off closes (#6307). A write-off forgives
  * the oldest unpaid days first (decision 20261120-235011), read off the Miner's account as it
- * stands now (`liveAccount`): the open disputes of the days it forgives in full close, a held day
+ * stands now (`liveRunningAccount`): the open disputes of the days it forgives in full close, a held day
  * included, while a day only partly forgiven keeps its dispute; a write-off of the whole balance
  * closes every one. With the account's days unknown, none closes.
  */

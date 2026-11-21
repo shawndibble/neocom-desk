@@ -3,7 +3,7 @@
  * JSON about one late notice, and this turns it into what the page prints. Pure: names (ore,
  * refinery, corporation) and number formatting stay in the page.
  */
-import type { OwedDay } from '../../../functions/src/corpTaxBookAccounts';
+import type { OwedDay } from '../../../functions/src/corpTaxBookRunningAccounts';
 import type { TaxPriceSource } from '../miningTax/priceBasis';
 
 /**
