@@ -4,10 +4,10 @@
  * without the route's snapshot loading.
  */
 import type { PayeeRecord } from '@/db';
-import type { PayeeAccount } from '@/engine/miningTax/payeeAccount';
+import type { PayeeRunningAccount } from '@/engine/miningTax/payeeRunningAccount';
 import { isCorpPayeeId } from './corpBook/corpRows';
 import { allMembers, type DisplayRow, type GroupMember } from './groupRows';
-import type { PayeeAccounts } from './payeeAccounts';
+import type { PayeeRunningAccounts } from './payeeRunningAccounts';
 
 export interface PayeeBalance {
   payee: PayeeRecord;
@@ -18,7 +18,7 @@ export interface PayeeBalance {
   /** The Outstanding Assignments behind `owed`, in view. */
   members: GroupMember[];
   /** A personal Payee's Running account; absent for a Corp Tax Book's and one nothing bills. */
-  account?: PayeeAccount;
+  account?: PayeeRunningAccount;
 }
 
 export interface UnassignedSummary {
@@ -37,7 +37,7 @@ export interface UnassignedSummary {
 export function computePayeeBalances(
   rows: readonly DisplayRow[],
   payees: readonly PayeeRecord[],
-  accounts: PayeeAccounts,
+  accounts: PayeeRunningAccounts,
   /** Payee ids that are another record of the same Payee (`payeeDuplicateAliases`): summed into it. */
   aliases: ReadonlyMap<string, string> = new Map(),
   /** A Corp Tax Book Payee's credit, by its id: its Miners' accounts' (`BookSummary.credit`). */

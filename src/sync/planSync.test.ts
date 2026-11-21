@@ -19,7 +19,7 @@ import { CACHE_PURGE_PENDING_PREFIX } from '@/esi/cachePurge';
 import { FEED_SYNC_WINDOW_MAX_ROWS, FEED_SYNC_WINDOW_MS } from '@/features/notifications/feed';
 import { backfillAccountWideData } from './accountWideBackfill';
 import { pullCursorKey } from './localBookkeeping';
-import { PAYEE_CHECKPOINTS_KEY, readStoredCheckpoints } from '@/db/payeeCheckpoints';
+import { subscribeRecordsChanged, type RecordsChange } from './recordsChanged';
 import { FULL_MINING_TAX_ASSIGNMENT } from './syncedCollectionFixtures';
 import { TOMBSTONE_TTL_MS } from './merge';
 import { hasPendingSync } from './status';
@@ -3031,16 +3031,16 @@ describe('triggerSync: a collection the rules do not know yet (B4)', () => {
   });
 });
 
-describe('triggerSync: a pulled row reaches back into the closed accounts', () => {
-  it("drops a Payee's device checkpoint when another device's edit is dated on or before it", async () => {
-    await db.settings.put({
-      key: PAYEE_CHECKPOINTS_KEY,
-      value: { p1: { checkpoint: { through: '2026-09-30' } } },
-    });
+describe('triggerSync: a pull tells who listens what rows it changed', () => {
+  it('names the rows it wrote, with their old copies', async () => {
+    const heard: RecordsChange[] = [];
+    const stop = subscribeRecordsChanged('miningTaxAssignments', (c) => void heard.push(c));
     seedRemote('characters/char:1/miningTaxAssignments', [
-      { ...FULL_MINING_TAX_ASSIGNMENT, date: '2026-09-04', ownerHash: HASH, deleted: false },
+      { ...FULL_MINING_TAX_ASSIGNMENT, ownerHash: HASH, deleted: false },
     ]);
     await triggerSync(1);
-    expect(await readStoredCheckpoints()).toEqual({});
+    stop();
+    expect(heard).toHaveLength(1);
+    expect(heard[0]!.upserted).toMatchObject([{ id: FULL_MINING_TAX_ASSIGNMENT.id }]);
   });
 });

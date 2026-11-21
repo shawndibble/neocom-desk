@@ -32,11 +32,14 @@ import {
   type CoalescableAssignment,
 } from '@/engine/miningTax/coalesce';
 import { deleteAssignments } from './assignments';
-import type { PayeeAccounts } from './payeeAccounts';
-import { loadPayeeAccounts } from './paymentLinkStore';
+import type { PayeeRunningAccounts } from './payeeRunningAccounts';
+import { loadPayeeRunningAccounts } from './paymentLinkStore';
 import { putAssignments } from './storedAssignments';
 
-function coalescable(a: MiningTaxAssignmentRecord, accounts: PayeeAccounts): CoalescableAssignment {
+function coalescable(
+  a: MiningTaxAssignmentRecord,
+  accounts: PayeeRunningAccounts
+): CoalescableAssignment {
   return {
     id: a.id,
     characterId: a.characterId,
@@ -58,14 +61,14 @@ export async function coalesceAssignments(
   characterId: number,
   entries?: readonly MiningLedgerEntry[],
   /** Every personal Payee's account, which says which days are paid; read from Dexie when absent. */
-  accounts?: PayeeAccounts
+  accounts?: PayeeRunningAccounts
 ): Promise<void> {
   const assignments = await db.miningTaxAssignments
     .where('characterId')
     .equals(characterId)
     .toArray();
   if (assignments.length === 0) return;
-  const paid = accounts ?? (await loadPayeeAccounts());
+  const paid = accounts ?? (await loadPayeeRunningAccounts());
 
   const working = new Map(assignments.map((a) => [a.id, a]));
   const rewritten = new Set<string>();

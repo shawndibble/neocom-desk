@@ -15,13 +15,13 @@ import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { loadPayees } from './payees';
 import { hubForPayee, loadUnitPricesOnDate } from './pricing';
 import { readCompressedOre, withOreFormMarker } from './oreForm';
-import type { PayeeAccounts } from './payeeAccounts';
+import type { PayeeRunningAccounts } from './payeeRunningAccounts';
 import { putAssignments } from './storedAssignments';
 
 export async function repriceForOreForm(
   characterId: number,
   /** What is paid, off the Payees' accounts: a paid day's bill stays as it was priced. */
-  accounts: Pick<PayeeAccounts, 'statusOf'>
+  accounts: Pick<PayeeRunningAccounts, 'statusOf'>
 ): Promise<void> {
   const compressed = await readCompressedOre();
   const owed = (a: MiningTaxAssignmentRecord) => accounts.statusOf(a) === 'outstanding';

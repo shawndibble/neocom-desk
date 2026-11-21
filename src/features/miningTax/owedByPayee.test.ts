@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { MiningTaxAssignmentRecord } from '@/db';
 import { computeOwedByPayee } from './owedByPayee';
-import { PayeeAccounts } from './payeeAccounts';
+import { PayeeRunningAccounts } from './payeeRunningAccounts';
 
 const assignment = (over: Partial<MiningTaxAssignmentRecord>) =>
   ({
@@ -14,7 +14,7 @@ const assignment = (over: Partial<MiningTaxAssignmentRecord>) =>
   }) as MiningTaxAssignmentRecord;
 
 const accountsOf = (assignments: MiningTaxAssignmentRecord[], paid = 0) =>
-  PayeeAccounts.build({
+  PayeeRunningAccounts.build({
     assignments,
     payees: [],
     links:

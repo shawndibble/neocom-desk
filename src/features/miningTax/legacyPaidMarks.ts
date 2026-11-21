@@ -12,7 +12,7 @@ import {
   paymentLinkKey,
   type PayeePaymentLink,
   type PayeePaymentRef,
-} from '@/engine/miningTax/payeeAccount';
+} from '@/engine/miningTax/payeeRunningAccount';
 
 /**
  * A mark's payment as the newest legacy shape: the oldest stored a bare `journalRefId` /

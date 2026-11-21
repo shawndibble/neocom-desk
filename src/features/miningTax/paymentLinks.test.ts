@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PayeeRecord } from '@/db';
-import type { PayeePaymentLink } from '@/engine/miningTax/payeeAccount';
+import type { PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
 import {
   autoMatchRecorded,
   linkablePayments,

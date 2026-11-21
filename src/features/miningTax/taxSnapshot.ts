@@ -1,7 +1,10 @@
 import type { RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import type { TradeHub } from '@/market/hubs';
 import type { PayeeRecord } from '@/db';
-import type { PayeePaymentLink, StoredPayeeCheckpoint } from '@/engine/miningTax/payeeAccount';
+import type {
+  PayeePaymentLink,
+  StoredPayeeCheckpoint,
+} from '@/engine/miningTax/payeeRunningAccount';
 import {
   loadMoonMiningTaxSnapshot,
   type MoonMiningTaxRow,

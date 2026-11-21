@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { payeeLedger } from './payeeLedger';
 import {
-  PayeeAccount,
+  PayeeRunningAccount,
   paymentLinkKey,
   type PayeeCharge,
   type PayeePaymentLink,
-} from './payeeAccount';
+} from './payeeRunningAccount';
 
 const charge = (id: string, date: string, tax: number): PayeeCharge => ({ id, date, tax });
 const link = (
@@ -31,9 +31,9 @@ const CHARGES = [
 ];
 
 const build = (links: PayeePaymentLink[], charges = CHARGES) =>
-  PayeeAccount.build({ payeeId: 'p1', charges, links });
+  PayeeRunningAccount.build({ payeeId: 'p1', charges, links });
 
-describe('PayeeAccount', () => {
+describe('PayeeRunningAccount', () => {
   it('pays the oldest day first, whatever entry the pilot had in mind', () => {
     const account = build([link(1, 1_000_000, '2026-10-05')]);
     expect(account.isPaid('2026-10-01')).toBe(true);
@@ -113,10 +113,10 @@ describe('PayeeAccount', () => {
     it('builds from a stored checkpoint the same as from the whole history', () => {
       const old = [charge('z', '2026-08-10', 300_000), ...CHARGES];
       const links = [link(1, 1_200_000, '2026-08-20'), link(2, 2_000_000, '2026-10-05')];
-      const whole = PayeeAccount.build({ payeeId: 'p1', charges: old, links });
+      const whole = PayeeRunningAccount.build({ payeeId: 'p1', charges: old, links });
       const stored = whole.nextCheckpoint(TODAY, '2026-11-20T00:00:00Z')!;
       expect(stored.checkpoint).toMatchObject({ through: '2026-09-30', credit: 900_000 });
-      const resumed = PayeeAccount.build({ payeeId: 'p1', charges: old, links, stored });
+      const resumed = PayeeRunningAccount.build({ payeeId: 'p1', charges: old, links, stored });
       expect(resumed.startsFrom).toBe(stored.checkpoint);
       expect(resumed.owes).toEqual(whole.owes);
       expect(resumed.paidThrough).toBe(whole.paidThrough);
@@ -127,9 +127,9 @@ describe('PayeeAccount', () => {
 
     it('trusts a stored checkpoint (a write on or before it drops it), and previews a back-dated payment on the whole history', () => {
       const old = [charge('z', '2026-08-10', 300_000), ...CHARGES];
-      const whole = PayeeAccount.build({ payeeId: 'p1', charges: old, links: [] });
+      const whole = PayeeRunningAccount.build({ payeeId: 'p1', charges: old, links: [] });
       const stored = whole.nextCheckpoint(TODAY, '2026-11-20T00:00:00Z')!;
-      const resumed = PayeeAccount.build({ payeeId: 'p1', charges: old, links: [], stored });
+      const resumed = PayeeRunningAccount.build({ payeeId: 'p1', charges: old, links: [], stored });
       expect(resumed.startsFrom).toBe(stored.checkpoint);
       // A payment from August, before the checkpoint, previews as paying the August day.
       expect(resumed.preview(300_000, '2026-08-12').lines).toContainEqual(
@@ -141,12 +141,18 @@ describe('PayeeAccount', () => {
       // A zero-tax day closed paid; then the store is rewritten under the app (an import, a
       // seed) with the same day owing: the checkpoint must not say it is paid.
       const zero = [charge('z', '2026-08-10', 0)];
-      const stored = PayeeAccount.build({ payeeId: 'p1', charges: zero, links: [] }).nextCheckpoint(
-        TODAY,
-        '2026-11-20T00:00:00Z'
-      )!;
+      const stored = PayeeRunningAccount.build({
+        payeeId: 'p1',
+        charges: zero,
+        links: [],
+      }).nextCheckpoint(TODAY, '2026-11-20T00:00:00Z')!;
       const owed = [charge('z', '2026-08-10', 300_000)];
-      const resumed = PayeeAccount.build({ payeeId: 'p1', charges: owed, links: [], stored });
+      const resumed = PayeeRunningAccount.build({
+        payeeId: 'p1',
+        charges: owed,
+        links: [],
+        stored,
+      });
       expect(resumed.startsFrom).toBeUndefined();
       expect(resumed.isPaid('2026-08-10')).toBe(false);
       expect(resumed.owes?.amount).toBe(300_000);
@@ -155,9 +161,9 @@ describe('PayeeAccount', () => {
     it('feeds the Payee ledger an opening row for what it closed', () => {
       const old = [charge('z', '2026-08-10', 300_000), ...CHARGES];
       const links = [link(1, 100_000, '2026-08-20')];
-      const whole = PayeeAccount.build({ payeeId: 'p1', charges: old, links });
+      const whole = PayeeRunningAccount.build({ payeeId: 'p1', charges: old, links });
       const stored = whole.nextCheckpoint(TODAY, '2026-11-20T00:00:00Z')!;
-      const resumed = PayeeAccount.build({ payeeId: 'p1', charges: old, links, stored });
+      const resumed = PayeeRunningAccount.build({ payeeId: 'p1', charges: old, links, stored });
       const source = resumed.ledgerSource({
         charge: () => ({ kind: 'mined' }),
         payment: (l) => ({ at: `${l.paidOn}T00:00:00Z` }),

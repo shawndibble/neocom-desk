@@ -220,7 +220,7 @@ export function personalEntriesOf(rows: readonly MoonMiningTaxRow[]): PersonalEn
         oreLines: a.oreLines,
         status: a.status,
         // A Default System's Assignment after its Payee's paid-through is ore given to no Payee as
-        // far as the book goes. `status` is as the Payee's account reads it (`PayeeAccounts.view`).
+        // far as the book goes. `status` is as the Payee's account reads it (`PayeeRunningAccounts.view`).
         ...(isUnpaidDefault(a) ? { releasable: true } : {}),
       })),
   }));

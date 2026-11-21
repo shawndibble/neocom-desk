@@ -16,7 +16,7 @@ import { QuietStatusLine } from '@/features/miningTax/corpBook/resolve/QuietStat
 import { conflictTarget, uncreditedTarget } from '@/features/miningTax/corpBook/resolve/targets';
 import { useResolve } from '@/features/miningTax/corpBook/resolve/useResolve';
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
-import { heldPaymentKeys, type PayeePaymentLink } from '@/engine/miningTax/payeeAccount';
+import { heldPaymentKeys, type PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
 import { leftCorpBooksOf } from '@/features/miningTax/corpBook/leftCorpBooks';
 import {
   corporationOfPayee,

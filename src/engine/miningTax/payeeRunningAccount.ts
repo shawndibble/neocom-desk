@@ -140,7 +140,7 @@ const sameSummary = (a: ClosedSummary, b: ClosedSummary) =>
   Math.abs(a.tax - b.tax) < 0.005 &&
   Math.abs(a.paid - b.paid) < 0.005;
 
-export interface PayeeAccountInput {
+export interface PayeeRunningAccountInput {
   /** The Payee: a merged Payee's primary id. */
   payeeId: string;
   charges: readonly PayeeCharge[];
@@ -168,7 +168,7 @@ function taxPaymentOf(payeeId: string, link: PayeePaymentLink): TaxPayment {
  * A personal Payee's account: what the Tax tab, Settle up, the Payee ledger and a Default System
  * read for what the pilot owes that Payee and what is paid.
  */
-export class PayeeAccount {
+export class PayeeRunningAccount {
   private constructor(
     readonly payeeId: string,
     readonly charges: readonly PayeeCharge[],
@@ -179,7 +179,7 @@ export class PayeeAccount {
     private readonly whole: MinerRunningAccountInput
   ) {}
 
-  static build(input: PayeeAccountInput): PayeeAccount {
+  static build(input: PayeeRunningAccountInput): PayeeRunningAccount {
     const links = input.links.filter(pays);
     const whole: MinerRunningAccountInput = {
       days: input.charges.map((c) => ({ date: c.date, tax: c.tax })),
@@ -196,7 +196,7 @@ export class PayeeAccount {
       ...whole,
       ...(cp ? { checkpoint: cp } : {}),
     });
-    return new PayeeAccount(input.payeeId, input.charges, links, account, whole);
+    return new PayeeRunningAccount(input.payeeId, input.charges, links, account, whole);
   }
 
   get paidThrough(): string | null {

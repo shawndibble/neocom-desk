@@ -4,6 +4,7 @@ import {
   touchCheckboxLabelClassName,
 } from '@/components/ui/controlStyles';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { plainTextActionClassName } from '@/components/ui/plainTextActionClassName';
 import { Pill } from '@/components/ui/Pill';
 import { AddPreviewReadout } from '@/features/fittings/AddPreviewReadout';
 import { NeedsLoginAction } from '@/features/character/NeedsLoginAction';
@@ -189,6 +190,14 @@ export function InteractionGrammar() {
           <button type="button" className={textActionClassName()}>
             {k('samples.textAction')}
           </button>
+        </Cue>
+        <Cue rule={k('rules.balanceFigure')} note={k('notes.balanceFigure')}>
+          <span className="flex items-center gap-2">
+            <span className="font-semibold">{k('samples.payeeName')}</span>
+            <button type="button" className={plainTextActionClassName('shrink-0')}>
+              <span className="font-semibold text-isk-neg tabular-nums">2,000,000 ISK</span>
+            </button>
+          </span>
         </Cue>
         <Cue rule={k('rules.externalLink')}>
           <ExternalLink href="https://zkillboard.com">zKillboard</ExternalLink>

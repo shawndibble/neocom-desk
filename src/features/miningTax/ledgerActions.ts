@@ -24,7 +24,7 @@ import {
   type MiningTaxOreLine,
   type PayeeRecord,
 } from '@/db';
-import type { PayeePaymentLink } from '@/engine/miningTax/payeeAccount';
+import type { PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
 import { scheduleSync } from '@/sync';
 import {
   AlreadyAssignedError,
@@ -53,7 +53,7 @@ import { groupPayees } from './payeeGroups';
 import { removePayeeRecord } from './payees';
 import {
   linksReady,
-  loadPayeeAccounts,
+  loadPayeeRunningAccounts,
   removePaymentLinks,
   savePaymentLink,
 } from './paymentLinkStore';
@@ -128,7 +128,7 @@ const charactersOf = (records: readonly { characterId: number }[]) =>
 async function paidReader(): Promise<(a: MiningTaxAssignmentRecord) => boolean> {
   const tracked = (await db.characters.toCollection().primaryKeys()) as number[];
   if (!(await linksReady(tracked))) return () => true;
-  const accounts = await loadPayeeAccounts();
+  const accounts = await loadPayeeRunningAccounts();
   return (a) => accounts.isPaid(a);
 }
 
@@ -329,7 +329,7 @@ export function split(
 export function assignmentsMovedWithPayee(
   assignments: readonly MiningTaxAssignmentRecord[],
   payeeId: string,
-  /** What is paid, off the Payee's account (`PayeeAccounts.statusOf`), never a stored mark. */
+  /** What is paid, off the Payee's account (`PayeeRunningAccounts.statusOf`), never a stored mark. */
   statusOf: (a: MiningTaxAssignmentRecord) => MiningTaxAssignmentStatus
 ): MiningTaxAssignmentRecord[] {
   const own = assignments.filter((a) => a.payeeId === payeeId);
@@ -361,7 +361,7 @@ export async function deletePayee(
       'rw',
       [db.miningTaxAssignments, db.payees, db.settings, db.miningTaxPaymentLinks],
       async () => {
-        const accounts = await loadPayeeAccounts();
+        const accounts = await loadPayeeRunningAccounts();
         let moved: MiningTaxAssignmentRecord[] = [];
         if (moveToPayeeId !== undefined) {
           // Walks the `characterId` index per character (keys only to find them), not every record.

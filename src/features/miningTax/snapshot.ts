@@ -14,14 +14,17 @@ import { applySurveyConnections } from './surveyConnections';
 import { readCompressedOre } from './oreForm';
 import { repriceForOreForm } from './oreFormReprice';
 import { coalesceAssignments } from './coalesce';
-import { PayeeAccounts } from './payeeAccounts';
+import { PayeeRunningAccounts } from './payeeRunningAccounts';
 import {
   linksReady,
-  loadAccountInputs,
-  loadPayeeAccounts,
+  loadRunningAccountInputs,
+  loadPayeeRunningAccounts,
   readLegacyPaidMarks,
 } from './paymentLinkStore';
-import type { PayeePaymentLink, StoredPayeeCheckpoint } from '@/engine/miningTax/payeeAccount';
+import type {
+  PayeePaymentLink,
+  StoredPayeeCheckpoint,
+} from '@/engine/miningTax/payeeRunningAccount';
 import { computeOwnership, findDuplicateAssignmentIds } from '@/engine/miningTax/ownership';
 import { entryFromAssignments } from '@/engine/miningTax/assignmentEntry';
 import { entryKey, type MiningLedgerEntry } from '@/engine/miningTax/types';
@@ -100,7 +103,7 @@ export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot
     // the Assignments covering it, so it has to see one fused record rather than two halves of
     // the same obligation. The fresh entries are passed only so it can tell a split day from an
     // exact duplicate (and leave an unverifiable pair alone).
-    const accounts = await loadPayeeAccounts();
+    const accounts = await loadPayeeRunningAccounts();
     await Promise.all(
       ledgers.map((ledger) => coalesceAssignments(ledger.characterId, ledger.entries, accounts))
     );
@@ -112,7 +115,7 @@ export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot
     // nothing else has touched.
     await applyDefaultSystems(ledgers).catch(() => []);
     // Read again: a Survey or a Default System may have billed a paid day anew.
-    const grown = await loadPayeeAccounts();
+    const grown = await loadPayeeRunningAccounts();
     await Promise.all(
       ledgers
         .filter((ledger) => ledger.entries.length > 0)
@@ -140,10 +143,10 @@ export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot
     Promise.all(ledgers.map((ledger) => loadPayees(ledger.characterId))),
     // Reloaded after reconcile so a fresh needs-review flip is reflected.
     Promise.all(ledgers.map((ledger) => loadAssignments(ledger.characterId))),
-    loadAccountInputs(),
+    loadRunningAccountInputs(),
   ]);
-  // The accounts every reader of this snapshot shares (`PayeeAccounts.build`).
-  const grown = PayeeAccounts.build({
+  // The accounts every reader of this snapshot shares (`PayeeRunningAccounts.build`).
+  const grown = PayeeRunningAccounts.build({
     assignments: assignmentsByLedger.flat(),
     payees: payeesByLedger.flat(),
     ...inputs,

@@ -1,7 +1,7 @@
 /**
  * What the pilot owes each Payee right now — the Tax tab's "You owe" cards and the Overview's
  * Mining tax card read the same figure from here: each Payee's Running account, oldest day first
- * (`PayeeAccounts`). A Corp Tax Book overlays the personal ledger (`buildDisplayRows`): a row the
+ * (`PayeeRunningAccounts`). A Corp Tax Book overlays the personal ledger (`buildDisplayRows`): a row the
  * book says it hasn't credited is owed again (#6219), and ore a book bills is owed to the
  * corporation, not to the member's own Payee too (#6204).
  */
@@ -18,8 +18,8 @@ import { loadBookPrices, loadCorpNames, loadTrackedCorpBooks } from './corpBook/
 import { buildCorpBookView, type CorpBookView } from './corpBook/corpBookView';
 import { buildDisplayRows } from './corpBook/corpRows';
 import type { DisplayRow } from './groupRows';
-import { heldPaymentKeys } from '@/engine/miningTax/payeeAccount';
-import { PayeeAccounts, withPaidStatus } from './payeeAccounts';
+import { heldPaymentKeys } from '@/engine/miningTax/payeeRunningAccount';
+import { PayeeRunningAccounts, withPaidStatus } from './payeeRunningAccounts';
 import { loadMadePaymentsWithStatus } from './madePayments';
 import { groupPayees, payeeDuplicateAliases } from './payeeGroups';
 import type { MoonMiningTaxSnapshot } from './snapshot';
@@ -42,7 +42,7 @@ export function bookCreditsOf(corpView: CorpBookView | null | undefined): Map<st
 export function owedBalances(
   rows: readonly DisplayRow[],
   ledgerPayees: readonly PayeeRecord[],
-  accounts: PayeeAccounts,
+  accounts: PayeeRunningAccounts,
   /** Duplicate records of one Payee mapped to the primary (`payeeDuplicateAliases`). */
   aliases?: ReadonlyMap<string, string>,
   /** Each Corp Tax Book Payee's credit, by its id (`BookSummary.credit`). */
@@ -92,7 +92,7 @@ export async function loadOwedBalances(
   for (const list of snapshot.payeesByCharacter.values()) for (const p of list) seen.set(p.id, p);
   const payees = [...seen.values()];
   // Paid read off each Payee's account, the one build the Tax tab reads too.
-  const accounts = PayeeAccounts.build({
+  const accounts = PayeeRunningAccounts.build({
     assignments: snapshot.rows.flatMap((row) => row.assignments),
     payees,
     links: snapshot.paymentLinks,

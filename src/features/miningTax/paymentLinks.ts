@@ -1,7 +1,7 @@
 /**
  * Which Payee a payment the pilot already made was for (issue #540, decision 20261120-235011,
  * "linking money under one payment model"). A Made Payment links to one Payee and pays its oldest
- * unpaid days (`PayeeAccount`), so a suggestion only has to name the recipient: never entries, and
+ * unpaid days (`PayeeRunningAccount`), so a suggestion only has to name the recipient: never entries, and
  * no day window, since back taxes are paid weeks later. The recipient is known by the entity a
  * Payee learned, then by its name, across every record of a merged Payee, so an alt's payment is
  * found too. An amount alone is the weakest hint, offered only when exactly one Payee owes it, and
@@ -13,7 +13,7 @@
 import { utcDayOf } from '../../../functions/src/timeConstants';
 import type { MiningTaxPaymentMethod, PayeeRecord } from '@/db';
 import { matchesStatedTransfer } from '../../../functions/src/corpTaxBookTransferMatch';
-import { paymentLinkKey, type PayeePaymentLink } from '@/engine/miningTax/payeeAccount';
+import { paymentLinkKey, type PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
 import { isCorpPayeeId } from './corpBook/corpRows';
 import { amountsMatch } from './paymentMatches';
 

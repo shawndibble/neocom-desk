@@ -10,7 +10,7 @@ import { utcDay } from '@/engine/localDay';
 import { scheduleSync } from '@/sync';
 import { appendTombstones, tombstoneKey } from '@/sync/localBookkeeping';
 import { PAYEES } from '@/sync/syncedCollections';
-import { dropPayeeCheckpointsFrom } from '@/db/payeeCheckpoints';
+import { dropPayeeCheckpointsReachedBy } from './payeeCheckpoints';
 import { payeeGroupKey } from './payeeGroups';
 
 /**
@@ -23,7 +23,7 @@ async function putPayees(records: readonly PayeeRecord[]): Promise<void> {
   await db.transaction('rw', db.payees, db.settings, async () => {
     const stored = await db.payees.bulkGet(records.map((r) => r.id));
     if (records.some((r, i) => !stored[i] || payeeGroupKey(stored[i]) !== payeeGroupKey(r)))
-      await dropPayeeCheckpointsFrom(null);
+      await dropPayeeCheckpointsReachedBy(null);
     // One `put` per record, as every Payee write always made: a pilot has a handful.
     for (const r of records) await db.payees.put(r);
   });
@@ -339,7 +339,7 @@ export function withCorporationLink(payee: PayeeRecord, corporationId: number): 
 export async function removePayeeRecord(
   payee: Pick<PayeeRecord, 'id' | 'characterId'>
 ): Promise<void> {
-  await dropPayeeCheckpointsFrom(null);
+  await dropPayeeCheckpointsReachedBy(null);
   await db.payees.delete(payee.id);
   await appendTombstones(tombstoneKey(PAYEES, payee.characterId), [payee.id]);
 }

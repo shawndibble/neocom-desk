@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { PayeeRecord } from '@/db';
-import { PayeeAccount } from '@/engine/miningTax/payeeAccount';
+import { PayeeRunningAccount } from '@/engine/miningTax/payeeRunningAccount';
 import type { LedgerActionResult } from './ledgerActions';
 import type { MadePayment } from './paymentLinks';
 import { LinkWalletPaymentDialog } from './LinkWalletPaymentDialog';
@@ -25,7 +25,7 @@ vi.mock('./payees', () => ({
 const PAYEE = { id: 'p-1', characterId: 1, name: 'Moon Corp', defaultTaxPct: 10 } as PayeeRecord;
 
 // Owes 600,000 over three days.
-const ACCOUNT = PayeeAccount.build({
+const ACCOUNT = PayeeRunningAccount.build({
   payeeId: 'p-1',
   charges: [
     { id: 'a-3', date: '2026-09-06', tax: 300_000 },

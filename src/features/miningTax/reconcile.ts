@@ -13,7 +13,7 @@
  * the one place `oreLines` itself re-snapshots.
  *
  * Paid stays paid (ADR 0024): an Assignment is paid once its day is on or
- * before its Payee's paid-through (`PayeeAccounts`, decision 20261120-235011:
+ * before its Payee's paid-through (`PayeeRunningAccounts`, decision 20261120-235011:
  * no Assignment carries a paid mark of its own), and a paid one is never
  * diffed against more than its own snapshot, because `computeOwnership` never
  * grows one. Its growth is left unassigned instead, and the Tax tab shows it as
@@ -39,8 +39,8 @@ import { scheduleSync } from '@/sync';
 import { diffAssignedOreLines } from '@/engine/miningTax/needsReview';
 import { computeOwnership, type Ownership } from '@/engine/miningTax/ownership';
 import { planNeedsReviewResolution } from './assignments';
-import type { PayeeAccounts } from './payeeAccounts';
-import { loadPayeeAccounts } from './paymentLinkStore';
+import type { PayeeRunningAccounts } from './payeeRunningAccounts';
+import { loadPayeeRunningAccounts } from './paymentLinkStore';
 import type { MiningLedgerEntry, QuantityDiff } from '@/engine/miningTax/types';
 import { putAssignments } from './storedAssignments';
 
@@ -55,13 +55,13 @@ export async function reconcileAssignments(
   characterId: number,
   freshEntries: readonly MiningLedgerEntry[],
   /** Every personal Payee's account, which says which days are paid; read from Dexie when absent. */
-  accounts?: PayeeAccounts
+  accounts?: PayeeRunningAccounts
 ): Promise<void> {
   const stored = await db.miningTaxAssignments.where('characterId').equals(characterId).toArray();
   if (stored.length === 0) return;
   // Read as the tab reads them: Paid where the Payee's account has paid the day. Only ever
   // written back from the stored record.
-  const paid = accounts ?? (await loadPayeeAccounts());
+  const paid = accounts ?? (await loadPayeeRunningAccounts());
   const assignments = stored.map((a) => paid.view(a));
   const storedById = new Map(stored.map((a) => [a.id, a]));
 

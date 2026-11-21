@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, IskInput, Modal, Radio, SearchInput } from '@/components/ui';
 import { selectedRowClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import type { PayeeRecord } from '@/db';
-import type { PayeeAccount } from '@/engine/miningTax/payeeAccount';
+import type { PayeeRunningAccount } from '@/engine/miningTax/payeeRunningAccount';
 import { GrantNote } from '@/app/GrantNote';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
@@ -24,7 +24,7 @@ interface LinkWalletPaymentDialogProps {
   /** The Payee the payment is linked to: a merged Payee's primary record. */
   payee: PayeeRecord;
   /** Its Running account, to say what the payment pays; absent while nothing bills it. */
-  account?: PayeeAccount;
+  account?: PayeeRunningAccount;
   /** Made Payments no link holds and no Corp Tax Book counts. */
   candidates: readonly MadePayment[];
   /** The Characters whose payments are offered, for a missing Permission's Grant note. */

@@ -16,8 +16,8 @@
  */
 import { db, type MiningTaxAssignmentRecord, type MiningTaxOreLine } from '@/db';
 import { isUnpaidDefault } from '@/engine/miningTax/defaultSystems';
-import type { PayeeAccounts } from './payeeAccounts';
-import { loadPayeeAccounts } from './paymentLinkStore';
+import type { PayeeRunningAccounts } from './payeeRunningAccounts';
+import { loadPayeeRunningAccounts } from './paymentLinkStore';
 import {
   isConnectionLive,
   parseSurveyConnections,
@@ -136,11 +136,11 @@ export async function applySurveyConnections(
   ledgers: readonly { characterId: number; entries: readonly MiningLedgerEntry[] }[],
   nowMs = Date.now(),
   /** Every personal Payee's account, which says which days are paid; read from Dexie when absent. */
-  accounts?: PayeeAccounts
+  accounts?: PayeeRunningAccounts
 ): Promise<MiningTaxAssignmentRecord[]> {
   const live = await liveConnections(nowMs);
   if (live.length === 0) return [];
-  const paid = accounts ?? (await loadPayeeAccounts());
+  const paid = accounts ?? (await loadPayeeRunningAccounts());
   const created: MiningTaxAssignmentRecord[] = [];
   for (const ledger of ledgers) {
     const connections = live.filter((c) => c.characterId === ledger.characterId);
@@ -201,7 +201,7 @@ export async function applySurveyConnections(
  */
 async function takeOverFromDefaults(
   takeovers: readonly Takeover[],
-  paid: PayeeAccounts
+  paid: PayeeRunningAccounts
 ): Promise<boolean> {
   const releases: { assignment: MiningTaxAssignmentRecord; after: MiningTaxOreLine[] }[] = [];
   for (const takeover of takeovers) {

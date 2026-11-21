@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useRef } from 'react';
 import type { PayeeRecord } from '@/db';
-import type { PayeePaymentLink, StoredPayeeCheckpoint } from '@/engine/miningTax/payeeAccount';
+import type {
+  PayeePaymentLink,
+  StoredPayeeCheckpoint,
+} from '@/engine/miningTax/payeeRunningAccount';
 import { utcDay } from '@/engine/localDay';
 import { allMembers, type DisplayRow } from '@/features/miningTax/groupRows';
 import { systemsByPayee } from '@/features/miningTax/suggestPayee';
 import { useLinkSuggestions } from '@/features/miningTax/useMadePayments';
 import { computeOwedByPayee } from './owedByPayee';
 import { owedBalances, unassignedSummary } from './owedNow';
-import type { PayeeAccounts } from './payeeAccounts';
+import type { PayeeRunningAccounts } from './payeeRunningAccounts';
 import { savePayeeCheckpoints } from './paymentLinkStore';
 
 interface Args {
@@ -22,7 +25,7 @@ interface Args {
   /** Every Made Payment linked to a Payee. */
   links: readonly PayeePaymentLink[];
   /** The one accounts build (`useTaxCorpBooks`). */
-  accounts: PayeeAccounts;
+  accounts: PayeeRunningAccounts;
   /** When the account inputs were read: a checkpoint is only stored while they still hold. */
   historyGen: number | undefined;
   /** The corporations of the member's Corp Tax Books: a donation to one is the book's. */

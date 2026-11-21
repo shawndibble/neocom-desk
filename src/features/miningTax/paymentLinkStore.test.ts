@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, type MiningTaxAssignmentRecord } from '@/db';
-import type { PayeePaymentLink } from '@/engine/miningTax/payeeAccount';
+import type { PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
 import { readTombstones, tombstoneKey } from '@/sync/localBookkeeping';
 import { MINING_TAX_PAYMENT_LINKS } from '@/sync/syncedCollections';
-import { PAYEE_CHECKPOINTS_KEY, readStoredCheckpoints } from '@/db/payeeCheckpoints';
+import { PAYEE_CHECKPOINTS_KEY, readStoredCheckpoints } from './payeeCheckpoints';
 import { pullCursorKey } from '@/sync/localBookkeeping';
 import {
   linksReady,
@@ -15,7 +15,7 @@ import {
   savePayeeCheckpoints,
   savePaymentLink,
 } from './paymentLinkStore';
-import { readPayeeHistoryGen } from '@/db/payeeCheckpoints';
+import { readPayeeHistoryGen } from './payeeCheckpoints';
 
 const link = (over: Partial<PayeePaymentLink> = {}): PayeePaymentLink => ({
   payeeId: 'p1',
@@ -185,6 +185,13 @@ describe('readLegacyPaidMarks', () => {
 });
 
 describe('checkpoints on the device', () => {
+  // Today a checkpoint closes through 2026-09-30 at the latest (`closedThroughFor`).
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-21T12:00:00Z'));
+  });
+  afterEach(() => vi.useRealTimers());
+
   const cp = (through: string) => ({
     checkpoint: {
       minerId: 'p1',
@@ -205,14 +212,14 @@ describe('checkpoints on the device', () => {
 
   it('stores a checkpoint only while nothing was written since its inputs were read', async () => {
     const gen = await readPayeeHistoryGen();
-    await savePaymentLink(link({ paidOn: '2026-10-12' }), 7);
+    await savePaymentLink(link({ paidOn: '2026-09-12' }), 7);
     await savePayeeCheckpoints(new Map([['p1', cp('2026-09-30')]]), gen);
     expect(await readStoredCheckpoints()).toEqual({});
     await savePayeeCheckpoints(new Map([['p1', cp('2026-09-30')]]), await readPayeeHistoryGen());
     expect(Object.keys(await readStoredCheckpoints())).toEqual(['p1']);
   });
 
-  it('a changed book share drops the checkpoints from its Assignment’s day', async () => {
+  it('a changed book share drops the checkpoints once it reaches a closed day', async () => {
     await db.settings.put({ key: PAYEE_CHECKPOINTS_KEY, value: { p1: cp('2026-09-30') } });
     expect(await saveBilledElsewhere(new Map([['a1', 0.5]]), () => '2026-10-05')).toBe(true);
     expect(Object.keys(await readStoredCheckpoints())).toEqual(['p1']);
