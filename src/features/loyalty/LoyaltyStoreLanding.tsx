@@ -16,8 +16,7 @@ import {
   useTabsId,
 } from '@/components/ui';
 import { LpStoreActions, WalletTabBar } from '@/features/loyalty/LpStoreChrome';
-import { pickHubFor, useHubFor, useMarketHub } from '@/features/market/hub';
-import { usePageHubs } from '@/features/market/pageHubs';
+import { pickHubFor, useHubFor } from '@/features/market/hub';
 import { JUMP_RANGES } from '@/engine/route/jumpRange';
 import { formatAge, MINUTE_MS } from '@/lib/age';
 import { useTicker } from '@/lib/ticker';
@@ -142,7 +141,7 @@ export function LoyaltyStoreLanding({ active = true }: { active?: boolean }) {
   const priceBasis = usePriceBasis((s) => s.value);
   const setPriceBasis = usePriceBasis((s) => s.setValue);
   const ownLpValue = useLpValue((s) => s.value);
-  useHydratedStore(usePageHubs, useMarketHub, usePriceBasis, useLpValue);
+  useHydratedStore(usePriceBasis, useLpValue);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
 
   const view = params.view;

@@ -54,7 +54,7 @@ _Recorded 2026-11-20. Issue #6523._
   - **Industry** covers BPC Sourcing, whose settings hub becomes a `HubField`, and the hub a new
     plan starts at (`newPlanHubId`, used by new plans, Opportunities and Retarget Group).
   - A new plan starts at the Industry entry when there is one. Otherwise it keeps the rule from
-    before page hubs, the latest plan's hub, else the default. That keeps "no entries, nothing
+    before page hubs, the latest plan's hub, else the Global hub (Jita before). That keeps "no entries, nothing
     moves".
   - Each Build Plan keeps its own hub.
   - **LP Store** covers its offers and landing. The header gear is a `HubField`. The filter box

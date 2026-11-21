@@ -19,8 +19,9 @@ import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { EMPTY_RIG_FIT, FACILITY_PRESETS, resolveRigFit } from '@/engine/industry/types';
 import type { FacilityKind, IndustryActivity } from '@/engine/industry/types';
-import { pageHubEntry } from '@/features/market/pageHubs';
-import { DEFAULT_TRADE_HUB, type TradeHub } from '@/market/hubs';
+import { useMarketHub } from '@/features/market/hub';
+import { pageHubEntry, usePageHubs } from '@/features/market/pageHubs';
+import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import {
   DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
   type ActivityFacilityDefaults,
@@ -106,11 +107,24 @@ export function mostRecentlyUpdatedPlan(
 /**
  * The Trade Hub a new plan starts at: the Industry page hub when the pilot set
  * one (issue #6523), else the plan it was started from (the pilot's latest),
- * else the default hub. Without an Industry entry this is the rule from before
- * page hubs, so nobody's next plan moves until they ask for it.
+ * else the Global hub. Without an Industry entry a pilot's next plan still
+ * follows their last one, as before page hubs.
+ *
+ * Reads the settled stores: a caller outside the Industry page (which waits
+ * for them) awaits `loadNewPlanHubInputs()` first.
  */
 export function newPlanHubId(defaultsFrom?: BuildPlanRecord | null): TradeHub['id'] {
-  return pageHubEntry('industry') ?? defaultsFrom?.hubId ?? DEFAULT_TRADE_HUB.id;
+  return pageHubEntry('industry') ?? defaultsFrom?.hubId ?? useMarketHub.getState().value;
+}
+
+/** `newPlanHubId` as the hub itself. */
+export function newPlanHub(defaultsFrom?: BuildPlanRecord | null): TradeHub {
+  return getTradeHub(newPlanHubId(defaultsFrom)) ?? DEFAULT_TRADE_HUB;
+}
+
+/** Reads what `newPlanHubId` depends on, for a caller that can run before any Industry page mounts. */
+export async function loadNewPlanHubInputs(): Promise<void> {
+  await Promise.all([usePageHubs.getState().hydrate(), useMarketHub.getState().hydrate()]);
 }
 
 /** Fields a caller may set on the new plan beyond what the defaults decide. */

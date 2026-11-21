@@ -11,7 +11,7 @@
 import {
   mostRecentlyUpdatedPlan,
   newBuildPlan,
-  newPlanHubId,
+  newPlanHub,
   startingLocation,
 } from './newBuildPlan';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
@@ -52,7 +52,7 @@ import {
   type OrderDepthThresholds,
 } from '@/engine/industry/opportunities';
 import type { CharacterBlueprint } from '@/esi/endpoints';
-import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
+import type { TradeHub } from '@/market/hubs';
 import type { PiData } from '@/sde/types';
 
 /** One owned blueprint (original or copy) matched to what it builds — the unit of an Opportunities row. */
@@ -108,7 +108,7 @@ export function hubForCharacter(
   plansByCharacter: ReadonlyMap<number, readonly BuildPlanRecord[]>
 ): TradeHub {
   const plan = mostRecentlyUpdatedPlan(plansByCharacter.get(characterId));
-  return getTradeHub(newPlanHubId(plan)) ?? DEFAULT_TRADE_HUB;
+  return newPlanHub(plan);
 }
 
 export interface OpportunityHubGroup {

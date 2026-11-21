@@ -48,7 +48,7 @@ import {
 import {
   mostRecentlyUpdatedPlan,
   newBuildPlan,
-  newPlanHubId,
+  newPlanHub,
 } from '@/features/industry/newBuildPlan';
 import { useHubFor } from '@/features/market/hub';
 import {
@@ -86,7 +86,6 @@ import type {
 import { usePageTab } from '@/lib/usePageTab';
 import { useUrlParam } from '@/lib/useUrlState';
 import { boolParam } from '@/lib/urlState';
-import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { loadMarketWideTrees } from '@/sde/loadSde';
 import type { MarketWideTreeMap } from '@/sde/types';
 import { DialogFooter } from '@/components/ui/DialogFooter';
@@ -791,7 +790,7 @@ export function Industry() {
   // plan's), not a fixed default: rows price with the settings the plan page uses, and a click
   // opens a plan with those same settings.
   const latestPlan = mostRecentlyUpdatedPlan(plans);
-  const marketWideHub = getTradeHub(newPlanHubId(latestPlan)) ?? DEFAULT_TRADE_HUB;
+  const marketWideHub = newPlanHub(latestPlan);
   // Not mounted until the plans have loaded: the hub it prices at is the latest plan's,
   // and a scan restored at Jita would flip when that lands.
   const marketWidePanel = catalog && plans !== undefined && (

@@ -51,8 +51,7 @@ import { loyaltyOfferCsvColumns } from '@/features/loyalty/loyaltyStoreCsv';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, optionalBoolParam, optionalIdParam, textParam } from '@/lib/urlState';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
-import { pickHubFor, useHubFor, useMarketHub } from '@/features/market/hub';
-import { usePageHubs } from '@/features/market/pageHubs';
+import { pickHubFor, useHubFor } from '@/features/market/hub';
 import { usePriceBasis } from '@/features/loyalty/priceBasis';
 import { useLpBasis } from '@/features/loyalty/lpBasis';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
@@ -130,7 +129,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
   const [arrivedState] = useState(() => location.state as Partial<LpSearchCrumbState> | null);
 
   const { hubId } = useHubFor('lpStore');
-  useHydratedStore(usePageHubs, useMarketHub, usePriceBasis, useLpBasis);
+  useHydratedStore(usePriceBasis, useLpBasis);
 
   const priceBasis = usePriceBasis((s) => s.value);
   const setPriceBasis = usePriceBasis((s) => s.setValue);

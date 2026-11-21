@@ -36,7 +36,7 @@ import {
 } from '@/engine/industry/types';
 import type { BuildPlanRecord } from '@/db';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
-import { newPlanHubId } from './newBuildPlan';
+import { newPlanHub } from './newBuildPlan';
 import { BuildSystemInput } from './BuildSystemInput';
 import { BuildLocationPicker } from './BuildLocationPicker';
 import { clampPct } from '@/lib/clampPct';
@@ -72,7 +72,7 @@ function initialTarget(group: BuildGroup): RetargetTarget {
     void appliedAt;
     return target;
   }
-  const hub = getTradeHub(newPlanHubId()) ?? DEFAULT_TRADE_HUB;
+  const hub = newPlanHub();
   return { hubId: hub.id, facility: 'npcStation', security: hub.security };
 }
 
