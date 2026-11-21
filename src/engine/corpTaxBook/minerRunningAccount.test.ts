@@ -527,7 +527,7 @@ describe('a checkpoint plus the later days is the whole history, at the toleranc
       const tolerant = { ...input, dayTolerancePct: 0.5 };
       const whole = MinerRunningAccount.build(tolerant);
       const cp = MinerRunningAccount.checkpoint(tolerant, 'm1', through, { at: 'x' });
-      expect(checkpointProblem(cp), `seed ${seed}`).toBeNull();
+      expect(checkpointProblems(cp), `seed ${seed}`).toEqual([]);
       const resumed = MinerRunningAccount.build({ ...tolerant, checkpoint: cp });
       const context = `seed ${seed}`;
       expect(resumed.paidThrough, context).toBe(whole.paidThrough);

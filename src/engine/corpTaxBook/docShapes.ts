@@ -326,13 +326,29 @@ export function readCheckpoint(id: string, d: Data): RunningAccountCheckpoint | 
     const r = o as Data;
     const date = str(r.date);
     const remaining = num(r.remaining);
-    const charge = num(r.charge);
+    const opt = (key: 'tax' | 'credited' | 'writtenOff' | 'charge') => {
+      const v = num(r[key]);
+      return v !== undefined ? { [key]: v } : {};
+    };
     return date && remaining !== undefined
-      ? [{ date, remaining, ...(charge !== undefined ? { charge } : {}) }]
+      ? [
+          {
+            date,
+            remaining,
+            ...opt('tax'),
+            ...opt('credited'),
+            ...opt('writtenOff'),
+            ...opt('charge'),
+            ...(r.held === true ? { held: true } : {}),
+          },
+        ]
       : [];
   });
   const paidThrough = str(d.paidThrough) ?? null;
   const by = num(d.by);
+  const characterIds = Array.isArray(d.characterIds)
+    ? d.characterIds.filter((c: unknown): c is number => typeof c === 'number')
+    : undefined;
   const checkpoint: RunningAccountCheckpoint = {
     minerId: str(d.minerId) ?? id,
     through,
@@ -340,6 +356,7 @@ export function readCheckpoint(id: string, d: Data): RunningAccountCheckpoint | 
     credit,
     balance,
     paidThrough,
+    ...(characterIds ? { characterIds } : {}),
     at,
     ...(by !== undefined ? { by } : {}),
   };

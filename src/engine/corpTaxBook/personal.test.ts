@@ -1033,6 +1033,7 @@ describe('overlayCorpBooks', () => {
       credit: 100_000,
       balance: -100_000,
       paidThrough: '2026-10-15',
+      characterIds: [ME],
       at: '2026-11-20T00:00:00Z',
     };
     const out = overlay(entries, [
