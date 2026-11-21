@@ -18,6 +18,12 @@ import { EVE_CLIENT_ID, KEY_DIR } from './e2e/support/taxBook/runEnv';
 const PORT = 5197;
 const BASE_URL = `http://localhost:${PORT}/`;
 
+/*
+ * Never `reuseExistingServer`: several worktrees share one machine, and these ports are fixed
+ * (the emulators' in firebase.json, Vite's 5197), so a server already up is as likely another
+ * worktree's as this one's, serving its app code and its functions. A run that finds the ports
+ * taken fails at once ("is already used"); wait for the other run, or stop your own servers.
+ */
 export default defineConfig({
   testDir: './e2e',
   testMatch: /\.book\.spec\.ts$/,
@@ -41,7 +47,7 @@ export default defineConfig({
       command: 'node scripts/e2e-book/emulators.mjs',
       // A GET on a callable answers 400 once the Functions emulator has loaded it.
       url: 'http://127.0.0.1:5001/demo-neocom-desk/us-central1/corpTaxBookCall',
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
       timeout: 240_000,
       stdout: 'ignore',
       env: { E2E_BOOK_KEY_DIR: KEY_DIR, EVE_CLIENT_ID },
@@ -52,7 +58,7 @@ export default defineConfig({
     {
       command: `npm run dev -- --port ${PORT} --strictPort`,
       url: BASE_URL,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
       timeout: 120_000,
       env: {
         VITE_EVE_CLIENT_ID: EVE_CLIENT_ID,

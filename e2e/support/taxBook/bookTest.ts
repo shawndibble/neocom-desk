@@ -11,10 +11,9 @@
  */
 import { test as base, expect, type Page, type Route } from '@playwright/test';
 import { signInAndGoto } from '../authSeed';
-import { SCOPES } from '../fixtureData';
 import { installEsiMock } from '../mockEsi';
 import { installSsoMock } from '../mockSso';
-import { scopesForGroup } from '../../../src/esi/scopes';
+import { CORE_GRANT, scopesForGroup } from '../../../src/esi/scopes';
 import { wipeFirestore, writeDocs, type SeedDoc } from './emulator';
 import { signedAccessToken } from './eveToken';
 import { REFINERY } from './bookSeed';
@@ -22,9 +21,20 @@ import { CORP, OFFICER, corpOf, nameOf } from './identities';
 import { installFlatPrices } from './prices';
 import { EMULATOR_HOSTS } from './runEnv';
 
-/** The officer's grant: the suite's usual one plus the corp group (roles, wallet, mining ledger). */
+/**
+ * The officer's grant: the Core Grant and only the Permissions the book's pages use (corp roles,
+ * wallets and ledgers; the pilot's own mining and wallet; mail to send late notices). Not the
+ * suite's full grant: at boot the app warms every granted endpoint, and with all of them the
+ * corp role lookup the officer check waits on queued behind ~25 personal reads, pushing a book
+ * page's first render to the edge of a test's 5-second wait.
+ */
 export const OFFICER_SCOPES: readonly string[] = [
-  ...new Set([...SCOPES, ...scopesForGroup('corp')]),
+  ...new Set([
+    ...CORE_GRANT,
+    ...(['corp', 'mining', 'wallet', 'mailSend'] as const).flatMap((group) =>
+      scopesForGroup(group)
+    ),
+  ]),
 ];
 
 export interface Book {
@@ -93,28 +103,91 @@ function defaultCorpEsi(path: string, route: Route): unknown {
   return undefined;
 }
 
+/**
+ * The network every book page runs on, for one page: the guard (only the app's server and the
+ * emulators), the SSO and ESI mocks, flat prices, and no synced data of the officer's own.
+ * Returns the requests that escaped, for the caller to assert empty. The `page` fixture and the
+ * run's warm-up (`warmUp.ts`) both use it.
+ */
+export async function installBookNetwork(page: Page, baseURL: string): Promise<string[]> {
+  const escaped: string[] = [];
+  const allowed = new Set([new URL(baseURL).host, ...EMULATOR_HOSTS]);
+  await page.route('**/*', async (route) => {
+    if (allowed.has(new URL(route.request().url()).host)) return route.fallback();
+    escaped.push(`${route.request().method()} ${route.request().url()}`);
+    await route.abort('failed');
+  });
+  await installSsoMock(page, OFFICER_SCOPES);
+  await installEsiMock(page);
+  await installFlatPrices(page);
+  // The officer's own synced data (`characters/char:<id>/...`): none. The emulator cannot run
+  // these queries (docs/agents/testing-and-ci.md, "Known emulator noise"), and they are not
+  // what these specs are about.
+  await page.route(/127\.0\.0\.1:8080\/.*\/documents\/characters\/[^/]+:runQuery/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([{ readTime: new Date().toISOString() }]),
+    })
+  );
+  // Nor does it write any: the app's own sync commits only under `characters/`, and its reads of
+  // those docs find none. (Book reads are batchGets of `corps/` docs, and book writes are all
+  // callables, so neither is touched.)
+  await page.route(/127\.0\.0\.1:8080\/.*\/documents:(commit|batchGet)/, (route) => {
+    const body = route.request().postData() ?? '';
+    if (!body.includes('/documents/characters/')) return route.fallback();
+    const now = new Date().toISOString();
+    if (route.request().url().includes(':commit')) {
+      const writes = (JSON.parse(body) as { writes?: unknown[] }).writes ?? [];
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          writeResults: writes.map(() => ({ updateTime: now })),
+          commitTime: now,
+        }),
+      });
+    }
+    const docs = (JSON.parse(body) as { documents?: string[] }).documents ?? [];
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(docs.map((missing) => ({ missing, readTime: now }))),
+    });
+  });
+  return escaped;
+}
+
+/**
+ * The corp ESI the officer's pages read (`defaultCorpEsi`), answered before the general mock.
+ * Returns how to add a test's own answers, tried first.
+ */
+export async function routeBookEsi(page: Page): Promise<(answer: EsiOverride) => void> {
+  const overrides: EsiOverride[] = [];
+  await page.route('https://esi.evetech.net/**', async (route) => {
+    const path = new URL(route.request().url()).pathname
+      .replace(/^\/latest/, '')
+      .replace(/\/$/, '');
+    for (const answer of [...overrides, defaultCorpEsi]) {
+      const body = answer(path, route);
+      if (body !== undefined) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(body),
+        });
+      }
+    }
+    return route.fallback();
+  });
+  return (answer) => overrides.unshift(answer);
+}
+
 /* eslint-disable react-hooks/rules-of-hooks -- Playwright fixture functions; `use` is not a hook. */
 export const test = base.extend<BookFixtures>({
   esi: [
     async ({ page }, use) => {
-      const overrides: EsiOverride[] = [];
-      await page.route('https://esi.evetech.net/**', async (route) => {
-        const path = new URL(route.request().url()).pathname
-          .replace(/^\/latest/, '')
-          .replace(/\/$/, '');
-        for (const answer of [...overrides, defaultCorpEsi]) {
-          const body = answer(path, route);
-          if (body !== undefined) {
-            return route.fulfill({
-              status: 200,
-              contentType: 'application/json',
-              body: JSON.stringify(body),
-            });
-          }
-        }
-        return route.fallback();
-      });
-      await use((answer) => overrides.unshift(answer));
+      await use(await routeBookEsi(page));
     },
     { auto: true },
   ],
@@ -127,26 +200,7 @@ export const test = base.extend<BookFixtures>({
     { auto: true },
   ],
   page: async ({ page, baseURL }, use) => {
-    const escaped: string[] = [];
-    const allowed = new Set([new URL(baseURL!).host, ...EMULATOR_HOSTS]);
-    await page.route('**/*', async (route) => {
-      if (allowed.has(new URL(route.request().url()).host)) return route.fallback();
-      escaped.push(`${route.request().method()} ${route.request().url()}`);
-      await route.abort('failed');
-    });
-    await installSsoMock(page, OFFICER_SCOPES);
-    await installEsiMock(page);
-    await installFlatPrices(page);
-    // The officer's own synced data (`characters/char:<id>/...`): none. The emulator cannot run
-    // these queries (docs/agents/testing-and-ci.md, "Known emulator noise"), and they are not
-    // what these specs are about.
-    await page.route(/127\.0\.0\.1:8080\/.*\/documents\/characters\/[^/]+:runQuery/, (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify([{ readTime: new Date().toISOString() }]),
-      })
-    );
+    const escaped = await installBookNetwork(page, baseURL!);
     await use(page);
     expect(escaped, `Real network reached (should be fully mocked): ${escaped.join(', ')}`).toEqual(
       []
@@ -178,8 +232,10 @@ export const minerUrl = (minerId: string): string =>
  */
 export async function openMiner(page: Page, minerId: string, name: string): Promise<void> {
   await signInAsOfficer(page, minerUrl(minerId));
-  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+  // Two signals in their order: the book read (the ledger), then the Miner's name, which ESI
+  // resolves only after it.
   await expect(page.getByRole('table', { name: 'Account ledger' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
 }
 
 /** The Miner page's figure beside a label ("Paid", "Oldest unpaid", "Last payment", ...). */
