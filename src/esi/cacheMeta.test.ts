@@ -8,6 +8,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { db } from '@/db';
+import { HOUR_MS } from '@/lib/age';
 import {
   conditionalFetch,
   conditionalPagedFetch,
@@ -376,7 +377,11 @@ describe('per-page conditional revalidation of a paginated list (ETag / 304)', (
    * Answers like `fetchAllPagesStatus` would against `server`: a page whose
    * sent ETag still matches is a 304 (no items), anything else a 200.
    */
-  function pagedFetch(server: ServerPage[], sent: Array<ReadonlyArray<string | undefined>> = []) {
+  function pagedFetch(
+    server: ServerPage[],
+    sent: Array<ReadonlyArray<string | undefined>> = [],
+    expires?: string
+  ) {
     return conditionalPagedFetch<string>(async ({ pageEtags }) => {
       sent.push([...pageEtags]);
       const pageResponses: PageResponse<string>[] = server.map((page, i) =>
@@ -390,6 +395,7 @@ describe('per-page conditional revalidation of a paginated list (ETag / 304)', (
         pagesFetched: server.length,
         pagesReported: server.length,
         pageResponses,
+        ...(expires ? { expires } : {}),
       };
       return result;
     });
@@ -435,6 +441,26 @@ describe('per-page conditional revalidation of a paginated list (ETag / 304)', (
     expect((await db.esiCacheMeta.get([CHAR_ID, KEY]))?.fetchedAt).toBe(later);
     expect((await db.esiCache.get([CHAR_ID, KEY]))?.fetchedAt).toBe(T0);
     expect(await isCacheFresh(CHAR_ID, KEY)).toBe(true);
+  });
+
+  it("keeps page 1's Expires on the row when the loader passes its capture, through a 304 too", async () => {
+    const first = new Date(T0 + HOUR_MS);
+    at(T0);
+    const seeded = pagedFetch(V1, [], first.toUTCString());
+    const read = await loadPaginatedWithCacheStatus(CHAR_ID, KEY, seeded.fetchLive, {
+      conditional: seeded.conditional,
+      expiresCapture: seeded.expiresCapture,
+    });
+    expect(read.cached?.expiresAt).toEqual(first);
+
+    const next = new Date(T0 + 2 * HOUR_MS);
+    at(T0 + HOUR_MS + 1);
+    const revalidated = pagedFetch(V1, [], next.toUTCString());
+    const again = await loadPaginatedWithCacheStatus(CHAR_ID, KEY, revalidated.fetchLive, {
+      conditional: revalidated.conditional,
+      expiresCapture: revalidated.expiresCapture,
+    });
+    expect(again.cached?.expiresAt).toEqual(next);
   });
 
   it('one page 200 among 304s: rebuilds the list in page order from stored and fresh pages', async () => {

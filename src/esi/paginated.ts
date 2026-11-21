@@ -28,6 +28,8 @@ export interface PaginatedResult<T> extends TruncatableResult<T> {
    * are not in `items`: the caller restores them from what it holds.
    */
   pageResponses?: PageResponse<T>[];
+  /** Page 1's raw `Expires`, when it sent one: when ESI next updates the list. */
+  expires?: string | null;
 }
 
 /** What one page of a revalidating walk answered. */
@@ -128,6 +130,7 @@ export async function fetchAllPagesStatus<T>(
       truncated: pagesFetched < first.pages,
       pagesFetched,
       pagesReported: first.pages,
+      ...(first.expires ? { expires: first.expires } : {}),
       ...(pageEtags ? { pageResponses: responses } : {}),
     };
   } catch (err) {

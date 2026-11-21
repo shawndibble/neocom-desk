@@ -214,23 +214,30 @@ export interface PagedConditionalCapture<T> {
  *     return loadPaginatedWithCacheStatus(id, KEY, fetchLive, { conditional });
  *
  * The same rule applies: only for a loader whose cached value is the pages'
- * items as-is.
+ * items as-is. `expiresCapture` holds page 1's `Expires`; a loader that wants
+ * the row to carry it (`CachedResult.expiresAt`) passes it on too.
  */
 export function conditionalPagedFetch<T>(
   fetch: (options: {
     pageEtags: ReadonlyArray<string | undefined>;
-  }) => Promise<TruncatableResult<T> & Pick<PaginatedResult<T>, 'pageResponses'>>
-): { fetchLive: () => Promise<TruncatableResult<T>>; conditional: PagedConditionalCapture<T> } {
+  }) => Promise<TruncatableResult<T> & Pick<PaginatedResult<T>, 'pageResponses' | 'expires'>>
+): {
+  fetchLive: () => Promise<TruncatableResult<T>>;
+  conditional: PagedConditionalCapture<T>;
+  expiresCapture: ExpiresCapture;
+} {
   const conditional: PagedConditionalCapture<T> = {
     ifNoneMatch: undefined,
     pageResponses: undefined,
   };
+  const expiresCapture: ExpiresCapture = { value: null };
   const fetchLive = async (): Promise<TruncatableResult<T>> => {
     const result = await fetch({ pageEtags: conditional.ifNoneMatch ?? [] });
     conditional.pageResponses = result.pageResponses;
+    expiresCapture.value = result.expires ?? null;
     return result;
   };
-  return { fetchLive, conditional };
+  return { fetchLive, conditional, expiresCapture };
 }
 
 /**

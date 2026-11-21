@@ -17,7 +17,6 @@ const editCorpTaxBook = vi.fn();
 vi.mock('@/features/corp/taxBook/bookClient', () => ({
   readVerifyTokens: (...a: unknown[]) => readVerifyTokens(...a),
   editBook: (...a: unknown[]) => editCorpTaxBook(...a),
-  verifyUrl: (origin: string, token: string) => `${origin}/v/${token}`,
 }));
 
 function notice(n: number): LateNoticeToMail {
@@ -61,7 +60,7 @@ describe('enqueueLateNotices', () => {
       ['s1', 101, 'waiting', 'notice'],
       ['s2', 102, 'waiting', 'notice'],
     ]);
-    expect(rows[0].body).toContain('https://app.test/v/tok1');
+    expect(rows[0].body).toContain('https://app.test/corp-tax-book/verify/tok1');
     expect(rows[0].batchId).toBe(rows[1].batchId);
   });
 
@@ -72,6 +71,28 @@ describe('enqueueLateNotices', () => {
     const again = await enqueueLateNotices({ ...base, notices: [notice(1), notice(2)] });
     expect(again).toMatchObject({ queued: 0, skipped: 1, missingLink: ['s2'] });
     expect(await db.corpMailQueue.count()).toBe(1);
+  });
+
+  it('sends an officer-edited subject and body, with the real verify link filled in', async () => {
+    readVerifyTokens.mockResolvedValue(new Map([['s1', 'tok1']]));
+    const preview = 'https://app.test/corp-tax-book/verify/…';
+    await enqueueLateNotices({
+      ...base,
+      notices: [
+        {
+          ...notice(1),
+          edited: {
+            subject: 'Please pay your moon tax',
+            body: `Hi, you are late.\n<a href="${preview}">${preview}</a>`,
+          },
+        },
+      ],
+    });
+    const [row] = await db.corpMailQueue.toArray();
+    expect(row.subject).toBe('Please pay your moon tax');
+    expect(row.body).toBe(
+      'Hi, you are late.\n<a href="https://app.test/corp-tax-book/verify/tok1">https://app.test/corp-tax-book/verify/tok1</a>'
+    );
   });
 
   it('continues numbering after what is already queued', async () => {

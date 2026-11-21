@@ -858,6 +858,4 @@ export async function recordCheckpoints(
 }
 
 /** Where a late notice's verify link points: the public page routes/CorpTaxBookVerify.tsx serves it. */
-export function verifyUrl(origin: string, token: string): string {
-  return `${origin}/corp-tax-book/verify/${token}`;
-}
+export { verifyUrl } from '@/engine/corpTaxBook/lateNoticeMail';
