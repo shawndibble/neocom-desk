@@ -3,6 +3,7 @@
  * shows. Pure. Every provider still answers with up to `GROUP_LIMIT` rows;
  * this decides how many of them fit on screen at once.
  */
+import { searchKey } from '@/lib/tokenSearch';
 import { GROUP_LIMIT } from './types';
 import type { PaletteGroup } from './usePaletteSearch';
 
@@ -18,8 +19,8 @@ const WORD_BOUNDARY = /[^\p{L}\p{N}]/u;
  * that begins with it, and the provider order then breaks the tie.
  */
 export function matchTier(label: string, query: string): number {
-  const q = query.trim().toLowerCase();
-  const l = label.toLowerCase();
+  const q = searchKey(query.trim());
+  const l = searchKey(label);
   if (l === q) return 0;
   if (l.startsWith(q)) return 1;
   let from = l.indexOf(q);

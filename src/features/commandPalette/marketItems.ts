@@ -34,12 +34,10 @@ export type MarketItemIndex = readonly IndexedItem[];
 
 export function buildMarketItemIndex(catalogue: readonly MarketTypeEntry[]): MarketItemIndex {
   return catalogue
-    .map(({ typeId, name }) => ({
-      typeId,
-      name,
-      lower: searchKey(name),
-      words: wordsOf(searchKey(name)),
-    }))
+    .map(({ typeId, name }) => {
+      const lower = searchKey(name);
+      return { typeId, name, lower, words: wordsOf(lower) };
+    })
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 

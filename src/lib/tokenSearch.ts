@@ -1,7 +1,7 @@
 /**
  * The two loose match tiers that sit below exact/prefix/substring (#5644),
  * shared by `rankedSearch` and the command palette's item scan so both agree.
- * Inputs are already lowercased.
+ * Inputs are already `searchKey`ed (lowercased, quote marks dropped).
  */
 
 /** A digit 1–5 and the roman numeral word it stands for, in both directions. */

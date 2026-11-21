@@ -45,7 +45,7 @@ function rankOf<T>(
   if (primaryLower === q) return PRIMARY_EXACT;
   if (primaryLower.startsWith(q)) return PRIMARY_PREFIX;
   if (primaryLower.includes(q)) return PRIMARY_SUBSTRING;
-  if (options.secondary?.some((field) => field(item).toLowerCase().includes(q))) {
+  if (options.secondary?.some((field) => searchKey(field(item)).includes(q))) {
     return SECONDARY_ONLY;
   }
   if (tokens && tokenPrefixMatchText(primaryLower, tokens)) return TOKEN_PREFIX;
