@@ -551,8 +551,9 @@ service cloud.firestore {
         allow write: if false;
       }
 
-      // A Running account's closed-through checkpoint: officers read every one, a Miner their own.
-      match /accountCheckpoints/{minerId} {
+      // A Running account's figures and its lock-date snapshot: officers read every one, a Miner
+      // their own (its `uids`, stored with the snapshot).
+      match /accounts/{minerId} {
         allow get, list: if isOfficer() || isOnOwnLine();
         allow write: if false;
       }

@@ -10,6 +10,7 @@ import { isDeepStrictEqual } from 'node:util';
 import {
   FieldPath,
   FieldValue,
+  type CollectionReference,
   type DocumentSnapshot,
   type DocumentReference,
   type Firestore,
@@ -63,7 +64,6 @@ import {
   REBILLS,
   TOKENS_COLLECTION,
   LATE_NOTICES,
-  RUNNING_ACCOUNT_CHECKPOINTS,
   WRITE_OFFS,
   TOLERANCE_EXEMPTIONS,
   MINER_PAID,
@@ -75,7 +75,6 @@ import {
   disputesClosedByWriteOff,
   checkpointRefusal,
   handRecordMatch,
-  type RecordedCheckpoint,
   mergeDisputeLines,
   type RecordedOre,
   moveStartRate,
@@ -1069,18 +1068,23 @@ function refuseLocked(now: number, ...dates: unknown[]): void {
 }
 
 /**
- * Deletes these Miners' snapshots, in the caller's transaction (a write: after its reads): their
- * characters changed, so the history a snapshot summed is not theirs any more. The next officer
- * load records them again.
+ * Reads which of these Miners' accounts hold a snapshot (before the caller's first write); the
+ * returned write deletes each one's `snapshot` and readers, keeping the figures: their characters
+ * changed, so the history it summed is not theirs any more. The next officer load records it
+ * again. `only` limits the write to one Miner. A caller leaves out an account it deletes.
  */
-function dropSnapshots(
+async function snapshotDropper(
   tx: Transaction,
-  db: Firestore,
-  corporationId: number,
-  minerIds: Iterable<string | null | undefined>
-): void {
-  for (const id of new Set(minerIds))
-    if (id) tx.delete(sub(db, corporationId, RUNNING_ACCOUNT_CHECKPOINTS).doc(id));
+  accounts: CollectionReference,
+  minerIds: Iterable<string>
+): Promise<(only?: string) => void> {
+  const refs = [...new Set(minerIds)].map((id) => accounts.doc(id));
+  const held = (refs.length > 0 ? await tx.getAll(...refs) : []).filter((s) => s.get('snapshot'));
+  return (only) => {
+    for (const s of held)
+      if (only === undefined || s.id === only)
+        tx.update(s.ref, { snapshot: FieldValue.delete(), uids: FieldValue.delete() });
+  };
 }
 
 async function mustGet(c: EditCtx, ref: DocumentReference, what: string): Promise<Data> {
@@ -1440,7 +1444,7 @@ async function rekeyAbsorbed(
     absorbed
   );
   const writes = planRekey({ target, targetUids, records, existingDisputeIds });
-  // A transaction holds 500 writes: a move is two, and each Miner's checkpoint goes too (the
+  // A transaction holds 500 writes: a move is two, and each Miner's snapshot goes too (the
   // caller drops them, as every change of a Miner's characters does). Refuse, rather than fail
   // half-way.
   const ops = writes.reduce((n, w) => n + (w.kind === 'move' ? 2 : 1), absorbed.length + 1);
@@ -1512,9 +1516,10 @@ function writeMiner(
 }
 
 /**
- * Every Miner whose characters a grouping changes: the target, what it absorbs, any other grouping
- * that held one of its characters, and each character's own solo id. Each one's checkpoint summed
- * other characters than it has now, so it is dropped (decision 20261120-235011).
+ * Every Miner whose characters a grouping changes and whose account stays: the target and any other
+ * grouping that held one of its characters (what it absorbs, solo ids included, goes with the
+ * rekey). Each one's snapshot summed other characters than it has now, so it is dropped (decision
+ * 20261120-235011).
  */
 function groupingChange(
   miners: readonly QueryDocumentSnapshot[],
@@ -1528,20 +1533,7 @@ function groupingChange(
       )
     )
     .map((d) => d.id);
-  return [
-    action.minerId,
-    ...absorbed,
-    ...holders,
-    ...action.characterIds.map((x) => soloMinerId(x)),
-  ];
-}
-
-/** The Miners an unlink changes: the grouping, the character's own, and a last one's left alone. */
-function unlinkChange(minerId: string, miner: Data, characterId: number): string[] {
-  const left = ((miner.characterIds as number[] | undefined) ?? []).filter(
-    (x) => x !== characterId
-  );
-  return [minerId, soloMinerId(characterId), ...(left.length === 1 ? [soloMinerId(left[0])] : [])];
+  return [action.minerId, ...holders].filter((id) => !absorbed.includes(id));
 }
 
 /** The ids a grouping answers to: its own aliases, and each absorbed Miner's id and aliases. */
@@ -1571,19 +1563,24 @@ function readersAfterUnlink(miner: Data, characterId: number): string[] {
  * and records it in the book so no officer's sync puts it straight back (D26). False when the
  * character was not in the Miner; nothing is written then.
  */
-function removeFromMiner(
+async function removeFromMiner(
   tx: Transaction,
   ref: DocumentReference,
   miner: Data,
   characterId: number
-): boolean {
+): Promise<boolean> {
   const before = miner.characterIds as number[];
   const characterIds = before.filter((x) => x !== characterId);
   if (characterIds.length === before.length) return false;
+  const accounts = ref.parent.parent!.collection(RUNNING_ACCOUNTS);
+  // The snapshots that summed other characters go: the grouping's (unless it goes whole), the
+  // character's own, and a last one's left alone.
+  const changed = characterIds.length > 1 ? [ref.id] : characterIds.map(soloMinerId);
+  (await snapshotDropper(tx, accounts, [soloMinerId(characterId), ...changed]))();
   if (characterIds.length <= 1) {
     tx.delete(ref);
     // Its recorded account goes with it, so no list offers a Miner that is gone.
-    tx.delete(ref.parent.parent!.collection(RUNNING_ACCOUNTS).doc(ref.id));
+    tx.delete(accounts.doc(ref.id));
   } else {
     tx.update(ref, {
       characterIds,
@@ -2204,9 +2201,9 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         scope.uids,
         scope.absorbed
       );
+      (await snapshotDropper(tx, col(c, RUNNING_ACCOUNTS), changed))();
       writeMiner(c, action, out, aliasesAfter(miners.docs, action.minerId, []));
       rekey();
-      dropSnapshots(tx, c.deps.db, c.corporationId, changed);
       keepInGroup(c, action.characterIds);
       return {
         detail: {
@@ -2243,10 +2240,10 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         scope.uids,
         scope.absorbed
       );
+      (await snapshotDropper(tx, col(c, RUNNING_ACCOUNTS), changed))();
       for (const id of absorbed) tx.delete(col(c, MINERS).doc(id));
       writeMiner(c, action, out, aliasesAfter(miners.docs, action.minerId, action.absorbMinerIds));
       rekey();
-      dropSnapshots(tx, c.deps.db, c.corporationId, changed);
       // A confirmation still stands for a character the Miner already held.
       clearAnswers(
         c,
@@ -2266,14 +2263,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     case 'unlink': {
       const ref = col(c, MINERS).doc(action.minerId);
       const miner = await mustGet(c, ref, 'Miner');
-      if (!removeFromMiner(c.tx, ref, miner, action.characterId))
+      if (!(await removeFromMiner(c.tx, ref, miner, action.characterId)))
         fail('not-found', 'Not in that Miner', 'not-in-miner');
-      dropSnapshots(
-        tx,
-        c.deps.db,
-        c.corporationId,
-        unlinkChange(action.minerId, miner, action.characterId)
-      );
       // The grouping the answer was about is gone, so the answer must not outlive it.
       clearAnswers(c, [action.characterId]);
       return { detail: { minerId: action.minerId, characterId: action.characterId } };
@@ -2655,7 +2646,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       return { detail: { noticeId: action.noticeId } };
     }
     case 'recordAccounts': {
-      // Every book is a running account (decision 20261117-060555).
+      // Every book is a running account (decision 20261117-060555). Reads first: a transaction
+      // refuses one after a write.
       const paidRef = col(c, META).doc(PAID_DOC);
       const settled = await storableSettledThrough(c, action.accounts, paidRef, iso);
       // Every editor's open tab records the same figures (#6313): one already stored is not
@@ -2666,11 +2658,33 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       // Miner it advanced now. Reads first: a transaction refuses one after a write.
       const advanced = Object.keys(settled);
       const advancedUids = await Promise.all(advanced.map((id) => minerUids(c, id)));
+      // One snapshot per Miner per lock date (decision 20261120-235011, "a lock date"), stored with
+      // its Miner's readers: one not due or not adding up is skipped and reported.
+      const today = utcDate(now);
+      const fresh = new Map<number, { snapshot: Data; uids: string[] }>();
+      const skipped: { minerId: string; through: string; reason: string }[] = [];
+      for (const [i, { minerId, snapshot: k }] of action.accounts.entries()) {
+        if (!k) continue;
+        const known = await knownMiner(c, minerId);
+        const reason = checkpointRefusal(k, {
+          stored: stored[i].get('snapshot') as RunningAccountCheckpoint | undefined,
+          today,
+          known,
+          characterIds: known
+            ? minerCharacters(minerId, (await c.tx.get(col(c, MINERS).doc(minerId))).data())
+            : [],
+        });
+        if (reason) skipped.push({ minerId, through: k.through, reason });
+        else fresh.set(i, { snapshot: { ...k, at: iso, by }, uids: await minerUids(c, minerId) });
+      }
       action.accounts.forEach((account, i) => {
         const a = { ...account };
         delete a.settledThrough; // the pay page's record; the marker lives in `meta/paid`
-        if (sameRunningAccount(stored[i].data(), a)) return;
-        tx.set(refs[i], { ...a, at: iso, by });
+        delete a.snapshot;
+        if (!fresh.has(i) && sameRunningAccount(stored[i].data(), a)) return;
+        // A stored snapshot and its readers stay until a newer one or a change of characters.
+        const { snapshot, uids }: Data = fresh.get(i) ?? stored[i].data() ?? {};
+        tx.set(refs[i], { ...a, at: iso, by, ...(snapshot ? { snapshot, uids } : {}) });
       });
       // Only ever grown: a day recorded paid stays paid, even if money is later taken back (D22).
       if (Object.keys(settled).length > 0)
@@ -2678,8 +2692,14 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       advanced.forEach((id, i) =>
         tx.set(col(c, MINER_PAID).doc(id), { id, paidThrough: settled[id], uids: advancedUids[i] })
       );
-      // The figures as recorded, so the audit says what the pay page was told.
-      return { detail: { count: action.accounts.length, accounts: action.accounts } };
+      // The figures as recorded: what the pay page was told, and each snapshot in full.
+      return {
+        detail: { count: action.accounts.length, accounts: action.accounts, skipped },
+        result: {
+          recorded: [...fresh.keys()].map((i) => action.accounts[i].minerId),
+          skipped: skipped.map(({ minerId, reason }) => ({ minerId, reason })),
+        },
+      };
     }
     case 'recordLateNoticeMail': {
       // The queue sent this mail (D16): log it on the notice and in the audit trail.
@@ -2687,42 +2707,6 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const loaded = await mustGetNotice(c, noticeId);
       writeNoticeMail(tx, bookRef(c.deps.db, c.corporationId), loaded, { kind: 'mailed', at: iso });
       return { detail: { noticeId, mailId: action.mailId, kind: action.kind } };
-    }
-    case 'recordCheckpoints': {
-      // One snapshot per Miner per lock date (decision 20261120-235011, "a lock date"): one that
-      // is not due or does not add up is skipped and reported. Reads first: a transaction refuses
-      // one after a write.
-      const today = utcDate(now);
-      const refs = action.checkpoints.map((k) =>
-        col(c, RUNNING_ACCOUNT_CHECKPOINTS).doc(k.minerId)
-      );
-      const stored = refs.length > 0 ? await c.tx.getAll(...refs) : [];
-      const recorded: { checkpoint: RecordedCheckpoint; ref: DocumentReference; uids: string[] }[] =
-        [];
-      const skipped: { minerId: string; through: string; reason: string }[] = [];
-      for (const [i, k] of action.checkpoints.entries()) {
-        const known = await knownMiner(c, k.minerId);
-        const reason = checkpointRefusal(k, {
-          stored: stored[i].data() as RunningAccountCheckpoint | undefined,
-          today,
-          known,
-          characterIds: known
-            ? minerCharacters(k.minerId, (await c.tx.get(col(c, MINERS).doc(k.minerId))).data())
-            : [],
-        });
-        if (reason) skipped.push({ minerId: k.minerId, through: k.through, reason });
-        else recorded.push({ checkpoint: k, ref: refs[i], uids: await minerUids(c, k.minerId) });
-      }
-      for (const { checkpoint, ref, uids } of recorded)
-        tx.set(ref, { ...checkpoint, at: iso, by, uids, updatedAt: FieldValue.serverTimestamp() });
-      // The full figures, so the audit says what each account stood at.
-      return {
-        detail: { recorded: recorded.map((r) => r.checkpoint), skipped },
-        result: {
-          recorded: recorded.map((r) => r.checkpoint.minerId),
-          skipped: skipped.map(({ minerId, reason }) => ({ minerId, reason })),
-        },
-      };
     }
     case 'setPopSharing':
     case 'setPopSharingMoon':
@@ -3012,14 +2996,15 @@ export async function confirmGrouping(
       [...new Set([...((miner.uids as string[] | undefined) ?? []), caller.uid])],
       [soloMinerId(characterId)]
     );
+    // The guest's own history joins the group's: the group's snapshot sums it no more (the guest's
+    // own account goes with the rekey).
+    (await snapshotDropper(tx, ref.parent.parent!.collection(RUNNING_ACCOUNTS), [minerId]))();
     tx.update(ref, {
       pendingConfirmation: (miner.pendingConfirmation as number[]).filter((x) => x !== characterId),
       confirmedCharacterIds: FieldValue.arrayUnion(characterId),
       uids: FieldValue.arrayUnion(caller.uid),
     });
     rekey();
-    // The guest's own history joins the group's: neither snapshot sums it any more.
-    dropSnapshots(tx, deps.db, corporationId, [minerId, soloMinerId(characterId)]);
     recordAnswer(tx, deps, corporationId, characterId, {
       minerId,
       answer: 'confirmed',
@@ -3046,8 +3031,7 @@ async function declinePending(
     // Removing the last other character deletes the Miner doc, which would erase `closedAt`.
     if (miner.closedAt != null)
       fail('failed-precondition', "This Miner's account is closed", 'account-closed');
-    removeFromMiner(tx, ref, miner, characterId);
-    dropSnapshots(tx, deps.db, corporationId, unlinkChange(minerId, miner, characterId));
+    await removeFromMiner(tx, ref, miner, characterId);
     recordAnswer(tx, deps, corporationId, characterId, {
       minerId,
       answer: 'declined',
@@ -3087,8 +3071,7 @@ export async function declineLink(
       fail('not-found', 'Nothing to decline', 'nothing-to-decline');
     if (miner.closedAt != null)
       fail('failed-precondition', "This Miner's account is closed", 'account-closed');
-    removeFromMiner(tx, ref, miner, characterId);
-    dropSnapshots(tx, deps.db, corporationId, unlinkChange(minerId, miner, characterId));
+    await removeFromMiner(tx, ref, miner, characterId);
     recordAnswer(tx, deps, corporationId, characterId, {
       minerId,
       answer: 'declined',
@@ -3154,6 +3137,12 @@ export async function promoteProvenClaims(
       }
       widen.push(refs);
     }
+    const accounts = sub(deps.db, corporationId, RUNNING_ACCOUNTS);
+    const dropSnapshot = await snapshotDropper(
+      tx,
+      accounts,
+      plans.map((p) => p.minerId)
+    );
     let budget = PROMOTE_WRITE_CAP;
     plans.forEach((p, i) => {
       if (widen[i].length + 1 > budget) return; // stays an officer claim until it fits
@@ -3166,7 +3155,7 @@ export async function promoteProvenClaims(
       });
       for (const w of widen[i]) tx.update(w.ref, { uids: FieldValue.arrayUnion(...w.uids) });
       // Its readers changed: the next officer load records its snapshot again, with them.
-      dropSnapshots(tx, deps.db, corporationId, [p.minerId]);
+      dropSnapshot(p.minerId);
       promoted += p.characterIds.length;
     });
     const items = groupConflicts(group, new Date(deps.now()).toISOString()).map((x) => {

@@ -168,7 +168,7 @@ export interface PersonalBook {
   toleranceExemptions?: readonly ToleranceExemption[];
   /** Each of the member's Miners' paid-through day (`minerPaid`), when the book recorded one. */
   minerPaidThrough?: ReadonlyMap<string, string>;
-  /** Each of the member's Miners' closed-through checkpoint (`accountCheckpoints`), by Miner id. */
+  /** Each of the member's Miners' snapshot (`accounts/{minerId}.snapshot`), by Miner id. */
   checkpoints?: ReadonlyMap<string, RunningAccountCheckpoint>;
 }
 

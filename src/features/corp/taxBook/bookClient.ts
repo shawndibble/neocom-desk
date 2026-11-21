@@ -12,7 +12,7 @@ import { LIVE_CHECK_ACTION_NAMES } from '../../../../functions/src/corpTaxBookKi
 import {
   LATE_NOTICES,
   LATE_NOTICE_LINKS,
-  RUNNING_ACCOUNT_CHECKPOINTS,
+  RUNNING_ACCOUNTS,
 } from '../../../../functions/src/corpTaxBookVersionKeys';
 import { parseBookSettings, type BookSettings } from '@/engine/corpTaxBook/bookDocs';
 import type { DivisionNames } from '@/engine/corpTaxBook/divisionNames';
@@ -573,7 +573,7 @@ export interface BookData {
   adjustments: Adjustment[];
   /** Officers' per-day limits on what a shortfall may forgive (the newest per day decides). */
   toleranceExemptions?: ToleranceExemption[];
-  /** Each Miner's closed-through checkpoint (`accountCheckpoints`); none before the server keeps them. */
+  /** Each Miner's snapshot (`accounts/{minerId}.snapshot`); none before the server keeps them. */
   checkpoints?: RunningAccountCheckpoint[];
   /** Each feeder's last good ledger read (#4509); a feeder's days are Billable only after one. */
   feeders?: BookFeeder[];
@@ -756,9 +756,10 @@ export async function readNotices(book: OpenBook): Promise<LateNotice[]> {
 
 /** Each Miner's snapshot; none until the server has written one. Best effort. */
 export async function readCheckpoints(book: OpenBook): Promise<RunningAccountCheckpoint[]> {
-  return book.written(RUNNING_ACCOUNT_CHECKPOINTS)
-    ? book.list<RunningAccountCheckpoint>(RUNNING_ACCOUNT_CHECKPOINTS).catch(() => [])
+  const accounts = book.written(RUNNING_ACCOUNTS)
+    ? await book.list<{ snapshot?: RunningAccountCheckpoint }>(RUNNING_ACCOUNTS).catch(() => [])
     : [];
+  return accounts.flatMap((a) => a.snapshot ?? []);
 }
 
 /** The verify token for each late notice id; one with no link doc is left out. Editors only (rules). */
@@ -803,18 +804,6 @@ export async function recordLateNoticeMail(
     { action: 'recordLateNoticeMail', ...mail },
     { freshToken: true }
   );
-}
-
-/**
- * Records each Miner's snapshot for the lock date (`recordCheckpoints`). What the server skips
- * (`exists`, `wrong-date`) is no failure: the account reads its whole history meanwhile.
- */
-export async function recordCheckpoints(
-  characterId: number,
-  corporationId: number,
-  checkpoints: readonly RunningAccountCheckpoint[]
-): Promise<void> {
-  await editBook(characterId, corporationId, { action: 'recordCheckpoints', checkpoints });
 }
 
 /** Where a late notice's verify link points: the public page routes/CorpTaxBookVerify.tsx serves it. */

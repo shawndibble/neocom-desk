@@ -33,14 +33,16 @@ test('an edit before the lock date is refused or hidden', async ({ page, book: e
 test('a snapshot is recorded once per lock date', async ({ page, book: emulator }) => {
   const book = closedMonthBook();
   await emulator.seed(book.seed.docs());
-  const path = `corps/${CORP}/accountCheckpoints/${book.minerId}`;
+  const path = `corps/${CORP}/accounts/${book.minerId}`;
+  const snapshot = async () =>
+    (await readDoc(path))?.snapshot as Record<string, unknown> | undefined;
   const minersRow = page.getByRole('row', { name: new RegExp(MINER.ada.name) });
   // Only a whole-book read records snapshots (a Miner page reads one Miner's slice).
   await signInAsOfficer(page, './corp/moons/miners');
   await expect(minersRow).toBeVisible();
   await expect
     .poll(async () => {
-      const stored = await readDoc(path);
+      const stored = await snapshot();
       return (
         stored && {
           minerId: stored.minerId,
@@ -54,13 +56,13 @@ test('a snapshot is recorded once per lock date', async ({ page, book: emulator 
       );
     })
     .toEqual(book.checkpoint);
-  const first = (await readDoc(path))!.at;
+  const first = (await snapshot())!.at;
 
   // The next visit finds this lock date's snapshot and records none.
   await page.reload();
   await expect(minersRow).toBeVisible();
   await page.waitForLoadState('networkidle');
-  expect((await readDoc(path))!.at).toBe(first);
+  expect((await snapshot())!.at).toBe(first);
 });
 
 test('a Miner read from their snapshot reads the same totals', async ({ page, book: emulator }) => {

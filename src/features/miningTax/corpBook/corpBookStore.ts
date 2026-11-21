@@ -8,10 +8,7 @@
  * defensively into the engine's shapes. Every write is a callable; the only one a player makes is
  * claiming their own Unmatched donation.
  */
-import {
-  LATE_NOTICES,
-  RUNNING_ACCOUNT_CHECKPOINTS,
-} from '../../../../functions/src/corpTaxBookVersionKeys';
+import { LATE_NOTICES, RUNNING_ACCOUNTS } from '../../../../functions/src/corpTaxBookVersionKeys';
 import {
   collection,
   doc,
@@ -54,6 +51,7 @@ import { ownerRefinerySystemsToLearn } from '@/engine/corpTaxBook/refinery';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 import type { TaxRate } from '@/engine/corpTaxBook/rates';
 import type { Adjustment } from '@/engine/corpTaxBook/adjustments';
+import { isRecord } from '@/engine/guards';
 import { readLateNotices } from '@/engine/corpTaxBook/lateNotices';
 import { NOTICE_ID_FIELD, type LateNotice } from '../../../../functions/src/corpTaxBookLateNotice';
 import type { RunningAccountCheckpoint } from '../../../../functions/src/corpTaxBookCheckpoint';
@@ -101,7 +99,7 @@ export interface LoadedCorpBook {
   dismissals: Dismissal[];
   /** The tracked Characters' own Late notices. */
   notices: LateNotice[];
-  /** Their Miners' closed-through checkpoints (`accountCheckpoints`), by Miner id. */
+  /** Their Miners' snapshots (`accounts/{minerId}.snapshot`), by Miner id. */
   checkpoints?: Map<string, RunningAccountCheckpoint>;
   miners: Miner[];
   /** The tracked Characters this was read for — the ones whose lines it holds. */
@@ -419,9 +417,7 @@ async function readOneBook(
       part('payments', 'uid'),
       part('dismissals', 'uids'),
       written(LATE_NOTICES) ? orNone(part(LATE_NOTICES, 'uids')) : Promise.resolve(null),
-      written(RUNNING_ACCOUNT_CHECKPOINTS)
-        ? orNone(part(RUNNING_ACCOUNT_CHECKPOINTS, 'uids'))
-        : Promise.resolve(null),
+      written(RUNNING_ACCOUNTS) ? orNone(part(RUNNING_ACCOUNTS, 'uids')) : Promise.resolve(null),
       part('miners', 'uids'),
       orNone(part('adjustments', 'uids')),
       orNone(part('writeOffs', 'uids')),
@@ -465,7 +461,8 @@ async function readOneBook(
     dismissals.push(dismissalDocs.flatMap((d) => readDismissal(d.id, d.data) ?? []));
     for (const d of lateNoticeDocs ?? []) noticeDocs.push({ ...d.data, id: d.id });
     for (const d of checkpointDocs ?? []) {
-      const cp = readCheckpoint(d.id, d.data);
+      const { snapshot } = d.data;
+      const cp = isRecord(snapshot) ? readCheckpoint(d.id, snapshot) : null;
       if (cp) checkpoints.set(cp.minerId, cp);
     }
     miners.push(minerDocs.flatMap((d) => readMiner(d.id, d.data) ?? []));

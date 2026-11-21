@@ -10,8 +10,8 @@ an open tab older than it must be reloaded.
 - **Firestore rules:**
   - `lateNotices/{noticeId}`: officers read every one; a Miner reads their own (`uids`).
   - `lateNoticeLinks/{noticeId}`: `{ token }`, editors only.
-  - `accountCheckpoints/{minerId}`: a Miner's snapshot for the lock date. Officers read every
-    one; a Miner reads their own (`uids`).
+  - `accounts/{minerId}`: a Miner's Running account figures and its `snapshot` for the lock
+    date. Officers read every one; a Miner reads their own once it holds a snapshot (`uids`).
   - `observed` and `payments` read by their own Character (`uid`) only, as before this feature:
     no copied readers (`uids`) on either. A pilot sees an alt's lines through the character
     selector.
@@ -23,8 +23,8 @@ an open tab older than it must be reloaded.
   its single-field `ownerHash` override), the same pair every synced collection has. Every other
   Corp Tax Book query is on a single field.
 - **Functions:**
-  - `corpTaxBookCall` (the book's router): `issueLateNotice`, `recordLateNoticeMail` and
-    `recordCheckpoints`; `closeAccount` issues its final notice from `notice`. Notices are
+  - `corpTaxBookCall` (the book's router): `issueLateNotice`, `recordLateNoticeMail`, and
+    `recordAccounts` taking each Miner's snapshot with its figures; `closeAccount` issues its final notice from `notice`. Notices are
     written to `lateNotices` / `lateNoticeLinks` only, and every read (the verify page, Stop
     reminders, declarations, the date guards) reads only those. `issueStatement`,
     `settleStatements`, `recordMail` and `resetCheckpoint` are gone.

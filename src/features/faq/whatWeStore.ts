@@ -116,7 +116,7 @@ export const CORP_COLLECTION_FAQ_ITEM = {
   payments: 'corpTaxBook',
   lateNotices: 'corpTaxBook',
   lateNoticeLinks: 'corpTaxBook',
-  accountCheckpoints: 'corpTaxBook',
+  accounts: 'corpTaxBook',
   dismissals: 'corpTaxBook',
   miners: 'corpTaxBook',
   minerTotals: 'corpTaxBook',

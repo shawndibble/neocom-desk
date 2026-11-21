@@ -158,8 +158,9 @@ Replaces "the checkpoint is a strict cache" and the copied `uids` on rows and pa
   after it. Since locked history cannot change, a snapshot never goes stale: there is no
   invalidation, no epoch and no Director gate. The one exception is a change to a Miner's
   characters (a grouping, an unlink): that deletes the affected Miners' snapshots, and the next
-  officer load records them again. A pilot's personal Payees have no lock date: their accounts
-  are built from the device's full history.
+  officer load records them again. The snapshot is a `snapshot` field on the Miner's
+  `accounts/{minerId}` doc, sent with its figures in one `recordAccounts` call. A pilot's personal
+  Payees have no lock date: their accounts are built from the device's full history.
 - **Wide dismissals and the start date respect the lock date too.** A Miner, moon or Extraction
   dismissal applies only from the lock date at the time it is made (`from`), and its reversal ends
   it only from the lock date at the time of the reversal; an Extraction wholly before the lock date

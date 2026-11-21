@@ -1533,8 +1533,9 @@ describe('Late notices and checkpoints (decision 20261120-235011)', () => {
     expect(() => parseEditAction({ action: 'resetCheckpoint', minerId: 'solo:5' })).toThrow();
   });
 
-  describe('recordCheckpoints', () => {
-    const checkpoint = {
+  describe('recordAccounts: a snapshot rides on its account', () => {
+    const account = { minerId: 'solo:9001', owed: 0, paid: 0, days: 0 };
+    const snapshot = {
       minerId: 'solo:9001',
       through: '2026-09-30',
       owed: [{ date: '2026-09-02', remaining: 50, tax: 60, credited: 10, charge: 10, held: true }],
@@ -1545,48 +1546,59 @@ describe('Late notices and checkpoints (decision 20261120-235011)', () => {
       at: '2026-11-18T09:00:00Z',
       by: 1,
     };
+    const parse = (patch: object) =>
+      parseEditAction({
+        action: 'recordAccounts',
+        accounts: [{ ...account, snapshot: { ...snapshot, ...patch } }],
+      });
 
-    it('parses each checkpoint; who recorded it and when are the server’s', () => {
-      const action = parseEditAction({ action: 'recordCheckpoints', checkpoints: [checkpoint] });
-      expect(action).toEqual({
-        action: 'recordCheckpoints',
-        checkpoints: [
+    it('parses the snapshot; who recorded it and when are the server’s, its Miner the account’s', () => {
+      expect(parse({ minerId: 'm-other' })).toEqual({
+        action: 'recordAccounts',
+        accounts: [
           {
-            minerId: 'solo:9001',
-            through: '2026-09-30',
-            owed: [
-              { date: '2026-09-02', remaining: 50, tax: 60, credited: 10, charge: 10, held: true },
-            ],
-            credit: 0,
-            balance: 50,
-            paidThrough: '2026-09-01',
-            characterIds: [9001],
+            ...account,
+            snapshot: {
+              minerId: 'solo:9001',
+              through: '2026-09-30',
+              owed: [
+                {
+                  date: '2026-09-02',
+                  remaining: 50,
+                  tax: 60,
+                  credited: 10,
+                  charge: 10,
+                  held: true,
+                },
+              ],
+              credit: 0,
+              balance: 50,
+              paidThrough: '2026-09-01',
+              characterIds: [9001],
+            },
           },
         ],
       });
-      expect(
-        parseEditAction({
-          action: 'recordCheckpoints',
-          checkpoints: [{ ...checkpoint, paidThrough: null, owed: [] }],
-        })
-      ).toMatchObject({ checkpoints: [{ paidThrough: null, owed: [] }] });
+      expect(parse({ paidThrough: null, owed: [] })).toMatchObject({
+        accounts: [{ snapshot: { paidThrough: null, owed: [] } }],
+      });
     });
 
-    it('refuses a malformed checkpoint', () => {
-      const bad = (patch: object) =>
-        parseEditAction({
-          action: 'recordCheckpoints',
-          checkpoints: [{ ...checkpoint, ...patch }],
-        });
-      expect(() => bad({ through: '2026-9-30' })).toThrow();
-      expect(() => bad({ credit: -1 })).toThrow();
-      expect(() => bad({ owed: [{ date: 'x', remaining: 1 }] })).toThrow();
-      expect(() => bad({ paidThrough: 5 })).toThrow();
-      expect(() => bad({ minerId: 'a/b' })).toThrow();
+    it('refuses a malformed snapshot', () => {
+      expect(() => parse({ through: '2026-9-30' })).toThrow();
+      expect(() => parse({ credit: -1 })).toThrow();
+      expect(() => parse({ owed: [{ date: 'x', remaining: 1 }] })).toThrow();
+      expect(() => parse({ paidThrough: 5 })).toThrow();
       // The day's whole figures and the characters it summed are required.
-      expect(() => bad({ owed: [{ date: '2026-09-02', remaining: 50 }] })).toThrow();
-      expect(() => bad({ characterIds: undefined })).toThrow();
-      expect(() => bad({ owed: [{ ...checkpoint.owed[0], held: 'yes' }] })).toThrow();
+      expect(() => parse({ owed: [{ date: '2026-09-02', remaining: 50 }] })).toThrow();
+      expect(() => parse({ characterIds: undefined })).toThrow();
+      expect(() => parse({ owed: [{ ...snapshot.owed[0], held: 'yes' }] })).toThrow();
+    });
+
+    it('no longer takes a snapshot on its own', () => {
+      expect(() =>
+        parseEditAction({ action: 'recordCheckpoints', checkpoints: [snapshot] })
+      ).toThrow();
     });
   });
 });
