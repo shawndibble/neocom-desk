@@ -1,5 +1,4 @@
 import { formatIsk } from '@/lib/isk';
-import { verifyPeriodLabel } from '@/features/corpTaxBook/verifyPeriodLabel';
 import { MONTHS } from '@/engine/corpTaxBook/monthNames';
 import { extractionWindowDays } from '@/engine/corpTaxBook/extractionWindow';
 import type { TFunction } from 'i18next';
@@ -117,11 +116,6 @@ export function extractionWindowLabel(
   // The days stay on one line: a break inside "(41 days)" leaves the "41" hanging.
   const span = t('corpTaxBook.moons.windowDays', { count: days }).replace(/ /g, '\u00a0');
   return `${atDateWithYear(row.startedAt, zone)} \u2013 ${atDateWithYear(row.chunkArrivalAt, zone)} (${span})`;
-}
-
-/** A period label: "Oct 2026" only for a whole calendar month, else the days it covers. */
-export function periodLabel(start: string, end: string): string {
-  return verifyPeriodLabel(start, end, 'en');
 }
 
 export function addDays(date: string, days: number): string {

@@ -7,9 +7,9 @@
  * Shared by the client and the Cloud Functions (decision 20261117-230113): dependency-free, and
  * `src/engine/corpTaxBook/notice.ts` re-exports it.
  *
- * Notices are stored as `corps/{id}/lateNotices` docs in this shape. Each is mirrored to a legacy
- * `statements` doc (`kind: 'notice'`, `legacyStatementDocOf`) for older tabs until the soak ends;
- * `lateNoticeFromStatementDoc` reads one of those, or an older one, into a `LateNotice`.
+ * Notices are stored as `corps/{id}/lateNotices` docs in this shape. A legacy `statements` doc
+ * (`kind: 'notice'`) is no longer written; `lateNoticeFromStatementDoc` reads one into a
+ * `LateNotice` for the one-time backfill.
  */
 import { isFiniteNumber, isRecord } from './guards.js';
 import { DAY_MS, utcDayOf } from './timeConstants.js';
@@ -247,45 +247,6 @@ export function lateNoticeFromStatementDoc(raw: Record<string, unknown>): LateNo
   };
 }
 
-/** The legacy store's hub and Ore Form when a notice carries none: what a book defaults to. */
-const DEFAULT_PRICING = { hubId: 'jita', oreForm: 'compressed' } as const;
-
-/**
- * The `statements` doc an older tab reads a late notice from, until the `statements` mirror goes
- * (decision 20261120-235011, step 5): the inverse of `lateNoticeFromStatementDoc`.
- */
-export function legacyStatementDocOf(notice: LateNotice): Record<string, unknown> {
-  const { first, last } = noticeSpan(notice);
-  const pricing = notice.pricing ?? DEFAULT_PRICING;
-  return {
-    id: notice.id,
-    minerId: notice.minerId,
-    kind: 'notice',
-    ...(notice.code ? { code: notice.code } : {}),
-    periodStart: first,
-    periodEnd: last,
-    coversFrom: first,
-    coversThrough: last,
-    issuedAt: notice.issuedAt,
-    ...(notice.issuedBy !== undefined ? { issuedBy: notice.issuedBy } : {}),
-    hubId: pricing.hubId,
-    oreForm: pricing.oreForm,
-    lines: notice.lines.map(({ key, ...line }) =>
-      key.startsWith(ADJUSTMENT_PREFIX)
-        ? { ...line, adjustmentId: key.slice(ADJUSTMENT_PREFIX.length) }
-        : { ...line, chargeKey: key }
-    ),
-    amount: notice.listed,
-    characterIds: notice.characterIds,
-    uids: notice.uids,
-    mailsSent: notice.mail.sent,
-    ...(notice.mail.lastAt ? { lastMailedAt: notice.mail.lastAt } : {}),
-    manualRemindersSent: notice.mail.manualSent,
-    remindersStopped: notice.mail.remindersStopped,
-    ...notice.names,
-  };
-}
-
 /**
  * Why a new notice is not sent, or null: a line another notice already listed (a notice lists only
  * new days), or the cooldown since the Miner's last late notice (`cooldownDays`) has not passed. So
@@ -317,8 +278,9 @@ export function lateNoticeRefusal(
  * The Late notices among `lateNotices` docs, their server stamp dropped; anything that is no
  * notice (a malformed doc) is left out.
  */
-export function mergeNoticeDocs(current: readonly Record<string, unknown>[]): LateNotice[] {
-  return current.flatMap((raw) => {
+export function noticesOfDocs(docs: readonly unknown[]): LateNotice[] {
+  return docs.flatMap((raw) => {
+    if (!isRecord(raw)) return [];
     if (typeof raw.id !== 'string' || typeof raw.minerId !== 'string') return [];
     if (!Array.isArray(raw.lines) || !isRecord(raw.mail)) return [];
     const { updatedAt: _stamp, ...rest } = raw;

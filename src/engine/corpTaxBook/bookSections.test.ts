@@ -10,13 +10,11 @@ import {
 import {
   accountSortValue,
   inRange,
-  owedOf,
   rangeFigures,
   rangeStart,
   activityFeed,
   daysByPhase,
   extractionBilling,
-  minerMoons,
   minersOnMoon,
   moonByStructure,
   moonSchedule,
@@ -69,7 +67,7 @@ describe('rangeStart and inRange', () => {
   });
 });
 
-describe('rangeFigures and owedOf', () => {
+describe('rangeFigures', () => {
   it('sums billed days mined and tax paid in the range, net of not-tax', () => {
     const days = [
       { date: '2026-11-15', status: 'owed' as const, tax: 10 },
@@ -82,10 +80,6 @@ describe('rangeFigures and owedOf', () => {
     ];
     expect(rangeFigures(days, payments, '2026-11-11')).toEqual({ tax: 10, paid: 5 });
     expect(rangeFigures(days, payments, undefined)).toEqual({ tax: 15, paid: 55 });
-  });
-
-  it('counts what a running day still owes, else its tax', () => {
-    expect(owedOf([{ tax: 10, owed: 4 }, { tax: 6 }, { tax: 9, owed: 0 }])).toBe(10);
   });
 });
 
@@ -392,7 +386,7 @@ describe('per Miner and moon ore lines (against the book view)', () => {
     }
   });
 
-  it('puts a refinery on one moon row, and knows its moon for a day outside any Extraction', () => {
+  it("knows a refinery's moon for a day outside any Extraction", () => {
     const outside = buildBookView({
       ...input,
       entries: [
@@ -407,16 +401,6 @@ describe('per Miner and moon ore lines (against the book view)', () => {
       ],
     });
     expect(moonByStructure(outside).get(1001)).toBe(7);
-    const moons = minerMoons(outside, 'solo:1');
-    expect(moons).toHaveLength(1);
-    expect(moons[0]).toMatchObject({ moonId: 7, days: 2 });
-  });
-
-  it("lists a Miner's moons with their ore lines", () => {
-    const moons = minerMoons(view, 'solo:1');
-    expect(moons).toHaveLength(1);
-    expect(moons[0]).toMatchObject({ moonId: 7, extractionId: extraction.id, days: 1 });
-    expect(moons[0].lines.map((l) => l.typeId).sort()).toEqual([ORE, ORE + 1]);
   });
 });
 

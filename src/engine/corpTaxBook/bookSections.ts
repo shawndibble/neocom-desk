@@ -62,10 +62,6 @@ export function rangeFigures(
   };
 }
 
-/** What a list of days still owes: an owed day's remainder (`owed`), else its tax. */
-export const owedOf = (days: readonly Pick<DayRow, 'tax' | 'owed'>[]): number =>
-  days.reduce((s, d) => s + (d.owed ?? d.tax), 0);
-
 /** Sorts Miners by how far behind they are: the oldest unpaid day first, the paid-up after. */
 export const accountSortValue = (account: RunningAccountStatus | undefined): string =>
   account?.owes ? account.owes.oldest : `~${account?.paidThrough ?? ''}`;
@@ -228,52 +224,6 @@ export function moonByStructure(view: BookView): Map<number, number> {
     for (const d of inner.days)
       if (d.moonId !== undefined && !moons.has(d.structureId)) moons.set(d.structureId, d.moonId);
   return moons;
-}
-
-export interface MinerMoon {
-  /** The refinery: one row per moon, whether or not an Extraction was running on the day. */
-  key: string;
-  moonId?: number;
-  structureId: number;
-  /** The latest Extraction this Miner mined at the moon; what the moon link opens. */
-  extractionId?: string;
-  days: number;
-  lastDate: string;
-  lines: OreTaxLine[];
-  units: number;
-  value: number;
-  tax: number;
-}
-
-/** The moons one Miner mined at, newest first, each with that Miner's ore lines there. */
-export function minerMoons(view: BookView, minerId: string): MinerMoon[] {
-  const days = view.internals.byMiner.get(minerId)?.days ?? [];
-  const moonOf = moonByStructure(view);
-  const groups = new Map<string, DayRow[]>();
-  for (const d of days) {
-    const key = `s${d.structureId}`;
-    const held = groups.get(key);
-    if (held) held.push(d);
-    else groups.set(key, [d]);
-  }
-  return [...groups]
-    .map(([key, rows]): MinerMoon => {
-      const newestFirst = [...rows].sort((a, b) => b.date.localeCompare(a.date));
-      const newest = newestFirst[0];
-      const lines = oreTaxLines(rows);
-      const extractionId = newestFirst.find((d) => d.extractionId !== undefined)?.extractionId;
-      return {
-        key,
-        ...(moonOf.has(newest.structureId) ? { moonId: moonOf.get(newest.structureId) } : {}),
-        structureId: newest.structureId,
-        ...(extractionId !== undefined ? { extractionId } : {}),
-        days: rows.length,
-        lastDate: newest.date,
-        lines,
-        ...sum(lines),
-      };
-    })
-    .sort((a, b) => b.lastDate.localeCompare(a.lastDate) || a.key.localeCompare(b.key));
 }
 
 // --- The place line --------------------------------------------------------

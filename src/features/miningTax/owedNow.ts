@@ -38,19 +38,6 @@ export function bookCreditsOf(corpView: CorpBookView | null | undefined): Map<st
   return new Map(corpView?.books.map((b) => [b.payee.id, b.summary.credit]) ?? []);
 }
 
-/** Per Payee, what is owed now over `rows` (display rows, a book's overlay applied). */
-export function owedBalances(
-  rows: readonly DisplayRow[],
-  ledgerPayees: readonly PayeeRecord[],
-  accounts: PayeeRunningAccounts,
-  /** Duplicate records of one Payee mapped to the primary (`payeeDuplicateAliases`). */
-  aliases?: ReadonlyMap<string, string>,
-  /** Each Corp Tax Book Payee's credit, by its id (`BookSummary.credit`). */
-  bookCredits?: ReadonlyMap<string, number>
-): PayeeBalance[] {
-  return computePayeeBalances(rows, ledgerPayees, accounts, aliases, bookCredits);
-}
-
 /**
  * Entries still needing a Payee. A row a Corp Tax Book has labelled (Pending corp record,
  * Unattributed) is not waiting on the member, so it stays out.
@@ -72,7 +59,7 @@ export interface OwedNow {
 }
 
 /**
- * `owedBalances` (and the Unassigned count) over every tracked Character, loading the Corp Tax Books the Tax tab overlays:
+ * `computePayeeBalances` (and the Unassigned count) over every tracked Character, loading the Corp Tax Books the Tax tab overlays:
  * the books, their corporations' names and prices, and (only when a book exists) the wallet's
  * payments the book's in-flight donations read. Without a book it is the personal ledger alone.
  */
@@ -130,7 +117,7 @@ export async function loadOwedBalances(
     (id) => characterNames.get(id) ?? `#${id}`
   );
   return {
-    balances: owedBalances(
+    balances: computePayeeBalances(
       rows,
       [...payees, ...(corpView?.payees ?? [])],
       accounts,

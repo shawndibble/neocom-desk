@@ -1,7 +1,7 @@
 /**
  * Donations into wallet divisions the book does not read (#6207). The sync never
  * credits them, so a Miner who paid into the wrong division goes Overdue with no
- * trace on the book. The sync notes the ones that look like tax (`uncountedDonations`, the rule
+ * trace on the book. The sync notes the ones that look like tax (`noteUncountedDonations`, the rule
  * shared with the server) and the Overview's Needs you lists them until an officer counts that
  * division or marks one not tax.
  */
@@ -10,7 +10,7 @@ import type { UncountedDonation } from '../../../functions/src/corpTaxBookDonati
 
 export {
   UNCOUNTED_LIMIT,
-  uncountedDonations,
+  noteUncountedDonations,
   type UncountedDonation,
 } from '../../../functions/src/corpTaxBookDonationMatch';
 

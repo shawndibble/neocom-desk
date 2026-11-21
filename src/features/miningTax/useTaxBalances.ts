@@ -5,7 +5,8 @@ import { allMembers, type DisplayRow } from '@/features/miningTax/groupRows';
 import { systemsByPayee } from '@/features/miningTax/suggestPayee';
 import { useLinkSuggestions } from '@/features/miningTax/useMadePayments';
 import { computeOwedByPayee } from './owedByPayee';
-import { owedBalances, unassignedSummary } from './owedNow';
+import { computePayeeBalances } from './balances';
+import { unassignedSummary } from './owedNow';
 import type { PayeeRunningAccounts } from './payeeRunningAccounts';
 
 interface Args {
@@ -48,7 +49,14 @@ export function useTaxBalances({
   // filter: narrowing the ledger to one Payee must not change a balance. The Overview's Mining
   // tax card reads the same figure (`loadOwedBalances`).
   const balances = useMemo(
-    () => owedBalances(characterFiltered, ledgerPayees, accounts, duplicateAliases, bookCredits),
+    () =>
+      computePayeeBalances(
+        characterFiltered,
+        ledgerPayees,
+        accounts,
+        duplicateAliases,
+        bookCredits
+      ),
     [characterFiltered, ledgerPayees, accounts, duplicateAliases, bookCredits]
   );
   const unassigned = useMemo(

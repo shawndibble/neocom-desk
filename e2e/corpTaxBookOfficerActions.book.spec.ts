@@ -84,8 +84,8 @@ async function openMovePayment(page: Page) {
 }
 
 // The Miner page reads only that Miner, so the picker reads the book's Miners itself
-// (`useBookMiners`): the groupings and the server's miner list, which holds every Miner an
-// officer's visit to the whole book counted. That visit comes first, as it would in use. Moving
+// (`useBookMiners`): the groupings and the accounts an officer's visit to the whole book
+// recorded. That visit comes first, as it would in use. Moving
 // the payment drops Bram's recorded paid-through on the server (decision 20261121-093000), so his
 // days are owed again.
 test('an officer moves a payment to another Miner', async ({ page }) => {
@@ -93,10 +93,10 @@ test('an officer moves a payment to another Miner', async ({ page }) => {
   await expect(page.getByRole('row', { name: new RegExp(MINER.cora.name) })).toBeVisible();
   await expect
     .poll(async () => {
-      const list = await readDoc(`corps/${CORP}/readModels/minerList`);
-      return ((list?.miners as { minerId: string }[] | undefined) ?? []).map((m) => m.minerId);
+      const account = await readDoc(`corps/${CORP}/accounts/${book.id('cora')}`);
+      return account !== null;
     })
-    .toContain(book.id('cora'));
+    .toBe(true);
   // Straight to Bram's page, as a link would: the book is read for him alone.
   await page.goto(minerUrl(book.id('bram')));
   await expect(page.getByRole('table', { name: 'Ledger', exact: true })).toBeVisible();

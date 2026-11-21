@@ -34,7 +34,7 @@ import { bookMinersOf, type Miner } from '@/engine/corpTaxBook/charges';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
 import type { Declaration } from '@/engine/corpTaxBook/overdue';
 import type { Adjustment } from '@/engine/corpTaxBook/adjustments';
-import { readLateNotices } from '@/engine/corpTaxBook/lateNotices';
+import { noticesOfDocs } from '@/engine/corpTaxBook/lateNotices';
 import type { RecordedWriteOff } from '@/engine/corpTaxBook/payments';
 import { NOTICE_ID_FIELD, type LateNotice } from '../../../../functions/src/corpTaxBookLateNotice';
 import type { RunningAccountCheckpoint } from '../../../../functions/src/corpTaxBookCheckpoint';
@@ -95,7 +95,7 @@ export interface BookSummary {
 export interface BookState {
   book: BookSummary;
   miners: Miner[];
-  /** The book's late notices, from `lateNotices` and the legacy `statements` docs. */
+  /** The book's late notices, from `lateNotices`. */
   notices: LateNotice[];
   payments: SettlePayment[];
   dismissals: Dismissal[];
@@ -749,7 +749,7 @@ export const LEGACY_ISSUE_ACTION = 'issueStatement';
 
 /** The book's late notices (`lateNotices`). */
 export async function readNotices(book: OpenBook): Promise<LateNotice[]> {
-  return readLateNotices(
+  return noticesOfDocs(
     book.written(LATE_NOTICES) ? await book.list<unknown>(LATE_NOTICES).catch(() => []) : []
   );
 }

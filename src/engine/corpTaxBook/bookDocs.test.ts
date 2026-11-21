@@ -6,7 +6,6 @@ import {
   parseRate,
   parseTaxContact,
   RATE_SCOPES,
-  RUNNING_ACCOUNTS_FROM,
 } from './bookDocs';
 import { DEFAULT_OVERDUE_DAYS } from './overdue';
 import { DEFAULT_NOTICE_RULES } from './notices';
@@ -97,7 +96,6 @@ describe('parseBookSettings', () => {
       oreForm: 'compressed',
       graceHours: DEFAULT_GRACE_HOURS,
       overdueDays: DEFAULT_OVERDUE_DAYS,
-      runningAccountFrom: RUNNING_ACCOUNTS_FROM,
       noticeRules: DEFAULT_NOTICE_RULES,
       dayTolerancePct: DAY_SETTLE_TOLERANCE_PCT,
       chunkM3PerHour: null,
@@ -108,13 +106,11 @@ describe('parseBookSettings', () => {
     });
   });
 
-  it('reads the running account switch-over and its rules', () => {
+  it('reads the running account rules', () => {
     const s = parseBookSettings({
-      runningAccountFrom: '2026-11-17T04:00:00.000Z',
       noticeRules: { after: { kind: 'dayOfMonth', day: 5 }, minimum: 20_000_000, cooldownDays: 7 },
       dayTolerancePct: 1,
     });
-    expect(s.runningAccountFrom).toBe('2026-11-17T04:00:00.000Z');
     expect(s.noticeRules.after).toEqual({ kind: 'dayOfMonth', day: 5 });
     expect(s.dayTolerancePct).toBe(1);
   });

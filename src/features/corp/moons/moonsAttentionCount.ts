@@ -32,6 +32,5 @@ export async function loadNeedsYouCount(
   const view = buildBookView(
     bookViewInputOf(corporationId, new Date().toISOString(), data, prices, { memberIds })
   );
-  return needsYouOf(view, data, data.settings.divisions, view.needsYou, data.settings.noticeRules)
-    .count;
+  return needsYouOf(view, data, data.settings.divisions, data.settings.noticeRules).count;
 }

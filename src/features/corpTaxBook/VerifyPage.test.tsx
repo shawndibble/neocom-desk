@@ -80,11 +80,12 @@ function payload(over: Partial<VerifyPayload> = {}): VerifyPayload {
         },
       ],
     },
-    terms: { overdueDays: 14 },
+    terms: { overdueDays: 14, divisions: [1] },
     declarations: [],
     remindersStopped: false,
     accountClosed: false,
     pendingCharacterIds: [],
+    ledger: { days: [], payments: [] },
     ...over,
   };
 }

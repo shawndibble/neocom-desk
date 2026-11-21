@@ -12,13 +12,11 @@
 import { bookMiner, newest, type BookView } from './bookView';
 import {
   listedKeys,
-  mergeNoticeDocs,
   noticeDocId,
   minerPaymentCode,
   type LateNotice,
   type LateNoticeKind,
 } from '../../../functions/src/corpTaxBookLateNotice';
-import { isRecord } from '@/engine/guards';
 import type { NoticeRules } from './notices';
 import { utcDay, utcDayOf, utcDaysBetween } from '@/engine/localDay';
 
@@ -170,6 +168,4 @@ export function planNotices(
 }
 
 /** The book's late notices from their `lateNotices` docs, read as the server reads them. */
-export function readLateNotices(noticeDocs: readonly unknown[]): LateNotice[] {
-  return mergeNoticeDocs(noticeDocs.filter(isRecord));
-}
+export { noticesOfDocs } from '../../../functions/src/corpTaxBookLateNotice';

@@ -9,7 +9,7 @@
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore/lite';
 import type { Adjustment } from '@/engine/corpTaxBook/adjustments';
 import { characterIdsOfMiner, type Miner } from '@/engine/corpTaxBook/charges';
-import { readLateNotices } from '@/engine/corpTaxBook/lateNotices';
+import { noticesOfDocs } from '@/engine/corpTaxBook/lateNotices';
 import { accountWindowStart } from '@/engine/corpTaxBook/minerScope';
 import type { RecordedWriteOff } from '@/engine/corpTaxBook/payments';
 import type { RunningAccountCheckpoint } from '../../../../../functions/src/corpTaxBookCheckpoint';
@@ -64,7 +64,7 @@ export async function readMinerScope(
     book.written(LATE_NOTICES)
       ? byMiner<unknown>(LATE_NOTICES).catch(() => [])
       : Promise.resolve([])
-  ).then(readLateNotices);
+  ).then(noticesOfDocs);
   const characterIds = grouping.then((g) =>
     characterIdsOfMiner(minerId, Array.isArray(g?.characterIds) ? [g as unknown as Miner] : [])
   );

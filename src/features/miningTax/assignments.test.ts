@@ -627,7 +627,7 @@ describe('planNeedsReviewResolution', () => {
   async function planAndWrite(
     ...args: Parameters<typeof planNeedsReviewResolution>
   ): Promise<void> {
-    await db.miningTaxAssignments.put(await planNeedsReviewResolution(...args));
+    await putAssignments([await planNeedsReviewResolution(...args)]);
   }
 
   const freshEntry: MiningLedgerEntry = {
@@ -1012,7 +1012,6 @@ describe('splitAssignment', () => {
     );
     expect(kept.status).toBe('outstanding');
     expect(kept.reviewDiff).toBeUndefined();
-    expect(kept.paidAt).toBeUndefined();
     expect(created.status).toBe('outstanding');
     expect((await db.miningTaxAssignments.get('orig'))?.reviewDiff).toBeUndefined();
   });

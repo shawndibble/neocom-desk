@@ -8332,26 +8332,7 @@
         "masterWallet": "Master Wallet",
         "division": "Division {{division}}",
         "codeOf": "{{character}} · code:",
-        "codeInReason": "The Reason is your own code: it tells the book the money is yours, and it pays your oldest unpaid days first.",
-        "where": {
-          "intro": "{{corp}}'s book pays your oldest days first. A payment can't pick a moon or a day, so this shows where yours lands.",
-          "label": "Where it lands",
-          "paid": "Paid by this",
-          "part": "Part paid",
-          "partOf": "{{amount}} ISK of it",
-          "held": "Held",
-          "next": "Next in line",
-          "heldNote": "{{kind}}. Waiting on {{corp}}, so no payment lands here.",
-          "more_one": "and {{count}} more day",
-          "more_other": "and {{count}} more days",
-          "credit": "{{amount}} ISK left over stays with the book as credit.",
-          "kind": {
-            "payee": "Payee dispute",
-            "quantity": "Quantity dispute",
-            "rate": "Rate dispute",
-            "notPaying": "Not paying"
-          }
-        }
+        "codeInReason": "The Reason is your own code: it tells the book the money is yours, and it pays your oldest unpaid days first."
       },
       "attention": {
         "overdueTitle": "{{corp}} Late notice {{period}}, sent {{date}}, not paid yet",
@@ -8420,7 +8401,6 @@
     "bulkDismissConfirmAction": "Dismiss {{count}}",
     "settleUpSelectedAction": "Settle up {{count}}",
     "settleUpTitle": "Settle up — {{payee}}",
-    "settleUpSeveralPayees": "{{count}} payees",
     "settleUpReasonPrefix": "Moon tax",
     "settleUpCopy": "Copy",
     "settleUpCopied": "Copied",
@@ -8462,16 +8442,9 @@
     "linkPaymentAmountLabel": "Value handed over",
     "linkPaymentInKindHint": "A contract's cargo isn't priced here. Enter what it was worth: that is what it pays.",
     "linkPaymentConfirmAction": "Link to {{payee}}",
-    "paidAtLabel": "Paid on",
     "paymentCardTitle": "Paid by",
     "noLinkedTransactions": "No linked payment reached this day.",
     "unlinkTransactionAction": "Unlink",
-    "linkTransactionTitle": "Link a wallet transaction",
-    "linkTransactionHint": "Pick the transaction that paid this. It is saved here so you can jump back to it later, even if you marked this paid before it showed in your wallet.",
-    "linkTransactionSearchLabel": "Search transactions",
-    "linkTransactionSuggestedBadge": "Suggested — amount matches exactly",
-    "linkTransactionEmpty": "No unlinked wallet transactions or contracts found for this character.",
-    "linkTransactionConfirmAction": "Link",
     "characterColumn": "Character",
     "dateColumn": "Date",
     "systemColumn": "System",

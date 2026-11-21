@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import type { RunningAccountStatus } from '@/engine/corpTaxBook/bookView';
-import { utcDaysBetween } from '@/engine/localDay';
-import { utcDay } from '@/engine/localDay';
+import { utcDay, utcDaysBetween } from '@/engine/localDay';
 import { isk, shortDate } from './moonsFormat';
 import { useBook } from './useBook';
 

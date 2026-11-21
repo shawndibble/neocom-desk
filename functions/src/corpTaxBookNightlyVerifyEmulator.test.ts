@@ -79,13 +79,11 @@ emulatorSuite('the nightly pass (emulator)', () => {
     ).toBe(1);
   });
 
-  it('builds the Overview from the Extractions, and the Miners list from recorded accounts', async () => {
-    await book().collection('accounts').doc('solo:50').set({ owed: 100, paid: 0, days: 1 });
+  it('builds the Overview from the Extractions', async () => {
     await verifyBook(db, CORP, () => NOW);
-    const list = (await book().collection('readModels').doc('minerList').get()).data();
-    expect(list).toMatchObject({ schema: READ_MODELS_SCHEMA, miners: [{ minerId: 'solo:50' }] });
     const overview = (await book().collection('readModels').doc('overview').get()).data();
     expect(Object.keys(overview ?? {}).sort()).toEqual(['extractions', 'schema', 'updatedAt']);
+    expect(overview?.schema).toBe(READ_MODELS_SCHEMA);
     expect(overview?.extractions).toEqual([]);
   });
 });

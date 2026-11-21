@@ -88,7 +88,6 @@ beforeEach(async () => {
     await setDoc(doc(db, `${CORP}/extractions/x1`), { moonId: 1 });
     // A moon owner's Extraction (#6097) is tagged with its corporation; same officer-only read.
     await setDoc(doc(db, `${CORP}/extractions/x2`), { moonId: 2, sourceCorporationId: 98000002 });
-    await setDoc(doc(db, `${CORP}/minerTotals/m1`), { minerId: 'm1', billed: 1 });
     await setDoc(doc(db, `${CORP}/moonDocs/x1`), { extractionId: 'x1', minerCount: 1 });
     await setDoc(doc(db, `${CORP}/readModels/minerList`), { schema: 1, miners: [] });
     await setDoc(doc(db, `${CORP}/meta/paid`), { ids: ['s1'] });
@@ -101,7 +100,6 @@ const OFFICER_ONLY = [
   'audit/e1',
   'extractions/x1',
   'extractions/x2',
-  'minerTotals/m1',
   'moonDocs/x1',
   'readModels/minerList',
   'accounts/m4',
@@ -234,8 +232,6 @@ describe('corps (Tax Book) rules', () => {
     await assertFails(setDoc(doc(db, `${CORP}/officers/char:1`), officer({ expiresAt: NOW * 2 })));
     await assertFails(updateDoc(doc(db, CORP), { rates: [] }));
     await assertFails(setDoc(doc(db, `${CORP}/meta/paid`), { ids: [] }));
-    await assertFails(setDoc(doc(db, `${CORP}/minerTotals/m1`), { billed: 0 }));
-    await assertFails(deleteDoc(doc(db, `${CORP}/minerTotals/m1`)));
     await assertFails(setDoc(doc(db, `${CORP}/moonDocs/x1`), { minerCount: 0 }));
     await assertFails(deleteDoc(doc(db, `${CORP}/moonDocs/x1`)));
     await assertFails(setDoc(doc(db, `${CORP}/readModels/minerList`), { miners: [] }));

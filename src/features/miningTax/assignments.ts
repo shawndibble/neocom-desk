@@ -520,7 +520,6 @@ export async function splitAssignment(
     // exactly as `planNeedsReviewResolution` would leave it.
     kept.status = 'outstanding';
     delete kept.reviewDiff;
-    delete kept.paidAt;
   }
 
   const createdValue = computeAssignmentValue(movedLines, prices.moved, input.taxPct);
@@ -703,7 +702,6 @@ export async function planNeedsReviewResolution(
     compressed
   );
   delete updated.reviewDiff;
-  delete updated.paidAt;
   // Same reason `splitAssignment` drops it: `oreLineValues` names typeIds
   // against the pre-review line set, and growth can add or resize lines —
   // a carried-over override would misprice this fresh re-snapshot.
