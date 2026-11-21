@@ -5,6 +5,7 @@
  * own view (only they can read it) and the miners' coverage copy (the Moon owners sheet has it).
  * Pure: the caller reads the book and hands the sheets to `downloadWorkbook`.
  */
+import type { RunningAccountCheckpoint } from '../../../../functions/src/corpTaxBookCheckpoint';
 import type { Miner } from '@/engine/corpTaxBook/charges';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
 import { deriveModeChanges, deriveOwnerRateHistory } from '@/engine/corpTaxBook/feederAccrual';
@@ -44,6 +45,8 @@ export interface BookExportInput {
   miners: readonly Miner[];
   observed: readonly ObservedRow[];
   notices: readonly LateNotice[];
+  /** Each Miner's closed-through checkpoint, as the server stored it. */
+  checkpoints?: readonly RunningAccountCheckpoint[];
   payments: readonly SettlePayment[];
   adjustments: readonly Adjustment[];
   writeOffs: readonly RecordedWriteOff[];
@@ -271,6 +274,19 @@ export function bookExportSheets(
       ['reason', (l) => l.line.reason],
       ['kind', (l) => t(`corpTaxBook.export.lineKind.${l.line.kind}`)],
       ['lineKey', (l) => l.line.key],
+    ]),
+    // Each Miner's account closed through a day: what it owed and held then, for good.
+    sheet(t, 'accountCheckpoints', input.checkpoints ?? [], [
+      ['miner', (c) => minerName(c.minerId)],
+      ['minerId', (c) => c.minerId],
+      ['through', (c) => c.through],
+      ['balance', (c) => c.balance],
+      ['credit', (c) => c.credit],
+      ['paidThrough', (c) => c.paidThrough],
+      ['owedDays', (c) => c.owed.length],
+      ['owedAmount', (c) => c.owed.reduce((sum, d) => sum + d.remaining, 0)],
+      ['recordedAt', (c) => c.at],
+      ['recordedBy', (c) => character(c.by)],
     ]),
     sheet(
       t,

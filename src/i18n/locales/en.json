@@ -20188,6 +20188,7 @@
         "moonOwnerRates": "Moon owner rates",
         "settings": "Settings",
         "activity": "Activity log",
+        "accountCheckpoints": "Account checkpoints",
         "lateNotices": "Late notices",
         "lateNoticeLines": "Late notice lines"
       },
@@ -20303,7 +20304,14 @@
         "lastDay": "Last day",
         "listed": "Asked for (ISK)",
         "lineKey": "Line key",
-        "finalNoticeId": "Final late notice ID"
+        "finalNoticeId": "Final late notice ID",
+        "through": "Closed through",
+        "balance": "Balance",
+        "credit": "Credit",
+        "paidThrough": "Paid through",
+        "owedDays": "Days owed",
+        "owedAmount": "Owed",
+        "recordedAt": "Recorded"
       },
       "lineKind": {
         "mined": "Mined",

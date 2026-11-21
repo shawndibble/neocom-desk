@@ -36,6 +36,7 @@ function useExportBook(): () => Promise<WorkbookDownload> {
         miners: state.miners,
         observed: data.observed,
         notices: state.notices,
+        checkpoints: data.checkpoints ?? [],
         payments: state.payments,
         adjustments: data.adjustments,
         writeOffs: state.writeOffs ?? [],

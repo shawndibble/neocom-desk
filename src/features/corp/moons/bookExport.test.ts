@@ -199,6 +199,7 @@ describe('bookExportSheets', () => {
       'corpTaxBook.export.sheets.miningLines',
       'corpTaxBook.export.sheets.lateNotices',
       'corpTaxBook.export.sheets.lateNoticeLines',
+      'corpTaxBook.export.sheets.accountCheckpoints',
       'corpTaxBook.export.sheets.payments',
       'corpTaxBook.export.sheets.adjustments',
       'corpTaxBook.export.sheets.writeOffs',
@@ -231,6 +232,30 @@ describe('bookExportSheets', () => {
     expect(at(second, 'moon')).toBe('Moon 40');
     expect(at(second, 'ore')).toBe('Ore 45490');
     expect(at(second, 'quantity')).toBe(1200);
+  });
+
+  it('lists each account checkpoint with what it still owed', () => {
+    const [header, row] = sheet('corpTaxBook.export.sheets.accountCheckpoints', {
+      ...input,
+      checkpoints: [
+        {
+          minerId: 'm1',
+          through: '2026-03-31',
+          owed: [{ date: '2026-03-02', remaining: 400 }],
+          credit: 0,
+          balance: 400,
+          paidThrough: '2026-03-01',
+          at: '2026-05-02T00:00:00Z',
+          by: 1,
+        },
+      ],
+    });
+    const at = (col: string) => row[header.indexOf(`corpTaxBook.export.cols.${col}`)];
+    expect(at('miner')).toBe('Char 1');
+    expect(at('through')).toBe('2026-03-31');
+    expect(at('owedDays')).toBe(1);
+    expect(at('owedAmount')).toBe(400);
+    expect(at('recordedBy')).toBe('Char 1');
   });
 
   it('lists each late notice and names a solo Miner by its one character', () => {
