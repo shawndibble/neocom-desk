@@ -263,7 +263,7 @@ here — they go one per file in `docs/context/decisions/`.
   not expose it (see **Character Not Training**), so the pilot sets it per
   Character. Alpha trains at half the Omega SP rate and cannot train past
   each skill's **Alpha cap** (the SDE's clone-grade skill levels).
-- **Closed-through checkpoint**: What a **Running account** stood at through the end of the last month at least 31 days old, past ESI's ~30-day ledger window, so no sync can change it: the days still owed (usually none), the credit and the balance. A load reads it and only the days after it. Rolled forward monthly. It is a cache, never a record: any edit dated on or before it, or any change to the Miner's characters, deletes it and the next load recomputes from full history. A corp book's is written by an officer's tab through a callable and checked by the server; a personal **Payee**'s stays on the pilot's device.
+- **Closed-through checkpoint** (snapshot): What a Corp Tax Book Miner's **Running account** stood at through the day before the **lock date** (the 1st of the month two months back): the days still owed (usually none), the credit and the balance. A load reads it and only the days after it. Recorded once per lock date by an officer's tab through a callable, and checked by the server; history before the lock date is read-only, so it never goes stale. A change to the Miner's characters deletes it. A personal **Payee**'s account keeps none: it is built from full history.
 - **Coming Up Rail**: The calendar list beside the **Calendar Map**: every
   **Character Board Item** the pilot can read, deadline-ordered, each row
   carrying a countdown. It answers "what happens next", where the map answers

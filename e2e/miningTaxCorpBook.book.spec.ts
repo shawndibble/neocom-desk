@@ -2,8 +2,9 @@
  * The pilot's Tax tab with two Payees (decision 20261120-235011): their corporation's Corp Tax
  * Book, whose figures are read off the book's Running account, and a personal Payee kept on the
  * device. Settle up for the book shows the Miner's one payment code and records nothing; a
- * donation counts while in flight and stays counted once the book credits it; an alt's donation
- * pays the group; a transfer to the book's corporation is never offered to a personal Payee.
+ * donation counts while in flight and stays counted once the book credits it; an alt grouped with
+ * the pilot but not added is named; a transfer to the book's corporation is never offered to a
+ * personal Payee.
  *
  * The book is read from the Firebase emulators (the `*.book.spec.ts` set). The pilot is the
  * suite's signed-in Character, a Miner of their own corporation's book (`memberSeed.ts`).
@@ -136,15 +137,28 @@ test('a donation in flight counts at once and stays counted once the book credit
   await expect(ledgerButton(page, CORP_NAME)).toContainText(isk(member.owed - DAY_TAX));
 });
 
-// The book bills the pilot's group and counts the alt's donation for it; the member reads it
-// by `uids` (every reader of the Miner), so the pilot's tab agrees with the book.
-test("an alt's donation pays the pilot's group", async ({ page, book, esi }) => {
+// The book groups the pilot with an alt this device does not hold, so the tab cannot read the
+// alt's lines: it says so, and offers to tell the corporation the alt is not theirs.
+test('a grouped alt the pilot has not added is named, and can be declined', async ({
+  page,
+  book,
+  esi,
+}) => {
   const member = await openTax(page, book, esi, {
     extra: [
       creditedDonation({ refId: 960_003, characterId: PILOT_ALT.id, amount: DAY_TAX, back: 2 }),
     ],
+    personal: false,
   });
-  await expect(ledgerButton(page, CORP_NAME)).toContainText(isk(member.owed - DAY_TAX));
+  // Read by each held Character's own lines: the alt's donation is not on this tab.
+  await expect(ledgerButton(page, CORP_NAME)).toContainText(isk(member.owed));
+  await page.getByRole('button', { name: /needs? attention/ }).click();
+  const warning = page.getByText(`${CORP_NAME} counts ${PILOT_ALT.name} as yours.`, {
+    exact: false,
+  });
+  await expect(warning.first()).toBeVisible();
+  await page.getByRole('button', { name: `Not yours? Tell ${CORP_NAME}` }).click();
+  await expect(warning).toHaveCount(0);
 });
 
 test("a transfer to the book's corporation is never offered to a personal Payee", async ({
