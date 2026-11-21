@@ -48,6 +48,11 @@ import {
 } from './corpTaxBookStore.js';
 import { SRP_CLAIMS, SRP_COLLECTIONS } from './srpTypes.js';
 import { VETTING_COLLECTIONS } from './vettingTypes.js';
+import {
+  installBookWriteTracking,
+  stampBook,
+  withBookVersions,
+} from './corpTaxBookVersionTracking.js';
 
 const CORP = 98000001;
 const T0 = Date.parse('2026-10-18T12:00:00Z');
@@ -2958,6 +2963,34 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         });
       const stored = async (minerId: string) =>
         (await book().collection('accounts').doc(minerId).get()).data();
+
+      it('moves the accounts version for a new snapshot, not for figures alone', async () => {
+        installBookWriteTracking();
+        await turnOn();
+        await minedHere(50, 52);
+        const versioned = <T>(run: () => Promise<T>) =>
+          withBookVersions(
+            (id, touched) => stampBook(db, id, touched),
+            run,
+            () => undefined
+          );
+        const stamp = async () =>
+          (await book().get()).data()?.collectionVersions?.accounts as string | undefined;
+        await versioned(() => record(checkpoint('solo:50', '2026-07-31')));
+        const withSnapshot = await stamp();
+        expect(withSnapshot).toEqual(expect.any(String));
+        await versioned(() =>
+          edit(ACCOUNTANT, {
+            action: 'recordAccounts',
+            accounts: [account('solo:50', { owed: 9 })],
+          })
+        );
+        expect((await stored('solo:50'))?.owed).toBe(9);
+        expect((await stored('solo:50'))?.snapshot).toBeDefined();
+        expect(await stamp()).toBe(withSnapshot);
+        await versioned(() => record(checkpoint('solo:52', '2026-07-31')));
+        expect(await stamp()).not.toBe(withSnapshot);
+      });
 
       it('records one through the day before the lock date, and reports what it skips', async () => {
         await turnOn();

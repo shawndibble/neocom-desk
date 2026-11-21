@@ -49,6 +49,11 @@ interface Scope {
 const scope = new AsyncLocalStorage<Scope>();
 let installed = false;
 
+/** Runs `fn` outside the recording scope, so its synchronous writes stamp nothing (figures no client reads). */
+export function withoutVersionStamp<T>(fn: () => T): T {
+  return scope.exit(fn);
+}
+
 /** Records one write, if it is a book write inside a scope. */
 function record(ref: { path?: unknown } | undefined): void {
   const current = scope.getStore();

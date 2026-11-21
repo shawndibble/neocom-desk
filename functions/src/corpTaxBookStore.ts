@@ -114,6 +114,7 @@ import { ledgerDays, ledgerPayments, liveRunningAccount } from './corpTaxBookRun
 import type { IdentityReader } from './corpTaxBookEsi.js';
 import { SRP_COLLECTIONS } from './srpTypes.js';
 import { VETTING_COLLECTIONS } from './vettingTypes.js';
+import { withoutVersionStamp } from './corpTaxBookVersionTracking.js';
 import { isMissingIndex } from './indexedSweep.js';
 import { FEEDER_OBSERVED, rollupChanges, writeRollupChanges } from './corpTaxBookFeederRollup.js';
 import { OBSERVED_UPDATED_AT_FIELD } from './corpTaxBookVersionKeys.js';
@@ -2684,7 +2685,12 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         if (!fresh.has(i) && sameRunningAccount(stored[i].data(), a)) return;
         // A stored snapshot and its readers stay until a newer one or a change of characters.
         const { snapshot, uids }: Data = fresh.get(i) ?? stored[i].data() ?? {};
-        tx.set(refs[i], { ...a, at: iso, by, ...(snapshot ? { snapshot, uids } : {}) });
+        const write = () =>
+          tx.set(refs[i], { ...a, at: iso, by, ...(snapshot ? { snapshot, uids } : {}) });
+        // Figures only (the kept snapshot and readers are rewritten as they were): no client reads
+        // them, so no stamp. A new snapshot stamps.
+        if (fresh.has(i)) write();
+        else withoutVersionStamp(write);
       });
       // Only ever grown: a day recorded paid stays paid, even if money is later taken back (D22).
       if (Object.keys(settled).length > 0)

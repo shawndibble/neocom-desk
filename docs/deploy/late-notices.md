@@ -12,6 +12,7 @@ an open tab older than it must be reloaded.
   - `lateNoticeLinks/{noticeId}`: `{ token }`, editors only.
   - `accounts/{minerId}`: a Miner's Running account figures and its `snapshot` for the lock
     date. Officers read every one; a Miner reads their own once it holds a snapshot (`uids`).
+    A figures-only write doesn't move the book's `accounts` version (only a snapshot does).
   - `observed` and `payments` read by their own Character (`uid`) only, as before this feature:
     no copied readers (`uids`) on either. A pilot sees an alt's lines through the character
     selector.
