@@ -1,5 +1,11 @@
+// RETIRED (decision 20261120-235011): the server no longer builds or stores these totals; every
+// book is a Running account, which only an officer's tab can price, and the nightly pass deletes
+// what is left of `minerTotals`. Nothing in the Cloud Functions imports this file: it stays only
+// for the client's parity tests (src/engine/corpTaxBook/minerTotals.test.ts, minerScope.test.ts,
+// readModels.test.ts' `BookRecords`), and goes with them when the calendar Statement code does.
+//
 // Miner running totals (issue #5255, ADR 0032): the frozen part of a Miner's account, kept
-// in `corps/{id}/minerTotals/{minerId}`. Shadow mode: nothing reads the docs yet.
+// in `corps/{id}/minerTotals/{minerId}`.
 //
 // Only frozen things go in: issued Statements, payments, dismissals of billed days,
 // officer write-offs, declarations. Open days (unbilled, pending) change with prices and
@@ -12,8 +18,6 @@
 // imports it to prove the results equal the client engine's full recompute.
 
 import {
-  DEFAULT_EXPIRY_HOURS,
-  MAX_EXPIRY_HOURS,
   allocatePayments,
   creditedLines,
   dismissalCredits,
@@ -422,35 +426,5 @@ export function editScope(action: { action: string } & Data): Scope {
   return s;
 }
 
-/** Whether two pulls at one structure cover the same day (the phase-0 assumption the verifier checks, ADR 0032). */
-export function overlappingPulls(
-  extractions: readonly Data[],
-  expiryHours: Readonly<Record<string, number>>
-): { structureId: number; a: string; b: string }[] {
-  const windows = (extractions as unknown as MirrorExtraction[])
-    .filter(
-      (x) => !x.cancelledAt && !Number.isNaN(Date.parse(x.laserFiredAt ?? x.naturalDecayTime))
-    )
-    .map((x) => {
-      const fracturedAt = Date.parse(x.laserFiredAt ?? x.naturalDecayTime);
-      const hours = Math.min(
-        expiryHours[String(x.structureId)] ?? DEFAULT_EXPIRY_HOURS,
-        MAX_EXPIRY_HOURS
-      );
-      return {
-        structureId: x.structureId,
-        id: `${x.structureId}_${Date.parse(x.extractionStartTime)}`,
-        from: new Date(fracturedAt).toISOString().slice(0, 10),
-        to: new Date(fracturedAt + hours * 3_600_000).toISOString().slice(0, 10),
-      };
-    });
-  const out: { structureId: number; a: string; b: string }[] = [];
-  for (let i = 0; i < windows.length; i++)
-    for (let j = i + 1; j < windows.length; j++) {
-      const x = windows[i];
-      const y = windows[j];
-      if (x.structureId === y.structureId && x.from <= y.to && y.from <= x.to)
-        out.push({ structureId: x.structureId, a: x.id, b: y.id });
-    }
-  return out;
-}
+/** Moved to the moon docs, which own a pull's window; re-exported for the client's parity test. */
+export { overlappingPulls } from './corpTaxBookMoonDocs.js';

@@ -1,13 +1,17 @@
 // The Overview and Miners tab read models (issue #5259, ADR 0032): two docs under
-// `corps/{id}/readModels`, built from the book's frozen records. The screens read them, and fall
-// back to the whole-book view while they are missing.
+// `corps/{id}/readModels`. The screens read them, and fall back to the whole-book view while
+// they are missing.
+//
+// Every book is a Running account (decision 20261120-235011), so the Miners list is built from
+// what officers' tabs record, never from Statements: each Miner's account (`accounts/{minerId}`,
+// `recordAccounts`) less what they paid since, and their Late notices still unsettled by it. The
+// server holds no prices, so it never works an account out itself.
 //
 // They hold inputs, never time-derived figures. Overdue days, paused, standing, the
 // "Pops in 7 days" window, billable-through and the open set (unbilled, pending, unrated)
 // are computed on read by src/engine/corpTaxBook/readModels.ts. Names are never stored.
 //
-// Pure and dependency-free: src/engine/corpTaxBook/readModels.test.ts imports it to prove
-// the figures the tabs derive from these docs equal `buildBookView`'s.
+// Pure and dependency-free: the client imports it.
 
 import {
   DEFAULT_EXPIRY_HOURS,
@@ -15,8 +19,16 @@ import {
   isBeforeBook,
   type MirrorExtraction,
 } from './corpTaxBookEngine.js';
+import type { OwedDay } from './corpTaxBookAccounts.js';
 import { READ_MODELS_SCHEMA } from './corpTaxBookVersionKeys.js';
-import { allocateMiner, minerIdsIn, type BookRecords } from './corpTaxBookMinerTotals.js';
+import { liveAccount, paidSinceRecord } from './corpTaxBookAccounts.js';
+import {
+  NOTICE_ID_FIELD,
+  lateNoticeStanding,
+  type LateNotice,
+  type LateNoticeDayState,
+  type LateNoticeLine,
+} from './corpTaxBookLateNotice.js';
 import { DAY_MS } from './timeConstants.js';
 
 export const READ_MODELS = 'readModels';
@@ -26,17 +38,18 @@ export { READ_MODELS_SCHEMA };
 
 type Data = Record<string, unknown>;
 
-/** A Miner's frozen account, as the Miners tab and the Needs you queue read it. */
+/** A Miner's account, as the Miners tab and the Needs you queue read it. */
 export interface MinerListEntry {
   minerId: string;
-  /** What is still due on unsettled Statements (excludes credit). */
+  /** What the account an officer's tab last recorded still owes, less what the Miner paid since. */
   owed: number;
+  /** What the Miner paid since that record beyond what it said they owed. */
   credit: number;
   /** ISO instant of the latest payment that was tax; null when none. */
   lastPaidAt: string | null;
-  /** Unsettled Statements, in the Statements' stored order, each with its declarations. */
+  /** Late notices not yet settled, oldest first, each with its declarations. */
   unsettled: { id: string; issuedAt: string; declarations: Data[] }[];
-  /** Declarations nobody resolved yet, on any of the Miner's Statements. */
+  /** Declarations nobody resolved yet, on any of the Miner's Late notices. */
   unresolvedDeclarations: Data[];
 }
 
@@ -63,6 +76,25 @@ export interface ReadModels {
   [OVERVIEW_DOC]: OverviewDoc;
 }
 
+/** The part of a Late notice the Miners list reads. */
+export type ListedNotice = Pick<LateNotice, 'id' | 'minerId' | 'issuedAt'> & {
+  lines: readonly Pick<LateNoticeLine, 'date' | 'tax'>[];
+};
+
+/** What both docs are built from: no ledger row, no Statement. */
+export interface ReadModelInputs {
+  startDate?: string;
+  expiryHours: Readonly<Record<string, number>>;
+  /** Every payment; a Miner's carry its `minerId`. */
+  payments: readonly Data[];
+  declarations: readonly Data[];
+  extractions: readonly Data[];
+  /** `accounts/{minerId}` docs, each with its `id`; absent reads as none recorded. */
+  accounts?: readonly Data[];
+  /** Late notices from both collections; absent reads as none issued. */
+  notices?: readonly ListedNotice[];
+}
+
 /** Whether an Extraction is still worth listing at `now` (ms): not cancelled, expiry no more than a day gone. */
 function inWindow(
   x: MirrorExtraction,
@@ -79,68 +111,87 @@ function inWindow(
   return fractured + hours * 3_600_000 >= now - DAY_MS;
 }
 
-/** Builds both docs from every record of a book. `now` is epoch ms. */
-export function buildReadModels(records: BookRecords, now: number): ReadModels {
+/** The days an account still owes, as `lateNoticeStanding` reads them. */
+function owedDays(days: readonly OwedDay[]) {
+  return new Map<string, LateNoticeDayState>(
+    days.map((d) => [
+      d.date,
+      {
+        tax: d.tax,
+        held: false,
+        credited: d.tax - d.owed,
+        forgiven: 0,
+        writtenOff: 0,
+        remaining: d.owed,
+        settled: false,
+      },
+    ])
+  );
+}
+
+/** Builds both docs. `now` is epoch ms. */
+export function buildReadModels(inputs: ReadModelInputs, now: number): ReadModels {
+  const accounts = new Map((inputs.accounts ?? []).map((a) => [a.id as string, a]));
+  const notices = inputs.notices ?? [];
+  const minerIds = new Set<string>([...accounts.keys(), ...notices.map((n) => n.minerId)]);
+  for (const p of inputs.payments) if (typeof p.minerId === 'string') minerIds.add(p.minerId);
+
   const entries: MinerListEntry[] = [];
-  for (const minerId of [...minerIdsIn(records)].sort()) {
-    const mine = {
-      minerId,
-      miner: records.miners.find((m) => m.id === minerId),
-      statements: records.statements.filter((s) => s.minerId === minerId),
-      payments: records.payments.filter((p) => p.minerId === minerId),
-      writeOffs: records.writeOffs.filter((w) => w.minerId === minerId),
-    };
-    const { statements, payments, allocation } = allocateMiner(mine, records);
-    // A donation before the book is neither credited nor shown as a payment.
-    const counted = payments.filter(
-      (p) => p.source !== 'donation' || !records.startDate || !isBeforeBook(p.at, records.startDate)
-    );
+  for (const minerId of [...minerIds].sort()) {
+    const payments = inputs.payments.filter((p) => p.minerId === minerId);
     let lastPaidAt: string | null = null;
-    for (const p of counted)
-      if (p.amount - (p.notTaxAmount ?? 0) > 0 && (lastPaidAt === null || p.at > lastPaidAt))
-        lastPaidAt = p.at;
-    // The allocation's own order, so the float sum equals the client's.
-    let owed = 0;
-    for (const settlement of allocation.byStatement.values())
-      if (!settlement.settled) owed += settlement.remaining;
-    const unsettled: MinerListEntry['unsettled'] = [];
-    for (const s of statements) {
-      const settlement = allocation.byStatement.get(s.id);
-      if (!settlement || settlement.settled) continue;
-      unsettled.push({
-        id: s.id,
-        issuedAt: s.issuedAt,
-        declarations: records.declarations.filter((d) => d.statementId === s.id),
-      });
+    for (const p of payments) {
+      const at = p.at as string;
+      // A donation before the book is neither credited nor shown as a payment.
+      if (p.source === 'donation' && inputs.startDate && isBeforeBook(at, inputs.startDate))
+        continue;
+      const tax = (p.amount as number) - ((p.notTaxAmount as number | undefined) ?? 0);
+      if (tax > 0 && (lastPaidAt === null || at > lastPaidAt)) lastPaidAt = at;
     }
-    const statementIds = new Set(statements.map((s) => s.id));
+    const account = accounts.get(minerId);
+    const live = account && liveAccount(account, payments);
+    const days = live?.unpaidDays && owedDays(live.unpaidDays);
+    const mine = notices
+      .filter((n) => n.minerId === minerId)
+      .sort((x, y) => x.issuedAt.localeCompare(y.issuedAt) || x.id.localeCompare(y.id));
+    // Without the days recorded, a notice cannot be read as settled.
+    const unsettled = mine
+      .filter((n) => !days || !lateNoticeStanding(n, days).settled)
+      .map((n) => ({
+        id: n.id,
+        issuedAt: n.issuedAt,
+        declarations: inputs.declarations.filter((d) => d[NOTICE_ID_FIELD] === n.id),
+      }));
+    const ids = new Set(mine.map((n) => n.id));
     entries.push({
       minerId,
-      owed,
-      credit: allocation.credit,
+      owed: live?.owed ?? 0,
+      credit: account
+        ? Math.max(0, paidSinceRecord(account, payments) - (Number(account.owed) || 0))
+        : 0,
       lastPaidAt,
       unsettled,
-      unresolvedDeclarations: records.declarations.filter(
-        (d) => !d.resolution && statementIds.has(d.statementId as string)
+      unresolvedDeclarations: inputs.declarations.filter(
+        (d) => !d.resolution && ids.has(d[NOTICE_ID_FIELD] as string)
       ),
     });
   }
 
   let donationsBeforeBook = 0;
   const unmatchedPayments: Data[] = [];
-  for (const p of records.payments) {
+  for (const p of inputs.payments) {
     if (
       p.source === 'donation' &&
-      records.startDate &&
-      isBeforeBook(p.at as string, records.startDate)
+      inputs.startDate &&
+      isBeforeBook(p.at as string, inputs.startDate)
     )
       donationsBeforeBook += 1;
     // A donation wholly marked not tax needs nothing more; a partly marked one still does.
     else if (!p.minerId && (p.amount as number) - ((p.notTaxAmount as number | undefined) ?? 0) > 0)
       unmatchedPayments.push(p);
   }
-  const extractions = (records.extractions as unknown as MirrorExtraction[]).filter((x) =>
-    inWindow(x, records.expiryHours, now)
+  const extractions = (inputs.extractions as unknown as MirrorExtraction[]).filter((x) =>
+    inWindow(x, inputs.expiryHours, now)
   );
   return {
     [MINER_LIST_DOC]: { schema: READ_MODELS_SCHEMA, miners: entries },
@@ -151,6 +202,34 @@ export function buildReadModels(records: BookRecords, now: number): ReadModels {
       extractions: extractions as unknown as Data[],
     },
   };
+}
+
+/** Edits that change what either doc is built from, whatever they name. */
+const READ_MODEL_EDITS: ReadonlySet<string> = new Set([
+  'recordAccounts',
+  'issueLateNotice',
+  'issueStatement',
+  'closeAccount',
+  'declare',
+  'resolveDeclaration',
+  'recordPayment',
+  'assignPayment',
+  'markNotTax',
+  'setMiner',
+  'unlink',
+  'regroupMiner',
+  'linkSurvey',
+  'setFullyMined',
+]);
+
+/**
+ * Whether an edit moves the Overview or Miners doc: a Miner's recorded account, their notices,
+ * payments, declarations or grouping, an Extraction, or the book's start date or expiry.
+ */
+export function movesReadModels(action: { action: string; patch?: object }): boolean {
+  if (READ_MODEL_EDITS.has(action.action)) return true;
+  const patch = (action.action === 'updateSettings' ? action.patch : undefined) as Data | undefined;
+  return patch?.startDate !== undefined || patch?.structureExpiryHours !== undefined;
 }
 
 /** Drops `undefined`, which Firestore refuses. */

@@ -49,6 +49,11 @@ export const UNVERSIONED_COLLECTIONS: ReadonlySet<string> = new Set([
 export const VERSIONED_COLLECTIONS = [
   'miners',
   'statements',
+  // Late notices and their verify links, and each Running account's closed-through checkpoint
+  // (decision 20261120-235011).
+  'lateNotices',
+  'lateNoticeLinks',
+  'accountCheckpoints',
   'payments',
   'dismissals',
   'extractions',
@@ -74,8 +79,12 @@ export const VERSIONED_COLLECTIONS = [
 
 export type VersionedCollection = (typeof VERSIONED_COLLECTIONS)[number];
 
-/** Bump when a field of a `readModels` doc changes meaning (#5259): the verifier then rewrites both docs and a client ignores the old ones. */
-export const READ_MODELS_SCHEMA = 1;
+/**
+ * Bump when a field of a `readModels` doc changes meaning (#5259): the verifier then rewrites both
+ * docs and a client ignores the old ones. 2: the Miners list is read off recorded Running accounts
+ * and Late notices, never Statements (decision 20261120-235011).
+ */
+export const READ_MODELS_SCHEMA = 2;
 
 /**
  * Where a document or collection path lands in a book: its corporation id, and

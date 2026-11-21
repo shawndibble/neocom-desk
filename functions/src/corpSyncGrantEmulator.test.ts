@@ -3,6 +3,7 @@
 // repo root (which starts the emulator and sets FIRESTORE_EMULATOR_HOST); a plain
 // `npm test` skips it.
 import type { Caller } from './actorAuth.js';
+import { minerPaymentCode } from './corpTaxBookLateNotice.js';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -494,6 +495,33 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       expect(
         (await audit()).some((a) => a.action === 'assignPayment' && a.via === 'scheduled sync')
       ).toBe(true);
+    });
+
+    it('matches a stranger’s donation by the Miner’s code, or a code a Late notice printed', async () => {
+      const donation = (id: number, reason: string) => ({
+        id,
+        date: '2026-10-17T10:00:00Z',
+        ref_type: 'player_donation',
+        amount: 1_000_000,
+        first_party_id: 777,
+        reason,
+      });
+      await book()
+        .collection('lateNotices')
+        .doc('n1')
+        .set({ id: 'n1', minerId: 'solo:60', code: 'MTOLD001', lines: [], uids: [] });
+      esiState.journal = ok([
+        donation(2, `tax ${minerPaymentCode('solo:50')}`),
+        donation(3, 'for MTOLD001'),
+      ]);
+      await optIn(ACCOUNTANT);
+      expect((await runScheduledCorpSyncs(syncDeps(), fakeEsi())).synced).toBe(1);
+      const payment = async (id: string) =>
+        (await book().collection('payments').doc(id).get()).data();
+      expect(await payment('j1_2')).toMatchObject({ minerId: 'solo:50' });
+      // A code only says whose money it is: no notice is pinned to it.
+      expect(await payment('j1_3')).toMatchObject({ minerId: 'solo:60' });
+      expect(await payment('j1_3')).not.toHaveProperty('statementId');
     });
 
     it('credits a known miner’s donation even when their Miner owes nothing (#6300)', async () => {

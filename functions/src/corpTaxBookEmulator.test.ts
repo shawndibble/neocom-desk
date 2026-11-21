@@ -2,6 +2,10 @@
 // only under `npm run test:rules` at the repo root (which starts the emulator
 // and sets FIRESTORE_EMULATOR_HOST); a plain `npm test` skips it.
 import { applyRekeyBackfill, planRekeyBackfill } from './corpTaxBookRekeyBackfill.js';
+import {
+  applyLateNoticeBackfill,
+  planLateNoticeBackfill,
+} from './corpTaxBookLateNoticeBackfill.js';
 import type { Caller } from './actorAuth.js';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
@@ -919,7 +923,12 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         .doc('m-b_2026-10-05')
         .set({ minerId: 'm-b', date: '2026-10-05', uids: ['char:62'] });
       await b.collection('accounts').doc('m-b').set({ minerId: 'm-b' });
-      await b.collection('minerTotals').doc('solo:63').set({ minerId: 'solo:63' });
+      await b.collection('accountCheckpoints').doc('solo:63').set({ minerId: 'solo:63' });
+      await b.collection('accountCheckpoints').doc('solo:60').set({ minerId: 'solo:60' });
+      await b
+        .collection('lateNotices')
+        .doc('n-b')
+        .set({ id: 'n-b', minerId: 'm-b', uids: ['char:62'] });
       await edit(ACCOUNTANT, {
         action: 'regroupMiner',
         minerId: 'solo:60',
@@ -940,7 +949,13 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         { minerId: 'solo:60', uids: readers }
       );
       expect((await b.collection('accounts').doc('m-b').get()).exists).toBe(false);
-      expect((await b.collection('minerTotals').doc('solo:63').get()).exists).toBe(false);
+      expect((await b.collection('accountCheckpoints').doc('solo:63').get()).exists).toBe(false);
+      // The surviving Miner's checkpoint no longer sums its history: the next load rolls a new one.
+      expect((await b.collection('accountCheckpoints').doc('solo:60').get()).exists).toBe(false);
+      expect((await b.collection('lateNotices').doc('n-b').get()).data()).toMatchObject({
+        minerId: 'solo:60',
+        uids: readers,
+      });
     });
 
     it('the backfill moves an older grouping alt records onto its group, and a re-run finds none (#6450)', async () => {
@@ -1726,14 +1741,6 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       await declare(50, { statementId: 's1' });
     });
 
-    it('refuses a declaration on a settled Statement', async () => {
-      await turnOn();
-      await edit(ACCOUNTANT, { action: 'issueStatement', statement: statement('s1') });
-      await edit(ACCOUNTANT, { action: 'settleStatements', statementIds: ['s1'] });
-      await pastSetup();
-      expect(await reason(declare(50, { statementId: 's1' }))).toBe('settled');
-    });
-
     it('gives an officer-recorded declaration the Miner’s uids too', async () => {
       await turnOn();
       await edit(ACCOUNTANT, { action: 'issueStatement', statement: statement('s1') });
@@ -1936,30 +1943,6 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect(
         await edit(ACCOUNTANT, { action: 'settleStatements', statementIds: ['s1'] })
       ).toMatchObject({ settled: ['s1'] });
-    });
-
-    it('keeps the Miner’s stored totals hold-aware: filing, withdrawing and a lapse recompute them', async () => {
-      await turnOn();
-      await recordOre([50]);
-      await billDay();
-      await pastSetup();
-      const totals = async () =>
-        (await book().collection('minerTotals').doc('solo:50').get()).data();
-      const { disputeId } = await dispute(50, [line(50)]);
-      const held = await totals();
-      expect(held?.owed).toBeLessThan(held?.billed as number);
-      expect(typeof held?.overdueAt === 'string' || held?.overdueAt === null).toBe(true);
-      await withdrawDispute(
-        deps(),
-        who(50),
-        parseWithdrawDisputeInput({ corporationId: CORP, date: '2026-10-17' })
-      );
-      expect((await totals())?.owed).toBe(held?.billed);
-      // Filed again, then answered: the officer's answer ends the hold.
-      await dispute(50, [line(50)]);
-      expect((await totals())?.owed).toBeLessThan(held?.billed as number);
-      await edit(ACCOUNTANT, { action: 'rejectDispute', disputeId, reason: 'Ours' });
-      expect((await totals())?.owed).toBe(held?.billed);
     });
 
     it('lets an officer reject a dispute once; the Miner may flag the day again, keeping the hold', async () => {
@@ -2251,13 +2234,35 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       });
     });
 
-    it('refuses to reverse a correction an issued Statement billed', async () => {
+    it('refuses to reverse a correction a Late notice listed, in either collection', async () => {
       await turnOn();
       const id = await addCorrection(500);
+      const listed = {
+        kind: 'correction',
+        date: '2026-10-17',
+        oreLines: [],
+        estimatedValue: 0,
+        tax: 5,
+      };
+      await book()
+        .collection('lateNotices')
+        .doc('n9')
+        .set({ id: 'n9', minerId: 'solo:50', lines: [{ ...listed, key: `adjustment:${id}` }] });
+      expect(
+        await reason(
+          edit(ACCOUNTANT, { action: 'reverseAdjustment', adjustmentId: id, reason: 'x' }, true)
+        )
+      ).toBe('billed-on-statement');
+      await book().collection('lateNotices').doc('n9').delete();
       await book()
         .collection('statements')
         .doc('s9')
-        .set({ id: 's9', minerId: 'solo:50', lines: [{ kind: 'correction', adjustmentId: id }] });
+        .set({
+          id: 's9',
+          minerId: 'solo:50',
+          kind: 'notice',
+          lines: [{ ...listed, adjustmentId: id }],
+        });
       expect(
         await reason(
           edit(ACCOUNTANT, { action: 'reverseAdjustment', adjustmentId: id, reason: 'x' }, true)
@@ -2584,11 +2589,11 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       });
     });
 
-    it('reads the Statement by token, and stops reminders with one audited manual reminder allowed', async () => {
+    it('reads a legacy notice by token, and stops reminders with one audited manual reminder allowed', async () => {
       await turnOn();
       const { verifyToken } = await edit(ACCOUNTANT, {
         action: 'issueStatement',
-        statement: statement('s1'),
+        statement: { ...statement('s1'), kind: 'notice' },
       });
       await edit(ACCOUNTANT, {
         action: 'recordPayment',
@@ -2598,16 +2603,8 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         amount: 3,
         at: '2026-11-02T00:00:00Z',
       });
-      await edit(ACCOUNTANT, {
-        action: 'recordPayment',
-        paymentId: 'm2',
-        minerId: 'solo:99',
-        characterId: 99,
-        amount: 3,
-        at: '2026-11-02T00:00:00Z',
-      });
       const view = await readStatementByToken(deps(), String(verifyToken));
-      expect(view.statement).toMatchObject({ id: 's1', amount: 10_000_000 });
+      expect(view.statement).toMatchObject({ id: 's1', amount: 1, kind: 'notice', code: 'ABC123' });
       expect(view.statement).not.toHaveProperty('verifyToken');
       for (const key of ['characterIds', 'minerId', 'issuedBy', 'uids', 'manualRemindersSent']) {
         expect(view.statement).not.toHaveProperty(key);
@@ -2620,15 +2617,26 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         verifyToken
       );
       expect(view.terms).toMatchObject({ hubId: 'jita', oreForm: 'compressed' });
-      expect(view.payments.map((p) => p.id)).toEqual(['m1']);
-      expect(view.settlement).toMatchObject({ amount: 10_000_000, credited: 3 });
+      // A notice takes no money: payments pay the Miner's oldest day.
+      expect(view.payments).toEqual([]);
+      expect(view.settlement).toBeNull();
+      expect(view.settled).toBe(false);
+      expect(view.ledger.days).toEqual([{ date: '2026-10-05', tax: 1 }]);
+      expect(view.ledger.payments.map((p) => p.id)).toEqual(['m1']);
       expect(view.accountClosed).toBe(false);
       expect(view.remindersStopped).toBe(false);
 
       await setRemindersByToken(deps(), String(verifyToken), true);
       expect((await readStatementByToken(deps(), String(verifyToken))).remindersStopped).toBe(true);
+      expect((await book().collection('lateNotices').doc('s1').get()).get('mail')).toMatchObject({
+        remindersStopped: true,
+      });
+      expect((await book().collection('statements').doc('s1').get()).get('remindersStopped')).toBe(
+        true
+      );
+      // An older tab names the notice as a Statement.
       await edit(ACCOUNTANT, { action: 'recordReminder', statementId: 's1' });
-      expect(await reason(edit(ACCOUNTANT, { action: 'recordReminder', statementId: 's1' }))).toBe(
+      expect(await reason(edit(ACCOUNTANT, { action: 'recordReminder', noticeId: 's1' }))).toBe(
         'reminders-stopped'
       );
       const log = (await book().collection('audit').orderBy('at').get()).docs.map((d) => d.data());
@@ -2641,157 +2649,299 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       const mailLog = (await book().collection('audit').orderBy('at').get()).docs
         .map((d) => d.data())
         .find((e) => e.action === 'recordMail');
-      expect(mailLog).toMatchObject({
-        detail: { statementId: 's1', mailId: 99, kind: 'statement' },
-      });
+      expect(mailLog).toMatchObject({ detail: { noticeId: 's1', mailId: 99, kind: 'statement' } });
       const stop = log.find((e) => e.action === 'stopReminders');
       expect(stop).toMatchObject({
         by: null,
         via: 'verify-link',
-        detail: { statementId: 's1', stopped: true },
+        detail: { noticeId: 's1', stopped: true },
       });
       expect(JSON.stringify(log)).not.toContain(String(verifyToken));
-    });
-
-    it('shows only the payments credited to this Statement, oldest first across Statements', async () => {
-      await turnOn();
-      await edit(ACCOUNTANT, {
-        action: 'issueStatement',
-        statement: statement('s1', { issuedAt: '2026-10-01T00:00:00.000Z', amount: 10_000_000 }),
+      // Both docs carry the mail while the mirror lives.
+      expect((await book().collection('lateNotices').doc('s1').get()).get('mail')).toMatchObject({
+        sent: 1,
+        manualSent: 1,
+        lastAt: expect.any(String),
       });
-      const second = await edit(ACCOUNTANT, {
-        action: 'issueStatement',
-        statement: statement('s2', {
-          issuedAt: '2026-11-01T00:00:00.000Z',
-          amount: 8_000_000,
-          code: 'DEF456',
-        }),
+      expect((await book().collection('statements').doc('s1').get()).data()).toMatchObject({
+        mailsSent: 1,
+        manualRemindersSent: 1,
       });
-      // 12M: all of s1 (10M) and 2M of s2. A later 1M goes to s2 as well.
-      await edit(ACCOUNTANT, {
-        action: 'recordPayment',
-        paymentId: 'big',
-        minerId: 'solo:50',
-        characterId: 50,
-        amount: 12_000_000,
-        at: '2026-11-02T00:00:00Z',
-      });
-      await edit(ACCOUNTANT, {
-        action: 'recordPayment',
-        paymentId: 'small',
-        minerId: 'solo:50',
-        characterId: 50,
-        amount: 1_000_000,
-        at: '2026-11-03T00:00:00Z',
-      });
-      const view = await readStatementByToken(deps(), String(second.verifyToken));
-      expect(view.payments.map((p) => [p.id, p.amount])).toEqual([
-        ['big', 2_000_000],
-        ['small', 1_000_000],
-      ]);
-      expect(view.settlement).toMatchObject({ credited: 3_000_000, remaining: 5_000_000 });
     });
 
     it('flags a Miner whose account is closed', async () => {
       await turnOn();
       const { verifyToken } = await edit(ACCOUNTANT, {
         action: 'issueStatement',
-        statement: statement('s1'),
+        statement: { ...statement('s1'), kind: 'notice' },
       });
       await book().collection('miners').doc('solo:50').set({ closedAt: '2026-11-05T00:00:00Z' });
       expect((await readStatementByToken(deps(), String(verifyToken))).accountClosed).toBe(true);
-    });
-
-    it("reduces the Statement by an officer's write-off (#4637)", async () => {
-      await turnOn();
-      const { verifyToken } = await edit(ACCOUNTANT, {
-        action: 'issueStatement',
-        statement: statement('s1'),
-      });
-      await edit(
-        ACCOUNTANT,
-        {
-          action: 'writeOff',
-          minerId: 'solo:50',
-          statementId: 's1',
-          amount: 4_000_000,
-          reason: 'r',
-        },
-        true
-      );
-      const view = await readStatementByToken(deps(), String(verifyToken));
-      expect(view.settlement).toMatchObject({ forgiven: 4_000_000, remaining: 6_000_000 });
-    });
-
-    describe('moon and Extraction dismissals (#4184)', () => {
-      const started = '2026-10-10T00:00:00Z';
-      const extractionId = `1000_${Date.parse(started)}`;
-      // Fractured 17 Oct 03:00, expired 19 Oct 03:00: it covers 17-19 Oct.
-      const seedExtraction = () =>
-        book().collection('extractions').doc(extractionId).set({
-          id: extractionId,
-          structureId: 1000,
-          moonId: 7,
-          extractionStartTime: started,
-          chunkArrivalTime: '2026-10-17T00:00:00Z',
-          naturalDecayTime: '2026-10-17T03:00:00Z',
-        });
-      const billed = (id: string, date: string, structureId: number) =>
-        statement(id, {
-          amount: 4_000_000,
-          lines: [
-            {
-              kind: 'mined',
-              date,
-              characterId: 50,
-              chargeKey: `50:${structureId}:${date}`,
-              structureId,
-              oreLines: [],
-              estimatedValue: 1,
-              tax: 4_000_000,
-            },
-          ],
-        });
-      const settlementAfter = async (
-        dismissal: Record<string, unknown>,
-        line: [string, number]
-      ) => {
-        await turnOn();
-        await seedExtraction();
-        const { verifyToken } = await edit(ACCOUNTANT, {
-          action: 'issueStatement',
-          statement: billed('s1', ...line),
-        });
-        await edit(ACCOUNTANT, { action: 'dismiss', reason: 'waived', ...dismissal }, true);
-        return (await readStatementByToken(deps(), String(verifyToken))).settlement;
-      };
-
-      it('settles a Statement whose day a moon dismissal waived', async () => {
-        expect(
-          await settlementAfter({ scope: 'moon', targetId: '7' }, ['2026-10-18', 1000])
-        ).toMatchObject({ credited: 4_000_000, remaining: 0, settled: true });
-      });
-
-      it('settles a Statement whose day an Extraction dismissal waived', async () => {
-        expect(
-          await settlementAfter({ scope: 'extraction', targetId: extractionId }, [
-            '2026-10-18',
-            1000,
-          ])
-        ).toMatchObject({ credited: 4_000_000, remaining: 0, settled: true });
-      });
-
-      it('leaves a day outside the Extraction owed', async () => {
-        expect(
-          await settlementAfter({ scope: 'moon', targetId: '7' }, ['2026-10-20', 1000])
-        ).toMatchObject({ credited: 0, remaining: 4_000_000, settled: false });
-      });
     });
 
     it('does not resolve a made-up token', async () => {
       expect(await reason(readStatementByToken(deps(), 'x'.repeat(43)))).toBe('invalid-token');
     });
   });
+  describe('Late notices (decision 20261120-235011)', () => {
+    const notice = (id: string, overrides: Record<string, unknown> = {}) => ({
+      id,
+      minerId: 'solo:50',
+      characterIds: [50],
+      kind: 'late',
+      issuedAt: '2026-10-18T09:00:00.000Z',
+      code: 'MTCODE01',
+      pricing: { hubId: 'jita', oreForm: 'compressed' },
+      lines: [
+        {
+          kind: 'mined',
+          date: '2026-10-05',
+          key: '50:1000:2026-10-05',
+          characterId: 50,
+          structureId: 1000,
+          oreLines: [{ typeId: 45490, quantity: 100 }],
+          unitPrices: { 45490: 1000 },
+          estimatedValue: 100_000,
+          taxPct: 10,
+          tax: 10_000,
+        },
+      ],
+      names: { minerName: 'Ore Pilot' },
+      ...overrides,
+    });
+    const issue = (id: string, overrides?: Record<string, unknown>) =>
+      edit(ACCOUNTANT, { action: 'issueLateNotice', notice: notice(id, overrides) });
+
+    it('stores the notice, its link and token, and mirrors both for older tabs', async () => {
+      await turnOn();
+      const out = await issue('n1', { uids: ['char:666'], issuedBy: 666 });
+      expect(out).toMatchObject({ noticeId: 'n1', verifyToken: expect.any(String) });
+      const stored = (await book().collection('lateNotices').doc('n1').get()).data();
+      expect(stored).toMatchObject({
+        id: 'n1',
+        minerId: 'solo:50',
+        kind: 'late',
+        code: 'MTCODE01',
+        listed: 10_000,
+        // The server names its readers and who issued it, never the tab.
+        uids: ['char:50'],
+        issuedBy: ACCOUNTANT,
+        mail: { sent: 0, manualSent: 0, remindersStopped: false },
+        updatedAt: expect.anything(),
+      });
+      expect((await book().collection('lateNoticeLinks').doc('n1').get()).data()).toEqual({
+        token: out.verifyToken,
+      });
+      expect((await book().collection('statements').doc('n1').get()).data()).toMatchObject({
+        id: 'n1',
+        kind: 'notice',
+        code: 'MTCODE01',
+        amount: 10_000,
+        uids: ['char:50'],
+        lines: [{ chargeKey: '50:1000:2026-10-05' }],
+      });
+      expect((await book().collection('statementLinks').doc('n1').get()).data()).toEqual({
+        verifyToken: out.verifyToken,
+      });
+      const view = await readStatementByToken(deps(), String(out.verifyToken));
+      expect(view.statement).toMatchObject({ id: 'n1', kind: 'notice', minerName: 'Ore Pilot' });
+      expect(await reason(issue('n1'))).toBe('notice-exists');
+    });
+
+    it('an older tab’s notice is stored as a Late notice too, under the same token', async () => {
+      await turnOn();
+      const { verifyToken } = await edit(ACCOUNTANT, {
+        action: 'issueStatement',
+        statement: { ...statement('s1'), kind: 'notice' },
+      });
+      expect((await book().collection('lateNotices').doc('s1').get()).data()).toMatchObject({
+        id: 's1',
+        minerId: 'solo:50',
+        code: 'ABC123',
+        uids: ['char:50'],
+        issuedBy: ACCOUNTANT,
+      });
+      expect((await book().collection('lateNoticeLinks').doc('s1').get()).get('token')).toBe(
+        verifyToken
+      );
+      expect(await reason(issue('s1'))).toBe('notice-exists');
+    });
+
+    it('a link keeps working whichever collection holds its notice', async () => {
+      await turnOn();
+      const { verifyToken } = await issue('n1');
+      // Before the backfill, only the legacy doc; after step 5, only the Late notice.
+      await book().collection('lateNotices').doc('n1').delete();
+      expect((await readStatementByToken(deps(), String(verifyToken))).statement.id).toBe('n1');
+      await setRemindersByToken(deps(), String(verifyToken), true);
+      expect((await book().collection('statements').doc('n1').get()).get('remindersStopped')).toBe(
+        true
+      );
+      const next = await issue('n2');
+      await book().collection('statements').doc('n2').delete();
+      expect((await readStatementByToken(deps(), String(next.verifyToken))).statement.id).toBe(
+        'n2'
+      );
+      await edit(ACCOUNTANT, {
+        action: 'recordLateNoticeMail',
+        noticeId: 'n2',
+        mailId: 5,
+        kind: 'notice',
+      });
+      expect((await book().collection('lateNotices').doc('n2').get()).get('mail.sent')).toBe(1);
+      expect(
+        await reason(
+          edit(ACCOUNTANT, {
+            action: 'recordLateNoticeMail',
+            noticeId: 'n404',
+            mailId: 5,
+            kind: 'notice',
+          })
+        )
+      ).toBe('not-found');
+    });
+
+    it('takes a declaration on a notice, by its id or the old Statement id', async () => {
+      await turnOn();
+      await issue('n1');
+      for (const key of ['noticeId', 'statementId']) {
+        const { declarationId } = await edit(ACCOUNTANT, {
+          action: 'declare',
+          [key]: 'n1',
+          kind: 'contract',
+        });
+        expect(
+          (await book().collection('declarations').doc(String(declarationId)).get()).data()
+        ).toMatchObject({ statementId: 'n1', minerId: 'solo:50', uids: ['char:50'] });
+      }
+    });
+
+    it('the backfill copies a notice and its link that only the legacy docs hold, once', async () => {
+      await turnOn();
+      const { verifyToken } = await issue('n1');
+      const copied = (await book().collection('lateNotices').doc('n1').get()).data();
+      await book().collection('lateNotices').doc('n1').delete();
+      await book().collection('lateNoticeLinks').doc('n1').delete();
+      const plan = await planLateNoticeBackfill(db, CORP);
+      expect(plan.links).toEqual([{ id: 'n1', token: verifyToken }]);
+      await applyLateNoticeBackfill(db, CORP, plan);
+      const again = (await book().collection('lateNotices').doc('n1').get()).data();
+      expect({ ...again, updatedAt: null }).toEqual({ ...copied, updatedAt: null });
+      expect((await book().collection('lateNoticeLinks').doc('n1').get()).get('token')).toBe(
+        verifyToken
+      );
+      expect(await planLateNoticeBackfill(db, CORP)).toEqual({ notices: [], links: [] });
+    });
+
+    it('refuses a final notice for a closed account', async () => {
+      await turnOn();
+      await book().collection('miners').doc('solo:50').set({ closedAt: '2026-10-17T00:00:00Z' });
+      expect(await reason(issue('n1'))).toBe('account-closed');
+    });
+
+    describe('recordCheckpoints', () => {
+      const checkpoint = (minerId: string, through: string) => ({
+        minerId,
+        through,
+        owed: [],
+        credit: 0,
+        balance: 0,
+        paidThrough: through,
+      });
+      const record = (...checkpoints: ReturnType<typeof checkpoint>[]) =>
+        edit(ACCOUNTANT, { action: 'recordCheckpoints', checkpoints });
+      const stored = async (minerId: string) =>
+        (await book().collection('accountCheckpoints').doc(minerId).get()).data();
+
+      it('moves only forward, never past what may close today, and skips what it refuses', async () => {
+        await turnOn();
+        // Today is 18 Oct: the last month at least 31 days closed is August.
+        expect(await record(checkpoint('solo:50', '2026-07-31'))).toEqual({
+          recorded: ['solo:50'],
+        });
+        expect(await stored('solo:50')).toMatchObject({
+          through: '2026-07-31',
+          by: ACCOUNTANT,
+          at: new Date(T0).toISOString(),
+          uids: ['char:50'],
+          updatedAt: expect.anything(),
+        });
+        const out = await record(
+          checkpoint('solo:50', '2026-06-30'),
+          checkpoint('solo:51', '2026-09-30'),
+          checkpoint('solo:52', '2026-08-31')
+        );
+        expect(out).toEqual({ recorded: ['solo:52'] });
+        expect((await stored('solo:50'))?.through).toBe('2026-07-31');
+        expect(await stored('solo:51')).toBeUndefined();
+        expect(await record(checkpoint('solo:50', '2026-08-31'))).toEqual({
+          recorded: ['solo:50'],
+        });
+        expect((await stored('solo:50'))?.through).toBe('2026-08-31');
+      });
+
+      it('needs an editor', async () => {
+        await turnOn();
+        expect(
+          await reason(
+            edit(JUNIOR, {
+              action: 'recordCheckpoints',
+              checkpoints: [checkpoint('solo:50', '2026-07-31')],
+            })
+          )
+        ).toBe('role-required');
+      });
+    });
+
+    describe('write-offs forgive the oldest days', () => {
+      const dispute = (date: string) =>
+        book()
+          .collection('disputes')
+          .doc(`solo_50_${date}`)
+          .set({
+            id: `solo_50_${date}`,
+            minerId: 'solo:50',
+            date,
+            by: 50,
+            at: '2026-10-17T00:00:00Z',
+            lines: [{ recordKey: `50:1000:${date}`, typeId: 1, quantity: 1, payeeName: 'P' }],
+          });
+
+      it('pins nothing an older client names, and closes the disputes of the days it forgives', async () => {
+        await turnOn();
+        await edit(ACCOUNTANT, {
+          action: 'recordAccounts',
+          accounts: [
+            {
+              minerId: 'solo:50',
+              owed: 300,
+              paid: 0,
+              days: 2,
+              unpaidDays: [
+                { date: '2026-10-05', owed: 100, tax: 100 },
+                { date: '2026-10-06', owed: 200, tax: 200 },
+              ],
+            },
+          ],
+        });
+        await dispute('2026-10-05');
+        await dispute('2026-10-06');
+        const { writeOffId } = await edit(
+          ACCOUNTANT,
+          { action: 'writeOff', minerId: 'solo:50', statementId: 's1', amount: 150, reason: 'r' },
+          true
+        );
+        expect(
+          (await book().collection('writeOffs').doc(String(writeOffId)).get()).data()
+        ).not.toHaveProperty('statementId');
+        const resolution = async (date: string) =>
+          (await book().collection('disputes').doc(`solo_50_${date}`).get()).get('resolution');
+        expect(await resolution('2026-10-05')).toMatchObject({ kind: 'dismissed', writeOffId });
+        expect(await resolution('2026-10-06')).toBeUndefined();
+      });
+    });
+  });
+
   describe('closeAccount (#4184)', () => {
     const close = (extra: Record<string, unknown> = {}, token = false) =>
       edit(

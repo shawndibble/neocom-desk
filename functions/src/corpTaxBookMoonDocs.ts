@@ -3,10 +3,10 @@
 // mode: nothing reads the docs yet.
 //
 // The doc stores inputs, never time-derived state: no "ready", "fractured" or "expired", and
-// no live tax (that needs today's prices; the device computes it from the open days). What
-// is stored is what a moon page needs to read in one go: the chunk's make-up and where it
-// came from, the ore mined across every row in the pull window (rows no charge covers
-// included), who mined it, and the tax the issued Statements froze for the window (D22).
+// no tax. Every book is a Running account (decision 20261120-235011): nothing freezes a pull's
+// tax, and the server holds no prices, so the device prices every day. What is stored is what a
+// moon page needs to read in one go: the chunk's make-up and where it came from, the ore mined
+// across every row in the pull window (rows no charge covers included), and who mined it.
 //
 // Pure and dependency-free: src/engine/corpTaxBook/moonDocs.test.ts imports it to prove the
 // mined totals equal the client engine's `minedDuringExtraction`.
@@ -18,11 +18,15 @@ import {
   type MirrorExtraction,
   type ObservedRow,
 } from './corpTaxBookEngine.js';
+import { closedThroughFor } from './corpTaxBookCheckpoint.js';
 import { HOUR_MS } from './timeConstants.js';
 
 export const MOON_DOCS = 'moonDocs';
-/** Bump when a field's meaning changes; the verifier then rewrites every doc. */
-export const MOON_DOC_SCHEMA = 1;
+/**
+ * Bump when a field's meaning changes; the verifier then rewrites every doc, and a client built
+ * for another schema reads the rows instead. 2: no frozen tax (decision 20261120-235011).
+ */
+export const MOON_DOC_SCHEMA = 2;
 
 type Data = Record<string, unknown>;
 
@@ -55,13 +59,15 @@ export interface MoonDoc {
   minerCount: number;
   /** Per Miner, the ore of every row in the window (a Miner is a grouping id, or `solo:<characterId>`). */
   miners: { minerId: string; oreLines: OreQty[] }[];
-  /** Σ tax on issued Statement lines for the window's days; the live part is computed on the device. */
+  /**
+   * @deprecated Always 0 from schema 2: a pull's tax is never frozen on a Running account. Kept
+   * only so a client reading schema-1 docs still compiles; it goes when that client does.
+   */
   frozenTax: number;
+  /** @deprecated Always 0 from schema 2 (`frozenTax`). */
   frozenLines: number;
 }
 
-const money = (n: number) => Math.round(n * 100) / 100;
-const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 /** Engine `fractureAndExpiry`, as the dates it covers. Null when the dates do not parse. */
@@ -91,8 +97,8 @@ export interface StoredExtraction extends MirrorExtraction {
 /** What every pull's doc reads besides its own rows. */
 export interface MoonRules {
   expiryHours: Readonly<Record<string, number>>;
-  /** Statements as stored; their `lines` carry structureId, date and tax. */
-  statements: readonly Data[];
+  /** @deprecated Ignored from schema 2: no tax is frozen. Accepted until the client's schema-1 tests go. */
+  statements?: readonly Data[];
   /** A Character's Miner (grouping docs); a Character in none is `solo:<id>`. */
   minerOf: (characterId: number) => string;
 }
@@ -134,20 +140,6 @@ export function computeMoonDoc(
     minedPct = total > 0 ? Math.min(100, Math.round((got / total) * 100)) : null;
   }
 
-  let frozenTax = 0;
-  let frozenLines = 0;
-  if (window) {
-    for (const s of rules.statements) {
-      for (const line of Array.isArray(s.lines) ? (s.lines as Data[]) : []) {
-        if (typeof line.chargeKey !== 'string' || line.structureId !== x.structureId) continue;
-        const date = line.date;
-        if (typeof date !== 'string' || date < window.from || date > window.to) continue;
-        frozenTax += num(line.tax);
-        frozenLines += 1;
-      }
-    }
-  }
-
   return {
     schema: MOON_DOC_SCHEMA,
     extractionId: extractionIdOf(x),
@@ -166,8 +158,8 @@ export function computeMoonDoc(
     miners: [...perMiner]
       .map(([minerId, lines]) => ({ minerId, oreLines: sorted(lines) }))
       .sort((a, b) => a.minerId.localeCompare(b.minerId)),
-    frozenTax: money(frozenTax),
-    frozenLines,
+    frozenTax: 0,
+    frozenLines: 0,
   };
 }
 
@@ -228,4 +220,50 @@ export function planMoonDocs(
     plan.deletes.push(id);
   }
   return plan;
+}
+
+/**
+ * The docs the nightly pass rebuilds (decision 20261120-235011): a pull whose window ends after
+ * the day the book is closed through can still gain rows; a closed pull is rebuilt only when its
+ * doc is missing or on another schema. `held` maps each stored doc to its schema; a doc whose pull
+ * is gone is checked too, so it is deleted. Nothing re-reads the rows of a closed pull.
+ */
+export function moonDocsToCheck(
+  extractions: readonly StoredExtraction[],
+  held: ReadonlyMap<string, unknown>,
+  expiryHours: Readonly<Record<string, number>>,
+  today: string
+): Set<string> {
+  const closedThrough = closedThroughFor(today);
+  const out = new Set<string>();
+  const live = new Set<string>();
+  for (const x of extractions) {
+    const id = extractionIdOf(x);
+    live.add(id);
+    const window = pullWindow(x, expiryHours);
+    const open = window === null || window.to > closedThrough;
+    if (open || held.get(id) !== MOON_DOC_SCHEMA) out.add(id);
+  }
+  for (const id of held.keys()) if (!live.has(id)) out.add(id);
+  return out;
+}
+
+/** Whether two pulls at one structure cover the same day (the assumption the verifier checks, ADR 0032). */
+export function overlappingPulls(
+  extractions: readonly object[],
+  expiryHours: Readonly<Record<string, number>>
+): { structureId: number; a: string; b: string }[] {
+  const windows = (extractions as unknown as MirrorExtraction[]).flatMap((x) => {
+    const window = x.cancelledAt ? null : pullWindow(x, expiryHours);
+    return window ? [{ structureId: x.structureId, id: extractionIdOf(x), ...window }] : [];
+  });
+  const out: { structureId: number; a: string; b: string }[] = [];
+  for (let i = 0; i < windows.length; i++)
+    for (let j = i + 1; j < windows.length; j++) {
+      const x = windows[i];
+      const y = windows[j];
+      if (x.structureId === y.structureId && x.from <= y.to && y.from <= x.to)
+        out.push({ structureId: x.structureId, a: x.id, b: y.id });
+    }
+  return out;
 }

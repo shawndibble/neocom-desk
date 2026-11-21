@@ -94,9 +94,12 @@ import {
   type ObservedRow,
   type OutgoingDonation,
 } from './corpTaxBookEngine.js';
-import { refreshAfterEvent } from './corpTaxBookMinerTotalsStore.js';
 import { reconcileFeederPayouts } from './corpTaxBookFeederPayouts.js';
 import { chunk } from './chunk.js';
+import { LATE_NOTICES } from './corpTaxBook.js';
+import type { LateNotice } from './corpTaxBookLateNotice.js';
+import { mergeNotices } from './corpTaxBookLateNoticeStore.js';
+import { recognisedCodes, withoutNotice } from './corpTaxBookPaymentCodes.js';
 
 /** Same bounds the officer's client uses against the callable's caps (corpTaxBook.ts MAX_SYNC_*). */
 export const OBSERVED_PER_CALL = 2000;
@@ -145,6 +148,8 @@ export interface AdminBookState {
   lastSync: { at: number; gaps?: SyncGap[] } | null;
   miners: (MinerLike & Data)[];
   statements: (SettleStatement & StatementLike)[];
+  /** Late notices from both collections: the codes they printed still name their Miner. */
+  notices: Pick<LateNotice, 'id' | 'minerId' | 'code'>[];
   payments: (SettlePayment & { characterId?: number })[];
   dismissals: MirrorDismissal[];
   extractions: SyncExtraction[];
@@ -199,6 +204,7 @@ async function readQuietBookState(
     ...bookDocState(snap),
     miners: [],
     statements: [],
+    notices: [],
     payments: [],
     dismissals: [],
     extractions: extractions.docs.map((d) => d.data() as SyncExtraction),
@@ -225,21 +231,32 @@ async function readBookStateFrom(snap: BookSnap, paidRead?: BookSnap): Promise<A
   const ref = snap.ref;
   const list = async <T>(name: string): Promise<T[]> =>
     (await ref.collection(name).get()).docs.map((d) => d.data() as T);
-  const [miners, statements, payments, dismissals, extractions, paid, writeOffDocs, disputes] =
-    await Promise.all([
-      list<AdminBookState['miners'][number]>(MINERS),
-      list<AdminBookState['statements'][number]>(STATEMENTS),
-      list<AdminBookState['payments'][number]>(PAYMENTS),
-      list<MirrorDismissal>(DISMISSALS),
-      list<SyncExtraction>(EXTRACTIONS),
-      paidRead ?? ref.collection(META).doc(PAID_DOC).get(),
-      list<Record<string, unknown>>(WRITE_OFFS),
-      list<unknown>(DISPUTES),
-    ]);
+  const [
+    miners,
+    statementSnap,
+    noticeSnap,
+    payments,
+    dismissals,
+    extractions,
+    paid,
+    writeOffDocs,
+    disputes,
+  ] = await Promise.all([
+    list<AdminBookState['miners'][number]>(MINERS),
+    ref.collection(STATEMENTS).get(),
+    ref.collection(LATE_NOTICES).get(),
+    list<AdminBookState['payments'][number]>(PAYMENTS),
+    list<MirrorDismissal>(DISMISSALS),
+    list<SyncExtraction>(EXTRACTIONS),
+    paidRead ?? ref.collection(META).doc(PAID_DOC).get(),
+    list<Record<string, unknown>>(WRITE_OFFS),
+    list<unknown>(DISPUTES),
+  ]);
   return {
     ...bookDocState(snap),
     miners,
-    statements,
+    statements: statementSnap.docs.map((d) => d.data() as AdminBookState['statements'][number]),
+    notices: mergeNotices(noticeSnap, statementSnap),
     payments,
     dismissals,
     extractions,
@@ -429,12 +446,12 @@ export async function runBookSync(
   ]);
   const matching = {
     miners: before.miners,
-    statements: before.statements,
+    statements: codesOf(before, known),
     knownCharacterIds: known,
     openBalance: quiet ? new Map<string, number>() : openBalanceOf(before),
     unbilled: quiet ? new Set<string>() : unbilledOf(before, rows),
   };
-  const resolved = resolveDonations(fresh, matching);
+  const resolved = resolveDonations(fresh, matching).map(withoutNotice);
   // #6207: what looks like tax paid into a division the book does not read. Only on a full run,
   // which holds the Miners and balances it rests on; a quiet one leaves the stored list as it was.
   const elsewhere = quiet
@@ -535,19 +552,6 @@ export async function runBookSync(
       : [];
   for (const ids of chunk(toSettle, SETTLE_PER_CALL)) {
     await edit({ action: 'settleStatements', statementIds: ids });
-  }
-
-  // --- Holds that lapsed ---------------------------------------------------
-  // A Miner's stored totals count an open dispute's amount as not due while its hold lasts, and
-  // a hold lapses with only time passing. The run after a lapse is never quiet (no marker is
-  // written while a dispute holds), so it recomputes the totals of every Miner with an
-  // unanswered dispute that no longer holds. Best effort: the daily verifier repairs a miss.
-  if (!quiet) {
-    const at = new Date(deps.now()).toISOString();
-    const lapsed = new Set(
-      before.disputes.filter((d) => !d.resolution && !disputeHolds(d, at)).map((d) => d.minerId)
-    );
-    if (lapsed.size > 0) await refreshAfterEvent(db, corporationId, [...lapsed], deps.now);
   }
 
   // --- Quiet marker ---------------------------------------------------------
@@ -662,14 +666,15 @@ async function billedStoredRows(
       typeof p.characterId === 'number' &&
       !(p.notTaxAmount && p.notTaxAmount > 0)
   ) as { characterId: number; at: string }[];
+  const knownCharacterIds = new Set<number>([
+    ...feedRows.map((r) => r.characterId),
+    ...book.miners.flatMap((m) => m.characterIds),
+    ...book.payments.filter((p) => p.minerId !== undefined).map((p) => p.characterId as number),
+  ]);
   const feedOnly = {
     miners: book.miners,
-    statements: book.statements,
-    knownCharacterIds: new Set<number>([
-      ...feedRows.map((r) => r.characterId),
-      ...book.miners.flatMap((m) => m.characterIds),
-      ...book.payments.filter((p) => p.minerId !== undefined).map((p) => p.characterId as number),
-    ]),
+    statements: codesOf(book, knownCharacterIds),
+    knownCharacterIds,
     openBalance: openBalanceOf(book),
     unbilled: unbilledOf(book, feedRows),
   };
@@ -728,6 +733,17 @@ async function billedStoredRows(
   }
 }
 
+/**
+ * The Reason codes a donation is matched on (`recognisedCodes`): every notice's, and the code of
+ * each Miner the book knows, grouped or a known Character on their own.
+ */
+function codesOf(book: AdminBookState, characterIds: Iterable<number>) {
+  return recognisedCodes(book.notices, [
+    ...book.miners.map((m) => m.id),
+    ...[...characterIds].map((c) => `solo:${c}`),
+  ]);
+}
+
 /** The Miners with ore this read found that no Statement covers yet, for `matchDonation` (#6207). */
 function unbilledOf(
   book: AdminBookState,
@@ -765,13 +781,14 @@ async function reassignUnmatched(
   // A sender the book knows credits their Miner, owing or not (#6300); a donation held under #6207 clears here.
   const balance = openBalanceOf(before);
   const unbilled = unbilledOf(before, rows);
+  const codes = codesOf(before, known);
   try {
     for (const p of open) {
       const match = matchDonation(
         { characterId: p.characterId as number, reason: (p as { reason?: string }).reason },
         {
           miners: before.miners,
-          statements: before.statements,
+          statements: codes,
           knownCharacterIds: known,
           openBalance: balance,
           unbilled,

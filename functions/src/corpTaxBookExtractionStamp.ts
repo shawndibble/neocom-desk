@@ -89,6 +89,14 @@ async function commitStamps(
 }
 
 /**
+ * Whether every row of the book carries its Extraction stamp (`stampBook` ran), so a pull's rows
+ * can be read by `extractionId` alone.
+ */
+export async function isBookStamped(db: Firestore, corporationId: number): Promise<boolean> {
+  return (await bookOf(db, corporationId).collection('meta').doc(MARKER).get()).exists;
+}
+
+/**
  * Stamps every unstamped row of the book once; returns how many it wrote. Rows no Extraction
  * covers stay unstamped, counted in the marker; a later Extraction stamps them (`restampStructures`).
  */
