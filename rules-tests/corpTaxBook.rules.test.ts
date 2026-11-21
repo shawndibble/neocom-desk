@@ -63,6 +63,11 @@ beforeEach(async () => {
       verifyToken: 't',
     });
     await setDoc(doc(db, `${CORP}/statementLinks/s1`), { verifyToken: 't' });
+    // Late notices, their links and the Running account checkpoints (decision 20261120-235011).
+    await setDoc(doc(db, `${CORP}/lateNotices/n1`), { minerId: 'm1', uids: ['char:2', 'char:9'] });
+    await setDoc(doc(db, `${CORP}/lateNoticeLinks/n1`), { token: 't' });
+    await setDoc(doc(db, `${CORP}/accountCheckpoints/m1`), { minerId: 'm1', uids: ['char:2'] });
+    await setDoc(doc(db, `${CORP}/accountCheckpoints/m3`), { minerId: 'm3', uids: ['char:3'] });
     await setDoc(
       doc(db, `${CORP}/officers/char:6`),
       officer({ characterId: 6, ownerHash: 'h6', canEdit: false })
@@ -92,7 +97,15 @@ const OFFICER_ONLY = [
   'meta/paid',
   'meta/scheduledSync',
 ];
-const OWN_LINE_PATHS = ['observed/a', 'payments/p1', 'statements/s1', 'dismissals/d1', 'miners/m1'];
+const OWN_LINE_PATHS = [
+  'observed/a',
+  'payments/p1',
+  'statements/s1',
+  'lateNotices/n1',
+  'accountCheckpoints/m1',
+  'dismissals/d1',
+  'miners/m1',
+];
 
 describe('corps (Tax Book) rules', () => {
   it("lets a live officer read the whole book, and no other corp's", async () => {
@@ -133,7 +146,23 @@ describe('corps (Tax Book) rules', () => {
         query(collection(db, `${CORP}/statements`), where('uids', 'array-contains', 'char:2'))
       )
     );
+    await assertSucceeds(
+      getDocs(
+        query(collection(db, `${CORP}/lateNotices`), where('uids', 'array-contains', 'char:2'))
+      )
+    );
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(db, `${CORP}/accountCheckpoints`),
+          where('uids', 'array-contains', 'char:2')
+        )
+      )
+    );
     await assertFails(getDoc(doc(db, `${CORP}/observed/b`)));
+    await assertFails(getDoc(doc(db, `${CORP}/accountCheckpoints/m3`)));
+    await assertFails(getDocs(collection(db, `${CORP}/lateNotices`)));
+    await assertFails(getDocs(collection(db, `${CORP}/accountCheckpoints`)));
     await assertFails(getDocs(collection(db, `${CORP}/observed`)));
     await assertFails(
       getDocs(query(collection(db, `${CORP}/observed`), where('uid', '==', 'char:3')))
@@ -141,21 +170,19 @@ describe('corps (Tax Book) rules', () => {
     for (const path of OFFICER_ONLY) await assertFails(getDoc(doc(db, `${CORP}/${path}`)));
   });
 
-  it('shows the verify link to editors only', async () => {
-    await assertSucceeds(
-      getDoc(doc(characterAuth(env, 1, 'h1').firestore(), `${CORP}/statementLinks/s1`))
-    );
-    await assertFails(
-      getDoc(doc(characterAuth(env, 6, 'h6').firestore(), `${CORP}/statementLinks/s1`))
-    );
-    await assertFails(
-      getDoc(doc(characterAuth(env, 2, 'h2').firestore(), `${CORP}/statementLinks/s1`))
-    );
-  });
+  it.each(['statementLinks/s1', 'lateNoticeLinks/n1'])(
+    'shows the verify link (%s) to editors only',
+    async (path) => {
+      await assertSucceeds(getDoc(doc(characterAuth(env, 1, 'h1').firestore(), `${CORP}/${path}`)));
+      await assertFails(getDoc(doc(characterAuth(env, 6, 'h6').firestore(), `${CORP}/${path}`)));
+      await assertFails(getDoc(doc(characterAuth(env, 2, 'h2').firestore(), `${CORP}/${path}`)));
+    }
+  );
 
   it('keeps own-line reads after leaving the corp (no officer record needed)', async () => {
     const db = characterAuth(env, 9, 'h9').firestore();
     await assertSucceeds(getDoc(doc(db, `${CORP}/statements/s1`)));
+    await assertSucceeds(getDoc(doc(db, `${CORP}/lateNotices/n1`)));
   });
 
   it('lets any signed-in character get the settings doc but never list books', async () => {
@@ -191,6 +218,10 @@ describe('corps (Tax Book) rules', () => {
     await assertFails(deleteDoc(doc(db, `${CORP}/moonDocs/x1`)));
     await assertFails(setDoc(doc(db, `${CORP}/readModels/minerList`), { miners: [] }));
     await assertFails(deleteDoc(doc(db, `${CORP}/readModels/minerList`)));
+    for (const path of ['lateNotices/n1', 'lateNoticeLinks/n1', 'accountCheckpoints/m1']) {
+      await assertFails(setDoc(doc(db, `${CORP}/${path}`), { uids: ['char:1'] }));
+      await assertFails(deleteDoc(doc(db, `${CORP}/${path}`)));
+    }
     await assertFails(getDoc(doc(db, 'corpTaxBookTokens/tok')));
     const own = characterAuth(env, 2, 'h2').firestore();
     await assertFails(updateDoc(doc(own, `${CORP}/observed/a`), { quantity: 0 }));

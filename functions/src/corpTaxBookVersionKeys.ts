@@ -49,6 +49,11 @@ export const UNVERSIONED_COLLECTIONS: ReadonlySet<string> = new Set([
 export const VERSIONED_COLLECTIONS = [
   'miners',
   'statements',
+  // Late notices and their verify links, and each Running account's closed-through checkpoint
+  // (decision 20261120-235011).
+  'lateNotices',
+  'lateNoticeLinks',
+  'accountCheckpoints',
   'payments',
   'dismissals',
   'extractions',
