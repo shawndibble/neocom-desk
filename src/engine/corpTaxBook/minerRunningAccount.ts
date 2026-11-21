@@ -296,11 +296,20 @@ export class MinerRunningAccount {
     return lateNoticeStanding(notice, this.byDay);
   }
 
-  /** What is still owed of one line of a day: its share of the date's remainder, none while held. */
+  /**
+   * What is still owed of one charging line of a day: its share of the date's remainder, by its
+   * tax among the date's charging lines, none while held. A credit correction on the date is in
+   * the remainder already, so the shares add up to what the date still owes, not to the gross.
+   */
   owedOf(date: string, tax: number): number {
     const day = this.byDay.get(date);
-    if (!day || day.held || day.tax <= 0) return 0;
-    return (day.remaining * tax) / day.tax;
+    if (!day || day.held || day.tax <= 0 || tax <= 0) return 0;
+    const charging = this.input.days
+      .filter((d) => d.date === date)
+      .reduce((sum, d) => sum + Math.max(0, d.tax), 0);
+    // A date the account holds only as a checkpoint's owed day: its lines are not in the input.
+    const gross = Math.max(charging, day.tax);
+    return (day.remaining * tax) / gross;
   }
 
   /**

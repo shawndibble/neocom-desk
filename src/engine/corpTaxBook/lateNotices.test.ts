@@ -217,6 +217,36 @@ describe('a late notice on the running account (#6294)', () => {
     ]);
   });
 
+  it('lists what is owed net of a credit correction, and a charge as a line of its own (M3)', () => {
+    const adjustment = (id: string, date: string, amount: number) => ({
+      id,
+      minerId: 'solo:1',
+      date,
+      amount,
+      reason: 'x',
+      by: 2,
+      at: '2026-09-12T00:00:00Z',
+    });
+    const view = buildBookView(
+      input({
+        adjustments: [
+          adjustment('c1', '2026-09-01', -3_000_000),
+          adjustment('c2', '2026-09-10', 2_000_000),
+        ],
+      })
+    );
+    expect(owedDays(view, 'solo:1')).toEqual([
+      { date: '2026-09-01', structureId: 1001, owed: 7_000_000 },
+      { date: '2026-09-02', structureId: 1001, owed: 10_000_000 },
+      { date: '2026-09-10', owed: 2_000_000, correction: true },
+      { date: '2026-09-10', structureId: 1001, owed: 10_000_000 },
+    ]);
+    const sum = owedDays(view, 'solo:1').reduce((s, d) => s + d.owed, 0);
+    expect(sum).toBe(view.miners[0]!.owed);
+    // A notice of every one of those days carries nothing from earlier notices.
+    expect(draftNotice(view, 'solo:1')!.carried).toBe(0);
+  });
+
   it("closes a guest's running account with a final notice of the unpaid days no notice listed", () => {
     const view = buildBookView(input({ payments: [pay(10_000_000)] }));
     const plan = planCloseAccount(view, 'solo:1')!;

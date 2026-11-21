@@ -35,6 +35,8 @@ export interface NoticePlan {
 export interface OwedDay {
   date: string;
   owed: number;
+  /** An officer's charge on the day, owed as a line of its own: no place. */
+  correction?: true;
   structureId?: number;
   moonId?: number;
 }
@@ -57,7 +59,15 @@ export function owedDays(view: BookView, minerId: string): OwedDay[] {
         ...(d.moonId !== undefined ? { moonId: d.moonId } : {}),
       });
   }
-  return [...byPlace.values()].sort(
+  // An officer's charge is owed like a mined line; a credit correction is in each line's share.
+  const charges = new Map<string, number>();
+  for (const l of inner.billable.lines)
+    if (l.kind === 'correction' && l.tax > 0)
+      charges.set(l.date, (charges.get(l.date) ?? 0) + inner.account.owedOf(l.date, l.tax));
+  const corrections = [...charges]
+    .filter(([, owed]) => owed > 0)
+    .map(([date, owed]): OwedDay => ({ date, owed, correction: true }));
+  return [...corrections, ...byPlace.values()].sort(
     (a, b) => a.date.localeCompare(b.date) || (a.structureId ?? 0) - (b.structureId ?? 0)
   );
 }
@@ -84,11 +94,9 @@ export function draftNotice(
     return day !== undefined && !day.held && !day.settled && !listed.has(l.key);
   });
 
-  // What the new lines still owe: each date's remainder, by the share of it they bill.
-  const taxByDate = new Map<string, number>();
-  for (const l of lines) taxByDate.set(l.date, (taxByDate.get(l.date) ?? 0) + l.tax);
-  let onLines = 0;
-  for (const [date, tax] of taxByDate) if (tax > 0) onLines += account.owedOf(date, tax);
+  // What the new lines still owe: each charging line's share of its date's remainder (a credit
+  // correction is in the remainder already, so it is no share of its own).
+  const onLines = lines.reduce((sum, l) => sum + account.owedOf(l.date, l.tax), 0);
 
   const first = lines[0]?.date ?? owes.oldest;
   const id = noticeDocId(opts.id ?? `notice_${first}_${minerId}_${now.slice(0, 10)}`);
