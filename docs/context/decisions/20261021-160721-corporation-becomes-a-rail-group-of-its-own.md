@@ -6,7 +6,7 @@ _Recorded 2026-10-21 · issue #4675._
   (`/corp`, `/corp/members`, `/corp/wallet`, `/corp/assets`, `/corp/moons`) are
   `NavPage`s in a new `corp` group headed "Corporation", placed directly after
   `primary`, where Corp sits today. Members and Moons each have tabs of their
-  own (Roles; Extractions, Miners, Statements, Moon owners), so the sub-nav made
+  own (Roles; Extractions, Miners, Late notices, Moon owners), so the sub-nav made
   them three levels deep. Everywhere else in the app it's page, then tabs, and
   now Corp follows that too. `CorpSubNav` goes away. Paths don't change.
 - **The whole group is conditional, so it gets a heading.** `primary` had no
