@@ -5,7 +5,7 @@
 // nightly pass rebuilds it too.
 
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
-import { ACCOUNTS, EXTRACTIONS } from './corpTaxBook.js';
+import { RUNNING_ACCOUNTS, EXTRACTIONS } from './corpTaxBook.js';
 import { extractionsSinceOf } from './corpTaxBookQuietRun.js';
 import {
   MINER_LIST_DOC,
@@ -39,7 +39,7 @@ export async function reconcileReadModels(
     sub(db, corporationId, EXTRACTIONS)
       .where('chunkArrivalTime', '>=', extractionsSinceOf(now))
       .get(),
-    sub(db, corporationId, ACCOUNTS).select().get(),
+    sub(db, corporationId, RUNNING_ACCOUNTS).select().get(),
     sub(db, corporationId, READ_MODELS).get(),
   ]);
   const plan = planReadModels(

@@ -2,7 +2,7 @@ import { HOUR_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
 import * as mirror from '../../../functions/src/corpTaxBookEngine';
 import * as calls from '../../../functions/src/corpTaxBookKinds';
-import { liveAccount } from '../../../functions/src/corpTaxBookAccounts';
+import { liveRunningAccount } from '../../../functions/src/corpTaxBookRunningAccounts';
 import { paymentNet } from './payments';
 import { DISPUTE_KINDS, disputeHold, readDisputes } from './disputes';
 import { CLAIM_CHECK_RESULTS, TRANSFER_RECIPIENTS } from './overdue';
@@ -120,10 +120,12 @@ describe('functions mirror of the Corp Tax Book engine', () => {
       { amount: 2, notTaxAmount: 9 },
     ];
     const counted = payments.reduce((sum, p) => sum + paymentNet(p), 0);
-    expect(liveAccount({ owed: 100, paid: 0, days: 1, at: 'x' }, payments).owed).toBe(
+    expect(liveRunningAccount({ owed: 100, paid: 0, days: 1, at: 'x' }, payments).owed).toBe(
       100 - counted
     );
-    expect(liveAccount({ owed: 100, paid: counted, days: 1, at: 'x' }, payments).owed).toBe(100);
+    expect(liveRunningAccount({ owed: 100, paid: counted, days: 1, at: 'x' }, payments).owed).toBe(
+      100
+    );
   });
 
   it('keeps the running account’s notice rules and day tolerance equal', () => {

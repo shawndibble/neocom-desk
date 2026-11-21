@@ -1,12 +1,12 @@
 /**
  * A running account's figures on the verify link (#6294). Pure and dependency-free: the client
  * imports `netPayment` (`src/engine/corpTaxBook/payments.ts`), and the root parity test
- * (`functionsMirror.test.ts`) checks `liveAccount` against it.
+ * (`functionsMirror.test.ts`) checks `liveRunningAccount` against it.
  */
 type Data = Record<string, unknown>;
 
 /**
- * A day a Running account still owes, as an officer's tab records it (`RecordedAccount.unpaidDays`)
+ * A day a Running account still owes, as an officer's tab records it (`RecordedRunningAccount.unpaidDays`)
  * and the verify page lists it: the one shape of an owed day on both sides.
  */
 export interface OwedDay {
@@ -59,7 +59,7 @@ export function payOldestFirst<D extends { date: string; owed: number }>(
  * tax") beyond the ones the officer's client counted, whenever each was synced, paying the
  * recorded days oldest first (`payOldestFirst`).
  */
-export function liveAccount(
+export function liveRunningAccount(
   recorded: Data,
   payments: readonly Data[]
 ): {
@@ -100,7 +100,7 @@ export function liveAccount(
 }
 
 /** A Running account as the verify page shows it (`VerifyPayload.account`). */
-export type LiveAccount = ReturnType<typeof liveAccount>;
+export type LiveRunningAccount = ReturnType<typeof liveRunningAccount>;
 
 /**
  * The Miner's mined days for the verify page's ledger: each date once, from the newest Late notice

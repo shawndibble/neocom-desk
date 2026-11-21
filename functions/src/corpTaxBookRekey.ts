@@ -1,6 +1,6 @@
 import { chunk, IN_QUERY_LIMIT } from './chunk.js';
 import {
-  ACCOUNTS,
+  RUNNING_ACCOUNTS,
   ADJUSTMENTS,
   DECLARATIONS,
   DISMISSALS,
@@ -56,7 +56,7 @@ export const MINER_KEYED = [
  * an officer's tab records again on its next load. A checkpoint is dropped by the caller with every
  * Miner whose characters change, not here.
  */
-export const MINER_CACHES = [ACCOUNTS, MINER_PAID];
+export const MINER_CACHES = [RUNNING_ACCOUNTS, MINER_PAID];
 
 /** The Miner ids a grouping absorbs: the groups dissolved, and a `solo:` id per Character folded in. */
 export function absorbedMinerIds(
