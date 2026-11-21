@@ -1,16 +1,17 @@
 /**
  * ISK per unit for the ores a Survey shows, from the Survey's price hub
- * (`useSurveyPriceHub`: Jita unless the pilot chose another on this device):
+ * (the Mining page hub, `useHubFor('mining')`):
  * the highest buy order of the ore's Compressed form where it has one, as the
  * Moon Mining Tax ledger prices ore
  * (`features/miningTax/pricing.ts`). Works for a visitor with no session too:
- * the hub falls back to Jita and Fuzzwork needs no login.
+ * the hub falls back to the default and Fuzzwork needs no login.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
-import { useSurveyPriceHub } from './surveyPref';
+import { useHubFor } from '@/features/market/hub';
+import { useSeededOnce } from '@/features/market/pageHubSeed';
+import { migrateSurveyPriceHub } from './surveyPref';
 import { loadOrePrices } from './orePrices';
-import { useHydratedStore } from '@/lib/useHydratedStore';
 
 export interface OrePrices {
   /** Ore name as the scanner prints it -> ISK per unit; empty until loaded or when unreachable. */
@@ -20,8 +21,9 @@ export interface OrePrices {
 }
 
 export function useOrePrices(oreNames: readonly string[]): OrePrices {
-  const hubId = useSurveyPriceHub((s) => s.value);
-  const hydrated = useHydratedStore(useSurveyPriceHub);
+  const seeded = useSeededOnce(migrateSurveyPriceHub);
+  const { hubId, hydrated: hubHydrated } = useHubFor('mining');
+  const hydrated = seeded && hubHydrated;
   const hub = (hydrated ? getTradeHub(hubId) : undefined) ?? DEFAULT_TRADE_HUB;
   const key = [...new Set(oreNames)].sort().join('\n');
   const [loaded, setLoaded] = useState<{

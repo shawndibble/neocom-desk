@@ -13,7 +13,8 @@ import { isShareId } from '@/engine/share/shareId';
 import { db } from '@/db';
 import { TIME_FORMATS, TIME_FORMAT_SETTING_KEY, type TimeFormat } from '@/lib/timeFormat';
 import { createLocalSetting } from '@/lib/useLocalSetting';
-import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
+import { getTradeHub, type TradeHub } from '@/market/hubs';
+import { seedPageHubsOnce } from '@/features/market/pageHubSeed';
 import { useLiveQuery } from 'dexie-react-hooks';
 
 export const useCurrentSurveyId = createLocalSetting<string | null>({
@@ -50,16 +51,22 @@ export function useDoneAtClock(): TimeFormat | null {
 }
 
 /**
- * The Trade Hub a Survey's ISK figures are priced at. Its own, device-local
- * choice, Jita until the pilot picks another: a Survey is mostly opened to
- * estimate a field's worth, and nearly everyone wants Jita for that whatever
- * hub they trade from (Settings' "Default Trade Hub" is not read here).
+ * Before issue #6523 a Survey priced at its own device-local hub, Jita until
+ * picked. Since then it prices at the Mining page hub (`useHubFor('mining')`).
  */
-export const useSurveyPriceHub = createLocalSetting<TradeHub['id']>({
-  key: 'miningSurveyPriceHub',
-  defaultValue: DEFAULT_TRADE_HUB.id,
-  parse: (raw) => (typeof raw === 'string' && getTradeHub(raw) ? (raw as TradeHub['id']) : null),
-});
+export const SURVEY_PRICE_HUB_KEY = 'miningSurveyPriceHub';
+/** Local only: this device's Survey hub has been folded into the Mining page hub. */
+export const SURVEY_PRICE_HUB_MIGRATED_KEY = 'miningSurveyPriceHubMigrated';
+
+/** A hub picked for the Survey on this device becomes Mining's own hub, once (`pageHubSeed.ts`). */
+export function migrateSurveyPriceHub(): Promise<void> {
+  return seedPageHubsOnce(SURVEY_PRICE_HUB_MIGRATED_KEY, ['mining'], async () => {
+    const raw = (await db.settings.get(SURVEY_PRICE_HUB_KEY))?.value;
+    return typeof raw === 'string' && getTradeHub(raw as TradeHub['id'])
+      ? (raw as TradeHub['id'])
+      : null;
+  });
+}
 
 /**
  * What the Survey chat message says and how it is drawn, as chosen in the copy
