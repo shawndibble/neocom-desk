@@ -152,6 +152,21 @@ describe('computePayeeBalances', () => {
     expect(balance).toMatchObject({ owed: 70 });
     expect(balance.account).toBeUndefined();
   });
+
+  it("owes a Corp Tax Book's Payee the book's account total, not the rows in view", () => {
+    const corp = payee('corp-book:98000001', 'Brass Meridian');
+    const rows = [displayRow(assignment({ id: 'b1', payeeId: corp.id, taxOwed: 70 }))];
+    const [balance] = computePayeeBalances(
+      rows,
+      [corp],
+      accountsOf([], []),
+      new Map(),
+      new Map(),
+      new Map([[corp.id, 250]])
+    );
+    expect(balance.owed).toBe(250);
+    expect(balance.members).toHaveLength(1);
+  });
 });
 
 describe('summarizeUnassigned', () => {

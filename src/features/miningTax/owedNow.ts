@@ -38,6 +38,13 @@ export function bookCreditsOf(corpView: CorpBookView | null | undefined): Map<st
   return new Map(corpView?.books.map((b) => [b.payee.id, b.summary.credit]) ?? []);
 }
 
+/** Each Corp Tax Book Payee's owed, by its id: the book's account total over the whole Miner. */
+export function bookOwesOf(corpView: CorpBookView | null | undefined): Map<string, number> {
+  return new Map(
+    corpView?.books.map((b) => [b.payee.id, b.summary.account.owes?.amount ?? 0]) ?? []
+  );
+}
+
 /**
  * Entries still needing a Payee. A row a Corp Tax Book has labelled (Pending corp record,
  * Unattributed) is not waiting on the member, so it stays out.
@@ -122,7 +129,8 @@ export async function loadOwedBalances(
       [...payees, ...(corpView?.payees ?? [])],
       accounts,
       payeeDuplicateAliases(groupPayees(payees)),
-      bookCreditsOf(corpView)
+      bookCreditsOf(corpView),
+      bookOwesOf(corpView)
     ),
     unassignedCount: unassignedSummary(rows, () => 0).entryCount,
   };

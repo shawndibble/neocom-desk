@@ -26,6 +26,8 @@ interface Args {
   bookCorporations: ReadonlySet<number>;
   /** Each Corp Tax Book Payee's credit, by its id (`bookCreditsOf`). */
   bookCredits?: ReadonlyMap<string, number>;
+  /** Each Corp Tax Book Payee's owed, by its id (`bookOwesOf`). */
+  bookOwes?: ReadonlyMap<string, number>;
 }
 
 /**
@@ -44,6 +46,7 @@ export function useTaxBalances({
   accounts,
   bookCorporations,
   bookCredits,
+  bookOwes,
 }: Args) {
   // The owed cards follow the Character filter (an alt's debts are still debts) but not the Payee
   // filter: narrowing the ledger to one Payee must not change a balance. The Overview's Mining
@@ -55,9 +58,10 @@ export function useTaxBalances({
         ledgerPayees,
         accounts,
         duplicateAliases,
-        bookCredits
+        bookCredits,
+        bookOwes
       ),
-    [characterFiltered, ledgerPayees, accounts, duplicateAliases, bookCredits]
+    [characterFiltered, ledgerPayees, accounts, duplicateAliases, bookCredits, bookOwes]
   );
   const unassigned = useMemo(
     () => unassignedSummary(characterFiltered, estimatedValueOf),

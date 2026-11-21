@@ -56,7 +56,7 @@ import { useTaxAttentionItems } from './useTaxAttentionItems';
 import { useUnheldCharacterItems } from './corpBook/useUnheldCharacterItems';
 import { useAutoLinkPayees } from './payeeAutoLink';
 import { useTaxBalances } from './useTaxBalances';
-import { bookCreditsOf } from './owedNow';
+import { bookCreditsOf, bookOwesOf } from './owedNow';
 import { corpPayAccounts, readsEveryDivision } from './corpBook/corpPayAccount';
 import { sum } from '@/engine/math';
 import { useTaxCorpBooks } from './useTaxCorpBooks';
@@ -158,6 +158,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     [corpView]
   );
   const bookCredits = useMemo(() => bookCreditsOf(corpView), [corpView]);
+  const bookOwes = useMemo(() => bookOwesOf(corpView), [corpView]);
   const corpStateLabel = useCorpStateLabel();
   const corpStateHint = useCorpStateHint();
 
@@ -277,6 +278,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     accounts: bookAccounts,
     bookCorporations: bookCorporationIds,
     bookCredits,
+    bookOwes,
   });
 
   // A Corp Tax Book row is the corp's to continue, not the member's.

@@ -30,7 +30,7 @@ export interface UnassignedSummary {
 /**
  * One balance per known Payee, owed-first then by name, settled Payees included (owed 0) so the
  * strip can offer to show them. Credit is the Payee's Running account's, for every Payee. A personal Payee owes what its Running account owes, oldest day
- * first; a Corp Tax Book's owes what its rows still owe (the book's account already paid them).
+ * first; a Corp Tax Book's owes the book's account total (`bookOwes`), else what its rows still owe.
  * A Payee with nothing Outstanding in view owes nothing here. An Assignment whose Payee is no
  * longer known is skipped rather than invented: the table still shows it as "Unknown Payee".
  */
@@ -41,7 +41,9 @@ export function computePayeeBalances(
   /** Payee ids that are another record of the same Payee (`payeeDuplicateAliases`): summed into it. */
   aliases: ReadonlyMap<string, string> = new Map(),
   /** A Corp Tax Book Payee's credit, by its id: its Miners' accounts' (`BookSummary.credit`). */
-  bookCredits: ReadonlyMap<string, number> = new Map()
+  bookCredits: ReadonlyMap<string, number> = new Map(),
+  /** A Corp Tax Book Payee's owed, by its id: the book's account total (`BookSummary.account.owes`). */
+  bookOwes: ReadonlyMap<string, number> = new Map()
 ): PayeeBalance[] {
   const byPayee = new Map<string, PayeeBalance>(
     payees
@@ -60,7 +62,10 @@ export function computePayeeBalances(
   for (const balance of byPayee.values()) {
     if (isCorpPayeeId(balance.payee.id)) {
       balance.credit = bookCredits.get(balance.payee.id) ?? 0;
-      balance.owed = balance.members.reduce((sum, m) => sum + m.assignment.taxOwed, 0);
+      // The book's own figure (the whole Miner), so the Character filter doesn't move it.
+      balance.owed =
+        bookOwes.get(balance.payee.id) ??
+        balance.members.reduce((sum, m) => sum + m.assignment.taxOwed, 0);
       continue;
     }
     const account = accounts.of(balance.payee.id);
