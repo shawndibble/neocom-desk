@@ -97,6 +97,7 @@ import { buildableEntry } from './corpProjects/corpProjectRows';
 import { useCorpProjects } from './corpProjects/useCorpProjects';
 import type { BuildPlanPricingInputs } from './buildPlanPricingInputs';
 import { useHubFor } from '@/features/market/hub';
+import { usePricePercentFor } from '@/features/market/pagePricePercents';
 import {
   OPPORTUNITIES_COLUMN_IDS,
   OPPORTUNITIES_DEFAULT_COLUMNS,
@@ -254,6 +255,7 @@ export function OpportunitiesPanel({
   // The Industry page hub (its entry, or Global) is part of what a row prices at:
   // a change re-keys the batch so rows re-price at it.
   const { hubId: industryHubId } = useHubFor('industry');
+  const industryPricePercent = usePricePercentFor('industry');
   const resolveHubForCharacter = useMemo(
     () => (characterId: number) => hubForCharacter(characterId, plansByCharacter),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- hubForCharacter reads the Industry hub from its store
@@ -296,6 +298,7 @@ export function OpportunitiesPanel({
     ownedByCharacter,
     assumedMe,
     profitBasis: pricingInputs.profitBasis,
+    pricePercent: industryPricePercent,
   });
 
   // Each product's history in its own row's hub region, for "vs 90d". Held while

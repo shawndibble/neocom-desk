@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { configureClipboard } from '@/lib/clipboard';
+import { usePagePricePercents } from '@/features/market/pagePricePercents';
 import { SkillsToBuyPanel } from './SkillsToBuyPanel';
 
 const pricesMock = vi.hoisted(() => ({
@@ -43,6 +44,19 @@ describe('SkillsToBuyPanel', () => {
     expect(screen.getByText('Skill 2')).toBeInTheDocument();
     expect(screen.queryByText('Skill 3')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /copy multibuy/i })).toBeInTheDocument();
+  });
+
+  it("prices at the Skills page's percent: the hub's and the region's prices alike", async () => {
+    usePagePricePercents.setState({ value: { skills: 90 }, hydrated: true });
+    try {
+      renderPanel(true, true);
+      // (1000 at the hub + 500 in the region) at 90%: 1,350, shown as 1.4K.
+      expect(
+        await screen.findByRole('button', { name: /^skills to buy.*1\.4K ISK/i })
+      ).toBeInTheDocument();
+    } finally {
+      usePagePricePercents.setState({ value: {}, hydrated: false });
+    }
   });
 
   it('says unknown until trained skills load', () => {

@@ -48,6 +48,8 @@ import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
 import { loadDepthPrices, type DepthPrices } from './depthPriceLoader';
 import { loadPlanSnapshots, type PlanSnapshots } from './planSnapshots';
+import { hubPricesAtPercent } from './priceBasis';
+import { usePricePercentFor } from '@/features/market/pagePricePercents';
 import { createYielder } from './yieldToMain';
 import { shoppingListMaterials } from './subBuildPlan';
 import { pricePlan } from './planPricing';
@@ -253,6 +255,8 @@ export function useComparedBuildResults({
     plansRef.current = plans;
   });
   const plansKey = plans.map((p) => `${p.id}:${p.updatedAt}:${p.hubId}`).join(',');
+  // Each plan keeps its own hub but prices at the Industry percent (issue #6531).
+  const pricePercent = usePricePercentFor('industry');
 
   useEffect(() => {
     const currentPlans = plansRef.current;
@@ -273,7 +277,7 @@ export function useComparedBuildResults({
       const entry = catalog.byBlueprintTypeID.get(plan.blueprintTypeID);
       return entry ? [{ plan, blueprint: toIndustryBlueprint(entry.blueprint) }] : [];
     });
-    const snapshots = loadPlanSnapshots(priceable, { catalog, pi });
+    const snapshots = loadPlanSnapshots(priceable, { catalog, pi }, pricePercent);
     const pricedByPlanId = new Map(priceable.map(({ plan }, i) => [plan.id, snapshots[i]!]));
 
     const rowFor = (plan: BuildPlanRecord, depthPrices?: HubPrices) =>
@@ -311,7 +315,10 @@ export function useComparedBuildResults({
             currentPlans.map(async (plan, i) => {
               const depth = depthByHub.get(hubIdOf(plan));
               return depth
-                ? { ...(await rowFor(plan, depthPriceMap(depth))), depth }
+                ? {
+                    ...(await rowFor(plan, hubPricesAtPercent(depthPriceMap(depth), pricePercent))),
+                    depth,
+                  }
                 : firstPass[i]!;
             })
           );
@@ -338,6 +345,7 @@ export function useComparedBuildResults({
     };
   }, [
     plansKey,
+    pricePercent,
     catalog,
     pi,
     ownedBlueprints,

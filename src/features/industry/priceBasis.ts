@@ -16,6 +16,18 @@
 import { buyOrderMaterialPrices } from '@/engine/industry/buyOrderPrices';
 import type { HubPrices, MaterialPriceBasis } from '@/engine/industry/types';
 import type { MarketSnapshot } from './marketData';
+import { atPercent } from '@/features/market/pagePricePercents';
+import { DEFAULT_PRICE_PERCENT } from '@/features/market/pricePercent';
+
+/** `prices` at `percent` of market (`atPercent`), for the Industry percent (issue #6531): the snapshot's hub maps and order-book depth. */
+export function hubPricesAtPercent(prices: HubPrices, percent: number): HubPrices {
+  if (percent === DEFAULT_PRICE_PERCENT) return prices;
+  const scaled: HubPrices = {};
+  for (const [typeId, price] of Object.entries(prices)) {
+    scaled[Number(typeId)] = atPercent(price, percent);
+  }
+  return scaled;
+}
 
 /** A stored value narrowed to a basis; anything unrecognised reads as 'sell'. */
 export function materialPriceBasisOf(stored: string | undefined): MaterialPriceBasis {

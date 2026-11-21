@@ -30,7 +30,7 @@ describe('SurveyHubSelect', () => {
     const user = userEvent.setup();
     render(<SurveyHubSelect />);
     await user.click(await screen.findByRole('button', { name: /Price ore at market hub$/ }));
-    await user.click(await screen.findByRole('menuitemradio', { name: /^Amarr/ }));
+    await user.click(await screen.findByRole('button', { name: /^Amarr/ }));
     await waitFor(() => expect(usePageHubs.getState().value).toEqual({ mining: 'amarr' }));
   });
 });

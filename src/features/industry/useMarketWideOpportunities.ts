@@ -28,6 +28,7 @@ import {
   type MarketWideScanOptions,
 } from './marketWideOpportunities';
 import { marketWideScanKey, readMarketWideScan, writeMarketWideScan } from './marketWideScanCache';
+import { usePricePercentFor } from '@/features/market/pagePricePercents';
 
 export interface UseMarketWideOpportunitiesArgs {
   hub: TradeHub;
@@ -104,6 +105,8 @@ export function useMarketWideOpportunities({
   // Both move a row's price, so a scan made before they changed is not this one.
   const facilityDefaults = useFacilityDefaults((value) => value.value);
   const lpValue = useLpValue((value) => value.value);
+  // The Industry percent (issue #6531): a scan priced at another percent is another scan.
+  const pricePercent = usePricePercentFor('industry');
 
   const keyFor = useCallback(
     (scanFilters: MarketWideFilters) =>
@@ -125,8 +128,19 @@ export function useMarketWideOpportunities({
         facilityDefaults,
         lpValue,
         planSettings: planSettings(latestPlan),
+        pricePercent,
       }),
-    [hub.id, characterIds, research, modifiers, standing, facilityDefaults, lpValue, latestPlan]
+    [
+      hub.id,
+      characterIds,
+      research,
+      modifiers,
+      standing,
+      facilityDefaults,
+      lpValue,
+      latestPlan,
+      pricePercent,
+    ]
   );
   const key = useMemo(() => keyFor(filters), [keyFor, filters]);
   // A scan this session ran, at these inputs, and the prices still hold.
@@ -168,6 +182,7 @@ export function useMarketWideOpportunities({
             ...options,
             research,
             characterId,
+            pricePercent,
             include: include.then((check) => check ?? (() => true)),
           },
           standing
@@ -205,7 +220,19 @@ export function useMarketWideOpportunities({
           });
         });
     },
-    [hub, trees, catalog, modifiers, options, standing, characterIds, characterId, research, keyFor]
+    [
+      hub,
+      trees,
+      catalog,
+      modifiers,
+      options,
+      standing,
+      characterIds,
+      characterId,
+      research,
+      keyFor,
+      pricePercent,
+    ]
   );
 
   // The scan in flight, or the one that ran at exactly these inputs, wins;

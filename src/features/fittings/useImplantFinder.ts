@@ -36,6 +36,7 @@ import type {
   PilotProfile,
 } from '@/engine/fittings/types';
 import { getTradeHub, DEFAULT_TRADE_HUB, type TradeHub } from '@/market/hubs';
+import { usePricePercentFor } from '@/features/market/pagePricePercents';
 import { loadImplantMarketEntries } from './implantSlotLookup';
 import { useDamageProfiles } from './damageProfiles';
 import { loadImplantPurchase, type ImplantPurchase } from './implantPurchase';
@@ -435,14 +436,21 @@ export function useImplantFinder({
     [helping]
   );
   const typeIdsKey = helpingTypeIds.join(',');
-  const purchaseKey = `${hubId}|${characterId ?? ''}|${typeIdsKey}`;
+  const percent = usePricePercentFor('fittings');
+  const purchaseKey = `${hubId}|${percent}|${characterId ?? ''}|${typeIdsKey}`;
   useEffect(() => {
     if (!open || typeIdsKey === '') return;
     let cancelled = false;
     const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
-    void loadImplantPurchase(typeIdsKey.split(',').map(Number), hub, characterId, (done, total) => {
-      if (!cancelled) setStoreProgress({ done, total });
-    })
+    void loadImplantPurchase(
+      typeIdsKey.split(',').map(Number),
+      hub,
+      characterId,
+      (done, total) => {
+        if (!cancelled) setStoreProgress({ done, total });
+      },
+      percent
+    )
       .then((purchase) => {
         if (!cancelled) setPurchaseRun({ key: purchaseKey, purchase });
       })
@@ -455,7 +463,7 @@ export function useImplantFinder({
       cancelled = true;
       setStoreProgress(null);
     };
-  }, [open, typeIdsKey, hubId, characterId, purchaseKey]);
+  }, [open, typeIdsKey, hubId, percent, characterId, purchaseKey]);
   const purchase = purchaseRun?.purchase ?? null;
 
   // Built from one run only, so a row's effect and its Add/Remove always describe the same set.

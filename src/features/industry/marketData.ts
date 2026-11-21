@@ -33,6 +33,9 @@ import { GLOBAL_CACHE_CHARACTER_ID, readCachedEntries, writeCachedMany } from '@
 import type { SystemCostIndices } from '@/esi/endpoints';
 import type { TradeHub } from '@/market/hubs';
 import type { AdjustedPrices, HubPrices, IndustryActivity } from '@/engine/industry/types';
+import { DEFAULT_PRICE_PERCENT } from '@/features/market/pricePercent';
+import { atPercent } from '@/features/market/pagePricePercents';
+import { hubPricesAtPercent } from './priceBasis';
 
 export interface MarketSnapshot {
   /** Lowest sell at the hub, materials + product. Missing key = unpriceable at this hub. */
@@ -183,6 +186,34 @@ export interface MarketSnapshotRequest {
   /** Where the job runs, when that isn't the hub's own system. */
   costIndexSystemId?: number;
   activity?: IndustryActivity;
+  /**
+   * The Industry page's price percent (`pagePricePercents.ts`, issue #6531):
+   * every hub price in the snapshot — sell, buy, and the average the troll cap
+   * reads — is at this percent of market, so materials and product scale alike.
+   * Absent is 100: the LP Store and PI read this loader at market.
+   */
+  pricePercent?: number;
+}
+
+/**
+ * CCP's average prices at `percent`, one copy per (global map, percent): the
+ * map covers every type, so copying it per request would cost a batch dearly.
+ */
+const averagesAtPercent = new WeakMap<HubPrices, Map<number, HubPrices>>();
+
+function averagePricesAt(average: HubPrices, percent: number): HubPrices {
+  if (percent === DEFAULT_PRICE_PERCENT) return average;
+  let byPercent = averagesAtPercent.get(average);
+  if (!byPercent) {
+    byPercent = new Map();
+    averagesAtPercent.set(average, byPercent);
+  }
+  let scaled = byPercent.get(percent);
+  if (!scaled) {
+    scaled = hubPricesAtPercent(average, percent);
+    byPercent.set(percent, scaled);
+  }
+  return scaled;
 }
 
 /** Never rejects: a dead ESI is the offline signal, not an error to propagate. */
@@ -265,11 +296,12 @@ export function loadMarketSnapshots(
     const hubPrices: HubPrices = {};
     const hubBuyPrices: HubPrices = {};
     const hubSellVolumes: HubPrices = {};
+    const percent = request.pricePercent ?? DEFAULT_PRICE_PERCENT;
     for (const typeId of request.typeIds) {
       const aggregate = hubAggregates.get(typeId);
       if (!aggregate) continue;
-      if (aggregate.sellMin !== null) hubPrices[typeId] = aggregate.sellMin;
-      if (aggregate.buyMax !== null) hubBuyPrices[typeId] = aggregate.buyMax;
+      if (aggregate.sellMin !== null) hubPrices[typeId] = atPercent(aggregate.sellMin, percent);
+      if (aggregate.buyMax !== null) hubBuyPrices[typeId] = atPercent(aggregate.buyMax, percent);
       hubSellVolumes[typeId] = aggregate.sellVolume;
     }
 
@@ -296,7 +328,7 @@ export function loadMarketSnapshots(
       hubBuyPrices,
       hubSellVolumes,
       adjustedPrices: global?.adjusted ?? null,
-      averagePrices: global?.average ?? null,
+      averagePrices: global ? averagePricesAt(global.average, percent) : null,
       systemCostIndex,
       systemCostIndexMissing,
       regionalTaxPct: regionalJobTaxPct(regionId),
@@ -328,7 +360,9 @@ export function loadMarketSnapshot(
   hub: TradeHub,
   typeIds: number[],
   costIndexSystemId?: number,
-  activity: IndustryActivity = 'manufacturing'
+  activity: IndustryActivity = 'manufacturing',
+  /** The Industry percent (`MarketSnapshotRequest.pricePercent`); absent is 100. */
+  pricePercent?: number
 ): Promise<MarketSnapshot> {
-  return loadMarketSnapshots([{ hub, typeIds, costIndexSystemId, activity }])[0];
+  return loadMarketSnapshots([{ hub, typeIds, costIndexSystemId, activity, pricePercent }])[0];
 }

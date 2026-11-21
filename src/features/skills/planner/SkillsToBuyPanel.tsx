@@ -8,7 +8,9 @@ import { useHubFor } from '@/features/market/hub';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatIskCompact } from '@/lib/isk';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
-import { getHubPricesWithStatus, getRegionSellPrices } from '@/market/prices';
+import { getRegionSellPrices } from '@/market/prices';
+import { getHubPricesWithStatusAt } from '@/features/market/hubPricesAtPercent';
+import { atPercent, usePricePercentFor } from '@/features/market/pagePricePercents';
 import { buildSkillsToBuy, skillsToBuyTypeIds } from './skillsToBuy';
 
 interface SkillsToBuyPanelProps {
@@ -40,6 +42,8 @@ export function SkillsToBuyPanel({
   const pricesUnavailableLabel = usePricesUnavailableLabel();
   const { hubId, hydrated: hubHydrated } = useHubFor('skills');
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
+  // The Skills page's price percent: the hub's and the region's sell prices alike.
+  const percent = usePricePercentFor('skills');
 
   const typeIds = useMemo(
     () => (trainedSkillsKnown ? skillsToBuyTypeIds(entries, trainedSkills) : []),
@@ -57,16 +61,19 @@ export function SkillsToBuyPanel({
   useEffect(() => {
     if (!hubHydrated || typeIds.length === 0) return;
     let cancelled = false;
-    const key = `${hub.id}:${typeKey}`;
+    const key = `${hub.id}:${percent}:${typeKey}`;
     void Promise.all([
-      getHubPricesWithStatus(hub, typeIds),
+      getHubPricesWithStatusAt(hub, typeIds, percent),
       getRegionSellPrices(hub.regionId, typeIds),
     ])
       .then(([{ prices: hubAgg, unreachable }, region]) => {
         if (cancelled) return;
         const hubMap = new Map<number, number | null>();
         for (const [id, agg] of hubAgg) hubMap.set(id, agg?.sellMin ?? null);
-        setPrices({ key, hub: hubMap, region, unreachable });
+        const regionMap = new Map<number, number | null>();
+        for (const [id, price] of region)
+          regionMap.set(id, price === null ? null : atPercent(price, percent));
+        setPrices({ key, hub: hubMap, region: regionMap, unreachable });
       })
       .catch(() => {
         // A failed fetch is flagged unreachable (shown as the prices-unavailable placeholder), never an endless "Loading".
@@ -77,14 +84,14 @@ export function SkillsToBuyPanel({
     };
     // typeIds is derived from typeKey
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hub, hubHydrated, typeKey]);
+  }, [hub, hubHydrated, typeKey, percent]);
 
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   // Bumped per copy so a second "copied" is announced again.
   const [copyCount, setCopyCount] = useState(0);
   const [expanded, setExpanded] = useState(false);
 
-  const loaded = prices !== null && prices.key === `${hub.id}:${typeKey}`;
+  const loaded = prices !== null && prices.key === `${hub.id}:${percent}:${typeKey}`;
   const unreachable = loaded && prices.unreachable;
   const facts =
     trainedSkillsKnown && typeIds.length > 0

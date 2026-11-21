@@ -77,7 +77,7 @@ describe('PiSettingsForm', () => {
     const strip = await screen.findByTestId('pi-header-strip');
     const stripSellAt = within(strip).getByRole('button', { name: /, Where do you sell\?$/ });
     await act(() => usePiSettings.getState().setValue({ ...DEFAULT_PI_SETTINGS, buybackPct: 85 }));
-    expect(stripSellAt).toHaveTextContent('My corp buyback');
+    expect(stripSellAt).toHaveTextContent('Jita · 85%');
     await user.click(screen.getByRole('button', { name: 'P2' }));
     expect(usePiSettings.getState().value).toMatchObject({ buybackPct: 85, buyTiers: [2] });
   });

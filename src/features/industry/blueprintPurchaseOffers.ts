@@ -38,6 +38,7 @@ import { lpPickPrice } from './blueprintAcquisitionSources';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import { loadInventionMarket, type InventionMarket } from './inventionSources';
 import { EMPTY_OWNED_STOCK_SNAPSHOT, loadOwnedStockSnapshot } from './ownedStockDetection';
+import { usePricePercentFor } from '@/features/market/pagePricePercents';
 
 /** Every purchase offer for one blueprint type the loader found. */
 export type BlueprintOffersLookup = (blueprintTypeID: number) => readonly BpcOffer[];
@@ -236,16 +237,18 @@ export function useBlueprintPurchaseOffers(
   blueprintTypeIds: readonly number[]
 ): BlueprintPurchaseOffersState {
   const rate = useLpValue((state) => state.value);
+  // Datacores and decryptors price at the Industry percent (issue #6531).
+  const pricePercent = usePricePercentFor('industry');
   const idsKey = idSetKey(blueprintTypeIds);
-  const key = `${characterId ?? ''}|${hub.id}|${rate}|${idsKey}`;
+  const key = `${characterId ?? ''}|${hub.id}|${rate}|${pricePercent}|${idsKey}`;
   const ids = useMemo(() => (idsKey === '' ? [] : idsKey.split(',').map(Number)), [idsKey]);
   const loader = useCallback(async () => {
     const [lookup, inventionMarket] = await Promise.all([
       loadBlueprintPurchaseOffers(characterId, hub, ids).catch(() => NO_BLUEPRINT_PURCHASE_OFFERS),
-      loadInventionMarket(hub, ids),
+      loadInventionMarket(hub, ids, pricePercent),
     ]);
     return { lookup, inventionMarket };
-  }, [characterId, hub, ids]);
+  }, [characterId, hub, ids, pricePercent]);
   const { data: loaded } = useKeyedLoad(key, loader);
   return useMemo(
     () => ({

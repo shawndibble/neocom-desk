@@ -12,7 +12,10 @@
  */
 import type { HubPrices } from '@/engine/industry/types';
 import type { LiquidationBasis } from '@/engine/industry/ownedStockSale';
+import type { TradedPrices } from '@/engine/market/tradedPriceCheck';
 import { createLocalSetting } from '@/lib/useLocalSetting';
+import { atPercent } from '@/features/market/pagePricePercents';
+import { DEFAULT_PRICE_PERCENT } from '@/features/market/pricePercent';
 
 export type PriceBasis = 'sell' | 'buy';
 
@@ -38,4 +41,49 @@ export function revenuePricing(
   return basis === 'buy'
     ? { revenueHubPrices: snapshot.hubBuyPrices, liquidationBasis: 'instant' }
     : { revenueHubPrices: snapshot.hubPrices, liquidationBasis: 'order' };
+}
+
+function mapAtPercent(prices: HubPrices, percent: number): HubPrices {
+  const out: HubPrices = {};
+  for (const [typeId, price] of Object.entries(prices))
+    out[Number(typeId)] = atPercent(price, percent);
+  return out;
+}
+
+function tradedAtPercent(traded: TradedPrices, percent: number): TradedPrices {
+  return {
+    recentSalePrice:
+      traded.recentSalePrice === null ? null : atPercent(traded.recentSalePrice, percent),
+    latestDay: traded.latestDay && {
+      ...traded.latestDay,
+      highest: atPercent(traded.latestDay.highest, percent),
+      lowest: atPercent(traded.latestDay.lowest, percent),
+    },
+  };
+}
+
+/**
+ * The LP Store's hub prices at its page price percent (issue #6531,
+ * `usePricePercentFor('lpStore')`): both sides of the book, so offer revenue,
+ * `required_items` turn-ins and blueprint materials all move together, and the
+ * recent trades a sale is checked against, so a capped sale scales too
+ * (`capListedPrice` of two scaled prices is the scaled cap). At 100 the inputs
+ * come back as they are.
+ */
+export function lpPricesAtPercent<S extends { hubPrices: HubPrices; hubBuyPrices: HubPrices }>(
+  snapshot: S,
+  tradedPrices: ReadonlyMap<number, TradedPrices> | null | undefined,
+  percent: number
+): { snapshot: S; tradedPrices: ReadonlyMap<number, TradedPrices> | null | undefined } {
+  if (percent === DEFAULT_PRICE_PERCENT) return { snapshot, tradedPrices };
+  return {
+    snapshot: {
+      ...snapshot,
+      hubPrices: mapAtPercent(snapshot.hubPrices, percent),
+      hubBuyPrices: mapAtPercent(snapshot.hubBuyPrices, percent),
+    },
+    tradedPrices:
+      tradedPrices &&
+      new Map([...tradedPrices].map(([typeId, t]) => [typeId, tradedAtPercent(t, percent)])),
+  };
 }

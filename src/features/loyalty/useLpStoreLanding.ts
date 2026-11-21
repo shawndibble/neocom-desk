@@ -33,7 +33,8 @@ import type { LpCorporationEntry } from '@/sde/marketTypes';
 import { useSolarSystemIndex } from '@/features/route/useSolarSystems';
 import type { CharacterLoyaltyPoints, LoyaltyStoreOffer, UniverseFaction } from '@/esi/endpoints';
 import type { SkillLevels } from '@/engine/industry/types';
-import { revenuePricing, usePriceBasis } from './priceBasis';
+import { usePricePercentFor } from '@/features/market/pagePricePercents';
+import { lpPricesAtPercent, revenuePricing, usePriceBasis } from './priceBasis';
 import { useLpStoreVolume } from './lpStoreVolume';
 import { useHaulingDemand } from '@/features/market/haulingDemand';
 import { loadMarketLpValues } from './marketLpValue';
@@ -96,6 +97,7 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
   const { hubId, hydrated: hubHydrated } = useHubFor('lpStore');
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   const priceBasis = usePriceBasis((s) => s.value);
+  const pricePercent = usePricePercentFor('lpStore');
   const standing = tradeHubStanding(useTradeHubStandings(activeCharacterId), hub.id);
   const { jumps, jumpsStatus } = useJumpRangeFilter(useCurrentSystem(), 'any');
 
@@ -341,11 +343,13 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
     catalog !== null && snapshot !== null && itemNames !== null && volumeSettled && demandSettled;
   const rows = useMemo(() => {
     if (!ready) return null;
+    // Every hub price on the page at the LP Store's price percent (issue #6531).
+    const priced = lpPricesAtPercent(snapshot, demand?.types, pricePercent);
     return computeLoyaltyOfferRows({
       offers: allOffers,
       catalog,
-      hubPrices: snapshot.hubPrices,
-      ...revenuePricing(snapshot, priceBasis),
+      hubPrices: priced.snapshot.hubPrices,
+      ...revenuePricing(priced.snapshot, priceBasis),
       adjustedPrices: snapshot.adjustedPrices,
       systemCostIndex: snapshot.systemCostIndex,
       regionalTaxPct: snapshot.regionalTaxPct,
@@ -356,7 +360,7 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
       // Affordability is per store here (`lpLanding.ts`), from each balance.
       playerLp: null,
       sellsPerDayByType: volume,
-      tradedPrices: demand?.types,
+      tradedPrices: priced.tradedPrices,
     });
   }, [
     ready,
@@ -364,6 +368,7 @@ export function useLpStoreLanding(active = true): LpStoreLandingState {
     catalog,
     snapshot,
     priceBasis,
+    pricePercent,
     skills,
     standing,
     itemNames,

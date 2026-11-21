@@ -362,7 +362,7 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
     await screen.findByRole('button', SHIPS_GROUP);
 
     await user.click(screen.getByRole('button', { name: /, Trade Hub$/ }));
-    await user.click(screen.getByRole('menuitemradio', { name: 'Amarr VIII' }));
+    await user.click(screen.getByRole('button', { name: 'Amarr VIII' }));
     expect(screen.getByRole('button', { name: /, Trade Hub$/ })).toHaveTextContent('Amarr');
 
     // The Market's own pick must not touch the Global hub other pages read.
@@ -399,7 +399,7 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
     expect(useMarketHub.getState().value).toBe('jita');
 
     await user.click(screen.getByRole('button', { name: /, Trade Hub$/ }));
-    await user.click(screen.getByRole('menuitemradio', { name: 'Global' }));
+    await user.click(screen.getByRole('button', { name: 'App setting' }));
 
     await waitFor(() => expect(usePageHubs.getState().value.market).toBeUndefined());
     // The page follows Global into its URL rather than re-adopting the old link.

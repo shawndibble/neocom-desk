@@ -17,6 +17,8 @@ import type { AdjustedPrices, FacilityPreset, SkillLevels } from '@/engine/indus
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { TradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
+import { atPercent } from '@/features/market/pagePricePercents';
+import { DEFAULT_PRICE_PERCENT } from '@/features/market/pricePercent';
 import { loadInvention, loadSkills } from '@/sde/loadSde';
 import type { InventionData, SkillType } from '@/sde/types';
 import { SCIENCE_SKILL_GROUP_ID } from '@/engine/industry/alphaIndustrySkills';
@@ -100,14 +102,17 @@ export function inventionRecipes(
  */
 export function loadInventionMarket(
   hub: TradeHub,
-  blueprintTypeIds: readonly number[]
+  blueprintTypeIds: readonly number[],
+  /** The Industry percent (issue #6531): datacores and decryptors are bought at the hub too. Absent is 100. */
+  pricePercent = DEFAULT_PRICE_PERCENT
 ): Promise<InventionMarket | null> {
-  return loadMarket(hub, blueprintTypeIds).catch(() => null);
+  return loadMarket(hub, blueprintTypeIds, pricePercent).catch(() => null);
 }
 
 async function loadMarket(
   hub: TradeHub,
-  blueprintTypeIds: readonly number[]
+  blueprintTypeIds: readonly number[],
+  pricePercent: number
 ): Promise<InventionMarket | null> {
   if (blueprintTypeIds.length === 0) return null;
   const [data, skills] = await Promise.all([loadInvention(), loadSkills()]);
@@ -123,7 +128,10 @@ async function loadMarket(
   return {
     recipeFor: (id) => recipes.get(id) ?? null,
     decryptors,
-    unitPriceFor: (id) => prices.get(id)?.sellMin ?? null,
+    unitPriceFor: (id) => {
+      const sellMin = prices.get(id)?.sellMin ?? null;
+      return sellMin === null ? null : atPercent(sellMin, pricePercent);
+    },
   };
 }
 

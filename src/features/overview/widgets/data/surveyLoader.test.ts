@@ -36,7 +36,11 @@ describe('loadSurveyWidget', () => {
     await db.settings.put({ key: 'miningSurveyCurrent', value: 'k7m2xq' });
     await db.settings.put({ key: 'sync.marketHub', value: 'amarr' });
     await loadSurveyWidget();
-    expect(loadOrePrices).toHaveBeenLastCalledWith([], expect.objectContaining({ id: 'amarr' }));
+    expect(loadOrePrices).toHaveBeenLastCalledWith(
+      [],
+      expect.objectContaining({ id: 'amarr' }),
+      100
+    );
   });
 
   it("prices at Mining's own hub over the Global hub", async () => {
@@ -46,7 +50,20 @@ describe('loadSurveyWidget', () => {
       { key: 'sync.pageHubs', value: { mining: 'jita' } },
     ]);
     await loadSurveyWidget();
-    expect(loadOrePrices).toHaveBeenLastCalledWith([], expect.objectContaining({ id: 'jita' }));
+    expect(loadOrePrices).toHaveBeenLastCalledWith(
+      [],
+      expect.objectContaining({ id: 'jita' }),
+      100
+    );
+  });
+
+  it("prices at Mining's price percent", async () => {
+    await db.settings.bulkPut([
+      { key: 'miningSurveyCurrent', value: 'k7m2xq' },
+      { key: 'sync.pagePricePercents', value: { mining: 90 } },
+    ]);
+    await loadSurveyWidget();
+    expect(loadOrePrices).toHaveBeenLastCalledWith([], expect.objectContaining({ id: 'jita' }), 90);
   });
 
   it("maps each ore name to its type id for the rows' Show info", async () => {
@@ -59,6 +76,10 @@ describe('loadSurveyWidget', () => {
     await db.settings.put({ key: 'miningSurveyCurrent', value: 'k7m2xq' });
     await db.settings.put({ key: 'miningSurveyPriceHub', value: 'amarr' });
     await loadSurveyWidget();
-    expect(loadOrePrices).toHaveBeenLastCalledWith([], expect.objectContaining({ id: 'amarr' }));
+    expect(loadOrePrices).toHaveBeenLastCalledWith(
+      [],
+      expect.objectContaining({ id: 'amarr' }),
+      100
+    );
   });
 });

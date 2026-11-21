@@ -31,6 +31,7 @@ import { industryActivityOf } from '@/engine/industry/types';
 import type { PiData } from '@/sde/types';
 import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
 import { loadPlanSnapshots } from './planSnapshots';
+import { loadPricePercentFor } from '@/features/market/pagePricePercents';
 import {
   facilityContextFor,
   reactionPlanFacilityContextFor,
@@ -202,7 +203,12 @@ export async function applyGroupAutoBuild(
     return member ? [member] : [];
   });
 
-  const snapshots = loadPlanSnapshots(members, { catalog, pi });
+  // Members keep their own hubs but price at the Industry percent (issue #6531).
+  const snapshots = loadPlanSnapshots(
+    members,
+    { catalog, pi },
+    await loadPricePercentFor('industry')
+  );
   const picks = new Map<string, Set<number>>();
   await Promise.all(
     members.map(async (member, index) => {

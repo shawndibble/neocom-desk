@@ -27,8 +27,9 @@ import {
   type VariationIndex,
 } from '@/engine/market/variations';
 import { useHubFor } from '@/features/market/hub';
+import { usePricePercentFor } from '@/features/market/pagePricePercents';
+import { getHubPricesAt } from '@/features/market/hubPricesAtPercent';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
-import { getHubPrices } from '@/market/prices';
 import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
 import type { VariantEvaluator } from './useFittingEvaluation';
 
@@ -147,17 +148,21 @@ export function useModuleVariations({
   // The Fittings hub, as the rest of the fit's prices.
   const { hubId, hydrated: hubHydrated } = useHubFor('fittings');
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
+  const percent = usePricePercentFor('fittings');
   const loadPrices = useCallback(async () => {
     const typeIds = members.map((member) => member.typeId);
     if (typeIds.length === 0) return new Map<number, number | null>();
-    const priceMap = await getHubPrices(hub, typeIds);
+    const priceMap = await getHubPricesAt(hub, typeIds, percent);
     return new Map<number, number | null>(
       typeIds.map((id) => [id, priceMap.get(id)?.sellMin ?? null])
     );
-  }, [members, hub]);
+  }, [members, hub, percent]);
   // Same hub: a new member list refreshes behind the prices showing (looked up per type, so never another type's).
   // Keyed on the hub: another hub's prices never show under this one; null until the hub is read.
-  const freshPrices = useKeyedLoad(hubHydrated ? `prices:${hub.id}` : null, loadPrices).data;
+  const freshPrices = useKeyedLoad(
+    hubHydrated ? `prices:${hub.id}:${percent}` : null,
+    loadPrices
+  ).data;
 
   const fresh =
     computed &&
