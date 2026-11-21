@@ -19,6 +19,7 @@ import * as stockTargets from '@/features/corp/stockTargets';
 import { db } from '@/db';
 import { CorpAssets } from './CorpAssets';
 import { LocationProbe } from '@/test/LocationProbe';
+import { useItemInfoModalStore } from '@/stores/itemInfoModal';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
 vi.mock('@/features/corp/boardData', async (importOriginal) => ({
@@ -493,16 +494,18 @@ describe('group by location', () => {
     expect(screen.getAllByText('Ships').length).toBeGreaterThan(0);
   });
 
-  it('opens the by-item view for a clicked division, dropping group', async () => {
+  it("opens the by-item view from a division's row menu, dropping group", async () => {
     const user = userEvent.setup();
     await ledger('/corp/assets?group=location');
-    await user.click((await screen.findAllByText('Ships'))[0]);
+    await user.click((await screen.findAllByRole('button', { name: 'More actions for Ships' }))[0]);
+    await user.click(await screen.findByRole('menuitem', { name: 'Show by item' }));
     await waitFor(() => expect(currentLocation()).toBe('/corp/assets?loc=60003760&div=1'));
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(screen.queryByText('Pyerite')).not.toBeInTheDocument();
   });
 
-  it("unfolds a division's caret into its containers and their contents", async () => {
+  it('unfolds a clicked division into its containers, and a loose stack opens Show info', async () => {
+    useItemInfoModalStore.getState().clear();
     const user = userEvent.setup();
     mocked.loadCorporationAssets.mockResolvedValue(
       cached([
@@ -526,13 +529,14 @@ describe('group by location', () => {
       ])
     );
     await ledger('/corp/assets?group=location');
-    await user.click(await screen.findByRole('button', { name: 'Contents of Ships' }));
+    await user.click((await screen.findAllByText('Ships'))[0]);
     const container = await screen.findByRole('button', { name: /Rifter/, expanded: false });
     expect(screen.queryByText('×40')).not.toBeInTheDocument();
     await user.click(container);
     expect(container).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByText('×40')).toBeInTheDocument();
-    // The caret only unfolds: the row's own click still opens the by-item view.
+    await user.click(screen.getByRole('button', { name: /×40/ }));
+    expect(useItemInfoModalStore.getState().request).toMatchObject({ typeId: 35 });
+    // The row click only unfolds: the by-item view is the row menu's.
     expect(currentLocation()).toBe('/corp/assets?group=location');
   });
 

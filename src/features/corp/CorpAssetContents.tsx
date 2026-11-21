@@ -1,7 +1,8 @@
 /**
  * What one Corp assets location row holds, nested the way the in-game hangar
  * shows it: containers (and ships) open to their contents, loose stacks list
- * beside them. The by-location view's caret unfolds it under the row.
+ * beside them. The by-location view's row click unfolds it under the row; a
+ * container opens in place, a loose stack opens Show info.
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,6 +11,7 @@ import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/u
 import type { AssetNameMap } from '@/engine/assetNames';
 import type { LedgerContentsNode } from '@/engine/corp/assetLedger';
 import { cx } from '@/lib/cx';
+import { openItemInfo } from '@/stores/itemInfoModal';
 import { formatCount } from '@/lib/formatCount';
 import { formatIsk } from '@/lib/isk';
 import type { LedgerLabels } from './assetLedgerView';
@@ -71,10 +73,17 @@ function ContentsNode({
 
   if (!isContainer) {
     return (
-      <li className={rowClass} style={indent}>
-        <span className="w-4 shrink-0" aria-hidden="true" />
-        <NodeName node={node} labels={labels} assetNames={assetNames} />
-        {value}
+      <li>
+        <button
+          type="button"
+          onClick={() => openItemInfo(node.typeId, labels.typeName(node.typeId))}
+          className={cx(rowClass, rowInteractiveClassName, focusRingInsetClassName)}
+          style={indent}
+        >
+          <span className="w-4 shrink-0" aria-hidden="true" />
+          <NodeName node={node} labels={labels} assetNames={assetNames} />
+          {value}
+        </button>
       </li>
     );
   }

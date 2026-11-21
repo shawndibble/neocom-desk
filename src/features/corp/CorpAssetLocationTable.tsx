@@ -1,14 +1,20 @@
 /**
  * Corp assets, grouped by location (issue #4671): a group per office with a
  * row per division (and its Corp deliveries), and on All a group for every
- * other place. A row opens the by-item view filtered to it; its caret unfolds
- * what it holds, nested by container (`CorpAssetContents`).
+ * other place. A row click unfolds what it holds, nested by container
+ * (`CorpAssetContents`); its row menu opens the by-item view filtered to it.
  */
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ColumnPickerMenu, DataTable, type DataTableColumn } from '@/components/ui';
+import { useNavigate } from 'react-router-dom';
+import {
+  ColumnPickerMenu,
+  DataTable,
+  MenuItem,
+  RowActionsMenu,
+  type DataTableColumn,
+} from '@/components/ui';
 import { Pill } from '@/components/ui/Pill';
-import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { buildContentsTree } from '@/engine/corp/assetLedger';
@@ -41,7 +47,7 @@ export function CorpAssetLocationTable({
   rows,
   labels,
   assetNames,
-  onOpenRow,
+  itemsViewHref,
   renderToolbar,
   truncated,
   emptyState,
@@ -50,13 +56,14 @@ export function CorpAssetLocationTable({
   labels: LedgerLabels;
   /** In-game names of containers and ships, for the unfolded contents. */
   assetNames: AssetNameMap;
-  /** Opens the by-item view filtered to this row. */
-  onOpenRow: (row: LocationRow) => void;
+  /** The by-item view filtered to this row: the row menu's destination. */
+  itemsViewHref: (row: LocationRow) => string;
   renderToolbar: (columnPicker: ReactNode, exportMenu: ReactNode) => ReactNode;
   truncated: boolean;
   emptyState: ReactNode;
 }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const columnVisibility = useColumnVisibility(
     useVisibleCorpAssetLocationColumns,
     CORP_ASSET_LOCATION_COLUMN_IDS
@@ -125,23 +132,31 @@ export function CorpAssetLocationTable({
         r.cell.volume === null || r.cell.itemCount === 0 ? '—' : formatCubicMetres(r.cell.volume),
     },
   };
-  const goColumn: DataTableColumn<LocationRow> = {
-    id: 'go',
-    header: '',
-    className: 'w-6',
-    cardCorner: true,
-    render: (r) =>
-      r.cell.itemCount === 0 ? null : (
-        <Icon.GoTo aria-hidden="true" size={Icon.ICON_SIZE.sm} className="text-text-faint" />
-      ),
-  };
   const columns = [
     allColumns.place,
     ...CORP_ASSET_LOCATION_COLUMN_IDS.filter((id) => columnVisibility.isVisible(id)).map(
       (id) => allColumns[id]
     ),
-    goColumn,
   ];
+
+  // The row click unfolds the row, so the jump to the by-item view it used to
+  // make lives here: a one-action menu, a recorded §6c exception
+  // (docs/context/decisions/20261121-111052-corp-assets-location-rows-unfold-on-click-show.md).
+  const rowContextMenu = (row: LocationRow, tr: ReactElement) => {
+    if (row.cell.itemCount === 0) return tr;
+    const href = itemsViewHref(row);
+    return (
+      <RowActionsMenu
+        name={row.label}
+        openHref={href}
+        items={
+          <MenuItem onSelect={() => void navigate(href)}>{t('corp.assets.showByItem')}</MenuItem>
+        }
+      >
+        {tr}
+      </RowActionsMenu>
+    );
+  };
 
   const picker = (
     <ColumnPickerMenu
@@ -176,12 +191,10 @@ export function CorpAssetLocationTable({
             density="compact"
             responsive="stack"
             mobileSort
-            onRowClick={onOpenRow}
-            rowClickable={(r) => r.cell.itemCount > 0}
+            rowContextMenu={rowContextMenu}
+            rowMoreActions
             expandableRow={{
               leadingIcon: true,
-              trigger: 'button',
-              toggleLabel: (r) => t('corp.assets.contentsOf', { place: r.label }),
               renderDetail: (r) =>
                 r.cell.itemCount === 0 ? (
                   <p className="px-3 py-1 text-sm text-text-dim">

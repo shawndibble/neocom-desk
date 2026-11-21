@@ -486,8 +486,8 @@ function CorpAssetsView({
     });
   }
 
-  /** A division, deliveries or place row opens the by-item view narrowed to it. */
-  function openLocationRow(row: LocationRow) {
+  /** The by-item view narrowed to a division, deliveries or place row (its row menu's destination). */
+  function itemsViewHref(row: LocationRow): string {
     const next = new URLSearchParams(location.search);
     next.delete('group');
     next.delete('lsort');
@@ -496,10 +496,8 @@ function CorpAssetsView({
     if (row.division === null) next.delete('div');
     else next.set('div', String(row.division));
     const search = next.toString();
-    void navigate({
-      pathname: corpAssetTabPath(row.kind === 'division' ? tab : tabForState(row.state)),
-      search: search === '' ? '' : `?${search}`,
-    });
+    const pathname = corpAssetTabPath(row.kind === 'division' ? tab : tabForState(row.state));
+    return search === '' ? pathname : `${pathname}?${search}`;
   }
 
   if (!snapshot.hydrated) return <Spinner />;
@@ -804,7 +802,7 @@ function CorpAssetsView({
                         rows={locationRows}
                         labels={labels}
                         assetNames={assetNames}
-                        onOpenRow={openLocationRow}
+                        itemsViewHref={itemsViewHref}
                         renderToolbar={(picker, exportMenu) => (
                           <div className="border-b border-line p-3">
                             {renderToolbar(picker, exportMenu)}
