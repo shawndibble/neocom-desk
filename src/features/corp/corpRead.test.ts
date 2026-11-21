@@ -5,7 +5,8 @@ import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { corpCacheKey } from '@/esi/cache';
 import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
 import { db } from '@/db';
-import { loadCorpPaginatedWithCacheStatus, loadCorpWithCacheStatus } from './corpRead';
+import { HOUR_MS } from '@/lib/age';
+import { eveReadAtMs, loadCorpPaginatedWithCacheStatus, loadCorpWithCacheStatus } from './corpRead';
 
 const CHAR_ID = 91;
 const CORP_ID = 98000001;
@@ -94,5 +95,12 @@ describe('loadCorpPaginatedWithCacheStatus', () => {
 
     expect(result.needsReauth).toBe(false);
     expect(result.cached).toBeNull();
+  });
+});
+
+describe('eveReadAtMs', () => {
+  it("is an hour before ESI's Expires, or null without one", () => {
+    expect(eveReadAtMs(new Date(5 * HOUR_MS))).toBe(4 * HOUR_MS);
+    expect(eveReadAtMs(undefined)).toBeNull();
   });
 });

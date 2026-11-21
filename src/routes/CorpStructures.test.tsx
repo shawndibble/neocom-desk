@@ -1,4 +1,4 @@
-import { DAY_MS, HOUR_MS } from '@/lib/age';
+import { DAY_MS, HOUR_MS, MINUTE_MS } from '@/lib/age';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -11,6 +11,7 @@ import * as fuelBayData from '@/features/corp/structures/fuelBays';
 import { configureClipboard } from '@/lib/clipboard';
 import { formatCount } from '@/lib/formatCount';
 import { LocationProbe } from '@/test/LocationProbe';
+import { useFuelRates } from '@/features/corp/structures/fuelRatePref';
 import { CorpStructures } from './CorpStructures';
 
 vi.mock('@/features/overview/data/boardData', async (importOriginal) => ({
@@ -75,6 +76,8 @@ function feed(structures: BoardStructureSource[], corps: [number, string, string
     structureCount: structures.length,
     needsReauth: false,
     fetchedAt: new Date(now),
+    // EVE read every corporation's structures just now.
+    expiresAtByCorp: new Map(corps.map(([id]) => [id, new Date(now + HOUR_MS)])),
     corporations: new Map(corps.map(([id, ticker, name]) => [id, { ticker, name }])),
   });
 }
@@ -107,8 +110,9 @@ function columnHeaders(tableEl: HTMLElement): string[] {
     .map((cell) => cell.textContent ?? '');
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks();
+  await useFuelRates.getState().setValue({});
   useActiveCharacter.setState({ activeCharacterId: 42, hydrated: true });
   mockedBays.mockResolvedValue(new Map());
   configureClipboard(null);
@@ -231,9 +235,7 @@ describe('CorpStructures', () => {
           [20, 'GAM', 'Gamma Corp'],
         ]
       );
-      mockedBays.mockResolvedValue(
-        new Map([[10, { bays: new Map([[1, 400]]), readAt: new Date(now) }]])
-      );
+      mockedBays.mockResolvedValue(new Map([[10, { bays: new Map([[1, 400]]), readAtMs: now }]]));
       renderPage();
       const tableEl = await table();
       await waitFor(() => expect(column(tableEl, 'Fuel blocks')).toContain('Not readable'));
@@ -274,10 +276,10 @@ describe('CorpStructures', () => {
                 [1, 400],
                 [4, 900],
               ]),
-              readAt: new Date(now),
+              readAtMs: now,
             },
           ],
-          [20, { bays: new Map([[3, 100]]), readAt: new Date(now) }],
+          [20, { bays: new Map([[3, 100]]), readAtMs: now }],
         ])
       );
       renderPage();
@@ -298,6 +300,41 @@ describe('CorpStructures', () => {
         listed.map((name) => `${name} (Efa): ${needed[rows.indexOf(name)]} fuel blocks`)
       );
       expect(lines.at(-1)).toContain(`${sum} fuel blocks, ${formatCount(sum * 5)} m³`);
+    });
+
+    describe('after a refuel EVE has shown in the fuel time but not yet in the bay', () => {
+      // Alpha: 400 blocks read 20 minutes before its 20 days of fuel were.
+      function refuelled() {
+        feed([ALPHA], [[10, 'ALP', 'Alpha Corp']]);
+        mockedBays.mockResolvedValue(
+          new Map([[10, { bays: new Map([[1, 400]]), readAtMs: now - 20 * MINUTE_MS }]])
+        );
+      }
+
+      it('waits for EVE rather than showing a rate that is too low', async () => {
+        refuelled();
+        renderPage();
+        const tableEl = await table();
+        await waitFor(() => expect(column(tableEl, 'Fuel blocks')).toEqual(['400Rate updating']));
+        expect(column(tableEl, 'Needed')).toEqual(['—']);
+      });
+
+      it('uses the rate last measured for the structure', async () => {
+        await useFuelRates.getState().setValue({ 1: 30 });
+        refuelled();
+        renderPage();
+        const tableEl = await table();
+        await waitFor(() => expect(column(tableEl, 'Fuel blocks')).toEqual(['400~30/day']));
+        expect(count(column(tableEl, 'Needed')[0]!)).toBeGreaterThan(0);
+      });
+    });
+
+    it('remembers a rate measured from a same-time pair', async () => {
+      feed([ALPHA], [[10, 'ALP', 'Alpha Corp']]);
+      mockedBays.mockResolvedValue(new Map([[10, { bays: new Map([[1, 400]]), readAtMs: now }]]));
+      renderPage();
+      await table();
+      await waitFor(() => expect(useFuelRates.getState().value[1]).toBe(20));
     });
   });
 });

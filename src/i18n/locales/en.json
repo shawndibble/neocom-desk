@@ -15682,9 +15682,11 @@
       },
       "fuelPlan": {
         "until": "Fuel until",
-        "blocksHint": "Fuel blocks in the structure's fuel bay, and how many it burns a day",
+        "blocksHint": "Fuel blocks in the structure's fuel bay, and how many it burns a day. EVE updates the bay and the fuel time separately, each about once an hour. After a refuel, the rate shows with ~ (the last rate measured) or as updating until EVE catches up.",
+        "ratePending": "Rate updating",
         "neededHint": "Fuel blocks to add to keep the structure fuelled until the Fuel until date (EVE time)",
         "perDay": "{{rate}}/day",
+        "perDayRemembered": "~{{rate}}/day",
         "noBayAccess": "Not readable",
         "noBayAccessHint": "Fuel blocks are read from corporation assets, which only a Director can see, or the read failed. These structures show time left only.",
         "total_one": "Total {{blocks}} block · {{volume}} m³",

@@ -55,11 +55,13 @@ export function loadCorporationAssets(
   characterId: number,
   corporationId: number
 ): Promise<CorpAssetsLoadResult> {
-  const { fetchLive, conditional } = conditionalPagedFetch((options) =>
+  const { fetchLive, conditional, expiresCapture } = conditionalPagedFetch((options) =>
     getCorporationAssets(characterId, corporationId, options)
   );
+  // `expiresAt` dates EVE's read, which the Structures page pairs with the structures'.
   return loadCorpPaginatedWithCacheStatus(characterId, corporationId, CORP_ASSETS_KEY, fetchLive, {
     conditional,
+    expiresCapture,
   });
 }
 
