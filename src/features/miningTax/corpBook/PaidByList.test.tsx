@@ -35,6 +35,13 @@ function renderList(
 }
 
 describe('PaidByList', () => {
+  it("shows an officer's note beside the payment they recorded by hand", () => {
+    renderList({ payments: [{ paymentId: 'p1', amount: 1_000_000 }], inFlight: [] }, [
+      payment({ source: 'manual', note: 'Handed over in person' }),
+    ]);
+    expect(screen.getByRole('listitem')).toHaveTextContent('Handed over in person');
+  });
+
   it('lists each payment with what it put on the day, its kind and when', () => {
     renderList(
       {

@@ -69,6 +69,7 @@ export function LedgerRowDetail({
       )}
       {row.kind === 'payment' && (
         <>
+          {row.payment.note && <p>{k('note', { note: row.payment.note })}</p>}
           {row.days.length > 0 && <Days title={k('paidDays')} days={row.days} />}
           {row.credit > 0 && <p>{k('leftAsCredit', { amount: isk(row.credit) })}</p>}
         </>

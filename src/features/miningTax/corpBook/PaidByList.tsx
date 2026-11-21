@@ -56,7 +56,12 @@ export function PaidByList({ paidBy, payments, corpName, walletRefs }: Props) {
                 time: dateTimeAt(made.at, zone),
               })
             : t(k('payment'));
-          return row(p.paymentId, label, p.amount, walletRefs?.get(p.paymentId));
+          return row(
+            p.paymentId,
+            made?.note ? t(k('withNote'), { label, note: made.note }) : label,
+            p.amount,
+            walletRefs?.get(p.paymentId)
+          );
         })}
         {paidBy.inFlight.map((d, i) =>
           row(

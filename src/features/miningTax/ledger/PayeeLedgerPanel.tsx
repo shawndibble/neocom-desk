@@ -158,7 +158,9 @@ function LedgerBody({
                 : r.charge.reason
               : r.kind === 'writeOff'
                 ? r.reason
-                : undefined;
+                : r.kind === 'payment'
+                  ? r.payment.note
+                  : undefined;
           return (
             <>
               {ledgerWhat(r, t)}
