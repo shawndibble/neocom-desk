@@ -525,7 +525,9 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                       ? actions.openCorpPay(corporationOfPayee(balance.payee.id))
                       : settleUpBalance(balance.members)
                   }
-                  onLinkPayment={(balance) => actions.openLinkWallet({ payeeId: balance.payee.id })}
+                  onLinkPayment={(balance) =>
+                    actions.openLinkPayment({ payeeId: balance.payee.id })
+                  }
                   onOpenLedger={(balance) =>
                     actions.openLedger(
                       isCorpPayeeId(balance.payee.id)
@@ -541,7 +543,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                   }
                   unlinkedOf={(balance) => unlinkedSentFor(linkable, balance.payee.id)}
                   onAssignNext={assignNext}
-                  onReviewPayments={() => actions.openLinkPayment(true)}
+                  onReviewPayments={() => actions.openLinkPayment({})}
                   conflicts={conflicts}
                   onReviewConflicts={() => {
                     const first = conflicts?.first.corp;

@@ -7,9 +7,12 @@ export interface SettleUpStart {
   payerId?: number;
 }
 
-/** The Payee "Link a wallet payment" picks a payment for. */
-export interface LinkWalletTarget {
-  payeeId: string;
+/**
+ * What the link-payment dialog is for: one Payee (its card, a row, Settle up), or, with no
+ * `payeeId`, every Payee at once (the "Payments to link" card).
+ */
+export interface LinkPaymentTarget {
+  payeeId?: string;
 }
 
 /** The Payee ledger open: a personal Payee's, or a Corp Tax Book's. */
@@ -33,14 +36,14 @@ export interface TaxDialogState {
   settleUpRows: SettleUpRow[] | null;
   /** Who pays — `SettleUpDialog`'s `payerId`. */
   settleUpStart: SettleUpStart;
-  linkWalletTarget: LinkWalletTarget | null;
+  /** The link-payment dialog, when open. */
+  linkPaymentTarget: LinkPaymentTarget | null;
   corpPayTarget: number | null;
   /** Opened from one book row: that row's Character pays. */
   corpPayFocus: { rowId: string; characterId: number } | null;
   /** The Payee ledger open, if any. */
   ledgerTarget: LedgerTarget | null;
   bulkDismissOpen: boolean;
-  linkPaymentOpen: boolean;
   /** Whether a dialog's ledger action is writing; mirrored here so `TaxTab` can disable its own controls. */
   acting: boolean;
 }
@@ -54,12 +57,11 @@ const CLOSED: TaxDialogState = {
   joinCandidateOverride: null,
   settleUpRows: null,
   settleUpStart: {},
-  linkWalletTarget: null,
+  linkPaymentTarget: null,
   corpPayTarget: null,
   corpPayFocus: null,
   ledgerTarget: null,
   bulkDismissOpen: false,
-  linkPaymentOpen: false,
   acting: false,
 };
 
@@ -115,16 +117,16 @@ function createActions(patch: (next: Patch) => void) {
     splitFromDetail: (dr: DisplayRow) => patch({ splitTarget: dr, detailTarget: null }),
     openSettleUp: (rows: SettleUpRow[] | null, start: SettleUpStart = {}) =>
       patch({ settleUpRows: rows, settleUpStart: start }),
-    openLinkWallet: (target: LinkWalletTarget | null) => patch({ linkWalletTarget: target }),
-    linkWalletFromDetail: (target: LinkWalletTarget) =>
-      patch({ linkWalletTarget: target, detailTarget: null }),
+    openLinkPayment: (target: LinkPaymentTarget | null) => patch({ linkPaymentTarget: target }),
+    /** Link payment replaces the detail view it was opened from. */
+    linkPaymentFromDetail: (target: LinkPaymentTarget) =>
+      patch({ linkPaymentTarget: target, detailTarget: null }),
     openCorpPay: (corporationId: number | null) =>
       patch({ corpPayTarget: corporationId, corpPayFocus: null }),
     corpPayFromDetail: (corporationId: number, focus: { rowId: string; characterId: number }) =>
       patch({ corpPayTarget: corporationId, corpPayFocus: focus, detailTarget: null }),
     openLedger: (target: LedgerTarget | null) => patch({ ledgerTarget: target }),
     openBulkDismiss: (open: boolean) => patch({ bulkDismissOpen: open }),
-    openLinkPayment: (open: boolean) => patch({ linkPaymentOpen: open }),
     setActing: (acting: boolean) => patch({ acting }),
   };
 }

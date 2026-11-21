@@ -53,7 +53,7 @@ interface GroupSummaryModalProps {
   onUncombine: () => void;
   /** Accepts the new ore total on every day that grew since it was paid. */
   onResolve: () => void;
-  /** Opens "Link a wallet payment" for this entry's owed days. */
+  /** Opens "Link a payment" for this entry's owed days. */
   onLinkWalletPayment?: () => void;
   /** Deletes every day's Assignment — asked first. */
   onUnassignAll: () => void;

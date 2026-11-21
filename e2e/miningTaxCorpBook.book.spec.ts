@@ -173,6 +173,6 @@ test("a transfer to the book's corporation is never offered to a personal Payee"
     .getByRole('region', { name: 'You owe' })
     .getByRole('button', { name: 'Link payment', exact: true })
     .click();
-  const dialog = page.getByRole('dialog', { name: 'Link a wallet payment' });
+  const dialog = page.getByRole('dialog', { name: 'Link a payment you already made' });
   await expect(dialog).toContainText('No unlinked wallet payments found');
 });

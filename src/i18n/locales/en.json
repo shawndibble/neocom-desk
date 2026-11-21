@@ -8649,7 +8649,11 @@
       }
     },
     "linkWallet": {
-      "title": "Link a wallet payment",
+      "matchesLabel": "Likely matches",
+      "manualLabel": "Pick from your wallet",
+      "otherLabel": "Other payments from your wallet",
+      "payeeLabel": "Which Payee did it pay?",
+      "payeePlaceholder": "Pick a Payee",
       "subtitle": "Pick the payment you sent {{payee}} ({{amount}} ISK owed now). It pays the oldest unpaid days first; anything over is kept as credit.",
       "searchLabel": "Search wallet payments",
       "searchPlaceholder": "Amount, date or recipient",
@@ -8742,7 +8746,7 @@
     "suggestedPayeeHint": "Last used in {{system}}.",
     "assignToAction": "Assign to {{payee}} · {{amount}} ISK",
     "detail": {
-      "linkWalletPayment": "Link a wallet payment",
+      "linkWalletPayment": "Link a payment",
       "splitAction": "Split between Payees",
       "reviewSplitAction": "Give new ore to another Payee",
       "moreLabel": "More actions for this entry",

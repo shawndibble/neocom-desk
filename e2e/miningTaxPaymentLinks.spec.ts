@@ -34,7 +34,7 @@ async function openLinkWallet(page: Page) {
     .getByRole('region', { name: 'You owe' })
     .getByRole('button', { name: 'Link payment', exact: true })
     .click();
-  const dialog = page.getByRole('dialog', { name: 'Link a wallet payment' });
+  const dialog = page.getByRole('dialog', { name: 'Link a payment you already made' });
   await expect(dialog).toBeVisible();
   return dialog;
 }
@@ -89,7 +89,8 @@ test('a payment to someone else is linked by hand', async ({ page }) => {
   const payment = dialog.getByRole('radio', { name: new RegExp(MINER.fen.name) });
   await expect(payment).not.toBeChecked();
   await payment.check();
-  await dialog.getByRole('button', { name: 'Link payment' }).click();
+  // Opened from the Payee's card, a payment picked by hand goes to that Payee.
+  await dialog.getByRole('button', { name: `Link to ${ROOK.name}` }).click();
   await expect(dialog).toBeHidden();
   await expect(ledgerButton(page)).toContainText(isk(OWED - DAY_TAX));
 });
