@@ -60,6 +60,8 @@ export function assignment(p: {
   taxPct?: number;
   status?: MiningTaxAssignmentRecord['status'];
   qty?: number;
+  /** False: made by the Payee's Default System, never touched by the pilot (a Corp Tax Book may take it). */
+  override?: boolean;
 }): MiningTaxAssignmentRecord {
   const taxPct = p.taxPct ?? 10;
   const qty = p.qty ?? DAY_QTY;
@@ -77,6 +79,7 @@ export function assignment(p: {
     estimatedValue: value,
     taxOwed: (value * taxPct) / 100,
     status: p.status ?? 'outstanding',
+    ...(p.override !== undefined ? { override: p.override } : {}),
     updatedAt: Date.now(),
   } as MiningTaxAssignmentRecord;
 }

@@ -94,7 +94,7 @@ export interface Donation {
   /** The Miner the server already placed it on; omitted, it waits Unmatched. */
   minerId?: string;
   reason?: string;
-  reviewReason?: 'ambiguous';
+  reviewReason?: 'ambiguous' | 'account-closed';
   ambiguousMinerIds?: string[];
   /** A wallet journal ref id, for a donation the journal also holds (`j1_<ref>`). */
   refId?: number;
@@ -122,12 +122,21 @@ export class BookSeed {
   readonly now = Date.now();
   private readonly out = new Map<string, Record<string, unknown>>();
   private readonly mined = new Map<number, MinedDay[]>();
+  /** The book's corporation. */
+  readonly corp: number;
 
   constructor(
-    private readonly options: { startBack: number; lastSyncBack?: number; tolerancePct?: number }
+    private readonly options: {
+      startBack: number;
+      lastSyncBack?: number;
+      tolerancePct?: number;
+      /** The book's corporation; `CORP` (the officer's) by default. A second book for a pilot in two. */
+      corporationId?: number;
+    }
   ) {
+    this.corp = options.corporationId ?? CORP;
     const start = day(options.startBack, this.now);
-    this.put(`corps/${CORP}`, {
+    this.put(`corps/${this.corp}`, {
       hubId: 'jita',
       oreForm: 'raw',
       graceHours: 0.5,
@@ -136,7 +145,7 @@ export class BookSeed {
       startDate: start,
       structureExpiryHours: {},
       rates: [{ scope: 'corp', pct: RATE_PCT, effectiveFrom: start }],
-      corporationId: CORP,
+      corporationId: this.corp,
       active: true,
       ownerCharacterId: OFFICER.id,
       createdAt: this.now - options.startBack * DAY_MS,
@@ -159,7 +168,7 @@ export class BookSeed {
   }
 
   private sub(name: string, id: string, data: Record<string, unknown>): this {
-    return this.put(`corps/${CORP}/${name}/${id}`, data);
+    return this.put(`corps/${this.corp}/${name}/${id}`, data);
   }
 
   /** Observed Mining Entries: one row per mined day. */
@@ -172,7 +181,7 @@ export class BookSeed {
       this.sub('observed', `${characterId}_${ORE_TYPE}_${date}_${refinery.id}`, {
         structureId: refinery.id,
         characterId,
-        recordedCorporationId: recordedCorpOf(characterId),
+        recordedCorporationId: this.corp === CORP ? recordedCorpOf(characterId) : this.corp,
         typeId: ORE_TYPE,
         date,
         quantity: d.qty ?? DAY_QTY,
@@ -245,7 +254,7 @@ export class BookSeed {
   /** The verify token's doc: what a verify link resolves (`corpTaxBookTokens/{token}`). */
   private token(input: NoticeInput, minerId: string): void {
     this.put(`${TOKENS_COLLECTION}/${input.token}`, {
-      corporationId: CORP,
+      corporationId: this.corp,
       [NOTICE_ID_FIELD]: input.id,
       minerId,
       remindersStopped: input.remindersStopped === true,
@@ -359,7 +368,7 @@ export class BookSeed {
    * real write hid every seeded collection but the one it touched.
    */
   docs(): SeedDoc[] {
-    const root = `corps/${CORP}`;
+    const root = `corps/${this.corp}`;
     const stamp = `seed-${this.now}`;
     const collections = new Set(
       [...this.out.keys()]

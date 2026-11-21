@@ -12,6 +12,8 @@ import { CHARACTER_ID, CHARACTER_NAME, CORPORATION_ID, OWNER_HASH } from '../fix
 export const OFFICER = { id: CHARACTER_ID, name: CHARACTER_NAME, ownerHash: OWNER_HASH };
 export const CORP = CORPORATION_ID;
 export const OUTSIDE_CORP = 98_999_999;
+/** A second corporation with its own book: the pilot's alt (`MINER.pilotAltB`) is in it, not in `CORP`. */
+export const OTHER_CORP = 98_000_002;
 const LEFT_FROM = 90_008_000;
 const OUTSIDE_FROM = 90_009_000;
 
@@ -26,6 +28,8 @@ export const MINER = {
   fen: { id: 90_000_107, name: 'Fen Corvane' },
   /** The signed-in pilot's alt (phase 2): grouped with the pilot in their corporation's book. */
   pilotAlt: { id: 90_000_120, name: 'Test Pilot Hauler' },
+  /** The pilot's alt in `OTHER_CORP`, a Character they hold in Neocom Desk too (phase 2). */
+  pilotAltB: { id: 90_000_121, name: 'Test Pilot Prospector' },
   /** A player the pilot pays moon tax to directly: a personal Payee (phase 2). */
   rook: { id: 90_000_130, name: 'Rook Belter' },
   /** Mined as a member, then left the corporation owing: a leaver. */
@@ -43,7 +47,8 @@ const NAMES = new Map<number, string>([
 
 export const nameOf = (id: number): string => NAMES.get(id) ?? `Pilot ${id}`;
 /** The corporation a Character is in now (ESI's affiliation). */
-export const corpOf = (id: number): number => (id >= LEFT_FROM ? OUTSIDE_CORP : CORP);
+export const corpOf = (id: number): number =>
+  id === MINER.pilotAltB.id ? OTHER_CORP : id >= LEFT_FROM ? OUTSIDE_CORP : CORP;
 /** The corporation the refinery's ledger recorded them in when they mined. */
 export const recordedCorpOf = (id: number): number => (id >= OUTSIDE_FROM ? OUTSIDE_CORP : CORP);
 /** A Miner's id as the book keys an ungrouped Character. */

@@ -17,7 +17,7 @@ import { CORE_GRANT, scopesForGroup } from '../../../src/esi/scopes';
 import { wipeFirestore, writeDocs, type SeedDoc } from './emulator';
 import { signedAccessToken } from './eveToken';
 import { REFINERY } from './bookSeed';
-import { CORP, OFFICER, corpOf, nameOf } from './identities';
+import { CORP, OFFICER, OTHER_CORP, corpOf, nameOf } from './identities';
 import { installFlatPrices } from './prices';
 import { EMULATOR_HOSTS } from './runEnv';
 
@@ -63,7 +63,9 @@ function defaultCorpEsi(path: string, route: Route): unknown {
     return ids.map((id) =>
       id === CORP
         ? { id, name: 'Test Corp', category: 'corporation' }
-        : { id, name: nameOf(id), category: 'character' }
+        : id === OTHER_CORP
+          ? { id, name: 'Other Corp', category: 'corporation' }
+          : { id, name: nameOf(id), category: 'character' }
     );
   }
   if (path === '/characters/affiliation') {
