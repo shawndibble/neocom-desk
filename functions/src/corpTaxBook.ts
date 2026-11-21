@@ -22,7 +22,7 @@
 
 import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, docId, record } from './communities.js';
-import { oneOf } from './inputParse.js';
+import { UNKNOWN_ACTION, oneOf } from './inputParse.js';
 import {
   BOOK_DEFAULTS,
   DIVISION_NAME_MAX,
@@ -42,7 +42,8 @@ import {
 } from './corpTaxBookLateNotice.js';
 import {
   canAdvanceCheckpoint,
-  checkpointProblem,
+  checkpointFits,
+  checkpointProblems,
   type CheckpointProblem,
   type RunningAccountCheckpoint,
 } from './corpTaxBookCheckpoint.js';
@@ -887,48 +888,54 @@ function parseCloseCredit(raw: unknown): CloseCredit {
 
 export function parseEditAction(data: unknown): EditAction {
   const d = record(data);
-  const action = oneOf(d.action, 'action', [
-    'addRate',
-    'addRates',
-    'setRecordRate',
-    'updateSettings',
-    'recordPayment',
-    'markNotTax',
-    'assignPayment',
-    'reassignPayment',
-    'ignoreUncounted',
-    'dismiss',
-    'dismissRecords',
-    'reverseDismissal',
-    'linkSurvey',
-    'setFullyMined',
-    'setMiner',
-    'unlink',
-    'regroupMiner',
-    'addAdjustment',
-    'reverseAdjustment',
-    'editAdjustment',
-    'reverseWriteOff',
-    'setToleranceExemption',
-    'writeOff',
-    'rebill',
-    'closeAccount',
-    'issueStatement',
-    'issueLateNotice',
-    'settleStatements',
-    'declare',
-    'resolveDeclaration',
-    'rejectDispute',
-    'dismissDispute',
-    'recordReminder',
-    'recordMail',
-    'recordLateNoticeMail',
-    'recordAccounts',
-    'recordCheckpoints',
-    'resetCheckpoint',
-    'setPopSharing',
-    'setPopSharingMoon',
-  ] as const);
+  const action = oneOf(
+    d.action,
+    'action',
+    [
+      'addRate',
+      'addRates',
+      'setRecordRate',
+      'updateSettings',
+      'recordPayment',
+      'markNotTax',
+      'assignPayment',
+      'reassignPayment',
+      'ignoreUncounted',
+      'dismiss',
+      'dismissRecords',
+      'reverseDismissal',
+      'linkSurvey',
+      'setFullyMined',
+      'setMiner',
+      'unlink',
+      'regroupMiner',
+      'addAdjustment',
+      'reverseAdjustment',
+      'editAdjustment',
+      'reverseWriteOff',
+      'setToleranceExemption',
+      'writeOff',
+      'rebill',
+      'closeAccount',
+      'issueStatement',
+      'issueLateNotice',
+      'settleStatements',
+      'declare',
+      'resolveDeclaration',
+      'rejectDispute',
+      'dismissDispute',
+      'recordReminder',
+      'recordMail',
+      'recordLateNoticeMail',
+      'recordAccounts',
+      'recordCheckpoints',
+      'resetCheckpoint',
+      'setPopSharing',
+      'setPopSharingMoon',
+    ] as const,
+    // A sub-action this server does not know: the client is newer than it.
+    { reason: UNKNOWN_ACTION }
+  );
   switch (action) {
     case 'addRate':
       return { action, rate: parseDatedRate(d.rate) };
@@ -1503,14 +1510,15 @@ export function parseLateNotice(raw: Record<string, unknown>): LateNotice {
 
 /** Why a checkpoint from a tab is not stored. */
 export type CheckpointRefusal =
-  CheckpointProblem | 'not-forward' | 'unknown-miner' | 'director-approval';
+  CheckpointProblem | 'not-forward' | 'unknown-miner' | 'characters-changed' | 'director-approval';
 
 /**
- * Whether a checkpoint is stored (B1): a checkpoint is a cache of history the book keeps for good,
- * so one that cannot be trusted is skipped and the next load works the account out again. It must
- * move forward (`canAdvanceCheckpoint`), add up (`checkpointProblem`) and name a Miner the book
- * knows; one that owes less through its date than the Miner's recorded account (`live`, after the
- * payments since) would forgive days, so it needs a Director.
+ * Every reason a checkpoint is not stored, none when it is (B1): a checkpoint is a strict cache of
+ * history the book keeps for good, so one that cannot be trusted is skipped and the next load works
+ * the account out again. It must move forward (`canAdvanceCheckpoint`), add up
+ * (`checkpointProblems`), name a Miner the book knows, and have summed that Miner's characters as
+ * they are now (`checkpointFits`); one that owes less through its date than the Miner's recorded
+ * account (`live`, after the payments since) would forgive days, so it needs a Director.
  */
 export function checkpointRefusal(
   k: RecordedCheckpoint,
@@ -1518,20 +1526,23 @@ export function checkpointRefusal(
     stored?: Pick<RunningAccountCheckpoint, 'through'>;
     today: string;
     known: boolean;
+    /** The Miner's characters now. */
+    characterIds: readonly number[];
     live?: { unpaidDays?: readonly { date: string; owed: number }[] };
     isDirector: boolean;
   }
-): CheckpointRefusal | null {
-  if (!canAdvanceCheckpoint(ctx.stored, k, ctx.today)) return 'not-forward';
-  const problem = checkpointProblem(k);
-  if (problem) return problem;
-  if (!ctx.known) return 'unknown-miner';
+): CheckpointRefusal[] {
+  const out: CheckpointRefusal[] = [];
+  if (!canAdvanceCheckpoint(ctx.stored, k, ctx.today)) out.push('not-forward');
+  out.push(...checkpointProblems(k));
+  if (!ctx.known) out.push('unknown-miner');
+  else if (!checkpointFits(k, ctx.characterIds)) out.push('characters-changed');
   const recorded = (ctx.live?.unpaidDays ?? [])
     .filter((d) => d.date <= k.through)
     .reduce((sum, d) => sum + d.owed, 0);
   const owes = k.owed.reduce((sum, d) => sum + d.remaining, 0);
-  if (owes < recorded - 1 && !ctx.isDirector) return 'director-approval';
-  return null;
+  if (owes < recorded - 1 && !ctx.isDirector) out.push('director-approval');
+  return out;
 }
 
 /** A checkpoint from an officer's tab; `checkpointRefusal` decides whether it is stored. */
@@ -1542,15 +1553,26 @@ export function parseCheckpoint(raw: unknown): RecordedCheckpoint {
     through: dateString(c.through, 'through'),
     owed: list(c.owed, 'owed', 1000).map((x) => {
       const day = record(x);
+      const opt = (key: string, max: number) =>
+        day[key] === undefined ? {} : { [key]: num(day[key], `owed.${key}`, 0, max) };
+      if (day.held !== undefined && typeof day.held !== 'boolean')
+        throw new HttpsError('invalid-argument', 'owed.held must be true or false');
       return {
         date: dateString(day.date, 'owed.date'),
         remaining: num(day.remaining, 'owed.remaining', 0, 1e13),
-        ...(day.charge !== undefined ? { charge: num(day.charge, 'owed.charge', 0, 1e13) } : {}),
+        tax: num(day.tax, 'owed.tax', 0, 1e13),
+        credited: num(day.credited, 'owed.credited', 0, 1e13),
+        ...opt('writtenOff', 1e13),
+        ...opt('charge', 1e13),
+        ...(day.held === true ? { held: true } : {}),
       };
     }),
     credit: num(c.credit, 'credit', 0, 1e15),
     balance: num(c.balance, 'balance', -1e15, 1e15),
     paidThrough: c.paidThrough === null ? null : dateString(c.paidThrough, 'paidThrough'),
+    characterIds: [
+      ...new Set(list(c.characterIds, 'characterIds', 50).map((x) => int(x, 'characterId'))),
+    ],
   };
 }
 

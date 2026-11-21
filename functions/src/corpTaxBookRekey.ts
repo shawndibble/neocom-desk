@@ -1,6 +1,5 @@
 import { chunk, IN_QUERY_LIMIT } from './chunk.js';
 import {
-  ACCOUNT_CHECKPOINTS,
   ACCOUNTS,
   ADJUSTMENTS,
   DECLARATIONS,
@@ -51,10 +50,11 @@ export const MINER_KEYED = [
   TOLERANCE_EXEMPTIONS,
 ];
 /**
- * Collections keyed by the Miner id itself (`accounts/{minerId}`, `minerPaid/{minerId}`,
- * `accountCheckpoints/{minerId}`): figures an officer's tab records again on its next load.
+ * Collections keyed by the Miner id itself (`accounts/{minerId}`, `minerPaid/{minerId}`): figures
+ * an officer's tab records again on its next load. A checkpoint is dropped by the caller with every
+ * Miner whose characters change, not here.
  */
-export const MINER_CACHES = [ACCOUNTS, MINER_PAID, ACCOUNT_CHECKPOINTS];
+export const MINER_CACHES = [ACCOUNTS, MINER_PAID];
 
 /** The Miner ids a grouping absorbs: the groups dissolved, and a `solo:` id per Character folded in. */
 export function absorbedMinerIds(

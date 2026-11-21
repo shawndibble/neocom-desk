@@ -2852,7 +2852,8 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect((await book().collection('statements').doc('n1').get()).get('remindersStopped')).toBe(
         true
       );
-      const next = await issue('n2');
+      // Another Miner's: one Miner's days are listed once, and its cooldown holds.
+      const next = await issue('n2', { minerId: 'solo:51', characterIds: [51] });
       await book().collection('statements').doc('n2').delete();
       expect((await readStatementByToken(deps(), String(next.verifyToken))).statement.id).toBe(
         'n2'
@@ -2948,6 +2949,20 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       );
     });
 
+    it('refuses a notice of days another notice listed, or inside the cooldown', async () => {
+      await turnOn();
+      await issue('n1');
+      // The same day, from another tab.
+      expect(await reason(issue('n1b'))).toBe('already-listed');
+      const later = {
+        lines: [{ ...notice('x').lines[0], date: '2026-10-06', key: '50:1000:2026-10-06' }],
+      };
+      expect(await reason(issue('n2', later))).toBe('notice-cooldown');
+      now = T0 + 8 * 86_400_000;
+      await verifyOfficer(deps(), who(ACCOUNTANT), parseBookCall(withToken(ACCOUNTANT)));
+      expect(await issue('n2', later)).toMatchObject({ noticeId: 'n2' });
+    });
+
     it('refuses a final notice for a closed account', async () => {
       await turnOn();
       await book().collection('miners').doc('solo:50').set({ closedAt: '2026-10-17T00:00:00Z' });
@@ -2966,6 +2981,7 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         credit: 0,
         balance: 0,
         paidThrough: through,
+        characterIds: [Number(minerId.slice('solo:'.length))],
         ...over,
       });
       const record = (...checkpoints: ReturnType<typeof checkpoint>[]) =>
@@ -2998,10 +3014,10 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         expect(out).toEqual({
           recorded: ['solo:52'],
           skipped: [
-            { minerId: 'solo:50', reason: 'not-forward' },
-            { minerId: 'solo:52', reason: 'not-forward' },
-            { minerId: 'solo:52', reason: 'balance' },
-            { minerId: 'solo:404', reason: 'unknown-miner' },
+            { minerId: 'solo:50', reason: 'not-forward', reasons: ['not-forward'] },
+            { minerId: 'solo:52', reason: 'not-forward', reasons: ['not-forward'] },
+            { minerId: 'solo:52', reason: 'balance', reasons: ['balance'] },
+            { minerId: 'solo:404', reason: 'unknown-miner', reasons: ['unknown-miner'] },
           ],
         });
         expect((await stored('solo:50'))?.through).toBe('2026-07-31');
@@ -3015,7 +3031,12 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         expect(entry?.detail).toMatchObject({
           recorded: [checkpoint('solo:52', '2026-08-31')],
           skipped: expect.arrayContaining([
-            { minerId: 'solo:404', through: '2026-08-31', reason: 'unknown-miner' },
+            {
+              minerId: 'solo:404',
+              through: '2026-08-31',
+              reason: 'unknown-miner',
+              reasons: ['unknown-miner'],
+            },
           ]),
         });
       });
@@ -3040,10 +3061,12 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         });
         const forgiving = checkpoint('solo:50', '2026-08-31');
         expect(await record(forgiving)).toMatchObject({
-          skipped: [{ minerId: 'solo:50', reason: 'director-approval' }],
+          skipped: [
+            { minerId: 'solo:50', reason: 'director-approval', reasons: ['director-approval'] },
+          ],
         });
         const owing = checkpoint('solo:50', '2026-08-31', {
-          owed: [{ date: '2026-08-05', remaining: 100 }],
+          owed: [{ date: '2026-08-05', remaining: 100, tax: 100, credited: 0 }],
           balance: 100,
           paidThrough: '2026-08-04',
         });
@@ -3070,6 +3093,97 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
           checkpoint: { through: '2026-07-31' },
         });
         expect(await reason(edit(DIRECTOR, reset, true))).toBe('not-found');
+      });
+
+      it('refuses one summed for other characters than the Miner has now', async () => {
+        await turnOn();
+        await minedHere(50);
+        expect(
+          await record(checkpoint('solo:50', '2026-07-31', { characterIds: [50, 51] }))
+        ).toMatchObject({ skipped: [{ minerId: 'solo:50', reasons: ['characters-changed'] }] });
+      });
+
+      describe('a checkpoint is dropped by anything that changes the days it closed', () => {
+        // Today is 18 Oct: a checkpoint closes no day after 31 Aug.
+        const seed = async () => {
+          await turnOn();
+          await minedHere(50, 52);
+          await record(checkpoint('solo:50', '2026-07-31'), checkpoint('solo:52', '2026-07-31'));
+        };
+
+        it('a payment dated on a day it may close; a recent one leaves it', async () => {
+          await seed();
+          const pay = (paymentId: string, at: string) =>
+            edit(ACCOUNTANT, {
+              action: 'recordPayment',
+              paymentId,
+              minerId: 'solo:50',
+              characterId: 50,
+              amount: 5,
+              at,
+            });
+          await pay('m-recent', '2026-10-17T00:00:00.000Z');
+          expect(await stored('solo:50')).toBeDefined();
+          await pay('m-old', '2026-07-15T00:00:00.000Z');
+          expect(await stored('solo:50')).toBeUndefined();
+          expect(await stored('solo:52')).toBeDefined();
+        });
+
+        it('a correction or a write-off, whose oldest days it reaches', async () => {
+          await seed();
+          await edit(ACCOUNTANT, {
+            action: 'addAdjustment',
+            minerId: 'solo:50',
+            date: '2026-07-10',
+            amount: 100,
+            reason: 'missed ore',
+          });
+          expect(await stored('solo:50')).toBeUndefined();
+          await edit(
+            ACCOUNTANT,
+            { action: 'writeOff', minerId: 'solo:52', amount: 5, reason: 'left' },
+            true
+          );
+          expect(await stored('solo:52')).toBeUndefined();
+        });
+
+        it('a regroup: every Miner whose characters change', async () => {
+          await seed();
+          await edit(ACCOUNTANT, {
+            action: 'setMiner',
+            minerId: 'm-a',
+            characterIds: [50, 52],
+            mainCharacterId: 50,
+          });
+          expect(await stored('solo:50')).toBeUndefined();
+          expect(await stored('solo:52')).toBeUndefined();
+        });
+
+        it('an unlink: the grouping and the character it lets go', async () => {
+          await seed();
+          await edit(ACCOUNTANT, {
+            action: 'setMiner',
+            minerId: 'm-a',
+            characterIds: [50, 52],
+            mainCharacterId: 50,
+          });
+          await record(checkpoint('m-a', '2026-07-31', { characterIds: [50, 52] }));
+          expect(await stored('m-a')).toBeDefined();
+          await edit(ACCOUNTANT, { action: 'unlink', minerId: 'm-a', characterId: 52 });
+          expect(await stored('m-a')).toBeUndefined();
+        });
+
+        it('a rate dated on a closed day drops every Miner’s', async () => {
+          await seed();
+          await edit(ACCOUNTANT, {
+            action: 'setRecordRate',
+            recordKey: '50:1000:2026-07-20',
+            pct: 5,
+            reason: 'agreed',
+          });
+          expect(await stored('solo:50')).toBeUndefined();
+          expect(await stored('solo:52')).toBeUndefined();
+        });
       });
 
       it('needs an editor', async () => {

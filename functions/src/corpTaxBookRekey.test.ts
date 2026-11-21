@@ -93,14 +93,14 @@ describe('planRekey', () => {
     );
   });
 
-  it('drops the absorbed Miner recorded figures: account and checkpoint', () => {
+  it('drops the absorbed Miner recorded figures', () => {
     const writes = planRekey({
       ...base,
-      records: [rec('accounts', 'solo:2', {}), rec('accountCheckpoints', 'solo:2', {})],
+      records: [rec('accounts', 'solo:2', {}), rec('minerPaid', 'solo:2', {})],
     });
     expect(writes).toEqual([
       { kind: 'delete', collection: 'accounts', id: 'solo:2' },
-      { kind: 'delete', collection: 'accountCheckpoints', id: 'solo:2' },
+      { kind: 'delete', collection: 'minerPaid', id: 'solo:2' },
     ]);
   });
 

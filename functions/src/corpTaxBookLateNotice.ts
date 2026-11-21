@@ -11,6 +11,7 @@
  * the calendar Statement they replaced; `lateNoticeFromStatementDoc` reads one into a `LateNotice`.
  */
 import { isFiniteNumber, isRecord } from './guards.js';
+import { DAY_MS } from './timeConstants.js';
 
 /** `late`: the Miner is behind. `final`: their account was closed, so it is the last one. */
 export type LateNoticeKind = 'late' | 'final';
@@ -282,6 +283,33 @@ export function legacyStatementDocOf(notice: LateNotice): Record<string, unknown
     remindersStopped: notice.mail.remindersStopped,
     ...notice.names,
   };
+}
+
+/**
+ * Why a new notice is not sent, or null: a line another notice already listed (a notice lists only
+ * new days), or the cooldown since the Miner's last late notice (`cooldownDays`) has not passed. So
+ * two tabs never mail the same days. A final notice starts no cooldown.
+ */
+export function lateNoticeRefusal(
+  notice: { lines: readonly Pick<LateNoticeLine, 'key'>[] },
+  earlier: readonly {
+    issuedAt: string;
+    kind?: LateNoticeKind;
+    lines: readonly Pick<LateNoticeLine, 'key'>[];
+  }[],
+  cooldownDays: number,
+  now: string
+): 'already-listed' | 'notice-cooldown' | null {
+  const listed = listedKeys(earlier);
+  if (notice.lines.some((l) => listed.has(l.key))) return 'already-listed';
+  const last = earlier
+    .filter((n) => n.kind !== 'final')
+    .map((n) => Date.parse(n.issuedAt))
+    .filter((t) => !Number.isNaN(t))
+    .sort((a, b) => b - a)[0];
+  if (last !== undefined && Date.parse(now) - last < cooldownDays * DAY_MS)
+    return 'notice-cooldown';
+  return null;
 }
 
 /** Every line key any of these notices listed. */

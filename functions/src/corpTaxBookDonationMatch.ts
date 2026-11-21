@@ -37,6 +37,15 @@ export function codesIn(reason: string | undefined): string[] {
   return [...new Set((reason ?? '').match(CODE_TOKEN)?.map((c) => c.toUpperCase()) ?? [])];
 }
 
+/** The id of the Miner a Character is on its own (no grouping holds it). */
+export const soloMinerId = (characterId: number): string => `solo:${characterId}`;
+
+/** The Character a solo Miner id names; undefined for a grouping's id. */
+export function soloCharacterId(minerId: string): number | undefined {
+  const solo = /^solo:(\d+)$/.exec(minerId);
+  return solo ? Number(solo[1]) : undefined;
+}
+
 /** The Miner a Character is billed under: its earliest grouping, else a Miner of its own. */
 export function minerIdFor(
   characterId: number,
@@ -45,7 +54,7 @@ export function minerIdFor(
   let best: Pick<MatchMiner, 'id' | 'createdAt'> | undefined;
   for (const m of miners)
     if (m.characterIds.includes(characterId) && (!best || earlierGrouping(m, best) < 0)) best = m;
-  return best?.id ?? `solo:${characterId}`;
+  return best?.id ?? soloMinerId(characterId);
 }
 
 /** Where a stored Miner id lives now: its grouping, the group a solo id or an absorbed id folded into. */
@@ -53,8 +62,8 @@ export function currentMinerOf(minerId: string, miners: readonly MatchMiner[]): 
   if (miners.some((m) => m.id === minerId)) return minerId;
   const folded = miners.find((m) => m.aliases?.includes(minerId));
   if (folded) return folded.id;
-  const solo = /^solo:(\d+)$/.exec(minerId);
-  return solo ? minerIdFor(Number(solo[1]), miners) : minerId;
+  const character = soloCharacterId(minerId);
+  return character !== undefined ? minerIdFor(character, miners) : minerId;
 }
 
 /** Code → the Miners that hold it: one is whose money it is, more is ambiguous. */
@@ -81,7 +90,7 @@ export function codeOwners(
   for (const m of miners) {
     ids.add(m.id);
     for (const a of m.aliases ?? []) ids.add(a);
-    for (const c of m.characterIds) ids.add(`solo:${c}`);
+    for (const c of m.characterIds) ids.add(soloMinerId(c));
   }
   for (const id of ids) add(minerPaymentCode(id), id);
   return owners;

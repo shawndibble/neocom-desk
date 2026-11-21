@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   finalNoticeId,
   isFinalNoticeId,
+  lateNoticeRefusal,
   mergeNoticeMail,
   legacyStatementDocOf,
   listedKeys,
@@ -265,5 +266,32 @@ describe('mergeNoticeMail: one notice kept in two docs reads as one mail state',
         { sent: 0, manualSent: 0, remindersStopped: false }
       )
     ).toEqual({ sent: 0, manualSent: 0, remindersStopped: false });
+  });
+});
+
+describe('lateNoticeRefusal: two tabs never mail the same days', () => {
+  const line = (key: string) => ({ key });
+  const earlier = [
+    { issuedAt: '2026-11-10T00:00:00.000Z', kind: 'late' as const, lines: [line('a')] },
+  ];
+  const now = '2026-11-20T00:00:00.000Z';
+
+  it('sends a notice of new days once the cooldown has passed', () => {
+    expect(lateNoticeRefusal({ lines: [line('b')] }, earlier, 7, now)).toBeNull();
+    expect(lateNoticeRefusal({ lines: [line('b')] }, [], 7, now)).toBeNull();
+  });
+
+  it('refuses a day another notice already listed', () => {
+    expect(lateNoticeRefusal({ lines: [line('b'), line('a')] }, earlier, 7, now)).toBe(
+      'already-listed'
+    );
+  });
+
+  it('refuses one inside the cooldown after the last notice', () => {
+    expect(lateNoticeRefusal({ lines: [line('b')] }, earlier, 14, now)).toBe('notice-cooldown');
+    // A final notice closed an account: it starts no cooldown.
+    expect(
+      lateNoticeRefusal({ lines: [line('b')] }, [{ ...earlier[0], kind: 'final' }], 14, now)
+    ).toBeNull();
   });
 });

@@ -151,6 +151,7 @@ import { refreshMoonDocs } from './corpTaxBookMoonDocsStore.js';
 import {
   currentMinerOf,
   ownerFields,
+  soloMinerId,
   type MatchBook,
   type UncountedDonation,
 } from './corpTaxBookDonationMatch.js';
@@ -164,7 +165,7 @@ import {
   verifyCallerToken,
   type Caller,
 } from './actorAuth.js';
-import type { AuditAction } from './corpTaxBookKinds.js';
+import { NOTICE_DEFAULTS, type AuditAction } from './corpTaxBookKinds.js';
 import { provenCharacterIds } from './playerLayerStore.js';
 import {
   classifyGroup,
@@ -176,8 +177,14 @@ import {
 } from './corpTaxBookClaims.js';
 import type { EveTokenClaims } from './verifyEveToken.js';
 import {
+  checkpointFits,
+  editReachesCheckpoint,
+  type RunningAccountCheckpoint,
+} from './corpTaxBookCheckpoint.js';
+import {
   NOTICE_ID_FIELD,
   lateNoticeFromStatementDoc,
+  lateNoticeRefusal,
   legacyStatementDocOf,
   lineKey,
 } from './corpTaxBookLateNotice.js';
@@ -977,6 +984,17 @@ interface EditCtx {
   book: Data;
   access: OfficerAccess;
   now: number;
+  /** The checkpoints the edit made stale, dropped once its reads are done (`staleCheckpoints`). */
+  stale: StaleCheckpoints[];
+  /** Every checkpoint id, read up front for an edit that may reach every Miner (`BOOK_WIDE_EDITS`). */
+  checkpointIds?: string[];
+}
+
+/** Checkpoints an edit made stale: these Miners' (or every Miner's), if it reaches a closed day. */
+interface StaleCheckpoints {
+  minerIds: readonly (string | null | undefined)[] | 'all';
+  /** The earliest day the edit changes; null when it can reach any day. */
+  onOrBefore: string | null;
 }
 
 interface EditOutcome {
@@ -997,6 +1015,55 @@ const hasLines = (d: Data) => Array.isArray(d.lines) && d.lines.length > 0;
 
 const col = (c: EditCtx, name: string) => sub(c.deps.db, c.corporationId, name);
 const bookOf = (c: EditCtx) => bookRef(c.deps.db, c.corporationId);
+
+/**
+ * Edits that may change every Miner's days (a rate, the book's settings, a dismissal of a record,
+ * moon or Extraction): `editBookAs` reads the checkpoint ids before the edit's writes.
+ */
+const BOOK_WIDE_EDITS = new Set<EditAction['action']>([
+  'addRate',
+  'addRates',
+  'setRecordRate',
+  'updateSettings',
+  'dismiss',
+  'dismissRecords',
+  'reverseDismissal',
+]);
+
+/**
+ * Marks the checkpoints an edit makes stale. A checkpoint is a strict cache of history (decision
+ * 20261120-235011): an edit dated on or before a day it may have closed (`editReachesCheckpoint`)
+ * deletes the Miner's checkpoint in the edit's own transaction, and the next load works the
+ * account out again from the history the book keeps for good. `editBookAs` applies them once the
+ * edit's reads are done.
+ */
+function staleCheckpoints(
+  c: EditCtx,
+  minerIds: StaleCheckpoints['minerIds'],
+  onOrBefore: string | null
+): void {
+  c.stale.push({ minerIds, onOrBefore });
+}
+
+/** Deletes these Miners' checkpoints when an edit dated `onOrBefore` reaches a closed day. */
+function dropCheckpoints(
+  tx: Transaction,
+  db: Firestore,
+  corporationId: number,
+  minerIds: Iterable<string | null | undefined>,
+  onOrBefore: string | null,
+  now: number
+): void {
+  if (!editReachesCheckpoint(onOrBefore, utcDate(now))) return;
+  for (const id of new Set(minerIds))
+    if (id) tx.delete(sub(db, corporationId, ACCOUNT_CHECKPOINTS).doc(id));
+}
+
+/** The earliest of some days or instants, as a day; null when any is unknown. */
+const earliestDay = (...days: unknown[]): string | null =>
+  days.every((d) => typeof d === 'string' && d.length >= 10)
+    ? ((days as string[]).map((d) => d.slice(0, 10)).sort()[0] ?? null)
+    : null;
 
 /**
  * The ids, among `statements`, that open disputes hold something of at `now`
@@ -1373,15 +1440,13 @@ async function rekeyAbsorbed(
     absorbed
   );
   const writes = planRekey({ target, targetUids, records, existingDisputeIds });
-  // A transaction holds 500 writes: a move is two, and the target's checkpoint goes too. Refuse,
-  // rather than fail half-way.
-  const ops = writes.reduce((n, w) => n + (w.kind === 'move' ? 2 : 1), writes.length > 0 ? 1 : 0);
+  // A transaction holds 500 writes: a move is two, and each Miner's checkpoint goes too (the
+  // caller drops them, as every change of a Miner's characters does). Refuse, rather than fail
+  // half-way.
+  const ops = writes.reduce((n, w) => n + (w.kind === 'move' ? 2 : 1), absorbed.length + 1);
   if (ops > 450)
     fail('failed-precondition', 'Too many records to move in one grouping', 'regroup-too-large');
   return () => {
-    // The target's closed-through checkpoint summed only its own history: its next load rolls a
-    // new one forward over the history moved onto it.
-    if (writes.length > 0) tx.delete(at(ACCOUNT_CHECKPOINTS).doc(target));
     for (const w of writes) {
       if (w.kind === 'update') tx.update(at(w.collection).doc(w.id), w.fields);
       else if (w.kind === 'delete') tx.delete(at(w.collection).doc(w.id));
@@ -1440,6 +1505,39 @@ function writeMiner(
     // The Miner ids folded into it: a Reason code printed for one still names it.
     ...(aliases.length > 0 ? { aliases: [...aliases] } : {}),
   });
+}
+
+/**
+ * Every Miner whose characters a grouping changes: the target, what it absorbs, any other grouping
+ * that held one of its characters, and each character's own solo id. Each one's checkpoint summed
+ * other characters than it has now, so it is dropped (decision 20261120-235011).
+ */
+function groupingChange(
+  miners: readonly QueryDocumentSnapshot[],
+  action: { minerId: string; characterIds: readonly number[] },
+  absorbed: readonly string[]
+): string[] {
+  const holders = miners
+    .filter((d) =>
+      ((d.get('characterIds') as number[] | undefined) ?? []).some((x) =>
+        action.characterIds.includes(x)
+      )
+    )
+    .map((d) => d.id);
+  return [
+    action.minerId,
+    ...absorbed,
+    ...holders,
+    ...action.characterIds.map((x) => soloMinerId(x)),
+  ];
+}
+
+/** The Miners an unlink changes: the grouping, the character's own, and a last one's left alone. */
+function unlinkChange(minerId: string, miner: Data, characterId: number): string[] {
+  const left = ((miner.characterIds as number[] | undefined) ?? []).filter(
+    (x) => x !== characterId
+  );
+  return [minerId, soloMinerId(characterId), ...(left.length === 1 ? [soloMinerId(left[0])] : [])];
 }
 
 /** The ids a grouping answers to: its own aliases, and each absorbed Miner's id and aliases. */
@@ -1626,6 +1724,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
   switch (action.action) {
     case 'addRate': {
       await checkRateStarts(c, [action.rate]);
+      staleCheckpoints(c, 'all', action.rate.effectiveFrom);
       const next = [...rates.filter((r) => rateKey(r) !== rateKey(action.rate)), action.rate];
       if (next.length > 500) fail('resource-exhausted', 'Too many rates', 'too-many-rates');
       tx.update(bookDoc, { rates: next });
@@ -1633,6 +1732,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     }
     case 'addRates': {
       await checkRateStarts(c, action.rates);
+      staleCheckpoints(c, 'all', earliestDay(...action.rates.map((r) => r.effectiveFrom)));
       const keys = new Set(action.rates.map(rateKey));
       if (keys.size !== action.rates.length)
         fail('invalid-argument', 'Two of the rates are the same', 'duplicate-rate');
@@ -1651,6 +1751,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         fail('failed-precondition', 'That day is already on a Statement', 'day-on-statement');
       }
       const rate: StoredRate = { scope: 'record', recordKey: action.recordKey, pct: action.pct };
+      staleCheckpoints(c, 'all', date);
       tx.update(bookDoc, { rates: [...rates.filter((r) => rateKey(r) !== rateKey(rate)), rate] });
       return { detail: { recordKey: action.recordKey, pct: action.pct, reason: action.reason } };
     }
@@ -1753,6 +1854,17 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       }
       // Counting a division the book already reads changes nothing.
       if (Object.keys(update).length > 0) tx.update(bookDoc, update);
+      // What every Miner's days are billed or priced at: the start date from the earlier of the
+      // two, the expiry, the day tolerance or the pricing from any day.
+      const patch = action.patch as Data;
+      if (
+        ['structureExpiryHours', 'dayTolerancePct', 'hubId', 'oreForm'].some(
+          (k) => patch[k] !== undefined
+        )
+      )
+        staleCheckpoints(c, 'all', null);
+      else if (startDate !== undefined && startDate !== c.book.startDate)
+        staleCheckpoints(c, 'all', earliestDay(startDate, c.book.startDate));
       // A counted division audits the list stored, never the fallback list sent for an older server.
       const audited =
         addDivision === undefined
@@ -1781,6 +1893,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       if (same?.kind === 'held' || (same && sent.some((p) => p.transferId === same.id)))
         fail('already-exists', 'That transfer is already in the book', 'transfer-in-book');
       await confirmDeclaration(c, action.declarationId, action.minerId, action.paymentId);
+      staleCheckpoints(c, [action.minerId], earliestDay(action.at));
       tx.create(ref, {
         id: action.paymentId,
         source: 'manual',
@@ -1809,6 +1922,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       if (action.notTaxAmount > (payment.amount as number)) {
         fail('invalid-argument', 'More than the payment', 'not-tax-too-large');
       }
+      staleCheckpoints(c, [payment.minerId as string | undefined], earliestDay(payment.at));
       tx.update(ref, {
         notTaxAmount: action.notTaxAmount,
         notTaxReason: action.reason ?? FieldValue.delete(),
@@ -1844,6 +1958,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       if (payment.minerId !== undefined)
         fail('failed-precondition', 'Already assigned', 'already-assigned');
       await confirmDeclaration(c, action.declarationId, action.minerId, action.paymentId);
+      staleCheckpoints(c, [action.minerId], earliestDay(payment.at));
       // An officer placed a held donation: the review it waited for is done (#6207).
       tx.update(ref, { minerId: action.minerId, assignedBy: by, ...reviewDone(payment) });
       return {
@@ -1862,6 +1977,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const from = typeof payment.minerId === 'string' ? payment.minerId : null;
       if (from === action.minerId)
         return { detail: { paymentId: action.paymentId, from, to: from } };
+      staleCheckpoints(c, [from, action.minerId], earliestDay(payment.at));
       tx.update(ref, {
         minerId: action.minerId ?? FieldValue.delete(),
         assignedBy: by,
@@ -1889,6 +2005,14 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         );
       }
       const id = `d${now}_${rand(4)}`;
+      // A Miner's own: their days, any of them; a record: its day; a moon or Extraction: any day.
+      if (action.scope === 'miner') staleCheckpoints(c, [action.targetId], null);
+      else
+        staleCheckpoints(
+          c,
+          'all',
+          action.scope === 'record' ? parseRecordKey(action.targetId).date : null
+        );
       let uids: string[] = [];
       if (action.scope === 'record') {
         const characterId = Number(action.targetId.split(':')[0]);
@@ -1953,6 +2077,11 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
           { reason: 'director-approval' }
         );
       }
+      staleCheckpoints(
+        c,
+        'all',
+        earliestDay(...targets.map((t) => parseRecordKey(t.targetId).date))
+      );
       const ids: string[] = [];
       targets.forEach((target, i) => {
         const id = `d${now}_${i}_${rand(4)}`;
@@ -1984,6 +2113,11 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const ref = col(c, DISMISSALS).doc(action.dismissalId);
       const dismissal = await mustGet(c, ref, 'Dismissal');
       if (dismissal.reversed) fail('failed-precondition', 'Already reversed', 'already-reversed');
+      staleCheckpoints(
+        c,
+        dismissal.scope === 'miner' ? [dismissal.targetId as string] : 'all',
+        dismissal.scope === 'record' ? earliestDay(String(dismissal.targetId).split(':')[2]) : null
+      );
       tx.update(ref, { reversed: { by, at: iso, reason: action.reason } });
       return { detail: { dismissalId: action.dismissalId, reason: action.reason } };
     }
@@ -2013,6 +2147,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const miners = await tx.get(col(c, MINERS));
       const out = await planMiner(c, miners.docs, action, new Set());
       const scope = rekeyScope(action, [], out.readers);
+      staleCheckpoints(c, groupingChange(miners.docs, action, scope.absorbed), null);
       const rekey = await rekeyAbsorbed(
         tx,
         c.deps.db,
@@ -2050,6 +2185,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       }
       const out = await planMiner(c, miners.docs, action, absorbed);
       const scope = rekeyScope(action, action.absorbMinerIds, out.readers);
+      staleCheckpoints(c, groupingChange(miners.docs, action, scope.absorbed), null);
       const rekey = await rekeyAbsorbed(
         tx,
         c.deps.db,
@@ -2082,11 +2218,14 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const miner = await mustGet(c, ref, 'Miner');
       if (!removeFromMiner(c.tx, ref, miner, action.characterId))
         fail('not-found', 'Not in that Miner', 'not-in-miner');
+      staleCheckpoints(c, unlinkChange(action.minerId, miner, action.characterId), null);
       // The grouping the answer was about is gone, so the answer must not outlive it.
       clearAnswers(c, [action.characterId]);
       return { detail: { minerId: action.minerId, characterId: action.characterId } };
     }
     case 'addAdjustment': {
+      // A correction or an opening balance ("Set balance"): its day.
+      staleCheckpoints(c, [action.minerId], action.date);
       const id = `a${now}_${rand(4)}`;
       // The Miner reads their own corrections on the personal tab (#4622).
       const uids = await minerUids(c, action.minerId);
@@ -2117,6 +2256,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const adjustment = await mustGet(c, ref, 'Adjustment');
       await assertAdjustmentReversible(c, action.adjustmentId, adjustment);
       requireDirectorAbove(c, [Math.abs(Number(adjustment.amount))]);
+      staleCheckpoints(c, [adjustment.minerId as string], earliestDay(adjustment.date));
       tx.update(ref, { reversed: { by, at: iso, reason: action.reason } });
       return {
         detail: {
@@ -2136,6 +2276,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const minerId = adjustment.minerId as string;
       const uids = await minerUids(c, minerId);
       const id = `a${now}_${rand(4)}`;
+      staleCheckpoints(c, [minerId], earliestDay(adjustment.date, action.date));
       tx.update(ref, { reversed: { by, at: iso, reason: `Edited: ${action.reason}` } });
       tx.create(col(c, ADJUSTMENTS).doc(id), {
         id,
@@ -2167,6 +2308,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       if (writeOff.reversed) fail('failed-precondition', 'Already reversed', 'already-reversed');
       requireDirectorAbove(c, [Math.abs(Number(writeOff.amount))]);
       // A dispute this write-off answered stays answered: only the forgiveness is undone.
+      // A write-off forgives the oldest days, so undoing it can reach any of them.
+      staleCheckpoints(c, [writeOff.minerId as string], null);
       tx.update(ref, { reversed: { by, at: iso, reason: action.reason } });
       return {
         detail: {
@@ -2178,6 +2321,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       };
     }
     case 'setToleranceExemption': {
+      staleCheckpoints(c, [action.minerId], action.date);
       // Forgiving more than the book would is a write-off, so it meets the same gate; charging a
       // shortfall (0) only raises what is owed.
       if (action.forgive > 0) requireDirectorAbove(c, [action.forgive]);
@@ -2206,6 +2350,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       };
     }
     case 'writeOff': {
+      // It forgives the oldest unpaid days, which may be closed ones.
+      staleCheckpoints(c, [action.minerId], null);
       // A write-off forgives the Miner's oldest unpaid days (decision 20261120-235011), and closes
       // the Miner's disputes of the days it forgives (#6307): answered, so they leave the
       // officer's Needs you and no longer hold those days.
@@ -2250,6 +2396,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       };
     }
     case 'rebill': {
+      staleCheckpoints(c, [action.minerId], action.fromDate);
       const [statements, paidDoc, minerDoc] = await Promise.all([
         readNoticeDocs(tx, bookOf(c), ofMinerFilter(action.minerId)),
         tx.get(col(c, META).doc(PAID_DOC)),
@@ -2318,6 +2465,18 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         fail('failed-precondition', "This Miner's account is closed", 'account-closed');
       if (current.exists || legacy.exists)
         fail('already-exists', 'A Late notice never changes', 'notice-exists');
+      // Two tabs never mail the same days: no line another notice listed, and the book's cooldown.
+      const refusal = lateNoticeRefusal(
+        sent,
+        await minerNotices(c, sent.minerId),
+        (c.book.noticeRules as { cooldownDays?: number } | undefined)?.cooldownDays ??
+          NOTICE_DEFAULTS.cooldownDays,
+        iso
+      );
+      if (refusal === 'already-listed')
+        fail('already-exists', 'Another notice already listed one of these days', refusal);
+      if (refusal === 'notice-cooldown')
+        fail('failed-precondition', 'This Miner was sent a notice too recently', refusal);
       // Who may read it and who issued it are the server's to say, never the tab's.
       const readers = minerReaders(sent.minerId, miner.data());
       const notice = {
@@ -2332,6 +2491,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       };
     }
     case 'closeAccount':
+      staleCheckpoints(c, [action.minerId], null);
       return closeAccount(c, action);
     case 'settleStatements': {
       const paidRef = col(c, META).doc(PAID_DOC);
@@ -2414,6 +2574,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const dispute = await mustGet(c, ref, 'Dispute');
       if (!hasLines(dispute)) fail('not-found', 'Dispute not found', 'not-found');
       if (dispute.resolution) fail('failed-precondition', 'Already resolved', 'already-resolved');
+      // The answer ends the day's hold, and the waiver credits the day.
+      staleCheckpoints(c, [action.minerId, dispute.minerId as string], earliestDay(dispute.date));
       if (dispute.minerId !== action.minerId)
         fail('invalid-argument', "Dispute is another Miner's", 'wrong-miner');
       const lines = (dispute.lines as DisputeConflictInput['lines'] | undefined) ?? [];
@@ -2478,6 +2640,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     case 'rejectDispute': {
       const ref = col(c, DISPUTES).doc(action.disputeId);
       const dispute = await mustGet(c, ref, 'Dispute');
+      // The answer ends the day's hold: the day is due again.
+      staleCheckpoints(c, [dispute.minerId as string], earliestDay(dispute.date));
       if (!hasLines(dispute)) fail('not-found', 'Dispute not found', 'not-found');
       if (dispute.resolution) fail('failed-precondition', 'Already resolved', 'already-resolved');
       const nextStep = action.nextStep !== undefined ? { nextStep: action.nextStep } : {};
@@ -2539,17 +2703,25 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const stored = refs.length > 0 ? await c.tx.getAll(...refs) : [];
       const recorded: { checkpoint: RecordedCheckpoint; ref: DocumentReference; uids: string[] }[] =
         [];
-      const skipped: { minerId: string; through: string; reason: string }[] = [];
+      const skipped: { minerId: string; through: string; reason: string; reasons: string[] }[] = [];
       for (const [i, k] of action.checkpoints.entries()) {
         const known = await knownMiner(c, k.minerId);
-        const reason = checkpointRefusal(k, {
-          stored: stored[i].data() as { through: string } | undefined,
+        const characterIds = known
+          ? minerCharacters(k.minerId, (await c.tx.get(col(c, MINERS).doc(k.minerId))).data())
+          : [];
+        // One summed for other characters than the Miner has now is no checkpoint at all.
+        const held = stored[i].data() as RunningAccountCheckpoint | undefined;
+        const reasons = checkpointRefusal(k, {
+          stored: held && checkpointFits(held, characterIds) ? held : undefined,
           today,
           known,
+          characterIds,
           live: known ? await liveAccountOf(c, k.minerId) : undefined,
           isDirector: c.access.isDirector,
         });
-        if (reason) skipped.push({ minerId: k.minerId, through: k.through, reason });
+        // `reason` is the first, for a tab that reads one; `reasons` names every one.
+        if (reasons.length > 0)
+          skipped.push({ minerId: k.minerId, through: k.through, reason: reasons[0], reasons });
         else recorded.push({ checkpoint: k, ref: refs[i], uids: await minerUids(c, k.minerId) });
       }
       for (const { checkpoint, ref, uids } of recorded)
@@ -2559,7 +2731,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         detail: { recorded: recorded.map((r) => r.checkpoint), skipped },
         result: {
           recorded: recorded.map((r) => r.checkpoint.minerId),
-          skipped: skipped.map(({ minerId, reason }) => ({ minerId, reason })),
+          skipped: skipped.map(({ minerId, reason, reasons }) => ({ minerId, reason, reasons })),
         },
       };
     }
@@ -2874,8 +3046,27 @@ export async function editBookAs(
       book: snap.data() as Data,
       access,
       now: deps.now(),
+      stale: [],
     };
+    if (BOOK_WIDE_EDITS.has(action.action))
+      ctx.checkpointIds = (
+        await tx.get(sub(deps.db, call.corporationId, ACCOUNT_CHECKPOINTS).select())
+      ).docs.map((d) => d.id);
     const outcome = await applyEdit(ctx, action);
+    dropCheckpoints(
+      tx,
+      deps.db,
+      call.corporationId,
+      ctx.stale.flatMap(({ minerIds, onOrBefore }) =>
+        !editReachesCheckpoint(onOrBefore, utcDate(ctx.now))
+          ? []
+          : minerIds === 'all'
+            ? (ctx.checkpointIds ?? [])
+            : minerIds
+      ),
+      null,
+      ctx.now
+    );
     const actor = actorOf(access, via);
     // `addRates` is never an audit action itself: it always returns its own per-rate `audits`.
     for (const a of outcome.audits ?? [
@@ -2949,6 +3140,15 @@ export async function confirmGrouping(
       uids: FieldValue.arrayUnion(caller.uid),
     });
     rekey();
+    // The guest's own history joins the group's: neither checkpoint sums it any more.
+    dropCheckpoints(
+      tx,
+      deps.db,
+      corporationId,
+      [minerId, soloMinerId(characterId)],
+      null,
+      deps.now()
+    );
     recordAnswer(tx, deps, corporationId, characterId, {
       minerId,
       answer: 'confirmed',
@@ -2977,6 +3177,14 @@ async function declinePending(
     if (miner.closedAt != null)
       fail('failed-precondition', "This Miner's account is closed", 'account-closed');
     removeFromMiner(tx, ref, miner, characterId);
+    dropCheckpoints(
+      tx,
+      deps.db,
+      corporationId,
+      unlinkChange(minerId, miner, characterId),
+      null,
+      deps.now()
+    );
     recordAnswer(tx, deps, corporationId, characterId, {
       minerId,
       answer: 'declined',
@@ -3018,6 +3226,14 @@ export async function declineLink(
     if (miner.closedAt != null)
       fail('failed-precondition', "This Miner's account is closed", 'account-closed');
     removeFromMiner(tx, ref, miner, characterId);
+    dropCheckpoints(
+      tx,
+      deps.db,
+      corporationId,
+      unlinkChange(minerId, miner, characterId),
+      null,
+      deps.now()
+    );
     recordAnswer(tx, deps, corporationId, characterId, {
       minerId,
       answer: 'declined',
@@ -3215,6 +3431,7 @@ async function claimPaymentTx(
       claimedAt: new Date(deps.now()).toISOString(),
       ...(inReview ? { reviewReason: FieldValue.delete() } : {}),
     });
+    dropCheckpoints(tx, deps.db, corporationId, [minerId], String(payment.at ?? ''), deps.now());
     appendAudit(
       tx,
       deps,
@@ -3301,6 +3518,9 @@ export async function declareOwnPayment(deps: BookDeps, caller: Caller, input: D
       transfers.length > 0
         ? await checkTransfers(tx, deps, corporationId, senderIds, transfers)
         : ([] as ClaimCheck[]);
+    // A transfer credited now pays the Miner's days, closed ones too.
+    if (checks.some((x) => x.result === 'found'))
+      dropCheckpoints(tx, deps.db, corporationId, [minerId], null, deps.now());
     // Every transfer found in the book: confirmed at once, nobody had to look.
     const allFound = checks.length > 0 && checks.every((c) => c.result === 'found');
     const now = deps.now();
@@ -3502,6 +3722,8 @@ export async function disputeConflict(deps: BookDeps, caller: Caller, input: Dis
         ...said,
       });
     }
+    // A hold on a closed day changes what the Miner owes through it.
+    dropCheckpoints(tx, deps.db, corporationId, [minerId], date, deps.now());
     appendAudit(
       tx,
       deps,
@@ -3543,6 +3765,7 @@ export async function withdrawDispute(deps: BookDeps, caller: Caller, input: Wit
       ...(Array.isArray(held.history) ? { history: held.history } : {}),
       withdrawnAt: new Date(deps.now()).toISOString(),
     });
+    dropCheckpoints(tx, deps.db, corporationId, [minerId], date, deps.now());
     appendAudit(
       tx,
       deps,
