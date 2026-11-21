@@ -117,7 +117,11 @@ function oreTotals(scan: SurveyScan): {
   return { byOre, iskByOre };
 }
 
-const total = (scan: SurveyScan): number => scan.rocks.reduce((sum, r) => sum + r.volume, 0);
+/** The sum of a scan's rock volumes (m³): the one place a scan's size is added up. */
+export const scanVolume = (rocks: readonly { volume: number }[]): number =>
+  rocks.reduce((sum, r) => (r.volume > 0 ? sum + r.volume : sum), 0);
+
+const total = (scan: SurveyScan): number => scanVolume(scan.rocks);
 
 /**
  * What changed between two scans. A scan only shows the rocks in range, so
@@ -172,6 +176,17 @@ export function countedScans(
   ignored: ReadonlySet<string>
 ): SurveyScan[] {
   return scans.filter((s) => s.id === undefined || !ignored.has(s.id));
+}
+
+/** The earliest counted scan, whatever order the scans were stored in: the best picture of the whole chunk. */
+export function firstCountedScan(
+  scans: readonly SurveyScan[],
+  ignored: ReadonlySet<string>
+): SurveyScan | undefined {
+  return countedScans(scans, ignored).reduce<SurveyScan | undefined>(
+    (a, b) => (a === undefined || b.at < a.at ? b : a),
+    undefined
+  );
 }
 
 /** A scan's rocks as a comparable string, so a repaste of the same scan is recognised. */

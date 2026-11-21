@@ -205,11 +205,6 @@ export interface ChunkEstimate {
   measuredVolume?: boolean;
 }
 
-/** The sum of a scan's rock volumes (m³). */
-export function scanVolume(rocks: readonly { volume: number }[]): number {
-  return rocks.reduce((sum, r) => (r.volume > 0 ? sum + r.volume : sum), 0);
-}
-
 /** Whether a scan taken at `at` can belong to this extraction's cycle: from chunk arrival to expiry. */
 function scanInCycle(ex: Extraction, at: number | undefined, expiryHours: number | undefined) {
   if (at === undefined) return true;
