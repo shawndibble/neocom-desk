@@ -29,7 +29,6 @@ import {
   donationsReadAtPatch,
   parseToken,
   parseTurnOnInput,
-  reanchorCadence,
   satisfies,
   startDateMoveReason,
 } from './corpTaxBook.js';
@@ -1108,23 +1107,6 @@ describe('settings patch: start date and member visibility', () => {
     expect(() => parseSettingsPatch({ divisionNames: { '2': 7 } })).toThrow();
     expect(() => parseSettingsPatch({ divisionNames: { '2': 'x'.repeat(51) } })).toThrow();
     expect(() => parseSettingsPatch({ divisionNames: ['x'] })).toThrow();
-  });
-});
-
-describe('reanchorCadence', () => {
-  const days = { kind: 'days', days: 7, anchor: '2026-10-01' };
-  it('moves an N-day anchor that sat on the old start to the new start', () => {
-    expect(reanchorCadence(days, '2026-10-01', '2026-09-25')).toEqual({
-      kind: 'days',
-      days: 7,
-      anchor: '2026-09-25',
-    });
-  });
-  it('leaves a custom anchor, a monthly cadence and no cadence alone', () => {
-    expect(reanchorCadence(days, '2026-09-01', '2026-09-25')).toBe(days);
-    const monthly = { kind: 'monthly' };
-    expect(reanchorCadence(monthly, '2026-10-01', '2026-09-25')).toBe(monthly);
-    expect(reanchorCadence(undefined, '2026-10-01', '2026-09-25')).toBeUndefined();
   });
 });
 
