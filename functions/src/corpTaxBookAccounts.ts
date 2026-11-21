@@ -12,8 +12,11 @@ export interface OwedDay {
   tax: number;
 }
 
-/** A payment's tax: its amount less what an officer marked not tax. */
-const net = (p: Data) => {
+/**
+ * A payment's tax: its amount less what an officer marked not tax. The one copy of the rule the
+ * client's `netOf` (src/engine/corpTaxBook/paymentPreview.ts) repeats: it can import this instead.
+ */
+export const netPayment = (p: Data): number => {
   const amount = Number(p.amount) || 0;
   return Math.max(0, amount - Math.min(Number(p.notTaxAmount) || 0, amount));
 };
@@ -23,7 +26,7 @@ const net = (p: Data) => {
  * the ones it counted (`paid`), whenever each was synced.
  */
 export function paidSinceRecord(recorded: Data, payments: readonly Data[]): number {
-  const paidNow = payments.reduce((sum, p) => sum + net(p), 0);
+  const paidNow = payments.reduce((sum, p) => sum + netPayment(p), 0);
   return Math.max(0, paidNow - (Number(recorded.paid) || 0));
 }
 
@@ -115,8 +118,7 @@ export function ledgerPayments(
 ): { id: string; at: string; amount: number; source: 'donation' | 'manual' }[] {
   return payments
     .flatMap(({ id, data }) => {
-      const amount = Number(data.amount) || 0;
-      const net = Math.max(0, amount - Math.min(Number(data.notTaxAmount) || 0, amount));
+      const net = netPayment(data);
       const at = typeof data.at === 'string' ? data.at : '';
       if (net <= 0 || !at || (startDate && at.slice(0, 10) < startDate)) return [];
       return [

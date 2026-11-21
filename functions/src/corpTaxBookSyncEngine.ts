@@ -22,6 +22,11 @@ import {
   type ObservedRow,
 } from './corpTaxBookEngine.js';
 
+import { UNCOUNTED_LIMIT, minerIdFor, type UncountedDonation } from './corpTaxBookDonationMatch.js';
+
+/** One copy each, in the shared donation matching (corpTaxBookDonationMatch.ts). */
+export { UNCOUNTED_LIMIT, minerIdFor, type UncountedDonation };
+
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 // --- Observer ledger ------------------------------------------------------
@@ -180,11 +185,6 @@ export interface StatementLike {
   code: string;
 }
 
-/** Engine `minerIdFor`. */
-export function minerIdFor(characterId: number, miners: readonly MinerLike[]): string {
-  return miners.find((m) => m.characterIds.includes(characterId))?.id ?? `solo:${characterId}`;
-}
-
 export type DonationMatch =
   | { kind: 'statement'; statementId: string; minerId: string }
   | { kind: 'miner'; minerId: string }
@@ -198,7 +198,11 @@ function carriesCode(reason: string, code: string): boolean {
   return new RegExp(`(^|[^a-z0-9])${escapeRegExp(code)}($|[^a-z0-9])`, 'i').test(reason);
 }
 
-/** Engine `matchDonation`. */
+/**
+ * Engine `matchDonation`.
+ * @deprecated The server matches with corpTaxBookDonationMatch.ts; this stays only for the
+ * client's parity test (syncMirror.test.ts) and goes with the client's own copy.
+ */
 export function matchDonation(
   donation: { characterId: number; reason: string | undefined },
   book: {
@@ -222,7 +226,7 @@ export function matchDonation(
   return { kind: 'unmatched' };
 }
 
-/** Engine `resolveDonations`. */
+/** Engine `resolveDonations`. @deprecated As `matchDonation`: the server uses `resolveDonationOwners`. */
 export function resolveDonations(
   donations: readonly JournalDonation[],
   book: {
@@ -261,24 +265,13 @@ export function resolveDonations(
 
 /** Engine `WALLET_DIVISIONS`. */
 export const WALLET_DIVISIONS = [1, 2, 3, 4, 5, 6, 7] as const;
-/** Engine `UNCOUNTED_LIMIT`: also the sync callable's bound on `uncounted`. */
-export const UNCOUNTED_LIMIT = 20;
-
-export interface UncountedDonation {
-  id: string;
-  refId: number;
-  division: number;
-  characterId: number;
-  amount: number;
-  at: string;
-}
 
 /** Engine `otherDivisions`. */
 export function otherDivisions(divisions: readonly number[]): number[] {
   return WALLET_DIVISIONS.filter((d) => !divisions.includes(d));
 }
 
-/** Engine `noteUncounted`. */
+/** Engine `noteUncounted`. @deprecated As `matchDonation`: the server uses `uncountedDonations`. */
 export function noteUncounted(
   donations: readonly JournalDonation[],
   book: {

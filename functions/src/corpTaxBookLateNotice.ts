@@ -123,6 +123,28 @@ export function noticeDocId(id: string): string {
   return id.replace(/[^A-Za-z0-9_:-]/g, '_');
 }
 
+/** Whether an id is a final notice's: only closing an account issues one. */
+export function isFinalNoticeId(id: string): boolean {
+  return id.startsWith(FINAL_PREFIX);
+}
+
+/**
+ * A notice's mail state from both docs that hold it while the legacy mirror lives: reminders are
+ * stopped if either says so, each count is the larger, the last mail the later.
+ */
+export function mergeNoticeMail(a: LateNoticeMail, b: LateNoticeMail): LateNoticeMail {
+  const lastAt = [a.lastAt, b.lastAt]
+    .filter((x): x is string => !!x)
+    .sort()
+    .at(-1);
+  return {
+    sent: Math.max(a.sent, b.sent),
+    ...(lastAt ? { lastAt } : {}),
+    manualSent: Math.max(a.manualSent, b.manualSent),
+    remindersStopped: a.remindersStopped || b.remindersStopped,
+  };
+}
+
 /** The id of the final notice closing `minerId`'s account sends. */
 export function finalNoticeId(minerId: string): string {
   return noticeDocId(`${FINAL_PREFIX}${minerId}`);
@@ -199,7 +221,7 @@ export function lateNoticeFromStatementDoc(raw: Record<string, unknown>): LateNo
     id,
     minerId: str(raw.minerId) ?? '',
     characterIds: (Array.isArray(raw.characterIds) ? raw.characterIds : []).filter(isFiniteNumber),
-    kind: id.startsWith(FINAL_PREFIX) ? 'final' : 'late',
+    kind: isFinalNoticeId(id) ? 'final' : 'late',
     issuedAt: str(raw.issuedAt) ?? '',
     ...(issuedBy !== undefined ? { issuedBy } : {}),
     // An empty code would match every donation's reason: no code is printed instead.

@@ -69,3 +69,39 @@ export function canAdvanceCheckpoint(
 ): boolean {
   return next.through <= closedThroughFor(today) && (!stored || next.through > stored.through);
 }
+
+/** Why a checkpoint does not add up, or null when it does. */
+export type CheckpointProblem =
+  | 'owed-order'
+  | 'owed-after-through'
+  | 'owed-remaining'
+  | 'owed-charge'
+  | 'credit'
+  | 'balance'
+  | 'paid-through';
+
+/**
+ * Whether a checkpoint is consistent in itself: owed days oldest first, once each, none after
+ * `through`, each still owing something with an officer's charge no more than it owes; no negative
+ * credit; a balance equal to what is owed less the credit, to the ISK; and a paid-through day no
+ * later than `through` and before the oldest owed day.
+ */
+export function checkpointProblem(
+  c: Pick<RunningAccountCheckpoint, 'through' | 'owed' | 'credit' | 'balance' | 'paidThrough'>
+): CheckpointProblem | null {
+  for (let i = 1; i < c.owed.length; i++)
+    if (c.owed[i].date <= c.owed[i - 1].date) return 'owed-order';
+  if (c.owed.some((d) => d.date > c.through)) return 'owed-after-through';
+  if (c.owed.some((d) => !(d.remaining > 0))) return 'owed-remaining';
+  if (c.owed.some((d) => d.charge !== undefined && !(d.charge >= 0 && d.charge <= d.remaining)))
+    return 'owed-charge';
+  if (!(c.credit >= 0)) return 'credit';
+  const owed = c.owed.reduce((sum, d) => sum + d.remaining, 0);
+  if (Math.abs(c.balance - (owed - c.credit)) >= 1) return 'balance';
+  if (
+    c.paidThrough !== null &&
+    (c.paidThrough > c.through || (c.owed.length > 0 && c.paidThrough >= c.owed[0].date))
+  )
+    return 'paid-through';
+  return null;
+}

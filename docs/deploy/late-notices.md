@@ -13,11 +13,14 @@ deployed now keep working at each point, so the steps can run before the PR merg
 - **Indexes:** none. Every new query is on a single field (`minerId`, `characterIds`,
   `issuedAt`, `extractionId`, `chunkArrivalTime`).
 - **Functions:**
-  - `corpTaxBookCall` (the book's router): `issueLateNotice`, `recordLateNoticeMail` and
-    `recordCheckpoints` edits; Late notices written beside their `statements` mirror; the verify
-    page, Stop reminders and declarations read `lateNotices` first; write-offs pin no notice.
-  - `syncCorpTaxBooks` (scheduled sync): donations matched on each Miner's code and every
-    notice's.
+  - `corpTaxBookCall` (the book's router): `issueLateNotice`, `recordLateNoticeMail`,
+    `recordCheckpoints` and `resetCheckpoint` edits; Late notices written beside their
+    `statements` mirror; the verify page, Stop reminders and declarations read `lateNotices`
+    first; a write-off pins no notice, and an older tab's write-off that names one is refused
+    with "reload the page".
+  - `syncCorpTaxBooks` (scheduled sync): donations matched by the shared rule
+    (`corpTaxBookDonationMatch.ts`): a known sender's money is their own Miner's; a stranger's is
+    named by each Miner's code or a notice's, and a code two Miners hold goes to review.
   - `dailyHousekeeping` (job `verifyBookDocs`): the nightly pass rebuilds moon docs (schema 2, no
     frozen tax) and the tab read models (schema 2, from recorded accounts), and deletes the
     retired `minerTotals` docs.
@@ -40,8 +43,12 @@ deployed now keep working at each point, so the steps can run before the PR merg
    ```
 
 3. **Backfill**, once the functions are live (a notice issued before step 2 exists only in
-   `statements`). Count first, then copy. It is create-only, so it can run again safely; a batch
-   that meets a notice issued during the run fails, and a re-run copies what is left.
+   `statements`). Count first, then copy. It creates missing copies, brings each existing copy's
+   mail state level with its legacy doc, and then marks the book (`meta/lateNoticesBackfilled`):
+   from then on reads look at `lateNotices` alone. Until a book is marked, every read also reads
+   the ids of its legacy docs and fetches those with no copy. It can run again safely; a book
+   that fails (a notice issued during its run) is reported, the run goes on, and the script exits
+   non-zero: re-run it with those corporation ids.
 
    ```sh
    cd functions && npm run build
@@ -55,9 +62,24 @@ deployed now keep working at each point, so the steps can run before the PR merg
    or a declaration on a notice the backfill has not reached still works: the functions fall
    back to its `statements` doc.
 
+5. **Promote `develop` to `main` soon after step 2.** The production client on `main` is built
+   for the old schemas (moon docs and read models schema 1): from step 2 it ignores the rebuilt
+   docs and reads the whole book instead. Its figures stay correct, only slower, until it is
+   promoted.
+
 ## After deploy
 
 - The first nightly pass rewrites every moon doc and both read models (new schemas) and deletes
   `minerTotals` and `meta/minerTotalsHealth`; its result is in `meta/verifierHealth`.
-- Rolling the functions back is safe: notices are still mirrored to `statements`, and verify
-  tokens still name their notice under `statementId`.
+- **Rolling the functions back is not free.** Verify links keep working (every notice is
+  mirrored to `statements`, and tokens still name it under `statementId`), but the older
+  functions write only the legacy docs: a notice issued or a mail recorded while rolled back
+  lands only in `statements`. They also write `minerTotals` and schema-1 moon docs and read
+  models again. After rolling forward again:
+  - delete every `corps/{id}/meta/lateNoticesBackfilled` doc, or a marked book's list reads
+    (the Miners list, codes, guards) miss the notices issued meanwhile;
+  - re-run the backfill (step 3): it copies those notices and brings their mail state across
+    (until then the verify page and mail already read both docs and merge their mail state);
+  - the next nightly pass rewrites the moon docs and read models and deletes `minerTotals`.
+- An older tab that still issues a calendar Statement on a book that never switched removes the
+  book's backfilled marker, so reads look at the legacy docs again until the next backfill.

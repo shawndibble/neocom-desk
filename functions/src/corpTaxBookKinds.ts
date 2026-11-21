@@ -91,6 +91,7 @@ export const AUDIT_ACTIONS = [
   'recordLateNoticeMail',
   'recordAccounts',
   'recordCheckpoints',
+  'resetCheckpoint',
   'setPopSharing',
   'setPopSharingMoon',
   'stopReminders',
