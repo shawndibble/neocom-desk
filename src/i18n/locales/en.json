@@ -7994,6 +7994,7 @@
       "check": {
         "ambiguous": "Several matches — an officer picks",
         "found": "Found",
+        "credited": "Already credited",
         "division": "Found · Division {{division}}",
         "notSynced": "Not synced yet",
         "tooOld": "Too old to check",
@@ -18620,6 +18621,8 @@
         },
         "check": {
           "found": "Found",
+          "credited": "Already credited to {{miner}}",
+          "anotherMiner": "a Miner no longer in the book",
           "division": "Found · Division {{division}}",
           "notSynced": "Not synced yet",
           "tooOld": "Too old to check",

@@ -262,15 +262,12 @@ export async function syncCorpTaxBook(
     ...feed.rows,
     ...(await billedStoredRows(deps, characterId, corporationId, before, feed.rows, fresh)),
   ] as ObservedRow[];
-  const known = new Set<number>([
-    ...rows.map((r) => r.characterId),
-    ...before.miners.flatMap((m) => m.characterIds),
-    ...before.payments.filter((p) => p.minerId !== undefined).map((p) => p.characterId),
-  ]);
+  const mined = new Set(rows.map((r) => r.characterId));
   const matching = donationMatchBook({
     miners: before.miners,
     notices: before.notices,
-    knownCharacterIds: known,
+    minedCharacterIds: mined,
+    payments: before.payments,
   });
   // The server places each donation itself, with the shared rule (`donationOwner`): a Miner this
   // tab named would be ignored, so none is sent.
@@ -334,7 +331,7 @@ export async function syncCorpTaxBook(
   // Miner (or mined here) since. Assign the ones that match now; the officer's queue keeps the rest.
   const { error: reassignError } = await reassignUnmatched(deps, characterId, corporationId, {
     before,
-    known,
+    mined,
     rows,
     regrouped: autoGrouped > 0,
   });
@@ -377,15 +374,11 @@ async function billedStoredRows(
       p.reviewReason === 'no-open-balance' &&
       !(p.notTaxAmount && p.notTaxAmount > 0)
   );
-  const known = new Set<number>([
-    ...feedRows.map((r) => r.characterId),
-    ...book.miners.flatMap((m) => m.characterIds),
-    ...book.payments.filter((p) => p.minerId !== undefined).map((p) => p.characterId),
-  ]);
   const feedOnly = donationMatchBook({
     miners: book.miners,
     notices: book.notices,
-    knownCharacterIds: known,
+    minedCharacterIds: new Set(feedRows.map((r) => r.characterId)),
+    payments: book.payments,
   });
   const senders = [
     ...new Set(
@@ -427,7 +420,7 @@ async function reassignUnmatched(
   corporationId: number,
   args: {
     before: BookState;
-    known: ReadonlySet<number>;
+    mined: ReadonlySet<number>;
     rows: readonly ObservedRow[];
     regrouped: boolean;
   }
@@ -441,13 +434,13 @@ async function reassignUnmatched(
     const book = args.regrouped
       ? ((await deps.readBookState(characterId, corporationId)) ?? args.before)
       : args.before;
-    const known = new Set([...args.known, ...book.miners.flatMap((m) => m.characterIds)]);
     // A sender the book knows credits their Miner, owing or not (#6300). That includes one held
     // for review under #6207: the next sync clears it.
     const matchBook = donationMatchBook({
       miners: book.miners,
       notices: book.notices,
-      knownCharacterIds: known,
+      minedCharacterIds: args.mined,
+      payments: book.payments,
     });
     for (const p of open) {
       const match = donationOwner(

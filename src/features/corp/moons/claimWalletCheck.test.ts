@@ -22,13 +22,13 @@ const entry = (over: Partial<WalletJournalEntry> = {}): WalletJournalEntry => ({
 describe('entryMatchesTransfer', () => {
   it('matches an incoming donation of the same amount from the member within 48 hours', () => {
     expect(entryMatchesTransfer(entry(), transfer, [50])).toBe(true);
-    expect(entryMatchesTransfer(entry({ amount: 10_000_001 }), transfer, [50])).toBe(true);
+    expect(entryMatchesTransfer(entry({ amount: 10_000_000.5 }), transfer, [50])).toBe(true);
     expect(entryMatchesTransfer(entry({ date: '2026-11-12T11:00:00Z' }), transfer, [50])).toBe(
       true
     );
   });
   it('rejects another amount, another sender, outgoing, another type, or too far apart', () => {
-    expect(entryMatchesTransfer(entry({ amount: 10_000_005 }), transfer, [50])).toBe(false);
+    expect(entryMatchesTransfer(entry({ amount: 10_000_001 }), transfer, [50])).toBe(false);
     expect(entryMatchesTransfer(entry({ first_party_id: 99 }), transfer, [50])).toBe(false);
     expect(entryMatchesTransfer(entry({ amount: -10_000_000 }), transfer, [50])).toBe(false);
     expect(entryMatchesTransfer(entry({ ref_type: 'market_escrow' }), transfer, [50])).toBe(false);

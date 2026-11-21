@@ -225,22 +225,30 @@ export function donationsFromJournal(
 
 /**
  * The book as the shared donation rule reads it (`donationOwner`, functions/src/
- * corpTaxBookDonationMatch.ts): its Miners, every code it recognises and the Characters it knows.
- * The officer tab's one way into that rule, so it cannot drift from the server's.
+ * corpTaxBookDonationMatch.ts): its Miners, every code it recognises, the Characters it has seen
+ * mine and whom each payer paid before. The officer tab's one way into that rule, so it cannot
+ * drift from the server's.
  */
 export function donationMatchBook(book: {
   miners: readonly Miner[];
   notices: readonly Pick<LateNotice, 'id' | 'minerId' | 'code'>[];
-  knownCharacterIds: ReadonlySet<number>;
+  minedCharacterIds: ReadonlySet<number>;
+  payments: readonly { characterId: number; minerId?: string }[];
 }): MatchBook {
+  const paidBefore = new Map<number, string[]>();
+  for (const p of book.payments)
+    if (p.minerId !== undefined && !paidBefore.get(p.characterId)?.includes(p.minerId))
+      paidBefore.set(p.characterId, [...(paidBefore.get(p.characterId) ?? []), p.minerId]);
   const knownMinerIds = new Set([
     ...book.notices.map((n) => n.minerId),
-    ...[...book.knownCharacterIds].map((c) => minerIdFor(c, book.miners)),
+    ...[...book.minedCharacterIds].map((c) => minerIdFor(c, book.miners)),
+    ...[...paidBefore.values()].flat(),
   ]);
   return {
     miners: book.miners,
     codes: codeOwners(book.notices, book.miners, knownMinerIds),
-    knownCharacterIds: book.knownCharacterIds,
+    minedCharacterIds: book.minedCharacterIds,
+    paidBefore,
   };
 }
 

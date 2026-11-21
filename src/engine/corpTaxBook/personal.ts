@@ -35,7 +35,7 @@ import {
   type MoneySource,
   type PaidBy,
 } from './paidBy';
-import { isSameTransfer } from './transferMatch';
+import { isSameJournalTransfer } from '../../../functions/src/corpTaxBookTransferMatch';
 import { daySettleTolerance } from './minerRunningAccount';
 import { exemptionsOf, type ToleranceExemption } from './toleranceExemptions';
 import { splitAcrossBooks, resolveBookShare, type BookObservation } from './attribution';
@@ -2137,7 +2137,11 @@ export function inFlightDonations(
     .filter(
       (m) =>
         !held.some((h) =>
-          isSameTransfer(h, { characterId: m.characterId, amount: m.amount ?? 0, date: m.date })
+          isSameJournalTransfer(h, {
+            characterId: m.characterId,
+            amount: m.amount ?? 0,
+            at: m.date,
+          })
         )
     )
     .map((m) => ({

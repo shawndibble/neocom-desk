@@ -347,7 +347,11 @@ export function NeedsYouQueue() {
               const d = item.declaration;
               const transfers = d.transfers ?? [];
               const statuses = transfers.map((tr, k) =>
-                transferStatus(t, tr, d.checks?.[k], miner.characterIds, ownIds, journals)
+                transferStatus(t, tr, d.checks?.[k], miner.characterIds, ownIds, journals, (id) =>
+                  miners.some((m) => m.id === id)
+                    ? nameOf(id)
+                    : t('corpTaxBook.moons.needs.check.anotherMiner')
+                )
               );
               const toYou = transfers.filter((tr) => paidToOwn(tr, ownIds) !== undefined);
               const paidToYou = toYou.length > 0;
