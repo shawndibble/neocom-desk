@@ -8454,7 +8454,7 @@
       "amount": "The amount matches what {{payee}} is owed"
     },
     "linkPaymentAmountLabel": "Value handed over",
-    "linkPaymentInKindHint": "A contract's cargo isn't priced here. Enter what you think it was worth. It starts at the ticked entries' total.",
+    "linkPaymentInKindHint": "A contract's cargo isn't priced here. Enter what it was worth: that is what it pays.",
     "linkPaymentConfirmAction": "Link to {{payee}}",
     "paidAtLabel": "Paid on",
     "paymentCardTitle": "Paid by",
@@ -8885,7 +8885,8 @@
       "emptyHint": "A day shows here once it is billed.",
       "filteredTitle": "No entries match these filters",
       "openFor": "Open the ledger of {{payee}}",
-      "balanceCredit": "{{amount}} credit"
+      "balanceCredit": "{{amount}} credit",
+      "minerPicker": "Whose account"
     }
   },
   "assets": {

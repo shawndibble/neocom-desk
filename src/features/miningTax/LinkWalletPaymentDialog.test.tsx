@@ -159,6 +159,8 @@ describe('LinkWalletPaymentDialog', () => {
     const { onLinked } = renderDialog();
     await userEvent.click(screen.getByText('Paid in kind · 2026-09-11'));
     expect(screen.queryByRole('checkbox', { name: /^Remember/ })).not.toBeInTheDocument();
+    // Left blank it links nothing: a cargo is never assumed to be the whole balance (N4).
+    expect(screen.getByRole('button', { name: 'Link payment' })).toBeDisabled();
     await userEvent.type(screen.getByRole('textbox', { name: 'Value handed over' }), '500,000');
     await userEvent.click(screen.getByRole('button', { name: 'Link payment' }));
     await waitFor(() => expect(onLinked).toHaveBeenCalled());

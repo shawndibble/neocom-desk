@@ -101,6 +101,16 @@ describe('readBookSettings', () => {
 describe('readPayment', () => {
   const base = { characterId: 5, amount: 100, at: '2026-10-18T00:00:00Z', source: 'donation' };
 
+  it("carries an officer's note on a payment recorded by hand", () => {
+    const read = readPayment('m1', {
+      ...base,
+      source: 'manual',
+      minerId: 'solo:5',
+      note: 'In person',
+    });
+    expect(read?.payment?.note).toBe('In person');
+  });
+
   it('credits a Miner when the payment has one', () => {
     const read = readPayment('j1_1', { ...base, minerId: 'solo:5', notTaxAmount: 10 });
     expect(read?.payment).toMatchObject({ id: 'j1_1', minerId: 'solo:5', notTaxAmount: 10 });
