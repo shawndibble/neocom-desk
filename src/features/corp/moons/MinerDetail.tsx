@@ -70,6 +70,7 @@ import {
 } from './CorrectionDialogs';
 import type { LedgerActions } from './LedgerRowMenu';
 import { isMinerAuditEntry } from './minerAudit';
+import { useAuditWords } from './useAuditWords';
 import { paymentWalletHref } from './paymentWalletHref';
 import { dayEndTime } from './dayEndTime';
 import { BookSection, EntityHeader, PlaceCell } from './sectionParts';
@@ -127,6 +128,7 @@ export function MinerDetail({ id }: { id: string }) {
   >(null);
   const [notice, setNotice] = useState<string | null>(null);
   const reminder = useMinerReminder(id, setNotice);
+  const auditWords = useAuditWords();
   const noticeIds = useMemo(() => new Set(detail?.notices.map((n) => n.id)), [detail]);
   const noticeParam = useNoticeParam(detail !== undefined, (nid) => noticeIds.has(nid));
   const paymentIds = useMemo(() => new Set(detail?.payments.map((p) => p.id)), [detail]);
@@ -507,6 +509,7 @@ export function MinerDetail({ id }: { id: string }) {
             {t('corpTaxBook.moons.payment.markedNotTax', { amount: isk(payment.notTaxAmount) })}
           </span>
         ) : null}
+        {payment.note && <span className="block">“{payment.note}”</span>}
       </span>
     );
   };
@@ -920,7 +923,12 @@ export function MinerDetail({ id }: { id: string }) {
             {shown.map((f) => {
               if (f.kind === 'audit')
                 return (
-                  <AuditLine key={`a-${f.id}`} entry={f.item} context={auditContext(f.item)} />
+                  <AuditLine
+                    key={`a-${f.id}`}
+                    entry={f.item}
+                    context={auditContext(f.item)}
+                    words={auditWords}
+                  />
                 );
               if (f.kind === 'mail') {
                 const m = f.item.mail;

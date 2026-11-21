@@ -97,3 +97,40 @@ describe('AuditFeed copy', () => {
     });
   });
 });
+
+describe('AuditFeed: what the pilot or officer wrote', () => {
+  it("words a dispute by its kind and shows the pilot's reason, a declaration's note and amount", () => {
+    render(
+      <AuditFeed
+        entries={[
+          {
+            id: 'd1',
+            at,
+            by: 5,
+            byName: 'Player dispute',
+            action: 'disputeConflict',
+            detail: { disputeId: 'q1', kind: 'notPaying' },
+          },
+          {
+            id: 'd2',
+            at,
+            by: 5,
+            byName: 'Player declaration',
+            action: 'declare',
+            detail: { declarationId: 'x1', amount: 2_000_000 },
+          },
+        ]}
+        words={(e) =>
+          e.action === 'disputeConflict'
+            ? { action: 'disputeKind.notPaying', said: 'That ore went to the buyback' }
+            : { said: 'Paid by contract', amount: 2_000_000 }
+        }
+      />
+    );
+    expect(screen.getByText(/said they won't pay a day/)).toBeInTheDocument();
+    expect(screen.getByText(/“That ore went to the buyback”/)).toBeInTheDocument();
+    expect(screen.getByText(/they say they paid 2,000,000/)).toBeInTheDocument();
+    expect(screen.getByText(/“Paid by contract”/)).toBeInTheDocument();
+    expect(screen.queryByText(/conflicts with a late notice/)).toBeNull();
+  });
+});

@@ -240,7 +240,6 @@ describe('late notices on the view', () => {
       outstanding: 0,
       settled: true,
       state: 'settled',
-      mail: { kind: 'not-mailed', count: 0 },
     });
     expect(view.miners[0].overdueDays).toBeNull();
   });

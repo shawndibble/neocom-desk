@@ -10,7 +10,6 @@
 import { NOTICE_ID_FIELD, type LateNotice } from '../../../functions/src/corpTaxBookLateNotice';
 import type { RunningAccountCheckpoint } from '../../../functions/src/corpTaxBookCheckpoint';
 import type { Adjustment } from './adjustments';
-import { savedPrice } from './billableLines';
 import type { FeederReadClock } from './feederHealth';
 import type { DayCharge, Miner } from './charges';
 import type { FeederCoverage } from './coverage';
@@ -36,7 +35,7 @@ import type { DayPrices } from './valuation';
 import { DAY_MS } from '@/lib/age';
 import { wholeIsk } from './wholeIsk';
 import { utcDayOf } from '../localDay';
-import { runningDaysFromLines, type RunningAccountOwes } from './minerRunningAccount';
+import type { RunningAccountOwes } from './minerRunningAccount';
 import type { ToleranceExemption } from './toleranceExemptions';
 import { settleOpenSet, type MinerSettlement, type OpenSet, type OpenSetInput } from './openSet';
 
@@ -307,12 +306,11 @@ export const newest = <T extends Pick<LateNotice, 'issuedAt' | 'id'>>(notices: r
 /** A late notice's Overdue clock: it starts at its issue and runs until every day it listed is paid. */
 export function noticeOverdue(
   view: Pick<BookView, 'input'>,
-  notice: Pick<LateNotice, 'id' | 'issuedAt'>,
-  settled: boolean
+  notice: Pick<LateNotice, 'id' | 'issuedAt'>
 ) {
   return overdueStatus({
     issuedAt: notice.issuedAt,
-    settled,
+    settled: false,
     now: view.input.now,
     declarations: view.input.declarations.filter((d) => d[NOTICE_ID_FIELD] === notice.id),
     overdueDays: view.input.overdueDays,
@@ -404,7 +402,7 @@ export function buildBookView(input: BookViewInput): BookView {
     // A late notice's Overdue clock starts at its issue, until its days are paid.
     for (const n of notices) {
       if (account.standingOf(n).settled) continue;
-      const status = noticeOverdue({ input }, n, false);
+      const status = noticeOverdue({ input }, n);
       if (status.state === 'paused') paused = true;
       if (status.state === 'overdue') {
         const days = Math.max(1, Math.floor((nowMs - Date.parse(status.overdueAt)) / DAY_MS));
@@ -420,10 +418,6 @@ export function buildBookView(input: BookViewInput): BookView {
       .sort()
       .at(-1);
     const standing = standingOf(characterIds, latestCorp, input);
-    const savedDays = runningDaysFromLines(billable.lines).map((d) => ({
-      date: d.date,
-      savedPrices: billable.lines.every((l) => l.date !== d.date || savedPrice(l)),
-    }));
 
     const row: MinerRow = {
       id,
@@ -439,7 +433,7 @@ export function buildBookView(input: BookViewInput): BookView {
       account: {
         paidThrough: account.paidThrough,
         owes: account.owes,
-        closableThrough: account.closableThrough(savedDays, today),
+        closableThrough: account.closableThrough(today),
       },
     };
     miners.push(row);
@@ -639,19 +633,6 @@ export interface MinerDetail {
   checkpoint?: RunningAccountCheckpoint;
 }
 
-function dayWriteOffsOf(inner: MinerInternals): MinerDetail['dayWriteOffs'] {
-  const paidAt = new Map(inner.payments.map((p) => [p.id, p.at]));
-  const closedAt = new Map<string, string>();
-  for (const p of inner.account.applications.payments) {
-    const at = paidAt.get(p.paymentId);
-    if (at) for (const d of p.days) closedAt.set(d.date, at);
-  }
-  const out: MinerDetail['dayWriteOffs'] = [];
-  for (const [date, d] of inner.account.byDay)
-    if (d.writtenOff >= 1) out.push({ date, amount: d.writtenOff, at: closedAt.get(date) ?? date });
-  return out.sort((a, b) => a.date.localeCompare(b.date));
-}
-
 /**
  * Each officer write-off with what it forgave of the days. The days' total is shared out oldest
  * write-off first, each up to its amount, as the account draws on them.
@@ -704,8 +685,8 @@ export function minerDetail(view: BookView, minerId: string): MinerDetail | unde
       .sort((a, b) => b.at.localeCompare(a.at)),
     notices: [...inner.notices].reverse(),
     paymentDays: inner.account.applications.payments,
-    dayWriteOffs: dayWriteOffsOf(inner),
-    heldDays: [...inner.account.byDay].filter(([, d]) => d.held).map(([date]) => date),
+    dayWriteOffs: inner.account.writtenOffDays(inner.payments),
+    heldDays: inner.account.heldDates(),
     officerWriteOffs: officerWriteOffsOf(view, minerId, inner),
     dismissals,
     declarations: view.input.declarations.filter((d) => noticeIds.has(d[NOTICE_ID_FIELD])),
@@ -747,12 +728,6 @@ export function extractionDetail(view: BookView, id: string): ExtractionDetail |
 
 // --- Late notices ----------------------------------------------------------
 
-/** What the book recorded about a late notice's mail; `stopped` wins over the sent count. */
-export interface NoticeMailState {
-  kind: 'sent' | 'not-mailed' | 'stopped';
-  count: number;
-}
-
 /** One late notice as its panel reads it, its figures read off the Miner's Running account. */
 export interface NoticeDetail {
   notice: LateNotice;
@@ -774,7 +749,6 @@ export interface NoticeDetail {
   state: OverdueState;
   /** While paused: when the pause ends on its own. */
   pausedUntil?: string;
-  mail: NoticeMailState;
 }
 
 /**
@@ -794,7 +768,7 @@ export function noticeDetail(view: BookView, noticeId: string): NoticeDetail | u
   const account = view.internals.byMiner.get(notice.minerId)?.account;
   const standing = account?.standingOf(notice);
   const settled = standing?.settled ?? false;
-  const status = settled ? undefined : noticeOverdue(view, notice, false);
+  const status = settled ? undefined : noticeOverdue(view, notice);
   const shown = settled
     ? shownFigures(standing!.due, 0, standing!.due)
     : shownFigures(
@@ -802,7 +776,6 @@ export function noticeDetail(view: BookView, noticeId: string): NoticeDetail | u
         standing?.remaining ?? notice.listed,
         standing?.credited ?? 0
       );
-  const { sent, remindersStopped } = notice.mail;
   return {
     notice,
     ...shown,
@@ -814,6 +787,5 @@ export function noticeDetail(view: BookView, noticeId: string): NoticeDetail | u
     dueAt: status?.overdueAt ?? null,
     state: status?.state ?? 'settled',
     ...(status?.pausedUntil ? { pausedUntil: status.pausedUntil } : {}),
-    mail: { kind: remindersStopped ? 'stopped' : sent > 0 ? 'sent' : 'not-mailed', count: sent },
   };
 }
