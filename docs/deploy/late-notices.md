@@ -44,6 +44,9 @@ order below.
 
 ## Order
 
+**Step 1 runs before the merge.** The rules and indexes are additive, and a pilot's payment
+links can only sync once the rules know their collection.
+
 Merging the PR to `develop` ships the new client to `https://dev.neocomdesk.com` straight away,
 before anything below. That is safe: against the functions deployed now it falls back to the old
 actions (`issueStatement`, `recordMail`) and reads the legacy `statements` docs beside
