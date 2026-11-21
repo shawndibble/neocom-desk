@@ -15,13 +15,19 @@ import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { loadPayees } from './payees';
 import { hubForPayee, loadUnitPricesOnDate } from './pricing';
 import { readCompressedOre, withOreFormMarker } from './oreForm';
+import type { PayeeAccounts } from './payeeAccounts';
 import { putAssignments } from './storedAssignments';
 
-export async function repriceForOreForm(characterId: number): Promise<void> {
+export async function repriceForOreForm(
+  characterId: number,
+  /** What is paid, off the Payees' accounts: a paid day's bill stays as it was priced. */
+  accounts: Pick<PayeeAccounts, 'statusOf'>
+): Promise<void> {
   const compressed = await readCompressedOre();
+  const owed = (a: MiningTaxAssignmentRecord) => accounts.statusOf(a) === 'outstanding';
   const stale = (
     await db.miningTaxAssignments.where('characterId').equals(characterId).toArray()
-  ).filter((a) => a.status === 'outstanding' && !a.rawOrePriced !== compressed);
+  ).filter((a) => owed(a) && !a.rawOrePriced !== compressed);
   if (stale.length === 0) return;
 
   const payees = await loadPayees(characterId);
@@ -59,11 +65,10 @@ export async function repriceForOreForm(characterId: number): Promise<void> {
   // still the Outstanding record we priced: a pay, a sync pull, a coalesce or a
   // delete in between wins over this write.
   let wrote = false;
-  await db.transaction('rw', db.miningTaxAssignments, async () => {
+  await db.transaction('rw', db.miningTaxAssignments, db.settings, async () => {
     for (const { assignment, estimatedValue, taxOwed } of updates) {
       const live = await db.miningTaxAssignments.get(assignment.id);
-      if (!live || live.status !== 'outstanding' || live.updatedAt !== assignment.updatedAt)
-        continue;
+      if (!live || !owed(live) || live.updatedAt !== assignment.updatedAt) continue;
       await putAssignments([
         withOreFormMarker({ ...live, estimatedValue, taxOwed, updatedAt: Date.now() }, compressed),
       ]);

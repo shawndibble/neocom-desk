@@ -101,12 +101,12 @@ describe('PayeeAccounts', () => {
     expect(accounts.of('p1')).toBeUndefined();
   });
 
-  it('bills what the caller says is left of an Assignment', () => {
+  it('bills only what is left once a Corp Tax Book bills part of an Assignment too', () => {
     const accounts = PayeeAccounts.build({
       assignments: [assignment('a', 'p1', '2026-10-01', 100)],
       payees: [payee('p1', 1)],
       links: [link('p1', 40)],
-      taxOf: (a) => a.taxOwed * 0.4,
+      billedElsewhere: new Map([['a', 0.6]]),
     });
     expect(accounts.paidThroughOf('p1')).toBe('2026-10-01');
   });

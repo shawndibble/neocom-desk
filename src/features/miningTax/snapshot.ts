@@ -14,11 +14,11 @@ import { applySurveyConnections } from './surveyConnections';
 import { readCompressedOre } from './oreForm';
 import { repriceForOreForm } from './oreFormReprice';
 import { coalesceAssignments } from './coalesce';
-import { linkOf } from './payeeAccounts';
+import { PayeeAccounts } from './payeeAccounts';
 import {
+  linksReady,
+  loadAccountInputs,
   loadPayeeAccounts,
-  loadPayeeCheckpoints,
-  loadPaymentLinks,
   readLegacyPaidMarks,
 } from './paymentLinkStore';
 import type { PayeePaymentLink, StoredPayeeCheckpoint } from '@/engine/miningTax/payeeAccount';
@@ -63,6 +63,10 @@ export interface MoonMiningTaxSnapshot {
   paymentLinks: PayeePaymentLink[];
   /** The device's closed-through checkpoints of the personal Payees' accounts. */
   payeeCheckpoints: ReadonlyMap<string, StoredPayeeCheckpoint>;
+  /** What the Corp Tax Books bill too, by Assignment id, as last seen (`saveBilledElsewhere`). */
+  billedElsewhere: ReadonlyMap<string, number>;
+  /** When the account inputs were read (`readPayeeHistoryGen`). */
+  payeeHistoryGen: number;
   unclassified: UnclassifiedOre[];
   /**
    * Tracked characters whose ledger read needed a re-login this refresh —
@@ -85,38 +89,38 @@ export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot
   // Settle up's "Ore still arriving" line reads growth between loads.
   await recordLedgerArrivals(ledgers);
 
-  // Before reconcile, not after: reconcile's growth diff is defined per
-  // Mining Ledger Entry over the Assignments covering it, so it has to see
-  // one fused record rather than two halves of the same obligation. Needs no
-  // ledger of its own — it only ever compares stored Assignments with each
-  // other. The fresh entries are passed only so it can tell a split day from
-  // an exact duplicate (and leave an unverifiable pair alone).
-  // First of all: a paid mark an older client wrote becomes the link it stands for, so every
-  // step below reads Paid off the Payees' accounts.
-  await readLegacyPaidMarks().catch(() => undefined);
-  const accounts = await loadPayeeAccounts();
-  await Promise.all(
-    ledgers.map((ledger) => coalesceAssignments(ledger.characterId, ledger.entries, accounts))
-  );
-
-  // Before reconcile too: a connected moon Survey's ore must become its own
-  // Assignment (the entry's growth collector) before reconcile folds it into
-  // an earlier moon's Assignment on the same day and system.
-  await applySurveyConnections(ledgers, Date.now(), accounts).catch(() => []);
-  // Last resort, after the Survey has had first claim: a Payee's Default Systems assign what
-  // nothing else has touched.
-  await applyDefaultSystems(ledgers).catch(() => []);
-
-  // Read again: a Survey or a Default System may have billed a paid day anew.
-  const grown = await loadPayeeAccounts();
-  await Promise.all(
-    ledgers
-      .filter((ledger) => ledger.entries.length > 0)
-      .map((ledger) => reconcileAssignments(ledger.characterId, ledger.entries, grown))
-  );
-
-  // Not gated on a non-empty ledger: it works from stored Assignments alone.
-  await Promise.all(ledgers.map((ledger) => repriceForOreForm(ledger.characterId)));
+  // Nothing here changes an Assignment before the links are known: a device that has not pulled
+  // them yet would read a day paid elsewhere as unpaid (decision 20261120-235011).
+  const ready = await linksReady(ledgers.map((l) => l.characterId));
+  if (ready) {
+    // First of all: a paid mark an older client wrote becomes the link it stands for, so every
+    // step below reads Paid off the Payees' accounts.
+    await readLegacyPaidMarks().catch(() => undefined);
+    // Before reconcile, not after: reconcile's growth diff is defined per Mining Ledger Entry over
+    // the Assignments covering it, so it has to see one fused record rather than two halves of
+    // the same obligation. The fresh entries are passed only so it can tell a split day from an
+    // exact duplicate (and leave an unverifiable pair alone).
+    const accounts = await loadPayeeAccounts();
+    await Promise.all(
+      ledgers.map((ledger) => coalesceAssignments(ledger.characterId, ledger.entries, accounts))
+    );
+    // Before reconcile too: a connected moon Survey's ore must become its own Assignment (the
+    // entry's growth collector) before reconcile folds it into an earlier moon's Assignment on
+    // the same day and system.
+    await applySurveyConnections(ledgers, Date.now(), accounts).catch(() => []);
+    // Last resort, after the Survey has had first claim: a Payee's Default Systems assign what
+    // nothing else has touched.
+    await applyDefaultSystems(ledgers).catch(() => []);
+    // Read again: a Survey or a Default System may have billed a paid day anew.
+    const grown = await loadPayeeAccounts();
+    await Promise.all(
+      ledgers
+        .filter((ledger) => ledger.entries.length > 0)
+        .map((ledger) => reconcileAssignments(ledger.characterId, ledger.entries, grown))
+    );
+    // Not gated on a non-empty ledger: it works from stored Assignments alone.
+    await Promise.all(ledgers.map((ledger) => repriceForOreForm(ledger.characterId, grown)));
+  }
 
   const rows: MoonMiningTaxRow[] = [];
   const characters: TrackedCharacter[] = ledgers.map((ledger) => ({
@@ -132,13 +136,18 @@ export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot
   // Payees + Assignments reads are fanned out across every character at once
   // (Dexie reads, not ESI — no fan-out cap needed) rather than one character
   // awaited at a time, matching `ledger.ts`'s own fan-out for the ESI half.
-  const [payeesByLedger, assignmentsByLedger, paymentLinks, payeeCheckpoints] = await Promise.all([
+  const [payeesByLedger, assignmentsByLedger, inputs] = await Promise.all([
     Promise.all(ledgers.map((ledger) => loadPayees(ledger.characterId))),
     // Reloaded after reconcile so a fresh needs-review flip is reflected.
     Promise.all(ledgers.map((ledger) => loadAssignments(ledger.characterId))),
-    loadPaymentLinks(),
-    loadPayeeCheckpoints(),
+    loadAccountInputs(),
   ]);
+  // The accounts every reader of this snapshot shares (`PayeeAccounts.build`).
+  const grown = PayeeAccounts.build({
+    assignments: assignmentsByLedger.flat(),
+    payees: payeesByLedger.flat(),
+    ...inputs,
+  });
 
   ledgers.forEach((ledger, index) => {
     if (ledger.needsReauth) {
@@ -217,8 +226,10 @@ export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot
     rows,
     characters,
     payeesByCharacter,
-    paymentLinks: paymentLinks.map(linkOf),
-    payeeCheckpoints,
+    paymentLinks: inputs.links,
+    payeeCheckpoints: inputs.checkpoints,
+    billedElsewhere: inputs.billedElsewhere,
+    payeeHistoryGen: inputs.historyGen,
     unclassified,
     reauthCharacters,
     fetchedAt,

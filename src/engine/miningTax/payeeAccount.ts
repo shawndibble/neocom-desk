@@ -6,9 +6,10 @@
  * `MinerRunningAccount`, so the two can never settle money differently.
  *
  * Its closed-through checkpoint lives on the pilot's device, on the same rule as a book's
- * (`closedThroughFor`). Everything a personal account is built from is the pilot's own and can
- * still change after the month closes (a payment from back then linked today), so a stored
- * checkpoint carries a fingerprint of what it summed and is only used while that still holds.
+ * (`closedThroughFor`), and the account is built from it and the days after it only. Everything
+ * a personal account is built from is the pilot's own and can still change after the month
+ * closes (a payment from back then linked today), so every write dated on or before a stored
+ * checkpoint drops it (the server's rule), and the next load recomputes from the whole history.
  *
  * Pure: the caller loads the Assignments, the links and the stored checkpoint.
  */
@@ -16,7 +17,6 @@ import {
   closedThroughFor,
   type RunningAccountCheckpoint,
 } from '../../../functions/src/corpTaxBookCheckpoint';
-import { paymentCode } from '../../../functions/src/corpTaxBookLateNotice';
 import {
   MinerRunningAccount,
   type MinerRunningAccountInput,
@@ -97,10 +97,9 @@ export interface PayeeCharge {
   tax: number;
 }
 
-/** A checkpoint as the device keeps it: with a fingerprint of everything it summed. */
+/** A checkpoint as the device keeps it, until a write dated on or before it drops it. */
 export interface StoredPayeeCheckpoint {
   checkpoint: RunningAccountCheckpoint;
-  fingerprint: string;
 }
 
 export interface PayeeAccountInput {
@@ -108,7 +107,7 @@ export interface PayeeAccountInput {
   payeeId: string;
   charges: readonly PayeeCharge[];
   links: readonly PayeePaymentLink[];
-  /** The device's stored checkpoint; ignored once what it summed has changed. */
+  /** The device's stored checkpoint: the account starts from it. */
   stored?: StoredPayeeCheckpoint;
 }
 
@@ -127,19 +126,6 @@ function taxPaymentOf(payeeId: string, link: PayeePaymentLink): TaxPayment {
   };
 }
 
-/** What every day and payment on or before `through` sums to, so a change to any shows. */
-function fingerprintOf(input: MinerRunningAccountInput, through: string): string {
-  const days = input.days
-    .filter((d) => d.date <= through)
-    .map((d) => `${d.date}=${Math.round(d.tax * 100)}`)
-    .sort();
-  const payments = input.payments
-    .filter((p) => p.at.slice(0, 10) <= through)
-    .map((p) => `${p.id}@${p.at}=${Math.round(p.amount * 100)}`)
-    .sort();
-  return paymentCode([...days, '|', ...payments].join(','));
-}
-
 /**
  * A personal Payee's account: what the Tax tab, Settle up, the Payee ledger and a Default System
  * read for what the pilot owes that Payee and what is paid.
@@ -151,7 +137,7 @@ export class PayeeAccount {
     readonly links: readonly PayeePaymentLink[],
     /** The Running account itself. */
     readonly account: MinerRunningAccount,
-    /** Everything the account bills and is paid, before any checkpoint: what a checkpoint sums. */
+    /** Everything the account bills and is paid, the closed past included. */
     private readonly whole: MinerRunningAccountInput
   ) {}
 
@@ -161,13 +147,10 @@ export class PayeeAccount {
       days: input.charges.map((c) => ({ date: c.date, tax: c.tax })),
       payments: links.map((l) => taxPaymentOf(input.payeeId, l)),
     };
-    const stored = input.stored;
-    const usable =
-      stored !== undefined &&
-      stored.fingerprint === fingerprintOf(whole, stored.checkpoint.through);
+    const cp = input.stored?.checkpoint;
     const account = MinerRunningAccount.build({
       ...whole,
-      ...(usable ? { checkpoint: stored.checkpoint } : {}),
+      ...(cp ? { checkpoint: cp } : {}),
     });
     return new PayeeAccount(input.payeeId, input.charges, links, account, whole);
   }
@@ -188,7 +171,7 @@ export class PayeeAccount {
     return this.account.balance;
   }
 
-  /** The checkpoint the account starts from, when the stored one still holds. */
+  /** The checkpoint the account starts from, when the device has one. */
   get startsFrom(): RunningAccountCheckpoint | undefined {
     return this.account.input.checkpoint;
   }
@@ -220,10 +203,15 @@ export class PayeeAccount {
     });
   }
 
-  /** What one more payment of `amount` on `paidOn` would do, before it is recorded. */
+  /**
+   * What one more payment of `amount` on `paidOn` (a UTC day) would do, before it is recorded. A
+   * payment dated on or before the checkpoint previews on the whole history: recording it drops
+   * the checkpoint, so that is what it will pay.
+   */
   preview(amount: number, paidOn: string): PaymentOutcome {
+    const cp = this.startsFrom;
     return previewPayment(
-      this.account.input,
+      cp !== undefined && paidOn <= cp.through ? this.whole : this.account.input,
       taxPaymentOf(this.payeeId, {
         payeeId: this.payeeId,
         kind: 'recorded',
@@ -236,9 +224,9 @@ export class PayeeAccount {
   }
 
   /**
-   * The checkpoint to store on `today`: through `closedThroughFor(today)`, from the whole
-   * history. Undefined when the account already starts from that date, or nothing is billed or
-   * paid on or before it yet.
+   * The checkpoint to store on `today`: through `closedThroughFor(today)`, built on the one it
+   * starts from. Undefined when the account already starts from that date, or nothing is billed
+   * or paid on or before it yet.
    */
   nextCheckpoint(today: string, at: string): StoredPayeeCheckpoint | undefined {
     const through = closedThroughFor(today);
@@ -249,8 +237,7 @@ export class PayeeAccount {
       this.whole.payments.some((p) => before(p.at.slice(0, 10)));
     if (!anything) return undefined;
     return {
-      checkpoint: MinerRunningAccount.checkpoint(this.whole, this.payeeId, through, { at }),
-      fingerprint: fingerprintOf(this.whole, through),
+      checkpoint: MinerRunningAccount.checkpoint(this.account.input, this.payeeId, through, { at }),
     };
   }
 

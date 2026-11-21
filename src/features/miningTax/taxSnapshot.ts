@@ -17,6 +17,8 @@ export interface TaxSnapshot {
   payeesByCharacter: Map<number, PayeeRecord[]>;
   paymentLinks: PayeePaymentLink[];
   payeeCheckpoints: ReadonlyMap<string, StoredPayeeCheckpoint>;
+  billedElsewhere: ReadonlyMap<string, number>;
+  payeeHistoryGen: number;
   unclassified: { characterId: number; characterName: string; typeIds: number[] }[];
   reauthCharacters: TrackedCharacter[];
   fetchedAt: Date | null;

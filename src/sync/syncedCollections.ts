@@ -155,6 +155,12 @@ export interface EditableCollection<
    */
   rulesMayLag?: true;
   /**
+   * The day a row's change reaches back to, for the device's closed-through checkpoints of the
+   * Payees' accounts (`dropPayeeCheckpointsFrom`): a pulled row dated on or before one drops it.
+   * `null` drops them all.
+   */
+  closesHistory?(record: L): string | null;
+  /**
    * What removing a Character (features/character/removeCharacter.ts) does
    * to this table's local rows. A change of owner (planSync's
    * handleOwnerHashChange) always wipes every editable collection.
@@ -624,6 +630,7 @@ export const PAYEES = defineEditableCollection<PayeeRecord, RemotePayeeDoc>({
   remoteName: 'payees',
   table: 'payees',
   tombstoneSegment: 'payeeTombstones',
+  closesHistory: () => null,
   onRemoval: 'delete',
   faqItem: 'miningTax',
   toRemoteDoc: (p, ownerHash) => ({
@@ -692,6 +699,7 @@ export const MINING_TAX_ASSIGNMENTS = defineEditableCollection<
   remoteName: 'miningTaxAssignments',
   table: 'miningTaxAssignments',
   tombstoneSegment: 'miningTaxAssignmentTombstones',
+  closesHistory: (a) => a.date,
   onRemoval: 'delete',
   faqItem: 'miningTax',
   toRemoteDoc: (a, ownerHash) => ({
@@ -752,6 +760,7 @@ export const MINING_TAX_PAYMENT_LINKS = defineEditableCollection<
   table: 'miningTaxPaymentLinks',
   tombstoneSegment: 'miningTaxPaymentLinkTombstones',
   rulesMayLag: true,
+  closesHistory: (l) => l.paidOn,
   onRemoval: 'delete',
   faqItem: 'miningTax',
   toRemoteDoc: (l, ownerHash) => ({

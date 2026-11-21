@@ -25,6 +25,7 @@ import { loadPayees } from './payees';
 import { hubForPayee, loadUnitPricesOnDate } from './pricing';
 import { currentCompressedOre, withOreFormMarker } from './oreForm';
 import { putAssignments } from './storedAssignments';
+import { dropPayeeCheckpointsFrom, earliestDay } from '@/db/payeeCheckpoints';
 
 /**
  * Thrown when a new Assignment would claim ore an existing one already does
@@ -193,7 +194,7 @@ export async function createAssignment(input: AssignInput): Promise<MiningTaxAss
   };
   // Check and write in one transaction so two tabs cannot both pass the check
   // (under a ledger action this joins the action's own transaction).
-  await db.transaction('rw', db.miningTaxAssignments, async () => {
+  await db.transaction('rw', db.miningTaxAssignments, db.settings, async () => {
     await putAssignments(
       await claimNewOre(record, input.entryOreLines, input.takesGrowth, input.isPaid)
     );
@@ -402,7 +403,7 @@ export async function joinAssignments(
   });
   // Only the members this call would *create* are checked — an already-assigned
   // member is just re-tagged, and adds no claim. Same transaction as the write.
-  await db.transaction('rw', db.miningTaxAssignments, async () => {
+  await db.transaction('rw', db.miningTaxAssignments, db.settings, async () => {
     const handedOver: MiningTaxAssignmentRecord[] = [];
     for (const [i, m] of members.entries()) {
       if (m.assignment) continue;
@@ -564,6 +565,9 @@ export async function deleteAssignments(
   assignments: readonly Pick<MiningTaxAssignmentRecord, 'id' | 'characterId'>[]
 ): Promise<void> {
   if (assignments.length === 0) return;
+  const stored = await db.miningTaxAssignments.bulkGet(assignments.map((a) => a.id));
+  const from = earliestDay(stored.map((a) => a?.date));
+  if (from !== undefined) await dropPayeeCheckpointsFrom(from);
   await db.miningTaxAssignments.bulkDelete(assignments.map((a) => a.id));
   const idsByCharacter = new Map<number, string[]>();
   for (const a of assignments) {

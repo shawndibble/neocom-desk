@@ -135,6 +135,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   );
 
   const {
+    accounts: bookAccounts,
     ledger,
     madePayments,
     paymentSources,
@@ -272,8 +273,8 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     estimatedValueOf,
     madePayments,
     links: data?.paymentLinks ?? NO_LINKS,
-    ...(data ? { checkpoints: data.payeeCheckpoints } : {}),
-    alsoBilled: corpView?.overlay.alsoBilled,
+    accounts: bookAccounts,
+    historyGen: data?.payeeHistoryGen,
     bookCorporations: bookCorporationIds,
     bookCredits,
   });

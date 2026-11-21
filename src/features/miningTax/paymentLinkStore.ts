@@ -9,12 +9,25 @@
  */
 import { db, type MiningTaxPaymentLinkRecord } from '@/db';
 import {
+  dropPayeeCheckpointsFrom,
+  earliestDay,
+  PAYEE_CHECKPOINTS_KEY,
+  readPayeeHistoryGen,
+  readStoredCheckpoints,
+} from '@/db/payeeCheckpoints';
+import {
   paymentLinkKey,
   type PayeePaymentLink,
   type StoredPayeeCheckpoint,
 } from '@/engine/miningTax/payeeAccount';
 import { scheduleSync } from '@/sync';
-import { appendTombstones, readTombstones, tombstoneKey } from '@/sync/localBookkeeping';
+import {
+  appendTombstones,
+  pullCursorKey,
+  readTombstones,
+  tombstoneKey,
+} from '@/sync/localBookkeeping';
+import { isSyncConfigured } from '@/app/syncStatus';
 import { MINING_TAX_PAYMENT_LINKS } from '@/sync/syncedCollections';
 import { unreadLegacyLinks } from './legacyPaidMarks';
 import { linkOf, PayeeAccounts } from './payeeAccounts';
@@ -47,6 +60,7 @@ async function removeLinks(keys: readonly string[]): Promise<Set<number>> {
   const stored = (await db.miningTaxPaymentLinks.bulkGet([...keys])).filter(
     (r): r is MiningTaxPaymentLinkRecord => r !== undefined
   );
+  if (stored.length > 0) await dropPayeeCheckpointsFrom(earliestDay(stored.map((r) => r.paidOn))!);
   for (const r of stored) {
     touched.add(r.characterId);
     if (r.kind === 'legacy') {
@@ -83,6 +97,7 @@ export async function savePaymentLink(
       ...(replaces !== undefined && replaces !== key ? [replaces] : []),
     ];
     const touched = await removeLinks(gone);
+    await dropPayeeCheckpointsFrom(earliestDay([link.paidOn, stored?.paidOn])!);
     await db.miningTaxPaymentLinks.put(recordOf(link, characterId));
     touched.add(characterId);
     return touched;
@@ -119,6 +134,8 @@ export async function readLegacyPaidMarks(): Promise<void> {
         for (const t of await readTombstones(tombstoneKey(MINING_TAX_PAYMENT_LINKS, characterId)))
           known.add(t.id);
       const unread = unreadLegacyLinks(marked, known);
+      if (unread.length === 0) return [];
+      await dropPayeeCheckpointsFrom(earliestDay(unread.map((l) => l.paidOn))!);
       await db.miningTaxPaymentLinks.bulkPut(unread.map((l) => recordOf(l, l.characterId)));
       return unread;
     }
@@ -127,38 +144,107 @@ export async function readLegacyPaidMarks(): Promise<void> {
 }
 
 /**
- * Every personal Payee's account as Dexie holds it now, from the stored Assignments as they are:
- * what the ledger's load (Survey connections, coalescing, growth) reads a day's Paid from.
+ * Whether the links are known for every tracked Character (decision 20261120-235011, "nothing that
+ * changes Assignments runs before links are known"): the links collection has completed a pull for
+ * each, or this device does not sync. Until then a day a link pays elsewhere could read as unpaid
+ * here, so takeovers, growth, coalescing, repricing and the old-mark read all wait.
  */
-export async function loadPayeeAccounts(): Promise<PayeeAccounts> {
-  const [assignments, payees, links] = await Promise.all([
-    db.miningTaxAssignments.toArray(),
-    db.payees.toArray(),
-    loadPaymentLinks(),
-  ]);
-  return PayeeAccounts.build({ assignments, payees, links: links.map(linkOf) });
+export async function linksReady(characterIds: readonly number[]): Promise<boolean> {
+  if (!isSyncConfigured()) return true;
+  const cursors = await db.settings.bulkGet(
+    characterIds.map((id) => pullCursorKey(id, MINING_TAX_PAYMENT_LINKS.remoteName))
+  );
+  return cursors.every((c) => c !== undefined);
 }
 
-/** Where the device keeps each personal Payee's closed-through checkpoint: never synced. */
-const CHECKPOINTS_KEY = 'miningTaxPayeeCheckpoints';
+/** What a Corp Tax Book bills too of the member's Assignments, as the device last saw it. */
+const BILLED_ELSEWHERE_KEY = 'miningTaxBilledElsewhere';
+
+/** By Assignment id, the share (0–1) of its tax a Corp Tax Book bills too (#6204). */
+export async function loadBilledElsewhere(): Promise<Map<string, number>> {
+  const value = (await db.settings.get(BILLED_ELSEWHERE_KEY))?.value;
+  if (!value || typeof value !== 'object') return new Map();
+  return new Map(
+    Object.entries(value as Record<string, unknown>).filter(
+      (e): e is [string, number] => typeof e[1] === 'number'
+    )
+  );
+}
+
+/**
+ * Stores what the books bill too, as the Tax tab's overlay reads it now, so every account build
+ * (the load path's, the journal's, the tab's) bills the same. A share that changed reaches back
+ * to its Assignment's day, so it drops the checkpoints from there. Returns whether it changed.
+ */
+export async function saveBilledElsewhere(
+  next: ReadonlyMap<string, number>,
+  dateOf: (assignmentId: string) => string | undefined
+): Promise<boolean> {
+  return db.transaction('rw', db.settings, async () => {
+    const held = await loadBilledElsewhere();
+    const changed = [...new Set([...held.keys(), ...next.keys()])].filter(
+      (id) => Math.abs((held.get(id) ?? 0) - (next.get(id) ?? 0)) > 1e-9
+    );
+    if (changed.length === 0) return false;
+    await db.settings.put({ key: BILLED_ELSEWHERE_KEY, value: Object.fromEntries(next) });
+    await dropPayeeCheckpointsFrom(earliestDay(changed.map(dateOf)) ?? null);
+    return true;
+  });
+}
+
+/** What every account build reads besides the Assignments and Payees. */
+export interface AccountInputs {
+  links: PayeePaymentLink[];
+  checkpoints: Map<string, StoredPayeeCheckpoint>;
+  billedElsewhere: Map<string, number>;
+  /** `readPayeeHistoryGen` when these were read: a checkpoint is only saved while it holds. */
+  historyGen: number;
+}
+
+export async function loadAccountInputs(): Promise<AccountInputs> {
+  const [links, checkpoints, billedElsewhere, historyGen] = await Promise.all([
+    loadPaymentLinks(),
+    loadPayeeCheckpoints(),
+    loadBilledElsewhere(),
+    readPayeeHistoryGen(),
+  ]);
+  return { links: links.map(linkOf), checkpoints, billedElsewhere, historyGen };
+}
+
+/**
+ * Every personal Payee's account as Dexie holds it now: the one build (`PayeeAccounts.build`)
+ * every reader shares, the load path's safeguards, the journal and the Tax tab alike.
+ */
+export async function loadPayeeAccounts(): Promise<PayeeAccounts> {
+  const [assignments, payees, inputs] = await Promise.all([
+    db.miningTaxAssignments.toArray(),
+    db.payees.toArray(),
+    loadAccountInputs(),
+  ]);
+  return PayeeAccounts.build({ assignments, payees, ...inputs });
+}
 
 /** The device's checkpoints, by a merged Payee's primary id. */
 export async function loadPayeeCheckpoints(): Promise<Map<string, StoredPayeeCheckpoint>> {
-  const row = await db.settings.get(CHECKPOINTS_KEY);
-  const value = row?.value;
-  if (!value || typeof value !== 'object') return new Map();
-  return new Map(Object.entries(value as Record<string, StoredPayeeCheckpoint>));
+  return new Map(
+    Object.entries(await readStoredCheckpoints()) as [string, StoredPayeeCheckpoint][]
+  );
 }
 
-/** Stores the checkpoints that moved forward; the rest are kept. */
+/**
+ * Stores the checkpoints that moved forward, the rest kept; nothing when a write reached the
+ * accounts since `historyGen` was read (what they were computed from is no longer what is stored).
+ */
 export async function savePayeeCheckpoints(
-  next: ReadonlyMap<string, StoredPayeeCheckpoint>
+  next: ReadonlyMap<string, StoredPayeeCheckpoint>,
+  historyGen: number
 ): Promise<void> {
   if (next.size === 0) return;
   await db.transaction('rw', db.settings, async () => {
+    if ((await readPayeeHistoryGen()) !== historyGen) return;
     const held = await loadPayeeCheckpoints();
-    for (const [id, cp] of next) held.set(id, cp);
-    await db.settings.put({ key: CHECKPOINTS_KEY, value: Object.fromEntries(held) });
+    for (const [id, cp] of next) held.set(id, { checkpoint: cp.checkpoint });
+    await db.settings.put({ key: PAYEE_CHECKPOINTS_KEY, value: Object.fromEntries(held) });
   });
 }
 
