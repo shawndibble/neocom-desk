@@ -7,7 +7,7 @@
  * `charges`, `openSet`, `minerRunningAccount`, `overdue` and `extraction`; this
  * module only joins them per Miner, per day and per Extraction.
  */
-import { NOTICE_ID_FIELD, type LateNotice } from '../../../functions/src/corpTaxBookLateNotice';
+import type { LateNotice } from '../../../functions/src/corpTaxBookLateNotice';
 import type { RunningAccountCheckpoint } from '../../../functions/src/corpTaxBookCheckpoint';
 import type { Adjustment } from './adjustments';
 import type { FeederReadClock } from './feederHealth';
@@ -312,7 +312,7 @@ export function noticeOverdue(
     issuedAt: notice.issuedAt,
     settled: false,
     now: view.input.now,
-    declarations: view.input.declarations.filter((d) => d[NOTICE_ID_FIELD] === notice.id),
+    declarations: view.input.declarations.filter((d) => d.noticeId === notice.id),
     overdueDays: view.input.overdueDays,
   });
 }
@@ -440,7 +440,7 @@ export function buildBookView(input: BookViewInput): BookView {
     byMiner.set(id, { ...settled, days });
 
     for (const d of input.declarations) {
-      if (d.resolution || !notices.some((n) => n.id === d[NOTICE_ID_FIELD])) continue;
+      if (d.resolution || !notices.some((n) => n.id === d.noticeId)) continue;
       needsYou.push({ kind: 'declaration', declaration: d, minerId: id, owed });
     }
     if (overdueDays !== null && overdueNoticeId && standing !== 'left') {
@@ -689,7 +689,7 @@ export function minerDetail(view: BookView, minerId: string): MinerDetail | unde
     heldDays: inner.account.heldDates(),
     officerWriteOffs: officerWriteOffsOf(view, minerId, inner),
     dismissals,
-    declarations: view.input.declarations.filter((d) => noticeIds.has(d[NOTICE_ID_FIELD])),
+    declarations: view.input.declarations.filter((d) => noticeIds.has(d.noticeId)),
     disputes: (view.input.disputes ?? []).filter((d) =>
       isMinersDispute(d, minerId, inner.characterIds)
     ),

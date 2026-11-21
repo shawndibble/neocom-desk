@@ -16,7 +16,7 @@ import type { OwedDay } from '../../../functions/src/corpTaxBookAccounts';
 import { savedPrice } from './billableLines';
 
 /** One Miner's account as `recordAccounts` takes it. */
-export interface AccountRecord {
+export interface RunningAccountRecord {
   minerId: string;
   owed: number;
   /** The Miner's net payments counted (less "not tax"): later ones come off `owed` on the server. */
@@ -42,7 +42,7 @@ export interface AccountRecord {
  * Each Miner's account in the view, whole ISK; `only` keeps one Miner (a page scoped to them
  * reads only their rows, so no other Miner's figure is whole).
  */
-export function accountRecords(view: BookView, only?: string): AccountRecord[] {
+export function runningAccountRecords(view: BookView, only?: string): RunningAccountRecord[] {
   const paidBy = new Map<string, number>();
   for (const p of view.input.payments)
     if (p.minerId) paidBy.set(p.minerId, (paidBy.get(p.minerId) ?? 0) + paymentNet(p));

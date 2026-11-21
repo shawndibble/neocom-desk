@@ -9,7 +9,7 @@ import {
 const ISSUED = '2026-08-01T00:00:00Z';
 
 function declaration(at: string, extra: Partial<Declaration> = {}): Declaration {
-  return { id: 'dc1', statementId: 's1', kind: 'contract', at, ...extra };
+  return { id: 'dc1', noticeId: 's1', kind: 'contract', at, ...extra };
 }
 
 describe('overdueStatus', () => {

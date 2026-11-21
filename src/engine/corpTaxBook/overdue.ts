@@ -73,7 +73,8 @@ export interface ClaimCheck {
 
 export interface Declaration {
   id: string;
-  statementId: string;
+  /** The late notice it answers (stored under `NOTICE_ID_FIELD`, its legacy name). */
+  noticeId: string;
   kind: DeclarationKind;
   at: string;
   note?: string;

@@ -337,7 +337,7 @@ describe('NeedsYouQueue (#6207)', () => {
         owed: 5_000_000,
         declaration: {
           id: 'x1',
-          statementId: 's1',
+          noticeId: 's1',
           kind: 'another-way',
           at: '2026-09-20T00:00:00Z',
           amount: 4_000_000,
@@ -360,7 +360,7 @@ describe('NeedsYouQueue (#6207)', () => {
         owed: 5_000_000,
         declaration: {
           id: 'x1',
-          statementId: 's1',
+          noticeId: 's1',
           kind: 'another-way',
           at: '2026-09-20T00:00:00Z',
           amount: 4_000_000,
@@ -443,7 +443,7 @@ describe('NeedsYouQueue (#6207)', () => {
       owed: 5_000_000,
       declaration: {
         id: 'x1',
-        statementId: 's1',
+        noticeId: 's1',
         kind: 'another-way',
         at: '2026-11-10T00:00:00Z',
         ...over,
@@ -599,7 +599,7 @@ describe('NeedsYouQueue (#6207)', () => {
             declarations: [
               {
                 id: 'a1',
-                statementId: 's1',
+                noticeId: 's1',
                 kind: 'another-way',
                 at,
                 transfers: [{ amount: 3_000_000, at, journalRef: 1, recipient: 'corporation' }],
@@ -607,7 +607,7 @@ describe('NeedsYouQueue (#6207)', () => {
               },
               {
                 id: 'a2',
-                statementId: 's1',
+                noticeId: 's1',
                 kind: 'another-way',
                 at,
                 resolution: { kind: 'confirmed', at: '2026-01-01T00:00:00Z', by: 0 },
