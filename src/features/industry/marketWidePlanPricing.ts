@@ -41,6 +41,8 @@ import { newBuildPlan, startingLocation } from './newBuildPlan';
 import { buildPlanTypeIds } from './recipes';
 import { resolveBuildPlan, type BuildPlanSources } from './resolveBuildPlan';
 import type { MarketWideResearch } from './marketWideOpportunities';
+import { atPercent } from '@/features/market/pagePricePercents';
+import { DEFAULT_PRICE_PERCENT } from '@/features/market/pricePercent';
 
 /** One liquidity-selected candidate, ready to be priced as a plan. */
 export interface MarketWidePlanCandidate {
@@ -63,6 +65,8 @@ export interface MarketWidePlanContext {
   /** The plan's owner, and whose blueprints `research.owned` are. Absent reads as no Character. */
   characterId: number | null;
   research?: MarketWideResearch;
+  /** The Industry percent (issue #6531): materials and the product price at it. Absent is 100. */
+  pricePercent?: number;
 }
 
 /** The snapshot with one product repriced, for a troll-capped sell order; shared otherwise. */
@@ -84,7 +88,7 @@ export async function priceCandidatesAsPlans(
   candidates: readonly MarketWidePlanCandidate[],
   context: MarketWidePlanContext
 ): Promise<PricedMarketWideCandidate[]> {
-  const { hub, catalog, modifiers, standing, characterId, research } = context;
+  const { hub, catalog, modifiers, standing, characterId, research, pricePercent } = context;
   const entries = candidates.map(
     (candidate) => catalog.byBlueprintTypeID.get(candidate.tree.blueprintTypeID) ?? null
   );
@@ -115,12 +119,13 @@ export async function priceCandidatesAsPlans(
       location.buildSystemId !== undefined && location.buildSystemName !== undefined
         ? location.buildSystemId
         : undefined,
-      'manufacturing'
+      'manufacturing',
+      pricePercent
     ),
     loadBlueprintPurchaseOffers(characterId, hub, blueprintIds).catch(
       () => NO_BLUEPRINT_PURCHASE_OFFERS
     ),
-    loadInventionMarket(hub, blueprintIds),
+    loadInventionMarket(hub, blueprintIds, pricePercent),
   ]);
 
   const rows = bpcRows ?? [];
@@ -150,7 +155,11 @@ export async function priceCandidatesAsPlans(
       hubId: hub.id,
     };
     const { result } = resolveBuildPlan(plan, sources, {
-      snapshot: snapshotAt(snapshot, candidate.productTypeID, candidate.sellPrice),
+      snapshot: snapshotAt(
+        snapshot,
+        candidate.productTypeID,
+        atPercent(candidate.sellPrice, pricePercent ?? DEFAULT_PRICE_PERCENT)
+      ),
     });
     if (!result || result.unpriceable || result.profit === null || result.iskPerHour === null) {
       return;

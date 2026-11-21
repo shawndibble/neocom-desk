@@ -23,9 +23,8 @@ import {
 import { formatIsk, parseIskAmount } from '@/lib/isk';
 import { getHubPrices } from '@/market/prices';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
-import { useMarketHub } from './hub';
+import { useHubFor } from './hub';
 import type { QuickbarTarget } from './quickbar';
-import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useAsyncLoad } from '@/lib/useAsyncLoad';
 
 export interface PriceAlertFormProps {
@@ -52,10 +51,9 @@ export function PriceAlertForm({
   const errorId = useId();
   const hasTarget = targetPrice !== undefined && targetDirection !== undefined;
 
-  // The hub the alert polls (`priceAlertDomain` → the synced Settings default),
-  // not necessarily the one the Market Browser is showing.
-  const hubId = useMarketHub((state) => state.value);
-  useHydratedStore(useMarketHub);
+  // The hub the alert polls (`priceAlertDomain` → the Market page hub), not
+  // necessarily the one a Market link is showing.
+  const { hubId } = useHubFor('market');
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
 
   const loadSellMin = useCallback(

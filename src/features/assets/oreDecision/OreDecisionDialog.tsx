@@ -35,7 +35,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadReprocessing } from '@/sde/loadSde';
 import { getHubPrices } from '@/market/prices';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadCharacterModifiers } from '@/features/character/characterModifiers';
 import { useIndustryWorkspace } from '@/features/industry/useIndustryWorkspace';
@@ -143,7 +143,7 @@ export function OreDecisionDialog({
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const hubId = useMarketHub((state) => state.value);
+  const { hubId, hydrated: hubHydrated } = useHubFor('assets');
   const { setup: refiningSetup } = useRefiningSetup();
   const [data, setData] = useState<OreData | null>(null);
   const [planId, setPlanId] = useState<string | null>(null);
@@ -160,6 +160,8 @@ export function OreDecisionDialog({
   const [reprocessingMissing, setReprocessingMissing] = useState(false);
 
   useEffect(() => {
+    // Priced only once the hub is read, so the figures never load twice.
+    if (!hubHydrated) return;
     let cancelled = false;
     clearLoadFailure();
     void (async () => {
@@ -203,7 +205,7 @@ export function OreDecisionDialog({
     return () => {
       cancelled = true;
     };
-  }, [typeId, hubId, activeCharacterId, loadAttempt, failLoad, clearLoadFailure]);
+  }, [typeId, hubId, hubHydrated, activeCharacterId, loadAttempt, failLoad, clearLoadFailure]);
 
   // Plans: resolved exactly as the Industry index resolves them.
   const workspace = useIndustryWorkspace();

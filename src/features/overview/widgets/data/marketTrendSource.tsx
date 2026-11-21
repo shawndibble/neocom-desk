@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { useHydratedStore } from '@/lib/useHydratedStore';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useOverviewLayout } from '../layoutStore';
 import {
@@ -31,9 +31,10 @@ export function MarketTrendSource() {
   const store = useFeedStore();
   const { epoch } = useOverviewRefresh();
   const layout = useOverviewLayout((state) => state.value);
-  const defaultHubId = useMarketHub((state) => state.value);
+  // A widget with no hubs of its own prices at the Overview page hub.
+  const { hubId: defaultHubId, hydrated: hubHydrated } = useHubFor('overview');
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
-  const hydrated = useHydratedStore(useOverviewLayout, useMarketHub);
+  const hydrated = useHydratedStore(useOverviewLayout) && hubHydrated;
   // Undefined only while the read is in flight, so a missing record (an empty Quickbar) still counts as loaded.
   const bar = useLiveQuery(
     async () => ({

@@ -1,6 +1,6 @@
 /**
  * PI phone layout (#2696): the Plan "What matters more?" row, the header
- * strip's buyback picker and the Map's Planets column head.
+ * strip's Sell at picker with a percent and the Map's Planets column head.
  * Bounding boxes, not screenshots, since only a real layout engine can tell
  * overlap. `PI_SHOTS=<dir>` also writes screenshots for the side by side with
  * `docs/design/pi-tabs/ref/`.
@@ -47,13 +47,19 @@ test.describe('PI phone layout', () => {
     await shot(page, 'plan-phone');
   });
 
-  test('header strip: the buyback picker shows its whole label', async ({ page }) => {
+  test('header strip: the Sell at picker shows its whole label with a percent', async ({
+    page,
+  }) => {
     await page.setViewportSize(PHONE);
     await open(page, 'plan');
-    const picker = page.getByRole('combobox', { name: 'Where do you sell?' });
+    const picker = page.getByRole('button', { name: /, Where do you sell\?$/ });
     await expect(picker).toBeVisible({ timeout: 20_000 });
     await picker.click();
-    await page.getByRole('option', { name: /corp buyback/i }).click();
+    const percent = page.getByRole('spinbutton', { name: 'Sell percent' });
+    await percent.fill('90');
+    await percent.press('Enter');
+    await page.keyboard.press('Escape');
+    await expect(picker).toHaveText(/· 90%/);
     const clipped = await picker.evaluate((el) => {
       return [el, ...el.querySelectorAll('*')].some((n) => n.scrollWidth > n.clientWidth);
     });

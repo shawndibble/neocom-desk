@@ -6,6 +6,7 @@ import { LpValueSettingsForm } from '@/features/settings/LpValueSettingsForm';
 import { HubField } from '@/features/market/HubMenu';
 import { WALLET_TABS } from '@/app/pageTabs';
 import { tabPath } from '@/lib/pageTabs';
+import { usePriceBasis } from './priceBasis';
 
 /**
  * The header's gear for the two settings this page's numbers lean on: LP
@@ -14,12 +15,14 @@ import { tabPath } from '@/lib/pageTabs';
  */
 export function LpStoreActions() {
   const { t } = useTranslation();
+  // The percent is named for the side of the book revenue is priced on.
+  const priceBasis = usePriceBasis((s) => s.value);
   return (
     <PageSettingsButton pageName={t('loyaltyStore.title')} section="market">
       <div className="space-y-4">
         <Fields variant="form">
           <Field label={t('loyaltyStore.hubLabel')}>
-            <HubField area="lpStore" label={t('loyaltyStore.hubLabel')} />
+            <HubField area="lpStore" side={priceBasis} label={t('loyaltyStore.hubLabel')} />
           </Field>
         </Fields>
         <LpValueSettingsForm />

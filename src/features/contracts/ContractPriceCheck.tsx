@@ -27,7 +27,9 @@ import {
   popoverValueClassName,
 } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
-import { HubMenu } from '@/features/market/HubMenu';
+import { HubMenu, type PriceSide } from '@/features/market/HubMenu';
+import { usePricePercentFor, withPercent } from '@/features/market/pagePricePercents';
+import { useHubFor } from '@/features/market/hub';
 import type { PageHubArea } from '@/features/market/pageHubs';
 import type { TradeHub } from '@/market/hubs';
 
@@ -59,6 +61,8 @@ export interface PriceCheckHubMenu {
   hub: TradeHub;
   /** The page area whose hub the menu reads and writes (`HubMenu`). */
   area: PageHubArea;
+  /** The side on screen: names the menu's percent field (Buy percent / Sell percent). */
+  side?: PriceSide;
 }
 
 export function ContractPriceCheck({
@@ -137,21 +141,30 @@ export function ContractPriceCheck({
  */
 function HeadingWithHubMenu({ heading, menu }: { heading: string; menu: PriceCheckHubMenu }) {
   const { t } = useTranslation();
+  const { closestFound } = useHubFor(menu.area);
+  const percent = usePricePercentFor(menu.area);
   const at = heading.indexOf(menu.hub.stationLabel);
   if (at < 0) return <Eyebrow>{heading}</Eyebrow>;
+  // Closest says so, with what it found (issue #6523).
+  const hubText = closestFound
+    ? t('pageHubs.closestFound', { hub: menu.hub.stationLabel })
+    : menu.hub.stationLabel;
+  // The prices are at the page's percent, so the heading says so (#6531).
+  const shown = menu.side ? withPercent(t, hubText, percent) : hubText;
   return (
     <p className="text-[0.6875rem] text-text-dim">
       <span className={eyebrowClassName}>{heading.slice(0, at)}</span>
       <HubMenu
         area={menu.area}
+        side={menu.side}
         // min-h-6: the 24px target floor (DESIGN.md §3), as the flip button beside it.
         triggerClassName={cx(
           popoverValueClassName,
           'inline-flex min-h-6 items-baseline touch:min-h-9'
         )}
-        triggerLabel={t('contractDetail.priceCheckHubMenu', { hub: menu.hub.stationLabel })}
+        triggerLabel={t('contractDetail.priceCheckHubMenu', { hub: shown })}
       >
-        {menu.hub.stationLabel}
+        {shown}
       </HubMenu>
       {heading.slice(at + menu.hub.stationLabel.length)}
     </p>

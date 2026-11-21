@@ -18,7 +18,7 @@ vi.mock('../layoutStore', () => ({
   ),
 }));
 vi.mock('@/features/market/hub', () => ({
-  useMarketHub: (select: (s: { value: string }) => unknown) => select({ value: 'amarr' }),
+  useHubFor: () => ({ hubId: 'amarr', scope: 'global', hydrated: true }),
 }));
 vi.mock('@/stores/activeCharacter', () => ({
   useActiveCharacter: (select: (s: { activeCharacterId: number }) => unknown) =>

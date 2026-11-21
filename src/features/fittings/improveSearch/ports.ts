@@ -5,7 +5,7 @@
  * community fits.
  */
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
-import { getHubPrices } from '@/market/prices';
+import { getHubPricesAt } from '@/features/market/hubPricesAtPercent';
 import { loadFittingPrice } from '../fittingPrice';
 import { searchPoolSize, type WorkerPool } from '../fittingWorker';
 import { loadHullCommonality } from '../hullCommonalityLoad';
@@ -19,6 +19,8 @@ export interface ImprovePortsInput {
   catalogue: FittingCatalogue;
   /** The pilot's Trade Hub; an unknown one prices at the default hub. */
   hubId: TradeHub['id'];
+  /** The Fittings page's price percent; 100 prices at the hub as it stands. */
+  percent?: number;
   /** The search's own workers (`searchPoolSize` of them), started on first use; the caller ends them. */
   workers: () => WorkerPool;
 }
@@ -27,6 +29,7 @@ export function createImprovePorts({
   variants,
   catalogue,
   hubId,
+  percent = 100,
   workers,
 }: ImprovePortsInput): ImproveSearchPorts {
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
@@ -40,10 +43,10 @@ export function createImprovePorts({
     chargeGroups: (slot, typeId) =>
       variants.engine.chargeGroupIdsFor(variants.fitting.shipTypeId, slot, typeId),
     prices: async (typeIds) => {
-      const prices = await getHubPrices(hub, [...typeIds]);
+      const prices = await getHubPricesAt(hub, typeIds, percent);
       return (typeId) => prices.get(typeId)?.sellMin ?? null;
     },
-    fitTotal: async () => (await loadFittingPrice(variants.fitting, hub)).totals.sell,
+    fitTotal: async () => (await loadFittingPrice(variants.fitting, hub, [], percent)).totals.sell,
     commonality: () => loadHullCommonality(variants.fitting.shipTypeId, catalogue.types),
   };
 }

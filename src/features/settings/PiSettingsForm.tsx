@@ -1,4 +1,6 @@
 import { useTranslation } from 'react-i18next';
+import { HubField } from '@/features/market/HubMenu';
+import { useSellHub } from '@/features/pi/sellHub';
 import {
   Checkbox,
   Field,
@@ -13,8 +15,6 @@ import {
 import { PI_CADENCE_DAYS, useCadence, type PiCadenceDays } from '@/features/pi/cadencePref';
 import { useExpiringWindowHours, EXPIRING_WINDOW_HOUR_OPTIONS } from '@/features/pi/expiringWindow';
 import {
-  DEFAULT_BUYBACK_PCT,
-  PI_BUYBACK_PCT_OPTIONS,
   PI_BUY_TIERS,
   usePiSettings,
   withHaulBetweenPlanets,
@@ -22,11 +22,8 @@ import {
 } from '@/features/pi/piSettings';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
-import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { ChipRow, SettingsFormLoading } from './settingsFields';
 import { useHydratedStore } from '@/lib/useHydratedStore';
-
-const BUYBACK = 'buyback';
 
 /**
  * Planetary Industry's settings: Settings → Industry, and the PI page's
@@ -45,11 +42,11 @@ export function PiSettingsForm({ showSellAt = false }: { showSellAt?: boolean })
   const setCadence = useCadence((state) => state.setValue);
   const expiringHydrated = useHydratedStore(useExpiringWindowHours);
   const settingsHydrated = useHydratedStore(usePiSettings);
+  const sellHub = useSellHub();
   const cadenceHydrated = useHydratedStore(useCadence);
 
   if (!expiringHydrated || !settingsHydrated || !cadenceHydrated) return <SettingsFormLoading />;
 
-  const hub = TRADE_HUBS.find((option) => option.id === settings.hub) ?? TRADE_HUBS[0];
   const toggleTier = (tier: PiBuyTier) =>
     void setSettings({
       ...settings,
@@ -67,60 +64,16 @@ export function PiSettingsForm({ showSellAt = false }: { showSellAt?: boolean })
           htmlFor="settings-pi-sell-at"
           note={t('settings.piSellAtHint')}
         >
-          <div className="flex flex-wrap items-center gap-2">
-            <Select
-              value={settings.buybackPct === null ? settings.hub : BUYBACK}
-              onValueChange={(value) =>
-                void setSettings(
-                  value === BUYBACK
-                    ? {
-                        ...settings,
-                        buybackPct: settings.buybackPct ?? DEFAULT_BUYBACK_PCT,
-                        hubChosen: true,
-                      }
-                    : {
-                        ...settings,
-                        hub: value as TradeHub['id'],
-                        buybackPct: null,
-                        hubChosen: true,
-                      }
-                )
-              }
-            >
-              <SelectTrigger id="settings-pi-sell-at" className="w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TRADE_HUBS.map((option) => (
-                  <SelectItem key={option.id} value={option.id}>
-                    {option.systemName}
-                  </SelectItem>
-                ))}
-                <SelectItem value={BUYBACK}>{t('piPlan.strip.corpBuyback')}</SelectItem>
-              </SelectContent>
-            </Select>
-            {settings.buybackPct !== null && (
-              <Select
-                value={String(settings.buybackPct)}
-                onValueChange={(value) =>
-                  void setSettings({ ...settings, buybackPct: Number(value) })
-                }
-              >
-                <SelectTrigger aria-label={t('piPlan.strip.buybackRate')} className="w-44">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[...new Set([...PI_BUYBACK_PCT_OPTIONS, settings.buybackPct])]
-                    .sort((a, b) => a - b)
-                    .map((pct) => (
-                      <SelectItem key={pct} value={String(pct)}>
-                        {t('piPlan.strip.buybackPct', { pct, hub: hub.systemName })}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
+          <HubField
+            id="settings-pi-sell-at"
+            area="pi"
+            className="w-44"
+            label={t('piPlan.strip.sellAt')}
+            onPicked={(id, kind) =>
+              kind === 'hub' ? sellHub.hubPicked(id) : sellHub.hubSwitched(id)
+            }
+            side="sell"
+          />
         </Field>
       )}
 

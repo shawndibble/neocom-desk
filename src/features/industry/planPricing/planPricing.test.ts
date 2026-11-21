@@ -202,6 +202,17 @@ describe('pricePlan', () => {
     expect(verdict.resolved.result!.materialCost).toBe(80_000);
   });
 
+  it('prices the walked materials at the Industry percent, as the snapshot already is', async () => {
+    const verdict = await pricePlan(
+      plan(),
+      SOURCES,
+      { snapshot: thin },
+      { depth: depthAt(800), profitBasis: 'free', pricePercent: 90 }
+    );
+    expect(verdict.resolved.materialPrices[34]).toBe(720);
+    expect(verdict.resolved.result!.materialCost).toBe(72_000);
+  });
+
   it('walks nothing when the need is small against the listing', async () => {
     const depth = depthAt(800);
     const verdict = await pricePlan(

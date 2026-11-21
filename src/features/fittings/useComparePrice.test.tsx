@@ -22,6 +22,6 @@ describe('useComparePrice', () => {
     const fittings = [fit];
     const { result } = renderHook(() => useComparePrice(fittings, profile));
     await waitFor(() => expect(result.current.values[0]).toEqual({ sell: 10, buy: 5 }));
-    expect(loadFittingPrice).toHaveBeenCalledWith(fit, DEFAULT_TRADE_HUB, [100, 200]);
+    expect(loadFittingPrice).toHaveBeenCalledWith(fit, DEFAULT_TRADE_HUB, [100, 200], 100);
   });
 });

@@ -20,6 +20,7 @@ import { InfoTooltip, IskAmount } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { PriceHubSelect } from '@/features/fittings/PriceHubSelect';
 import { useHubFor } from '@/features/market/hub';
+import { atPercent, usePricePercentFor } from '@/features/market/pagePricePercents';
 import { getOrderBook } from '@/features/market/orderBook';
 import { buildMarketParams, marketNearbyParams } from '@/engine/market/urlState';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
@@ -43,6 +44,8 @@ export function SkillPriceSection({
   const { t } = useTranslation();
   const { hubId, hydrated: hubHydrated } = useHubFor('skills');
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
+  // The Skills page's price percent scales the hub's and region's market prices, never the fixed NPC price.
+  const percent = usePricePercentFor('skills');
   // What the currently-rendered prices (if any) were fetched for — a hub or
   // typeID change invalidates them immediately on render, rather than showing
   // the previous hub's price under the new hub's label until the next fetch
@@ -72,7 +75,7 @@ export function SkillPriceSection({
     return value === null ? (
       <span className="text-text-dim">{t('skills.inspector.priceNoSellOrders')}</span>
     ) : (
-      <IskAmount value={value} />
+      <IskAmount value={atPercent(value, percent)} />
     );
   }
 

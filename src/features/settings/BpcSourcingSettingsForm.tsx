@@ -28,7 +28,7 @@ export function BpcSourcingSettingsForm() {
       <Fields variant="form">
         {/* The Industry page hub: Global unless the pilot gave Industry its own. */}
         <Field label={t('settings.bpcMarketHubLabel')} note={t('settings.bpcMarketHubHint')}>
-          <HubField area="industry" label={t('settings.bpcMarketHubLabel')} />
+          <HubField area="industry" side="buy" label={t('settings.bpcMarketHubLabel')} />
         </Field>
         <CheckboxField
           id="settings-bpc-hide-auctions"

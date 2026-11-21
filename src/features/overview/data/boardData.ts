@@ -35,7 +35,7 @@ import { resolveNames } from '@/features/character/names';
 import { db } from '@/db';
 import { lastPriceAlertSnapshot } from '@/features/notifications/pollDomains';
 import { buildPriceAlertRows, type BoardPriceAlert } from './priceAlertsBoard';
-import { useMarketHub } from '@/features/market/hub';
+import { tradeHubIdFor } from '@/features/market/hub';
 import { loadPriceVsMedian } from '@/features/market/priceVsMedian';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { sum } from '@/engine/math';
@@ -481,10 +481,10 @@ export async function loadPriceAlertsBoard(characterId: number): Promise<PriceAl
   const [record, snapshot] = await Promise.all([
     db.quickbars.get(String(characterId)),
     lastPriceAlertSnapshot(characterId),
-    useMarketHub.getState().hydrate(),
   ]);
   const alerts = buildPriceAlertRows(record?.items ?? [], snapshot);
-  const hub = getTradeHub(useMarketHub.getState().value) ?? DEFAULT_TRADE_HUB;
+  // The hub the poller prices alerts at: the Market page hub.
+  const hub = getTradeHub(await tradeHubIdFor(characterId, 'market')) ?? DEFAULT_TRADE_HUB;
   const typeIds = [...new Set(alerts.map((alert) => alert.typeId))];
   const vs90d = new Map<number, number | null>();
   await mapWithConcurrencyLimit(typeIds, ESI_FANOUT_CONCURRENCY, async (typeId) => {

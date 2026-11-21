@@ -24,7 +24,8 @@ import { useMarketSnapshot } from '@/features/industry/useMarketSnapshot';
 import { loadCorrectedSkills, skillLevelsOf } from '@/features/skills/correctedSkills';
 import { loadCharacterLoyaltyPoints } from '@/features/character/loyalty';
 import { loadTypeNames } from '@/features/character/typeNames';
-import { revenuePricing, usePriceBasis, type PriceBasis } from './priceBasis';
+import { usePricePercentFor } from '@/features/market/pagePricePercents';
+import { lpPricesAtPercent, revenuePricing, usePriceBasis, type PriceBasis } from './priceBasis';
 import { useLpStoreVolume } from './lpStoreVolume';
 import { useHaulingDemand } from '@/features/market/haulingDemand';
 import {
@@ -81,6 +82,7 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
   const { hubId, hydrated: hubHydrated } = useHubFor('lpStore');
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   const priceBasis = usePriceBasis((s) => s.value);
+  const pricePercent = usePricePercentFor('lpStore');
   // Issue #1238: LP store offers carry no issuing-corp home station in this
   // app's data, so every offer prices standing against the configured Trade
   // Hub, same as the prices it already reads.
@@ -229,7 +231,13 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
   // Withheld until the market hub setting hydrates — `useMarketSnapshot`
   // skips fetching whenever it's handed no type ids, same as the empty-list
   // case below it.
-  const { snapshot } = useMarketSnapshot(hub, hubHydrated ? typeIds : []);
+  const { snapshot: hubSnapshot } = useMarketSnapshot(hub, hubHydrated ? typeIds : []);
+  // Every hub price on the page at the LP Store's price percent (issue #6531).
+  const priced = useMemo(
+    () => (hubSnapshot ? lpPricesAtPercent(hubSnapshot, demand?.types, pricePercent) : null),
+    [hubSnapshot, demand, pricePercent]
+  );
+  const snapshot = priced?.snapshot ?? null;
 
   const rowsOn = useCallback(
     (basis: PriceBasis): LoyaltyOfferRow[] => {
@@ -249,7 +257,7 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
         useOwnMaterialsFor,
         playerLp,
         sellsPerDayByType: volume,
-        tradedPrices: demand?.types,
+        tradedPrices: priced?.tradedPrices,
       });
     },
     [
@@ -263,7 +271,7 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
       useOwnMaterialsFor,
       playerLp,
       volume,
-      demand,
+      priced,
     ]
   );
   const rows = useMemo(() => rowsOn(priceBasis), [rowsOn, priceBasis]);

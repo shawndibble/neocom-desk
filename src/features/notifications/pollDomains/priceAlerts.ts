@@ -28,7 +28,7 @@ const isPriceAlertEntrySnapshot = shapeGuard<PriceAlertEntrySnapshot>({
  * value. Polling runs per Character, so never the active one's.
  */
 export async function currentHub(characterId: number) {
-  return getTradeHub(await tradeHubIdFor(characterId)) ?? DEFAULT_TRADE_HUB;
+  return getTradeHub(await tradeHubIdFor(characterId, 'market')) ?? DEFAULT_TRADE_HUB;
 }
 
 type TargetedItem = QuickbarItem & { targetPrice: number; targetDirection: 'above' | 'below' };

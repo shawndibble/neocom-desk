@@ -14,7 +14,7 @@ import {
   stockListAt,
   type StockList,
 } from '@/engine/stockTargets/stockLists';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { MarketDialog, type MarketChoice } from './MarketDialog';
@@ -42,8 +42,8 @@ export function StockTab({ activeCharacterId }: { activeCharacterId: number | nu
   const hydrated = useHydratedStore(useStockLists);
   const setLists = useStockLists((state) => state.setValue);
   const setSelectedId = useSelectedStockList((state) => state.setValue);
-  const hubId = useMarketHub((state) => state.value);
-  useHydratedStore(useSelectedStockList, useMarketHub);
+  const { hubId } = useHubFor('market');
+  useHydratedStore(useSelectedStockList);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
 
   const listId = listIdFromPath(useParams()['*'] ?? '');

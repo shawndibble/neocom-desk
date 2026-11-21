@@ -135,7 +135,7 @@ function useLiveAdviceInputs(
   preference: RebuildPreference,
   reloadKey: number
 ): PiAdviceInputsState {
-  const { hub, buybackPct } = useSellHub();
+  const { hub, hydrated: hubHydrated, buybackPct } = useSellHub();
   const cadence = useCadence((state) => state.value);
   const goalPrefs = useGoalPlannerPrefs((state) => state.value);
   useHydratedStore(useCadence, useGoalPlannerPrefs);
@@ -151,7 +151,7 @@ function useLiveAdviceInputs(
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `reloadKey` is the caller's "read again" signal, not read by the loader.
     [pi, hub, reloadKey]
   );
-  const pricedLoad = useKeyedLoad(pi ? hub.id : null, loadPrices);
+  const pricedLoad = useKeyedLoad(pi && hubHydrated ? hub.id : null, loadPrices);
   const pricedNow =
     pricedLoad.status === 'idle' || pricedLoad.status === 'loading' ? null : pricedLoad;
   const prices = pricedLoad.data ?? null;
