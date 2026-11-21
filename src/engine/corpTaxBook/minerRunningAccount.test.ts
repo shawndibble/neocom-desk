@@ -142,6 +142,57 @@ describe('MinerRunningAccount.build: a dispute on a day recorded paid (M4)', () 
   });
 });
 
+describe('MinerRunningAccount.build: exemptions and officer charges', () => {
+  it('lets no exemption reopen a day recorded paid', () => {
+    const account = MinerRunningAccount.build({
+      days: [day('2026-11-01', 1e6), day('2026-11-02', 1e6)],
+      payments: [payment('p1', 1e6, '2026-11-03T10:00:00Z')],
+      storedPaidThrough: '2026-11-01',
+      toleranceExemptions: new Map([['2026-11-01', 0]]),
+    });
+    // 1 Nov stays paid for good; the payment pays it and 2 Nov is the one left owed.
+    expect(account.day('2026-11-01')?.settled).toBe(true);
+    expect(account.paidThrough).toBe('2026-11-01');
+    expect(account.owes).toEqual({ amount: 1e6, days: 1, oldest: '2026-11-02' });
+  });
+
+  it('counts an officer charge on a day recorded paid once, even with an exemption on it', () => {
+    const account = MinerRunningAccount.build({
+      days: [
+        { date: '2026-11-01', tax: 1_100_000, charge: 100_000 },
+        { date: '2026-11-02', tax: 1_100_000, charge: 100_000 },
+      ],
+      payments: [],
+      storedPaidThrough: '2026-11-02',
+      toleranceExemptions: new Map([['2026-11-01', 0]]),
+    });
+    // Both days stay paid for good but their two charges: owed once each, not again for the
+    // exempted day's whole tax.
+    expect(account.owes?.amount).toBe(200_000);
+  });
+
+  it('never lets the tolerance forgive an officer charge, however small', () => {
+    // 1,000,000 mined, paid in full, then a 3,000 charge: under 0.5% of the day, still owed.
+    const account = MinerRunningAccount.build({
+      days: [{ date: '2026-11-01', tax: 1_003_000, charge: 3_000 }],
+      payments: [payment('p1', 1e6, '2026-11-03T10:00:00Z')],
+    });
+    expect(account.owes?.amount).toBe(3_000);
+    // Money pays the mined part first, so what is short is the charge's, and stays owed.
+    const short = MinerRunningAccount.build({
+      days: [{ date: '2026-11-01', tax: 1_003_000, charge: 3_000 }],
+      payments: [payment('p1', 1_002_000, '2026-11-03T10:00:00Z')],
+    });
+    expect(short.owes?.amount).toBe(1_000);
+    // A day with no charge keeps its tolerance.
+    const plain = MinerRunningAccount.build({
+      days: [day('2026-11-01', 1e6)],
+      payments: [payment('p1', 997_000, '2026-11-03T10:00:00Z')],
+    });
+    expect(plain.owes).toBeNull();
+  });
+});
+
 describe('MinerRunningAccount.build: float residue (M6)', () => {
   it('treats under half an ISK left as done, so no day reads "owes 0 ISK"', () => {
     // A credit correction that leaves 0.3 ISK, and a payment with no tolerance that leaves 0.4.

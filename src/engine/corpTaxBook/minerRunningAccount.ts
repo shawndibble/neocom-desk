@@ -435,9 +435,15 @@ function settleDays(input: DaysInput, pools: DayPools): SettledDays {
     held.has(d.date) && d.tax > 0 && !(stored !== undefined && d.date <= stored);
   const isDone = (st: Running) => {
     const remaining = st.tax - st.credited;
-    const limit = st.exempt ?? daySettleTolerance(st.tax, pct);
     // Under half an ISK is float residue, never a debt: it would read "owes 0 ISK (1 day)".
-    return remaining < RESIDUE_ISK || (st.paidIn > 0 && remaining <= limit);
+    if (remaining < RESIDUE_ISK) return true;
+    if (st.paidIn <= 0) return false;
+    // The tolerance forgives only the mined part: the money pays it first, so an officer's
+    // charge is what is left short, and is never forgiven however small.
+    const mined = Math.max(0, st.tax - Math.max(0, st.charge));
+    const minedLeft = Math.max(0, mined - st.credited);
+    const limit = st.exempt ?? daySettleTolerance(mined, pct);
+    return remaining - minedLeft < RESIDUE_ISK && minedLeft <= limit;
   };
   const queue = pools.payments.map((p) => ({
     paymentId: p.paymentId,
@@ -500,8 +506,9 @@ function settleDays(input: DaysInput, pools: DayPools): SettledDays {
   for (const d of days) {
     const st = state.get(d.date)!;
     const dayHeld = isHeld(d);
-    // A day recorded paid stays closed, unless an officer set a limit on what it may forgive.
-    const pinned = st.pinned && st.exempt === undefined;
+    // A day recorded paid stays closed: an exemption sets what a day still open may forgive, and
+    // never reopens one recorded paid (nor counts its charge twice, here and in the pool).
+    const pinned = st.pinned;
     const shortfall = Math.max(0, st.tax - st.credited);
     // A day recorded paid stays closed, but officers' charges on recorded-paid days are owed, not
     // forgiven: they stay on the oldest such day that ended short, wherever the money fell.
