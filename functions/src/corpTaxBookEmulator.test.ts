@@ -8,7 +8,7 @@ import {
   planLateNoticeBackfill,
   planPaymentReadersBackfill,
 } from './corpTaxBookLateNoticeBackfill.js';
-import { minerPaymentCode, paymentCode } from './corpTaxBookLateNotice.js';
+import { minerPaymentCode } from './corpTaxBookLateNotice.js';
 import type { Caller } from './actorAuth.js';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
@@ -2812,7 +2812,7 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         id: 'n1',
         minerId: 'solo:50',
         kind: 'late',
-        code: paymentCode('n1'),
+        code: minerPaymentCode('solo:50'),
         listed: 10_000,
         // The server names its readers and who issued it, never the tab.
         uids: ['char:50'],
@@ -2826,7 +2826,7 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect((await book().collection('statements').doc('n1').get()).data()).toMatchObject({
         id: 'n1',
         kind: 'notice',
-        code: paymentCode('n1'),
+        code: minerPaymentCode('solo:50'),
         amount: 10_000,
         uids: ['char:50'],
         lines: [{ chargeKey: '50:1000:2026-10-05' }],

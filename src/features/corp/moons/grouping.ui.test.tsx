@@ -148,7 +148,7 @@ describe('MinerCharacters', () => {
     await openCharacters();
     expect(screen.getByText(/confirmed by the player/)).toBeInTheDocument();
     expect(screen.getByText('Pilot 4')).toBeInTheDocument();
-    expect(screen.getByText(/declined, from the main's Statement link/)).toBeInTheDocument();
+    expect(screen.getByText(/declined, from the main's late notice link/)).toBeInTheDocument();
   });
 
   it('unlinks a character and makes another the main', async () => {

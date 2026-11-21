@@ -28,14 +28,16 @@ export interface CoalescableAssignment {
   /** Absent on a dismissal, which never merges anyway. */
   payeeId?: string;
   taxPct: number;
+  /**
+   * As its Payee's account reads it: `paid` once its day is on or before the Payee's paid-through
+   * (decision 20261120-235011), whatever the record stores.
+   */
   status: string;
   groupId?: string;
   oreLines: readonly OreLine[];
   estimatedValue: number;
   taxOwed: number;
   collectsGrowth?: boolean;
-  /** True when a Settle-up payment is recorded against this record — `paymentLinks.ts` keys off it, so it is never fused away. */
-  hasPayment: boolean;
 }
 
 /** One set of same-entry Assignments to fuse into the single record `keepId` names. */
@@ -121,10 +123,10 @@ function bucket<T>(items: readonly T[], key: (item: T) => string): Map<string, T
  *   Payee with no way back. Two *rival* groups over one entry do refuse — and
  *   so does a loose half sitting beside them, since which group it belongs to
  *   is not knowable and guessing moves ore between obligations.
- * - `outstanding`, with no recorded payment. A fused record cannot be half
- *   paid, and `paymentLinks.ts`/`madePayments.ts` reference the ids a fuse
- *   would delete. `needs-review` is left alone too: its `reviewDiff` is a
- *   before/after over one record's own snapshot.
+ * - `outstanding`: its day is after its Payee's paid-through. A paid day is
+ *   history, and stays as it was billed (ADR 0024). `needs-review` is left
+ *   alone too: its `reviewDiff` is a before/after over one record's own
+ *   snapshot.
  *
  * The surviving record is the lowest id in the set, so a repeated run over
  * unchanged data picks the same one however Dexie ordered the read.
@@ -149,7 +151,7 @@ export function planEntryMerges(
     coverageByEntry.set(key, (coverageByEntry.get(key) ?? 0) + 1);
   }
 
-  const fusable = assignments.filter((a) => a.status === 'outstanding' && !a.hasPayment);
+  const fusable = assignments.filter((a) => a.status === 'outstanding');
   const buckets = bucket(
     fusable,
     (a) => `${entryKey(a.characterId, a.date, a.solarSystemId)}:${termsKey(a)}`

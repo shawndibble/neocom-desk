@@ -27,6 +27,7 @@ import type {
   CharacterAcceleratorRecord,
   FittingRecord,
   MiningTaxAssignmentRecord,
+  MiningTaxPaymentLinkRecord,
   NetWorthSnapshotRecord,
   PayeeRecord,
   PlanetRichnessRecord,
@@ -45,6 +46,7 @@ import type {
   RemoteDoc,
   RemoteFittingDoc,
   RemoteMiningTaxAssignmentDoc,
+  RemoteMiningTaxPaymentLinkDoc,
   RemotePayeeDoc,
   RemotePlanDoc,
   RemotePlanetRichnessDoc,
@@ -100,6 +102,7 @@ export type SyncedCollectionName =
   | 'payees'
   | 'fittings'
   | 'miningTaxAssignments'
+  | 'miningTaxPaymentLinks'
   | 'notificationFeed'
   | 'settings';
 
@@ -733,6 +736,43 @@ export const MINING_TAX_ASSIGNMENTS = defineEditableCollection<
   }),
 });
 
+/** Made Payments linked to a Payee (decision 20261120-235011). */
+export const MINING_TAX_PAYMENT_LINKS = defineEditableCollection<
+  MiningTaxPaymentLinkRecord,
+  RemoteMiningTaxPaymentLinkDoc
+>({
+  kind: 'editable',
+  remoteName: 'miningTaxPaymentLinks',
+  table: 'miningTaxPaymentLinks',
+  tombstoneSegment: 'miningTaxPaymentLinkTombstones',
+  onRemoval: 'delete',
+  faqItem: 'miningTax',
+  toRemoteDoc: (l, ownerHash) => ({
+    id: l.id,
+    characterId: l.characterId,
+    payeeId: l.payeeId,
+    kind: l.kind,
+    refId: l.refId,
+    amount: l.amount,
+    paidOn: l.paidOn,
+    source: l.source,
+    updatedAt: l.updatedAt,
+    ownerHash,
+    deleted: false,
+  }),
+  toLocalRecord: (r) => ({
+    id: r.id,
+    characterId: r.characterId,
+    payeeId: r.payeeId,
+    kind: r.kind,
+    refId: r.refId,
+    amount: r.amount,
+    paidOn: r.paidOn,
+    source: r.source,
+    updatedAt: r.updatedAt,
+  }),
+});
+
 /** One Character's net worth on one UTC day (issue #2865) — numbers only, one document per day. */
 const NET_WORTH_SNAPSHOTS = defineEditableCollection<
   NetWorthSnapshotRecord,
@@ -823,6 +863,7 @@ export const EDITABLE_COLLECTIONS: readonly EditableCollection[] = [
   PAYEES,
   FITTINGS,
   MINING_TAX_ASSIGNMENTS,
+  MINING_TAX_PAYMENT_LINKS,
 ];
 
 /** The Notification Feed's remote copy (issue #362). Device-local archive, synced window only. */

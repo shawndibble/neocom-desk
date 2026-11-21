@@ -7,7 +7,7 @@ import { highlightHref } from '@/lib/highlightParam';
 import { Well } from '@/components/ui/Well';
 import { Eyebrow } from '@/components/ui/Eyebrow';
 import type { TaxPayment } from '@/engine/corpTaxBook/payments';
-import type { PaidBy } from '@/engine/corpTaxBook/paidBy';
+import type { PaidBy } from '@/engine/corpTaxBook/personal';
 import { formatIsk } from '@/lib/isk';
 
 interface Props {

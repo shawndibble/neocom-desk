@@ -447,6 +447,29 @@ describe('syncCorpTaxBook', () => {
     expect(d.assignPayment).toHaveBeenCalledWith(5, CORP, 'j1_1', 'm1');
   });
 
+  it('never assigns a donation held as ambiguous: the server re-resolves it (M8)', async () => {
+    const d = deps({
+      readBookState: async () =>
+        emptyState({
+          miners: [{ id: 'm1', mainCharacterId: 7, characterIds: [7, 8] }] as BookState['miners'],
+          notices: [owing('m1')],
+          payments: [
+            {
+              id: 'j1_1',
+              characterId: 8,
+              amount: 5,
+              at: '2026-07-19T00:00:00Z',
+              source: 'donation',
+              reviewReason: 'ambiguous',
+              ambiguousMinerIds: ['m1', 'm2'],
+            },
+          ],
+        }),
+    });
+    await run(d);
+    expect(d.assignPayment).not.toHaveBeenCalled();
+  });
+
   it('does not fail the sync when re-matching an Unmatched donation is refused, and says so', async () => {
     const d = deps({
       readBookState: async () =>

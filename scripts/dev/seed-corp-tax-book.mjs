@@ -276,7 +276,7 @@ for (const m of MINERS) {
     kind: 'late',
     issuedAt: iso(NOW - 6 * DAY),
     issuedBy: OFFICER,
-    code: paymentCode(noticeId),
+    code: minerPaymentCode(minerId),
     pricing: { hubId: 'jita', oreForm: 'compressed' },
     uids: [`char:${m.id}`],
     lines,

@@ -5,6 +5,7 @@
  * the member's wallet never leaves the device.
  */
 import type { ClaimedTransfer, TransferRecipient } from '@/engine/corpTaxBook/overdue';
+import { inFlightDonations, type HeldPayment } from '@/engine/corpTaxBook/personal';
 import type { MadePayment } from '../../paymentLinks';
 
 /** What the ids a payment went to are: the app's name lookup says character or corporation. */
@@ -30,6 +31,36 @@ export function recipientOf(
 ): TransferRecipient {
   if (counterpartyId === bookCorporationId) return 'corporation';
   return category === 'corporation' || category === 'alliance' ? 'otherCorporation' : 'character';
+}
+
+/**
+ * The member's payments a claim may name: never one a link holds (it pays a personal Payee), and
+ * never a donation the book already holds (it is credited, or counted for review). Which donation
+ * the book holds is the shared one-to-one rule the account counts in-flight donations by.
+ */
+export function claimablePayments(
+  payments: readonly MadePayment[],
+  opts: {
+    bookCorporationId: number;
+    /** `paymentLinkKey`s a link holds. */
+    linked: ReadonlySet<string>;
+    /** The book's payments (`LoadedCorpBook.payments`). */
+    held: readonly HeldPayment[];
+  }
+): MadePayment[] {
+  const toBook = payments.filter((p) => p.counterpartyId === opts.bookCorporationId);
+  const inFlight = new Set(
+    inFlightDonations(toBook, opts.held, opts.bookCorporationId, '').map((d) => d.refId)
+  );
+  return payments.filter(
+    (p) =>
+      !opts.linked.has(p.key) &&
+      !(
+        p.counterpartyId === opts.bookCorporationId &&
+        p.method === 'donation' &&
+        !inFlight.has(p.refId)
+      )
+  );
 }
 
 /**

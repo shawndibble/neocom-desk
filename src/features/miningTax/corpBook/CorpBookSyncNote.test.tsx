@@ -132,7 +132,7 @@ describe('CorpBookSyncNote', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('shows credit for the next Statement, and never a donation waiting to be credited', () => {
+  it('shows credit on the account, and never a donation waiting to be credited', () => {
     render(<CorpBookSyncNote book={book({ credit: 1_000_000 })} owedNow={1} now={NOW} />);
     expect(screen.getByText(/1,000,000 ISK credit/)).toBeInTheDocument();
     expect(screen.queryByText(/waiting for .* to credit it/)).toBeNull();

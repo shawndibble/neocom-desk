@@ -86,6 +86,7 @@ export async function openBook(characterId: number, corporationId: number) {
   const written = (name: string) => versions === null || versions.collections[name] !== undefined;
   return {
     db,
+    corporationId,
     data,
     part,
     read,

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildBookView, noticeDetail, type BookViewInput } from './bookView';
-import { paymentCode, type LateNotice } from '../../../functions/src/corpTaxBookLateNotice';
-import { draftNotice, owedDays, planNotices } from './lateNotices';
+import { minerPaymentCode, type LateNotice } from '../../../functions/src/corpTaxBookLateNotice';
+import { draftNotice, owedDays, planNotices, readLateNotices } from './lateNotices';
 import { DEFAULT_NOTICE_RULES, type NoticeRules } from './notices';
 import { planCloseAccount } from './closeAccount';
 import type { ObservedMiningEntry } from './types';
@@ -85,8 +85,8 @@ describe('planNotices (#6294)', () => {
       pricing: { hubId: 'jita', oreForm: 'compressed' },
       mail: { sent: 0, manualSent: 0, remindersStopped: false },
     });
-    // The server sets a notice's code itself, as this, and refuses any other.
-    expect(plan.notice.code).toBe(paymentCode(plan.notice.id));
+    // The server sets a notice's code itself, as this, and refuses any other. One code per Miner: the one the mail asks for, whichever notice it is.
+    expect(plan.notice.code).toBe(minerPaymentCode(plan.notice.minerId));
     expect(plan.notice.lines.map((l) => [l.date, l.tax])).toEqual([
       ['2026-09-01', 10_000_000],
       ['2026-09-02', 10_000_000],
@@ -217,6 +217,36 @@ describe('a late notice on the running account (#6294)', () => {
     ]);
   });
 
+  it('lists what is owed net of a credit correction, and a charge as a line of its own (M3)', () => {
+    const adjustment = (id: string, date: string, amount: number) => ({
+      id,
+      minerId: 'solo:1',
+      date,
+      amount,
+      reason: 'x',
+      by: 2,
+      at: '2026-09-12T00:00:00Z',
+    });
+    const view = buildBookView(
+      input({
+        adjustments: [
+          adjustment('c1', '2026-09-01', -3_000_000),
+          adjustment('c2', '2026-09-10', 2_000_000),
+        ],
+      })
+    );
+    expect(owedDays(view, 'solo:1')).toEqual([
+      { date: '2026-09-01', structureId: 1001, owed: 7_000_000 },
+      { date: '2026-09-02', structureId: 1001, owed: 10_000_000 },
+      { date: '2026-09-10', owed: 2_000_000, correction: true },
+      { date: '2026-09-10', structureId: 1001, owed: 10_000_000 },
+    ]);
+    const sum = owedDays(view, 'solo:1').reduce((s, d) => s + d.owed, 0);
+    expect(sum).toBe(view.miners[0]!.owed);
+    // A notice of every one of those days carries nothing from earlier notices.
+    expect(draftNotice(view, 'solo:1')!.carried).toBe(0);
+  });
+
   it("closes a guest's running account with a final notice of the unpaid days no notice listed", () => {
     const view = buildBookView(input({ payments: [pay(10_000_000)] }));
     const plan = planCloseAccount(view, 'solo:1')!;
@@ -224,5 +254,43 @@ describe('a late notice on the running account (#6294)', () => {
     expect(plan.notice?.lines.map((l) => l.date)).toEqual(['2026-09-02', '2026-09-10']);
     expect(plan.owedAfter).toBe(20_000_000);
     expect(plan.creditAfter).toBe(0);
+  });
+});
+
+describe('readLateNotices: both stores, as the server reads them', () => {
+  const legacy = (over: Record<string, unknown> = {}) => ({
+    id: 'n1',
+    minerId: 'solo:1',
+    issuedAt: '2026-09-02T00:00:00Z',
+    lines: [
+      {
+        kind: 'mined',
+        date: '2026-09-01',
+        chargeKey: '1:1001:2026-09-01',
+        tax: 5,
+        estimatedValue: 50,
+      },
+    ],
+    amount: 5,
+    characterIds: [1],
+    uids: ['char:1'],
+    mailsSent: 1,
+    manualRemindersSent: 0,
+    remindersStopped: false,
+    ...over,
+  });
+
+  it('reads every legacy doc as a notice, whatever its kind says (fromLegacy)', () => {
+    const [n] = readLateNotices([], [legacy({ kind: undefined })]);
+    expect(n).toMatchObject({ id: 'n1', minerId: 'solo:1', listed: 5 });
+  });
+
+  it('merges the mail state of both copies of one notice (mergeNoticeMail)', () => {
+    const current = {
+      ...readLateNotices([], [legacy()])[0]!,
+      mail: { sent: 1, manualSent: 0, remindersStopped: false },
+    };
+    const [n] = readLateNotices([current], [legacy({ remindersStopped: true, mailsSent: 2 })]);
+    expect(n!.mail).toMatchObject({ sent: 2, remindersStopped: true });
   });
 });

@@ -68,7 +68,12 @@ const ledger = (quantity: number) => ({
 });
 
 beforeEach(async () => {
-  await Promise.all([db.payees.clear(), db.miningTaxAssignments.clear(), db.settings.clear()]);
+  await Promise.all([
+    db.payees.clear(),
+    db.miningTaxAssignments.clear(),
+    db.miningTaxPaymentLinks.clear(),
+    db.settings.clear(),
+  ]);
   useSurveyConnections.setState({ value: [], hydrated: false });
   pricingMock.loadUnitPricesOnDate.mockResolvedValue({
     prices: new Map([[ORE, 100]]),
@@ -231,7 +236,7 @@ describe('applySurveyConnections', () => {
       });
     });
 
-    it('leaves one the pilot changed, or already paid, alone', async () => {
+    it('leaves one the pilot changed, or on or before its Payee’s paid-through, alone', async () => {
       const payee = await createPayee(CHAR, { name: 'Moon Corp', defaultTaxPct: 5 });
       await db.miningTaxAssignments.put(
         madeByDefault([{ typeId: ORE, quantity: 50 }], { override: undefined })
@@ -240,9 +245,19 @@ describe('applySurveyConnections', () => {
       expect(await applySurveyConnections([ledger(50)], NOW)).toEqual([]);
       expect((await db.miningTaxAssignments.get('dflt'))?.payeeId).toBe('landlord');
 
-      await db.miningTaxAssignments.put(
-        madeByDefault([{ typeId: ORE, quantity: 50 }], { status: 'paid' })
-      );
+      // Paid: a payment linked to its Payee reached its day (decision 20261120-235011).
+      await db.miningTaxAssignments.put(madeByDefault([{ typeId: ORE, quantity: 50 }]));
+      await db.miningTaxPaymentLinks.put({
+        id: 'journal:1',
+        characterId: CHAR,
+        payeeId: 'landlord',
+        kind: 'journal',
+        refId: 1,
+        amount: 350,
+        paidOn: '2026-10-22',
+        source: 'manual',
+        updatedAt: 0,
+      });
       expect(await applySurveyConnections([ledger(50)], NOW)).toEqual([]);
     });
   });

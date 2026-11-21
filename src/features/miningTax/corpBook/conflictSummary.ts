@@ -27,7 +27,7 @@ const dayKey = (view: BookRowView) => `${view.characterId}:${view.date}:${view.s
 
 /**
  * Sums the Conflict rows in view, earliest-resolving first (one with no date last), so a miner
- * sees the bill a Conflict turns into before the next Statement does. Null when there are none.
+ * sees the bill a Conflict turns into before a Late notice does. Null when there are none.
  *
  * Days the member chose not to pay are left out: they are listed on the quiet line instead.
  *

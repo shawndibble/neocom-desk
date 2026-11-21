@@ -69,6 +69,7 @@ import {
   RateOverrideDialog,
 } from './CorrectionDialogs';
 import type { LedgerActions } from './LedgerRowMenu';
+import { isMinerAuditEntry } from './minerAudit';
 import { paymentWalletHref } from './paymentWalletHref';
 import { dayEndTime } from './dayEndTime';
 import { BookSection, EntityHeader, PlaceCell } from './sectionParts';
@@ -129,18 +130,16 @@ export function MinerDetail({ id }: { id: string }) {
   const noticeIds = useMemo(() => new Set(detail?.notices.map((n) => n.id)), [detail]);
   const noticeParam = useNoticeParam(detail !== undefined, (nid) => noticeIds.has(nid));
   const paymentIds = useMemo(() => new Set(detail?.payments.map((p) => p.id)), [detail]);
-  const minerAudit = useMemo(
-    () =>
-      audit.entries.filter((e) => {
-        const d = e.detail;
-        return (
-          d.minerId === id ||
-          noticeIds.has((d.noticeId ?? d[NOTICE_ID_FIELD]) as string) ||
-          paymentIds.has(d.paymentId as string)
-        );
-      }),
-    [audit.entries, id, noticeIds, paymentIds]
-  );
+  const minerAudit = useMemo(() => {
+    const subjects = {
+      minerId: id,
+      noticeIds,
+      paymentIds,
+      declarationIds: new Set(detail?.declarations.map((d) => d.id)),
+      disputeIds: new Set(detail?.disputes.map((d) => d.id)),
+    };
+    return audit.entries.filter((e) => isMinerAuditEntry(e.detail, subjects));
+  }, [audit.entries, id, noticeIds, paymentIds, detail]);
   // The range narrows what happened (Earlier days, Payments); what is owed now always shows whole.
   const phases = useMemo(() => {
     const all = daysByPhase(detail?.days ?? []);
@@ -335,11 +334,19 @@ export function MinerDetail({ id }: { id: string }) {
           {d.oreLines
             .map((l) => `${names.ore(l.typeId)}\u00a0×\u00a0${formatCount(l.quantity)}`)
             .join(', ')}
-          {withStatus && (
-            <span className={cx('block text-xs whitespace-nowrap', STATUS_TONE[d.status])}>
-              {d.heldBy !== undefined
-                ? t('corpTaxBook.moons.dayStatus.held', { owner: names.corporation(d.heldBy) })
-                : t(`corpTaxBook.moons.dayStatus.${d.status}`)}
+          {/* A day a dispute holds says so wherever it is listed: nothing pays it until the dispute ends. */}
+          {(withStatus || d.disputed) && (
+            <span
+              className={cx(
+                'block text-xs whitespace-nowrap',
+                d.disputed ? 'text-warning' : STATUS_TONE[d.status]
+              )}
+            >
+              {d.disputed
+                ? t('corpTaxBook.moons.dayStatus.disputed', { date: shortDate(d.disputed.until) })
+                : d.heldBy !== undefined
+                  ? t('corpTaxBook.moons.dayStatus.held', { owner: names.corporation(d.heldBy) })
+                  : t(`corpTaxBook.moons.dayStatus.${d.status}`)}
               {(() => {
                 const n = noticeOf(d.noticeId);
                 return n && <> · {noticeLink(n)}</>;

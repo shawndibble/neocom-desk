@@ -4,7 +4,8 @@
  * no grant, no book) resolves to nothing, never an error. Sources and the stat chips share one
  * load per player, kept briefly so opening the tab twice does not read twice.
  */
-import { collection, getDocs, limit as limitTo, query, where } from 'firebase/firestore/lite';
+import { collection, getDocs, query, where } from 'firebase/firestore/lite';
+import { minerIdFor, type Miner } from '@/engine/corpTaxBook/charges';
 import { buildBookView, minerDetail } from '@/engine/corpTaxBook/bookView';
 import type { Contract } from '@/esi/endpoints';
 import { resolveAffiliations } from '@/features/character/affiliations';
@@ -35,8 +36,11 @@ const settled = async <T>(work: () => Promise<T>, fallback: T): Promise<T> => {
   }
 };
 
-/** The Miner the player's characters bill under: its grouping, else the solo Miner. */
-async function minerIdFor(characterId: number, corporationId: number, otherId: number) {
+/**
+ * The Miner the player's characters bill under: the shared rule (`minerIdFor`), so of two
+ * groupings that list the character the earliest wins, as everywhere else; else the solo Miner.
+ */
+async function billedMinerOf(characterId: number, corporationId: number, otherId: number) {
   const solo = `solo:${otherId}`;
   try {
     const book = await openBook(characterId, corporationId);
@@ -44,11 +48,13 @@ async function minerIdFor(characterId: number, corporationId: number, otherId: n
     const snap = await getDocs(
       query(
         collection(book.db, 'corps', String(corporationId), 'miners'),
-        where('characterIds', 'array-contains', otherId),
-        limitTo(1)
+        where('characterIds', 'array-contains', otherId)
       )
     );
-    return snap.docs[0]?.id ?? solo;
+    return minerIdFor(
+      otherId,
+      snap.docs.map((d) => ({ ...(d.data() as Miner), id: d.id }))
+    );
   } catch {
     return solo;
   }
@@ -61,7 +67,7 @@ async function readBookFacts(
 ): Promise<BookFacts | null> {
   const verdict = await verifyOfficer(characterId, corporationId);
   if (!verdict.canView || !verdict.bookActive) return null;
-  const minerId = await minerIdFor(characterId, corporationId, otherId);
+  const minerId = await billedMinerOf(characterId, corporationId, otherId);
   const read = await readBook(characterId, corporationId, {
     parts: bookPartsFor('miners', 'miner'),
     minerId,
@@ -105,7 +111,8 @@ async function readBookFacts(
       .map((d) => ({
         date: d.date,
         tax: d.tax,
-        settled: d.status === 'paid' || (d.status === 'owed' && d.owed === 0),
+        // A day a dispute holds owes nothing yet, but is not paid.
+        settled: d.status === 'paid' || (d.status === 'owed' && d.owed === 0 && !d.disputed),
       })),
   };
 }

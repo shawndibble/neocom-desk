@@ -32,7 +32,7 @@ import {
   satisfies,
   startDateMoveReason,
 } from './corpTaxBook.js';
-import { finalNoticeId, paymentCode } from './corpTaxBookLateNotice.js';
+import { finalNoticeId, minerPaymentCode, paymentCode } from './corpTaxBookLateNotice.js';
 
 describe('decideRoles (D8)', () => {
   it.each([
@@ -1401,7 +1401,7 @@ describe('Late notices and checkpoints (decision 20261120-235011)', () => {
     characterIds: [9001],
     kind: 'late',
     issuedAt: '2026-11-18T09:00:00Z',
-    code: paymentCode('notice_solo:9001_2026-11-18'),
+    code: minerPaymentCode('solo:9001'),
     pricing: { hubId: 'jita', oreForm: 'compressed' },
     uids: ['char:1'],
     lines: [
@@ -1429,7 +1429,7 @@ describe('Late notices and checkpoints (decision 20261120-235011)', () => {
       characterIds: [9001],
       kind: 'late',
       issuedAt: '2026-11-18T09:00:00.000Z',
-      code: paymentCode(notice.id),
+      code: minerPaymentCode('solo:9001'),
       pricing: { hubId: 'jita', oreForm: 'compressed' },
       listed: 10_005,
       names: { minerName: 'Ore Pilot', refineryNames: { '1000': 'Athanor X' } },
@@ -1477,10 +1477,11 @@ describe('Late notices and checkpoints (decision 20261120-235011)', () => {
     expect(() => parseLateNotice({ ...notice, id: 'final_other' })).toThrow();
   });
 
-  it('prints the code its id hashes to, and refuses any other', () => {
-    const own = paymentCode(notice.id);
+  it("prints the Miner's one code, and refuses any other, the id's own included", () => {
+    const own = minerPaymentCode('solo:9001');
     expect(parseLateNotice({ ...notice, code: own }).code).toBe(own);
     expect(parseLateNotice({ ...notice, code: undefined }).code).toBe(own);
+    expect(() => parseLateNotice({ ...notice, code: paymentCode(notice.id) })).toThrow();
     expect(() => parseLateNotice({ ...notice, code: 'MT00AB12' })).toThrow();
   });
 

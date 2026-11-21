@@ -1,9 +1,7 @@
 import { Trans, useTranslation } from 'react-i18next';
 import { useTimeZone } from '@/lib/timeFormat';
 import { dateTimeAt } from '@/features/corp/moons/moonsFormat';
-import { formatList } from '@/lib/listFormat';
 import { formatCount } from '@/lib/formatCount';
-import { formatIsk } from '@/lib/isk';
 import { IskText } from '../../IskText';
 import { isoDay } from '../memberFlag';
 import type { ResolveTarget } from './targets';
@@ -134,17 +132,6 @@ export function ProblemFacts({ target }: { target: ResolveTarget }) {
             </>
           )}
         </>
-      );
-    case 'markedPaid':
-      return (
-        <p>
-          {t(k(row?.bookSpentOn ? 'markedPaidSpent' : 'markedPaid'), {
-            corp,
-            date: row?.date ?? '',
-            owed: formatIsk(row?.bookOwed ?? 0, 0),
-            days: formatList(row?.bookSpentOn ?? []),
-          })}
-        </p>
       );
     case 'billed':
       return bills;

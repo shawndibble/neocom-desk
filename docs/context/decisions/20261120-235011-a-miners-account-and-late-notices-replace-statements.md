@@ -89,3 +89,23 @@ running account).
 - **One rule per question.** Whether two records are the same transfer, which Miner a Character
   is in (earliest grouping wins), and when money pays a day (the Running account, a date at a
   time) each have one shared definition, used by both sides.
+
+## Added 2026-11-21: the checkpoint is a strict cache
+
+Refines "A closed-through date keeps the work bounded" above, after a review found edits to closed
+days were silently dropped.
+
+- **A checkpoint is a cache of history, never a record.** Raw data is kept forever, so a missing
+  checkpoint only means a load recomputes from the full history. Any edit whose effective date is
+  on or before a Miner's checkpoint (a payment, its move to another Miner, a write-off, an
+  adjustment, a dismissal, a rate or record rate, a dispute answer, or any reversal) deletes that
+  checkpoint in the same write, and so does any change to the Miner's characters. This replaces
+  "a fix to a closed day is an Adjustment dated today": an officer can fix a closed day directly,
+  as far back as the data goes, and the next load rolls the checkpoint forward again.
+- **Only final history is checkpointed.** A checkpoint covers only days that are billable, priced
+  at a saved close-of-day price, and read by a tab that sees the whole book. It stores each owed
+  day's full tax and what was paid into it, and the characters it summed, so a rebuild is exact
+  and one built for other characters is ignored.
+- **The server checks what it can.** It has no prices, so it refuses a checkpoint that does not add
+  up in itself, and one that owes less than the Miner's recorded account unless a Director sends
+  it. A Director can reset a checkpoint; the next load recomputes it.

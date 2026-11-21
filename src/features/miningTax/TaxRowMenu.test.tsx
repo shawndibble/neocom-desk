@@ -57,8 +57,10 @@ describe('TaxRowMenu', () => {
   it('runs the picked action on its row after the menu closes', async () => {
     const onAction = renderMenu(outstanding);
     fireEvent.contextMenu(screen.getByTestId('row'));
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Mark as paid' }));
-    expect(onAction).toHaveBeenCalledWith({ id: 'markPaid' }, outstanding);
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Combine with another day' })
+    );
+    expect(onAction).toHaveBeenCalledWith({ id: 'join' }, outstanding);
   });
 
   // The label keys live in a record, which the `t('a.b')` guard in i18n cannot see: an item

@@ -18,7 +18,7 @@ interface Props {
   onTakeOver: () => void;
   onPaidAnotherWay: () => void;
   /**
-   * Billed on a Statement (#6206): "I paid this another way" goes to the corporation, so this
+   * Asked for on a Late notice (#6206): "I paid this another way" goes to the corporation, so this
    * replaces the device-only button.
    */
   paidAnotherWay?: ReactNode;

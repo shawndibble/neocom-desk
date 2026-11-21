@@ -41,7 +41,7 @@ const loaded = (over: Partial<LoadedCorpBook> = {}): LoadedCorpBook => ({
   held: [],
   claimable: [],
   dismissals: [],
-  statements: [],
+  notices: [],
   miners: [],
   characterIds: [ME],
   memberCharacterIds: [ME],

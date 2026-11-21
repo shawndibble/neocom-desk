@@ -98,8 +98,6 @@ export function buildCorpBookView(
       characterIds: book.characterIds,
       startDate: book.startDate,
       graceHours: book.graceHours,
-      ...(book.overdueDays !== undefined ? { overdueDays: book.overdueDays } : {}),
-      ...(book.runningAccountFrom ? { runningAccountFrom: book.runningAccountFrom } : {}),
       ...(book.lastSyncedAt !== undefined ? { lastSyncedAt: book.lastSyncedAt } : {}),
       ...(book.donationsCheckedAt !== undefined
         ? { donationsCheckedAt: book.donationsCheckedAt }
@@ -108,7 +106,8 @@ export function buildCorpBookView(
       miners: book.miners,
       observed: book.observed,
       dismissals: book.dismissals,
-      statements: book.statements,
+      notices: book.notices,
+      ...(book.checkpoints ? { checkpoints: book.checkpoints } : {}),
       payments: book.payments,
       ...(book.feeders ? { feeders: book.feeders } : {}),
       ...(book.adjustments ? { adjustments: book.adjustments } : {}),

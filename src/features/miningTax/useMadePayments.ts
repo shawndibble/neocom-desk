@@ -1,26 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { MiningTaxAssignmentRecord } from '@/db';
-import type { PayeeBalance } from './balances';
-import { linkRecordedPayment } from './ledgerActions';
+import type { PayeeRecord } from '@/db';
+import { paymentLinkKey, type PayeePaymentLink } from '@/engine/miningTax/payeeAccount';
+import { linkPayment } from './ledgerActions';
 import { useRetainedResult } from '@/lib/useRetainedResult';
 import { loadMadePaymentsWithStatus, type MadePaymentsResult } from './madePayments';
+import type { PayeeAccounts } from './payeeAccounts';
 import {
-  autoMatchRecordedPayments,
+  autoMatchRecorded,
+  linkFor,
   suggestLinks,
-  unlinkedPayments,
-  unlinkedRecordedPayments,
+  type LinkContext,
   type MadePayment,
 } from './paymentLinks';
 
 interface UseLinkSuggestionsInput {
   madePayments: readonly MadePayment[];
-  everyAssignment: readonly MiningTaxAssignmentRecord[];
-  /**
-   * Every stored Assignment, the ones a book row stands in for included: a transaction any of
-   * them links is already used. Defaults to `everyAssignment`.
-   */
-  linkedAssignments?: readonly MiningTaxAssignmentRecord[];
-  balances: readonly PayeeBalance[];
+  /** Every stored link: a payment one holds is never offered again. */
+  links: readonly PayeePaymentLink[];
+  /** Every stored Payee record. */
+  payees: readonly PayeeRecord[];
+  accounts: PayeeAccounts;
+  /** The corporations of the member's Corp Tax Books: a donation to one is the book's. */
+  bookCorporations: ReadonlySet<number>;
 }
 
 const NO_PAYMENTS: MadePaymentsResult['payments'] = [];
@@ -59,8 +60,8 @@ export function useMadePayments(trackedCharacterIds: string) {
    * journal and contracts for every character each time, to learn nothing.
    *
    * Nothing is lost by not refetching after a link is confirmed either: the
-   * just-linked payment disappears because `unlinkedPayments` now sees the
-   * Assignment referencing it, not because the payment list was reloaded.
+   * just-linked payment disappears because a link now holds it, not because
+   * the payment list was reloaded.
    */
   useEffect(() => {
     if (trackedCharacterIds === '') return;
@@ -94,66 +95,61 @@ export function useMadePayments(trackedCharacterIds: string) {
 }
 
 /**
- * Silently links recorded payments whose transaction has since shown up, and
- * suggests links for the rest. Separate from `useMadePayments` because the
- * payments feed the Corp Tax Book view, which the ledger rows (and so the
- * assignments and balances this reads) are built from.
+ * Silently links a recorded Settle-up payment to its transaction once it shows up (one to one,
+ * to its recipient, or nothing: `autoMatchRecorded`), and suggests a Payee for every other
+ * payment it can name the recipient of. Separate from `useMadePayments` because the payments feed
+ * the Corp Tax Book view, which the ledger rows (and so the accounts this reads) are built from.
  */
 export function useLinkSuggestions({
   madePayments,
-  everyAssignment,
-  linkedAssignments = everyAssignment,
-  balances,
+  links,
+  payees,
+  accounts,
+  bookCorporations,
 }: UseLinkSuggestionsInput) {
-  // Settle-up payments already recorded (paid-on/method/amount) but never
-  // live-linked, because step 2 stopped trying to search the wallet journal
-  // at pay time (it always missed — ESI hadn't posted the transaction yet).
-  // An exact amount + recorded-date + paying-character match is unambiguous
-  // enough to attach silently, once the real transaction actually shows up —
-  // see `autoMatchRecordedPayments`'s own doc comment for why this skips the
-  // confirmation dialog `suggestLink` uses.
-  const recordedMatches = useMemo(() => {
-    const candidates = unlinkedPayments(madePayments, linkedAssignments);
-    return autoMatchRecordedPayments(candidates, unlinkedRecordedPayments(linkedAssignments));
-  }, [linkedAssignments, madePayments]);
+  const ctx = useMemo(
+    (): LinkContext => ({
+      payees: accounts.linkable(payees),
+      linked: new Set(links.map(paymentLinkKey)),
+      bookCorporations,
+    }),
+    [accounts, payees, links, bookCorporations]
+  );
+  const recordedMatches = useMemo(
+    () => autoMatchRecorded(madePayments, links, ctx),
+    [madePayments, links, ctx]
+  );
 
-  // Attempted once per `paymentId`, not on every render this effect's deps
-  // happen to recompute — the write lands in Dexie but nothing here forces a
-  // `refresh()` (that always re-hits ESI); the exclusion below already keeps
-  // the card in sync for this render, and the next real reload picks up the
-  // persisted link like any other Assignment field.
-  const attemptedLinksRef = useRef<Set<string>>(new Set());
+  // Attempted once per recorded payment, not on every render: the write lands in Dexie, and the
+  // next reload reads the link like any other.
+  const attemptedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     const fresh = recordedMatches.filter(
-      ({ group }) => !attemptedLinksRef.current.has(group.paymentId)
+      ({ link }) => !attemptedRef.current.has(paymentLinkKey(link))
     );
     if (fresh.length === 0) return;
-    for (const { group } of fresh) attemptedLinksRef.current.add(group.paymentId);
+    for (const { link } of fresh) attemptedRef.current.add(paymentLinkKey(link));
     void Promise.all(
-      fresh.map(({ group, payment }) =>
-        linkRecordedPayment(
-          group.assignments,
-          payment.kind === 'journal'
-            ? { journalRefId: payment.refId }
-            : { contractId: payment.refId }
-        )
-      )
+      fresh.map(({ link, payment }) => {
+        const record = payees.find((p) => p.id === link.payeeId);
+        return record
+          ? linkPayment(
+              linkFor(payment, link.payeeId, 'auto'),
+              record.characterId,
+              paymentLinkKey(link)
+            )
+          : Promise.resolve();
+      })
     );
-  }, [recordedMatches]);
+  }, [recordedMatches, payees]);
 
-  // Payments nothing accounts for, each with the Payee and entries it most
-  // likely settled. Only payments with a plausible target survive
-  // `suggestLinks`, which is what lets the card stay a quiet offer rather than
-  // a standing alert. Excludes whatever `recordedMatches` just claimed
-  // automatically — those never need the confirmation dialog.
-  const linkSuggestions = useMemo(() => {
-    const candidates = unlinkedPayments(madePayments, linkedAssignments);
-    const autoLinked = new Set(recordedMatches.map((m) => m.payment.key));
+  // Payments nothing accounts for, each with the Payee it most likely paid; what the matcher just
+  // claimed is left out.
+  return useMemo(() => {
+    const claimed = new Set(recordedMatches.map((m) => m.payment.key));
     return suggestLinks(
-      candidates.filter((p) => !autoLinked.has(p.key)),
-      balances
+      madePayments.filter((p) => !claimed.has(p.key)),
+      ctx
     );
-  }, [linkedAssignments, madePayments, balances, recordedMatches]);
-
-  return linkSuggestions;
+  }, [madePayments, recordedMatches, ctx]);
 }

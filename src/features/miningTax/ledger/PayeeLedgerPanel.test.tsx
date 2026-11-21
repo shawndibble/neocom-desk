@@ -41,6 +41,7 @@ describe('PayeeLedgerPanel', () => {
     expect(screen.getByText('Late notice sent')).toBeInTheDocument();
     expect(screen.getByText('Written off by an officer')).toBeInTheDocument();
     expect(screen.getByText('Shortfall forgiven')).toBeInTheDocument();
+    expect(within(table()).getByRole('columnheader', { name: 'Credited' })).toBeInTheDocument();
   });
 
   it('opens a row in place to say what it was', async () => {

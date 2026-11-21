@@ -71,6 +71,11 @@ export interface LedgerNotice {
  */
 export interface PayeeLedgerSource {
   account: LedgerAccount;
+  /**
+   * The closed-through checkpoint the account starts from (`RunningAccountCheckpoint`): one
+   * opening row stands for every day through it, and no charge on or before it is listed again.
+   */
+  opening?: { through: string; balance: number };
   charges: readonly LedgerCharge[];
   payments?: readonly LedgerPayment[];
   /** In the order they were recorded; absent for a personal Payee. */
@@ -117,7 +122,9 @@ export type PayeeLedgerRow =
       days: DayAmount[];
       reason?: string;
     })
-  | (RowBase & { kind: 'notice'; notice: LedgerNotice; standing: LateNoticeStanding });
+  | (RowBase & { kind: 'notice'; notice: LedgerNotice; standing: LateNoticeStanding })
+  /** The balance brought forward from the checkpoint: never filtered out. */
+  | (RowBase & { kind: 'opening' });
 
 /** "Owes X (N days, oldest D)", or "Paid through D", or nothing billed yet. */
 export type PayeeLedgerStatus =
@@ -140,8 +147,20 @@ const dayOf = (at: string) => utcDay(Date.parse(at));
 
 export function payeeLedger(source: PayeeLedgerSource): PayeeLedger {
   const { account } = source;
+  const { opening } = source;
   const rows: Unbalanced[] = [
-    ...chargeRows(source),
+    ...(opening
+      ? [
+          {
+            kind: 'opening',
+            key: 'opening',
+            date: opening.through,
+            charged: Math.max(0, opening.balance),
+            paid: Math.max(0, -opening.balance),
+          } as Unbalanced,
+        ]
+      : []),
+    ...chargeRows(source).filter((r) => !opening || r.date > opening.through),
     ...paymentRows(source),
     ...officerWriteOffRows(source),
     ...toleranceRows(source),
@@ -156,9 +175,11 @@ export function payeeLedger(source: PayeeLedgerSource): PayeeLedger {
       standing: lateNoticeStanding(notice, account.byDay),
     })),
   ];
-  // A day's charges come first (they are the day itself), then events in the order they happened.
+  // The opening row first; a day's charges come first (they are the day itself), then events in
+  // the order they happened.
   rows.sort(
     (a, b) =>
+      Number(b.kind === 'opening') - Number(a.kind === 'opening') ||
       a.date.localeCompare(b.date) ||
       Number(a.kind !== 'charge') - Number(b.kind !== 'charge') ||
       (a.at ?? '').localeCompare(b.at ?? '') ||

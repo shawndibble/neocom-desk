@@ -8,7 +8,9 @@ import type { VerifyPayloadLine } from '@/engine/corpTaxBook/verifyView';
 import { NoticeLines } from '@/features/corpTaxBook/NoticeLines';
 import { writeToClipboard } from '@/lib/clipboard';
 import { readVerifyTokens, verifyUrl } from '../taxBook/bookClient';
+import { minerPaymentCode } from '../../../../functions/src/corpTaxBookLateNotice';
 import { useBook } from './useBook';
+import { useEntityName } from '@/features/character/useEntityName';
 import {
   type ClockZone,
   atDate,
@@ -103,6 +105,8 @@ export function LateNoticePanel({
   const { t } = useTranslation();
   const { view, names, canEdit } = useBook();
   const detail = noticeDetail(view, noticeId);
+  // The officer who issued it is no Miner of the book: their name is looked up.
+  const issuer = useEntityName(detail?.notice.issuedBy);
   if (!detail) return null;
   const { notice } = detail;
   const miner = view.miners.find((m) => m.id === notice.minerId);
@@ -147,7 +151,7 @@ export function LateNoticePanel({
             {atDateWithYear(notice.issuedAt, zone)}
             {notice.issuedBy !== undefined && (
               <span className="block text-xs text-text-dim">
-                {t(k('issuedBy'), { name: names.character(notice.issuedBy) })}
+                {t(k('issuedBy'), { name: issuer ?? names.character(notice.issuedBy) })}
               </span>
             )}
           </Fact>
@@ -168,11 +172,10 @@ export function LateNoticePanel({
             )}
           </Fact>
           <Fact label={t(k('mail'))}>{mailText(detail, t, zone)}</Fact>
-          {notice.code && (
-            <Fact label={t(k('code'))}>
-              <span className="font-mono">{notice.code}</span>
-            </Fact>
-          )}
+          {/* The Miner's one code, which the mail asks for; an older notice's own still matches. */}
+          <Fact label={t(k('code'))}>
+            <span className="font-mono">{minerPaymentCode(notice.minerId)}</span>
+          </Fact>
         </dl>
         <NoticeLines
           notice={{
@@ -183,6 +186,7 @@ export function LateNoticePanel({
             refineryNames,
           }}
           formatDate={shortDate}
+          title={t(k('mined'))}
         />
         <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
           {canEdit && <CopyVerifyLink noticeId={notice.id} />}

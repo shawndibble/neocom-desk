@@ -6,8 +6,11 @@
  * server wrote under the officer rules) and shares the settings parser, `parseBookSettings`
  * (`bookDocs.ts`), with this one.
  */
+import {
+  checkpointProblems,
+  type RunningAccountCheckpoint,
+} from '../../../functions/src/corpTaxBookCheckpoint';
 import type { Adjustment } from './adjustments';
-import type { LegacyStatementDoc } from './legacyStatementDoc';
 import type { RecordedWriteOff, TaxPayment } from './payments';
 import { num, parseBookSettings, str } from './bookDocs';
 import type { Miner } from './charges';
@@ -48,6 +51,8 @@ export interface HeldPayment {
   amount: number;
   at: string;
   notTaxAmount?: number;
+  /** A donation the sync read from the wallet, or a hand record an officer dated. */
+  source?: 'donation' | 'manual';
 }
 
 /** A moon owner's coverage and read clock as the miner reads them: never a name, payee or rate. */
@@ -112,6 +117,7 @@ export function readPayment(
     amount,
     at,
     ...(notTaxAmount !== undefined ? { notTaxAmount } : {}),
+    source: d.source === 'manual' ? 'manual' : 'donation',
   };
   const minerId = str(d.minerId);
   if (!minerId) {
@@ -212,15 +218,6 @@ export function readMemberDeclaration(id: string, d: Data): Declaration | null {
   };
 }
 
-/** A legacy `statements` doc, as the member side reads it until its rework. */
-export function readStatement(id: string, d: Data): LegacyStatementDoc | null {
-  const minerId = str(d.minerId);
-  const amount = num(d.amount);
-  const issuedAt = str(d.issuedAt);
-  if (!minerId || amount === undefined || !issuedAt || !Array.isArray(d.lines)) return null;
-  return { ...(d as unknown as LegacyStatementDoc), id, minerId, amount, issuedAt };
-}
-
 export function readMiner(id: string, d: Data): Miner | null {
   const characterIds = Array.isArray(d.characterIds)
     ? d.characterIds.filter((x): x is number => typeof x === 'number')
@@ -311,4 +308,40 @@ export function readToleranceExemption(id: string, d: Data): ToleranceExemption 
     by: num(d.by) ?? 0,
     at: str(d.at) ?? '',
   };
+}
+
+/**
+ * A Miner's closed-through checkpoint as the book stores it (`accountCheckpoints/{minerId}`,
+ * readable by the Miner); null for anything that does not add up (`checkpointProblems`).
+ */
+export function readCheckpoint(id: string, d: Data): RunningAccountCheckpoint | null {
+  const through = str(d.through);
+  const credit = num(d.credit);
+  const balance = num(d.balance);
+  const at = str(d.at);
+  if (!through || credit === undefined || balance === undefined || !at || !Array.isArray(d.owed))
+    return null;
+  const owed = d.owed.flatMap((o: unknown) => {
+    if (typeof o !== 'object' || o === null) return [];
+    const r = o as Data;
+    const date = str(r.date);
+    const remaining = num(r.remaining);
+    const charge = num(r.charge);
+    return date && remaining !== undefined
+      ? [{ date, remaining, ...(charge !== undefined ? { charge } : {}) }]
+      : [];
+  });
+  const paidThrough = str(d.paidThrough) ?? null;
+  const by = num(d.by);
+  const checkpoint: RunningAccountCheckpoint = {
+    minerId: str(d.minerId) ?? id,
+    through,
+    owed,
+    credit,
+    balance,
+    paidThrough,
+    at,
+    ...(by !== undefined ? { by } : {}),
+  };
+  return checkpointProblems(checkpoint).length === 0 ? checkpoint : null;
 }

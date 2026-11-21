@@ -3,7 +3,7 @@ import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { TaxPayment } from '@/engine/corpTaxBook/payments';
-import type { PaidBy } from '@/engine/corpTaxBook/paidBy';
+import type { PaidBy } from '@/engine/corpTaxBook/personal';
 import { PaidByList } from './PaidByList';
 
 const payment = (over: Partial<TaxPayment>): TaxPayment => ({

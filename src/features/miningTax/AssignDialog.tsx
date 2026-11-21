@@ -169,7 +169,6 @@ export function AssignDialog({
   const [includedTypeIds, setIncludedTypeIds] = useState<ReadonlySet<number>>(
     new Set(oreLines.map((line) => line.typeId))
   );
-  const [markPaid, setMarkPaid] = useState(false);
   const [label, setLabel] = useState('');
   const { pending: saving, error: saveError, run } = useLedgerAction();
   // Empty means "track the computed default"; any other string is a pilot
@@ -275,7 +274,6 @@ export function AssignDialog({
           taxPct: pctValue,
           estimatedValue,
           taxOwed,
-          markPaid,
           label,
         }),
       onAssigned
@@ -425,11 +423,6 @@ export function AssignDialog({
       </div>
 
       <LabelField value={label} onChange={setLabel} />
-
-      <label className={`flex items-center gap-2 text-sm ${tappableRowClassName}`}>
-        <Checkbox checked={markPaid} onChange={(e) => setMarkPaid(e.target.checked)} />
-        {t('miningTax.markPaidLabel')}
-      </label>
 
       {warnUnpricedOffline && (
         <p role="status" className="text-xs text-warning">

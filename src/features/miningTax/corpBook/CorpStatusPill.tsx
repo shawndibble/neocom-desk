@@ -20,7 +20,6 @@ const PILL_TONE: Record<PillState, string> = {
   unattributed: 'text-text-dim',
   dismissed: 'text-text-dim',
   waived: 'text-text-dim',
-  markedPaid: 'text-warning bg-warning/10',
   // Acted on: no longer a warning the member has to answer.
   sent: 'text-text-dim',
   oreWaived: 'text-text-dim',
@@ -32,9 +31,7 @@ export function CorpStatusPill({ corp }: { corp: CorpRowInfo }) {
   const label = useCorpStateLabel();
   const hint = useCorpStateHint();
   const { hidden } = useNotPaying();
-  // Marked paid by the member while the book's Statement still bills the day: not plain Paid.
-  const markedOnly = corp.kind === 'row' && corp.view.bookOwed !== undefined;
-  if (corp.kind === 'row' && corp.view.state === 'paid' && !markedOnly) {
+  if (corp.kind === 'row' && corp.view.state === 'paid') {
     return <StatusPill status="paid" label={label(corp)} hint={hint(corp)} />;
   }
   // The member's own "Not paying" (resolving in the app): never reads as settled, and the
@@ -47,11 +44,7 @@ export function CorpStatusPill({ corp }: { corp: CorpRowInfo }) {
     said?.flagged?.state === 'rejected' ? said.flagged.nextStep : said?.declaration?.nextStep;
   const flagged = corp.kind === 'row' ? flaggedPillState(corp.view) : undefined;
   const state = (
-    notPaying
-      ? 'notPaying'
-      : markedOnly
-        ? 'markedPaid'
-        : (flagged ?? (corp.kind === 'label' ? corp.state : corp.view.state))
+    notPaying ? 'notPaying' : (flagged ?? (corp.kind === 'label' ? corp.state : corp.view.state))
   ) as PillState;
   const pill = (
     <HintText

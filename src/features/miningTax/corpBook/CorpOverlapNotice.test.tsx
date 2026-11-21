@@ -152,24 +152,13 @@ describe('CorpOverlapNotice on a Conflict day', () => {
     ]);
   });
 
-  it('asks to unmark a paid entry first, and unmarks it', async () => {
+  it("lets the book take a paid entry's ore too: what was paid becomes credit there", () => {
     const paid = { ...assignment, status: 'paid' } as MiningTaxAssignmentRecord;
-    await db.miningTaxAssignments.put(paid);
-    let changed = 0;
-    renderConflict(
-      paid,
-      { ...conflict, overlap: { ...view.overlap!, paid: true } },
-      () => changed++
-    );
+    renderConflict(paid, { ...conflict, overlap: { ...view.overlap!, paid: true } });
     const region = screen.getByRole('region', { name: 'Conflict' });
-    expect(region).toHaveTextContent('Your entry: Ashfall · 500 ISK · marked paid');
-    expect(region).toHaveTextContent(
-      'If the book is right: unmark your payment, then take this ore off your entry.'
-    );
-    expect(screen.queryByRole('button', { name: 'Let the corporation bill it' })).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: /mark as unpaid/i }));
-    await waitFor(() => expect(changed).toBe(1));
-    expect((await db.miningTaxAssignments.get('a1'))?.status).toBe('outstanding');
+    expect(region).toHaveTextContent('Your entry: Ashfall · 500 ISK · paid');
+    expect(region).toHaveTextContent('If the book is right: take this ore off your entry.');
+    expect(screen.getByRole('button', { name: 'Let the corporation bill it' })).toBeInTheDocument();
   });
 
   it('still explains the conflict after "I paid it another way" was said for the day', async () => {
@@ -398,11 +387,11 @@ describe('CorpOverlapNotice: what reaches the corporation (#6206)', () => {
     expect(screen.queryByRole('button', { name: /^Tell / })).toBeNull();
   });
 
-  it('on a day billed on a Statement, Resolve opens its Statement problem', async () => {
+  it('on a day a Late notice asked for, Resolve opens its Late notice problem', async () => {
     const onResolve = vi.fn();
     render(
       <CorpOverlapNotice
-        view={{ ...view, state: 'billed', statementId: 's1' } as BookRowView}
+        view={{ ...view, state: 'billed', noticeId: 's1' } as BookRowView}
         corpName="Brass Meridian"
         recordedAt="Efa"
         everyAssignment={[assignment]}
@@ -415,7 +404,7 @@ describe('CorpOverlapNotice: what reaches the corporation (#6206)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Resolve' }));
     expect(onResolve).toHaveBeenCalledWith(
       expect.objectContaining({
-        problem: expect.objectContaining({ kind: 'overdue', statementId: 's1' }),
+        problem: expect.objectContaining({ kind: 'overdue', noticeId: 's1' }),
       })
     );
   });
@@ -425,7 +414,7 @@ describe('CorpOverlapNotice: what reaches the corporation (#6206)', () => {
       {
         ...view,
         state: 'billed',
-        statementId: 's1',
+        noticeId: 's1',
         declaration: { state: 'waiting', at: '2026-10-18T10:00:00.000Z' },
       } as BookRowView,
       () => {},

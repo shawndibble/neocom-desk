@@ -24,6 +24,10 @@ import type {
   RunningAccountCheckpoint,
 } from '../../../functions/src/corpTaxBookCheckpoint';
 import { countedPayments, paymentNet, type TaxPayment } from './payments';
+import { shiftUtcDate } from '@/engine/localDay';
+
+/** What is left of a day below this is float residue: the day is done (whole ISK on every screen). */
+export const RESIDUE_ISK = 0.5;
 
 /** The default per-day tolerance, in percent of the day's tax. */
 export const DAY_SETTLE_TOLERANCE_PCT = 0.5;
@@ -247,14 +251,26 @@ export class MinerRunningAccount {
       })
       .sort((a, b) => a.date.localeCompare(b.date));
     const billed = account.byDay.size > 0 || input.checkpoint !== undefined;
-    const nothingOwed = owed.every((d) => account.byDay.get(d.date)?.held);
+    // Paid through `through` with nothing owed. A day still owed, held by a dispute or not, caps
+    // it before that day (`checkpointProblem`); building from the checkpoint closes it again
+    // once those days are paid.
+    const first = owed[0]?.date;
+    const capped =
+      first !== undefined && account.paidThrough !== null && account.paidThrough >= first
+        ? shiftUtcDate(first, -1)
+        : account.paidThrough;
+    // The account's balance leaves a held day out (it is not due yet); the checkpoint keeps it
+    // owed, so its balance counts it: always what it owes less its credit (`checkpointProblem`).
+    const heldOwed = owed
+      .filter((d) => account.byDay.get(d.date)?.held)
+      .reduce((sum, d) => sum + d.remaining, 0);
     return {
       minerId,
       through,
       owed,
       credit: account.credit,
-      balance: account.balance,
-      paidThrough: billed && nothingOwed ? through : account.paidThrough,
+      balance: account.balance + heldOwed,
+      paidThrough: billed && owed.length === 0 ? through : capped,
       at: recorded.at,
       ...(recorded.by !== undefined ? { by: recorded.by } : {}),
     };
@@ -280,11 +296,20 @@ export class MinerRunningAccount {
     return lateNoticeStanding(notice, this.byDay);
   }
 
-  /** What is still owed of one line of a day: its share of the date's remainder, none while held. */
+  /**
+   * What is still owed of one charging line of a day: its share of the date's remainder, by its
+   * tax among the date's charging lines, none while held. A credit correction on the date is in
+   * the remainder already, so the shares add up to what the date still owes, not to the gross.
+   */
   owedOf(date: string, tax: number): number {
     const day = this.byDay.get(date);
-    if (!day || day.held || day.tax <= 0) return 0;
-    return (day.remaining * tax) / day.tax;
+    if (!day || day.held || day.tax <= 0 || tax <= 0) return 0;
+    const charging = this.input.days
+      .filter((d) => d.date === date)
+      .reduce((sum, d) => sum + Math.max(0, d.tax), 0);
+    // A date the account holds only as a checkpoint's owed day: its lines are not in the input.
+    const gross = Math.max(charging, day.tax);
+    return (day.remaining * tax) / gross;
   }
 
   /**
@@ -301,9 +326,16 @@ export class MinerRunningAccount {
     today: string
   ): string | null {
     if (this.paidThrough === null) return null;
+    const closed = this.input.checkpoint?.through;
     let through: string | null = null;
     for (const d of [...days].sort((a, b) => a.date.localeCompare(b.date))) {
       const day = this.byDay.get(d.date);
+      // A day the checkpoint closed is not billed here any more: it was settled and priced then.
+      // One it still owes is billed here, and holds the rest back until it is paid.
+      if (!day && closed !== undefined && d.date <= closed) {
+        through = d.date;
+        continue;
+      }
       if (d.date >= today || !d.savedPrices || !day || day.held || !day.settled) break;
       through = d.date;
     }
@@ -396,11 +428,22 @@ function settleDays(input: DaysInput, pools: DayPools): SettledDays {
       },
     ])
   );
-  const isHeld = (d: RunningDay) => held.has(d.date) && d.tax > 0;
+  // A dispute holds a day still open. One recorded paid for good stays paid (D22): the dispute
+  // neither releases its money as credit nor takes it out of the balance; an officer who agrees
+  // waives the disputed ore (`dismissDispute`), which credits it.
+  const isHeld = (d: RunningDay) =>
+    held.has(d.date) && d.tax > 0 && !(stored !== undefined && d.date <= stored);
   const isDone = (st: Running) => {
     const remaining = st.tax - st.credited;
-    const limit = st.exempt ?? daySettleTolerance(st.tax, pct);
-    return remaining <= 0 || (st.paidIn > 0 && remaining <= limit);
+    // Under half an ISK is float residue, never a debt: it would read "owes 0 ISK (1 day)".
+    if (remaining < RESIDUE_ISK) return true;
+    if (st.paidIn <= 0) return false;
+    // The tolerance forgives only the mined part: the money pays it first, so an officer's
+    // charge is what is left short, and is never forgiven however small.
+    const mined = Math.max(0, st.tax - Math.max(0, st.charge));
+    const minedLeft = Math.max(0, mined - st.credited);
+    const limit = st.exempt ?? daySettleTolerance(mined, pct);
+    return remaining - minedLeft < RESIDUE_ISK && minedLeft <= limit;
   };
   const queue = pools.payments.map((p) => ({
     paymentId: p.paymentId,
@@ -463,8 +506,9 @@ function settleDays(input: DaysInput, pools: DayPools): SettledDays {
   for (const d of days) {
     const st = state.get(d.date)!;
     const dayHeld = isHeld(d);
-    // A day recorded paid stays closed, unless an officer set a limit on what it may forgive.
-    const pinned = st.pinned && st.exempt === undefined;
+    // A day recorded paid stays closed: an exemption sets what a day still open may forgive, and
+    // never reopens one recorded paid (nor counts its charge twice, here and in the pool).
+    const pinned = st.pinned;
     const shortfall = Math.max(0, st.tax - st.credited);
     // A day recorded paid stays closed, but officers' charges on recorded-paid days are owed, not
     // forgiven: they stay on the oldest such day that ended short, wherever the money fell.

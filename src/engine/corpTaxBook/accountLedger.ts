@@ -50,8 +50,10 @@ export interface AccountLedger {
   entries: LedgerEntry[];
   /** Positive is owed, negative is credit held; equals the last entry's balance. */
   balance: number;
-  /** Mined but not billable yet, or held by a dispute: shown below, outside the balance. */
+  /** Mined but not billable yet: shown below, outside the balance. */
   notYetBilled: { tax: number; days: number };
+  /** Owed days an open dispute holds: shown below as held, outside the balance. */
+  held: { tax: number; days: number };
 }
 
 /** Within one date a day's tax comes first, then what was paid against it. */
@@ -73,6 +75,7 @@ export function accountLedger(
   type Draft = Omit<LedgerEntry, 'balance'> & { at: string };
   const drafts: Draft[] = [];
   const notYetBilled = { tax: 0, days: 0 };
+  const heldTotal = { tax: 0, days: 0 };
   // A closed-through checkpoint opens the ledger: what came before it is summed up in it.
   const cp = detail.checkpoint;
   const open = (date: string) => !cp || date > cp.through;
@@ -100,7 +103,10 @@ export function accountLedger(
       held.days += 1;
       held.keys.push(d.key);
       billed.set(d.date, held);
-    } else if (d.status === 'owed' || d.status === 'not-billable') {
+    } else if (d.status === 'owed') {
+      heldTotal.tax += d.tax;
+      heldTotal.days += 1;
+    } else if (d.status === 'not-billable') {
       notYetBilled.tax += d.tax;
       notYetBilled.days += 1;
     }
@@ -226,5 +232,5 @@ export function accountLedger(
       ...(d.forDate !== undefined ? { forDate: d.forDate } : {}),
     };
   });
-  return { entries, balance, notYetBilled };
+  return { entries, balance, notYetBilled, held: heldTotal };
 }

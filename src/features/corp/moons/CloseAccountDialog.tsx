@@ -14,7 +14,7 @@ import {
   planCloseAccount,
   type CreditDisposition,
 } from '@/engine/corpTaxBook/closeAccount';
-import { DialogShell, Effect, Label } from './BookDialogs';
+import { DialogShell, Effect, GroupLabel, Label } from './BookDialogs';
 import { dateWithYear, isk } from './moonsFormat';
 import { useBook } from './useBook';
 import { noticeRefineryNames, useCorporationName } from './lateNoticeMailing';
@@ -110,7 +110,7 @@ export function CloseAccountDialog({
     >
       <p className="text-text-dim">{t('corpTaxBook.moons.dialogs.close.intro')}</p>
       {waivable > 0 && (
-        <Label text={t('corpTaxBook.moons.dialogs.close.settleLabel')}>
+        <GroupLabel text={t('corpTaxBook.moons.dialogs.close.settleLabel')}>
           <SegmentedControl
             label={t('corpTaxBook.moons.dialogs.close.settleLabel')}
             value={settle}
@@ -121,7 +121,7 @@ export function CloseAccountDialog({
             ]}
             uppercase={false}
           />
-        </Label>
+        </GroupLabel>
       )}
       <Effect>
         {dismissing
@@ -150,7 +150,9 @@ export function CloseAccountDialog({
 
       {credit > 0 && (
         <>
-          <Label text={t('corpTaxBook.moons.dialogs.close.creditLabel', { amount: isk(credit) })}>
+          <GroupLabel
+            text={t('corpTaxBook.moons.dialogs.close.creditLabel', { amount: isk(credit) })}
+          >
             <SegmentedControl
               label={t('corpTaxBook.moons.dialogs.close.creditLabel', { amount: isk(credit) })}
               value={forfeit ? 'forfeit' : 'refund'}
@@ -161,7 +163,7 @@ export function CloseAccountDialog({
               ]}
               uppercase={false}
             />
-          </Label>
+          </GroupLabel>
           {forfeit ? (
             <>
               <SegmentedControl

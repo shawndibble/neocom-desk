@@ -202,4 +202,35 @@ describe('payeeLedger', () => {
     const src = source(MINED.slice(0, 1), [payment('p1', 600_000, '2026-10-02T12:00:00Z')]);
     expect(payeeLedger({ ...src, payments: [] }).rows.map((r) => r.kind)).toEqual(['charge']);
   });
+
+  it('opens with the checkpoint the account starts from, and lists only what came after it', () => {
+    const days = MINED.map((c) => ({ date: c.date, tax: c.tax }));
+    const payments = [payment('p1', 1_000_000, '2026-10-02T12:00:00Z')];
+    const checkpoint = MinerRunningAccount.checkpoint({ days, payments }, 'm1', '2026-10-02', {
+      at: '2026-11-05T00:00:00Z',
+    });
+    const account = MinerRunningAccount.build({ days, payments, checkpoint });
+    const ledger = payeeLedger({
+      account,
+      charges: MINED,
+      payments: [{ id: 'p1', at: '2026-10-02T12:00:00Z' }],
+      opening: { through: checkpoint.through, balance: checkpoint.balance },
+    });
+    expect(ledger.rows.map((r) => [r.date, r.kind, r.charged, r.paid, r.balance])).toEqual([
+      ['2026-10-02', 'opening', 2_000_000, 0, 2_000_000],
+      ['2026-10-03', 'charge', 500_000, 0, 2_500_000],
+    ]);
+    expect(ledger.rows.at(-1)!.balance).toBe(account.balance);
+  });
+
+  it('opens in credit as a payment-side amount', () => {
+    const ledger = payeeLedger({
+      account: MinerRunningAccount.build({ days: [], payments: [] }),
+      charges: [],
+      opening: { through: '2026-09-30', balance: -250_000 },
+    });
+    expect(ledger.rows).toMatchObject([
+      { kind: 'opening', date: '2026-09-30', charged: 0, paid: 250_000, balance: -250_000 },
+    ]);
+  });
 });

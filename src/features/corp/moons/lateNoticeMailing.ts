@@ -64,8 +64,9 @@ export function mailTarget(
   const recipientId = mailRecipientOf(miner, ctx.view.input.memberIds);
   const days = owedDays(ctx.view, miner.id).map((d) => ({
     date: d.date,
-    place:
-      d.moonId !== undefined
+    place: d.correction
+      ? i18n.t('corpTaxBook.verify.correction')
+      : d.moonId !== undefined
         ? ctx.names.moon(d.moonId)
         : d.structureId !== undefined
           ? ctx.names.refinery(d.structureId)
