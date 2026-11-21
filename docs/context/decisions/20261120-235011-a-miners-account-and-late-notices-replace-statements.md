@@ -81,7 +81,7 @@ running account).
 - **A donation links to a Miner, never to a late notice.** One resolver,
   `functions/src/corpTaxBookDonationMatch.ts`, decides whose money a donation is, and the server
   runs it on every donation it stores, whichever sync sent it (a client's Miner is ignored).
-  "Known" means grouped or seen mining, not "has paid before". An ambiguous donation is stored for
+  "Known" means grouped or seen mining, not "has paid before": a payer known only through earlier payments is not their own Miner, but a donation of theirs with no code goes to the Miner those payments named, and to review if they named more than one. An ambiguous donation is stored for
   review, shown in Needs you, and never claimed automatically. An officer can move a payment to
   another Miner. A donation from an alt pays the group the alt is in, as the alt is billed with
   it. A hand-recorded payment is checked against uncounted and in-flight transfers so
