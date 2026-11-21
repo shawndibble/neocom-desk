@@ -6,7 +6,6 @@ import { uncountedToShow } from '@/engine/corpTaxBook/uncounted';
 import { disputesToShow } from '@/engine/corpTaxBook/disputes';
 import type { BookData } from '../taxBook/bookClient';
 import { useBook } from './useBook';
-import { useTabsProjection } from './useTabsProjection';
 
 const noticesByView = new WeakMap<BookView, { rules: NoticeRules; plans: NoticePlan[] }>();
 
@@ -51,7 +50,7 @@ export function needsYouOf(
 /** `needsYouOf` for the open book. */
 export function useNeedsYou() {
   const { view, data, settings } = useBook();
-  const { needsYou } = useTabsProjection();
+  const { needsYou } = view;
   return useMemo(
     () => needsYouOf(view, data, settings.divisions, needsYou, settings.noticeRules),
     [view, data, settings.divisions, settings.noticeRules, needsYou]

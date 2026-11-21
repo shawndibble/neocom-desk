@@ -38,7 +38,7 @@ import {
 import { minerDetail, type DayRow, type DayStatus } from '@/engine/corpTaxBook/bookView';
 import type { Adjustment } from '@/engine/corpTaxBook/adjustments';
 import {
-  lineKey,
+  adjustmentLineKey,
   NOTICE_ID_FIELD,
   type LateNotice,
 } from '../../../../functions/src/corpTaxBookLateNotice';
@@ -480,7 +480,7 @@ export function MinerDetail({ id }: { id: string }) {
 
   /** The late notice that listed a correction; undefined while none has. */
   const listedOn = (adjustment: Adjustment) => {
-    const key = lineKey({ adjustmentId: adjustment.id, date: adjustment.date });
+    const key = adjustmentLineKey(adjustment.id);
     return detail.notices.find((n) => n.lines.some((l) => l.key === key));
   };
 

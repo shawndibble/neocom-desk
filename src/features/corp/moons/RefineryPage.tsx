@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { soloCharacterId } from '../../../../functions/src/corpTaxBookDonationMatch';
 import { useTimeZone } from '@/lib/timeFormat';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -139,8 +140,7 @@ export function RefineryPage({ structureId }: { structureId: number }) {
   const miners = refineryMiners(docs, priceOf);
   const minerName = (minerId: string) => {
     const main = view.input.miners.find((m) => m.id === minerId)?.mainCharacterId;
-    const solo = /^solo:(\d+)$/.exec(minerId);
-    return names.character(main ?? (solo ? Number(solo[1]) : 0));
+    return names.character(main ?? soloCharacterId(minerId) ?? 0);
   };
 
   const archive = async (reason: ArchiveReason) => {

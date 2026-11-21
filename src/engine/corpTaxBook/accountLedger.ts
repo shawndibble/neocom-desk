@@ -9,6 +9,7 @@
  * forgiven, or money taken back from a day already closed, is that day's own `tolerance` row, dated by
  * the payment that closed it. The rows add up to the balance, so there is no catch-all row.
  */
+import { utcDayOf } from '@/engine/localDay';
 import type { Adjustment } from './adjustments';
 import type { MinerDetail } from './bookView';
 
@@ -66,7 +67,7 @@ const ORDER: Record<LedgerEntryKind, number> = {
   tolerance: 3,
 };
 
-const day = (iso: string) => iso.slice(0, 10);
+const day = utcDayOf;
 
 export function accountLedger(
   detail: MinerDetail,

@@ -4,7 +4,6 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { MinerRow, NeedsYouItem } from '@/engine/corpTaxBook/bookView';
-import type { TabsProjection } from '@/engine/corpTaxBook/readModels';
 import type { UncountedDonation } from '@/engine/corpTaxBook/uncounted';
 import type { OreDispute } from '@/engine/corpTaxBook/disputes';
 import type { ClaimedTransfer, Declaration } from '@/engine/corpTaxBook/overdue';
@@ -47,8 +46,6 @@ const wallet = vi.hoisted(() => ({
   })),
 }));
 vi.mock('@/features/character/wallet', () => wallet);
-const projection = vi.hoisted(() => ({ value: { miners: [], needsYou: [] } as unknown }));
-vi.mock('./useTabsProjection', () => ({ useTabsProjection: () => projection.value }));
 const { editBook } = await import('../taxBook/bookClient');
 
 const miner = (id: string, characterId: number, over: Partial<MinerRow> = {}): MinerRow => ({
@@ -85,7 +82,6 @@ function renderQueue(
     disputes = [] as OreDispute[],
   } = {}
 ) {
-  projection.value = { miners, needsYou } as unknown as TabsProjection;
   render(
     <MemoryRouter>
       <BookProvider
@@ -93,36 +89,44 @@ function renderQueue(
           {
             characterId: 9,
             corporationId: 98000001,
-            view: view ?? {
-              input: {
-                notices: [
+            // The tabs read the view's Miners and Needs you items: the test's own.
+            view: {
+              ...((view as object | undefined) ?? {
+                input: {
+                  notices: [
+                    {
+                      id: 's1',
+                      minerId: 'solo:7',
+                      issuedAt: '2026-10-01T00:00:00Z',
+                      lines: [],
+                      mail: { sent: 1, manualSent: 0, remindersStopped: false },
+                    },
+                  ],
+                  miners: [],
+                  now: '2026-10-20T00:00:00Z',
+                  declarations: [],
+                  dismissals: [],
+                },
+                miners: [],
+                internals: { byMiner: new Map() },
+                charges: [
                   {
-                    id: 's1',
-                    minerId: 'solo:7',
-                    issuedAt: '2026-10-01T00:00:00Z',
-                    lines: [],
-                    mail: { sent: 1, manualSent: 0, remindersStopped: false },
+                    key: '7:1000:2026-09-05',
+                    oreLines: [
+                      { typeId: 45490, quantity: 1200 },
+                      { typeId: 45491, quantity: 500 },
+                    ],
+                    unitPrices: { 45490: 10_000, 45491: 4_000 },
+                    taxPct: 10,
+                    taxOwed: 1_400_000,
                   },
                 ],
-                miners: [],
-                now: '2026-10-20T00:00:00Z',
-                declarations: [],
-                dismissals: [],
-              },
-              miners: [],
-              internals: { byMiner: new Map() },
-              charges: [
-                {
-                  key: '7:1000:2026-09-05',
-                  oreLines: [
-                    { typeId: 45490, quantity: 1200 },
-                    { typeId: 45491, quantity: 500 },
-                  ],
-                  unitPrices: { 45490: 10_000, 45491: 4_000 },
-                  taxPct: 10,
-                  taxOwed: 1_400_000,
-                },
-              ],
+              }),
+              // A built view keeps its own Miners; a hand-built one takes the given ones.
+              miners: (view as { miners?: MinerRow[] } | undefined)?.miners?.length
+                ? (view as { miners: MinerRow[] }).miners
+                : miners,
+              needsYou,
             },
             names: {
               character: (id: number) => `Pilot ${id}`,

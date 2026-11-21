@@ -69,6 +69,9 @@ export function cellOf(ms: number, zone: DayZone): Date {
     : new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
+/** The UTC day (`YYYY-MM-DD`) of an ISO instant: the shared rule. */
+export { utcDayOf } from '../../functions/src/timeConstants';
+
 /** The UTC (EVE) calendar date of `ms`, as `YYYY-MM-DD`. Defaults to now. */
 export function utcDay(ms: number = Date.now()): string {
   return new Date(ms).toISOString().slice(0, 10);
