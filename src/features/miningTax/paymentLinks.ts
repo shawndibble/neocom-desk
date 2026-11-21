@@ -126,7 +126,8 @@ export function recipientOf(
 
 /**
  * The Payee a payment was most likely for, or null: its recipient (a Payee anything was billed
- * to), else the one Payee whose owed figure it matches. Nothing plausible is never offered.
+ * to), else, for a payment whose recipient is unknown, the one Payee whose owed figure it
+ * matches. A payment to a known recipient who is none of the Payees is never offered by amount.
  */
 export function suggestLink(payment: MadePayment, ctx: LinkContext): LinkSuggestion | null {
   if (linkablePayments([payment], ctx).length === 0) return null;
@@ -135,7 +136,8 @@ export function suggestLink(payment: MadePayment, ctx: LinkContext): LinkSuggest
     ctx.payees.filter((p) => p.billed)
   );
   if (known) return { payment, ...known };
-  if (payment.amount === null) return null;
+  // A payment to someone the app knows, who is none of the Payees, went to someone else.
+  if (payment.amount === null || payment.counterpartyId !== undefined) return null;
   const amount = payment.amount;
   const byAmount = ctx.payees.filter(
     (p) => !isCorpPayeeId(p.id) && p.owed > 0 && amountsMatch(p.owed, amount)

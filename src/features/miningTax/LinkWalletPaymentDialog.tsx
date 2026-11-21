@@ -90,11 +90,14 @@ export function LinkWalletPaymentDialog({
   }, [candidates, search]);
 
   const selected = candidates.find((p) => p.key === selectedKey) ?? null;
-  /** The ISK that moved, or the pilot's figure for cargo handed over (blank: what is owed). */
+  /**
+   * The ISK that moved, or the pilot's figure for cargo handed over: required, never assumed to be
+   * the whole balance (a cargo is rarely worth exactly that).
+   */
   const amount =
     selected === null
       ? null
-      : (selected.amount ?? (valueText.trim() === '' ? Math.round(owed) : Number(valueText)));
+      : (selected.amount ?? (valueText.trim() === '' ? Number.NaN : Number(valueText)));
   const amountValid =
     amount !== null &&
     Number.isFinite(amount) &&
@@ -226,7 +229,6 @@ export function LinkWalletPaymentDialog({
               value={valueText}
               onChange={setValueText}
               onParseableChange={setValueParses}
-              defaultAmount={Math.round(owed)}
               aria-label={t('miningTax.linkPaymentAmountLabel')}
               className="w-full"
             />

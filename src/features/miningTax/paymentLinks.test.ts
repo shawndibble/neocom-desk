@@ -102,8 +102,14 @@ describe('suggestLink', () => {
     expect(suggestLink(old, ctx([p]))).toMatchObject({ payee: { id: 'p1' }, confidence: 'name' });
   });
 
-  it('falls back on an amount only when exactly one Payee owes it', () => {
-    const anon = made({ counterpartyId: 77, counterpartyName: 'Someone' });
+  it('never suggests by amount a payment to a known recipient who is none of the Payees (N5)', () => {
+    const toSomeoneElse = made({ counterpartyId: 77, counterpartyName: 'Someone' });
+    const p = payeeOf([record({ id: 'p1', entityId: 5 })], 1_000_000);
+    expect(suggestLink(toSomeoneElse, ctx([p]))).toBeNull();
+  });
+
+  it('falls back on an amount only when exactly one Payee owes it, its recipient unknown', () => {
+    const anon = made({ counterpartyId: undefined, counterpartyName: undefined });
     const p = payeeOf([record({ id: 'p1', entityId: 5 })], 1_000_000);
     const q = payeeOf([record({ id: 'q1', name: 'Other', entityId: 6 })], 2_000_000);
     expect(suggestLink(anon, ctx([p, q]))).toMatchObject({

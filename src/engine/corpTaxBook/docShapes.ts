@@ -152,6 +152,8 @@ export function readPayment(
       at,
       source: d.source === 'manual' ? 'manual' : 'donation',
       ...(notTaxAmount !== undefined ? { notTaxAmount } : {}),
+      // An officer's note on a payment recorded by hand: the Miner reads it beside the payment.
+      ...(str(d.note) ? { note: str(d.note)! } : {}),
     },
   };
 }

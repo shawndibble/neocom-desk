@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactElement } from 'react';
+import { useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -46,6 +46,8 @@ export interface PayeeLedgerPanelProps {
   source: PayeeLedgerSource | null;
   /** Ore names the caller already holds; an ore without one reads `#id`. */
   typeNames?: ReadonlyMap<number, string>;
+  /** Above the ledger: a pick between accounts, when the Payee has several (a book's Miners). */
+  picker?: ReactNode;
 }
 
 /**
@@ -60,6 +62,7 @@ export function PayeeLedgerPanel({
   payeeName,
   source,
   typeNames,
+  picker,
 }: PayeeLedgerPanelProps) {
   const { t } = useTranslation();
   const ledger = useMemo(() => (source ? payeeLedger(source) : null), [source]);
@@ -72,6 +75,7 @@ export function PayeeLedgerPanel({
       side="right"
       wide
     >
+      {picker && <div className="mb-3">{picker}</div>}
       {ledger ? (
         <LedgerBody ledger={ledger} typeNames={typeNames} />
       ) : (
