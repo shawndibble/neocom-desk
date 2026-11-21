@@ -37,7 +37,7 @@ test("a Miner's page fits a phone", async ({ page }) => {
 
 test("the account ledger's running balance stays on screen on a phone", async ({ page }) => {
   await openMiner(page, solo(MINER.ada.id), MINER.ada.name);
-  const ledger = page.getByRole('table', { name: 'Account ledger' });
+  const ledger = page.getByRole('table', { name: 'Ledger', exact: true });
   await expectWithinWidth(page, ledger);
   const payment = ledger.getByRole('row', { name: /Payment from Ada Lunar/ });
   const balance = payment.getByRole('cell').nth(4);

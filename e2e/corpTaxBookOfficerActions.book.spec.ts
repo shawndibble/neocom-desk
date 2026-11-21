@@ -99,7 +99,7 @@ test('an officer moves a payment to another Miner', async ({ page }) => {
     .toContain(book.id('cora'));
   // Straight to Bram's page, as a link would: the book is read for him alone.
   await page.goto(minerUrl(book.id('bram')));
-  await expect(page.getByRole('table', { name: 'Account ledger' })).toBeVisible();
+  await expect(page.getByRole('table', { name: 'Ledger', exact: true })).toBeVisible();
   await page.getByRole('button', { name: /^More actions for .* payment$/ }).click();
   await page.getByRole('menuitem', { name: 'Move to another Miner' }).click();
   const dialog = page.getByRole('dialog', { name: 'Move a payment' });
@@ -158,7 +158,7 @@ test("a write-off forgives a leaver's oldest days, with the officer's reason", a
   await openMinerInApp(page, MINER.lev.name);
   await owed(page, 0);
   await expect(
-    page.getByRole('table', { name: 'Account ledger' }).getByRole('row', {
+    page.getByRole('table', { name: 'Ledger', exact: true }).getByRole('row', {
       name: /Written off by an officer.*Left for a null-sec alliance/,
     })
   ).toContainText(isk(book.lev.owed));

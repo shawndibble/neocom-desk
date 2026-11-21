@@ -78,6 +78,27 @@ describe("minerLedgerSource: a Miner's account as the Payee ledger reads it", ()
     expect(l.notYetBilled).toEqual({ tax: 50_000, days: 1 });
   });
 
+  it('links each payment to where the caller says it sits in a wallet', () => {
+    const view = buildBookView(
+      input({
+        payments: [
+          pay('j3_5550123', 150_000, '2026-09-17T10:00:00Z'),
+          pay('m-abc', 10_000, '2026-09-17T11:00:00Z'),
+        ],
+      })
+    );
+    const source = minerLedgerSource(view, 'solo:1', {
+      character: (id) => `Pilot ${id}`,
+      walletHref: (id) => (id.startsWith('j') ? `/wallet/${id}` : undefined),
+    })!;
+    expect(new Map(source.payments?.map((p) => [p.id, p.href]))).toEqual(
+      new Map([
+        ['j3_5550123', '/wallet/j3_5550123'],
+        ['m-abc', undefined],
+      ])
+    );
+  });
+
   it('lists a correction, its reversal, and an officer write-off', () => {
     const adjustments = [
       {

@@ -18,7 +18,7 @@ import {
 import type { Page } from '@playwright/test';
 
 const ledgerRow = (page: Page, name: RegExp) =>
-  page.getByRole('table', { name: 'Account ledger' }).getByRole('row', { name });
+  page.getByRole('table', { name: 'Ledger', exact: true }).getByRole('row', { name });
 const minersRow = (page: Page) =>
   page
     .getByRole('table', { name: 'Miners' })

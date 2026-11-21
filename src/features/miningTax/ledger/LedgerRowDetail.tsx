@@ -1,5 +1,7 @@
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { ValueList, ValueRow } from '@/components/ui';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import type { DayAmount } from '@/engine/corpTaxBook/minerRunningAccount';
 import type { PayeeLedgerRow } from '@/engine/miningTax/payeeLedger';
 import { formatCount } from '@/lib/formatCount';
@@ -72,6 +74,13 @@ export function LedgerRowDetail({
           {row.payment.note && <p>{k('note', { note: row.payment.note })}</p>}
           {row.days.length > 0 && <Days title={k('paidDays')} days={row.days} />}
           {row.credit > 0 && <p>{k('leftAsCredit', { amount: isk(row.credit) })}</p>}
+          {row.payment.href && (
+            <p>
+              <Link to={row.payment.href} className={inlineLinkClassName}>
+                {k('viewPayment')}
+              </Link>
+            </p>
+          )}
         </>
       )}
       {row.kind === 'writeOff' && (

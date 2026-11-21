@@ -17,6 +17,8 @@ export interface MinerLedgerNames {
   character: (characterId: number) => string;
   /** Where a mined day was: its moon, else its refinery; absent when unknown. */
   place?: (day: DayRow) => string | undefined;
+  /** Where a payment sits in the corp wallet, by its id; absent for one recorded by hand. */
+  walletHref?: (paymentId: string) => string | undefined;
 }
 
 /** Undefined for a Miner the view does not hold. */
@@ -55,12 +57,16 @@ export function minerLedgerSource(
       ...(a.kind === 'opening' ? { opening: true } : {}),
       ...(a.reversed ? { reversed: { at: a.reversed.at, reason: a.reversed.reason } } : {}),
     }));
-  const payments = detail.payments.map((p): LedgerPayment => ({
-    id: p.id,
-    at: p.at,
-    from: names.character(p.characterId),
-    ...(p.note ? { note: p.note } : {}),
-  }));
+  const payments = detail.payments.map((p): LedgerPayment => {
+    const href = names.walletHref?.(p.id);
+    return {
+      id: p.id,
+      at: p.at,
+      from: names.character(p.characterId),
+      ...(p.note ? { note: p.note } : {}),
+      ...(href ? { href } : {}),
+    };
+  });
   // A write-off on or before the checkpoint is in its balance already.
   const writeOffs = (view.input.writeOffs ?? [])
     .filter((w) => w.minerId === minerId && after(utcDayOf(w.at)))
