@@ -12,11 +12,32 @@
  * The side label, when the panel offers a flip, is accent text with no
  * underline and a tooltip naming the press (DESIGN.md §6c: a value that flips
  * in place). Nothing navigates, so it is not a link.
+ *
+ * The hub in the heading, when the panel offers a `hubMenu`, is accent text
+ * with a dashed underline that opens the hub list (DESIGN.md §6c: a value in a
+ * readout that opens a picker to change it), so the reader re-prices at another
+ * hub without a trip to Settings.
  */
 import type { ReactNode } from 'react';
-import { Eyebrow, Spinner, Tooltip } from '@/components/ui';
-import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
+import { useTranslation } from 'react-i18next';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+  Eyebrow,
+  eyebrowClassName,
+  Spinner,
+  Tooltip,
+} from '@/components/ui';
+import {
+  focusRingClassName,
+  interactiveClassName,
+  popoverValueClassName,
+} from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
+import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 
 // min-h-6: the 24px target floor (DESIGN.md §3) for a text-sized control.
 const flipClassName = `min-h-6 shrink-0 whitespace-nowrap font-semibold text-accent text-left rounded-xs ${interactiveClassName} ${focusRingClassName}`;
@@ -41,16 +62,24 @@ export interface PriceCheckFlip {
   onFlip: () => void;
 }
 
+export interface PriceCheckHubMenu {
+  /** The hub priced at; its `stationLabel` is the part of the heading that opens the menu. */
+  hub: TradeHub;
+  onChange: (hubId: TradeHub['id']) => void;
+}
+
 export function ContractPriceCheck({
   heading,
   rows,
   flip,
+  hubMenu,
   message,
   busy = false,
 }: {
   heading: string;
   rows: readonly PriceCheckRowModel[];
   flip?: PriceCheckFlip;
+  hubMenu?: PriceCheckHubMenu;
   /** Replaces the rows with why there is no figure (no prices, no data for that day). */
   message?: ReactNode;
   busy?: boolean;
@@ -58,7 +87,11 @@ export function ContractPriceCheck({
   return (
     <section aria-label={heading}>
       <div className="flex items-baseline justify-between gap-2">
-        <Eyebrow>{heading}</Eyebrow>
+        {hubMenu ? (
+          <HeadingWithHubMenu heading={heading} menu={hubMenu} />
+        ) : (
+          <Eyebrow>{heading}</Eyebrow>
+        )}
         {flip && (
           <Tooltip content={flip.showOther}>
             <button type="button" className={flipClassName} onClick={flip.onFlip}>
@@ -99,5 +132,45 @@ export function ContractPriceCheck({
         </dl>
       )}
     </section>
+  );
+}
+
+/**
+ * The heading with its hub label as the menu trigger. The heading was worded
+ * with exactly `hub.stationLabel`, so it splits there; a wording without it
+ * shows plain rather than losing the text. Laid out as Appraisal's hold line:
+ * only the title is an eyebrow (an eyebrow never carries an action); the
+ * value and the rest stay in normal case.
+ */
+function HeadingWithHubMenu({ heading, menu }: { heading: string; menu: PriceCheckHubMenu }) {
+  const { t } = useTranslation();
+  const at = heading.indexOf(menu.hub.stationLabel);
+  if (at < 0) return <Eyebrow>{heading}</Eyebrow>;
+  return (
+    <p className="text-[0.6875rem] text-text-dim">
+      <span className={eyebrowClassName}>{heading.slice(0, at)}</span>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          // min-h-6: the 24px target floor (DESIGN.md §3), as the flip button beside it.
+          className={cx(popoverValueClassName, 'inline-flex min-h-6 items-baseline touch:min-h-9')}
+          aria-label={t('contractDetail.priceCheckHubMenu', { hub: menu.hub.stationLabel })}
+        >
+          {menu.hub.stationLabel}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          <DropdownMenuRadioGroup
+            value={menu.hub.id}
+            onValueChange={(id) => menu.onChange(id as TradeHub['id'])}
+          >
+            {TRADE_HUBS.map((hub) => (
+              <DropdownMenuRadioItem key={hub.id} value={hub.id}>
+                {hub.stationLabel}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {heading.slice(at + menu.hub.stationLabel.length)}
+    </p>
   );
 }

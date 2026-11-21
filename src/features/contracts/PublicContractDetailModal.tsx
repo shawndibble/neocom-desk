@@ -172,6 +172,7 @@ export function PublicContractDetailModal({
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const hubId = useMarketHub((s) => s.value);
+  const setHubId = useMarketHub((s) => s.setValue);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   const isAbyssalType = useMutaplasmidLookup()?.isAbyssalType;
   const [location, setLocation] = useState<string | null | undefined>(undefined);
@@ -275,6 +276,7 @@ export function PublicContractDetailModal({
     asking: askingIsk ?? 0,
     basis: LIVE,
     hub,
+    onHubChange: (id) => void setHubId(id),
     defaultSide: defaultPriceSide,
     sellOverrides,
     otherValue,

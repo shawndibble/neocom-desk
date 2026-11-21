@@ -159,6 +159,7 @@ export function ContractDetailModal({
   const now = useNow();
   const deliverByMs = courierDeliveryDeadlineMs(contract);
   const hubId = useMarketHub((s) => s.value);
+  const setHubId = useMarketHub((s) => s.setValue);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   const isAbyssalType = useMutaplasmidLookup()?.isAbyssalType;
   const [location, setLocation] = useState<LocationState | undefined>(undefined);
@@ -253,6 +254,7 @@ export function ContractDetailModal({
     contract,
     items: HAS_ITEMS.has(contract.type) ? items?.list : undefined,
     hub,
+    onHubChange: (id) => void setHubId(id),
     isAbyssalType,
   });
 

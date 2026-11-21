@@ -24,13 +24,14 @@ import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailabl
 import { formatSignedPercent, percentDirection, savingTone } from '@/lib/formatSignedPercent';
 import { formatContractIsk } from '@/lib/isk';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
-import type { PriceCheckFlip, PriceCheckRowModel } from './ContractPriceCheck';
+import type { PriceCheckFlip, PriceCheckHubMenu, PriceCheckRowModel } from './ContractPriceCheck';
 import { loadContractPrices, type PriceBasisChoice } from './contractPrices';
 
 export interface ContractPriceCheckView {
   heading: string;
   rows: PriceCheckRowModel[];
   flip: PriceCheckFlip;
+  hubMenu?: PriceCheckHubMenu;
   message?: string;
   busy: boolean;
   /**
@@ -52,6 +53,8 @@ export interface ContractPriceCheckArgs {
   /** An Open Price of a past UTC day, or the live book. */
   basis: PriceBasisChoice;
   hub: TradeHub;
+  /** Re-prices at another hub: the heading's hub opens a menu of them. Absent, it is plain text. */
+  onHubChange?: (hubId: TradeHub['id']) => void;
   defaultSide: PriceSide;
   /** Live sell prices for what the hub never lists (PLEX). Keep the map stable between renders: a new one reloads the prices. */
   sellOverrides?: ReadonlyMap<number, number>;
@@ -91,6 +94,7 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
     asking,
     basis,
     hub,
+    onHubChange,
     defaultSide,
     sellOverrides,
     searchedTypeIds = null,
@@ -134,6 +138,7 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
       showOther: t('contractDetail.priceCheckShowSide', { side: wordOf(other).toLowerCase() }),
       onFlip: () => setSide(other),
     },
+    hubMenu: onHubChange && { hub, onChange: onHubChange },
   };
 
   if (load.status !== 'ready') {
