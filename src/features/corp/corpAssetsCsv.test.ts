@@ -90,7 +90,7 @@ describe('corpAssetLocationCsvColumns', () => {
       groupValue: 3000,
       groupEmpty: true,
       groupDivisionsInUse: 0,
-      cell: { itemCount: 0, topStacks: [], estimatedValue: 0, volume: null },
+      cell: { itemCount: 0, topStacks: [], stacks: [], estimatedValue: 0, volume: null },
     } as unknown as LocationRow;
     expect(columns.slice(6).map((c) => c.value(row))).toEqual([
       12,
