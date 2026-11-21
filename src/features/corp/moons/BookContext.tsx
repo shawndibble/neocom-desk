@@ -3,7 +3,7 @@
  * and dialogs take few props: the joined view, names, who the viewer is, and
  * `edit` — one action through `editBook` (ADR 0023), then a reload.
  */
-import { useCallback, useEffect, useMemo, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { noteDirectorHeld } from './checkpointHolds';
 import { accountRecords, dueCheckpoints } from '@/engine/corpTaxBook/accountRecords';
 import { chunk } from '@/lib/chunk';
@@ -87,7 +87,16 @@ function sendChanged<T extends { minerId: string }>(
  */
 function useRecordAccounts(value: Omit<BookContextValue, 'edit' | 'canEdit'>, canEdit: boolean) {
   const { view, data, characterId, corporationId } = value;
+  // The page rebuilds its view every minute for its clocks; the accounts and checkpoints change
+  // only with the book read or the UTC day, so they are worked out once per read or per day (M10).
+  // (A context built by hand, a story or a test, may carry no clock.)
+  const today = (view.input?.now as string | undefined)?.slice(0, 10);
+  const latest = useRef(view);
   useEffect(() => {
+    latest.current = view;
+  }, [view]);
+  useEffect(() => {
+    const view = latest.current;
     // Only a read with every row and payment counts. A moon page's read (`BookRead.moon`) holds
     // other Miners' days only in part; a one-Miner page counts that Miner only.
     // A context built by hand (a story, a test) may carry no parts: then it counts nothing.
@@ -96,11 +105,14 @@ function useRecordAccounts(value: Omit<BookContextValue, 'edit' | 'canEdit'>, ca
     sendChanged(corporationId, 'accounts', accountRecords(view, data.scopedMiner), (accounts) =>
       editBook(characterId, corporationId, { action: 'recordAccounts', accounts })
     );
+    // A checkpoint comes only from a read of the whole book: a Miner's own page cannot see the
+    // groupings around them (B2).
+    if (data.scopedMiner !== undefined) return;
     const at = { at: view.input.now, by: characterId };
     sendChanged(
       corporationId,
       'checkpoints',
-      dueCheckpoints(view, at, data.scopedMiner),
+      dueCheckpoints(view, at),
       async (checkpoints) => {
         const { skipped } = await recordCheckpoints(characterId, corporationId, checkpoints);
         noteDirectorHeld(
@@ -117,5 +129,5 @@ function useRecordAccounts(value: Omit<BookContextValue, 'edit' | 'canEdit'>, ca
           stored: view.input.checkpoints?.get(c.minerId)?.through ?? null,
         })
     );
-  }, [view, data, canEdit, characterId, corporationId]);
+  }, [data, today, canEdit, characterId, corporationId]);
 }
