@@ -384,8 +384,6 @@ export function AppraisalPanel({
       ) : (
         <AppraisalPasteCard
           controller={controller}
-          hub={hub}
-          onHubChange={onHubChange}
           characterId={characterId}
           percentText={percentText}
           onPercentChange={handlePercentChange}

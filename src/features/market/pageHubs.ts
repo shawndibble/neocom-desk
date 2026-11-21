@@ -28,6 +28,8 @@ export const PAGE_HUB_AREAS = [
   'industry',
   'lpStore',
   'corpSrp',
+  'market',
+  'appraisal',
 ] as const;
 
 export type PageHubArea = (typeof PAGE_HUB_AREAS)[number];
@@ -40,6 +42,8 @@ const AREA_NAME_KEYS = {
   industry: 'pageHubs.area.industry',
   lpStore: 'pageHubs.area.lpStore',
   corpSrp: 'pageHubs.area.corpSrp',
+  market: 'pageHubs.area.market',
+  appraisal: 'pageHubs.area.appraisal',
 } as const satisfies Record<PageHubArea, string>;
 
 export function pageHubAreaName(t: TFunction, area: PageHubArea): string {

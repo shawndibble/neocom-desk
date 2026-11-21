@@ -32,9 +32,15 @@ export function HubMenu({
   area,
   triggerClassName,
   triggerLabel,
+  shownHubId,
+  onPicked,
   children,
 }: {
   area: PageHubArea;
+  /** The hub on screen when it is not the stored one (a Market link naming a hub); ticked instead. */
+  shownHubId?: TradeHub['id'];
+  /** After a hub pick is written: for a page that also points its URL at the hub. */
+  onPicked?: (hubId: TradeHub['id']) => void;
   triggerClassName?: string;
   /** The trigger's accessible name; it starts with the visible hub (WCAG 2.5.3). */
   triggerLabel: string;
@@ -64,9 +70,12 @@ export function HubMenu({
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
         <DropdownMenuRadioGroup
-          value={hubId}
+          value={shownHubId ?? hubId}
           aria-label={t('pageHubs.hubLabel')}
-          onValueChange={(next) => void pickHubFor(area, next as TradeHub['id'])}
+          onValueChange={(next) => {
+            void pickHubFor(area, next as TradeHub['id']);
+            onPicked?.(next as TradeHub['id']);
+          }}
         >
           {TRADE_HUBS.map((hub) => (
             <DropdownMenuRadioItem key={hub.id} value={hub.id}>
@@ -89,8 +98,12 @@ export function HubField({
   label,
   size = 'md',
   className,
+  shownHubId,
+  onPicked,
 }: {
   area: PageHubArea;
+  shownHubId?: TradeHub['id'];
+  onPicked?: (hubId: TradeHub['id']) => void;
   /** What the field picks ("Priced at"); the trigger is named "<hub>, <label>" so it starts with what shows. */
   label: string;
   size?: ControlSize;
@@ -98,10 +111,12 @@ export function HubField({
 }) {
   const { t } = useTranslation();
   const { hubId } = useHubFor(area);
-  const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
+  const hub = getTradeHub(shownHubId ?? hubId) ?? DEFAULT_TRADE_HUB;
   return (
     <HubMenu
       area={area}
+      shownHubId={shownHubId}
+      onPicked={onPicked}
       triggerClassName={cx(selectTriggerClassName(size), className)}
       triggerLabel={t('pageHubs.fieldLabel', { hub: hub.systemName, label })}
     >

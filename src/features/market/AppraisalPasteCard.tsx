@@ -21,7 +21,8 @@ import { GrantNote } from '@/app/GrantNote';
 import { formatAge } from '@/lib/age';
 import { MD_UP_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 import { countPasteLines, pasteBoxRows } from '@/engine/market/appraisalPaste';
-import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
+import { TRADE_HUBS } from '@/market/hubs';
+import { HubField } from './HubMenu';
 import { ASSETS_ENDPOINTS, OWNED_EVERYWHERE, type AppraisalOwnedPref } from './appraisalOwnedPref';
 import { recentLabel, type RecentAppraisal } from './appraisalRecent';
 import { formatVolume } from './format';
@@ -33,8 +34,6 @@ const CLEAR_RECENT = 'clear';
 
 interface AppraisalPasteCardProps {
   controller: AppraisalController;
-  hub: TradeHub;
-  onHubChange: (id: TradeHub['id']) => void;
   characterId: number | null;
   percentText: string;
   onPercentChange: (next: string) => void;
@@ -56,8 +55,6 @@ interface AppraisalPasteCardProps {
 
 export function AppraisalPasteCard({
   controller,
-  hub,
-  onHubChange,
   characterId,
   percentText,
   onPercentChange,
@@ -166,18 +163,12 @@ export function AppraisalPasteCard({
             onChange={(event) => onPercentChange(event.target.value)}
             className="field-no-spinner w-16 text-right"
           />
-          <Select value={hub.id} onValueChange={(value) => onHubChange(value as TradeHub['id'])}>
-            <SelectTrigger size="sm" aria-label={t('market.tradeHub')} className="min-w-0 flex-1">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {TRADE_HUBS.map((h) => (
-                <SelectItem key={h.id} value={h.id}>
-                  {h.systemName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <HubField
+            area="appraisal"
+            size="sm"
+            label={t('market.tradeHub')}
+            className="min-w-0 flex-1"
+          />
         </div>
 
         <div className="flex flex-col gap-1.5">

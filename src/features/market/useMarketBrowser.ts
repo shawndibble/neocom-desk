@@ -25,7 +25,8 @@ import {
   type UrlParamCodec,
 } from '@/lib/urlState';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
-import { useMarketBrowserHub } from '@/features/market/browserHub';
+import { useDeviceMarketHubMigrated } from '@/features/market/browserHub';
+import { setPageHubEntry, useHubFor } from '@/features/market/hub';
 import { useLocationMode, type LocationMode } from '@/features/market/locationMode';
 import {
   filterMarketTree,
@@ -143,9 +144,10 @@ export function useMarketBrowser({
 }: UseMarketBrowserArgs): MarketBrowserController {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const hubId = useMarketBrowserHub((state) => state.value);
-  const hubHydrated = useHydratedStore(useMarketBrowserHub);
-  const setHubId = useMarketBrowserHub((state) => state.setValue);
+  // The Market page hub, once this device's old Browser hub is folded into it.
+  const migrated = useDeviceMarketHubMigrated();
+  const { hubId, hydrated: marketHubHydrated } = useHubFor('market');
+  const hubHydrated = marketHubHydrated && migrated;
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
 
   const locationModeValue = useLocationMode((state) => state.value);
@@ -259,13 +261,14 @@ export function useMarketBrowser({
   }, [groups, linkedGroupId, groupsById]);
 
   /**
-   * The device's Trade Hub and Location Mode as the stored default behind the
+   * The Market page hub and the device's Location Mode as the stored default behind the
    * URL's `hub`/`region`. A linked location that names nothing real (a
    * region the catalogue lacks, a hub not in `TRADE_HUBS`) reads as absent.
    *
    * `adoptLinked` is this page's one exception to decision `20260922-221531`
    * (see decision `20260926-201312`): a valid linked hub/region is copied
-   * into the device's own setting. `buildMarketParams` only ever writes one
+   * into the stored setting: the hub as the Market page's own entry
+   * (`setPageHubEntry`), so a link never moves the pages on Global. `buildMarketParams` only ever writes one
    * of `hub`/`region`, so a linked hub is dropped from the query string the
    * moment the mode toggles to Region — without the copy, toggling back to
    * Trade Hub would fall back to whatever hub was stored before the link was
@@ -287,7 +290,7 @@ export function useMarketBrowser({
         return isMarketRegionChoice(value as RegionChoice, marketRegions);
       },
       remember: (patch: Partial<LocationParams>) => {
-        if (patch.hub) void setHubId(patch.hub as TradeHub['id']);
+        if (patch.hub) void setPageHubEntry('market', patch.hub as TradeHub['id']);
         if (patch.region !== undefined && patch.region !== null) {
           void setLocationModeValue({ mode: 'region', regionId: patch.region });
         }
@@ -299,7 +302,6 @@ export function useMarketBrowser({
       hubHydrated,
       locationModeHydrated,
       marketRegions,
-      setHubId,
       setLocationModeValue,
     ]
   );
@@ -430,8 +432,8 @@ export function useMarketBrowser({
     );
   }
 
+  /** After the header's `HubField` writes the hub: points the URL at it, since a linked hub outranks the stored one. */
   function handleHubChange(id: TradeHub['id']) {
-    void setHubId(id);
     navigateTo(selectedTypeId, { mode: 'hub', hubId: id });
   }
 

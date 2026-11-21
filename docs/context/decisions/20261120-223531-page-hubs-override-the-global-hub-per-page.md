@@ -61,3 +61,17 @@ _Recorded 2026-11-20. Issue #6523._
     keeps its hub `Select`, because the box applies its drafts together on Apply. An Applied hub
     writes through `pickHubFor('lpStore', …)`.
   - **Corp SRP** covers Doctrine coverage.
+- **Market and Appraisal join (slice 4). This supersedes `20260923-174003`'s device-local
+  Market Browser hub.** It was device-local so browsing a hub on a phone never moved every other
+  page's hub. A Market entry gives the same separation, and it syncs (the owner agreed).
+  - **Migration:** on a device's first Market visit, its old `marketBrowserHub` becomes the Market
+    and Appraisal entries, where those have none yet. Then the device copy is deleted. A device that
+    never opened the Market starts on Global, which is what it seeded from before.
+  - **Market** covers the Browser, an item's Market section (`useSavedOrderBookLocation`), the
+    Stock tab, the Compare drawer's own-hub mark, and price alerts: the form, the poller and the
+    Overview card. A good price sends the pilot to the market to buy.
+  - **Links:** a Market link naming a hub (`?hub=`) is adopted as the Market's own entry
+    (`setPageHubEntry`), never the Global hub. Opening someone's link moves no other page.
+  - **Appraisal** prices at its own hub, apart from the Browser's. Its picker writes that hub, not
+    the URL. The Fittings export's Minus owned station falls back to it.
+  - **Hauling** keeps its From/To. The default pair still comes from the Global hub.

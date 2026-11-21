@@ -32,7 +32,7 @@ import {
   summarizeOrderBook,
   type OrderBookSummary,
 } from '@/engine/market/orderBook';
-import { useMarketHub } from './hub';
+import { useHubFor } from './hub';
 import { useLocationMode, type LocationMode } from './locationMode';
 import {
   clearOrderBookCache,
@@ -285,9 +285,8 @@ export function useGlobalMarketOverrides(
  * fetched once for the defaults and again for the real preference.
  */
 export function useSavedOrderBookLocation(enabled = true): OrderBookLocation | null {
-  const hubId = useMarketHub((state) => state.value);
-  const hubHydrated = useMarketHub((state) => state.hydrated);
-  const hydrateHub = useMarketHub((state) => state.hydrate);
+  // The Market page hub, the one the Browser itself is on.
+  const { hubId, hydrated: hubHydrated } = useHubFor('market');
   const locationMode = useLocationMode((state) => state.value);
   const locationModeHydrated = useLocationMode((state) => state.hydrated);
   const hydrateLocationMode = useLocationMode((state) => state.hydrate);
@@ -295,9 +294,8 @@ export function useSavedOrderBookLocation(enabled = true): OrderBookLocation | n
 
   useEffect(() => {
     if (!enabled) return;
-    void hydrateHub();
     void hydrateLocationMode();
-  }, [enabled, hydrateHub, hydrateLocationMode]);
+  }, [enabled, hydrateLocationMode]);
 
   return useMemo(() => {
     if (!enabled || !hubHydrated || !locationModeHydrated || !globalMarkets) return null;

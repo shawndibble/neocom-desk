@@ -8,7 +8,7 @@ import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useMarketHub } from '@/features/market/hub';
-import { useMarketBrowserHub } from '@/features/market/browserHub';
+import { usePageHubs } from '@/features/market/pageHubs';
 import { useLocationMode, DEFAULT_LOCATION_MODE } from '@/features/market/locationMode';
 import {
   useBrowserFilterSetting,
@@ -247,7 +247,7 @@ async function resetMarketSession(): Promise<void> {
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
   useMarketHub.setState({ value: 'jita', hydrated: false });
-  useMarketBrowserHub.setState({ value: 'jita', hydrated: false });
+  usePageHubs.setState({ value: {}, hydrated: false });
   useLocationMode.setState({ value: DEFAULT_LOCATION_MODE, hydrated: false });
   useBrowserFilterSetting.setState({ value: DEFAULT_BROWSER_FILTER_SETTING, hydrated: false });
   useCompareSet.setState({ items: [] });

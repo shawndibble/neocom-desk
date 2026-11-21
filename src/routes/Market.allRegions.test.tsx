@@ -13,7 +13,7 @@ import '@/i18n';
 import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { useMarketHub } from '@/features/market/hub';
-import { useMarketBrowserHub } from '@/features/market/browserHub';
+import { usePageHubs } from '@/features/market/pageHubs';
 import { useLocationMode, DEFAULT_LOCATION_MODE } from '@/features/market/locationMode';
 import {
   useBrowserFilterSetting,
@@ -170,7 +170,7 @@ beforeEach(async () => {
   await db.characters.put({ characterId: 1, name: 'Pilot One', ownerHash: 'oh', addedAt: 0 });
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   useMarketHub.setState({ value: 'jita', hydrated: false });
-  useMarketBrowserHub.setState({ value: 'jita', hydrated: false });
+  usePageHubs.setState({ value: {}, hydrated: false });
   useLocationMode.setState({ value: DEFAULT_LOCATION_MODE, hydrated: false });
   useBrowserFilterSetting.setState({ value: DEFAULT_BROWSER_FILTER_SETTING, hydrated: false });
   usePickedSystems.setState({ value: {}, hydrated: false });

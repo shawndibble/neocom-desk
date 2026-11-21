@@ -1074,7 +1074,7 @@ describe('AppraisalPanel', () => {
   it('names the hub and percentage the figures are quoted at', () => {
     renderPanel({ controller: controller({ result: outcome() }) });
     expect(screen.getAllByText('Jita').length).toBeGreaterThan(1);
-    expect(screen.getByRole('combobox', { name: /Trade Hub/i })).toHaveTextContent('Jita');
+    expect(screen.getByRole('button', { name: /, Trade Hub$/ })).toHaveTextContent('Jita');
     expect(screen.getByText('90%')).toBeInTheDocument();
   });
 

@@ -11334,7 +11334,9 @@
       "contracts": "Contracts",
       "industry": "Industry",
       "lpStore": "LP Store",
-      "corpSrp": "Corp SRP"
+      "corpSrp": "Corp SRP",
+      "market": "Market",
+      "appraisal": "Appraisal"
     }
   },
   "contractDetail": {

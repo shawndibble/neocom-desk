@@ -55,17 +55,31 @@ export const useDefaultMarketHub = createSyncedSetting<TradeHub['id']>({
   parse: parseMarketHub,
 });
 
-/** The hub `characterId` trades at (the account default when none), read from Dexie-backed stores. */
-export async function tradeHubIdFor(characterId: number | null): Promise<TradeHub['id']> {
+/**
+ * The hub `characterId` trades at (the account default when none), read from
+ * Dexie-backed stores; with `area`, that page's own hub when it has one.
+ */
+export async function tradeHubIdFor(
+  characterId: number | null,
+  area?: PageHubArea
+): Promise<TradeHub['id']> {
   await Promise.all([
     useDefaultMarketHub.getState().hydrate(),
     useHubByCharacter.getState().hydrate(),
+    area ? usePageHubs.getState().hydrate() : undefined,
   ]);
-  return resolveTradeHub(
+  const global = resolveTradeHub(
     useHubByCharacter.getState().value,
     characterId,
     useDefaultMarketHub.getState().value
   );
+  return area ? resolvePageHub(usePageHubs.getState().value, area, global) : global;
+}
+
+/** `useHubFor(area)` outside React: the area's entry, else the active Character's Global hub. */
+export async function loadHubFor(area: PageHubArea): Promise<TradeHub['id']> {
+  await Promise.all([usePageHubs.getState().hydrate(), useMarketHub.getState().hydrate()]);
+  return resolvePageHub(usePageHubs.getState().value, area, useMarketHub.getState().value);
 }
 
 function inForce(): Pick<SettingState<TradeHub['id']>, 'value' | 'hydrated'> {
@@ -157,4 +171,16 @@ export async function setHubScope(area: PageHubArea, scope: HubScope): Promise<v
   if (scope === 'global') return usePageHubs.getState().setValue(dropPageHub(map, area));
   if (map[area]) return;
   return usePageHubs.getState().setValue(setPageHub(map, area, useMarketHub.getState().value));
+}
+
+/**
+ * Gives `area` its own entry at `hub`, whatever it used before: for a choice
+ * that belongs to that page alone, such as a Market link naming a hub, which
+ * must never move the pages on Global.
+ */
+export async function setPageHubEntry(area: PageHubArea, hub: TradeHub['id']): Promise<void> {
+  if (!usePageHubs.getState().hydrated) await usePageHubs.getState().hydrate();
+  const map = usePageHubs.getState().value;
+  if (map[area] === hub) return;
+  return usePageHubs.getState().setValue(setPageHub(map, area, hub));
 }
