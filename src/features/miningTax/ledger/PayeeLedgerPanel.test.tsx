@@ -81,6 +81,16 @@ describe('PayeeLedgerPanel', () => {
     expect(balances.at(-1)).toMatch(/credit$/);
   });
 
+  it("shows an officer's note on a payment, on its row", () => {
+    renderPanel({
+      ...CORP_BOOK_LEDGER,
+      payments: (CORP_BOOK_LEDGER.payments ?? []).map((p, i) =>
+        i === 0 ? { ...p, note: 'Handed over in person' } : p
+      ),
+    });
+    expect(within(table()).getByText('Handed over in person')).toBeInTheDocument();
+  });
+
   it('says so when nothing is billed yet, and spins while loading', () => {
     const { unmount } = renderPanel(EMPTY_LEDGER);
     expect(screen.getByText('Nothing on this ledger yet')).toBeInTheDocument();

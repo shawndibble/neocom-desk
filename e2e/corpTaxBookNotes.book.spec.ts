@@ -130,9 +130,9 @@ test("an officer's label on a correction reaches the pilot's ledger", async ({ p
   await expect(page.getByRole('dialog', { name: CORP_NAME })).toContainText(label);
 });
 
-// Record a payment takes a note now, and the officer's Miner page, ledger and Activity show it.
-// Still open: the pilot's ledger (member side) does not show a payment's `note` yet.
-test.fixme("an officer's note on a hand-recorded payment reaches the pilot", async ({ page }) => {
+// Record a payment takes a note, and the officer's Miner page, ledger and Activity show it; so
+// does the pilot's ledger, beside the payment.
+test("an officer's note on a hand-recorded payment reaches the pilot", async ({ page }) => {
   const note = 'Handed over in person at the staging Fortizar';
   await signInAsOfficer(page, minerUrl(PILOT_MINER_ID));
   await page.getByRole('button', { name: 'Record payment' }).click();
