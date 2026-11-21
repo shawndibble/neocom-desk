@@ -31,6 +31,7 @@ import {
   type ForfeitBasis,
 } from './corpTaxBookEngine.js';
 import { DAY_MS } from './timeConstants.js';
+import { payOldestFirst } from './corpTaxBookAccounts.js';
 import { matchesStatedTransfer } from './corpTaxBookTransferMatch.js';
 import {
   NOTICE_ID_FIELD,
@@ -2147,13 +2148,7 @@ export function disputesClosedByWriteOff(
   if (!live?.unpaidDays) return [];
   const open = disputes.filter((d) => typeof d.id === 'string' && !d.resolution);
   if (writeOff.amount >= live.owed - 0.01) return open.map((d) => d.id as string);
-  const forgiven = new Set<string>();
-  let left = writeOff.amount;
-  for (const day of live.unpaidDays) {
-    if (left < day.owed - 0.01) break;
-    left -= day.owed;
-    forgiven.add(day.date);
-  }
+  const forgiven = new Set(payOldestFirst(live.unpaidDays, writeOff.amount, 0.01).paid);
   return open
     .filter((d) => typeof d.date === 'string' && forgiven.has(d.date))
     .map((d) => d.id as string);

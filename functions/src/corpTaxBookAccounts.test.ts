@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { ledgerDays, ledgerPayments, liveAccount, paidSinceRecord } from './corpTaxBookAccounts.js';
+import {
+  ledgerDays,
+  ledgerPayments,
+  liveAccount,
+  netPayment,
+  paidSinceRecord,
+  payOldestFirst,
+} from './corpTaxBookAccounts.js';
 
 describe('liveAccount', () => {
   const recorded = {
@@ -19,7 +26,15 @@ describe('liveAccount', () => {
       oldest: '2026-10-05',
       paidThrough: '2026-10-04',
       asOf: '2026-10-20T10:00:00.000Z',
+      credit: 0,
     });
+  });
+
+  it("returns the record's credit and what was paid beyond what it owed", () => {
+    expect(liveAccount({ ...recorded, credit: 5 }, [{ amount: 1_000_000 }]).credit).toBe(5);
+    expect(liveAccount({ ...recorded, credit: 5 }, [{ amount: 12_000_000 }]).credit).toBe(
+      1_000_005
+    );
   });
 
   it('owes nothing, and lists no days, once the payments since cover it', () => {
@@ -73,18 +88,10 @@ describe('liveAccount with the days still owed', () => {
     });
   });
 
-  it('lets what older Statements owe take the new money before any running day', () => {
-    const withLegacy = { ...recorded, owed: 8_000_000, oldest: '2026-10-01' };
-    expect(liveAccount(withLegacy, [{ amount: 500_000 }])).toMatchObject({
-      owed: 7_500_000,
-      oldest: '2026-10-01',
-      unpaidDays: recorded.unpaidDays,
-    });
-  });
-
-  it('does not take a few ISK of per-day rounding for Statement debt', () => {
-    const rounded = { ...recorded, owed: 7_000_002 };
-    expect(liveAccount(rounded, [{ amount: 1_500_000 }])).toMatchObject({
+  it('pays the recorded days oldest first, whatever the record owes beyond them', () => {
+    const more = { ...recorded, owed: 8_000_000, oldest: '2026-10-01' };
+    expect(liveAccount(more, [{ amount: 1_500_000 }])).toMatchObject({
+      owed: 6_500_000,
       oldest: '2026-11-09',
       unpaidDays: [
         { date: '2026-11-09', owed: 2_500_000, tax: 3_000_000 },
@@ -145,5 +152,36 @@ describe('ledgerPayments', () => {
       { id: 'a', at: '2026-11-12T10:00:00Z', amount: 500, source: 'donation' },
       { id: 'b', at: '2026-11-15T10:00:00Z', amount: 500, source: 'manual' },
     ]);
+  });
+});
+
+describe('payOldestFirst', () => {
+  const days = [
+    { date: '2026-11-08', owed: 100 },
+    { date: '2026-11-09', owed: 300 },
+    { date: '2026-11-10', owed: 300 },
+  ];
+
+  it('pays the oldest day, part of the next, and leaves the rest', () => {
+    expect(payOldestFirst(days, 250)).toEqual({
+      unpaid: [
+        { date: '2026-11-09', owed: 150 },
+        { date: '2026-11-10', owed: 300 },
+      ],
+      paid: ['2026-11-08'],
+    });
+  });
+
+  it('reads a day left owing no more than the tolerance as paid', () => {
+    expect(payOldestFirst(days, 399.995, 0.01).paid).toEqual(['2026-11-08', '2026-11-09']);
+    expect(payOldestFirst(days, 0)).toEqual({ unpaid: days, paid: [] });
+  });
+});
+
+describe('netPayment', () => {
+  it('is the amount less what is not tax, never below zero', () => {
+    expect(netPayment({ amount: 10, notTaxAmount: 3 })).toBe(7);
+    expect(netPayment({ amount: 10, notTaxAmount: 30 })).toBe(0);
+    expect(netPayment({ amount: 10 })).toBe(10);
   });
 });
