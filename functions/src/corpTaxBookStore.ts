@@ -161,7 +161,8 @@ import {
   type GroupConflict,
 } from './corpTaxBookClaims.js';
 import type { EveTokenClaims } from './verifyEveToken.js';
-import { isLocked, type RunningAccountCheckpoint } from './corpTaxBookCheckpoint.js';
+import { isLocked, lockDateFor, type RunningAccountCheckpoint } from './corpTaxBookCheckpoint.js';
+import { pullWindow } from './corpTaxBookMoonDocs.js';
 import {
   NOTICE_ID_FIELD,
   adjustmentLineKey,
@@ -1835,6 +1836,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       if (showToMembers) update.membersSeeFrom = now;
       const oldStart = c.book.startDate as string | undefined;
       if (startDate !== undefined && startDate !== oldStart) {
+        // Days before the lock date are never billed or unbilled again.
+        refuseLocked(now, startDate);
         const notices = await readNotices(tx, bookOf(c));
         const reason = startDateMoveReason(
           oldStart ?? startDate,
@@ -2008,8 +2011,20 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
           { reason: 'director-approval' }
         );
       }
-      // A record's day is locked before the lock date; a Miner, moon or Extraction is no one day.
+      // A record's day is locked before the lock date. A Miner, moon or Extraction dismissal waives
+      // only days from the lock date on (`from`), and an Extraction wholly before it is locked.
+      const lockDate = lockDateFor(utcDate(now));
       if (action.scope === 'record') refuseLocked(now, parseRecordKey(action.targetId).date);
+      if (action.scope === 'extraction') {
+        const x = (await tx.get(col(c, EXTRACTIONS).doc(action.targetId))).data();
+        const window =
+          x &&
+          pullWindow(
+            x as MirrorExtraction,
+            (c.book.structureExpiryHours as Record<string, number> | undefined) ?? {}
+          );
+        if (window) refuseLocked(now, window.to);
+      }
       const id = `d${now}_${rand(4)}`;
       let uids: string[] = [];
       if (action.scope === 'record') {
@@ -2027,6 +2042,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         at: iso,
         reason: action.reason,
         uids,
+        ...(action.scope !== 'record' ? { from: lockDate } : {}),
         ...(action.amountIsk !== undefined ? { amountIsk: action.amountIsk } : {}),
       });
       return {
@@ -2107,9 +2123,18 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const ref = col(c, DISMISSALS).doc(action.dismissalId);
       const dismissal = await mustGet(c, ref, 'Dismissal');
       if (dismissal.reversed) fail('failed-precondition', 'Already reversed', 'already-reversed');
-      if (dismissal.scope === 'record')
-        refuseLocked(now, parseRecordKey(String(dismissal.targetId)).date);
-      tx.update(ref, { reversed: { by, at: iso, reason: action.reason } });
+      // A record's day is locked before the lock date; a wide dismissal's reversal ends it only
+      // from the lock date on (`from`), so the days before it stay waived (`dismissalWaives`).
+      const wide = dismissal.scope !== 'record';
+      if (!wide) refuseLocked(now, parseRecordKey(String(dismissal.targetId)).date);
+      tx.update(ref, {
+        reversed: {
+          by,
+          at: iso,
+          reason: action.reason,
+          ...(wide ? { from: lockDateFor(utcDate(now)) } : {}),
+        },
+      });
       return { detail: { dismissalId: action.dismissalId, reason: action.reason } };
     }
     case 'linkSurvey': {

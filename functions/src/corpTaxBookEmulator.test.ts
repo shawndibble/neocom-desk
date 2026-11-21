@@ -559,6 +559,17 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect((await book().get()).get('membersSeeFrom')).toBe(now);
     });
 
+    it('never moves the start date before the lock date (1 Aug, on 18 Oct)', async () => {
+      await turnOn();
+      expect(
+        await reason(
+          edit(DIRECTOR, { action: 'updateSettings', patch: { startDate: '2026-07-31' } })
+        )
+      ).toBe('locked');
+      await edit(DIRECTOR, { action: 'updateSettings', patch: { startDate: '2026-08-01' } });
+      expect((await book().get()).get('startDate')).toBe('2026-08-01');
+    });
+
     it('lets a rate start up to 30 days back, and only on a day not yet on a Statement for a record rate', async () => {
       await turnOn();
       expect(
@@ -3137,6 +3148,62 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         expect((await book().collection('payments').doc('p-old').get()).get('minerId')).toBe(
           'solo:50'
         );
+      });
+
+      it('a wide dismissal waives only from the lock date, and its reversal ends it from then', async () => {
+        await seedOld();
+        const dismissals = book().collection('dismissals');
+        const { dismissalId } = await edit(
+          ACCOUNTANT,
+          { action: 'dismiss', scope: 'miner', targetId: 'solo:50', reason: 'x', amountIsk: 1 },
+          true
+        );
+        expect((await dismissals.doc(String(dismissalId)).get()).get('from')).toBe('2026-08-01');
+        // An older one, with no `from`, reversed: the reversal ends it from the lock date on.
+        await dismissals.doc('d-old').set({
+          id: 'd-old',
+          scope: 'moon',
+          targetId: '7',
+          by: ACCOUNTANT,
+          at: '2026-06-01T00:00:00.000Z',
+          reason: 'old',
+        });
+        await edit(
+          ACCOUNTANT,
+          { action: 'reverseDismissal', dismissalId: 'd-old', reason: 'undo' },
+          true
+        );
+        expect((await dismissals.doc('d-old').get()).get('reversed')).toMatchObject({
+          from: '2026-08-01',
+        });
+        // A record's reversal has no `from`: its one day is locked or it is not.
+        expect((await dismissals.doc(String(dismissalId)).get()).get('reversed')).toBeUndefined();
+      });
+
+      it('refuses an Extraction dismissal when every day of it is before the lock date', async () => {
+        await seedOld();
+        const extraction = (id: string, fracturedAt: string) =>
+          book().collection('extractions').doc(id).set({
+            structureId: 1000,
+            moonId: 7,
+            extractionStartTime: '2026-07-01T00:00:00.000Z',
+            chunkArrivalTime: fracturedAt,
+            naturalDecayTime: fracturedAt,
+          });
+        await extraction('x-old', '2026-07-20T00:00:00.000Z');
+        await extraction('x-edge', '2026-07-31T00:00:00.000Z');
+        const dismiss = (targetId: string) =>
+          edit(
+            ACCOUNTANT,
+            { action: 'dismiss', scope: 'extraction', targetId, reason: 'x', amountIsk: 1 },
+            true
+          );
+        expect(await reason(dismiss('x-old'))).toBe('locked');
+        // Fractured 31 Jul, it runs into 2 Aug: those days are still open.
+        const { dismissalId } = await dismiss('x-edge');
+        expect(
+          (await book().collection('dismissals').doc(String(dismissalId)).get()).get('from')
+        ).toBe('2026-08-01');
       });
 
       it('a fix dated today is how an old mistake is put right', async () => {
