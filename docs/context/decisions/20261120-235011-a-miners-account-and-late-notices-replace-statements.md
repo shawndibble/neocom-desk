@@ -170,3 +170,7 @@ Replaces "the checkpoint is a strict cache" and the copied `uids` on rows and pa
   their mining and payments." with "Not yours? Tell {corp}", which declines the grouping
   (`declineLink`). One bar per corporation, naming every such Character; it goes once each is added
   or declined.
+- **A declined grouping reaches the officers.** Besides its Activity entry and the Miner page's
+  answer list, a Character declining a grouping puts an item in the officers' Needs you: "{character}
+  says they aren't part of {Miner} — billed on their own now", linking to the Miner's page. It
+  clears once an officer dismisses it or groups the Character again.
