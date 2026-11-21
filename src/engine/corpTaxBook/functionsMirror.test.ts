@@ -8,7 +8,7 @@ import { DISPUTE_KINDS, disputeHold, readDisputes } from './disputes';
 import { CLAIM_CHECK_RESULTS, TRANSFER_RECIPIENTS } from './overdue';
 import { TAX_CONTACT_MAX_CHARACTERS } from './bookDocs';
 import { DEFAULT_NOTICE_RULES, NOTICE_AFTER_KINDS } from './notices';
-import { DAY_SETTLE_TOLERANCE_PCT } from './minerRunningAccount';
+import { DAY_SETTLE_TOLERANCE_PCT, daySettleTolerance } from './minerRunningAccount';
 import { placeOfFactory } from './openSet';
 import { FORFEIT_NO_REPLY_DAYS, forfeitAllowed } from './closeAccount';
 import { extractionId, type SyncExtraction } from './sync';
@@ -126,6 +126,21 @@ describe('functions mirror of the Corp Tax Book engine', () => {
     expect(liveRunningAccount({ owed: 100, paid: counted, days: 1, at: 'x' }, payments).owed).toBe(
       100
     );
+  });
+
+  it('counts a payment within the day tolerance as paying the day, as the client does', () => {
+    const recorded = {
+      owed: 1000,
+      paid: 0,
+      days: 1,
+      at: 'x',
+      unpaidDays: [{ date: '2026-11-01', owed: 1000, tax: 1000 }],
+    };
+    const within = 1000 - daySettleTolerance(1000);
+    expect(liveRunningAccount(recorded, [{ amount: within }]).days).toBe(0);
+    expect(liveRunningAccount(recorded, [{ amount: within }]).unpaidDays).toEqual([]);
+    expect(liveRunningAccount(recorded, [{ amount: within - 1 }]).unpaidDays).toHaveLength(1);
+    expect(calls.daySettleTolerance(1000, 1)).toBe(daySettleTolerance(1000, 1));
   });
 
   it('keeps the running account’s notice rules and day tolerance equal', () => {

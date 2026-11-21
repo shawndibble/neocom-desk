@@ -76,6 +76,16 @@ describe('liveRunningAccount with the days still owed', () => {
     });
   });
 
+  it('reads a day short by no more than the book tolerance of its tax as paid', () => {
+    // Day one is 1,000,000 owed of a 2,000,000 tax: 0.5% of the tax is 10,000.
+    const live = liveRunningAccount(recorded, [{ amount: 990_000 }]);
+    expect(live).toMatchObject({ days: 2, oldest: '2026-11-09' });
+    expect(live.unpaidDays?.map((d) => d.date)).toEqual(['2026-11-09', '2026-11-10']);
+    expect(liveRunningAccount(recorded, [{ amount: 989_999 }]).days).toBe(3);
+    // A book's own tolerance applies.
+    expect(liveRunningAccount(recorded, [{ amount: 989_999 }], 1).days).toBe(2);
+  });
+
   it('pays the oldest day first, part of the next, and moves the oldest date on', () => {
     expect(liveRunningAccount(recorded, [{ amount: 1_500_000 }])).toMatchObject({
       owed: 5_500_000,
@@ -170,6 +180,12 @@ describe('payOldestFirst', () => {
       ],
       paid: ['2026-11-08'],
     });
+  });
+
+  it('takes the tolerance of each day from the day itself', () => {
+    const owing = [{ date: 'a', owed: 100, tax: 1000 }];
+    expect(payOldestFirst(owing, 96, (d) => d.tax * 0.005).paid).toEqual(['a']);
+    expect(payOldestFirst(owing, 94, (d) => d.tax * 0.005).paid).toEqual([]);
   });
 
   it('reads a day left owing no more than the tolerance as paid', () => {

@@ -63,6 +63,15 @@ export const NOTICE_RULE_BOUNDS = {
 export const DAY_TOLERANCE_PCT_DEFAULT = 0.5;
 
 /**
+ * How short of one day's tax a payment may fall and still pay it: a percent of the day's tax,
+ * never an ISK floor. The one definition: the client's Running account and the server's live
+ * figure (`liveRunningAccount`) both read it.
+ */
+export function daySettleTolerance(tax: number, pct: number = DAY_TOLERANCE_PCT_DEFAULT): number {
+  return (Math.max(0, tax) * pct) / 100;
+}
+
+/**
  * Every action the book writes to its audit trail (`appendAudit`). The Activity log needs a
  * sentence for each (`corpTaxBook.moons.activity.actions.<action>`); `AuditFeed.ui.test.tsx` fails
  * for one without. Add the name here when you write a new one.

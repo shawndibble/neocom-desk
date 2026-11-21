@@ -149,7 +149,11 @@ import {
   verifyCallerToken,
   type Caller,
 } from './actorAuth.js';
-import { NOTICE_DEFAULTS, type AuditAction } from './corpTaxBookKinds.js';
+import {
+  DAY_TOLERANCE_PCT_DEFAULT,
+  NOTICE_DEFAULTS,
+  type AuditAction,
+} from './corpTaxBookKinds.js';
 import { provenCharacterIds } from './playerLayerStore.js';
 import {
   classifyGroup,
@@ -1150,6 +1154,10 @@ async function assertAdjustmentReversible(
     );
 }
 
+/** The book's day tolerance in percent: its setting, else the default. */
+const dayTolerancePctOf = (book: Data): number =>
+  typeof book.dayTolerancePct === 'number' ? book.dayTolerancePct : DAY_TOLERANCE_PCT_DEFAULT;
+
 /** A Miner's account as it stands now: the officer's last record less what they paid since. */
 async function liveRunningAccountOf(c: EditCtx, minerId: string) {
   const [account, payments] = await Promise.all([
@@ -1159,7 +1167,8 @@ async function liveRunningAccountOf(c: EditCtx, minerId: string) {
   return account.exists
     ? liveRunningAccount(
         account.data() as Data,
-        payments.docs.map((d) => d.data())
+        payments.docs.map((d) => d.data()),
+        dayTolerancePctOf(c.book)
       )
     : undefined;
 }
@@ -3696,7 +3705,8 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
     account: account.exists
       ? liveRunningAccount(
           account.data() as Data,
-          payments.docs.map((d) => d.data())
+          payments.docs.map((d) => d.data()),
+          dayTolerancePctOf(b)
         )
       : null,
     // The Miner's whole history for the ledger: every day a notice listed once, and every payment.

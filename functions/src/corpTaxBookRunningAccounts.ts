@@ -3,6 +3,8 @@
  * imports `netPayment` (`src/engine/corpTaxBook/payments.ts`), and the root parity test
  * (`functionsMirror.test.ts`) checks `liveRunningAccount` against it.
  */
+import { DAY_TOLERANCE_PCT_DEFAULT, daySettleTolerance } from './corpTaxBookKinds.js';
+
 type Data = Record<string, unknown>;
 
 /**
@@ -35,12 +37,12 @@ export function paidSinceRecord(recorded: Data, payments: readonly Data[]): numb
 /**
  * Pays `amount` into `days` (oldest first) the way a Running account does: the oldest day first,
  * then part of the next. What each still owes after, and the dates paid in full; a day left owing
- * no more than `tolerance` reads as paid.
+ * no more than `tolerance` (an amount, or one read off each day) reads as paid.
  */
 export function payOldestFirst<D extends { date: string; owed: number }>(
   days: readonly D[],
   amount: number,
-  tolerance = 0
+  tolerance: number | ((day: D) => number) = 0
 ): { unpaid: D[]; paid: string[] } {
   const unpaid: D[] = [];
   const paid: string[] = [];
@@ -48,7 +50,8 @@ export function payOldestFirst<D extends { date: string; owed: number }>(
   for (const d of days) {
     const take = Math.min(d.owed, left);
     left -= take;
-    if (d.owed - take <= tolerance) paid.push(d.date);
+    if (d.owed - take <= (typeof tolerance === 'function' ? tolerance(d) : tolerance))
+      paid.push(d.date);
     else unpaid.push(take > 0 ? { ...d, owed: d.owed - take } : d);
   }
   return { unpaid, paid };
@@ -57,11 +60,13 @@ export function payOldestFirst<D extends { date: string; owed: number }>(
 /**
  * A recorded running account less what the Miner paid since: their net payments now (less "not
  * tax") beyond the ones the officer's client counted, whenever each was synced, paying the
- * recorded days oldest first (`payOldestFirst`).
+ * recorded days oldest first (`payOldestFirst`). A day left short by no more than the book's day
+ * tolerance (`tolerancePct`, percent of the day's tax) reads as paid, as on the client.
  */
 export function liveRunningAccount(
   recorded: Data,
-  payments: readonly Data[]
+  payments: readonly Data[],
+  tolerancePct: number = DAY_TOLERANCE_PCT_DEFAULT
 ): {
   owed: number;
   days: number;
@@ -79,7 +84,9 @@ export function liveRunningAccount(
   const recordedDays = Array.isArray(recorded.unpaidDays)
     ? (recorded.unpaidDays as OwedDay[])
     : undefined;
-  const unpaidDays = recordedDays && payOldestFirst(recordedDays, since).unpaid;
+  const unpaidDays =
+    recordedDays &&
+    payOldestFirst(recordedDays, since, (d) => daySettleTolerance(d.tax, tolerancePct)).unpaid;
   const recordedCount = Number(recorded.days) || 0;
   const days = recordedDays
     ? Math.max(0, recordedCount - (recordedDays.length - unpaidDays!.length))

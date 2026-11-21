@@ -26,6 +26,7 @@ import type {
 import { countedPayments, paymentNet, type TaxPayment } from './payments';
 import type { OwedDay } from '../../../functions/src/corpTaxBookRunningAccounts';
 import { shiftUtcDate, utcDayOf } from '@/engine/localDay';
+import { daySettleTolerance } from '../../../functions/src/corpTaxBookKinds';
 
 /** What is left of a day below this is float residue: the day is done (whole ISK on every screen). */
 export const RESIDUE_ISK = 0.5;
@@ -33,10 +34,8 @@ export const RESIDUE_ISK = 0.5;
 /** The default per-day tolerance, in percent of the day's tax. */
 export const DAY_SETTLE_TOLERANCE_PCT = 0.5;
 
-/** How short of one day's tax a payment may fall and still pay it: a percent, never an ISK floor. */
-export function daySettleTolerance(tax: number, pct: number = DAY_SETTLE_TOLERANCE_PCT): number {
-  return (Math.max(0, tax) * pct) / 100;
-}
+/** How short of one day's tax a payment may fall and still pay it (one definition, shared with the server). */
+export { daySettleTolerance };
 
 /** One closed day on a Miner's account: the tax of every line that day. */
 export interface RunningDay {
