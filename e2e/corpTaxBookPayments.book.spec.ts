@@ -4,7 +4,14 @@
  * per-day tolerance closes and the gap is written off; a bigger shortfall part-pays the day; what
  * is over is credit. Read on the Miner's page (its figures and account ledger) and the Miners list.
  */
-import { expect, minerFact, openMiner, signInAsOfficer, test } from './support/taxBook/bookTest';
+import {
+  expect,
+  minerFact,
+  openMiner,
+  signInAsOfficer,
+  test,
+  minerLedger,
+} from './support/taxBook/bookTest';
 import { DAY_TOLERANCE, paymentBook, twoRefineriesBook } from './support/taxBook/bookScenarios';
 import { DAY_TAX, isk, shortDay } from './support/taxBook/bookSeed';
 import { MINER } from './support/taxBook/identities';
@@ -17,8 +24,7 @@ import {
 } from './support/taxBook/memberSeed';
 import type { Page } from '@playwright/test';
 
-const ledgerRow = (page: Page, name: RegExp) =>
-  page.getByRole('table', { name: 'Account ledger' }).getByRole('row', { name });
+const ledgerRow = (page: Page, name: RegExp) => minerLedger(page).getByRole('row', { name });
 const minersRow = (page: Page) =>
   page
     .getByRole('table', { name: 'Miners' })

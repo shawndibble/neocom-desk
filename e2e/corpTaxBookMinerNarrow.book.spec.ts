@@ -6,7 +6,7 @@
 import type { Locator, Page } from '@playwright/test';
 import { PHONE } from './support/testBase';
 import { expectNoPageOverflow } from './support/overflow';
-import { expect, openMiner, test } from './support/taxBook/bookTest';
+import { expect, openMiner, test, minerLedger } from './support/taxBook/bookTest';
 import { historyBook } from './support/taxBook/bookScenarios';
 import { isk, shortDay } from './support/taxBook/bookSeed';
 import { MINER, solo } from './support/taxBook/identities';
@@ -37,7 +37,7 @@ test("a Miner's page fits a phone", async ({ page }) => {
 
 test("the account ledger's running balance stays on screen on a phone", async ({ page }) => {
   await openMiner(page, solo(MINER.ada.id), MINER.ada.name);
-  const ledger = page.getByRole('table', { name: 'Account ledger' });
+  const ledger = minerLedger(page);
   await expectWithinWidth(page, ledger);
   const payment = ledger.getByRole('row', { name: /Payment from Ada Lunar/ });
   const balance = payment.getByRole('cell').nth(4);

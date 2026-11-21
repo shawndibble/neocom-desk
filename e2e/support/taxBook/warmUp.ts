@@ -17,7 +17,13 @@
  */
 import { chromium, expect, type FullConfig, type Page } from '@playwright/test';
 import { officerBook } from './bookScenarios';
-import { installBookNetwork, minerUrl, routeBookEsi, signInAsOfficer } from './bookTest';
+import {
+  installBookNetwork,
+  minerUrl,
+  routeBookEsi,
+  signInAsOfficer,
+  minerLedger,
+} from './bookTest';
 import { wipeFirestore, writeDocs } from './emulator';
 import { OFFICER } from './identities';
 import { PROJECT_ID } from './runEnv';
@@ -32,7 +38,7 @@ async function visit(page: Page) {
   await wipeFirestore();
   await writeDocs(book.seed.docs());
   await signInAsOfficer(page, minerUrl(book.id('bram')));
-  await expect(page.getByRole('table', { name: 'Account ledger' })).toBeVisible({
+  await expect(minerLedger(page)).toBeVisible({
     timeout: COLD_MS,
   });
   for (const path of ['miners', 'overview', 'late-notices']) {

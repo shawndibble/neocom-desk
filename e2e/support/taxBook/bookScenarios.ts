@@ -4,7 +4,7 @@
  * Every figure follows from `bookSeed.ts`'s flat pricing: one ordinary mined day owes `DAY_TAX`.
  */
 import { closedThroughFor } from '../../../functions/src/corpTaxBookCheckpoint';
-import { BookSeed, DAY_TAX, day, verifyToken } from './bookSeed';
+import { BookSeed, DAY_TAX, day, noonOf, verifyToken } from './bookSeed';
 import { MINER, OFFICER, solo } from './identities';
 
 /**
@@ -300,4 +300,25 @@ export function closedMonthBook(how: { checkpointed?: boolean } = {}) {
     oldestBack: 98,
     paid: 2 * DAY_TAX,
   };
+}
+
+/**
+ * A Miner page's ledger with every kind of row: Ada mined three days (3,000,000), paid one day's
+ * tax by donation three days ago, and an officer wrote one more day off two days ago. She owes
+ * her newest day.
+ */
+export function minerLedgerBook() {
+  const minerId = solo(MINER.ada.id);
+  const seed = new BookSeed({ startBack: 30 })
+    .mine(MINER.ada.id, [6, 5, 4])
+    .donation({ id: 'j1_970001', characterId: MINER.ada.id, amount: DAY_TAX, back: 3, minerId });
+  seed.raw('writeOffs', 'wo-ada-1', {
+    id: 'wo-ada-1',
+    minerId,
+    amount: DAY_TAX,
+    at: noonOf(2, seed.now),
+    reason: 'Fleet op, corp covers it',
+    by: OFFICER.id,
+  });
+  return { seed, minerId, owed: DAY_TAX, writeOffReason: 'Fleet op, corp covers it' };
 }

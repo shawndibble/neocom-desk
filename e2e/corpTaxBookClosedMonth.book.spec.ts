@@ -5,7 +5,14 @@
  * it. Read either way, a Miner's page shows the same totals.
  */
 import type { Page } from '@playwright/test';
-import { expect, minerFact, openMiner, signInAsOfficer, test } from './support/taxBook/bookTest';
+import {
+  expect,
+  minerFact,
+  openMiner,
+  signInAsOfficer,
+  test,
+  minerLedger,
+} from './support/taxBook/bookTest';
 import { closedMonthBook } from './support/taxBook/bookScenarios';
 import { isk, shortDay } from './support/taxBook/bookSeed';
 import { readDoc } from './support/taxBook/emulator';
@@ -53,8 +60,6 @@ test('a Miner whose history passes a closed month reads the same totals', async 
   await emulator.seed(book.seed.docs());
   await openMiner(page, book.minerId, MINER.ada.name);
   // The one Payee ledger opens on the checkpoint: "Balance through <day>".
-  await expect(page.getByRole('table', { name: 'Account ledger' })).toContainText(
-    'Balance through'
-  );
+  await expect(minerLedger(page)).toContainText('Balance through');
   await expectTotals(page, book);
 });

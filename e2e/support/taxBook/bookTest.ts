@@ -235,7 +235,7 @@ export async function openMiner(page: Page, minerId: string, name: string): Prom
   await signInAsOfficer(page, minerUrl(minerId));
   // Two signals in their order: the book read (the ledger), then the Miner's name, which ESI
   // resolves only after it.
-  await expect(page.getByRole('table', { name: 'Account ledger' })).toBeVisible();
+  await expect(minerLedger(page)).toBeVisible();
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
 }
 
@@ -246,3 +246,10 @@ export function minerFact(page: Page, label: string) {
     .locator('dt', { hasText: new RegExp(`^${label}$`) })
     .locator('xpath=following-sibling::dd[1]');
 }
+
+/**
+ * The Miner page's ledger table. Named by the book ("Account ledger", soon "Ledger", the name the
+ * pilot's ledger already has), so the pattern takes either and survives the rename.
+ */
+export const minerLedger = (page: Page) =>
+  page.getByRole('main').getByRole('table', { name: /^(Account ledger|Ledger)$/ });
