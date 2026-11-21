@@ -178,82 +178,6 @@ export interface StatementLike {
   code: string;
 }
 
-export type DonationMatch =
-  | { kind: 'statement'; statementId: string; minerId: string }
-  | { kind: 'miner'; minerId: string }
-  | { kind: 'unmatched' };
-
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function carriesCode(reason: string, code: string): boolean {
-  return new RegExp(`(^|[^a-z0-9])${escapeRegExp(code)}($|[^a-z0-9])`, 'i').test(reason);
-}
-
-/**
- * Engine `matchDonation`.
- * @deprecated The server matches with corpTaxBookDonationMatch.ts; this stays only for the
- * client's parity test (syncMirror.test.ts) and goes with the client's own copy.
- */
-export function matchDonation(
-  donation: { characterId: number; reason: string | undefined },
-  book: {
-    miners: readonly MinerLike[];
-    statements: readonly StatementLike[];
-    knownCharacterIds: ReadonlySet<number>;
-    openBalance: ReadonlyMap<string, number>;
-    unbilled: ReadonlySet<string>;
-  }
-): DonationMatch {
-  const reason = donation.reason ?? '';
-  if (reason) {
-    const pinned = book.statements.find((s) => carriesCode(reason, s.code));
-    if (pinned) return { kind: 'statement', statementId: pinned.id, minerId: pinned.minerId };
-  }
-  const grouped = book.miners.some((m) => m.characterIds.includes(donation.characterId));
-  if (grouped || book.knownCharacterIds.has(donation.characterId)) {
-    const minerId = minerIdFor(donation.characterId, book.miners);
-    return { kind: 'miner', minerId };
-  }
-  return { kind: 'unmatched' };
-}
-
-/** Engine `resolveDonations`. @deprecated As `matchDonation`: the server uses `resolveDonationOwners`. */
-export function resolveDonations(
-  donations: readonly JournalDonation[],
-  book: {
-    miners: readonly MinerLike[];
-    statements: readonly StatementLike[];
-    knownCharacterIds: ReadonlySet<number>;
-    openBalance: ReadonlyMap<string, number>;
-    unbilled: ReadonlySet<string>;
-  }
-): JournalDonation[] {
-  const balance = new Map(book.openBalance);
-  const resolved = new Map<JournalDonation, JournalDonation>();
-  const oldestFirst = [...donations].sort(
-    (a, b) => a.at.localeCompare(b.at) || a.division - b.division || a.refId - b.refId
-  );
-  for (const d of oldestFirst) {
-    const match = matchDonation(
-      { characterId: d.characterId, reason: d.reason },
-      { ...book, openBalance: balance }
-    );
-    if (match.kind === 'statement' || match.kind === 'miner')
-      balance.set(match.minerId, (balance.get(match.minerId) ?? 0) - d.amount);
-    resolved.set(
-      d,
-      match.kind === 'statement'
-        ? { ...d, minerId: match.minerId, statementId: match.statementId }
-        : match.kind === 'miner'
-          ? { ...d, minerId: match.minerId }
-          : d
-    );
-  }
-  return donations.map((d) => resolved.get(d)!);
-}
-
 // --- Donations into divisions the book does not read (#6207) --------------
 
 /** Engine `WALLET_DIVISIONS`. */
@@ -262,44 +186,6 @@ export const WALLET_DIVISIONS = [1, 2, 3, 4, 5, 6, 7] as const;
 /** Engine `otherDivisions`. */
 export function otherDivisions(divisions: readonly number[]): number[] {
   return WALLET_DIVISIONS.filter((d) => !divisions.includes(d));
-}
-
-/** Engine `noteUncounted`. @deprecated As `matchDonation`: the server uses `uncountedDonations`. */
-export function noteUncounted(
-  donations: readonly JournalDonation[],
-  book: {
-    miners: readonly MinerLike[];
-    statements: readonly StatementLike[];
-    knownCharacterIds: ReadonlySet<number>;
-    openBalance: ReadonlyMap<string, number>;
-    unbilled: ReadonlySet<string>;
-  },
-  counted: readonly JournalDonation[] = []
-): UncountedDonation[] {
-  const openBalance = new Map(book.openBalance);
-  for (const c of counted)
-    if (c.minerId !== undefined)
-      openBalance.set(c.minerId, (openBalance.get(c.minerId) ?? 0) - c.amount);
-  return donations
-    .filter((d) => {
-      const match = matchDonation({ characterId: d.characterId, reason: d.reason }, book);
-      if (match.kind === 'statement') return true;
-      // A known sender's donation here is likely tax only while their Miner owes (#6207).
-      return (
-        match.kind === 'miner' &&
-        ((openBalance.get(match.minerId) ?? 0) > 0 || book.unbilled.has(match.minerId))
-      );
-    })
-    .sort((a, b) => b.at.localeCompare(a.at) || b.refId - a.refId)
-    .slice(0, UNCOUNTED_LIMIT)
-    .map((d) => ({
-      id: `j${d.division}_${d.refId}`,
-      refId: d.refId,
-      division: d.division,
-      characterId: d.characterId,
-      amount: d.amount,
-      at: d.at,
-    }));
 }
 
 // --- Notification payloads ------------------------------------------------
