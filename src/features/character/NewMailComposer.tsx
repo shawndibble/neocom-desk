@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import { GrantNote } from '@/app/GrantNote';
 import { SEND_MAIL_ENDPOINTS } from '@/esi/registry';
 import { Button, FieldError, IconButton, Modal, TextInput } from '@/components/ui';
+import { stackedLabelClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { useVisualViewportBox } from '@/lib/useVisualViewportBox';
@@ -261,7 +262,7 @@ export function NewMailComposer({
     if (result.ok) setRecipients(result.recipients);
   }
 
-  const labelClass = 'block text-[0.6875rem] text-text-dim';
+  const labelClass = stackedLabelClassName;
   const subjectOver = subject.length > MAX_SUBJECT_LENGTH;
   const bodyOver = bodyLength > MAX_BODY_LENGTH;
 

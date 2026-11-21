@@ -45,6 +45,7 @@ export async function loadStructuresBoardData(characterId: number): Promise<Stru
     structureCount: structures.length,
     needsReauth: result.needsReauth,
     fetchedAt: result.cached.fetchedAt,
+    ...(result.cached.expiresAt ? { expiresAt: result.cached.expiresAt } : {}),
   };
 }
 
@@ -122,6 +123,11 @@ export async function loadAllStructuresBoardData(): Promise<StructuresBoardData>
     structureCount: readable.reduce((sum, read) => sum + read.structureCount, 0),
     needsReauth: readable.some((read) => read.needsReauth),
     fetchedAt: oldest(readable.map((read) => read.fetchedAt)),
+    expiresAtByCorp: new Map(
+      readable.flatMap(({ corporationId, expiresAt }) =>
+        expiresAt ? [[corporationId, expiresAt] as const] : []
+      )
+    ),
     corporations: await loadCorpLabels(readable.map((read) => read.corporationId)),
     partlyFailed,
   };
