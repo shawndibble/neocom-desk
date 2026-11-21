@@ -18686,8 +18686,8 @@
         },
         "none": "Nothing needs you.",
         "declinedGrouping": {
-          "title": "{{character}} says they aren't part of {{miner}}.",
-          "body": "They're billed on their own now.",
+          "title": "{{character}} says they aren't part of {{miner}} — billed on their own now.",
+          "former": "their former group",
           "dismiss": "Dismiss",
           "failed": "Could not dismiss that. Try again."
         }

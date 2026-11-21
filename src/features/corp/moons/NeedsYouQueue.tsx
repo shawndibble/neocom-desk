@@ -21,7 +21,7 @@ import { cx } from '@/lib/cx';
 import { formatCount } from '@/lib/formatCount';
 import { useNow } from '@/lib/useNow';
 import { useBook } from './useBook';
-import { isLocked } from '../../../../functions/src/corpTaxBookCheckpoint';
+import { minerIdFor } from '../../../../functions/src/corpTaxBookDonationMatch';
 import { useCorpAccess } from '../useCorpAccess';
 import { divisionNamesFor } from '../taxBook/pushDivisionNames';
 import { dismissGroupingAnswer } from '../taxBook/bookClient';
@@ -52,7 +52,7 @@ function QueueCard({
 }: {
   tone: 'danger' | 'warning' | 'neutral';
   title: ReactNode;
-  body: string;
+  body?: string;
   /** Under the body: a declaration's wallet check, a dispute's hold. */
   detail?: ReactNode;
   actions: ReactNode;
@@ -68,7 +68,7 @@ function QueueCard({
       />
       <span className="min-w-0 flex-1 basis-60">
         <span className="block text-sm font-semibold">{title}</span>
-        <span className="block text-xs text-text-dim">{body}</span>
+        {body !== undefined && <span className="block text-xs text-text-dim">{body}</span>}
         {detail}
       </span>
       <span className="flex shrink-0 flex-wrap items-center gap-2 max-sm:pl-3">{actions}</span>
@@ -665,8 +665,9 @@ export function NeedsYouQueue() {
                 )
               }
               actions={
-                // A dispute of a day before the lock date can no longer be answered.
-                canEdit && !isLocked(d.date, view.input.now) ? (
+                // An officer may answer a dispute of a locked day too: the snapshot holds the day
+                // aside, so the answer settles only that day (decision 20261120-235011).
+                canEdit ? (
                   <>
                     <Button
                       size="sm"
@@ -689,19 +690,26 @@ export function NeedsYouQueue() {
         })}
         {declined.map((a) => {
           const group = miners.find((m) => m.id === a.minerId);
+          // A dissolved group is named by the others it held, and linked where the first of them is
+          // now; with none known, the decliner's own Miner.
+          const others = a.otherCharacterIds ?? [];
+          const linkId = group ? a.minerId : minerIdFor(others[0] ?? a.characterId, miners);
           return (
             <QueueCard
               key={`g-${a.characterId}`}
               tone="neutral"
               title={
-                <MinerTitle minerId={group ? a.minerId : undefined}>
+                <MinerTitle minerId={linkId}>
                   {t('corpTaxBook.moons.needs.declinedGrouping.title', {
                     character: names.character(a.characterId),
-                    miner: group ? names.character(group.mainCharacterId) : a.minerId,
+                    miner: group
+                      ? names.character(group.mainCharacterId)
+                      : others.length > 0
+                        ? formatList(others.map((id) => names.character(id)))
+                        : t('corpTaxBook.moons.needs.declinedGrouping.former'),
                   })}
                 </MinerTitle>
               }
-              body={t('corpTaxBook.moons.needs.declinedGrouping.body')}
               actions={
                 canEdit ? (
                   <button

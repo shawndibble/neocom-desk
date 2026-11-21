@@ -429,6 +429,8 @@ export interface GroupingAnswer {
   via: 'character' | 'verify-link';
   /** ISO instant an officer took it out of Needs you (`dismissGroupingAnswer`). */
   dismissedAt?: string;
+  /** A declined grouping: the Characters that were in that Miner besides the decliner, so the card can name a group that has since dissolved. */
+  otherCharacterIds?: number[];
 }
 
 /** Reads `meta/groupingAnswers`, dropping anything malformed. */
@@ -447,6 +449,13 @@ export function groupingAnswersFrom(d: Record<string, unknown> | undefined): Gro
         at: String(a.at ?? ''),
         via: a.via === 'verify-link' ? ('verify-link' as const) : ('character' as const),
         ...(typeof a.dismissedAt === 'string' ? { dismissedAt: a.dismissedAt } : {}),
+        ...(Array.isArray(a.otherCharacterIds)
+          ? {
+              otherCharacterIds: a.otherCharacterIds.filter(
+                (n): n is number => typeof n === 'number' && Number.isSafeInteger(n)
+              ),
+            }
+          : {}),
       },
     ];
   });
