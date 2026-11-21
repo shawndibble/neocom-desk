@@ -1,7 +1,7 @@
 /**
- * Phase-2 fixtures: the pilot's own Moon Mining Tax tab against a Corp Tax Book (decision
- * 20261120-235011, "every Payee is paid oldest first"). Not used by a spec yet: the member side is
- * being rebuilt, so these hold only what will not change with its UI.
+ * The pilot's own Moon Mining Tax tab against a Corp Tax Book (decision 20261120-235011, "every
+ * Payee is paid oldest first"), for `miningTaxCorpBook.book.spec.ts`. The personal side's Dexie
+ * rows are `personalSeed.ts`'s.
  *
  * - The corp book (Firestore, the server's layout) the pilot's corp-book Payee reads.
  * - What ESI tells the pilot's tab: their mining ledger and wallet journal, served on the network
