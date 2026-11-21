@@ -42,7 +42,7 @@ Moon names in other lists link to the moon page:
 
 - **Moon owner page** (moons table, no row click): the name is a real `<a href>` to the moon page.
 - **Extractions tab** (row click): the row still opens that Extraction's page, and its moon name is a real link to the moon page. This is a recorded exception to "a row's primary action beats name links inside it"; add it to §6c's Overrides table or a scope decision at build time.
-- **Sharing tab, Miner pages, Statements:** a moon name that stands alone is a real link; inside a row with its own click it follows the Extractions-tab pattern.
+- **Sharing tab, Miner pages, Late notices:** a moon name that stands alone is a real link; inside a row with its own click it follows the Extractions-tab pattern.
 
 ## New components
 

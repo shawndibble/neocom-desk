@@ -493,15 +493,20 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   the fourth kind of Firebase data: a corporation's moon-mining tax record,
   `corps/{corporationId}`, shared by every officer and gated by a
   verified corp role instead of a uid or a Community. The root doc holds the
-  settings (start date, trade hub, Ore Form, dated rates, grace, minimum
-  Statement, divisions, last sync); beside it are `officers/{uid}` (access
+  settings (start date, trade hub, Ore Form, dated rates, grace, late-notice
+  rules and minimum, divisions, last sync); beside it are `officers/{uid}` (access
   records), `observed` (Observed Mining Entry rows), `extractions`,
   `payments` (Tax Payments), `dismissals`, `declarations`, `adjustments`,
-  `writeOffs`, `rebills`, `statements` (create-only; a Statement never
-  changes), `miners` (groupings), `meta/paid` (`paidStatementIds`, only ever
-  grown: a paid Statement's days stay closed, D22) and `audit` (immutable log,
-  shown as the activity feed). `corpTaxBookTokens/{token}` maps a Statement's
-  verify link to its Statement; no client can read it. **Nothing is written by
+  `writeOffs`, `rebills`, `lateNotices` (Late notices, create-only, with a
+  temporary mirror in the legacy collection older tabs read; `LateNotice`,
+  `functions/src/corpTaxBookLateNotice.ts`), `miners` (groupings), `meta/paid`
+  (each Miner's paid-through day, only ever moved forward: a paid day stays
+  closed, D22), `accountCheckpoints/{minerId}` (the Closed-through checkpoint,
+  `functions/src/corpTaxBookCheckpoint.ts`) and `audit` (immutable log, shown
+  as the activity feed). A Miner's Running account (`MinerRunningAccount`,
+  `src/engine/corpTaxBook/minerRunningAccount.ts`) is built from these on read
+  and never stored. `corpTaxBookTokens/{token}` maps a Late notice's verify
+  link to its notice; no client can read it. **Nothing is written by
   a client**: every write is a callable in `functions/src/corpTaxBookStore.ts`
   (pure parsing and role decisions in `corpTaxBook.ts`) that appends an audit
   entry in the same transaction. `verifyCorpOfficerCallable` takes the caller's
@@ -519,22 +524,22 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   (Director), `deleteCorpTaxBookCallable` (the opener or the CEO; wipes the book), `reclaimCorpTaxBookCallable` (the CEO; revokes other officers'
   access), `syncCorpTaxBookCallable` (monotonic observer upsert, Extractions,
   donations; Accountant+), `editCorpTaxBookCallable` (rates, settings, payments,
-  dismissals, groupings, adjustments, write-offs, rebills, Statements,
+  dismissals, groupings, adjustments, write-offs, rebills, Late notices,
   declarations), `confirmCorpTaxBookGroupingCallable` /
   `declineCorpTaxBookGroupingCallable` / `listPendingCorpTaxBookGroupingsCallable`
   (a guest answers a hand-made grouping as the added character, never by token;
   #4210), the player-facing `claimCorpTaxBookPaymentCallable` (see below), and
-  the no-login verify-link callables `readCorpTaxBookStatementCallable`,
+  the no-login verify-link callables (the verify read,
   `stopCorpTaxBookRemindersCallable` and
-  `declineCorpTaxBookGroupingByTokenCallable` (decline only). `functions/` cannot import `src/`, so the
+  `declineCorpTaxBookGroupingByTokenCallable`, decline only). `functions/` cannot import `src/`, so the
   slice of the pure engine the callables enforce is mirrored in
   `functions/src/corpTaxBookEngine.ts`, pinned to `src/engine/corpTaxBook` by
   `functionsMirror.test.ts`. Callable tests run against the emulator
   (`functions/src/corpTaxBookEmulator.test.ts`, part of `npm run test:rules`).
   The officer sync client is `src/features/corp/taxBook/` (issue #4062):
   `syncCorpTaxBook` reads the observer ledger, Extractions, moon notifications
-  and journal donations, uploads them, then settles the Statements
-  `allocatePayments` reports paid (the server never detects settlement); its
+  and journal donations, uploads them, then records the days each Miner's
+  Running account reports paid (the server never detects settlement); its
   pure half is `src/engine/corpTaxBook/sync.ts` (gaps, donation resolution,
   settlement plan). `useCorpTaxBook` exposes last-synced/stale/gaps and syncs
   on visit; `useMiningLedgerAccess` says when to ask for the mining scope.
@@ -550,7 +555,7 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   the grant's own token) and `revokeCorpTaxBookSyncGrantCallable` (the holder, or
   the CEO with a live role check). A run refreshes and rotates the token,
   re-reads the holder's corporation and roles, then calls `syncBookAs` /
-  `editBookAs` (`assignPayment`, `settleStatements` only; never issues or mails).
+  `editBookAs` (re-match a donation and record what is paid only; never issues or mails).
   It stops the schedule and deletes the token when the holder lost the role, left
   the corp, SSO says `invalid_grant`, ESI refuses the token or the book is off.
   A stop that commits (not `book-off`) pushes `corpTaxBookSyncStopped`, a server-pushed
@@ -582,15 +587,13 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   (`src/features/corpTaxBook/VerifyPage.tsx`): it is in `PUBLIC_ROUTES`
   (`src/app/routerPath.ts`), so it sits outside `RequireCharacter`, registers
   no service worker and skips the update wait, and analytics and Sentry
-  record the route pattern, never the token. It calls
-  `readCorpTaxBookStatementCallable`, whose `readStatementByToken` resolves
-  `corpTaxBookTokens/{token}` and returns that Statement, its terms and **only
-  the payments credited to it** (`paymentCredits`, from the mirrored
-  `allocatePayments`, so a donation that paid two Statements shows its own part
-  on each) and never the Miner's other Statements. A token carries a
+  record the route pattern, never the token. Its read callable resolves
+  `corpTaxBookTokens/{token}` and returns that Late notice, its terms and what
+  the Miner owes now on their Running account (the days still owed and a
+  closed ledger of mined days and payments), never another Miner's. A token carries a
   closed-account note when `miners/{id}.closedAt` is set (the `closeAccount`
   edit, issue #4184), and applies day, Miner, moon and Extraction dismissals
-  to the allocation, mirrored by `moonOnDay` / `dismissalCredits` in
+  to the account, mirrored by `moonOnDay` / `dismissalCredits` in
   `corpTaxBookEngine.ts`.
   **Local development** runs against the Firebase emulators instead of
   production: `VITE_FIREBASE_EMULATORS=1` in `.env.local` (issue #4190)
@@ -618,8 +621,8 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   (`features/corp/moons/sectionParts.tsx`): a count in the title, the newest
   ten rows, "Load older" (`usePaged`), a phone fold. No inner tabs. Everything
   they group comes from the client-side `buildBookView` (ADR 0032's read models
-  are not built); the pure grouping (day phases Today's mining / Next
-  Statement / earlier, the Overview's 7-day pops window, ore lines per Miner and
+  are not built); the pure grouping (day phases Today's mining / unpaid /
+  earlier, the Overview's 7-day pops window, ore lines per Miner and
   moon, the place line, the merged Payments and Activity ledgers) is
   `src/engine/corpTaxBook/bookSections.ts`.
   The Overview tab is `OverviewTab.tsx` (totals chips, `NeedsYouQueue`, the
@@ -659,16 +662,16 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   (`communities/{id}/popSharingBlocks`).
 - **Corp Tax Book send queue** (issue #4064, D16). Pure rules:
   `src/engine/corpTaxBook/mailQueue.ts` (pacing, 520 holds, summary, D27
-  reminder rule) and `statementMail.ts` (the short Statement mail). Client:
-  `src/features/corpTaxBook/`: `mailQueue.ts` (`enqueueStatements`,
-  `enqueueReminder`, `retryMail`, the API the Statements tab calls),
+  reminder rule) and the short Late notice mail beside it. Client:
+  `src/features/corpTaxBook/`: `mailQueue.ts` (enqueueing notices,
+  `enqueueReminder`, `retryMail`, the API the Late notices tab calls),
   `officerMail.ts` (the one door for any Officer mail, SRP results included: `canSendMail`, `resolveRecipients`, fire-and-forget `queueOfficerMail`; nothing else calls `sendMail` for an officer's notice),
   `mailQueueStore.ts` (Dexie `corpMailQueue`, one row per mail),
   `mailQueueRunner.ts` (`stepQueue` / `runMailQueue` under the
   `neocom:mailQueue` Web Lock), `bookApi.ts` (verify tokens, `recordMail` /
   `recordReminder` through `editCorpTaxBookCallable`), and the UI
-  (`MailQueueChip`, `MailQueuePanel`, `MailLimitNotice`,
-  `StatementMailPreview`). `MailQueueMount` sits in `Layout` and loads the
+  (`MailQueueChip`, `MailQueuePanel`, `MailLimitNotice` and the mail
+  preview). `MailQueueMount` sits in `Layout` and loads the
   chip and sender only while the queue has rows. The queue is **local**, never
   in Firebase: Dexie `corpMailQueue` (indexed on corporation, batch and sender)
   is the only record of what is waiting, and the sender is whichever tab holds
