@@ -38,7 +38,7 @@ function SeededRun() {
 const meta = {
   title: 'corp/LateNoticeRunPreview',
   component: SeededRun,
-  parameters: { layout: 'fullscreen', shell: { path: '/corp/moons/statements', scopes: [] } },
+  parameters: { layout: 'fullscreen', shell: { path: '/corp/moons/late-notices', scopes: [] } },
 } satisfies Meta<typeof SeededRun>;
 
 export default meta;

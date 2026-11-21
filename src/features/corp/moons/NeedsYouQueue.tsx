@@ -329,7 +329,7 @@ export function NeedsYouQueue() {
             tone="warning"
             title={
               <Link
-                to={tabPath(MOONS_TABS, 'statements')}
+                to={tabPath(MOONS_TABS, 'late-notices')}
                 className={entityLinkClassName('inline-block py-0.5')}
               >
                 {t('corpTaxBook.moons.needs.noticesDue.title', { count: noticesDue.length })}

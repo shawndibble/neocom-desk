@@ -13,9 +13,15 @@ export const MOONS_TABS = definePageTabs('/corp/moons', [
   // The retired Moons tab (#6348): its URLs redirect to the refinery they name.
   { id: 'moons', labelKey: 'corpTaxBook.moons.tabs.refineries', deep: true, standalone: true },
   { id: 'miners', labelKey: 'corpTaxBook.moons.tabs.miners', deep: true },
-  // The URL keeps the old id so bookmarks and old mail links work; below it only the retired period pages (#6294)
-  // lived, and they redirect here.
-  { id: 'statements', labelKey: 'corpTaxBook.moons.tabs.statements', deep: true },
+  { id: 'late-notices', labelKey: 'corpTaxBook.moons.tabs.lateNotices', deep: true },
+  // The tab's old URL, and the retired period pages below it (#6294): bookmarks and old mail links
+  // redirect to Late notices.
+  {
+    id: 'statements',
+    labelKey: 'corpTaxBook.moons.tabs.lateNotices',
+    deep: true,
+    standalone: true,
+  },
   { id: 'moon-owners', labelKey: 'corpTaxBook.moons.tabs.moonOwners', deep: true },
 ]);
 
@@ -29,7 +35,7 @@ export type MoonsDetail =
   | { kind: 'refinery'; structureId: number }
   /** The retired moon owner's refinery page (#6298): redirects to `refinery`. */
   | { kind: 'legacyRefinery'; structureId: number }
-  /** The retired Statements period page `/corp/moons/statements/:period`: redirects to the Late notices tab. */
+  /** The retired period page `/corp/moons/statements/:period`: redirects to the Late notices tab. */
   | { kind: 'legacyStatementPeriod' }
   | null;
 
@@ -56,7 +62,7 @@ export const extractionPath = (id: string) => `/corp/moons/extractions/${encodeU
 /** A refinery's page (#6348): its moon, owner, ore, every Extraction and every Miner. */
 export const refineryPath = (structureId: number) => `/corp/moons/refineries/${structureId}`;
 export const refineriesTabPath = tabPath(MOONS_TABS, 'refineries');
-export const statementsTabPath = tabPath(MOONS_TABS, 'statements');
+export const lateNoticesTabPath = tabPath(MOONS_TABS, 'late-notices');
 export const minerPath = (id: string) => `/corp/moons/miners/${encodeURIComponent(id)}`;
 export const moonOwnerPath = (id: string) => `/corp/moons/moon-owners/${encodeURIComponent(id)}`;
 

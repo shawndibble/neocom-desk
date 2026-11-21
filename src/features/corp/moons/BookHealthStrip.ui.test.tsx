@@ -31,7 +31,17 @@ function renderStrip(
           {
             characterId: 7,
             corporationId: 98000001,
-            view: { unrated: [], billableThrough: null, input: { graceHours: 6 } },
+            view: {
+              unrated: [],
+              billableThrough: null,
+              miners: [],
+              input: {
+                graceHours: 6,
+                payments: [],
+                now: '2026-11-21T00:00:00Z',
+                startDate: '2026-11-01',
+              },
+            },
             names: { refinery: () => 'Efa - Brass Anvil' },
             data: {
               scheduledSync,
@@ -196,7 +206,17 @@ describe('BookHealthStrip, plain status', () => {
             {
               characterId: 7,
               corporationId: 98000001,
-              view: { unrated: [], billableThrough: null, input: { graceHours: 6 } },
+              view: {
+                unrated: [],
+                billableThrough: null,
+                miners: [],
+                input: {
+                  graceHours: 6,
+                  payments: [],
+                  now: '2026-11-21T00:00:00Z',
+                  startDate: '2026-11-01',
+                },
+              },
               names: { refinery: () => 'x' },
               data: {
                 scheduledSync: null,

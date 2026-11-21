@@ -129,13 +129,13 @@ describe('the small doc readers', () => {
       at: '',
     });
     expect(readWriteOff('w', { minerId: 'm', amount: 1 })).toBeNull();
+    // A legacy write-off's notice id is not read: money names no day.
     expect(readWriteOff('w', { minerId: 'm', amount: 1, at: 't', statementId: 's' })).toEqual({
       id: 'w',
       minerId: 'm',
       amount: 1,
       at: 't',
       reason: '',
-      statementId: 's',
     });
   });
   it('readFeederCoverage reads the corp from the doc id and drops malformed periods', () => {

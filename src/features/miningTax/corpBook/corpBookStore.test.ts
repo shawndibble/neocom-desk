@@ -292,7 +292,6 @@ describe('the miner-side copies (#4622)', () => {
       amount: 5,
       reason: 'y',
       at: '2026-10-20T00:00:00Z',
-      statementId: 's1',
     });
     expect(readWriteOff('w2', { minerId: 'solo:1', amount: 5 })).toBeNull();
   });

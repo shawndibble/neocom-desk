@@ -63,9 +63,7 @@ function book(parts: BookPartSet): BookRead {
       active: true,
       startDate: '2026-10-01',
       graceHours: 24,
-      minimumStatement: 0,
       overdueDays: 14,
-      cadence: { kind: 'monthly' },
       hubId: 'jita',
       oreForm: 'raw',
       structureExpiryHours: {},
@@ -73,11 +71,10 @@ function book(parts: BookPartSet): BookRead {
     } as never,
     state: {
       miners: [],
-      statements: [],
+      notices: [],
       payments: [],
       dismissals: [],
       extractions: [],
-      paidStatementIds: new Set(),
     } as never,
     observed: [],
     declarations: [],
@@ -93,7 +90,7 @@ beforeEach(() => {
 });
 
 describe('useCorpBook read plan', () => {
-  it('opens on the core and rows, and reads just the ledger when Statements opens', async () => {
+  it('opens on the core and rows, and reads just the ledger when Late notices opens', async () => {
     const { result, rerender } = renderHook(
       ({ tab }) => useCorpBook(SYNC, bookPartsFor(tab, null)),
       {
@@ -104,14 +101,14 @@ describe('useCorpBook read plan', () => {
     expect(readBook).toHaveBeenCalledTimes(1);
     expect(readBook.mock.calls[0]?.[2].parts).toEqual(new Set(['core', 'observed']));
 
-    rerender({ tab: 'statements' });
+    rerender({ tab: 'late-notices' });
     await waitFor(() => expect(readBook).toHaveBeenCalledTimes(2));
     expect(readBook.mock.calls[1]?.[2].parts).toEqual(new Set(['ledger']));
     await waitFor(() => expect(result.current.state.status).toBe('ready'));
 
     // Going back, and on to a tab the held slices cover, reads nothing.
     rerender({ tab: 'extractions' });
-    rerender({ tab: 'statements' });
+    rerender({ tab: 'late-notices' });
     expect(readBook).toHaveBeenCalledTimes(2);
   });
 

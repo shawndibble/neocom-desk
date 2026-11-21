@@ -662,7 +662,7 @@ describe('NeedsYouQueue: late notices are due (#6294)', () => {
     expect(screen.getByRole('heading', { name: 'Needs you · 1' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Late notice due for 1 Miner' })).toHaveAttribute(
       'href',
-      '/corp/moons/statements'
+      '/corp/moons/late-notices'
     );
     expect(screen.getByText(/owe 20,000,000 between them/)).toBeInTheDocument();
   });

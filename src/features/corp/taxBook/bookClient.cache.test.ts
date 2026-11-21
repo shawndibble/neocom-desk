@@ -277,7 +277,7 @@ describe('readBook over the version marker', () => {
     store.docs.set(`${BOOK}/payments/p1`, { id: 'p1' });
     store.docs.set(BOOK, stamped({ payments: 'payments-2' }));
 
-    const merged = await extendBook(7, CORP, core!, bookPartsFor('statements', null));
+    const merged = await extendBook(7, CORP, core!, bookPartsFor('late-notices', null));
 
     expect(store.reads).not.toContain(`${BOOK}/miners`);
     expect(store.reads).not.toContain(`${BOOK}/observed`);

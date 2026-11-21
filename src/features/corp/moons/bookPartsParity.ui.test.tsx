@@ -355,7 +355,7 @@ const ROUTES: Route[] = [
   { name: 'overview', tab: 'overview', detail: null, ui: <OverviewTab /> },
   { name: 'extractions', tab: 'extractions', detail: null, ui: <ExtractionsTab /> },
   { name: 'miners', tab: 'miners', detail: null, ui: <MinersTab /> },
-  { name: 'statements', tab: 'statements', detail: null, ui: <LateNoticesTab /> },
+  { name: 'late notices', tab: 'late-notices', detail: null, ui: <LateNoticesTab /> },
   { name: 'moon-owners', tab: 'moon-owners', detail: null, ui: <MoonOwnersTab /> },
   { name: 'miner', tab: 'miners', detail: 'miner', ui: <MinerDetail id="g1" /> },
   {

@@ -2,10 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { accountRecords } from './accountRecords';
 import type { BookView } from './bookView';
 
-const view = (running: boolean) =>
+const view = () =>
   ({
     input: {
-      ...(running ? { runningAccountFrom: '2026-11-01T00:00:00Z' } : {}),
       payments: [
         { id: 'p1', minerId: 'm1', characterId: 1, amount: 100.4, at: 'x', source: 'donation' },
         {
@@ -25,7 +24,7 @@ const view = (running: boolean) =>
         [
           'm1',
           {
-            running: {
+            account: {
               byDay: new Map([
                 ['2026-11-04', { tax: 1000.4, held: false, settled: false, remaining: 400.2 }],
                 ['2026-11-03', { tax: 900, held: false, settled: false, remaining: 900 }],
@@ -41,23 +40,25 @@ const view = (running: boolean) =>
       {
         id: 'm1',
         owed: 300.6,
+        credit: 0,
         account: {
           paidThrough: '2026-11-02',
           closableThrough: '2026-11-02',
           owes: { amount: 300.6, days: 2, oldest: '2026-11-03' },
         },
       },
-      { id: 'm2', owed: 0, account: { paidThrough: null, owes: null } },
+      { id: 'm2', owed: 0, credit: 49.6, account: { paidThrough: null, owes: null } },
     ],
   }) as unknown as BookView;
 
 describe('accountRecords', () => {
   it('records each Miner’s account in whole ISK, with the net payments counted and the days still owed (oldest first, none held or settled)', () => {
-    expect(accountRecords(view(true))).toEqual([
+    expect(accountRecords(view())).toEqual([
       {
         minerId: 'm1',
         owed: 301,
         paid: 130,
+        credit: 0,
         days: 2,
         oldest: '2026-11-03',
         paidThrough: '2026-11-02',
@@ -67,12 +68,11 @@ describe('accountRecords', () => {
         ],
         settledThrough: '2026-11-02',
       },
-      { minerId: 'm2', owed: 0, paid: 0, days: 0, unpaidDays: [] },
+      { minerId: 'm2', owed: 0, paid: 0, credit: 50, days: 0, unpaidDays: [] },
     ]);
   });
 
-  it('keeps only the Miner a scoped page read, and nothing on a calendar book', () => {
-    expect(accountRecords(view(true), 'm2').map((a) => a.minerId)).toEqual(['m2']);
-    expect(accountRecords(view(false))).toEqual([]);
+  it('keeps only the Miner a scoped page read', () => {
+    expect(accountRecords(view(), 'm2').map((a) => a.minerId)).toEqual(['m2']);
   });
 });

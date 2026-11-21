@@ -47,9 +47,7 @@ export function bookPartsFor(tab?: string, detail: BookDetailKind | null = null)
   if (tab === undefined) return ALL_BOOK_PART_SET;
   const route = detail ?? tab;
   switch (route) {
-    // The read models stand in for payments and declarations, but the open set (unbilled
-    // days) still reads dismissals and corrections, and a book whose docs are missing falls
-    // back to the whole-book view, which needs the ledger.
+    // The Running accounts read the money, dismissals and corrections: the ledger.
     case 'overview':
       return new Set<BookPart>(['core', 'observed', 'ledger']);
     case 'miner':
@@ -61,12 +59,13 @@ export function bookPartsFor(tab?: string, detail: BookDetailKind | null = null)
     case 'legacyMoon':
     case 'legacyRefinery':
     case 'legacyStatementPeriod':
+    case 'statements':
       return new Set<BookPart>(['core']);
     // An Extraction's page says whether its days are billed, dismissed or in Today's mining.
     case 'moon-owners':
       return new Set<BookPart>(['core', 'owners']);
     case 'extraction':
-    case 'statements':
+    case 'late-notices':
       return new Set<BookPart>(['core', 'observed', 'ledger']);
     default:
       return new Set<BookPart>(['core', 'observed']);
