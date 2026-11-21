@@ -20,20 +20,20 @@ const row = (over: Partial<MoonOwnerRow> = {}): MoonOwnerRow => ({
 
 describe('moonOwnerNote', () => {
   it('says when a read moon owner is read next, in EVE time', () => {
-    expect(moonOwnerNote(row(), NOW, t)).toBe(
+    expect(moonOwnerNote(row(), NOW, t, 'UTC')).toBe(
       '1 refinery · Synced 2h ago · next read 08:35\u00a0UTC'
     );
   });
 
   it('gives a moon owner nothing was seen at yet its next read too', () => {
-    expect(moonOwnerNote(row({ nothingSeen: true, refineryCount: 0 }), NOW, t)).toBe(
+    expect(moonOwnerNote(row({ nothingSeen: true, refineryCount: 0 }), NOW, t, 'UTC')).toBe(
       'No mining or extraction seen yet · Synced 2h ago · next read 08:35\u00a0UTC'
     );
   });
 
   it('a moon owner that is never read again has no next read', () => {
     for (const status of ['disconnected', 'left', 'removed'] as const) {
-      expect(moonOwnerNote(row({ status }), NOW, t)).not.toMatch(/next read/);
+      expect(moonOwnerNote(row({ status }), NOW, t, 'UTC')).not.toMatch(/next read/);
     }
   });
 });

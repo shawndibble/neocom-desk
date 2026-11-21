@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTimeZone } from '@/lib/timeFormat';
 import { useTranslation } from 'react-i18next';
 import { Pill } from '@/components/ui/Pill';
 import {
@@ -51,6 +52,7 @@ export function MoonOwnersTable({
   /** Pop Sharing marks by moon owner corporation (#6226). */
   shareMarks?: Readonly<Record<string, PopShareMark>>;
 }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   // The phone list has no sort control (the "Stacked" design); most owed first, as the table's default.
@@ -67,7 +69,7 @@ export function MoonOwnersTable({
             {r.sameOwner && <Pill tone="accent">{t(k('yours'))}</Pill>}
             <PopShareIcon mark={shareMarks?.[String(r.corporationId)]} />
           </span>
-          <span className="block text-xs text-text-dim">{moonOwnerNote(r, now, t)}</span>
+          <span className="block text-xs text-text-dim">{moonOwnerNote(r, now, t, zone)}</span>
         </span>
       ),
       sortValue: (r) => name(r.corporationId),

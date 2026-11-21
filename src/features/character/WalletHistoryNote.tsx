@@ -1,5 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import type { WalletArchiveInfo } from '@/features/character/walletArchive';
+import { useTimeZone } from '@/lib/timeFormat';
+import { formatDateOnly } from '@/lib/timestamp';
 
 /**
  * The Journal's archive line: how far back the device holds history and any
@@ -7,9 +9,10 @@ import type { WalletArchiveInfo } from '@/features/character/walletArchive';
  * Filters. Renders nothing before the first stored row.
  */
 export function WalletHistoryNote({ info }: { info: WalletArchiveInfo | undefined }) {
-  const { t, i18n } = useTranslation();
-  // EVE days, written the way the journal's own dates are.
-  const day = (ms: number) => new Date(ms).toLocaleDateString(i18n.language, { timeZone: 'UTC' });
+  const { t } = useTranslation();
+  const timeZone = useTimeZone();
+  // On the Time format's clock, like the journal rows under it.
+  const day = (ms: number) => formatDateOnly(new Date(ms), timeZone);
   if (!info || (info.since === null && !info.unconfirmed)) return null;
   return (
     <div className="px-3 pt-2 text-[0.6875rem] text-text-dim">

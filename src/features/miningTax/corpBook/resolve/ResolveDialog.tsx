@@ -1,4 +1,6 @@
 import { useState, type ReactNode } from 'react';
+import { useTimeZone } from '@/lib/timeFormat';
+import { dateTimeAt } from '@/features/corp/moons/moonsFormat';
 import { formatList } from '@/lib/listFormat';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, Modal, Radio, TextArea } from '@/components/ui';
@@ -8,7 +10,6 @@ import { InlineError } from '@/components/ui/InlineError';
 import { Pill } from '@/components/ui/Pill';
 import { disputeHold } from '@/engine/corpTaxBook/disputes';
 import type { ClaimCheck, ClaimedTransfer } from '@/engine/corpTaxBook/overdue';
-import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { IskText } from '../../IskText';
@@ -415,6 +416,7 @@ function outcomeContext(kind: ResolveProblem['kind'], id: OutcomeId): string | u
 }
 
 function DoneView({ done, corp }: { done: Done; corp: string }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   if (done.kind === 'hidden') return <p className="text-sm">{t(k('result.hidden'), { corp })}</p>;
   return (
@@ -441,7 +443,7 @@ function DoneView({ done, corp }: { done: Done; corp: string }) {
                     <span className="font-semibold">
                       <IskText value={transfer.amount} />
                     </span>{' '}
-                    · {eveTimeLabel(Date.parse(transfer.at))}
+                    · {dateTimeAt(transfer.at, zone)}
                   </span>
                 )}
                 <Pill tone={CHECK_TONE[c.result]}>

@@ -1,4 +1,5 @@
 import { formatCount } from '@/lib/formatCount';
+import { useTimeZone } from '@/lib/timeFormat';
 import { useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
@@ -48,7 +49,15 @@ import { CloseAccountDialog } from './CloseAccountDialog';
 import { OldestUnpaid } from './AccountStatus';
 import { AccountLedger } from './AccountLedger';
 import { MarkNotTaxDialog, ReasonDialog, RecordPaymentDialog } from './BookDialogs';
-import { isk, iskOrDash, periodLabel, shortDate, shortDateTime, signedIsk } from './moonsFormat';
+import {
+  atDate,
+  isk,
+  iskOrDash,
+  periodLabel,
+  shortDate,
+  shortDateTime,
+  signedIsk,
+} from './moonsFormat';
 import type { AuditEntry } from '../taxBook/bookClient';
 import { extractionPath, refineryPath } from './moonsPaths';
 import { Crumb, StandingWord } from './moonsParts';
@@ -89,6 +98,7 @@ type PaymentRow = LedgerRow<Payment, Adjustment>;
  * No inner tabs; each section carries its count and pages its newest ten rows.
  */
 export function MinerDetail({ id }: { id: string }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const ctx = useBook();
   const { view, names, edit, canEdit, corporationId, data } = ctx;
@@ -526,10 +536,10 @@ export function MinerDetail({ id }: { id: string }) {
         const href = r.kind === 'payment' ? paymentWalletHref(r.payment.id) : null;
         return href ? (
           <Link to={href} className={entityLinkClassName(tapTargetClassName)}>
-            {shortDateTime(r.at)}
+            {shortDateTime(r.at, zone)}
           </Link>
         ) : (
-          shortDateTime(r.at)
+          shortDateTime(r.at, zone)
         );
       },
       sortValue: (r) => r.at,
@@ -735,7 +745,7 @@ export function MinerDetail({ id }: { id: string }) {
       </p>
       {closedAt && (
         <p role="status" className="text-xs text-text-dim">
-          {t('corpTaxBook.moons.miner.closedNote', { date: shortDate(closedAt.slice(0, 10)) })}
+          {t('corpTaxBook.moons.miner.closedNote', { date: atDate(closedAt, zone) })}
         </p>
       )}
       <EntityHeader
@@ -775,7 +785,7 @@ export function MinerDetail({ id }: { id: string }) {
               },
           {
             label: t('corpTaxBook.moons.miner.lastPayment'),
-            value: row.lastPaidAt ? shortDate(row.lastPaidAt.slice(0, 10)) : '—',
+            value: row.lastPaidAt ? atDate(row.lastPaidAt, zone) : '—',
           },
           { label: t('corpTaxBook.moons.chips.pending'), value: iskOrDash(row.pending) },
           // Nothing written off, nothing to say: the fact would be a row of zeros.
