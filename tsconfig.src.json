@@ -23,6 +23,7 @@
     "functions/src/corpTaxBookCheckpoint.ts",
     "functions/src/corpTaxBookReadModels.ts",
     "functions/src/corpTaxBookRunningAccounts.ts",
+    "functions/src/corpTaxBookSettleDays.ts",
     "functions/src/corpTaxBookKinds.ts",
     "functions/src/corpTaxBookDonationMatch.ts",
     "functions/src/corpTaxBookTransferMatch.ts",

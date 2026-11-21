@@ -59,7 +59,7 @@ export const NOTICE_RULE_BOUNDS = {
   cooldownDays: { min: 1, max: 90 },
   earlyAt: { min: 1, max: 1e12 },
 } as const;
-/** A running account's per-day tolerance, in percent; mirrors `DAY_SETTLE_TOLERANCE_PCT`. */
+/** A running account's per-day tolerance, in percent (`DAY_SETTLE_TOLERANCE_PCT` in `corpTaxBookSettleDays`). */
 export const DAY_TOLERANCE_PCT_DEFAULT = 0.5;
 
 /**
