@@ -61,7 +61,12 @@
 // key it used before it synced; `lib/useSyncedSetting.ts` explains why that
 // seed is written unstamped.
 //
-// sync.pageHubs (issue #6523): one map of page area -> Trade Hub, the pages a
+// sync.marketHubClosest (issue #6523): the Global hub set to Closest hub, the
+// Trade Hub nearest the active Character (features/market/closestHub.ts). Its
+// own boolean rather than a 'closest' value in sync.marketHub, so an older
+// build always reads a real hub there; that hub is also Closest's fallback.
+//
+// sync.pageHubs (issue #6523): one map of page area -> Trade Hub or 'closest', the pages a
 // pilot prices somewhere other than their Global hub (features/market/
 // pageHubs.ts). Account-wide. A blob over a fixed key set, against the
 // one-key-each rule above, for the reason sync.marketHubByCharacter is one:
@@ -379,6 +384,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.marketHub',
   'sync.marketHubByCharacter',
   'sync.pageHubs',
+  'sync.marketHubClosest',
   'sync.marketPricePercent',
   'sync.miningTaxDefaultOptOuts',
   'sync.miningTaxManualIgnoredTypeIds',

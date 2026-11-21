@@ -6,7 +6,7 @@
 import { rankMarkets } from '@/engine/stockTargets/markets';
 import { buildStockRows, summarizeStock, type StockSummary } from '@/engine/stockTargets/stockRows';
 import type { DeadlineSeverity } from '@/engine/character/severity';
-import { useMarketHub } from '@/features/market/hub';
+import { loadHubFor } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
 import { useStockLists } from './stockListsStore';
@@ -28,10 +28,10 @@ export interface StockBoardData {
 
 /** Null when the pilot stocks no market, which is also what keeps the card off the board. */
 export async function loadStockBoard(): Promise<StockBoardData | null> {
-  await Promise.all([useStockLists.getState().hydrate(), useMarketHub.getState().hydrate()]);
+  const [, hubId] = await Promise.all([useStockLists.getState().hydrate(), loadHubFor('market')]);
   const lists = useStockLists.getState().value;
   if (lists.length === 0) return null;
-  const hub = getTradeHub(useMarketHub.getState().value) ?? DEFAULT_TRADE_HUB;
+  const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   const typeIds = [...new Set(lists.flatMap((list) => list.items.map((item) => item.typeId)))];
   const [entries, prices] = await Promise.all([
     loadStockAlertEntries(lists),

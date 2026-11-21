@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { StructureFeesList } from '@/features/market/StructureFeesList';
 import { Fields, Panel } from '@/components/ui';
 import { useHydratedStore } from '@/lib/useHydratedStore';
-import { useDefaultMarketHub, useMarketHub } from '@/features/market/hub';
+import { useDefaultMarketHub, useGlobalClosest, useMarketHub } from '@/features/market/hub';
 import { usePageHubs } from '@/features/market/pageHubs';
 import { useHubByCharacter } from '@/features/market/characterHubs';
 import { TradeHubField } from '@/features/settings/TradeHubField';
@@ -26,7 +26,8 @@ export function MarketDefaultsPanel() {
     useDefaultMarketHub,
     useHubByCharacter,
     useMarketHub,
-    usePageHubs
+    usePageHubs,
+    useGlobalClosest
   );
   const collateralRatio = useCourierCollateralRatio((state) => state.value);
   const setCollateralRatio = useCourierCollateralRatio((state) => state.setValue);

@@ -19,7 +19,7 @@ import type { HubId } from './characterHubs';
  * The page areas a pilot can give a hub of their own, in the order Settings
  * lists them. An area joins once its pages read `useHubFor` (issue #6523 moves
  * them one slice at a time), so Settings never offers an entry that does
- * nothing; an entry for an area this build does not list is dropped on parse.
+ * nothing; an entry for an area this build does not list is kept, unread.
  */
 export const PAGE_HUB_AREAS = [
   'fittings',
@@ -28,6 +28,12 @@ export const PAGE_HUB_AREAS = [
   'industry',
   'lpStore',
   'corpSrp',
+  'market',
+  'appraisal',
+  'pi',
+  'mining',
+  'assets',
+  'overview',
 ] as const;
 
 export type PageHubArea = (typeof PAGE_HUB_AREAS)[number];
@@ -40,32 +46,53 @@ const AREA_NAME_KEYS = {
   industry: 'pageHubs.area.industry',
   lpStore: 'pageHubs.area.lpStore',
   corpSrp: 'pageHubs.area.corpSrp',
+  market: 'pageHubs.area.market',
+  appraisal: 'pageHubs.area.appraisal',
+  pi: 'pageHubs.area.pi',
+  mining: 'pageHubs.area.mining',
+  assets: 'pageHubs.area.assets',
+  overview: 'pageHubs.area.overview',
 } as const satisfies Record<PageHubArea, string>;
 
 export function pageHubAreaName(t: TFunction, area: PageHubArea): string {
   return t(AREA_NAME_KEYS[area]);
 }
-export type PageHubMap = Readonly<Partial<Record<PageHubArea, HubId>>>;
+/**
+ * The stored map, as stored: `area -> value`. Read an area through `ownChoice`,
+ * never by indexing, since a key or value this build does not know (a newer
+ * build's area, a future value such as Closest) is kept as it came.
+ */
+export type PageHubMap = Readonly<Record<string, string>>;
 
 export const PAGE_HUBS_SETTING_KEY = 'sync.pageHubs';
 
-function isPageHubArea(key: string): key is PageHubArea {
-  return (PAGE_HUB_AREAS as readonly string[]).includes(key);
-}
-
 /**
- * A stored map. Pulled from other devices, maybe newer builds, so an unknown
- * area or hub is dropped on its own: that page falls back to Global here.
+ * A stored map. Pulled from other devices, maybe newer builds, so an entry
+ * this build cannot use is **kept**, not dropped: the map is written back
+ * whole on the next edit, and dropping it would erase a newer build's entry
+ * on every device. Only a non-string value is discarded. `ownChoice` decides what
+ * an entry means here; one it cannot read leaves that page on Global.
  */
 export function parsePageHubs(raw: unknown): PageHubMap | null {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
-  const out: Partial<Record<PageHubArea, HubId>> = {};
-  for (const [area, hub] of Object.entries(raw)) {
-    if (!isPageHubArea(area)) continue;
-    if (typeof hub !== 'string' || !getTradeHub(hub as HubId)) continue;
-    out[area] = hub as HubId;
+  const out: Record<string, string> = {};
+  for (const [area, value] of Object.entries(raw)) {
+    if (typeof value === 'string') out[area] = value;
   }
   return out;
+}
+
+/** A page entry's value besides a hub: the hub nearest the active Character (`closestHub.ts`). */
+export const CLOSEST = 'closest';
+
+/** What a page (or the Global hub) is set to: a Trade Hub, or Closest. */
+export type HubChoice = HubId | typeof CLOSEST;
+
+/** `area`'s own entry, when it names a Trade Hub this build knows or Closest; else `undefined` (Global). */
+export function ownChoice(map: PageHubMap, area: PageHubArea): HubChoice | undefined {
+  const value = map[area];
+  if (value === CLOSEST) return CLOSEST;
+  return value !== undefined && getTradeHub(value as HubId) ? (value as HubId) : undefined;
 }
 
 export const usePageHubs = createSyncedSetting<PageHubMap>({
@@ -74,11 +101,7 @@ export const usePageHubs = createSyncedSetting<PageHubMap>({
   parse: parsePageHubs,
 });
 
-export function resolvePageHub(map: PageHubMap, area: PageHubArea, globalHub: HubId): HubId {
-  return map[area] ?? globalHub;
-}
-
-export function setPageHub(map: PageHubMap, area: PageHubArea, hub: HubId): PageHubMap {
+export function setPageHub(map: PageHubMap, area: PageHubArea, hub: HubChoice): PageHubMap {
   return { ...map, [area]: hub };
 }
 
@@ -93,6 +116,6 @@ export function dropPageHub(map: PageHubMap, area: PageHubArea): PageHubMap {
  * `area`'s own entry right now, `undefined` on Global (or before page hubs
  * are read): for non-React code that only differs from today with an entry.
  */
-export function pageHubEntry(area: PageHubArea): HubId | undefined {
-  return usePageHubs.getState().value[area];
+export function pageHubEntry(area: PageHubArea): HubChoice | undefined {
+  return ownChoice(usePageHubs.getState().value, area);
 }

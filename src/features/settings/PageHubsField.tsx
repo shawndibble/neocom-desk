@@ -21,47 +21,53 @@ import {
   Toast,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { useMarketHub } from '@/features/market/hub';
+import { useGlobalClosest, useMarketHub } from '@/features/market/hub';
 import {
+  CLOSEST,
   dropPageHub,
+  ownChoice,
   pageHubAreaName,
   PAGE_HUB_AREAS,
   setPageHub,
   usePageHubs,
+  type HubChoice,
   type PageHubArea,
   type PageHubMap,
 } from '@/features/market/pageHubs';
-import type { HubId } from '@/features/market/characterHubs';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { HubSelect } from './TradeHubField';
 
-type Removed = { area: PageHubArea; hub: HubId };
+type Removed = { area: PageHubArea; hub: HubChoice };
 
 function write(edit: (map: PageHubMap) => PageHubMap) {
   const store = usePageHubs.getState();
   return store.setValue(edit(store.value));
 }
 
-/** Reads settled stores; the caller waits for `usePageHubs` and `useMarketHub` to hydrate. */
+/** Reads settled stores; the caller waits for `usePageHubs`, `useMarketHub` and `useGlobalClosest` to hydrate. */
 export function PageHubsField() {
   const { t } = useTranslation();
   const map = usePageHubs((state) => state.value);
   const globalHub = useMarketHub((state) => state.value);
+  // A new entry starts at what Global is set to, so adding re-prices nothing.
+  const globalChoice: HubChoice = useGlobalClosest((state) => state.value) ? CLOSEST : globalHub;
   const [removed, setRemoved] = useState<Removed | null>(null);
   const removeRefs = useRef(new Map<PageHubArea, HTMLButtonElement>());
   const addRef = useRef<HTMLButtonElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
-  const set = PAGE_HUB_AREAS.filter((area) => map[area]);
-  const unset = PAGE_HUB_AREAS.filter((area) => !map[area]);
+  // Only areas with an entry this build reads are listed, so `own(area)` is set for each.
+  const own = (area: PageHubArea) => ownChoice(map, area)!;
+  const set = PAGE_HUB_AREAS.filter((area) => ownChoice(map, area));
+  const unset = PAGE_HUB_AREAS.filter((area) => !ownChoice(map, area));
   const name = (area: PageHubArea) => pageHubAreaName(t, area);
-  const add = (area: PageHubArea) => void write((m) => setPageHub(m, area, globalHub));
+  const add = (area: PageHubArea) => void write((m) => setPageHub(m, area, globalChoice));
 
   function remove(area: PageHubArea, index: number) {
     const near = [set[index + 1], set[index - 1]].map(
       (key) => () => (key === undefined ? null : (removeRefs.current.get(key) ?? null))
     );
     focusAfterCommit(...near, () => addRef.current);
-    setRemoved({ area, hub: map[area]! });
+    setRemoved({ area, hub: own(area) });
     void write((m) => dropPageHub(m, area));
   }
 
@@ -78,9 +84,10 @@ export function PageHubsField() {
                 <span className="min-w-0 flex-1 truncate text-sm">{name(area)}</span>
                 <div className="flex w-full items-center gap-2 sm:w-80">
                   <div className="min-w-0 flex-1 [&_button]:w-full">
-                    <HubSelect
+                    <HubSelect<HubChoice>
                       size="sm"
-                      value={map[area]!}
+                      closest
+                      value={own(area)}
                       label={t('settings.pageHubFor', { page: name(area) })}
                       onChange={(hub) => void write((m) => setPageHub(m, area, hub))}
                     />

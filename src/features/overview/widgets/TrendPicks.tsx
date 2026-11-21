@@ -4,7 +4,7 @@
  * draws (a dialog, since the choice is a list of up to a few hundred names).
  *
  * Neither is stored until it differs from the default: no hubs picked is the
- * pilot's Market hub, no items picked is the Quickbar.
+ * Overview page hub, no items picked is the Quickbar.
  */
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -26,7 +26,7 @@ import {
   tappableRowClassName,
 } from '@/components/ui/controlStyles';
 import { useQuickbar } from '@/features/market/useQuickbar';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
 import { TRADE_HUBS } from '@/market/hubs';
 import { planTrendSeries, TREND_MAX_SERIES } from '@/engine/market/trendSeries';
 import { useGlobalMarketOverrides } from '@/features/market/orderBookView';
@@ -41,9 +41,9 @@ import {
   type TrendSourceItem,
 } from './trendCatalogue';
 
-/** The hubs a widget prices at: its own picks, else the pilot's Market hub. */
+/** The hubs a widget prices at: its own picks, else the Overview page hub. */
 function useTrendHubs(widget: Widget): { pilot: string; current: string[] } {
-  const pilot = useMarketHub((state) => state.value);
+  const pilot = useHubFor('overview').hubId;
   return { pilot, current: widget.trendHubs ?? [pilot] };
 }
 

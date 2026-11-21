@@ -5,7 +5,7 @@ import '@/i18n';
 import { db } from '@/db';
 import { useHubByCharacter } from '@/features/market/characterHubs';
 import { useDefaultMarketHub, useMarketHub } from '@/features/market/hub';
-import { usePageHubs } from '@/features/market/pageHubs';
+import { PAGE_HUB_AREAS, usePageHubs } from '@/features/market/pageHubs';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { PageHubsField } from './PageHubsField';
 
@@ -43,13 +43,14 @@ describe('PageHubsField', () => {
   });
 
   it('with one page left to add, a plain button names it', async () => {
-    await usePageHubs.getState().setValue({
-      fittings: 'jita',
-      skills: 'jita',
-      industry: 'jita',
-      lpStore: 'jita',
-      corpSrp: 'jita',
-    });
+    // Every page but Contracts has its own hub.
+    await usePageHubs
+      .getState()
+      .setValue(
+        Object.fromEntries(
+          PAGE_HUB_AREAS.filter((area) => area !== 'contracts').map((area) => [area, 'jita'])
+        )
+      );
     render(<PageHubsField />);
     await userEvent.click(screen.getByRole('button', { name: 'Add Contracts hub' }));
     await waitFor(() => expect(usePageHubs.getState().value.contracts).toBe('amarr'));

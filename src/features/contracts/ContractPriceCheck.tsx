@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { HubMenu } from '@/features/market/HubMenu';
+import { useHubFor } from '@/features/market/hub';
 import type { PageHubArea } from '@/features/market/pageHubs';
 import type { TradeHub } from '@/market/hubs';
 
@@ -137,8 +138,13 @@ export function ContractPriceCheck({
  */
 function HeadingWithHubMenu({ heading, menu }: { heading: string; menu: PriceCheckHubMenu }) {
   const { t } = useTranslation();
+  const { closestFound } = useHubFor(menu.area);
   const at = heading.indexOf(menu.hub.stationLabel);
   if (at < 0) return <Eyebrow>{heading}</Eyebrow>;
+  // Closest says so, with what it found (issue #6523).
+  const shown = closestFound
+    ? t('pageHubs.closestFound', { hub: menu.hub.stationLabel })
+    : menu.hub.stationLabel;
   return (
     <p className="text-[0.6875rem] text-text-dim">
       <span className={eyebrowClassName}>{heading.slice(0, at)}</span>
@@ -149,9 +155,9 @@ function HeadingWithHubMenu({ heading, menu }: { heading: string; menu: PriceChe
           popoverValueClassName,
           'inline-flex min-h-6 items-baseline touch:min-h-9'
         )}
-        triggerLabel={t('contractDetail.priceCheckHubMenu', { hub: menu.hub.stationLabel })}
+        triggerLabel={t('contractDetail.priceCheckHubMenu', { hub: shown })}
       >
-        {menu.hub.stationLabel}
+        {shown}
       </HubMenu>
       {heading.slice(at + menu.hub.stationLabel.length)}
     </p>

@@ -19,8 +19,8 @@ import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { EMPTY_RIG_FIT, FACILITY_PRESETS, resolveRigFit } from '@/engine/industry/types';
 import type { FacilityKind, IndustryActivity } from '@/engine/industry/types';
-import { useMarketHub } from '@/features/market/hub';
-import { pageHubEntry, usePageHubs } from '@/features/market/pageHubs';
+import { hubNowFor, loadHubFor } from '@/features/market/hub';
+import { pageHubEntry } from '@/features/market/pageHubs';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import {
   DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
@@ -114,7 +114,8 @@ export function mostRecentlyUpdatedPlan(
  * for them) awaits `loadNewPlanHubInputs()` first.
  */
 export function newPlanHubId(defaultsFrom?: BuildPlanRecord | null): TradeHub['id'] {
-  return pageHubEntry('industry') ?? defaultsFrom?.hubId ?? useMarketHub.getState().value;
+  if (pageHubEntry('industry') === undefined && defaultsFrom) return defaultsFrom.hubId;
+  return hubNowFor('industry');
 }
 
 /** `newPlanHubId` as the hub itself. */
@@ -124,7 +125,7 @@ export function newPlanHub(defaultsFrom?: BuildPlanRecord | null): TradeHub {
 
 /** Reads what `newPlanHubId` depends on, for a caller that can run before any Industry page mounts. */
 export async function loadNewPlanHubInputs(): Promise<void> {
-  await Promise.all([usePageHubs.getState().hydrate(), useMarketHub.getState().hydrate()]);
+  await loadHubFor('industry');
 }
 
 /** Fields a caller may set on the new plan beyond what the defaults decide. */

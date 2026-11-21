@@ -19,7 +19,7 @@ import { loadAllCharactersAssets } from '@/features/assets/assets';
 import { loadStationName } from '@/features/character/stations';
 import { loadStructureNameNoRoster } from '@/features/character/structures';
 import { useAppraisalOwnedPref } from '@/features/market/appraisalOwnedPref';
-import { useMarketHub } from '@/features/market/hub';
+import { loadHubFor } from '@/features/market/hub';
 import { TRADE_HUBS, getTradeHub } from '@/market/hubs';
 import {
   exportFitting,
@@ -69,15 +69,14 @@ export function useFittingExport(fitting: Fitting, cloneImplants: readonly numbe
 
   /**
    * The multibuy list less what every Character holds at the Appraisal's
-   * "Minus owned" station (its saved pick, else the Market's hub).
+   * "Minus owned" station (its saved pick, else the Appraisal page hub).
    */
   async function copyMultibuyMinusOwned() {
     try {
       const ownedPref = useAppraisalOwnedPref.getState();
-      const marketHub = useMarketHub.getState();
-      await Promise.all([ownedPref.hydrate(), marketHub.hydrate()]);
-      const marketHubStation = getTradeHub(useMarketHub.getState().value)?.stationId;
-      const stationId = useAppraisalOwnedPref.getState().value.stationId ?? marketHubStation;
+      const [, appraisalHubId] = await Promise.all([ownedPref.hydrate(), loadHubFor('appraisal')]);
+      const appraisalHubStation = getTradeHub(appraisalHubId)?.stationId;
+      const stationId = useAppraisalOwnedPref.getState().value.stationId ?? appraisalHubStation;
       if (stationId === undefined) {
         setNotice(t('fittings.export.copyFailed'));
         return;

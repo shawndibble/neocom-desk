@@ -1233,7 +1233,9 @@ describe('PlanetaryIndustry', () => {
     await renderIndustryRoutes();
     await colonyPanelFor(/Jita IV/);
     const strip = screen.getByTestId('pi-header-strip');
-    expect(within(strip).getByRole('combobox', { name: 'Where do you sell?' })).toBeInTheDocument();
+    expect(
+      within(strip).getByRole('button', { name: /, Where do you sell\?$/ })
+    ).toBeInTheDocument();
     // Home, the colony count and the route wait behind the strip's "i".
     await userEvent.click(within(strip).getByRole('button', { name: 'Home, colonies and route' }));
     expect(
@@ -1244,8 +1246,8 @@ describe('PlanetaryIndustry', () => {
   it('lets the Sell at picker grow past its minimum, so "My corp buyback" is not cut off', async () => {
     await renderIndustryRoutes();
     await colonyPanelFor(/Jita IV/);
-    const picker = within(screen.getByTestId('pi-header-strip')).getByRole('combobox', {
-      name: 'Where do you sell?',
+    const picker = within(screen.getByTestId('pi-header-strip')).getByRole('button', {
+      name: /, Where do you sell\?$/,
     });
     expect(picker).toHaveClass('min-w-40', 'w-auto');
     expect(picker).not.toHaveClass('w-40');

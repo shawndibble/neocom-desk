@@ -374,10 +374,11 @@ const NO_SURVEY: SurveyWidgetData = {
 /**
  * The survey this device is tracking, summarised: what is left of each ore and when the field runs out. A survey is a Firestore
  * share link and its prices are a market read, at the Survey page's own price
- * hub (`useSurveyPriceHub`), so all of it is behind `import()`. A failed read throws, which keeps the last good figure on show.
+ * hub (the Mining page hub), so all of it is behind `import()`. A failed read throws, which keeps the last good figure on show.
  */
 export async function loadSurveyWidget(): Promise<SurveyWidgetData> {
-  const { useCurrentSurveyId, useSurveyPriceHub } = await import('@/features/survey/surveyPref');
+  const { useCurrentSurveyId, migrateSurveyPriceHub } =
+    await import('@/features/survey/surveyPref');
   await useCurrentSurveyId.getState().hydrate();
   const id = useCurrentSurveyId.getState().value;
   if (id === null) return NO_SURVEY;
@@ -400,8 +401,9 @@ export async function loadSurveyWidget(): Promise<SurveyWidgetData> {
     import('@/engine/survey/pricing'),
     import('@/sde/loadSde'),
   ]);
-  await useSurveyPriceHub.getState().hydrate();
-  const hub = getTradeHub(useSurveyPriceHub.getState().value) ?? DEFAULT_TRADE_HUB;
+  await migrateSurveyPriceHub().catch(() => undefined);
+  const { loadHubFor } = await import('@/features/market/hub');
+  const hub = getTradeHub(await loadHubFor('mining')) ?? DEFAULT_TRADE_HUB;
   const scans = countedScans(survey.scans, survey.ignored);
   const { prices } = await loadOrePrices(
     scans.flatMap((s) => s.rocks.map((r) => r.ore)),

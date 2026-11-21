@@ -16,7 +16,9 @@
  * "invalid".
  */
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
+import { MARKET_TABS } from '@/app/pageTabs';
+import { tabPath } from '@/lib/pageTabs';
 import { useRememberedUrlParams, useUrlParam, type UrlParamValues } from '@/lib/useUrlState';
 import {
   enumParam,
@@ -25,7 +27,8 @@ import {
   type UrlParamCodec,
 } from '@/lib/urlState';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
-import { useMarketBrowserHub } from '@/features/market/browserHub';
+import { useDeviceMarketHubMigrated } from '@/features/market/browserHub';
+import { setPageHubEntry, useHubFor } from '@/features/market/hub';
 import { useLocationMode, type LocationMode } from '@/features/market/locationMode';
 import {
   filterMarketTree,
@@ -135,6 +138,21 @@ export interface MarketBrowserController {
   setCompareRegionIds: (next: readonly number[]) => void;
 }
 
+/**
+ * The last hub the Market put in the URL or adopted from it, for the session
+ * (not per mount: Back to a URL the page wrote must not adopt it either). A
+ * link's hub is adopted once, when it is new: the adopt check re-runs whenever
+ * the stored hub differs from the linked one, so without this a "back to
+ * Global" or a Global change under a URL the page wrote would create a Market
+ * entry the pilot never asked for.
+ */
+const knownLinkedHubRef: { current: string | null } = { current: null };
+
+/** Forgets the hub the Market last linked (tests). */
+export function resetKnownLinkedHub(): void {
+  knownLinkedHubRef.current = null;
+}
+
 export function useMarketBrowser({
   groups,
   types,
@@ -143,9 +161,13 @@ export function useMarketBrowser({
 }: UseMarketBrowserArgs): MarketBrowserController {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const hubId = useMarketBrowserHub((state) => state.value);
-  const hubHydrated = useHydratedStore(useMarketBrowserHub);
-  const setHubId = useMarketBrowserHub((state) => state.setValue);
+  // The Market page hub, once this device's old Browser hub is folded into it.
+  const migrated = useDeviceMarketHubMigrated();
+  const { hubId, hydrated: marketHubHydrated } = useHubFor('market');
+  const hubHydrated = marketHubHydrated && migrated;
+  // The Appraisal's `?hub=` (a Shared Appraisal's "Open Neocom Desk") is that
+  // tab's override for the visit, never the Market's hub.
+  const onAppraisal = useLocation().pathname.startsWith(tabPath(MARKET_TABS, 'appraisal'));
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
 
   const locationModeValue = useLocationMode((state) => state.value);
@@ -259,13 +281,14 @@ export function useMarketBrowser({
   }, [groups, linkedGroupId, groupsById]);
 
   /**
-   * The device's Trade Hub and Location Mode as the stored default behind the
+   * The Market page hub and the device's Location Mode as the stored default behind the
    * URL's `hub`/`region`. A linked location that names nothing real (a
    * region the catalogue lacks, a hub not in `TRADE_HUBS`) reads as absent.
    *
    * `adoptLinked` is this page's one exception to decision `20260922-221531`
    * (see decision `20260926-201312`): a valid linked hub/region is copied
-   * into the device's own setting. `buildMarketParams` only ever writes one
+   * into the stored setting: the hub as the Market page's own entry
+   * (`setPageHubEntry`), so a link never moves the pages on Global. `buildMarketParams` only ever writes one
    * of `hub`/`region`, so a linked hub is dropped from the query string the
    * moment the mode toggles to Region — without the copy, toggling back to
    * Trade Hub would fall back to whatever hub was stored before the link was
@@ -278,7 +301,7 @@ export function useMarketBrowser({
         region: locationModeValue.mode === 'region' ? locationModeValue.regionId : null,
       } satisfies LocationParams,
       hydrated: hubHydrated && locationModeHydrated,
-      adoptLinked: true,
+      adoptLinked: !onAppraisal,
       accepts: (key: keyof LocationParams, value: unknown) => {
         if (value === null) return false;
         // A hub id is a small static set (`TRADE_HUBS`), so unlike the region
@@ -287,7 +310,10 @@ export function useMarketBrowser({
         return isMarketRegionChoice(value as RegionChoice, marketRegions);
       },
       remember: (patch: Partial<LocationParams>) => {
-        if (patch.hub) void setHubId(patch.hub as TradeHub['id']);
+        if (patch.hub && patch.hub !== knownLinkedHubRef.current) {
+          knownLinkedHubRef.current = patch.hub;
+          void setPageHubEntry('market', patch.hub as TradeHub['id']);
+        }
         if (patch.region !== undefined && patch.region !== null) {
           void setLocationModeValue({ mode: 'region', regionId: patch.region });
         }
@@ -299,8 +325,8 @@ export function useMarketBrowser({
       hubHydrated,
       locationModeHydrated,
       marketRegions,
-      setHubId,
       setLocationModeValue,
+      onAppraisal,
     ]
   );
   const [linkedLocation, , isLinked] = useRememberedUrlParams(LOCATION_PARAMS, rememberedLocation);
@@ -430,8 +456,10 @@ export function useMarketBrowser({
     );
   }
 
+  /** After the header's `HubField` writes the hub: points the URL at it, since a linked hub outranks the stored one. */
   function handleHubChange(id: TradeHub['id']) {
-    void setHubId(id);
+    // The page's own write: never adopted back as a link.
+    knownLinkedHubRef.current = id;
     navigateTo(selectedTypeId, { mode: 'hub', hubId: id });
   }
 

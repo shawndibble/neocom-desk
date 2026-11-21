@@ -144,7 +144,7 @@ function GoalPlanner({
 
   // Where the plan sells, and what it may buy there, are the shared PI
   // settings: the page strip and the settings form edit the same record.
-  const { hub, buybackPct, buyTiers } = useSellHub();
+  const { hub, hydrated: hubHydrated, buybackPct, buyTiers } = useSellHub();
   const buysAnything = buyTiers.length > 0;
   const buysP1 = buyTiers.includes(1);
 
@@ -154,7 +154,8 @@ function GoalPlanner({
     () => (pi ? loadGoalPlannerPrices(hub, pi) : Promise.reject(new Error('no snapshot'))),
     [pi, hub]
   );
-  const prices: PlanPrices | null = useKeyedLoad(pi ? hub.id : null, loadPrices).data ?? null;
+  const prices: PlanPrices | null =
+    useKeyedLoad(pi && hubHydrated ? hub.id : null, loadPrices).data ?? null;
 
   // --- Customs: edits layered over the snapshot, written through to the synced setting ---
   const [customsEdits, setCustomsEdits] = useState<CustomsOverrides | null>(null);

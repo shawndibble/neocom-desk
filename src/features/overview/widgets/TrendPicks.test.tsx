@@ -23,7 +23,7 @@ vi.mock('@/features/market/useQuickbar', () => ({
   }),
 }));
 vi.mock('@/features/market/hub', () => ({
-  useMarketHub: (select: (s: { value: string }) => unknown) => select({ value: 'jita' }),
+  useHubFor: () => ({ hubId: 'jita', scope: 'global', hydrated: true }),
 }));
 vi.mock('@/features/market/orderBookView', () => ({
   useGlobalMarketOverrides: () => new Map([[44992, { regionId: 1, regionName: 'Global' }]]),
