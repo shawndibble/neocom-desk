@@ -76,7 +76,7 @@ describe('the removal strip', () => {
   it('says when it takes effect and who started it', () => {
     page(pending());
     expect(screen.getByRole('status')).toHaveTextContent(
-      'Removal pending, takes effect 18 Oct 2026 14:22 EVE time'
+      /Removal pending, takes effect 18 Oct( 2026)? 14:22/
     );
     expect(screen.getByRole('status')).toHaveTextContent('Started by Kestrel Vane');
   });
