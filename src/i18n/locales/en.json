@@ -19206,6 +19206,7 @@
           "director-approval": "Over the book's approval limit: a Director must do this.",
           "divisions-changed": "Another officer changed the divisions since you opened the settings. Close and reopen them to see the current divisions, then try again.",
           "already-resolved": "Another officer already answered this.",
+          "locked": "That falls before the lock date: earlier history is read-only. Use a date from the lock date on, or make the change dated today.",
           "not-priced": "That ore isn't billed yet, so there is no tax to waive. Try again once it is.",
           "nothing-to-waive": "The disputed ore carries no tax to waive.",
           "not-an-accountant": "That Character is not an Accountant. In EVE's login, pick a Character that holds the Accountant role in the corporation that owns the moons.",
@@ -19546,6 +19547,8 @@
           "raw": "Raw"
         },
         "startDate": "Start date (EVE time)",
+        "startBeforeLock": "The start date can't be moved before {{date}}: earlier history is locked.",
+        "startLocked": "The start date ({{date}}) is before {{lock}}, in locked history, so it is locked.",
         "grace": "Grace after day end (hours)",
         "divisions": "Wallet divisions donations are read from",
         "division": "Division {{n}}",

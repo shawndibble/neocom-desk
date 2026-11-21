@@ -48,6 +48,7 @@ import { useCorpAccess } from '../useCorpAccess';
 import { loadCorporationDivisions } from '../wallet';
 import { divisionNamesFor } from '../taxBook/pushDivisionNames';
 import { utcDay } from '@/engine/localDay';
+import { lockDateFor } from '../../../../functions/src/corpTaxBookCheckpoint';
 import {
   DEFAULT_NOTICE_RULES,
   parseNoticeRules,
@@ -317,7 +318,19 @@ export function BookSettingsDialog({
 
   const rateIsDuplicate =
     rateReady && pending.some((p) => pendingKey(p.rate) === pendingKey(formRate()));
-  const problem = pendingProblems.size > 0 ? 'pending' : rateFilled && !rateReady ? 'form' : null;
+  // History before the lock date is read-only (decision 20261120-235011, "a lock date"): the start
+  // date cannot move from or to a day before it, the same rule the server applies.
+  const lockDate = lockDateFor(today);
+  const startIsLocked = settings.startDate < lockDate;
+  const startMovedBeforeLock = startDate !== settings.startDate && startDate < lockDate;
+  const problem =
+    pendingProblems.size > 0
+      ? 'pending'
+      : rateFilled && !rateReady
+        ? 'form'
+        : startMovedBeforeLock
+          ? 'start'
+          : null;
 
   const addPending = () => {
     const rate = formRate();
@@ -471,6 +484,10 @@ export function BookSettingsDialog({
           ) : problem === 'pending' ? (
             <span id={rateHintId} className="text-sm text-danger">
               {t('corpTaxBook.moons.settings.pendingBlocked')}
+            </span>
+          ) : problem === 'start' ? (
+            <span id={rateHintId} className="text-sm text-danger">
+              {t('corpTaxBook.moons.settings.startBeforeLock', { date: displayDate(lockDate) })}
             </span>
           ) : problem === 'form' || rateIsDuplicate ? (
             <span id={rateHintId} className="text-sm text-text-dim">
@@ -789,7 +806,9 @@ export function BookSettingsDialog({
                     <TextInput
                       type="date"
                       id={`${fieldId}-start`}
+                      min={lockDate}
                       max={today}
+                      disabled={startIsLocked}
                       value={startDate}
                       onChange={(e) => e.target.value && setStartDate(e.target.value)}
                     />
@@ -803,6 +822,18 @@ export function BookSettingsDialog({
                     content={t('corpTaxBook.moons.settings.startHint')}
                   />
                 </span>
+                {verdict.isDirector && (startIsLocked || startMovedBeforeLock) && (
+                  <span className="mt-1 block text-xs text-text-dim">
+                    {startIsLocked
+                      ? t('corpTaxBook.moons.settings.startLocked', {
+                          date: displayDate(settings.startDate),
+                          lock: displayDate(lockDate),
+                        })
+                      : t('corpTaxBook.moons.settings.startBeforeLock', {
+                          date: displayDate(lockDate),
+                        })}
+                  </span>
+                )}
               </Field>
               <Field label={t('corpTaxBook.moons.settings.grace')} htmlFor={`${fieldId}-grace`}>
                 <TextInput
