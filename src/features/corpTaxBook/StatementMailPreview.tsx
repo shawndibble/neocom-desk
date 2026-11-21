@@ -46,6 +46,8 @@ export function StatementMailPreview({ to, subject, body, summarised }: MailPrev
 export interface MailEdit {
   subject: string;
   body: string;
+  /** The standard mail's body the edit was made from: when that changes, the edit is stale. */
+  basis: string;
 }
 
 /**
@@ -57,6 +59,7 @@ export function EditableMailPreview({
   mail,
   edited,
   stale,
+  basis,
   onSave,
   onReset,
   disabled,
@@ -66,6 +69,11 @@ export function EditableMailPreview({
   edited: boolean;
   /** The standard mail changed since the edit was saved (a payment, a new day). */
   stale?: boolean;
+  /**
+   * The standard mail a new draft starts from: the edit's own basis, else today's standard body.
+   * Kept as the draft opened, so figures that change while the officer types are still flagged.
+   */
+  basis: string;
   onSave: (edit: MailEdit) => void;
   onReset: () => void;
   disabled?: boolean;
@@ -87,7 +95,7 @@ export function EditableMailPreview({
         <div className="flex flex-wrap gap-2">
           <Button
             size="sm"
-            onClick={() => setDraft({ subject: mail.subject, body: mail.body })}
+            onClick={() => setDraft({ subject: mail.subject, body: mail.body, basis })}
             disabled={disabled}
           >
             {t('corpTaxBook.mailQueue.preview.edit')}

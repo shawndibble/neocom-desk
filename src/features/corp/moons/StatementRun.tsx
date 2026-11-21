@@ -116,7 +116,7 @@ export function StatementRun() {
    * The officer's own wording for a mail, by preview key: what the queue sends instead. `basis`
    * is the standard body it was edited from, so a later change to the figures is flagged.
    */
-  const [edits, setEdits] = useState<ReadonlyMap<string, MailEdit & { basis: string }>>(new Map());
+  const [edits, setEdits] = useState<ReadonlyMap<string, MailEdit>>(new Map());
 
   const notices = useMemo(
     () => plannedNotices(view, settings.noticeRules),
@@ -260,6 +260,25 @@ export function StatementRun() {
     const sent = { queued: 0, skipped: 0, missingLink: 0 };
     /** Each notice issued this run: its preview key, then the key of the Statement it became. */
     const issued: { from: string; to: string }[] = [];
+    /** Statements the queue refused for want of a verify link: they come back unmailed. */
+    const notQueued: string[] = [];
+    /**
+     * The edits still wanted after this send: an issued notice's edit follows its Statement, and
+     * after a send that finished only the Statements left unmailed (`keep`) keep theirs.
+     */
+    const carryEdits = (keep?: readonly string[]) =>
+      setEdits((current) => {
+        const next = new Map(current);
+        for (const { from, to } of issued) {
+          const edit = next.get(from);
+          if (!edit) continue;
+          next.delete(from);
+          next.set(to, edit);
+        }
+        if (!keep) return next;
+        const wanted = new Set(keep.map((id) => `statement:${id}`));
+        return new Map([...next].filter(([key]) => wanted.has(key)));
+      });
     const queueTargets = async (targets: ReturnType<typeof mailTarget>[]) => {
       if (targets.length === 0) return;
       // Inside `try`: a chunk that will not load is an error shown, not a run stuck busy.
@@ -274,6 +293,7 @@ export function StatementRun() {
       sent.queued += queued.queued;
       sent.skipped += queued.skipped;
       sent.missingLink += queued.missingLink.length;
+      notQueued.push(...queued.missingLink);
     };
     try {
       // Earlier Statements whose mail never went out are the oldest; they go first.
@@ -316,20 +336,11 @@ export function StatementRun() {
       }
       await queueTargets(noticeTargets);
       setResult(sent);
-      setEdits(new Map());
+      carryEdits(notQueued);
       setStep('done');
     } catch (e) {
       // A notice issued before the failure comes back as an unmailed Statement: its edit follows.
-      setEdits((current) => {
-        const next = new Map(current);
-        for (const { from, to } of issued) {
-          const edit = next.get(from);
-          if (!edit) continue;
-          next.delete(from);
-          next.set(to, edit);
-        }
-        return next;
-      });
+      carryEdits();
       setError(editErrorMessage(e));
     } finally {
       reload();
@@ -347,15 +358,8 @@ export function StatementRun() {
       mail={mail}
       edited={edits.has(previewItem.key)}
       stale={isStale(previewItem)}
-      onSave={(edit) =>
-        corporationName !== null &&
-        setEdits((current) =>
-          new Map(current).set(previewItem.key, {
-            ...edit,
-            basis: standardMail(previewItem, corporationName).body,
-          })
-        )
-      }
+      basis={edits.get(previewItem.key)?.basis ?? mail.body}
+      onSave={(edit) => setEdits((current) => new Map(current).set(previewItem.key, edit))}
       onReset={() =>
         setEdits((current) => {
           const next = new Map(current);
