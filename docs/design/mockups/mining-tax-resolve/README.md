@@ -81,4 +81,4 @@ The book pays a Miner's oldest days first and can't target a moon or a day, so t
 - Auto-credit only on exactly one match (sender, exact amount, not already credited); two candidates go to an officer side by side.
 - "Too old to check" is never "not found". The sync keeps only donations it credits or flags, so wallet history before the book started (or past ESI's window) can't be searched; keeping every donation the sync sees would shrink that gap.
 - A person's own wallet is checked on their own device: personal wallet tokens never leave it (CLAUDE.md).
-- Open question: an open dispute does not pause the 14-day Conflict clock today. The Overdue flow's pause budget (14 days per Statement) is the precedent to weigh.
+- Open question: an open dispute does not pause the 14-day Conflict clock today. The Overdue flow's pause budget (14 days per Late notice) is the precedent to weigh.

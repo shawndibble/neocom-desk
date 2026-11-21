@@ -540,6 +540,25 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // Late notices (decision 20261120-235011): officers read every one, a Miner their own. The
+      // `statements` docs above are their legacy mirror, until it goes.
+      match /lateNotices/{noticeId} {
+        allow get, list: if isOfficer() || isOnOwnLine();
+        allow write: if false;
+      }
+
+      // A Late notice's verify link: editors only, never the Miner or a view-only officer.
+      match /lateNoticeLinks/{noticeId} {
+        allow get, list: if isOfficer() && get(officerPath()).data.canEdit == true;
+        allow write: if false;
+      }
+
+      // A Running account's closed-through checkpoint: officers read every one, a Miner their own.
+      match /accountCheckpoints/{minerId} {
+        allow get, list: if isOfficer() || isOnOwnLine();
+        allow write: if false;
+      }
+
       match /dismissals/{dismissalId} {
         allow get, list: if isOfficer() || isOnOwnLine();
         allow write: if false;

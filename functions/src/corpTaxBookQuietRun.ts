@@ -56,7 +56,9 @@ export const QUIET_MAX_AGE_MS = 24 * 3_600_000;
  * What `readBookStateAdmin` reads that a quiet run does not. Not `meta`: every
  * run writes its status there, so its stamp always moves; a quiet run reads the
  * one meta doc that counts (`paid`) and compares it instead, as it does the
- * extractions.
+ * extractions. `lateNotices` is not listed: every notice written there is mirrored to
+ * `statements` (corpTaxBookLegacyMirror.ts), whose stamp moves with it, and a book that never
+ * wrote one has no stamp for it. Swap it in when the mirror goes.
  */
 export const QUIET_COLLECTIONS = [MINERS, STATEMENTS, PAYMENTS, DISMISSALS, WRITE_OFFS] as const;
 

@@ -26,22 +26,22 @@ D-numbers are the decision numbers in epic #4055.
   verify page.
 - **Own lines.** Anyone signed in with EVE SSO reads their own lines in any
   corp's book (ADR 0023).
-- **Verify link (D27).** Every Statement mail carries a verify link to a
-  read-only, no-login page (ADR 0023). Its "Stop reminders" toggle keeps the monthly Statement
-  but allows officers only one manual reminder per Statement.
+- **Verify link (D27).** Every Late notice mail carries a verify link to a
+  read-only, no-login page (ADR 0023). Its "Stop reminders" toggle keeps the
+  Late notices but allows officers only one manual reminder per notice.
 - **Leavers** keep their debt, flagged "Left corp, owes X", still mailed, with
   a one-click logged write-off. They keep read access to their own lines; the
   Payee is archived.
-- **Guest close-account.** A final Statement, then mail stops. Credit is
+- **Guest close-account.** A final Late notice, then mail stops. Credit is
   refunded by default; forfeited only with the guest's recorded consent or
   after 90 days with no reply.
 - **Automatic credit (D5/D15).** Every `player_donation` into the selected
   division(s) (division 1 by default) from any character of a Miner credits
-  at Miner level, oldest first. No code is needed; a code pins a donation to a
-  Statement, and a coded donation from any character is credited without
+  at Miner level, oldest first. No code is needed; a code names the donation's
+  Miner (one code per Miner), and a coded donation from any character is credited without
   revealing any grouping. An unknown character with no code goes to
   Unmatched, claimable privately or assignable by an officer. Overpaying or
-  prepaying becomes credit, printed on the next Statement.
+  prepaying becomes credit, which pays the next days billed.
 - **"Not tax"** marks all or part of a donation as something else (a
   buyback); the debt reopens by that amount, logged. Manual payments are
   allowed and logged.

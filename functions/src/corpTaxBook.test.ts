@@ -22,6 +22,7 @@ import {
   parseSettingsPatch,
   sameDivisions,
   parseStatement,
+  parseLateNotice,
   parseSyncInput,
   donationsReadAtPatch,
   parseToken,
@@ -30,6 +31,7 @@ import {
   satisfies,
   startDateMoveReason,
 } from './corpTaxBook.js';
+import { finalNoticeId } from './corpTaxBookLateNotice.js';
 
 describe('decideRoles (D8)', () => {
   it.each([
@@ -304,19 +306,19 @@ describe('parsers', () => {
     expect(() => parseClaimPaymentInput({ corporationId: 0, paymentId: 'a' })).toThrow();
   });
 
-  it('parses a Miner declaring their own Statement paid: amount and note optional (#6206)', () => {
-    expect(parseDeclareOwnInput({ corporationId: 9, statementId: 's1' })).toEqual({
+  it('parses a Miner declaring their own Late notice paid: amount and note optional (#6206)', () => {
+    expect(parseDeclareOwnInput({ corporationId: 9, noticeId: 's1' })).toEqual({
       corporationId: 9,
-      statementId: 's1',
+      noticeId: 's1',
     });
     expect(
       parseDeclareOwnInput({
         corporationId: 9,
-        statementId: 's1',
+        noticeId: 's1',
         amount: 1500000,
         note: ' sent by contract ',
       })
-    ).toEqual({ corporationId: 9, statementId: 's1', amount: 1500000, note: 'sent by contract' });
+    ).toEqual({ corporationId: 9, noticeId: 's1', amount: 1500000, note: 'sent by contract' });
     expect(() => parseDeclareOwnInput({ corporationId: 9, statementId: '../x' })).toThrow();
     expect(() =>
       parseDeclareOwnInput({ corporationId: 9, statementId: 's1', amount: 0 })
@@ -532,13 +534,15 @@ describe('parsers', () => {
     });
   });
 
-  describe('disputesClosedByWriteOff: a write-off answers the disputes of the days it closes (#6307)', () => {
-    const statement = {
-      id: 's1',
-      amount: 900_000,
-      coversFrom: '2026-11-01',
-      coversThrough: '2026-11-02',
-      lines: [{ kind: 'mined', date: '2026-11-01' }],
+  describe('disputesClosedByWriteOff: a write-off answers the disputes of the days it forgives (#6307)', () => {
+    // The Miner's account as an officer's tab last recorded it: what each unpaid day still owes.
+    const account = {
+      owed: 900_000,
+      unpaidDays: [
+        { date: '2026-11-01', owed: 400_000, tax: 400_000 },
+        { date: '2026-11-02', owed: 300_000, tax: 500_000 },
+        { date: '2026-11-09', owed: 200_000, tax: 200_000 },
+      ],
     };
     const dispute = (id: string, date: string, resolution?: unknown) => ({ id, date, resolution });
     const disputes = [
@@ -548,57 +552,68 @@ describe('parsers', () => {
       dispute('d', '2026-11-01', { kind: 'rejected' }),
     ];
 
-    it('a Statement written off in full closes the open disputes of its days', () => {
-      expect(disputesClosedByWriteOff(disputes, { amount: 900_000 }, statement)).toEqual([
+    it('forgives the oldest days first: their open disputes close, the rest stay open', () => {
+      expect(disputesClosedByWriteOff(disputes, { amount: 700_000 }, account)).toEqual(['a', 'b']);
+      expect(disputesClosedByWriteOff(disputes, { amount: 500_000 }, account)).toEqual(['a']);
+    });
+
+    it('a day only partly forgiven keeps its dispute open', () => {
+      expect(disputesClosedByWriteOff(disputes, { amount: 300_000 }, account)).toEqual([]);
+    });
+
+    it('a write-off of the whole balance closes every open dispute', () => {
+      expect(disputesClosedByWriteOff(disputes, { amount: 900_000 }, account)).toEqual([
         'a',
         'b',
+        'c',
       ]);
     });
 
-    it('a part write-off leaves them open', () => {
-      expect(disputesClosedByWriteOff(disputes, { amount: 400_000 }, statement)).toEqual([]);
-    });
-
-    it('the leaver write-off, with no Statement, closes every open dispute', () => {
+    it('with no recorded days it is the leaver’s whole balance: every open dispute closes', () => {
       expect(disputesClosedByWriteOff(disputes, { amount: 1 })).toEqual(['a', 'b', 'c']);
+      expect(disputesClosedByWriteOff(disputes, { amount: 1 }, { owed: 5 })).toEqual([
+        'a',
+        'b',
+        'c',
+      ]);
     });
   });
 
-  describe('billedDisputeTax: a waived dispute priced from the book’s issued Statements', () => {
+  describe('billedDisputeTax: a waived dispute priced from the Late notices that listed it', () => {
     const disputed = {
       lines: [
         { recordKey: '60:1000:2026-11-01', typeId: 45490, quantity: 100, payeeName: 'A' },
         { recordKey: '77:1000:2026-11-01', typeId: 45491, quantity: 50, payeeName: 'A' },
       ],
     };
-    const mined = (chargeKey: string, typeId: number, quantity: number, taxPct = 10) => ({
+    const mined = (key: string, typeId: number, quantity: number, taxPct = 10) => ({
       kind: 'mined',
       date: '2026-11-01',
-      chargeKey,
+      key,
       oreLines: [{ typeId, quantity }],
       unitPrices: { [typeId]: typeId === 45490 ? 1000 : 2000 },
       taxPct,
     });
 
-    it('prices the disputed ore at the prices and rate its Statement billed', () => {
-      const statements = [
+    it('prices the disputed ore at the prices and rate the notice listed it at', () => {
+      const notices = [
         { lines: [mined('60:1000:2026-11-01', 45490, 100)] },
         { lines: [mined('77:1000:2026-11-01', 45491, 50, 20)] },
       ];
       // 100 × 1000 × 10% + 50 × 2000 × 20%
-      expect(billedDisputeTax(disputed, statements)).toBe(30_000);
+      expect(billedDisputeTax(disputed, notices)).toBe(30_000);
     });
 
-    it('caps the disputed ore at what the Statements billed, late ore included', () => {
+    it('caps the disputed ore at what the notices listed, late ore included', () => {
       const late = { ...mined('60:1000:2026-11-01', 45490, 30), kind: 'late-ore' };
-      const statements = [
+      const notices = [
         { lines: [mined('60:1000:2026-11-01', 45490, 40), late] },
         { lines: [mined('77:1000:2026-11-01', 45491, 50)] },
       ];
-      expect(billedDisputeTax(disputed, statements)).toBe(70 * 100 + 50 * 200);
+      expect(billedDisputeTax(disputed, notices)).toBe(70 * 100 + 50 * 200);
     });
 
-    it('cannot price a disputed record no Statement billed yet', () => {
+    it('cannot price a disputed record no notice listed yet', () => {
       expect(
         billedDisputeTax(disputed, [{ lines: [mined('60:1000:2026-11-01', 45490, 100)] }])
       ).toBeUndefined();
@@ -607,27 +622,27 @@ describe('parsers', () => {
 
     // A rate dispute is about the rate: waiving it credits the gap, never the whole tax.
     it('prices a rate dispute as the gap between the billed and claimed rates', () => {
-      const statements = [{ lines: [mined('60:1000:2026-11-01', 45490, 100, 12)] }];
+      const notices = [{ lines: [mined('60:1000:2026-11-01', 45490, 100, 12)] }];
       const rate = {
         kind: 'rate' as const,
         claimedPct: 10,
         lines: [{ recordKey: '60:1000:2026-11-01', typeId: 45490, quantity: 100 }],
       };
-      expect(billedDisputeTax(rate, statements)).toBeCloseTo(100 * 1000 * 0.02);
-      expect(billedDisputeTax({ ...rate, claimedPct: 15 }, statements)).toBe(0);
+      expect(billedDisputeTax(rate, notices)).toBeCloseTo(100 * 1000 * 0.02);
+      expect(billedDisputeTax({ ...rate, claimedPct: 15 }, notices)).toBe(0);
     });
 
     it('ignores correction lines and malformed lines', () => {
-      const statements = [
+      const notices = [
         {
           lines: [
-            { kind: 'correction', date: '2026-11-01', adjustmentId: 'a1', tax: -5 },
-            { kind: 'mined', chargeKey: '77:1000:2026-11-01' },
+            { kind: 'correction', date: '2026-11-01', key: 'adjustment:a1', tax: -5 },
+            { kind: 'mined', key: '77:1000:2026-11-01' },
             mined('60:1000:2026-11-01', 45490, 100),
           ],
         },
       ];
-      expect(billedDisputeTax(disputed, statements)).toBeUndefined();
+      expect(billedDisputeTax(disputed, notices)).toBeUndefined();
     });
   });
 
@@ -1319,5 +1334,217 @@ describe('parseDeclareOwnInput transfers', () => {
         transfers: [{ ...t, recipient: 'someone' }],
       })
     ).toThrow();
+  });
+});
+
+describe('Late notices and checkpoints (decision 20261120-235011)', () => {
+  const line = {
+    kind: 'mined',
+    date: '2026-11-01',
+    key: '9001:1000:2026-11-01',
+    characterId: 9001,
+    structureId: 1000,
+    oreLines: [{ typeId: 46280, quantity: 100 }],
+    unitPrices: { 46280: 1000 },
+    priceSources: { 46280: 'hub' },
+    estimatedValue: 100_000,
+    taxPct: 10,
+    rateEffectiveFrom: '2026-10-01',
+    tax: 10_000,
+  };
+  const notice = {
+    id: 'notice_solo:9001_2026-11-18',
+    minerId: 'solo:9001',
+    characterIds: [9001],
+    kind: 'late',
+    issuedAt: '2026-11-18T09:00:00Z',
+    code: 'MT00AB12',
+    pricing: { hubId: 'jita', oreForm: 'compressed' },
+    uids: ['char:1'],
+    lines: [
+      line,
+      {
+        kind: 'correction',
+        date: '2026-11-03',
+        key: 'adjustment:a1',
+        oreLines: [],
+        estimatedValue: 0,
+        reason: 'fix',
+        tax: 5,
+      },
+    ],
+    listed: 1,
+    mail: { sent: 4, manualSent: 2, remindersStopped: true },
+    names: { minerName: 'Ore Pilot', refineryNames: { '1000': 'Athanor X' } },
+  };
+
+  it('parses a Late notice: what it listed is summed here, never taken on the client’s word', () => {
+    const parsed = parseLateNotice(notice);
+    expect(parsed).toMatchObject({
+      id: notice.id,
+      minerId: 'solo:9001',
+      characterIds: [9001],
+      kind: 'late',
+      issuedAt: '2026-11-18T09:00:00.000Z',
+      code: 'MT00AB12',
+      pricing: { hubId: 'jita', oreForm: 'compressed' },
+      listed: 10_005,
+      names: { minerName: 'Ore Pilot', refineryNames: { '1000': 'Athanor X' } },
+    });
+    expect(parsed.lines[0]).toEqual({ ...line, unitPrices: { 46280: 1000 } });
+    expect(parsed.lines[1]).toMatchObject({
+      kind: 'correction',
+      key: 'adjustment:a1',
+      reason: 'fix',
+    });
+  });
+
+  it('starts a notice unmailed, read by no one until the server names its readers', () => {
+    const parsed = parseLateNotice(notice);
+    expect(parsed.mail).toEqual({ sent: 0, manualSent: 0, remindersStopped: false });
+    expect(parsed.uids).toEqual([]);
+    expect(parsed.issuedBy).toBeUndefined();
+  });
+
+  it('prints no empty code and no pricing it cannot name', () => {
+    const parsed = parseLateNotice({
+      ...notice,
+      code: undefined,
+      pricing: undefined,
+      names: undefined,
+    });
+    expect(parsed).not.toHaveProperty('code');
+    expect(parsed).not.toHaveProperty('pricing');
+    expect(parsed).not.toHaveProperty('names');
+  });
+
+  it('refuses a malformed notice', () => {
+    expect(() => parseLateNotice({ ...notice, id: 'a/b' })).toThrow();
+    expect(() => parseLateNotice({ ...notice, kind: 'statement' })).toThrow();
+    expect(() => parseLateNotice({ ...notice, lines: [{ ...line, date: 'soon' }] })).toThrow();
+    expect(() => parseLateNotice({ ...notice, lines: [{ ...line, kind: 'other' }] })).toThrow();
+    expect(() => parseLateNotice({ ...notice, pricing: { hubId: 'x', oreForm: 'raw' } })).toThrow();
+    expect(() => parseLateNotice({ ...notice, names: { minerName: 5 } })).toThrow();
+  });
+
+  it('names a final notice only by the id closing the account sends', () => {
+    expect(() => parseLateNotice({ ...notice, kind: 'final' })).toThrow();
+    expect(parseLateNotice({ ...notice, kind: 'final', id: finalNoticeId('solo:9001') }).kind).toBe(
+      'final'
+    );
+    expect(() => parseLateNotice({ ...notice, id: finalNoticeId('solo:9001') })).toThrow();
+  });
+
+  it('issues a Late notice through the edit union', () => {
+    const action = parseEditAction({ action: 'issueLateNotice', notice });
+    expect(action).toMatchObject({ action: 'issueLateNotice', notice: { id: notice.id } });
+    const huge = {
+      ...notice,
+      lines: Array.from({ length: 4000 }, () => ({ ...line, reason: 'x'.repeat(400) })),
+    };
+    expect(() => parseEditAction({ action: 'issueLateNotice', notice: huge })).toThrow();
+  });
+
+  it('records a Late notice’s mail, as recordMail does', () => {
+    expect(
+      parseEditAction({ action: 'recordLateNoticeMail', noticeId: 'n1', mailId: 7, kind: 'notice' })
+    ).toEqual({ action: 'recordLateNoticeMail', noticeId: 'n1', mailId: 7, kind: 'notice' });
+    expect(
+      parseEditAction({
+        action: 'recordLateNoticeMail',
+        noticeId: 'n1',
+        mailId: 7,
+        kind: 'reminder',
+      })
+    ).toMatchObject({ kind: 'reminder' });
+    expect(() =>
+      parseEditAction({
+        action: 'recordLateNoticeMail',
+        noticeId: 'n/1',
+        mailId: 7,
+        kind: 'notice',
+      })
+    ).toThrow();
+  });
+
+  it('takes a noticeId where a Statement id was named, and the old name still', () => {
+    for (const key of ['noticeId', 'statementId'])
+      expect(parseEditAction({ action: 'declare', [key]: 'n1', kind: 'contract' })).toMatchObject({
+        action: 'declare',
+        noticeId: 'n1',
+      });
+    for (const key of ['noticeId', 'statementId'])
+      expect(parseEditAction({ action: 'recordReminder', [key]: 'n1' })).toEqual({
+        action: 'recordReminder',
+        noticeId: 'n1',
+      });
+    expect(parseDeclareOwnInput({ corporationId: 1, noticeId: 'n1' })).toMatchObject({
+      noticeId: 'n1',
+    });
+    expect(parseDeclareOwnInput({ corporationId: 1, statementId: 'n1' })).toMatchObject({
+      noticeId: 'n1',
+    });
+    expect(() => parseEditAction({ action: 'declare', kind: 'contract' })).toThrow();
+  });
+
+  it('a write-off pins nothing: an old client’s Statement id is accepted and dropped', () => {
+    expect(
+      parseEditAction({
+        action: 'writeOff',
+        minerId: 'm1',
+        statementId: 's1',
+        amount: 5,
+        reason: 'left',
+      })
+    ).toEqual({ action: 'writeOff', minerId: 'm1', amount: 5, reason: 'left' });
+  });
+
+  describe('recordCheckpoints', () => {
+    const checkpoint = {
+      minerId: 'solo:9001',
+      through: '2026-09-30',
+      owed: [{ date: '2026-09-02', remaining: 50, charge: 10 }],
+      credit: 0,
+      balance: 50,
+      paidThrough: '2026-09-01',
+      at: '2026-11-18T09:00:00Z',
+      by: 1,
+    };
+
+    it('parses each checkpoint; who recorded it and when are the server’s', () => {
+      const action = parseEditAction({ action: 'recordCheckpoints', checkpoints: [checkpoint] });
+      expect(action).toEqual({
+        action: 'recordCheckpoints',
+        checkpoints: [
+          {
+            minerId: 'solo:9001',
+            through: '2026-09-30',
+            owed: [{ date: '2026-09-02', remaining: 50, charge: 10 }],
+            credit: 0,
+            balance: 50,
+            paidThrough: '2026-09-01',
+          },
+        ],
+      });
+      expect(
+        parseEditAction({
+          action: 'recordCheckpoints',
+          checkpoints: [{ ...checkpoint, paidThrough: null, owed: [] }],
+        })
+      ).toMatchObject({ checkpoints: [{ paidThrough: null, owed: [] }] });
+    });
+
+    it('refuses a malformed checkpoint', () => {
+      const bad = (patch: object) =>
+        parseEditAction({
+          action: 'recordCheckpoints',
+          checkpoints: [{ ...checkpoint, ...patch }],
+        });
+      expect(() => bad({ through: '2026-9-30' })).toThrow();
+      expect(() => bad({ credit: -1 })).toThrow();
+      expect(() => bad({ owed: [{ date: 'x', remaining: 1 }] })).toThrow();
+      expect(() => bad({ paidThrough: 5 })).toThrow();
+      expect(() => bad({ minerId: 'a/b' })).toThrow();
+    });
   });
 });

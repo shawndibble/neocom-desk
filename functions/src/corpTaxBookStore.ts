@@ -64,6 +64,8 @@ import {
   STATEMENTS,
   STATEMENT_LINKS,
   TOKENS_COLLECTION,
+  LATE_NOTICES,
+  ACCOUNT_CHECKPOINTS,
   WRITE_OFFS,
   TOLERANCE_EXEMPTIONS,
   MINER_PAID,
@@ -144,10 +146,9 @@ import {
   stampEditorUseIfSharing,
   stampFailedRoleCheck,
 } from './sharedPopsStore.js';
-import { editScope } from './corpTaxBookMinerTotals.js';
-import { refreshAfterEvent } from './corpTaxBookMinerTotalsStore.js';
-import { pullsOfDays, refreshMoonDocs } from './corpTaxBookMoonDocsStore.js';
+import { refreshMoonDocs } from './corpTaxBookMoonDocsStore.js';
 import { refreshReadModels } from './corpTaxBookReadModelsStore.js';
+import { movesReadModels } from './corpTaxBookReadModels.js';
 import {
   fail,
   requireLiveRoles,
@@ -166,6 +167,27 @@ import {
   type GroupConflict,
 } from './corpTaxBookClaims.js';
 import type { EveTokenClaims } from './verifyEveToken.js';
+import {
+  NOTICE_ID_FIELD,
+  lateNoticeFromStatementDoc,
+  legacyStatementDocOf,
+  lineKey,
+} from './corpTaxBookLateNotice.js';
+import { canAdvanceCheckpoint } from './corpTaxBookCheckpoint.js';
+import {
+  issueLateNoticeDocs,
+  mergeNotices,
+  newVerifyToken,
+  readLateNotice,
+  writeLateNoticeDocs,
+  writeNoticeMail,
+  type LoadedNotice,
+} from './corpTaxBookLateNoticeStore.js';
+import {
+  legacyNoticeRef,
+  legacyNotices as legacyNoticesRoot,
+  legacyNoticesOf,
+} from './corpTaxBookLegacyMirror.js';
 
 /** One type's parsed R2 open-prices object (`readOpenPricesFromR2`), or null when R2 has none. Throws on a failed read. */
 export type OpenPricesReader = (typeId: number) => Promise<unknown | null>;
@@ -867,9 +889,7 @@ export async function syncBookAs(
     await storeUncounted(deps, input.corporationId, input.uncounted).catch((e) =>
       console.error('uncounted donations write failed', e instanceof Error ? e.message : e)
     );
-  if (paidMiners.size > 0)
-    await refreshAfterEvent(deps.db, input.corporationId, [...paidMiners], deps.now);
-  // Rows or a chunk make-up moved these pulls (ADR 0032). Best effort, like the totals above.
+  // Rows or a chunk make-up moved these pulls (ADR 0032). Best effort.
   await refreshMoonDocs(deps.db, input.corporationId, touchedPulls);
   // Only donations and Extractions are in the Overview and Miners tab docs (ADR 0032); rows are not. Best effort.
   // A quiet run wrote none of either: the docs stand.
@@ -1011,8 +1031,8 @@ function requireDirectorAbove(c: EditCtx, amounts: readonly number[]): void {
 }
 
 /**
- * A correction can be undone only while no issued Statement has billed it (D22: a Statement is
- * frozen): after that the officer adds an opposite correction.
+ * A correction can be undone only while no Late notice has listed it (D22): after that the
+ * officer adds an opposite correction.
  */
 async function assertAdjustmentReversible(
   c: EditCtx,
@@ -1020,12 +1040,9 @@ async function assertAdjustmentReversible(
   adjustment: Record<string, unknown>
 ): Promise<void> {
   if (adjustment.reversed) fail('failed-precondition', 'Already reversed', 'already-reversed');
-  const billed = (
-    await c.tx.get(col(c, STATEMENTS).where('minerId', '==', adjustment.minerId))
-  ).docs.some((d) =>
-    ((d.data().lines as { adjustmentId?: string }[] | undefined) ?? []).some(
-      (l) => l.adjustmentId === adjustmentId
-    )
+  const key = lineKey({ adjustmentId, date: '' });
+  const billed = (await minerNotices(c, adjustment.minerId as string)).some((n) =>
+    n.lines.some((l) => l.key === key)
   );
   if (billed)
     fail(
@@ -1033,6 +1050,23 @@ async function assertAdjustmentReversible(
       'A Statement already billed this correction: add an opposite correction instead',
       'billed-on-statement'
     );
+}
+
+/** A Miner's Late notices, from both collections, read in the transaction. */
+async function minerNotices(c: EditCtx, minerId: string) {
+  const book = bookRef(c.deps.db, c.corporationId);
+  const [current, legacy] = await Promise.all([
+    c.tx.get(col(c, LATE_NOTICES).where('minerId', '==', minerId)),
+    c.tx.get(legacyNoticesOf(book, minerId)),
+  ]);
+  return mergeNotices(current, legacy);
+}
+
+/** A Late notice by id, read in the transaction; not-found when neither collection holds it. */
+async function mustGetNotice(c: EditCtx, id: string): Promise<LoadedNotice> {
+  const loaded = await readLateNotice(c.tx, bookRef(c.deps.db, c.corporationId), id);
+  if (!loaded) fail('not-found', 'Late notice not found', 'not-found');
+  return loaded;
 }
 
 async function minerUids(c: EditCtx, minerId: string): Promise<string[]> {
@@ -1275,6 +1309,9 @@ async function rekeyAbsorbed(
   if (writes.length > 450)
     fail('failed-precondition', 'Too many records to move in one grouping', 'regroup-too-large');
   return () => {
+    // The target's closed-through checkpoint summed only its own history: its next load rolls a
+    // new one forward over the history moved onto it.
+    if (writes.length > 0) tx.delete(at(ACCOUNT_CHECKPOINTS).doc(target));
     for (const w of writes) {
       if (w.kind === 'update') tx.update(at(w.collection).doc(w.id), w.fields);
       else if (w.kind === 'delete') tx.delete(at(w.collection).doc(w.id));
@@ -2059,25 +2096,17 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       };
     }
     case 'writeOff': {
-      const statementDoc = action.statementId
-        ? await mustGet(c, col(c, STATEMENTS).doc(action.statementId), 'Statement')
-        : undefined;
-      if (statementDoc && statementDoc.minerId !== action.minerId)
-        fail('invalid-argument', "Statement is another Miner's", 'wrong-miner');
-      // A write-off that closes a day closes the Miner's dispute of it too (#6307): answered, so
-      // it leaves the officer's Needs you and no longer holds the day from the write-off.
-      const mineOpen = (
-        await c.tx.get(col(c, DISPUTES).where('minerId', '==', action.minerId))
-      ).docs
-        .map((d) => d.data())
-        .filter(hasLines); // a withdrawn dispute is a tombstone: nothing to answer
+      // A write-off forgives the Miner's oldest unpaid days (decision 20261120-235011), and closes
+      // the Miner's disputes of the days it forgives (#6307): answered, so they leave the
+      // officer's Needs you and no longer hold those days.
+      const [disputes, account] = await Promise.all([
+        c.tx.get(col(c, DISPUTES).where('minerId', '==', action.minerId)),
+        c.tx.get(col(c, ACCOUNTS).doc(action.minerId)),
+      ]);
+      const mineOpen = disputes.docs.map((d) => d.data()).filter(hasLines); // a withdrawn dispute is a tombstone
       // Every read stays above the first write: a Firestore transaction refuses a read after one.
       const uids = await minerUids(c, action.minerId);
-      const closing = disputesClosedByWriteOff(
-        mineOpen,
-        { amount: action.amount },
-        statementDoc as Parameters<typeof disputesClosedByWriteOff>[2]
-      );
+      const closing = disputesClosedByWriteOff(mineOpen, { amount: action.amount }, account.data());
       const id = `w${now}_${rand(4)}`;
       for (const disputeId of closing)
         tx.update(col(c, DISPUTES).doc(disputeId), {
@@ -2099,7 +2128,6 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         by,
         at: iso,
         uids,
-        ...(action.statementId ? { statementId: action.statementId } : {}),
       });
       return {
         detail: {
@@ -2173,6 +2201,32 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         result: { statementId: statement.id, verifyToken: token },
       };
     }
+    case 'issueLateNotice': {
+      const { notice: sent } = action;
+      const book = bookRef(c.deps.db, c.corporationId);
+      const [miner, current, legacy] = await c.tx.getAll(
+        col(c, MINERS).doc(sent.minerId),
+        col(c, LATE_NOTICES).doc(sent.id),
+        legacyNoticeRef(book, sent.id)
+      );
+      // A final notice goes out with the account's closing (`closeAccount`), never after it.
+      if (miner.exists && miner.get('closedAt') != null)
+        fail('failed-precondition', "This Miner's account is closed", 'account-closed');
+      if (current.exists || legacy.exists)
+        fail('already-exists', 'A Late notice never changes', 'notice-exists');
+      // Who may read it and who issued it are the server's to say, never the tab's.
+      const readers = miner.exists ? minerReaders(sent.minerId, miner.data()) : sent.characterIds;
+      const notice = {
+        ...sent,
+        uids: readers.map((x) => `char:${x}`),
+        issuedBy: c.access.characterId,
+      };
+      const token = issueLateNoticeDocs(tx, c.deps.db, book, c.corporationId, notice, now);
+      return {
+        detail: { noticeId: notice.id, minerId: notice.minerId, listed: notice.listed },
+        result: { noticeId: notice.id, verifyToken: token },
+      };
+    }
     case 'closeAccount':
       return closeAccount(c, action);
     case 'settleStatements': {
@@ -2203,21 +2257,21 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       return { detail: { statementIds: fresh }, result: { settled: fresh } };
     }
     case 'declare': {
-      const statement = await mustGet(c, col(c, STATEMENTS).doc(action.statementId), 'Statement');
+      const { notice } = await mustGetNotice(c, action.noticeId);
       const id = `x${now}_${rand(4)}`;
       tx.create(col(c, DECLARATIONS).doc(id), {
         id,
-        statementId: action.statementId,
+        [NOTICE_ID_FIELD]: notice.id,
         kind: action.kind,
         at: iso,
         recordedBy: by,
-        // The Miner reads their own declarations (#6206), as they read the Statement.
-        minerId: statement.minerId,
-        uids: statement.uids ?? [],
+        // The Miner reads their own declarations (#6206), as they read the notice.
+        minerId: notice.minerId,
+        uids: notice.uids,
         ...(action.note ? { note: action.note } : {}),
       });
       return {
-        detail: { declarationId: id, statementId: action.statementId, kind: action.kind },
+        detail: { declarationId: id, noticeId: notice.id, kind: action.kind },
         result: { declarationId: id },
       };
     }
@@ -2255,14 +2309,19 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       if (dispute.minerId !== action.minerId)
         fail('invalid-argument', "Dispute is another Miner's", 'wrong-miner');
       const lines = (dispute.lines as DisputeConflictInput['lines'] | undefined) ?? [];
-      const billing: Data[] = [];
+      const billing = [];
+      const book = bookRef(c.deps.db, c.corporationId);
       for (const characterId of new Set(
         lines.map((l) => parseRecordKey(l.recordKey).characterId)
       )) {
-        const snap = await tx.get(
-          col(c, STATEMENTS).where('characterIds', 'array-contains', characterId)
+        const listing = (q: FirebaseFirestore.CollectionReference) =>
+          tx.get(q.where('characterIds', 'array-contains', characterId));
+        billing.push(
+          ...mergeNotices(
+            await listing(col(c, LATE_NOTICES)),
+            await listing(legacyNoticesRoot(book))
+          )
         );
-        billing.push(...snap.docs.map((d) => d.data()));
       }
       const priced = billedDisputeTax(
         {
@@ -2331,14 +2390,13 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       return { detail: { disputeId: action.disputeId, reason: action.reason, ...nextStep } };
     }
     case 'recordReminder': {
-      const ref = col(c, STATEMENTS).doc(action.statementId);
-      const statement = await mustGet(c, ref, 'Statement');
-      // A miner who opted out gets one manual reminder per Statement (D27).
-      if (statement.remindersStopped === true && (statement.manualRemindersSent as number) >= 1) {
+      const loaded = await mustGetNotice(c, action.noticeId);
+      const { mail } = loaded.notice;
+      // A miner who opted out gets one manual reminder per notice (D27).
+      if (mail.remindersStopped && mail.manualSent >= 1)
         fail('failed-precondition', 'This miner stopped reminders', 'reminders-stopped');
-      }
-      tx.update(ref, { manualRemindersSent: FieldValue.increment(1) });
-      return { detail: { statementId: action.statementId } };
+      writeNoticeMail(tx, bookRef(c.deps.db, c.corporationId), loaded, { kind: 'reminded' });
+      return { detail: { noticeId: action.noticeId } };
     }
     case 'recordAccounts': {
       // Every book is a running account (decision 20261117-060555).
@@ -2367,13 +2425,44 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       // The figures as recorded, so the audit says what the pay page was told.
       return { detail: { count: action.accounts.length, accounts: action.accounts } };
     }
-    case 'recordMail': {
-      // The queue sent this mail (D16): log it on the Statement and in the audit trail.
-      const ref = col(c, STATEMENTS).doc(action.statementId);
-      await mustGet(c, ref, 'Statement');
-      tx.update(ref, { lastMailedAt: iso, mailsSent: FieldValue.increment(1) });
+    case 'recordMail':
+    case 'recordLateNoticeMail': {
+      // The queue sent this mail (D16): log it on the notice and in the audit trail.
+      const noticeId = action.action === 'recordMail' ? action.statementId : action.noticeId;
+      const loaded = await mustGetNotice(c, noticeId);
+      writeNoticeMail(tx, bookRef(c.deps.db, c.corporationId), loaded, { kind: 'mailed', at: iso });
+      return { detail: { noticeId, mailId: action.mailId, kind: action.kind } };
+    }
+    case 'recordCheckpoints': {
+      // Only ever forward, and never past what may close today: one that fails is skipped, as a
+      // paid-through day is (`recordAccounts`). Reads first: a transaction refuses one after a write.
+      const today = utcDate(now);
+      const refs = action.checkpoints.map((k) => col(c, ACCOUNT_CHECKPOINTS).doc(k.minerId));
+      const stored = refs.length > 0 ? await c.tx.getAll(...refs) : [];
+      const moving = action.checkpoints.flatMap((k, i) =>
+        canAdvanceCheckpoint(stored[i].data() as { through: string } | undefined, k, today)
+          ? [{ checkpoint: k, ref: refs[i] }]
+          : []
+      );
+      const uids = await Promise.all(moving.map((m) => minerUids(c, m.checkpoint.minerId)));
+      moving.forEach(({ checkpoint, ref }, i) =>
+        tx.set(ref, {
+          ...checkpoint,
+          at: iso,
+          by,
+          uids: uids[i],
+          updatedAt: FieldValue.serverTimestamp(),
+        })
+      );
       return {
-        detail: { statementId: action.statementId, mailId: action.mailId, kind: action.kind },
+        detail: {
+          recorded: moving.map((m) => ({
+            minerId: m.checkpoint.minerId,
+            through: m.checkpoint.through,
+          })),
+          skipped: action.checkpoints.length - moving.length,
+        },
+        result: { recorded: moving.map((m) => m.checkpoint.minerId) },
       };
     }
     case 'setPopSharing':
@@ -2451,16 +2540,21 @@ async function issueStatementDoc(
 ): Promise<string> {
   const { tx, now } = c;
   const ref = col(c, STATEMENTS).doc(statement.id);
-  if ((await tx.get(ref)).exists)
+  const [held, heldNotice] = await tx.getAll(ref, col(c, LATE_NOTICES).doc(statement.id));
+  if (held.exists || heldNotice.exists)
     fail('already-exists', 'An issued Statement never changes', 'statement-exists');
-  const token = randomBytes(32).toString('base64url');
-  tx.create(ref, {
+  const token = newVerifyToken();
+  const stored = {
     ...statement,
     uids: readers.map((x) => `char:${x}`),
     remindersStopped: false,
     manualRemindersSent: 0,
     issuedBy: c.access.characterId,
-  });
+  };
+  tx.create(ref, stored);
+  // An older tab still issues a Late notice this way: it is stored as one too, under the same token.
+  const notice = lateNoticeFromStatementDoc(stored);
+  if (notice) writeLateNoticeDocs(tx, bookRef(c.deps.db, c.corporationId), notice, token);
   // The link lives beside the Statement, readable by editors only (rules): the
   // miner and view-only officers never see it.
   tx.create(col(c, STATEMENT_LINKS).doc(statement.id), { verifyToken: token });
@@ -2636,13 +2730,6 @@ async function refreshMoonDocsAfterEdit(
   try {
     if (action.action === 'linkSurvey') {
       await refreshMoonDocs(db, corporationId, [action.extractionId]);
-    } else if (action.action === 'issueStatement') {
-      const days = (parseStatement(action.statement).lines as unknown as Data[]).flatMap((l) =>
-        typeof l.structureId === 'number' && typeof l.date === 'string'
-          ? [{ structureId: l.structureId, date: l.date }]
-          : []
-      );
-      await refreshMoonDocs(db, corporationId, await pullsOfDays(db, corporationId, days));
     } else if (
       (action.action === 'updateSettings' && action.patch.structureExpiryHours) ||
       action.action === 'setMiner' ||
@@ -2691,18 +2778,10 @@ export async function editBookAs(
       appendAudit(tx, deps, call.corporationId, actor, a.action, a.detail);
     return outcome.result ?? {};
   });
-  // The edit changed some Miners' frozen totals (ADR 0032). Best effort: the verifier repairs.
-  await refreshAfterEvent(deps.db, call.corporationId, editScope(action), deps.now);
-  // Statements freeze a pull's tax, and a survey link or expiry changes its doc (ADR 0032). Best effort.
+  // A survey link, an expiry or a regroup changes a pull's doc (ADR 0032). Best effort.
   await refreshMoonDocsAfterEdit(deps.db, call.corporationId, action);
-  // The same edits move the Overview and Miners tab docs (ADR 0032). Best effort.
-  const scope = editScope(action);
-  if (
-    scope.all ||
-    scope.minerIds.length + scope.statementIds.length + scope.paymentIds.length > 0 ||
-    action.action === 'linkSurvey'
-  )
-    await refreshReadModels(deps.db, call.corporationId, deps.now());
+  // Edits that move the Overview and Miners tab docs (ADR 0032). Best effort.
+  if (movesReadModels(action)) await refreshReadModels(deps.db, call.corporationId, deps.now());
   // A changed expiry moves which days a pull covers, so its rows' stamps (ADR 0032). Best effort.
   if (action.action === 'updateSettings' && action.patch.structureExpiryHours) {
     await restampStructures(
@@ -2771,7 +2850,6 @@ export async function confirmGrouping(
     });
     appendAudit(tx, deps, corporationId, { characterId, name: '' }, 'confirmGrouping', { minerId });
   });
-  await refreshAfterEvent(deps.db, corporationId, [minerId], deps.now);
   await refreshReadModels(deps.db, corporationId, deps.now());
 }
 
@@ -2800,7 +2878,6 @@ async function declinePending(
     });
     appendAudit(tx, deps, corporationId, actor, 'declineGrouping', { minerId, characterId });
   });
-  await refreshAfterEvent(deps.db, corporationId, [minerId, `solo:${characterId}`], deps.now);
   await refreshReadModels(deps.db, corporationId, deps.now());
 }
 
@@ -2846,7 +2923,6 @@ export async function declineLink(
       link: true,
     });
   });
-  await refreshAfterEvent(deps.db, corporationId, [minerId, `solo:${characterId}`], deps.now);
   await refreshReadModels(deps.db, corporationId, deps.now());
   return { declined: true as const };
 }
@@ -2990,7 +3066,6 @@ export async function claimPayment(
   options: { inReview?: boolean } = {}
 ) {
   const claimed = await claimPaymentTx(deps, caller, corporationId, paymentId, options);
-  await refreshAfterEvent(deps.db, corporationId, [claimed.minerId], deps.now);
   await refreshReadModels(deps.db, corporationId, deps.now());
   return claimed;
 }
@@ -3080,26 +3155,22 @@ async function callerMiner(
 }
 
 /**
- * A Miner's own "I paid this another way" (#6206): a declaration on one of their own
- * unsettled Statements, with an optional amount and note. No officer role: the caller's
- * sign-in must be one the Statement lists (`uids`, the same proof the rules give the member
- * read), and the answer for someone else's Statement is the same as for a missing one. It
- * pauses the Overdue clock like an officer-recorded declaration, until an officer answers.
+ * A Miner's own "I paid this another way" (#6206): a declaration on one of their own Late
+ * notices, with an optional amount and note. No officer role: the caller's sign-in must be one
+ * the notice lists (`uids`, the same proof the rules give the member read), and the answer for
+ * someone else's notice is the same as for a missing one. It pauses the Overdue clock like an
+ * officer-recorded declaration, until an officer answers.
  */
 export async function declareOwnPayment(deps: BookDeps, caller: Caller, input: DeclareOwnInput) {
   const characterId = signedInCharacter(caller);
-  const { corporationId, statementId } = input;
+  const { corporationId, noticeId } = input;
   const declared = await deps.db.runTransaction(async (tx) => {
     await memberBook(tx, deps, corporationId);
-    const statementSnap = await tx.get(sub(deps.db, corporationId, STATEMENTS).doc(statementId));
-    const statement = statementSnap.data();
-    if (!statement || !((statement.uids as string[] | undefined) ?? []).includes(caller.uid))
-      fail('not-found', 'Statement not found', 'not-found');
-    const paid = (await tx.get(sub(deps.db, corporationId, META).doc(PAID_DOC))).data();
-    if (((paid?.ids as string[] | undefined) ?? []).includes(statementId))
-      fail('failed-precondition', 'This Statement is settled', 'settled');
+    const notice = (await readLateNotice(tx, bookRef(deps.db, corporationId), noticeId))?.notice;
+    if (!notice || !notice.uids.includes(caller.uid))
+      fail('not-found', 'Late notice not found', 'not-found');
     const open = await tx.get(
-      sub(deps.db, corporationId, DECLARATIONS).where('statementId', '==', statementId)
+      sub(deps.db, corporationId, DECLARATIONS).where(NOTICE_ID_FIELD, '==', noticeId)
     );
     if (open.docs.some((d) => d.get('resolution') === undefined))
       fail('already-exists', 'A declaration is already waiting', 'already-declared');
@@ -3108,7 +3179,7 @@ export async function declareOwnPayment(deps: BookDeps, caller: Caller, input: D
     const transfers = input.transfers ?? [];
     const checks =
       transfers.length > 0
-        ? await checkTransfers(tx, deps, corporationId, statement.uids as string[], transfers)
+        ? await checkTransfers(tx, deps, corporationId, notice.uids, transfers)
         : ([] as ClaimCheck[]);
     // Every transfer found in the book: confirmed at once, nobody had to look.
     const allFound = checks.length > 0 && checks.every((c) => c.result === 'found');
@@ -3120,7 +3191,7 @@ export async function declareOwnPayment(deps: BookDeps, caller: Caller, input: D
     for (const c of checks) {
       if (c.result === 'found' && c.paymentId)
         tx.update(sub(deps.db, corporationId, PAYMENTS).doc(c.paymentId), {
-          minerId: statement.minerId,
+          minerId: notice.minerId,
           claimedBy: characterId,
           claimedAt: iso,
           reviewReason: FieldValue.delete(),
@@ -3129,13 +3200,13 @@ export async function declareOwnPayment(deps: BookDeps, caller: Caller, input: D
     const id = `x${now}_${rand(4)}`;
     tx.create(sub(deps.db, corporationId, DECLARATIONS).doc(id), {
       id,
-      statementId,
+      [NOTICE_ID_FIELD]: noticeId,
       kind: 'another-way',
       at: iso,
       recordedBy: characterId,
       via: 'player',
-      minerId: statement.minerId,
-      uids: statement.uids,
+      minerId: notice.minerId,
+      uids: notice.uids,
       ...(input.amount !== undefined ? { amount: input.amount } : {}),
       ...(input.note !== undefined ? { note: input.note } : {}),
       ...(transfers.length > 0 ? { transfers, checks } : {}),
@@ -3159,14 +3230,13 @@ export async function declareOwnPayment(deps: BookDeps, caller: Caller, input: D
       'declare',
       {
         declarationId: id,
-        statementId,
+        noticeId,
         kind: 'another-way',
         ...(input.amount !== undefined ? { amount: input.amount } : {}),
       }
     );
-    return { declarationId: id, minerId: statement.minerId as string, checks, confirmed: allFound };
+    return { declarationId: id, minerId: notice.minerId, checks, confirmed: allFound };
   });
-  await refreshAfterEvent(deps.db, corporationId, [declared.minerId], deps.now);
   await refreshReadModels(deps.db, corporationId, deps.now());
   return {
     declarationId: declared.declarationId,
@@ -3227,11 +3297,9 @@ async function checkTransfers(
 export async function disputeConflict(deps: BookDeps, caller: Caller, input: DisputeConflictInput) {
   const characterId = signedInCharacter(caller);
   const { corporationId, date } = input;
-  let touched = '';
   const result = await deps.db.runTransaction(async (tx) => {
     await memberBook(tx, deps, corporationId);
     const { minerId, uids } = await callerMiner(tx, deps, corporationId, caller, characterId);
-    touched = minerId;
     const characters = new Set<number>();
     for (const line of input.lines) {
       const lineCharacter = parseRecordKey(line.recordKey).characterId;
@@ -3325,8 +3393,6 @@ export async function disputeConflict(deps: BookDeps, caller: Caller, input: Dis
     );
     return { disputeId };
   });
-  // A dispute holds its Statement's disputed amount, so the Miner's stored totals move (best effort).
-  await refreshAfterEvent(deps.db, corporationId, [touched], deps.now);
   return result;
 }
 
@@ -3338,11 +3404,9 @@ export async function disputeConflict(deps: BookDeps, caller: Caller, input: Dis
 export async function withdrawDispute(deps: BookDeps, caller: Caller, input: WithdrawDisputeInput) {
   const characterId = signedInCharacter(caller);
   const { corporationId, date } = input;
-  let touched = '';
   const result = await deps.db.runTransaction(async (tx) => {
     await memberBook(tx, deps, corporationId);
     const { minerId } = await callerMiner(tx, deps, corporationId, caller, characterId);
-    touched = minerId;
     const disputeId = disputeIdFor(minerId, date);
     const ref = sub(deps.db, corporationId, DISPUTES).doc(disputeId);
     const held = (await tx.get(ref)).data();
@@ -3370,47 +3434,36 @@ export async function withdrawDispute(deps: BookDeps, caller: Caller, input: Wit
     );
     return { disputeId };
   });
-  // The hold is released: the Miner's stored totals count the amount as due again (best effort).
-  await refreshAfterEvent(deps.db, corporationId, [touched], deps.now);
   return result;
 }
 
 // --- Verify link -----------------------------------------------------------
 
+/**
+ * The verify page (#4066): the Late notice a mailed link names, read from `lateNotices` and else
+ * from its legacy `statements` doc, so every link already mailed keeps working. The notice goes
+ * out in the shape the page has always read (`legacyStatementDocOf`); a notice takes no money, so
+ * no payment is credited to it and it never settles for good: what the Miner owes is `account`.
+ */
 export async function readStatementByToken(deps: BookDeps, token: string) {
   const tokenSnap = await deps.db.collection(TOKENS_COLLECTION).doc(token).get();
   if (!tokenSnap.exists) fail('not-found', 'Verify link is not valid', 'invalid-token');
-  const { corporationId, statementId, minerId } = tokenSnap.data() as {
-    corporationId: number;
-    statementId: string;
-    minerId: string;
-  };
-  const [
-    book,
-    statements,
-    payments,
-    dismissals,
-    extractions,
-    paid,
-    declarations,
-    miner,
-    writeOffs,
-    account,
-  ] = await Promise.all([
-    bookRef(deps.db, corporationId).get(),
-    sub(deps.db, corporationId, STATEMENTS).where('minerId', '==', minerId).get(),
+  const { corporationId, ...held } = tokenSnap.data() as { corporationId: number } & Data;
+  const book = bookRef(deps.db, corporationId);
+  const loaded = await readLateNotice(deps.db, book, held[NOTICE_ID_FIELD] as string);
+  if (!loaded) fail('not-found', 'Verify link is not valid', 'invalid-token');
+  const { notice } = loaded;
+  const minerId = notice.minerId;
+  const [bookSnap, current, legacy, payments, declarations, miner, account] = await Promise.all([
+    book.get(),
+    sub(deps.db, corporationId, LATE_NOTICES).where('minerId', '==', minerId).get(),
+    legacyNoticesOf(book, minerId).get(),
     sub(deps.db, corporationId, PAYMENTS).where('minerId', '==', minerId).get(),
-    sub(deps.db, corporationId, DISMISSALS).get(),
-    sub(deps.db, corporationId, EXTRACTIONS).get(),
-    sub(deps.db, corporationId, META).doc(PAID_DOC).get(),
-    sub(deps.db, corporationId, DECLARATIONS).where('statementId', '==', statementId).get(),
+    sub(deps.db, corporationId, DECLARATIONS).where(NOTICE_ID_FIELD, '==', notice.id).get(),
     sub(deps.db, corporationId, MINERS).doc(minerId).get(),
-    sub(deps.db, corporationId, WRITE_OFFS).where('minerId', '==', minerId).get(),
     sub(deps.db, corporationId, ACCOUNTS).doc(minerId).get(),
   ]);
-  const thisStatement = statements.docs.find((d) => d.id === statementId);
-  if (!thisStatement) fail('not-found', 'Verify link is not valid', 'invalid-token');
-  const s = thisStatement.data() as Data;
+  const s = legacyStatementDocOf(notice);
   // A whitelist: the guest sees no character ids (bar `pendingCharacterIds` below, which they must answer), officer ids or other bookkeeping.
   const shown: Data = {};
   for (const key of [
@@ -3436,34 +3489,7 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
     void _c;
     return rest;
   });
-  const b = book.data() ?? {};
-
-  // The payments credited to THIS Statement: the Miner's whole allocation, then
-  // the part of each payment that landed here (the miner's other Statements stay private).
-  // A running account's notices bill no days of their own (#6294): legacy Statements only.
-  const billing = statements.docs.filter((d) => billsDays(d.data()));
-  const allocation = allocatePayments({
-    statements: billing.map((d) => {
-      const x = d.data();
-      return { id: d.id, amount: x.amount as number, issuedAt: x.issuedAt as string };
-    }),
-    payments: payments.docs.map((d) => paymentForAllocation(d.id, d.data())),
-    dismissalCredits: dismissalCredits({
-      minerId,
-      statements: billing.map((d) => ({
-        id: d.id,
-        lines: (d.data().lines as DismissableLine[]) ?? [],
-      })),
-      dismissals: dismissals.docs.map((d) => d.data() as MirrorDismissal),
-      extractions: extractions.docs.map((d) => d.data() as MirrorExtraction),
-      expiryHours: (b.structureExpiryHours as Record<string, number> | undefined) ?? {},
-    }),
-    officerWriteOffs: writeOffs.docs.flatMap((d) => writeOffForAllocation(d.data()) ?? []),
-    startDate: b.startDate as string | undefined,
-  });
-  const here = allocation.paymentCredits.filter((c) => c.statementId === statementId);
-  const bySource = new Map(payments.docs.map((d) => [d.id, d.data()]));
-  const settlement = allocation.byStatement.get(statementId);
+  const b = bookSnap.data() ?? {};
   return {
     statement: shown,
     corporationId,
@@ -3478,23 +3504,14 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
       divisionNames: b.divisionNames,
       cadence: b.cadence,
     },
-    payments: here
-      .map((c) => {
-        const p = bySource.get(c.paymentId) ?? {};
-        return {
-          id: c.paymentId,
-          amount: c.amount,
-          at: p.at as string,
-          source: p.source === 'manual' ? 'manual' : 'donation',
-        };
-      })
-      .sort((x, y) => x.at.localeCompare(y.at) || x.id.localeCompare(y.id)),
-    settlement: settlement ?? null,
+    // Money pays the Miner's oldest day, never a notice: none is credited to this one.
+    payments: [],
+    settlement: null,
     declarations: declarations.docs.map((d) => {
       const x = d.data();
       return { kind: x.kind, at: x.at, resolution: x.resolution ?? null };
     }),
-    settled: ((paid.data()?.ids as string[] | undefined) ?? []).includes(statementId),
+    settled: false,
     // A running account's total now (#6294): what an officer's client last worked out, less the
     // payments credited to this Miner since. Days mined since then show once it recounts.
     account: account.exists
@@ -3503,15 +3520,15 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
           payments.docs.map((d) => d.data())
         )
       : null,
-    // The Miner's whole history for the ledger: every mined day once, and every payment.
+    // The Miner's whole history for the ledger: every day a notice listed once, and every payment.
     ledger: {
-      days: ledgerDays(statements.docs.map((d) => d.data())),
+      days: ledgerDays(mergeNotices(current, legacy)),
       payments: ledgerPayments(
         payments.docs.map((d) => ({ id: d.id, data: d.data() })),
         b.startDate as string | undefined
       ),
     },
-    remindersStopped: s.remindersStopped === true,
+    remindersStopped: notice.mail.remindersStopped,
     // A guest's closed account (epic): set by the `closeAccount` edit (#4184).
     accountClosed: miner.exists && miner.get('closedAt') != null,
     // Characters an officer added by hand that still wait for their own confirmation (#4210).
@@ -3527,23 +3544,23 @@ export async function setRemindersByToken(deps: BookDeps, token: string, stopped
   await deps.db.runTransaction(async (tx) => {
     const snap = await tx.get(tokenRef);
     if (!snap.exists) fail('not-found', 'Verify link is not valid', 'invalid-token');
-    const { corporationId, statementId, minerId } = snap.data() as {
+    const { corporationId, minerId, ...held } = snap.data() as {
       corporationId: number;
-      statementId: string;
       minerId: string;
-    };
+    } & Data;
+    const book = bookRef(deps.db, corporationId);
+    const loaded = await readLateNotice(tx, book, held[NOTICE_ID_FIELD] as string);
+    if (!loaded) fail('not-found', 'Verify link is not valid', 'invalid-token');
     tx.update(tokenRef, { remindersStopped: stopped });
-    tx.update(sub(deps.db, corporationId, STATEMENTS).doc(statementId), {
-      remindersStopped: stopped,
-    });
-    // The audit entry names the Statement, never the token.
+    writeNoticeMail(tx, book, loaded, { kind: 'remindersStopped', stopped });
+    // The audit entry names the notice, never the token.
     appendAudit(
       tx,
       deps,
       corporationId,
       { characterId: null, name: 'Miner (verify link)', via: 'verify-link' },
       'stopReminders',
-      { statementId, minerId, stopped }
+      { noticeId: loaded.notice.id, minerId, stopped }
     );
   });
   return { stopped };

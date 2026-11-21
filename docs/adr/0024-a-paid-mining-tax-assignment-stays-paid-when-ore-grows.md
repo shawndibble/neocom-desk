@@ -15,8 +15,8 @@ flips the Assignment to `needs-review`, so a pilot who already paid sees a
 settled day reopen.
 
 The **Corp Tax Book** (ADR 0023, epic #4055) makes this worse. Its rule is
-forward-only: an issued **Statement** never changes, and late ore on a paid
-Statement's days is written off, never billed. If the personal tab reopens a
+forward-only: a day the book has recorded paid stays paid, and late ore on a
+paid day is written off, never billed. If the personal tab reopens a
 paid day the corp has closed, a corp member and their corp disagree about whether
 anything is owed, which the book's forward-only rule exists to prevent.
 

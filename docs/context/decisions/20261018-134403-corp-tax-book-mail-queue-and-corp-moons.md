@@ -19,6 +19,6 @@ D-numbers are the decision numbers in epic #4055.
 - **Route `/corp/moons` with three tabs (D21):** Extractions (timeline,
   states, ore and ISK, mined vs left; drill into a moon's history), Miners
   (owed, overdue first; drill into a miner's days, payments, dismissals and
-  mail) and Statements (periods, sending, the queue). Settings open from the
+  mail) and Late notices (first calendar periods; sending, the queue). Settings open from the
   page header. The moon Kind Cards on `/corp` link here.
 - **No UI is built before one of three mockup options is chosen** (#4056).

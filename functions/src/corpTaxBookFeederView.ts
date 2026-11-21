@@ -16,7 +16,9 @@ import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import type { CollectionReference, Firestore } from 'firebase-admin/firestore';
 import { commitInBatches } from './commitInBatches.js';
-import { FEEDER_VIEWS, STATEMENTS, utcDate } from './corpTaxBook.js';
+import { FEEDER_VIEWS, LATE_NOTICES, utcDate } from './corpTaxBook.js';
+import { mergeNotices } from './corpTaxBookLateNoticeStore.js';
+import { legacyNotices } from './corpTaxBookLegacyMirror.js';
 import {
   BOOK_DEFAULTS,
   accrueValuedDays,
@@ -575,9 +577,9 @@ async function loadPrices(
 }
 
 /**
- * What issued Statements billed the miners' lines at, for the covered rows with no saved price
- * (#6209). Reads nothing when every row is priced; else only the Statements that reach the
- * earliest such day.
+ * What the Late notices listed the miners' lines at, for the covered rows with no saved price
+ * (#6209). Reads nothing when every row is priced; else only the notices that can list the
+ * earliest such day (issued on or after it), from both collections while the legacy mirror lives.
  */
 async function readBilledPrices(
   book: FirebaseFirestore.DocumentReference,
@@ -597,15 +599,14 @@ async function readBilledPrices(
     if (earliest === undefined || r.date < earliest) earliest = r.date;
   }
   if (earliest === undefined) return out;
-  const snap = await book.collection(STATEMENTS).where('coversThrough', '>=', earliest).get();
-  for (const doc of snap.docs) {
-    const lines = doc.get('lines') as unknown;
-    if (!Array.isArray(lines)) continue;
-    for (const line of lines as { chargeKey?: unknown; unitPrices?: unknown }[]) {
-      if (typeof line.chargeKey !== 'string' || !keys.has(line.chargeKey)) continue;
-      if (out.has(line.chargeKey) || typeof line.unitPrices !== 'object' || !line.unitPrices)
-        continue;
-      out.set(line.chargeKey, line.unitPrices as Record<string, number>);
+  const [current, legacy] = await Promise.all([
+    book.collection(LATE_NOTICES).where('issuedAt', '>=', earliest).get(),
+    legacyNotices(book).where('coversThrough', '>=', earliest).get(),
+  ]);
+  for (const notice of mergeNotices(current, legacy)) {
+    for (const line of notice.lines) {
+      if (!keys.has(line.key) || out.has(line.key) || !line.unitPrices) continue;
+      out.set(line.key, line.unitPrices);
     }
   }
   return out;

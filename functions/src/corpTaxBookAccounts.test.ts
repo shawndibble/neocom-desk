@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ledgerDays, ledgerPayments, liveAccount } from './corpTaxBookAccounts.js';
+import { ledgerDays, ledgerPayments, liveAccount, paidSinceRecord } from './corpTaxBookAccounts.js';
 
 describe('liveAccount', () => {
   const recorded = {
@@ -28,6 +28,14 @@ describe('liveAccount', () => {
       days: 0,
       oldest: null,
     });
+  });
+});
+
+describe('paidSinceRecord', () => {
+  it('is what the Miner paid, net of not tax, beyond what the record counted', () => {
+    const payments = [{ amount: 1_000_000 }, { amount: 3_000_000, notTaxAmount: 1_000_000 }];
+    expect(paidSinceRecord({ paid: 1_000_000 }, payments)).toBe(2_000_000);
+    expect(paidSinceRecord({ paid: 9_000_000 }, payments)).toBe(0);
   });
 });
 

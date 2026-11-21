@@ -32,4 +32,4 @@ end-of-day bullets stand._
   functions deploy; nothing reads either.
 - **Amounts on unbilled days can change.** A tax row on a day that had no saved
   price was billed at today's live buy; it now prices at that day's buy.
-  Already-billed Statements keep their stored amounts, as before.
+  Late notices already sent keep their stored amounts, as before.
