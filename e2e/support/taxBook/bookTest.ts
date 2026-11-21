@@ -22,7 +22,8 @@ import { installFlatPrices } from './prices';
 import { EMULATOR_HOSTS } from './runEnv';
 
 /**
- * The officer's grant: the Core Grant and only the Permissions the book's pages use (corp roles,
+ * The officer's grant: the Core Grant and only the Permissions the book's pages use (the pilot's
+ * details, which name them; corp roles,
  * wallets and ledgers; the pilot's own mining and wallet; mail to send late notices). Not the
  * suite's full grant: at boot the app warms every granted endpoint, and with all of them the
  * corp role lookup the officer check waits on queued behind ~25 personal reads, pushing a book
@@ -31,7 +32,7 @@ import { EMULATOR_HOSTS } from './runEnv';
 export const OFFICER_SCOPES: readonly string[] = [
   ...new Set([
     ...CORE_GRANT,
-    ...(['corp', 'mining', 'wallet', 'mailSend'] as const).flatMap((group) =>
+    ...(['characterDetails', 'corp', 'mining', 'wallet', 'mailSend'] as const).flatMap((group) =>
       scopesForGroup(group)
     ),
   ]),
