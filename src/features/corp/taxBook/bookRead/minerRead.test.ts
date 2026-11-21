@@ -157,6 +157,27 @@ describe('readBook for one Miner', () => {
 
   // #6206/#6207: Needs you lists them on every page, so a one-Miner read that claims the core
   // and the ledger reads them as the whole book does.
+  it('reads no legacy notice once the server has backfilled them (M10)', async () => {
+    store.docs.set(BOOK, {
+      active: true,
+      startDate: '2026-08-01',
+      bookVersion: 'b1',
+      collectionVersions: { lateNotices: 'v1', meta: 'v1' },
+    });
+    store.docs.set(`${BOOK}/lateNotices/n1`, {
+      id: 'n1',
+      minerId: 'm1',
+      kind: 'late',
+      issuedAt: '2026-09-02T00:00:00Z',
+      lines: [],
+      mail: { sent: 0, manualSent: 0, remindersStopped: false },
+    });
+    store.docs.set(`${BOOK}/meta/lateNoticesBackfilled`, { at: 1 });
+    const d = (await readMiner('m1'))!;
+    expect(d.state.notices.map((n) => n.id)).toEqual(['n1']);
+    expect(store.reads.filter((p) => p.startsWith(`${BOOK}/statements/`))).toEqual([]);
+  });
+
   it("reads the disputes it claims, this Miner's only, and the uncounted donations", async () => {
     store.docs.set(BOOK, {
       active: true,

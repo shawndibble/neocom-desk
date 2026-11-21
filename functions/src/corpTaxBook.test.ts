@@ -29,11 +29,10 @@ import {
   donationsReadAtPatch,
   parseToken,
   parseTurnOnInput,
-  reanchorCadence,
   satisfies,
   startDateMoveReason,
 } from './corpTaxBook.js';
-import { finalNoticeId, paymentCode } from './corpTaxBookLateNotice.js';
+import { finalNoticeId, minerPaymentCode, paymentCode } from './corpTaxBookLateNotice.js';
 
 describe('decideRoles (D8)', () => {
   it.each([
@@ -657,6 +656,12 @@ describe('parsers', () => {
     expect(parseEditAction(payment)).not.toHaveProperty('statementId');
   });
 
+  it('names an edit it does not know as an unknown action, so a newer client can tell', () => {
+    expect(() => parseEditAction({ action: 'fromTheFuture' })).toThrow(
+      expect.objectContaining({ code: 'invalid-argument', details: { reason: 'unknown-action' } })
+    );
+  });
+
   it('moves a payment to another Miner, or back to Unmatched, re-checking the role live', () => {
     const move = parseEditAction({ action: 'reassignPayment', paymentId: 'j1_1', minerId: 'm2' });
     expect(move).toEqual({ action: 'reassignPayment', paymentId: 'j1_1', minerId: 'm2' });
@@ -1105,23 +1110,6 @@ describe('settings patch: start date and member visibility', () => {
   });
 });
 
-describe('reanchorCadence', () => {
-  const days = { kind: 'days', days: 7, anchor: '2026-10-01' };
-  it('moves an N-day anchor that sat on the old start to the new start', () => {
-    expect(reanchorCadence(days, '2026-10-01', '2026-09-25')).toEqual({
-      kind: 'days',
-      days: 7,
-      anchor: '2026-09-25',
-    });
-  });
-  it('leaves a custom anchor, a monthly cadence and no cadence alone', () => {
-    expect(reanchorCadence(days, '2026-09-01', '2026-09-25')).toBe(days);
-    const monthly = { kind: 'monthly' };
-    expect(reanchorCadence(monthly, '2026-10-01', '2026-09-25')).toBe(monthly);
-    expect(reanchorCadence(undefined, '2026-10-01', '2026-09-25')).toBeUndefined();
-  });
-});
-
 describe('Pop Sharing edits (#6222)', () => {
   it('parses turning sharing on and a Sharing default change', () => {
     expect(
@@ -1412,7 +1400,7 @@ describe('Late notices and checkpoints (decision 20261120-235011)', () => {
     characterIds: [9001],
     kind: 'late',
     issuedAt: '2026-11-18T09:00:00Z',
-    code: paymentCode('notice_solo:9001_2026-11-18'),
+    code: minerPaymentCode('solo:9001'),
     pricing: { hubId: 'jita', oreForm: 'compressed' },
     uids: ['char:1'],
     lines: [
@@ -1440,7 +1428,7 @@ describe('Late notices and checkpoints (decision 20261120-235011)', () => {
       characterIds: [9001],
       kind: 'late',
       issuedAt: '2026-11-18T09:00:00.000Z',
-      code: paymentCode(notice.id),
+      code: minerPaymentCode('solo:9001'),
       pricing: { hubId: 'jita', oreForm: 'compressed' },
       listed: 10_005,
       names: { minerName: 'Ore Pilot', refineryNames: { '1000': 'Athanor X' } },
@@ -1488,10 +1476,11 @@ describe('Late notices and checkpoints (decision 20261120-235011)', () => {
     expect(() => parseLateNotice({ ...notice, id: 'final_other' })).toThrow();
   });
 
-  it('prints the code its id hashes to, and refuses any other', () => {
-    const own = paymentCode(notice.id);
+  it("prints the Miner's one code, and refuses any other, the id's own included", () => {
+    const own = minerPaymentCode('solo:9001');
     expect(parseLateNotice({ ...notice, code: own }).code).toBe(own);
     expect(parseLateNotice({ ...notice, code: undefined }).code).toBe(own);
+    expect(() => parseLateNotice({ ...notice, code: paymentCode(notice.id) })).toThrow();
     expect(() => parseLateNotice({ ...notice, code: 'MT00AB12' })).toThrow();
   });
 
@@ -1590,10 +1579,11 @@ describe('Late notices and checkpoints (decision 20261120-235011)', () => {
     const checkpoint = {
       minerId: 'solo:9001',
       through: '2026-09-30',
-      owed: [{ date: '2026-09-02', remaining: 50, charge: 10 }],
+      owed: [{ date: '2026-09-02', remaining: 50, tax: 60, credited: 10, charge: 10, held: true }],
       credit: 0,
       balance: 50,
       paidThrough: '2026-09-01',
+      characterIds: [9001, 9001],
       at: '2026-11-18T09:00:00Z',
       by: 1,
     };
@@ -1606,10 +1596,13 @@ describe('Late notices and checkpoints (decision 20261120-235011)', () => {
           {
             minerId: 'solo:9001',
             through: '2026-09-30',
-            owed: [{ date: '2026-09-02', remaining: 50, charge: 10 }],
+            owed: [
+              { date: '2026-09-02', remaining: 50, tax: 60, credited: 10, charge: 10, held: true },
+            ],
             credit: 0,
             balance: 50,
             paidThrough: '2026-09-01',
+            characterIds: [9001],
           },
         ],
       });
@@ -1632,6 +1625,10 @@ describe('Late notices and checkpoints (decision 20261120-235011)', () => {
       expect(() => bad({ owed: [{ date: 'x', remaining: 1 }] })).toThrow();
       expect(() => bad({ paidThrough: 5 })).toThrow();
       expect(() => bad({ minerId: 'a/b' })).toThrow();
+      // The day's whole figures and the characters it summed are required.
+      expect(() => bad({ owed: [{ date: '2026-09-02', remaining: 50 }] })).toThrow();
+      expect(() => bad({ characterIds: undefined })).toThrow();
+      expect(() => bad({ owed: [{ ...checkpoint.owed[0], held: 'yes' }] })).toThrow();
     });
   });
 });
@@ -1640,12 +1637,13 @@ describe('checkpointRefusal: a checkpoint is a cache, stored only when it can be
   const k = {
     minerId: 'solo:5',
     through: '2026-08-31',
-    owed: [{ date: '2026-08-20', remaining: 100 }],
+    owed: [{ date: '2026-08-20', remaining: 100, tax: 100, credited: 0 }],
     credit: 0,
     balance: 100,
     paidThrough: '2026-08-19',
+    characterIds: [5],
   };
-  const ctx = { today: '2026-10-18', known: true, isDirector: false };
+  const ctx = { today: '2026-10-18', known: true, characterIds: [5], isDirector: false };
   const live = {
     unpaidDays: [
       { date: '2026-08-20', owed: 100 },
@@ -1654,24 +1652,29 @@ describe('checkpointRefusal: a checkpoint is a cache, stored only when it can be
   };
 
   it('stores one that moves forward, adds up and owes what the account says', () => {
-    expect(checkpointRefusal(k, ctx)).toBeNull();
-    expect(checkpointRefusal(k, { ...ctx, live })).toBeNull();
+    expect(checkpointRefusal(k, ctx)).toEqual([]);
+    expect(checkpointRefusal(k, { ...ctx, live })).toEqual([]);
   });
 
-  it('refuses one that does not move forward, does not add up, or names no Miner', () => {
-    expect(checkpointRefusal(k, { ...ctx, stored: { through: '2026-08-31' } })).toBe('not-forward');
-    expect(checkpointRefusal({ ...k, balance: 5 }, ctx)).toBe('balance');
-    expect(checkpointRefusal(k, { ...ctx, known: false })).toBe('unknown-miner');
+  it('names every reason it refuses one', () => {
+    expect(
+      checkpointRefusal({ ...k, balance: 5 }, { ...ctx, stored: { through: '2026-08-31' } })
+    ).toEqual(['not-forward', 'balance']);
+    expect(checkpointRefusal(k, { ...ctx, known: false })).toEqual(['unknown-miner']);
+  });
+
+  it('refuses one summed for other characters than the Miner has now', () => {
+    expect(checkpointRefusal(k, { ...ctx, characterIds: [5, 6] })).toEqual(['characters-changed']);
   });
 
   it('owing less than the recorded account through that day needs a Director', () => {
     const less = { ...k, owed: [], balance: 0, paidThrough: '2026-08-31' };
-    expect(checkpointRefusal(less, { ...ctx, live })).toBe('director-approval');
-    expect(checkpointRefusal(less, { ...ctx, live, isDirector: true })).toBeNull();
+    expect(checkpointRefusal(less, { ...ctx, live })).toEqual(['director-approval']);
+    expect(checkpointRefusal(less, { ...ctx, live, isDirector: true })).toEqual([]);
     // Days after `through` are not the checkpoint's to owe.
     expect(
       checkpointRefusal(k, { ...ctx, live: { unpaidDays: [{ date: '2026-09-02', owed: 70 }] } })
-    ).toBeNull();
+    ).toEqual([]);
   });
 });
 

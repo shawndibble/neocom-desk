@@ -11,6 +11,7 @@ import {
 import type { BookView } from './bookView';
 import { MinerRunningAccount } from './minerRunningAccount';
 import { paymentNet } from './payments';
+import { savedPrice } from './billableLines';
 
 /** One Miner's account as `recordAccounts` takes it. */
 export interface AccountRecord {
@@ -73,19 +74,24 @@ export function accountRecords(view: BookView, only?: string): AccountRecord[] {
 /**
  * The checkpoints due now (decision 20261120-235011): each Miner's account closed through the end
  * of the last month at least 31 days old, where that moves the stored one forward. Only an
- * officer's client can work them out: the server has no prices. `only` keeps one Miner.
+ * officer's client can work them out: the server has no prices. Only from a read of the WHOLE
+ * book: a page read for one Miner cannot see the groupings around them.
  */
 export function dueCheckpoints(
   view: BookView,
-  recorded: { at: string; by: number },
-  only?: string
+  recorded: { at: string; by: number }
 ): RunningAccountCheckpoint[] {
   const today = recorded.at.slice(0, 10);
   const through = closedThroughFor(today);
   if (through < view.input.startDate) return [];
   return view.miners.flatMap((m) => {
     const inner = view.internals.byMiner.get(m.id);
-    if (!inner || (only !== undefined && m.id !== only)) return [];
+    if (!inner) return [];
+    // A checkpoint is history kept for good: only days the book bills for certain go in it. Every
+    // day up to `through` must be billable (no moon owner's hold, no sync gap) and priced at a
+    // saved close-of-day price, as `closableThrough` asks of a day stored as paid.
+    if (inner.billableThrough === undefined || inner.billableThrough < through) return [];
+    if (!inner.billable.lines.every((l) => l.date > through || savedPrice(l))) return [];
     const stored = view.input.checkpoints?.get(m.id);
     if (!canAdvanceCheckpoint(stored, { through }, today)) return [];
     // Nothing billed and no money: nothing to close.

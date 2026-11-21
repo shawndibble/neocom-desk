@@ -8,6 +8,7 @@
  * Firestore here is the `lite` build (no listeners), so callers refetch after
  * a change.
  */
+import { LIVE_CHECK_ACTION_NAMES } from '../../../../functions/src/corpTaxBookKinds';
 import { parseBookSettings, type BookSettings } from '@/engine/corpTaxBook/bookDocs';
 import type { DivisionNames } from '@/engine/corpTaxBook/divisionNames';
 import type { PayeeSetBy } from '@/engine/corpTaxBook/payeeChange';
@@ -24,7 +25,8 @@ import {
 import { getValidAccessToken } from '@/auth/session';
 import { popShareMarks, type PopShareMarks } from '@/engine/corpTaxBook/popShareMarks';
 import { readPopSharingCached } from './popSharingCache';
-import type { Miner } from '@/engine/corpTaxBook/charges';
+import { bookMinersOf, type Miner } from '@/engine/corpTaxBook/charges';
+import { MINER_LIST_DOC } from '../../../../functions/src/corpTaxBookReadModels';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
 import type { Declaration } from '@/engine/corpTaxBook/overdue';
 import type { Adjustment } from '@/engine/corpTaxBook/adjustments';
@@ -179,6 +181,27 @@ export interface FeederChunkParts {
 }
 
 /**
+ * Every Miner of the book, for a picker on a page read for one Miner (moving a payment): the
+ * groupings, and each Miner of its own the server's miner list names (one doc). Without that doc
+ * (an older server) only the groupings.
+ */
+export async function readBookMiners(characterId: number, corporationId: number): Promise<Miner[]> {
+  await ensureSignedIn(characterId);
+  const book = doc(getSyncFirestore(characterId), 'corps', String(corporationId));
+  return asOfficer(characterId, corporationId, async () => {
+    const [grouped, list] = await Promise.all([
+      getDocs(collection(book, 'miners')),
+      getDoc(doc(book, 'readModels', MINER_LIST_DOC)).catch(() => null),
+    ]);
+    const listed = (list?.data()?.miners as { minerId?: unknown }[] | undefined) ?? [];
+    return bookMinersOf(
+      grouped.docs.map((d) => ({ ...(d.data() as Miner), id: d.id })),
+      listed.flatMap((m) => (typeof m.minerId === 'string' ? [m.minerId] : []))
+    );
+  });
+}
+
+/**
  * The Feeder Extractions a book holds and the records that name their refineries (#6116),
  * under the officer rules. Null when the corporation has no book. The Extractions come from the
  * Overview read model (ADR 0032: one doc, already windowed and without cancelled ones); a book
@@ -260,21 +283,10 @@ export function uploadSync(characterId: number, upload: SyncUpload): Promise<Syn
 }
 
 /**
- * Edits that re-check the Character's roles live (D7). The callable refuses
- * them on the 10-minute cache, so the access token travels with them.
+ * Edits that re-check the Character's roles live (D7). The callable refuses them on the 10-minute
+ * cache, so the access token travels with them. The server's own list, so the two cannot drift.
  */
-export const LIVE_CHECK_ACTIONS: ReadonlySet<string> = new Set([
-  'dismiss',
-  'dismissRecords',
-  'dismissDispute',
-  'reverseDismissal',
-  'reverseAdjustment',
-  'editAdjustment',
-  'reverseWriteOff',
-  'setToleranceExemption',
-  'writeOff',
-  'markNotTax',
-]);
+export const LIVE_CHECK_ACTIONS: ReadonlySet<string> = new Set(LIVE_CHECK_ACTION_NAMES);
 
 /** A close-account that forfeits credit writes value off, so it re-checks the role live too (#4184). */
 function needsLiveToken(action: { action: string } & Record<string, unknown>): boolean {
@@ -732,9 +744,35 @@ const LEGACY_NOTICE_LINKS = 'statementLinks';
 export async function readNotices(book: OpenBook): Promise<LateNotice[]> {
   const [current, legacy] = await Promise.all([
     book.written(LATE_NOTICES) ? book.list<unknown>(LATE_NOTICES).catch(() => []) : [],
-    book.list<unknown>(LEGACY_NOTICES),
+    readsLegacyNotices(book).then((reads) => (reads ? book.list<unknown>(LEGACY_NOTICES) : [])),
   ]);
   return readLateNotices(current, legacy);
+}
+
+/**
+ * Doc under `meta` the server writes once its backfill copied every legacy notice into
+ * `lateNotices` (`BACKFILLED_DOC`, functions/src/corpTaxBookLateNoticeStore.ts).
+ */
+const NOTICES_BACKFILLED_DOC = 'lateNoticesBackfilled';
+
+/** Whether the legacy notice docs still need reading: until the backfill marker exists, as the server reads them. */
+export async function readsLegacyNotices(book: OpenBook): Promise<boolean> {
+  if (!book.written(LATE_NOTICES)) return true;
+  try {
+    const marker = await book.part(
+      'meta',
+      async () =>
+        (
+          await getDoc(
+            doc(book.db, 'corps', String(book.corporationId), 'meta', NOTICES_BACKFILLED_DOC)
+          )
+        ).exists(),
+      'meta:noticesBackfilled'
+    );
+    return !marker;
+  } catch {
+    return true;
+  }
 }
 
 /** Each Miner's closed-through checkpoint; none until the server has written one. Best effort. */
@@ -777,6 +815,9 @@ export async function readVerifyTokens(
 }
 
 /** Whether a refusal says the server does not know an action yet (Cloud Functions ship later). */
+// TODO(M7): fall back only on the router's exact unknown-action answer, not on any
+// `invalid-argument` or `not-found` (a real refusal of a known action falls back today). The
+// server agent is naming the exact old and new answers; match them here once known.
 const unknownAction = (error: unknown) => {
   const code = errorCode(error);
   return code.endsWith('invalid-argument') || code.endsWith('not-found');

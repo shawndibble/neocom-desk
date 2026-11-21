@@ -101,6 +101,7 @@ emulatorSuite('the nightly pass (emulator)', () => {
         minerId: 'solo:50',
         issuedAt: '2026-10-15T00:00:00Z',
         lines: [{ date: '2026-10-11', tax: 100 }],
+        mail: { sent: 0, manualSent: 0, remindersStopped: false },
       });
     await verifyBook(db, CORP, () => NOW);
     const list = (await book().collection('readModels').doc('minerList').get()).data();

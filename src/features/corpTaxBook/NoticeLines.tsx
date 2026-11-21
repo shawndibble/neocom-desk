@@ -27,9 +27,12 @@ type DateFormat = (value: string) => string;
 export function NoticeLines({
   notice: statement,
   formatDate,
+  title,
 }: {
   notice: NoticeLinesSource;
   formatDate?: DateFormat;
+  /** The section's title; the Miner's own page says "What you mined". */
+  title?: string;
 }) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
@@ -51,7 +54,7 @@ export function NoticeLines({
   return (
     <div className="@container">
       <Panel
-        title={t('corpTaxBook.verify.mined')}
+        title={title ?? t('corpTaxBook.verify.mined')}
         meta={<span className="hidden text-xs text-text-dim @md:inline">{minedMeta}</span>}
         padded={false}
       >

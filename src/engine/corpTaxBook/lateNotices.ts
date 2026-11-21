@@ -13,8 +13,9 @@ import { newest, type BookView } from './bookView';
 import {
   lateNoticeFromStatementDoc,
   listedKeys,
+  mergeNoticeMail,
   noticeDocId,
-  paymentCode,
+  minerPaymentCode,
   type LateNotice,
   type LateNoticeKind,
 } from '../../../functions/src/corpTaxBookLateNotice';
@@ -35,6 +36,8 @@ export interface NoticePlan {
 export interface OwedDay {
   date: string;
   owed: number;
+  /** An officer's charge on the day, owed as a line of its own: no place. */
+  correction?: true;
   structureId?: number;
   moonId?: number;
 }
@@ -57,7 +60,15 @@ export function owedDays(view: BookView, minerId: string): OwedDay[] {
         ...(d.moonId !== undefined ? { moonId: d.moonId } : {}),
       });
   }
-  return [...byPlace.values()].sort(
+  // An officer's charge is owed like a mined line; a credit correction is in each line's share.
+  const charges = new Map<string, number>();
+  for (const l of inner.billable.lines)
+    if (l.kind === 'correction' && l.tax > 0)
+      charges.set(l.date, (charges.get(l.date) ?? 0) + inner.account.owedOf(l.date, l.tax));
+  const corrections = [...charges]
+    .filter(([, owed]) => owed > 0)
+    .map(([date, owed]): OwedDay => ({ date, owed, correction: true }));
+  return [...corrections, ...byPlace.values()].sort(
     (a, b) => a.date.localeCompare(b.date) || (a.structureId ?? 0) - (b.structureId ?? 0)
   );
 }
@@ -84,11 +95,9 @@ export function draftNotice(
     return day !== undefined && !day.held && !day.settled && !listed.has(l.key);
   });
 
-  // What the new lines still owe: each date's remainder, by the share of it they bill.
-  const taxByDate = new Map<string, number>();
-  for (const l of lines) taxByDate.set(l.date, (taxByDate.get(l.date) ?? 0) + l.tax);
-  let onLines = 0;
-  for (const [date, tax] of taxByDate) if (tax > 0) onLines += account.owedOf(date, tax);
+  // What the new lines still owe: each charging line's share of its date's remainder (a credit
+  // correction is in the remainder already, so it is no share of its own).
+  const onLines = lines.reduce((sum, l) => sum + account.owedOf(l.date, l.tax), 0);
 
   const first = lines[0]?.date ?? owes.oldest;
   const id = noticeDocId(opts.id ?? `notice_${first}_${minerId}_${now.slice(0, 10)}`);
@@ -99,8 +108,8 @@ export function draftNotice(
       characterIds: row.characterIds,
       kind: opts.kind ?? 'late',
       issuedAt: now,
-      // The server sets a notice's code itself, as this, and refuses any other.
-      code: paymentCode(id),
+      // The Miner's one code, which the mail asks for: the server sets it as this, and refuses any other.
+      code: minerPaymentCode(minerId),
       pricing: { hubId: view.input.hubId, oreForm: view.input.oreForm },
       uids: row.characterIds.map((c) => `char:${c}`),
       lines,
@@ -165,9 +174,9 @@ export function planNotices(
 }
 
 /**
- * The book's late notices from both places they are stored: `lateNotices` docs, and the
- * `statements` docs older servers wrote them as (`kind: 'notice'`), one per id. A `lateNotices`
- * doc wins: it is the one the server keeps.
+ * The book's late notices from both places they are stored: `lateNotices` docs, and the legacy
+ * docs older servers wrote them as, one per id, read as the server reads them. A `lateNotices`
+ * doc wins, with the mail state of both copies.
  */
 export function readLateNotices(
   noticeDocs: readonly unknown[],
@@ -175,7 +184,10 @@ export function readLateNotices(
 ): LateNotice[] {
   const byId = new Map<string, LateNotice>();
   for (const raw of legacyDocs) {
-    const notice = isRecord(raw) ? lateNoticeFromStatementDoc(raw) : undefined;
+    // Every legacy doc the book still reads is a notice, as the server reads it (`fromLegacy`).
+    const notice = isRecord(raw)
+      ? lateNoticeFromStatementDoc({ ...raw, kind: 'notice' })
+      : undefined;
     if (notice?.id && notice.minerId) byId.set(notice.id, notice);
   }
   for (const raw of noticeDocs) {
@@ -183,7 +195,9 @@ export function readLateNotices(
     if (!Array.isArray(raw.lines) || !isRecord(raw.mail)) continue;
     const notice = { ...raw } as unknown as LateNotice & { updatedAt?: unknown };
     delete notice.updatedAt;
-    byId.set(notice.id, notice);
+    // A mail change an older tab wrote to only one copy still counts (`mergeNoticeMail`).
+    const old = byId.get(notice.id);
+    byId.set(notice.id, old ? { ...notice, mail: mergeNoticeMail(notice.mail, old.mail) } : notice);
   }
   return [...byId.values()];
 }

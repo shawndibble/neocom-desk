@@ -14985,7 +14985,7 @@
           "title": "Kept for your corporation",
           "description": "Only if your corporation uses SRP or a Corp Tax Book, or you shared a Vetting report with a corporation. These are the corporation's records, not yours: they sit on our server (Google Firebase) under the corporation's ID, and Delete all data leaves them with it. A Vetting report is the exception: the pilot can delete their own from its status page.",
           "srp": "SRP Claims: the killmail, the Character's name and ID, the hull, system and loss value, the fleet or FC and note you gave, the Reimbursement and the claim's state. Also the corporation's SRP settings, its Doctrine Fits and its SRP log: each filing (with the pilot's name, killmail, hull and amount) and each officer action. The CEO, Directors and Accountants read all of it; a pilot reads only their own claims.",
-          "corpTaxBook": "The Corp Tax Book: what each Character mined at the refineries it covers (corp members, Guests, and miners at a moon owner's refineries it collects for), the Statements sent, the payments that settle them, write-offs and corrections (an officer can reverse one, and it stays on record marked reversed), the day each Miner is recorded paid through, an officer's limit on how much of a short day is forgiven, a miner's own \"I paid this another way\" declarations and disputes of a line with the officers' answers, a log of who did each, and which books bill each Character (kept under that Character's ID), the groups of Characters an officer set up or removed (a Miner's characters, and any an officer added from outside the corporation by name, which see nothing of the group until their owner logs in as them). Logging in with several Characters also lets the app prove they are one Player: for each, a one-way owner hash and the time it was proven are kept (never a token), readable only by those Characters, and a corporation sees a link only for a Character in its own book. The CEO, Directors, Accountants and Junior Accountants read the whole book; a corp member reads only their own lines; a moon owner reads only its own mined volume, rate, amount due and payouts, never what each miner owes. A Statement's verify link, sent by mail, shows that Statement to whoever has the link. With Pop Sharing on, each shared moon's pop (refinery, moon, Pop Time, ore make-up if shared, notes and rate, never ISK) is kept for the pilots in the audiences the officers chose, until the belt expires; a Community admin's block of a sharing corporation is kept in the Community.",
+          "corpTaxBook": "The Corp Tax Book: what each Character mined at the refineries it covers (corp members, Guests, and miners at a moon owner's refineries it collects for), the late notices sent, the payments that pay each Miner's oldest days, write-offs and corrections (an officer can reverse one, and it stays on record marked reversed), the day each Miner is recorded paid through, an officer's limit on how much of a short day is forgiven, a miner's own \"I paid this another way\" declarations and disputes of a line with the officers' answers, a log of who did each, and which books bill each Character (kept under that Character's ID), the groups of Characters an officer set up or removed (a Miner's characters, and any an officer added from outside the corporation by name, which see nothing of the group until their owner logs in as them). Logging in with several Characters also lets the app prove they are one Player: for each, a one-way owner hash and the time it was proven are kept (never a token), readable only by those Characters, and a corporation sees a link only for a Character in its own book. The CEO, Directors, Accountants and Junior Accountants read the whole book; a corp member reads only their own lines; a moon owner reads only its own mined volume, rate, amount due and payouts, never what each miner owes. A late notice's link, sent by mail, shows that notice and what the Miner owes now to whoever has the link. With Pop Sharing on, each shared moon's pop (refinery, moon, Pop Time, ore make-up if shared, notes and rate, never ISK) is kept for the pilots in the audiences the officers chose, until the belt expires; a Community admin's block of a sharing corporation is kept in the Community.",
           "vetting": "Vetting: for a pilot who applied to a corporation or shared a review with it, a report of what one read of their Characters found. It holds each Character's name, corporation, age and skill points, the flags raised with up to 10 rows behind each (who a wallet, contract, contact or mail row was with, when, and the ISK), and every row the read returned, kept as it was read: the last 30 days of wallet journal and contracts, every contact, mail headers (who wrote to whom, never a subject or text), every trained skill and corporation history, which the corporation's officers can browse, the pilot's note and their answers to the corporation's questions, the invite link it started from, and who opened or decided it. No mail subject or text is kept, and no login is kept. The corporation's CEO, Directors and Personnel Managers read it; the pilot sees who opened it and can delete it. Also the corporation's watchlist, questions, invite links and settings, and which of its reviewers opened the vetting page in the last 30 days, used only to send the alert for a new report."
         },
         "notes": {
@@ -15047,7 +15047,7 @@
           "srp": "SRP Claims:",
           "srpKept": "a Paid or Rejected claim is deleted 365 days after it closes (checked daily), and its lines in the SRP log (the filing and each officer action on it) go with it. A Pending or Approved claim, the SRP settings and the log's other lines have no expiry; Doctrine Fits stay until a Director or the CEO deletes them.",
           "corpTaxBook": "Corp Tax Book:",
-          "corpTaxBookKept": "no expiry. Its lines, Statements, payments, verify links and log stay until whoever turned the book on, or the CEO, deletes the book, which deletes everything in it, including its place in the record of which books bill each Character.",
+          "corpTaxBookKept": "no expiry. Its lines, late notices, payments, verify links and log stay until whoever turned the book on, or the CEO, deletes the book, which deletes everything in it, including its place in the record of which books bill each Character.",
           "vetting": "Vetting reports:",
           "vettingKept": "deleted 30 days after the corporation decides, or 90 days after it was shared if nobody decides (checked daily), or at once when the pilot deletes it. While a pilot is still adding Characters, the rows read are kept for 24 hours and removed by the daily clean-up; once the report is sent they are kept with it, until the same dates."
         }
@@ -15872,7 +15872,7 @@
         "removeAction": "Remove",
         "removeFailed": "Couldn't remove that. Try again.",
         "changeMainTitle": "Change the main of {{name}}'s Player",
-        "changeMainIntro": "Statements are mailed to the main. Only a character in the corporation can be the main while the Player has one.",
+        "changeMainIntro": "Late notices are mailed to the main. Only a character in the corporation can be the main while the Player has one.",
         "changeMainConfirm": "Change main"
       }
     },
@@ -17988,7 +17988,7 @@
     "verify": {
       "title": "Your late notice",
       "goneTitle": "This link is not valid",
-      "goneHint": "Check that you copied the whole link from the mail. If it still fails, ask the corporation's officers for a fresh Statement.",
+      "goneHint": "Check that you copied the whole link from the mail. If it still fails, ask the corporation's officers for a fresh link.",
       "failedTitle": "Couldn't load this late notice",
       "failedHint": "Check your connection and try again.",
       "theCorp": "the corporation",
@@ -18294,7 +18294,7 @@
           "mined": "Mined (est.)",
           "minedTip": "Ore mined here during each Extraction, from the fracture to the field's end. Mining outside those windows is not counted. Valued at today's hub prices.",
           "tax": "Tax billed",
-          "taxTip": "Tax already billed on Statements for these Extractions. Tax not yet on a Statement is left out; each Extraction's own page shows it."
+          "taxTip": "Tax these Extractions' mining owes, as each Miner's Running account bills it. Each Extraction's own page shows its days."
         },
         "ore": {
           "title": "Ore in the chunk",
@@ -18385,6 +18385,7 @@
         "owed": "Owed",
         "not-billable": "Today's mining",
         "held": "Waiting for {{owner}}'s ledger",
+        "disputed": "Held: disputed, until {{date}}",
         "dismissed": "Dismissed"
       },
       "payment": {
@@ -18692,6 +18693,8 @@
         "even": "even",
         "summary_one": "{{count}} entry · {{balance}} ISK {{side}}",
         "summary_other": "{{count}} entries · {{balance}} ISK {{side}}",
+        "heldByDispute_one": "Held by a dispute: {{count}} day, {{amount}} ISK tax. Not in the balance until the dispute ends.",
+        "heldByDispute_other": "Held by a dispute: {{count}} days, {{amount}} ISK tax. Not in the balance until the dispute ends.",
         "notYetBilled_one": "Not in the balance yet: {{count}} day mined, {{amount}} ISK tax, not billable yet.",
         "notYetBilled_other": "Not in the balance yet: {{count}} days mined, {{amount}} ISK tax, not billable yet.",
         "cols": {
@@ -18858,7 +18861,7 @@
           "writeOff": "wrote off a balance",
           "rebill": "rebilled from a date",
           "issueStatement": "issued a late notice",
-          "settleStatements": "settled Statements",
+          "settleStatements": "settled old calendar bills",
           "declare": "declared a payment",
           "resolveDeclaration": "answered a declaration",
           "recordReminder": "sent a reminder",
@@ -18879,7 +18882,7 @@
           "confirmGrouping": "confirmed a grouping of characters",
           "declineGrouping": "declined a grouping of characters",
           "claimPayment": "claimed a donation",
-          "disputeConflict": "found a dispute that conflicts with a Statement",
+          "disputeConflict": "found a dispute that conflicts with a late notice",
           "withdrawDispute": "withdrew a dispute",
           "refineryLabelSet": "named a refinery",
           "refinerySystemLearned": "learned a refinery's system",
@@ -18952,7 +18955,9 @@
         "billableHint": "A day becomes billable {{hours}} h after it ends, once a sync has read it. The book warns here when nobody has synced for about 3 days.",
         "hiddenLabel": "hidden from members",
         "hiddenHint": "A new book stays out of members' Mining Tax pages for 3 days, so officers can set it up first.",
-        "showToMembers": "Show to members now"
+        "showToMembers": "Show to members now",
+        "checkpointSkipped_one": "The server did not store {{count}} Miner's closed months ({{reasons}}). Their account is read in full meanwhile.",
+        "checkpointSkipped_other": "The server did not store {{count}} Miners' closed months ({{reasons}}). Their accounts are read in full meanwhile."
       },
       "run": {
         "check": "Check",
@@ -19011,7 +19016,7 @@
         "notDirector": "A Director has to turn the book on. Ask one to open this page.",
         "rate": "Corp default tax rate (%)",
         "confirm": "Turn the book on",
-        "startHint": "EVE time (UTC). Mining before this day is kept as history and owes no tax. You can't set a start later than a day a Statement already covers."
+        "startHint": "EVE time (UTC). Mining before this day is kept as history and owes no tax. You can't set a start later than a day already billed."
       },
       "addCorps": {
         "open": "Add my other corps",
@@ -19213,14 +19218,14 @@
           "director-approval": "Over the book's approval limit: a Director must do this.",
           "divisions-changed": "Another officer changed the divisions since you opened the settings. Close and reopen them to see the current divisions, then try again.",
           "already-resolved": "Another officer already answered this.",
-          "not-priced": "That ore isn't on a Statement yet, so there is no tax to waive. Try again once it is billed.",
+          "not-priced": "That ore isn't billed yet, so there is no tax to waive. Try again once it is.",
           "nothing-to-waive": "The disputed ore carries no tax to waive.",
           "not-an-accountant": "That Character is not an Accountant. In EVE's login, pick a Character that holds the Accountant role in the corporation that owns the moons.",
           "invite-invalid": "That invite link or code is not valid.",
           "invite-revoked": "That invite link was cancelled. Ask for a new one.",
           "invite-used": "That invite link was already used. Ask for a new one.",
           "own-book-exists": "This corporation already keeps its own book. Delete it before letting another corporation handle the tax.",
-          "already-declared": "A declaration for this Statement is already waiting for an officer.",
+          "already-declared": "A declaration for this late notice is already waiting for an officer.",
           "already-feeder": "This corporation is already handled by an accounting corporation.",
           "feeder-active": "This corporation is already connected.",
           "token-mismatch": "That login did not match your logged-in account. Try again.",
@@ -19242,14 +19247,14 @@
           "start-before-leave": "The book can start no earlier than the day the accounting corporation stopped handling your moons.",
           "survey-not-found": "That Survey could not be opened. Check the link, and that it has not expired.",
           "unknown-refinery": "That refinery has no mining for this corporation yet.",
-          "settled": "This Statement is already settled.",
+          "settled": "These days are already paid.",
           "role-required": "Your Character does not hold the corporation role this needs.",
-          "start-over-billed": "A Statement already covers days before that date.",
+          "start-over-billed": "Days before that date are already billed.",
           "start-in-future": "The start date can't be in the future.",
           "director-only": "Only a Director can do that.",
           "rate-too-old": "A rate can start at most 30 days back.",
-          "day-on-statement": "That day is already on an issued Statement, so a rate cannot start on or before it.",
-          "running-account": "This book bills a running account now, so it sends late notices instead of Statements. Reload the page to get the current version.",
+          "day-on-statement": "That day is already billed on an issued notice, so a rate cannot start on or before it.",
+          "running-account": "This book bills a Running account, so it sends late notices. Reload the page to get the current version.",
           "transfer-in-book": "That transfer is already in the book, so recording it would count it twice. Assign the donation the sync stored instead: Needs you lists it while no Miner has it.",
           "needs-automatic-sync": "Turn on Automatic sync before sharing pops. Pops are shared as part of each sync.",
           "unknown-moon": "This book has no Extraction at that moon."
@@ -19334,7 +19339,7 @@
         },
         "confirm": {
           "title": "Archive {{name}}?",
-          "body": "It leaves the Refineries list. Its Extractions, mining rows, label and Statements stay, and every figure still counts them. Restore it any time, or mine there again.",
+          "body": "It leaves the Refineries list. Its Extractions, mining rows, label and late notices stay, and every figure still counts them. Restore it any time, or mine there again.",
           "action": "Archive"
         },
         "failed": "Could not save that. Try again."
@@ -19459,7 +19464,7 @@
       },
       "autoSync": {
         "title": "Automatic sync",
-        "hint": "Every 2 hours our server updates this book for you, so it stays current even when no officer visits. It reads the refinery ledger, Extractions, moon notifications and donations in the chosen wallet divisions, and settles Statements that donations now cover. It never issues a Statement and never sends mail.",
+        "hint": "Every 2 hours our server updates this book for you, so it stays current even when no officer visits. It reads the refinery ledger, Extractions, moon notifications and donations in the chosen wallet divisions, and credits the donations to each Miner's Running account. It never issues a late notice and never sends mail.",
         "state": {
           "off": "Off. The book updates when an officer syncs it.",
           "on": "On, held by {{name}}.",
@@ -19475,7 +19480,7 @@
           "unknown": "it could not continue"
         },
         "neverRan": "It has not run yet; the first run is within 2 hours.",
-        "lastRan": "Last ran {{age}}: {{rows}} ledger rows, {{donations}} new donations, {{settled}} Statements settled.",
+        "lastRan": "Last ran {{age}}: {{rows}} ledger rows, {{donations}} new donations.",
         "couldNotRead": "It could not read {{sources}} that time.",
         "missing": {
           "extractions": "Extractions",
@@ -19512,7 +19517,7 @@
       "settings": {
         "open": "Corp Tax Book settings",
         "title": "Corp Tax Book settings",
-        "ratesHint": "The most specific rate wins, in this order: Miner, moon, refinery, moon owner, Guest default, corp default. A rate starts on its date. That can be up to 30 days back, but never on a day an issued Statement already bills.",
+        "ratesHint": "The most specific rate wins, in this order: Miner, moon, refinery, moon owner, Guest default, corp default. A rate starts on its date. That can be up to 30 days back, but never on a day an issued late notice already bills.",
         "rateScope": {
           "corp": "Corp default",
           "guest": "Guest default",
@@ -19583,7 +19588,7 @@
           "hint": "Erases the book for good so the corporation can start over.",
           "open": "Delete the book",
           "confirmTitle": "Delete the book?",
-          "body": "Every mining entry, payment, Statement and the activity log is erased, Automatic sync stops, and Statement verify links stop working. Members' Mining Tax pages stop showing this corporation's book. This can't be undone.",
+          "body": "Every mining entry, payment, late notice and the activity log is erased, Automatic sync stops, and late notice links stop working. Members' Mining Tax pages stop showing this corporation's book. This can't be undone.",
           "confirm": "Delete the book",
           "typeTicker": "Type {{ticker}} to confirm",
           "typeCorpId": "Type the corporation ID {{id}} to confirm"
@@ -19647,7 +19652,7 @@
         "pending": "waiting for their confirmation",
         "confirmed": "confirmed by the player",
         "declined": "declined to join",
-        "declinedByLink": "declined, from the main's Statement link",
+        "declinedByLink": "declined, from the main's late notice link",
         "outsideCorp": "not in the corporation",
         "dialogTitle": "Group characters with {{name}}",
         "dialogIntro": "Pick the Miners whose characters should be billed together.",
@@ -19655,7 +19660,7 @@
         "mailMain": "Mail goes to",
         "confirm_one": "Group {{count}} Miner",
         "confirm_other": "Group {{count}} Miners",
-        "effect": "Their days, Statements and payments are billed as one Miner from now on.",
+        "effect": "Their days, late notices and payments are billed as one Miner from now on.",
         "claimEffect": "A character added by name is billed with the group. Its owner can't see this until they log in as that character.",
         "count_one": "{{count}} character",
         "count_other": "{{count}} characters",
@@ -19684,7 +19689,7 @@
         "rate": {
           "open": "Change a day's rate",
           "title": "Change one day's rate",
-          "intro": "Changes the rate for one Miner's mining at one refinery on one day. 0% means no tax. Not for a day already on a Statement. If the day was already paid, it is repriced too, and any payment no longer needed becomes credit. The change is logged.",
+          "intro": "Changes the rate for one Miner's mining at one refinery on one day. 0% means no tax. Not for a day already on a late notice. If the day was already paid, it is repriced too, and any payment no longer needed becomes credit. The change is logged.",
           "day": "Day",
           "pickDay": "Pick a day",
           "pct": "Rate for that day (%)",
@@ -20113,7 +20118,8 @@
         "notMailed": "Not mailed",
         "notFound": "Late notice not found.",
         "alreadyPaid": "Its days are already paid",
-        "reminderCap": "Reminders stopped; one already sent"
+        "reminderCap": "Reminders stopped; one already sent",
+        "mined": "What they mined"
       }
     },
     "export": {

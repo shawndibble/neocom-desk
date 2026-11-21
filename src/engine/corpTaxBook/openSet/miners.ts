@@ -1,4 +1,4 @@
-import type { DayCharge } from '../charges';
+import { characterIdsOfMiner, type DayCharge } from '../charges';
 import { minerBillableLines } from '../billableLines';
 import { disputeHold, disputesToShow } from '../disputes';
 import { heldBillableThrough, type StaleHold } from '../feederHealth';
@@ -14,13 +14,6 @@ export function minerIdsOf(input: OpenSetInput, charges: readonly DayCharge[]): 
   for (const n of input.notices) ids.add(n.minerId);
   for (const p of input.payments) if (p.minerId) ids.add(p.minerId);
   return [...ids];
-}
-
-/** A Miner's characters: its grouping's, or the one a `solo:` id names. */
-function characterIdsOf(input: OpenSetInput, minerId: string): number[] {
-  const grouping = input.miners.find((m) => m.id === minerId);
-  const solo = /^solo:(\d+)$/.exec(minerId);
-  return grouping?.characterIds ?? (solo ? [Number(solo[1])] : []);
 }
 
 /**
@@ -40,7 +33,7 @@ export function settleMiner(
     (p): p is TaxPayment =>
       p.minerId === minerId && (p.source !== 'donation' || !isBeforeBook(p.at, input.startDate))
   );
-  const characterIds = characterIdsOf(input, minerId);
+  const characterIds = characterIdsOfMiner(minerId, input.miners);
   const hold = characterIds
     .map((cid) => book.holds.get(cid))
     .filter((h) => h !== undefined)

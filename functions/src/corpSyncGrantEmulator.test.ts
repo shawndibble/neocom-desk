@@ -417,7 +417,7 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
   });
 
   describe('the scheduled run', () => {
-    it('syncs and settles a seeded book, rotates the token, and never issues or mails', async () => {
+    it('syncs a seeded book, rotates the token, and never issues, settles or mails', async () => {
       await book().collection('statements').doc('s1').set(statement);
       await optIn(ACCOUNTANT);
       now = T0 + 6 * 3_600_000;
@@ -434,10 +434,10 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       });
       expect((await book().collection('extractions').get()).size).toBe(1);
 
-      // The donation is matched to the Miner who mined (character 50) and settles the Statement.
+      // The donation is matched to the Miner who mined (character 50); nothing settles for good.
       const payment = (await book().collection('payments').doc('j1_1').get()).data();
       expect(payment).toMatchObject({ minerId: 'solo:50', amount: 10_000_000 });
-      expect((await book().collection('meta').doc('paid').get()).data()?.ids).toEqual(['s1']);
+      expect((await book().collection('meta').doc('paid').get()).data()?.ids).toBeUndefined();
 
       const lastSync = (await book().get()).data()?.lastSync;
       expect(lastSync).toMatchObject({
@@ -449,7 +449,7 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       const actions = (await audit())
         .filter((a) => a.via === 'scheduled sync')
         .map((a) => a.action);
-      expect(actions.sort()).toEqual(['settleStatements', 'sync']);
+      expect(actions.sort()).toEqual(['sync']);
 
       expect(await status()).toMatchObject({
         status: 'active',
@@ -458,7 +458,6 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
           observedRows: 1,
           extractions: 1,
           donationsAdded: 1,
-          settled: 1,
         },
         systemIds: { '5000': 30000142 },
       });
@@ -474,7 +473,7 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       );
     });
 
-    it('re-matches an Unmatched donation once its sender is known, then settles', async () => {
+    it('re-matches an Unmatched donation once its sender is known', async () => {
       await book().collection('statements').doc('s1').set(statement);
       await book().collection('payments').doc('j1_1').set({
         id: 'j1_1',
@@ -491,7 +490,6 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       expect((await book().collection('payments').doc('j1_1').get()).data()?.minerId).toBe(
         'solo:50'
       );
-      expect((await book().collection('meta').doc('paid').get()).data()?.ids).toEqual(['s1']);
       expect(
         (await audit()).some((a) => a.action === 'assignPayment' && a.via === 'scheduled sync')
       ).toBe(true);
@@ -832,8 +830,21 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
         );
       const run = () => versioned(() => runScheduledCorpSyncs(syncDeps(), fakeEsi()));
       const marker = async () => (await book().collection('meta').doc(QUIET_DOC).get()).data();
-      const paid = async () =>
-        ((await book().collection('meta').doc('paid').get()).data()?.ids as string[]) ?? [];
+      // An Unmatched donation from a Character the book knows: a full run places it, a quiet one
+      // never reads it.
+      const unmatched = () =>
+        book().collection('payments').doc('j1_77').set({
+          id: 'j1_77',
+          source: 'donation',
+          characterId: 50,
+          uid: 'char:50',
+          amount: 1,
+          at: '2026-10-17T12:00:00.000Z',
+          division: 1,
+        });
+      const placed = async () =>
+        (await book().collection('payments').doc('j1_77').get()).get('minerId') as
+          string | undefined;
       /** Runs until the book holds a quiet marker: the donation lands, then a run finds nothing to do. */
       async function quietBook() {
         await optIn(ACCOUNTANT);
@@ -850,19 +861,19 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
 
       it('skips the full read while the book is unchanged, and reads again once a stamp moves', async () => {
         await quietBook();
-        // Written with no stamp: a quiet run cannot see it, which shows it did not read Statements.
-        await book().collection('statements').doc('s1').set(statement);
+        // Written with no stamp: a quiet run cannot see it, which shows it did not read payments.
+        await unmatched();
         now += 6 * H;
         expect((await run()).synced).toBe(1);
-        expect(await paid()).toEqual([]);
+        expect(await placed()).toBeUndefined();
         // The ledger and the sync record still land on the quiet path.
         expect((await book().get()).data()?.lastSync).toMatchObject({ at: now, scheduled: true });
 
-        // Any server write to Statements moves the stamp: the next run reads in full and settles.
-        await versioned(() => book().collection('statements').doc('s1').set(statement));
+        // Any server write to payments moves the stamp: the next run reads in full and places it.
+        await versioned(() => unmatched());
         now += 6 * H;
         await run();
-        expect(await paid()).toEqual(['s1']);
+        expect(await placed()).toBe('solo:50');
         expect(await marker()).toBeUndefined();
       });
 
@@ -898,18 +909,6 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
         expect((await book().collection('payments').doc('j1_2').get()).exists).toBe(true);
         // Nothing settled, but the run was not quiet: the old marker no longer vouches.
         expect(await marker()).toBeUndefined();
-      });
-
-      it('reads in full when the paid Statements are not the ones it saw', async () => {
-        await quietBook();
-        await book().collection('statements').doc('s1').set(statement);
-        await book()
-          .collection('meta')
-          .doc('paid')
-          .set({ ids: ['s0'] });
-        now += 6 * H;
-        await run();
-        expect(await paid()).toEqual(['s0', 's1']);
       });
 
       it('reads in full when a Character new to it mines, who may match an Unmatched donation', async () => {
@@ -968,10 +967,10 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
 
       it('reads in full once the marker is a day old, whatever the stamps say', async () => {
         await quietBook();
-        await book().collection('statements').doc('s1').set(statement);
+        await unmatched();
         now += 24 * H;
         await run();
-        expect(await paid()).toEqual(['s1']);
+        expect(await placed()).toBe('solo:50');
       });
     });
 

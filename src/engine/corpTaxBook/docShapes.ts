@@ -7,7 +7,7 @@
  * (`bookDocs.ts`), with this one.
  */
 import {
-  checkpointProblem,
+  checkpointProblems,
   type RunningAccountCheckpoint,
 } from '../../../functions/src/corpTaxBookCheckpoint';
 import type { Adjustment } from './adjustments';
@@ -312,7 +312,7 @@ export function readToleranceExemption(id: string, d: Data): ToleranceExemption 
 
 /**
  * A Miner's closed-through checkpoint as the book stores it (`accountCheckpoints/{minerId}`,
- * readable by the Miner); null for anything that does not add up (`checkpointProblem`).
+ * readable by the Miner); null for anything that does not add up (`checkpointProblems`).
  */
 export function readCheckpoint(id: string, d: Data): RunningAccountCheckpoint | null {
   const through = str(d.through);
@@ -343,5 +343,5 @@ export function readCheckpoint(id: string, d: Data): RunningAccountCheckpoint | 
     at,
     ...(by !== undefined ? { by } : {}),
   };
-  return checkpointProblem(checkpoint) === null ? checkpoint : null;
+  return checkpointProblems(checkpoint).length === 0 ? checkpoint : null;
 }

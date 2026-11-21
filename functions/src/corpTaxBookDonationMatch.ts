@@ -37,6 +37,15 @@ export function codesIn(reason: string | undefined): string[] {
   return [...new Set((reason ?? '').match(CODE_TOKEN)?.map((c) => c.toUpperCase()) ?? [])];
 }
 
+/** The id of the Miner a Character is on its own (no grouping holds it). */
+export const soloMinerId = (characterId: number): string => `solo:${characterId}`;
+
+/** The Character a solo Miner id names; undefined for a grouping's id. */
+export function soloCharacterId(minerId: string): number | undefined {
+  const solo = /^solo:(\d+)$/.exec(minerId);
+  return solo ? Number(solo[1]) : undefined;
+}
+
 /** The Miner a Character is billed under: its earliest grouping, else a Miner of its own. */
 export function minerIdFor(
   characterId: number,
@@ -45,7 +54,7 @@ export function minerIdFor(
   let best: Pick<MatchMiner, 'id' | 'createdAt'> | undefined;
   for (const m of miners)
     if (m.characterIds.includes(characterId) && (!best || earlierGrouping(m, best) < 0)) best = m;
-  return best?.id ?? `solo:${characterId}`;
+  return best?.id ?? soloMinerId(characterId);
 }
 
 /** Where a stored Miner id lives now: its grouping, the group a solo id or an absorbed id folded into. */
@@ -53,8 +62,8 @@ export function currentMinerOf(minerId: string, miners: readonly MatchMiner[]): 
   if (miners.some((m) => m.id === minerId)) return minerId;
   const folded = miners.find((m) => m.aliases?.includes(minerId));
   if (folded) return folded.id;
-  const solo = /^solo:(\d+)$/.exec(minerId);
-  return solo ? minerIdFor(Number(solo[1]), miners) : minerId;
+  const character = soloCharacterId(minerId);
+  return character !== undefined ? minerIdFor(character, miners) : minerId;
 }
 
 /** Code → the Miners that hold it: one is whose money it is, more is ambiguous. */
@@ -81,7 +90,7 @@ export function codeOwners(
   for (const m of miners) {
     ids.add(m.id);
     for (const a of m.aliases ?? []) ids.add(a);
-    for (const c of m.characterIds) ids.add(`solo:${c}`);
+    for (const c of m.characterIds) ids.add(soloMinerId(c));
   }
   for (const id of ids) add(minerPaymentCode(id), id);
   return owners;
@@ -131,6 +140,64 @@ export type ResolvedOwner =
   | { reviewReason: 'ambiguous'; ambiguousMinerIds: string[] }
   | Record<string, never>;
 
+/**
+ * The book the resolver reads, from what either side loaded: the groupings, every Late notice
+ * (its code), the Characters seen mining what the book bills, the Miner ids it holds a record of
+ * (a recorded account, a billed-by pointer), and the Miners each payer's earlier payments named.
+ */
+export function matchBookOf(input: {
+  miners: readonly MatchMiner[];
+  notices: readonly { id: string; minerId: string; code?: string }[];
+  minedCharacterIds: Iterable<number>;
+  recordedMinerIds?: Iterable<string>;
+  paidBefore?: ReadonlyMap<number, readonly string[]>;
+}): MatchBook {
+  const mined = new Set(input.minedCharacterIds);
+  return {
+    miners: input.miners,
+    codes: codeOwners(input.notices, input.miners, [
+      ...(input.recordedMinerIds ?? []),
+      ...[...mined].map((c) => minerIdFor(c, input.miners)),
+    ]),
+    minedCharacterIds: mined,
+    ...(input.paidBefore ? { paidBefore: input.paidBefore } : {}),
+  };
+}
+
+/** A stored payment, as a re-match reads it. */
+export interface UnmatchedCandidate {
+  id: string;
+  characterId?: number;
+  reason?: string;
+  minerId?: string;
+  at: string;
+  notTaxAmount?: number;
+  reviewReason?: string;
+}
+
+/**
+ * The Unmatched payments that now have a Miner, oldest first: a sender or code the book has come
+ * to know since. One already placed, marked not tax, or held for an officer as ambiguous is left.
+ */
+export function rematchUnmatched(
+  payments: readonly UnmatchedCandidate[],
+  book: MatchBook
+): { paymentId: string; minerId: string }[] {
+  return [...payments]
+    .filter(
+      (p) =>
+        p.minerId === undefined &&
+        typeof p.characterId === 'number' &&
+        !(p.notTaxAmount && p.notTaxAmount > 0) &&
+        p.reviewReason !== 'ambiguous'
+    )
+    .sort((a, b) => a.at.localeCompare(b.at))
+    .flatMap((p) => {
+      const owner = donationOwner({ characterId: p.characterId!, reason: p.reason }, book);
+      return owner.kind === 'miner' ? [{ paymentId: p.id, minerId: owner.minerId }] : [];
+    });
+}
+
 /** What resolving puts on one stored donation: its Miner, or the review it waits for. */
 export function ownerFields(
   donation: { characterId: number; reason?: string },
@@ -163,40 +230,32 @@ export interface UncountedDonation {
   at: string;
 }
 
+/** A donation into a division the book does not read, as the journal gave it. */
+type ElsewhereDonation = {
+  refId: number;
+  division: number;
+  characterId: number;
+  amount: number;
+  at: string;
+  reason?: string;
+};
+
 /**
  * The donations into divisions the book does not read that look like tax (#6207): one carrying a
- * code the book knows, or one whose sender's Miner owes (an open balance less what was already
- * counted, or days not yet listed). Newest first, at most `UNCOUNTED_LIMIT`.
+ * code the book knows, one an officer has to place, or one whose sender's Miner mined what the book
+ * bills (`mined`, `minedSinceStart`). Newest first, at most `UNCOUNTED_LIMIT`.
  */
-export function uncountedDonations(
-  donations: readonly {
-    refId: number;
-    division: number;
-    characterId: number;
-    amount: number;
-    at: string;
-    reason?: string;
-  }[],
-  book: MatchBook & {
-    openBalance: ReadonlyMap<string, number>;
-    unbilled: ReadonlySet<string>;
-  },
-  counted: readonly { minerId?: string; amount: number }[] = []
+export function noteUncountedDonations(
+  donations: readonly ElsewhereDonation[],
+  book: MatchBook,
+  mined: ReadonlySet<string>
 ): UncountedDonation[] {
-  const openBalance = new Map(book.openBalance);
-  for (const c of counted)
-    if (c.minerId !== undefined)
-      openBalance.set(c.minerId, (openBalance.get(c.minerId) ?? 0) - c.amount);
   return donations
     .filter((d) => {
       const owner = donationOwner(d, book);
-      // A code says it was tax; so does a donation an officer has to place.
       if (owner.kind === 'ambiguous' || (owner.kind === 'miner' && owner.by === 'code'))
         return true;
-      return (
-        owner.kind === 'miner' &&
-        ((openBalance.get(owner.minerId) ?? 0) > 0 || book.unbilled.has(owner.minerId))
-      );
+      return owner.kind === 'miner' && mined.has(owner.minerId);
     })
     .sort((a, b) => b.at.localeCompare(a.at) || b.refId - a.refId)
     .slice(0, UNCOUNTED_LIMIT)
@@ -208,4 +267,15 @@ export function uncountedDonations(
       amount: d.amount,
       at: d.at,
     }));
+}
+
+/**
+ * @deprecated `noteUncountedDonations`: a Running account has no open balance a sync reads, and
+ * nothing counted takes one down. Kept only until the client's sync calls the new one.
+ */
+export function uncountedDonations(
+  donations: readonly ElsewhereDonation[],
+  book: MatchBook & { openBalance?: ReadonlyMap<string, number>; unbilled: ReadonlySet<string> }
+): UncountedDonation[] {
+  return noteUncountedDonations(donations, book, book.unbilled);
 }

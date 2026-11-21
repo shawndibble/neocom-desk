@@ -42,7 +42,27 @@ describe('planRekey', () => {
         id: 's1',
         fields: { minerId: 'g1', uids: ['char:1', 'char:2'] },
       },
-      { kind: 'update', collection: 'payments', id: 'p1', fields: { minerId: 'g1' } },
+      {
+        kind: 'update',
+        collection: 'payments',
+        id: 'p1',
+        fields: { minerId: 'g1', uids: ['char:1', 'char:2'] },
+      },
+    ]);
+  });
+
+  it("gives every payment the group's readers and its sender, one stored without uids too", () => {
+    const writes = planRekey({
+      ...base,
+      records: [rec('payments', 'p2', { minerId: 'solo:9', uid: 'char:9' })],
+    });
+    expect(writes).toEqual([
+      {
+        kind: 'update',
+        collection: 'payments',
+        id: 'p2',
+        fields: { minerId: 'g1', uids: ['char:1', 'char:2', 'char:9'] },
+      },
     ]);
   });
 
@@ -93,14 +113,14 @@ describe('planRekey', () => {
     );
   });
 
-  it('drops the absorbed Miner recorded figures: account and checkpoint', () => {
+  it('drops the absorbed Miner recorded figures', () => {
     const writes = planRekey({
       ...base,
-      records: [rec('accounts', 'solo:2', {}), rec('accountCheckpoints', 'solo:2', {})],
+      records: [rec('accounts', 'solo:2', {}), rec('minerPaid', 'solo:2', {})],
     });
     expect(writes).toEqual([
       { kind: 'delete', collection: 'accounts', id: 'solo:2' },
-      { kind: 'delete', collection: 'accountCheckpoints', id: 'solo:2' },
+      { kind: 'delete', collection: 'minerPaid', id: 'solo:2' },
     ]);
   });
 
