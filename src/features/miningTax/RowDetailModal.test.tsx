@@ -103,29 +103,6 @@ describe('RowDetailModal system link', () => {
   });
 });
 
-describe('RowDetailModal before the lock date', () => {
-  it('is read-only: it says so, and offers no edit', () => {
-    const assigned = {
-      id: 'a1',
-      characterId: 1,
-      date: row.entry.date,
-      solarSystemId: row.entry.solarSystemId,
-      payeeId: 'p1',
-      oreLines: row.entry.oreLines,
-      taxPct: 10,
-      estimatedValue: 1000,
-      taxOwed: 100,
-      status: 'outstanding' as const,
-      updatedAt: 1,
-    };
-    renderModal('outstanding', assigned, undefined, vi.fn(), { lockDate: '2026-10-01' });
-    expect(
-      screen.getByText("Days before 2026-10-01 are locked and can't be changed.")
-    ).toBeVisible();
-    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
-  });
-});
-
 describe('RowDetailModal split', () => {
   it('offers handing the new ore to another Payee on a needs-review row', async () => {
     const onSplit = vi.fn();

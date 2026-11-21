@@ -8824,8 +8824,7 @@
         "totalText": "Estimated value {{value}} ISK, tax owed {{tax}} ISK"
       },
       "editAction": "Edit",
-      "unassignConfirm": "Unassign this entry from {{payee}}? It goes back to Unassigned and its tax figures are removed.",
-      "locked": "Days before {{date}} are locked and can't be changed."
+      "unassignConfirm": "Unassign this entry from {{payee}}? It goes back to Unassigned and its tax figures are removed."
     },
     "linkPaymentSelectedAction": "Link payment",
     "linkPaymentOnePayeeHint": "One wallet payment pays one Payee — tick entries for a single Payee to link a payment.",

@@ -33,24 +33,14 @@ function corpRowActions(dr: DisplayRow): RowMenuAction[][] {
   return owing ? [[{ id: 'view' }, { id: 'corpPay' }]] : [[{ id: 'view' }]];
 }
 
-/** Whether a personal row has a day before `lockDate`: then it is read-only (decision 20261120-235011). */
-export function isLockedRow(dr: DisplayRow, lockDate: string | undefined): boolean {
-  if (lockDate === undefined || dr.corp?.kind === 'row') return false;
-  return [dr.row, ...(dr.groupMembers ?? []).map((m) => m.row)].some(
-    (r) => r.entry.date < lockDate
-  );
-}
-
 /**
  * The menu's actions for a row, in groups (a separator between each), View
  * details first. Each rule matches the detail modal's: Settle up for an owed
- * row, Accept new total for a grown one, then Edit, then the rarer moves. A row
- * dated before `lockDate` only opens.
+ * row, Accept new total for a grown one, then Edit, then the rarer moves.
  */
-export function rowMenuActions(dr: DisplayRow, lockDate?: string): RowMenuAction[][] {
+export function rowMenuActions(dr: DisplayRow): RowMenuAction[][] {
   if (dr.corp?.kind === 'row') return corpRowActions(dr);
   const view: RowMenuAction = { id: 'view' };
-  if (isLockedRow(dr, lockDate)) return [[view]];
 
   if (dr.status === 'unassigned') return [[view, { id: 'dismiss' }, { id: 'join' }]];
   if (dr.status === 'dismissed') return [[view, { id: 'undismiss' }]];
