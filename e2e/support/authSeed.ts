@@ -83,12 +83,16 @@ interface SeedPayload {
  * `extraSettings` are more `settings` rows to seed, e.g. a saved Overview
  * layout (`overviewLayoutSetting`); without one the Overview shows its
  * first-run Role chooser.
+ *
+ * `accessToken` replaces the fake-signed token, for a spec whose backend
+ * checks the signature (the Corp Tax Book specs, `e2e/support/taxBook`).
  */
 export async function signInAndGoto(
   page: Page,
   path = './overview',
   scopes: readonly string[] = SCOPES,
-  extraSettings: readonly { key: string; value: unknown }[] = []
+  extraSettings: readonly { key: string; value: unknown }[] = [],
+  accessToken: string = makeAccessToken(scopes)
 ): Promise<void> {
   await page.route(`**/${BLANK_PATH}`, (route) =>
     route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>seed</title>' })
@@ -106,7 +110,7 @@ export async function signInAndGoto(
     },
     token: {
       characterId: CHARACTER_ID,
-      accessToken: makeAccessToken(scopes),
+      accessToken,
       refreshToken: 'fake-refresh',
       expiresAt: EXP_SECONDS * 1000,
       scopes: [...scopes],

@@ -26,11 +26,38 @@ const SAFE = [
 ];
 
 /**
+ * The Corp Tax Book specs (`e2e/*.book.spec.ts`, ci.yml's `e2e-book`) drive the real Cloud
+ * Functions and Firestore rules in the emulators, so the backend is not safe to skip for them:
+ * the list above less `functions/` (bar its unit tests), the rules and the emulator config.
+ */
+const BOOK_INPUTS = [
+  /^functions\//,
+  /^firestore\.(rules|indexes\.json)$/,
+  /^firebase\.json$/,
+  /^\.firebaserc$/,
+];
+const BOOK_SAFE = [
+  ...SAFE.filter((pattern) => !BOOK_INPUTS.some((input) => input.source === pattern.source)),
+  /^functions\/src\/.*\.test\.ts$/,
+];
+
+/** True unless every file matches a pattern of `safe`; an empty list means the diff failed. */
+const needsRun = (changedFiles, safe) =>
+  changedFiles.length === 0 ||
+  changedFiles.some((file) => !safe.some((pattern) => pattern.test(file)));
+
+/**
  * @param {string[]} changedFiles repo-relative paths, `/`-separated
  * @returns {boolean} false only when every file is known not to affect e2e
  */
 export function needsE2e(changedFiles) {
-  // An empty list means the diff itself failed, not that nothing changed.
-  if (changedFiles.length === 0) return true;
-  return changedFiles.some((file) => !SAFE.some((pattern) => pattern.test(file)));
+  return needsRun(changedFiles, SAFE);
+}
+
+/**
+ * @param {string[]} changedFiles repo-relative paths, `/`-separated
+ * @returns {boolean} false only when every file is known not to affect the Corp Tax Book specs
+ */
+export function needsBookE2e(changedFiles) {
+  return needsRun(changedFiles, BOOK_SAFE);
 }
