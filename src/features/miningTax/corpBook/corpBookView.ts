@@ -70,6 +70,11 @@ export interface CorpBookViewInput {
   /** The member's stored Payees: one verified as a book's corporation is that book's own Payee. */
   payees: readonly PayeeRecord[];
   made: readonly MadePayment[];
+  /**
+   * The Made Payments links hold (`heldPaymentKeys`): each pays the personal Payee it is linked
+   * to, so none counts as a donation in flight to a book as well.
+   */
+  linked?: ReadonlySet<string>;
   characterNames: ReadonlyMap<number, string>;
   now: string;
 }
@@ -132,7 +137,7 @@ export function buildCorpBookView(
       }),
       inReviewRefs: (book.inReview ?? []).flatMap((d) => (d.refId === undefined ? [] : [d.refId])),
       inFlight: inFlightDonations(
-        input.made.map(madeDonationOf),
+        input.made.filter((p) => !input.linked?.has(p.key)).map(madeDonationOf),
         book.held,
         book.corporationId,
         book.startDate
