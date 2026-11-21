@@ -126,6 +126,16 @@ describe('parseLayout', () => {
     );
   });
 
+  it("keeps the Calendar widget's known hidden kinds, and drops them on another kind", () => {
+    const cal = (over: Record<string, unknown>) =>
+      parseLayout(wrap(good({ kind: 'comingUp', view: 'table', ...over })))!.widgets[0];
+    expect(cal({ hiddenKinds: ['industryJob', 'gone'] }).hiddenKinds).toEqual(['industryJob']);
+    expect('hiddenKinds' in cal({ hiddenKinds: ['gone'] })).toBe(false);
+    expect(
+      'hiddenKinds' in parseLayout(wrap(good({ hiddenKinds: ['industryJob'] })))!.widgets[0]
+    ).toBe(false);
+  });
+
   it('keeps the Skyhook raids Where and radius, drops bad ones and other kinds', () => {
     const raids = (over: Record<string, unknown>) =>
       parseLayout(wrap(good({ kind: 'sovRaids', ...over })))!.widgets[0];

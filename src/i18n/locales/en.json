@@ -6070,15 +6070,15 @@
         }
       },
       "comingUp": {
-        "title": "Coming up",
-        "description": "Calendar events you accepted or may attend",
-        "empty": "No accepted or tentative events ahead.",
-        "emptyAll": "No events ahead.",
+        "title": "Calendar",
+        "description": "What comes up next on your Calendar: events, timers, jobs and the rest",
+        "empty": "Nothing ahead.",
+        "allHidden": "Every type is switched off. Turn one on from this widget's menu.",
         "more": "+{{count}} more in 24h",
         "col": {
-          "event": "Event",
+          "item": "What",
           "in": "In",
-          "response": "Response"
+          "kind": "Type"
         }
       },
       "contracts": {
@@ -6896,7 +6896,7 @@
       "titleLater": "Start from a role",
       "body": "Pick all that apply. We set up your Overview from your picks, and you can change any widget later.",
       "group": "Roles",
-      "always": "Always included: Wallet, Training, Coming up and Mail.",
+      "always": "Always included: Wallet, Training, Calendar and Mail.",
       "build": "Build my Overview",
       "basics": "Just the basics",
       "cancel": "Cancel",
@@ -6963,6 +6963,8 @@
       "trendFollowQuickbar": "Follow my Quickbar",
       "trendCancel": "Cancel",
       "trendSave": "Save",
+      "types": "Types",
+      "typesHidden": "Types ({{count}} hidden)",
       "events": "Events",
       "eventsChoice": {
         "committed": "Accepted and tentative",

@@ -380,6 +380,7 @@ const SPECS = {
   },
   // The game clock (UTC); reads no feed, so it needs no permission and is always ready.
   eveTime: { category: 'travel', views: N, view: 'number', size: 'S', endpoints: [] },
+  // The Calendar widget: the Calendar page's agenda, with its own Types and Events settings.
   comingUp: {
     category: 'messages',
     views: NT,

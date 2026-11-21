@@ -1,28 +1,31 @@
 /**
- * The Training, SP and Coming up builders: the Character-clock kinds, split
+ * The Training, SP and Calendar builders: the Character-clock kinds, split
  * out of `models.ts`.
  */
 import { acceleratorSeverity, isAcceleratorLive } from '@/engine/accelerator';
 import { severityForRemaining, type DeadlineSeverity } from '@/engine/character/severity';
-import {
-  soonestCalendarDeadline,
-  upcomingCommittedEvents,
-  upcomingEvents,
-} from '@/engine/character/calendarDeadline';
 import { extractableSp, extractorCount } from '@/engine/skills/spExtraction';
 import { formatCompactNumber } from '@/lib/compactNumber';
-import { formatCountdown, formatDuration } from '@/lib/duration';
+import { formatCountdown } from '@/lib/duration';
 import { DAY_MS } from '@/lib/age';
 import { sortQueueEntries, selectActiveEntryFromSorted } from '@/features/overview/overviewQueue';
-import {
-  comingUpEventSeverity,
-  comingUpSeverity,
-  spExtractionSeverity,
-} from '../../data/boardSeverity';
-import { comingUpSummary, spExtractionSummary } from '../../data/boardSummary';
+import { comingUpEventSeverity, spExtractionSeverity } from '../../data/boardSeverity';
+import { spExtractionSummary } from '../../data/boardSummary';
 import { blank, count, NEUTRAL_NUMBER, statusOf, UNKNOWN, type Builder } from './builderKit';
 import { queueSegments, queueStack } from './chartBuilders';
-import { acceleratorSlot, comingUpTable, spTable, trainingTable } from './characterTables';
+import { acceleratorSlot, calendarTable, spTable, trainingTable } from './characterTables';
+import {
+  buildCharacterBoard,
+  pastDeadlineLabelKey,
+  type CharacterBoardItem,
+} from '@/engine/character/board';
+import { filterByKinds, LONG_OVERDUE_MS, splitLongOverdue } from '@/engine/character/deadlines';
+import { boardSourcesWithSharedPops } from '@/features/character/calendarSharedPops';
+import { DEFAULT_SHARED_POP_TIME } from '@/features/character/calendarSharedPopTime';
+import { shownKinds } from '@/features/character/calendarKindFilter';
+import { KIND_LABEL } from '@/features/character/calendarKindLabels';
+import { sharedPopCalendarHref } from '@/features/character/sharedPopLink';
+import { highlightHref, openHref } from '@/lib/highlightParam';
 import type { BoardDeadline } from '../nextDeadline';
 import type { ListRow } from './types';
 import { createNumberFormat, formatNumber } from '@/lib/numberLocale';
@@ -250,64 +253,120 @@ export const sp: Builder = (feeds, { t }) => {
   };
 };
 
-export const comingUp: Builder = (feeds, { t, now, calendarEvents }) => {
+/** Where a Calendar widget row opens: the item itself where the Calendar has a link for it. */
+function boardItemHref(item: CharacterBoardItem): string {
+  if (item.kind === 'calendarEvent') return openHref('/calendar', item.sourceId);
+  if (item.kind === 'sharedMoonPop') return sharedPopCalendarHref(item.detailId ?? item.sourceId);
+  if (item.kind === 'contractExpiry') return highlightHref('/contracts/history', item.sourceId);
+  return '/calendar';
+}
+
+const isCommitted = (item: CharacterBoardItem) =>
+  item.response === 'accepted' || item.response === 'tentative';
+
+/**
+ * The Calendar widget (kind id `comingUp`): the Calendar page's agenda, the same rows as its
+ * Coming Up Rail, less the kinds this widget hides and anything overdue for days (the rail folds
+ * those away). The Events choice narrows calendar events only.
+ */
+export const comingUp: Builder = (
+  feeds,
+  { t, now, calendarEvents, hiddenKinds = [], sharedPopTime = DEFAULT_SHARED_POP_TIME }
+) => {
   const feed = feeds.calendar;
   const data = feed?.data ?? null;
   const to = '/calendar';
   if (!data) return blank(to, statusOf(feed));
+  const board = buildCharacterBoard({
+    ...boardSourcesWithSharedPops(data, sharedPopTime),
+    nowMs: now,
+  });
   const all = calendarEvents === 'all';
-  const upcoming = all
-    ? upcomingEvents(data.events, now)
-    : upcomingCommittedEvents(data.events, now);
-  const next = upcoming[0];
-  const soonest = soonestCalendarDeadline(data.events, now);
-  const laterToday = upcoming.filter(
-    (event) => event !== next && event.atMs <= now + DAY_MS
+  const shown = shownKinds(hiddenKinds);
+  const items = splitLongOverdue(
+    filterByKinds(board, shown).filter(
+      (item) => all || item.kind !== 'calendarEvent' || isCommitted(item)
+    ),
+    now,
+    LONG_OVERDUE_MS
+  ).rest;
+  const next = items.find((item) => item.deadlineMs > now);
+  const laterToday = items.filter(
+    (item) => item !== next && item.deadlineMs > now && item.deadlineMs <= now + DAY_MS
   ).length;
+  // The calendar's share of Next deadline: committed events only, whatever the widget shows,
+  // because every other clock reaches the strip through its own widget.
+  const soonest = board.find(
+    (item) => item.kind === 'calendarEvent' && item.deadlineMs > now && isCommitted(item)
+  );
+  const countdown = (item: CharacterBoardItem) =>
+    item.deadlineMs > now
+      ? formatCountdown((item.deadlineMs - now) / 1000)
+      : t(item.pastLabelKey ?? pastDeadlineLabelKey(item.kind));
+  const kindText = (item: CharacterBoardItem) =>
+    item.response === null
+      ? t(KIND_LABEL[item.kind])
+      : `${t(KIND_LABEL[item.kind])} · ${t(`overview.board.response.${item.response}`)}`;
   return {
     ...blank(
       to,
       statusOf(feed, {
-        needsPermission: data.needsReauth,
-        isEmpty: upcoming.length === 0,
-        // A read time means the events came from a real (cached) read.
-        hasStaleData: data.fetchedAt !== null,
+        needsPermission: data.reauthKinds.length > 0,
+        isEmpty: items.length === 0,
+        // A source that still read keeps the widget up, with a sign-in note for the lapsed one.
+        hasStaleData: data.readableKinds.length > 0,
       })
     ),
-    emptyMessage: all ? t('overview.widgets.comingUp.emptyAll') : undefined,
-    // The description names accepted events only; under All it would contradict the message.
-    emptyHealthy: all,
-    fetchedAt: data.fetchedAt,
+    emptyMessage:
+      shown.size === 0
+        ? t('overview.widgets.comingUp.allHidden')
+        : t('overview.widgets.comingUp.empty'),
+    fetchedAt: data.oldestFetchedAt,
+    fromCache: data.fromCache,
     number: next
       ? {
-          value: formatCountdown((next.atMs - now) / 1000),
-          // The others within a day: the one fact the headline event does not carry.
+          value: formatCountdown((next.deadlineMs - now) / 1000),
+          // The others within a day: the one fact the headline clock does not carry.
           unit:
             laterToday > 0 ? t('overview.widgets.comingUp.more', { count: laterToday }) : undefined,
-          secondary: { text: next.title },
-          tone: all
-            ? comingUpEventSeverity(next.atMs, now)
-            : (comingUpSeverity(data, now) ?? 'clear'),
+          secondary: { text: next.subject },
+          tone: comingUpEventSeverity(next.deadlineMs, now),
         }
       : NEUTRAL_NUMBER,
-    rows: upcoming.map((event) => ({
-      key: String(event.eventId),
-      title: event.title,
-      detail: t(`overview.board.response.${event.response}`),
-      value: formatDuration((event.atMs - now) / 1000),
-      tone: comingUpEventSeverity(event.atMs, now),
+    rows: items.map((item) => ({
+      key: item.id,
+      title: item.subject,
+      detail: kindText(item),
+      value: countdown(item),
+      tone: comingUpEventSeverity(item.deadlineMs, now),
+      to: boardItemHref(item),
     })),
-    table: comingUpTable(t, upcoming, now, comingUpEventSeverity),
+    table: calendarTable(
+      t,
+      items.map((item) => ({
+        key: item.id,
+        subject: item.subject,
+        when: countdown(item),
+        kind: kindText(item),
+        tone: comingUpEventSeverity(item.deadlineMs, now),
+        to: boardItemHref(item),
+      }))
+    ),
     deadlines: soonest
       ? [
           {
-            at: soonest.atMs,
-            note: soonest.title,
-            severity: severityForRemaining(soonest.atMs - now),
-            to,
+            at: soonest.deadlineMs,
+            note: soonest.subject,
+            severity: severityForRemaining(soonest.deadlineMs - now),
+            to: boardItemHref(soonest),
           },
         ]
       : [],
-    summary: comingUpSummary(t, data, now),
+    summary: next
+      ? t('overview.board.comingUpNext', {
+          title: next.subject,
+          when: formatCountdown((next.deadlineMs - now) / 1000),
+        })
+      : t('overview.board.comingUpNone'),
   };
 };

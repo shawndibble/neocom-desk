@@ -427,76 +427,117 @@ describe('training', () => {
   });
 });
 
-describe('comingUp', () => {
-  it('is empty with nothing committed ahead', () => {
-    const feeds: Feeds = {
-      calendar: ok({ events: [], needsReauth: false, fetchedAt: new Date(NOW) }),
-    };
-    expect(stateOf(buildView('comingUp', feeds, ctx()))).toBe('empty');
+describe('comingUp (the Calendar widget)', () => {
+  const board = (over: Record<string, unknown> = {}) =>
+    ok({
+      calendarEvents: [],
+      industryJobs: [],
+      corporations: [],
+      sharedPops: [],
+      readableRefineries: [],
+      sharingCorporations: [],
+      skyhookRaidDetails: [],
+      readableKinds: ['calendarEvent', 'industryJob'],
+      reauthKinds: [],
+      oldestFetchedAt: new Date(NOW),
+      fromCache: false,
+      events: [],
+      loadedAtMs: NOW,
+      ...over,
+    }) as never;
+  const ev = (id: number, hours: number, response = 'accepted') => ({
+    id: String(id),
+    subject: `Event ${id}`,
+    detail: '',
+    deadlineMs: NOW + hours * HOUR_MS,
+    response,
+    important: false,
+  });
+  const job = (id: number, hours: number) => ({
+    id: String(id),
+    subject: `Job ${id}`,
+    detail: 'active',
+    deadlineMs: NOW + hours * HOUR_MS,
+  });
+  const subjects = (view: ReturnType<typeof buildView>) =>
+    (view.table?.rows ?? []).map((row) => row.cells[0]);
+
+  it('is empty with nothing ahead', () => {
+    expect(stateOf(buildView('comingUp', { calendar: board() }, ctx()))).toBe('empty');
   });
 
-  it('counts down to the next accepted event', () => {
-    const events = [
-      {
-        event_id: 1,
-        title: 'Fleet op',
-        event_date: new Date(NOW + 2 * HOUR_MS).toISOString(),
-        event_response: 'accepted',
-        importance: 1,
-      },
-    ];
+  it('lists every kind of clock in deadline order, headed by the next one', () => {
     const feeds: Feeds = {
-      calendar: ok({ events, needsReauth: false, fetchedAt: new Date(NOW) }) as never,
+      calendar: board({ calendarEvents: [ev(1, 2)], industryJobs: [job(7, 1)] }),
     };
     const view = buildView('comingUp', feeds, ctx());
-    expect(view.number.value).toBe('2h 0m');
-    expect(view.number.secondary?.text).toBe('Fleet op');
-    expect(view.deadlines[0].at).toBe(NOW + 2 * HOUR_MS);
+    expect(subjects(view)).toEqual(['Job 7', 'Event 1']);
+    expect(view.number.value).toBe('1h 0m');
+    expect(view.number.secondary?.text).toBe('Job 7');
+    expect(view.number.unit).toContain('"count":1');
+    expect(view.table?.columns.map((c) => c.key)).toEqual(['item', 'in', 'kind']);
+    expect(view.table?.rows.map((row) => row.cells[2])).toEqual([
+      'calendar.kind.industryJob',
+      'calendar.kind.calendarEvent · overview.board.response.accepted',
+    ]);
+    expect(view.table?.rows.map((row) => row.to)).toEqual(['/calendar', '/calendar?open=1']);
   });
 
-  it('lists unanswered events only when the widget asks for all events', () => {
-    const events = [
-      {
-        event_id: 1,
-        title: 'Mass op',
-        event_date: new Date(NOW + 2 * HOUR_MS).toISOString(),
-        event_response: 'not_responded',
-        importance: 1,
-      },
-    ];
+  it('applies the Events choice to calendar events only', () => {
     const feeds: Feeds = {
-      calendar: ok({ events, needsReauth: false, fetchedAt: new Date(NOW) }) as never,
+      calendar: board({ calendarEvents: [ev(1, 2, 'not_responded')], industryJobs: [job(7, 3)] }),
     };
-    expect(stateOf(buildView('comingUp', feeds, ctx()))).toBe('empty');
-    const all = buildView('comingUp', feeds, ctx({ calendarEvents: 'all' }));
-    expect(all.number.secondary?.text).toBe('Mass op');
-    expect(all.rows).toHaveLength(1);
+    expect(subjects(buildView('comingUp', feeds, ctx()))).toEqual(['Job 7']);
+    expect(subjects(buildView('comingUp', feeds, ctx({ calendarEvents: 'all' })))).toEqual([
+      'Event 1',
+      'Job 7',
+    ]);
   });
 
-  it('links each table row to its event on the Calendar', () => {
-    const events = [
-      {
-        event_id: 42,
-        title: 'Fleet op',
-        event_date: new Date(NOW + 2 * HOUR_MS).toISOString(),
-        event_response: 'accepted',
-        importance: 1,
-      },
-    ];
+  it('leaves out the kinds the widget hides', () => {
     const feeds: Feeds = {
-      calendar: ok({ events, needsReauth: false, fetchedAt: new Date(NOW) }) as never,
+      calendar: board({ calendarEvents: [ev(1, 2)], industryJobs: [job(7, 1)] }),
     };
-    const rows = buildView('comingUp', feeds, ctx()).table?.rows ?? [];
-    expect(rows.map((row) => row.to)).toEqual(['/calendar?open=42']);
-    expect(rows.every((row) => row.detail === undefined)).toBe(true);
+    const view = buildView('comingUp', feeds, ctx({ hiddenKinds: ['industryJob'] }));
+    expect(subjects(view)).toEqual(['Event 1']);
   });
 
-  it('leaves an empty accepted-and-tentative widget to its description', () => {
+  it('keeps a recently overdue clock with its past label, and drops one overdue for days', () => {
     const feeds: Feeds = {
-      calendar: ok({ events: [], needsReauth: false, fetchedAt: new Date(NOW) }),
+      calendar: board({ industryJobs: [job(7, -1), job(8, -72), job(9, 4)] }),
     };
-    expect(buildView('comingUp', feeds, ctx()).emptyHint).toBeUndefined();
-    expect(buildView('comingUp', feeds, ctx({ calendarEvents: 'all' })).emptyHealthy).toBe(true);
+    const view = buildView('comingUp', feeds, ctx());
+    expect(subjects(view)).toEqual(['Job 7', 'Job 9']);
+    expect(view.table?.rows[0]?.cells[1]).toBe('calendar.detail.industryJob.ready');
+    // The headline is the next clock still ahead.
+    expect(view.number.secondary?.text).toBe('Job 9');
+  });
+
+  it('gives Next deadline the next committed event only: the other clocks have their own widgets', () => {
+    const feeds: Feeds = {
+      calendar: board({
+        calendarEvents: [ev(1, 2, 'not_responded'), ev(2, 5)],
+        industryJobs: [job(7, 1)],
+      }),
+    };
+    const view = buildView('comingUp', feeds, ctx({ calendarEvents: 'all' }));
+    expect(view.deadlines.map((d) => d.at)).toEqual([NOW + 5 * HOUR_MS]);
+  });
+
+  it('keeps the readable clocks with a sign-in note, and asks for the grant when none read', () => {
+    const lapsed = board({ readableKinds: ['industryJob'], reauthKinds: ['calendarEvent'] });
+    expect(resolveWidget(buildView('comingUp', { calendar: lapsed }, ctx()).status)).toMatchObject({
+      reauthNote: true,
+    });
+    const none = board({
+      calendarEvents: undefined,
+      industryJobs: undefined,
+      readableKinds: [],
+      reauthKinds: ['calendarEvent'],
+    });
+    expect(resolveWidget(buildView('comingUp', { calendar: none }, ctx()).status)).toMatchObject({
+      state: 'needsPermission',
+    });
   });
 });
 
@@ -1100,31 +1141,6 @@ describe('sp table', () => {
   });
 });
 
-describe('comingUp table', () => {
-  it('tables event, time left and response, and counts the others within a day', () => {
-    const ev = (id: number, hours: number, response: string) => ({
-      event_id: id,
-      title: `Event ${id}`,
-      event_date: new Date(NOW + hours * HOUR_MS).toISOString(),
-      event_response: response,
-      importance: 1,
-    });
-    const events = [ev(1, 2, 'accepted'), ev(2, 5, 'tentative'), ev(3, 30, 'accepted')];
-    const feeds: Feeds = {
-      calendar: ok({ events, needsReauth: false, fetchedAt: new Date(NOW) }) as never,
-    };
-    const view = buildView('comingUp', feeds, ctx());
-    expect(view.number.unit).toContain('overview.widgets.comingUp.more');
-    expect(view.number.unit).toContain('"count":1');
-    expect(view.table?.columns.map((c) => c.key)).toEqual(['event', 'in', 'response']);
-    expect(view.table?.rows[1]?.cells).toEqual([
-      'Event 2',
-      '5h 0m',
-      'overview.board.response.tentative',
-    ]);
-  });
-});
-
 describe('a lapsed grant over saved data', () => {
   const resolved = (kind: string, feeds: Feeds) =>
     resolveWidget(buildView(kind, feeds, ctx()).status);
@@ -1140,15 +1156,6 @@ describe('a lapsed grant over saved data', () => {
     expect(resolved('mail', { mail: ok({ ...mail, ...unsaved }) })).toMatchObject({
       state: 'needsPermission',
       reauthNote: false,
-    });
-  });
-
-  it('keeps saved events with a sign-in note, and asks for the grant when nothing was read', () => {
-    expect(resolved('comingUp', { calendar: ok({ events: [], ...saved }) })).toMatchObject({
-      reauthNote: true,
-    });
-    expect(resolved('comingUp', { calendar: ok({ events: [], ...unsaved }) })).toMatchObject({
-      state: 'needsPermission',
     });
   });
 

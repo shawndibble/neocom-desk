@@ -7,7 +7,7 @@ import { DAY_MS, HOUR_MS, MINUTE_MS } from '@/lib/age';
 
 export const DEMO_NAME = 'Aurelia Vex';
 
-/** The header's Next chip, and the first row of Coming up. */
+/** The header's Next chip, and the first row of the Calendar widget. */
 export const NEXT_EVENT = {
   title: 'Corp mining op: Badivefi belt',
   inMs: DAY_MS + 18 * HOUR_MS + 6 * MINUTE_MS,
