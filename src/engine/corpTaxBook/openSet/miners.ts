@@ -1,5 +1,5 @@
 import { characterIdsOfMiner, type DayCharge } from '../charges';
-import { minerBillableLines } from '../billableLines';
+import { minerBillableLines, savedPrice } from '../billableLines';
 import { disputeHold, disputesToShow, isMinersDispute } from '../disputes';
 import { heldBillableThrough, type StaleHold } from '../feederHealth';
 import { MinerRunningAccount } from '../minerRunningAccount';
@@ -59,7 +59,8 @@ export function settleMiner(
   const checkpoint = stored && checkpointFits(stored, characterIds) ? stored : undefined;
   const storedPaidThrough = input.minerPaidThrough?.get(minerId);
   const account = MinerRunningAccount.build({
-    days: billable.lines,
+    // Whether each line was priced at a saved close-of-day price: only such days close for good.
+    days: billable.lines.map((l) => ({ ...l, savedPrice: savedPrice(l) })),
     payments,
     writeOffs: (input.writeOffs ?? []).filter((w) => w.minerId === minerId && !w.reversed),
     startDate: input.startDate,

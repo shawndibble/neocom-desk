@@ -49,14 +49,7 @@ export function accountRecords(view: BookView, only?: string): AccountRecord[] {
   return view.miners.flatMap((m) => {
     if (only !== undefined && m.id !== only) return [];
     const { owes, paidThrough, closableThrough } = m.account;
-    const unpaidDays = [...(view.internals.byMiner.get(m.id)?.account.byDay ?? [])]
-      .filter(([, d]) => !d.settled && !d.held && Math.round(d.remaining) > 0)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, d]) => ({
-        date,
-        owed: Math.round(d.remaining),
-        tax: Math.round(d.tax),
-      }));
+    const unpaidDays = view.internals.byMiner.get(m.id)?.account.owedDays() ?? [];
     return [
       {
         minerId: m.id,
