@@ -121,37 +121,46 @@ const charactersOf = (records: readonly { characterId: number }[]) =>
   records.map((r) => r.characterId);
 
 /**
- * Assigns an entry's ore (or a slice of it) to a Payee. Which days are paid is read off the
- * Payees' accounts before the write, so a paid growth collector hands its flag over. Until the
- * links are known (`linksReady`) every day reads as paid, so no collector hands over a day a link
- * pays elsewhere.
+ * What is paid, read off the Payees' accounts for a write that may hand a growth collector over.
+ * Until the links are known (`linksReady`) every day reads as paid, so no collector hands over a
+ * day a link pays elsewhere.
  */
+async function paidReader(): Promise<(a: MiningTaxAssignmentRecord) => boolean> {
+  const tracked = (await db.characters.toCollection().primaryKeys()) as number[];
+  if (!(await linksReady(tracked))) return () => true;
+  const accounts = await loadPayeeAccounts();
+  return (a) => accounts.isPaid(a);
+}
+
+/** Assigns an entry's ore (or a slice of it) to a Payee. */
 export async function assign(
-  input: AssignInput
+  input: Omit<AssignInput, 'isPaid'> & Partial<Pick<AssignInput, 'isPaid'>>
 ): Promise<LedgerActionResult<MiningTaxAssignmentRecord>> {
-  let isPaid = input.isPaid;
-  if (!isPaid) {
-    try {
-      const tracked = (await db.characters.toCollection().primaryKeys()) as number[];
-      if (await linksReady(tracked)) {
-        const accounts = await loadPayeeAccounts();
-        isPaid = (a) => accounts.isPaid(a);
-      } else isPaid = () => true;
-    } catch (cause) {
-      return failure(cause);
-    }
+  let isPaid: AssignInput['isPaid'];
+  try {
+    isPaid = input.isPaid ?? (await paidReader());
+  } catch (cause) {
+    return failure(cause);
   }
   return commit([input.characterId], () => createAssignment({ ...input, isPaid }));
 }
 
 /** Combines 2+ entries into one Combined Entry — see `joinAssignments`. */
-export function combine(
+export async function combine(
   members: readonly JoinMemberInput[],
   payeeId: string,
   taxPct: number,
   pricesOn: (date: string) => ReadonlyMap<number, number>
 ): Promise<LedgerActionResult<MiningTaxAssignmentRecord[]>> {
-  return commit(charactersOf(members), () => joinAssignments(members, payeeId, taxPct, pricesOn));
+  let isPaid: (a: MiningTaxAssignmentRecord) => boolean;
+  try {
+    isPaid = await paidReader();
+  } catch (cause) {
+    return failure(cause);
+  }
+  return commit(charactersOf(members), () =>
+    joinAssignments(members, payeeId, taxPct, pricesOn, isPaid)
+  );
 }
 
 /** Everything `undoContinue` needs to take a continue back, and nothing stale. */

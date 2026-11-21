@@ -31,6 +31,8 @@ vi.mock('./pricing', async (importOriginal) => ({
 }));
 
 const CHAR_A = 1;
+/** Paid as the test's stored record says: the account's reading, stood in for. */
+const byStatus = (a: MiningTaxAssignmentRecord) => a.status === 'paid';
 const TYPE_A = 45490;
 const TYPE_B = 45491;
 
@@ -53,6 +55,7 @@ beforeEach(async () => {
 describe('createAssignment', () => {
   it('persists exactly the value/tax the caller supplies, without recomputing them', async () => {
     const assignment = await createAssignment({
+      isPaid: byStatus,
       characterId: CHAR_A,
       date: '2026-09-04',
       solarSystemId: 30000142,
@@ -77,6 +80,7 @@ describe('createAssignment', () => {
     useMiningTaxCompressedOre.setState({ value: false, hydrated: true });
 
     const assignment = await createAssignment({
+      isPaid: byStatus,
       characterId: CHAR_A,
       date: '2026-09-04',
       solarSystemId: 30000142,
@@ -92,6 +96,7 @@ describe('createAssignment', () => {
 
   it('stores a pilot-corrected value verbatim, even when it disagrees with the Jita price', async () => {
     const assignment = await createAssignment({
+      isPaid: byStatus,
       characterId: CHAR_A,
       date: '2026-09-04',
       solarSystemId: 30000142,
@@ -141,7 +146,7 @@ describe("assigning a paid day's late ore (paid stays paid, ADR 0024)", () => {
     const paid = paidDay();
     await db.miningTaxAssignments.put(paid);
 
-    const created = await createAssignment(lateOre);
+    const created = await createAssignment({ ...lateOre, isPaid: byStatus });
 
     expect(created.collectsGrowth).toBe(true);
     expect(await db.miningTaxAssignments.get('paid')).toEqual(paid);
@@ -160,7 +165,7 @@ describe("assigning a paid day's late ore (paid stays paid, ADR 0024)", () => {
       }),
     ]);
 
-    const created = await createAssignment(lateOre);
+    const created = await createAssignment({ ...lateOre, isPaid: byStatus });
 
     expect(created.collectsGrowth).toBe(true);
     // Only the flag moves; the paid record's status, ore and tax stay as paid.
@@ -189,6 +194,7 @@ describe("assigning a paid day's late ore (paid stays paid, ADR 0024)", () => {
     );
 
     const created = await createAssignment({
+      isPaid: byStatus,
       ...lateOre,
       entryOreLines: [
         { typeId: TYPE_A, quantity: 150 },
@@ -200,7 +206,7 @@ describe("assigning a paid day's late ore (paid stays paid, ADR 0024)", () => {
   });
 
   it('leaves the flag off on an entry nobody has assigned yet', async () => {
-    const created = await createAssignment(lateOre);
+    const created = await createAssignment({ ...lateOre, isPaid: byStatus });
     expect(created.collectsGrowth).toBeUndefined();
   });
 
@@ -209,14 +215,23 @@ describe("assigning a paid day's late ore (paid stays paid, ADR 0024)", () => {
       paidDay({ status: 'outstanding', paidAt: undefined, collectsGrowth: true })
     );
 
-    const created = await createAssignment({ ...lateOre, payeeId: 'payee-2', takesGrowth: true });
+    const created = await createAssignment({
+      isPaid: byStatus,
+      ...lateOre,
+      payeeId: 'payee-2',
+      takesGrowth: true,
+    });
 
     expect(created.collectsGrowth).toBe(true);
     expect((await db.miningTaxAssignments.get('paid'))?.collectsGrowth).toBeUndefined();
   });
 
   it('takesGrowth leaves the flag off on an entry nobody has assigned yet', async () => {
-    const created = await createAssignment({ ...lateOre, takesGrowth: true });
+    const created = await createAssignment({
+      isPaid: byStatus,
+      ...lateOre,
+      takesGrowth: true,
+    });
     expect(created.collectsGrowth).toBeUndefined();
   });
 
@@ -240,7 +255,8 @@ describe("assigning a paid day's late ore (paid stays paid, ADR 0024)", () => {
         new Map([
           [TYPE_A, 10],
           [TYPE_B, 4],
-        ])
+        ]),
+      byStatus
     );
 
     expect(late.collectsGrowth).toBe(true);
@@ -260,10 +276,18 @@ describe('Moon / structure label', () => {
       estimatedValue: 1000,
       taxOwed: 100,
     };
-    const labelled = await createAssignment({ ...base, label: '  Athanor  ' });
+    const labelled = await createAssignment({
+      isPaid: byStatus,
+      ...base,
+      label: '  Athanor  ',
+    });
     expect(labelled.label).toBe('Athanor');
     await db.miningTaxAssignments.clear();
-    const blank = await createAssignment({ ...base, label: '   ' });
+    const blank = await createAssignment({
+      isPaid: byStatus,
+      ...base,
+      label: '   ',
+    });
     expect('label' in blank).toBe(false);
   });
 
@@ -357,6 +381,7 @@ describe('dismissEntries', () => {
 describe('deleteAssignments', () => {
   it('deletes the row and tombstones it so the deletion syncs', async () => {
     const assignment = await createAssignment({
+      isPaid: byStatus,
       characterId: CHAR_A,
       date: '2026-09-04',
       solarSystemId: 1,
@@ -424,7 +449,8 @@ describe('joinAssignments', () => {
       ],
       'payee-1',
       10,
-      () => prices
+      () => prices,
+      byStatus
     );
 
     expect(a.groupId).toBeDefined();
@@ -465,7 +491,8 @@ describe('joinAssignments', () => {
       ],
       'payee-1',
       10,
-      pricesOn
+      pricesOn,
+      byStatus
     );
 
     expect(pricesOn).toHaveBeenCalledWith('2026-09-04');
@@ -478,6 +505,7 @@ describe('joinAssignments', () => {
 
   it('tags an already-assigned member with the shared groupId, leaving its own fields untouched', async () => {
     const existing = await createAssignment({
+      isPaid: byStatus,
       characterId: CHAR_A,
       date: '2026-09-04',
       solarSystemId: 1,
@@ -501,7 +529,8 @@ describe('joinAssignments', () => {
       ],
       existing.payeeId as string,
       existing.taxPct,
-      () => prices
+      () => prices,
+      byStatus
     );
 
     expect(taggedExisting.groupId).toBeDefined();
@@ -515,6 +544,7 @@ describe('joinAssignments', () => {
 
   it('reuses an already-set groupId instead of minting a second one', async () => {
     const existing = await createAssignment({
+      isPaid: byStatus,
       characterId: CHAR_A,
       date: '2026-09-04',
       solarSystemId: 1,
@@ -544,7 +574,8 @@ describe('joinAssignments', () => {
       ],
       'payee-1',
       10,
-      () => prices
+      () => prices,
+      byStatus
     );
 
     expect(created.groupId).toBe('existing-group');
@@ -552,6 +583,7 @@ describe('joinAssignments', () => {
 
   it('merges two already-assigned members onto one shared groupId without recomputing their values', async () => {
     const first = await createAssignment({
+      isPaid: byStatus,
       characterId: CHAR_A,
       date: '2026-09-04',
       solarSystemId: 1,
@@ -562,6 +594,7 @@ describe('joinAssignments', () => {
       taxOwed: 100,
     });
     const second = await createAssignment({
+      isPaid: byStatus,
       characterId: CHAR_A,
       date: '2026-09-05',
       solarSystemId: 1,
@@ -579,7 +612,8 @@ describe('joinAssignments', () => {
       ],
       'payee-1',
       10,
-      () => prices
+      () => prices,
+      byStatus
     );
 
     expect(a.groupId).toBe(b.groupId);
@@ -1092,15 +1126,24 @@ describe('double-assignment guard', () => {
   };
 
   it('createAssignment refuses ore an existing Assignment on the entry already claims', async () => {
-    await createAssignment(base);
+    await createAssignment({ ...base, isPaid: byStatus });
 
-    await expect(createAssignment({ ...base })).rejects.toBeInstanceOf(AlreadyAssignedError);
+    await expect(
+      createAssignment({
+        isPaid: byStatus,
+        ...base,
+      })
+    ).rejects.toBeInstanceOf(AlreadyAssignedError);
     expect(await db.miningTaxAssignments.count()).toBe(1);
   });
 
   it('createAssignment still allows a different ore type on the same entry', async () => {
-    await createAssignment(base);
-    await createAssignment({ ...base, oreLines: [{ typeId: TYPE_B, quantity: 5 }] });
+    await createAssignment({ ...base, isPaid: byStatus });
+    await createAssignment({
+      isPaid: byStatus,
+      ...base,
+      oreLines: [{ typeId: TYPE_B, quantity: 5 }],
+    });
     expect(await db.miningTaxAssignments.count()).toBe(2);
   });
 
@@ -1114,11 +1157,13 @@ describe('double-assignment guard', () => {
         estimatedValue: 1000,
       },
     ]);
-    await expect(createAssignment(base)).rejects.toBeInstanceOf(AlreadyAssignedError);
+    await expect(createAssignment({ ...base, isPaid: byStatus })).rejects.toBeInstanceOf(
+      AlreadyAssignedError
+    );
   });
 
   it('joinAssignments refuses to create a member whose ore is already claimed', async () => {
-    await createAssignment(base);
+    await createAssignment({ ...base, isPaid: byStatus });
 
     await expect(
       joinAssignments(
@@ -1133,7 +1178,8 @@ describe('double-assignment guard', () => {
         ],
         'payee-1',
         5,
-        () => new Map([[TYPE_A, 10]])
+        () => new Map([[TYPE_A, 10]]),
+        byStatus
       )
     ).rejects.toBeInstanceOf(AlreadyAssignedError);
     expect(await db.miningTaxAssignments.count()).toBe(1);
@@ -1141,17 +1187,21 @@ describe('double-assignment guard', () => {
 
   it('refuses a twin when the entry holds no more than the first claim, even across a stale view', async () => {
     const withEntry = { ...base, entryOreLines: [{ typeId: TYPE_A, quantity: 100 }] };
-    await createAssignment(withEntry);
-    await expect(createAssignment(withEntry)).rejects.toBeInstanceOf(AlreadyAssignedError);
+    await createAssignment({ ...withEntry, isPaid: byStatus });
+    await expect(createAssignment({ ...withEntry, isPaid: byStatus })).rejects.toBeInstanceOf(
+      AlreadyAssignedError
+    );
   });
 
   it('still allows a claim on growth another Assignment on that type has not covered', async () => {
     await createAssignment({
+      isPaid: byStatus,
       ...base,
       oreLines: [{ typeId: TYPE_A, quantity: 60 }],
       entryOreLines: [{ typeId: TYPE_A, quantity: 130 }],
     });
     await createAssignment({
+      isPaid: byStatus,
       ...base,
       payeeId: 'payee-2',
       oreLines: [{ typeId: TYPE_A, quantity: 40 }],
@@ -1159,6 +1209,7 @@ describe('double-assignment guard', () => {
     });
     // 60 + 40 claimed of 130: the 30 residual is still assignable.
     await createAssignment({
+      isPaid: byStatus,
       ...base,
       payeeId: 'payee-3',
       oreLines: [{ typeId: TYPE_A, quantity: 30 }],
@@ -1407,9 +1458,17 @@ describe('override (a Default System made it, and nobody has changed it)', () =>
       estimatedValue: 1000,
       taxOwed: 100,
     };
-    expect((await createAssignment({ ...input, byDefault: true })).override).toBe(false);
+    expect(
+      (
+        await createAssignment({
+          isPaid: byStatus,
+          ...input,
+          byDefault: true,
+        })
+      ).override
+    ).toBe(false);
     await db.miningTaxAssignments.clear();
-    expect('override' in (await createAssignment(input))).toBe(false);
+    expect('override' in (await createAssignment({ ...input, isPaid: byStatus }))).toBe(false);
   });
 
   it('is cleared when the pilot edits the entry', async () => {
@@ -1458,7 +1517,8 @@ describe('override (a Default System made it, and nobody has changed it)', () =>
       [{ characterId: CHAR_A, date: row.date, solarSystemId: 1, assignment: row }],
       'landlord',
       5,
-      () => new Map()
+      () => new Map(),
+      byStatus
     );
     expect('override' in joined).toBe(false);
   });
