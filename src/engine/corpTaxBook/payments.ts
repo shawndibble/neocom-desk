@@ -21,9 +21,11 @@ export interface TaxPayment {
   /**
    * Why a donation waits Unmatched for an officer. `ambiguous`: the shared rule found it could be
    * any of several Miners (`ambiguousMinerIds`). `no-open-balance` is legacy (#6207, reversed by
-   * #6300): no longer set, and the next sync assigns any still stored.
+   * #6300): no longer set, and the next sync assigns any still stored. `account-closed`: the
+   * sender's Miner account is closed, so an officer decides where it goes (the exact string is the
+   * server's; reconcile at merge).
    */
-  reviewReason?: 'no-open-balance' | 'ambiguous';
+  reviewReason?: 'no-open-balance' | 'ambiguous' | 'account-closed';
   /** `ambiguous`: the Miners the donation could be, for the officer to pick from. */
   ambiguousMinerIds?: string[];
   /** A hand record of a transfer the book also noted in a division it does not read: that donation's id. */
@@ -52,7 +54,7 @@ export function isBeforeBook(at: string, startDate: string): boolean {
 }
 
 /** What of a Tax Payment is tax: its amount less the part coded "not tax" (the shared rule). */
-export { netPayment as paymentNet };
+export { netPayment };
 
 /** The Tax Payments the book counts, in the order they are applied: a donation before `startDate` drops out; oldest first. */
 export function countedPayments(payments: readonly TaxPayment[], startDate?: string): TaxPayment[] {

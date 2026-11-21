@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -260,6 +260,42 @@ describe('BookSettingsDialog tabs', () => {
         patch: expect.objectContaining({ startDate: '2026-09-20' }),
       })
     );
+  });
+
+  describe('the start date and the lock date', () => {
+    const open = async (today: string) => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date(`${today}T12:00:00Z`));
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter>
+          <BookProvider value={bookSettingsValue({ isDirector: true })}>
+            <BookSettingsDialog open onClose={() => {}} />
+          </BookProvider>
+        </MemoryRouter>
+      );
+      await user.click(screen.getByRole('tab', { name: 'Billing' }));
+      return user;
+    };
+    afterEach(() => vi.useRealTimers());
+
+    it('asks for a start date no earlier than the lock date, and will not save one before it', async () => {
+      // On 20 Dec the lock date is 1 Oct; the book's start (1 Oct) is not locked.
+      const user = await open('2026-12-20');
+      const start = screen.getByLabelText('Start date (EVE time)');
+      expect(start).toHaveAttribute('min', '2026-10-01');
+      fireEvent.change(start, { target: { value: '2026-09-15' } });
+      expect(screen.getAllByText(/can't be moved before/).length).toBeGreaterThan(0);
+      await user.click(screen.getByRole('button', { name: 'Save' }));
+      expect(editBook).not.toHaveBeenCalled();
+    });
+
+    it('locks a start date that is itself before the lock date', async () => {
+      // On 1 Mar 2027 the lock date is 1 Dec: the book started on 1 Oct, in locked history.
+      await open('2027-03-01');
+      expect(screen.getByLabelText('Start date (EVE time)')).toBeDisabled();
+      expect(screen.getByText(/is locked/)).toBeInTheDocument();
+    });
   });
 
   it('leaves unchanged divisions and their names out of a save, so it never overwrites them', async () => {

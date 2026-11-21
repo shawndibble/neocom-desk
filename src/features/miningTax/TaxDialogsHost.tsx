@@ -615,7 +615,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             l.kind === 'recorded' || l.kind === 'legacy'
               ? undefined
               : characterNameOf(
-                  madePayments.find((m) => m.key === `${l.kind}:${l.refId}`)?.characterId ?? 0
+                  madePayments.find((m) => m.key === paymentLinkKey(l))?.characterId ?? 0
                 );
           const href = madePaymentHref(l);
           return {
@@ -627,7 +627,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
         }),
       };
     }
-    const book = corpView?.books.find((b) => b.loaded.corporationId === ledgerTarget.corporationId);
+    const book = ledgerBook;
     if (!book) return null;
     const miner = book.summary.miners.find((m) => m.minerId === ledgerMinerId);
     if (!miner) return null;
@@ -643,7 +643,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     everyAssignment,
     systemNames,
     madePayments,
-    corpView,
+    ledgerBook,
     ledgerMinerId,
     trackedCharacters,
   ]);
@@ -651,8 +651,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     ledgerTarget?.kind === 'personal'
       ? (payeeById.get(ledgerTarget.payeeId)?.name ?? '')
       : ledgerTarget?.kind === 'book'
-        ? (corpView?.books.find((b) => b.loaded.corporationId === ledgerTarget.corporationId)?.payee
-            .name ?? '')
+        ? (ledgerBook?.payee.name ?? '')
         : '';
 
   const corpDetail = detailTarget?.corp?.kind === 'row' ? detailTarget.corp : null;

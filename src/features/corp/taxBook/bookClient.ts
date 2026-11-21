@@ -8,6 +8,7 @@
  * Firestore here is the `lite` build (no listeners), so callers refetch after
  * a change.
  */
+import type { MoonDoc } from '../../../../functions/src/corpTaxBookMoonDocs';
 import { LIVE_CHECK_ACTION_NAMES } from '../../../../functions/src/corpTaxBookKinds';
 import {
   LATE_NOTICES,
@@ -429,6 +430,8 @@ export interface GroupingAnswer {
   via: 'character' | 'verify-link';
   /** ISO instant an officer took it out of Needs you (`dismissGroupingAnswer`). */
   dismissedAt?: string;
+  /** A declined grouping: the Characters that were in that Miner besides the decliner, so the card can name a group that has since dissolved. */
+  otherCharacterIds?: number[];
 }
 
 /** Reads `meta/groupingAnswers`, dropping anything malformed. */
@@ -447,6 +450,13 @@ export function groupingAnswersFrom(d: Record<string, unknown> | undefined): Gro
         at: String(a.at ?? ''),
         via: a.via === 'verify-link' ? ('verify-link' as const) : ('character' as const),
         ...(typeof a.dismissedAt === 'string' ? { dismissedAt: a.dismissedAt } : {}),
+        ...(Array.isArray(a.otherCharacterIds)
+          ? {
+              otherCharacterIds: a.otherCharacterIds.filter(
+                (n): n is number => typeof n === 'number' && Number.isSafeInteger(n)
+              ),
+            }
+          : {}),
       },
     ];
   });
@@ -593,6 +603,8 @@ export interface BookData {
   disputes?: OreDispute[];
   /** Which parts this read covered (`bookRead/`); every field of the others is empty. */
   parts: ReadonlySet<BookPart>;
+  /** A moon page's read (#5716): the moon docs that stand in for earlier cycles' ledger rows. */
+  moon?: { docs: ReadonlyMap<string, MoonDoc>; fromDocs: ReadonlySet<string> };
   /**
    * Each moon owner's view summary by corporation id (ADR 0032, #5717); read with the `owners`
    * part. Absent when that part was not read; a moon owner without one is priced from `observed`.

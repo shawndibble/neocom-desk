@@ -42,6 +42,20 @@ describe('groupingAnswersFrom', () => {
     ]);
   });
 
+  it('reads the characters a declined grouping held besides the decliner', () => {
+    const [a] = groupingAnswersFrom({
+      answers: {
+        '61': {
+          minerId: 'm-a',
+          answer: 'declined',
+          at: '2026-10-18T10:00:00Z',
+          otherCharacterIds: [7, 'x', 9, 1.5],
+        },
+      },
+    });
+    expect(a?.otherCharacterIds).toEqual([7, 9]);
+  });
+
   it('reads when an officer dismissed an answer from Needs you', () => {
     expect(
       groupingAnswersFrom({

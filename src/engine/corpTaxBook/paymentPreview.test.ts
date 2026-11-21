@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { MinerRunningAccountInput } from './minerRunningAccount';
 import { previewPayment } from './paymentPreview';
-import { paymentNet, type TaxPayment } from './payments';
+import { netPayment, type TaxPayment } from './payments';
 
 function payment(id: string, amount: number, at: string, extra: Partial<TaxPayment> = {}) {
   return {
@@ -74,10 +74,10 @@ describe('previewPayment', () => {
   });
 });
 
-describe('paymentNet', () => {
+describe('netPayment', () => {
   it('takes off the part marked not tax, never below zero', () => {
-    expect(paymentNet({ amount: 100 })).toBe(100);
-    expect(paymentNet({ amount: 100, notTaxAmount: 30 })).toBe(70);
-    expect(paymentNet({ amount: 100, notTaxAmount: 500 })).toBe(0);
+    expect(netPayment({ amount: 100 })).toBe(100);
+    expect(netPayment({ amount: 100, notTaxAmount: 30 })).toBe(70);
+    expect(netPayment({ amount: 100, notTaxAmount: 500 })).toBe(0);
   });
 });

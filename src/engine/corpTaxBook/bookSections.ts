@@ -8,7 +8,7 @@ import type { BookView, DayRow, ExtractionRow, RunningAccountStatus } from './bo
 import type { OreLine } from './types';
 import { DAY_MS } from '@/lib/age';
 import { shiftUtcDate, utcDay } from '../localDay';
-import { paymentNet } from './payments';
+import { netPayment } from './payments';
 
 /** How far ahead the Overview looks for an Extracting moon's chunk to arrive. */
 export const POPS_WINDOW_DAYS = 7;
@@ -58,7 +58,7 @@ export function rangeFigures(
     tax: days
       .filter((d) => billed.has(d.status) && inRange(d.date, from))
       .reduce((s, d) => s + d.tax, 0),
-    paid: payments.filter((p) => inRange(p.at, from)).reduce((s, p) => s + paymentNet(p), 0),
+    paid: payments.filter((p) => inRange(p.at, from)).reduce((s, p) => s + netPayment(p), 0),
   };
 }
 

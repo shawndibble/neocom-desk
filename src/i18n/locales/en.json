@@ -18653,6 +18653,7 @@
           "body": "{{date}}. {{name}} has not mined at your refineries, so there is no Miner to credit.",
           "bodyInMiner": "{{date}}. {{name}} is in a Miner now; the next sync assigns it, or you can assign it.",
           "bodyAmbiguous": "{{date}}. The book could credit it to {{miners}} and cannot tell which. Assign it to the right Miner.",
+          "bodyAccountClosed": "{{date}}. {{name}}'s Miner account is closed, so the book did not credit it. Assign it to a Miner, or mark it not tax.",
           "bodyReview": "{{date}}. {{name}}'s Miner owed no tax then, so an earlier sync held it. The next sync assigns it as credit. Mark it not tax if it was for something else, such as a buyback.",
           "assign": "Assign to a Miner",
           "notTax": "Mark not tax"
@@ -18686,8 +18687,8 @@
         },
         "none": "Nothing needs you.",
         "declinedGrouping": {
-          "title": "{{character}} says they aren't part of {{miner}}.",
-          "body": "They're billed on their own now.",
+          "title": "{{character}} says they aren't part of {{miner}} — billed on their own now.",
+          "former": "their former group",
           "dismiss": "Dismiss",
           "failed": "Could not dismiss that. Try again."
         }
@@ -19248,7 +19249,7 @@
           "transfer-in-book": "That transfer is already in the book, so recording it would count it twice. Assign the donation the sync stored instead: Needs you lists it while no Miner has it.",
           "needs-automatic-sync": "Turn on Automatic sync before sharing pops. Pops are shared as part of each sync.",
           "unknown-moon": "This book has no Extraction at that moon.",
-          "locked": "That date is locked: nothing before the 1st of the month two months back can be changed. Add a correction dated today instead.",
+          "locked": "That date is locked: nothing before {{date}} can be changed. Add a correction dated {{date}} or later instead.",
           "unknown-miner": "That Miner isn't in the book any more. Reload and pick another.",
           "account-closed": "That Miner's account is closed: it takes no more payments.",
           "wrong-miner": "The final notice is for another Miner. Reload and try again.",
@@ -19546,6 +19547,8 @@
           "raw": "Raw"
         },
         "startDate": "Start date (EVE time)",
+        "startBeforeLock": "The start date can't be moved before {{date}}: earlier history is locked.",
+        "startLocked": "The start date ({{date}}) is before {{lock}}, in locked history, so it is locked.",
         "grace": "Grace after day end (hours)",
         "divisions": "Wallet divisions donations are read from",
         "division": "Division {{n}}",
@@ -19807,7 +19810,7 @@
           "owesNothing": "{{name}} owes nothing",
           "creditHeld": "{{amount}} held as credit toward the next days",
           "dayLine": "Day of {{date}}",
-          "dateLocked": "Days before {{date}} are locked: record it dated today instead."
+          "dateLocked": "Days before {{date}} are locked: record it dated {{date}} or later instead."
         },
         "notTax": {
           "title": "Mark part of a donation as not tax",

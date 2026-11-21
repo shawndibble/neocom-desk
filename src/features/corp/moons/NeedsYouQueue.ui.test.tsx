@@ -248,6 +248,23 @@ describe('NeedsYouQueue (#6207)', () => {
     ).toBeInTheDocument();
   });
 
+  it('says a donation from a closed Miner account waits for an officer', () => {
+    renderQueue([
+      {
+        kind: 'unmatched',
+        payment: {
+          id: 'j1_8',
+          characterId: 7,
+          amount: 1_000_000,
+          at: '2026-10-10T00:00:00Z',
+          source: 'donation',
+          reviewReason: 'account-closed',
+        },
+      },
+    ]);
+    expect(screen.getByText(/Pilot 7's Miner account is closed/)).toBeInTheDocument();
+  });
+
   const dispute: OreDispute = {
     id: 'solo_7_2026-09-05',
     minerId: 'solo:7',
@@ -276,6 +293,27 @@ describe('NeedsYouQueue (#6207)', () => {
       amountIsk: 1_200_000,
       reason: 'Their ore',
     });
+  });
+
+  it('still lets an officer answer a dispute of a locked day', () => {
+    // 2026-09-05 is before the lock date (2026-10-01) on 2026-12-20; the server allows the answer.
+    renderQueue([], {
+      disputes: [dispute],
+      view: {
+        input: {
+          miners: [],
+          now: '2026-12-20T00:00:00Z',
+          notices: [],
+          dismissals: [],
+          declarations: [],
+        },
+        miners: [],
+        internals: { byMiner: new Map() },
+        charges: [],
+      },
+    });
+    expect(screen.getByRole('button', { name: 'Waive their ore' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Keep the bill' })).toBeInTheDocument();
   });
 
   it('never waives a dispute whose day it cannot price (#6206)', async () => {
@@ -346,15 +384,50 @@ describe('NeedsYouQueue (#6207)', () => {
     const group = { ...miner('g1', 7), characterIds: [7, 9] };
     renderQueue([], { miners: [group, miner('solo:8', 8)], groupingAnswers: [declined] });
     expect(
-      screen.getByRole('link', { name: "Pilot 8 says they aren't part of Pilot 7." })
+      screen.getByRole('link', {
+        name: "Pilot 8 says they aren't part of Pilot 7 — billed on their own now.",
+      })
     ).toHaveAttribute('href', '/corp/moons/miners/g1');
-    expect(screen.getByText("They're billed on their own now.")).toBeInTheDocument();
     cleanup();
     renderQueue([], {
       miners: [{ ...group, characterIds: [7, 9, 8] }],
       groupingAnswers: [declined],
     });
     expect(screen.queryByText(/says they aren't part of/)).not.toBeInTheDocument();
+  });
+
+  it('names a dissolved group by the others it held, and links where they are now', () => {
+    const declined: GroupingAnswer = {
+      characterId: 8,
+      minerId: 'g1',
+      answer: 'declined',
+      at: '2026-10-19T00:00:00Z',
+      via: 'character',
+      otherCharacterIds: [7, 9],
+    };
+    const other = { ...miner('g2', 7), characterIds: [7, 11] };
+    renderQueue([], { miners: [other, miner('solo:8', 8)], groupingAnswers: [declined] });
+    const link = screen.getByRole('link', {
+      name: /^Pilot 8 says they aren't part of Pilot 7 and Pilot 9/,
+    });
+    expect(link).toHaveAttribute('href', '/corp/moons/miners/g2');
+    expect(screen.queryByText(/g1/)).not.toBeInTheDocument();
+  });
+
+  it('never shows a raw id for a group nobody can name; links the decliner', () => {
+    const declined: GroupingAnswer = {
+      characterId: 8,
+      minerId: 'g1',
+      answer: 'declined',
+      at: '2026-10-19T00:00:00Z',
+      via: 'character',
+    };
+    renderQueue([], { miners: [miner('solo:8', 8)], groupingAnswers: [declined] });
+    const link = screen.getByRole('link', {
+      name: /^Pilot 8 says they aren't part of their former group/,
+    });
+    expect(link).toHaveAttribute('href', '/corp/moons/miners/solo%3A8');
+    expect(screen.queryByText(/g1/)).not.toBeInTheDocument();
   });
 
   it('dismisses a declined grouping, and hides one an officer dismissed', async () => {

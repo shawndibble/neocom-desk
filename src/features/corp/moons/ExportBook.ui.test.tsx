@@ -80,6 +80,7 @@ function renderIn(children: React.ReactNode) {
       value={
         {
           characterId: ME,
+          view: { input: { now: '2026-10-20T00:00:00Z' } },
           corporationId: CORP,
           names,
           verdict: { canEdit: false },

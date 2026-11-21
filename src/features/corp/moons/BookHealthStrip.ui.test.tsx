@@ -265,7 +265,11 @@ describe('BookHealthStrip, unrated days (#5717)', () => {
             {
               characterId: 7,
               corporationId: 98000001,
-              view: { unrated: [{}, {}], billableThrough: null, input: { graceHours: 6 } },
+              view: {
+                unrated: [{}, {}],
+                billableThrough: null,
+                input: { graceHours: 6, now: '2026-11-21T00:00:00Z' },
+              },
               names: { refinery: () => 'x' },
               data: { scheduledSync: null, feeders: [], parts },
               settings: {},

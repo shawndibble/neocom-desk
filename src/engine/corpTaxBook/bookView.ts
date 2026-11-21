@@ -24,7 +24,7 @@ import {
   type LearnedChunkRate,
 } from './extraction';
 import { overdueStatus, type Declaration, type OverdueState } from './overdue';
-import { isBeforeBook, paymentNet, type TaxPayment } from './payments';
+import { isBeforeBook, netPayment, type TaxPayment } from './payments';
 import { toEngineExtraction, type SettlePayment, type SyncExtraction } from './sync';
 import { latestRecordedCorp } from './bookDocs';
 import type { ObservedMiningEntry, OreLine } from './types';
@@ -398,7 +398,7 @@ export function buildBookView(input: BookViewInput): BookView {
       }
     }
     const lastPaid = payments
-      .filter((p) => paymentNet(p) > 0)
+      .filter((p) => netPayment(p) > 0)
       .map((p) => p.at)
       .sort()
       .at(-1);
@@ -440,7 +440,7 @@ export function buildBookView(input: BookViewInput): BookView {
   for (const p of input.payments) {
     if (p.source === 'donation' && isBeforeBook(p.at, input.startDate)) donationsBeforeBook++;
     // A donation wholly marked not tax needs nothing more; a partly marked one still does.
-    else if (!p.minerId && paymentNet(p) > 0) needsYou.push({ kind: 'unmatched', payment: p });
+    else if (!p.minerId && netPayment(p) > 0) needsYou.push({ kind: 'unmatched', payment: p });
   }
   // The same ordering the cards read in: declarations, then the oldest debt.
   const rank: Record<NeedsYouItem['kind'], number> = {
@@ -655,7 +655,7 @@ export function minerDetail(view: BookView, minerId: string): MinerDetail | unde
     row,
     days: inner.days,
     payments: inner.payments
-      .map((p) => ({ ...p, credited: paymentNet(p) }))
+      .map((p) => ({ ...p, credited: netPayment(p) }))
       .sort((a, b) => b.at.localeCompare(a.at)),
     notices: [...inner.notices].reverse(),
     paymentDays: inner.account.applications.payments,

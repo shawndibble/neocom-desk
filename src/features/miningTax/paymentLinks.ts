@@ -13,7 +13,7 @@
 import { utcDayOf } from '../../../functions/src/timeConstants';
 import type { MiningTaxPaymentMethod, PayeeRecord } from '@/db';
 import { matchesStatedTransfer } from '../../../functions/src/corpTaxBookTransferMatch';
-import { paymentLinkKey, type PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
+import type { PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
 import { isCorpPayeeId } from './corpBook/corpRows';
 import { amountsMatch } from './paymentMatches';
 
@@ -222,13 +222,4 @@ export function linkFor(
     paidOn: utcDayOf(payment.date),
     source,
   };
-}
-
-/** The made payment behind a link, when the wallet or contracts still hold it. */
-export function paymentOfLink(
-  link: Pick<PayeePaymentLink, 'kind' | 'refId'>,
-  payments: readonly MadePayment[]
-): MadePayment | undefined {
-  const key = paymentLinkKey(link);
-  return payments.find((p) => p.key === key);
 }
