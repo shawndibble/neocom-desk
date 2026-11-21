@@ -1,7 +1,7 @@
 import { useDefaultMarketHub, useGlobalClosest, useMarketHub } from '@/features/market/hub';
 import { resetClosestHubs } from '@/features/market/closestHub';
 import { useHubByCharacter } from '@/features/market/characterHubs';
-import { usePageHubs } from '@/features/market/pageHubs';
+import { usePageHubs, useParkedPageHubs } from '@/features/market/pageHubs';
 import { usePagePricePercents } from '@/features/market/pagePricePercents';
 import { useMarketPricePercent } from '@/features/market/pricePercent';
 import { DEFAULT_PI_SETTINGS, usePiSettings } from '@/features/pi/piSettings';
@@ -18,6 +18,7 @@ export function resetHubStores(): void {
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   useMarketHub.setState({ value: 'jita', hydrated: false });
   usePageHubs.setState({ value: {}, hydrated: false });
+  useParkedPageHubs.setState({ value: {}, hydrated: false });
   useGlobalClosest.setState({ value: false, hydrated: false });
   usePagePricePercents.setState({ value: {}, hydrated: false });
   useMarketPricePercent.setState({ value: 100, hydrated: false });

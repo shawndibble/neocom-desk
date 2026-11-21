@@ -3,8 +3,9 @@
  * Trade Hub comes from, changes it, and holds the page's price percent.
  *
  * - **Market hub settings**: App setting · <page>, which one the page uses; a
- *   press switches it (the page's own entry starts at the hub it uses now; App
- *   setting drops the entry).
+ *   press switches it and keeps both (App setting sets the page's own hub
+ *   aside, and the page gets it back; a page with none starts at the hub it
+ *   uses now). Only Settings › Page hubs removes a page's own hub.
  * - **Market hub**: Closest hub on its own row, then the hubs in a grid, the
  *   one in use pressed. A pick writes the page's own entry when it has one,
  *   else the Global hub, which moves every page without an entry.

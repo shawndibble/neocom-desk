@@ -7,7 +7,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { resetHubStores } from '@/test/hubStores';
 import { useMarketHub } from './hub';
 import { HubField, HubMenu } from './HubMenu';
-import { usePageHubs } from './pageHubs';
+import { usePageHubs, useParkedPageHubs } from './pageHubs';
 import { usePagePricePercents } from './pagePricePercents';
 import { useClosestHubs } from './closestHub';
 
@@ -67,7 +67,7 @@ describe('HubMenu', () => {
     expect(useMarketHub.getState().value).toBe('jita');
   });
 
-  it('switching back to App setting drops the page’s own hub', async () => {
+  it('switching back to App setting sets the page’s own hub aside, and switching again restores it', async () => {
     await reset({ contracts: 'rens' });
     await open();
     expect(within(hubs()).getByRole('button', { name: 'Rens VI-8' })).toHaveAttribute(
@@ -76,7 +76,15 @@ describe('HubMenu', () => {
     );
     await userEvent.click(within(settings()).getByRole('button', { name: 'App setting' }));
     await waitFor(() => expect(usePageHubs.getState().value).toEqual({}));
+    expect(useParkedPageHubs.getState().value).toEqual({ contracts: 'rens' });
     expect(within(hubs()).getByRole('button', { name: 'Jita 4-4' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    await userEvent.click(within(settings()).getByRole('button', { name: 'Contracts' }));
+    await waitFor(() => expect(usePageHubs.getState().value).toEqual({ contracts: 'rens' }));
+    expect(useParkedPageHubs.getState().value).toEqual({});
+    expect(within(hubs()).getByRole('button', { name: 'Rens VI-8' })).toHaveAttribute(
       'aria-pressed',
       'true'
     );

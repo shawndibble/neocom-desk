@@ -40,6 +40,7 @@ import {
   ownChoice,
   setPageHub,
   usePageHubs,
+  useParkedPageHubs,
   type HubChoice,
   type PageHubArea,
 } from './pageHubs';
@@ -255,9 +256,11 @@ export async function pickGlobalHub(choice: HubChoice): Promise<void> {
 }
 
 /**
- * Switches `area` between Global and its own hub. Its own starts at what it
- * uses now (Closest when the Global hub is), so nothing re-prices; back to
- * Global drops the entry.
+ * Switches `area` between Global and its own hub, keeping its own: back to
+ * Global sets the entry aside (`useParkedPageHubs`), and the page's own hub
+ * comes back from there. A page that never had one starts at what it uses now
+ * (Closest when the Global hub is), so nothing re-prices. Only Settings'
+ * Remove forgets a page's hub.
  */
 export async function setHubScope(area: PageHubArea, scope: HubScope): Promise<void> {
   if (
@@ -271,13 +274,23 @@ export async function setHubScope(area: PageHubArea, scope: HubScope): Promise<v
       useGlobalClosest.getState().hydrate(),
     ]);
   }
+  const parked = useParkedPageHubs.getState();
+  if (!parked.hydrated) await parked.hydrate();
   const map = usePageHubs.getState().value;
-  if (scope === 'global') return usePageHubs.getState().setValue(dropPageHub(map, area));
+  const parkedMap = useParkedPageHubs.getState().value;
+  if (scope === 'global') {
+    const own = ownChoice(map, area);
+    if (!own) return;
+    // Set aside first: a failure between the writes leaves the hub in both, never in neither.
+    await parked.setValue(setPageHub(parkedMap, area, own));
+    return usePageHubs.getState().setValue(dropPageHub(map, area));
+  }
   if (ownChoice(map, area)) return;
-  const start: HubChoice = useGlobalClosest.getState().value
-    ? CLOSEST
-    : useMarketHub.getState().value;
-  return usePageHubs.getState().setValue(setPageHub(map, area, start));
+  const start: HubChoice =
+    ownChoice(parkedMap, area) ??
+    (useGlobalClosest.getState().value ? CLOSEST : useMarketHub.getState().value);
+  await usePageHubs.getState().setValue(setPageHub(map, area, start));
+  if (area in parkedMap) await parked.setValue(dropPageHub(parkedMap, area));
 }
 
 /**
