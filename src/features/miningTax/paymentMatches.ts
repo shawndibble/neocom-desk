@@ -15,14 +15,6 @@ export const PAYMENT_REF_TYPES: ReadonlySet<string> = new Set([
   'contract_deposit',
 ]);
 
-/**
- * How long after a Mining Ledger Entry a payment can still plausibly be
- * settling it (issue #540). Deliberately used asymmetrically — see
- * `withinLinkWindow` in `paymentLinks.ts`: a pilot pays *after* mining, so an
- * entry dated well past its payment is not a match however close the amounts.
- */
-export const LINK_WINDOW_DAYS = 14;
-
 /** How far two ISK figures may differ and still match: half a percent, or one ISK, whichever is larger. */
 export function amountSlack(amount: number): number {
   return Math.max(1, amount * 0.005);
