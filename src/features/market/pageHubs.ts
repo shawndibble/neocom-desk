@@ -21,12 +21,14 @@ import type { HubId } from './characterHubs';
  * them one slice at a time), so Settings never offers an entry that does
  * nothing; an entry for an area this build does not list is dropped on parse.
  */
-export const PAGE_HUB_AREAS = ['contracts'] as const;
+export const PAGE_HUB_AREAS = ['fittings', 'skills', 'contracts'] as const;
 
 export type PageHubArea = (typeof PAGE_HUB_AREAS)[number];
 
 /** Each area's player-facing name, as literal keys so a dead-key scan sees them. */
 const AREA_NAME_KEYS = {
+  fittings: 'pageHubs.area.fittings',
+  skills: 'pageHubs.area.skills',
   contracts: 'pageHubs.area.contracts',
 } as const satisfies Record<PageHubArea, string>;
 

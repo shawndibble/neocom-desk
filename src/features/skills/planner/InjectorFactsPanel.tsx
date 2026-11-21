@@ -3,14 +3,13 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IskAmount } from '@/components/ui';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPricesWithStatus, type HubAggregate } from '@/market/prices';
 import { LARGE_SKILL_INJECTOR_TYPE_ID } from '@/engine/skills/spExtraction';
 import { ALPHA_SP_CAP } from '@/engine/skills/skillInjectors';
 import type { CloneState } from '@/engine/types';
 import { buildInjectorFacts } from './injectorFacts';
-import { useHydratedStore } from '@/lib/useHydratedStore';
 import { createNumberFormat, formatNumber } from '@/lib/numberLocale';
 
 // Part-trained levels bank fractional SP; the old default printed up to 3 decimals.
@@ -38,8 +37,7 @@ export function InjectorFactsPanel({
 }: InjectorFactsPanelProps) {
   const { t } = useTranslation();
   const pricesUnavailableLabel = usePricesUnavailableLabel();
-  const hubId = useMarketHub((state) => state.value);
-  const hubHydrated = useHydratedStore(useMarketHub);
+  const { hubId, hydrated: hubHydrated } = useHubFor('skills');
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
 
   const [aggregate, setAggregate] = useState<HubAggregate | null>(null);

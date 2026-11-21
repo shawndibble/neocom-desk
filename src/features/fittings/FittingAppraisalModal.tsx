@@ -11,7 +11,7 @@ import {
 import type { Appraisal, AppraisalRow } from '@/engine/market/appraisal';
 import { multibuyText } from '@/engine/market/haulingPlan';
 import { unpricedSellRows } from '@/features/fittings/fittingPrice';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatIsk } from '@/lib/isk';
@@ -31,7 +31,7 @@ interface Props {
  */
 export function FittingAppraisalModal({ open, onClose, price }: Props) {
   const { t } = useTranslation();
-  const hubId = useMarketHub((state) => state.value);
+  const { hubId } = useHubFor('fittings');
   const hub = TRADE_HUBS.find((tradeHub) => tradeHub.id === hubId);
   const [notice, setNotice] = useState<string | null>(null);
 

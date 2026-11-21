@@ -32,12 +32,21 @@ describe('PageHubsField', () => {
   });
 
   it('adds a page from the ones without a hub, starting at the Global hub', async () => {
-    await usePageHubs.getState().setValue({});
     render(<PageHubsField />);
-    // One page left to add: a plain button names it, no one-item menu.
+    await userEvent.click(screen.getByRole('button', { name: /Add page hub/ }));
+    // Contracts already has one, so it is not offered.
+    expect(screen.queryByRole('menuitem', { name: 'Contracts' })).toBeNull();
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Ship Fit Costs' }));
+    await waitFor(() =>
+      expect(usePageHubs.getState().value).toEqual({ contracts: 'hek', fittings: 'amarr' })
+    );
+  });
+
+  it('with one page left to add, a plain button names it', async () => {
+    await usePageHubs.getState().setValue({ fittings: 'jita', skills: 'jita' });
+    render(<PageHubsField />);
     await userEvent.click(screen.getByRole('button', { name: 'Add Contracts hub' }));
-    await waitFor(() => expect(usePageHubs.getState().value).toEqual({ contracts: 'amarr' }));
-    // Every page has one now, so there is nothing left to add.
+    await waitFor(() => expect(usePageHubs.getState().value.contracts).toBe('amarr'));
     expect(screen.queryByRole('button', { name: /^Add / })).toBeNull();
   });
 
@@ -46,10 +55,8 @@ describe('PageHubsField', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Remove Contracts hub' }));
     await waitFor(() => expect(usePageHubs.getState().value).toEqual({}));
     expect(screen.getAllByText('Contracts uses your Trade Hub again').length).toBeGreaterThan(0);
-    // Focus moves off the removed row, to the Add control that replaces it.
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Add Contracts hub' })).toHaveFocus()
-    );
+    // Focus moves off the removed row; with no row left, to Add.
+    await waitFor(() => expect(screen.getByRole('button', { name: /Add page hub/ })).toHaveFocus());
     await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
     await waitFor(() => expect(usePageHubs.getState().value).toEqual({ contracts: 'hek' }));
     // Undo closes its own toast.

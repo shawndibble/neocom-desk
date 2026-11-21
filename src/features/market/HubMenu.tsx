@@ -21,7 +21,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui';
-import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
+import { selectTriggerClassName, type ControlSize } from '@/components/ui/controlStyles';
+import { SelectChevron } from '@/components/ui/SelectChevron';
+import { cx } from '@/lib/cx';
+import { DEFAULT_TRADE_HUB, getTradeHub, TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { pickHubFor, setHubScope, useHubFor, type HubScope } from './hub';
 import { pageHubAreaName, type PageHubArea } from './pageHubs';
 
@@ -73,5 +76,36 @@ export function HubMenu({
         </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+/**
+ * `HubMenu` standing alone as a control: field chrome with the hub's name and
+ * the chevron (DESIGN.md §6c, `CaretDown` inside field chrome), where a page
+ * used to have a hub `Select`.
+ */
+export function HubField({
+  area,
+  label,
+  size = 'md',
+  className,
+}: {
+  area: PageHubArea;
+  /** What the field picks ("Price hub"); the trigger is named "<label>: <hub>". */
+  label: string;
+  size?: ControlSize;
+  className?: string;
+}) {
+  const { hubId } = useHubFor(area);
+  const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
+  return (
+    <HubMenu
+      area={area}
+      triggerClassName={cx(selectTriggerClassName(size), className)}
+      triggerLabel={`${hub.systemName}, ${label}`}
+    >
+      <span>{hub.systemName}</span>
+      <SelectChevron size={size} />
+    </HubMenu>
   );
 }

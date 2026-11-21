@@ -1,5 +1,5 @@
 /**
- * Fit-wide sell/buy totals per compare slot, at the default Trade Hub —
+ * Fit-wide sell/buy totals per compare slot, at the Fittings hub —
  * the same figures `loadFittingPrice` gives the single-Fitting page,
  * reused here so "what this fit is worth" reads the same on both pages.
  * Riding `useCompareAsync` for its per-Fitting cache means a price never
@@ -7,12 +7,18 @@
  */
 import type { FittingPriceTotals } from '@/engine/fittings/fittingCompare';
 import type { Fitting, PilotProfile } from '@/engine/fittings/types';
-import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+import { useHubFor } from '@/features/market/hub';
+import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { loadFittingPrice } from './fittingPrice';
 import { useCompareAsync, type CompareAsyncResult } from './useCompareAsync';
 
-async function computeOne(fitting: Fitting, profile: PilotProfile): Promise<FittingPriceTotals> {
-  const price = await loadFittingPrice(fitting, DEFAULT_TRADE_HUB, profile.implantTypeIds);
+async function computeOne(
+  fitting: Fitting,
+  profile: PilotProfile,
+  hub?: unknown
+): Promise<FittingPriceTotals> {
+  const at = (hub as TradeHub | undefined) ?? DEFAULT_TRADE_HUB;
+  const price = await loadFittingPrice(fitting, at, profile.implantTypeIds);
   return { sell: price.totals.sell, buy: price.totals.buy };
 }
 
@@ -26,5 +32,7 @@ export function useComparePrice(
   fittings: readonly (Fitting | null)[],
   profile: PilotProfile | null
 ): CompareAsyncResult<FittingPriceTotals> {
-  return useCompareAsync(fittings, profile, computeOne);
+  const { hubId } = useHubFor('fittings');
+  // The hub is the cache's context: a new hub re-prices every slot.
+  return useCompareAsync(fittings, profile, computeOne, getTradeHub(hubId) ?? DEFAULT_TRADE_HUB);
 }

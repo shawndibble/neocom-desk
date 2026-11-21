@@ -1095,7 +1095,7 @@
       "unknownItemCount": "{{name}} ×{{count}}",
       "unknownItemsMore_one": "…and {{count}} more",
       "unknownItemsMore_other": "…and {{count}} more",
-      "priceSell": "Buy now at Jita: {{value}} ISK",
+      "priceSell": "Buy now at {{hub}}: {{value}} ISK",
       "priceHub": "Priced at",
       "manage": "Manage",
       "priceUnpriced_one": "{{count}} item has no price at this hub",
@@ -11326,6 +11326,8 @@
     "scopeLabel": "Hub used here",
     "hubLabel": "Trade Hub",
     "area": {
+      "fittings": "Ship Fit Costs",
+      "skills": "Skills",
       "contracts": "Contracts"
     }
   },

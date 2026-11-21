@@ -33,10 +33,9 @@ import {
 } from '@/engine/fittings/abyssalWeather';
 import { diffFittingStats, type StatChange } from '@/engine/fittings/variationDelta';
 import type { FittingCargoItem, FittingStats } from '@/engine/fittings/types';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
 import { getTradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
-import { useHydratedStore } from '@/lib/useHydratedStore';
 import { formatIsk } from '@/lib/isk';
 import { abyssalWeatherLabel, useAbyssalWeather, useWeatherName } from './abyssalWeatherSelection';
 import { abyssalVerdict } from './abyssalVerdict';
@@ -122,8 +121,7 @@ export function AbyssalRunPlanner({
   typeName: (typeId: number) => string;
 }) {
   const { t } = useTranslation();
-  const hubId = useMarketHub((state) => state.value);
-  const hubHydrated = useHydratedStore(useMarketHub);
+  const { hubId, hydrated: hubHydrated } = useHubFor('fittings');
   const { tier, security, setTier, setSecurity } = useAbyssalRunPlan();
   const weatherTypeId = useAbyssalWeather((state) => state.weatherTypeId);
   const setWeather = useAbyssalWeather((state) => state.setWeather);
