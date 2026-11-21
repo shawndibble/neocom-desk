@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { useTimeZone } from '@/lib/timeFormat';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { SlideOver, StatChip, StatChips, textActionClassName } from '@/components/ui';
@@ -8,7 +9,15 @@ import { NoticeLines } from '@/features/corpTaxBook/NoticeLines';
 import { writeToClipboard } from '@/lib/clipboard';
 import { readVerifyTokens, verifyUrl } from '../taxBook/bookClient';
 import { useBook } from './useBook';
-import { dateTimeUtc, dateWithYear, isk, iskOrDash, shortDate } from './moonsFormat';
+import {
+  type ClockZone,
+  atDate,
+  atDateWithYear,
+  dateTimeAt,
+  isk,
+  iskOrDash,
+  shortDate,
+} from './moonsFormat';
 import { DueWord } from './moonsParts';
 import { minerPath } from './moonsPaths';
 
@@ -24,7 +33,11 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** Mail state from what the book recorded; who a mail went to and whether it was read are not stored. */
-function mailText(d: NoticeDetail, t: (key: string, opts?: Record<string, unknown>) => string) {
+function mailText(
+  d: NoticeDetail,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+  zone: ClockZone
+) {
   const { mail } = d.notice;
   const parts = [
     mail.sent === 0
@@ -32,7 +45,7 @@ function mailText(d: NoticeDetail, t: (key: string, opts?: Record<string, unknow
       : mail.lastAt
         ? t(k('mailedLast'), {
             what: t(k('mailed'), { count: mail.sent }),
-            date: dateTimeUtc(mail.lastAt),
+            date: dateTimeAt(mail.lastAt, zone),
           })
         : t(k('mailed'), { count: mail.sent }),
   ];
@@ -86,6 +99,7 @@ export function LateNoticePanel({
   /** False on the Miner's own page, where the link would lead back to it. */
   showMinerLink?: boolean;
 }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const { view, names, canEdit } = useBook();
   const detail = noticeDetail(view, noticeId);
@@ -109,7 +123,7 @@ export function LateNoticePanel({
       onClose={onClose}
       closeOnBack={false}
       title={name}
-      subtitle={t(k('subtitle'), { date: shortDate(notice.issuedAt) })}
+      subtitle={t(k('subtitle'), { date: atDate(notice.issuedAt, zone) })}
       returnFocusFallback={() =>
         document.querySelector<HTMLElement>(`[data-row-key="${CSS.escape(noticeId)}"]`)
       }
@@ -130,7 +144,7 @@ export function LateNoticePanel({
             <Fact label={t(k('writtenOff'))}>{isk(detail.writtenOff)}</Fact>
           )}
           <Fact label={t(k('issued'))}>
-            {dateWithYear(notice.issuedAt)}
+            {atDateWithYear(notice.issuedAt, zone)}
             {notice.issuedBy !== undefined && (
               <span className="block text-xs text-text-dim">
                 {t(k('issuedBy'), { name: names.character(notice.issuedBy) })}
@@ -148,12 +162,12 @@ export function LateNoticePanel({
             {detail.settled ? (
               t(k('paid'))
             ) : detail.state === 'paused' && detail.pausedUntil ? (
-              t(k('paused'), { date: shortDate(detail.pausedUntil) })
+              t(k('paused'), { date: atDate(detail.pausedUntil, zone) })
             ) : (
               <DueWord dueAt={detail.dueAt} now={view.input.now} />
             )}
           </Fact>
-          <Fact label={t(k('mail'))}>{mailText(detail, t)}</Fact>
+          <Fact label={t(k('mail'))}>{mailText(detail, t, zone)}</Fact>
           {notice.code && (
             <Fact label={t(k('code'))}>
               <span className="font-mono">{notice.code}</span>

@@ -22,6 +22,8 @@ import { composePayeeChangeMail } from '@/engine/corpTaxBook/payeeChange';
 import type { OwnerRateChange } from '@/engine/corpTaxBook/ownerRate';
 import {
   composeLateNoticeMail,
+  fillVerifyLink,
+  verifyUrl,
   type LateNoticeMailInput,
 } from '@/engine/corpTaxBook/lateNoticeMail';
 import { db } from '@/db';
@@ -35,6 +37,11 @@ export interface LateNoticeToMail extends Omit<
   noticeId: string;
   /** The character who gets the mail. */
   recipientId: number;
+  /**
+   * The mail as the officer edited it in the run's preview: sent as written, except that the
+   * preview's verify link (`previewVerifyUrl`) becomes this notice's real one.
+   */
+  edited?: { subject: string; body: string };
 }
 
 export interface EnqueueInput {
@@ -61,7 +68,7 @@ async function buildItems(
   kind: MailKind,
   batchId: string
 ): Promise<{ items: MailQueueItem[]; missingLink: string[] }> {
-  const { readVerifyTokens, verifyUrl } = await import('@/features/corp/taxBook/bookClient');
+  const { readVerifyTokens } = await import('@/features/corp/taxBook/bookClient');
   const tokens = await readVerifyTokens(
     input.senderCharacterId,
     input.corporationId,
@@ -77,12 +84,18 @@ async function buildItems(
       missingLink.push(s.noticeId);
       continue;
     }
-    const mail = composeLateNoticeMail({
-      ...s,
-      kind,
-      corporationName: input.corporationName,
-      verifyUrl: verifyUrl(origin, token),
-    });
+    const link = verifyUrl(origin, token);
+    const mail = s.edited
+      ? {
+          subject: s.edited.subject,
+          body: fillVerifyLink(s.edited.body, origin, link),
+        }
+      : composeLateNoticeMail({
+          ...s,
+          kind,
+          corporationName: input.corporationName,
+          verifyUrl: link,
+        });
     items.push({
       id: crypto.randomUUID(),
       batchId,

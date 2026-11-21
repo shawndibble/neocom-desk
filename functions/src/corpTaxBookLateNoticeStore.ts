@@ -30,6 +30,7 @@ import {
   mirrorMail,
   type NoticeMailChange,
 } from './corpTaxBookLegacyMirror.js';
+import { VERIFY_TOKEN_BYTES } from './verifyToken.js';
 
 export type { NoticeMailChange };
 
@@ -168,8 +169,8 @@ export async function readNoticeDocById(
   return legacy.exists ? legacy.data() : undefined;
 }
 
-/** A fresh verify-link token: 32 random bytes, url-safe. */
-export const newVerifyToken = (): string => randomBytes(32).toString('base64url');
+/** A fresh verify-link token: `VERIFY_TOKEN_BYTES` random bytes, url-safe. */
+export const newVerifyToken = (): string => randomBytes(VERIFY_TOKEN_BYTES).toString('base64url');
 
 /** Stores a notice's own doc and its link. Reads nothing: the caller checked it is new. */
 export function writeLateNoticeDocs(

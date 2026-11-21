@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { composeLateNoticeMail, type LateNoticeMailInput } from './lateNoticeMail';
+import { EVE_MARKUP_LIMIT } from '../mail/eveMarkup';
+import { MAX_SUBJECT_LENGTH } from '../mail/mailCompose';
+import {
+  PREVIEW_VERIFY_TOKEN,
+  checkEditedMail,
+  composeLateNoticeMail,
+  editedMailBlocked,
+  editedMailLength,
+  fillVerifyLink,
+  previewVerifyUrl,
+  verifyUrl,
+  type LateNoticeMailInput,
+} from './lateNoticeMail';
+import { VERIFY_TOKEN_LENGTH } from './verifyToken';
 
 function notice(patch: Partial<LateNoticeMailInput> = {}): LateNoticeMailInput {
   return {
@@ -77,5 +90,68 @@ describe('composeLateNoticeMail', () => {
     expect(body.length).toBeLessThanOrEqual(10_000);
     expect(body).toContain('You owe 400,000,000 ISK');
     expect(body).toContain('MT-4F2K');
+  });
+});
+
+describe('an edited preview mail (fillVerifyLink, editedMailLength, checkEditedMail)', () => {
+  const origin = 'https://app.test';
+  const preview = previewVerifyUrl(origin);
+  const real = verifyUrl(origin, 'tok123');
+
+  it('builds the preview link and the real one on one route', () => {
+    expect(preview).toBe(`https://app.test/corp-tax-book/verify/${PREVIEW_VERIFY_TOKEN}`);
+    expect(real).toBe('https://app.test/corp-tax-book/verify/tok123');
+  });
+
+  it('swaps every copy of the preview link, the href and its text', () => {
+    const { body } = composeLateNoticeMail(notice({ verifyUrl: preview }));
+    const filled = fillVerifyLink(`Edited intro\n${body}`, origin, real);
+    expect(filled).not.toContain(PREVIEW_VERIFY_TOKEN);
+    expect(filled).toContain(`<a href="${real}">${real}</a>`);
+    expect(filled.startsWith('Edited intro\n')).toBe(true);
+  });
+
+  it('swaps a percent-encoded copy too, as an editor may write the href', () => {
+    const filled = fillVerifyLink(`<a href="${encodeURI(preview)}">here</a>`, origin, real);
+    expect(filled).toBe(`<a href="${real}">here</a>`);
+  });
+
+  it('leaves a body the officer took the link out of as it is', () => {
+    expect(fillVerifyLink('Pay up.', origin, real)).toBe('Pay up.');
+  });
+
+  it('counts an edited body as it will be sent, with the real token in place of the preview one', () => {
+    const body = `Pay: <a href="${preview}">${preview}</a>`;
+    const grow = VERIFY_TOKEN_LENGTH - PREVIEW_VERIFY_TOKEN.length;
+    expect(editedMailLength(body, origin)).toBe(body.length + 2 * grow);
+    expect(editedMailLength('Pay up.', origin)).toBe(7);
+  });
+
+  it('passes a mail with a subject, a message and the link', () => {
+    const { subject, body } = composeLateNoticeMail(notice({ verifyUrl: preview }));
+    expect(checkEditedMail({ subject, body }, origin)).toEqual([]);
+  });
+
+  it('needs a subject and a message, markup alone being no message', () => {
+    expect(checkEditedMail({ subject: ' ', body: `<b> </b>${preview}` }, origin)).toEqual([
+      'empty',
+    ]);
+    expect(checkEditedMail({ subject: 'Late', body: '<b></b>\n' }, origin)).toEqual([
+      'empty',
+      'noLink',
+    ]);
+  });
+
+  it('flags a subject or body over EVE’s limits, the body counted with the real link', () => {
+    const subject = 'x'.repeat(MAX_SUBJECT_LENGTH + 1);
+    expect(checkEditedMail({ subject, body: preview }, origin)).toEqual(['subjectTooLong']);
+    const fits = 'x'.repeat(EVE_MARKUP_LIMIT - preview.length) + preview;
+    expect(checkEditedMail({ subject: 'Late', body: fits }, origin)).toEqual(['bodyTooLong']);
+  });
+
+  it('warns, without blocking, when the link was taken out', () => {
+    expect(checkEditedMail({ subject: 'Late', body: 'Pay up.' }, origin)).toEqual(['noLink']);
+    expect(editedMailBlocked(['noLink'])).toBe(false);
+    expect(editedMailBlocked(['noLink', 'empty'])).toBe(true);
   });
 });
