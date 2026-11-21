@@ -70,7 +70,8 @@ export function AttentionStrip({ items }: { items: readonly AttentionItem[] }) {
       >
         {ordered.map((item) => (
           <div key={item.id} className="flex flex-wrap items-start gap-x-3 gap-y-1.5 px-2.5 py-2">
-            <div className="min-w-0 flex-1 space-y-1">
+            {/* A 16rem basis: on a phone the action wraps under the text, not beside a sliver of it. */}
+            <div className="min-w-0 flex-[1_1_16rem] space-y-1">
               <p
                 className={cx(
                   'font-semibold',

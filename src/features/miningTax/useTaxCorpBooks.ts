@@ -52,6 +52,27 @@ export function useTaxCorpBooks(
       data ? { ...data, entries: withPaidStatus(data.entries, accounts) } : null,
     [data, accounts]
   );
+  // What the books read of the ledger is each Assignment as its Payee's account stands before any
+  // book takes ore off it (no `billedElsewhere`): a Default System's day is the book's to take only
+  // while unpaid, and reading it after the take (a trimmed day paid by exactly what is left) would
+  // flip it back and forth between taken and not.
+  const bookInput = useMemo(
+    (): TaxSnapshot | null =>
+      data
+        ? {
+            ...data,
+            entries: withPaidStatus(
+              data.entries,
+              PayeeRunningAccounts.build({
+                assignments: data.entries.flatMap((row) => row.assignments),
+                payees,
+                links: data.paymentLinks ?? [],
+              })
+            ),
+          }
+        : null,
+    [data, payees]
+  );
 
   // The member's Corp Tax Books (D24: only when their corp has an active one; otherwise null and
   // the tab is exactly what it was).
@@ -64,7 +85,7 @@ export function useTaxCorpBooks(
     corpNameOf,
     hiddenLeft,
   } = useCorpBookView({
-    rows: ledger?.entries,
+    rows: bookInput?.entries,
     characters,
     activeCharacterId,
     madePayments,
@@ -75,10 +96,10 @@ export function useTaxCorpBooks(
   });
   // The overlay's shares, once they differ from what the accounts were built with: stored, and
   // the accounts rebuilt with them (the next overlay reads the same, so this settles).
-  const alsoBilled = corpView?.overlay.alsoBilled;
+  const overlay = corpView?.overlay;
   useEffect(() => {
-    if (!data || !alsoBilled) return;
-    const next = billedElsewhereOf(alsoBilled);
+    if (!data || !overlay) return;
+    const next = billedElsewhereOf(overlay);
     const held = billed ?? new Map<string, number>();
     const same =
       next.size === held.size &&
@@ -88,7 +109,7 @@ export function useTaxCorpBooks(
     void saveBilledElsewhere(next)
       .catch(() => undefined)
       .finally(() => setBilledElsewhere(next));
-  }, [alsoBilled, billed, data]);
+  }, [overlay, billed, data]);
   // The player's own Unmatched donations are claimed for them; only a failed claim is left to retry.
   // Only from a book read this visit: the last good copy can offer a donation already claimed since.
   const { failed: failedClaims } = useAutoClaimDonations(

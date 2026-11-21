@@ -110,4 +110,21 @@ describe('PayeeRunningAccounts', () => {
     });
     expect(accounts.paidThroughOf('p1')).toBe('2026-10-01');
   });
+
+  // An Assignment a Corp Tax Book bills whole (the corporation's own Payee's days the book took)
+  // is no charge of its Payee: neither owed nor a zero line in its ledger.
+  it('leaves a day billed elsewhere in full off the account, and the money to pay the rest', () => {
+    const accounts = PayeeRunningAccounts.build({
+      assignments: [
+        assignment('old', 'p1', '2026-10-01', 100),
+        assignment('booked', 'p1', '2026-10-02', 100),
+      ],
+      payees: [payee('p1', 1)],
+      links: [link('p1', 60)],
+      billedElsewhere: new Map([['booked', 1]]),
+    });
+    const account = accounts.of('p1')!;
+    expect(account.charges.map((c) => c.id)).toEqual(['old']);
+    expect(account.owes?.amount).toBe(40);
+  });
 });
