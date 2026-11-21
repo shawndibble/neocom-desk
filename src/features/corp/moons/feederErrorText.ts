@@ -1,5 +1,8 @@
 import type { TFunction } from 'i18next';
 import { callableErrorReason } from '@/lib/callableError';
+import { utcDay } from '@/engine/localDay';
+import { lockDateFor } from '../../../../functions/src/corpTaxBookCheckpoint';
+import { dateWithYear } from './moonsFormat';
 
 const FAILED = 'corpTaxBook.moons.setup.failed';
 
@@ -8,9 +11,15 @@ const FAILED = 'corpTaxBook.moons.setup.failed';
  * `setup.failed` string, else the translated `fallbackKey`. Never the server's
  * raw English `message`; network and popup failures read as the fallback.
  */
-export function callableErrorText(t: TFunction, e: unknown, fallbackKey: string): string {
+export function callableErrorText(
+  t: TFunction,
+  e: unknown,
+  fallbackKey: string,
+  // `{{date}}` is the lock date today, for the server's `locked` refusal.
+  values: Record<string, unknown> = { date: dateWithYear(lockDateFor(utcDay())) }
+): string {
   const reason = callableErrorReason(e);
-  const known = reason === null ? '' : t(`${FAILED}.${reason}`, { defaultValue: '' });
+  const known = reason === null ? '' : t(`${FAILED}.${reason}`, { ...values, defaultValue: '' });
   return known === '' ? t(fallbackKey) : known;
 }
 

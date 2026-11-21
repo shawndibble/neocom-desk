@@ -88,8 +88,7 @@ function useRecordAccounts(value: Omit<BookContextValue, 'edit' | 'canEdit'>, ca
   const { view, data, characterId, corporationId } = value;
   // The page rebuilds its view every minute for its clocks; the accounts and snapshots change
   // only with the book read or the UTC day, so they are worked out once per read or per day (M10).
-  // (A context built by hand, a story or a test, may carry no clock.)
-  const today = (view as typeof view | undefined)?.input?.now?.slice(0, 10);
+  const today = view.input.now.slice(0, 10);
   const latest = useRef(view);
   useEffect(() => {
     latest.current = view;
@@ -100,7 +99,7 @@ function useRecordAccounts(value: Omit<BookContextValue, 'edit' | 'canEdit'>, ca
     // other Miners' days only in part; a one-Miner page counts that Miner only.
     // A context built by hand (a story, a test) may carry no parts: then it counts nothing.
     const whole = !!data?.parts?.has('observed') && !!data.parts.has('ledger');
-    if (!canEdit || !whole || (data as { moon?: unknown }).moon) return;
+    if (!canEdit || !whole || data.moon) return;
     // A snapshot comes only from a read of the whole book: a Miner's own page cannot see the
     // groupings around them (B2).
     const due = new Map(

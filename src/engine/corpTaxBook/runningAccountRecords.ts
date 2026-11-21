@@ -11,7 +11,7 @@ import {
 } from '../../../functions/src/corpTaxBookCheckpoint';
 import type { BookView } from './bookView';
 import { MinerRunningAccount } from './minerRunningAccount';
-import { paymentNet } from './payments';
+import { netPayment } from './payments';
 import type { OwedDay } from '../../../functions/src/corpTaxBookRunningAccounts';
 import { savedPrice } from './billableLines';
 
@@ -47,7 +47,7 @@ export interface RunningAccountRecord {
 export function runningAccountRecords(view: BookView, only?: string): RunningAccountRecord[] {
   const paidBy = new Map<string, number>();
   for (const p of view.input.payments)
-    if (p.minerId) paidBy.set(p.minerId, (paidBy.get(p.minerId) ?? 0) + paymentNet(p));
+    if (p.minerId) paidBy.set(p.minerId, (paidBy.get(p.minerId) ?? 0) + netPayment(p));
   const today = utcDayOf(view.input.now);
   return view.miners.flatMap((m) => {
     if (only !== undefined && m.id !== only) return [];

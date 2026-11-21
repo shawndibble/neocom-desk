@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import * as mirror from '../../../functions/src/corpTaxBookEngine';
 import * as calls from '../../../functions/src/corpTaxBookKinds';
 import { liveRunningAccount } from '../../../functions/src/corpTaxBookRunningAccounts';
-import { paymentNet } from './payments';
+import { netPayment } from './payments';
 import { DISPUTE_KINDS, disputeHold, readDisputes } from './disputes';
 import { CLAIM_CHECK_RESULTS, TRANSFER_RECIPIENTS } from './overdue';
 import { TAX_CONTACT_MAX_CHARACTERS } from './bookDocs';
@@ -119,7 +119,7 @@ describe('functions mirror of the Corp Tax Book engine', () => {
       { amount: 7, notTaxAmount: 3 },
       { amount: 2, notTaxAmount: 9 },
     ];
-    const counted = payments.reduce((sum, p) => sum + paymentNet(p), 0);
+    const counted = payments.reduce((sum, p) => sum + netPayment(p), 0);
     expect(liveRunningAccount({ owed: 100, paid: 0, days: 1, at: 'x' }, payments).owed).toBe(
       100 - counted
     );

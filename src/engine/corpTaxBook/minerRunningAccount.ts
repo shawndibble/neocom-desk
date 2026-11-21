@@ -23,7 +23,7 @@ import type {
   CheckpointOwedDay,
   RunningAccountCheckpoint,
 } from '../../../functions/src/corpTaxBookCheckpoint';
-import { countedPayments, paymentNet, type TaxPayment } from './payments';
+import { countedPayments, netPayment, type TaxPayment } from './payments';
 import type { OwedDay } from '../../../functions/src/corpTaxBookRunningAccounts';
 import { shiftUtcDate, utcDayOf } from '@/engine/localDay';
 
@@ -197,7 +197,7 @@ export class MinerRunningAccount {
     const counted = countedPayments(input.payments, input.startDate).filter((p) =>
       after(utcDayOf(p.at))
     );
-    const paid = counted.reduce((sum, p) => sum + paymentNet(p), 0);
+    const paid = counted.reduce((sum, p) => sum + netPayment(p), 0);
     const opening = Math.max(0, cp?.credit ?? 0);
     // A checkpoint's held day follows its dispute now: still held while it is open, owed again
     // once rejected or withdrawn, and credited by what dismissing it waived (at most what is left).
@@ -222,8 +222,8 @@ export class MinerRunningAccount {
         payments: [
           ...(opening > 0 ? [{ paymentId: OPENING_CREDIT, left: opening }] : []),
           ...counted
-            .filter((p) => paymentNet(p) > 0)
-            .map((p) => ({ paymentId: p.id, left: paymentNet(p) })),
+            .filter((p) => netPayment(p) > 0)
+            .map((p) => ({ paymentId: p.id, left: netPayment(p) })),
         ],
         writeOffPool: (input.writeOffs ?? [])
           .filter((w) => after(utcDayOf(w.at)))

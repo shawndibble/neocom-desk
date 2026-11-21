@@ -41,6 +41,7 @@ function renderSection(
         value={
           {
             characterId: ME,
+            view: { input: { now: '2026-10-20T00:00:00Z' } },
             corporationId: CORP,
             names: { character: (id: number) => `Pilot ${id}` },
             data: { scheduledSync: scheduled },

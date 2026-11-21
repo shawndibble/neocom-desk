@@ -25,7 +25,10 @@ function renderDialog(data: object = {}) {
       value={{
         characterId: 7,
         corporationId: 1,
-        view: { miners: [miner('m1', 1), miner('m2', 2)] } as never,
+        view: {
+          miners: [miner('m1', 1), miner('m2', 2)],
+          input: { now: '2026-10-20T00:00:00Z' },
+        } as never,
         names: { character: (id: number) => NAMES[id] ?? `Pilot ${id}` } as never,
         settings: {} as BookSettings,
         data: data as never,

@@ -248,6 +248,23 @@ describe('NeedsYouQueue (#6207)', () => {
     ).toBeInTheDocument();
   });
 
+  it('says a donation from a closed Miner account waits for an officer', () => {
+    renderQueue([
+      {
+        kind: 'unmatched',
+        payment: {
+          id: 'j1_8',
+          characterId: 7,
+          amount: 1_000_000,
+          at: '2026-10-10T00:00:00Z',
+          source: 'donation',
+          reviewReason: 'account-closed',
+        },
+      },
+    ]);
+    expect(screen.getByText(/Pilot 7's Miner account is closed/)).toBeInTheDocument();
+  });
+
   const dispute: OreDispute = {
     id: 'solo_7_2026-09-05',
     minerId: 'solo:7',

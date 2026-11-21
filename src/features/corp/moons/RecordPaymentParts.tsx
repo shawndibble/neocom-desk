@@ -10,7 +10,7 @@ import { Radio, SearchInput } from '@/components/ui';
 import { selectedRowClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import type { PaymentOutcome } from '@/engine/corpTaxBook/paymentPreview';
-import { paymentNet } from '@/engine/corpTaxBook/payments';
+import { netPayment } from '@/engine/corpTaxBook/payments';
 import type { SettlePayment } from '@/engine/corpTaxBook/sync';
 import { cx } from '@/lib/cx';
 import { atDate, clockAt, isk, shortDate } from './moonsFormat';
@@ -94,7 +94,7 @@ export function DonationPicker({
     ? donations.filter(
         (d) =>
           nameOf(d.characterId).toLowerCase().includes(needle) ||
-          (digits !== '' && String(Math.round(paymentNet(d))).includes(digits)) ||
+          (digits !== '' && String(Math.round(netPayment(d))).includes(digits)) ||
           // The chosen donation stays listed, so a search never hides what Assign will send.
           d.id === value
       )
@@ -134,7 +134,7 @@ export function DonationPicker({
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="tabular-nums">
                     {t(`${k}.donationRow`, {
-                      amount: isk(paymentNet(d)),
+                      amount: isk(netPayment(d)),
                       name: nameOf(d.characterId),
                     })}
                   </span>

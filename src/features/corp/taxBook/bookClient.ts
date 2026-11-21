@@ -8,6 +8,7 @@
  * Firestore here is the `lite` build (no listeners), so callers refetch after
  * a change.
  */
+import type { MoonDoc } from '../../../../functions/src/corpTaxBookMoonDocs';
 import { LIVE_CHECK_ACTION_NAMES } from '../../../../functions/src/corpTaxBookKinds';
 import {
   LATE_NOTICES,
@@ -602,6 +603,8 @@ export interface BookData {
   disputes?: OreDispute[];
   /** Which parts this read covered (`bookRead/`); every field of the others is empty. */
   parts: ReadonlySet<BookPart>;
+  /** A moon page's read (#5716): the moon docs that stand in for earlier cycles' ledger rows. */
+  moon?: { docs: ReadonlyMap<string, MoonDoc>; fromDocs: ReadonlySet<string> };
   /**
    * Each moon owner's view summary by corporation id (ADR 0032, #5717); read with the `owners`
    * part. Absent when that part was not read; a moon owner without one is priced from `observed`.

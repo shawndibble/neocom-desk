@@ -528,11 +528,13 @@ export function NeedsYouQueue() {
                     // as it is now: a sender who has since joined a Miner is not a stranger.
                     item.payment.reviewReason === 'ambiguous'
                       ? 'corpTaxBook.moons.needs.unmatched.bodyAmbiguous'
-                      : item.payment.reviewReason === 'no-open-balance'
-                        ? 'corpTaxBook.moons.needs.unmatched.bodyReview'
-                        : miners.some((m) => m.characterIds.includes(item.payment.characterId))
-                          ? 'corpTaxBook.moons.needs.unmatched.bodyInMiner'
-                          : 'corpTaxBook.moons.needs.unmatched.body',
+                      : item.payment.reviewReason === 'account-closed'
+                        ? 'corpTaxBook.moons.needs.unmatched.bodyAccountClosed'
+                        : item.payment.reviewReason === 'no-open-balance'
+                          ? 'corpTaxBook.moons.needs.unmatched.bodyReview'
+                          : miners.some((m) => m.characterIds.includes(item.payment.characterId))
+                            ? 'corpTaxBook.moons.needs.unmatched.bodyInMiner'
+                            : 'corpTaxBook.moons.needs.unmatched.body',
                     {
                       date: atDate(item.payment.at, zone),
                       name: names.character(item.payment.characterId),
