@@ -107,7 +107,6 @@ const OFFICER_ONLY = [
 const OWN_LINE_PATHS = [
   'observed/a',
   'payments/p1',
-  'statements/s1',
   'lateNotices/n1',
   'accountCheckpoints/m1',
   'dismissals/d1',
@@ -150,11 +149,6 @@ describe('corps (Tax Book) rules', () => {
     );
     await assertSucceeds(
       getDocs(
-        query(collection(db, `${CORP}/statements`), where('uids', 'array-contains', 'char:2'))
-      )
-    );
-    await assertSucceeds(
-      getDocs(
         query(collection(db, `${CORP}/lateNotices`), where('uids', 'array-contains', 'char:2'))
       )
     );
@@ -194,18 +188,23 @@ describe('corps (Tax Book) rules', () => {
     await assertFails(getDoc(doc(alt, `${CORP}/observed/a`)));
   });
 
-  it.each(['statementLinks/s1', 'lateNoticeLinks/n1'])(
-    'shows the verify link (%s) to editors only',
-    async (path) => {
-      await assertSucceeds(getDoc(doc(characterAuth(env, 1, 'h1').firestore(), `${CORP}/${path}`)));
-      await assertFails(getDoc(doc(characterAuth(env, 6, 'h6').firestore(), `${CORP}/${path}`)));
-      await assertFails(getDoc(doc(characterAuth(env, 2, 'h2').firestore(), `${CORP}/${path}`)));
-    }
-  );
+  it('shows the verify link to editors only', async () => {
+    const path = `${CORP}/lateNoticeLinks/n1`;
+    await assertSucceeds(getDoc(doc(characterAuth(env, 1, 'h1').firestore(), path)));
+    await assertFails(getDoc(doc(characterAuth(env, 6, 'h6').firestore(), path)));
+    await assertFails(getDoc(doc(characterAuth(env, 2, 'h2').firestore(), path)));
+  });
+
+  it('reads no legacy notice: only the one-time copy reads them', async () => {
+    for (const id of [1, 2])
+      for (const path of ['statements/s1', 'statementLinks/s1'])
+        await assertFails(
+          getDoc(doc(characterAuth(env, id, `h${id}`).firestore(), `${CORP}/${path}`))
+        );
+  });
 
   it('keeps own-line reads after leaving the corp (no officer record needed)', async () => {
     const db = characterAuth(env, 9, 'h9').firestore();
-    await assertSucceeds(getDoc(doc(db, `${CORP}/statements/s1`)));
     await assertSucceeds(getDoc(doc(db, `${CORP}/lateNotices/n1`)));
   });
 

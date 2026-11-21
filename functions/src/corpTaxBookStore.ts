@@ -78,7 +78,6 @@ import {
   type RecordedCheckpoint,
   mergeDisputeLines,
   type RecordedOre,
-  parseStatement,
   moveStartRate,
   sameDivisions,
   rateKey,
@@ -91,7 +90,6 @@ import {
   type OfficerAccess,
   type OfficerRoles,
   type StoredRate,
-  type StoredStatement,
   type SyncInput,
   type TurnOnInput,
   donationsReadAtPatch,
@@ -166,12 +164,10 @@ import type { EveTokenClaims } from './verifyEveToken.js';
 import { isLocked, type RunningAccountCheckpoint } from './corpTaxBookCheckpoint.js';
 import {
   NOTICE_ID_FIELD,
-  lateNoticeFromStatementDoc,
   adjustmentLineKey,
   lastNoticedDay,
   lateNoticeRefusal,
   legacyStatementDocOf,
-  minerPaymentCode,
   noticedDates,
   reminderAllowed,
 } from './corpTaxBookLateNotice.js';
@@ -179,17 +175,13 @@ import {
   dbReader,
   type DocReader,
   issueLateNoticeDocs,
-  newVerifyToken,
   readNotices,
   ofCharacterFilter,
   ofMinerFilter,
-  writeVerifyToken,
   readLateNotice,
-  writeLateNoticeDocs,
   writeNoticeMail,
   type LoadedNotice,
 } from './corpTaxBookLateNoticeStore.js';
-import { legacyNoticeRef, writeLegacyStatement } from './corpTaxBookLegacyMirror.js';
 
 /** One type's parsed R2 open-prices object (`readOpenPricesFromR2`), or null when R2 has none. Throws on a failed read. */
 export type OpenPricesReader = (typeId: number) => Promise<unknown | null>;
@@ -1801,13 +1793,9 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         divisionsBase,
         addDivision,
         taxContact,
-        switchToRunningAccount,
         ...rest
       } = action.patch;
-      if (
-        (startDate !== undefined || showToMembers || switchToRunningAccount) &&
-        !c.access.isDirector
-      ) {
+      if ((startDate !== undefined || showToMembers) && !c.access.isDirector) {
         throw new HttpsError('permission-denied', 'Only a Director sets this', {
           reason: 'director-only',
         });
@@ -1845,10 +1833,6 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         update.taxContact = taxContact === null ? FieldValue.delete() : taxContact;
       }
       if (showToMembers) update.membersSeeFrom = now;
-      // Once, and never back: an older tab still sends it; every book is a Running account.
-      if (switchToRunningAccount && typeof c.book.runningAccountFrom !== 'string') {
-        update.runningAccountFrom = iso;
-      }
       const oldStart = c.book.startDate as string | undefined;
       if (startDate !== undefined && startDate !== oldStart) {
         const notices = await readNotices(tx, bookOf(c));
@@ -2441,35 +2425,17 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         result: { rebillId: id },
       };
     }
-    case 'issueStatement': {
-      const statement = parseStatement(action.statement);
-      const miner = await tx.get(col(c, MINERS).doc(statement.minerId));
-      if (miner.exists && miner.get('closedAt') != null)
-        fail('failed-precondition', "This Miner's account is closed", 'account-closed');
-      refuseCalendarStatement(statement);
-      const token = await issueStatementDoc(
-        c,
-        statement,
-        miner.exists ? minerReaders(statement.minerId, miner.data()) : statement.characterIds
-      );
-      return {
-        detail: { statementId: statement.id, minerId: statement.minerId, amount: statement.amount },
-        result: { statementId: statement.id, verifyToken: token },
-      };
-    }
     case 'issueLateNotice': {
       const { notice: sent } = action;
       const book = bookRef(c.deps.db, c.corporationId);
-      const [miner, current, legacy] = await c.tx.getAll(
+      const [miner, current] = await c.tx.getAll(
         col(c, MINERS).doc(sent.minerId),
-        col(c, LATE_NOTICES).doc(sent.id),
-        legacyNoticeRef(book, sent.id)
+        col(c, LATE_NOTICES).doc(sent.id)
       );
       // A final notice goes out with the account's closing (`closeAccount`), never after it.
       if (miner.exists && miner.get('closedAt') != null)
         fail('failed-precondition', "This Miner's account is closed", 'account-closed');
-      if (current.exists || legacy.exists)
-        fail('already-exists', 'A Late notice never changes', 'notice-exists');
+      if (current.exists) fail('already-exists', 'A Late notice never changes', 'notice-exists');
       // Two tabs never mail the same days: no line another notice listed, and the book's cooldown.
       const refusal = lateNoticeRefusal(
         sent,
@@ -2497,10 +2463,6 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     }
     case 'closeAccount':
       return closeAccount(c, action);
-    case 'settleStatements':
-      // Only an older tab still asks: no notice settles for good, and no calendar Statement is
-      // issued any more, so nothing is ever settled here.
-      return { detail: { statementIds: [] }, result: { settled: [] } };
     case 'declare': {
       const { notice } = await mustGetNotice(c, action.noticeId);
       const id = `x${now}_${rand(4)}`;
@@ -2663,10 +2625,9 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       // The figures as recorded, so the audit says what the pay page was told.
       return { detail: { count: action.accounts.length, accounts: action.accounts } };
     }
-    case 'recordMail':
     case 'recordLateNoticeMail': {
       // The queue sent this mail (D16): log it on the notice and in the audit trail.
-      const noticeId = action.action === 'recordMail' ? action.statementId : action.noticeId;
+      const { noticeId } = action;
       const loaded = await mustGetNotice(c, noticeId);
       writeNoticeMail(tx, bookRef(c.deps.db, c.corporationId), loaded, { kind: 'mailed', at: iso });
       return { detail: { noticeId, mailId: action.mailId, kind: action.kind } };
@@ -2775,49 +2736,6 @@ async function applyPopSharingEdit(
 }
 
 /**
- * Stores a notice an older tab issued as a Statement (`issueStatement`): its legacy doc, its Late
- * notice and its verify link; returns the link's token. Reads nothing: callers check first.
- */
-async function issueStatementDoc(
-  c: EditCtx,
-  statement: StoredStatement,
-  readers: readonly number[] = statement.characterIds
-): Promise<string> {
-  const { tx, now } = c;
-  const book = bookOf(c);
-  const [held, heldNotice] = await tx.getAll(
-    legacyNoticeRef(book, statement.id),
-    col(c, LATE_NOTICES).doc(statement.id)
-  );
-  if (held.exists || heldNotice.exists)
-    fail('already-exists', 'An issued Statement never changes', 'statement-exists');
-  const token = newVerifyToken();
-  const stored = {
-    ...statement,
-    uids: readers.map((x) => `char:${x}`),
-    remindersStopped: false,
-    manualRemindersSent: 0,
-    issuedBy: c.access.characterId,
-  };
-  // An older tab still issues a Late notice this way: it is stored as one too, under the same token.
-  writeLegacyStatement(tx, book, stored, token);
-  const notice = lateNoticeFromStatementDoc(stored);
-  if (notice) writeLateNoticeDocs(tx, book, notice, token);
-  writeVerifyToken(tx, c.deps.db, c.corporationId, statement, token, now);
-  return token;
-}
-
-/** Every book is a Running account: an older tab's calendar Statement is refused on every one. */
-function refuseCalendarStatement(statement: { kind?: string }): void {
-  if (statement.kind !== 'notice')
-    fail(
-      'failed-precondition',
-      'This book bills a running account: only late notices are issued',
-      'running-account'
-    );
-}
-
-/**
  * Guest close-account (epic #4055, #4184): a final Late notice, then the Miner
  * is closed so its mail stops. Credit is refunded unless the guest
  * consented or 90 days passed without a reply; a forfeit re-checks the role
@@ -2851,22 +2769,26 @@ async function closeAccount(
       fail('failed-precondition', "Only a guest's account can be closed", 'not-a-guest');
   }
 
-  // The final notice asks for the Miner's one code, like every notice (decision 20261120-235011).
-  const statement = action.statement
-    ? { ...parseStatement(action.statement), code: minerPaymentCode(action.minerId) }
-    : undefined;
-  if (statement && statement.minerId !== action.minerId)
-    fail('invalid-argument', "Statement is another Miner's", 'wrong-miner');
-  if (statement) refuseCalendarStatement(statement);
+  // The final notice (`finalNoticeId`), issued with the close; never one issued already.
+  const sent = action.notice;
+  if (sent && sent.minerId !== action.minerId)
+    fail('invalid-argument', "Notice is another Miner's", 'wrong-miner');
+  if (sent && (await tx.get(col(c, LATE_NOTICES).doc(sent.id))).exists)
+    fail('already-exists', 'A Late notice never changes', 'notice-exists');
 
   // A Running account's figures are the officer's tab's to work out (the server holds no
   // prices): the credit it sends, and what the account recorded still owes, less payments since.
   const credit = Math.max(0, action.runningCredit ?? 0);
   const owed = (await liveRunningAccountOf(c, action.minerId))?.owed ?? 0;
 
-  let token: string | undefined;
-  if (statement)
-    token = await issueStatementDoc(c, statement, minerReaders(action.minerId, minerSnap.data()));
+  // Who may read it and who issued it are the server's to say, never the tab's.
+  const notice = sent && {
+    ...sent,
+    uids: minerReaders(action.minerId, minerSnap.data()).map((x) => `char:${x}`),
+    issuedBy: c.access.characterId,
+  };
+  const token =
+    notice && issueLateNoticeDocs(tx, c.deps.db, bookOf(c), c.corporationId, notice, now);
   const closeFields = {
     closedAt: iso,
     closedBy: c.access.characterId,
@@ -2876,7 +2798,8 @@ async function closeAccount(
       disposition: action.credit.kind,
       ...(action.credit.kind === 'forfeit' ? { basis: action.credit.basis } : {}),
     },
-    ...(statement ? { finalStatementId: statement.id } : {}),
+    // The field name the client reads a closed Miner's final notice by.
+    ...(notice ? { finalStatementId: notice.id } : {}),
   };
   if (minerSnap.exists) {
     tx.update(minerRef, closeFields);
@@ -2898,13 +2821,13 @@ async function closeAccount(
     detail: {
       minerId: action.minerId,
       reason: action.reason,
-      ...(statement ? { statementId: statement.id, amount: statement.amount } : {}),
+      ...(notice ? { noticeId: notice.id, listed: notice.listed } : {}),
       credit,
       disposition: action.credit.kind,
       owed,
       ...(action.credit.kind === 'forfeit' ? { basis: action.credit.basis } : {}),
     },
-    result: { credit, owed, ...(token ? { statementId: statement!.id, verifyToken: token } : {}) },
+    result: { credit, owed, ...(notice ? { noticeId: notice.id, verifyToken: token } : {}) },
   };
 }
 
@@ -3657,10 +3580,9 @@ async function noticeOfToken(
 }
 
 /**
- * The verify page (#4066): the Late notice a mailed link names, read from `lateNotices` and else
- * from its legacy `statements` doc, so every link already mailed keeps working. The notice goes
- * out in the shape the page has always read (`legacyStatementDocOf`); a notice takes no money, so
- * no payment is credited to it and it never settles for good: what the Miner owes is `account`.
+ * The verify page (#4066): the Late notice a mailed link names. The notice goes out in the shape
+ * the page has always read (`legacyStatementDocOf`); a notice takes no money, so no payment is
+ * credited to it and it never settles for good: what the Miner owes is `account`.
  */
 export async function readStatementByToken(deps: BookDeps, token: string) {
   const tokenSnap = await deps.db.collection(TOKENS_COLLECTION).doc(token).get();

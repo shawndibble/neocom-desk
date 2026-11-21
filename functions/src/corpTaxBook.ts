@@ -10,11 +10,11 @@
 //     observed/{char_type_date_structure}       Observed Mining Entry rows, upserted monotonically
 //     extractions/{structure_start}             Extractions, kept after ESI stops listing them
 //     payments/{id}                             Tax Payments (donations found in the journal, manual);
-//                                               read by the sender (`uid`) and its Miner (`uids`)
+//                                               read by its sender (`uid`)
 //     dismissals/{id}  declarations/{id}  adjustments/{id}  writeOffs/{id}  rebills/{id}
 //     lateNotices/{id}  lateNoticeLinks/{id}    Late notices and their verify tokens (decision 20261120-235011)
-//     statements/{id}  statementLinks/{id}      the legacy mirror of every Late notice, for older tabs
-//     accountCheckpoints/{minerId}              a Running account's closed-through checkpoint
+//     statements/{id}  statementLinks/{id}      legacy notices, read once by the one-time copy
+//     accountCheckpoints/{minerId}              a Running account's snapshot for the lock date
 //     miners/{minerId}                          Miner groupings
 //     meta/paid                                 each Miner's paid-through day, only ever grown (D22)
 //     meta/uncounted                            donations into divisions the book does not read (#6207)
@@ -364,7 +364,6 @@ export interface SettingsPatch {
   hubId?: string;
   oreForm?: 'compressed' | 'raw';
   graceHours?: number;
-  minimumStatement?: number;
   overdueDays?: number;
   divisions?: number[];
   /**
@@ -386,7 +385,6 @@ export interface SettingsPatch {
    * name the Account to pick. Replaces the stored map whole; `{}` clears it.
    */
   divisionNames?: Record<string, string>;
-  cadence?: { kind: 'monthly' } | { kind: 'days'; days: number; anchor: string };
   chunkM3PerHour?: number;
   structureExpiryHours?: Record<string, number>;
   dismissApprovalAboveIsk?: number | null;
@@ -396,11 +394,6 @@ export interface SettingsPatch {
   startDate?: string;
   /** End the member setup window now (Director): `membersSeeFrom` becomes the call time. */
   showToMembers?: true;
-  /**
-   * Stamps a running account's switch-over (Director, #6294). Every book is one now (decision
-   * 20261117-060555); kept so an older client's call still succeeds.
-   */
-  switchToRunningAccount?: true;
   /** A running account's late notices. */
   noticeRules?: NoticeRules;
   /** A running account's per-day tolerance, in percent. */
@@ -489,9 +482,6 @@ export function parseSettingsPatch(data: unknown): SettingsPatch {
   if (d.oreForm !== undefined)
     patch.oreForm = oneOf(d.oreForm, 'oreForm', ['compressed', 'raw'] as const);
   if (d.graceHours !== undefined) patch.graceHours = num(d.graceHours, 'graceHours', 0, 72);
-  if (d.minimumStatement !== undefined) {
-    patch.minimumStatement = num(d.minimumStatement, 'minimumStatement', 0, 1e12);
-  }
   if (d.overdueDays !== undefined) patch.overdueDays = int(d.overdueDays, 'overdueDays', 1, 365);
   if (d.divisions !== undefined) {
     patch.divisions = parseDivisions(d.divisions, 'divisions');
@@ -509,17 +499,6 @@ export function parseSettingsPatch(data: unknown): SettingsPatch {
     patch.addDivision = int(d.addDivision, 'addDivision', 1, 7);
   }
   if (d.divisionNames !== undefined) patch.divisionNames = parseDivisionNames(d.divisionNames);
-  if (d.cadence !== undefined) {
-    const c = record(d.cadence);
-    patch.cadence =
-      oneOf(c.kind, 'cadence.kind', ['monthly', 'days'] as const) === 'monthly'
-        ? { kind: 'monthly' }
-        : {
-            kind: 'days',
-            days: int(c.days, 'cadence.days', 1, 366),
-            anchor: dateString(c.anchor, 'cadence.anchor'),
-          };
-  }
   if (d.chunkM3PerHour !== undefined) {
     patch.chunkM3PerHour = num(d.chunkM3PerHour, 'chunkM3PerHour', 1, 1e7);
   }
@@ -551,11 +530,6 @@ export function parseSettingsPatch(data: unknown): SettingsPatch {
     if (d.showToMembers !== true)
       throw new HttpsError('invalid-argument', 'showToMembers must be true');
     patch.showToMembers = true;
-  }
-  if (d.switchToRunningAccount !== undefined) {
-    if (d.switchToRunningAccount !== true)
-      throw new HttpsError('invalid-argument', 'switchToRunningAccount must be true');
-    patch.switchToRunningAccount = true;
   }
   if (d.noticeRules !== undefined) patch.noticeRules = parseNoticeRules(d.noticeRules);
   if (d.dayTolerancePct !== undefined)
@@ -705,8 +679,6 @@ export type EditAction =
       reason: string;
       /** The final Late notice, issued in the same write. Absent when nothing is left to bill. */
       notice?: LateNotice;
-      /** An older tab's final notice, sent as a Statement. */
-      statement?: Record<string, unknown>;
       /** Credit is refunded unless the guest consented or went 90 days without replying. */
       credit: CloseCredit;
       /**
@@ -715,9 +687,7 @@ export type EditAction =
        */
       runningCredit?: number;
     }
-  | { action: 'issueStatement'; statement: Record<string, unknown> }
   | { action: 'issueLateNotice'; notice: LateNotice }
-  | { action: 'settleStatements'; statementIds: string[] }
   /** An officer-recorded declaration. It carries the Miner's `uids`, so its note is theirs to read. */
   | {
       action: 'declare';
@@ -756,12 +726,6 @@ export type EditAction =
   | { action: 'setPopSharing'; enabled?: boolean; defaults?: Partial<PopSharingSettings> }
   /** One moon's overrides; null returns a setting to the Sharing default. */
   | { action: 'setPopSharingMoon'; moonId: number; override: PopSharingOverridePatch }
-  | {
-      action: 'recordMail';
-      statementId: string;
-      mailId: number;
-      kind: 'statement' | 'reminder';
-    }
   | { action: 'recordLateNoticeMail'; noticeId: string; mailId: number; kind: LateNoticeMailKind }
   /** A running account's figures per Miner, as the officer's client works them out (#6294). */
   | { action: 'recordAccounts'; accounts: RecordedRunningAccount[] }
@@ -883,15 +847,12 @@ export function parseEditAction(data: unknown): EditAction {
       'writeOff',
       'rebill',
       'closeAccount',
-      'issueStatement',
       'issueLateNotice',
-      'settleStatements',
       'declare',
       'resolveDeclaration',
       'rejectDispute',
       'dismissDispute',
       'recordReminder',
-      'recordMail',
       'recordLateNoticeMail',
       'recordAccounts',
       'recordCheckpoints',
@@ -1064,12 +1025,6 @@ export function parseEditAction(data: unknown): EditAction {
         reason: reason(d.reason),
       };
     case 'writeOff':
-      // A write-off forgives the oldest days: an older tab that names a Statement meant something
-      // else, so it is refused rather than read another way.
-      if (d.statementId !== undefined)
-        throw new HttpsError('failed-precondition', 'This page is out of date: reload it', {
-          reason: 'reload',
-        });
       return {
         action,
         minerId: docId(d.minerId, 'minerId'),
@@ -1083,13 +1038,6 @@ export function parseEditAction(data: unknown): EditAction {
         fromDate: dateString(d.fromDate, 'fromDate'),
         reason: reason(d.reason),
       };
-    case 'issueStatement': {
-      const statement = record(d.statement);
-      if (JSON.stringify(statement).length > MAX_NOTICE_JSON) {
-        throw new HttpsError('invalid-argument', 'statement is too large');
-      }
-      return { action, statement };
-    }
     case 'issueLateNotice': {
       const notice = record(d.notice);
       if (JSON.stringify(notice).length > MAX_NOTICE_JSON)
@@ -1097,9 +1045,8 @@ export function parseEditAction(data: unknown): EditAction {
       return { action, notice: parseLateNotice(notice) };
     }
     case 'closeAccount': {
-      const statement = d.statement === undefined ? undefined : record(d.statement);
       const notice = d.notice === undefined ? undefined : record(d.notice);
-      if (JSON.stringify([statement, notice]).length > MAX_NOTICE_JSON) {
+      if (notice && JSON.stringify(notice).length > MAX_NOTICE_JSON) {
         throw new HttpsError('invalid-argument', 'notice is too large');
       }
       return {
@@ -1107,18 +1054,12 @@ export function parseEditAction(data: unknown): EditAction {
         minerId: docId(d.minerId, 'minerId'),
         reason: reason(d.reason),
         ...(notice ? { notice: parseLateNotice(notice, 'final') } : {}),
-        ...(statement ? { statement } : {}),
         credit: parseCloseCredit(d.credit),
         ...(d.runningCredit !== undefined
           ? { runningCredit: num(d.runningCredit, 'runningCredit', 0, 1e13) }
           : {}),
       };
     }
-    case 'settleStatements':
-      return {
-        action,
-        statementIds: list(d.statementIds, 'statementIds', 200).map((x) => docId(x, 'statementId')),
-      };
     case 'declare':
       return {
         action,
@@ -1185,23 +1126,12 @@ export function parseEditAction(data: unknown): EditAction {
         throw new HttpsError('invalid-argument', 'a setting cannot be set and cleared');
       return { action, moonId: int(d.moonId, 'moonId'), override: { set, clear } };
     }
-    case 'recordMail':
-      return {
-        action,
-        statementId: docId(d.statementId, 'statementId'),
-        mailId: int(d.mailId, 'mailId', 1, Number.MAX_SAFE_INTEGER),
-        kind: oneOf(d.kind, 'kind', ['statement', 'reminder'] as const),
-      };
     case 'recordLateNoticeMail':
       return {
         action,
         noticeId: docId(d.noticeId, 'noticeId'),
         mailId: int(d.mailId, 'mailId', 1, Number.MAX_SAFE_INTEGER),
-        // An older client names a notice's first mail as it named a Statement's.
-        kind:
-          d.kind === 'statement'
-            ? 'notice'
-            : oneOf(d.kind, 'kind', ['notice', 'reminder'] as const),
+        kind: oneOf(d.kind, 'kind', ['notice', 'reminder'] as const),
       };
     case 'recordCheckpoints':
       return {
@@ -1301,26 +1231,6 @@ function popSettingsPatch(raw: unknown, allowEmpty: boolean): Partial<PopSharing
   return out as Partial<PopSharingSettings>;
 }
 
-/** The Statement fields the book relies on; the rest of the engine's shape is stored as given. */
-export interface StoredStatement {
-  id: string;
-  minerId: string;
-  code: string;
-  periodStart: string;
-  periodEnd: string;
-  coversFrom: string;
-  coversThrough: string;
-  issuedAt: string;
-  hubId: string;
-  oreForm: string;
-  /** A running account's late notice (#6294); absent on a calendar Statement. */
-  kind?: 'notice';
-  lines: { kind: string; date: string; characterId?: number }[];
-  amount: number;
-  /** Characters of the Miner, for the own-lines rule. */
-  characterIds: number[];
-}
-
 /**
  * The names the guest verify page prints (#4066): a guest cannot look up a
  * structure's name, so the officer's client stores them on the Statement.
@@ -1348,39 +1258,6 @@ function displayNames(raw: Record<string, unknown>) {
     }
   }
   return out;
-}
-
-export function parseStatement(raw: Record<string, unknown>): StoredStatement {
-  const lines = list(raw.lines, 'statement.lines', 5000).map((l) => {
-    const line = record(l);
-    return {
-      ...line,
-      kind: oneOf(line.kind, 'line.kind', ['mined', 'late-ore', 'correction'] as const),
-      date: dateString(line.date, 'line.date'),
-    } as StoredStatement['lines'][number];
-  });
-  return {
-    ...(raw as object),
-    ...(raw.kind !== undefined
-      ? { kind: oneOf(raw.kind, 'statement.kind', ['notice'] as const) }
-      : {}),
-    id: docId(raw.id, 'statement.id'),
-    minerId: docId(raw.minerId, 'statement.minerId'),
-    code: boundedString(raw.code, 'statement.code', 64),
-    periodStart: dateString(raw.periodStart, 'periodStart'),
-    periodEnd: dateString(raw.periodEnd, 'periodEnd'),
-    coversFrom: dateString(raw.coversFrom, 'coversFrom'),
-    coversThrough: dateString(raw.coversThrough, 'coversThrough'),
-    issuedAt: instant(raw.issuedAt, 'issuedAt'),
-    hubId: oneOf(raw.hubId, 'hubId', HUBS),
-    oreForm: oneOf(raw.oreForm, 'oreForm', ['compressed', 'raw'] as const),
-    lines,
-    amount: num(raw.amount, 'statement.amount', 0, 1e13),
-    characterIds: list(raw.characterIds, 'statement.characterIds', 50).map((x) =>
-      int(x, 'characterId')
-    ),
-    ...displayNames(raw),
-  } as StoredStatement;
 }
 
 const LINE_KINDS = ['mined', 'late-ore', 'correction'] as const;

@@ -3,7 +3,7 @@
 // repo root (which starts the emulator and sets FIRESTORE_EMULATOR_HOST); a plain
 // `npm test` skips it.
 import type { Caller } from './actorAuth.js';
-import { minerPaymentCode } from './corpTaxBookLateNotice.js';
+import { lateNoticeFromStatementDoc, minerPaymentCode } from './corpTaxBookLateNotice.js';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -418,7 +418,10 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
 
   describe('the scheduled run', () => {
     it('syncs a seeded book, rotates the token, and never issues, settles or mails', async () => {
-      await book().collection('statements').doc('s1').set(statement);
+      await book()
+        .collection('lateNotices')
+        .doc('s1')
+        .set(lateNoticeFromStatementDoc({ ...statement, kind: 'notice' })!);
       await optIn(ACCOUNTANT);
       now = T0 + 6 * 3_600_000;
       const summary = await runScheduledCorpSyncs(syncDeps(), fakeEsi());
@@ -461,9 +464,9 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
         },
         systemIds: { '5000': 30000142 },
       });
-      // Nothing was issued, nothing mailed: the one Statement is the seeded one, no verify links.
-      expect((await book().collection('statements').get()).size).toBe(1);
-      expect((await book().collection('statementLinks').get()).size).toBe(0);
+      // Nothing was issued, nothing mailed: the one notice is the seeded one, no verify links.
+      expect((await book().collection('lateNotices').get()).size).toBe(1);
+      expect((await book().collection('lateNoticeLinks').get()).size).toBe(0);
       expect((await db.collection('corpTaxBookTokens').get()).size).toBe(0);
 
       // SSO rotated the token again on the run; the stored blob follows.
@@ -474,7 +477,10 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
     });
 
     it('re-matches an Unmatched donation once its sender is known', async () => {
-      await book().collection('statements').doc('s1').set(statement);
+      await book()
+        .collection('lateNotices')
+        .doc('s1')
+        .set(lateNoticeFromStatementDoc({ ...statement, kind: 'notice' })!);
       await book().collection('payments').doc('j1_1').set({
         id: 'j1_1',
         source: 'donation',
@@ -539,9 +545,17 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
     it('credits a known miner’s donation even when their Miner owes nothing (#6300)', async () => {
       // Billed through the day character 50 mined, and paid in full: nothing owed, nothing unbilled.
       await book()
-        .collection('statements')
+        .collection('lateNotices')
         .doc('sPaid')
-        .set({ ...statement, id: 'sPaid', code: 'PAID01', coversThrough: '2026-10-31' });
+        .set(
+          lateNoticeFromStatementDoc({
+            ...statement,
+            kind: 'notice',
+            id: 'sPaid',
+            code: 'PAID01',
+            coversThrough: '2026-10-31',
+          })!
+        );
       await book().collection('payments').doc('j0').set({
         id: 'j0',
         source: 'manual',
@@ -549,7 +563,8 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
         characterId: 50,
         uid: 'char:50',
         amount: 10_000_000,
-        at: '2026-10-16T12:00:00.000Z',
+        // Days before the donation below: another transfer, not a hand record of it (M8).
+        at: '2026-10-10T12:00:00.000Z',
       });
       await optIn(ACCOUNTANT);
       const summary = await runScheduledCorpSyncs(syncDeps(), fakeEsi());
@@ -671,7 +686,10 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
     });
 
     it('notes tax paid into a division the book does not read, without crediting it (#6207)', async () => {
-      await book().collection('statements').doc('s1').set(statement);
+      await book()
+        .collection('lateNotices')
+        .doc('s1')
+        .set(lateNoticeFromStatementDoc({ ...statement, kind: 'notice' })!);
       await optIn(ACCOUNTANT);
       // The fake wallet answers the same journal for every division: division 2's copy is the
       // Miner who owes paying where the book does not look.

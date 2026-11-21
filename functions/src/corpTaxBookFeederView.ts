@@ -578,7 +578,7 @@ async function loadPrices(
 /**
  * What the Late notices listed the miners' lines at, for the covered rows with no saved price
  * (#6209). Reads nothing when every row is priced; else only the notices that can list the
- * earliest such day (issued on or after it), from both collections while the legacy mirror lives.
+ * earliest such day (issued on or after it).
  */
 async function readBilledPrices(
   book: FirebaseFirestore.DocumentReference,
@@ -599,8 +599,8 @@ async function readBilledPrices(
   }
   if (earliest === undefined) return out;
   const since = earliest;
-  const notices = await readNotices(dbReader(book.firestore), book, (collection, legacy) =>
-    collection.where(legacy ? 'coversThrough' : 'issuedAt', '>=', since)
+  const notices = await readNotices(dbReader(book.firestore), book, (collection) =>
+    collection.where('issuedAt', '>=', since)
   );
   for (const notice of notices) {
     for (const line of notice.lines) {

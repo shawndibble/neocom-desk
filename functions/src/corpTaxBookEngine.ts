@@ -117,30 +117,6 @@ export function rateStartRefusal(
   return null;
 }
 
-/**
- * @deprecated The server reads the days a Late notice listed (`noticedDates`); kept only while the
- * client's mirror test imports it. A legacy Statement's covered days.
- */
-export interface StatementDays {
-  id: string;
-  coversFrom: string;
-  coversThrough: string;
-  lines: { kind: string; date: string }[];
-}
-
-/** @deprecated See `StatementDays`. Engine `statementDays`. */
-export function statementDays(statement: StatementDays): Set<string> {
-  const days = new Set<string>();
-  for (let d = statement.coversFrom; d <= statement.coversThrough; d = shiftDate(d, 1)) days.add(d);
-  for (const line of statement.lines) if (line.kind !== 'correction') days.add(line.date);
-  return days;
-}
-
-/** @deprecated The server checks `noticedDates(...).has(date)`. Engine `canOverrideRecordRate`. */
-export function canOverrideRecordRate(date: string, statements: readonly StatementDays[]): boolean {
-  return !statements.some((s) => statementDays(s).has(date));
-}
-
 // Book defaults (hand-off from #4059: they live in the backend, not the engine).
 // Grace, minimum Statement and Overdue days equal the engine's
 // DEFAULT_GRACE_HOURS, DEFAULT_MINIMUM_STATEMENT and DEFAULT_OVERDUE_DAYS.

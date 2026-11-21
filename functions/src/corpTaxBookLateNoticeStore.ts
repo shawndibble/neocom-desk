@@ -1,8 +1,6 @@
 // Firestore side of Late notices (decision 20261120-235011): where a notice, its verify link and
-// its token live, how notices are read back (from `lateNotices`, and from the legacy `statements`
-// docs that have no copy yet, until the backfill marks the book), and how a notice's mail state
-// changes. The legacy mirror's writes are all in corpTaxBookLegacyMirror.ts. The edits that call
-// these are in corpTaxBookStore.ts.
+// its token live, how notices are read back from `lateNotices`, and how a notice's mail state
+// changes. The edits that call these are in corpTaxBookStore.ts.
 
 import { randomBytes } from 'node:crypto';
 import {
@@ -15,20 +13,17 @@ import {
   type QuerySnapshot,
   type Transaction,
 } from 'firebase-admin/firestore';
-import { LATE_NOTICES, LATE_NOTICE_LINKS, META, TOKENS_COLLECTION } from './corpTaxBook.js';
+import { LATE_NOTICES, LATE_NOTICE_LINKS, TOKENS_COLLECTION } from './corpTaxBook.js';
 import { NOTICE_ID_FIELD, mergeNoticeDocs, type LateNotice } from './corpTaxBookLateNotice.js';
-import {
-  legacyNoticeRef,
-  legacyNotices,
-  mirrorIssue,
-  mirrorMail,
-  type NoticeMailChange,
-} from './corpTaxBookLegacyMirror.js';
 import { VERIFY_TOKEN_BYTES } from './verifyToken.js';
 
-export type { NoticeMailChange };
-
 type Data = Record<string, unknown>;
+
+/** A change to a notice's mail state. */
+export type NoticeMailChange =
+  | { kind: 'mailed'; at: string }
+  | { kind: 'reminded' }
+  | { kind: 'remindersStopped'; stopped: boolean };
 
 /** What reads the book: a transaction, or the database outside one (`dbReader`). */
 export interface DocReader {
@@ -42,43 +37,30 @@ export const dbReader = (db: Firestore): DocReader => ({
   getAll: (...refs) => db.getAll(...refs),
 });
 
-/**
- * Doc under `meta`: written once the backfill copied every legacy notice of the book into
- * `lateNotices` (corpTaxBookLateNoticeBackfill.ts). From then on no read looks at the legacy docs.
- */
-export const BACKFILLED_DOC = 'lateNoticesBackfilled';
-
-/** A Late notice as read, and which of its docs exist: a mail change updates each. */
+/** A Late notice as read. */
 export interface LoadedNotice {
   notice: LateNotice;
-  current: boolean;
-  legacy: boolean;
 }
 
-const noticeRef = (book: DocumentReference, id: string) => book.collection(LATE_NOTICES).doc(id);
+export const noticeRef = (book: DocumentReference, id: string) =>
+  book.collection(LATE_NOTICES).doc(id);
 
 /** A doc with its id, as `mergeNoticeDocs` reads it. */
 const withId = (d: DocumentSnapshot): Data => ({ ...d.data(), id: d.id });
 
-/**
- * A Late notice by id: its `lateNotices` doc, else its legacy doc (`mergeNoticeDocs`, which reads
- * the mail state from both while both exist); undefined when neither holds one.
- */
+/** A Late notice by id; undefined when there is none. */
 export async function readLateNotice(
   reader: Pick<DocReader, 'getAll'>,
   book: DocumentReference,
   id: string
 ): Promise<LoadedNotice | undefined> {
-  const [current, legacy] = await reader.getAll(noticeRef(book, id), legacyNoticeRef(book, id));
-  const [notice] = mergeNoticeDocs(
-    current.exists ? [withId(current)] : [],
-    legacy.exists ? [withId(legacy)] : []
-  );
-  return notice && { notice, current: current.exists, legacy: legacy.exists };
+  const [doc] = await reader.getAll(noticeRef(book, id));
+  const [notice] = doc.exists ? mergeNoticeDocs([withId(doc)], []) : [];
+  return notice && { notice };
 }
 
-/** Narrows a notice read: the same filter on both collections, or one each (`legacy` says which). */
-export type NoticeFilter = (collection: CollectionReference, legacy: boolean) => Query;
+/** Narrows a notice read. */
+export type NoticeFilter = (collection: CollectionReference) => Query;
 
 const everything: NoticeFilter = (collection) => collection;
 
@@ -94,51 +76,22 @@ export const ofCharacterFilter =
   (collection) =>
     collection.where('characterIds', 'array-contains', characterId);
 
-/**
- * What a filter finds: every `lateNotices` doc, and each legacy doc with no copy there yet (ids
- * first, then only those docs). Once the book is backfilled the legacy docs are not read at all.
- */
-async function readBoth(reader: DocReader, book: DocumentReference, where: NoticeFilter) {
-  const [current, [marker]] = await Promise.all([
-    reader.get(where(book.collection(LATE_NOTICES), false)),
-    reader.getAll(book.collection(META).doc(BACKFILLED_DOC)),
-  ]);
-  if (marker.exists) return { current: current.docs, legacy: [] as DocumentSnapshot[] };
-  const held = new Set(current.docs.map((d) => d.id));
-  const ids = await reader.get(where(legacyNotices(book), true).select());
-  const missing = ids.docs.filter((d) => !held.has(d.id)).map((d) => d.ref);
-  const legacy = missing.length > 0 ? await reader.getAll(...missing) : [];
-  return { current: current.docs, legacy: legacy.filter((d) => d.exists) };
-}
-
-/** The Late notices a filter finds in both collections, once each (`mergeNoticeDocs`). */
+/** The Late notices a filter finds. */
 export async function readNotices(
   reader: DocReader,
   book: DocumentReference,
   where: NoticeFilter = everything
 ): Promise<LateNotice[]> {
-  const { current, legacy } = await readBoth(reader, book, where);
-  return mergeNoticeDocs(current.map(withId), legacy.map(withId));
+  const snap = await reader.get(where(book.collection(LATE_NOTICES)));
+  return mergeNoticeDocs(snap.docs.map(withId), []);
 }
 
 /** A fresh verify-link token: `VERIFY_TOKEN_BYTES` random bytes, url-safe. */
 export const newVerifyToken = (): string => randomBytes(VERIFY_TOKEN_BYTES).toString('base64url');
 
-/** Stores a notice's own doc and its link. Reads nothing: the caller checked it is new. */
-export function writeLateNoticeDocs(
-  tx: Transaction,
-  book: DocumentReference,
-  notice: LateNotice,
-  token: string
-): void {
-  tx.create(noticeRef(book, notice.id), { ...notice, updatedAt: FieldValue.serverTimestamp() });
-  // Editors only (rules): the Miner and view-only officers never see the token.
-  tx.create(book.collection(LATE_NOTICE_LINKS).doc(notice.id), { token });
-}
-
 /**
- * Stores a new Late notice for good: its doc, its link, the token the verify page resolves, and
- * the legacy mirror. Reads nothing: the caller checked the id is free in both collections.
+ * Stores a new Late notice for good: its doc, its link and the token the verify page resolves.
+ * Reads nothing: the caller checked the id is free.
  */
 export function issueLateNoticeDocs(
   tx: Transaction,
@@ -149,21 +102,9 @@ export function issueLateNoticeDocs(
   now: number
 ): string {
   const token = newVerifyToken();
-  writeLateNoticeDocs(tx, book, notice, token);
-  writeVerifyToken(tx, db, corporationId, notice, token, now);
-  mirrorIssue(tx, book, notice, token);
-  return token;
-}
-
-/** The token a verify link resolves: which book and notice it names. Function-only. */
-export function writeVerifyToken(
-  tx: Transaction,
-  db: Firestore,
-  corporationId: number,
-  notice: { id: string; minerId: string },
-  token: string,
-  now: number
-): void {
+  tx.create(noticeRef(book, notice.id), { ...notice, updatedAt: FieldValue.serverTimestamp() });
+  // Editors only (rules): the Miner and view-only officers never see the token.
+  tx.create(book.collection(LATE_NOTICE_LINKS).doc(notice.id), { token });
   tx.create(db.collection(TOKENS_COLLECTION).doc(token), {
     corporationId,
     [NOTICE_ID_FIELD]: notice.id,
@@ -171,24 +112,22 @@ export function writeVerifyToken(
     remindersStopped: false,
     createdAt: now,
   });
+  return token;
 }
 
-/** Applies a mail change to every doc that holds the notice. */
+/** Applies a mail change to the notice. */
 export function writeNoticeMail(
   tx: Transaction,
   book: DocumentReference,
   loaded: LoadedNotice,
   change: NoticeMailChange
 ): void {
-  const id = loaded.notice.id;
-  if (loaded.current)
-    tx.update(noticeRef(book, id), {
-      ...(change.kind === 'mailed'
-        ? { 'mail.sent': FieldValue.increment(1), 'mail.lastAt': change.at }
-        : change.kind === 'reminded'
-          ? { 'mail.manualSent': FieldValue.increment(1) }
-          : { 'mail.remindersStopped': change.stopped }),
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-  if (loaded.legacy) mirrorMail(tx, book, id, change);
+  tx.update(noticeRef(book, loaded.notice.id), {
+    ...(change.kind === 'mailed'
+      ? { 'mail.sent': FieldValue.increment(1), 'mail.lastAt': change.at }
+      : change.kind === 'reminded'
+        ? { 'mail.manualSent': FieldValue.increment(1) }
+        : { 'mail.remindersStopped': change.stopped }),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
 }

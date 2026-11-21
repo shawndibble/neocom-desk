@@ -35,7 +35,7 @@ export const MINER_PAID = 'minerPaid';
 export const REBILLS = 'rebills';
 /** `corpTaxBookTokens/{token}`: a verify link's token, naming its corporation and notice. */
 export const TOKENS_COLLECTION = 'corpTaxBookTokens';
-/** The legacy mirror of every Late notice, for older tabs until the soak ends. */
+/** Legacy Late notices, read once by the one-time copy into `lateNotices`. */
 export const STATEMENTS = 'statements';
 /** `statementLinks/{statementId}`: the verify token, readable by editors only. */
 export const STATEMENT_LINKS = 'statementLinks';
