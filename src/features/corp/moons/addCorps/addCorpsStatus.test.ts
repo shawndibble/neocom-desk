@@ -108,5 +108,7 @@ describe('needsYou', () => {
       [21, 'needs-names'],
     ]);
     expect(items.every(needsThePlayer)).toBe(true);
+    expect(items.find((i) => i.corporationId === 21)?.alsoOre).toBe(true);
+    expect(items.find((i) => i.corporationId === 20)).not.toHaveProperty('alsoOre');
   });
 });

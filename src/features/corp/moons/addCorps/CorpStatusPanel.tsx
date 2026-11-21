@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { InlineError } from '@/components/ui/InlineError';
 import { Button, Panel } from '@/components/ui';
 import { addCorpsErrorText } from '../addCorpsErrorText';
-import { needsThePlayer, type NeedsYouItem } from './addCorpsStatus';
+import { needsThePlayer, offersGrantAgain, type NeedsYouItem } from './addCorpsStatus';
 import { CorpStatePill } from './CorpRow';
 
 const k = (key: string) => `corpTaxBook.moons.addCorps.needs.${key}`;
@@ -74,7 +74,7 @@ export function CorpStatusPanel({
                 >
                   {t(k('gone-quiet.action'))}
                 </Button>
-              ) : item.state === 'needs-names' || item.state === 'needs-ore' ? (
+              ) : offersGrantAgain(item) ? (
                 <Button
                   size="sm"
                   variant="ghost"
@@ -97,7 +97,9 @@ export function CorpStatusPanel({
             <p className="text-xs text-text-dim">
               {item.reason
                 ? addCorpsErrorText(t, item.reason)
-                : t(k(`${item.state}.text`), { name: item.name })}
+                : t(k(item.alsoOre ? 'needs-names.textBoth' : `${item.state}.text`), {
+                    name: item.name,
+                  })}
             </p>
             {item.state === 'failed' && item.reason && (
               <p className="text-xs text-text-dim">

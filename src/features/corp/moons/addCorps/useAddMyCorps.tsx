@@ -32,7 +32,7 @@ import { useBook } from '../useBook';
 import { useAddCorpsRun, useAddCorpsRunStore } from '../useAddCorpsRun';
 import { newCorps, useMoonsHiddenCorps, useMoonsHiddenCorpsStore } from '../moonsHiddenCorps';
 import { useOwnCeoCorps, verifyOwnCeoCorp } from '../useOwnCeoCorps';
-import { connectedInRun, needsYou } from './addCorpsStatus';
+import { connectedInRun, needsYou, offersGrantAgain } from './addCorpsStatus';
 import { NewCorpBanner, ResumeNotice } from './AddCorpsNotices';
 import { ConfirmBatchDialog } from './ConfirmBatchDialog';
 import { CorpStatusPanel } from './CorpStatusPanel';
@@ -179,9 +179,7 @@ export function useAddMyCorps(rows: readonly MoonOwnerRow[]): AddMyCorps {
   const items = canEdit ? needsYou(run, rows, names.corporation, grantable) : [];
   // Grant again is one guided pass over every own corp without names or ore, the clicked one first.
   const grantAgain = (id: number) => {
-    const wanted = items
-      .filter((i) => i.state === 'needs-names' || i.state === 'needs-ore')
-      .map((i) => i.corporationId);
+    const wanted = items.filter(offersGrantAgain).map((i) => i.corporationId);
     const queue = [id, ...wanted.filter((w) => w !== id)].flatMap((w) =>
       own.corps.filter((c) => c.corporationId === w)
     );

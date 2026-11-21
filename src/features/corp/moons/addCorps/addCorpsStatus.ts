@@ -61,6 +61,8 @@ export interface NeedsYouItem {
   state: NeedsYouState;
   /** For a refusal with no fixed wording: its reason code, read through `addCorpsErrorText`. */
   reason?: string;
+  /** `needs-names` whose grant also reads no chunk ore: the one Grant again fixes both. */
+  alsoOre?: true;
 }
 
 /** Whether a moon owner row of the player's own is no longer being read. */
@@ -77,6 +79,10 @@ const lacksNames = (row: OwnerRowLike): boolean =>
 /** Whether a moon owner the book reads came without each chunk's ore. */
 const lacksOre = (row: OwnerRowLike): boolean =>
   row.readsNotifications === false && READ.has(row.status);
+
+/** Whether an item's fix is Grant again: an own corp read without names or without the ore. */
+export const offersGrantAgain = (item: Pick<NeedsYouItem, 'state'>): boolean =>
+  item.state === 'needs-names' || item.state === 'needs-ore';
 
 /** Whether an item is the player's to fix (counted), rather than information about another officer's. */
 export const needsThePlayer = (item: NeedsYouItem): boolean => item.state !== 'names-not-shared';
@@ -130,6 +136,9 @@ export function needsYou(
           r.sameOwner === true && grantable.has(r.corporationId)
             ? 'needs-names'
             : 'names-not-shared',
+        ...(lacksOre(r) && r.sameOwner === true && grantable.has(r.corporationId)
+          ? { alsoOre: true as const }
+          : {}),
       });
     } else if (
       lacksOre(r) &&

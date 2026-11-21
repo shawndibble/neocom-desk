@@ -147,8 +147,7 @@ export async function refreshRefineryStructures(
   feederCorporationId: number,
   structureIds: Iterable<number>,
   accessToken: string,
-  readsStructures: boolean,
-  readsNotifications: boolean
+  { readsStructures, readsNotifications }: { readsStructures: boolean; readsNotifications: boolean }
 ): Promise<void> {
   const ref = feederRef(deps.db, collectorCorporationId, feederCorporationId);
   const record = (await ref.get()).data() as FeederRecord | undefined;

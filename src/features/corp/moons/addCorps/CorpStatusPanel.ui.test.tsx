@@ -135,6 +135,27 @@ describe('CorpStatusPanel', () => {
     expect(onGrantAgain).toHaveBeenCalledWith(32);
   });
 
+  it('says one Grant again brings both the names and the ore when both are missing', () => {
+    render(
+      <CorpStatusPanel
+        items={[
+          {
+            corporationId: 33,
+            name: 'Sable Ridge Extraction',
+            state: 'needs-names',
+            alsoOre: true,
+          },
+        ]}
+        onSignInAgain={() => {}}
+        onGrantAgain={() => {}}
+        onRemove={() => Promise.resolve(true)}
+      />
+    );
+    expect(
+      screen.getByText(/Refinery names and each chunk's ore aren't shown/)
+    ).toBeInTheDocument();
+  });
+
   it("titles a list of only other officers' corps without a count", () => {
     render(
       <CorpStatusPanel

@@ -19203,6 +19203,7 @@
           },
           "needs-names": {
             "text": "Refinery names aren't shown: this corp was connected before names were read. Log in again as its CEO to fix it. Coverage and billing don't change.",
+            "textBoth": "Refinery names and each chunk's ore aren't shown: this corp was connected before they were read. Log in again as its CEO to fix it. Coverage and billing don't change.",
             "action": "Grant again"
           },
           "names-not-shared": {

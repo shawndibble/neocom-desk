@@ -789,8 +789,10 @@ export async function syncOneFeeder(
       feederCorporationId,
       [...read.rows.map((r) => r.structureId), ...extractionRefineries],
       refreshed.accessToken,
-      live.readsStructures === true,
-      live.readsNotifications === true
+      {
+        readsStructures: live.readsStructures === true,
+        readsNotifications: live.readsNotifications === true,
+      }
     );
   } catch (err) {
     deps.log('Refinery structure lookup failed', {
