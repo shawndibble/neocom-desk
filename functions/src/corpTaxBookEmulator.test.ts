@@ -18,6 +18,7 @@ import {
   parseDisputeConflictInput,
   parseWithdrawDisputeInput,
   parseEditAction,
+  parseGroupingAnswerInput,
   parseSyncInput,
   parseTurnOnInput,
 } from './corpTaxBook.js';
@@ -33,6 +34,7 @@ import {
   declineGrouping,
   declineGroupingByToken,
   declineLink,
+  dismissGroupingAnswer,
   promoteProvenClaims,
   editBook,
   listPendingGroupings,
@@ -1359,6 +1361,33 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       const answers = async () =>
         (await book().collection('meta').doc('groupingAnswers').get()).get('answers');
       const miner = () => book().collection('miners').doc('m-a').get();
+
+      it('an officer dismisses a declined answer from Needs you, once; a new answer shows again', async () => {
+        await pendingGuest();
+        await declineGrouping(deps(), who(61), CORP, 'm-a');
+        const dismiss = (id: number, characterId: number) =>
+          dismissGroupingAnswer(
+            deps(),
+            who(id),
+            parseGroupingAnswerInput({ corporationId: CORP, characterId })
+          );
+        expect(await reason(dismiss(JUNIOR, 61))).toBe('role-required');
+        expect(await reason(dismiss(ACCOUNTANT, 99))).toBe('not-found');
+        const first = await dismiss(ACCOUNTANT, 61);
+        expect(first).toEqual({ dismissedAt: new Date(T0).toISOString() });
+        expect((await answers())['61']).toMatchObject({ answer: 'declined', ...first });
+        now += 60_000;
+        expect(await dismiss(ACCOUNTANT, 61)).toEqual(first);
+        // Asked again and declined again: a new item, not dismissed.
+        await edit(ACCOUNTANT, {
+          action: 'setMiner',
+          minerId: 'm-a',
+          characterIds: [60, 61],
+          mainCharacterId: 60,
+        });
+        await declineLink(deps(), who(61), CORP, 'm-a');
+        expect((await answers())['61']).not.toHaveProperty('dismissedAt');
+      });
 
       it('shows the officers a confirmation after the fact', async () => {
         await pendingGuest();
@@ -3204,6 +3233,66 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         expect(
           (await book().collection('dismissals').doc(String(dismissalId)).get()).get('from')
         ).toBe('2026-08-01');
+      });
+
+      it('members cannot dispute a locked day, but officers still answer one', async () => {
+        await seedOld();
+        expect(
+          await reason(
+            disputeConflict(
+              deps(),
+              who(50),
+              parseDisputeConflictInput({
+                corporationId: CORP,
+                date: '2026-07-20',
+                lines: [
+                  {
+                    recordKey: '50:1000:2026-07-20',
+                    typeId: 45490,
+                    quantity: 1,
+                    payeeName: 'P',
+                  },
+                ],
+              })
+            )
+          )
+        ).toBe('locked');
+        // Filed before the day locked, and still open: it must not stay in Needs you forever.
+        for (const date of ['2026-07-20', '2026-07-21'])
+          await book()
+            .collection('disputes')
+            .doc(`solo_50_${date}`)
+            .set({
+              id: `solo_50_${date}`,
+              minerId: 'solo:50',
+              date,
+              by: 50,
+              at: '2026-07-22T00:00:00Z',
+              lines: [{ recordKey: `50:1000:${date}`, typeId: 1, quantity: 1, payeeName: 'P' }],
+            });
+        await edit(ACCOUNTANT, {
+          action: 'rejectDispute',
+          disputeId: 'solo_50_2026-07-20',
+          reason: 'Ours',
+        });
+        await edit(
+          DIRECTOR,
+          {
+            action: 'dismissDispute',
+            disputeId: 'solo_50_2026-07-21',
+            minerId: 'solo:50',
+            reason: 'Theirs',
+            amountIsk: 100,
+          },
+          true
+        );
+        for (const [date, kind] of [
+          ['2026-07-20', 'rejected'],
+          ['2026-07-21', 'dismissed'],
+        ])
+          expect(
+            (await book().collection('disputes').doc(`solo_50_${date}`).get()).get('resolution')
+          ).toMatchObject({ kind });
       });
 
       it('a fix dated today is how an old mistake is put right', async () => {

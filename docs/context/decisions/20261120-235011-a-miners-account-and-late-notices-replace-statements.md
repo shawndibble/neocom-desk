@@ -164,6 +164,10 @@ Replaces "the checkpoint is a strict cache" and the copied `uids` on rows and pa
   dismissal applies only from the lock date at the time it is made (`from`), and its reversal ends
   it only from the lock date at the time of the reversal; an Extraction wholly before the lock date
   cannot be dismissed. The book's start date cannot move before the lock date.
+- **An open dispute on a locked day can still be answered.** A member cannot file or withdraw a
+  dispute of a locked day, but an officer may dismiss or reject one already open: a snapshot keeps
+  a held day aside (`held`, out of `balance`), so the answer settles only that day, after the
+  snapshot. Otherwise a dispute crossing the lock date would stay in Needs you for good.
 - **No copied reader lists.** Rows and payments are not given `uids`, and no queue maintains them.
   A pilot sees an alt's lines through the Mining Tax page's character selector ("All characters"),
   as before.

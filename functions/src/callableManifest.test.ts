@@ -84,6 +84,7 @@ const WIRE_NAMES = [
   'corpTaxBook:reclaimCorpTaxBookCallable',
   'corpTaxBook:syncCorpTaxBookCallable',
   'corpTaxBook:editCorpTaxBookCallable',
+  'corpTaxBook:dismissGroupingAnswer',
   'corpTaxBook:verifySrpOfficerCallable',
   'corpTaxBook:getSrpStatusCallable',
   'corpTaxBook:fileSrpClaimCallable',
