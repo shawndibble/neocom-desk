@@ -790,6 +790,11 @@ export interface RecordedRunningAccount {
   settledThrough?: string;
   /** Money ahead of every billed day, as the client counted it; absent from an older client. */
   credit?: number;
+  /**
+   * The Miner's money epoch the tab read (`moneyEpochOf`): a `settledThrough` worked out before
+   * the Miner's money last moved is not stored. Absent from an older tab.
+   */
+  epoch?: number;
 }
 
 export type CloseCredit = { kind: 'refund' } | { kind: 'forfeit'; basis: ForfeitBasis };
@@ -1235,6 +1240,7 @@ export function parseEditAction(data: unknown): EditAction {
               ? { settledThrough: dateString(a.settledThrough, 'settledThrough') }
               : {}),
             ...(a.credit !== undefined ? { credit: num(a.credit, 'credit', 0, 1e15) } : {}),
+            ...(a.epoch !== undefined ? { epoch: int(a.epoch, 'epoch', 0) } : {}),
           };
         }),
       };
@@ -1473,7 +1479,13 @@ export function parseLateNotice(raw: Record<string, unknown>): LateNotice {
 
 /** Why a checkpoint from a tab is not stored. */
 export type CheckpointRefusal =
-  CheckpointProblem | 'not-forward' | 'unknown-miner' | 'characters-changed' | 'director-approval';
+  | CheckpointProblem
+  | 'not-forward'
+  | 'unknown-miner'
+  | 'characters-changed'
+  | 'director-approval'
+  /** The Miner's money moved after the tab read it (`moneyEpochOf`): it works it out again. */
+  | 'stale';
 
 /**
  * Every reason a checkpoint is not stored, none when it is (B1): a checkpoint is a strict cache of
@@ -1493,9 +1505,12 @@ export function checkpointRefusal(
     characterIds: readonly number[];
     live?: { unpaidDays?: readonly Pick<OwedDay, 'date' | 'owed'>[] };
     isDirector: boolean;
+    /** The Miner's money epoch now (`moneyEpochOf`). */
+    epoch?: number;
   }
 ): CheckpointRefusal[] {
   const out: CheckpointRefusal[] = [];
+  if (k.epoch !== undefined && ctx.epoch !== undefined && k.epoch !== ctx.epoch) out.push('stale');
   if (!canAdvanceCheckpoint(ctx.stored, k, ctx.today)) out.push('not-forward');
   out.push(...checkpointProblems(k));
   if (!ctx.known) out.push('unknown-miner');
@@ -1536,6 +1551,7 @@ export function parseCheckpoint(raw: unknown): RecordedCheckpoint {
     characterIds: [
       ...new Set(list(c.characterIds, 'characterIds', 50).map((x) => int(x, 'characterId'))),
     ],
+    ...(c.epoch !== undefined ? { epoch: int(c.epoch, 'epoch', 0) } : {}),
   };
 }
 

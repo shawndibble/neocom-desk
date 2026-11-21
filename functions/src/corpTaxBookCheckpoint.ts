@@ -61,6 +61,24 @@ export interface RunningAccountCheckpoint {
   /** ISO instant it was recorded, and who recorded it (a Character id; absent on a device). */
   at: string;
   by?: number;
+  /** The Miner's money epoch (`moneyEpochOf`) the tab read; absent from an older tab. */
+  epoch?: number;
+}
+
+/**
+ * The money epoch a tab must have read for figures it records about a Miner to stand: the book's
+ * (`meta/paid.bookEpoch`, moved by an edit that may reach every Miner) plus the Miner's own
+ * (`meta/paid.minerEpochs.<minerId>`, moved by every edit of their money or checkpoint and every
+ * paid-through release). Both only grow, so the sum changes whenever either does; none is 0.
+ */
+export function moneyEpochOf(
+  paid: { bookEpoch?: unknown; minerEpochs?: unknown } | undefined,
+  minerId: string
+): number {
+  const book = typeof paid?.bookEpoch === 'number' ? paid.bookEpoch : 0;
+  const miners = (paid?.minerEpochs ?? {}) as Record<string, unknown>;
+  const own = typeof miners[minerId] === 'number' ? (miners[minerId] as number) : 0;
+  return book + own;
 }
 
 /** Whether a stored checkpoint still stands for a Miner with these characters now. */

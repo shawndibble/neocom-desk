@@ -11,6 +11,7 @@ import {
 } from './corpTaxBookLateNoticeBackfill.js';
 import { minerPaymentCode } from './corpTaxBookLateNotice.js';
 import { drainReaders } from './corpTaxBookReaders.js';
+import { moneyEpochOf } from './corpTaxBookCheckpoint.js';
 import type { Caller } from './actorAuth.js';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
@@ -3045,6 +3046,62 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         edit(ACCOUNTANT, { action: 'recordCheckpoints', checkpoints });
       const stored = async (minerId: string) =>
         (await book().collection('accountCheckpoints').doc(minerId).get()).data();
+
+      it('skips figures worked out before the Miner’s money moved, as stale', async () => {
+        await turnOn();
+        await minedHere(50);
+        const epochNow = async (minerId: string) =>
+          moneyEpochOf((await book().collection('meta').doc('paid').get()).data(), minerId);
+        const read = await epochNow('solo:50');
+        await edit(ACCOUNTANT, {
+          action: 'recordPayment',
+          paymentId: 'm-epoch',
+          minerId: 'solo:50',
+          characterId: 50,
+          amount: 3,
+          at: '2026-10-09T00:00:00.000Z',
+        });
+        const now = await epochNow('solo:50');
+        expect(now).toBeGreaterThan(read);
+        expect(await record(checkpoint('solo:50', '2026-07-31', { epoch: read }))).toEqual({
+          recorded: [],
+          skipped: [{ minerId: 'solo:50', reason: 'stale', reasons: ['stale'] }],
+        });
+        expect(await record(checkpoint('solo:50', '2026-07-31', { epoch: now }))).toMatchObject({
+          recorded: ['solo:50'],
+        });
+        expect(await stored('solo:50')).toMatchObject({ epoch: now });
+        // The paid-through day a tab sends is held to the same epoch; the audit says what stood.
+        const account = { minerId: 'solo:50', owed: 0, paid: 3, days: 0 };
+        expect(
+          await edit(ACCOUNTANT, {
+            action: 'recordAccounts',
+            accounts: [{ ...account, settledThrough: '2026-10-10', epoch: read }],
+          })
+        ).toEqual({ stale: ['solo:50'] });
+        expect((await book().collection('meta').doc('paid').get()).get('minerPaidThrough')).toBe(
+          undefined
+        );
+        await edit(ACCOUNTANT, {
+          action: 'recordAccounts',
+          accounts: [{ ...account, settledThrough: '2026-10-10', epoch: now }],
+        });
+        const audits = (
+          await book().collection('audit').where('action', '==', 'recordAccounts').get()
+        ).docs.map((d) => d.data().detail);
+        expect(audits).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ stale: ['solo:50'], settledThrough: {} }),
+            expect.objectContaining({ settledThrough: { 'solo:50': '2026-10-10' } }),
+          ])
+        );
+        // An edit that may reach every Miner moves the book's epoch.
+        await edit(ACCOUNTANT, {
+          action: 'addRate',
+          rate: { scope: 'corp', pct: 9, effectiveFrom: '2026-10-18' },
+        });
+        expect(await epochNow('solo:50')).toBeGreaterThan(now);
+      });
 
       it('moves only forward, never past what may close today, and reports what it skips', async () => {
         await turnOn();

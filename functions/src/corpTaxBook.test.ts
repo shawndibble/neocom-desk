@@ -1643,6 +1643,25 @@ describe('Late notices and checkpoints (decision 20261120-235011)', () => {
       expect(() => bad({ owed: [{ date: '2026-09-02', remaining: 50 }] })).toThrow();
       expect(() => bad({ characterIds: undefined })).toThrow();
       expect(() => bad({ owed: [{ ...checkpoint.owed[0], held: 'yes' }] })).toThrow();
+      expect(() => bad({ epoch: -1 })).toThrow();
+    });
+
+    it('keeps the money epoch the tab read', () => {
+      expect(
+        parseEditAction({ action: 'recordCheckpoints', checkpoints: [{ ...checkpoint, epoch: 4 }] })
+      ).toMatchObject({ checkpoints: [{ epoch: 4 }] });
+    });
+  });
+
+  describe('recordAccounts', () => {
+    it('keeps the money epoch the tab read for each account', () => {
+      const account = { minerId: 'solo:5', owed: 0, paid: 0, days: 0 };
+      expect(
+        parseEditAction({ action: 'recordAccounts', accounts: [{ ...account, epoch: 3 }] })
+      ).toMatchObject({ accounts: [{ epoch: 3 }] });
+      expect(() =>
+        parseEditAction({ action: 'recordAccounts', accounts: [{ ...account, epoch: 'x' }] })
+      ).toThrow();
     });
   });
 });
@@ -1675,6 +1694,13 @@ describe('checkpointRefusal: a checkpoint is a cache, stored only when it can be
       checkpointRefusal({ ...k, balance: 5 }, { ...ctx, stored: { through: '2026-08-31' } })
     ).toEqual(['not-forward', 'balance']);
     expect(checkpointRefusal(k, { ...ctx, known: false })).toEqual(['unknown-miner']);
+  });
+
+  it('refuses one worked out from money that has moved since the tab read it', () => {
+    expect(checkpointRefusal({ ...k, epoch: 2 }, { ...ctx, epoch: 3 })).toEqual(['stale']);
+    expect(checkpointRefusal({ ...k, epoch: 3 }, { ...ctx, epoch: 3 })).toEqual([]);
+    // An older tab sends none: it is checked as before.
+    expect(checkpointRefusal(k, { ...ctx, epoch: 3 })).toEqual([]);
   });
 
   it('refuses one summed for other characters than the Miner has now', () => {

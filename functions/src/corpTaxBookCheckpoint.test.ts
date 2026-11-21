@@ -5,6 +5,7 @@ import {
   checkpointProblems,
   closedThroughFor,
   editReachesCheckpoint,
+  moneyEpochOf,
 } from './corpTaxBookCheckpoint.js';
 
 describe('closedThroughFor', () => {
@@ -143,5 +144,13 @@ describe('editReachesCheckpoint: whether an edit may change a closed day', () =>
   });
   it('an edit that can reach any day (no date) always does', () => {
     expect(editReachesCheckpoint(null, today)).toBe(true);
+  });
+});
+
+describe('moneyEpochOf: what a tab must have read for its figures to stand', () => {
+  it("is the book's epoch plus the Miner's, none being 0", () => {
+    expect(moneyEpochOf(undefined, 'g1')).toBe(0);
+    expect(moneyEpochOf({ bookEpoch: 2, minerEpochs: { g1: 3 } }, 'g1')).toBe(5);
+    expect(moneyEpochOf({ bookEpoch: 2, minerEpochs: { g1: 3 } }, 'g2')).toBe(2);
   });
 });
