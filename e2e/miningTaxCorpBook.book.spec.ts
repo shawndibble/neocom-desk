@@ -136,11 +136,9 @@ test('a donation in flight counts at once and stays counted once the book credit
   await expect(ledgerButton(page, CORP_NAME)).toContainText(isk(member.owed - DAY_TAX));
 });
 
-// The book bills the pilot's group and counts the alt's donation for it (the officer's Miner page
-// shows it, corpTaxBookPayments.book.spec.ts), but the member's read of `payments` is limited to
-// their own uid (firestore.rules `isOwnLine`, `uid == request.auth.uid`), so the pilot's Tax tab
-// never sees it and still bills the day: the two disagree.
-test.fixme("an alt's donation pays the pilot's group", async ({ page, book, esi }) => {
+// The book bills the pilot's group and counts the alt's donation for it; the member reads it
+// by `uids` (every reader of the Miner), so the pilot's tab agrees with the book.
+test("an alt's donation pays the pilot's group", async ({ page, book, esi }) => {
   const member = await openTax(page, book, esi, {
     extra: [
       creditedDonation({ refId: 960_003, characterId: PILOT_ALT.id, amount: DAY_TAX, back: 2 }),
