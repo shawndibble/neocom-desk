@@ -744,9 +744,35 @@ const LEGACY_NOTICE_LINKS = 'statementLinks';
 export async function readNotices(book: OpenBook): Promise<LateNotice[]> {
   const [current, legacy] = await Promise.all([
     book.written(LATE_NOTICES) ? book.list<unknown>(LATE_NOTICES).catch(() => []) : [],
-    book.list<unknown>(LEGACY_NOTICES),
+    readsLegacyNotices(book).then((reads) => (reads ? book.list<unknown>(LEGACY_NOTICES) : [])),
   ]);
   return readLateNotices(current, legacy);
+}
+
+/**
+ * Doc under `meta` the server writes once its backfill copied every legacy notice into
+ * `lateNotices` (`BACKFILLED_DOC`, functions/src/corpTaxBookLateNoticeStore.ts).
+ */
+const NOTICES_BACKFILLED_DOC = 'lateNoticesBackfilled';
+
+/** Whether the legacy notice docs still need reading: until the backfill marker exists, as the server reads them. */
+export async function readsLegacyNotices(book: OpenBook): Promise<boolean> {
+  if (!book.written(LATE_NOTICES)) return true;
+  try {
+    const marker = await book.part(
+      'meta',
+      async () =>
+        (
+          await getDoc(
+            doc(book.db, 'corps', String(book.corporationId), 'meta', NOTICES_BACKFILLED_DOC)
+          )
+        ).exists(),
+      'meta:noticesBackfilled'
+    );
+    return !marker;
+  } catch {
+    return true;
+  }
 }
 
 /** Each Miner's closed-through checkpoint; none until the server has written one. Best effort. */

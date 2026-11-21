@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildBookView, noticeDetail, type BookViewInput } from './bookView';
 import { minerPaymentCode, type LateNotice } from '../../../functions/src/corpTaxBookLateNotice';
-import { draftNotice, owedDays, planNotices } from './lateNotices';
+import { draftNotice, owedDays, planNotices, readLateNotices } from './lateNotices';
 import { DEFAULT_NOTICE_RULES, type NoticeRules } from './notices';
 import { planCloseAccount } from './closeAccount';
 import type { ObservedMiningEntry } from './types';
@@ -254,5 +254,43 @@ describe('a late notice on the running account (#6294)', () => {
     expect(plan.notice?.lines.map((l) => l.date)).toEqual(['2026-09-02', '2026-09-10']);
     expect(plan.owedAfter).toBe(20_000_000);
     expect(plan.creditAfter).toBe(0);
+  });
+});
+
+describe('readLateNotices: both stores, as the server reads them', () => {
+  const legacy = (over: Record<string, unknown> = {}) => ({
+    id: 'n1',
+    minerId: 'solo:1',
+    issuedAt: '2026-09-02T00:00:00Z',
+    lines: [
+      {
+        kind: 'mined',
+        date: '2026-09-01',
+        chargeKey: '1:1001:2026-09-01',
+        tax: 5,
+        estimatedValue: 50,
+      },
+    ],
+    amount: 5,
+    characterIds: [1],
+    uids: ['char:1'],
+    mailsSent: 1,
+    manualRemindersSent: 0,
+    remindersStopped: false,
+    ...over,
+  });
+
+  it('reads every legacy doc as a notice, whatever its kind says (fromLegacy)', () => {
+    const [n] = readLateNotices([], [legacy({ kind: undefined })]);
+    expect(n).toMatchObject({ id: 'n1', minerId: 'solo:1', listed: 5 });
+  });
+
+  it('merges the mail state of both copies of one notice (mergeNoticeMail)', () => {
+    const current = {
+      ...readLateNotices([], [legacy()])[0]!,
+      mail: { sent: 1, manualSent: 0, remindersStopped: false },
+    };
+    const [n] = readLateNotices([current], [legacy({ remindersStopped: true, mailsSent: 2 })]);
+    expect(n!.mail).toMatchObject({ sent: 2, remindersStopped: true });
   });
 });
