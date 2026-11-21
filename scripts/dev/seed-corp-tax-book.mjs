@@ -91,7 +91,7 @@ const ORES = [
 ];
 const RATE_PCT = 5;
 const START = day(40);
-const STATEMENT_DAYS = [12, 11, 10, 9, 8]; // billed on the issued Statement
+const NOTICE_DAYS = [12, 11, 10, 9, 8]; // listed on the issued Late notice
 const OPEN_DAYS = [7, 6, 5, 4, 3, 2, 1]; // still Billable
 
 const book = db.collection('corps').doc(String(CORP));
@@ -201,15 +201,50 @@ for (const r of MINERS.flatMap((m) => m.rows)) {
   });
 }
 
-// --- One issued Statement per Miner that has billed days; verify link for the member
-let statementSeq = 0;
-const statementOf = new Map(); // character id -> { statementId, minerId, amount }
+// --- One issued Late notice per Miner that has billed days; verify link for the member
+// Layout of issueLateNoticeDocs (functions/src/corpTaxBookLateNoticeStore.ts): the `lateNotices`
+// doc, its `lateNoticeLinks` token, the verify token, and the legacy mirror older clients read.
+// The legacy wire names live here only: `LEGACY_NOTICES`, its links, and the token's id field.
+const LEGACY_NOTICES = 'statements';
+const LEGACY_NOTICE_LINKS = 'statementLinks';
+const NOTICE_ID_FIELD = 'statementId';
+/** `paymentCode` (functions/src/corpTaxBookLateNotice.ts): a stable Reason code for a seed. */
+const paymentCode = (seed) => {
+  let h = 2166136261;
+  for (const ch of seed) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
+  return `MT${h.toString(36).toUpperCase().padStart(7, '0').slice(-6)}`;
+};
+/** The code a Miner puts on a donation: one per Miner (`minerPaymentCode`). */
+const minerPaymentCode = (minerId) => paymentCode(`miner:${minerId}`);
+/** `legacyStatementDocOf`: the mirror an older client reads. */
+const legacyNoticeDoc = (n) => ({
+  id: n.id,
+  minerId: n.minerId,
+  kind: 'notice',
+  code: n.code,
+  periodStart: n.lines[0].date,
+  periodEnd: n.lines.at(-1).date,
+  coversFrom: n.lines[0].date,
+  coversThrough: n.lines.at(-1).date,
+  issuedAt: n.issuedAt,
+  issuedBy: n.issuedBy,
+  hubId: n.pricing.hubId,
+  oreForm: n.pricing.oreForm,
+  lines: n.lines.map(({ key, ...line }) => ({ ...line, chargeKey: key })),
+  amount: n.listed,
+  characterIds: n.characterIds,
+  uids: n.uids,
+  mailsSent: n.mail.sent,
+  manualRemindersSent: n.mail.manualSent,
+  remindersStopped: n.mail.remindersStopped,
+  ...n.names,
+});
+const noticeOf = new Map(); // character id -> { noticeId, minerId, amount }
 let token = '';
 for (const m of MINERS) {
-  const billed = STATEMENT_DAYS.filter((back) => m.days.includes(back));
+  const billed = NOTICE_DAYS.filter((back) => m.days.includes(back)).reverse();
   if (billed.length === 0) continue;
-  statementSeq += 1;
-  const statementId = `st-${m.id}-1`;
+  const noticeId = `ln-${m.id}-1`;
   const minerId = `solo:${m.id}`;
   const lines = billed.map((back) => {
     const dayRows = m.rows.filter((r) => r.date === day(back));
@@ -221,7 +256,7 @@ for (const m of MINERS) {
     return {
       kind: 'mined',
       date: day(back),
-      chargeKey: `${m.id}:${structure.id}:${day(back)}`,
+      key: `${m.id}:${structure.id}:${day(back)}`,
       characterId: m.id,
       structureId: structure.id,
       oreLines: dayRows.map((r) => ({ typeId: r.typeId, quantity: r.quantity })),
@@ -234,40 +269,39 @@ for (const m of MINERS) {
     };
   });
   const amount = lines.reduce((sum, l) => sum + l.tax, 0);
-  const code = `NTX-D${String(statementSeq).padStart(3, '0')}`;
-  put(sub('statements').doc(statementId), {
-    id: statementId,
+  const notice = {
+    id: noticeId,
     minerId,
-    code,
-    periodStart: day(12),
-    periodEnd: day(8),
-    coversFrom: day(12),
-    coversThrough: day(8),
-    issuedAt: iso(NOW - 6 * DAY),
-    hubId: 'jita',
-    oreForm: 'compressed',
-    lines,
-    amount,
     characterIds: [m.id],
-    corporationName: CORP_NAME,
-    minerName: m.name,
-    refineryNames: Object.fromEntries(REFINERIES.map((r) => [String(r.id), r.name])),
-    uids: [`char:${m.id}`],
-    remindersStopped: false,
-    manualRemindersSent: 0,
+    kind: 'late',
+    issuedAt: iso(NOW - 6 * DAY),
     issuedBy: OFFICER,
-  });
+    code: paymentCode(noticeId),
+    pricing: { hubId: 'jita', oreForm: 'compressed' },
+    uids: [`char:${m.id}`],
+    lines,
+    listed: amount,
+    mail: { sent: 0, manualSent: 0, remindersStopped: false },
+    names: {
+      corporationName: CORP_NAME,
+      minerName: m.name,
+      refineryNames: Object.fromEntries(REFINERIES.map((r) => [String(r.id), r.name])),
+    },
+  };
+  put(sub('lateNotices').doc(noticeId), notice);
+  put(sub(LEGACY_NOTICES).doc(noticeId), legacyNoticeDoc(notice));
   const verifyToken = randomBytes(32).toString('base64url');
   if (m.id === MEMBER) token = verifyToken;
-  put(sub('statementLinks').doc(statementId), { verifyToken });
+  put(sub('lateNoticeLinks').doc(noticeId), { token: verifyToken });
+  put(sub(LEGACY_NOTICE_LINKS).doc(noticeId), { verifyToken });
   put(db.collection('corpTaxBookTokens').doc(verifyToken), {
     corporationId: CORP,
-    statementId,
+    [NOTICE_ID_FIELD]: noticeId,
     minerId,
     remindersStopped: false,
     createdAt: NOW - 6 * DAY,
   });
-  statementOf.set(m.id, { statementId, minerId, amount, code });
+  noticeOf.set(m.id, { noticeId, minerId, amount, code: minerPaymentCode(minerId) });
 }
 
 // --- Tax Payments: matched, partial, over, Unmatched, not tax, manual --------
@@ -284,14 +318,11 @@ const donation = (refId, characterId, amountIsk, back, extra = {}) => ({
 const payments = [];
 let ref = 900_000;
 for (const m of MINERS) {
-  const st = statementOf.get(m.id);
+  const st = noticeOf.get(m.id);
   if (!st) continue;
+  // Money names no notice: it pays the Miner's oldest unpaid day, whatever code it carries.
   const pinned = (amt, back) =>
-    donation((ref += 1), m.id, amt, back, {
-      reason: st.code,
-      minerId: st.minerId,
-      statementId: st.statementId,
-    });
+    donation((ref += 1), m.id, amt, back, { reason: st.code, minerId: st.minerId });
   if (m.pays === 'third') payments.push(pinned(Math.round(st.amount / 3), 4));
   if (m.pays === 'full') payments.push(pinned(st.amount, 5));
   if (m.pays === 'partial') payments.push(pinned(Math.round(st.amount * 0.6), 4));
@@ -313,16 +344,15 @@ payments.push(
   })
 );
 for (const p of payments) put(sub('payments').doc(p.id), p);
-const memberStatement = statementOf.get(MEMBER);
+const memberNotice = noticeOf.get(MEMBER);
 put(sub('payments').doc('manual-dev-1'), {
   id: 'manual-dev-1',
   source: 'manual',
-  minerId: memberStatement.minerId,
+  minerId: memberNotice.minerId,
   characterId: MEMBER,
   uid: `char:${MEMBER}`,
   amount: 500_000,
   at: iso(NOW - 2 * DAY),
-  statementId: memberStatement.statementId,
   note: 'Paid in person',
   recordedBy: OFFICER,
 });
@@ -341,7 +371,7 @@ put(sub('dismissals').doc('d-dev-1'), {
 });
 put(sub('declarations').doc('x-dev-1'), {
   id: 'x-dev-1',
-  statementId: memberStatement.statementId,
+  [NOTICE_ID_FIELD]: memberNotice.noticeId,
   kind: 'contract',
   at: iso(NOW - 1 * DAY),
   recordedBy: OFFICER,
@@ -476,7 +506,7 @@ for (let i = 0; i < 14; i++) {
   if (state === 'paid') entry(filedAt + 6 * HOUR, 'markClaimPaid');
 }
 
-// --- Audit trail (what turnOn and issueStatement append) ---------------------
+// --- Audit trail (what turnOn and issueLateNotice append) --------------------
 function audit(at, action, detail) {
   put(sub('audit').doc(`${String(at).padStart(15, '0')}~${randomBytes(6).toString('base64url')}`), {
     at,
@@ -487,11 +517,11 @@ function audit(at, action, detail) {
   });
 }
 audit(NOW - 40 * DAY, 'turnOn', { startDate: START, startRatePct: RATE_PCT });
-for (const [, st] of statementOf)
-  audit(NOW - 6 * DAY, 'issueStatement', {
-    statementId: st.statementId,
+for (const [, st] of noticeOf)
+  audit(NOW - 6 * DAY, 'issueLateNotice', {
+    noticeId: st.noticeId,
     minerId: st.minerId,
-    amount: st.amount,
+    listed: st.amount,
   });
 
 // --- Player groups (--players): Miner groups, Self-proven links, conflicts, declines ----------
@@ -512,7 +542,7 @@ if (args.players) {
   const MINED = [
     ['Vane Hauler', [9, 8, 6, 5, 3, 2]],
     ['Vane Miner Two', [7, 5, 4, 2, 1]],
-    ['Sora Tenn', [...STATEMENT_DAYS, 4, 3, 1]],
+    ['Sora Tenn', [...NOTICE_DAYS, 4, 3, 1]],
     ['Tenn Industrial', [10, 9, 6, 2]],
     ['Dax Orlov', [11, 9, 7, 5, 2, 1]],
     ['Orlov Scout', [12, 8]],
