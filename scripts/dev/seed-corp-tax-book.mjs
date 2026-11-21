@@ -148,7 +148,7 @@ const MINERS = [
     id: MEMBER,
     name: args['member-name'],
     corp: CORP,
-    days: [...STATEMENT_DAYS, ...OPEN_DAYS],
+    days: [...NOTICE_DAYS, ...OPEN_DAYS],
     pays: 'third',
   },
   ...(GUEST === null
@@ -161,9 +161,9 @@ const MINERS = [
     corp: i % 5 === 4 ? 98_999_000 + i : CORP,
     days:
       i % 3 === 0
-        ? [...STATEMENT_DAYS, ...OPEN_DAYS]
+        ? [...NOTICE_DAYS, ...OPEN_DAYS]
         : i % 3 === 1
-          ? [...STATEMENT_DAYS, 3, 2]
+          ? [...NOTICE_DAYS, 3, 2]
           : [9, 8, 4, 3, 1],
     pays: ['full', 'partial', 'none', 'over', 'full', 'none'][i % 6],
   })),

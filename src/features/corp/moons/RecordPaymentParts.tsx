@@ -3,6 +3,7 @@
  * the ISK pays or part-pays, oldest first, and what is owed or held after,
  * read from `previewMinerPayment`) and the picker for an Unmatched donation.
  */
+import { useTimeZone } from '@/lib/timeFormat';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Radio, SearchInput } from '@/components/ui';
@@ -12,7 +13,7 @@ import type { PaymentOutcome } from '@/engine/corpTaxBook/paymentPreview';
 import { paymentNet } from '@/engine/corpTaxBook/payments';
 import type { SettlePayment } from '@/engine/corpTaxBook/sync';
 import { cx } from '@/lib/cx';
-import { isk, shortDate } from './moonsFormat';
+import { atDate, clockAt, isk, shortDate } from './moonsFormat';
 
 /** A picker over this many donations gets a search box; fewer read at a glance. */
 const DONATION_SEARCH_FROM = 4;
@@ -83,6 +84,7 @@ export function DonationPicker({
   value: string | null;
   onChange: (id: string) => void;
 }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const k = 'corpTaxBook.moons.dialogs.record';
   const [query, setQuery] = useState('');
@@ -137,7 +139,7 @@ export function DonationPicker({
                     })}
                   </span>
                   <span className="text-text-dim">
-                    {t(`${k}.donationAt`, { date: shortDate(d.at), time: d.at.slice(11, 16) })}
+                    {t(`${k}.donationAt`, { date: atDate(d.at, zone), time: clockAt(d.at, zone) })}
                   </span>
                 </span>
               </label>

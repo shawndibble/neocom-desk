@@ -1,4 +1,5 @@
 import { Fragment, type ReactNode } from 'react';
+import { useTimeZone } from '@/lib/timeFormat';
 import type { TFunction } from 'i18next';
 import { Trans, useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -26,9 +27,12 @@ export function ActivityRow({
   children: ReactNode;
   aside?: ReactNode;
 }) {
+  const zone = useTimeZone();
   return (
     <li className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-1.5">
-      <span className="w-28 shrink-0 text-xs text-text-dim tabular-nums">{shortDateTime(at)}</span>
+      <span className="w-28 shrink-0 text-xs text-text-dim tabular-nums">
+        {shortDateTime(at, zone)}
+      </span>
       <span className="min-w-0 flex-1">{children}</span>
       {aside}
     </li>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTimeZone } from '@/lib/timeFormat';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, TextInput } from '@/components/ui';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -13,7 +14,7 @@ import { parseRequestedRate } from '../taxBook/feederViewModel';
 import { Label } from './BookDialogs';
 import { callableErrorText } from './feederErrorText';
 import { InviteLinkField } from './InviteLinkField';
-import { shortDate } from './moonsFormat';
+import { atDate } from './moonsFormat';
 
 const k = (key: string) => `corpTaxBook.moons.moonOwners.dialogs.invite.${key}`;
 
@@ -33,6 +34,7 @@ export function InviteMoonOwnerDialog({
   characterName: (id: number) => string;
   onClose: () => void;
 }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const phone = useIsPhone();
   const [invites, setInvites] = useState<OpenInvite[] | null>(null);
@@ -145,7 +147,7 @@ export function InviteMoonOwnerDialog({
               <li key={i.inviteId} className="flex items-center justify-between gap-2 py-2">
                 <span>
                   {t(k('made'), {
-                    date: shortDate(new Date(i.createdAt).toISOString()),
+                    date: atDate(i.createdAt, zone),
                     name: characterName(i.createdBy),
                   })}
                   {i.offeredOwnerRatePct !== undefined && (
@@ -159,7 +161,7 @@ export function InviteMoonOwnerDialog({
                   size="sm"
                   variant="ghost"
                   aria-label={t(k('revokeLabel'), {
-                    date: shortDate(new Date(i.createdAt).toISOString()),
+                    date: atDate(i.createdAt, zone),
                   })}
                   loading={revoking === i.inviteId}
                   onClick={() => void revoke(i.inviteId)}

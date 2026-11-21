@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
+import { useTimeZone } from '@/lib/timeFormat';
 import { ReauthBanner } from '@/components/ui';
-import { shortDate } from './moonsFormat';
+import { atDate } from './moonsFormat';
 
 /**
  * The accounting corporation can't read the moon owner's mining ledger: shown to
@@ -18,13 +19,14 @@ export function OwnerStaleBanner({
   daysLeft: number;
   onReconnect: () => void;
 }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   return (
     <ReauthBanner
       variant="ghost"
       compact
       title={t('corpTaxBook.moons.ownerView.stale.title', {
-        date: shortDate(new Date(since).toISOString()),
+        date: atDate(since, zone),
       })}
       hint={
         daysLeft > 0

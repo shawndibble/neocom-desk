@@ -1,4 +1,6 @@
 import { useMemo } from 'react';
+import { useTimeZone } from '@/lib/timeFormat';
+import { dateTimeAt } from '@/features/corp/moons/moonsFormat';
 import { useTranslation } from 'react-i18next';
 import { Button, NeedsConnection } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
@@ -20,7 +22,6 @@ import {
   uncreditedTarget,
   type ResolveTarget,
 } from '@/features/miningTax/corpBook/resolve/targets';
-import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
 import { CorpDeclarationStatus } from '@/features/miningTax/corpBook/CorpDeclareAction';
 import { canDeclare } from '@/engine/corpTaxBook/personal';
 import { systemLabel } from '@/features/miningTax/names';
@@ -91,6 +92,7 @@ export function useTaxAttentionItems({
   openUnassign,
   resolve,
 }: Args): AttentionItem[] {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const pricesUnavailableLabel = usePricesUnavailableLabel();
   const { claiming, claimError, handleClaim } = useClaimDonation(reloadCorpBooks);
@@ -405,7 +407,7 @@ export function useTaxAttentionItems({
                 {t('miningTax.corpBook.attention.uncreditedDispute', {
                   corp: corpName,
                   amount: formatIsk(only.amount, 0),
-                  time: eveTimeLabel(Date.parse(only.at)),
+                  time: dateTimeAt(only.at, zone),
                 })}
                 {only.refId !== undefined &&
                   ` ${t('miningTax.corpBook.attention.uncreditedRef', { ref: only.refId })}`}
@@ -419,7 +421,7 @@ export function useTaxAttentionItems({
                   <li key={`${u.characterId}:${u.at}`}>
                     {t('miningTax.corpBook.attention.uncreditedItem', {
                       amount: formatIsk(u.amount, 0),
-                      time: eveTimeLabel(Date.parse(u.at)),
+                      time: dateTimeAt(u.at, zone),
                     })}
                     {u.refId !== undefined &&
                       ` ${t('miningTax.corpBook.attention.uncreditedRef', { ref: u.refId })}`}
@@ -466,7 +468,7 @@ export function useTaxAttentionItems({
               <li key={d.id}>
                 {t('miningTax.corpBook.attention.inReviewItem', {
                   amount: formatIsk(d.amount, 0),
-                  time: eveTimeLabel(Date.parse(d.at)),
+                  time: dateTimeAt(d.at, zone),
                 })}
                 {d.reason &&
                   ` — ${t('miningTax.corpBook.attention.inReviewReason', { reason: d.reason })}`}

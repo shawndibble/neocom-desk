@@ -284,7 +284,7 @@ describe('CorpRowDetailModal', () => {
     renderModal({ corp: { ...corp, view: unlinked } });
     expect(
       screen.getByText(
-        /^Your 26,952,549 ISK donation sent 2 Nov 2026 22:38 EVE time paid this day, but Brass Meridian Logistics never credited it/
+        /^Your 26,952,549 ISK donation sent 2 Nov( 2026)? 22:38 paid this day, but Brass Meridian Logistics never credited it/
       )
     ).toBeInTheDocument();
   });

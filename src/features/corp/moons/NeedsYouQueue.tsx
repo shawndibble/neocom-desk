@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { formatList } from '@/lib/listFormat';
+import { useTimeZone } from '@/lib/timeFormat';
 import { Link } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button, Panel, plainTextActionClassName } from '@/components/ui';
@@ -30,7 +31,7 @@ import {
   RecordPaymentDialog,
   ReasonDialog,
 } from './BookDialogs';
-import { isk, shortDate, shortDateTime } from './moonsFormat';
+import { atDate, isk, shortDate, shortDateTime } from './moonsFormat';
 import { autoCredited, paidToOwn, transferStatus, type TransferStatus } from './claimWalletCheck';
 import { useOwnWalletJournals } from './useOwnWalletJournals';
 import { useCheckpointsAwaitingDirector } from './checkpointHolds';
@@ -82,6 +83,7 @@ function TransferLines({
   transfers: ClaimedTransfer[];
   statuses: (TransferStatus | undefined)[];
 }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   return (
     <ul className="mt-1 space-y-0.5 text-xs text-text-dim">
@@ -93,7 +95,7 @@ function TransferLines({
             <span className="tabular-nums">
               {t('corpTaxBook.moons.needs.declaration.transfer', {
                 amount: isk(tr.amount),
-                time: shortDateTime(tr.at),
+                time: shortDateTime(tr.at, zone),
                 ref: tr.journalRef,
               })}
             </span>
@@ -168,6 +170,7 @@ type Open =
 
 /** "Needs you": the few things only an officer can answer, a panel of the Overview. */
 export function NeedsYouQueue() {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const ctx = useBook();
   const { view, names, edit, canEdit, characterId, corporationId, settings } = ctx;
@@ -260,7 +263,7 @@ export function NeedsYouQueue() {
 
   const issuedOn = (id: string) => {
     const n = view.input.notices.find((x) => x.id === id);
-    return n ? shortDate(n.issuedAt) : id;
+    return n ? atDate(n.issuedAt, zone) : id;
   };
 
   // An overdue Miner and a leaver get the same manual reminder (one per late notice).
@@ -308,7 +311,7 @@ export function NeedsYouQueue() {
             values={{
               name: names.character(miner.mainCharacterId),
               amount: isk(amount),
-              date: shortDate(at),
+              date: atDate(at, zone),
             }}
             components={{
               miner: (
@@ -348,10 +351,18 @@ export function NeedsYouQueue() {
               const d = item.declaration;
               const transfers = d.transfers ?? [];
               const statuses = transfers.map((tr, k) =>
-                transferStatus(t, tr, d.checks?.[k], miner.characterIds, ownIds, journals, (id) =>
-                  miners.some((m) => m.id === id)
-                    ? nameOf(id)
-                    : t('corpTaxBook.moons.needs.check.anotherMiner')
+                transferStatus(
+                  t,
+                  tr,
+                  d.checks?.[k],
+                  miner.characterIds,
+                  ownIds,
+                  journals,
+                  zone,
+                  (id) =>
+                    miners.some((m) => m.id === id)
+                      ? nameOf(id)
+                      : t('corpTaxBook.moons.needs.check.anotherMiner')
                 )
               );
               const toYou = transfers.filter((tr) => paidToOwn(tr, ownIds) !== undefined);
@@ -399,7 +410,7 @@ export function NeedsYouQueue() {
                   body={[
                     t('corpTaxBook.moons.needs.declaration.body', {
                       kind: t(`corpTaxBook.moons.needs.declaration.kind.${d.kind}`),
-                      date: shortDate(d.at),
+                      date: atDate(d.at, zone),
                     }),
                     // What is still to count: transfers the check found are credited already.
                     declaredLeft(d) !== undefined &&
@@ -519,7 +530,7 @@ export function NeedsYouQueue() {
                           ? 'corpTaxBook.moons.needs.unmatched.bodyInMiner'
                           : 'corpTaxBook.moons.needs.unmatched.body',
                     {
-                      date: shortDate(item.payment.at),
+                      date: atDate(item.payment.at, zone),
                       name: names.character(item.payment.characterId),
                       miners: formatList(
                         (item.payment.ambiguousMinerIds ?? [])
@@ -641,10 +652,10 @@ export function NeedsYouQueue() {
                     {heldIsk > 0
                       ? t('corpTaxBook.moons.needs.dispute.heldAmount', {
                           amount: isk(heldIsk),
-                          date: shortDate(hold.until),
+                          date: atDate(hold.until, zone),
                         })
                       : t('corpTaxBook.moons.needs.dispute.held', {
-                          date: shortDate(hold.until),
+                          date: atDate(hold.until, zone),
                         })}
                   </span>
                 )
@@ -684,7 +695,7 @@ export function NeedsYouQueue() {
                 })}
               </MinerTitle>
             }
-            body={t('corpTaxBook.moons.needs.uncounted.body', { date: shortDate(u.at) })}
+            body={t('corpTaxBook.moons.needs.uncounted.body', { date: atDate(u.at, zone) })}
             actions={
               canEdit ? (
                 <>

@@ -1,4 +1,6 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
+import { useTimeZone } from '@/lib/timeFormat';
+import { dateTimeAt } from '@/features/corp/moons/moonsFormat';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, InfoTooltip, Modal, ValueList, ValueRow } from '@/components/ui';
@@ -30,7 +32,6 @@ import {
 } from './resolve/targets';
 import type { CorpRowInfo } from './corpRows';
 import { formatCount } from '@/lib/formatCount';
-import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
 
 interface Props {
   open: boolean;
@@ -75,6 +76,7 @@ export function CorpRowDetailModal({
   onFixRecords,
   madePayments,
 }: Props) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   const now = useTicker(MINUTE_MS);
@@ -261,7 +263,7 @@ export function CorpRowDetailModal({
                     {t('miningTax.corpBook.detail.unlinkedDonation', {
                       corp: corp.corpName,
                       amount: formatIsk(view.unlinkedDonation.amount, 0),
-                      time: eveTimeLabel(Date.parse(view.unlinkedDonation.at)),
+                      time: dateTimeAt(view.unlinkedDonation.at, zone),
                     })}
                   </p>
                   {onResolve && unlinked && (

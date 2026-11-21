@@ -21,6 +21,12 @@ const BUILT_SPECS = /\.built\.spec\.ts$/;
 const DEV_SPECS = /\.dev\.spec\.ts$/;
 
 /**
+ * The Corp Tax Book specs run against the Firebase emulators under their own config
+ * (`playwright.book.config.ts`), never here: this suite's servers blank Firebase.
+ */
+const BOOK_SPECS = /\.book\.spec\.ts$/;
+
+/**
  * Escape hatch for a local dev-server-only run.
  *
  * Playwright starts every `webServer` entry whatever `--project` or a file
@@ -135,7 +141,7 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      testIgnore: skipBuilt ? BUILT_SPECS : [BUILT_SPECS, DEV_SPECS],
+      testIgnore: skipBuilt ? [BUILT_SPECS, BOOK_SPECS] : [BUILT_SPECS, DEV_SPECS, BOOK_SPECS],
       // Default (CI): the production bundle on the preview server. The dev
       // server makes every spec's fresh browser context re-fetch its module
       // waterfall, which was most of the suite's wall time. `E2E_SKIP_BUILT=1`

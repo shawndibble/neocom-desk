@@ -3,10 +3,11 @@
  * them at once instead of waiting up to two hours for the schedule. The server rests it ten
  * minutes per book; a press inside that says when it runs again. The book reloads after a read.
  */
+import { useTimeZone } from '@/lib/timeFormat';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isStillRead, type MoonOwnerRow } from '@/engine/corpTaxBook/moonOwners';
-import { utcTime } from './moonsFormat';
+import { clockAt } from './moonsFormat';
 import { useBook } from './useBook';
 
 /** A toast line; `instance` changes on every press so a repeated line replays (DESIGN.md Toast). */
@@ -26,6 +27,7 @@ export interface MoonOwnersSyncNow {
 }
 
 export function useMoonOwnersSyncNow(rows: readonly MoonOwnerRow[]): MoonOwnersSyncNow {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const { characterId, corporationId, canEdit, reload } = useBook();
   const [busy, setBusy] = useState(false);
@@ -47,14 +49,16 @@ export function useMoonOwnersSyncNow(rows: readonly MoonOwnerRow[]): MoonOwnersS
         reload();
         if (result.read + result.stale === 0 && result.skipped > 0) failed();
       } else if (result.kind === 'rate-limited') {
-        say(t('corpTaxBook.moons.moonOwners.syncNow.tooSoon', { time: utcTime(result.retryAt) }));
+        say(
+          t('corpTaxBook.moons.moonOwners.syncNow.tooSoon', { time: clockAt(result.retryAt, zone) })
+        );
       } else failed();
     } catch {
       failed();
     } finally {
       setBusy(false);
     }
-  }, [enabled, busy, characterId, corporationId, reload, t]);
+  }, [enabled, busy, characterId, corporationId, reload, t, zone]);
 
   return { enabled, busy, run, notice, clearNotice: () => setNotice(null) };
 }

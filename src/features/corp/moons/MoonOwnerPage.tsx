@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTimeZone } from '@/lib/timeFormat';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { daysUntilOreLost, staleLedgerClock } from '@/engine/corpTaxBook/feederHealth';
@@ -23,7 +24,7 @@ import type { Payee } from '@/engine/corpTaxBook/payouts';
 import { CharacterLink, CorporationLink } from '@/features/entities/EntityLink';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import { formatCount } from '@/lib/formatCount';
-import { isk, shortDate } from './moonsFormat';
+import { atDate, isk, shortDate } from './moonsFormat';
 import { Crumb } from './moonsParts';
 import { RefineryLabels, type RefineryLabelEdit, type RefineryRowInfo } from './RefineryLabels';
 import { RemovalStrip } from './RemovalStrip';
@@ -111,6 +112,7 @@ function HistoryLines({
   joinedAt: number;
   ownerName: string;
 }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   return (
     <ul className="space-y-1 text-xs text-text-dim">
@@ -126,8 +128,7 @@ function HistoryLines({
       ))}
       {offeredPct !== undefined && (
         <li>
-          {shortDate(new Date(joinedAt).toISOString())} ·{' '}
-          {t(k('history.joined'), { pct: offeredPct })}
+          {atDate(joinedAt, zone)} · {t(k('history.joined'), { pct: offeredPct })}
         </li>
       )}
     </ul>
@@ -205,6 +206,7 @@ export function MoonOwnerPage({
   /** Mark a payment "not a payout" (or count it again). */
   onMarkPayout?: (payoutId: string, notAPayout: boolean) => void;
 }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const { row } = detail;
   const payouts = detail.payouts;
@@ -387,7 +389,7 @@ export function MoonOwnerPage({
       {row.status === 'cant-read' && row.staleSince !== undefined && (
         <p role="note" className="text-sm text-warning">
           {(() => {
-            const date = shortDate(new Date(row.staleSince).toISOString());
+            const date = atDate(row.staleSince, zone);
             const count = daysUntilOreLost(
               staleLedgerClock(row.staleSince, row.lastReadWellAt),
               new Date().toISOString()

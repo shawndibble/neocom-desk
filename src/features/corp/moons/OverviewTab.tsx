@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { useTimeZone } from '@/lib/timeFormat';
 import { Panel, StatChip } from '@/components/ui';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { POPS_WINDOW_DAYS } from '@/engine/corpTaxBook/bookSections';
@@ -10,7 +11,7 @@ import { useTabsProjection } from './useTabsProjection';
 import { SetupChecklist } from './SetupChecklist';
 import { NeedsYouQueue } from './NeedsYouQueue';
 import { BookTotals, OverdueAging } from './BookTotals';
-import { isk, shortDate } from './moonsFormat';
+import { atDate, isk, shortDate } from './moonsFormat';
 import { extractionPath } from './moonsPaths';
 import { PopShareIcon } from './PopShareIcon';
 import { usePopShareMarks } from './usePopShareMarks';
@@ -23,6 +24,7 @@ import { PlaceCell } from './sectionParts';
  * stays on the Extractions tab.
  */
 export function OverviewTab() {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const { view, names } = useBook();
   const { billableThrough, donationsBeforeBook, schedule } = useTabsProjection();
@@ -55,7 +57,7 @@ export function OverviewTab() {
           ? t('corpTaxBook.moons.overview.readyAgo', {
               ago: formatCountdown(Math.max(0, since) / 1000),
             })
-          : t('corpTaxBook.moons.overview.readySince', { date: shortDate(r.chunkArrivalAt) });
+          : t('corpTaxBook.moons.overview.readySince', { date: atDate(r.chunkArrivalAt, zone) });
       },
     },
     {

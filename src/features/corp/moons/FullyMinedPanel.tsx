@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTimeZone } from '@/lib/timeFormat';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { Button, Panel } from '@/components/ui';
@@ -8,7 +9,7 @@ import { minersOnMoon } from '@/engine/corpTaxBook/bookSections';
 import { extractionDetail } from '@/engine/corpTaxBook/bookView';
 import { moonLoss } from '@/engine/corpTaxBook/moonLoss';
 import { formatCount } from '@/lib/formatCount';
-import { dateTimeUtc } from './moonsFormat';
+import { dateTimeAt } from './moonsFormat';
 import { editErrorMessage, useBook } from './useBook';
 
 /**
@@ -17,6 +18,7 @@ import { editErrorMessage, useBook } from './useBook';
  * no figure and no button. Marking and clearing are one click each, both audited server-side.
  */
 export function FullyMinedPanel({ id }: { id: string }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const { view, names, edit, canEdit } = useBook();
   const [busy, setBusy] = useState(false);
@@ -87,7 +89,7 @@ export function FullyMinedPanel({ id }: { id: string }) {
             <>
               {t('corpTaxBook.moons.fullyMined.markedBy', {
                 name: row.fullyMined.byName,
-                at: dateTimeUtc(row.fullyMined.at),
+                at: dateTimeAt(row.fullyMined.at, zone),
               })}
               {canEdit && (
                 <>

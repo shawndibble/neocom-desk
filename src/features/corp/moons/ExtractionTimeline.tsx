@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTimeZone } from '@/lib/timeFormat';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { CheckboxSelect, FilterChip, Panel, RowCaret, Tooltip } from '@/components/ui';
@@ -9,7 +10,7 @@ import { cx } from '@/lib/cx';
 import { splitPlace } from '@/engine/corpTaxBook/bookSections';
 import { useBook } from './useBook';
 import { EXPIRED_KEEP_DAYS, FILTER_STATES, isPastExtraction } from './extractionStates';
-import { extractionWindowLabel, shortDate } from './moonsFormat';
+import { atDate, extractionWindowLabel } from './moonsFormat';
 import { formatCountdown } from '@/lib/duration';
 import { formatLocalDateTime } from '@/lib/localDate';
 import { extractionPath } from './moonsPaths';
@@ -71,16 +72,17 @@ export function ExtractionStateFilter({
   );
 }
 
-/** The dates an officer plans around, in local time, with the time left where one is still ahead. */
+/** The dates an officer plans around, on the Time format's clock, with the time left where one is still ahead. */
 function PlanTip({ row, now }: { row: ExtractionRow; now: number }) {
   const { t } = useTranslation();
+  const zone = useTimeZone();
   const line = (label: string, iso: string) => {
     const ms = Date.parse(iso);
     return (
       <div>
         <div className="text-text-dim">{label}</div>
         <div className="tabular-nums">
-          {formatLocalDateTime(new Date(ms))}
+          {formatLocalDateTime(new Date(ms), zone)}
           {ms > now && (
             <span className="text-text-dim">
               {' · '}
@@ -149,6 +151,7 @@ export function ExtractionTimeline({
 }
 
 function TimelineBody({ shown, now }: { shown: readonly ExtractionRow[]; now: number }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const { names } = useBook();
   const from = now - EXPIRED_KEEP_DAYS * DAY_MS;
@@ -165,7 +168,7 @@ function TimelineBody({ shown, now }: { shown: readonly ExtractionRow[]; now: nu
       >
         {ticks.map((ms, i) => (
           <span key={ms} className="absolute -translate-x-1/2" style={{ left: pct(ms) }}>
-            {i === 0 ? t('corpTaxBook.moons.timeline.now') : shortDate(new Date(ms).toISOString())}
+            {i === 0 ? t('corpTaxBook.moons.timeline.now') : atDate(ms, zone)}
           </span>
         ))}
       </div>
@@ -206,7 +209,7 @@ function TimelineBody({ shown, now }: { shown: readonly ExtractionRow[]; now: nu
               <Tooltip content={<PlanTip row={e} now={now} />} side="bottom">
                 <div
                   tabIndex={0}
-                  aria-label={extractionWindowLabel(t, e)}
+                  aria-label={extractionWindowLabel(t, e, zone)}
                   className="relative h-4 w-full rounded-xs bg-panel-2 focus-visible:outline-2 focus-visible:outline-accent sm:w-auto sm:flex-1"
                 >
                   <span
