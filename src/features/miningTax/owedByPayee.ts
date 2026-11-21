@@ -26,7 +26,9 @@ export function computeOwedByPayee(
     out.set(a.payeeId, entry);
   }
   for (const [payeeId, entry] of out) {
-    entry.moving = assignmentsMovedWithPayee(everyAssignment, payeeId).length;
+    entry.moving = assignmentsMovedWithPayee(everyAssignment, payeeId, (a) =>
+      accounts.statusOf(a)
+    ).length;
   }
   return out;
 }
