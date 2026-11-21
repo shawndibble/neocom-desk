@@ -96,7 +96,7 @@ export function loyaltyOfferProfit(input: LoyaltyOfferProfitInput): LoyaltyOffer
   const accounting = skills[SKILL_IDS.accounting] ?? 0;
   const brokerRelations = skills[SKILL_IDS.brokerRelations] ?? 0;
 
-  const tax = revenue === null ? null : salesTax(revenue, accounting);
+  const tax = revenue === null ? null : salesTax(revenue, accounting, standing?.feeDiscountFactor);
   // One redemption is one listing: the offer hands over a single stack of a
   // single type, so it goes up as one order and the 100 ISK broker-fee
   // minimum bites once for the whole stack — the same "per stack listed"
@@ -113,7 +113,8 @@ export function loyaltyOfferProfit(input: LoyaltyOfferProfitInput): LoyaltyOffer
             brokerRelations,
             standing?.factionStanding,
             standing?.corpStanding,
-            standing?.safetyTaxPct
+            standing?.safetyTaxPct,
+            standing?.feeDiscountFactor
           )
         : 0;
   const netRevenue =

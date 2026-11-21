@@ -120,6 +120,7 @@ export function planVerdictOf<R extends Pick<ResolvedBuildPlan, 'result'>>(
         factionStanding: standing?.factionStanding,
         corpStanding: standing?.corpStanding,
         safetyTaxPct: standing?.safetyTaxPct,
+        feeDiscountFactor: standing?.feeDiscountFactor,
       })
     : null;
   const basisResult =

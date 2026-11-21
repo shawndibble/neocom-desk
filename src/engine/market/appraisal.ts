@@ -460,7 +460,7 @@ export function appraisalNet(
     const item = { ...raw, buy: scale(raw.buy, pricePercent), sell: scale(raw.sell, pricePercent) };
     if (item.buy !== null) {
       const buyTotal = item.buy * (item.buyWalk?.filled ?? item.quantity);
-      instantNet += buyTotal - salesTax(buyTotal, accountingLevel);
+      instantNet += buyTotal - salesTax(buyTotal, accountingLevel, standing.feeDiscountFactor);
     }
 
     const undercut = appraisalUndercut(item);
@@ -471,21 +471,23 @@ export function appraisalNet(
         brokerRelationsLevel,
         standing.factionStanding,
         standing.corpStanding,
-        standing.safetyTaxPct
+        standing.safetyTaxPct,
+        standing.feeDiscountFactor
       );
-      listNet += listValue - salesTax(listValue, accountingLevel) - fee;
+      listNet += listValue - salesTax(listValue, accountingLevel, standing.feeDiscountFactor) - fee;
     }
   }
 
   return {
     instantNet,
     listNet,
-    salesTaxPct: salesTaxPct(accountingLevel),
+    salesTaxPct: salesTaxPct(accountingLevel, standing.feeDiscountFactor),
     brokerFeePct: brokerFeePct(
       brokerRelationsLevel,
       standing.factionStanding,
       standing.corpStanding,
-      standing.safetyTaxPct
+      standing.safetyTaxPct,
+      standing.feeDiscountFactor
     ),
   };
 }
@@ -521,12 +523,17 @@ export function compareMargin(
       brokerRelationsLevel,
       standing.factionStanding,
       standing.corpStanding,
-      standing.safetyTaxPct
+      standing.safetyTaxPct,
+      standing.feeDiscountFactor
     );
   return {
     spread,
     spreadPct: bestBuy > 0 ? (spread / bestBuy) * 100 : null,
-    afterFees: spread - salesTax(bestSell, accountingLevel) - broker(bestSell) - broker(bestBuy),
+    afterFees:
+      spread -
+      salesTax(bestSell, accountingLevel, standing.feeDiscountFactor) -
+      broker(bestSell) -
+      broker(bestBuy),
   };
 }
 

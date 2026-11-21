@@ -17,7 +17,7 @@ import { useCallback } from 'react';
 import { loadCharacterStandings } from '@/features/character/standings';
 import { resolveLocationStandings } from './locationStandings';
 import { ZERO_STANDINGS, type ResolvedStandings } from '@/engine/market/standings';
-import { getTradeHub, TRADE_HUBS, type TradeHub } from '@/market/hubs';
+import { getTradeHub, hubFeeDiscountFactor, TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { useWarmLoad } from '@/lib/useWarmLoad';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
@@ -32,7 +32,21 @@ async function resolveHubStandings(
   entries: Parameters<typeof resolveLocationStandings>[1]
 ): Promise<ResolvedStandings> {
   const standing = await resolveLocationStandings(hub.stationId, entries);
-  return hub.safetyTaxPct > 0 ? { ...standing, safetyTaxPct: hub.safetyTaxPct } : standing;
+  return withHubFeeModifiers(hub, standing);
+}
+
+/**
+ * A standing plus the hub's own fee modifiers (Safety Tax, temporary fee discount)
+ * so fee sites need no hub lookup. The discount is read at resolve time, which
+ * is when the page loads: it lapses on the next load after its end date.
+ */
+function withHubFeeModifiers(hub: TradeHub, standing: ResolvedStandings): ResolvedStandings {
+  const feeDiscountFactor = hubFeeDiscountFactor(hub, Date.now());
+  return {
+    ...standing,
+    ...(hub.safetyTaxPct > 0 ? { safetyTaxPct: hub.safetyTaxPct } : {}),
+    ...(feeDiscountFactor !== 1 ? { feeDiscountFactor } : {}),
+  };
 }
 
 async function loadTradeHubStandings(characterId: number): Promise<TradeHubStandingsMap> {
@@ -82,10 +96,10 @@ export function useTradeHubStandingsByCharacter(
   return useKeyedLoad(key, load).data ?? NO_STANDINGS_BY_CHARACTER;
 }
 
-/** No standing at a hub, but still the hub's own Safety Tax: it is the market's, not the pilot's. */
+/** No standing at a hub, but still the hub's own Safety Tax and fee discount: they are the market's, not the pilot's. */
 export function zeroStandingsAt(hubId: TradeHub['id']): ResolvedStandings {
-  const safetyTaxPct = getTradeHub(hubId)?.safetyTaxPct ?? 0;
-  return safetyTaxPct > 0 ? { ...ZERO_STANDINGS, safetyTaxPct } : ZERO_STANDINGS;
+  const hub = getTradeHub(hubId);
+  return hub ? withHubFeeModifiers(hub, ZERO_STANDINGS) : ZERO_STANDINGS;
 }
 
 /** `standings.get(hubId)`, defaulting to zero for a hub not yet resolved. */
