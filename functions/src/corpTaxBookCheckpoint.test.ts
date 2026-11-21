@@ -2,46 +2,12 @@ import { describe, it, expect } from 'vitest';
 import {
   lockDateFor,
   snapshotThroughFor,
-  canAdvanceCheckpoint,
   checkpointFits,
   checkpointProblems,
-  closedThroughFor,
-  editReachesCheckpoint,
   dismissalWaives,
   isLocked,
   isSnapshot,
 } from './corpTaxBookCheckpoint.js';
-
-describe('closedThroughFor', () => {
-  it('is the end of the last month that ended at least 31 days ago', () => {
-    expect(closedThroughFor('2026-11-21')).toBe('2026-09-30');
-    expect(closedThroughFor('2026-11-30')).toBe('2026-09-30');
-    expect(closedThroughFor('2026-12-01')).toBe('2026-10-31');
-    expect(closedThroughFor('2026-12-02')).toBe('2026-10-31');
-  });
-
-  it('crosses a year and a leap February', () => {
-    expect(closedThroughFor('2027-01-15')).toBe('2026-11-30');
-    expect(closedThroughFor('2028-04-01')).toBe('2028-02-29');
-  });
-});
-
-describe('canAdvanceCheckpoint', () => {
-  it('only moves forward, and never past what may close', () => {
-    const today = '2026-12-02';
-    expect(canAdvanceCheckpoint(undefined, { through: '2026-10-31' }, today)).toBe(true);
-    expect(canAdvanceCheckpoint({ through: '2026-09-30' }, { through: '2026-10-31' }, today)).toBe(
-      true
-    );
-    expect(canAdvanceCheckpoint({ through: '2026-10-31' }, { through: '2026-10-31' }, today)).toBe(
-      false
-    );
-    expect(canAdvanceCheckpoint({ through: '2026-10-31' }, { through: '2026-09-30' }, today)).toBe(
-      false
-    );
-    expect(canAdvanceCheckpoint(undefined, { through: '2026-11-30' }, today)).toBe(false);
-  });
-});
 
 describe('checkpointProblems: a checkpoint must add up before it is stored', () => {
   // Day 2 owes 50 of its 60 (10 paid), 10 of it an officer's charge; day 5 owes all 25.
@@ -135,19 +101,6 @@ describe('checkpointFits: a checkpoint stands only for the characters it summed'
     expect(checkpointFits({ characterIds: [1, 2] }, [1])).toBe(false);
     // One recorded before characters were stored is read as absent.
     expect(checkpointFits({}, [1])).toBe(false);
-  });
-});
-
-describe('editReachesCheckpoint: whether an edit may change a closed day', () => {
-  // On 18 Oct the book can be closed through 31 Aug at the latest.
-  const today = '2026-10-18';
-  it('reaches one when it is dated on or before the latest day a checkpoint can close', () => {
-    expect(editReachesCheckpoint('2026-08-31', today)).toBe(true);
-    expect(editReachesCheckpoint('2026-08-31T23:00:00.000Z', today)).toBe(true);
-    expect(editReachesCheckpoint('2026-09-01', today)).toBe(false);
-  });
-  it('an edit that can reach any day (no date) always does', () => {
-    expect(editReachesCheckpoint(null, today)).toBe(true);
   });
 });
 

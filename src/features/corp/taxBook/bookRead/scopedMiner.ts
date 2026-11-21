@@ -12,10 +12,8 @@ import { characterIdsOfMiner, type Miner } from '@/engine/corpTaxBook/charges';
 import { readLateNotices } from '@/engine/corpTaxBook/lateNotices';
 import { accountWindowStart } from '@/engine/corpTaxBook/minerScope';
 import type { RecordedWriteOff } from '@/engine/corpTaxBook/payments';
-import {
-  checkpointFits,
-  type RunningAccountCheckpoint,
-} from '../../../../../functions/src/corpTaxBookCheckpoint';
+import type { RunningAccountCheckpoint } from '../../../../../functions/src/corpTaxBookCheckpoint';
+import { usableCheckpoint } from '@/engine/corpTaxBook/openSet/miners';
 import { NOTICE_ID_FIELD } from '../../../../../functions/src/corpTaxBookLateNotice';
 import type { SettlePayment } from '@/engine/corpTaxBook/sync';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
@@ -25,14 +23,8 @@ import { readDisputes } from '@/engine/corpTaxBook/disputes';
 import {
   LATE_NOTICES,
   RUNNING_ACCOUNT_CHECKPOINTS,
-  STATEMENTS as LEGACY_NOTICES,
 } from '../../../../../functions/src/corpTaxBookVersionKeys';
-import {
-  bookDeclarationOf,
-  readsLegacyNotices,
-  settingsFrom,
-  type BookDeclaration,
-} from '../bookClient';
+import { bookDeclarationOf, settingsFrom, type BookDeclaration } from '../bookClient';
 import { errorCode } from '../openBook';
 import { ALL_BOOK_PARTS, type BookPart, type BookPartSet } from './parts';
 import { bookOf, readSlices, type BookRead, type ReadContext } from './slices';
@@ -58,7 +50,7 @@ export async function readMinerScope(
     const snap = await getDoc(doc(db, 'corps', String(corporationId), name, minerId));
     return snap.exists() ? (snap.data() as Record<string, unknown>) : undefined;
   };
-  // Best effort: a server that keeps no checkpoints yet, or rules that predate them, read none.
+  // Best effort: none until the server has written one.
   const checkpoint = (async () => {
     if (!book.written(RUNNING_ACCOUNT_CHECKPOINTS)) return undefined;
     try {
@@ -68,16 +60,17 @@ export async function readMinerScope(
     }
   })();
   const grouping = one('miners');
-  const notices = Promise.all([
-    book.written(LATE_NOTICES) ? byMiner<unknown>(LATE_NOTICES).catch(() => []) : [],
-    readsLegacyNotices(book).then((reads) => (reads ? byMiner<unknown>(LEGACY_NOTICES) : [])),
-  ]).then(([current, legacy]) => readLateNotices(current, legacy));
+  const notices = (
+    book.written(LATE_NOTICES)
+      ? byMiner<unknown>(LATE_NOTICES).catch(() => [])
+      : Promise.resolve([])
+  ).then(readLateNotices);
   const characterIds = grouping.then((g) =>
     characterIdsOfMiner(minerId, Array.isArray(g?.characterIds) ? [g as unknown as Miner] : [])
   );
-  // A checkpoint summed for other characters than the Miner has now is none: read from the start.
+  // One that is no snapshot, or summed for other characters, is none: read from the start.
   const fitting = Promise.all([checkpoint, characterIds]).then(([c, ids]) =>
-    c && checkpointFits(c, ids) ? c : undefined
+    usableCheckpoint(c, ids)
   );
   const from = fitting.then((c) => accountWindowStart(c, settingsFrom(book.data).startDate));
 

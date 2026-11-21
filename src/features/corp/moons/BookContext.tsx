@@ -4,7 +4,6 @@
  * `edit` — one action through `editBook` (ADR 0023), then a reload.
  */
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
-import { noteCheckpointSkips } from './checkpointHolds';
 import { runningAccountRecords, dueCheckpoints } from '@/engine/corpTaxBook/runningAccountRecords';
 import { chunk } from '@/lib/chunk';
 import { editBook, recordCheckpoints } from '../taxBook/bookClient';
@@ -82,7 +81,7 @@ function sendChanged<T extends { minerId: string }>(
 /**
  * What only an officer's tab can work out, since the server cannot price days (#6294, decision
  * 20261120-235011): each Miner's Running account figures for the pay page (`recordAccounts`),
- * and each closed-through checkpoint that is due (`recordCheckpoints`). Sent once the book's rows
+ * and each Miner's snapshot for the lock date when it has none (`recordCheckpoints`). Sent once the book's rows
  * and payments are read, and again whenever they change; no reload.
  */
 function useRecordAccounts(value: Omit<BookContextValue, 'edit' | 'canEdit'>, canEdit: boolean) {
@@ -116,18 +115,10 @@ function useRecordAccounts(value: Omit<BookContextValue, 'edit' | 'canEdit'>, ca
       corporationId,
       'checkpoints',
       dueCheckpoints(view, at),
-      async (checkpoints) => {
-        const { skipped } = await recordCheckpoints(characterId, corporationId, checkpoints);
-        noteCheckpointSkips(corporationId, skipped);
-      },
-      // When it was worked out is no change to send again; a stored one that went (a regroup, a
-      // Director's reset) is.
-      (c) =>
-        JSON.stringify({
-          ...c,
-          at: undefined,
-          stored: view.input.checkpoints?.get(c.minerId)?.through ?? null,
-        })
+      // What the server skipped (`exists`, `wrong-date`) is no error: the account reads whole.
+      (checkpoints) => recordCheckpoints(characterId, corporationId, checkpoints),
+      // When it was worked out is no change to send again.
+      (c) => JSON.stringify({ ...c, at: undefined })
     );
   }, [data, today, canEdit, characterId, corporationId]);
 }

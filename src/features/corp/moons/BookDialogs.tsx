@@ -20,6 +20,7 @@ import type { MinerRow } from '@/engine/corpTaxBook/bookView';
 import { previewMinerPayment } from '@/engine/corpTaxBook/paymentPreview';
 import { paymentNet } from '@/engine/corpTaxBook/payments';
 import { utcDay } from '@/engine/localDay';
+import { lockDateFor } from '../../../../functions/src/corpTaxBookCheckpoint';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { callableErrorReason } from '@/lib/callableError';
 import { callableErrorText } from './feederErrorText';
@@ -263,6 +264,9 @@ export function RecordPaymentDialog({
   const [payer, setPayer] = useState(String(miner.mainCharacterId));
   const today = utcDay();
   const startDate = view.input.startDate;
+  // Nothing is dated before the lock date (decision 20261120-235011, "a lock date").
+  const lockDate = lockDateFor(today);
+  const earliest = startDate > lockDate ? startDate : lockDate;
   const [date, setDate] = useState(today);
   // The officer's note on a payment by hand ("handed over in person"): the Miner reads it too.
   const [note, setNote] = useState('');
@@ -284,7 +288,9 @@ export function RecordPaymentDialog({
         ? t(`${k}.dateFuture`)
         : date < startDate
           ? t(`${k}.dateBeforeBook`, { date: dateWithYear(startDate) })
-          : null;
+          : date < lockDate
+            ? t(`${k}.dateLocked`, { date: dateWithYear(lockDate) })
+            : null;
   const dateErrorId = useId();
 
   const outcome = useMemo(() => {
@@ -381,7 +387,7 @@ export function RecordPaymentDialog({
               <TextInput
                 type="date"
                 value={date}
-                min={startDate}
+                min={earliest}
                 max={today}
                 onChange={(e) => setDate(e.target.value)}
                 aria-invalid={dateError !== null}

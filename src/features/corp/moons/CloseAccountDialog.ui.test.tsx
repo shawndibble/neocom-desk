@@ -122,7 +122,7 @@ describe('CloseAccountDialog', () => {
       minerId: 'solo:2',
       reason: 'Left the area',
       credit: { kind: 'refund' },
-      statement: { id: 'final_solo:2', minerId: 'solo:2', amount: 200_000, characterIds: [2] },
+      notice: { id: 'final_solo:2', minerId: 'solo:2', kind: 'final', listed: 200_000 },
     });
     await vi.waitFor(() => expect(onClose).toHaveBeenCalled());
   });
@@ -143,7 +143,7 @@ describe('CloseAccountDialog', () => {
     });
     const close = editBook.mock.calls[1][2];
     expect(close).toMatchObject({ action: 'closeAccount', minerId: 'solo:2' });
-    expect(close).not.toHaveProperty('statement');
+    expect(close).not.toHaveProperty('notice');
   });
 
   it('offers a forfeit only when there is credit, and holds it until the basis is valid', async () => {

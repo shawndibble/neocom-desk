@@ -19,8 +19,6 @@ import { CACHE_PURGE_PENDING_PREFIX } from '@/esi/cachePurge';
 import { FEED_SYNC_WINDOW_MAX_ROWS, FEED_SYNC_WINDOW_MS } from '@/features/notifications/feed';
 import { backfillAccountWideData } from './accountWideBackfill';
 import { pullCursorKey } from './localBookkeeping';
-import { subscribeRecordsChanged, type RecordsChange } from './recordsChanged';
-import { FULL_MINING_TAX_ASSIGNMENT } from './syncedCollectionFixtures';
 import { TOMBSTONE_TTL_MS } from './merge';
 import { hasPendingSync } from './status';
 import {
@@ -3028,19 +3026,5 @@ describe('triggerSync: a collection the rules do not know yet (B4)', () => {
     }) as never);
     await expect(triggerSync(1)).rejects.toThrow();
     expect(getSyncStatus(1).state).toBe('error');
-  });
-});
-
-describe('triggerSync: a pull tells who listens what rows it changed', () => {
-  it('names the rows it wrote, with their old copies', async () => {
-    const heard: RecordsChange[] = [];
-    const stop = subscribeRecordsChanged('miningTaxAssignments', (c) => void heard.push(c));
-    seedRemote('characters/char:1/miningTaxAssignments', [
-      { ...FULL_MINING_TAX_ASSIGNMENT, ownerHash: HASH, deleted: false },
-    ]);
-    await triggerSync(1);
-    stop();
-    expect(heard).toHaveLength(1);
-    expect(heard[0]!.upserted).toMatchObject([{ id: FULL_MINING_TAX_ASSIGNMENT.id }]);
   });
 });

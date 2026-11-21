@@ -41,7 +41,6 @@ export function useTaxCorpBooks(
         assignments: data?.entries.flatMap((row) => row.assignments) ?? [],
         payees,
         links: data?.paymentLinks ?? [],
-        ...(data ? { checkpoints: new Map(data.payeeCheckpoints) } : {}),
         ...(billed ? { billedElsewhere: billed } : {}),
       }),
     [data, payees, billed]
@@ -85,9 +84,8 @@ export function useTaxCorpBooks(
       next.size === held.size &&
       [...next].every(([id, v]) => Math.abs((held.get(id) ?? 0) - v) < 1e-9);
     if (same) return;
-    const dates = new Map(data.entries.flatMap((r) => r.assignments.map((a) => [a.id, a.date])));
     // Rebuilt once stored (or once storing failed: this page still bills what the books do).
-    void saveBilledElsewhere(next, (id) => dates.get(id))
+    void saveBilledElsewhere(next)
       .catch(() => undefined)
       .finally(() => setBilledElsewhere(next));
   }, [alsoBilled, billed, data]);

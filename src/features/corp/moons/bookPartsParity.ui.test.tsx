@@ -10,7 +10,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { buildBookView, type BookViewInput } from '@/engine/corpTaxBook/bookView';
 import { draftNotice } from '@/engine/corpTaxBook/lateNotices';
-import { legacyStatementDocOf } from '../../../../functions/src/corpTaxBookLateNotice';
 import { extractionId } from '@/engine/corpTaxBook/sync';
 import type { ObservedMiningEntry } from '@/engine/corpTaxBook/types';
 import type { BookData, BookFeeder, BookPart, OfficerVerdict } from '../taxBook/bookClient';
@@ -243,8 +242,7 @@ function richBook() {
       },
     ],
   };
-  // Older servers store each notice as a legacy statements doc: the book reads it from there.
-  return { statements: [...issued, ...septNotices].map(legacyStatementDocOf), ...ledger };
+  return { lateNotices: [...issued, ...septNotices], ...ledger };
 }
 
 const RICH = richBook();
@@ -272,7 +270,7 @@ function seed() {
   base.extractions.forEach((x, i) => store.set(`${book}/extractions/e${i}`, { ...x }));
   const lists: Record<string, readonly { id: string }[]> = {
     miners: base.miners,
-    statements: RICH.statements as unknown as { id: string }[],
+    lateNotices: RICH.lateNotices,
     payments: RICH.payments,
     dismissals: RICH.dismissals,
     declarations: RICH.declarations,
@@ -391,7 +389,7 @@ describe('book parts parity', () => {
     expect(RICH.declarations).toHaveLength(1);
     expect(RICH.adjustments).toHaveLength(1);
     expect(RICH.writeOffs).toHaveLength(1);
-    expect(RICH.statements.length).toBeGreaterThan(3);
+    expect(RICH.lateNotices.length).toBeGreaterThan(3);
   });
 
   it.each(ROUTES)('$name renders the same from its own parts as from the whole book', async (r) => {
@@ -412,9 +410,9 @@ describe('book parts parity', () => {
     expect(view.totals.owed).toBe(sum);
     const whole = viewOf(await bookData(undefined));
     const g1 = (v: typeof view) => v.miners.find((m) => m.id === 'g1')!;
-    const billed = RICH.statements
-      .filter((s) => s.minerId === 'g1')
-      .reduce((total, s) => total + (s.amount as number), 0);
+    const billed = RICH.lateNotices
+      .filter((n) => n.minerId === 'g1')
+      .reduce((total, n) => total + n.listed, 0);
     expect(g1(view).owed).toBeLessThan(billed);
     expect(g1(view).owed).toBe(g1(whole).owed);
     expect(view.totals.owed).toBe(whole.totals.owed);

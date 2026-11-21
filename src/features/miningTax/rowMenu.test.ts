@@ -108,6 +108,13 @@ describe('rowMenuActions', () => {
     expect(actions.filter((x) => x.id === 'takeOut')).toHaveLength(2);
   });
 
+  it('offers only View on a row dated before the lock date: locked history is read-only', () => {
+    expect(ids(rowMenuActions(dr(), '2026-10-01'))).toEqual(['view']);
+    expect(ids(rowMenuActions(dr({ status: 'dismissed' }), '2026-10-01'))).toEqual(['view']);
+    // On or after the lock date: the usual actions.
+    expect(ids(rowMenuActions(dr(), '2026-09-04'))).toContain('edit');
+  });
+
   it('offers Pay on a corp book row that is owed, and nothing else beyond View', () => {
     const corp = {
       kind: 'row',

@@ -3,11 +3,10 @@
  * alts each hold a record of the same recipient, and the group is one Payee). One build, the same
  * inputs everywhere (`loadRunningAccountInputs`): row statuses, owed figures, safeguards and the journal
  * read the same accounts. What is paid is read here and nowhere else: an Assignment is Paid while its Payee's account has paid its day, oldest
- * first (decision 20261120-235011). Assignments no longer carry a paid mark of their own; a stored
- * `status: 'paid'` from an older client is read as billed, its money having been read into a link
- * (`legacyPaidMarks.ts`).
+ * first (decision 20261120-235011). Assignments carry no paid mark of their own; an old one is read
+ * into a link once per device and cleared (`readLegacyPaidMarks`), and is read as billed until then.
  *
- * Pure: the caller loads the Assignments, Payees, links and stored checkpoints.
+ * Pure: the caller loads the Assignments, Payees and links.
  */
 import type {
   MiningTaxAssignmentRecord,
@@ -15,11 +14,7 @@ import type {
   MiningTaxPaymentLinkRecord,
   PayeeRecord,
 } from '@/db';
-import {
-  PayeeRunningAccount,
-  type PayeePaymentLink,
-  type StoredPayeeCheckpoint,
-} from '@/engine/miningTax/payeeRunningAccount';
+import { PayeeRunningAccount, type PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
 import { groupPayees } from './payeeGroups';
 import type { LinkablePayee } from './paymentLinks';
 import type { MoonMiningTaxRow } from './snapshot';
@@ -39,8 +34,6 @@ export interface PayeeRunningAccountsInput {
   assignments: readonly BilledAssignment[];
   payees: readonly PayeeRecord[];
   links: readonly PayeePaymentLink[];
-  /** The device's checkpoints, by a merged Payee's primary id. */
-  checkpoints?: ReadonlyMap<string, StoredPayeeCheckpoint>;
   /**
    * By Assignment id, the share (0–1) of its tax a Corp Tax Book bills too (#6204), 1 for one a
    * book took over whole: it bills its Payee only what is left. As the device last saw the books
@@ -78,14 +71,12 @@ export class PayeeRunningAccounts {
     }
     const byPrimary = new Map<string, PayeeRunningAccount>();
     for (const key of new Set([...charges.keys(), ...links.keys()])) {
-      const stored = input.checkpoints?.get(key);
       byPrimary.set(
         key,
         PayeeRunningAccount.build({
           payeeId: key,
           charges: charges.get(key) ?? [],
           links: links.get(key) ?? [],
-          ...(stored ? { stored } : {}),
         })
       );
     }
@@ -170,7 +161,6 @@ export function linkOf(record: MiningTaxPaymentLinkRecord): PayeePaymentLink {
     source: record.source,
     characterId: record.characterId,
     ...(record.refs ? { refs: record.refs } : {}),
-    ...(record.unlinked ? { unlinked: true as const } : {}),
   };
 }
 

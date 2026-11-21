@@ -21,6 +21,7 @@ import { cx } from '@/lib/cx';
 import { formatCount } from '@/lib/formatCount';
 import { useNow } from '@/lib/useNow';
 import { useBook } from './useBook';
+import { isLocked } from '../../../../functions/src/corpTaxBookCheckpoint';
 import { useCorpAccess } from '../useCorpAccess';
 import { divisionNamesFor } from '../taxBook/pushDivisionNames';
 import { useNeedsYou } from './useNeedsYou';
@@ -33,7 +34,6 @@ import {
 import { atDate, isk, shortDate, shortDateTime } from './moonsFormat';
 import { autoCredited, paidToOwn, transferStatus, type TransferStatus } from './claimWalletCheck';
 import { useOwnWalletJournals } from './useOwnWalletJournals';
-import { useCheckpointsAwaitingDirector } from './checkpointHolds';
 import { MOONS_TABS, minerPath } from './moonsPaths';
 import { tabPath } from '@/lib/pageTabs';
 import { mailTarget, useCorporationName } from './lateNoticeMailing';
@@ -174,9 +174,7 @@ export function NeedsYouQueue() {
   const ctx = useBook();
   const { view, names, edit, canEdit, characterId, corporationId, settings } = ctx;
   const { miners } = view;
-  const { needsYou, uncounted, disputes, noticesDue, count } = useNeedsYou();
-  // A closed month the server records only with a Director's approval: quiet, never an error.
-  const awaitingDirector = useCheckpointsAwaitingDirector(corporationId);
+  const { needsYou, uncounted, disputes, noticesDue, declined, count } = useNeedsYou();
   // The officer's own Characters on this device: a transfer paid to one is checked in its journal.
   const ownIds = new Set(useCharacters().map((c) => c.characterId));
   const journals = useOwnWalletJournals(
@@ -296,11 +294,6 @@ export function NeedsYouQueue() {
       )}
       {count === 0 && (
         <p className="px-3 py-2.5 text-xs text-text-dim">{t('corpTaxBook.moons.needs.none')}</p>
-      )}
-      {awaitingDirector.length > 0 && (
-        <p className="px-3 py-2 text-xs text-text-dim">
-          {t('corpTaxBook.moons.needs.checkpointDirector', { count: awaitingDirector.length })}
-        </p>
       )}
       {creditedAutomatically.map(({ d, miner, amount, at }) => (
         <p key={d.id} className="px-3 py-2 text-xs text-text-dim">
@@ -660,7 +653,8 @@ export function NeedsYouQueue() {
                 )
               }
               actions={
-                canEdit ? (
+                // A dispute of a day before the lock date can no longer be answered.
+                canEdit && !isLocked(d.date, view.input.now) ? (
                   <>
                     <Button
                       size="sm"
@@ -678,6 +672,25 @@ export function NeedsYouQueue() {
                   </>
                 ) : null
               }
+            />
+          );
+        })}
+        {declined.map((a) => {
+          const group = miners.find((m) => m.id === a.minerId);
+          return (
+            <QueueCard
+              key={`g-${a.characterId}`}
+              tone="neutral"
+              title={
+                <MinerTitle minerId={group ? a.minerId : undefined}>
+                  {t('corpTaxBook.moons.needs.declinedGrouping.title', {
+                    character: names.character(a.characterId),
+                    miner: group ? names.character(group.mainCharacterId) : a.minerId,
+                  })}
+                </MinerTitle>
+              }
+              body={t('corpTaxBook.moons.needs.declinedGrouping.body')}
+              actions={null}
             />
           );
         })}

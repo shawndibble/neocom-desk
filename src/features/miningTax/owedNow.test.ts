@@ -81,7 +81,6 @@ describe('loadOwedBalances', () => {
           source: 'manual',
         },
       ],
-      payeeCheckpoints: new Map(),
       billedElsewhere: new Map(),
     });
 

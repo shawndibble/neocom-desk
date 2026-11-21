@@ -1,8 +1,7 @@
 /**
- * The closed-through checkpoint (decision 20261120-235011, "a closed-through date keeps the work
- * bounded"): an officer's tab records, for each Miner, where the account stood at the end of the
- * last month at least 31 days old, and later loads read the checkpoint and only the days after
- * it. Read either way, a Miner's page shows the same totals.
+ * The lock date (decision 20261120-235011, "a lock date"): history before the 1st of the month two
+ * months back is read-only, and an officer's tab records each Miner's snapshot of it once per lock
+ * date. A later load reads the snapshot and only the days after it, with the same totals.
  */
 import type { Page } from '@playwright/test';
 import { expect, minerFact, openMiner, signInAsOfficer, test } from './support/taxBook/bookTest';
@@ -18,18 +17,30 @@ async function expectTotals(page: Page, book: ReturnType<typeof closedMonthBook>
   await expect(page.getByRole('heading', { name: `Owed days · ${book.days}` })).toBeVisible();
 }
 
-test("an officer's visit records the closed-through checkpoint", async ({
-  page,
-  book: emulator,
-}) => {
+test('an edit before the lock date is refused or hidden', async ({ page, book: emulator }) => {
   const book = closedMonthBook();
   await emulator.seed(book.seed.docs());
-  // Only a whole-book read records checkpoints (a Miner page reads one Miner's slice).
+  await openMiner(page, book.minerId, MINER.ada.name);
+  const ledger = page.getByRole('table', { name: 'Ledger', exact: true });
+  // Her two recent owed days can be re-rated or dismissed; the old owed day, before the lock
+  // date, cannot, and nor can the old payment.
+  await expect(ledger.getByRole('button', { name: /^More actions for .* charge$/ })).toHaveCount(2);
+  await expect(ledger.getByRole('button', { name: /^More actions for .* payment$/ })).toHaveCount(
+    0
+  );
+});
+
+test('a snapshot is recorded once per lock date', async ({ page, book: emulator }) => {
+  const book = closedMonthBook();
+  await emulator.seed(book.seed.docs());
+  const path = `corps/${CORP}/accountCheckpoints/${book.minerId}`;
+  const minersRow = page.getByRole('row', { name: new RegExp(MINER.ada.name) });
+  // Only a whole-book read records snapshots (a Miner page reads one Miner's slice).
   await signInAsOfficer(page, './corp/moons/miners');
-  await expect(page.getByRole('row', { name: new RegExp(MINER.ada.name) })).toBeVisible();
+  await expect(minersRow).toBeVisible();
   await expect
     .poll(async () => {
-      const stored = await readDoc(`corps/${CORP}/accountCheckpoints/${book.minerId}`);
+      const stored = await readDoc(path);
       return (
         stored && {
           minerId: stored.minerId,
@@ -43,16 +54,20 @@ test("an officer's visit records the closed-through checkpoint", async ({
       );
     })
     .toEqual(book.checkpoint);
+  const first = (await readDoc(path))!.at;
+
+  // The next visit finds this lock date's snapshot and records none.
+  await page.reload();
+  await expect(minersRow).toBeVisible();
+  await page.waitForLoadState('networkidle');
+  expect((await readDoc(path))!.at).toBe(first);
 });
 
-test('a Miner whose history passes a closed month reads the same totals', async ({
-  page,
-  book: emulator,
-}) => {
+test('a Miner read from their snapshot reads the same totals', async ({ page, book: emulator }) => {
   const book = closedMonthBook({ checkpointed: true });
   await emulator.seed(book.seed.docs());
   await openMiner(page, book.minerId, MINER.ada.name);
-  // The one Payee ledger opens on the checkpoint: "Balance through <day>".
+  // The one Payee ledger opens on the snapshot: "Balance through <day>".
   await expect(page.getByRole('table', { name: 'Ledger', exact: true })).toContainText(
     'Balance through'
   );

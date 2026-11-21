@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MiningTaxAssignmentRecord } from '@/db';
-import { withStoredMark } from './storedAssignments';
+import { withoutPaidMark } from './storedAssignments';
 
 const record = (over: Partial<MiningTaxAssignmentRecord> = {}): MiningTaxAssignmentRecord => ({
   id: 'a1',
@@ -18,21 +18,17 @@ const record = (over: Partial<MiningTaxAssignmentRecord> = {}): MiningTaxAssignm
 });
 
 describe('a view never reaches a write', () => {
-  it('drops a Paid read off the account, and keeps a stored mark exactly', () => {
-    expect(withStoredMark(record({ status: 'paid' }), record()).status).toBe('outstanding');
-    expect(withStoredMark(record({ status: 'paid' }), undefined).status).toBe('outstanding');
-    const mark = record({
-      status: 'paid',
-      paidAt: 5,
-      payment: { paymentId: 'pay1', paidOn: '2026-10-05', method: 'other', amount: 9 },
-    });
-    // A view of a marked day the account now reads as owed still writes the mark back.
-    const viewed = { ...record({ taxOwed: 1 }), status: 'outstanding' as const };
-    expect(withStoredMark(viewed, mark)).toMatchObject({
-      status: 'paid',
-      paidAt: 5,
-      payment: mark.payment,
-      taxOwed: 1,
-    });
+  it('drops a Paid read off the account, and any old mark', () => {
+    const written = withoutPaidMark(
+      record({
+        status: 'paid',
+        paidAt: 5,
+        payment: { paymentId: 'pay1', paidOn: '2026-10-05', method: 'other', amount: 9 },
+      })
+    );
+    expect(written.status).toBe('outstanding');
+    expect(written).not.toHaveProperty('paidAt');
+    expect(written).not.toHaveProperty('payment');
+    expect(withoutPaidMark(record({ status: 'dismissed' })).status).toBe('dismissed');
   });
 });

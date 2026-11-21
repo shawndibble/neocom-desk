@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useCheckpointSkips } from './checkpointHolds';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useTranslation } from 'react-i18next';
 import { Button, InfoTooltip } from '@/components/ui';
@@ -17,8 +16,7 @@ import type { CorpTaxBookSync } from '../taxBook/useCorpTaxBook';
 export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
   const zone = useTimeZone();
   const { t } = useTranslation();
-  const { view, names, canEdit, data, settings, verdict, edit, corporationId } = useBook();
-  const checkpointSkips = useCheckpointSkips(corporationId);
+  const { view, names, canEdit, data, settings, verdict, edit } = useBook();
   const [openedAt] = useState(() => Date.now());
   const { status } = sync;
   const items: AttentionItem[] = [];
@@ -52,18 +50,6 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
       }),
     });
   }
-  // Checkpoints the server would not store: the account is read whole meanwhile, so only a note.
-  // A Director's approval is asked in Needs you.
-  const skips = checkpointSkips.filter((s) => s.reason !== 'director-approval');
-  if (skips.length > 0)
-    items.push({
-      id: 'checkpointSkips',
-      tone: 'info',
-      title: t('corpTaxBook.moons.health.checkpointSkipped', {
-        count: skips.length,
-        reasons: [...new Set(skips.map((s) => s.reason))].join(', '),
-      }),
-    });
   const scheduled = data.scheduledSync;
   if (scheduled?.status === 'stopped') {
     items.push({

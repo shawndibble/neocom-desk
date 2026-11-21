@@ -1,6 +1,6 @@
 /**
  * A Corp Tax Book as the server stores it, built for one test: the settings doc, Observed Mining
- * Entries, Tax Payments, Late notices (current and legacy), groupings, disputes, declarations,
+ * Entries, Tax Payments, Late notices, groupings, disputes, declarations,
  * checkpoints. Layout: `functions/src/corpTaxBookStore.ts`, as `scripts/dev/seed-corp-tax-book.mjs`
  * writes it for the manual sandbox.
  *
@@ -14,13 +14,10 @@
 import {
   LATE_NOTICES,
   LATE_NOTICE_LINKS,
-  STATEMENTS,
-  STATEMENT_LINKS,
   TOKENS_COLLECTION,
 } from '../../../functions/src/corpTaxBookVersionKeys';
 import {
   NOTICE_ID_FIELD,
-  legacyStatementDocOf,
   minerPaymentCode,
   paymentCode,
   type LateNotice,
@@ -282,25 +279,11 @@ export class BookSeed {
     };
   }
 
-  /**
-   * A Late notice as `issueLateNoticeDocs` writes it today: the `lateNotices` doc and its link,
-   * the legacy mirror and its link older tabs read, and the verify token.
-   */
+  /** A Late notice as `issueLateNoticeDocs` writes it: its doc, its link and the verify token. */
   lateNotice(input: NoticeInput): this {
     const notice = this.notice(input);
     this.sub(LATE_NOTICES, input.id, { ...notice });
     this.sub(LATE_NOTICE_LINKS, input.id, { token: input.token });
-    return this.legacyNotice(input);
-  }
-
-  /**
-   * A Late notice only in the legacy collection (`kind: 'notice'`, `legacyStatementDocOf`) with
-   * its old verify link: a book from before the move to `lateNotices`.
-   */
-  legacyNotice(input: NoticeInput): this {
-    const notice = this.notice(input);
-    this.sub(STATEMENTS, input.id, legacyStatementDocOf(notice));
-    this.sub(STATEMENT_LINKS, input.id, { verifyToken: input.token });
     this.token(input, notice.minerId);
     return this;
   }

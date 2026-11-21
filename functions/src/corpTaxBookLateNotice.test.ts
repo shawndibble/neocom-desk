@@ -3,7 +3,6 @@ import {
   finalNoticeId,
   isFinalNoticeId,
   lateNoticeRefusal,
-  mergeNoticeMail,
   mergeNoticeDocs,
   legacyStatementDocOf,
   listedKeys,
@@ -254,28 +253,6 @@ describe('isFinalNoticeId', () => {
   });
 });
 
-describe('mergeNoticeMail: one notice kept in two docs reads as one mail state', () => {
-  it('stops reminders if either doc did, and keeps the larger count and the later mail', () => {
-    expect(
-      mergeNoticeMail(
-        { sent: 2, manualSent: 0, remindersStopped: false, lastAt: '2026-11-19T00:00:00.000Z' },
-        { sent: 1, manualSent: 1, remindersStopped: true, lastAt: '2026-11-20T00:00:00.000Z' }
-      )
-    ).toEqual({
-      sent: 2,
-      manualSent: 1,
-      remindersStopped: true,
-      lastAt: '2026-11-20T00:00:00.000Z',
-    });
-    expect(
-      mergeNoticeMail(
-        { sent: 0, manualSent: 0, remindersStopped: false },
-        { sent: 0, manualSent: 0, remindersStopped: false }
-      )
-    ).toEqual({ sent: 0, manualSent: 0, remindersStopped: false });
-  });
-});
-
 describe('lateNoticeRefusal: two tabs never mail the same days', () => {
   const line = (key: string) => ({ key });
   const earlier = [
@@ -303,24 +280,17 @@ describe('lateNoticeRefusal: two tabs never mail the same days', () => {
   });
 });
 
-describe('mergeNoticeDocs: one notice per id from both collections', () => {
-  const current = {
-    ...lateNoticeFromStatementDoc(storedNotice)!,
-    mail: { sent: 1, manualSent: 0, remindersStopped: false },
-    updatedAt: { seconds: 1 },
-  };
-
-  it('keeps the lateNotices doc, without its stamp, and reads its mail from both docs', () => {
-    const [notice] = mergeNoticeDocs([current], [storedNotice]);
+describe('mergeNoticeDocs: the notices among lateNotices docs', () => {
+  it('keeps each notice without its stamp, and drops anything that is no notice', () => {
+    const current = {
+      ...lateNoticeFromStatementDoc(storedNotice)!,
+      mail: { sent: 1, manualSent: 0, remindersStopped: false },
+      updatedAt: { seconds: 1 },
+    };
+    const [notice] = mergeNoticeDocs([current]);
     expect(notice).not.toHaveProperty('updatedAt');
-    expect(notice.mail).toMatchObject({ sent: 2, manualSent: 1, remindersStopped: true });
     expect(notice.lines).toEqual(current.lines);
-  });
-
-  it('reads a legacy doc with no copy as its notice, and drops anything that is no notice', () => {
-    expect(mergeNoticeDocs([], [storedNotice]).map((n) => n.id)).toEqual([storedNotice.id]);
-    expect(mergeNoticeDocs([], [{ ...storedNotice, kind: undefined }])).toEqual([]);
-    expect(mergeNoticeDocs([{ id: 'x' }], [])).toEqual([]);
+    expect(mergeNoticeDocs([{ id: 'x' }])).toEqual([]);
   });
 });
 

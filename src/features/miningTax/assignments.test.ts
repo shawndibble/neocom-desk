@@ -168,12 +168,10 @@ describe("assigning a paid day's late ore (paid stays paid, ADR 0024)", () => {
     const created = await createAssignment({ ...lateOre, isPaid: byStatus });
 
     expect(created.collectsGrowth).toBe(true);
-    // Only the flag moves; the paid record's status, ore and tax stay as paid.
+    // Only the flag moves; the paid record's ore and tax stay as they were (an old mark goes).
     const stored = await db.miningTaxAssignments.get('paid');
     expect(stored?.collectsGrowth).toBeUndefined();
     expect(stored).toMatchObject({
-      status: 'paid',
-      paidAt: paid.paidAt,
       oreLines: paid.oreLines,
       estimatedValue: paid.estimatedValue,
       taxOwed: paid.taxOwed,
@@ -1266,7 +1264,7 @@ describe('updateCombinedAssignments', () => {
     expect(s4?.oreLineValues).toBeUndefined();
   });
 
-  it('leaves status and payment alone', async () => {
+  it('keeps no old paid mark: Paid is read off the account', async () => {
     const paid = member('d3', '2026-10-03', {
       status: 'paid',
       paidAt: 5,
@@ -1281,8 +1279,8 @@ describe('updateCombinedAssignments', () => {
     });
 
     const stored = await db.miningTaxAssignments.get('d3');
-    expect(stored?.status).toBe('paid');
-    expect(stored?.payment?.paymentId).toBe('p1');
+    expect(stored?.status).toBe('outstanding');
+    expect(stored?.payment).toBeUndefined();
   });
 });
 
@@ -1305,7 +1303,7 @@ describe('updateCombinedAssignments label', () => {
       db.miningTaxAssignments.get('d3'),
       db.miningTaxAssignments.get('d4'),
     ]);
-    expect(s3).toMatchObject({ label: 'Athanor in Q-S', status: 'paid', paidAt: 5, groupId: 'g1' });
+    expect(s3).toMatchObject({ label: 'Athanor in Q-S', groupId: 'g1' });
     expect(s4?.label).toBe('Athanor in Q-S');
   });
 

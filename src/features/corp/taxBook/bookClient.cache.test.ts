@@ -59,7 +59,7 @@ const OBSERVED_ROW = {
 };
 const COLLECTIONS = [
   'miners',
-  'statements',
+  'lateNotices',
   'payments',
   'dismissals',
   'extractions',
@@ -100,7 +100,7 @@ beforeEach(async () => {
   store.denied.clear();
   store.docs.set(BOOK, stamped());
   store.docs.set(`${BOOK}/miners/m1`, { id: 'm1', characterIds: [1] });
-  store.docs.set(`${BOOK}/statements/s1`, notice('s1'));
+  store.docs.set(`${BOOK}/lateNotices/s1`, notice('s1'));
   store.docs.set(`${BOOK}/observed/o1`, { ...OBSERVED_ROW });
   store.docs.set(`${BOOK}/feeders/5`, { corporationId: 5, status: 'active' });
   store.docs.set(`${BOOK}/feeders/5/payouts/p1`, { amount: 1 });
@@ -109,9 +109,15 @@ beforeEach(async () => {
   store.docs.set(MODEL_DOCS[1]!, MODELS.overview);
 });
 
-/** A late notice as older servers store it, in the legacy collection. */
+/** A late notice as the server stores it. */
 function notice(id: string) {
-  return { id, kind: 'notice', minerId: 'solo:1', issuedAt: '2026-09-01T00:00:00Z', lines: [] };
+  return {
+    id,
+    minerId: 'solo:1',
+    issuedAt: '2026-09-01T00:00:00Z',
+    lines: [],
+    mail: { sent: 1, manualSent: 0, remindersStopped: false },
+  };
 }
 
 describe('readBook over the version marker', () => {
@@ -178,13 +184,13 @@ describe('readBook over the version marker', () => {
   it('after a reload, re-reads only the part whose stamp moved', async () => {
     await readBook(7, CORP, WHOLE);
     clearBookCache();
-    store.docs.set(`${BOOK}/statements/s2`, notice('s2'));
-    store.docs.set(BOOK, stamped({ statements: 'statements-2' }));
+    store.docs.set(`${BOOK}/lateNotices/s2`, notice('s2'));
+    store.docs.set(BOOK, stamped({ lateNotices: 'lateNotices-2' }));
     store.reads.length = 0;
 
     const data = await readBook(7, CORP, WHOLE);
 
-    expect(store.reads.sort()).toEqual([BOOK, `${BOOK}/meta/paid`, `${BOOK}/statements`].sort());
+    expect(store.reads.sort()).toEqual([BOOK, `${BOOK}/meta/paid`, `${BOOK}/lateNotices`].sort());
     expect(data?.state.notices).toHaveLength(2);
   });
 
@@ -203,7 +209,7 @@ describe('readBook over the version marker', () => {
     const data = await readBook(7, CORP, { parts: new Set(['core']) });
 
     const read = new Set(store.reads);
-    for (const c of ['miners', 'statements', 'extractions', 'feeders'])
+    for (const c of ['miners', 'lateNotices', 'extractions', 'feeders'])
       expect(read).toContain(`${BOOK}/${c}`);
     // The ledger rows are a part of their own (#5717).
     for (const c of [
@@ -345,13 +351,13 @@ describe('readBook over the version marker', () => {
 
   it('re-reads only the collection an edit restamped', async () => {
     await readBook(7, CORP, WHOLE);
-    store.docs.set(`${BOOK}/statements/s2`, notice('s2'));
-    store.docs.set(BOOK, stamped({ statements: 'statements-2' }));
+    store.docs.set(`${BOOK}/lateNotices/s2`, notice('s2'));
+    store.docs.set(BOOK, stamped({ lateNotices: 'lateNotices-2' }));
     store.reads.length = 0;
 
     const data = await readBook(7, CORP, WHOLE);
 
-    expect(store.reads.sort()).toEqual([BOOK, `${BOOK}/meta/paid`, `${BOOK}/statements`].sort());
+    expect(store.reads.sort()).toEqual([BOOK, `${BOOK}/meta/paid`, `${BOOK}/lateNotices`].sort());
     expect(data?.state.notices.map((n) => n.id)).toEqual(['s1', 's2']);
   });
 

@@ -7,6 +7,8 @@ import { rowMenuActions, type RowMenuAction } from './rowMenu';
 interface TaxRowMenuProps {
   dr: DisplayRow;
   systemName: string;
+  /** Rows dated before it are read-only: they only open (`rowMenuActions`). */
+  lockDate?: string;
   /** Runs one action on this row — `useTaxDialogs`'s `runRowMenuAction`. */
   onAction: (action: RowMenuAction, dr: DisplayRow) => void;
   children: ReactElement;
@@ -37,10 +39,10 @@ const LABEL_KEY: Record<Exclude<RowMenuAction['id'], 'takeOut'>, string> = {
  * back to the ⋮ when it closes. A row with only View details gets no menu —
  * clicking the row already does that (DESIGN.md §6c restraint).
  */
-export function TaxRowMenu({ dr, systemName, onAction, children }: TaxRowMenuProps) {
+export function TaxRowMenu({ dr, systemName, lockDate, onAction, children }: TaxRowMenuProps) {
   const { t } = useTranslation();
   const openAfterMenu = useOpenAfterMenu();
-  const groups = rowMenuActions(dr);
+  const groups = rowMenuActions(dr, lockDate);
   if (groups.flat().length < 2) return children;
 
   const dates = [dr.row.entry.date, ...(dr.groupMembers ?? []).map((m) => m.row.entry.date)].sort();

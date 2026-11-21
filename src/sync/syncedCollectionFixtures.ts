@@ -251,7 +251,6 @@ export const FULL_MINING_TAX_PAYMENT_LINK: Required<MiningTaxPaymentLinkRecord> 
   paidOn: '2026-10-05',
   source: 'manual',
   refs: [{ kind: 'journal', refId: 9001 }],
-  unlinked: true,
   updatedAt: UPDATED_AT,
 };
 

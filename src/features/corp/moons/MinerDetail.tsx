@@ -49,6 +49,7 @@ import { listQueue } from '@/features/corpTaxBook/mailQueueStore';
 import { ActivityRow, AuditLine } from './AuditFeed';
 import { useBookAudit } from './useBookAudit';
 import { useBook } from './useBook';
+import { isLocked } from '../../../../functions/src/corpTaxBookCheckpoint';
 import { CloseAccountDialog } from './CloseAccountDialog';
 import { OldestUnpaid } from './AccountStatus';
 import { MinerLedger } from './MinerLedger';
@@ -220,7 +221,10 @@ export function MinerDetail({ id }: { id: string }) {
     .reduce((s, d) => s + d.tax, 0);
   const selectedDays = detail.days.filter((d) => selected.has(d.key));
   const selectedTax = selectedDays.reduce((s, d) => s + d.tax, 0);
-  const canSelect = (d: DayRow) => d.status === 'owed' || d.status === 'not-billable';
+  // A day before the lock date is read-only (decision 20261120-235011, "a lock date").
+  const locked = (date: string) => isLocked(date, view.input.now);
+  const canSelect = (d: DayRow) =>
+    (d.status === 'owed' || d.status === 'not-billable') && !locked(d.date);
   const sumTax = (days: readonly DayRow[]) => days.reduce((s, d) => s + d.tax, 0);
   const moonName = (moonId: number | undefined) =>
     moonId === undefined ? undefined : names.moon(moonId);
@@ -652,26 +656,6 @@ export function MinerDetail({ id }: { id: string }) {
       {t('corpTaxBook.moons.corrections.adjust.open')}
     </DropdownMenuItem>
   );
-  // A Director's correction of a closed month: the next load works the account out again from
-  // its history, and the officer tab records the checkpoint afresh.
-  const resetItem =
-    ctx.verdict.isDirector && detail.checkpoint ? (
-      <DropdownMenuItem
-        onSelect={() =>
-          void edit({ action: 'resetCheckpoint', minerId: id }).then(
-            () =>
-              setNotice(
-                t('corpTaxBook.moons.miner.checkpointReset', {
-                  date: shortDate(detail.checkpoint!.through),
-                })
-              ),
-            () => setNotice(t('corpTaxBook.moons.miner.checkpointResetFailed'))
-          )
-        }
-      >
-        {t('corpTaxBook.moons.miner.resetCheckpoint')}
-      </DropdownMenuItem>
-    ) : null;
   const closeItem = guestOpen ? (
     <DropdownMenuItem onSelect={() => setDialog({ kind: 'close' })}>
       {t('corpTaxBook.moons.miner.closeAccount')}
@@ -690,7 +674,6 @@ export function MinerDetail({ id }: { id: string }) {
           {dismissAllItem}
           {rateItem}
           {adjustItem}
-          {resetItem}
           {closeItem}
         </HeaderMoreMenu>
       ) : (
@@ -712,7 +695,6 @@ export function MinerDetail({ id }: { id: string }) {
           <HeaderMoreMenu>
             {rateItem}
             {adjustItem}
-            {resetItem}
             {closeItem}
           </HeaderMoreMenu>
         </>
@@ -944,7 +926,13 @@ export function MinerDetail({ id }: { id: string }) {
                   key={`d-${f.id}`}
                   at={d.at}
                   aside={
-                    canEdit && !d.reversed ? (
+                    canEdit &&
+                    !d.reversed &&
+                    // A record's dismissal is locked with its day; a wider one never is.
+                    !(
+                      d.scope === 'record' &&
+                      locked(detail.days.find((x) => x.key === d.targetId)?.date ?? d.at)
+                    ) ? (
                       <button
                         type="button"
                         className={entityLinkClassName(

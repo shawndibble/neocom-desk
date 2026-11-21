@@ -8381,6 +8381,11 @@
         "detail": "{{amount}} ISK sent on {{date}} from {{character}}. Claim it to credit it to you; only you and {{corp}}'s officers can see it.",
         "action": "Claim",
         "failed": "The claim did not go through. Try again."
+      },
+      "unheld": {
+        "title": "{{corp}} counts {{character}} as yours. Add them to Neocom Desk to see their mining and payments.",
+        "decline": "Not yours? Tell {{corp}}",
+        "failed": "Couldn't tell the corporation. Try again."
       }
     },
     "status": {
@@ -8818,7 +8823,8 @@
         "totalText": "Estimated value {{value}} ISK, tax owed {{tax}} ISK"
       },
       "editAction": "Edit",
-      "unassignConfirm": "Unassign this entry from {{payee}}? It goes back to Unassigned and its tax figures are removed."
+      "unassignConfirm": "Unassign this entry from {{payee}}? It goes back to Unassigned and its tax figures are removed.",
+      "locked": "Days before {{date}} are locked and can't be changed."
     },
     "linkPaymentSelectedAction": "Link payment",
     "linkPaymentOnePayeeHint": "One wallet payment pays one Payee — tick entries for a single Payee to link a payment.",
@@ -18724,8 +18730,10 @@
           "missingLink": "This late notice has no verify link yet, so no mail can go."
         },
         "none": "Nothing needs you.",
-        "checkpointDirector_one": "Closing a past month for {{count}} Miner needs a Director's visit; until then the account is worked out from its whole history.",
-        "checkpointDirector_other": "Closing a past month for {{count}} Miners needs a Director's visit; until then their accounts are worked out from their whole history."
+        "declinedGrouping": {
+          "title": "{{character}} says they aren't part of {{miner}}.",
+          "body": "They're billed on their own now."
+        }
       },
       "ledger": {
         "title": "Ledger",
@@ -18840,10 +18848,7 @@
           "mail": "Mail",
           "dismissed": "Dismissed",
           "audit": "Audit"
-        },
-        "resetCheckpoint": "Reopen closed months",
-        "checkpointReset": "Months closed through {{date}} reopened: the account is worked out from its whole history again.",
-        "checkpointResetFailed": "Couldn't reopen the closed months. Only a Director can."
+        }
       },
       "activity": {
         "button": "Activity",
@@ -18981,9 +18986,7 @@
         "billableHint": "A day becomes billable {{hours}} h after it ends, once a sync has read it. The book warns here when nobody has synced for about 3 days.",
         "hiddenLabel": "hidden from members",
         "hiddenHint": "A new book stays out of members' Mining Tax pages for 3 days, so officers can set it up first.",
-        "showToMembers": "Show to members now",
-        "checkpointSkipped_one": "The server did not store {{count}} Miner's closed months ({{reasons}}). Their account is read in full meanwhile.",
-        "checkpointSkipped_other": "The server did not store {{count}} Miners' closed months ({{reasons}}). Their accounts are read in full meanwhile."
+        "showToMembers": "Show to members now"
       },
       "run": {
         "check": "Check",
@@ -19285,7 +19288,12 @@
           "running-account": "This book bills a Running account, so it sends late notices. Reload the page to get the current version.",
           "transfer-in-book": "That transfer is already in the book, so recording it would count it twice. Assign the donation the sync stored instead: Needs you lists it while no Miner has it.",
           "needs-automatic-sync": "Turn on Automatic sync before sharing pops. Pops are shared as part of each sync.",
-          "unknown-moon": "This book has no Extraction at that moon."
+          "unknown-moon": "This book has no Extraction at that moon.",
+          "locked": "That date is locked: nothing before the 1st of the month two months back can be changed. Add a correction dated today instead.",
+          "unknown-miner": "That Miner isn't in the book any more. Reload and pick another.",
+          "account-closed": "That Miner's account is closed: it takes no more payments.",
+          "wrong-miner": "The final notice is for another Miner. Reload and try again.",
+          "notice-exists": "This account's final notice was already sent. Reload to see it."
         }
       },
       "consent": {
@@ -19828,7 +19836,8 @@
           "stillOwes": "{{name}} still owes {{amount}}",
           "owesNothing": "{{name}} owes nothing",
           "creditHeld": "{{amount}} held as credit toward the next days",
-          "dayLine": "Day of {{date}}"
+          "dayLine": "Day of {{date}}",
+          "dateLocked": "Days before {{date}} are locked: record it dated today instead."
         },
         "notTax": {
           "title": "Mark part of a donation as not tax",

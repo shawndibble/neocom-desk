@@ -135,23 +135,6 @@ export function isFinalNoticeId(id: string): boolean {
   return id.startsWith(FINAL_PREFIX);
 }
 
-/**
- * A notice's mail state from both docs that hold it while the legacy mirror lives: reminders are
- * stopped if either says so, each count is the larger, the last mail the later.
- */
-export function mergeNoticeMail(a: LateNoticeMail, b: LateNoticeMail): LateNoticeMail {
-  const lastAt = [a.lastAt, b.lastAt]
-    .filter((x): x is string => !!x)
-    .sort()
-    .at(-1);
-  return {
-    sent: Math.max(a.sent, b.sent),
-    ...(lastAt ? { lastAt } : {}),
-    manualSent: Math.max(a.manualSent, b.manualSent),
-    remindersStopped: a.remindersStopped || b.remindersStopped,
-  };
-}
-
 /** The id of the final notice closing `minerId`'s account sends. */
 export function finalNoticeId(minerId: string): string {
   return noticeDocId(`${FINAL_PREFIX}${minerId}`);
@@ -331,34 +314,17 @@ export function lateNoticeRefusal(
 }
 
 /**
- * The Late notices stored in both collections, one per id (decision 20261120-235011): a
- * `lateNotices` doc (`current`, its server stamp dropped) wins, with its mail state read from its
- * legacy copy too (`mergeNoticeMail`); a legacy doc with no copy is read as its notice; anything
- * that is no notice (a malformed doc, a calendar Statement) is left out.
+ * The Late notices among `lateNotices` docs, their server stamp dropped; anything that is no
+ * notice (a malformed doc) is left out.
  */
-export function mergeNoticeDocs(
-  current: readonly Record<string, unknown>[],
-  legacy: readonly Record<string, unknown>[]
-): LateNotice[] {
-  const old = new Map<string, LateNotice>();
-  for (const raw of legacy) {
-    const notice = lateNoticeFromStatementDoc(raw);
-    if (notice?.id && notice.minerId) old.set(notice.id, notice);
-  }
-  const out = new Map(old);
-  for (const raw of current) {
-    if (typeof raw.id !== 'string' || typeof raw.minerId !== 'string') continue;
-    if (!Array.isArray(raw.lines) || !isRecord(raw.mail)) continue;
+export function mergeNoticeDocs(current: readonly Record<string, unknown>[]): LateNotice[] {
+  return current.flatMap((raw) => {
+    if (typeof raw.id !== 'string' || typeof raw.minerId !== 'string') return [];
+    if (!Array.isArray(raw.lines) || !isRecord(raw.mail)) return [];
     const { updatedAt: _stamp, ...rest } = raw;
     void _stamp;
-    const notice = rest as unknown as LateNotice;
-    const copy = old.get(notice.id);
-    out.set(
-      notice.id,
-      copy ? { ...notice, mail: mergeNoticeMail(notice.mail, copy.mail) } : notice
-    );
-  }
-  return [...out.values()];
+    return [rest as unknown as LateNotice];
+  });
 }
 
 /** A notice as the date rules read it: its lines' kinds, days and Characters. */

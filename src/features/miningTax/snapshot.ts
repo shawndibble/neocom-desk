@@ -21,10 +21,7 @@ import {
   loadPayeeRunningAccounts,
   readLegacyPaidMarks,
 } from './paymentLinkStore';
-import type {
-  PayeePaymentLink,
-  StoredPayeeCheckpoint,
-} from '@/engine/miningTax/payeeRunningAccount';
+import type { PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
 import { computeOwnership, findDuplicateAssignmentIds } from '@/engine/miningTax/ownership';
 import { entryFromAssignments } from '@/engine/miningTax/assignmentEntry';
 import { entryKey, type MiningLedgerEntry } from '@/engine/miningTax/types';
@@ -64,12 +61,8 @@ export interface MoonMiningTaxSnapshot {
   payeesByCharacter: Map<number, PayeeRecord[]>;
   /** Every Made Payment linked to a Payee, whichever Character's: it pays that Payee's oldest days. */
   paymentLinks: PayeePaymentLink[];
-  /** The device's closed-through checkpoints of the personal Payees' accounts. */
-  payeeCheckpoints: ReadonlyMap<string, StoredPayeeCheckpoint>;
   /** What the Corp Tax Books bill too, by Assignment id, as last seen (`saveBilledElsewhere`). */
   billedElsewhere: ReadonlyMap<string, number>;
-  /** When the account inputs were read (`readPayeeHistoryGen`). */
-  payeeHistoryGen: number;
   unclassified: UnclassifiedOre[];
   /**
    * Tracked characters whose ledger read needed a re-login this refresh —
@@ -230,9 +223,7 @@ export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot
     characters,
     payeesByCharacter,
     paymentLinks: inputs.links,
-    payeeCheckpoints: inputs.checkpoints,
     billedElsewhere: inputs.billedElsewhere,
-    payeeHistoryGen: inputs.historyGen,
     unclassified,
     reauthCharacters,
     fetchedAt,

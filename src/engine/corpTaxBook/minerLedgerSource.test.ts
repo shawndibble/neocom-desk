@@ -150,7 +150,7 @@ describe("minerLedgerSource: a Miner's account as the Payee ledger reads it", ()
               balance: 100_000,
               paidThrough: null,
               characterIds: [1],
-              at: '2026-09-01T00:00:00Z',
+              at: '2026-11-01T00:00:00Z',
             },
           ],
         ]),

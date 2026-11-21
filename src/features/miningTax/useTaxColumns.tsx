@@ -1,4 +1,7 @@
 import { useMemo, type ReactNode } from 'react';
+import { utcDay } from '@/engine/localDay';
+import { lockDateFor } from '../../../functions/src/corpTaxBookCheckpoint';
+import { isLockedRow } from './rowMenu';
 import { useTranslation } from 'react-i18next';
 import {
   Caret,
@@ -51,7 +54,9 @@ export function statusLabel(t: (key: string) => string, status: MiningTaxRowStat
  */
 export const isSelectableRow = (dr: DisplayRow) =>
   !isBookRow(dr) &&
-  ((dr.status === 'outstanding' && dr.assignment !== null) || dr.status === 'unassigned');
+  ((dr.status === 'outstanding' && dr.assignment !== null) || dr.status === 'unassigned') &&
+  // A day before the lock date is read-only (decision 20261120-235011).
+  !isLockedRow(dr, lockDateFor(utcDay()));
 
 interface UseTaxColumnsInput {
   isPhone: boolean;

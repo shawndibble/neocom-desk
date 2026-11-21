@@ -8,17 +8,10 @@
  * Firestore here is the `lite` build (no listeners), so callers refetch after
  * a change.
  */
-import { UNKNOWN_ACTION } from '../../../../functions/src/callableManifest';
-import { callableErrorReason } from '@/lib/callableError';
-import {
-  LEGACY_NOTICE_MAIL_KIND,
-  LIVE_CHECK_ACTION_NAMES,
-} from '../../../../functions/src/corpTaxBookKinds';
+import { LIVE_CHECK_ACTION_NAMES } from '../../../../functions/src/corpTaxBookKinds';
 import {
   LATE_NOTICES,
   LATE_NOTICE_LINKS,
-  STATEMENTS as LEGACY_NOTICES,
-  STATEMENT_LINKS as LEGACY_NOTICE_LINKS,
   RUNNING_ACCOUNT_CHECKPOINTS,
 } from '../../../../functions/src/corpTaxBookVersionKeys';
 import { parseBookSettings, type BookSettings } from '@/engine/corpTaxBook/bookDocs';
@@ -43,11 +36,7 @@ import type { Declaration } from '@/engine/corpTaxBook/overdue';
 import type { Adjustment } from '@/engine/corpTaxBook/adjustments';
 import { readLateNotices } from '@/engine/corpTaxBook/lateNotices';
 import type { RecordedWriteOff } from '@/engine/corpTaxBook/payments';
-import {
-  legacyStatementDocOf,
-  NOTICE_ID_FIELD,
-  type LateNotice,
-} from '../../../../functions/src/corpTaxBookLateNotice';
+import { NOTICE_ID_FIELD, type LateNotice } from '../../../../functions/src/corpTaxBookLateNotice';
 import type { RunningAccountCheckpoint } from '../../../../functions/src/corpTaxBookCheckpoint';
 import type { ToleranceExemption } from '@/engine/corpTaxBook/toleranceExemptions';
 import type {
@@ -74,7 +63,7 @@ import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import type { FeederCoverage } from '@/engine/corpTaxBook/coverage';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import type { FeederViewSummary } from './feederViewClient';
-import { errorCode, openBook, type OpenBook } from './openBook';
+import { openBook, type OpenBook } from './openBook';
 import { callSignedIn } from '@/sync/signedInCallable';
 import { clearNotFound } from '@/sync/notFoundCache';
 import { ensureSignedIn } from '@/sync/syncAuth';
@@ -740,48 +729,17 @@ export async function deleteBook(characterId: number, corporationId: number): Pr
   await callSignedIn(characterId, 'deleteCorpTaxBookCallable', { corporationId, accessToken });
 }
 
-/** The action servers older than `issueLateNotice` take a late notice through (and audit it as). */
+/** The action an older server issued a late notice through: what older audit entries name. */
 export const LEGACY_ISSUE_ACTION = 'issueStatement';
 
-/**
- * The book's late notices: the `lateNotices` docs, and the legacy docs older servers wrote them
- * as, one per id. A book whose server has not written `lateNotices` yet reads the legacy docs only.
- */
+/** The book's late notices (`lateNotices`). */
 export async function readNotices(book: OpenBook): Promise<LateNotice[]> {
-  const [current, legacy] = await Promise.all([
-    book.written(LATE_NOTICES) ? book.list<unknown>(LATE_NOTICES).catch(() => []) : [],
-    readsLegacyNotices(book).then((reads) => (reads ? book.list<unknown>(LEGACY_NOTICES) : [])),
-  ]);
-  return readLateNotices(current, legacy);
+  return readLateNotices(
+    book.written(LATE_NOTICES) ? await book.list<unknown>(LATE_NOTICES).catch(() => []) : []
+  );
 }
 
-/**
- * Doc under `meta` the server writes once its backfill copied every legacy notice into
- * `lateNotices` (`BACKFILLED_DOC`, functions/src/corpTaxBookLateNoticeStore.ts).
- */
-const NOTICES_BACKFILLED_DOC = 'lateNoticesBackfilled';
-
-/** Whether the legacy notice docs still need reading: until the backfill marker exists, as the server reads them. */
-export async function readsLegacyNotices(book: OpenBook): Promise<boolean> {
-  if (!book.written(LATE_NOTICES)) return true;
-  try {
-    const marker = await book.part(
-      'meta',
-      async () =>
-        (
-          await getDoc(
-            doc(book.db, 'corps', String(book.corporationId), 'meta', NOTICES_BACKFILLED_DOC)
-          )
-        ).exists(),
-      'meta:noticesBackfilled'
-    );
-    return !marker;
-  } catch {
-    return true;
-  }
-}
-
-/** Each Miner's closed-through checkpoint; none until the server has written one. Best effort. */
+/** Each Miner's snapshot; none until the server has written one. Best effort. */
 export async function readCheckpoints(book: OpenBook): Promise<RunningAccountCheckpoint[]> {
   return book.written(RUNNING_ACCOUNT_CHECKPOINTS)
     ? book.list<RunningAccountCheckpoint>(RUNNING_ACCOUNT_CHECKPOINTS).catch(() => [])
@@ -796,118 +754,52 @@ export async function readVerifyTokens(
 ): Promise<Map<string, string>> {
   await ensureSignedIn(characterId);
   const db = getSyncFirestore(characterId);
-  const tokenIn = async (collectionName: string, field: string, id: string) => {
-    try {
-      const token = (await getDoc(doc(db, 'corps', String(corporationId), collectionName, id))).get(
-        field
-      );
-      return typeof token === 'string' && token !== '' ? token : undefined;
-    } catch (error) {
-      // A server whose rules predate the new collection refuses it: the legacy link still serves.
-      if (errorCode(error).endsWith('permission-denied')) return undefined;
-      throw error;
-    }
-  };
   const tokens = new Map<string, string>();
   await Promise.all(
     noticeIds.map(async (id) => {
-      const token =
-        (await tokenIn(LATE_NOTICE_LINKS, 'token', id)) ??
-        (await tokenIn(LEGACY_NOTICE_LINKS, 'verifyToken', id));
-      if (token) tokens.set(id, token);
+      const token = (
+        await getDoc(doc(db, 'corps', String(corporationId), LATE_NOTICE_LINKS, id))
+      ).get('token');
+      if (typeof token === 'string' && token !== '') tokens.set(id, token);
     })
   );
   return tokens;
 }
 
-/** Whether a refusal says the server does not know an action yet (Cloud Functions ship later). */
-/**
- * Whether the server does not know this edit action yet, so the legacy one is the way (M7): its
- * `unknown-action` reason, or, from a server before that reason, the router's "Unknown action"
- * or the edit parser's "action must be one of ..." refusal. Any other refusal of a known action
- * is the action's own answer, never a reason to fall back.
- */
-export const unknownAction = (error: unknown): boolean => {
-  const reason = callableErrorReason(error);
-  if (reason !== null) return reason === UNKNOWN_ACTION;
-  if (!errorCode(error).endsWith('invalid-argument')) return false;
-  const message = error instanceof Error ? error.message : '';
-  return /^(Unknown action|action must be one of )/.test(message);
-};
-
-/**
- * Issues a late notice (`issueLateNotice`). A server that does not know that action yet takes it
- * as the legacy `issueStatement` doc it has always stored notices as.
- */
+/** Issues a late notice (`issueLateNotice`). */
 export async function issueLateNotice(
   characterId: number,
   corporationId: number,
   notice: LateNotice
 ): Promise<void> {
-  try {
-    await editBook(characterId, corporationId, { action: 'issueLateNotice', notice });
-  } catch (error) {
-    if (!unknownAction(error)) throw error;
-    await editBook(characterId, corporationId, {
-      action: LEGACY_ISSUE_ACTION,
-      statement: legacyStatementDocOf(notice),
-    });
-  }
+  await editBook(characterId, corporationId, { action: 'issueLateNotice', notice });
 }
 
-/** Records a late notice's mail (`recordLateNoticeMail`), or the legacy `recordMail` on an older server. */
+/** Records a late notice's mail (`recordLateNoticeMail`). */
 export async function recordLateNoticeMail(
   characterId: number,
   corporationId: number,
   mail: { noticeId: string; mailId: number; kind: 'notice' | 'reminder' }
 ): Promise<void> {
   // Called from the mail queue, which may outlive the 10-minute role cache.
-  const fresh = { freshToken: true };
-  try {
-    await editBook(characterId, corporationId, { action: 'recordLateNoticeMail', ...mail }, fresh);
-  } catch (error) {
-    if (!unknownAction(error)) throw error;
-    // The legacy action names the notice by its old field, and its first mail as a Statement's.
-    const { noticeId, mailId, kind } = mail;
-    await editBook(
-      characterId,
-      corporationId,
-      {
-        action: 'recordMail',
-        [NOTICE_ID_FIELD]: noticeId,
-        mailId,
-        kind: kind === 'notice' ? LEGACY_NOTICE_MAIL_KIND : kind,
-      },
-      fresh
-    );
-  }
-}
-
-/** What `recordCheckpoints` did: the Miners it moved forward, and why it left the others. */
-export interface CheckpointsRecorded {
-  recorded: string[];
-  skipped: { minerId: string; reason: string }[];
+  await editBook(
+    characterId,
+    corporationId,
+    { action: 'recordLateNoticeMail', ...mail },
+    { freshToken: true }
+  );
 }
 
 /**
- * Records Running account checkpoints (`recordCheckpoints`). A server that does not know the
- * action yet keeps none, and the book reads the whole history as before: that is no failure.
+ * Records each Miner's snapshot for the lock date (`recordCheckpoints`). What the server skips
+ * (`exists`, `wrong-date`) is no failure: the account reads its whole history meanwhile.
  */
 export async function recordCheckpoints(
   characterId: number,
   corporationId: number,
   checkpoints: readonly RunningAccountCheckpoint[]
-): Promise<CheckpointsRecorded> {
-  try {
-    const out = await editBook<Partial<CheckpointsRecorded>>(characterId, corporationId, {
-      action: 'recordCheckpoints',
-      checkpoints,
-    });
-    return { recorded: out.recorded ?? [], skipped: out.skipped ?? [] };
-  } catch (error) {
-    if (!unknownAction(error)) throw error;
-    return { recorded: [], skipped: [] };
-  }
+): Promise<void> {
+  await editBook(characterId, corporationId, { action: 'recordCheckpoints', checkpoints });
 }
 
 /** Where a late notice's verify link points: the public page routes/CorpTaxBookVerify.tsx serves it. */

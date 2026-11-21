@@ -96,8 +96,7 @@ describe('repriceForOreForm', () => {
     await repriceForOreForm(CHAR, { statusOf: () => 'outstanding' });
     expect(await db.miningTaxAssignments.get('a1')).toMatchObject({
       estimatedValue: 500,
-      // The mark stays as the older client left it.
-      status: 'paid',
+      status: 'outstanding',
     });
   });
 

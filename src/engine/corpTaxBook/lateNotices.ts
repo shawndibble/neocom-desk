@@ -169,14 +169,7 @@ export function planNotices(
   return plans;
 }
 
-/**
- * The book's late notices from both places they are stored: `lateNotices` docs, and the legacy
- * docs older servers wrote them as, one per id, read as the server reads them. A `lateNotices`
- * doc wins, with the mail state of both copies.
- */
-export function readLateNotices(
-  noticeDocs: readonly unknown[],
-  legacyDocs: readonly unknown[]
-): LateNotice[] {
-  return mergeNoticeDocs(noticeDocs.filter(isRecord), legacyDocs.filter(isRecord));
+/** The book's late notices from their `lateNotices` docs, read as the server reads them. */
+export function readLateNotices(noticeDocs: readonly unknown[]): LateNotice[] {
+  return mergeNoticeDocs(noticeDocs.filter(isRecord));
 }

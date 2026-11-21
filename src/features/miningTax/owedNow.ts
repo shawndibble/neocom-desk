@@ -79,12 +79,7 @@ export interface OwedNow {
 export async function loadOwedBalances(
   snapshot: Pick<
     MoonMiningTaxSnapshot,
-    | 'rows'
-    | 'characters'
-    | 'payeesByCharacter'
-    | 'paymentLinks'
-    | 'payeeCheckpoints'
-    | 'billedElsewhere'
+    'rows' | 'characters' | 'payeesByCharacter' | 'paymentLinks' | 'billedElsewhere'
   >,
   now: number = Date.now()
 ): Promise<OwedNow> {
@@ -96,7 +91,6 @@ export async function loadOwedBalances(
     assignments: snapshot.rows.flatMap((row) => row.assignments),
     payees,
     links: snapshot.paymentLinks,
-    checkpoints: new Map(snapshot.payeeCheckpoints),
     billedElsewhere: snapshot.billedElsewhere,
   });
   const entries = withPaidStatus(snapshot.rows, accounts);
