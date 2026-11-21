@@ -158,6 +158,28 @@ async function namesFromEsi(
 /** A read the rules may not allow yet (a newer collection before its rules deploy): none, never a failed book. */
 const orNone = <T>(read: Promise<T>): Promise<T | null> => read.catch(() => null);
 
+/**
+ * Field on `corps/{id}`: moves whenever the server takes a reader off a book's copied records or
+ * backfills them (the server's `READERS_EPOCH_FIELD`, `corpTaxBookReaders.ts`, which imports the
+ * Admin SDK and so cannot be shared here). Absent means 0.
+ */
+const READERS_EPOCH_FIELD = 'readersEpoch';
+
+/** The book's readers epoch, 0 when the server never moved it. */
+export function readersEpochOf(bookDoc: Data | undefined): number {
+  const value = bookDoc?.[READERS_EPOCH_FIELD];
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+/**
+ * The cache slot of a part read by who may read it: one per readers epoch, so a copy read under
+ * another epoch is never served again (it may hold records this Character can no longer read, or
+ * lack ones it now can) and the part is read again whole.
+ */
+export function epochSlot(slot: string, readersEpoch: number): string {
+  return readersEpoch === 0 ? slot : `${slot}@${readersEpoch}`;
+}
+
 function mergeById<T extends { id: string }>(lists: readonly (readonly T[])[]): T[] {
   return [...new Map(lists.flat().map((x) => [x.id, x])).values()];
 }
@@ -360,6 +382,7 @@ async function readOneBook(
   const versions = bookVersionsOf(bookDoc);
   const written = (name: string) => versions === null || versions.collections[name] !== undefined;
   const bookCreatedAt = typeof bookDoc?.createdAt === 'number' ? bookDoc.createdAt : undefined;
+  const readersEpoch = readersEpochOf(bookDoc);
 
   const rows: ObservedRow[] = [];
   const paymentDocLists: Docs[] = [];
@@ -433,11 +456,12 @@ async function readOneBook(
         version: versions?.collections.observed,
         store,
         bookCreatedAt,
+        readersEpoch,
       }),
-      part('payments', 'uid'),
+      part('payments', 'uid', epochSlot('payments', readersEpoch)),
       // Every reader of the payment's Miner: an alt's donation for the group. A server that has
       // not stamped `uids` on payments yet refuses this read; the `uid` read above still stands.
-      orNone(part('payments', 'uids', 'payments:uids')),
+      orNone(part('payments', 'uids', epochSlot('payments:uids', readersEpoch))),
       part('dismissals', 'uids'),
       // Late notices: the `lateNotices` docs, and the `statements` mirror older servers wrote.
       part(LEGACY_NOTICES, 'uids'),

@@ -47,6 +47,35 @@ const read = () =>
     store: NOWHERE,
   });
 
+/** A store holding one copy, read under readers epoch 0 at the book's current stamp. */
+function holding(rows: string[]): PartStore {
+  return {
+    load: async () => ({
+      version: 'v1',
+      at: Date.now(),
+      data: {
+        rows: rows.map((id) => ({ id, row: { uid: 'char:1', characterId: 1 }, updatedMs: 1 })),
+        fullAt: Date.now(),
+        watermark: 1,
+        readersEpoch: 0,
+      },
+    }),
+    save: async () => {},
+    forget: async () => {},
+  };
+}
+
+const readUnder = (store: PartStore, key: string, readersEpoch: number) =>
+  readMemberObserved({
+    db: {} as Firestore,
+    key,
+    root: 'corps/98000001',
+    uid: 'char:1',
+    version: 'v1',
+    store,
+    readersEpoch,
+  });
+
 describe("readMemberObserved: the main's and the alt's mined rows", () => {
   it("reads the alt's rows by uids beside the own rows by uid, one row once", async () => {
     store.rows = [
@@ -63,5 +92,30 @@ describe("readMemberObserved: the main's and the alt's mined rows", () => {
     expect((await read()).map((r) => r.id)).toEqual(['own']);
     store.refuseUids = true;
     expect((await read()).map((r) => r.id)).toEqual(['own']);
+  });
+});
+
+describe('readMemberObserved: the readers epoch', () => {
+  it("reads again whole when it moved: an alt's backfilled older rows reach a main that had a copy", async () => {
+    store.refuseUids = false;
+    store.rows = [
+      { id: 'own', data: { uid: 'char:1', uids: ['char:1', 'char:2'], characterId: 1 } },
+      { id: 'alt-old', data: { uid: 'char:2', uids: ['char:2', 'char:1'], characterId: 2 } },
+    ];
+    // Same epoch, same stamp: the copy stands.
+    expect((await readUnder(holding(['own']), 'epoch-a', 0)).map((r) => r.id)).toEqual(['own']);
+    // The backfill moved the epoch: read again whole.
+    expect((await readUnder(holding(['own']), 'epoch-b', 1)).map((r) => r.id).sort()).toEqual([
+      'alt-old',
+      'own',
+    ]);
+  });
+
+  it("replaces the copy when it moved: a removed Character's device drops the group's rows", async () => {
+    store.refuseUids = false;
+    // Taken out of the group: the server no longer lists this Character on the group's rows.
+    store.rows = [{ id: 'own', data: { uid: 'char:1', uids: ['char:1'], characterId: 1 } }];
+    const kept = await readUnder(holding(['own', 'group-row']), 'epoch-c', 2);
+    expect(kept.map((r) => r.id)).toEqual(['own']);
   });
 });

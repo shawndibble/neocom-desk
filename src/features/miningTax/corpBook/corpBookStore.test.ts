@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { readBilledByPointer, readMemberPayments, refineryNamesOf } from './corpBookStore';
+import {
+  epochSlot,
+  readBilledByPointer,
+  readersEpochOf,
+  readMemberPayments,
+  refineryNamesOf,
+} from './corpBookStore';
 import {
   readAdjustment,
   readBookSettings,
@@ -160,6 +166,20 @@ describe('readPayment', () => {
 
   it('skips what is not a payment', () => {
     expect(readPayment('x', { amount: 'a' })).toBeNull();
+  });
+});
+
+describe('the readers epoch', () => {
+  it("reads the book doc's readersEpoch, absent as 0", () => {
+    expect(readersEpochOf({ readersEpoch: 3 })).toBe(3);
+    expect(readersEpochOf({})).toBe(0);
+    expect(readersEpochOf(undefined)).toBe(0);
+  });
+
+  it("keeps each epoch's payments copy apart, so a moved epoch reads them again whole", () => {
+    expect(epochSlot('payments', 0)).toBe('payments');
+    expect(epochSlot('payments', 2)).toBe('payments@2');
+    expect(epochSlot('payments:uids', 2)).not.toBe(epochSlot('payments:uids', 3));
   });
 });
 

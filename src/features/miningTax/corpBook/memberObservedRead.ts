@@ -35,6 +35,8 @@ interface Held {
   fullAt: number;
   watermark: number | null;
   bookCreatedAt?: number;
+  /** The book's `readersEpoch` the rows were read under (absent: 0). */
+  readersEpoch?: number;
 }
 
 function toStored(docs: { id: string; data: () => Data }[]): StoredObserved<Data>[] {
@@ -53,6 +55,7 @@ export async function readMemberObserved({
   store,
   now = Date.now(),
   bookCreatedAt,
+  readersEpoch = 0,
 }: {
   db: Firestore;
   key: string;
@@ -63,6 +66,12 @@ export async function readMemberObserved({
   store: PartStore;
   now?: number;
   bookCreatedAt?: number;
+  /**
+   * The book's `readersEpoch`: it moves when the server takes a reader off rows or backfills
+   * them. A copy read under another epoch may hold rows this Character can no longer read, or
+   * lack ones it now can, so it is read again whole and replaced.
+   */
+  readersEpoch?: number;
 }): Promise<{ id: string; data: Data }[]> {
   const out = (rows: StoredObserved<Data>[]) => rows.map((r) => ({ id: r.id, data: r.row }));
   const col = collection(db, root, 'observed');
@@ -91,7 +100,9 @@ export async function readMemberObserved({
 
   let copy = memoryCopy(key, MEMBER_OBSERVED_SLOT);
   if (!copy) copy = await store.load(MEMBER_OBSERVED_SLOT).catch(() => undefined);
-  const held = copy?.data as Held | undefined;
+  // A copy read under another readers epoch is no copy: read it all again.
+  const stored = copy?.data as Held | undefined;
+  const held = stored && (stored.readersEpoch ?? 0) === readersEpoch ? stored : undefined;
   const meta: ObservedCopyMeta | undefined =
     copy && held
       ? {
@@ -131,6 +142,7 @@ export async function readMemberObserved({
       fullAt: now,
       watermark: applyObservedDelta([], rows, null).watermark,
       ...(bookCreatedAt !== undefined ? { bookCreatedAt } : {}),
+      readersEpoch,
     };
   }
   if (version === undefined) {
