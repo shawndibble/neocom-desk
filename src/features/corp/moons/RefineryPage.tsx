@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTimeZone } from '@/lib/timeFormat';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -23,7 +24,7 @@ import { utcDay } from '@/engine/localDay';
 import { formatCount } from '@/lib/formatCount';
 import { setRefineryArchive, setRefineryLabel } from '../taxBook/feederClient';
 import { callableErrorText } from './feederErrorText';
-import { isk, shortDate, shortDateTime } from './moonsFormat';
+import { atDate, isk, shortDate, shortDateTime } from './moonsFormat';
 import { extractionPath, moonOwnerPath, refineriesTabPath } from './moonsPaths';
 import { Crumb } from './moonsParts';
 import { MoonRate } from './MoonRate';
@@ -46,6 +47,7 @@ const kp = (key: string) => `corpTaxBook.moons.refineryPage.${key}`;
  * an officer may archive by hand any time. Archive hides; it never deletes.
  */
 export function RefineryPage({ structureId }: { structureId: number }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { view, names, data, canEdit, characterId, corporationId, reload, refinery } = useBook();
@@ -226,7 +228,7 @@ export function RefineryPage({ structureId }: { structureId: number }) {
         <Panel>
           <p className="text-sm">
             {t(k('archivedBanner'), {
-              date: shortDate(new Date(row.archive.at).toISOString()),
+              date: atDate(row.archive.at, zone),
               name: names.character(row.archive.by),
               why: t(kl(`archived.why.${row.archive.reason}`)),
             })}
@@ -235,8 +237,12 @@ export function RefineryPage({ structureId }: { structureId: number }) {
       )}
       <StatChips>
         <StatChip label={t(kp('facts.extractions'))} value={formatCount(rows.length)} />
-        {nextPop && <StatChip label={t(kp('facts.nextPop'))} value={shortDateTime(nextPop)} />}
-        {lastPop && <StatChip label={t(kp('facts.lastPop'))} value={shortDateTime(lastPop)} />}
+        {nextPop && (
+          <StatChip label={t(kp('facts.nextPop'))} value={shortDateTime(nextPop, zone)} />
+        )}
+        {lastPop && (
+          <StatChip label={t(kp('facts.lastPop'))} value={shortDateTime(lastPop, zone)} />
+        )}
         <StatChip
           label={t(kp('facts.mined'))}
           value={minedTotal ? isk(minedTotal) : '—'}

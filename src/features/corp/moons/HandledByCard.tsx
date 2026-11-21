@@ -1,9 +1,10 @@
 import { useState } from 'react';
+import { useTimeZone } from '@/lib/timeFormat';
 import { useTranslation } from 'react-i18next';
 import { Button, Panel } from '@/components/ui';
 import type { FeederViewSummary } from '../taxBook/feederViewClient';
 import { isSettledAfterLeaving } from '../taxBook/feederViewModel';
-import { addDays, isk, shortDate } from './moonsFormat';
+import { addDays, atDate, isk, shortDate } from './moonsFormat';
 
 /**
  * "Previously handled by <accounting corporation>" on a moon owner's Moons page
@@ -21,12 +22,13 @@ export function HandledByCard({
   canDismiss: boolean;
   onDismiss: () => Promise<void>;
 }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const settled = isSettledAfterLeaving(summary);
   const before = summary.leftAt
-    ? shortDate(new Date(summary.leftAt).toISOString())
+    ? atDate(summary.leftAt, zone)
     : summary.coverageTo
       ? shortDate(addDays(summary.coverageTo, 1))
       : null;

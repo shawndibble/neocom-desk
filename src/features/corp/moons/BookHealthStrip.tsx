@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTimeZone } from '@/lib/timeFormat';
 import { useTranslation } from 'react-i18next';
 import { Button, InfoTooltip } from '@/components/ui';
 import { formatAge } from '@/lib/age';
@@ -13,6 +14,7 @@ import type { CorpTaxBookSync } from '../taxBook/useCorpTaxBook';
  * no figure.
  */
 export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const { view, names, canEdit, data, settings, verdict, edit } = useBook();
   const [openedAt] = useState(() => Date.now());
@@ -204,7 +206,7 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
       {held && (
         <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-text-dim" role="note">
           {t('corpTaxBook.moons.health.hiddenFromMembers', {
-            date: shortDateTime(new Date(seeFrom).toISOString()),
+            date: shortDateTime(new Date(seeFrom).toISOString(), zone),
           })}
           <InfoTooltip
             label={t('common.aboutLabel', {

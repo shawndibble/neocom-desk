@@ -10,7 +10,7 @@ import type { PillTone } from '@/components/ui/Pill';
 import type { ClaimCheck, ClaimedTransfer, Declaration } from '@/engine/corpTaxBook/overdue';
 import { CHECK_TONE } from '@/features/miningTax/corpBook/resolve/checkTone';
 import { DAY_MS } from '@/lib/age';
-import { shortDate, shortDateTime } from './moonsFormat';
+import { type ClockZone, atDate, shortDateTime } from './moonsFormat';
 
 type Transfer = NonNullable<Declaration['transfers']>[number];
 
@@ -106,7 +106,8 @@ export function ownStatus(
   t: TFunction,
   tr: ClaimedTransfer,
   journal: OwnJournal | undefined,
-  memberCharacterIds: readonly number[]
+  memberCharacterIds: readonly number[],
+  zone: ClockZone
 ): TransferStatus {
   if (journal === undefined)
     return { tone: 'neutral', label: t('corpTaxBook.moons.needs.paidToYou.reading') };
@@ -122,7 +123,7 @@ export function ownStatus(
       tone: 'success',
       label: t('corpTaxBook.moons.needs.paidToYou.found'),
       note: t('corpTaxBook.moons.needs.paidToYou.foundBody', {
-        time: shortDateTime(entry.date),
+        time: shortDateTime(entry.date, zone),
         ref: entry.id,
       }),
       own: { found: true },
@@ -134,7 +135,7 @@ export function ownStatus(
     note:
       oldest === undefined
         ? undefined
-        : t('corpTaxBook.moons.needs.paidToYou.notFoundBody', { date: shortDate(oldest) }),
+        : t('corpTaxBook.moons.needs.paidToYou.notFoundBody', { date: atDate(oldest, zone) }),
     own: { found: false },
   };
 }
@@ -146,10 +147,11 @@ export function transferStatus(
   check: ClaimCheck | undefined,
   memberCharacterIds: readonly number[],
   ownIds: ReadonlySet<number>,
-  journals: ReadonlyMap<number, OwnJournal>
+  journals: ReadonlyMap<number, OwnJournal>,
+  zone: ClockZone
 ): TransferStatus | undefined {
   const own = paidToOwn(tr, ownIds);
-  if (own !== undefined) return ownStatus(t, tr, journals.get(own), memberCharacterIds);
+  if (own !== undefined) return ownStatus(t, tr, journals.get(own), memberCharacterIds, zone);
   if (!check) return undefined;
   return {
     tone: CHECK_TONE[check.result],

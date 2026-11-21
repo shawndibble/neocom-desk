@@ -1,4 +1,5 @@
 import { formatCount } from '@/lib/formatCount';
+import { useTimeZone } from '@/lib/timeFormat';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -24,7 +25,7 @@ import { ReasonDialog } from './BookDialogs';
 import { FILTER_STATES } from './extractionStates';
 import { FullyMinedPanel } from './FullyMinedPanel';
 import { LinkSurveyDialog } from './LinkSurveyDialog';
-import { dateTimeUtc, extractionWindowLabel, isk, periodLabel } from './moonsFormat';
+import { dateTimeAt, extractionWindowLabel, isk, periodLabel } from './moonsFormat';
 import { extractionPath as extractionLink, minerPath } from './moonsPaths';
 import { caretColumn } from './caretColumn';
 import { Crumb, OreLine, StateWord } from './moonsParts';
@@ -36,6 +37,7 @@ import { BookSection, EntityHeader, UndockableChip } from './sectionParts';
  * who mined it (a row opens in place to that Miner's ore lines) and earlier cycles.
  */
 export function MoonDetail({ id }: { id: string }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const { view, names, edit, canEdit } = useBook();
   const phone = useIsPhone();
@@ -116,7 +118,7 @@ export function MoonDetail({ id }: { id: string }) {
     {
       id: 'fractured',
       header: t('corpTaxBook.moons.cols.fractured'),
-      render: (r) => (r.fracturedAt ? dateTimeUtc(r.fracturedAt) : '—'),
+      render: (r) => (r.fracturedAt ? dateTimeAt(r.fracturedAt, zone) : '—'),
       sortValue: (r) => r.fracturedAt,
       sortFirst: 'desc',
     },
@@ -220,7 +222,7 @@ export function MoonDetail({ id }: { id: string }) {
         facts={[
           {
             label: t('corpTaxBook.moons.moon.window'),
-            value: extractionWindowLabel(t, row),
+            value: extractionWindowLabel(t, row, zone),
           },
           {
             label: t('corpTaxBook.moons.moon.estValue'),
@@ -242,12 +244,12 @@ export function MoonDetail({ id }: { id: string }) {
               ]),
           {
             label: t('corpTaxBook.moons.moon.fractured'),
-            value: row.fracturedAt ? dateTimeUtc(row.fracturedAt) : '—',
+            value: row.fracturedAt ? dateTimeAt(row.fracturedAt, zone) : '—',
           },
           {
             label: t('corpTaxBook.moons.moon.fieldGone'),
             value: row.expiresAt
-              ? t('corpTaxBook.moons.moon.about', { at: dateTimeUtc(row.expiresAt) })
+              ? t('corpTaxBook.moons.moon.about', { at: dateTimeAt(row.expiresAt, zone) })
               : '—',
           },
         ]}

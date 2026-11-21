@@ -1,4 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
+import { useTimeZone } from '@/lib/timeFormat';
 import { useTranslation } from 'react-i18next';
 import {
   DataTable,
@@ -28,6 +29,7 @@ import { useRefineryList, type RefineryEntry } from './useRefineryList';
  * archived moon owner refinery leaves the table for the folded Archived section.
  */
 export function RefineriesTab() {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const { names, corporationId, canEdit, characterId, reload, data } = useBook();
   const navigate = useNavigate();
@@ -97,9 +99,9 @@ export function RefineriesTab() {
       header: t('corpTaxBook.moons.cols.pop'),
       render: (row) =>
         row.nextPopAt
-          ? t('corpTaxBook.moons.moons.nextPop', { date: shortDateTime(row.nextPopAt) })
+          ? t('corpTaxBook.moons.moons.nextPop', { date: shortDateTime(row.nextPopAt, zone) })
           : row.lastPopAt
-            ? t('corpTaxBook.moons.moons.lastPop', { date: shortDateTime(row.lastPopAt) })
+            ? t('corpTaxBook.moons.moons.lastPop', { date: shortDateTime(row.lastPopAt, zone) })
             : '—',
       sortValue: (row) => row.nextPopAt ?? row.lastPopAt,
     },

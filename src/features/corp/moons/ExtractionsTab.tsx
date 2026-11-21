@@ -1,4 +1,5 @@
 import { useCallback, useState, type ReactElement } from 'react';
+import { useTimeZone } from '@/lib/timeFormat';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -27,7 +28,7 @@ import {
   isPastExtraction,
 } from './extractionStates';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { isk, shortDate, shortDateTime } from './moonsFormat';
+import { atDate, isk, shortDateTime } from './moonsFormat';
 import { extractionPath, refineryPath, sharingMoonPath } from './moonsPaths';
 import { PopShareIcon } from './PopShareIcon';
 import { usePopShareMarks } from './usePopShareMarks';
@@ -35,6 +36,7 @@ import { BookSection, PlaceCell } from './sectionParts';
 import { MinedBar, OreLine, StateWord } from './moonsParts';
 
 export function ExtractionsTab() {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const { view, names, canEdit, edit, corporationId } = useBook();
   const [states, setStates] = useState<ReadonlySet<ExtractionState>>(DEFAULT_STATES);
@@ -134,9 +136,9 @@ export function ExtractionsTab() {
       header: t('corpTaxBook.moons.cols.when'),
       render: (row) => (
         <span className="block">
-          {shortDateTime(row.fracturedAt ?? row.chunkArrivalAt)}
+          {shortDateTime(row.fracturedAt ?? row.chunkArrivalAt, zone)}
           <span className="block text-xs text-text-dim">
-            {t('corpTaxBook.moons.startedOn', { date: shortDate(row.startedAt) })}
+            {t('corpTaxBook.moons.startedOn', { date: atDate(row.startedAt, zone) })}
           </span>
         </span>
       ),

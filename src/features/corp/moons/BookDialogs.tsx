@@ -4,6 +4,7 @@
  * through `useBook().edit` (`editBook`, role re-checked live on the server)
  * and shows the refusal's mapped reason when it refuses.
  */
+import { useTimeZone } from '@/lib/timeFormat';
 import { useId, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -22,7 +23,7 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { callableErrorReason } from '@/lib/callableError';
 import { callableErrorText } from './feederErrorText';
 import { useBook } from './useBook';
-import { dateWithYear, isk, newId, paidAtFor } from './moonsFormat';
+import { dateWithYear, isk, newId, paidAtFor, wallClock } from './moonsFormat';
 import { MinerPicker } from './MinerPicker';
 import { DonationPicker, PaymentOutcomePanel } from './RecordPaymentParts';
 import { DialogFooter } from '@/components/ui/DialogFooter';
@@ -401,6 +402,7 @@ export function MarkNotTaxDialog({
   payment: { id: string; amount: number; at: string; notTaxAmount?: number; minerId?: string };
   fromName: string;
 }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const { edit } = useBook();
   const [mode, setMode] = useState<'all' | 'part'>('part');
@@ -427,7 +429,7 @@ export function MarkNotTaxDialog({
         {t('corpTaxBook.moons.dialogs.notTax.intro', {
           name: fromName,
           amount: isk(payment.amount),
-          at: payment.at.slice(0, 16).replace('T', ' '),
+          at: wallClock(payment.at, zone).replace('T', ' '),
         })}
       </p>
       <div className="space-y-1">

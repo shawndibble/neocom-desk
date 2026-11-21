@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTimeZone } from '@/lib/timeFormat';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -17,7 +18,7 @@ import type { RefineryMiner } from '@/engine/corpTaxBook/refineryDocs';
 import { formatCount } from '@/lib/formatCount';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { FILTER_STATES } from './extractionStates';
-import { isk, shortDate, shortDateTime } from './moonsFormat';
+import { atDate, isk, shortDateTime } from './moonsFormat';
 import { minerPath } from './moonsPaths';
 import { OreLine, StateWord } from './moonsParts';
 import { useBook } from './useBook';
@@ -40,6 +41,7 @@ export function OrePanel({
   row: ExtractionRow;
   priceOf: (id: number) => number;
 }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const { names } = useBook();
   if (row.oreSource === 'unknown' || row.oreLines.length === 0) {
@@ -53,7 +55,7 @@ export function OrePanel({
           />
           <span>
             <span className="text-warning">{t(kp('ore.unknown'))}</span>{' '}
-            {t(kp('ore.unknownWhy'), { date: shortDate(row.startedAt) })}
+            {t(kp('ore.unknownWhy'), { date: atDate(row.startedAt, zone) })}
           </span>
         </p>
       </Panel>
@@ -108,7 +110,7 @@ export function OrePanel({
       title={t(kp('ore.title'))}
       meta={
         <span className="text-xs text-text-dim">
-          {t(kp(`ore.source.${row.oreSource}`))} · {shortDate(row.startedAt)}
+          {t(kp(`ore.source.${row.oreSource}`))} · {atDate(row.startedAt, zone)}
         </span>
       }
       wrapMeta
@@ -164,6 +166,7 @@ export function ExtractionsPanel({
   pulls: readonly PullRow[];
   onOpen: (id: string) => void;
 }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const [off, setOff] = useState<ReadonlySet<string>>(new Set());
   const shown = pulls.filter((p) => !off.has(p.row.state));
@@ -182,7 +185,7 @@ export function ExtractionsPanel({
         <span className="block">
           <StateWord state={row.state} />
           <span className="block text-xs text-text-dim">
-            {t('corpTaxBook.moons.startedOn', { date: shortDate(row.startedAt) })}
+            {t('corpTaxBook.moons.startedOn', { date: atDate(row.startedAt, zone) })}
           </span>
         </span>
       ),
@@ -191,7 +194,7 @@ export function ExtractionsPanel({
     {
       id: 'pop',
       header: t('corpTaxBook.moons.cols.pop'),
-      render: ({ row }) => shortDateTime(row.chunkArrivalAt),
+      render: ({ row }) => shortDateTime(row.chunkArrivalAt, zone),
       sortValue: ({ row }) => row.chunkArrivalAt,
     },
     {
@@ -200,7 +203,7 @@ export function ExtractionsPanel({
       render: ({ row }) =>
         row.fracturedAt ? (
           <span className="block">
-            {shortDateTime(row.fracturedAt)}
+            {shortDateTime(row.fracturedAt, zone)}
             {row.fracturedBy && (
               <span className="block text-xs text-text-dim">
                 {t(`corpTaxBook.moons.moons.by.${row.fracturedBy}`)}
@@ -314,6 +317,7 @@ export function MinersPanel({
   nameOf: (minerId: string) => string;
   nextPop: string | undefined;
 }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const phone = useIsPhone();
   const [open, setOpen] = useState(true);
@@ -322,7 +326,7 @@ export function MinersPanel({
       <Panel title={t(kp('miners.title'), { count: 0 })}>
         <p className="text-sm text-text-dim">
           {nextPop
-            ? t(kp('miners.noneYet'), { date: shortDateTime(nextPop) })
+            ? t(kp('miners.noneYet'), { date: shortDateTime(nextPop, zone) })
             : t(kp('miners.none'))}
         </p>
       </Panel>
@@ -355,7 +359,7 @@ export function MinersPanel({
       id: 'last',
       header: t(kp('miners.cols.last')),
       phoneHidden: true,
-      render: (m) => shortDate(m.lastPopAt),
+      render: (m) => atDate(m.lastPopAt, zone),
       sortValue: (m) => m.lastPopAt,
     },
     {

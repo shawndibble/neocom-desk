@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTimeZone } from '@/lib/timeFormat';
 import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import { beginFeederGrantLogin } from '@/app/loginFlow';
@@ -23,7 +24,7 @@ import { OwnerStaleBanner } from './OwnerStaleBanner';
 import { daysUntilOreLost, staleLedgerClock } from '@/engine/corpTaxBook/feederHealth';
 import { RefineryNamesBanner } from './RefineryNamesBanner';
 import { OwnerStatusStrip } from './OwnerStatusStrip';
-import { shortDate } from './moonsFormat';
+import { atDate } from './moonsFormat';
 import { enqueuePayeeChangeMail } from '@/features/corpTaxBook/mailQueue';
 import { canSendMail, queueOfficerMail } from '@/features/corpTaxBook/officerMail';
 import { useFeederView } from './useFeederView';
@@ -50,6 +51,7 @@ export function MoonOwnerPanel({
   canLeave: boolean;
   onLeft: () => void;
 }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const { load, reload } = useFeederView(characterId, corporationId);
   const grantedScopes = useGrantedScopes();
@@ -174,7 +176,7 @@ export function MoonOwnerPanel({
                 }
                 body={t('corpTaxBook.moons.ownerView.removal.body', {
                   name,
-                  date: shortDate(new Date(view.summary.removalStartedAt ?? 0).toISOString()),
+                  date: atDate(view.summary.removalStartedAt ?? 0, zone),
                 })}
                 actions={
                   canLeave ? (
