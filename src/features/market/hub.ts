@@ -34,7 +34,14 @@ import type { SettingState } from '@/lib/settingStore';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { resolveTradeHub, setCharacterHub, useHubByCharacter } from './characterHubs';
-import { dropPageHub, resolvePageHub, setPageHub, usePageHubs, type PageHubArea } from './pageHubs';
+import {
+  dropPageHub,
+  ownHub,
+  resolvePageHub,
+  setPageHub,
+  usePageHubs,
+  type PageHubArea,
+} from './pageHubs';
 
 export const MARKET_HUB_SETTING_KEY = 'sync.marketHub';
 
@@ -142,7 +149,7 @@ export function useHubFor(area: PageHubArea): {
   const hydrated = useHydratedStore(usePageHubs, useMarketHub);
   return {
     hubId: resolvePageHub(map, area, global),
-    scope: map[area] ? 'page' : 'global',
+    scope: ownHub(map, area) ? 'page' : 'global',
     hydrated,
   };
 }
@@ -155,7 +162,7 @@ export async function pickHubFor(area: PageHubArea, hub: TradeHub['id']): Promis
   // Skipped when settled: the press must apply in the same tick, as every setting store's does.
   if (!usePageHubs.getState().hydrated) await usePageHubs.getState().hydrate();
   const map = usePageHubs.getState().value;
-  if (map[area]) return usePageHubs.getState().setValue(setPageHub(map, area, hub));
+  if (ownHub(map, area)) return usePageHubs.getState().setValue(setPageHub(map, area, hub));
   return useMarketHub.getState().setValue(hub);
 }
 
@@ -169,7 +176,7 @@ export async function setHubScope(area: PageHubArea, scope: HubScope): Promise<v
   }
   const map = usePageHubs.getState().value;
   if (scope === 'global') return usePageHubs.getState().setValue(dropPageHub(map, area));
-  if (map[area]) return;
+  if (ownHub(map, area)) return;
   return usePageHubs.getState().setValue(setPageHub(map, area, useMarketHub.getState().value));
 }
 
@@ -181,6 +188,6 @@ export async function setHubScope(area: PageHubArea, scope: HubScope): Promise<v
 export async function setPageHubEntry(area: PageHubArea, hub: TradeHub['id']): Promise<void> {
   if (!usePageHubs.getState().hydrated) await usePageHubs.getState().hydrate();
   const map = usePageHubs.getState().value;
-  if (map[area] === hub) return;
+  if (ownHub(map, area) === hub) return;
   return usePageHubs.getState().setValue(setPageHub(map, area, hub));
 }

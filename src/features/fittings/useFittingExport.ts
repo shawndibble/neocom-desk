@@ -75,8 +75,8 @@ export function useFittingExport(fitting: Fitting, cloneImplants: readonly numbe
     try {
       const ownedPref = useAppraisalOwnedPref.getState();
       const [, appraisalHubId] = await Promise.all([ownedPref.hydrate(), loadHubFor('appraisal')]);
-      const marketHubStation = getTradeHub(appraisalHubId)?.stationId;
-      const stationId = useAppraisalOwnedPref.getState().value.stationId ?? marketHubStation;
+      const appraisalHubStation = getTradeHub(appraisalHubId)?.stationId;
+      const stationId = useAppraisalOwnedPref.getState().value.stationId ?? appraisalHubStation;
       if (stationId === undefined) {
         setNotice(t('fittings.export.copyFailed'));
         return;

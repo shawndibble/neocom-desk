@@ -24,6 +24,7 @@ import * as Icon from '@/components/ui/icons';
 import { useMarketHub } from '@/features/market/hub';
 import {
   dropPageHub,
+  ownHub,
   pageHubAreaName,
   PAGE_HUB_AREAS,
   setPageHub,
@@ -51,8 +52,10 @@ export function PageHubsField() {
   const removeRefs = useRef(new Map<PageHubArea, HTMLButtonElement>());
   const addRef = useRef<HTMLButtonElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
-  const set = PAGE_HUB_AREAS.filter((area) => map[area]);
-  const unset = PAGE_HUB_AREAS.filter((area) => !map[area]);
+  // Only areas with an entry this build reads are listed, so `own(area)` is set for each.
+  const own = (area: PageHubArea) => ownHub(map, area)!;
+  const set = PAGE_HUB_AREAS.filter((area) => ownHub(map, area));
+  const unset = PAGE_HUB_AREAS.filter((area) => !ownHub(map, area));
   const name = (area: PageHubArea) => pageHubAreaName(t, area);
   const add = (area: PageHubArea) => void write((m) => setPageHub(m, area, globalHub));
 
@@ -61,7 +64,7 @@ export function PageHubsField() {
       (key) => () => (key === undefined ? null : (removeRefs.current.get(key) ?? null))
     );
     focusAfterCommit(...near, () => addRef.current);
-    setRemoved({ area, hub: map[area]! });
+    setRemoved({ area, hub: own(area) });
     void write((m) => dropPageHub(m, area));
   }
 
@@ -80,7 +83,7 @@ export function PageHubsField() {
                   <div className="min-w-0 flex-1 [&_button]:w-full">
                     <HubSelect
                       size="sm"
-                      value={map[area]!}
+                      value={own(area)}
                       label={t('settings.pageHubFor', { page: name(area) })}
                       onChange={(hub) => void write((m) => setPageHub(m, area, hub))}
                     />

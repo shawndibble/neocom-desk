@@ -25,7 +25,7 @@ import { selectTriggerClassName, type ControlSize } from '@/components/ui/contro
 import { SelectChevron } from '@/components/ui/SelectChevron';
 import { cx } from '@/lib/cx';
 import { DEFAULT_TRADE_HUB, getTradeHub, TRADE_HUBS, type TradeHub } from '@/market/hubs';
-import { pickHubFor, setHubScope, useHubFor, type HubScope } from './hub';
+import { loadHubFor, pickHubFor, setHubScope, useHubFor, type HubScope } from './hub';
 import { pageHubAreaName, type PageHubArea } from './pageHubs';
 
 export function HubMenu({
@@ -39,7 +39,7 @@ export function HubMenu({
   area: PageHubArea;
   /** The hub on screen when it is not the stored one (a Market link naming a hub); ticked instead. */
   shownHubId?: TradeHub['id'];
-  /** After a hub pick is written: for a page that also points its URL at the hub. */
+  /** After a hub pick (or a scope switch) is written, with the hub now in use: for a page that also points its URL at it. */
   onPicked?: (hubId: TradeHub['id']) => void;
   triggerClassName?: string;
   /** The trigger's accessible name; it starts with the visible hub (WCAG 2.5.3). */
@@ -58,7 +58,12 @@ export function HubMenu({
         <DropdownMenuRadioGroup
           value={scope}
           aria-label={t('pageHubs.scopeLabel')}
-          onValueChange={(next) => void setHubScope(area, next as HubScope)}
+          onValueChange={(next) => {
+            // After the switch the page may use another hub (Global's): report it like a pick.
+            void setHubScope(area, next as HubScope)
+              .then(() => loadHubFor(area))
+              .then((hub) => onPicked?.(hub));
+          }}
         >
           {/* preventDefault keeps the menu open; Radix still fires onValueChange for a radio item. */}
           <DropdownMenuRadioItem value="global" onSelect={(e) => e.preventDefault()}>

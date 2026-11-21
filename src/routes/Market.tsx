@@ -35,7 +35,7 @@ import { industryTabHref } from '@/features/industry/industryTabs';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useOnline } from '@/stores/network';
 import { orderBookFailedOffline } from '@/features/market/orderBookView';
-import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
+import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { pickHubFor, useHubFor } from '@/features/market/hub';
 import { HubField } from '@/features/market/HubMenu';
 import { DEFAULT_JUMP_RANGE } from '@/engine/route/jumpRange';
@@ -336,8 +336,24 @@ export function Market() {
   // trip to the Browser tab, and so the header's refresh button can drive it.
   const { setup: refiningSetup, hydrated: refiningHydrated } = useRefiningSetup();
   // Appraisal prices at its own page hub, apart from the hub the Browser is on.
+  // On its tab `?hub=` overrides it for the visit, as `?percent=` does the Price
+  // Percent (a Shared Appraisal's "Open Neocom Desk"); a pick drops the override.
   const { hubId: appraisalHubId } = useHubFor('appraisal');
-  const appraisalHub = getTradeHub(appraisalHubId) ?? DEFAULT_TRADE_HUB;
+  const appraisalHubOverride =
+    tab === 'appraisal' ? getTradeHub(searchParams.get('hub') as TradeHub['id']) : undefined;
+  const appraisalHub = appraisalHubOverride ?? getTradeHub(appraisalHubId) ?? DEFAULT_TRADE_HUB;
+  function handleAppraisalHubChange(id: TradeHub['id']) {
+    void pickHubFor('appraisal', id);
+    if (appraisalHubOverride === undefined) return;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('hub');
+        return next;
+      },
+      { replace: true }
+    );
+  }
   const appraisal = useAppraisal(
     appraisalHub,
     pricePercent,
@@ -713,7 +729,7 @@ export function Market() {
                 pricePercent={pricePercent}
                 onPricePercentChange={handlePricePercentChange}
                 hub={appraisalHub}
-                onHubChange={(id) => void pickHubFor('appraisal', id)}
+                onHubChange={handleAppraisalHubChange}
                 standing={tradeHubStanding(tradeHubStandings, appraisalHub.id)}
                 characterId={activeCharacterId}
                 defaultCompareExpanded={expandCompareOnAppraisal}

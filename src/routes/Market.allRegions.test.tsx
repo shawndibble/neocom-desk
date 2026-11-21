@@ -12,7 +12,7 @@ import { setupServer } from 'msw/node';
 import '@/i18n';
 import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
-import { useMarketHub } from '@/features/market/hub';
+import { useDefaultMarketHub, useMarketHub } from '@/features/market/hub';
 import { usePageHubs } from '@/features/market/pageHubs';
 import { useLocationMode, DEFAULT_LOCATION_MODE } from '@/features/market/locationMode';
 import {
@@ -169,6 +169,7 @@ beforeEach(async () => {
   await db.quickbars.clear();
   await db.characters.put({ characterId: 1, name: 'Pilot One', ownerHash: 'oh', addedAt: 0 });
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
+  useDefaultMarketHub.setState({ value: 'jita', hydrated: false });
   useMarketHub.setState({ value: 'jita', hydrated: false });
   usePageHubs.setState({ value: {}, hydrated: false });
   useLocationMode.setState({ value: DEFAULT_LOCATION_MODE, hydrated: false });

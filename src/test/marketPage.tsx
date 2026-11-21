@@ -7,7 +7,7 @@ import '@/i18n';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
-import { useMarketHub } from '@/features/market/hub';
+import { useDefaultMarketHub, useMarketHub } from '@/features/market/hub';
 import { usePageHubs } from '@/features/market/pageHubs';
 import { useLocationMode, DEFAULT_LOCATION_MODE } from '@/features/market/locationMode';
 import {
@@ -246,6 +246,7 @@ async function resetMarketSession(): Promise<void> {
   await db.characters.put({ characterId: 1, name: 'Pilot One', ownerHash: 'oh', addedAt: 0 });
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
+  useDefaultMarketHub.setState({ value: 'jita', hydrated: false });
   useMarketHub.setState({ value: 'jita', hydrated: false });
   usePageHubs.setState({ value: {}, hydrated: false });
   useLocationMode.setState({ value: DEFAULT_LOCATION_MODE, hydrated: false });

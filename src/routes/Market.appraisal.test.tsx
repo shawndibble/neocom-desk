@@ -121,6 +121,15 @@ describe('Market Appraisal tab navigation', () => {
     expect(screen.getByText('Nothing appraised yet')).toBeInTheDocument();
   });
 
+  it("a link's ?hub= prices this visit's Appraisal there, never writing a hub", async () => {
+    renderAt('/market/appraisal?hub=amarr');
+    expect(await screen.findByRole('button', { name: /, Trade Hub$/ })).toHaveTextContent('Amarr');
+    // Once page hubs are read (adoption runs after that), nothing was written.
+    await waitFor(() => expect(usePageHubs.getState().hydrated).toBe(true));
+    expect(usePageHubs.getState().value).toEqual({});
+    expect(useMarketHub.getState().value).toBe('jita');
+  });
+
   it('with its own entry, an Appraisal pick moves only the Appraisal hub', async () => {
     await usePageHubs.getState().setValue({ appraisal: 'jita' });
     renderAt('/market/appraisal');

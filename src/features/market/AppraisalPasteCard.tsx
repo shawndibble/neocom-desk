@@ -21,7 +21,7 @@ import { GrantNote } from '@/app/GrantNote';
 import { formatAge } from '@/lib/age';
 import { MD_UP_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 import { countPasteLines, pasteBoxRows } from '@/engine/market/appraisalPaste';
-import { TRADE_HUBS } from '@/market/hubs';
+import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { HubField } from './HubMenu';
 import { ASSETS_ENDPOINTS, OWNED_EVERYWHERE, type AppraisalOwnedPref } from './appraisalOwnedPref';
 import { recentLabel, type RecentAppraisal } from './appraisalRecent';
@@ -33,6 +33,10 @@ import type { AppraisalController } from './useAppraisal';
 const CLEAR_RECENT = 'clear';
 
 interface AppraisalPasteCardProps {
+  /** The hub the figures are quoted at, when a link overrides the Appraisal hub for this visit. */
+  shownHubId?: TradeHub['id'];
+  /** After the hub field writes a pick: drops that override. */
+  onHubPicked?: (id: TradeHub['id']) => void;
   controller: AppraisalController;
   characterId: number | null;
   percentText: string;
@@ -55,6 +59,8 @@ interface AppraisalPasteCardProps {
 
 export function AppraisalPasteCard({
   controller,
+  shownHubId,
+  onHubPicked,
   characterId,
   percentText,
   onPercentChange,
@@ -165,6 +171,8 @@ export function AppraisalPasteCard({
           />
           <HubField
             area="appraisal"
+            shownHubId={shownHubId}
+            onPicked={onHubPicked}
             size="sm"
             label={t('market.tradeHub')}
             className="min-w-0 flex-1"

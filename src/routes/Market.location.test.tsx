@@ -390,6 +390,23 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
     expect(screen.getByRole('button', { name: /, Trade Hub$/ })).toHaveTextContent('Amarr');
   });
 
+  it('a linked hub is adopted once: back to Global then sticks under the same link', async () => {
+    window.history.pushState({}, '', '/market?hub=amarr');
+    const user = userEvent.setup({ delay: null });
+    renderMarketRoute();
+    await screen.findByRole('button', SHIPS_GROUP);
+    await waitFor(() => expect(usePageHubs.getState().value.market).toBe('amarr'));
+    expect(useMarketHub.getState().value).toBe('jita');
+
+    await user.click(screen.getByRole('button', { name: /, Trade Hub$/ }));
+    await user.click(screen.getByRole('menuitemradio', { name: 'Global' }));
+
+    await waitFor(() => expect(usePageHubs.getState().value.market).toBeUndefined());
+    // The page follows Global into its URL rather than re-adopting the old link.
+    await waitFor(() => expect(window.location.search).toContain('hub=jita'));
+    expect(usePageHubs.getState().value.market).toBeUndefined();
+  });
+
   it("folds this device's old Market Browser hub into the Market and Appraisal page hubs, once", async () => {
     await db.settings.put({ key: 'marketBrowserHub', value: 'hek' });
     renderMarketRoute();
@@ -399,7 +416,9 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
     await waitFor(() =>
       expect(usePageHubs.getState().value).toEqual({ market: 'hek', appraisal: 'hek' })
     );
-    expect(await db.settings.get('marketBrowserHub')).toBeUndefined();
+    // The device row stays for an older build on this device; a marker records the fold.
+    expect((await db.settings.get('marketBrowserHub'))?.value).toBe('hek');
+    expect(await db.settings.get('marketBrowserHubMigrated')).toBeDefined();
   });
 
   it('browser back and forward move through previous selections', async () => {

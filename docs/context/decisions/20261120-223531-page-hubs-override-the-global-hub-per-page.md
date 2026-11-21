@@ -65,13 +65,21 @@ _Recorded 2026-11-20. Issue #6523._
   Market Browser hub.** It was device-local so browsing a hub on a phone never moved every other
   page's hub. A Market entry gives the same separation, and it syncs (the owner agreed).
   - **Migration:** on a device's first Market visit, its old `marketBrowserHub` becomes the Market
-    and Appraisal entries, where those have none yet. Then the device copy is deleted. A device that
-    never opened the Market starts on Global, which is what it seeded from before.
+    and Appraisal entries, where those have none yet, after the first sync pull, so the map it
+    writes back holds other devices' entries. The device row is kept, so an older build on that
+    device still reads it, and a local marker records the fold. A device that never opened the
+    Market starts on Global, which is what it seeded from before.
+  - **The stored map keeps every entry, even one this build cannot read** (`parsePageHubs`,
+    `ownHub`). A newer build's area or value survives an older build's edit, which writes the map
+    back whole.
   - **Market** covers the Browser, an item's Market section (`useSavedOrderBookLocation`), the
     Stock tab, the Compare drawer's own-hub mark, and price alerts: the form, the poller and the
     Overview card. A good price sends the pilot to the market to buy.
   - **Links:** a Market link naming a hub (`?hub=`) is adopted as the Market's own entry
-    (`setPageHubEntry`), never the Global hub. Opening someone's link moves no other page.
+    (`setPageHubEntry`), never the Global hub, and only once per new link. Opening someone's link
+    moves no other page, and switching the Market back to Global sticks.
+  - **Appraisal links:** on the Appraisal tab, `?hub=` (a Shared Appraisal's "Open Neocom Desk")
+    prices that visit only, as `?percent=` does.
   - **Appraisal** prices at its own hub, apart from the Browser's. Its picker writes that hub, not
     the URL. The Fittings export's Minus owned station falls back to it.
   - **Hauling** keeps its From/To. The default pair still comes from the Global hub.

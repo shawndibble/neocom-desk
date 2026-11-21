@@ -49,27 +49,35 @@ const AREA_NAME_KEYS = {
 export function pageHubAreaName(t: TFunction, area: PageHubArea): string {
   return t(AREA_NAME_KEYS[area]);
 }
-export type PageHubMap = Readonly<Partial<Record<PageHubArea, HubId>>>;
+/**
+ * The stored map, as stored: `area -> value`. Read an area through `ownHub`,
+ * never by indexing, since a key or value this build does not know (a newer
+ * build's area, a future value such as Closest) is kept as it came.
+ */
+export type PageHubMap = Readonly<Record<string, string>>;
 
 export const PAGE_HUBS_SETTING_KEY = 'sync.pageHubs';
 
-function isPageHubArea(key: string): key is PageHubArea {
-  return (PAGE_HUB_AREAS as readonly string[]).includes(key);
-}
-
 /**
- * A stored map. Pulled from other devices, maybe newer builds, so an unknown
- * area or hub is dropped on its own: that page falls back to Global here.
+ * A stored map. Pulled from other devices, maybe newer builds, so an entry
+ * this build cannot use is **kept**, not dropped: the map is written back
+ * whole on the next edit, and dropping it would erase a newer build's entry
+ * on every device. Only a non-string value is discarded. `ownHub` decides what
+ * an entry means here; one it cannot read leaves that page on Global.
  */
 export function parsePageHubs(raw: unknown): PageHubMap | null {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
-  const out: Partial<Record<PageHubArea, HubId>> = {};
-  for (const [area, hub] of Object.entries(raw)) {
-    if (!isPageHubArea(area)) continue;
-    if (typeof hub !== 'string' || !getTradeHub(hub as HubId)) continue;
-    out[area] = hub as HubId;
+  const out: Record<string, string> = {};
+  for (const [area, value] of Object.entries(raw)) {
+    if (typeof value === 'string') out[area] = value;
   }
   return out;
+}
+
+/** `area`'s own hub, when its entry names a Trade Hub this build knows; else `undefined` (Global). */
+export function ownHub(map: PageHubMap, area: PageHubArea): HubId | undefined {
+  const value = map[area];
+  return value !== undefined && getTradeHub(value as HubId) ? (value as HubId) : undefined;
 }
 
 export const usePageHubs = createSyncedSetting<PageHubMap>({
@@ -79,7 +87,7 @@ export const usePageHubs = createSyncedSetting<PageHubMap>({
 });
 
 export function resolvePageHub(map: PageHubMap, area: PageHubArea, globalHub: HubId): HubId {
-  return map[area] ?? globalHub;
+  return ownHub(map, area) ?? globalHub;
 }
 
 export function setPageHub(map: PageHubMap, area: PageHubArea, hub: HubId): PageHubMap {
@@ -98,5 +106,5 @@ export function dropPageHub(map: PageHubMap, area: PageHubArea): PageHubMap {
  * are read): for non-React code that only differs from today with an entry.
  */
 export function pageHubEntry(area: PageHubArea): HubId | undefined {
-  return usePageHubs.getState().value[area];
+  return ownHub(usePageHubs.getState().value, area);
 }

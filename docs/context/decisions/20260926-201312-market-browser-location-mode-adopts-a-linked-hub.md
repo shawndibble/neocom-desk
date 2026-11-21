@@ -1,5 +1,7 @@
 # Scope decisions — Market Browser Location Mode adopts a linked hub or region (issue #2042)
 
+> **Amended (2026-11-20, issue #6523):** a linked hub is now adopted once, as the Market page hub's own entry, never the Global hub; see `20261120-223531-page-hubs-override-the-global-hub-per-page.md`.
+
 _Recorded 2026-09-26 · issue #2042._
 
 - **The Market Browser is the one exception to "nothing read from the URL is

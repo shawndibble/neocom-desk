@@ -3,12 +3,22 @@ import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useHubByCharacter } from './characterHubs';
 import { pickHubFor, setHubScope, tradeHubIdFor, useDefaultMarketHub, useMarketHub } from './hub';
-import { dropPageHub, parsePageHubs, resolvePageHub, setPageHub, usePageHubs } from './pageHubs';
+import {
+  dropPageHub,
+  ownHub,
+  parsePageHubs,
+  resolvePageHub,
+  setPageHub,
+  usePageHubs,
+} from './pageHubs';
 
 describe('parsePageHubs', () => {
-  it('keeps known areas at known hubs and drops the rest one by one', () => {
-    expect(parsePageHubs({ contracts: 'amarr', moonbase: 'jita' })).toEqual({ contracts: 'amarr' });
-    expect(parsePageHubs({ contracts: 'nowhere' })).toEqual({});
+  it('keeps every entry as stored, even one this build cannot read, so writing it back loses nothing', () => {
+    expect(parsePageHubs({ contracts: 'amarr', moonbase: 'jita', market: 'closest' })).toEqual({
+      contracts: 'amarr',
+      moonbase: 'jita',
+      market: 'closest',
+    });
     expect(parsePageHubs({ contracts: 3 })).toEqual({});
   });
 
@@ -16,6 +26,17 @@ describe('parsePageHubs', () => {
     expect(parsePageHubs('jita')).toBeNull();
     expect(parsePageHubs(null)).toBeNull();
     expect(parsePageHubs(['jita'])).toBeNull();
+  });
+
+  it('reads an entry only when it names a known hub; another value leaves the page on Global', () => {
+    expect(ownHub({ contracts: 'amarr' }, 'contracts')).toBe('amarr');
+    expect(ownHub({ contracts: 'closest' }, 'contracts')).toBeUndefined();
+    expect(resolvePageHub({ contracts: 'nowhere' }, 'contracts', 'jita')).toBe('jita');
+    // An edit keeps what it cannot read.
+    expect(setPageHub({ moonbase: 'jita' }, 'contracts', 'hek')).toEqual({
+      moonbase: 'jita',
+      contracts: 'hek',
+    });
   });
 });
 
