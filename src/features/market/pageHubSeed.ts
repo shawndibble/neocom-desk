@@ -20,7 +20,7 @@ import { isSyncConfigured } from '@/app/syncStatus';
 import { FIRST_PULL_WAIT_MS } from '@/features/overview/widgets/firstRun';
 import type { TradeHub } from '@/market/hubs';
 import { subscribeSyncStatus } from '@/sync/status';
-import { ownHub, setPageHub, usePageHubs, type PageHubArea } from './pageHubs';
+import { ownChoice, setPageHub, usePageHubs, type PageHubArea } from './pageHubs';
 
 /** Resolves once a sync pass has run (or failed), or after the first-pull wait, whichever is first. */
 function afterFirstPull(): Promise<void> {
@@ -61,7 +61,7 @@ export async function seedPageHubsOnce(
     await Promise.all([afterFirstPull(), usePageHubs.getState().hydrate()]);
     const before = usePageHubs.getState().value;
     let next = before;
-    for (const area of areas) if (!ownHub(next, area)) next = setPageHub(next, area, hub);
+    for (const area of areas) if (!ownChoice(next, area)) next = setPageHub(next, area, hub);
     if (next !== before) await usePageHubs.getState().setValue(next);
   }
   await db.settings.put({ key: markerKey, value: true });

@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { useHubByCharacter } from './characterHubs';
-import { useDefaultMarketHub, useMarketHub } from './hub';
-import { HubMenu } from './HubMenu';
+import { resetHubStores } from '@/test/hubStores';
+import { useMarketHub } from './hub';
+import { HubField, HubMenu } from './HubMenu';
 import { usePageHubs } from './pageHubs';
+import { useClosestHubs } from './closestHub';
 
 async function reset(pageHubs: Record<string, string>) {
   await db.settings.clear();
@@ -15,11 +16,7 @@ async function reset(pageHubs: Record<string, string>) {
     { key: 'sync.marketHub', value: 'jita' },
     { key: 'sync.pageHubs', value: pageHubs },
   ]);
-  useDefaultMarketHub.setState({ value: 'jita', hydrated: false });
-  useHubByCharacter.setState({ value: {}, hydrated: false });
-  useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
-  useMarketHub.setState({ value: 'jita', hydrated: false });
-  usePageHubs.setState({ value: {}, hydrated: false });
+  resetHubStores();
   await Promise.all([usePageHubs.getState().hydrate(), useMarketHub.getState().hydrate()]);
 }
 
@@ -61,5 +58,24 @@ describe('HubMenu', () => {
     await userEvent.click(screen.getByRole('menuitemradio', { name: 'Global' }));
     await waitFor(() => expect(usePageHubs.getState().value).toEqual({}));
     expect(screen.getByRole('menuitemradio', { name: 'Jita 4-4' })).toBeChecked();
+  });
+
+  it('lists Closest first; on a page it shows the hub it found, and with no location the Global hub', async () => {
+    await reset({ contracts: 'closest' });
+    useActiveCharacter.setState({ activeCharacterId: 91, hydrated: true });
+    useClosestHubs.setState({ byCharacter: { '91': { hubId: 'amarr', at: Date.now() } } });
+    const { unmount } = render(<HubField area="contracts" label="Priced at" />);
+    const field = await screen.findByRole('button', { name: 'Closest (Amarr), Priced at' });
+    await userEvent.click(field);
+    const hubs = within(screen.getByRole('group', { name: 'Trade Hub' })).getAllByRole(
+      'menuitemradio'
+    );
+    expect(hubs[0]).toHaveAccessibleName('Closest hub');
+    expect(hubs[0]).toBeChecked();
+    unmount();
+
+    useClosestHubs.setState({ byCharacter: { '91': { hubId: null, at: Date.now() } } });
+    render(<HubField area="contracts" label="Priced at" />);
+    expect(await screen.findByRole('button', { name: 'Jita, Priced at' })).toBeInTheDocument();
   });
 });

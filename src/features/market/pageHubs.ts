@@ -82,9 +82,16 @@ export function parsePageHubs(raw: unknown): PageHubMap | null {
   return out;
 }
 
-/** `area`'s own hub, when its entry names a Trade Hub this build knows; else `undefined` (Global). */
-export function ownHub(map: PageHubMap, area: PageHubArea): HubId | undefined {
+/** A page entry's value besides a hub: the hub nearest the active Character (`closestHub.ts`). */
+export const CLOSEST = 'closest';
+
+/** What a page (or the Global hub) is set to: a Trade Hub, or Closest. */
+export type HubChoice = HubId | typeof CLOSEST;
+
+/** `area`'s own entry, when it names a Trade Hub this build knows or Closest; else `undefined` (Global). */
+export function ownChoice(map: PageHubMap, area: PageHubArea): HubChoice | undefined {
   const value = map[area];
+  if (value === CLOSEST) return CLOSEST;
   return value !== undefined && getTradeHub(value as HubId) ? (value as HubId) : undefined;
 }
 
@@ -94,11 +101,7 @@ export const usePageHubs = createSyncedSetting<PageHubMap>({
   parse: parsePageHubs,
 });
 
-export function resolvePageHub(map: PageHubMap, area: PageHubArea, globalHub: HubId): HubId {
-  return ownHub(map, area) ?? globalHub;
-}
-
-export function setPageHub(map: PageHubMap, area: PageHubArea, hub: HubId): PageHubMap {
+export function setPageHub(map: PageHubMap, area: PageHubArea, hub: HubChoice): PageHubMap {
   return { ...map, [area]: hub };
 }
 
@@ -113,6 +116,6 @@ export function dropPageHub(map: PageHubMap, area: PageHubArea): PageHubMap {
  * `area`'s own entry right now, `undefined` on Global (or before page hubs
  * are read): for non-React code that only differs from today with an entry.
  */
-export function pageHubEntry(area: PageHubArea): HubId | undefined {
-  return ownHub(usePageHubs.getState().value, area);
+export function pageHubEntry(area: PageHubArea): HubChoice | undefined {
+  return ownChoice(usePageHubs.getState().value, area);
 }

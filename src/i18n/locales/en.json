@@ -11325,6 +11325,8 @@
   },
   "pageHubs": {
     "global": "Global",
+    "closest": "Closest hub",
+    "closestFound": "Closest ({{hub}})",
     "fieldLabel": "{{hub}}, {{label}}",
     "scopeLabel": "Hub used here",
     "hubLabel": "Trade Hub",
@@ -14956,7 +14958,7 @@
           "settings": "These preferences. Every other preference stays on this device:",
           "settingsDetail": {
             "notifications": "Notifications: your notification preferences.",
-            "defaults": "Defaults: trade hub (the default, the trade hub of each character, and the trade hub of each page you set one for), industry facility, reaction facility, assumed ME/TE, PI expiring-soon window, corp dark threshold, default characters shown.",
+            "defaults": "Defaults: trade hub (the default, the trade hub of each character, and the trade hub of each page you set one for, and whether to use the closest trade hub), industry facility, reaction facility, assumed ME/TE, PI expiring-soon window, corp dark threshold, default characters shown.",
             "industry": "Industry: build groups and BPC Sourcing's hide auctions / hide PLEX.",
             "market": "Market: appraisal price %, ISK-per-LP value, courier collateral warning, item contract flag multiple, and the structure broker fees you typed.",
             "skills": "Skills: Alpha/Omega per character, the target skill plan, SP Extraction monitoring and its threshold, and which characters you marked as SP Farm. Clones: the names you gave your jump clones.",

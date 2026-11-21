@@ -26,7 +26,7 @@ import { SelectChevron } from '@/components/ui/SelectChevron';
 import { cx } from '@/lib/cx';
 import { DEFAULT_TRADE_HUB, getTradeHub, TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { loadHubFor, pickHubFor, setHubScope, useHubFor, type HubScope } from './hub';
-import { pageHubAreaName, type PageHubArea } from './pageHubs';
+import { CLOSEST, pageHubAreaName, type HubChoice, type PageHubArea } from './pageHubs';
 
 /** An option a page lists after the hubs, in the same radio group (PI's corp buyback). */
 export interface HubMenuOption {
@@ -66,7 +66,9 @@ export function HubMenu({
   children: ReactNode;
 }) {
   const { t } = useTranslation();
-  const { hubId, scope } = useHubFor(area);
+  const { hubId, choice, scope } = useHubFor(area);
+  // A hub on screen other than the stored one (a link's) is ticked; the stored one ticks what it is set to.
+  const ticked = shownHubId !== undefined && shownHubId !== hubId ? shownHubId : choice;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger id={triggerId} className={triggerClassName} aria-label={triggerLabel}>
@@ -93,15 +95,23 @@ export function HubMenu({
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
         <DropdownMenuRadioGroup
-          value={selectedOption ?? shownHubId ?? hubId}
+          value={selectedOption ?? ticked}
           aria-label={t('pageHubs.hubLabel')}
           onValueChange={(next) => {
             const option = extraOptions.find((each) => each.value === next);
             if (option) return option.onSelect();
-            void pickHubFor(area, next as TradeHub['id']);
+            if (next === CLOSEST) {
+              // Report the hub Closest finds, once it is written and worked out.
+              void pickHubFor(area, CLOSEST)
+                .then(() => loadHubFor(area))
+                .then((hub) => onPicked?.(hub, 'hub'));
+              return;
+            }
+            void pickHubFor(area, next as HubChoice);
             onPicked?.(next as TradeHub['id'], 'hub');
           }}
         >
+          <DropdownMenuRadioItem value={CLOSEST}>{t('pageHubs.closest')}</DropdownMenuRadioItem>
           {TRADE_HUBS.map((hub) => (
             <DropdownMenuRadioItem key={hub.id} value={hub.id}>
               {hub.stationLabel}
@@ -148,10 +158,13 @@ export function HubField({
   className?: string;
 }) {
   const { t } = useTranslation();
-  const { hubId } = useHubFor(area);
+  const { hubId, closestFound } = useHubFor(area);
   const hub = getTradeHub(shownHubId ?? hubId) ?? DEFAULT_TRADE_HUB;
   const shown =
-    extraOptions?.find((option) => option.value === selectedOption)?.label ?? hub.systemName;
+    extraOptions?.find((option) => option.value === selectedOption)?.label ??
+    (closestFound && (shownHubId === undefined || shownHubId === hubId)
+      ? t('pageHubs.closestFound', { hub: hub.systemName })
+      : hub.systemName);
   return (
     <HubMenu
       area={area}

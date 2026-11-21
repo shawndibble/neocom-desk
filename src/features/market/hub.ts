@@ -35,13 +35,15 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { resolveTradeHub, setCharacterHub, useHubByCharacter } from './characterHubs';
 import {
+  CLOSEST,
   dropPageHub,
-  ownHub,
-  resolvePageHub,
+  ownChoice,
   setPageHub,
   usePageHubs,
+  type HubChoice,
   type PageHubArea,
 } from './pageHubs';
+import { closestHubKnown, loadClosestHub, useClosestHub } from './closestHub';
 
 export const MARKET_HUB_SETTING_KEY = 'sync.marketHub';
 
@@ -63,8 +65,41 @@ export const useDefaultMarketHub = createSyncedSetting<TradeHub['id']>({
 });
 
 /**
+ * The Global hub set to Closest (issue #6523). Its own key, so `sync.marketHub`
+ * always holds a hub an older build can read; that hub (or the Character's
+ * own) is also what Closest falls back to with no location.
+ */
+export const MARKET_HUB_CLOSEST_SETTING_KEY = 'sync.marketHubClosest';
+
+export const useGlobalClosest = createSyncedSetting<boolean>({
+  key: MARKET_HUB_CLOSEST_SETTING_KEY,
+  defaultValue: false,
+  parse: (raw) => (typeof raw === 'boolean' ? raw : null),
+});
+
+/** What a page uses, in order: its own entry, else Closest when the Global hub is set to it, else the Global hub. */
+function choiceFor(
+  map: Parameters<typeof ownChoice>[0],
+  area: PageHubArea | undefined,
+  globalClosest: boolean
+): HubChoice | undefined {
+  return (area ? ownChoice(map, area) : undefined) ?? (globalClosest ? CLOSEST : undefined);
+}
+
+/** A choice made a hub: Closest is the found hub, else `fallback` (no location); no choice is `fallback`. */
+function resolveChoice(
+  choice: HubChoice | undefined,
+  closest: TradeHub['id'] | null,
+  fallback: TradeHub['id']
+): TradeHub['id'] {
+  if (choice === CLOSEST) return closest ?? fallback;
+  return choice ?? fallback;
+}
+
+/**
  * The hub `characterId` trades at (the account default when none), read from
  * Dexie-backed stores; with `area`, that page's own hub when it has one.
+ * Closest is worked out for `characterId`'s location.
  */
 export async function tradeHubIdFor(
   characterId: number | null,
@@ -73,6 +108,7 @@ export async function tradeHubIdFor(
   await Promise.all([
     useDefaultMarketHub.getState().hydrate(),
     useHubByCharacter.getState().hydrate(),
+    useGlobalClosest.getState().hydrate(),
     area ? usePageHubs.getState().hydrate() : undefined,
   ]);
   const global = resolveTradeHub(
@@ -80,13 +116,24 @@ export async function tradeHubIdFor(
     characterId,
     useDefaultMarketHub.getState().value
   );
-  return area ? resolvePageHub(usePageHubs.getState().value, area, global) : global;
+  const choice = choiceFor(usePageHubs.getState().value, area, useGlobalClosest.getState().value);
+  const closest =
+    choice === CLOSEST && characterId !== null ? await loadClosestHub(characterId) : null;
+  return resolveChoice(choice, closest, global);
 }
 
 /** `useHubFor(area)` outside React: the area's entry, else the active Character's Global hub. */
 export async function loadHubFor(area: PageHubArea): Promise<TradeHub['id']> {
-  await Promise.all([usePageHubs.getState().hydrate(), useMarketHub.getState().hydrate()]);
-  return resolvePageHub(usePageHubs.getState().value, area, useMarketHub.getState().value);
+  await Promise.all([
+    usePageHubs.getState().hydrate(),
+    useMarketHub.getState().hydrate(),
+    useGlobalClosest.getState().hydrate(),
+  ]);
+  const choice = choiceFor(usePageHubs.getState().value, area, useGlobalClosest.getState().value);
+  const characterId = useActiveCharacter.getState().activeCharacterId;
+  const closest =
+    choice === CLOSEST && characterId !== null ? await loadClosestHub(characterId) : null;
+  return resolveChoice(choice, closest, useMarketHub.getState().value);
 }
 
 function inForce(): Pick<SettingState<TradeHub['id']>, 'value' | 'hydrated'> {
@@ -138,46 +185,99 @@ for (const source of [useDefaultMarketHub, useHubByCharacter, useActiveCharacter
 /** Where a page's hub comes from: the Global hub, or the page's own entry. */
 export type HubScope = 'global' | 'page';
 
-/** The hub `area` prices at and where it comes from, re-rendering when either store changes. */
-export function useHubFor(area: PageHubArea): {
+/**
+ * `loadHubFor(area)` from the settled stores, at once: Closest is the last
+ * answer worked out (the Global hub before there is one). For code that
+ * cannot wait, after `loadHubFor` has run once.
+ */
+export function hubNowFor(area: PageHubArea): TradeHub['id'] {
+  const choice = choiceFor(usePageHubs.getState().value, area, useGlobalClosest.getState().value);
+  const characterId = useActiveCharacter.getState().activeCharacterId;
+  const closest = choice === CLOSEST && characterId !== null ? closestHubKnown(characterId) : null;
+  return resolveChoice(choice, closest, useMarketHub.getState().value);
+}
+
+export interface PageHub {
+  /** The hub `area` prices at: Closest resolved, or the Global hub while it cannot be. */
   hubId: TradeHub['id'];
+  /** What the page is set to: a hub, or Closest (its own entry, else the Global hub's). */
+  choice: HubChoice;
+  /** Closest is chosen and found from the Character's location; false while it falls back to Global. */
+  closestFound: boolean;
   scope: HubScope;
   hydrated: boolean;
-} {
+}
+
+/** The hub `area` prices at and where it comes from, re-rendering when any store it reads changes. */
+export function useHubFor(area: PageHubArea): PageHub {
   const map = usePageHubs((s) => s.value);
   const global = useMarketHub((s) => s.value);
-  const hydrated = useHydratedStore(usePageHubs, useMarketHub);
+  const globalClosest = useGlobalClosest((s) => s.value);
+  const characterId = useActiveCharacter((s) => s.activeCharacterId);
+  const storesHydrated = useHydratedStore(usePageHubs, useMarketHub, useGlobalClosest);
+  const choice = choiceFor(map, area, globalClosest);
+  const closest = useClosestHub(characterId, storesHydrated && choice === CLOSEST);
   return {
-    hubId: resolvePageHub(map, area, global),
-    scope: ownHub(map, area) ? 'page' : 'global',
-    hydrated,
+    hubId: resolveChoice(choice, closest.hubId, global),
+    choice: choice ?? global,
+    closestFound: choice === CLOSEST && closest.hubId !== null,
+    scope: ownChoice(map, area) ? 'page' : 'global',
+    hydrated: storesHydrated && closest.loaded,
   };
 }
 
-/**
- * A hub picked on `area`'s picker: its own entry when it has one, else the
- * Global hub, which moves every page without an entry.
- */
-export async function pickHubFor(area: PageHubArea, hub: TradeHub['id']): Promise<void> {
-  // Skipped when settled: the press must apply in the same tick, as every setting store's does.
-  if (!usePageHubs.getState().hydrated) await usePageHubs.getState().hydrate();
-  const map = usePageHubs.getState().value;
-  if (ownHub(map, area)) return usePageHubs.getState().setValue(setPageHub(map, area, hub));
-  return useMarketHub.getState().setValue(hub);
+/** Writes the Global hub: Closest sets its flag (the stored hub stays the fallback); a hub clears it. */
+async function setGlobalChoice(choice: HubChoice): Promise<void> {
+  const closest = useGlobalClosest.getState();
+  if (choice === CLOSEST) return closest.setValue(true);
+  if (closest.value) await closest.setValue(false);
+  return useMarketHub.getState().setValue(choice);
 }
 
 /**
- * Switches `area` between Global and its own hub. Its own starts at the hub it
- * uses now, so nothing re-prices; back to Global drops the entry.
+ * A hub (or Closest) picked on `area`'s picker: its own entry when it has one,
+ * else the Global hub, which moves every page without an entry.
+ */
+export async function pickHubFor(area: PageHubArea, choice: HubChoice): Promise<void> {
+  // Skipped when settled: the press must apply in the same tick, as every setting store's does.
+  if (!usePageHubs.getState().hydrated || !useGlobalClosest.getState().hydrated) {
+    await Promise.all([usePageHubs.getState().hydrate(), useGlobalClosest.getState().hydrate()]);
+  }
+  const map = usePageHubs.getState().value;
+  if (ownChoice(map, area)) return usePageHubs.getState().setValue(setPageHub(map, area, choice));
+  return setGlobalChoice(choice);
+}
+
+/** The Global hub the Settings control picks: as a page on Global picks it. */
+export async function pickGlobalHub(choice: HubChoice): Promise<void> {
+  if (!useGlobalClosest.getState().hydrated) await useGlobalClosest.getState().hydrate();
+  return setGlobalChoice(choice);
+}
+
+/**
+ * Switches `area` between Global and its own hub. Its own starts at what it
+ * uses now (Closest when the Global hub is), so nothing re-prices; back to
+ * Global drops the entry.
  */
 export async function setHubScope(area: PageHubArea, scope: HubScope): Promise<void> {
-  if (!usePageHubs.getState().hydrated || !useMarketHub.getState().hydrated) {
-    await Promise.all([usePageHubs.getState().hydrate(), useMarketHub.getState().hydrate()]);
+  if (
+    !usePageHubs.getState().hydrated ||
+    !useMarketHub.getState().hydrated ||
+    !useGlobalClosest.getState().hydrated
+  ) {
+    await Promise.all([
+      usePageHubs.getState().hydrate(),
+      useMarketHub.getState().hydrate(),
+      useGlobalClosest.getState().hydrate(),
+    ]);
   }
   const map = usePageHubs.getState().value;
   if (scope === 'global') return usePageHubs.getState().setValue(dropPageHub(map, area));
-  if (ownHub(map, area)) return;
-  return usePageHubs.getState().setValue(setPageHub(map, area, useMarketHub.getState().value));
+  if (ownChoice(map, area)) return;
+  const start: HubChoice = useGlobalClosest.getState().value
+    ? CLOSEST
+    : useMarketHub.getState().value;
+  return usePageHubs.getState().setValue(setPageHub(map, area, start));
 }
 
 /**
@@ -188,6 +288,6 @@ export async function setHubScope(area: PageHubArea, scope: HubScope): Promise<v
 export async function setPageHubEntry(area: PageHubArea, hub: TradeHub['id']): Promise<void> {
   if (!usePageHubs.getState().hydrated) await usePageHubs.getState().hydrate();
   const map = usePageHubs.getState().value;
-  if (ownHub(map, area) === hub) return;
+  if (ownChoice(map, area) === hub) return;
   return usePageHubs.getState().setValue(setPageHub(map, area, hub));
 }

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
 import { seedCharacter } from '@/test/seed';
 import { useHubByCharacter, type HubId } from '@/features/market/characterHubs';
-import { useDefaultMarketHub } from '@/features/market/hub';
+import { useDefaultMarketHub, useGlobalClosest } from '@/features/market/hub';
 import { TradeHubField } from './TradeHubField';
 
 async function setup(map: Record<number, HubId>, ids: number[]) {
@@ -14,6 +14,7 @@ async function setup(map: Record<number, HubId>, ids: number[]) {
   for (const id of ids) await seedCharacter(id, `Pilot ${id}`);
   useDefaultMarketHub.setState({ value: 'jita', hydrated: true });
   useHubByCharacter.setState({ value: map, hydrated: true });
+  useGlobalClosest.setState({ value: false, hydrated: true });
   render(<TradeHubField />);
 }
 
@@ -51,5 +52,19 @@ describe('TradeHubField', () => {
     ).toHaveTextContent(/Hek/);
     await user.click(screen.getByRole('button', { name: 'Apply default to all' }));
     expect(useHubByCharacter.getState().value).toEqual({ 1: 'jita', 2: 'jita' });
+  });
+
+  it('offers Closest hub, kept apart from the stored hub, and a hub pick ends it', async () => {
+    const user = userEvent.setup();
+    await setup({}, [1]);
+    await user.click(await screen.findByRole('combobox', { name: 'Trade Hub' }));
+    await user.click(await screen.findByRole('option', { name: 'Closest hub' }));
+    await waitFor(() => expect(useGlobalClosest.getState().value).toBe(true));
+    expect(useDefaultMarketHub.getState().value).toBe('jita');
+    expect(screen.getByRole('combobox', { name: 'Trade Hub' })).toHaveTextContent('Closest hub');
+
+    await user.click(screen.getByRole('combobox', { name: 'Trade Hub' }));
+    await user.click(await screen.findByRole('option', { name: /^Amarr/ }));
+    await waitFor(() => expect(useGlobalClosest.getState().value).toBe(false));
   });
 });
