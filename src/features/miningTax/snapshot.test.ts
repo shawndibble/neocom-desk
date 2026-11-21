@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import { loadMoonMiningTaxSnapshot } from './snapshot';
 import { computePayeeBalances } from './balances';
-import { PayeeAccounts } from './payeeAccounts';
+import { PayeeRunningAccounts } from './payeeRunningAccounts';
 import { flatten } from './groupRows';
 import { seedCharacter } from '@/test/seed';
 
@@ -194,7 +194,7 @@ describe('loadMoonMiningTaxSnapshot', () => {
 
       const { rows, paymentLinks } = await loadMoonMiningTaxSnapshot();
       const shown = flatten(rows);
-      const accounts = PayeeAccounts.build({
+      const accounts = PayeeRunningAccounts.build({
         assignments: shown.flatMap((dr) => (dr.assignment ? [dr.assignment] : [])),
         payees: [payee],
         links: paymentLinks,

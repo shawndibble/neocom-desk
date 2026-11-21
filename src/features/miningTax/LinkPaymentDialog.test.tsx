@@ -5,7 +5,7 @@ import '@/i18n';
 import { LinkPaymentDialog } from './LinkPaymentDialog';
 import type { LedgerActionResult } from './ledgerActions';
 import type { LinkSuggestion } from './paymentLinks';
-import { PayeeAccount } from '@/engine/miningTax/payeeAccount';
+import { PayeeRunningAccount } from '@/engine/miningTax/payeeRunningAccount';
 
 const settle = vi.fn<(...args: unknown[]) => Promise<LedgerActionResult>>();
 vi.mock('./ledgerActions', () => ({
@@ -39,7 +39,7 @@ const IN_KIND = {
 } as unknown as LinkSuggestion;
 
 /** What the Payee owes: one 250,000 ISK day. */
-const ACCOUNT = PayeeAccount.build({
+const ACCOUNT = PayeeRunningAccount.build({
   payeeId: 'p1',
   charges: [{ id: 'a1', date: '2026-09-09', tax: 250_000 }],
   links: [],

@@ -19,7 +19,7 @@ import {
   paymentLinkKey,
   type PayeePaymentLink,
   type StoredPayeeCheckpoint,
-} from '@/engine/miningTax/payeeAccount';
+} from '@/engine/miningTax/payeeRunningAccount';
 import { scheduleSync } from '@/sync';
 import {
   appendTombstones,
@@ -30,7 +30,7 @@ import {
 import { isSyncConfigured } from '@/app/syncStatus';
 import { MINING_TAX_PAYMENT_LINKS } from '@/sync/syncedCollections';
 import { unreadLegacyLinks } from './legacyPaidMarks';
-import { linkOf, PayeeAccounts } from './payeeAccounts';
+import { linkOf, PayeeRunningAccounts } from './payeeRunningAccounts';
 
 /** Every stored link, every Character's: a merged Payee's money can come from any of them. */
 export function loadPaymentLinks(): Promise<MiningTaxPaymentLinkRecord[]> {
@@ -193,7 +193,7 @@ export async function saveBilledElsewhere(
 }
 
 /** What every account build reads besides the Assignments and Payees. */
-export interface AccountInputs {
+export interface RunningAccountInputs {
   links: PayeePaymentLink[];
   checkpoints: Map<string, StoredPayeeCheckpoint>;
   billedElsewhere: Map<string, number>;
@@ -201,7 +201,7 @@ export interface AccountInputs {
   historyGen: number;
 }
 
-export async function loadAccountInputs(): Promise<AccountInputs> {
+export async function loadRunningAccountInputs(): Promise<RunningAccountInputs> {
   const [links, checkpoints, billedElsewhere, historyGen] = await Promise.all([
     loadPaymentLinks(),
     loadPayeeCheckpoints(),
@@ -212,16 +212,16 @@ export async function loadAccountInputs(): Promise<AccountInputs> {
 }
 
 /**
- * Every personal Payee's account as Dexie holds it now: the one build (`PayeeAccounts.build`)
+ * Every personal Payee's account as Dexie holds it now: the one build (`PayeeRunningAccounts.build`)
  * every reader shares, the load path's safeguards, the journal and the Tax tab alike.
  */
-export async function loadPayeeAccounts(): Promise<PayeeAccounts> {
+export async function loadPayeeRunningAccounts(): Promise<PayeeRunningAccounts> {
   const [assignments, payees, inputs] = await Promise.all([
     db.miningTaxAssignments.toArray(),
     db.payees.toArray(),
-    loadAccountInputs(),
+    loadRunningAccountInputs(),
   ]);
-  return PayeeAccounts.build({ assignments, payees, ...inputs });
+  return PayeeRunningAccounts.build({ assignments, payees, ...inputs });
 }
 
 /** The device's checkpoints, by a merged Payee's primary id. */
@@ -261,7 +261,7 @@ export interface LinkedDay {
  * read off each Payee's account, so the journal says what the ledger does.
  */
 export async function loadLinkedDays(): Promise<Map<string, LinkedDay[]>> {
-  const accounts = await loadPayeeAccounts();
+  const accounts = await loadPayeeRunningAccounts();
   const out = new Map<string, LinkedDay[]>();
   for (const [, account] of accounts.entries()) {
     for (const applied of account.account.applications.payments) {

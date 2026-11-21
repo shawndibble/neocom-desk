@@ -1,7 +1,7 @@
 /**
- * Every personal Payee's Running account (`PayeeAccount`), one per merged Payee (#6308: a pilot's
+ * Every personal Payee's Running account (`PayeeRunningAccount`), one per merged Payee (#6308: a pilot's
  * alts each hold a record of the same recipient, and the group is one Payee). One build, the same
- * inputs everywhere (`loadAccountInputs`): row statuses, owed figures, safeguards and the journal
+ * inputs everywhere (`loadRunningAccountInputs`): row statuses, owed figures, safeguards and the journal
  * read the same accounts. What is paid is read here and nowhere else: an Assignment is Paid while its Payee's account has paid its day, oldest
  * first (decision 20261120-235011). Assignments no longer carry a paid mark of their own; a stored
  * `status: 'paid'` from an older client is read as billed, its money having been read into a link
@@ -16,10 +16,10 @@ import type {
   PayeeRecord,
 } from '@/db';
 import {
-  PayeeAccount,
+  PayeeRunningAccount,
   type PayeePaymentLink,
   type StoredPayeeCheckpoint,
-} from '@/engine/miningTax/payeeAccount';
+} from '@/engine/miningTax/payeeRunningAccount';
 import { groupPayees } from './payeeGroups';
 import type { LinkablePayee } from './paymentLinks';
 import type { MoonMiningTaxRow } from './snapshot';
@@ -35,7 +35,7 @@ export function isBilled(a: Pick<MiningTaxAssignmentRecord, 'payeeId' | 'status'
   return a.payeeId !== undefined && a.status !== 'dismissed';
 }
 
-export interface PayeeAccountsInput {
+export interface PayeeRunningAccountsInput {
   assignments: readonly BilledAssignment[];
   payees: readonly PayeeRecord[];
   links: readonly PayeePaymentLink[];
@@ -50,14 +50,14 @@ export interface PayeeAccountsInput {
 }
 
 /** Every personal Payee's account, looked up by any of a merged Payee's record ids. */
-export class PayeeAccounts {
+export class PayeeRunningAccounts {
   private constructor(
-    private readonly byPrimary: ReadonlyMap<string, PayeeAccount>,
+    private readonly byPrimary: ReadonlyMap<string, PayeeRunningAccount>,
     /** Each record's id to its merged Payee's primary id. */
     private readonly primaryOf: ReadonlyMap<string, string>
   ) {}
 
-  static build(input: PayeeAccountsInput): PayeeAccounts {
+  static build(input: PayeeRunningAccountsInput): PayeeRunningAccounts {
     const taxOf = (a: BilledAssignment) =>
       a.taxOwed * (1 - Math.min(1, input.billedElsewhere?.get(a.id) ?? 0));
     const primaryOf = new Map<string, string>();
@@ -76,12 +76,12 @@ export class PayeeAccounts {
       const key = keyOf(l.payeeId);
       links.set(key, [...(links.get(key) ?? []), l]);
     }
-    const byPrimary = new Map<string, PayeeAccount>();
+    const byPrimary = new Map<string, PayeeRunningAccount>();
     for (const key of new Set([...charges.keys(), ...links.keys()])) {
       const stored = input.checkpoints?.get(key);
       byPrimary.set(
         key,
-        PayeeAccount.build({
+        PayeeRunningAccount.build({
           payeeId: key,
           charges: charges.get(key) ?? [],
           links: links.get(key) ?? [],
@@ -89,7 +89,7 @@ export class PayeeAccounts {
         })
       );
     }
-    return new PayeeAccounts(byPrimary, primaryOf);
+    return new PayeeRunningAccounts(byPrimary, primaryOf);
   }
 
   /** A merged Payee's primary id, for any of its records' ids. */
@@ -98,12 +98,12 @@ export class PayeeAccounts {
   }
 
   /** The account of the Payee a record id belongs to; undefined while nothing bills or pays it. */
-  of(payeeId: string): PayeeAccount | undefined {
+  of(payeeId: string): PayeeRunningAccount | undefined {
     return this.byPrimary.get(this.primaryIdOf(payeeId));
   }
 
   /** Every account, by its merged Payee's primary id. */
-  entries(): IterableIterator<[string, PayeeAccount]> {
+  entries(): IterableIterator<[string, PayeeRunningAccount]> {
     return this.byPrimary.entries();
   }
 
@@ -176,11 +176,11 @@ export function linkOf(record: MiningTaxPaymentLinkRecord): PayeePaymentLink {
 
 /**
  * The ledger's entries as the tab reads them: each Assignment viewed through its Payee's account
- * (`PayeeAccounts.view`). The Tax tab and the Overview read the same.
+ * (`PayeeRunningAccounts.view`). The Tax tab and the Overview read the same.
  */
 export function withPaidStatus(
   entries: readonly MoonMiningTaxRow[],
-  accounts: PayeeAccounts
+  accounts: PayeeRunningAccounts
 ): MoonMiningTaxRow[] {
   return entries.map((row) => {
     const assignments = row.assignments.map((a) => accounts.view(a));

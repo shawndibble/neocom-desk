@@ -13,7 +13,7 @@ import type {
 import type { TradeHub } from '@/market/hubs';
 import type { OrderProblemSample } from '@/engine/market/orderProblemHistory';
 import type { MiningLedgerRow } from '@/engine/miningTax/types';
-import type { PayeePaymentLink } from '@/engine/miningTax/payeeAccount';
+import type { PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
 import type {
   Contract,
   ContractItem,
@@ -783,7 +783,7 @@ export type MiningTaxPaymentMethod = 'donation' | 'contract' | 'other';
 
 /**
  * A Made Payment linked to one Payee (decision 20261120-235011, "linking money under one payment
- * model"): it pays that Payee's oldest unpaid days (`engine/miningTax/payeeAccount.ts`), never
+ * model"): it pays that Payee's oldest unpaid days (`engine/miningTax/payeeRunningAccount.ts`), never
  * chosen entries. One record per payment, keyed by what was paid (`paymentLinkKey`), so a payment
  * can pay one Payee only. Stored under the Payee's Character and synced as Editable Data, in its
  * own collection: an older client, which knows no such field on a Payee or an Assignment, can

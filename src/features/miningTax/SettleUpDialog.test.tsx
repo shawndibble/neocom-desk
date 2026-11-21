@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { MiningTaxAssignmentRecord } from '@/db';
-import { PayeeAccount } from '@/engine/miningTax/payeeAccount';
+import { PayeeRunningAccount } from '@/engine/miningTax/payeeRunningAccount';
 import type { LedgerActionResult } from './ledgerActions';
 import { SettleUpDialog, type SettlePayment, type SettleUpRow } from './SettleUpDialog';
 
@@ -42,7 +42,7 @@ const ROWS = [
 ];
 
 const accountOf = (rows: readonly SettleUpRow[]) =>
-  PayeeAccount.build({
+  PayeeRunningAccount.build({
     payeeId: 'p-jita',
     charges: rows.map((r) => ({
       id: r.assignment.id,

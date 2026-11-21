@@ -1,4 +1,4 @@
-import type { PayeePaymentLink } from '@/engine/miningTax/payeeAccount';
+import type { PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
 import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
 
 /**

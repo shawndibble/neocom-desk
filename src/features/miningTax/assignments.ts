@@ -102,7 +102,7 @@ function entryAssignments(
 
 async function claimNewOre(
   record: MiningTaxAssignmentRecord,
-  /** What is paid, off the Payees' accounts (`PayeeAccounts.isPaid`): never a stored mark. */
+  /** What is paid, off the Payees' accounts (`PayeeRunningAccounts.isPaid`): never a stored mark. */
   isPaid: (a: MiningTaxAssignmentRecord) => boolean,
   entryOreLines?: readonly MiningTaxOreLine[],
   takesGrowth = false
@@ -151,7 +151,7 @@ export interface AssignInput {
    */
   takesGrowth?: boolean;
   /**
-   * Whether an Assignment's day is paid on its Payee's account (`PayeeAccounts.isPaid`), read
+   * Whether an Assignment's day is paid on its Payee's account (`PayeeRunningAccounts.isPaid`), read
    * before the write: a paid growth collector hands the flag to the new Assignment.
    */
   isPaid: (a: MiningTaxAssignmentRecord) => boolean;

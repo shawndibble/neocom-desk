@@ -391,7 +391,7 @@ export interface PersonalAccountStatus {
 }
 
 /** One of the member's Miners in a book: its Running account, in-flight donations included. */
-export interface BookMinerAccount {
+export interface BookMinerRunningAccount {
   minerId: string;
   account: MinerRunningAccount;
   /** What the account bills: each Billable mined line and Adjustment, oldest first. */
@@ -431,7 +431,7 @@ export interface BookSummary {
   /** Paid through a day, or what the member owes now. */
   account: PersonalAccountStatus;
   /** Each of the member's Miners' account in this book. */
-  miners: BookMinerAccount[];
+  miners: BookMinerRunningAccount[];
   /** The member's Late notices whose days are still unpaid, oldest first. */
   notices: MemberNoticeView[];
   /** Donations the book synced past without crediting (`UNCREDITED_AFTER_DAYS`): not counted as paid. */
@@ -1253,7 +1253,7 @@ export function overlayCorpBooks(input: {
   }
 
   const summaries: BookSummary[] = prepared.map((p) => {
-    const miners = minerAccountsOf(p);
+    const miners = minerRunningAccountsOf(p);
     const closedThrough = p.billableThrough;
     return {
       corporationId: p.book.corporationId,
@@ -1262,7 +1262,7 @@ export function overlayCorpBooks(input: {
       ...(p.book.lastSyncedAt !== undefined ? { lastSyncedAt: p.book.lastSyncedAt } : {}),
       ...(closedThrough !== undefined ? { closedThrough } : {}),
       credit: miners.reduce((sum, m) => sum + m.account.credit, 0),
-      account: accountStatusOf(miners),
+      account: runningAccountStatusOf(miners),
       miners,
       notices: unpaidNotices(miners, p.book.declarations ?? []),
       uncredited: uncreditedByBook.get(p.book.corporationId) ?? [],
@@ -1603,7 +1603,7 @@ function uncreditedOf(p: Prepared, rows: readonly BookRowView[]): UncreditedDona
 }
 
 /** The member's Miners in a book, each with its account: one that bills, was paid or was asked. */
-function minerAccountsOf(p: Prepared): BookMinerAccount[] {
+function minerRunningAccountsOf(p: Prepared): BookMinerRunningAccount[] {
   return [...p.miners]
     .filter(([, m]) => m.account.byDay.size > 0 || m.payments.length > 0 || m.notices.length > 0)
     .map(([minerId, m]) => ({
@@ -1617,7 +1617,7 @@ function minerAccountsOf(p: Prepared): BookMinerAccount[] {
 }
 
 /** Where the member stands over their Miners in one book. */
-function accountStatusOf(miners: readonly BookMinerAccount[]): PersonalAccountStatus {
+function runningAccountStatusOf(miners: readonly BookMinerRunningAccount[]): PersonalAccountStatus {
   const owing = miners.flatMap((m) => (m.account.owes ? [m.account.owes] : []));
   const paid = miners.flatMap((m) => (m.account.paidThrough ? [m.account.paidThrough] : []));
   const owes: RunningAccountOwes | null =
@@ -1633,7 +1633,7 @@ function accountStatusOf(miners: readonly BookMinerAccount[]): PersonalAccountSt
 
 /** The member's Late notices whose days are still unpaid on their Miner's account, oldest first. */
 function unpaidNotices(
-  miners: readonly BookMinerAccount[],
+  miners: readonly BookMinerRunningAccount[],
   declarations: readonly Declaration[]
 ): MemberNoticeView[] {
   return miners

@@ -42,8 +42,8 @@ import {
   paymentLinkKey,
   type PayeePaymentLink,
   heldPaymentKeys,
-} from '@/engine/miningTax/payeeAccount';
-import type { PayeeAccounts } from '@/features/miningTax/payeeAccounts';
+} from '@/engine/miningTax/payeeRunningAccount';
+import type { PayeeRunningAccounts } from '@/features/miningTax/payeeRunningAccounts';
 import { buildSettleUpReason } from '@/features/miningTax/groupRows';
 import { systemLabel } from '@/features/miningTax/names';
 import { bookLedgerSource, personalLedgerSource } from '@/features/miningTax/ledger/ledgerSources';
@@ -124,7 +124,7 @@ export interface TaxDialogsHostProps {
   characterFiltered: readonly DisplayRow[];
   everyAssignment: readonly MiningTaxAssignmentRecord[];
   /** Every personal Payee's Running account: what Settle up, the ledger and Paid read. */
-  accounts: PayeeAccounts;
+  accounts: PayeeRunningAccounts;
   /** Every Made Payment linked to a Payee. */
   links: readonly PayeePaymentLink[];
   /** The corporations of the member's Corp Tax Books: a donation to one is the book's. */

@@ -1,6 +1,6 @@
 /**
  * The one way an Assignment is written (decision 20261120-235011, "a view never reaches a
- * write"). Rows on screen carry a Paid read off the Payee's account (`PayeeAccounts.view`), and
+ * write"). Rows on screen carry a Paid read off the Payee's account (`PayeeRunningAccounts.view`), and
  * old paid marks (`status: 'paid'`, `payment`, `paidAt`) are an older client's, never this one's:
  * whatever a caller hands in, the mark the stored record holds is written back exactly as it was,
  * and a record that never held one is never given one.

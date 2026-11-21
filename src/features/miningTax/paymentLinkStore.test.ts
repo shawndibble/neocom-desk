@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, type MiningTaxAssignmentRecord } from '@/db';
-import type { PayeePaymentLink } from '@/engine/miningTax/payeeAccount';
+import type { PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
 import { readTombstones, tombstoneKey } from '@/sync/localBookkeeping';
 import { MINING_TAX_PAYMENT_LINKS } from '@/sync/syncedCollections';
 import { PAYEE_CHECKPOINTS_KEY, readStoredCheckpoints } from '@/db/payeeCheckpoints';

@@ -19,7 +19,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { PayeeRecord } from '@/db';
-import type { PayeeAccount } from '@/engine/miningTax/payeeAccount';
+import type { PayeeRunningAccount } from '@/engine/miningTax/payeeRunningAccount';
 import { formatIsk } from '@/lib/isk';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { useSystemName } from '@/features/route/useSolarSystems';
@@ -78,7 +78,7 @@ interface PayeeManagerDialogProps {
    */
   bookCorporations?: readonly BookCorporation[];
   /** Each personal Payee's Running account, by any of its record ids: its credit, and its ledger. */
-  accountOf?: (payeeId: string) => PayeeAccount | undefined;
+  accountOf?: (payeeId: string) => PayeeRunningAccount | undefined;
   /** Opens a Payee's ledger: each row's balance is the way in, owed, in credit or settled. */
   onOpenLedger?: (payeeId: string) => void;
 }

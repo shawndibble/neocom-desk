@@ -1,7 +1,7 @@
 import type { MiningTaxAssignmentRecord } from '@/db';
 import { assignmentsMovedWithPayee } from '@/features/miningTax/ledgerActions';
 import type { PayeeOwed } from '@/features/miningTax/PayeeManagerDialog';
-import type { PayeeAccounts } from './payeeAccounts';
+import type { PayeeRunningAccounts } from './payeeRunningAccounts';
 
 /**
  * Every Payee record's owed total, entry count and how many entries would move with it, for the
@@ -10,7 +10,7 @@ import type { PayeeAccounts } from './payeeAccounts';
  */
 export function computeOwedByPayee(
   everyAssignment: readonly MiningTaxAssignmentRecord[],
-  accounts: PayeeAccounts
+  accounts: PayeeRunningAccounts
 ): Map<string, PayeeOwed> {
   const out = new Map<string, PayeeOwed>();
   for (const a of everyAssignment) {

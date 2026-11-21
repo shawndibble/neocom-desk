@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { allMembers, type DisplayRow } from './groupRows';
-import { PayeeAccounts } from './payeeAccounts';
+import { PayeeRunningAccounts } from './payeeRunningAccounts';
 import type { MoonMiningTaxRow } from './snapshot';
 import { computePayeeBalances, summarizeUnassigned } from './balances';
 
@@ -53,7 +53,7 @@ function displayRow(
 
 /** The accounts the balances read, from the same rows and some links. */
 const accountsOf = (rows: DisplayRow[], payees: PayeeRecord[], paid: [string, number][] = []) =>
-  PayeeAccounts.build({
+  PayeeRunningAccounts.build({
     assignments: rows.flatMap((dr) => allMembers(dr).map((m) => m.assignment)),
     payees,
     links: paid.map(([payeeId, amount], i) => ({

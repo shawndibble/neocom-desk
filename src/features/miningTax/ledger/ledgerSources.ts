@@ -1,19 +1,19 @@
 /**
  * What a Payee ledger is built from (`PayeeLedgerSource`), for either kind of Payee: a personal
- * Payee's Running account (`PayeeAccount`), or a Corp Tax Book's Miner's (`BookMinerAccount`, the
+ * Payee's Running account (`PayeeRunningAccount`), or a Corp Tax Book's Miner's (`BookMinerRunningAccount`, the
  * book's own account with the member's donations in flight). The money is the account's; these
  * only say what each charge, payment, write-off and notice was.
  */
-import type { BookMinerAccount } from '@/engine/corpTaxBook/personal';
+import type { BookMinerRunningAccount } from '@/engine/corpTaxBook/personal';
 import type { RecordedWriteOff } from '@/engine/corpTaxBook/payments';
-import type { PayeeAccount } from '@/engine/miningTax/payeeAccount';
+import type { PayeeRunningAccount } from '@/engine/miningTax/payeeRunningAccount';
 import type { PayeeLedgerSource } from '@/engine/miningTax/payeeLedger';
 import type { MiningTaxAssignmentRecord } from '@/db';
 import { madePaymentHref } from '../madePaymentHref';
 
 /** A personal Payee's ledger: each charge an Assignment, each payment a link to its transaction. */
 export function personalLedgerSource(
-  account: PayeeAccount,
+  account: PayeeRunningAccount,
   assignmentOf: (id: string) => MiningTaxAssignmentRecord | undefined,
   placeOf: (a: MiningTaxAssignmentRecord) => string | undefined,
   payerOf: (payment: { kind: string; refId: number | string }) => string | undefined
@@ -42,7 +42,7 @@ export function personalLedgerSource(
 
 /** A Corp Tax Book Miner's ledger, with the book's write-offs and Late notices. */
 export function bookLedgerSource(
-  miner: BookMinerAccount,
+  miner: BookMinerRunningAccount,
   writeOffs: readonly RecordedWriteOff[],
   placeOf: (structureId: number | undefined) => string | undefined,
   nameOf: (characterId: number) => string | undefined

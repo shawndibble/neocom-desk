@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
-import type { PayeePaymentLink } from '@/engine/miningTax/payeeAccount';
+import type { PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
 import { formatIsk } from '@/lib/isk';
 import { madePaymentHref } from './madePaymentHref';
 import { Well } from '@/components/ui/Well';
@@ -24,7 +24,7 @@ export interface PaidByLink {
 }
 
 interface PaymentLinksCardProps {
-  /** The linked payments that paid the day, oldest first (`PayeeAccount.paidBy`). */
+  /** The linked payments that paid the day, oldest first (`PayeeRunningAccount.paidBy`). */
   paidBy: readonly PaidByLink[];
   /** Unlinks one: it pays nothing, and is offered again. */
   onUnlink?: (key: string) => void;

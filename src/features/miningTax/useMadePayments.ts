@@ -4,11 +4,11 @@ import {
   paymentLinkKey,
   type PayeePaymentLink,
   heldPaymentKeys,
-} from '@/engine/miningTax/payeeAccount';
+} from '@/engine/miningTax/payeeRunningAccount';
 import { linkPayment } from './ledgerActions';
 import { useRetainedResult } from '@/lib/useRetainedResult';
 import { loadMadePaymentsWithStatus, type MadePaymentsResult } from './madePayments';
-import type { PayeeAccounts } from './payeeAccounts';
+import type { PayeeRunningAccounts } from './payeeRunningAccounts';
 import {
   autoMatchRecorded,
   linkFor,
@@ -23,7 +23,7 @@ interface UseLinkSuggestionsInput {
   links: readonly PayeePaymentLink[];
   /** Every stored Payee record. */
   payees: readonly PayeeRecord[];
-  accounts: PayeeAccounts;
+  accounts: PayeeRunningAccounts;
   /** The corporations of the member's Corp Tax Books: a donation to one is the book's. */
   bookCorporations: ReadonlySet<number>;
 }

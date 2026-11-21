@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import '@/i18n';
 import { db, type PayeeRecord } from '@/db';
-import type { PayeeAccount } from '@/engine/miningTax/payeeAccount';
+import type { PayeeRunningAccount } from '@/engine/miningTax/payeeRunningAccount';
 import { PayeeManagerDialog } from './PayeeManagerDialog';
 import { loadPayees } from './payees';
 
@@ -349,7 +349,7 @@ describe('PayeeManagerDialog — list rows', () => {
   });
 
   it("reads a personal Payee's credit off its Running account", () => {
-    const account = { credit: 500_000 } as PayeeAccount;
+    const account = { credit: 500_000 } as PayeeRunningAccount;
     renderDialog([bureau, police], {
       owedByPayee: new Map(),
       accountOf: (id) => (id === 'p1' ? account : undefined),
@@ -360,7 +360,7 @@ describe('PayeeManagerDialog — list rows', () => {
 
   it("opens any Payee's ledger from its balance, settled or not, when it has an account", async () => {
     const onOpenLedger = vi.fn();
-    const account = { credit: 0 } as PayeeAccount;
+    const account = { credit: 0 } as PayeeRunningAccount;
     renderDialog([bureau, police], {
       owedByPayee: new Map(),
       accountOf: (id) => (id === 'p1' ? account : undefined),

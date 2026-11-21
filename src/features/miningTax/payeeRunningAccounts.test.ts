@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
-import type { PayeePaymentLink } from '@/engine/miningTax/payeeAccount';
-import { PayeeAccounts } from './payeeAccounts';
+import type { PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
+import { PayeeRunningAccounts } from './payeeRunningAccounts';
 
 const payee = (id: string, characterId: number, entityId?: number): PayeeRecord => ({
   id,
@@ -42,9 +42,9 @@ const link = (payeeId: string, amount: number, refId = 1): PayeePaymentLink => (
   source: 'manual',
 });
 
-describe('PayeeAccounts', () => {
+describe('PayeeRunningAccounts', () => {
   it('reads Paid off the account: the oldest day first, whichever entry was linked before', () => {
-    const accounts = PayeeAccounts.build({
+    const accounts = PayeeRunningAccounts.build({
       assignments: [
         assignment('a', 'p1', '2026-10-01', 100),
         assignment('b', 'p1', '2026-10-02', 100),
@@ -58,7 +58,7 @@ describe('PayeeAccounts', () => {
   });
 
   it('is one account for a merged Payee: an alt’s payment pays the group’s oldest day', () => {
-    const accounts = PayeeAccounts.build({
+    const accounts = PayeeRunningAccounts.build({
       assignments: [
         assignment('a', 'p1', '2026-10-01', 100),
         assignment('b', 'p2', '2026-10-02', 100),
@@ -77,7 +77,7 @@ describe('PayeeAccounts', () => {
       paidAt: 1,
       payment: { paymentId: 'x', paidOn: '2026-10-02', method: 'other', amount: 100 },
     });
-    const accounts = PayeeAccounts.build({
+    const accounts = PayeeRunningAccounts.build({
       assignments: [marked],
       payees: [payee('p1', 1)],
       links: [],
@@ -90,7 +90,7 @@ describe('PayeeAccounts', () => {
   });
 
   it('leaves a review and a dismissal as they are, and bills neither a dismissal', () => {
-    const accounts = PayeeAccounts.build({
+    const accounts = PayeeRunningAccounts.build({
       assignments: [assignment('d', undefined, '2026-10-01', 0, { status: 'dismissed' })],
       payees: [],
       links: [],
@@ -102,7 +102,7 @@ describe('PayeeAccounts', () => {
   });
 
   it('bills only what is left once a Corp Tax Book bills part of an Assignment too', () => {
-    const accounts = PayeeAccounts.build({
+    const accounts = PayeeRunningAccounts.build({
       assignments: [assignment('a', 'p1', '2026-10-01', 100)],
       payees: [payee('p1', 1)],
       links: [link('p1', 40)],

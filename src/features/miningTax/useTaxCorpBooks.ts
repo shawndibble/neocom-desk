@@ -5,8 +5,8 @@ import { useAutoClaimDonations } from '@/features/miningTax/corpBook/useAutoClai
 import { useBookSystems } from '@/features/miningTax/corpBook/useBookSystems';
 import { useHiddenLeftCorps } from '@/features/miningTax/corpBook/leftCorpAck';
 import { useCorpBookView } from '@/features/miningTax/corpBook/useCorpBookView';
-import { heldPaymentKeys } from '@/engine/miningTax/payeeAccount';
-import { PayeeAccounts, withPaidStatus } from './payeeAccounts';
+import { heldPaymentKeys } from '@/engine/miningTax/payeeRunningAccount';
+import { PayeeRunningAccounts, withPaidStatus } from './payeeRunningAccounts';
 import { saveBilledElsewhere } from './paymentLinkStore';
 import { billedElsewhereOf } from './owedNow';
 import type { TaxSnapshot } from './taxSnapshot';
@@ -34,10 +34,10 @@ export function useTaxCorpBooks(
   // something else, so every account build bills the same.
   const [billedElsewhere, setBilledElsewhere] = useState<ReadonlyMap<string, number> | null>(null);
   const billed = billedElsewhere ?? data?.billedElsewhere;
-  // The one accounts build (`PayeeAccounts.build`): row statuses, owed figures and Settle up.
+  // The one accounts build (`PayeeRunningAccounts.build`): row statuses, owed figures and Settle up.
   const accounts = useMemo(
     () =>
-      PayeeAccounts.build({
+      PayeeRunningAccounts.build({
         assignments: data?.entries.flatMap((row) => row.assignments) ?? [],
         payees,
         links: data?.paymentLinks ?? [],

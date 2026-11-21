@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, IskInput, Radio } from '@/components/ui';
 import { selectedRowClassName } from '@/components/ui/controlStyles';
-import type { PayeeAccount } from '@/engine/miningTax/payeeAccount';
+import type { PayeeRunningAccount } from '@/engine/miningTax/payeeRunningAccount';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { linkPayment } from './ledgerActions';
@@ -21,7 +21,7 @@ interface LinkPaymentDialogProps {
   /** Unlinked payments with a Payee named, the surest first. */
   suggestions: readonly LinkSuggestion[];
   /** Each personal Payee's account, by any of its record ids: what a payment would pay. */
-  accountOf: (payeeId: string) => PayeeAccount | undefined;
+  accountOf: (payeeId: string) => PayeeRunningAccount | undefined;
   onLinked: () => void;
 }
 
