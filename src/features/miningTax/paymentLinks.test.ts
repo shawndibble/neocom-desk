@@ -6,6 +6,7 @@ import {
   linkablePayments,
   recipientOf,
   suggestLink,
+  unlinkedSentFor,
   suggestLinks,
   type LinkablePayee,
   type LinkContext,
@@ -208,5 +209,28 @@ describe('autoMatchRecorded', () => {
     expect(autoMatchRecorded([made()], [recorded({ characterId: MAIN + 1 })], ctx([p]))).toEqual(
       []
     );
+  });
+});
+
+describe('unlinkedSentFor', () => {
+  const landlord = payeeOf([record({ id: 'p1', name: 'Landlord', entityId: LANDLORD })]);
+  const other = payeeOf([record({ id: 'p2', name: 'Other', entityId: 90_000_002 })]);
+  const suggestion = (payee: LinkablePayee, amount: number | null, key: string) => ({
+    payment: made({ key, amount }),
+    payee,
+    confidence: 'entity' as const,
+  });
+
+  it("counts and sums only the Payee's own suggestions", () => {
+    const all = [
+      suggestion(landlord, 400_000, 'journal:1'),
+      suggestion(landlord, 100_000, 'journal:2'),
+      suggestion(other, 999, 'journal:3'),
+    ];
+    expect(unlinkedSentFor(all, landlord.id)).toEqual({ count: 2, amount: 500_000 });
+  });
+
+  it('is undefined when nothing was sent to it', () => {
+    expect(unlinkedSentFor([suggestion(other, 5, 'journal:3')], landlord.id)).toBeUndefined();
   });
 });

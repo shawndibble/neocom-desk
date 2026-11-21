@@ -58,6 +58,7 @@ function renderDialog(
     record?: (p: SettlePayment) => Promise<LedgerActionResult>;
     onPaid?: () => void;
     onPickFromWallet?: () => void;
+    unlinked?: { count: number; amount: number };
     reason?: string | ((payerId: number | null) => string | undefined);
   } = {}
 ) {
@@ -74,6 +75,7 @@ function renderDialog(
       reason={extra.reason ?? 'Moon tax · Jita · 2026-09-04 – 2026-09-06'}
       {...(extra.record ? { record: extra.record } : {})}
       {...(extra.onPickFromWallet ? { onPickFromWallet: extra.onPickFromWallet } : {})}
+      {...(extra.unlinked ? { unlinked: extra.unlinked } : {})}
     />
   );
 }
@@ -162,5 +164,24 @@ describe('SettleUpDialog', () => {
     renderDialog({ record: vi.fn(), onPickFromWallet });
     await user.click(screen.getByRole('button', { name: /already in my wallet/i }));
     expect(onPickFromWallet).toHaveBeenCalledOnce();
+  });
+
+  it('warns about a payment already sent but not linked, and links it first', async () => {
+    const user = userEvent.setup();
+    const onPickFromWallet = vi.fn();
+    renderDialog({
+      record: vi.fn(),
+      onPickFromWallet,
+      unlinked: { count: 1, amount: 400_000 },
+    });
+    expect(screen.getByText(/400,000 ISK you already sent isn't linked yet/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Link payment' }));
+    expect(onPickFromWallet).toHaveBeenCalledOnce();
+  });
+
+  it('shows no warning when nothing sent is unlinked', () => {
+    renderDialog({ record: vi.fn(), onPickFromWallet: vi.fn() });
+    expect(screen.queryByText(/isn't linked yet/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Link payment' })).not.toBeInTheDocument();
   });
 });

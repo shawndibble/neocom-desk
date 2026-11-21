@@ -31,6 +31,7 @@ import { PayeeOpenInEveButton } from './PayeeOpenInEveButton';
 import { payerOptions } from './settlePayer';
 import type { SettleUpRecheck } from './useSettleUpRecheck';
 import { DividedList } from '@/components/ui/DividedList';
+import { UnlinkedSentNote, type UnlinkedSent } from './UnlinkedSentNote';
 
 /** One Outstanding entry of the Payee being paid, and who mined it. */
 export interface SettleUpRow {
@@ -84,6 +85,12 @@ interface SettleUpDialogProps {
    * already shows in the journal. The button shows only when this is given.
    */
   onPickFromWallet?: () => void;
+  /**
+   * Payments the pilot already sent this Payee that nothing here accounts for yet. The owed figure
+   * is overstated until they are linked, so the dialog warns, as the Payee card does, and
+   * `onPickFromWallet` (when given) is the way to link them first.
+   */
+  unlinked?: UnlinkedSent;
   /** The fresh ledger pull behind the "Ore still arriving" line. */
   arrivalCheck?: SettleUpRecheck;
   /** The Character paying; absent, the Character owing most. */
@@ -115,6 +122,7 @@ export function SettleUpDialog({
   preview,
   record,
   onPickFromWallet,
+  unlinked,
   arrivalCheck,
   payerId,
   reason: reasonOf,
@@ -262,6 +270,16 @@ export function SettleUpDialog({
           {reason !== '' &&
             copyRow('reason', t('miningTax.settleUp.reasonLabel'), reason, reason, true)}
         </DividedList>
+        {unlinked && unlinked.count > 0 && (
+          <div className="space-y-1">
+            <UnlinkedSentNote unlinked={unlinked} />
+            {onPickFromWallet && (
+              <button type="button" className={inlineLinkClassName} onClick={onPickFromWallet}>
+                {t('miningTax.owed.linkPayment')}
+              </button>
+            )}
+          </div>
+        )}
         {outcome && <PaymentPreview outcome={outcome} />}
         {typeof notice === 'function' ? notice(payer, amountToSend) : notice}
 

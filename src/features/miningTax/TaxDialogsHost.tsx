@@ -33,7 +33,11 @@ import {
 import { buildPriceBreakdown } from '@/features/miningTax/usePriceBreakdown';
 import { useMiningTaxCompressedOre } from '@/features/miningTax/oreForm';
 import type { RowMenuAction } from '@/features/miningTax/rowMenu';
-import { linkablePayments, type MadePayment } from '@/features/miningTax/paymentLinks';
+import {
+  linkablePayments,
+  unlinkedSentFor,
+  type MadePayment,
+} from '@/features/miningTax/paymentLinks';
 import {
   paymentLinkKey,
   linkAt,
@@ -924,6 +928,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             rows={liveSettleUpRows ?? settleUpRows}
             {...(settleUpStart.payerId !== undefined ? { payerId: settleUpStart.payerId } : {})}
             arrivalCheck={settleUpRecheck}
+            unlinked={unlinkedSentFor(linkSuggestions, settleUpPayee.id)}
             owedFor={() => settleUpAccount.owes?.amount ?? 0}
             preview={(amount, paidOn) => settleUpAccount.preview(amount, paidOn)}
             reason={buildSettleUpReason(

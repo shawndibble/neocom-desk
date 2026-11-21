@@ -24,6 +24,7 @@ import {
   corpPayeeId,
   isCorpPayeeId,
 } from '@/features/miningTax/corpBook/corpRows';
+import { unlinkedSentFor } from '@/features/miningTax/paymentLinks';
 import { PendingGroupingNotice } from '@/features/miningTax/corpBook/PendingGroupingNotice';
 import {
   useCorpStateHint,
@@ -538,14 +539,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                       ? uncreditedByCorp.get(corporationOfPayee(balance.payee.id))
                       : undefined
                   }
-                  unlinkedOf={(balance) => {
-                    const mine = linkable.filter((s) => s.payee.id === balance.payee.id);
-                    if (mine.length === 0) return undefined;
-                    return {
-                      count: mine.length,
-                      amount: mine.reduce((sum, s) => sum + (s.payment.amount ?? 0), 0),
-                    };
-                  }}
+                  unlinkedOf={(balance) => unlinkedSentFor(linkable, balance.payee.id)}
                   onAssignNext={assignNext}
                   onReviewPayments={() => actions.openLinkPayment(true)}
                   conflicts={conflicts}

@@ -9,6 +9,7 @@ import { formatIsk } from '@/lib/isk';
 import type { PayeeBalance, UnassignedSummary } from './balances';
 import type { ConflictSummary } from './corpBook/conflictSummary';
 import { DAY_MS } from '@/lib/age';
+import { UnlinkedSentNote, type UnlinkedSent } from './UnlinkedSentNote';
 
 /** Whole EVE days between the oldest unpaid day and today (UTC) — how long this Payee has been waiting. */
 function owedForDays(balance: PayeeBalance, today: Date = new Date()): number {
@@ -52,7 +53,7 @@ interface OwedBalancesProps {
    * the same reason an uncredited donation does: the owed figure is overstated until the
    * payment is linked, so paying it in full pays twice.
    */
-  unlinkedOf?: (balance: PayeeBalance) => { count: number; amount: number } | undefined;
+  unlinkedOf?: (balance: PayeeBalance) => UnlinkedSent | undefined;
   onAssignNext: () => void;
   onReviewPayments: () => void;
   /**
@@ -303,14 +304,7 @@ export function OwedBalances({
                         })}
                   </p>
                 )}
-                {warnUnlinked && (
-                  <p className="text-xs text-warning">
-                    {t('miningTax.owed.unlinkedNote', {
-                      count: unlinked.count,
-                      amount: formatIsk(unlinked.amount, 0),
-                    })}
-                  </p>
-                )}
+                {warnUnlinked && <UnlinkedSentNote unlinked={unlinked} />}
               </>
             );
             // Nothing owed: nothing to settle; its ledger is its figure.
