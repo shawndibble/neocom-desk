@@ -98,8 +98,17 @@ export interface MinerRunningAccountInput {
   writeOffs?: readonly RunningAccountWriteOff[];
   /** The book's start date: a donation dated before it credits nothing. Hand-recorded payments always count. */
   startDate?: string;
-  /** Dates an open dispute holds. */
+  /**
+   * Dates an open dispute holds. A checkpoint's owed day is held only if the checkpoint held it
+   * too: its dispute may have been answered since, but none can be filed on a locked day.
+   */
   heldDays?: ReadonlySet<string>;
+  /**
+   * Per date, what officers credited by dismissing its dispute (`resolution.amountIsk`). Read only
+   * for a checkpoint's held day: its credit is dated on a day the checkpoint closed, so the
+   * account's days never carry it.
+   */
+  disputeWaivers?: ReadonlyMap<string, number>;
   /** The newest day the book has recorded as paid (`meta/paid`): it and every day before it stay closed. */
   storedPaidThrough?: string;
   /** The book's per-day tolerance, in percent. */
@@ -196,12 +205,24 @@ export class MinerRunningAccount {
     );
     const paid = counted.reduce((sum, p) => sum + paymentNet(p), 0);
     const opening = Math.max(0, cp?.credit ?? 0);
+    // A checkpoint's held day follows its dispute now: still held while it is open, owed again
+    // once rejected or withdrawn, and credited by what dismissing it waived (at most what is left).
+    const heldDays = new Set(
+      [...(input.heldDays ?? [])].filter(
+        (date) => after(date) || cp?.owed.some((d) => d.held && d.date === date)
+      )
+    );
+    const waivers = (cp?.owed ?? []).flatMap((d): RunningDay[] => {
+      const waived = d.held ? Math.min(input.disputeWaivers?.get(d.date) ?? 0, d.remaining) : 0;
+      return waived > 0 ? [{ date: d.date, tax: -waived }] : [];
+    });
     const days: RunningDay[] = [
       ...(cp?.owed ?? []).map((d: StoredOwedDay) => owedDayOf(d)),
+      ...waivers,
       ...input.days.filter((d) => after(d.date)),
     ];
     const settled = settleDays(
-      { ...input, days },
+      { ...input, heldDays, days },
       {
         paymentPool: opening + paid,
         payments: [
@@ -223,7 +244,16 @@ export class MinerRunningAccount {
         const day = settled.byDay.get(d.date);
         return !day || day.settled || day.held;
       });
-    const floor = closed ? cp.through : (cp?.paidThrough ?? null);
+    // A day the checkpoint held passed its paid-through; owed again now, it caps it before itself.
+    const reopened = cp?.owed.find((d) => {
+      const day = d.held ? settled.byDay.get(d.date) : undefined;
+      return day !== undefined && !day.settled && !day.held;
+    })?.date;
+    const stored = closed ? cp.through : (cp?.paidThrough ?? null);
+    const floor =
+      reopened !== undefined && stored !== null && stored >= reopened
+        ? shiftUtcDate(reopened, -1)
+        : stored;
     const paidThrough =
       floor !== null && (settled.paidThrough === null || settled.paidThrough < floor)
         ? floor
