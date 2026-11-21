@@ -11,10 +11,10 @@ import {
   MINER_PAID,
   PAYMENTS,
   REBILLS,
-  STATEMENTS,
   TOLERANCE_EXEMPTIONS,
   WRITE_OFFS,
 } from './corpTaxBook.js';
+import { LEGACY_MINER_KEYED } from './corpTaxBookLegacyMirror.js';
 
 /**
  * Grouping Characters into one Miner (#6450): everything the absorbed Miners were billed, paid
@@ -42,7 +42,7 @@ export type RekeyWrite =
 /** Collections whose records carry `minerId`. */
 export const MINER_KEYED = [
   LATE_NOTICES,
-  STATEMENTS,
+  ...LEGACY_MINER_KEYED,
   PAYMENTS,
   WRITE_OFFS,
   ADJUSTMENTS,

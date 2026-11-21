@@ -13,6 +13,7 @@ function fakeDb(failReads: boolean) {
     },
     doc: (id: string) => ({ path: `${path}/${id}`, get: async () => empty }),
     where: () => col(path),
+    select: () => col(path),
   });
   const db = {
     collection: (name: string) => ({
@@ -21,6 +22,8 @@ function fakeDb(failReads: boolean) {
         get: async () => empty,
       }),
     }),
+    getAll: async (...refs: unknown[]) =>
+      refs.map(() => ({ exists: false, data: () => undefined })),
     batch: () => ({
       set: vi.fn(),
       delete: (ref: { path: string }) => deleted.push(ref.path),

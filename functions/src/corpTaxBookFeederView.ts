@@ -16,9 +16,8 @@ import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import type { CollectionReference, Firestore } from 'firebase-admin/firestore';
 import { commitInBatches } from './commitInBatches.js';
-import { FEEDER_VIEWS, LATE_NOTICES, utcDate } from './corpTaxBook.js';
-import { mergeNotices } from './corpTaxBookLateNoticeStore.js';
-import { legacyNotices } from './corpTaxBookLegacyMirror.js';
+import { FEEDER_VIEWS, utcDate } from './corpTaxBook.js';
+import { dbReader, readNotices } from './corpTaxBookLateNoticeStore.js';
 import {
   BOOK_DEFAULTS,
   accrueValuedDays,
@@ -599,11 +598,11 @@ async function readBilledPrices(
     if (earliest === undefined || r.date < earliest) earliest = r.date;
   }
   if (earliest === undefined) return out;
-  const [current, legacy] = await Promise.all([
-    book.collection(LATE_NOTICES).where('issuedAt', '>=', earliest).get(),
-    legacyNotices(book).where('coversThrough', '>=', earliest).get(),
-  ]);
-  for (const notice of mergeNotices(current, legacy)) {
+  const since = earliest;
+  const notices = await readNotices(dbReader(book.firestore), book, (collection, legacy) =>
+    collection.where(legacy ? 'coversThrough' : 'issuedAt', '>=', since)
+  );
+  for (const notice of notices) {
     for (const line of notice.lines) {
       if (!keys.has(line.key) || out.has(line.key) || !line.unitPrices) continue;
       out.set(line.key, line.unitPrices);

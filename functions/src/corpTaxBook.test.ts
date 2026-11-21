@@ -16,6 +16,7 @@ import {
   billedDisputeTax,
   disputesClosedByWriteOff,
   checkClaimedTransfer,
+  checkpointRefusal,
   checkClaimedTransfers,
   needsLiveCheck,
   parseEditAction,
@@ -31,7 +32,7 @@ import {
   satisfies,
   startDateMoveReason,
 } from './corpTaxBook.js';
-import { finalNoticeId } from './corpTaxBookLateNotice.js';
+import { finalNoticeId, paymentCode } from './corpTaxBookLateNotice.js';
 
 describe('decideRoles (D8)', () => {
   it.each([
@@ -535,8 +536,8 @@ describe('parsers', () => {
   });
 
   describe('disputesClosedByWriteOff: a write-off answers the disputes of the days it forgives (#6307)', () => {
-    // The Miner's account as an officer's tab last recorded it: what each unpaid day still owes.
-    const account = {
+    // The Miner's account as it stands now: what each unpaid day still owes, oldest first.
+    const live = {
       owed: 900_000,
       unpaidDays: [
         { date: '2026-11-01', owed: 400_000, tax: 400_000 },
@@ -552,30 +553,26 @@ describe('parsers', () => {
       dispute('d', '2026-11-01', { kind: 'rejected' }),
     ];
 
-    it('forgives the oldest days first: their open disputes close, the rest stay open', () => {
-      expect(disputesClosedByWriteOff(disputes, { amount: 700_000 }, account)).toEqual(['a', 'b']);
-      expect(disputesClosedByWriteOff(disputes, { amount: 500_000 }, account)).toEqual(['a']);
+    it('forgives the oldest days first, held days too: their open disputes close', () => {
+      expect(disputesClosedByWriteOff(disputes, { amount: 700_000 }, live)).toEqual(['a', 'b']);
+      expect(disputesClosedByWriteOff(disputes, { amount: 500_000 }, live)).toEqual(['a']);
     });
 
     it('a day only partly forgiven keeps its dispute open', () => {
-      expect(disputesClosedByWriteOff(disputes, { amount: 300_000 }, account)).toEqual([]);
+      expect(disputesClosedByWriteOff(disputes, { amount: 300_000 }, live)).toEqual([]);
     });
 
     it('a write-off of the whole balance closes every open dispute', () => {
-      expect(disputesClosedByWriteOff(disputes, { amount: 900_000 }, account)).toEqual([
+      expect(disputesClosedByWriteOff(disputes, { amount: 900_000 }, live)).toEqual([
         'a',
         'b',
         'c',
       ]);
     });
 
-    it('with no recorded days it is the leaver’s whole balance: every open dispute closes', () => {
-      expect(disputesClosedByWriteOff(disputes, { amount: 1 })).toEqual(['a', 'b', 'c']);
-      expect(disputesClosedByWriteOff(disputes, { amount: 1 }, { owed: 5 })).toEqual([
-        'a',
-        'b',
-        'c',
-      ]);
+    it('closes none when the account’s days are unknown', () => {
+      expect(disputesClosedByWriteOff(disputes, { amount: 1 })).toEqual([]);
+      expect(disputesClosedByWriteOff(disputes, { amount: 10_000_000 }, { owed: 5 })).toEqual([]);
     });
   });
 
@@ -1358,7 +1355,7 @@ describe('Late notices and checkpoints (decision 20261120-235011)', () => {
     characterIds: [9001],
     kind: 'late',
     issuedAt: '2026-11-18T09:00:00Z',
-    code: 'MT00AB12',
+    code: paymentCode('notice_solo:9001_2026-11-18'),
     pricing: { hubId: 'jita', oreForm: 'compressed' },
     uids: ['char:1'],
     lines: [
@@ -1386,7 +1383,7 @@ describe('Late notices and checkpoints (decision 20261120-235011)', () => {
       characterIds: [9001],
       kind: 'late',
       issuedAt: '2026-11-18T09:00:00.000Z',
-      code: 'MT00AB12',
+      code: paymentCode(notice.id),
       pricing: { hubId: 'jita', oreForm: 'compressed' },
       listed: 10_005,
       names: { minerName: 'Ore Pilot', refineryNames: { '1000': 'Athanor X' } },
@@ -1406,14 +1403,12 @@ describe('Late notices and checkpoints (decision 20261120-235011)', () => {
     expect(parsed.issuedBy).toBeUndefined();
   });
 
-  it('prints no empty code and no pricing it cannot name', () => {
+  it('prints no pricing or names it cannot name', () => {
     const parsed = parseLateNotice({
       ...notice,
-      code: undefined,
       pricing: undefined,
       names: undefined,
     });
-    expect(parsed).not.toHaveProperty('code');
     expect(parsed).not.toHaveProperty('pricing');
     expect(parsed).not.toHaveProperty('names');
   });
@@ -1427,12 +1422,20 @@ describe('Late notices and checkpoints (decision 20261120-235011)', () => {
     expect(() => parseLateNotice({ ...notice, names: { minerName: 5 } })).toThrow();
   });
 
-  it('names a final notice only by the id closing the account sends', () => {
+  it('never issues a final notice: only closing the account sends one', () => {
     expect(() => parseLateNotice({ ...notice, kind: 'final' })).toThrow();
-    expect(parseLateNotice({ ...notice, kind: 'final', id: finalNoticeId('solo:9001') }).kind).toBe(
-      'final'
-    );
+    expect(() =>
+      parseLateNotice({ ...notice, kind: 'final', id: finalNoticeId('solo:9001') })
+    ).toThrow();
     expect(() => parseLateNotice({ ...notice, id: finalNoticeId('solo:9001') })).toThrow();
+    expect(() => parseLateNotice({ ...notice, id: 'final_other' })).toThrow();
+  });
+
+  it('prints the code its id hashes to, and refuses any other', () => {
+    const own = paymentCode(notice.id);
+    expect(parseLateNotice({ ...notice, code: own }).code).toBe(own);
+    expect(parseLateNotice({ ...notice, code: undefined }).code).toBe(own);
+    expect(() => parseLateNotice({ ...notice, code: 'MT00AB12' })).toThrow();
   });
 
   it('issues a Late notice through the edit union', () => {
@@ -1487,16 +1490,43 @@ describe('Late notices and checkpoints (decision 20261120-235011)', () => {
     expect(() => parseEditAction({ action: 'declare', kind: 'contract' })).toThrow();
   });
 
-  it('a write-off pins nothing: an old client’s Statement id is accepted and dropped', () => {
+  it('a write-off pins nothing: an old client naming a Statement is told to reload', () => {
     expect(
+      parseEditAction({ action: 'writeOff', minerId: 'm1', amount: 5, reason: 'left' })
+    ).toEqual({ action: 'writeOff', minerId: 'm1', amount: 5, reason: 'left' });
+    let caught: unknown;
+    try {
       parseEditAction({
         action: 'writeOff',
         minerId: 'm1',
         statementId: 's1',
         amount: 5,
-        reason: 'left',
-      })
-    ).toEqual({ action: 'writeOff', minerId: 'm1', amount: 5, reason: 'left' });
+        reason: 'l',
+      });
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toMatchObject({ code: 'failed-precondition', details: { reason: 'reload' } });
+  });
+
+  it('records an account’s credit when the tab sends it', () => {
+    const base = { minerId: 'm1', owed: 0, paid: 0, days: 0 };
+    expect(
+      parseEditAction({ action: 'recordAccounts', accounts: [{ ...base, credit: 25 }] })
+    ).toMatchObject({ accounts: [{ credit: 25 }] });
+    expect(() =>
+      parseEditAction({ action: 'recordAccounts', accounts: [{ ...base, credit: -1 }] })
+    ).toThrow();
+  });
+
+  it('resets a Miner’s checkpoint', () => {
+    expect(parseEditAction({ action: 'resetCheckpoint', minerId: 'solo:5' })).toEqual({
+      action: 'resetCheckpoint',
+      minerId: 'solo:5',
+    });
+    expect(needsLiveCheck(parseEditAction({ action: 'resetCheckpoint', minerId: 'solo:5' }))).toBe(
+      true
+    );
   });
 
   describe('recordCheckpoints', () => {
@@ -1546,5 +1576,44 @@ describe('Late notices and checkpoints (decision 20261120-235011)', () => {
       expect(() => bad({ paidThrough: 5 })).toThrow();
       expect(() => bad({ minerId: 'a/b' })).toThrow();
     });
+  });
+});
+
+describe('checkpointRefusal: a checkpoint is a cache, stored only when it can be trusted', () => {
+  const k = {
+    minerId: 'solo:5',
+    through: '2026-08-31',
+    owed: [{ date: '2026-08-20', remaining: 100 }],
+    credit: 0,
+    balance: 100,
+    paidThrough: '2026-08-19',
+  };
+  const ctx = { today: '2026-10-18', known: true, isDirector: false };
+  const live = {
+    unpaidDays: [
+      { date: '2026-08-20', owed: 100 },
+      { date: '2026-09-02', owed: 70 },
+    ],
+  };
+
+  it('stores one that moves forward, adds up and owes what the account says', () => {
+    expect(checkpointRefusal(k, ctx)).toBeNull();
+    expect(checkpointRefusal(k, { ...ctx, live })).toBeNull();
+  });
+
+  it('refuses one that does not move forward, does not add up, or names no Miner', () => {
+    expect(checkpointRefusal(k, { ...ctx, stored: { through: '2026-08-31' } })).toBe('not-forward');
+    expect(checkpointRefusal({ ...k, balance: 5 }, ctx)).toBe('balance');
+    expect(checkpointRefusal(k, { ...ctx, known: false })).toBe('unknown-miner');
+  });
+
+  it('owing less than the recorded account through that day needs a Director', () => {
+    const less = { ...k, owed: [], balance: 0, paidThrough: '2026-08-31' };
+    expect(checkpointRefusal(less, { ...ctx, live })).toBe('director-approval');
+    expect(checkpointRefusal(less, { ...ctx, live, isDirector: true })).toBeNull();
+    // Days after `through` are not the checkpoint's to owe.
+    expect(
+      checkpointRefusal(k, { ...ctx, live: { unpaidDays: [{ date: '2026-09-02', owed: 70 }] } })
+    ).toBeNull();
   });
 });

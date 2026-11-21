@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { planLateNoticeCopies } from './corpTaxBookLateNoticeBackfill.js';
 
-const notice = (id: string, kind?: string) => ({
+const notice = (id: string, kind?: string, mail: Record<string, unknown> = {}) => ({
   id,
   minerId: 'solo:5',
   ...(kind ? { kind } : {}),
@@ -10,7 +10,9 @@ const notice = (id: string, kind?: string) => ({
     { kind: 'mined', date: '2026-10-05', chargeKey: 'k', oreLines: [], estimatedValue: 1, tax: 9 },
   ],
   uids: ['char:5'],
+  ...mail,
 });
+const quiet = { sent: 0, manualSent: 0, remindersStopped: false };
 
 describe('planLateNoticeCopies', () => {
   it('copies each legacy notice and each link that has no copy yet', () => {
@@ -23,26 +25,44 @@ describe('planLateNoticeCopies', () => {
         { id: 'n1', data: { verifyToken: 't1' } },
         { id: 'n2', data: { verifyToken: 't2' } },
       ],
-      { notices: new Set(['n2']), links: new Set(['n2']) }
+      { notices: new Map([['n2', quiet]]), links: new Set(['n2']) }
     );
     expect(plan.notices.map((n) => [n.id, n.listed, n.uids])).toEqual([['n1', 9, ['char:5']]]);
     expect(plan.links).toEqual([{ id: 'n1', token: 't1' }]);
+    expect(plan.mail).toEqual([]);
+  });
+
+  it('brings a copy’s mail state level with its legacy doc', () => {
+    const plan = planLateNoticeCopies(
+      [{ id: 'n1', data: notice('n1', 'notice', { mailsSent: 2, remindersStopped: true }) }],
+      [],
+      { notices: new Map([['n1', { ...quiet, sent: 1, manualSent: 1 }]]), links: new Set() }
+    );
+    expect(plan.mail).toEqual([
+      { id: 'n1', mail: { sent: 2, manualSent: 1, remindersStopped: true } },
+    ]);
   });
 
   it('leaves a calendar Statement and a link with no token alone', () => {
     const plan = planLateNoticeCopies(
       [{ id: 's1', data: notice('s1') }],
       [{ id: 's1', data: {} }],
-      { notices: new Set(), links: new Set() }
+      {
+        notices: new Map(),
+        links: new Set(),
+      }
     );
-    expect(plan).toEqual({ notices: [], links: [] });
+    expect(plan).toEqual({ notices: [], links: [], mail: [] });
   });
 
   it('plans nothing on a re-run', () => {
     const statements = [{ id: 'n1', data: notice('n1', 'notice') }];
     const links = [{ id: 'n1', data: { verifyToken: 't1' } }];
     expect(
-      planLateNoticeCopies(statements, links, { notices: new Set(['n1']), links: new Set(['n1']) })
-    ).toEqual({ notices: [], links: [] });
+      planLateNoticeCopies(statements, links, {
+        notices: new Map([['n1', quiet]]),
+        links: new Set(['n1']),
+      })
+    ).toEqual({ notices: [], links: [], mail: [] });
   });
 });

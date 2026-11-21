@@ -497,7 +497,7 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       ).toBe(true);
     });
 
-    it('matches a stranger’s donation by the Miner’s code, or a code a Late notice printed', async () => {
+    it('matches a stranger’s donation by a Miner’s code or a notice’s, a known sender’s by who sent it', async () => {
       const donation = (id: number, reason: string) => ({
         id,
         date: '2026-10-17T10:00:00Z',
@@ -509,10 +509,23 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       await book()
         .collection('lateNotices')
         .doc('n1')
-        .set({ id: 'n1', minerId: 'solo:60', code: 'MTOLD001', lines: [], uids: [] });
+        .set({
+          id: 'n1',
+          minerId: 'solo:60',
+          characterIds: [60],
+          kind: 'late',
+          issuedAt: '2026-10-16T00:00:00.000Z',
+          code: 'MTOLD001',
+          lines: [],
+          listed: 0,
+          uids: ['char:60'],
+          mail: { sent: 1, manualSent: 0, remindersStopped: false },
+        });
       esiState.journal = ok([
         donation(2, `tax ${minerPaymentCode('solo:50')}`),
         donation(3, 'for MTOLD001'),
+        // A sender the book knows pays their own Miner, whatever code they wrote.
+        { ...donation(4, 'for MTOLD001'), first_party_id: 50 },
       ]);
       await optIn(ACCOUNTANT);
       expect((await runScheduledCorpSyncs(syncDeps(), fakeEsi())).synced).toBe(1);
@@ -522,6 +535,7 @@ emulatorSuite('Corp Tax Book scheduled sync (emulator)', () => {
       // A code only says whose money it is: no notice is pinned to it.
       expect(await payment('j1_3')).toMatchObject({ minerId: 'solo:60' });
       expect(await payment('j1_3')).not.toHaveProperty('statementId');
+      expect(await payment('j1_4')).toMatchObject({ minerId: 'solo:50' });
     });
 
     it('credits a known miner’s donation even when their Miner owes nothing (#6300)', async () => {

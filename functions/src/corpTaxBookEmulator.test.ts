@@ -6,6 +6,7 @@ import {
   applyLateNoticeBackfill,
   planLateNoticeBackfill,
 } from './corpTaxBookLateNoticeBackfill.js';
+import { paymentCode } from './corpTaxBookLateNotice.js';
 import type { Caller } from './actorAuth.js';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
@@ -1204,8 +1205,17 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         ownerHash: 'h',
         provenAt: '2026-10-19T00:00:00Z',
       });
+      await book()
+        .collection('accountCheckpoints')
+        .doc('m-a')
+        .set({ minerId: 'm-a', through: '2026-08-31', uids: ['char:60'] });
       expect(await promoteProvenClaims(deps(), CORP)).toEqual({ promoted: 1 });
       expect(await claimPayment(deps(), who(77), CORP, 'j1_9')).toEqual({ minerId: 'm-a' });
+      // The checkpoint's readers widen with the group's, as its notices' do.
+      expect((await book().collection('accountCheckpoints').doc('m-a').get()).get('uids')).toEqual([
+        'char:60',
+        'char:77',
+      ]);
     });
 
     it('refuses a claim when the corporation has no book', async () => {
@@ -2690,7 +2700,6 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       characterIds: [50],
       kind: 'late',
       issuedAt: '2026-10-18T09:00:00.000Z',
-      code: 'MTCODE01',
       pricing: { hubId: 'jita', oreForm: 'compressed' },
       lines: [
         {
@@ -2714,14 +2723,15 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
 
     it('stores the notice, its link and token, and mirrors both for older tabs', async () => {
       await turnOn();
-      const out = await issue('n1', { uids: ['char:666'], issuedBy: 666 });
+      // The tab's own say on readers counts for nothing: the Miner's characters read it.
+      const out = await issue('n1', { uids: ['char:666'], issuedBy: 666, characterIds: [666] });
       expect(out).toMatchObject({ noticeId: 'n1', verifyToken: expect.any(String) });
       const stored = (await book().collection('lateNotices').doc('n1').get()).data();
       expect(stored).toMatchObject({
         id: 'n1',
         minerId: 'solo:50',
         kind: 'late',
-        code: 'MTCODE01',
+        code: paymentCode('n1'),
         listed: 10_000,
         // The server names its readers and who issued it, never the tab.
         uids: ['char:50'],
@@ -2735,7 +2745,7 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect((await book().collection('statements').doc('n1').get()).data()).toMatchObject({
         id: 'n1',
         kind: 'notice',
-        code: 'MTCODE01',
+        code: paymentCode('n1'),
         amount: 10_000,
         uids: ['char:50'],
         lines: [{ chargeKey: '50:1000:2026-10-05' }],
@@ -2825,12 +2835,52 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       const plan = await planLateNoticeBackfill(db, CORP);
       expect(plan.links).toEqual([{ id: 'n1', token: verifyToken }]);
       await applyLateNoticeBackfill(db, CORP, plan);
+      expect((await book().collection('meta').doc('lateNoticesBackfilled').get()).exists).toBe(
+        true
+      );
       const again = (await book().collection('lateNotices').doc('n1').get()).data();
       expect({ ...again, updatedAt: null }).toEqual({ ...copied, updatedAt: null });
       expect((await book().collection('lateNoticeLinks').doc('n1').get()).get('token')).toBe(
         verifyToken
       );
-      expect(await planLateNoticeBackfill(db, CORP)).toEqual({ notices: [], links: [] });
+      expect(await planLateNoticeBackfill(db, CORP)).toEqual({ notices: [], links: [], mail: [] });
+      // Mail an older tab recorded only on the legacy doc is brought across on a re-run.
+      await book().collection('statements').doc('n1').update({ mailsSent: 4 });
+      const again2 = await planLateNoticeBackfill(db, CORP);
+      expect(again2.mail).toEqual([{ id: 'n1', mail: expect.objectContaining({ sent: 4 }) }]);
+      await applyLateNoticeBackfill(db, CORP, again2);
+      expect((await book().collection('lateNotices').doc('n1').get()).get('mail.sent')).toBe(4);
+    });
+
+    it('reads mail from both docs while the mirror lives, and resolves only a token that names a notice', async () => {
+      await turnOn();
+      const { verifyToken } = await issue('n1');
+      // A rolled-back function or an older tab wrote only the legacy doc.
+      await book()
+        .collection('statements')
+        .doc('n1')
+        .update({ remindersStopped: true, mailsSent: 3 });
+      expect((await readStatementByToken(deps(), String(verifyToken))).remindersStopped).toBe(true);
+      // Stopped on either doc: one manual reminder, then no more.
+      await edit(ACCOUNTANT, { action: 'recordReminder', noticeId: 'n1' });
+      expect(await reason(edit(ACCOUNTANT, { action: 'recordReminder', noticeId: 'n1' }))).toBe(
+        'reminders-stopped'
+      );
+      await db
+        .collection('corpTaxBookTokens')
+        .doc('t'.repeat(43))
+        .set({ corporationId: CORP, minerId: 'solo:50' });
+      expect(await reason(readStatementByToken(deps(), 't'.repeat(43)))).toBe('invalid-token');
+      expect(await reason(setRemindersByToken(deps(), 't'.repeat(43), true))).toBe('invalid-token');
+    });
+
+    it('a calendar Statement an older tab issues brings the legacy reads back', async () => {
+      await turnOn();
+      await book().collection('meta').doc('lateNoticesBackfilled').set({ at: 1 });
+      await edit(ACCOUNTANT, { action: 'issueStatement', statement: statement('cal1') });
+      expect((await book().collection('meta').doc('lateNoticesBackfilled').get()).exists).toBe(
+        false
+      );
     });
 
     it('refuses a final notice for a closed account', async () => {
@@ -2839,25 +2889,32 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect(await reason(issue('n1'))).toBe('account-closed');
     });
 
-    describe('recordCheckpoints', () => {
-      const checkpoint = (minerId: string, through: string) => ({
+    describe('recordCheckpoints: a checkpoint is a cache, stored only when it can be trusted', () => {
+      const checkpoint = (
+        minerId: string,
+        through: string,
+        over: Record<string, unknown> = {}
+      ) => ({
         minerId,
         through,
         owed: [],
         credit: 0,
         balance: 0,
         paidThrough: through,
+        ...over,
       });
       const record = (...checkpoints: ReturnType<typeof checkpoint>[]) =>
         edit(ACCOUNTANT, { action: 'recordCheckpoints', checkpoints });
       const stored = async (minerId: string) =>
         (await book().collection('accountCheckpoints').doc(minerId).get()).data();
 
-      it('moves only forward, never past what may close today, and skips what it refuses', async () => {
+      it('moves only forward, never past what may close today, and reports what it skips', async () => {
         await turnOn();
+        await minedHere(50, 52);
         // Today is 18 Oct: the last month at least 31 days closed is August.
         expect(await record(checkpoint('solo:50', '2026-07-31'))).toEqual({
           recorded: ['solo:50'],
+          skipped: [],
         });
         expect(await stored('solo:50')).toMatchObject({
           through: '2026-07-31',
@@ -2868,16 +2925,86 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         });
         const out = await record(
           checkpoint('solo:50', '2026-06-30'),
-          checkpoint('solo:51', '2026-09-30'),
+          checkpoint('solo:52', '2026-09-30'),
+          checkpoint('solo:52', '2026-08-31', { balance: 7 }),
+          checkpoint('solo:404', '2026-08-31'),
           checkpoint('solo:52', '2026-08-31')
         );
-        expect(out).toEqual({ recorded: ['solo:52'] });
-        expect((await stored('solo:50'))?.through).toBe('2026-07-31');
-        expect(await stored('solo:51')).toBeUndefined();
-        expect(await record(checkpoint('solo:50', '2026-08-31'))).toEqual({
-          recorded: ['solo:50'],
+        expect(out).toEqual({
+          recorded: ['solo:52'],
+          skipped: [
+            { minerId: 'solo:50', reason: 'not-forward' },
+            { minerId: 'solo:52', reason: 'not-forward' },
+            { minerId: 'solo:52', reason: 'balance' },
+            { minerId: 'solo:404', reason: 'unknown-miner' },
+          ],
         });
-        expect((await stored('solo:50'))?.through).toBe('2026-08-31');
+        expect((await stored('solo:50'))?.through).toBe('2026-07-31');
+        expect(await stored('solo:404')).toBeUndefined();
+        // The audit holds the full figures of what it stored, and why each other was skipped.
+        const entry = (
+          await book().collection('audit').where('action', '==', 'recordCheckpoints').get()
+        ).docs
+          .map((d) => d.data())
+          .find((e) => e.detail.skipped.length > 0);
+        expect(entry?.detail).toMatchObject({
+          recorded: [checkpoint('solo:52', '2026-08-31')],
+          skipped: expect.arrayContaining([
+            { minerId: 'solo:404', through: '2026-08-31', reason: 'unknown-miner' },
+          ]),
+        });
+      });
+
+      it('one that owes less than the recorded account through its date needs a Director', async () => {
+        await turnOn();
+        await minedHere(50);
+        await edit(ACCOUNTANT, {
+          action: 'recordAccounts',
+          accounts: [
+            {
+              minerId: 'solo:50',
+              owed: 300,
+              paid: 0,
+              days: 2,
+              unpaidDays: [
+                { date: '2026-08-05', owed: 100, tax: 100 },
+                { date: '2026-09-05', owed: 200, tax: 200 },
+              ],
+            },
+          ],
+        });
+        const forgiving = checkpoint('solo:50', '2026-08-31');
+        expect(await record(forgiving)).toMatchObject({
+          skipped: [{ minerId: 'solo:50', reason: 'director-approval' }],
+        });
+        const owing = checkpoint('solo:50', '2026-08-31', {
+          owed: [{ date: '2026-08-05', remaining: 100 }],
+          balance: 100,
+          paidThrough: '2026-08-04',
+        });
+        expect(await record(owing)).toMatchObject({ recorded: ['solo:50'] });
+        await book().collection('accountCheckpoints').doc('solo:50').delete();
+        expect(
+          await edit(DIRECTOR, { action: 'recordCheckpoints', checkpoints: [forgiving] })
+        ).toMatchObject({ recorded: ['solo:50'] });
+      });
+
+      it('a Director resets a checkpoint, audited; no one else may', async () => {
+        await turnOn();
+        await minedHere(50);
+        await record(checkpoint('solo:50', '2026-07-31'));
+        const reset = { action: 'resetCheckpoint', minerId: 'solo:50' };
+        expect(await reason(edit(ACCOUNTANT, reset, true))).toBe('director-approval');
+        await edit(DIRECTOR, reset, true);
+        expect(await stored('solo:50')).toBeUndefined();
+        const entry = (
+          await book().collection('audit').where('action', '==', 'resetCheckpoint').get()
+        ).docs[0]?.data();
+        expect(entry?.detail).toMatchObject({
+          minerId: 'solo:50',
+          checkpoint: { through: '2026-07-31' },
+        });
+        expect(await reason(edit(DIRECTOR, reset, true))).toBe('not-found');
       });
 
       it('needs an editor', async () => {
@@ -2907,7 +3034,7 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
             lines: [{ recordKey: `50:1000:${date}`, typeId: 1, quantity: 1, payeeName: 'P' }],
           });
 
-      it('pins nothing an older client names, and closes the disputes of the days it forgives', async () => {
+      it('closes the disputes of the days it forgives off the account as it stands now', async () => {
         await turnOn();
         await edit(ACCOUNTANT, {
           action: 'recordAccounts',
@@ -2926,18 +3053,56 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         });
         await dispute('2026-10-05');
         await dispute('2026-10-06');
+        // An older tab naming a Statement meant something else: it is told to reload.
+        expect(
+          await reason(
+            // The refusal comes from parsing, before any call is made.
+            Promise.resolve().then(() =>
+              edit(
+                ACCOUNTANT,
+                {
+                  action: 'writeOff',
+                  minerId: 'solo:50',
+                  statementId: 's1',
+                  amount: 150,
+                  reason: 'r',
+                },
+                true
+              )
+            )
+          )
+        ).toBe('reload');
+        // Paid since the record: 50 of the oldest day, so 150 forgives the rest of it and 100 more.
+        await edit(ACCOUNTANT, {
+          action: 'recordPayment',
+          paymentId: 'm1',
+          minerId: 'solo:50',
+          characterId: 50,
+          amount: 50,
+          at: '2026-10-17T00:00:00Z',
+        });
         const { writeOffId } = await edit(
           ACCOUNTANT,
-          { action: 'writeOff', minerId: 'solo:50', statementId: 's1', amount: 150, reason: 'r' },
+          { action: 'writeOff', minerId: 'solo:50', amount: 150, reason: 'r' },
           true
         );
-        expect(
-          (await book().collection('writeOffs').doc(String(writeOffId)).get()).data()
-        ).not.toHaveProperty('statementId');
         const resolution = async (date: string) =>
           (await book().collection('disputes').doc(`solo_50_${date}`).get()).get('resolution');
         expect(await resolution('2026-10-05')).toMatchObject({ kind: 'dismissed', writeOffId });
         expect(await resolution('2026-10-06')).toBeUndefined();
+      });
+
+      it('closes none when the account’s days are unknown', async () => {
+        await turnOn();
+        await dispute('2026-10-05');
+        await edit(
+          ACCOUNTANT,
+          { action: 'writeOff', minerId: 'solo:50', amount: 1_000_000, reason: 'r' },
+          true
+        );
+        expect(
+          (await book().collection('disputes').doc('solo_50_2026-10-05').get()).get('resolution')
+        ).toBeUndefined();
       });
     });
   });

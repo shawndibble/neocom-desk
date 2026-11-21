@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   finalNoticeId,
+  isFinalNoticeId,
+  mergeNoticeMail,
   legacyStatementDocOf,
   listedKeys,
   paymentCode,
@@ -233,5 +235,35 @@ describe('legacyStatementDocOf', () => {
       amount: 3_000_000,
     });
     expect((doc.lines as { adjustmentId?: string }[])[1]?.adjustmentId).toBe('a1');
+  });
+});
+
+describe('isFinalNoticeId', () => {
+  it('names only the ids closing an account gives', () => {
+    expect(isFinalNoticeId(finalNoticeId('solo:5'))).toBe(true);
+    expect(isFinalNoticeId('final_anything')).toBe(true);
+    expect(isFinalNoticeId('notice_solo:5')).toBe(false);
+  });
+});
+
+describe('mergeNoticeMail: one notice kept in two docs reads as one mail state', () => {
+  it('stops reminders if either doc did, and keeps the larger count and the later mail', () => {
+    expect(
+      mergeNoticeMail(
+        { sent: 2, manualSent: 0, remindersStopped: false, lastAt: '2026-11-19T00:00:00.000Z' },
+        { sent: 1, manualSent: 1, remindersStopped: true, lastAt: '2026-11-20T00:00:00.000Z' }
+      )
+    ).toEqual({
+      sent: 2,
+      manualSent: 1,
+      remindersStopped: true,
+      lastAt: '2026-11-20T00:00:00.000Z',
+    });
+    expect(
+      mergeNoticeMail(
+        { sent: 0, manualSent: 0, remindersStopped: false },
+        { sent: 0, manualSent: 0, remindersStopped: false }
+      )
+    ).toEqual({ sent: 0, manualSent: 0, remindersStopped: false });
   });
 });

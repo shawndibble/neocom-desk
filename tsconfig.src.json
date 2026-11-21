@@ -24,6 +24,7 @@
     "functions/src/corpTaxBookCheckpoint.ts",
     "functions/src/corpTaxBookReadModels.ts",
     "functions/src/corpTaxBookAccounts.ts",
+    "functions/src/corpTaxBookDonationMatch.ts",
     "functions/src/corpTaxBookSchedule.ts",
     "functions/src/corpTaxBookVersionKeys.ts",
     "functions/src/popSharing.ts",
