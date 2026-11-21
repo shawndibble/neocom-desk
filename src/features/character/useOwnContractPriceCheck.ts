@@ -44,14 +44,12 @@ export function useOwnContractPriceCheck({
   contract,
   items,
   hub,
-  onHubChange,
   isAbyssalType,
 }: {
   contract: Contract;
   /** `undefined` until the item read settles. */
   items: readonly ContractItem[] | undefined;
   hub: TradeHub;
-  onHubChange?: (hubId: TradeHub['id']) => void;
   isAbyssalType?: (typeId: number) => boolean;
 }): ContractPriceCheckView | null {
   const asking = ownContractAskingPrice(contract);
@@ -91,7 +89,7 @@ export function useOwnContractPriceCheck({
     asking,
     basis,
     hub,
-    onHubChange,
+    hubArea: 'contracts',
     defaultSide: 'buy',
     sellOverrides,
   });

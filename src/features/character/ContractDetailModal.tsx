@@ -57,7 +57,7 @@ import {
 } from './contractLabels';
 import { ItemInfoLink } from '@/features/entities';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
 import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { CharacterLink, CorporationLink, PlaceLink, SystemLink } from '@/features/entities';
@@ -158,8 +158,7 @@ export function ContractDetailModal({
   const timeZone = useTimeZone();
   const now = useNow();
   const deliverByMs = courierDeliveryDeadlineMs(contract);
-  const hubId = useMarketHub((s) => s.value);
-  const setHubId = useMarketHub((s) => s.setValue);
+  const { hubId } = useHubFor('contracts');
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   const isAbyssalType = useMutaplasmidLookup()?.isAbyssalType;
   const [location, setLocation] = useState<LocationState | undefined>(undefined);
@@ -254,7 +253,6 @@ export function ContractDetailModal({
     contract,
     items: HAS_ITEMS.has(contract.type) ? items?.list : undefined,
     hub,
-    onHubChange: (id) => void setHubId(id),
     isAbyssalType,
   });
 

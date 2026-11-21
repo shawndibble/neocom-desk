@@ -13,7 +13,7 @@ import {
 } from '@/engine/contracts/belowMarket';
 import { PLEX_TYPE_ID, type PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import { loadMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import type { PriceSide } from '@/engine/miningTax/priceBasis';
 import { createLocalSetting } from '@/lib/useLocalSetting';
@@ -38,11 +38,10 @@ export const useBelowMarketSide = createLocalSetting<PriceSide>({
 async function loadBelowMarketPricing(
   rows: readonly PublicContractOfferRow[],
   plexPrice: number | null,
-  side: PriceSide
+  side: PriceSide,
+  hub: TradeHub
 ): Promise<BelowMarketPricingRead> {
-  const [lookup] = await Promise.all([loadMutaplasmidLookup(), useMarketHub.getState().hydrate()]);
-  const hub = getTradeHub(useMarketHub.getState().value) ?? DEFAULT_TRADE_HUB;
-  const { isAbyssalType } = lookup;
+  const { isAbyssalType } = await loadMutaplasmidLookup();
   const typeIds = belowMarketPriceTypeIds(rows, plexPrice, isAbyssalType);
   const { prices: books, unreachable } = await getHubPricesWithStatus(hub, typeIds);
   const prices = new Map<number, number | null>();
@@ -77,12 +76,14 @@ interface PricedRows {
   rows: readonly PublicContractOfferRow[];
   plexPrice: number | null;
   side: PriceSide;
+  hub: TradeHub;
   result: BelowMarketPricingRead;
 }
 
 /**
  * The Below market contracts of `rows`, which must be the whole snapshot.
- * Re-priced whenever the rows or the PLEX price change; the last answer stays
+ * Re-priced whenever the rows, the PLEX price, the side or the Contracts hub
+ * (`useHubFor('contracts')`, the hub its detail panel prices at) change; the last answer stays
  * on screen until the next lands, and through a failed re-price.
  */
 export function useBelowMarket(
@@ -93,13 +94,15 @@ export function useBelowMarket(
   includeOther: boolean
 ): BelowMarketState {
   const [read, setRead] = useState<PricedRows | 'failed' | null>(null);
+  const { hubId, hydrated: hubHydrated } = useHubFor('contracts');
+  const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
 
   useEffect(() => {
-    if (!enabled || rows.length === 0) return;
+    if (!enabled || rows.length === 0 || !hubHydrated) return;
     let cancelled = false;
-    void loadBelowMarketPricing(rows, plexPrice, side).then(
+    void loadBelowMarketPricing(rows, plexPrice, side, hub).then(
       (result) => {
-        if (!cancelled) setRead({ rows, plexPrice, side, result });
+        if (!cancelled) setRead({ rows, plexPrice, side, hub, result });
       },
       () => {
         if (!cancelled) setRead((last) => (last !== null && last !== 'failed' ? last : 'failed'));
@@ -108,7 +111,7 @@ export function useBelowMarket(
     return () => {
       cancelled = true;
     };
-  }, [enabled, rows, plexPrice, side]);
+  }, [enabled, rows, plexPrice, side, hub, hubHydrated]);
 
   // Keyed on the read alone: newer rows arriving must not re-run the valuation over the old ones.
   const contracts = useMemo(
@@ -123,7 +126,8 @@ export function useBelowMarket(
     read !== 'failed' &&
     read.rows === rows &&
     read.plexPrice === plexPrice &&
-    read.side === side;
+    read.side === side &&
+    read.hub === hub;
 
   return useMemo<BelowMarketState>(() => {
     if (!enabled) return IDLE;

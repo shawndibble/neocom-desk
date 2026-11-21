@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import { PLEX_TYPE_ID } from '@/engine/contracts/contractOffers';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
 import { idSetKey } from '@/lib/idSetKey';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { getHubPricesWithStatus, getRegionSellPrices } from '@/market/prices';
@@ -56,7 +56,8 @@ export function useContractFlagPrices(
   rows: readonly PublicContractOfferRow[],
   enabled: boolean
 ): ContractFlagPrices {
-  const hubId = useMarketHub((state) => state.value);
+  // The Contracts hub, so a row's flag and the detail panel it opens agree.
+  const { hubId } = useHubFor('contracts');
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
 
   // PLEX trades only on its own market, so no hub lists it.
