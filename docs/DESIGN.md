@@ -1531,6 +1531,10 @@ is clutter, and clutter hides the actions that matter.
   `RowActionsMenu` or `rowContextMenu` too), not hidden: a row without a ⋮
   has no custom right-click or touch-and-hold menu, and the browser's own
   menu still copies text.
+  Recorded exception: a Corp assets row grouped by location unfolds on click
+  and keeps a one-item ⋮, Show by item, for the by-item view its click used to
+  open
+  (`docs/context/decisions/20261121-111052-corp-assets-location-rows-unfold-on-click-show.md`).
 - **A chart mark may have a one-item right-click menu** when a visible,
   keyboard-reachable control elsewhere does the same thing (the Survey's
   "Remove scan" on a chart node, with Remove/Restore in the scan list below the
