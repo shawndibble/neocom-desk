@@ -51,7 +51,7 @@ describe('Miner page', () => {
       /^Owed days · /,
       /^Today's mining · 1/,
       /^Earlier days · /,
-      /^Payments · 1/,
+      /^Ledger · /,
       /^Activity · 0/,
     ])
       expect(screen.getByText(title)).toBeInTheDocument();
@@ -69,11 +69,10 @@ describe('Miner page', () => {
       ).toBeTruthy();
   });
 
-  it('sorts the Payments ledger by When, From and Amount', () => {
+  it('has no separate Payments table: payments are rows of the Ledger', () => {
     renderBook(<MinerDetail id={VARRO_ID} />);
-    const payments = screen.getByRole('table', { name: 'Payments' });
-    for (const name of [/^When/, /^From/, /^Amount/])
-      expect(within(payments).getByRole('button', { name })).toBeInTheDocument();
+    expect(screen.queryByRole('table', { name: 'Payments' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Payments · /)).not.toBeInTheDocument();
   });
 
   it('keeps the characters panel reachable from the header', async () => {

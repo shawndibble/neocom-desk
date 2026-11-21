@@ -251,32 +251,6 @@ export function splitPlace(
 
 // --- Merged ledgers --------------------------------------------------------
 
-export type LedgerRow<P extends { id: string; at: string }, A extends { id: string; at: string }> =
-  | { kind: 'payment'; id: string; at: string; payment: P }
-  | { kind: 'correction'; id: string; at: string; correction: A };
-
-/** A Miner's Payments ledger: payments and the correction lines given, newest first. */
-export function paymentLedger<
-  P extends { id: string; at: string },
-  A extends { id: string; at: string },
->(payments: readonly P[], corrections: readonly A[]): LedgerRow<P, A>[] {
-  const rows: LedgerRow<P, A>[] = [
-    ...payments.map((payment): LedgerRow<P, A> => ({
-      kind: 'payment',
-      id: payment.id,
-      at: payment.at,
-      payment,
-    })),
-    ...corrections.map((correction): LedgerRow<P, A> => ({
-      kind: 'correction',
-      id: correction.id,
-      at: correction.at,
-      correction,
-    })),
-  ];
-  return rows.sort((a, b) => b.at.localeCompare(a.at) || a.id.localeCompare(b.id));
-}
-
 export type ActivityKind = 'mail' | 'dismissed' | 'audit';
 
 /** Audit actions that are mail going out: the Mail chip counts them, not Audit. */

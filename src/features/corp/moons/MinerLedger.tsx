@@ -1,6 +1,7 @@
 import { useMemo, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useOpenAfterMenu } from '@/components/ui';
+import { inRange } from '@/engine/corpTaxBook/bookSections';
 import { minerLedgerSource } from '@/engine/corpTaxBook/minerLedgerSource';
 import { minerAccountOf, type MinerDetail } from '@/engine/corpTaxBook/bookView';
 import { payeeLedger, type PayeeLedgerRow } from '@/engine/miningTax/payeeLedger';
@@ -22,12 +23,15 @@ export function MinerLedger({
   detail,
   phone,
   actions,
+  from,
 }: {
   minerId: string;
   detail: MinerDetail;
   phone: boolean;
   /** What a row's menu opens; without it the rows have no menu. */
   actions?: LedgerActions;
+  /** The first UTC day the page's range takes in; earlier rows hide (the balance keeps them). */
+  from?: string;
 }) {
   const { t } = useTranslation();
   const { view, names } = useBook();
@@ -48,7 +52,13 @@ export function MinerLedger({
       })
     );
   }, [view, minerId, detail.days, names]);
-  const rows = useMemo(() => [...(ledger?.rows ?? [])].reverse(), [ledger]);
+  const rows = useMemo(
+    () =>
+      [...(ledger?.rows ?? [])]
+        .filter((r) => r.kind === 'opening' || inRange(r.date, from))
+        .reverse(),
+    [ledger, from]
+  );
   const typeNames = useMemo(() => {
     const out = new Map<number, string>();
     for (const d of detail.days) for (const l of d.oreLines) out.set(l.typeId, names.ore(l.typeId));

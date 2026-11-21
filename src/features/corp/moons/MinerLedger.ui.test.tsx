@@ -99,7 +99,7 @@ function running(overrides: Partial<BookViewInput> = {}) {
   );
 }
 
-function renderLedger(view = running(), canEdit = true) {
+function renderLedger(view = running(), canEdit = true, from?: string) {
   const calls: string[] = [];
   const actions: LedgerActions = {
     editCorrection: (id) => calls.push(`edit:${id}`),
@@ -134,7 +134,7 @@ function renderLedger(view = running(), canEdit = true) {
           reload: vi.fn(),
         }}
       >
-        <MinerLedger minerId="solo:2" detail={detail} phone={false} actions={actions} />
+        <MinerLedger minerId="solo:2" detail={detail} phone={false} actions={actions} from={from} />
       </BookProvider>
     </MemoryRouter>
   );
@@ -199,6 +199,41 @@ describe('the Miner ledger row menus (the one Payee ledger)', () => {
       'href',
       '/corp/wallet?division=3&highlight=5550123'
     );
+  });
+
+  it('opens a payment to its source, the days it paid and what was marked not tax', async () => {
+    renderLedger(
+      running({
+        payments: [
+          {
+            id: 'p1',
+            minerId: 'solo:2',
+            characterId: 2,
+            amount: 249_000,
+            notTaxAmount: 50_000,
+            at: '2026-08-12T10:00:00Z',
+            source: 'manual',
+          } as never,
+        ],
+      })
+    );
+    await userEvent.click(screen.getByText(/^Payment from Pilot 2/));
+    expect(screen.getByText('Recorded by hand')).toBeInTheDocument();
+    expect(screen.getByText(/marked not tax, so not credited/)).toHaveTextContent('50,000 ISK');
+    expect(screen.getByText('Days it paid')).toBeInTheDocument();
+  });
+
+  it("names a donation as one in the payment's detail", async () => {
+    renderLedger();
+    await userEvent.click(screen.getByText(/^Payment from Pilot 2/));
+    expect(screen.getByText('A donation')).toBeInTheDocument();
+  });
+
+  it("hides rows before the page's range, and keeps the later ones", () => {
+    renderLedger(running(), true, '2026-08-13');
+    expect(screen.queryByText(/^Payment from Pilot 2/)).not.toBeInTheDocument();
+    renderLedger(running(), true, '2026-08-12');
+    expect(screen.getByText(/^Payment from Pilot 2/)).toBeInTheDocument();
   });
 
   it('gives a row dated before the lock date no menu: locked history is read-only', () => {

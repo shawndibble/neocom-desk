@@ -6,7 +6,7 @@
  */
 import { expect, minerFact, openMiner, signInAsOfficer, test } from './support/taxBook/bookTest';
 import { DAY_TOLERANCE, paymentBook, twoRefineriesBook } from './support/taxBook/bookScenarios';
-import { DAY_TAX, isk, shortDay } from './support/taxBook/bookSeed';
+import { DAY_TAX, day, isk, shortDay } from './support/taxBook/bookSeed';
 import { MINER } from './support/taxBook/identities';
 import {
   PILOT,
@@ -19,6 +19,11 @@ import type { Page } from '@playwright/test';
 
 const ledgerRow = (page: Page, name: RegExp) =>
   page.getByRole('table', { name: 'Ledger', exact: true }).getByRole('row', { name });
+/** Opens a payment row in the Ledger: its detail lists the days it paid, as ISO dates. */
+const openPayment = async (page: Page, name: RegExp) => {
+  await ledgerRow(page, name).click();
+  return page.getByRole('table', { name: 'Ledger', exact: true });
+};
 const minersRow = (page: Page) =>
   page
     .getByRole('table', { name: 'Miners' })
@@ -33,8 +38,8 @@ test('an exact payment pays the oldest day and leaves the next owed', async ({ p
   await expect(ledgerRow(page, /Payment from Ada Lunar/)).toContainText(
     `${isk(b.paid)}${isk(DAY_TAX)}`
   );
-  await expect(page.getByRole('table', { name: 'Payments' })).toContainText(
-    `Paid 1 day, from ${shortDay(b.oldestBack)}`
+  await expect(await openPayment(page, /Payment from Ada Lunar/)).toContainText(
+    `Days it paid${day(b.oldestBack)}`
   );
 });
 
@@ -89,8 +94,8 @@ test('two refineries on one date are paid as one date', async ({ page, book }) =
   await openMiner(page, b.minerId, MINER.ada.name);
   await expect(page.getByRole('main')).toContainText(`Owed${isk(DAY_TAX)}`);
   await expect(minerFact(page, 'Oldest unpaid')).toContainText(shortDay(b.owedBack));
-  await expect(page.getByRole('table', { name: 'Payments' })).toContainText(
-    `Paid 1 day, from ${shortDay(b.sharedBack)}`
+  await expect(await openPayment(page, /Payment from Ada Lunar/)).toContainText(
+    `Days it paid${day(b.sharedBack)}`
   );
 });
 
@@ -103,7 +108,7 @@ test("an alt's donation pays its group's oldest day", async ({ page, book }) => 
   await openMiner(page, PILOT_MINER_ID, PILOT.name);
   await expect(page.getByRole('main')).toContainText(`Owed${isk(member.owed - DAY_TAX)}`);
   await expect(ledgerRow(page, new RegExp(`Payment from ${PILOT_ALT.name}`))).toBeVisible();
-  await expect(page.getByRole('table', { name: 'Payments' })).toContainText(
-    `Paid 1 day, from ${shortDay(member.bookDays[0])}`
+  await expect(await openPayment(page, new RegExp(`Payment from ${PILOT_ALT.name}`))).toContainText(
+    `Days it paid${day(member.bookDays[0])}`
   );
 });
