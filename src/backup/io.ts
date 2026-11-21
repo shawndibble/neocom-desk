@@ -40,10 +40,20 @@ async function readEditableTables(): Promise<Record<string, EditableRow[]>> {
   return Object.fromEntries(entries);
 }
 
+/**
+ * Adds a new Character's Editable Data rows. A row whose id the device already holds (a payment
+ * link another Character owns here, say) is left as it is: import never overwrites, and one
+ * duplicate never fails the whole import with a ConstraintError.
+ */
 async function writeEditableTables(editableTables: Record<string, EditableRow[]>): Promise<void> {
   for (const table of EDITABLE_TABLES) {
     const rows = editableTables[table];
-    if (rows?.length) await editableTable(table).bulkAdd(rows);
+    if (!rows?.length) continue;
+    const target = editableTable(table);
+    // Every Editable Data table is keyed by `id`, the id the sync merges by.
+    const held = await target.bulkGet(rows.map((r) => r.id));
+    const fresh = rows.filter((_, i) => held[i] === undefined);
+    if (fresh.length) await target.bulkAdd(fresh);
   }
 }
 

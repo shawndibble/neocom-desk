@@ -137,6 +137,21 @@ describe('PayeeAccount', () => {
       );
     });
 
+    it('drops a stored checkpoint whose closed history no longer adds up (a write past the app)', () => {
+      // A zero-tax day closed paid; then the store is rewritten under the app (an import, a
+      // seed) with the same day owing: the checkpoint must not say it is paid.
+      const zero = [charge('z', '2026-08-10', 0)];
+      const stored = PayeeAccount.build({ payeeId: 'p1', charges: zero, links: [] }).nextCheckpoint(
+        TODAY,
+        '2026-11-20T00:00:00Z'
+      )!;
+      const owed = [charge('z', '2026-08-10', 300_000)];
+      const resumed = PayeeAccount.build({ payeeId: 'p1', charges: owed, links: [], stored });
+      expect(resumed.startsFrom).toBeUndefined();
+      expect(resumed.isPaid('2026-08-10')).toBe(false);
+      expect(resumed.owes?.amount).toBe(300_000);
+    });
+
     it('feeds the Payee ledger an opening row for what it closed', () => {
       const old = [charge('z', '2026-08-10', 300_000), ...CHARGES];
       const links = [link(1, 100_000, '2026-08-20')];

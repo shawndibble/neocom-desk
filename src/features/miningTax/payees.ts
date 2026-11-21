@@ -24,7 +24,8 @@ async function putPayees(records: readonly PayeeRecord[]): Promise<void> {
     const stored = await db.payees.bulkGet(records.map((r) => r.id));
     if (records.some((r, i) => !stored[i] || payeeGroupKey(stored[i]) !== payeeGroupKey(r)))
       await dropPayeeCheckpointsFrom(null);
-    await db.payees.bulkPut([...records]);
+    // One `put` per record, as every Payee write always made: a pilot has a handful.
+    for (const r of records) await db.payees.put(r);
   });
 }
 
