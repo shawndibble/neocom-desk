@@ -102,6 +102,22 @@ export function isSnapshot(checkpoint: Pick<RunningAccountCheckpoint, 'through' 
   return checkpoint.through <= snapshotThroughFor(checkpoint.at.slice(0, 10));
 }
 
+/**
+ * Whether a dismissal waives `date`, read off its lock-date stamps (owner's decision, option A):
+ * a Miner, moon or Extraction dismissal is stored with `from`, the lock date when it was made, and
+ * waives only days on or after it; a reversal is stored with its own `from` and ends the
+ * dismissal from that day, so days before the lock date stay as they were. A dismissal or a
+ * reversal stored without `from` (before the lock date existed) reaches every day. Which charges a
+ * dismissal's scope covers is the engine's to say; this is only its dates.
+ */
+export function dismissalWaives(
+  d: { from?: string; reversed?: { from?: string } | null },
+  date: string
+): boolean {
+  if (d.from !== undefined && date < d.from) return false;
+  return !d.reversed || (d.reversed.from !== undefined && date < d.reversed.from);
+}
+
 /** Why a checkpoint does not add up. */
 export type CheckpointProblem =
   | 'owed-order'

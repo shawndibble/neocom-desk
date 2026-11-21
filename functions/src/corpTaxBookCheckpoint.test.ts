@@ -4,6 +4,7 @@ import {
   snapshotThroughFor,
   checkpointFits,
   checkpointProblems,
+  dismissalWaives,
   isLocked,
   isSnapshot,
 } from './corpTaxBookCheckpoint.js';
@@ -141,5 +142,21 @@ describe('isSnapshot: a checkpoint covers only days locked when it was recorded'
   it('is not one recorded through days still open then (the old strict cache)', () => {
     expect(isSnapshot({ through: '2026-10-31', at: '2026-12-01T10:00:00.000Z' })).toBe(false);
     expect(isSnapshot({ through: '2026-09-30', at: '2026-11-21T10:00:00.000Z' })).toBe(false);
+  });
+});
+
+describe('dismissalWaives: a wide dismissal changes nothing before the lock date', () => {
+  it('waives every day without `from` (one made before the lock date existed)', () => {
+    expect(dismissalWaives({}, '2026-01-01')).toBe(true);
+  });
+  it('waives only days on or after its `from`', () => {
+    expect(dismissalWaives({ from: '2026-10-01' }, '2026-09-30')).toBe(false);
+    expect(dismissalWaives({ from: '2026-10-01' }, '2026-10-01')).toBe(true);
+  });
+  it('a reversal ends it from its own `from`, and a legacy reversal ends it outright', () => {
+    const reversed = { from: '2026-08-01', reversed: { from: '2026-10-01' } };
+    expect(dismissalWaives(reversed, '2026-09-30')).toBe(true);
+    expect(dismissalWaives(reversed, '2026-10-01')).toBe(false);
+    expect(dismissalWaives({ reversed: {} }, '2026-01-01')).toBe(false);
   });
 });
