@@ -149,6 +149,12 @@ export interface EditableCollection<
    */
   tombstoneSegment: string;
   /**
+   * A collection newer than the deployed rules may be: a pull or push the rules refuse
+   * (`permission-denied`) reads as "not ready yet", never as a sync error. Its rows stay in
+   * Dexie and the next pass tries again.
+   */
+  rulesMayLag?: true;
+  /**
    * What removing a Character (features/character/removeCharacter.ts) does
    * to this table's local rows. A change of owner (planSync's
    * handleOwnerHashChange) always wipes every editable collection.
@@ -745,6 +751,7 @@ export const MINING_TAX_PAYMENT_LINKS = defineEditableCollection<
   remoteName: 'miningTaxPaymentLinks',
   table: 'miningTaxPaymentLinks',
   tombstoneSegment: 'miningTaxPaymentLinkTombstones',
+  rulesMayLag: true,
   onRemoval: 'delete',
   faqItem: 'miningTax',
   toRemoteDoc: (l, ownerHash) => ({
