@@ -71,11 +71,13 @@ export function liveAccount(
 }
 
 /**
- * The Miner's mined days for the verify page's ledger: each date once, from the newest Statement
- * (a late notice lists every unpaid day again, so older ones overlap) that holds it, with that
- * Statement's tax for the date. Oldest first.
+ * The Miner's mined days for the verify page's ledger: each date once, from the newest Late notice
+ * that lists it (an older notice may list it too), with that notice's tax for the date. Oldest
+ * first.
  */
-export function ledgerDays(statements: readonly Data[]): { date: string; tax: number }[] {
+export function ledgerDays(
+  statements: readonly { issuedAt?: unknown; lines?: unknown }[]
+): { date: string; tax: number }[] {
   const newestFirst = [...statements].sort((a, b) =>
     String(b.issuedAt ?? '').localeCompare(String(a.issuedAt ?? ''))
   );

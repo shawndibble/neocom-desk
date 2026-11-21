@@ -11,7 +11,9 @@
 //     extractions/{structure_start}             Extractions, kept after ESI stops listing them
 //     payments/{id}                             Tax Payments (donations found in the journal, manual)
 //     dismissals/{id}  declarations/{id}  adjustments/{id}  writeOffs/{id}  rebills/{id}
-//     statements/{id}                           issued Statements, create-only (forward-only)
+//     lateNotices/{id}  lateNoticeLinks/{id}    Late notices and their verify tokens (decision 20261120-235011)
+//     statements/{id}  statementLinks/{id}      the legacy mirror of every Late notice, for older tabs
+//     accountCheckpoints/{minerId}              a Running account's closed-through checkpoint
 //     miners/{minerId}                          Miner groupings
 //     meta/paid                                 paidStatementIds, only ever grown (D22)
 //     meta/uncounted                            donations into divisions the book does not read (#6207)
@@ -30,6 +32,13 @@ import {
   type StatementDays,
 } from './corpTaxBookEngine.js';
 import { DAY_MS } from './timeConstants.js';
+import {
+  finalNoticeId,
+  type LateNotice,
+  type LateNoticeKind,
+  type LateNoticeLine,
+} from './corpTaxBookLateNotice.js';
+import type { RunningAccountCheckpoint } from './corpTaxBookCheckpoint.js';
 import { UNCOUNTED_LIMIT, type UncountedDonation } from './corpTaxBookSyncEngine.js';
 import {
   MAX_POP_AUDIENCES,
@@ -82,6 +91,23 @@ export const REBILLS = 'rebills';
 export const STATEMENTS = 'statements';
 /** `statementLinks/{statementId}`: the verify token, readable by editors only. */
 export const STATEMENT_LINKS = 'statementLinks';
+/**
+ * `lateNotices/{noticeId}`: a `LateNotice` and a server `updatedAt` (decision 20261120-235011).
+ * Officers read every one; a Miner reads their own (`uids`).
+ */
+export const LATE_NOTICES = 'lateNotices';
+/** `lateNoticeLinks/{noticeId}`: `{ token }`, the verify link's token. Editors only. */
+export const LATE_NOTICE_LINKS = 'lateNoticeLinks';
+/**
+ * `accountCheckpoints/{minerId}`: a `RunningAccountCheckpoint`, its Miner's readers (`uids`) and a
+ * server `updatedAt`. Officers read every one; a Miner reads their own.
+ */
+export const ACCOUNT_CHECKPOINTS = 'accountCheckpoints';
+/**
+ * The field a declaration and a verify token name their Late notice by: the wire name they had
+ * when notices were stored as Statements, which every deployed client reads.
+ */
+export const NOTICE_ID_FIELD = 'statementId';
 export const MINERS = 'miners';
 /**
  * `accounts/{minerId}` (#6294): a running account's figures as an officer's client last worked
@@ -135,7 +161,8 @@ export const MAX_SYNC_OBSERVED = 2000;
 export const MAX_SYNC_EXTRACTIONS = 200;
 export const MAX_SYNC_DONATIONS = 500;
 export const MAX_RATES = 500;
-export const MAX_STATEMENT_JSON = 900_000;
+/** The largest Late notice (or legacy Statement) one call stores, as JSON: under Firestore's 1 MiB. */
+export const MAX_NOTICE_JSON = 900_000;
 
 const VIEW_ROLES = ['Director', 'Accountant', 'Junior_Accountant'];
 const EDIT_ROLES = ['Director', 'Accountant'];
@@ -688,7 +715,8 @@ export type EditAction =
       forgive: number;
       reason: string;
     }
-  | { action: 'writeOff'; minerId: string; statementId?: string; amount: number; reason: string }
+  /** Forgives the Miner's oldest unpaid days (decision 20261120-235011): it names no notice. */
+  | { action: 'writeOff'; minerId: string; amount: number; reason: string }
   | { action: 'rebill'; minerId: string; fromDate: string; reason: string }
   | {
       action: 'closeAccount';
@@ -705,11 +733,12 @@ export type EditAction =
       runningCredit?: number;
     }
   | { action: 'issueStatement'; statement: Record<string, unknown> }
+  | { action: 'issueLateNotice'; notice: LateNotice }
   | { action: 'settleStatements'; statementIds: string[] }
   /** An officer-recorded declaration. It carries the Miner's `uids`, so its note is theirs to read. */
   | {
       action: 'declare';
-      statementId: string;
+      noticeId: string;
       kind: 'contract' | 'other-division' | 'wrong-corp';
       note?: string;
     }
@@ -739,7 +768,7 @@ export type EditAction =
       /** A rejection's next step for the member (see `rejectDispute`). */
       nextStep?: string;
     }
-  | { action: 'recordReminder'; statementId: string }
+  | { action: 'recordReminder'; noticeId: string }
   /** Pop Sharing (#6222): the switch and the Sharing default. Turning it on needs Automatic sync. */
   | { action: 'setPopSharing'; enabled?: boolean; defaults?: Partial<PopSharingSettings> }
   /** One moon's overrides; null returns a setting to the Sharing default. */
@@ -750,8 +779,17 @@ export type EditAction =
       mailId: number;
       kind: 'statement' | 'reminder';
     }
+  | { action: 'recordLateNoticeMail'; noticeId: string; mailId: number; kind: LateNoticeMailKind }
   /** A running account's figures per Miner, as the officer's client works them out (#6294). */
-  | { action: 'recordAccounts'; accounts: RecordedAccount[] };
+  | { action: 'recordAccounts'; accounts: RecordedAccount[] }
+  /** Each Miner's closed-through checkpoint; the server sets who recorded it, when, and its readers. */
+  | { action: 'recordCheckpoints'; checkpoints: RecordedCheckpoint[] };
+
+/** A Late notice's first mail, or a reminder of it. */
+export type LateNoticeMailKind = 'notice' | 'reminder';
+
+/** A checkpoint as an officer's tab sends it: the server adds `at` and `by`. */
+export type RecordedCheckpoint = Omit<RunningAccountCheckpoint, 'at' | 'by'>;
 
 /** What a Miner owes on a running account, as one officer's client worked it out. */
 export interface RecordedAccount {
@@ -824,6 +862,9 @@ const optNote = (v: unknown) => (v === undefined ? undefined : boundedString(v, 
 const optNextStep = (v: unknown) =>
   v === undefined ? undefined : boundedString(v, 'nextStep', 500);
 const optId = (v: unknown, f: string) => (v === undefined ? undefined : docId(v, f));
+/** A Late notice's id, as `noticeId` or by the old name an older client still sends. */
+const noticeIdOf = (d: Record<string, unknown>) =>
+  docId(d.noticeId ?? d[NOTICE_ID_FIELD], 'noticeId');
 const money = (v: unknown, f: string) => num(v, f, 0.01, 1e13);
 
 function parseCloseCredit(raw: unknown): CloseCredit {
@@ -864,6 +905,7 @@ export function parseEditAction(data: unknown): EditAction {
     'rebill',
     'closeAccount',
     'issueStatement',
+    'issueLateNotice',
     'settleStatements',
     'declare',
     'resolveDeclaration',
@@ -871,7 +913,9 @@ export function parseEditAction(data: unknown): EditAction {
     'dismissDispute',
     'recordReminder',
     'recordMail',
+    'recordLateNoticeMail',
     'recordAccounts',
+    'recordCheckpoints',
     'setPopSharing',
     'setPopSharingMoon',
   ] as const);
@@ -1032,10 +1076,10 @@ export function parseEditAction(data: unknown): EditAction {
         reason: reason(d.reason),
       };
     case 'writeOff':
+      // An older client may still name a Statement: it pins nothing now, so it is dropped.
       return {
         action,
         minerId: docId(d.minerId, 'minerId'),
-        statementId: optId(d.statementId, 'statementId'),
         amount: money(d.amount, 'amount'),
         reason: reason(d.reason),
       };
@@ -1048,14 +1092,20 @@ export function parseEditAction(data: unknown): EditAction {
       };
     case 'issueStatement': {
       const statement = record(d.statement);
-      if (JSON.stringify(statement).length > MAX_STATEMENT_JSON) {
+      if (JSON.stringify(statement).length > MAX_NOTICE_JSON) {
         throw new HttpsError('invalid-argument', 'statement is too large');
       }
       return { action, statement };
     }
+    case 'issueLateNotice': {
+      const notice = record(d.notice);
+      if (JSON.stringify(notice).length > MAX_NOTICE_JSON)
+        throw new HttpsError('invalid-argument', 'notice is too large');
+      return { action, notice: parseLateNotice(notice) };
+    }
     case 'closeAccount': {
       const statement = d.statement === undefined ? undefined : record(d.statement);
-      if (statement && JSON.stringify(statement).length > MAX_STATEMENT_JSON) {
+      if (statement && JSON.stringify(statement).length > MAX_NOTICE_JSON) {
         throw new HttpsError('invalid-argument', 'statement is too large');
       }
       return {
@@ -1077,7 +1127,7 @@ export function parseEditAction(data: unknown): EditAction {
     case 'declare':
       return {
         action,
-        statementId: docId(d.statementId, 'statementId'),
+        noticeId: noticeIdOf(d),
         kind: oneOf(d.kind, 'kind', ['contract', 'other-division', 'wrong-corp'] as const),
         note: optNote(d.note),
       };
@@ -1110,7 +1160,7 @@ export function parseEditAction(data: unknown): EditAction {
         reason: reason(d.reason),
       };
     case 'recordReminder':
-      return { action, statementId: docId(d.statementId, 'statementId') };
+      return { action, noticeId: noticeIdOf(d) };
     case 'setPopSharing': {
       if (d.enabled !== undefined && typeof d.enabled !== 'boolean')
         throw new HttpsError('invalid-argument', 'enabled must be true or false');
@@ -1146,6 +1196,22 @@ export function parseEditAction(data: unknown): EditAction {
         statementId: docId(d.statementId, 'statementId'),
         mailId: int(d.mailId, 'mailId', 1, Number.MAX_SAFE_INTEGER),
         kind: oneOf(d.kind, 'kind', ['statement', 'reminder'] as const),
+      };
+    case 'recordLateNoticeMail':
+      return {
+        action,
+        noticeId: docId(d.noticeId, 'noticeId'),
+        mailId: int(d.mailId, 'mailId', 1, Number.MAX_SAFE_INTEGER),
+        // An older client names a notice's first mail as it named a Statement's.
+        kind:
+          d.kind === 'statement'
+            ? 'notice'
+            : oneOf(d.kind, 'kind', ['notice', 'reminder'] as const),
+      };
+    case 'recordCheckpoints':
+      return {
+        action,
+        checkpoints: list(d.checkpoints, 'checkpoints', 200).map(parseCheckpoint),
       };
     case 'recordAccounts':
       return {
@@ -1319,6 +1385,116 @@ export function parseStatement(raw: Record<string, unknown>): StoredStatement {
     ),
     ...displayNames(raw),
   } as StoredStatement;
+}
+
+const LINE_KINDS = ['mined', 'late-ore', 'correction'] as const;
+
+function parseNoticeLine(raw: unknown): LateNoticeLine {
+  const l = record(raw);
+  const opt = <T>(v: unknown, parse: (x: unknown) => T) => (v === undefined ? undefined : parse(v));
+  const characterId = opt(l.characterId, (x) => int(x, 'line.characterId'));
+  const structureId = opt(l.structureId, (x) => int(x, 'line.structureId'));
+  const unitPrices = opt(l.unitPrices, (x) => {
+    const out: Record<number, number> = {};
+    for (const [id, price] of Object.entries(record(x)))
+      out[int(Number(id), 'unitPrices type id')] = num(price, 'unitPrice', 0, 1e13);
+    return out;
+  });
+  const priceSources = opt(l.priceSources, (x) => {
+    const out: Record<number, string> = {};
+    for (const [id, source] of Object.entries(record(x)))
+      out[int(Number(id), 'priceSources type id')] = boundedString(source, 'priceSource', 40);
+    return out;
+  });
+  const taxPct = opt(l.taxPct, (x) => pctField(x, 'line.taxPct'));
+  const rateEffectiveFrom = opt(l.rateEffectiveFrom, (x) => dateString(x, 'rateEffectiveFrom'));
+  const why = opt(l.reason, reason);
+  return {
+    kind: oneOf(l.kind, 'line.kind', LINE_KINDS),
+    date: dateString(l.date, 'line.date'),
+    key: boundedString(l.key, 'line.key', 200),
+    ...(characterId !== undefined ? { characterId } : {}),
+    ...(structureId !== undefined ? { structureId } : {}),
+    oreLines: list(l.oreLines ?? [], 'line.oreLines', 100).map((o) => {
+      const ore = record(o);
+      return {
+        typeId: int(ore.typeId, 'typeId'),
+        quantity: num(ore.quantity, 'quantity', 0, 1e13),
+      };
+    }),
+    ...(unitPrices !== undefined ? { unitPrices } : {}),
+    ...(priceSources !== undefined ? { priceSources } : {}),
+    estimatedValue: num(l.estimatedValue, 'line.estimatedValue', -1e15, 1e15),
+    ...(taxPct !== undefined ? { taxPct } : {}),
+    ...(rateEffectiveFrom !== undefined ? { rateEffectiveFrom } : {}),
+    ...(why !== undefined ? { reason: why } : {}),
+    tax: num(l.tax, 'line.tax', -1e13, 1e13),
+  };
+}
+
+/**
+ * A Late notice from an officer's tab (decision 20261120-235011). What it listed is summed here
+ * from its lines; who may read it, who issued it and its mail state are the server's to set, so
+ * they start empty. A final notice is stored only under the id closing the account gives it.
+ */
+export function parseLateNotice(raw: Record<string, unknown>): LateNotice {
+  const id = docId(raw.id, 'notice.id');
+  const minerId = docId(raw.minerId, 'notice.minerId');
+  const kind: LateNoticeKind = oneOf(raw.kind, 'notice.kind', ['late', 'final'] as const);
+  if ((kind === 'final') !== (id === finalNoticeId(minerId)))
+    throw new HttpsError('invalid-argument', 'only an account closing sends a final notice');
+  const lines = list(raw.lines, 'notice.lines', 5000).map(parseNoticeLine);
+  const code =
+    raw.code === undefined || raw.code === ''
+      ? undefined
+      : boundedString(raw.code, 'notice.code', 64);
+  const pricing =
+    raw.pricing === undefined
+      ? undefined
+      : {
+          hubId: oneOf(record(raw.pricing).hubId, 'pricing.hubId', HUBS),
+          oreForm: oneOf(record(raw.pricing).oreForm, 'pricing.oreForm', [
+            'compressed',
+            'raw',
+          ] as const),
+        };
+  const names = raw.names === undefined ? {} : displayNames(record(raw.names));
+  return {
+    id,
+    minerId,
+    characterIds: list(raw.characterIds, 'notice.characterIds', 50).map((x) =>
+      int(x, 'characterId')
+    ),
+    kind,
+    issuedAt: instant(raw.issuedAt, 'notice.issuedAt'),
+    ...(code !== undefined ? { code } : {}),
+    ...(pricing !== undefined ? { pricing } : {}),
+    uids: [],
+    lines,
+    listed: lines.reduce((sum, l) => sum + l.tax, 0),
+    mail: { sent: 0, manualSent: 0, remindersStopped: false },
+    ...(Object.keys(names).length > 0 ? { names } : {}),
+  };
+}
+
+/** A checkpoint from an officer's tab; `canAdvanceCheckpoint` decides whether it is stored. */
+export function parseCheckpoint(raw: unknown): RecordedCheckpoint {
+  const c = record(raw);
+  return {
+    minerId: docId(c.minerId, 'minerId'),
+    through: dateString(c.through, 'through'),
+    owed: list(c.owed, 'owed', 1000).map((x) => {
+      const day = record(x);
+      return {
+        date: dateString(day.date, 'owed.date'),
+        remaining: num(day.remaining, 'owed.remaining', 0, 1e13),
+        ...(day.charge !== undefined ? { charge: num(day.charge, 'owed.charge', 0, 1e13) } : {}),
+      };
+    }),
+    credit: num(c.credit, 'credit', 0, 1e15),
+    balance: num(c.balance, 'balance', -1e15, 1e15),
+    paidThrough: c.paidThrough === null ? null : dateString(c.paidThrough, 'paidThrough'),
+  };
 }
 
 export interface SyncInput extends BookCall {
@@ -1562,10 +1738,10 @@ export interface ClaimTransfer {
 /** The most transfers one "I already paid" carries. */
 export const CLAIM_TRANSFERS_MAX = 10;
 
-/** A Miner's own "I paid this another way" on one of their Statements (#6206). */
+/** A Miner's own "I paid this another way" on one of their Late notices (#6206). */
 export interface DeclareOwnInput {
   corporationId: number;
-  statementId: string;
+  noticeId: string;
   /** What they say they paid; absent when they did not say. */
   amount?: number;
   note?: string;
@@ -1594,7 +1770,7 @@ export function parseDeclareOwnInput(data: unknown): DeclareOwnInput {
         });
   return {
     corporationId: parseBookCall(data).corporationId,
-    statementId: docId(d.statementId, 'statementId'),
+    noticeId: noticeIdOf(d),
     ...(d.amount !== undefined ? { amount: money(d.amount, 'amount') } : {}),
     ...(note !== undefined ? { note } : {}),
     ...(transfers !== undefined ? { transfers } : {}),
@@ -1818,18 +1994,18 @@ export function mergeDisputeLines(
   return lines;
 }
 
-/** A billed ore line as an issued Statement stores it (engine `StatementLine`). */
+/** An ore line a Late notice listed, as it was priced (`LateNoticeLine`). */
 interface BilledLine {
   oreLines: { typeId: number; quantity: number }[];
   unitPrices: Record<string, number>;
   taxPct: number;
 }
 
-function billedLineOf(raw: unknown): (BilledLine & { chargeKey: string }) | null {
+function billedLineOf(raw: unknown): (BilledLine & { key: string }) | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const l = raw as Record<string, unknown>;
   if (l.kind !== 'mined' && l.kind !== 'late-ore') return null;
-  if (typeof l.chargeKey !== 'string' || typeof l.taxPct !== 'number') return null;
+  if (typeof l.key !== 'string' || typeof l.taxPct !== 'number') return null;
   if (!Array.isArray(l.oreLines) || typeof l.unitPrices !== 'object' || l.unitPrices === null)
     return null;
   const oreLines = (l.oreLines as unknown[]).flatMap((o) => {
@@ -1839,7 +2015,7 @@ function billedLineOf(raw: unknown): (BilledLine & { chargeKey: string }) | null
       : [];
   });
   return {
-    chargeKey: l.chargeKey,
+    key: l.key,
     oreLines,
     unitPrices: l.unitPrices as Record<string, number>,
     taxPct: l.taxPct,
@@ -1848,10 +2024,10 @@ function billedLineOf(raw: unknown): (BilledLine & { chargeKey: string }) | null
 
 /**
  * The tax a waived dispute credits, priced on the server from the book's own records: each
- * disputed ore at the unit price and rate the issued Statements billed it at, never more of it
- * than they billed (a late-ore line adds its growth). Undefined when a disputed record is on no
- * Statement yet: the server holds no price for a day not billed, so it is never waived at the
- * client's word under the Director limit.
+ * disputed ore at the unit price and rate the Late notices listed it at, never more of it than
+ * they listed (a late-ore line adds its growth). Undefined when a disputed record is on no notice
+ * yet: the server holds no price for a day not listed, so it is never waived at the client's word
+ * under the Director limit.
  */
 export function billedDisputeTax(
   dispute: {
@@ -1859,14 +2035,14 @@ export function billedDisputeTax(
     kind?: DisputeKind;
     claimedPct?: number;
   },
-  statements: readonly { lines?: unknown }[]
+  notices: readonly { lines?: unknown }[]
 ): number | undefined {
   const billed = new Map<string, BilledLine[]>();
-  for (const s of statements) {
+  for (const s of notices) {
     if (!Array.isArray(s.lines)) continue;
     for (const raw of s.lines) {
       const line = billedLineOf(raw);
-      if (line) billed.set(line.chargeKey, [...(billed.get(line.chargeKey) ?? []), line]);
+      if (line) billed.set(line.key, [...(billed.get(line.key) ?? []), line]);
     }
   }
   const disputed = new Map<string, number>();
@@ -1900,32 +2076,34 @@ export function billedDisputeTax(
 }
 
 /**
- * The ids of a Miner's open disputes an officer write-off closes (#6307). A write-off with no
- * Statement is the leaver's whole balance: it closes every open dispute. One that names a
- * Statement and forgives all of it closes the disputes of the days that Statement bills; a part
- * write-off leaves them open, their hold still standing.
+ * The ids of a Miner's open disputes an officer write-off closes (#6307). A write-off forgives
+ * the oldest unpaid days first (decision 20261120-235011), read off the account an officer's tab
+ * last recorded (`accounts/{minerId}`): the open disputes of the days it forgives in full close,
+ * a day only partly forgiven keeps its dispute. A write-off of the whole balance, or one for a
+ * Miner with no recorded days, is the leaver's: it closes every open dispute.
  */
 export function disputesClosedByWriteOff(
   disputes: readonly { id?: unknown; date?: unknown; resolution?: unknown }[],
   writeOff: { amount: number },
-  statement?: {
-    id: string;
-    amount?: unknown;
-    coversFrom: string;
-    coversThrough: string;
-    lines: { kind: string; date: string }[];
-  }
+  account?: { owed?: unknown; unpaidDays?: unknown }
 ): string[] {
   const open = disputes.filter((d) => typeof d.id === 'string' && !d.resolution);
-  if (statement) {
-    const amount = typeof statement.amount === 'number' ? statement.amount : Infinity;
-    if (writeOff.amount < amount - 0.01) return [];
-    const days = statementDays(statement);
-    return open
-      .filter((d) => typeof d.date === 'string' && days.has(d.date))
-      .map((d) => d.id as string);
+  const days = Array.isArray(account?.unpaidDays)
+    ? (account.unpaidDays as { date?: unknown; owed?: unknown }[])
+    : undefined;
+  const owed = typeof account?.owed === 'number' ? account.owed : Infinity;
+  if (!days || writeOff.amount >= owed - 0.01) return open.map((d) => d.id as string);
+  const forgiven = new Set<string>();
+  let left = writeOff.amount;
+  for (const day of days) {
+    const due = typeof day.owed === 'number' ? day.owed : 0;
+    if (left < due - 0.01) break;
+    left -= due;
+    if (typeof day.date === 'string') forgiven.add(day.date);
   }
-  return open.map((d) => d.id as string);
+  return open
+    .filter((d) => typeof d.date === 'string' && forgiven.has(d.date))
+    .map((d) => d.id as string);
 }
 
 /** One dispute per Miner and day: `solo:7` has a colon, which a doc id avoids. */
