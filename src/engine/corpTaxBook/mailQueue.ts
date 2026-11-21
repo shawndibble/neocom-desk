@@ -97,6 +97,9 @@ export interface MailQueueItem {
 }
 
 /** Whole minutes (rounded up) `count` mails take at EVE's limit. */
+/** D27: an officer's manual reminder to a Miner who opted out is one per late notice (shared). */
+export { reminderAllowed } from '../../../functions/src/corpTaxBookLateNotice';
+
 export function estimateMinutes(count: number): number {
   return Math.ceil(count / MAILS_PER_MINUTE);
 }
@@ -104,14 +107,6 @@ export function estimateMinutes(count: number): number {
 /** The pause after a send, 12–15 s; `random` is a `[0, 1)` draw. */
 export function sendGapMs(random: number): number {
   return Math.round(SEND_GAP_MIN_MS + random * (SEND_GAP_MAX_MS - SEND_GAP_MIN_MS));
-}
-
-/** D27: an officer's manual reminder to a Miner who opted out is limited to one per late notice. */
-export function reminderAllowed(statement: {
-  remindersStopped: boolean;
-  manualRemindersSent: number;
-}): boolean {
-  return !statement.remindersStopped || statement.manualRemindersSent < 1;
 }
 
 export type MailFailure =
