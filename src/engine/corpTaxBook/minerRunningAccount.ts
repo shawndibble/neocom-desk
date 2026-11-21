@@ -56,9 +56,6 @@ export interface RunningDay {
   savedPrice?: boolean;
 }
 
-/** A checkpoint's owed day as it is stored: an older one holds `remaining` only. */
-type StoredOwedDay = CheckpointOwedDay;
-
 /** What became of one day. */
 export interface DaySettlement {
   tax: number;
@@ -126,14 +123,11 @@ export interface MinerRunningAccountInput {
   checkpoint?: RunningAccountCheckpoint;
 }
 
-/** The UTC day of an ISO instant: which side of a checkpoint money falls. */
-const dayOf = utcDayOf;
-
 /**
  * A checkpoint's owed day as a running day: its whole tax and what was paid of it before, so its
  * tolerance is the whole day's; an older checkpoint's holds only what remains.
  */
-function owedDayOf(d: StoredOwedDay): RunningDay {
+function owedDayOf(d: CheckpointOwedDay): RunningDay {
   const whole = d.tax !== undefined && d.tax >= d.remaining;
   return {
     date: d.date,
@@ -201,7 +195,7 @@ export class MinerRunningAccount {
     const cp = input.checkpoint;
     const after = (date: string) => cp === undefined || date > cp.through;
     const counted = countedPayments(input.payments, input.startDate).filter((p) =>
-      after(dayOf(p.at))
+      after(utcDayOf(p.at))
     );
     const paid = counted.reduce((sum, p) => sum + paymentNet(p), 0);
     const opening = Math.max(0, cp?.credit ?? 0);
@@ -217,7 +211,7 @@ export class MinerRunningAccount {
       return waived > 0 ? [{ date: d.date, tax: -waived }] : [];
     });
     const days: RunningDay[] = [
-      ...(cp?.owed ?? []).map((d: StoredOwedDay) => owedDayOf(d)),
+      ...(cp?.owed ?? []).map((d: CheckpointOwedDay) => owedDayOf(d)),
       ...waivers,
       ...input.days.filter((d) => after(d.date)),
     ];
@@ -232,7 +226,7 @@ export class MinerRunningAccount {
             .map((p) => ({ paymentId: p.id, left: paymentNet(p) })),
         ],
         writeOffPool: (input.writeOffs ?? [])
-          .filter((w) => after(dayOf(w.at)))
+          .filter((w) => after(utcDayOf(w.at)))
           .reduce((sum, w) => sum + Math.max(0, w.amount), 0),
       }
     );
@@ -287,18 +281,20 @@ export class MinerRunningAccount {
     const account = MinerRunningAccount.build({
       ...input,
       days,
-      payments: input.payments.filter((p) => upTo(dayOf(p.at))),
-      ...(input.writeOffs ? { writeOffs: input.writeOffs.filter((w) => upTo(dayOf(w.at))) } : {}),
+      payments: input.payments.filter((p) => upTo(utcDayOf(p.at))),
+      ...(input.writeOffs
+        ? { writeOffs: input.writeOffs.filter((w) => upTo(utcDayOf(w.at))) }
+        : {}),
     });
     const charges = new Map(
       runningDaysFromLines([
-        ...(input.checkpoint?.owed ?? []).map((d: StoredOwedDay) => owedDayOf(d)),
+        ...(input.checkpoint?.owed ?? []).map((d: CheckpointOwedDay) => owedDayOf(d)),
         ...days,
       ]).map((d) => [d.date, d.charge ?? 0])
     );
     const owed = [...account.byDay]
       .filter(([, d]) => !d.settled)
-      .map(([date, d]): StoredOwedDay => {
+      .map(([date, d]): CheckpointOwedDay => {
         const charge = Math.min(charges.get(date) ?? 0, d.remaining);
         return {
           date,

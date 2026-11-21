@@ -577,7 +577,6 @@ export interface MinerDetail {
   declarations: Declaration[];
   /** The Miner's disputes, answered or not. */
   disputes: OreDispute[];
-  credit: number;
   /** The checkpoint the account is built from: what came before it is summed up in it. */
   checkpoint?: RunningAccountCheckpoint;
 }
@@ -621,7 +620,6 @@ export function minerDetail(view: BookView, minerId: string): MinerDetail | unde
     disputes: (view.input.disputes ?? []).filter((d) =>
       isMinersDispute(d, minerId, inner.characterIds)
     ),
-    credit: inner.account.credit,
     ...(inner.account.input.checkpoint ? { checkpoint: inner.account.input.checkpoint } : {}),
   };
 }
