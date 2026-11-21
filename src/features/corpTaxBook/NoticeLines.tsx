@@ -3,17 +3,16 @@ import { useTranslation } from 'react-i18next';
 import { Panel } from '@/components/ui';
 import {
   verifyRows,
-  type VerifyPayload,
   type VerifyPayloadLine,
   type VerifyRow,
 } from '@/engine/corpTaxBook/verifyView';
 import { formatCount } from '@/lib/formatCount';
 import { TRADE_HUBS } from '@/market/hubs';
 import { useOreNames } from './useOreNames';
-import { isk, shortDate } from './statementFormat';
+import { isk, shortDate } from './noticeFormat';
 
-/** What the lines panel prints: a Statement as the verify page reads it, or the book holds it. */
-export interface StatementLinesSource {
+/** What the lines panel prints: a late notice as the verify page reads it, or the book holds it. */
+export interface NoticeLinesSource {
   lines: readonly VerifyPayloadLine[];
   hubId: string;
   oreForm: 'compressed' | 'raw';
@@ -24,12 +23,12 @@ export interface StatementLinesSource {
 /** Formats a date for the page it sits on; the verify page's own is the default. */
 type DateFormat = (value: string) => string;
 
-/** The mined days of one Statement with every ore's price, and the billed total (shared by the verify page and the officer's Statement panel). */
-export function StatementLines({
-  statement,
+/** The mined days of one late notice with every ore's price, and the total asked (shared by the verify page and the officer's notice panel). */
+export function NoticeLines({
+  notice: statement,
   formatDate,
 }: {
-  statement: StatementLinesSource;
+  notice: NoticeLinesSource;
   formatDate?: DateFormat;
 }) {
   const { t, i18n } = useTranslation();
@@ -76,39 +75,6 @@ export function StatementLines({
         </p>
       </Panel>
     </div>
-  );
-}
-
-/** The payments credited to a Statement, or the line saying none have been. */
-export function StatementPayments({
-  payments,
-  formatDate,
-}: {
-  payments: VerifyPayload['payments'];
-  formatDate?: DateFormat;
-}) {
-  const { t, i18n } = useTranslation();
-  const locale = i18n.language;
-  return (
-    <Panel title={t('corpTaxBook.verify.paymentsTitle')} padded={payments.length === 0}>
-      {payments.length === 0 ? (
-        <p className="text-sm text-text-dim">{t('corpTaxBook.verify.noPayments')}</p>
-      ) : (
-        <ul aria-label={t('corpTaxBook.verify.paymentsTitle')} className="divide-y divide-line">
-          {payments.map((p) => (
-            <li key={p.id} className="flex justify-between gap-3 px-3 py-2 text-sm tabular-nums">
-              <span>
-                {(formatDate ?? ((v) => shortDate(v, locale)))(p.at)}
-                <span className="block text-xs text-text-dim">
-                  {t(`corpTaxBook.verify.source.${p.source}`)}
-                </span>
-              </span>
-              <span className="text-isk-pos">+{isk(p.amount)}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Panel>
   );
 }
 

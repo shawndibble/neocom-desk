@@ -8,7 +8,7 @@
  */
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DisabledMenuItem, MenuItem, RowActionsMenu } from '@/components/ui';
+import { MenuItem, RowActionsMenu } from '@/components/ui';
 import type { LedgerEntry } from '@/engine/corpTaxBook/accountLedger';
 import { useBook } from './useBook';
 
@@ -55,18 +55,10 @@ export function LedgerRowMenu({
   const items: ReactElement[] = [];
   if (entry.kind === 'correction' && entry.refId) {
     const id = entry.refId;
-    if (entry.locked) {
-      items.push(
-        <DisabledMenuItem key="locked" reason={t('corpTaxBook.moons.ledger.menu.correctionLocked')}>
-          {t('corpTaxBook.moons.ledger.menu.correctionReverse')}
-        </DisabledMenuItem>
-      );
-    } else {
-      items.push(
-        item('correctionEdit', () => actions.editCorrection(id)),
-        item('correctionReverse', () => actions.reverseCorrection(id))
-      );
-    }
+    items.push(
+      item('correctionEdit', () => actions.editCorrection(id)),
+      item('correctionReverse', () => actions.reverseCorrection(id))
+    );
   } else if (entry.kind === 'writeOff' && entry.refId) {
     const id = entry.refId;
     items.push(item('writeOffReverse', () => actions.reverseWriteOff(id)));

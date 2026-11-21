@@ -41,7 +41,7 @@ import {
   type Declaration,
 } from '@/engine/corpTaxBook/overdue';
 import { readDisputes, type DisputeKind, type OreDispute } from '@/engine/corpTaxBook/disputes';
-import type { RecordedWriteOff, TaxPayment } from '@/engine/corpTaxBook/allocation';
+import type { RecordedWriteOff, TaxPayment } from '@/engine/corpTaxBook/payments';
 import type { Miner } from '@/engine/corpTaxBook/charges';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
 import type { DivisionNames } from '@/engine/corpTaxBook/divisionNames';
@@ -49,7 +49,8 @@ import { groupObservedEntries, readObservedRow } from '@/engine/corpTaxBook/obse
 import { ownerRefinerySystemsToLearn } from '@/engine/corpTaxBook/refinery';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 import type { TaxRate } from '@/engine/corpTaxBook/rates';
-import type { Adjustment, Statement } from '@/engine/corpTaxBook/statements';
+import type { Adjustment } from '@/engine/corpTaxBook/adjustments';
+import type { LegacyStatementDoc as Statement } from '@/engine/corpTaxBook/legacyStatementDoc';
 import type { ToleranceExemption } from '@/engine/corpTaxBook/toleranceExemptions';
 import { loadStructureName } from '@/features/character/structures';
 import type { ObservedMiningEntry, ObservedRow } from '@/engine/corpTaxBook/types';

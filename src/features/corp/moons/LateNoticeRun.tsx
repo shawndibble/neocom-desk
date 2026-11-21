@@ -16,8 +16,8 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { mailableAfterClose } from '@/engine/corpTaxBook/closeAccount';
-import { composeStatementMail } from '@/engine/corpTaxBook/statementMail';
-import type { Statement } from '@/engine/corpTaxBook/statements';
+import { composeLateNoticeMail } from '@/engine/corpTaxBook/lateNoticeMail';
+import type { LateNotice } from '../../../../functions/src/corpTaxBookLateNotice';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { DAY_MS } from '@/lib/age';
 import { cx } from '@/lib/cx';
@@ -25,21 +25,26 @@ import { MailLimitNotice } from '@/features/corpTaxBook/MailLimitNotice';
 import { MailQueueSummary } from '@/features/corpTaxBook/MailQueuePanel';
 import { listQueue } from '@/features/corpTaxBook/mailQueueStore';
 import {
-  StatementMailPreview,
-  StatementMailPreviewDialog,
+  LateNoticeMailPreview,
+  LateNoticeMailPreviewDialog,
   type MailPreviewContent,
-} from '@/features/corpTaxBook/StatementMailPreview';
+} from '@/features/corpTaxBook/LateNoticeMailPreview';
 import { useIsBelowDesktop } from '@/lib/useIsBelowDesktop';
-import { editBook } from '../taxBook/bookClient';
+import { issueLateNotice } from '../taxBook/bookClient';
 import { editErrorMessage, useBook } from './useBook';
 import { isk } from './moonsFormat';
 import { TRADE_HUBS } from '@/market/hubs';
-import { mailTarget, statementRefineryNames, useCorporationName } from './statementMailing';
+import {
+  mailTarget,
+  noticeRefineryNames,
+  noticeSettled,
+  useCorporationName,
+} from './lateNoticeMailing';
 import { plannedNotices } from './useNeedsYou';
 
 type Step = 'check' | 'send' | 'done';
 
-/** A Miner mailed a Statement within this long is left unticked in the run. */
+/** A Miner mailed a late notice within this long is left unticked in the run. */
 const RECENTLY_MAILED_MS = 7 * DAY_MS;
 
 function StepDot({
@@ -74,12 +79,12 @@ function StepDot({
 
 /**
  * Check → Send → Done (#4056 steps 10-12). Check shows the late notices the run would send
- * (#6294), plus any earlier Statement whose mail never went out; Send issues each notice (which
+ * (#6294), plus any earlier notice whose mail never went out; Send issues each notice (which
  * creates its verify link, so it must come first) and hands the mails to the queue (#4064), which
  * paces them and shows its own chip on every page. On a desktop the chosen Miner's mail shows
  * beside Check and Send; below it, "Preview mail" opens it in a dialog.
  */
-export function StatementRun() {
+export function LateNoticeRun() {
   const { t } = useTranslation();
   const ctx = useBook();
   const { view, names, canEdit, corporationId, characterId, reload, settings } = ctx;
@@ -116,19 +121,16 @@ export function StatementRun() {
     () => plannedNotices(view, settings.noticeRules),
     [view, settings.noticeRules]
   );
-  // Statements issued earlier whose mail never went out (a closed tab, a refused enqueue).
+  // Notices issued earlier whose mail never went out (a closed tab, a refused enqueue).
   const unmailed = useMemo(
     () =>
-      view.input.statements.filter((s) => {
-        const settled = view.internals.byMiner
-          .get(s.minerId)
-          ?.allocation.byStatement.get(s.id)?.settled;
-        const miner = view.input.miners.find((m) => m.id === s.minerId);
+      view.input.notices.filter((n) => {
+        const miner = view.input.miners.find((m) => m.id === n.minerId);
         return (
-          !settled &&
-          (s.mailsSent ?? 0) === 0 &&
-          mailableAfterClose(miner, s) &&
-          !queue.some((q) => q.statementId === s.id)
+          !noticeSettled(view, n) &&
+          n.mail.sent === 0 &&
+          mailableAfterClose(miner, n) &&
+          !queue.some((q) => q.statementId === n.id)
         );
       }),
     [view, queue]
@@ -137,46 +139,31 @@ export function StatementRun() {
   const nothingToDo = notices.length === 0 && unmailed.length === 0;
   const minerRow = (id: string) => view.miners.find((m) => m.id === id)!;
 
-  /** Everything the run will send: the new late notices, then earlier unmailed Statements. */
+  /** Everything the run will send: the new late notices, then earlier unmailed ones. */
   const previews = useMemo(() => {
-    const out: {
-      key: string;
-      minerId: string;
-      statement: Statement;
-      amountDue: number;
-      carried: number;
-    }[] = [];
-    for (const n of notices) {
+    const out: { key: string; minerId: string; notice: LateNotice; amountDue: number }[] = [];
+    for (const n of notices)
       out.push({
-        key: `notice:${n.minerId}`,
-        minerId: n.minerId,
-        statement: n.statement,
+        key: `notice:${n.notice.minerId}`,
+        minerId: n.notice.minerId,
+        notice: n.notice,
         amountDue: n.owed,
-        carried: n.carried,
       });
-    }
-    for (const s of unmailed) {
+    for (const n of unmailed) {
       // A Miner since unlinked or regrouped has no row to address the mail to; skip it rather than crash.
-      const row = view.miners.find((m) => m.id === s.minerId);
-      if (!row) continue;
-      const owed = row.owed;
-      out.push({
-        key: `statement:${s.id}`,
-        minerId: s.minerId,
-        statement: s as Statement,
-        amountDue: owed,
-        carried: Math.max(0, owed - s.amount),
-      });
+      const row = view.miners.find((m) => m.id === n.minerId);
+      if (row)
+        out.push({ key: `issued:${n.id}`, minerId: n.minerId, notice: n, amountDue: row.owed });
     }
     return out;
   }, [view, notices, unmailed]);
 
-  /** The last time any Statement of this Miner was mailed, if ever. */
+  /** The last time any late notice of this Miner was mailed, if ever. */
   const lastMailedAt = (minerId: string): number | null => {
     let last: number | null = null;
-    for (const s of view.input.statements) {
-      if (s.minerId !== minerId || !s.lastMailedAt) continue;
-      const at = Date.parse(s.lastMailedAt);
+    for (const n of view.input.notices) {
+      if (n.minerId !== minerId || !n.mail.lastAt) continue;
+      const at = Date.parse(n.mail.lastAt);
       if (!Number.isNaN(at) && (last === null || at > last)) last = at;
     }
     return last;
@@ -192,15 +179,11 @@ export function StatementRun() {
   const total = chosen.size;
 
   const previewFor = (item: (typeof previews)[number], corpName: string): MailPreviewContent => {
-    const target = mailTarget(ctx, item.statement, minerRow(item.minerId), {
-      amountDue: item.amountDue,
-      carried: item.carried,
-    });
-    const mail = composeStatementMail({
+    const target = mailTarget(ctx, item.notice, minerRow(item.minerId));
+    const mail = composeLateNoticeMail({
       ...target,
-      kind: 'statement',
+      kind: 'notice',
       corporationName: corpName,
-      refineryName: (id) => names.refinery(id),
       verifyUrl: `${window.location.origin}/corp-tax-book/verify/…`,
     });
     return {
@@ -216,7 +199,7 @@ export function StatementRun() {
     previewItem && corporationName && (showInline || previewOpen)
       ? previewFor(previewItem, corporationName)
       : null;
-  /** Previous / Next Statement in the run, wrapping round. */
+  /** Previous / Next late notice in the run, wrapping round. */
   const stepPreview = (delta: number) => {
     if (previews.length === 0 || !previewItem) return;
     const next = (previews.indexOf(previewItem) + delta + previews.length) % previews.length;
@@ -228,54 +211,45 @@ export function StatementRun() {
     setBusy(true);
     setError(null);
     // A failure part-way keeps what was issued (and queued); the next run plans the
-    // remaining notices and offers any Statement whose mail never left.
+    // remaining notices and offers any notice whose mail never left.
     const sent = { queued: 0, skipped: 0, missingLink: 0 };
     const queueTargets = async (targets: ReturnType<typeof mailTarget>[]) => {
       if (targets.length === 0) return;
       // Inside `try`: a chunk that will not load is an error shown, not a run stuck busy.
-      const { enqueueStatements } = await import('@/features/corpTaxBook/mailQueue');
-      const queued = await enqueueStatements({
+      const { enqueueLateNotices } = await import('@/features/corpTaxBook/mailQueue');
+      const queued = await enqueueLateNotices({
         corporationId,
         corporationName,
         senderCharacterId: characterId,
-        statements: targets,
-        refineryName: (id) => names.refinery(id),
+        notices: targets,
       });
       sent.queued += queued.queued;
       sent.skipped += queued.skipped;
       sent.missingLink += queued.missingLink.length;
     };
     try {
-      // Earlier Statements whose mail never went out are the oldest; they go first.
+      // Earlier notices whose mail never went out are the oldest; they go first.
       await queueTargets(
         unmailed
-          .filter((s) => chosen.has(`statement:${s.id}`))
-          .map((s) => {
-            const row = minerRow(s.minerId);
-            return mailTarget(ctx, s as Statement, row, {
-              amountDue: row.owed,
-              carried: Math.max(0, row.owed - s.amount),
-            });
-          })
+          .filter((n) => chosen.has(`issued:${n.id}`))
+          .map((n) => mailTarget(ctx, n, minerRow(n.minerId)))
       );
       // Late notices (#6294): each issued (which makes its verify link), then all queued.
       const noticeTargets = [];
       for (const n of notices) {
         // A notice is rebuilt every run, so an unticked one is not issued at all.
-        if (!chosen.has(`notice:${n.minerId}`)) continue;
-        const row = minerRow(n.minerId);
-        await editBook(characterId, corporationId, {
-          action: 'issueStatement',
-          statement: {
-            ...n.statement,
+        if (!chosen.has(`notice:${n.notice.minerId}`)) continue;
+        const row = minerRow(n.notice.minerId);
+        await issueLateNotice(characterId, corporationId, {
+          ...n.notice,
+          issuedBy: characterId,
+          names: {
             corporationName,
             minerName: names.character(row.mainCharacterId),
-            refineryNames: statementRefineryNames(n.statement, names),
+            refineryNames: noticeRefineryNames(n.notice, names),
           },
         });
-        noticeTargets.push(
-          mailTarget(ctx, n.statement, row, { amountDue: n.owed, carried: n.carried })
-        );
+        noticeTargets.push(mailTarget(ctx, n.notice, row));
       }
       await queueTargets(noticeTargets);
       setResult(sent);
@@ -508,7 +482,7 @@ export function StatementRun() {
                 {minerPicker}
                 {mail ? (
                   <div className="max-h-[36rem] overflow-y-auto">
-                    <StatementMailPreview {...mail} />
+                    <LateNoticeMailPreview {...mail} />
                   </div>
                 ) : (
                   <p className="text-sm text-text-dim">
@@ -520,7 +494,7 @@ export function StatementRun() {
           </div>
         </>
       )}
-      <StatementMailPreviewDialog
+      <LateNoticeMailPreviewDialog
         open={previewOpen && !inline}
         onClose={() => setPreviewOpen(false)}
         mail={mail}

@@ -7,7 +7,6 @@ import {
   disputeKindOf,
   disputedTax,
   disputesToShow,
-  heldByStatement,
   readDisputes,
   type OreDispute,
 } from './disputes';
@@ -248,84 +247,5 @@ describe('a dispute filed again after a kept bill', () => {
     expect(read.holdFrom).toBe('2026-11-03T00:00:00.000Z');
     expect(read.history).toEqual([{ kind: 'quantity', reason: 'too much', resolution: kept }]);
     expect(readDisputes([{ ...dispute(), holdFrom: 'soon' }])[0].holdFrom).toBeUndefined();
-  });
-});
-
-describe('heldByStatement', () => {
-  const NOW = '2026-11-05T00:00:00.000Z';
-  const statement = (id: string, chargeKey: string, quantity: number, taxPct = 10) => ({
-    id,
-    lines: [
-      {
-        kind: 'mined',
-        chargeKey,
-        oreLines: [{ typeId: 45490, quantity }],
-        unitPrices: { 45490: 1000 },
-        taxPct,
-        tax: quantity * 1000 * (taxPct / 100),
-      },
-    ],
-  });
-  const open = dispute({
-    lines: [{ recordKey: '60:1000:2026-11-01', typeId: 45490, quantity: 100, payeeName: '' }],
-  });
-
-  it('holds the disputed ore of the Statement that billed it, at its price and rate', () => {
-    const held = heldByStatement(
-      [statement('s1', '60:1000:2026-11-01', 400)],
-      [open],
-      new Set(),
-      NOW
-    );
-    expect(held.get('s1')).toBe(100 * 1000 * 0.1);
-  });
-
-  it('holds only the rate gap for a rate dispute', () => {
-    const rate = { ...open, kind: 'rate' as const, claimedPct: 8 };
-    const held = heldByStatement(
-      [statement('s1', '60:1000:2026-11-01', 100, 12)],
-      [rate],
-      new Set(),
-      NOW
-    );
-    expect(held.get('s1')).toBeCloseTo(100 * 1000 * 0.04);
-  });
-
-  it('holds nothing of a line a dismissal already credits, so it is never counted twice', () => {
-    const held = heldByStatement(
-      [statement('s1', '60:1000:2026-11-01', 400)],
-      [open],
-      new Set(['s1|60:1000:2026-11-01']),
-      NOW
-    );
-    expect(held.size).toBe(0);
-  });
-
-  it('holds nothing once answered, or once its 14 days are up', () => {
-    const answered = {
-      ...open,
-      resolution: { kind: 'rejected' as const, at: NOW, by: 1, reason: 'r' },
-    };
-    expect(
-      heldByStatement([statement('s1', '60:1000:2026-11-01', 400)], [answered], new Set(), NOW).size
-    ).toBe(0);
-    expect(
-      heldByStatement(
-        [statement('s1', '60:1000:2026-11-01', 400)],
-        [open],
-        new Set(),
-        '2026-12-01T00:00:00.000Z'
-      ).size
-    ).toBe(0);
-  });
-
-  it('never holds more ore than the Statement billed', () => {
-    const held = heldByStatement(
-      [statement('s1', '60:1000:2026-11-01', 40)],
-      [open],
-      new Set(),
-      NOW
-    );
-    expect(held.get('s1')).toBe(40 * 1000 * 0.1);
   });
 });

@@ -6,13 +6,14 @@
  * server wrote under the officer rules) and shares the settings parser, `parseBookSettings`
  * (`bookDocs.ts`), with this one.
  */
-import type { RecordedWriteOff, TaxPayment } from './allocation';
+import type { Adjustment } from './adjustments';
+import type { LegacyStatementDoc } from './legacyStatementDoc';
+import type { RecordedWriteOff, TaxPayment } from './payments';
 import { num, parseBookSettings, str } from './bookDocs';
 import type { Miner } from './charges';
 import type { Dismissal } from './dismissals';
 import { parsePaymentId } from './payouts';
 import { readClaimEvidence, type Declaration } from './overdue';
-import type { Adjustment, Statement } from './statements';
 import type { ToleranceExemption } from './toleranceExemptions';
 
 type Data = Record<string, unknown>;
@@ -134,7 +135,6 @@ export function readPayment(
     }
     return { held, ...(claimable ? { claimable } : {}) };
   }
-  const statementId = str(d.statementId);
   return {
     held,
     payment: {
@@ -144,7 +144,6 @@ export function readPayment(
       amount,
       at,
       source: d.source === 'manual' ? 'manual' : 'donation',
-      ...(statementId ? { statementId } : {}),
       ...(notTaxAmount !== undefined ? { notTaxAmount } : {}),
     },
   };
@@ -213,12 +212,13 @@ export function readMemberDeclaration(id: string, d: Data): Declaration | null {
   };
 }
 
-export function readStatement(id: string, d: Data): Statement | null {
+/** A legacy `statements` doc, as the member side reads it until its rework. */
+export function readStatement(id: string, d: Data): LegacyStatementDoc | null {
   const minerId = str(d.minerId);
   const amount = num(d.amount);
   const issuedAt = str(d.issuedAt);
   if (!minerId || amount === undefined || !issuedAt || !Array.isArray(d.lines)) return null;
-  return { ...(d as unknown as Statement), id, minerId, amount, issuedAt };
+  return { ...(d as unknown as LegacyStatementDoc), id, minerId, amount, issuedAt };
 }
 
 export function readMiner(id: string, d: Data): Miner | null {
@@ -286,14 +286,12 @@ export function readWriteOff(id: string, d: Data): RecordedWriteOff | null {
   const amount = num(d.amount);
   const at = str(d.at);
   if (!minerId || amount === undefined || !at) return null;
-  const statementId = str(d.statementId);
   return {
     id,
     minerId,
     amount,
     at,
     reason: str(d.reason) ?? '',
-    ...(statementId ? { statementId } : {}),
     ...reversedOf(d.reversed),
   };
 }

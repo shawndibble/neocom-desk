@@ -20,10 +20,9 @@ import { writeToClipboard } from '@/lib/clipboard';
 import { ShareShell } from '@/features/share/ShareShell';
 import { GroupingQuestions } from './GroupingQuestions';
 import { OwedDayList } from './OwedDayList';
-import { StatementLines, StatementPayments } from './StatementBody';
+import { NoticeLines } from './NoticeLines';
 import { VerifyLedger } from './VerifyLedger';
-import { isk, shortDate } from './statementFormat';
-import { verifyPeriodLabel as periodLabel } from './verifyPeriodLabel';
+import { isk, shortDate } from './noticeFormat';
 import { readVerifyStatement, setVerifyRemindersStopped } from './verifyApi';
 
 type LoadState =
@@ -33,11 +32,11 @@ type LoadState =
   | { status: 'failed' };
 
 /**
- * The guest verify page (issue #4066, D27): a Statement or late notice read with the link's token
- * alone, no login and no Character. It leads with what is owed now and how to pay, lists only the
- * days still owed (one line each, opening to its ore), and keeps every day and payment in a
- * Ledger that stays closed until asked for. A Statement whose days the officer's client did not
- * record, or that older Statements still owe on, lists every line and its payments instead.
+ * The guest verify page (issue #4066, D27): a late notice read with the link's token alone, no
+ * login and no Character. It leads with what the Miner's Running account owes now and how to pay,
+ * lists only the days still owed (one line each, opening to its ore), and keeps every day and
+ * payment in a Ledger that stays closed until asked for. A notice whose account the officer's
+ * client has not counted lists its own lines instead.
  */
 export function VerifyPage({ token }: { token: string }) {
   const { t } = useTranslation();
@@ -101,12 +100,13 @@ export function VerifyPage({ token }: { token: string }) {
 function VerifyStatement({ token, payload }: { token: string; payload: VerifyPayload }) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
-  const { statement, terms, settlement } = payload;
-  const rows = useMemo(() => verifyRows(statement.lines), [statement.lines]);
+  // The wire still names the late notice `statement`, in the shape older servers stored it.
+  const { statement: notice, terms } = payload;
+  const rows = useMemo(() => verifyRows(notice.lines), [notice.lines]);
 
-  const [corpName, setCorpName] = useState<string | undefined>(statement.corporationName);
+  const [corpName, setCorpName] = useState<string | undefined>(notice.corporationName);
   useEffect(() => {
-    if (statement.corporationName) return;
+    if (notice.corporationName) return;
     let cancelled = false;
     getCorporationPublicInfo(payload.corporationId).then(
       (result) => {
@@ -117,32 +117,22 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
     return () => {
       cancelled = true;
     };
-  }, [payload.corporationId, statement.corporationName]);
+  }, [payload.corporationId, notice.corporationName]);
   const corp = corpName ?? t('corpTaxBook.verify.theCorp');
 
-  const credited = payload.payments.reduce((sum, p) => sum + p.amount, 0);
-  const remaining = settlement?.remaining ?? Math.max(0, statement.amount - credited);
-  // A running account (#6294): the notice's own balance, and everything owed now beside it.
+  // What the Miner's account owes now; the notice's own figure stands in until an officer's tab
+  // has counted the account. Money pays the oldest day first: no payment is this notice's own.
   const account = payload.account ?? null;
-  const notice = statement.kind === 'notice';
-  // A notice's own figure stands in until an officer's tab has counted the account.
-  const owedNow = account ? account.owed : statement.amount;
-  const forgiven = settlement?.forgiven ?? 0;
-  const dismissed = settlement ? settlement.credited - credited - forgiven : 0;
+  const owing = account ? account.owed : notice.amount;
   const rates = ratesUsed(rows);
-  // The page leads with one figure: the account's total on a notice or a counted account, else
-  // this Statement's own balance.
-  const byAccount = Boolean(account) || notice;
-  const owing = byAccount ? owedNow : remaining;
   // The days still owed, when the officer's client recorded them: the page then lists those and
-  // keeps everything paid in the ledger, instead of every line of this Statement. Money older
-  // Statements still owe has no day to list (a few ISK of rounding aside), so the page keeps
-  // every line of the Statement then and the miner can still check them.
+  // keeps everything paid in the ledger, instead of every line of this notice. When they do not
+  // add up to what is owed (a few ISK of rounding aside), the page keeps the notice's lines.
   const recordedDays = account?.unpaidDays;
   const unpaidSum = recordedDays?.reduce((sum, d) => sum + d.owed, 0) ?? 0;
   const unpaidDays =
-    recordedDays && owedNow - unpaidSum <= recordedDays.length + 1 ? recordedDays : undefined;
-  // Days mined since the last notice are in no Statement: the recorded days add them to the ledger.
+    recordedDays && owing - unpaidSum <= recordedDays.length + 1 ? recordedDays : undefined;
+  // Days mined since the last notice are on no notice: the recorded days add them to the ledger.
   const ledger = useMemo(() => {
     if (!payload.ledger) return undefined;
     const known = new Set(payload.ledger.days.map((d) => d.date));
@@ -169,20 +159,12 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
     <>
       <header>
         <p className="text-xs tracking-widest text-text-dim uppercase">
-          {notice
-            ? t('corpTaxBook.verify.eyebrowNotice', {
-                corp,
-                issued: shortDate(statement.issuedAt, locale),
-              })
-            : t('corpTaxBook.verify.eyebrow', {
-                corp,
-                period: periodLabel(statement.periodStart, statement.periodEnd, locale),
-                issued: shortDate(statement.issuedAt, locale),
-              })}
+          {t('corpTaxBook.verify.eyebrowNotice', {
+            corp,
+            issued: shortDate(notice.issuedAt, locale),
+          })}
         </p>
-        <p className="text-xl font-semibold">
-          {statement.minerName ?? t('corpTaxBook.verify.title')}
-        </p>
+        <p className="text-xl font-semibold">{notice.minerName ?? t('corpTaxBook.verify.title')}</p>
       </header>
       {payload.accountClosed && (
         <p className="rounded-xs border border-line p-3 text-sm" role="status">
@@ -198,9 +180,7 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
         />
       )}
       <div className={cx('grid gap-4', owing > 0 && 'md:grid-cols-2')}>
-        <Panel
-          title={t(byAccount ? 'corpTaxBook.verify.owedNow' : 'corpTaxBook.verify.balanceDue')}
-        >
+        <Panel title={t('corpTaxBook.verify.owedNow')}>
           <p
             className={cx(
               'text-3xl font-semibold tabular-nums',
@@ -223,25 +203,6 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
                     })
                   : t('corpTaxBook.verify.paidUp', { corp })}
             </p>
-          )}
-          {/* Without the days still owed the page lists this Statement whole, so its sum stays. */}
-          {!notice && !unpaidDays && (
-            <p className="mt-2 text-sm text-text-dim tabular-nums">
-              {t('corpTaxBook.verify.balanceSum', {
-                billed: isk(statement.amount),
-                paid: isk(credited),
-              })}
-              {dismissed > 0 && (
-                <> {t('corpTaxBook.verify.dismissed', { amount: isk(dismissed) })}</>
-              )}
-              {forgiven > 0 && <> {t('corpTaxBook.verify.forgiven', { amount: isk(forgiven) })}</>}
-              {settlement && settlement.writtenOff > 0 && (
-                <> {t('corpTaxBook.verify.writtenOff', { amount: isk(settlement.writtenOff) })}</>
-              )}
-            </p>
-          )}
-          {!notice && payload.settled && remaining === 0 && (
-            <p className="mt-2 text-sm text-text-dim">{t('corpTaxBook.verify.settled')}</p>
           )}
           {lastDeclaration && (
             <p className="mt-2 text-xs text-text-dim">
@@ -274,14 +235,12 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
               )}
               <PayField
                 label={t('corpTaxBook.verify.payReason')}
-                value={statement.code}
+                value={notice.code}
                 mono
                 copyable
               />
             </dl>
-            <p className="mt-3 text-xs text-text-dim">
-              {t(notice ? 'corpTaxBook.verify.payNoteNotice' : 'corpTaxBook.verify.payNote')}
-            </p>
+            <p className="mt-3 text-xs text-text-dim">{t('corpTaxBook.verify.payNoteNotice')}</p>
           </Panel>
         )}
       </div>
@@ -295,14 +254,14 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
               }
               padded={false}
             >
-              <OwedDayList days={unpaidDays} statement={statement} />
+              <OwedDayList days={unpaidDays} notice={notice} />
             </Panel>
           )}
           {ledger && <VerifyLedger ledger={ledger} />}
         </>
       ) : (
         <>
-          <StatementLines statement={statement} />
+          <NoticeLines notice={notice} />
           {rates.length > 0 && (
             <p className="text-xs text-text-dim">
               {t('corpTaxBook.verify.rate')}:{' '}
@@ -319,8 +278,6 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
               {hasRecordOverride(rows) && <> {t('corpTaxBook.verify.rateOverride')}</>}
             </p>
           )}
-          {/* A notice is paid by the account, oldest day first: no payment is its own. */}
-          {!notice && <StatementPayments payments={payload.payments} />}
         </>
       )}
       <StopReminders token={token} initial={payload.remindersStopped} />

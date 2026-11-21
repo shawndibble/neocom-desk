@@ -1,6 +1,6 @@
 /**
- * The Record payment dialog's two richer parts: the outcome panel (which
- * Statements the ISK clears or part-pays, and what is owed or held after,
+ * The Record payment dialog's two richer parts: the outcome panel (which days
+ * the ISK pays or part-pays, oldest first, and what is owed or held after,
  * read from `previewMinerPayment`) and the picker for an Unmatched donation.
  */
 import { useState } from 'react';
@@ -8,31 +8,25 @@ import { useTranslation } from 'react-i18next';
 import { Radio, SearchInput } from '@/components/ui';
 import { selectedRowClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { netOf, type PaymentOutcome } from '@/engine/corpTaxBook/paymentPreview';
-import type { Statement } from '@/engine/corpTaxBook/statements';
+import type { PaymentOutcome } from '@/engine/corpTaxBook/paymentPreview';
+import { paymentNet } from '@/engine/corpTaxBook/payments';
 import type { SettlePayment } from '@/engine/corpTaxBook/sync';
 import { cx } from '@/lib/cx';
-import { isk, periodLabel, shortDate } from './moonsFormat';
+import { isk, shortDate } from './moonsFormat';
 
 /** A picker over this many donations gets a search box; fewer read at a glance. */
 const DONATION_SEARCH_FROM = 4;
 
-/** "After this payment": the Statements it reaches, oldest (or the pinned one) first, then the balance. */
+/** "After this payment": the days it reaches, oldest first, then the balance. */
 export function PaymentOutcomePanel({
   outcome,
-  statements,
   minerName,
 }: {
   outcome: PaymentOutcome | undefined;
-  statements: readonly Statement[];
   minerName: string;
 }) {
   const { t } = useTranslation();
   const k = 'corpTaxBook.moons.dialogs.record';
-  const period = (id: string) => {
-    const st = statements.find((s) => s.id === id);
-    return st ? periodLabel(st.periodStart, st.periodEnd) : id;
-  };
   return (
     <section
       aria-label={t(`${k}.outcomeTitle`)}
@@ -46,11 +40,9 @@ export function PaymentOutcomePanel({
           {outcome.lines.length > 0 && (
             <ul className="space-y-1">
               {outcome.lines.map((l) => (
-                <li key={l.statementId} className="flex justify-between gap-3">
+                <li key={l.date} className="flex justify-between gap-3">
                   <span className="min-w-0">
-                    <span className="block">
-                      {t(`${k}.statementLine`, { period: period(l.statementId) })}
-                    </span>
+                    <span className="block">{t(`${k}.dayLine`, { date: shortDate(l.date) })}</span>
                     <span className="block text-text-dim">
                       {l.settled
                         ? t(`${k}.clears`)
@@ -100,7 +92,7 @@ export function DonationPicker({
     ? donations.filter(
         (d) =>
           nameOf(d.characterId).toLowerCase().includes(needle) ||
-          (digits !== '' && String(Math.round(netOf(d))).includes(digits)) ||
+          (digits !== '' && String(Math.round(paymentNet(d))).includes(digits)) ||
           // The chosen donation stays listed, so a search never hides what Assign will send.
           d.id === value
       )
@@ -140,7 +132,7 @@ export function DonationPicker({
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="tabular-nums">
                     {t(`${k}.donationRow`, {
-                      amount: isk(netOf(d)),
+                      amount: isk(paymentNet(d)),
                       name: nameOf(d.characterId),
                     })}
                   </span>

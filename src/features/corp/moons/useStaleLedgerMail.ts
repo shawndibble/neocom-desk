@@ -14,7 +14,7 @@ import { staleLedgerMailDue, type MoonOwnerRow } from '@/engine/corpTaxBook/moon
 import { enqueueGrantStaleMail } from '@/features/corpTaxBook/mailQueue';
 import { queueOfficerMail } from '@/features/corpTaxBook/officerMail';
 import { claimFeederStaleMail } from '../taxBook/feederClient';
-import { useCorporationName } from './statementMailing';
+import { useCorporationName } from './lateNoticeMailing';
 import { useBook } from './useBook';
 
 export function useStaleLedgerMail(rows: readonly MoonOwnerRow[]): void {

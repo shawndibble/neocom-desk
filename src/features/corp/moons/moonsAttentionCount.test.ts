@@ -42,7 +42,7 @@ function book(observed: unknown[] = [ROW], hubId = 'jita'): BookRead {
     } as never,
     state: {
       miners: [],
-      statements: [],
+      notices: [],
       payments: [],
       dismissals: [],
       extractions: [],

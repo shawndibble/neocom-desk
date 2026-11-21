@@ -10,8 +10,7 @@ import {
 } from './bookDocs';
 import { DEFAULT_OVERDUE_DAYS } from './overdue';
 import { DEFAULT_NOTICE_RULES } from './notices';
-import { DAY_SETTLE_TOLERANCE_PCT } from './runningAccount';
-import { DEFAULT_MINIMUM_STATEMENT } from './statements';
+import { DAY_SETTLE_TOLERANCE_PCT } from './minerRunningAccount';
 
 describe('parseRate', () => {
   it.each([
@@ -60,7 +59,6 @@ describe('parseBookSettings', () => {
       { scope: 'nonsense', pct: 5 },
       'junk',
     ],
-    minimumStatement: 1_000_000,
     overdueDays: 21,
     lastSync: { at: Date.parse('2026-10-18T12:00:00Z'), byName: 'Officer' },
   };
@@ -74,7 +72,6 @@ describe('parseBookSettings', () => {
       oreForm: 'raw',
       divisions: [2, 3],
       rates: [{ scope: 'corp', pct: 10, effectiveFrom: '2026-10-01' }],
-      minimumStatement: 1_000_000,
       overdueDays: 21,
       lastSync: book.lastSync,
     });
@@ -99,9 +96,7 @@ describe('parseBookSettings', () => {
       hubId: 'jita',
       oreForm: 'compressed',
       graceHours: DEFAULT_GRACE_HOURS,
-      minimumStatement: DEFAULT_MINIMUM_STATEMENT,
       overdueDays: DEFAULT_OVERDUE_DAYS,
-      cadence: { kind: 'monthly' },
       runningAccountFrom: RUNNING_ACCOUNTS_FROM,
       noticeRules: DEFAULT_NOTICE_RULES,
       dayTolerancePct: DAY_SETTLE_TOLERANCE_PCT,
@@ -129,7 +124,6 @@ describe('parseBookSettings', () => {
     expect(
       parseBookSettings({
         structureExpiryHours: { '1020': 48, '1021': 'x' },
-        cadence: { kind: 'days', days: 7, anchor: '2026-10-01' },
         chunkM3PerHour: 30_000,
         dismissApprovalAboveIsk: 50_000_000,
         ownerCharacterId: 9,
@@ -138,7 +132,6 @@ describe('parseBookSettings', () => {
       })
     ).toMatchObject({
       structureExpiryHours: { '1020': 48 },
-      cadence: { kind: 'days', days: 7, anchor: '2026-10-01' },
       chunkM3PerHour: 30_000,
       dismissApprovalAboveIsk: 50_000_000,
       ownerCharacterId: 9,

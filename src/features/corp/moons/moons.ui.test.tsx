@@ -7,31 +7,28 @@ import '@/i18n';
 import { LocationProbe } from '@/test/LocationProbe';
 import { stubViewport } from '@/test/viewport';
 import { BELOW_DESKTOP_QUERY } from '@/lib/useIsBelowDesktop';
-import {
-  buildBookView,
-  nextRunPeriod,
-  planStatementRun,
-  statementForLine,
-  type BookViewInput,
-} from '@/engine/corpTaxBook/bookView';
+import { buildBookView, type BookViewInput } from '@/engine/corpTaxBook/bookView';
+import { draftNotice } from '@/engine/corpTaxBook/lateNotices';
 import { DEFAULT_NOTICE_RULES } from '@/engine/corpTaxBook/notices';
 import type { ObservedMiningEntry } from '@/engine/corpTaxBook/types';
 import { BookProvider } from './BookContext';
 import { MinersTab } from './MinersTab';
 import { BookTotals, OverdueAging } from './BookTotals';
 import { MINERS_COLUMN_IDS, useVisibleMinersColumns } from './moonsColumns';
-import { StatementRun } from './StatementRun';
+import { LateNoticeRun } from './LateNoticeRun';
 import { MarkNotTaxDialog } from './BookDialogs';
 import type { BookSettings, OfficerVerdict } from '../taxBook/bookClient';
 
 const editBook = vi.fn();
-const enqueueStatements = vi.fn();
+const enqueueLateNotices = vi.fn();
 vi.mock('../taxBook/bookClient', () => ({
   editBook: (...a: unknown[]) => editBook(...a),
+  issueLateNotice: (character: number, corp: number, notice: unknown) =>
+    editBook(character, corp, { action: 'issueLateNotice', notice }),
   readAudit: vi.fn().mockResolvedValue([]),
 }));
 vi.mock('@/features/corpTaxBook/mailQueue', () => ({
-  enqueueStatements: (...a: unknown[]) => enqueueStatements(...a),
+  enqueueLateNotices: (...a: unknown[]) => enqueueLateNotices(...a),
   enqueueReminder: vi.fn(),
 }));
 
@@ -61,9 +58,7 @@ function input(overrides: Partial<BookViewInput> = {}): BookViewInput {
     now: '2026-09-18T14:00:00Z',
     startDate: '2026-08-01',
     graceHours: 6,
-    minimumStatement: 0,
     overdueDays: 14,
-    cadence: { kind: 'monthly' },
     hubId: 'jita',
     oreForm: 'compressed',
     structureExpiryHours: {},
@@ -71,13 +66,12 @@ function input(overrides: Partial<BookViewInput> = {}): BookViewInput {
     rates: [{ scope: 'corp', pct: 10, effectiveFrom: '2026-08-01' }],
     entries: [entry(1, '2026-08-10', 1000), entry(2, '2026-08-11', 2000, 555)],
     miners: [],
-    statements: [],
+    notices: [],
     payments: [],
     dismissals: [],
     declarations: [],
     adjustments: [],
     extractions: [],
-    paidStatementIds: new Set(),
     pricesOn: () => ({ prices: new Map([[ORE, 1000]]), sources: new Map() }),
     ...overrides,
   };
@@ -116,7 +110,7 @@ function renderBook(
             moon: (id) => `Moon ${id}`,
             ore: () => 'Sylvite',
           },
-          settings: { minimumStatement: 0, noticeRules: DEFAULT_NOTICE_RULES } as BookSettings,
+          settings: { noticeRules: DEFAULT_NOTICE_RULES } as BookSettings,
           data: {} as never,
           verdict,
           reload,
@@ -133,7 +127,7 @@ beforeEach(() => {
   useVisibleMinersColumns.setState({ value: MINERS_COLUMN_IDS, hydrated: false });
   corpName.value = 'Ore & Glory';
   editBook.mockReset().mockResolvedValue({});
-  enqueueStatements.mockReset().mockResolvedValue({ queued: 1, skipped: 0, missingLink: [] });
+  enqueueLateNotices.mockReset().mockResolvedValue({ queued: 1, skipped: 0, missingLink: [] });
 });
 
 describe('MinersTab', () => {
@@ -293,17 +287,16 @@ describe('Mark not tax dialog', () => {
   });
 });
 
-describe('StatementRun (late notices, #6294)', () => {
+describe('LateNoticeRun (late notices, #6294)', () => {
   /** Two Miners 60 days behind, each owing at least the default notice minimum. */
   const behind = {
-    runningAccountFrom: '2026-08-01T00:00:00Z',
     now: '2026-10-18T14:00:00Z',
     lastSyncedAt: '2026-10-18T12:00:00Z',
     entries: [entry(1, '2026-08-10', 100_000), entry(2, '2026-08-11', 200_000)],
   };
 
   it("on a desktop shows the chosen Miner's mail beside the step, picked by a labelled select", async () => {
-    renderBook(<StatementRun />, behind);
+    renderBook(<LateNoticeRun />, behind);
     const preview = screen.getByRole('region', { name: 'Mail preview' });
     expect(within(preview).getByText(/moon tax: late notice/)).toBeInTheDocument();
     expect(within(preview).getByRole('combobox', { name: 'Preview for' })).toBeInTheDocument();
@@ -316,7 +309,7 @@ describe('StatementRun (late notices, #6294)', () => {
   it('keeps Send disabled until the corporation name resolves, then previews with it', async () => {
     stubViewport(BELOW_DESKTOP_QUERY);
     corpName.value = null;
-    const first = renderBook(<StatementRun />, behind);
+    const first = renderBook(<LateNoticeRun />, behind);
     await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
     expect(screen.getByText('Loading corporation name…')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send 2 late notices' })).toBeDisabled();
@@ -325,7 +318,7 @@ describe('StatementRun (late notices, #6294)', () => {
     first.unmount();
 
     corpName.value = 'Ore & Glory';
-    renderBook(<StatementRun />, behind);
+    renderBook(<LateNoticeRun />, behind);
     await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
     expect(screen.getByRole('button', { name: 'Send 2 late notices' })).toBeEnabled();
     await userEvent.click(screen.getByRole('button', { name: 'Preview mail' }));
@@ -334,17 +327,17 @@ describe('StatementRun (late notices, #6294)', () => {
 
   it('previews the mail of each Miner from the Send step, before sending', async () => {
     stubViewport(BELOW_DESKTOP_QUERY);
-    renderBook(<StatementRun />, behind);
+    renderBook(<LateNoticeRun />, behind);
     await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
     await userEvent.click(screen.getByRole('button', { name: 'Preview mail' }));
     expect(await screen.findByText('1 of 2')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Next Miner' }));
     expect(screen.getByText('2 of 2')).toBeInTheDocument();
-    expect(enqueueStatements).not.toHaveBeenCalled();
+    expect(enqueueLateNotices).not.toHaveBeenCalled();
   });
 
   it('checks, then issues each notice before handing the mails to the queue', async () => {
-    const { reload } = renderBook(<StatementRun />, behind);
+    const { reload } = renderBook(<LateNoticeRun />, behind);
     expect(screen.getByRole('heading', { name: 'Late notices' })).toBeInTheDocument();
     expect(screen.getByText('2 to send')).toBeInTheDocument();
 
@@ -352,18 +345,20 @@ describe('StatementRun (late notices, #6294)', () => {
     expect(screen.getByText(/about \d+ minute/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Send 2 late notices' }));
 
-    await waitFor(() => expect(enqueueStatements).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(enqueueLateNotices).toHaveBeenCalledTimes(1));
     const issued = editBook.mock.calls.map((c) => (c[2] as { action: string }).action);
-    expect(issued).toEqual(['issueStatement', 'issueStatement']);
+    expect(issued).toEqual(['issueLateNotice', 'issueLateNotice']);
     const stored = editBook.mock.calls[0][2] as {
-      statement: { minerName: string; refineryNames: Record<string, string> };
+      notice: { kind: string; issuedBy: number; names: Record<string, unknown> };
     };
-    expect(stored.statement.minerName).toMatch(/^Pilot \d$/);
-    expect(stored.statement.refineryNames).toEqual({ '1001': 'Efa - Brass Anvil' });
-    const [{ statements, corporationId, senderCharacterId }] = enqueueStatements.mock.calls[0];
+    expect(stored.notice.kind).toBe('late');
+    expect(stored.notice.issuedBy).toBe(7);
+    expect(stored.notice.names.minerName).toMatch(/^Pilot \d$/);
+    expect(stored.notice.names.refineryNames).toEqual({ '1001': 'Efa - Brass Anvil' });
+    const [{ notices, corporationId, senderCharacterId }] = enqueueLateNotices.mock.calls[0];
     expect(corporationId).toBe(CORP);
     expect(senderCharacterId).toBe(7);
-    expect(statements.map((s: { amountDue: number }) => s.amountDue).sort()).toEqual([
+    expect(notices.map((s: { amountDue: number }) => s.amountDue).sort()).toEqual([
       10_000_000, 20_000_000,
     ]);
     expect(await screen.findByText('1 late notice is in the send queue.')).toBeInTheDocument();
@@ -371,7 +366,7 @@ describe('StatementRun (late notices, #6294)', () => {
   });
 
   it('mails and issues only the ticked Miners', async () => {
-    renderBook(<StatementRun />, behind);
+    renderBook(<LateNoticeRun />, behind);
     const boxes = screen.getAllByRole('checkbox');
     expect(boxes).toHaveLength(2);
     expect(boxes.every((b) => (b as HTMLInputElement).checked)).toBe(true);
@@ -381,26 +376,26 @@ describe('StatementRun (late notices, #6294)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
     await userEvent.click(screen.getByRole('button', { name: 'Send 1 late notice' }));
 
-    await waitFor(() => expect(enqueueStatements).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(enqueueLateNotices).toHaveBeenCalledTimes(1));
     // A notice is rebuilt every run, so an unticked one is not issued at all.
     const issued = editBook.mock.calls.map((c) => (c[2] as { action: string }).action);
-    expect(issued).toEqual(['issueStatement']);
-    expect(enqueueStatements.mock.calls[0][0].statements).toHaveLength(1);
+    expect(issued).toEqual(['issueLateNotice']);
+    expect(enqueueLateNotices.mock.calls[0][0].notices).toHaveLength(1);
   });
 
   it('leaves Send off until at least one Miner is ticked', async () => {
-    renderBook(<StatementRun />, behind);
+    renderBook(<LateNoticeRun />, behind);
     for (const box of screen.getAllByRole('checkbox')) await userEvent.click(box);
     expect(screen.getByRole('button', { name: 'Continue to send' })).toBeDisabled();
   });
 
   it('shows a refused issue instead of queueing mail', async () => {
     editBook.mockRejectedValueOnce(new Error('An issued Statement never changes'));
-    renderBook(<StatementRun />, behind);
+    renderBook(<LateNoticeRun />, behind);
     await userEvent.click(screen.getByRole('button', { name: 'Continue to send' }));
     await userEvent.click(screen.getByRole('button', { name: 'Send 2 late notices' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('An issued Statement never changes');
-    expect(enqueueStatements).not.toHaveBeenCalled();
+    expect(enqueueLateNotices).not.toHaveBeenCalled();
   });
 });
 
@@ -411,14 +406,11 @@ describe('Totals links and Overdue by age', () => {
    */
   function overdueBook() {
     const first = buildBookView(input({ now: '2026-09-02T12:00:00Z' }));
-    const plan = planStatementRun(first, nextRunPeriod(first)!);
-    const statements = plan.lines.map((l) => {
-      const s = statementForLine(first, plan, l);
-      return s.minerId === first.miners.find((m) => m.mainCharacterId === 2)?.id
-        ? { ...s, issuedAt: '2026-07-20T00:00:00Z' }
-        : s;
+    const notices = first.miners.map((m) => {
+      const n = draftNotice(first, m.id)!.notice;
+      return m.mainCharacterId === 2 ? { ...n, issuedAt: '2026-07-20T00:00:00Z' } : n;
     });
-    return { statements };
+    return { notices };
   }
 
   it('links Owed and Overdue to the Miners narrowed to them; an empty Credit stays a readout', () => {

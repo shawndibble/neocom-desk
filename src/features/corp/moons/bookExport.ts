@@ -1,17 +1,18 @@
 /**
  * The Corp Tax Book as one workbook (#4946, #4959): a sheet per record type, every record the
  * officer can read, names beside ids so the file reads for a person and still joins for a script.
- * Left out on purpose: the Statement verify links (credentials, editors only), the moon owners'
+ * Left out on purpose: the late notice verify links (credentials, editors only), the moon owners'
  * own view (only they can read it) and the miners' coverage copy (the Moon owners sheet has it).
  * Pure: the caller reads the book and hands the sheets to `downloadWorkbook`.
  */
 import type { Miner } from '@/engine/corpTaxBook/charges';
-import type { RecordedWriteOff } from '@/engine/corpTaxBook/allocation';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
 import { deriveModeChanges, deriveOwnerRateHistory } from '@/engine/corpTaxBook/feederAccrual';
 import type { ScheduledSyncStatus } from '@/engine/corpTaxBook/scheduledSync';
 import type { TaxRate } from '@/engine/corpTaxBook/rates';
-import type { Adjustment, Statement, StatementLine } from '@/engine/corpTaxBook/statements';
+import type { Adjustment } from '@/engine/corpTaxBook/adjustments';
+import type { RecordedWriteOff } from '@/engine/corpTaxBook/payments';
+import type { LateNotice, LateNoticeLine } from '../../../../functions/src/corpTaxBookLateNotice';
 import type { SettlePayment, SyncExtraction } from '@/engine/corpTaxBook/sync';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import type { CsvTranslate } from '@/lib/csv';
@@ -42,8 +43,7 @@ export interface BookExportInput {
   settings: BookSettings;
   miners: readonly Miner[];
   observed: readonly ObservedRow[];
-  statements: readonly Statement[];
-  paidStatementIds: ReadonlySet<string>;
+  notices: readonly LateNotice[];
   payments: readonly SettlePayment[];
   adjustments: readonly Adjustment[];
   writeOffs: readonly RecordedWriteOff[];
@@ -104,18 +104,12 @@ function settingsRows(
   const scheduled = input.scheduledSync ?? null;
   const label = (key: string, options?: Record<string, unknown>) =>
     t(`corpTaxBook.export.setting.${key}`, options);
-  const cadence =
-    s.cadence.kind === 'monthly'
-      ? label('cadenceMonthly')
-      : label('cadenceDays', { days: s.cadence.days, anchor: s.cadence.anchor });
   return [
     [label('active'), exportFlag(t, s.active)],
     [label('startDate'), s.startDate],
     [label('hub'), s.hubId],
     [label('oreForm'), s.oreForm],
-    [label('cadence'), cadence],
     [label('graceHours'), s.graceHours],
-    [label('minimumStatement'), s.minimumStatement],
     [label('overdueDays'), s.overdueDays],
     [label('divisions'), joined(s.divisions)],
     [label('approvalLimit'), s.dismissApprovalAboveIsk],
@@ -161,22 +155,18 @@ export function bookExportSheets(
   const minerOf = (characterId: number) => minerIdOf.get(characterId) ?? `solo:${characterId}`;
   const character = (id: number | null | undefined) =>
     typeof id === 'number' ? names.character(id) : null;
-  const statementLines = [...input.statements]
-    .sort(
-      byKey(
-        (s) => s.issuedAt,
-        (s) => s.id
-      )
+  const notices = [...input.notices].sort(
+    byKey(
+      (n) => n.issuedAt,
+      (n) => n.id
     )
-    .flatMap((statement) =>
-      statement.lines.map((line): { statement: Statement; line: StatementLine } => ({
-        statement,
-        line,
-      }))
-    );
-  /** "Ore: value" for each ore of a Statement line that has one in `byType`. */
+  );
+  const noticeLines = notices.flatMap((notice) =>
+    notice.lines.map((line): { notice: LateNotice; line: LateNoticeLine } => ({ notice, line }))
+  );
+  /** "Ore: value" for each ore of a notice line that has one in `byType`. */
   const perOre = <V>(
-    line: StatementLine,
+    line: LateNoticeLine,
     byType: Readonly<Record<number, V>> | undefined,
     format: (value: V) => string | number
   ) =>
@@ -186,7 +176,7 @@ export function bookExportSheets(
         return value === undefined ? [] : [`${names.ore(ore.typeId)}: ${format(value)}`];
       })
     );
-  const statementMiner = new Map(input.statements.map((s) => [s.id, s.minerId]));
+  const noticeMiner = new Map(input.notices.map((n) => [n.id, n.minerId]));
   const payouts = input.feeders.flatMap((f) =>
     f.payouts.map((payout) => ({ feeder: f.corporationId, payout }))
   );
@@ -231,44 +221,32 @@ export function bookExportSheets(
         ['readAt', (r) => r.cachedAt],
       ]
     ),
-    sheet(
-      t,
-      'statements',
-      [...input.statements].sort(
-        byKey(
-          (s) => s.issuedAt,
-          (s) => s.id
-        )
-      ),
-      [
-        ['statementId', (s) => s.id],
-        ['miner', (s) => minerName(s.minerId)],
-        ['minerId', (s) => s.minerId],
-        ['code', (s) => s.code],
-        ['periodStart', (s) => s.periodStart],
-        ['periodEnd', (s) => s.periodEnd],
-        ['coversFrom', (s) => s.coversFrom],
-        ['coversThrough', (s) => s.coversThrough],
-        ['issued', (s) => s.issuedAt],
-        ['hub', (s) => s.hubId],
-        ['oreForm', (s) => s.oreForm],
-        ['lines', (s) => s.lines.length],
-        ['amount', (s) => s.amount],
-        ['settled', (s) => exportFlag(t, input.paidStatementIds.has(s.id))],
-        ['mailsSent', (s) => s.mailsSent],
-        ['lastMailed', (s) => s.lastMailedAt],
-        ['issuedBy', (s) => character(s.issuedBy)],
-        ['issuedById', (s) => s.issuedBy],
-        ['remindersStopped', (s) => exportFlag(t, s.remindersStopped)],
-        ['manualReminders', (s) => s.manualRemindersSent],
-        ['storedMinerName', (s) => s.minerName],
-      ]
-    ),
-    // Every line of every Statement: the Statements sheet only counts them.
-    sheet(t, 'statementLines', statementLines, [
-      ['statementId', (l) => l.statement.id],
-      ['miner', (l) => minerName(l.statement.minerId)],
-      ['minerId', (l) => l.statement.minerId],
+    sheet(t, 'lateNotices', notices, [
+      ['noticeId', (n) => n.id],
+      ['miner', (n) => minerName(n.minerId)],
+      ['minerId', (n) => n.minerId],
+      ['kind', (n) => t(`corpTaxBook.export.noticeKind.${n.kind}`)],
+      ['code', (n) => n.code],
+      ['firstDay', (n) => n.lines[0]?.date],
+      ['lastDay', (n) => n.lines.at(-1)?.date],
+      ['issued', (n) => n.issuedAt],
+      ['hub', (n) => n.pricing?.hubId],
+      ['oreForm', (n) => n.pricing?.oreForm],
+      ['lines', (n) => n.lines.length],
+      ['listed', (n) => n.listed],
+      ['mailsSent', (n) => n.mail.sent],
+      ['lastMailed', (n) => n.mail.lastAt],
+      ['issuedBy', (n) => character(n.issuedBy)],
+      ['issuedById', (n) => n.issuedBy],
+      ['remindersStopped', (n) => exportFlag(t, n.mail.remindersStopped)],
+      ['manualReminders', (n) => n.mail.manualSent],
+      ['storedMinerName', (n) => n.names?.minerName],
+    ]),
+    // Every line of every late notice: the Late notices sheet only counts them.
+    sheet(t, 'lateNoticeLines', noticeLines, [
+      ['noticeId', (l) => l.notice.id],
+      ['miner', (l) => minerName(l.notice.minerId)],
+      ['minerId', (l) => l.notice.minerId],
       ['date', (l) => l.line.date],
       ['character', (l) => character(l.line.characterId)],
       ['characterId', (l) => l.line.characterId],
@@ -292,7 +270,7 @@ export function bookExportSheets(
       ['tax', (l) => l.line.tax],
       ['reason', (l) => l.line.reason],
       ['kind', (l) => t(`corpTaxBook.export.lineKind.${l.line.kind}`)],
-      ['adjustmentId', (l) => l.line.adjustmentId],
+      ['lineKey', (l) => l.line.key],
     ]),
     sheet(
       t,
@@ -313,7 +291,6 @@ export function bookExportSheets(
         ['amount', (p) => p.amount],
         ['notTax', (p) => p.notTaxAmount],
         ['source', (p) => t(`corpTaxBook.export.paymentSource.${p.source}`)],
-        ['statementId', (p) => p.statementId],
       ]
     ),
     sheet(
@@ -355,7 +332,6 @@ export function bookExportSheets(
         ['minerId', (w) => w.minerId],
         ['amount', (w) => w.amount],
         ['reason', (w) => w.reason],
-        ['statementId', (w) => w.statementId],
         ['time', (w) => w.at],
         ['reversedBy', (w) => character(w.reversed?.by)],
         ['reversedAt', (w) => w.reversed?.at],
@@ -394,9 +370,9 @@ export function bookExportSheets(
       ),
       [
         ['declarationId', (d) => d.id],
-        ['statementId', (d) => d.statementId],
-        ['miner', (d) => minerName(statementMiner.get(d.statementId))],
-        ['minerId', (d) => statementMiner.get(d.statementId)],
+        ['noticeId', (d) => d.statementId],
+        ['miner', (d) => minerName(noticeMiner.get(d.statementId))],
+        ['minerId', (d) => noticeMiner.get(d.statementId)],
         ['kind', (d) => t(`corpTaxBook.export.declarationKind.${d.kind}`)],
         ['time', (d) => d.at],
         ['note', (d) => d.note],
@@ -444,7 +420,7 @@ export function bookExportSheets(
         ['characters', (m) => joined(m.characterIds.map(names.character))],
         ['characterIds', (m) => joined(m.characterIds)],
         ['closed', (m) => m.closedAt],
-        ['finalStatementId', (m) => m.finalStatementId],
+        ['finalNoticeId', (m) => m.finalStatementId],
       ]
     ),
     sheet(

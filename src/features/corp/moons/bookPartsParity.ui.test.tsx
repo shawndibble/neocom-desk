@@ -8,13 +8,9 @@ import type { ReactElement } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
-import {
-  buildBookView,
-  nextRunPeriod,
-  planStatementRun,
-  statementForLine,
-  type BookViewInput,
-} from '@/engine/corpTaxBook/bookView';
+import { buildBookView, type BookViewInput } from '@/engine/corpTaxBook/bookView';
+import { draftNotice } from '@/engine/corpTaxBook/lateNotices';
+import { legacyStatementDocOf } from '../../../../functions/src/corpTaxBookLateNotice';
 import { extractionId } from '@/engine/corpTaxBook/sync';
 import type { ObservedMiningEntry } from '@/engine/corpTaxBook/types';
 import type { BookData, BookFeeder, BookPart, OfficerVerdict } from '../taxBook/bookClient';
@@ -144,9 +140,7 @@ const base: BookViewInput = {
   now: '2026-10-20T12:00:00Z',
   startDate: '2026-08-01',
   graceHours: 6,
-  minimumStatement: 0,
   overdueDays: 14,
-  cadence: { kind: 'monthly' },
   hubId: 'jita',
   oreForm: 'compressed',
   structureExpiryHours: {},
@@ -154,36 +148,33 @@ const base: BookViewInput = {
   rates: [{ scope: 'corp', pct: 10, effectiveFrom: '2026-08-01' }],
   entries: ENTRIES,
   miners: [{ id: 'g1', characterIds: [1, 2], mainCharacterId: 1 }],
-  statements: [],
+  notices: [],
   payments: [],
   dismissals: [],
   declarations: [],
   adjustments: [],
   feeders: [FEEDER],
   extractions: [AUG, SEP, { ...AUG, structureId: 1003, moonId: 5 }],
-  paidStatementIds: new Set(),
   pricesOn: () => ({ prices: new Map([[ORE, 1000]]), sources: new Map() }),
 };
 
 /** The ledger slice of a rich book: a payment, dismissal, declaration, adjustment, write-off, rebill. */
 function richBook() {
-  const first = buildBookView(base);
-  const aug = planStatementRun(first, nextRunPeriod(first)!);
-  const issued = aug.lines.map((l) => ({
-    ...statementForLine(first, aug, l),
-    issuedAt: '2026-09-01T10:00:00Z',
-  }));
-  // September's run bills the Extraction's days for everyone but Pilot 4, whose day is dismissed:
-  // one chunk with days on a Statement and a dismissed one.
-  const augOnly = buildBookView({ ...base, statements: issued });
-  const sep = planStatementRun(augOnly, nextRunPeriod(augOnly)!);
-  const septStatements = sep.lines
-    .filter((l) => l.minerId !== 'solo:4')
-    .map((l) => ({ ...statementForLine(augOnly, sep, l), issuedAt: '2026-10-02T10:00:00Z' }));
+  // A late notice to each Miner who owed on 1 Sep and 2 Oct; Pilot 4's September day is
+  // dismissed: one chunk with days a notice listed and a dismissed one.
+  const at = (now: string) => buildBookView({ ...base, now });
+  const aug = at('2026-09-01T10:00:00Z');
+  const issued = aug.miners.flatMap((m) => draftNotice(aug, m.id)?.notice ?? []);
+  const augOnly = buildBookView({ ...base, notices: issued });
+  const sep = buildBookView({ ...augOnly.input, now: '2026-10-02T10:00:00Z' });
+  const septNotices = sep.miners
+    .filter((m) => m.id !== 'solo:4')
+    .flatMap((m) => draftNotice(sep, m.id)?.notice ?? [])
+    .filter((n) => n.lines.length > 0);
   const dismissedDay = augOnly.charges.find(
     (c) => c.minerId === 'solo:4' && c.extractionId === SEP_ID
   )!;
-  const of = (minerId: string) => issued.find((s) => s.minerId === minerId)!;
+  const of = (minerId: string) => issued.find((n) => n.minerId === minerId)!;
   const g1 = of('g1');
   const solo3 = of('solo:3');
   const solo4 = of('solo:4');
@@ -193,7 +184,7 @@ function richBook() {
         id: 'p1',
         minerId: 'g1',
         characterId: 1,
-        amount: Math.round(g1.amount / 2),
+        amount: Math.round(g1.listed / 2),
         at: '2026-09-05T08:00:00Z',
         source: 'donation' as const,
       },
@@ -201,7 +192,7 @@ function richBook() {
         id: 'p2',
         minerId: 'solo:3',
         characterId: 3,
-        amount: solo3.amount,
+        amount: solo3.listed,
         at: '2026-09-06T08:00:00Z',
         source: 'donation' as const,
       },
@@ -252,9 +243,8 @@ function richBook() {
       },
     ],
   };
-  // A rebill: the August Statement re-issued after the correction, under a new id.
-  const rebill = { ...solo3, id: `${solo3.id}-rebill`, issuedAt: '2026-09-03T10:00:00Z' };
-  return { statements: [...issued, ...septStatements, rebill], ...ledger };
+  // Older servers store each notice as a legacy statements doc: the book reads it from there.
+  return { statements: [...issued, ...septNotices].map(legacyStatementDocOf), ...ledger };
 }
 
 const RICH = richBook();
@@ -267,9 +257,7 @@ function seed() {
     active: true,
     startDate: base.startDate,
     graceHours: base.graceHours,
-    minimumStatement: 0,
     overdueDays: base.overdueDays,
-    cadence: base.cadence,
     hubId: base.hubId,
     oreForm: base.oreForm,
     rates: base.rates,
@@ -284,7 +272,7 @@ function seed() {
   base.extractions.forEach((x, i) => store.set(`${book}/extractions/e${i}`, { ...x }));
   const lists: Record<string, readonly { id: string }[]> = {
     miners: base.miners,
-    statements: RICH.statements,
+    statements: RICH.statements as unknown as { id: string }[],
     payments: RICH.payments,
     dismissals: RICH.dismissals,
     declarations: RICH.declarations,
@@ -304,7 +292,7 @@ async function bookData(parts: BookPartSet | undefined): Promise<BookData> {
 function viewOf(data: BookData) {
   return buildBookView({
     ...base,
-    statements: data.state.statements,
+    notices: data.state.notices,
     payments: data.state.payments,
     dismissals: data.state.dismissals,
     declarations: data.declarations,
@@ -397,13 +385,13 @@ const ROUTES: Route[] = [
 ];
 
 describe('book parts parity', () => {
-  it('the rich book has a payment, dismissal, declaration, adjustment, write-off and rebill', () => {
+  it('the rich book has a payment, dismissal, declaration, adjustment, write-off and notices', () => {
     expect(RICH.payments.length).toBeGreaterThan(1);
     expect(RICH.dismissals).toHaveLength(1);
     expect(RICH.declarations).toHaveLength(1);
     expect(RICH.adjustments).toHaveLength(1);
     expect(RICH.writeOffs).toHaveLength(1);
-    expect(RICH.statements.some((s) => s.id.endsWith('-rebill'))).toBe(true);
+    expect(RICH.statements.length).toBeGreaterThan(3);
   });
 
   it.each(ROUTES)('$name renders the same from its own parts as from the whole book', async (r) => {
@@ -418,11 +406,6 @@ describe('book parts parity', () => {
     expect(await screenText(<OverviewTab />, new Set(['core']))).not.toBe(whole);
   });
 
-  it('the Extractions detail needs the ledger for its dismissed days', async () => {
-    const whole = await screenText(<MoonDetail id={SEP_ID} />, undefined);
-    expect(await screenText(<MoonDetail id={SEP_ID} />, new Set(['core']))).not.toBe(whole);
-  });
-
   it('the Overview owes what the Miners tab owes, for a Miner who paid', async () => {
     const view = viewOf(await bookData(bookPartsFor('overview', null)));
     const sum = view.miners.reduce((total, m) => total + m.owed, 0);
@@ -431,7 +414,7 @@ describe('book parts parity', () => {
     const g1 = (v: typeof view) => v.miners.find((m) => m.id === 'g1')!;
     const billed = RICH.statements
       .filter((s) => s.minerId === 'g1')
-      .reduce((total, s) => total + s.amount, 0);
+      .reduce((total, s) => total + (s.amount as number), 0);
     expect(g1(view).owed).toBeLessThan(billed);
     expect(g1(view).owed).toBe(g1(whole).owed);
     expect(view.totals.owed).toBe(whole.totals.owed);

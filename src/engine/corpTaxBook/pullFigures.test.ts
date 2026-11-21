@@ -6,13 +6,7 @@ import {
   type StoredExtraction,
 } from '../../../functions/src/corpTaxBookMoonDocs';
 import type { ObservedRow } from '../../../functions/src/corpTaxBookEngine';
-import {
-  buildBookView,
-  nextRunPeriod,
-  planStatementRun,
-  statementForLine,
-  type BookViewInput,
-} from './bookView';
+import { buildBookView, type BookViewInput } from './bookView';
 import { moonDocUsable, planMoonScope, withMoonDocs } from './pullFigures';
 import { extractionId } from './sync';
 import type { ObservedMiningEntry } from './types';
@@ -60,9 +54,7 @@ function book(): BookViewInput {
     now: NOW,
     startDate: '2026-08-01',
     graceHours: 6,
-    minimumStatement: 0,
     overdueDays: 14,
-    cadence: { kind: 'monthly' },
     hubId: 'jita',
     oreForm: 'compressed',
     structureExpiryHours: {},
@@ -79,13 +71,12 @@ function book(): BookViewInput {
       entry(3, '2026-09-18', 100),
     ],
     miners: [],
-    statements: [],
+    notices: [],
     payments: [],
     dismissals: [],
     declarations: [],
     adjustments: [],
     extractions: [FROZEN, SURVEYED, OPEN],
-    paidStatementIds: new Set<string>(),
     pricesOn: () => ({
       prices: new Map([
         [ORE, 1000],
@@ -95,14 +86,7 @@ function book(): BookViewInput {
     }),
     surveyOreLines: new Map([[extractionId(SURVEYED), [{ typeId: SURVEY_ORE, quantity: 5000 }]]]),
   };
-  // August issued for miners 1 and 2; miner 3 is never billed.
-  const view = buildBookView(first);
-  const plan = planStatementRun(view, nextRunPeriod(view)!);
-  const statements = plan.lines.map((l) => ({
-    ...statementForLine(view, plan, l),
-    issuedAt: '2026-09-02T00:00:00Z',
-  }));
-  return { ...first, statements };
+  return first;
 }
 
 const rowsOf = (entries: readonly ObservedMiningEntry[]): ObservedRow[] =>
@@ -122,7 +106,6 @@ function docsOf(input: BookViewInput): Map<string, MoonDoc> {
   const rows = rowsOf(input.entries);
   const rules = {
     expiryHours: input.structureExpiryHours,
-    statements: input.statements as unknown as Record<string, unknown>[],
     minerOf: (c: number) => `solo:${c}`,
   };
   return new Map(
@@ -139,8 +122,6 @@ function scopedView(input: BookViewInput, shown: string, docs: Map<string, MoonD
     extractionId: shown,
     extractions: input.extractions,
     docs,
-    statements: input.statements,
-    startDate: input.startDate,
     expiryHours: input.structureExpiryHours,
   });
   if (!scope.ok) return { scope, view: undefined, read: [] as ObservedMiningEntry[] };
@@ -152,6 +133,19 @@ function scopedView(input: BookViewInput, shown: string, docs: Map<string, MoonD
 }
 
 describe('the moon page from the moon docs', () => {
+  it('reads every cycle’s window of the moon, and only those days: a doc carries no tax', () => {
+    const scope = planMoonScope({
+      extractionId: extractionId(OPEN),
+      extractions: book().extractions,
+      docs: docsOf(book()),
+      expiryHours: {},
+    });
+    expect(scope.ok && scope.rows.map((r) => r.extractionId)).toEqual(
+      book().extractions.map(extractionId)
+    );
+    expect(scope.ok && scope.fromDocs.size).toBe(0);
+  });
+
   const input = book();
   const whole = buildBookView(input);
   const docs = docsOf(input);
@@ -159,54 +153,11 @@ describe('the moon page from the moon docs', () => {
 
   it('prints every cycle the same from the docs as from the whole-book view', () => {
     // The scenario covers what the page shows, so an empty comparison cannot pass.
-    expect(input.statements.length).toBeGreaterThan(0);
     for (const x of whole.extractions) expect(x.tax).toBeGreaterThan(0);
     for (const x of whole.extractions) expect(x.minedPct).toBeGreaterThan(0);
     for (const shown of ids) {
       const { view } = scopedView(input, shown, docs);
       expect(view!.extractions).toEqual(whole.extractions);
-    }
-  });
-
-  it('reads no row outside the shown pull window, and none for a frozen cycle', () => {
-    const [frozen, surveyed, open] = ids;
-    const onOpen = scopedView(input, open!, docs);
-    expect(onOpen.read.every((e) => e.date >= '2026-09-17' && e.date <= '2026-09-19')).toBe(true);
-    expect(onOpen.read.length).toBeGreaterThan(0);
-    // Miner 3 never billed has no row in the frozen windows: earlier cycles read none.
-    expect([...(onOpen.scope.ok ? onOpen.scope.fromDocs : [])].sort()).toEqual(
-      [frozen, surveyed].sort()
-    );
-    // The frozen pull's own window, plus the open cycle's (a Miner there has open days); the
-    // billed survey cycle between them reads nothing.
-    const onFrozen = scopedView(input, frozen!, docs);
-    expect(onFrozen.read.map((e) => e.date).sort()).toEqual([
-      '2026-08-05',
-      '2026-08-06',
-      '2026-09-17',
-      '2026-09-18',
-      '2026-09-18',
-    ]);
-  });
-
-  it('reads a cycle whose Miner can still have an open day', () => {
-    // Miner 4 has a Statement-free row in the frozen window: its window is read.
-    const withUnbilled: BookViewInput = {
-      ...input,
-      entries: [...input.entries, entry(4, '2026-08-06', 300)],
-    };
-    const scope = planMoonScope({
-      extractionId: extractionId(OPEN),
-      extractions: withUnbilled.extractions,
-      docs: docsOf(withUnbilled),
-      statements: withUnbilled.statements,
-      startDate: withUnbilled.startDate,
-      expiryHours: {},
-    });
-    expect(scope.ok && scope.rows.map((r) => r.extractionId)).toContain(extractionId(FROZEN));
-    for (const shown of ids) {
-      const { view } = scopedView(withUnbilled, shown, docsOf(withUnbilled));
-      expect(view!.extractions).toEqual(buildBookView(withUnbilled).extractions);
     }
   });
 
@@ -227,8 +178,6 @@ describe('the moon page from the moon docs', () => {
       extractionId: 'nope',
       extractions: input.extractions,
       docs,
-      statements: input.statements,
-      startDate: input.startDate,
       expiryHours: {},
     });
     expect(scope).toEqual({ ok: true, rows: [], fromDocs: new Set() });

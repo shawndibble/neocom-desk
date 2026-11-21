@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
-import type { TaxPayment } from '@/engine/corpTaxBook/allocation';
+import type { TaxPayment } from '@/engine/corpTaxBook/payments';
 import type { PaidBy } from '@/engine/corpTaxBook/paidBy';
 import { PaidByList } from './PaidByList';
 

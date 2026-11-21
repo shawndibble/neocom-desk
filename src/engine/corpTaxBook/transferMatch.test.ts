@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { TaxPayment } from './allocation';
+import type { TaxPayment } from './payments';
 import { isSameTransfer, pairWithMadePayments, SAME_TRANSFER_MS } from './transferMatch';
 
 const CORP = 98000001;

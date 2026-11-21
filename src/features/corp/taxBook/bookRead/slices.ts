@@ -6,14 +6,14 @@
  * leaves one out: a read's `parts` names exactly the parts it filled.
  */
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore/lite';
-import type { RecordedWriteOff } from '@/engine/corpTaxBook/allocation';
 import type { Miner } from '@/engine/corpTaxBook/charges';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
 import { readDisputes, type OreDispute } from '@/engine/corpTaxBook/disputes';
-import type { HeaderTotals } from '@/engine/corpTaxBook/minerScope';
-import type { ReadModelDocs } from '@/engine/corpTaxBook/readModels';
 import { scheduledSyncFrom, type ScheduledSyncStatus } from '@/engine/corpTaxBook/scheduledSync';
-import type { Adjustment, Statement } from '@/engine/corpTaxBook/statements';
+import type { Adjustment } from '@/engine/corpTaxBook/adjustments';
+import type { RecordedWriteOff } from '@/engine/corpTaxBook/payments';
+import type { LateNotice } from '../../../../../functions/src/corpTaxBookLateNotice';
+import type { RunningAccountCheckpoint } from '../../../../../functions/src/corpTaxBookCheckpoint';
 import type { ToleranceExemption } from '@/engine/corpTaxBook/toleranceExemptions';
 import type { SettlePayment, SyncExtraction } from '@/engine/corpTaxBook/sync';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
@@ -21,6 +21,8 @@ import { readUncounted, type UncountedDonation } from '@/engine/corpTaxBook/unco
 import type { MoonDoc } from '../../../../../functions/src/corpTaxBookMoonDocs';
 import {
   bookFeederFrom,
+  readCheckpoints,
+  readNotices,
   groupingAnswersFrom,
   groupConflictsFrom,
   type GroupConflict,
@@ -41,8 +43,8 @@ import type { BookPart, BookPartSet } from './parts';
 export interface BookRead extends BookData {
   /** The parts this read filled; every field of every other part is empty. */
   parts: BookPartSet;
-  /** A one-Miner read (#5258): the first day whose rows were read, and the Miner's stored totals. */
-  minerScope?: { from: string; totals?: HeaderTotals };
+  /** A one-Miner read (#5258): the first day whose rows were read. */
+  minerScope?: { from: string };
   /** The moon page this read was for (#5716), whether its docs stood in or the whole book was read. */
   forMoon?: string;
   /** The moon docs that stand in for the ledger rows of a moon page's earlier cycles. */
@@ -144,7 +146,8 @@ async function feederSummariesOf(ctx: ReadContext): Promise<Map<number, FeederVi
 const SLICES = {
   core: {
     miners: field<Miner[]>(none, (c) => c.book.list('miners')),
-    statements: field<Statement[]>(none, (c) => c.book.list('statements')),
+    notices: field<LateNotice[]>(none, (c) => readNotices(c.book)),
+    checkpoints: field<RunningAccountCheckpoint[]>(none, (c) => readCheckpoints(c.book)),
     extractions: field<SyncExtraction[]>(none, (c) => c.book.list('extractions')),
     feeders: field<BookFeeder[]>(none, feedersOf),
     scheduledSync: field<ScheduledSyncStatus | null>(
@@ -250,23 +253,21 @@ export async function readSlices(
 /** The fields as `BookData` holds them: the records the sync shares sit under `state`. */
 function shape(
   settings: BookSettings,
-  paidStatementIds: Set<string>,
   minerPaidThrough: Map<string, string>,
   parts: BookPartSet,
   fields: Fields
 ): BookRead {
-  const { miners, statements, extractions, payments, dismissals, writeOffs, ...rest } = fields;
+  const { miners, notices, extractions, payments, dismissals, writeOffs, ...rest } = fields;
   const defined = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined));
   return {
     settings,
     state: {
       book: settings,
       miners,
-      statements,
+      notices,
       payments,
       dismissals,
       extractions,
-      paidStatementIds,
       minerPaidThrough,
       writeOffs,
     },
@@ -277,35 +278,12 @@ function shape(
 
 /** A read's fields with the settings document and `meta/paid`, both always read fresh. */
 export async function bookOf(ctx: ReadContext, parts: BookPartSet, fields: Fields) {
-  return shape(
-    settingsFrom(ctx.book.data),
-    await ctx.book.paidStatementIds(),
-    await ctx.book.minerPaidThrough(),
-    parts,
-    fields
-  );
-}
-
-/**
- * The Overview and Miners tab docs: two docs, one stamp (ADR 0032). Best effort, even on a
- * refusal (rules not deployed): the screens fall back to the whole-book view, and the book's own
- * reads already surface a lost role.
- */
-function readModelsOf({ book, corporationId }: ReadContext): Promise<ReadModelDocs | undefined> {
-  return book
-    .part('readModels', async () => {
-      const docs = async (id: string) =>
-        (await getDoc(doc(book.db, 'corps', String(corporationId), 'readModels', id))).data();
-      const [minerList, overview] = await Promise.all([docs('minerList'), docs('overview')]);
-      return { minerList, overview } as ReadModelDocs;
-    })
-    .catch(() => undefined);
+  return shape(settingsFrom(ctx.book.data), await ctx.book.minerPaidThrough(), parts, fields);
 }
 
 /** The asked parts of the whole book, and the read model docs. */
 export async function readWhole(ctx: ReadContext, parts: BookPartSet): Promise<BookRead> {
-  const [fields, readModels] = await Promise.all([readSlices(ctx, parts), readModelsOf(ctx)]);
-  return { ...(await bookOf(ctx, parts, fields)), ...(readModels ? { readModels } : {}) };
+  return bookOf(ctx, parts, await readSlices(ctx, parts));
 }
 
 /** The fields a read holds, `state`'s lifted out. */
@@ -326,16 +304,13 @@ export function mergeReads(held: BookRead, extra: BookRead): BookRead {
     )
   ) as Fields;
   const { scopedMiner, minerScope, forMoon, moon, refinery } = held;
-  const readModels = extra.readModels ?? held.readModels;
   return {
     ...shape(
       held.settings,
-      extra.state.paidStatementIds,
       extra.state.minerPaidThrough ?? new Map(),
       new Set([...held.parts, ...extra.parts]),
       fields
     ),
-    ...(readModels ? { readModels } : {}),
     ...(scopedMiner !== undefined ? { scopedMiner } : {}),
     ...(minerScope ? { minerScope } : {}),
     ...(forMoon !== undefined ? { forMoon } : {}),

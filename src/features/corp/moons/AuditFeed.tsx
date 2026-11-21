@@ -52,9 +52,12 @@ export function AuditLine({
   const { t } = useTranslation();
   const why = detailLine(a, t);
   const who = subject?.(a) ?? null;
-  // A queued mail is a Statement or a reminder; `kind` says which.
+  // A queued mail is a late notice or a reminder; `kind` says which.
   const action =
-    a.action === 'recordMail' && a.detail.kind === 'reminder' ? 'recordReminder' : a.action;
+    (a.action === 'recordMail' || a.action === 'recordLateNoticeMail') &&
+    a.detail.kind === 'reminder'
+      ? 'recordReminder'
+      : a.action;
   // The Miner's name opens their page, in the sentence when it names them, else after it.
   const minerLink = who?.path ? (
     <Link to={who.path} className={entityLinkClassName()} onClick={onOpen}>

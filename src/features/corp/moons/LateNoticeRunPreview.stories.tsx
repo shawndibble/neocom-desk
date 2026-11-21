@@ -4,7 +4,7 @@ import { usePublicInfo } from '@/stores/publicInfo';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { BookProvider } from './BookContext';
 import { CORP_ID, NOTICE_BOOK_CONTEXT } from './corpBookFixture';
-import { StatementRun } from './StatementRun';
+import { LateNoticeRun } from './LateNoticeRun';
 
 /** The corporation's name the mail is signed with, so the preview renders instead of "Loading…". */
 function SeededRun() {
@@ -24,7 +24,7 @@ function SeededRun() {
   return (
     <BookProvider value={NOTICE_BOOK_CONTEXT}>
       <div className="mx-auto max-w-page px-4 py-4">
-        <StatementRun />
+        <LateNoticeRun />
       </div>
     </BookProvider>
   );
@@ -36,7 +36,7 @@ function SeededRun() {
  * opens it in a dialog.
  */
 const meta = {
-  title: 'corp/StatementRunPreview',
+  title: 'corp/LateNoticeRunPreview',
   component: SeededRun,
   parameters: { layout: 'fullscreen', shell: { path: '/corp/moons/statements', scopes: [] } },
 } satisfies Meta<typeof SeededRun>;

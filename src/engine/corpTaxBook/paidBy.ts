@@ -4,7 +4,7 @@
  * this keeps that pool as a queue of its sources so each day can say which payments it took.
  * Nothing here decides who is paid: it only reports what the pooled settlement already did.
  */
-import { countedPayments, paymentNet, type Allocation, type TaxPayment } from './allocation';
+import { countedPayments, paymentNet, type TaxPayment } from './payments';
 
 /** What reached one day, by kind of money. A credit correction is not a payment. */
 export interface PaidBy {
@@ -12,7 +12,7 @@ export interface PaidBy {
   payments: { paymentId: string; amount: number }[];
   /** Donations the member sent that the book has not credited yet. `refId` is the member's own journal entry. */
   inFlight: { amount: number; at: string; refId?: number }[];
-  /** Credit that came from no payment (a negative Statement, a dismissal's leftover). */
+  /** Credit that came from no payment (a credit correction). */
   corrections?: number;
   /** What an officer forgave of the day: no payment's, and nothing was paid for it. */
   writtenOff?: number;
@@ -28,12 +28,12 @@ const DUST = 0.01;
 
 /**
  * The book's credit for one Miner as its sources, in the order the pool is spent: what no
- * payment gave (as `runningAccount.ts` pays corrections first), then each payment's leftover
- * after the Statements took theirs, oldest payment first.
+ * payment gave (as the Running account pays corrections first), then each payment's leftover
+ * after what it already paid (`paymentCredits`), oldest payment first.
  */
 export function creditSources(
   payments: readonly TaxPayment[],
-  allocation: Pick<Allocation, 'paymentCredits' | 'credit'>,
+  allocation: { paymentCredits: readonly { paymentId: string; amount: number }[]; credit: number },
   startDate?: string
 ): MoneySource[] {
   const toStatements = new Map<string, number>();
@@ -70,7 +70,7 @@ export function inFlightSources(
     }));
 }
 
-/** Two draws on the same day (a day on two Statements) as one. */
+/** Two draws on the same day as one. */
 export function mergePaidBy(a: PaidBy | undefined, b: PaidBy): PaidBy {
   if (!a) return b;
   const payments = [...a.payments];

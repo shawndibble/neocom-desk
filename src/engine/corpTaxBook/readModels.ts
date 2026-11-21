@@ -1,36 +1,11 @@
 /**
- * What the Overview and Miners tabs render, from either source (issue #5259, ADR 0032).
- *
- * - `fromBookView`: the figures `buildBookView` already decided from the whole book.
- * - `fromReadModels`: the same figures from the two server-built docs
- *   (`functions/src/corpTaxBookReadModels.ts`) plus the open set computed on read.
- *
- * The docs hold frozen inputs only. Time-derived values (overdue days, paused, standing,
- * the pops window, billable-through) and everything price-dependent (unbilled, pending,
- * unrated, an Extraction's estimate) are computed here from the clock and the loaded rows,
- * so a doc is never stale about them. `readModels.test.ts` proves the two paths agree.
- * Pure: no fetch, DOM or Dexie.
+ * What the Overview and Miners tabs render (issue #5259): the figures `buildBookView` decided
+ * from the whole book, and the Overview's Extraction schedule. The server's read-model docs
+ * counted calendar Statements, which no book has (decision 20261120-235011), so the tabs read
+ * every figure off the Miners' Running accounts. Pure: no fetch, DOM or Dexie.
  */
-import type { MinerListDoc, OverviewDoc } from '../../../functions/src/corpTaxBookReadModels';
-import { DAY_MS } from '@/lib/age';
-import type { DayCharge } from './charges';
-import { overdueStatus, type Declaration } from './overdue';
+import type { BookView, ExtractionRow, MinerRow, NeedsYouItem } from './bookView';
 import { moonSchedule } from './bookSections';
-import { latestRecordedCorp } from './bookDocs';
-import {
-  extractionRowBase,
-  minerDraft,
-  openSetInputOf,
-  pendingTax,
-  standingOf,
-  type BookView,
-  type BookViewInput,
-  type ExtractionRow,
-  type MinerRow,
-  type NeedsYouItem,
-} from './bookView';
-import type { SettlePayment, SyncExtraction } from './sync';
-import { settleOpenSet } from './openSet';
 
 /** The Extraction fields the Overview's schedule prints. */
 export type ScheduleRow = Pick<
@@ -59,19 +34,8 @@ const scheduleRow = (r: ScheduleRow): ScheduleRow => ({
   estimatedValue: r.estimatedValue,
 });
 
-function totalsOf(miners: readonly MinerRow[]): BookView['totals'] {
-  const overdueRows = miners.filter((m) => m.overdueDays !== null);
-  return {
-    owed: miners.reduce((s, m) => s + m.owed, 0),
-    overdue: overdueRows.reduce((s, m) => s + m.owed, 0),
-    overdueCount: overdueRows.length,
-    unbilled: miners.reduce((s, m) => s + m.unbilled, 0),
-    credit: miners.reduce((s, m) => s + m.credit, 0),
-  };
-}
-
-/** The old path: every figure from the whole-book view. */
-export function fromBookView(view: BookView): TabsProjection {
+/** What the Overview and Miners tabs render, from the whole-book view. */
+export function tabsProjection(view: BookView): TabsProjection {
   return {
     miners: view.miners,
     totals: view.totals,
@@ -81,178 +45,4 @@ export function fromBookView(view: BookView): TabsProjection {
     needsYou: view.needsYou,
     schedule: moonSchedule(view.extractions.map(scheduleRow), view.input.now),
   };
-}
-
-/** What the loaded rows decide, whatever the docs say: unbilled, pending and unrated days. */
-export interface OpenAmounts {
-  billableThrough: string | undefined;
-  /** The Miner ids a view lists, in order. */
-  minerIds: string[];
-  byMiner: ReadonlyMap<string, { characterIds: number[]; unbilled: number; pending: number }>;
-  unratedCount: number;
-}
-
-/** The open set of `input`: the same day charges and drafts `buildBookView` builds, without the ledger. */
-export function openSetOf(input: BookViewInput): OpenAmounts {
-  const { charges, billableThrough, minerIds, miners, unrated } = settleOpenSet(
-    openSetInputOf(input)
-  );
-  const byMiner = new Map<string, { characterIds: number[]; unbilled: number; pending: number }>();
-  for (const id of minerIds) {
-    const { characterIds, statements } = miners.get(id)!;
-    const mine: DayCharge[] = charges.filter((c) => c.minerId === id);
-    // The book's billable-through, not the Miner's held one: as this path has always drafted.
-    const draft = minerDraft(input, id, statements, mine, billableThrough);
-    const billed = new Set<string>();
-    for (const s of statements) for (const l of s.lines) if (l.chargeKey) billed.add(l.chargeKey);
-    byMiner.set(id, {
-      characterIds,
-      unbilled: (draft.kind === 'nothing' ? [] : draft.lines).reduce((sum, l) => sum + l.tax, 0),
-      pending: pendingTax(input, mine, billed, billableThrough),
-    });
-  }
-  return { billableThrough, minerIds, byMiner, unratedCount: unrated.length };
-}
-
-/** A doc that is missing, from another schema, or malformed is not used: the tab falls back. */
-export function readModelsUsable(
-  minerList: MinerListDoc | undefined,
-  overview: OverviewDoc | undefined,
-  schema: number
-): minerList is MinerListDoc {
-  return (
-    minerList?.schema === schema &&
-    Array.isArray(minerList.miners) &&
-    overview?.schema === schema &&
-    Array.isArray(overview.unmatchedPayments) &&
-    Array.isArray(overview.extractions)
-  );
-}
-
-/** The new path: frozen figures from the docs, time- and price-derived ones computed here. */
-export function fromReadModels(
-  docs: { minerList: MinerListDoc; overview: OverviewDoc },
-  input: BookViewInput,
-  open: OpenAmounts = openSetOf(input)
-): TabsProjection {
-  const entries = new Map(docs.minerList.miners.map((e) => [e.minerId, e]));
-  const latestCorp = latestRecordedCorp(input.entries);
-  const nowMs = Date.parse(input.now);
-  const miners: MinerRow[] = [];
-  const needsYou: NeedsYouItem[] = [];
-
-  for (const id of open.minerIds) {
-    const amounts = open.byMiner.get(id);
-    const characterIds = amounts?.characterIds ?? [];
-    const mainCharacterId =
-      input.miners.find((m) => m.id === id)?.mainCharacterId ?? characterIds[0] ?? 0;
-    const entry = entries.get(id);
-    const owed = entry?.owed ?? 0;
-
-    let overdueDays: number | null = null;
-    let overdueStatementId: string | undefined;
-    let paused = false;
-    for (const s of entry?.unsettled ?? []) {
-      const status = overdueStatus({
-        issuedAt: s.issuedAt,
-        settled: false,
-        now: input.now,
-        declarations: s.declarations as unknown as Declaration[],
-        overdueDays: input.overdueDays,
-      });
-      if (status.state === 'paused') paused = true;
-      if (status.state === 'overdue') {
-        const days = Math.max(1, Math.floor((nowMs - Date.parse(status.overdueAt)) / DAY_MS));
-        if (overdueDays === null || days > overdueDays) {
-          overdueDays = days;
-          overdueStatementId = s.id;
-        }
-      }
-    }
-    const standing = standingOf(characterIds, latestCorp, input);
-    miners.push({
-      id,
-      mainCharacterId,
-      characterIds,
-      standing,
-      owed,
-      overdueDays,
-      unbilled: amounts?.unbilled ?? 0,
-      pending: amounts?.pending ?? 0,
-      credit: entry?.credit ?? 0,
-      lastPaidAt: entry?.lastPaidAt ?? null,
-      paused,
-    });
-
-    for (const d of entry?.unresolvedDeclarations ?? [])
-      needsYou.push({
-        kind: 'declaration',
-        declaration: d as unknown as Declaration,
-        minerId: id,
-        owed,
-      });
-    if (overdueDays !== null && overdueStatementId && standing !== 'left')
-      needsYou.push({
-        kind: 'overdue',
-        minerId: id,
-        days: overdueDays,
-        owed,
-        statementId: overdueStatementId,
-      });
-    if (standing === 'left' && owed > 0)
-      needsYou.push({ kind: 'leaver', minerId: id, owed, statementId: entry?.unsettled[0]?.id });
-  }
-  for (const p of docs.overview.unmatchedPayments)
-    needsYou.push({ kind: 'unmatched', payment: p as unknown as SettlePayment });
-  // The same ordering the cards read in: declarations, then the oldest debt.
-  const rank: Record<NeedsYouItem['kind'], number> = {
-    declaration: 0,
-    overdue: 1,
-    unmatched: 2,
-    leaver: 3,
-  };
-  needsYou.sort(
-    (a, b) =>
-      rank[a.kind] - rank[b.kind] ||
-      (a.kind === 'overdue' && b.kind === 'overdue' ? b.days - a.days : 0)
-  );
-
-  const todayPrices = input.pricesOn(input.now.slice(0, 10)).prices;
-  const rows = (docs.overview.extractions as unknown as SyncExtraction[]).map((x) =>
-    scheduleRow(extractionRowBase(x, input, todayPrices, new Map()))
-  );
-  return {
-    miners,
-    totals: totalsOf(miners),
-    billableThrough: open.billableThrough,
-    donationsBeforeBook: docs.overview.donationsBeforeBook,
-    unratedCount: open.unratedCount,
-    needsYou,
-    schedule: moonSchedule(rows, input.now),
-  };
-}
-
-/** The docs the screens read, as stored; either may be missing before the server has written them. */
-export interface ReadModelDocs {
-  minerList?: MinerListDoc;
-  overview?: OverviewDoc;
-}
-
-/**
- * The projection a tab renders: the docs', unless they are missing or from another schema
- * (the server has not built or deployed them yet). Then the whole-book view still answers.
- */
-export function tabsProjection(
-  view: BookView,
-  docs: ReadModelDocs | undefined,
-  schema: number
-): TabsProjection {
-  // The docs count Statements only: a running account's owed days come from the view (#6294).
-  if (
-    docs &&
-    !view.input.runningAccountFrom &&
-    readModelsUsable(docs.minerList, docs.overview, schema)
-  )
-    return fromReadModels({ minerList: docs.minerList, overview: docs.overview! }, view.input);
-  return fromBookView(view);
 }

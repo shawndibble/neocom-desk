@@ -34,9 +34,9 @@ describe('AuditFeed subject (CX-47)', () => {
       />
     );
     expect(
-      screen.getByText(/issued a Statement to Dax Ferrin, 28,390,765 ISK/)
+      screen.getByText(/issued a late notice to Dax Ferrin, 28,390,765 ISK/)
     ).toBeInTheDocument();
-    expect(screen.getByText(/mailed a Statement to Dax Ferrin/)).toBeInTheDocument();
+    expect(screen.getByText(/mailed a late notice to Dax Ferrin/)).toBeInTheDocument();
     expect(screen.getByText(/sent a reminder to Dax Ferrin/)).toBeInTheDocument();
     expect(screen.getByText(/stopped reminders/)).toBeInTheDocument();
   });
@@ -66,7 +66,7 @@ describe('AuditFeed links the Miner an entry is about', () => {
       'href',
       '/corp/moons/miners/g1'
     );
-    expect(screen.getByText(/mailed a Statement to/)).toBeInTheDocument();
+    expect(screen.getByText(/mailed a late notice to/)).toBeInTheDocument();
     expect(screen.getByText(/recorded a payment/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Lysa Kestane' })).toHaveAttribute(
       'href',

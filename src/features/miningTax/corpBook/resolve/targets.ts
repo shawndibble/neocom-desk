@@ -9,7 +9,7 @@ import type {
   UncreditedDonation,
 } from '@/engine/corpTaxBook/personal';
 import { characterIdsOfMiner, minerIdFor, type Miner } from '@/engine/corpTaxBook/charges';
-import type { Statement } from '@/engine/corpTaxBook/statements';
+import type { LegacyStatementDoc as Statement } from '@/engine/corpTaxBook/legacyStatementDoc';
 import {
   keptDayKey,
   keptStatementKey,

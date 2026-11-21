@@ -1,4 +1,4 @@
-import { daySettleTolerance } from '@/engine/corpTaxBook/runningAccount';
+import { daySettleTolerance } from '@/engine/corpTaxBook/minerRunningAccount';
 import type { RowHold } from '@/engine/corpTaxBook/personal';
 
 /** One open day of the member's book (a `BookRowView` reduced to what a payment needs). */

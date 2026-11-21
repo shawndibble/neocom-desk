@@ -5,8 +5,7 @@
  * load per player, kept briefly so opening the tab twice does not read twice.
  */
 import { collection, getDocs, limit as limitTo, query, where } from 'firebase/firestore/lite';
-import { buildBookView, noticeSettlement, minerDetail } from '@/engine/corpTaxBook/bookView';
-import { withMinerTotals } from '@/engine/corpTaxBook/minerScope';
+import { buildBookView, minerDetail } from '@/engine/corpTaxBook/bookView';
 import type { Contract } from '@/esi/endpoints';
 import { resolveAffiliations } from '@/features/character/affiliations';
 import { loadCorporationContracts } from '@/features/corp/contracts';
@@ -69,41 +68,34 @@ async function readBookFacts(
   });
   if (!read?.settings.active) return null;
   const prices = await loadBookPrices(read, read.minerScope?.from);
-  const built = buildBookView(
+  const view = buildBookView(
     bookViewInputOf(corporationId, new Date().toISOString(), read, prices)
   );
-  const view = withMinerTotals(built, minerId, read.minerScope?.totals);
   const detail = minerDetail(view, minerId);
   const inner = view.internals.byMiner.get(minerId);
   if (!detail || !inner) return null;
-
-  const isSettled = (s: (typeof detail.statements)[number]) =>
-    s.kind === 'notice' && inner.running
-      ? noticeSettlement(s, inner.running).settled
-      : inner.allocation.byStatement.get(s.id)?.settled === true;
-  const statementSettled = new Map(detail.statements.map((s) => [s.id, isSettled(s)]));
-  const creditedTo = new Map<string, string>();
-  for (const c of detail.paymentCredits) creditedTo.set(c.paymentId, c.statementId);
+  const paidDays = new Set(
+    detail.paymentDays.filter((p) => p.days.length > 0).map((p) => p.paymentId)
+  );
 
   return {
     minerId,
     standing: detail.row.standing,
     owed: detail.row.owed,
-    statements: detail.statements.map((s) => ({
-      id: s.id,
-      issuedAt: s.issuedAt,
-      periodStart: s.periodStart,
-      periodEnd: s.periodEnd,
-      amount: s.amount,
-      notice: s.kind === 'notice',
-      mailsSent: s.mailsSent ?? 0,
-      settled: statementSettled.get(s.id) === true,
+    notices: detail.notices.map((n) => ({
+      id: n.id,
+      issuedAt: n.issuedAt,
+      from: n.lines[0]?.date ?? n.issuedAt.slice(0, 10),
+      to: n.lines.at(-1)?.date ?? n.issuedAt.slice(0, 10),
+      listed: n.listed,
+      mailsSent: n.mail.sent,
+      settled: inner.account.standingOf(n).settled,
     })),
     payments: detail.payments.map((p) => ({
       id: p.id,
       at: p.at,
       amount: p.amount,
-      statementId: p.statementId ?? creditedTo.get(p.id),
+      paidDays: paidDays.has(p.id),
     })),
     adjustments: view.input.adjustments
       .filter((a) => a.minerId === minerId && !a.reversed)
@@ -113,11 +105,7 @@ async function readBookFacts(
       .map((d) => ({
         date: d.date,
         tax: d.tax,
-        settled:
-          d.status === 'paid' ||
-          d.status === 'written-off' ||
-          (d.status === 'on-statement' && statementSettled.get(d.statementId ?? '') === true) ||
-          (d.status === 'unbilled' && d.owed === 0),
+        settled: d.status === 'paid' || (d.status === 'owed' && d.owed === 0),
       })),
   };
 }

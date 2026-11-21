@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { daySettleTolerance } from '@/engine/corpTaxBook/runningAccount';
+import { daySettleTolerance } from '@/engine/corpTaxBook/minerRunningAccount';
 import { payableRows, wherePaymentGoes, type PayDay } from './paymentLanding';
 
 const day = (date: string, taxOwed: number, over: Partial<PayDay> = {}): PayDay => ({

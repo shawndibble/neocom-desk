@@ -1,21 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
-import type { Statement } from '@/engine/corpTaxBook/statements';
-import { mailRecipientOf, mailTarget } from './statementMailing';
+import { minerPaymentCode } from '../../../../functions/src/corpTaxBookLateNotice';
+import { mailRecipientOf, mailTarget } from './lateNoticeMailing';
 
-const statement = {
-  id: 's1',
-  code: 'ABC',
-  periodStart: '2026-10-01',
-  periodEnd: '2026-10-31',
-  issuedAt: '2026-11-01T00:00:00Z',
-  lines: [],
-} as unknown as Statement;
-const miner = { mainCharacterId: 1 } as MinerRow;
+const notice = { id: 'n1' };
+const miner = {
+  id: 'solo:1',
+  mainCharacterId: 1,
+  characterIds: [1],
+  owed: 1,
+  account: { paidThrough: null, owes: null, closableThrough: null },
+} as MinerRow;
 const ctx = (settings?: unknown) =>
   ({
     names: { character: () => 'Pilot' },
-    view: { input: { overdueDays: 14 } },
+    view: { input: { overdueDays: 14 }, internals: { byMiner: new Map() } },
     ...(settings !== undefined ? { settings } : {}),
   }) as unknown as Parameters<typeof mailTarget>[0];
 
@@ -23,23 +22,17 @@ describe('mailTarget (#6204)', () => {
   it("names the Accounts the book reads donations from, the corp's own name first", () => {
     const target = mailTarget(
       ctx({ divisions: [3], divisionNames: { 3: 'MOON TAXES' } }),
-      statement,
-      miner,
-      {
-        amountDue: 1,
-        carried: 0,
-      }
+      notice,
+      miner
     );
     expect(target.accounts).toEqual(['MOON TAXES']);
+    // The Miner's own Reason code, whichever notice the mail is for.
+    expect(target.code).toBe(minerPaymentCode('solo:1'));
   });
 
   it('names none for a book whose settings carry no divisions (older docs, fixtures)', () => {
-    expect(
-      mailTarget(ctx({}), statement, miner, { amountDue: 1, carried: 0 }).accounts
-    ).toBeUndefined();
-    expect(
-      mailTarget(ctx(), statement, miner, { amountDue: 1, carried: 0 }).accounts
-    ).toBeUndefined();
+    expect(mailTarget(ctx({}), notice, miner).accounts).toBeUndefined();
+    expect(mailTarget(ctx(), notice, miner).accounts).toBeUndefined();
   });
 });
 

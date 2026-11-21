@@ -5,7 +5,7 @@
  * find the member's own journal entry for a Tax Payment (`pairWithMadePayments`).
  */
 import { MINUTE_MS } from '@/lib/age';
-import type { TaxPayment } from './allocation';
+import type { TaxPayment } from './payments';
 
 /** The corp's journal stamps the same ISK transfer within the same minute or two. */
 export const SAME_TRANSFER_MS = 10 * MINUTE_MS;

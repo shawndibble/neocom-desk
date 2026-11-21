@@ -3,7 +3,7 @@
  * personal Payee, one with nothing billed and one in credit. Each Running account is built from
  * the same charges and payments the ledger describes, as a caller would.
  */
-import type { TaxPayment } from '@/engine/corpTaxBook/allocation';
+import type { TaxPayment } from '@/engine/corpTaxBook/payments';
 import { MinerRunningAccount } from '@/engine/corpTaxBook/minerRunningAccount';
 import type {
   LedgerCharge,
@@ -48,7 +48,7 @@ function sample(input: {
       at: p.at,
       source: 'donation',
     })),
-    writeOffs: input.writeOffs?.map((w) => ({ id: w.id, amount: w.amount })),
+    writeOffs: input.writeOffs?.map((w) => ({ id: w.id, amount: w.amount, at: w.at })),
   });
   return {
     account,

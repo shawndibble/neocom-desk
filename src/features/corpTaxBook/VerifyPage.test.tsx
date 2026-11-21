@@ -60,8 +60,6 @@ function payload(over: Partial<VerifyPayload> = {}): VerifyPayload {
     statement: {
       id: 's1',
       code: 'BRML-7Q4K',
-      periodStart: '2026-08-01',
-      periodEnd: '2026-08-31',
       issuedAt: '2026-09-01T00:00:00.000Z',
       amount: 8_000_000,
       hubId: 'jita',
@@ -82,11 +80,8 @@ function payload(over: Partial<VerifyPayload> = {}): VerifyPayload {
         },
       ],
     },
-    terms: { overdueDays: 14, minimumStatement: 5_000_000 },
-    payments: [{ id: 'p1', amount: 2_500_000, at: '2026-09-02T20:14:00Z', source: 'donation' }],
-    settlement: { amount: 8_000_000, credited: 2_500_000, writtenOff: 0, remaining: 5_500_000 },
+    terms: { overdueDays: 14 },
     declarations: [],
-    settled: false,
     remindersStopped: false,
     accountClosed: false,
     pendingCharacterIds: [],
@@ -104,7 +99,7 @@ beforeEach(() => {
 });
 
 describe('VerifyPage', () => {
-  it('shows each line with its pricing, the terms with dates and the payments credited', async () => {
+  it('shows each line the notice asked for, with its pricing and the rate', async () => {
     api.read.mockResolvedValue(payload());
     renderPage();
     expect(await screen.findByText(/Zeolites × 70,200/)).toBeInTheDocument();
@@ -113,7 +108,6 @@ describe('VerifyPage', () => {
     expect(screen.getByText(/15%, effective Aug 1, 2026/)).toBeInTheDocument();
     expect(screen.getAllByText(/priced on the day mined/).length).toBeGreaterThan(0);
     expect(screen.queryByText(/days after issue/)).not.toBeInTheDocument();
-    expect(screen.getByText('+2,500,000 ISK')).toBeInTheDocument();
     expect(screen.getByText('BRML-7Q4K')).toBeInTheDocument();
     expect(await screen.findByText('Brass Meridian')).toBeInTheDocument();
     expect(screen.queryByText(/Donate/)).not.toBeInTheDocument();
@@ -154,25 +148,6 @@ describe('VerifyPage', () => {
     renderPage();
     expect(await screen.findByText('Reason')).toBeInTheDocument();
     expect(screen.queryByText('Wallet')).not.toBeInTheDocument();
-  });
-
-  it("says an officer's write-off apart from a dismissal (#4637)", async () => {
-    api.read.mockResolvedValue(
-      payload({
-        settlement: {
-          amount: 8_000_000,
-          credited: 8_000_000,
-          forgiven: 4_000_000,
-          writtenOff: 0,
-          remaining: 0,
-        },
-      })
-    );
-    renderPage();
-    expect(
-      await screen.findByText(/4,000,000 ISK was written off by an officer/)
-    ).toBeInTheDocument();
-    expect(screen.getByText(/1,500,000 ISK was waived by an officer/)).toBeInTheDocument();
   });
 
   it('puts each ore of a day on its own sub-row beside its own price, with the day once', async () => {
@@ -223,18 +198,12 @@ describe('VerifyPage', () => {
       })
     );
     renderPage();
-    const list = await screen.findByRole('list', { name: /statement lines/i });
+    const list = await screen.findByRole('list', { name: /late notice lines/i });
     const days = list.querySelectorAll(':scope > li');
     expect(days).toHaveLength(1);
     expect(days[0]!.textContent?.match(/Aug 13, 2026/g)).toHaveLength(1);
     expect(days[0]!.textContent?.match(/Efa V - Moon 3/g)).toHaveLength(1);
     expect(days[0]).toHaveTextContent('1,500,000 ISK');
-  });
-
-  it('says so when nothing is credited yet', async () => {
-    api.read.mockResolvedValue(payload({ payments: [], settlement: null }));
-    renderPage();
-    expect(await screen.findByText(/No payments have been credited/)).toBeInTheDocument();
   });
 
   it('on a running account shows everything owed now beside the notice', async () => {
@@ -255,11 +224,9 @@ describe('VerifyPage', () => {
     expect(screen.getByText(/3 days owed, oldest/)).toBeInTheDocument();
   });
 
-  it('reads a late notice by the account: no Statement balance, payments or settled line', async () => {
-    const base = payload();
+  it('reads a late notice by the account: no balance of its own, no payments of its own', async () => {
     api.read.mockResolvedValue(
       payload({
-        statement: { ...base.statement, kind: 'notice' },
         account: {
           owed: 5,
           days: 1,
@@ -299,7 +266,7 @@ describe('VerifyPage', () => {
             { id: 'p1', at: '2026-08-20T10:00:00Z', amount: 1_000_000, source: 'donation' },
           ],
         },
-        statement: { ...base.statement, kind: 'notice' },
+        statement: base.statement,
       })
     );
     renderPage();
@@ -345,7 +312,7 @@ describe('VerifyPage', () => {
     expect(rows[2]).toHaveTextContent('500,000 ISK');
   });
 
-  it('keeps every line of the Statement when older Statements still owe beyond the recorded days', async () => {
+  it('keeps every line of the notice when the recorded days do not add up to what is owed', async () => {
     api.read.mockResolvedValue(
       payload({
         account: {

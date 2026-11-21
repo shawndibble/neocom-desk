@@ -25,12 +25,7 @@ import {
   type DataTableColumn,
   type DataTableSort,
 } from '@/components/ui';
-import {
-  minerDetail,
-  type BookView,
-  type MinerRow,
-  type MinerStanding,
-} from '@/engine/corpTaxBook/bookView';
+import type { MinerRow, MinerStanding } from '@/engine/corpTaxBook/bookView';
 import {
   MINER_BALANCES,
   matchesMinerBalance,
@@ -199,23 +194,14 @@ export function MinersTab() {
       render: (m) => <OverdueWord days={m.overdueDays} paused={m.paused} />,
       sortValue: (m) => m.overdueDays ?? -1,
     },
-    // A running account bills every day as it closes (#6294): its column says where each Miner stands.
-    view.input.runningAccountFrom
-      ? {
-          id: 'unbilled',
-          header: t('corpTaxBook.moons.cols.account'),
-          render: (m) => (m.account ? <AccountStatus account={m.account} /> : '—'),
-          sortValue: (m) => accountSortValue(m.account),
-          sortFirst: 'asc',
-        }
-      : {
-          id: 'unbilled',
-          header: t('corpTaxBook.moons.cols.unbilled'),
-          align: 'right',
-          className: 'tabular-nums',
-          render: (m) => (m.unbilled ? isk(m.unbilled) : '—'),
-          sortValue: (m) => m.unbilled,
-        },
+    // The Running account bills every day as it closes (#6294): where each Miner stands.
+    {
+      id: 'account',
+      header: t('corpTaxBook.moons.cols.account'),
+      render: (m) => <AccountStatus account={m.account} />,
+      sortValue: (m) => accountSortValue(m.account),
+      sortFirst: 'asc',
+    },
     {
       id: 'credit',
       header: t('corpTaxBook.moons.cols.credit'),
@@ -454,7 +440,6 @@ export function MinersTab() {
           miner={dialog.miner}
           minerName={names.character(dialog.miner.mainCharacterId)}
           defaultAmount={dialog.miner.owed}
-          statementId={openStatementId(view, dialog.miner.id)}
         />
       )}
       {dialog?.kind === 'notTax' &&
@@ -481,7 +466,7 @@ export function MinersTab() {
           intro={t('corpTaxBook.moons.dialogs.dismissMiner.intro')}
           reasonLabel={t('corpTaxBook.moons.dialogs.reasonShown')}
           confirmLabel={t('corpTaxBook.moons.dialogs.dismissConfirm', {
-            amount: isk(dialog.miner.owed + dialog.miner.unbilled),
+            amount: isk(dialog.miner.owed),
           })}
           run={async (reason) => {
             await edit({
@@ -489,18 +474,11 @@ export function MinersTab() {
               scope: 'miner',
               targetId: dialog.miner.id,
               reason,
-              amountIsk: dialog.miner.owed + dialog.miner.unbilled,
+              amountIsk: dialog.miner.owed,
             });
           }}
         />
       )}
     </div>
   );
-}
-
-/** The Statement a payment recorded from the Miners table settles: the Miner's first unsettled one. */
-function openStatementId(view: BookView, minerId: string): string | undefined {
-  return minerDetail(view, minerId)?.statements.find(
-    (s) => !view.internals.byMiner.get(minerId)?.allocation.byStatement.get(s.id)?.settled
-  )?.id;
 }

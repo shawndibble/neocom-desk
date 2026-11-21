@@ -1,6 +1,6 @@
 /**
- * Close a guest's account (epic #4055, #4184): a final Statement over
- * everything Billable, then Statement mail stops. Credit is refunded unless the
+ * Close a guest's account (epic #4055, #4184): a final late notice of the unpaid days no notice
+ * listed, then late notice mail stops. Credit is refunded unless the
  * guest consented to forfeit it or went 90 days without replying. Its own file
  * so the Miner page carries only the button and this mount.
  */
@@ -17,7 +17,8 @@ import {
 import { DialogShell, Effect, Label } from './BookDialogs';
 import { dateWithYear, isk } from './moonsFormat';
 import { useBook } from './useBook';
-import { statementRefineryNames, useCorporationName } from './statementMailing';
+import { noticeRefineryNames, useCorporationName } from './lateNoticeMailing';
+import { legacyStatementDocOf } from '../../../../functions/src/corpTaxBookLateNotice';
 
 type Basis = 'consent' | 'no-reply';
 /** What happens to what is still owed: a final late notice goes out, or the tax is waived. */
@@ -37,7 +38,7 @@ export function CloseAccountDialog({
   onClosed?: () => void;
 }) {
   const { t } = useTranslation();
-  const { view, names, edit } = useBook();
+  const { view, names, edit, characterId } = useBook();
   const corporationName = useCorporationName();
   const plan = useMemo(() => planCloseAccount(view, miner.id), [view, miner.id]);
   const [reason, setReason] = useState('');
@@ -48,7 +49,7 @@ export function CloseAccountDialog({
   const [askedAt, setAskedAt] = useState('');
 
   const today = view.input.now.slice(0, 10);
-  const waivable = miner.owed + miner.unbilled;
+  const waivable = miner.owed;
   const dismissing = settle === 'dismiss' && waivable > 0;
   const credit = dismissing ? miner.credit : (plan?.creditAfter ?? miner.credit);
   const disposition: CreditDisposition = !forfeit
@@ -68,20 +69,22 @@ export function CloseAccountDialog({
       canConfirm={
         reason.trim().length > 0 &&
         forfeitOk &&
-        (dismissing || !plan?.statement || corporationName !== null)
+        (dismissing || !plan?.notice || corporationName !== null)
       }
       run={async () => {
-        if (!dismissing && plan?.statement && corporationName === null) return;
+        if (!dismissing && plan?.notice && corporationName === null) return;
+        // The close takes its final notice as the legacy doc the server has always stored it as.
         const statement =
-          !dismissing && plan?.statement
-            ? {
-                ...plan.statement,
-                corporationName,
-                minerName,
-                refineryNames: statementRefineryNames(plan.statement, names),
-                // A running account issues only late notices (#6294); its final bill is one.
-                ...(view.input.runningAccountFrom ? { kind: 'notice' as const } : {}),
-              }
+          !dismissing && plan?.notice && corporationName !== null
+            ? legacyStatementDocOf({
+                ...plan.notice,
+                issuedBy: characterId,
+                names: {
+                  corporationName,
+                  minerName,
+                  refineryNames: noticeRefineryNames(plan.notice, names),
+                },
+              })
             : undefined;
         // Waive first, so the close finds nothing to bill; a failed close can be retried.
         if (dismissing) {
@@ -99,10 +102,8 @@ export function CloseAccountDialog({
           reason: reason.trim(),
           credit: disposition,
           ...(statement ? { statement } : {}),
-          // A running account's credit only this client can price (#6294).
-          ...(view.input.runningAccountFrom && plan
-            ? { runningCredit: Math.round(plan.creditAfter) }
-            : {}),
+          // The Running account's credit only this client can price (#6294).
+          ...(plan ? { runningCredit: Math.round(plan.creditAfter) } : {}),
         });
         onClosed?.();
       }}
@@ -125,12 +126,12 @@ export function CloseAccountDialog({
       <Effect>
         {dismissing
           ? t('corpTaxBook.moons.dialogs.close.dismissing', { amount: isk(waivable) })
-          : plan?.statement
-            ? t('corpTaxBook.moons.dialogs.close.finalStatement', {
-                amount: isk(plan.statement.amount),
-                through: dateWithYear(plan.statement.coversThrough),
+          : plan?.notice
+            ? t('corpTaxBook.moons.dialogs.close.finalNotice', {
+                amount: isk(plan.notice.listed),
+                through: dateWithYear(plan.notice.lines.at(-1)?.date ?? today),
               })
-            : t('corpTaxBook.moons.dialogs.close.noStatement')}
+            : t('corpTaxBook.moons.dialogs.close.noNotice')}
         {!dismissing && (
           <>
             {' '}

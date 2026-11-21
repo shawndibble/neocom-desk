@@ -79,3 +79,8 @@ export function shiftUtcDate(date: string, days: number): string {
   const [y, m, d] = date.split('-').map(Number);
   return utcDay(Date.UTC(y!, m! - 1, d! + days));
 }
+
+/** Whole days from one UTC `YYYY-MM-DD` to another (negative when `to` is earlier). */
+export function utcDaysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS);
+}

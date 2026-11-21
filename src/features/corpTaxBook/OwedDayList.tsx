@@ -15,28 +15,28 @@ import {
 } from '@/engine/corpTaxBook/verifyView';
 import { formatCount } from '@/lib/formatCount';
 import { useOreNames } from './useOreNames';
-import { isk, shortDate } from './statementFormat';
+import { isk, shortDate } from './noticeFormat';
 
 /**
  * The days a Miner still owes, oldest first, one line each: the day, its refinery, what is left
- * of it (with the day's whole tax when part is paid). A day whose ore the Statement lists opens
+ * of it (with the day's whole tax when part is paid). A day whose ore the notice lists opens
  * to it; a day mined since has no lines to show and is a plain line.
  */
 export function OwedDayList({
   days,
-  statement,
+  notice,
 }: {
   days: readonly UnpaidDay[];
-  statement: Pick<VerifyPayload['statement'], 'lines' | 'refineryNames'>;
+  notice: Pick<VerifyPayload['statement'], 'lines' | 'refineryNames'>;
 }) {
   const { t, i18n } = useTranslation();
-  const rows = useMemo(() => verifyRows(statement.lines), [statement.lines]);
+  const rows = useMemo(() => verifyRows(notice.lines), [notice.lines]);
   const oreNames = useOreNames(rows);
   const [open, setOpen] = useState<string | null>(null);
   const refinery = (id: number | undefined) =>
     id === undefined
       ? undefined
-      : (statement.refineryNames?.[String(id)] ?? t('corpTaxBook.verify.refinery', { id }));
+      : (notice.refineryNames?.[String(id)] ?? t('corpTaxBook.verify.refinery', { id }));
   return (
     <ul aria-label={t('corpTaxBook.verify.stillOwed')} className="divide-y divide-line">
       {days.map((d) => {

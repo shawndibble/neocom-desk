@@ -6,7 +6,7 @@ import { useBook } from './useBook';
 import { caretColumn } from './caretColumn';
 import { minerPath } from './moonsPaths';
 import { isk, shortDate } from './moonsFormat';
-import { StatementRun } from './StatementRun';
+import { LateNoticeRun } from './LateNoticeRun';
 import { useCards } from './sectionHelpers';
 
 interface NoticeRow {
@@ -28,8 +28,7 @@ export function LateNoticesTab() {
   const rows = useMemo(() => {
     const byMiner = new Map<string, NoticeRow>();
     const minerById = new Map(view.miners.map((m) => [m.id, m]));
-    for (const s of view.input.statements) {
-      if (s.kind !== 'notice') continue;
+    for (const s of view.input.notices) {
       const miner = minerById.get(s.minerId);
       if (!miner) continue;
       const row = byMiner.get(s.minerId) ?? {
@@ -41,7 +40,7 @@ export function LateNoticesTab() {
         owed: miner.owed,
       };
       row.sent += 1;
-      if (!s.mailsSent) row.unmailed += 1;
+      if (s.mail.sent === 0) row.unmailed += 1;
       if (s.issuedAt > row.lastIssuedAt) row.lastIssuedAt = s.issuedAt;
       byMiner.set(s.minerId, row);
     }
@@ -93,7 +92,7 @@ export function LateNoticesTab() {
 
   return (
     <div className="space-y-4">
-      <StatementRun />
+      <LateNoticeRun />
       <Panel title={t('corpTaxBook.moons.notices.title')} padded={false}>
         {rows.length === 0 ? (
           <EmptyState

@@ -16,12 +16,14 @@ export interface Miner {
   characterIds: number[];
   /** The character that gets the mail. */
   mainCharacterId: number;
-  /** An officer closed this guest's account (#4184): no Statement mail after the final one. */
+  /** An officer closed this guest's account (#4184): no late notice mail after the final one. */
   closedAt?: string;
-  /** The final Statement the close issued, if anything was left to bill. */
+  /** The final late notice the close issued, if anything was left to ask for (its stored name). */
   finalStatementId?: string;
   /** The newest day the book has recorded as paid for this Miner (copied from `meta/paid` so the Miner can read it). */
   paidThrough?: string;
+  /** The Miner ids a regroup folded into this one: their codes and records are this Miner's now. */
+  aliases?: string[];
 }
 
 /** The characters a Miner bills: its grouping's, or the one character of a Miner of its own. */

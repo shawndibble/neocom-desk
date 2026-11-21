@@ -3,7 +3,6 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { buildBookView, type BookViewInput } from '@/engine/corpTaxBook/bookView';
-import type { Statement } from '@/engine/corpTaxBook/statements';
 import { BookProvider } from './BookContext';
 import { RecordPaymentDialog } from './BookDialogs';
 import { paidAtFor } from './moonsFormat';
@@ -12,22 +11,15 @@ import type { BookSettings, OfficerVerdict } from '../taxBook/bookClient';
 const CORP = 98000001;
 const MINER = 'solo:1';
 
-function statement(id: string, amount: number, month: string): Statement {
-  return {
-    id,
-    minerId: MINER,
-    code: `NDT-${id}`,
-    periodStart: `${month}-01`,
-    periodEnd: `${month}-30`,
-    coversFrom: `${month}-01`,
-    coversThrough: `${month}-30`,
-    issuedAt: `${month}-30T12:00:00Z`,
-    hubId: 'jita',
-    oreForm: 'compressed',
-    amount,
-    lines: [],
-  };
-}
+const ORE = 45490;
+/** 1,000 ISK a unit at 10%: a day of 100,000 units owes 10,000,000. */
+const day = (date: string, quantity: number) => ({
+  characterId: 1,
+  recordedCorporationId: CORP,
+  structureId: 1001,
+  date,
+  oreLines: [{ typeId: ORE, quantity }],
+});
 
 function input(overrides: Partial<BookViewInput> = {}): BookViewInput {
   return {
@@ -35,24 +27,21 @@ function input(overrides: Partial<BookViewInput> = {}): BookViewInput {
     now: '2026-10-18T14:00:00Z',
     startDate: '2026-08-01',
     graceHours: 6,
-    minimumStatement: 0,
     overdueDays: 14,
-    cadence: { kind: 'monthly' },
     hubId: 'jita',
     oreForm: 'compressed',
     structureExpiryHours: {},
     lastSyncedAt: '2026-10-18T12:00:00Z',
     rates: [{ scope: 'corp', pct: 10, effectiveFrom: '2026-08-01' }],
-    entries: [],
+    entries: [day('2026-08-10', 100_000), day('2026-09-10', 60_000)],
     miners: [],
-    statements: [statement('aug', 10_000_000, '2026-08'), statement('sep', 6_000_000, '2026-09')],
+    notices: [],
     payments: [],
     dismissals: [],
     declarations: [],
     adjustments: [],
     extractions: [],
-    paidStatementIds: new Set(),
-    pricesOn: () => ({ prices: new Map(), sources: new Map() }),
+    pricesOn: () => ({ prices: new Map([[ORE, 1000]]), sources: new Map() }),
     ...overrides,
   };
 }
@@ -77,7 +66,6 @@ vi.mock('../taxBook/bookClient', () => ({
 
 function renderDialog(
   overrides: Partial<BookViewInput> = {},
-  statementId?: string,
   extra: { paymentId?: string; declarationId?: string; onRecorded?: () => Promise<void> } = {}
 ) {
   const view = buildBookView(input(overrides));
@@ -96,7 +84,7 @@ function renderDialog(
           moon: (id) => `Moon ${id}`,
           ore: () => 'Ore',
         },
-        settings: { minimumStatement: 0 } as BookSettings,
+        settings: {} as BookSettings,
         data: {} as never,
         verdict,
         reload: vi.fn(),
@@ -108,7 +96,6 @@ function renderDialog(
         miner={miner}
         minerName="Pilot 1"
         defaultAmount={miner.owed}
-        statementId={statementId}
         {...extra}
       />
     </BookProvider>
@@ -134,15 +121,15 @@ const outcome = (dialog: HTMLElement) =>
   within(dialog).getByRole('region', { name: 'After this payment' });
 
 describe('RecordPaymentDialog', () => {
-  it('shows which Statements the amount pays, oldest first, and what is left', async () => {
+  it('shows which days the amount pays, oldest first, and what is left', async () => {
     const dialog = renderDialog();
     const amount = within(dialog).getByRole('textbox', { name: 'Amount' });
     await userEvent.clear(amount);
     await userEvent.type(amount, '13000000');
     const panel = outcome(dialog);
     const rows = within(panel).getAllByRole('listitem');
-    expect(rows[0]).toHaveTextContent(/Aug 2026 Statement.*Paid in full.*10,000,000/);
-    expect(rows[1]).toHaveTextContent(/Sep 2026 Statement.*Part paid, 3,000,000 left.*3,000,000/);
+    expect(rows[0]).toHaveTextContent(/Day of 10 Aug.*Paid in full.*10,000,000/);
+    expect(rows[1]).toHaveTextContent(/Day of 10 Sep.*Part paid, 3,000,000 left.*3,000,000/);
     expect(panel).toHaveTextContent('Pilot 1 still owes 3,000,000');
   });
 
@@ -154,16 +141,6 @@ describe('RecordPaymentDialog', () => {
     const panel = outcome(dialog);
     expect(panel).toHaveTextContent('Pilot 1 owes nothing');
     expect(panel).toHaveTextContent('4,000,000 held as credit');
-  });
-
-  it('pays the pinned Statement first', async () => {
-    const dialog = renderDialog({}, 'sep');
-    const amount = within(dialog).getByRole('textbox', { name: 'Amount' });
-    await userEvent.clear(amount);
-    await userEvent.type(amount, '7000000');
-    const rows = within(outcome(dialog)).getAllByRole('listitem');
-    expect(rows[0]).toHaveTextContent(/Sep 2026 Statement.*Paid in full/);
-    expect(rows[1]).toHaveTextContent(/Aug 2026 Statement.*Part paid, 9,000,000 left/);
   });
 
   it('records the date paid, defaulting to today, and refuses a future or pre-book date', async () => {
@@ -199,14 +176,14 @@ describe('RecordPaymentDialog', () => {
     edit.mockImplementationOnce(() => {
       throw Object.assign(new Error('exists'), { details: { reason: 'payment-exists' } });
     });
-    const dialog = renderDialog({}, undefined, { paymentId: 'm_x1', onRecorded });
+    const dialog = renderDialog({}, { paymentId: 'm_x1', onRecorded });
     await userEvent.click(within(dialog).getByRole('button', { name: /^Record / }));
     await waitFor(() => expect(onRecorded).toHaveBeenCalled());
     expect(edit.mock.calls[0][0]).toMatchObject({ action: 'recordPayment', paymentId: 'm_x1' });
   });
 
   it('confirms the declaration in the same write, by hand or by a donation match', async () => {
-    const byHand = renderDialog({}, undefined, { paymentId: 'm_x1', declarationId: 'x1' });
+    const byHand = renderDialog({}, { paymentId: 'm_x1', declarationId: 'x1' });
     await userEvent.click(within(byHand).getByRole('button', { name: /^Record / }));
     await waitFor(() => expect(edit).toHaveBeenCalledTimes(1));
     expect(edit.mock.calls[0][0]).toMatchObject({
@@ -216,7 +193,7 @@ describe('RecordPaymentDialog', () => {
     });
     cleanup();
     edit.mockClear();
-    const matched = renderDialog({ payments: [DONATION] }, undefined, { declarationId: 'x1' });
+    const matched = renderDialog({ payments: [DONATION] }, { declarationId: 'x1' });
     await userEvent.click(within(matched).getByRole('button', { name: 'Wallet donation (1)' }));
     await userEvent.click(within(matched).getByRole('radio', { name: /12,000,000 from Pilot 99/ }));
     await userEvent.click(within(matched).getByRole('button', { name: 'Assign 12,000,000' }));
@@ -231,7 +208,7 @@ describe('RecordPaymentDialog', () => {
     edit.mockImplementationOnce(() => {
       throw Object.assign(new Error('exists'), { details: { reason: 'payment-exists' } });
     });
-    const dialog = renderDialog({}, undefined, { onRecorded });
+    const dialog = renderDialog({}, { onRecorded });
     await userEvent.click(within(dialog).getByRole('button', { name: /^Record / }));
     await waitFor(() => expect(edit).toHaveBeenCalled());
     expect(onRecorded).not.toHaveBeenCalled();

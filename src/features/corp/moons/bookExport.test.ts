@@ -23,9 +23,7 @@ const settings: BookSettings = {
   hubId: 'jita',
   oreForm: 'compressed',
   graceHours: 6,
-  minimumStatement: 5_000_000,
   overdueDays: 14,
-  cadence: { kind: 'monthly' },
   runningAccountFrom: '2026-01-01T00:00:00.000Z',
   noticeRules: DEFAULT_NOTICE_RULES,
   dayTolerancePct: 0.5,
@@ -63,23 +61,21 @@ const input: BookExportInput = {
       cachedAt: '2026-03-01T11:00:00Z',
     },
   ],
-  statements: [
+  notices: [
     {
-      id: 's1',
+      id: 'n1',
       minerId: 'solo:3',
-      code: 'ABC',
-      periodStart: '2026-03-01',
-      periodEnd: '2026-03-31',
-      coversFrom: '2026-03-01',
-      coversThrough: '2026-03-31',
+      characterIds: [3],
+      kind: 'late',
       issuedAt: '2026-04-01T00:00:00Z',
-      hubId: 'jita',
-      oreForm: 'compressed',
+      code: 'MTABC123',
+      pricing: { hubId: 'jita', oreForm: 'compressed' },
+      uids: ['char:3'],
       lines: [],
-      amount: 1000,
+      listed: 1000,
+      mail: { sent: 0, manualSent: 0, remindersStopped: false },
     },
   ],
-  paidStatementIds: new Set(['s1']),
   payments: [],
   adjustments: [],
   writeOffs: [],
@@ -101,7 +97,7 @@ const input: BookExportInput = {
   declarations: [
     {
       id: 'd1',
-      statementId: 's1',
+      statementId: 'n1',
       kind: 'contract',
       at: '2026-04-02T00:00:00Z',
       note: 'sent by contract',
@@ -201,8 +197,8 @@ describe('bookExportSheets', () => {
   it('writes every record type, in the order the export lists them', () => {
     expect(bookExportSheets(input, names, t).map((s) => s.name)).toEqual([
       'corpTaxBook.export.sheets.miningLines',
-      'corpTaxBook.export.sheets.statements',
-      'corpTaxBook.export.sheets.statementLines',
+      'corpTaxBook.export.sheets.lateNotices',
+      'corpTaxBook.export.sheets.lateNoticeLines',
       'corpTaxBook.export.sheets.payments',
       'corpTaxBook.export.sheets.adjustments',
       'corpTaxBook.export.sheets.writeOffs',
@@ -237,31 +233,29 @@ describe('bookExportSheets', () => {
     expect(at(second, 'quantity')).toBe(1200);
   });
 
-  it('marks a settled Statement and names a solo Miner by its one character', () => {
-    const [header, row] = sheet('corpTaxBook.export.sheets.statements');
+  it('lists each late notice and names a solo Miner by its one character', () => {
+    const [header, row] = sheet('corpTaxBook.export.sheets.lateNotices');
     const at = (col: string) => row[header.indexOf(`corpTaxBook.export.cols.${col}`)];
     expect(at('miner')).toBe('Char 3');
-    expect(at('settled')).toBe('common.exportFlagYes');
-    expect(at('amount')).toBe(1000);
+    expect(at('kind')).toBe('corpTaxBook.export.noticeKind.late');
+    expect(at('listed')).toBe(1000);
     expect(at('issued')).toBe('2026-04-01T00:00:00Z');
   });
 
-  it('writes every Statement line with its ore, price, rate and tax, and the mail facts on the Statement', () => {
+  it('writes every late notice line with its ore, price, rate and tax, and the mail facts on the notice', () => {
     const withLines: BookExportInput = {
       ...input,
-      statements: [
+      notices: [
         {
-          ...input.statements[0],
-          mailsSent: 2,
-          lastMailedAt: '2026-04-02T00:00:00Z',
+          ...input.notices[0],
+          mail: { sent: 2, lastAt: '2026-04-02T00:00:00Z', manualSent: 1, remindersStopped: true },
           issuedBy: 7,
-          remindersStopped: true,
-          manualRemindersSent: 1,
-          minerName: 'Pilot',
+          names: { minerName: 'Pilot' },
           lines: [
             {
               kind: 'mined',
               date: '2026-03-01',
+              key: '3:900:2026-03-01',
               characterId: 3,
               structureId: 900,
               oreLines: [{ typeId: 45490, quantity: 10 }],
@@ -275,6 +269,7 @@ describe('bookExportSheets', () => {
             {
               kind: 'correction',
               date: '2026-03-02',
+              key: 'adjustment:a1',
               oreLines: [],
               estimatedValue: 0,
               tax: -1,
@@ -284,9 +279,9 @@ describe('bookExportSheets', () => {
         },
       ],
     };
-    const [lh, first, second] = sheet('corpTaxBook.export.sheets.statementLines', withLines);
+    const [lh, first, second] = sheet('corpTaxBook.export.sheets.lateNoticeLines', withLines);
     const line = (row: unknown[], col: string) => row[lh.indexOf(`corpTaxBook.export.cols.${col}`)];
-    expect(line(first, 'statementId')).toBe('s1');
+    expect(line(first, 'noticeId')).toBe('n1');
     expect(line(first, 'character')).toBe('Char 3');
     expect(line(first, 'refinery')).toBe('Refinery 900');
     expect(line(first, 'ore')).toBe('Ore 45490 × 10');
@@ -298,7 +293,7 @@ describe('bookExportSheets', () => {
     expect(line(second, 'kind')).toBe('corpTaxBook.export.lineKind.correction');
     expect(line(second, 'reason')).toBe('fix');
     expect(line(second, 'character')).toBeNull();
-    const [sh, srow] = sheet('corpTaxBook.export.sheets.statements', withLines);
+    const [sh, srow] = sheet('corpTaxBook.export.sheets.lateNotices', withLines);
     const at = (col: string) => srow[sh.indexOf(`corpTaxBook.export.cols.${col}`)];
     expect([
       at('mailsSent'),
@@ -416,11 +411,11 @@ describe('bookExportSheets', () => {
     expect(at('ore')).toBe('Ore 45490 × 1000; Ore 45491 × 50');
   });
 
-  it("writes a declaration with the Statement's Miner and who recorded and resolved it", () => {
+  it("writes a declaration with its late notice's Miner and who recorded and resolved it", () => {
     const [header, row] = sheet('corpTaxBook.export.sheets.declarations');
     const at = (col: string) => row[header.indexOf(`corpTaxBook.export.cols.${col}`)];
     expect(at('declarationId')).toBe('d1');
-    expect(at('statementId')).toBe('s1');
+    expect(at('noticeId')).toBe('n1');
     expect(at('miner')).toBe('Char 3');
     expect(at('minerId')).toBe('solo:3');
     expect(at('kind')).toBe('corpTaxBook.export.declarationKind.contract');

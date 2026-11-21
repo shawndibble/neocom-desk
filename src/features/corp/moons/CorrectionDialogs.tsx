@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { InlineError } from '@/components/ui/InlineError';
 import { useTranslation } from 'react-i18next';
 import {
   IskInput,
@@ -14,7 +13,7 @@ import {
 } from '@/components/ui';
 import type { DayRow, MinerRow } from '@/engine/corpTaxBook/bookView';
 import { accountBalance, balanceAdjustment } from '@/engine/corpTaxBook/balanceAdjustment';
-import { canRebillFrom, type Adjustment } from '@/engine/corpTaxBook/statements';
+import type { Adjustment } from '@/engine/corpTaxBook/adjustments';
 import { DialogShell, Effect, Label } from './BookDialogs';
 import { canOverrideDay } from './dayEligibility';
 import { dateWithYear, isk, shortDate } from './moonsFormat';
@@ -364,56 +363,6 @@ export function MarketAdjustmentDialog({
       <Label text={t('corpTaxBook.moons.ledger.dialogs.reasonLabel')}>
         <TextArea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
       </Label>
-    </DialogShell>
-  );
-}
-
-/** Rebill from date (D22): never reaches a paid Statement; for a member it needs a Director. */
-export function RebillDialog({
-  open,
-  onClose,
-  miner,
-  minerName,
-  statements,
-}: {
-  open: boolean;
-  onClose: () => void;
-  miner: MinerRow;
-  minerName: string;
-  statements: Parameters<typeof canRebillFrom>[1];
-}) {
-  const { t } = useTranslation();
-  const { edit, verdict, data } = useBook();
-  const [fromDate, setFromDate] = useState('');
-  const [reason, setReason] = useState('');
-  const open_ = fromDate !== '' && canRebillFrom(fromDate, statements, data.state.paidStatementIds);
-  const needsDirector = miner.standing !== 'guest' && !verdict.isDirector;
-  return (
-    <DialogShell
-      open={open}
-      onClose={onClose}
-      title={t('corpTaxBook.moons.corrections.rebill.title', { name: minerName })}
-      confirmLabel={t('corpTaxBook.moons.corrections.rebill.confirm')}
-      canConfirm={open_ && reason.trim().length > 0}
-      run={async () => {
-        await edit({ action: 'rebill', minerId: miner.id, fromDate, reason: reason.trim() });
-      }}
-    >
-      <p className="text-text-dim">{t('corpTaxBook.moons.corrections.rebill.intro')}</p>
-      <Label text={t('corpTaxBook.moons.corrections.rebill.from')}>
-        <TextInput type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-        {fromDate !== '' && <DateReadback date={fromDate} />}
-      </Label>
-      {fromDate !== '' && !open_ && (
-        <InlineError>{t('corpTaxBook.moons.corrections.rebill.paid')}</InlineError>
-      )}
-      <Label text={t('corpTaxBook.moons.corrections.reason')}>
-        <TextArea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
-      </Label>
-      <Effect>
-        {t('corpTaxBook.moons.corrections.rebill.effect')}
-        {needsDirector && ` ${t('corpTaxBook.moons.corrections.rebill.director')}`}
-      </Effect>
     </DialogShell>
   );
 }

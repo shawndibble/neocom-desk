@@ -5,7 +5,7 @@ import {
   type RunningDay,
 } from './minerRunningAccount';
 import type { RunningAccountCheckpoint } from '../../../functions/src/corpTaxBookCheckpoint';
-import type { TaxPayment } from './allocation';
+import type { TaxPayment } from './payments';
 
 const day = (date: string, tax: number): RunningDay => ({ date, tax });
 const payment = (id: string, amount: number, at: string, extra: Partial<TaxPayment> = {}) =>

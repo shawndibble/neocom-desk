@@ -26,7 +26,7 @@ function item(n: number, patch: Partial<MailQueueItem> = {}): MailQueueItem {
     batchId: 'b1',
     corporationId: 98000001,
     statementId: `s${n}`,
-    kind: 'statement',
+    kind: 'notice',
     senderCharacterId: 1,
     recipientId: 100 + n,
     recipientName: `Miner ${n}`,
@@ -202,8 +202,8 @@ describe('Stop reminders (D27)', () => {
 
 describe('isAlreadyQueued', () => {
   it('never queues a Statement mail twice, whatever its state', () => {
-    expect(isAlreadyQueued([item(1, { status: 'sent' })], 's1', 'statement')).toBe(true);
-    expect(isAlreadyQueued([item(1)], 's2', 'statement')).toBe(false);
+    expect(isAlreadyQueued([item(1, { status: 'sent' })], 's1', 'notice')).toBe(true);
+    expect(isAlreadyQueued([item(1)], 's2', 'notice')).toBe(false);
   });
   it('lets a reminder be queued again once the earlier one went out', () => {
     const r = item(1, { kind: 'reminder', status: 'sent' });
@@ -299,7 +299,7 @@ describe('staleMailSpell (#6210)', () => {
   });
 
   it('is undefined for any other mail, or a malformed id', () => {
-    expect(staleMailSpell({ kind: 'statement', statementId: 'stale:1:2:3' })).toBeUndefined();
+    expect(staleMailSpell({ kind: 'notice', statementId: 'stale:1:2:3' })).toBeUndefined();
     expect(staleMailSpell({ kind: 'grant-stale', statementId: 'stale:x:2:3' })).toBeUndefined();
     expect(staleMailSpell({ kind: 'grant-stale', statementId: 's1' })).toBeUndefined();
   });

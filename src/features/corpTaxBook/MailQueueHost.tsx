@@ -5,7 +5,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { usePageHeaderSlot } from '@/components/ui/pageHeaderSlot';
 import { db } from '@/db';
 import {
-  isStatementMail,
+  isLateNoticeMail,
   removalNoticeStillDue,
   startsRemovalClock,
   staleMailSpell,
@@ -70,20 +70,14 @@ function liveDeps(sending: (id: string | undefined) => void): QueueDeps {
         );
         return;
       }
-      // A rate-change mail has no Statement to log on; the rate change is already in the audit trail.
-      if (!isStatementMail(item.kind)) return;
-      const { editBook } = await import('@/features/corp/taxBook/bookClient');
-      await editBook(
-        item.senderCharacterId,
-        item.corporationId,
-        {
-          action: 'recordMail',
-          statementId: item.statementId,
-          mailId: item.mailId!,
-          kind: item.kind,
-        },
-        { freshToken: true }
-      );
+      // A rate-change mail has no late notice to log on; the rate change is already in the audit trail.
+      if (!isLateNoticeMail(item.kind)) return;
+      const { recordLateNoticeMail } = await import('@/features/corp/taxBook/bookClient');
+      await recordLateNoticeMail(item.senderCharacterId, item.corporationId, {
+        noticeId: item.statementId,
+        mailId: item.mailId!,
+        kind: item.kind === 'reminder' ? 'reminder' : 'notice',
+      });
     },
     sending,
     isUnconfirmed: isUnconfirmedWrite,

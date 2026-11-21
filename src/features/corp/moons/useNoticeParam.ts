@@ -2,29 +2,34 @@ import { useEffect } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
+const PARAM = 'notice';
+/** The name the param had before late notices were renamed: an old link still opens the panel. */
+const LEGACY_PARAM = 'statement';
+
 /**
- * The `?statement=<id>` that opens a Statement panel. Opening pushes an entry; closing replaces it,
- * so Back leaves the page instead of reopening the panel. Other query params are kept.
- * An id the page does not hold (`ready`, but not `known`) is dropped with a replace and
- * leaves `notFound` to say so.
+ * The `?notice=<id>` that opens a late notice panel. Opening pushes an entry; closing replaces it,
+ * so Back leaves the page instead of reopening the panel. Other query params are kept. An id the
+ * page does not hold (`ready`, but not `known`) is dropped with a replace and leaves `notFound` to
+ * say so.
  */
-export function useStatementParam(ready: boolean, isKnown: (id: string) => boolean) {
+export function useNoticeParam(ready: boolean, isKnown: (id: string) => boolean) {
   const { t } = useTranslation();
   const [params, setParams] = useSearchParams();
   const location = useLocation();
-  const openId = params.get('statement');
+  const openId = params.get(PARAM) ?? params.get(LEGACY_PARAM);
   const known = openId !== null && ready && isKnown(openId);
   const set = (id: string | null, options: { replace: boolean; notFound?: boolean }) =>
     setParams(
       (prev) => {
         const next = new URLSearchParams(prev);
-        if (id === null) next.delete('statement');
-        else next.set('statement', id);
+        next.delete(LEGACY_PARAM);
+        if (id === null) next.delete(PARAM);
+        else next.set(PARAM, id);
         return next;
       },
       {
         replace: options.replace,
-        ...(options.notFound ? { state: { statementNotFound: true } } : {}),
+        ...(options.notFound ? { state: { noticeNotFound: true } } : {}),
       }
     );
   const drop = openId !== null && ready && !known;
@@ -33,8 +38,8 @@ export function useStatementParam(ready: boolean, isKnown: (id: string) => boole
     // `set` only closes over setParams.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drop]);
-  const notFound = (location.state as { statementNotFound?: boolean } | null)?.statementNotFound
-    ? t('corpTaxBook.moons.statementPeriod.statementNotFound')
+  const notFound = (location.state as { noticeNotFound?: boolean } | null)?.noticeNotFound
+    ? t('corpTaxBook.moons.noticePanel.notFound')
     : null;
   return {
     /** The id to open, only when the page holds it. */
