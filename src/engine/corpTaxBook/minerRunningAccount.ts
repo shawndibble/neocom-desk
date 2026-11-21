@@ -388,7 +388,7 @@ export class MinerRunningAccount {
     const out = new Map<string, DayAmount[]>();
     let head = 0;
     const counted = (this.input.writeOffs ?? [])
-      .filter((w) => cp === undefined || dayOf(w.at) > cp.through)
+      .filter((w) => cp === undefined || utcDayOf(w.at) > cp.through)
       .sort((a, b) => a.at.localeCompare(b.at));
     for (const w of counted) {
       const days: DayAmount[] = [];
