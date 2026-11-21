@@ -27,7 +27,6 @@ import { getValidAccessToken } from '@/auth/session';
 import { popShareMarks, type PopShareMarks } from '@/engine/corpTaxBook/popShareMarks';
 import { readPopSharingCached } from './popSharingCache';
 import { bookMinersOf, type Miner } from '@/engine/corpTaxBook/charges';
-import { MINER_LIST_DOC } from '../../../../functions/src/corpTaxBookReadModels';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
 import type { Declaration } from '@/engine/corpTaxBook/overdue';
 import type { Adjustment } from '@/engine/corpTaxBook/adjustments';
@@ -183,21 +182,19 @@ export interface FeederChunkParts {
 
 /**
  * Every Miner of the book, for a picker on a page read for one Miner (moving a payment): the
- * groupings, and each Miner of its own the server's miner list names (one doc). Without that doc
- * (an older server) only the groupings.
+ * groupings, and a Miner of its own for each character the book's rows name. The rows come from
+ * this device's copy of the ledger (`observed`, a delta read), so a book already opened on this
+ * device costs little; the book's own figures are not built.
  */
 export async function readBookMiners(characterId: number, corporationId: number): Promise<Miner[]> {
-  await ensureSignedIn(characterId);
-  const book = doc(getSyncFirestore(characterId), 'corps', String(corporationId));
   return asOfficer(characterId, corporationId, async () => {
-    const [grouped, list] = await Promise.all([
-      getDocs(collection(book, 'miners')),
-      getDoc(doc(book, 'readModels', MINER_LIST_DOC)).catch(() => null),
-    ]);
-    const listed = (list?.data()?.miners as { minerId?: unknown }[] | undefined) ?? [];
+    const book = await openBook(characterId, corporationId);
+    if (!book) return [];
+    const [grouped, rows] = await Promise.all([book.list<Miner>('miners'), book.observed()]);
+    const characters = [...new Set(rows.map((r) => r.characterId))];
     return bookMinersOf(
-      grouped.docs.map((d) => ({ ...(d.data() as Miner), id: d.id })),
-      listed.flatMap((m) => (typeof m.minerId === 'string' ? [m.minerId] : []))
+      grouped,
+      characters.map((c) => `solo:${c}`)
     );
   });
 }
