@@ -24,7 +24,7 @@ import type {
   RunningAccountCheckpoint,
 } from '../../../functions/src/corpTaxBookCheckpoint';
 import { countedPayments, paymentNet, type TaxPayment } from './payments';
-import { shiftUtcDate } from '@/engine/localDay';
+import { shiftUtcDate, utcDayOf } from '@/engine/localDay';
 
 /** What is left of a day below this is float residue: the day is done (whole ISK on every screen). */
 export const RESIDUE_ISK = 0.5;
@@ -112,7 +112,7 @@ export interface MinerRunningAccountInput {
 }
 
 /** The UTC day of an ISO instant: which side of a checkpoint money falls. */
-const dayOf = (at: string) => at.slice(0, 10);
+const dayOf = utcDayOf;
 
 /**
  * A checkpoint's owed day as a running day: its whole tax and what was paid of it before, so its

@@ -35,7 +35,7 @@ import type { ObservedMiningEntry, OreLine } from './types';
 import type { DayPrices } from './valuation';
 import { DAY_MS } from '@/lib/age';
 import { wholeIsk } from './wholeIsk';
-import { utcDay } from '../localDay';
+import { utcDayOf } from '../localDay';
 import { runningDaysFromLines, type RunningAccountOwes } from './minerRunningAccount';
 import type { ToleranceExemption } from './toleranceExemptions';
 import { settleOpenSet, type MinerSettlement, type OpenSet, type OpenSetInput } from './openSet';
@@ -323,7 +323,7 @@ export function buildBookView(input: BookViewInput): BookView {
   const open = settleOpenSet(openSetInputOf(input));
   const { charges } = open;
   const latestCorp = latestRecordedCorp(input.entries);
-  const today = utcDay(Date.parse(input.now));
+  const today = utcDayOf(input.now);
 
   const byMiner = new Map<string, MinerInternals>();
   const miners: MinerRow[] = [];
@@ -571,7 +571,7 @@ function buildExtractionRows(
   charges: readonly DayCharge[],
   chunkRates: ReadonlyMap<number, LearnedChunkRate>
 ): ExtractionRow[] {
-  const today = input.now.slice(0, 10);
+  const today = utcDayOf(input.now);
   const todayPrices = input.pricesOn(today).prices;
   return input.extractions
     .map((x): ExtractionRow => {
@@ -669,7 +669,7 @@ function officerWriteOffsOf(
   return mine.map((w) => {
     // A reversed write-off forgave nothing, and one the checkpoint holds is summed up in it:
     // neither takes a share of the days' forgiveness.
-    if (w.reversed || (through !== undefined && w.at.slice(0, 10) <= through))
+    if (w.reversed || (through !== undefined && utcDayOf(w.at) <= through))
       return {
         id: w.id,
         amount: w.amount,

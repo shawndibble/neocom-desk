@@ -5,6 +5,7 @@
  * own view (only they can read it) and the miners' coverage copy (the Moon owners sheet has it).
  * Pure: the caller reads the book and hands the sheets to `downloadWorkbook`.
  */
+import { soloCharacterId, soloMinerId } from '../../../../functions/src/corpTaxBookDonationMatch';
 import type { RunningAccountCheckpoint } from '../../../../functions/src/corpTaxBookCheckpoint';
 import type { Miner } from '@/engine/corpTaxBook/charges';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
@@ -152,10 +153,10 @@ export function bookExportSheets(
     if (!minerId) return null;
     const miner = minerById.get(minerId);
     if (miner) return names.character(miner.mainCharacterId);
-    const solo = /^solo:(\d+)$/.exec(minerId);
-    return solo ? names.character(Number(solo[1])) : minerId;
+    const solo = soloCharacterId(minerId);
+    return solo !== undefined ? names.character(solo) : minerId;
   };
-  const minerOf = (characterId: number) => minerIdOf.get(characterId) ?? `solo:${characterId}`;
+  const minerOf = (characterId: number) => minerIdOf.get(characterId) ?? soloMinerId(characterId);
   const character = (id: number | null | undefined) =>
     typeof id === 'number' ? names.character(id) : null;
   const notices = [...input.notices].sort(

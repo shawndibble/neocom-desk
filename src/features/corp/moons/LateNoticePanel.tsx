@@ -8,7 +8,7 @@ import type { VerifyPayloadLine } from '@/engine/corpTaxBook/verifyView';
 import { NoticeLines } from '@/features/corpTaxBook/NoticeLines';
 import { writeToClipboard } from '@/lib/clipboard';
 import { readVerifyTokens, verifyUrl } from '../taxBook/bookClient';
-import { minerPaymentCode } from '../../../../functions/src/corpTaxBookLateNotice';
+import { minerPaymentCode, noticeSpan } from '../../../../functions/src/corpTaxBookLateNotice';
 import { useBook } from './useBook';
 import { useEntityName } from '@/features/character/useEntityName';
 import {
@@ -118,8 +118,7 @@ export function LateNoticePanel({
     structureIds.map((id) => [String(id), names.refinery(id)])
   );
   const credited = detail.paid - detail.forgiven - detail.writtenOff;
-  const first = notice.lines[0]?.date ?? notice.issuedAt.slice(0, 10);
-  const last = notice.lines.at(-1)?.date ?? first;
+  const { first, last } = noticeSpan(notice);
   const pricing = notice.pricing ?? { hubId: view.input.hubId, oreForm: view.input.oreForm };
   return (
     <SlideOver

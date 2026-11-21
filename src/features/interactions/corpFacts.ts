@@ -4,6 +4,7 @@
  * no grant, no book) resolves to nothing, never an error. Sources and the stat chips share one
  * load per player, kept briefly so opening the tab twice does not read twice.
  */
+import { noticeSpan } from '../../../functions/src/corpTaxBookLateNotice';
 import { collection, getDocs, query, where } from 'firebase/firestore/lite';
 import { minerIdFor, type Miner } from '@/engine/corpTaxBook/charges';
 import { buildBookView, minerDetail } from '@/engine/corpTaxBook/bookView';
@@ -91,8 +92,8 @@ async function readBookFacts(
     notices: detail.notices.map((n) => ({
       id: n.id,
       issuedAt: n.issuedAt,
-      from: n.lines[0]?.date ?? n.issuedAt.slice(0, 10),
-      to: n.lines.at(-1)?.date ?? n.issuedAt.slice(0, 10),
+      from: noticeSpan(n).first,
+      to: noticeSpan(n).last,
       listed: n.listed,
       mailsSent: n.mail.sent,
       settled: inner.account.standingOf(n).settled,
