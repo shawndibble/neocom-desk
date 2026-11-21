@@ -15,13 +15,17 @@ import {
   reconcileExtractions,
   donationMatchBook,
   billableStoredRows,
+  minedSinceStart,
   storedRowsWanted,
   type JournalDonation,
   type MoonNotification,
   type SyncExtraction,
 } from '@/engine/corpTaxBook/sync';
-import { minerIdFor } from '@/engine/corpTaxBook/charges';
-import { donationOwner } from '../../../../functions/src/corpTaxBookDonationMatch';
+import {
+  donationOwner,
+  rematchUnmatched,
+  type UnmatchedCandidate,
+} from '../../../../functions/src/corpTaxBookDonationMatch';
 import { otherDivisions, uncountedDonations } from '@/engine/corpTaxBook/uncounted';
 import {
   planSignInGroups,
@@ -278,7 +282,7 @@ export async function syncCorpTaxBook(
       : uncountedDonations(elsewhere, {
           ...matching,
           openBalance: new Map(),
-          unbilled: owingOf(before, rows),
+          unbilled: minedSinceStart(rows, before.miners, before.book.startDate),
         });
 
   // The first call carries everything but the overflow of observer rows, so a
@@ -404,15 +408,6 @@ async function billedStoredRows(
   }
 }
 
-/** The Miners with ore in these rows from the book's start on: a donation of theirs is likely tax. */
-function owingOf(book: BookState, rows: readonly ObservedRow[]): Set<string> {
-  const out = new Set<string>();
-  for (const r of rows)
-    if (r.quantity > 0 && r.date >= book.book.startDate)
-      out.add(minerIdFor(r.characterId, book.miners));
-  return out;
-}
-
 /** Re-runs `donationOwner` for stored Unmatched payments and assigns those that now match. A failure is not the sync's, so it is returned for the page to show. */
 async function reassignUnmatched(
   deps: SyncDeps,
@@ -425,15 +420,8 @@ async function reassignUnmatched(
     regrouped: boolean;
   }
 ): Promise<{ assigned: number; error?: string }> {
-  // One held as ambiguous waits for an officer, or for the server to resolve it again (M8).
-  const open = args.before.payments
-    .filter(
-      (p) =>
-        p.minerId === undefined &&
-        p.reviewReason !== 'ambiguous' &&
-        !(p.notTaxAmount && p.notTaxAmount > 0)
-    )
-    .sort((a, b) => a.at.localeCompare(b.at));
+  // The shared re-match (`rematchUnmatched`): one placed, not tax or held as ambiguous is left.
+  const open = args.before.payments.filter((p) => p.minerId === undefined);
   if (open.length === 0) return { assigned: 0 };
   let assigned = 0;
   try {
@@ -448,13 +436,11 @@ async function reassignUnmatched(
       minedCharacterIds: args.mined,
       payments: book.payments,
     });
-    for (const p of open) {
-      const match = donationOwner(
-        { characterId: p.characterId, reason: (p as { reason?: string }).reason },
-        matchBook
-      );
-      if (match.kind !== 'miner') continue;
-      await deps.assignPayment(characterId, corporationId, p.id, match.minerId);
+    for (const { paymentId, minerId } of rematchUnmatched(
+      open as readonly UnmatchedCandidate[],
+      matchBook
+    )) {
+      await deps.assignPayment(characterId, corporationId, paymentId, minerId);
       assigned += 1;
     }
     return { assigned };
