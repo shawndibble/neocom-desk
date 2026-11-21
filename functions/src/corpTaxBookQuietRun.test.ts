@@ -27,7 +27,6 @@ const marker = (over: Partial<QuietMarker> = {}): QuietMarker => ({
   known: [50, 51],
   extractions: 'x',
   extractionsSince: '2026-08-25T00:00:00.000Z',
-  paid: 'p',
   ...over,
 });
 const book = { createdAt: 1, startDate: '2026-10-01', divisions: [1], versions };
@@ -53,7 +52,6 @@ describe('readQuietMarker', () => {
     expect(readQuietMarker(undefined)).toBeNull();
     expect(readQuietMarker({ ...marker(), known: ['50'] })).toBeNull();
     expect(readQuietMarker({ ...marker(), extractions: undefined })).toBeNull();
-    expect(readQuietMarker({ ...marker(), paid: 1 })).toBeNull();
   });
 
   it('refuses a marker from before the extraction window, so one full run writes a new one', () => {

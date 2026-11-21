@@ -100,34 +100,23 @@ import {
 import {
   BOOK_DEFAULTS,
   extractionIdOf,
-  allocatePayments,
-  dismissalCredits,
   forfeitAllowed,
   canOverrideRecordRate,
   canRebillFrom,
   lastStatementDay,
   rateStartRefusal,
   latestRecordedCorp,
-  creditedLines,
   disputeHolds,
-  heldByStatement,
   readHoldingDisputes,
   mergeObservedRows,
   observedRowKey,
   shiftDate,
-  writeOffForAllocation,
   type CorpRecord,
   type CoveragePeriod,
-  type DismissableLine,
-  type MirrorDismissal,
   type MirrorExtraction,
   type ObservedRow,
 } from './corpTaxBookEngine.js';
-import {
-  billsDays,
-  type FeederExtraction,
-  type StoredExtractionKey,
-} from './corpTaxBookSyncEngine.js';
+import { type FeederExtraction, type StoredExtractionKey } from './corpTaxBookSyncEngine.js';
 import { ledgerDays, ledgerPayments, liveAccount } from './corpTaxBookAccounts.js';
 import type { IdentityReader } from './corpTaxBookEsi.js';
 import { SRP_COLLECTIONS } from './srpTypes.js';
@@ -189,12 +178,10 @@ import {
   lineKey,
 } from './corpTaxBookLateNotice.js';
 import {
-  BACKFILLED_DOC,
   dbReader,
   type DocReader,
   issueLateNoticeDocs,
   newVerifyToken,
-  readNoticeDocById,
   readNoticeDocs,
   readNotices,
   ofCharacterFilter,
@@ -1064,41 +1051,6 @@ const earliestDay = (...days: unknown[]): string | null =>
   days.every((d) => typeof d === 'string' && d.length >= 10)
     ? ((days as string[]).map((d) => d.slice(0, 10)).sort()[0] ?? null)
     : null;
-
-/**
- * The ids, among `statements`, that open disputes hold something of at `now`
- * (`heldByStatement`, priced and credited as the allocation reads them).
- */
-async function heldStatementIds(c: EditCtx, statements: readonly Data[], now: string) {
-  const held = new Set<string>();
-  for (const minerId of new Set(statements.map((s) => s.minerId as string))) {
-    const disputes = readHoldingDisputes(
-      (await c.tx.get(col(c, DISPUTES).where('minerId', '==', minerId))).docs.map((d) => d.data())
-    ).filter((d) => disputeHolds(d, now));
-    if (disputes.length === 0) continue;
-    const [ofMiner, dismissals, extractions] = await Promise.all([
-      readNoticeDocs(c.tx, bookOf(c), ofMinerFilter(minerId)),
-      c.tx.get(col(c, DISMISSALS)),
-      c.tx.get(col(c, EXTRACTIONS)),
-    ]);
-    const byId = new Map(ofMiner.map((s) => [s.id as string, s]));
-    for (const s of statements) if (s.minerId === minerId) byId.set(s.id as string, s);
-    const mine = [...byId.values()].map((x) => ({
-      id: x.id as string,
-      lines: (x.lines as DismissableLine[]) ?? [],
-    }));
-    const credits = dismissalCredits({
-      minerId,
-      statements: mine,
-      dismissals: dismissals.docs.map((d) => d.data() as MirrorDismissal),
-      extractions: extractions.docs.map((d) => d.data() as MirrorExtraction),
-      expiryHours: (c.book.structureExpiryHours as Record<string, number> | undefined) ?? {},
-    });
-    const amounts = heldByStatement(mine, disputes, creditedLines(credits), now);
-    for (const [id, amount] of amounts) if (amount > 0) held.add(id);
-  }
-  return held;
-}
 
 async function mustGet(c: EditCtx, ref: DocumentReference, what: string): Promise<Data> {
   const snap = await c.tx.get(ref);
@@ -2441,7 +2393,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const miner = await tx.get(col(c, MINERS).doc(statement.minerId));
       if (miner.exists && miner.get('closedAt') != null)
         fail('failed-precondition', "This Miner's account is closed", 'account-closed');
-      refuseCalendarStatement(c, statement);
+      refuseCalendarStatement(statement);
       const token = await issueStatementDoc(
         c,
         statement,
@@ -2493,37 +2445,10 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     case 'closeAccount':
       staleCheckpoints(c, [action.minerId], null);
       return closeAccount(c, action);
-    case 'settleStatements': {
-      const paidRef = col(c, META).doc(PAID_DOC);
-      const paid = new Set<string>(
-        ((await tx.get(paidRef)).data()?.ids as string[] | undefined) ?? []
-      );
-      const wanted = [...new Set(action.statementIds)].filter((id) => !paid.has(id));
-      const docs: Data[] = [];
-      for (const id of wanted) {
-        const doc = await readNoticeDocById(tx, bookOf(c), id);
-        if (!doc) fail('not-found', 'Statement not found', 'not-found');
-        docs.push(doc);
-      }
-      // A Statement settles for good (D22), so the server never trusts the caller's plan: an
-      // older client plans without disputes. One an open dispute holds right now is dropped.
-      const held = await heldStatementIds(c, docs, iso);
-      // A late notice (#6294) is never settled for good: its days stay on the running account.
-      const notices = new Set(docs.filter((d) => !billsDays(d)).map((d) => d.id as string));
-      const fresh = wanted.filter((id) => !held.has(id) && !notices.has(id));
-      if (fresh.length > 0) {
-        // Only ever grown: a Statement settled once keeps its days closed for good (D22).
-        tx.set(
-          paidRef,
-          {
-            ids: FieldValue.arrayUnion(...fresh),
-            settled: Object.fromEntries(fresh.map((id) => [id, { at: iso, by }])),
-          },
-          { merge: true }
-        );
-      }
-      return { detail: { statementIds: fresh }, result: { settled: fresh } };
-    }
+    case 'settleStatements':
+      // Only an older tab still asks: no notice settles for good, and no calendar Statement is
+      // issued any more, so nothing is ever settled here.
+      return { detail: { statementIds: [] }, result: { settled: [] } };
     case 'declare': {
       const { notice } = await mustGetNotice(c, action.noticeId);
       const id = `x${now}_${rand(4)}`;
@@ -2840,15 +2765,13 @@ async function issueStatementDoc(
   writeLegacyStatement(tx, book, stored, token);
   const notice = lateNoticeFromStatementDoc(stored);
   if (notice) writeLateNoticeDocs(tx, book, notice, token);
-  // A calendar Statement has no `lateNotices` copy: reads look at the legacy docs again.
-  else tx.delete(book.collection(META).doc(BACKFILLED_DOC));
   writeVerifyToken(tx, c.deps.db, c.corporationId, statement, token, now);
   return token;
 }
 
-/** A running account bills by day (#6294): an older client's calendar Statement is refused. */
-function refuseCalendarStatement(c: { book: Data }, statement: { kind?: string }): void {
-  if (typeof c.book.runningAccountFrom === 'string' && statement.kind !== 'notice')
+/** Every book is a Running account: an older tab's calendar Statement is refused on every one. */
+function refuseCalendarStatement(statement: { kind?: string }): void {
+  if (statement.kind !== 'notice')
     fail(
       'failed-precondition',
       'This book bills a running account: only late notices are issued',
@@ -2893,47 +2816,12 @@ async function closeAccount(
   const statement = action.statement ? parseStatement(action.statement) : undefined;
   if (statement && statement.minerId !== action.minerId)
     fail('invalid-argument', "Statement is another Miner's", 'wrong-miner');
-  if (statement) refuseCalendarStatement(c, statement);
+  if (statement) refuseCalendarStatement(statement);
 
-  // The credit the guest is left with once the final Statement is counted.
-  const [statements, payments, dismissals, extractions, writeOffs] = await Promise.all([
-    readNoticeDocs(tx, bookOf(c), ofMinerFilter(action.minerId)),
-    tx.get(col(c, PAYMENTS).where('minerId', '==', action.minerId)),
-    tx.get(col(c, DISMISSALS)),
-    tx.get(col(c, EXTRACTIONS)),
-    tx.get(col(c, WRITE_OFFS).where('minerId', '==', action.minerId)),
-  ]);
-  // A running account's notices bill no days of their own (#6294): legacy Statements only.
-  const held = statements.filter(billsDays);
-  const allocation = allocatePayments({
-    statements: [...held, ...(statement && billsDays(statement) ? [statement] : [])].map((x) => ({
-      id: x.id as string,
-      amount: x.amount as number,
-      issuedAt: x.issuedAt as string,
-    })),
-    payments: payments.docs.map((d) => paymentForAllocation(d.id, d.data())),
-    dismissalCredits: dismissalCredits({
-      minerId: action.minerId,
-      statements: [...held, ...(statement ? [statement] : [])].map((x) => ({
-        id: x.id as string,
-        lines: (x.lines as DismissableLine[]) ?? [],
-      })),
-      dismissals: dismissals.docs.map((d) => d.data() as MirrorDismissal),
-      extractions: extractions.docs.map((d) => d.data() as MirrorExtraction),
-      expiryHours: (c.book.structureExpiryHours as Record<string, number> | undefined) ?? {},
-    }),
-    officerWriteOffs: writeOffs.docs.flatMap((d) => writeOffForAllocation(d.data()) ?? []),
-    startDate: c.book.startDate as string | undefined,
-  });
-  // Payments that paid running days are no credit; only the officer's client can price those days.
-  // Every book is a running account (decision 20261117-060555): the client's credit when sent.
-  const credit = Math.max(
-    0,
-    action.runningCredit !== undefined ? action.runningCredit : allocation.credit
-  );
-  const owed = [...allocation.byStatement.values()]
-    .filter((s) => !s.settled)
-    .reduce((sum, s) => sum + s.remaining, 0);
+  // A Running account's figures are the officer's tab's to work out (the server holds no
+  // prices): the credit it sends, and what the account recorded still owes, less payments since.
+  const credit = Math.max(0, action.runningCredit ?? 0);
+  const owed = (await liveAccountOf(c, action.minerId))?.owed ?? 0;
 
   let token: string | undefined;
   if (statement)
@@ -2976,19 +2864,6 @@ async function closeAccount(
       ...(action.credit.kind === 'forfeit' ? { basis: action.credit.basis } : {}),
     },
     result: { credit, owed, ...(token ? { statementId: statement!.id, verifyToken: token } : {}) },
-  };
-}
-
-function paymentForAllocation(id: string, p: Data) {
-  return {
-    id,
-    amount: p.amount as number,
-    at: p.at as string,
-    ...(p.source === 'donation' || p.source === 'manual'
-      ? { source: p.source as 'donation' | 'manual' }
-      : {}),
-    ...(typeof p.statementId === 'string' ? { statementId: p.statementId } : {}),
-    ...(typeof p.notTaxAmount === 'number' ? { notTaxAmount: p.notTaxAmount } : {}),
   };
 }
 

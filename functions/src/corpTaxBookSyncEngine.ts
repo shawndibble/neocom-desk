@@ -7,17 +7,10 @@
 // file. Dependency-free apart from its sibling mirror, so that test can import it.
 
 import {
-  allocatePayments,
-  creditedLines,
-  dismissalCredits,
-  heldByStatement,
   isDayCovered,
   type CoveragePeriod,
-  type HoldingDispute,
   moonOnDay,
   shiftDate,
-  type AllocWriteOff,
-  type MirrorDismissal,
   type MirrorExtraction,
   type ObservedRow,
 } from './corpTaxBookEngine.js';
@@ -633,7 +626,6 @@ export interface SettleStatement {
     date?: string;
     tax?: number;
     structureId?: number;
-    /** Read by `heldByStatement` to price a disputed line as it was billed. */
     kind?: string;
     oreLines?: { typeId: number; quantity: number }[];
     unitPrices?: Record<string, number>;
@@ -651,35 +643,6 @@ export interface SettlePayment {
   source?: 'donation' | 'manual';
   /** Held for an officer's review (#6207): never re-matched by a sync. */
   reviewReason?: 'no-open-balance';
-}
-
-interface SettleInput {
-  statements: readonly SettleStatement[];
-  payments: readonly SettlePayment[];
-  dismissals: readonly MirrorDismissal[];
-  alreadyPaid: ReadonlySet<string>;
-  extractions: readonly MirrorExtraction[];
-  /** Officer write-offs (#4637): a Statement one forgives in full is settled. */
-  writeOffs?: readonly (AllocWriteOff & { minerId: string })[];
-  startDate?: string;
-  /** Engine `SettleInput.disputes`: with `now`, an open one holds its amount out of what is due. */
-  disputes?: readonly (HoldingDispute & { minerId: string })[];
-  now?: string;
-}
-
-/** Engine `planSettlements`: the Statements now settled that the book does not yet hold as paid. */
-export function planSettlements(input: SettleInput): string[] {
-  const settled: string[] = [];
-  for (const { statements, allocation } of allocateEachMiner(input)) {
-    for (const s of statements) {
-      const st = allocation.byStatement.get(s.id);
-      // Settled only because a dispute holds part of it: not for good (D22).
-      if (st?.settled && !st.held && !input.alreadyPaid.has(s.id)) {
-        settled.push(s.id);
-      }
-    }
-  }
-  return settled;
 }
 
 /** Engine `billsDays`: a running account's late notice (#6294) bills no days of its own. */
@@ -826,50 +789,5 @@ export function billableStoredRows<
     const periods =
       source === undefined || source === bookCorporationId ? undefined : periodsOf.get(source);
     return periods === undefined || isDayCovered(periods, r.date);
-  });
-}
-
-/** Engine `openBalances`: what each Miner still owes on issued Statements. */
-export function openBalances(input: Omit<SettleInput, 'alreadyPaid'>): Map<string, number> {
-  const out = new Map<string, number>();
-  for (const { minerId, allocation } of allocateEachMiner(input)) {
-    let owed = 0;
-    for (const s of allocation.byStatement.values()) if (!s.settled) owed += s.remaining;
-    if (owed > 0) out.set(minerId, owed);
-  }
-  return out;
-}
-
-function allocateEachMiner(input: Omit<SettleInput, 'alreadyPaid'>) {
-  const billing = input.statements.filter(billsDays);
-  const minerIds = [...new Set(billing.map((s) => s.minerId))];
-  return minerIds.map((minerId) => {
-    const statements = billing.filter((s) => s.minerId === minerId);
-    const payments = input.payments.filter((p) => p.minerId === minerId);
-    const credits = dismissalCredits({
-      minerId,
-      statements,
-      dismissals: input.dismissals,
-      extractions: input.extractions,
-      expiryHours: {},
-    });
-    const held =
-      input.now !== undefined && input.disputes
-        ? heldByStatement(
-            statements,
-            input.disputes.filter((d) => d.minerId === minerId),
-            creditedLines(credits),
-            input.now
-          )
-        : new Map<string, number>();
-    const allocation = allocatePayments({
-      statements,
-      payments,
-      dismissalCredits: credits,
-      officerWriteOffs: (input.writeOffs ?? []).filter((w) => w.minerId === minerId),
-      startDate: input.startDate,
-      ...(held.size > 0 ? { held } : {}),
-    });
-    return { minerId, statements, allocation };
   });
 }

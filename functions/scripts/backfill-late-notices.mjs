@@ -31,8 +31,18 @@ let notices = 0;
 let links = 0;
 let mail = 0;
 const failed = [];
+// Every book is a Running account: the server now refuses a calendar Statement on every one.
+// A book with no `runningAccountFrom` is listed, so an officer knows an older tab of it is refused.
+const unswitched = [];
 for (const corporationId of corps) {
   try {
+    const book = await db.collection('corps').doc(String(corporationId)).get();
+    if (
+      book.exists &&
+      book.get('active') === true &&
+      typeof book.get('runningAccountFrom') !== 'string'
+    )
+      unswitched.push(corporationId);
     const plan = await planLateNoticeBackfill(db, corporationId);
     const counts = [plan.notices.length, plan.links.length, plan.mail.length];
     if (counts.some((n) => n > 0))
@@ -59,6 +69,10 @@ console.log(
   `links: ${links}`,
   `mail synced: ${mail}`
 );
+if (unswitched.length > 0)
+  console.log(
+    `books with no runningAccountFrom (calendar Statements refused): ${unswitched.join(' ')}`
+  );
 if (failed.length > 0) {
   console.error(`failed: ${failed.join(' ')} (re-run with these ids)`);
   process.exitCode = 1;
