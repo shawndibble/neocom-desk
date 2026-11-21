@@ -25,6 +25,9 @@ import type {
 } from '../../../functions/src/corpTaxBookCheckpoint';
 import { countedPayments, paymentNet, type TaxPayment } from './payments';
 
+/** What is left of a day below this is float residue: the day is done (whole ISK on every screen). */
+export const RESIDUE_ISK = 0.5;
+
 /** The default per-day tolerance, in percent of the day's tax. */
 export const DAY_SETTLE_TOLERANCE_PCT = 0.5;
 
@@ -301,9 +304,16 @@ export class MinerRunningAccount {
     today: string
   ): string | null {
     if (this.paidThrough === null) return null;
+    const closed = this.input.checkpoint?.through;
     let through: string | null = null;
     for (const d of [...days].sort((a, b) => a.date.localeCompare(b.date))) {
       const day = this.byDay.get(d.date);
+      // A day the checkpoint closed is not billed here any more: it was settled and priced then.
+      // One it still owes is billed here, and holds the rest back until it is paid.
+      if (!day && closed !== undefined && d.date <= closed) {
+        through = d.date;
+        continue;
+      }
       if (d.date >= today || !d.savedPrices || !day || day.held || !day.settled) break;
       through = d.date;
     }
@@ -400,7 +410,8 @@ function settleDays(input: DaysInput, pools: DayPools): SettledDays {
   const isDone = (st: Running) => {
     const remaining = st.tax - st.credited;
     const limit = st.exempt ?? daySettleTolerance(st.tax, pct);
-    return remaining <= 0 || (st.paidIn > 0 && remaining <= limit);
+    // Under half an ISK is float residue, never a debt: it would read "owes 0 ISK (1 day)".
+    return remaining < RESIDUE_ISK || (st.paidIn > 0 && remaining <= limit);
   };
   const queue = pools.payments.map((p) => ({
     paymentId: p.paymentId,

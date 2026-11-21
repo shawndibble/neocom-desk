@@ -114,6 +114,30 @@ const checkpoint = (over: Partial<RunningAccountCheckpoint> = {}): RunningAccoun
   ...over,
 });
 
+describe('MinerRunningAccount.build: float residue (M6)', () => {
+  it('treats under half an ISK left as done, so no day reads "owes 0 ISK"', () => {
+    // A credit correction that leaves 0.3 ISK, and a payment with no tolerance that leaves 0.4.
+    const account = MinerRunningAccount.build({
+      days: [day('2026-11-01', 1_000.3), day('2026-11-01', -1_000), day('2026-11-02', 2_000)],
+      payments: [payment('p1', 1_999.6, '2026-11-03T10:00:00Z')],
+      dayTolerancePct: 0,
+    });
+    expect(account.byDay.get('2026-11-01')?.settled).toBe(true);
+    expect(account.byDay.get('2026-11-02')?.settled).toBe(true);
+    expect(account.owes).toBeNull();
+    expect(account.paidThrough).toBe('2026-11-02');
+  });
+
+  it('still owes a day half an ISK or more short', () => {
+    const account = MinerRunningAccount.build({
+      days: [day('2026-11-02', 2_000)],
+      payments: [payment('p1', 1_999.5, '2026-11-03T10:00:00Z')],
+      dayTolerancePct: 0,
+    });
+    expect(account.owes).toEqual({ amount: 0.5, days: 1, oldest: '2026-11-02' });
+  });
+});
+
 describe('MinerRunningAccount.build from a closed-through checkpoint', () => {
   it('never bills again a day on or before the checkpoint', () => {
     const account = MinerRunningAccount.build({
@@ -177,6 +201,30 @@ describe('MinerRunningAccount.build from a closed-through checkpoint', () => {
       checkpoint: checkpoint(),
     });
     expect(account.owes?.amount).toBe(1e6);
+  });
+
+  it('keeps closableThrough moving past the days the checkpoint closed (M2)', () => {
+    const account = MinerRunningAccount.build({
+      days: [day('2026-10-05', 1e6), day('2026-11-02', 1e6)],
+      payments: [payment('p1', 1e6, '2026-11-05T10:00:00Z')],
+      checkpoint: checkpoint(),
+    });
+    const priced = [
+      { date: '2026-10-05', savedPrices: true },
+      { date: '2026-11-02', savedPrices: true },
+    ];
+    expect(account.closableThrough(priced, '2026-11-21')).toBe('2026-11-02');
+    // A day the checkpoint still owes holds it back until it is paid.
+    const owing = MinerRunningAccount.build({
+      days: [day('2026-11-02', 1e6)],
+      payments: [payment('p1', 1e6, '2026-11-05T10:00:00Z')],
+      checkpoint: checkpoint({
+        owed: [{ date: '2026-10-05', remaining: 1e6 }],
+        balance: 1e6,
+        paidThrough: '2026-10-04',
+      }),
+    });
+    expect(owing.closableThrough(priced, '2026-11-21')).toBe('2026-10-05');
   });
 
   it('forgives the checkpoint’s owed days first with a later write-off', () => {
