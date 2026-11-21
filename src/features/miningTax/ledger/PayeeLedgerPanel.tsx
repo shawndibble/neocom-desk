@@ -187,7 +187,12 @@ function LedgerBody({
         header: t('miningTax.ledger.column.balance'),
         align: 'right',
         className: 'tabular-nums font-medium',
-        render: (r) => formatIsk(r.balance),
+        // Owed reads positive; money ahead reads as credit, never as a negative balance.
+        cellClassName: (r) => (r.balance < -0.005 ? 'text-isk-pos' : undefined),
+        render: (r) =>
+          r.balance < -0.005
+            ? t('miningTax.ledger.balanceCredit', { amount: formatIsk(-r.balance) })
+            : formatIsk(Math.max(0, r.balance)),
       },
     ],
     [t]

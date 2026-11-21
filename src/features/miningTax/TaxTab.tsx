@@ -16,7 +16,7 @@ import { QuietStatusLine } from '@/features/miningTax/corpBook/resolve/QuietStat
 import { conflictTarget, uncreditedTarget } from '@/features/miningTax/corpBook/resolve/targets';
 import { useResolve } from '@/features/miningTax/corpBook/resolve/useResolve';
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
-import { paymentLinkKey, type PayeePaymentLink } from '@/engine/miningTax/payeeAccount';
+import { heldPaymentKeys, type PayeePaymentLink } from '@/engine/miningTax/payeeAccount';
 import { leftCorpBooksOf } from '@/features/miningTax/corpBook/leftCorpBooks';
 import {
   corporationOfPayee,
@@ -55,6 +55,7 @@ import { useEntryDeepLink } from './useEntryDeepLink';
 import { useTaxAttentionItems } from './useTaxAttentionItems';
 import { useAutoLinkPayees } from './payeeAutoLink';
 import { useTaxBalances } from './useTaxBalances';
+import { bookCreditsOf } from './owedNow';
 import { corpPayAccounts, readsEveryDivision } from './corpBook/corpPayAccount';
 import { sum } from '@/engine/math';
 import { useTaxCorpBooks } from './useTaxCorpBooks';
@@ -134,6 +135,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   );
 
   const {
+    accounts: bookAccounts,
     ledger,
     madePayments,
     paymentSources,
@@ -154,6 +156,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
       })) ?? [],
     [corpView]
   );
+  const bookCredits = useMemo(() => bookCreditsOf(corpView), [corpView]);
   const corpStateLabel = useCorpStateLabel();
   const corpStateHint = useCorpStateHint();
 
@@ -270,9 +273,10 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     estimatedValueOf,
     madePayments,
     links: data?.paymentLinks ?? NO_LINKS,
-    ...(data ? { checkpoints: data.payeeCheckpoints } : {}),
-    alsoBilled: corpView?.overlay.alsoBilled,
+    accounts: bookAccounts,
+    historyGen: data?.payeeHistoryGen,
     bookCorporations: bookCorporationIds,
+    bookCredits,
   });
 
   // A Corp Tax Book row is the corp's to continue, not the member's.
@@ -320,7 +324,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     [allDisplayRows, actions]
   );
   const linkedKeys = useMemo(
-    () => new Set((data?.paymentLinks ?? NO_LINKS).map(paymentLinkKey)),
+    () => heldPaymentKeys(data?.paymentLinks ?? NO_LINKS),
     [data?.paymentLinks]
   );
   const resolve = useResolve({
@@ -660,6 +664,11 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
           systemsByPayee={payeeSystems}
           systemNames={systemNames}
           bookCorporations={bookCorporations}
+          accountOf={(id) => accounts.of(id)}
+          onOpenLedger={(payeeId) => {
+            closePayeeManager();
+            actions.openLedger({ kind: 'personal', payeeId });
+          }}
           refresh={refresh}
         />
 

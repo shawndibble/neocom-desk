@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef } from 'react';
 import type { PayeeRecord } from '@/db';
-import type { PersonalOverlay } from '@/engine/corpTaxBook/personal';
 import type { PayeePaymentLink, StoredPayeeCheckpoint } from '@/engine/miningTax/payeeAccount';
 import { utcDay } from '@/engine/localDay';
 import { allMembers, type DisplayRow } from '@/features/miningTax/groupRows';
 import { systemsByPayee } from '@/features/miningTax/suggestPayee';
 import { useLinkSuggestions } from '@/features/miningTax/useMadePayments';
 import { computeOwedByPayee } from './owedByPayee';
-import { owedBalances, payeeAccountsOf, unassignedSummary } from './owedNow';
+import { owedBalances, unassignedSummary } from './owedNow';
+import type { PayeeAccounts } from './payeeAccounts';
 import { savePayeeCheckpoints } from './paymentLinkStore';
 
 interface Args {
@@ -21,17 +21,19 @@ interface Args {
   madePayments: Parameters<typeof useLinkSuggestions>[0]['madePayments'];
   /** Every Made Payment linked to a Payee. */
   links: readonly PayeePaymentLink[];
-  /** The device's checkpoints of the personal accounts. */
-  checkpoints?: ReadonlyMap<string, StoredPayeeCheckpoint>;
-  /** What the Corp Tax Books bill too of the member's Assignments to other Payees (#6204). */
-  alsoBilled?: PersonalOverlay['alsoBilled'];
+  /** The one accounts build (`useTaxCorpBooks`). */
+  accounts: PayeeAccounts;
+  /** When the account inputs were read: a checkpoint is only stored while they still hold. */
+  historyGen: number | undefined;
   /** The corporations of the member's Corp Tax Books: a donation to one is the book's. */
   bookCorporations: ReadonlySet<number>;
+  /** Each Corp Tax Book Payee's credit, by its id (`bookCreditsOf`). */
+  bookCredits?: ReadonlyMap<string, number>;
 }
 
 /**
  * What the owed cards, Settle up, the Payee ledger, the payment-link suggestions and the Payee
- * manager read: every personal Payee's Running account, and the balances off it.
+ * manager read: the balances off every personal Payee's Running account.
  */
 export function useTaxBalances({
   characterFiltered,
@@ -42,29 +44,17 @@ export function useTaxBalances({
   estimatedValueOf,
   madePayments,
   links,
-  checkpoints,
-  alsoBilled,
+  accounts,
+  historyGen,
   bookCorporations,
+  bookCredits,
 }: Args) {
-  // Every Character's rows: a merged Payee's oldest day may be an alt's, whatever the filter.
-  // Ore a Corp Tax Book bills is owed to the corporation, not to the member's own Payee too.
-  const accounts = useMemo(
-    () =>
-      payeeAccountsOf({
-        rows: personalRows,
-        payees: allPayees,
-        links,
-        alsoBilled,
-        ...(checkpoints ? { checkpoints } : {}),
-      }),
-    [personalRows, allPayees, links, alsoBilled, checkpoints]
-  );
   // The owed cards follow the Character filter (an alt's debts are still debts) but not the Payee
   // filter: narrowing the ledger to one Payee must not change a balance. The Overview's Mining
   // tax card reads the same figure (`loadOwedBalances`).
   const balances = useMemo(
-    () => owedBalances(characterFiltered, ledgerPayees, accounts, duplicateAliases),
-    [characterFiltered, ledgerPayees, accounts, duplicateAliases]
+    () => owedBalances(characterFiltered, ledgerPayees, accounts, duplicateAliases, bookCredits),
+    [characterFiltered, ledgerPayees, accounts, duplicateAliases, bookCredits]
   );
   const unassigned = useMemo(
     () => unassignedSummary(characterFiltered, estimatedValueOf),
@@ -92,13 +82,14 @@ export function useTaxBalances({
     const next = new Map<string, StoredPayeeCheckpoint>();
     for (const [id, account] of accounts.entries()) {
       const stored = account.nextCheckpoint(today, new Date().toISOString());
-      const key = stored ? `${id}|${stored.checkpoint.through}|${stored.fingerprint}` : '';
+      const key = stored ? `${id}|${stored.checkpoint.through}|${historyGen ?? ''}` : '';
       if (!stored || storedRef.current.has(key)) continue;
       storedRef.current.add(key);
       next.set(id, stored);
     }
-    if (next.size > 0) void savePayeeCheckpoints(next).catch(() => undefined);
-  }, [accounts]);
+    if (next.size > 0 && historyGen !== undefined)
+      void savePayeeCheckpoints(next, historyGen).catch(() => undefined);
+  }, [accounts, historyGen]);
 
   // Every Payee's systems and owed entries, for the Payee manager's rows.
   const payeeSystems = useMemo(

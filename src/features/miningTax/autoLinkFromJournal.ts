@@ -9,7 +9,7 @@
  */
 import { db } from '@/db';
 import type { WalletJournalEntry } from '@/esi/endpoints';
-import { paymentLinkKey } from '@/engine/miningTax/payeeAccount';
+import { paymentLinkKey, heldPaymentKeys } from '@/engine/miningTax/payeeAccount';
 import { linkPayment } from './ledgerActions';
 import { fromJournal } from './madePayments';
 import { linkOf } from './payeeAccounts';
@@ -35,20 +35,17 @@ export async function autoLinkRecordedPaymentsFromJournals(
     links,
     {
       payees: accounts.linkable(payees),
-      linked: new Set(links.map(paymentLinkKey)),
+      linked: heldPaymentKeys(links),
       bookCorporations,
     }
   );
   await Promise.all(
     matches.map(({ link, payment }) => {
-      const record = payees.find((p) => p.id === link.payeeId);
-      return record
-        ? linkPayment(
-            linkFor(payment, link.payeeId, 'auto'),
-            record.characterId,
-            paymentLinkKey(link)
-          )
-        : undefined;
+      linkPayment(
+        linkFor(payment, link.payeeId, 'auto'),
+        payment.characterId,
+        paymentLinkKey(link)
+      );
     })
   );
 }

@@ -13,13 +13,17 @@ order below.
   - `accountCheckpoints/{minerId}`: officers read every one; a Miner reads their own (`uids`).
   - `payments/{paymentId}`: also readable by its Miner's readers (`uids`), so a main reads an
     alt's donation. A payment without `uids` still reads by its sender (`uid`) alone.
+  - `observed/{rowId}`: also readable by its Character's Miner's readers (`uids`), so a main
+    reads an alt's mined days. A row without `uids` still reads by its Character (`uid`) alone.
+    **Added after the first rules deploy: redeploy the rules** (step 1).
   - Under `users/{uid}`, a pilot's own `miningTaxPaymentLinks/{linkId}` (a Made Payment's link
     to one Payee), with the same owner and hash rules as `miningTaxAssignments`. Older clients
     never read or write it.
-- **Indexes:** for the synced `miningTaxPaymentLinks` collection only (`ownerHash` + `updatedAt`,
-  and its single-field `ownerHash` override), the same pair every synced collection has. Corp Tax
-  Book queries need none: each is on a single field (`minerId`, `characterIds`, `uids` on
-  `payments`, `issuedAt`, `extractionId`, `chunkArrivalTime`, `transferId`, and
+- **Indexes:** for the synced `miningTaxPaymentLinks` collection (`ownerHash` + `updatedAt`, and
+  its single-field `ownerHash` override), the same pair every synced collection has; and
+  `observed` `uids` (array-contains) + `updatedAt`, for a member's delta read of their Miner's
+  rows (step 1). Every other Corp Tax Book query is on a single field (`minerId`, `characterIds`,
+  `uids` on `payments`, `issuedAt`, `extractionId`, `chunkArrivalTime`, `transferId`, and
   `books.<corporationId>` on `corpTaxBookBilledBy`, indexed as a map field by default).
 - **Functions:**
   - `corpTaxBookCall` (the book's router): `issueLateNotice`, `recordLateNoticeMail`,
@@ -33,12 +37,19 @@ order below.
     grouping); a stranger is named by a Miner's or a notice's code, else by the Miner their earlier
     payments named; one that could be two Miners' is stored for review (`reviewReason:
 'ambiguous'`). A hand record of a transfer the book already holds is refused; one noted in an
-    unread division is linked to it and never counted again. `reassignPayment` moves a payment.
+    unread division is linked to it and never counted again. `reassignPayment` moves a payment;
+    moving one off a Miner, or marking more of it not tax, drops that Miner's recorded paid-through
+    day (`meta/paid`, `minerPaid`) so the days it paid reopen (decision 20261121-093000).
     Every payment write stores `uids`: its Miner's readers and its sender. A grouping, an unlink
-    and a promoted claim bring its Miner's payments' `uids` level with who reads the Miner.
+    and a promoted claim bring its Miner's payments' `uids` level with who reads the Miner. Every
+    `observed` row a sync writes stores `uids` too: its Character's Miner's readers and itself.
+    After a grouping, an unlink, a guest's answer or a promoted claim commits, the rows of every
+    Character it touched are brought level a page at a time (best effort, with a fresh
+    `updatedAt`), since one Character can hold more rows than a transaction writes.
   - `dailyHousekeeping` (job `verifyBookDocs`): the nightly pass rebuilds moon docs (schema 2, no
-    frozen tax) and the Overview read model (schema 2, its Extractions alone), and deletes the
-    retired `minerTotals` docs and `readModels/minerList` doc (nothing reads it).
+    frozen tax) and the tab read models (schema 2: the Overview's Extractions, and the Miners list
+    as the ids of recorded accounts, which a Miner page's Move dialog reads), and deletes the
+    retired `minerTotals` docs.
   - A rate refused on a day a Late notice listed still answers `day-on-statement`, which every
     client matches; a correction a notice listed answers `billed-on-notice` (was
     `billed-on-statement`, which no client matched). The date guards read the days a notice
@@ -64,21 +75,27 @@ actions (`issueStatement`, `recordMail`) and reads the legacy `statements` docs 
    firebase deploy --only firestore:rules,firestore:indexes
    ```
 
+   **Already deployed? Run it again.** The `observed` rule and its `uids` + `updatedAt` index (an
+   alt's mined rows) came after the first rules deploy. Additive: a row without `uids` reads as
+   before.
+
 2. **Functions**, which start writing `lateNotices` (and still mirror every notice to
    `statements`/`statementLinks`, so older tabs keep reading them):
 
-   ```sh
-   firebase deploy --only functions
-   ```
+```sh
+firebase deploy --only functions
+```
 
 3. **Backfill**, once the functions are live (a notice issued before step 2 exists only in
    `statements`). Count first, then copy. It creates missing copies, brings each existing copy's
    mail state level with its legacy doc, and then marks the book (`meta/lateNoticesBackfilled`):
    from then on reads look at `lateNotices` alone. Until a book is marked, every read also reads
    the ids of its legacy docs and fetches those with no copy. It also gives each payment stored
-   without `uids` its Miner's readers and its sender (`payment readers` in its output); until it
-   has, a main does not see an alt's older donations. It can run again safely; a book that fails
-   (a notice issued, or a payment written, during its run) is reported, the run goes on, and the
+   without `uids` its Miner's readers and its sender (`payment readers` in its output), and each
+   `observed` row without `uids` its Character's Miner's readers and itself (`row readers`, a
+   page of 1000 rows at a time, without moving `updatedAt`); until it has, a main does not see an
+   alt's older donations or mined days. It can run again safely; a book that fails (a notice
+   issued, or a payment or row written, during its run) is reported, the run goes on, and the
    script exits non-zero: re-run it with those corporation ids.
 
    ```sh
@@ -95,9 +112,8 @@ actions (`issueStatement`, `recordMail`) and reads the legacy `statements` docs 
 
 ## After deploy
 
-- The first nightly pass rewrites every moon doc and the Overview read model (new schemas) and
-  deletes `minerTotals`, `meta/minerTotalsHealth` and `readModels/minerList`; its result is in
-  `meta/verifierHealth`.
+- The first nightly pass rewrites every moon doc and both read models (new schemas) and deletes
+  `minerTotals` and `meta/minerTotalsHealth`; its result is in `meta/verifierHealth`.
 - **Rolling the functions back is not free.** Verify links keep working (every notice is
   mirrored to `statements`, and tokens still name it under `statementId`), but the older
   functions write only the legacy docs: a notice issued or a mail recorded while rolled back
@@ -108,8 +124,7 @@ actions (`issueStatement`, `recordMail`) and reads the legacy `statements` docs 
   - re-run the backfill (step 3): it copies those notices and brings their mail state across
     (until then the verify page and mail already read both docs and merge their mail state), and
     gives the payments written meanwhile their `uids`;
-  - the next nightly pass rewrites the moon docs and the Overview read model and deletes
-    `minerTotals` and `readModels/minerList`.
+  - the next nightly pass rewrites the moon docs and both read models and deletes `minerTotals`.
 - An older tab that still issues a calendar Statement is refused on every book (the backfill
   lists the books with no `runningAccountFrom`, whose older tabs see that refusal).
 

@@ -17,7 +17,13 @@
  * primitives in `assignments.ts` are this module's to call; the UI imports
  * actions from here (an ESLint rule holds that line).
  */
-import { db, type MiningTaxAssignmentRecord, type MiningTaxOreLine, type PayeeRecord } from '@/db';
+import {
+  db,
+  type MiningTaxAssignmentRecord,
+  type MiningTaxAssignmentStatus,
+  type MiningTaxOreLine,
+  type PayeeRecord,
+} from '@/db';
 import type { PayeePaymentLink } from '@/engine/miningTax/payeeAccount';
 import { scheduleSync } from '@/sync';
 import {
@@ -43,9 +49,16 @@ import {
 } from './assignments';
 import { recordDefaultOptOuts } from './defaultOptOuts';
 import type { GroupMember } from './groupRows';
+import { groupPayees } from './payeeGroups';
 import { removePayeeRecord } from './payees';
-import { loadPayeeAccounts, removePaymentLinks, savePaymentLink } from './paymentLinkStore';
+import {
+  linksReady,
+  loadPayeeAccounts,
+  removePaymentLinks,
+  savePaymentLink,
+} from './paymentLinkStore';
 import type { SessionContinuation } from './sessionContinuation';
+import { putAssignments } from './storedAssignments';
 
 export type {
   AssignInput,
@@ -109,7 +122,9 @@ const charactersOf = (records: readonly { characterId: number }[]) =>
 
 /**
  * Assigns an entry's ore (or a slice of it) to a Payee. Which days are paid is read off the
- * Payees' accounts before the write, so a paid growth collector hands its flag over.
+ * Payees' accounts before the write, so a paid growth collector hands its flag over. Until the
+ * links are known (`linksReady`) every day reads as paid, so no collector hands over a day a link
+ * pays elsewhere.
  */
 export async function assign(
   input: AssignInput
@@ -117,8 +132,11 @@ export async function assign(
   let isPaid = input.isPaid;
   if (!isPaid) {
     try {
-      const accounts = await loadPayeeAccounts();
-      isPaid = (a) => accounts.isPaid(a);
+      const tracked = (await db.characters.toCollection().primaryKeys()) as number[];
+      if (await linksReady(tracked)) {
+        const accounts = await loadPayeeAccounts();
+        isPaid = (a) => accounts.isPaid(a);
+      } else isPaid = () => true;
     } catch (cause) {
       return failure(cause);
     }
@@ -257,7 +275,7 @@ export async function acceptNewTotal(members: readonly GroupMember[]): Promise<L
     return failure(cause);
   }
   return commit(charactersOf(resolved), async () => {
-    if (resolved.length > 0) await db.miningTaxAssignments.bulkPut(resolved);
+    await putAssignments(resolved);
   });
 }
 
@@ -301,15 +319,16 @@ export function split(
  */
 export function assignmentsMovedWithPayee(
   assignments: readonly MiningTaxAssignmentRecord[],
-  payeeId: string
+  payeeId: string,
+  /** What is paid, off the Payee's account (`PayeeAccounts.statusOf`), never a stored mark. */
+  statusOf: (a: MiningTaxAssignmentRecord) => MiningTaxAssignmentStatus
 ): MiningTaxAssignmentRecord[] {
   const own = assignments.filter((a) => a.payeeId === payeeId);
+  const owed = (a: MiningTaxAssignmentRecord) => statusOf(a) === 'outstanding';
   const owedGroups = new Set(
-    own.filter((a) => a.status === 'outstanding' && a.groupId !== undefined).map((a) => a.groupId)
+    own.filter((a) => owed(a) && a.groupId !== undefined).map((a) => a.groupId)
   );
-  return own.filter(
-    (a) => a.status === 'outstanding' || (a.groupId !== undefined && owedGroups.has(a.groupId))
-  );
+  return own.filter((a) => owed(a) || (a.groupId !== undefined && owedGroups.has(a.groupId)));
 }
 
 /**
@@ -317,30 +336,71 @@ export function assignmentsMovedWithPayee(
  * `moveToPayeeId` when given — one transaction, so a failure leaves both the
  * Payee and every one of its entries as they were. The entries are re-read
  * inside it, so a day another tab assigned since the dialog opened moves too.
+ *
+ * Its payment links go with it in the same transaction: to the rest of its merged Payee when
+ * another record of the same recipient stays (the links name the group's primary, which may be
+ * the record deleted), else to the Payee its entries move to. Deleted with nowhere to move, they
+ * stay with its entries, under its own id.
  */
-export function deletePayee(
+export async function deletePayee(
   payee: PayeeRecord,
   moveToPayeeId?: string
 ): Promise<LedgerActionResult> {
-  return commit(
-    (moved: MiningTaxAssignmentRecord[]) => [payee.characterId, ...charactersOf(moved)],
-    async () => {
-      let moved: MiningTaxAssignmentRecord[] = [];
-      if (moveToPayeeId !== undefined) {
-        // Walks the `characterId` index per character (keys only to find them), not every record.
-        const characterIds = await db.miningTaxAssignments.orderBy('characterId').uniqueKeys();
-        const own = await db.miningTaxAssignments
-          .where('characterId')
-          .anyOf(characterIds)
-          .filter((a) => a.payeeId === payee.id)
-          .toArray();
-        moved = assignmentsMovedWithPayee(own, payee.id);
-        await moveAssignmentsToPayee(moved, moveToPayeeId);
+  let touched: { assignments: number[]; links: number[] };
+  try {
+    touched = await db.transaction(
+      'rw',
+      [db.miningTaxAssignments, db.payees, db.settings, db.miningTaxPaymentLinks],
+      async () => {
+        const accounts = await loadPayeeAccounts();
+        let moved: MiningTaxAssignmentRecord[] = [];
+        if (moveToPayeeId !== undefined) {
+          // Walks the `characterId` index per character (keys only to find them), not every record.
+          const characterIds = await db.miningTaxAssignments.orderBy('characterId').uniqueKeys();
+          const own = await db.miningTaxAssignments
+            .where('characterId')
+            .anyOf(characterIds)
+            .filter((a) => a.payeeId === payee.id)
+            .toArray();
+          moved = assignmentsMovedWithPayee(own, payee.id, (a) => accounts.statusOf(a));
+          await moveAssignmentsToPayee(moved, moveToPayeeId);
+        }
+        const remaining = (await db.payees.toArray()).filter((p) => p.id !== payee.id);
+        const group = groupPayees([...remaining, payee]).find((g) =>
+          g.members.some((m) => m.id === payee.id)
+        );
+        const rest = group?.members.filter((m) => m.id !== payee.id) ?? [];
+        const primaryOf = (id: string) =>
+          groupPayees(remaining).find((g) => g.members.some((m) => m.id === id))?.primary.id ?? id;
+        const to =
+          rest.length > 0
+            ? primaryOf(rest[0]!.id)
+            : moveToPayeeId !== undefined
+              ? primaryOf(moveToPayeeId)
+              : undefined;
+        const links =
+          to === undefined
+            ? []
+            : await db.miningTaxPaymentLinks.filter((l) => l.payeeId === payee.id).toArray();
+        const now = Date.now();
+        await db.miningTaxPaymentLinks.bulkPut(
+          links.map((l) => ({ ...l, payeeId: to!, updatedAt: now }))
+        );
+        await removePayeeRecord(payee);
+        return {
+          assignments: [payee.characterId, ...charactersOf(moved)],
+          links: charactersOf(links),
+        };
       }
-      await removePayeeRecord(payee);
-      return moved;
-    }
-  ).then((result) => (result.ok ? { ok: true, value: undefined } : result));
+    );
+  } catch (cause) {
+    return failure(cause);
+  }
+  for (const characterId of new Set(touched.assignments))
+    scheduleSync(characterId, { collections: ['miningTaxAssignments', 'payees'] });
+  for (const characterId of new Set(touched.links))
+    scheduleSync(characterId, { collections: ['miningTaxPaymentLinks'] });
+  return { ok: true, value: undefined };
 }
 
 /**

@@ -49,6 +49,8 @@ const snapshot = {
   payeesByCharacter: new Map([[ME, [ASHFALL, BRIMSTONE]]]),
   paymentLinks: [],
   payeeCheckpoints: new Map(),
+  billedElsewhere: new Map(),
+  payeeHistoryGen: 0,
   unclassified: [],
   reauthCharacters: [],
   fetchedAt: new Date(),

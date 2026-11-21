@@ -3,6 +3,7 @@ import {
   classifyGroup,
   groupConflicts,
   minerReaderIds,
+  characterUids,
   minerUidsOf,
   paymentUids,
   promoteClaims,
@@ -149,5 +150,28 @@ describe('promoteClaims', () => {
     expect(
       promoteClaims([miner('g1', { characterIds: [1, 9], officerClaimed: [9] })], set(7))
     ).toEqual([]);
+  });
+});
+
+describe("characterUids: who reads a Character's own rows", () => {
+  const miners = [
+    { id: 'g', characterIds: [1, 2, 3], officerClaimed: [3] },
+    { id: 'late', characterIds: [4], createdAt: '2026-12-01' },
+  ];
+
+  it("is its Miner's readers and itself", () => {
+    expect(characterUids(2, miners)).toEqual(['char:1', 'char:2']);
+    // An Officer claim reads its own rows; the group's readers read them too.
+    expect(characterUids(3, miners)).toEqual(['char:1', 'char:2', 'char:3']);
+  });
+
+  it('is itself alone when no grouping holds it', () => {
+    expect(characterUids(9, miners)).toEqual(['char:9']);
+  });
+
+  it('is itself alone for a guest still waiting to confirm', () => {
+    expect(characterUids(5, [{ id: 'h', characterIds: [1, 5], pendingConfirmation: [5] }])).toEqual(
+      ['char:5']
+    );
   });
 });

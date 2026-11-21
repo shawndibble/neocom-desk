@@ -85,11 +85,10 @@ async function openMovePayment(page: Page) {
 
 // The Miner page reads only that Miner, so the picker reads the book's Miners itself
 // (`useBookMiners`): the groupings and the server's miner list, which holds every Miner an
-// officer's visit to the whole book counted. That visit comes first, as it would in use.
-// Still open: that visit recorded Bram's days as paid for good (`meta/paid`), so once the payment
-// moves off they stay paid, written off as Market adjustments, and his Owed stays 0. Moving a
-// payment must release the recorded paid-through (server side), as the test below needs too.
-test.fixme('an officer moves a payment to another Miner', async ({ page }) => {
+// officer's visit to the whole book counted. That visit comes first, as it would in use. Moving
+// the payment drops Bram's recorded paid-through on the server (decision 20261121-093000), so his
+// days are owed again.
+test('an officer moves a payment to another Miner', async ({ page }) => {
   await signInAsOfficer(page, './corp/moons/miners');
   await expect(page.getByRole('row', { name: new RegExp(MINER.cora.name) })).toBeVisible();
   await expect
@@ -113,14 +112,10 @@ test.fixme('an officer moves a payment to another Miner', async ({ page }) => {
   await owed(page, book.cora.owed - book.bram.paid);
 });
 
-// The server re-checks roles live for `reassignPayment`: its token goes with it now
-// (LIVE_CHECK_ACTION_NAMES, shared with the server). Still open: the officer's visit recorded the
-// days the payment paid as paid for good (`meta/paid`, settledThrough), so once it is moved off
-// they stay paid, the money written off as a Market adjustment, and Owed stays 0. Moving a payment
-// must release the Miner's recorded paid-through (server side, like a checkpoint on an edit).
-test.fixme('an officer takes a payment off a Miner, and it waits in Needs you', async ({
-  page,
-}) => {
+// The server re-checks roles live for `reassignPayment` (its token goes with it,
+// LIVE_CHECK_ACTION_NAMES) and drops the Miner's recorded paid-through, so the days the payment
+// paid are owed again.
+test('an officer takes a payment off a Miner, and it waits in Needs you', async ({ page }) => {
   const dialog = await openMovePayment(page);
   await dialog.getByRole('button', { name: 'No Miner' }).click();
   await dialog.getByRole('button', { name: 'Take it off this Miner' }).click();

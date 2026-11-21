@@ -528,8 +528,10 @@ service cloud.firestore {
         allow list, write: if false;
       }
 
+      // A mined row is its Character's (`uid`) and its Miner's readers' (`uids`), so a main reads an
+      // alt's days. One stored before `uids` reads by its Character alone.
       match /observed/{rowId} {
-        allow get, list: if isOfficer() || isOwnLine();
+        allow get, list: if isOfficer() || isOwnLine() || isOnOwnLine();
         allow write: if false;
       }
 

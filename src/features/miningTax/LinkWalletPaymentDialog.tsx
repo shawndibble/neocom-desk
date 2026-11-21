@@ -118,7 +118,7 @@ export function LinkWalletPaymentDialog({
   async function commit() {
     if (!selected || !amountValid || amount === null) return;
     const result = await run(() =>
-      linkPayment(linkFor(selected, payee.id, 'manual', Math.round(amount)), payee.characterId)
+      linkPayment(linkFor(selected, payee.id, 'manual', Math.round(amount)), selected.characterId)
     );
     if (!result.ok) return;
     setLinked(true);

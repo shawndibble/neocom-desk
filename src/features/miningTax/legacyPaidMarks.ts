@@ -3,12 +3,16 @@
  * `status: 'paid'` and a `payment` naming its lump sum and the transactions behind it. They stay
  * readable, since dev and production share one Firebase project and an older client still writes
  * them, but nothing reads them for what is paid any more. Each is read once into the link it
- * stands for (`readLegacyPaidMarks`), under a key derived from the mark itself, so reading it
- * again finds the link already there. Pure.
+ * stands for (`readLegacyPaidMarks`), under an id that never changes, so reading it again finds
+ * the link already there. The marks are never written or cleared. Pure.
  */
 import type { MiningTaxAssignmentRecord, MiningTaxPaymentInfo } from '@/db';
 import { utcDay } from '@/engine/localDay';
-import { paymentLinkKey, type PayeePaymentLink } from '@/engine/miningTax/payeeAccount';
+import {
+  paymentLinkKey,
+  type PayeePaymentLink,
+  type PayeePaymentRef,
+} from '@/engine/miningTax/payeeAccount';
 
 /**
  * A mark's payment as the newest legacy shape: the oldest stored a bare `journalRefId` /
@@ -29,85 +33,68 @@ function normalizePaymentInfo(payment: MiningTaxPaymentInfo): MiningTaxPaymentIn
   };
 }
 
-/** A link read from paid marks, with the Character whose Payee record it names. */
+/** A link read from paid marks, with the Character whose mark it was read from (its owner). */
 export interface LegacyLink extends PayeePaymentLink {
+  kind: 'legacy';
   characterId: number;
-  /** The Assignments whose marks it was read from. */
-  from: string[];
 }
 
-/** One link per payment the marks recorded: per transaction behind it, else the recorded sum. */
+/**
+ * One link per payment the marks recorded (decision 20261120-235011, "reading old paid marks is
+ * passive and idempotent"). Its id never depends on what the mark holds now: `legacy:<paymentId>`,
+ * or `legacy:mark:<assignmentId>` for a bare "mark paid". It pays the old payment's recorded
+ * amount (a bare mark: the day's tax as stored when first read); the transactions the payment
+ * named are kept on it as `refs`, held but never paying on their own. A journal attached later, or
+ * a second installment on the same payment, changes nothing: the id is already there.
+ */
 export function legacyPaymentLinks(
   assignments: readonly MiningTaxAssignmentRecord[]
 ): LegacyLink[] {
   const marked = assignments
     .filter((a) => a.status === 'paid' && a.payeeId !== undefined)
     .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
-  const groups = new Map<string, MiningTaxAssignmentRecord[]>();
+  const firstOf = new Map<string, MiningTaxAssignmentRecord>();
   const out: LegacyLink[] = [];
   for (const a of marked) {
     if (a.payment) {
-      groups.set(a.payment.paymentId, [...(groups.get(a.payment.paymentId) ?? []), a]);
+      if (!firstOf.has(a.payment.paymentId)) firstOf.set(a.payment.paymentId, a);
       continue;
     }
     // "Mark paid" with no payment recorded: the pilot said this day was paid, in full.
     out.push({
       payeeId: a.payeeId!,
       characterId: a.characterId,
-      kind: 'recorded',
+      kind: 'legacy',
       refId: `mark:${a.id}`,
       amount: a.taxOwed,
       paidOn: a.paidAt !== undefined ? utcDay(a.paidAt) : a.date,
       source: 'manual',
-      from: [a.id],
     });
   }
-  for (const [paymentId, members] of groups) {
-    const first = members[0]!;
+  for (const [paymentId, first] of firstOf) {
     const payment = normalizePaymentInfo(first.payment!);
-    const refs = [
-      ...(payment.journalLinks ?? []).map((l) => ({ kind: 'journal' as const, ...l })),
-      ...(payment.contractLinks ?? []).map((l) => ({ kind: 'contract' as const, ...l })),
+    const refs: PayeePaymentRef[] = [
+      ...(payment.journalLinks ?? []).map((l) => ({ kind: 'journal' as const, refId: l.refId })),
+      ...(payment.contractLinks ?? []).map((l) => ({ kind: 'contract' as const, refId: l.refId })),
     ];
-    const shared = {
+    out.push({
       payeeId: first.payeeId!,
       characterId: first.characterId,
+      kind: 'legacy',
+      refId: paymentId,
+      amount: payment.amount,
       paidOn: payment.paidOn,
-      from: members.map((m) => m.id),
-    };
-    if (refs.length === 0) {
-      out.push({
-        ...shared,
-        kind: 'recorded',
-        refId: paymentId,
-        amount: payment.amount,
-        source: 'manual',
-      });
-      continue;
-    }
-    // The marks recorded only the lump sum: installments share it.
-    for (const ref of refs)
-      out.push({
-        ...shared,
-        kind: ref.kind,
-        refId: ref.refId,
-        amount: payment.amount / refs.length,
-        source: ref.source,
-      });
+      source: 'manual',
+      ...(refs.length > 0 ? { refs } : {}),
+    });
   }
   return out;
 }
 
-/** The legacy links not yet read: no link holds their payment's key. */
+/** The legacy links not read yet: no link (an unlinked one included) and no tombstone has its id. */
 export function unreadLegacyLinks(
   assignments: readonly MiningTaxAssignmentRecord[],
-  linkedKeys: ReadonlySet<string>
+  known: ReadonlySet<string>
 ): LegacyLink[] {
-  const seen = new Set(linkedKeys);
-  return legacyPaymentLinks(assignments).filter((l) => {
-    const key = paymentLinkKey(l);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  return legacyPaymentLinks(assignments).filter((l) => !known.has(paymentLinkKey(l)));
 }

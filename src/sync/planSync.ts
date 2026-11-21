@@ -553,10 +553,21 @@ async function syncCharacter(
   // and the failed one re-reads its window on the next pass. A collection
   // left out of a narrowed pass is not touched at all — its pull cursor,
   // tombstones and rows stay exactly as the last pass left them.
+  // A collection the deployed rules do not know yet (`rulesMayLag`) is not ready, not failing:
+  // no error, no report, and the rest of the pass, heartbeat included, goes on as if it synced.
+  // Only the "nothing changed" claim is withheld, so the next pass tries it again.
+  let notReady = false;
   const tasks: (NamedTask & { name: SyncedCollectionName })[] = [
     ...EDITABLE_COLLECTIONS.map((spec) => ({
       name: spec.remoteName,
-      run: () => syncEditableCollection(spec, ctx),
+      run: async () => {
+        try {
+          await syncEditableCollection(spec, ctx);
+        } catch (error) {
+          if (!spec.rulesMayLag || errorCodeOf(error) !== 'permission-denied') throw error;
+          notReady = true;
+        }
+      },
     })),
     { name: NOTIFICATION_FEED.remoteName, run: () => syncFeed(ctx) },
     { name: SYNCED_SETTINGS.remoteName, run: () => syncSettings(ctx) },
@@ -582,7 +593,7 @@ async function syncCharacter(
     }
   }
   if (scope === 'all') {
-    if (markerBefore !== undefined && bumped) {
+    if (markerBefore !== undefined && bumped && !notReady) {
       // Plus this pass's own bump, if it made one: the marker only moves by +1,
       // so another device's bump still leaves the remote ahead of this.
       await writeSeenSyncMarker(characterId, {

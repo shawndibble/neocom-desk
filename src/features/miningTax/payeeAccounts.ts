@@ -1,7 +1,8 @@
 /**
  * Every personal Payee's Running account (`PayeeAccount`), one per merged Payee (#6308: a pilot's
- * alts each hold a record of the same recipient, and the group is one Payee). What is paid is read
- * here and nowhere else: an Assignment is Paid while its Payee's account has paid its day, oldest
+ * alts each hold a record of the same recipient, and the group is one Payee). One build, the same
+ * inputs everywhere (`loadAccountInputs`): row statuses, owed figures, safeguards and the journal
+ * read the same accounts. What is paid is read here and nowhere else: an Assignment is Paid while its Payee's account has paid its day, oldest
  * first (decision 20261120-235011). Assignments no longer carry a paid mark of their own; a stored
  * `status: 'paid'` from an older client is read as billed, its money having been read into a link
  * (`legacyPaidMarks.ts`).
@@ -41,10 +42,11 @@ export interface PayeeAccountsInput {
   /** The device's checkpoints, by a merged Payee's primary id. */
   checkpoints?: ReadonlyMap<string, StoredPayeeCheckpoint>;
   /**
-   * What an Assignment bills its Payee; its `taxOwed` by default. The Tax tab passes what is left
-   * once a Corp Tax Book bills part of it too (#6204), and nothing for one a book took over whole.
+   * By Assignment id, the share (0–1) of its tax a Corp Tax Book bills too (#6204), 1 for one a
+   * book took over whole: it bills its Payee only what is left. As the device last saw the books
+   * (`saveBilledElsewhere`), so every build bills the same.
    */
-  taxOf?: (a: BilledAssignment) => number;
+  billedElsewhere?: ReadonlyMap<string, number>;
 }
 
 /** Every personal Payee's account, looked up by any of a merged Payee's record ids. */
@@ -56,7 +58,8 @@ export class PayeeAccounts {
   ) {}
 
   static build(input: PayeeAccountsInput): PayeeAccounts {
-    const taxOf = input.taxOf ?? ((a: BilledAssignment) => a.taxOwed);
+    const taxOf = (a: BilledAssignment) =>
+      a.taxOwed * (1 - Math.min(1, input.billedElsewhere?.get(a.id) ?? 0));
     const primaryOf = new Map<string, string>();
     for (const group of groupPayees(input.payees))
       for (const member of group.members) primaryOf.set(member.id, group.primary.id);
@@ -165,24 +168,19 @@ export function linkOf(record: MiningTaxPaymentLinkRecord): PayeePaymentLink {
     amount: record.amount,
     paidOn: record.paidOn,
     source: record.source,
+    ...(record.refs ? { refs: record.refs } : {}),
+    ...(record.unlinked ? { unlinked: true as const } : {}),
   };
 }
 
 /**
  * The ledger's entries as the tab reads them: each Assignment viewed through its Payee's account
- * (`PayeeAccounts.view`), built from the stored Assignments as they are. The Tax tab and the
- * Overview read the same.
+ * (`PayeeAccounts.view`). The Tax tab and the Overview read the same.
  */
 export function withPaidStatus(
   entries: readonly MoonMiningTaxRow[],
-  payees: readonly PayeeRecord[],
-  links: readonly PayeePaymentLink[]
+  accounts: PayeeAccounts
 ): MoonMiningTaxRow[] {
-  const accounts = PayeeAccounts.build({
-    assignments: entries.flatMap((row) => row.assignments),
-    payees,
-    links,
-  });
   return entries.map((row) => {
     const assignments = row.assignments.map((a) => accounts.view(a));
     return assignments.every((a, i) => a === row.assignments[i]) ? row : { ...row, assignments };

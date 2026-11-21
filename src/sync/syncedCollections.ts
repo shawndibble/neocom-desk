@@ -149,6 +149,18 @@ export interface EditableCollection<
    */
   tombstoneSegment: string;
   /**
+   * A collection newer than the deployed rules may be: a pull or push the rules refuse
+   * (`permission-denied`) reads as "not ready yet", never as a sync error. Its rows stay in
+   * Dexie and the next pass tries again.
+   */
+  rulesMayLag?: true;
+  /**
+   * The day a row's change reaches back to, for the device's closed-through checkpoints of the
+   * Payees' accounts (`dropPayeeCheckpointsFrom`): a pulled row dated on or before one drops it.
+   * `null` drops them all.
+   */
+  closesHistory?(record: L): string | null;
+  /**
    * What removing a Character (features/character/removeCharacter.ts) does
    * to this table's local rows. A change of owner (planSync's
    * handleOwnerHashChange) always wipes every editable collection.
@@ -618,6 +630,7 @@ export const PAYEES = defineEditableCollection<PayeeRecord, RemotePayeeDoc>({
   remoteName: 'payees',
   table: 'payees',
   tombstoneSegment: 'payeeTombstones',
+  closesHistory: () => null,
   onRemoval: 'delete',
   faqItem: 'miningTax',
   toRemoteDoc: (p, ownerHash) => ({
@@ -686,6 +699,7 @@ export const MINING_TAX_ASSIGNMENTS = defineEditableCollection<
   remoteName: 'miningTaxAssignments',
   table: 'miningTaxAssignments',
   tombstoneSegment: 'miningTaxAssignmentTombstones',
+  closesHistory: (a) => a.date,
   onRemoval: 'delete',
   faqItem: 'miningTax',
   toRemoteDoc: (a, ownerHash) => ({
@@ -745,6 +759,8 @@ export const MINING_TAX_PAYMENT_LINKS = defineEditableCollection<
   remoteName: 'miningTaxPaymentLinks',
   table: 'miningTaxPaymentLinks',
   tombstoneSegment: 'miningTaxPaymentLinkTombstones',
+  rulesMayLag: true,
+  closesHistory: (l) => l.paidOn,
   onRemoval: 'delete',
   faqItem: 'miningTax',
   toRemoteDoc: (l, ownerHash) => ({
@@ -756,6 +772,8 @@ export const MINING_TAX_PAYMENT_LINKS = defineEditableCollection<
     amount: l.amount,
     paidOn: l.paidOn,
     source: l.source,
+    ...(l.refs !== undefined ? { refs: l.refs } : {}),
+    ...(l.unlinked ? { unlinked: true } : {}),
     updatedAt: l.updatedAt,
     ownerHash,
     deleted: false,
@@ -769,6 +787,8 @@ export const MINING_TAX_PAYMENT_LINKS = defineEditableCollection<
     amount: r.amount,
     paidOn: r.paidOn,
     source: r.source,
+    ...(r.refs !== undefined ? { refs: r.refs } : {}),
+    ...(r.unlinked ? { unlinked: true as const } : {}),
     updatedAt: r.updatedAt,
   }),
 });

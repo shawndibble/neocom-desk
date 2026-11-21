@@ -13,6 +13,8 @@ export interface PayeeBalance {
   payee: PayeeRecord;
   /** What its account owes now (a Corp Tax Book's: what its rows still owe). 0 for a settled Payee. */
   owed: number;
+  /** What its Running account holds beyond what it bills (a Corp Tax Book's: its Miners'). */
+  credit: number;
   /** The Outstanding Assignments behind `owed`, in view. */
   members: GroupMember[];
   /** A personal Payee's Running account; absent for a Corp Tax Book's and one nothing bills. */
@@ -27,7 +29,7 @@ export interface UnassignedSummary {
 
 /**
  * One balance per known Payee, owed-first then by name, settled Payees included (owed 0) so the
- * strip can offer to show them. A personal Payee owes what its Running account owes, oldest day
+ * strip can offer to show them. Credit is the Payee's Running account's, for every Payee. A personal Payee owes what its Running account owes, oldest day
  * first; a Corp Tax Book's owes what its rows still owe (the book's account already paid them).
  * A Payee with nothing Outstanding in view owes nothing here. An Assignment whose Payee is no
  * longer known is skipped rather than invented: the table still shows it as "Unknown Payee".
@@ -37,12 +39,14 @@ export function computePayeeBalances(
   payees: readonly PayeeRecord[],
   accounts: PayeeAccounts,
   /** Payee ids that are another record of the same Payee (`payeeDuplicateAliases`): summed into it. */
-  aliases: ReadonlyMap<string, string> = new Map()
+  aliases: ReadonlyMap<string, string> = new Map(),
+  /** A Corp Tax Book Payee's credit, by its id: its Miners' accounts' (`BookSummary.credit`). */
+  bookCredits: ReadonlyMap<string, number> = new Map()
 ): PayeeBalance[] {
   const byPayee = new Map<string, PayeeBalance>(
     payees
       .filter((payee) => !aliases.has(payee.id))
-      .map((payee) => [payee.id, { payee, owed: 0, members: [] }])
+      .map((payee) => [payee.id, { payee, owed: 0, credit: 0, members: [] }])
   );
   for (const dr of rows) {
     for (const member of allMembers(dr)) {
@@ -54,15 +58,17 @@ export function computePayeeBalances(
     }
   }
   for (const balance of byPayee.values()) {
-    if (balance.members.length === 0) continue;
     if (isCorpPayeeId(balance.payee.id)) {
+      balance.credit = bookCredits.get(balance.payee.id) ?? 0;
       balance.owed = balance.members.reduce((sum, m) => sum + m.assignment.taxOwed, 0);
       continue;
     }
     const account = accounts.of(balance.payee.id);
     if (!account) continue;
+    // Credit is the account's whatever is in view; what is owed follows the Character filter.
     balance.account = account;
-    balance.owed = account.owes?.amount ?? 0;
+    balance.credit = account.credit;
+    if (balance.members.length > 0) balance.owed = account.owes?.amount ?? 0;
   }
   return [...byPayee.values()].sort(
     (a, b) => b.owed - a.owed || a.payee.name.localeCompare(b.payee.name)

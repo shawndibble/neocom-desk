@@ -8718,6 +8718,8 @@
       "waitingDays_one": "owed {{count}} day",
       "waitingDays_other": "owed {{count}} days",
       "linkPayment": "Link payment",
+      "creditLabel": "credit",
+      "creditHint": "Paid ahead: the next days billed are paid from this",
       "unassignedHint_one": "{{count}} entry has no Payee yet",
       "unassignedHint_other": "{{count}} entries have no Payee yet",
       "acrossPayees_one": "across {{count}} payee",
@@ -8778,7 +8780,8 @@
       "autoLinked": "auto-linked",
       "unlinkNamed": "Unlink transaction #{{id}}",
       "notCached": "Transaction #{{id}} · no longer in your saved wallet journal",
-      "recorded": "Recorded in Settle up on {{date}}, not seen in your wallet yet"
+      "recorded": "Recorded in Settle up on {{date}}, not seen in your wallet yet",
+      "legacy": "Paid on {{date}}, recorded by an older version of the app"
     },
     "suggestedPayeeHint": "Last used in {{system}}.",
     "assignToAction": "Assign to {{payee}} · {{amount}} ISK",
@@ -8877,7 +8880,8 @@
       "emptyTitle": "Nothing on this ledger yet",
       "emptyHint": "A day shows here once it is billed.",
       "filteredTitle": "No entries match these filters",
-      "openFor": "Open the ledger of {{payee}}"
+      "openFor": "Open the ledger of {{payee}}",
+      "balanceCredit": "{{amount}} credit"
     }
   },
   "assets": {

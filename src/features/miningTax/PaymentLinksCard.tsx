@@ -45,15 +45,18 @@ export function PaymentLinksCard({ paidBy, onUnlink, busy }: PaymentLinksCardPro
       {paidBy.length > 0 ? (
         <ul className="space-y-0.5 text-xs">
           {paidBy.map(({ key, link, amount, label }) => {
+            const unseen = link.kind === 'recorded' || link.kind === 'legacy';
             const named =
               link.kind === 'recorded'
                 ? t('miningTax.payment.recorded', { date: link.paidOn })
-                : (label ?? t('miningTax.payment.notCached', { id: link.refId }));
+                : link.kind === 'legacy'
+                  ? t('miningTax.payment.legacy', { date: link.paidOn })
+                  : (label ?? t('miningTax.payment.notCached', { id: link.refId }));
             return (
               <li key={key} className="flex items-center gap-2">
                 <span className="shrink-0 tabular-nums">{formatIsk(amount, 0)} ISK</span>
                 <span className="min-w-0 flex-1 truncate">
-                  {link.kind === 'recorded' || label === null ? (
+                  {unseen || label === null ? (
                     <span className="text-text-dim">{named}</span>
                   ) : (
                     <Link

@@ -75,7 +75,7 @@ export function LinkPaymentDialog({
     const record = payee.members[0];
     if (!record) return;
     const result = await run(() =>
-      linkPayment(linkFor(payment, payee.id, 'manual', Math.round(amount)), record.characterId)
+      linkPayment(linkFor(payment, payee.id, 'manual', Math.round(amount)), payment.characterId)
     );
     if (!result.ok) return;
     setLinked(true);
