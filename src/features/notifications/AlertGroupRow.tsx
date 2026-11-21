@@ -45,6 +45,7 @@ const TOPIC_GLYPH: Record<AlertTopic, typeof Icon.NavAlerts> = {
   industry: Icon.NavIndustry,
   skills: Icon.NavSkills,
   mail: Icon.NavMail,
+  calendar: Icon.NavCalendar,
   other: Icon.NavAlerts,
 };
 
