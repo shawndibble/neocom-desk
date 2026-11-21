@@ -2,7 +2,7 @@
  * What one Corp assets location row holds, nested the way the in-game hangar
  * shows it: containers (and ships) open to their contents, loose stacks list
  * beside them. The by-location view's row click unfolds it under the row; a
- * container opens in place, a loose stack opens Show info.
+ * container opens in place, a loose stack's name opens Show info.
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,8 +10,8 @@ import { Caret } from '@/components/ui';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import type { AssetNameMap } from '@/engine/assetNames';
 import type { LedgerContentsNode } from '@/engine/corp/assetLedger';
+import { ItemInfoLink } from '@/features/entities';
 import { cx } from '@/lib/cx';
-import { openItemInfo } from '@/stores/itemInfoModal';
 import { formatCount } from '@/lib/formatCount';
 import { formatIsk } from '@/lib/isk';
 import type { LedgerLabels } from './assetLedgerView';
@@ -23,17 +23,27 @@ function NodeName({
   node,
   labels,
   assetNames,
+  infoLink = false,
 }: {
   node: LedgerContentsNode;
   labels: LedgerLabels;
   assetNames: AssetNameMap;
+  /** A loose stack's name opens its Show info (§6c: the row has no action of its own). */
+  infoLink?: boolean;
 }) {
   const typeName = labels.typeName(node.typeId);
   const gameName = assetNames[node.itemId];
   const quantity = node.stack?.quantity ?? 1;
+  const name = gameName ?? typeName;
   return (
     <span className="min-w-0 truncate">
-      {gameName ?? typeName}
+      {infoLink ? (
+        <ItemInfoLink typeId={node.typeId} itemName={typeName}>
+          {name}
+        </ItemInfoLink>
+      ) : (
+        name
+      )}
       {gameName !== undefined && <span className="text-text-dim"> · {typeName}</span>}
       {quantity > 1 && (
         <span className="text-text-dim tabular-nums"> ×{formatCount(quantity)}</span>
@@ -73,17 +83,10 @@ function ContentsNode({
 
   if (!isContainer) {
     return (
-      <li>
-        <button
-          type="button"
-          onClick={() => openItemInfo(node.typeId, labels.typeName(node.typeId))}
-          className={cx(rowClass, rowInteractiveClassName, focusRingInsetClassName)}
-          style={indent}
-        >
-          <span className="w-4 shrink-0" aria-hidden="true" />
-          <NodeName node={node} labels={labels} assetNames={assetNames} />
-          {value}
-        </button>
+      <li className={rowClass} style={indent}>
+        <span className="w-4 shrink-0" aria-hidden="true" />
+        <NodeName node={node} labels={labels} assetNames={assetNames} infoLink />
+        {value}
       </li>
     );
   }

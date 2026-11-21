@@ -6,7 +6,7 @@
  */
 import { useMemo, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
   ColumnPickerMenu,
   DataTable,
@@ -63,7 +63,6 @@ export function CorpAssetLocationTable({
   emptyState: ReactNode;
 }) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const columnVisibility = useColumnVisibility(
     useVisibleCorpAssetLocationColumns,
     CORP_ASSET_LOCATION_COLUMN_IDS
@@ -148,9 +147,10 @@ export function CorpAssetLocationTable({
     return (
       <RowActionsMenu
         name={row.label}
-        openHref={href}
         items={
-          <MenuItem onSelect={() => void navigate(href)}>{t('corp.assets.showByItem')}</MenuItem>
+          <MenuItem asChild>
+            <Link to={href}>{t('corp.assets.showByItem')}</Link>
+          </MenuItem>
         }
       >
         {tr}

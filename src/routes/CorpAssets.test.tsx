@@ -19,7 +19,6 @@ import * as stockTargets from '@/features/corp/stockTargets';
 import { db } from '@/db';
 import { CorpAssets } from './CorpAssets';
 import { LocationProbe } from '@/test/LocationProbe';
-import { useItemInfoModalStore } from '@/stores/itemInfoModal';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
 vi.mock('@/features/corp/boardData', async (importOriginal) => ({
@@ -257,6 +256,7 @@ beforeEach(() => {
       [587, 'Rifter'],
       [691, 'Rifter Blueprint'],
       [27, 'Office'],
+      [3465, 'Large Secure Container'],
     ]),
     locations: new Map([
       [OFFICE, 'Jita IV - Moon 4'],
@@ -504,8 +504,7 @@ describe('group by location', () => {
     expect(screen.queryByText('Pyerite')).not.toBeInTheDocument();
   });
 
-  it('unfolds a clicked division into its containers, and a loose stack opens Show info', async () => {
-    useItemInfoModalStore.getState().clear();
+  it("unfolds a clicked division into its containers, and a loose stack's name opens Show info", async () => {
     const user = userEvent.setup();
     mocked.loadCorporationAssets.mockResolvedValue(
       cached([
@@ -519,25 +518,37 @@ describe('group by location', () => {
           is_singleton: true,
         }),
         asset({
-          item_id: 7,
-          type_id: 35,
-          quantity: 40,
+          item_id: 8,
+          type_id: 3465,
           location_id: 6,
           location_type: 'item',
           location_flag: 'Cargo',
+          is_singleton: true,
+        }),
+        asset({
+          item_id: 7,
+          type_id: 35,
+          quantity: 40,
+          location_id: 8,
+          location_type: 'item',
+          location_flag: 'Unlocked',
         }),
       ])
     );
     await ledger('/corp/assets?group=location');
     await user.click((await screen.findAllByText('Ships'))[0]);
-    const container = await screen.findByRole('button', { name: /Rifter/, expanded: false });
+    // Each level opens on its own click: ship, then the container in its cargo.
+    const ship = await screen.findByRole('button', { name: /Rifter/, expanded: false });
+    await user.click(ship);
+    expect(ship).toHaveAttribute('aria-expanded', 'true');
+    const box = screen.getByRole('button', { name: /Large Secure Container/, expanded: false });
     expect(screen.queryByText('×40')).not.toBeInTheDocument();
-    await user.click(container);
-    expect(container).toHaveAttribute('aria-expanded', 'true');
-    await user.click(screen.getByRole('button', { name: /×40/ }));
-    expect(useItemInfoModalStore.getState().request).toMatchObject({ typeId: 35 });
+    await user.click(box);
+    expect(box).toHaveAttribute('aria-expanded', 'true');
     // The row click only unfolds: the by-item view is the row menu's.
     expect(currentLocation()).toBe('/corp/assets?group=location');
+    await user.click(screen.getByRole('link', { name: 'Pyerite' }));
+    await waitFor(() => expect(currentLocation()).toContain('info=type-35'));
   });
 
   it('lists only the divisions in use, with a count, and folds an empty office', async () => {
