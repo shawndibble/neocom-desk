@@ -42,6 +42,7 @@ import { planNeedsReviewResolution } from './assignments';
 import type { PayeeAccounts } from './payeeAccounts';
 import { loadPayeeAccounts } from './paymentLinkStore';
 import type { MiningLedgerEntry, QuantityDiff } from '@/engine/miningTax/types';
+import { putAssignments } from './storedAssignments';
 
 function sameDiffs(a: readonly QuantityDiff[] | undefined, b: readonly QuantityDiff[]): boolean {
   if (!a || a.length !== b.length) return false;
@@ -132,7 +133,7 @@ export async function reconcileAssignments(
   }
 
   if (updates.length > 0) {
-    await db.miningTaxAssignments.bulkPut(updates);
+    await putAssignments(updates);
     scheduleSync(characterId, { collections: ['miningTaxAssignments'] });
   }
 }

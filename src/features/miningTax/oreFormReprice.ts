@@ -15,6 +15,7 @@ import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { loadPayees } from './payees';
 import { hubForPayee, loadUnitPricesOnDate } from './pricing';
 import { readCompressedOre, withOreFormMarker } from './oreForm';
+import { putAssignments } from './storedAssignments';
 
 export async function repriceForOreForm(characterId: number): Promise<void> {
   const compressed = await readCompressedOre();
@@ -63,9 +64,9 @@ export async function repriceForOreForm(characterId: number): Promise<void> {
       const live = await db.miningTaxAssignments.get(assignment.id);
       if (!live || live.status !== 'outstanding' || live.updatedAt !== assignment.updatedAt)
         continue;
-      await db.miningTaxAssignments.put(
-        withOreFormMarker({ ...live, estimatedValue, taxOwed, updatedAt: Date.now() }, compressed)
-      );
+      await putAssignments([
+        withOreFormMarker({ ...live, estimatedValue, taxOwed, updatedAt: Date.now() }, compressed),
+      ]);
       wrote = true;
     }
   });

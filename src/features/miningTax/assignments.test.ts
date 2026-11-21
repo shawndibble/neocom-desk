@@ -16,6 +16,8 @@ import {
   updateCombinedAssignments,
 } from './assignments';
 import { useMiningTaxCompressedOre } from './oreForm';
+import { readLegacyPaidMarks } from './paymentLinkStore';
+import { putAssignments } from './storedAssignments';
 import { readTombstones, tombstoneKey } from '@/sync/localBookkeeping';
 import { MINING_TAX_ASSIGNMENTS } from '@/sync/syncedCollections';
 
@@ -36,6 +38,7 @@ beforeEach(async () => {
   useMiningTaxCompressedOre.setState({ value: true, hydrated: true });
   vi.clearAllMocks();
   await db.miningTaxAssignments.clear();
+  await db.miningTaxPaymentLinks.clear();
   await db.payees.clear();
   await db.settings.clear();
   pricingMock.loadUnitPricesOnDate.mockResolvedValue({
@@ -1479,5 +1482,42 @@ describe('override (a Default System made it, and nobody has changed it)', () =>
     await db.miningTaxAssignments.put(row);
     const next = await releaseOreFromAssignment(row, [{ typeId: TYPE_B, quantity: 50 }], priced);
     expect(next && 'override' in next).toBe(false);
+  });
+});
+
+describe('a view never reaches a write (B1)', () => {
+  const record = (over: Partial<MiningTaxAssignmentRecord> = {}): MiningTaxAssignmentRecord => ({
+    id: 'a1',
+    characterId: 7,
+    date: '2026-10-01',
+    solarSystemId: 30000142,
+    payeeId: 'p1',
+    oreLines: [{ typeId: 45490, quantity: 100 }],
+    taxPct: 10,
+    estimatedValue: 1_000_000,
+    taxOwed: 100_000,
+    status: 'outstanding',
+    updatedAt: 0,
+    ...over,
+  });
+
+  it('editing, uncombining or splitting a day its link paid writes no mark, so no link is read from it', async () => {
+    await putAssignments([record({ groupId: 'g' })]);
+    // The row on screen: paid by a link, so its view says Paid.
+    const view = { ...record({ groupId: 'g' }), status: 'paid' as const };
+    await updateCombinedAssignments([view], { payeeId: 'p1', taxPct: 12, members: {} });
+    await uncombineAssignments([{ ...view, taxPct: 12 }]);
+    const prices = { kept: new Map([[45490, 10_000]]), moved: new Map([[45490, 10_000]]) };
+    await splitAssignment(
+      { ...view, taxPct: 12 },
+      { moves: [{ typeId: 45490, quantity: 40 }], payeeId: 'p2', taxPct: 5 },
+      prices
+    );
+    expect((await db.miningTaxAssignments.toArray()).map((a) => a.status)).toEqual([
+      'outstanding',
+      'outstanding',
+    ]);
+    await readLegacyPaidMarks();
+    expect(await db.miningTaxPaymentLinks.count()).toBe(0);
   });
 });

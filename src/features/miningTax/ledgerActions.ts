@@ -46,6 +46,7 @@ import type { GroupMember } from './groupRows';
 import { removePayeeRecord } from './payees';
 import { loadPayeeAccounts, removePaymentLinks, savePaymentLink } from './paymentLinkStore';
 import type { SessionContinuation } from './sessionContinuation';
+import { putAssignments } from './storedAssignments';
 
 export type {
   AssignInput,
@@ -257,7 +258,7 @@ export async function acceptNewTotal(members: readonly GroupMember[]): Promise<L
     return failure(cause);
   }
   return commit(charactersOf(resolved), async () => {
-    if (resolved.length > 0) await db.miningTaxAssignments.bulkPut(resolved);
+    await putAssignments(resolved);
   });
 }
 
