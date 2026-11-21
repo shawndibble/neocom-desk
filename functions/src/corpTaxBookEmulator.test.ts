@@ -2343,7 +2343,7 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         await reason(
           edit(ACCOUNTANT, { action: 'reverseAdjustment', adjustmentId: id, reason: 'x' }, true)
         )
-      ).toBe('billed-on-statement');
+      ).toBe('billed-on-notice');
       await book().collection('lateNotices').doc('n9').delete();
       await book()
         .collection('statements')
@@ -2358,7 +2358,7 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         await reason(
           edit(ACCOUNTANT, { action: 'reverseAdjustment', adjustmentId: id, reason: 'x' }, true)
         )
-      ).toBe('billed-on-statement');
+      ).toBe('billed-on-notice');
       expect((await adjustment(id))?.reversed).toBeUndefined();
     });
 

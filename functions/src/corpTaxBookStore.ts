@@ -512,7 +512,7 @@ async function deleteBilledByPointers(deps: BookDeps, corporationId: number): Pr
 
 /**
  * The player who turned the book on (or the CEO) deletes it outright: the book,
- * everything under it, its Statement verify links and billed-by pointers. The
+ * everything under it, its Late notice verify links and billed-by pointers. The
  * corporation's SRP data under the same `corps/{id}` document stays. `beforeDelete` lets the
  * caller drop what lives outside the book first (the scheduled-sync grant), so a
  * failure there leaves the book standing. Turning the book on again starts clean.
@@ -1138,8 +1138,8 @@ async function assertAdjustmentReversible(
   if (billed)
     fail(
       'failed-precondition',
-      'A Statement already billed this correction: add an opposite correction instead',
-      'billed-on-statement'
+      'A Late notice already listed this correction: add an opposite correction instead',
+      'billed-on-notice'
     );
 }
 
@@ -1723,6 +1723,12 @@ async function storableSettledThrough(
 }
 
 /**
+ * A rate refused on a day a Late notice listed. Sent under its old name, which every client
+ * matches, until the soak ends (docs/deploy/late-notices.md): then `'day-on-notice'`.
+ */
+const DAY_ON_NOTICE = 'day-on-statement';
+
+/**
  * A new rate may start up to 30 days back but never on or before the last day a Late notice
  * listed: what it asked never changes. Notices are read only when a rate is backdated.
  */
@@ -1735,7 +1741,7 @@ async function checkRateStarts(c: EditCtx, newRates: readonly { effectiveFrom: s
     if (why === 'too-old')
       fail('failed-precondition', 'A rate cannot start more than 30 days back', 'rate-too-old');
     if (why === 'on-statement')
-      fail('failed-precondition', 'That day is already on a Statement', 'day-on-statement');
+      fail('failed-precondition', 'A Late notice already listed that day', DAY_ON_NOTICE);
   }
 }
 
@@ -1773,7 +1779,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const { characterId, date } = parseRecordKey(action.recordKey);
       const onChar = await readNotices(tx, bookOf(c), ofCharacterFilter(characterId));
       if (noticedDates(onChar, characterId).has(date)) {
-        fail('failed-precondition', 'That day is already on a Statement', 'day-on-statement');
+        fail('failed-precondition', 'A Late notice already listed that day', DAY_ON_NOTICE);
       }
       const rate: StoredRate = { scope: 'record', recordKey: action.recordKey, pct: action.pct };
       staleCheckpoints(c, 'all', date);
@@ -1839,7 +1845,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         update.taxContact = taxContact === null ? FieldValue.delete() : taxContact;
       }
       if (showToMembers) update.membersSeeFrom = now;
-      // Once, and never back: Statements issued before it keep their own rules.
+      // Once, and never back: an older tab still sends it; every book is a Running account.
       if (switchToRunningAccount && typeof c.book.runningAccountFrom !== 'string') {
         update.runningAccountFrom = iso;
       }
@@ -2066,8 +2072,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       };
     }
     case 'dismissRecords': {
-      // A day an active dismissal already covers is skipped, not dismissed twice. Days already on a
-      // Statement are dismissed as the single `dismiss` does (the Statement is not touched).
+      // A day an active dismissal already covers is skipped, not dismissed twice. Days a Late notice
+      // listed are dismissed as the single `dismiss` does (the notice is not touched).
       const wanted = new Map<string, number>();
       for (const t of action.targets) {
         wanted.set(t.targetId, (wanted.get(t.targetId) ?? 0) + t.amountIsk);
@@ -2568,8 +2574,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     }
     case 'dismissDispute': {
       // Only the disputed ore is waived, as a credit on the day (#6206): the rest of the day
-      // stays billed. The server prices it from the Statements that billed it, so a client cannot
-      // understate it to slip under the Director limit. A day on no Statement yet has no price
+      // stays billed. The server prices it from the Late notices that listed it, so a client cannot
+      // understate it to slip under the Director limit. A day on no notice yet has no price
       // here: the client's figure stands only for a Director, or a book with no limit.
       const ref = col(c, DISPUTES).doc(action.disputeId);
       const dispute = await mustGet(c, ref, 'Dispute');
@@ -2815,7 +2821,10 @@ async function applyPopSharingEdit(
   return { detail };
 }
 
-/** Stores an issued Statement and its verify link; returns the link's token. Reads nothing: callers check first. */
+/**
+ * Stores a notice an older tab issued as a Statement (`issueStatement`): its legacy doc, its Late
+ * notice and its verify link; returns the link's token. Reads nothing: callers check first.
+ */
 async function issueStatementDoc(
   c: EditCtx,
   statement: StoredStatement,
@@ -2856,8 +2865,8 @@ function refuseCalendarStatement(statement: { kind?: string }): void {
 }
 
 /**
- * Guest close-account (epic #4055, #4184): a final Statement, then the Miner
- * is closed so Statement mail stops. Credit is refunded unless the guest
+ * Guest close-account (epic #4055, #4184): a final Late notice, then the Miner
+ * is closed so its mail stops. Credit is refunded unless the guest
  * consented or 90 days passed without a reply; a forfeit re-checks the role
  * live (`needsLiveCheck`). Members are not closed: a leaver's debt has its own
  * write-off.
@@ -3336,7 +3345,7 @@ export async function listPendingGroupings(deps: BookDeps, caller: Caller) {
  * A player privately claims an Unmatched donation of their own (D5): the
  * callable has no officer role, only the caller's uid, which must be the
  * donor's. The ISK then credits the Miner the caller's character belongs to
- * (its confirmed grouping, or a Miner of its own), oldest Statement first.
+ * (its confirmed grouping, or a Miner of its own), its oldest unpaid day first.
  * Audited like every write; the audit entry names the donor character and
  * that the player did it, never anything else.
  */

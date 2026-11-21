@@ -5,7 +5,7 @@
 //
 // Firestore layout (rules in firestore.rules; every write is a callable):
 //   corps/{corporationId}                settings: start date, hub, Ore Form, rates, grace,
-//                                               minimum Statement, divisions, lastSync
+//                                               notice rules, divisions, lastSync
 //     officers/{uid}                            officer access record (24h) written by verifyOfficer
 //     observed/{char_type_date_structure}       Observed Mining Entry rows, upserted monotonically
 //     extractions/{structure_start}             Extractions, kept after ESI stops listing them
@@ -16,7 +16,7 @@
 //     statements/{id}  statementLinks/{id}      the legacy mirror of every Late notice, for older tabs
 //     accountCheckpoints/{minerId}              a Running account's closed-through checkpoint
 //     miners/{minerId}                          Miner groupings
-//     meta/paid                                 paidStatementIds, only ever grown (D22)
+//     meta/paid                                 each Miner's paid-through day, only ever grown (D22)
 //     meta/uncounted                            donations into divisions the book does not read (#6207)
 //     audit/{at~rand}                           immutable audit log
 //   corpTaxBookTokens/{token}                   verify-link tokens; no client access at all

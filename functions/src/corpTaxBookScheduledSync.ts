@@ -1,13 +1,13 @@
 // One scheduled sync of one corporation's Corp Tax Book (issue #4068, ADR 0025):
 // the server-side twin of the officer visit in src/features/corp/taxBook/
 // syncCorpTaxBook.ts. It reads what ESI holds with the grant holder's token,
-// uploads it monotonically, records the gaps, re-matches Unmatched donations
-// and settles the Statements the donations now cover — through the same
-// `syncBookAs` / `editBookAs` the callables use, so the audit log and
-// `lastSync` read as they do for a visit. The pure decisions are the mirror in
-// corpTaxBookSyncEngine.ts.
+// uploads it monotonically, records the gaps and re-matches Unmatched donations
+// (`rematchUnmatched`) — through the same `syncBookAs` / `editBookAs` the
+// callables use, so the audit log and `lastSync` read as they do for a visit.
+// Money pays a Miner's oldest unpaid day on its own, so nothing is settled here.
+// The pure decisions are the mirror in corpTaxBookSyncEngine.ts.
 //
-// What it must never do is issue a Statement or send mail; those stay officer
+// What it must never do is issue a Late notice or send mail; those stay officer
 // actions. That is enforced by what this file imports (no issuing helper) and by
 // `ScheduledAction`, the only edits it can ask for. It also does not group the
 // officer's own Characters (that needs the officer's device).

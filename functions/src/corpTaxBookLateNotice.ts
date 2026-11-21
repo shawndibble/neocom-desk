@@ -7,8 +7,9 @@
  * Shared by the client and the Cloud Functions (decision 20261117-230113): dependency-free, and
  * `src/engine/corpTaxBook/notice.ts` re-exports it.
  *
- * Notices are stored today as `corps/{id}/statements` docs with `kind: 'notice'`, in the shape of
- * the calendar Statement they replaced; `lateNoticeFromStatementDoc` reads one into a `LateNotice`.
+ * Notices are stored as `corps/{id}/lateNotices` docs in this shape. Each is mirrored to a legacy
+ * `statements` doc (`kind: 'notice'`, `legacyStatementDocOf`) for older tabs until the soak ends;
+ * `lateNoticeFromStatementDoc` reads one of those, or an older one, into a `LateNotice`.
  */
 import { isFiniteNumber, isRecord } from './guards.js';
 import { DAY_MS } from './timeConstants.js';
