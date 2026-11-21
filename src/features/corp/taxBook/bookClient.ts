@@ -8,6 +8,7 @@
  * Firestore here is the `lite` build (no listeners), so callers refetch after
  * a change.
  */
+import { LATE_NOTICES, LEGACY_NOTICES } from '@/engine/corpTaxBook/noticeCollections';
 import { LIVE_CHECK_ACTION_NAMES } from '../../../../functions/src/corpTaxBookKinds';
 import { parseBookSettings, type BookSettings } from '@/engine/corpTaxBook/bookDocs';
 import type { DivisionNames } from '@/engine/corpTaxBook/divisionNames';
@@ -725,16 +726,12 @@ export async function deleteBook(characterId: number, corporationId: number): Pr
   await callSignedIn(characterId, 'deleteCorpTaxBookCallable', { corporationId, accessToken });
 }
 
-/** Where the book keeps its late notices, and their verify links. */
-export const LATE_NOTICES = 'lateNotices';
+/** Where the book keeps its late notices (`noticeCollections.ts`), and their verify links. */
+export { LATE_NOTICES, LEGACY_NOTICES };
 const LATE_NOTICE_LINKS = 'lateNoticeLinks';
 /** The mail kind the legacy `recordMail` action takes for a late notice's first mail. */
 const LEGACY_NOTICE_MAIL_KIND = 'statement';
-/**
- * Where servers older than the `lateNotices` collection keep a late notice, and its verify link
- * (decision 20261120-235011, step 5): read until that mirror goes.
- */
-export const LEGACY_NOTICES = 'statements';
+/** Where servers older than the `lateNotices` collection keep a late notice's verify link. */
 const LEGACY_NOTICE_LINKS = 'statementLinks';
 
 /**
