@@ -221,7 +221,7 @@ describe('late notices on the view', () => {
       ...owing,
       notices: [notice],
       declarations: [
-        { id: 'x1', statementId: notice.id, kind: 'contract', at: '2026-09-15T00:00:00Z' },
+        { id: 'x1', noticeId: notice.id, kind: 'contract', at: '2026-09-15T00:00:00Z' },
       ],
     });
     expect(view.miners[0]).toMatchObject({ overdueDays: null, paused: true });

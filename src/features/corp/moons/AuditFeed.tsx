@@ -1,4 +1,5 @@
 import { Fragment, type ReactNode } from 'react';
+import { LEGACY_ISSUE_ACTION } from '../taxBook/bookClient';
 import { useTimeZone } from '@/lib/timeFormat';
 import type { TFunction } from 'i18next';
 import { Trans, useTranslation } from 'react-i18next';
@@ -80,7 +81,7 @@ export function AuditLine({
       <span className="font-semibold">{a.byName || t('corpTaxBook.moons.activity.system')}</span>{' '}
       {inSentence ? (
         <Trans
-          i18nKey={`corpTaxBook.moons.activity.actionsTo.${action}${a.action === 'issueStatement' && who.amount === undefined ? 'Plain' : ''}`}
+          i18nKey={`corpTaxBook.moons.activity.actionsTo.${action}${a.action === LEGACY_ISSUE_ACTION && who.amount === undefined ? 'Plain' : ''}`}
           values={{ name: who.name, amount: who.amount === undefined ? '' : isk(who.amount) }}
           components={{ name: minerLink ?? <Fragment /> }}
         />

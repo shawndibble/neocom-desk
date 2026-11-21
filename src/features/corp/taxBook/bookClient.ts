@@ -630,6 +630,12 @@ export type BookDeclaration = Declaration & {
   resolution?: NonNullable<Declaration['resolution']> & { by?: number };
 };
 
+/** A stored declaration with the notice it answers read off its legacy field (`NOTICE_ID_FIELD`). */
+export function bookDeclarationOf(raw: Record<string, unknown>): BookDeclaration {
+  const { [NOTICE_ID_FIELD]: legacy, ...rest } = raw;
+  return { ...rest, noticeId: (raw.noticeId ?? legacy) as string } as unknown as BookDeclaration;
+}
+
 /** An officer's "rebill from date" (D22), server-written. */
 export interface Rebill {
   id: string;
@@ -726,6 +732,8 @@ export async function deleteBook(characterId: number, corporationId: number): Pr
 /** Where the book keeps its late notices (`noticeCollections.ts`), and their verify links. */
 export { LATE_NOTICES, LEGACY_NOTICES };
 const LATE_NOTICE_LINKS = 'lateNoticeLinks';
+/** The action servers older than `issueLateNotice` take a late notice through (and audit it as). */
+export const LEGACY_ISSUE_ACTION = 'issueStatement';
 /** The mail kind the legacy `recordMail` action takes for a late notice's first mail. */
 const LEGACY_NOTICE_MAIL_KIND = 'statement';
 /** Where servers older than the `lateNotices` collection keep a late notice's verify link. */
@@ -831,7 +839,7 @@ export async function issueLateNotice(
   } catch (error) {
     if (!unknownAction(error)) throw error;
     await editBook(characterId, corporationId, {
-      action: 'issueStatement',
+      action: LEGACY_ISSUE_ACTION,
       statement: legacyStatementDocOf(notice),
     });
   }

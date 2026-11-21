@@ -20,7 +20,7 @@ import {
 } from '../../../functions/src/corpTaxBookLateNotice';
 import { isRecord } from '@/engine/guards';
 import type { NoticeRules } from './notices';
-import { utcDay, utcDaysBetween } from '@/engine/localDay';
+import { utcDay, utcDayOf, utcDaysBetween } from '@/engine/localDay';
 
 export interface NoticePlan {
   /** The notice to issue: the unpaid days no earlier notice listed, priced as they are billed. */
@@ -138,15 +138,12 @@ export function noticeDue(
   lastIssued: string | undefined,
   owed: number
 ): boolean {
-  if (
-    lastIssued !== undefined &&
-    utcDaysBetween(lastIssued.slice(0, 10), today) < rules.cooldownDays
-  )
+  if (lastIssued !== undefined && utcDaysBetween(utcDayOf(lastIssued), today) < rules.cooldownDays)
     return false;
   if (rules.earlyAt !== undefined && owed >= rules.earlyAt) return true;
   if (rules.after.kind === 'behind') return utcDaysBetween(oldest, today) >= rules.after.days;
   const anchor = lastAnchorDay(today, rules.after.day);
-  return oldest < anchor && (lastIssued === undefined || lastIssued.slice(0, 10) < anchor);
+  return oldest < anchor && (lastIssued === undefined || utcDayOf(lastIssued) < anchor);
 }
 
 /**

@@ -27,7 +27,6 @@ import { minusLines, priceMap } from '../miningTax/oreLines';
 import type { RecordedWriteOff, TaxPayment } from './payments';
 import {
   minerPaymentCode,
-  NOTICE_ID_FIELD,
   paymentCode,
   type LateNotice,
 } from '../../../functions/src/corpTaxBookLateNotice';
@@ -289,7 +288,7 @@ export function declarationFor(
   declarations: readonly Declaration[]
 ): MemberDeclaration | undefined {
   const latest = declarations
-    .filter((d) => d[NOTICE_ID_FIELD] === noticeId)
+    .filter((d) => d.noticeId === noticeId)
     .reduce<Declaration | undefined>((a, d) => (a === undefined || d.at > a.at ? d : a), undefined);
   if (!latest) return undefined;
   const shared = {

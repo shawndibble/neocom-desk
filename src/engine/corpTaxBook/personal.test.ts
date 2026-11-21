@@ -7,7 +7,7 @@ import {
   type PersonalBook,
   type PersonalEntry,
 } from './personal';
-import { NOTICE_ID_FIELD, type LateNotice } from '../../../functions/src/corpTaxBookLateNotice';
+import type { LateNotice } from '../../../functions/src/corpTaxBookLateNotice';
 import type { Declaration } from './overdue';
 import type { OreDispute } from './disputes';
 
@@ -2159,7 +2159,7 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
   describe("a Miner's own declaration and dispute (#6206)", () => {
     const declared = (over: Partial<Declaration> = {}): Declaration => ({
       id: 'x1',
-      [NOTICE_ID_FIELD]: 'n1',
+      noticeId: 'n1',
       kind: 'another-way',
       at: '2026-10-14T00:00:00.000Z',
       amount: 500_000,

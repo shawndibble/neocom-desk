@@ -20,6 +20,7 @@ import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import { readUncounted, type UncountedDonation } from '@/engine/corpTaxBook/uncounted';
 import type { MoonDoc } from '../../../../../functions/src/corpTaxBookMoonDocs';
 import {
+  bookDeclarationOf,
   bookFeederFrom,
   readCheckpoints,
   readNotices,
@@ -167,7 +168,9 @@ const SLICES = {
     payments: field<SettlePayment[]>(none, (c) => c.book.list('payments')),
     dismissals: field<Dismissal[]>(none, (c) => c.book.list('dismissals')),
     writeOffs: field<RecordedWriteOff[]>(none, (c) => c.book.list('writeOffs')),
-    declarations: field<BookDeclaration[]>(none, (c) => c.book.list('declarations')),
+    declarations: field<BookDeclaration[]>(none, async (c) =>
+      (await c.book.list<Record<string, unknown>>('declarations')).map(bookDeclarationOf)
+    ),
     adjustments: field<Adjustment[]>(none, (c) => c.book.list('adjustments')),
     // Best effort, like disputes: nothing is read until a write stamped it, and a denied read is none.
     toleranceExemptions: field<ToleranceExemption[]>(none, async (c) =>

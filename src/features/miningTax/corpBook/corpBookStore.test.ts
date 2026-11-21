@@ -226,7 +226,7 @@ describe('readMemberDeclaration (#6206)', () => {
       })
     ).toEqual({
       id: 'x1',
-      statementId: 's1',
+      noticeId: 's1',
       kind: 'another-way',
       at: '2026-11-01T00:00:00.000Z',
       amount: 5,

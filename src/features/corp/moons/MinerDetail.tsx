@@ -1,4 +1,5 @@
 import { formatCount } from '@/lib/formatCount';
+import { LEGACY_ISSUE_ACTION } from '../taxBook/bookClient';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
@@ -189,7 +190,7 @@ export function MinerDetail({ id }: { id: string }) {
       return (
         <>
           {noticeLink(n)}
-          {(e.action === 'issueLateNotice' || e.action === 'issueStatement') && (
+          {(e.action === 'issueLateNotice' || e.action === LEGACY_ISSUE_ACTION) && (
             <> · {isk(n.listed)}</>
           )}
         </>
