@@ -7894,7 +7894,7 @@
       },
       "facts": {
         "declarationRejected": "{{corp}} rejected what you said you paid: {{reason}}",
-        "overdue": "{{corp}}'s Statement for {{period}} is open and not paid.",
+        "overdue": "{{corp}}'s Late notice for {{period}} is not paid yet.",
         "rateUnrecorded": "{{corp}}'s book bills {{date}} at {{book}}%; your record has no rate for it.",
         "uncredited": "You sent <amount/>, but {{corp}}'s book has synced since and doesn't show it. Days you had paid are billed again.",
         "inReview": "{{corp}}'s book received <amount/> from you but isn't counting it yet. Nothing was owed when you paid, so an officer has to review it.",
@@ -7903,15 +7903,13 @@
         "rate": "{{corp}}'s book bills {{date}} at {{book}}%; you recorded {{yours}}%.",
         "quantity": "{{corp}}'s book recorded {{book}} units of ore on {{date}}; your record has {{yours}}.",
         "bills": "Its book bills <amount/>.",
-        "markedPaid": "You marked {{date}} paid, but {{corp}}'s Statement still shows {{owed}} ISK owed. Its book only counts payments it can see in its wallet.",
-        "markedPaidSpent": "You marked {{date}} paid. {{corp}}'s book has that payment, but it pays your oldest open days first and used it on {{days}}. So {{date}} still owes {{owed}} ISK.",
         "conflict": "You gave this ore to {{payee}}. {{corp}}'s book also recorded it, and bills it on {{date}} unless something changes first.",
         "anotherPayee": "another Payee",
         "kept": "{{corp}} kept the bill on {{date}}: {{reason}}",
         "nextStep": "What to do next: {{step}}"
       },
       "quiet": {
-        "statementLabel": "{{corp}} · Statement",
+        "noticeLabel": "{{corp}} · Late notice",
         "waiting_one": "Waiting on the corp: 1",
         "waiting_other": "Waiting on the corp: {{count}}",
         "notPaying_one": "Not paying: 1",
@@ -7924,12 +7922,11 @@
         "uncreditedLabel": "{{corp}} · donations not credited"
       },
       "title": {
-        "overdue": "{{corp}} Statement {{period}}",
+        "overdue": "{{corp}} Late notice {{period}}",
         "uncredited": "Donations not credited",
         "inReview": "Donations held for review",
         "figure": "{{date}}: the book's figure differs",
         "conflict": "{{date}} claimed twice",
-        "markedPaid": "{{date}}: marked paid, {{corp}} still bills it",
         "billed": "{{date}}: {{corp}} bills this day",
         "kept": "{{corp}} kept the bill"
       },
@@ -7978,8 +7975,7 @@
       "noteLabel": "Add a note (optional)",
       "hiddenNote": "Hidden days stay under Not paying on this tab, and come back with one click.",
       "sendsTo": "Goes to {{corp}}'s Needs you list, and as an EVE mail to whoever handles its tax questions. It leaves your list until they answer. Their answer shows up here.",
-      "noStatement": "Nothing is on a Statement yet: {{corp}}'s book credits your donation on its next sync. If it still hasn't when the Statement goes out, send the proof then.",
-      "noStatementSpent": "{{corp}}'s book already used your payment on {{days}}, so there is no Statement to send proof against yet. Pay what it still bills, or send the proof once this day is on a Statement.",
+      "noNotice": "No Late notice has asked for it yet: {{corp}}'s book credits your donation on its next sync. If it still hasn't when a Late notice goes out, send the proof then.",
       "countsHeld": "{{corp}}'s book already has them. They count as paid right away, and its audit log records that you said so.",
       "failed": "That didn't reach the book. Check your connection and try again.",
       "done": "Done",
@@ -8055,9 +8051,6 @@
     "taxPctLabel": "Tax %",
     "estimatedValueLabel": "Estimated value",
     "taxOwedLabel": "Tax owed",
-    "markPaidLabel": "I already paid this",
-    "markPaidAction": "Mark as paid",
-    "unmarkPaidAction": "Mark as unpaid",
     "detailTitle": "{{date}} — {{system}}",
     "dateEveHint": "EVE (UTC) date, as the in-game mining ledger reports it. The game gives no time of day, so it can't be shown as your local date.",
     "assignAction": "Assign",
@@ -8104,7 +8097,6 @@
     "joinLockedToExistingHint": "Combines with {{payee}}'s existing Assignment at {{pct}}% tax — the Payee and tax % come from it.",
     "joinConfirmAction": "Combine",
     "groupTotalValueLabel": "Combined estimated value: {{value}}",
-    "markGroupPaidAction": "Mark all as paid",
     "duplicateTitle": "Possible double-assigned mining days",
     "duplicateHint": "These days each have two identical Assignments, so the tax is counted twice. Pick a day to drop its extra Assignment — nothing is removed until you confirm.",
     "duplicateOpen": "Open {{entry}} to drop its duplicate Assignment",
@@ -8144,7 +8136,7 @@
       "payeeName": "{{corp}}",
       "grouping": {
         "title": "A corporation wants to group a character of yours",
-        "ask": "{{corp}} grouped {{name}} with {{main}} so one Statement and one payment cover them. Only you can agree, and you can say no.",
+        "ask": "{{corp}} grouped {{name}} with {{main}} so one account and one payment cover them. Only you can agree, and you can say no.",
         "confirm": "Confirm {{name}}",
         "decline": "No, remove it",
         "failed": "Couldn't save that. Try again."
@@ -8157,7 +8149,6 @@
         "unattributed": "Unattributed",
         "dismissed": "Dismissed by corp",
         "waived": "Waived",
-        "markedPaid": "Marked paid",
         "sent": "Sent",
         "oreWaived": "Tax waived",
         "notPaying": "Not paying"
@@ -8173,8 +8164,6 @@
         "dismissed": "{{corp}} dismissed this day: {{reason}}",
         "waived": "{{corp}} wrote this day off: {{reason}}",
         "paid": "Paid to {{corp}}.",
-        "markedPaid": "Marked paid by you — {{corp}} still shows {{owed}} ISK owed.",
-        "markedPaidSpent": "Marked paid by you. {{corp}} used that payment on {{days}} and still shows {{owed}} ISK owed.",
         "sent": "Sent to {{corp}} on {{sentOn}}. An officer answers it in the book; nothing more to do until they do.",
         "oreWaived": "{{corp}} waived the tax on that ore: {{flagReason}}",
         "notPaying": "You chose not to pay this. {{corp}} still bills it; bring it back under Not paying, above."
@@ -8194,7 +8183,7 @@
         "safeOnce": "Safe to pay once {{corp}} syncs (last synced {{ago}}).",
         "neverSynced": "Safe to pay once {{corp}} syncs (never synced).",
         "openDay": "{{date}}: safe to pay once it is closed, after {{time}} UTC on {{closeDate}} and {{corp}}'s next sync.",
-        "credit": "{{amount}} ISK credit with {{corp}} goes on your next Statement.",
+        "credit": "{{amount}} ISK credit with {{corp}} pays your next days.",
         "behind_one": "You owe {{corp}} {{amount}} ISK: {{count}} day, oldest {{date}}.",
         "behind_other": "You owe {{corp}} {{amount}} ISK: {{count}} days, oldest {{date}}.",
         "openingOwes": "Opening balance from the old system: you owe {{corp}} {{amount}} ISK.",
@@ -8244,19 +8233,14 @@
         "factBilling": "Billing",
         "factBillingNext": "On its date",
         "factSynced": "Synced",
-        "factStatement": "Statement",
-        "factStatementFinal": "Issued, final",
+        "factNotice": "Late notice",
+        "factNoticeSent": "Sent. A payment pays your oldest unpaid days first, this one among them.",
         "factSettledBy": "Settled by",
         "creditAppliedNote": "{{corp}} already held credit from an earlier payment of yours, and applied {{amount}} ISK of it to this day.",
-        "yourMarkNote": "The corporation confirms your mark against its wallet.",
-        "markedPaidNote": "Marked paid by you — {{corp}} still shows {{owed}} ISK owed. It confirms your mark against its wallet.",
-        "markedPaidSpentNote": "Marked paid by you. {{corp}} already has that payment, but it pays your oldest open days first and used it on {{days}}. So it still bills this day {{owed}} ISK. Resolve shows what you can do.",
         "settledBy": {
-          "yourMark": "Your mark",
           "donation": "Donation",
           "credit": "Corp credit",
-          "closed": "Closed by the corporation",
-          "statement": "Statement payment"
+          "closed": "Closed by the corporation"
         },
         "paidBy": {
           "title": "Paid by",
@@ -8269,9 +8253,7 @@
           "writtenOff": "Forgiven by an officer (not a payment)"
         },
         "factOriginal": "Originally billed",
-        "settled": {
-          "alsoMarked": "You also marked this day paid. Unmark it if that was a mistake."
-        },
+        "settled": {},
         "disputeHint": "Your own record differs from the corp's records.",
         "corrected": "Corrected by the corporation: {{before}} → {{after}}.",
         "reason": "Their reason: {{reasons}}",
@@ -8292,7 +8274,7 @@
         "ownerCollectedAsk": "If you already paid {{owner}}, Resolve it: it tells {{corp}} where the ore went.",
         "yourEntry": "Your entry: {{payee}} · {{amount}} ISK · {{status}}",
         "yourEntryUnknown": "Your entry: gives this ore to another Payee",
-        "entryPaid": "marked paid",
+        "entryPaid": "paid",
         "entryOwed": "owed",
         "bookEntry": "{{corp}}'s book: recorded it at {{place}}",
         "alsoContested": "Also in conflict on this day: {{list}}.",
@@ -8303,9 +8285,7 @@
         "cardBills": "On its date",
         "fixTitle": "To fix it",
         "bookRight": "If the book is right: take this ore off your entry.",
-        "bookRightPaid": "If the book is right: unmark your payment, then take this ore off your entry.",
         "booksRight": "If the books are right: take what each corporation recorded off your entry.",
-        "booksRightPaid": "If the books are right: unmark your payment, then take what each corporation recorded off your entry.",
         "letEachBill": "Let each corp bill its share",
         "entryRight": "If your entry is right: tell {{corp}}, and its officers correct the book or keep the bill and say what to do next.",
         "tell": "Tell {{corp}} it went to {{payee}}",
@@ -8340,10 +8320,8 @@
         "account": "Account: <strong>{{account}}</strong>",
         "masterWallet": "Master Wallet",
         "division": "Division {{division}}",
-        "codeOf": "{{character}} · {{period}} Statement code:",
-        "codeInReason": "The Reason is your {{period}} Statement's code.",
-        "codeOldest": "The Reason is the code of the payer's oldest open Statement ({{period}}).",
-        "oldestFirst": "A payment goes to your oldest open Statement first, unless its Reason holds another Statement's code.",
+        "codeOf": "{{character}} · code:",
+        "codeInReason": "The Reason is your own code: it tells the book the money is yours, and it pays your oldest unpaid days first.",
         "where": {
           "intro": "{{corp}}'s book pays your oldest days first. A payment can't pick a moon or a day, so this shows where yours lands.",
           "label": "Where it lands",
@@ -8362,13 +8340,11 @@
             "rate": "Rate dispute",
             "notPaying": "Not paying"
           }
-        },
-        "heldElsewhere_one": "Nothing was recorded. The entry of {{dates}} is already with another Payee, dismissed, or waiting for review in your ledger. Untick it, or sort it out on its row first.",
-        "heldElsewhere_other": "Nothing was recorded. {{count}} entries ({{dates}}) are already with another Payee, dismissed, or waiting for review in your ledger. Untick them, or sort them out on their rows first."
+        }
       },
       "attention": {
-        "overdueTitle": "{{corp}} Statement {{period}} overdue since {{date}}",
-        "overdueDetail": "Code {{code}}. A payment goes to your oldest open Statement first.",
+        "overdueTitle": "{{corp}} Late notice {{period}}, sent {{date}}, not paid yet",
+        "overdueDetail": "Code {{code}}. A payment pays your oldest unpaid days first.",
         "uncreditedTitle": "{{corp}} hasn't credited your {{amount}} ISK donation of {{date}} — check the wallet division",
         "uncreditedDetail": "{{corp}} has updated since and still doesn't show it, so it no longer counts as paid here. Its book reads donations from these wallet divisions: {{accounts}}.",
         "uncreditedEveryTitle": "{{corp}} hasn't credited your {{amount}} ISK donation of {{date}}",
@@ -8429,9 +8405,6 @@
     "settleUpSelectedAction": "Settle up {{count}}",
     "settleUpTitle": "Settle up — {{payee}}",
     "settleUpSeveralPayees": "{{count}} payees",
-    "settleUpIncludeLabel": "Include {{date}}",
-    "settleUpUntickHint": "Untick an entry to hold it back.",
-    "settleUpJustMarkPaid": "Mark paid only",
     "settleUpReasonPrefix": "Moon tax",
     "settleUpCopy": "Copy",
     "settleUpCopied": "Copied",
@@ -8462,32 +8435,23 @@
     "unlinkedPaymentsHint": "ISK you sent that nothing here accounts for.",
     "linkPaymentAction": "Review",
     "linkPaymentTitle": "Link a payment you already made",
-    "linkPaymentHint": "Donations and contracts from your wallet that no entry records yet. Pick one to see what it most likely paid off.",
+    "linkPaymentHint": "Donations and contracts from your wallet that no Payee has yet, with who each was most likely for. Linking one pays that Payee’s oldest unpaid days.",
     "linkPaymentInKind": "Paid in kind",
     "linkPaymentUntitledContract": "Item exchange",
     "linkConfidence": {
-      "identity-and-amount": "Matches {{payee}} — recipient and amount",
-      "identity": "Matches {{payee}} — recipient",
-      "name-and-amount": "Amount matches, and the name looks like {{payee}}",
-      "name": "Name looks like {{payee}} — check this is right",
-      "amount": "Amount matches {{payee}}"
+      "entity": "Sent to {{payee}}",
+      "name": "The recipient’s name looks like {{payee}}: check this is right",
+      "amount": "The amount matches what {{payee}} is owed"
     },
-    "linkPaymentCoversLabel": "What it covered — {{payee}}",
-    "linkPaymentIncludeLabel": "Include {{date}}",
-    "linkPaymentIncluded": "{{count}} entries · {{range}}",
     "linkPaymentAmountLabel": "Value handed over",
     "linkPaymentInKindHint": "A contract's cargo isn't priced here. Enter what you think it was worth. It starts at the ticked entries' total.",
-    "linkPaymentOverpaid": "{{amount}} more than the ticked entries owe — tick more, or leave it as an overpayment.",
-    "linkPaymentShort": "{{amount}} short of the ticked entries — untick one, or the rest stays outstanding.",
-    "linkPaymentConfirmAction": "Mark {{count}} paid",
+    "linkPaymentConfirmAction": "Link to {{payee}}",
     "paidAtLabel": "Paid on",
-    "paymentCardTitle": "Payment",
-    "noLinkedTransactions": "No wallet transaction linked yet.",
-    "linkTransactionAction": "Link transaction",
+    "paymentCardTitle": "Paid by",
+    "noLinkedTransactions": "No linked payment reached this day.",
     "unlinkTransactionAction": "Unlink",
     "linkTransactionTitle": "Link a wallet transaction",
     "linkTransactionHint": "Pick the transaction that paid this. It is saved here so you can jump back to it later, even if you marked this paid before it showed in your wallet.",
-    "linkTransactionSearchPlaceholder": "Search by amount, date, or description…",
     "linkTransactionSearchLabel": "Search transactions",
     "linkTransactionSuggestedBadge": "Suggested — amount matches exactly",
     "linkTransactionEmpty": "No unlinked wallet transactions or contracts found for this character.",
@@ -8693,8 +8657,6 @@
         "checking": "Checking for new ore…",
         "unchecked": "Couldn't check for new ore · it can lag up to 1 h"
       },
-      "entriesSummary_one": "{{count}} entry · {{range}}",
-      "entriesSummary_other": "{{count}} entries · {{range}}",
       "amountLabel": "Amount",
       "toLabel": "To",
       "reasonLabel": "Reason",
@@ -8703,38 +8665,28 @@
       "differentAmountHide": "Sent the full amount",
       "sentAmountLabel": "Amount you sent",
       "sentAmountPlaceholder": "ISK, e.g. 1,250,000",
-      "paysSome_one": "Pays {{paid}} of {{count}} entry",
-      "paysSome_other": "Pays {{paid}} of {{count}} entries",
-      "leftOver": "{{amount}} ISK left over",
-      "shortBy": "{{amount}} ISK short of the ticked entries",
-      "notEnough": "Not enough for the oldest entry",
       "hint": "Record it now. The payment links itself once it shows in your wallet journal.",
       "recordAction": "Record payment",
       "pickFromWallet": "Already in my wallet? Pick it",
       "fromLabel": "Paying from",
-      "fromOption": "{{name}} · {{amount}} ISK",
-      "alsoPayRest_one": "Also pay {{count}} other entry",
-      "alsoPayRest_other": "Also pay {{count}} other entries",
-      "alsoPayOthers_one": "Also pay for other characters · {{count}} entry",
-      "alsoPayOthers_other": "Also pay for other characters · {{count}} entries",
-      "openInEveAs": "Open in EVE · {{name}}"
+      "openInEveAs": "Open in EVE · {{name}}",
+      "preview": {
+        "pays": "Pays your oldest unpaid days first:",
+        "paidDay": "{{amount}} ISK · paid",
+        "partDay": "{{amount}} ISK · {{left}} ISK still owed",
+        "credit": "{{amount}} ISK more than is owed: kept as credit for the next days.",
+        "owedAfter": "{{amount}} ISK still owed after it."
+      }
     },
     "linkWallet": {
       "title": "Link a wallet payment",
-      "subtitle_one": "{{payee}} · {{count}} entry owed",
-      "subtitle_other": "{{payee}} · {{count}} entries owed",
+      "subtitle": "Pick the payment you sent {{payee}} ({{amount}} ISK owed now). It pays the oldest unpaid days first; anything over is kept as credit.",
       "searchLabel": "Search wallet payments",
+      "searchPlaceholder": "Amount, date or recipient",
       "paymentsLabel": "Wallet payments",
       "noMatch": "No payments match that search.",
-      "coversLabel": "What it paid for",
-      "tickedOwe": "Ticked entries owe",
-      "payment": "Payment",
-      "matches": "Matches exactly",
-      "over": "{{amount}} more than owed — leave as overpayment",
-      "short": "{{amount}} short — the rest stays owed",
       "remember": "Remember {{name}} as who {{payee}} is paid",
-      "confirm_one": "Mark {{count}} paid with this payment",
-      "confirm_other": "Mark {{count}} paid with this payment",
+      "confirm": "Link payment",
       "empty": "No unlinked wallet payments found. Payments appear here once they show in your wallet journal.",
       "rememberFailed": "Payment linked, but couldn’t remember who {{payee}} is paid. You can close this.",
       "grantTitle": "Some payments can’t be seen"
@@ -8819,9 +8771,7 @@
       "autoLinked": "auto-linked",
       "unlinkNamed": "Unlink transaction #{{id}}",
       "notCached": "Transaction #{{id}} · no longer in your saved wallet journal",
-      "paidLine": "Paid {{amount}} ISK · {{date}}",
-      "alsoCovers": "The same payment also settled:",
-      "alsoCoversLine": "{{date}} · {{amount}} ISK"
+      "recorded": "Recorded in Settle up on {{date}}, not seen in your wallet yet"
     },
     "suggestedPayeeHint": "Last used in {{system}}.",
     "assignToAction": "Assign to {{payee}} · {{amount}} ISK",
@@ -8876,7 +8826,7 @@
         "dateTooltip": "The EVE (UTC) day.",
         "what": "What",
         "charged": "Charged",
-        "paid": "Paid",
+        "credited": "Credited",
         "balance": "Balance"
       },
       "kind": {
@@ -8899,7 +8849,8 @@
         "officer": "Written off by an officer",
         "tolerance": "Shortfall forgiven",
         "late": "Late notice sent",
-        "final": "Final notice sent"
+        "final": "Final notice sent",
+        "opening": "Balance through {{date}}"
       },
       "held": "On hold while a dispute is open",
       "detail": {
@@ -8913,11 +8864,13 @@
         "nothingToForgive": "Nothing was left to forgive.",
         "listedDays": "Days it listed",
         "noticeSettled": "Every day it listed is paid.",
-        "noticeRemaining": "{{amount}} still owed on its days."
+        "noticeRemaining": "{{amount}} still owed on its days.",
+        "opening": "Every day up to here is summed into this one balance: ledger syncs can no longer change those days, so a fix to one shows as a new entry today."
       },
       "emptyTitle": "Nothing on this ledger yet",
       "emptyHint": "A day shows here once it is billed.",
-      "filteredTitle": "No entries match these filters"
+      "filteredTitle": "No entries match these filters",
+      "openFor": "Open the ledger of {{payee}}"
     }
   },
   "assets": {

@@ -24,13 +24,12 @@ import {
 } from '@/features/miningTax/corpBook/resolve/targets';
 import { CorpDeclarationStatus } from '@/features/miningTax/corpBook/CorpDeclareAction';
 import { canDeclare } from '@/engine/corpTaxBook/personal';
-import { verifyPeriodLabel } from '@/features/corpTaxBook/verifyPeriodLabel';
 import { systemLabel } from '@/features/miningTax/names';
 import { pricesAtHubOnDate, sellFallbackAtHubOnDate } from '@/features/miningTax/pricing';
 import { findPricingGaps } from '@/features/miningTax/pricingGaps';
 import type { AttentionItem } from '@/features/miningTax/AttentionStrip';
 import { tagAsIgnored, tagAsMoonOre } from '@/features/miningTax/typeOverrides';
-import type { DisplayRow } from '@/features/miningTax/groupRows';
+import { formatDateRange, type DisplayRow } from '@/features/miningTax/groupRows';
 import type { PayeeRecord } from '@/db';
 import type { TradeHub } from '@/market/hubs';
 import { duplicateRowToOpen } from './duplicateRowToOpen';
@@ -94,7 +93,7 @@ export function useTaxAttentionItems({
   resolve,
 }: Args): AttentionItem[] {
   const zone = useTimeZone();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const pricesUnavailableLabel = usePricesUnavailableLabel();
   const { claiming, claimError, handleClaim } = useClaimDonation(reloadCorpBooks);
 
@@ -300,16 +299,16 @@ export function useTaxAttentionItems({
     });
   }
   for (const o of corp.overdue) {
-    const period = verifyPeriodLabel(o.periodStart, o.periodEnd, i18n.language);
+    const period = formatDateRange([o.from, o.through]);
     // #6206: the member says they paid it another way, or pays it, or stops being reminded;
     // every way out is the Resolve dialog, which also mails whoever answers tax questions.
     // Told the corporation already: the quiet "Waiting on the corp" line covers it, not the strip.
     if (o.declaration?.state === 'waiting') continue;
-    // A recorded day of the Statement, so "Not paying" can tell the corporation why.
+    // A recorded day of the Late notice, so "Not paying" can tell the corporation why.
     const dayOf = (corpView?.overlay.rows ?? []).find(
       (r) =>
         r.corporationId === o.corporationId &&
-        r.statementId === o.statementId &&
+        r.noticeId === o.noticeId &&
         r.state === 'billed' &&
         r.recordKey !== undefined
     );
@@ -318,9 +317,9 @@ export function useTaxAttentionItems({
         ? overdueTarget({
             corporationId: o.corporationId,
             corpName: o.corpName,
-            statementId: o.statementId,
+            noticeId: o.noticeId,
             characterId: o.declarerId,
-            periodStart: o.periodStart,
+            periodStart: o.from,
             period,
             ...(o.declaration ? { declaration: o.declaration } : {}),
             ...(dayOf ? { row: dayOf } : {}),
@@ -328,12 +327,12 @@ export function useTaxAttentionItems({
         : undefined;
     if (target && resolve.hidden.has(target.hideKey)) continue;
     attentionItems.push({
-      id: `corp-overdue:${o.corporationId}:${o.statementId}`,
+      id: `corp-overdue:${o.corporationId}:${o.noticeId}`,
       tone: 'warning',
       title: t('miningTax.corpBook.attention.overdueTitle', {
         corp: o.corpName,
         period,
-        date: o.overdueAt.slice(0, 10),
+        date: o.issuedAt.slice(0, 10),
       }),
       detail: (
         <>
@@ -486,15 +485,15 @@ export function useTaxAttentionItems({
   const inView = (id: number) =>
     resolvedCharacterFilter === 'all' || resolvedCharacterFilter.has(id);
   const seenDays = new Set<string>();
-  const overdueIds = new Set(corp.overdue.map((o) => `${o.corporationId}:${o.statementId}`));
+  const overdueIds = new Set(corp.overdue.map((o) => `${o.corporationId}:${o.noticeId}`));
   for (const row of corpView?.overlay.rows ?? []) {
     if (!inView(row.characterId)) continue;
     const by = keptBy(row);
-    // The Statement's own item already says an officer rejected what it declared.
+    // The Late notice's own item already says an officer rejected what it declared.
     if (
       by === 'declaration' &&
-      row.statementId !== undefined &&
-      overdueIds.has(`${row.corporationId}:${row.statementId}`)
+      row.noticeId !== undefined &&
+      overdueIds.has(`${row.corporationId}:${row.noticeId}`)
     )
       continue;
     const figure = by === undefined && figureNeedsAnswer(row);

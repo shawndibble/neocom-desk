@@ -1,8 +1,9 @@
 /**
  * What the pilot owes each Payee right now — the Tax tab's "You owe" cards and the Overview's
- * Mining tax card read the same figure from here. A Corp Tax Book overlays the personal ledger
- * (`buildDisplayRows`): a row the book says it hasn't credited is owed again (#6219), and ore a
- * book bills is owed to the corporation, not to the member's own Payee too (#6204).
+ * Mining tax card read the same figure from here: each Payee's Running account, oldest day first
+ * (`PayeeAccounts`). A Corp Tax Book overlays the personal ledger (`buildDisplayRows`): a row the
+ * book says it hasn't credited is owed again (#6219), and ore a book bills is owed to the
+ * corporation, not to the member's own Payee too (#6204).
  */
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { entryKey } from '@/engine/miningTax/types';
@@ -17,7 +18,9 @@ import {
 import { loadBookPrices, loadCorpNames, loadTrackedCorpBooks } from './corpBook/corpBookSources';
 import { buildCorpBookView } from './corpBook/corpBookView';
 import { buildDisplayRows } from './corpBook/corpRows';
-import type { DisplayRow } from './groupRows';
+import { allMembers, type DisplayRow } from './groupRows';
+import { PayeeAccounts, withPaidStatus } from './payeeAccounts';
+import type { PayeePaymentLink, StoredPayeeCheckpoint } from '@/engine/miningTax/payeeAccount';
 import { loadMadePaymentsWithStatus } from './madePayments';
 import { groupPayees, payeeDuplicateAliases } from './payeeGroups';
 import type { MoonMiningTaxSnapshot } from './snapshot';
@@ -34,16 +37,40 @@ export function alsoBilledShareOf(
   return (a) => alsoBilled?.get(entryKey(a.characterId, a.date, a.solarSystemId))?.get(a.id) ?? 0;
 }
 
+/**
+ * Every personal Payee's account as the tab shows it: from every personal row's Assignments
+ * (every Character's: a merged Payee's oldest day may be an alt's), each billing what is left once
+ * a Corp Tax Book bills part of it too (#6204), and the links that pay them.
+ */
+export function payeeAccountsOf(input: {
+  rows: readonly DisplayRow[];
+  payees: readonly PayeeRecord[];
+  links: readonly PayeePaymentLink[];
+  alsoBilled: PersonalOverlay['alsoBilled'] | undefined;
+  checkpoints?: ReadonlyMap<string, StoredPayeeCheckpoint>;
+}): PayeeAccounts {
+  const share = alsoBilledShareOf(input.alsoBilled);
+  const assignments = input.rows
+    .filter((dr) => !dr.corp || dr.corp.kind !== 'row')
+    .flatMap((dr) => allMembers(dr).map((m) => m.assignment));
+  return PayeeAccounts.build({
+    assignments,
+    payees: input.payees,
+    links: input.links,
+    ...(input.checkpoints ? { checkpoints: input.checkpoints } : {}),
+    taxOf: (a) => a.taxOwed * (1 - Math.min(1, share(a as MiningTaxAssignmentRecord))),
+  });
+}
+
 /** Per Payee, what is owed now over `rows` (display rows, a book's overlay applied). */
 export function owedBalances(
   rows: readonly DisplayRow[],
   ledgerPayees: readonly PayeeRecord[],
-  alsoBilled: PersonalOverlay['alsoBilled'] | undefined,
+  accounts: PayeeAccounts,
   /** Duplicate records of one Payee mapped to the primary (`payeeDuplicateAliases`). */
   aliases?: ReadonlyMap<string, string>
 ): PayeeBalance[] {
-  const share = alsoBilledShareOf(alsoBilled);
-  return computePayeeBalances(rows, ledgerPayees, ({ assignment }) => share(assignment), aliases);
+  return computePayeeBalances(rows, ledgerPayees, accounts, aliases);
 }
 
 /**
@@ -72,12 +99,17 @@ export interface OwedNow {
  * payments the book's in-flight donations read. Without a book it is the personal ledger alone.
  */
 export async function loadOwedBalances(
-  snapshot: Pick<MoonMiningTaxSnapshot, 'rows' | 'characters' | 'payeesByCharacter'>,
+  snapshot: Pick<
+    MoonMiningTaxSnapshot,
+    'rows' | 'characters' | 'payeesByCharacter' | 'paymentLinks' | 'payeeCheckpoints'
+  >,
   now: number = Date.now()
 ): Promise<OwedNow> {
   const seen = new Map<string, PayeeRecord>();
   for (const list of snapshot.payeesByCharacter.values()) for (const p of list) seen.set(p.id, p);
   const payees = [...seen.values()];
+  // Paid read off each Payee's account, as on the Tax tab.
+  const entries = withPaidStatus(snapshot.rows, payees, snapshot.paymentLinks);
   const characterNames = new Map(snapshot.characters.map((c) => [c.characterId, c.characterName]));
 
   const books = await loadTrackedCorpBooks();
@@ -94,7 +126,7 @@ export async function loadOwedBalances(
         ]).then(([corpNames, pricesByCorp, made]) =>
           buildCorpBookView(
             {
-              rows: snapshot.rows,
+              rows: entries,
               loaded: books,
               pricesByCorp,
               corpNames,
@@ -108,15 +140,22 @@ export async function loadOwedBalances(
         );
 
   const rows = buildDisplayRows(
-    snapshot.rows,
+    entries,
     corpView?.overlay ?? null,
     (id) => characterNames.get(id) ?? `#${id}`
   );
+  const accounts = payeeAccountsOf({
+    rows,
+    payees,
+    links: snapshot.paymentLinks,
+    alsoBilled: corpView?.overlay.alsoBilled,
+    checkpoints: snapshot.payeeCheckpoints,
+  });
   return {
     balances: owedBalances(
       rows,
       [...payees, ...(corpView?.payees ?? [])],
-      corpView?.overlay.alsoBilled,
+      accounts,
       payeeDuplicateAliases(groupPayees(payees))
     ),
     unassignedCount: unassignedSummary(rows, () => 0).entryCount,

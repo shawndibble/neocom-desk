@@ -7,6 +7,7 @@ import { AutoAssignmentBar } from '@/features/miningTax/AutoAssignmentBar';
 import { CorpBookSyncNote } from '@/features/miningTax/corpBook/CorpBookSyncNote';
 import { LeftCorpNotices } from '@/features/miningTax/corpBook/LeftCorpNotice';
 import {
+  noticeKey,
   notPayingDayKey,
   parseNotPayingKey,
 } from '@/features/miningTax/corpBook/resolve/notPaying';
@@ -15,6 +16,7 @@ import { QuietStatusLine } from '@/features/miningTax/corpBook/resolve/QuietStat
 import { conflictTarget, uncreditedTarget } from '@/features/miningTax/corpBook/resolve/targets';
 import { useResolve } from '@/features/miningTax/corpBook/resolve/useResolve';
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
+import { paymentLinkKey, type PayeePaymentLink } from '@/engine/miningTax/payeeAccount';
 import { leftCorpBooksOf } from '@/features/miningTax/corpBook/leftCorpBooks';
 import {
   corporationOfPayee,
@@ -81,6 +83,9 @@ interface TaxTabProps {
   tabsId: string;
 }
 
+/** Shared, so the hooks below don't see a new empty list on every render. */
+const NO_LINKS: readonly PayeePaymentLink[] = [];
+
 export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
@@ -130,7 +135,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
 
   const {
     ledger,
-    storedAssignments,
     madePayments,
     paymentSources,
     corpView,
@@ -244,18 +248,32 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
       ),
     [corpView, resolvedCharacterFilter, t, quietUncredited]
   );
-  const { balances, unassigned, everyAssignment, linkSuggestions, payeeSystems, owedByPayee } =
-    useTaxBalances({
-      characterFiltered,
-      personalRows,
-      ledgerPayees,
-      allPayees,
-      duplicateAliases,
-      estimatedValueOf,
-      madePayments,
-      storedAssignments,
-      alsoBilled: corpView?.overlay.alsoBilled,
-    });
+  // A donation to one of these is the book's money: never a personal Payee's.
+  const bookCorporationIds = useMemo(
+    () => new Set(corpView?.books.map((b) => b.loaded.corporationId) ?? []),
+    [corpView]
+  );
+  const {
+    accounts,
+    balances,
+    unassigned,
+    everyAssignment,
+    linkSuggestions,
+    payeeSystems,
+    owedByPayee,
+  } = useTaxBalances({
+    characterFiltered,
+    personalRows,
+    ledgerPayees,
+    allPayees,
+    duplicateAliases,
+    estimatedValueOf,
+    madePayments,
+    links: data?.paymentLinks ?? NO_LINKS,
+    ...(data ? { checkpoints: data.payeeCheckpoints } : {}),
+    alsoBilled: corpView?.overlay.alsoBilled,
+    bookCorporations: bookCorporationIds,
+  });
 
   // A Corp Tax Book row is the corp's to continue, not the member's.
   const continuationRows = useMemo(
@@ -288,13 +306,8 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     settleUpRowsFor
   );
 
-  // A Corp Tax Book Payee credits itself from the corporation's wallet journal and hides Link
-  // payment, so a suggestion aimed at one can be acted on nowhere: counting it on the tile
-  // while its card stayed silent was the double-pay this guard exists to stop.
-  const linkable = useMemo(
-    () => linkSuggestions.filter((s) => !isCorpPayeeId(s.balance.payee.id)),
-    [linkSuggestions]
-  );
+  // Every suggestion names a personal Payee: a Corp Tax Book credits itself from its wallet.
+  const linkable = linkSuggestions;
 
   // The Resolve dialog (resolving in the app): every problem's ways out, in one place.
   const openBookDay = useCallback(
@@ -306,11 +319,16 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     },
     [allDisplayRows, actions]
   );
+  const linkedKeys = useMemo(
+    () => new Set((data?.paymentLinks ?? NO_LINKS).map(paymentLinkKey)),
+    [data?.paymentLinks]
+  );
   const resolve = useResolve({
     corpView,
     nameOf: (id) => characterNames.get(id) ?? '',
     reloadCorpBooks,
     madePayments,
+    linked: linkedKeys,
     onPay: actions.openCorpPay,
     onOpenDay: openBookDay,
   });
@@ -322,8 +340,8 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
         .filter((r) => r.flagged?.state === 'sent')
         .map((r) => notPayingDayKey(r.corporationId, r.characterId, r.date)),
       ...rows
-        .filter((r) => r.declaration?.state === 'waiting' && r.statementId !== undefined)
-        .map((r) => `statement:${r.corporationId}:${r.statementId}`),
+        .filter((r) => r.declaration?.state === 'waiting' && r.noticeId !== undefined)
+        .map((r) => noticeKey(r.corporationId, r.noticeId!)),
     ]).size;
     const notPaying = [...resolve.hidden].sort().flatMap((key) => {
       const parsed = parseNotPayingKey(key);
@@ -496,6 +514,13 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                       : settleUpBalance(balance.members)
                   }
                   onLinkPayment={(balance) => actions.openLinkWallet({ payeeId: balance.payee.id })}
+                  onOpenLedger={(balance) =>
+                    actions.openLedger(
+                      isCorpPayeeId(balance.payee.id)
+                        ? { kind: 'book', corporationId: corporationOfPayee(balance.payee.id) }
+                        : { kind: 'personal', payeeId: balance.payee.id }
+                    )
+                  }
                   hideLinkPayment={(balance) => isCorpPayeeId(balance.payee.id)}
                   uncreditedOf={(balance) =>
                     isCorpPayeeId(balance.payee.id)
@@ -503,7 +528,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                       : undefined
                   }
                   unlinkedOf={(balance) => {
-                    const mine = linkable.filter((s) => s.balance.payee.id === balance.payee.id);
+                    const mine = linkable.filter((s) => s.payee.id === balance.payee.id);
                     if (mine.length === 0) return undefined;
                     return {
                       count: mine.length,
@@ -649,11 +674,13 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
           refresh={refresh}
           loading={loading}
           continuing={continuing}
-          characterCount={characters.length}
           allDisplayRows={allDisplayRows}
           characterFiltered={characterFiltered}
           everyAssignment={everyAssignment}
-          storedAssignments={storedAssignments}
+          accounts={accounts}
+          links={data?.paymentLinks ?? NO_LINKS}
+          bookCorporations={bookCorporationIds}
+          activeCharacterId={activeCharacterId}
           allPayees={allPayees}
           duplicateAliases={duplicateAliases}
           payeeById={payeeById}

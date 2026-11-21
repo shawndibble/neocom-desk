@@ -207,7 +207,8 @@ describe('restoring an existing-format backup file', () => {
     'netWorthSnapshots',
     'productionLosses',
     'characterAccelerators',
-  ]); // #2865, #2851
+    'miningTaxPaymentLinks',
+  ]); // #2865, #2851, decision 20261120-235011
   const LEGACY_EXPECTED_RECORDS = Object.fromEntries(
     Object.entries(FULL_RECORDS)
       .filter(([table]) => !POSTDATES_FIXTURE.has(table))

@@ -47,6 +47,8 @@ const snapshot = {
   entries: [assigned('2026-10-17', 'p1'), assigned('2026-10-13', 'p2')],
   characters: [{ characterId: ME, characterName: 'Kestrel Vane' }],
   payeesByCharacter: new Map([[ME, [ASHFALL, BRIMSTONE]]]),
+  paymentLinks: [],
+  payeeCheckpoints: new Map(),
   unclassified: [],
   reauthCharacters: [],
   fetchedAt: new Date(),

@@ -176,8 +176,8 @@ function LedgerBody({
         render: (r) => amountCell(r.charged),
       },
       {
-        id: 'paid',
-        header: t('miningTax.ledger.column.paid'),
+        id: 'credited',
+        header: t('miningTax.ledger.column.credited'),
         align: 'right',
         className: 'tabular-nums',
         render: (r) => amountCell(r.paid),

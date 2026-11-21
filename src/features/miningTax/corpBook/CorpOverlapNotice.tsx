@@ -7,7 +7,7 @@ import {
   type BookOverlap,
   type BookRowView,
 } from '@/engine/corpTaxBook/personal';
-import { releaseOre, unsettle } from '../ledgerActions';
+import { releaseOre } from '../ledgerActions';
 import { useLedgerAction } from '../useLedgerAction';
 import { ConflictNotice } from './ConflictNotice';
 import { CorpDeclareSlot } from './CorpDeclareAction';
@@ -38,11 +38,11 @@ interface Props {
   onChanged: () => void;
   /**
    * A message reached the corporation (#6206): reload the books. With it, "I paid it another way"
-   * on a day billed on a Statement goes to the corporation instead of staying a device-only note,
+   * on a day a Late notice asked for goes to the corporation instead of staying a device-only note,
    * and a Conflict offers "Tell {corp}".
    */
   onBookChanged?: () => void;
-  /** Opens the Resolve dialog (resolving in the app) on a problem of this day or its Statement. */
+  /** Opens the Resolve dialog (resolving in the app) on a problem of this day or its Late notice. */
   onResolve?: (target: ResolveTarget) => void;
   /** Who is asking and who answers the book's tax questions: a Conflict's "Tell" mails them too. */
   mail?: MailContext;
@@ -177,9 +177,6 @@ export function CorpOverlapNotice({
         typeNames={typeNames}
         busy={pending}
         error={error}
-        onUnmarkPaid={() =>
-          void run(() => unsettle(mine.filter((a) => a.status === 'paid')), onChanged)
-        }
         onTakeOver={takeOver}
         onResolve={resolveConflict}
         tell={
@@ -197,10 +194,10 @@ export function CorpOverlapNotice({
     );
   }
   const declare =
-    // Only while the Statement still bills the day: a settled one has nothing to declare.
+    // Only while the day a Late notice asked for is still owed: a paid one has nothing to declare.
     onResolve &&
-    view.statementId !== undefined &&
-    (view.state === 'billed' || view.bookOwed !== undefined || view.declaration !== undefined) ? (
+    view.noticeId !== undefined &&
+    (view.state === 'billed' || view.declaration !== undefined) ? (
       <CorpDeclareSlot view={view} onResolve={onResolve} />
     ) : undefined;
   // A declaration goes to the corporation, so the device's own note no longer hides the notice.

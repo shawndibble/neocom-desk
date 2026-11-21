@@ -13,11 +13,7 @@ export type RowMenuAction =
         | 'settleUp'
         | 'resolve'
         | 'reviewSplit'
-        | 'markPaid'
-        | 'markGroupPaid'
-        | 'unmarkPaid'
         | 'linkWallet'
-        | 'linkTransaction'
         | 'join'
         | 'split'
         | 'copyBreakdown'
@@ -51,17 +47,13 @@ export function rowMenuActions(dr: DisplayRow): RowMenuAction[][] {
 
   const members = allMembers(dr);
   if (dr.groupMembers) {
-    const anyOutstanding = members.some((m) => m.assignment.status === 'outstanding');
     const anyGrown = members.some((m) => m.assignment.status === 'needs-review');
-    const allPaid = members.every((m) => m.assignment.status === 'paid');
     const lead: RowMenuAction[] = [view];
     if (anyGrown) lead.push({ id: 'resolve' });
     else if (dr.status === 'outstanding') lead.push({ id: 'settleUp' });
     lead.push({ id: 'edit' });
-    const payments: RowMenuAction[] = [];
-    if (anyOutstanding && dr.assignment?.payeeId) payments.push({ id: 'linkWallet' });
-    if (allPaid) payments.push({ id: 'linkTransaction' });
-    if (anyOutstanding) payments.push({ id: 'markGroupPaid' });
+    // A payment links to the Payee and pays its oldest days: there is no mark to set here.
+    const payments: RowMenuAction[] = dr.assignment?.payeeId ? [{ id: 'linkWallet' }] : [];
     const regroup: RowMenuAction[] = [
       ...[...members]
         .sort((a, b) => a.row.entry.date.localeCompare(b.row.entry.date))
@@ -82,10 +74,8 @@ export function rowMenuActions(dr: DisplayRow): RowMenuAction[][] {
   lead.push({ id: 'edit' });
 
   const more: RowMenuAction[] = [];
-  if (status === 'outstanding' && dr.assignment?.payeeId) more.push({ id: 'linkWallet' });
-  if (status === 'paid') more.push({ id: 'linkTransaction' });
-  if (status === 'outstanding') more.push({ id: 'markPaid' });
-  if (status === 'paid') more.push({ id: 'unmarkPaid' });
+  if ((status === 'outstanding' || status === 'paid') && dr.assignment?.payeeId)
+    more.push({ id: 'linkWallet' });
   if (status === 'outstanding') more.push({ id: 'join' });
   if ((status === 'outstanding' || status === 'paid') && !dr.assignment?.groupId)
     more.push({ id: 'split' });

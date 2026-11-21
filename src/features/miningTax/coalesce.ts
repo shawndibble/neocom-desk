@@ -32,8 +32,10 @@ import {
   type CoalescableAssignment,
 } from '@/engine/miningTax/coalesce';
 import { deleteAssignments } from './assignments';
+import type { PayeeAccounts } from './payeeAccounts';
+import { loadPayeeAccounts } from './paymentLinkStore';
 
-function coalescable(a: MiningTaxAssignmentRecord): CoalescableAssignment {
+function coalescable(a: MiningTaxAssignmentRecord, accounts: PayeeAccounts): CoalescableAssignment {
   return {
     id: a.id,
     characterId: a.characterId,
@@ -41,31 +43,34 @@ function coalescable(a: MiningTaxAssignmentRecord): CoalescableAssignment {
     solarSystemId: a.solarSystemId,
     payeeId: a.payeeId,
     taxPct: a.taxPct,
-    status: a.status,
+    // Paid where its Payee's account has paid the day: a paid day is never fused.
+    status: accounts.statusOf(a),
     groupId: a.groupId,
     oreLines: a.oreLines,
     estimatedValue: a.estimatedValue,
     taxOwed: a.taxOwed,
     collectsGrowth: a.collectsGrowth,
-    hasPayment: a.payment !== undefined,
   };
 }
 
 export async function coalesceAssignments(
   characterId: number,
-  entries?: readonly MiningLedgerEntry[]
+  entries?: readonly MiningLedgerEntry[],
+  /** Every personal Payee's account, which says which days are paid; read from Dexie when absent. */
+  accounts?: PayeeAccounts
 ): Promise<void> {
   const assignments = await db.miningTaxAssignments
     .where('characterId')
     .equals(characterId)
     .toArray();
   if (assignments.length === 0) return;
+  const paid = accounts ?? (await loadPayeeAccounts());
 
   const working = new Map(assignments.map((a) => [a.id, a]));
   const rewritten = new Set<string>();
   const absorbedIds: string[] = [];
   const now = Date.now();
-  const current = () => [...working.values()].map(coalescable);
+  const current = () => [...working.values()].map((a) => coalescable(a, paid));
 
   function eject() {
     for (const id of planGroupEjections(current())) {

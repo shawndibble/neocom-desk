@@ -6,8 +6,8 @@ import {
   readFeederCoverage,
   readMemberDeclaration,
   readMiner,
+  readCheckpoint,
   readPayment,
-  readStatement,
   readWriteOff,
 } from './docShapes';
 
@@ -103,11 +103,21 @@ describe('the small doc readers', () => {
       })?.resolution?.by
     ).toBe(0);
   });
-  it('readStatement needs lines, a Miner, an amount and an issue time', () => {
-    expect(readStatement('s', { minerId: 'm', amount: 1, issuedAt: 'i' })).toBeNull();
-    expect(readStatement('s', { minerId: 'm', amount: 1, issuedAt: 'i', lines: [] })).toMatchObject(
-      { id: 's' }
-    );
+  it('readCheckpoint reads a checkpoint that adds up, and skips one that does not', () => {
+    const stored = {
+      through: '2026-09-30',
+      owed: [{ date: '2026-09-12', remaining: 100 }],
+      credit: 0,
+      balance: 100,
+      paidThrough: '2026-09-11',
+      at: '2026-11-02T00:00:00Z',
+    };
+    expect(readCheckpoint('solo:5', stored)).toMatchObject({
+      minerId: 'solo:5',
+      through: '2026-09-30',
+    });
+    expect(readCheckpoint('solo:5', { ...stored, balance: 999 })).toBeNull();
+    expect(readCheckpoint('solo:5', { ...stored, owed: undefined })).toBeNull();
   });
   it('readMiner needs characters; the main defaults to the first', () => {
     expect(readMiner('m', { characterIds: [] })).toBeNull();

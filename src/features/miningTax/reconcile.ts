@@ -12,11 +12,13 @@
  * — only `status`/`reviewDiff` move; `planNeedsReviewResolution` (assignments.ts) is
  * the one place `oreLines` itself re-snapshots.
  *
- * Paid stays paid (ADR 0024): a paid Assignment is never diffed against more
- * than its own snapshot, because `computeOwnership` never grows one. Its
- * growth is left unassigned instead, and the Tax tab shows it as a new,
- * separately assignable row for the same day and system, so its status, ore
- * and tax never move here. Combined members and split sides alike.
+ * Paid stays paid (ADR 0024): an Assignment is paid once its day is on or
+ * before its Payee's paid-through (`PayeeAccounts`, decision 20261120-235011:
+ * no Assignment carries a paid mark of its own), and a paid one is never
+ * diffed against more than its own snapshot, because `computeOwnership` never
+ * grows one. Its growth is left unassigned instead, and the Tax tab shows it as
+ * a new, separately assignable row for the same day and system, so its ore and
+ * tax never move here. Combined members and split sides alike.
  *
  * Unpaid growth on a *sole* Assignment skips the flag: it is absorbed straight
  * into the Assignment (`planNeedsReviewResolution`), since an unsettled
@@ -37,6 +39,8 @@ import { scheduleSync } from '@/sync';
 import { diffAssignedOreLines } from '@/engine/miningTax/needsReview';
 import { computeOwnership, type Ownership } from '@/engine/miningTax/ownership';
 import { planNeedsReviewResolution } from './assignments';
+import type { PayeeAccounts } from './payeeAccounts';
+import { loadPayeeAccounts } from './paymentLinkStore';
 import type { MiningLedgerEntry, QuantityDiff } from '@/engine/miningTax/types';
 
 function sameDiffs(a: readonly QuantityDiff[] | undefined, b: readonly QuantityDiff[]): boolean {
@@ -48,13 +52,17 @@ function sameDiffs(a: readonly QuantityDiff[] | undefined, b: readonly QuantityD
 
 export async function reconcileAssignments(
   characterId: number,
-  freshEntries: readonly MiningLedgerEntry[]
+  freshEntries: readonly MiningLedgerEntry[],
+  /** Every personal Payee's account, which says which days are paid; read from Dexie when absent. */
+  accounts?: PayeeAccounts
 ): Promise<void> {
-  const assignments = await db.miningTaxAssignments
-    .where('characterId')
-    .equals(characterId)
-    .toArray();
-  if (assignments.length === 0) return;
+  const stored = await db.miningTaxAssignments.where('characterId').equals(characterId).toArray();
+  if (stored.length === 0) return;
+  // Read as the tab reads them: Paid where the Payee's account has paid the day. Only ever
+  // written back from the stored record.
+  const paid = accounts ?? (await loadPayeeAccounts());
+  const assignments = stored.map((a) => paid.view(a));
+  const storedById = new Map(stored.map((a) => [a.id, a]));
 
   const freshByKey = new Map(
     freshEntries.map((entry) => [`${entry.date}:${entry.solarSystemId}`, entry])
@@ -99,13 +107,19 @@ export async function reconcileAssignments(
       absorbs.push({ assignment, key });
       continue;
     }
-    updates.push({ ...assignment, status: 'needs-review', reviewDiff: diffs, updatedAt: now });
+    updates.push({
+      ...storedById.get(assignment.id)!,
+      status: 'needs-review',
+      reviewDiff: diffs,
+      updatedAt: now,
+    });
   }
 
   for (const { assignment, key } of absorbs) {
+    const record = storedById.get(assignment.id)!;
     try {
       updates.push(
-        await planNeedsReviewResolution(assignment, freshByKey.get(key)!, siblingsByKey.get(key)!)
+        await planNeedsReviewResolution(record, freshByKey.get(key)!, siblingsByKey.get(key)!)
       );
     } catch {
       // Re-pricing can fail (no prices yet); fall back to surfacing the growth.
@@ -113,7 +127,7 @@ export async function reconcileAssignments(
         assignment.oreLines,
         ownershipByKey.get(key)!.ownedLines.get(assignment.id)!
       );
-      updates.push({ ...assignment, status: 'needs-review', reviewDiff: diffs, updatedAt: now });
+      updates.push({ ...record, status: 'needs-review', reviewDiff: diffs, updatedAt: now });
     }
   }
 
