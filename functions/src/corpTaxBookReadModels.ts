@@ -268,6 +268,7 @@ const READ_MODEL_EDITS: ReadonlySet<string> = new Set([
   'resolveDeclaration',
   'recordPayment',
   'assignPayment',
+  'reassignPayment',
   'markNotTax',
   'setMiner',
   'unlink',

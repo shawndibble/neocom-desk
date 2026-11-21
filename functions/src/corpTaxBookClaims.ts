@@ -3,6 +3,7 @@
  * group but cannot read it until its owner signs in as it (a Self-proven link). Pure: the store
  * reads the facts, this decides who reads, who is claimed and what a sign-in promotes.
  */
+import { earlierGrouping } from './corpTaxBookDonationMatch.js';
 
 export interface GroupConflict {
   characterId: number;
@@ -74,8 +75,8 @@ export interface ClaimMiner {
   createdAt?: string;
 }
 
-const earlier = (a: ClaimMiner, b: ClaimMiner) =>
-  (a.createdAt ?? '').localeCompare(b.createdAt ?? '') || a.id.localeCompare(b.id);
+/** The earliest grouping wins a Character stored in two: the one rule (`minerIdFor` reads it too). */
+const earlier = earlierGrouping;
 
 /** Characters stored in more than one Miner group (a `solo:` id holds none); earlier group first. */
 export function groupConflicts(miners: readonly ClaimMiner[], at: string): GroupConflict[] {

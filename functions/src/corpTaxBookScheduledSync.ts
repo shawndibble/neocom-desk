@@ -94,12 +94,12 @@ import { reconcileFeederPayouts } from './corpTaxBookFeederPayouts.js';
 import { chunk } from './chunk.js';
 import { dbReader, readNoticeDocs } from './corpTaxBookLateNoticeStore.js';
 import {
-  codeOwners,
   donationOwner,
   resolveDonationOwners,
   uncountedDonations,
-  type MatchMiner,
+  type MatchBook,
 } from './corpTaxBookDonationMatch.js';
+import { loadMatchBook } from './corpTaxBookDonationMatchStore.js';
 
 /** Same bounds the officer's client uses against the callable's caps (corpTaxBook.ts MAX_SYNC_*). */
 export const OBSERVED_PER_CALL = 2000;
@@ -420,30 +420,49 @@ export async function runBookSync(
     .filter((d) => !stored.has(paymentId(d)))
     .sort((a, b) => b.at.localeCompare(a.at))
     .slice(0, DONATIONS_PER_CALL);
-  // The rows donations are matched against: this read's, and the moon owners' mining the book
-  // bills, which only the stored rows hold (a quiet run matches nothing, so reads none).
-  const rows: { characterId: number; date: string; quantity: number }[] = [
-    ...feed.rows,
-    ...(quiet ? [] : await billedStoredRows(db, corporationId, before, feed.rows, fresh, now)),
-  ];
-  const known = new Set<number>([
-    ...rows.map((r) => r.characterId),
-    ...before.miners.flatMap((m) => m.characterIds),
-    ...before.payments.filter((p) => p.minerId !== undefined).map((p) => p.characterId as number),
-  ]);
-  const matching = {
-    ...matchBookOf(before, known),
-    openBalance: quiet ? new Map<string, number>() : openBalanceOf(before),
-    unbilled: quiet ? new Set<string>() : unbilledOf(before, rows),
-  };
-  const resolved = resolveDonationOwners(fresh, matching);
   // #6207: what looks like tax paid into a division the book does not read. Only on a full run,
   // which holds the Miners and balances it rests on; a quiet one leaves the stored list as it was.
   const elsewhere = quiet
     ? null
     : await readDonationsElsewhere(esi, corporationId, before.divisions, accessToken);
+  // Whose money each donation is (corpTaxBookDonationMatch.ts), for every sender this run decides
+  // on: its new donations, those elsewhere, and the Unmatched ones it re-matches. A quiet run
+  // matches nothing, so reads none of it.
+  const book = quiet
+    ? undefined
+    : await loadMatchBook(
+        db,
+        corporationId,
+        [
+          ...fresh,
+          ...(elsewhere ?? []),
+          ...(before.payments.filter((p) => p.minerId === undefined) as {
+            characterId?: number;
+            reason?: string;
+          }[]),
+        ],
+        feed.rows.map((r) => r.characterId)
+      );
+  // The rows donations are matched against: this read's, and the moon owners' mining the book
+  // bills, which only the stored rows hold.
+  const rows: { characterId: number; date: string; quantity: number }[] = [
+    ...feed.rows,
+    ...(book ? await billedStoredRows(db, corporationId, before, book, fresh, now) : []),
+  ];
+  // Every Character the run knew, for the quiet marker: one new to it could match a donation.
+  const known = new Set<number>([
+    ...rows.map((r) => r.characterId),
+    ...before.miners.flatMap((m) => m.characterIds),
+  ]);
+  const resolved = book ? resolveDonationOwners(fresh, book) : [];
   const uncounted =
-    elsewhere === null ? undefined : uncountedDonations(elsewhere, matching, resolved);
+    elsewhere === null || !book
+      ? undefined
+      : uncountedDonations(
+          elsewhere,
+          { ...book, openBalance: openBalanceOf(before), unbilled: unbilledOf(before, rows) },
+          resolved
+        );
 
   const placed = placeObservedRows(
     feed.rows,
@@ -470,13 +489,16 @@ export async function runBookSync(
     {
       observed: batches.shift() ?? [],
       extractions: extraCalls.shift() ?? [],
-      donations: resolved,
+      donations: fresh,
       ...(uncounted ? { uncounted } : {}),
     },
     // Members' "not credited" notes wait on a sync that read the wallet, not on any sync.
     { donationsRead }
   );
-  const receipt = await syncBookAs(deps, access, first, { scheduled: true });
+  const receipt = await syncBookAs(deps, access, first, {
+    scheduled: true,
+    ...(book ? { matchBook: book } : {}),
+  });
   for (const observed of batches) {
     await syncBookAs(deps, access, call({ observed }), { scheduled: true });
   }
@@ -509,9 +531,9 @@ export async function runBookSync(
 
   // --- Re-match Unmatched donations -----------------------------------------
   // Quiet: the quiet run re-matched nothing, and no Unmatched donation or known Character is new.
-  const { assigned, error: reassignError } = quiet
-    ? { assigned: new Map<string, string>(), error: undefined }
-    : await reassignUnmatched(edit, before, known);
+  const { assigned, error: reassignError } = book
+    ? await reassignUnmatched(edit, before, book)
+    : { assigned: new Map<string, string>(), error: undefined };
 
   // --- Settle ---------------------------------------------------------------
   // Read again, right before settling, whenever this run brought in money: a settle is never
@@ -641,7 +663,7 @@ async function billedStoredRows(
   db: Firestore,
   corporationId: number,
   book: AdminBookState,
-  feedRows: readonly ObservedRow[],
+  matchBook: MatchBook,
   fresh: readonly JournalDonation[],
   now: number
 ): Promise<ObservedRow[]> {
@@ -652,15 +674,9 @@ async function billedStoredRows(
       typeof p.characterId === 'number' &&
       !(p.notTaxAmount && p.notTaxAmount > 0)
   ) as { characterId: number; at: string }[];
-  const knownCharacterIds = new Set<number>([
-    ...feedRows.map((r) => r.characterId),
-    ...book.miners.flatMap((m) => m.characterIds),
-    ...book.payments.filter((p) => p.minerId !== undefined).map((p) => p.characterId as number),
-  ]);
-  const feedOnly = matchBookOf(book, knownCharacterIds);
   const senders = [
     ...new Set(
-      fresh.filter((d) => donationOwner(d, feedOnly).kind !== 'miner').map((d) => d.characterId)
+      fresh.filter((d) => donationOwner(d, matchBook).kind !== 'miner').map((d) => d.characterId)
     ),
   ];
   const wanted = storedRowsWanted({
@@ -708,23 +724,6 @@ async function billedStoredRows(
   }
 }
 
-/**
- * What a donation is matched on (corpTaxBookDonationMatch.ts): the Miners, the Characters the book
- * knows, and every Reason code: each notice's and the own code of each Miner it knows.
- */
-function matchBookOf(book: AdminBookState, characterIds: ReadonlySet<number>) {
-  const miners = book.miners as MatchMiner[];
-  return {
-    miners,
-    knownCharacterIds: characterIds,
-    codes: codeOwners(
-      book.statements,
-      miners,
-      [...characterIds].map((c) => `solo:${c}`)
-    ),
-  };
-}
-
 /** The Miners with ore this read found that no Statement covers yet, for `matchDonation` (#6207). */
 function unbilledOf(
   book: AdminBookState,
@@ -752,14 +751,19 @@ function openBalanceOf(book: AdminBookState): Map<string, number> {
 async function reassignUnmatched(
   edit: (action: ScheduledAction) => Promise<unknown>,
   before: AdminBookState,
-  known: ReadonlySet<number>
+  book: MatchBook
 ): Promise<{ assigned: Map<string, string>; error?: string }> {
+  // One an officer has to place (ambiguous) waits for them; nothing places it automatically.
   const open = before.payments
-    .filter((p) => p.minerId === undefined && !(p.notTaxAmount && p.notTaxAmount > 0))
+    .filter(
+      (p) =>
+        p.minerId === undefined &&
+        !(p.notTaxAmount && p.notTaxAmount > 0) &&
+        (p as { reviewReason?: string }).reviewReason !== 'ambiguous'
+    )
     .sort((a, b) => a.at.localeCompare(b.at));
   const assigned = new Map<string, string>();
   // A sender the book knows credits their Miner, owing or not (#6300); a donation held under #6207 clears here.
-  const book = matchBookOf(before, known);
   try {
     for (const p of open) {
       const match = donationOwner(

@@ -6,7 +6,7 @@ import {
   applyLateNoticeBackfill,
   planLateNoticeBackfill,
 } from './corpTaxBookLateNoticeBackfill.js';
-import { paymentCode } from './corpTaxBookLateNotice.js';
+import { minerPaymentCode, paymentCode } from './corpTaxBookLateNotice.js';
 import type { Caller } from './actorAuth.js';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
@@ -1149,7 +1149,7 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect(p?.reviewReason).toBeUndefined();
     });
 
-    it('credits a claim to the Miner the character is grouped into', async () => {
+    it('credits a grouped character’s donation to its group as it is stored', async () => {
       await turnOn();
       await minedHere(60, 77);
       await edit(ACCOUNTANT, {
@@ -1171,10 +1171,12 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
           now
         )
       );
-      expect(await claimPayment(deps(), who(77), CORP, 'j1_8')).toEqual({ minerId: 'm-a' });
+      // The server decides whose money it is: nothing is left for the player to claim.
+      expect((await book().collection('payments').doc('j1_8').get()).get('minerId')).toBe('m-a');
+      expect(await reason(claimPayment(deps(), who(77), CORP, 'j1_8'))).toBe('already-assigned');
     });
 
-    it('credits a claim from a never-mined character to its own Miner until its link is proven', async () => {
+    it('credits an officer claim’s donation to the group it is billed with, and widens readers on proof', async () => {
       await turnOn();
       await minedHere(60);
       await edit(ACCOUNTANT, {
@@ -1197,8 +1199,8 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
           now
         )
       );
-      // An officer claim is no reader of the group, so it is its own Miner for now.
-      expect(await claimPayment(deps(), who(77), CORP, 'j1_8')).toEqual({ minerId: 'solo:77' });
+      // An officer claim is billed with the group, so its money pays the group's days.
+      expect((await book().collection('payments').doc('j1_8').get()).get('minerId')).toBe('m-a');
       await db.collection('playerCharacters').doc('77').set({
         characterId: 77,
         playerId: '60',
@@ -1210,7 +1212,6 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         .doc('m-a')
         .set({ minerId: 'm-a', through: '2026-08-31', uids: ['char:60'] });
       expect(await promoteProvenClaims(deps(), CORP)).toEqual({ promoted: 1 });
-      expect(await claimPayment(deps(), who(77), CORP, 'j1_9')).toEqual({ minerId: 'm-a' });
       // The checkpoint's readers widen with the group's, as its notices' do.
       expect((await book().collection('accountCheckpoints').doc('m-a').get()).get('uids')).toEqual([
         'char:60',
@@ -1631,13 +1632,14 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       });
       return declarationId as string;
     };
+    // Paid by contract a week later: another transfer than the donation the book holds.
     const manual = (declarationId: string) => ({
       action: 'recordPayment',
       paymentId: `m_${declarationId}`,
       minerId: 'solo:50',
       characterId: 50,
       amount: 10_000_000,
-      at: '2026-11-02T00:00:00.000Z',
+      at: '2026-11-09T00:00:00.000Z',
       declarationId,
     });
     const match = (declarationId: string) => ({
@@ -1665,6 +1667,69 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect(await resolution(id)).toMatchObject({ kind: 'confirmed', paymentId: 'j1_1' });
       expect(await reason(edit(ACCOUNTANT, manual(id)))).toBe('already-resolved');
       expect((await book().collection('payments').doc(`m_${id}`).get()).exists).toBe(false);
+    });
+
+    it('never counts one transfer twice: refuses a hand record of a donation the book holds', async () => {
+      const id = await declared();
+      expect(
+        await reason(edit(ACCOUNTANT, { ...manual(id), at: '2026-11-03T12:00:00.000Z' }))
+      ).toBe('transfer-in-book');
+    });
+
+    it('links a hand record to a donation noted in an unread division, which is then never stored', async () => {
+      await turnOn();
+      await book()
+        .collection('meta')
+        .doc('uncounted')
+        .set({
+          donations: [
+            {
+              id: 'j3_77',
+              refId: 77,
+              division: 3,
+              characterId: 50,
+              amount: 4_000_000,
+              at: '2026-10-16T10:00:00.000Z',
+            },
+          ],
+        });
+      const hand = {
+        action: 'recordPayment',
+        paymentId: 'm_hand',
+        minerId: 'solo:50',
+        characterId: 50,
+        amount: 4_000_000,
+        at: '2026-10-17T00:00:00.000Z',
+      };
+      await edit(ACCOUNTANT, hand);
+      expect((await book().collection('payments').doc('m_hand').get()).get('transferId')).toBe(
+        'j3_77'
+      );
+      // A second officer recording it again is refused.
+      expect(await reason(edit(ACCOUNTANT, { ...hand, paymentId: 'm_hand2' }))).toBe(
+        'transfer-in-book'
+      );
+      // Division 3 is read later: the donation is not stored a second time.
+      await syncBook(
+        deps(),
+        who(ACCOUNTANT),
+        parseSyncInput(
+          {
+            corporationId: CORP,
+            donations: [
+              {
+                refId: 77,
+                division: 3,
+                characterId: 50,
+                amount: 4_000_000,
+                at: '2026-10-16T10:00:00Z',
+              },
+            ],
+          },
+          now
+        )
+      );
+      expect((await book().collection('payments').doc('j3_77').get()).exists).toBe(false);
     });
 
     it("refuses another Miner's declaration", async () => {
@@ -2096,9 +2161,9 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         expect((await book().collection('payments').doc('j1_2').get()).get('minerId')).toBe(
           'solo:50'
         );
-        // The same wallet payments are credited now: a new declaration finds nothing to credit.
+        // The same wallet payments are credited now: a new declaration says to whom.
         const next = await declare(50, { statementId: 's1', transfers: [transfer(4_000_000, 1)] });
-        expect(next.checks[0].result).toBe('notFound');
+        expect(next.checks[0]).toMatchObject({ result: 'credited', minerId: 'solo:50' });
       });
 
       it("credits the member's own donation the sync held for review, clearing the hold", async () => {
@@ -3104,6 +3169,100 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
           (await book().collection('disputes').doc('solo_50_2026-10-05').get()).get('resolution')
         ).toBeUndefined();
       });
+    });
+  });
+
+  describe('linking money: one resolver, review and reassignment (decision 20261120-235011)', () => {
+    const donate = (refId: number, characterId: number, extra: Record<string, unknown> = {}) =>
+      syncBook(
+        deps(),
+        who(ACCOUNTANT),
+        parseSyncInput(
+          {
+            corporationId: CORP,
+            donations: [
+              { refId, division: 1, characterId, amount: 10, at: '2026-10-18T00:00:00Z', ...extra },
+            ],
+          },
+          now
+        )
+      );
+    const payment = async (id: string) =>
+      (await book().collection('payments').doc(id).get()).data();
+
+    it('decides whose money it is itself: a client’s Miner and notice are not stored', async () => {
+      await turnOn();
+      await minedHere(50);
+      await donate(1, 50, { minerId: 'solo:999', statementId: 's1' });
+      expect(await payment('j1_1')).toMatchObject({ minerId: 'solo:50' });
+      expect(await payment('j1_1')).not.toHaveProperty('statementId');
+      // A stranger the book has never seen stays Unmatched, whatever the client said.
+      await donate(2, 777, { minerId: 'solo:50' });
+      expect(await payment('j1_2')).not.toHaveProperty('minerId');
+    });
+
+    it('a payer known only by an earlier payment keeps that payment’s Miner', async () => {
+      await turnOn();
+      await minedHere(50);
+      await edit(ACCOUNTANT, {
+        action: 'recordPayment',
+        paymentId: 'm0',
+        minerId: 'solo:50',
+        characterId: 88,
+        amount: 3,
+        at: '2026-10-01T00:00:00.000Z',
+      });
+      await donate(3, 88);
+      expect(await payment('j1_3')).toMatchObject({ minerId: 'solo:50' });
+    });
+
+    it('holds a donation that names two Miners for review, which no claim takes', async () => {
+      await turnOn();
+      await minedHere(50, 51);
+      await donate(4, 777, {
+        reason: `${minerPaymentCode('solo:50')} ${minerPaymentCode('solo:51')}`,
+      });
+      expect(await payment('j1_4')).toMatchObject({
+        reviewReason: 'ambiguous',
+        ambiguousMinerIds: ['solo:50', 'solo:51'],
+      });
+      expect(await payment('j1_4')).not.toHaveProperty('minerId');
+      expect(await reason(claimPayment(deps(), who(777), CORP, 'j1_4'))).toBe('in-review');
+      expect(await reason(claimPayment(deps(), who(777), CORP, 'j1_4', { inReview: true }))).toBe(
+        'in-review'
+      );
+    });
+
+    it('an officer moves a payment to another Miner or back to Unmatched, audited and idempotent', async () => {
+      await turnOn();
+      await minedHere(50, 51);
+      await donate(5, 777, {
+        reason: `${minerPaymentCode('solo:50')} ${minerPaymentCode('solo:51')}`,
+      });
+      const move = (minerId: string | null) =>
+        edit(ACCOUNTANT, { action: 'reassignPayment', paymentId: 'j1_5', minerId }, true);
+      await move('solo:51');
+      expect(await payment('j1_5')).toMatchObject({ minerId: 'solo:51', assignedBy: ACCOUNTANT });
+      expect(await payment('j1_5')).not.toHaveProperty('reviewReason');
+      expect(await payment('j1_5')).not.toHaveProperty('ambiguousMinerIds');
+      await move('solo:51');
+      await move(null);
+      expect(await payment('j1_5')).not.toHaveProperty('minerId');
+      const moves = (
+        await book().collection('audit').where('action', '==', 'reassignPayment').get()
+      ).docs.map((d) => d.data().detail);
+      expect(moves).toEqual(
+        expect.arrayContaining([
+          { paymentId: 'j1_5', from: null, to: 'solo:51' },
+          { paymentId: 'j1_5', from: 'solo:51', to: 'solo:51' },
+          { paymentId: 'j1_5', from: 'solo:51', to: null },
+        ])
+      );
+      expect(
+        await reason(
+          edit(JUNIOR, { action: 'reassignPayment', paymentId: 'j1_5', minerId: null }, true)
+        )
+      ).toBe('role-required');
     });
   });
 
