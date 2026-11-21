@@ -268,14 +268,3 @@ export function noteUncountedDonations(
       at: d.at,
     }));
 }
-
-/**
- * @deprecated `noteUncountedDonations`: a Running account has no open balance a sync reads, and
- * nothing counted takes one down. Kept only until the client's sync calls the new one.
- */
-export function uncountedDonations(
-  donations: readonly ElsewhereDonation[],
-  book: MatchBook & { openBalance?: ReadonlyMap<string, number>; unbilled: ReadonlySet<string> }
-): UncountedDonation[] {
-  return noteUncountedDonations(donations, book, book.unbilled);
-}

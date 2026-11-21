@@ -26,7 +26,7 @@ import {
   rematchUnmatched,
   type UnmatchedCandidate,
 } from '../../../../functions/src/corpTaxBookDonationMatch';
-import { otherDivisions, uncountedDonations } from '@/engine/corpTaxBook/uncounted';
+import { noteUncountedDonations, otherDivisions } from '@/engine/corpTaxBook/uncounted';
 import {
   planSignInGroups,
   type GroupingEdit,
@@ -279,11 +279,11 @@ export async function syncCorpTaxBook(
   const uncounted =
     elsewhere === null
       ? undefined
-      : uncountedDonations(elsewhere, {
-          ...matching,
-          openBalance: new Map(),
-          unbilled: minedSinceStart(rows, before.miners, before.book.startDate),
-        });
+      : noteUncountedDonations(
+          elsewhere,
+          matching,
+          minedSinceStart(rows, before.miners, before.book.startDate)
+        );
 
   // The first call carries everything but the overflow of observer rows, so a
   // later failure loses only ledger rows (each call also records the visit).
