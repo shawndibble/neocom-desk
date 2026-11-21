@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { TaxPayment } from './allocation';
+import type { TaxPayment } from './payments';
 import { creditSources, moneyQueue } from './paidBy';
 
 const pay = (
@@ -24,7 +24,7 @@ describe('creditSources', () => {
         pay('p2', 500, '2026-11-02T00:00:00Z', { notTaxAmount: 100 }),
         pay('p1', 1000, '2026-11-01T00:00:00Z'),
       ],
-      { paymentCredits: [{ paymentId: 'p1', statementId: 's1', amount: 300 }], credit: 1500 }
+      { paymentCredits: [{ paymentId: 'p1', amount: 300 }], credit: 1500 }
     );
     expect(sources).toEqual([
       { kind: 'credit', amount: 400 },
@@ -36,7 +36,7 @@ describe('creditSources', () => {
   it('leaves out a payment a Statement fully absorbed and a donation before the book', () => {
     const sources = creditSources(
       [pay('p1', 300, '2026-11-01T00:00:00Z'), pay('old', 900, '2026-09-01T00:00:00Z')],
-      { paymentCredits: [{ paymentId: 'p1', statementId: 's1', amount: 300 }], credit: 0 },
+      { paymentCredits: [{ paymentId: 'p1', amount: 300 }], credit: 0 },
       '2026-10-01'
     );
     expect(sources).toEqual([]);

@@ -87,7 +87,17 @@ function needsYouOf(data: BookRead) {
   const value = {
     characterId: 7,
     corporationId: CORP,
-    view: { input: { dismissals: data.state.dismissals } },
+    view: {
+      input: {
+        dismissals: data.state.dismissals,
+        miners: [],
+        notices: [],
+        payments: [],
+        now: '2026-09-18T00:00:00Z',
+      },
+      miners: [],
+      internals: { byMiner: new Map() },
+    },
     names: {},
     settings: data.settings,
     data,

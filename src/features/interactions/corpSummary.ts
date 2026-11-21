@@ -12,7 +12,6 @@ export const HOSTILE_WINDOW_DAYS = 90;
 export interface CorpMemberChips {
   owedNow: number | null;
   taxPaid: number | null;
-  statements: number | null;
   lateNotices: number | null;
   /** Epoch ms of the oldest record the corp book holds for them. */
   memberSince: number | null;
@@ -44,15 +43,14 @@ export function summarizeCorpInteractions(input: {
   let member: CorpMemberChips | null = null;
   if (isMember && book) {
     const stamps = [
-      ...book.statements.map((s) => Date.parse(s.issuedAt)),
+      ...book.notices.map((n) => Date.parse(n.issuedAt)),
       ...book.payments.map((p) => Date.parse(p.at)),
       ...book.days.map((d) => Date.parse(d.date)),
     ].filter(Number.isFinite);
     member = {
       owedNow: positive(book.owed),
       taxPaid: positive(book.payments.reduce((sum, p) => sum + p.amount, 0)),
-      statements: positive(book.statements.filter((s) => !s.notice).length),
-      lateNotices: positive(book.statements.filter((s) => s.notice).length),
+      lateNotices: positive(book.notices.length),
       memberSince: stamps.length > 0 ? Math.min(...stamps) : null,
     };
   }

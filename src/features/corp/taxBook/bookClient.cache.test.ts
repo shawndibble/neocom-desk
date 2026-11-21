@@ -100,7 +100,7 @@ beforeEach(async () => {
   store.denied.clear();
   store.docs.set(BOOK, stamped());
   store.docs.set(`${BOOK}/miners/m1`, { id: 'm1', characterIds: [1] });
-  store.docs.set(`${BOOK}/statements/s1`, { id: 's1' });
+  store.docs.set(`${BOOK}/statements/s1`, notice('s1'));
   store.docs.set(`${BOOK}/observed/o1`, { ...OBSERVED_ROW });
   store.docs.set(`${BOOK}/feeders/5`, { corporationId: 5, status: 'active' });
   store.docs.set(`${BOOK}/feeders/5/payouts/p1`, { amount: 1 });
@@ -108,6 +108,11 @@ beforeEach(async () => {
   store.docs.set(MODEL_DOCS[0]!, MODELS.minerList);
   store.docs.set(MODEL_DOCS[1]!, MODELS.overview);
 });
+
+/** A late notice as older servers store it, in the legacy collection. */
+function notice(id: string) {
+  return { id, kind: 'notice', minerId: 'solo:1', issuedAt: '2026-09-01T00:00:00Z', lines: [] };
+}
 
 describe('readBook over the version marker', () => {
   it('re-opens an unchanged book for its settings document and the officer-only probe', async () => {
@@ -173,14 +178,14 @@ describe('readBook over the version marker', () => {
   it('after a reload, re-reads only the part whose stamp moved', async () => {
     await readBook(7, CORP, WHOLE);
     clearBookCache();
-    store.docs.set(`${BOOK}/statements/s2`, { id: 's2' });
+    store.docs.set(`${BOOK}/statements/s2`, notice('s2'));
     store.docs.set(BOOK, stamped({ statements: 'statements-2' }));
     store.reads.length = 0;
 
     const data = await readBook(7, CORP, WHOLE);
 
     expect(store.reads.sort()).toEqual([BOOK, `${BOOK}/meta/paid`, `${BOOK}/statements`].sort());
-    expect(data?.state.statements).toHaveLength(2);
+    expect(data?.state.notices).toHaveLength(2);
   });
 
   it('after a reload, reads a part again once its copy is over a day old', async () => {
@@ -213,8 +218,7 @@ describe('readBook over the version marker', () => {
     expect(read).not.toContain(`${BOOK}/meta/groupingAnswers`);
     expect(read).toContain(`${BOOK}/meta/paid`);
     expect(data?.parts).toEqual(new Set(['core']));
-    expect(data?.state.paidStatementIds).toEqual(new Set(['s0']));
-    expect(data?.state.statements).toHaveLength(1);
+    expect(data?.state.notices).toHaveLength(1);
     expect(data?.state.payments).toEqual([]);
   });
 
@@ -273,7 +277,7 @@ describe('readBook over the version marker', () => {
     store.docs.set(`${BOOK}/payments/p1`, { id: 'p1' });
     store.docs.set(BOOK, stamped({ payments: 'payments-2' }));
 
-    const merged = await extendBook(7, CORP, core!, bookPartsFor('statements', null));
+    const merged = await extendBook(7, CORP, core!, bookPartsFor('late-notices', null));
 
     expect(store.reads).not.toContain(`${BOOK}/miners`);
     expect(store.reads).not.toContain(`${BOOK}/observed`);
@@ -341,14 +345,14 @@ describe('readBook over the version marker', () => {
 
   it('re-reads only the collection an edit restamped', async () => {
     await readBook(7, CORP, WHOLE);
-    store.docs.set(`${BOOK}/statements/s2`, { id: 's2' });
+    store.docs.set(`${BOOK}/statements/s2`, notice('s2'));
     store.docs.set(BOOK, stamped({ statements: 'statements-2' }));
     store.reads.length = 0;
 
     const data = await readBook(7, CORP, WHOLE);
 
     expect(store.reads.sort()).toEqual([BOOK, `${BOOK}/meta/paid`, `${BOOK}/statements`].sort());
-    expect(data?.state.statements).toEqual([{ id: 's1' }, { id: 's2' }]);
+    expect(data?.state.notices.map((n) => n.id)).toEqual(['s1', 's2']);
   });
 
   it('re-reads a feeder and its payouts when the feeders stamp moves', async () => {
@@ -384,8 +388,7 @@ describe('readBook over the version marker', () => {
     // The disputes are the sync's own read (an open one holds its Statement); the page's copy
     // above never read them.
     expect(store.reads).toEqual([BOOK, `${BOOK}/meta/paid`, `${BOOK}/disputes`]);
-    expect(state?.statements).toEqual([{ id: 's1' }]);
-    expect(state?.paidStatementIds).toEqual(new Set(['s0']));
+    expect(state?.notices.map((n) => n.id)).toEqual(['s1']);
   });
 
   it('serves no copy to a Character the rules now refuse', async () => {
@@ -399,44 +402,6 @@ describe('readBook over the version marker', () => {
     store.docs.delete(BOOK);
     expect(await readBook(7, CORP, WHOLE)).toBeNull();
     expect(store.reads).toEqual([BOOK]);
-  });
-});
-
-describe('readBook and the Overview/Miners read models (#5259)', () => {
-  it('reads the two docs, and reuses them while their stamp holds', async () => {
-    const data = await readBook(7, CORP, WHOLE);
-    expect(data?.readModels).toEqual(MODELS);
-    expect(store.reads.filter((p) => p.includes('/readModels')).sort()).toEqual(MODEL_DOCS);
-
-    store.reads.length = 0;
-    await readBook(7, CORP, WHOLE);
-    expect(store.reads.some((p) => p.includes('/readModels'))).toBe(false);
-
-    store.docs.set(BOOK, stamped({ readModels: 'readModels-2' }));
-    await readBook(7, CORP, WHOLE);
-    expect(store.reads.filter((p) => p.includes('/readModels')).sort()).toEqual(MODEL_DOCS);
-  });
-
-  it('opens the book without them while the server has not built them', async () => {
-    store.docs.delete(MODEL_DOCS[0]!);
-    store.docs.delete(MODEL_DOCS[1]!);
-    const data = await readBook(7, CORP, WHOLE);
-    expect(data?.readModels).toEqual({ minerList: undefined, overview: undefined });
-    expect(data?.state.miners).toHaveLength(1);
-  });
-
-  it('opens the book without them, wiping nothing, when the rules refuse the docs', async () => {
-    await readBook(7, CORP, WHOLE);
-    clearBookCache();
-    store.denied.add(MODEL_DOCS[0]!);
-    store.denied.add(MODEL_DOCS[1]!);
-    // A moved stamp, so the held copy is not served and the refused docs are read.
-    store.docs.set(BOOK, stamped({ readModels: 'readModels-2' }));
-
-    const data = await readBook(7, CORP, WHOLE);
-    expect(data?.readModels).toBeUndefined();
-    expect(data?.state.miners).toBeDefined();
-    expect(await db.corpBookParts.count()).toBeGreaterThan(0);
   });
 });
 

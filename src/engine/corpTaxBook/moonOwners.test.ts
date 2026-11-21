@@ -333,9 +333,9 @@ describe('buildMoonOwners', () => {
 });
 
 describe('billed prices (#6209)', () => {
-  it('keeps the first price each Statement line was billed at, by line', () => {
+  it('keeps the first price a late notice listed each line at, by line', () => {
     const lines = (key: string, price: number) => ({
-      lines: [{ chargeKey: key, unitPrices: { 100: price } }, { adjustmentId: 'a' }],
+      lines: [{ key, unitPrices: { 100: price } }, { key: 'adjustment:a' }],
     });
     expect(billedPricesOf([lines('1:10:2026-10-05', 3), lines('1:10:2026-10-05', 9)])).toEqual(
       new Map([['1:10:2026-10-05', { 100: 3 }]])

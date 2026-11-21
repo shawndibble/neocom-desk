@@ -10,7 +10,7 @@ import {
   type AccountLedger as Ledger,
 } from '@/engine/corpTaxBook/accountLedger';
 import type { MinerDetail } from '@/engine/corpTaxBook/bookView';
-import type { Adjustment } from '@/engine/corpTaxBook/statements';
+import type { Adjustment } from '@/engine/corpTaxBook/adjustments';
 import { canOverrideDay } from './dayEligibility';
 import { LedgerRowMenu, type LedgerActions } from './LedgerRowMenu';
 import { isk, shortDate } from './moonsFormat';
@@ -29,13 +29,11 @@ import { useBook } from './useBook';
 export function AccountLedger({
   detail,
   corrections,
-  running,
   phone,
   actions,
 }: {
   detail: MinerDetail;
   corrections: readonly Adjustment[];
-  running: boolean;
   phone: boolean;
   /** What a row's menu opens; without it the rows have no menu. */
   actions?: LedgerActions;
@@ -51,13 +49,11 @@ export function AccountLedger({
     chargeShortfall: (e) => run(() => actions.chargeShortfall(e)),
     changeForgiven: (e) => run(() => actions.changeForgiven(e)),
     markNotTax: (id) => run(() => actions.markNotTax(id)),
+    reassignPayment: (id) => run(() => actions.reassignPayment(id)),
     changeRate: (key) => run(() => actions.changeRate(key)),
     dismissDays: (keys) => run(() => actions.dismissDays(keys)),
   };
-  const ledger: Ledger = useMemo(
-    () => accountLedger(detail, corrections, running),
-    [detail, corrections, running]
-  );
+  const ledger: Ledger = useMemo(() => accountLedger(detail, corrections), [detail, corrections]);
   const rows = useMemo(() => [...ledger.entries].reverse(), [ledger]);
 
   /** The mined days behind a day row, with their status: what can still be changed on them. */
@@ -134,6 +130,8 @@ export function AccountLedger({
         return undone(e, t('corpTaxBook.moons.ledger.what.writeOff', { reason: e.note }));
       case 'tolerance':
         return t('corpTaxBook.moons.ledger.what.tolerance');
+      case 'checkpoint':
+        return t('corpTaxBook.moons.ledger.what.checkpoint');
     }
   };
 
@@ -168,8 +166,7 @@ export function AccountLedger({
       <p className="px-3 py-2 text-sm text-text-dim">
         {e.kind === 'tolerance'
           ? t(
-              // `note` is the mined day a running account's row closes; a Statement's has none and
-              // is always paid after it is issued.
+              // `note` is the mined day a Running account's row closes.
               e.note !== undefined && e.date <= e.note
                 ? 'corpTaxBook.moons.ledger.toleranceNote'
                 : 'corpTaxBook.moons.ledger.toleranceNoteLater'
@@ -268,7 +265,7 @@ export function AccountLedger({
                         .filter(canOverrideDay)
                         .map((d) => d.key)}
                       dismissDays={daysOf(e)
-                        .filter((d) => d.status === 'unbilled' || d.status === 'not-billable')
+                        .filter((d) => d.status === 'owed' || d.status === 'not-billable')
                         .map((d) => d.key)}
                       onCloseAutoFocus={onCloseAutoFocus}
                     >

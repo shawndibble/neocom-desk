@@ -2,13 +2,12 @@
  * The account ledger's row menu (right-click, touch-and-hold, ⋮). Each row offers only what
  * changes that row: a correction is edited or reversed (never deleted: the record stays, struck
  * through), a write-off is reversed, a Market adjustment is charged or changed, a payment is
- * marked not tax, a mined day gets its rate changed or its tax dismissed. A correction an issued
- * Statement billed is frozen (D22), so its item says so. Officers only: without edit rights the
- * row has no menu.
+ * marked not tax or moved to another Miner, a mined day gets its rate changed or its tax
+ * dismissed. Officers only: without edit rights the row has no menu.
  */
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DisabledMenuItem, MenuItem, RowActionsMenu } from '@/components/ui';
+import { MenuItem, RowActionsMenu } from '@/components/ui';
 import type { LedgerEntry } from '@/engine/corpTaxBook/accountLedger';
 import { useBook } from './useBook';
 
@@ -20,6 +19,7 @@ export interface LedgerActions {
   chargeShortfall: (entry: LedgerEntry) => void;
   changeForgiven: (entry: LedgerEntry) => void;
   markNotTax: (paymentId: string) => void;
+  reassignPayment: (paymentId: string) => void;
   changeRate: (dayKey: string) => void;
   dismissDays: (dayKeys: readonly string[]) => void;
 }
@@ -37,7 +37,7 @@ export function LedgerRowMenu({
   actions: LedgerActions;
   /** Of a mined-day row's days, the ones whose rate can still be changed. */
   rateDays?: readonly string[];
-  /** Of a mined-day row's days, the ones whose tax can still be dismissed (none paid or on a Statement). */
+  /** Of a mined-day row's days, the ones whose tax can still be dismissed (none paid or on a Late notice). */
   dismissDays?: readonly string[];
   /** What the menu is named for assistive tech: the row's date and kind. */
   name: string;
@@ -55,18 +55,10 @@ export function LedgerRowMenu({
   const items: ReactElement[] = [];
   if (entry.kind === 'correction' && entry.refId) {
     const id = entry.refId;
-    if (entry.locked) {
-      items.push(
-        <DisabledMenuItem key="locked" reason={t('corpTaxBook.moons.ledger.menu.correctionLocked')}>
-          {t('corpTaxBook.moons.ledger.menu.correctionReverse')}
-        </DisabledMenuItem>
-      );
-    } else {
-      items.push(
-        item('correctionEdit', () => actions.editCorrection(id)),
-        item('correctionReverse', () => actions.reverseCorrection(id))
-      );
-    }
+    items.push(
+      item('correctionEdit', () => actions.editCorrection(id)),
+      item('correctionReverse', () => actions.reverseCorrection(id))
+    );
   } else if (entry.kind === 'writeOff' && entry.refId) {
     const id = entry.refId;
     items.push(item('writeOffReverse', () => actions.reverseWriteOff(id)));
@@ -77,7 +69,10 @@ export function LedgerRowMenu({
     );
   } else if (entry.kind === 'payment' && entry.paymentId) {
     const id = entry.paymentId;
-    items.push(item('notTax', () => actions.markNotTax(id)));
+    items.push(
+      item('notTax', () => actions.markNotTax(id)),
+      item('reassign', () => actions.reassignPayment(id))
+    );
   } else if (entry.kind === 'day') {
     if (rateDays.length > 0) items.push(item('rate', () => actions.changeRate(rateDays[0]!)));
     if (dismissDays.length > 0) items.push(item('dismiss', () => actions.dismissDays(dismissDays)));

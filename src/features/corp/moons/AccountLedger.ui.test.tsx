@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { buildBookView, minerDetail, type BookViewInput } from '@/engine/corpTaxBook/bookView';
-import type { Adjustment } from '@/engine/corpTaxBook/statements';
+import type { Adjustment } from '@/engine/corpTaxBook/adjustments';
 import { BookProvider } from './BookContext';
 import { AccountLedger } from './AccountLedger';
 import { EditCorrectionDialog, MarketAdjustmentDialog } from './CorrectionDialogs';
@@ -30,9 +30,7 @@ function input(overrides: Partial<BookViewInput> = {}): BookViewInput {
     now: '2026-09-18T14:00:00Z',
     startDate: '2026-08-01',
     graceHours: 6,
-    minimumStatement: 5_000_000,
     overdueDays: 14,
-    cadence: { kind: 'monthly' },
     hubId: 'jita',
     oreForm: 'compressed',
     structureExpiryHours: {},
@@ -48,13 +46,12 @@ function input(overrides: Partial<BookViewInput> = {}): BookViewInput {
       },
     ],
     miners: [],
-    statements: [],
+    notices: [],
     payments: [],
     dismissals: [],
     declarations: [],
     adjustments: [],
     extractions: [],
-    paidStatementIds: new Set(),
     pricesOn: () => ({ prices: new Map([[ORE, 1000]]), sources: new Map() }),
     ...overrides,
   };
@@ -86,8 +83,6 @@ const correction: Adjustment = {
 function running(overrides: Partial<BookViewInput> = {}) {
   return buildBookView(
     input({
-      runningAccountFrom: '2026-08-01T00:00:00Z',
-      minimumStatement: 0,
       // The day is 200,000; 199,000 paid is within the book's tolerance.
       payments: [
         {
@@ -113,6 +108,7 @@ function renderLedger(view = running(), canEdit = true, corrections: Adjustment[
     chargeShortfall: (e) => calls.push(`charge:${e.forDate}`),
     changeForgiven: (e) => calls.push(`forgiven:${e.forDate}`),
     markNotTax: (id) => calls.push(`notTax:${id}`),
+    reassignPayment: (id) => calls.push(`reassign:${id}`),
     changeRate: (key) => calls.push(`rate:${key}`),
     dismissDays: (keys) => calls.push(`dismiss:${keys.length}`),
   };
@@ -138,13 +134,7 @@ function renderLedger(view = running(), canEdit = true, corrections: Adjustment[
           reload: vi.fn(),
         }}
       >
-        <AccountLedger
-          detail={detail}
-          corrections={corrections}
-          running
-          phone={false}
-          actions={actions}
-        />
+        <AccountLedger detail={detail} corrections={corrections} phone={false} actions={actions} />
       </BookProvider>
     </MemoryRouter>
   );
@@ -189,67 +179,18 @@ describe('the account ledger row menus', () => {
     expect(screen.queryByRole('menuitem', { name: 'Dismiss tax' })).toBeNull();
   });
 
+  it('offers a payment not tax and a move to another Miner, and the move opens its dialog', async () => {
+    const calls = renderLedger(running());
+    fireEvent.contextMenu(rowOf(/^Payment from Pilot 2/));
+    expect(await screen.findByRole('menuitem', { name: 'Mark part not tax' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Move to another Miner' }));
+    await vi.waitFor(() => expect(calls).toEqual(['reassign:p1']));
+  });
+
   it('has no menu without edit rights', () => {
     renderLedger(running({ adjustments: [correction] }), false);
     fireEvent.contextMenu(rowOf(/Correction: Auth rollover/));
     expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
-  });
-
-  it('says a correction an issued Statement billed can only be offset', async () => {
-    const view = running({ adjustments: [correction] });
-    const detail = minerDetail(view, 'solo:2')!;
-    // A Statement that carries the correction's line freezes it.
-    const frozen = {
-      ...detail,
-      statements: [{ id: 's1', lines: [{ kind: 'correction', adjustmentId: 'c1' }] } as never],
-    };
-    const calls: string[] = [];
-    render(
-      <MemoryRouter>
-        <BookProvider
-          value={{
-            characterId: 7,
-            corporationId: CORP,
-            view,
-            names: {
-              character: (id) => `Pilot ${id}`,
-              corporation: (id) => `Corp ${id}`,
-              refinery: () => 'Efa - Brass Anvil',
-              ownerRefinery: () => 'Efa - Brass Anvil',
-              moon: (id) => `Moon ${id}`,
-              ore: () => 'Sylvite',
-            },
-            settings: {} as BookSettings,
-            data: {} as never,
-            verdict,
-            reload: vi.fn(),
-          }}
-        >
-          <AccountLedger
-            detail={frozen}
-            corrections={[correction]}
-            running
-            phone={false}
-            actions={{
-              editCorrection: (id) => calls.push(id),
-              reverseCorrection: (id) => calls.push(id),
-              reverseWriteOff: vi.fn(),
-              chargeShortfall: vi.fn(),
-              changeForgiven: vi.fn(),
-              markNotTax: vi.fn(),
-              changeRate: vi.fn(),
-              dismissDays: vi.fn(),
-            }}
-          />
-        </BookProvider>
-      </MemoryRouter>
-    );
-    fireEvent.contextMenu(rowOf(/Correction: Auth rollover/));
-    const item = await screen.findByRole('menuitem', { name: /Reverse correction/ });
-    expect(item).toHaveAttribute('aria-disabled', 'true');
-    expect(screen.queryByRole('menuitem', { name: /Edit correction/ })).toBeNull();
-    await userEvent.click(item);
-    expect(calls).toEqual([]);
   });
 });
 

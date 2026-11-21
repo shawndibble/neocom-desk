@@ -4,13 +4,8 @@
  * `BookProvider`, so the stories are the shipped components.
  */
 import { DEFAULT_NOTICE_RULES } from '@/engine/corpTaxBook/notices';
-import {
-  buildBookView,
-  nextRunPeriod,
-  planStatementRun,
-  statementForLine,
-  type BookView,
-} from '@/engine/corpTaxBook/bookView';
+import { buildBookView, type BookView } from '@/engine/corpTaxBook/bookView';
+import { draftNotice } from '@/engine/corpTaxBook/lateNotices';
 import { extractionId } from '@/engine/corpTaxBook/sync';
 import type { ObservedMiningEntry } from '@/engine/corpTaxBook/types';
 import type { BookSettings, OfficerVerdict } from '@/features/corp/taxBook/bookClient';
@@ -150,9 +145,7 @@ const base = {
   now: '2026-10-18T14:00:00Z',
   startDate: '2026-08-01',
   graceHours: 6,
-  minimumStatement: 0,
   overdueDays: 14,
-  cadence: { kind: 'monthly' as const },
   hubId: 'jita',
   oreForm: 'compressed' as const,
   structureExpiryHours: {},
@@ -160,13 +153,12 @@ const base = {
   rates: [{ scope: 'corp' as const, pct: 10, effectiveFrom: '2026-08-01' }],
   entries: ENTRIES,
   miners: [{ id: 'g1', characterIds: [1, 2], mainCharacterId: 1 }],
-  statements: [],
+  notices: [],
   payments: [],
   dismissals: [],
   declarations: [],
   adjustments: [],
   extractions: EXTRACTIONS,
-  paidStatementIds: new Set<string>(),
   pricesOn: () => ({
     prices: new Map(Object.entries(ORES).map(([id, [, p]]) => [Number(id), p])),
     sources: new Map(),
@@ -174,18 +166,12 @@ const base = {
 };
 
 function build(): BookView {
-  const first = buildBookView(base);
-  const period = nextRunPeriod(first);
-  const plan = period ? planStatementRun(first, period) : undefined;
-  const statements = plan
-    ? plan.lines.map((l) => ({
-        ...statementForLine(first, plan, l),
-        issuedAt: '2026-09-01T10:00:00Z',
-      }))
-    : [];
-  const tam = statements.find((s) => s.minerId === 'solo:4');
-  const odile = statements.find((s) => s.minerId === 'solo:3');
-  const varro = statements.find((s) => s.minerId === 'g1');
+  // A late notice to each Miner who owed on 1 Sep, read off the book as it stood then.
+  const then = buildBookView({ ...base, now: '2026-09-01T10:00:00Z' });
+  const notices = then.miners.flatMap((m) => draftNotice(then, m.id)?.notice ?? []);
+  const tam = notices.find((n) => n.minerId === 'solo:4');
+  const odile = notices.find((n) => n.minerId === 'solo:3');
+  const varro = notices.find((n) => n.minerId === 'g1');
   const payments = [
     {
       id: 'u1',
@@ -212,7 +198,7 @@ function build(): BookView {
             id: 'p1',
             minerId: 'solo:3',
             characterId: 3,
-            amount: odile.amount,
+            amount: odile.listed,
             at: '2026-09-10T08:00:00Z',
             source: 'donation' as const,
           },
@@ -224,19 +210,14 @@ function build(): BookView {
             id: 'p2',
             minerId: 'solo:4',
             characterId: 4,
-            amount: Math.round(tam.amount / 2),
+            amount: Math.round(tam.listed / 2),
             at: '2026-09-12T08:00:00Z',
             source: 'donation' as const,
           },
         ]
       : []),
   ];
-  return buildBookView({
-    ...base,
-    statements,
-    payments,
-    paidStatementIds: new Set(odile ? [odile.id] : []),
-  });
+  return buildBookView({ ...base, notices, payments });
 }
 
 export const BOOK_VIEW = build();
@@ -278,7 +259,7 @@ export const BOOK_CONTEXT = {
   corporationId: CORP_ID,
   view: BOOK_VIEW,
   names: NAMES,
-  settings: { minimumStatement: 0 } as BookSettings,
+  settings: { noticeRules: DEFAULT_NOTICE_RULES } as BookSettings,
   data: {
     adjustments: [],
     declarations: [],
@@ -291,9 +272,9 @@ export const BOOK_CONTEXT = {
   reload: () => {},
 };
 
-/** The same corporation on a running account that is behind: what the late notice run sends. */
+/** The same corporation before any notice went out, behind: what the late notice run sends. */
 export const NOTICE_BOOK_CONTEXT = {
   ...BOOK_CONTEXT,
-  view: buildBookView({ ...base, runningAccountFrom: '2026-08-01T00:00:00Z' }),
-  settings: { minimumStatement: 0, noticeRules: DEFAULT_NOTICE_RULES } as BookSettings,
+  view: buildBookView(base),
+  settings: { noticeRules: DEFAULT_NOTICE_RULES } as BookSettings,
 };

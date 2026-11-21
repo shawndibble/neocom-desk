@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import type { RunningAccountStatus } from '@/engine/corpTaxBook/bookView';
-import { daysBetween } from '@/engine/corpTaxBook/statements';
+import { utcDaysBetween } from '@/engine/localDay';
 import { utcDay } from '@/engine/localDay';
 import { isk, shortDate } from './moonsFormat';
 import { useBook } from './useBook';
@@ -39,7 +39,10 @@ export function OldestUnpaid({ account }: { account: RunningAccountStatus }) {
       <span className="text-danger">
         {t('corpTaxBook.moons.account.oldestUnpaid', {
           date: shortDate(account.owes.oldest),
-          count: Math.max(0, daysBetween(account.owes.oldest, utcDay(Date.parse(view.input.now)))),
+          count: Math.max(
+            0,
+            utcDaysBetween(account.owes.oldest, utcDay(Date.parse(view.input.now)))
+          ),
         })}
       </span>
     );

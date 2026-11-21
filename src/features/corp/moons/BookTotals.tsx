@@ -10,7 +10,6 @@ import {
 } from '@/engine/corpTaxBook/overdueAging';
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
 import { useTabsProjection } from './useTabsProjection';
-import { useBook } from './useBook';
 import { isk } from './moonsFormat';
 import { minersBalancePath } from './moonsPaths';
 
@@ -24,14 +23,11 @@ function linkTo(miners: readonly MinerRow[], balance: MinerBalance) {
 /**
  * The book's totals strip on the Overview and Miners tabs. A figure that a Miners view lists
  * (Owed, Overdue, Credit held) links to the Miners tab narrowed to those Miners, only while it
- * counts someone; Next Statement has no such view and stays a readout. `children` adds the
- * Overview's own chips after them.
+ * counts someone. `children` adds the Overview's own chips after them.
  */
 export function BookTotals({ children }: { children?: ReactNode }) {
   const { t } = useTranslation();
   const { totals, miners } = useTabsProjection();
-  // A running account has no Next Statement: every Billable day is owed already (#6294).
-  const running = !!useBook().view.input.runningAccountFrom;
   return (
     <StatChips>
       <StatChip
@@ -49,9 +45,6 @@ export function BookTotals({ children }: { children?: ReactNode }) {
         {...(totals.overdueCount > 0 ? { tone: 'danger' as const } : {})}
         {...linkTo(miners, 'overdue')}
       />
-      {!running && (
-        <StatChip label={t('corpTaxBook.moons.chips.unbilled')} value={isk(totals.unbilled)} />
-      )}
       <StatChip
         label={t('corpTaxBook.moons.chips.credit')}
         value={isk(totals.credit)}

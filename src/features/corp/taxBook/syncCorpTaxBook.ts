@@ -1,9 +1,9 @@
 /**
  * One officer visit's sync of the Corp Tax Book (issue #4062, D9): read what
- * ESI holds, upload it monotonically, record the gaps, then settle the
- * Statements the donations now cover. The server stores what it is sent and
- * does not detect settlement or gaps (#4061 hand-off), so both are decided here
- * with the pure engine (`engine/corpTaxBook/sync.ts`).
+ * ESI holds, upload it monotonically, and record the gaps. The server stores
+ * what it is sent and does not detect gaps (#4061 hand-off), so they are decided
+ * here with the pure engine (`engine/corpTaxBook/sync.ts`). Money pays each
+ * Miner's oldest day on their Running account: there is nothing to settle.
  *
  * The collaborators are passed in so the flow is testable without Firebase or
  * ESI; `defaultSyncDeps` wires the real ones.
@@ -12,26 +12,23 @@ import {
   detectGaps,
   mergeGaps,
   placeObservedRows,
-  openBalances,
-  planSettlements,
   reconcileExtractions,
-  resolveDonations,
+  donationMatchBook,
   billableStoredRows,
   storedRowsWanted,
-  unbilledMinerIds,
   type JournalDonation,
   type MoonNotification,
   type SyncExtraction,
 } from '@/engine/corpTaxBook/sync';
-import { matchDonation } from '@/engine/corpTaxBook/allocation';
-import { noteUncounted, otherDivisions } from '@/engine/corpTaxBook/uncounted';
+import { minerIdFor } from '@/engine/corpTaxBook/charges';
+import { donationOwner } from '../../../../functions/src/corpTaxBookDonationMatch';
+import { otherDivisions, uncountedDonations } from '@/engine/corpTaxBook/uncounted';
 import {
   planSignInGroups,
   type GroupingEdit,
   type MergePrompt,
   type RegroupEdit,
 } from '@/engine/corpTaxBook/grouping';
-import type { Statement } from '@/engine/corpTaxBook/statements';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import type { FeederCoverage } from '@/engine/corpTaxBook/coverage';
 import type { CorpCapabilities } from '@/engine/corpRoles';
@@ -65,9 +62,8 @@ import { chunk } from '@/lib/chunk';
 export const OBSERVED_PER_CALL = 2000;
 /** And this many donations; the newest are sent first and the rest follow on the next visit. */
 export const DONATIONS_PER_CALL = 500;
-/** And this many extractions, and this many Statement ids to settle. */
+/** And this many extractions. */
 export const EXTRACTIONS_PER_CALL = 200;
-export const SETTLE_PER_CALL = 200;
 
 export interface SyncDeps {
   now: () => number;
@@ -94,11 +90,6 @@ export interface SyncDeps {
     characterId: number,
     corporationId: number,
     divisions: readonly number[]
-  ) => Promise<unknown>;
-  settleStatements: (
-    characterId: number,
-    corporationId: number,
-    statementIds: string[]
   ) => Promise<unknown>;
   /** The Characters on this app account with the corporation they were last seen in (D26). */
   loadAccountCharacters: () => Promise<{ characterId: number; corporationId: number }[]>;
@@ -143,8 +134,6 @@ export const defaultSyncDeps: SyncDeps = {
     const outgoing = await loadOutgoingDonations(characterId, corporationId, divisions);
     if (outgoing.length > 0) await reconcileFeederPayouts(characterId, corporationId, outgoing);
   },
-  settleStatements: (characterId, corporationId, statementIds) =>
-    editBook(characterId, corporationId, { action: 'settleStatements', statementIds }),
   loadAccountCharacters: async () =>
     (await db.characters.toArray()).flatMap((c) =>
       c.corporationId === undefined
@@ -176,8 +165,6 @@ export type SyncOutcome =
       observedRows: number;
       extractions: number;
       donationsAdded: number;
-      /** Statement ids this visit settled. */
-      settled: string[];
       /** The gaps now on record, earlier ones included. */
       gaps: ReturnType<typeof mergeGaps>;
       /** The corporation has no refinery this Character can read: donations synced, the ledger is empty. */
@@ -275,20 +262,24 @@ export async function syncCorpTaxBook(
     ...feed.rows,
     ...(await billedStoredRows(deps, characterId, corporationId, before, feed.rows, fresh)),
   ] as ObservedRow[];
-  const known = new Set<number>([
-    ...rows.map((r) => r.characterId),
-    ...before.miners.flatMap((m) => m.characterIds),
-    ...before.payments.filter((p) => p.minerId !== undefined).map((p) => p.characterId),
-  ]);
-  const matching = {
+  const mined = new Set(rows.map((r) => r.characterId));
+  const matching = donationMatchBook({
     miners: before.miners,
-    statements: before.statements as Statement[],
-    knownCharacterIds: known,
-    openBalance: openBalanceOf(before),
-    unbilled: unbilledOf(before, rows),
-  };
-  const resolved = resolveDonations(fresh, matching);
-  const uncounted = elsewhere === null ? undefined : noteUncounted(elsewhere, matching, resolved);
+    notices: before.notices,
+    minedCharacterIds: mined,
+    payments: before.payments,
+  });
+  // The server places each donation itself, with the shared rule (`donationOwner`): a Miner this
+  // tab named would be ignored, so none is sent.
+  // A sender whose Miner has mined since the book began likely owes: no open balance to read.
+  const uncounted =
+    elsewhere === null
+      ? undefined
+      : uncountedDonations(elsewhere, {
+          ...matching,
+          openBalance: new Map(),
+          unbilled: owingOf(before, rows),
+        });
 
   // The first call carries everything but the overflow of observer rows, so a
   // later failure loses only ledger rows (each call also records the visit).
@@ -307,7 +298,7 @@ export async function syncCorpTaxBook(
   const receipt = await deps.uploadSync(characterId, {
     corporationId,
     ...first,
-    donations: resolved,
+    donations: fresh,
     gaps,
     ...(uncounted ? { uncounted } : {}),
     // Members' "not credited" notes wait on a sync that read the wallet, not on any sync.
@@ -338,47 +329,18 @@ export async function syncCorpTaxBook(
 
   // A donation stored Unmatched stays so forever unless re-matched: its sender may have joined a
   // Miner (or mined here) since. Assign the ones that match now; the officer's queue keeps the rest.
-  const { assigned: reassigned, error: reassignError } = await reassignUnmatched(
-    deps,
-    characterId,
-    corporationId,
-    {
-      before,
-      known,
-      rows,
-      regrouped: autoGrouped > 0,
-    }
-  );
-
-  // The donations just stored may settle Statements; read the book back to allocate against all of it.
-  const after =
-    donationsAdded > 0 || reassigned > 0
-      ? await deps.readBookState(characterId, corporationId)
-      : before;
-  const toSettle = after
-    ? planSettlements({
-        statements: after.statements as Statement[],
-        payments: after.payments,
-        dismissals: after.dismissals,
-        miners: after.miners,
-        alreadyPaid: after.paidStatementIds,
-        extractions: after.extractions,
-        ...(after.writeOffs ? { writeOffs: after.writeOffs } : {}),
-        startDate: after.book.startDate,
-        ...(after.disputes ? { disputes: after.disputes } : {}),
-        now: new Date(deps.now()).toISOString(),
-      })
-    : [];
-  for (const ids of chunk(toSettle, SETTLE_PER_CALL)) {
-    await deps.settleStatements(characterId, corporationId, ids);
-  }
+  const { error: reassignError } = await reassignUnmatched(deps, characterId, corporationId, {
+    before,
+    mined,
+    rows,
+    regrouped: autoGrouped > 0,
+  });
 
   return {
     kind: 'synced',
     observedRows: feed.rows.length,
     extractions: extractions.length,
     donationsAdded,
-    settled: toSettle,
     gaps,
     missing,
     truncated: feed.truncated,
@@ -412,24 +374,17 @@ async function billedStoredRows(
       p.reviewReason === 'no-open-balance' &&
       !(p.notTaxAmount && p.notTaxAmount > 0)
   );
-  const known = new Set<number>([
-    ...feedRows.map((r) => r.characterId),
-    ...book.miners.flatMap((m) => m.characterIds),
-    ...book.payments.filter((p) => p.minerId !== undefined).map((p) => p.characterId),
-  ]);
-  const feedOnly = {
+  const feedOnly = donationMatchBook({
     miners: book.miners,
-    statements: book.statements as Statement[],
-    knownCharacterIds: known,
-    openBalance: openBalanceOf(book),
-    unbilled: unbilledOf(book, feedRows),
-  };
+    notices: book.notices,
+    minedCharacterIds: new Set(feedRows.map((r) => r.characterId)),
+    payments: book.payments,
+  });
   const senders = [
     ...new Set(
       fresh
         .filter((d) => {
-          const match = matchDonation({ characterId: d.characterId, reason: d.reason }, feedOnly);
-          return match.kind !== 'miner' && match.kind !== 'statement';
+          return donationOwner(d, feedOnly).kind !== 'miner';
         })
         .map((d) => d.characterId)
     ),
@@ -438,7 +393,6 @@ async function billedStoredRows(
     held,
     senders,
     miners: book.miners,
-    statements: book.statements as Statement[],
     startDate: book.book.startDate,
   });
   if (wanted.size === 0) return [];
@@ -450,36 +404,23 @@ async function billedStoredRows(
   }
 }
 
-/** The Miners with ore this read found that no Statement covers yet, for `matchDonation` (#6207). */
-function unbilledOf(book: BookState, rows: readonly ObservedRow[]): Set<string> {
-  return unbilledMinerIds(rows, {
-    miners: book.miners,
-    statements: book.statements as Statement[],
-    startDate: book.book.startDate,
-  });
+/** The Miners with ore in these rows from the book's start on: a donation of theirs is likely tax. */
+function owingOf(book: BookState, rows: readonly ObservedRow[]): Set<string> {
+  const out = new Set<string>();
+  for (const r of rows)
+    if (r.quantity > 0 && r.date >= book.book.startDate)
+      out.add(minerIdFor(r.characterId, book.miners));
+  return out;
 }
 
-/** What each Miner owes on the book's issued Statements, for `matchDonation` (#6207). */
-function openBalanceOf(book: BookState): Map<string, number> {
-  return openBalances({
-    statements: book.statements as Statement[],
-    payments: book.payments,
-    dismissals: book.dismissals,
-    miners: book.miners,
-    extractions: book.extractions,
-    ...(book.writeOffs ? { writeOffs: book.writeOffs } : {}),
-    startDate: book.book.startDate,
-  });
-}
-
-/** Re-runs `matchDonation` for stored Unmatched payments and assigns those that now match. A failure is not the sync's, so it is returned for the page to show. */
+/** Re-runs `donationOwner` for stored Unmatched payments and assigns those that now match. A failure is not the sync's, so it is returned for the page to show. */
 async function reassignUnmatched(
   deps: SyncDeps,
   characterId: number,
   corporationId: number,
   args: {
     before: BookState;
-    known: ReadonlySet<number>;
+    mined: ReadonlySet<number>;
     rows: readonly ObservedRow[];
     regrouped: boolean;
   }
@@ -493,25 +434,21 @@ async function reassignUnmatched(
     const book = args.regrouped
       ? ((await deps.readBookState(characterId, corporationId)) ?? args.before)
       : args.before;
-    const known = new Set([...args.known, ...book.miners.flatMap((m) => m.characterIds)]);
     // A sender the book knows credits their Miner, owing or not (#6300). That includes one held
     // for review under #6207: the next sync clears it.
-    const balance = openBalanceOf(book);
-    const unbilled = unbilledOf(book, args.rows);
+    const matchBook = donationMatchBook({
+      miners: book.miners,
+      notices: book.notices,
+      minedCharacterIds: args.mined,
+      payments: book.payments,
+    });
     for (const p of open) {
-      const match = matchDonation(
+      const match = donationOwner(
         { characterId: p.characterId, reason: (p as { reason?: string }).reason },
-        {
-          miners: book.miners,
-          statements: book.statements as Statement[],
-          knownCharacterIds: known,
-          openBalance: balance,
-          unbilled,
-        }
+        matchBook
       );
-      if (match.kind !== 'miner' && match.kind !== 'statement') continue;
+      if (match.kind !== 'miner') continue;
       await deps.assignPayment(characterId, corporationId, p.id, match.minerId);
-      balance.set(match.minerId, (balance.get(match.minerId) ?? 0) - p.amount);
       assigned += 1;
     }
     return { assigned };
@@ -558,13 +495,13 @@ async function autoGroup(
   }
 }
 
-/** What a merge would move per Miner: its Statements and payments (the records the re-key rewrites). */
+/** What a merge would move per Miner: its late notices and payments (the records the re-key rewrites). */
 function recordCounts(book: BookState): Map<string, number> {
   const counts = new Map<string, number>();
   const bump = (id: string | undefined) => {
     if (id !== undefined) counts.set(id, (counts.get(id) ?? 0) + 1);
   };
-  for (const s of book.statements as { minerId?: string }[]) bump(s.minerId);
+  for (const n of book.notices) bump(n.minerId);
   for (const p of book.payments) bump(p.minerId);
   for (const d of book.dismissals as { minerId?: string }[]) bump(d.minerId);
   for (const w of book.writeOffs ?? []) bump((w as { minerId?: string }).minerId);

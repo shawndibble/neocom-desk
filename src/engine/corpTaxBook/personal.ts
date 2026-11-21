@@ -24,7 +24,8 @@
 import { computeAssignmentValue } from '../miningTax/valuation';
 import { entryKey, type OreLine } from '../miningTax/types';
 import { minusLines, priceMap } from '../miningTax/oreLines';
-import { type RecordedWriteOff, type TaxPayment } from './allocation';
+import { countedPayments, paymentNet, type RecordedWriteOff, type TaxPayment } from './payments';
+import { lateNoticeFromStatementDoc } from '../../../functions/src/corpTaxBookLateNotice';
 import {
   creditSources,
   hasMoney,
@@ -34,8 +35,8 @@ import {
   type MoneySource,
   type PaidBy,
 } from './paidBy';
-import { isSameTransfer } from './transferMatch';
-import { daySettleTolerance } from './runningAccount';
+import { isSameJournalTransfer } from '../../../functions/src/corpTaxBookTransferMatch';
+import { daySettleTolerance } from './minerRunningAccount';
 import { exemptionsOf, type ToleranceExemption } from './toleranceExemptions';
 import { splitAcrossBooks, resolveBookShare, type BookObservation } from './attribution';
 import { dayClosesAt, isDayBillable } from './billable';
@@ -46,13 +47,13 @@ import type { FeederReadClock } from './feederHealth';
 import { settleOpenSet } from './openSet';
 import { observedEntryKey } from './observed';
 import type { TaxRate, RateScope } from './rates';
+import type { Adjustment } from './adjustments';
 import {
   frozenDayRate,
   statementDays,
-  type Adjustment,
-  type Statement,
-  type StatementLine,
-} from './statements';
+  type LegacyStatementDoc as Statement,
+  type LegacyStatementLine as StatementLine,
+} from './legacyStatementDoc';
 import type { DayPrices } from './valuation';
 import type { ObservedMiningEntry } from './types';
 import type { ClaimCheck, ClaimedTransfer, Declaration, OverdueStatus } from './overdue';
@@ -604,18 +605,16 @@ function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: str
     rates: book.rates,
     entries: book.observed,
     miners: book.miners,
-    statements: book.statements,
+    notices: book.statements.flatMap(
+      (s) => lateNoticeFromStatementDoc(s as unknown as Record<string, unknown>) ?? []
+    ),
     payments: book.payments,
     dismissals: book.dismissals,
     ...(book.writeOffs ? { writeOffs: book.writeOffs } : {}),
-    ...(book.declarations ? { declarations: book.declarations } : {}),
     ...(book.disputes ? { disputes: book.disputes } : {}),
-    ...(book.overdueDays !== undefined ? { overdueDays: book.overdueDays } : {}),
     ...(book.feeders ? { feeders: book.feeders } : {}),
     pricesOn: book.pricesOn,
     placement: { kind: 'observed-rows' },
-    // A running account's notices bill no days of their own (#6294): they stay running days.
-    ...(book.runningAccountFrom ? { runningAccount: true } : {}),
   });
   const observedByKey = new Map(book.observed.map((o) => [observedEntryKey(o), o]));
   const lineIndex = new Map<string, { id: string; lines: StatementLine[] }>();
@@ -657,42 +656,34 @@ function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: str
     pending.push({ observed, ...(entry ? { entry } : {}) });
   }
 
-  // Payments credit each Miner's Statements, oldest first (D5/D15).
+  // The book's money per Miner, before the member's own oldest-first pass below. The calendar
+  // Statement settlement is gone (decision 20261120-235011): as on a running account before, no
+  // statements doc settles here and every payment is the Miner's credit. The member-side rework
+  // reads a notice's standing off the Miner's Running account (`open.miners`) instead.
   const settlement: Prepared['settlement'] = new Map();
   const credit = new Map<string, number>();
   const sources = new Map<string, MoneySource[]>();
   for (const [minerId, miner] of open.miners) {
-    const { allocation } = miner;
-    if (allocation.credit > 0) {
-      credit.set(minerId, allocation.credit);
-      sources.set(minerId, creditSources(miner.payments, allocation, book.startDate));
+    const paid = countedPayments(miner.payments, book.startDate).reduce(
+      (sum, p) => sum + paymentNet(p),
+      0
+    );
+    if (paid > 0) {
+      credit.set(minerId, paid);
+      sources.set(
+        minerId,
+        creditSources(miner.payments, { paymentCredits: [], credit: paid }, book.startDate)
+      );
     }
-    const writeOffs = (book.writeOffs ?? []).filter((w) => w.minerId === minerId);
-    for (const s of miner.statements) {
-      const result = allocation.byStatement.get(s.id);
-      const dismissed = miner.dismissalCredits
-        .filter((c) => c.statementId === s.id)
-        .reduce((sum, c) => sum + c.amount, 0);
-      const forgiven = result?.forgiven ?? 0;
-      const forgivenReasons = [
-        ...new Set(
-          allocation.writeOffCredits
-            .filter((c) => c.statementId === s.id)
-            .map((c) => writeOffs.find((w) => w.id === c.writeOffId)?.reason ?? '')
-            .filter((r) => r !== '')
-        ),
-      ];
+    for (const s of book.statements.filter((x) => x.minerId === minerId))
       settlement.set(s.id, {
-        settled: result?.settled ?? false,
-        pool: Math.max(0, (result?.credited ?? 0) - dismissed - forgiven),
-        payments: allocation.paymentCredits
-          .filter((c) => c.statementId === s.id)
-          .map((c): MoneySource => ({ kind: 'payment', paymentId: c.paymentId, amount: c.amount })),
-        forgiven,
-        forgivenReasons,
-        overdue: miner.overdue.get(s.id),
+        settled: false,
+        pool: 0,
+        payments: [],
+        forgiven: 0,
+        forgivenReasons: [],
+        overdue: undefined,
       });
-    }
   }
   return {
     book,
@@ -2146,7 +2137,11 @@ export function inFlightDonations(
     .filter(
       (m) =>
         !held.some((h) =>
-          isSameTransfer(h, { characterId: m.characterId, amount: m.amount ?? 0, date: m.date })
+          isSameJournalTransfer(h, {
+            characterId: m.characterId,
+            amount: m.amount ?? 0,
+            at: m.date,
+          })
         )
     )
     .map((m) => ({

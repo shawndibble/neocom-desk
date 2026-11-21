@@ -16,7 +16,8 @@ import {
   TextInput,
 } from '@/components/ui';
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
-import { netOf, previewMinerPayment } from '@/engine/corpTaxBook/paymentPreview';
+import { previewMinerPayment } from '@/engine/corpTaxBook/paymentPreview';
+import { paymentNet } from '@/engine/corpTaxBook/payments';
 import { utcDay } from '@/engine/localDay';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { callableErrorReason } from '@/lib/callableError';
@@ -193,8 +194,8 @@ export function ReasonDialog({
 
 /**
  * Record payment: ISK that reached the corporation outside the wallet journal. It shows,
- * before confirming, which Statements the ISK clears or part-pays and what is owed or held
- * after (the book's own allocation). When the wallet holds Unmatched donations it also offers
+ * before confirming, which days the ISK pays or part-pays, oldest first, and what is owed or
+ * held after (the Miner's own Running account). When the wallet holds Unmatched donations it also offers
  * to match one of them instead: that assigns the donation to this Miner, so the same ISK is
  * never recorded twice.
  */
@@ -204,7 +205,6 @@ export function RecordPaymentDialog({
   miner,
   minerName,
   defaultAmount,
-  statementId,
   paymentId,
   declarationId,
   onRecorded,
@@ -214,8 +214,6 @@ export function RecordPaymentDialog({
   miner: MinerRow;
   minerName: string;
   defaultAmount: number;
-  /** Credit this Statement first (a payment code would do the same). */
-  statementId?: string;
   /**
    * A fixed id for the hand-recorded payment, e.g. one derived from the declaration it
    * confirms: a retry, or a second officer, then finds it already recorded instead of
@@ -241,7 +239,7 @@ export function RecordPaymentDialog({
   const donations = useMemo(
     () =>
       view.needsYou.flatMap((n) =>
-        n.kind === 'unmatched' && netOf(n.payment) > 0 ? [n.payment] : []
+        n.kind === 'unmatched' && paymentNet(n.payment) > 0 ? [n.payment] : []
       ),
     [view.needsYou]
   );
@@ -271,10 +269,8 @@ export function RecordPaymentDialog({
       amount: value,
       at: dateError ? new Date().toISOString() : paidAtFor(date),
       source: 'manual',
-      ...(statementId ? { statementId } : {}),
     });
-  }, [mode, donation, value, payer, date, dateError, statementId, view, miner.id]);
-  const statements = view.internals.byMiner.get(miner.id)?.statements ?? [];
+  }, [mode, donation, value, payer, date, dateError, view, miner.id]);
 
   return (
     <DialogShell
@@ -283,7 +279,7 @@ export function RecordPaymentDialog({
       title={t(`${k}.title`, { name: minerName })}
       confirmLabel={
         mode === 'donation'
-          ? t(`${k}.confirmMatch`, { amount: isk(donation ? netOf(donation) : 0) })
+          ? t(`${k}.confirmMatch`, { amount: isk(donation ? paymentNet(donation) : 0) })
           : t(`${k}.confirm`, { amount: isk(value || 0) })
       }
       canConfirm={mode === 'donation' ? donation !== undefined : value > 0 && dateError === null}
@@ -306,7 +302,6 @@ export function RecordPaymentDialog({
               characterId: Number(payer),
               amount: value,
               at: paidAtFor(date),
-              ...(statementId ? { statementId } : {}),
               ...(declarationId ? { declarationId } : {}),
             });
           } catch (e) {
@@ -384,7 +379,7 @@ export function RecordPaymentDialog({
           )}
         </>
       )}
-      <PaymentOutcomePanel outcome={outcome} statements={statements} minerName={minerName} />
+      <PaymentOutcomePanel outcome={outcome} minerName={minerName} />
     </DialogShell>
   );
 }
@@ -469,6 +464,80 @@ export function MarkNotTaxDialog({
                 amount: isk(amount || 0),
               })}
       </Effect>
+    </DialogShell>
+  );
+}
+
+/**
+ * A payment's row menu: move it to another Miner, or off every Miner (Unmatched), for a donation
+ * the book placed wrongly (`reassignPayment`). An officer's placement stands over the book's match.
+ */
+export function ReassignPaymentDialog({
+  open,
+  onClose,
+  payment,
+  fromName,
+  minerName,
+}: {
+  open: boolean;
+  onClose: () => void;
+  payment: { id: string; minerId: string; amount: number; at: string };
+  fromName: string;
+  /** Whose account it counts toward now. */
+  minerName: string;
+}) {
+  const { t } = useTranslation();
+  const k = 'corpTaxBook.moons.dialogs.reassign';
+  const { edit, view, names } = useBook();
+  const [to, setTo] = useState<'miner' | 'unmatched'>('miner');
+  const [minerId, setMinerId] = useState('');
+  const filterRef = useRef<HTMLInputElement>(null);
+  const others = view.miners.filter((m) => m.id !== payment.minerId);
+  return (
+    <DialogShell
+      initialFocusRef={filterRef}
+      open={open}
+      onClose={onClose}
+      title={t(`${k}.title`)}
+      confirmLabel={t(to === 'miner' ? `${k}.confirm` : `${k}.confirmUnmatched`)}
+      canConfirm={to === 'unmatched' || minerId !== ''}
+      showLogged="plain"
+      run={async () => {
+        await edit({
+          action: 'reassignPayment',
+          paymentId: payment.id,
+          minerId: to === 'miner' ? minerId : null,
+        });
+      }}
+    >
+      <p>
+        {t(`${k}.intro`, {
+          amount: isk(payment.amount),
+          name: fromName,
+          date: dateWithYear(payment.at.slice(0, 10)),
+          miner: minerName,
+        })}
+      </p>
+      <SegmentedControl
+        label={t(`${k}.to`)}
+        value={to}
+        onChange={setTo}
+        options={[
+          { value: 'miner', label: t(`${k}.toMiner`) },
+          { value: 'unmatched', label: t(`${k}.toUnmatched`) },
+        ]}
+        uppercase={false}
+      />
+      {to === 'miner' && (
+        <MinerPicker
+          miners={others}
+          nameOf={names.character}
+          value={minerId}
+          onChange={setMinerId}
+          filterRef={filterRef}
+        />
+      )}
+      <Effect>{t(to === 'miner' ? `${k}.effect` : `${k}.effectUnmatched`)}</Effect>
     </DialogShell>
   );
 }

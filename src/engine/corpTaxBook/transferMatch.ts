@@ -1,26 +1,12 @@
 /**
  * The member's own wallet journal and the corporation's journal stamp the same ISK transfer with
- * different entry ids, so the two are matched by sender, amount and time. One rule, used both to
- * tell a donation the book already holds from one still in flight (`inFlightDonations`) and to
- * find the member's own journal entry for a Tax Payment (`pairWithMadePayments`).
+ * different entry ids, so the two are matched by sender, amount and time: the shared
+ * `isSameJournalTransfer` (functions/src/corpTaxBookTransferMatch.ts), used both to tell a donation
+ * the book already holds from one still in flight (`inFlightDonations`) and here, to find the
+ * member's own journal entry for a Tax Payment (`pairWithMadePayments`).
  */
-import { MINUTE_MS } from '@/lib/age';
-import type { TaxPayment } from './allocation';
-
-/** The corp's journal stamps the same ISK transfer within the same minute or two. */
-export const SAME_TRANSFER_MS = 10 * MINUTE_MS;
-
-/** Whether `held` (the corporation's side) and `made` (the member's) are one transfer. */
-export function isSameTransfer(
-  held: { characterId: number; amount: number; at: string },
-  made: { characterId: number; amount: number; date: string }
-): boolean {
-  return (
-    held.characterId === made.characterId &&
-    Math.abs(held.amount - made.amount) < 1 &&
-    Math.abs(Date.parse(held.at) - Date.parse(made.date)) <= SAME_TRANSFER_MS
-  );
-}
+import { isSameJournalTransfer } from '../../../functions/src/corpTaxBookTransferMatch';
+import type { TaxPayment } from './payments';
 
 /** An outgoing entry of the member's own wallet journal. */
 export interface MadeEntry {
@@ -56,7 +42,7 @@ export function pairWithMadePayments(
   for (const p of payments) {
     if (p.source !== 'donation') continue;
     const near = entries
-      .filter((m) => isSameTransfer(p, m))
+      .filter((m) => isSameJournalTransfer(p, { ...m, at: m.date }))
       .map((m) => ({ refId: m.refId, gap: Math.abs(Date.parse(p.at) - Date.parse(m.date)) }))
       .sort((a, b) => a.gap - b.gap);
     // Two equally near entries: nothing says which is the member's.

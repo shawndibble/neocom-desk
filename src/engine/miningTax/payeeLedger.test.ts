@@ -3,7 +3,7 @@ import {
   MinerRunningAccount,
   type MinerRunningAccountInput,
 } from '../corpTaxBook/minerRunningAccount';
-import type { TaxPayment } from '../corpTaxBook/allocation';
+import type { TaxPayment } from '../corpTaxBook/payments';
 import { payeeLedger, type LedgerCharge, type PayeeLedgerSource } from './payeeLedger';
 
 const payment = (id: string, amount: number, at: string): TaxPayment => ({
@@ -29,7 +29,7 @@ function source(
   const account = MinerRunningAccount.build({
     days: charges.map((c) => ({ date: c.date, tax: c.tax })),
     payments,
-    writeOffs: writeOffs?.map((w) => ({ id: w.id, amount: w.amount })),
+    writeOffs: writeOffs?.map((w) => ({ id: w.id, amount: w.amount, at: w.at })),
     ...input,
   });
   return {

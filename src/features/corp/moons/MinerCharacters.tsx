@@ -5,7 +5,7 @@ import { Button, Popover, PopoverContent, PopoverTrigger } from '@/components/ui
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
-import { useCorporationName } from './statementMailing';
+import { useCorporationName } from './lateNoticeMailing';
 import { GroupMinersDialog } from './GroupMinersDialog';
 import { callableErrorText } from './feederErrorText';
 import { useBook } from './useBook';

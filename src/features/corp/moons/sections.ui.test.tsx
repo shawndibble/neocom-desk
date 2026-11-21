@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { readAudit } from '../taxBook/bookClient';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
@@ -48,9 +48,9 @@ describe('Miner page', () => {
     renderBook(<MinerDetail id={VARRO_ID} />);
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
     for (const title of [
-      /^Next Statement · 4/,
+      /^Owed days · /,
       /^Today's mining · 1/,
-      /^Earlier days · 4/,
+      /^Earlier days · /,
       /^Payments · 1/,
       /^Activity · 0/,
     ])
@@ -58,33 +58,15 @@ describe('Miner page', () => {
     expect(screen.queryByText(/^Moons · /)).not.toBeInTheDocument();
   });
 
-  it("lists Today's mining above Next Statement, then Earlier days", () => {
+  it("lists Today's mining above Owed days, then Earlier days", () => {
     renderBook(<MinerDetail id={VARRO_ID} />);
-    const order = [/^Today's mining · /, /^Next Statement · /, /^Earlier days · /].map((re) =>
+    const order = [/^Today's mining · /, /^Owed days · /, /^Earlier days · /].map((re) =>
       screen.getByText(re)
     );
     for (let i = 1; i < order.length; i++)
       expect(
         order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING
       ).toBeTruthy();
-  });
-
-  it("opens the Statement panel from a payment's Credited to link and from an Earlier day", async () => {
-    renderBook(<MinerDetail id={VARRO_ID} />);
-    const payments = screen.getByRole('table', { name: 'Payments' });
-    await userEvent.click(
-      within(payments).getAllByRole('button', { name: /^Open the .* Statement$/ })[0]
-    );
-    const panel = await screen.findByRole('dialog');
-    expect(within(panel).getByText('Remaining')).toBeInTheDocument();
-    expect(within(panel).queryByRole('link', { name: 'Open Miner page' })).not.toBeInTheDocument();
-    await userEvent.keyboard('{Escape}');
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    const earlier = screen.getByRole('table', { name: 'Earlier days' });
-    await userEvent.click(
-      within(earlier).getAllByRole('button', { name: /^Open the .* Statement$/ })[0]
-    );
-    expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 
   it('sorts the Payments ledger by When, From and Amount', () => {
@@ -106,15 +88,15 @@ describe('Miner page', () => {
     expect(screen.queryByRole('group', { name: 'Filter activity' })).not.toBeInTheDocument();
   });
 
-  it('counts a mailed Statement from the audit log under Mail, not Audit', async () => {
+  it('counts a mailed late notice from the audit log under Mail, not Audit', async () => {
     vi.mocked(readAudit).mockResolvedValue([
       {
         id: 'a1',
         at: Date.parse('2026-10-20T10:00:00Z'),
         by: 1,
         byName: 'Test Pilot',
-        action: 'recordMail',
-        detail: { minerId: VARRO_ID, kind: 'statement' },
+        action: 'recordLateNoticeMail',
+        detail: { minerId: VARRO_ID, kind: 'notice' },
       },
     ]);
     renderBook(<MinerDetail id={VARRO_ID} />);
@@ -122,13 +104,13 @@ describe('Miner page', () => {
     expect(within(chips).getByRole('button', { name: /^Mail/ })).toHaveTextContent('1');
     expect(within(chips).getByRole('button', { name: /^Audit/ })).toHaveTextContent('0');
     await userEvent.click(within(chips).getByRole('button', { name: /^Mail/ }));
-    expect(await screen.findByText(/mailed a Statement/)).toBeInTheDocument();
+    expect(await screen.findByText(/mailed a late notice/)).toBeInTheDocument();
     vi.mocked(readAudit).mockResolvedValue([]);
   });
 
   it('shows a moon once, with only the station under it', () => {
     renderBook(<MinerDetail id={VARRO_ID} />);
-    const table = screen.getByRole('table', { name: 'Next Statement' });
+    const table = screen.getByRole('table', { name: 'Owed days' });
     expect(within(table).getAllByText('Efa V - Moon 3').length).toBeGreaterThan(0);
     expect(within(table).queryByText('Efa V - Moon 3 - Brass Anvil')).not.toBeInTheDocument();
     expect(within(table).getAllByText('Brass Anvil').length).toBeGreaterThan(0);
@@ -136,16 +118,14 @@ describe('Miner page', () => {
 });
 
 describe('Miner page on a running account', () => {
-  const view = buildBookView({ ...BOOK_VIEW.input, runningAccountFrom: '2026-08-01T00:00:00Z' });
+  const view = buildBookView(BOOK_VIEW.input);
   const running = { ...BOOK_CONTEXT, view };
 
-  it('lists Owed days and says where the Miner stands instead of a Next Statement', () => {
+  it('lists Owed days and says where the Miner stands', () => {
     renderBook(<MinerDetail id={VARRO_ID} />, running);
-    expect(screen.queryByText(/^Next Statement · /)).not.toBeInTheDocument();
     expect(screen.getByText(/^Owed days · /)).toBeInTheDocument();
     expect(screen.getByText('Oldest unpaid')).toBeInTheDocument();
     expect(screen.getByText('Last payment')).toBeInTheDocument();
-    // A day still on an unpaid older Statement is owed, so it lists here, not under Earlier days.
     const owed = screen.getByRole('table', { name: /^Owed days/ });
     expect(within(owed).getAllByRole('row').length).toBeGreaterThan(1);
     expect(screen.getAllByText(/^Payment from /).length).toBeGreaterThan(0);
@@ -163,19 +143,11 @@ describe('Miner page on a running account', () => {
 });
 
 describe('Corrections', () => {
-  it('sit in the header menu, with Rebill only on a book that still bills Statements', async () => {
+  it('sit in the header menu, and Rebill is gone: late ore changes the day itself', async () => {
     renderBook(<MinerDetail id={VARRO_ID} />);
     await userEvent.click(screen.getAllByRole('button', { name: 'More actions' })[0]);
     expect(await screen.findByRole('menuitem', { name: /rate/i })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Add a correction line' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Rebill from date' })).toBeInTheDocument();
-  });
-
-  it('leave Rebill out on a running account', async () => {
-    const view = buildBookView({ ...BOOK_VIEW.input, runningAccountFrom: '2026-08-01T00:00:00Z' });
-    renderBook(<MinerDetail id={VARRO_ID} />, { ...BOOK_CONTEXT, view });
-    await userEvent.click(screen.getAllByRole('button', { name: 'More actions' })[0]);
-    expect(await screen.findByRole('menuitem', { name: /rate/i })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Rebill from date' })).not.toBeInTheDocument();
   });
 });

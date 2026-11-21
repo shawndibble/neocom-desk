@@ -1,33 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { TaxPayment } from './allocation';
-import { isSameTransfer, pairWithMadePayments, SAME_TRANSFER_MS } from './transferMatch';
+import type { TaxPayment } from './payments';
+import { pairWithMadePayments } from './transferMatch';
 
 const CORP = 98000001;
 const ME = 90000001;
-
-const held = { characterId: ME, amount: 1_000_000, at: '2026-11-10T12:00:00Z' };
-const made = (over: Partial<Parameters<typeof isSameTransfer>[1]> = {}) => ({
-  characterId: ME,
-  amount: 1_000_000,
-  date: '2026-11-10T12:00:00Z',
-  ...over,
-});
-
-describe('isSameTransfer', () => {
-  it('is the same sender, the same amount and the same few minutes', () => {
-    expect(SAME_TRANSFER_MS).toBe(10 * 60_000);
-    expect(isSameTransfer(held, made())).toBe(true);
-    expect(isSameTransfer(held, made({ date: '2026-11-10T12:10:00Z' }))).toBe(true);
-    expect(isSameTransfer(held, made({ date: '2026-11-10T11:50:00Z' }))).toBe(true);
-  });
-
-  it('is not once the time, the amount or the sender differs by more than the rule allows', () => {
-    expect(isSameTransfer(held, made({ date: '2026-11-10T12:10:01Z' }))).toBe(false);
-    expect(isSameTransfer(held, made({ amount: 1_000_000.99 }))).toBe(true);
-    expect(isSameTransfer(held, made({ amount: 1_000_001 }))).toBe(false);
-    expect(isSameTransfer(held, made({ characterId: ME + 1 }))).toBe(false);
-  });
-});
 
 const payment = (id: string, at: string, over: Partial<TaxPayment> = {}): TaxPayment => ({
   id,

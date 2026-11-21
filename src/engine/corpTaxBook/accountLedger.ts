@@ -9,10 +9,12 @@
  * forgiven, or money taken back from a day already closed, is that day's own `tolerance` row, dated by
  * the payment that closed it. The rows add up to the balance, so there is no catch-all row.
  */
-import type { Adjustment } from './statements';
+import type { Adjustment } from './adjustments';
 import type { MinerDetail } from './bookView';
 
-export type LedgerEntryKind = 'day' | 'payment' | 'correction' | 'writeOff' | 'tolerance';
+/** `checkpoint`: what the account stood at on the day it is closed through. */
+export type LedgerEntryKind =
+  'checkpoint' | 'day' | 'payment' | 'correction' | 'writeOff' | 'tolerance';
 
 export interface LedgerEntry {
   /** Unique within the ledger. */
@@ -36,9 +38,7 @@ export interface LedgerEntry {
   refId?: string;
   /** A `correction` row that is the balance rolled over from another system. */
   opening?: boolean;
-  /** A `correction` row an issued Statement billed: it cannot be undone, only offset. */
-  locked?: boolean;
-  /** A `tolerance` row of a running account: the mined day whose shortfall it closed. */
+  /** A `tolerance` row: the mined day whose shortfall it closed. */
   forDate?: string;
   /** A correction or write-off an officer undid: this row is the original, shown struck through. */
   reversed?: boolean;
@@ -50,12 +50,13 @@ export interface AccountLedger {
   entries: LedgerEntry[];
   /** Positive is owed, negative is credit held; equals the last entry's balance. */
   balance: number;
-  /** Mined but not billable yet (or waiting for a Statement): shown below, outside the balance. */
+  /** Mined but not billable yet, or held by a dispute: shown below, outside the balance. */
   notYetBilled: { tax: number; days: number };
 }
 
 /** Within one date a day's tax comes first, then what was paid against it. */
 const ORDER: Record<LedgerEntryKind, number> = {
+  checkpoint: -1,
   day: 0,
   correction: 1,
   payment: 2,
@@ -67,34 +68,39 @@ const day = (iso: string) => iso.slice(0, 10);
 
 export function accountLedger(
   detail: MinerDetail,
-  corrections: readonly Adjustment[],
-  running: boolean
+  corrections: readonly Adjustment[]
 ): AccountLedger {
   type Draft = Omit<LedgerEntry, 'balance'> & { at: string };
   const drafts: Draft[] = [];
   const notYetBilled = { tax: 0, days: 0 };
+  // A closed-through checkpoint opens the ledger: what came before it is summed up in it.
+  const cp = detail.checkpoint;
+  const open = (date: string) => !cp || date > cp.through;
+  if (cp)
+    drafts.push({
+      key: 'checkpoint',
+      kind: 'checkpoint',
+      date: cp.through,
+      at: cp.through,
+      debit: Math.max(0, cp.balance),
+      credit: Math.max(0, -cp.balance),
+    });
 
-  // A running account owes every billable day not yet on a Statement; a Statement-era book waits
-  // for the Statement to bill it.
+  // The account owes every Billable day; a date an open dispute holds is not billed yet.
   const billed = new Map<string, { debit: number; days: number; keys: string[] }>();
   // A date an open dispute holds is not billed yet, so it stays out of the balance.
   const held = new Set(detail.heldDays);
   for (const d of detail.days) {
     if (d.tax <= 0) continue;
-    // A day an officer forgave off a Statement was billed first; the write-off is its credit.
-    const forgivenOnStatement = d.status === 'written-off' && d.statementId !== undefined;
-    const owedNow =
-      d.status === 'paid' ||
-      d.status === 'on-statement' ||
-      forgivenOnStatement ||
-      (running && d.status === 'unbilled' && !held.has(d.date));
+    const owedNow = d.status === 'paid' || (d.status === 'owed' && !held.has(d.date));
     if (owedNow) {
+      if (!open(d.date)) continue;
       const held = billed.get(d.date) ?? { debit: 0, days: 0, keys: [] };
       held.debit += d.tax;
       held.days += 1;
       held.keys.push(d.key);
       billed.set(d.date, held);
-    } else if (d.status === 'unbilled' || d.status === 'not-billable') {
+    } else if (d.status === 'owed' || d.status === 'not-billable') {
       notYetBilled.tax += d.tax;
       notYetBilled.days += 1;
     }
@@ -112,7 +118,7 @@ export function accountLedger(
     });
 
   for (const p of detail.payments)
-    if (p.credited > 0)
+    if (p.credited > 0 && open(day(p.at)))
       drafts.push({
         key: `payment-${p.id}`,
         kind: 'payment',
@@ -122,14 +128,8 @@ export function accountLedger(
         credit: p.credited,
         paymentId: p.id,
       });
-  // A correction a Statement billed is frozen with it (D22): undoing it is an opposite correction.
-  const billedCorrections = new Set(
-    detail.statements.flatMap((s) =>
-      s.lines.flatMap((l) => (l.adjustmentId ? [l.adjustmentId] : []))
-    )
-  );
   for (const a of corrections) {
-    if (a.amount === 0) continue;
+    if (a.amount === 0 || !open(a.date)) continue;
     const debit = Math.max(0, a.amount);
     const credit = Math.max(0, -a.amount);
     drafts.push({
@@ -142,7 +142,6 @@ export function accountLedger(
       note: a.reason,
       refId: a.id,
       ...(a.kind === 'opening' ? { opening: true } : {}),
-      ...(billedCorrections.has(a.id) ? { locked: true } : {}),
       ...(a.reversed ? { reversed: true } : {}),
     });
     // An undone correction stays, with an offsetting row on the day it was undone.
@@ -161,7 +160,7 @@ export function accountLedger(
       });
   }
   for (const w of detail.officerWriteOffs) {
-    if (w.amount <= 0) continue;
+    if (w.amount <= 0 || !open(day(w.at))) continue;
     drafts.push({
       key: `writeOff-${w.id}`,
       kind: 'writeOff',
@@ -198,28 +197,6 @@ export function accountLedger(
       note: w.date,
       forDate: w.date,
     });
-  // A Statement's tolerance is dated by the last payment that reached it, else its issue date.
-  const paidAt = new Map(detail.payments.map((p) => [p.id, p.at]));
-  for (const w of detail.toleranceWriteOffs) {
-    const at =
-      detail.paymentCredits
-        .filter((c) => c.statementId === w.statementId)
-        .map((c) => paidAt.get(c.paymentId) ?? '')
-        .sort()
-        .at(-1) ||
-      detail.statements.find((s) => s.id === w.statementId)?.issuedAt ||
-      '';
-    if (w.amount >= 1 && at)
-      drafts.push({
-        key: `tolerance-${w.statementId}`,
-        kind: 'tolerance',
-        date: day(at),
-        at,
-        debit: 0,
-        credit: w.amount,
-      });
-  }
-
   drafts.sort(
     (a, b) =>
       a.date.localeCompare(b.date) ||
@@ -246,7 +223,6 @@ export function accountLedger(
       ...(d.reversal ? { reversal: true } : {}),
       ...(d.refId !== undefined ? { refId: d.refId } : {}),
       ...(d.opening ? { opening: true } : {}),
-      ...(d.locked ? { locked: true } : {}),
       ...(d.forDate !== undefined ? { forDate: d.forDate } : {}),
     };
   });

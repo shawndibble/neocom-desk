@@ -1,8 +1,7 @@
 /**
- * The Corp Tax Book send queue's public API (issue #4064). The Statements tab
- * (#4063) calls `enqueueStatements` when the officer presses Send; everything
- * after that (pacing, 520 waits, survival across tabs, the audit log) is the
- * queue's own business.
+ * The Corp Tax Book send queue's public API (issue #4064). The late notice run calls
+ * `enqueueLateNotices` when the officer presses Send; everything after that (pacing, 520 waits,
+ * survival across tabs, the audit log) is the queue's own business.
  */
 import {
   isAlreadyQueued,
@@ -21,20 +20,21 @@ import {
 } from '@/engine/corpTaxBook/ownerRateMail';
 import { composePayeeChangeMail } from '@/engine/corpTaxBook/payeeChange';
 import type { OwnerRateChange } from '@/engine/corpTaxBook/ownerRate';
-import { composeStatementMail, type StatementMailInput } from '@/engine/corpTaxBook/statementMail';
+import {
+  composeLateNoticeMail,
+  type LateNoticeMailInput,
+} from '@/engine/corpTaxBook/lateNoticeMail';
 import { db } from '@/db';
 import { addToQueue, listQueue, nextOrder, saveItem, saveItems } from './mailQueueStore';
 
-/** What the queue needs to mail one Miner their Statement. */
-export interface StatementToMail extends Omit<
-  StatementMailInput,
-  'kind' | 'corporationName' | 'refineryName' | 'verifyUrl'
+/** What the queue needs to mail one Miner their late notice. */
+export interface LateNoticeToMail extends Omit<
+  LateNoticeMailInput,
+  'kind' | 'corporationName' | 'verifyUrl'
 > {
-  statementId: string;
-  /** The Miner's main character, who gets the mail. */
+  noticeId: string;
+  /** The character who gets the mail. */
   recipientId: number;
-  /** Balance due, shown on the queue row. */
-  amountDue: number;
 }
 
 export interface EnqueueInput {
@@ -42,8 +42,7 @@ export interface EnqueueInput {
   corporationName: string;
   /** The officer's character the mail goes from. */
   senderCharacterId: number;
-  statements: readonly StatementToMail[];
-  refineryName: StatementMailInput['refineryName'];
+  notices: readonly LateNoticeToMail[];
   /** Where the app is served, for the verify link. Defaults to this origin. */
   origin?: string;
 }
@@ -53,7 +52,7 @@ export interface EnqueueResult {
   queued: number;
   /** Already in the queue (or already sent): not queued again. */
   skipped: number;
-  /** Statements with no verify link in the book: not queued. */
+  /** Late notices with no verify link in the book: not queued. */
   missingLink: string[];
 }
 
@@ -66,30 +65,29 @@ async function buildItems(
   const tokens = await readVerifyTokens(
     input.senderCharacterId,
     input.corporationId,
-    input.statements.map((s) => s.statementId)
+    input.notices.map((n) => n.noticeId)
   );
   const origin = input.origin ?? window.location.origin;
   const start = await nextOrder();
   const items: MailQueueItem[] = [];
   const missingLink: string[] = [];
-  for (const s of input.statements) {
-    const token = tokens.get(s.statementId);
+  for (const s of input.notices) {
+    const token = tokens.get(s.noticeId);
     if (token === undefined) {
-      missingLink.push(s.statementId);
+      missingLink.push(s.noticeId);
       continue;
     }
-    const mail = composeStatementMail({
+    const mail = composeLateNoticeMail({
       ...s,
       kind,
       corporationName: input.corporationName,
-      refineryName: input.refineryName,
       verifyUrl: verifyUrl(origin, token),
     });
     items.push({
       id: crypto.randomUUID(),
       batchId,
       corporationId: input.corporationId,
-      statementId: s.statementId,
+      statementId: s.noticeId,
       kind,
       senderCharacterId: input.senderCharacterId,
       recipientId: s.recipientId,
@@ -106,10 +104,10 @@ async function buildItems(
   return { items, missingLink };
 }
 
-/** Queues one Statement mail per Miner. A Statement already queued or sent is skipped. */
-export async function enqueueStatements(input: EnqueueInput): Promise<EnqueueResult> {
+/** Queues one late notice mail per Miner. A notice already queued or sent is skipped. */
+export async function enqueueLateNotices(input: EnqueueInput): Promise<EnqueueResult> {
   const batchId = crypto.randomUUID();
-  const { items, missingLink } = await buildItems(input, 'statement', batchId);
+  const { items, missingLink } = await buildItems(input, 'notice', batchId);
   const { added, skipped } = await addToQueue(items);
   return { batchId, queued: added.length, skipped: skipped.length, missingLink };
 }
@@ -118,25 +116,23 @@ export type ReminderResult =
   ({ ok: true } & EnqueueResult) | { ok: false; reason: 'stopped' | 'queued' | 'missingLink' };
 
 /**
- * Queues one manual reminder for a Statement (D19: reminders are manual). A
- * Miner who chose "Stop reminders" (D27) gets one per Statement: the book
- * counts it before the mail is queued and refuses the next.
+ * Queues one manual reminder of a late notice (D19: reminders are manual). A Miner who chose
+ * "Stop reminders" (D27) gets one per notice: the book counts it before the mail is queued and
+ * refuses the next.
  */
 export async function enqueueReminder(
-  input: Omit<EnqueueInput, 'statements'> & {
-    statement: StatementToMail;
+  input: Omit<EnqueueInput, 'notices'> & {
+    notice: LateNoticeToMail;
     remindersStopped: boolean;
     manualRemindersSent: number;
   }
 ): Promise<ReminderResult> {
   if (!reminderAllowed(input)) return { ok: false, reason: 'stopped' };
-  if (
-    isAlreadyQueued(await listQueue(input.corporationId), input.statement.statementId, 'reminder')
-  )
+  if (isAlreadyQueued(await listQueue(input.corporationId), input.notice.noticeId, 'reminder'))
     return { ok: false, reason: 'queued' };
   const batchId = crypto.randomUUID();
   const { items, missingLink } = await buildItems(
-    { ...input, statements: [input.statement] },
+    { ...input, notices: [input.notice] },
     'reminder',
     batchId
   );
@@ -146,10 +142,8 @@ export async function enqueueReminder(
   await editBook(
     input.senderCharacterId,
     input.corporationId,
-    {
-      action: 'recordReminder',
-      statementId: input.statement.statementId,
-    },
+    // The server's reminder count still names the notice by its legacy field.
+    { action: 'recordReminder', statementId: input.notice.noticeId },
     { freshToken: true }
   );
   const { added, skipped } = await addToQueue(items);

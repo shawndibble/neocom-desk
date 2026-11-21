@@ -25,7 +25,7 @@ export function useMoonOwnersInput(): MoonOwnersInput {
       // The moon owner's page's prices (#4621), so the tab, Pay and that page owe one figure.
       pricesOn: view.input.moonOwnerPricesOn ?? ((date) => view.input.pricesOn(date).prices),
       // An ore with no saved price takes what its line was billed at, as on that page (#6209).
-      billedPrices: billedPricesOf(view.input.statements),
+      billedPrices: billedPricesOf(view.input.notices),
     }),
     [view, settings, data.feeders, data.feederSummaries, corporationId]
   );

@@ -36,7 +36,7 @@ describe('SetupChecklist', () => {
   it('does not list a first Statement as a setup step', () => {
     render({
       ...BOOK_CONTEXT,
-      view: { ...BOOK_VIEW, input: { ...BOOK_VIEW.input, statements: [] } },
+      view: { ...BOOK_VIEW, input: { ...BOOK_VIEW.input, notices: [] } },
     });
     expect(screen.queryByText('First Statement issued')).not.toBeInTheDocument();
     expect(screen.getByText('2 of 3 done')).toBeInTheDocument();

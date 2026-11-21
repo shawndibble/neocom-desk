@@ -24,11 +24,18 @@ import {
 import { getValidAccessToken } from '@/auth/session';
 import { popShareMarks, type PopShareMarks } from '@/engine/corpTaxBook/popShareMarks';
 import { readPopSharingCached } from './popSharingCache';
-import type { RecordedWriteOff } from '@/engine/corpTaxBook/allocation';
 import type { Miner } from '@/engine/corpTaxBook/charges';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
 import type { Declaration } from '@/engine/corpTaxBook/overdue';
-import type { Adjustment, Statement } from '@/engine/corpTaxBook/statements';
+import type { Adjustment } from '@/engine/corpTaxBook/adjustments';
+import { readLateNotices } from '@/engine/corpTaxBook/lateNotices';
+import type { RecordedWriteOff } from '@/engine/corpTaxBook/payments';
+import {
+  legacyStatementDocOf,
+  NOTICE_ID_FIELD,
+  type LateNotice,
+} from '../../../../functions/src/corpTaxBookLateNotice';
+import type { RunningAccountCheckpoint } from '../../../../functions/src/corpTaxBookCheckpoint';
 import type { ToleranceExemption } from '@/engine/corpTaxBook/toleranceExemptions';
 import type {
   JournalDonation,
@@ -54,8 +61,7 @@ import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import type { FeederCoverage } from '@/engine/corpTaxBook/coverage';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import type { FeederViewSummary } from './feederViewClient';
-import { openBook } from './openBook';
-import type { ReadModelDocs } from '@/engine/corpTaxBook/readModels';
+import { errorCode, openBook, type OpenBook } from './openBook';
 import { callSignedIn } from '@/sync/signedInCallable';
 import { clearNotFound } from '@/sync/notFoundCache';
 import { ensureSignedIn } from '@/sync/syncAuth';
@@ -87,17 +93,16 @@ export interface BookSummary {
 export interface BookState {
   book: BookSummary;
   miners: Miner[];
-  statements: Statement[];
+  /** The book's late notices, from `lateNotices` and the legacy `statements` docs. */
+  notices: LateNotice[];
   payments: SettlePayment[];
   dismissals: Dismissal[];
   extractions: SyncExtraction[];
-  /** Statement ids settled so far (`meta/paid`), which only ever grows (D22). */
-  paidStatementIds: Set<string>;
   /** Each Miner's stored paid-through day (`meta/paid`): their days up to it stay paid (D22). */
   minerPaidThrough?: Map<string, string>;
   /** Officer write-offs (#4637): they reduce what a Miner owes. */
   writeOffs?: RecordedWriteOff[];
-  /** Members' disputes: an open one keeps its Statement from settling for good (resolving in the app). */
+  /** Members' disputes: an open one holds its day out of what is due (resolving in the app). */
   disputes?: OreDispute[];
 }
 
@@ -268,7 +273,6 @@ export const LIVE_CHECK_ACTIONS: ReadonlySet<string> = new Set([
   'reverseWriteOff',
   'setToleranceExemption',
   'writeOff',
-  'rebill',
   'markNotTax',
 ]);
 
@@ -281,9 +285,8 @@ function needsLiveToken(action: { action: string } & Record<string, unknown>): b
 }
 
 /**
- * One edit action through `editCorpTaxBookCallable`, e.g.
- * `{ action: 'settleStatements', statementIds }`. Attaches the access token
- * for the live-check actions and for nothing else.
+ * One edit action through `editCorpTaxBookCallable`, e.g. `{ action: 'writeOff', ... }`.
+ * Attaches the access token for the live-check actions and for nothing else.
  */
 export async function editBook<Out = Record<string, unknown>>(
   characterId: number,
@@ -365,33 +368,23 @@ export async function readBookState(
   const book = await openBook(characterId, corporationId);
   if (!book) return null;
   const { list } = book;
-  const [
-    miners,
-    statements,
-    payments,
-    dismissals,
-    extractions,
-    paidStatementIds,
-    writeOffs,
-    disputes,
-  ] = await Promise.all([
-    list<Miner>('miners'),
-    list<Statement>('statements'),
-    list<SettlePayment>('payments'),
-    list<Dismissal>('dismissals'),
-    list<SyncExtraction>('extractions'),
-    book.paidStatementIds(),
-    list<RecordedWriteOff>('writeOffs'),
-    list<unknown>('disputes'),
-  ]);
+  const [miners, notices, payments, dismissals, extractions, writeOffs, disputes] =
+    await Promise.all([
+      list<Miner>('miners'),
+      readNotices(book),
+      list<SettlePayment>('payments'),
+      list<Dismissal>('dismissals'),
+      list<SyncExtraction>('extractions'),
+      list<RecordedWriteOff>('writeOffs'),
+      list<unknown>('disputes'),
+    ]);
   return {
     book: summaryFrom(book.data),
     miners,
-    statements,
+    notices,
     payments,
     dismissals,
     extractions,
-    paidStatementIds,
     writeOffs,
     disputes: readDisputes(disputes),
   };
@@ -555,6 +548,8 @@ export interface BookData {
   adjustments: Adjustment[];
   /** Officers' per-day limits on what a shortfall may forgive (the newest per day decides). */
   toleranceExemptions?: ToleranceExemption[];
+  /** Each Miner's closed-through checkpoint (`accountCheckpoints`); none before the server keeps them. */
+  checkpoints?: RunningAccountCheckpoint[];
   /** Each feeder's last good ledger read (#4509); a feeder's days are Billable only after one. */
   feeders?: BookFeeder[];
   groupingAnswers?: GroupingAnswer[];
@@ -568,8 +563,6 @@ export interface BookData {
   disputes?: OreDispute[];
   /** Which parts this read covered (`bookRead/`); every field of the others is empty. */
   parts: ReadonlySet<BookPart>;
-  /** The Overview and Miners tab docs (ADR 0032); absent until the server has built them. */
-  readModels?: ReadModelDocs;
   /**
    * Each moon owner's view summary by corporation id (ADR 0032, #5717); read with the `owners`
    * part. Absent when that part was not read; a moon owner without one is priced from `observed`.
@@ -720,26 +713,151 @@ export async function deleteBook(characterId: number, corporationId: number): Pr
   await callSignedIn(characterId, 'deleteCorpTaxBookCallable', { corporationId, accessToken });
 }
 
-/** The verify token for each Statement id; one with no link doc is left out. Editors only (rules). */
+/** Where the book keeps its late notices, and their verify links. */
+export const LATE_NOTICES = 'lateNotices';
+const LATE_NOTICE_LINKS = 'lateNoticeLinks';
+/** The mail kind the legacy `recordMail` action takes for a late notice's first mail. */
+const LEGACY_NOTICE_MAIL_KIND = 'statement';
+/**
+ * Where servers older than the `lateNotices` collection keep a late notice, and its verify link
+ * (decision 20261120-235011, step 5): read until that mirror goes.
+ */
+export const LEGACY_NOTICES = 'statements';
+const LEGACY_NOTICE_LINKS = 'statementLinks';
+
+/**
+ * The book's late notices: the `lateNotices` docs, and the legacy docs older servers wrote them
+ * as, one per id. A book whose server has not written `lateNotices` yet reads the legacy docs only.
+ */
+export async function readNotices(book: OpenBook): Promise<LateNotice[]> {
+  const [current, legacy] = await Promise.all([
+    book.written(LATE_NOTICES) ? book.list<unknown>(LATE_NOTICES).catch(() => []) : [],
+    book.list<unknown>(LEGACY_NOTICES),
+  ]);
+  return readLateNotices(current, legacy);
+}
+
+/** Each Miner's closed-through checkpoint; none until the server has written one. Best effort. */
+export async function readCheckpoints(book: OpenBook): Promise<RunningAccountCheckpoint[]> {
+  return book.written('accountCheckpoints')
+    ? book.list<RunningAccountCheckpoint>('accountCheckpoints').catch(() => [])
+    : [];
+}
+
+/** The verify token for each late notice id; one with no link doc is left out. Editors only (rules). */
 export async function readVerifyTokens(
   characterId: number,
   corporationId: number,
-  statementIds: readonly string[]
+  noticeIds: readonly string[]
 ): Promise<Map<string, string>> {
   await ensureSignedIn(characterId);
   const db = getSyncFirestore(characterId);
+  const tokenIn = async (collectionName: string, field: string, id: string) => {
+    try {
+      const token = (await getDoc(doc(db, 'corps', String(corporationId), collectionName, id))).get(
+        field
+      );
+      return typeof token === 'string' && token !== '' ? token : undefined;
+    } catch (error) {
+      // A server whose rules predate the new collection refuses it: the legacy link still serves.
+      if (errorCode(error).endsWith('permission-denied')) return undefined;
+      throw error;
+    }
+  };
   const tokens = new Map<string, string>();
   await Promise.all(
-    statementIds.map(async (id) => {
-      const snap = await getDoc(doc(db, 'corps', String(corporationId), 'statementLinks', id));
-      const token = snap.get('verifyToken');
-      if (typeof token === 'string' && token !== '') tokens.set(id, token);
+    noticeIds.map(async (id) => {
+      const token =
+        (await tokenIn(LATE_NOTICE_LINKS, 'token', id)) ??
+        (await tokenIn(LEGACY_NOTICE_LINKS, 'verifyToken', id));
+      if (token) tokens.set(id, token);
     })
   );
   return tokens;
 }
 
-/** Where a Statement's verify link points: the public page routes/CorpTaxBookVerify.tsx serves it. */
+/** Whether a refusal says the server does not know an action yet (Cloud Functions ship later). */
+const unknownAction = (error: unknown) => {
+  const code = errorCode(error);
+  return code.endsWith('invalid-argument') || code.endsWith('not-found');
+};
+
+/**
+ * Issues a late notice (`issueLateNotice`). A server that does not know that action yet takes it
+ * as the legacy `issueStatement` doc it has always stored notices as.
+ */
+export async function issueLateNotice(
+  characterId: number,
+  corporationId: number,
+  notice: LateNotice
+): Promise<void> {
+  try {
+    await editBook(characterId, corporationId, { action: 'issueLateNotice', notice });
+  } catch (error) {
+    if (!unknownAction(error)) throw error;
+    await editBook(characterId, corporationId, {
+      action: 'issueStatement',
+      statement: legacyStatementDocOf(notice),
+    });
+  }
+}
+
+/** Records a late notice's mail (`recordLateNoticeMail`), or the legacy `recordMail` on an older server. */
+export async function recordLateNoticeMail(
+  characterId: number,
+  corporationId: number,
+  mail: { noticeId: string; mailId: number; kind: 'notice' | 'reminder' }
+): Promise<void> {
+  // Called from the mail queue, which may outlive the 10-minute role cache.
+  const fresh = { freshToken: true };
+  try {
+    await editBook(characterId, corporationId, { action: 'recordLateNoticeMail', ...mail }, fresh);
+  } catch (error) {
+    if (!unknownAction(error)) throw error;
+    // The legacy action names the notice by its old field, and its first mail as a Statement's.
+    const { noticeId, mailId, kind } = mail;
+    await editBook(
+      characterId,
+      corporationId,
+      {
+        action: 'recordMail',
+        [NOTICE_ID_FIELD]: noticeId,
+        mailId,
+        kind: kind === 'notice' ? LEGACY_NOTICE_MAIL_KIND : kind,
+      },
+      fresh
+    );
+  }
+}
+
+/** What `recordCheckpoints` did: the Miners it moved forward, and why it left the others. */
+export interface CheckpointsRecorded {
+  recorded: string[];
+  skipped: { minerId: string; reason: string }[];
+}
+
+/**
+ * Records Running account checkpoints (`recordCheckpoints`). A server that does not know the
+ * action yet keeps none, and the book reads the whole history as before: that is no failure.
+ */
+export async function recordCheckpoints(
+  characterId: number,
+  corporationId: number,
+  checkpoints: readonly RunningAccountCheckpoint[]
+): Promise<CheckpointsRecorded> {
+  try {
+    const out = await editBook<Partial<CheckpointsRecorded>>(characterId, corporationId, {
+      action: 'recordCheckpoints',
+      checkpoints,
+    });
+    return { recorded: out.recorded ?? [], skipped: out.skipped ?? [] };
+  } catch (error) {
+    if (!unknownAction(error)) throw error;
+    return { recorded: [], skipped: [] };
+  }
+}
+
+/** Where a late notice's verify link points: the public page routes/CorpTaxBookVerify.tsx serves it. */
 export function verifyUrl(origin: string, token: string): string {
   return `${origin}/corp-tax-book/verify/${token}`;
 }

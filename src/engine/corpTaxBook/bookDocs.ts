@@ -11,10 +11,9 @@ import { readDivisionNames, type DivisionNames } from './divisionNames';
 import { recordedLater, type CorpRecord } from './observed';
 import { DEFAULT_OVERDUE_DAYS } from './overdue';
 import { SCOPE_ORDER, type RateScope, type TaxRate } from './rates';
-import { DEFAULT_MINIMUM_STATEMENT, type StatementCadence } from './statements';
 import type { LastSync } from './sync';
 import { parseNoticeRules, type NoticeRules } from './notices';
-import { DAY_SETTLE_TOLERANCE_PCT } from './runningAccount';
+import { DAY_SETTLE_TOLERANCE_PCT } from './minerRunningAccount';
 
 type Data = Record<string, unknown>;
 
@@ -58,9 +57,7 @@ export interface BookSettings {
   hubId: string;
   oreForm: 'compressed' | 'raw';
   graceHours: number;
-  minimumStatement: number;
   overdueDays: number;
-  cadence: StatementCadence;
   chunkM3PerHour: number | null;
   rates: TaxRate[];
   /** Above this a dismissal needs a Director (D6); null when there is no limit. */
@@ -113,15 +110,6 @@ export function parseRate(v: unknown): TaxRate | null {
   return v as unknown as TaxRate;
 }
 
-function parseCadence(v: unknown): StatementCadence {
-  if (isRecord(v) && v.kind === 'days') {
-    const days = num(v.days);
-    const anchor = str(v.anchor);
-    if (days !== undefined && anchor !== undefined) return { kind: 'days', days, anchor };
-  }
-  return { kind: 'monthly' };
-}
-
 /**
  * The settings doc as `BookSettings`, validated, with the engine's defaults for anything absent
  * or malformed. Whether a member may see the book yet (active, setup window) is the caller's.
@@ -144,9 +132,7 @@ export function parseBookSettings(d: Data): BookSettings {
     hubId: str(d.hubId) ?? 'jita',
     oreForm: d.oreForm === 'raw' ? 'raw' : 'compressed',
     graceHours: num(d.graceHours) ?? DEFAULT_GRACE_HOURS,
-    minimumStatement: num(d.minimumStatement) ?? DEFAULT_MINIMUM_STATEMENT,
     overdueDays: num(d.overdueDays) ?? DEFAULT_OVERDUE_DAYS,
-    cadence: parseCadence(d.cadence),
     chunkM3PerHour: num(d.chunkM3PerHour) ?? null,
     rates: (Array.isArray(d.rates) ? d.rates : []).flatMap((r) => parseRate(r) ?? []),
     dismissApprovalAboveIsk: num(d.dismissApprovalAboveIsk) ?? null,

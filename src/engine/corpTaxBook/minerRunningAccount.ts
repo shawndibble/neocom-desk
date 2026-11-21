@@ -9,19 +9,24 @@
  * book's tolerance, a percent of the day with no ISK floor; the gap is written off. A day no
  * payment reached stays owed in full.
  *
- * Recomputed from the whole history each time; a day at or before the stored paid-through stays
- * paid even when money is later taken back (D22), and takes no more money. Days are settled a
- * date at a time: what one date's lines owe together.
+ * Recomputed from the Miner's closed-through checkpoint, or the whole history when there is none
+ * (decision 20261120-235011); a day at or before the stored paid-through stays paid even when
+ * money is later taken back (D22), and takes no more money. Days are settled a date at a time:
+ * what one date's lines owe together.
  */
 import {
   lateNoticeStanding,
   type LateNoticeLine,
   type LateNoticeStanding,
 } from '../../../functions/src/corpTaxBookLateNotice';
-import { countedPayments, paymentNet, SETTLE_TOLERANCE_PCT, type TaxPayment } from './allocation';
+import type {
+  CheckpointOwedDay,
+  RunningAccountCheckpoint,
+} from '../../../functions/src/corpTaxBookCheckpoint';
+import { countedPayments, paymentNet, type TaxPayment } from './payments';
 
 /** The default per-day tolerance, in percent of the day's tax. */
-export const DAY_SETTLE_TOLERANCE_PCT = SETTLE_TOLERANCE_PCT;
+export const DAY_SETTLE_TOLERANCE_PCT = 0.5;
 
 /** How short of one day's tax a payment may fall and still pay it: a percent, never an ISK floor. */
 export function daySettleTolerance(tax: number, pct: number = DAY_SETTLE_TOLERANCE_PCT): number {
@@ -61,6 +66,8 @@ export interface DayAmount {
 export interface RunningAccountWriteOff {
   id: string;
   amount: number;
+  /** ISO instant it was recorded: a checkpoint holds every write-off up to its date. */
+  at: string;
 }
 
 /** Everything one Miner's account is built from. */
@@ -84,7 +91,19 @@ export interface MinerRunningAccountInput {
    * tolerance (`exemptionsOf`): 0 forgives nothing.
    */
   toleranceExemptions?: ReadonlyMap<string, number>;
+  /**
+   * The account's closed-through checkpoint: no day on or before its `through` is billed again,
+   * and no money dated on or before it is counted again. Its owed days are still owed, oldest
+   * first, and its credit pays the next days.
+   */
+  checkpoint?: RunningAccountCheckpoint;
 }
+
+/** The UTC day of an ISO instant: which side of a checkpoint money falls. */
+const dayOf = (at: string) => at.slice(0, 10);
+
+/** The queue slot of a checkpoint's credit: the oldest money, and no payment of the Miner's. */
+const OPENING_CREDIT = '\u0000checkpoint';
 
 /** Where one Tax Payment's money went: `days` and `credit` add up to the payment's tax. */
 export interface RunningAccountPayment {
@@ -119,6 +138,8 @@ export interface RunningAccountOwes {
  */
 export class MinerRunningAccount {
   private constructor(
+    /** What it was built from: a preview or a checkpoint builds on it again. */
+    readonly input: MinerRunningAccountInput,
     /** What became of each closed day. */
     readonly byDay: ReadonlyMap<string, DaySettlement>,
     /** The same money as `byDay`'s `credited`, split by where it came from. */
@@ -136,24 +157,107 @@ export class MinerRunningAccount {
   ) {}
 
   static build(input: MinerRunningAccountInput): MinerRunningAccount {
-    const counted = countedPayments(input.payments, input.startDate);
+    const cp = input.checkpoint;
+    const after = (date: string) => cp === undefined || date > cp.through;
+    const counted = countedPayments(input.payments, input.startDate).filter((p) =>
+      after(dayOf(p.at))
+    );
     const paid = counted.reduce((sum, p) => sum + paymentNet(p), 0);
-    const settled = settleDays(input, {
-      extraCorrections: 0,
-      paymentPool: paid,
-      payments: counted
-        .filter((p) => paymentNet(p) > 0)
-        .map((p) => ({ paymentId: p.id, left: paymentNet(p) })),
-      writeOffPool: (input.writeOffs ?? []).reduce((sum, w) => sum + Math.max(0, w.amount), 0),
-    });
+    const opening = Math.max(0, cp?.credit ?? 0);
+    const days: RunningDay[] = [
+      ...(cp?.owed ?? []).map((d) => ({
+        date: d.date,
+        tax: d.remaining,
+        ...(d.charge ? { charge: d.charge } : {}),
+      })),
+      ...input.days.filter((d) => after(d.date)),
+    ];
+    const settled = settleDays(
+      { ...input, days },
+      {
+        extraCorrections: 0,
+        paymentPool: opening + paid,
+        payments: [
+          ...(opening > 0 ? [{ paymentId: OPENING_CREDIT, left: opening }] : []),
+          ...counted
+            .filter((p) => paymentNet(p) > 0)
+            .map((p) => ({ paymentId: p.id, left: paymentNet(p) })),
+        ],
+        writeOffPool: (input.writeOffs ?? [])
+          .filter((w) => after(dayOf(w.at)))
+          .reduce((sum, w) => sum + Math.max(0, w.amount), 0),
+      }
+    );
+    // Once none of the checkpoint's owed days is left, every day through it is paid.
+    const closed =
+      cp !== undefined &&
+      (cp.paidThrough !== null || cp.owed.length > 0) &&
+      cp.owed.every((d) => {
+        const day = settled.byDay.get(d.date);
+        return !day || day.settled || day.held;
+      });
+    const floor = closed ? cp.through : (cp?.paidThrough ?? null);
+    const paidThrough =
+      floor !== null && (settled.paidThrough === null || settled.paidThrough < floor)
+        ? floor
+        : settled.paidThrough;
     return new MinerRunningAccount(
+      input,
       settled.byDay,
-      settled.applications,
+      {
+        ...settled.applications,
+        payments: settled.applications.payments.filter((p) => p.paymentId !== OPENING_CREDIT),
+      },
       settled.credit,
-      settled.balanceBeforePayments - paid,
-      settled.paidThrough,
+      settled.balanceBeforePayments - opening - paid,
+      paidThrough,
       settled.owes
     );
+  }
+
+  /**
+   * The account closed through `through` (decision 20261120-235011): built from its days and its
+   * money dated on or before that day only, so later money never reaches into it.
+   */
+  static checkpoint(
+    input: MinerRunningAccountInput,
+    minerId: string,
+    through: string,
+    recorded: { at: string; by?: number }
+  ): RunningAccountCheckpoint {
+    const upTo = (date: string) => date <= through;
+    const days = input.days.filter((d) => upTo(d.date));
+    const account = MinerRunningAccount.build({
+      ...input,
+      days,
+      payments: input.payments.filter((p) => upTo(dayOf(p.at))),
+      ...(input.writeOffs ? { writeOffs: input.writeOffs.filter((w) => upTo(dayOf(w.at))) } : {}),
+    });
+    const charges = new Map(
+      runningDaysFromLines([
+        ...(input.checkpoint?.owed ?? []).map((d) => ({ ...d, tax: d.remaining })),
+        ...days,
+      ]).map((d) => [d.date, d.charge ?? 0])
+    );
+    const owed = [...account.byDay]
+      .filter(([, d]) => !d.settled)
+      .map(([date, d]): CheckpointOwedDay => {
+        const charge = Math.min(charges.get(date) ?? 0, d.remaining);
+        return { date, remaining: d.remaining, ...(charge > 0 ? { charge } : {}) };
+      })
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const billed = account.byDay.size > 0 || input.checkpoint !== undefined;
+    const nothingOwed = owed.every((d) => account.byDay.get(d.date)?.held);
+    return {
+      minerId,
+      through,
+      owed,
+      credit: account.credit,
+      balance: account.balance,
+      paidThrough: billed && nothingOwed ? through : account.paidThrough,
+      at: recorded.at,
+      ...(recorded.by !== undefined ? { by: recorded.by } : {}),
+    };
   }
 
   /** What became of one closed day; undefined for a day the account does not bill. */
@@ -174,6 +278,36 @@ export class MinerRunningAccount {
     lines: readonly Pick<LateNoticeLine, 'date' | 'tax'>[];
   }): LateNoticeStanding {
     return lateNoticeStanding(notice, this.byDay);
+  }
+
+  /** What is still owed of one line of a day: its share of the date's remainder, none while held. */
+  owedOf(date: string, tax: number): number {
+    const day = this.byDay.get(date);
+    if (!day || day.held || day.tax <= 0) return 0;
+    return (day.remaining * tax) / day.tax;
+  }
+
+  /**
+   * The newest day that may be stored as paid for good (D22): every day up to it is settled, held
+   * by no dispute, before `today`, and priced at a saved close-of-day price. A day with no price
+   * has no tax and reads as paid, so storing past one would forgive it; a live price is a guess
+   * that moves. Null while no day qualifies. Only an officer's client can compute it: the server
+   * has no prices. The stored day never moves back (`paidThrough` holds it).
+   */
+  closableThrough(
+    /** The account's days, with whether every line was priced at a saved close-of-day price. */
+    days: readonly { date: string; savedPrices: boolean }[],
+    /** The UTC date of the read; ore for it is still coming in. */
+    today: string
+  ): string | null {
+    if (this.paidThrough === null) return null;
+    let through: string | null = null;
+    for (const d of [...days].sort((a, b) => a.date.localeCompare(b.date))) {
+      const day = this.byDay.get(d.date);
+      if (d.date >= today || !d.savedPrices || !day || day.held || !day.settled) break;
+      through = d.date;
+    }
+    return through;
   }
 }
 
@@ -200,7 +334,7 @@ export function runningDaysFromLines(
 }
 
 /** The money `settleDays` spreads over the days, oldest day first. */
-export interface DayPools {
+interface DayPools {
   /** Credit from outside the days that is not a payment: it pays days without the tolerance. */
   extraCorrections: number;
   /** The payments' money for the days, paid in one go (a day's tolerance can close mid-run). */
@@ -212,13 +346,13 @@ export interface DayPools {
 }
 
 /** The part of the input that says how days settle; the money comes in `DayPools`. */
-export type DaysInput = Pick<
+type DaysInput = Pick<
   MinerRunningAccountInput,
   'days' | 'heldDays' | 'storedPaidThrough' | 'dayTolerancePct' | 'toleranceExemptions'
 >;
 
 /** What `settleDays` makes of the days, before the caller takes the payments off the balance. */
-export interface SettledDays {
+interface SettledDays {
   byDay: Map<string, DaySettlement>;
   applications: RunningAccountApplications;
   credit: number;
@@ -239,12 +373,8 @@ type Running = {
   exempt?: number;
 };
 
-/**
- * Settles the days from the given pools: corrections first, then payments, then officer
- * write-offs. Shared by `MinerRunningAccount.build` and the legacy `allocateRunningAccount` until
- * the calendar Statement code is removed.
- */
-export function settleDays(input: DaysInput, pools: DayPools): SettledDays {
+/** Settles the days from the given pools: corrections first, then payments, then officer write-offs. */
+function settleDays(input: DaysInput, pools: DayPools): SettledDays {
   const pct = input.dayTolerancePct ?? DAY_SETTLE_TOLERANCE_PCT;
   const held = input.heldDays ?? new Set<string>();
   const stored = input.storedPaidThrough;

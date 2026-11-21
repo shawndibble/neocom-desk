@@ -24,7 +24,7 @@ import { ReasonDialog } from './BookDialogs';
 import { FILTER_STATES } from './extractionStates';
 import { FullyMinedPanel } from './FullyMinedPanel';
 import { LinkSurveyDialog } from './LinkSurveyDialog';
-import { dateTimeUtc, extractionWindowLabel, isk, periodLabel } from './moonsFormat';
+import { dateTimeUtc, extractionWindowLabel, isk } from './moonsFormat';
 import { extractionPath as extractionLink, minerPath } from './moonsPaths';
 import { caretColumn } from './caretColumn';
 import { Crumb, OreLine, StateWord } from './moonsParts';
@@ -60,16 +60,10 @@ export function MoonDetail({ id }: { id: string }) {
     row.estimatedValue !== null && row.minedPct !== null
       ? Math.round(row.estimatedValue * (1 - row.minedPct / 100))
       : null;
-  const billedPeriods = billing.statementIds.flatMap((sid) => {
-    const st = view.input.statements.find((x) => x.id === sid);
-    return st ? [periodLabel(st.periodStart, st.periodEnd)] : [];
-  });
-  // The tax says what state it is in: still counting, or already on a Statement.
-  const minersHint = !billing.billed
-    ? t('corpTaxBook.moons.moon.minersHint')
-    : billedPeriods.length === 1
-      ? t('corpTaxBook.moons.moon.minersHintBilled', { period: billedPeriods[0] })
-      : t('corpTaxBook.moons.moon.minersHintBilledMany');
+  // The tax says what state it is in: still owed or counting, or all paid.
+  const minersHint = t(
+    billing.paid ? 'corpTaxBook.moons.moon.minersHintPaid' : 'corpTaxBook.moons.moon.minersHint'
+  );
   // Looking at an older cycle: the moon's newest one is a click away.
   const current = detail.otherCycles
     .filter((c) => c.startedAt > row.startedAt)
@@ -189,18 +183,9 @@ export function MoonDetail({ id }: { id: string }) {
         }
       />
       <EntityHeader
-        label={
-          billing.rollingOver > 0
-            ? t('corpTaxBook.moons.moon.taxPartial', {
-                periods: billedPeriods.join(', '),
-                amount: isk(billing.rollingOver),
-              })
-            : t(
-                billing.billed
-                  ? 'corpTaxBook.moons.moon.taxBilled'
-                  : 'corpTaxBook.moons.moon.taxSoFar'
-              )
-        }
+        label={t(
+          billing.paid ? 'corpTaxBook.moons.moon.taxPaid' : 'corpTaxBook.moons.moon.taxSoFar'
+        )}
         value={isk(row.tax)}
         note={
           <>

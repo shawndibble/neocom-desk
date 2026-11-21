@@ -10,7 +10,7 @@ describe('bookPartsFor', () => {
     expect(sorted('overview')).toEqual(['core', 'ledger', 'observed']);
     expect(sorted('extractions')).toEqual(['core', 'observed']);
     expect(sorted('miners')).toEqual(['answers', 'core', 'ledger', 'observed']);
-    expect(sorted('statements')).toEqual(['core', 'ledger', 'observed']);
+    expect(sorted('late-notices')).toEqual(['core', 'ledger', 'observed']);
     expect(sorted('moon-owners')).toEqual(['core', 'owners']);
     expect(sorted('anything-else')).toEqual(['core', 'observed']);
   });

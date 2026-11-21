@@ -1,26 +1,27 @@
 /**
- * The guest verify page's view model (issue #4066, D27): `readCorpTaxBookStatementCallable`
- * answers with plain JSON, and this turns it into what the page prints. Pure:
- * names (ore, refinery, corporation) and number formatting stay in the page.
+ * The guest verify page's view model (issue #4066, D27): the verify callable answers with plain
+ * JSON about one late notice, and this turns it into what the page prints. Pure: names (ore,
+ * refinery, corporation) and number formatting stay in the page.
  */
 import type { TaxPriceSource } from '../miningTax/priceBasis';
 
-/** What `readCorpTaxBookStatementCallable` returns (functions/src/corpTaxBookStore.ts). */
+/**
+ * What the verify callable returns (`readStatementByToken`, functions/src/corpTaxBookStore.ts).
+ * Its fields keep the names older servers gave them: `statement` is the late notice.
+ */
 export interface VerifyPayload {
   corporationId: number;
   statement: {
     id: string;
+    /** The Reason code its mail printed: the Miner's own on a notice issued now. */
     code: string;
-    periodStart: string;
-    periodEnd: string;
     issuedAt: string;
+    /** What its lines asked for. */
     amount: number;
     hubId: string;
     oreForm: 'compressed' | 'raw';
     lines: VerifyPayloadLine[];
-    /** A running account's late notice (#6294); absent on a Statement. */
-    kind?: 'notice';
-    /** Names the officer's client stored with the Statement, when it did. */
+    /** Names the officer's client stored with the notice, when it did. */
     corporationName?: string;
     minerName?: string;
     refineryNames?: Record<string, string>;
@@ -28,32 +29,19 @@ export interface VerifyPayload {
   terms: {
     startDate?: string;
     overdueDays?: number;
-    minimumStatement?: number;
     /** The wallet divisions the book reads donations from; absent from older servers. */
     divisions?: number[];
     /** The corp's own names for those divisions, when a Director's visit stored them. */
     divisionNames?: Record<string, string>;
-    /** The book's Statement cadence; absent from older servers. */
-    cadence?: { kind: 'monthly' } | { kind: 'days'; days: number };
   };
-  payments: { id: string; amount: number; at: string; source: 'donation' | 'manual' }[];
-  settlement: {
-    amount: number;
-    credited: number;
-    /** What officer write-offs forgave (#4637), part of `credited`; absent from older servers. */
-    forgiven?: number;
-    writtenOff: number;
-    remaining: number;
-  } | null;
   declarations: { kind: string; at: string; resolution: string | null }[];
-  settled: boolean;
   remindersStopped: boolean;
   accountClosed: boolean;
   /** Characters an officer added by hand that still wait for their own confirmation (D26b). */
   pendingCharacterIds: number[];
   /**
-   * A running account's total now (#6294): what an officer's client last counted, less what the
-   * Miner paid since. Absent from older servers, null on a calendar book or before any count.
+   * The Miner's Running account now (#6294): what an officer's client last counted, less what the
+   * Miner paid since. Absent from older servers, null before any count.
    */
   account?: {
     owed: number;

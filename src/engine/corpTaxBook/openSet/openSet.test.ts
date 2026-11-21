@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { settleOpenSet, placeOfFactory, type OpenSet, type OpenSetInput } from '.';
-import { buildBookView, type BookViewInput } from '../bookView';
-import { overlayCorpBooks, type PersonalBook } from '../personal';
-import type { Statement } from '../statements';
 import type { SyncExtraction } from '../sync';
 import type { ObservedMiningEntry } from '../types';
 
@@ -41,37 +38,6 @@ function row(
   };
 }
 
-/** A Statement billing whole days at 1,000 ISK per unit and 10%. */
-function statement(
-  id: string,
-  minerId: string,
-  days: { key: string; date: string; tax: number }[],
-  issuedAt = '2026-09-01T12:00:00Z'
-): Statement {
-  return {
-    id,
-    minerId,
-    code: id,
-    periodStart: '2026-08-01',
-    periodEnd: '2026-08-31',
-    coversFrom: '2026-08-01',
-    coversThrough: '2026-08-31',
-    issuedAt,
-    hubId: 'jita',
-    oreForm: 'compressed',
-    lines: days.map((d) => ({
-      kind: 'mined' as const,
-      date: d.date,
-      chargeKey: d.key,
-      structureId: 1001,
-      oreLines: [{ typeId: ORE, quantity: d.tax / 100 }],
-      estimatedValue: d.tax * 10,
-      tax: d.tax,
-    })),
-    amount: days.reduce((sum, d) => sum + d.tax, 0),
-  };
-}
-
 const keyOf = (characterId: number, date: string) => `${characterId}:1001:${date}`;
 
 /** The whole book an officer reads. */
@@ -82,14 +48,12 @@ function officer(over: Partial<OpenSetInput> = {}): OpenSetInput {
     startDate: '2026-08-01',
     graceHours: 6,
     lastSyncedAt: '2026-09-18T12:00:00Z',
-    overdueDays: 14,
     rates: [{ scope: 'corp', pct: 10, effectiveFrom: '2026-08-01' }],
     entries: [],
     miners: [],
-    statements: [],
+    notices: [],
     payments: [],
     dismissals: [],
-    declarations: [],
     pricesOn: () => ({
       prices: new Map([[ORE, 1000]]),
       sources: new Map([[ORE, 'saved' as const]]),
@@ -109,7 +73,7 @@ function member(book: OpenSetInput, characterIds: readonly number[]): OpenSetInp
   return {
     ...book,
     entries: book.entries.filter((e) => mine.has(e.characterId)),
-    statements: book.statements.filter((s) => minerIds.has(s.minerId)),
+    notices: book.notices.filter((n) => minerIds.has(n.minerId)),
     payments: book.payments.filter((p) => p.minerId !== undefined && minerIds.has(p.minerId)),
     placement: { kind: 'observed-rows' },
   };
@@ -125,10 +89,10 @@ function settlementOf(open: OpenSet, minerId: string) {
     unrated: open.unrated.map((e) => keyOf(e.characterId, e.date)),
     unread: open.unread.map((e) => keyOf(e.characterId, e.date)),
     billableThrough: open.billableThrough,
-    byStatement: s ? [...s.allocation.byStatement] : [],
-    credit: s?.allocation.credit ?? 0,
-    dismissalCredits: s?.dismissalCredits ?? [],
-    overdue: s ? [...s.overdue].map(([id, o]) => [id, o.state, o.overdueAt]) : [],
+    byDay: s ? [...s.account.byDay] : [],
+    owes: s?.account.owes ?? null,
+    credit: s?.account.credit ?? 0,
+    paidThrough: s?.account.paidThrough ?? null,
   };
 }
 
@@ -141,13 +105,10 @@ const donation = (id: string, minerId: string, amount: number, at = '2026-09-05T
   source: 'donation' as const,
 });
 
-const AUG10 = keyOf(1, '2026-08-10');
-const AUG11 = keyOf(1, '2026-08-11');
-
 describe('settleOpenSet: officer and member agree', () => {
   const table: { name: string; book: OpenSetInput; minerId: string; characterIds: number[] }[] = [
     {
-      name: 'unbilled days, one held for a moon owner not read since',
+      name: 'days, one held for a moon owner not read since',
       book: officer({
         entries: [
           row(1, '2026-08-10', 1000),
@@ -160,25 +121,18 @@ describe('settleOpenSet: officer and member agree', () => {
       characterIds: [1],
     },
     {
-      name: 'a billed day a donation settles, the rest left as credit',
+      name: 'a donation that pays the oldest day and leaves credit',
       book: officer({
         entries: [row(1, '2026-08-10', 1000)],
-        statements: [statement('s1', 'solo:1', [{ key: AUG10, date: '2026-08-10', tax: 100_000 }])],
         payments: [donation('p1', 'solo:1', 150_000)],
       }),
       minerId: 'solo:1',
       characterIds: [1],
     },
     {
-      name: 'a moon dismissal crediting a billed day of that moon',
+      name: 'a moon dismissal that takes the moon’s days off the account',
       book: officer({
         entries: [row(1, '2026-08-10', 1000), row(1, '2026-08-11', 1000)],
-        statements: [
-          statement('s1', 'solo:1', [
-            { key: AUG10, date: '2026-08-10', tax: 100_000 },
-            { key: AUG11, date: '2026-08-11', tax: 100_000 },
-          ]),
-        ],
         dismissals: [
           {
             id: 'd1',
@@ -194,35 +148,10 @@ describe('settleOpenSet: officer and member agree', () => {
       characterIds: [1],
     },
     {
-      name: 'an unpaid Statement past its Overdue days, one paused by a declaration',
-      book: officer({
-        entries: [row(1, '2026-08-10', 1000), row(1, '2026-08-11', 1000)],
-        statements: [
-          statement('s1', 'solo:1', [{ key: AUG10, date: '2026-08-10', tax: 100_000 }]),
-          statement(
-            's2',
-            'solo:1',
-            [{ key: AUG11, date: '2026-08-11', tax: 100_000 }],
-            '2026-08-20T00:00:00Z'
-          ),
-        ],
-        declarations: [
-          { id: 'x1', statementId: 's1', kind: 'contract', at: '2026-09-15T00:00:00Z' },
-        ],
-      }),
-      minerId: 'solo:1',
-      characterIds: [1],
-    },
-    {
-      name: 'a record dismissal on an absorbed Miner’s billed day after a regroup',
+      name: 'a record dismissal on an absorbed Miner’s day after a regroup',
       book: officer({
         entries: [row(2, '2026-08-10', 1000)],
         miners: [{ id: 'solo:1', characterIds: [1, 2], mainCharacterId: 1 }],
-        statements: [
-          statement('s2', 'solo:2', [
-            { key: keyOf(2, '2026-08-10'), date: '2026-08-10', tax: 100_000 },
-          ]),
-        ],
         dismissals: [
           {
             id: 'd2',
@@ -234,7 +163,7 @@ describe('settleOpenSet: officer and member agree', () => {
           },
         ],
       }),
-      minerId: 'solo:2',
+      minerId: 'solo:1',
       characterIds: [1, 2],
     },
   ];
@@ -275,70 +204,5 @@ describe('settleOpenSet: officer and member agree', () => {
       billableThrough: '2026-09-08',
       hold: { from: '2026-09-09', ownerCorporationId: OWNER },
     });
-  });
-});
-
-describe('the callers read one settlement', () => {
-  /** The regroup row above, through the officer's view and the member's overlay. */
-  const regrouped = {
-    entries: [row(2, '2026-08-10', 1000)],
-    miners: [{ id: 'solo:1', characterIds: [1, 2], mainCharacterId: 1 }],
-    statements: [
-      statement('s2', 'solo:2', [
-        { key: keyOf(2, '2026-08-10'), date: '2026-08-10', tax: 100_000 },
-      ]),
-    ],
-    dismissals: [
-      {
-        id: 'd2',
-        scope: 'record' as const,
-        targetId: keyOf(2, '2026-08-10'),
-        by: 9,
-        at: '2026-09-03T00:00:00Z',
-        reason: 'wrong refinery',
-      },
-    ],
-  };
-
-  it('settles a dismissed day of an absorbed Miner’s Statement for the officer and the member alike', () => {
-    const base = officer();
-    const view = buildBookView({
-      ...(base as unknown as BookViewInput),
-      minimumStatement: 0,
-      cadence: { kind: 'monthly' },
-      hubId: 'jita',
-      oreForm: 'compressed',
-      structureExpiryHours: {},
-      adjustments: [],
-      extractions: [PULL],
-      paidStatementIds: new Set(),
-      graceHours: 6,
-      overdueDays: 14,
-      declarations: [],
-      ...regrouped,
-    });
-    const officerOwes = view.miners.find((m) => m.id === 'solo:2')?.owed ?? 0;
-
-    const personal: PersonalBook = {
-      corporationId: CORP,
-      corpName: 'Brass Meridian Logistics',
-      characterIds: [1, 2],
-      startDate: base.startDate,
-      graceHours: 6,
-      lastSyncedAt: base.lastSyncedAt!,
-      rates: [...base.rates],
-      hubId: 'jita',
-      oreForm: 'compressed',
-      payments: [],
-      inFlight: [],
-      pricesOn: base.pricesOn,
-      ...regrouped,
-      observed: regrouped.entries,
-    };
-    const [summary] = overlayCorpBooks({ entries: [], books: [personal], now: NOW }).books;
-    const memberOwes = summary.openStatements.length > 0;
-
-    expect(officerOwes > 0).toBe(memberOwes);
-    expect(officerOwes).toBe(0);
   });
 });

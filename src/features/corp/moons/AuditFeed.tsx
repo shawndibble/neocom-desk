@@ -44,7 +44,7 @@ export function AuditLine({
 }: {
   entry: AuditEntry;
   subject?: AuditSubject;
-  /** What the entry is about, when the page does not already say it (a Statement's period and amount). */
+  /** What the entry is about, when the page does not already say it (a Late notice's days and amount). */
   context?: ReactNode;
   /** Called when a Miner link is followed (the panel showing the feed closes). */
   onOpen?: () => void;
@@ -52,9 +52,12 @@ export function AuditLine({
   const { t } = useTranslation();
   const why = detailLine(a, t);
   const who = subject?.(a) ?? null;
-  // A queued mail is a Statement or a reminder; `kind` says which.
+  // A queued mail is a late notice or a reminder; `kind` says which.
   const action =
-    a.action === 'recordMail' && a.detail.kind === 'reminder' ? 'recordReminder' : a.action;
+    (a.action === 'recordMail' || a.action === 'recordLateNoticeMail') &&
+    a.detail.kind === 'reminder'
+      ? 'recordReminder'
+      : a.action;
   // The Miner's name opens their page, in the sentence when it names them, else after it.
   const minerLink = who?.path ? (
     <Link to={who.path} className={entityLinkClassName()} onClick={onOpen}>

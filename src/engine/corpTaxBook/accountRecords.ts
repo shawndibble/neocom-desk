@@ -3,8 +3,14 @@
  * so an officer's client records each Miner's account (`recordAccounts`) and the verify link
  * shows it, less what the Miner paid since (`liveAccount`, functions).
  */
+import {
+  canAdvanceCheckpoint,
+  closedThroughFor,
+  type RunningAccountCheckpoint,
+} from '../../../functions/src/corpTaxBookCheckpoint';
 import type { BookView } from './bookView';
-import { netOf } from './paymentPreview';
+import { MinerRunningAccount } from './minerRunningAccount';
+import { paymentNet } from './payments';
 
 /** One Miner's account as `recordAccounts` takes it. */
 export interface AccountRecord {
@@ -12,6 +18,8 @@ export interface AccountRecord {
   owed: number;
   /** The Miner's net payments counted (less "not tax"): later ones come off `owed` on the server. */
   paid: number;
+  /** Money ahead of every billed day. */
+  credit: number;
   days: number;
   oldest?: string;
   paidThrough?: string;
@@ -28,19 +36,17 @@ export interface AccountRecord {
 }
 
 /**
- * Each Miner's account in a running book's view, whole ISK; `only` keeps one Miner (a page
- * scoped to them reads only their rows, so no other Miner's figure is whole). Empty on a
- * calendar book.
+ * Each Miner's account in the view, whole ISK; `only` keeps one Miner (a page scoped to them
+ * reads only their rows, so no other Miner's figure is whole).
  */
 export function accountRecords(view: BookView, only?: string): AccountRecord[] {
-  if (!view.input.runningAccountFrom) return [];
   const paidBy = new Map<string, number>();
   for (const p of view.input.payments)
-    if (p.minerId) paidBy.set(p.minerId, (paidBy.get(p.minerId) ?? 0) + netOf(p));
+    if (p.minerId) paidBy.set(p.minerId, (paidBy.get(p.minerId) ?? 0) + paymentNet(p));
   return view.miners.flatMap((m) => {
-    if (!m.account || (only !== undefined && m.id !== only)) return [];
+    if (only !== undefined && m.id !== only) return [];
     const { owes, paidThrough, closableThrough } = m.account;
-    const unpaidDays = [...(view.internals.byMiner.get(m.id)?.running?.byDay ?? [])]
+    const unpaidDays = [...(view.internals.byMiner.get(m.id)?.account.byDay ?? [])]
       .filter(([, d]) => !d.settled && !d.held && Math.round(d.remaining) > 0)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, d]) => ({
@@ -53,6 +59,7 @@ export function accountRecords(view: BookView, only?: string): AccountRecord[] {
         minerId: m.id,
         owed: Math.round(m.owed),
         paid: Math.round(paidBy.get(m.id) ?? 0),
+        credit: Math.max(0, Math.round(m.credit)),
         days: owes?.days ?? 0,
         ...(owes ? { oldest: owes.oldest } : {}),
         ...(paidThrough ? { paidThrough } : {}),
@@ -60,5 +67,29 @@ export function accountRecords(view: BookView, only?: string): AccountRecord[] {
         ...(closableThrough ? { settledThrough: closableThrough } : {}),
       },
     ];
+  });
+}
+
+/**
+ * The checkpoints due now (decision 20261120-235011): each Miner's account closed through the end
+ * of the last month at least 31 days old, where that moves the stored one forward. Only an
+ * officer's client can work them out: the server has no prices. `only` keeps one Miner.
+ */
+export function dueCheckpoints(
+  view: BookView,
+  recorded: { at: string; by: number },
+  only?: string
+): RunningAccountCheckpoint[] {
+  const today = recorded.at.slice(0, 10);
+  const through = closedThroughFor(today);
+  if (through < view.input.startDate) return [];
+  return view.miners.flatMap((m) => {
+    const inner = view.internals.byMiner.get(m.id);
+    if (!inner || (only !== undefined && m.id !== only)) return [];
+    const stored = view.input.checkpoints?.get(m.id);
+    if (!canAdvanceCheckpoint(stored, { through }, today)) return [];
+    // Nothing billed and no money: nothing to close.
+    if (inner.billable.lines.length === 0 && inner.payments.length === 0 && !stored) return [];
+    return [MinerRunningAccount.checkpoint(inner.account.input, m.id, through, recorded)];
   });
 }

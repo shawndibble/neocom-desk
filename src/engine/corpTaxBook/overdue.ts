@@ -1,7 +1,7 @@
 import { isPlainRecord } from '@/engine/guards';
 import { DAY_MS } from '@/lib/age';
 /**
- * Overdue (D19, D29): an unsettled Statement goes Overdue N days (14 by
+ * Overdue (D19, D29): an unsettled Late notice goes Overdue N days (14 by
  * default) after it is issued; no interest, reminders are manual. A miner's
  * declaration ("paid by contract / other division / wrong corp") pauses the
  * clock for at most 14 days, after which it resumes on its own with a note.
@@ -10,7 +10,7 @@ import { DAY_MS } from '@/lib/age';
  */
 
 export const DEFAULT_OVERDUE_DAYS = 14;
-/** The most a Statement's Overdue clock pauses for declarations, in total. */
+/** The most a Late notice's Overdue clock pauses for declarations, in total. */
 export const DECLARATION_PAUSE_DAYS = 14;
 
 /** `another-way`: the Miner's own "I paid this another way" (#6206). */
@@ -36,15 +36,24 @@ export interface ClaimedTransfer {
 
 /**
  * What the server's check of a claimed transfer found (resolving in the app): in the book
- * (`found`), in a division it does not read (`division`), paid after its last sync
+ * (`found`), already placed on a Miner's account (`credited`, whose `minerId` it names), in a division it does not read (`division`), paid after its last sync
  * (`notSynced`), older than any sync could read (`tooOld`), none of those (`notFound`), matched by several
  * payments (`ambiguous`, an officer picks), or paid
  * to a person or another corporation, which the book cannot see.
  */
 export type ClaimCheckResult =
-  'found' | 'division' | 'notSynced' | 'tooOld' | 'notFound' | 'ambiguous' | 'person' | 'otherCorp';
+  | 'found'
+  | 'credited'
+  | 'division'
+  | 'notSynced'
+  | 'tooOld'
+  | 'notFound'
+  | 'ambiguous'
+  | 'person'
+  | 'otherCorp';
 export const CLAIM_CHECK_RESULTS: readonly ClaimCheckResult[] = [
   'found',
+  'credited',
   'division',
   'notSynced',
   'tooOld',
@@ -57,6 +66,8 @@ export const CLAIM_CHECK_RESULTS: readonly ClaimCheckResult[] = [
 export interface ClaimCheck {
   result: ClaimCheckResult;
   paymentId?: string;
+  /** `credited`: the Miner whose account the transfer was placed on. */
+  minerId?: string;
   division?: number;
 }
 
@@ -115,6 +126,7 @@ export function readClaimEvidence(d: {
               {
                 result: c.result as ClaimCheckResult,
                 ...(typeof c.paymentId === 'string' ? { paymentId: c.paymentId } : {}),
+                ...(typeof c.minerId === 'string' ? { minerId: c.minerId } : {}),
                 ...(typeof c.division === 'number' ? { division: c.division } : {}),
               },
             ]
@@ -141,10 +153,10 @@ export interface OverdueStatus {
 
 export interface OverdueInput {
   issuedAt: string;
-  /** From `allocatePayments`. */
+  /** Every day the notice listed is paid (`lateNoticeStanding`). */
   settled: boolean;
   now: string;
-  /** This Statement's declarations. */
+  /** This notice's declarations. */
   declarations: readonly Declaration[];
   overdueDays?: number;
 }

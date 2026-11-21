@@ -4,8 +4,8 @@ import {
   type MinerRunningAccountInput,
   type RunningDay,
 } from './minerRunningAccount';
-import { allocateRunningAccount } from './runningAccount';
-import type { TaxPayment } from './allocation';
+import type { RunningAccountCheckpoint } from '../../../functions/src/corpTaxBookCheckpoint';
+import type { TaxPayment } from './payments';
 
 const day = (date: string, tax: number): RunningDay => ({ date, tax });
 const payment = (id: string, amount: number, at: string, extra: Partial<TaxPayment> = {}) =>
@@ -86,7 +86,7 @@ describe('MinerRunningAccount.build', () => {
     const account = MinerRunningAccount.build({
       days: [day('2026-11-01', 1e6), day('2026-11-02', 1e6)],
       payments: [],
-      writeOffs: [{ id: 'w1', amount: 1e6 }],
+      writeOffs: [{ id: 'w1', amount: 1e6, at: '2026-11-03T00:00:00Z' }],
     });
     expect(account.owes).toEqual({ amount: 1e6, days: 1, oldest: '2026-11-02' });
   });
@@ -95,11 +95,152 @@ describe('MinerRunningAccount.build', () => {
     const account = MinerRunningAccount.build({
       days: [day('2026-11-01', 1_000_000), day('2026-11-02', 1_000_000)],
       payments: [payment('p1', 1_000_000, '2026-11-03T10:00:00Z')],
-      writeOffs: [{ id: 'w1', amount: 5_000_000 }],
+      writeOffs: [{ id: 'w1', amount: 5_000_000, at: '2026-11-03T00:00:00Z' }],
     });
     expect(account.applications.writeOffs).toEqual([{ date: '2026-11-02', amount: 1_000_000 }]);
     expect(account.owes).toBeNull();
     expect(account.credit).toBe(0);
+  });
+});
+
+const checkpoint = (over: Partial<RunningAccountCheckpoint> = {}): RunningAccountCheckpoint => ({
+  minerId: 'm1',
+  through: '2026-10-31',
+  owed: [],
+  credit: 0,
+  balance: 0,
+  paidThrough: '2026-10-31',
+  at: '2026-12-02T00:00:00Z',
+  ...over,
+});
+
+describe('MinerRunningAccount.build from a closed-through checkpoint', () => {
+  it('never bills again a day on or before the checkpoint', () => {
+    const account = MinerRunningAccount.build({
+      days: [day('2026-10-15', 5e6), day('2026-11-02', 1e6)],
+      payments: [],
+      checkpoint: checkpoint(),
+    });
+    expect(account.day('2026-10-15')).toBeUndefined();
+    expect(account.owes).toEqual({ amount: 1e6, days: 1, oldest: '2026-11-02' });
+  });
+
+  it('still owes the checkpoint’s owed days, oldest first', () => {
+    const account = MinerRunningAccount.build({
+      days: [day('2026-11-02', 1e6)],
+      payments: [payment('p1', 600_000, '2026-11-05T10:00:00Z')],
+      checkpoint: checkpoint({
+        owed: [{ date: '2026-10-20', remaining: 500_000 }],
+        balance: 500_000,
+        paidThrough: '2026-10-19',
+      }),
+    });
+    expect(account.day('2026-10-20')?.settled).toBe(true);
+    expect(account.day('2026-11-02')?.remaining).toBe(900_000);
+    expect(account.owes).toEqual({ amount: 900_000, days: 1, oldest: '2026-11-02' });
+    expect(account.paidThrough).toBe('2026-10-31');
+  });
+
+  it('opens at the checkpoint’s balance', () => {
+    const account = MinerRunningAccount.build({
+      days: [],
+      payments: [],
+      checkpoint: checkpoint({
+        owed: [{ date: '2026-10-20', remaining: 500_000 }],
+        balance: 500_000,
+        paidThrough: '2026-10-19',
+      }),
+    });
+    expect(account.balance).toBe(500_000);
+    expect(account.owes).toEqual({ amount: 500_000, days: 1, oldest: '2026-10-20' });
+    expect(account.paidThrough).toBe('2026-10-19');
+  });
+
+  it('carries the checkpoint’s credit forward to the next days', () => {
+    const account = MinerRunningAccount.build({
+      days: [day('2026-11-02', 1e6)],
+      payments: [],
+      checkpoint: checkpoint({ credit: 2e6, balance: -2e6 }),
+    });
+    expect(account.day('2026-11-02')?.settled).toBe(true);
+    expect(account.credit).toBe(1e6);
+    expect(account.balance).toBe(-1e6);
+    expect(account.paidThrough).toBe('2026-11-02');
+    expect(account.applications.payments).toEqual([]);
+  });
+
+  it('counts only money dated after the checkpoint: the rest is in it', () => {
+    const account = MinerRunningAccount.build({
+      days: [day('2026-11-02', 1e6)],
+      payments: [payment('old', 3e6, '2026-10-25T10:00:00Z')],
+      writeOffs: [{ id: 'w-old', amount: 1e6, at: '2026-10-26T00:00:00Z' }],
+      checkpoint: checkpoint(),
+    });
+    expect(account.owes?.amount).toBe(1e6);
+  });
+
+  it('forgives the checkpoint’s owed days first with a later write-off', () => {
+    const account = MinerRunningAccount.build({
+      days: [day('2026-11-02', 1e6)],
+      payments: [],
+      writeOffs: [{ id: 'w1', amount: 500_000, at: '2026-11-10T00:00:00Z' }],
+      checkpoint: checkpoint({
+        owed: [{ date: '2026-10-20', remaining: 500_000 }],
+        balance: 500_000,
+        paidThrough: '2026-10-19',
+      }),
+    });
+    expect(account.applications.writeOffs).toEqual([{ date: '2026-10-20', amount: 500_000 }]);
+    expect(account.owes).toEqual({ amount: 1e6, days: 1, oldest: '2026-11-02' });
+  });
+});
+
+describe('MinerRunningAccount.checkpoint', () => {
+  const input: MinerRunningAccountInput = {
+    days: [day('2026-10-01', 1e6), day('2026-10-02', 2e6), day('2026-11-02', 1e6)],
+    payments: [
+      payment('p1', 1_500_000, '2026-10-10T10:00:00Z'),
+      payment('p2', 5e6, '2026-11-05T10:00:00Z'),
+    ],
+  };
+
+  it('sums up the days and money through a date, ignoring what came later', () => {
+    expect(
+      MinerRunningAccount.checkpoint(input, 'm1', '2026-10-31', { at: '2026-12-02T00:00:00Z' })
+    ).toEqual({
+      minerId: 'm1',
+      through: '2026-10-31',
+      owed: [{ date: '2026-10-02', remaining: 1_500_000 }],
+      credit: 0,
+      balance: 1_500_000,
+      paidThrough: '2026-10-01',
+      at: '2026-12-02T00:00:00Z',
+    });
+  });
+
+  it('is paid through its date once nothing is owed, and keeps who recorded it', () => {
+    const paid = { ...input, payments: [payment('p1', 4e6, '2026-10-10T10:00:00Z')] };
+    expect(
+      MinerRunningAccount.checkpoint(paid, 'm1', '2026-10-31', { at: 'x', by: 7 })
+    ).toMatchObject({ owed: [], credit: 1e6, balance: -1e6, paidThrough: '2026-10-31', by: 7 });
+  });
+
+  it('keeps an officer’s charge on a day still owed', () => {
+    const charged = { days: [{ date: '2026-10-02', tax: 3e6, charge: 1e6 }], payments: [] };
+    expect(MinerRunningAccount.checkpoint(charged, 'm1', '2026-10-31', { at: 'x' }).owed).toEqual([
+      { date: '2026-10-02', remaining: 3e6, charge: 1e6 },
+    ]);
+  });
+
+  it('rolls forward from the previous checkpoint', () => {
+    const first = MinerRunningAccount.checkpoint(input, 'm1', '2026-10-31', { at: 'x' });
+    const chained = MinerRunningAccount.checkpoint(
+      { ...input, checkpoint: first },
+      'm1',
+      '2026-11-30',
+      { at: 'x' }
+    );
+    expect(chained).toEqual(MinerRunningAccount.checkpoint(input, 'm1', '2026-11-30', { at: 'x' }));
   });
 });
 
@@ -119,78 +260,67 @@ function rng(seed: number) {
   };
 }
 
-function randomInput(seed: number): MinerRunningAccountInput {
+/**
+ * A book whose closed days do not change after they close, as ESI's ledgers guarantee: days and
+ * money either side of `through`, some days held by a dispute, a mined day on `through` itself.
+ */
+function randomBook(seed: number): { input: MinerRunningAccountInput; through: string } {
   const r = rng(seed);
   const date = (n: number) => `2026-11-${String(n).padStart(2, '0')}`;
-  const days = Array.from({ length: r.int(0, 8) }, (): RunningDay => {
-    const tax = r.pick([-500_000, 0, 90_000, 1_000_000, 2_345_678, 10_000_000]);
-    // An officer's charge on the day (a positive correction line), which a recorded-paid day keeps owed.
-    const charge = tax > 0 && r.next() < 0.3 ? r.pick([50_000, tax]) : undefined;
-    return { ...day(date(r.int(1, 20)), tax), ...(charge !== undefined ? { charge } : {}) };
-  });
-  const payments = Array.from({ length: r.int(0, 5) }, (_, i) =>
+  const cut = r.int(3, 15);
+  const days = [
+    day(date(cut), r.pick([90_000, 1_000_000])),
+    ...Array.from({ length: r.int(0, 10) }, () =>
+      day(date(r.int(1, 25)), r.pick([0, 90_000, 1_000_000, 2_345_678, 10_000_000]))
+    ),
+  ];
+  const payments = Array.from({ length: r.int(0, 6) }, (_, i) =>
     payment(
       `p${i}`,
       r.pick([0, 1, 45_000, 999_000, 1_000_000, 3_000_000, 20_000_000]),
-      `${date(r.int(1, 25))}T0${i}:00:00Z`,
+      `${date(r.int(1, 28))}T0${i}:00:00Z`,
       {
         source: r.pick(['donation', 'manual'] as const),
-        // A code pins a donation to a mailed notice; with no Statement to settle it pays days alike.
-        ...(r.next() < 0.3 ? { statementId: 'notice_x' } : {}),
         ...(r.next() < 0.3 ? { notTaxAmount: r.pick([1, 500_000, 50_000_000]) } : {}),
       }
     )
   );
-  const writeOffs = Array.from({ length: r.int(0, 2) }, (_, i) => ({
-    id: `w${i}`,
-    amount: r.pick([1_000, 500_000, 4_000_000]),
-  }));
   const dates = [...new Set(days.map((d) => d.date))];
   return {
-    days,
-    payments,
-    writeOffs,
-    ...(r.next() < 0.5 ? { startDate: date(r.int(1, 10)) } : {}),
-    ...(r.next() < 0.3 && dates.length > 0
-      ? { heldDays: new Set(dates.filter(() => r.next() < 0.5)) }
-      : {}),
-    // Any date: on a day, between days, before or after them all.
-    ...(r.next() < 0.3 ? { storedPaidThrough: date(r.int(1, 22)) } : {}),
-    ...(r.next() < 0.3 ? { dayTolerancePct: r.pick([0, 0.5, 2]) } : {}),
-    ...(r.next() < 0.2 && dates.length > 0
-      ? { toleranceExemptions: new Map([[r.pick(dates), r.pick([0, 10_000])]]) }
-      : {}),
+    through: date(cut),
+    input: {
+      days,
+      payments,
+      ...(r.next() < 0.5 ? { startDate: date(r.int(1, 10)) } : {}),
+      // The day on `through` is not held, so "paid through" names it whichever way it is built.
+      ...(r.next() < 0.3
+        ? { heldDays: new Set(dates.filter((d) => d !== date(cut) && r.next() < 0.3)) }
+        : {}),
+      dayTolerancePct: 0,
+    },
   };
 }
 
-describe('MinerRunningAccount.build is wired as allocateRunningAccount with no Statements', () => {
-  // Both run the same day-settling core (`settleDays`); this pins the money each feeds it. Production
-  // holds no calendar Statement, so the legacy pass in `allocateRunningAccount` must find nothing.
-  it('on 500 random books with no Statements', () => {
+describe('a checkpoint plus the later days is the whole history', () => {
+  it('on 500 random books', () => {
     for (let seed = 1; seed <= 500; seed += 1) {
-      const input = randomInput(seed);
-      const before = allocateRunningAccount({
-        ...input,
-        statements: [],
-        dismissalCredits: [],
-        officerWriteOffs: input.writeOffs?.map((w) => ({ ...w, at: '2026-11-01T00:00:00Z' })),
-      });
-      const after = MinerRunningAccount.build(input);
+      const { input, through } = randomBook(seed);
+      const whole = MinerRunningAccount.build(input);
+      const cp = MinerRunningAccount.checkpoint(input, 'm1', through, { at: 'x' });
+      const resumed = MinerRunningAccount.build({ ...input, checkpoint: cp });
       const context = `seed ${seed}`;
-      expect(after.byDay, context).toEqual(before.byDay);
-      expect(after.credit, context).toBeCloseTo(before.credit, 6);
-      expect(after.balance, context).toBeCloseTo(before.balance, 6);
-      expect(after.paidThrough, context).toBe(before.paidThrough);
-      expect(after.owes, context).toEqual(before.owes);
-      expect(after.applications.corrections, context).toEqual(before.applications.corrections);
-      expect(after.applications.writeOffs, context).toEqual(before.applications.writeOffs);
-      expect(after.applications.payments, context).toEqual(
-        before.applications.payments.map(({ paymentId, days, credit }) => ({
-          paymentId,
-          days,
-          credit,
-        }))
-      );
+      expect(resumed.credit, context).toBeCloseTo(whole.credit, 6);
+      expect(resumed.balance, context).toBeCloseTo(whole.balance, 6);
+      expect(resumed.paidThrough, context).toBe(whole.paidThrough);
+      expect(resumed.owes?.days, context).toBe(whole.owes?.days);
+      expect(resumed.owes?.oldest, context).toBe(whole.owes?.oldest);
+      expect(resumed.owes?.amount ?? 0, context).toBeCloseTo(whole.owes?.amount ?? 0, 6);
+      expect(resumed.owedDates(), context).toEqual(whole.owedDates());
+      for (const [date, d] of resumed.byDay) {
+        const w = whole.day(date)!;
+        expect([date, d.settled, d.held], context).toEqual([date, w.settled, w.held]);
+        expect(d.remaining, `${context} ${date}`).toBeCloseTo(w.remaining, 6);
+      }
     }
   });
 });

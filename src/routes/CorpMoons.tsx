@@ -71,7 +71,7 @@ import {
   isSettingsTab,
   moonsDetail,
   refineriesTabPath,
-  statementsTabPath,
+  lateNoticesTabPath,
   type SettingsTab,
 } from '@/features/corp/moons/moonsPaths';
 import { LateNoticesTab } from '@/features/corp/moons/LateNoticesTab';
@@ -101,7 +101,7 @@ function ActivityPanel({ open, onClose }: { open: boolean; onClose: () => void }
 
 function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   const { t } = useTranslation();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   // With no moon owners the empty state carries the invite button itself.
   const { rows: moonOwnerRows } = useMoonOwners();
   const hasMoonOwners = moonOwnerRows.length > 0;
@@ -243,7 +243,10 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
               {tab === 'refineries' && <RefineriesTab />}
               {tab === 'moons' && <Navigate replace to={refineriesTabPath} />}
               {tab === 'miners' && <MinersTab />}
-              {tab === 'statements' && <LateNoticesTab />}
+              {tab === 'late-notices' && <LateNoticesTab />}
+              {tab === 'statements' && (
+                <Navigate replace to={{ pathname: lateNoticesTabPath, search }} />
+              )}
               {tab === 'moon-owners' && (
                 <div className="space-y-4">
                   {addCorps.notices}
@@ -255,7 +258,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
           </>
         )}
         {detail?.kind === 'extraction' && <MoonDetail key={detail.id} id={detail.id} />}
-        {detail?.kind === 'legacyStatementPeriod' && <Navigate replace to={statementsTabPath} />}
+        {detail?.kind === 'legacyStatementPeriod' && <Navigate replace to={lateNoticesTabPath} />}
         {detail?.kind === 'legacyMoon' && <LegacyRefineryRedirect moonId={Number(detail.id)} />}
         {detail?.kind === 'legacyRefinery' && (
           <LegacyRefineryRedirect structureId={detail.structureId} />

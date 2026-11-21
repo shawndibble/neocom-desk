@@ -1,4 +1,4 @@
-import { daysBetween } from '@/engine/corpTaxBook/statements';
+import { utcDaysBetween } from '@/engine/localDay';
 import { utcDay } from '@/engine/localDay';
 
 /**
@@ -97,7 +97,7 @@ export function refineryRows(input: RefineryRowsInput): {
       ...exts.flatMap((x) => [x.startedAt.slice(0, 10), x.chunkArrivalAt.slice(0, 10)]),
       ...(lastMinedOn ? [lastMinedOn] : []),
     ]);
-    const idleDays = lastActive === undefined ? 0 : daysBetween(lastActive, today);
+    const idleDays = lastActive === undefined ? 0 : utcDaysBetween(lastActive, today);
     const offer: ArchiveOffer | null = archive
       ? null
       : input.isGone(structureId)

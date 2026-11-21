@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { formatList } from '@/lib/listFormat';
 import { Link } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button, Panel, plainTextActionClassName } from '@/components/ui';
@@ -10,7 +11,6 @@ import {
   disputeHold,
   disputeKindOf,
   disputedTax,
-  heldByStatement,
   type DisputeKind,
   type OreDispute,
 } from '@/engine/corpTaxBook/disputes';
@@ -30,12 +30,13 @@ import {
   RecordPaymentDialog,
   ReasonDialog,
 } from './BookDialogs';
-import { isk, periodLabel, shortDate, shortDateTime } from './moonsFormat';
+import { isk, shortDate, shortDateTime } from './moonsFormat';
 import { autoCredited, paidToOwn, transferStatus, type TransferStatus } from './claimWalletCheck';
 import { useOwnWalletJournals } from './useOwnWalletJournals';
+import { useCheckpointsAwaitingDirector } from './checkpointHolds';
 import { MOONS_TABS, minerPath } from './moonsPaths';
 import { tabPath } from '@/lib/pageTabs';
-import { mailTarget, useCorporationName } from './statementMailing';
+import { mailTarget, useCorporationName } from './lateNoticeMailing';
 import { declaredLeft } from './declaredLeft';
 
 /** The card's second action: a text link off the primary Button, so the pair is not two boxes (DESIGN.md §6, text action off a primary). */
@@ -172,6 +173,8 @@ export function NeedsYouQueue() {
   const { view, names, edit, canEdit, characterId, corporationId, settings } = ctx;
   const { miners } = useTabsProjection();
   const { needsYou, uncounted, disputes, noticesDue, count } = useNeedsYou();
+  // A closed month the server records only with a Director's approval: quiet, never an error.
+  const awaitingDirector = useCheckpointsAwaitingDirector(corporationId);
   // The officer's own Characters on this device: a transfer paid to one is checked in its journal.
   const ownIds = new Set(useCharacters().map((c) => c.characterId));
   const journals = useOwnWalletJournals(
@@ -247,7 +250,7 @@ export function NeedsYouQueue() {
 
   const creditedAutomatically = autoCredited(view.input.declarations, now).flatMap((d) => {
     const miner = miners.find((m) =>
-      view.input.statements.some((s) => s.id === d.statementId && s.minerId === m.id)
+      view.input.notices.some((n) => n.id === d.statementId && n.minerId === m.id)
     );
     if (!miner) return [];
     const transfers = d.transfers ?? [];
@@ -255,25 +258,24 @@ export function NeedsYouQueue() {
     return [{ d, miner, amount, at: transfers[0]?.at ?? d.at }];
   });
 
-  const statementPeriod = (id: string) => {
-    const s = view.input.statements.find((x) => x.id === id);
-    return s ? periodLabel(s.periodStart, s.periodEnd) : id;
+  const issuedOn = (id: string) => {
+    const n = view.input.notices.find((x) => x.id === id);
+    return n ? shortDate(n.issuedAt) : id;
   };
 
-  // An overdue Miner and a leaver get the same manual reminder (one per Statement).
-  const remind = async (item: { minerId: string; statementId?: string }) => {
+  // An overdue Miner and a leaver get the same manual reminder (one per late notice).
+  const remind = async (item: { minerId: string; noticeId?: string }) => {
     const miner = minerOf(item.minerId);
-    const statement = view.input.statements.find((s) => s.id === item.statementId);
-    if (!statement || corporationName === null) return;
+    const notice = view.input.notices.find((n) => n.id === item.noticeId);
+    if (!notice || corporationName === null) return;
     const { enqueueReminder } = await import('@/features/corpTaxBook/mailQueue');
     const result = await enqueueReminder({
       corporationId,
       corporationName,
       senderCharacterId: characterId,
-      refineryName: (id) => names.refinery(id),
-      statement: mailTarget(ctx, statement, miner, { amountDue: miner.owed, carried: 0 }),
-      remindersStopped: statement.remindersStopped === true,
-      manualRemindersSent: statement.manualRemindersSent ?? 0,
+      notice: mailTarget(ctx, notice, miner),
+      remindersStopped: notice.mail.remindersStopped,
+      manualRemindersSent: notice.mail.manualSent,
     });
     setNotice(
       result.ok
@@ -292,6 +294,11 @@ export function NeedsYouQueue() {
       )}
       {count === 0 && (
         <p className="px-3 py-2.5 text-xs text-text-dim">{t('corpTaxBook.moons.needs.none')}</p>
+      )}
+      {awaitingDirector.length > 0 && (
+        <p className="px-3 py-2 text-xs text-text-dim">
+          {t('corpTaxBook.moons.needs.checkpointDirector', { count: awaitingDirector.length })}
+        </p>
       )}
       {creditedAutomatically.map(({ d, miner, amount, at }) => (
         <p key={d.id} className="px-3 py-2 text-xs text-text-dim">
@@ -322,7 +329,7 @@ export function NeedsYouQueue() {
             tone="warning"
             title={
               <Link
-                to={tabPath(MOONS_TABS, 'statements')}
+                to={tabPath(MOONS_TABS, 'late-notices')}
                 className={entityLinkClassName('inline-block py-0.5')}
               >
                 {t('corpTaxBook.moons.needs.noticesDue.title', { count: noticesDue.length })}
@@ -341,7 +348,11 @@ export function NeedsYouQueue() {
               const d = item.declaration;
               const transfers = d.transfers ?? [];
               const statuses = transfers.map((tr, k) =>
-                transferStatus(t, tr, d.checks?.[k], miner.characterIds, ownIds, journals)
+                transferStatus(t, tr, d.checks?.[k], miner.characterIds, ownIds, journals, (id) =>
+                  miners.some((m) => m.id === id)
+                    ? nameOf(id)
+                    : t('corpTaxBook.moons.needs.check.anotherMiner')
+                )
               );
               const toYou = transfers.filter((tr) => paidToOwn(tr, ownIds) !== undefined);
               const paidToYou = toYou.length > 0;
@@ -454,7 +465,7 @@ export function NeedsYouQueue() {
                     </MinerTitle>
                   }
                   body={t('corpTaxBook.moons.needs.overdue.body', {
-                    period: statementPeriod(item.statementId),
+                    date: issuedOn(item.noticeId),
                   })}
                   actions={
                     canEdit ? (
@@ -500,14 +511,22 @@ export function NeedsYouQueue() {
                   body={t(
                     // Held because the sender's Miner owed nothing (#6207); otherwise, from the book
                     // as it is now: a sender who has since joined a Miner is not a stranger.
-                    item.payment.reviewReason === 'no-open-balance'
-                      ? 'corpTaxBook.moons.needs.unmatched.bodyReview'
-                      : miners.some((m) => m.characterIds.includes(item.payment.characterId))
-                        ? 'corpTaxBook.moons.needs.unmatched.bodyInMiner'
-                        : 'corpTaxBook.moons.needs.unmatched.body',
+                    item.payment.reviewReason === 'ambiguous'
+                      ? 'corpTaxBook.moons.needs.unmatched.bodyAmbiguous'
+                      : item.payment.reviewReason === 'no-open-balance'
+                        ? 'corpTaxBook.moons.needs.unmatched.bodyReview'
+                        : miners.some((m) => m.characterIds.includes(item.payment.characterId))
+                          ? 'corpTaxBook.moons.needs.unmatched.bodyInMiner'
+                          : 'corpTaxBook.moons.needs.unmatched.body',
                     {
                       date: shortDate(item.payment.at),
                       name: names.character(item.payment.characterId),
+                      miners: formatList(
+                        (item.payment.ambiguousMinerIds ?? [])
+                          .filter((id) => miners.some((m) => m.id === id))
+                          .map(nameOf),
+                        'disjunction'
+                      ),
                     }
                   )}
                   actions={
@@ -544,7 +563,7 @@ export function NeedsYouQueue() {
                   }
                   body={t('corpTaxBook.moons.needs.leaver.body')}
                   actions={
-                    canEdit && item.statementId ? (
+                    canEdit && item.noticeId ? (
                       <>
                         <Button
                           size="sm"
@@ -600,17 +619,9 @@ export function NeedsYouQueue() {
             .filter(Boolean)
             .join(' ');
           const hold = disputeHold(d, new Date(now).toISOString());
-          // What the hold did to this Miner's Statements: the part of the bill payments skip.
-          const heldIsk = hold
-            ? [
-                ...heldByStatement(
-                  view.input.statements.filter((s) => s.minerId === d.minerId),
-                  [d],
-                  new Set(),
-                  new Date(now).toISOString()
-                ).values(),
-              ].reduce((n, v) => n + v, 0)
-            : 0;
+          // What the hold keeps out of what is due: the disputed day, which payments skip.
+          const heldDay = view.internals.byMiner.get(d.minerId)?.account.day(d.date);
+          const heldIsk = hold && heldDay?.held ? heldDay.tax : 0;
           const waiveLabel = t(copy.waiveKey);
           return (
             <QueueCard
@@ -765,7 +776,7 @@ export function NeedsYouQueue() {
           canConfirm={waiveIsk !== undefined && waiveIsk > 0}
           run={async (reason) => {
             // Only the disputed ore's tax, as one credit. The server prices it from the day's
-            // Statement; this figure counts only for a day not billed yet (a Director's call).
+            // late notice; this figure counts only for a day not billed yet (a Director's call).
             await edit({
               action: 'dismissDispute',
               disputeId: open.dispute.id,
@@ -845,7 +856,7 @@ export function NeedsYouQueue() {
             amount: isk(open.item.owed),
           })}
           run={async (reason) => {
-            // The whole balance, so no Statement: it reduces open Statements oldest first (#4637).
+            // The whole balance: it forgives the Miner's oldest unpaid days first (#4637).
             await edit({
               action: 'writeOff',
               minerId: open.miner.id,

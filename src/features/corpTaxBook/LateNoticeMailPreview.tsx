@@ -12,7 +12,7 @@ export interface MailPreviewContent {
 }
 
 /** The mail as the miner will read it: recipient, subject and the EVE-markup body. */
-export function StatementMailPreview({ to, subject, body, summarised }: MailPreviewContent) {
+export function LateNoticeMailPreview({ to, subject, body, summarised }: MailPreviewContent) {
   const { t } = useTranslation();
   return (
     <div className="space-y-2">
@@ -30,8 +30,8 @@ export function StatementMailPreview({ to, subject, body, summarised }: MailPrev
   );
 }
 
-/** "Preview mail", opened from the Statements run's Check step (D16). */
-export function StatementMailPreviewDialog({
+/** "Preview mail", opened from the late notice run's Check step (D16). */
+export function LateNoticeMailPreviewDialog({
   open,
   onClose,
   mail,
@@ -72,7 +72,7 @@ export function StatementMailPreviewDialog({
         </>
       }
     >
-      {mail && <StatementMailPreview {...mail} />}
+      {mail && <LateNoticeMailPreview {...mail} />}
     </Modal>
   );
 }

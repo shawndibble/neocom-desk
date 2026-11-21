@@ -104,9 +104,6 @@ function CorpChips({ query }: { query: CorpQuery }) {
           value={`${formatIskCompact(member.taxPaid)} ISK`}
         />
       )}
-      {member?.statements != null && (
-        <StatChip label={t('interactions.chip.statements')} value={member.statements} />
-      )}
       {member?.lateNotices != null && (
         <StatChip
           label={t('interactions.chip.lateNotices')}

@@ -38,7 +38,6 @@ import { loadStructureAccess, loadStructureName } from '@/features/character/str
 import { loadTypeNames } from '@/features/character/typeNames';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useActiveCorporationId } from '../owner';
-import { withMinerTotals } from '@/engine/corpTaxBook/minerScope';
 import { withMoonDocs } from '@/engine/corpTaxBook/pullFigures';
 import {
   verifyOfficer,
@@ -229,7 +228,7 @@ export function useCorpBook(
           return;
         }
         // Prices for every ore on every day it was mined, at the book's hub and Ore Form. A Miner's
-        // slice prices only its open window: a day on a Statement is frozen and needs no price.
+        // slice prices only its open window: a day before its checkpoint is closed and needs no price.
         const { pricesOn, moonOwnerPricesOn } = await loadBookPrices(data, data.minerScope?.from);
         if (cancelled) return;
         setFetched({
@@ -345,9 +344,8 @@ export function useCorpBook(
     const built = buildBookView(
       bookViewInputOf(corporationId, now, fetched.data, fetched, { memberIds, surveyOreLines })
     );
-    const { moon, scopedMiner: minerId, minerScope } = fetched.data;
-    if (moon) return withMoonDocs(built, moon.docs, moon.fromDocs);
-    return minerId !== undefined ? withMinerTotals(built, minerId, minerScope?.totals) : built;
+    const { moon } = fetched.data;
+    return moon ? withMoonDocs(built, moon.docs, moon.fromDocs) : built;
   }, [fetched, now, corporationId, memberIds, surveyOreLines]);
 
   // Names, resolved after the figures so the tables never wait on them.

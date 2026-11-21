@@ -27,9 +27,7 @@ function input(overrides: Partial<BookViewInput> = {}): BookViewInput {
     now: '2026-09-18T14:00:00Z',
     startDate: '2026-08-01',
     graceHours: 6,
-    minimumStatement: 5_000_000,
     overdueDays: 14,
-    cadence: { kind: 'monthly' },
     hubId: 'jita',
     oreForm: 'compressed',
     structureExpiryHours: {},
@@ -45,13 +43,12 @@ function input(overrides: Partial<BookViewInput> = {}): BookViewInput {
       },
     ],
     miners: [],
-    statements: [],
+    notices: [],
     payments: [],
     dismissals: [],
     declarations: [],
     adjustments: [],
     extractions: [],
-    paidStatementIds: new Set(),
     pricesOn: () => ({ prices: new Map([[ORE, 1000]]), sources: new Map() }),
     ...overrides,
   };
@@ -112,7 +109,7 @@ describe('CloseAccountDialog', () => {
   it('shows the final late notice and closes the account with the reason', async () => {
     const { onClose } = renderDialog();
     expect(
-      screen.getByText(/A final late notice lists .* through 17 Sep( 2026)?\./)
+      screen.getByText(/A final late notice lists 200,000 through 11 Aug( 2026)?\./)
     ).toBeInTheDocument();
     const confirm = screen.getByRole('button', { name: 'Close account' });
     expect(confirm).toBeDisabled();
