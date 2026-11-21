@@ -1,3 +1,5 @@
+import { utcDayOf } from '../../../functions/src/timeConstants';
+import { soloCharacterId } from '../../../functions/src/corpTaxBookDonationMatch';
 import { lazy, memo, Suspense, useEffect, useMemo, useState } from 'react';
 import { writeToClipboard } from '@/lib/clipboard';
 import { guarded } from '@/app/routeChunks';
@@ -431,7 +433,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     const amount =
       made.amount === null ? t('miningTax.linkPaymentInKind') : `${formatIsk(made.amount)} ISK`;
     const label = made.label || t('miningTax.linkPaymentUntitledContract');
-    return `${amount} · ${made.date.slice(0, 10)} — ${label}`;
+    return `${amount} · ${utcDayOf(made.date)} — ${label}`;
   }
   const detailPaidBy = useMemo(
     () =>
@@ -601,8 +603,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
   })();
   const minerName = (minerId: string) => {
     const main = ledgerBook?.loaded.miners.find((m) => m.id === minerId)?.mainCharacterId;
-    const solo = /^solo:(\d+)$/.exec(minerId)?.[1];
-    const id = main ?? (solo === undefined ? undefined : Number(solo));
+    const id = main ?? soloCharacterId(minerId);
     return (id === undefined ? undefined : characterNameOf(id)) ?? minerId;
   };
   const ledgerPicker =

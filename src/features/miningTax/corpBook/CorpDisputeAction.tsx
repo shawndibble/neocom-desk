@@ -1,3 +1,4 @@
+import { utcDayOf } from '../../../../functions/src/timeConstants';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, NeedsConnection, plainTextActionClassName } from '@/components/ui';
@@ -66,7 +67,7 @@ export function CorpDisputeAction({ view, payeeName, onSent, onResolve, mail }: 
       <div className="space-y-1">
         <div className="flex flex-wrap items-center gap-x-3">
           <p className="text-text-dim">
-            {t(k('told'), { corp: view.corpName, date: view.flagged.at.slice(0, 10) })}
+            {t(k('told'), { corp: view.corpName, date: utcDayOf(view.flagged.at) })}
           </p>
           <NeedsConnection>
             <button

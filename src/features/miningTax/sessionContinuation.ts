@@ -1,3 +1,4 @@
+import { utcDayOf } from '../../../functions/src/timeConstants';
 import type { MiningTaxAssignmentRecord } from '@/db';
 import { allMembers, type DisplayRow } from './groupRows';
 
@@ -5,7 +6,7 @@ import { allMembers, type DisplayRow } from './groupRows';
 export function nextEveDate(date: string): string {
   const next = new Date(`${date}T00:00:00Z`);
   next.setUTCDate(next.getUTCDate() + 1);
-  return next.toISOString().slice(0, 10);
+  return utcDayOf(next.toISOString());
 }
 
 export interface SessionContinuation {

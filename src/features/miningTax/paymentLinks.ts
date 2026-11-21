@@ -10,6 +10,7 @@
  * Pure: the route feeds it the normalized payments (`madePayments.ts`), the Payees with what they
  * owe, and which payments a link or a book already holds.
  */
+import { utcDayOf } from '../../../functions/src/timeConstants';
 import type { MiningTaxPaymentMethod, PayeeRecord } from '@/db';
 import { matchesStatedTransfer } from '../../../functions/src/corpTaxBookTransferMatch';
 import { paymentLinkKey, type PayeePaymentLink } from '@/engine/miningTax/payeeAccount';
@@ -218,7 +219,7 @@ export function linkFor(
     kind: payment.kind,
     refId: payment.refId,
     amount,
-    paidOn: payment.date.slice(0, 10),
+    paidOn: utcDayOf(payment.date),
     source,
   };
 }
