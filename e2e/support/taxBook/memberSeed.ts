@@ -134,6 +134,11 @@ export function creditedDonation(p: {
       source: 'donation',
       characterId: p.characterId,
       uid: `char:${p.characterId}`,
+      // Every reader of the payment's Miner, as the server stamps it: the pilot's group.
+      uids: (p.minerId === undefined || p.minerId === PILOT_MINER_ID
+        ? [PILOT.id, PILOT_ALT.id]
+        : [p.characterId]
+      ).map((c) => `char:${c}`),
       amount: p.amount,
       at: noonOf(p.back, p.now),
       division: 1,

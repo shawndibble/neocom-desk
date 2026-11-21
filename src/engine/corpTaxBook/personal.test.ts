@@ -1478,6 +1478,22 @@ describe('inFlightDonations', () => {
     ).toHaveLength(1);
   });
 
+  it("matches the wallet's own record first, then an officer's hand record, closest pairs first (M9)", () => {
+    // Two equal donations two hours apart. The book read the first from its wallet; an officer
+    // recorded one by hand at noon, nearer the first. One to one, both are held.
+    const two = [
+      made({ refId: 1, date: '2026-10-18T10:00:00Z' }),
+      made({ refId: 2, date: '2026-10-18T12:00:00Z' }),
+    ];
+    const held = [
+      { characterId: ME, amount: 500_000, at: '2026-10-18T10:01:00Z', source: 'donation' as const },
+      { characterId: ME, amount: 500_000, at: '2026-10-18T10:30:00Z', source: 'manual' as const },
+    ];
+    expect(inFlightDonations(two, held, CORP, '2026-10-01')).toEqual([]);
+    // Listed hand record first: still the wallet's match is made first.
+    expect(inFlightDonations(two, [held[1]!, held[0]!], CORP, '2026-10-01')).toEqual([]);
+  });
+
   it('skips other recipients, contracts and donations before the book started', () => {
     expect(
       inFlightDonations(
@@ -2006,6 +2022,22 @@ describe('overlayCorpBooks: the tab agrees with the book (#6204)', () => {
       ]);
       expect(stateOf(out, ME)).toBe('paid');
       expect(stateOf(out, ALT)).toBe('paid');
+    });
+
+    it("an alt this device does not track still shows its mined days on the main's tab", () => {
+      // The alt's row reached the main by `uids` (`readMemberObserved`); only the main is tracked.
+      const out = overlay(
+        [entry()],
+        [
+          twoMiners({
+            characterIds: [ME],
+            miners: [{ id: 'g1', characterIds: [ME, ALT], mainCharacterId: ME }],
+          }),
+        ]
+      );
+      expect(stateOf(out, ALT)).toBe('billed');
+      const [summary] = out.books;
+      expect(summary?.account?.owes?.amount).toBeCloseTo(2 * DAY, 2);
     });
   });
 

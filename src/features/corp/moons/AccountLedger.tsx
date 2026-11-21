@@ -158,6 +158,7 @@ export function AccountLedger({
               })}
             </p>
           )}
+          {p?.note && <p>“{p.note}”</p>}
           {!href && <p className="text-text-dim">{t('corpTaxBook.moons.ledger.noWalletEntry')}</p>}
         </div>
       );

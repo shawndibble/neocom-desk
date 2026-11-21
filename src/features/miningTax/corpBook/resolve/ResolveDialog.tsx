@@ -414,7 +414,10 @@ function DoneView({ done, corp }: { done: Done; corp: string }) {
             ? t(k('result.sentProof'), { corp })
             : done.again
               ? t(k('result.sentAgain'), { corp })
-              : t(k('result.sent'), { corp, date: isoDay(done.holdsUntil) })}
+              : done.holdsUntil
+                ? t(k('result.sent'), { corp, date: isoDay(done.holdsUntil) })
+                : // "I already paid" holds no day: only a dispute does.
+                  t(k('result.sentPaid'), { corp })}
         </p>
       )}
       {done.checks && done.checks.length > 0 && (

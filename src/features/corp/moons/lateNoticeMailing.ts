@@ -5,7 +5,6 @@
  */
 import { useTranslation } from 'react-i18next';
 import { useTimeZone } from '@/lib/timeFormat';
-import { oldestUnsettled } from '@/engine/corpTaxBook/bookSections';
 import { minerDetail, type MinerRow } from '@/engine/corpTaxBook/bookView';
 import { owedDays } from '@/engine/corpTaxBook/lateNotices';
 import { usePublicInfo } from '@/stores/publicInfo';
@@ -113,10 +112,10 @@ export function noticeSettled(view: BookContextValue['view'], notice: LateNotice
 
 /** The late notice a Miner is reminded of: the oldest one whose days are not all paid. */
 export function oldestOpenNotice(view: BookContextValue['view'], minerId: string) {
-  return oldestUnsettled(view.internals.byMiner.get(minerId)?.notices ?? [], (id) => {
-    const notice = view.input.notices.find((n) => n.id === id);
-    return !notice || noticeSettled(view, notice);
-  });
+  const inner = view.internals.byMiner.get(minerId);
+  return [...(inner?.notices ?? [])]
+    .sort((a, b) => a.issuedAt.localeCompare(b.issuedAt))
+    .find((n) => !inner!.account.standingOf(n).settled);
 }
 
 /**

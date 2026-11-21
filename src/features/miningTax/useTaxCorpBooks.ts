@@ -5,6 +5,7 @@ import { useAutoClaimDonations } from '@/features/miningTax/corpBook/useAutoClai
 import { useBookSystems } from '@/features/miningTax/corpBook/useBookSystems';
 import { useHiddenLeftCorps } from '@/features/miningTax/corpBook/leftCorpAck';
 import { useCorpBookView } from '@/features/miningTax/corpBook/useCorpBookView';
+import { heldPaymentKeys } from '@/engine/miningTax/payeeAccount';
 import { PayeeAccounts, withPaidStatus } from './payeeAccounts';
 import { saveBilledElsewhere } from './paymentLinkStore';
 import { billedElsewhereOf } from './owedNow';
@@ -27,6 +28,8 @@ export function useTaxCorpBooks(
     () => [...(data?.payeesByCharacter.values() ?? [])].flat(),
     [data?.payeesByCharacter]
   );
+  // A payment a link holds pays its personal Payee, never a book as a donation in flight too.
+  const linked = useMemo(() => heldPaymentKeys(data?.paymentLinks ?? []), [data?.paymentLinks]);
   // What the books bill too, as last seen; replaced (and stored) when the overlay below reads
   // something else, so every account build bills the same.
   const [billedElsewhere, setBilledElsewhere] = useState<ReadonlyMap<string, number> | null>(null);
@@ -66,6 +69,7 @@ export function useTaxCorpBooks(
     characters,
     activeCharacterId,
     madePayments,
+    linked,
     payees,
     reloadKey: data?.fetchedAt?.getTime(),
     hiddenCorps: leftAck.hidden,

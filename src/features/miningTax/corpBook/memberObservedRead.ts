@@ -2,11 +2,15 @@
  * A member's own `observed` rows through the part store (#5243, ADR 0031's delta
  * on the member side): nothing while the collection's stamp is unchanged, the
  * own rows written since the watermark otherwise, all own rows when no copy can
- * be trusted. The query is `uid == me` (the rules' own-line check) plus the
- * `updatedAt` watermark; the plan is the officer's (`planObservedRead`).
+ * be trusted. Two queries, merged by doc id: `uid == me` (the rules' own-line
+ * check), and `uids` array-contains me (every reader of the row's Character's
+ * Miner, so an alt's mined rows reach the main's Tax tab). Each takes the
+ * `updatedAt` watermark for a delta; the plan is the officer's
+ * (`planObservedRead`). A server that has not stamped `uids` on the rows yet
+ * finds nothing by it, or refuses it: the `uid` read stands.
  */
 import { collection, getDocs, query, where } from 'firebase/firestore/lite';
-import type { Firestore } from 'firebase/firestore/lite';
+import type { Firestore, QueryConstraint } from 'firebase/firestore/lite';
 import { OBSERVED_UPDATED_AT_FIELD } from '../../../../functions/src/corpTaxBookVersionKeys';
 import {
   memoryCopy,
@@ -63,6 +67,27 @@ export async function readMemberObserved({
   const out = (rows: StoredObserved<Data>[]) => rows.map((r) => ({ id: r.id, data: r.row }));
   const col = collection(db, root, 'observed');
   const own = where('uid', '==', uid);
+  const readers = where('uids', 'array-contains', uid);
+  /**
+   * One window of rows, the own ones and every reader's. `strict`: a refused `uids` read fails
+   * the window (a delta must miss nothing); otherwise the own rows stand alone.
+   */
+  const readWindow = async (extra: QueryConstraint[], strict: boolean) => {
+    const [mine, theirs] = await Promise.all([
+      getDocs(query(col, own, ...extra)),
+      getDocs(query(col, readers, ...extra)).catch((error: unknown) => {
+        if (strict) throw error;
+        return null;
+      }),
+    ]);
+    const byId = new Map<string, StoredObserved<Data>>();
+    for (const r of [
+      ...toStored(mine.docs as never),
+      ...(theirs ? toStored(theirs.docs as never) : []),
+    ])
+      byId.set(r.id, r);
+    return [...byId.values()];
+  };
 
   let copy = memoryCopy(key, MEMBER_OBSERVED_SLOT);
   if (!copy) copy = await store.load(MEMBER_OBSERVED_SLOT).catch(() => undefined);
@@ -87,15 +112,12 @@ export async function readMemberObserved({
   let delta: StoredObserved<Data>[] | null = null;
   if (plan.kind === 'delta' && held) {
     try {
-      delta = toStored(
-        (
-          await getDocs(
-            query(col, own, where(OBSERVED_UPDATED_AT_FIELD, '>=', new Date(plan.since)))
-          )
-        ).docs as never
+      delta = await readWindow(
+        [where(OBSERVED_UPDATED_AT_FIELD, '>=', new Date(plan.since))],
+        true
       );
     } catch {
-      // Its composite index is not deployed yet: read the own rows whole, as before.
+      // Its composite index is not deployed yet: read the rows whole, as before.
       delta = null;
     }
   }
@@ -103,7 +125,7 @@ export async function readMemberObserved({
     const merged = applyObservedDelta(held.rows, delta, held.watermark);
     next = { ...held, rows: merged.rows, watermark: merged.watermark };
   } else {
-    const rows = toStored((await getDocs(query(col, own))).docs as never);
+    const rows = await readWindow([], false);
     next = {
       rows,
       fullAt: now,

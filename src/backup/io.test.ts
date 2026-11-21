@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { db, type MiningTaxAssignmentRecord } from '@/db';
 import { FULL_RECORDS } from '@/sync/syncedCollectionFixtures';
 import { EDITABLE_COLLECTIONS } from '@/sync/syncedCollections';
@@ -66,6 +66,27 @@ describe('exportBackup / importBackup', () => {
     expect(plans2).toHaveLength(1);
   });
 
+  it('never fails on an Editable Data id the device already holds, and never overwrites it (M2)', async () => {
+    await db.miningTaxPaymentLinks.clear();
+    await db.characters.bulkAdd([{ characterId: 2, name: 'Alt', ownerHash: 'h2', addedAt: 0 }]);
+    await db.tokens.bulkAdd([
+      { characterId: 2, accessToken: 'a2', refreshToken: 'r2', expiresAt: 0, scopes: [] },
+    ]);
+    const link = { ...FULL_RECORDS.miningTaxPaymentLinks, characterId: 2, amount: 1 };
+    await db.miningTaxPaymentLinks.put(link);
+    const { contents } = await exportBackup(PASSWORD);
+    await db.characters.delete(2);
+    await db.tokens.delete(2);
+    // The same payment's link, here under another Character, since the backup was made.
+    await db.miningTaxPaymentLinks.put({ ...link, characterId: 1, amount: 2 });
+
+    expect((await importBackup(contents, PASSWORD)).addedCharacterIds).toEqual([2]);
+    expect(await db.miningTaxPaymentLinks.get(link.id)).toMatchObject({
+      characterId: 1,
+      amount: 2,
+    });
+  });
+
   it('carries Overview character groups through a backup', async () => {
     const value = { groups: [{ id: 'g1', name: 'Miners', characterIds: [1, 2] }], updatedAt: 5 };
     await db.settings.put({ key: 'overviewGroups', value });
@@ -98,17 +119,21 @@ describe('exportBackup / importBackup', () => {
 
     const { contents } = await exportBackup(PASSWORD);
 
-    // Fresh device: doesn't have character 3 yet, but already has an
-    // unrelated skill plan whose id collides with the one in the backup —
-    // the bulkAdd for `skillPlans` throws partway through the import, after
-    // `characters`/`tokens` would already have been written outside a
+    // Fresh device: doesn't have character 3 yet, and the write of its skill plans fails partway
+    // through the import, after `characters`/`tokens` would already have been written outside a
     // transaction.
     await db.characters.delete(3);
     await db.tokens.delete(3);
     await db.skillPlans.clear();
-    await db.skillPlans.bulkAdd([
-      { id: 'conflict', characterId: 99, name: 'Unrelated', entries: [], remapCount: 0 } as never,
-    ]);
+    const proto = Object.getPrototypeOf(db.skillPlans) as typeof db.skillPlans;
+    const bulkAdd = proto.bulkAdd;
+    const failing = vi.spyOn(proto, 'bulkAdd').mockImplementation(function (
+      this: typeof db.skillPlans,
+      ...args: Parameters<typeof bulkAdd>
+    ) {
+      if (this.name === 'skillPlans') return Promise.reject(new Error('quota')) as never;
+      return bulkAdd.apply(this, args);
+    });
 
     await expect(importBackup(contents, PASSWORD)).rejects.toThrow();
 
@@ -117,6 +142,7 @@ describe('exportBackup / importBackup', () => {
     // reaching the failing table.
     await expect(db.characters.get(3)).resolves.toBeUndefined();
     await expect(db.tokens.get(3)).resolves.toBeUndefined();
+    failing.mockRestore();
   });
 });
 

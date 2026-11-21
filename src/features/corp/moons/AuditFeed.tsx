@@ -7,6 +7,7 @@ import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import type { AuditEntry } from '../taxBook/bookClient';
 import { isk, shortDateTime } from './moonsFormat';
 import type { AuditSubject } from './useAuditSubject';
+import type { AuditWordsOf } from './useAuditWords';
 
 function detailLine(entry: AuditEntry, t: TFunction): string {
   const revoked = entry.detail.officersRevoked;
@@ -45,9 +46,12 @@ export function AuditLine({
   subject,
   context,
   onOpen,
+  words: wordsOf,
 }: {
   entry: AuditEntry;
   subject?: AuditSubject;
+  /** What the pilot or officer wrote behind the entry (`useAuditWords`). */
+  words?: AuditWordsOf;
   /** What the entry is about, when the page does not already say it (a Late notice's days and amount). */
   context?: ReactNode;
   /** Called when a Miner link is followed (the panel showing the feed closes). */
@@ -56,12 +60,14 @@ export function AuditLine({
   const { t } = useTranslation();
   const why = detailLine(a, t);
   const who = subject?.(a) ?? null;
+  const words = wordsOf?.(a) ?? {};
   // A queued mail is a late notice or a reminder; `kind` says which.
   const action =
-    (a.action === 'recordMail' || a.action === 'recordLateNoticeMail') &&
+    words.action ??
+    ((a.action === 'recordMail' || a.action === 'recordLateNoticeMail') &&
     a.detail.kind === 'reminder'
       ? 'recordReminder'
-      : a.action;
+      : a.action);
   // The Miner's name opens their page, in the sentence when it names them, else after it.
   const minerLink = who?.path ? (
     <Link to={who.path} className={entityLinkClassName()} onClick={onOpen}>
@@ -86,7 +92,14 @@ export function AuditLine({
         <span className="text-text-dim"> ({t('corpTaxBook.moons.activity.viaScheduled')})</span>
       )}
       {context && <span className="text-text-dim"> · {context}</span>}
-      {why && <span className="text-text-dim"> · {why}</span>}
+      {words.amount !== undefined && (
+        <span className="text-text-dim">
+          {' '}
+          · {t('corpTaxBook.moons.activity.declaredAmount', { amount: isk(words.amount) })}
+        </span>
+      )}
+      {words.said && <span className="text-text-dim"> · “{words.said}”</span>}
+      {why && why !== words.said && <span className="text-text-dim"> · {why}</span>}
     </ActivityRow>
   );
 }
@@ -97,10 +110,12 @@ export function AuditFeed({
   empty,
   subject,
   onOpen,
+  words,
 }: {
   entries: readonly AuditEntry[];
   empty?: string;
   subject?: AuditSubject;
+  words?: AuditWordsOf;
   /** Called when a Miner link is followed. */
   onOpen?: () => void;
 }) {
@@ -112,7 +127,7 @@ export function AuditFeed({
   return (
     <ul className="divide-y divide-line text-sm">
       {entries.map((a) => (
-        <AuditLine key={a.id} entry={a} subject={subject} onOpen={onOpen} />
+        <AuditLine key={a.id} entry={a} subject={subject} onOpen={onOpen} words={words} />
       ))}
     </ul>
   );

@@ -21,6 +21,7 @@
  * - A Late notice only says what was asked: one whose days are still unpaid is
  *   the member's overdue notice.
  */
+import { utcDayOf } from '../../../functions/src/timeConstants';
 import { computeAssignmentValue } from '../miningTax/valuation';
 import { entryKey, type OreLine } from '../miningTax/types';
 import { minusLines, priceMap } from '../miningTax/oreLines';
@@ -1696,7 +1697,8 @@ export type { HeldPayment };
  * so a held payment is recognised as the same transfer by the shared rule: a donation the book
  * read from its wallet within minutes (`isSameJournalTransfer`), an officer's hand record within
  * the days a stated transfer may be off (`matchesStatedTransfer`). One held payment is one
- * donation: two equal donations are never both taken for one held payment.
+ * donation: two equal donations are never both taken for one held payment, the closest pairs are
+ * matched first, and the wallet's own records before an officer's hand records.
  */
 export function inFlightDonations(
   made: readonly MadeDonation[],
@@ -1711,7 +1713,7 @@ export function inFlightDonations(
         m.counterpartyId === corporationId &&
         m.amount !== null &&
         m.amount > 0 &&
-        m.date.slice(0, 10) >= startDate
+        utcDayOf(m.date) >= startDate
     )
     .map((m) => ({
       characterId: m.characterId,
@@ -1721,16 +1723,29 @@ export function inFlightDonations(
     }))
     .sort((a, b) => a.at.localeCompare(b.at) || (a.refId ?? 0) - (b.refId ?? 0));
   const taken = new Set<InFlightDonation>();
-  for (const h of [...held].sort((a, b) => a.at.localeCompare(b.at))) {
-    const same = h.source === 'manual' ? matchesStatedTransfer : isSameJournalTransfer;
-    const nearest = sent
-      .filter((d) => !taken.has(d) && same(h, d))
-      .sort(
-        (a, b) =>
-          Math.abs(Date.parse(a.at) - Date.parse(h.at)) -
-          Math.abs(Date.parse(b.at) - Date.parse(h.at))
-      )[0];
-    if (nearest) taken.add(nearest);
-  }
+  const gap = (a: { at: string }, b: { at: string }) =>
+    Math.abs(Date.parse(a.at) - Date.parse(b.at));
+  // One to one, the closest pairs first. The donations the book read from its wallet are matched
+  // before an officer's hand records: those are the same journal transfer, to the minute, while a
+  // hand record is dated by a person and may sit nearer a different donation.
+  const pairOff = (records: readonly HeldPayment[], same: typeof isSameJournalTransfer) => {
+    const pairs = records
+      .flatMap((h, i) => sent.filter((d) => same(h, d)).map((d) => ({ i, d, gap: gap(h, d) })))
+      .sort((a, b) => a.gap - b.gap || a.d.at.localeCompare(b.d.at) || a.i - b.i);
+    const used = new Set<number>();
+    for (const { i, d } of pairs) {
+      if (used.has(i) || taken.has(d)) continue;
+      used.add(i);
+      taken.add(d);
+    }
+  };
+  pairOff(
+    held.filter((h) => h.source !== 'manual'),
+    isSameJournalTransfer
+  );
+  pairOff(
+    held.filter((h) => h.source === 'manual'),
+    matchesStatedTransfer
+  );
   return sent.filter((d) => !taken.has(d));
 }

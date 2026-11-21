@@ -18,6 +18,7 @@ import { loadBookPrices, loadCorpNames, loadTrackedCorpBooks } from './corpBook/
 import { buildCorpBookView, type CorpBookView } from './corpBook/corpBookView';
 import { buildDisplayRows } from './corpBook/corpRows';
 import type { DisplayRow } from './groupRows';
+import { heldPaymentKeys } from '@/engine/miningTax/payeeAccount';
 import { PayeeAccounts, withPaidStatus } from './payeeAccounts';
 import { loadMadePaymentsWithStatus } from './madePayments';
 import { groupPayees, payeeDuplicateAliases } from './payeeGroups';
@@ -121,6 +122,7 @@ export async function loadOwedBalances(
               corpNames,
               payees,
               made,
+              linked: heldPaymentKeys(snapshot.paymentLinks),
               characterNames,
               now: new Date(now).toISOString(),
             },

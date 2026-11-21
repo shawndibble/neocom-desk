@@ -288,11 +288,7 @@ describe('MinerRunningAccount.build from a closed-through checkpoint', () => {
       payments: [payment('p1', 1e6, '2026-11-05T10:00:00Z')],
       checkpoint: checkpoint(),
     });
-    const priced = [
-      { date: '2026-10-05', savedPrices: true },
-      { date: '2026-11-02', savedPrices: true },
-    ];
-    expect(account.closableThrough(priced, '2026-11-21')).toBe('2026-11-02');
+    expect(account.closableThrough('2026-11-21')).toBe('2026-11-02');
     // A day the checkpoint still owes holds it back until it is paid.
     const owing = MinerRunningAccount.build({
       days: [day('2026-11-02', 1e6)],
@@ -303,7 +299,7 @@ describe('MinerRunningAccount.build from a closed-through checkpoint', () => {
         paidThrough: '2026-10-04',
       }),
     });
-    expect(owing.closableThrough(priced, '2026-11-21')).toBe('2026-10-05');
+    expect(owing.closableThrough('2026-11-21')).toBe('2026-10-05');
   });
 
   it('forgives the checkpoint’s owed days first with a later write-off', () => {
@@ -544,5 +540,43 @@ describe('a checkpoint plus the later days is the whole history, at the toleranc
       const owed = (x: MinerRunningAccount) => x.owes?.amount ?? 0;
       expect(Math.abs(owed(resumed) - owed(whole)), context).toBeLessThanOrEqual(forgiven + 1e-6);
     }
+  });
+});
+
+describe('MinerRunningAccount: what screens read off it (D1)', () => {
+  const account = MinerRunningAccount.build({
+    days: [
+      day('2026-11-01', 1e6),
+      day('2026-11-02', 1e6),
+      day('2026-11-03', 2e6),
+      day('2026-11-04', 1e6),
+    ],
+    payments: [payment('p1', 1_995_000, '2026-11-05T10:00:00Z')],
+    heldDays: new Set(['2026-11-04']),
+  });
+
+  it('lists the days still owed with their whole tax, none held or settled', () => {
+    expect(account.owedDays()).toEqual([{ date: '2026-11-03', owed: 2e6, tax: 2e6 }]);
+  });
+
+  it('lists the dates an open dispute holds', () => {
+    expect(account.heldDates()).toEqual(['2026-11-04']);
+  });
+
+  it('lists what the tolerance wrote off, by day, dated by the payment that closed it', () => {
+    expect(account.writtenOffDays([{ id: 'p1', at: '2026-11-05T10:00:00Z' }])).toEqual([
+      { date: '2026-11-02', amount: 5_000, at: '2026-11-05T10:00:00Z' },
+    ]);
+  });
+
+  it('closes through the newest settled, saved-priced day before today', () => {
+    const priced = MinerRunningAccount.build({
+      days: [
+        { date: '2026-11-01', tax: 1e6, savedPrice: true },
+        { date: '2026-11-02', tax: 1e6, savedPrice: false },
+      ],
+      payments: [payment('p1', 2e6, '2026-11-05T10:00:00Z')],
+    });
+    expect(priced.closableThrough('2026-11-21')).toBe('2026-11-01');
   });
 });
