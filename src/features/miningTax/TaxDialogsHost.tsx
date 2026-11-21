@@ -36,7 +36,11 @@ import {
   paymentOfLink,
   type MadePayment,
 } from '@/features/miningTax/paymentLinks';
-import { paymentLinkKey, type PayeePaymentLink } from '@/engine/miningTax/payeeAccount';
+import {
+  paymentLinkKey,
+  type PayeePaymentLink,
+  heldPaymentKeys,
+} from '@/engine/miningTax/payeeAccount';
 import type { PayeeAccounts } from '@/features/miningTax/payeeAccounts';
 import { buildSettleUpReason } from '@/features/miningTax/groupRows';
 import { systemLabel } from '@/features/miningTax/names';
@@ -552,7 +556,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
   const linkCandidates = useMemo(
     () =>
       linkablePayments(madePayments, {
-        linked: new Set(links.map(paymentLinkKey)),
+        linked: heldPaymentKeys(links),
         bookCorporations,
       }),
     [madePayments, links, bookCorporations]
@@ -590,7 +594,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
         (id) => byId.get(id),
         (a) => systemLabel(systemNames, a.solarSystemId),
         (l) =>
-          l.kind === 'recorded'
+          l.kind === 'recorded' || l.kind === 'legacy'
             ? undefined
             : characterNameOf(
                 madePayments.find((m) => m.key === `${l.kind}:${l.refId}`)?.characterId ?? 0
@@ -916,7 +920,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
                   paidOn: payment.paidOn,
                   source: 'manual',
                 },
-                settleUpPayee.characterId
+                payment.payerId ?? settleUpPayee.characterId
               )
             }
             onPaid={() => {

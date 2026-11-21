@@ -8773,7 +8773,8 @@
       "autoLinked": "auto-linked",
       "unlinkNamed": "Unlink transaction #{{id}}",
       "notCached": "Transaction #{{id}} · no longer in your saved wallet journal",
-      "recorded": "Recorded in Settle up on {{date}}, not seen in your wallet yet"
+      "recorded": "Recorded in Settle up on {{date}}, not seen in your wallet yet",
+      "legacy": "Paid on {{date}}, recorded by an older version of the app"
     },
     "suggestedPayeeHint": "Last used in {{system}}.",
     "assignToAction": "Assign to {{payee}} · {{amount}} ISK",

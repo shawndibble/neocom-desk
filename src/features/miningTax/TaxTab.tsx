@@ -16,7 +16,7 @@ import { QuietStatusLine } from '@/features/miningTax/corpBook/resolve/QuietStat
 import { conflictTarget, uncreditedTarget } from '@/features/miningTax/corpBook/resolve/targets';
 import { useResolve } from '@/features/miningTax/corpBook/resolve/useResolve';
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
-import { paymentLinkKey, type PayeePaymentLink } from '@/engine/miningTax/payeeAccount';
+import { heldPaymentKeys, type PayeePaymentLink } from '@/engine/miningTax/payeeAccount';
 import { leftCorpBooksOf } from '@/features/miningTax/corpBook/leftCorpBooks';
 import {
   corporationOfPayee,
@@ -323,7 +323,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     [allDisplayRows, actions]
   );
   const linkedKeys = useMemo(
-    () => new Set((data?.paymentLinks ?? NO_LINKS).map(paymentLinkKey)),
+    () => heldPaymentKeys(data?.paymentLinks ?? NO_LINKS),
     [data?.paymentLinks]
   );
   const resolve = useResolve({

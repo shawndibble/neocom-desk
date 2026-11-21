@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PayeeRecord } from '@/db';
-import { paymentLinkKey, type PayeePaymentLink } from '@/engine/miningTax/payeeAccount';
+import {
+  paymentLinkKey,
+  type PayeePaymentLink,
+  heldPaymentKeys,
+} from '@/engine/miningTax/payeeAccount';
 import { linkPayment } from './ledgerActions';
 import { useRetainedResult } from '@/lib/useRetainedResult';
 import { loadMadePaymentsWithStatus, type MadePaymentsResult } from './madePayments';
@@ -110,7 +114,7 @@ export function useLinkSuggestions({
   const ctx = useMemo(
     (): LinkContext => ({
       payees: accounts.linkable(payees),
-      linked: new Set(links.map(paymentLinkKey)),
+      linked: heldPaymentKeys(links),
       bookCorporations,
     }),
     [accounts, payees, links, bookCorporations]
@@ -130,18 +134,15 @@ export function useLinkSuggestions({
     if (fresh.length === 0) return;
     for (const { link } of fresh) attemptedRef.current.add(paymentLinkKey(link));
     void Promise.all(
-      fresh.map(({ link, payment }) => {
-        const record = payees.find((p) => p.id === link.payeeId);
-        return record
-          ? linkPayment(
-              linkFor(payment, link.payeeId, 'auto'),
-              record.characterId,
-              paymentLinkKey(link)
-            )
-          : Promise.resolve();
-      })
+      fresh.map(({ link, payment }) =>
+        linkPayment(
+          linkFor(payment, link.payeeId, 'auto'),
+          payment.characterId,
+          paymentLinkKey(link)
+        )
+      )
     );
-  }, [recordedMatches, payees]);
+  }, [recordedMatches]);
 
   // Payments nothing accounts for, each with the Payee it most likely paid; what the matcher just
   // claimed is left out.

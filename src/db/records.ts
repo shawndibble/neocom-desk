@@ -790,9 +790,13 @@ export type MiningTaxPaymentMethod = 'donation' | 'contract' | 'other';
  * never drop it on a write.
  */
 export interface MiningTaxPaymentLinkRecord extends PayeePaymentLink {
-  /** `paymentLinkKey`: `journal:<id>`, `contract:<id>` or `recorded:<id>`. */
+  /** `paymentLinkKey`: `journal:<id>`, `contract:<id>`, `recorded:<id>` or `legacy:<id>`. */
   id: string;
-  /** The Character whose Payee record `payeeId` is. */
+  /**
+   * The one Character that owns it, so a payment's link lives under one Character on every
+   * device: the Character whose wallet paid (the payer the pilot picked, for a recorded payment),
+   * or the one whose old paid mark a legacy link was read from.
+   */
   characterId: number;
   /** Epoch ms of the last edit. */
   updatedAt: number;

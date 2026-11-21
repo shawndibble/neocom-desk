@@ -27,10 +27,17 @@ import type { TaxPayment } from '../corpTaxBook/payments';
 import type { LedgerCharge, LedgerPayment, PayeeLedgerSource } from './payeeLedger';
 
 /**
- * Where a linked payment came from: a wallet journal entry, a contract paid in kind, or a
- * payment the pilot recorded in Settle up before (or without) its transaction showing up.
+ * Where a linked payment came from: a wallet journal entry, a contract paid in kind, a payment
+ * the pilot recorded in Settle up before (or without) its transaction showing up, or a payment
+ * an older client recorded as paid marks (`legacy`, read once from them: `legacyPaidMarks.ts`).
  */
-export type PayeePaymentKind = 'journal' | 'contract' | 'recorded';
+export type PayeePaymentKind = 'journal' | 'contract' | 'recorded' | 'legacy';
+
+/** A wallet transaction a legacy link's old payment named: what it holds, never what it pays. */
+export interface PayeePaymentRef {
+  kind: 'journal' | 'contract';
+  refId: number;
+}
 
 /**
  * A Made Payment linked to one Payee: it pays that Payee's oldest unpaid days, never chosen
@@ -50,11 +57,35 @@ export interface PayeePaymentLink {
   paidOn: string;
   /** Linked by the one-to-one matcher, or by the pilot. */
   source: 'auto' | 'manual';
+  /** A legacy link's old payment's transactions: held, so never linked or matched again. */
+  refs?: readonly PayeePaymentRef[];
+  /**
+   * A legacy link the pilot unlinked: kept, paying nothing, so reading the old marks again finds
+   * it and never brings it back (a deleted record leaves no lasting trace on other devices).
+   */
+  unlinked?: true;
 }
 
 /** One Made Payment's identity: a journal id and a contract id are separate id spaces. */
 export function paymentLinkKey(link: Pick<PayeePaymentLink, 'kind' | 'refId'>): string {
   return `${link.kind}:${link.refId}`;
+}
+
+/** Whether a link pays its Payee: every link but a legacy one the pilot unlinked. */
+export const pays = (link: Pick<PayeePaymentLink, 'unlinked'>): boolean => link.unlinked !== true;
+
+/**
+ * The Made Payments links hold (`paymentLinkKey`): each paying link's own, and the transactions
+ * a legacy link's old payment named. A held payment is never linked, suggested or matched again.
+ */
+export function heldPaymentKeys(links: readonly PayeePaymentLink[]): Set<string> {
+  const out = new Set<string>();
+  for (const l of links) {
+    if (!pays(l)) continue;
+    out.add(paymentLinkKey(l));
+    for (const ref of l.refs ?? []) out.add(paymentLinkKey(ref));
+  }
+  return out;
 }
 
 /** One billed Assignment, as its Payee's account bills it. */
@@ -125,9 +156,10 @@ export class PayeeAccount {
   ) {}
 
   static build(input: PayeeAccountInput): PayeeAccount {
+    const links = input.links.filter(pays);
     const whole: MinerRunningAccountInput = {
       days: input.charges.map((c) => ({ date: c.date, tax: c.tax })),
-      payments: input.links.map((l) => taxPaymentOf(input.payeeId, l)),
+      payments: links.map((l) => taxPaymentOf(input.payeeId, l)),
     };
     const stored = input.stored;
     const usable =
@@ -137,7 +169,7 @@ export class PayeeAccount {
       ...whole,
       ...(usable ? { checkpoint: stored.checkpoint } : {}),
     });
-    return new PayeeAccount(input.payeeId, input.charges, input.links, account, whole);
+    return new PayeeAccount(input.payeeId, input.charges, links, account, whole);
   }
 
   get paidThrough(): string | null {

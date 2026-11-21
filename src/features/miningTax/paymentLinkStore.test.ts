@@ -59,6 +59,15 @@ describe('payment links', () => {
     ).toEqual(['journal:41']);
   });
 
+  it('unlinking an ordinary link deletes and tombstones it, so the payment is offered again', async () => {
+    await savePaymentLink(link(), 7);
+    await removePaymentLinks(['journal:41']);
+    expect(await loadPaymentLinks()).toEqual([]);
+    expect(
+      (await readTombstones(tombstoneKey(MINING_TAX_PAYMENT_LINKS, 7))).map((t) => t.id)
+    ).toEqual(['journal:41']);
+  });
+
   it('replaces a recorded payment with the transaction that turned up', async () => {
     await savePaymentLink(link({ kind: 'recorded', refId: 'r1' }), 7);
     await savePaymentLink(link({ source: 'auto' }), 7, 'recorded:r1');
@@ -67,32 +76,103 @@ describe('payment links', () => {
 });
 
 describe('readLegacyPaidMarks', () => {
-  it('reads a paid mark into a link once, and leaves the mark as it was', async () => {
+  const ids = async () => (await loadPaymentLinks()).map((l) => l.id).sort();
+
+  it('reads a paid mark into a link once, and never writes the mark', async () => {
     await db.miningTaxAssignments.put(marked('a'));
+    const before = await db.miningTaxAssignments.get('a');
     await readLegacyPaidMarks();
     await readLegacyPaidMarks();
     expect(await loadPaymentLinks()).toMatchObject([
-      { id: 'recorded:pay1', payeeId: 'p1', characterId: 7, amount: 250_000 },
+      { id: 'legacy:pay1', payeeId: 'p1', characterId: 7, amount: 250_000 },
     ]);
+    expect(await db.miningTaxAssignments.get('a')).toEqual(before);
+  });
+
+  it('a journal an older client attaches later adds nothing', async () => {
+    await db.miningTaxAssignments.put(marked('a'));
+    await readLegacyPaidMarks();
+    const m = marked('a');
+    await db.miningTaxAssignments.put({
+      ...m,
+      payment: { ...m.payment!, journalLinks: [{ refId: 41, source: 'auto' }] },
+    });
+    await readLegacyPaidMarks();
+    expect(await ids()).toEqual(['legacy:pay1']);
+  });
+
+  it('a second installment on the same payment adds nothing; a new payment is its own link', async () => {
+    const m = marked('a');
+    await db.miningTaxAssignments.put({
+      ...m,
+      payment: { ...m.payment!, journalLinks: [{ refId: 41, source: 'manual' }] },
+    });
+    await readLegacyPaidMarks();
+    await db.miningTaxAssignments.put({
+      ...m,
+      payment: {
+        ...m.payment!,
+        journalLinks: [
+          { refId: 41, source: 'manual' },
+          { refId: 42, source: 'manual' },
+        ],
+      },
+    });
+    await db.miningTaxAssignments.put(
+      marked('b', {
+        payment: { paymentId: 'pay2', paidOn: '2026-10-09', method: 'other', amount: 9 },
+      })
+    );
+    await readLegacyPaidMarks();
+    expect(await ids()).toEqual(['legacy:pay1', 'legacy:pay2']);
+    expect((await db.miningTaxPaymentLinks.get('legacy:pay1'))?.amount).toBe(250_000);
+  });
+
+  it('two devices read the same mark into the same link', async () => {
+    await db.miningTaxAssignments.put(marked('a'));
+    // Another device read it first; the link arrived by sync.
+    await db.miningTaxPaymentLinks.put({
+      ...link({ kind: 'legacy', refId: 'pay1', amount: 250_000 }),
+      id: 'legacy:pay1',
+      characterId: 7,
+      updatedAt: 1,
+    });
+    await readLegacyPaidMarks();
+    expect(await ids()).toEqual(['legacy:pay1']);
+    expect((await db.miningTaxPaymentLinks.get('legacy:pay1'))?.updatedAt).toBe(1);
+  });
+
+  it('an unlinked legacy link stays, paying nothing, and is never brought back; the mark stays', async () => {
+    await db.miningTaxAssignments.put(marked('a'));
+    await readLegacyPaidMarks();
+    await removePaymentLinks(['legacy:pay1']);
+    await readLegacyPaidMarks();
+    expect(await loadPaymentLinks()).toMatchObject([{ id: 'legacy:pay1', unlinked: true }]);
     expect((await db.miningTaxAssignments.get('a'))?.status).toBe('paid');
   });
 
-  it('never brings back a link the pilot unlinked: its marks go with it', async () => {
+  it('an unmark and re-record on an older client: the new payment is its own link, the old one stays', async () => {
     await db.miningTaxAssignments.put(marked('a'));
     await readLegacyPaidMarks();
-    await removePaymentLinks(['recorded:pay1']);
+    // The older client unmarks and records again: a new payment id.
+    await db.miningTaxAssignments.put(
+      marked('a', {
+        payment: { paymentId: 'pay3', paidOn: '2026-10-06', method: 'other', amount: 250_000 },
+      })
+    );
     await readLegacyPaidMarks();
-    expect(await loadPaymentLinks()).toEqual([]);
-    const a = await db.miningTaxAssignments.get('a');
-    expect(a?.status).toBe('outstanding');
-    expect(a?.payment).toBeUndefined();
+    // Absence is never read as a withdrawal (it is also "not synced yet"): the pilot unlinks the old one.
+    expect(await ids()).toEqual(['legacy:pay1', 'legacy:pay3']);
   });
 
-  it('never brings back a recorded payment its transaction replaced', async () => {
+  it('skips a link this device tombstoned whose deletion is not pushed yet (M4)', async () => {
     await db.miningTaxAssignments.put(marked('a'));
+    // Another device unlinked it mid-sync; here only the tombstone has landed so far.
+    await db.settings.put({
+      key: tombstoneKey(MINING_TAX_PAYMENT_LINKS, 7),
+      value: [{ id: 'legacy:pay1', deletedAt: 5 }],
+    });
     await readLegacyPaidMarks();
-    await savePaymentLink(link({ source: 'auto' }), 7, 'recorded:pay1');
-    await readLegacyPaidMarks();
-    expect((await loadPaymentLinks()).map((l) => l.id)).toEqual(['journal:41']);
+    expect(await ids()).toEqual([]);
   });
 });

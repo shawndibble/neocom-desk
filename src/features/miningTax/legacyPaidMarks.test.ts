@@ -32,7 +32,7 @@ const settled = (paymentId: string, extra: object = {}) => ({
 });
 
 describe('legacyPaymentLinks', () => {
-  it('reads a Settle-up payment with its transaction as one journal link for the lump sum', () => {
+  it("reads one payment as one link under the payment's own id, for its recorded amount", () => {
     const links = legacyPaymentLinks([
       assignment(
         'a',
@@ -49,30 +49,29 @@ describe('legacyPaymentLinks', () => {
       {
         payeeId: 'p1',
         characterId: 7,
-        kind: 'journal',
-        refId: 41,
+        kind: 'legacy',
+        refId: 'pay1',
         amount: 250_000,
         paidOn: '2026-10-05',
-        source: 'auto',
-        from: ['a', 'b'],
+        source: 'manual',
+        refs: [{ kind: 'journal', refId: 41 }],
       },
     ]);
   });
 
-  it('reads the oldest shape, a bare journalRefId, too', () => {
+  it('reads the oldest shape, a bare journalRefId, as a held transaction too', () => {
     const [link] = legacyPaymentLinks([
       assignment('a', '2026-10-01', settled('pay1', { journalRefId: 41 })),
     ]);
-    expect(link).toMatchObject({ kind: 'journal', refId: 41, source: 'auto' });
+    expect(link).toMatchObject({
+      kind: 'legacy',
+      refId: 'pay1',
+      refs: [{ kind: 'journal', refId: 41 }],
+    });
   });
 
-  it('reads a recorded payment with no transaction yet as the recorded sum', () => {
-    const [link] = legacyPaymentLinks([assignment('a', '2026-10-01', settled('pay1'))]);
-    expect(link).toMatchObject({ kind: 'recorded', refId: 'pay1', amount: 250_000 });
-  });
-
-  it('shares the lump sum between installments, and keeps a payment in kind’s figure', () => {
-    const links = legacyPaymentLinks([
+  it('keeps every installment as metadata: the link pays the recorded amount once', () => {
+    const [link, ...rest] = legacyPaymentLinks([
       assignment(
         'a',
         '2026-10-01',
@@ -82,18 +81,22 @@ describe('legacyPaymentLinks', () => {
         })
       ),
     ]);
-    expect(links.map((l) => [l.kind, l.refId, l.amount])).toEqual([
-      ['journal', 41, 125_000],
-      ['contract', 9, 125_000],
-    ]);
+    expect(rest).toEqual([]);
+    expect(link).toMatchObject({
+      amount: 250_000,
+      refs: [
+        { kind: 'journal', refId: 41 },
+        { kind: 'contract', refId: 9 },
+      ],
+    });
   });
 
-  it('reads a bare “mark paid” as the day’s own tax, on the day it was marked', () => {
+  it('reads a bare “mark paid” under its Assignment’s id, for the day’s tax, on the day it was marked', () => {
     const [link] = legacyPaymentLinks([
       assignment('a', '2026-10-01', { paidAt: Date.parse('2026-10-03T08:00:00Z') }),
     ]);
     expect(link).toMatchObject({
-      kind: 'recorded',
+      kind: 'legacy',
       refId: 'mark:a',
       amount: 100_000,
       paidOn: '2026-10-03',
@@ -111,16 +114,22 @@ describe('legacyPaymentLinks', () => {
 });
 
 describe('unreadLegacyLinks', () => {
-  it('reads each mark once: a link already under its key, from any Payee, is left alone', () => {
+  it('reads each mark once: an id already known is left alone, whatever the mark holds now', () => {
     const marks = [
+      assignment('a', '2026-10-01', settled('pay1')),
+      assignment('b', '2026-10-02', settled('pay2')),
+    ];
+    expect(unreadLegacyLinks(marks, new Set(['legacy:pay1'])).map((l) => l.refId)).toEqual([
+      'pay2',
+    ]);
+    // A journal attached later by an older client changes nothing: the id is the payment's.
+    const later = [
       assignment(
         'a',
         '2026-10-01',
         settled('pay1', { journalLinks: [{ refId: 41, source: 'auto' }] })
       ),
-      assignment('b', '2026-10-02', settled('pay2')),
     ];
-    expect(unreadLegacyLinks(marks, new Set(['journal:41'])).map((l) => l.refId)).toEqual(['pay2']);
-    expect(unreadLegacyLinks(marks, new Set(['journal:41', 'recorded:pay2']))).toEqual([]);
+    expect(unreadLegacyLinks(later, new Set(['legacy:pay1']))).toEqual([]);
   });
 });
