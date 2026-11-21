@@ -27,6 +27,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
   Eyebrow,
+  eyebrowClassName,
   Spinner,
   Tooltip,
 } from '@/components/ui';
@@ -86,9 +87,11 @@ export function ContractPriceCheck({
   return (
     <section aria-label={heading}>
       <div className="flex items-baseline justify-between gap-2">
-        <Eyebrow>
-          {hubMenu ? <HeadingWithHubMenu heading={heading} menu={hubMenu} /> : heading}
-        </Eyebrow>
+        {hubMenu ? (
+          <HeadingWithHubMenu heading={heading} menu={hubMenu} />
+        ) : (
+          <Eyebrow>{heading}</Eyebrow>
+        )}
         {flip && (
           <Tooltip content={flip.showOther}>
             <button type="button" className={flipClassName} onClick={flip.onFlip}>
@@ -135,18 +138,21 @@ export function ContractPriceCheck({
 /**
  * The heading with its hub label as the menu trigger. The heading was worded
  * with exactly `hub.stationLabel`, so it splits there; a wording without it
- * shows plain rather than losing the text.
+ * shows plain rather than losing the text. Laid out as Appraisal's hold line:
+ * only the title is an eyebrow (an eyebrow never carries an action); the
+ * value and the rest stay in normal case.
  */
 function HeadingWithHubMenu({ heading, menu }: { heading: string; menu: PriceCheckHubMenu }) {
   const { t } = useTranslation();
   const at = heading.indexOf(menu.hub.stationLabel);
-  if (at < 0) return heading;
+  if (at < 0) return <Eyebrow>{heading}</Eyebrow>;
   return (
-    <>
-      {heading.slice(0, at)}
+    <p className="text-[0.6875rem] text-text-dim">
+      <span className={eyebrowClassName}>{heading.slice(0, at)}</span>
       <DropdownMenu>
         <DropdownMenuTrigger
-          className={popoverValueClassName}
+          // min-h-6: the 24px target floor (DESIGN.md §3), as the flip button beside it.
+          className={cx(popoverValueClassName, 'inline-flex min-h-6 items-baseline touch:min-h-9')}
           aria-label={t('contractDetail.priceCheckHubMenu', { hub: menu.hub.stationLabel })}
         >
           {menu.hub.stationLabel}
@@ -165,6 +171,6 @@ function HeadingWithHubMenu({ heading, menu }: { heading: string; menu: PriceChe
         </DropdownMenuContent>
       </DropdownMenu>
       {heading.slice(at + menu.hub.stationLabel.length)}
-    </>
+    </p>
   );
 }

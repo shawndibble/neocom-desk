@@ -11342,7 +11342,7 @@
     "priceCheckBuy": "Buy orders",
     "priceCheckSell": "Sell orders",
     "priceCheckShowSide": "Show {{side}}",
-    "priceCheckHubMenu": "Priced at {{hub}}. Choose another trade hub",
+    "priceCheckHubMenu": "{{hub}}, choose another Trade Hub",
     "priceCheckAsking": "Asking price",
     "priceCheckDifference": "Difference",
     "priceCheckSaving": "Saving",

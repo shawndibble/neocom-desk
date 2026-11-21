@@ -44,7 +44,7 @@ describe('ContractPriceCheck', () => {
     );
     // The heading still reads whole around the trigger.
     expect(screen.getByRole('region', { name: 'Is it fair? · Jita 4-4 right now' })).toBeVisible();
-    await userEvent.click(screen.getByRole('button', { name: /Priced at Jita 4-4/ }));
+    await userEvent.click(screen.getByRole('button', { name: /^Jita 4-4, choose another/ }));
     expect(screen.getByRole('menuitemradio', { name: 'Jita 4-4' })).toBeChecked();
     await userEvent.click(screen.getByRole('menuitemradio', { name: 'Amarr VIII' }));
     expect(onChange).toHaveBeenCalledWith('amarr');
