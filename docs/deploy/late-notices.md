@@ -1,4 +1,4 @@
-# Deploying Late notices (decision 20261120-235011, step 2)
+# Deploying the Running account and Late notices (decision 20261120-235011)
 
 Dev and production share one Firebase project and its data, and neither the rules nor the
 Cloud Functions are deployed by CI. Every step is additive: older open tabs and the functions
@@ -12,10 +12,14 @@ deployed now keep working at each point, so the steps can run before the PR merg
   - `accountCheckpoints/{minerId}`: officers read every one; a Miner reads their own (`uids`).
   - `payments/{paymentId}`: also readable by its Miner's readers (`uids`), so a main reads an
     alt's donation. A payment without `uids` still reads by its sender (`uid`) alone.
-- **Indexes:** none. Every new query is on a single field (`minerId`, `characterIds`, `uids` on
-  `payments`,
-  `issuedAt`, `extractionId`, `chunkArrivalTime`, `transferId`, and `books.<corporationId>` on
-  `corpTaxBookBilledBy`, which Firestore indexes as a map field by default).
+  - Under `users/{uid}`, a pilot's own `miningTaxPaymentLinks/{linkId}` (a Made Payment's link
+    to one Payee), with the same owner and hash rules as `miningTaxAssignments`. Older clients
+    never read or write it.
+- **Indexes:** for the synced `miningTaxPaymentLinks` collection only (`ownerHash` + `updatedAt`,
+  and its single-field `ownerHash` override), the same pair every synced collection has. Corp Tax
+  Book queries need none: each is on a single field (`minerId`, `characterIds`, `uids` on
+  `payments`, `issuedAt`, `extractionId`, `chunkArrivalTime`, `transferId`, and
+  `books.<corporationId>` on `corpTaxBookBilledBy`, indexed as a map field by default).
 - **Functions:**
   - `corpTaxBookCall` (the book's router): `issueLateNotice`, `recordLateNoticeMail`,
     `recordCheckpoints` and `resetCheckpoint` edits; Late notices written beside their
@@ -39,10 +43,17 @@ deployed now keep working at each point, so the steps can run before the PR merg
 
 ## Order
 
-1. **Rules first**, so a client can read the new collections the moment anything writes them:
+Merging the PR to `develop` ships the new client to `https://dev.neocomdesk.com` straight away,
+before anything below. That is safe: against the functions deployed now it falls back to the old
+actions (`issueStatement`, `recordMail`) and reads the legacy `statements` docs beside
+`lateNotices`. A pilot's payment links stay on their device until the rules allow syncing them
+(step 1), and sync once they do.
+
+1. **Rules and indexes**, so a client can read and sync the new collections the moment anything
+   writes them. Indexes build in the background; the client works while they do.
 
    ```sh
-   firebase deploy --only firestore:rules
+   firebase deploy --only firestore:rules,firestore:indexes
    ```
 
 2. **Functions**, which start writing `lateNotices` (and still mirror every notice to
@@ -70,14 +81,9 @@ deployed now keep working at each point, so the steps can run before the PR merg
 
    Add corporation ids after the project id to run only those books.
 
-4. **The client** that reads `lateNotices` ships after step 3. Until then a verify link, a mail
-   or a declaration on a notice the backfill has not reached still works: the functions fall
-   back to its `statements` doc.
-
-5. **Promote `develop` to `main` soon after step 2.** The production client on `main` is built
-   for the old schemas (moon docs and read models schema 1): from step 2 it ignores the rebuilt
-   docs and reads the whole book instead. Its figures stay correct, only slower, until it is
-   promoted.
+4. **Promote `develop` to `main` straight after.** The production client on `main` is built for
+   the old schemas (moon docs and read models schema 1): from step 2 it ignores the rebuilt docs
+   and reads the whole book instead. Its figures stay correct, only slower, until it is promoted.
 
 ## After deploy
 
