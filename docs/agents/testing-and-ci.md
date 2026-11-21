@@ -243,9 +243,13 @@ and its CI shards skip them; they have their own config and CI job.
   starts everything: `scripts/e2e-book/emulators.mjs` builds `functions/` and starts the
   emulators (a fresh per-run key signs fake EVE tokens; `ccpStub.mjs`, loaded into the Functions
   runtime, answers SSO's key set and ESI's who-is-who), and a Vite dev server on 5197 points at
-  them. A global warm-up pays the cold compile, and the emulators stop on SIGINT at the end.
-  Outside CI both servers are reused if already up. Ports 8080, 9099 and 5001 must be free (no
-  `npm run emulators` running). If your Playwright browser build is not the pinned one, point
+  them. A global warm-up (`e2e/support/taxBook/warmUp.ts`) signs the officer in and opens the
+  book's pages once, so no test pays the cold start (Vite's first compile, the Functions
+  emulator loading each function), and the emulators stop on SIGINT at the end.
+  **A run never reuses a server already up**, locally included: the ports (8080, 9099, 5001, 5197) are fixed and shared by every worktree on the machine, so a server already up may be
+  another worktree's, serving its code. Such a run fails at once ("is already used"): wait for
+  the other worktree's run to end, or stop your own servers, `npm run emulators` too. Run one
+  book spec file at a time, `--workers=1`. If your Playwright browser build is not the pinned one, point
   `launchOptions.executablePath` at yours in an uncommitted wrapper config; never commit it.
 - **In CI:** the `e2e-book` job in `ci.yml`, one runner in the Playwright container (the pinned
   browser) with Java added, ~5 minutes in all. It runs from the dev server, not `build`'s
