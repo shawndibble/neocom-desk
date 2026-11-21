@@ -132,3 +132,16 @@ test("a personal Payee's ledger lists its whole history, with no snapshot row", 
   await expect(ledger).toContainText(day(100));
   await expect(ledger).toContainText(new RegExp(`Days owed\\s*3`));
 });
+
+test('Unlink says so with an Undo that links the same payment back', async ({ page }) => {
+  const ledger = await openLedger(page);
+  await bodyRows(ledger).filter({ hasText: 'Payment' }).click();
+  await ledger.getByRole('button', { name: 'Unlink' }).click();
+  // The payment pays nothing now: its day is owed again.
+  await expect(ledger).toContainText(new RegExp(`Owes\\s*${isk(3 * DAY_TAX)} ISK`));
+  const toast = page.getByRole('status').filter({ hasText: /Unlinked the .* ISK payment/ });
+  await expect(toast).toBeVisible();
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(ledger).toContainText(new RegExp(`Owes\\s*${isk(2 * DAY_TAX)} ISK`));
+  await expect(ledger).toContainText(`${day(PAID_BACK)}Payment`);
+});

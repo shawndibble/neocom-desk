@@ -45,6 +45,7 @@ import {
   type PayeePaymentLink,
   heldPaymentKeys,
 } from '@/engine/miningTax/payeeRunningAccount';
+import { formatIsk } from '@/lib/isk';
 import type { LedgerCharge, LedgerPayment } from '@/engine/miningTax/payeeLedger';
 import type { PayeeRunningAccounts } from '@/features/miningTax/payeeRunningAccounts';
 import { buildSettleUpReason } from '@/features/miningTax/groupRows';
@@ -163,7 +164,8 @@ export interface TaxDialogsHostProps {
   /** The Add-payee shortcut in the row detail; absent when there is no character to add one for. */
   onAddPayee: (() => void) | undefined;
   /** A short confirmation for a row-menu action that has no dialog to show it in ("Copied"). */
-  onToast: (message: string) => void;
+  /** A transient message; with `onUndo` it carries an Undo (DESIGN 6c, Transient messages). */
+  onToast: (message: string, onUndo?: () => void) => void;
 }
 
 /**
@@ -416,8 +418,27 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     actions.openLedger({ kind: 'personal', payeeId });
   }
 
+  /**
+   * Unlinks a payment from a Payee's ledger, then says so with an Undo that links the same payment
+   * to the same Payee again (as it was: amount, day and owner).
+   */
   function unlinkPayment(key: string) {
-    void runAndClose(() => unlinkPayments([key]));
+    const was = links.find((l) => paymentLinkKey(l) === key);
+    void runAndClose(async () => {
+      const result = await unlinkPayments([key]);
+      if (result.ok && was) {
+        const { characterId } = was;
+        onToast(
+          t('miningTax.ledger.unlinkedToast', { amount: formatIsk(was.amount, 0) }),
+          characterId === undefined
+            ? undefined
+            : () => {
+                void linkPayment(was, characterId).then(() => refresh());
+              }
+        );
+      }
+      return result;
+    });
   }
 
   function resolveEntry(dr: DisplayRow, fromMenu = false) {

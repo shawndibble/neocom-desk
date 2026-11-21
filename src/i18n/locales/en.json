@@ -8846,6 +8846,7 @@
         "viewPayment": "View the payment",
         "unlinkHint": "Unlinking frees this payment: its days are owed again and it is offered under Payments to link."
       },
+      "unlinkedToast": "Unlinked the {{amount}} ISK payment. Its days are owed again.",
       "emptyTitle": "Nothing on this ledger yet",
       "emptyHint": "A day shows here once it is billed.",
       "filteredTitle": "No entries match these filters",

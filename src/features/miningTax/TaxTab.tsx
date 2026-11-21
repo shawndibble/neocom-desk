@@ -713,7 +713,19 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
           priceSourcesFor={priceSourcesFor}
           onClearSelection={selection.clearSelection}
           onAddPayee={onAddPayee}
-          onToast={(message) => setToast({ message })}
+          onToast={(message, onUndo) =>
+            setToast({
+              message,
+              ...(onUndo
+                ? {
+                    onUndo: () => {
+                      setToast(null);
+                      onUndo();
+                    },
+                  }
+                : {}),
+            })
+          }
         />
       </TabPanel>
     </div>
