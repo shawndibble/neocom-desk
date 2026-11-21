@@ -252,6 +252,24 @@ describe('ResolveDialog', () => {
     );
   });
 
+  it('after "I already paid" with nothing found, says the answer comes back, never a hold with no date', async () => {
+    const user = userEvent.setup();
+    submit.sendProof.mockResolvedValueOnce({ checks: [], confirmed: false });
+    open(
+      { ...base, kind: 'uncredited', amount: 5, noticeId: 's1', days: ['2026-11-06'] },
+      {
+        transfers: [
+          { amount: 5, at: '2026-11-08T00:00:00Z', journalRef: 3, recipient: 'corporation' },
+        ],
+      }
+    );
+    await user.click(screen.getByRole('button', { name: 'Send proof' }));
+    expect(
+      await screen.findByText(/Sent to Bureau\. Their answer comes back here/)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/until\s+while/)).not.toBeInTheDocument();
+  });
+
   it('opens the day to fix your own records on a Conflict', async () => {
     const user = userEvent.setup();
     const onFixRecords = vi.fn();

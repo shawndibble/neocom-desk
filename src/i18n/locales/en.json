@@ -7871,7 +7871,7 @@
     }
   },
   "miningTax": {
-    "iskFigure": "<value/> ISK",
+    "iskFigure": "<value/><unit> ISK</unit>",
     "resolve": {
       "pick": {
         "privacy": "Only the payments you tick are sent. The rest of your wallet stays on this device.",
@@ -7903,17 +7903,18 @@
         "declarationRejected": "{{corp}} rejected what you said you paid: {{reason}}",
         "overdue": "{{corp}}'s Late notice for {{period}} is not paid yet.",
         "rateUnrecorded": "{{corp}}'s book bills {{date}} at {{book}}%; your record has no rate for it.",
-        "uncredited": "You sent <amount/>, but {{corp}}'s book has synced since and doesn't show it. Days you had paid are billed again.",
-        "inReview": "{{corp}}'s book received <amount/> from you but isn't counting it yet. Nothing was owed when you paid, so an officer has to review it.",
+        "uncredited": "You sent {{amount}} ISK, but {{corp}}'s book has synced since and doesn't show it. Days you had paid are billed again.",
+        "inReview": "{{corp}}'s book received {{amount}} ISK from you but isn't counting it yet. Nothing was owed when you paid, so an officer has to review it.",
         "journalRef": "journal ref {{ref}}",
         "paidDays": "paid {{days}}",
         "rate": "{{corp}}'s book bills {{date}} at {{book}}%; you recorded {{yours}}%.",
         "quantity": "{{corp}}'s book recorded {{book}} units of ore on {{date}}; your record has {{yours}}.",
-        "bills": "Its book bills <amount/>.",
+        "bills": "Its book bills {{amount}} ISK.",
         "conflict": "You gave this ore to {{payee}}. {{corp}}'s book also recorded it, and bills it on {{date}} unless something changes first.",
         "anotherPayee": "another Payee",
         "kept": "{{corp}} kept the bill on {{date}}: {{reason}}",
-        "nextStep": "What to do next: {{step}}"
+        "nextStep": "What to do next: {{step}}",
+        "donation": "{{amount}} ISK"
       },
       "quiet": {
         "noticeLabel": "{{corp}} · Late notice",
@@ -7992,7 +7993,8 @@
         "credited": "Found in {{corp}}'s wallet and credited. Nothing more to do.",
         "countedHeld": "{{corp}}'s book counts them as paid now, toward your oldest days. Nothing more to do.",
         "sentProof": "Sent to {{corp}}, with what checking its wallet found:",
-        "sent": "Sent to {{corp}}. It holds the day until {{date}} while they answer; their answer comes back here."
+        "sent": "Sent to {{corp}}. It holds the day until {{date}} while they answer; their answer comes back here.",
+        "sentPaid": "Sent to {{corp}}. Their answer comes back here; the days stay billed until the book credits the payment."
       },
       "check": {
         "ambiguous": "Several matches — an officer picks",
