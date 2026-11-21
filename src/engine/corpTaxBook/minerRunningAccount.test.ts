@@ -337,7 +337,8 @@ describe('MinerRunningAccount.checkpoint', () => {
     ).toEqual({
       minerId: 'm1',
       through: '2026-10-31',
-      owed: [{ date: '2026-10-02', remaining: 1_500_000 }],
+      // The day whole, and what money paid of it, so it is rebuilt with its whole tolerance (M1).
+      owed: [{ date: '2026-10-02', remaining: 1_500_000, tax: 2e6, credited: 500_000 }],
       credit: 0,
       balance: 1_500_000,
       paidThrough: '2026-10-01',
@@ -355,7 +356,7 @@ describe('MinerRunningAccount.checkpoint', () => {
   it('keeps an officer’s charge on a day still owed', () => {
     const charged = { days: [{ date: '2026-10-02', tax: 3e6, charge: 1e6 }], payments: [] };
     expect(MinerRunningAccount.checkpoint(charged, 'm1', '2026-10-31', { at: 'x' }).owed).toEqual([
-      { date: '2026-10-02', remaining: 3e6, charge: 1e6 },
+      { date: '2026-10-02', remaining: 3e6, charge: 1e6, tax: 3e6, credited: 0 },
     ]);
   });
 
@@ -497,6 +498,51 @@ describe('a checkpoint always passes the shared checkpointProblem (M5)', () => {
       const { input, through } = harderBook(seed);
       const cp = MinerRunningAccount.checkpoint(input, 'm1', through, { at: 'x' });
       expect(checkpointProblem(cp), `seed ${seed}: ${JSON.stringify(cp)}`).toBeNull();
+    }
+  });
+});
+
+describe('a checkpoint plus the later days is the whole history, at the tolerance edge (M1)', () => {
+  it('settles a 100M day paid 60M before the checkpoint and 39.7M after, as the whole history does', () => {
+    const input: MinerRunningAccountInput = {
+      days: [day('2026-10-10', 100e6)],
+      payments: [
+        payment('a', 60e6, '2026-10-20T00:00:00Z'),
+        payment('b', 39.7e6, '2026-11-05T00:00:00Z'),
+      ],
+    };
+    const whole = MinerRunningAccount.build(input);
+    expect(whole.owes).toBeNull();
+    const cp = MinerRunningAccount.checkpoint(input, 'm1', '2026-10-31', { at: 'x' });
+    expect(cp.owed).toEqual([{ date: '2026-10-10', remaining: 40e6, tax: 100e6, credited: 60e6 }]);
+    const resumed = MinerRunningAccount.build({ ...input, checkpoint: cp });
+    expect(resumed.owes).toBeNull();
+    expect(resumed.day('2026-10-10')).toMatchObject({ tax: 100e6, settled: true });
+    expect(resumed.balance).toBeCloseTo(whole.balance, 6);
+  });
+
+  it('on 500 random books with the book tolerance', () => {
+    for (let seed = 1; seed <= 500; seed += 1) {
+      const { input, through } = randomBook(seed);
+      const tolerant = { ...input, dayTolerancePct: 0.5 };
+      const whole = MinerRunningAccount.build(tolerant);
+      const cp = MinerRunningAccount.checkpoint(tolerant, 'm1', through, { at: 'x' });
+      expect(checkpointProblem(cp), `seed ${seed}`).toBeNull();
+      const resumed = MinerRunningAccount.build({ ...tolerant, checkpoint: cp });
+      const context = `seed ${seed}`;
+      expect(resumed.paidThrough, context).toBe(whole.paidThrough);
+      // The whole history pools every payment, so later money can still top up a day the
+      // tolerance closed before the checkpoint; the checkpoint keeps it closed, and that money
+      // pays later days or is credit instead. Each differs by no more than what was forgiven.
+      const before = MinerRunningAccount.build({
+        ...tolerant,
+        days: tolerant.days.filter((d) => d.date <= through),
+        payments: tolerant.payments.filter((p) => p.at.slice(0, 10) <= through),
+      });
+      const forgiven = [...before.byDay.values()].reduce((sum, d) => sum + d.writtenOff, 0);
+      expect(Math.abs(resumed.credit - whole.credit), context).toBeLessThanOrEqual(forgiven + 1e-6);
+      const owed = (x: MinerRunningAccount) => x.owes?.amount ?? 0;
+      expect(Math.abs(owed(resumed) - owed(whole)), context).toBeLessThanOrEqual(forgiven + 1e-6);
     }
   });
 });
