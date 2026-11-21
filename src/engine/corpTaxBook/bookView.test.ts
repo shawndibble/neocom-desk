@@ -157,6 +157,31 @@ describe('buildBookView: a Running account per Miner', () => {
     );
   });
 
+  it('ignores a checkpoint recorded for other characters than the Miner has now (B3)', () => {
+    const view = buildBookView(
+      input({
+        entries: [entry(1, '2026-08-10', 1000), entry(1, '2026-09-10', 1000)],
+        checkpoints: new Map([
+          [
+            'solo:1',
+            {
+              minerId: 'solo:1',
+              through: '2026-08-31',
+              owed: [],
+              credit: 0,
+              balance: 0,
+              paidThrough: '2026-08-31',
+              at: '2026-10-01T00:00:00Z',
+              characterIds: [1, 2],
+            } as never,
+          ],
+        ]),
+      })
+    );
+    // Read whole: August is owed again, as if no checkpoint were stored.
+    expect(view.miners[0].account.owes).toEqual({ amount: 200_000, days: 2, oldest: '2026-08-10' });
+  });
+
   it('marks a Miner no longer in the corporation as left, and a stranger as a guest', () => {
     const view = buildBookView(
       input({

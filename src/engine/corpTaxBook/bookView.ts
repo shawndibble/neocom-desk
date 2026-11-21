@@ -350,7 +350,7 @@ export function buildBookView(input: BookViewInput): BookView {
     /** The newest late notice that listed each day. */
     const noticeBy = new Map<string, string>();
     for (const n of notices) for (const line of n.lines) noticeBy.set(line.key, n.id);
-    const through = input.checkpoints?.get(id)?.through;
+    const through = account.input.checkpoint?.through;
     /** The open dispute that holds a date, and until when. */
     const disputeOf = (date: string) => {
       for (const d of input.disputes ?? []) {
