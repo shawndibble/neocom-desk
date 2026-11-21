@@ -34,10 +34,16 @@ function assertLevel(name: string, level: number): void {
   }
 }
 
-/** Sales (transaction) tax rate, percent. */
-export function salesTaxPct(accountingLevel: number): number {
+/**
+ * Sales (transaction) tax rate, percent. `discountFactor` is a hub's temporary
+ * fee discount (`hubFeeDiscountFactor`, 0.5 at Amarr during the Deaconry of
+ * Economic Oversight), multiplied onto the rate after skills; 1 is none.
+ */
+export function salesTaxPct(accountingLevel: number, discountFactor = 1): number {
   assertLevel('Accounting', accountingLevel);
-  return SALES_TAX_BASE_PCT * (1 - ACCOUNTING_REDUCTION_PER_LEVEL * accountingLevel);
+  return (
+    SALES_TAX_BASE_PCT * (1 - ACCOUNTING_REDUCTION_PER_LEVEL * accountingLevel) * discountFactor
+  );
 }
 
 /**
@@ -51,7 +57,8 @@ export function brokerFeePct(
   brokerRelationsLevel: number,
   factionStanding = 0,
   corpStanding = 0,
-  safetyTaxPct = 0
+  safetyTaxPct = 0,
+  discountFactor = 1
 ): number {
   assertLevel('Broker Relations', brokerRelationsLevel);
   const pct =
@@ -59,12 +66,12 @@ export function brokerFeePct(
     BROKER_RELATIONS_PCT_PER_LEVEL * brokerRelationsLevel -
     FACTION_STANDING_PCT_PER_POINT * factionStanding -
     CORP_STANDING_PCT_PER_POINT * corpStanding;
-  return Math.max(0, pct) + safetyTaxPct;
+  return Math.max(0, pct) * discountFactor + safetyTaxPct;
 }
 
 /** Sales tax in ISK on a filled order of `value` ISK. */
-export function salesTax(value: number, accountingLevel: number): number {
-  return (value * salesTaxPct(accountingLevel)) / 100;
+export function salesTax(value: number, accountingLevel: number, discountFactor = 1): number {
+  return (value * salesTaxPct(accountingLevel, discountFactor)) / 100;
 }
 
 /** Broker fee in ISK for listing an order of `value` ISK (100 ISK minimum). */
@@ -73,11 +80,14 @@ export function brokerFee(
   brokerRelationsLevel: number,
   factionStanding = 0,
   corpStanding = 0,
-  safetyTaxPct = 0
+  safetyTaxPct = 0,
+  discountFactor = 1
 ): number {
   if (value <= 0) return 0;
+  // The discount scales the rate, never the 100 ISK minimum (measured at Amarr).
   const skillFee =
-    (value * brokerFeePct(brokerRelationsLevel, factionStanding, corpStanding)) / 100;
+    (value * brokerFeePct(brokerRelationsLevel, factionStanding, corpStanding, 0, discountFactor)) /
+    100;
   return Math.max(MIN_BROKER_FEE_ISK, skillFee) + (value * safetyTaxPct) / 100;
 }
 
@@ -101,9 +111,16 @@ export function relistBrokerFeePct(
   brokerRelationsLevel: number,
   advancedBrokerRelationsLevel: number,
   factionStanding = 0,
-  corpStanding = 0
+  corpStanding = 0,
+  discountFactor = 1
 ): number {
-  const brokerPct = brokerFeePct(brokerRelationsLevel, factionStanding, corpStanding);
+  const brokerPct = brokerFeePct(
+    brokerRelationsLevel,
+    factionStanding,
+    corpStanding,
+    0,
+    discountFactor
+  );
   const discountPct = relistDiscountPct(advancedBrokerRelationsLevel);
   return (brokerPct * (100 - discountPct)) / 100;
 }
@@ -122,17 +139,25 @@ export function relistFee(
   brokerRelationsLevel: number,
   advancedBrokerRelationsLevel: number,
   factionStanding = 0,
-  corpStanding = 0
+  corpStanding = 0,
+  discountFactor = 1
 ): number {
   if (quantity <= 0 || newPrice <= 0) return 0;
 
   const increaseIncrement = Math.max(0, newPrice - oldPrice) * quantity;
-  const brokerPct = brokerFeePct(brokerRelationsLevel, factionStanding, corpStanding);
+  const brokerPct = brokerFeePct(
+    brokerRelationsLevel,
+    factionStanding,
+    corpStanding,
+    0,
+    discountFactor
+  );
   const discountedPct = relistBrokerFeePct(
     brokerRelationsLevel,
     advancedBrokerRelationsLevel,
     factionStanding,
-    corpStanding
+    corpStanding,
+    discountFactor
   );
   const fee = (increaseIncrement * brokerPct + newPrice * quantity * discountedPct) / 100;
 
@@ -174,10 +199,17 @@ export function breakEvenPrice(
   brokerRelationsLevel: number,
   factionStanding = 0,
   corpStanding = 0,
-  safetyTaxPct = 0
+  safetyTaxPct = 0,
+  discountFactor = 1
 ): number | null {
-  const taxPct = salesTaxPct(accountingLevel);
-  const brokerPct = brokerFeePct(brokerRelationsLevel, factionStanding, corpStanding);
+  const taxPct = salesTaxPct(accountingLevel, discountFactor);
+  const brokerPct = brokerFeePct(
+    brokerRelationsLevel,
+    factionStanding,
+    corpStanding,
+    0,
+    discountFactor
+  );
   return breakEvenPriceAtRate(totalCost, quantity, taxPct, brokerPct, safetyTaxPct);
 }
 
@@ -195,14 +227,16 @@ export function relistBreakEvenPrice(
   brokerRelationsLevel: number,
   advancedBrokerRelationsLevel: number,
   factionStanding = 0,
-  corpStanding = 0
+  corpStanding = 0,
+  discountFactor = 1
 ): number | null {
-  const taxPct = salesTaxPct(accountingLevel);
+  const taxPct = salesTaxPct(accountingLevel, discountFactor);
   const brokerPct = relistBrokerFeePct(
     brokerRelationsLevel,
     advancedBrokerRelationsLevel,
     factionStanding,
-    corpStanding
+    corpStanding,
+    discountFactor
   );
   return breakEvenPriceAtRate(totalCost, quantity, taxPct, brokerPct);
 }

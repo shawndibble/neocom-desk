@@ -28,6 +28,8 @@ export interface ProfitBasisInput {
   factionStanding?: number;
   /** The market's Safety Tax, percent of an order's value (`TradeHub.safetyTaxPct`); none when absent. */
   safetyTaxPct?: number;
+  /** The hub's temporary fee discount factor (`hubFeeDiscountFactor`); none when absent. */
+  feeDiscountFactor?: number;
   corpStanding?: number;
 }
 
@@ -65,7 +67,8 @@ export function profitOnBasis(basis: ProfitBasis, input: ProfitBasisInput): Prof
       input.brokerRelationsLevel,
       input.factionStanding,
       input.corpStanding,
-      input.safetyTaxPct
+      input.safetyTaxPct,
+      input.feeDiscountFactor
     );
   }
 

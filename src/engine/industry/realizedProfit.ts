@@ -57,13 +57,18 @@ export interface RealizedProfitResult {
 
 export function realizedProfit(inputs: RealizedProfitInputs): RealizedProfitResult {
   const totalCost = inputs.materialCost + inputs.jobFee;
-  const salesTaxAmount = salesTax(inputs.grossRevenue, inputs.accountingLevel);
+  const salesTaxAmount = salesTax(
+    inputs.grossRevenue,
+    inputs.accountingLevel,
+    inputs.standing?.feeDiscountFactor
+  );
   const brokerFeeAmount = brokerFee(
     inputs.brokerFeeableRevenue,
     inputs.brokerRelationsLevel,
     inputs.standing?.factionStanding,
     inputs.standing?.corpStanding,
-    inputs.standing?.safetyTaxPct
+    inputs.standing?.safetyTaxPct,
+    inputs.standing?.feeDiscountFactor
   );
   const netRevenue = inputs.grossRevenue - salesTaxAmount - brokerFeeAmount;
   const insurance = inputs.insurancePayout ?? 0;

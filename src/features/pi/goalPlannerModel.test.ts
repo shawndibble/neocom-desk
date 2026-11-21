@@ -449,4 +449,11 @@ describe('earningsNow', () => {
     );
     expect(off.iskPerHour).toBeNull();
   });
+
+  it('halves the sales tax under a hub fee discount, but not a buyback (which pays none)', () => {
+    const prices = { prices: { 1: 100 }, buyPrices: { 1: 90 } };
+    const full = priceBooks(prices, 5);
+    expect(priceBooks(prices, 5, null, 0.5).salesTaxPct).toBeCloseTo(full.salesTaxPct / 2, 12);
+    expect(priceBooks(prices, 5, 80, 0.5).salesTaxPct).toBe(0);
+  });
 });

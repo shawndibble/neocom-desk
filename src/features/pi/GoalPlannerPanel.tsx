@@ -86,6 +86,7 @@ import {
   Shortfalls,
   type PlanNames,
 } from './GoalPlannerResults';
+import { hubFeeDiscountFactor } from '@/market/hubs';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
 const HOURS_PER_DAY = 24;
@@ -287,7 +288,12 @@ function GoalPlanner({
           goals: plannedGoals,
           colonies: goalPlannerInput(rows),
           policy: plannerPolicy({ maxP0Types: prefs.maxP0Types, buyTiers }),
-          books: priceBooks(prices, snapshot.accountingLevel, buybackPct),
+          books: priceBooks(
+            prices,
+            snapshot.accountingLevel,
+            buybackPct,
+            hubFeeDiscountFactor(hub, snapshot.nowMs)
+          ),
           jumps: jumpsFn,
           salesCapPerDay: salesCaps,
         },
@@ -301,6 +307,7 @@ function GoalPlanner({
     pi,
     prices,
     snapshot,
+    hub,
     rows,
     plannedGoals,
     prefs.maxP0Types,
@@ -360,7 +367,12 @@ function GoalPlanner({
     const { best } = result;
     const planned = goalPlannerInput(rows);
     const hauling = planHauling(best.plan, best.baseline, pi, haulHours);
-    const books = priceBooks(prices, snapshot.accountingLevel, buybackPct);
+    const books = priceBooks(
+      prices,
+      snapshot.accountingLevel,
+      buybackPct,
+      hubFeeDiscountFactor(hub, snapshot.nowMs)
+    );
     const earnings = earningsNow(rows, pi, prices, books.salesTaxPct, buybackPct);
     const verdict =
       best.economics.status === 'costed'
