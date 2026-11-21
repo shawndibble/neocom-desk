@@ -8,7 +8,7 @@ import { PAYOUT_LINK_WINDOW_DAYS } from '../../../functions/src/corpTaxBookTrans
  * journal's outgoing donation to it later ("paying backwards", like
  * `paymentLinks.ts`). Pure. Mirrored in `functions/src/corpTaxBookEngine.ts`
  * (`functionsMirror.test.ts` keeps the two equal). Payouts never reach Tax
- * Payment matching or Statements: those read incoming donations only.
+ * Payment matching or Running accounts: those read incoming donations only.
  */
 
 /** A donation the accounting corporation's wallet sent. */

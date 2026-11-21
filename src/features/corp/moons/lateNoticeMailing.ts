@@ -150,10 +150,7 @@ export function useMinerReminder(
     }
     if (noticeId) {
       if (noticeSettled(view, notice)) return t('corpTaxBook.moons.noticePanel.alreadyPaid');
-      const capped = !reminderAllowed({
-        remindersStopped: notice.mail.remindersStopped,
-        manualRemindersSent: notice.mail.manualSent,
-      });
+      const capped = !reminderAllowed(notice.mail);
       if (capped) return t('corpTaxBook.moons.noticePanel.reminderCap');
     }
     return corporationName === null ? t('corpTaxBook.moons.run.loadingCorporation') : null;

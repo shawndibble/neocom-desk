@@ -1081,7 +1081,7 @@ function LateNoticesF({
   return (
     <Page>
       <MoonsHeader lead={running ? <ChipF items={queue} open={queueOpen} /> : undefined} />
-      <MoonsTabs value="statements" />
+      <MoonsTabs value="late-notices" />
       <BookHealthStrip />
       <LateNoticeRun step={step} queue={queue} />
       <Panel

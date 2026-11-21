@@ -260,6 +260,7 @@ describe('a late notice on the running account (#6294)', () => {
 describe('readLateNotices: both stores, as the server reads them', () => {
   const legacy = (over: Record<string, unknown> = {}) => ({
     id: 'n1',
+    kind: 'notice',
     minerId: 'solo:1',
     issuedAt: '2026-09-02T00:00:00Z',
     lines: [
@@ -280,9 +281,10 @@ describe('readLateNotices: both stores, as the server reads them', () => {
     ...over,
   });
 
-  it('reads every legacy doc as a notice, whatever its kind says (fromLegacy)', () => {
-    const [n] = readLateNotices([], [legacy({ kind: undefined })]);
+  it('reads a legacy notice, and leaves out a legacy calendar bill (mergeNoticeDocs)', () => {
+    const [n] = readLateNotices([], [legacy()]);
     expect(n).toMatchObject({ id: 'n1', minerId: 'solo:1', listed: 5 });
+    expect(readLateNotices([], [legacy({ kind: undefined })])).toEqual([]);
   });
 
   it('merges the mail state of both copies of one notice (mergeNoticeMail)', () => {

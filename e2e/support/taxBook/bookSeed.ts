@@ -17,7 +17,7 @@ import {
   STATEMENTS,
   STATEMENT_LINKS,
   TOKENS_COLLECTION,
-} from '../../../functions/src/corpTaxBook';
+} from '../../../functions/src/corpTaxBookVersionKeys';
 import {
   NOTICE_ID_FIELD,
   legacyStatementDocOf,

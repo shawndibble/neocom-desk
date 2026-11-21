@@ -26,7 +26,7 @@ export function MoonsChrome({ tab }: { tab: 'moons' | 'extractions' }) {
           { id: 'extractions', label: 'Extractions' },
           { id: 'moons', label: 'Moons' },
           { id: 'miners', label: 'Miners' },
-          { id: 'statements', label: 'Statements' },
+          { id: 'late-notices', label: 'Late notices' },
           { id: 'moon-owners', label: 'Moon owners' },
           { id: 'sharing', label: 'Sharing' },
         ]}
