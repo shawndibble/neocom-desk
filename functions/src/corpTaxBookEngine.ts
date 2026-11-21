@@ -8,6 +8,7 @@
 
 import { isPlainRecord } from './guards.js';
 import { DAY_MS, HOUR_MS } from './timeConstants.js';
+import { PAYOUT_LINK_WINDOW_DAYS } from './corpTaxBookTransferMatch.js';
 
 export interface ObservedRow {
   structureId: number;
@@ -102,53 +103,18 @@ export function latestRecordedCorp(
 /** Engine `MAX_RATE_BACKDATE_DAYS`. */
 export const MAX_RATE_BACKDATE_DAYS = 30;
 
-/** Engine `rateStartRefusal`. The start-date rate at book creation skips it. */
+/**
+ * Engine `rateStartRefusal`: never more than 30 days back, never on or before the last day a Late
+ * notice listed (`lastNoticedDay`). The start-date rate at book creation skips it.
+ */
 export function rateStartRefusal(
   effectiveFrom: string,
   today: string,
-  lastStatementDay: string | null
+  lastNoticed: string | null
 ): 'too-old' | 'on-statement' | null {
   if (effectiveFrom < shiftDate(today, -MAX_RATE_BACKDATE_DAYS)) return 'too-old';
-  if (lastStatementDay !== null && effectiveFrom <= lastStatementDay) return 'on-statement';
+  if (lastNoticed !== null && effectiveFrom <= lastNoticed) return 'on-statement';
   return null;
-}
-
-/** The fields of a stored Statement the date rules read. */
-export interface StatementDays {
-  id: string;
-  coversFrom: string;
-  coversThrough: string;
-  lines: { kind: string; date: string }[];
-}
-
-/** Engine `statementDays`. */
-export function statementDays(statement: StatementDays): Set<string> {
-  const days = new Set<string>();
-  for (let d = statement.coversFrom; d <= statement.coversThrough; d = shiftDate(d, 1)) days.add(d);
-  for (const line of statement.lines) if (line.kind !== 'correction') days.add(line.date);
-  return days;
-}
-
-/** The latest day any of `statements` bills, or null with none (engine `daysOnStatements`, maxed). */
-export function lastStatementDay(statements: readonly StatementDays[]): string | null {
-  let last: string | null = null;
-  for (const s of statements)
-    for (const d of statementDays(s)) if (last === null || d > last) last = d;
-  return last;
-}
-
-/** Engine `canOverrideRecordRate` over `daysOnStatements`. */
-export function canOverrideRecordRate(date: string, statements: readonly StatementDays[]): boolean {
-  return !statements.some((s) => statementDays(s).has(date));
-}
-
-/** Engine `canRebillFrom` (D22): never reaches a day a paid Statement covered. */
-export function canRebillFrom(
-  date: string,
-  statements: readonly StatementDays[],
-  paidStatementIds: ReadonlySet<string>
-): boolean {
-  return statements.every((s) => !paidStatementIds.has(s.id) || date > s.coversThrough);
 }
 
 // Book defaults (hand-off from #4059: they live in the backend, not the engine).
@@ -167,208 +133,12 @@ export const BOOK_DEFAULTS = {
 /** The longest wallet division name a book stores (#6161); mirrors `src/engine/corpTaxBook/divisionNames.ts`. */
 export const DIVISION_NAME_MAX = 50;
 
-// --- Payment allocation (issue #4066) ---------------------------------------
-// Mirror of src/engine/corpTaxBook/allocation.ts `allocatePayments`, so the
-// verify link can show which payments were credited to one Statement.
-// functionsMirror.test.ts keeps the two in step.
-
-export interface AllocStatement {
-  id: string;
-  amount: number;
-  issuedAt: string;
-}
-
-export interface AllocPayment {
-  id: string;
-  amount: number;
-  at: string;
-  statementId?: string;
-  notTaxAmount?: number;
-  source?: 'donation' | 'manual';
-}
-
-export interface AllocDismissalCredit {
-  statementId: string;
-  amount: number;
-  /** The line it credits: `heldByStatement` never holds a line a dismissal already credits. */
-  chargeKey?: string;
-}
-
-/** Mirror of allocation.ts `OfficerWriteOff` (#4637). */
-export interface AllocWriteOff {
-  id: string;
-  amount: number;
-  at: string;
-  statementId?: string;
-}
-
-/** A `writeOffs` doc as allocation reads it; null when malformed or reversed by an officer. */
-export function writeOffForAllocation(d: Record<string, unknown>): AllocWriteOff | null {
-  if (typeof d.id !== 'string' || typeof d.amount !== 'number' || typeof d.at !== 'string')
-    return null;
-  // A reversal stamp names when it was made, as the app's reader requires.
-  if (typeof d.reversed === 'object' && d.reversed !== null) {
-    if (typeof (d.reversed as { at?: unknown }).at === 'string') return null;
-  }
-  return {
-    id: d.id,
-    amount: d.amount,
-    at: d.at,
-    ...(typeof d.statementId === 'string' ? { statementId: d.statementId } : {}),
-  };
-}
-
-export function settleTolerance(amount: number): number {
-  return Math.max((amount * 0.5) / 100, 100_000);
-}
-
-/** Mirror of allocation.ts `isBeforeBook`. */
+/** Whether a payment is dated before the book's first day: counted, never credited. */
 export function isBeforeBook(at: string, startDate: string): boolean {
   return at.slice(0, 10) < startDate;
 }
 
-export function allocatePayments(rawInput: {
-  statements: readonly AllocStatement[];
-  payments: readonly AllocPayment[];
-  dismissalCredits: readonly AllocDismissalCredit[];
-  officerWriteOffs?: readonly AllocWriteOff[];
-  startDate?: string;
-  /** Mirror of allocation.ts `held`: what open disputes hold of each Statement. */
-  held?: ReadonlyMap<string, number>;
-}) {
-  const { startDate } = rawInput;
-  const input = {
-    ...rawInput,
-    payments: startDate
-      ? rawInput.payments.filter((p) => p.source !== 'donation' || !isBeforeBook(p.at, startDate))
-      : rawInput.payments,
-  };
-  const ordered = [...input.statements].sort(
-    (a, b) => a.issuedAt.localeCompare(b.issuedAt) || a.id.localeCompare(b.id)
-  );
-  type Running = {
-    amount: number;
-    held: number;
-    credited: number;
-    paidIn: number;
-    forgiven: number;
-  };
-  const heldOf = (s: { id: string; amount: number }) =>
-    Math.min(Math.max(0, input.held?.get(s.id) ?? 0), Math.max(0, s.amount));
-  const state = new Map<string, Running>(
-    ordered.map((s) => [
-      s.id,
-      { amount: s.amount - heldOf(s), held: heldOf(s), credited: 0, paidIn: 0, forgiven: 0 },
-    ])
-  );
-  const isDone = (st: Running): boolean => {
-    const remaining = st.amount - st.credited;
-    return remaining <= 0 || (st.paidIn > 0 && remaining <= settleTolerance(st.amount));
-  };
-  const apply = (id: string, available: number, isPayment: boolean): number => {
-    const st = state.get(id);
-    if (!st || isDone(st)) return available;
-    const take = Math.min(available, st.amount - st.credited);
-    st.credited += take;
-    if (isPayment) st.paidIn += take;
-    return available - take;
-  };
-  const applyOldestFirst = (available: number, isPayment: boolean): number => {
-    for (const s of ordered) {
-      if (available <= 0) break;
-      available = apply(s.id, available, isPayment);
-    }
-    return available;
-  };
-
-  let credit = ordered.reduce((sum, s) => sum + Math.max(0, -s.amount), 0);
-  let paid = 0;
-  let dismissed = 0;
-  for (const d of input.dismissalCredits) {
-    dismissed += d.amount;
-    credit += applyOldestFirst(apply(d.statementId, d.amount, false), false);
-  }
-  const payments = [...input.payments].sort(
-    (a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id)
-  );
-  const paymentCredits: { paymentId: string; statementId: string; amount: number }[] = [];
-  for (const p of payments) {
-    let available = p.amount - Math.min(p.notTaxAmount ?? 0, p.amount);
-    paid += available;
-    const before = new Map([...state].map(([id, st]) => [id, st.credited]));
-    if (p.statementId) available = apply(p.statementId, available, true);
-    credit += applyOldestFirst(available, true);
-    for (const [id, st] of state) {
-      const amount = st.credited - (before.get(id) ?? 0);
-      if (amount > 0) paymentCredits.push({ paymentId: p.id, statementId: id, amount });
-    }
-  }
-
-  // Officer write-offs (#4637), after every payment; a leftover is dropped, never credit.
-  const writeOffCredits: { writeOffId: string; statementId: string; amount: number }[] = [];
-  let forgivenTotal = 0;
-  const officerWriteOffs = [...(input.officerWriteOffs ?? [])].sort(
-    (a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id)
-  );
-  for (const w of officerWriteOffs) {
-    const targets = w.statementId ? ordered.filter((s) => s.id === w.statementId) : ordered;
-    let available = w.amount;
-    for (const s of targets) {
-      if (available <= 0) break;
-      const left = apply(s.id, available, false);
-      const amount = available - left;
-      available = left;
-      if (amount <= 0) continue;
-      state.get(s.id)!.forgiven += amount;
-      forgivenTotal += amount;
-      writeOffCredits.push({ writeOffId: w.id, statementId: s.id, amount });
-    }
-  }
-
-  const byStatement = new Map<
-    string,
-    {
-      amount: number;
-      credited: number;
-      forgiven: number;
-      writtenOff: number;
-      remaining: number;
-      settled: boolean;
-      held?: number;
-    }
-  >();
-  let billed = 0;
-  let writtenOffTotal = 0;
-  for (const s of ordered) {
-    const st = state.get(s.id)!;
-    billed += st.amount;
-    const settled = isDone(st);
-    const shortfall = Math.max(0, st.amount - st.credited);
-    const writtenOff = settled ? shortfall : 0;
-    writtenOffTotal += writtenOff;
-    byStatement.set(s.id, {
-      amount: st.amount,
-      ...(st.held > 0 ? { held: st.held } : {}),
-      credited: st.credited,
-      forgiven: st.forgiven,
-      writtenOff,
-      remaining: shortfall - writtenOff,
-      settled,
-    });
-  }
-  return {
-    byStatement,
-    paymentCredits,
-    writeOffCredits,
-    credit,
-    balance: billed - paid - dismissed - writtenOffTotal - forgivenTotal,
-  };
-}
-
-// --- Dismissal credits (issue #4184) -----------------------------------------
-// Mirror of src/engine/corpTaxBook/{dismissals,extraction,sync,allocation}.ts
-// for the verify read: which Statement lines an active record, Miner, moon or
-// Extraction dismissal waives. functionsMirror.test.ts keeps them in step.
+// --- Pull windows and dismissals ---------------------------------------------
 
 export const DEFAULT_EXPIRY_HOURS = 48;
 export const MAX_EXPIRY_HOURS = 96;
@@ -419,98 +189,6 @@ export function moonOnDay(
     }
   }
   return {};
-}
-
-export interface MirrorDismissal {
-  scope?: string;
-  targetId?: string;
-  at?: string;
-  reversed?: unknown;
-}
-
-export interface DismissableLine {
-  chargeKey?: string;
-  date?: string;
-  tax?: number;
-  structureId?: number;
-}
-
-/**
- * Engine `dismissalCredits`: the credit active dismissals give a Miner's billed
- * days. A Miner or moon dismissal waives what was mined up to the day it was
- * made; a record or Extraction one is exact.
- */
-export function dismissalCredits(input: {
-  minerId: string;
-  statements: readonly { id: string; lines: readonly DismissableLine[] }[];
-  dismissals: readonly MirrorDismissal[];
-  extractions: readonly MirrorExtraction[];
-  expiryHours: Readonly<Record<string, number>>;
-}): AllocDismissalCredit[] {
-  const active = input.dismissals.filter((d) => !d.reversed);
-  const credits: AllocDismissalCredit[] = [];
-  for (const st of input.statements) {
-    for (const line of st.lines) {
-      if (!line.chargeKey) continue;
-      const date = line.date ?? '';
-      const place = moonOnDay(input.extractions, input.expiryHours, line.structureId, date);
-      const hit = active.find((d) => {
-        const waivedUpTo = date <= (d.at ?? '').slice(0, 10);
-        switch (d.scope) {
-          case 'record':
-            return d.targetId === line.chargeKey;
-          case 'extraction':
-            return place.extractionId !== undefined && d.targetId === place.extractionId;
-          case 'miner':
-            return d.targetId === input.minerId && waivedUpTo;
-          case 'moon':
-            return place.moonId !== undefined && d.targetId === String(place.moonId) && waivedUpTo;
-          default:
-            return false;
-        }
-      });
-      if (hit)
-        credits.push({ statementId: st.id, amount: line.tax ?? 0, chargeKey: line.chargeKey });
-    }
-  }
-  return credits;
-}
-
-// --- Overdue clock (issue #5255) ----------------------------------------------
-// Mirror of src/engine/corpTaxBook/overdue.ts `overdueStatus(...).overdueAt`: when an
-// unsettled Statement goes Overdue, every declaration pause counted. It does not depend
-// on `now`, so a running total can store it.
-
-const DECLARATION_PAUSE_DAYS = 14;
-
-export interface MirrorDeclaration {
-  at: string;
-  resolution?: { kind: 'confirmed' | 'rejected'; at: string };
-}
-
-export function overdueAtFor(
-  issuedAt: string,
-  overdueDays: number,
-  declarations: readonly MirrorDeclaration[]
-): string {
-  const cap = DECLARATION_PAUSE_DAYS * DAY_MS;
-  const requested = declarations
-    .map((d) => {
-      const start = Date.parse(d.at);
-      const capped = start + cap;
-      return { start, end: d.resolution ? Math.min(Date.parse(d.resolution.at), capped) : capped };
-    })
-    .sort((a, b) => a.start - b.start);
-  let paused = 0;
-  let cursor = -Infinity;
-  for (const w of requested) {
-    const start = Math.max(w.start, cursor);
-    const end = Math.min(w.end, start + (cap - paused));
-    if (end > start) paused += end - start;
-    cursor = Math.max(cursor, w.end);
-  }
-  // A rejection resumes the original clock: no fresh days (#6206).
-  return new Date(Date.parse(issuedAt) + overdueDays * DAY_MS + paused).toISOString();
 }
 
 // --- Guest close-account (issue #4184) ---------------------------------------
@@ -1021,8 +699,8 @@ export interface JournalEntryOut {
   reason?: string;
 }
 
-/** How far a recorded date may sit from the journal's day and still be the same payment. */
-export const PAYOUT_LINK_WINDOW_DAYS = 3;
+/** How far a recorded date may sit from the journal's day and still be the same payment (one copy). */
+export { PAYOUT_LINK_WINDOW_DAYS };
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -1313,15 +991,6 @@ export interface HoldingDispute {
   claimedPct?: number;
 }
 
-export interface HeldStatementLine {
-  kind?: string;
-  chargeKey?: string;
-  oreLines?: readonly { typeId: number; quantity: number }[];
-  unitPrices?: Readonly<Record<string, number>>;
-  taxPct?: number;
-  tax?: number;
-}
-
 /** Mirror of `disputeHold`: unanswered, and its hold (from `holdFrom`, else `at`) under 14 days old. */
 export function disputeHolds(
   dispute: Pick<HoldingDispute, 'at' | 'resolution' | 'holdFrom'>,
@@ -1385,48 +1054,4 @@ export function readHoldingDisputes(raw: readonly unknown[]): (HoldingDispute & 
     });
   }
   return out;
-}
-
-/** Mirror of `heldByStatement`. */
-export function heldByStatement(
-  statements: readonly { id: string; lines: readonly HeldStatementLine[] }[],
-  disputes: readonly HoldingDispute[],
-  credited: ReadonlySet<string>,
-  now: string
-): Map<string, number> {
-  const held = new Map<string, number>();
-  for (const d of disputes) {
-    if (!disputeHolds(d, now)) continue;
-    for (const l of d.lines) {
-      let left = l.quantity;
-      for (const s of statements) {
-        for (const line of s.lines) {
-          if (left <= 0) break;
-          if (line.chargeKey !== l.recordKey) continue;
-          if (line.kind !== 'mined' && line.kind !== 'late-ore') continue;
-          if (credited.has(`${s.id}|${line.chargeKey}`)) continue;
-          const billed = (line.oreLines ?? []).reduce(
-            (n, o) => (o.typeId === l.typeId ? n + o.quantity : n),
-            0
-          );
-          const take = Math.min(left, billed);
-          const price = line.unitPrices?.[String(l.typeId)];
-          if (take <= 0 || price === undefined || line.taxPct === undefined) continue;
-          const pct =
-            d.kind === 'rate' && d.claimedPct !== undefined
-              ? Math.max(0, line.taxPct - d.claimedPct)
-              : line.taxPct;
-          const amount = Math.min(take * price * (pct / 100), line.tax ?? Infinity);
-          held.set(s.id, (held.get(s.id) ?? 0) + amount);
-          left -= take;
-        }
-      }
-    }
-  }
-  return held;
-}
-
-/** The `credited` set `heldByStatement` reads, from a Miner's dismissal credits. */
-export function creditedLines(credits: readonly AllocDismissalCredit[]): Set<string> {
-  return new Set(credits.flatMap((c) => (c.chargeKey ? [`${c.statementId}|${c.chargeKey}`] : [])));
 }

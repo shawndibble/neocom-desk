@@ -163,31 +163,6 @@ describe('moon doc chunk and tax', () => {
     // ore 1 caps at its 600, ore 2 gives 100: 700 of 1000.
     expect(doc.minedPct).toBe(70);
   });
-
-  it('sums the tax frozen on Statement lines inside the window only', () => {
-    const line = (date: string, tax: number, structureId = 1001) => ({
-      kind: 'mined',
-      date,
-      chargeKey: `1:1:${date}`,
-      structureId,
-      tax,
-    });
-    const doc = computeMoonDoc(
-      EXTRACTIONS[0],
-      [],
-      rules({
-        statements: [
-          { id: 's1', lines: [line(dayOf(4), 10.5), line(dayOf(5), 4.25), line(dayOf(20), 99)] },
-          {
-            id: 's2',
-            lines: [line(dayOf(5), 1, 1002), { kind: 'correction', date: dayOf(5), tax: 7 }],
-          },
-        ],
-      })
-    );
-    expect(doc.frozenTax).toBe(14.75);
-    expect(doc.frozenLines).toBe(2);
-  });
 });
 
 describe('moon doc plan', () => {

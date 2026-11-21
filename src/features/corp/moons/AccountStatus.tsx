@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import type { RunningAccountStatus } from '@/engine/corpTaxBook/bookView';
-import { daysBetween } from '@/engine/corpTaxBook/statements';
-import { utcDay } from '@/engine/localDay';
+import { utcDay, utcDaysBetween } from '@/engine/localDay';
 import { isk, shortDate } from './moonsFormat';
 import { useBook } from './useBook';
 
@@ -9,9 +8,9 @@ import { useBook } from './useBook';
  * A Miner's running account in words (#6294): "Owes X (N days, oldest D)" or "Paid through D";
  * a dash when they have neither paid nor owed a day yet.
  */
-export function AccountStatus({ account }: { account: RunningAccountStatus }) {
+export function AccountStatus({ account }: { account: RunningAccountStatus | undefined }) {
   const { t } = useTranslation();
-  if (account.owes)
+  if (account?.owes)
     return (
       <span className="text-danger">
         {t('corpTaxBook.moons.account.owes', {
@@ -21,7 +20,7 @@ export function AccountStatus({ account }: { account: RunningAccountStatus }) {
         })}
       </span>
     );
-  if (account.paidThrough)
+  if (account?.paidThrough)
     return (
       <span className="text-success">
         {t('corpTaxBook.moons.account.paidThrough', { date: shortDate(account.paidThrough) })}
@@ -39,7 +38,10 @@ export function OldestUnpaid({ account }: { account: RunningAccountStatus }) {
       <span className="text-danger">
         {t('corpTaxBook.moons.account.oldestUnpaid', {
           date: shortDate(account.owes.oldest),
-          count: Math.max(0, daysBetween(account.owes.oldest, utcDay(Date.parse(view.input.now)))),
+          count: Math.max(
+            0,
+            utcDaysBetween(account.owes.oldest, utcDay(Date.parse(view.input.now)))
+          ),
         })}
       </span>
     );

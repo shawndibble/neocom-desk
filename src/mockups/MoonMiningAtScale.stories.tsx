@@ -72,7 +72,7 @@ import {
  * names the next page as a link instead of repeating it.
  *
  * - **Miner** (step 1): chips for the whole position; one table of pops,
- *   folded by month with each month's Statement and what is owed in its
+ *   folded by month with each month's Late notice and what is owed in its
  *   header; Payments say which pops they cleared.
  * - **Miner x pop** (step 2): a side panel over the Miner or pop page (it is
  *   four lines and two payments, not a page): the days of one pop and its payments.
@@ -80,7 +80,7 @@ import {
  *   pops with their outstanding, and the moon's rate going forward.
  * - **Dialogs** (steps 4 to 6): change this pop's tax, dismiss it, change a
  *   moon's rate from a date.
- * - **Miners** (step 7): filter to who gets a Statement, who is overdue, who
+ * - **Miners** (step 7): filter to who gets a Late notice, who is overdue, who
  *   is below the minimum.
  *
  * Proposed new component: a percent field (the % sits inside the input's
@@ -180,7 +180,7 @@ function ActivityPanel({ lines }: { lines: ActivityLine[] }) {
 /**
  * What the pop's name line adds beyond the columns: only the exceptions. A
  * pop that is simply owed, paid or waiting says nothing here; its month's
- * header already names the Statement.
+ * header already names the Late notice.
  */
 function PopTags({ row }: { row: PopRow }) {
   return (
@@ -272,7 +272,7 @@ const FILTERS: { id: PopFilter; label: string; match: (r: PopRow) => boolean }[]
   {
     id: 'next',
     label: 'Not billed yet',
-    match: (r) => r.status === 'Next Statement' || r.status === 'Not billable yet',
+    match: (r) => r.status === 'Owed' || r.status === 'Not billable yet',
   },
   { id: 'paid', label: 'Paid', match: (r) => r.status === 'Paid' },
   { id: 'dismissed', label: 'Dismissed', match: (r) => r.status === 'Dismissed' },
@@ -371,7 +371,7 @@ function MinerAtScale({
         <StatChip
           label="Not billed yet"
           value={isk(t.nextStatement)}
-          tooltip={`Goes on the 1 Nov Statement. 18 Oct (${isk(t.notBillable)} so far) is not Billable yet.`}
+          tooltip={`Goes on the 1 Nov Late notice. 18 Oct (${isk(t.notBillable)} so far) is not Billable yet.`}
           tooltipGlyph="info"
         />
         <StatChip
@@ -470,7 +470,7 @@ function MinerAtScale({
           }}
         />
         <Footing>
-          Tax {isk(t.tax)} = paid {isk(t.paid)} + owed {isk(t.owed)} + next Statement{' '}
+          Tax {isk(t.tax)} = paid {isk(t.paid)} + owed {isk(t.owed)} + next Late notice{' '}
           {isk(t.nextStatement)} + today’s mining {isk(t.notBillable)}
         </Footing>
       </Panel>
@@ -495,7 +495,7 @@ function MinerAtScale({
           {
             when: '16 Oct',
             who: 'Book',
-            what: `credited Lysa Kestane’s ${isk(PAYMENTS[3].amount)} donation to the Sep Statement`,
+            what: `credited Lysa Kestane’s ${isk(PAYMENTS[3].amount)} donation to the Sep Late notice`,
             why: 'Automatic',
           },
           {
@@ -512,7 +512,7 @@ function MinerAtScale({
             why: 'Alliance mining op',
             reverse: true,
           },
-          { when: '1 Oct', who: 'Kestrel Vane', what: 'sent the Sep Statement' },
+          { when: '1 Oct', who: 'Kestrel Vane', what: 'sent the Sep Late notice' },
         ]}
       />
       <MinerPopSlide open={slideOpen} onClose={() => setSlideOpen(false)} adjust={adjust} />
@@ -768,7 +768,7 @@ const moonPopColumns: DataTableColumn<MoonPop>[] = [
     render: (p) =>
       p.owed ? (
         <span className="text-danger">{isk(p.owed)}</span>
-      ) : p.status === 'Next Statement' || p.status === 'Not billable yet' ? (
+      ) : p.status === 'Owed' || p.status === 'Not billable yet' ? (
         <span className="text-xs text-text-dim">Not billed yet</span>
       ) : (
         '—'
@@ -957,7 +957,7 @@ function PopPage({
           {
             when: '1 Oct',
             who: 'Kestrel Vane',
-            what: 'sent the Sep Statement (9 Miners on this pop)',
+            what: 'sent the Sep Late notice (9 Miners on this pop)',
           },
           { when: '1 Aug', who: 'Kestrel Vane', what: 'set the book default to 10% / 15%' },
         ]}
@@ -1174,12 +1174,12 @@ function ChangeTaxDialog({ open, who = 'all' }: { open: boolean; who?: Who }) {
               label="Credit held"
               from={isk(0)}
               to={isk(e.credit)}
-              note="Paid at 10% already; used on their next Statement"
+              note="Paid at 10% already; used on their next Late notice"
             />
           </span>
         </Effect>
         <p className="text-xs text-warning">
-          The Sep Statement is already sent. It is not re-mailed.
+          The Sep Late notice is already sent. It is not re-mailed.
         </p>
       </div>
     </Modal>
@@ -1219,7 +1219,7 @@ function DismissPopDialog({ open }: { open: boolean }) {
               label="Credit held"
               from={isk(0)}
               to={isk(FOCUS_TOTALS.paid)}
-              note="What Miners already paid, used on their next Statement"
+              note="What Miners already paid, used on their next Late notice"
             />
           </span>
         </Effect>
@@ -1321,7 +1321,7 @@ type MinerFilter = 'bill' | 'overdue' | 'below' | 'all';
 
 /** One label per Miners view: its chip, and its pill while it is on. */
 const MINER_FILTER_LABEL: Record<MinerFilter, string> = {
-  bill: 'Gets a Statement',
+  bill: 'Gets a Late notice',
   overdue: 'Overdue',
   below: 'Under the minimum',
   all: 'Everyone',
@@ -1446,7 +1446,7 @@ function MinersList({ initial = 'bill', ticked = 0 }: { initial?: MinerFilter; t
         <StatChip
           label="Not billed yet"
           value={`${isk(LIST_TOTALS.next)} · ${LIST_TOTALS.willBill} Miners`}
-          tooltip={`Goes on the 1 Nov Statement. ${LIST_TOTALS.below} more Miners are under the ${isk(MIN_STATEMENT)} minimum and carry over.`}
+          tooltip={`Goes on the 1 Nov Late notice. ${LIST_TOTALS.below} more Miners are under the ${isk(MIN_STATEMENT)} minimum and carry over.`}
           tooltipGlyph="info"
         />
       </StatChips>
@@ -1522,7 +1522,7 @@ function MinersList({ initial = 'bill', ticked = 0 }: { initial?: MinerFilter; t
                 {phone
                   ? `Send (${selected.length})…`
                   : filter === 'bill'
-                    ? `Send Statements (${selected.length})…`
+                    ? `Send Late notices (${selected.length})…`
                     : `Send reminders (${selected.length})…`}
               </Button>
             )}
@@ -1557,7 +1557,7 @@ const corp = (render: () => ReactElement, phone = false): Story => ({
 });
 void MINING_PARAMS;
 
-/** @summary 1 · Miner: chips for the whole position, one table of pops folded by month (Statement and owed in each header), Payments say what they cleared. */
+/** @summary 1 · Miner: chips for the whole position, one table of pops folded by month (Late notice and owed in each header), Payments say what they cleared. */
 export const Miner = corp(() => <MinerAtScale />);
 /** @summary 1 · Miner, phone. */
 export const MinerPhone = corp(() => <MinerAtScale />, true);
@@ -1593,9 +1593,9 @@ export const ChangeAllMoonsRate = corp(() => <PopPage dialog="rate-all" />);
 export const ChangeMoonRateBackdated = corp(() => <PopPage dialog="rate-backdated" />);
 /** @summary 6 · Change a moon's rate going forward, phone. */
 export const ChangeMoonRatePhone = corp(() => <PopPage dialog="rate" />, true);
-/** @summary 7 · Miners: filtered to who gets the next Statement. */
+/** @summary 7 · Miners: filtered to who gets the next Late notice. */
 export const MinersNeedStatements = corp(() => <MinersList />);
-/** @summary 7b · Miners with three ticked: the count-labelled Send Statements button appears. */
+/** @summary 7b · Miners with three ticked: the count-labelled Send Late notices button appears. */
 export const MinersBulkSelected = corp(() => <MinersList ticked={3} />);
 /** @summary 7c · Overdue filter with Send reminders. */
 export const MinersOverdueReminders = corp(() => <MinersList initial="overdue" ticked={4} />);

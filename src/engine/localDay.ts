@@ -16,6 +16,7 @@
  */
 
 import { DAY_MS } from '@/lib/age';
+import { utcDay, utcDayOf } from '../../functions/src/timeConstants';
 
 export function localMidnight(ms: number): number {
   const date = new Date(ms);
@@ -69,13 +70,16 @@ export function cellOf(ms: number, zone: DayZone): Date {
     : new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
-/** The UTC (EVE) calendar date of `ms`, as `YYYY-MM-DD`. Defaults to now. */
-export function utcDay(ms: number = Date.now()): string {
-  return new Date(ms).toISOString().slice(0, 10);
-}
+/** The UTC day of an ISO instant, and of ms (now by default), as `YYYY-MM-DD`: the shared rules. */
+export { utcDay, utcDayOf };
 
 /** A `YYYY-MM-DD` UTC date shifted by `days` (negative = earlier). */
 export function shiftUtcDate(date: string, days: number): string {
   const [y, m, d] = date.split('-').map(Number);
   return utcDay(Date.UTC(y!, m! - 1, d! + days));
+}
+
+/** Whole days from one UTC `YYYY-MM-DD` to another (negative when `to` is earlier). */
+export function utcDaysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS);
 }

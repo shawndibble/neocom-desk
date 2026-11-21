@@ -25,9 +25,12 @@ export const notPayingDayKey = (corporationId: number, characterId: number, date
 export const uncreditedKey = (corporationId: number, sentAt: readonly string[]) =>
   `uncredited:${corporationId}:${[...sentAt].sort().join(',')}`;
 
-/** A Statement of one book: the problem is the whole Statement, not a day. */
-export const statementKey = (corporationId: number, statementId: string) =>
-  `statement:${corporationId}:${statementId}`;
+/**
+ * A Late notice of one book: the problem is the whole notice, not a day. Stored on the device
+ * under the `statement:` prefix it was first written with, so a hidden notice stays hidden.
+ */
+export const noticeKey = (corporationId: number, noticeId: string) =>
+  `statement:${corporationId}:${noticeId}`;
 
 /**
  * An officer's answer on a day, as the member reads it: "Not paying" hides that answer only,
@@ -36,14 +39,14 @@ export const statementKey = (corporationId: number, statementId: string) =>
 export const keptDayKey = (corporationId: number, characterId: number, date: string, at: string) =>
   `kept:${corporationId}:${characterId}:${date}:${at}`;
 
-/** An officer's answer on a Statement's declaration, keyed by when they answered. */
-export const keptStatementKey = (corporationId: number, statementId: string, at: string) =>
-  `keptStatement:${corporationId}:${statementId}:${at}`;
+/** An officer's answer on a Late notice's declaration, keyed by when they answered (stored prefix kept). */
+export const keptNoticeKey = (corporationId: number, noticeId: string, at: string) =>
+  `keptStatement:${corporationId}:${noticeId}:${at}`;
 
 /** What a hide key is about, for the one quiet line that lists them. */
 export type NotPayingKey =
   | { kind: 'day'; corporationId: number; date: string }
-  | { kind: 'uncredited' | 'statement'; corporationId: number };
+  | { kind: 'uncredited' | 'notice'; corporationId: number };
 
 /** Reads a key back; undefined for one this build never wrote. */
 export function parseNotPayingKey(key: string): NotPayingKey | undefined {
@@ -53,8 +56,8 @@ export function parseNotPayingKey(key: string): NotPayingKey | undefined {
   if (kind === 'day' && rest.length === 2) return { kind, corporationId, date: rest[1] };
   // The answer's time has colons of its own: only the first two parts are the day.
   if (kind === 'kept' && rest.length >= 3) return { kind: 'day', corporationId, date: rest[1] };
-  if (kind === 'keptStatement') return { kind: 'statement', corporationId };
-  if (kind === 'uncredited' || kind === 'statement') return { kind, corporationId };
+  if (kind === 'keptStatement' || kind === 'statement') return { kind: 'notice', corporationId };
+  if (kind === 'uncredited') return { kind, corporationId };
   return undefined;
 }
 

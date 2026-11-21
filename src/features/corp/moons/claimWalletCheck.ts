@@ -10,14 +10,11 @@ import type { PillTone } from '@/components/ui/Pill';
 import type { ClaimCheck, ClaimedTransfer, Declaration } from '@/engine/corpTaxBook/overdue';
 import { CHECK_TONE } from '@/features/miningTax/corpBook/resolve/checkTone';
 import { DAY_MS } from '@/lib/age';
+import { matchesStatedTransfer } from '../../../../functions/src/corpTaxBookTransferMatch';
 import { type ClockZone, atDate, shortDateTime } from './moonsFormat';
 
 type Transfer = NonNullable<Declaration['transfers']>[number];
 
-/** How far apart the member's journal time and the officer's may be. */
-export const MATCH_WINDOW_MS = 2 * DAY_MS;
-/** ISK the two journals may differ by. */
-export const MATCH_TOLERANCE_ISK = 1;
 /** An automatically credited claim stays on the queue's line this long. */
 export const AUTO_CREDIT_DAYS = 7;
 
@@ -31,9 +28,10 @@ export function paidToOwn(transfer: Transfer, ownIds: ReadonlySet<number>): numb
 }
 
 /**
- * Whether an entry of the officer's own journal is this transfer: an incoming donation of the
- * same amount (±1 ISK) within 48 hours. `senderIds` are the member's Characters; with none known
- * the amount and time alone decide.
+ * Whether an entry of the officer's own journal is this transfer: an incoming donation the
+ * member's stated transfer matches (the shared `matchesStatedTransfer`: under 1 ISK apart, within
+ * two days). `senderIds` are the member's Characters; with none known, or an entry naming no
+ * sender, the amount and time alone decide.
  */
 export function entryMatchesTransfer(
   entry: WalletJournalEntry,
@@ -42,12 +40,13 @@ export function entryMatchesTransfer(
 ): boolean {
   if (entry.ref_type !== 'player_donation') return false;
   if (entry.amount === undefined || entry.amount <= 0) return false;
-  if (Math.abs(entry.amount - transfer.amount) > MATCH_TOLERANCE_ISK) return false;
-  if (Math.abs(Date.parse(entry.date) - Date.parse(transfer.at)) > MATCH_WINDOW_MS) return false;
-  return (
-    senderIds.length === 0 ||
-    entry.first_party_id === undefined ||
-    senderIds.includes(entry.first_party_id)
+  const sender = entry.first_party_id;
+  if (senderIds.length > 0 && sender !== undefined && !senderIds.includes(sender)) return false;
+  // The sender is settled above, so the shared rule compares only the amount and the time.
+  const characterId = sender ?? 0;
+  return matchesStatedTransfer(
+    { characterId, amount: transfer.amount, at: transfer.at },
+    { characterId, amount: entry.amount, at: entry.date }
   );
 }
 
@@ -148,7 +147,8 @@ export function transferStatus(
   memberCharacterIds: readonly number[],
   ownIds: ReadonlySet<number>,
   journals: ReadonlyMap<number, OwnJournal>,
-  zone: ClockZone
+  zone: ClockZone,
+  minerName: (minerId: string) => string = (id) => id
 ): TransferStatus | undefined {
   const own = paidToOwn(tr, ownIds);
   if (own !== undefined) return ownStatus(t, tr, journals.get(own), memberCharacterIds, zone);
@@ -160,7 +160,9 @@ export function transferStatus(
         ? t('corpTaxBook.moons.needs.check.division', {
             division: check.division ?? t('corpTaxBook.moons.needs.check.divisionUnknown'),
           })
-        : t(`corpTaxBook.moons.needs.check.${check.result}`),
+        : t(`corpTaxBook.moons.needs.check.${check.result}`, {
+            miner: check.minerId === undefined ? '' : minerName(check.minerId),
+          }),
     note: check.result === 'tooOld' ? t('corpTaxBook.moons.needs.check.tooOldBody') : undefined,
     division: check.result === 'division' ? check.division : undefined,
   };

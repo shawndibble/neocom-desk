@@ -57,7 +57,6 @@ function renderModal(
         busy={false}
         onAssigned={noop}
         onDismiss={noop}
-        onMarkPaid={noop}
         onResolve={noop}
         onUndo={noop}
         onSplit={onSplit}
@@ -171,7 +170,6 @@ describe('RowDetailModal payment', () => {
           onAssigned={noop}
           onEdit={noop}
           onDismiss={noop}
-          onMarkPaid={noop}
           onResolve={noop}
           onUndo={noop}
           {...overrides}
@@ -180,82 +178,17 @@ describe('RowDetailModal payment', () => {
     );
   }
 
-  it('shows when the row was marked paid', () => {
-    renderPaid();
-    expect(screen.getByText(/Paid on 2026-09-10/)).toBeInTheDocument();
+  it("opens the Payee's ledger from one link, with no paid-by card", async () => {
+    const onOpenLedger = vi.fn();
+    renderPaid({ onOpenLedger });
+    expect(screen.queryByText('Paid by')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /^Open .* ledger$/ }));
+    expect(onOpenLedger).toHaveBeenCalledOnce();
   });
 
-  it('links a linked transaction to the Wallet Journal, highlighting it', () => {
-    renderPaid({
-      linkedTransactions: [
-        {
-          kind: 'journal',
-          refId: 42,
-          source: 'manual',
-          label: '100 ISK · 2026-09-10 — Player donation',
-        },
-      ],
-    });
-    const link = screen.getByRole('link', { name: /Player donation/ });
-    expect(link.getAttribute('href')).toBe('/wallet/journal?highlight=42');
-  });
-
-  it('flags an auto-matched link without claiming the pilot verified it', () => {
-    renderPaid({
-      linkedTransactions: [
-        {
-          kind: 'journal',
-          refId: 42,
-          source: 'auto',
-          label: '100 ISK · 2026-09-10 — Player donation',
-        },
-      ],
-    });
-    expect(screen.getByText(/auto-linked/)).toBeInTheDocument();
-  });
-
-  it('lists the other entries the same payment settled', () => {
-    renderPaid({ alsoCovers: [{ id: 'x', date: '2026-09-02', taxOwed: 1_234_567 }] });
-    expect(screen.getByText(/also settled/)).toBeInTheDocument();
-    expect(screen.getByText(/2026-09-02 · 1,234,567 ISK/)).toBeInTheDocument();
-  });
-
-  it('opens a listed sibling entry when clicked', async () => {
-    const onOpenCovered = vi.fn();
-    renderPaid({
-      alsoCovers: [{ id: 'x', date: '2026-09-02', taxOwed: 1_234_567 }],
-      onOpenCovered,
-    });
-    await userEvent.click(screen.getByRole('button', { name: /2026-09-02/ }));
-    expect(onOpenCovered).toHaveBeenCalledWith('x');
-  });
-
-  it('calls onUnlinkTransaction with the clicked transaction', async () => {
-    const onUnlink = vi.fn();
-    const transaction = {
-      kind: 'journal' as const,
-      refId: 42,
-      source: 'manual' as const,
-      label: '100 ISK · 2026-09-10 — Player donation',
-    };
-    renderPaid({ linkedTransactions: [transaction], onUnlinkTransaction: onUnlink });
-    await userEvent.click(screen.getByRole('button', { name: 'Unlink transaction #42' }));
-    expect(onUnlink).toHaveBeenCalledWith(transaction);
-  });
-
-  it('offers Link transaction whenever the row is paid, even with no payment recorded yet', async () => {
-    const onLink = vi.fn();
-    renderPaid({
-      assignment: { ...paidAssignment, payment: undefined },
-      onLinkTransaction: onLink,
-    });
-    await userEvent.click(screen.getByRole('button', { name: 'Link transaction' }));
-    expect(onLink).toHaveBeenCalledTimes(1);
-  });
-
-  it('never shows the payment card for a non-paid row', () => {
+  it('shows no payment card while no payment reached the day', () => {
     renderModal('unassigned', null);
-    expect(screen.queryByText('Payment')).not.toBeInTheDocument();
+    expect(screen.queryByText('Paid by')).not.toBeInTheDocument();
   });
 });
 
@@ -330,43 +263,6 @@ describe('RowDetailModal owed entry', () => {
     expect(onUndo).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Unassign' }));
     expect(onUndo).toHaveBeenCalledTimes(1);
-  });
-
-  it('marks an outstanding entry paid from the More menu, not the footer', async () => {
-    const onMarkPaid = vi.fn();
-    renderModal('outstanding', owed, undefined, undefined, { onMarkPaid });
-    expect(screen.queryByRole('button', { name: 'Mark as paid' })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'More actions for this entry' }));
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Mark as paid' }));
-    expect(onMarkPaid).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not offer Mark as paid for a paid entry', async () => {
-    renderModal('paid', { ...owed, status: 'paid' } as MiningTaxAssignmentRecord);
-    await userEvent.click(screen.getByRole('button', { name: 'More actions for this entry' }));
-    expect(screen.queryByRole('menuitem', { name: 'Mark as paid' })).not.toBeInTheDocument();
-  });
-
-  it('marks a paid entry unpaid from the More menu, and not an outstanding one', async () => {
-    const onUnmarkPaid = vi.fn();
-    renderModal(
-      'paid',
-      { ...owed, status: 'paid' } as MiningTaxAssignmentRecord,
-      undefined,
-      undefined,
-      {
-        onUnmarkPaid,
-      }
-    );
-    await userEvent.click(screen.getByRole('button', { name: 'More actions for this entry' }));
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Mark as unpaid' }));
-    expect(onUnmarkPaid).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not offer Mark as unpaid for an outstanding entry', async () => {
-    renderModal('outstanding', owed, undefined, undefined, { onUnmarkPaid: vi.fn() });
-    await userEvent.click(screen.getByRole('button', { name: 'More actions for this entry' }));
-    expect(screen.queryByRole('menuitem', { name: 'Mark as unpaid' })).not.toBeInTheDocument();
   });
 
   it('offers linking a wallet payment from the More menu', async () => {

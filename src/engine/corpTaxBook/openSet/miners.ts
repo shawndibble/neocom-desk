@@ -1,44 +1,45 @@
-import {
-  allocatePayments,
-  dismissalCredits,
-  isBeforeBook,
-  type AllocationInput,
-  type TaxPayment,
-} from '../allocation';
-import type { DayCharge } from '../charges';
-import { heldByStatement } from '../disputes';
+import { characterIdsOfMiner, type DayCharge } from '../charges';
+import { minerBillableLines, savedPrice } from '../billableLines';
+import { disputeHold, disputesToShow, isMinersDispute } from '../disputes';
 import { heldBillableThrough, type StaleHold } from '../feederHealth';
-import { overdueStatus, type OverdueStatus } from '../overdue';
+import { MinerRunningAccount } from '../minerRunningAccount';
+import {
+  checkpointFits,
+  isSnapshot,
+  type RunningAccountCheckpoint,
+} from '../../../../functions/src/corpTaxBookCheckpoint';
+import { isBeforeBook, type TaxPayment } from '../payments';
+import { exemptionsOf } from '../toleranceExemptions';
 import type { MinerSettlement, OpenSetInput } from './types';
 
-/** The Miner ids a book lists, in order: groupings, then the ids days, Statements and payments name. */
+/**
+ * A stored checkpoint an account may start from: a snapshot (`isSnapshot`: an older strict cache
+ * is not one, and is recorded again) summed for the characters the Miner has now.
+ */
+export function usableCheckpoint(
+  stored: RunningAccountCheckpoint | undefined,
+  characterIds: readonly number[]
+): RunningAccountCheckpoint | undefined {
+  return stored &&
+    typeof stored.at === 'string' &&
+    isSnapshot(stored) &&
+    checkpointFits(stored, characterIds)
+    ? stored
+    : undefined;
+}
+
+/** The Miner ids a book lists, in order: groupings, then the ids days, notices and payments name. */
 export function minerIdsOf(input: OpenSetInput, charges: readonly DayCharge[]): string[] {
   const ids = new Set<string>(input.miners.map((m) => m.id));
   for (const c of charges) ids.add(c.minerId);
-  for (const s of input.statements) ids.add(s.minerId);
+  for (const n of input.notices) ids.add(n.minerId);
   for (const p of input.payments) if (p.minerId) ids.add(p.minerId);
   return [...ids];
 }
 
-/** A Miner's characters: its grouping's, or the one a `solo:` id names. */
-function characterIdsOf(input: OpenSetInput, minerId: string): number[] {
-  const grouping = input.miners.find((m) => m.id === minerId);
-  const solo = /^solo:(\d+)$/.exec(minerId);
-  return grouping?.characterIds ?? (solo ? [Number(solo[1])] : []);
-}
-
 /**
- * One Miner's payments against its Statements (D5/D15), oldest first, after dismissal credits
- * and officer write-offs; then each unsettled Statement's Overdue clock.
- *
- * Dismissal credits look a billed line's day up among every charge, not only the ones now
- * under this Miner: after a regroup an absorbed Miner's Statements still bill days that sit
- * under the new grouping. For record, extraction and moon dismissals that matches the server
- * (`dismissalCredits` in `functions/src/corpTaxBookEngine.ts`). Two gaps are older than this
- * module: a `miner` dismissal is checked against the day's current Miner here but against the
- * Statement's Miner on the server, and a billed line whose day has no current charge (no longer
- * readable or rated) gets no credit here. On the member side (`'observed-rows'` placement) a
- * day has no Extraction id, so an extraction dismissal never matches there.
+ * One Miner's Running account (#6294): its Billable lines through its own billable-through, its
+ * payments and write-offs, the days an open dispute holds, from its closed-through checkpoint.
  */
 export function settleMiner(
   input: OpenSetInput,
@@ -46,61 +47,61 @@ export function settleMiner(
   charges: readonly DayCharge[],
   book: { billableThrough: string | undefined; holds: ReadonlyMap<number, StaleHold> }
 ): MinerSettlement {
-  const statements = input.statements.filter((s) => s.minerId === minerId);
-  // On a running account a late notice's days are running days (#6294): never Statement debt.
-  const billed = input.runningAccount ? statements.filter((s) => s.kind !== 'notice') : statements;
-  // A donation before the book is neither credited nor shown as a payment.
+  const notices = input.notices
+    .filter((n) => n.minerId === minerId)
+    .sort((a, b) => a.issuedAt.localeCompare(b.issuedAt) || a.id.localeCompare(b.id));
   const payments = input.payments.filter(
     (p): p is TaxPayment =>
       p.minerId === minerId && (p.source !== 'donation' || !isBeforeBook(p.at, input.startDate))
   );
-  const credits = dismissalCredits(billed, input.dismissals, charges);
-  // A member's open dispute holds its amount out of what is due (resolving in the app).
-  const held = heldByStatement(
-    billed,
-    (input.disputes ?? []).filter((d) => d.minerId === minerId),
-    new Set(credits.map((c) => `${c.statementId}|${c.chargeKey}`)),
-    input.now
-  );
-  const allocationInput: AllocationInput = {
-    statements: billed,
-    payments,
-    dismissalCredits: credits,
-    officerWriteOffs: (input.writeOffs ?? []).filter((w) => w.minerId === minerId && !w.reversed),
-    startDate: input.startDate,
-    ...(held.size > 0 ? { held } : {}),
-  };
-  const allocation = allocatePayments(allocationInput);
-
-  const overdue = new Map<string, OverdueStatus>();
-  for (const s of billed) {
-    if (allocation.byStatement.get(s.id)?.settled) continue;
-    overdue.set(
-      s.id,
-      overdueStatus({
-        issuedAt: s.issuedAt,
-        settled: false,
-        now: input.now,
-        declarations: (input.declarations ?? []).filter((d) => d.statementId === s.id),
-        ...(input.overdueDays !== undefined ? { overdueDays: input.overdueDays } : {}),
-      })
-    );
-  }
-
-  const characterIds = characterIdsOf(input, minerId);
+  const characterIds = characterIdsOfMiner(minerId, input.miners);
   const hold = characterIds
     .map((cid) => book.holds.get(cid))
     .filter((h) => h !== undefined)
     .sort((a, b) => a.from.localeCompare(b.from))[0];
+  const billableThrough = heldBillableThrough(book.billableThrough, characterIds, book.holds);
+  const billable = minerBillableLines({
+    minerId,
+    startDate: input.startDate,
+    charges,
+    adjustments: input.adjustments ?? [],
+    dismissals: input.dismissals,
+    billableThrough,
+  });
+  // An open dispute nobody has dismissed yet holds its date (`disputesToShow`).
+  const heldDays = new Set(
+    disputesToShow(input.disputes ?? [], input.dismissals)
+      .filter((d) => isMinersDispute(d, minerId, characterIds) && disputeHold(d, input.now))
+      .map((d) => d.date)
+  );
+  // What dismissing a dispute credited: a checkpoint's held day reads it off the dispute.
+  const disputeWaivers = new Map<string, number>();
+  for (const d of input.disputes ?? [])
+    if (d.resolution?.kind === 'dismissed' && isMinersDispute(d, minerId, characterIds))
+      disputeWaivers.set(d.date, (disputeWaivers.get(d.date) ?? 0) + d.resolution.amountIsk);
+  const checkpoint = usableCheckpoint(input.checkpoints?.get(minerId), characterIds);
+  const storedPaidThrough = input.minerPaidThrough?.get(minerId);
+  const account = MinerRunningAccount.build({
+    // Whether each line was priced at a saved close-of-day price: only such days close for good.
+    days: billable.lines.map((l) => ({ ...l, savedPrice: savedPrice(l) })),
+    payments,
+    writeOffs: (input.writeOffs ?? []).filter((w) => w.minerId === minerId && !w.reversed),
+    startDate: input.startDate,
+    heldDays,
+    disputeWaivers,
+    ...(storedPaidThrough !== undefined ? { storedPaidThrough } : {}),
+    ...(input.dayTolerancePct !== undefined ? { dayTolerancePct: input.dayTolerancePct } : {}),
+    toleranceExemptions: exemptionsOf(input.toleranceExemptions, minerId),
+    ...(checkpoint ? { checkpoint } : {}),
+  });
   return {
     characterIds,
-    statements,
+    notices,
     payments,
-    dismissalCredits: credits,
-    allocationInput,
-    allocation,
-    overdue,
-    billableThrough: heldBillableThrough(book.billableThrough, characterIds, book.holds),
+    billableThrough,
     ...(hold ? { hold } : {}),
+    billable,
+    heldDays,
+    account,
   };
 }

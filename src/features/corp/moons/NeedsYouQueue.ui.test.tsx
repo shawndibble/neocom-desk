@@ -1,10 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { MinerRow, NeedsYouItem } from '@/engine/corpTaxBook/bookView';
-import type { TabsProjection } from '@/engine/corpTaxBook/readModels';
 import type { UncountedDonation } from '@/engine/corpTaxBook/uncounted';
 import type { OreDispute } from '@/engine/corpTaxBook/disputes';
 import type { ClaimedTransfer, Declaration } from '@/engine/corpTaxBook/overdue';
@@ -12,11 +11,17 @@ import { DEFAULT_NOTICE_RULES } from '@/engine/corpTaxBook/notices';
 import { BookProvider } from './BookContext';
 import { NeedsYouQueue } from './NeedsYouQueue';
 import type { BookContextValue } from './bookContextValue';
+import type { GroupingAnswer } from '../taxBook/bookClient';
 
-vi.mock('../taxBook/bookClient', () => ({ editBook: vi.fn(async () => ({})), readAudit: vi.fn() }));
+const dismissGroupingAnswer = vi.fn(async () => ({ dismissedAt: '2026-10-20T00:00:00Z' }));
+vi.mock('../taxBook/bookClient', () => ({
+  editBook: vi.fn(async () => ({})),
+  readAudit: vi.fn(),
+  dismissGroupingAnswer: (...args: unknown[]) => dismissGroupingAnswer(...(args as [])),
+}));
 const loadDivisions = vi.fn(async () => ({ cached: null, needsReauth: false }) as unknown);
 vi.mock('../wallet', () => ({ loadCorporationDivisions: () => loadDivisions() }));
-vi.mock('./statementMailing', () => ({
+vi.mock('./lateNoticeMailing', () => ({
   mailTarget: vi.fn(),
   useCorporationName: () => 'Brass Anvil Corp',
 }));
@@ -47,8 +52,6 @@ const wallet = vi.hoisted(() => ({
   })),
 }));
 vi.mock('@/features/character/wallet', () => wallet);
-const projection = vi.hoisted(() => ({ value: { miners: [], needsYou: [] } as unknown }));
-vi.mock('./useTabsProjection', () => ({ useTabsProjection: () => projection.value }));
 const { editBook } = await import('../taxBook/bookClient');
 
 const miner = (id: string, characterId: number, over: Partial<MinerRow> = {}): MinerRow => ({
@@ -58,7 +61,6 @@ const miner = (id: string, characterId: number, over: Partial<MinerRow> = {}): M
   standing: 'member',
   owed: 5_000_000,
   overdueDays: null,
-  unbilled: 0,
   pending: 0,
   credit: 0,
   lastPaidAt: null,
@@ -83,9 +85,9 @@ function renderQueue(
     divisions = [1],
     view = undefined as unknown,
     disputes = [] as OreDispute[],
+    groupingAnswers = [] as GroupingAnswer[],
   } = {}
 ) {
-  projection.value = { miners, needsYou } as unknown as TabsProjection;
   render(
     <MemoryRouter>
       <BookProvider
@@ -93,39 +95,51 @@ function renderQueue(
           {
             characterId: 9,
             corporationId: 98000001,
-            view: view ?? {
-              input: {
-                statements: [
+            // The tabs read the view's Miners and Needs you items: the test's own.
+            view: {
+              ...((view as object | undefined) ?? {
+                input: {
+                  notices: [
+                    {
+                      id: 's1',
+                      minerId: 'solo:7',
+                      issuedAt: '2026-10-01T00:00:00Z',
+                      lines: [],
+                      mail: { sent: 1, manualSent: 0, remindersStopped: false },
+                    },
+                  ],
+                  miners: [],
+                  now: '2026-10-20T00:00:00Z',
+                  declarations: [],
+                  dismissals: [],
+                },
+                miners: [],
+                internals: { byMiner: new Map() },
+                charges: [
                   {
-                    id: 's1',
-                    minerId: 'solo:7',
-                    periodStart: '2026-09-01',
-                    periodEnd: '2026-09-30',
-                    lines: [],
+                    key: '7:1000:2026-09-05',
+                    oreLines: [
+                      { typeId: 45490, quantity: 1200 },
+                      { typeId: 45491, quantity: 500 },
+                    ],
+                    unitPrices: { 45490: 10_000, 45491: 4_000 },
+                    taxPct: 10,
+                    taxOwed: 1_400_000,
                   },
                 ],
-                declarations: [],
-                dismissals: [],
-              },
-              charges: [
-                {
-                  key: '7:1000:2026-09-05',
-                  oreLines: [
-                    { typeId: 45490, quantity: 1200 },
-                    { typeId: 45491, quantity: 500 },
-                  ],
-                  unitPrices: { 45490: 10_000, 45491: 4_000 },
-                  taxPct: 10,
-                  taxOwed: 1_400_000,
-                },
-              ],
+              }),
+              // A built view keeps its own Miners; a hand-built one takes the given ones.
+              miners: (view as { miners?: MinerRow[] } | undefined)?.miners?.length
+                ? (view as { miners: MinerRow[] }).miners
+                : miners,
+              needsYou,
             },
             names: {
               character: (id: number) => `Pilot ${id}`,
               refinery: () => 'Refinery',
               ore: () => 'Zeolites',
             },
-            data: { uncounted, disputes },
+            data: { uncounted, disputes, groupingAnswers },
             settings: { divisions, divisionNames: {}, noticeRules: DEFAULT_NOTICE_RULES },
             verdict: { canEdit: true },
             reload: vi.fn(),
@@ -180,15 +194,13 @@ describe('NeedsYouQueue (#6207)', () => {
   });
 
   it('calls the overdue card’s waiver what it is', () => {
-    renderQueue([
-      { kind: 'overdue', minerId: 'solo:7', days: 3, owed: 5_000_000, statementId: 's1' },
-    ]);
+    renderQueue([{ kind: 'overdue', minerId: 'solo:7', days: 3, owed: 5_000_000, noticeId: 's1' }]);
     expect(screen.getByRole('button', { name: 'Waive all' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Dismiss' })).not.toBeInTheDocument();
   });
 
   it('offers a leaver a reminder as well as a write-off, and does not promise monthly mail', () => {
-    renderQueue([{ kind: 'leaver', minerId: 'solo:7', owed: 5_000_000, statementId: 's1' }], {
+    renderQueue([{ kind: 'leaver', minerId: 'solo:7', owed: 5_000_000, noticeId: 's1' }], {
       miners: [miner('solo:7', 7, { standing: 'left' })],
     });
     expect(screen.getByRole('button', { name: 'Send reminder' })).toBeInTheDocument();
@@ -211,6 +223,29 @@ describe('NeedsYouQueue (#6207)', () => {
       },
     ]);
     expect(screen.getByText(/owed no tax then/)).toBeInTheDocument();
+  });
+
+  it('names the Miners an ambiguous donation could be, for the officer to pick', () => {
+    renderQueue(
+      [
+        {
+          kind: 'unmatched',
+          payment: {
+            id: 'j1_6',
+            characterId: 5,
+            amount: 1_000_000,
+            at: '2026-10-10T00:00:00Z',
+            source: 'donation',
+            reviewReason: 'ambiguous',
+            ambiguousMinerIds: ['solo:7', 'solo:8'],
+          },
+        },
+      ],
+      { miners: [miner('solo:7', 7), miner('solo:8', 8)] }
+    );
+    expect(
+      screen.getByText(/could credit it to Pilot 7 or Pilot 8 and cannot tell which/)
+    ).toBeInTheDocument();
   });
 
   const dispute: OreDispute = {
@@ -246,7 +281,18 @@ describe('NeedsYouQueue (#6207)', () => {
   it('never waives a dispute whose day it cannot price (#6206)', async () => {
     renderQueue([], {
       disputes: [dispute],
-      view: { input: { dismissals: [], declarations: [] }, charges: [] },
+      view: {
+        input: {
+          miners: [],
+          now: '2026-10-20T00:00:00Z',
+          notices: [],
+          dismissals: [],
+          declarations: [],
+        },
+        miners: [],
+        internals: { byMiner: new Map() },
+        charges: [],
+      },
     });
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Waive their ore' }));
@@ -289,6 +335,49 @@ describe('NeedsYouQueue (#6207)', () => {
     expect(screen.queryByText(/went to Rival Corp/)).not.toBeInTheDocument();
   });
 
+  it('lists a declined grouping, linking to the Miner, until the character is grouped again', () => {
+    const declined: GroupingAnswer = {
+      characterId: 8,
+      minerId: 'g1',
+      answer: 'declined',
+      at: '2026-10-19T00:00:00Z',
+      via: 'character',
+    };
+    const group = { ...miner('g1', 7), characterIds: [7, 9] };
+    renderQueue([], { miners: [group, miner('solo:8', 8)], groupingAnswers: [declined] });
+    expect(
+      screen.getByRole('link', { name: "Pilot 8 says they aren't part of Pilot 7." })
+    ).toHaveAttribute('href', '/corp/moons/miners/g1');
+    expect(screen.getByText("They're billed on their own now.")).toBeInTheDocument();
+    cleanup();
+    renderQueue([], {
+      miners: [{ ...group, characterIds: [7, 9, 8] }],
+      groupingAnswers: [declined],
+    });
+    expect(screen.queryByText(/says they aren't part of/)).not.toBeInTheDocument();
+  });
+
+  it('dismisses a declined grouping, and hides one an officer dismissed', async () => {
+    const declined: GroupingAnswer = {
+      characterId: 8,
+      minerId: 'g1',
+      answer: 'declined',
+      at: '2026-10-19T00:00:00Z',
+      via: 'character',
+    };
+    const miners = [{ ...miner('g1', 7), characterIds: [7, 9] }, miner('solo:8', 8)];
+    renderQueue([], { miners, groupingAnswers: [declined] });
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    // The officer's own Character signs the call; the answer's Character is the one dismissed.
+    expect(dismissGroupingAnswer).toHaveBeenCalledWith(9, 98000001, 8);
+    cleanup();
+    renderQueue([], {
+      miners,
+      groupingAnswers: [{ ...declined, dismissedAt: '2026-10-20T00:00:00Z' }],
+    });
+    expect(screen.queryByText(/says they aren't part of/)).not.toBeInTheDocument();
+  });
+
   it('shows what a Miner declared, amount and note (#6206)', () => {
     renderQueue([
       {
@@ -297,7 +386,7 @@ describe('NeedsYouQueue (#6207)', () => {
         owed: 5_000_000,
         declaration: {
           id: 'x1',
-          statementId: 's1',
+          noticeId: 's1',
           kind: 'another-way',
           at: '2026-09-20T00:00:00Z',
           amount: 4_000_000,
@@ -320,7 +409,7 @@ describe('NeedsYouQueue (#6207)', () => {
         owed: 5_000_000,
         declaration: {
           id: 'x1',
-          statementId: 's1',
+          noticeId: 's1',
           kind: 'another-way',
           at: '2026-09-20T00:00:00Z',
           amount: 4_000_000,
@@ -369,38 +458,29 @@ describe('NeedsYouQueue (#6207)', () => {
     });
   });
 
-  it('says what a hold did: the held amount, and that the Statement settles on the rest', () => {
+  it('says what a hold did: the held day, which payments skip', () => {
     renderQueue([], {
       disputes: [{ ...dispute, kind: 'notPaying', at: new Date().toISOString() }],
       view: {
         input: {
-          statements: [
-            {
-              id: 's1',
-              minerId: 'solo:7',
-              periodStart: '2026-09-01',
-              periodEnd: '2026-09-30',
-              lines: [
-                {
-                  kind: 'mined',
-                  chargeKey: '7:1000:2026-09-05',
-                  oreLines: [{ typeId: 45490, quantity: 1200 }],
-                  unitPrices: { 45490: 10_000 },
-                  taxPct: 10,
-                  tax: 1_400_000,
-                },
-              ],
-            },
-          ],
+          miners: [],
+          now: '2026-10-20T00:00:00Z',
+          notices: [],
           declarations: [],
           dismissals: [],
+        },
+        miners: [],
+        internals: {
+          byMiner: new Map([
+            ['solo:7', { account: { day: () => ({ held: true, tax: 1_200_000 }) } }],
+          ]),
         },
         charges: [],
       },
     });
     expect(
       screen.getByText(
-        /^1,200,000 is held until \d+ \w+: payments skip it, and the Statement settles on the rest\.$/
+        /^1,200,000 is held until \d+ \w+: payments skip the disputed day and pay the next ones\.$/
       )
     ).toBeInTheDocument();
   });
@@ -412,7 +492,7 @@ describe('NeedsYouQueue (#6207)', () => {
       owed: 5_000_000,
       declaration: {
         id: 'x1',
-        statementId: 's1',
+        noticeId: 's1',
         kind: 'another-way',
         at: '2026-11-10T00:00:00Z',
         ...over,
@@ -558,13 +638,17 @@ describe('NeedsYouQueue (#6207)', () => {
       const at = new Date(Date.now() - 86_400_000).toISOString();
       renderQueue([], {
         view: {
+          miners: [],
+          internals: { byMiner: new Map() },
           input: {
-            statements: [{ id: 's1', minerId: 'solo:7' }],
+            miners: [],
+            now: '2026-10-20T00:00:00Z',
+            notices: [{ id: 's1', minerId: 'solo:7' }],
             dismissals: [],
             declarations: [
               {
                 id: 'a1',
-                statementId: 's1',
+                noticeId: 's1',
                 kind: 'another-way',
                 at,
                 transfers: [{ amount: 3_000_000, at, journalRef: 1, recipient: 'corporation' }],
@@ -572,7 +656,7 @@ describe('NeedsYouQueue (#6207)', () => {
               },
               {
                 id: 'a2',
-                statementId: 's1',
+                noticeId: 's1',
                 kind: 'another-way',
                 at,
                 resolution: { kind: 'confirmed', at: '2026-01-01T00:00:00Z', by: 0 },
@@ -604,9 +688,7 @@ describe('NeedsYouQueue: late notices are due (#6294)', () => {
       now: '2026-10-18T14:00:00Z',
       startDate: '2026-08-01',
       graceHours: 6,
-      minimumStatement: 0,
       overdueDays: 14,
-      cadence: { kind: 'monthly' },
       hubId: 'jita',
       oreForm: 'compressed',
       structureExpiryHours: {},
@@ -621,21 +703,19 @@ describe('NeedsYouQueue: late notices are due (#6294)', () => {
         oreLines: [{ typeId: 45490, quantity: 100_000 }],
       })),
       miners: [],
-      statements: [],
+      notices: [],
       payments: [],
       dismissals: [],
       declarations: [],
       adjustments: [],
       extractions: [],
-      paidStatementIds: new Set(),
-      runningAccountFrom: '2026-08-01T00:00:00Z',
       pricesOn: () => ({ prices: new Map([[45490, 1000]]), sources: new Map() }),
     });
     renderQueue([], { view });
     expect(screen.getByRole('heading', { name: 'Needs you · 1' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Late notice due for 1 Miner' })).toHaveAttribute(
       'href',
-      '/corp/moons/statements'
+      '/corp/moons/late-notices'
     );
     expect(screen.getByText(/owe 20,000,000 between them/)).toBeInTheDocument();
   });

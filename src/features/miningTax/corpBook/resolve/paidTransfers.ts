@@ -4,7 +4,9 @@
  * labelled by who received it. The chosen ones become the declaration's transfers; the rest of
  * the member's wallet never leaves the device.
  */
+import { utcDayOf } from '../../../../../functions/src/timeConstants';
 import type { ClaimedTransfer, TransferRecipient } from '@/engine/corpTaxBook/overdue';
+import { inFlightDonations, type HeldPayment } from '@/engine/corpTaxBook/personal';
 import type { MadePayment } from '../../paymentLinks';
 
 /** What the ids a payment went to are: the app's name lookup says character or corporation. */
@@ -33,6 +35,36 @@ export function recipientOf(
 }
 
 /**
+ * The member's payments a claim may name: never one a link holds (it pays a personal Payee), and
+ * never a donation the book already holds (it is credited, or counted for review). Which donation
+ * the book holds is the shared one-to-one rule the account counts in-flight donations by.
+ */
+export function claimablePayments(
+  payments: readonly MadePayment[],
+  opts: {
+    bookCorporationId: number;
+    /** `paymentLinkKey`s a link holds. */
+    linked: ReadonlySet<string>;
+    /** The book's payments (`LoadedCorpBook.payments`). */
+    held: readonly HeldPayment[];
+  }
+): MadePayment[] {
+  const toBook = payments.filter((p) => p.counterpartyId === opts.bookCorporationId);
+  const inFlight = new Set(
+    inFlightDonations(toBook, opts.held, opts.bookCorporationId, '').map((d) => d.refId)
+  );
+  return payments.filter(
+    (p) =>
+      !opts.linked.has(p.key) &&
+      !(
+        p.counterpartyId === opts.bookCorporationId &&
+        p.method === 'donation' &&
+        !inFlight.has(p.refId)
+      )
+  );
+}
+
+/**
  * The member's outgoing journal payments from `since` on (the billed period's first day),
  * newest first, each as the transfer it would claim. Contracts carry no ISK figure and are left
  * out; so is a payment with no journal id to search on.
@@ -51,7 +83,7 @@ export function transferChoices(
         p.kind === 'journal' &&
         p.amount !== null &&
         p.amount > 0 &&
-        p.date.slice(0, 10) >= opts.since.slice(0, 10)
+        utcDayOf(p.date) >= utcDayOf(opts.since)
     )
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, MAX_CHOICES)

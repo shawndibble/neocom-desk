@@ -1,439 +1,103 @@
 /**
- * Paying backwards (issue #540): given a payment the pilot has *already* made,
- * work out which outstanding Assignments it settled.
+ * Which Payee a payment the pilot already made was for (issue #540, decision 20261120-235011,
+ * "linking money under one payment model"). A Made Payment links to one Payee and pays its oldest
+ * unpaid days (`PayeeRunningAccount`), so a suggestion only has to name the recipient: never entries, and
+ * no day window, since back taxes are paid weeks later. The recipient is known by the entity a
+ * Payee learned, then by its name, across every record of a merged Payee, so an alt's payment is
+ * found too. An amount alone is the weakest hint, offered only when exactly one Payee owes it, and
+ * never for a donation a Corp Tax Book counts: that money is the book's.
  *
- * The mirror of the Settle-up flow, which runs forward from "what shall I
- * pay?". Pure — the route feeds it the normalized payments (`madePayments.ts`)
- * and the Balances strip's own per-Payee figures (`balances.ts`), so the
- * matching rules stay testable without ESI or Dexie.
+ * Pure: the route feeds it the normalized payments (`madePayments.ts`), the Payees with what they
+ * owe, and which payments a link or a book already holds.
  */
-import type {
-  MiningTaxAssignmentRecord,
-  MiningTaxPaymentInfo,
-  MiningTaxPaymentMethod,
-  PayeeRecord,
-} from '@/db';
-import type { TFunction } from 'i18next';
-import { DAY_MS } from '@/lib/age';
-import { formatIsk } from '@/lib/isk';
-import type { PayeeBalance } from './balances';
-import { allMembers, type DisplayRow, type GroupMember } from './groupRows';
-import type { LinkedTransaction } from './PaymentLinksCard';
-import { amountSlack, amountsMatch, LINK_WINDOW_DAYS } from './paymentMatches';
-import { allocateOldestFirst } from './settleAllocation';
-import type { MoonMiningTaxRow } from './snapshot';
+import { utcDayOf } from '../../../functions/src/timeConstants';
+import type { MiningTaxPaymentMethod, PayeeRecord } from '@/db';
+import { matchesStatedTransfer } from '../../../functions/src/corpTaxBookTransferMatch';
+import { paymentLinkKey, type PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
+import { isCorpPayeeId } from './corpBook/corpRows';
+import { amountsMatch } from './paymentMatches';
 
 /**
- * One payment the pilot has already made, normalized across its two sources:
- * an outgoing wallet-journal entry, or an item-exchange contract they issued
- * at no price (payment in kind).
+ * One payment the pilot has already made, normalized across its two sources: an outgoing
+ * wallet-journal entry, or an item-exchange contract they issued at no price (payment in kind).
  */
 export interface MadePayment {
-  /** `journal:<id>` or `contract:<id>` — a numeric id alone is ambiguous across the two sources. */
+  /** `journal:<id>` or `contract:<id>` (`paymentLinkKey`): the two id spaces collide. */
   key: string;
   kind: 'journal' | 'contract';
-  /** Written to `payment.journalRefId` or `payment.contractId` when the link is confirmed. */
   refId: number;
-  /** The paying character — a Payee is scoped to one character, so this narrows the candidates. */
+  /** The paying character. */
   characterId: number;
   /** ISO timestamp the ISK (or the cargo) left. */
   date: string;
   /**
-   * Positive ISK. `null` for a payment-in-kind contract: its cargo is
-   * deliberately never priced (the decision doc rules out a second valuation
-   * model beside the Jita snapshot Assignments already carry), so the amount
-   * is confirmed by the pilot instead.
+   * Positive ISK. `null` for a payment-in-kind contract: its cargo is never priced (the decision
+   * doc rules out a second valuation model), so the pilot gives its figure when linking it.
    */
   amount: number | null;
-  /**
-   * How this settles, decided once at the source from the journal `ref_type`
-   * (or the fact that it is a contract) — never re-derived later from display
-   * text, which would tie a domain fact to a copy tweak.
-   */
+  /** Decided once at the source from the journal `ref_type` (or the fact that it is a contract). */
   method: MiningTaxPaymentMethod;
-  /** Who received it — the journal's `second_party_id` or the contract's `assignee_id`. */
+  /** Who received it: the journal's `second_party_id` or the contract's `assignee_id`. */
   counterpartyId?: number;
   counterpartyName?: string;
-  /**
-   * One-line description for the picker: a humanized ESI ref type, or the
-   * contract's own title. Empty when neither exists (an untitled contract) —
-   * the dialog supplies a translated fallback rather than this module inventing
-   * user-facing copy.
-   */
+  /** One-line description for the picker: a humanized ESI ref type, or the contract's title. */
   label: string;
 }
 
-/**
- * How sure the match is, best first — drives ordering and the wording shown
- * beside a suggestion.
- *
- * The `identity-*` tiers mean the recipient's EVE id matched what this Payee
- * learned. The `name-*` tiers are the weaker string match on a free-text Payee
- * label, kept distinct precisely because the decision doc rules name equality
- * out as *the* identity signal: it is what bootstraps the first link for a
- * Payee that has learned nothing yet, and it says so rather than claiming to
- * know the recipient.
- */
-export type LinkConfidence =
-  'identity-and-amount' | 'identity' | 'name-and-amount' | 'name' | 'amount';
+/** How the recipient was known, best first. */
+export type LinkConfidence = 'entity' | 'name' | 'amount';
+
+/** A personal Payee a payment may be linked to: every record of one recipient. */
+export interface LinkablePayee {
+  /** The merged Payee's primary record id: the link names it. */
+  id: string;
+  name: string;
+  /** Every record of the recipient, the primary first. */
+  members: readonly PayeeRecord[];
+  /** What its account owes now. */
+  owed: number;
+  /** Whether anything was ever billed to it: a Payee nothing bills is no one's recipient yet. */
+  billed: boolean;
+}
 
 export interface LinkSuggestion {
   payment: MadePayment;
-  balance: PayeeBalance;
-  /** The Assignments to pre-tick — the best-fit subset of `balance.members` inside the date window. */
-  members: GroupMember[];
+  payee: LinkablePayee;
   confidence: LinkConfidence;
 }
 
-/** UTC calendar day index, from either a `YYYY-MM-DD` EVE date or a full ISO timestamp. */
-export function utcDay(date: string): number {
-  const iso = date.length === 10 ? `${date}T00:00:00Z` : date;
-  return Math.floor(Date.parse(iso) / DAY_MS);
+/** What a suggestion is weighed against. */
+export interface LinkContext {
+  payees: readonly LinkablePayee[];
+  /** The keys of the payments a link already holds (`paymentLinkKey`). */
+  linked: ReadonlySet<string>;
+  /**
+   * The corporations of the member's Corp Tax Books: a donation to one is the book's (held, or in
+   * flight), and never a personal Payee's.
+   */
+  bookCorporations: ReadonlySet<number>;
 }
 
-/**
- * Whether a Mining Ledger Entry could plausibly be what this payment settled.
- *
- * Asymmetric on purpose: a pilot pays *after* mining, and one payment covers a
- * span of entry dates. So an entry may sit up to `LINK_WINDOW_DAYS` before its
- * payment, but only one day after it — that single day of slack is for the
- * EVE/UTC calendar edge, where a session logged on the 7th UTC was really paid
- * for on the evening of the 6th. An entry any further ahead of its payment did
- * not exist yet when the ISK moved.
- */
-export function withinLinkWindow(entryDate: string, paymentDate: string): boolean {
-  const delta = utcDay(paymentDate) - utcDay(entryDate);
-  return delta >= -1 && delta <= LINK_WINDOW_DAYS;
-}
-
-/**
- * Reads back a payment written before it could hold more than one linked
- * transaction (pre-issue-#540-followup): a bare `journalRefId`/`contractId`
- * becomes a single link, sourced `auto` since every pre-existing link was
- * written by the silent recorded-payment matcher. Every reader of a stored
- * `payment` goes through this rather than the raw field, so the legacy shape
- * never needs a Dexie migration (`db/index.ts`'s usual rule for an unindexed
- * field).
- */
-export function normalizePaymentInfo(payment: MiningTaxPaymentInfo): MiningTaxPaymentInfo {
-  const legacy = payment as MiningTaxPaymentInfo & { journalRefId?: number; contractId?: number };
-  if (legacy.journalRefId === undefined && legacy.contractId === undefined) return payment;
-  const { journalRefId, contractId, ...rest } = legacy;
-  return {
-    ...rest,
-    journalLinks:
-      rest.journalLinks ??
-      (journalRefId === undefined ? undefined : [{ refId: journalRefId, source: 'auto' }]),
-    contractLinks:
-      rest.contractLinks ??
-      (contractId === undefined ? undefined : [{ refId: contractId, source: 'auto' }]),
-  };
-}
-
-/** Every Assignment each journal / contract id is linked to, oldest first — the wallet journal lists one link per entry a payment settled. */
-export function linkedAssignmentsByRef(assignments: readonly MiningTaxAssignmentRecord[]) {
-  const journal = new Map<number, MiningTaxAssignmentRecord[]>();
-  const contract = new Map<number, MiningTaxAssignmentRecord[]>();
-  const add = (map: typeof journal, refId: number, a: MiningTaxAssignmentRecord) => {
-    const list = map.get(refId);
-    if (list) list.push(a);
-    else map.set(refId, [a]);
-  };
-  for (const a of assignments) {
-    if (!a.payment) continue;
-    const normalized = normalizePaymentInfo(a.payment);
-    for (const link of normalized.journalLinks ?? []) add(journal, link.refId, a);
-    for (const link of normalized.contractLinks ?? []) add(contract, link.refId, a);
-  }
-  for (const map of [journal, contract]) {
-    for (const list of map.values()) list.sort((x, y) => x.date.localeCompare(y.date));
-  }
-  return { journal, contract };
-}
-
-/** What linked ISK actually reaches (`paymentCoverage`). */
-export interface PaymentCoverage {
-  /** Paid Assignments the ISK of their linked transactions is used up before. */
-  uncovered: ReadonlySet<string>;
-  /** Per linked transaction (`MadePayment.key`): the Assignments its ISK reaches. */
-  reaches: ReadonlyMap<string, ReadonlySet<string>>;
-}
-
-const linkKeys = (payment: MiningTaxPaymentInfo): string[] => {
-  const normalized = normalizePaymentInfo(payment);
-  return [
-    ...(normalized.journalLinks ?? []).map((l) => `journal:${l.refId}`),
-    ...(normalized.contractLinks ?? []).map((l) => `contract:${l.refId}`),
-  ];
-};
-
-/**
- * Which paid Assignments the transactions linked to them can actually pay. Assignments that share
- * a transaction (or a recorded payment) share its ISK, and it pays them oldest first, whole days
- * only (`allocateOldestFirst`, within `amountsMatch`'s slack): a day it is used up before is not
- * paid by it, however it came to be linked — a manual link once reused a donation two other days
- * had already used up. A group with a transaction whose amount is unknown (`amountOf` gives
- * `null`/`undefined`, as for a payment in kind) is not judged: every link reaches all of it.
- */
-export function paymentCoverage(
-  assignments: readonly MiningTaxAssignmentRecord[],
-  amountOf: (key: string) => number | null | undefined
-): PaymentCoverage {
-  const linked = assignments.filter(
-    (a) => a.status === 'paid' && a.payment && linkKeys(a.payment).length > 0
-  );
-  // Union-find over the Assignments: by a shared transaction, or a shared recorded payment.
-  const parent = new Map<string, string>();
-  const find = (x: string): string => {
-    const up = parent.get(x) ?? x;
-    if (up === x) return x;
-    const root = find(up);
-    parent.set(x, root);
-    return root;
-  };
-  const union = (a: string, b: string) => parent.set(find(a), find(b));
-  const firstBy = new Map<string, string>();
-  for (const a of linked) {
-    parent.set(a.id, find(a.id));
-    for (const key of [...linkKeys(a.payment!), `payment:${a.payment!.paymentId}`]) {
-      const first = firstBy.get(key);
-      if (first === undefined) firstBy.set(key, a.id);
-      else union(a.id, first);
-    }
-  }
-  const groups = new Map<string, MiningTaxAssignmentRecord[]>();
-  for (const a of linked) groups.set(find(a.id), [...(groups.get(find(a.id)) ?? []), a]);
-
-  const uncovered = new Set<string>();
-  const reaches = new Map<string, Set<string>>();
-  const fits = (members: readonly MiningTaxAssignmentRecord[], amount: number) =>
-    new Set(
-      allocateOldestFirst(
-        members.map((m) => ({ id: m.id, date: m.date, taxOwed: m.taxOwed })),
-        amount + amountSlack(amount)
-      ).coveredIds
-    );
-  for (const members of groups.values()) {
-    members.sort((x, y) => x.date.localeCompare(y.date) || x.id.localeCompare(y.id));
-    // Journal ids rise with time: the transactions in the order they were sent.
-    const keys = [...new Set(members.flatMap((m) => linkKeys(m.payment!)))].sort((x, y) =>
-      x.localeCompare(y, undefined, { numeric: true })
-    );
-    const amounts = keys.map((key) => amountOf(key));
-    if (amounts.some((x) => x === null || x === undefined)) {
-      for (const key of keys)
-        reaches.set(
-          key,
-          new Set(members.filter((m) => linkKeys(m.payment!).includes(key)).map((m) => m.id))
-        );
-      continue;
-    }
-    // Each transaction in turn: what the ISK so far reaches that the earlier ones did not. One
-    // that only adds to a day it cannot finish reaches that day.
-    let total = 0;
-    let before = new Set<string>();
-    for (const [i, key] of keys.entries()) {
-      total += amounts[i] as number;
-      const now = fits(members, total);
-      const added = [...now].filter((id) => !before.has(id));
-      const next = members.find((m) => !now.has(m.id));
-      reaches.set(key, new Set(added.length > 0 ? added : next ? [next.id] : []));
-      before = now;
-    }
-    // As `linkTargetsWithin`: ISK that finishes no day still part-pays the oldest, which stays paid.
-    const paid = before.size > 0 ? before : new Set(members.slice(0, 1).map((m) => m.id));
-    for (const m of members) if (!paid.has(m.id)) uncovered.add(m.id);
-  }
-  return { uncovered, reaches };
-}
-
-/**
- * Of the Assignments linked to one transaction (`key`, as `MadePayment.key`), those its ISK
- * reaches (`paymentCoverage`), judged with only its own `amount` known: what the wallet journal
- * lists under the entry. A transaction that shares its days with another one whose amount this
- * does not know is not judged: every linked day is listed.
- */
-export function reachedByTransaction(
-  key: string,
-  amount: number | null,
-  linked: readonly MiningTaxAssignmentRecord[],
-  all: readonly MiningTaxAssignmentRecord[]
-): MiningTaxAssignmentRecord[] {
-  const paymentIds = new Set(linked.flatMap((a) => (a.payment ? [a.payment.paymentId] : [])));
-  const group = all.filter(
-    (a) => linked.includes(a) || (a.payment !== undefined && paymentIds.has(a.payment.paymentId))
-  );
-  const reach = paymentCoverage(group, (k) => (k === key ? amount : undefined)).reaches.get(key);
-  return reach ? linked.filter((a) => reach.has(a.id)) : [...linked];
-}
-
-/**
- * Of the Assignments a transaction is about to be recorded against, those its ISK pays: oldest
- * first, whole days, within `amountsMatch`'s slack (`paymentCoverage`'s rule). A day it cannot
- * reach stays owed, as the dialogs' "short" line says; one it can only part-pay is the oldest,
- * kept alone. A payment in kind (`null`) has no figure to judge by: every day is kept.
- */
-export function linkTargetsWithin<
-  T extends Pick<MiningTaxAssignmentRecord, 'id' | 'date' | 'taxOwed'>,
->(assignments: readonly T[], amount: number | null): T[] {
-  if (amount === null || assignments.length === 0) return [...assignments];
-  const covered = new Set(
-    allocateOldestFirst(
-      assignments.map((a) => ({ id: a.id, date: a.date, taxOwed: a.taxOwed })),
-      amount + amountSlack(amount)
-    ).coveredIds
-  );
-  const oldest = [...assignments].sort(
-    (a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id)
-  );
-  const kept = oldest.filter((a) => covered.has(a.id));
-  return kept.length > 0 ? kept : oldest.slice(0, 1);
-}
-
-/**
- * The ledger as the tab reads it: a paid Assignment its linked ISK does not reach
- * (`paymentCoverage`) is still owed, its payment record left off. The stored record is untouched
- * until the member acts on the day.
- */
-export function owedWhereUncovered(
-  rows: readonly MoonMiningTaxRow[],
-  uncovered: ReadonlySet<string>
-): MoonMiningTaxRow[] {
-  if (uncovered.size === 0) return rows as MoonMiningTaxRow[];
-  return rows.map((row) =>
-    row.assignments.some((a) => uncovered.has(a.id))
-      ? {
-          ...row,
-          assignments: row.assignments.map((a) => {
-            if (!uncovered.has(a.id)) return a;
-            const owed: MiningTaxAssignmentRecord = { ...a, status: 'outstanding' };
-            delete owed.payment;
-            delete owed.paidAt;
-            return owed;
-          }),
-        }
-      : row
-  );
-}
-
-/** The journal and contract ids some Assignment already records a payment against. */
-export function linkedRefIds(assignments: readonly MiningTaxAssignmentRecord[]) {
-  const { journal, contract } = linkedAssignmentsByRef(assignments);
-  return { journal: new Set(journal.keys()), contract: new Set(contract.keys()) };
-}
-
-/**
- * Payments not already accounted for. Namespaced by kind: a journal entry id
- * and a contract id are separate id spaces that regularly collide.
- *
- * Note this test has a known false-negative edge — settle-up's later steps are
- * skippable, and "Mark paid only" records no `payment` at all, so a payment
- * settled that way stays eligible forever. That is why `suggestLink` only ever
- * offers a payment with a plausible target, rather than an ignore-list.
- */
-export function unlinkedPayments(
+/** The payments a pilot may still link: no link holds them, and no book counts them. */
+export function linkablePayments(
   payments: readonly MadePayment[],
-  assignments: readonly MiningTaxAssignmentRecord[]
+  ctx: Pick<LinkContext, 'linked' | 'bookCorporations'>
 ): MadePayment[] {
-  const linked = linkedRefIds(assignments);
-  return payments.filter((p) => !linked[p.kind].has(p.refId));
+  return payments.filter(
+    (p) =>
+      !ctx.linked.has(p.key) &&
+      (p.counterpartyId === undefined || !ctx.bookCorporations.has(p.counterpartyId))
+  );
 }
 
 /**
- * One Settle-up "Record payment" that has no live wallet/contract link yet —
- * every Assignment it covers, grouped by the shared `paymentId`
- * (`markAssignmentsPaid`'s `PaymentInput`). These are exactly the Assignments
- * `unlinkedPayments`'s doc comment calls out as staying eligible forever: once
- * Settle-up marks them `paid`, they drop out of `computePayeeBalances`'s
- * "owed" set, so `suggestLink`'s dialog never offers them a link again. This
- * is the other half — matching them automatically, later, once ESI actually
- * shows the transaction.
- */
-export interface RecordedPaymentGroup {
-  paymentId: string;
-  amount: number;
-  /** The pilot's own recorded paid-on date — a local calendar date, not an EVE one. */
-  paidOn: string;
-  /** Whichever of the pilot's characters could plausibly have sent it — a lump sum can cover alts' Assignments together. */
-  characterIds: ReadonlySet<number>;
-  assignments: readonly MiningTaxAssignmentRecord[];
-}
-
-export function unlinkedRecordedPayments(
-  assignments: readonly MiningTaxAssignmentRecord[]
-): RecordedPaymentGroup[] {
-  const groups = new Map<
-    string,
-    { amount: number; paidOn: string; members: MiningTaxAssignmentRecord[] }
-  >();
-  for (const a of assignments) {
-    const { payment } = a;
-    if (a.status !== 'paid' || !payment) continue;
-    const normalized = normalizePaymentInfo(payment);
-    if ((normalized.journalLinks?.length ?? 0) > 0 || (normalized.contractLinks?.length ?? 0) > 0) {
-      continue;
-    }
-    const group = groups.get(payment.paymentId);
-    if (group) group.members.push(a);
-    else
-      groups.set(payment.paymentId, {
-        amount: payment.amount,
-        paidOn: payment.paidOn,
-        members: [a],
-      });
-  }
-  return [...groups.entries()].map(([paymentId, { amount, paidOn, members }]) => ({
-    paymentId,
-    amount,
-    paidOn,
-    characterIds: new Set(members.map((m) => m.characterId)),
-    assignments: members,
-  }));
-}
-
-/** How far a real transaction's date may drift from the pilot's own recorded paid-on date — slack for ESI's post-lag and the local/EVE calendar gap, not a second guess at when the ISK actually moved. */
-const RECORDED_LINK_WINDOW_DAYS = 3;
-
-/**
- * Silently attaches an already-recorded Settle-up payment to the real
- * transaction behind it, once ESI shows one — no confirmation dialog, unlike
- * `suggestLink`. A mining tax lump sum is specific enough (exact ISK, the
- * pilot's own recorded date, one of their own characters) that asking to
- * confirm would be busywork; an *ambiguous* match (more than one plausible
- * transaction) is simply never auto-linked rather than guessed.
- */
-export function autoMatchRecordedPayments(
-  payments: readonly MadePayment[],
-  groups: readonly RecordedPaymentGroup[]
-): { group: RecordedPaymentGroup; payment: MadePayment }[] {
-  const matches: { group: RecordedPaymentGroup; payment: MadePayment }[] = [];
-  for (const group of groups) {
-    const candidates = payments.filter(
-      (p) =>
-        group.characterIds.has(p.characterId) &&
-        p.amount !== null &&
-        amountsMatch(group.amount, p.amount) &&
-        Math.abs(utcDay(p.date) - utcDay(group.paidOn)) <= RECORDED_LINK_WINDOW_DAYS
-    );
-    if (candidates.length === 1) matches.push({ group, payment: candidates[0] });
-  }
-  return matches;
-}
-
-/**
- * How — if at all — this Payee is identifiable as the payment's recipient.
- *
- * `'entity'` is the real signal: the id this Payee learned from a previous
- * confirmed link. `'name'` is the weaker bootstrap for a Payee that has learned
- * nothing yet, and is deliberately reported as its own kind rather than folded
- * in — a Payee's name is a free-text label ("the moon, the corp, or the person,
- * whichever is memorable") that need not equal any ESI name, so a suggestion
- * built on it must not claim to know who was paid.
+ * How one record knows the recipient: `entity` is the id it learned from an earlier link (or the
+ * pilot verified); `name` is the weaker bootstrap for a record that learned nothing. A record that
+ * learned an entity is never matched by name.
  */
 function identityKind(payee: PayeeRecord, payment: MadePayment): 'entity' | 'name' | null {
-  if (payee.entityId !== undefined && payment.counterpartyId !== undefined) {
+  if (payee.entityId !== undefined && payment.counterpartyId !== undefined)
     return payee.entityId === payment.counterpartyId ? 'entity' : null;
-  }
   if (payment.counterpartyName === undefined) return null;
   return payee.name.trim().toLowerCase() === payment.counterpartyName.trim().toLowerCase()
     ? 'name'
@@ -441,149 +105,52 @@ function identityKind(payee: PayeeRecord, payment: MadePayment): 'entity' | 'nam
 }
 
 /**
- * The subset of `members` whose tax adds up to `amount` — the whole in-window
- * balance if that is what was paid, else a single Assignment that matches on
- * its own. Deliberately not a general subset-sum: a pilot pays off a balance or
- * one entry, and an arbitrary "these four of seven happen to add up" match
- * would be a coincidence presented as a finding.
+ * The personal Payee a payment went to: the one whose records know its recipient, by entity
+ * first, then by name. Undefined when none does, or two Payees answer equally (the pilot picks).
  */
-function bestSubset(members: readonly GroupMember[], amount: number | null): GroupMember[] | null {
-  if (amount === null || members.length === 0) return null;
-  const total = members.reduce((sum, m) => sum + m.assignment.taxOwed, 0);
-  if (amountsMatch(total, amount)) return [...members];
-  const single = members.find((m) => amountsMatch(m.assignment.taxOwed, amount));
-  return single ? [single] : null;
-}
-
-/**
- * What a payment that settles only *part* of a balance most likely paid off:
- * the oldest entries, taken in order, for as long as the next one still fits
- * inside the figure sent. Back taxes are paid oldest-first, and a lump sum
- * rarely lands on an exact entry boundary, so `bestSubset` finds nothing at
- * all for the commonest real case.
- *
- * Deliberately a prefix and never a general subset-sum (`bestSubset`'s rule
- * still holds): "the oldest N you could afford" is how the debt was actually
- * worked down, whereas "whichever four of seven happen to add up" is a
- * coincidence dressed as a finding.
- *
- * Never returns an empty list: the first entry is admitted whatever it costs,
- * so a payment too small to cover even the oldest still offers that one entry
- * and the dialog shows a single short-by warning, rather than pre-ticking a
- * balance the payment plainly did not settle.
- * Callers use this only once a Payee is identified; with nobody identifiable,
- * a partial figure is not evidence of anything.
- */
-function oldestAffordable(members: readonly GroupMember[], amount: number): GroupMember[] {
-  const oldestFirst = [...members].sort((a, b) =>
-    a.assignment.date.localeCompare(b.assignment.date)
-  );
-  const covered: GroupMember[] = [];
-  let running = 0;
-  for (const m of oldestFirst) {
-    const next = running + m.assignment.taxOwed;
-    if (covered.length > 0 && !amountsMatch(next, amount) && next > amount) break;
-    covered.push(m);
-    running = next;
-  }
-  return covered;
-}
-
-/**
- * The best guess at what one payment paid off, or `null` when nothing plausible
- * lines up — an unmatched payment is simply never offered, which is what keeps
- * the entry point from nagging without a table of waved-away payments.
- *
- * Identity outranks amount: a payment to a Payee we can name is that Payee's
- * even when some *other* Payee's balance happens to equal the figure sent.
- */
-export function suggestLink(
+export function recipientOf(
   payment: MadePayment,
-  balances: readonly PayeeBalance[]
-): LinkSuggestion | null {
-  const candidates = balances
-    .filter((b) => b.payee.characterId === payment.characterId && b.owed > 0)
-    .map((b) => ({
-      balance: b,
-      inWindow: b.members.filter((m) => withinLinkWindow(m.assignment.date, payment.date)),
-      identity: identityKind(b.payee, payment),
-    }))
-    .filter((c) => c.inWindow.length > 0);
-
-  // A learned id beats a name, and either beats a coincidental amount: once
-  // *some* Payee is identifiable, no other Payee's balance is considered, however
-  // neatly its figure happens to match.
-  const byEntity = candidates.filter((c) => c.identity === 'entity');
-  const byName = candidates.filter((c) => c.identity === 'name');
-  const identified = byEntity.length > 0 ? byEntity : byName;
-
-  if (identified.length > 0) {
-    const viaEntity = identified === byEntity;
-    for (const c of identified) {
-      const members = bestSubset(c.inWindow, payment.amount);
-      if (members) {
-        return {
-          payment,
-          balance: c.balance,
-          members,
-          confidence: viaEntity ? 'identity-and-amount' : 'name-and-amount',
-        };
-      }
-    }
-    // No amount agreed, but we know (or think we know) who was paid. With a
-    // real ISK figure that means a part payment — back taxes — so only the
-    // oldest entries it could actually cover are pre-ticked; ticking the whole
-    // balance would claim the payment settled more than it did. A payment in
-    // kind carries no figure at all, so its whole in-window balance stands.
-    const first = identified[0];
-    return {
-      payment,
-      balance: first.balance,
-      members:
-        payment.amount === null ? first.inWindow : oldestAffordable(first.inWindow, payment.amount),
-      confidence: viaEntity ? 'identity' : 'name',
-    };
+  payees: readonly LinkablePayee[]
+): { payee: LinkablePayee; confidence: 'entity' | 'name' } | undefined {
+  const kindOf = (p: LinkablePayee) => {
+    const kinds = p.members.map((m) => identityKind(m, payment));
+    return kinds.includes('entity') ? 'entity' : kinds.includes('name') ? 'name' : null;
+  };
+  const personal = payees.filter((p) => !isCorpPayeeId(p.id));
+  for (const confidence of ['entity', 'name'] as const) {
+    const found = personal.filter((p) => kindOf(p) === confidence);
+    if (found.length === 1) return { payee: found[0]!, confidence };
+    if (found.length > 1) return undefined;
   }
-
-  // Nobody identifiable: an amount that adds up is the only thing left worth
-  // offering. Anything less plausible is never shown at all.
-  for (const c of candidates) {
-    const members = bestSubset(c.inWindow, payment.amount);
-    if (members) return { payment, balance: c.balance, members, confidence: 'amount' };
-  }
-  return null;
+  return undefined;
 }
 
 /**
- * The exact-ISK candidate(s) for manually linking a transaction to an
- * already-Paid Assignment (issue #540 follow-up: "paying backwards" applied
- * retroactively) — deliberately stricter than `suggestLink`'s fuzzy, tiered
- * confidence: a row the pilot already marked paid needs no "maybe", so an
- * inexact figure is left for the pilot to find and pick themselves in the
- * manual picker rather than guessed at. Still only a suggestion, pre-ticked
- * but never applied without the pilot confirming it.
+ * The Payee a payment was most likely for, or null: its recipient (a Payee anything was billed
+ * to), else, for a payment whose recipient is unknown, the one Payee whose owed figure it
+ * matches. A payment to a known recipient who is none of the Payees is never offered by amount.
  */
-export function exactAmountMatches(
-  payments: readonly MadePayment[],
-  amount: number
-): MadePayment[] {
-  return payments.filter((p) => p.amount !== null && Math.round(p.amount) === Math.round(amount));
+export function suggestLink(payment: MadePayment, ctx: LinkContext): LinkSuggestion | null {
+  if (linkablePayments([payment], ctx).length === 0) return null;
+  const known = recipientOf(
+    payment,
+    ctx.payees.filter((p) => p.billed)
+  );
+  if (known) return { payment, ...known };
+  // A payment to someone the app knows, who is none of the Payees, went to someone else.
+  if (payment.amount === null || payment.counterpartyId !== undefined) return null;
+  const amount = payment.amount;
+  const byAmount = ctx.payees.filter(
+    (p) => !isCorpPayeeId(p.id) && p.owed > 0 && amountsMatch(p.owed, amount)
+  );
+  return byAmount.length === 1 ? { payment, payee: byAmount[0]!, confidence: 'amount' } : null;
 }
 
-/** Every payment worth offering, most confident first, then newest. */
-export function suggestLinks(
-  payments: readonly MadePayment[],
-  balances: readonly PayeeBalance[]
-): LinkSuggestion[] {
-  const rank: Record<LinkConfidence, number> = {
-    'identity-and-amount': 0,
-    identity: 1,
-    'name-and-amount': 2,
-    name: 3,
-    amount: 4,
-  };
+/** Every payment worth offering, the surest first, then newest. */
+export function suggestLinks(payments: readonly MadePayment[], ctx: LinkContext): LinkSuggestion[] {
+  const rank: Record<LinkConfidence, number> = { entity: 0, name: 1, amount: 2 };
   return payments
-    .map((p) => suggestLink(p, balances))
+    .map((p) => suggestLink(p, ctx))
     .filter((s): s is LinkSuggestion => s !== null)
     .sort(
       (a, b) =>
@@ -591,101 +158,77 @@ export function suggestLinks(
     );
 }
 
-/** A short display line for a linked ref, from the same `MadePayment[]` the Payments-to-link card already loaded — `null` when it's no longer in the cached wallet journal/contracts. */
-export function labelForLinkedRef(
-  madePayments: readonly MadePayment[],
-  t: TFunction,
-  kind: 'journal' | 'contract',
-  refId: number
-): string | null {
-  const mp = madePayments.find((p) => p.key === `${kind}:${refId}`);
-  if (!mp) return null;
-  const amount =
-    mp.amount === null ? t('miningTax.linkPaymentInKind') : `${formatIsk(mp.amount)} ISK`;
-  const label = mp.label || t('miningTax.linkPaymentUntitledContract');
-  return `${amount} · ${mp.date.slice(0, 10)} — ${label}`;
-}
-
-/** The dedup'd `LinkedTransaction[]` across `assignments`' payments — the same shape whether it's one row's shared-payment group or a joined group's members. */
-export function linkedTransactionsFor(
-  assignments: readonly MiningTaxAssignmentRecord[],
-  madePayments: readonly MadePayment[],
-  t: TFunction
-): LinkedTransaction[] {
-  const seen = new Set<string>();
-  const out: LinkedTransaction[] = [];
-  for (const a of assignments) {
-    if (!a.payment) continue;
-    for (const kind of ['journal', 'contract'] as const) {
-      for (const l of (kind === 'journal' ? a.payment.journalLinks : a.payment.contractLinks) ??
-        []) {
-        const key = `${kind}:${l.refId}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        out.push({
-          kind,
-          refId: l.refId,
-          source: l.source,
-          label: labelForLinkedRef(madePayments, t, kind, l.refId),
-        });
-      }
-    }
-  }
-  return out;
-}
-
 /**
- * The other entries settled by the same lump sum as `assignment`, oldest
- * first (the same `paymentId` rule as `assignmentsSharingPayment`, which only
- * `ledgerActions` may import) — what the payment card lists so a single entry's detail still shows
- * what the total covers. Empty when it has no payment record or paid alone.
+ * A recorded payment (Settle up, before its transaction showed up) and the one transaction behind
+ * it: to its Payee's recipient, the transfer it states by the shared rule (`matchesStatedTransfer`:
+ * its payer, its amount, within two days of the day it gave). One to one or nothing: a recorded
+ * payment with two candidates, or a transaction two recorded payments could be, is left for the
+ * pilot.
  */
-export function coPaidAssignments(
-  assignment: MiningTaxAssignmentRecord,
-  everyAssignment: readonly MiningTaxAssignmentRecord[]
-): MiningTaxAssignmentRecord[] {
-  const paymentId = assignment.payment?.paymentId;
-  if (paymentId === undefined) return [];
-  return everyAssignment
-    .filter((a) => a.id !== assignment.id && a.payment?.paymentId === paymentId)
-    .sort((a, b) => a.date.localeCompare(b.date));
+export function autoMatchRecorded(
+  payments: readonly MadePayment[],
+  recorded: readonly PayeePaymentLink[],
+  ctx: LinkContext
+): { link: PayeePaymentLink; payment: MadePayment }[] {
+  const open = linkablePayments(payments, ctx);
+  const payeeOf = (payeeId: string) =>
+    ctx.payees.find((p) => p.members.some((m) => m.id === payeeId));
+  const candidates = recorded
+    .filter((l) => l.kind === 'recorded')
+    .map((link) => {
+      const payee = payeeOf(link.payeeId);
+      return {
+        link,
+        payments: payee
+          ? open.filter(
+              (p) =>
+                p.amount !== null &&
+                matchesStatedTransfer(
+                  {
+                    ...(link.characterId !== undefined ? { characterId: link.characterId } : {}),
+                    amount: link.amount,
+                    // A day, stated: its middle, so the two days either way cover it whole.
+                    at: `${link.paidOn}T12:00:00.000Z`,
+                  },
+                  { characterId: p.characterId, amount: p.amount, at: p.date }
+                ) &&
+                recipientOf(p, [payee]) !== undefined
+            )
+          : [],
+      };
+    });
+  const claims = new Map<string, number>();
+  for (const c of candidates)
+    for (const p of c.payments) claims.set(p.key, (claims.get(p.key) ?? 0) + 1);
+  return candidates.flatMap((c) =>
+    c.payments.length === 1 && claims.get(c.payments[0]!.key) === 1
+      ? [{ link: c.link, payment: c.payments[0]! }]
+      : []
+  );
 }
 
-/**
- * The entries outside a joined group that its payment also settled: the
- * co-paid siblings of every member, minus the members themselves.
- */
-export function coPaidOutsideGroup(
-  members: readonly MiningTaxAssignmentRecord[],
-  everyAssignment: readonly MiningTaxAssignmentRecord[]
-): MiningTaxAssignmentRecord[] {
-  const inGroup = new Set(members.map((m) => m.id));
-  const seen = new Set<string>();
-  const out: MiningTaxAssignmentRecord[] = [];
-  for (const m of members) {
-    for (const a of coPaidAssignments(m, everyAssignment)) {
-      if (inGroup.has(a.id) || seen.has(a.id)) continue;
-      seen.add(a.id);
-      out.push(a);
-    }
-  }
-  return out.sort((a, b) => a.date.localeCompare(b.date));
+/** The link a Made Payment becomes once linked to `payeeId`: a payment in kind takes `amount`. */
+export function linkFor(
+  payment: MadePayment,
+  payeeId: string,
+  source: PayeePaymentLink['source'],
+  amount = payment.amount ?? 0
+): PayeePaymentLink {
+  return {
+    payeeId,
+    kind: payment.kind,
+    refId: payment.refId,
+    amount,
+    paidOn: utcDayOf(payment.date),
+    source,
+  };
 }
 
-/**
- * Every Assignment a "Link transaction" action on `dr` should apply to:
- * every member of a joined group at once (issue #540 follow-up — a joined
- * group is billed as one obligation, so a linked transaction covers all of
- * it), or the single row's own shared-`paymentId` group otherwise.
- */
-export function assignmentsForLinkTarget(
-  dr: DisplayRow,
-  everyAssignment: readonly MiningTaxAssignmentRecord[]
-): MiningTaxAssignmentRecord[] {
-  if (dr.groupMembers) return allMembers(dr).map((m) => m.assignment);
-  if (!dr.assignment) return [];
-  // The same rule as `assignmentsSharingPayment`, which only `ledgerActions` may import.
-  const paymentId = dr.assignment.payment?.paymentId;
-  if (paymentId === undefined) return [dr.assignment];
-  return everyAssignment.filter((a) => a.payment?.paymentId === paymentId);
+/** The made payment behind a link, when the wallet or contracts still hold it. */
+export function paymentOfLink(
+  link: Pick<PayeePaymentLink, 'kind' | 'refId'>,
+  payments: readonly MadePayment[]
+): MadePayment | undefined {
+  const key = paymentLinkKey(link);
+  return payments.find((p) => p.key === key);
 }

@@ -7,6 +7,7 @@ import { AutoAssignmentBar } from '@/features/miningTax/AutoAssignmentBar';
 import { CorpBookSyncNote } from '@/features/miningTax/corpBook/CorpBookSyncNote';
 import { LeftCorpNotices } from '@/features/miningTax/corpBook/LeftCorpNotice';
 import {
+  noticeKey,
   notPayingDayKey,
   parseNotPayingKey,
 } from '@/features/miningTax/corpBook/resolve/notPaying';
@@ -15,6 +16,7 @@ import { QuietStatusLine } from '@/features/miningTax/corpBook/resolve/QuietStat
 import { conflictTarget, uncreditedTarget } from '@/features/miningTax/corpBook/resolve/targets';
 import { useResolve } from '@/features/miningTax/corpBook/resolve/useResolve';
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
+import { heldPaymentKeys, type PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
 import { leftCorpBooksOf } from '@/features/miningTax/corpBook/leftCorpBooks';
 import {
   corporationOfPayee,
@@ -51,8 +53,10 @@ import { TaxSelectionBar } from './TaxSelectionBar';
 import { usePayeeFilter } from './usePayeeFilter';
 import { useEntryDeepLink } from './useEntryDeepLink';
 import { useTaxAttentionItems } from './useTaxAttentionItems';
+import { useUnheldCharacterItems } from './corpBook/useUnheldCharacterItems';
 import { useAutoLinkPayees } from './payeeAutoLink';
 import { useTaxBalances } from './useTaxBalances';
+import { bookCreditsOf, bookOwesOf } from './owedNow';
 import { corpPayAccounts, readsEveryDivision } from './corpBook/corpPayAccount';
 import { sum } from '@/engine/math';
 import { useTaxCorpBooks } from './useTaxCorpBooks';
@@ -80,6 +84,9 @@ interface TaxTabProps {
   /** The id base the tab bar was built with, so the body is its tab panel. */
   tabsId: string;
 }
+
+/** Shared, so the hooks below don't see a new empty list on every render. */
+const NO_LINKS: readonly PayeePaymentLink[] = [];
 
 export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   const { t } = useTranslation();
@@ -129,8 +136,8 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   );
 
   const {
+    accounts: bookAccounts,
     ledger,
-    storedAssignments,
     madePayments,
     paymentSources,
     corpView,
@@ -150,6 +157,8 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
       })) ?? [],
     [corpView]
   );
+  const bookCredits = useMemo(() => bookCreditsOf(corpView), [corpView]);
+  const bookOwes = useMemo(() => bookOwesOf(corpView), [corpView]);
   const corpStateLabel = useCorpStateLabel();
   const corpStateHint = useCorpStateHint();
 
@@ -244,18 +253,33 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
       ),
     [corpView, resolvedCharacterFilter, t, quietUncredited]
   );
-  const { balances, unassigned, everyAssignment, linkSuggestions, payeeSystems, owedByPayee } =
-    useTaxBalances({
-      characterFiltered,
-      personalRows,
-      ledgerPayees,
-      allPayees,
-      duplicateAliases,
-      estimatedValueOf,
-      madePayments,
-      storedAssignments,
-      alsoBilled: corpView?.overlay.alsoBilled,
-    });
+  // A donation to one of these is the book's money: never a personal Payee's.
+  const bookCorporationIds = useMemo(
+    () => new Set(corpView?.books.map((b) => b.loaded.corporationId) ?? []),
+    [corpView]
+  );
+  const {
+    accounts,
+    balances,
+    unassigned,
+    everyAssignment,
+    linkSuggestions,
+    payeeSystems,
+    owedByPayee,
+  } = useTaxBalances({
+    characterFiltered,
+    personalRows,
+    ledgerPayees,
+    allPayees,
+    duplicateAliases,
+    estimatedValueOf,
+    madePayments,
+    links: data?.paymentLinks ?? NO_LINKS,
+    accounts: bookAccounts,
+    bookCorporations: bookCorporationIds,
+    bookCredits,
+    bookOwes,
+  });
 
   // A Corp Tax Book row is the corp's to continue, not the member's.
   const continuationRows = useMemo(
@@ -288,13 +312,8 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     settleUpRowsFor
   );
 
-  // A Corp Tax Book Payee credits itself from the corporation's wallet journal and hides Link
-  // payment, so a suggestion aimed at one can be acted on nowhere: counting it on the tile
-  // while its card stayed silent was the double-pay this guard exists to stop.
-  const linkable = useMemo(
-    () => linkSuggestions.filter((s) => !isCorpPayeeId(s.balance.payee.id)),
-    [linkSuggestions]
-  );
+  // Every suggestion names a personal Payee: a Corp Tax Book credits itself from its wallet.
+  const linkable = linkSuggestions;
 
   // The Resolve dialog (resolving in the app): every problem's ways out, in one place.
   const openBookDay = useCallback(
@@ -306,11 +325,16 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     },
     [allDisplayRows, actions]
   );
+  const linkedKeys = useMemo(
+    () => heldPaymentKeys(data?.paymentLinks ?? NO_LINKS),
+    [data?.paymentLinks]
+  );
   const resolve = useResolve({
     corpView,
     nameOf: (id) => characterNames.get(id) ?? '',
     reloadCorpBooks,
     madePayments,
+    linked: linkedKeys,
     onPay: actions.openCorpPay,
     onOpenDay: openBookDay,
   });
@@ -322,8 +346,8 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
         .filter((r) => r.flagged?.state === 'sent')
         .map((r) => notPayingDayKey(r.corporationId, r.characterId, r.date)),
       ...rows
-        .filter((r) => r.declaration?.state === 'waiting' && r.statementId !== undefined)
-        .map((r) => `statement:${r.corporationId}:${r.statementId}`),
+        .filter((r) => r.declaration?.state === 'waiting' && r.noticeId !== undefined)
+        .map((r) => noticeKey(r.corporationId, r.noticeId!)),
     ]).size;
     const notPaying = [...resolve.hidden].sort().flatMap((key) => {
       const parsed = parseNotPayingKey(key);
@@ -342,7 +366,8 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     return { waiting, notPaying };
   }, [corpView, resolve.hidden, t, leftCorp]);
 
-  const attentionItems = useTaxAttentionItems({
+  const unheldItems = useUnheldCharacterItems(corpView, characterIds, reloadCorpBooks);
+  const taxAttentionItems = useTaxAttentionItems({
     data: ledger,
     resolvedCharacterFilter,
     personalRows,
@@ -360,6 +385,10 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     openUnassign: actions.confirmUnassignFor,
     resolve,
   });
+  const attentionItems = useMemo(
+    () => [...unheldItems, ...taxAttentionItems],
+    [unheldItems, taxAttentionItems]
+  );
 
   const { open: openRows, history } = useMemo(
     () => splitLedger(visibleRows, (dr) => dateRangeOf(dr).at(-1) ?? dr.row.entry.date),
@@ -496,6 +525,13 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                       : settleUpBalance(balance.members)
                   }
                   onLinkPayment={(balance) => actions.openLinkWallet({ payeeId: balance.payee.id })}
+                  onOpenLedger={(balance) =>
+                    actions.openLedger(
+                      isCorpPayeeId(balance.payee.id)
+                        ? { kind: 'book', corporationId: corporationOfPayee(balance.payee.id) }
+                        : { kind: 'personal', payeeId: balance.payee.id }
+                    )
+                  }
                   hideLinkPayment={(balance) => isCorpPayeeId(balance.payee.id)}
                   uncreditedOf={(balance) =>
                     isCorpPayeeId(balance.payee.id)
@@ -503,7 +539,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                       : undefined
                   }
                   unlinkedOf={(balance) => {
-                    const mine = linkable.filter((s) => s.balance.payee.id === balance.payee.id);
+                    const mine = linkable.filter((s) => s.payee.id === balance.payee.id);
                     if (mine.length === 0) return undefined;
                     return {
                       count: mine.length,
@@ -635,6 +671,11 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
           systemsByPayee={payeeSystems}
           systemNames={systemNames}
           bookCorporations={bookCorporations}
+          accountOf={(id) => accounts.of(id)}
+          onOpenLedger={(payeeId) => {
+            closePayeeManager();
+            actions.openLedger({ kind: 'personal', payeeId });
+          }}
           refresh={refresh}
         />
 
@@ -649,11 +690,13 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
           refresh={refresh}
           loading={loading}
           continuing={continuing}
-          characterCount={characters.length}
           allDisplayRows={allDisplayRows}
           characterFiltered={characterFiltered}
           everyAssignment={everyAssignment}
-          storedAssignments={storedAssignments}
+          accounts={accounts}
+          links={data?.paymentLinks ?? NO_LINKS}
+          bookCorporations={bookCorporationIds}
+          activeCharacterId={activeCharacterId}
           allPayees={allPayees}
           duplicateAliases={duplicateAliases}
           payeeById={payeeById}

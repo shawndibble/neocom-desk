@@ -13,6 +13,7 @@ import type {
 import type { TradeHub } from '@/market/hubs';
 import type { OrderProblemSample } from '@/engine/market/orderProblemHistory';
 import type { MiningLedgerRow } from '@/engine/miningTax/types';
+import type { PayeePaymentLink } from '@/engine/miningTax/payeeRunningAccount';
 import type {
   Contract,
   ContractItem,
@@ -781,6 +782,27 @@ export interface MiningTaxAssignmentRecord {
 export type MiningTaxPaymentMethod = 'donation' | 'contract' | 'other';
 
 /**
+ * A Made Payment linked to one Payee (decision 20261120-235011, "linking money under one payment
+ * model"): it pays that Payee's oldest unpaid days (`engine/miningTax/payeeRunningAccount.ts`), never
+ * chosen entries. One record per payment, keyed by what was paid (`paymentLinkKey`), so a payment
+ * can pay one Payee only. Stored under the Payee's Character and synced as Editable Data, in its
+ * own collection: an older client, which knows no such field on a Payee or an Assignment, can
+ * never drop it on a write.
+ */
+export interface MiningTaxPaymentLinkRecord extends PayeePaymentLink {
+  /** `paymentLinkKey`: `journal:<id>`, `contract:<id>`, `recorded:<id>` or `legacy:<id>`. */
+  id: string;
+  /**
+   * The one Character that owns it, so a payment's link lives under one Character on every
+   * device: the Character whose wallet paid (the payer the pilot picked, for a recorded payment),
+   * or the one whose old paid mark a legacy link was read from.
+   */
+  characterId: number;
+  /** Epoch ms of the last edit. */
+  updatedAt: number;
+}
+
+/**
  * Whether a linked transaction was attached by the silent recorded-payment
  * matcher (`paymentLinks.ts`'s `autoMatchRecordedPayments`) or picked by the
  * pilot through the manual "Link transaction" dialog (issue #540 follow-up:
@@ -1173,7 +1195,7 @@ export interface CorpBookObservedRecord {
 }
 
 /**
- * One part of an officer's Corp Tax Book (miners, statements, payments, ...) kept
+ * One part of an officer's Corp Tax Book (miners, late notices, payments, ...) kept
  * on this device under its version stamp (#5243, ADR 0031 extended). Officer-only,
  * wiped by the same paths as `CorpBookObservedRecord`.
  */

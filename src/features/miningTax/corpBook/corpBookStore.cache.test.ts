@@ -352,3 +352,33 @@ describe('a member book on this device (#5243)', () => {
     expect(store.reads).toContain(OBS);
   });
 });
+
+describe('an alt the pilot holds (the character selector\'s "All characters")', () => {
+  const ALT = 6;
+  it("reads the alt's own mined rows and payments as the alt, so they count for the group", async () => {
+    store.docs.set(`corpTaxBookBilledBy/char:${ALT}`, { books: { [CORP]: 1 } });
+    store.docs.delete(`${BOOK}/miners/solo:6`);
+    store.docs.set(`${BOOK}/miners/g1`, {
+      characterIds: [ME, ALT],
+      mainCharacterId: ME,
+      uids: [`char:${ME}`, `char:${ALT}`],
+    });
+    const mined = { structureId: 1001, typeId: 45490, quantity: 100, date: '2026-10-05' };
+    store.docs.set(`${BOOK}/observed/r5`, { ...mined, characterId: ME, uid: `char:${ME}` });
+    store.docs.set(`${BOOK}/observed/r6`, { ...mined, characterId: ALT, uid: `char:${ALT}` });
+    store.docs.set(`${BOOK}/payments/j1_7`, {
+      source: 'donation',
+      characterId: ALT,
+      uid: `char:${ALT}`,
+      amount: 1000,
+      at: '2026-10-06T12:00:00Z',
+      minerId: 'g1',
+    });
+
+    const [book] = await loadCorpBooks([...me, { characterId: ALT, corporationId: CORP }]);
+
+    expect(book?.characterIds).toEqual([ME, ALT]);
+    expect(book?.observed.map((e) => e.characterId).sort()).toEqual([ME, ALT]);
+    expect(book?.payments).toMatchObject([{ id: 'j1_7', minerId: 'g1', characterId: ALT }]);
+  });
+});

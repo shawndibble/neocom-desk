@@ -1,8 +1,8 @@
 import { formatCount } from '@/lib/formatCount';
+import { LEGACY_ISSUE_ACTION } from '../taxBook/bookClient';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useMemo, useState, type ReactElement, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
-import { Trans, useTranslation } from 'react-i18next';
+import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Button,
@@ -30,34 +30,28 @@ import {
   rangeFigures,
   rangeStart,
   type DayRange,
-  statementAdjustment,
   moonByStructure,
-  paymentLedger,
   type ActivityKind,
-  type LedgerRow,
 } from '@/engine/corpTaxBook/bookSections';
-import { minerDetail, type DayRow, type DayStatus } from '@/engine/corpTaxBook/bookView';
-import { wholeIsk } from '@/engine/corpTaxBook/wholeIsk';
-import type { Adjustment, Statement } from '@/engine/corpTaxBook/statements';
+import { bookMiner, minerDetail, type DayRow, type DayStatus } from '@/engine/corpTaxBook/bookView';
+import { NOTICE_ID_FIELD, type LateNotice } from '../../../../functions/src/corpTaxBookLateNotice';
 import { cx } from '@/lib/cx';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { listQueue } from '@/features/corpTaxBook/mailQueueStore';
 import { ActivityRow, AuditLine } from './AuditFeed';
 import { useBookAudit } from './useBookAudit';
 import { useBook } from './useBook';
+import { isLocked } from '../../../../functions/src/corpTaxBookCheckpoint';
 import { CloseAccountDialog } from './CloseAccountDialog';
 import { OldestUnpaid } from './AccountStatus';
-import { AccountLedger } from './AccountLedger';
-import { MarkNotTaxDialog, ReasonDialog, RecordPaymentDialog } from './BookDialogs';
+import { MinerLedger } from './MinerLedger';
 import {
-  atDate,
-  isk,
-  iskOrDash,
-  periodLabel,
-  shortDate,
-  shortDateTime,
-  signedIsk,
-} from './moonsFormat';
+  MarkNotTaxDialog,
+  ReasonDialog,
+  ReassignPaymentDialog,
+  RecordPaymentDialog,
+} from './BookDialogs';
+import { atDate, isk, iskOrDash, shortDate, signedIsk } from './moonsFormat';
 import type { AuditEntry } from '../taxBook/bookClient';
 import { extractionPath, refineryPath } from './moonsPaths';
 import { Crumb, StandingWord } from './moonsParts';
@@ -67,34 +61,31 @@ import {
   EditCorrectionDialog,
   MarketAdjustmentDialog,
   RateOverrideDialog,
-  RebillDialog,
 } from './CorrectionDialogs';
 import type { LedgerActions } from './LedgerRowMenu';
-import { paymentWalletHref } from './paymentWalletHref';
+import { isMinerAuditEntry } from './minerAudit';
+import { useAuditWords } from './useAuditWords';
 import { dayEndTime } from './dayEndTime';
 import { BookSection, EntityHeader, PlaceCell } from './sectionParts';
 import { tapTargetClassName } from './sectionHelpers';
-import { StatementPanel } from './StatementPanel';
-import { useStatementParam } from './useStatementParam';
-import { oldestOpenStatement, useMinerReminder } from './statementMailing';
+import { LateNoticePanel } from './LateNoticePanel';
+import { useNoticeParam } from './useNoticeParam';
+import { useMinerReminder } from './lateNoticeMailing';
 
 const STATUS_TONE: Record<DayStatus, string> = {
   paid: 'text-success',
-  'on-statement': 'text-text-dim',
-  unbilled: 'text-text',
+  owed: 'text-text',
   'not-billable': 'text-text-dim',
   dismissed: 'text-text-dim line-through decoration-text-faint',
-  'written-off': 'text-text-dim line-through decoration-text-faint',
 };
 
 type Detail = NonNullable<ReturnType<typeof minerDetail>>;
 type Payment = Detail['payments'][number];
-type PaymentRow = LedgerRow<Payment, Adjustment>;
 
 /**
  * A Miner's page: the owed figure and its facts first, then one
- * scroll of Today's mining, Next Statement, Earlier days, Payments (corrections are a kind of
- * row in it), Moons and Activity (mail, dismissals and the audit log behind filter chips).
+ * scroll of the Ledger (payments and corrections are rows in it), Today's mining, Owed days,
+ * Earlier days, Moons and Activity (mail, dismissals and the audit log behind filter chips).
  * No inner tabs; each section carries its count and pages its newest ten rows.
  */
 export function MinerDetail({ id }: { id: string }) {
@@ -109,7 +100,6 @@ export function MinerDetail({ id }: { id: string }) {
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [filter, setFilter] = useState<'all' | ActivityKind>('all');
   const [range, setRange] = useState<DayRange>('all');
-  const running = !!view.input.runningAccountFrom;
   const from = rangeStart(range, view.input.now);
   const [dialog, setDialog] = useState<
     | { kind: 'record' }
@@ -118,8 +108,8 @@ export function MinerDetail({ id }: { id: string }) {
     | { kind: 'close' }
     | { kind: 'rate'; dayKey?: string }
     | { kind: 'adjust'; date?: string }
-    | { kind: 'rebill' }
     | { kind: 'notTax'; payment: Payment }
+    | { kind: 'reassign'; payment: Payment }
     | { kind: 'reverse'; dismissalId: string }
     | { kind: 'editCorrection'; adjustmentId: string }
     | { kind: 'reverseCorrection'; adjustmentId: string }
@@ -130,44 +120,35 @@ export function MinerDetail({ id }: { id: string }) {
   >(null);
   const [notice, setNotice] = useState<string | null>(null);
   const reminder = useMinerReminder(id, setNotice);
-  const statementIds = useMemo(() => new Set(detail?.statements.map((s) => s.id)), [detail]);
-  const statementParam = useStatementParam(detail !== undefined, (sid) => statementIds.has(sid));
+  const auditWords = useAuditWords();
+  const noticeIds = useMemo(() => new Set(detail?.notices.map((n) => n.id)), [detail]);
+  const noticeParam = useNoticeParam(detail !== undefined, (nid) => noticeIds.has(nid));
   const paymentIds = useMemo(() => new Set(detail?.payments.map((p) => p.id)), [detail]);
-  const minerAudit = useMemo(
-    () =>
-      audit.entries.filter((e) => {
-        const d = e.detail;
-        return (
-          d.minerId === id ||
-          statementIds.has(d.statementId as string) ||
-          paymentIds.has(d.paymentId as string)
-        );
-      }),
-    [audit.entries, id, statementIds, paymentIds]
-  );
+  const minerAudit = useMemo(() => {
+    const subjects = {
+      minerId: id,
+      noticeIds,
+      paymentIds,
+      declarationIds: new Set(detail?.declarations.map((d) => d.id)),
+      disputeIds: new Set(detail?.disputes.map((d) => d.id)),
+    };
+    return audit.entries.filter((e) => isMinerAuditEntry(e.detail, subjects));
+  }, [audit.entries, id, noticeIds, paymentIds, detail]);
   // The range narrows what happened (Earlier days, Payments); what is owed now always shows whole.
   const phases = useMemo(() => {
-    const all = daysByPhase(detail?.days ?? [], { running });
+    const all = daysByPhase(detail?.days ?? []);
     return { ...all, earlier: all.earlier.filter((d) => inRange(d.date, from)) };
-  }, [detail, from, running]);
+  }, [detail, from]);
   const rangeTax = useMemo(
     () => rangeFigures(detail?.days ?? [], detail?.payments ?? [], from),
     [detail, from]
   );
   const moonOf = useMemo(() => moonByStructure(view), [view]);
-  const ledger = useMemo(
-    () =>
-      paymentLedger(
-        (detail?.payments ?? []).filter((p) => inRange(p.at, from)),
-        data.adjustments.filter((a) => a.minerId === id && !a.reversed && inRange(a.at, from))
-      ),
-    [detail, data.adjustments, id, from]
-  );
   const feed = useMemo(
     () =>
       activityFeed({
         mail: queue
-          .filter((m) => statementIds.has(m.statementId))
+          .filter((m) => noticeIds.has(m.statementId))
           .map((m) => ({
             id: m.id,
             at: m.createdAt,
@@ -181,20 +162,20 @@ export function MinerDetail({ id }: { id: string }) {
         })),
         audit: minerAudit,
       }),
-    [queue, statementIds, detail, minerAudit]
+    [queue, noticeIds, detail, minerAudit]
   );
-  // The Statement (period and amount) or payment amount an entry is about.
+  // The late notice (and what it asked) or payment amount an entry is about.
   const auditContext = (e: AuditEntry): ReactNode => {
-    const { statementId, amount } = e.detail;
-    const st =
-      typeof statementId === 'string'
-        ? detail?.statements.find((x) => x.id === statementId)
-        : undefined;
-    if (st) {
+    const { noticeId, [NOTICE_ID_FIELD]: legacyId, amount } = e.detail;
+    const nid = noticeId ?? legacyId;
+    const n = typeof nid === 'string' ? detail?.notices.find((x) => x.id === nid) : undefined;
+    if (n) {
       return (
         <>
-          {statementLink(st)}
-          {e.action === 'issueStatement' && <> · {isk(st.amount)}</>}
+          {noticeLink(n)}
+          {(e.action === 'issueLateNotice' || e.action === LEGACY_ISSUE_ACTION) && (
+            <> · {isk(n.listed)}</>
+          )}
         </>
       );
     }
@@ -212,18 +193,20 @@ export function MinerDetail({ id }: { id: string }) {
   }
   const { row } = detail;
   const name = names.character(row.mainCharacterId);
-  const openStatement = oldestOpenStatement(view, id);
   const closedAt = view.input.miners.find((m) => m.id === id)?.closedAt;
   // Tolerance shortfalls and officer write-offs (#4637) both come off what is owed.
-  const toleranceTotal =
-    detail.toleranceWriteOffs.reduce((s, w) => s + w.amount, 0) +
-    detail.officerWriteOffs.reduce((s, w) => s + (w.reversed ? 0 : w.amount), 0);
-  const lateTotal = detail.lateWriteOffs.reduce((s, w) => s + w.tax, 0);
+  const toleranceTotal = detail.dayWriteOffs.reduce((s, w) => s + w.amount, 0) + detail.forgiven;
   const paidTotal = detail.payments.reduce((s, p) => s + p.credited, 0);
-  const billedTotal = detail.statements.reduce((s, x) => s + x.amount, 0);
+  const held = new Set(detail.heldDays);
+  const billedTotal = detail.days
+    .filter((d) => d.status === 'paid' || (d.status === 'owed' && !held.has(d.date)))
+    .reduce((s, d) => s + d.tax, 0);
   const selectedDays = detail.days.filter((d) => selected.has(d.key));
   const selectedTax = selectedDays.reduce((s, d) => s + d.tax, 0);
-  const canSelect = (d: DayRow) => d.status === 'unbilled' || d.status === 'not-billable';
+  // A day before the lock date is read-only (decision 20261120-235011, "a lock date").
+  const locked = (date: string) => isLocked(date, view.input.now);
+  const canSelect = (d: DayRow) =>
+    (d.status === 'owed' || d.status === 'not-billable') && !locked(d.date);
   const sumTax = (days: readonly DayRow[]) => days.reduce((s, d) => s + d.tax, 0);
   const moonName = (moonId: number | undefined) =>
     moonId === undefined ? undefined : names.moon(moonId);
@@ -241,21 +224,19 @@ export function MinerDetail({ id }: { id: string }) {
   };
   const noun = (key: string) => t(`corpTaxBook.moons.sections.nouns.${key}`);
 
-  /** A Statement's period as a link that opens the shared Statement panel (#5288). */
-  const statementLink = (st: Statement) => (
+  /** A late notice's issue date as a link that opens the shared notice panel (#5288). */
+  const noticeLink = (n: LateNotice) => (
     <button
       type="button"
       className={entityLinkClassName(cx('whitespace-nowrap', tapTargetClassName))}
-      aria-label={t('corpTaxBook.moons.payment.openStatement', {
-        period: periodLabel(st.periodStart, st.periodEnd),
-      })}
-      onClick={() => statementParam.open(st.id)}
+      aria-label={t('corpTaxBook.moons.payment.openNotice', { date: atDate(n.issuedAt, zone) })}
+      onClick={() => noticeParam.open(n.id)}
     >
-      {periodLabel(st.periodStart, st.periodEnd)}
+      {t('corpTaxBook.moons.payment.noticeOf', { date: atDate(n.issuedAt, zone) })}
     </button>
   );
-  const statementOf = (statementId: string | undefined) =>
-    statementId === undefined ? undefined : detail.statements.find((x) => x.id === statementId);
+  const noticeOf = (noticeId: string | undefined) =>
+    noticeId === undefined ? undefined : detail.notices.find((x) => x.id === noticeId);
 
   // The three day tables share one grid (select, day, moon, character, ore, rate, tax), so a
   // reader's eye keeps its column from one section to the next: Earlier days keeps the select
@@ -340,16 +321,22 @@ export function MinerDetail({ id }: { id: string }) {
           {d.oreLines
             .map((l) => `${names.ore(l.typeId)}\u00a0×\u00a0${formatCount(l.quantity)}`)
             .join(', ')}
-          {withStatus && (
-            <span className={cx('block text-xs whitespace-nowrap', STATUS_TONE[d.status])}>
-              {d.heldBy !== undefined
-                ? t('corpTaxBook.moons.dayStatus.held', { owner: names.corporation(d.heldBy) })
-                : t(
-                    `corpTaxBook.moons.dayStatus.${running && d.status === 'unbilled' ? 'owed' : d.status}`
-                  )}
+          {/* A day a dispute holds says so wherever it is listed: nothing pays it until the dispute ends. */}
+          {(withStatus || d.disputed) && (
+            <span
+              className={cx(
+                'block text-xs whitespace-nowrap',
+                d.disputed ? 'text-warning' : STATUS_TONE[d.status]
+              )}
+            >
+              {d.disputed
+                ? t('corpTaxBook.moons.dayStatus.disputed', { date: shortDate(d.disputed.until) })
+                : d.heldBy !== undefined
+                  ? t('corpTaxBook.moons.dayStatus.held', { owner: names.corporation(d.heldBy) })
+                  : t(`corpTaxBook.moons.dayStatus.${d.status}`)}
               {(() => {
-                const st = statementOf(d.statementId);
-                return st && <> · {statementLink(st)}</>;
+                const n = noticeOf(d.noticeId);
+                return n && <> · {noticeLink(n)}</>;
               })()}
             </span>
           )}
@@ -370,8 +357,7 @@ export function MinerDetail({ id }: { id: string }) {
       align: 'right',
       className: 'w-36 tabular-nums',
       cardCorner: true,
-      cellClassName: (d) =>
-        d.status === 'dismissed' || d.status === 'written-off' ? 'line-through text-text-dim' : '',
+      cellClassName: (d) => (d.status === 'dismissed' ? 'line-through text-text-dim' : ''),
       render: (d) => isk(d.tax),
       sortValue: (d) => d.tax,
     },
@@ -381,13 +367,15 @@ export function MinerDetail({ id }: { id: string }) {
     editCorrection: (adjustmentId) => setDialog({ kind: 'editCorrection', adjustmentId }),
     reverseCorrection: (adjustmentId) => setDialog({ kind: 'reverseCorrection', adjustmentId }),
     reverseWriteOff: (writeOffId) => setDialog({ kind: 'reverseWriteOff', writeOffId }),
-    chargeShortfall: (e) =>
-      e.forDate && setDialog({ kind: 'marketCharge', date: e.forDate, amount: e.credit }),
-    changeForgiven: (e) =>
-      e.forDate && setDialog({ kind: 'marketEdit', date: e.forDate, amount: e.credit }),
+    chargeShortfall: (d) => setDialog({ kind: 'marketCharge', date: d.date, amount: d.amount }),
+    changeForgiven: (d) => setDialog({ kind: 'marketEdit', date: d.date, amount: d.amount }),
     markNotTax: (paymentId) => {
       const payment = detail?.payments.find((p) => p.id === paymentId);
       if (payment) setDialog({ kind: 'notTax', payment });
+    },
+    reassignPayment: (paymentId) => {
+      const payment = detail?.payments.find((p) => p.id === paymentId);
+      if (payment) setDialog({ kind: 'reassign', payment });
     },
     changeRate: (dayKey) => setDialog({ kind: 'rate', dayKey }),
     dismissDays: (keys) => {
@@ -404,20 +392,16 @@ export function MinerDetail({ id }: { id: string }) {
 
   const daysSection = (
     title: string,
-    key: 'nextStatement' | 'stillAccruing' | 'earlier',
+    key: 'owed' | 'stillAccruing' | 'earlier',
     meta: ReactNode,
     opts: { select: boolean; status: boolean; startOpen: boolean; rowMenu?: boolean }
   ) => {
     const columns = dayColumns(opts.select, opts.status, phone);
-    const adjust =
-      key === 'nextStatement' && !running ? statementAdjustment(phases.nextStatement, row) : 0;
     return (
       <BookSection
         title={title}
         noun={noun('days')}
-        empty={t(
-          `corpTaxBook.moons.miner.empty.${key === 'nextStatement' && running ? 'owedDays' : key}`
-        )}
+        empty={t(`corpTaxBook.moons.miner.empty.${key === 'owed' ? 'owedDays' : key}`)}
         rows={phases[key]}
         sortColumns={columns}
         meta={meta}
@@ -426,7 +410,7 @@ export function MinerDetail({ id }: { id: string }) {
         startOpen={opts.startOpen}
         summary={t('corpTaxBook.moons.miner.daysSummary', {
           count: phases[key].length,
-          tax: isk(key === 'nextStatement' && running ? row.owed : sumTax(phases[key]) + adjust),
+          tax: isk(key === 'owed' ? row.owed : sumTax(phases[key])),
         })}
       >
         {(shown, table) => (
@@ -451,7 +435,7 @@ export function MinerDetail({ id }: { id: string }) {
     );
   };
 
-  /** One day's actions (right-click, touch-and-hold, ⋮): only a day not yet on a Statement has them. */
+  /** One day's actions (right-click, touch-and-hold, ⋮): only a day not paid yet has them. */
   const dayMenu = (d: DayRow, tr: ReactElement) =>
     canSelect(d) ? (
       <RowActionsMenu name={shortDate(d.date)} items={dayMenuItems(d)}>
@@ -478,163 +462,6 @@ export function MinerDetail({ id }: { id: string }) {
       </MenuItem>
     </>
   );
-
-  /** The Statement a correction line was billed on; undefined while it waits for the next one. */
-  const billedOn = (adjustmentId: string) =>
-    detail.statements.find((x) => x.lines.some((l) => l.adjustmentId === adjustmentId));
-
-  const paymentCredited = (payment: Payment) => {
-    // Only Statements the payment put at least 1 ISK on; a fraction is not a credit (#5247).
-    const credited = detail.paymentCredits
-      .filter((c) => c.paymentId === payment.id && wholeIsk(c.amount) >= 1)
-      .flatMap((c) => {
-        const st = statementOf(c.statementId);
-        return st ? [{ st, amount: c.amount }] : [];
-      });
-    const hidden = credited.slice(2);
-    return (
-      <span className="text-xs">
-        {credited.length > 0 ? (
-          <span className="flex flex-col">
-            {credited.slice(0, 2).map(({ st, amount }) => (
-              <span key={st.id}>
-                {statementLink(st)}
-                <span className="text-text-dim"> · {isk(amount)}</span>
-              </span>
-            ))}
-            {hidden.length > 0 && (
-              <Tooltip
-                content={hidden
-                  .map(({ st }) => periodLabel(st.periodStart, st.periodEnd))
-                  .join(', ')}
-              >
-                <span tabIndex={0} className="w-fit text-text-dim">
-                  {t('corpTaxBook.moons.payment.moreStatements', { count: hidden.length })}
-                </span>
-              </Tooltip>
-            )}
-          </span>
-        ) : (
-          !payment.notTaxAmount && (
-            <span className="text-text-dim">{t('corpTaxBook.moons.payment.oldestFirst')}</span>
-          )
-        )}
-        {payment.notTaxAmount ? (
-          <span className="block text-warning">
-            {t('corpTaxBook.moons.payment.markedNotTax', { amount: isk(payment.notTaxAmount) })}
-          </span>
-        ) : null}
-      </span>
-    );
-  };
-
-  const paymentColumns: DataTableColumn<PaymentRow>[] = [
-    {
-      id: 'at',
-      header: t('corpTaxBook.moons.cols.when'),
-      render: (r) => {
-        const href = r.kind === 'payment' ? paymentWalletHref(r.payment.id) : null;
-        return href ? (
-          <Link to={href} className={entityLinkClassName(tapTargetClassName)}>
-            {shortDateTime(r.at, zone)}
-          </Link>
-        ) : (
-          shortDateTime(r.at, zone)
-        );
-      },
-      sortValue: (r) => r.at,
-      sortFirst: 'desc',
-    },
-    {
-      id: 'from',
-      header: t('corpTaxBook.moons.cols.from'),
-      primary: true,
-      render: (r) =>
-        r.kind === 'payment' ? (
-          <span>
-            {names.character(r.payment.characterId)}
-            <span className="block text-xs text-text-dim">
-              {t(`corpTaxBook.moons.payment.${r.payment.source}`)}
-            </span>
-          </span>
-        ) : (
-          <span>
-            {r.correction.reason}
-            <span className="block text-xs text-text-dim">
-              {t(
-                r.correction.amount < 0
-                  ? 'corpTaxBook.moons.payment.correctionCredit'
-                  : 'corpTaxBook.moons.payment.correctionCharge',
-                { name: names.character(r.correction.by) }
-              )}
-            </span>
-          </span>
-        ),
-      sortValue: (r) =>
-        r.kind === 'payment' ? names.character(r.payment.characterId) : r.correction.reason,
-    },
-    {
-      id: 'amount',
-      header: t('corpTaxBook.moons.cols.amount'),
-      align: 'right',
-      className: 'tabular-nums',
-      cardCorner: true,
-      render: (r) =>
-        r.kind === 'payment' ? (
-          <span className="text-isk-pos">{isk(r.payment.amount)}</span>
-        ) : (
-          <span className={r.correction.amount < 0 ? 'text-isk-pos' : 'text-warning'}>
-            {signedIsk(r.correction.amount)}
-          </span>
-        ),
-      sortValue: (r) => (r.kind === 'payment' ? r.payment.amount : r.correction.amount),
-    },
-    {
-      id: 'credited',
-      header: t('corpTaxBook.moons.cols.creditedTo'),
-      render: (r) =>
-        r.kind === 'correction' ? (
-          <span className="text-xs text-text-dim">
-            {(() => {
-              const st = billedOn(r.correction.id);
-              const date = shortDate(r.correction.date);
-              return st ? (
-                <Trans
-                  i18nKey="corpTaxBook.moons.payment.billedOn"
-                  values={{ period: periodLabel(st.periodStart, st.periodEnd), date }}
-                  components={{ link: statementLink(st) }}
-                />
-              ) : (
-                t('corpTaxBook.moons.payment.correctsDay', { date })
-              );
-            })()}
-          </span>
-        ) : (
-          paymentCredited(r.payment)
-        ),
-    },
-    ...(canEdit
-      ? [
-          {
-            id: 'actions',
-            header: '',
-            align: 'right',
-            render: (r: PaymentRow) =>
-              r.kind === 'payment' ? (
-                <button
-                  type="button"
-                  className={entityLinkClassName(
-                    cx('shrink-0 whitespace-nowrap', tapTargetClassName)
-                  )}
-                  onClick={() => setDialog({ kind: 'notTax', payment: r.payment })}
-                >
-                  {t('corpTaxBook.moons.payment.markNotTax')}
-                </button>
-              ) : null,
-          } satisfies DataTableColumn<PaymentRow>,
-        ]
-      : []),
-  ];
 
   const guestOpen = row.standing === 'guest' && !closedAt;
   // The reason a disabled action is inert, printed under it: a menu item has no tooltip on touch.
@@ -669,13 +496,6 @@ export function MinerDetail({ id }: { id: string }) {
       {t('corpTaxBook.moons.corrections.adjust.open')}
     </DropdownMenuItem>
   );
-  // A running account has no next Statement to rebill onto: late ore already changes the day's
-  // owed amount, so Rebill from date stays only for a book still billing Statements.
-  const rebillItem = running ? null : (
-    <DropdownMenuItem onSelect={() => setDialog({ kind: 'rebill' })}>
-      {t('corpTaxBook.moons.corrections.rebill.open')}
-    </DropdownMenuItem>
-  );
   const closeItem = guestOpen ? (
     <DropdownMenuItem onSelect={() => setDialog({ kind: 'close' })}>
       {t('corpTaxBook.moons.miner.closeAccount')}
@@ -694,7 +514,6 @@ export function MinerDetail({ id }: { id: string }) {
           {dismissAllItem}
           {rateItem}
           {adjustItem}
-          {rebillItem}
           {closeItem}
         </HeaderMoreMenu>
       ) : (
@@ -716,7 +535,6 @@ export function MinerDetail({ id }: { id: string }) {
           <HeaderMoreMenu>
             {rateItem}
             {adjustItem}
-            {rebillItem}
             {closeItem}
           </HeaderMoreMenu>
         </>
@@ -739,9 +557,9 @@ export function MinerDetail({ id }: { id: string }) {
       />
       <p
         role="status"
-        className={(notice ?? statementParam.notFound) ? 'text-xs text-text-dim' : 'sr-only'}
+        className={(notice ?? noticeParam.notFound) ? 'text-xs text-text-dim' : 'sr-only'}
       >
-        {notice ?? statementParam.notFound}
+        {notice ?? noticeParam.notFound}
       </p>
       {closedAt && (
         <p role="status" className="text-xs text-text-dim">
@@ -763,50 +581,33 @@ export function MinerDetail({ id }: { id: string }) {
         }
         facts={[
           { label: t('corpTaxBook.moons.miner.paid'), value: iskOrDash(paidTotal) },
-          running && row.account
-            ? {
-                label: t('corpTaxBook.moons.miner.oldestUnpaid'),
-                value: <OldestUnpaid account={row.account} />,
-              }
-            : {
-                label: t('corpTaxBook.moons.chips.unbilled'),
-                value: (
-                  <span className="inline-flex items-center gap-1">
-                    {iskOrDash(row.unbilled)}
-                    <InfoTooltip
-                      label={t('corpTaxBook.moons.chips.unbilled')}
-                      content={t('corpTaxBook.moons.miner.unbilledTip', {
-                        pending: isk(row.pending),
-                      })}
-                      glyph="info"
-                    />
-                  </span>
-                ),
-              },
+          // Billed − written off − settled = owed: the figures the old Payments footer printed.
+          { label: t('corpTaxBook.moons.miner.billed'), value: isk(billedTotal) },
+          {
+            label: t('corpTaxBook.moons.miner.settled'),
+            value: isk(billedTotal - toleranceTotal - row.owed),
+          },
+          {
+            label: t('corpTaxBook.moons.miner.oldestUnpaid'),
+            value: <OldestUnpaid account={bookMiner(view, id)!.account} />,
+          },
           {
             label: t('corpTaxBook.moons.miner.lastPayment'),
             value: row.lastPaidAt ? atDate(row.lastPaidAt, zone) : '—',
           },
           { label: t('corpTaxBook.moons.chips.pending'), value: iskOrDash(row.pending) },
           // Nothing written off, nothing to say: the fact would be a row of zeros.
-          ...(toleranceTotal === 0 && detail.lateWriteOffs.length === 0
+          ...(toleranceTotal === 0
             ? []
             : [
                 {
                   label: t('corpTaxBook.moons.miner.writtenOff'),
                   value: (
                     <span className="inline-flex items-center gap-1">
-                      {detail.lateWriteOffs.length === 0
-                        ? isk(toleranceTotal)
-                        : t('corpTaxBook.moons.miner.writtenOffValue', {
-                            tolerance: isk(toleranceTotal),
-                            count: detail.lateWriteOffs.length,
-                          })}
+                      {isk(toleranceTotal)}
                       <InfoTooltip
                         label={t('corpTaxBook.moons.miner.writtenOff')}
-                        content={t('corpTaxBook.moons.miner.writtenOffTip', {
-                          late: isk(lateTotal),
-                        })}
+                        content={t('corpTaxBook.moons.miner.writtenOffTip')}
                         glyph="info"
                       />
                     </span>
@@ -815,33 +616,6 @@ export function MinerDetail({ id }: { id: string }) {
               ]),
         ]}
       />
-      <AccountLedger
-        detail={detail}
-        corrections={data.adjustments.filter((a) => a.minerId === id)}
-        running={running}
-        phone={phone}
-        actions={ledgerActions}
-      />
-      {daysSection(
-        t('corpTaxBook.moons.sections.stillAccruing'),
-        'stillAccruing',
-        <InfoTooltip
-          label={t('corpTaxBook.moons.sections.stillAccruing')}
-          content={t('corpTaxBook.moons.miner.dayEndTip', {
-            time: dayEndTime(view.input.graceHours),
-          })}
-          glyph="info"
-        />,
-        { select: true, status: false, startOpen: false, rowMenu: true }
-      )}
-      {daysSection(
-        t(`corpTaxBook.moons.sections.${running ? 'owedDays' : 'nextStatement'}`),
-        'nextStatement',
-        <span className="text-xs text-text-dim">
-          {t(running ? 'corpTaxBook.moons.miner.owedDaysHint' : 'corpTaxBook.moons.miner.daysHint')}
-        </span>,
-        { select: true, status: false, startOpen: true, rowMenu: true }
-      )}
       <div className="flex flex-wrap items-center gap-3">
         <SegmentedControl
           label={t('corpTaxBook.moons.account.range.label')}
@@ -861,56 +635,31 @@ export function MinerDetail({ id }: { id: string }) {
           </span>
         )}
       </div>
+      <MinerLedger minerId={id} detail={detail} phone={phone} actions={ledgerActions} from={from} />
+      {daysSection(
+        t('corpTaxBook.moons.sections.stillAccruing'),
+        'stillAccruing',
+        <InfoTooltip
+          label={t('corpTaxBook.moons.sections.stillAccruing')}
+          content={t('corpTaxBook.moons.miner.dayEndTip', {
+            time: dayEndTime(view.input.graceHours),
+          })}
+          glyph="info"
+        />,
+        { select: true, status: false, startOpen: false, rowMenu: true }
+      )}
+      {daysSection(
+        t('corpTaxBook.moons.sections.owedDays'),
+        'owed',
+        <span className="text-xs text-text-dim">{t('corpTaxBook.moons.miner.owedDaysHint')}</span>,
+        { select: true, status: false, startOpen: true, rowMenu: true }
+      )}
       {daysSection(
         t('corpTaxBook.moons.sections.earlierDays'),
         'earlier',
         <span className="text-xs text-text-dim">{t('corpTaxBook.moons.miner.earlierHint')}</span>,
         { select: false, status: true, startOpen: false }
       )}
-      <BookSection
-        title={t('corpTaxBook.moons.miner.payments')}
-        noun={noun('payments')}
-        empty={t('corpTaxBook.moons.miner.empty.payments')}
-        rows={ledger}
-        sortColumns={paymentColumns}
-        meta={
-          <span className="text-xs text-text-dim">{t('corpTaxBook.moons.miner.paymentsHint')}</span>
-        }
-        phone={phone}
-        summary={t('corpTaxBook.moons.miner.paymentsSummary', {
-          count: ledger.length,
-          amount: isk(paidTotal),
-        })}
-      >
-        {(shown, table) => (
-          <>
-            <DataTable
-              label={t('corpTaxBook.moons.miner.payments')}
-              columns={paymentColumns}
-              rows={[...shown]}
-              rowKey={(r) => `${r.kind}-${r.id}`}
-              density="compact"
-              stackLayout="dense"
-              mobileSort
-              {...table}
-            />
-            <p className="border-t border-line px-3 py-2 text-xs text-text-dim tabular-nums">
-              {/* Nothing written off: leave the term out rather than print "− written off —". */}
-              {t(
-                Math.abs(toleranceTotal) < 1
-                  ? 'corpTaxBook.moons.miner.sumNoWriteOff'
-                  : 'corpTaxBook.moons.miner.sum',
-                {
-                  billed: isk(billedTotal),
-                  written: iskOrDash(toleranceTotal),
-                  settled: isk(billedTotal - toleranceTotal - row.owed),
-                  owed: isk(row.owed),
-                }
-              )}
-            </p>
-          </>
-        )}
-      </BookSection>
       <BookSection
         title={t('corpTaxBook.moons.miner.activity')}
         noun={noun('activity')}
@@ -950,7 +699,12 @@ export function MinerDetail({ id }: { id: string }) {
             {shown.map((f) => {
               if (f.kind === 'audit')
                 return (
-                  <AuditLine key={`a-${f.id}`} entry={f.item} context={auditContext(f.item)} />
+                  <AuditLine
+                    key={`a-${f.id}`}
+                    entry={f.item}
+                    context={auditContext(f.item)}
+                    words={auditWords}
+                  />
                 );
               if (f.kind === 'mail') {
                 const m = f.item.mail;
@@ -974,7 +728,13 @@ export function MinerDetail({ id }: { id: string }) {
                   key={`d-${f.id}`}
                   at={d.at}
                   aside={
-                    canEdit && !d.reversed ? (
+                    canEdit &&
+                    !d.reversed &&
+                    // A record's dismissal is locked with its day; a wider one never is.
+                    !(
+                      d.scope === 'record' &&
+                      locked(detail.days.find((x) => x.key === d.targetId)?.date ?? d.at)
+                    ) ? (
                       <button
                         type="button"
                         className={entityLinkClassName(
@@ -993,7 +753,16 @@ export function MinerDetail({ id }: { id: string }) {
                   })}
                   <span className="text-text-dim">
                     {' '}
-                    · “{d.reason}”{d.reversed && ` · ${t('corpTaxBook.moons.miner.reversed')}`}
+                    · “{d.reason}”
+                    {d.reversed &&
+                      // A reversal stamped with a lock date ends the dismissal only from that day.
+                      ` · ${
+                        d.reversed.from
+                          ? t('corpTaxBook.moons.miner.reversedFrom', {
+                              date: shortDate(d.reversed.from),
+                            })
+                          : t('corpTaxBook.moons.miner.reversed')
+                      }`}
                   </span>
                 </ActivityRow>
               );
@@ -1009,7 +778,6 @@ export function MinerDetail({ id }: { id: string }) {
           miner={row}
           minerName={name}
           defaultAmount={row.owed}
-          statementId={openStatement?.id}
         />
       )}
       {dialog?.kind === 'dismiss' && (
@@ -1041,7 +809,7 @@ export function MinerDetail({ id }: { id: string }) {
           intro={t('corpTaxBook.moons.dialogs.dismissMiner.intro')}
           reasonLabel={t('corpTaxBook.moons.dialogs.reasonShown')}
           confirmLabel={t('corpTaxBook.moons.dialogs.dismissConfirm', {
-            amount: isk(row.owed + row.unbilled),
+            amount: isk(row.owed),
           })}
           run={async (reason) => {
             await edit({
@@ -1049,16 +817,16 @@ export function MinerDetail({ id }: { id: string }) {
               scope: 'miner',
               targetId: id,
               reason,
-              amountIsk: row.owed + row.unbilled,
+              amountIsk: row.owed,
             });
           }}
         />
       )}
-      {statementParam.openId && (
-        <StatementPanel
-          key={statementParam.openId}
-          statementId={statementParam.openId}
-          onClose={statementParam.close}
+      {noticeParam.openId && (
+        <LateNoticePanel
+          key={noticeParam.openId}
+          noticeId={noticeParam.openId}
+          onClose={noticeParam.close}
           showMinerLink={false}
         />
       )}
@@ -1080,15 +848,6 @@ export function MinerDetail({ id }: { id: string }) {
           openingDate={data.settings.startDate}
         />
       )}
-      {dialog?.kind === 'rebill' && (
-        <RebillDialog
-          open
-          onClose={() => setDialog(null)}
-          miner={row}
-          minerName={name}
-          statements={detail.statements as Statement[]}
-        />
-      )}
       {dialog?.kind === 'close' && (
         <CloseAccountDialog open onClose={() => setDialog(null)} miner={row} minerName={name} />
       )}
@@ -1098,6 +857,15 @@ export function MinerDetail({ id }: { id: string }) {
           onClose={() => setDialog(null)}
           payment={dialog.payment}
           fromName={names.character(dialog.payment.characterId)}
+        />
+      )}
+      {dialog?.kind === 'reassign' && (
+        <ReassignPaymentDialog
+          open
+          onClose={() => setDialog(null)}
+          payment={dialog.payment}
+          fromName={names.character(dialog.payment.characterId)}
+          minerName={name}
         />
       )}
       {dialog?.kind === 'editCorrection' &&

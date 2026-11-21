@@ -60,22 +60,34 @@ const payee: PayeeRecord = {
 };
 
 describe('loadOwedBalances', () => {
-  it('without a Corp Tax Book, is the personal ledger: owed Assignments per Payee', async () => {
+  it("without a Corp Tax Book, is the personal ledger: each Payee's account, oldest day first", async () => {
     const { balances, unassignedCount } = await loadOwedBalances({
       rows: [
         row('2026-11-01', [assignment('a1')]),
         row('2026-11-02', [assignment('a2', { date: '2026-11-02', taxOwed: 50 })]),
-        row('2026-11-03', [assignment('a3', { date: '2026-11-03', status: 'paid' })]),
+        row('2026-11-03', [assignment('a3', { date: '2026-11-03', taxOwed: 30 })]),
         { ...row('2026-11-04', []), unassignedOreLines: [{ typeId: ORE, quantity: 100 }] },
       ],
       characters: [{ characterId: CHAR, characterName: 'Miner' }],
       payeesByCharacter: new Map([[CHAR, [payee]]]),
+      // 100 ISK linked to the Payee pays its oldest day, whichever entry the pilot meant.
+      paymentLinks: [
+        {
+          payeeId: 'p1',
+          kind: 'journal',
+          refId: 1,
+          amount: 100,
+          paidOn: '2026-11-05',
+          source: 'manual',
+        },
+      ],
+      billedElsewhere: new Map(),
     });
 
     expect(balances).toHaveLength(1);
     expect(unassignedCount).toBe(1);
-    expect(balances[0]).toMatchObject({ payee: { id: 'p1' }, owed: 150 });
-    expect(balances[0].members.map((m) => m.assignment.id)).toEqual(['a1', 'a2']);
+    expect(balances[0]).toMatchObject({ payee: { id: 'p1' }, owed: 80 });
+    expect(balances[0].members.map((m) => m.assignment.id)).toEqual(['a2', 'a3']);
     // No book to overlay: the wallet is never read for in-flight donations.
     expect(mocks.made).not.toHaveBeenCalled();
   });

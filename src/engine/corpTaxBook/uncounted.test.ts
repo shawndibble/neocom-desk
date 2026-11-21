@@ -1,30 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Statement } from './statements';
-import type { JournalDonation } from './sync';
-import {
-  UNCOUNTED_LIMIT,
-  noteUncounted,
-  otherDivisions,
-  readUncounted,
-  uncountedToShow,
-} from './uncounted';
-
-const donation = (over: Partial<JournalDonation> = {}): JournalDonation => ({
-  refId: 1,
-  division: 2,
-  characterId: 7,
-  amount: 5_000_000,
-  at: '2026-10-10T00:00:00.000Z',
-  ...over,
-});
-
-const book = {
-  miners: [{ id: 'm1', characterIds: [7, 8], mainCharacterId: 7 }],
-  statements: [{ id: 's1', minerId: 'm1', code: 'MT-AB12' }] as unknown as Statement[],
-  knownCharacterIds: new Set([9]),
-  openBalance: new Map([['m1', 10_000_000]]),
-  unbilled: new Set<string>(),
-};
+import { otherDivisions, readUncounted, uncountedToShow } from './uncounted';
 
 describe('otherDivisions', () => {
   it('is every wallet division the book does not read', () => {
@@ -33,56 +8,16 @@ describe('otherDivisions', () => {
   });
 });
 
-describe('noteUncounted (#6207)', () => {
-  it('notes a donation from a Miner who owes, into a division the book does not read', () => {
-    expect(noteUncounted([donation()], book)).toEqual([
-      {
-        id: 'j2_1',
-        refId: 1,
-        division: 2,
-        characterId: 7,
-        amount: 5_000_000,
-        at: '2026-10-10T00:00:00.000Z',
-      },
-    ]);
-  });
-
-  it('notes one carrying a pay code, from anyone', () => {
-    expect(noteUncounted([donation({ characterId: 555, reason: 'MT-AB12' })], book)).toHaveLength(
-      1
-    );
-  });
-
-  it('leaves out strangers and Miners who owe nothing: likely not tax', () => {
-    expect(noteUncounted([donation({ characterId: 555 })], book)).toEqual([]);
-    expect(noteUncounted([donation({ characterId: 9 })], book)).toEqual([]);
-    expect(noteUncounted([donation()], { ...book, openBalance: new Map() })).toEqual([]);
-    // A Miner with ore not yet billed owes too.
-    expect(
-      noteUncounted([donation()], { ...book, openBalance: new Map(), unbilled: new Set(['m1']) })
-    ).toHaveLength(1);
-  });
-
-  it('leaves out a Miner whose debt this sync’s counted donation already paid', () => {
-    const paid = donation({ division: 1, refId: 9, amount: 10_000_000, minerId: 'm1' });
-    expect(noteUncounted([donation()], book, [paid])).toEqual([]);
-    expect(noteUncounted([donation()], book, [{ ...paid, amount: 1 }])).toHaveLength(1);
-  });
-
-  it('keeps the newest, up to the limit', () => {
-    const many = Array.from({ length: UNCOUNTED_LIMIT + 5 }, (_, i) =>
-      donation({ refId: i + 1, at: new Date(Date.UTC(2026, 9, 1 + i)).toISOString() })
-    );
-    const noted = noteUncounted(many, book);
-    expect(noted).toHaveLength(UNCOUNTED_LIMIT);
-    expect(noted[0].id).toBe(`j2_${UNCOUNTED_LIMIT + 5}`);
-  });
-});
-
 describe('uncountedToShow', () => {
-  const stored = {
-    donations: noteUncounted([donation(), donation({ refId: 2, division: 3 })], book),
-  };
+  const noted = (refId: number, division: number) => ({
+    id: `j${division}_${refId}`,
+    refId,
+    division,
+    characterId: 7,
+    amount: 5_000_000,
+    at: '2026-10-10T00:00:00.000Z',
+  });
+  const stored = { donations: [noted(1, 2), noted(2, 3)] };
 
   it('drops a donation once its division is one the book reads', () => {
     expect(uncountedToShow(stored, [1, 3]).map((u) => u.id)).toEqual(['j2_1']);

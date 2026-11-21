@@ -1,13 +1,25 @@
 // Callable input validators shared by the parse modules. Messages are asserted by tests; keep them stable.
 import { HttpsError } from 'firebase-functions/v2/https';
 
-/** A string that is one of `allowed`. */
-export function oneOf<T extends string>(value: unknown, field: string, allowed: readonly T[]): T {
+/** A string that is one of `allowed`; `details` go on the refusal (a `reason` the client reads). */
+export function oneOf<T extends string>(
+  value: unknown,
+  field: string,
+  allowed: readonly T[],
+  details?: { reason: string }
+): T {
   if (typeof value !== 'string' || !allowed.includes(value as T)) {
-    throw new HttpsError('invalid-argument', `${field} must be one of ${allowed.join(', ')}`);
+    throw new HttpsError(
+      'invalid-argument',
+      `${field} must be one of ${allowed.join(', ')}`,
+      ...(details ? [details] : [])
+    );
   }
   return value as T;
 }
+
+/** The `reason` for an action or sub-action this server does not know (callableManifest.ts). */
+export { UNKNOWN_ACTION } from './callableManifest.js';
 
 /** A safe integer in [min, max]. */
 export function intIn(value: unknown, field: string, min: number, max: number): number {

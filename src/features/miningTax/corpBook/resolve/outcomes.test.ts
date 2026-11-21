@@ -43,25 +43,25 @@ describe('outcomesFor (resolving in the app)', () => {
       ...base,
       kind: 'uncredited',
       amount: 40,
-      statementId: 's1',
+      noticeId: 's1',
       row: row(),
     };
     expect(outcomesFor(p)).toEqual({
       outcomes: ['pay', 'notPaying', 'paid'],
       preselected: 'paid',
       tellWhy: true,
-      noStatement: false,
+      noNotice: false,
     });
   });
 
   // A preselected outcome whose button is disabled would greet the member with a dead dialog.
-  it('does not preselect sending the proof when there is no Statement to send it on', () => {
+  it('does not preselect sending the proof when there is no Late notice to send it on', () => {
     const p: ResolveProblem = { ...base, kind: 'uncredited', amount: 40, row: row() };
-    expect(outcomesFor(p)).toMatchObject({ preselected: 'pay', noStatement: true });
+    expect(outcomesFor(p)).toMatchObject({ preselected: 'pay', noNotice: true });
   });
 
   // The book holds these donations already: the member says they were tax, with or without a
-  // Statement to declare on (a claim of their own donation needs none); paying again is no answer.
+  // Late notice to declare on (a claim of their own donation needs none); paying again is no answer.
   // "Not paying" ISK the book already holds would say it still bills it: only counting them fits.
   it('offers only counting them, for donations the book holds for review', () => {
     const p: ResolveProblem = {
@@ -74,7 +74,7 @@ describe('outcomesFor (resolving in the app)', () => {
       outcomes: ['paid'],
       preselected: 'paid',
       tellWhy: false,
-      noStatement: false,
+      noNotice: false,
     });
   });
 
@@ -123,26 +123,17 @@ describe('outcomesFor (resolving in the app)', () => {
       kind: 'kept',
       row: row(),
       by: 'declaration',
-      statementId: 's1',
+      noticeId: 's1',
     };
     expect(outcomesFor(declaration).outcomes).toEqual(['pay', 'notPaying', 'paid']);
     // A kept declaration disputed nothing: "Not paying" may tell the corporation why.
     expect(outcomesFor(declaration).tellWhy).toBe(true);
   });
 
-  it('lets an Overdue Statement tell why when it has a recorded day, and not without one', () => {
-    const p: ResolveProblem = { ...base, kind: 'overdue', statementId: 's1', period: 'Oct' };
+  it('lets a Late notice whose days are unpaid tell why when it has a recorded day, and not without one', () => {
+    const p: ResolveProblem = { ...base, kind: 'overdue', noticeId: 's1', period: 'Oct' };
     expect(outcomesFor(p).tellWhy).toBe(false);
     expect(outcomesFor({ ...p, row: row() }).tellWhy).toBe(true);
-  });
-
-  it('offers a day marked paid that the book still bills proof, paying and not paying', () => {
-    const p: ResolveProblem = { ...base, kind: 'markedPaid', statementId: 's1', row: row() };
-    expect(outcomesFor(p)).toMatchObject({
-      outcomes: ['pay', 'notPaying', 'paid'],
-      preselected: 'paid',
-      tellWhy: true,
-    });
   });
 
   it('offers a plain billed day paying and not paying', () => {
@@ -160,12 +151,12 @@ describe('outcomesFor (resolving in the app)', () => {
     expect(outcomesFor(p).outcomes).toEqual(['pay', 'notPaying']);
   });
 
-  it('offers paying, not paying and proof on an Overdue Statement', () => {
-    const p: ResolveProblem = { ...base, kind: 'overdue', statementId: 's1', period: 'Oct' };
+  it('offers paying, not paying and proof on a Late notice whose days are unpaid', () => {
+    const p: ResolveProblem = { ...base, kind: 'overdue', noticeId: 's1', period: 'Oct' };
     expect(outcomesFor(p)).toMatchObject({
       outcomes: ['pay', 'notPaying', 'paid'],
       preselected: 'pay',
-      noStatement: false,
+      noNotice: false,
       tellWhy: false,
     });
   });
@@ -176,7 +167,7 @@ describe('outcomesFor (resolving in the app)', () => {
   });
 
   it('cannot tell the corporation why on a day with no book record to name', () => {
-    const p: ResolveProblem = { ...base, kind: 'uncredited', amount: 40, statementId: 's1' };
+    const p: ResolveProblem = { ...base, kind: 'uncredited', amount: 40, noticeId: 's1' };
     expect(outcomesFor(p)).toMatchObject({
       outcomes: ['pay', 'notPaying', 'paid'],
       tellWhy: false,

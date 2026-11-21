@@ -1,111 +1,84 @@
+import { utcDayOf } from '../../../functions/src/timeConstants';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, IskInput, Modal, Radio, SearchInput } from '@/components/ui';
 import { selectedRowClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import type { PayeeRecord } from '@/db';
+import type { PayeeRunningAccount } from '@/engine/miningTax/payeeRunningAccount';
 import { GrantNote } from '@/app/GrantNote';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
-import type { GroupMember } from './groupRows';
-import { settle } from './ledgerActions';
+import { linkPayment } from './ledgerActions';
 import { rememberPayeeEntity } from './payees';
-import { missingPaymentEndpoints, paidOnFromIso, type MadePaymentSources } from './madePayments';
-import { systemLabel } from './names';
-import * as Icon from '@/components/ui/icons';
-import { exactAmountMatches, linkTargetsWithin, type MadePayment } from './paymentLinks';
-import { allocateOldestFirst } from './settleAllocation';
+import { missingPaymentEndpoints, type MadePaymentSources } from './madePayments';
+import { linkFor, type MadePayment } from './paymentLinks';
+import { amountsMatch } from './paymentMatches';
+import { PaymentPreview } from './SettleUpDialog';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
-import { toggleInSet } from '@/lib/sets';
-import { DividedList } from '@/components/ui/DividedList';
 
 interface LinkWalletPaymentDialogProps {
   open: boolean;
   onClose: () => void;
+  /** The Payee the payment is linked to: a merged Payee's primary record. */
   payee: PayeeRecord;
-  /** That Payee's Outstanding Assignments, with their ledger rows. */
-  owed: readonly GroupMember[];
-  /** Made Payments no Assignment records yet. */
+  /** Its Running account, to say what the payment pays; absent while nothing bills it. */
+  account?: PayeeRunningAccount;
+  /** Made Payments no link holds and no Corp Tax Book counts. */
   candidates: readonly MadePayment[];
+  /** The Characters whose payments are offered, for a missing Permission's Grant note. */
+  characters: readonly { characterId: number; characterName: string }[];
   /** How each tracked Character's payment reads went; a skipped one gets a Grant note. */
   paymentSources?: readonly MadePaymentSources[];
-  systemNames: ReadonlyMap<number, string>;
   onLinked: () => void;
 }
 
 const FIELD_LABEL = eyebrowClassName;
 
 /**
- * "Link a wallet payment": the pilot picks, from their own wallet, the Made
- * Payment that settled this Payee's owed entries — for when `suggestLink`
- * didn't offer it (no learned identity, an amount that matches nothing) and
- * the row isn't Paid yet, which is all `LinkTransactionDialog` covers.
- *
- * Picking a payment pre-ticks the oldest entries its amount pays in full
- * (`allocateOldestFirst`, the same rule as Settle up's "Sent a different
- * amount?"); a payment in kind has no amount, so it pre-ticks everything and
- * asks what the cargo was worth. The ticks stay editable — never a blind
- * mark-all. Confirming records the payment against every ticked Assignment
- * with a manual link to the transaction, and (unless unticked) teaches the
- * Payee who the recipient was.
+ * "Link a wallet payment": the pilot picks, from their own wallet, the Made Payment they sent
+ * this Payee. It is linked to the Payee and pays its oldest unpaid days, whatever entries the
+ * pilot had in mind, so nothing is ticked: the dialog says what it pays, off the Payee's account,
+ * and what is over is credit. A payment in kind asks what its cargo was worth. A payment the
+ * pilot picks is always their own link (`manual`), whether or not it was offered first.
+ * Confirming also teaches the Payee who the recipient was, unless unticked.
  */
 export function LinkWalletPaymentDialog({
   open,
   onClose,
   payee,
-  owed,
+  account,
   candidates,
+  characters,
   paymentSources = [],
-  systemNames,
   onLinked,
 }: LinkWalletPaymentDialogProps) {
   const { t } = useTranslation();
-  const owedTotal = owed.reduce((sum, m) => sum + m.assignment.taxOwed, 0);
+  const owed = account?.owes?.amount ?? 0;
 
-  // One note per Character who mined an owed entry and lacks a Permission —
-  // the same Characters whose payments the candidate list draws from.
-  const grantGaps = [
-    ...new Map(owed.map((m) => [m.row.characterId, m.row.characterName])).entries(),
-  ]
-    .map(([characterId, characterName]) => {
-      const sources = paymentSources.find((s) => s.characterId === characterId);
-      return {
-        characterId,
-        characterName,
-        endpoints: sources ? missingPaymentEndpoints(sources) : [],
-      };
+  const grantGaps = characters
+    .map((c) => {
+      const sources = paymentSources.find((s) => s.characterId === c.characterId);
+      return { ...c, endpoints: sources ? missingPaymentEndpoints(sources) : [] };
     })
     .filter((gap) => gap.endpoints.length > 0);
 
-  // A lone exact match for the whole balance is the obvious pick.
-  // Only the first render's pick; later prop changes don't move the selection.
+  // A lone payment of exactly what is owed is the obvious pick; only on the first render.
   const [initialPick] = useState(() => {
-    const exact = exactAmountMatches(candidates, owedTotal);
-    return exact.length === 1 ? exact[0] : null;
+    const exact = candidates.filter(
+      (p) => p.amount !== null && owed > 0 && amountsMatch(owed, p.amount)
+    );
+    return exact.length === 1 ? exact[0]!.key : null;
   });
-
   const [search, setSearch] = useState('');
-  const [selectedKey, setSelectedKey] = useState<string | null>(initialPick?.key ?? null);
-  const [ticked, setTicked] = useState<ReadonlySet<string>>(() => ticksFor(initialPick));
+  const [selectedKey, setSelectedKey] = useState<string | null>(initialPick);
   const [valueText, setValueText] = useState('');
   const [valueParses, setValueParses] = useState(true);
   const [remember, setRemember] = useState(true);
   const { pending: saving, error: saveError, setError: setSaveError, run } = useLedgerAction();
-  // Set once the entries are marked paid, so a retry after a later failure can't record it twice.
-  const [recorded, setRecorded] = useState(false);
-
-  function ticksFor(payment: MadePayment | null): ReadonlySet<string> {
-    if (payment === null || payment.amount === null) {
-      return new Set(owed.map((m) => m.assignment.id));
-    }
-    const pool = owed.map((m) => ({
-      id: m.assignment.id,
-      date: m.assignment.date,
-      taxOwed: m.assignment.taxOwed,
-    }));
-    return new Set(allocateOldestFirst(pool, payment.amount).coveredIds);
-  }
+  // Set once the link is saved, so a retry after a later failure can't save it twice.
+  const [linked, setLinked] = useState(false);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -118,70 +91,46 @@ export function LinkWalletPaymentDialog({
   }, [candidates, search]);
 
   const selected = candidates.find((p) => p.key === selectedKey) ?? null;
-  const included = owed.filter((m) => ticked.has(m.assignment.id));
-  const includedTotal = included.reduce((sum, m) => sum + m.assignment.taxOwed, 0);
-
-  /** The ISK that actually moved, or the pilot's figure for cargo handed over (blank = the ticked total). */
-  const paymentAmount =
+  /**
+   * The ISK that moved, or the pilot's figure for cargo handed over: required, never assumed to be
+   * the whole balance (a cargo is rarely worth exactly that).
+   */
+  const amount =
     selected === null
       ? null
-      : (selected.amount ??
-        (valueText.trim() === '' ? Math.round(includedTotal) : Number(valueText)));
+      : (selected.amount ?? (valueText.trim() === '' ? Number.NaN : Number(valueText)));
   const amountValid =
-    paymentAmount !== null &&
-    Number.isFinite(paymentAmount) &&
-    paymentAmount >= 0 &&
+    amount !== null &&
+    Number.isFinite(amount) &&
+    amount > 0 &&
     (selected?.amount != null || valueParses);
-  const difference = paymentAmount === null ? 0 : Math.round(paymentAmount - includedTotal);
-
-  function pick(payment: MadePayment) {
-    setSelectedKey(payment.key);
-    setTicked(ticksFor(payment));
-    setValueText('');
-    setValueParses(true);
-    setRemember(true);
-  }
-
-  function toggle(id: string) {
-    setTicked((previous) => toggleInSet(previous, id));
-  }
-
-  const systemName = (solarSystemId: number) => systemLabel(systemNames, solarSystemId);
+  const outcome =
+    selected && amountValid && account ? account.preview(amount, utcDayOf(selected.date)) : null;
 
   const counterpartyName =
     selected?.counterpartyId === undefined
       ? null
       : (selected.counterpartyName ?? `#${String(selected.counterpartyId)}`);
 
+  function pick(payment: MadePayment) {
+    setSelectedKey(payment.key);
+    setValueText('');
+    setValueParses(true);
+    setRemember(true);
+  }
+
   async function commit() {
-    if (!selected || included.length === 0 || !amountValid || paymentAmount === null) return;
-    const link = [{ refId: selected.refId, source: 'manual' as const }];
+    if (!selected || !amountValid || amount === null) return;
     const result = await run(() =>
-      settle(
-        // A day the ISK sent cannot reach stays owed, as the "short" line says.
-        linkTargetsWithin(
-          included.map((m) => m.assignment),
-          selected.amount
-        ),
-        {
-          paidOn: paidOnFromIso(selected.date),
-          method: selected.method,
-          amount: Math.round(paymentAmount),
-          ...(selected.kind === 'journal' ? { journalLinks: link } : { contractLinks: link }),
-        }
-      )
+      linkPayment(linkFor(selected, payee.id, 'manual', Math.round(amount)), selected.characterId)
     );
     if (!result.ok) return;
-    // `recorded` keeps the button disabled from here on, so the remember step
-    // below can't be raced into recording the payment twice.
-    setRecorded(true);
+    setLinked(true);
     try {
-      if (remember && selected.counterpartyId !== undefined) {
+      if (remember && selected.counterpartyId !== undefined)
         await rememberPayeeEntity(payee, selected.counterpartyId);
-      }
     } catch {
-      // The payment is recorded; only learning who the Payee is paid failed.
-      // Say so and keep the dialog open, rather than closing as if all went.
+      // The payment is linked; only learning who the Payee is failed. Say so and stay open.
       onLinked();
       setSaveError(t('miningTax.linkWallet.rememberFailed', { payee: payee.name }));
       return;
@@ -199,7 +148,10 @@ export function LinkWalletPaymentDialog({
     >
       <div className="space-y-3 text-sm">
         <p className="text-xs text-text-dim">
-          {t('miningTax.linkWallet.subtitle', { payee: payee.name, count: owed.length })}
+          {t('miningTax.linkWallet.subtitle', {
+            payee: payee.name,
+            amount: formatIsk(owed, 0),
+          })}
         </p>
 
         {grantGaps.map((gap) => (
@@ -221,11 +173,10 @@ export function LinkWalletPaymentDialog({
             <SearchInput
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={t('miningTax.linkTransactionSearchPlaceholder')}
+              placeholder={t('miningTax.linkWallet.searchPlaceholder')}
               aria-label={t('miningTax.linkWallet.searchLabel')}
               className="w-full"
             />
-
             {filtered.length === 0 ? (
               <p className="text-xs text-text-dim">{t('miningTax.linkWallet.noMatch')}</p>
             ) : (
@@ -256,7 +207,7 @@ export function LinkWalletPaymentDialog({
                               ? t('miningTax.linkPaymentInKind')
                               : `${formatIsk(p.amount)} ISK`}
                             {' · '}
-                            {p.date.slice(0, 10)}
+                            {utcDayOf(p.date)}
                           </span>
                           <span className="truncate text-text-dim">
                             {p.label || t('miningTax.linkPaymentUntitledContract')}
@@ -272,40 +223,6 @@ export function LinkWalletPaymentDialog({
           </>
         )}
 
-        <div className="space-y-1">
-          <p className={FIELD_LABEL}>{t('miningTax.linkWallet.coversLabel')}</p>
-          <DividedList as="ul">
-            {owed.map((m) => {
-              const on = ticked.has(m.assignment.id);
-              return (
-                <li key={m.assignment.id}>
-                  <label
-                    className={cx(
-                      'flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs',
-                      tappableRowClassName
-                    )}
-                  >
-                    <Checkbox
-                      checked={on}
-                      onChange={() => toggle(m.assignment.id)}
-                      aria-label={t('miningTax.linkPaymentIncludeLabel', {
-                        date: m.assignment.date,
-                      })}
-                    />
-                    <span className="w-20 shrink-0 tabular-nums">{m.assignment.date}</span>
-                    <span className="min-w-0 flex-1 truncate text-text-dim">
-                      {systemName(m.assignment.solarSystemId)}
-                    </span>
-                    <span className={cx('shrink-0 tabular-nums', !on && 'text-text-dim')}>
-                      {formatIsk(m.assignment.taxOwed)} ISK
-                    </span>
-                  </label>
-                </li>
-              );
-            })}
-          </DividedList>
-        </div>
-
         {selected && selected.amount === null && (
           <div className="space-y-1">
             <p className={FIELD_LABEL}>{t('miningTax.linkPaymentAmountLabel')}</p>
@@ -313,7 +230,6 @@ export function LinkWalletPaymentDialog({
               value={valueText}
               onChange={setValueText}
               onParseableChange={setValueParses}
-              defaultAmount={Math.round(includedTotal)}
               aria-label={t('miningTax.linkPaymentAmountLabel')}
               className="w-full"
             />
@@ -321,48 +237,7 @@ export function LinkWalletPaymentDialog({
           </div>
         )}
 
-        {selected && (
-          <div className="space-y-1 rounded-xs border border-line bg-panel-2 px-3 py-2 text-xs">
-            <dl className="space-y-1">
-              <div className="flex items-center justify-between gap-2">
-                <dt className="text-text-dim">{t('miningTax.linkWallet.tickedOwe')}</dt>
-                <dd className="tabular-nums">{formatIsk(includedTotal)} ISK</dd>
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <dt className="text-text-dim">{t('miningTax.linkWallet.payment')}</dt>
-                <dd className="tabular-nums">
-                  {amountValid && paymentAmount !== null ? `${formatIsk(paymentAmount)} ISK` : '—'}
-                </dd>
-              </div>
-            </dl>
-            {amountValid && (
-              <p
-                role="status"
-                className={cx(
-                  'border-t border-line pt-1 font-semibold',
-                  difference === 0
-                    ? 'text-isk-pos'
-                    : difference > 0
-                      ? 'text-text-dim'
-                      : 'text-isk-neg'
-                )}
-              >
-                {difference === 0 ? (
-                  <>
-                    {t('miningTax.linkWallet.matches')}
-                    <Icon.Done size={Icon.ICON_SIZE.sm} className="ml-1 inline" aria-hidden />
-                  </>
-                ) : difference > 0 ? (
-                  t('miningTax.linkWallet.over', { amount: `${formatIsk(difference, 0)} ISK` })
-                ) : (
-                  t('miningTax.linkWallet.short', {
-                    amount: `${formatIsk(-difference, 0)} ISK`,
-                  })
-                )}
-              </p>
-            )}
-          </div>
-        )}
+        {outcome && <PaymentPreview outcome={outcome} />}
 
         {selected && counterpartyName !== null && (
           <label
@@ -379,10 +254,10 @@ export function LinkWalletPaymentDialog({
         <div className="flex flex-wrap gap-2 pt-1">
           <Button
             variant="primary"
-            disabled={!selected || included.length === 0 || !amountValid || saving || recorded}
+            disabled={!selected || !amountValid || saving || linked}
             onClick={() => void commit()}
           >
-            {t('miningTax.linkWallet.confirm', { count: included.length })}
+            {t('miningTax.linkWallet.confirm')}
           </Button>
           <Button className="ml-auto" onClick={onClose}>
             {t('filters.cancel')}

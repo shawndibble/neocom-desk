@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import { loadMoonMiningTaxSnapshot } from './snapshot';
 import { computePayeeBalances } from './balances';
+import { PayeeRunningAccounts } from './payeeRunningAccounts';
 import { flatten } from './groupRows';
 import { seedCharacter } from '@/test/seed';
 
@@ -191,8 +192,14 @@ describe('loadMoonMiningTaxSnapshot', () => {
       await db.payees.put(payee);
       await seedAssignment('old', '2026-07-01', 'outstanding');
 
-      const { rows } = await loadMoonMiningTaxSnapshot();
-      const [balance] = computePayeeBalances(flatten(rows), [payee]);
+      const { rows, paymentLinks } = await loadMoonMiningTaxSnapshot();
+      const shown = flatten(rows);
+      const accounts = PayeeRunningAccounts.build({
+        assignments: shown.flatMap((dr) => (dr.assignment ? [dr.assignment] : [])),
+        payees: [payee],
+        links: paymentLinks,
+      });
+      const [balance] = computePayeeBalances(shown, [payee], accounts);
 
       expect(balance.owed).toBe(500000);
       expect(balance.members).toHaveLength(1);

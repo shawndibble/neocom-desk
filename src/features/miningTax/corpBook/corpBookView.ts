@@ -70,6 +70,11 @@ export interface CorpBookViewInput {
   /** The member's stored Payees: one verified as a book's corporation is that book's own Payee. */
   payees: readonly PayeeRecord[];
   made: readonly MadePayment[];
+  /**
+   * The Made Payments links hold (`heldPaymentKeys`): each pays the personal Payee it is linked
+   * to, so none counts as a donation in flight to a book as well.
+   */
+  linked?: ReadonlySet<string>;
   characterNames: ReadonlyMap<number, string>;
   now: string;
 }
@@ -98,8 +103,6 @@ export function buildCorpBookView(
       characterIds: book.characterIds,
       startDate: book.startDate,
       graceHours: book.graceHours,
-      ...(book.overdueDays !== undefined ? { overdueDays: book.overdueDays } : {}),
-      ...(book.runningAccountFrom ? { runningAccountFrom: book.runningAccountFrom } : {}),
       ...(book.lastSyncedAt !== undefined ? { lastSyncedAt: book.lastSyncedAt } : {}),
       ...(book.donationsCheckedAt !== undefined
         ? { donationsCheckedAt: book.donationsCheckedAt }
@@ -108,7 +111,8 @@ export function buildCorpBookView(
       miners: book.miners,
       observed: book.observed,
       dismissals: book.dismissals,
-      statements: book.statements,
+      notices: book.notices,
+      ...(book.checkpoints ? { checkpoints: book.checkpoints } : {}),
       payments: book.payments,
       ...(book.feeders ? { feeders: book.feeders } : {}),
       ...(book.adjustments ? { adjustments: book.adjustments } : {}),
@@ -133,7 +137,7 @@ export function buildCorpBookView(
       }),
       inReviewRefs: (book.inReview ?? []).flatMap((d) => (d.refId === undefined ? [] : [d.refId])),
       inFlight: inFlightDonations(
-        input.made.map(madeDonationOf),
+        input.made.filter((p) => !input.linked?.has(p.key)).map(madeDonationOf),
         book.held,
         book.corporationId,
         book.startDate

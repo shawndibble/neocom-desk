@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { VerifyRow } from '@/engine/corpTaxBook/verifyView';
 import { loadTypeNames } from '@/features/character/typeNames';
 
-/** The names of the ores a Statement's rows bill, loaded once; ids show until they arrive. */
+/** The names of the ores a Late notice's lines bill, loaded once; ids show until they arrive. */
 export function useOreNames(rows: readonly VerifyRow[]): ReadonlyMap<number, string> {
   const [oreNames, setOreNames] = useState<ReadonlyMap<number, string>>(new Map());
   useEffect(() => {

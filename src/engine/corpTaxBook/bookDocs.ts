@@ -11,10 +11,9 @@ import { readDivisionNames, type DivisionNames } from './divisionNames';
 import { recordedLater, type CorpRecord } from './observed';
 import { DEFAULT_OVERDUE_DAYS } from './overdue';
 import { SCOPE_ORDER, type RateScope, type TaxRate } from './rates';
-import { DEFAULT_MINIMUM_STATEMENT, type StatementCadence } from './statements';
 import type { LastSync } from './sync';
 import { parseNoticeRules, type NoticeRules } from './notices';
-import { DAY_SETTLE_TOLERANCE_PCT } from './runningAccount';
+import { DAY_SETTLE_TOLERANCE_PCT } from './minerRunningAccount';
 
 type Data = Record<string, unknown>;
 
@@ -42,9 +41,6 @@ export function parseTaxContact(v: unknown): TaxContact | undefined {
   return undefined;
 }
 
-/** When every Corp Tax Book became a running account: the switch-over of a book that stored none. */
-export const RUNNING_ACCOUNTS_FROM = '2026-11-17T06:00:00.000Z';
-
 /** Every setting the book document stores, every default filled in. */
 export interface BookSettings {
   active: boolean;
@@ -58,9 +54,7 @@ export interface BookSettings {
   hubId: string;
   oreForm: 'compressed' | 'raw';
   graceHours: number;
-  minimumStatement: number;
   overdueDays: number;
-  cadence: StatementCadence;
   chunkM3PerHour: number | null;
   rates: TaxRate[];
   /** Above this a dismissal needs a Director (D6); null when there is no limit. */
@@ -72,11 +66,6 @@ export interface BookSettings {
   membersSeeFrom?: number;
   /** Who gets the EVE mail when a member asks about tax. Absent → the corporation's CEO. */
   taxContact?: TaxContact;
-  /**
-   * The instant the book switched to a running account (#6294). Every book is one: a book that
-   * stored no instant reads `RUNNING_ACCOUNTS_FROM` (decision 20261117-060555).
-   */
-  runningAccountFrom: string;
   /** A running account's late notices. */
   noticeRules: NoticeRules;
   /** A running account's per-day tolerance, in percent. */
@@ -113,15 +102,6 @@ export function parseRate(v: unknown): TaxRate | null {
   return v as unknown as TaxRate;
 }
 
-function parseCadence(v: unknown): StatementCadence {
-  if (isRecord(v) && v.kind === 'days') {
-    const days = num(v.days);
-    const anchor = str(v.anchor);
-    if (days !== undefined && anchor !== undefined) return { kind: 'days', days, anchor };
-  }
-  return { kind: 'monthly' };
-}
-
 /**
  * The settings doc as `BookSettings`, validated, with the engine's defaults for anything absent
  * or malformed. Whether a member may see the book yet (active, setup window) is the caller's.
@@ -144,9 +124,7 @@ export function parseBookSettings(d: Data): BookSettings {
     hubId: str(d.hubId) ?? 'jita',
     oreForm: d.oreForm === 'raw' ? 'raw' : 'compressed',
     graceHours: num(d.graceHours) ?? DEFAULT_GRACE_HOURS,
-    minimumStatement: num(d.minimumStatement) ?? DEFAULT_MINIMUM_STATEMENT,
     overdueDays: num(d.overdueDays) ?? DEFAULT_OVERDUE_DAYS,
-    cadence: parseCadence(d.cadence),
     chunkM3PerHour: num(d.chunkM3PerHour) ?? null,
     rates: (Array.isArray(d.rates) ? d.rates : []).flatMap((r) => parseRate(r) ?? []),
     dismissApprovalAboveIsk: num(d.dismissApprovalAboveIsk) ?? null,
@@ -154,7 +132,6 @@ export function parseBookSettings(d: Data): BookSettings {
     createdBy: num(d.createdBy) ?? null,
     ...(membersSeeFrom !== undefined ? { membersSeeFrom } : {}),
     ...(taxContact ? { taxContact } : {}),
-    runningAccountFrom: str(d.runningAccountFrom) ?? RUNNING_ACCOUNTS_FROM,
     noticeRules: parseNoticeRules(d.noticeRules),
     dayTolerancePct: num(d.dayTolerancePct) ?? DAY_SETTLE_TOLERANCE_PCT,
   };

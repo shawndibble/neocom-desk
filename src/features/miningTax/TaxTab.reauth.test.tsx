@@ -14,6 +14,8 @@ const snapshot = {
     { characterId: ALT, characterName: 'Shadow Ruler' },
   ],
   payeesByCharacter: new Map(),
+  paymentLinks: [],
+  billedElsewhere: new Map(),
   unclassified: [],
   reauthCharacters: [{ characterId: ALT, characterName: 'Shadow Ruler' }],
   fetchedAt: new Date(),

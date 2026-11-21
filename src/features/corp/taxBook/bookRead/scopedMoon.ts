@@ -1,7 +1,7 @@
 /**
  * A moon page from the moon docs (issue #5716, ADR 0032): the book's records, the refinery's moon
- * docs, and the rows of the shown pull's window (plus any earlier cycle of the moon that can still
- * have an open day; pullFigures.ts) in place of the whole ledger. When a doc the page needs is
+ * docs, and the rows of the windows of the moon's cycles (pullFigures.ts) in place of the whole
+ * ledger. When a doc the page needs is
  * missing, on another schema or unreadable, the page reads the whole book instead. A missing
  * composite index (observed: structureId + date) reads the window's days at every refinery and
  * filters here, so an undeployed index costs reads, not the page.
@@ -66,10 +66,7 @@ export async function readMoonScope(
   const whole = async () => ({ ...(await readWhole(ctx, asked)), forMoon: extractionId });
   // The records are read either way; only the rows wait on the docs.
   startReading(ctx, ['core', 'ledger']);
-  const [statements, extractions] = await Promise.all([
-    readField(ctx, 'statements'),
-    readField(ctx, 'extractions'),
-  ]);
+  const extractions = await readField(ctx, 'extractions');
 
   const shown = extractions.find((x) => extractionIdOf(x) === extractionId);
   const docList = shown
@@ -84,8 +81,6 @@ export async function readMoonScope(
     extractionId,
     extractions,
     docs,
-    statements,
-    startDate: settings.startDate,
     expiryHours: settings.structureExpiryHours,
   });
   if (!scope.ok) return whole();

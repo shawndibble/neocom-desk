@@ -17,6 +17,7 @@ import type {
   NetWorthSnapshotRecord,
   CharacterAcceleratorRecord,
   MiningTaxAssignmentRecord,
+  MiningTaxPaymentLinkRecord,
   PayeeRecord,
   PlanetRichnessRecord,
   ProductionLossRecord,
@@ -240,6 +241,19 @@ export const FULL_CHARACTER_ACCELERATOR: Required<CharacterAcceleratorRecord> = 
   updatedAt: UPDATED_AT,
 };
 
+export const FULL_MINING_TAX_PAYMENT_LINK: Required<MiningTaxPaymentLinkRecord> = {
+  id: 'legacy:pay-1',
+  characterId: 1,
+  payeeId: 'payee-1',
+  kind: 'legacy',
+  refId: 'pay-1',
+  amount: 12_500_000,
+  paidOn: '2026-10-05',
+  source: 'manual',
+  refs: [{ kind: 'journal', refId: 9001 }],
+  updatedAt: UPDATED_AT,
+};
+
 /** One full record per synced Dexie table, keyed by table name. */
 export const FULL_RECORDS = {
   skillPlans: FULL_SKILL_PLAN,
@@ -256,4 +270,5 @@ export const FULL_RECORDS = {
   payees: FULL_PAYEE,
   fittings: FULL_FITTING,
   miningTaxAssignments: FULL_MINING_TAX_ASSIGNMENT,
+  miningTaxPaymentLinks: FULL_MINING_TAX_PAYMENT_LINK,
 } as const;

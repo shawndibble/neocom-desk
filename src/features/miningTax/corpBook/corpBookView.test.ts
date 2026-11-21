@@ -41,7 +41,7 @@ const loaded = (over: Partial<LoadedCorpBook> = {}): LoadedCorpBook => ({
   held: [],
   claimable: [],
   dismissals: [],
-  statements: [],
+  notices: [],
   miners: [],
   characterIds: [ME],
   memberCharacterIds: [ME],
@@ -174,6 +174,25 @@ describe('buildCorpBookView', () => {
       payeeName
     )!;
     expect(view.overlay.rows[0].state).toBe('paid');
+  });
+
+  it('never counts a donation a link holds: it pays the personal Payee it is linked to (M6)', () => {
+    const donation = {
+      key: 'journal:1',
+      kind: 'journal' as const,
+      refId: 1,
+      characterId: ME,
+      date: '2026-10-18T13:10:00Z',
+      amount: 148_000 * 0.15,
+      method: 'donation' as const,
+      counterpartyId: CORP,
+      label: '',
+    };
+    const view = buildCorpBookView(
+      input({ made: [donation], linked: new Set(['journal:1']) }),
+      payeeName
+    )!;
+    expect(view.overlay.rows[0].state).toBe('billed');
   });
 
   it("lists the member's own Unmatched donations to claim", () => {

@@ -3,6 +3,7 @@ import {
   classifyGroup,
   groupConflicts,
   minerReaderIds,
+  minerUidsOf,
   promoteClaims,
   type ClaimMiner,
 } from './corpTaxBookClaims.js';
@@ -73,6 +74,20 @@ describe('minerReaderIds', () => {
     expect(
       minerReaderIds({ characterIds: [1, 2, 3], officerClaimed: [2], pendingConfirmation: [3] })
     ).toEqual([1]);
+  });
+});
+
+describe('minerUidsOf', () => {
+  it("is a grouping's reader Characters' sign-ins", () => {
+    expect(minerUidsOf('g1', { characterIds: [1, 2, 3], officerClaimed: [3] })).toEqual([
+      'char:1',
+      'char:2',
+    ]);
+  });
+
+  it("is a solo Miner's own Character, and nobody for an unknown id", () => {
+    expect(minerUidsOf('solo:7', undefined)).toEqual(['char:7']);
+    expect(minerUidsOf('g-gone', undefined)).toEqual([]);
   });
 });
 

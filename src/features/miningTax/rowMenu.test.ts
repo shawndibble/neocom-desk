@@ -41,28 +41,16 @@ describe('rowMenuActions', () => {
     const out = ids(rowMenuActions(dr()));
     expect(out.slice(0, 3)).toEqual(['view', 'settleUp', 'edit']);
     expect(out).toEqual(
-      expect.arrayContaining([
-        'linkWallet',
-        'markPaid',
-        'join',
-        'split',
-        'copyBreakdown',
-        'unassign',
-      ])
+      expect.arrayContaining(['linkWallet', 'join', 'split', 'copyBreakdown', 'unassign'])
     );
-    expect(out).not.toContain('unmarkPaid');
-    expect(out).not.toContain('linkTransaction');
   });
 
-  it('offers unmark, link transaction and split on a paid row, but no settle up', () => {
+  it('offers linking a payment and split on a paid row, but no settle up and no mark to undo', () => {
     const paid = dr({ status: 'paid', assignment: assignment({ status: 'paid' }) });
     const out = ids(rowMenuActions(paid));
     expect(out[0]).toBe('view');
-    expect(out).toEqual(
-      expect.arrayContaining(['edit', 'linkTransaction', 'unmarkPaid', 'split', 'unassign'])
-    );
+    expect(out).toEqual(expect.arrayContaining(['edit', 'linkWallet', 'split', 'unassign']));
     expect(out).not.toContain('settleUp');
-    expect(out).not.toContain('markPaid');
     expect(out).not.toContain('join');
   });
 
@@ -112,7 +100,6 @@ describe('rowMenuActions', () => {
       'settleUp',
       'edit',
       'linkWallet',
-      'markGroupPaid',
       'takeOut',
       'takeOut',
       'uncombine',

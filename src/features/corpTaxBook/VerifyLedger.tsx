@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CollapsiblePanel } from '@/components/ui';
 import type { VerifyLedgerData } from '@/engine/corpTaxBook/verifyView';
-import { isk, shortDate } from './statementFormat';
+import { isk, shortDate } from './noticeFormat';
 
 /**
  * The Miner's whole history, closed until asked for: every mined day (its tax) and every payment

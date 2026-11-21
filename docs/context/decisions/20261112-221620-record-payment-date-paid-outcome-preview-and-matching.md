@@ -10,12 +10,12 @@ _Recorded 2026-11-12._
   asked for and noon keeps the instant inside it whatever the reader's zone. The server
   still accepts any instant (it always has); a future-date check there would need a
   Functions deploy and was left out.
-- **The outcome before confirming is the book's own allocation.** `previewPayment`
-  (`src/engine/corpTaxBook/paymentPreview.ts`) runs `allocatePayments` with and without the
-  new payment and reads the difference: per Statement credited, settled (tolerance
-  included), owed and credit after. It never re-implements the allocation, so the preview
-  cannot disagree with the book after the edit. A Statement the dialog was opened on is
-  pinned (`statementId`) and listed first, the way the money goes.
+- **The outcome before confirming is the book's own account.** `previewPayment`
+  (`src/engine/corpTaxBook/paymentPreview.ts`) builds the Miner's Running account with and
+  without the new payment and reads the difference: the days credited, settled (tolerance
+  included), owed and credit after. It never re-implements the account, so the preview
+  cannot disagree with the book after the edit. The days are listed oldest first, the way
+  the money goes.
 - **Matching a wallet donation assigns it; it never records new ISK.** When Unmatched
   donations exist, Record payment offers "Wallet donation" beside "Not in the wallet".
   Picking one runs the existing `assignPayment` action for this Miner, so the same ISK is

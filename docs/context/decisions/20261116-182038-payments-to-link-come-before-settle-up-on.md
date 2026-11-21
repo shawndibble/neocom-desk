@@ -45,6 +45,6 @@ _Recorded 2026-11-16._
 
 - **Pausing the clock while a dispute is open is the open question, not a decision.**
   Until it is answered, the prompt states the deadline rather than hiding it. The
-  Overdue flow's bounded pause budget (`overdue.ts`, 14 days per Statement) is the
+  Overdue flow's bounded pause budget (`overdue.ts`, 14 days per Late notice) is the
   precedent to weigh, since an unbounded pause would let a dispute stall a bill
   indefinitely.

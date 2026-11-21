@@ -26,7 +26,8 @@ Detail moved out of `CLAUDE.md` so it is read on demand. The short rules stay in
   `e2e/shard-weights.json`; a new spec needs no entry, and
   `node scripts/e2e-shard.mjs --weights <ci-log>` refreshes the table) inside
   Playwright's container image, whose tag in `ci.yml` (and `cache-warm.yml`) must match
-  `@playwright/test`; that's the gate, not a local
+  `@playwright/test`, plus the Corp Tax Book specs in one `e2e-book` job against the Firebase
+  emulators (see "Running the app against the Firebase emulators" below); that's the gate, not a local
   pre-PR run. Both sharded jobs report through a single aggregate check
   (`test`, `e2e`) because the `develop` and `main` rulesets require those exact names. The `e2e` shards are skipped (and `e2e` still reports green) when every file a PR changes is on `scripts/lib/e2eRelevance.mjs`'s safe list (docs, `functions/`, workflows other than `ci.yml`, unit tests, and the like); any other or unlisted path runs them. The four `test-shard` jobs skip the same way (and `test` still reports green) when every changed file is prose on `scripts/lib/testRelevance.mjs`'s narrower safe list (`docs/`, root and `.claude/` Markdown, `.out-of-scope/`). In ticket-loop work (`/next-ticket`, `/implement`),
   see `.claude/commands/next-ticket.md`'s "Pre-commit hook, then CI" for the
@@ -220,7 +221,7 @@ touches a real Firebase project: the project id is `demo-neocom-desk`.
    It wipes the Firestore emulator and writes a sample book (settings, officer
    access, Observed Mining Entries, Extractions in every state, matched /
    Unmatched / not-tax / manual Tax Payments, a dismissal, a declaration and an
-   issued, unpaid Statement with its verify token) in the schema of
+   issued notice for unpaid days, with its verify token) in the schema of
    `functions/src/corpTaxBookStore.ts`, then prints the verify URL. The officer
    record carries `--owner-hash`; the Firestore rules compare it to the signed-in
    token's `ownerHash` claim. The seeded value is a placeholder, and opening
@@ -232,6 +233,35 @@ touches a real Firebase project: the project id is `demo-neocom-desk`.
 
 Without a real EVE login (a fake officer, mocked SSO/ESI, a larger seed of six refineries and
 fifteen miners), use the `manual-testing` skill: `.claude/skills/manual-testing/SKILL.md`.
+
+**Corp Tax Book browser tests** (`e2e/*.book.spec.ts`) run the officer pages, the verify page
+and the member tab against these emulators, with the real callables and rules. The main suite
+and its CI shards skip them; they have their own config and CI job.
+
+- **Locally:** `npx playwright test -c playwright.book.config.ts e2e/<file>.book.spec.ts`, one
+  file at a time like any e2e spec. Needs a JRE and `npm ci --prefix functions`. The config
+  starts everything: `scripts/e2e-book/emulators.mjs` builds `functions/` and starts the
+  emulators (a fresh per-run key signs fake EVE tokens; `ccpStub.mjs`, loaded into the Functions
+  runtime, answers SSO's key set and ESI's who-is-who), and a Vite dev server on 5197 points at
+  them. A global warm-up (`e2e/support/taxBook/warmUp.ts`) signs the officer in and opens the
+  book's pages once, so no test pays the cold start (Vite's first compile, the Functions
+  emulator loading each function), and the emulators stop on SIGINT at the end.
+  **A run never reuses a server already up**, locally included: the ports (8080, 9099, 5001, 5197) are fixed and shared by every worktree on the machine, so a server already up may be
+  another worktree's, serving its code. Such a run fails at once ("is already used"): wait for
+  the other worktree's run to end, or stop your own servers, `npm run emulators` too. Run one
+  book spec file at a time, `--workers=1`. If your Playwright browser build is not the pinned one, point
+  `launchOptions.executablePath` at yours in an uncommitted wrapper config; never commit it.
+- **In CI:** the `e2e-book` job in `ci.yml`, one runner in the Playwright container (the pinned
+  browser) with Java added, ~5 minutes in all. It runs from the dev server, not `build`'s
+  `dist/`: the app reaches the emulators only in a dev build (`emulatorsOn`). It is gated by
+  `needsBookE2e` (`scripts/lib/e2eRelevance.mjs`), which unlike the e2e shards' gate runs it for
+  `functions/`, the rules and the emulator config, and it reports through the required `e2e`
+  check. Its report uploads as `playwright-report-book` on failure.
+- **Writing one:** one worker, so each test wipes the emulator and seeds its own book
+  (`e2e/support/taxBook`: `BookSeed` writes the server's layout with flat prices, so one mined
+  day owes exactly 1,000,000; `bookScenarios.ts` holds the books specs share; `memberSeed.ts` the
+  member side's). Assert what the page shows, and read the emulator (`readDoc`) only for what a
+  server write leaves behind.
 
 **Known emulator noise.** The Firestore emulator logs `Cannot find field:
 structuredQuery in message Document` when a query runs under a parent document

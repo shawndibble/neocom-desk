@@ -9,7 +9,7 @@ export type { OverlapPreview } from './TakeoverConfirm';
 interface Props {
   corpName: string;
   payeeNames: readonly string[];
-  /** Every allocation involved is marked paid: only "I paid it another way" is offered. */
+  /** Every allocation involved is paid on its Payee's account: only "I paid it another way" is offered. */
   paid: boolean;
   previews: readonly OverlapPreview[];
   typeNames: ReadonlyMap<number, string>;
@@ -18,7 +18,7 @@ interface Props {
   onTakeOver: () => void;
   onPaidAnotherWay: () => void;
   /**
-   * Billed on a Statement (#6206): "I paid this another way" goes to the corporation, so this
+   * Asked for on a Late notice (#6206): "I paid this another way" goes to the corporation, so this
    * replaces the device-only button.
    */
   paidAnotherWay?: ReactNode;

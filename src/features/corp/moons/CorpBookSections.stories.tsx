@@ -16,11 +16,11 @@ import { useTranslation } from 'react-i18next';
 
 /**
  * The Corp Tax Book's section pages on a sample book the real engine built: the
- * Overview, Extractions, Miners (a row opens the Miner's page) and Statements tabs, and the Miner,
- * moon and Statement period pages, each at desktop and phone width. The components are the
+ * Overview, Extractions, Miners (a row opens the Miner's page) and Late notices tabs, and the
+ * Miner and moon pages, each at desktop and phone width. The components are the
  * route's own.
  */
-type SectionTab = 'overview' | 'extractions' | 'miners' | 'statements';
+type SectionTab = 'overview' | 'extractions' | 'miners' | 'late-notices';
 
 function Page({ children, tab }: { children: ReactNode; tab?: SectionTab }) {
   const { t } = useTranslation();
@@ -128,15 +128,15 @@ export const Extractions: Story = {
 export const ExtractionsPhone: Story = { ...Extractions, ...phone };
 
 /** @summary Late notices tab: the next run and the notices sent. */
-export const Statements: Story = {
+export const LateNotices: Story = {
   render: () => (
-    <Page tab="statements">
+    <Page tab="late-notices">
       <LateNoticesTab />
     </Page>
   ),
 };
 /** @summary Late notices tab, phone. */
-export const StatementsPhone: Story = { ...Statements, ...phone };
+export const LateNoticesPhone: Story = { ...LateNotices, ...phone };
 
 /** @summary Miners list as the Overdue total's link opens it: `?balance=overdue`, a Balance pill. */
 export const MinersOverdue: Story = {

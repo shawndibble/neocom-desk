@@ -477,7 +477,7 @@ function firstName(name: string): string {
 
 // ------------------------------------------------------------- Mail preview
 
-/** The mail as the member reads it, in the Statement mail preview's monospace box. */
+/** The mail as the member reads it, in the Late notice mail preview's monospace box. */
 export function MailPreviewDialog({
   onClose,
   sent = false,

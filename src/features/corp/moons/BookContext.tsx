@@ -3,12 +3,13 @@
  * and dialogs take few props: the joined view, names, who the viewer is, and
  * `edit` — one action through `editBook` (ADR 0023), then a reload.
  */
-import { useCallback, useEffect, useMemo, type ReactNode } from 'react';
-import { accountRecords } from '@/engine/corpTaxBook/accountRecords';
+import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { runningAccountRecords, dueCheckpoints } from '@/engine/corpTaxBook/runningAccountRecords';
 import { chunk } from '@/lib/chunk';
 import { editBook } from '../taxBook/bookClient';
 import { invalidatePopSharing } from '../taxBook/popSharingCache';
 import { BookContext, type BookContextValue } from './bookContextValue';
+import { useReloadOnRecordedMail } from './useReloadOnRecordedMail';
 
 export function BookProvider({
   value,
@@ -31,6 +32,7 @@ export function BookProvider({
     [characterId, corporationId, reload]
   );
   useRecordAccounts(value, verdict.canEdit);
+  useReloadOnRecordedMail(corporationId, reload, verdict.canEdit);
   const merged = useMemo(
     () => ({ ...value, edit, canEdit: verdict.canEdit }),
     [value, edit, verdict.canEdit]
@@ -38,47 +40,84 @@ export function BookProvider({
   return <BookContext.Provider value={merged}>{children}</BookContext.Provider>;
 }
 
-/** What this tab last recorded per book and Miner, so an unchanged account is never sent again. */
-const recorded = new Map<number, Map<string, string>>();
+/** What this tab last recorded per book, kind and Miner, so an unchanged record is never sent again. */
+const recorded = new Map<string, Map<string, string>>();
 /** The sends in flight per book, chained. */
 const sending = new Map<number, Promise<void>>();
 
 /**
- * A running account's figures for the pay page (#6294): the server cannot price days, so an
- * editor's tab records each Miner's account once its rows and payments are read, and again
- * whenever it changes. Best effort and quiet: no reload, and a refusal leaves the page as it was.
+ * Sends each Miner's record that changed since this tab last sent it, 200 at a time, one send
+ * at a time per book and in order, so an older record never lands over a newer one. Best effort
+ * and quiet: a refusal is sent again on the next change or visit.
+ */
+function sendChanged<T extends { minerId: string }>(
+  corporationId: number,
+  kind: string,
+  records: readonly T[],
+  send: (batch: T[]) => Promise<unknown>,
+  keyOf: (record: T) => string = (r) => JSON.stringify(r)
+) {
+  const key = `${corporationId}:${kind}`;
+  const sent = recorded.get(key) ?? new Map<string, string>();
+  recorded.set(key, sent);
+  const changed = records.filter((r) => sent.get(r.minerId) !== keyOf(r));
+  if (changed.length === 0) return;
+  for (const r of changed) sent.set(r.minerId, keyOf(r));
+  const before = sending.get(corporationId) ?? Promise.resolve();
+  sending.set(
+    corporationId,
+    before.then(async () => {
+      for (const batch of chunk(changed, 200)) {
+        try {
+          await send(batch);
+        } catch {
+          for (const r of batch) if (sent.get(r.minerId) === keyOf(r)) sent.delete(r.minerId);
+        }
+      }
+    })
+  );
+}
+
+/**
+ * What only an officer's tab can work out, since the server cannot price days (#6294, decision
+ * 20261120-235011): each Miner's Running account figures for the pay page, with its snapshot for
+ * the lock date when it has none (`recordAccounts`). Sent once the book's rows and payments are
+ * read, and again whenever they change; no reload.
  */
 function useRecordAccounts(value: Omit<BookContextValue, 'edit' | 'canEdit'>, canEdit: boolean) {
   const { view, data, characterId, corporationId } = value;
+  // The page rebuilds its view every minute for its clocks; the accounts and snapshots change
+  // only with the book read or the UTC day, so they are worked out once per read or per day (M10).
+  // (A context built by hand, a story or a test, may carry no clock.)
+  const today = (view as typeof view | undefined)?.input?.now?.slice(0, 10);
+  const latest = useRef(view);
   useEffect(() => {
+    latest.current = view;
+  }, [view]);
+  useEffect(() => {
+    const view = latest.current;
     // Only a read with every row and payment counts. A moon page's read (`BookRead.moon`) holds
     // other Miners' days only in part; a one-Miner page counts that Miner only.
     // A context built by hand (a story, a test) may carry no parts: then it counts nothing.
     const whole = !!data?.parts?.has('observed') && !!data.parts.has('ledger');
-    if (!canEdit || !whole || !view.input.runningAccountFrom || (data as { moon?: unknown }).moon)
-      return;
-    const sent = recorded.get(corporationId) ?? new Map<string, string>();
-    recorded.set(corporationId, sent);
-    const changed = accountRecords(view, data.scopedMiner).filter(
-      (a) => sent.get(a.minerId) !== JSON.stringify(a)
+    if (!canEdit || !whole || (data as { moon?: unknown }).moon) return;
+    // A snapshot comes only from a read of the whole book: a Miner's own page cannot see the
+    // groupings around them (B2).
+    const due = new Map(
+      data.scopedMiner === undefined
+        ? dueCheckpoints(view, { at: view.input.now, by: characterId }).map((s) => [s.minerId, s])
+        : []
     );
-    if (changed.length === 0) return;
-    for (const a of changed) sent.set(a.minerId, JSON.stringify(a));
-    // One send at a time per book, in order, so an older count never lands over a newer one.
-    const before = sending.get(corporationId) ?? Promise.resolve();
-    sending.set(
+    sendChanged(
       corporationId,
-      before.then(async () => {
-        for (const accounts of chunk(changed, 200)) {
-          try {
-            await editBook(characterId, corporationId, { action: 'recordAccounts', accounts });
-          } catch {
-            // Sent again on the next change or visit, unless a newer count is already queued.
-            for (const x of accounts)
-              if (sent.get(x.minerId) === JSON.stringify(x)) sent.delete(x.minerId);
-          }
-        }
-      })
+      'accounts',
+      runningAccountRecords(view, data.scopedMiner).map((a) =>
+        due.has(a.minerId) ? { ...a, snapshot: due.get(a.minerId) } : a
+      ),
+      // A snapshot the server skipped (`exists`, `wrong-date`) is no error: the account reads whole.
+      (accounts) => editBook(characterId, corporationId, { action: 'recordAccounts', accounts }),
+      // When a snapshot was worked out is no change to send again.
+      (a) => JSON.stringify({ ...a, snapshot: a.snapshot && { ...a.snapshot, at: undefined } })
     );
-  }, [view, data, canEdit, characterId, corporationId]);
+  }, [data, today, canEdit, characterId, corporationId]);
 }

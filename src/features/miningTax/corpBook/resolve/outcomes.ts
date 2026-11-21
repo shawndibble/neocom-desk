@@ -26,13 +26,13 @@ export type ResolveProblem =
   | (Of & {
       kind: 'uncredited';
       amount: number;
-      /** The Statement the days they paid are on; without one there is nothing to declare yet. */
-      statementId?: string;
+      /** The Late notice the days they paid are on; without one there is nothing to declare yet. */
+      noticeId?: string;
       /** Every day the donations were paying, oldest first: what the mail to the corporation says. */
       days?: string[];
       /**
        * Donations the book holds for an officer's review without counting them (#6207), not ones
-       * it lacks: each the member may say was tax (a claim of their own, no Statement needed).
+       * it lacks: each the member may say was tax (a claim of their own, no Late notice needed).
        */
       held?: { id: string; characterId: number }[];
     })
@@ -40,10 +40,8 @@ export type ResolveProblem =
   | (Of & { kind: 'figure'; bookAsksMore: boolean })
   /** Ore the member gave another Payee that the book also recorded. */
   | (Of & { kind: 'conflict' })
-  /** A Statement past its due date that nothing has settled. */
-  | (Of & { kind: 'overdue'; statementId: string; period: string })
-  /** A day the member marked paid that the book's Statement still bills. */
-  | (Of & { kind: 'markedPaid'; statementId?: string })
+  /** A Late notice whose days are still unpaid. */
+  | (Of & { kind: 'overdue'; noticeId: string; period: string })
   /** A plain billed day with nothing disputed: pay it, or stop being reminded. */
   | (Of & { kind: 'billed' })
   /** An officer kept the bill, with what to do next. */
@@ -52,7 +50,7 @@ export type ResolveProblem =
       by: 'dispute' | 'declaration';
       nextStep?: string;
       reason?: string;
-      statementId?: string;
+      noticeId?: string;
     });
 
 /** What "I don't owe this" says about a day: the dispute it sends. */
@@ -89,8 +87,8 @@ export interface Offer {
   preselected: OutcomeId;
   /** Whether "Not paying" can also tell the corporation why: it needs a day the book recorded. */
   tellWhy: boolean;
-  /** "I already paid" is offered, but there is no Statement to declare it on yet. */
-  noStatement: boolean;
+  /** "I already paid" is offered, but there is no Late notice to declare it on yet. */
+  noNotice: boolean;
 }
 
 export function outcomesFor(p: ResolveProblem): Offer {
@@ -101,21 +99,21 @@ export function outcomesFor(p: ResolveProblem): Offer {
   switch (p.kind) {
     case 'uncredited': {
       // The book holds them already: paying again, or "not paying" ISK it holds, is no answer;
-      // claiming needs no Statement.
+      // claiming needs no Late notice.
       if (p.held)
         return {
           outcomes: ['paid'],
           preselected: 'paid',
           tellWhy,
-          noStatement: false,
+          noNotice: false,
         };
-      const noStatement = p.statementId === undefined;
+      const noNotice = p.noticeId === undefined;
       // The donation is the proof, not a quarrel with a figure: no "I don't owe this" here.
       return {
         outcomes: ['pay', 'notPaying', 'paid'],
-        preselected: noStatement ? 'pay' : 'paid',
+        preselected: noNotice ? 'pay' : 'paid',
         tellWhy,
-        noStatement,
+        noNotice,
       };
     }
     case 'figure': {
@@ -124,7 +122,7 @@ export function outcomesFor(p: ResolveProblem): Offer {
         outcomes: ['pay', 'notPaying', ...(canDispute ? (['notOwed'] as const) : [])],
         preselected: p.bookAsksMore && canDispute ? 'notOwed' : 'pay',
         tellWhy,
-        noStatement: false,
+        noNotice: false,
       };
     }
     case 'conflict':
@@ -132,26 +130,17 @@ export function outcomesFor(p: ResolveProblem): Offer {
         outcomes: ['fixRecords', 'notPaying', ...(tellWhy ? (['notOwed'] as const) : [])],
         preselected: 'fixRecords',
         tellWhy,
-        noStatement: false,
+        noNotice: false,
       };
     case 'overdue':
       return {
         outcomes: ['pay', 'notPaying', 'paid'],
         preselected: 'pay',
         tellWhy,
-        noStatement: false,
+        noNotice: false,
       };
-    case 'markedPaid': {
-      const noStatement = p.statementId === undefined;
-      return {
-        outcomes: ['pay', 'notPaying', 'paid'],
-        preselected: noStatement ? 'pay' : 'paid',
-        tellWhy,
-        noStatement,
-      };
-    }
     case 'billed':
-      return { outcomes: ['pay', 'notPaying'], preselected: 'pay', tellWhy, noStatement: false };
+      return { outcomes: ['pay', 'notPaying'], preselected: 'pay', tellWhy, noNotice: false };
     case 'kept':
       // The member may say it again: a dispute again (the hold does not renew), or the proof again.
       return {
@@ -163,7 +152,7 @@ export function outcomesFor(p: ResolveProblem): Offer {
         ],
         preselected: 'pay',
         tellWhy,
-        noStatement: p.by === 'declaration' && p.statementId === undefined,
+        noNotice: p.by === 'declaration' && p.noticeId === undefined,
       };
   }
 }

@@ -4,9 +4,10 @@
  * no grant, no book) resolves to nothing, never an error. Sources and the stat chips share one
  * load per player, kept briefly so opening the tab twice does not read twice.
  */
-import { collection, getDocs, limit as limitTo, query, where } from 'firebase/firestore/lite';
-import { buildBookView, noticeSettlement, minerDetail } from '@/engine/corpTaxBook/bookView';
-import { withMinerTotals } from '@/engine/corpTaxBook/minerScope';
+import { noticeSpan } from '../../../functions/src/corpTaxBookLateNotice';
+import { collection, getDocs, query, where } from 'firebase/firestore/lite';
+import { minerIdFor, type Miner } from '@/engine/corpTaxBook/charges';
+import { buildBookView, minerDetail } from '@/engine/corpTaxBook/bookView';
 import type { Contract } from '@/esi/endpoints';
 import { resolveAffiliations } from '@/features/character/affiliations';
 import { loadCorporationContracts } from '@/features/corp/contracts';
@@ -36,8 +37,11 @@ const settled = async <T>(work: () => Promise<T>, fallback: T): Promise<T> => {
   }
 };
 
-/** The Miner the player's characters bill under: its grouping, else the solo Miner. */
-async function minerIdFor(characterId: number, corporationId: number, otherId: number) {
+/**
+ * The Miner the player's characters bill under: the shared rule (`minerIdFor`), so of two
+ * groupings that list the character the earliest wins, as everywhere else; else the solo Miner.
+ */
+async function billedMinerOf(characterId: number, corporationId: number, otherId: number) {
   const solo = `solo:${otherId}`;
   try {
     const book = await openBook(characterId, corporationId);
@@ -45,11 +49,13 @@ async function minerIdFor(characterId: number, corporationId: number, otherId: n
     const snap = await getDocs(
       query(
         collection(book.db, 'corps', String(corporationId), 'miners'),
-        where('characterIds', 'array-contains', otherId),
-        limitTo(1)
+        where('characterIds', 'array-contains', otherId)
       )
     );
-    return snap.docs[0]?.id ?? solo;
+    return minerIdFor(
+      otherId,
+      snap.docs.map((d) => ({ ...(d.data() as Miner), id: d.id }))
+    );
   } catch {
     return solo;
   }
@@ -62,48 +68,41 @@ async function readBookFacts(
 ): Promise<BookFacts | null> {
   const verdict = await verifyOfficer(characterId, corporationId);
   if (!verdict.canView || !verdict.bookActive) return null;
-  const minerId = await minerIdFor(characterId, corporationId, otherId);
+  const minerId = await billedMinerOf(characterId, corporationId, otherId);
   const read = await readBook(characterId, corporationId, {
     parts: bookPartsFor('miners', 'miner'),
     minerId,
   });
   if (!read?.settings.active) return null;
   const prices = await loadBookPrices(read, read.minerScope?.from);
-  const built = buildBookView(
+  const view = buildBookView(
     bookViewInputOf(corporationId, new Date().toISOString(), read, prices)
   );
-  const view = withMinerTotals(built, minerId, read.minerScope?.totals);
   const detail = minerDetail(view, minerId);
   const inner = view.internals.byMiner.get(minerId);
   if (!detail || !inner) return null;
-
-  const isSettled = (s: (typeof detail.statements)[number]) =>
-    s.kind === 'notice' && inner.running
-      ? noticeSettlement(s, inner.running).settled
-      : inner.allocation.byStatement.get(s.id)?.settled === true;
-  const statementSettled = new Map(detail.statements.map((s) => [s.id, isSettled(s)]));
-  const creditedTo = new Map<string, string>();
-  for (const c of detail.paymentCredits) creditedTo.set(c.paymentId, c.statementId);
+  const paidDays = new Set(
+    detail.paymentDays.filter((p) => p.days.length > 0).map((p) => p.paymentId)
+  );
 
   return {
     minerId,
     standing: detail.row.standing,
     owed: detail.row.owed,
-    statements: detail.statements.map((s) => ({
-      id: s.id,
-      issuedAt: s.issuedAt,
-      periodStart: s.periodStart,
-      periodEnd: s.periodEnd,
-      amount: s.amount,
-      notice: s.kind === 'notice',
-      mailsSent: s.mailsSent ?? 0,
-      settled: statementSettled.get(s.id) === true,
+    notices: detail.notices.map((n) => ({
+      id: n.id,
+      issuedAt: n.issuedAt,
+      from: noticeSpan(n).first,
+      to: noticeSpan(n).last,
+      listed: n.listed,
+      mailsSent: n.mail.sent,
+      settled: inner.account.standingOf(n).settled,
     })),
     payments: detail.payments.map((p) => ({
       id: p.id,
       at: p.at,
       amount: p.amount,
-      statementId: p.statementId ?? creditedTo.get(p.id),
+      paidDays: paidDays.has(p.id),
     })),
     adjustments: view.input.adjustments
       .filter((a) => a.minerId === minerId && !a.reversed)
@@ -113,11 +112,8 @@ async function readBookFacts(
       .map((d) => ({
         date: d.date,
         tax: d.tax,
-        settled:
-          d.status === 'paid' ||
-          d.status === 'written-off' ||
-          (d.status === 'on-statement' && statementSettled.get(d.statementId ?? '') === true) ||
-          (d.status === 'unbilled' && d.owed === 0),
+        // A day a dispute holds owes nothing yet, but is not paid.
+        settled: d.status === 'paid' || (d.status === 'owed' && d.owed === 0 && !d.disputed),
       })),
   };
 }

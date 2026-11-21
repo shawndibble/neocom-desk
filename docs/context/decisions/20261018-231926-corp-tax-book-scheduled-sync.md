@@ -13,8 +13,8 @@ _Recorded 2026-10-19 · issue #4068 · amends D25 ("no server-side scheduled syn
   the scopes those reads need (ADR 0025 lists them).
 - **Sync and settle only; never issue, never mail.** After syncing it runs the
   rest of the visit's pipeline: monotonic upserts, gap detection,
-  `matchDonation` and re-matching of Unmatched donations, `allocatePayments`
-  and `settleStatements`. Issuing a Statement and sending mail stay officer
+  `matchDonation` and re-matching of Unmatched donations, and paying each
+  Miner's oldest unpaid days. Issuing a Late notice and sending mail stay officer
   actions. It also does not group the officer's own Characters, which needs
   the officer's device.
 - **Roles are re-checked every run with the holder's own token.** If the holder

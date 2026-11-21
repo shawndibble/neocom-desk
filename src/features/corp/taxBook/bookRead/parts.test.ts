@@ -7,10 +7,10 @@ const sorted = (tab: string, detail: Parameters<typeof bookPartsFor>[1] = null) 
 describe('bookPartsFor', () => {
   it('names the parts every route reads (#5717)', () => {
     // Only the Moon owners tab opens without ledger rows; every other route keeps `observed`.
-    expect(sorted('overview')).toEqual(['core', 'ledger', 'observed']);
+    expect(sorted('overview')).toEqual(['answers', 'core', 'ledger', 'observed']);
     expect(sorted('extractions')).toEqual(['core', 'observed']);
     expect(sorted('miners')).toEqual(['answers', 'core', 'ledger', 'observed']);
-    expect(sorted('statements')).toEqual(['core', 'ledger', 'observed']);
+    expect(sorted('late-notices')).toEqual(['core', 'ledger', 'observed']);
     expect(sorted('moon-owners')).toEqual(['core', 'owners']);
     expect(sorted('anything-else')).toEqual(['core', 'observed']);
   });

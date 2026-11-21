@@ -2980,3 +2980,51 @@ describe('triggerSync: last-synced heartbeat (#2065)', () => {
     expect(Object.keys(heartbeat() as object)).toEqual(['lastSyncedAt']);
   });
 });
+
+describe('triggerSync: a collection the rules do not know yet (B4)', () => {
+  const LINKS_PATH = 'characters/char:1/miningTaxPaymentLinks';
+  const refuse = () =>
+    vi.mocked(getDocs).mockImplementation((async (target: { col?: { path: string } }) => {
+      if (target.col?.path === LINKS_PATH)
+        throw Object.assign(new Error('Missing or insufficient permissions.'), {
+          code: 'permission-denied',
+        });
+      return fake.getDocsImpl(target as never);
+    }) as never);
+
+  it('is not ready, never an error: the pass succeeds, the heartbeat is stamped, the links stay', async () => {
+    refuse();
+    await db.miningTaxPaymentLinks.put({
+      id: 'journal:41',
+      characterId: 1,
+      payeeId: 'p1',
+      kind: 'journal',
+      refId: 41,
+      amount: 5,
+      paidOn: '2026-10-05',
+      source: 'manual',
+      updatedAt: 1,
+    });
+
+    await expect(triggerSync(1)).resolves.toBeUndefined();
+
+    expect(getSyncStatus(1).state).toBe('idle');
+    expect(remoteStore.get('characters')?.get('char:1')).toEqual({
+      lastSyncedAt: expect.any(Number),
+    });
+    expect(await db.miningTaxPaymentLinks.count()).toBe(1);
+    // Its cursor never advanced: the next pass reads it again.
+    expect(await db.settings.get(pullCursorKey(1, 'miningTaxPaymentLinks'))).toBeUndefined();
+    expect(await db.settings.get(pullCursorKey(1, 'miningTaxAssignments'))).toBeDefined();
+  });
+
+  it('still fails the pass when an established collection is refused', async () => {
+    vi.mocked(getDocs).mockImplementation((async (target: { col?: { path: string } }) => {
+      if (target.col?.path === 'characters/char:1/miningTaxAssignments')
+        throw Object.assign(new Error('denied'), { code: 'permission-denied' });
+      return fake.getDocsImpl(target as never);
+    }) as never);
+    await expect(triggerSync(1)).rejects.toThrow();
+    expect(getSyncStatus(1).state).toBe('error');
+  });
+});

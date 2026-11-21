@@ -26,8 +26,13 @@ describe('createActionGroup', () => {
     (body) => {
       const group = createActionGroup();
       group.register('a', () => 1);
+      // A client tells a server older than it by this reason; a server from before it sends none.
       expect(() => group.route(req(body))).toThrow(
-        expect.objectContaining({ code: 'invalid-argument' })
+        expect.objectContaining({
+          code: 'invalid-argument',
+          message: 'Unknown action',
+          details: { reason: 'unknown-action' },
+        })
       );
     }
   );

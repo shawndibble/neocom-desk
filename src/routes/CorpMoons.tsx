@@ -1,6 +1,6 @@
 /**
  * `/corp/moons` — the Corp Tax Book (issue #4063, epic #4055, D21): Overview,
- * Extractions, Miners, Statements and Moon owners as path-segment tabs (ADR 0015), the moon and Miner
+ * Extractions, Miners, Late notices and Moon owners as path-segment tabs (ADR 0015), the moon and Miner
  * pages below their tabs, settings (Rates, Billing, Extractions, Sharing, Access) behind the header's gear and the audit log
  * behind Activity.
  *
@@ -13,6 +13,7 @@
  * is read through the officer rules, so the Character is verified first
  * (`useCorpBook`), and a corporation with no book shows the Director's turn-on.
  */
+import { useAuditWords } from '@/features/corp/moons/useAuditWords';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { canViewCorpTaxBook } from '@/engine/corpRoles';
 import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
@@ -71,7 +72,7 @@ import {
   isSettingsTab,
   moonsDetail,
   refineriesTabPath,
-  statementsTabPath,
+  lateNoticesTabPath,
   type SettingsTab,
 } from '@/features/corp/moons/moonsPaths';
 import { LateNoticesTab } from '@/features/corp/moons/LateNoticesTab';
@@ -87,13 +88,14 @@ function ActivityPanel({ open, onClose }: { open: boolean; onClose: () => void }
   const { t } = useTranslation();
   const audit = useBookAudit(200);
   const subject = useAuditSubject();
+  const words = useAuditWords();
   return (
     <SlideOver open={open} onClose={onClose} title={t('corpTaxBook.moons.activity.title')} wide>
       {audit.loading ? (
         <Spinner label={t('common.loading')} />
       ) : (
         // A Miner link opens their page: close over it rather than cover it.
-        <AuditFeed entries={audit.entries} subject={subject} onOpen={onClose} />
+        <AuditFeed entries={audit.entries} subject={subject} words={words} onOpen={onClose} />
       )}
     </SlideOver>
   );
@@ -101,7 +103,7 @@ function ActivityPanel({ open, onClose }: { open: boolean; onClose: () => void }
 
 function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   const { t } = useTranslation();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   // With no moon owners the empty state carries the invite button itself.
   const { rows: moonOwnerRows } = useMoonOwners();
   const hasMoonOwners = moonOwnerRows.length > 0;
@@ -243,7 +245,10 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
               {tab === 'refineries' && <RefineriesTab />}
               {tab === 'moons' && <Navigate replace to={refineriesTabPath} />}
               {tab === 'miners' && <MinersTab />}
-              {tab === 'statements' && <LateNoticesTab />}
+              {tab === 'late-notices' && <LateNoticesTab />}
+              {tab === 'statements' && (
+                <Navigate replace to={{ pathname: lateNoticesTabPath, search }} />
+              )}
               {tab === 'moon-owners' && (
                 <div className="space-y-4">
                   {addCorps.notices}
@@ -255,7 +260,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
           </>
         )}
         {detail?.kind === 'extraction' && <MoonDetail key={detail.id} id={detail.id} />}
-        {detail?.kind === 'legacyStatementPeriod' && <Navigate replace to={statementsTabPath} />}
+        {detail?.kind === 'legacyStatementPeriod' && <Navigate replace to={lateNoticesTabPath} />}
         {detail?.kind === 'legacyMoon' && <LegacyRefineryRedirect moonId={Number(detail.id)} />}
         {detail?.kind === 'legacyRefinery' && (
           <LegacyRefineryRedirect structureId={detail.structureId} />

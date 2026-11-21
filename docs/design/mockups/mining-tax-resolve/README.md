@@ -14,7 +14,7 @@ Every problem the Tax tab reports has the same five possible outcomes, split by 
 
 Today the tab leads every warning with "ask an officer" — the slowest, least certain outcome — and offers no control for it. After an answer, the problem leaves the attention strip for one quiet line and comes back only when an officer hands it back, with what to do next. Hiding is never "resolved": the row reads "Not paying — {corp} still bills this".
 
-New components: `ResolveOptions` (A), `ResolveDialog` (B), `QuietStatusLine`, `LeftCorpNotice`, `QueueCard: won't pay`, `RequiredNextStep`, `TaxContactSetting`, `WalletCheck`, `AutoCreditedLine`, `WherePaymentGoes`. Everything else is the real `AttentionStrip`, `OwedBalances`, `DataTable`, `Modal` and `src/components/ui` primitives.
+New components: `ResolveOptions` (A), `ResolveDialog` (B), `QuietStatusLine`, `LeftCorpNotice`, `QueueCard: won't pay`, `RequiredNextStep`, `TaxContactSetting`, `WalletCheck`, `AutoCreditedLine`. Everything else is the real `AttentionStrip`, `OwedBalances`, `DataTable`, `Modal` and `src/components/ui` primitives.
 
 ## Today
 
@@ -51,11 +51,10 @@ The pilot's own journal entry already gives the amount, EVE time, journal ref an
 
 ## Paying a Corp Tax Book: an amount, not days
 
-The book pays a Miner's oldest days first and can't target a moon or a day, so the pilot pays an amount and the dialog shows where it lands. A day held by an open dispute or "Not paying" is skipped until an officer answers; the officer's card says where the money went.
+The book pays a Miner's oldest days first and can't target a moon or a day, so the pilot pays an amount. The pay side shipped as Settle up's preview off the Miner's Running account (`SettleUpDialog`), so its mockup is gone; the officer's card says where the money went.
 
 | | 1440 | 390 |
 |---|---|---|
-| Pay dialog: oldest first, the held day skipped | ![](pay-oldest-first-1440.png) | ![](pay-oldest-first-phone-390.png) |
 | Officer: where the member's payment landed, and what is held | ![](officer-held-1440.png) | |
 
 ## After the pilot answers
@@ -81,4 +80,4 @@ The book pays a Miner's oldest days first and can't target a moon or a day, so t
 - Auto-credit only on exactly one match (sender, exact amount, not already credited); two candidates go to an officer side by side.
 - "Too old to check" is never "not found". The sync keeps only donations it credits or flags, so wallet history before the book started (or past ESI's window) can't be searched; keeping every donation the sync sees would shrink that gap.
 - A person's own wallet is checked on their own device: personal wallet tokens never leave it (CLAUDE.md).
-- Open question: an open dispute does not pause the 14-day Conflict clock today. The Overdue flow's pause budget (14 days per Statement) is the precedent to weigh.
+- Open question: an open dispute does not pause the 14-day Conflict clock today. The Overdue flow's pause budget (14 days per Late notice) is the precedent to weigh.

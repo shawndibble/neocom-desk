@@ -18,8 +18,8 @@ _Recorded 2026-11-16._ Follows #6207 (donations held for review, `reviewReason: 
 
 - **The member sees the donations a book holds for review, and may count them as tax.** They are
   neither in flight (the book has them) nor credited, so nothing on the Tax tab said where the
-  ISK went. One attention item per book lists them; Resolve offers "I already paid". With an open
-  Statement of the donor's Miner it is a declaration with the transfers, and the wallet check
+  ISK went. One attention item per book lists them; Resolve offers "I already paid". With an unsettled
+  Late notice of the donor's Miner it is a declaration with the transfers, and the wallet check
   now finds the sender's own held donation and credits it (clearing the hold) instead of saying
   "not found"; with none it is the donor's own claim (`claimCorpTaxBookPayment` with
   `inReview`), audited. The automatic claim never takes a held donation: an officer still

@@ -8,8 +8,8 @@ import { BOOK_CONTEXT, VARRO_ID } from './corpBookFixture';
 import { MinersTab } from './MinersTab';
 import { OverviewTab } from './OverviewTab';
 
-// The Overview and Miners tab print the read models (#5259) and fall back to the whole-book
-// view while the docs are missing. The docs here are deliberately unlike the view.
+// The Overview and Miners tab printed the read models (#5259). The docs here are deliberately
+// unlike the view, so a tab still reading them would show.
 vi.mock('../taxBook/bookClient', () => ({ editBook: vi.fn(), readAudit: vi.fn() }));
 vi.mock('@/features/corpTaxBook/mailQueueStore', () => ({
   listQueue: vi.fn().mockResolvedValue([]),
@@ -61,31 +61,17 @@ const VARRO_DOCS = {
   },
 };
 
-describe('the Overview and Miners tab read models', () => {
-  it("prints a Miner's balance from the miner list doc, and only then", () => {
-    const without = renderTab(<MinersTab />, null);
-    expect(screen.queryAllByText(/123,456/)).toHaveLength(0);
-    without.unmount();
+describe('the Overview and Miners tabs, with read model docs still stored', () => {
+  // The read models counted calendar Statements (decision 20261120-235011): the tabs read every
+  // Miner off their Running account, whatever docs an older server left.
+  it("prints a Miner's balance from their Running account, not the miner list doc", () => {
     renderTab(<MinersTab />, VARRO_DOCS);
-    expect(screen.getAllByText(/123,456/).length).toBeGreaterThan(0);
+    expect(screen.queryAllByText(/123,456/)).toHaveLength(0);
   });
 
-  it('prints the Overview from the docs', () => {
+  it('prints the Overview from the whole-book view', () => {
     renderTab(<OverviewTab />);
-    expect(headings()).toEqual(['Fractured · 0', 'Ready · 0', 'Pops in the next 7 days · 0']);
-    expect(screen.getByText(/Before the book: 7 donations/)).toBeInTheDocument();
-  });
-
-  it('falls back to the whole-book view while the docs are missing', () => {
-    renderTab(<OverviewTab />, null);
     expect(headings()).toEqual(['Fractured · 1', 'Ready · 1', 'Pops in the next 7 days · 1']);
-  });
-
-  it('falls back when the docs are from another schema', () => {
-    renderTab(<OverviewTab />, {
-      ...DOCS,
-      minerList: { ...DOCS.minerList, schema: READ_MODELS_SCHEMA + 1 },
-    });
-    expect(headings()).toEqual(['Fractured · 1', 'Ready · 1', 'Pops in the next 7 days · 1']);
+    expect(screen.queryByText(/Before the book: 7 donations/)).not.toBeInTheDocument();
   });
 });

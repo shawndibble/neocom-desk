@@ -13,6 +13,8 @@ export const TRANSFER_RECIPIENTS = ['corporation', 'character', 'otherCorporatio
 /** What checking one claimed transfer against the book found. */
 export const CLAIM_CHECK_RESULTS = [
   'found',
+  /** The book already credited the payment, to the Miner it names. */
+  'credited',
   'division',
   'notSynced',
   'tooOld',
@@ -41,6 +43,22 @@ export const NOTICE_DEFAULTS = {
   minimum: 10_000_000,
   cooldownDays: 7,
 } as const;
+/** A running account's notice rules, as a book stores them. Mirrors the client's `NoticeRules`. */
+export interface NoticeRules {
+  after: { kind: 'behind'; days: number } | { kind: 'dayOfMonth'; day: number };
+  minimum: number;
+  cooldownDays: number;
+  /** Owing this much is due a notice early; absent: off. */
+  earlyAt?: number;
+}
+/** What the server accepts for each notice rule: the settings form offers the same range. */
+export const NOTICE_RULE_BOUNDS = {
+  behindDays: { min: 1, max: 365 },
+  dayOfMonth: { min: 1, max: 28 },
+  minimum: { min: 0, max: 1e12 },
+  cooldownDays: { min: 1, max: 90 },
+  earlyAt: { min: 1, max: 1e12 },
+} as const;
 /** A running account's per-day tolerance, in percent; mirrors `DAY_SETTLE_TOLERANCE_PCT`. */
 export const DAY_TOLERANCE_PCT_DEFAULT = 0.5;
 
@@ -62,6 +80,7 @@ export const AUDIT_ACTIONS = [
   'recordPayment',
   'markNotTax',
   'assignPayment',
+  'reassignPayment',
   'ignoreUncounted',
   'dismiss',
   'dismissRecords',
@@ -80,6 +99,7 @@ export const AUDIT_ACTIONS = [
   'rebill',
   'closeAccount',
   'issueStatement',
+  'issueLateNotice',
   'settleStatements',
   'declare',
   'rejectDispute',
@@ -87,6 +107,7 @@ export const AUDIT_ACTIONS = [
   'resolveDeclaration',
   'recordReminder',
   'recordMail',
+  'recordLateNoticeMail',
   'recordAccounts',
   'setPopSharing',
   'setPopSharingMoon',
@@ -125,3 +146,27 @@ export const AUDIT_ACTIONS = [
   'feederViewDismissed',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
+
+/**
+ * Edit actions that re-check the caller's roles live (D7): dismissals, write-offs, rebills, "not
+ * tax" and moving a payment. The callable refuses them on the 10-minute
+ * role cache, so the client sends its access token with each. One list for both sides
+ * (`LIVE_CHECK_ACTIONS` on the server, `needsLiveToken` on the client), so they cannot drift.
+ */
+export const LIVE_CHECK_ACTION_NAMES = [
+  'dismiss',
+  'dismissRecords',
+  'dismissDispute',
+  'reverseDismissal',
+  'reverseAdjustment',
+  'editAdjustment',
+  'reverseWriteOff',
+  'setToleranceExemption',
+  'writeOff',
+  'rebill',
+  'markNotTax',
+  'reassignPayment',
+] as const;
+
+/** The longest note an officer may put on a payment they record or a write-off. */
+export const PAYMENT_NOTE_MAX = 500;

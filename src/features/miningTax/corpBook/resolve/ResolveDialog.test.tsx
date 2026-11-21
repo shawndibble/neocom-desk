@@ -96,7 +96,7 @@ describe('ResolveDialog', () => {
       mailed: { status: 'no-scope' },
     });
     open(
-      { ...base, kind: 'uncredited', amount: 25_000_000, statementId: 's1' },
+      { ...base, kind: 'uncredited', amount: 25_000_000, noticeId: 's1' },
       {
         transfers: [
           {
@@ -113,29 +113,11 @@ describe('ResolveDialog', () => {
     expect(screen.getByText(/give this Character the mail permission/)).toBeInTheDocument();
   });
 
-  it('cannot send the proof before anything is on a Statement, says why, and does not preselect it', async () => {
+  it('cannot send the proof before any Late notice asks for it, says why, and does not preselect it', async () => {
     open({ ...base, kind: 'uncredited', amount: 25_000_000 });
     expect(screen.getByRole('radio', { name: /Pay it/ })).toBeChecked();
     await userEvent.click(screen.getByRole('radio', { name: /I already paid/ }));
-    expect(screen.getByText(/Nothing is on a Statement yet/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Send proof' })).toBeDisabled();
-  });
-
-  // The Bureau report: the book credited the payment, but to an older day; no Statement yet.
-  it('says where the book credited a marked day’s payment when there is no Statement to prove it on', async () => {
-    const spent = {
-      ...row,
-      state: 'paid',
-      settledBy: 'yourMark',
-      bookOwed: 10_242_021,
-      bookSpentOn: ['2026-11-01'],
-    } as BookRowView;
-    open({ ...base, row: spent, kind: 'markedPaid' });
-    expect(screen.getByRole('radio', { name: /Pay it/ })).toBeChecked();
-    await userEvent.click(screen.getByRole('radio', { name: /I already paid/ }));
-    expect(
-      screen.getByText(/Bureau's book already used your payment on 2026-11-01/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/No Late notice has asked for it yet/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send proof' })).toBeDisabled();
   });
 
@@ -145,7 +127,7 @@ describe('ResolveDialog', () => {
       { id: 'j5_2', characterId: 8 },
     ];
 
-    it('counts them as tax at once when no Statement is open, and says they are credited', async () => {
+    it('counts them as tax at once when no Late notice is unpaid, and says they are credited', async () => {
       const user = userEvent.setup();
       const props = open({ ...base, kind: 'uncredited', amount: 37_929_058, held });
       expect(
@@ -160,13 +142,13 @@ describe('ResolveDialog', () => {
       expect(props.onSent).toHaveBeenCalled();
     });
 
-    it('sends the proof on the open Statement, where an officer sees it', async () => {
+    it('sends the proof on the unpaid Late notice, where an officer sees it', async () => {
       const user = userEvent.setup();
       submit.sendProof.mockResolvedValueOnce({ checks: [{ result: 'found' }], confirmed: true });
       const transfers = [
         { amount: 1, at: '2026-11-02T22:38:44Z', journalRef: 5, recipient: 'corporation' as const },
       ];
-      open({ ...base, kind: 'uncredited', amount: 1, statementId: 's1', held }, { transfers });
+      open({ ...base, kind: 'uncredited', amount: 1, noticeId: 's1', held }, { transfers });
       await user.click(screen.getByRole('button', { name: 'Send proof' }));
       expect(submit.sendProof).toHaveBeenCalledWith(mail, 's1', transfers, '', expect.any(String));
       expect(submit.countHeldDonations).not.toHaveBeenCalled();
@@ -174,7 +156,7 @@ describe('ResolveDialog', () => {
   });
 
   it('never offers disputing uncredited donations', () => {
-    open({ ...base, kind: 'uncredited', amount: 25_000_000, statementId: 's1' });
+    open({ ...base, kind: 'uncredited', amount: 25_000_000, noticeId: 's1' });
     expect(screen.queryByRole('radio', { name: /I don't owe this/ })).toBeNull();
   });
 
@@ -197,11 +179,11 @@ describe('ResolveDialog', () => {
     expect(await screen.findByText(/again/)).toBeInTheDocument();
   });
 
-  it('lets an Overdue Statement be paid, hidden, or declared with the payment the member picks', async () => {
+  it('lets a Late notice whose days are unpaid be paid, hidden, or declared with the payment the member picks', async () => {
     const user = userEvent.setup();
     submit.sendProof.mockResolvedValueOnce({ checks: [{ result: 'person' }], confirmed: false });
     open(
-      { ...base, row: undefined, kind: 'overdue', statementId: 's1', period: 'Oct 1 – Oct 31' },
+      { ...base, row: undefined, kind: 'overdue', noticeId: 's1', period: 'Oct 1 – Oct 31' },
       {
         payments: [
           {
@@ -251,7 +233,7 @@ describe('ResolveDialog', () => {
         ...base,
         kind: 'uncredited',
         amount: 5,
-        statementId: 's1',
+        noticeId: 's1',
         days: ['2026-11-06', '2026-11-07'],
       },
       {
@@ -268,6 +250,24 @@ describe('ResolveDialog', () => {
       '',
       '2026-11-06, 2026-11-07'
     );
+  });
+
+  it('after "I already paid" with nothing found, says the answer comes back, never a hold with no date', async () => {
+    const user = userEvent.setup();
+    submit.sendProof.mockResolvedValueOnce({ checks: [], confirmed: false });
+    open(
+      { ...base, kind: 'uncredited', amount: 5, noticeId: 's1', days: ['2026-11-06'] },
+      {
+        transfers: [
+          { amount: 5, at: '2026-11-08T00:00:00Z', journalRef: 3, recipient: 'corporation' },
+        ],
+      }
+    );
+    await user.click(screen.getByRole('button', { name: 'Send proof' }));
+    expect(
+      await screen.findByText(/Sent to Bureau\. Their answer comes back here/)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/until\s+while/)).not.toBeInTheDocument();
   });
 
   it('opens the day to fix your own records on a Conflict', async () => {

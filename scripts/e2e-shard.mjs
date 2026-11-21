@@ -35,6 +35,8 @@ if (!Number.isInteger(current) || !Number.isInteger(total) || current < 1 || cur
 
 const files = readdirSync('e2e')
   .filter((name) => name.endsWith('.spec.ts'))
+  // The Corp Tax Book specs run under playwright.book.config.ts (the Firebase emulators), not here.
+  .filter((name) => !name.endsWith('.book.spec.ts'))
   .map((name) => `e2e/${name}`);
 const weights = JSON.parse(readFileSync(WEIGHTS_PATH, 'utf8'));
 const mine = partitionByWeight(files, weights, total)[current - 1];

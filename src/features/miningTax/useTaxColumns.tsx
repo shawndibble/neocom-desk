@@ -316,7 +316,7 @@ export function useTaxColumns({
           dr.corp?.kind === 'row' &&
           dr.corp.view.state === 'conflict' &&
           dr.corp.view.conflictCause === 'overListed' ? (
-            // Ore the book never recorded: no Statement bills it.
+            // Ore the book never recorded: the book never bills it.
             '—'
           ) : dr.corp?.kind === 'row' && dr.corp.view.state === 'conflict' ? (
             <span className="block">

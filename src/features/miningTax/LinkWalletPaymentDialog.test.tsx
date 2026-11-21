@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
-import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
+import type { PayeeRecord } from '@/db';
+import { PayeeRunningAccount } from '@/engine/miningTax/payeeRunningAccount';
 import type { LedgerActionResult } from './ledgerActions';
-import type { GroupMember } from './groupRows';
 import type { MadePayment } from './paymentLinks';
 import { LinkWalletPaymentDialog } from './LinkWalletPaymentDialog';
 import type { MadePaymentSources } from './madePayments';
@@ -13,10 +13,10 @@ import { beginEveLogin } from '@/app/loginFlow';
 
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
 
-const settle = vi.fn<(...args: unknown[]) => Promise<LedgerActionResult>>();
+const linkPayment = vi.fn<(...args: unknown[]) => Promise<LedgerActionResult>>();
 const rememberPayeeEntity = vi.fn<(...args: unknown[]) => Promise<void>>();
 vi.mock('./ledgerActions', () => ({
-  settle: (...args: unknown[]) => settle(...args),
+  linkPayment: (...args: unknown[]) => linkPayment(...args),
 }));
 vi.mock('./payees', () => ({
   rememberPayeeEntity: (...args: unknown[]) => rememberPayeeEntity(...args),
@@ -24,19 +24,16 @@ vi.mock('./payees', () => ({
 
 const PAYEE = { id: 'p-1', characterId: 1, name: 'Moon Corp', defaultTaxPct: 10 } as PayeeRecord;
 
-function member(id: string, date: string, taxOwed: number): GroupMember {
-  return {
-    assignment: { id, date, solarSystemId: 30000142, taxOwed } as MiningTaxAssignmentRecord,
-    row: { characterId: 1, characterName: 'Pilot One' },
-  } as unknown as GroupMember;
-}
-
-// Deliberately out of date order: allocation must still pay the oldest first.
-const OWED = [
-  member('a-3', '2026-09-06', 300_000),
-  member('a-1', '2026-09-04', 100_000),
-  member('a-2', '2026-09-05', 200_000),
-];
+// Owes 600,000 over three days.
+const ACCOUNT = PayeeRunningAccount.build({
+  payeeId: 'p-1',
+  charges: [
+    { id: 'a-3', date: '2026-09-06', tax: 300_000 },
+    { id: 'a-1', date: '2026-09-04', tax: 100_000 },
+    { id: 'a-2', date: '2026-09-05', tax: 200_000 },
+  ],
+  links: [],
+});
 
 const DONATION: MadePayment = {
   key: 'journal:77',
@@ -50,6 +47,8 @@ const DONATION: MadePayment = {
   counterpartyName: 'Landlord Alt',
   label: 'Player donation',
 };
+
+const EXACT: MadePayment = { ...DONATION, key: 'journal:78', refId: 78, amount: 600_000 };
 
 const IN_KIND: MadePayment = {
   key: 'contract:5',
@@ -73,134 +72,103 @@ function renderDialog(
       open
       onClose={onClose}
       payee={PAYEE}
-      owed={OWED}
+      account={ACCOUNT}
       candidates={candidates}
+      characters={[{ characterId: 1, characterName: 'Pilot One' }]}
       paymentSources={paymentSources}
-      systemNames={new Map([[30000142, 'Jita']])}
       onLinked={onLinked}
     />
   );
   return { onLinked, onClose };
 }
 
-function paidIds(): string[] {
-  const [assignments] = settle.mock.calls[0] as [MiningTaxAssignmentRecord[]];
-  return assignments.map((a) => a.id).sort();
-}
-
 describe('LinkWalletPaymentDialog', () => {
   beforeEach(() => {
-    settle.mockReset();
-    settle.mockResolvedValue({ ok: true, value: undefined });
+    linkPayment.mockReset();
+    linkPayment.mockResolvedValue({ ok: true, value: undefined });
     rememberPayeeEntity.mockReset();
     rememberPayeeEntity.mockResolvedValue();
   });
 
-  it('names the payee and how many entries it owes', () => {
+  it('names the payee and what it owes, with nothing to tick', () => {
     renderDialog();
-
     expect(screen.getByRole('dialog', { name: 'Link a wallet payment' })).toBeInTheDocument();
-    expect(screen.getByText('Moon Corp · 3 entries owed')).toBeInTheDocument();
+    expect(screen.getByText(/Moon Corp \(600,000 ISK owed now\)/)).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: /Include/ })).not.toBeInTheDocument();
   });
 
   it('shows an empty state when no unlinked payments exist', () => {
     renderDialog([]);
-
     expect(screen.getByText(/No unlinked wallet payments found/)).toBeInTheDocument();
     expect(screen.queryByRole('radio')).not.toBeInTheDocument();
   });
 
-  it('renders its filter as a search box', () => {
-    renderDialog();
-    expect(screen.getByRole('searchbox', { name: 'Search wallet payments' })).toBeInTheDocument();
-  });
-
   it('filters payments by search', async () => {
     renderDialog();
-
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search wallet payments' }), 'Ore');
-
     expect(screen.getAllByRole('radio')).toHaveLength(1);
     expect(screen.getByText('Paid in kind · 2026-09-11')).toBeInTheDocument();
   });
 
-  it('pre-ticks the oldest entries an ISK payment covers and links it manually', async () => {
+  it('says what the payment pays, oldest day first, and links it to the Payee', async () => {
     const { onLinked, onClose } = renderDialog();
-
     await userEvent.click(screen.getByText('350,000 ISK · 2026-09-10'));
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent('2026-09-04');
+    expect(status).toHaveTextContent(/2026-09-0650,000 ISK · 250,000 ISK still owed/);
 
-    expect(screen.getByRole('checkbox', { name: 'Include 2026-09-04' })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'Include 2026-09-05' })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'Include 2026-09-06' })).not.toBeChecked();
-    expect(
-      screen.getByText('50,000 ISK more than owed — leave as overpayment')
-    ).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Mark 2 paid with this payment' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Link payment' }));
 
     await waitFor(() => expect(onLinked).toHaveBeenCalled());
     expect(onClose).toHaveBeenCalled();
-    expect(paidIds()).toEqual(['a-1', 'a-2']);
-    expect(settle.mock.calls[0][1]).toEqual({
-      paidOn: expect.stringMatching(/^2026-09-1[01]$/),
-      method: 'donation',
-      amount: 350_000,
-      journalLinks: [{ refId: 77, source: 'manual' }],
-    });
+    expect(linkPayment).toHaveBeenCalledWith(
+      {
+        payeeId: 'p-1',
+        kind: 'journal',
+        refId: 77,
+        amount: 350_000,
+        paidOn: '2026-09-10',
+        source: 'manual',
+      },
+      1
+    );
     expect(rememberPayeeEntity).toHaveBeenCalledWith(PAYEE, 9001);
   });
 
-  it('reports a short payment when more is ticked than it covers', async () => {
-    renderDialog();
-    await userEvent.click(screen.getByText('350,000 ISK · 2026-09-10'));
-
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Include 2026-09-06' }));
-
-    expect(screen.getByText('250,000 ISK short — the rest stays owed')).toBeInTheDocument();
-  });
-
-  // The Bureau report: a donation used up by two days was linked to a third as well.
-  it('marks paid only the days the ISK reaches: the rest stays owed, as the line says', async () => {
-    renderDialog();
-    await userEvent.click(screen.getByText('350,000 ISK · 2026-09-10'));
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Include 2026-09-06' }));
-
-    await userEvent.click(screen.getByRole('button', { name: 'Mark 3 paid with this payment' }));
-
-    await waitFor(() => expect(settle).toHaveBeenCalled());
-    expect(paidIds()).toEqual(['a-1', 'a-2']);
+  // Audit bug 7: picking the payment the dialog offered first was recorded as `auto`.
+  it('records a payment the pilot confirms as their own link, even the one it picked first', async () => {
+    renderDialog([EXACT, DONATION]);
+    expect(screen.getByRole('radio', { name: /600,000 ISK/ })).toBeChecked();
+    await userEvent.click(screen.getByRole('button', { name: 'Link payment' }));
+    await waitFor(() => expect(linkPayment).toHaveBeenCalled());
+    expect(linkPayment.mock.calls[0]![0]).toMatchObject({ refId: 78, source: 'manual' });
   });
 
   it('does not remember the recipient when that box is unticked', async () => {
     const { onLinked } = renderDialog();
     await userEvent.click(screen.getByText('350,000 ISK · 2026-09-10'));
-
     await userEvent.click(
       screen.getByRole('checkbox', { name: 'Remember Landlord Alt as who Moon Corp is paid' })
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Mark 2 paid with this payment' }));
-
+    await userEvent.click(screen.getByRole('button', { name: 'Link payment' }));
     await waitFor(() => expect(onLinked).toHaveBeenCalled());
     expect(rememberPayeeEntity).not.toHaveBeenCalled();
   });
 
-  it('pre-ticks every entry for a payment in kind and records the value handed over', async () => {
+  it("links a payment in kind at the pilot's figure for what was handed over", async () => {
     const { onLinked } = renderDialog();
     await userEvent.click(screen.getByText('Paid in kind · 2026-09-11'));
-
-    expect(screen.getByText('Matches exactly')).toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: /^Remember/ })).not.toBeInTheDocument();
+    // Left blank it links nothing: a cargo is never assumed to be the whole balance (N4).
+    expect(screen.getByRole('button', { name: 'Link payment' })).toBeDisabled();
     await userEvent.type(screen.getByRole('textbox', { name: 'Value handed over' }), '500,000');
-    await userEvent.click(screen.getByRole('button', { name: 'Mark 3 paid with this payment' }));
-
+    await userEvent.click(screen.getByRole('button', { name: 'Link payment' }));
     await waitFor(() => expect(onLinked).toHaveBeenCalled());
-    expect(paidIds()).toEqual(['a-1', 'a-2', 'a-3']);
-    expect(settle.mock.calls[0][1]).toMatchObject({
-      method: 'contract',
+    expect(linkPayment.mock.calls[0]![0]).toMatchObject({
+      kind: 'contract',
+      refId: 5,
       amount: 500_000,
-      contractLinks: [{ refId: 5, source: 'manual' }],
     });
-    expect(rememberPayeeEntity).not.toHaveBeenCalled();
   });
 });
 

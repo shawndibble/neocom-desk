@@ -6,7 +6,7 @@
  * Miners list are synthesized or asserted (see UNLISTED).
  *
  * Today is 18 Oct 2026 14:00 EVE; every day through 17 Oct is Billable. The
- * Aug Statement went out 1 Sep, the Sep Statement 1 Oct (due 15 Oct).
+ * Aug Late notice went out 1 Sep, the Sep Late notice 1 Oct (due 15 Oct).
  */
 export const TODAY_DAY = 78; // 18 Oct, counted from 1 Aug = 0
 export const BILLABLE_THROUGH_DAY = 77; // 17 Oct
@@ -96,9 +96,9 @@ export interface Line {
 export type PopStatus =
   | 'Paid'
   | 'Part paid'
-  | 'On Aug Statement'
-  | 'On Sep Statement'
-  | 'Next Statement'
+  | 'On Aug Late notice'
+  | 'On Sep Late notice'
+  | 'Owed'
   | 'Not billable yet'
   | 'Dismissed';
 
@@ -190,8 +190,8 @@ export interface Payment {
   date: string;
   from: string;
   amount: number;
-  /** Which Statement it settles, and the pops it reaches (oldest debt first). */
-  statement: 'Aug Statement' | 'Sep Statement';
+  /** Which Late notice it settles, and the pops it reaches (oldest debt first). */
+  statement: 'Aug Late notice' | 'Sep Late notice';
   covers: string;
   partial: boolean;
   popIds: number[];
@@ -223,20 +223,20 @@ const aug40 = round4(AUG_BILLED * 0.4);
 
 /** Payments land on whole pops, except the last, which is part paid. */
 const PAYMENT_PLAN: Omit<Payment, 'covers' | 'partial' | 'popIds' | 'applied'>[] = [
-  { id: 1, date: '2 Sep', from: 'Lysa Kestane', amount: aug40, statement: 'Aug Statement' },
+  { id: 1, date: '2 Sep', from: 'Lysa Kestane', amount: aug40, statement: 'Aug Late notice' },
   {
     id: 2,
     date: '9 Sep',
     from: 'Varro Kestane',
     amount: AUG_BILLED - aug40,
-    statement: 'Aug Statement',
+    statement: 'Aug Late notice',
   },
   {
     id: 3,
     date: '6 Oct',
     from: 'Varro Kestane',
     amount: taxOfPops(sepBilled.slice(0, 5)),
-    statement: 'Sep Statement',
+    statement: 'Sep Late notice',
   },
   {
     id: 4,
@@ -245,7 +245,7 @@ const PAYMENT_PLAN: Omit<Payment, 'covers' | 'partial' | 'popIds' | 'applied'>[]
     amount:
       taxOfPops(sepBilled.slice(5, 11)) +
       Math.round((popTotals.get(sepBilled[11].id)!.tax * 0.4) / 1000) * 1000,
-    statement: 'Sep Statement',
+    statement: 'Sep Late notice',
   },
 ];
 
@@ -280,10 +280,10 @@ export const PAYMENTS: Payment[] = PAYMENT_PLAN.map((plan) => {
 export function statusOf(pop: Pop, tax: number, paid: number): PopStatus {
   if (pop.dismissed) return 'Dismissed';
   const month = monthOf(pop.fracture);
-  if (month === 'Oct') return pop.fracture + 1 >= TODAY_DAY ? 'Not billable yet' : 'Next Statement';
+  if (month === 'Oct') return pop.fracture + 1 >= TODAY_DAY ? 'Not billable yet' : 'Owed';
   if (paid >= tax) return 'Paid';
   if (paid > 0) return 'Part paid';
-  return month === 'Aug' ? 'On Aug Statement' : 'On Sep Statement';
+  return month === 'Aug' ? 'On Aug Late notice' : 'On Sep Late notice';
 }
 
 export const POP_ROWS: PopRow[] = POPS.filter((p) => LINES.some((l) => l.popId === p.id))
@@ -326,7 +326,7 @@ export const VARRO_TOTALS = {
   paid: sum(POP_ROWS, (r) => r.paid),
   owed: sum(POP_ROWS, (r) => r.owed),
   nextStatement: sum(
-    POP_ROWS.filter((r) => r.status === 'Next Statement'),
+    POP_ROWS.filter((r) => r.status === 'Owed'),
     (r) => r.tax
   ),
   notBillable: sum(
@@ -339,9 +339,9 @@ export const VARRO_TOTALS = {
 };
 
 export const MONTH_STATEMENT: Record<Month, string> = {
-  Aug: 'Statement sent 1 Sep',
-  Sep: 'Statement sent 1 Oct, due 15 Oct',
-  Oct: 'Not on a Statement yet',
+  Aug: 'Late notice sent 1 Sep',
+  Sep: 'Late notice sent 1 Oct, due 15 Oct',
+  Oct: 'Not on a Late notice yet',
 };
 
 /** A pop that Varro mined a lot of, for the Miner x Pop page. */
@@ -458,7 +458,7 @@ export const MOON_TOTALS = {
   owed: sum2(MOON_POPS, (p) => p.owed),
   value: sum2(MOON_POPS, (p) => p.value),
   unbilled: sum2(
-    MOON_POPS.filter((p) => p.status === 'Next Statement' || p.status === 'Not billable yet'),
+    MOON_POPS.filter((p) => p.status === 'Owed' || p.status === 'Not billable yet'),
     (p) => p.tax
   ),
 };
@@ -521,7 +521,7 @@ export const LIST_MINERS: ListMiner[] = NAMES.map((main, i) => {
     standing: i % 5 === 0 ? ('Guest' as const) : ('Member' as const),
     corp: i % 5 === 0 ? 'Ashfall Prospecting' : 'Brass Meridian Logistics',
     owed,
-    // Overdue counts from the oldest unpaid Statement: Sep (due 15 Oct) is 3 days, Aug (due 15 Sep) is 33.
+    // Overdue counts from the oldest unpaid Late notice: Sep (due 15 Oct) is 3 days, Aug (due 15 Sep) is 33.
     overdueDays: owed > 0 && i % 2 === 0 ? (i % 4 === 0 ? 33 : 3) : null,
     nextStatement,
     lastPaid:

@@ -215,7 +215,7 @@ function rememberThisPage(): void {
  * before it starts (#3075), and `/communities/join`, whose invite page does the
  * same so a visitor lands back on the invite after EVE's login, and
  * `/corp-tax-book/verify`, where a guest signs in as the character they are
- * confirming into a grouping and returns to the Statement (#4210), and
+ * confirming into a grouping and returns to the late notice (#4210), and
  * `/corp-tax-book/remove-now`, where a payee signs in and returns to the link (#4520).
  *
  * `/apply` is deliberately absent: its vetting sign-ins stash the page themselves

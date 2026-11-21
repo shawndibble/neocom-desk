@@ -13,9 +13,9 @@ Supersedes the "whole-or-nothing" sentence of
   books' hub prices of the day. A Default System's Assignment is never a Conflict.
 - **Only the excess of an over-listed own-Payee Assignment is a Conflict.** The book bills its
   share in full; the ore the member listed for the corporation beyond what any book recorded is an
-  `overListed` Conflict line. The book never recorded it, so no Statement bills it and it never
+  `overListed` Conflict line. The book never recorded it, so the book never bills it and it never
   resolves to the corporation: the line reads "—", "Not billed". Ore another book contests stays
-  on the Assignment and is that book's ordinary Conflict. On a Statement day, or one the
+  on the Assignment and is that book's ordinary Conflict. On a day a Late notice listed, or one the
   corporation dismissed, no excess line is made and the ore stays on the Assignment.
 - **A Conflict says why.** An own-Payee Assignment that needs review reads "Your own entry for
   {corp} needs review", not "another Payee". When a Collector's book recorded the ore at a moon
@@ -24,5 +24,5 @@ Supersedes the "whole-or-nothing" sentence of
   {collector}."
 - **Disputed is checked per book.** On a day several books split, each book's quantity is
   compared with its own share of the member's entry, not skipped.
-- **A Conflict's hint names both deadlines:** it resolves on the 14-day date or on the
-  corporation's next Statement, whichever comes first.
+- **A Conflict's hint names both deadlines:** it resolves on the 14-day date or once a
+  Late notice lists the day, whichever comes first.

@@ -8,6 +8,12 @@
  * Firestore here is the `lite` build (no listeners), so callers refetch after
  * a change.
  */
+import { LIVE_CHECK_ACTION_NAMES } from '../../../../functions/src/corpTaxBookKinds';
+import {
+  LATE_NOTICES,
+  LATE_NOTICE_LINKS,
+  RUNNING_ACCOUNTS,
+} from '../../../../functions/src/corpTaxBookVersionKeys';
 import { parseBookSettings, type BookSettings } from '@/engine/corpTaxBook/bookDocs';
 import type { DivisionNames } from '@/engine/corpTaxBook/divisionNames';
 import type { PayeeSetBy } from '@/engine/corpTaxBook/payeeChange';
@@ -24,11 +30,14 @@ import {
 import { getValidAccessToken } from '@/auth/session';
 import { popShareMarks, type PopShareMarks } from '@/engine/corpTaxBook/popShareMarks';
 import { readPopSharingCached } from './popSharingCache';
-import type { RecordedWriteOff } from '@/engine/corpTaxBook/allocation';
-import type { Miner } from '@/engine/corpTaxBook/charges';
+import { bookMinersOf, type Miner } from '@/engine/corpTaxBook/charges';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
 import type { Declaration } from '@/engine/corpTaxBook/overdue';
-import type { Adjustment, Statement } from '@/engine/corpTaxBook/statements';
+import type { Adjustment } from '@/engine/corpTaxBook/adjustments';
+import { noticesOfDocs } from '@/engine/corpTaxBook/lateNotices';
+import type { RecordedWriteOff } from '@/engine/corpTaxBook/payments';
+import { NOTICE_ID_FIELD, type LateNotice } from '../../../../functions/src/corpTaxBookLateNotice';
+import type { RunningAccountCheckpoint } from '../../../../functions/src/corpTaxBookCheckpoint';
 import type { ToleranceExemption } from '@/engine/corpTaxBook/toleranceExemptions';
 import type {
   JournalDonation,
@@ -54,8 +63,7 @@ import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import type { FeederCoverage } from '@/engine/corpTaxBook/coverage';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import type { FeederViewSummary } from './feederViewClient';
-import { openBook } from './openBook';
-import type { ReadModelDocs } from '@/engine/corpTaxBook/readModels';
+import { openBook, type OpenBook } from './openBook';
 import { callSignedIn } from '@/sync/signedInCallable';
 import { clearNotFound } from '@/sync/notFoundCache';
 import { ensureSignedIn } from '@/sync/syncAuth';
@@ -87,17 +95,16 @@ export interface BookSummary {
 export interface BookState {
   book: BookSummary;
   miners: Miner[];
-  statements: Statement[];
+  /** The book's late notices, from `lateNotices`. */
+  notices: LateNotice[];
   payments: SettlePayment[];
   dismissals: Dismissal[];
   extractions: SyncExtraction[];
-  /** Statement ids settled so far (`meta/paid`), which only ever grows (D22). */
-  paidStatementIds: Set<string>;
   /** Each Miner's stored paid-through day (`meta/paid`): their days up to it stay paid (D22). */
   minerPaidThrough?: Map<string, string>;
   /** Officer write-offs (#4637): they reduce what a Miner owes. */
   writeOffs?: RecordedWriteOff[];
-  /** Members' disputes: an open one keeps its Statement from settling for good (resolving in the app). */
+  /** Members' disputes: an open one holds its day out of what is due (resolving in the app). */
   disputes?: OreDispute[];
 }
 
@@ -171,6 +178,25 @@ export interface FeederChunkParts {
    * absent when the sharing settings could not be read.
    */
   shareMarks?: PopShareMarks['structures'];
+}
+
+/**
+ * Every Miner of the book, for a picker on a page read for one Miner (moving a payment): the
+ * groupings, and a Miner of its own for each character the book's rows name. The rows come from
+ * this device's copy of the ledger (`observed`, a delta read), so a book already opened on this
+ * device costs little; the book's own figures are not built.
+ */
+export async function readBookMiners(characterId: number, corporationId: number): Promise<Miner[]> {
+  return asOfficer(characterId, corporationId, async () => {
+    const book = await openBook(characterId, corporationId);
+    if (!book) return [];
+    const [grouped, rows] = await Promise.all([book.list<Miner>('miners'), book.observed()]);
+    const characters = [...new Set(rows.map((r) => r.characterId))];
+    return bookMinersOf(
+      grouped,
+      characters.map((c) => `solo:${c}`)
+    );
+  });
 }
 
 /**
@@ -255,22 +281,10 @@ export function uploadSync(characterId: number, upload: SyncUpload): Promise<Syn
 }
 
 /**
- * Edits that re-check the Character's roles live (D7). The callable refuses
- * them on the 10-minute cache, so the access token travels with them.
+ * Edits that re-check the Character's roles live (D7). The callable refuses them on the 10-minute
+ * cache, so the access token travels with them. The server's own list, so the two cannot drift.
  */
-export const LIVE_CHECK_ACTIONS: ReadonlySet<string> = new Set([
-  'dismiss',
-  'dismissRecords',
-  'dismissDispute',
-  'reverseDismissal',
-  'reverseAdjustment',
-  'editAdjustment',
-  'reverseWriteOff',
-  'setToleranceExemption',
-  'writeOff',
-  'rebill',
-  'markNotTax',
-]);
+export const LIVE_CHECK_ACTIONS: ReadonlySet<string> = new Set(LIVE_CHECK_ACTION_NAMES);
 
 /** A close-account that forfeits credit writes value off, so it re-checks the role live too (#4184). */
 function needsLiveToken(action: { action: string } & Record<string, unknown>): boolean {
@@ -281,9 +295,8 @@ function needsLiveToken(action: { action: string } & Record<string, unknown>): b
 }
 
 /**
- * One edit action through `editCorpTaxBookCallable`, e.g.
- * `{ action: 'settleStatements', statementIds }`. Attaches the access token
- * for the live-check actions and for nothing else.
+ * One edit action through `editCorpTaxBookCallable`, e.g. `{ action: 'writeOff', ... }`.
+ * Attaches the access token for the live-check actions and for nothing else.
  */
 export async function editBook<Out = Record<string, unknown>>(
   characterId: number,
@@ -365,33 +378,23 @@ export async function readBookState(
   const book = await openBook(characterId, corporationId);
   if (!book) return null;
   const { list } = book;
-  const [
-    miners,
-    statements,
-    payments,
-    dismissals,
-    extractions,
-    paidStatementIds,
-    writeOffs,
-    disputes,
-  ] = await Promise.all([
-    list<Miner>('miners'),
-    list<Statement>('statements'),
-    list<SettlePayment>('payments'),
-    list<Dismissal>('dismissals'),
-    list<SyncExtraction>('extractions'),
-    book.paidStatementIds(),
-    list<RecordedWriteOff>('writeOffs'),
-    list<unknown>('disputes'),
-  ]);
+  const [miners, notices, payments, dismissals, extractions, writeOffs, disputes] =
+    await Promise.all([
+      list<Miner>('miners'),
+      readNotices(book),
+      list<SettlePayment>('payments'),
+      list<Dismissal>('dismissals'),
+      list<SyncExtraction>('extractions'),
+      list<RecordedWriteOff>('writeOffs'),
+      list<unknown>('disputes'),
+    ]);
   return {
     book: summaryFrom(book.data),
     miners,
-    statements,
+    notices,
     payments,
     dismissals,
     extractions,
-    paidStatementIds,
     writeOffs,
     disputes: readDisputes(disputes),
   };
@@ -424,6 +427,8 @@ export interface GroupingAnswer {
   at: string;
   /** Whether the character answered itself or the Miner's verify link declined for it. */
   via: 'character' | 'verify-link';
+  /** ISO instant an officer took it out of Needs you (`dismissGroupingAnswer`). */
+  dismissedAt?: string;
 }
 
 /** Reads `meta/groupingAnswers`, dropping anything malformed. */
@@ -441,8 +446,21 @@ export function groupingAnswersFrom(d: Record<string, unknown> | undefined): Gro
         answer: a.answer,
         at: String(a.at ?? ''),
         via: a.via === 'verify-link' ? ('verify-link' as const) : ('character' as const),
+        ...(typeof a.dismissedAt === 'string' ? { dismissedAt: a.dismissedAt } : {}),
       },
     ];
+  });
+}
+
+/** An officer takes a Character's answer to a grouping out of Needs you. */
+export function dismissGroupingAnswer(
+  characterId: number,
+  corporationId: number,
+  answerCharacterId: number
+): Promise<{ dismissedAt: string }> {
+  return callSignedIn(characterId, 'dismissGroupingAnswer', {
+    corporationId,
+    characterId: answerCharacterId,
   });
 }
 
@@ -560,6 +578,8 @@ export interface BookData {
   adjustments: Adjustment[];
   /** Officers' per-day limits on what a shortfall may forgive (the newest per day decides). */
   toleranceExemptions?: ToleranceExemption[];
+  /** Each Miner's snapshot (`accounts/{minerId}.snapshot`); none before the server keeps them. */
+  checkpoints?: RunningAccountCheckpoint[];
   /** Each feeder's last good ledger read (#4509); a feeder's days are Billable only after one. */
   feeders?: BookFeeder[];
   groupingAnswers?: GroupingAnswer[];
@@ -573,8 +593,6 @@ export interface BookData {
   disputes?: OreDispute[];
   /** Which parts this read covered (`bookRead/`); every field of the others is empty. */
   parts: ReadonlySet<BookPart>;
-  /** The Overview and Miners tab docs (ADR 0032); absent until the server has built them. */
-  readModels?: ReadModelDocs;
   /**
    * Each moon owner's view summary by corporation id (ADR 0032, #5717); read with the `owners`
    * part. Absent when that part was not read; a moon owner without one is priced from `observed`.
@@ -631,6 +649,12 @@ export type BookDeclaration = Declaration & {
   recordedBy?: number;
   resolution?: NonNullable<Declaration['resolution']> & { by?: number };
 };
+
+/** A stored declaration with the notice it answers read off its legacy field (`NOTICE_ID_FIELD`). */
+export function bookDeclarationOf(raw: Record<string, unknown>): BookDeclaration {
+  const { [NOTICE_ID_FIELD]: legacy, ...rest } = raw;
+  return { ...rest, noticeId: (raw.noticeId ?? legacy) as string } as unknown as BookDeclaration;
+}
 
 /** An officer's "rebill from date" (D22), server-written. */
 export interface Rebill {
@@ -725,24 +749,67 @@ export async function deleteBook(characterId: number, corporationId: number): Pr
   await callSignedIn(characterId, 'deleteCorpTaxBookCallable', { corporationId, accessToken });
 }
 
-/** The verify token for each Statement id; one with no link doc is left out. Editors only (rules). */
+/** The action an older server issued a late notice through: what older audit entries name. */
+export const LEGACY_ISSUE_ACTION = 'issueStatement';
+
+/** The book's late notices (`lateNotices`). */
+export async function readNotices(book: OpenBook): Promise<LateNotice[]> {
+  return noticesOfDocs(
+    book.written(LATE_NOTICES) ? await book.list<unknown>(LATE_NOTICES).catch(() => []) : []
+  );
+}
+
+/** Each Miner's snapshot; none until the server has written one. Best effort. */
+export async function readCheckpoints(book: OpenBook): Promise<RunningAccountCheckpoint[]> {
+  const accounts = book.written(RUNNING_ACCOUNTS)
+    ? await book.list<{ snapshot?: RunningAccountCheckpoint }>(RUNNING_ACCOUNTS).catch(() => [])
+    : [];
+  return accounts.flatMap((a) => a.snapshot ?? []);
+}
+
+/** The verify token for each late notice id; one with no link doc is left out. Editors only (rules). */
 export async function readVerifyTokens(
   characterId: number,
   corporationId: number,
-  statementIds: readonly string[]
+  noticeIds: readonly string[]
 ): Promise<Map<string, string>> {
   await ensureSignedIn(characterId);
   const db = getSyncFirestore(characterId);
   const tokens = new Map<string, string>();
   await Promise.all(
-    statementIds.map(async (id) => {
-      const snap = await getDoc(doc(db, 'corps', String(corporationId), 'statementLinks', id));
-      const token = snap.get('verifyToken');
+    noticeIds.map(async (id) => {
+      const token = (
+        await getDoc(doc(db, 'corps', String(corporationId), LATE_NOTICE_LINKS, id))
+      ).get('token');
       if (typeof token === 'string' && token !== '') tokens.set(id, token);
     })
   );
   return tokens;
 }
 
-/** Where a Statement's verify link points: the public page routes/CorpTaxBookVerify.tsx serves it. */
-export { verifyUrl } from '@/engine/corpTaxBook/statementMail';
+/** Issues a late notice (`issueLateNotice`). */
+export async function issueLateNotice(
+  characterId: number,
+  corporationId: number,
+  notice: LateNotice
+): Promise<void> {
+  await editBook(characterId, corporationId, { action: 'issueLateNotice', notice });
+}
+
+/** Records a late notice's mail (`recordLateNoticeMail`). */
+export async function recordLateNoticeMail(
+  characterId: number,
+  corporationId: number,
+  mail: { noticeId: string; mailId: number; kind: 'notice' | 'reminder' }
+): Promise<void> {
+  // Called from the mail queue, which may outlive the 10-minute role cache.
+  await editBook(
+    characterId,
+    corporationId,
+    { action: 'recordLateNoticeMail', ...mail },
+    { freshToken: true }
+  );
+}
+
+/** Where a late notice's verify link points: the public page routes/CorpTaxBookVerify.tsx serves it. */
+export { verifyUrl } from '@/engine/corpTaxBook/lateNoticeMail';

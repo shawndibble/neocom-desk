@@ -85,6 +85,7 @@ export const CALLABLE_ACTIONS = {
     'reclaimCorpTaxBookCallable',
     'syncCorpTaxBookCallable',
     'editCorpTaxBookCallable',
+    'dismissGroupingAnswer',
     'verifySrpOfficerCallable',
     'getSrpStatusCallable',
     'fileSrpClaimCallable',
@@ -160,3 +161,9 @@ const GROUP_OF = new Map<string, CallableGroup>(
 export function groupOf(name: string): CallableGroup | undefined {
   return GROUP_OF.get(name);
 }
+
+/**
+ * The `reason` a server gives an action or sub-action it does not know, so a client tells "this
+ * server is older than me" from a refused input. A server from before it sends none.
+ */
+export const UNKNOWN_ACTION = 'unknown-action';

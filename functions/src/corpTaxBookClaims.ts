@@ -3,6 +3,7 @@
  * group but cannot read it until its owner signs in as it (a Self-proven link). Pure: the store
  * reads the facts, this decides who reads, who is claimed and what a sign-in promotes.
  */
+import { earlierGrouping, soloCharacterId } from './corpTaxBookDonationMatch.js';
 
 export interface GroupConflict {
   characterId: number;
@@ -65,6 +66,25 @@ export function minerReaderIds(m: {
   return m.characterIds.filter((id) => !held.has(id));
 }
 
+/**
+ * The sign-ins (`uids`) that read a Miner's own records: its reader Characters', or a solo Miner's
+ * own Character's. A grouping not read (`undefined`) that is no solo id has none.
+ */
+export function minerUidsOf(
+  minerId: string,
+  miner:
+    | {
+        characterIds: readonly number[];
+        officerClaimed?: readonly number[];
+        pendingConfirmation?: readonly number[];
+      }
+    | undefined
+): string[] {
+  const solo = soloCharacterId(minerId);
+  const ids = miner ? minerReaderIds(miner) : solo === undefined ? [] : [solo];
+  return ids.map((id) => `char:${id}`);
+}
+
 export interface ClaimMiner {
   id: string;
   characterIds: readonly number[];
@@ -74,8 +94,8 @@ export interface ClaimMiner {
   createdAt?: string;
 }
 
-const earlier = (a: ClaimMiner, b: ClaimMiner) =>
-  (a.createdAt ?? '').localeCompare(b.createdAt ?? '') || a.id.localeCompare(b.id);
+/** The earliest grouping wins a Character stored in two: the one rule (`minerIdFor` reads it too). */
+const earlier = earlierGrouping;
 
 /** Characters stored in more than one Miner group (a `solo:` id holds none); earlier group first. */
 export function groupConflicts(miners: readonly ClaimMiner[], at: string): GroupConflict[] {

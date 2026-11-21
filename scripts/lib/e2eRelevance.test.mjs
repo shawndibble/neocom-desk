@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { needsE2e } from './e2eRelevance.mjs';
+import { needsBookE2e, needsE2e } from './e2eRelevance.mjs';
 
 describe('needsE2e', () => {
   it('skips e2e when every change is docs, tooling config or backend-only', () => {
@@ -54,5 +54,32 @@ describe('needsE2e', () => {
     // scripts/needs-e2e.mjs diffs with --no-renames, so a move shows as a
     // delete of the old path plus an add of the new one.
     expect(needsE2e(['src/features/x/Foo.tsx', 'docs/Foo.md'])).toBe(true);
+  });
+});
+
+describe('needsBookE2e', () => {
+  it('runs the Corp Tax Book specs for the backend they drive', () => {
+    expect(needsBookE2e(['functions/src/corpTaxBookStore.ts'])).toBe(true);
+    expect(needsBookE2e(['functions/package-lock.json'])).toBe(true);
+    expect(needsBookE2e(['firestore.rules'])).toBe(true);
+    expect(needsBookE2e(['firebase.json'])).toBe(true);
+    expect(needsBookE2e(['e2e/corpTaxBookPayments.book.spec.ts'])).toBe(true);
+    expect(needsBookE2e(['src/routes/CorpMoons.tsx'])).toBe(true);
+  });
+
+  it('skips them for what the e2e shards skip, bar the backend', () => {
+    expect(
+      needsBookE2e([
+        'docs/ARCHITECTURE.md',
+        'rules-tests/orders.test.ts',
+        'functions/src/corpTaxBook.test.ts',
+        '.github/workflows/cache-warm.yml',
+        'src/routes/Market.test.tsx',
+      ])
+    ).toBe(false);
+  });
+
+  it('runs them when it was given no files', () => {
+    expect(needsBookE2e([])).toBe(true);
   });
 });

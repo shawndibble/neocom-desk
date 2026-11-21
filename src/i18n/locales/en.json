@@ -7872,7 +7872,7 @@
     }
   },
   "miningTax": {
-    "iskFigure": "<value/> ISK",
+    "iskFigure": "<value/><unit> ISK</unit>",
     "resolve": {
       "pick": {
         "privacy": "Only the payments you tick are sent. The rest of your wallet stays on this device.",
@@ -7902,24 +7902,23 @@
       },
       "facts": {
         "declarationRejected": "{{corp}} rejected what you said you paid: {{reason}}",
-        "overdue": "{{corp}}'s Statement for {{period}} is open and not paid.",
+        "overdue": "{{corp}}'s Late notice for {{period}} is not paid yet.",
         "rateUnrecorded": "{{corp}}'s book bills {{date}} at {{book}}%; your record has no rate for it.",
-        "uncredited": "You sent <amount/>, but {{corp}}'s book has synced since and doesn't show it. Days you had paid are billed again.",
-        "inReview": "{{corp}}'s book received <amount/> from you but isn't counting it yet. Nothing was owed when you paid, so an officer has to review it.",
+        "uncredited": "You sent {{amount}} ISK, but {{corp}}'s book has synced since and doesn't show it. Days you had paid are billed again.",
+        "inReview": "{{corp}}'s book received {{amount}} ISK from you but isn't counting it yet. Nothing was owed when you paid, so an officer has to review it.",
         "journalRef": "journal ref {{ref}}",
         "paidDays": "paid {{days}}",
         "rate": "{{corp}}'s book bills {{date}} at {{book}}%; you recorded {{yours}}%.",
         "quantity": "{{corp}}'s book recorded {{book}} units of ore on {{date}}; your record has {{yours}}.",
-        "bills": "Its book bills <amount/>.",
-        "markedPaid": "You marked {{date}} paid, but {{corp}}'s Statement still shows {{owed}} ISK owed. Its book only counts payments it can see in its wallet.",
-        "markedPaidSpent": "You marked {{date}} paid. {{corp}}'s book has that payment, but it pays your oldest open days first and used it on {{days}}. So {{date}} still owes {{owed}} ISK.",
+        "bills": "Its book bills {{amount}} ISK.",
         "conflict": "You gave this ore to {{payee}}. {{corp}}'s book also recorded it, and bills it on {{date}} unless something changes first.",
         "anotherPayee": "another Payee",
         "kept": "{{corp}} kept the bill on {{date}}: {{reason}}",
-        "nextStep": "What to do next: {{step}}"
+        "nextStep": "What to do next: {{step}}",
+        "donation": "{{amount}} ISK"
       },
       "quiet": {
-        "statementLabel": "{{corp}} · Statement",
+        "noticeLabel": "{{corp}} · Late notice",
         "waiting_one": "Waiting on the corp: 1",
         "waiting_other": "Waiting on the corp: {{count}}",
         "notPaying_one": "Not paying: 1",
@@ -7932,12 +7931,11 @@
         "uncreditedLabel": "{{corp}} · donations not credited"
       },
       "title": {
-        "overdue": "{{corp}} Statement {{period}}",
+        "overdue": "{{corp}} Late notice {{period}}",
         "uncredited": "Donations not credited",
         "inReview": "Donations held for review",
         "figure": "{{date}}: the book's figure differs",
         "conflict": "{{date}} claimed twice",
-        "markedPaid": "{{date}}: marked paid, {{corp}} still bills it",
         "billed": "{{date}}: {{corp}} bills this day",
         "kept": "{{corp}} kept the bill"
       },
@@ -7986,8 +7984,7 @@
       "noteLabel": "Add a note (optional)",
       "hiddenNote": "Hidden days stay under Not paying on this tab, and come back with one click.",
       "sendsTo": "Goes to {{corp}}'s Needs you list, and as an EVE mail to whoever handles its tax questions. It leaves your list until they answer. Their answer shows up here.",
-      "noStatement": "Nothing is on a Statement yet: {{corp}}'s book credits your donation on its next sync. If it still hasn't when the Statement goes out, send the proof then.",
-      "noStatementSpent": "{{corp}}'s book already used your payment on {{days}}, so there is no Statement to send proof against yet. Pay what it still bills, or send the proof once this day is on a Statement.",
+      "noNotice": "No Late notice has asked for it yet: {{corp}}'s book credits your donation on its next sync. If it still hasn't when a Late notice goes out, send the proof then.",
       "countsHeld": "{{corp}}'s book already has them. They count as paid right away, and its audit log records that you said so.",
       "failed": "That didn't reach the book. Check your connection and try again.",
       "done": "Done",
@@ -7997,11 +7994,13 @@
         "credited": "Found in {{corp}}'s wallet and credited. Nothing more to do.",
         "countedHeld": "{{corp}}'s book counts them as paid now, toward your oldest days. Nothing more to do.",
         "sentProof": "Sent to {{corp}}, with what checking its wallet found:",
-        "sent": "Sent to {{corp}}. It holds the day until {{date}} while they answer; their answer comes back here."
+        "sent": "Sent to {{corp}}. It holds the day until {{date}} while they answer; their answer comes back here.",
+        "sentPaid": "Sent to {{corp}}. Their answer comes back here; the days stay billed until the book credits the payment."
       },
       "check": {
         "ambiguous": "Several matches — an officer picks",
         "found": "Found",
+        "credited": "Already credited",
         "division": "Found · Division {{division}}",
         "notSynced": "Not synced yet",
         "tooOld": "Too old to check",
@@ -8062,9 +8061,6 @@
     "taxPctLabel": "Tax %",
     "estimatedValueLabel": "Estimated value",
     "taxOwedLabel": "Tax owed",
-    "markPaidLabel": "I already paid this",
-    "markPaidAction": "Mark as paid",
-    "unmarkPaidAction": "Mark as unpaid",
     "detailTitle": "{{date}} — {{system}}",
     "dateEveHint": "EVE (UTC) date, as the in-game mining ledger reports it. The game gives no time of day, so it can't be shown as your local date.",
     "assignAction": "Assign",
@@ -8111,7 +8107,6 @@
     "joinLockedToExistingHint": "Combines with {{payee}}'s existing Assignment at {{pct}}% tax — the Payee and tax % come from it.",
     "joinConfirmAction": "Combine",
     "groupTotalValueLabel": "Combined estimated value: {{value}}",
-    "markGroupPaidAction": "Mark all as paid",
     "duplicateTitle": "Possible double-assigned mining days",
     "duplicateHint": "These days each have two identical Assignments, so the tax is counted twice. Pick a day to drop its extra Assignment — nothing is removed until you confirm.",
     "duplicateOpen": "Open {{entry}} to drop its duplicate Assignment",
@@ -8151,7 +8146,7 @@
       "payeeName": "{{corp}}",
       "grouping": {
         "title": "A corporation wants to group a character of yours",
-        "ask": "{{corp}} grouped {{name}} with {{main}} so one Statement and one payment cover them. Only you can agree, and you can say no.",
+        "ask": "{{corp}} grouped {{name}} with {{main}} so one account and one payment cover them. Only you can agree, and you can say no.",
         "confirm": "Confirm {{name}}",
         "decline": "No, remove it",
         "failed": "Couldn't save that. Try again."
@@ -8164,7 +8159,6 @@
         "unattributed": "Unattributed",
         "dismissed": "Dismissed by corp",
         "waived": "Waived",
-        "markedPaid": "Marked paid",
         "sent": "Sent",
         "oreWaived": "Tax waived",
         "notPaying": "Not paying"
@@ -8180,8 +8174,6 @@
         "dismissed": "{{corp}} dismissed this day: {{reason}}",
         "waived": "{{corp}} wrote this day off: {{reason}}",
         "paid": "Paid to {{corp}}.",
-        "markedPaid": "Marked paid by you — {{corp}} still shows {{owed}} ISK owed.",
-        "markedPaidSpent": "Marked paid by you. {{corp}} used that payment on {{days}} and still shows {{owed}} ISK owed.",
         "sent": "Sent to {{corp}} on {{sentOn}}. An officer answers it in the book; nothing more to do until they do.",
         "oreWaived": "{{corp}} waived the tax on that ore: {{flagReason}}",
         "notPaying": "You chose not to pay this. {{corp}} still bills it; bring it back under Not paying, above."
@@ -8201,7 +8193,7 @@
         "safeOnce": "Safe to pay once {{corp}} syncs (last synced {{ago}}).",
         "neverSynced": "Safe to pay once {{corp}} syncs (never synced).",
         "openDay": "{{date}}: safe to pay once it is closed, after {{time}} UTC on {{closeDate}} and {{corp}}'s next sync.",
-        "credit": "{{amount}} ISK credit with {{corp}} goes on your next Statement.",
+        "credit": "{{amount}} ISK credit with {{corp}} pays your next days.",
         "behind_one": "You owe {{corp}} {{amount}} ISK: {{count}} day, oldest {{date}}.",
         "behind_other": "You owe {{corp}} {{amount}} ISK: {{count}} days, oldest {{date}}.",
         "openingOwes": "Opening balance from the old system: you owe {{corp}} {{amount}} ISK.",
@@ -8251,38 +8243,14 @@
         "factBilling": "Billing",
         "factBillingNext": "On its date",
         "factSynced": "Synced",
-        "factStatement": "Statement",
-        "factStatementFinal": "Issued, final",
-        "factSettledBy": "Settled by",
-        "creditAppliedNote": "{{corp}} already held credit from an earlier payment of yours, and applied {{amount}} ISK of it to this day.",
-        "yourMarkNote": "The corporation confirms your mark against its wallet.",
-        "markedPaidNote": "Marked paid by you — {{corp}} still shows {{owed}} ISK owed. It confirms your mark against its wallet.",
-        "markedPaidSpentNote": "Marked paid by you. {{corp}} already has that payment, but it pays your oldest open days first and used it on {{days}}. So it still bills this day {{owed}} ISK. Resolve shows what you can do.",
-        "settledBy": {
-          "yourMark": "Your mark",
-          "donation": "Donation",
-          "credit": "Corp credit",
-          "closed": "Closed by the corporation",
-          "statement": "Statement payment"
-        },
-        "paidBy": {
-          "title": "Paid by",
-          "donation": "Donation, {{time}}",
-          "manual": "Recorded by an officer, {{time}}",
-          "payment": "Payment",
-          "openInWallet": "Open in wallet",
-          "inFlight": "Your donation, {{time}}, not credited by {{corp}} yet",
-          "corrections": "Credit from corrections (not a payment)",
-          "writtenOff": "Forgiven by an officer (not a payment)"
-        },
+        "factNotice": "Late notice",
+        "factNoticeSent": "Sent. A payment pays your oldest unpaid days first, this one among them.",
+        "openLedger": "Open {{payee}} ledger",
         "factOriginal": "Originally billed",
-        "settled": {
-          "alsoMarked": "You also marked this day paid. Unmark it if that was a mistake."
-        },
+        "settled": {},
         "disputeHint": "Your own record differs from the corp's records.",
         "corrected": "Corrected by the corporation: {{before}} → {{after}}.",
         "reason": "Their reason: {{reasons}}",
-        "partPaid": "Billed {{billed}} ISK · paid {{paid}} ISK · owes {{owes}} ISK.",
         "forgiven": "{{amount}} ISK forgiven by the corporation. This is a small shortfall it closed out (a Market adjustment), or an amount still showing on a day it had recorded as paid.",
         "reversedTag": "Reversed by an officer"
       },
@@ -8299,7 +8267,7 @@
         "ownerCollectedAsk": "If you already paid {{owner}}, Resolve it: it tells {{corp}} where the ore went.",
         "yourEntry": "Your entry: {{payee}} · {{amount}} ISK · {{status}}",
         "yourEntryUnknown": "Your entry: gives this ore to another Payee",
-        "entryPaid": "marked paid",
+        "entryPaid": "paid",
         "entryOwed": "owed",
         "bookEntry": "{{corp}}'s book: recorded it at {{place}}",
         "alsoContested": "Also in conflict on this day: {{list}}.",
@@ -8310,9 +8278,7 @@
         "cardBills": "On its date",
         "fixTitle": "To fix it",
         "bookRight": "If the book is right: take this ore off your entry.",
-        "bookRightPaid": "If the book is right: unmark your payment, then take this ore off your entry.",
         "booksRight": "If the books are right: take what each corporation recorded off your entry.",
-        "booksRightPaid": "If the books are right: unmark your payment, then take what each corporation recorded off your entry.",
         "letEachBill": "Let each corp bill its share",
         "entryRight": "If your entry is right: tell {{corp}}, and its officers correct the book or keep the bill and say what to do next.",
         "tell": "Tell {{corp}} it went to {{payee}}",
@@ -8347,35 +8313,12 @@
         "account": "Account: <strong>{{account}}</strong>",
         "masterWallet": "Master Wallet",
         "division": "Division {{division}}",
-        "codeOf": "{{character}} · {{period}} Statement code:",
-        "codeInReason": "The Reason is your {{period}} Statement's code.",
-        "codeOldest": "The Reason is the code of the payer's oldest open Statement ({{period}}).",
-        "oldestFirst": "A payment goes to your oldest open Statement first, unless its Reason holds another Statement's code.",
-        "where": {
-          "intro": "{{corp}}'s book pays your oldest days first. A payment can't pick a moon or a day, so this shows where yours lands.",
-          "label": "Where it lands",
-          "paid": "Paid by this",
-          "part": "Part paid",
-          "partOf": "{{amount}} ISK of it",
-          "held": "Held",
-          "next": "Next in line",
-          "heldNote": "{{kind}}. Waiting on {{corp}}, so no payment lands here.",
-          "more_one": "and {{count}} more day",
-          "more_other": "and {{count}} more days",
-          "credit": "{{amount}} ISK left over stays with the book as credit.",
-          "kind": {
-            "payee": "Payee dispute",
-            "quantity": "Quantity dispute",
-            "rate": "Rate dispute",
-            "notPaying": "Not paying"
-          }
-        },
-        "heldElsewhere_one": "Nothing was recorded. The entry of {{dates}} is already with another Payee, dismissed, or waiting for review in your ledger. Untick it, or sort it out on its row first.",
-        "heldElsewhere_other": "Nothing was recorded. {{count}} entries ({{dates}}) are already with another Payee, dismissed, or waiting for review in your ledger. Untick them, or sort them out on their rows first."
+        "codeOf": "{{character}} · code:",
+        "codeInReason": "The Reason is your own code: it tells the book the money is yours, and it pays your oldest unpaid days first."
       },
       "attention": {
-        "overdueTitle": "{{corp}} Statement {{period}} overdue since {{date}}",
-        "overdueDetail": "Code {{code}}. A payment goes to your oldest open Statement first.",
+        "overdueTitle": "{{corp}} Late notice {{period}}, sent {{date}}, not paid yet",
+        "overdueDetail": "Code {{code}}. A payment pays your oldest unpaid days first.",
         "uncreditedTitle": "{{corp}} hasn't credited your {{amount}} ISK donation of {{date}} — check the wallet division",
         "uncreditedDetail": "{{corp}} has updated since and still doesn't show it, so it no longer counts as paid here. Its book reads donations from these wallet divisions: {{accounts}}.",
         "uncreditedEveryTitle": "{{corp}} hasn't credited your {{amount}} ISK donation of {{date}}",
@@ -8402,6 +8345,11 @@
         "detail": "{{amount}} ISK sent on {{date}} from {{character}}. Claim it to credit it to you; only you and {{corp}}'s officers can see it.",
         "action": "Claim",
         "failed": "The claim did not go through. Try again."
+      },
+      "unheld": {
+        "title": "{{corp}} counts {{character}} as yours. Add them to Neocom Desk to see their mining and payments.",
+        "decline": "Not yours? Tell {{corp}}",
+        "failed": "Couldn't tell the corporation. Try again."
       }
     },
     "status": {
@@ -8435,10 +8383,6 @@
     "bulkDismissConfirmAction": "Dismiss {{count}}",
     "settleUpSelectedAction": "Settle up {{count}}",
     "settleUpTitle": "Settle up — {{payee}}",
-    "settleUpSeveralPayees": "{{count}} payees",
-    "settleUpIncludeLabel": "Include {{date}}",
-    "settleUpUntickHint": "Untick an entry to hold it back.",
-    "settleUpJustMarkPaid": "Mark paid only",
     "settleUpReasonPrefix": "Moon tax",
     "settleUpCopy": "Copy",
     "settleUpCopied": "Copied",
@@ -8469,36 +8413,19 @@
     "unlinkedPaymentsHint": "ISK you sent that nothing here accounts for.",
     "linkPaymentAction": "Review",
     "linkPaymentTitle": "Link a payment you already made",
-    "linkPaymentHint": "Donations and contracts from your wallet that no entry records yet. Pick one to see what it most likely paid off.",
+    "linkPaymentHint": "Donations and contracts from your wallet that no Payee has yet, with who each was most likely for. Linking one pays that Payee’s oldest unpaid days.",
     "linkPaymentInKind": "Paid in kind",
     "linkPaymentUntitledContract": "Item exchange",
     "linkConfidence": {
-      "identity-and-amount": "Matches {{payee}} — recipient and amount",
-      "identity": "Matches {{payee}} — recipient",
-      "name-and-amount": "Amount matches, and the name looks like {{payee}}",
-      "name": "Name looks like {{payee}} — check this is right",
-      "amount": "Amount matches {{payee}}"
+      "entity": "Sent to {{payee}}",
+      "name": "The recipient’s name looks like {{payee}}: check this is right",
+      "amount": "The amount matches what {{payee}} is owed"
     },
-    "linkPaymentCoversLabel": "What it covered — {{payee}}",
-    "linkPaymentIncludeLabel": "Include {{date}}",
-    "linkPaymentIncluded": "{{count}} entries · {{range}}",
     "linkPaymentAmountLabel": "Value handed over",
-    "linkPaymentInKindHint": "A contract's cargo isn't priced here. Enter what you think it was worth. It starts at the ticked entries' total.",
-    "linkPaymentOverpaid": "{{amount}} more than the ticked entries owe — tick more, or leave it as an overpayment.",
-    "linkPaymentShort": "{{amount}} short of the ticked entries — untick one, or the rest stays outstanding.",
-    "linkPaymentConfirmAction": "Mark {{count}} paid",
-    "paidAtLabel": "Paid on",
-    "paymentCardTitle": "Payment",
-    "noLinkedTransactions": "No wallet transaction linked yet.",
-    "linkTransactionAction": "Link transaction",
+    "linkPaymentInKindHint": "A contract's cargo isn't priced here. Enter what it was worth: that is what it pays.",
+    "linkPaymentConfirmAction": "Link to {{payee}}",
+    "openLedger": "Open {{payee}} ledger",
     "unlinkTransactionAction": "Unlink",
-    "linkTransactionTitle": "Link a wallet transaction",
-    "linkTransactionHint": "Pick the transaction that paid this. It is saved here so you can jump back to it later, even if you marked this paid before it showed in your wallet.",
-    "linkTransactionSearchPlaceholder": "Search by amount, date, or description…",
-    "linkTransactionSearchLabel": "Search transactions",
-    "linkTransactionSuggestedBadge": "Suggested — amount matches exactly",
-    "linkTransactionEmpty": "No unlinked wallet transactions or contracts found for this character.",
-    "linkTransactionConfirmAction": "Link",
     "characterColumn": "Character",
     "dateColumn": "Date",
     "systemColumn": "System",
@@ -8700,8 +8627,6 @@
         "checking": "Checking for new ore…",
         "unchecked": "Couldn't check for new ore · it can lag up to 1 h"
       },
-      "entriesSummary_one": "{{count}} entry · {{range}}",
-      "entriesSummary_other": "{{count}} entries · {{range}}",
       "amountLabel": "Amount",
       "toLabel": "To",
       "reasonLabel": "Reason",
@@ -8710,38 +8635,28 @@
       "differentAmountHide": "Sent the full amount",
       "sentAmountLabel": "Amount you sent",
       "sentAmountPlaceholder": "ISK, e.g. 1,250,000",
-      "paysSome_one": "Pays {{paid}} of {{count}} entry",
-      "paysSome_other": "Pays {{paid}} of {{count}} entries",
-      "leftOver": "{{amount}} ISK left over",
-      "shortBy": "{{amount}} ISK short of the ticked entries",
-      "notEnough": "Not enough for the oldest entry",
       "hint": "Record it now. The payment links itself once it shows in your wallet journal.",
       "recordAction": "Record payment",
       "pickFromWallet": "Already in my wallet? Pick it",
       "fromLabel": "Paying from",
-      "fromOption": "{{name}} · {{amount}} ISK",
-      "alsoPayRest_one": "Also pay {{count}} other entry",
-      "alsoPayRest_other": "Also pay {{count}} other entries",
-      "alsoPayOthers_one": "Also pay for other characters · {{count}} entry",
-      "alsoPayOthers_other": "Also pay for other characters · {{count}} entries",
-      "openInEveAs": "Open in EVE · {{name}}"
+      "openInEveAs": "Open in EVE · {{name}}",
+      "preview": {
+        "pays": "Pays your oldest unpaid days first:",
+        "paidDay": "{{amount}} ISK · paid",
+        "partDay": "{{amount}} ISK · {{left}} ISK still owed",
+        "credit": "{{amount}} ISK more than is owed: kept as credit for the next days.",
+        "owedAfter": "{{amount}} ISK still owed after it."
+      }
     },
     "linkWallet": {
       "title": "Link a wallet payment",
-      "subtitle_one": "{{payee}} · {{count}} entry owed",
-      "subtitle_other": "{{payee}} · {{count}} entries owed",
+      "subtitle": "Pick the payment you sent {{payee}} ({{amount}} ISK owed now). It pays the oldest unpaid days first; anything over is kept as credit.",
       "searchLabel": "Search wallet payments",
+      "searchPlaceholder": "Amount, date or recipient",
       "paymentsLabel": "Wallet payments",
       "noMatch": "No payments match that search.",
-      "coversLabel": "What it paid for",
-      "tickedOwe": "Ticked entries owe",
-      "payment": "Payment",
-      "matches": "Matches exactly",
-      "over": "{{amount}} more than owed — leave as overpayment",
-      "short": "{{amount}} short — the rest stays owed",
       "remember": "Remember {{name}} as who {{payee}} is paid",
-      "confirm_one": "Mark {{count}} paid with this payment",
-      "confirm_other": "Mark {{count}} paid with this payment",
+      "confirm": "Link payment",
       "empty": "No unlinked wallet payments found. Payments appear here once they show in your wallet journal.",
       "rememberFailed": "Payment linked, but couldn’t remember who {{payee}} is paid. You can close this.",
       "grantTitle": "Some payments can’t be seen"
@@ -8766,6 +8681,8 @@
       "waitingDays_one": "owed {{count}} day",
       "waitingDays_other": "owed {{count}} days",
       "linkPayment": "Link payment",
+      "creditLabel": "credit",
+      "creditHint": "Paid ahead: the next days billed are paid from this",
       "unassignedHint_one": "{{count}} entry has no Payee yet",
       "unassignedHint_other": "{{count}} entries have no Payee yet",
       "acrossPayees_one": "across {{count}} payee",
@@ -8822,14 +8739,6 @@
       "monthSummary_one": "{{count}} entry · {{amount}} ISK tax",
       "monthSummary_other": "{{count}} entries · {{amount}} ISK tax"
     },
-    "payment": {
-      "autoLinked": "auto-linked",
-      "unlinkNamed": "Unlink transaction #{{id}}",
-      "notCached": "Transaction #{{id}} · no longer in your saved wallet journal",
-      "paidLine": "Paid {{amount}} ISK · {{date}}",
-      "alsoCovers": "The same payment also settled:",
-      "alsoCoversLine": "{{date}} · {{amount}} ISK"
-    },
     "suggestedPayeeHint": "Last used in {{system}}.",
     "assignToAction": "Assign to {{payee}} · {{amount}} ISK",
     "detail": {
@@ -8866,7 +8775,81 @@
     },
     "linkPaymentSelectedAction": "Link payment",
     "linkPaymentOnePayeeHint": "One wallet payment pays one Payee — tick entries for a single Payee to link a payment.",
-    "saveFailed": "Couldn’t save — nothing was changed. Try again."
+    "saveFailed": "Couldn’t save — nothing was changed. Try again.",
+    "ledger": {
+      "subtitle": "Ledger, oldest first",
+      "loading": "Loading the ledger",
+      "tableLabel": "Ledger",
+      "status": {
+        "owes": "Owes",
+        "days": "Days owed",
+        "oldest": "Oldest unpaid",
+        "paidThrough": "Paid through",
+        "credit": "Credit"
+      },
+      "column": {
+        "date": "Date",
+        "dateTooltip": "The EVE (UTC) day.",
+        "what": "What",
+        "charged": "Charged",
+        "credited": "Credited",
+        "balance": "Balance"
+      },
+      "kind": {
+        "charge": "Charges",
+        "payment": "Payments",
+        "writeOff": "Write-offs",
+        "notice": "Late notices"
+      },
+      "filter": {
+        "show": "Show",
+        "from": "From",
+        "to": "To"
+      },
+      "what": {
+        "mined": "Mined",
+        "minedAt": "Mined at {{place}}",
+        "correction": "Adjustment",
+        "payment": "Payment",
+        "paymentFrom": "Payment from {{name}}",
+        "officer": "Written off by an officer",
+        "tolerance": "Shortfall forgiven",
+        "late": "Late notice sent",
+        "final": "Final notice sent",
+        "opening": "Balance through {{date}}",
+        "reversal": "Reversal",
+        "openingBalance": "Opening balance"
+      },
+      "held": "On hold while a dispute is open",
+      "detail": {
+        "reason": "Reason: {{reason}}",
+        "noDetail": "No ore or place recorded for this charge.",
+        "paidDays": "Days it paid",
+        "source": {
+          "donation": "A donation",
+          "manual": "Recorded by hand"
+        },
+        "notTax": "{{amount}} marked not tax, so not credited.",
+        "leftAsCredit": "{{amount}} left as credit.",
+        "officer": "An officer forgave this much of the oldest unpaid days.",
+        "tolerance": "A payment fell short of the day by no more than the tolerance, so the gap was forgiven.",
+        "forgaveDays": "Days it forgave",
+        "nothingToForgive": "Nothing was left to forgive.",
+        "listedDays": "Days it listed",
+        "noticeSettled": "Every day it listed is paid.",
+        "noticeRemaining": "{{amount}} still owed on its days.",
+        "opening": "Every day up to here is summed into this one balance: ledger syncs can no longer change those days, so a fix to one shows as a new entry today.",
+        "note": "The officer noted: {{note}}",
+        "viewPayment": "View the payment"
+      },
+      "emptyTitle": "Nothing on this ledger yet",
+      "emptyHint": "A day shows here once it is billed.",
+      "filteredTitle": "No entries match these filters",
+      "openFor": "Open the ledger of {{payee}}",
+      "balanceCredit": "{{amount}} credit",
+      "reversedTag": "reversed",
+      "minerPicker": "Whose account"
+    }
   },
   "assets": {
     "tabs": {
@@ -15001,7 +14984,7 @@
           "title": "Kept for your corporation",
           "description": "Only if your corporation uses SRP or a Corp Tax Book, or you shared a Vetting report with a corporation. These are the corporation's records, not yours: they sit on our server (Google Firebase) under the corporation's ID, and Delete all data leaves them with it. A Vetting report is the exception: the pilot can delete their own from its status page.",
           "srp": "SRP Claims: the killmail, the Character's name and ID, the hull, system and loss value, the fleet or FC and note you gave, the Reimbursement and the claim's state. Also the corporation's SRP settings, its Doctrine Fits and its SRP log: each filing (with the pilot's name, killmail, hull and amount) and each officer action. The CEO, Directors and Accountants read all of it; a pilot reads only their own claims.",
-          "corpTaxBook": "The Corp Tax Book: what each Character mined at the refineries it covers (corp members, Guests, and miners at a moon owner's refineries it collects for), the Statements sent, the payments that settle them, write-offs and corrections (an officer can reverse one, and it stays on record marked reversed), the day each Miner is recorded paid through, an officer's limit on how much of a short day is forgiven, a miner's own \"I paid this another way\" declarations and disputes of a line with the officers' answers, a log of who did each, and which books bill each Character (kept under that Character's ID), the groups of Characters an officer set up or removed (a Miner's characters, and any an officer added from outside the corporation by name, which see nothing of the group until their owner logs in as them). Logging in with several Characters also lets the app prove they are one Player: for each, a one-way owner hash and the time it was proven are kept (never a token), readable only by those Characters, and a corporation sees a link only for a Character in its own book. The CEO, Directors, Accountants and Junior Accountants read the whole book; a corp member reads only their own lines; a moon owner reads only its own mined volume, rate, amount due and payouts, never what each miner owes. A Statement's verify link, sent by mail, shows that Statement to whoever has the link. With Pop Sharing on, each shared moon's pop (refinery, moon, Pop Time, ore make-up if shared, notes and rate, never ISK) is kept for the pilots in the audiences the officers chose, until the belt expires; a Community admin's block of a sharing corporation is kept in the Community.",
+          "corpTaxBook": "The Corp Tax Book: what each Character mined at the refineries it covers (corp members, Guests, and miners at a moon owner's refineries it collects for), the late notices sent, the payments that pay each Miner's oldest days, write-offs and corrections (an officer can reverse one, and it stays on record marked reversed), the day each Miner is recorded paid through, an officer's limit on how much of a short day is forgiven, a miner's own \"I paid this another way\" declarations and disputes of a line with the officers' answers, a log of who did each, and which books bill each Character (kept under that Character's ID), the groups of Characters an officer set up or removed (a Miner's characters, and any an officer added from outside the corporation by name, which see nothing of the group until their owner logs in as them). Logging in with several Characters also lets the app prove they are one Player: for each, a one-way owner hash and the time it was proven are kept (never a token), readable only by those Characters, and a corporation sees a link only for a Character in its own book. The CEO, Directors, Accountants and Junior Accountants read the whole book; a corp member reads only their own lines; a moon owner reads only its own mined volume, rate, amount due and payouts, never what each miner owes. A late notice's link, sent by mail, shows that notice and what the Miner owes now to whoever has the link. With Pop Sharing on, each shared moon's pop (refinery, moon, Pop Time, ore make-up if shared, notes and rate, never ISK) is kept for the pilots in the audiences the officers chose, until the belt expires; a Community admin's block of a sharing corporation is kept in the Community.",
           "vetting": "Vetting: for a pilot who applied to a corporation or shared a review with it, a report of what one read of their Characters found. It holds each Character's name, corporation, age and skill points, the flags raised with up to 10 rows behind each (who a wallet, contract, contact or mail row was with, when, and the ISK), and every row the read returned, kept as it was read: the last 30 days of wallet journal and contracts, every contact, mail headers (who wrote to whom, never a subject or text), every trained skill and corporation history, which the corporation's officers can browse, the pilot's note and their answers to the corporation's questions, the invite link it started from, and who opened or decided it. No mail subject or text is kept, and no login is kept. The corporation's CEO, Directors and Personnel Managers read it; the pilot sees who opened it and can delete it. Also the corporation's watchlist, questions, invite links and settings, and which of its reviewers opened the vetting page in the last 30 days, used only to send the alert for a new report."
         },
         "notes": {
@@ -15063,7 +15046,7 @@
           "srp": "SRP Claims:",
           "srpKept": "a Paid or Rejected claim is deleted 365 days after it closes (checked daily), and its lines in the SRP log (the filing and each officer action on it) go with it. A Pending or Approved claim, the SRP settings and the log's other lines have no expiry; Doctrine Fits stay until a Director or the CEO deletes them.",
           "corpTaxBook": "Corp Tax Book:",
-          "corpTaxBookKept": "no expiry. Its lines, Statements, payments, verify links and log stay until whoever turned the book on, or the CEO, deletes the book, which deletes everything in it, including its place in the record of which books bill each Character.",
+          "corpTaxBookKept": "no expiry. Its lines, late notices, payments, verify links and log stay until whoever turned the book on, or the CEO, deletes the book, which deletes everything in it, including its place in the record of which books bill each Character.",
           "vetting": "Vetting reports:",
           "vettingKept": "deleted 30 days after the corporation decides, or 90 days after it was shared if nobody decides (checked daily), or at once when the pilot deletes it. While a pilot is still adding Characters, the rows read are kept for 24 hours and removed by the daily clean-up; once the report is sent they are kept with it, until the same dates."
         }
@@ -15899,7 +15882,7 @@
         "removeAction": "Remove",
         "removeFailed": "Couldn't remove that. Try again.",
         "changeMainTitle": "Change the main of {{name}}'s Player",
-        "changeMainIntro": "Statements are mailed to the main. Only a character in the corporation can be the main while the Player has one.",
+        "changeMainIntro": "Late notices are mailed to the main. Only a character in the corporation can be the main while the Player has one.",
         "changeMainConfirm": "Change main"
       }
     },
@@ -16175,20 +16158,17 @@
         "title": "Mined on {{date}}",
         "detail": "Tax {{tax}}"
       },
-      "statement": {
-        "title": "Statement for {{from}} to {{to}}",
-        "detail": "{{amount}} tax, {{mailed}}",
+      "notice": {
+        "title": "Late notice for {{from}} to {{to}}",
+        "detail": "{{amount}} asked, {{mailed}}",
         "mailed_one": "mailed once",
         "mailed_other": "mailed {{count}} times",
         "notMailed": "not mailed"
       },
-      "notice": {
-        "title": "Late notice for {{from}} to {{to}}"
-      },
       "payment": {
         "title": "Tax payment",
-        "matched": "Matched to a statement",
-        "unmatched": "Not matched to a statement"
+        "paidDays": "Paid their oldest days",
+        "credit": "Held as credit"
       },
       "adjustment": {
         "title": "Tax correction for {{date}}",
@@ -16220,7 +16200,6 @@
       "firstContact": "First contact",
       "owed": "Owed now",
       "taxPaid": "Tax paid, all time",
-      "statements": "Statements",
       "lateNotices": "Late notices",
       "memberSince": "In the corp since",
       "standing": "Standing with the corp",
@@ -16250,7 +16229,6 @@
       "itemExchange": "Item exchange",
       "auction": "Auction",
       "mail": "Mail",
-      "statement": "Statement",
       "lateNotice": "Late notice",
       "mining": "Mining",
       "adjustment": "Adjustment",
@@ -18020,41 +17998,33 @@
       "theOwner": "the moon owner"
     },
     "verify": {
-      "title": "Your Statement",
+      "title": "Your late notice",
       "goneTitle": "This link is not valid",
-      "goneHint": "Check that you copied the whole link from the mail. If it still fails, ask the corporation's officers for a fresh Statement.",
-      "failedTitle": "Couldn't load this Statement",
+      "goneHint": "Check that you copied the whole link from the mail. If it still fails, ask the corporation's officers for a fresh link.",
+      "failedTitle": "Couldn't load this late notice",
       "failedHint": "Check your connection and try again.",
       "theCorp": "the corporation",
       "refinery": "Refinery {{id}}",
-      "eyebrow": "{{corp}} · Statement {{period}} · issued {{issued}}",
-      "closed": "This account is closed. {{corp}} sent a final Statement and will not mail you again.",
+      "closed": "This account is closed. {{corp}} sent a final late notice and will not mail you again.",
       "mined": "What you mined",
       "minedMeta": "{{hub}} buy, {{form}} ore, priced on the day mined",
       "oreForm": {
         "compressed": "Compressed",
         "raw": "raw"
       },
-      "linesLabel": "Statement lines",
+      "linesLabel": "Late notice lines",
       "correction": "Correction",
       "lateOre": "Late ore",
       "billed": "Billed",
-      "paymentsTitle": "Payments credited",
-      "noPayments": "No payments have been credited to this Statement yet.",
       "source": {
         "donation": "Donation to the corporation",
         "manual": "Recorded by an officer"
       },
-      "balanceDue": "Balance due",
       "owedNow": "Owed now",
       "owedDays_one": "{{count}} day owed, oldest {{date}}",
       "owedDays_other": "{{count}} days owed, oldest {{date}}",
       "paidUp": "You are paid up with {{corp}}.",
       "paidUpThrough": "You are paid through {{date}} with {{corp}}.",
-      "balanceSum": "Billed {{billed}} − paid {{paid}}.",
-      "dismissed": "{{amount}} was waived by an officer.",
-      "forgiven": "{{amount}} was written off by an officer.",
-      "writtenOff": "{{amount}} short of the Statement was written off.",
       "stillOwed": "Still owed",
       "oldestFirst": "Oldest first",
       "partOf": "of {{tax}}",
@@ -18074,13 +18044,11 @@
       "payWallet": "Wallet",
       "payWalletHint": "Choose this wallet division in EVE's transfer window. A donation to another division is not counted.",
       "payReason": "Reason",
-      "payNote": "You can pay from any of your characters. The reason ties your donation to this Statement.",
       "payNoteNotice": "You can pay from any of your characters. The reason links the payment to you. It pays your oldest days first.",
       "copy": "Copy",
       "copied": "Copied",
       "copyFailed": "Couldn't copy",
       "eyebrowNotice": "{{corp}} · Late notice · {{issued}}",
-      "settled": "This Statement is settled.",
       "declaration": "You told {{corp}} on {{date}} that you paid another way.",
       "declarationPending": "An officer will confirm it.",
       "rate": "Rate",
@@ -18089,7 +18057,7 @@
       "rateOverride": "An officer changed the rate on some days.",
       "grouping": {
         "title": "A character is waiting to join this account",
-        "intro": "{{corp}} grouped a character with this account so one Statement and one payment cover them. Only that character can agree, by logging in with it.",
+        "intro": "{{corp}} grouped a character with this account so one account and one payment cover them. Only that character can agree, by logging in with it.",
         "confirm": "Confirm {{name}}",
         "signIn": "Log in as {{name}} to confirm",
         "whySignIn": "This link only proves the mail reached you. Logging in with EVE proves the character is yours.",
@@ -18105,13 +18073,13 @@
       }
     },
     "mailQueue": {
-      "title": "Statement mail",
+      "title": "Late notice mail",
       "sentAt": "{{time}} EVE",
       "minutes_one": "{{count}} minute",
       "minutes_other": "{{count}} minutes",
       "chip": {
-        "aria": "Statement mail: {{percent}}% sent",
-        "ariaDone": "Statement mail: {{percent}}% sent, done",
+        "aria": "Late notice mail: {{percent}}% sent",
+        "ariaDone": "Late notice mail: {{percent}}% sent, done",
         "ariaFailed": "{{count}} failed"
       },
       "summary": {
@@ -18122,14 +18090,13 @@
         "waiting": "{{count}} waiting",
         "failed": "{{count}} failed",
         "left": "about {{time}} left",
-        "progressLabel": "Statements sent",
+        "progressLabel": "Mails sent",
         "runningNote": "One mail goes out every 12–15 seconds, in the background. It keeps going while the app is open in any tab. If you close every tab, it waits and carries on when you open the app again.",
         "doneNote": "Every mail is logged on its Miner. Retry a failure, or open it in EVE to send it by hand."
       },
       "table": {
         "label": "Send queue",
         "to": "To",
-        "statement": "Statement",
         "status": "Status",
         "reminder": "Reminder",
         "rate-change": "Rate change",
@@ -18140,7 +18107,8 @@
         "vetting-result": "Vetting decision",
         "vetting-request": "Vetting request",
         "removal": "Moon owner removal",
-        "removalCancelled": "Removal cancelled"
+        "removalCancelled": "Removal cancelled",
+        "owed": "Owed"
       },
       "status": {
         "sent": "Sent",
@@ -18193,7 +18161,7 @@
           "noLink": "This mail no longer has the verify link. Without it the Miner can't see their days, payments or live total."
         }
       },
-      "panelTitle": "Statement mail queue"
+      "panelTitle": "Late notice mail queue"
     },
     "moons": {
       "undockable": "Undockable",
@@ -18230,7 +18198,7 @@
         "extractions": "Extractions",
         "refineries": "Refineries",
         "miners": "Miners",
-        "statements": "Late notices",
+        "lateNotices": "Late notices",
         "moonOwners": "Moon owners"
       },
       "sharing": {
@@ -18339,7 +18307,7 @@
           "mined": "Mined (est.)",
           "minedTip": "Ore mined here during each Extraction, from the fracture to the field's end. Mining outside those windows is not counted. Valued at today's hub prices.",
           "tax": "Tax billed",
-          "taxTip": "Tax already billed on Statements for these Extractions. Tax not yet on a Statement is left out; each Extraction's own page shows it."
+          "taxTip": "Tax these Extractions' mining owes, as each Miner's Running account bills it. Each Extraction's own page shows its days."
         },
         "ore": {
           "title": "Ore in the chunk",
@@ -18430,28 +18398,17 @@
       "dayStatus": {
         "paid": "Paid",
         "owed": "Owed",
-        "on-statement": "On Statement",
-        "unbilled": "Next Statement",
         "not-billable": "Today's mining",
         "held": "Waiting for {{owner}}'s ledger",
-        "dismissed": "Dismissed",
-        "written-off": "Written off"
+        "disputed": "Held: disputed, until {{date}}",
+        "dismissed": "Dismissed"
       },
       "payment": {
-        "donation": "Donation",
-        "manual": "Recorded by hand",
         "markNotTax": "Mark not tax",
-        "markedNotTax": "{{amount}} marked not tax",
-        "oldestFirst": "Oldest debt first",
-        "correction": "Correction by {{name}}",
-        "correctionCredit": "Credit by {{name}}",
-        "correctionCharge": "Charge by {{name}}",
-        "correctsDay": "Next Statement, for {{date}}",
-        "billedOn": "On the <link/> Statement, for {{date}}",
-        "openStatement": "Open the {{period}} Statement",
-        "moreStatements": "+{{count}} more",
         "markNotTaxNone": "No payment to mark",
-        "markNotTaxTarget": "Payment of {{date}}, {{amount}}"
+        "markNotTaxTarget": "Payment of {{date}}, {{amount}}",
+        "openNotice": "Open the late notice of {{date}}",
+        "noticeOf": "late notice of {{date}}"
       },
       "cols": {
         "moon": "Moon",
@@ -18471,7 +18428,6 @@
         "inCorp": "In corp",
         "owed": "Owed",
         "overdue": "Overdue",
-        "unbilled": "Next Statement",
         "account": "Account",
         "credit": "Credit",
         "lastPaid": "Last paid",
@@ -18505,7 +18461,6 @@
         "overdue": "Overdue",
         "overdueValue_one": "{{amount}} · {{count}} Miner",
         "overdueValue_other": "{{amount}} · {{count}} Miners",
-        "unbilled": "Next Statement",
         "credit": "Credit held",
         "pending": "Today's mining"
       },
@@ -18556,19 +18511,17 @@
         "dismissIntro": "{{tax}} of tax recorded against this extraction stays on the record as dismissed and can be reversed.",
         "leftToMine": "Left to mine, est.",
         "minedEst": "Mined, est.",
-        "minersHint": "Tax so far, not billed yet; a row opens the miner, its caret the ore",
-        "minersHintBilled": "Billed on {{period}}; a row opens the miner, its caret the ore",
-        "minersHintBilledMany": "Already billed; a row opens the miner, its caret the ore",
+        "minersHint": "Tax so far; a row opens the miner, its caret the ore",
         "minersSummary_one": "{{count}} Miner · {{tax}}",
         "minersSummary_other": "{{count}} Miners · {{tax}}",
         "oreOf": "Ore mined by {{name}}",
         "pastSummary_one": "{{count}} other cycle",
         "pastSummary_other": "{{count}} other cycles",
         "taxSoFar": "Tax so far",
-        "taxBilled": "Tax",
         "currentCycle": "Open the current cycle",
-        "taxPartial": "Billed on {{periods}} · {{amount}} rolling over",
-        "noOtherCycles": "No other cycles on record for this moon."
+        "noOtherCycles": "No other cycles on record for this moon.",
+        "minersHintPaid": "Paid; a row opens the miner, its caret the ore",
+        "taxPaid": "Tax, paid"
       },
       "fullyMined": {
         "residue": "Residue",
@@ -18642,6 +18595,8 @@
         },
         "check": {
           "found": "Found",
+          "credited": "Already credited to {{miner}}",
+          "anotherMiner": "a Miner no longer in the book",
           "division": "Found · Division {{division}}",
           "notSynced": "Not synced yet",
           "tooOld": "Too old to check",
@@ -18678,7 +18633,7 @@
           "lineQuantity": "{{quantity}} {{ore}}",
           "reason": "“{{reason}}”",
           "held": "Held until {{date}} — payments skip it while you answer",
-          "heldAmount": "{{amount}} is held until {{date}}: payments skip it, and the Statement settles on the rest.",
+          "heldAmount": "{{amount}} is held until {{date}}: payments skip the disputed day and pay the next ones.",
           "line": "{{quantity}} {{ore}} to {{payee}}",
           "dismiss": "Waive their ore",
           "waive": "Waive it",
@@ -18689,7 +18644,7 @@
         "overdue": {
           "title_one": "{{name}} · overdue {{count}} day · {{amount}}",
           "title_other": "{{name}} · overdue {{count}} days · {{amount}}",
-          "body": "The {{period}} Statement is unpaid past its due date.",
+          "body": "The late notice of {{date}} is unpaid past its due date.",
           "remind": "Send reminder",
           "dismiss": "Waive all"
         },
@@ -18697,6 +18652,7 @@
           "title": "Unmatched donation · {{amount}} from {{name}}",
           "body": "{{date}}. {{name}} has not mined at your refineries, so there is no Miner to credit.",
           "bodyInMiner": "{{date}}. {{name}} is in a Miner now; the next sync assigns it, or you can assign it.",
+          "bodyAmbiguous": "{{date}}. The book could credit it to {{miners}} and cannot tell which. Assign it to the right Miner.",
           "bodyReview": "{{date}}. {{name}}'s Miner owed no tax then, so an earlier sync held it. The next sync assigns it as credit. Mark it not tax if it was for something else, such as a buyback.",
           "assign": "Assign to a Miner",
           "notTax": "Mark not tax"
@@ -18717,56 +18673,46 @@
         },
         "leaver": {
           "title": "{{name}} left the corp · owes {{amount}}",
-          "body": "No new Statement goes out unless they mine again. Send a reminder, or write it off once it is clear it will not be paid.",
+          "body": "No new late notice goes out unless they mine again. Send a reminder, or write it off once it is clear it will not be paid.",
           "remind": "Send reminder",
           "writeOff": "Write off"
         },
         "reminderQueued": "Reminder to {{name}} is in the send queue.",
-        "reminderQueuedFor": "Reminder to {{name}} about the {{period}} Statement is in the send queue.",
+        "reminderQueuedFor": "Reminder to {{name}} about the late notice of {{date}} is in the send queue.",
         "reminderRefused": {
           "stopped": "This Miner stopped reminders and has had their one.",
-          "queued": "A reminder for this Statement is already queued.",
-          "missingLink": "This Statement has no verify link yet, so no mail can go."
+          "queued": "A reminder for this late notice is already queued.",
+          "missingLink": "This late notice has no verify link yet, so no mail can go."
         },
-        "none": "Nothing needs you."
+        "none": "Nothing needs you.",
+        "declinedGrouping": {
+          "title": "{{character}} says they aren't part of {{miner}}.",
+          "body": "They're billed on their own now.",
+          "dismiss": "Dismiss",
+          "failed": "Could not dismiss that. Try again."
+        }
       },
       "ledger": {
-        "title": "Account ledger",
-        "hint": "Moon tax and payments in date order, balance after each (a minus is owed). Newest first.",
+        "title": "Ledger",
+        "hint": "Moon tax and payments in date order, with the balance after each. Newest first.",
         "empty": "Nothing billed or paid yet.",
         "owed": "owed",
         "credit": "credit",
         "even": "even",
         "summary_one": "{{count}} entry · {{balance}} ISK {{side}}",
         "summary_other": "{{count}} entries · {{balance}} ISK {{side}}",
+        "heldByDispute_one": "Held by a dispute: {{count}} day, {{amount}} ISK tax. Not in the balance until the dispute ends.",
+        "heldByDispute_other": "Held by a dispute: {{count}} days, {{amount}} ISK tax. Not in the balance until the dispute ends.",
         "notYetBilled_one": "Not in the balance yet: {{count}} day mined, {{amount}} ISK tax, not billable yet.",
         "notYetBilled_other": "Not in the balance yet: {{count}} days mined, {{amount}} ISK tax, not billable yet.",
-        "cols": {
-          "date": "Date",
-          "what": "What",
-          "debit": "Tax",
-          "credit": "Credit",
-          "balance": "Balance"
-        },
-        "what": {
-          "day": "Moon mining",
-          "payment": "Payment",
-          "paymentFrom": "Payment from {{name}}",
-          "correction": "Correction: {{reason}}",
-          "writeOff": "Written off: {{reason}}",
-          "tolerance": "Market adjustment",
-          "opening": "Opening balance: {{reason}}",
-          "reversedTag": "reversed",
-          "reversal": "Reversal: {{reason}}"
-        },
         "menu": {
           "correctionEdit": "Edit correction",
           "correctionReverse": "Reverse correction",
-          "correctionLocked": "A Statement already billed this correction. Add an opposite correction instead.",
           "writeOffReverse": "Reverse write-off",
           "marketCharge": "Charge this shortfall",
           "marketEdit": "Change amount forgiven",
           "notTax": "Mark part not tax",
+          "reassign": "Move to another Miner",
           "rate": "Change rate",
           "dismiss": "Dismiss tax"
         },
@@ -18798,19 +18744,14 @@
             "intro": "Reverses this correction and adds the new one. The old one stays, struck through.",
             "confirm": "Save changes"
           }
-        },
-        "oreOf": "Ore mined {{date}}",
-        "paidBy": "{{name}} · {{source}}",
-        "noWalletEntry": "An officer recorded this by hand, so it has no corp wallet entry.",
-        "toleranceNote": "A small unpaid part of a day's tax. The Miner paid on the day it was mined, before that day's closing price (the price the tax is billed at) was known. It is within the book's per-day tolerance, so the day counts as paid and the Miner is not charged.",
-        "toleranceNoteLater": "Paid after this day closed, so the Miner and the book used the same close-of-day price and the payment should have matched. The shortfall is within the book's per-day tolerance, so the day counts as paid and the Miner is not charged."
+        }
       },
       "miner": {
         "notFound": "This Miner is not in the book",
         "credit": "Credit",
         "record": "Record payment",
         "remind": "Send reminder",
-        "remindNone": "No Statement issued yet",
+        "remindNone": "No late notice sent yet",
         "remindNothingOwed": "Nothing owed",
         "dismissAll": "Dismiss tax",
         "closeAccount": "Close account",
@@ -18818,27 +18759,22 @@
         "selectDay": "Select {{date}}",
         "dismissSelected_one": "Dismiss selected ({{count}})",
         "dismissSelected_other": "Dismiss selected ({{count}})",
-        "daysHint": "Newest first",
         "dismissDay": "Dismiss this day",
         "oldestUnpaid": "Oldest unpaid",
         "lastPayment": "Last payment",
         "owedDaysHint": "Paid oldest first; a payment pays these as soon as the book holds it",
-        "payments": "Payments",
-        "paymentsHint": "Credited oldest debt first",
-        "sum": "Statements {{billed}} − written off {{written}} − payments and dismissals {{settled}} = {{owed}} owed",
-        "sumNoWriteOff": "Statements {{billed}} − payments and dismissals {{settled}} = {{owed}} owed",
+        "billed": "Days billed",
+        "settled": "Payments and dismissals",
         "dismissals": "Dismissals",
         "reversed": "reversed",
+        "reversedFrom": "reversed from {{date}}",
         "reverse": "Reverse",
         "activity": "Activity",
         "activityHint": "Mail, dismissals and the audit log for this Miner, newest first",
-        "unbilledTip": "Billable days waiting for the next Statement. {{pending}} more is in today's mining.",
         "writtenOff": "Written off",
-        "writtenOffValue_one": "{{tolerance}} · {{count}} line",
-        "writtenOffValue_other": "{{tolerance}} · {{count}} lines",
-        "writtenOffTip": "What officers wrote off, what payments within tolerance left over, and lines recorded after a Statement was paid ({{late}}). Paid days are closed for good; all are logged.",
+        "writtenOffTip": "What officers wrote off, and what payments within the tolerance left over of a day. Days recorded paid stay closed; all are logged.",
         "dayEndTip": "Today ends at {{time}} EVE time.",
-        "earlierHint": "On a Statement, paid, dismissed or written off",
+        "earlierHint": "Paid or dismissed",
         "daysSummary_one": "{{count}} day · {{tax}}",
         "daysSummary_other": "{{count}} days · {{tax}}",
         "overduePausedNote": "Overdue paused",
@@ -18849,18 +18785,14 @@
           "extraction": "dismissed tax for the extraction at {{what}}"
         },
         "empty": {
-          "nextStatement": "Nothing is waiting for the next Statement.",
           "owedDays": "No day is owed.",
           "stillAccruing": "Nothing in today's mining.",
           "earlier": "No earlier days.",
-          "payments": "No payments yet.",
           "activity": "Nothing has happened for this Miner yet."
         },
         "overdueNote_one": "Overdue {{count}} day",
         "overdueNote_other": "Overdue {{count}} days",
         "paid": "Paid",
-        "paymentsSummary_one": "{{count}} entry · {{amount}} credited",
-        "paymentsSummary_other": "{{count}} entries · {{amount}} credited",
         "activitySummary_one": "{{count}} entry",
         "activitySummary_other": "{{count}} entries",
         "filter": {
@@ -18893,6 +18825,7 @@
           "recordPayment": "recorded a payment",
           "markNotTax": "marked a donation as not tax",
           "assignPayment": "assigned a donation",
+          "reassignPayment": "moved a payment to another Miner",
           "dismiss": "dismissed tax",
           "reverseDismissal": "reversed a dismissal",
           "setMiner": "grouped characters into a Miner",
@@ -18904,12 +18837,12 @@
           "setToleranceExemption": "changed how much of a day's shortfall is forgiven",
           "writeOff": "wrote off a balance",
           "rebill": "rebilled from a date",
-          "issueStatement": "issued a Statement",
-          "settleStatements": "settled Statements",
+          "issueStatement": "issued a late notice",
+          "settleStatements": "settled old calendar bills",
           "declare": "declared a payment",
           "resolveDeclaration": "answered a declaration",
           "recordReminder": "sent a reminder",
-          "recordMail": "mailed a Statement",
+          "recordMail": "mailed a late notice",
           "recordAccounts": "counted Miners' accounts for their pay page",
           "stopReminders": "stopped reminders",
           "setPopSharing": "changed pop sharing",
@@ -18926,7 +18859,7 @@
           "confirmGrouping": "confirmed a grouping of characters",
           "declineGrouping": "declined a grouping of characters",
           "claimPayment": "claimed a donation",
-          "disputeConflict": "found a dispute that conflicts with a Statement",
+          "disputeConflict": "found a dispute that conflicts with a late notice",
           "withdrawDispute": "withdrew a dispute",
           "refineryLabelSet": "named a refinery",
           "refinerySystemLearned": "learned a refinery's system",
@@ -18953,14 +18886,27 @@
           "feederPayoutMarked": "marked a payout as sent",
           "feederPayoutsReconciled": "matched payouts to the wallet",
           "feederPayoutDisputed": "disputed a payout",
-          "feederViewDismissed": "dismissed a notice on the moon owner page"
+          "feederViewDismissed": "dismissed a notice on the moon owner page",
+          "issueLateNotice": "issued a late notice",
+          "recordLateNoticeMail": "mailed a late notice",
+          "resetCheckpoint": "reopened a Miner's closed months",
+          "disputeKind": {
+            "payee": "disputed a day: the ore went to another Payee",
+            "quantity": "disputed a day: the book recorded more ore than they mined",
+            "rate": "disputed a day's rate",
+            "notPaying": "said they won't pay a day"
+          }
         },
         "actionsTo": {
-          "issueStatement": "issued a Statement to <name>{{name}}</name>, {{amount}} ISK",
-          "issueStatementPlain": "issued a Statement to <name>{{name}}</name>",
-          "recordMail": "mailed a Statement to <name>{{name}}</name>",
-          "recordReminder": "sent a reminder to <name>{{name}}</name>"
-        }
+          "issueStatement": "issued a late notice to <name>{{name}}</name>, {{amount}} ISK",
+          "issueStatementPlain": "issued a late notice to <name>{{name}}</name>",
+          "recordMail": "mailed a late notice to <name>{{name}}</name>",
+          "recordReminder": "sent a reminder to <name>{{name}}</name>",
+          "issueLateNotice": "issued a late notice to <name>{{name}}</name>, {{amount}} ISK",
+          "issueLateNoticePlain": "issued a late notice to <name>{{name}}</name>",
+          "recordLateNoticeMail": "mailed a late notice to <name>{{name}}</name>"
+        },
+        "declaredAmount": "they say they paid {{amount}}"
       },
       "health": {
         "hiddenFromMembers": "Hidden from members until {{date}}",
@@ -19002,9 +18948,9 @@
         "done": "(done)",
         "toSend_one": "{{count}} to send",
         "toSend_other": "{{count}} to send",
-        "unmailed_one": "{{count}} earlier Statement was never mailed. It is included in this run.",
-        "unmailed_other": "{{count}} earlier Statements were never mailed. They are included in this run.",
-        "unmatched": "An Unmatched donation is on nobody's Statement until you assign it.",
+        "unmailed_one": "{{count}} earlier late notice was never mailed. It is included in this run.",
+        "unmailed_other": "{{count}} earlier late notices were never mailed. They are included in this run.",
+        "unmatched": "An Unmatched donation pays nobody's days until you assign it.",
         "previewFor": "Preview for",
         "recipients": "Mail to",
         "edited": "Edited mail",
@@ -19033,41 +18979,9 @@
         "sendNotices_one": "Send {{count}} late notice",
         "sendNotices_other": "Send {{count}} late notices",
         "noticesQueued_one": "{{count}} late notice is in the send queue.",
-        "noticesQueued_other": "{{count}} late notices are in the send queue.",
-        "statementPlace": "Statement, {{period}}"
+        "noticesQueued_other": "{{count}} late notices are in the send queue."
       },
-      "statementPanel": {
-        "remaining": "Remaining",
-        "subtitle": "Statement · {{period}}",
-        "credited": "Credited",
-        "forgiven": "Forgiven",
-        "writtenOff": "Written off (small leftover)",
-        "coversRange_one": "{{from}} – {{through}} · {{count}} day",
-        "coversRange_other": "{{from}} – {{through}} · {{count}} days",
-        "issued": "Issued",
-        "issuedBy": "by {{name}}",
-        "covers": "Covers",
-        "due": "Due",
-        "paid": "Paid",
-        "paused": "Paused by a declaration until {{date}}",
-        "mail": "Mail",
-        "mailed_one": "Mailed once",
-        "mailed_other": "Mailed {{count}} times",
-        "mailedLast": "{{what}} · last {{date}}",
-        "manualReminders_one": "{{count}} reminder by hand",
-        "manualReminders_other": "{{count}} reminders by hand",
-        "stopped": "Miner stopped reminders",
-        "code": "Payment code",
-        "copyLink": "Copy verify link",
-        "copied": "Copied",
-        "copyFailed": "Could not copy the link",
-        "openMiner": "Open Miner page"
-      },
-      "statementPeriod": {
-        "notMailed": "Not mailed",
-        "statementNotFound": "Statement not found.",
-        "alreadyPaid": "Statement already paid",
-        "reminderCap": "Reminders stopped; one already sent",
+      "noticeDue": {
         "pausedUntil": "Paused · until {{date}}",
         "dueLate_one": "{{date}} · {{count}} day late",
         "dueLate_other": "{{date}} · {{count}} days late"
@@ -19084,7 +18998,7 @@
         "notDirector": "A Director has to turn the book on. Ask one to open this page.",
         "rate": "Corp default tax rate (%)",
         "confirm": "Turn the book on",
-        "startHint": "EVE time (UTC). Mining before this day is kept as history and owes no tax. You can't set a start later than a day a Statement already covers."
+        "startHint": "EVE time (UTC). Mining before this day is kept as history and owes no tax. You can't set a start later than a day already billed."
       },
       "addCorps": {
         "open": "Add my other corps",
@@ -19292,14 +19206,14 @@
           "director-approval": "Over the book's approval limit: a Director must do this.",
           "divisions-changed": "Another officer changed the divisions since you opened the settings. Close and reopen them to see the current divisions, then try again.",
           "already-resolved": "Another officer already answered this.",
-          "not-priced": "That ore isn't on a Statement yet, so there is no tax to waive. Try again once it is billed.",
+          "not-priced": "That ore isn't billed yet, so there is no tax to waive. Try again once it is.",
           "nothing-to-waive": "The disputed ore carries no tax to waive.",
           "not-an-accountant": "That Character is not an Accountant. In EVE's login, pick a Character that holds the Accountant role in the corporation that owns the moons.",
           "invite-invalid": "That invite link or code is not valid.",
           "invite-revoked": "That invite link was cancelled. Ask for a new one.",
           "invite-used": "That invite link was already used. Ask for a new one.",
           "own-book-exists": "This corporation already keeps its own book. Delete it before letting another corporation handle the tax.",
-          "already-declared": "A declaration for this Statement is already waiting for an officer.",
+          "already-declared": "A declaration for this late notice is already waiting for an officer.",
           "already-feeder": "This corporation is already handled by an accounting corporation.",
           "feeder-active": "This corporation is already connected.",
           "token-mismatch": "That login did not match your logged-in account. Try again.",
@@ -19321,16 +19235,24 @@
           "start-before-leave": "The book can start no earlier than the day the accounting corporation stopped handling your moons.",
           "survey-not-found": "That Survey could not be opened. Check the link, and that it has not expired.",
           "unknown-refinery": "That refinery has no mining for this corporation yet.",
-          "settled": "This Statement is already settled.",
+          "settled": "These days are already paid.",
           "role-required": "Your Character does not hold the corporation role this needs.",
-          "start-over-billed": "A Statement already covers days before that date.",
+          "start-over-billed": "Days before that date are already billed.",
           "start-in-future": "The start date can't be in the future.",
           "director-only": "Only a Director can do that.",
           "rate-too-old": "A rate can start at most 30 days back.",
-          "day-on-statement": "That day is already on an issued Statement, so a rate cannot start on or before it.",
-          "running-account": "This book bills a running account now, so it sends late notices instead of Statements. Reload the page to get the current version.",
+          "day-on-statement": "That day is already billed on an issued notice, so a rate cannot start on or before it.",
+          "day-on-notice": "That day is already billed on an issued notice, so a rate cannot start on or before it.",
+          "billed-on-notice": "A late notice already listed this correction, so it can't be changed. Add an opposite correction instead.",
+          "running-account": "This book bills a Running account, so it sends late notices. Reload the page to get the current version.",
+          "transfer-in-book": "That transfer is already in the book, so recording it would count it twice. Assign the donation the sync stored instead: Needs you lists it while no Miner has it.",
           "needs-automatic-sync": "Turn on Automatic sync before sharing pops. Pops are shared as part of each sync.",
-          "unknown-moon": "This book has no Extraction at that moon."
+          "unknown-moon": "This book has no Extraction at that moon.",
+          "locked": "That date is locked: nothing before the 1st of the month two months back can be changed. Add a correction dated today instead.",
+          "unknown-miner": "That Miner isn't in the book any more. Reload and pick another.",
+          "account-closed": "That Miner's account is closed: it takes no more payments.",
+          "wrong-miner": "The final notice is for another Miner. Reload and try again.",
+          "notice-exists": "This account's final notice was already sent. Reload to see it."
         }
       },
       "consent": {
@@ -19412,13 +19334,13 @@
         },
         "confirm": {
           "title": "Archive {{name}}?",
-          "body": "It leaves the Refineries list. Its Extractions, mining rows, label and Statements stay, and every figure still counts them. Restore it any time, or mine there again.",
+          "body": "It leaves the Refineries list. Its Extractions, mining rows, label and late notices stay, and every figure still counts them. Restore it any time, or mine there again.",
           "action": "Archive"
         },
         "failed": "Could not save that. Try again."
       },
       "ownerView": {
-        "statement": {
+        "account": {
           "intro": "{{name}} handles the tax on your moons.",
           "noRate": "No rate is agreed yet, so nothing is owed to you. Once one is agreed, it counts from the day they pick. Ask for one below.",
           "pending": "{{value}} of ore mined is waiting for a rate.",
@@ -19547,7 +19469,7 @@
       },
       "autoSync": {
         "title": "Automatic sync",
-        "hint": "Every 2 hours our server updates this book for you, so it stays current even when no officer visits. It reads the refinery ledger, Extractions, moon notifications and donations in the chosen wallet divisions, and settles Statements that donations now cover. It never issues a Statement and never sends mail.",
+        "hint": "Every 2 hours our server updates this book for you, so it stays current even when no officer visits. It reads the refinery ledger, Extractions, moon notifications and donations in the chosen wallet divisions, and credits the donations to each Miner's Running account. It never issues a late notice and never sends mail.",
         "state": {
           "off": "Off. The book updates when an officer syncs it.",
           "on": "On, held by {{name}}.",
@@ -19563,7 +19485,7 @@
           "unknown": "it could not continue"
         },
         "neverRan": "It has not run yet; the first run is within 2 hours.",
-        "lastRan": "Last ran {{age}}: {{rows}} ledger rows, {{donations}} new donations, {{settled}} Statements settled.",
+        "lastRan": "Last ran {{age}}: {{rows}} ledger rows, {{donations}} new donations.",
         "couldNotRead": "It could not read {{sources}} that time.",
         "missing": {
           "extractions": "Extractions",
@@ -19601,7 +19523,7 @@
       "settings": {
         "open": "Corp Tax Book settings",
         "title": "Corp Tax Book settings",
-        "ratesHint": "The most specific rate wins, in this order: Miner, moon, refinery, moon owner, Guest default, corp default. A rate starts on its date. That can be up to 30 days back, but never on a day an issued Statement already bills.",
+        "ratesHint": "The most specific rate wins, in this order: Miner, moon, refinery, moon owner, Guest default, corp default. A rate starts on its date. That can be up to 30 days back, but never on a day an issued late notice already bills.",
         "rateScope": {
           "corp": "Corp default",
           "guest": "Guest default",
@@ -19672,7 +19594,7 @@
           "hint": "Erases the book for good so the corporation can start over.",
           "open": "Delete the book",
           "confirmTitle": "Delete the book?",
-          "body": "Every mining entry, payment, Statement and the activity log is erased, Automatic sync stops, and Statement verify links stop working. Members' Mining Tax pages stop showing this corporation's book. This can't be undone.",
+          "body": "Every mining entry, payment, late notice and the activity log is erased, Automatic sync stops, and late notice links stop working. Members' Mining Tax pages stop showing this corporation's book. This can't be undone.",
           "confirm": "Delete the book",
           "typeTicker": "Type {{ticker}} to confirm",
           "typeCorpId": "Type the corporation ID {{id}} to confirm"
@@ -19736,7 +19658,7 @@
         "pending": "waiting for their confirmation",
         "confirmed": "confirmed by the player",
         "declined": "declined to join",
-        "declinedByLink": "declined, from the main's Statement link",
+        "declinedByLink": "declined, from the main's late notice link",
         "outsideCorp": "not in the corporation",
         "dialogTitle": "Group characters with {{name}}",
         "dialogIntro": "Pick the Miners whose characters should be billed together.",
@@ -19744,7 +19666,7 @@
         "mailMain": "Mail goes to",
         "confirm_one": "Group {{count}} Miner",
         "confirm_other": "Group {{count}} Miners",
-        "effect": "Their days, Statements and payments are billed as one Miner from now on.",
+        "effect": "Their days, late notices and payments are billed as one Miner from now on.",
         "claimEffect": "A character added by name is billed with the group. Its owner can't see this until they log in as that character.",
         "count_one": "{{count}} character",
         "count_other": "{{count}} characters",
@@ -19773,7 +19695,7 @@
         "rate": {
           "open": "Change a day's rate",
           "title": "Change one day's rate",
-          "intro": "Changes the rate for one Miner's mining at one refinery on one day. 0% means no tax. Not for a day already on a Statement. If the day was already paid, it is repriced too, and any payment no longer needed becomes credit. The change is logged.",
+          "intro": "Changes the rate for one Miner's mining at one refinery on one day. 0% means no tax. Not for a day already on a late notice. If the day was already paid, it is repriced too, and any payment no longer needed becomes credit. The change is logged.",
           "day": "Day",
           "pickDay": "Pick a day",
           "pct": "Rate for that day (%)",
@@ -19783,7 +19705,7 @@
         "adjust": {
           "open": "Add a correction line",
           "title": "Correct {{name}}'s bill",
-          "intro": "Added to the next Statement as its own labelled line.",
+          "intro": "Charged or credited on the account as its own labelled line, dated the day it corrects.",
           "kind": "Direction",
           "credit": "Credit them",
           "charge": "Charge them",
@@ -19806,16 +19728,6 @@
           "label": "Label on the line",
           "confirm": "Add {{amount}}",
           "confirmEmpty": "Add"
-        },
-        "rebill": {
-          "open": "Rebill from date",
-          "title": "Rebill {{name}}",
-          "intro": "Bills ore that came in late for days not yet paid, on the next Statement.",
-          "from": "From date",
-          "paid": "A paid Statement covers that day. A paid day is closed for good.",
-          "confirm": "Rebill",
-          "effect": "Never reaches a paid Statement.",
-          "director": "Rebilling a corporation member needs a Director."
         }
       },
       "dialogs": {
@@ -19836,8 +19748,6 @@
           "settleNotice": "Send a final notice",
           "settleDismiss": "Dismiss the tax",
           "dismissing": "Dismisses {{amount}} of tax, owed and waiting, so no final notice is sent. It stays on the record as dismissed.",
-          "finalStatement": "A final late notice lists {{amount}} through {{through}}.",
-          "noStatement": "Nothing left to bill, so there is no final late notice.",
           "owedAfter": "Still owed afterwards: {{amount}}.",
           "pending": "{{amount}} of tax on days that are not Billable yet will never be billed.",
           "creditLabel": "Credit of {{amount}}",
@@ -19851,11 +19761,13 @@
           "askedAt": "When you asked where to refund it (at least {{days}} days ago)",
           "notYet": "Credit can be forfeited only with the guest's recorded consent, or once the refund offer has gone unanswered for {{days}} days.",
           "reason": "Reason (kept in the activity log)",
-          "sendHint": "The final late notice is mailed from the Late notices tab."
+          "sendHint": "The final late notice is mailed from the Late notices tab.",
+          "finalNotice": "A final late notice lists {{amount}} through {{through}}.",
+          "noNotice": "No day is left that a notice has not listed, so there is no final late notice."
         },
         "dispute": {
           "dismissTitle": "Waive {{name}}'s disputed ore for {{date}}?",
-          "dismissIntro": "{{amount}} of tax on the ore they disputed is credited on their next Statement. The rest of the day stays billed.",
+          "dismissIntro": "{{amount}} of tax on the ore they disputed is credited to their account. The rest of the day stays billed.",
           "dismissUnpriced": "The book cannot price that day's ore yet, so it cannot be waived. Sync the book, then try again.",
           "dismissConfirm": "Waive {{amount}}",
           "rejectTitle": "Keep the bill on {{name}}'s dispute for {{date}}?",
@@ -19863,7 +19775,7 @@
         },
         "dismissMiner": {
           "title": "Dismiss {{name}}'s tax?",
-          "intro": "Everything this Miner owes, and everything waiting for the next Statement, is waived. Today's mining is not included. It stays on the record as dismissed and can be reversed."
+          "intro": "Everything this Miner owes is waived. Today's mining is not included."
         },
         "record": {
           "title": "Record a payment for {{name}}",
@@ -19872,6 +19784,7 @@
           "amount": "Amount",
           "paidBy": "Paid by",
           "datePaid": "Date paid (EVE time)",
+          "note": "Note (optional): the Miner sees it on the payment",
           "dateMissing": "Enter the date it was paid.",
           "dateFuture": "A payment can't be dated after today (EVE time).",
           "dateBeforeBook": "The book starts {{date}}; a payment can't be dated before it.",
@@ -19887,13 +19800,14 @@
           "donationAt": "{{date}} {{time}}",
           "confirmMatch": "Assign {{amount}}",
           "outcomeTitle": "After this payment",
-          "enterAmount": "Enter an amount to see which Statements it pays.",
-          "statementLine": "{{period}} Statement",
+          "enterAmount": "Enter an amount to see which days it pays.",
           "clears": "Paid in full",
           "partPays": "Part paid, {{left}} left",
           "stillOwes": "{{name}} still owes {{amount}}",
           "owesNothing": "{{name}} owes nothing",
-          "creditHeld": "{{amount}} held as credit toward the next Statement"
+          "creditHeld": "{{amount}} held as credit toward the next days",
+          "dayLine": "Day of {{date}}",
+          "dateLocked": "Days before {{date}} are locked: record it dated today instead."
         },
         "notTax": {
           "title": "Mark part of a donation as not tax",
@@ -19927,6 +19841,17 @@
           "find": "Find a Miner",
           "noMatch": "No Miner matches",
           "effect": "It is credited to that Miner's oldest debt, or held as credit. The player can still claim it themselves from their own lines."
+        },
+        "reassign": {
+          "title": "Move a payment",
+          "intro": "{{amount}} from {{name}}, {{date}}. It counts toward {{miner}}'s account now.",
+          "to": "Move it to",
+          "toMiner": "Another Miner",
+          "toUnmatched": "No Miner",
+          "confirm": "Move payment",
+          "confirmUnmatched": "Take it off this Miner",
+          "effect": "It pays that Miner's oldest unpaid day, or is held as their credit. This account owes it back. The sync does not move it again.",
+          "effectUnmatched": "It leaves this account, which owes it back, and waits in Needs you as Unmatched."
         },
         "writeOff": {
           "title": "Write off {{name}}'s balance",
@@ -20147,7 +20072,6 @@
         "billableThrough": "Billable through"
       },
       "sections": {
-        "nextStatement": "Next Statement",
         "owedDays": "Owed days",
         "stillAccruing": "Today's mining",
         "earlierDays": "Earlier days",
@@ -20172,6 +20096,38 @@
           "cycles": "cycles",
           "extractions": "extractions"
         }
+      },
+      "noticePanel": {
+        "remaining": "Still owed of its days",
+        "subtitle": "Late notice · {{date}}",
+        "credited": "Paid",
+        "forgiven": "Forgiven",
+        "writtenOff": "Written off (small leftover)",
+        "coversRange_one": "{{from}} – {{through}} · {{count}} line",
+        "coversRange_other": "{{from}} – {{through}} · {{count}} lines",
+        "issued": "Issued",
+        "issuedBy": "by {{name}}",
+        "covers": "Days it listed",
+        "due": "Due",
+        "paid": "Paid",
+        "paused": "Paused by a declaration until {{date}}",
+        "mail": "Mail",
+        "mailed_one": "Mailed once",
+        "mailed_other": "Mailed {{count}} times",
+        "mailedLast": "{{what}} · last {{date}}",
+        "manualReminders_one": "{{count}} reminder by hand",
+        "manualReminders_other": "{{count}} reminders by hand",
+        "stopped": "Miner stopped reminders",
+        "code": "Reason code it printed",
+        "copyLink": "Copy verify link",
+        "copied": "Copied",
+        "copyFailed": "Could not copy the link",
+        "openMiner": "Open Miner page",
+        "notMailed": "Not mailed",
+        "notFound": "Late notice not found.",
+        "alreadyPaid": "Its days are already paid",
+        "reminderCap": "Reminders stopped; one already sent",
+        "mined": "What they mined"
       }
     },
     "export": {
@@ -20182,8 +20138,6 @@
       "action": "Download the book (.xlsx)",
       "sheets": {
         "miningLines": "Mining lines",
-        "statements": "Statements",
-        "statementLines": "Statement lines",
         "payments": "Payments",
         "adjustments": "Adjustments",
         "writeOffs": "Write-offs",
@@ -20197,7 +20151,10 @@
         "moonOwnerPayments": "Moon owner payments",
         "moonOwnerRates": "Moon owner rates",
         "settings": "Settings",
-        "activity": "Activity log"
+        "activity": "Activity log",
+        "accountCheckpoints": "Account checkpoints",
+        "lateNotices": "Late notices",
+        "lateNoticeLines": "Late notice lines"
       },
       "cols": {
         "date": "Date",
@@ -20216,12 +20173,7 @@
         "quantity": "Quantity",
         "moonOwnerId": "Moon owner ID",
         "readAt": "Read at",
-        "statementId": "Statement ID",
         "code": "Payment code",
-        "periodStart": "Period start",
-        "periodEnd": "Period end",
-        "coversFrom": "Covers from",
-        "coversThrough": "Covers through",
         "issued": "Issued",
         "hub": "Trade hub",
         "oreForm": "Ore Form",
@@ -20234,7 +20186,7 @@
         "issuedById": "Issued by ID",
         "remindersStopped": "Reminders stopped",
         "manualReminders": "Manual reminders sent",
-        "storedMinerName": "Miner name on the Statement",
+        "storedMinerName": "Miner name on the late notice",
         "unitPrices": "Unit prices (ISK)",
         "priceSources": "Price sources",
         "taxPct": "Tax (%)",
@@ -20261,7 +20213,6 @@
         "characters": "Characters",
         "characterIds": "Character IDs",
         "closed": "Closed",
-        "finalStatementId": "Final Statement ID",
         "setting": "Setting",
         "value": "Value",
         "via": "Via",
@@ -20311,7 +20262,20 @@
         "journalRef": "Wallet journal ref",
         "notAPayout": "Not a payout",
         "ratePct": "Rate (%)",
-        "effectiveFrom": "Effective from"
+        "effectiveFrom": "Effective from",
+        "noticeId": "Late notice ID",
+        "firstDay": "First day",
+        "lastDay": "Last day",
+        "listed": "Asked for (ISK)",
+        "lineKey": "Line key",
+        "finalNoticeId": "Final late notice ID",
+        "through": "Closed through",
+        "balance": "Balance",
+        "credit": "Credit",
+        "paidThrough": "Paid through",
+        "owedDays": "Days owed",
+        "owedAmount": "Owed",
+        "recordedAt": "Recorded"
       },
       "lineKind": {
         "mined": "Mined",
@@ -20373,11 +20337,7 @@
         "startDate": "Start date",
         "hub": "Trade hub",
         "oreForm": "Ore Form",
-        "cadence": "Statement period",
-        "cadenceMonthly": "Monthly",
-        "cadenceDays": "Every {{days}} days from {{anchor}}",
         "graceHours": "Grace period (hours)",
-        "minimumStatement": "Smallest Statement (ISK)",
         "overdueDays": "Overdue after (days)",
         "divisions": "Wallet divisions",
         "approvalLimit": "Dismissals above this need a Director (ISK)",
@@ -20400,6 +20360,10 @@
           "structure": "Tax rate (%): refinery {{target}}, from {{from}}",
           "record": "Tax rate (%): one entry, {{target}}"
         }
+      },
+      "noticeKind": {
+        "late": "Late notice",
+        "final": "Final notice"
       }
     }
   },
@@ -20574,6 +20538,7 @@
       "accentText": "Accent text: clickable (entity links)",
       "inlineLink": "Solid underline at rest: link inside a sentence",
       "textAction": "Text action: performs an action",
+      "balanceFigure": "Solid underline on a Payee's balance figure: opens its ledger",
       "externalLink": "Trailing external icon: leaves Neocom Desk",
       "hintText": "Dotted underline: has a tooltip (HintText)",
       "communityMark": "Community icon with a tooltip: another Member shared this Fitting",
@@ -20620,6 +20585,7 @@
     },
     "notes": {
       "textAction": "Actions only. Navigation is a link or a row.",
+      "balanceFigure": "The figure keeps its tone; the name beside it keeps its own action.",
       "iskAmount": "Hover, focus or tap reveals the exact figure.",
       "rowMenu": "Only where the row has two or more actions nothing else reaches. Right-click and touch-and-hold open the same menu.",
       "altAction": "The Command Palette's second action (Places: Set waypoint). Enter does the row's main thing; this does the other and keeps the palette open to show the outcome. The button is the touch path.",
@@ -20710,7 +20676,8 @@
       "toggleOn": "Toggle on",
       "toggleOff": "Toggle off",
       "region": "Region",
-      "pending": "RSVP pending"
+      "pending": "RSVP pending",
+      "payeeName": "Rook Belter"
     }
   },
   "srp": {

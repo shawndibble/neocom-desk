@@ -44,7 +44,7 @@ _Recorded 2026-10-18 · issue #4277. Supersedes
   old job folded up to four Fuzzwork captures into a running mean for the
   day; the new day is the book standing at ~23:45 UTC. Moon Mining Tax and
   Corp Tax Book amounts for days published from now on can differ slightly
-  from what the old average would have given. Already-billed Statements keep
+  from what the old average would have given. Late notices already sent keep
   their stored amounts: nothing here reprices them. Older days keep their
   migrated values.
 - **One-time migration, no maintainer script.** While

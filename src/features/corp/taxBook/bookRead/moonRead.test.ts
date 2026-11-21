@@ -149,7 +149,7 @@ beforeEach(async () => {
   store.docs.set(`${BOOK}/meta/paid`, { ids: [] });
   for (const [i, x] of [OLD, NEW, ELSEWHERE].entries())
     store.docs.set(`${BOOK}/extractions/e${i}`, x);
-  // Miner 1 was billed through August; miner 2 never was.
+  // A legacy notice of Miner 1's: the moon page reads no notices.
   store.docs.set(`${BOOK}/statements/s1`, {
     id: 's1',
     minerId: 'solo:1',
@@ -170,15 +170,20 @@ beforeEach(async () => {
 });
 
 describe('readBook for one moon', () => {
-  it('reads the shown pull window and its moon docs, not the ledger', async () => {
+  it('reads every cycle’s pull window and its moon docs, not the ledger', async () => {
     const read = await scopedMoon(ID.new);
     expect(read.observed.map((r) => `${r.characterId}:${r.date}`).sort()).toEqual([
+      '1:2026-08-05',
       '1:2026-09-17',
       '2:2026-09-18',
     ]);
-    // The billed cycle prints its doc: no row of its window is read.
-    expect([...read.fromDocs]).toEqual([ID.old]);
-    expect(reads('observed')).toEqual([`${BOOK}/observed/b`, `${BOOK}/observed/c`]);
+    // A moon doc carries no tax any more: even an old cycle's days are priced from its rows.
+    expect([...read.fromDocs]).toEqual([]);
+    expect(reads('observed')).toEqual([
+      `${BOOK}/observed/a`,
+      `${BOOK}/observed/b`,
+      `${BOOK}/observed/c`,
+    ]);
     // This refinery's two docs; the other refinery's is not read.
     expect(reads('moonDocs')).toEqual(
       [`${BOOK}/moonDocs/${ID.new}`, `${BOOK}/moonDocs/${ID.old}`].sort()
@@ -193,10 +198,14 @@ describe('readBook for one moon', () => {
     expect(read.moon).toBeDefined();
     expect(reads('moonDocs')).toEqual([]);
     expect(reads('statements')).toEqual([]);
-    expect(reads('observed')).toEqual([`${BOOK}/observed/b`, `${BOOK}/observed/c`]);
+    expect(reads('observed')).toEqual([
+      `${BOOK}/observed/a`,
+      `${BOOK}/observed/b`,
+      `${BOOK}/observed/c`,
+    ]);
   });
 
-  it('reads a cycle whose Miner can still have an open day', async () => {
+  it('reads a cycle whose Miner can still have an open day, as every cycle', async () => {
     moonDoc(ID.old, STRUCTURE, ['solo:1', 'solo:2']);
     const read = await scopedMoon(ID.new);
     expect([...read.fromDocs]).toEqual([]);
@@ -211,6 +220,7 @@ describe('readBook for one moon', () => {
     store.noIndex = true;
     const read = await scopedMoon(ID.new);
     expect(read.observed.map((r) => `${r.characterId}:${r.date}`).sort()).toEqual([
+      '1:2026-08-05',
       '1:2026-09-17',
       '2:2026-09-18',
     ]);

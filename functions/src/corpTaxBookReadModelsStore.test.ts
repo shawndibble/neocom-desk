@@ -13,6 +13,7 @@ function fakeDb(failReads: boolean) {
     },
     doc: (id: string) => ({ path: `${path}/${id}`, get: async () => empty }),
     where: () => col(path),
+    select: () => col(path),
   });
   const db = {
     collection: (name: string) => ({
@@ -21,6 +22,8 @@ function fakeDb(failReads: boolean) {
         get: async () => empty,
       }),
     }),
+    getAll: async (...refs: unknown[]) =>
+      refs.map(() => ({ exists: false, data: () => undefined })),
     batch: () => ({
       set: vi.fn(),
       delete: (ref: { path: string }) => deleted.push(ref.path),
@@ -31,14 +34,14 @@ function fakeDb(failReads: boolean) {
 }
 
 describe('refreshReadModels', () => {
-  it('deletes both docs when the rebuild fails, and never throws', async () => {
+  it('deletes the doc when the rebuild fails, and never throws', async () => {
     const { db, deleted } = fakeDb(true);
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     await expect(refreshReadModels(db, 1, 0)).resolves.toBeUndefined();
-    expect(deleted.sort()).toEqual(['corps/1/readModels/minerList', 'corps/1/readModels/overview']);
+    expect(deleted).toEqual(['corps/1/readModels/overview']);
   });
 
-  it('leaves the docs alone when the rebuild works', async () => {
+  it('leaves the doc alone when the rebuild works', async () => {
     const { db, deleted } = fakeDb(false);
     await refreshReadModels(db, 1, 0);
     expect(deleted).toEqual([]);

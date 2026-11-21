@@ -1,13 +1,14 @@
 import { useTranslation } from 'react-i18next';
+import { useMemo } from 'react';
 import { useTimeZone } from '@/lib/timeFormat';
 import { Panel, StatChip } from '@/components/ui';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { POPS_WINDOW_DAYS } from '@/engine/corpTaxBook/bookSections';
-import type { ScheduleRow } from '@/engine/corpTaxBook/readModels';
+import type { ExtractionRow } from '@/engine/corpTaxBook/bookView';
+import { moonSchedule } from '@/engine/corpTaxBook/bookSections';
 import { DAY_MS } from '@/lib/age';
 import { formatCountdown } from '@/lib/duration';
 import { useBook } from './useBook';
-import { useTabsProjection } from './useTabsProjection';
 import { SetupChecklist } from './SetupChecklist';
 import { NeedsYouQueue } from './NeedsYouQueue';
 import { BookTotals, OverdueAging } from './BookTotals';
@@ -27,15 +28,19 @@ export function OverviewTab() {
   const zone = useTimeZone();
   const { t } = useTranslation();
   const { view, names } = useBook();
-  const { billableThrough, donationsBeforeBook, schedule } = useTabsProjection();
+  const { billableThrough, donationsBeforeBook } = view;
+  const schedule = useMemo(
+    () => moonSchedule(view.extractions, view.input.now),
+    [view.extractions, view.input.now]
+  );
   const shareMarks = usePopShareMarks();
   const now = Date.parse(view.input.now);
   const until = (iso: string) => formatCountdown(Math.max(0, Date.parse(iso) - now) / 1000);
   const groups: {
     id: string;
     title: string;
-    rows: ScheduleRow[];
-    when: (r: ScheduleRow) => string;
+    rows: ExtractionRow[];
+    when: (r: ExtractionRow) => string;
   }[] = [
     {
       id: 'fractured',

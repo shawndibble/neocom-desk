@@ -31,16 +31,14 @@ const book = {
     active: true,
     startDate: '2026-01-01',
     divisions: [1],
-    cadence: { kind: 'monthly' },
     rates: [],
   },
   state: {
     miners: [],
-    statements: [],
+    notices: [],
     payments: [],
     dismissals: [],
     extractions: [],
-    paidStatementIds: new Set<string>(),
     writeOffs: [],
   },
   observed: [
@@ -116,9 +114,9 @@ describe('ExportBookSection', () => {
     });
     expect(readAudit).toHaveBeenCalledWith(ME, CORP, 2000);
     expect(save.mock.calls[0][0]).toMatch(/^neocom-corp-tax-book-test-\d{4}-\d{2}-\d{2}\.xlsx$/);
-    // 2 mining lines + 17 settings rows + 1 log entry.
+    // 2 mining lines + 15 settings rows + 1 log entry.
     expect(done).toHaveTextContent(
-      /^Downloaded neocom-corp-tax-book-test-.*\.xlsx · 17 sheets, 20 rows$/
+      /^Downloaded neocom-corp-tax-book-test-.*\.xlsx · 18 sheets, 18 rows$/
     );
   });
 

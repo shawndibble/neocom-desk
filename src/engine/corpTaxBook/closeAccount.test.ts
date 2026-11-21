@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { buildBookView, planStatementRun, type BookViewInput } from './bookView';
+import { buildBookView, type BookViewInput } from './bookView';
+import { planNotices } from './lateNotices';
+import { DEFAULT_NOTICE_RULES } from './notices';
 import {
   FORFEIT_NO_REPLY_DAYS,
   forfeitAllowed,
@@ -27,9 +29,7 @@ function input(overrides: Partial<BookViewInput> = {}): BookViewInput {
     now: '2026-09-18T14:00:00Z',
     startDate: '2026-08-01',
     graceHours: 6,
-    minimumStatement: 5_000_000,
     overdueDays: 14,
-    cadence: { kind: 'monthly' },
     hubId: 'jita',
     oreForm: 'compressed',
     structureExpiryHours: {},
@@ -37,13 +37,12 @@ function input(overrides: Partial<BookViewInput> = {}): BookViewInput {
     rates: [{ scope: 'corp', pct: 10, effectiveFrom: '2026-08-01' }],
     entries: [guestEntry('2026-08-10', 1000), guestEntry('2026-09-17', 500)],
     miners: [],
-    statements: [],
+    notices: [],
     payments: [],
     dismissals: [],
     declarations: [],
     adjustments: [],
     extractions: [],
-    paidStatementIds: new Set(),
     pricesOn: () => ({
       prices: new Map([[ORE, 1000]]),
       sources: new Map([[ORE, 'saved' as const]]),
@@ -66,23 +65,22 @@ describe('forfeitAllowed', () => {
 });
 
 describe('planCloseAccount', () => {
-  it('issues one final Statement over everything Billable, ignoring the minimum', () => {
+  it('sends one final notice of every unpaid day, whatever the notice rules say', () => {
     const view = buildBookView(input());
     const plan = planCloseAccount(view, 'solo:50')!;
-    // The 17 Sep day is Billable (synced after its grace) and is billed too.
-    expect(plan.statement?.amount).toBe(150_000);
-    expect(plan.statement?.minerId).toBe('solo:50');
-    expect(plan.statement?.characterIds).toEqual([50]);
+    // The 17 Sep day is Billable (synced after its grace) and is listed too.
+    expect(plan.notice?.listed).toBe(150_000);
+    expect(plan.notice).toMatchObject({ kind: 'final', minerId: 'solo:50', characterIds: [50] });
     expect(plan.owedAfter).toBe(150_000);
     expect(plan.creditAfter).toBe(0);
   });
 
-  it('has no final Statement when nothing is left to bill', () => {
+  it('has nothing to plan for a Miner the book does not hold', () => {
     const view = buildBookView(input({ entries: [] }));
     expect(planCloseAccount(view, 'solo:50')).toBeUndefined();
   });
 
-  it('refunds credit left after the final Statement', () => {
+  it('refunds the credit held, with no final notice when nothing is owed', () => {
     const view = buildBookView(
       input({
         payments: [
@@ -91,6 +89,7 @@ describe('planCloseAccount', () => {
       })
     );
     const plan = planCloseAccount(view, 'solo:50')!;
+    expect(plan.notice).toBeUndefined();
     expect(plan.owedAfter).toBe(0);
     expect(plan.creditAfter).toBe(1_000_000 - 150_000);
   });
@@ -104,19 +103,13 @@ describe('a closed Miner', () => {
     closedAt: '2026-09-18T14:00:00Z',
   };
 
-  it('is skipped by the Statement run', () => {
-    const open = planStatementRun(buildBookView(input({ minimumStatement: 0 })), {
-      start: '2026-08-01',
-      end: '2026-08-31',
-    });
-    expect(open.lines).toHaveLength(1);
-    const view = buildBookView(input({ minimumStatement: 0, miners: [closed] }));
-    expect(planStatementRun(view, { start: '2026-08-01', end: '2026-08-31' }).lines).toHaveLength(
-      0
-    );
+  it('gets no more late notices', () => {
+    const rules = { ...DEFAULT_NOTICE_RULES, minimum: 0 };
+    expect(planNotices(buildBookView(input()), rules)).toHaveLength(1);
+    expect(planNotices(buildBookView(input({ miners: [closed] })), rules)).toHaveLength(0);
   });
 
-  it('mails the final Statement and earlier ones, nothing issued after', () => {
+  it('mails the final notice and earlier ones, nothing issued after', () => {
     const miner = { ...closed, finalStatementId: 'final_solo:50' };
     expect(
       mailableAfterClose(miner, { id: 'final_solo:50', issuedAt: '2026-09-18T14:00:01Z' })

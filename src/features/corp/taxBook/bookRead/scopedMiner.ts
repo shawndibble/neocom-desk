@@ -1,36 +1,30 @@
 /**
- * One Miner's page from the read models (issue #5258, ADR 0032): the Miner's totals doc, their
- * Statements, payments, write-offs, adjustments, disputes and declarations by Miner, and the
- * ledger rows since the newest Statement began. Never the whole ledger. Every other field of its
+ * One Miner's page (issue #5258, ADR 0032): their late notices, payments, write-offs,
+ * adjustments, disputes and declarations by Miner, their closed-through checkpoint, and the
+ * ledger rows from it on (`accountWindowStart`). Never the whole ledger. Every other field of its
  * parts (dismissals, Extractions, feeders, ...) is the whole book's, read as `slices.ts` reads it.
  * A missing composite index (observed: characterId + date) falls back to the Miner's characters'
  * whole ledger, filtered here, so an undeployed index costs reads, not the page.
  */
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  limit as limitTo,
-  orderBy,
-  query,
-  where,
-} from 'firebase/firestore/lite';
-import type { RecordedWriteOff } from '@/engine/corpTaxBook/allocation';
-import type { Miner } from '@/engine/corpTaxBook/charges';
-import {
-  minerScopedRows,
-  openWindowStart,
-  type HeaderTotals,
-} from '@/engine/corpTaxBook/minerScope';
-import type { Adjustment, Statement } from '@/engine/corpTaxBook/statements';
+import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore/lite';
+import type { Adjustment } from '@/engine/corpTaxBook/adjustments';
+import { characterIdsOfMiner, type Miner } from '@/engine/corpTaxBook/charges';
+import { noticesOfDocs } from '@/engine/corpTaxBook/lateNotices';
+import { accountWindowStart } from '@/engine/corpTaxBook/minerScope';
+import type { RecordedWriteOff } from '@/engine/corpTaxBook/payments';
+import type { RunningAccountCheckpoint } from '../../../../../functions/src/corpTaxBookCheckpoint';
+import { usableCheckpoint } from '@/engine/corpTaxBook/openSet/miners';
+import { NOTICE_ID_FIELD } from '../../../../../functions/src/corpTaxBookLateNotice';
 import type { SettlePayment } from '@/engine/corpTaxBook/sync';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
-import { latestRecordedCorp } from '@/engine/corpTaxBook/bookDocs';
 import { readObservedRow } from '@/engine/corpTaxBook/observed';
 import { chunk } from '@/lib/chunk';
 import { readDisputes } from '@/engine/corpTaxBook/disputes';
-import { settingsFrom, type BookDeclaration } from '../bookClient';
+import {
+  LATE_NOTICES,
+  RUNNING_ACCOUNTS,
+} from '../../../../../functions/src/corpTaxBookVersionKeys';
+import { bookDeclarationOf, settingsFrom, type BookDeclaration } from '../bookClient';
 import { errorCode } from '../openBook';
 import { ALL_BOOK_PARTS, type BookPart, type BookPartSet } from './parts';
 import { bookOf, readSlices, type BookRead, type ReadContext } from './slices';
@@ -56,27 +50,29 @@ export async function readMinerScope(
     const snap = await getDoc(doc(db, 'corps', String(corporationId), name, minerId));
     return snap.exists() ? (snap.data() as Record<string, unknown>) : undefined;
   };
-  // The totals doc may not be deployed or readable yet: no reason to lose the page.
-  // A refusal is not that, and neither is a failed grouping read (the Miner would vanish).
-  const totalsOrNone = async () => {
+  // Best effort: none until the server has written one.
+  const checkpoint = (async () => {
+    if (!book.written(RUNNING_ACCOUNTS)) return undefined;
     try {
-      return (await one('minerTotals')) as HeaderTotals | undefined;
-    } catch (error) {
-      if (errorCode(error).endsWith('permission-denied')) throw error;
+      return (await one(RUNNING_ACCOUNTS))?.snapshot as RunningAccountCheckpoint | undefined;
+    } catch {
       return undefined;
     }
-  };
+  })();
   const grouping = one('miners');
-  const statements = byMiner<Statement>('statements');
-  const characterIds = grouping.then((g) => {
-    const solo = /^solo:(\d+)$/.exec(minerId);
-    return Array.isArray(g?.characterIds)
-      ? (g.characterIds as number[])
-      : solo
-        ? [Number(solo[1])]
-        : [];
-  });
-  const from = statements.then((s) => openWindowStart(s, settingsFrom(book.data).startDate));
+  const notices = (
+    book.written(LATE_NOTICES)
+      ? byMiner<unknown>(LATE_NOTICES).catch(() => [])
+      : Promise.resolve([])
+  ).then(noticesOfDocs);
+  const characterIds = grouping.then((g) =>
+    characterIdsOfMiner(minerId, Array.isArray(g?.characterIds) ? [g as unknown as Miner] : [])
+  );
+  // One that is no snapshot, or summed for other characters, is none: read from the start.
+  const fitting = Promise.all([checkpoint, characterIds]).then(([c, ids]) =>
+    usableCheckpoint(c, ids)
+  );
+  const from = fitting.then((c) => accountWindowStart(c, settingsFrom(book.data).startDate));
 
   const rowsOf = (snap: { docs: { data: () => unknown }[] }) =>
     snap.docs.flatMap((d) => readObservedRow(d.data() as Record<string, unknown>) ?? []);
@@ -96,55 +92,34 @@ export async function readMinerScope(
     }
     return rows;
   };
-  /**
-   * The corporation a character was last recorded in (`latestRecordedCorp`): member, leaver or
-   * guest. The window holds every row of its newest day when it holds any; otherwise that day
-   * is read whole, since a character can change corporation mid-day.
-   */
-  const latestCorp = async (id: number, known: readonly ObservedRow[]) => {
-    const mine = known.filter((r) => r.characterId === id);
-    if (mine.length > 0) return latestRecordedCorp(mine).get(id)?.corp ?? corporationId;
-    try {
-      const mineOnly = where('characterId', '==', id);
-      const newest = query(under('observed'), mineOnly, orderBy('date', 'desc'), limitTo(1));
-      const top = rowsOf(await getDocs(newest))[0];
-      if (!top) return corporationId;
-      const day = rowsOf(
-        await getDocs(query(under('observed'), mineOnly, where('date', '==', top.date)))
-      );
-      return latestRecordedCorp([top, ...day]).get(id)?.corp ?? corporationId;
-    } catch {
-      return corporationId;
-    }
-  };
   const observed = async () => {
-    const [ids, since, own] = await Promise.all([characterIds, from, statements]);
-    const windowed = await windowRows(ids, since);
-    const corps = new Map(
-      await Promise.all(ids.map(async (id) => [id, await latestCorp(id, windowed)] as const))
-    );
-    return minerScopedRows(own, windowed, { corpFor: (id) => corps.get(id) ?? corporationId });
+    const [ids, since] = await Promise.all([characterIds, from]);
+    return windowRows(ids, since);
   };
   const declarations = async (): Promise<BookDeclaration[]> => {
-    const ids = (await statements).map((s) => s.id);
+    const ids = (await notices).map((n) => n.id);
     const out: BookDeclaration[] = [];
     for (const batch of chunk(ids, IN_LIMIT))
       out.push(
         ...(
-          await getDocs(query(under('declarations'), where('statementId', 'in', batch)))
-        ).docs.map((d) => d.data() as BookDeclaration)
+          await getDocs(query(under('declarations'), where(NOTICE_ID_FIELD, 'in', batch)))
+        ).docs.map((d) => bookDeclarationOf(d.data()))
       );
     return out;
   };
 
   const parts = new Set<BookPart>([...ALL_BOOK_PARTS, ...asked]);
-  const [fields, since, totals] = await Promise.all([
+  const [fields, since] = await Promise.all([
     readSlices(ctx, parts, {
       miners: async () => {
         const g = await grouping;
         return g ? [g as unknown as Miner] : [];
       },
-      statements: () => statements,
+      notices: () => notices,
+      checkpoints: async () => {
+        const c = await fitting;
+        return c ? [c] : [];
+      },
       payments: () => byMiner<SettlePayment>('payments'),
       writeOffs: () => byMiner<RecordedWriteOff>('writeOffs'),
       adjustments: () => byMiner<Adjustment>('adjustments'),
@@ -157,11 +132,10 @@ export async function readMinerScope(
       observed,
     }),
     from,
-    totalsOrNone(),
   ]);
   return {
     ...(await bookOf(ctx, parts, fields)),
     scopedMiner: minerId,
-    minerScope: { from: since, ...(totals ? { totals } : {}) },
+    minerScope: { from: since },
   };
 }

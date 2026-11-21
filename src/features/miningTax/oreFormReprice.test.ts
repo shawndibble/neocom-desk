@@ -49,12 +49,15 @@ beforeEach(async () => {
   await db.payees.clear();
 });
 
+/** Paid as each test's record says: the account's reading, stood in for. */
+const BY_STATUS = { statusOf: (a: MiningTaxAssignmentRecord) => a.status };
+
 describe('repriceForOreForm', () => {
   it('re-prices an Outstanding record priced under the other form and marks it raw', async () => {
     formMock.compressed = false;
     await db.miningTaxAssignments.put(record());
 
-    await repriceForOreForm(CHAR);
+    await repriceForOreForm(CHAR, BY_STATUS);
 
     const row = await db.miningTaxAssignments.get('a1');
     expect(row).toMatchObject({ estimatedValue: 500, taxOwed: 50, rawOrePriced: true });
@@ -72,7 +75,7 @@ describe('repriceForOreForm', () => {
   it('clears the raw marker when flipping back to Compressed', async () => {
     await db.miningTaxAssignments.put(record({ rawOrePriced: true }));
 
-    await repriceForOreForm(CHAR);
+    await repriceForOreForm(CHAR, BY_STATUS);
 
     const row = await db.miningTaxAssignments.get('a1');
     expect(row?.estimatedValue).toBe(500);
@@ -81,9 +84,20 @@ describe('repriceForOreForm', () => {
 
   it('leaves a record already priced under the current form alone', async () => {
     await db.miningTaxAssignments.put(record());
-    await repriceForOreForm(CHAR);
+    await repriceForOreForm(CHAR, BY_STATUS);
     expect(pricingMock.loadUnitPricesOnDate).not.toHaveBeenCalled();
     expect(syncMock.scheduleSync).not.toHaveBeenCalled();
+  });
+
+  it("reads paid off the Payee's account, never the stored mark (M1)", async () => {
+    formMock.compressed = false;
+    // An older client marked it paid; no link pays it: it is owed, so it re-prices.
+    await db.miningTaxAssignments.put(record({ status: 'paid' }));
+    await repriceForOreForm(CHAR, { statusOf: () => 'outstanding' });
+    expect(await db.miningTaxAssignments.get('a1')).toMatchObject({
+      estimatedValue: 500,
+      status: 'outstanding',
+    });
   });
 
   it.each(['paid', 'needs-review', 'dismissed'] as const)(
@@ -91,7 +105,7 @@ describe('repriceForOreForm', () => {
     async (status) => {
       formMock.compressed = false;
       await db.miningTaxAssignments.put(record({ status }));
-      await repriceForOreForm(CHAR);
+      await repriceForOreForm(CHAR, BY_STATUS);
       expect((await db.miningTaxAssignments.get('a1'))?.estimatedValue).toBe(1000);
     }
   );
@@ -105,7 +119,7 @@ describe('repriceForOreForm', () => {
     });
     await db.miningTaxAssignments.put(record());
 
-    await repriceForOreForm(CHAR);
+    await repriceForOreForm(CHAR, BY_STATUS);
 
     const row = await db.miningTaxAssignments.get('a1');
     expect(row?.estimatedValue).toBe(1000);
@@ -115,7 +129,7 @@ describe('repriceForOreForm', () => {
   it('keeps a per-ore value override', async () => {
     formMock.compressed = false;
     await db.miningTaxAssignments.put(record({ oreLineValues: { [TYPE]: 777 } }));
-    await repriceForOreForm(CHAR);
+    await repriceForOreForm(CHAR, BY_STATUS);
     expect((await db.miningTaxAssignments.get('a1'))?.estimatedValue).toBe(777);
   });
 
@@ -127,7 +141,7 @@ describe('repriceForOreForm', () => {
       return { prices: new Map([[TYPE, 5]]), unpriced: new Set(), sellFallback: new Set() };
     });
 
-    await repriceForOreForm(CHAR);
+    await repriceForOreForm(CHAR, BY_STATUS);
 
     const row = await db.miningTaxAssignments.get('a1');
     expect(row).toMatchObject({ status: 'paid', estimatedValue: 1000 });
@@ -142,7 +156,7 @@ describe('repriceForOreForm', () => {
       return { prices: new Map([[TYPE, 5]]), unpriced: new Set(), sellFallback: new Set() };
     });
 
-    await repriceForOreForm(CHAR);
+    await repriceForOreForm(CHAR, BY_STATUS);
 
     expect(await db.miningTaxAssignments.get('a1')).toBeUndefined();
   });

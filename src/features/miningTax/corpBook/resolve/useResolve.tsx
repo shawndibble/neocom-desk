@@ -5,6 +5,7 @@ import type { CorpBookView } from '../corpBookView';
 import { useNotPaying } from './notPaying';
 import { ProblemFacts } from './ProblemFacts';
 import { ResolveDialog } from './ResolveDialog';
+import { claimablePayments } from './paidTransfers';
 import { proofSenders, type ResolveTarget } from './targets';
 
 interface Args {
@@ -14,6 +15,8 @@ interface Args {
   reloadCorpBooks: () => void;
   /** The member's own payments, for "Which payment was it?". */
   madePayments: readonly MadePayment[];
+  /** `paymentLinkKey`s a link holds: those payments pay a personal Payee, never a claim. */
+  linked: ReadonlySet<string>;
   onPay: (corporationId: number) => void;
   /** Opens a book day's own row (its Conflict takeover lives there). */
   onOpenDay: (row: BookRowView) => void;
@@ -28,6 +31,7 @@ export function useResolve({
   nameOf,
   reloadCorpBooks,
   madePayments,
+  linked,
   onPay,
   onOpenDay,
 }: Args): {
@@ -55,16 +59,17 @@ export function useResolve({
           contact: book?.loaded.taxContact,
         }}
         {...(target.transfers ? { transfers: target.transfers } : {})}
-        payments={madePayments}
+        payments={claimablePayments(madePayments, {
+          bookCorporationId: problem.corporationId,
+          linked,
+          held: book?.loaded.payments ?? [],
+        })}
         senderIds={proofSenders(book?.loaded, {
           characterId: problem.characterId,
           ...(problem.row ? { row: problem.row } : {}),
-          ...(problem.kind === 'uncredited' ||
-          problem.kind === 'kept' ||
-          problem.kind === 'overdue' ||
-          problem.kind === 'markedPaid'
-            ? problem.statementId !== undefined
-              ? { statementId: problem.statementId }
+          ...(problem.kind === 'uncredited' || problem.kind === 'kept' || problem.kind === 'overdue'
+            ? problem.noticeId !== undefined
+              ? { noticeId: problem.noticeId }
               : {}
             : {}),
         })}
@@ -89,7 +94,7 @@ export function useResolve({
         onClose={close}
       />
     );
-  }, [target, corpView, nameOf, hide, onPay, onOpenDay, reloadCorpBooks, madePayments]);
+  }, [target, corpView, nameOf, hide, onPay, onOpenDay, reloadCorpBooks, madePayments, linked]);
   return {
     open: setTarget,
     hidden,

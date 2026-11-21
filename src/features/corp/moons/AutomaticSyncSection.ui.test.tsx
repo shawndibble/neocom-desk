@@ -65,7 +65,7 @@ describe('AutomaticSyncSection', () => {
   it('is off by default and starts the opt-in for the active Character', async () => {
     renderSection(null);
     expect(screen.getByTestId('auto-sync-state')).toHaveTextContent(/^Off/);
-    expect(screen.getByText(/never issues a Statement and never sends mail/)).toBeInTheDocument();
+    expect(screen.getByText(/never issues a late notice and never sends mail/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Turn on for Pilot 7' }));
     expect(beginCorpSyncLogin).toHaveBeenCalledWith(ME, CORP);
   });
@@ -83,9 +83,7 @@ describe('AutomaticSyncSection', () => {
       })
     );
     expect(screen.getByTestId('auto-sync-state')).toHaveTextContent('On, held by Pilot 7.');
-    expect(
-      screen.getByText(/12 ledger rows, 2 new donations, 1 Statements settled/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/12 ledger rows, 2 new donations\./)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Turn on/ })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Turn off' }));
     expect(turnOffScheduledSync).toHaveBeenCalledWith({

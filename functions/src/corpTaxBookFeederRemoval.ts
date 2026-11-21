@@ -7,6 +7,7 @@
 // expired, already over, wrong person, or the payee guard (engine `payeeMayForce`). The reason
 // is never in the response, the logs or the audit trail.
 
+import { DAY_MS } from './timeConstants.js';
 import { randomBytes } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
@@ -46,7 +47,7 @@ import {
 import { signedInCharacter, fail, type Caller } from './actorAuth.js';
 
 /** Slack on the link past the wait, for a mail read late. */
-const LINK_SLACK_MS = 24 * 3_600_000;
+const LINK_SLACK_MS = DAY_MS;
 
 /**
  * How long the mail's link stays valid, from the start: the wait plus slack. Once the notice is

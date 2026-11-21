@@ -85,18 +85,21 @@ beforeEach(async () => {
   store.docs.clear();
   store.reads.length = 0;
   store.noIndex = false;
-  store.docs.set(BOOK, { active: true, startDate: '2026-08-01', bookVersion: 'b1' });
+  store.docs.set(BOOK, {
+    active: true,
+    startDate: '2026-08-01',
+    bookVersion: 'b1',
+    collectionVersions: { lateNotices: 'v1' },
+  });
   store.docs.set(`${BOOK}/meta/paid`, { ids: [] });
   store.docs.set(`${BOOK}/miners/m1`, { id: 'm1', characterIds: [1, 2], mainCharacterId: 1 });
-  store.docs.set(`${BOOK}/minerTotals/m1`, { schema: 1, owed: 5, credit: 0, lastPaidAt: null });
   const st = (id: string, minerId: string, from: string) =>
-    store.docs.set(`${BOOK}/statements/${id}`, {
+    store.docs.set(`${BOOK}/lateNotices/${id}`, {
       id,
       minerId,
-      coversFrom: from,
-      coversThrough: from,
       issuedAt: `${from}T00:00:00Z`,
       lines: [],
+      mail: { sent: 1, manualSent: 0, remindersStopped: false },
     });
   st('s-old', 'm1', '2026-08-01');
   st('s-new', 'm1', '2026-09-01');
@@ -106,19 +109,18 @@ beforeEach(async () => {
   store.docs.set(`${BOOK}/dismissals/d1`, { id: 'd1' });
   store.docs.set(`${BOOK}/declarations/x1`, { id: 'x1', statementId: 's-new' });
   store.docs.set(`${BOOK}/declarations/x2`, { id: 'x2', statementId: 's-other' });
-  obs('o1', 1, '2026-08-10'); // before the newest Statement: frozen, never read
+  obs('o1', 1, '2026-07-10'); // before the book: never read
   obs('o2', 1, '2026-09-10');
   obs('o3', 2, '2026-09-12');
   obs('o4', 9, '2026-09-12'); // someone else's
 });
 
 describe('readBook for one Miner', () => {
-  it('reads this Miner and the open window, not the ledger', async () => {
+  it('reads this Miner from the book’s start while it has no checkpoint, not the ledger', async () => {
     const d = (await readMiner('m1'))!;
     expect(d.scopedMiner).toBe('m1');
-    expect(d.minerScope?.from).toBe('2026-09-01');
-    expect(d.minerScope?.totals).toMatchObject({ owed: 5 });
-    expect(d.state.statements.map((s) => s.id).sort()).toEqual(['s-new', 's-old']);
+    expect(d.minerScope?.from).toBe('2026-08-01');
+    expect(d.state.notices.map((n) => n.id).sort()).toEqual(['s-new', 's-old']);
     expect(d.state.payments.map((p) => p.id)).toEqual(['p1']);
     expect(d.declarations.map((x) => x.id)).toEqual(['x1']);
     expect(d.state.miners).toHaveLength(1);
@@ -138,24 +140,15 @@ describe('readBook for one Miner', () => {
     expect(read!.observed.map((r) => r.date).sort()).toEqual(['2026-09-10', '2026-09-12']);
   });
 
-  it('survives a totals doc that is not deployed', async () => {
-    store.docs.delete(`${BOOK}/minerTotals/m1`);
-    const read = await readMiner('m1');
-    expect(read!.minerScope?.totals).toBeUndefined();
-  });
-
-  it('reads a solo Miner by its character, and a quiet one by its newest day only', async () => {
+  it('reads a solo Miner by its character, from the book’s start', async () => {
     store.docs.delete(`${BOOK}/miners/m1`);
     obs('o5', 5, '2026-07-30', 98000099); // a guest's last row, before the book
     obs('o6', 5, '2026-06-01', 98000099);
     store.reads.length = 0;
     const read = await readMiner('solo:5');
+    // Mining before the book owes nothing, and none is read.
     expect(read!.observed).toEqual([]);
-    // The newest row, then every row of that day (a character can change corp mid-day).
-    expect(store.reads.filter((p) => p.includes('/observed/'))).toEqual([
-      `${BOOK}/observed/o5`,
-      `${BOOK}/observed/o5`,
-    ]);
+    expect(store.reads.filter((p) => p.includes('/observed/'))).toEqual([]);
   });
 
   it('claims only the parts it read, and holds every field a whole read of them holds', async () => {
@@ -165,8 +158,6 @@ describe('readBook for one Miner', () => {
     expect(fieldsOf(scoped)).toEqual(fieldsOf(whole));
   });
 
-  // #6206/#6207: Needs you lists them on every page, so a one-Miner read that claims the core
-  // and the ledger reads them as the whole book does.
   it("reads the disputes it claims, this Miner's only, and the uncounted donations", async () => {
     store.docs.set(BOOK, {
       active: true,

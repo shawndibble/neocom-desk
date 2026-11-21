@@ -1,14 +1,12 @@
-// Firestore side of the Overview and Miners tab read models (issue #5259, ADR 0032). The
-// maths is in corpTaxBookReadModels.ts; this loads a book's frozen records and writes the
-// docs that changed. Shadow mode: nothing reads the docs until the screens' switch flips,
-// so a failure here is logged and swallowed, never thrown into the sync or edit that caused
-// it. The scheduled verifier rebuilds them too.
+// Firestore side of the tab read models (issue #5259, ADR 0032). The rules are in
+// corpTaxBookReadModels.ts; this reads the recent Extractions and writes the doc when it changed.
+// A failure here is logged and swallowed, never thrown into the sync or edit that caused it; the
+// nightly pass rebuilds it too.
 
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
-import { loadRules, withId } from './corpTaxBookMinerTotalsStore.js';
-import type { BookRecords } from './corpTaxBookMinerTotals.js';
+import { EXTRACTIONS } from './corpTaxBook.js';
+import { extractionsSinceOf } from './corpTaxBookQuietRun.js';
 import {
-  MINER_LIST_DOC,
   OVERVIEW_DOC,
   READ_MODELS,
   buildReadModels,
@@ -22,8 +20,8 @@ const sub = (db: Firestore, corporationId: number, name: string) =>
   db.collection('corps').doc(String(corporationId)).collection(name);
 
 /**
- * Rebuilds both docs from the book's frozen records and writes the ones that differ. With
- * `repair: false` it only reports. Reads the small collections whole: no ledger rows.
+ * Rebuilds the doc and writes it when it differs; with `repair: false` it only reports. Reads
+ * only the book doc, the Extractions recent enough to be listed, and the docs held.
  */
 export async function reconcileReadModels(
   db: Firestore,
@@ -31,23 +29,24 @@ export async function reconcileReadModels(
   now: number,
   options: { repair: boolean } = { repair: true }
 ): Promise<ReadModelsPlan> {
-  const [rules, statements, payments, writeOffs, miners, held] = await Promise.all([
-    loadRules(db, corporationId),
-    sub(db, corporationId, 'statements').get(),
-    sub(db, corporationId, 'payments').get(),
-    sub(db, corporationId, 'writeOffs').get(),
-    sub(db, corporationId, 'miners').get(),
+  const ref = db.collection('corps').doc(String(corporationId));
+  const [bookDoc, extractions, held] = await Promise.all([
+    ref.get(),
+    // The Overview lists a pull until a day past its expiry: an older chunk is never listed.
+    sub(db, corporationId, EXTRACTIONS)
+      .where('chunkArrivalTime', '>=', extractionsSinceOf(now))
+      .get(),
     sub(db, corporationId, READ_MODELS).get(),
   ]);
-  const records: BookRecords = {
-    ...rules,
-    statements: statements.docs.map(withId),
-    payments: payments.docs.map(withId),
-    writeOffs: writeOffs.docs.map(withId),
-    miners: miners.docs.map(withId),
-  };
   const plan = planReadModels(
-    buildReadModels(records, now),
+    buildReadModels(
+      {
+        expiryHours:
+          (bookDoc.data()?.structureExpiryHours as Record<string, number> | undefined) ?? {},
+        extractions: extractions.docs.map((d) => d.data()),
+      },
+      now
+    ),
     new Map(held.docs.map((d) => [d.id, d.data() as Data]))
   );
   if (options.repair && plan.writes.length > 0) {
@@ -62,17 +61,16 @@ export async function reconcileReadModels(
   return plan;
 }
 
-/** Removes both docs so a client falls back to the whole-book view instead of trusting stale ones. */
+/** Removes the doc so a client falls back to the Extractions instead of trusting a stale one. */
 export async function invalidateReadModels(db: Firestore, corporationId: number): Promise<void> {
   const batch = db.batch();
-  for (const id of [MINER_LIST_DOC, OVERVIEW_DOC])
-    batch.delete(sub(db, corporationId, READ_MODELS).doc(id));
+  batch.delete(sub(db, corporationId, READ_MODELS).doc(OVERVIEW_DOC));
   await batch.commit();
 }
 
 /**
- * Brings the docs in line after rows or an edit moved them. Best effort, but a rebuild that
- * fails (a doc past 1 MiB, say) deletes the docs: a missing doc is a fallback, a stale one is wrong.
+ * Brings the doc in line after an Extraction or an edit moved it. Best effort, but a rebuild that
+ * fails (a doc past 1 MiB, say) deletes the doc: a missing doc is a fallback, a stale one is wrong.
  */
 export async function refreshReadModels(
   db: Firestore,

@@ -3,11 +3,12 @@ import { useTimeZone } from '@/lib/timeFormat';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { DataTable, EmptyState, Panel, type DataTableColumn } from '@/components/ui';
+import { newest } from '@/engine/corpTaxBook/bookView';
 import { useBook } from './useBook';
 import { caretColumn } from './caretColumn';
 import { minerPath } from './moonsPaths';
 import { atDate, isk } from './moonsFormat';
-import { StatementRun } from './StatementRun';
+import { LateNoticeRun } from './LateNoticeRun';
 import { useCards } from './sectionHelpers';
 
 interface NoticeRow {
@@ -27,28 +28,28 @@ export function LateNoticesTab() {
   const navigate = useNavigate();
   const [tableRef, cards] = useCards();
 
-  const rows = useMemo(() => {
-    const byMiner = new Map<string, NoticeRow>();
-    const minerById = new Map(view.miners.map((m) => [m.id, m]));
-    for (const s of view.input.statements) {
-      if (s.kind !== 'notice') continue;
-      const miner = minerById.get(s.minerId);
-      if (!miner) continue;
-      const row = byMiner.get(s.minerId) ?? {
-        minerId: s.minerId,
-        name: names.character(miner.mainCharacterId),
-        sent: 0,
-        unmailed: 0,
-        lastIssuedAt: s.issuedAt,
-        owed: miner.owed,
-      };
-      row.sent += 1;
-      if (!s.mailsSent) row.unmailed += 1;
-      if (s.issuedAt > row.lastIssuedAt) row.lastIssuedAt = s.issuedAt;
-      byMiner.set(s.minerId, row);
-    }
-    return [...byMiner.values()].sort((a, b) => b.lastIssuedAt.localeCompare(a.lastIssuedAt));
-  }, [view, names]);
+  // Each Miner's settlement holds its late notices already, oldest first.
+  const rows = useMemo(
+    () =>
+      view.miners
+        .flatMap((miner): NoticeRow[] => {
+          const notices = view.internals.byMiner.get(miner.id)?.notices ?? [];
+          const last = newest(notices);
+          if (!last) return [];
+          return [
+            {
+              minerId: miner.id,
+              name: names.character(miner.mainCharacterId),
+              sent: notices.length,
+              unmailed: notices.filter((n) => n.mail.sent === 0).length,
+              lastIssuedAt: last.issuedAt,
+              owed: miner.owed,
+            },
+          ];
+        })
+        .sort((a, b) => b.lastIssuedAt.localeCompare(a.lastIssuedAt)),
+    [view, names]
+  );
 
   const columns: DataTableColumn<NoticeRow>[] = [
     {
@@ -95,7 +96,7 @@ export function LateNoticesTab() {
 
   return (
     <div className="space-y-4">
-      <StatementRun />
+      <LateNoticeRun />
       <Panel title={t('corpTaxBook.moons.notices.title')} padded={false}>
         {rows.length === 0 ? (
           <EmptyState
