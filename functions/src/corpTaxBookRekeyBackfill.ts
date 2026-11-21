@@ -9,6 +9,7 @@ import {
   type RekeyWrite,
 } from './corpTaxBookRekey.js';
 import { DISPUTES, MINERS } from './corpTaxBook.js';
+import { soloCharacterId } from './corpTaxBookDonationMatch.js';
 import { invalidateReadModels } from './corpTaxBookReadModelsStore.js';
 
 const sub = (db: Firestore, corporationId: number, name: string) =>
@@ -63,7 +64,8 @@ export async function planRekeyBackfill(
   for (const collection of [...MINER_KEYED, DISPUTES])
     for (const d of (await sub(db, corporationId, collection).select('minerId').get()).docs) {
       const id = d.get('minerId');
-      if (typeof id === 'string' && !known.has(id) && !id.startsWith('solo:')) named.add(id);
+      if (typeof id === 'string' && !known.has(id) && soloCharacterId(id) === undefined)
+        named.add(id);
     }
   return { corporationId, writes, unresolved: [...named] };
 }

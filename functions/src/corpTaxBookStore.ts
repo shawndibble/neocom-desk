@@ -1088,8 +1088,8 @@ async function mustGet(c: EditCtx, ref: DocumentReference, what: string): Promis
 
 function minerCharacters(minerId: string, miner: Data | undefined): number[] {
   if (miner) return miner.characterIds as number[];
-  const solo = /^solo:(\d+)$/.exec(minerId);
-  return solo ? [Number(solo[1])] : [];
+  const solo = soloCharacterId(minerId);
+  return solo === undefined ? [] : [solo];
 }
 
 /** The characters that may read a Miner: an Officer claim and a legacy unconfirmed guest may not. */
@@ -1165,11 +1165,9 @@ async function knownMiner(c: EditCtx, minerId: string): Promise<boolean> {
     col(c, ACCOUNTS).doc(minerId)
   );
   if (miner.exists || account.exists) return true;
-  const solo = /^solo:(\d+)$/.exec(minerId);
-  if (!solo) return false;
-  const rows = await c.tx.get(
-    col(c, OBSERVED).where('characterId', '==', Number(solo[1])).select().limit(1)
-  );
+  const solo = soloCharacterId(minerId);
+  if (solo === undefined) return false;
+  const rows = await c.tx.get(col(c, OBSERVED).where('characterId', '==', solo).select().limit(1));
   return !rows.empty;
 }
 
@@ -3096,7 +3094,7 @@ export async function confirmGrouping(
       corporationId,
       minerId,
       [...new Set([...((miner.uids as string[] | undefined) ?? []), caller.uid])],
-      [`solo:${characterId}`]
+      [soloMinerId(characterId)]
     );
     tx.update(ref, {
       pendingConfirmation: (miner.pendingConfirmation as number[]).filter((x) => x !== characterId),
@@ -3433,7 +3431,7 @@ async function callerMiner(
   const miner = grouped.docs.find((d) => (d.get('uids') as string[]).includes(caller.uid));
   return miner
     ? { minerId: miner.id, uids: miner.get('uids') as string[] }
-    : { minerId: `solo:${characterId}`, uids: [caller.uid] };
+    : { minerId: soloMinerId(characterId), uids: [caller.uid] };
 }
 
 /**
