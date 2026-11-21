@@ -12,6 +12,11 @@ const NUMERAL_PAIRS: ReadonlyMap<string, string> = new Map(
   ])
 );
 
+/** Lowercase with apostrophes and quote marks dropped, so "'Augmented' Wasp" is found by "augmented wasp". */
+export function searchKey(text: string): string {
+  return text.toLowerCase().replace(/['"\u2018\u2019\u201C\u201D]/g, '');
+}
+
 /** Lowercased name split into words on anything that is not a letter or digit. */
 export function wordsOf(lower: string): string[] {
   return lower.split(/[^\p{L}\p{N}]+/u).filter(Boolean);

@@ -4,6 +4,7 @@
  * corner, bonus grouping, search, and the Ship Info window's Mastery and
  * Blueprint read-outs. Pure — no React, no fetch.
  */
+import { searchKey } from '@/lib/tokenSearch';
 import {
   CALDARI_FACTION_ID,
   PIRATE_FACTION_IDS,
@@ -243,10 +244,10 @@ export function traitGroups(traits: readonly ShipTreeTrait[]): TraitGroup[] {
 
 /** Hulls whose name contains `query`, earliest match first; none for a blank query. */
 export function searchHulls(ships: readonly ShipTreeShip[], query: string): ShipTreeShip[] {
-  const q = query.trim().toLowerCase();
+  const q = searchKey(query.trim());
   if (!q) return [];
   return ships
-    .map((ship) => ({ ship, at: ship.name.toLowerCase().indexOf(q) }))
+    .map((ship) => ({ ship, at: searchKey(ship.name).indexOf(q) }))
     .filter((hit) => hit.at >= 0)
     .sort((a, b) => a.at - b.at || a.ship.name.localeCompare(b.ship.name))
     .map((hit) => hit.ship);
