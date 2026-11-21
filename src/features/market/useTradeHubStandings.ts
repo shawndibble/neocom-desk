@@ -42,6 +42,8 @@ async function resolveHubStandings(
  */
 function withHubFeeModifiers(hub: TradeHub, standing: ResolvedStandings): ResolvedStandings {
   const feeDiscountFactor = hubFeeDiscountFactor(hub, Date.now());
+  // Unchanged when no modifier applies, so a hub without one keeps the shared `ZERO_STANDINGS` reference.
+  if (hub.safetyTaxPct <= 0 && feeDiscountFactor === 1) return standing;
   return {
     ...standing,
     ...(hub.safetyTaxPct > 0 ? { safetyTaxPct: hub.safetyTaxPct } : {}),
