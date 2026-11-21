@@ -88,7 +88,9 @@ export const test = base.extend<BookFixtures>({
     async ({ page }, use) => {
       const overrides: EsiOverride[] = [];
       await page.route('https://esi.evetech.net/**', async (route) => {
-        const path = new URL(route.request().url()).pathname.replace(/^\/latest/, '');
+        const path = new URL(route.request().url()).pathname
+          .replace(/^\/latest/, '')
+          .replace(/\/$/, '');
         for (const answer of [...overrides, defaultCorpEsi]) {
           const body = answer(path, route);
           if (body !== undefined) {

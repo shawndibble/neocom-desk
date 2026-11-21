@@ -203,3 +203,56 @@ export function officerBook() {
     fen: { owed: 2 * DAY_TAX, donation: DAY_TAX },
   };
 }
+
+/**
+ * Late notices from plan to verify link.
+ *
+ * - Cora mined eleven days, the oldest twenty days ago, and has had no notice: she is behind by
+ *   the default rules (oldest unpaid 14+ days, 10,000,000+ owed), so the run plans one for her.
+ * - Ada has a notice in `lateNotices` (its verify link in `lateNoticeLinks`).
+ * - Bram has only a legacy notice, its link only in `statementLinks`: an old mailed link.
+ * - Gale is a guest whose notice listed his first two days; two more days were never listed, so
+ *   closing his account leaves a final notice to send.
+ */
+export function lateNoticeBook() {
+  const tokens = {
+    ada: verifyToken('ada-current'),
+    bram: verifyToken('bram-old-style'),
+    guest: verifyToken('guest'),
+  };
+  const coraDays = [20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10];
+  const seed = new BookSeed({ startBack: 40 })
+    .mine(MINER.cora.id, coraDays)
+    .mine(MINER.ada.id, [9, 8, 7])
+    .lateNotice({
+      id: 'ln-ada',
+      characterId: MINER.ada.id,
+      days: [9, 8, 7],
+      issuedBack: 3,
+      token: tokens.ada,
+    })
+    .mine(MINER.bram.id, [12, 11])
+    .legacyNotice({
+      id: 'st-bram',
+      characterId: MINER.bram.id,
+      days: [12, 11],
+      issuedBack: 5,
+      token: tokens.bram,
+    })
+    .mine(MINER.guest.id, [9, 8, 4, 3])
+    .lateNotice({
+      id: 'ln-guest',
+      characterId: MINER.guest.id,
+      days: [9, 8],
+      issuedBack: 6,
+      token: tokens.guest,
+    });
+  return {
+    seed,
+    tokens,
+    cora: { owed: coraDays.length * DAY_TAX, days: coraDays.length, oldestBack: 20 },
+    ada: { owed: 3 * DAY_TAX },
+    bram: { owed: 2 * DAY_TAX },
+    guest: { unlisted: 2 * DAY_TAX, unlistedFromBack: 4, unlistedThroughBack: 3 },
+  };
+}
