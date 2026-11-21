@@ -202,10 +202,7 @@ for (const r of MINERS.flatMap((m) => m.rows)) {
 
 // --- One issued Late notice per Miner that has billed days; verify link for the member
 // Layout of issueLateNoticeDocs (functions/src/corpTaxBookLateNoticeStore.ts): the `lateNotices`
-// doc, its `lateNoticeLinks` token, the verify token, and the legacy mirror older clients read.
-// The legacy wire names live here only: `LEGACY_NOTICES`, its links, and the token's id field.
-const LEGACY_NOTICES = 'statements';
-const LEGACY_NOTICE_LINKS = 'statementLinks';
+// doc, its `lateNoticeLinks` token, and the verify token (whose id field keeps its legacy wire name).
 const NOTICE_ID_FIELD = 'statementId';
 /** `paymentCode` (functions/src/corpTaxBookLateNotice.ts): a stable Reason code for a seed. */
 const paymentCode = (seed) => {
@@ -215,29 +212,6 @@ const paymentCode = (seed) => {
 };
 /** The code a Miner puts on a donation: one per Miner (`minerPaymentCode`). */
 const minerPaymentCode = (minerId) => paymentCode(`miner:${minerId}`);
-/** `legacyStatementDocOf`: the mirror an older client reads. */
-const legacyNoticeDoc = (n) => ({
-  id: n.id,
-  minerId: n.minerId,
-  kind: 'notice',
-  code: n.code,
-  periodStart: n.lines[0].date,
-  periodEnd: n.lines.at(-1).date,
-  coversFrom: n.lines[0].date,
-  coversThrough: n.lines.at(-1).date,
-  issuedAt: n.issuedAt,
-  issuedBy: n.issuedBy,
-  hubId: n.pricing.hubId,
-  oreForm: n.pricing.oreForm,
-  lines: n.lines.map(({ key, ...line }) => ({ ...line, chargeKey: key })),
-  amount: n.listed,
-  characterIds: n.characterIds,
-  uids: n.uids,
-  mailsSent: n.mail.sent,
-  manualRemindersSent: n.mail.manualSent,
-  remindersStopped: n.mail.remindersStopped,
-  ...n.names,
-});
 const noticeOf = new Map(); // character id -> { noticeId, minerId, amount }
 let token = '';
 for (const m of MINERS) {
@@ -288,11 +262,9 @@ for (const m of MINERS) {
     },
   };
   put(sub('lateNotices').doc(noticeId), notice);
-  put(sub(LEGACY_NOTICES).doc(noticeId), legacyNoticeDoc(notice));
   const verifyToken = randomBytes(32).toString('base64url');
   if (m.id === MEMBER) token = verifyToken;
   put(sub('lateNoticeLinks').doc(noticeId), { token: verifyToken });
-  put(sub(LEGACY_NOTICE_LINKS).doc(noticeId), { verifyToken });
   put(db.collection('corpTaxBookTokens').doc(verifyToken), {
     corporationId: CORP,
     [NOTICE_ID_FIELD]: noticeId,
