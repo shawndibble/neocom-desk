@@ -1,160 +1,86 @@
 import { describe, expect, it } from 'vitest';
-import { READ_MODELS_SCHEMA, buildReadModels, movesReadModels } from './corpTaxBookReadModels.js';
+import {
+  MINER_LIST_DOC,
+  OVERVIEW_DOC,
+  READ_MODELS_SCHEMA,
+  buildReadModels,
+  movesReadModels,
+  planReadModels,
+} from './corpTaxBookReadModels.js';
 
 const NOW = Date.parse('2026-11-20T12:00:00Z');
-const notice = (
-  id: string,
-  minerId: string,
-  dates: string[],
-  issuedAt = '2026-11-10T00:00:00Z'
-) => ({
+const pull = (id: string, naturalDecayTime: string, extra: Record<string, unknown> = {}) => ({
   id,
-  minerId,
-  issuedAt,
-  lines: dates.map((date) => ({ date, tax: 100 })),
+  structureId: 1000,
+  naturalDecayTime,
+  ...extra,
 });
 
-describe('buildReadModels on Running accounts', () => {
-  const inputs = {
-    startDate: '2026-10-01',
-    expiryHours: {},
-    extractions: [],
-    accounts: [
+describe('buildReadModels: the Overview’s Extractions, nothing else', () => {
+  it('lists the pulls not cancelled and expired no more than a day ago', () => {
+    const live = pull('live', '2026-11-19T00:00:00Z');
+    const models = buildReadModels(
       {
-        id: 'g1',
-        owed: 300,
-        paid: 1000,
-        days: 2,
-        oldest: '2026-11-01',
-        unpaidDays: [
-          { date: '2026-11-01', owed: 100, tax: 100 },
-          { date: '2026-11-02', owed: 200, tax: 200 },
+        expiryHours: {},
+        extractions: [
+          live,
+          pull('gone', '2026-11-10T00:00:00Z'),
+          pull('cancelled', '2026-11-19T00:00:00Z', { cancelledAt: '2026-11-18T00:00:00Z' }),
         ],
-        at: '2026-11-15T00:00:00Z',
       },
-      { id: 'solo:5', owed: 0, paid: 0, days: 0, at: '2026-11-15T00:00:00Z' },
-    ],
-    payments: [
-      { id: 'p1', minerId: 'g1', source: 'donation', amount: 1000, at: '2026-11-05T00:00:00Z' },
-      { id: 'p2', minerId: 'g1', source: 'donation', amount: 150, at: '2026-11-16T00:00:00Z' },
-      { id: 'p3', minerId: 'solo:5', source: 'manual', amount: 40, at: '2026-11-17T00:00:00Z' },
-      { id: 'p4', source: 'donation', amount: 9, at: '2026-11-17T00:00:00Z' },
-    ],
-    notices: [
-      notice('n-old', 'g1', ['2026-10-20']),
-      notice('n-open', 'g1', ['2026-11-01', '2026-11-02'], '2026-11-12T00:00:00Z'),
-    ],
-    declarations: [
-      { id: 'x1', statementId: 'n-open', kind: 'contract', at: '2026-11-13T00:00:00Z' },
-      { id: 'x2', statementId: 'n-old', kind: 'contract', resolution: { kind: 'confirmed' } },
-    ],
-  };
-
-  it('reads each Miner’s owed off the account an officer’s tab recorded, less what they paid since', () => {
-    const { minerList } = buildReadModels(inputs, NOW);
-    expect(minerList.schema).toBe(READ_MODELS_SCHEMA);
+      NOW
+    );
+    expect(models).toEqual({ [OVERVIEW_DOC]: { schema: READ_MODELS_SCHEMA, extractions: [live] } });
     expect(READ_MODELS_SCHEMA).toBe(2);
-    const g1 = minerList.miners.find((m) => m.minerId === 'g1')!;
-    // 150 paid since the record: the oldest day (100) and half of the next.
-    expect(g1).toMatchObject({
-      owed: 150,
-      credit: 0,
-      lastPaidAt: '2026-11-16T00:00:00Z',
-      asOf: '2026-11-15T00:00:00Z',
-    });
-    // Money paid beyond what the record said was owed is credit.
-    expect(minerList.miners.find((m) => m.minerId === 'solo:5')).toMatchObject({
-      owed: 0,
-      credit: 40,
-      lastPaidAt: '2026-11-17T00:00:00Z',
-    });
   });
 
-  it('lists a Miner’s Late notices still unsettled, each with its declarations', () => {
-    const g1 = buildReadModels(inputs, NOW).minerList.miners.find((m) => m.minerId === 'g1')!;
-    // Every day n-old listed is paid; n-open still lists an unpaid day.
-    expect(g1.unsettled).toEqual([
-      {
-        id: 'n-open',
-        issuedAt: '2026-11-12T00:00:00Z',
-        declarations: [inputs.declarations[0]],
-      },
-    ]);
-    expect(g1.unresolvedDeclarations).toEqual([inputs.declarations[0]]);
-  });
-
-  it('adds the credit the tab recorded to what was paid beyond the record', () => {
-    const { minerList } = buildReadModels(
-      { ...inputs, accounts: [{ ...inputs.accounts[1], credit: 10 }] },
-      NOW
-    );
-    expect(minerList.miners.find((m) => m.minerId === 'solo:5')?.credit).toBe(50);
-  });
-
-  it('flags an entry whose record is old, missing, or older than a notice it judges', () => {
-    const fresh = Date.parse('2026-11-15T12:00:00Z');
-    const of = (id: string, at = fresh) =>
-      buildReadModels(inputs, at).minerList.miners.find((m) => m.minerId === id)!;
-    expect(of('g1').stale).toBe(false);
-    expect(of('g1', NOW).stale).toBe(true);
-    const late = buildReadModels(
-      {
-        ...inputs,
-        notices: [...inputs.notices, notice('n-new', 'g1', ['2026-11-02'], '2026-11-16T00:00:00Z')],
-      },
-      fresh
-    ).minerList.miners.find((m) => m.minerId === 'g1')!;
-    expect(late.stale).toBe(true);
-    const edited = (edits: { minerId?: string; at: string }[]) =>
-      buildReadModels({ ...inputs, edits }, fresh).minerList.miners.find((m) => m.minerId === 'g1')!
-        .stale;
-    expect(edited([{ minerId: 'g1', at: '2026-11-15T06:00:00Z' }])).toBe(true);
-    expect(edited([{ at: '2026-11-15T06:00:00Z' }])).toBe(true);
-    expect(edited([{ minerId: 'solo:5', at: '2026-11-15T06:00:00Z' }])).toBe(false);
-    expect(edited([{ minerId: 'g1', at: '2026-11-14T00:00:00Z' }])).toBe(false);
-    const none = buildReadModels({ ...inputs, accounts: [] }, fresh).minerList.miners;
-    expect(none.find((m) => m.minerId === 'g1')).toMatchObject({ asOf: null, stale: true });
-  });
-
-  it('counts a listed day the record does not cover as unknown, never as paid', () => {
-    // Recorded on 15 Nov: a notice day after it is not the record's to call paid.
-    const g1 = buildReadModels(
-      { ...inputs, notices: [notice('n-after', 'g1', ['2026-11-17'])] },
-      NOW
-    ).minerList.miners.find((m) => m.minerId === 'g1')!;
-    expect(g1.unsettled.map((u) => u.id)).toEqual(['n-after']);
-  });
-
-  it('counts a notice of a Miner with no recorded account as unsettled', () => {
-    const { minerList } = buildReadModels(
-      { ...inputs, accounts: [], notices: [notice('n1', 'solo:9', ['2026-11-01'])] },
-      NOW
-    );
+  it('keeps a pull its refinery’s own expiry still holds', () => {
+    // Fractured on 17 Nov: the default 48 hours ran out on the 19th, a 72-hour expiry holds it.
+    const late = pull('late', '2026-11-17T00:00:00Z');
     expect(
-      minerList.miners.find((m) => m.minerId === 'solo:9')?.unsettled.map((u) => u.id)
-    ).toEqual(['n1']);
+      buildReadModels({ expiryHours: {}, extractions: [late] }, NOW).overview.extractions
+    ).toEqual([]);
+    expect(
+      buildReadModels({ expiryHours: { 1000: 72 }, extractions: [late] }, NOW).overview.extractions
+    ).toEqual([late]);
+  });
+});
+
+describe('planReadModels', () => {
+  const fresh = buildReadModels({ expiryHours: {}, extractions: [] }, NOW);
+
+  it('writes a missing or changed Overview, and leaves a current one', () => {
+    expect(planReadModels(fresh, new Map()).writes).toEqual([
+      { id: OVERVIEW_DOC, data: { schema: READ_MODELS_SCHEMA, extractions: [] } },
+    ]);
+    const held = new Map([[OVERVIEW_DOC, { schema: READ_MODELS_SCHEMA, extractions: [] }]]);
+    expect(planReadModels(fresh, held)).toEqual({ writes: [], deletes: [], mismatches: [] });
   });
 
-  it('keeps the overview’s unmatched payments', () => {
-    expect(buildReadModels(inputs, NOW).overview.unmatchedPayments).toEqual([inputs.payments[3]]);
+  it('deletes the retired Miners list doc', () => {
+    const held = new Map([
+      [OVERVIEW_DOC, { schema: READ_MODELS_SCHEMA, extractions: [] }],
+      [MINER_LIST_DOC, { schema: READ_MODELS_SCHEMA, miners: [] }],
+    ]);
+    expect(planReadModels(fresh, held)).toEqual({
+      writes: [],
+      deletes: [MINER_LIST_DOC],
+      mismatches: [{ id: MINER_LIST_DOC, kind: 'retired' }],
+    });
   });
 });
 
 describe('movesReadModels', () => {
-  it('rebuilds after what the docs are built from changes, and not otherwise', () => {
-    for (const action of [
-      'recordAccounts',
-      'issueLateNotice',
-      'declare',
-      'assignPayment',
-      'regroupMiner',
-    ])
+  it('rebuilds after an edit that moves an Extraction or its expiry, and not otherwise', () => {
+    for (const action of ['linkSurvey', 'setFullyMined'])
       expect(movesReadModels({ action })).toBe(true);
-    expect(movesReadModels({ action: 'updateSettings', patch: { startDate: '2026-10-01' } })).toBe(
-      true
-    );
-    expect(movesReadModels({ action: 'updateSettings', patch: { hubId: 'jita' } })).toBe(false);
-    for (const action of ['recordLateNoticeMail', 'recordCheckpoints', 'addRate'])
+    expect(
+      movesReadModels({ action: 'updateSettings', patch: { structureExpiryHours: { 1: 48 } } })
+    ).toBe(true);
+    for (const action of ['recordAccounts', 'issueLateNotice', 'assignPayment', 'regroupMiner'])
       expect(movesReadModels({ action })).toBe(false);
+    expect(movesReadModels({ action: 'updateSettings', patch: { startDate: '2026-10-01' } })).toBe(
+      false
+    );
   });
 });

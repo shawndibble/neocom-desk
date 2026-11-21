@@ -918,9 +918,8 @@ export async function syncBookAs(
     );
   // Rows or a chunk make-up moved these pulls (ADR 0032). Best effort.
   await refreshMoonDocs(deps.db, input.corporationId, touchedPulls);
-  // Only donations and Extractions are in the Overview and Miners tab docs (ADR 0032); rows are not. Best effort.
-  // A quiet run wrote none of either: the docs stand.
-  if (!quiet && (donationsAdded > 0 || input.extractions.length > 0))
+  // Only Extractions are in the Overview doc (ADR 0032). Best effort. A quiet run wrote none.
+  if (!quiet && input.extractions.length > 0)
     await refreshReadModels(deps.db, input.corporationId, deps.now());
   // A sync that changed something republishes the book's Shared Pops (#6223). Best effort. A
   // quiet one has nothing new to publish (a viewer's read drops an expired pop by itself), except
@@ -3028,7 +3027,7 @@ export async function editBookAs(
   });
   // A survey link, an expiry or a regroup changes a pull's doc (ADR 0032). Best effort.
   await refreshMoonDocsAfterEdit(deps.db, call.corporationId, action);
-  // Edits that move the Overview and Miners tab docs (ADR 0032). Best effort.
+  // Edits that move the Overview doc (ADR 0032). Best effort.
   if (movesReadModels(action)) await refreshReadModels(deps.db, call.corporationId, deps.now());
   // A changed expiry moves which days a pull covers, so its rows' stamps (ADR 0032). Best effort.
   if (action.action === 'updateSettings' && action.patch.structureExpiryHours) {
@@ -3107,7 +3106,6 @@ export async function confirmGrouping(
     });
     appendAudit(tx, deps, corporationId, { characterId, name: '' }, 'confirmGrouping', { minerId });
   });
-  await refreshReadModels(deps.db, corporationId, deps.now());
 }
 
 /** Declines a pending grouping inside a transaction; shared by the two ways to decline. */
@@ -3143,7 +3141,6 @@ async function declinePending(
     });
     appendAudit(tx, deps, corporationId, actor, 'declineGrouping', { minerId, characterId });
   });
-  await refreshReadModels(deps.db, corporationId, deps.now());
 }
 
 /** The added character itself declines, signed in as itself. */
@@ -3196,7 +3193,6 @@ export async function declineLink(
       link: true,
     });
   });
-  await refreshReadModels(deps.db, corporationId, deps.now());
   return { declined: true as const };
 }
 
@@ -3346,18 +3342,6 @@ export async function claimPayment(
   corporationId: number,
   paymentId: string,
   options: { inReview?: boolean } = {}
-) {
-  const claimed = await claimPaymentTx(deps, caller, corporationId, paymentId, options);
-  await refreshReadModels(deps.db, corporationId, deps.now());
-  return claimed;
-}
-
-async function claimPaymentTx(
-  deps: BookDeps,
-  caller: Caller,
-  corporationId: number,
-  paymentId: string,
-  options: { inReview?: boolean }
 ) {
   const characterId = signedInCharacter(caller);
   const paymentRef = sub(deps.db, corporationId, PAYMENTS).doc(paymentId);
@@ -3543,7 +3527,6 @@ export async function declareOwnPayment(deps: BookDeps, caller: Caller, input: D
     );
     return { declarationId: id, minerId, checks, confirmed: allFound };
   });
-  await refreshReadModels(deps.db, corporationId, deps.now());
   return {
     declarationId: declared.declarationId,
     checks: declared.checks,
