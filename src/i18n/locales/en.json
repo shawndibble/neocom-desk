@@ -11321,6 +11321,14 @@
       "cueLabel": "Buyback contract"
     }
   },
+  "pageHubs": {
+    "global": "Global",
+    "scopeLabel": "Hub used here",
+    "hubLabel": "Trade Hub",
+    "area": {
+      "contracts": "Contracts"
+    }
+  },
   "contractDetail": {
     "regionLabel": "Region",
     "showMoreItems_one": "Show {{count}} more item",
@@ -14934,7 +14942,7 @@
           "settings": "These preferences. Every other preference stays on this device:",
           "settingsDetail": {
             "notifications": "Notifications: your notification preferences.",
-            "defaults": "Defaults: trade hub (the default, and the trade hub of each character), industry facility, reaction facility, assumed ME/TE, PI expiring-soon window, corp dark threshold, default characters shown.",
+            "defaults": "Defaults: trade hub (the default, the trade hub of each character, and the trade hub of each page you set one for), industry facility, reaction facility, assumed ME/TE, PI expiring-soon window, corp dark threshold, default characters shown.",
             "industry": "Industry: build groups and BPC Sourcing's hide auctions / hide PLEX.",
             "market": "Market: appraisal price %, ISK-per-LP value, courier collateral warning, item contract flag multiple, and the structure broker fees you typed.",
             "skills": "Skills: Alpha/Omega per character, the target skill plan, SP Extraction monitoring and its threshold, and which characters you marked as SP Farm. Clones: the names you gave your jump clones.",
@@ -15446,6 +15454,14 @@
     "tradeHubHidePerCharacter": "Hide per character",
     "tradeHubFor": "Trade Hub for {{name}}",
     "tradeHubApplyAll": "Apply default to all",
+    "pageHubsLabel": "Page hubs",
+    "pageHubsNote": "Pages that price at their own Trade Hub instead of the default. A page's hub menu can switch it here too.",
+    "pageHubFor": "Trade Hub for {{page}}",
+    "pageHubAdd": "Add page hub",
+    "pageHubRemove": "Remove",
+    "pageHubRemoveFor": "Remove {{page}} hub",
+    "pageHubRemoved": "{{page}} uses the default hub again",
+    "pageHubUndo": "Undo",
     "courierCollateralLabel": "Flag courier collateral at",
     "courierCollateralHint": "Shows a High collateral warning when a courier contract's collateral is this many times its reward or more.",
     "courierCollateralOption": "{{count}}× reward",
@@ -20524,6 +20540,7 @@
       "absenceNote": "Small dim text at a row's right edge: the row's item has none of something here; the row is not dimmed and stays clickable",
       "figureHistory": "Small dim glyph after a figure: click or tap for its history in a popover",
       "figureBreakdown": "Dashed underline on a figure: click or tap opens how it is worked out",
+      "hubMenu": "Hub in a readout, accent with a dashed underline: opens Global · <page> and the hub list",
       "infoTooltip": "? circle: explains a term (InfoTooltip)",
       "chartPoint": "Highlighted column or dot on a chart: hover or tap reads that point (ChartHover)",
       "addPreview": "Readout under the Add panel list: hover or keyboard-focus a module row to see what adding it changes (never on touch)",
@@ -20597,6 +20614,8 @@
       "hintContent": "The full name, in a tooltip.",
       "figureHistory": "4.4%",
       "figureBreakdown": "1.6M",
+      "hubMenuTitle": "Is it fair? · ",
+      "hubMenu": "Jita 4-4",
       "communityMark": "Shared in a Community",
       "channelOffLabel": "Device",
       "communityMarkContent": "Shared by Bob in Pals. Last updated 1 Oct 2026.",

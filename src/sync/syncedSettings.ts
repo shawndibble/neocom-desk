@@ -49,6 +49,11 @@
 // builds at my rigged Azbel" is answering for themselves, not for one machine,
 // and had to answer again on every device.
 //
+// sync.pageHubs (issue #6523) is one map of page area -> Trade Hub, the
+// pages a pilot prices somewhere other than their default hub (features/market/
+// pageHubs.ts). Account-wide; an entry is removed by rewriting the map without
+// it, never by deleting the key, so the tombstone edge does not bite it either.
+//
 // One key each, unlike the two blobs above: the set of defaults is fixed and
 // small, so an exact-match entry per preference is expressible — and each key
 // merges on its own, so changing the hub on a laptop cannot roll back an ME
@@ -367,6 +372,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.loyaltyLpValue',
   'sync.marketHub',
   'sync.marketHubByCharacter',
+  'sync.pageHubs',
   'sync.marketPricePercent',
   'sync.miningTaxDefaultOptOuts',
   'sync.miningTaxManualIgnoredTypeIds',

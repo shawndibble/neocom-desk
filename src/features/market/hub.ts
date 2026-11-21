@@ -29,10 +29,12 @@
  */
 import { create } from 'zustand';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
+import { useHydratedStore } from '@/lib/useHydratedStore';
 import type { SettingState } from '@/lib/settingStore';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { resolveTradeHub, setCharacterHub, useHubByCharacter } from './characterHubs';
+import { dropPageHub, resolvePageHub, setPageHub, usePageHubs, type PageHubArea } from './pageHubs';
 
 export const MARKET_HUB_SETTING_KEY = 'sync.marketHub';
 
@@ -53,17 +55,25 @@ export const useDefaultMarketHub = createSyncedSetting<TradeHub['id']>({
   parse: parseMarketHub,
 });
 
-/** The hub `characterId` trades at (the account default when none), read from Dexie-backed stores. */
-export async function tradeHubIdFor(characterId: number | null): Promise<TradeHub['id']> {
+/**
+ * The hub `characterId` trades at (the account default when none), read from
+ * Dexie-backed stores; with `area`, that page's own hub when it has one.
+ */
+export async function tradeHubIdFor(
+  characterId: number | null,
+  area?: PageHubArea
+): Promise<TradeHub['id']> {
   await Promise.all([
     useDefaultMarketHub.getState().hydrate(),
     useHubByCharacter.getState().hydrate(),
+    area ? usePageHubs.getState().hydrate() : undefined,
   ]);
-  return resolveTradeHub(
+  const global = resolveTradeHub(
     useHubByCharacter.getState().value,
     characterId,
     useDefaultMarketHub.getState().value
   );
+  return area ? resolvePageHub(usePageHubs.getState().value, area, global) : global;
 }
 
 function inForce(): Pick<SettingState<TradeHub['id']>, 'value' | 'hydrated'> {
@@ -110,4 +120,42 @@ export const useMarketHub = create<SettingState<TradeHub['id']>>((set, get) => (
 
 for (const source of [useDefaultMarketHub, useHubByCharacter, useActiveCharacter]) {
   source.subscribe(() => useMarketHub.setState(inForce()));
+}
+
+/** Where a page's hub comes from: the Global hub, or the page's own entry. */
+export type HubScope = 'global' | 'page';
+
+/** The hub `area` prices at and where it comes from, re-rendering when either store changes. */
+export function useHubFor(area: PageHubArea): {
+  hubId: TradeHub['id'];
+  scope: HubScope;
+  hydrated: boolean;
+} {
+  const own = usePageHubs((s) => s.value[area]);
+  const global = useMarketHub((s) => s.value);
+  const hydrated = useHydratedStore(usePageHubs, useMarketHub);
+  return { hubId: own ?? global, scope: own ? 'page' : 'global', hydrated };
+}
+
+/**
+ * A hub picked on `area`'s picker: its own entry when it has one, else the
+ * Global hub, which moves every page without an entry.
+ */
+export async function pickHubFor(area: PageHubArea, hub: TradeHub['id']): Promise<void> {
+  await usePageHubs.getState().hydrate();
+  const map = usePageHubs.getState().value;
+  if (map[area]) return usePageHubs.getState().setValue(setPageHub(map, area, hub));
+  return useMarketHub.getState().setValue(hub);
+}
+
+/**
+ * Switches `area` between Global and its own hub. Its own starts at the hub it
+ * uses now, so nothing re-prices; back to Global drops the entry.
+ */
+export async function setHubScope(area: PageHubArea, scope: HubScope): Promise<void> {
+  await Promise.all([usePageHubs.getState().hydrate(), useMarketHub.getState().hydrate()]);
+  const map = usePageHubs.getState().value;
+  if (scope === 'global') return usePageHubs.getState().setValue(dropPageHub(map, area));
+  if (map[area]) return;
+  return usePageHubs.getState().setValue(setPageHub(map, area, useMarketHub.getState().value));
 }

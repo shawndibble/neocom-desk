@@ -20,24 +20,16 @@
  */
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-  Eyebrow,
-  eyebrowClassName,
-  Spinner,
-  Tooltip,
-} from '@/components/ui';
+import { Eyebrow, eyebrowClassName, Spinner, Tooltip } from '@/components/ui';
 import {
   focusRingClassName,
   interactiveClassName,
   popoverValueClassName,
 } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
-import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
+import { HubMenu } from '@/features/market/HubMenu';
+import type { PageHubArea } from '@/features/market/pageHubs';
+import type { TradeHub } from '@/market/hubs';
 
 // min-h-6: the 24px target floor (DESIGN.md §3) for a text-sized control.
 const flipClassName = `min-h-6 shrink-0 whitespace-nowrap font-semibold text-accent text-left rounded-xs ${interactiveClassName} ${focusRingClassName}`;
@@ -65,7 +57,8 @@ export interface PriceCheckFlip {
 export interface PriceCheckHubMenu {
   /** The hub priced at; its `stationLabel` is the part of the heading that opens the menu. */
   hub: TradeHub;
-  onChange: (hubId: TradeHub['id']) => void;
+  /** The page area whose hub the menu reads and writes (`HubMenu`). */
+  area: PageHubArea;
 }
 
 export function ContractPriceCheck({
@@ -149,27 +142,17 @@ function HeadingWithHubMenu({ heading, menu }: { heading: string; menu: PriceChe
   return (
     <p className="text-[0.6875rem] text-text-dim">
       <span className={eyebrowClassName}>{heading.slice(0, at)}</span>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          // min-h-6: the 24px target floor (DESIGN.md §3), as the flip button beside it.
-          className={cx(popoverValueClassName, 'inline-flex min-h-6 items-baseline touch:min-h-9')}
-          aria-label={t('contractDetail.priceCheckHubMenu', { hub: menu.hub.stationLabel })}
-        >
-          {menu.hub.stationLabel}
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start">
-          <DropdownMenuRadioGroup
-            value={menu.hub.id}
-            onValueChange={(id) => menu.onChange(id as TradeHub['id'])}
-          >
-            {TRADE_HUBS.map((hub) => (
-              <DropdownMenuRadioItem key={hub.id} value={hub.id}>
-                {hub.stationLabel}
-              </DropdownMenuRadioItem>
-            ))}
-          </DropdownMenuRadioGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <HubMenu
+        area={menu.area}
+        // min-h-6: the 24px target floor (DESIGN.md §3), as the flip button beside it.
+        triggerClassName={cx(
+          popoverValueClassName,
+          'inline-flex min-h-6 items-baseline touch:min-h-9'
+        )}
+        triggerLabel={t('contractDetail.priceCheckHubMenu', { hub: menu.hub.stationLabel })}
+      >
+        {menu.hub.stationLabel}
+      </HubMenu>
       {heading.slice(at + menu.hub.stationLabel.length)}
     </p>
   );
