@@ -226,7 +226,7 @@ export async function loadPayeeRunningAccounts(): Promise<PayeeRunningAccounts> 
 }
 
 /** The device's checkpoints, by a merged Payee's primary id. */
-export async function loadPayeeCheckpoints(): Promise<Map<string, StoredPayeeCheckpoint>> {
+async function loadPayeeCheckpoints(): Promise<Map<string, StoredPayeeCheckpoint>> {
   return new Map(
     Object.entries(await readStoredCheckpoints()) as [string, StoredPayeeCheckpoint][]
   );
