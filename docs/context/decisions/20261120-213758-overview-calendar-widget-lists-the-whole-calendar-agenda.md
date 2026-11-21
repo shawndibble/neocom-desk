@@ -15,7 +15,8 @@ _Recorded 2026-11-20._
 - **The widget's filter is never the Calendar page's.** The page's filter is device-local and tidies
   one page. The widget's lives in the synced Overview layout, like every widget setting, and is per
   instance: two Calendar widgets may show different kinds. Hiding a kind on the page must not
-  silently empty a widget, or the other way round.
+  silently empty a widget, or the other way round. Does not reverse 20260907-123312 (the page's
+  filter stays device-local); that decision governs the page's filter only.
 - **The Events choice (accepted and tentative, or all) still narrows calendar events only.** Every
   other kind has no RSVP.
 - **Next deadline still takes calendar events only from this widget, the committed ones.** The other

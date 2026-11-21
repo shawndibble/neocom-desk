@@ -539,6 +539,21 @@ describe('comingUp (the Calendar widget)', () => {
       state: 'needsPermission',
     });
   });
+
+  it('asks no sign-in for a kind the widget hides, and names the corporation behind a clock', () => {
+    const lapsed = board({
+      readableKinds: ['industryJob'],
+      reauthKinds: ['calendarEvent'],
+      industryJobs: [{ ...job(7, 1), corporation: { id: 1, name: 'Tax Corp', ticker: 'TAX' } }],
+    });
+    const view = buildView(
+      'comingUp',
+      { calendar: lapsed },
+      ctx({ hiddenKinds: ['calendarEvent'] })
+    );
+    expect(resolveWidget(view.status)).toMatchObject({ state: 'ok', reauthNote: false });
+    expect(view.table?.rows[0]?.cells[2]).toBe('calendar.kind.industryJob · Tax Corp');
+  });
 });
 
 describe('priceWatch', () => {

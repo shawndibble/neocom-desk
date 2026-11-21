@@ -6848,10 +6848,13 @@
           "jumps_other": "{{count}} jumps"
         },
         "comingUp": {
-          "note": "Stratop fleet forms · 2 events ahead",
+          "note": "Stratop fleet forms · 2 more today",
           "fleet": "Stratop fleet",
-          "forms": "Forms",
-          "meeting": "Alliance meeting"
+          "forms": "Calendar event",
+          "timer": "Efa - Tatara armor timer",
+          "timerKind": "Structure timer",
+          "job": "Raven Navy Issue",
+          "jobKind": "Industry job"
         },
         "contracts": {
           "unit": "couriers due",

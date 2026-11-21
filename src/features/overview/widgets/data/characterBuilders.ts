@@ -303,18 +303,28 @@ export const comingUp: Builder = (
     item.deadlineMs > now
       ? formatCountdown((item.deadlineMs - now) / 1000)
       : t(item.pastLabelKey ?? pastDeadlineLabelKey(item.kind));
+  // The kind, then what tells two of them apart, as the rail's detail line does: the RSVP, the
+  // corporation, the sharer.
   const kindText = (item: CharacterBoardItem) =>
-    item.response === null
-      ? t(KIND_LABEL[item.kind])
-      : `${t(KIND_LABEL[item.kind])} · ${t(`overview.board.response.${item.response}`)}`;
+    [
+      t(KIND_LABEL[item.kind]),
+      item.response === null ? null : t(`overview.board.response.${item.response}`),
+      item.corporation?.name,
+      item.sharedBy?.name,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  // A kind this widget hides never asks for a sign-in, nor keeps the widget up.
+  const lapsed = data.reauthKinds.some((kind) => shown.has(kind));
+  const readable = data.readableKinds.some((kind) => shown.has(kind));
   return {
     ...blank(
       to,
       statusOf(feed, {
-        needsPermission: data.reauthKinds.length > 0,
+        needsPermission: lapsed,
         isEmpty: items.length === 0,
         // A source that still read keeps the widget up, with a sign-in note for the lapsed one.
-        hasStaleData: data.readableKinds.length > 0,
+        hasStaleData: readable,
       })
     ),
     emptyMessage:

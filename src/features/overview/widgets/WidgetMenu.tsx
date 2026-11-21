@@ -14,7 +14,7 @@
  * `inert` is the signed-out landing page's demo: the same menu over a layout
  * whose actions do nothing, where Rename must not open its dialog either.
  */
-import { useId, useRef, useState, type ReactElement } from 'react';
+import { useId, useRef, useState, useSyncExternalStore, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -204,7 +204,9 @@ function PlexPlanDialog({
 function CalendarTypesSub({ widget }: { widget: Widget }) {
   const { t } = useTranslation();
   const edit = useOverviewEdit();
-  const data = useFeedStore().get().calendar?.data;
+  const store = useFeedStore();
+  // Live: a calendar read landing while the menu is open adds the kinds it made readable.
+  const data = useSyncExternalStore(store.subscribe, () => store.get().calendar)?.data;
   const hidden = widget.hiddenKinds ?? [];
   const state = {
     hidden: new Set(hidden),

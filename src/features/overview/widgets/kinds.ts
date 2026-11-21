@@ -387,7 +387,16 @@ const SPECS = {
     view: 'table',
     size: 'M',
     calendarEvents: true,
-    endpoints: ['getCharacterCalendar'],
+    // The Character reads behind the board; corp sources are gated by role and never ask here.
+    endpoints: [
+      'getCharacterCalendar',
+      'getCharacterSkillQueue',
+      'getCharacterIndustryJobs',
+      'getCharacterPlanets',
+      'getCharacterContracts',
+      'getCharacterOrders',
+      'getCharacterMercenaryDens',
+    ],
   },
   contracts: {
     category: 'messages',
