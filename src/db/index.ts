@@ -308,7 +308,7 @@ db.version(28).stores({
   corpBookObservedMeta: '[characterId+corporationId], characterId',
 });
 
-// Adds the officer's copy of the rest of a Corp Tax Book (miners, statements,
+// Adds the officer's copy of the rest of a Corp Tax Book (miners, late notices,
 // payments, ...) under each part's version stamp (#5243). Device-local, never
 // synced, officer-only: wiped with the `observed` copy.
 db.version(29).stores({

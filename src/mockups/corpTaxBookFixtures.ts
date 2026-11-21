@@ -4,9 +4,9 @@
  *
  * One story throughout: an officer synced the book at 12:00 (2h ago), so the
  * Billable rule (day end + 30 min grace passed AND a sync after that) makes every
- * day through 17 Oct Billable and 18 Oct not yet. The Aug 2026 Statements
- * went out on 1 Sep (due 15 Sep). The Sep 2026 Statements are NOT sent yet:
- * the run in the Statements tab is about to send them, and Oct is still open.
+ * day through 17 Oct Billable and 18 Oct not yet. The Aug 2026 Late notices
+ * went out on 1 Sep (due 15 Sep). The Sep 2026 Late notices are NOT sent yet:
+ * the run in the Late notices tab is about to send them, and Oct is still open.
  * Miner figures that appear in more than one place are derived below from
  * their lines and payments, so every view reconciles.
  */
@@ -271,7 +271,7 @@ export function varroLedger(notTax: number) {
       from: 'Lysa Kestane',
       amount: 5_000_000,
       kind: 'Donation',
-      credited: 'Aug 2026 Statement',
+      credited: 'Aug 2026 Late notice',
       notTax: notTax || undefined,
       by: notTax ? 'Kestrel Vane' : undefined,
     },
@@ -281,7 +281,7 @@ export function varroLedger(notTax: number) {
       from: 'Varro Kestane',
       amount: 2_000_000,
       kind: 'Donation',
-      credited: 'Aug 2026 Statement',
+      credited: 'Aug 2026 Late notice',
     },
     {
       id: 3,
@@ -289,7 +289,7 @@ export function varroLedger(notTax: number) {
       from: 'Varro Kestane',
       amount: handPayment,
       kind: 'Recorded by hand',
-      credited: '14 Aug, before the Aug 2026 Statement (paid by contract)',
+      credited: '14 Aug, before the Aug 2026 Late notice (paid by contract)',
       writtenOff: toleranceWriteOff,
       by: 'Kestrel Vane',
     },
@@ -339,8 +339,8 @@ export const VARRO_DISMISSALS = [
 ];
 
 export const VARRO_MAIL = [
-  { id: 1, date: '15 Oct 14:02', what: 'Reminder: Aug 2026 Statement', status: 'Sent' },
-  { id: 2, date: '1 Sep 14:00', what: 'Aug 2026 Statement', status: 'Sent' },
+  { id: 1, date: '15 Oct 14:02', what: 'Reminder: Aug 2026 Late notice', status: 'Sent' },
+  { id: 2, date: '1 Sep 14:00', what: 'Aug 2026 Late notice', status: 'Sent' },
 ];
 
 /** D6/D7: the audit log lines about Varro, newest first. */
@@ -356,14 +356,14 @@ export const VARRO_ACTIVITY = [
     id: 2,
     when: '16 Oct 21:40',
     who: 'Book',
-    what: 'Credited a 5,000,000 donation from Lysa Kestane to the Aug 2026 Statement',
+    what: 'Credited a 5,000,000 donation from Lysa Kestane to the Aug 2026 Late notice',
     why: 'Automatic',
   },
   {
     id: 3,
     when: '15 Oct 14:02',
     who: 'Kestrel Vane',
-    what: 'Sent a reminder for the Aug 2026 Statement',
+    what: 'Sent a reminder for the Aug 2026 Late notice',
     why: '',
   },
   {
@@ -382,7 +382,7 @@ export const VARRO_ACTIVITY = [
   },
 ];
 
-/** D16: the Sep 2026 Statement mail for Varro, exactly as it would be sent. */
+/** D16: the Sep 2026 Late notice mail for Varro, exactly as it would be sent. */
 export const VARRO_MAIL_STATEMENT = {
   to: 'Varro Kestane',
   subject: `${CORP.ticker} moon tax · Sep 2026 · ${VARRO.mailBalance.toLocaleString('en')} ISK`,
@@ -399,7 +399,7 @@ export const VARRO_MAIL_STATEMENT = {
   chars: 1_460,
 };
 
-/** Tamsin Holloway (Guest, 15%): her Aug 2026 Statement, issued 1 Sep. */
+/** Tamsin Holloway (Guest, 15%): her Aug 2026 Late notice, issued 1 Sep. */
 export const TAMSIN_AUG: DayLine[] = [
   line(101, '28 Aug', ...EFA7, 'Tamsin Holloway', 'Euxenite', 15_850, 15, 'On Aug notice'),
   line(102, '27 Aug', ...EFA7, 'Tamsin Holloway', 'Cobaltite', 22_400, 15, 'On Aug notice'),
@@ -469,7 +469,7 @@ export const MOON_CYCLES: MoonCycle[] = [
     estIsk: 798_100_000,
     minedPct: 97,
     tax: 79_420_000,
-    on: 'Sep Statement, not sent yet',
+    on: 'Sep Late notice, not sent yet',
     miners: 14,
     state: 'Expired',
   },
@@ -480,7 +480,7 @@ export const MOON_CYCLES: MoonCycle[] = [
     estIsk: 805_900_000,
     minedPct: 92,
     tax: 74_860_000,
-    on: 'Sep Statement, not sent yet',
+    on: 'Sep Late notice, not sent yet',
     miners: 12,
     state: 'Expired',
   },
@@ -491,7 +491,7 @@ export const MOON_CYCLES: MoonCycle[] = [
     estIsk: 790_300_000,
     minedPct: 88,
     tax: 70_150_000,
-    on: 'Aug Statement',
+    on: 'Aug Late notice',
     miners: 11,
     state: 'Expired',
   },
@@ -503,9 +503,9 @@ export interface Miner {
   characters: string[];
   standing: MinerStanding;
   corp: string;
-  /** On issued Statements, less payments and dismissals. */
+  /** On issued Late notices, less payments and dismissals. */
   owed: number;
-  /** Billable days not on a sent Statement yet (Sep not sent, plus Oct so far). */
+  /** Billable days not on a sent Late notice yet (Sep not sent, plus Oct so far). */
   unbilled: number;
   overdueDays: number | null;
   credit: number;
@@ -514,7 +514,7 @@ export interface Miner {
   note?: string;
 }
 
-/** Aug Statements are due 15 Sep, so anything unpaid is 33 days overdue today. */
+/** Aug Late notices are due 15 Sep, so anything unpaid is 33 days overdue today. */
 const OVERDUE_DAYS = 33;
 const ODILE = { sep: 14_205_800, oct: 8_275_100 };
 const JUNO = { sep: 2_120_000, oct: 1_820_000 };
@@ -588,7 +588,7 @@ export const MINERS: Miner[] = [
     credit: 0,
     lastPaid: '4 Sep',
     lastStatement: 'Aug 2026',
-    note: 'Sep Statement is below the 5,000,000 minimum · rolls into October',
+    note: 'Sep Late notice is below the 5,000,000 minimum · rolls into October',
   },
   {
     id: 6,
@@ -670,7 +670,7 @@ const QUEUE_NAMES = [
   'Galen Mott',
 ];
 
-/** A Statement is the Miner's balance due: carried + this period's lines, less credit. */
+/** A Late notice is the Miner's balance due: carried + this period's lines, less credit. */
 const QUEUE_AMOUNTS = [
   ODILE.sep,
   VARRO.mailBalance,
@@ -738,14 +738,14 @@ export const QUEUE_DONE: QueueItem[] = QUEUE_RUNNING.map((item) =>
 /** The Sep run in numbers (Check step). */
 export const SEP_RUN = {
   statements: QUEUE_AMOUNTS.length,
-  /** What the 19 Statements add up to: carried + new lines, less credit. */
+  /** What the 19 Late notices add up to: carried + new lines, less credit. */
   balances: sum(QUEUE_AMOUNTS),
   belowMinimum: 4,
   credit: ILSE.credit,
 };
 
 const AUG_BILLED = 231_860_400;
-/** D20 tolerance: payments within max(0.5%, 100k) settled these Statements; the rest was written off. */
+/** D20 tolerance: payments within max(0.5%, 100k) settled these Late notices; the rest was written off. */
 export const AUG_WRITE_OFFS = { toleranceTotal: 128_900, toleranceCount: 3, lateLines: 3 };
 
 export const PERIODS: StatementPeriod[] = [
@@ -766,7 +766,7 @@ export const PERIODS: StatementPeriod[] = [
     status: 'Ready to send',
     miners: 23,
     toSend: SEP_RUN.statements,
-    // New lines only: the Statements' balances less what was carried from Aug and plus the credit applied.
+    // New lines only: the Late notices' balances less what was carried from Aug and plus the credit applied.
     billed: SEP_RUN.balances - MINER_TOTALS.owed + SEP_RUN.credit,
     paid: 0,
     outstanding: 0,
@@ -934,7 +934,7 @@ export const DIFF = {
   rateNote: 'Book rate 15% is the per-moon rate for Efa V - Moon 3, effective 1 Oct 2026',
 };
 
-/** The guest verify page: Tamsin Holloway's Aug 2026 Statement, issued 1 Sep (D27). */
+/** The guest verify page: Tamsin Holloway's Aug 2026 Late notice, issued 1 Sep (D27). */
 export const VERIFY = {
   miner: 'Tamsin Holloway',
   period: 'Aug 2026',
@@ -960,7 +960,7 @@ export const VERIFY = {
     { term: 'Price', value: 'Jita buy, Compressed ore, on the day mined' },
     { term: 'Due', value: '15 Sep 2026 (14 days after issue)' },
     {
-      term: 'Minimum Statement',
+      term: 'Minimum Late notice',
       value: '5,000,000 ISK; smaller balances roll into the next month',
     },
     { term: 'Paying', value: 'Donate to Brass Meridian Logistics; any of your characters counts' },

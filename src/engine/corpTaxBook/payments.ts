@@ -50,9 +50,7 @@ export function isBeforeBook(at: string, startDate: string): boolean {
 }
 
 /** What of a Tax Payment is tax: its amount less the part coded "not tax" (the shared rule). */
-export function paymentNet(p: Pick<TaxPayment, 'amount' | 'notTaxAmount'>): number {
-  return netPayment({ ...p });
-}
+export { netPayment as paymentNet };
 
 /** The Tax Payments the book counts, in the order they are applied: a donation before `startDate` drops out; oldest first. */
 export function countedPayments(payments: readonly TaxPayment[], startDate?: string): TaxPayment[] {

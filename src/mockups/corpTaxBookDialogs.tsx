@@ -117,7 +117,7 @@ export function RecordPaymentDialog({ open }: { open: boolean }) {
           <TextInput value="2026-10-18 13:40" onChange={() => {}} aria-label="Received on" />
         </Label>
         <Effect>
-          Credited oldest debt first, to the Aug 2026 Statement. Varro Kestane owes{' '}
+          Credited oldest debt first, to the Aug 2026 Late notice. Varro Kestane owes{' '}
           {isk(VARRO.owed)} → {isk(0)}. An overpayment would be held as credit.
         </Effect>
         <p className="text-xs text-text-dim">{LOGGED}</p>
@@ -141,7 +141,7 @@ export function MarkNotTaxDialog({ open }: { open: boolean }) {
       <div className="space-y-3 text-sm">
         <p>
           Donation from <span className="font-semibold">Lysa Kestane</span>, 16 Oct 21:40,{' '}
-          {isk(5_000_000)}, credited to the Aug 2026 Statement.
+          {isk(5_000_000)}, credited to the Aug 2026 Late notice.
         </p>
         <Label text="How much of it is not tax">
           <SegmentedControl
@@ -189,7 +189,7 @@ export function RejectDeclarationDialog({ open }: { open: boolean }) {
           Tamsin Holloway said on 14 Oct that they paid {isk(TAMSIN.owed)} by contract. Overdue has
           been paused since then.
         </p>
-        <Label text="Reason (required, shown to Tamsin Holloway on their Statement page)">
+        <Label text="Reason (required, shown to Tamsin Holloway on their Late notice page)">
           <TextArea
             value="No contract to Brass Meridian Logistics or Kestrel Vane for this amount"
             onChange={() => {}}
@@ -237,8 +237,8 @@ export function AssignDonationDialog({ open }: { open: boolean }) {
           </Select>
         </Label>
         <Effect>
-          Odile Marchetti has nothing owed on a sent Statement, so {isk(UNMATCHED.amount)} is held
-          as credit and printed on their next Statement. {UNMATCHED.from} becomes one of their
+          Odile Marchetti has nothing owed on a sent Late notice, so {isk(UNMATCHED.amount)} is held
+          as credit and printed on their next Late notice. {UNMATCHED.from} becomes one of their
           characters, so later donations from it credit automatically.
         </Effect>
         <p className="text-xs text-text-dim">

@@ -45,7 +45,8 @@ export { minerIdFor };
 
 /**
  * Every Miner of the book as a picker lists them: the groupings, and each Miner of its own that
- * `ids` (the server's miner list) names whose character no grouping holds. Once each.
+ * `ids` (`solo:<character>` for each character the book's rows name) names whose character no
+ * grouping holds. Once each.
  */
 export function bookMinersOf(grouped: readonly Miner[], ids: readonly string[]): Miner[] {
   const out = [...grouped];

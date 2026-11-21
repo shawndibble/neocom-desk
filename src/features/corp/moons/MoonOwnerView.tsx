@@ -40,13 +40,13 @@ type Names = (characterId: number) => string;
 /** An ore's name; undefined until it resolves. */
 type TypeNames = (typeId: number) => string | undefined;
 
-/** Page B's plain statement: who handles the tax, what is owed, what was paid. */
-function Statement({ view, name }: { view: FeederView; name: string }) {
+/** Page B's plain account: who handles the tax, what is owed, what was paid. */
+function OwedToYou({ view, name }: { view: FeederView; name: string }) {
   const { t } = useTranslation();
   const s = view.summary;
   const rate = s.effectiveRatePct;
   const since = s.coverageFrom ? shortDate(s.coverageFrom) : null;
-  const k = (key: string) => `corpTaxBook.moons.ownerView.statement.${key}`;
+  const k = (key: string) => `corpTaxBook.moons.ownerView.account.${key}`;
   return (
     <Panel>
       <div className="space-y-1 text-sm">
@@ -540,7 +540,7 @@ export function MoonOwnerView({
       {afterCard}
       {!folded && (
         <>
-          {state === 'normal' && <Statement view={view} name={name} />}
+          {state === 'normal' && <OwedToYou view={view} name={name} />}
           {state === 'settled-otherwise' && (
             <SettledOtherwise view={view} name={name} payments={payments} />
           )}

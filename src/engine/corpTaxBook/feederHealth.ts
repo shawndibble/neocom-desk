@@ -204,10 +204,10 @@ export function splitByCoverageAndRead<
 }
 
 /**
- * The last day a miner's next Statement may cover while one of its days is held (#6209): the day
- * before its earliest held day, else the book's `billableThrough`. A Statement must not cover a
- * held day: once paid, ore that lands on that day later would be written off as recorded after
- * payment instead of reaching the next Statement.
+ * The last day a miner's account may bill while one of its days is held (#6209): the day before
+ * its earliest held day, else the book's `billableThrough`. The account must not bill a held day:
+ * once paid, ore that lands on that day later would be written off as recorded after payment
+ * instead of being billed.
  */
 export function heldBillableThrough(
   billableThrough: string | undefined,
@@ -241,8 +241,8 @@ export interface StaleHold {
 /**
  * The day each miner is held from while a moon owner it mines at cannot be read (#6209): a stale
  * moon owner's first unread day (its first covered day when never read well), for every character
- * with a row at its refineries. Its ore for those days may not be read yet, so a Statement must not
- * cover them. An owner read up to `billableThrough`, or whose coverage ended before its first
+ * with a row at its refineries. Its ore for those days may not be read yet, so the account must not
+ * bill them. An owner read up to `billableThrough`, or whose coverage ended before its first
  * unread day, holds nothing. Each hold names its moon owner, so a held day can say why (#6210).
  */
 export function staleOwnerHolds(

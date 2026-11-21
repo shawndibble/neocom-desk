@@ -11,7 +11,20 @@
  * Dates are UTC days counted back from today (`day(n)`): a test reads "the day 5 days ago",
  * never a calendar date, so it reads the same whenever it runs.
  */
-import { minerPaymentCode, paymentCode } from '../../../functions/src/corpTaxBookLateNotice';
+import {
+  LATE_NOTICES,
+  LATE_NOTICE_LINKS,
+  STATEMENTS,
+  STATEMENT_LINKS,
+  TOKENS_COLLECTION,
+} from '../../../functions/src/corpTaxBookVersionKeys';
+import {
+  NOTICE_ID_FIELD,
+  legacyStatementDocOf,
+  minerPaymentCode,
+  paymentCode,
+  type LateNotice,
+} from '../../../functions/src/corpTaxBookLateNotice';
 import { MONTHS } from '../../../src/engine/corpTaxBook/monthNames';
 import { utcDay } from '../../../src/engine/localDay';
 import { DAY_MS, HOUR_MS, MINUTE_MS } from '../../../src/lib/age';
@@ -216,7 +229,7 @@ export class BookSeed {
         const date = day(back, this.now);
         const value = DAY_QTY * UNIT_PRICE;
         return {
-          kind: 'mined',
+          kind: 'mined' as const,
           date,
           key: `${input.characterId}:${refinery.id}:${date}`,
           characterId: input.characterId,
@@ -234,53 +247,21 @@ export class BookSeed {
 
   /** The verify token's doc: what a verify link resolves (`corpTaxBookTokens/{token}`). */
   private token(input: NoticeInput, minerId: string): void {
-    this.put(`corpTaxBookTokens/${input.token}`, {
+    this.put(`${TOKENS_COLLECTION}/${input.token}`, {
       corporationId: CORP,
-      statementId: input.id,
+      [NOTICE_ID_FIELD]: input.id,
       minerId,
       remindersStopped: input.remindersStopped === true,
       createdAt: this.now - input.issuedBack * DAY_MS,
     });
   }
 
-  /** What `legacyStatementDocOf` writes: the shape older tabs, and books from before the move, hold. */
-  private legacyDoc(input: NoticeInput, minerId: string) {
+  /** The `LateNotice` an officer's tab issues for `input` (`issueLateNoticeDocs`' input). */
+  private notice(input: NoticeInput): LateNotice {
     const lines = this.noticeLines(input);
     return {
       id: input.id,
-      minerId,
-      kind: 'notice',
-      code: paymentCode(input.id),
-      periodStart: lines[0].date,
-      periodEnd: lines.at(-1)!.date,
-      coversFrom: lines[0].date,
-      coversThrough: lines.at(-1)!.date,
-      issuedAt: new Date(this.now - input.issuedBack * DAY_MS).toISOString(),
-      issuedBy: OFFICER.id,
-      hubId: 'jita',
-      oreForm: 'raw',
-      lines: lines.map(({ key, ...line }) => ({ ...line, chargeKey: key })),
-      amount: lines.reduce((sum, l) => sum + l.tax, 0),
-      characterIds: [input.characterId],
-      uids: [`char:${input.characterId}`],
-      mailsSent: 1,
-      manualRemindersSent: 0,
-      remindersStopped: input.remindersStopped === true,
-      corporationName: 'Test Corp',
-      minerName: nameOf(input.characterId),
-    };
-  }
-
-  /**
-   * A Late notice as `issueLateNoticeDocs` writes it today: the `lateNotices` doc and its link,
-   * the legacy mirror and its link older tabs read, and the verify token.
-   */
-  lateNotice(input: NoticeInput): this {
-    const minerId = input.minerId ?? solo(input.characterId);
-    const lines = this.noticeLines(input);
-    this.sub('lateNotices', input.id, {
-      id: input.id,
-      minerId,
+      minerId: input.minerId ?? solo(input.characterId),
       characterIds: [input.characterId],
       kind: input.final ? 'final' : 'late',
       issuedAt: new Date(this.now - input.issuedBack * DAY_MS).toISOString(),
@@ -298,20 +279,29 @@ export class BookSeed {
           Object.values(REFINERY).map((r) => [String(r.id), r.name])
         ),
       },
-    });
-    this.sub('lateNoticeLinks', input.id, { token: input.token });
+    };
+  }
+
+  /**
+   * A Late notice as `issueLateNoticeDocs` writes it today: the `lateNotices` doc and its link,
+   * the legacy mirror and its link older tabs read, and the verify token.
+   */
+  lateNotice(input: NoticeInput): this {
+    const notice = this.notice(input);
+    this.sub(LATE_NOTICES, input.id, { ...notice });
+    this.sub(LATE_NOTICE_LINKS, input.id, { token: input.token });
     return this.legacyNotice(input);
   }
 
   /**
-   * A Late notice only in the legacy `statements` collection (`kind: 'notice'`) with its old
-   * `statementLinks` verify link: a book from before the move to `lateNotices`.
+   * A Late notice only in the legacy collection (`kind: 'notice'`, `legacyStatementDocOf`) with
+   * its old verify link: a book from before the move to `lateNotices`.
    */
   legacyNotice(input: NoticeInput): this {
-    const minerId = input.minerId ?? solo(input.characterId);
-    this.sub('statements', input.id, this.legacyDoc(input, minerId));
-    this.sub('statementLinks', input.id, { verifyToken: input.token });
-    this.token(input, minerId);
+    const notice = this.notice(input);
+    this.sub(STATEMENTS, input.id, legacyStatementDocOf(notice));
+    this.sub(STATEMENT_LINKS, input.id, { verifyToken: input.token });
+    this.token(input, notice.minerId);
     return this;
   }
 
@@ -327,7 +317,7 @@ export class BookSeed {
   }): this {
     return this.sub('declarations', p.id, {
       id: p.id,
-      statementId: p.noticeId,
+      [NOTICE_ID_FIELD]: p.noticeId,
       kind: p.kind ?? 'contract',
       at: noonOf(p.back, this.now),
       characterId: p.characterId,

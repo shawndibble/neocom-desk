@@ -1,6 +1,6 @@
 /**
  * `/corp/moons` — the Corp Tax Book (issue #4063, epic #4055, D21): Overview,
- * Extractions, Miners, Statements and Moon owners as path-segment tabs (ADR 0015), the moon and Miner
+ * Extractions, Miners, Late notices and Moon owners as path-segment tabs (ADR 0015), the moon and Miner
  * pages below their tabs, settings (Rates, Billing, Extractions, Sharing, Access) behind the header's gear and the audit log
  * behind Activity.
  *

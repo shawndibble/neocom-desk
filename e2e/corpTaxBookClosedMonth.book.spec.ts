@@ -5,7 +5,7 @@
  * it. Read either way, a Miner's page shows the same totals.
  */
 import type { Page } from '@playwright/test';
-import { expect, minerFact, openMiner, test } from './support/taxBook/bookTest';
+import { expect, minerFact, openMiner, signInAsOfficer, test } from './support/taxBook/bookTest';
 import { closedMonthBook } from './support/taxBook/bookScenarios';
 import { isk, shortDay } from './support/taxBook/bookSeed';
 import { readDoc } from './support/taxBook/emulator';
@@ -24,8 +24,9 @@ test("an officer's visit records the closed-through checkpoint", async ({
 }) => {
   const book = closedMonthBook();
   await emulator.seed(book.seed.docs());
-  await openMiner(page, book.minerId, MINER.ada.name);
-  await expectTotals(page, book);
+  // Only a whole-book read records checkpoints (a Miner page reads one Miner's slice).
+  await signInAsOfficer(page, './corp/moons/miners');
+  await expect(page.getByRole('row', { name: new RegExp(MINER.ada.name) })).toBeVisible();
   await expect
     .poll(async () => {
       const stored = await readDoc(`corps/${CORP}/accountCheckpoints/${book.minerId}`);
@@ -37,6 +38,7 @@ test("an officer's visit records the closed-through checkpoint", async ({
           credit: stored.credit,
           balance: stored.balance,
           paidThrough: stored.paidThrough,
+          characterIds: stored.characterIds,
         }
       );
     })

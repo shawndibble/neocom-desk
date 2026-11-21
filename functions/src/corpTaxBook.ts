@@ -96,7 +96,7 @@ export {
 
 /** The Tax Book lives under the `corps/{id}` umbrella (issue #4858, ADR 0026). */
 export const BOOKS_COLLECTION = 'corps';
-export const TOKENS_COLLECTION = 'corpTaxBookTokens';
+export { TOKENS_COLLECTION } from './corpTaxBookVersionKeys.js';
 
 /**
  * How long a freshly turned-on book stays out of the members' own Mining Tax

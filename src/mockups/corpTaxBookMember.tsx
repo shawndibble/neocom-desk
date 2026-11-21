@@ -584,8 +584,8 @@ function RowDetail({ open }: { open: boolean }) {
         />
         <p className="rounded-xs border border-line p-2 text-xs text-text-dim">
           The book decides this day: it is Billable (the corp synced {BOOK.lastSynced}, after its
-          grace period) and goes on {CORP.name}&apos;s Oct Statement. Terms are locked to the book:{' '}
-          {BOOK.hub} buy, {BOOK.oreForm} ore, 15% per-moon rate from 1 Oct 2026.
+          grace period) and goes on {CORP.name}&apos;s Oct Late notice. Terms are locked to the
+          book: {BOOK.hub} buy, {BOOK.oreForm} ore, 15% per-moon rate from 1 Oct 2026.
         </p>
         <div className="space-y-2 rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs">
           <p className="font-semibold text-warning uppercase">{DIFF.disputed}</p>
@@ -681,7 +681,7 @@ export function VerifyF() {
       <main className="mx-auto max-w-6xl space-y-4 px-4 py-6">
         <header>
           <p className="text-xs tracking-widest text-text-dim uppercase">
-            {CORP.name} · Statement {VERIFY.period} · issued {VERIFY.issued}
+            {CORP.name} · Late notice {VERIFY.period} · issued {VERIFY.issued}
           </p>
           <h1 className="text-xl font-semibold">{VERIFY.miner}</h1>
         </header>
@@ -697,7 +697,7 @@ export function VerifyF() {
               padded={false}
             >
               <DataTable
-                label="Statement lines"
+                label="Late notice lines"
                 columns={verifyColumns}
                 rows={VERIFY.lines}
                 rowKey={(r) => r.id}
@@ -713,7 +713,7 @@ export function VerifyF() {
                 <p key={p.id} className="flex justify-between gap-3 text-sm tabular-nums">
                   <span>
                     {p.date} · {p.from}
-                    <span className="block text-xs text-text-dim">to the {p.to} Statement</span>
+                    <span className="block text-xs text-text-dim">to the {p.to} Late notice</span>
                   </span>
                   <span className="text-isk-pos">+{isk(p.amount)}</span>
                 </p>
@@ -726,7 +726,7 @@ export function VerifyF() {
             </StatChips>
             <p className="mt-2 text-sm tabular-nums">
               Billed {isk(VERIFY.billed)} − paid {isk(paid)}. Due {VERIFY.due}. Code{' '}
-              <span className="font-mono">{VERIFY.code}</span> pins a donation to this Statement.
+              <span className="font-mono">{VERIFY.code}</span> pins a donation to this Late notice.
             </p>
             <p className="mt-2 text-xs text-text-dim">{VERIFY.declaration}</p>
           </Panel>

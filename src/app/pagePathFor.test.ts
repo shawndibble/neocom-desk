@@ -33,7 +33,7 @@ describe('pagePathFor', () => {
     expect(pagePathFor('/corp-tax-book/remove-now/abcDEF123_-xyz')).toBe('/*');
   });
 
-  it("never reports a verify link's token, the only secret keeping a Statement private", () => {
+  it("never reports a verify link's token, the only secret keeping a late notice private", () => {
     expect(pagePathFor('/corp-tax-book/verify/abcDEF123_-xyz')).toBe('/*');
   });
 

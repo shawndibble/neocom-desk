@@ -1195,7 +1195,7 @@ export interface CorpBookObservedRecord {
 }
 
 /**
- * One part of an officer's Corp Tax Book (miners, statements, payments, ...) kept
+ * One part of an officer's Corp Tax Book (miners, late notices, payments, ...) kept
  * on this device under its version stamp (#5243, ADR 0031 extended). Officer-only,
  * wiped by the same paths as `CorpBookObservedRecord`.
  */
