@@ -89,9 +89,8 @@ test("a pilot's reason for not paying a day reaches the officers", async ({ page
   ).toContainText(WHY);
 });
 
-// The Activity entry reads "Player dispute found a dispute that conflicts with a late notice ·
-// Test Pilot": not the pilot's words, and the day was on no late notice.
-test.fixme("a pilot's reason for not paying is in the Activity log", async ({ page }) => {
+// The Activity entry words the dispute by its kind and shows the pilot's reason (useAuditWords).
+test("a pilot's reason for not paying is in the Activity log", async ({ page }) => {
   await tellWhyNotPaying(page, WHY);
   await openNeedsYou(page);
   await expectInActivity(page, WHY);
@@ -105,10 +104,8 @@ test("a pilot's note on a payment made another way reaches the officers", async 
   ).toContainText(`“${NOTE}”`);
 });
 
-// The Activity entry reads "Player declaration declared a payment · Test Pilot", without the note.
-test.fixme("a pilot's note on a payment made another way is in the Activity log", async ({
-  page,
-}) => {
+// The Activity entry shows the declaration's note and amount (useAuditWords).
+test("a pilot's note on a payment made another way is in the Activity log", async ({ page }) => {
   await declarePaid(page, NOTE);
   await openNeedsYou(page);
   await expectInActivity(page, NOTE);
@@ -133,8 +130,8 @@ test("an officer's label on a correction reaches the pilot's ledger", async ({ p
   await expect(page.getByRole('dialog', { name: CORP_NAME })).toContainText(label);
 });
 
-// Record a payment (BookDialogs.tsx RecordPaymentDialog) has no note field, though the server
-// stores one (`recordPayment`'s `note`); nothing on the pilot's side shows a payment's note.
+// Record a payment takes a note now, and the officer's Miner page, ledger and Activity show it.
+// Still open: the pilot's ledger (member side) does not show a payment's `note` yet.
 test.fixme("an officer's note on a hand-recorded payment reaches the pilot", async ({ page }) => {
   const note = 'Handed over in person at the staging Fortizar';
   await signInAsOfficer(page, minerUrl(PILOT_MINER_ID));

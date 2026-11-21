@@ -63,6 +63,9 @@ export function GroupLabel({ text, children }: { text: ReactNode; children: Reac
   );
 }
 
+/** The longest note the server keeps on a payment (`recordPayment`'s `note`). */
+const PAYMENT_NOTE_MAX = 500;
+
 interface ShellProps {
   open: boolean;
   onClose: () => void;
@@ -261,6 +264,8 @@ export function RecordPaymentDialog({
   const today = utcDay();
   const startDate = view.input.startDate;
   const [date, setDate] = useState(today);
+  // The officer's note on a payment by hand ("handed over in person"): the Miner reads it too.
+  const [note, setNote] = useState('');
   const donations = useMemo(
     () =>
       view.needsYou.flatMap((n) =>
@@ -327,6 +332,7 @@ export function RecordPaymentDialog({
               characterId: Number(payer),
               amount: value,
               at: paidAtFor(date),
+              ...(note.trim() ? { note: note.trim() } : {}),
               ...(declarationId ? { declarationId } : {}),
             });
           } catch (e) {
@@ -402,6 +408,14 @@ export function RecordPaymentDialog({
               />
             </Label>
           )}
+          <Label text={t(`${k}.note`)}>
+            <TextArea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={2}
+              maxLength={PAYMENT_NOTE_MAX}
+            />
+          </Label>
         </>
       )}
       <PaymentOutcomePanel outcome={outcome} minerName={minerName} />

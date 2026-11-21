@@ -18947,7 +18947,13 @@
           "issueLateNotice": "issued a late notice",
           "recordLateNoticeMail": "mailed a late notice",
           "recordCheckpoints": "closed past months on Miners' accounts",
-          "resetCheckpoint": "reopened a Miner's closed months"
+          "resetCheckpoint": "reopened a Miner's closed months",
+          "disputeKind": {
+            "payee": "disputed a day: the ore went to another Payee",
+            "quantity": "disputed a day: the book recorded more ore than they mined",
+            "rate": "disputed a day's rate",
+            "notPaying": "said they won't pay a day"
+          }
         },
         "actionsTo": {
           "issueStatement": "issued a late notice to <name>{{name}}</name>, {{amount}} ISK",
@@ -18957,7 +18963,8 @@
           "issueLateNotice": "issued a late notice to <name>{{name}}</name>, {{amount}} ISK",
           "issueLateNoticePlain": "issued a late notice to <name>{{name}}</name>",
           "recordLateNoticeMail": "mailed a late notice to <name>{{name}}</name>"
-        }
+        },
+        "declaredAmount": "they say they paid {{amount}}"
       },
       "health": {
         "hiddenFromMembers": "Hidden from members until {{date}}",
@@ -19814,6 +19821,7 @@
           "amount": "Amount",
           "paidBy": "Paid by",
           "datePaid": "Date paid (EVE time)",
+          "note": "Note (optional): the Miner sees it on the payment",
           "dateMissing": "Enter the date it was paid.",
           "dateFuture": "A payment can't be dated after today (EVE time).",
           "dateBeforeBook": "The book starts {{date}}; a payment can't be dated before it.",
