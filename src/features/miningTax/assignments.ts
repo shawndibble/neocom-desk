@@ -24,6 +24,8 @@ import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 import { loadPayees } from './payees';
 import { hubForPayee, loadUnitPricesOnDate } from './pricing';
 import { currentCompressedOre, withOreFormMarker } from './oreForm';
+import { putAssignments } from './storedAssignments';
+import { dropPayeeCheckpointsFrom, earliestDay } from '@/db/payeeCheckpoints';
 
 /**
  * Thrown when a new Assignment would claim ore an existing one already does
@@ -192,8 +194,8 @@ export async function createAssignment(input: AssignInput): Promise<MiningTaxAss
   };
   // Check and write in one transaction so two tabs cannot both pass the check
   // (under a ledger action this joins the action's own transaction).
-  await db.transaction('rw', db.miningTaxAssignments, async () => {
-    await db.miningTaxAssignments.bulkPut(
+  await db.transaction('rw', db.miningTaxAssignments, db.settings, async () => {
+    await putAssignments(
       await claimNewOre(record, input.entryOreLines, input.takesGrowth, input.isPaid)
     );
   });
@@ -234,7 +236,7 @@ export async function dismissEntries(
     status: 'dismissed',
     updatedAt: now,
   }));
-  await db.miningTaxAssignments.bulkPut(records);
+  await putAssignments(records);
   return records;
 }
 
@@ -297,7 +299,7 @@ export async function updateCombinedAssignments(
     }
     return asPilotAct(next);
   });
-  await db.miningTaxAssignments.bulkPut(updated);
+  await putAssignments(updated);
   return updated;
 }
 
@@ -319,7 +321,7 @@ export async function uncombineAssignments(
       return next;
     });
   if (updated.length === 0) return;
-  await db.miningTaxAssignments.bulkPut(updated);
+  await putAssignments(updated);
 }
 
 /**
@@ -335,7 +337,7 @@ export async function moveAssignmentsToPayee(
   if (assignments.length === 0) return;
   const now = Date.now();
   const updated = assignments.map((a) => asPilotAct({ ...a, payeeId, updatedAt: now }));
-  await db.miningTaxAssignments.bulkPut(updated);
+  await putAssignments(updated);
 }
 
 export interface JoinMemberInput {
@@ -401,13 +403,13 @@ export async function joinAssignments(
   });
   // Only the members this call would *create* are checked — an already-assigned
   // member is just re-tagged, and adds no claim. Same transaction as the write.
-  await db.transaction('rw', db.miningTaxAssignments, async () => {
+  await db.transaction('rw', db.miningTaxAssignments, db.settings, async () => {
     const handedOver: MiningTaxAssignmentRecord[] = [];
     for (const [i, m] of members.entries()) {
       if (m.assignment) continue;
       handedOver.push(...(await claimNewOre(records[i], m.entryOreLines)).slice(1));
     }
-    await db.miningTaxAssignments.bulkPut([...records, ...handedOver]);
+    await putAssignments([...records, ...handedOver]);
   });
   return records;
 }
@@ -549,7 +551,7 @@ export async function splitAssignment(
         })
     : [];
 
-  await db.miningTaxAssignments.bulkPut([kept, created, ...handedOver]);
+  await putAssignments([kept, created, ...handedOver]);
   return { kept, created };
 }
 
@@ -563,6 +565,9 @@ export async function deleteAssignments(
   assignments: readonly Pick<MiningTaxAssignmentRecord, 'id' | 'characterId'>[]
 ): Promise<void> {
   if (assignments.length === 0) return;
+  const stored = await db.miningTaxAssignments.bulkGet(assignments.map((a) => a.id));
+  const from = earliestDay(stored.map((a) => a?.date));
+  if (from !== undefined) await dropPayeeCheckpointsFrom(from);
   await db.miningTaxAssignments.bulkDelete(assignments.map((a) => a.id));
   const idsByCharacter = new Map<number, string[]>();
   for (const a of assignments) {
@@ -633,7 +638,7 @@ export async function releaseOreFromAssignment(
   );
   delete next.oreLineValues;
   if (!keepOverride) asPilotAct(next);
-  await db.miningTaxAssignments.put(next);
+  await putAssignments([next]);
   return next;
 }
 
@@ -643,13 +648,11 @@ export async function releaseOreFromAssignment(
  * its own ore lines to the entry's current fresh totals — a new valuation
  * moment, exactly like a fresh assignment — and clears `reviewDiff`.
  *
- * Deliberately reverts to `outstanding` even when the Assignment had been
- * `paid`: a full re-review is a simpler, and never *under*-stating, choice
- * than trying to carve the delta into a second record while leaving stale
- * paid/unpaid history behind (the risk the decision doc's "never silently
- * absorbed" rule exists to avoid is under-counting, not over-asking). A
- * Payee who genuinely already covered part of the new total is a one-click
- * "mark paid" away from being square again.
+ * Reverts the stored status to `outstanding`: a full re-review is a simpler,
+ * and never *under*-stating, choice than trying to carve the delta into a
+ * second record. What is paid is read off the Payee's account, so whatever the
+ * Payee was already paid still pays the regrown day, oldest first; an older
+ * client's paid mark is never cleared (`putAssignments`).
  *
  * `siblings` (every Assignment covering this entry — this one included, or
  * it re-snapshots to nothing) decides how much of the fresh entry it re-snapshots to: a sole Assignment

@@ -242,14 +242,16 @@ export const FULL_CHARACTER_ACCELERATOR: Required<CharacterAcceleratorRecord> = 
 };
 
 export const FULL_MINING_TAX_PAYMENT_LINK: Required<MiningTaxPaymentLinkRecord> = {
-  id: 'journal:9001',
+  id: 'legacy:pay-1',
   characterId: 1,
   payeeId: 'payee-1',
-  kind: 'journal',
-  refId: 9001,
+  kind: 'legacy',
+  refId: 'pay-1',
   amount: 12_500_000,
   paidOn: '2026-10-05',
   source: 'manual',
+  refs: [{ kind: 'journal', refId: 9001 }],
+  unlinked: true,
   updatedAt: UPDATED_AT,
 };
 

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import '@/i18n';
 import { db, type PayeeRecord } from '@/db';
+import type { PayeeAccount } from '@/engine/miningTax/payeeAccount';
 import { PayeeManagerDialog } from './PayeeManagerDialog';
 import { loadPayees } from './payees';
 
@@ -56,7 +57,12 @@ const characters = [{ characterId: CHAR, characterName: 'Miner Alt' }];
 
 type ExtraProps = Pick<
   ComponentProps<typeof PayeeManagerDialog>,
-  'owedByPayee' | 'systemsByPayee' | 'systemNames' | 'bookCorporations'
+  | 'owedByPayee'
+  | 'systemsByPayee'
+  | 'systemNames'
+  | 'bookCorporations'
+  | 'accountOf'
+  | 'onOpenLedger'
 >;
 
 function renderDialog(payees: PayeeRecord[] = [], extra: ExtraProps = {}) {
@@ -340,6 +346,32 @@ describe('PayeeManagerDialog — list rows', () => {
     });
     expect(screen.getByText('4,309,281 ISK')).toHaveClass('text-isk-neg');
     expect(screen.getByText('Settled')).toBeInTheDocument();
+  });
+
+  it("reads a personal Payee's credit off its Running account", () => {
+    const account = { credit: 500_000 } as PayeeAccount;
+    renderDialog([bureau, police], {
+      owedByPayee: new Map(),
+      accountOf: (id) => (id === 'p1' ? account : undefined),
+    });
+    expect(screen.getByText('500,000 ISK credit')).toHaveClass('text-isk-pos');
+    expect(screen.getByText('Settled')).toBeInTheDocument();
+  });
+
+  it("opens any Payee's ledger from its balance, settled or not, when it has an account", async () => {
+    const onOpenLedger = vi.fn();
+    const account = { credit: 0 } as PayeeAccount;
+    renderDialog([bureau, police], {
+      owedByPayee: new Map(),
+      accountOf: (id) => (id === 'p1' ? account : undefined),
+      onOpenLedger,
+    });
+    await userEvent.click(
+      screen.getByRole('button', { name: `Open the ledger of ${bureau.name}` })
+    );
+    expect(onOpenLedger).toHaveBeenCalledWith('p1');
+    // Nothing ever billed: no account, so no ledger to open.
+    expect(screen.queryByRole('button', { name: `Open the ledger of ${police.name}` })).toBeNull();
   });
 
   it('lists the systems mined for a Payee after its rate and hub', () => {

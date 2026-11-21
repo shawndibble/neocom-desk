@@ -120,7 +120,6 @@ describe('continueSession', () => {
     await db.miningTaxAssignments.put(previous);
 
     const result = await continueSession(continuation(previous), () => PRICES);
-
     expect(result.ok).toBe(true);
     const records = await stored();
     expect(records).toHaveLength(2);
@@ -398,16 +397,30 @@ describe('deletePayee', () => {
     amount: 100,
   };
 
-  /** One Combined Entry under A: a day settled oldest-first, and a day still owed. */
+  /** One Combined Entry under A: a day its link paid (oldest first), and a day still owed. */
   const paidDay = assignment({ id: 'g1', groupId: 'g', status: 'paid', payment });
   const owedDay = assignment({ id: 'g2', groupId: 'g', date: '2026-09-05' });
+  /** A's link: pays 100 ISK, so the oldest 100-ISK day, whatever any stored mark says. */
+  const linkOfA = (payeeId = 'p1') => ({
+    id: 'journal:41',
+    characterId: CHAR,
+    payeeId,
+    kind: 'journal' as const,
+    refId: 41,
+    amount: 100,
+    paidOn: '2026-09-06',
+    source: 'manual' as const,
+    updatedAt: 1,
+  });
 
   beforeEach(async () => {
     await db.payees.bulkPut([payeeA, payeeB]);
+    await db.miningTaxPaymentLinks.clear();
   });
 
   it('moves every day of a Combined Entry with an owed day, keeping each status, and coalesce leaves it whole', async () => {
     await db.miningTaxAssignments.bulkPut([paidDay, owedDay]);
+    await db.miningTaxPaymentLinks.put(linkOfA());
 
     expect(await deletePayee(payeeA, 'p2')).toEqual({ ok: true, value: undefined });
 
@@ -421,22 +434,33 @@ describe('deletePayee', () => {
     expect(after.find((a) => a.id === 'g1')!.payment).toEqual(payment);
     expect(await db.payees.get('p1')).toBeUndefined();
     expect((await readTombstones(tombstoneKey(PAYEES, CHAR))).map((t) => t.id)).toEqual(['p1']);
-    expect(syncMock.scheduleSync).toHaveBeenCalledTimes(1);
     expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR, {
       collections: ['miningTaxAssignments', 'payees'],
     });
+    // The link goes with the Payee, in the same write.
+    expect((await db.miningTaxPaymentLinks.get('journal:41'))?.payeeId).toBe('p2');
 
     await coalesceAssignments(CHAR);
     expect((await stored()).every((a) => a.groupId === 'g')).toBe(true);
   });
 
+  it("decides paid off the Payee's account, never a stored mark", async () => {
+    // Marked paid by an older client, but no link pays it: it is owed, and moves.
+    const markedOnly = assignment({ id: 'm1', date: '2026-09-01', status: 'paid', payment });
+    await db.miningTaxAssignments.bulkPut([markedOnly]);
+    expect((await deletePayee(payeeA, 'p2')).ok).toBe(true);
+    expect((await stored())[0].payeeId).toBe('p2');
+  });
+
   it('leaves standalone paid days, and Combined Entries with nothing owed, where they are', async () => {
-    const standalonePaid = assignment({ id: 's1', date: '2026-09-01', status: 'paid', payment });
+    const standalonePaid = assignment({ id: 's1', date: '2026-08-01' });
     const settledGroup = [
-      assignment({ id: 'h1', groupId: 'h', date: '2026-08-01', status: 'paid', payment }),
-      assignment({ id: 'h2', groupId: 'h', date: '2026-08-02', status: 'paid', payment }),
+      assignment({ id: 'h1', groupId: 'h', date: '2026-08-02' }),
+      assignment({ id: 'h2', groupId: 'h', date: '2026-08-03' }),
     ];
     await db.miningTaxAssignments.bulkPut([standalonePaid, ...settledGroup, owedDay]);
+    // 300 ISK pays the three oldest days; the owed day stays owed.
+    await db.miningTaxPaymentLinks.put({ ...linkOfA(), amount: 300 });
 
     expect((await deletePayee(payeeA, 'p2')).ok).toBe(true);
 
@@ -456,6 +480,18 @@ describe('deletePayee', () => {
     expect(syncMock.scheduleSync).not.toHaveBeenCalled();
   });
 
+  it('re-points the links to the rest of a merged Payee when its primary record is deleted', async () => {
+    // The same recipient on two Characters: p1 is the group's primary, so links name it.
+    const alt: PayeeRecord = { ...payeeA, id: 'p9', characterId: 2 };
+    await db.payees.put(alt);
+    await db.miningTaxPaymentLinks.put(linkOfA());
+    expect((await deletePayee(payeeA)).ok).toBe(true);
+    expect((await db.miningTaxPaymentLinks.get('journal:41'))?.payeeId).toBe('p9');
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR, {
+      collections: ['miningTaxPaymentLinks'],
+    });
+  });
+
   it('deletes only the Payee when there is nowhere to move its entries', async () => {
     await db.miningTaxAssignments.bulkPut([owedDay]);
 
@@ -471,7 +507,9 @@ describe('deletePayee', () => {
   it('counts what a move takes: owed days plus the rest of their Combined Entries', () => {
     const elsewhere = assignment({ id: 'x1', payeeId: 'p2', groupId: 'g' });
     expect(
-      assignmentsMovedWithPayee([paidDay, owedDay, elsewhere], 'p1')
+      assignmentsMovedWithPayee([paidDay, owedDay, elsewhere], 'p1', (a) =>
+        a.id === 'g1' ? 'paid' : 'outstanding'
+      )
         .map((a) => a.id)
         .sort()
     ).toEqual(['g1', 'g2']);

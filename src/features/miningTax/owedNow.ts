@@ -5,8 +5,7 @@
  * book says it hasn't credited is owed again (#6219), and ore a book bills is owed to the
  * corporation, not to the member's own Payee too (#6204).
  */
-import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
-import { entryKey } from '@/engine/miningTax/types';
+import type { PayeeRecord } from '@/db';
 import type { PersonalOverlay } from '@/engine/corpTaxBook/personal';
 import i18n from '@/i18n';
 import {
@@ -16,50 +15,26 @@ import {
   type UnassignedSummary,
 } from './balances';
 import { loadBookPrices, loadCorpNames, loadTrackedCorpBooks } from './corpBook/corpBookSources';
-import { buildCorpBookView } from './corpBook/corpBookView';
+import { buildCorpBookView, type CorpBookView } from './corpBook/corpBookView';
 import { buildDisplayRows } from './corpBook/corpRows';
-import { allMembers, type DisplayRow } from './groupRows';
+import type { DisplayRow } from './groupRows';
 import { PayeeAccounts, withPaidStatus } from './payeeAccounts';
-import type { PayeePaymentLink, StoredPayeeCheckpoint } from '@/engine/miningTax/payeeAccount';
 import { loadMadePaymentsWithStatus } from './madePayments';
 import { groupPayees, payeeDuplicateAliases } from './payeeGroups';
 import type { MoonMiningTaxSnapshot } from './snapshot';
 
-type AssignmentRef = Pick<
-  MiningTaxAssignmentRecord,
-  'id' | 'characterId' | 'date' | 'solarSystemId'
->;
-
-/** The share (0–1) of an Assignment's tax a Corp Tax Book bills too. */
-export function alsoBilledShareOf(
+/** By Assignment id, the share (0–1) of its tax the books' overlay says a Corp Tax Book bills too. */
+export function billedElsewhereOf(
   alsoBilled: PersonalOverlay['alsoBilled'] | undefined
-): (a: AssignmentRef) => number {
-  return (a) => alsoBilled?.get(entryKey(a.characterId, a.date, a.solarSystemId))?.get(a.id) ?? 0;
+): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const byId of alsoBilled?.values() ?? []) for (const [id, share] of byId) out.set(id, share);
+  return out;
 }
 
-/**
- * Every personal Payee's account as the tab shows it: from every personal row's Assignments
- * (every Character's: a merged Payee's oldest day may be an alt's), each billing what is left once
- * a Corp Tax Book bills part of it too (#6204), and the links that pay them.
- */
-export function payeeAccountsOf(input: {
-  rows: readonly DisplayRow[];
-  payees: readonly PayeeRecord[];
-  links: readonly PayeePaymentLink[];
-  alsoBilled: PersonalOverlay['alsoBilled'] | undefined;
-  checkpoints?: ReadonlyMap<string, StoredPayeeCheckpoint>;
-}): PayeeAccounts {
-  const share = alsoBilledShareOf(input.alsoBilled);
-  const assignments = input.rows
-    .filter((dr) => !dr.corp || dr.corp.kind !== 'row')
-    .flatMap((dr) => allMembers(dr).map((m) => m.assignment));
-  return PayeeAccounts.build({
-    assignments,
-    payees: input.payees,
-    links: input.links,
-    ...(input.checkpoints ? { checkpoints: input.checkpoints } : {}),
-    taxOf: (a) => a.taxOwed * (1 - Math.min(1, share(a as MiningTaxAssignmentRecord))),
-  });
+/** Each Corp Tax Book Payee's credit, by its id: what its Miners' accounts hold over what they bill. */
+export function bookCreditsOf(corpView: CorpBookView | null | undefined): Map<string, number> {
+  return new Map(corpView?.books.map((b) => [b.payee.id, b.summary.credit]) ?? []);
 }
 
 /** Per Payee, what is owed now over `rows` (display rows, a book's overlay applied). */
@@ -68,9 +43,11 @@ export function owedBalances(
   ledgerPayees: readonly PayeeRecord[],
   accounts: PayeeAccounts,
   /** Duplicate records of one Payee mapped to the primary (`payeeDuplicateAliases`). */
-  aliases?: ReadonlyMap<string, string>
+  aliases?: ReadonlyMap<string, string>,
+  /** Each Corp Tax Book Payee's credit, by its id (`BookSummary.credit`). */
+  bookCredits?: ReadonlyMap<string, number>
 ): PayeeBalance[] {
-  return computePayeeBalances(rows, ledgerPayees, accounts, aliases);
+  return computePayeeBalances(rows, ledgerPayees, accounts, aliases, bookCredits);
 }
 
 /**
@@ -101,15 +78,27 @@ export interface OwedNow {
 export async function loadOwedBalances(
   snapshot: Pick<
     MoonMiningTaxSnapshot,
-    'rows' | 'characters' | 'payeesByCharacter' | 'paymentLinks' | 'payeeCheckpoints'
+    | 'rows'
+    | 'characters'
+    | 'payeesByCharacter'
+    | 'paymentLinks'
+    | 'payeeCheckpoints'
+    | 'billedElsewhere'
   >,
   now: number = Date.now()
 ): Promise<OwedNow> {
   const seen = new Map<string, PayeeRecord>();
   for (const list of snapshot.payeesByCharacter.values()) for (const p of list) seen.set(p.id, p);
   const payees = [...seen.values()];
-  // Paid read off each Payee's account, as on the Tax tab.
-  const entries = withPaidStatus(snapshot.rows, payees, snapshot.paymentLinks);
+  // Paid read off each Payee's account, the one build the Tax tab reads too.
+  const accounts = PayeeAccounts.build({
+    assignments: snapshot.rows.flatMap((row) => row.assignments),
+    payees,
+    links: snapshot.paymentLinks,
+    checkpoints: new Map(snapshot.payeeCheckpoints),
+    billedElsewhere: snapshot.billedElsewhere,
+  });
+  const entries = withPaidStatus(snapshot.rows, accounts);
   const characterNames = new Map(snapshot.characters.map((c) => [c.characterId, c.characterName]));
 
   const books = await loadTrackedCorpBooks();
@@ -144,19 +133,13 @@ export async function loadOwedBalances(
     corpView?.overlay ?? null,
     (id) => characterNames.get(id) ?? `#${id}`
   );
-  const accounts = payeeAccountsOf({
-    rows,
-    payees,
-    links: snapshot.paymentLinks,
-    alsoBilled: corpView?.overlay.alsoBilled,
-    checkpoints: snapshot.payeeCheckpoints,
-  });
   return {
     balances: owedBalances(
       rows,
       [...payees, ...(corpView?.payees ?? [])],
       accounts,
-      payeeDuplicateAliases(groupPayees(payees))
+      payeeDuplicateAliases(groupPayees(payees)),
+      bookCreditsOf(corpView)
     ),
     unassignedCount: unassignedSummary(rows, () => 0).entryCount,
   };

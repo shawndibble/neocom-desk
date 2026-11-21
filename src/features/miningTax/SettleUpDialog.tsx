@@ -51,6 +51,8 @@ export interface SettlePayment {
   method: MiningTaxPaymentMethod;
   /** A payment in kind's contract, when the pilot gave its id. */
   contractId?: number;
+  /** The Character sending it: the link's owner. */
+  payerId: number | null;
 }
 
 interface SettleUpDialogProps {
@@ -155,7 +157,13 @@ export function SettleUpDialog({
     const parsed = Number(trimmed);
     const hasContract =
       method === 'contract' && trimmed !== '' && Number.isSafeInteger(parsed) && parsed > 0;
-    return { amount: amountToSend, paidOn, method, ...(hasContract ? { contractId: parsed } : {}) };
+    return {
+      amount: amountToSend,
+      paidOn,
+      method,
+      payerId: payer,
+      ...(hasContract ? { contractId: parsed } : {}),
+    };
   }
 
   async function commit() {

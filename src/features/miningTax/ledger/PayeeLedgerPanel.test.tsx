@@ -74,6 +74,13 @@ describe('PayeeLedgerPanel', () => {
     expect(screen.getByText('4,150,000 ISK')).toBeInTheDocument();
   });
 
+  it('shows owed as a positive balance, and money ahead as credit, never negative', () => {
+    renderPanel(CREDIT_LEDGER);
+    const balances = bodyRows().map((r) => within(r).getAllByRole('cell').at(-1)?.textContent);
+    expect(balances.some((b) => b?.startsWith('-'))).toBe(false);
+    expect(balances.at(-1)).toMatch(/credit$/);
+  });
+
   it('says so when nothing is billed yet, and spins while loading', () => {
     const { unmount } = renderPanel(EMPTY_LEDGER);
     expect(screen.getByText('Nothing on this ledger yet')).toBeInTheDocument();

@@ -18,6 +18,7 @@ import {
   type Firestore,
 } from 'firebase/firestore/lite';
 import { db, type PlanetRichnessRecord, type StationPinRecord } from '@/db';
+import { dropPayeeCheckpointsFrom, earliestDay } from '@/db/payeeCheckpoints';
 import { planetRichnessDeletedAtByKey, stationPinDeletedAtByKey } from './accountWideBackfill';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import {
@@ -290,6 +291,19 @@ export async function syncEditableCollection(
   }
   if (plan.deleteLocal.length > 0) {
     await table.bulkDelete(plan.deleteLocal);
+  }
+  // What another device changed reaches back into the Payees' closed accounts too.
+  if (spec.closesHistory && (plan.pullUpserts.length > 0 || plan.deleteLocal.length > 0)) {
+    const gone = new Set(plan.deleteLocal);
+    const changed = [
+      ...plan.pullUpserts.map((r) => spec.toLocalRecord(r)),
+      ...local.filter((r) => gone.has(r.id)),
+      // A row moved: what it was dated before changes too.
+      ...local.filter((r) => plan.pullUpserts.some((u) => u.id === r.id)),
+    ].map((r) => spec.closesHistory!(r));
+    await dropPayeeCheckpointsFrom(
+      changed.includes(null) ? null : (earliestDay(changed as string[]) ?? null)
+    );
   }
   // A remote tombstone pulled down here (`deleteLocal`) previously left no
   // local trace once the row itself was gone — so `deletedAtByKey()`

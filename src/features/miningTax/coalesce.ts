@@ -34,6 +34,7 @@ import {
 import { deleteAssignments } from './assignments';
 import type { PayeeAccounts } from './payeeAccounts';
 import { loadPayeeAccounts } from './paymentLinkStore';
+import { putAssignments } from './storedAssignments';
 
 function coalescable(a: MiningTaxAssignmentRecord, accounts: PayeeAccounts): CoalescableAssignment {
   return {
@@ -116,7 +117,7 @@ export async function coalesceAssignments(
   // local delete would let the next pull resurrect them beside the record
   // that now holds their ore.
   await db.transaction('rw', db.miningTaxAssignments, db.settings, async () => {
-    await db.miningTaxAssignments.bulkPut([...rewritten].map((id) => working.get(id)!));
+    await putAssignments([...rewritten].map((id) => working.get(id)!));
     await deleteAssignments(absorbedIds.map((id) => ({ id, characterId })));
   });
   scheduleSync(characterId, { collections: ['miningTaxAssignments'] });

@@ -1,6 +1,7 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { InlineError } from '@/components/ui/InlineError';
-import { useId, useMemo, useRef, useState } from 'react';
+import { useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { plainTextActionClassName } from '@/components/ui/plainTextActionClassName';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -18,6 +19,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { PayeeRecord } from '@/db';
+import type { PayeeAccount } from '@/engine/miningTax/payeeAccount';
 import { formatIsk } from '@/lib/isk';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { useSystemName } from '@/features/route/useSolarSystems';
@@ -75,6 +77,10 @@ interface PayeeManagerDialogProps {
    * corporation as its own (`payeesOfBookCorporation`).
    */
   bookCorporations?: readonly BookCorporation[];
+  /** Each personal Payee's Running account, by any of its record ids: its credit, and its ledger. */
+  accountOf?: (payeeId: string) => PayeeAccount | undefined;
+  /** Opens a Payee's ledger: each row's balance is the way in, owed, in credit or settled. */
+  onOpenLedger?: (payeeId: string) => void;
 }
 
 export interface PayeeOwed {
@@ -162,6 +168,8 @@ export function PayeeManagerDialog({
   systemsByPayee,
   systemNames,
   bookCorporations = NO_BOOK_CORPORATIONS,
+  accountOf,
+  onOpenLedger,
 }: PayeeManagerDialogProps) {
   const { t } = useTranslation();
   const formId = useId();
@@ -424,15 +432,37 @@ export function PayeeManagerDialog({
     }));
   }
 
-  /** What the member has paid a group's Corp Tax Book beyond what it bills: its credit. */
+  /**
+   * What the member has paid a group beyond what it bills: its Running account's credit, and
+   * that of a Corp Tax Book it is linked to.
+   */
   function creditOfGroup(group: PayeeGroup): number {
     const ids = new Set(group.members.map((m) => m.id));
+    const own = accountOf?.(group.primary.id)?.credit ?? 0;
     return bookCorporations.reduce(
       (sum, corp) =>
         (corp.credit ?? 0) > 0 && payeesOfBookCorporation(payees, corp).some((p) => ids.has(p.id))
           ? sum + (corp.credit ?? 0)
           : sum,
-      0
+      own
+    );
+  }
+
+  /**
+   * A row's balance is the readout of the Payee's ledger, so it opens it (DESIGN §6c, as on the
+   * Payee card): the way into the ledger of a Payee that owes nothing and so has no card.
+   */
+  function balanceReadout(payee: PayeeRecord, readout: ReactNode) {
+    if (!readout || !onOpenLedger || !accountOf?.(payee.id)) return readout;
+    return (
+      <button
+        type="button"
+        onClick={() => onOpenLedger(payee.id)}
+        aria-label={t('miningTax.ledger.openFor', { payee: payee.name })}
+        className={plainTextActionClassName('shrink-0')}
+      >
+        {readout}
+      </button>
     );
   }
 
@@ -489,19 +519,22 @@ export function PayeeManagerDialog({
                       <Tooltip content={payee.name}>
                         <p className="min-w-0 flex-1 truncate text-sm">{payee.name}</p>
                       </Tooltip>
-                      {owed && owed.amount > 0 ? (
-                        <span className="shrink-0 text-xs text-isk-neg tabular-nums">
-                          {t('miningTax.payees.owed', { amount: formatIsk(owed.amount, 0) })}
-                        </span>
-                      ) : credit > 0 ? (
-                        <span className="shrink-0 text-xs text-isk-pos tabular-nums">
-                          {t('miningTax.payees.credit', { amount: formatIsk(credit, 0) })}
-                        </span>
-                      ) : owedByPayee ? (
-                        <span className="shrink-0 text-xs text-text-dim">
-                          {t('miningTax.payees.settled')}
-                        </span>
-                      ) : null}
+                      {balanceReadout(
+                        payee,
+                        owed && owed.amount > 0 ? (
+                          <span className="shrink-0 text-xs text-isk-neg tabular-nums">
+                            {t('miningTax.payees.owed', { amount: formatIsk(owed.amount, 0) })}
+                          </span>
+                        ) : credit > 0 ? (
+                          <span className="shrink-0 text-xs text-isk-pos tabular-nums">
+                            {t('miningTax.payees.credit', { amount: formatIsk(credit, 0) })}
+                          </span>
+                        ) : owedByPayee ? (
+                          <span className="shrink-0 text-xs text-text-dim">
+                            {t('miningTax.payees.settled')}
+                          </span>
+                        ) : null
+                      )}
                     </div>
                     <p className="mt-0.5 truncate text-[0.6875rem] text-text-dim">
                       {systems.length > 0
