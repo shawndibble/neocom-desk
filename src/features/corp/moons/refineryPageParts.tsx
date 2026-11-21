@@ -110,7 +110,12 @@ export function OrePanel({
       title={t(kp('ore.title'))}
       meta={
         <span className="text-xs text-text-dim">
-          {t(kp(`ore.source.${row.oreSource}`))} · {atDate(row.startedAt, zone)}
+          {t(
+            kp(
+              `ore.source.${row.oreSource === 'survey' && row.oreCorrected ? 'surveyCorrected' : row.oreSource}`
+            )
+          )}{' '}
+          · {atDate(row.startedAt, zone)}
         </span>
       }
       wrapMeta

@@ -25,7 +25,12 @@ import {
   refineryLabeler,
   type RefineryLabelSources,
 } from '@/engine/corpTaxBook/refinery';
-import { surveyFractions, estimateChunk, learnChunkRates } from '@/engine/corpTaxBook/extraction';
+import {
+  surveyFractions,
+  estimateChunk,
+  learnChunkRates,
+  scanVolume,
+} from '@/engine/corpTaxBook/extraction';
 import { measurable } from '@/engine/corpTaxBook/bookView';
 import { toEngineExtraction } from '@/engine/corpTaxBook/sync';
 import { countedScans } from '@/engine/survey/series';
@@ -174,12 +179,14 @@ export function useCorpBook(
     | {
         from: Fetched;
         lines: NonNullable<BookViewInput['surveyOreLines']>;
+        measured: ReadonlySet<string>;
         prices: BookPrices | undefined;
       }
     | undefined
   >(undefined);
   const survey = builtSurvey?.from === fetched ? builtSurvey : undefined;
   const surveyOreLines = survey?.lines;
+  const surveyMeasured = survey?.measured;
   const reload = useCallback(() => setAttempt((n) => n + 1), []);
   // The Moon owners tab reads no ledger rows unless its summaries cannot stand in (#5717).
   const needsRows =
@@ -319,6 +326,7 @@ export function useCorpBook(
     const measured = learnChunkRates(data.state.extractions.map(measurable));
     (async () => {
       const found = new Map<string, { typeId: number; quantity: number }[]>();
+      const measuredIds = new Set<string>();
       if (wanted.length > 0) {
         const [moonIds, types] = await Promise.all([loadMoonOreTypeIds(), loadTypes()]);
         const typeIdByName = new Map<string, number>();
@@ -330,15 +338,22 @@ export function useCorpBook(
           wanted.map(async (x) => {
             const survey = await loadSurvey(x.surveyId!);
             if (!survey.ok) return;
-            const [first] = countedScans(survey.scans, survey.ignored);
+            // The first counted scan is the best picture of the whole chunk.
+            const first = countedScans(survey.scans, survey.ignored).reduce<
+              (typeof survey.scans)[number] | undefined
+            >((a, b) => (a === undefined || b.at < a.at ? b : a), undefined);
             if (!first) return;
             const ex = toEngineExtraction(x);
             const estimate = estimateChunk(ex, {
               survey: surveyFractions(first.rocks, (ore) => typeIdByName.get(ore)),
+              surveyVolumeM3: scanVolume(first.rocks),
+              surveyAt: first.at,
+              expiryHours: data.settings.structureExpiryHours[String(ex.structureId)],
               chunkM3PerHour: data.settings.chunkM3PerHour ?? undefined,
               measured: measured.get(ex.structureId),
             });
             if (estimate.oreLines.length > 0) found.set(ex.id, estimate.oreLines);
+            if (estimate.measuredVolume) measuredIds.add(ex.id);
           })
         );
       }
@@ -351,7 +366,11 @@ export function useCorpBook(
             )
           : undefined;
       if (!cancelled)
-        setSurvey(found.size > 0 ? { from: fetched, lines: found, prices } : undefined);
+        setSurvey(
+          found.size > 0
+            ? { from: fetched, lines: found, measured: measuredIds, prices }
+            : undefined
+        );
     })().catch(() => undefined);
     return () => {
       cancelled = true;
@@ -364,12 +383,13 @@ export function useCorpBook(
       bookViewInputOf(corporationId, now, fetched.data, survey?.prices ?? fetched, {
         memberIds,
         surveyOreLines,
+        surveyMeasured,
       })
     );
     const { moon, scopedMiner: minerId, minerScope } = fetched.data;
     if (moon) return withMoonDocs(built, moon.docs, moon.fromDocs);
     return minerId !== undefined ? withMinerTotals(built, minerId, minerScope?.totals) : built;
-  }, [fetched, now, corporationId, memberIds, survey, surveyOreLines]);
+  }, [fetched, now, corporationId, memberIds, survey, surveyOreLines, surveyMeasured]);
 
   // Names, resolved after the figures so the tables never wait on them.
   useEffect(() => {
