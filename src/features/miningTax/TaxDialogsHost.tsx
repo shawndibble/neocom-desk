@@ -41,6 +41,7 @@ import {
 import {
   paymentLinkKey,
   linkAt,
+  PayeeRunningAccount,
   type PayeePaymentLink,
   heldPaymentKeys,
 } from '@/engine/miningTax/payeeRunningAccount';
@@ -598,8 +599,10 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
   const ledgerSource = useMemo(() => {
     if (!ledgerTarget) return null;
     if (ledgerTarget.kind === 'personal') {
-      const account = accounts.of(ledgerTarget.payeeId);
-      if (!account) return null;
+      // A Payee nothing was billed to has no account: its ledger opens empty.
+      const account =
+        accounts.of(ledgerTarget.payeeId) ??
+        PayeeRunningAccount.build({ payeeId: ledgerTarget.payeeId, charges: [], links: [] });
       const byId = new Map(everyAssignment.map((a) => [a.id, a]));
       return {
         account: account.account,

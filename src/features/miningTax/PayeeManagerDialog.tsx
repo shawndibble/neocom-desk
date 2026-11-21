@@ -450,10 +450,11 @@ export function PayeeManagerDialog({
 
   /**
    * A row's balance is the readout of the Payee's ledger, so it opens it (DESIGN §6c, as on the
-   * Payee card): the way into the ledger of a Payee that owes nothing and so has no card.
+   * Payee card): the way into the ledger of a Payee that owes nothing and so has no card. Always,
+   * "Settled" too: a Payee nothing was ever billed to opens an empty ledger rather than plain text.
    */
   function balanceReadout(payee: PayeeRecord, readout: ReactNode) {
-    if (!readout || !onOpenLedger || !accountOf?.(payee.id)) return readout;
+    if (!readout || !onOpenLedger) return readout;
     return (
       <button
         type="button"
