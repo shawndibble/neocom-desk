@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
+  lockDateFor,
+  snapshotThroughFor,
   canAdvanceCheckpoint,
   checkpointFits,
   checkpointProblems,
@@ -143,5 +145,19 @@ describe('editReachesCheckpoint: whether an edit may change a closed day', () =>
   });
   it('an edit that can reach any day (no date) always does', () => {
     expect(editReachesCheckpoint(null, today)).toBe(true);
+  });
+});
+
+describe('lockDateFor', () => {
+  it('is the 1st of the month two months back', () => {
+    expect(lockDateFor('2026-12-01')).toBe('2026-10-01');
+    expect(lockDateFor('2026-12-15')).toBe('2026-10-01');
+    expect(lockDateFor('2026-12-31')).toBe('2026-10-01');
+    expect(lockDateFor('2027-01-05')).toBe('2026-11-01');
+    expect(lockDateFor('2027-02-28')).toBe('2026-12-01');
+  });
+  it('makes a snapshot cover every day before it', () => {
+    expect(snapshotThroughFor('2026-12-15')).toBe('2026-09-30');
+    expect(snapshotThroughFor('2028-05-02')).toBe('2028-02-29');
   });
 });

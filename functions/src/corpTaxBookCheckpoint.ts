@@ -79,6 +79,21 @@ export function checkpointFits(
  * The newest date an account may be closed through on `today` (`YYYY-MM-DD`, UTC): the end of the
  * last month that ended at least `CLOSE_AFTER_DAYS` days before today.
  */
+/**
+ * The lock date on `today` (`YYYY-MM-DD`, UTC): the 1st of the month two months back. Nothing
+ * dated before it can be added, changed or removed, and a snapshot covers every day before it
+ * (decision 20261120-235011, "a lock date"). On Dec 1 and on Dec 15 alike it is Oct 1.
+ */
+export function lockDateFor(today: string): string {
+  const [y, m] = today.split('-').map(Number);
+  return utcDay(Date.UTC(y, m - 3, 1));
+}
+
+/** The last day a snapshot on `today` covers: the day before the lock date. */
+export function snapshotThroughFor(today: string): string {
+  return utcDay(Date.parse(`${lockDateFor(today)}T00:00:00Z`) - DAY_MS);
+}
+
 export function closedThroughFor(today: string): string {
   const cutoff = Date.parse(`${today}T00:00:00Z`) - CLOSE_AFTER_DAYS * DAY_MS;
   const c = new Date(cutoff);
