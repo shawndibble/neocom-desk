@@ -13,6 +13,7 @@
  *
  * Pure: the caller loads the Assignments, the links and the stored checkpoint.
  */
+import { utcDayOf } from '../../../functions/src/timeConstants';
 import {
   closedThroughFor,
   type RunningAccountCheckpoint,
@@ -100,7 +101,42 @@ export interface PayeeCharge {
 /** A checkpoint as the device keeps it, until a write dated on or before it drops it. */
 export interface StoredPayeeCheckpoint {
   checkpoint: RunningAccountCheckpoint;
+  /**
+   * How much it closed: what a write that bypasses the app's own write paths (a backup import, a
+   * Character removed, a hand-edited store) would change. Two sums, no account work: a checkpoint
+   * whose closed history no longer adds up is not used.
+   */
+  closed?: ClosedSummary;
 }
+
+/** The charges and payments dated on or before a checkpoint, counted and summed. */
+export interface ClosedSummary {
+  charges: number;
+  tax: number;
+  payments: number;
+  paid: number;
+}
+
+function closedSummary(input: MinerRunningAccountInput, through: string): ClosedSummary {
+  const out: ClosedSummary = { charges: 0, tax: 0, payments: 0, paid: 0 };
+  for (const d of input.days)
+    if (d.date <= through) {
+      out.charges += 1;
+      out.tax += d.tax;
+    }
+  for (const p of input.payments)
+    if (utcDayOf(p.at) <= through) {
+      out.payments += 1;
+      out.paid += p.amount;
+    }
+  return out;
+}
+
+const sameSummary = (a: ClosedSummary, b: ClosedSummary) =>
+  a.charges === b.charges &&
+  a.payments === b.payments &&
+  Math.abs(a.tax - b.tax) < 0.005 &&
+  Math.abs(a.paid - b.paid) < 0.005;
 
 export interface PayeeAccountInput {
   /** The Payee: a merged Payee's primary id. */
@@ -147,7 +183,13 @@ export class PayeeAccount {
       days: input.charges.map((c) => ({ date: c.date, tax: c.tax })),
       payments: links.map((l) => taxPaymentOf(input.payeeId, l)),
     };
-    const cp = input.stored?.checkpoint;
+    const stored = input.stored;
+    // Trusted while what it closed still adds up; a write through the app drops it outright.
+    const cp =
+      stored?.closed !== undefined &&
+      sameSummary(stored.closed, closedSummary(whole, stored.checkpoint.through))
+        ? stored.checkpoint
+        : undefined;
     const account = MinerRunningAccount.build({
       ...whole,
       ...(cp ? { checkpoint: cp } : {}),
@@ -234,10 +276,11 @@ export class PayeeAccount {
     const before = (date: string) => date <= through;
     const anything =
       this.whole.days.some((d) => before(d.date)) ||
-      this.whole.payments.some((p) => before(p.at.slice(0, 10)));
+      this.whole.payments.some((p) => before(utcDayOf(p.at)));
     if (!anything) return undefined;
     return {
       checkpoint: MinerRunningAccount.checkpoint(this.account.input, this.payeeId, through, { at }),
+      closed: closedSummary(this.whole, through),
     };
   }
 
