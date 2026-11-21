@@ -1,13 +1,13 @@
 // One scheduled sync of one corporation's Corp Tax Book (issue #4068, ADR 0025):
 // the server-side twin of the officer visit in src/features/corp/taxBook/
 // syncCorpTaxBook.ts. It reads what ESI holds with the grant holder's token,
-// uploads it monotonically, records the gaps, re-matches Unmatched donations
-// and settles the Statements the donations now cover — through the same
-// `syncBookAs` / `editBookAs` the callables use, so the audit log and
-// `lastSync` read as they do for a visit. The pure decisions are the mirror in
-// corpTaxBookSyncEngine.ts.
+// uploads it monotonically, records the gaps and re-matches Unmatched donations
+// (`rematchUnmatched`) — through the same `syncBookAs` / `editBookAs` the
+// callables use, so the audit log and `lastSync` read as they do for a visit.
+// Money pays a Miner's oldest unpaid day on its own, so nothing is settled here.
+// The pure decisions are the mirror in corpTaxBookSyncEngine.ts.
 //
-// What it must never do is issue a Statement or send mail; those stay officer
+// What it must never do is issue a Late notice or send mail; those stay officer
 // actions. That is enforced by what this file imports (no issuing helper) and by
 // `ScheduledAction`, the only edits it can ask for. It also does not group the
 // officer's own Characters (that needs the officer's device).
@@ -58,8 +58,6 @@ import {
   type MinerLike,
   type MoonNotification,
   type SettlePayment,
-  type SettleStatement,
-  type StatementLike,
   type SyncExtraction,
   type SyncGap,
 } from './corpTaxBookSyncEngine.js';
@@ -70,7 +68,6 @@ import {
 } from './corpTaxBookEngine.js';
 import { reconcileFeederPayouts } from './corpTaxBookFeederPayouts.js';
 import { chunk } from './chunk.js';
-import { dbReader, readNoticeDocs } from './corpTaxBookLateNoticeStore.js';
 import {
   donationOwner,
   noteUncountedDonations,
@@ -123,7 +120,6 @@ export interface AdminBookState {
   divisions: number[];
   lastSync: { at: number; gaps?: SyncGap[] } | null;
   miners: (MinerLike & Data)[];
-  statements: (SettleStatement & StatementLike)[];
   payments: (SettlePayment & { characterId?: number })[];
   extractions: SyncExtraction[];
   /** Per refinery, the last read merged in full: which rows are final (corpTaxBookObservedThrough.ts). */
@@ -170,7 +166,6 @@ async function readQuietBookState(
   return {
     ...bookDocState(snap),
     miners: [],
-    statements: [],
     payments: [],
     extractions: extractions.docs.map((d) => d.data() as SyncExtraction),
   };
@@ -189,16 +184,14 @@ async function readBookStateFrom(snap: BookSnap): Promise<AdminBookState> {
   const ref = snap.ref;
   const list = async <T>(name: string): Promise<T[]> =>
     (await ref.collection(name).get()).docs.map((d) => d.data() as T);
-  const [miners, statements, payments, extractions] = await Promise.all([
+  const [miners, payments, extractions] = await Promise.all([
     list<AdminBookState['miners'][number]>(MINERS),
-    readNoticeDocs(dbReader(ref.firestore), ref),
     list<AdminBookState['payments'][number]>(PAYMENTS),
     list<SyncExtraction>(EXTRACTIONS),
   ]);
   return {
     ...bookDocState(snap),
     miners,
-    statements: statements as unknown as AdminBookState['statements'],
     payments,
     extractions,
   };

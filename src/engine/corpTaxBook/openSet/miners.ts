@@ -1,8 +1,9 @@
 import { characterIdsOfMiner, type DayCharge } from '../charges';
 import { minerBillableLines } from '../billableLines';
-import { disputeHold, disputesToShow } from '../disputes';
+import { disputeHold, disputesToShow, isMinersDispute } from '../disputes';
 import { heldBillableThrough, type StaleHold } from '../feederHealth';
 import { MinerRunningAccount } from '../minerRunningAccount';
+import { checkpointFits } from '../../../../functions/src/corpTaxBookCheckpoint';
 import { isBeforeBook, type TaxPayment } from '../payments';
 import { exemptionsOf } from '../toleranceExemptions';
 import type { MinerSettlement, OpenSetInput } from './types';
@@ -50,10 +51,12 @@ export function settleMiner(
   // An open dispute nobody has dismissed yet holds its date (`disputesToShow`).
   const heldDays = new Set(
     disputesToShow(input.disputes ?? [], input.dismissals)
-      .filter((d) => d.minerId === minerId && disputeHold(d, input.now))
+      .filter((d) => isMinersDispute(d, minerId, characterIds) && disputeHold(d, input.now))
       .map((d) => d.date)
   );
-  const checkpoint = input.checkpoints?.get(minerId);
+  // One summed for other characters than the Miner has now is no history of this account (B3).
+  const stored = input.checkpoints?.get(minerId);
+  const checkpoint = stored && checkpointFits(stored, characterIds) ? stored : undefined;
   const storedPaidThrough = input.minerPaidThrough?.get(minerId);
   const account = MinerRunningAccount.build({
     days: billable.lines,

@@ -92,10 +92,15 @@ export function dueCheckpoints(
     // saved close-of-day price, as `closableThrough` asks of a day stored as paid.
     if (inner.billableThrough === undefined || inner.billableThrough < through) return [];
     if (!inner.billable.lines.every((l) => l.date > through || savedPrice(l))) return [];
-    const stored = view.input.checkpoints?.get(m.id);
+    const stored = inner.account.input.checkpoint;
     if (!canAdvanceCheckpoint(stored, { through }, today)) return [];
     // Nothing billed and no money: nothing to close.
     if (inner.billable.lines.length === 0 && inner.payments.length === 0 && !stored) return [];
-    return [MinerRunningAccount.checkpoint(inner.account.input, m.id, through, recorded)];
+    return [
+      MinerRunningAccount.checkpoint(inner.account.input, m.id, through, {
+        ...recorded,
+        characterIds: inner.characterIds,
+      }),
+    ];
   });
 }

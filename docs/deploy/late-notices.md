@@ -37,12 +37,19 @@ order below.
     Every payment write stores `uids`: its Miner's readers and its sender. A grouping, an unlink
     and a promoted claim bring its Miner's payments' `uids` level with who reads the Miner.
   - `dailyHousekeeping` (job `verifyBookDocs`): the nightly pass rebuilds moon docs (schema 2, no
-    frozen tax) and the tab read models (schema 2, from recorded accounts), and deletes the
-    retired `minerTotals` docs.
+    frozen tax) and the Overview read model (schema 2, its Extractions alone), and deletes the
+    retired `minerTotals` docs and `readModels/minerList` doc (nothing reads it).
+  - A rate refused on a day a Late notice listed still answers `day-on-statement`, which every
+    client matches; a correction a notice listed answers `billed-on-notice` (was
+    `billed-on-statement`, which no client matched). The date guards read the days a notice
+    listed, never the days between its first and last line.
   - Other functions share the same store code (moon owner notifications refresh moon docs and
-    read models), so deploy every function rather than a list.
+    the Overview read model), so deploy every function rather than a list.
 
 ## Order
+
+**Step 1 runs before the merge.** The rules and indexes are additive, and a pilot's payment
+links can only sync once the rules know their collection.
 
 Merging the PR to `develop` ships the new client to `https://dev.neocomdesk.com` straight away,
 before anything below. That is safe: against the functions deployed now it falls back to the old
@@ -88,19 +95,21 @@ actions (`issueStatement`, `recordMail`) and reads the legacy `statements` docs 
 
 ## After deploy
 
-- The first nightly pass rewrites every moon doc and both read models (new schemas) and deletes
-  `minerTotals` and `meta/minerTotalsHealth`; its result is in `meta/verifierHealth`.
+- The first nightly pass rewrites every moon doc and the Overview read model (new schemas) and
+  deletes `minerTotals`, `meta/minerTotalsHealth` and `readModels/minerList`; its result is in
+  `meta/verifierHealth`.
 - **Rolling the functions back is not free.** Verify links keep working (every notice is
   mirrored to `statements`, and tokens still name it under `statementId`), but the older
   functions write only the legacy docs: a notice issued or a mail recorded while rolled back
   lands only in `statements`. They also write `minerTotals` and schema-1 moon docs and read
   models again. After rolling forward again:
   - delete every `corps/{id}/meta/lateNoticesBackfilled` doc, or a marked book's list reads
-    (the Miners list, codes, guards) miss the notices issued meanwhile;
+    (codes, the date guards, the notice cooldown) miss the notices issued meanwhile;
   - re-run the backfill (step 3): it copies those notices and brings their mail state across
     (until then the verify page and mail already read both docs and merge their mail state), and
     gives the payments written meanwhile their `uids`;
-  - the next nightly pass rewrites the moon docs and read models and deletes `minerTotals`.
+  - the next nightly pass rewrites the moon docs and the Overview read model and deletes
+    `minerTotals` and `readModels/minerList`.
 - An older tab that still issues a calendar Statement is refused on every book (the backfill
   lists the books with no `runningAccountFrom`, whose older tabs see that refusal).
 
@@ -116,7 +125,10 @@ a week after promotion. Then a follow-up PR removes the legacy half, each in one
 - **Server reads:** the fallback to `statements` / `statementLinks` in the Late notice store and
   the verify page, the `meta/lateNoticesBackfilled` marker, and the quiet-run stamp on `statements`
   (swap in `lateNotices`).
-- **Settings fields** `cadence`, `minimumStatement` and `overdueDays`, still accepted from old tabs.
+- **Settings fields** `cadence`, `minimumStatement` and `overdueDays`, still accepted from old tabs,
+  still in `BOOK_DEFAULTS` and still sent in the verify page's `terms`.
+- **Wire names:** the rate refusal answers `day-on-notice` instead of `day-on-statement` (the
+  `DAY_ON_NOTICE` constant in `corpTaxBookStore.ts`), once every client accepts both.
 - **Client fallbacks:** `issueLateNotice` → `issueStatement`, `recordLateNoticeMail` →
   `recordMail`, the unknown-action branch of `recordCheckpoints`, the legacy `statements` read in
   `readNotices`, the `statementLinks` token read, and `LEGACY_NOTICES` / `LEGACY_NOTICE_LINKS` /

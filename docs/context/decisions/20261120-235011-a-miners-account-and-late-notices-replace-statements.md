@@ -109,3 +109,24 @@ days were silently dropped.
 - **The server checks what it can.** It has no prices, so it refuses a checkpoint that does not add
   up in itself, and one that owes less than the Miner's recorded account unless a Director sends
   it. A Director can reset a checkpoint; the next load recomputes it.
+
+## Added 2026-11-21: reading old paid marks is passive and idempotent
+
+A review found that reading old-client paid marks into payment links double-counted payments
+and flipped paid days back for older clients.
+
+- **A legacy link's id is stable.** It comes from the old payment's id (`legacy:<paymentId>`), or
+  for a bare mark from the Assignment's id (`legacy:mark:<assignmentId>`), never from what the mark
+  holds now. Its amount is the old payment's recorded amount. A mark read again finds the same link;
+  a legacy link the pilot deleted stays deleted, since its tombstone is checked first.
+- **Old marks are never written or cleared.** Assignments keep `status`, `payment` and `paidAt`
+  exactly as older clients left them, so those clients see what they saw before. The new client
+  only reads them, once each, into links.
+- **A view never reaches a write.** Rows on screen carry a derived paid status; every write path
+  re-reads the stored record before it saves, so a derived status is never stored as a mark.
+- **Nothing that changes Assignments runs before links are known.** Takeovers, growth, coalescing
+  and Ore Form repricing wait until the links collection has completed a pull for every tracked
+  Character, so a device that has not seen the links yet never treats a paid day as unpaid.
+- **Rules ship before the client.** The rules and indexes for the new collection are deployed
+  before the merge (they are additive). A refused pull of a collection the rules do not know yet is
+  treated as "not ready", not as a sync error.

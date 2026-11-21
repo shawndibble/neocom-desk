@@ -1,19 +1,18 @@
 // A scheduled run that skips reading the whole book (issue #5048). The first
-// thing a scheduled sync did was read every Miner, Statement, payment, dismissal
-// and write-off: O(book) reads every scheduled run (4 a day), also when nothing had changed.
+// thing a scheduled sync did was read every Miner and payment: O(book) reads every
+// scheduled run (4 a day), also when nothing had changed.
 //
-// What it reads them for: matching new donations, re-matching Unmatched ones, and
-// planning which Statements are settled. A run that found none of that to do
-// leaves a **quiet marker** on the book: the version stamps (#5047,
-// corpTaxBookVersionTracking.ts) of those collections as that run read them, and
-// what else its decisions rested on. A later run whose stamps still match, whose
+// What it reads them for: matching new donations and re-matching Unmatched ones.
+// A run that found none of that to do leaves a **quiet marker** on the book: the
+// version stamps (#5047, corpTaxBookVersionTracking.ts) of those collections as
+// that run read them, and what else its decisions rested on. A later run whose stamps still match, whose
 // ESI reads bring no new donation and no new Character, and whose extractions
 // read the same, would decide exactly what the quiet run decided — nothing — so
 // it skips those reads and those steps. It still merges the ledger and the
 // extractions, and records the sync.
 //
-// It never settles, assigns or adds a payment on the skipped path, so a stale
-// marker can only delay those, never make a wrong settle (D22). A delay is
+// It never assigns or adds a payment on the skipped path, so a stale marker can
+// only delay those, never place money wrongly (D22). A delay is
 // bounded: the marker expires after QUIET_MAX_AGE_MS, which forces a full run
 // whatever hid a change — a stamp that failed, one that landed before its
 // write committed (corpTaxBookVersionTracking.ts records at the call), or a
@@ -76,7 +75,7 @@ export interface QuietMarker {
   journalThrough: Record<string, number>;
   /** Every Character the quiet run knew: one new to it could match an Unmatched donation. */
   known: number[];
-  /** The extractions it read, which dismissal credits rest on (`fingerprintOf`), from `extractionsSince` on. */
+  /** The extractions it read (`fingerprintOf`), from `extractionsSince` on: a changed one ends quiet. */
   extractions: string;
   /** The `chunkArrivalTime` cut-off its extractions fingerprint, and later quiet reads, use (`extractionsSinceOf`). */
   extractionsSince: string;

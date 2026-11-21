@@ -278,10 +278,11 @@ export function closedMonthBook(how: { checkpointed?: boolean } = {}) {
   const checkpoint = {
     minerId,
     through: closedThroughFor(day(0, seed.now)),
-    owed: [{ date: day(98, seed.now), remaining: DAY_TAX }],
+    owed: [{ date: day(98, seed.now), remaining: DAY_TAX, tax: DAY_TAX, credited: 0 }],
     credit: 0,
     balance: DAY_TAX,
     paidThrough: day(99, seed.now),
+    characterIds: [MINER.ada.id],
   };
   if (how.checkpointed) {
     seed.raw('accountCheckpoints', minerId, {

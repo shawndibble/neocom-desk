@@ -327,7 +327,7 @@ export interface FeederViewInput {
   /** The hub station's end-of-day prices, by `priceKey(oreFormTypeId, date)`. */
   prices: ReadonlyMap<string, SidePrices>;
   /**
-   * The unit prices an issued Statement billed each miner's line at, by the line's `chargeKey`
+   * The unit prices an issued Late notice listed each miner's line at, by the line's `chargeKey`
    * (`characterId:structureId:date`) then raw type id: what an unsaved day falls back to (#6209).
    */
   billedPrices?: ReadonlyMap<string, Readonly<Record<string, number>>>;
@@ -348,7 +348,7 @@ const latestPct = (
   today: string
 ) => latestOwnerRate(history, kind, today)?.pct ?? null;
 
-/** A row's Statement line key (engine `observedEntryKey`): character, refinery and day. */
+/** A row's notice line key (engine `observedEntryKey`): character, refinery and day. */
 const chargeKeyOf = (r: Pick<FeederViewRow, 'characterId' | 'structureId' | 'date'>) =>
   `${r.characterId}:${r.structureId}:${r.date}`;
 

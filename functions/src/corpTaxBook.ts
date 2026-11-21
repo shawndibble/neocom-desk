@@ -5,7 +5,7 @@
 //
 // Firestore layout (rules in firestore.rules; every write is a callable):
 //   corps/{corporationId}                settings: start date, hub, Ore Form, rates, grace,
-//                                               minimum Statement, divisions, lastSync
+//                                               notice rules, divisions, lastSync
 //     officers/{uid}                            officer access record (24h) written by verifyOfficer
 //     observed/{char_type_date_structure}       Observed Mining Entry rows, upserted monotonically
 //     extractions/{structure_start}             Extractions, kept after ESI stops listing them
@@ -16,7 +16,7 @@
 //     statements/{id}  statementLinks/{id}      the legacy mirror of every Late notice, for older tabs
 //     accountCheckpoints/{minerId}              a Running account's closed-through checkpoint
 //     miners/{minerId}                          Miner groupings
-//     meta/paid                                 paidStatementIds, only ever grown (D22)
+//     meta/paid                                 each Miner's paid-through day, only ever grown (D22)
 //     meta/uncounted                            donations into divisions the book does not read (#6207)
 //     audit/{at~rand}                           immutable audit log
 //   corpTaxBookTokens/{token}                   verify-link tokens; no client access at all
@@ -28,9 +28,7 @@ import {
   BOOK_DEFAULTS,
   DIVISION_NAME_MAX,
   shiftDate,
-  statementDays,
   type ForfeitBasis,
-  type StatementDays,
 } from './corpTaxBookEngine.js';
 import { DAY_MS } from './timeConstants.js';
 import { matchesStatedTransfer } from './corpTaxBookTransferMatch.js';
@@ -38,6 +36,7 @@ import {
   NOTICE_ID_FIELD,
   isFinalNoticeId,
   minerPaymentCode,
+  noticedDates,
   type LateNotice,
   type LateNoticeLine,
 } from './corpTaxBookLateNotice.js';
@@ -579,19 +578,19 @@ export function parseSettingsPatch(data: unknown): SettingsPatch {
 /**
  * Why a book's start date cannot move from `oldStart` to `newStart`, else null. Never the
  * future, never before a former moon owner's leave day (`floor`); moving later is allowed
- * only while no issued Statement covers a day in the gap, so billed days stay billed.
+ * only while no Late notice listed a day in the gap (`noticedDates`), so billed days stay billed.
  */
 export function startDateMoveReason(
   oldStart: string,
   newStart: string,
   today: string,
   floor: string | null,
-  statements: readonly StatementDays[]
+  notices: Parameters<typeof noticedDates>[0]
 ): 'start-in-future' | 'start-before-leave' | 'start-over-billed' | null {
   if (newStart > today) return 'start-in-future';
   if (floor !== null && newStart < floor) return 'start-before-leave';
   if (newStart > oldStart) {
-    const billed = new Set(statements.flatMap((s) => [...statementDays(s)]));
+    const billed = noticedDates(notices);
     for (let d = oldStart; d < newStart; d = shiftDate(d, 1))
       if (billed.has(d)) return 'start-over-billed';
   }
