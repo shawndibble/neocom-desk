@@ -11,19 +11,23 @@
  * Dates are UTC days counted back from today (`day(n)`): a test reads "the day 5 days ago",
  * never a calendar date, so it reads the same whenever it runs.
  */
+import { minerPaymentCode, paymentCode } from '../../../functions/src/corpTaxBookLateNotice';
+import { MONTHS } from '../../../src/engine/corpTaxBook/monthNames';
+import { utcDay } from '../../../src/engine/localDay';
+import { DAY_MS, HOUR_MS, MINUTE_MS } from '../../../src/lib/age';
 import type { SeedDoc } from './emulator';
 import { CORP, OFFICER, nameOf, recordedCorpOf, solo } from './identities';
 import { UNIT_PRICE } from './prices';
-
-const DAY_MS = 86_400_000;
-const HOUR_MS = 3_600_000;
 
 export const RATE_PCT = 10;
 export const DAY_QTY = 10_000;
 /** What one ordinary mined day owes: 10,000 units x 1,000 ISK x 10%. */
 export const DAY_TAX = (DAY_QTY * UNIT_PRICE * RATE_PCT) / 100;
-/** The Late notice payment code of the book's notices (`paymentCode`, corpTaxBookLateNotice.ts). */
-export const ORE_TYPE = 45490; // Zeolites (R4)
+/** The one code a Miner puts on a donation; a notice's own code is `paymentCode(noticeId)`. */
+export { minerPaymentCode };
+
+/** Zeolites (R4): the one ore every seeded day mines. */
+export const ORE_TYPE = 45490;
 
 export const REFINERY = {
   alpha: { id: 1_040_000_000_001, name: 'E2E Athanor Alpha', systemId: 30002187, moonId: 40139001 },
@@ -32,9 +36,7 @@ export const REFINERY = {
 export type RefineryKey = keyof typeof REFINERY;
 
 /** The UTC day `back` days before today, as the book keys it. */
-export const day = (back: number, now = Date.now()): string =>
-  new Date(now - back * DAY_MS).toISOString().slice(0, 10);
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+export const day = (back: number, now = Date.now()): string => utcDay(now - back * DAY_MS);
 /** That day as the book's tables print it ("13 Nov", `shortDate` in moonsFormat.ts). */
 export const shortDay = (back: number, now = Date.now()): string => {
   const [, m, d] = day(back, now).split('-').map(Number);
@@ -54,15 +56,6 @@ export const verifyToken = (label: string): string =>
 
 /** Noon UTC of that day, for a payment or a note made on it. */
 export const noonOf = (back: number, now = Date.now()): string => `${day(back, now)}T12:00:00.000Z`;
-
-/** `paymentCode` (functions/src/corpTaxBookLateNotice.ts), as the seed script restates it. */
-export function paymentCode(seed: string): string {
-  let h = 2166136261;
-  for (const ch of seed) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
-  return `MT${h.toString(36).toUpperCase().padStart(7, '0').slice(-6)}`;
-}
-/** The one code a Miner puts on a donation (`minerPaymentCode`). */
-export const minerPaymentCode = (minerId: string): string => paymentCode(`miner:${minerId}`);
 
 export interface MinedDay {
   back: number;
@@ -128,7 +121,7 @@ export class BookSeed {
       createdBy: OFFICER.id,
       // Synced just now: a visit does not sync again by itself (AUTO_SYNC_MIN_AGE_MS).
       lastSync: {
-        at: this.now - (options.lastSyncBack ?? 0) * DAY_MS - 60_000,
+        at: this.now - (options.lastSyncBack ?? 0) * DAY_MS - MINUTE_MS,
         byCharacterId: OFFICER.id,
         byName: OFFICER.name,
         gaps: [],

@@ -153,7 +153,11 @@ test("closing a guest's account leaves a final notice for the days no notice lis
   await dialog.getByRole('textbox', { name: /Reason/ }).fill('Guest fleet ended');
   await dialog.getByRole('button', { name: 'Close account' }).click();
   await expect(dialog).toBeHidden();
-  await page.goto('./corp/moons/late-notices');
+  // In-app, not page.goto: closing navigates on its own, and a reload would race it.
+  await page
+    .getByRole('list', { name: 'Moons' })
+    .getByRole('link', { name: 'Late notices' })
+    .click();
   await expect(
     page.getByRole('checkbox', { name: new RegExp(`^${MINER.guest.name} · `) })
   ).toBeVisible();

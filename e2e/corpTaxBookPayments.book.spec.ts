@@ -8,6 +8,13 @@ import { expect, minerFact, openMiner, signInAsOfficer, test } from './support/t
 import { DAY_TOLERANCE, paymentBook, twoRefineriesBook } from './support/taxBook/bookScenarios';
 import { DAY_TAX, isk, shortDay } from './support/taxBook/bookSeed';
 import { MINER } from './support/taxBook/identities';
+import {
+  PILOT,
+  PILOT_ALT,
+  PILOT_MINER_ID,
+  creditedDonation,
+  memberBook,
+} from './support/taxBook/memberSeed';
 import type { Page } from '@playwright/test';
 
 const ledgerRow = (page: Page, name: RegExp) =>
@@ -84,5 +91,19 @@ test('two refineries on one date are paid as one date', async ({ page, book }) =
   await expect(minerFact(page, 'Oldest unpaid')).toContainText(shortDay(b.owedBack));
   await expect(page.getByRole('table', { name: 'Payments' })).toContainText(
     `Paid 1 day, from ${shortDay(b.sharedBack)}`
+  );
+});
+
+test("an alt's donation pays its group's oldest day", async ({ page, book }) => {
+  const member = memberBook();
+  await book.seed([
+    ...member.seed.docs(),
+    creditedDonation({ refId: 950_001, characterId: PILOT_ALT.id, amount: DAY_TAX, back: 1 }),
+  ]);
+  await openMiner(page, PILOT_MINER_ID, PILOT.name);
+  await expect(page.getByRole('main')).toContainText(`Owed${isk(member.owed - DAY_TAX)}`);
+  await expect(ledgerRow(page, new RegExp(`Payment from ${PILOT_ALT.name}`))).toBeVisible();
+  await expect(page.getByRole('table', { name: 'Payments' })).toContainText(
+    `Paid 1 day, from ${shortDay(member.bookDays[0])}`
   );
 });

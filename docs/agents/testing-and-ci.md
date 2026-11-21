@@ -233,6 +233,16 @@ touches a real Firebase project: the project id is `demo-neocom-desk`.
 Without a real EVE login (a fake officer, mocked SSO/ESI, a larger seed of six refineries and
 fifteen miners), use the `manual-testing` skill: `.claude/skills/manual-testing/SKILL.md`.
 
+**Corp Tax Book browser tests** (`e2e/*.book.spec.ts`) run the officer pages, the verify page
+and the member tab against these emulators, with the real callables and rules:
+`npx playwright test -c playwright.book.config.ts e2e/<file>.book.spec.ts`. Their config starts
+the emulators itself (`scripts/e2e-book/emulators.mjs`: a fresh per-run key signs fake EVE tokens,
+and `ccpStub.mjs`, loaded into the Functions runtime, answers SSO's key set and ESI's
+who-is-who) and a dev server on 5197 pointed at them; the browser is mocked as in every spec.
+One worker: each test wipes the emulator and seeds its book (`e2e/support/taxBook`: `BookSeed`
+writes the server's layout with flat prices, `bookScenarios.ts` holds the books the specs share).
+The main suite and CI's shards skip them; they need a JRE, like the rules tests.
+
 **Known emulator noise.** The Firestore emulator logs `Cannot find field:
 structuredQuery in message Document` when a query runs under a parent document
 whose id has a colon (`characters/char:<id>`). Its REST adapter mis-routes

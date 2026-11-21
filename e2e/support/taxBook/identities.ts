@@ -24,6 +24,10 @@ export const MINER = {
   daxAlt: { id: 90_000_105, name: 'Orlov Hauler' },
   eli: { id: 90_000_106, name: 'Eli Brask' },
   fen: { id: 90_000_107, name: 'Fen Corvane' },
+  /** The signed-in pilot's alt (phase 2): grouped with the pilot in their corporation's book. */
+  pilotAlt: { id: 90_000_120, name: 'Test Pilot Hauler' },
+  /** A player the pilot pays moon tax to directly: a personal Payee (phase 2). */
+  rook: { id: 90_000_130, name: 'Rook Belter' },
   /** Mined as a member, then left the corporation owing: a leaver. */
   lev: { id: 90_008_001, name: 'Lev Departed' },
   /** Mines in the book's refineries from another corporation: a guest, paid on the verify page. */
