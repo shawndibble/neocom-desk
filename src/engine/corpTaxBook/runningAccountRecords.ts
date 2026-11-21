@@ -1,7 +1,8 @@
 /**
  * A running account's figures as the pay page reads them (#6294): the server cannot price days,
- * so an officer's client records each Miner's account (`recordAccounts`) and the verify link
- * shows it, less what the Miner paid since (`liveRunningAccount`, functions).
+ * so an officer's client records each Miner's account (`recordAccounts`), with its snapshot when
+ * one is due, and the verify link shows it, less what the Miner paid since (`liveRunningAccount`,
+ * functions).
  */
 import { utcDayOf } from '@/engine/localDay';
 import {
@@ -35,6 +36,8 @@ export interface RunningAccountRecord {
    * saved-price: only the officer's client can know, the server has no prices.
    */
   settledThrough?: string;
+  /** Its snapshot for the lock date, when one is due (`dueCheckpoints`). */
+  snapshot?: RunningAccountCheckpoint;
 }
 
 /**

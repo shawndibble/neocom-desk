@@ -22,7 +22,7 @@ import { chunk } from '@/lib/chunk';
 import { readDisputes } from '@/engine/corpTaxBook/disputes';
 import {
   LATE_NOTICES,
-  RUNNING_ACCOUNT_CHECKPOINTS,
+  RUNNING_ACCOUNTS,
 } from '../../../../../functions/src/corpTaxBookVersionKeys';
 import { bookDeclarationOf, settingsFrom, type BookDeclaration } from '../bookClient';
 import { errorCode } from '../openBook';
@@ -52,9 +52,9 @@ export async function readMinerScope(
   };
   // Best effort: none until the server has written one.
   const checkpoint = (async () => {
-    if (!book.written(RUNNING_ACCOUNT_CHECKPOINTS)) return undefined;
+    if (!book.written(RUNNING_ACCOUNTS)) return undefined;
     try {
-      return (await one(RUNNING_ACCOUNT_CHECKPOINTS)) as RunningAccountCheckpoint | undefined;
+      return (await one(RUNNING_ACCOUNTS))?.snapshot as RunningAccountCheckpoint | undefined;
     } catch {
       return undefined;
     }

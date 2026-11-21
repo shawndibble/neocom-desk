@@ -14,7 +14,7 @@
 //     dismissals/{id}  declarations/{id}  adjustments/{id}  writeOffs/{id}  rebills/{id}
 //     lateNotices/{id}  lateNoticeLinks/{id}    Late notices and their verify tokens (decision 20261120-235011)
 //     statements/{id}  statementLinks/{id}      legacy notices, read once by the one-time copy
-//     accountCheckpoints/{minerId}              a Running account's snapshot for the lock date
+//     accounts/{minerId}                        a Running account's figures and lock-date snapshot
 //     miners/{minerId}                          Miner groupings
 //     meta/paid                                 each Miner's paid-through day, only ever grown (D22)
 //     meta/uncounted                            donations into divisions the book does not read (#6207)
@@ -92,7 +92,7 @@ export {
   STATEMENT_LINKS,
   LATE_NOTICES,
   LATE_NOTICE_LINKS,
-  RUNNING_ACCOUNT_CHECKPOINTS,
+  RUNNING_ACCOUNTS,
   MINERS,
   META,
 } from './corpTaxBookVersionKeys.js';
@@ -108,11 +108,6 @@ export { TOKENS_COLLECTION } from './corpTaxBookVersionKeys.js';
  */
 export const MEMBER_SETUP_MS = 72 * 60 * 60 * 1000;
 export const OFFICERS = 'officers';
-/**
- * `accounts/{minerId}` (#6294): a running account's figures as an officer's client last worked
- * them out (the server cannot price days), for the pay page's live total. Function-only.
- */
-export const RUNNING_ACCOUNTS = 'accounts';
 export const PAID_DOC = 'paid';
 /** Doc under `meta`: the scheduled sync's public status (ADR 0025); `status: 'active'` is Automatic sync on. */
 export const SCHEDULED_SYNC_DOC = 'scheduledSync';
@@ -727,10 +722,12 @@ export type EditAction =
   /** One moon's overrides; null returns a setting to the Sharing default. */
   | { action: 'setPopSharingMoon'; moonId: number; override: PopSharingOverridePatch }
   | { action: 'recordLateNoticeMail'; noticeId: string; mailId: number; kind: LateNoticeMailKind }
-  /** A running account's figures per Miner, as the officer's client works them out (#6294). */
-  | { action: 'recordAccounts'; accounts: RecordedRunningAccount[] }
-  /** Each Miner's snapshot for the lock date; the server sets who recorded it, when, and its readers. */
-  | { action: 'recordCheckpoints'; checkpoints: RecordedCheckpoint[] };
+  /**
+   * A running account's figures per Miner, as the officer's client works them out (#6294), each
+   * with its snapshot for the lock date when one is due; the server sets the snapshot's `at`,
+   * `by` and readers.
+   */
+  | { action: 'recordAccounts'; accounts: RecordedRunningAccount[] };
 
 /** A Late notice's first mail, or a reminder of it. */
 export type LateNoticeMailKind = 'notice' | 'reminder';
@@ -757,6 +754,8 @@ export interface RecordedRunningAccount {
   settledThrough?: string;
   /** Money ahead of every billed day, as the client counted it; absent from an older client. */
   credit?: number;
+  /** The account through the day before the lock date, when one is due (`checkpointRefusal`). */
+  snapshot?: RecordedCheckpoint;
 }
 
 export type CloseCredit = { kind: 'refund' } | { kind: 'forfeit'; basis: ForfeitBasis };
@@ -855,7 +854,6 @@ export function parseEditAction(data: unknown): EditAction {
       'recordReminder',
       'recordLateNoticeMail',
       'recordAccounts',
-      'recordCheckpoints',
       'setPopSharing',
       'setPopSharingMoon',
     ] as const,
@@ -1133,11 +1131,6 @@ export function parseEditAction(data: unknown): EditAction {
         mailId: int(d.mailId, 'mailId', 1, Number.MAX_SAFE_INTEGER),
         kind: oneOf(d.kind, 'kind', ['notice', 'reminder'] as const),
       };
-    case 'recordCheckpoints':
-      return {
-        action,
-        checkpoints: list(d.checkpoints, 'checkpoints', 200).map(parseCheckpoint),
-      };
     case 'recordAccounts':
       return {
         action,
@@ -1168,6 +1161,9 @@ export function parseEditAction(data: unknown): EditAction {
               ? { settledThrough: dateString(a.settledThrough, 'settledThrough') }
               : {}),
             ...(a.credit !== undefined ? { credit: num(a.credit, 'credit', 0, 1e15) } : {}),
+            ...(a.snapshot !== undefined
+              ? { snapshot: parseCheckpoint({ ...record(a.snapshot), minerId: a.minerId }) }
+              : {}),
           };
         }),
       };

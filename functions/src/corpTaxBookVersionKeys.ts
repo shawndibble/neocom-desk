@@ -47,10 +47,11 @@ export const LATE_NOTICES = 'lateNotices';
 /** `lateNoticeLinks/{noticeId}`: `{ token }`, the verify link's token. Editors only. */
 export const LATE_NOTICE_LINKS = 'lateNoticeLinks';
 /**
- * `accountCheckpoints/{minerId}`: a `RunningAccountCheckpoint`, its Miner's readers (`uids`) and a
- * server `updatedAt`. Officers read every one; a Miner reads their own.
+ * `accounts/{minerId}` (#6294): a running account's figures as an officer's client last worked
+ * them out (the server cannot price days), for the pay page, and its `snapshot` for the lock date
+ * with the Miner's readers (`uids`). Officers read every one; a Miner reads their own snapshot.
  */
-export const RUNNING_ACCOUNT_CHECKPOINTS = 'accountCheckpoints';
+export const RUNNING_ACCOUNTS = 'accounts';
 export const MINERS = 'miners';
 export const META = 'meta';
 
@@ -77,8 +78,6 @@ export const UNVERSIONED_COLLECTIONS: ReadonlySet<string> = new Set([
   'vettingThrottle',
   // A server-side mirror of `observed` (corpTaxBookFeederRollup.ts); no client reads it.
   'feederObserved',
-  // A running account's figures for the pay page (#6294); only the verify link reads them.
-  'accounts',
 ]);
 
 /**
@@ -90,11 +89,11 @@ export const UNVERSIONED_COLLECTIONS: ReadonlySet<string> = new Set([
 export const VERSIONED_COLLECTIONS = [
   MINERS,
   STATEMENTS,
-  // Late notices and their verify links, and each Running account's closed-through checkpoint
+  // Late notices and their verify links, and each Running account with its snapshot
   // (decision 20261120-235011).
   LATE_NOTICES,
   LATE_NOTICE_LINKS,
-  RUNNING_ACCOUNT_CHECKPOINTS,
+  RUNNING_ACCOUNTS,
   PAYMENTS,
   DISMISSALS,
   EXTRACTIONS,

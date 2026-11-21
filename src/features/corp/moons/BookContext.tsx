@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { runningAccountRecords, dueCheckpoints } from '@/engine/corpTaxBook/runningAccountRecords';
 import { chunk } from '@/lib/chunk';
-import { editBook, recordCheckpoints } from '../taxBook/bookClient';
+import { editBook } from '../taxBook/bookClient';
 import { invalidatePopSharing } from '../taxBook/popSharingCache';
 import { BookContext, type BookContextValue } from './bookContextValue';
 import { useReloadOnRecordedMail } from './useReloadOnRecordedMail';
@@ -80,13 +80,13 @@ function sendChanged<T extends { minerId: string }>(
 
 /**
  * What only an officer's tab can work out, since the server cannot price days (#6294, decision
- * 20261120-235011): each Miner's Running account figures for the pay page (`recordAccounts`),
- * and each Miner's snapshot for the lock date when it has none (`recordCheckpoints`). Sent once the book's rows
- * and payments are read, and again whenever they change; no reload.
+ * 20261120-235011): each Miner's Running account figures for the pay page, with its snapshot for
+ * the lock date when it has none (`recordAccounts`). Sent once the book's rows and payments are
+ * read, and again whenever they change; no reload.
  */
 function useRecordAccounts(value: Omit<BookContextValue, 'edit' | 'canEdit'>, canEdit: boolean) {
   const { view, data, characterId, corporationId } = value;
-  // The page rebuilds its view every minute for its clocks; the accounts and checkpoints change
+  // The page rebuilds its view every minute for its clocks; the accounts and snapshots change
   // only with the book read or the UTC day, so they are worked out once per read or per day (M10).
   // (A context built by hand, a story or a test, may carry no clock.)
   const today = (view as typeof view | undefined)?.input?.now?.slice(0, 10);
@@ -101,24 +101,23 @@ function useRecordAccounts(value: Omit<BookContextValue, 'edit' | 'canEdit'>, ca
     // A context built by hand (a story, a test) may carry no parts: then it counts nothing.
     const whole = !!data?.parts?.has('observed') && !!data.parts.has('ledger');
     if (!canEdit || !whole || (data as { moon?: unknown }).moon) return;
+    // A snapshot comes only from a read of the whole book: a Miner's own page cannot see the
+    // groupings around them (B2).
+    const due = new Map(
+      data.scopedMiner === undefined
+        ? dueCheckpoints(view, { at: view.input.now, by: characterId }).map((s) => [s.minerId, s])
+        : []
+    );
     sendChanged(
       corporationId,
       'accounts',
-      runningAccountRecords(view, data.scopedMiner),
-      (accounts) => editBook(characterId, corporationId, { action: 'recordAccounts', accounts })
-    );
-    // A checkpoint comes only from a read of the whole book: a Miner's own page cannot see the
-    // groupings around them (B2).
-    if (data.scopedMiner !== undefined) return;
-    const at = { at: view.input.now, by: characterId };
-    sendChanged(
-      corporationId,
-      'checkpoints',
-      dueCheckpoints(view, at),
-      // What the server skipped (`exists`, `wrong-date`) is no error: the account reads whole.
-      (checkpoints) => recordCheckpoints(characterId, corporationId, checkpoints),
-      // When it was worked out is no change to send again.
-      (c) => JSON.stringify({ ...c, at: undefined })
+      runningAccountRecords(view, data.scopedMiner).map((a) =>
+        due.has(a.minerId) ? { ...a, snapshot: due.get(a.minerId) } : a
+      ),
+      // A snapshot the server skipped (`exists`, `wrong-date`) is no error: the account reads whole.
+      (accounts) => editBook(characterId, corporationId, { action: 'recordAccounts', accounts }),
+      // When a snapshot was worked out is no change to send again.
+      (a) => JSON.stringify({ ...a, snapshot: a.snapshot && { ...a.snapshot, at: undefined } })
     );
   }, [data, today, canEdit, characterId, corporationId]);
 }

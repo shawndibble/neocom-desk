@@ -18946,7 +18946,6 @@
           "feederViewDismissed": "dismissed a notice on the moon owner page",
           "issueLateNotice": "issued a late notice",
           "recordLateNoticeMail": "mailed a late notice",
-          "recordCheckpoints": "closed past months on Miners' accounts",
           "resetCheckpoint": "reopened a Miner's closed months",
           "disputeKind": {
             "payee": "disputed a day: the ore went to another Payee",

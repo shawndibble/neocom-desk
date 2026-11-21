@@ -8,9 +8,9 @@
  * `snapshotThroughFor(today)`; only a change to the Miner's characters deletes it.
  *
  * Shared by the client and the Cloud Functions (decision 20261117-230113): dependency-free.
- * Stored at `corps/{id}/accountCheckpoints/{minerId}` for a Corp Tax Book (written by an
- * officer's tab through a callable: the server has no prices) and on the pilot's device for a
- * personal Payee.
+ * Stored as `snapshot` on `corps/{id}/accounts/{minerId}` for a Corp Tax Book (written by an
+ * officer's tab through `recordAccounts`: the server has no prices) and on the pilot's device for
+ * a personal Payee.
  */
 import { DAY_MS, utcDay } from './timeConstants.js';
 

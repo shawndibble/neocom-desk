@@ -501,8 +501,8 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   temporary mirror in the legacy collection older tabs read; `LateNotice`,
   `functions/src/corpTaxBookLateNotice.ts`), `miners` (groupings), `meta/paid`
   (each Miner's paid-through day, only ever moved forward: a paid day stays
-  closed, D22), `accountCheckpoints/{minerId}` (the Closed-through checkpoint,
-  `functions/src/corpTaxBookCheckpoint.ts`) and `audit` (immutable log, shown
+  closed, D22), `accounts/{minerId}` (the Running account's
+  figures and its Closed-through checkpoint, `functions/src/corpTaxBookCheckpoint.ts`) and `audit` (immutable log, shown
   as the activity feed). A Miner's Running account (`MinerRunningAccount`,
   `src/engine/corpTaxBook/minerRunningAccount.ts`) is built from these on read
   and never stored. `corpTaxBookTokens/{token}` maps a Late notice's verify

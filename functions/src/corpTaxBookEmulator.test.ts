@@ -929,8 +929,12 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         .doc('m-b_2026-10-05')
         .set({ minerId: 'm-b', date: '2026-10-05', uids: ['char:62'] });
       await b.collection('accounts').doc('m-b').set({ minerId: 'm-b' });
-      await b.collection('accountCheckpoints').doc('solo:63').set({ minerId: 'solo:63' });
-      await b.collection('accountCheckpoints').doc('solo:60').set({ minerId: 'solo:60' });
+      const snapshot = { through: '2026-08-31' };
+      await b.collection('accounts').doc('solo:63').set({ minerId: 'solo:63', snapshot });
+      await b
+        .collection('accounts')
+        .doc('solo:60')
+        .set({ minerId: 'solo:60', owed: 5, snapshot, uids: ['char:60'] });
       await b
         .collection('lateNotices')
         .doc('n-b')
@@ -955,9 +959,12 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         { minerId: 'solo:60', uids: readers }
       );
       expect((await b.collection('accounts').doc('m-b').get()).exists).toBe(false);
-      expect((await b.collection('accountCheckpoints').doc('solo:63').get()).exists).toBe(false);
-      // The surviving Miner's checkpoint no longer sums its history: the next load rolls a new one.
-      expect((await b.collection('accountCheckpoints').doc('solo:60').get()).exists).toBe(false);
+      expect((await b.collection('accounts').doc('solo:63').get()).exists).toBe(false);
+      // The surviving Miner's snapshot no longer sums its history: the next load records a new one.
+      expect((await b.collection('accounts').doc('solo:60').get()).data()).toEqual({
+        minerId: 'solo:60',
+        owed: 5,
+      });
     });
 
     it('the backfill moves an older grouping alt records onto its group, and a re-run finds none (#6450)', async () => {
@@ -1210,12 +1217,15 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         provenAt: '2026-10-19T00:00:00Z',
       });
       await book()
-        .collection('accountCheckpoints')
+        .collection('accounts')
         .doc('m-a')
-        .set({ minerId: 'm-a', through: '2026-08-31', uids: ['char:60'] });
+        .set({ minerId: 'm-a', owed: 5, snapshot: { through: '2026-08-31' }, uids: ['char:60'] });
       expect(await promoteProvenClaims(deps(), CORP)).toEqual({ promoted: 1 });
       // Its readers changed: the next officer load records its snapshot again, with them.
-      expect((await book().collection('accountCheckpoints').doc('m-a').get()).exists).toBe(false);
+      expect((await book().collection('accounts').doc('m-a').get()).data()).toEqual({
+        minerId: 'm-a',
+        owed: 5,
+      });
     });
 
     it('refuses a claim when the corporation has no book', async () => {
@@ -2919,7 +2929,7 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
       expect(await reason(issue('n1'))).toBe('account-closed');
     });
 
-    describe('recordCheckpoints: one snapshot per Miner per lock date', () => {
+    describe('recordAccounts: one snapshot per Miner per lock date, on its account', () => {
       const checkpoint = (
         minerId: string,
         through: string,
@@ -2934,10 +2944,20 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         characterIds: [Number(minerId.slice('solo:'.length))],
         ...over,
       });
-      const record = (...checkpoints: ReturnType<typeof checkpoint>[]) =>
-        edit(ACCOUNTANT, { action: 'recordCheckpoints', checkpoints });
+      const account = (minerId: string, over: Record<string, unknown> = {}) => ({
+        minerId,
+        owed: 0,
+        paid: 0,
+        days: 0,
+        ...over,
+      });
+      const record = (...snapshots: ReturnType<typeof checkpoint>[]) =>
+        edit(ACCOUNTANT, {
+          action: 'recordAccounts',
+          accounts: snapshots.map((snapshot) => account(snapshot.minerId, { snapshot })),
+        });
       const stored = async (minerId: string) =>
-        (await book().collection('accountCheckpoints').doc(minerId).get()).data();
+        (await book().collection('accounts').doc(minerId).get()).data();
 
       it('records one through the day before the lock date, and reports what it skips', async () => {
         await turnOn();
@@ -2948,40 +2968,56 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
           skipped: [],
         });
         expect(await stored('solo:50')).toMatchObject({
-          through: '2026-07-31',
-          by: ACCOUNTANT,
-          at: new Date(T0).toISOString(),
+          ...account('solo:50'),
           uids: ['char:50'],
-          updatedAt: expect.anything(),
+          snapshot: { through: '2026-07-31', by: ACCOUNTANT, at: new Date(T0).toISOString() },
         });
-        const out = await record(
-          checkpoint('solo:50', '2026-07-31'),
-          checkpoint('solo:52', '2026-08-31'),
-          checkpoint('solo:52', '2026-07-31', { balance: 7 }),
-          checkpoint('solo:404', '2026-07-31'),
-          checkpoint('solo:52', '2026-07-31')
-        );
-        expect(out).toEqual({
-          recorded: ['solo:52'],
+        expect(
+          await record(
+            checkpoint('solo:50', '2026-07-31'),
+            checkpoint('solo:52', '2026-08-31'),
+            checkpoint('solo:404', '2026-07-31')
+          )
+        ).toEqual({
+          recorded: [],
           skipped: [
             { minerId: 'solo:50', reason: 'exists' },
             { minerId: 'solo:52', reason: 'wrong-date' },
-            { minerId: 'solo:52', reason: 'balance' },
             { minerId: 'solo:404', reason: 'unknown-miner' },
           ],
         });
-        expect(await stored('solo:404')).toBeUndefined();
+        expect(await record(checkpoint('solo:52', '2026-07-31', { balance: 7 }))).toMatchObject({
+          skipped: [{ minerId: 'solo:52', reason: 'balance' }],
+        });
+        expect(await record(checkpoint('solo:52', '2026-07-31'))).toMatchObject({
+          recorded: ['solo:52'],
+        });
+        expect((await stored('solo:404'))?.snapshot).toBeUndefined();
         // The audit holds the full figures of what it stored, and why each other was skipped.
-        const entry = (
-          await book().collection('audit').where('action', '==', 'recordCheckpoints').get()
-        ).docs
-          .map((d) => d.data())
-          .find((e) => e.detail.skipped.length > 0);
-        expect(entry?.detail).toMatchObject({
-          recorded: [checkpoint('solo:52', '2026-07-31')],
-          skipped: expect.arrayContaining([
-            { minerId: 'solo:404', through: '2026-07-31', reason: 'unknown-miner' },
-          ]),
+        const entries = (
+          await book().collection('audit').where('action', '==', 'recordAccounts').get()
+        ).docs.map((d) => d.data().detail);
+        expect(entries).toContainEqual(
+          expect.objectContaining({
+            skipped: expect.arrayContaining([
+              { minerId: 'solo:404', through: '2026-07-31', reason: 'unknown-miner' },
+            ]),
+          })
+        );
+        expect(entries).toContainEqual(
+          expect.objectContaining({
+            accounts: [account('solo:52', { snapshot: checkpoint('solo:52', '2026-07-31') })],
+          })
+        );
+        // New figures keep the stored snapshot and its readers.
+        await edit(ACCOUNTANT, {
+          action: 'recordAccounts',
+          accounts: [account('solo:50', { owed: 9 })],
+        });
+        expect(await stored('solo:50')).toMatchObject({
+          owed: 9,
+          uids: ['char:50'],
+          snapshot: { through: '2026-07-31' },
         });
       });
 
@@ -2989,13 +3025,16 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         await turnOn();
         await minedHere(50);
         await book()
-          .collection('accountCheckpoints')
+          .collection('accounts')
           .doc('solo:50')
-          .set({ ...checkpoint('solo:50', '2026-08-31'), at: '2026-10-02T00:00:00.000Z' });
+          .set({
+            ...account('solo:50'),
+            snapshot: { ...checkpoint('solo:50', '2026-08-31'), at: '2026-10-02T00:00:00.000Z' },
+          });
         expect(await record(checkpoint('solo:50', '2026-07-31'))).toMatchObject({
           recorded: ['solo:50'],
         });
-        expect((await stored('solo:50'))?.through).toBe('2026-07-31');
+        expect((await stored('solo:50'))?.snapshot.through).toBe('2026-07-31');
       });
 
       it('refuses one summed for other characters than the Miner has now', async () => {
@@ -3006,21 +3045,21 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         ).toMatchObject({ skipped: [{ minerId: 'solo:50', reason: 'characters-changed' }] });
       });
 
-      it('is no longer an action to reset', async () => {
+      it('is no longer an action to reset or to record on its own', async () => {
         await turnOn();
-        expect(
-          await reason(
-            Promise.resolve().then(() =>
-              edit(DIRECTOR, { action: 'resetCheckpoint', minerId: 'solo:50' }, true)
-            )
-          )
-        ).toBe('unknown-action');
+        for (const action of [
+          { action: 'resetCheckpoint', minerId: 'solo:50' },
+          { action: 'recordCheckpoints', checkpoints: [checkpoint('solo:50', '2026-07-31')] },
+        ])
+          expect(await reason(Promise.resolve().then(() => edit(DIRECTOR, action, true)))).toBe(
+            'unknown-action'
+          );
       });
 
       describe('a change to a Miner’s characters drops its snapshot, nothing else does', () => {
         const seed = async () => {
           await turnOn();
-          await minedHere(50, 52);
+          await minedHere(50, 52, 53);
           await record(checkpoint('solo:50', '2026-07-31'), checkpoint('solo:52', '2026-07-31'));
         };
 
@@ -3032,21 +3071,29 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
             characterIds: [50, 52],
             mainCharacterId: 50,
           });
+          // Their solo accounts go with the rekey.
           expect(await stored('solo:50')).toBeUndefined();
           expect(await stored('solo:52')).toBeUndefined();
         });
 
-        it('an unlink: the grouping and the character it lets go', async () => {
+        it('an unlink: the grouping and the character it lets go; the figures stay', async () => {
           await seed();
           await edit(ACCOUNTANT, {
             action: 'setMiner',
             minerId: 'm-a',
-            characterIds: [50, 52],
+            characterIds: [50, 52, 53],
             mainCharacterId: 50,
           });
-          await record(checkpoint('m-a', '2026-07-31', { characterIds: [50, 52] }));
-          expect(await stored('m-a')).toBeDefined();
+          await record(checkpoint('m-a', '2026-07-31', { characterIds: [50, 52, 53] }));
+          expect((await stored('m-a'))?.snapshot).toBeDefined();
           await edit(ACCOUNTANT, { action: 'unlink', minerId: 'm-a', characterId: 52 });
+          expect(await stored('m-a')).toEqual(
+            expect.not.objectContaining({ snapshot: expect.anything() })
+          );
+          expect(await stored('m-a')).toMatchObject(account('m-a'));
+          expect((await stored('m-a'))?.uids).toBeUndefined();
+          // The last one left alone: the grouping and its account go.
+          await edit(ACCOUNTANT, { action: 'unlink', minerId: 'm-a', characterId: 53 });
           expect(await stored('m-a')).toBeUndefined();
         });
 
@@ -3072,7 +3119,7 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
             amount: 5,
             at: '2026-10-17T00:00:00.000Z',
           });
-          expect(await stored('solo:50')).toBeDefined();
+          expect((await stored('solo:50'))?.snapshot).toBeDefined();
         });
       });
 
@@ -3081,8 +3128,8 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         expect(
           await reason(
             edit(JUNIOR, {
-              action: 'recordCheckpoints',
-              checkpoints: [checkpoint('solo:50', '2026-07-31')],
+              action: 'recordAccounts',
+              accounts: [account('solo:50', { snapshot: checkpoint('solo:50', '2026-07-31') })],
             })
           )
         ).toBe('role-required');

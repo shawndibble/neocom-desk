@@ -283,10 +283,9 @@ export function closedMonthBook(how: { checkpointed?: boolean } = {}) {
     characterIds: [MINER.ada.id],
   };
   if (how.checkpointed) {
-    seed.raw('accountCheckpoints', minerId, {
-      ...checkpoint,
-      at: new Date(seed.now).toISOString(),
-      by: OFFICER.id,
+    seed.raw('accounts', minerId, {
+      minerId,
+      snapshot: { ...checkpoint, at: new Date(seed.now).toISOString(), by: OFFICER.id },
     });
   }
   return {
