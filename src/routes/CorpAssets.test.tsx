@@ -538,15 +538,19 @@ describe('group by location', () => {
     await ledger('/corp/assets?group=location');
     await user.click((await screen.findAllByText('Ships'))[0]);
     // Each level opens on its own click: ship, then the container in its cargo.
-    const ship = await screen.findByRole('button', { name: /Rifter/, expanded: false });
+    const ship = await screen.findByRole('button', { name: /^Rifter/, expanded: false });
     await user.click(ship);
     expect(ship).toHaveAttribute('aria-expanded', 'true');
-    const box = screen.getByRole('button', { name: /Large Secure Container/, expanded: false });
+    const box = screen.getByRole('button', { name: /^Large Secure Container/, expanded: false });
     expect(screen.queryByText('×40')).not.toBeInTheDocument();
     await user.click(box);
     expect(box).toHaveAttribute('aria-expanded', 'true');
     // The row click only unfolds: the by-item view is the row menu's.
     expect(currentLocation()).toBe('/corp/assets?group=location');
+    // A nested stack carries the by-item view's item menu.
+    await user.click(screen.getByRole('button', { name: 'More actions for Pyerite' }));
+    expect(await screen.findByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
     await user.click(screen.getByRole('link', { name: 'Pyerite' }));
     await waitFor(() => expect(currentLocation()).toContain('info=type-35'));
   });
