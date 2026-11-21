@@ -5,6 +5,10 @@
  */
 type Data = Record<string, unknown>;
 
+/**
+ * A day a Running account still owes, as an officer's tab records it (`RecordedAccount.unpaidDays`)
+ * and the verify page lists it: the one shape of an owed day on both sides.
+ */
 export interface OwedDay {
   date: string;
   /** What is still owed of the day. */
@@ -94,6 +98,9 @@ export function liveAccount(
     ...(unpaidDays ? { unpaidDays } : {}),
   };
 }
+
+/** A Running account as the verify page shows it (`VerifyPayload.account`). */
+export type LiveAccount = ReturnType<typeof liveAccount>;
 
 /**
  * The Miner's mined days for the verify page's ledger: each date once, from the newest Late notice

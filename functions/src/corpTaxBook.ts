@@ -31,7 +31,7 @@ import {
   type ForfeitBasis,
 } from './corpTaxBookEngine.js';
 import { DAY_MS } from './timeConstants.js';
-import { payOldestFirst } from './corpTaxBookAccounts.js';
+import { payOldestFirst, type OwedDay } from './corpTaxBookAccounts.js';
 import { matchesStatedTransfer } from './corpTaxBookTransferMatch.js';
 import {
   NOTICE_ID_FIELD,
@@ -782,7 +782,7 @@ export interface RecordedAccount {
   oldest?: string;
   paidThrough?: string;
   /** The running days still owed, oldest first (what the verify page lists); absent from an older client. */
-  unpaidDays?: { date: string; owed: number; tax: number }[];
+  unpaidDays?: OwedDay[];
   /**
    * The newest day the officer's client says is paid for good (D22), stored in `meta/paid`. Only
    * ever moves forward. The server has no prices, so it can't check the day was priced at a saved
@@ -1492,7 +1492,7 @@ export function checkpointRefusal(
     known: boolean;
     /** The Miner's characters now. */
     characterIds: readonly number[];
-    live?: { unpaidDays?: readonly { date: string; owed: number }[] };
+    live?: { unpaidDays?: readonly Pick<OwedDay, 'date' | 'owed'>[] };
     isDirector: boolean;
   }
 ): CheckpointRefusal[] {
@@ -2130,7 +2130,7 @@ export function billedDisputeTax(
 export function disputesClosedByWriteOff(
   disputes: readonly { id?: unknown; date?: unknown; resolution?: unknown }[],
   writeOff: { amount: number },
-  live?: { owed: number; unpaidDays?: readonly { date: string; owed: number }[] }
+  live?: { owed: number; unpaidDays?: readonly Pick<OwedDay, 'date' | 'owed'>[] }
 ): string[] {
   if (!live?.unpaidDays) return [];
   const open = disputes.filter((d) => typeof d.id === 'string' && !d.resolution);
