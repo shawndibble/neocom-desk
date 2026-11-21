@@ -243,8 +243,9 @@ export function rookOwed(characterId: number, days: readonly number[] = [6, 5, 4
 
 /**
  * Signs the pilot in (main suite: `signInAndGoto`'s token), seeds `data` and opens the Tax tab.
- * It lands on the tab first and reloads after seeding: the app has opened its database by then,
- * and the reload is served the tab's modules from the browser's cache.
+ * It lands on the tab first and seeds after: the app has opened its database by then (the seed
+ * cannot make the later stores before it does). The tab is then left and entered again, which
+ * reads the seeded rows; no reload, which would boot the whole app a second time.
  */
 export async function openPersonalTax(
   page: Page,
@@ -254,6 +255,10 @@ export async function openPersonalTax(
   await installPilotEsi(page, { ...esi, names: nameOf });
   await signInAndGoto(page, './mining/tax');
   await seedPersonal(page, data);
-  await page.reload();
+  // Away and back by the page's own tabs (there at every width): the Tax tab mounts again and
+  // reads what was seeded, without a second full boot of the app. A reload cost seconds under
+  // load and failed the assertion below on its 5s clock.
+  await page.getByRole('tab', { name: 'Overview' }).click();
+  await page.getByRole('tab', { name: 'Tax' }).click();
   await expect(page.getByRole('tab', { name: 'Tax', selected: true })).toBeVisible();
 }
