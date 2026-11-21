@@ -7,6 +7,7 @@ import { payeeLedger, type PayeeLedgerRow } from '@/engine/miningTax/payeeLedger
 import { PayeeLedgerTable } from '@/features/miningTax/ledger/PayeeLedgerPanel';
 import { canOverrideDay } from './dayEligibility';
 import { LedgerRowMenu, type LedgerActions } from './LedgerRowMenu';
+import { paymentWalletHref } from './paymentWalletHref';
 import { isk, shortDate } from './moonsFormat';
 import { BookSection } from './sectionParts';
 import { useBook } from './useBook';
@@ -35,6 +36,7 @@ export function MinerLedger({
     const source = minerLedgerSource(view, minerId, {
       character: names.character,
       place: (d) => (d.moonId !== undefined ? names.moon(d.moonId) : names.refinery(d.structureId)),
+      walletHref: (id) => paymentWalletHref(id) ?? undefined,
     });
     return source ? payeeLedger(source) : null;
   }, [view, minerId, names]);

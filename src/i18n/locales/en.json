@@ -8881,7 +8881,8 @@
         "noticeSettled": "Every day it listed is paid.",
         "noticeRemaining": "{{amount}} still owed on its days.",
         "opening": "Every day up to here is summed into this one balance: ledger syncs can no longer change those days, so a fix to one shows as a new entry today.",
-        "note": "The officer noted: {{note}}"
+        "note": "The officer noted: {{note}}",
+        "viewPayment": "View the payment"
       },
       "emptyTitle": "Nothing on this ledger yet",
       "emptyHint": "A day shows here once it is billed.",
@@ -18727,8 +18728,8 @@
         "checkpointDirector_other": "Closing a past month for {{count}} Miners needs a Director's visit; until then their accounts are worked out from their whole history."
       },
       "ledger": {
-        "title": "Account ledger",
-        "hint": "Moon tax and payments in date order, balance after each (a minus is owed). Newest first.",
+        "title": "Ledger",
+        "hint": "Moon tax and payments in date order, with the balance after each. Newest first.",
         "empty": "Nothing billed or paid yet.",
         "owed": "owed",
         "credit": "credit",

@@ -247,9 +247,6 @@ export function minerFact(page: Page, label: string) {
     .locator('xpath=following-sibling::dd[1]');
 }
 
-/**
- * The Miner page's ledger table. Named by the book ("Account ledger", soon "Ledger", the name the
- * pilot's ledger already has), so the pattern takes either and survives the rename.
- */
+/** The Miner page's ledger table: "Ledger", the name the pilot's Payee ledger has too. */
 export const minerLedger = (page: Page) =>
-  page.getByRole('main').getByRole('table', { name: /^(Account ledger|Ledger)$/ });
+  page.getByRole('main').getByRole('table', { name: 'Ledger', exact: true });

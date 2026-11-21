@@ -54,6 +54,8 @@ export interface LedgerPayment {
   from?: string;
   /** An officer's note on a payment recorded by hand. */
   note?: string;
+  /** Where it sits in a wallet, an in-app route: its row's detail links there. */
+  href?: string;
 }
 
 /** An officer's write-off, as the account was given it. */

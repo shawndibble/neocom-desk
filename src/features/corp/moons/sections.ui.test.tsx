@@ -130,7 +130,7 @@ describe('Miner page on a running account', () => {
     expect(within(owed).getAllByRole('row').length).toBeGreaterThan(1);
     expect(screen.getAllByText(/^Payment from /).length).toBeGreaterThan(0);
     // The one Payee ledger: owed reads positive, never as a minus.
-    const ledger = screen.getByRole('table', { name: 'Account ledger' });
+    const ledger = screen.getByRole('table', { name: 'Ledger' });
     expect(within(ledger).queryAllByText(/^\u2212[\d,]+/)).toHaveLength(0);
     expect(within(ledger).getAllByText(/^[\d,]+$/).length).toBeGreaterThan(0);
   });

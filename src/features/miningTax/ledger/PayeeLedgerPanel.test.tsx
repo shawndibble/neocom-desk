@@ -91,6 +91,21 @@ describe('PayeeLedgerPanel', () => {
     expect(within(table()).getByText('Handed over in person')).toBeInTheDocument();
   });
 
+  it('links a payment to where it sits in a wallet, from its detail', async () => {
+    const user = userEvent.setup();
+    renderPanel({
+      ...CORP_BOOK_LEDGER,
+      payments: (CORP_BOOK_LEDGER.payments ?? []).map((p, i) =>
+        i === 0 ? { ...p, href: '/wallet/journal?highlight=42' } : p
+      ),
+    });
+    await user.click(screen.getAllByText('Payment from Varro Kestane')[0]!);
+    expect(screen.getByRole('link', { name: 'View the payment' })).toHaveAttribute(
+      'href',
+      '/wallet/journal?highlight=42'
+    );
+  });
+
   it("shows a pick between a pilot's Miners above the ledger (N7)", () => {
     render(
       <MemoryRouter>

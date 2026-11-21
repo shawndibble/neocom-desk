@@ -5,8 +5,8 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import type { PayeePaymentLink } from '@/engine/miningTax/payeeAccount';
-import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
 import { formatIsk } from '@/lib/isk';
+import { madePaymentHref } from './madePaymentHref';
 import { Well } from '@/components/ui/Well';
 
 /** One linked payment whose money reached the entry's day, resolved for display. */
@@ -59,14 +59,7 @@ export function PaymentLinksCard({ paidBy, onUnlink, busy }: PaymentLinksCardPro
                   {unseen || label === null ? (
                     <span className="text-text-dim">{named}</span>
                   ) : (
-                    <Link
-                      to={
-                        link.kind === 'journal'
-                          ? `/wallet/journal?${HIGHLIGHT_PARAM}=${link.refId}`
-                          : `/contracts?${HIGHLIGHT_PARAM}=${link.refId}`
-                      }
-                      className={inlineLinkClassName}
-                    >
+                    <Link to={madePaymentHref(link)!} className={inlineLinkClassName}>
                       {named}
                     </Link>
                   )}

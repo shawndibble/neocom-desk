@@ -185,6 +185,22 @@ describe('the Miner ledger row menus (the one Payee ledger)', () => {
     await vi.waitFor(() => expect(calls).toEqual(['reassign:p1']));
   });
 
+  it("links a wallet payment's detail to its corp wallet entry", async () => {
+    const pay = { minerId: 'solo:2', characterId: 2, source: 'donation' } as const;
+    renderLedger(
+      running({
+        payments: [
+          { ...pay, id: 'j3_5550123', amount: 199_000, at: '2026-08-12T10:00:00Z' } as never,
+        ],
+      })
+    );
+    await userEvent.click(screen.getByText(/^Payment from Pilot 2/));
+    expect(screen.getByRole('link', { name: 'View the payment' })).toHaveAttribute(
+      'href',
+      '/corp/wallet?division=3&highlight=5550123'
+    );
+  });
+
   it('has no menu without edit rights', () => {
     renderLedger(running({ adjustments: [correction] }), false);
     fireEvent.contextMenu(rowOf(/^Adjustment/));
