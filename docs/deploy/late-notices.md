@@ -2,7 +2,8 @@
 
 Dev and production share one Firebase project and its data, and neither the rules nor the
 Cloud Functions are deployed by CI. Every step is additive: older open tabs and the functions
-deployed now keep working at each point, so the steps can run before the PR merges.
+deployed now keep working at each point. Run them right after the PR merges to `develop`, in the
+order below.
 
 ## What changes
 
@@ -102,3 +103,30 @@ actions (`issueStatement`, `recordMail`) and reads the legacy `statements` docs 
   - the next nightly pass rewrites the moon docs and read models and deletes `minerTotals`.
 - An older tab that still issues a calendar Statement is refused on every book (the backfill
   lists the books with no `runningAccountFrom`, whose older tabs see that refusal).
+
+## After the soak (step 5)
+
+The soak ends once production runs this client and no tab older than it can still be open: about
+a week after promotion. Then a follow-up PR removes the legacy half, each in one place:
+
+- **Server writes:** `corpTaxBookLegacyMirror.ts` (every `statements` / `statementLinks` write), and
+  the legacy actions it serves: `issueStatement`, `settleStatements`, `recordMail` with kind
+  `'statement'`, `closeAccount`'s `statement` field, `parseStatement` / `StoredStatement`,
+  `switchToRunningAccount`, `refuseCalendarStatement`.
+- **Server reads:** the fallback to `statements` / `statementLinks` in the Late notice store and
+  the verify page, the `meta/lateNoticesBackfilled` marker, and the quiet-run stamp on `statements`
+  (swap in `lateNotices`).
+- **Settings fields** `cadence`, `minimumStatement` and `overdueDays`, still accepted from old tabs.
+- **Client fallbacks:** `issueLateNotice` → `issueStatement`, `recordLateNoticeMail` →
+  `recordMail`, the unknown-action branch of `recordCheckpoints`, the legacy `statements` read in
+  `readNotices`, the `statementLinks` token read, and `LEGACY_NOTICES` / `LEGACY_NOTICE_LINKS` /
+  `LEGACY_NOTICE_MAIL_KIND`. The `/corp/moons/statements` and `?statement=` redirects can stay: old
+  links in sent mail use them.
+- **Rules:** the `statements` and `statementLinks` blocks. Then delete those collections' docs with
+  a one-off script (after a final backfill).
+- **Pilot side:** reading the old Assignment paid marks into links (`legacyPaidMarks.ts`), once
+  every device has run this client; the stored `status`, `payment` and `paidAt` fields can then be
+  dropped from new writes' readers.
+- **Kept on purpose:** the verify wire field `statement` and the callable name
+  `readCorpTaxBookStatementCallable` (links in mail already sent call them), and the `statementId`
+  index of the device mail queue.
