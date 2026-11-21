@@ -1,7 +1,7 @@
 /**
  * The two loose match tiers that sit below exact/prefix/substring (#5644),
  * shared by `rankedSearch` and the command palette's item scan so both agree.
- * Inputs are already lowercased.
+ * Inputs are already `searchKey`ed (lowercased, quote marks dropped).
  */
 
 /** A digit 1–5 and the roman numeral word it stands for, in both directions. */
@@ -11,6 +11,11 @@ const NUMERAL_PAIRS: ReadonlyMap<string, string> = new Map(
     [roman, String(i + 1)],
   ])
 );
+
+/** Lowercase with apostrophes and quote marks dropped, so "'Augmented' Wasp" is found by "augmented wasp". */
+export function searchKey(text: string): string {
+  return text.toLowerCase().replace(/['"\u2018\u2019\u201C\u201D]/g, '');
+}
 
 /** Lowercased name split into words on anything that is not a letter or digit. */
 export function wordsOf(lower: string): string[] {
