@@ -157,9 +157,11 @@ import {
   classifyGroup,
   groupConflicts,
   minerReaderIds,
+  characterUids,
   minerUidsOf,
   paymentUids,
   promoteClaims,
+  type ReaderMiner,
   type ClaimMiner,
   type GroupConflict,
 } from './corpTaxBookClaims.js';
@@ -620,6 +622,10 @@ export async function mergeObservedInto(
 ): Promise<number> {
   // Each row carries the Extraction covering its day (ADR 0032): a merge replaces the whole row, so it must stamp.
   const rows = stampRows(incoming, await loadStampContext(deps.db, corporationId, extractions));
+  // Each row is read by its Character and the readers of the Miner it is billed under.
+  const readers = rowReadersFrom(
+    rows.length > 0 ? await readerMinersOf(deps.db, corporationId) : []
+  );
   let observedChanged = 0;
   const pulls = touched ?? new Set<string>();
   for (const part of chunk(rows, CHUNK)) {
@@ -638,6 +644,7 @@ export async function mergeObservedInto(
         tx.set(col.doc(obsId(row)), {
           ...row,
           uid: `char:${row.characterId}`,
+          uids: readers(row.characterId),
           [OBSERVED_UPDATED_AT_FIELD]: FieldValue.serverTimestamp(),
         });
       }
@@ -653,6 +660,90 @@ export async function mergeObservedInto(
   await writeBilledByPointers(deps, corporationId, rows);
   if (touched === undefined) await refreshMoonDocs(deps.db, corporationId, pulls);
   return observedChanged;
+}
+
+/** Whether a stored `uids` holds exactly these readers. */
+function sameReaders(held: unknown, uids: readonly string[]): boolean {
+  return Array.isArray(held) && held.length === uids.length && uids.every((u) => held.includes(u));
+}
+
+/** The book's groupings, as `characterUids` reads them. */
+async function readerMinersOf(db: Firestore, corporationId: number): Promise<ReaderMiner[]> {
+  const snap = await sub(db, corporationId, MINERS)
+    .select('characterIds', 'officerClaimed', 'pendingConfirmation', 'createdAt')
+    .get();
+  return snap.docs.map((d) => ({
+    id: d.id,
+    characterIds: (d.get('characterIds') as number[] | undefined) ?? [],
+    officerClaimed: d.get('officerClaimed') as number[] | undefined,
+    pendingConfirmation: d.get('pendingConfirmation') as number[] | undefined,
+    ...(typeof d.get('createdAt') === 'string' ? { createdAt: d.get('createdAt') as string } : {}),
+  }));
+}
+
+/** `characterUids` over one read of the groupings, once per Character. */
+function rowReadersFrom(miners: readonly ReaderMiner[]): (characterId: number) => string[] {
+  const memo = new Map<number, string[]>();
+  return (characterId) => {
+    let uids = memo.get(characterId);
+    if (!uids) memo.set(characterId, (uids = characterUids(characterId, miners)));
+    return uids;
+  };
+}
+
+/** How many `observed` rows one page of a readers refresh reads and writes. */
+const READERS_PAGE = 400;
+
+/**
+ * Brings these Characters' `observed` rows' readers (`uids`) level with the groupings as they
+ * stand now, after a grouping, an unlink, an answer or a promoted claim committed. A Character
+ * can hold thousands of rows, more than one transaction writes, so it runs after the change, a
+ * page at a time; a row already right is not written. Each row it writes gets a fresh
+ * `updatedAt`, so a member's delta read sees it. Best effort: a failure is logged, and the next
+ * merge of a row writes its readers again.
+ */
+export async function refreshObservedReaders(
+  db: Firestore,
+  corporationId: number,
+  characterIds: Iterable<number>
+): Promise<number> {
+  const ids = [...new Set(characterIds)];
+  if (ids.length === 0) return 0;
+  try {
+    const readers = rowReadersFrom(await readerMinersOf(db, corporationId));
+    const rows = sub(db, corporationId, OBSERVED);
+    let written = 0;
+    for (const characterId of ids) {
+      const uids = readers(characterId);
+      let after: QueryDocumentSnapshot | undefined;
+      for (;;) {
+        let q = rows
+          .where('characterId', '==', characterId)
+          .orderBy(FieldPath.documentId())
+          .select('uids')
+          .limit(READERS_PAGE);
+        if (after) q = q.startAfter(after);
+        const page = await q.get();
+        const stale = page.docs.filter((d) => !sameReaders(d.get('uids'), uids));
+        if (stale.length > 0) {
+          const batch = db.batch();
+          for (const d of stale)
+            batch.update(d.ref, {
+              uids,
+              [OBSERVED_UPDATED_AT_FIELD]: FieldValue.serverTimestamp(),
+            });
+          await batch.commit();
+          written += stale.length;
+        }
+        if (page.size < READERS_PAGE) break;
+        after = page.docs[page.size - 1];
+      }
+    }
+    return written;
+  } catch (e) {
+    console.error('observed readers refresh failed', e instanceof Error ? e.message : e);
+    return 0;
+  }
 }
 
 /**
@@ -1003,6 +1094,8 @@ interface EditCtx {
   stale: StaleCheckpoints[];
   /** Every checkpoint id, read up front for an edit that may reach every Miner (`BOOK_WIDE_EDITS`). */
   checkpointIds?: string[];
+  /** Characters whose rows' readers the edit changed (`refreshObservedReaders`, after it commits). */
+  rowReaders: Set<number>;
 }
 
 /** Checkpoints an edit made stale: these Miners' (or every Miner's), if it reaches a closed day. */
@@ -1470,10 +1563,7 @@ async function paymentReadersFor(
   const snap = await tx.get(sub(db, corporationId, PAYMENTS).where('minerId', '==', minerId));
   return snap.docs.flatMap((d) => {
     const uids = paymentUids(minerUids, d.get('uid'));
-    const held = d.get('uids') as unknown;
-    const same =
-      Array.isArray(held) && held.length === uids.length && uids.every((u) => held.includes(u));
-    return same ? [] : [{ ref: d.ref, uids }];
+    return sameReaders(d.get('uids'), uids) ? [] : [{ ref: d.ref, uids }];
   });
 }
 
@@ -1549,6 +1639,19 @@ function groupingChange(
     ...holders,
     ...action.characterIds.map((x) => soloMinerId(x)),
   ];
+}
+
+/** Every Character of these Miners, before the change, and the ones it names: their rows' readers change. */
+function markRowReaders(
+  c: EditCtx,
+  miners: readonly QueryDocumentSnapshot[],
+  minerIds: readonly string[],
+  characterIds: readonly number[]
+): void {
+  for (const x of characterIds) c.rowReaders.add(x);
+  for (const d of miners)
+    if (minerIds.includes(d.id))
+      for (const x of (d.get('characterIds') as number[] | undefined) ?? []) c.rowReaders.add(x);
 }
 
 /** The Miners an unlink changes: the grouping, the character's own, and a last one's left alone. */
@@ -2176,7 +2279,9 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const miners = await tx.get(col(c, MINERS));
       const out = await planMiner(c, miners.docs, action, new Set());
       const scope = rekeyScope(action, [], out.readers);
-      staleCheckpoints(c, groupingChange(miners.docs, action, scope.absorbed), null);
+      const changed = groupingChange(miners.docs, action, scope.absorbed);
+      staleCheckpoints(c, changed, null);
+      markRowReaders(c, miners.docs, changed, action.characterIds);
       const rekey = await rekeyAbsorbed(
         tx,
         c.deps.db,
@@ -2214,7 +2319,9 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       }
       const out = await planMiner(c, miners.docs, action, absorbed);
       const scope = rekeyScope(action, action.absorbMinerIds, out.readers);
-      staleCheckpoints(c, groupingChange(miners.docs, action, scope.absorbed), null);
+      const changed = groupingChange(miners.docs, action, scope.absorbed);
+      staleCheckpoints(c, changed, null);
+      markRowReaders(c, miners.docs, changed, action.characterIds);
       const rekey = await rekeyAbsorbed(
         tx,
         c.deps.db,
@@ -2259,6 +2366,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         fail('not-found', 'Not in that Miner', 'not-in-miner');
       for (const w of narrowed) tx.update(w.ref, { uids: w.uids });
       staleCheckpoints(c, unlinkChange(action.minerId, miner, action.characterId), null);
+      for (const x of miner.characterIds as number[]) c.rowReaders.add(x);
       // The grouping the answer was about is gone, so the answer must not outlive it.
       clearAnswers(c, [action.characterId]);
       return { detail: { minerId: action.minerId, characterId: action.characterId } };
@@ -2997,6 +3105,7 @@ export async function editBookAs(
   via?: string
 ) {
   const ref = bookRef(deps.db, call.corporationId);
+  let rowReaders: ReadonlySet<number> = new Set();
   const result = await deps.db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists || snap.get('active') !== true)
@@ -3009,6 +3118,7 @@ export async function editBookAs(
       access,
       now: deps.now(),
       stale: [],
+      rowReaders: new Set(),
     };
     if (BOOK_WIDE_EDITS.has(action.action))
       ctx.checkpointIds = (
@@ -3035,8 +3145,11 @@ export async function editBookAs(
       { action: action.action as AuditAction, detail: outcome.detail },
     ])
       appendAudit(tx, deps, call.corporationId, actor, a.action, a.detail);
+    rowReaders = ctx.rowReaders;
     return outcome.result ?? {};
   });
+  // A grouping or an unlink changed who reads these Characters' rows. Best effort.
+  await refreshObservedReaders(deps.db, call.corporationId, rowReaders);
   // A survey link, an expiry or a regroup changes a pull's doc (ADR 0032). Best effort.
   await refreshMoonDocsAfterEdit(deps.db, call.corporationId, action);
   // Edits that move the Overview doc (ADR 0032). Best effort.
@@ -3082,6 +3195,7 @@ export async function confirmGrouping(
 ) {
   const characterId = signedInCharacter(caller);
   const ref = sub(deps.db, corporationId, MINERS).doc(minerId);
+  let held: number[] = [];
   await deps.db.runTransaction(async (tx) => {
     const miner = (await tx.get(ref)).data();
     if (!miner || !(miner.pendingConfirmation as number[]).includes(characterId)) {
@@ -3117,7 +3231,10 @@ export async function confirmGrouping(
       via: 'character',
     });
     appendAudit(tx, deps, corporationId, { characterId, name: '' }, 'confirmGrouping', { minerId });
+    held = miner.characterIds as number[];
   });
+  // The guest's rows now read by the group, and the group's by the guest. Best effort.
+  await refreshObservedReaders(deps.db, corporationId, held);
 }
 
 /** Declines a pending grouping inside a transaction; shared by the two ways to decline. */
@@ -3129,6 +3246,7 @@ async function declinePending(
   actor: Actor
 ) {
   const ref = sub(deps.db, corporationId, MINERS).doc(minerId);
+  let held: number[] = [];
   await deps.db.runTransaction(async (tx) => {
     const miner = (await tx.get(ref)).data();
     if (!miner || !(miner.pendingConfirmation as number[]).includes(characterId)) {
@@ -3152,7 +3270,9 @@ async function declinePending(
       via: actor.via === 'verify-link' ? 'verify-link' : 'character',
     });
     appendAudit(tx, deps, corporationId, actor, 'declineGrouping', { minerId, characterId });
+    held = miner.characterIds as number[];
   });
+  await refreshObservedReaders(deps.db, corporationId, [...held, characterId]);
 }
 
 /** The added character itself declines, signed in as itself. */
@@ -3179,6 +3299,7 @@ export async function declineLink(
 ) {
   const characterId = signedInCharacter(caller);
   const ref = sub(deps.db, corporationId, MINERS).doc(minerId);
+  let held: number[] = [];
   await deps.db.runTransaction(async (tx) => {
     const miner = (await tx.get(ref)).data();
     if (!miner || !(miner.characterIds as number[]).includes(characterId))
@@ -3204,7 +3325,10 @@ export async function declineLink(
       characterId,
       link: true,
     });
+    held = miner.characterIds as number[];
   });
+  // Its rows are its own again, and it no longer reads the group's. Best effort.
+  await refreshObservedReaders(deps.db, corporationId, [...held, characterId]);
   return { declined: true as const };
 }
 
@@ -3238,8 +3362,10 @@ export async function promoteProvenClaims(
   if (provenNow.size === 0 && stored.length === 0) return { promoted: 0 };
   const conflictsRef = sub(deps.db, corporationId, META).doc(GROUP_CONFLICTS_DOC);
   let promoted = 0;
+  let widened: number[] = [];
   await deps.db.runTransaction(async (tx) => {
     promoted = 0;
+    widened = [];
     const miners = (await tx.get(minersCol)).docs;
     const group = miners.map((d) => claimMinerOf(d.id, d.data()));
     const proven = await provenAmong(tx, deps.db, [...provenNow]);
@@ -3279,6 +3405,9 @@ export async function promoteProvenClaims(
       });
       for (const w of widen[i]) tx.update(w.ref, { uids: FieldValue.arrayUnion(...w.uids) });
       promoted += p.characterIds.length;
+      widened.push(
+        ...((miners.find((d) => d.id === p.minerId)?.get('characterIds') as number[]) ?? [])
+      );
     });
     const items = groupConflicts(group, new Date(deps.now()).toISOString()).map((x) => {
       const old = ((held?.items as GroupConflict[] | undefined) ?? []).find(
@@ -3289,6 +3418,8 @@ export async function promoteProvenClaims(
     const same = JSON.stringify(items) === JSON.stringify(held?.items ?? []);
     if (!same && (items.length > 0 || held)) tx.set(conflictsRef, { items });
   });
+  // The promoted Characters now read the group's rows, and the group theirs. Best effort.
+  await refreshObservedReaders(deps.db, corporationId, widened);
   return { promoted };
 }
 

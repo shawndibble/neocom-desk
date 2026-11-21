@@ -5,6 +5,7 @@ import { applyRekeyBackfill, planRekeyBackfill } from './corpTaxBookRekeyBackfil
 import {
   applyLateNoticeBackfill,
   applyPaymentReadersBackfill,
+  backfillObservedReaders,
   planLateNoticeBackfill,
   planPaymentReadersBackfill,
 } from './corpTaxBookLateNoticeBackfill.js';
@@ -3493,6 +3494,90 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
         });
         expect(await promoteProvenClaims(deps(), CORP)).toEqual({ promoted: 1 });
         expect(await readers('old')).toEqual(['char:60', 'char:61']);
+      });
+
+      it("an alt's mined rows are the group's to read, kept level as the grouping changes", async () => {
+        const rowReaders = async (characterId: number) => {
+          const snap = await book()
+            .collection('observed')
+            .where('characterId', '==', characterId)
+            .get();
+          return snap.docs.map((d) => [...((d.get('uids') as string[] | undefined) ?? [])].sort());
+        };
+        await turnOn();
+        await minedHere(52);
+        expect(await rowReaders(52)).toEqual([['char:52']]);
+        await minedHere(50, 51);
+        await group([50, 51]);
+        // A row synced after the grouping carries the group's readers.
+        await minedHere(51);
+        expect(await rowReaders(51)).toEqual([['char:50', 'char:51']]);
+        // A grouping widens the rows already held.
+        await group([50, 51, 52]);
+        expect(await rowReaders(52)).toEqual([['char:50', 'char:51', 'char:52']]);
+        expect(await rowReaders(50)).toEqual([['char:50', 'char:51', 'char:52']]);
+        // An unlink narrows them: the Character keeps its own.
+        await edit(ACCOUNTANT, { action: 'unlink', minerId: 'g', characterId: 51 });
+        expect(await rowReaders(51)).toEqual([['char:51']]);
+        expect(await rowReaders(50)).toEqual([['char:50', 'char:52']]);
+      });
+
+      it('the backfill gives older rows their readers once; a dry run writes nothing', async () => {
+        await turnOn();
+        await minedHere(50, 51);
+        await group([50, 51]);
+        const rows = await book().collection('observed').get();
+        for (const d of rows.docs) await d.ref.update({ uids: FieldValue.delete() });
+        expect(await backfillObservedReaders(db, CORP, { dryRun: true })).toBe(2);
+        expect((await book().collection('observed').get()).docs.every((d) => !d.get('uids'))).toBe(
+          true
+        );
+        expect(await backfillObservedReaders(db, CORP, { dryRun: false })).toBe(2);
+        const after = await book().collection('observed').get();
+        expect(after.docs.map((d) => [...(d.get('uids') as string[])].sort())).toEqual([
+          ['char:50', 'char:51'],
+          ['char:50', 'char:51'],
+        ]);
+        expect(await backfillObservedReaders(db, CORP, { dryRun: false })).toBe(0);
+      });
+
+      it("a promoted claim reads the group's rows, and the group the claim's", async () => {
+        await turnOn();
+        await minedHere(60);
+        await syncBook(
+          deps(),
+          who(ACCOUNTANT),
+          parseSyncInput(
+            {
+              corporationId: CORP,
+              observed: [
+                row(10, '2026-10-18T10:00:00Z', { characterId: 61, recordedCorporationId: 555 }),
+              ],
+            },
+            now
+          )
+        );
+        await edit(ACCOUNTANT, {
+          action: 'setMiner',
+          minerId: 'm-a',
+          characterIds: [60, 61],
+          mainCharacterId: 60,
+        });
+        const readersOf = async (characterId: number) =>
+          (await book().collection('observed').where('characterId', '==', characterId).get()).docs
+            .map((d) => [...(d.get('uids') as string[])].sort())
+            .at(0);
+        // The claim is no reader yet: the main reads its rows, it reads its own.
+        expect(await readersOf(61)).toEqual(['char:60', 'char:61']);
+        expect(await readersOf(60)).toEqual(['char:60']);
+        await db.collection('playerCharacters').doc('61').set({
+          characterId: 61,
+          playerId: '60',
+          ownerHash: 'h',
+          provenAt: '2026-10-19T00:00:00Z',
+        });
+        await promoteProvenClaims(deps(), CORP);
+        expect(await readersOf(60)).toEqual(['char:60', 'char:61']);
       });
 
       it('the backfill gives older payments their readers once, never over a newer write', async () => {

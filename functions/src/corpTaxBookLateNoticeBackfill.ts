@@ -6,17 +6,24 @@
 // each payment stored before `uids` its readers (`planPaymentReaders`). A re-run copies nothing
 // new. Run by functions/scripts/backfill-late-notices.mjs.
 
-import { FieldValue, type Firestore, type Timestamp } from 'firebase-admin/firestore';
+import {
+  FieldPath,
+  FieldValue,
+  type Firestore,
+  type QueryDocumentSnapshot,
+  type Timestamp,
+} from 'firebase-admin/firestore';
 import { commitInBatches, type BatchOp } from './commitInBatches.js';
 import {
   LATE_NOTICES,
   LATE_NOTICE_LINKS,
   MINERS,
+  OBSERVED,
   PAYMENTS,
   STATEMENTS,
   STATEMENT_LINKS,
 } from './corpTaxBook.js';
-import { minerUidsOf, paymentUids } from './corpTaxBookClaims.js';
+import { characterUids, minerUidsOf, paymentUids, type ReaderMiner } from './corpTaxBookClaims.js';
 import {
   lateNoticeFromStatementDoc,
   mergeNoticeMail,
@@ -133,24 +140,94 @@ export function planPaymentReaders(
   payments: readonly Doc[],
   miners: readonly Doc[]
 ): { id: string; uids: string[] }[] {
-  const byId = new Map(miners.map((m) => [m.id, m.data]));
+  const byId = new Map(miners.map((m) => [m.id, readerMinerOf(m)]));
   return payments.flatMap(({ id, data }) => {
     if ('uids' in data) return [];
     const minerId = typeof data.minerId === 'string' ? data.minerId : undefined;
-    const miner = minerId === undefined ? undefined : byId.get(minerId);
-    const readers =
-      minerId === undefined
-        ? []
-        : minerUidsOf(
-            minerId,
-            miner && {
-              characterIds: (miner.characterIds as number[] | undefined) ?? [],
-              officerClaimed: miner.officerClaimed as number[] | undefined,
-              pendingConfirmation: miner.pendingConfirmation as number[] | undefined,
-            }
-          );
+    const readers = minerId === undefined ? [] : minerUidsOf(minerId, byId.get(minerId));
     return [{ id, uids: paymentUids(readers, data.uid) }];
   });
+}
+
+/** A stored grouping, as the readers rules read it. */
+function readerMinerOf({ id, data }: Doc): ReaderMiner {
+  return {
+    id,
+    characterIds: (data.characterIds as number[] | undefined) ?? [],
+    officerClaimed: data.officerClaimed as number[] | undefined,
+    pendingConfirmation: data.pendingConfirmation as number[] | undefined,
+    ...(typeof data.createdAt === 'string' ? { createdAt: data.createdAt } : {}),
+  };
+}
+
+/**
+ * The `observed` rows stored before `uids`, each with its readers (`characterUids`), as every
+ * merge now stores them. A row that has `uids` is left alone, so a re-run plans nothing.
+ */
+export function planObservedReaders(
+  rows: readonly Doc[],
+  miners: readonly Doc[]
+): { id: string; uids: string[] }[] {
+  const grouped = miners.map(readerMinerOf);
+  const memo = new Map<number, string[]>();
+  return rows.flatMap(({ id, data }) => {
+    if ('uids' in data || typeof data.characterId !== 'number') return [];
+    const characterId = data.characterId;
+    let uids = memo.get(characterId);
+    if (!uids) memo.set(characterId, (uids = characterUids(characterId, grouped)));
+    return [{ id, uids }];
+  });
+}
+
+/** How many `observed` rows one page of the backfill reads. */
+const ROWS_PAGE = 1000;
+
+/**
+ * Gives one book's `observed` rows stored before `uids` their readers, a page at a time (a book
+ * can hold far more rows than a batch). Each write is guarded by the row's update time: a row a
+ * sync rewrote meanwhile already carries `uids`, and its batch fails, so a re-run picks up what
+ * is left. Its `updatedAt` is not moved: an officer's device has no reason to re-read the row.
+ * With `dryRun` it only counts. Returns how many rows it gave (or would give) readers.
+ */
+export async function backfillObservedReaders(
+  db: Firestore,
+  corporationId: number,
+  options: { dryRun: boolean }
+): Promise<number> {
+  const book = db.collection('corps').doc(String(corporationId));
+  const miners = (
+    await book
+      .collection(MINERS)
+      .select('characterIds', 'officerClaimed', 'pendingConfirmation', 'createdAt')
+      .get()
+  ).docs.map((d) => ({ id: d.id, data: d.data() }));
+  const rows = book.collection(OBSERVED);
+  let planned = 0;
+  let after: QueryDocumentSnapshot | undefined;
+  for (;;) {
+    let q = rows.orderBy(FieldPath.documentId()).select('characterId', 'uids').limit(ROWS_PAGE);
+    if (after) q = q.startAfter(after);
+    const page = await q.get();
+    const plan = planObservedReaders(
+      page.docs.map((d) => ({ id: d.id, data: d.data() })),
+      miners
+    );
+    planned += plan.length;
+    if (!options.dryRun && plan.length > 0) {
+      const read = new Map(page.docs.map((d) => [d.id, d.updateTime]));
+      await commitInBatches(
+        db,
+        plan.map(
+          ({ id, uids }): BatchOp =>
+            (b) =>
+              void b.update(rows.doc(id), { uids }, { lastUpdateTime: read.get(id)! })
+        )
+      );
+    }
+    if (page.size < ROWS_PAGE) break;
+    after = page.docs[page.size - 1];
+  }
+  return planned;
 }
 
 /** A payment's planned readers, with the version read, so a write meanwhile is never overwritten. */
