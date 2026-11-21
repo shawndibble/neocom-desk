@@ -173,7 +173,16 @@ export function readDismissal(id: string, d: Data): Dismissal | null {
     by: num(d.by) ?? 0,
     at,
     reason: str(d.reason) ?? '',
-    ...(reversed ? { reversed: { by: num(reversed.by) ?? 0, at: str(reversed.at) ?? at } } : {}),
+    ...(str(d.from) ? { from: str(d.from)! } : {}),
+    ...(reversed
+      ? {
+          reversed: {
+            by: num(reversed.by) ?? 0,
+            at: str(reversed.at) ?? at,
+            ...(str(reversed.from) ? { from: str(reversed.from)! } : {}),
+          },
+        }
+      : {}),
   };
 }
 

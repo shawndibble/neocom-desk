@@ -18812,6 +18812,7 @@
         "sumNoWriteOff": "Days billed {{billed}} − payments and dismissals {{settled}} = {{owed}} owed",
         "dismissals": "Dismissals",
         "reversed": "reversed",
+        "reversedFrom": "reversed from {{date}}",
         "reverse": "Reverse",
         "activity": "Activity",
         "activityHint": "Mail, dismissals and the audit log for this Miner, newest first",

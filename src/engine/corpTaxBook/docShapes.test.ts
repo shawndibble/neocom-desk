@@ -83,6 +83,17 @@ describe('the small doc readers', () => {
       reversed: { by: 2, at: 'a' },
     });
   });
+  it('readDismissal keeps the lock-date stamps of a wide dismissal and its reversal', () => {
+    expect(
+      readDismissal('d', {
+        scope: 'moon',
+        targetId: 't',
+        at: 'a',
+        from: '2026-09-01',
+        reversed: { by: 2, at: 'b', from: '2026-10-01' },
+      })
+    ).toMatchObject({ from: '2026-09-01', reversed: { by: 2, at: 'b', from: '2026-10-01' } });
+  });
   it('readMemberDeclaration keeps only a confirmed or rejected resolution, and hides the officer id', () => {
     expect(readMemberDeclaration('x', { statementId: 's', kind: 'nope', at: 'a' })).toBeNull();
     const out = readMemberDeclaration('x', {

@@ -56,6 +56,22 @@ describe('activeDismissalFor', () => {
     const reversed = reverseDismissal(dismissal({}), { by: 95000002, at: '2026-07-21T00:00:00Z' });
     expect(activeDismissalFor(charge, [reversed])).toBeUndefined();
   });
+
+  it('a stamped dismissal waives only days on or after its `from`', () => {
+    const miner = dismissal({ scope: 'miner', targetId: 'm1', from: '2026-07-12' });
+    expect(activeDismissalFor(charge, [miner])).toBeDefined();
+    expect(activeDismissalFor({ ...charge, date: '2026-07-11' }, [miner])).toBeUndefined();
+  });
+
+  it('a stamped reversal ends the dismissal from its `from`; earlier days stay waived', () => {
+    const moon = dismissal({
+      scope: 'moon',
+      targetId: '40000001',
+      reversed: { by: 95000002, at: '2026-07-21T00:00:00Z', from: '2026-07-12' },
+    });
+    expect(activeDismissalFor({ ...charge, date: '2026-07-11' }, [moon])).toBeDefined();
+    expect(activeDismissalFor(charge, [moon])).toBeUndefined();
+  });
 });
 
 describe('reverseDismissal', () => {
