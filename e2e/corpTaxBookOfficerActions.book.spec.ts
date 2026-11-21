@@ -159,7 +159,7 @@ test("a write-off forgives a leaver's oldest days, with the officer's reason", a
   await owed(page, 0);
   await expect(
     page.getByRole('table', { name: 'Account ledger' }).getByRole('row', {
-      name: /Written off: Left for a null-sec alliance/,
+      name: /Written off by an officer.*Left for a null-sec alliance/,
     })
   ).toContainText(isk(book.lev.owed));
 });

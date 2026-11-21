@@ -6,7 +6,7 @@ import '@/i18n';
 import { buildBookView, minerDetail, type BookViewInput } from '@/engine/corpTaxBook/bookView';
 import type { Adjustment } from '@/engine/corpTaxBook/adjustments';
 import { BookProvider } from './BookContext';
-import { AccountLedger } from './AccountLedger';
+import { MinerLedger } from './MinerLedger';
 import { EditCorrectionDialog, MarketAdjustmentDialog } from './CorrectionDialogs';
 import type { LedgerActions } from './LedgerRowMenu';
 import type { BookSettings, OfficerVerdict } from '../taxBook/bookClient';
@@ -99,14 +99,14 @@ function running(overrides: Partial<BookViewInput> = {}) {
   );
 }
 
-function renderLedger(view = running(), canEdit = true, corrections: Adjustment[] = [correction]) {
+function renderLedger(view = running(), canEdit = true) {
   const calls: string[] = [];
   const actions: LedgerActions = {
     editCorrection: (id) => calls.push(`edit:${id}`),
     reverseCorrection: (id) => calls.push(`reverse:${id}`),
     reverseWriteOff: (id) => calls.push(`reverseWriteOff:${id}`),
-    chargeShortfall: (e) => calls.push(`charge:${e.forDate}`),
-    changeForgiven: (e) => calls.push(`forgiven:${e.forDate}`),
+    chargeShortfall: (d) => calls.push(`charge:${d.date}`),
+    changeForgiven: (d) => calls.push(`forgiven:${d.date}`),
     markNotTax: (id) => calls.push(`notTax:${id}`),
     reassignPayment: (id) => calls.push(`reassign:${id}`),
     changeRate: (key) => calls.push(`rate:${key}`),
@@ -134,7 +134,7 @@ function renderLedger(view = running(), canEdit = true, corrections: Adjustment[
           reload: vi.fn(),
         }}
       >
-        <AccountLedger detail={detail} corrections={corrections} phone={false} actions={actions} />
+        <MinerLedger minerId="solo:2" detail={detail} phone={false} actions={actions} />
       </BookProvider>
     </MemoryRouter>
   );
@@ -147,33 +147,33 @@ beforeEach(() => {
   editBook.mockReset().mockResolvedValue({});
 });
 
-describe('the account ledger row menus', () => {
+describe('the Miner ledger row menus (the one Payee ledger)', () => {
   it('offers edit and reverse on a correction, and reverse opens the dialog it names', async () => {
     const calls = renderLedger(running({ adjustments: [correction] }));
-    fireEvent.contextMenu(rowOf(/Correction: Auth rollover/));
+    fireEvent.contextMenu(rowOf(/^Adjustment/));
     expect(await screen.findByRole('menuitem', { name: 'Edit correction' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('menuitem', { name: 'Reverse correction' }));
     await vi.waitFor(() => expect(calls).toEqual(['reverse:c1']));
   });
 
-  it('offers charge and change on a Market adjustment, and nothing on a reversed row', async () => {
+  it('offers charge and change on a forgiven shortfall, and nothing on a reversed row', async () => {
     const reversed: Adjustment = {
       ...correction,
       reversed: { by: 7, at: '2026-09-02T10:00:00Z', reason: 'Entered twice' },
     };
-    const calls = renderLedger(running({ adjustments: [reversed] }), true, [reversed]);
-    fireEvent.contextMenu(rowOf(/Market adjustment/));
+    const calls = renderLedger(running({ adjustments: [reversed] }));
+    fireEvent.contextMenu(rowOf(/^Shortfall forgiven/));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Charge this shortfall' }));
     await vi.waitFor(() => expect(calls).toEqual(['charge:2026-08-11']));
     // The struck-through original and its reversal carry no menu.
     expect(screen.getByText('reversed')).toBeInTheDocument();
-    fireEvent.contextMenu(rowOf(/Reversal: Entered twice/));
+    fireEvent.contextMenu(rowOf(/^Reversal/));
     expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
   });
 
   it('gives a paid day no menu: its one action, Change rate, is in the page menu', () => {
     renderLedger(running());
-    fireEvent.contextMenu(rowOf(/^Moon mining/));
+    fireEvent.contextMenu(rowOf(/^Mined at/));
     expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
   });
 
@@ -187,7 +187,7 @@ describe('the account ledger row menus', () => {
 
   it('has no menu without edit rights', () => {
     renderLedger(running({ adjustments: [correction] }), false);
-    fireEvent.contextMenu(rowOf(/Correction: Auth rollover/));
+    fireEvent.contextMenu(rowOf(/^Adjustment/));
     expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
   });
 });

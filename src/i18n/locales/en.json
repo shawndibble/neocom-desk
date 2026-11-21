@@ -18739,25 +18739,6 @@
         "heldByDispute_other": "Held by a dispute: {{count}} days, {{amount}} ISK tax. Not in the balance until the dispute ends.",
         "notYetBilled_one": "Not in the balance yet: {{count}} day mined, {{amount}} ISK tax, not billable yet.",
         "notYetBilled_other": "Not in the balance yet: {{count}} days mined, {{amount}} ISK tax, not billable yet.",
-        "cols": {
-          "date": "Date",
-          "what": "What",
-          "debit": "Tax",
-          "credit": "Credit",
-          "balance": "Balance"
-        },
-        "what": {
-          "day": "Moon mining",
-          "payment": "Payment",
-          "paymentFrom": "Payment from {{name}}",
-          "correction": "Correction: {{reason}}",
-          "writeOff": "Written off: {{reason}}",
-          "tolerance": "Market adjustment",
-          "opening": "Opening balance: {{reason}}",
-          "reversedTag": "reversed",
-          "reversal": "Reversal: {{reason}}",
-          "checkpoint": "Closed months, through this day"
-        },
         "menu": {
           "correctionEdit": "Edit correction",
           "correctionReverse": "Reverse correction",
@@ -18797,12 +18778,7 @@
             "intro": "Reverses this correction and adds the new one. The old one stays, struck through.",
             "confirm": "Save changes"
           }
-        },
-        "oreOf": "Ore mined {{date}}",
-        "paidBy": "{{name}} · {{source}}",
-        "noWalletEntry": "An officer recorded this by hand, so it has no corp wallet entry.",
-        "toleranceNote": "A small unpaid part of a day's tax. The Miner paid on the day it was mined, before that day's closing price (the price the tax is billed at) was known. It is within the book's per-day tolerance, so the day counts as paid and the Miner is not charged.",
-        "toleranceNoteLater": "Paid after this day closed, so the Miner and the book used the same close-of-day price and the payment should have matched. The shortfall is within the book's per-day tolerance, so the day counts as paid and the Miner is not charged."
+        }
       },
       "miner": {
         "notFound": "This Miner is not in the book",

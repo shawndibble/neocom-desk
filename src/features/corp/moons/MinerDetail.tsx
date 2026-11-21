@@ -51,7 +51,7 @@ import { useBookAudit } from './useBookAudit';
 import { useBook } from './useBook';
 import { CloseAccountDialog } from './CloseAccountDialog';
 import { OldestUnpaid } from './AccountStatus';
-import { AccountLedger } from './AccountLedger';
+import { MinerLedger } from './MinerLedger';
 import {
   MarkNotTaxDialog,
   ReasonDialog,
@@ -212,9 +212,7 @@ export function MinerDetail({ id }: { id: string }) {
   const name = names.character(row.mainCharacterId);
   const closedAt = view.input.miners.find((m) => m.id === id)?.closedAt;
   // Tolerance shortfalls and officer write-offs (#4637) both come off what is owed.
-  const toleranceTotal =
-    detail.dayWriteOffs.reduce((s, w) => s + w.amount, 0) +
-    detail.officerWriteOffs.reduce((s, w) => s + (w.reversed ? 0 : w.amount), 0);
+  const toleranceTotal = detail.dayWriteOffs.reduce((s, w) => s + w.amount, 0) + detail.forgiven;
   const paidTotal = detail.payments.reduce((s, p) => s + p.credited, 0);
   const held = new Set(detail.heldDays);
   const billedTotal = detail.days
@@ -383,10 +381,8 @@ export function MinerDetail({ id }: { id: string }) {
     editCorrection: (adjustmentId) => setDialog({ kind: 'editCorrection', adjustmentId }),
     reverseCorrection: (adjustmentId) => setDialog({ kind: 'reverseCorrection', adjustmentId }),
     reverseWriteOff: (writeOffId) => setDialog({ kind: 'reverseWriteOff', writeOffId }),
-    chargeShortfall: (e) =>
-      e.forDate && setDialog({ kind: 'marketCharge', date: e.forDate, amount: e.credit }),
-    changeForgiven: (e) =>
-      e.forDate && setDialog({ kind: 'marketEdit', date: e.forDate, amount: e.credit }),
+    chargeShortfall: (d) => setDialog({ kind: 'marketCharge', date: d.date, amount: d.amount }),
+    changeForgiven: (d) => setDialog({ kind: 'marketEdit', date: d.date, amount: d.amount }),
     markNotTax: (paymentId) => {
       const payment = detail?.payments.find((p) => p.id === paymentId);
       if (payment) setDialog({ kind: 'notTax', payment });
@@ -792,12 +788,7 @@ export function MinerDetail({ id }: { id: string }) {
               ]),
         ]}
       />
-      <AccountLedger
-        detail={detail}
-        corrections={data.adjustments.filter((a) => a.minerId === id)}
-        phone={phone}
-        actions={ledgerActions}
-      />
+      <MinerLedger minerId={id} detail={detail} phone={phone} actions={ledgerActions} />
       {daysSection(
         t('corpTaxBook.moons.sections.stillAccruing'),
         'stillAccruing',

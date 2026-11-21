@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { accountLedger } from './accountLedger';
+import { payeeLedger } from '../miningTax/payeeLedger';
+import { minerLedgerSource } from './minerLedgerSource';
 import {
   buildBookView,
   extractionDetail,
@@ -425,7 +426,7 @@ describe('buildBookView: moon owner coverage (#4618)', () => {
   });
 });
 
-describe('accountLedger', () => {
+describe('the Miner ledger (minerLedgerSource into payeeLedger)', () => {
   const pay = (id: string, amount: number, at: string) => ({
     id,
     minerId: 'solo:1',
@@ -443,26 +444,30 @@ describe('accountLedger', () => {
       ],
       payments,
     });
-  const ledgerOf = (v: BookView) => accountLedger(minerDetail(v, 'solo:1')!, []);
+  const ledgerOf = (v: BookView) => {
+    const l = payeeLedger(minerLedgerSource(v, 'solo:1', { character: (id) => `Pilot ${id}` })!);
+    return { ...l, balance: l.rows.at(-1)?.balance ?? 0 };
+  };
+  const shape = (l: ReturnType<typeof ledgerOf>) =>
+    l.rows.map((e) => [e.kind, e.date, e.charged, e.paid, e.balance]);
 
   it('lists each day and payment oldest first with the balance after each', () => {
     const l = ledgerOf(buildBookView(running([pay('a', 100_000, '2026-09-17T10:00:00Z')])));
-    expect(l.entries.map((e) => [e.kind, e.date, e.debit, e.credit, e.balance])).toEqual([
-      ['day', '2026-09-15', 100_000, 0, 100_000],
-      ['day', '2026-09-16', 200_000, 0, 300_000],
+    expect(shape(l)).toEqual([
+      ['charge', '2026-09-15', 100_000, 0, 100_000],
+      ['charge', '2026-09-16', 200_000, 0, 300_000],
       ['payment', '2026-09-17', 0, 100_000, 200_000],
     ]);
     expect(l.balance).toBe(200_000);
   });
 
-  it('names the mined days behind each day entry, so a row can open onto them', () => {
+  it('names the mined day behind each charge row, so a row can act on it', () => {
     const v = buildBookView(running([]));
     const l = ledgerOf(v);
     const keys = minerDetail(v, 'solo:1')!.days.map((d) => d.key);
-    const days = l.entries.filter((e) => e.kind === 'day');
+    const days = l.rows.flatMap((e) => (e.kind === 'charge' ? [e.charge.id] : []));
     expect(days.length).toBeGreaterThan(0);
-    expect(days.flatMap((e) => e.dayKeys ?? []).every((k) => keys.includes(k))).toBe(true);
-    expect(days.every((e) => e.dayKeys?.length === e.days)).toBe(true);
+    expect(days.every((k) => keys.includes(k))).toBe(true);
   });
 
   it('ends at the credit held when a payment is more than every billed day', () => {
@@ -474,7 +479,7 @@ describe('accountLedger', () => {
 
   it('puts a payment after the day it lands on, and keeps today outside the balance', () => {
     const l = ledgerOf(buildBookView(running([pay('a', 100_000, '2026-09-15T01:00:00Z')])));
-    expect(l.entries.slice(0, 2).map((e) => e.kind)).toEqual(['day', 'payment']);
+    expect(l.rows.slice(0, 2).map((e) => e.kind)).toEqual(['charge', 'payment']);
     expect(l.notYetBilled).toEqual({ tax: 50_000, days: 1 });
   });
 
@@ -492,7 +497,7 @@ describe('accountLedger', () => {
       ],
     });
     const l = ledgerOf(view);
-    expect(l.entries.some((e) => e.kind === 'writeOff')).toBe(true);
+    expect(l.rows.some((e) => e.kind === 'writeOff')).toBe(true);
     expect(l.balance).toBe(view.miners[0].owed - view.miners[0].credit);
   });
 
@@ -513,11 +518,11 @@ describe('accountLedger', () => {
     const before = buildBookView({ ...running([]), adjustments: [] }).miners[0];
     const view = buildBookView({ ...running([]), adjustments: [reversed] });
     expect(view.miners[0].owed).toBe(before.owed);
-    const l = accountLedger(minerDetail(view, 'solo:1')!, [reversed]);
-    const rows = l.entries.filter((e) => e.kind === 'correction');
-    expect(rows.map((e) => [e.date, e.debit, e.credit, e.reversal ?? false])).toEqual([
-      ['2026-09-15', 300_000, 0, false],
-      ['2026-09-21', 0, 300_000, true],
+    const l = ledgerOf(view);
+    const rows = l.rows.filter((e) => e.kind === 'charge' && e.charge.kind === 'correction');
+    expect(rows.map((e) => [e.date, e.charged, e.reversal ?? false])).toEqual([
+      ['2026-09-15', 300_000, false],
+      ['2026-09-21', -300_000, true],
     ]);
     expect(l.balance).toBe(view.miners[0].owed - view.miners[0].credit);
   });
@@ -537,13 +542,16 @@ describe('accountLedger', () => {
       ...running([pay('a', 99_700, '2026-09-15T10:00:00Z')]),
       adjustments: [adjustment],
     });
-    const detail = minerDetail(view, 'solo:1')!;
-    const rows = accountLedger(detail, [adjustment]).entries;
-    expect(rows.find((e) => e.kind === 'correction')).toMatchObject({
-      refId: 'c1',
+    const rows = ledgerOf(view).rows;
+    const correction = rows.find((e) => e.kind === 'charge' && e.charge.kind === 'correction');
+    expect(correction?.kind === 'charge' && correction.charge).toMatchObject({
+      id: 'c1',
       opening: true,
     });
-    expect(rows.find((e) => e.kind === 'tolerance')?.forDate).toBe('2026-09-15');
+    const tolerance = rows.find((e) => e.kind === 'writeOff' && e.cause === 'tolerance');
+    expect(tolerance?.kind === 'writeOff' && tolerance.days.map((d) => d.date)).toEqual([
+      '2026-09-15',
+    ]);
   });
 
   it('does not let a reversed write-off take the forgiveness of a live one after it', () => {
@@ -556,11 +564,9 @@ describe('accountLedger', () => {
     };
     const live = { ...base, id: 'w2', at: '2026-09-20T10:00:00Z' };
     const view = buildBookView({ ...running([]), writeOffs: [reversed, live] });
-    const l = accountLedger(minerDetail(view, 'solo:1')!, []);
+    const l = ledgerOf(view);
     expect(
-      l.entries
-        .filter((e) => e.kind === 'writeOff' && !e.reversed && !e.reversal)
-        .map((e) => e.credit)
+      l.rows.filter((e) => e.kind === 'writeOff' && !e.reversed && !e.reversal).map((e) => e.paid)
     ).toEqual([100_000]);
     expect(l.balance).toBe(view.miners[0].owed - view.miners[0].credit);
   });
@@ -580,8 +586,8 @@ describe('accountLedger', () => {
     const plain = buildBookView({ ...running([]) }).miners[0];
     const view = buildBookView({ ...running([]), writeOffs: [reversed] });
     expect(view.miners[0].owed).toBe(plain.owed);
-    const l = accountLedger(minerDetail(view, 'solo:1')!, []);
-    expect(l.entries.filter((e) => e.kind === 'writeOff').map((e) => [e.credit, e.debit])).toEqual([
+    const l = ledgerOf(view);
+    expect(l.rows.filter((e) => e.kind === 'writeOff').map((e) => [e.paid, e.charged])).toEqual([
       [200_000, 0],
       [0, 200_000],
     ]);
@@ -592,7 +598,9 @@ describe('accountLedger', () => {
     // 15 Sep is 100,000; paying 99,700 leaves 300 short (0.3%), forgiven by default.
     const payments = [pay('a', 99_700, '2026-09-15T10:00:00Z')];
     const forgiven = ledgerOf(buildBookView(running(payments)));
-    expect(forgiven.entries.some((e) => e.kind === 'tolerance')).toBe(true);
+    const tolerance = (l: ReturnType<typeof ledgerOf>) =>
+      l.rows.some((e) => e.kind === 'writeOff' && e.cause === 'tolerance');
+    expect(tolerance(forgiven)).toBe(true);
     const view = buildBookView({
       ...running(payments),
       toleranceExemptions: [
@@ -608,7 +616,7 @@ describe('accountLedger', () => {
       ],
     });
     const l = ledgerOf(view);
-    expect(l.entries.some((e) => e.kind === 'tolerance')).toBe(false);
+    expect(tolerance(l)).toBe(false);
     expect(l.balance).toBe(view.miners[0].owed - view.miners[0].credit);
     expect(view.miners[0].owed).toBeGreaterThanOrEqual(300);
   });
@@ -630,12 +638,13 @@ describe('accountLedger', () => {
       ],
     });
     const l = ledgerOf(view);
-    expect(l.entries.some((e) => e.date === '2026-09-16')).toBe(false);
+    // Listed as held, but out of the balance.
+    const heldRow = l.rows.find((e) => e.date === '2026-09-16');
+    expect(heldRow?.kind === 'charge' && heldRow.held).toBe(true);
     expect(l.balance).toBe(view.miners[0].owed - view.miners[0].credit);
     // Held, with the dispute that holds it: never "not billable yet".
     const day = minerDetail(view, 'solo:1')!.days.find((d) => d.date === '2026-09-16')!;
     expect(day.disputed).toEqual({ disputeId: 'd1', until: '2026-10-01T00:00:00.000Z' });
-    expect(l.held).toEqual({ tax: day.tax, days: 1 });
     expect(l.notYetBilled).toEqual(ledgerOf(buildBookView(running([]))).notYetBilled);
     expect(minerDetail(view, 'solo:1')!.disputes.map((d) => d.id)).toEqual(['d1']);
   });
@@ -657,8 +666,10 @@ describe('accountLedger', () => {
       adjustments,
       minerPaidThrough: new Map([['solo:1', '2026-09-16']]),
     });
-    const l = accountLedger(minerDetail(view, 'solo:1')!, adjustments);
-    expect(l.entries.find((e) => e.kind === 'correction')?.date).toBe('2026-09-15');
+    const l = ledgerOf(view);
+    expect(l.rows.find((e) => e.kind === 'charge' && e.charge.kind === 'correction')?.date).toBe(
+      '2026-09-15'
+    );
     expect(view.miners[0].owed).toBeGreaterThan(0);
     expect(l.balance).toBe(view.miners[0].owed - view.miners[0].credit);
   });
@@ -676,18 +687,18 @@ describe('accountLedger', () => {
     // Day 15 is 100,000 and day 16 is 200,000. Paying 299,000 leaves day 16 1,000 short (0.5%).
     const view = buildBookView(running([pay('a', 299_000, '2026-09-17T10:00:00Z')]));
     const l = ledgerOf(view);
-    expect(l.entries.map((e) => [e.kind, e.date, e.credit])).toEqual([
-      ['day', '2026-09-15', 0],
-      ['day', '2026-09-16', 0],
+    expect(l.rows.map((e) => [e.kind, e.date, e.paid])).toEqual([
+      ['charge', '2026-09-15', 0],
+      ['charge', '2026-09-16', 0],
       ['payment', '2026-09-17', 299_000],
-      ['tolerance', '2026-09-17', 1_000],
+      ['writeOff', '2026-09-17', 1_000],
     ]);
     expect(l.balance).toBe(view.miners[0].owed - view.miners[0].credit);
     expect(l.balance).toBe(0);
   });
 });
 
-describe('accountLedger from a checkpoint', () => {
+describe('the Miner ledger from a checkpoint', () => {
   it('opens on the closed months’ balance and lists only what came after', () => {
     const view = buildBookView(
       input({
@@ -710,11 +721,11 @@ describe('accountLedger from a checkpoint', () => {
         ]),
       })
     );
-    const l = accountLedger(minerDetail(view, 'solo:1')!, []);
-    expect(l.entries.map((e) => [e.kind, e.date, e.debit, e.credit, e.balance])).toEqual([
-      ['checkpoint', '2026-08-31', 50_000, 0, 50_000],
-      ['day', '2026-09-10', 100_000, 0, 150_000],
+    const l = payeeLedger(minerLedgerSource(view, 'solo:1', { character: (id) => `Pilot ${id}` })!);
+    expect(l.rows.map((e) => [e.kind, e.date, e.charged, e.paid, e.balance])).toEqual([
+      ['opening', '2026-08-31', 50_000, 0, 50_000],
+      ['charge', '2026-09-10', 100_000, 0, 150_000],
     ]);
-    expect(l.balance).toBe(view.miners[0].owed - view.miners[0].credit);
+    expect(l.rows.at(-1)!.balance).toBe(view.miners[0].owed - view.miners[0].credit);
   });
 });

@@ -615,15 +615,17 @@ export interface MinerDetail {
   dayWriteOffs: { date: string; amount: number; at: string }[];
   /** Dates an open dispute holds: not billed yet, so not in the balance. */
   heldDays: string[];
-  /** Officer write-offs (#4637), oldest first; `amount` is what each forgave, 0 when nothing was left. */
+  /** The Miner's officer write-offs (#4637) as recorded, oldest first (the ledger says what each forgave). */
   officerWriteOffs: {
     id: string;
     amount: number;
     reason: string;
     at: string;
-    /** Undone by an officer: `amount` is what it forgave while it stood. */
+    /** Undone by an officer. */
     reversed?: { by: number; at: string; reason: string };
   }[];
+  /** What officer write-offs forgave of the days the account bills now. */
+  forgiven: number;
   dismissals: Dismissal[];
   declarations: Declaration[];
   /** The Miner's disputes, answered or not. */
@@ -631,37 +633,6 @@ export interface MinerDetail {
   credit: number;
   /** The checkpoint the account is built from: what came before it is summed up in it. */
   checkpoint?: RunningAccountCheckpoint;
-}
-
-/**
- * Each officer write-off with what it forgave of the days. The days' total is shared out oldest
- * write-off first, each up to its amount, as the account draws on them.
- */
-function officerWriteOffsOf(
-  view: BookView,
-  minerId: string,
-  inner: MinerInternals
-): MinerDetail['officerWriteOffs'] {
-  const mine = (view.input.writeOffs ?? [])
-    .filter((w) => w.minerId === minerId)
-    .sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
-  let onDays = inner.account.applications.writeOffs.reduce((s, d) => s + d.amount, 0);
-  const through = inner.account.input.checkpoint?.through;
-  return mine.map((w) => {
-    // A reversed write-off forgave nothing, and one the checkpoint holds is summed up in it:
-    // neither takes a share of the days' forgiveness.
-    if (w.reversed || (through !== undefined && utcDayOf(w.at) <= through))
-      return {
-        id: w.id,
-        amount: w.amount,
-        reason: w.reason,
-        at: w.at,
-        ...(w.reversed ? { reversed: w.reversed } : {}),
-      };
-    const amount = Math.min(onDays, Math.max(0, w.amount));
-    onDays -= amount;
-    return { id: w.id, amount, reason: w.reason, at: w.at };
-  });
 }
 
 export function minerDetail(view: BookView, minerId: string): MinerDetail | undefined {
@@ -687,7 +658,17 @@ export function minerDetail(view: BookView, minerId: string): MinerDetail | unde
     paymentDays: inner.account.applications.payments,
     dayWriteOffs: inner.account.writtenOffDays(inner.payments),
     heldDays: inner.account.heldDates(),
-    officerWriteOffs: officerWriteOffsOf(view, minerId, inner),
+    officerWriteOffs: (view.input.writeOffs ?? [])
+      .filter((w) => w.minerId === minerId)
+      .sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id))
+      .map((w) => ({
+        id: w.id,
+        amount: w.amount,
+        reason: w.reason,
+        at: w.at,
+        ...(w.reversed ? { reversed: w.reversed } : {}),
+      })),
+    forgiven: inner.account.applications.writeOffs.reduce((sum, d) => sum + d.amount, 0),
     dismissals,
     declarations: view.input.declarations.filter((d) => noticeIds.has(d.noticeId)),
     disputes: (view.input.disputes ?? []).filter((d) =>
