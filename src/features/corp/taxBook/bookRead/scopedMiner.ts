@@ -13,6 +13,7 @@ import { readLateNotices } from '@/engine/corpTaxBook/lateNotices';
 import { accountWindowStart } from '@/engine/corpTaxBook/minerScope';
 import type { RecordedWriteOff } from '@/engine/corpTaxBook/payments';
 import type { RunningAccountCheckpoint } from '../../../../../functions/src/corpTaxBookCheckpoint';
+import { NOTICE_ID_FIELD } from '../../../../../functions/src/corpTaxBookLateNotice';
 import type { SettlePayment } from '@/engine/corpTaxBook/sync';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import { readObservedRow } from '@/engine/corpTaxBook/observed';
@@ -96,7 +97,7 @@ export async function readMinerScope(
     for (const batch of chunk(ids, IN_LIMIT))
       out.push(
         ...(
-          await getDocs(query(under('declarations'), where('statementId', 'in', batch)))
+          await getDocs(query(under('declarations'), where(NOTICE_ID_FIELD, 'in', batch)))
         ).docs.map((d) => d.data() as BookDeclaration)
       );
     return out;

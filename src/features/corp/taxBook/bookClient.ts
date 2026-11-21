@@ -273,7 +273,6 @@ export const LIVE_CHECK_ACTIONS: ReadonlySet<string> = new Set([
   'reverseWriteOff',
   'setToleranceExemption',
   'writeOff',
-  'rebill',
   'markNotTax',
 ]);
 
