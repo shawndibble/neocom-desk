@@ -8,6 +8,7 @@
  * Firestore here is the `lite` build (no listeners), so callers refetch after
  * a change.
  */
+import { callableErrorReason } from '@/lib/callableError';
 import { LATE_NOTICES, LEGACY_NOTICES } from '@/engine/corpTaxBook/noticeCollections';
 import { LIVE_CHECK_ACTION_NAMES } from '../../../../functions/src/corpTaxBookKinds';
 import { parseBookSettings, type BookSettings } from '@/engine/corpTaxBook/bookDocs';
@@ -817,12 +818,24 @@ export async function readVerifyTokens(
 }
 
 /** Whether a refusal says the server does not know an action yet (Cloud Functions ship later). */
-// TODO(M7): fall back only on the router's exact unknown-action answer, not on any
-// `invalid-argument` or `not-found` (a real refusal of a known action falls back today). The
-// server agent is naming the exact old and new answers; match them here once known.
-const unknownAction = (error: unknown) => {
-  const code = errorCode(error);
-  return code.endsWith('invalid-argument') || code.endsWith('not-found');
+/**
+ * The `reason` a server gives an action or edit it does not know (`UNKNOWN_ACTION`,
+ * functions/src/inputParse.ts, which the client cannot import: it pulls in firebase-functions).
+ */
+const UNKNOWN_ACTION_REASON = 'unknown-action';
+
+/**
+ * Whether the server does not know this edit action yet, so the legacy one is the way (M7): its
+ * `unknown-action` reason, or, from a server before that reason, the router's "Unknown action"
+ * or the edit parser's "action must be one of ..." refusal. Any other refusal of a known action
+ * is the action's own answer, never a reason to fall back.
+ */
+export const unknownAction = (error: unknown): boolean => {
+  const reason = callableErrorReason(error);
+  if (reason !== null) return reason === UNKNOWN_ACTION_REASON;
+  if (!errorCode(error).endsWith('invalid-argument')) return false;
+  const message = error instanceof Error ? error.message : '';
+  return /^(Unknown action|action must be one of )/.test(message);
 };
 
 /**
