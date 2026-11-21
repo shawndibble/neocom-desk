@@ -27,6 +27,7 @@ import {
   type OverviewLayout,
   type Widget,
   type WidgetRange,
+  cleanHiddenKinds,
   cleanHiddenLayers,
 } from './layout';
 import { migrateRetiredKind } from './migrate';
@@ -61,6 +62,9 @@ function parseWidget(stored: unknown): Widget | null {
   }
   if (!isRowsPerPage(raw.rowsPerPage)) delete out.rowsPerPage;
   if (!def.hasCalendarEvents || raw.calendarEvents !== 'all') delete out.calendarEvents;
+  const hiddenKinds = cleanHiddenKinds(raw.hiddenKinds);
+  if (!def.hasCalendarEvents || hiddenKinds.length === 0) delete out.hiddenKinds;
+  else out.hiddenKinds = hiddenKinds;
   if (!def.hasRaidsWhere || raw.raidsWhere !== 'near') delete out.raidsWhere;
   if (
     !def.hasRaidsWhere ||

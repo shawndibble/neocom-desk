@@ -7,6 +7,7 @@ import {
 } from '@/features/notifications/preferences';
 import { useTicker } from '@/lib/ticker';
 import { useTimeZone } from '@/lib/timeFormat';
+import { useSharedPopTime } from '@/features/character/calendarSharedPopTime';
 import type { FeedStore } from './feedStore';
 import { useFeedStore } from './feedStoreContext';
 import { buildView, builderEpoch, feedsOf, subscribeBuilders } from './models';
@@ -62,6 +63,7 @@ function cachedView(
     ctx.activeCharacterId,
     ctx.notTrainingAlert,
     ctx.zone,
+    ctx.sharedPopTime,
     builders,
   ];
   const hit = cache.get(id);
@@ -90,6 +92,7 @@ export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<stri
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const zone = useTimeZone();
+  const sharedPopTime = useSharedPopTime((state) => state.value);
   // A lazy builder landing (`ensureBuilders`) makes every view built before it stale.
   const builders = useSyncExternalStore(subscribeBuilders, builderEpoch);
   const prefs = useNotificationPreferences((state) => state.value);
@@ -133,6 +136,7 @@ export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<stri
             activeCharacterId,
             notTrainingAlert,
             zone,
+            sharedPopTime,
           },
           builders
         )
@@ -141,7 +145,18 @@ export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<stri
     return views;
     // `slice` is the signal that an own feed changed; the store read inside is current.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stable, store, slice, now, t, activeCharacterId, notTrainingAlert, zone, builders]);
+  }, [
+    stable,
+    store,
+    slice,
+    now,
+    t,
+    activeCharacterId,
+    notTrainingAlert,
+    zone,
+    sharedPopTime,
+    builders,
+  ]);
 }
 
 /** The view for one widget. */
@@ -150,6 +165,7 @@ export function useWidgetView(kind: string, scopeAll: boolean, settings: ViewSet
     range,
     plexPer30Days,
     calendarEvents,
+    hiddenKinds,
     raidsWhere,
     raidsRadius,
     profitSource,
@@ -165,6 +181,7 @@ export function useWidgetView(kind: string, scopeAll: boolean, settings: ViewSet
       range,
       plexPer30Days,
       calendarEvents,
+      hiddenKinds,
       raidsWhere,
       raidsRadius,
       profitSource,
@@ -179,6 +196,7 @@ export function useWidgetView(kind: string, scopeAll: boolean, settings: ViewSet
       range,
       plexPer30Days,
       calendarEvents,
+      hiddenKinds,
       raidsWhere,
       raidsRadius,
       profitSource,

@@ -1,6 +1,6 @@
 /**
  * The Table views of the character-facing kinds (training, skill points,
- * coming up, contracts, mail): real columns, ordered name first, then the one
+ * calendar, contracts, mail): real columns, ordered name first, then the one
  * "key" figure, then the rest, each with the priority `visibleColumns` uses to
  * decide what survives a narrow widget. Pure: figures and a translate function
  * in, a `TableModel` out.
@@ -10,7 +10,6 @@ import type { DeadlineSeverity } from '@/engine/character/severity';
 import { extractableSp, extractorCount } from '@/engine/skills/spExtraction';
 import type { SkillQueueEntry } from '@/esi/endpoints';
 import type { ContractTableRow } from '@/engine/contracts/contractsBoard';
-import type { UpcomingCalendarEvent } from '@/engine/character/calendarDeadline';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { DAY_MS, HOUR_MS } from '@/lib/age';
 import { formatCountdown } from '@/lib/duration';
@@ -201,29 +200,30 @@ export function spTable(t: Translate, input: SpTableInput): TableModel {
   };
 }
 
-// --- Coming up -----------------------------------------------------------------------
+// --- Calendar ------------------------------------------------------------------------
 
-export function comingUpTable(
-  t: Translate,
-  events: readonly UpcomingCalendarEvent[],
-  now: number,
-  toneOf: (atMs: number, now: number) => DeadlineSeverity
-): TableModel {
+/** One Calendar agenda row, already worded: what, when (a countdown or its past label), which kind. */
+export interface CalendarTableRow {
+  key: string;
+  subject: string;
+  when: string;
+  kind: string;
+  tone: DeadlineSeverity;
+  to: string;
+}
+
+export function calendarTable(t: Translate, rows: readonly CalendarTableRow[]): TableModel {
   return {
     columns: [
-      { key: 'event', label: t(`${W}.comingUp.col.event`), priority: 0 },
+      { key: 'item', label: t(`${W}.comingUp.col.item`), priority: 0 },
       { key: 'in', label: t(`${W}.comingUp.col.in`), align: 'end', priority: 1 },
-      { key: 'response', label: t(`${W}.comingUp.col.response`), priority: 2 },
+      { key: 'kind', label: t(`${W}.comingUp.col.kind`), priority: 2 },
     ],
-    rows: events.map((event) => ({
-      key: String(event.eventId),
-      cells: [
-        event.title,
-        formatCountdown((event.atMs - now) / 1000),
-        t(`overview.board.response.${event.response}`),
-      ],
-      tone: toneOf(event.atMs, now),
-      to: openHref('/calendar', event.eventId),
+    rows: rows.map((row) => ({
+      key: row.key,
+      cells: [row.subject, row.when, row.kind],
+      tone: row.tone,
+      to: row.to,
     })),
   };
 }

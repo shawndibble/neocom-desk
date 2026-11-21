@@ -23,6 +23,7 @@ import type {
   WidgetView,
 } from './layout';
 import type { LayerId } from '@/engine/netWorth/series';
+import type { CharacterBoardItemKind } from '@/engine/character/board';
 import type { RowsPerPage } from './tableSortPage';
 
 export interface OverviewEditActions {
@@ -45,6 +46,7 @@ export interface OverviewEditActions {
   setRowsPerPage: (id: string, rows: RowsPerPage) => void;
   setPlexPer30Days: (id: string, plex: number) => void;
   setCalendarEvents: (id: string, choice: CalendarEventsChoice) => void;
+  setHiddenKinds: (id: string, kinds: CharacterBoardItemKind[]) => void;
   setRaidsWhere: (id: string, where: RaidsWhere) => void;
   setRaidsRadius: (id: string, radius: number) => void;
   setProfitSource: (id: string, source: ProfitSource) => void;
@@ -92,6 +94,7 @@ export const OverviewEditContext = createContext<OverviewEdit>({
   setRowsPerPage: none,
   setPlexPer30Days: none,
   setCalendarEvents: none,
+  setHiddenKinds: none,
   setRaidsWhere: none,
   setProfitSource: none,
   setRaidsRadius: none,

@@ -832,7 +832,8 @@ here — they go one per file in `docs/context/decisions/`.
 - **What We Store**: The section of Settings' FAQ tab that tells a pilot, in their own words, what leaves their device. Not documentation but a **commitment**: the **Synced Collection** registry is the authoritative set, and every synced collection must be accounted for. Names its own exceptions (Notification Feed rows, Scheduled Push occurrences, crash reports) rather than rounding them off.
 - **What-If Implants**: Optimizer override that assumes a hypothetical implant set instead of the clone's current implants: five independent per-attribute bonuses (+0..+5 each), since EVE's attribute hardwirings are per slot. The matched sets (+1..+5 in every slot) remain one-click **presets** over those five values. Stored on the Skill Plan and synced with it.
 - **Widget**: One tile on a **Widget board** (the Overview or the **Corp Board**): an instance of a **Widget Kind** with
-  its own **Size**, **View**, optional rename, character scope and range. The
+  its own **Size**, **View**, optional rename, character scope and range, plus
+  any setting its kind adds (the Calendar widget's Types and Events). The
   same kind may appear more than once. Always in one **Widget State**.
 - **Widget board**: A page drawn as a **Widget** grid: the Overview or the
   **Corp Board**. One engine (grid, Customize, **Gallery**, menu) with the
