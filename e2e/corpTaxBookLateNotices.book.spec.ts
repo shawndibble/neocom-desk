@@ -80,11 +80,9 @@ test('an officer issues the planned late notice, and it is mailed', async ({ pag
     .toBe(1);
 });
 
-// Once the queue has mailed it and the book recorded the mail, the table still reads "1 of 1 not
-// mailed" until the page is reloaded: nothing re-reads the book after `recordMail`.
-test.fixme('the Notices sent table shows the notice as mailed once it is sent', async ({
-  page,
-}) => {
+// Once the queue has mailed it and the book recorded the mail, the page reads the book again
+// (`useReloadOnRecordedMail`).
+test('the Notices sent table shows the notice as mailed once it is sent', async ({ page }) => {
   const notice = await issueCorasNotice(page);
   await expect
     .poll(async () => {

@@ -10,6 +10,7 @@ import { chunk } from '@/lib/chunk';
 import { editBook, recordCheckpoints } from '../taxBook/bookClient';
 import { invalidatePopSharing } from '../taxBook/popSharingCache';
 import { BookContext, type BookContextValue } from './bookContextValue';
+import { useReloadOnRecordedMail } from './useReloadOnRecordedMail';
 
 export function BookProvider({
   value,
@@ -32,6 +33,7 @@ export function BookProvider({
     [characterId, corporationId, reload]
   );
   useRecordAccounts(value, verdict.canEdit);
+  useReloadOnRecordedMail(corporationId, reload, verdict.canEdit);
   const merged = useMemo(
     () => ({ ...value, edit, canEdit: verdict.canEdit }),
     [value, edit, verdict.canEdit]
