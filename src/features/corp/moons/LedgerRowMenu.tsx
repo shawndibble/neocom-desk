@@ -73,9 +73,13 @@ export function LedgerRowMenu({
       item('notTax', () => actions.markNotTax(id)),
       item('reassign', () => actions.reassignPayment(id))
     );
-  } else if (entry.kind === 'day') {
-    if (rateDays.length > 0) items.push(item('rate', () => actions.changeRate(rateDays[0]!)));
-    if (dismissDays.length > 0) items.push(item('dismiss', () => actions.dismissDays(dismissDays)));
+  } else if (entry.kind === 'day' && rateDays.length > 0 && dismissDays.length > 0) {
+    // A day with only one of these (a paid day can only be repriced) gets no menu: one action
+    // never earns one (DESIGN.md §6c), and the page's own menu reaches both, and the day tables'.
+    items.push(
+      item('rate', () => actions.changeRate(rateDays[0]!)),
+      item('dismiss', () => actions.dismissDays(dismissDays))
+    );
   }
   if (items.length === 0) return children;
   return (

@@ -7,11 +7,25 @@ import {
 } from './pushDivisionNames';
 
 function deps(data: CorporationDivisions | null) {
-  const edit = vi.fn().mockResolvedValue({});
+  const calls: string[] = [];
+  const edit = vi.fn(async () => {
+    calls.push('edit');
+    return {};
+  });
+  const verify = vi.fn(async () => {
+    calls.push('verify');
+    return { canEdit: true };
+  });
   const load = vi
     .fn()
     .mockResolvedValue({ cached: data === null ? null : { data }, needsReauth: false });
-  return { load, edit, deps: { load, edit } as unknown as PushDivisionNamesDeps };
+  return {
+    load,
+    edit,
+    verify,
+    calls,
+    deps: { load, edit, verify } as unknown as PushDivisionNamesDeps,
+  };
 }
 
 describe('pushDivisionNames (#6161)', () => {
@@ -23,6 +37,8 @@ describe('pushDivisionNames (#6161)', () => {
       action: 'updateSettings',
       patch: { divisionNames: { 5: 'MOON TAXES' } },
     });
+    // The officer check comes first: the write rides on the role it caches, else a 403.
+    expect(d.calls).toEqual(['verify', 'edit']);
   });
 
   it('writes nothing when the names are unchanged or ESI did not answer', async () => {
@@ -37,6 +53,7 @@ describe('pushDivisionNames (#6161)', () => {
     await expect(pushDivisionNames(1, 77, stored, noWallet.deps)).resolves.toBe(false);
     expect(none.edit).not.toHaveBeenCalled();
     expect(noWallet.edit).not.toHaveBeenCalled();
+    expect(same.verify).not.toHaveBeenCalled();
   });
 });
 

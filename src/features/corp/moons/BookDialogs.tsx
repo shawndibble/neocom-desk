@@ -48,6 +48,21 @@ export function Label({ text, children }: { text: ReactNode; children: ReactNode
   );
 }
 
+/**
+ * `Label`'s look for a group that names itself (a `SegmentedControl` with its own `label`): a
+ * `<label>` around buttons would add its text to the first button's name, so it is read twice.
+ */
+export function GroupLabel({ text, children }: { text: ReactNode; children: ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <span aria-hidden className="block text-xs text-text-dim">
+        {text}
+      </span>
+      {children}
+    </div>
+  );
+}
+
 interface ShellProps {
   open: boolean;
   onClose: () => void;
