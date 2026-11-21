@@ -5,12 +5,26 @@
  * Functions emulator loads its code on the first call, which together cost the first test
  * several seconds the others never pay. The verify page of an unknown token pays both: it loads
  * the app and calls the book's router, and it needs no seeded data or sign-in. Then the page
- * imports the officer route's module, which Vite compiles with everything it imports.
+ * imports the officer route's module, which Vite compiles with everything it imports. The token
+ * mint is a function of its own, loaded by a call of its own.
  */
 import { chromium, type FullConfig } from '@playwright/test';
-import { EMULATOR_HOSTS } from './runEnv';
+import { EMULATOR_HOSTS, PROJECT_ID } from './runEnv';
+
+/** The callables a first page load reaches: the Functions emulator loads each on its first call. */
+const FUNCTIONS = ['mintFirebaseToken', 'corpTaxBookCall'];
 
 export default async function warmUp(config: FullConfig): Promise<void> {
+  // A call with no data is refused, but only after the function is loaded (several seconds cold).
+  await Promise.all(
+    FUNCTIONS.map((name) =>
+      fetch(`http://127.0.0.1:5001/${PROJECT_ID}/us-central1/${name}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ data: {} }),
+      })
+    )
+  );
   const { baseURL, launchOptions } = config.projects[0].use;
   const browser = await chromium.launch(launchOptions);
   try {
