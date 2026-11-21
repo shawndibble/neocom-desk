@@ -9,11 +9,15 @@
  */
 import type { EveNotificationPayload } from '../eveNotificationPayload';
 import { shiftDate } from '../miningTax/yieldRange';
-import { isDayCovered, type CoveragePeriod } from './coverage';
-import { codeOwners, type MatchBook } from '../../../functions/src/corpTaxBookDonationMatch';
+import { matchBookOf, type MatchBook } from '../../../functions/src/corpTaxBookDonationMatch';
+import {
+  billableStoredRows,
+  minedSinceStart,
+  storedRowsWanted,
+} from '../../../functions/src/corpTaxBookMatchRows';
 import type { LateNotice } from '../../../functions/src/corpTaxBookLateNotice';
 import type { TaxPayment } from './payments';
-import { minerIdFor, type Miner } from './charges';
+import type { Miner } from './charges';
 import { MOON_ORE_M3_PER_UNIT, extractionStatus, type Extraction } from './extraction';
 import type { ObservedRow } from './types';
 import { DAY_MS, MINUTE_MS } from '@/lib/age';
@@ -239,17 +243,14 @@ export function donationMatchBook(book: {
   for (const p of book.payments)
     if (p.minerId !== undefined && !paidBefore.get(p.characterId)?.includes(p.minerId))
       paidBefore.set(p.characterId, [...(paidBefore.get(p.characterId) ?? []), p.minerId]);
-  const knownMinerIds = new Set([
-    ...book.notices.map((n) => n.minerId),
-    ...[...book.minedCharacterIds].map((c) => minerIdFor(c, book.miners)),
-    ...[...paidBefore.values()].flat(),
-  ]);
-  return {
+  return matchBookOf({
     miners: book.miners,
-    codes: codeOwners(book.notices, book.miners, knownMinerIds),
+    notices: book.notices,
     minedCharacterIds: book.minedCharacterIds,
+    // The Miners the book holds a record of, as the server counts them: a notice or a payment.
+    recordedMinerIds: [...book.notices.map((n) => n.minerId), ...[...paidBefore.values()].flat()],
     paidBefore,
-  };
+  });
 }
 
 // --- Settlement -----------------------------------------------------------
@@ -375,55 +376,8 @@ export function restampPlan(
   });
 }
 
-/**
- * The stored rows a sync reads to match donations, by Character: the first day it wants. A
- * sync's own ESI read holds only the book's refineries, but the book also bills ore mined at its
- * moon owners' refineries, which their reads store. Without those rows a Miner who mined only
- * there looks unknown, and their donation is held for review for good. Wanted: each held
- * (`no-open-balance`) donation's Miner, through the day it was paid, if it was paid on or after
- * the book's start; and each new donation's sender's Miner. Every Character of the Miner, from
- * the book's start.
- */
-export function storedRowsWanted(input: {
-  held: readonly { characterId: number; at: string }[];
-  senders: readonly number[];
-  miners: readonly Miner[];
-  startDate: string;
-}): Map<number, string> {
-  const out = new Map<number, string>();
-  const want = (characterId: number) => {
-    const minerId = minerIdFor(characterId, input.miners);
-    const characters = input.miners.find((m) => m.id === minerId)?.characterIds ?? [characterId];
-    for (const c of characters) out.set(c, input.startDate);
-  };
-  for (const p of input.held) if (p.at.slice(0, 10) >= input.startDate) want(p.characterId);
-  for (const characterId of input.senders) want(characterId);
-  return out;
-}
-
-/**
- * The stored rows `storedRowsWanted` asked for that the book bills: a wanted Character's, from
- * its day on, and a moon owner's only on a day its coverage holds (outside it, mining owes
- * nothing). The book's own refineries' rows, and a moon owner it does not know, are not tested.
- */
-export function billableStoredRows<
-  T extends { characterId: number; date: string; sourceCorporationId?: number },
->(
-  rows: readonly T[],
-  wanted: ReadonlyMap<number, string>,
-  bookCorporationId: number,
-  feeders: readonly { corporationId: number; coveragePeriods?: readonly CoveragePeriod[] }[]
-): T[] {
-  const periodsOf = new Map(feeders.map((f) => [f.corporationId, f.coveragePeriods]));
-  return rows.filter((r) => {
-    const from = wanted.get(r.characterId);
-    if (from === undefined || r.date < from) return false;
-    const source = r.sourceCorporationId;
-    const periods =
-      source === undefined || source === bookCorporationId ? undefined : periodsOf.get(source);
-    return periods === undefined || isDayCovered(periods, r.date);
-  });
-}
+/** Which stored rows a sync reads to match donations: the shared rules (corpTaxBookMatchRows). */
+export { billableStoredRows, minedSinceStart, storedRowsWanted };
 
 // --- Extractions ----------------------------------------------------------
 

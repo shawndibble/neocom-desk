@@ -141,7 +141,7 @@ export function Crumb({ to, label }: { to: string; label: string }) {
 }
 
 /**
- * A Statement's due date; once past, the days late, in danger. `now` is the book's clock.
+ * A late notice's due date; once past, the days late, in danger. `now` is the book's clock.
  * While a declaration pauses the Overdue clock (`pausedUntil`), no due date or lateness shows.
  */
 export function DueWord({
@@ -158,7 +158,7 @@ export function DueWord({
   if (pausedUntil) {
     return (
       <span className="whitespace-nowrap text-text-dim">
-        {t('corpTaxBook.moons.statementPeriod.pausedUntil', { date: atDate(pausedUntil, zone) })}
+        {t('corpTaxBook.moons.noticeDue.pausedUntil', { date: atDate(pausedUntil, zone) })}
       </span>
     );
   }
@@ -168,7 +168,7 @@ export function DueWord({
   const late = Math.max(1, Math.floor(elapsed / DAY_MS));
   return (
     <span className="font-semibold whitespace-nowrap text-danger">
-      {t('corpTaxBook.moons.statementPeriod.dueLate', { date: atDate(dueAt, zone), count: late })}
+      {t('corpTaxBook.moons.noticeDue.dueLate', { date: atDate(dueAt, zone), count: late })}
     </span>
   );
 }

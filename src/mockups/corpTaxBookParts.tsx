@@ -132,7 +132,7 @@ export function BookHealthStrip() {
   );
 }
 
-export type MoonsTab = 'extractions' | 'miners' | 'statements';
+export type MoonsTab = 'extractions' | 'miners' | 'late-notices';
 
 export function MoonsTabs({ value }: { value: MoonsTab }) {
   const tabsId = useTabsId();
@@ -145,7 +145,7 @@ export function MoonsTabs({ value }: { value: MoonsTab }) {
       tabs={[
         { id: 'extractions', label: 'Extractions' },
         { id: 'miners', label: 'Miners' },
-        { id: 'statements', label: 'Statements' },
+        { id: 'late-notices', label: 'Late notices' },
       ]}
     />
   );
@@ -267,7 +267,7 @@ const queueColumns: DataTableColumn<QueueItem>[] = [
   { id: 'to', header: 'To', primary: true, render: (row) => row.to },
   {
     id: 'amount',
-    header: 'Statement',
+    header: 'Late notice',
     align: 'right',
     className: 'tabular-nums',
     phoneHidden: true,
@@ -323,7 +323,7 @@ export function QueueSummary({ items }: { items: QueueItem[] }) {
         {!done && <span className="text-text-dim">about 2 minutes left</span>}
       </p>
       <ProgressBar
-        label="Statements sent"
+        label="Late notices sent"
         value={c.sent + c.failed}
         max={c.total}
         size="sm"
@@ -375,7 +375,7 @@ export function MailQueueChip({
         >
           <Icon.MailSent size={Icon.ICON_SIZE.sm} aria-hidden="true" />
           <span className="tabular-nums">
-            <span className="max-sm:hidden">Statements </span>
+            <span className="max-sm:hidden">Late notices </span>
             {done ? 'sent' : `${c.sent} of ${c.total}`}
           </span>
           {c.failed > 0 && (
@@ -386,7 +386,7 @@ export function MailQueueChip({
           )}
           {!done && (
             <ProgressBar
-              label="Statements sent"
+              label="Late notices sent"
               value={c.sent + c.failed}
               max={c.total}
               size="xs"
@@ -463,7 +463,7 @@ export function CorpBookDiff() {
   );
 }
 
-/** D27: the guest's opt-out. The monthly Statement still goes. */
+/** D27: the guest's opt-out. The monthly Late notice still goes. */
 export function StopReminders({ checked }: { checked: boolean }) {
   return (
     <label
@@ -476,8 +476,8 @@ export function StopReminders({ checked }: { checked: boolean }) {
       <span className="text-sm">
         Stop reminders
         <span className="block text-xs text-text-dim">
-          Your monthly Statement still comes. Officers can send you at most one reminder per
-          Statement.
+          Your monthly Late notice still comes. Officers can send you at most one reminder per Late
+          notice.
         </span>
       </span>
     </label>

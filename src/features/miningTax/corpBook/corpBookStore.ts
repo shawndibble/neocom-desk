@@ -8,6 +8,7 @@
  * defensively into the engine's shapes. Every write is a callable; the only one a player makes is
  * claiming their own Unmatched donation.
  */
+import { LATE_NOTICES, LEGACY_NOTICES } from '@/engine/corpTaxBook/noticeCollections';
 import {
   collection,
   doc,
@@ -417,8 +418,8 @@ async function readOneBook(
       part('payments', 'uid'),
       part('dismissals', 'uids'),
       // Late notices: the `lateNotices` docs, and the `statements` mirror older servers wrote.
-      part('statements', 'uids'),
-      written('lateNotices') ? orNone(part('lateNotices', 'uids')) : Promise.resolve(null),
+      part(LEGACY_NOTICES, 'uids'),
+      written(LATE_NOTICES) ? orNone(part(LATE_NOTICES, 'uids')) : Promise.resolve(null),
       written('accountCheckpoints')
         ? orNone(part('accountCheckpoints', 'uids'))
         : Promise.resolve(null),
