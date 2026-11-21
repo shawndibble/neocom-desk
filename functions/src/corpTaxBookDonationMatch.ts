@@ -140,6 +140,64 @@ export type ResolvedOwner =
   | { reviewReason: 'ambiguous'; ambiguousMinerIds: string[] }
   | Record<string, never>;
 
+/**
+ * The book the resolver reads, from what either side loaded: the groupings, every Late notice
+ * (its code), the Characters seen mining what the book bills, the Miner ids it holds a record of
+ * (a recorded account, a billed-by pointer), and the Miners each payer's earlier payments named.
+ */
+export function matchBookOf(input: {
+  miners: readonly MatchMiner[];
+  notices: readonly { id: string; minerId: string; code?: string }[];
+  minedCharacterIds: Iterable<number>;
+  recordedMinerIds?: Iterable<string>;
+  paidBefore?: ReadonlyMap<number, readonly string[]>;
+}): MatchBook {
+  const mined = new Set(input.minedCharacterIds);
+  return {
+    miners: input.miners,
+    codes: codeOwners(input.notices, input.miners, [
+      ...(input.recordedMinerIds ?? []),
+      ...[...mined].map((c) => minerIdFor(c, input.miners)),
+    ]),
+    minedCharacterIds: mined,
+    ...(input.paidBefore ? { paidBefore: input.paidBefore } : {}),
+  };
+}
+
+/** A stored payment, as a re-match reads it. */
+export interface UnmatchedCandidate {
+  id: string;
+  characterId?: number;
+  reason?: string;
+  minerId?: string;
+  at: string;
+  notTaxAmount?: number;
+  reviewReason?: string;
+}
+
+/**
+ * The Unmatched payments that now have a Miner, oldest first: a sender or code the book has come
+ * to know since. One already placed, marked not tax, or held for an officer as ambiguous is left.
+ */
+export function rematchUnmatched(
+  payments: readonly UnmatchedCandidate[],
+  book: MatchBook
+): { paymentId: string; minerId: string }[] {
+  return [...payments]
+    .filter(
+      (p) =>
+        p.minerId === undefined &&
+        typeof p.characterId === 'number' &&
+        !(p.notTaxAmount && p.notTaxAmount > 0) &&
+        p.reviewReason !== 'ambiguous'
+    )
+    .sort((a, b) => a.at.localeCompare(b.at))
+    .flatMap((p) => {
+      const owner = donationOwner({ characterId: p.characterId!, reason: p.reason }, book);
+      return owner.kind === 'miner' ? [{ paymentId: p.id, minerId: owner.minerId }] : [];
+    });
+}
+
 /** What resolving puts on one stored donation: its Miner, or the review it waits for. */
 export function ownerFields(
   donation: { characterId: number; reason?: string },

@@ -17,8 +17,9 @@ import { isDayCovered, type CoveragePeriod } from './corpTaxBookEngine.js';
 /** How many of a sender's stored rows are looked at for one the book bills. */
 const SEEN_ROWS = 50;
 import {
-  codeOwners,
   codesIn,
+  matchBookOf,
+  soloMinerId,
   type MatchBook,
   type MatchMiner,
 } from './corpTaxBookDonationMatch.js';
@@ -97,24 +98,22 @@ export async function loadMatchBook(
       if (!held.includes(minerId)) paidBefore.set(characterId, [...held, minerId]);
     }
   }
-  const known = [
-    ...accounts.docs.map((d) => d.id),
-    ...[...minedCharacterIds].map((c) => `solo:${c}`),
-  ];
   const listed = notices as { id: string; minerId: string; code?: string }[];
-  let codes = codeOwners(listed, miners, known);
+  const recorded = accounts.docs.map((d) => d.id);
+  const ofBook = (recordedMinerIds: string[]) =>
+    matchBookOf({ miners, notices: listed, minedCharacterIds, recordedMinerIds, paidBefore });
+  const first = ofBook(recorded);
   // A code none of those names may be a solo Miner's the book bills but holds no record of yet:
   // only then are the Characters it bills read (their billed-by pointers name the book).
-  if (donations.some((d) => codesIn(d.reason).some((c) => !codes.has(c)))) {
-    const billed = await db
-      .collection(BILLED_BY_COLLECTION)
-      .where(new FieldPath('books', String(corporationId)), '>', 0)
-      .select()
-      .get();
-    const solos = billed.docs.flatMap((d) =>
-      /^char:\d+$/.test(d.id) ? [`solo:${d.id.slice(5)}`] : []
-    );
-    codes = codeOwners(listed, miners, [...known, ...solos]);
-  }
-  return { miners, codes, minedCharacterIds, paidBefore };
+  if (!donations.some((d) => codesIn(d.reason).some((c) => !first.codes.has(c)))) return first;
+  const billed = await db
+    .collection(BILLED_BY_COLLECTION)
+    .where(new FieldPath('books', String(corporationId)), '>', 0)
+    .select()
+    .get();
+  const solos = billed.docs.flatMap((d) => {
+    const character = /^char:(\d+)$/.exec(d.id);
+    return character ? [soloMinerId(Number(character[1]))] : [];
+  });
+  return ofBook([...recorded, ...solos]);
 }

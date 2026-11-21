@@ -74,7 +74,9 @@ import { dbReader, readNoticeDocs } from './corpTaxBookLateNoticeStore.js';
 import {
   donationOwner,
   noteUncountedDonations,
+  rematchUnmatched,
   type MatchBook,
+  type UnmatchedCandidate,
 } from './corpTaxBookDonationMatch.js';
 import { loadMatchBook } from './corpTaxBookDonationMatchStore.js';
 import { billableStoredRows, minedSinceStart, storedRowsWanted } from './corpTaxBookMatchRows.js';
@@ -638,26 +640,16 @@ async function reassignUnmatched(
   before: AdminBookState,
   book: MatchBook
 ): Promise<{ assigned: Map<string, string>; error?: string }> {
-  // One an officer has to place (ambiguous) waits for them; nothing places it automatically.
-  const open = before.payments
-    .filter(
-      (p) =>
-        p.minerId === undefined &&
-        !(p.notTaxAmount && p.notTaxAmount > 0) &&
-        (p as { reviewReason?: string }).reviewReason !== 'ambiguous'
-    )
-    .sort((a, b) => a.at.localeCompare(b.at));
+  // A sender the book knows credits their Miner, owing or not (#6300); a donation held under #6207
+  // clears here; one an officer has to place (ambiguous) waits for them (`rematchUnmatched`).
   const assigned = new Map<string, string>();
-  // A sender the book knows credits their Miner, owing or not (#6300); a donation held under #6207 clears here.
   try {
-    for (const p of open) {
-      const match = donationOwner(
-        { characterId: p.characterId as number, reason: (p as { reason?: string }).reason },
-        book
-      );
-      if (match.kind !== 'miner') continue;
-      await edit({ action: 'assignPayment', paymentId: p.id, minerId: match.minerId });
-      assigned.set(p.id, match.minerId);
+    for (const { paymentId, minerId } of rematchUnmatched(
+      before.payments as UnmatchedCandidate[],
+      book
+    )) {
+      await edit({ action: 'assignPayment', paymentId, minerId });
+      assigned.set(paymentId, minerId);
     }
     return { assigned };
   } catch (e) {

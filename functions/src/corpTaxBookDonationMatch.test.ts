@@ -5,7 +5,9 @@ import {
   codesIn,
   currentMinerOf,
   donationOwner,
+  matchBookOf,
   minerIdFor,
+  rematchUnmatched,
   resolveDonationOwners,
   noteUncountedDonations,
 } from './corpTaxBookDonationMatch.js';
@@ -176,5 +178,55 @@ describe('donationOwner', () => {
       new Set(['g1'])
     );
     expect(noted.map((u) => u.refId).sort()).toEqual([1, 3]);
+  });
+});
+
+describe('matchBookOf: the book the resolver reads, from what either side loaded', () => {
+  it('knows each grouped and mined Miner’s code, each recorded one’s, and each notice’s', () => {
+    const book = matchBookOf({
+      miners,
+      notices: [{ id: 'n1', minerId: 'solo:30', code: 'MTOLD001' }],
+      minedCharacterIds: [10, 40],
+      recordedMinerIds: ['solo:50'],
+    });
+    expect(book.minedCharacterIds).toEqual(new Set([10, 40]));
+    for (const [minerId, owner] of [
+      ['g1', 'g1'],
+      ['solo:40', 'solo:40'],
+      ['solo:50', 'solo:50'],
+    ])
+      expect(book.codes.get(minerPaymentCode(minerId))).toEqual([owner]);
+    expect(book.codes.get('MTOLD001')).toEqual(['solo:30']);
+  });
+});
+
+describe('rematchUnmatched: which Unmatched payments now have a Miner', () => {
+  const book = matchBookOf({ miners, notices: [], minedCharacterIds: [20] });
+  const p = (id: string, characterId: number, extra: Record<string, unknown> = {}) => ({
+    id,
+    characterId,
+    amount: 5,
+    at: `2026-11-0${id.length}T00:00:00Z`,
+    ...extra,
+  });
+
+  it('places each one a known sender sent, oldest first', () => {
+    expect(rematchUnmatched([p('bb', 20), p('a', 10), p('ccc', 99)], book)).toEqual([
+      { paymentId: 'a', minerId: 'g1' },
+      { paymentId: 'bb', minerId: 'g2' },
+    ]);
+  });
+
+  it('leaves one already placed, marked not tax, or waiting for an officer as ambiguous', () => {
+    expect(
+      rematchUnmatched(
+        [
+          p('a', 10, { minerId: 'g1' }),
+          p('b', 10, { notTaxAmount: 1 }),
+          p('c', 10, { reviewReason: 'ambiguous' }),
+        ],
+        book
+      )
+    ).toEqual([]);
   });
 });
