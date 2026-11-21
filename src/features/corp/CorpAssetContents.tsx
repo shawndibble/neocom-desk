@@ -14,7 +14,8 @@ import { formatCount } from '@/lib/formatCount';
 import { formatIsk } from '@/lib/isk';
 import type { LedgerLabels } from './assetLedgerView';
 
-const INDENT_REM = 1.25;
+/** Per-level step, as `MarketGroupTree` indents. */
+const INDENT_REM = 0.75;
 
 function NodeName({
   node,
@@ -64,7 +65,7 @@ function ContentsNode({
           })
         : node.estimatedValue === 0
           ? '—'
-          : `${formatIsk(node.estimatedValue)} ISK`}
+          : t('corp.assets.stackValue', { value: formatIsk(node.estimatedValue) })}
     </span>
   );
 

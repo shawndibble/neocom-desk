@@ -525,7 +525,9 @@ export interface LedgerContentsNode {
  * Nests one place's stacks (a `LedgerCell`'s) by their container paths, the
  * way the in-game hangar shows them: containers first, then by value. A
  * container missing from `stacks` (filtered out) is rebuilt from the path of
- * what it holds, so a search still shows where a hit sits.
+ * what it holds, so a search still shows where a hit sits. Not
+ * `engine/assetTree.ts`: that walks raw assets with bays and ship rules; this
+ * only follows the paths the ledger already recorded.
  */
 export function buildContentsTree(stacks: readonly LedgerStack[]): LedgerContentsNode[] {
   const nodes = new Map<number, LedgerContentsNode>();
