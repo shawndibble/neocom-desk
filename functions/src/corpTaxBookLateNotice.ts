@@ -106,6 +106,9 @@ export interface LateNoticeDayState {
   settled: boolean;
 }
 
+/** A line key that names an Adjustment rather than a day charge. */
+const ADJUSTMENT_PREFIX = 'adjustment:';
+
 /** The id a closing account's last notice is stored under (`closeAccount`). */
 const FINAL_PREFIX = 'final_';
 
@@ -138,7 +141,7 @@ function numberRecord(v: unknown): Record<number, number> | undefined {
 
 /** The key a stored line names: its day charge, else its Adjustment, else its date. */
 export function lineKey(line: { chargeKey?: string; adjustmentId?: string; date: string }): string {
-  return line.chargeKey ?? `adjustment:${line.adjustmentId ?? line.date}`;
+  return line.chargeKey ?? `${ADJUSTMENT_PREFIX}${line.adjustmentId ?? line.date}`;
 }
 
 /**
@@ -210,6 +213,46 @@ export function lateNoticeFromStatementDoc(raw: Record<string, unknown>): LateNo
       remindersStopped: raw.remindersStopped === true,
     },
     ...(Object.keys(names).length > 0 ? { names } : {}),
+  };
+}
+
+/** The legacy store's hub and Ore Form when a notice carries none: what a book defaults to. */
+const DEFAULT_PRICING = { hubId: 'jita', oreForm: 'compressed' } as const;
+
+/**
+ * The `statements` doc an older tab reads a late notice from, until the `statements` mirror goes
+ * (decision 20261120-235011, step 5): the inverse of `lateNoticeFromStatementDoc`.
+ */
+export function legacyStatementDocOf(notice: LateNotice): Record<string, unknown> {
+  const first = notice.lines[0]?.date ?? notice.issuedAt.slice(0, 10);
+  const last = notice.lines.at(-1)?.date ?? first;
+  const pricing = notice.pricing ?? DEFAULT_PRICING;
+  return {
+    id: notice.id,
+    minerId: notice.minerId,
+    kind: 'notice',
+    ...(notice.code ? { code: notice.code } : {}),
+    periodStart: first,
+    periodEnd: last,
+    coversFrom: first,
+    coversThrough: last,
+    issuedAt: notice.issuedAt,
+    ...(notice.issuedBy !== undefined ? { issuedBy: notice.issuedBy } : {}),
+    hubId: pricing.hubId,
+    oreForm: pricing.oreForm,
+    lines: notice.lines.map(({ key, ...line }) =>
+      key.startsWith(ADJUSTMENT_PREFIX)
+        ? { ...line, adjustmentId: key.slice(ADJUSTMENT_PREFIX.length) }
+        : { ...line, chargeKey: key }
+    ),
+    amount: notice.listed,
+    characterIds: notice.characterIds,
+    uids: notice.uids,
+    mailsSent: notice.mail.sent,
+    ...(notice.mail.lastAt ? { lastMailedAt: notice.mail.lastAt } : {}),
+    manualRemindersSent: notice.mail.manualSent,
+    remindersStopped: notice.mail.remindersStopped,
+    ...notice.names,
   };
 }
 
