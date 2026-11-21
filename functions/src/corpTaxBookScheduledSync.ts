@@ -107,6 +107,9 @@ export const SETTLE_PER_CALL = 200;
 /** Why the schedule for a corporation stopped; the health strip words each of these. */
 export type StopReason = (typeof SCHEDULED_STOP_REASONS)[number];
 
+/** A source a scheduled run could not read. */
+export type ScheduledMissingSource = 'extractions' | 'donations' | 'ore';
+
 /**
  * `esi-refused`: ESI refused the holder's token on the observer list or a ledger
  * even though the role check passed. One refusal skips the run; the same one on
@@ -122,8 +125,11 @@ export type BookSyncResult =
       donationsAdded: number;
       settled: number;
       reassigned: number;
-      /** Sources the holder could not read this time; the rest still synced. */
-      missing: ('extractions' | 'donations')[];
+      /**
+       * Sources the holder could not read this time; the rest still synced. `ore`: the holder
+       * lacks Station_Manager, so neither the Extractions nor their ore are read.
+       */
+      missing: ScheduledMissingSource[];
       truncated: boolean;
       reassignError?: string;
     }
@@ -347,8 +353,11 @@ export async function runBookSync(
     }
   }
 
-  const missing: ('extractions' | 'donations')[] = [];
+  const missing: ScheduledMissingSource[] = [];
   const canExtract = access.isStationManager;
+  // A lacking role, not a failed read: every run until it changes. A book with no refinery of its
+  // own (only moon owners) has no chunk of its own to read.
+  if (!canExtract && observers.data.length > 0) missing.push('ore');
   let esiExtractions: Awaited<ReturnType<SyncEsi['extractions']>> | null = null;
   let notifications: MoonNotification[] = [];
   if (canExtract) {

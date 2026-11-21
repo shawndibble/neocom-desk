@@ -52,5 +52,12 @@ export const RefineryNames: Story = {
   },
 };
 
+/** @summary Read without each chunk's ore (a grant from before the notifications): Grant again. */
+export const ChunkOre: Story = {
+  args: {
+    items: [{ corporationId: 26, name: 'Sable Ridge Extraction', state: 'needs-ore' }],
+  },
+};
+
 /** @summary Nothing needs the player: the panel is gone. */
 export const Empty: Story = { args: { items: [] } };

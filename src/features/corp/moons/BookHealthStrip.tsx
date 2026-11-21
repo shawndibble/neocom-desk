@@ -74,10 +74,12 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
     sync.run.phase === 'done' && sync.run.outcome.kind === 'synced'
       ? (sync.run.outcome.missing ?? [])
       : undefined;
+  // The chunk ore is flagged only for the automatic sync (its holder lacks Station_Manager): a
+  // visit by an officer without the role is not a problem the book has.
   const unread =
     scheduledMissing && visitMissing
       ? scheduledMissing.filter((m) => visitMissing.includes(m))
-      : (scheduledMissing ?? visitMissing ?? []);
+      : (scheduledMissing ?? visitMissing?.filter((m) => m !== 'ore') ?? []);
   if (unread.length > 0) {
     items.push({
       id: 'couldNotRead',
@@ -85,7 +87,12 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
       title: t('corpTaxBook.moons.health.couldNotRead', {
         sources: unread.map((m) => t(`corpTaxBook.moons.autoSync.missing.${m}`)).join(', '),
       }),
-      detail: <p>{t('corpTaxBook.moons.health.couldNotReadDetail')}</p>,
+      detail: (
+        <>
+          <p>{t('corpTaxBook.moons.health.couldNotReadDetail')}</p>
+          {unread.includes('ore') && <p>{t('corpTaxBook.moons.health.couldNotReadOre')}</p>}
+        </>
+      ),
     });
   }
   // Counted from the ledger rows, so only on a tab that reads them (the Moon owners tab does not).
