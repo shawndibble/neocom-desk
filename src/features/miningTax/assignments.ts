@@ -25,7 +25,7 @@ import { loadPayees } from './payees';
 import { hubForPayee, loadUnitPricesOnDate } from './pricing';
 import { currentCompressedOre, withOreFormMarker } from './oreForm';
 import { putAssignments } from './storedAssignments';
-import { dropPayeeCheckpointsFrom, earliestDay } from '@/db/payeeCheckpoints';
+import { dropPayeeCheckpointsReachedBy, earliestKnownDay } from './payeeCheckpoints';
 
 /**
  * Thrown when a new Assignment would claim ore an existing one already does
@@ -569,8 +569,8 @@ export async function deleteAssignments(
 ): Promise<void> {
   if (assignments.length === 0) return;
   const stored = await db.miningTaxAssignments.bulkGet(assignments.map((a) => a.id));
-  const from = earliestDay(stored.map((a) => a?.date));
-  if (from !== undefined) await dropPayeeCheckpointsFrom(from);
+  const from = earliestKnownDay(stored.map((a) => a?.date));
+  if (from !== undefined) await dropPayeeCheckpointsReachedBy(from);
   await db.miningTaxAssignments.bulkDelete(assignments.map((a) => a.id));
   const idsByCharacter = new Map<number, string[]>();
   for (const a of assignments) {

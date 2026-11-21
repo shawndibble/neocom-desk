@@ -9,12 +9,12 @@
  */
 import { db, type MiningTaxPaymentLinkRecord } from '@/db';
 import {
-  dropPayeeCheckpointsFrom,
-  earliestDay,
+  dropPayeeCheckpointsReachedBy,
+  earliestKnownDay,
   PAYEE_CHECKPOINTS_KEY,
   readPayeeHistoryGen,
   readStoredCheckpoints,
-} from '@/db/payeeCheckpoints';
+} from './payeeCheckpoints';
 import {
   paymentLinkKey,
   type PayeePaymentLink,
@@ -60,7 +60,8 @@ async function removeLinks(keys: readonly string[]): Promise<Set<number>> {
   const stored = (await db.miningTaxPaymentLinks.bulkGet([...keys])).filter(
     (r): r is MiningTaxPaymentLinkRecord => r !== undefined
   );
-  if (stored.length > 0) await dropPayeeCheckpointsFrom(earliestDay(stored.map((r) => r.paidOn))!);
+  if (stored.length > 0)
+    await dropPayeeCheckpointsReachedBy(earliestKnownDay(stored.map((r) => r.paidOn))!);
   for (const r of stored) {
     touched.add(r.characterId);
     if (r.kind === 'legacy') {
@@ -97,7 +98,7 @@ export async function savePaymentLink(
       ...(replaces !== undefined && replaces !== key ? [replaces] : []),
     ];
     const touched = await removeLinks(gone);
-    await dropPayeeCheckpointsFrom(earliestDay([link.paidOn, stored?.paidOn])!);
+    await dropPayeeCheckpointsReachedBy(earliestKnownDay([link.paidOn, stored?.paidOn])!);
     await db.miningTaxPaymentLinks.put(recordOf(link, characterId));
     touched.add(characterId);
     return touched;
@@ -135,7 +136,7 @@ export async function readLegacyPaidMarks(): Promise<void> {
           known.add(t.id);
       const unread = unreadLegacyLinks(marked, known);
       if (unread.length === 0) return [];
-      await dropPayeeCheckpointsFrom(earliestDay(unread.map((l) => l.paidOn))!);
+      await dropPayeeCheckpointsReachedBy(earliestKnownDay(unread.map((l) => l.paidOn))!);
       await db.miningTaxPaymentLinks.bulkPut(unread.map((l) => recordOf(l, l.characterId)));
       return unread;
     }
@@ -187,7 +188,7 @@ export async function saveBilledElsewhere(
     );
     if (changed.length === 0) return false;
     await db.settings.put({ key: BILLED_ELSEWHERE_KEY, value: Object.fromEntries(next) });
-    await dropPayeeCheckpointsFrom(earliestDay(changed.map(dateOf)) ?? null);
+    await dropPayeeCheckpointsReachedBy(earliestKnownDay(changed.map(dateOf)) ?? null);
     return true;
   });
 }

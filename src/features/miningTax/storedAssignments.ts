@@ -6,7 +6,7 @@
  * and a record that never held one is never given one.
  */
 import { db, type MiningTaxAssignmentRecord } from '@/db';
-import { dropPayeeCheckpointsFrom, earliestDay } from '@/db/payeeCheckpoints';
+import { dropPayeeCheckpointsReachedBy, earliestKnownDay } from './payeeCheckpoints';
 
 const MARKS = ['payment', 'paidAt'] as const;
 
@@ -28,15 +28,15 @@ export function withStoredMark(
 
 /**
  * Writes Assignments, each with its stored record's paid mark (`withStoredMark`), and drops the
- * Payees' checkpoints the write reaches back to (`dropPayeeCheckpointsFrom`). Only awaits Dexie,
+ * Payees' checkpoints the write reaches back to (`dropPayeeCheckpointsReachedBy`). Only awaits Dexie,
  * so it may run inside a caller's transaction over the Assignments and `db.settings`.
  */
 export async function putAssignments(records: readonly MiningTaxAssignmentRecord[]): Promise<void> {
   if (records.length === 0) return;
   await db.transaction('rw', db.miningTaxAssignments, db.settings, async () => {
     const stored = await db.miningTaxAssignments.bulkGet(records.map((r) => r.id));
-    await dropPayeeCheckpointsFrom(
-      earliestDay([...records.map((r) => r.date), ...stored.map((r) => r?.date)])!
+    await dropPayeeCheckpointsReachedBy(
+      earliestKnownDay([...records.map((r) => r.date), ...stored.map((r) => r?.date)])!
     );
     await db.miningTaxAssignments.bulkPut(records.map((r, i) => withStoredMark(r, stored[i])));
   });
