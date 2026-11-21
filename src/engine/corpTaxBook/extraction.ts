@@ -81,6 +81,12 @@ export interface ChunkSources {
   notified?: readonly { typeId: number; volumeM3: number }[];
   /** A linked Moon Ore Survey's composition, as fractions of the chunk. */
   survey?: readonly { typeId: number; fraction: number }[];
+  /** The survey's own measured volume: its first scan's rocks summed, in m³. */
+  surveyVolumeM3?: number;
+  /** When that scan was taken, epoch ms; a scan outside this cycle's window is not used. */
+  surveyAt?: number;
+  /** The structure's expiry hours, bounding the cycle a survey scan may belong to. */
+  expiryHours?: number;
   /** The book's manual chunk rate, the fallback behind a measured one. */
   chunkM3PerHour?: number;
   /** The refinery's learned rate (`learnChunkRates`); preferred over the manual one. */
@@ -193,8 +199,21 @@ export function surveyFractions(
 export interface ChunkEstimate {
   source: 'notification' | 'survey' | 'unknown';
   oreLines: OreLine[];
-  /** The chunk rate a survey estimate was made at; absent for the other sources. */
+  /** The chunk rate a survey estimate was guessed at; absent when the survey's measured volume was used. */
   rate?: ChunkRate;
+  /** A survey estimate sized by the survey's own measured volume rather than a rate. */
+  measuredVolume?: boolean;
+}
+
+/** The sum of a scan's rock volumes (m³). */
+export function scanVolume(rocks: readonly { volume: number }[]): number {
+  return rocks.reduce((sum, r) => (r.volume > 0 ? sum + r.volume : sum), 0);
+}
+
+/** Whether a scan taken at `at` can belong to this extraction's cycle: from chunk arrival to expiry. */
+function scanInCycle(ex: Extraction, at: number | undefined, expiryHours: number | undefined) {
+  if (at === undefined) return true;
+  return at >= Date.parse(ex.chunkArrivalAt) && at <= fractureAndExpiry(ex, expiryHours).expiresAt;
 }
 
 export function estimateChunk(ex: Extraction, sources: ChunkSources): ChunkEstimate {
@@ -206,11 +225,14 @@ export function estimateChunk(ex: Extraction, sources: ChunkSources): ChunkEstim
     };
   }
   if (sources.survey?.length) {
+    const volume = sources.surveyVolumeM3;
+    const useMeasured =
+      volume !== undefined && volume > 0 && scanInCycle(ex, sources.surveyAt, sources.expiryHours);
     const hours = (Date.parse(ex.chunkArrivalAt) - Date.parse(ex.startedAt)) / HOUR_MS;
     const rate = chunkRateFor(sources.measured, sources.chunkM3PerHour);
-    const chunkM3 = hours * rate.m3PerHour;
+    const chunkM3 = useMeasured ? volume : hours * rate.m3PerHour;
     return {
-      rate,
+      ...(useMeasured ? { measuredVolume: true } : { rate }),
       source: 'survey',
       oreLines: sources.survey.map((o) => ({
         typeId: o.typeId,

@@ -344,6 +344,127 @@ describe('buildBookView', () => {
     ).toEqual({ m3PerHour: 20_000, basis: 'manual' });
   });
 
+  describe('a chunk make-up and what was mined (source order, correction)', () => {
+    const ORE2 = 45491;
+    const x = {
+      structureId: 1001,
+      moonId: 7,
+      extractionStartTime: '2026-09-01T10:00:00Z',
+      chunkArrivalTime: '2026-09-15T10:00:00Z',
+      naturalDecayTime: '2026-09-15T13:00:00Z',
+    };
+    const mine = (date: string, typeId: number, quantity: number): ObservedMiningEntry => ({
+      characterId: 1,
+      recordedCorporationId: CORP,
+      structureId: 1001,
+      date,
+      oreLines: [{ typeId, quantity }],
+    });
+    const idOf = (extra: Partial<BookViewInput>) =>
+      buildBookView(input({ extractions: [x], ...extra })).extractions[0].id;
+    const row = (extra: Partial<BookViewInput>, id?: string) =>
+      buildBookView(
+        input({
+          extractions: [x],
+          surveyOreLines: id
+            ? new Map([
+                [
+                  id,
+                  [
+                    { typeId: ORE, quantity: 100 },
+                    { typeId: ORE2, quantity: 300 },
+                  ],
+                ],
+              ])
+            : undefined,
+          ...extra,
+        })
+      ).extractions[0];
+    const ended = { now: '2026-09-18T14:00:00Z' };
+    const minedBoth = [mine('2026-09-16', ORE, 150), mine('2026-09-16', ORE2, 200)];
+
+    it('raises only the ore mined past its survey figure once the chunk has expired', () => {
+      const id = idOf({});
+      const r = row({ ...ended, entries: minedBoth }, id);
+      expect(r.oreSource).toBe('survey');
+      expect(r.oreCorrected).toBe(true);
+      expect(r.oreLines).toEqual([
+        { typeId: ORE, quantity: 150 },
+        { typeId: ORE2, quantity: 300 },
+      ]);
+      // Only ORE is priced in this fixture: 150 units at 1,000.
+      expect(r.estimatedValue).toBe(150_000);
+    });
+
+    it('does not correct while the chunk is still active', () => {
+      const id = idOf({});
+      const r = row({ now: '2026-09-16T14:00:00Z', entries: minedBoth }, id);
+      expect(r.state).toBe('fractured');
+      expect(r.oreCorrected).toBeUndefined();
+      expect(r.oreLines[0].quantity).toBe(100);
+    });
+
+    it('corrects once flagged Fully Mined', () => {
+      const id = idOf({});
+      const flagged = { ...x, fullyMined: { by: 1, byName: 'A', at: '2026-09-16T00:00:00Z' } };
+      const r = buildBookView(
+        input({
+          now: '2026-09-16T14:00:00Z',
+          extractions: [flagged],
+          entries: minedBoth,
+          surveyOreLines: new Map([[id, [{ typeId: ORE, quantity: 100 }]]]),
+        })
+      ).extractions[0];
+      expect(r.oreLines).toEqual([{ typeId: ORE, quantity: 150 }]);
+    });
+
+    it('never corrects a notification', () => {
+      const r = row({
+        ...ended,
+        entries: minedBoth,
+        extractions: [{ ...x, oreLines: [{ typeId: ORE, quantity: 100 }] }],
+      });
+      expect(r.oreSource).toBe('notification');
+      expect(r.oreCorrected).toBeUndefined();
+      expect(r.oreLines).toEqual([{ typeId: ORE, quantity: 100 }]);
+    });
+
+    it('rebuilds the make-up from the mined ore when there is neither notification nor survey', () => {
+      const r = row({ ...ended, entries: minedBoth });
+      expect(r.oreSource).toBe('mined');
+      expect(r.oreLines).toEqual([
+        { typeId: ORE, quantity: 150 },
+        { typeId: ORE2, quantity: 200 },
+      ]);
+      expect(r.minedPct).toBe(100);
+      // A still-active chunk with nothing known stays unknown.
+      expect(row({ now: '2026-09-16T14:00:00Z', entries: minedBoth }).oreSource).toBe('unknown');
+    });
+
+    it('names a survey row rate only when the volume was not measured', () => {
+      const id = idOf({});
+      expect(row({}, id).chunkRate).toBeDefined();
+      expect(row({ surveyMeasured: new Set([id]) }, id).chunkRate).toBeUndefined();
+    });
+
+    it('prices a four-ore survey chunk into estimatedValue', () => {
+      const ores = [ORE, ORE2, 45492, 45493];
+      // Zeolites 28%, 33%, 18%, 21% of a 1,000-unit chunk.
+      const lines = [280, 330, 180, 210].map((quantity, i) => ({ typeId: ores[i], quantity }));
+      const r = buildBookView(
+        input({
+          extractions: [x],
+          surveyOreLines: new Map([[idOf({}), lines]]),
+          pricesOn: () => ({
+            prices: new Map(ores.map((id, i) => [id, 1000 * (i + 1)])),
+            sources: new Map(ores.map((id) => [id, 'saved' as const])),
+          }),
+        })
+      ).extractions[0];
+      expect(r.estimatedValue).toBe(280_000 + 660_000 + 540_000 + 840_000);
+    });
+  });
+
   it('learns each refinery chunk rate from its notified extractions and names it on a survey row', () => {
     // 100h at 34,000 m³/h = 340,000 units of 10 m³.
     const noted = {

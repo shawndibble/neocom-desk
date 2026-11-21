@@ -7658,7 +7658,7 @@
     "statTimeLeft": "Time left",
     "statTotalTime": "Total time",
     "statRocks": "Rocks left",
-    "statIsk": "ISK left",
+    "statIsk": "ISK left at last scan",
     "eveTime": "{{time}} EVE",
     "showLocalTime": "Show in your time zone",
     "showEveTime": "Show in EVE time (UTC)",
@@ -18344,7 +18344,9 @@
           "unknownWhy": "The book has no moon notification or survey for the Extraction started {{date}}, so the ore make-up can't be shown.",
           "source": {
             "notification": "From the moon notification",
-            "survey": "From a survey"
+            "survey": "From a survey",
+            "surveyCorrected": "From a survey, raised to what was mined",
+            "mined": "From what was mined"
           },
           "shareOf": "{{ore}} share",
           "cols": {
@@ -18575,6 +18577,7 @@
         "markedBy": "Marked fully mined by {{name}}, {{at}}.",
         "why": "Residue is ore that came off the rock but was never delivered (strip-miner waste, which becomes space dust). Until the moon is marked fully mined it cannot be told apart from ore nobody mined yet.",
         "noSource": "Loss needs the chunk's ore. Link a Survey above to see it.",
+        "unknownLoss": "Unknown: no notification or survey for this chunk.",
         "tableLabel": "Ore lost per ore",
         "cols": {
           "ore": "Ore",

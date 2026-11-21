@@ -30,7 +30,7 @@ export function bookViewInputOf(
   now: string,
   data: BookData,
   prices: BookPrices,
-  extra: Pick<BookViewInput, 'memberIds' | 'surveyOreLines'> = {}
+  extra: Pick<BookViewInput, 'memberIds' | 'surveyOreLines' | 'surveyMeasured'> = {}
 ): BookViewInput {
   const s = data.settings;
   return {
@@ -68,6 +68,7 @@ export function bookViewInputOf(
     moonOwnerPricesOn: prices.moonOwnerPricesOn,
     memberIds: extra.memberIds,
     surveyOreLines: extra.surveyOreLines,
+    surveyMeasured: extra.surveyMeasured,
   };
 }
 
