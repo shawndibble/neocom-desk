@@ -4,6 +4,7 @@
  * rolls up to a Miner — one or more characters billed together (D18), one per
  * character by default.
  */
+import { minerIdFor } from '../../../functions/src/corpTaxBookDonationMatch';
 import { observedEntryKey } from './observed';
 import { resolveRate, type RateScope, type TaxRate } from './rates';
 import { valueObservedEntry } from './valuation';
@@ -18,8 +19,10 @@ export interface Miner {
   mainCharacterId: number;
   /** An officer closed this guest's account (#4184): no late notice mail after the final one. */
   closedAt?: string;
-  /** The final late notice the close issued, if anything was left to ask for (its stored name). */
+  /** The final late notice the close issued, if anything was left to ask for (the legacy wire field). */
   finalStatementId?: string;
+  /** When the grouping was made: of two that list one character, the earlier bills it. */
+  createdAt?: string;
   /** The newest day the book has recorded as paid for this Miner (copied from `meta/paid` so the Miner can read it). */
   paidThrough?: string;
   /** The Miner ids a regroup folded into this one: their codes and records are this Miner's now. */
@@ -34,10 +37,11 @@ export function characterIdsOfMiner(minerId: string, miners: readonly Miner[]): 
   return Number.isFinite(solo) && minerId.startsWith('solo:') ? [solo] : [];
 }
 
-/** The Miner a character is billed under: its grouping, or a Miner of its own. */
-export function minerIdFor(characterId: number, miners: readonly Miner[]): string {
-  return miners.find((m) => m.characterIds.includes(characterId))?.id ?? `solo:${characterId}`;
-}
+/**
+ * The Miner a character is billed under: its earliest grouping (`earlierGrouping`), or a Miner of
+ * its own. The shared rule, so the book and the server never bill a character to different Miners.
+ */
+export { minerIdFor };
 
 /** What one Observed Mining Entry owes, snapshotted with the inputs that priced it. */
 export interface DayCharge {
