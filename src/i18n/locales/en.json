@@ -18996,7 +18996,7 @@
         "noticesQueued_one": "{{count}} late notice is in the send queue.",
         "noticesQueued_other": "{{count}} late notices are in the send queue."
       },
-      "statementPeriod": {
+      "noticeDue": {
         "pausedUntil": "Paused · until {{date}}",
         "dueLate_one": "{{date}} · {{count}} day late",
         "dueLate_other": "{{date}} · {{count}} days late"
@@ -19342,7 +19342,7 @@
         "failed": "Could not save that. Try again."
       },
       "ownerView": {
-        "statement": {
+        "account": {
           "intro": "{{name}} handles the tax on your moons.",
           "noRate": "No rate is agreed yet, so nothing is owed to you. Once one is agreed, it counts from the day they pick. Ask for one below.",
           "pending": "{{value}} of ore mined is waiting for a rate.",
