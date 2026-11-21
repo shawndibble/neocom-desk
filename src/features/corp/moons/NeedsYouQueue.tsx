@@ -24,6 +24,7 @@ import { useBook } from './useBook';
 import { isLocked } from '../../../../functions/src/corpTaxBookCheckpoint';
 import { useCorpAccess } from '../useCorpAccess';
 import { divisionNamesFor } from '../taxBook/pushDivisionNames';
+import { dismissGroupingAnswer } from '../taxBook/bookClient';
 import { useNeedsYou } from './useNeedsYou';
 import {
   AssignDonationDialog,
@@ -236,6 +237,17 @@ export function NeedsYouQueue() {
       setNotice(t('corpTaxBook.moons.needs.uncounted.ignored'));
     } catch {
       setNotice(t('corpTaxBook.moons.needs.uncounted.failed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const dismissDeclined = async (answerCharacterId: number) => {
+    setBusy(true);
+    try {
+      await dismissGroupingAnswer(characterId, corporationId, answerCharacterId);
+      ctx.reload();
+    } catch {
+      setNotice(t('corpTaxBook.moons.needs.declinedGrouping.failed'));
     } finally {
       setBusy(false);
     }
@@ -690,7 +702,18 @@ export function NeedsYouQueue() {
                 </MinerTitle>
               }
               body={t('corpTaxBook.moons.needs.declinedGrouping.body')}
-              actions={null}
+              actions={
+                canEdit ? (
+                  <button
+                    type="button"
+                    className={secondaryActionClassName}
+                    disabled={busy}
+                    onClick={() => void dismissDeclined(a.characterId)}
+                  >
+                    {t('corpTaxBook.moons.needs.declinedGrouping.dismiss')}
+                  </button>
+                ) : null
+              }
             />
           );
         })}

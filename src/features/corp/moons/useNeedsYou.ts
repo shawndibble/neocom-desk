@@ -24,7 +24,7 @@ export function plannedNotices(view: BookView, rules: NoticeRules): NoticePlan[]
 /**
  * A character that said it is not part of the Miner an officer grouped it with, while it is still
  * billed on its own (decision 20261120-235011, "a declined grouping reaches the officers"): grouped
- * with anyone again, it is no longer listed.
+ * with anyone again, or dismissed by an officer, it is no longer listed.
  */
 export function declinedGroupings(
   view: Pick<BookView, 'miners'>,
@@ -33,6 +33,7 @@ export function declinedGroupings(
   return answers.filter(
     (a) =>
       a.answer === 'declined' &&
+      a.dismissedAt === undefined &&
       !view.miners.some((m) => m.characterIds.length > 1 && m.characterIds.includes(a.characterId))
   );
 }

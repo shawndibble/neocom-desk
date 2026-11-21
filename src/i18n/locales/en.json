@@ -18742,7 +18742,9 @@
         "none": "Nothing needs you.",
         "declinedGrouping": {
           "title": "{{character}} says they aren't part of {{miner}}.",
-          "body": "They're billed on their own now."
+          "body": "They're billed on their own now.",
+          "dismiss": "Dismiss",
+          "failed": "Could not dismiss that. Try again."
         }
       },
       "ledger": {
