@@ -9,7 +9,7 @@
  * `useCorpRouteGate`. Rows come from the same model the Structures widget draws
  * (`structureRows`), so its Problems only and this page's keep the same rows.
  */
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -46,7 +46,12 @@ import { shiftUtcDate, utcDay } from '@/engine/localDay';
 import { structureStateLabel } from '@/features/corp/boardSources';
 import { corpLabelText, type CorpLabel } from '@/features/corp/corpTicker';
 import { StructureDetail } from '@/features/corp/structures/StructureDetail';
-import { loadStructureFuelBays, type CorpFuelBays } from '@/features/corp/structures/fuelBays';
+import {
+  eveReadAtMs,
+  loadStructureFuelBays,
+  type CorpFuelBays,
+} from '@/features/corp/structures/fuelBays';
+import { useFuelRates, withMeasuredRates } from '@/features/corp/structures/fuelRatePref';
 import { useFuelUntil } from '@/features/corp/structures/fuelUntilPref';
 import {
   byUrgency,
@@ -151,7 +156,9 @@ export function CorpStructures() {
   const [search] = useDebouncedValue(params.q);
   const storedFuelUntil = useFuelUntil((s) => s.value);
   const setFuelUntil = useFuelUntil((s) => s.setValue);
-  useHydratedStore(useFuelUntil);
+  const fuelRates = useFuelRates((s) => s.value);
+  const setFuelRates = useFuelRates((s) => s.setValue);
+  const fuelRatesHydrated = useHydratedStore(useFuelUntil, useFuelRates);
   const today = utcDay(now);
   // A saved date that has passed would zero every row: plan the default month instead.
   const fuelUntil =
@@ -172,7 +179,6 @@ export function CorpStructures() {
   const fuelRows = useMemo(() => {
     const byId = new Map<number, FuelRow>();
     const untilMs = fuelUntilMs(fuelUntil);
-    const expiryReadAtMs = data?.fetchedAt?.getTime() ?? 0;
     for (const { source } of rows) {
       const corp =
         source.corporationId === undefined
@@ -183,15 +189,30 @@ export function CorpStructures() {
         blocks,
         plan: fuelPlan({
           blocks,
-          bayReadAtMs: corp?.readAt.getTime() ?? 0,
+          bayAsOfMs: corp?.readAtMs ?? null,
           fuelExpiresMs: source.fuelExpiresMs,
-          expiryReadAtMs,
+          expiryAsOfMs:
+            source.corporationId === undefined
+              ? null
+              : eveReadAtMs(data?.expiresAtByCorp?.get(source.corporationId)),
           untilMs,
+          knownPerDay: fuelRates[source.structureId] ?? null,
         }),
       });
     }
     return byId;
-  }, [rows, data, snapshot.data, fuelUntil]);
+  }, [rows, data, snapshot.data, fuelUntil, fuelRates]);
+  // Remember each rate measured from a same-time pair, for when a refuel splits the next one.
+  useEffect(() => {
+    if (!fuelRatesHydrated) return;
+    const measured = new Map<number, number>();
+    for (const [structureId, { plan }] of fuelRows) {
+      if (plan.rateSource === 'measured' && plan.perDay !== null)
+        measured.set(structureId, plan.perDay);
+    }
+    const next = withMeasuredRates(fuelRates, measured);
+    if (next !== fuelRates) void setFuelRates(next);
+  }, [fuelRows, fuelRates, fuelRatesHydrated, setFuelRates]);
   const fuelOf = useCallback(
     (row: StructureRow) => fuelRows.get(row.source.structureId),
     [fuelRows]
@@ -328,6 +349,11 @@ export function CorpStructures() {
           return (
             <span className="flex flex-col items-end">
               <span className="tabular-nums">{formatCount(fuel.blocks)}</span>
+              {fuel.plan.ratePending && (
+                <span className="text-xs text-text-dim">
+                  {t('corp.structures.fuelPlan.ratePending')}
+                </span>
+              )}
               {fuel.plan.perDay !== null && (
                 <span className="text-xs text-text-dim">
                   {t('corp.structures.fuelPlan.perDay', {

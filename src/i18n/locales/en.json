@@ -15682,7 +15682,8 @@
       },
       "fuelPlan": {
         "until": "Fuel until",
-        "blocksHint": "Fuel blocks in the structure's fuel bay, and how many it burns a day",
+        "blocksHint": "Fuel blocks in the structure's fuel bay, and how many it burns a day. EVE updates the bay and the fuel time separately, each about once an hour, so after a refuel the rate can show as updating for up to an hour.",
+        "ratePending": "Rate updating",
         "neededHint": "Fuel blocks to add to keep the structure fuelled until the Fuel until date (EVE time)",
         "perDay": "{{rate}}/day",
         "noBayAccess": "Not readable",

@@ -539,6 +539,10 @@ export interface StructuresBoardData {
   structureCount: number;
   needsReauth: boolean;
   fetchedAt: Date | null;
+  /** ESI's `Expires` for this read, when stored: dates EVE's read (`eveReadAtMs`). */
+  expiresAt?: Date;
+  /** Read across several corporations (All scope): each one's `expiresAt`, by corporation id. */
+  expiresAtByCorp?: ReadonlyMap<number, Date>;
   /** Read across several corporations (All scope): each one's ticker and name, for its rows. */
   corporations?: ReadonlyMap<number, CorpLabel>;
   /** Read across several corporations, and one of them failed: the rest draws, flagged. */

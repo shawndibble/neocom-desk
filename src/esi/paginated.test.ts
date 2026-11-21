@@ -132,6 +132,19 @@ describe('fetchAllPagesStatus', () => {
     });
   });
 
+  it("carries page 1's Expires, when sent", async () => {
+    const expires = 'Sat, 21 Nov 2026 12:00:00 GMT';
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/10000002/orders`, () =>
+        HttpResponse.json(['only-item'], { headers: { Expires: expires } })
+      )
+    );
+
+    const result = await fetchAllPagesStatus<string>('/markets/10000002/orders');
+
+    expect(result.expires).toBe(expires);
+  });
+
   it('reports a fully fetched multi-page result as complete', async () => {
     server.use(pagedHandler(3));
 
