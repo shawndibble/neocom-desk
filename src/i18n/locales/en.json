@@ -7045,7 +7045,7 @@
         "market": "Market",
         "industry": "Industry",
         "mail": "Mail",
-        "calendar": "Calendar",
+        "calendar": "In-game calendar",
         "structures": "Structures",
         "skills": "Skills"
       },
@@ -12811,6 +12811,7 @@
         "title": "Moon pop · {{refinery}}",
         "titleUnnamed": "Moon pop",
         "body": "{{popTime}} at {{when}} · taxed by {{corporation}} · {{rate}}%",
+        "bodyAtRefinery": "{{popTime}} at {{when}} · {{refinery}} · taxed by {{corporation}} · {{rate}}%",
         "ready": "Ready",
         "autoFracture": "Auto-fracture",
         "fracturedEarly": "Fractured early"

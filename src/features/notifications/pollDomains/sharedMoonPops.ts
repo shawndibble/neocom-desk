@@ -13,7 +13,9 @@ import type { SharedPopMatchSource } from '@/features/character/calendarSharedPo
 import type { SharedPopView } from '@/sync/sharedPops';
 import type { SharedMoonPopNames } from '../domainCopy';
 import { NOTIFICATION_EVENT_ENTRIES, SNAPSHOT_SOURCES } from '../eventEntries';
+import { isEventEnabledFor, NOTIFICATION_CHANNELS } from '../eventSelection';
 import {
+  characterEventPrefs,
   hydrateNotificationPreferences,
   mutedSharedPopCorporations,
   useNotificationPreferences,
@@ -78,11 +80,21 @@ async function currentMuted(): Promise<ReadonlySet<number>> {
 }
 
 /**
- * The Shared Pops that already alert this Character (in its audience, sharing corporation not
- * muted), with their moon names, for the calendar alerts to recognise the same fleet by. Best
+ * The Shared Pops that already alert this Character (Shared moon pop alerts on for some channel,
+ * in its audience, sharing corporation not muted), with their moon names, for the calendar alerts to recognise the same fleet by. Best
  * effort: a failed read is none, and the calendar alerts then run as they always did.
  */
 export async function alertedSharedPops(characterId: number): Promise<SharedPopMatchSource[]> {
+  await hydrateNotificationPreferences();
+  const prefs = useNotificationPreferences.getState().value;
+  // Alerts switched off for this Character: the calendar event is then the only alert there is.
+  const eventPrefs = characterEventPrefs(prefs, characterId);
+  if (
+    !NOTIFICATION_CHANNELS.some((channel) =>
+      isEventEnabledFor(eventPrefs, 'sharedMoonPop', channel)
+    )
+  )
+    return [];
   const [pops, muted] = await Promise.all([
     loadSharedPopsCached().catch(() => [] as SharedPopView[]),
     currentMuted(),
