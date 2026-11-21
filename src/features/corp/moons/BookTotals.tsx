@@ -9,7 +9,7 @@ import {
   type MinerBalance,
 } from '@/engine/corpTaxBook/overdueAging';
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
-import { useTabsProjection } from './useTabsProjection';
+import { useBook } from './useBook';
 import { isk } from './moonsFormat';
 import { minersBalancePath } from './moonsPaths';
 
@@ -27,7 +27,7 @@ function linkTo(miners: readonly MinerRow[], balance: MinerBalance) {
  */
 export function BookTotals({ children }: { children?: ReactNode }) {
   const { t } = useTranslation();
-  const { totals, miners } = useTabsProjection();
+  const { totals, miners } = useBook().view;
   return (
     <StatChips>
       <StatChip
@@ -62,7 +62,7 @@ export function BookTotals({ children }: { children?: ReactNode }) {
  */
 export function OverdueAging() {
   const { t } = useTranslation();
-  const { miners, totals } = useTabsProjection();
+  const { miners, totals } = useBook().view;
   const aging = useMemo(() => overdueAging(miners), [miners]);
   const titleId = useId();
   if (totals.overdueCount === 0) return null;

@@ -38,7 +38,6 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { boolParam, optionalEnumParam, textParam } from '@/lib/urlState';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { useBook } from './useBook';
-import { useTabsProjection } from './useTabsProjection';
 import { BookTotals } from './BookTotals';
 import { atDate, isk } from './moonsFormat';
 import {
@@ -84,7 +83,7 @@ export function MinersTab() {
   const zone = useTimeZone();
   const { t } = useTranslation();
   const { view, names, edit, canEdit } = useBook();
-  const { miners, donationsBeforeBook } = useTabsProjection();
+  const { miners, donationsBeforeBook } = view;
   const [dialog, setDialog] = useState<
     | { kind: 'record' | 'dismiss'; miner: MinerRow }
     | { kind: 'notTax'; miner: MinerRow; paymentId: string }
