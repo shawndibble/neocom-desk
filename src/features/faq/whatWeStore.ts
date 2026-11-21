@@ -114,8 +114,6 @@ export const CORP_COLLECTION_FAQ_ITEM = {
   officers: 'corpTaxBook',
   observed: 'corpTaxBook',
   payments: 'corpTaxBook',
-  statementLinks: 'corpTaxBook',
-  statements: 'corpTaxBook',
   lateNotices: 'corpTaxBook',
   lateNoticeLinks: 'corpTaxBook',
   accountCheckpoints: 'corpTaxBook',

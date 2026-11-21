@@ -465,7 +465,7 @@ describe('FaqPanel: corporation records', () => {
       .filter((name) => name !== 'corps');
     const officerOnly = /officerOnly in \[([^\]]+)\]/.exec(corpBlocks)?.[1] ?? '';
     names.push(...[...officerOnly.matchAll(/'(\w+)'/g)].map((match) => match[1]));
-    expect(names).toEqual(expect.arrayContaining(['srpClaims', 'statements', 'audit']));
+    expect(names).toEqual(expect.arrayContaining(['srpClaims', 'lateNotices', 'audit']));
     for (const name of names) {
       expect(
         CORP_COLLECTION_FAQ_ITEM,
