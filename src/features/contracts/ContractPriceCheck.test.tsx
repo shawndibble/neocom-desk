@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
+import { TRADE_HUBS } from '@/market/hubs';
 import { ContractPriceCheck } from './ContractPriceCheck';
 
 const ROWS = [
@@ -29,6 +30,24 @@ describe('ContractPriceCheck', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Buy orders' }));
     expect(onFlip).toHaveBeenCalledOnce();
+  });
+
+  it('opens a hub list from the heading hub and re-prices at the one picked', async () => {
+    const jita = TRADE_HUBS.find((hub) => hub.id === 'jita')!;
+    const onChange = vi.fn();
+    render(
+      <ContractPriceCheck
+        heading="Is it fair? · Jita 4-4 right now"
+        rows={ROWS}
+        hubMenu={{ hub: jita, onChange }}
+      />
+    );
+    // The heading still reads whole around the trigger.
+    expect(screen.getByRole('region', { name: 'Is it fair? · Jita 4-4 right now' })).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: /Priced at Jita 4-4/ }));
+    expect(screen.getByRole('menuitemradio', { name: 'Jita 4-4' })).toBeChecked();
+    await userEvent.click(screen.getByRole('menuitemradio', { name: 'Amarr VIII' }));
+    expect(onChange).toHaveBeenCalledWith('amarr');
   });
 
   it('indents a part of the line above, and keeps it in the same list', () => {
