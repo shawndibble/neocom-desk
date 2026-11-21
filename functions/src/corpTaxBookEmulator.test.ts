@@ -2,6 +2,10 @@
 // only under `npm run test:rules` at the repo root (which starts the emulator
 // and sets FIRESTORE_EMULATOR_HOST); a plain `npm test` skips it.
 import { applyRekeyBackfill, planRekeyBackfill } from './corpTaxBookRekeyBackfill.js';
+import {
+  applyLateNoticeBackfill,
+  planLateNoticeBackfill,
+} from './corpTaxBookLateNoticeBackfill.js';
 import type { Caller } from './actorAuth.js';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { clearEmulator, emulatorDb as db, emulatorSuite } from './testSupport/emulator.js';
@@ -2810,6 +2814,23 @@ emulatorSuite('Corp Tax Book callables (emulator)', () => {
           (await book().collection('declarations').doc(String(declarationId)).get()).data()
         ).toMatchObject({ statementId: 'n1', minerId: 'solo:50', uids: ['char:50'] });
       }
+    });
+
+    it('the backfill copies a notice and its link that only the legacy docs hold, once', async () => {
+      await turnOn();
+      const { verifyToken } = await issue('n1');
+      const copied = (await book().collection('lateNotices').doc('n1').get()).data();
+      await book().collection('lateNotices').doc('n1').delete();
+      await book().collection('lateNoticeLinks').doc('n1').delete();
+      const plan = await planLateNoticeBackfill(db, CORP);
+      expect(plan.links).toEqual([{ id: 'n1', token: verifyToken }]);
+      await applyLateNoticeBackfill(db, CORP, plan);
+      const again = (await book().collection('lateNotices').doc('n1').get()).data();
+      expect({ ...again, updatedAt: null }).toEqual({ ...copied, updatedAt: null });
+      expect((await book().collection('lateNoticeLinks').doc('n1').get()).get('token')).toBe(
+        verifyToken
+      );
+      expect(await planLateNoticeBackfill(db, CORP)).toEqual({ notices: [], links: [] });
     });
 
     it('refuses a final notice for a closed account', async () => {
