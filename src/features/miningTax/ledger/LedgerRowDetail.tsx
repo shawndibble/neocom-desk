@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { ValueList, ValueRow } from '@/components/ui';
+import { ValueList, ValueRow, textActionClassName } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import type { DayAmount } from '@/engine/corpTaxBook/minerRunningAccount';
 import type { PayeeLedgerRow } from '@/engine/miningTax/payeeLedger';
@@ -36,9 +36,12 @@ function byDate(lines: readonly { date: string; tax: number }[]): DayAmount[] {
 export function LedgerRowDetail({
   row,
   typeNames,
+  onUnlinkPayment,
 }: {
   row: PayeeLedgerRow;
-  typeNames?: ReadonlyMap<number, string>;
+  typeNames?: ReadonlyMap<number, string> | undefined;
+  /** Given on a personal Payee's ledger: unlinks this payment (a legacy link too). */
+  onUnlinkPayment?: ((paymentId: string) => void) | undefined;
 }) {
   const { t } = useTranslation();
   const k = (key: string, opts?: Record<string, unknown>) =>
@@ -83,6 +86,17 @@ export function LedgerRowDetail({
               <Link to={row.payment.href} className={inlineLinkClassName}>
                 {k('viewPayment')}
               </Link>
+            </p>
+          )}
+          {onUnlinkPayment && (
+            <p>
+              <button
+                type="button"
+                className={textActionClassName()}
+                onClick={() => onUnlinkPayment(row.payment.id)}
+              >
+                {t('miningTax.unlinkTransactionAction')}
+              </button>
             </p>
           )}
         </>

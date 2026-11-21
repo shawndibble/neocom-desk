@@ -11,9 +11,7 @@ import {
   FilterBar,
   FilterChip,
   FilterField,
-  MenuItem,
   Panel,
-  RowActionsMenu,
   SlideOver,
   Spinner,
   StatChip,
@@ -307,47 +305,11 @@ function LedgerBody({
             label={t('miningTax.ledger.tableLabel')}
             rows={rows}
             typeNames={typeNames}
-            {...(onUnlinkPayment
-              ? {
-                  rowContextMenu: (r: PayeeLedgerRow, tr: ReactElement) =>
-                    r.kind === 'payment' ? (
-                      <PaymentRowMenu row={r} onUnlink={onUnlinkPayment}>
-                        {tr}
-                      </PaymentRowMenu>
-                    ) : (
-                      tr
-                    ),
-                }
-              : {})}
+            {...(onUnlinkPayment ? { onUnlinkPayment } : {})}
           />
         )}
       </Panel>
     </div>
-  );
-}
-
-/** A linked payment's row menu on a personal Payee's ledger: Unlink, for a legacy link too. */
-function PaymentRowMenu({
-  row,
-  onUnlink,
-  children,
-}: {
-  row: Extract<PayeeLedgerRow, { kind: 'payment' }>;
-  onUnlink: (paymentId: string) => void;
-  children: ReactElement;
-}) {
-  const { t } = useTranslation();
-  return (
-    <RowActionsMenu
-      name={`${row.date} ${ledgerWhat(row, t)}`}
-      items={
-        <MenuItem onSelect={() => onUnlink(row.payment.id)}>
-          {t('miningTax.unlinkTransactionAction')}
-        </MenuItem>
-      }
-    >
-      {children}
-    </RowActionsMenu>
   );
 }
 
@@ -360,6 +322,7 @@ export function PayeeLedgerTable({
   label,
   typeNames,
   rowContextMenu,
+  onUnlinkPayment,
   ...rest
 }: {
   rows: readonly PayeeLedgerRow[];
@@ -367,6 +330,8 @@ export function PayeeLedgerTable({
   typeNames?: ReadonlyMap<number, string>;
   /** A row's menu (right-click, touch-and-hold, ⋮); without it the rows have none. */
   rowContextMenu?: (row: PayeeLedgerRow, tr: ReactElement) => ReactElement;
+  /** Offers Unlink in a payment row's detail (a personal Payee's ledger, a legacy link too). */
+  onUnlinkPayment?: (paymentId: string) => void;
 } & Omit<
   DataTableProps<PayeeLedgerRow>,
   'rows' | 'label' | 'columns' | 'rowKey' | 'expandableRow' | 'rowContextMenu'
@@ -453,7 +418,9 @@ export function PayeeLedgerTable({
       rowKey={(r) => r.key}
       expandableRow={{
         leadingIcon: true,
-        renderDetail: (r) => <LedgerRowDetail row={r} typeNames={typeNames} />,
+        renderDetail: (r) => (
+          <LedgerRowDetail row={r} typeNames={typeNames} onUnlinkPayment={onUnlinkPayment} />
+        ),
       }}
       {...(rowContextMenu ? { rowMoreActions: true, rowContextMenu } : {})}
     />

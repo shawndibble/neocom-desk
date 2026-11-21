@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -53,7 +53,7 @@ describe('PayeeLedgerPanel', () => {
     expect(screen.getByText('Zeolites')).toBeInTheDocument();
   });
 
-  it("unlinks a payment from its row's menu, for a personal Payee only", async () => {
+  it('unlinks a payment from its opened row, for a personal Payee only', async () => {
     const user = userEvent.setup();
     const onUnlinkPayment = vi.fn();
     const { unmount } = render(
@@ -67,14 +67,14 @@ describe('PayeeLedgerPanel', () => {
         />
       </MemoryRouter>
     );
-    const row = screen.getAllByText('Payment from Varro Kestane')[0]!.closest('tr')!;
-    fireEvent.contextMenu(row);
-    await user.click(await screen.findByRole('menuitem', { name: 'Unlink' }));
+    await user.click(screen.getAllByText('Payment from Varro Kestane')[0]!);
+    await user.click(await screen.findByRole('button', { name: 'Unlink' }));
     expect(onUnlinkPayment).toHaveBeenCalledWith(expect.any(String));
     unmount();
     renderPanel(CORP_BOOK_LEDGER);
-    fireEvent.contextMenu(screen.getAllByText('Payment from Varro Kestane')[0]!.closest('tr')!);
-    expect(screen.queryByRole('menuitem', { name: 'Unlink' })).not.toBeInTheDocument();
+    await user.click(screen.getAllByText('Payment from Varro Kestane')[0]!);
+    expect(screen.getByText('Days it paid')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Unlink' })).not.toBeInTheDocument();
   });
 
   it('filters by kind, and offers a reset when nothing is left', async () => {
