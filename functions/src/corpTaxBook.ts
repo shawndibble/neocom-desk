@@ -64,8 +64,10 @@ import {
   DISPUTE_KINDS,
   LIVE_CHECK_ACTION_NAMES,
   NOTICE_AFTER_KINDS,
+  NOTICE_RULE_BOUNDS,
   TAX_CONTACT_MAX_CHARACTERS,
   TRANSFER_RECIPIENTS,
+  type NoticeRules,
 } from './corpTaxBookKinds.js';
 
 export { CLAIM_CHECK_RESULTS, DISPUTE_KINDS, TAX_CONTACT_MAX_CHARACTERS, TRANSFER_RECIPIENTS };
@@ -415,28 +417,25 @@ export interface SettingsPatch {
   dayTolerancePct?: number;
 }
 
-/** Mirror of the client's `NoticeRules` (`src/engine/corpTaxBook/notices.ts`). */
-export interface NoticeRules {
-  after: { kind: 'behind'; days: number } | { kind: 'dayOfMonth'; day: number };
-  minimum: number;
-  cooldownDays: number;
-  /** Owing this much is due a notice early; absent: off. */
-  earlyAt?: number;
-}
-
 function parseNoticeRules(raw: unknown): NoticeRules {
   const d = record(raw);
   const a = record(d.after);
   const kind = oneOf(a.kind, 'noticeRules.after.kind', NOTICE_AFTER_KINDS);
+  const b = NOTICE_RULE_BOUNDS;
   return {
     after:
       kind === 'behind'
-        ? { kind, days: int(a.days, 'noticeRules.after.days', 1, 365) }
-        : { kind, day: int(a.day, 'noticeRules.after.day', 1, 28) },
-    minimum: num(d.minimum, 'noticeRules.minimum', 0, 1e12),
-    cooldownDays: int(d.cooldownDays, 'noticeRules.cooldownDays', 1, 90),
+        ? { kind, days: int(a.days, 'noticeRules.after.days', b.behindDays.min, b.behindDays.max) }
+        : { kind, day: int(a.day, 'noticeRules.after.day', b.dayOfMonth.min, b.dayOfMonth.max) },
+    minimum: num(d.minimum, 'noticeRules.minimum', b.minimum.min, b.minimum.max),
+    cooldownDays: int(
+      d.cooldownDays,
+      'noticeRules.cooldownDays',
+      b.cooldownDays.min,
+      b.cooldownDays.max
+    ),
     ...(d.earlyAt !== undefined && d.earlyAt !== null
-      ? { earlyAt: num(d.earlyAt, 'noticeRules.earlyAt', 1, 1e12) }
+      ? { earlyAt: num(d.earlyAt, 'noticeRules.earlyAt', b.earlyAt.min, b.earlyAt.max) }
       : {}),
   };
 }

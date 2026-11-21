@@ -53,6 +53,11 @@ export interface LateNoticeMail {
   remindersStopped: boolean;
 }
 
+/** D27: reminders run until the Miner stops them; after that an officer may send one by hand. */
+export function reminderAllowed(mail: LateNoticeMail): boolean {
+  return !mail.remindersStopped || mail.manualSent < 1;
+}
+
 /** The names a guest's notice page prints: a guest cannot look a structure's name up (#4066). */
 export interface LateNoticeNames {
   corporationName?: string;

@@ -43,6 +43,22 @@ export const NOTICE_DEFAULTS = {
   minimum: 10_000_000,
   cooldownDays: 7,
 } as const;
+/** A running account's notice rules, as a book stores them. Mirrors the client's `NoticeRules`. */
+export interface NoticeRules {
+  after: { kind: 'behind'; days: number } | { kind: 'dayOfMonth'; day: number };
+  minimum: number;
+  cooldownDays: number;
+  /** Owing this much is due a notice early; absent: off. */
+  earlyAt?: number;
+}
+/** What the server accepts for each notice rule: the settings form offers the same range. */
+export const NOTICE_RULE_BOUNDS = {
+  behindDays: { min: 1, max: 365 },
+  dayOfMonth: { min: 1, max: 28 },
+  minimum: { min: 0, max: 1e12 },
+  cooldownDays: { min: 1, max: 90 },
+  earlyAt: { min: 1, max: 1e12 },
+} as const;
 /** A running account's per-day tolerance, in percent; mirrors `DAY_SETTLE_TOLERANCE_PCT`. */
 export const DAY_TOLERANCE_PCT_DEFAULT = 0.5;
 

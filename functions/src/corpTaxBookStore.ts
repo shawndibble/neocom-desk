@@ -178,6 +178,7 @@ import {
   lineKey,
   minerPaymentCode,
   noticedDates,
+  reminderAllowed,
 } from './corpTaxBookLateNotice.js';
 import {
   dbReader,
@@ -2661,7 +2662,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const loaded = await mustGetNotice(c, action.noticeId);
       const { mail } = loaded.notice;
       // A miner who opted out gets one manual reminder per notice (D27).
-      if (mail.remindersStopped && mail.manualSent >= 1)
+      if (!reminderAllowed(mail))
         fail('failed-precondition', 'This miner stopped reminders', 'reminders-stopped');
       writeNoticeMail(tx, bookRef(c.deps.db, c.corporationId), loaded, { kind: 'reminded' });
       return { detail: { noticeId: action.noticeId } };

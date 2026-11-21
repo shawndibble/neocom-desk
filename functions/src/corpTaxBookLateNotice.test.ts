@@ -14,6 +14,7 @@ import {
   type LateNoticeDayState,
   lastNoticedDay,
   noticedDates,
+  reminderAllowed,
 } from './corpTaxBookLateNotice.js';
 
 /** A late notice as `issueStatement` stores it today, in `corps/{id}/statements`. */
@@ -341,5 +342,13 @@ describe('noticedDates / lastNoticedDay: the days a Late notice listed', () => {
 
   it("is one Character's lines alone when asked", () => {
     expect([...noticedDates(notices, 2)]).toEqual(['2026-10-02']);
+  });
+});
+
+describe('reminderAllowed: one manual reminder after the Miner stopped them (D27)', () => {
+  it('allows any while reminders run, and one once they are stopped', () => {
+    expect(reminderAllowed({ sent: 3, manualSent: 5, remindersStopped: false })).toBe(true);
+    expect(reminderAllowed({ sent: 3, manualSent: 0, remindersStopped: true })).toBe(true);
+    expect(reminderAllowed({ sent: 3, manualSent: 1, remindersStopped: true })).toBe(false);
   });
 });
