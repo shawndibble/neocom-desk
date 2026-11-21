@@ -4,6 +4,7 @@
  * for review without counting them, and ore a book bills that the member's own list also owes
  * another Payee.
  */
+import { utcDayOf } from '../../../../functions/src/timeConstants';
 import type { MemberNoticeView, UncreditedDonation } from '@/engine/corpTaxBook/personal';
 import type { MultiSelectFilter } from '@/lib/multiSelectFilter';
 import type { CorpBookView } from './corpBookView';
@@ -58,7 +59,7 @@ export function corpBookAttention(
       if (inView(d.characterId)) out.uncredited.push({ ...of, ...d });
     }
     const held = (loaded.inReview ?? [])
-      .filter((p) => inView(p.characterId) && p.at.slice(0, 10) >= loaded.startDate)
+      .filter((p) => inView(p.characterId) && utcDayOf(p.at) >= loaded.startDate)
       .sort((a, b) => a.at.localeCompare(b.at));
     // Counted as tax at once, each to its own donor's Miner: the book already holds the ISK, so
     // no Late notice is needed (and none can be blocked by a declaration already waiting on it).

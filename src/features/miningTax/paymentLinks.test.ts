@@ -62,6 +62,7 @@ const recorded = (over: Partial<PayeePaymentLink> = {}): PayeePaymentLink => ({
   amount: 1_000_000,
   paidOn: '2026-10-20',
   source: 'manual',
+  characterId: MAIN,
   ...over,
 });
 
@@ -196,10 +197,16 @@ describe('autoMatchRecorded', () => {
     expect(autoMatchRecorded(twins, [recorded()], ctx([p]))).toEqual([]);
   });
 
-  it('allows a few days of drift, and the amount’s slack, no more', () => {
+  it('is the shared stated-transfer rule: its payer, its amount, within two days', () => {
     expect(
-      autoMatchRecorded([made({ date: '2026-10-24T12:00:00Z' })], [recorded()], ctx([p]))
+      autoMatchRecorded([made({ date: '2026-10-22T12:00:00Z' })], [recorded()], ctx([p]))
+    ).toHaveLength(1);
+    expect(
+      autoMatchRecorded([made({ date: '2026-10-23T12:00:01Z' })], [recorded()], ctx([p]))
     ).toEqual([]);
-    expect(autoMatchRecorded([made({ amount: 1_100_000 })], [recorded()], ctx([p]))).toEqual([]);
+    expect(autoMatchRecorded([made({ amount: 1_000_002 })], [recorded()], ctx([p]))).toEqual([]);
+    expect(autoMatchRecorded([made()], [recorded({ characterId: MAIN + 1 })], ctx([p]))).toEqual(
+      []
+    );
   });
 });

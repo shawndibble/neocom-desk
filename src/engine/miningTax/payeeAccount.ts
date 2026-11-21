@@ -58,6 +58,8 @@ export interface PayeePaymentLink {
   paidOn: string;
   /** Linked by the one-to-one matcher, or by the pilot. */
   source: 'auto' | 'manual';
+  /** A stored link's owner: the Character that paid (`MiningTaxPaymentLinkRecord.characterId`). */
+  characterId?: number;
   /** A legacy link's old payment's transactions: held, so never linked or matched again. */
   refs?: readonly PayeePaymentRef[];
   /**

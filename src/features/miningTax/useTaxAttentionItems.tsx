@@ -1,3 +1,4 @@
+import { utcDayOf } from '../../../functions/src/timeConstants';
 import { useMemo } from 'react';
 import { useTimeZone } from '@/lib/timeFormat';
 import { dateTimeAt } from '@/features/corp/moons/moonsFormat';
@@ -271,7 +272,7 @@ export function useTaxAttentionItems({
         <p>
           {t('miningTax.corpBook.claim.detail', {
             amount: formatIsk(claim.payment.amount, 0),
-            date: claim.payment.at.slice(0, 10),
+            date: utcDayOf(claim.payment.at),
             character: claim.characterName,
             corp: claim.corpName,
           })}
@@ -332,7 +333,7 @@ export function useTaxAttentionItems({
       title: t('miningTax.corpBook.attention.overdueTitle', {
         corp: o.corpName,
         period,
-        date: o.issuedAt.slice(0, 10),
+        date: utcDayOf(o.issuedAt),
       }),
       detail: (
         <>
@@ -378,7 +379,7 @@ export function useTaxAttentionItems({
             every
               ? 'miningTax.corpBook.attention.uncreditedEveryTitle'
               : 'miningTax.corpBook.attention.uncreditedTitle',
-            { corp: corpName, amount: formatIsk(only.amount, 0), date: only.at.slice(0, 10) }
+            { corp: corpName, amount: formatIsk(only.amount, 0), date: utcDayOf(only.at) }
           )
         : t(
             every
@@ -453,7 +454,7 @@ export function useTaxAttentionItems({
         ? t('miningTax.corpBook.attention.inReviewTitle', {
             corp: group.corpName,
             amount: formatIsk(only.amount, 0),
-            date: only.at.slice(0, 10),
+            date: utcDayOf(only.at),
           })
         : t('miningTax.corpBook.attention.inReviewTitleMany', {
             corp: group.corpName,

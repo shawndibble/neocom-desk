@@ -1,3 +1,4 @@
+import { utcDayOf } from '../../../functions/src/timeConstants';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -59,7 +60,7 @@ export function LinkPaymentDialog({
     (selected?.payment.amount != null || amountInKindParses);
   const outcome =
     selected && amountValid && account
-      ? account.preview(amount, selected.payment.date.slice(0, 10))
+      ? account.preview(amount, utcDayOf(selected.payment.date))
       : null;
 
   function pick(key: string) {
@@ -130,7 +131,7 @@ export function LinkPaymentDialog({
                       {payment.amount === null
                         ? t('miningTax.linkPaymentInKind')
                         : `${formatIsk(payment.amount)} ISK`}{' '}
-                      · {payment.date.slice(0, 10)}
+                      · {utcDayOf(payment.date)}
                     </span>
                     <span className="truncate text-text-dim">
                       {payment.label || t('miningTax.linkPaymentUntitledContract')}

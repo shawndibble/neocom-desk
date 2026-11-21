@@ -10,8 +10,9 @@
  * Pure: the route feeds it the normalized payments (`madePayments.ts`), the Payees with what they
  * owe, and which payments a link or a book already holds.
  */
+import { utcDayOf } from '../../../functions/src/timeConstants';
 import type { MiningTaxPaymentMethod, PayeeRecord } from '@/db';
-import { utcDaysBetween } from '@/engine/localDay';
+import { matchesStatedTransfer } from '../../../functions/src/corpTaxBookTransferMatch';
 import { paymentLinkKey, type PayeePaymentLink } from '@/engine/miningTax/payeeAccount';
 import { isCorpPayeeId } from './corpBook/corpRows';
 import { amountsMatch } from './paymentMatches';
@@ -157,14 +158,12 @@ export function suggestLinks(payments: readonly MadePayment[], ctx: LinkContext)
     );
 }
 
-/** How far a transaction may drift from the date a recorded payment said. */
-const RECORDED_LINK_WINDOW_DAYS = 3;
-
 /**
  * A recorded payment (Settle up, before its transaction showed up) and the one transaction behind
- * it: to its Payee's recipient, of its amount, within a few days. One to one or nothing: a
- * recorded payment with two candidates, or a transaction two recorded payments could be, is left
- * for the pilot.
+ * it: to its Payee's recipient, the transfer it states by the shared rule (`matchesStatedTransfer`:
+ * its payer, its amount, within two days of the day it gave). One to one or nothing: a recorded
+ * payment with two candidates, or a transaction two recorded payments could be, is left for the
+ * pilot.
  */
 export function autoMatchRecorded(
   payments: readonly MadePayment[],
@@ -184,9 +183,15 @@ export function autoMatchRecorded(
           ? open.filter(
               (p) =>
                 p.amount !== null &&
-                amountsMatch(link.amount, p.amount) &&
-                Math.abs(utcDaysBetween(link.paidOn, p.date.slice(0, 10))) <=
-                  RECORDED_LINK_WINDOW_DAYS &&
+                matchesStatedTransfer(
+                  {
+                    ...(link.characterId !== undefined ? { characterId: link.characterId } : {}),
+                    amount: link.amount,
+                    // A day, stated: its middle, so the two days either way cover it whole.
+                    at: `${link.paidOn}T12:00:00.000Z`,
+                  },
+                  { characterId: p.characterId, amount: p.amount, at: p.date }
+                ) &&
                 recipientOf(p, [payee]) !== undefined
             )
           : [],
@@ -214,7 +219,7 @@ export function linkFor(
     kind: payment.kind,
     refId: payment.refId,
     amount,
-    paidOn: payment.date.slice(0, 10),
+    paidOn: utcDayOf(payment.date),
     source,
   };
 }

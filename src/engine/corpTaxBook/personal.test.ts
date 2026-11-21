@@ -2494,12 +2494,9 @@ describe('resolving in the app: an open dispute holds its day', () => {
     expect(out.rows.find((r) => r.date === '2026-10-15')?.held).toBeUndefined();
   });
 
-  // The member's own record governs which days *they* paid: a mark pays the day it names. (Until
-  // the fix for the Bureau report, marks were pooled and spent on the oldest open days, so a
-  // member who marked 11-06 paid saw it stay Billed while an older day turned Paid.)
-
-  // The Bureau report (2026-11-16): one 10,898,549 ISK donation paid 11-06 and 11-07, which the
-  // member marked paid. The book's credit pays a Miner's oldest open day (11-01) first.
+  // The Bureau report (2026-11-16): one 10,898,549 ISK donation the member meant for 11-06 and
+  // 11-07. The book's credit pays a Miner's oldest open day (11-01) first, and so does the member's
+  // side: there are no marks of their own on a book.
 
   describe('a disputed Conflict day', () => {
     const assigned = () =>

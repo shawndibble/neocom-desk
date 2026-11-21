@@ -1,3 +1,4 @@
+import { utcDayOf } from '../../../../functions/src/timeConstants';
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
 
 /**
@@ -13,4 +14,4 @@ export const answeredByMember = (view: Pick<BookRowView, 'flagged'>): boolean =>
   view.flagged?.state === 'sent' || view.flagged?.state === 'dismissed';
 
 /** A `YYYY-MM-DD` day from an ISO instant or date; empty when there is none. */
-export const isoDay = (iso: string | undefined) => (iso ? iso.slice(0, 10) : '');
+export const isoDay = (iso: string | undefined) => (iso ? utcDayOf(iso) : '');

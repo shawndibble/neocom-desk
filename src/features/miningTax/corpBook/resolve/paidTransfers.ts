@@ -4,6 +4,7 @@
  * labelled by who received it. The chosen ones become the declaration's transfers; the rest of
  * the member's wallet never leaves the device.
  */
+import { utcDayOf } from '../../../../../functions/src/timeConstants';
 import type { ClaimedTransfer, TransferRecipient } from '@/engine/corpTaxBook/overdue';
 import { inFlightDonations, type HeldPayment } from '@/engine/corpTaxBook/personal';
 import type { MadePayment } from '../../paymentLinks';
@@ -82,7 +83,7 @@ export function transferChoices(
         p.kind === 'journal' &&
         p.amount !== null &&
         p.amount > 0 &&
-        p.date.slice(0, 10) >= opts.since.slice(0, 10)
+        utcDayOf(p.date) >= utcDayOf(opts.since)
     )
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, MAX_CHOICES)
