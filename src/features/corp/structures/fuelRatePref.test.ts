@@ -23,4 +23,8 @@ describe('withMeasuredRates', () => {
     expect(withMeasuredRates(rates, new Map([[1, 120.2]]))).toBe(rates);
     expect(withMeasuredRates(rates, new Map())).toBe(rates);
   });
+
+  it('stores a first rate however small', () => {
+    expect(withMeasuredRates({}, new Map([[1, 0.2]]))).toEqual({ 1: 0.2 });
+  });
 });

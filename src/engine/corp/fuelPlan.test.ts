@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DAY_MS } from '@/lib/age';
+import { DAY_MS, MINUTE_MS } from '@/lib/age';
 import { FUEL_BLOCK_VOLUME_M3, fuelBays, fuelPlan, fuelUntilMs } from './fuelPlan';
 
 const NOW = Date.UTC(2026, 10, 12, 12);
@@ -49,7 +49,7 @@ describe('fuelUntilMs', () => {
 });
 
 describe('fuelPlan', () => {
-  const base = { bayAsOfMs: NOW, expiryAsOfMs: NOW, untilMs: NOW + 30 * DAY_MS };
+  const base = { bayReadAtMs: NOW, expiryReadAtMs: NOW, untilMs: NOW + 30 * DAY_MS };
 
   it('works the rate out from the bay and the time to expiry', () => {
     const plan = fuelPlan({ ...base, blocks: 240, fuelExpiresMs: NOW + 10 * DAY_MS });
@@ -91,7 +91,7 @@ describe('fuelPlan', () => {
   });
 
   it('has no rate when the fuel runs out within the hour', () => {
-    const plan = fuelPlan({ ...base, blocks: 2, fuelExpiresMs: NOW + 30 * 60_000 });
+    const plan = fuelPlan({ ...base, blocks: 2, fuelExpiresMs: NOW + 30 * MINUTE_MS });
     expect(plan).toEqual({ perDay: null, needed: null, rateSource: null, ratePending: false });
   });
 
@@ -100,9 +100,9 @@ describe('fuelPlan', () => {
       ...base,
       blocks: 240,
       fuelExpiresMs: NOW + 10 * DAY_MS,
-      bayAsOfMs: NOW - 2 * 60_000,
+      bayReadAtMs: NOW - 2 * MINUTE_MS,
     });
-    expect(plan.perDay).toBeCloseTo(240 / (10 + 2 / (24 * 60)), 6);
+    expect(plan.perDay).toBeCloseTo((240 * DAY_MS) / (10 * DAY_MS + 2 * MINUTE_MS), 6);
     expect(plan.rateSource).toBe('measured');
   });
 
@@ -112,7 +112,7 @@ describe('fuelPlan', () => {
       ...base,
       blocks: 773,
       fuelExpiresMs: NOW + 27 * DAY_MS,
-      bayAsOfMs: NOW - 20 * 60_000,
+      bayReadAtMs: NOW - 20 * MINUTE_MS,
     };
 
     it('does not trust the pair, which would understate the rate', () => {
@@ -132,6 +132,17 @@ describe('fuelPlan', () => {
       // 3 more days at 120/day.
       expect(plan.needed).toBe(360);
     });
+
+    it('waits for EVE when the old bay read was empty', () => {
+      expect(fuelPlan({ ...refuelled, blocks: 0 }).ratePending).toBe(true);
+      expect(fuelPlan({ ...refuelled, blocks: 0, knownPerDay: 120 }).perDay).toBe(120);
+    });
+
+    it('remembers no rate for an unreadable bay or a dry structure', () => {
+      const none = { perDay: null, needed: null, rateSource: null, ratePending: false };
+      expect(fuelPlan({ ...refuelled, blocks: null, knownPerDay: 120 })).toEqual(none);
+      expect(fuelPlan({ ...refuelled, fuelExpiresMs: null, knownPerDay: 120 })).toEqual(none);
+    });
   });
 
   describe('when EVE read the bay after the expiry', () => {
@@ -139,7 +150,7 @@ describe('fuelPlan', () => {
       ...base,
       blocks: 240,
       fuelExpiresMs: NOW + 10 * DAY_MS,
-      expiryAsOfMs: NOW - 20 * 60_000,
+      expiryReadAtMs: NOW - 20 * MINUTE_MS,
     };
 
     it('estimates from the pair, since a refuel between them can only overstate the rate', () => {
@@ -148,10 +159,10 @@ describe('fuelPlan', () => {
       expect(plan.rateSource).toBe('estimated');
     });
 
-    it('prefers the remembered rate', () => {
+    it('prefers its estimate to an older remembered rate', () => {
       const plan = fuelPlan({ ...later, knownPerDay: 20 });
-      expect(plan.perDay).toBe(20);
-      expect(plan.rateSource).toBe('remembered');
+      expect(plan.perDay).toBe(24);
+      expect(plan.rateSource).toBe('estimated');
     });
   });
 
@@ -160,7 +171,7 @@ describe('fuelPlan', () => {
       ...base,
       blocks: 240,
       fuelExpiresMs: NOW + 10 * DAY_MS,
-      bayAsOfMs: null,
+      bayReadAtMs: null,
     });
     expect(plan.perDay).toBeNull();
     expect(plan.ratePending).toBe(true);
@@ -168,7 +179,7 @@ describe('fuelPlan', () => {
       ...base,
       blocks: 240,
       fuelExpiresMs: NOW + 10 * DAY_MS,
-      expiryAsOfMs: null,
+      expiryReadAtMs: null,
       knownPerDay: 24,
     });
     expect(remembered.perDay).toBe(24);

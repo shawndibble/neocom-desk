@@ -7,20 +7,8 @@
 import { fuelBays } from '@/engine/corp/fuelPlan';
 import { loadCorporationAssets } from '@/features/corp/assets';
 import { accountCorpReaders } from '@/features/corp/corpReadAccess';
+import { eveReadAtMs } from '@/features/corp/corpRead';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { HOUR_MS } from '@/lib/age';
-
-/** How long ESI caches a corporation's structures and its assets alike. */
-const CORP_READ_CACHE_MS = HOUR_MS;
-
-/**
- * When EVE read a corporation's structures or assets, from the read's ESI
- * `Expires`: each is cached for an hour from that read. Null when unknown —
- * a row stored before `Expires` was kept, or a read that sent none.
- */
-export function eveReadAtMs(expiresAt: Date | undefined): number | null {
-  return expiresAt ? expiresAt.getTime() - CORP_READ_CACHE_MS : null;
-}
 
 export interface CorpFuelBays {
   /** Blocks by structure id; a structure with an empty bay has no entry. */

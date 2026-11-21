@@ -13,10 +13,10 @@
  * hourly clock, so a refuel can land between them. Read the bay before the
  * refuel and the expiry after, and the rate comes out far too low — and so
  * does the fuel to haul. So a rate is *measured* only from a pair EVE read at
- * the same time; otherwise the last measured rate is used (a structure burns
- * at one rate until its services change), and failing that, a pair whose bay
- * is the newer read still gives an estimate, because a refuel between the
- * two can only make that one too high, never too low.
+ * the same time. A pair whose bay is the newer read still gives an *estimate*:
+ * a refuel between the two can only make that one too high. A bay read before
+ * the expiry gives nothing; there the last measured rate is *remembered* (a
+ * structure burns at one rate until its services change), or the rate waits.
  */
 import { DAY_MS, HOUR_MS, MINUTE_MS } from '@/lib/age';
 import { shiftUtcDate } from '../localDay';
@@ -72,11 +72,11 @@ export interface FuelPlanInput {
   /** Blocks in the bay, or null when the bay could not be read. */
   blocks: number | null;
   /** When EVE read the bay, or null when unknown. */
-  bayAsOfMs: number | null;
+  bayReadAtMs: number | null;
   /** `fuel_expires`, or null for a structure already out of fuel. */
   fuelExpiresMs: number | null;
   /** When EVE read the expiry, or null when unknown. */
-  expiryAsOfMs: number | null;
+  expiryReadAtMs: number | null;
   /** The moment the structure should stay fuelled until. */
   untilMs: number;
   /** The rate last measured for this structure (`rateSource: 'measured'`), if any. */
@@ -100,32 +100,42 @@ export interface FuelPlan {
 }
 
 export function fuelPlan(input: FuelPlanInput): FuelPlan {
-  const { blocks, bayAsOfMs, fuelExpiresMs, expiryAsOfMs, untilMs, knownPerDay } = input;
-  const runwayMs = fuelExpiresMs === null || bayAsOfMs === null ? null : fuelExpiresMs - bayAsOfMs;
-  const readable = blocks !== null && blocks > 0 && runwayMs !== null && runwayMs >= MIN_RUNWAY_MS;
-  const bayLeadMs = bayAsOfMs === null || expiryAsOfMs === null ? null : bayAsOfMs - expiryAsOfMs;
-  const remembered = knownPerDay != null && knownPerDay > 0 ? knownPerDay : null;
+  const { blocks, bayReadAtMs, fuelExpiresMs, expiryReadAtMs, untilMs, knownPerDay } = input;
+  const runwayMs =
+    fuelExpiresMs === null || bayReadAtMs === null ? null : fuelExpiresMs - bayReadAtMs;
+  // The pair, when it has a rate in it at all.
+  const reading =
+    blocks !== null && blocks > 0 && runwayMs !== null && runwayMs >= MIN_RUNWAY_MS
+      ? { blocks, runwayMs }
+      : null;
+  // How much later EVE read the bay than the expiry; null when either time is unknown.
+  const bayLeadMs =
+    bayReadAtMs === null || expiryReadAtMs === null ? null : bayReadAtMs - expiryReadAtMs;
+  const sameRead = bayLeadMs !== null && Math.abs(bayLeadMs) <= SAME_READ_MS;
+  // The bay is the older read, or its age is unknown: a refuel since would understate the rate.
+  const bayBehind = bayLeadMs === null || bayLeadMs < -SAME_READ_MS;
+  const remembered =
+    bayBehind && blocks !== null && fuelExpiresMs !== null && knownPerDay != null && knownPerDay > 0
+      ? knownPerDay
+      : null;
   const rateSource: FuelRateSource | null =
-    readable && bayLeadMs !== null && Math.abs(bayLeadMs) <= SAME_READ_MS
+    reading && sameRead
       ? 'measured'
-      : remembered !== null
-        ? 'remembered'
-        : readable && bayLeadMs !== null && bayLeadMs > 0
-          ? 'estimated'
+      : reading && !bayBehind
+        ? 'estimated'
+        : remembered !== null
+          ? 'remembered'
           : null;
-  // A runway under the minimum has no rate to wait for; an unknown read time will have one.
+  // Waiting on EVE: a bay read before the expiry with no rate to fall back on.
   const ratePending =
     rateSource === null &&
+    bayBehind &&
     blocks !== null &&
-    blocks > 0 &&
     fuelExpiresMs !== null &&
     (runwayMs === null || runwayMs >= MIN_RUNWAY_MS);
-  const perDay =
-    rateSource === null
-      ? null
-      : rateSource === 'remembered'
-        ? remembered
-        : (blocks! * DAY_MS) / runwayMs!;
+  // The pair the rate comes from, when it does: measured or estimated.
+  const rated = rateSource === 'measured' || rateSource === 'estimated' ? reading : null;
+  const perDay = rated ? (rated.blocks * DAY_MS) / rated.runwayMs : remembered;
   if (fuelExpiresMs !== null && fuelExpiresMs >= untilMs) {
     return { perDay, needed: 0, rateSource, ratePending: false };
   }
@@ -134,9 +144,8 @@ export function fuelPlan(input: FuelPlanInput): FuelPlan {
   }
   // Multiply before dividing so a whole answer stays whole; the epsilon keeps
   // a float's last-bit error from rounding 90.000…01 up to 91.
-  const raw =
-    rateSource === 'remembered'
-      ? (perDay * (untilMs - fuelExpiresMs)) / DAY_MS
-      : (blocks! * (untilMs - fuelExpiresMs)) / runwayMs!;
+  const raw = rated
+    ? (rated.blocks * (untilMs - fuelExpiresMs)) / rated.runwayMs
+    : (perDay * (untilMs - fuelExpiresMs)) / DAY_MS;
   return { perDay, needed: Math.ceil(raw - 1e-9), rateSource, ratePending };
 }

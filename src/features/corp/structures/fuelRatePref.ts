@@ -37,7 +37,7 @@ export function withMeasuredRates(
   measured: ReadonlyMap<number, number>
 ): FuelRates {
   const changed = [...measured].filter(
-    ([id, perDay]) => Math.abs((rates[id] ?? 0) - perDay) >= SAME_RATE
+    ([id, perDay]) => rates[id] === undefined || Math.abs(rates[id] - perDay) >= SAME_RATE
   );
   return changed.length === 0 ? rates : { ...rates, ...Object.fromEntries(changed) };
 }

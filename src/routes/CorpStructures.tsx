@@ -46,11 +46,8 @@ import { shiftUtcDate, utcDay } from '@/engine/localDay';
 import { structureStateLabel } from '@/features/corp/boardSources';
 import { corpLabelText, type CorpLabel } from '@/features/corp/corpTicker';
 import { StructureDetail } from '@/features/corp/structures/StructureDetail';
-import {
-  eveReadAtMs,
-  loadStructureFuelBays,
-  type CorpFuelBays,
-} from '@/features/corp/structures/fuelBays';
+import { eveReadAtMs } from '@/features/corp/corpRead';
+import { loadStructureFuelBays, type CorpFuelBays } from '@/features/corp/structures/fuelBays';
 import { useFuelRates, withMeasuredRates } from '@/features/corp/structures/fuelRatePref';
 import { useFuelUntil } from '@/features/corp/structures/fuelUntilPref';
 import {
@@ -158,7 +155,7 @@ export function CorpStructures() {
   const setFuelUntil = useFuelUntil((s) => s.setValue);
   const fuelRates = useFuelRates((s) => s.value);
   const setFuelRates = useFuelRates((s) => s.setValue);
-  const fuelRatesHydrated = useHydratedStore(useFuelUntil, useFuelRates);
+  const fuelPrefsHydrated = useHydratedStore(useFuelUntil, useFuelRates);
   const today = utcDay(now);
   // A saved date that has passed would zero every row: plan the default month instead.
   const fuelUntil =
@@ -189,9 +186,9 @@ export function CorpStructures() {
         blocks,
         plan: fuelPlan({
           blocks,
-          bayAsOfMs: corp?.readAtMs ?? null,
+          bayReadAtMs: corp?.readAtMs ?? null,
           fuelExpiresMs: source.fuelExpiresMs,
-          expiryAsOfMs:
+          expiryReadAtMs:
             source.corporationId === undefined
               ? null
               : eveReadAtMs(data?.expiresAtByCorp?.get(source.corporationId)),
@@ -204,7 +201,7 @@ export function CorpStructures() {
   }, [rows, data, snapshot.data, fuelUntil, fuelRates]);
   // Remember each rate measured from a same-time pair, for when a refuel splits the next one.
   useEffect(() => {
-    if (!fuelRatesHydrated) return;
+    if (!fuelPrefsHydrated) return;
     const measured = new Map<number, number>();
     for (const [structureId, { plan }] of fuelRows) {
       if (plan.rateSource === 'measured' && plan.perDay !== null)
@@ -212,7 +209,7 @@ export function CorpStructures() {
     }
     const next = withMeasuredRates(fuelRates, measured);
     if (next !== fuelRates) void setFuelRates(next);
-  }, [fuelRows, fuelRates, fuelRatesHydrated, setFuelRates]);
+  }, [fuelRows, fuelRates, fuelPrefsHydrated, setFuelRates]);
   const fuelOf = useCallback(
     (row: StructureRow) => fuelRows.get(row.source.structureId),
     [fuelRows]
@@ -356,12 +353,17 @@ export function CorpStructures() {
               )}
               {fuel.plan.perDay !== null && (
                 <span className="text-xs text-text-dim">
-                  {t('corp.structures.fuelPlan.perDay', {
-                    rate:
-                      fuel.plan.perDay < 1
-                        ? formatTenths(fuel.plan.perDay)
-                        : formatCount(fuel.plan.perDay),
-                  })}
+                  {t(
+                    fuel.plan.rateSource === 'remembered'
+                      ? 'corp.structures.fuelPlan.perDayRemembered'
+                      : 'corp.structures.fuelPlan.perDay',
+                    {
+                      rate:
+                        fuel.plan.perDay < 1
+                          ? formatTenths(fuel.plan.perDay)
+                          : formatCount(fuel.plan.perDay),
+                    }
+                  )}
                 </span>
               )}
             </span>

@@ -21,7 +21,21 @@ import {
   type StatusResult,
 } from '@/esi/cache';
 import type { TruncatableResult } from '@/esi/paginated';
+import { HOUR_MS } from '@/lib/age';
 import { detectCorpAuthFailure } from './corpAuthFailure';
+
+/** How long ESI caches a corporation's structures and its assets alike. */
+const CORP_HOURLY_CACHE_MS = HOUR_MS;
+
+/**
+ * When EVE read a corporation's structures or assets, from the read's ESI
+ * `Expires` (kept by a loader that passes `expiresCapture`): ESI caches each
+ * for an hour from that read. Null when unknown — a row stored without
+ * `Expires`, or a read that sent none.
+ */
+export function eveReadAtMs(expiresAt: Date | undefined): number | null {
+  return expiresAt ? expiresAt.getTime() - CORP_HOURLY_CACHE_MS : null;
+}
 
 type CorpReadOptions = Omit<LoadSingleWithCacheOptions, 'detectAuthFailure'>;
 type CorpPaginatedReadOptions<T> = Omit<LoadPaginatedWithCacheOptions<T>, 'detectAuthFailure'>;

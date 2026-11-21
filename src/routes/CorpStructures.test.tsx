@@ -1,4 +1,4 @@
-import { DAY_MS, HOUR_MS } from '@/lib/age';
+import { DAY_MS, HOUR_MS, MINUTE_MS } from '@/lib/age';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -21,9 +21,6 @@ vi.mock('@/features/overview/data/boardData', async (importOriginal) => ({
 }));
 vi.mock('@/features/corp/structures/fuelBays', () => ({
   loadStructureFuelBays: vi.fn(),
-  // ESI caches both reads for an hour from EVE's read.
-  eveReadAtMs: (expiresAt: Date | undefined) =>
-    expiresAt ? expiresAt.getTime() - 3_600_000 : null,
 }));
 vi.mock('@/features/character/typeNames', () => ({
   loadTypeNames: vi.fn(async () => new Map([[35832, 'Astrahus']])),
@@ -310,7 +307,7 @@ describe('CorpStructures', () => {
       function refuelled() {
         feed([ALPHA], [[10, 'ALP', 'Alpha Corp']]);
         mockedBays.mockResolvedValue(
-          new Map([[10, { bays: new Map([[1, 400]]), readAtMs: now - 20 * 60_000 }]])
+          new Map([[10, { bays: new Map([[1, 400]]), readAtMs: now - 20 * MINUTE_MS }]])
         );
       }
 
@@ -327,7 +324,7 @@ describe('CorpStructures', () => {
         refuelled();
         renderPage();
         const tableEl = await table();
-        await waitFor(() => expect(column(tableEl, 'Fuel blocks')).toEqual(['40030/day']));
+        await waitFor(() => expect(column(tableEl, 'Fuel blocks')).toEqual(['400~30/day']));
         expect(count(column(tableEl, 'Needed')[0]!)).toBeGreaterThan(0);
       });
     });
