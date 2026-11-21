@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildBookView, noticeDetail, type BookViewInput } from './bookView';
+import { bookMiner, buildBookView, noticeDetail, type BookViewInput } from './bookView';
 import { minerPaymentCode, type LateNotice } from '../../../functions/src/corpTaxBookLateNotice';
 import { draftNotice, owedDays, planNotices, readLateNotices } from './lateNotices';
 import { DEFAULT_NOTICE_RULES, type NoticeRules } from './notices';
@@ -177,7 +177,7 @@ describe('a late notice on the running account (#6294)', () => {
     const part = buildBookView(
       input({ notices: [n], payments: [pay(15_000_000, '2026-09-19T00:00:00Z')] })
     );
-    expect(part.miners[0].account?.paidThrough).toBe('2026-09-01');
+    expect(bookMiner(part, part.miners[0].id)?.account.paidThrough).toBe('2026-09-01');
     expect(part.miners[0].owed).toBe(15_000_000);
     expect(noticeDetail(part, n.id)).toMatchObject({ settled: false, outstanding: 15_000_000 });
 

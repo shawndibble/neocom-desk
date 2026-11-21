@@ -46,10 +46,14 @@ export function runningAccountRecords(view: BookView, only?: string): RunningAcc
   const paidBy = new Map<string, number>();
   for (const p of view.input.payments)
     if (p.minerId) paidBy.set(p.minerId, (paidBy.get(p.minerId) ?? 0) + paymentNet(p));
+  const today = utcDayOf(view.input.now);
   return view.miners.flatMap((m) => {
     if (only !== undefined && m.id !== only) return [];
-    const { owes, paidThrough, closableThrough } = m.account;
-    const unpaidDays = view.internals.byMiner.get(m.id)?.account.owedDays() ?? [];
+    const account = view.internals.byMiner.get(m.id)?.account;
+    if (!account) return [];
+    const { owes, paidThrough } = account;
+    const closableThrough = account.closableThrough(today);
+    const unpaidDays = account.owedDays();
     return [
       {
         minerId: m.id,

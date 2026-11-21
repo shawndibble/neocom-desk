@@ -4,6 +4,7 @@ import { minerLedgerSource } from './minerLedgerSource';
 import {
   buildBookView,
   extractionDetail,
+  bookMiner,
   minerDetail,
   noticeDetail,
   type BookView,
@@ -83,7 +84,11 @@ describe('buildBookView: a Running account per Miner', () => {
     expect(miner.owed).toBe(100_000);
     expect(miner.pending).toBe(50_000);
     expect(view.beforeBook).toHaveLength(1);
-    expect(miner.account.owes).toEqual({ amount: 100_000, days: 1, oldest: '2026-08-10' });
+    const one = bookMiner(view, 'solo:1')!;
+    expect(one.row).toBe(miner);
+    expect(one.settlement).toBe(view.internals.byMiner.get('solo:1'));
+    expect(one.account.owes).toEqual({ amount: 100_000, days: 1, oldest: '2026-08-10' });
+    expect(bookMiner(view, 'solo:404')).toBeUndefined();
     expect(minerDetail(view, 'solo:1')!.days.map((d) => [d.date, d.status, d.owed])).toEqual([
       ['2026-09-18', 'not-billable', undefined],
       ['2026-08-10', 'owed', 100_000],
@@ -102,7 +107,7 @@ describe('buildBookView: a Running account per Miner', () => {
       ['2026-08-11', 'owed', 150_000],
       ['2026-08-10', 'paid', undefined],
     ]);
-    expect(view.miners[0].account.paidThrough).toBe('2026-08-10');
+    expect(bookMiner(view, 'solo:1')!.account.paidThrough).toBe('2026-08-10');
     expect(view.totals).toMatchObject({ owed: 150_000, credit: 0 });
   });
 
@@ -126,7 +131,11 @@ describe('buildBookView: a Running account per Miner', () => {
         ],
       })
     );
-    expect(view.miners[0].account.owes).toEqual({ amount: 100_000, days: 1, oldest: '2026-08-11' });
+    expect(bookMiner(view, 'solo:1')!.account.owes).toEqual({
+      amount: 100_000,
+      days: 1,
+      oldest: '2026-08-11',
+    });
     expect(minerDetail(view, 'solo:1')!.officerWriteOffs).toEqual([
       { id: 'w1', amount: 100_000, reason: 'x', at: '2026-09-01T00:00:00Z' },
     ]);
@@ -153,7 +162,11 @@ describe('buildBookView: a Running account per Miner', () => {
         ]),
       })
     );
-    expect(view.miners[0].account.owes).toEqual({ amount: 100_000, days: 1, oldest: '2026-09-10' });
+    expect(bookMiner(view, 'solo:1')!.account.owes).toEqual({
+      amount: 100_000,
+      days: 1,
+      oldest: '2026-09-10',
+    });
     expect(minerDetail(view, 'solo:1')!.days.find((d) => d.date === '2026-08-10')?.status).toBe(
       'paid'
     );
@@ -181,7 +194,11 @@ describe('buildBookView: a Running account per Miner', () => {
       })
     );
     // Read whole: August is owed again, as if no checkpoint were stored.
-    expect(view.miners[0].account.owes).toEqual({ amount: 200_000, days: 2, oldest: '2026-08-10' });
+    expect(bookMiner(view, 'solo:1')!.account.owes).toEqual({
+      amount: 200_000,
+      days: 2,
+      oldest: '2026-08-10',
+    });
   });
 
   it('marks a Miner no longer in the corporation as left, and a stranger as a guest', () => {

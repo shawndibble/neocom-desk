@@ -35,7 +35,7 @@ import type { DayPrices } from './valuation';
 import { DAY_MS } from '@/lib/age';
 import { wholeIsk } from './wholeIsk';
 import { utcDayOf } from '../localDay';
-import type { RunningAccountOwes } from './minerRunningAccount';
+import type { MinerRunningAccount } from './minerRunningAccount';
 import type { ToleranceExemption } from './toleranceExemptions';
 import { settleOpenSet, type MinerSettlement, type OpenSet, type OpenSetInput } from './openSet';
 
@@ -112,17 +112,10 @@ export interface MinerRow {
   lastPaidAt: string | null;
   /** An overdue clock is paused by a declaration. */
   paused: boolean;
-  /** Paid through, or what is owed. */
-  account: RunningAccountStatus;
 }
 
 /** A Running account's status: "Paid through {date}" or "Owes X (N days, oldest D)". */
-export interface RunningAccountStatus {
-  paidThrough: string | null;
-  owes: RunningAccountOwes | null;
-  /** The newest day an officer's client may store as paid for good (`closableThrough`). */
-  closableThrough: string | null;
-}
+export type RunningAccountStatus = Pick<MinerRunningAccount, 'paidThrough' | 'owes'>;
 
 /** `owed`: billed, not paid yet. `not-billable`: not Billable yet. */
 export type DayStatus = 'paid' | 'owed' | 'not-billable' | 'dismissed';
@@ -237,6 +230,23 @@ export interface MinerInternals extends MinerSettlement {
   days: DayRow[];
 }
 
+/** One Miner of a view: their row, their settlement and their Running account. */
+export interface BookMiner {
+  row: MinerRow;
+  settlement: MinerInternals;
+  account: MinerRunningAccount;
+}
+
+/** Undefined for a Miner the view does not hold. */
+export function bookMiner(
+  view: Pick<BookView, 'miners' | 'internals'>,
+  minerId: string
+): BookMiner | undefined {
+  const settlement = view.internals.byMiner.get(minerId);
+  const row = settlement && view.miners.find((m) => m.id === minerId);
+  return row && settlement ? { row, settlement, account: settlement.account } : undefined;
+}
+
 /** Tax on days that are not Billable yet: not dismissed, after the Miner's last Billable day. */
 export function pendingTax(
   input: Pick<BookViewInput, 'dismissals'>,
@@ -321,7 +331,6 @@ export function buildBookView(input: BookViewInput): BookView {
   const open = settleOpenSet(openSetInputOf(input));
   const { charges } = open;
   const latestCorp = latestRecordedCorp(input.entries);
-  const today = utcDayOf(input.now);
 
   const byMiner = new Map<string, MinerInternals>();
   const miners: MinerRow[] = [];
@@ -430,11 +439,6 @@ export function buildBookView(input: BookViewInput): BookView {
       credit: account.credit,
       lastPaidAt: lastPaid ?? null,
       paused,
-      account: {
-        paidThrough: account.paidThrough,
-        owes: account.owes,
-        closableThrough: account.closableThrough(today),
-      },
     };
     miners.push(row);
     byMiner.set(id, { ...settled, days });
@@ -636,9 +640,9 @@ export interface MinerDetail {
 }
 
 export function minerDetail(view: BookView, minerId: string): MinerDetail | undefined {
-  const row = view.miners.find((m) => m.id === minerId);
-  const inner = view.internals.byMiner.get(minerId);
-  if (!row || !inner) return undefined;
+  const miner = bookMiner(view, minerId);
+  if (!miner) return undefined;
+  const { row, settlement: inner } = miner;
   const mineKeys = new Set(inner.days.map((d) => d.key));
   const dismissals = view.input.dismissals.filter((d) => {
     if (d.scope === 'miner') return d.targetId === minerId;
