@@ -55,25 +55,17 @@ export const useDefaultMarketHub = createSyncedSetting<TradeHub['id']>({
   parse: parseMarketHub,
 });
 
-/**
- * The hub `characterId` trades at (the account default when none), read from
- * Dexie-backed stores; with `area`, that page's own hub when it has one.
- */
-export async function tradeHubIdFor(
-  characterId: number | null,
-  area?: PageHubArea
-): Promise<TradeHub['id']> {
+/** The hub `characterId` trades at (the account default when none), read from Dexie-backed stores. */
+export async function tradeHubIdFor(characterId: number | null): Promise<TradeHub['id']> {
   await Promise.all([
     useDefaultMarketHub.getState().hydrate(),
     useHubByCharacter.getState().hydrate(),
-    area ? usePageHubs.getState().hydrate() : undefined,
   ]);
-  const global = resolveTradeHub(
+  return resolveTradeHub(
     useHubByCharacter.getState().value,
     characterId,
     useDefaultMarketHub.getState().value
   );
-  return area ? resolvePageHub(usePageHubs.getState().value, area, global) : global;
 }
 
 function inForce(): Pick<SettingState<TradeHub['id']>, 'value' | 'hydrated'> {
@@ -131,10 +123,14 @@ export function useHubFor(area: PageHubArea): {
   scope: HubScope;
   hydrated: boolean;
 } {
-  const own = usePageHubs((s) => s.value[area]);
+  const map = usePageHubs((s) => s.value);
   const global = useMarketHub((s) => s.value);
   const hydrated = useHydratedStore(usePageHubs, useMarketHub);
-  return { hubId: own ?? global, scope: own ? 'page' : 'global', hydrated };
+  return {
+    hubId: resolvePageHub(map, area, global),
+    scope: map[area] ? 'page' : 'global',
+    hydrated,
+  };
 }
 
 /**
@@ -142,7 +138,8 @@ export function useHubFor(area: PageHubArea): {
  * Global hub, which moves every page without an entry.
  */
 export async function pickHubFor(area: PageHubArea, hub: TradeHub['id']): Promise<void> {
-  await usePageHubs.getState().hydrate();
+  // Skipped when settled: the press must apply in the same tick, as every setting store's does.
+  if (!usePageHubs.getState().hydrated) await usePageHubs.getState().hydrate();
   const map = usePageHubs.getState().value;
   if (map[area]) return usePageHubs.getState().setValue(setPageHub(map, area, hub));
   return useMarketHub.getState().setValue(hub);
@@ -153,7 +150,9 @@ export async function pickHubFor(area: PageHubArea, hub: TradeHub['id']): Promis
  * uses now, so nothing re-prices; back to Global drops the entry.
  */
 export async function setHubScope(area: PageHubArea, scope: HubScope): Promise<void> {
-  await Promise.all([usePageHubs.getState().hydrate(), useMarketHub.getState().hydrate()]);
+  if (!usePageHubs.getState().hydrated || !useMarketHub.getState().hydrated) {
+    await Promise.all([usePageHubs.getState().hydrate(), useMarketHub.getState().hydrate()]);
+  }
   const map = usePageHubs.getState().value;
   if (scope === 'global') return usePageHubs.getState().setValue(dropPageHub(map, area));
   if (map[area]) return;

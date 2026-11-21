@@ -10,6 +10,7 @@
  * edits below are pure; the store-touching actions live in `hub.ts`, beside
  * the Global hub they fall back to.
  */
+import type { TFunction } from 'i18next';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import { getTradeHub } from '@/market/hubs';
 import type { HubId } from './characterHubs';
@@ -23,6 +24,15 @@ import type { HubId } from './characterHubs';
 export const PAGE_HUB_AREAS = ['contracts'] as const;
 
 export type PageHubArea = (typeof PAGE_HUB_AREAS)[number];
+
+/** Each area's player-facing name, as literal keys so a dead-key scan sees them. */
+const AREA_NAME_KEYS = {
+  contracts: 'pageHubs.area.contracts',
+} as const satisfies Record<PageHubArea, string>;
+
+export function pageHubAreaName(t: TFunction, area: PageHubArea): string {
+  return t(AREA_NAME_KEYS[area]);
+}
 export type PageHubMap = Readonly<Partial<Record<PageHubArea, HubId>>>;
 
 export const PAGE_HUBS_SETTING_KEY = 'sync.pageHubs';

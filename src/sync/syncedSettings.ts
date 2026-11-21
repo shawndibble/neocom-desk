@@ -49,11 +49,6 @@
 // builds at my rigged Azbel" is answering for themselves, not for one machine,
 // and had to answer again on every device.
 //
-// sync.pageHubs (issue #6523) is one map of page area -> Trade Hub, the
-// pages a pilot prices somewhere other than their default hub (features/market/
-// pageHubs.ts). Account-wide; an entry is removed by rewriting the map without
-// it, never by deleting the key, so the tombstone edge does not bite it either.
-//
 // One key each, unlike the two blobs above: the set of defaults is fixed and
 // small, so an exact-match entry per preference is expressible — and each key
 // merges on its own, so changing the hub on a laptop cannot roll back an ME
@@ -65,6 +60,17 @@
 // edge above does not bite these either. Each is seeded from the device-local
 // key it used before it synced; `lib/useSyncedSetting.ts` explains why that
 // seed is written unstamped.
+//
+// sync.pageHubs (issue #6523): one map of page area -> Trade Hub, the pages a
+// pilot prices somewhere other than their Global hub (features/market/
+// pageHubs.ts). Account-wide. A blob over a fixed key set, against the
+// one-key-each rule above, for the reason sync.marketHubByCharacter is one:
+// the areas join one release at a time, and a key per area would make each a
+// new allow-list and FAQ edit. The cost is the LWW edge: two devices editing
+// different areas inside one sync window keep only the later map, which for a
+// setting edited this rarely is accepted. An entry is removed by rewriting the
+// map without it, never by deleting the key, so the tombstone edge does not
+// bite it.
 //
 // sync.defaultCharacterFilter (issue #607): a sixth Defaults-panel preference,
 // added later than the five above and with no device-local life to seed from

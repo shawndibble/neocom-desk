@@ -23,7 +23,7 @@ import {
 } from '@/components/ui';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { pickHubFor, setHubScope, useHubFor, type HubScope } from './hub';
-import type { PageHubArea } from './pageHubs';
+import { pageHubAreaName, type PageHubArea } from './pageHubs';
 
 export function HubMenu({
   area,
@@ -51,11 +51,12 @@ export function HubMenu({
           aria-label={t('pageHubs.scopeLabel')}
           onValueChange={(next) => void setHubScope(area, next as HubScope)}
         >
+          {/* preventDefault keeps the menu open; Radix still fires onValueChange for a radio item. */}
           <DropdownMenuRadioItem value="global" onSelect={(e) => e.preventDefault()}>
             {t('pageHubs.global')}
           </DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="page" onSelect={(e) => e.preventDefault()}>
-            {t(`pageHubs.area.${area}`)}
+            {pageHubAreaName(t, area)}
           </DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />

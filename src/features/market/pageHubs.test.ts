@@ -78,8 +78,7 @@ describe('picking a hub for a page', () => {
     expect(usePageHubs.getState().value).toEqual({ contracts: 'hek' });
   });
 
-  it('background jobs resolve a page the same way', async () => {
-    expect(await tradeHubIdFor(null, 'contracts')).toBe('amarr');
+  it('background jobs still read the Global hub', async () => {
     expect(await tradeHubIdFor(null)).toBe('jita');
   });
 });

@@ -259,6 +259,7 @@ export function InteractionGrammar() {
         <Cue rule={k('rules.hubMenu')}>
           <span className="text-[0.6875rem] text-text-dim">
             <span className={eyebrowClassName}>{k('samples.hubMenuTitle')}</span>
+            {' · '}
             <HubMenu
               area="contracts"
               triggerClassName={popoverValueClassName}

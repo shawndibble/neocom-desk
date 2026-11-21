@@ -31,22 +31,28 @@ describe('PageHubsField', () => {
     );
   });
 
-  it('adds a page from the ones without a hub, starting at the default hub', async () => {
+  it('adds a page from the ones without a hub, starting at the Global hub', async () => {
     await usePageHubs.getState().setValue({});
     render(<PageHubsField />);
-    await userEvent.click(screen.getByRole('button', { name: /Add page hub/ }));
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Contracts' }));
+    // One page left to add: a plain button names it, no one-item menu.
+    await userEvent.click(screen.getByRole('button', { name: 'Add Contracts hub' }));
     await waitFor(() => expect(usePageHubs.getState().value).toEqual({ contracts: 'amarr' }));
     // Every page has one now, so there is nothing left to add.
-    expect(screen.queryByRole('button', { name: /Add page hub/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Add / })).toBeNull();
   });
 
-  it('removes a page back to the default hub, and Undo restores it', async () => {
+  it('removes a page back to the Global hub, and Undo restores it', async () => {
     render(<PageHubsField />);
     await userEvent.click(screen.getByRole('button', { name: 'Remove Contracts hub' }));
     await waitFor(() => expect(usePageHubs.getState().value).toEqual({}));
-    expect(screen.getAllByText('Contracts uses the default hub again').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Contracts uses your Trade Hub again').length).toBeGreaterThan(0);
+    // Focus moves off the removed row, to the Add control that replaces it.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Add Contracts hub' })).toHaveFocus()
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
     await waitFor(() => expect(usePageHubs.getState().value).toEqual({ contracts: 'hek' }));
+    // Undo closes its own toast.
+    expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull();
   });
 });

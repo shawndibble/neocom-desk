@@ -28,8 +28,13 @@ _Recorded 2026-11-20. Issue #6523._
   older build instead of failing. Closest will therefore be a value an older
   client drops to Global, never a value written into `sync.marketHub`, where
   an older client would read it as Jita.
-- **This slice moves Contracts only.** Contract Search, own contract and
-  public contract panels read `useHubFor('contracts')`. The other areas keep
+- **One synced map, not a key per area.** Whole-value last write wins, so two
+  devices editing different areas inside one sync window keep only the later
+  map; accepted for a setting edited this rarely, the same trade
+  `sync.marketHubByCharacter` makes.
+- **This slice moves Contracts only.** Contract Search (its Item Search flags
+  and Below market), own contract and public contract panels read
+  `useHubFor('contracts')`, so a row and the panel it opens price at one hub. The other areas keep
   reading the Global hub until their own slice moves their readers and pickers
   onto `useHubFor` and `HubMenu`, and adds the area to `PAGE_HUB_AREAS`. Only
   listed areas are offered in Settings or kept on parse, so no entry is ever

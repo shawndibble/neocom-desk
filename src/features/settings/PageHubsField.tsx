@@ -1,13 +1,15 @@
 /**
  * Settings › Market defaults › Page hubs (issue #6523): the pages that price at
- * a Trade Hub of their own instead of the default. One row per page, its hub
- * select and Remove; Add page hub lists only the pages without one, and a new
- * entry starts at the hub that page uses now, so adding re-prices nothing.
- * Remove puts the page back on the default hub, with Undo.
+ * a Trade Hub of their own instead of the Global hub. One row per page, its hub
+ * select and Remove; Add lists only the pages without one (a menu once there
+ * are several, a plain button for one), and a new entry starts at the hub that
+ * page uses now, so adding re-prices nothing. Remove puts the page back on the
+ * Global hub, with Undo; focus moves to the next row, else the previous one,
+ * else the Add control (DESIGN.md "Removing a row").
  *
  * The same entries the in-page `HubMenu` switches between Global and the page.
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -22,6 +24,7 @@ import * as Icon from '@/components/ui/icons';
 import { useMarketHub } from '@/features/market/hub';
 import {
   dropPageHub,
+  pageHubAreaName,
   PAGE_HUB_AREAS,
   setPageHub,
   usePageHubs,
@@ -29,6 +32,7 @@ import {
   type PageHubMap,
 } from '@/features/market/pageHubs';
 import type { HubId } from '@/features/market/characterHubs';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { HubSelect } from './TradeHubField';
 
 type Removed = { area: PageHubArea; hub: HubId };
@@ -44,16 +48,29 @@ export function PageHubsField() {
   const map = usePageHubs((state) => state.value);
   const globalHub = useMarketHub((state) => state.value);
   const [removed, setRemoved] = useState<Removed | null>(null);
+  const removeRefs = useRef(new Map<PageHubArea, HTMLButtonElement>());
+  const addRef = useRef<HTMLButtonElement>(null);
+  const focusAfterCommit = useFocusAfterCommit();
   const set = PAGE_HUB_AREAS.filter((area) => map[area]);
   const unset = PAGE_HUB_AREAS.filter((area) => !map[area]);
-  const name = (area: PageHubArea) => t(`pageHubs.area.${area}`);
+  const name = (area: PageHubArea) => pageHubAreaName(t, area);
+  const add = (area: PageHubArea) => void write((m) => setPageHub(m, area, globalHub));
+
+  function remove(area: PageHubArea, index: number) {
+    const near = [set[index + 1], set[index - 1]].map(
+      (key) => () => (key === undefined ? null : (removeRefs.current.get(key) ?? null))
+    );
+    focusAfterCommit(...near, () => addRef.current);
+    setRemoved({ area, hub: map[area]! });
+    void write((m) => dropPageHub(m, area));
+  }
 
   return (
     <Field label={t('settings.pageHubsLabel')} note={t('settings.pageHubsNote')}>
       <div className="min-w-0 space-y-2">
         {set.length > 0 && (
           <ul className="divide-y divide-line">
-            {set.map((area) => (
+            {set.map((area, index) => (
               <li
                 key={area}
                 className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5 sm:flex-nowrap"
@@ -70,11 +87,13 @@ export function PageHubsField() {
                   </div>
                   <Button
                     size="sm"
-                    aria-label={t('settings.pageHubRemoveFor', { page: name(area) })}
-                    onClick={() => {
-                      setRemoved({ area, hub: map[area]! });
-                      void write((m) => dropPageHub(m, area));
+                    variant="ghost"
+                    ref={(el) => {
+                      if (el) removeRefs.current.set(area, el);
+                      else removeRefs.current.delete(area);
                     }}
+                    aria-label={t('settings.pageHubRemoveFor', { page: name(area) })}
+                    onClick={() => remove(area, index)}
                   >
                     {t('settings.pageHubRemove')}
                   </Button>
@@ -83,20 +102,22 @@ export function PageHubsField() {
             ))}
           </ul>
         )}
-        {unset.length > 0 && (
+        {unset.length === 1 && (
+          <Button ref={addRef} variant="ghost" size="sm" onClick={() => add(unset[0]!)}>
+            {t('settings.pageHubAddOne', { page: name(unset[0]!) })}
+          </Button>
+        )}
+        {unset.length > 1 && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm">
+              <Button ref={addRef} variant="ghost" size="sm">
                 {t('settings.pageHubAdd')}
                 <Icon.Expanded size={Icon.ICON_SIZE.sm} aria-hidden="true" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
               {unset.map((area) => (
-                <DropdownMenuItem
-                  key={area}
-                  onSelect={() => void write((m) => setPageHub(m, area, globalHub))}
-                >
+                <DropdownMenuItem key={area} onSelect={() => add(area)}>
                   {name(area)}
                 </DropdownMenuItem>
               ))}
@@ -109,7 +130,10 @@ export function PageHubsField() {
           message={t('settings.pageHubRemoved', { page: name(removed.area) })}
           undo={{
             label: t('settings.pageHubUndo'),
-            onUndo: () => void write((m) => setPageHub(m, removed.area, removed.hub)),
+            onUndo: () => {
+              setRemoved(null);
+              void write((m) => setPageHub(m, removed.area, removed.hub));
+            },
           }}
           onClose={() => setRemoved(null)}
         />
