@@ -4,7 +4,7 @@
 export interface Adjustment {
   id: string;
   minerId: string;
-  /** The mined day it corrects; a fix to a day the account closed through is dated today. */
+  /** The mined day it corrects; one on or before the Miner's checkpoint drops the checkpoint. */
   date: string;
   amount: number;
   reason: string;

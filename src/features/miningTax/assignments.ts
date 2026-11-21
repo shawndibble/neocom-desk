@@ -102,9 +102,10 @@ function entryAssignments(
 
 async function claimNewOre(
   record: MiningTaxAssignmentRecord,
+  /** What is paid, off the Payees' accounts (`PayeeAccounts.isPaid`): never a stored mark. */
+  isPaid: (a: MiningTaxAssignmentRecord) => boolean,
   entryOreLines?: readonly MiningTaxOreLine[],
-  takesGrowth = false,
-  isPaid: (a: MiningTaxAssignmentRecord) => boolean = (a) => a.status === 'paid'
+  takesGrowth = false
 ): Promise<MiningTaxAssignmentRecord[]> {
   const covering = await entryAssignments(record);
   assertUnclaimed(covering, record.oreLines, entryOreLines);
@@ -153,7 +154,7 @@ export interface AssignInput {
    * Whether an Assignment's day is paid on its Payee's account (`PayeeAccounts.isPaid`), read
    * before the write: a paid growth collector hands the flag to the new Assignment.
    */
-  isPaid?: (a: MiningTaxAssignmentRecord) => boolean;
+  isPaid: (a: MiningTaxAssignmentRecord) => boolean;
   /**
    * A Payee's Default Systems made this, not the pilot: the row is written with `override: false`
    * (`MiningTaxAssignmentRecord.override`), so a Survey connection or the Corp Tax Book can still
@@ -196,7 +197,7 @@ export async function createAssignment(input: AssignInput): Promise<MiningTaxAss
   // (under a ledger action this joins the action's own transaction).
   await db.transaction('rw', db.miningTaxAssignments, db.settings, async () => {
     await putAssignments(
-      await claimNewOre(record, input.entryOreLines, input.takesGrowth, input.isPaid)
+      await claimNewOre(record, input.isPaid, input.entryOreLines, input.takesGrowth)
     );
   });
   return record;
@@ -375,7 +376,9 @@ export async function joinAssignments(
   members: readonly JoinMemberInput[],
   payeeId: string,
   taxPct: number,
-  pricesOn: (date: string) => ReadonlyMap<number, number>
+  pricesOn: (date: string) => ReadonlyMap<number, number>,
+  /** What is paid, off the Payees' accounts: a paid growth collector hands its flag over. */
+  isPaid: (a: MiningTaxAssignmentRecord) => boolean
 ): Promise<MiningTaxAssignmentRecord[]> {
   const groupId =
     members.map((m) => m.assignment?.groupId).find((id) => id !== undefined) ?? crypto.randomUUID();
@@ -407,7 +410,7 @@ export async function joinAssignments(
     const handedOver: MiningTaxAssignmentRecord[] = [];
     for (const [i, m] of members.entries()) {
       if (m.assignment) continue;
-      handedOver.push(...(await claimNewOre(records[i], m.entryOreLines)).slice(1));
+      handedOver.push(...(await claimNewOre(records[i], isPaid, m.entryOreLines)).slice(1));
     }
     await putAssignments([...records, ...handedOver]);
   });

@@ -134,8 +134,9 @@ function IskField({ ariaLabel, computedDefault, override, onOverrideChange }: Is
  * same ore is worth, because the hub belongs to the Payee (the figure is a
  * bill one player sends another, not a local viewing preference).
  *
- * "I already paid this" creates the Assignment already marked Paid, for ore
- * the pilot settled before recording it here.
+ * It never marks anything paid: what is paid is read off the Payee's account,
+ * so ore the pilot settled before recording it here is paid by linking that
+ * payment to the Payee.
  */
 export function AssignDialog({
   row,

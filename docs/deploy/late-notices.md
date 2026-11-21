@@ -140,8 +140,9 @@ a week after promotion. Then a follow-up PR removes the legacy half, each in one
 - **Server reads:** the fallback to `statements` / `statementLinks` in the Late notice store and
   the verify page, the `meta/lateNoticesBackfilled` marker, and the quiet-run stamp on `statements`
   (swap in `lateNotices`).
-- **Settings fields** `cadence`, `minimumStatement` and `overdueDays`, still accepted from old tabs,
-  still in `BOOK_DEFAULTS` and still sent in the verify page's `terms`.
+- **Settings fields** `cadence` and `minimumStatement`, still accepted from old tabs, still in
+  `BOOK_DEFAULTS` and still sent in the verify page's `terms`. (`overdueDays` stays: it still
+  decides when a notice is overdue.)
 - **Wire names:** the rate refusal answers `day-on-notice` instead of `day-on-statement` (the
   `DAY_ON_NOTICE` constant in `corpTaxBookStore.ts`), once every client accepts both.
 - **Client fallbacks:** `issueLateNotice` → `issueStatement`, `recordLateNoticeMail` →
@@ -154,6 +155,13 @@ a week after promotion. Then a follow-up PR removes the legacy half, each in one
 - **Pilot side:** reading the old Assignment paid marks into links (`legacyPaidMarks.ts`), once
   every device has run this client; the stored `status`, `payment` and `paidAt` fields can then be
   dropped from new writes' readers.
+- **Also then:** `finalStatementId` on Miner docs and the `statementId` in the close audit detail
+  (once every client closes accounts through the `notice` field); the deprecated
+  `uncountedDonations`, `StatementDays` and `canOverrideRecordRate`; `MoonRules.statements` and the
+  schema-1 `frozenTax` fields; `JournalDonation.statementId` / `SettlePayment.statementId`; the
+  server accepting a client's `reviewReason: 'no-open-balance'`; and the emulator tests that issue
+  notices through `issueStatement`, rewritten to `issueLateNotice`.
 - **Kept on purpose:** the verify wire field `statement` and the callable name
-  `readCorpTaxBookStatementCallable` (links in mail already sent call them), and the `statementId`
-  index of the device mail queue.
+  `readCorpTaxBookStatementCallable` (links in mail already sent call them), the `statementId`
+  index of the device mail queue, the `statement:` / `keptStatement:` keys a pilot's device hides
+  problems under, and the audit action names (and their i18n keys) older audit entries carry.

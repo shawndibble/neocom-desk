@@ -168,6 +168,7 @@ export function linkOf(record: MiningTaxPaymentLinkRecord): PayeePaymentLink {
     amount: record.amount,
     paidOn: record.paidOn,
     source: record.source,
+    characterId: record.characterId,
     ...(record.refs ? { refs: record.refs } : {}),
     ...(record.unlinked ? { unlinked: true as const } : {}),
   };

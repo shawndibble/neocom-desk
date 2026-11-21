@@ -81,7 +81,7 @@ running account).
 - **A donation links to a Miner, never to a late notice.** One resolver,
   `functions/src/corpTaxBookDonationMatch.ts`, decides whose money a donation is, and the server
   runs it on every donation it stores, whichever sync sent it (a client's Miner is ignored).
-  "Known" means grouped or seen mining, not "has paid before". An ambiguous donation is stored for
+  "Known" means grouped or seen mining, not "has paid before": a payer known only through earlier payments is not their own Miner, but a donation of theirs with no code goes to the Miner those payments named, and to review if they named more than one. An ambiguous donation is stored for
   review, shown in Needs you, and never claimed automatically. An officer can move a payment to
   another Miner. A donation from an alt pays the group the alt is in, as the alt is billed with
   it. A hand-recorded payment is checked against uncounted and in-flight transfers so
@@ -132,3 +132,13 @@ and flipped paid days back for older clients.
   treated as "not ready", not as a sync error.
 - **An older client's unmark and re-record counts twice until the pilot unlinks one.** Confirmed
   by the owner: few users, and they upgrade almost at once, so no extra handling is built for it.
+
+## Added 2026-11-21: a known limit on the officer's first read
+
+- **The work per load is bounded; the officer's first read on a device is not.** A Running account
+  is built from its checkpoint and the days after it, so no load recomputes closed history, and an
+  officer's device keeps a copy of the book's mining rows and reads only what changed since. The
+  first open on a new device still reads every row: a solo Miner with no checkpoint is found only
+  by reading their rows, and Firestore cannot query "characters not in this set". Bounding that
+  read needs a server-kept list of every character the book bills, or a checkpoint for every Miner
+  who has mined; left for a later change.
