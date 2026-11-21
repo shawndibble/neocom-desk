@@ -25,6 +25,7 @@ import {
 export type { WidgetKindId, WidgetShow, WidgetSize, WidgetView };
 
 import { LAYER_IDS, type LayerId } from '@/engine/netWorth/series';
+import { CHARACTER_BOARD_ITEM_KINDS, type CharacterBoardItemKind } from '@/engine/character/board';
 
 export type WidgetScope = 'header' | 'all';
 export type CalendarEventsChoice = 'committed' | 'all';
@@ -89,8 +90,13 @@ export interface Widget {
   rowsPerPage?: RowsPerPage;
   /** The pilot's Omega plan: PLEX per 30 days. Absent means the default (500). Only a kind with a plan reads it. */
   plexPer30Days?: number;
-  /** Coming up only: which events it lists. Absent means accepted and tentative; stored only for 'all'. */
+  /** Calendar only: which events it lists. Absent means accepted and tentative; stored only for 'all'. */
   calendarEvents?: CalendarEventsChoice;
+  /**
+   * Calendar only: the Clock Kinds it leaves out. Absent means every kind shows. Stored as what is
+   * hidden, so a kind added later shows on every widget the day it ships (calendarKindFilter.ts).
+   */
+  hiddenKinds?: CharacterBoardItemKind[];
   /** Skyhook raids only: 'near' lists any holder's space near the pilot. Absent means My alliance; stored only for 'near'. */
   raidsWhere?: 'near';
   /** Skyhook raids only: jumps for Near me. Absent means the default (8). */
@@ -550,6 +556,12 @@ export function cleanHiddenLayers(raw: unknown): LayerId[] {
   return hidden.length >= LAYER_IDS.length ? [] : hidden;
 }
 
+/** Known Clock Kinds only, once each, in the board's order. Every kind may be hidden: the widget says so. */
+export function cleanHiddenKinds(raw: unknown): CharacterBoardItemKind[] {
+  if (!Array.isArray(raw)) return [];
+  return CHARACTER_BOARD_ITEM_KINDS.filter((kind) => raw.includes(kind));
+}
+
 const sameList = (a: readonly unknown[] | undefined, b: readonly unknown[]) =>
   (a ?? []).length === b.length && b.every((v, i) => a![i] === v);
 
@@ -578,6 +590,20 @@ export function setTrendHubs(layout: OverviewLayout, id: string, hubs: unknown):
       return rest;
     }
     return { ...w, trendHubs: next };
+  });
+}
+
+/** An empty list clears the setting, so every kind shows again. */
+export function setHiddenKinds(layout: OverviewLayout, id: string, kinds: unknown): OverviewLayout {
+  const next = cleanHiddenKinds(kinds);
+  return update(layout, id, (w) => {
+    if (!getKind(w.kind)?.hasCalendarEvents || sameList(w.hiddenKinds, next)) return null;
+    if (next.length === 0) {
+      const { hiddenKinds: _dropped, ...rest } = w;
+      void _dropped;
+      return rest;
+    }
+    return { ...w, hiddenKinds: next };
   });
 }
 

@@ -7,6 +7,32 @@ import type { SecurityBand } from '@/engine/securityStatus';
  * 2026-08-29.
  */
 
+/**
+ * A temporary multiplier on a hub's sales tax and broker fee rates, applied
+ * after skills and standings (the 100 ISK minimum broker fee and any Safety
+ * Tax are not scaled). See `hubFeeDiscountFactor`.
+ */
+export interface HubFeeDiscount {
+  /** Multiplied onto the rate: 0.5 halves it. */
+  factor: number;
+  /** First UTC millisecond the discount no longer applies (exclusive end). */
+  untilMs: number;
+  /** First UTC millisecond it applies (inclusive start). */
+  fromMs: number;
+}
+
+/** Fractured Skies went live 2026-11-10 11:00 UTC, when the Deaconry of Economic Oversight opened at Amarr VIII. */
+const AMARR_FEE_DISCOUNT_FROM_MS = Date.UTC(2026, 10, 10, 11);
+
+/**
+ * ASSUMPTION, not a confirmed date: CCP's In Focus post says six months, with no
+ * end date found. This is the Tuesday 11:00 UTC about six months after
+ * Fractured Skies, taken as the next expansion. Correct this one constant when
+ * CCP announces the real date; after it the discount stops on its own, so a
+ * wrong guess errs toward showing standard (higher) fees.
+ */
+export const AMARR_FEE_DISCOUNT_UNTIL_MS = Date.UTC(2027, 4, 11, 11);
+
 export interface TradeHub {
   id: 'jita' | 'amarr' | 'dodixie' | 'rens' | 'hek' | 'manifest';
   name: string;
@@ -65,6 +91,13 @@ export interface TradeHub {
    * showed 150 broker + 250 safety tax; a 230 ISK order showed 100 + 11.50.
    */
   safetyTaxPct: number;
+  /**
+   * A temporary discount on this hub's sales tax and broker fee, if one is
+   * running (Amarr VIII's Deaconry of Economic Oversight: 50%, measured in game
+   * 2026-11: 1.69% sales tax at Accounting V, broker fee halved, 100 ISK minimum
+   * kept). Read it through `hubFeeDiscountFactor`, which also checks the dates.
+   */
+  feeDiscount?: HubFeeDiscount;
 }
 
 export const TRADE_HUBS: readonly TradeHub[] = [
@@ -99,6 +132,11 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     dailyJobs: true,
     compared: true,
     safetyTaxPct: 0,
+    feeDiscount: {
+      factor: 0.5,
+      fromMs: AMARR_FEE_DISCOUNT_FROM_MS,
+      untilMs: AMARR_FEE_DISCOUNT_UNTIL_MS,
+    },
   },
   {
     id: 'dodixie',
@@ -184,4 +222,15 @@ export const DEFAULT_TRADE_HUB: TradeHub = TRADE_HUBS[0];
 
 export function getTradeHub(id: string): TradeHub | undefined {
   return TRADE_HUBS.find((hub) => hub.id === id);
+}
+
+/**
+ * The factor to multiply a hub's sales tax and broker fee rates by at `nowMs`:
+ * the hub's `feeDiscount.factor` while it runs, otherwise 1. Pure: the caller
+ * supplies the clock.
+ */
+export function hubFeeDiscountFactor(hub: TradeHub | undefined, nowMs: number): number {
+  const discount = hub?.feeDiscount;
+  if (!discount || nowMs < discount.fromMs || nowMs >= discount.untilMs) return 1;
+  return discount.factor;
 }

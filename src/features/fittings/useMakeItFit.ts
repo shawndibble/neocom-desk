@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { FittingStats } from '@/engine/fittings/types';
 import { findFitSwaps, type FitSwap, type FitSwapsResult } from '@/engine/fittings/makeItFit';
 import { buildVariationIndex, getVariations } from '@/engine/market/variations';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
 import type { FittingCatalogue } from './useFittingCatalogue';
@@ -29,7 +29,7 @@ export function useMakeItFit(
   catalogue: FittingCatalogue | null,
   enabled: boolean
 ): MakeItFitState {
-  const hubId = useMarketHub((state) => state.value);
+  const { hubId } = useHubFor('fittings');
   const [failed, setFailed] = useState<VariantEvaluator | null>(null);
   const [computed, setComputed] = useState<{
     variants: VariantEvaluator;

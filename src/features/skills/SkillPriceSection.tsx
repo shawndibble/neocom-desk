@@ -19,12 +19,11 @@ import { Link } from 'react-router-dom';
 import { InfoTooltip, IskAmount } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { PriceHubSelect } from '@/features/fittings/PriceHubSelect';
-import { useMarketHub } from '@/features/market/hub';
+import { useHubFor } from '@/features/market/hub';
 import { getOrderBook } from '@/features/market/orderBook';
 import { buildMarketParams, marketNearbyParams } from '@/engine/market/urlState';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { skillSellPrices, type SkillSellPrices } from './skillSellPrices';
-import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 
 const NEARBY_JUMPS = '10';
@@ -42,8 +41,7 @@ export function SkillPriceSection({
   npcPrice: number | null;
 }) {
   const { t } = useTranslation();
-  const hubId = useMarketHub((state) => state.value);
-  const hubHydrated = useHydratedStore(useMarketHub);
+  const { hubId, hydrated: hubHydrated } = useHubFor('skills');
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   // What the currently-rendered prices (if any) were fetched for — a hub or
   // typeID change invalidates them immediately on render, rather than showing
@@ -82,7 +80,7 @@ export function SkillPriceSection({
     <section>
       <div className="flex items-center justify-between border-b border-line pb-1">
         <h3 className={eyebrowClassName}>{t('skills.inspector.priceTitle')}</h3>
-        <PriceHubSelect />
+        <PriceHubSelect area="skills" />
       </div>
       <dl className="mt-1 space-y-0.5 text-xs">
         <div className="flex items-center justify-between gap-2">

@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   MINING_TAX_WARNING_DAYS,
-  comingUpSeverity,
   mailSeverity,
   miningTaxSeverity,
   priceAlertsSeverity,
   spExtractionSeverity,
 } from './boardSeverity';
-import type { CalendarEventsBoardData, MailBoardData, MiningTaxBoardData } from './boardData';
+import type { MailBoardData, MiningTaxBoardData } from './boardData';
 
 function data(overrides: Partial<MiningTaxBoardData> = {}): MiningTaxBoardData {
   return {
@@ -50,38 +49,6 @@ describe('miningTaxSeverity', () => {
   it('is watch for unassigned entries and clear when nothing is owed', () => {
     expect(miningTaxSeverity(data({ unassignedCount: 2 }))).toBe('watch');
     expect(miningTaxSeverity(data())).toBe('clear');
-  });
-});
-
-describe('comingUpSeverity', () => {
-  const NOW = Date.parse('2026-01-01T00:00:00Z');
-  const data = (hoursAhead: number[], needsReauth = false): CalendarEventsBoardData => ({
-    events: hoursAhead.map((hours, i) => ({
-      event_id: i,
-      event_date: new Date(NOW + hours * 3_600_000).toISOString(),
-      title: `Op ${i}`,
-      importance: 0,
-      event_response: 'accepted',
-    })),
-    needsReauth,
-    fetchedAt: null,
-  });
-
-  it('is null until the calendar has loaded', () => {
-    expect(comingUpSeverity(null, NOW)).toBeNull();
-  });
-
-  it('is watch when a committed event starts within a day — a plan, not a problem', () => {
-    expect(comingUpSeverity(data([5, 48]), NOW)).toBe('watch');
-  });
-
-  it('is clear when the next event is further out, or there is none', () => {
-    expect(comingUpSeverity(data([48]), NOW)).toBe('clear');
-    expect(comingUpSeverity(data([]), NOW)).toBe('clear');
-  });
-
-  it('is warning when the calendar cannot be read', () => {
-    expect(comingUpSeverity(data([], true), NOW)).toBe('warning');
   });
 });
 

@@ -55,6 +55,7 @@ import { corpLabelText } from '@/features/corp/corpTicker';
 import { KIND_LABEL } from './calendarKindLabels';
 import { KIND_TEXT } from '@/components/ui/kindTone';
 import { KIND_ICON } from './calendarKindIcons';
+import { kindHasFilterRow } from './calendarKindFilter';
 
 export interface CalendarKindFilterMenuProps {
   hidden: readonly CharacterBoardItemKind[];
@@ -139,21 +140,11 @@ function CorporationFilterSub({
   );
 }
 
-function KindGlyph({ kind }: { kind: CharacterBoardItemKind }) {
+/** A kind's glyph in its hue: the legend for the icons and colours the Calendar draws. */
+export function KindGlyph({ kind }: { kind: CharacterBoardItemKind }) {
   const Glyph = KIND_ICON[kind];
   return <Glyph aria-hidden="true" className={`size-4 shrink-0 ${KIND_TEXT[kind]}`} />;
 }
-
-/** Kinds read through an opt-in Permission: no row while unreadable. */
-const OPT_IN_KINDS: ReadonlySet<CharacterBoardItemKind> = new Set([
-  'structureTimer',
-  'structureFuel',
-  'corpJob',
-  'moonChunk',
-  'sharedMoonPop',
-  'skyhookRaid',
-  'mercenaryDen',
-]);
 
 export function CalendarKindFilterMenu({
   hidden,
@@ -197,8 +188,10 @@ export function CalendarKindFilterMenu({
    * a choice the pilot never made.
    */
   function hasRow(kind: CharacterBoardItemKind) {
-    if (hiddenSet.has(kind) || needsReauth.has(kind)) return true;
-    if (!readable.has(kind)) return !OPT_IN_KINDS.has(kind);
+    if (!kindHasFilterRow(kind, { hidden: hiddenSet, readable, reauth: needsReauth })) return false;
+    // Here, unlike the Overview widget's menu, the counts are on hand: a readable kind with
+    // nothing due is not worth a row.
+    if (!readable.has(kind) || hiddenSet.has(kind) || needsReauth.has(kind)) return true;
     return (counts.get(kind) ?? 0) > 0;
   }
 

@@ -402,7 +402,7 @@ describe('RoleChooser', () => {
     render(<RoleChooser firstRun onChoose={(l) => (built = l)} />);
     expect(screen.getByRole('heading', { name: 'What do you do in EVE?' })).toBeInTheDocument();
     expect(
-      screen.getByText('Always included: Wallet, Training, Coming up and Mail.')
+      screen.getByText('Always included: Wallet, Training, Calendar and Mail.')
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Planetary industry' }));
     await user.click(screen.getByRole('button', { name: 'Build my Overview' }));

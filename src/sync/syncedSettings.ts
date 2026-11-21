@@ -61,6 +61,17 @@
 // key it used before it synced; `lib/useSyncedSetting.ts` explains why that
 // seed is written unstamped.
 //
+// sync.pageHubs (issue #6523): one map of page area -> Trade Hub, the pages a
+// pilot prices somewhere other than their Global hub (features/market/
+// pageHubs.ts). Account-wide. A blob over a fixed key set, against the
+// one-key-each rule above, for the reason sync.marketHubByCharacter is one:
+// the areas join one release at a time, and a key per area would make each a
+// new allow-list and FAQ edit. The cost is the LWW edge: two devices editing
+// different areas inside one sync window keep only the later map, which for a
+// setting edited this rarely is accepted. An entry is removed by rewriting the
+// map without it, never by deleting the key, so the tombstone edge does not
+// bite it.
+//
 // sync.defaultCharacterFilter (issue #607): a sixth Defaults-panel preference,
 // added later than the five above and with no device-local life to seed from
 // (no `legacyKey`). Which Character a cross-character view (Wallet Balance,
@@ -367,6 +378,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.loyaltyLpValue',
   'sync.marketHub',
   'sync.marketHubByCharacter',
+  'sync.pageHubs',
   'sync.marketPricePercent',
   'sync.miningTaxDefaultOptOuts',
   'sync.miningTaxManualIgnoredTypeIds',

@@ -399,11 +399,13 @@ export function walkInstant(input: {
   /** The destination's buy ladder, descending. */
   destBuyLadder: readonly LadderLevel[];
   accountingLevel: number;
+  /** The destination hub's temporary fee discount factor (`hubFeeDiscountFactor`); 1 or absent is none. */
+  feeDiscountFactor?: number;
   maxUnits?: number;
   /** Stop at the first unit earning less than this percent of its buy price; 0 (the default) stops at break-even. */
   minMarginPct?: number;
 }): InstantWalk {
-  const { originLadder, destBuyLadder, accountingLevel } = input;
+  const { originLadder, destBuyLadder, accountingLevel, feeDiscountFactor } = input;
   const minMargin = 1 + Math.max(0, input.minMarginPct ?? 0) / 100;
   let remaining = input.maxUnits === undefined ? Infinity : Math.max(0, Math.floor(input.maxUnits));
   let units = 0;
@@ -416,7 +418,7 @@ export function walkInstant(input: {
   while (remaining > 0 && i < originLadder.length && j < destBuyLadder.length) {
     const buyAt = originLadder[i]!.price;
     const sellAt = destBuyLadder[j]!.price;
-    if (sellAt - salesTax(sellAt, accountingLevel) <= buyAt * minMargin) break;
+    if (sellAt - salesTax(sellAt, accountingLevel, feeDiscountFactor) <= buyAt * minMargin) break;
     const take = Math.min(leftAtOrigin, leftAtDest, remaining);
     units += take;
     cost += take * buyAt;
@@ -427,7 +429,7 @@ export function walkInstant(input: {
     if (leftAtOrigin <= 0) leftAtOrigin = originLadder[++i]?.units ?? 0;
     if (leftAtDest <= 0) leftAtDest = destBuyLadder[++j]?.units ?? 0;
   }
-  const tax = units > 0 ? salesTax(revenue, accountingLevel) : 0;
+  const tax = units > 0 ? salesTax(revenue, accountingLevel, feeDiscountFactor) : 0;
   return { units, cost, revenue, salesTax: tax, profit: revenue - tax - cost };
 }
 
@@ -482,7 +484,7 @@ export function lotEconomics(input: {
     : input.quantity;
   const { filled, cost } = walkLadder(input.buyLadder, quantity);
   const revenue = instant ? walkLadder(destBuyLadder, filled).cost : filled * input.expectedPrice;
-  const tax = filled > 0 ? salesTax(revenue, accountingLevel) : 0;
+  const tax = filled > 0 ? salesTax(revenue, accountingLevel, standing.feeDiscountFactor) : 0;
   const broker =
     filled > 0 && !instant
       ? brokerFee(
@@ -490,7 +492,8 @@ export function lotEconomics(input: {
           brokerRelationsLevel,
           standing.factionStanding,
           standing.corpStanding,
-          standing.safetyTaxPct
+          standing.safetyTaxPct,
+          standing.feeDiscountFactor
         )
       : 0;
   const profit = revenue - tax - broker - cost;
@@ -501,14 +504,15 @@ export function lotEconomics(input: {
     fees: tax + broker,
     salesTax: tax,
     brokerFee: broker,
-    salesTaxPct: salesTaxPct(accountingLevel),
+    salesTaxPct: salesTaxPct(accountingLevel, standing.feeDiscountFactor),
     brokerFeePct: instant
       ? 0
       : brokerFeePct(
           brokerRelationsLevel,
           standing.factionStanding,
           standing.corpStanding,
-          standing.safetyTaxPct
+          standing.safetyTaxPct,
+          standing.feeDiscountFactor
         ),
     profit,
     marginPct: cost > 0 ? (profit / cost) * 100 : 0,
