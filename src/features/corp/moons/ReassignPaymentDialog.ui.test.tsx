@@ -7,14 +7,19 @@ import { BookProvider } from './BookContext';
 import { ReassignPaymentDialog } from './BookDialogs';
 
 const edit = vi.fn();
+const readBookMiners = vi.fn();
 vi.mock('../taxBook/bookClient', () => ({
   editBook: (_c: number, _o: number, action: unknown) => Promise.resolve(edit(action) ?? {}),
+  readBookMiners: (...args: unknown[]) => readBookMiners(...args),
+}));
+vi.mock('@/features/character/names', () => ({
+  resolveNames: async () => new Map([[3, 'Carol']]),
 }));
 
 const NAMES: Record<number, string> = { 1: 'Alice', 2: 'Bob' };
 const miner = (id: string, main: number) => ({ id, mainCharacterId: main, characterIds: [main] });
 
-function renderDialog() {
+function renderDialog(data: object = {}) {
   render(
     <BookProvider
       value={{
@@ -23,7 +28,7 @@ function renderDialog() {
         view: { miners: [miner('m1', 1), miner('m2', 2)] } as never,
         names: { character: (id: number) => NAMES[id] ?? `Pilot ${id}` } as never,
         settings: {} as BookSettings,
-        data: {} as never,
+        data: data as never,
         verdict: { canEdit: true, bookActive: true } as OfficerVerdict,
         reload: vi.fn(),
       }}
@@ -66,6 +71,18 @@ describe('ReassignPaymentDialog', () => {
       action: 'reassignPayment',
       paymentId: 'p1',
       minerId: null,
+    });
+  });
+
+  it('lists every Miner of the book on a page read for one Miner', async () => {
+    readBookMiners.mockResolvedValue([miner('m1', 1), miner('m3', 3)]);
+    const dialog = renderDialog({ scopedMiner: 'm1' });
+    await userEvent.click(await within(dialog).findByRole('radio', { name: 'Carol' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Move payment' }));
+    expect(edit).toHaveBeenCalledWith({
+      action: 'reassignPayment',
+      paymentId: 'p1',
+      minerId: 'm3',
     });
   });
 });

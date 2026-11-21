@@ -8,7 +8,7 @@
  */
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore/lite';
 import type { Adjustment } from '@/engine/corpTaxBook/adjustments';
-import type { Miner } from '@/engine/corpTaxBook/charges';
+import { characterIdsOfMiner, type Miner } from '@/engine/corpTaxBook/charges';
 import { readLateNotices } from '@/engine/corpTaxBook/lateNotices';
 import { accountWindowStart } from '@/engine/corpTaxBook/minerScope';
 import type { RecordedWriteOff } from '@/engine/corpTaxBook/payments';
@@ -19,7 +19,13 @@ import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import { readObservedRow } from '@/engine/corpTaxBook/observed';
 import { chunk } from '@/lib/chunk';
 import { readDisputes } from '@/engine/corpTaxBook/disputes';
-import { LATE_NOTICES, LEGACY_NOTICES, settingsFrom, type BookDeclaration } from '../bookClient';
+import {
+  LATE_NOTICES,
+  LEGACY_NOTICES,
+  readsLegacyNotices,
+  settingsFrom,
+  type BookDeclaration,
+} from '../bookClient';
 import { errorCode } from '../openBook';
 import { ALL_BOOK_PARTS, type BookPart, type BookPartSet } from './parts';
 import { bookOf, readSlices, type BookRead, type ReadContext } from './slices';
@@ -57,16 +63,11 @@ export async function readMinerScope(
   const grouping = one('miners');
   const notices = Promise.all([
     book.written(LATE_NOTICES) ? byMiner<unknown>(LATE_NOTICES).catch(() => []) : [],
-    byMiner<unknown>(LEGACY_NOTICES),
+    readsLegacyNotices(book).then((reads) => (reads ? byMiner<unknown>(LEGACY_NOTICES) : [])),
   ]).then(([current, legacy]) => readLateNotices(current, legacy));
-  const characterIds = grouping.then((g) => {
-    const solo = /^solo:(\d+)$/.exec(minerId);
-    return Array.isArray(g?.characterIds)
-      ? (g.characterIds as number[])
-      : solo
-        ? [Number(solo[1])]
-        : [];
-  });
+  const characterIds = grouping.then((g) =>
+    characterIdsOfMiner(minerId, Array.isArray(g?.characterIds) ? [g as unknown as Miner] : [])
+  );
   const from = checkpoint.then((c) => accountWindowStart(c, settingsFrom(book.data).startDate));
 
   const rowsOf = (snap: { docs: { data: () => unknown }[] }) =>

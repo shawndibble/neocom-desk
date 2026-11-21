@@ -37,7 +37,7 @@ import { matchesStatedTransfer } from './corpTaxBookTransferMatch.js';
 import {
   NOTICE_ID_FIELD,
   isFinalNoticeId,
-  paymentCode,
+  minerPaymentCode,
   type LateNotice,
   type LateNoticeLine,
 } from './corpTaxBookLateNotice.js';
@@ -62,6 +62,7 @@ import {
 import {
   CLAIM_CHECK_RESULTS,
   DISPUTE_KINDS,
+  LIVE_CHECK_ACTION_NAMES,
   NOTICE_AFTER_KINDS,
   TAX_CONTACT_MAX_CHARACTERS,
   TRANSFER_RECIPIENTS,
@@ -808,21 +809,9 @@ export interface RecordedAccount {
 export type CloseCredit = { kind: 'refund' } | { kind: 'forfeit'; basis: ForfeitBasis };
 
 /** Dismissals, write-offs, rebills and "not tax" re-check the role live (D7). */
-export const LIVE_CHECK_ACTIONS: ReadonlySet<EditAction['action']> = new Set([
-  'dismiss',
-  'dismissRecords',
-  'dismissDispute',
-  'reverseDismissal',
-  'reverseAdjustment',
-  'editAdjustment',
-  'reverseWriteOff',
-  'setToleranceExemption',
-  'writeOff',
-  'rebill',
-  'markNotTax',
-  'resetCheckpoint',
-  'reassignPayment',
-]);
+export const LIVE_CHECK_ACTIONS: ReadonlySet<EditAction['action']> = new Set(
+  LIVE_CHECK_ACTION_NAMES satisfies readonly EditAction['action'][]
+);
 
 /** A close that forfeits credit writes value off, so it re-checks the role live too (#4184). */
 export function needsLiveCheck(action: EditAction): boolean {
@@ -1452,7 +1441,8 @@ function parseNoticeLine(raw: unknown): LateNoticeLine {
 
 /**
  * A Late notice from an officer's tab (decision 20261120-235011). What it listed is summed here
- * from its lines, and its Reason code is the one its id hashes to; who may read it, who issued it
+ * from its lines, and its Reason code is the Miner's one code (`minerPaymentCode`), as the mail
+ * asks for; who may read it, who issued it
  * and its mail state are the server's to set, so they start empty. A final notice is never issued
  * here: only closing the account sends one.
  */
@@ -1462,7 +1452,7 @@ export function parseLateNotice(raw: Record<string, unknown>): LateNotice {
   oneOf(raw.kind, 'notice.kind', ['late'] as const);
   if (isFinalNoticeId(id))
     throw new HttpsError('invalid-argument', 'only closing an account sends a final notice');
-  const code = paymentCode(id);
+  const code = minerPaymentCode(minerId);
   if (raw.code !== undefined && raw.code !== code)
     throw new HttpsError('invalid-argument', `notice.code must be ${code}`);
   const lines = list(raw.lines, 'notice.lines', 5000).map(parseNoticeLine);

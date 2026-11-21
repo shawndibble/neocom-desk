@@ -10,7 +10,7 @@ vi.mock('@/sync/syncAuth', () => ({ ensureSignedIn: vi.fn().mockResolvedValue(un
 const token = vi.hoisted(() => vi.fn());
 vi.mock('@/auth/session', () => ({ getValidAccessToken: token }));
 
-import { bookFeederFrom, reclaimBook } from './bookClient';
+import { bookFeederFrom, editBook, reclaimBook } from './bookClient';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -28,6 +28,23 @@ describe('reclaimBook', () => {
       action: 'reclaimCorpTaxBookCallable',
       data: { corporationId: 98000001, accessToken: 'access-token' },
     });
+  });
+});
+
+describe('editBook', () => {
+  it.each(['reassignPayment', 'resetCheckpoint', 'writeOff'])(
+    'sends the access token with %s, which the server re-checks live',
+    async (action) => {
+      fns.callable.mockResolvedValue({ data: {} });
+      await editBook(7, 98000001, { action });
+      expect(fns.callable.mock.calls[0]?.[0].data).toMatchObject({ accessToken: 'access-token' });
+    }
+  );
+
+  it('sends no token with an edit the role cache covers', async () => {
+    fns.callable.mockResolvedValue({ data: {} });
+    await editBook(7, 98000001, { action: 'assignPayment' });
+    expect(token).not.toHaveBeenCalled();
   });
 });
 

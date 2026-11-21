@@ -425,8 +425,14 @@ async function reassignUnmatched(
     regrouped: boolean;
   }
 ): Promise<{ assigned: number; error?: string }> {
+  // One held as ambiguous waits for an officer, or for the server to resolve it again (M8).
   const open = args.before.payments
-    .filter((p) => p.minerId === undefined && !(p.notTaxAmount && p.notTaxAmount > 0))
+    .filter(
+      (p) =>
+        p.minerId === undefined &&
+        p.reviewReason !== 'ambiguous' &&
+        !(p.notTaxAmount && p.notTaxAmount > 0)
+    )
     .sort((a, b) => a.at.localeCompare(b.at));
   if (open.length === 0) return { assigned: 0 };
   let assigned = 0;

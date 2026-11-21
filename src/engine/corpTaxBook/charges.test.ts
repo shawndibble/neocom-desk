@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { buildDayCharges, characterIdsOfMiner, minerIdFor, type Miner } from './charges';
+import {
+  bookMinersOf,
+  buildDayCharges,
+  characterIdsOfMiner,
+  minerIdFor,
+  type Miner,
+} from './charges';
 import type { ObservedMiningEntry } from './types';
 import type { TaxRate } from './rates';
 
@@ -45,6 +51,20 @@ describe('characterIdsOfMiner', () => {
     expect(characterIdsOfMiner('m1', miners)).toEqual([1, 2]);
     expect(characterIdsOfMiner('solo:7', miners)).toEqual([7]);
     expect(characterIdsOfMiner('gone', miners)).toEqual([]);
+  });
+});
+
+describe('bookMinersOf', () => {
+  const group: Miner = { id: 'g1', characterIds: [1, 2], mainCharacterId: 2 };
+  it('lists each grouping and each Miner of its own the book names, once', () => {
+    expect(bookMinersOf([group], ['g1', 'solo:3', 'solo:3', 'solo:1'])).toEqual([
+      group,
+      { id: 'solo:3', characterIds: [3], mainCharacterId: 3 },
+    ]);
+  });
+
+  it('keeps a grouping no list names, and skips an id it cannot read', () => {
+    expect(bookMinersOf([group], ['bad', 'solo:x'])).toEqual([group]);
   });
 });
 

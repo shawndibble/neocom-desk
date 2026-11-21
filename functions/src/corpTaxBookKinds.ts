@@ -132,3 +132,25 @@ export const AUDIT_ACTIONS = [
   'feederViewDismissed',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
+
+/**
+ * Edit actions that re-check the caller's roles live (D7): dismissals, write-offs, rebills, "not
+ * tax", moving a payment and resetting a checkpoint. The callable refuses them on the 10-minute
+ * role cache, so the client sends its access token with each. One list for both sides
+ * (`LIVE_CHECK_ACTIONS` on the server, `needsLiveToken` on the client), so they cannot drift.
+ */
+export const LIVE_CHECK_ACTION_NAMES = [
+  'dismiss',
+  'dismissRecords',
+  'dismissDispute',
+  'reverseDismissal',
+  'reverseAdjustment',
+  'editAdjustment',
+  'reverseWriteOff',
+  'setToleranceExemption',
+  'writeOff',
+  'rebill',
+  'markNotTax',
+  'resetCheckpoint',
+  'reassignPayment',
+] as const;

@@ -122,6 +122,21 @@ export function disputeHold(
   return Date.parse(now) < until ? { until: new Date(until).toISOString() } : undefined;
 }
 
+/**
+ * Whether a dispute is this Miner's: it names them, or (filed before a regroup, under the Miner it
+ * was then) one of its lines is one of their characters' records.
+ */
+export function isMinersDispute(
+  dispute: Pick<OreDispute, 'minerId' | 'lines'>,
+  minerId: string,
+  characterIds: readonly number[]
+): boolean {
+  return (
+    dispute.minerId === minerId ||
+    dispute.lines.some((l) => characterIds.some((c) => l.recordKey.startsWith(`${c}:`)))
+  );
+}
+
 /** The disputes Needs you still lists: unanswered, with a line no active dismissal covers. Oldest day first. */
 export function disputesToShow(
   disputes: readonly OreDispute[],

@@ -171,12 +171,10 @@ describe('the account ledger row menus', () => {
     expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
   });
 
-  it('offers a mined day only what its status allows: a paid day can be repriced, not dismissed', async () => {
-    const calls = renderLedger(running());
+  it('gives a paid day no menu: its one action, Change rate, is in the page menu', () => {
+    renderLedger(running());
     fireEvent.contextMenu(rowOf(/^Moon mining/));
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Change rate' }));
-    await vi.waitFor(() => expect(calls[0]).toMatch(/^rate:/));
-    expect(screen.queryByRole('menuitem', { name: 'Dismiss tax' })).toBeNull();
+    expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
   });
 
   it('offers a payment not tax and a move to another Miner, and the move opens its dialog', async () => {

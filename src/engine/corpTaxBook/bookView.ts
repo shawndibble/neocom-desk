@@ -7,7 +7,7 @@
  * `charges`, `openSet`, `minerRunningAccount`, `overdue` and `extraction`; this
  * module only joins them per Miner, per day and per Extraction.
  */
-import type { LateNotice } from '../../../functions/src/corpTaxBookLateNotice';
+import { NOTICE_ID_FIELD, type LateNotice } from '../../../functions/src/corpTaxBookLateNotice';
 import type { RunningAccountCheckpoint } from '../../../functions/src/corpTaxBookCheckpoint';
 import type { Adjustment } from './adjustments';
 import { savedPrice } from './billableLines';
@@ -15,7 +15,7 @@ import type { FeederReadClock } from './feederHealth';
 import type { DayCharge, Miner } from './charges';
 import type { FeederCoverage } from './coverage';
 import { activeDismissalFor, type Dismissal } from './dismissals';
-import type { OreDispute } from './disputes';
+import { disputeHold, isMinersDispute, type OreDispute } from './disputes';
 import {
   chunkRateFor,
   extractionStatus,
@@ -146,6 +146,8 @@ export interface DayRow {
   owed?: number;
   /** A `not-billable` day held while this moon owner's ledger cannot be read (#6210). */
   heldBy?: number;
+  /** An `owed` day an open dispute holds: nothing pays it or bills it until the dispute ends. */
+  disputed?: { disputeId: string; until: string };
   /** The newest late notice that listed the day. */
   noticeId?: string;
   dismissalId?: string;
@@ -312,7 +314,7 @@ export function noticeOverdue(
     issuedAt: notice.issuedAt,
     settled,
     now: view.input.now,
-    declarations: view.input.declarations.filter((d) => d.statementId === notice.id),
+    declarations: view.input.declarations.filter((d) => d[NOTICE_ID_FIELD] === notice.id),
     overdueDays: view.input.overdueDays,
   });
 }
@@ -349,6 +351,15 @@ export function buildBookView(input: BookViewInput): BookView {
     const noticeBy = new Map<string, string>();
     for (const n of notices) for (const line of n.lines) noticeBy.set(line.key, n.id);
     const through = input.checkpoints?.get(id)?.through;
+    /** The open dispute that holds a date, and until when. */
+    const disputeOf = (date: string) => {
+      for (const d of input.disputes ?? []) {
+        if (d.date !== date || !isMinersDispute(d, id, characterIds)) continue;
+        const hold = disputeHold(d, input.now);
+        if (hold) return { disputeId: d.id, until: hold.until };
+      }
+      return undefined;
+    };
 
     const days: DayRow[] = mine
       .map((c): DayRow => {
@@ -361,6 +372,7 @@ export function buildBookView(input: BookViewInput): BookView {
         else if (day ? day.settled : through !== undefined && c.date <= through) status = 'paid';
         else status = 'owed';
         const heldBy = status === 'not-billable' ? heldByOf(c.date) : undefined;
+        const disputed = status === 'owed' && day?.held ? disputeOf(c.date) : undefined;
         const noticeId = noticeBy.get(c.key);
         return {
           key: c.key,
@@ -378,6 +390,7 @@ export function buildBookView(input: BookViewInput): BookView {
           status,
           ...(status === 'owed' ? { owed: account.owedOf(c.date, c.taxOwed) } : {}),
           ...(heldBy !== undefined ? { heldBy } : {}),
+          ...(disputed ? { disputed } : {}),
           ...(noticeId ? { noticeId } : {}),
           ...(dismissal ? { dismissalId: dismissal.id } : {}),
         };
@@ -433,7 +446,7 @@ export function buildBookView(input: BookViewInput): BookView {
     byMiner.set(id, { ...settled, days });
 
     for (const d of input.declarations) {
-      if (d.resolution || !notices.some((n) => n.id === d.statementId)) continue;
+      if (d.resolution || !notices.some((n) => n.id === d[NOTICE_ID_FIELD])) continue;
       needsYou.push({ kind: 'declaration', declaration: d, minerId: id, owed });
     }
     if (overdueDays !== null && overdueNoticeId && standing !== 'left') {
@@ -619,6 +632,8 @@ export interface MinerDetail {
   }[];
   dismissals: Dismissal[];
   declarations: Declaration[];
+  /** The Miner's disputes, answered or not. */
+  disputes: OreDispute[];
   credit: number;
   /** The checkpoint the account is built from: what came before it is summed up in it. */
   checkpoint?: RunningAccountCheckpoint;
@@ -693,7 +708,10 @@ export function minerDetail(view: BookView, minerId: string): MinerDetail | unde
     heldDays: [...inner.account.byDay].filter(([, d]) => d.held).map(([date]) => date),
     officerWriteOffs: officerWriteOffsOf(view, minerId, inner),
     dismissals,
-    declarations: view.input.declarations.filter((d) => noticeIds.has(d.statementId)),
+    declarations: view.input.declarations.filter((d) => noticeIds.has(d[NOTICE_ID_FIELD])),
+    disputes: (view.input.disputes ?? []).filter((d) =>
+      isMinersDispute(d, minerId, inner.characterIds)
+    ),
     credit: inner.account.credit,
     ...(inner.account.input.checkpoint ? { checkpoint: inner.account.input.checkpoint } : {}),
   };

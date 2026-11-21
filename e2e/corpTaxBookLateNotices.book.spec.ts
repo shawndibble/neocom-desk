@@ -80,11 +80,9 @@ test('an officer issues the planned late notice, and it is mailed', async ({ pag
     .toBe(1);
 });
 
-// Once the queue has mailed it and the book recorded the mail, the table still reads "1 of 1 not
-// mailed" until the page is reloaded: nothing re-reads the book after `recordMail`.
-test.fixme('the Notices sent table shows the notice as mailed once it is sent', async ({
-  page,
-}) => {
+// Once the queue has mailed it and the book recorded the mail, the page reads the book again
+// (`useReloadOnRecordedMail`).
+test('the Notices sent table shows the notice as mailed once it is sent', async ({ page }) => {
   const notice = await issueCorasNotice(page);
   await expect
     .poll(async () => {
@@ -107,9 +105,8 @@ test('the verify link shows what the Miner owes now, without a login', async ({ 
   await expect(page.getByRole('main')).toContainText(isk(book.ada.owed));
 });
 
-// The mail asks for the Miner's code (`minerPaymentCode`, lateNoticeMailing.ts), but the verify
-// page's Pay section prints the notice's own code (`notice.code`, VerifyPage.tsx): two codes.
-test.fixme('the pay section gives the Miner the same code the mail did', async ({ page }) => {
+// One code per Miner: the mail asks for `minerPaymentCode`, and the server stores it on the notice.
+test('the pay section gives the Miner the same code the mail did', async ({ page }) => {
   const notice = await issueCorasNotice(page);
   await page.goto(`./corp-tax-book/verify/${notice.token}`);
   await expect(page.getByRole('main')).toContainText(

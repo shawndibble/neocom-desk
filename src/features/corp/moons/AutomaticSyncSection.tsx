@@ -175,7 +175,6 @@ function lastRunLine(t: ReturnType<typeof useTranslation>['t'], run: ScheduledSy
       age,
       rows: run.observedRows ?? 0,
       donations: run.donationsAdded ?? 0,
-      settled: run.settled ?? 0,
     }),
     ...(missing.length > 0
       ? [t('corpTaxBook.moons.autoSync.couldNotRead', { sources: missing.join(', ') })]

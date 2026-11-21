@@ -178,6 +178,7 @@ import {
   lateNoticeRefusal,
   legacyStatementDocOf,
   lineKey,
+  minerPaymentCode,
 } from './corpTaxBookLateNotice.js';
 import {
   dbReader,
@@ -2898,7 +2899,10 @@ async function closeAccount(
       fail('failed-precondition', "Only a guest's account can be closed", 'not-a-guest');
   }
 
-  const statement = action.statement ? parseStatement(action.statement) : undefined;
+  // The final notice asks for the Miner's one code, like every notice (decision 20261120-235011).
+  const statement = action.statement
+    ? { ...parseStatement(action.statement), code: minerPaymentCode(action.minerId) }
+    : undefined;
   if (statement && statement.minerId !== action.minerId)
     fail('invalid-argument', "Statement is another Miner's", 'wrong-miner');
   if (statement) refuseCalendarStatement(statement);

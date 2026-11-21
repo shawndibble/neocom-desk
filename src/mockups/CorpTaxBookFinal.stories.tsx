@@ -90,7 +90,7 @@ import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
  *
  * One story throughout: today is 18 Oct 2026 14:00 EVE, an officer synced the
  * book at 12:00 (2h ago), so every day through 17 Oct is Billable. The Aug
- * Statements went out on 1 Sep (due 15 Sep); the Sep Statements are about to
+ * Late notices went out on 1 Sep (due 15 Sep); the Sep Late notices are about to
  * be sent; Oct is open.
  *
  * `/corp/moons` keeps D21's three tabs. Every drill-down is a page of its own
@@ -104,7 +104,7 @@ import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
  *   opens the Miner's page, which also carries the Miner's activity feed.
  * - **Dialogs** (steps 5 to 9): Dismiss, Record payment, Mark not tax on the
  *   Miner page, and Reject declaration and Assign a donation from Needs you.
- * - **Statements** is a Check, Send, Done run that carries EVE's mail-limit
+ * - **Late notices** is a Check, Send, Done run that carries EVE's mail-limit
  *   notice; "Preview mail" opens the full per-line mail in a dialog. Write-offs
  *   (tolerance, lines recorded after payment) show under the periods table.
  * - The **progress chip** in the page header opens the queue as a popover; on
@@ -120,7 +120,7 @@ import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
  *   and Terms come first.
  *
  * New components in this mockup: `ExtractionTimeline`, `NeedsYouQueue`,
- * `StatementRun`, `StatementMailPreview`, `MailQueueChip` (with its phone
+ * `LateNoticeRun`, `LateNoticeMailPreview`, `MailQueueChip` (with its phone
  * percent badge), `CorpBookDiff`, `CorpBookSyncNote`. The personal tab's new
  * Status pill values (Pending corp record, Billed, Sent waiting for the corp,
  * Conflict, Unattributed, Dismissed by corp) extend the existing
@@ -414,7 +414,7 @@ const minerColumns: DataTableColumn<Miner>[] = [
   },
   {
     id: 'unbilled',
-    header: 'Next Statement',
+    header: 'Owed',
     align: 'right',
     className: 'tabular-nums',
     render: (row) => (row.unbilled ? isk(row.unbilled) : '—'),
@@ -446,7 +446,7 @@ function MinersF({ chip, dialog }: { chip?: QueueItem[]; dialog?: MinersDialog }
           value={`${isk(MINER_TOTALS.overdue)} · ${MINER_TOTALS.overdueCount} Miners`}
           tone="danger"
         />
-        <StatChip label="Next Statement" value={isk(MINER_TOTALS.unbilled)} />
+        <StatChip label="Owed" value={isk(MINER_TOTALS.unbilled)} />
         <StatChip label="Credit held" value={isk(MINER_TOTALS.credit)} />
       </StatChips>
       <NeedsYouQueue />
@@ -495,7 +495,7 @@ function MinerDetailF({ dialog }: { dialog?: MinerDialog }) {
     header: '',
     className: 'w-8',
     render: (row) =>
-      row.status === 'Next Statement' || row.status === 'Not Billable yet' ? (
+      row.status === 'Owed' || row.status === 'Not Billable yet' ? (
         <label className={touchCheckboxLabelClassName}>
           <Checkbox
             aria-label={`Select ${row.date} ${row.ore}`}
@@ -532,7 +532,7 @@ function MinerDetailF({ dialog }: { dialog?: MinerDialog }) {
         <StatChip label="Owed" value={isk(ledger.owed)} tone="danger" emphasis />
         <StatChip label="Overdue since" value="15 Sep · 33 days" tone="danger" />
         <StatChip
-          label="Next Statement"
+          label="Owed"
           value={isk(VARRO.unbilled)}
           tooltip={`Sep 2026, not sent yet: ${isk(VARRO.sepNew)}. Oct 2026 so far, Billable through 17 Oct: ${isk(VARRO.octNew)}. 18 Oct (${isk(VARRO.pending)}) is not Billable yet.`}
           tooltipGlyph="info"
@@ -592,8 +592,8 @@ function MinerDetailF({ dialog }: { dialog?: MinerDialog }) {
           density="compact"
         />
         <p className="border-t border-line px-3 py-2 text-xs text-text-dim tabular-nums">
-          Aug 2026 Statement {isk(ledger.augBilled)} − credited {isk(ledger.credited)} − written off{' '}
-          {isk(ledger.toleranceWriteOff)} ={' '}
+          Aug 2026 Late notice {isk(ledger.augBilled)} − credited {isk(ledger.credited)} − written
+          off {isk(ledger.toleranceWriteOff)} ={' '}
           <span className="text-text">{isk(ledger.owed)} owed</span>
         </p>
       </Panel>
@@ -654,7 +654,7 @@ function MinerDetailF({ dialog }: { dialog?: MinerDialog }) {
   );
 }
 
-// ---------------------------------------------------------------- Statements
+// ---------------------------------------------------------------- Late notices
 
 const periodColumns: DataTableColumn<StatementPeriod>[] = [
   {
@@ -856,7 +856,7 @@ function NeedsYouQueue() {
           <QueueCard
             tone="danger"
             title={`Varro Kestane · overdue 33 days · ${isk(VARRO.owed)}`}
-            body="Aug 2026 Statement. Reminder sent 15 Oct. 16 Oct donation from Lysa Kestane: 5,000,000, of which 1,000,000 is marked not tax."
+            body="Aug 2026 Late notice. Reminder sent 15 Oct. 16 Oct donation from Lysa Kestane: 5,000,000, of which 1,000,000 is marked not tax."
             actions={
               <>
                 <Button size="sm">Send reminder…</Button>
@@ -894,7 +894,7 @@ function NeedsYouQueue() {
   );
 }
 
-// ---------------------------------------------------------------- Statement run
+// ---------------------------------------------------------------- Late notice run
 
 type RunStep = 'check' | 'send' | 'sending' | 'done';
 
@@ -927,14 +927,14 @@ function StepDot({
   );
 }
 
-function StatementRun({ step, queue }: { step: RunStep; queue: QueueItem[] }) {
+function LateNoticeRun({ step, queue }: { step: RunStep; queue: QueueItem[] }) {
   const order: RunStep[] = ['check', 'send', 'sending', 'done'];
   const at = order.indexOf(step);
   const stateOf = (i: number) => (at > i ? 'done' : at === i ? 'now' : 'next');
   return (
-    <NewComponent name="StatementRun">
+    <NewComponent name="LateNoticeRun">
       <Panel
-        title="Sep 2026 Statements"
+        title="Sep 2026 Late notices"
         meta={
           <span className="text-xs text-text-dim">
             Sep is fully Billable · synced {BOOK.lastSynced}
@@ -949,11 +949,11 @@ function StatementRun({ step, queue }: { step: RunStep; queue: QueueItem[] }) {
         {step === 'check' && (
           <div className="space-y-3 text-sm">
             <StatChips>
-              <StatChip label="Statements" value={`${SEP_RUN.statements} to send`} emphasis />
+              <StatChip label="Late notices" value={`${SEP_RUN.statements} to send`} emphasis />
               <StatChip
                 label="Balances due"
                 value={isk(SEP_RUN.balances)}
-                tooltip="Carried from the Aug Statements plus Sep's lines, less credit"
+                tooltip="Carried from the Aug Late notices plus Sep's lines, less credit"
                 tooltipGlyph="info"
               />
               <StatChip label="Below 5,000,000" value={`${SEP_RUN.belowMinimum} roll into Oct`} />
@@ -971,7 +971,7 @@ function StatementRun({ step, queue }: { step: RunStep; queue: QueueItem[] }) {
               </li>
               <li className="flex items-center gap-2">
                 <Icon.Warn size={Icon.ICON_SIZE.sm} className="text-warning" aria-hidden />1
-                Unmatched donation; it is not on anyone&apos;s Statement until assigned
+                Unmatched donation; it is not on anyone&apos;s Late notice until assigned
               </li>
             </ul>
             <div className="flex flex-wrap gap-2">
@@ -988,7 +988,7 @@ function StatementRun({ step, queue }: { step: RunStep; queue: QueueItem[] }) {
             </p>
             <MailLimitNotice count={SEP_RUN.statements} />
             <div className="flex flex-wrap gap-2">
-              <Button variant="primary">Send {SEP_RUN.statements} Statements</Button>
+              <Button variant="primary">Send {SEP_RUN.statements} Late notices</Button>
               <Button variant="ghost">Back</Button>
             </div>
           </div>
@@ -1008,10 +1008,10 @@ function StatementRun({ step, queue }: { step: RunStep; queue: QueueItem[] }) {
 
 // ---------------------------------------------------------------- Mail preview
 
-function StatementMailPreview() {
+function LateNoticeMailPreview() {
   const m = VARRO_MAIL_STATEMENT;
   return (
-    <NewComponent name="StatementMailPreview">
+    <NewComponent name="LateNoticeMailPreview">
       <div className="space-y-2 rounded-xs border border-line bg-bg p-3 font-mono text-xs leading-relaxed">
         <p>
           <span className="text-text-dim">To:</span> {m.to}
@@ -1019,7 +1019,7 @@ function StatementMailPreview() {
           <span className="text-text-dim">Subject:</span> {m.subject}
         </p>
         <p>
-          Hi {m.to}, here is your {CORP.name} moon tax Statement for Sep 2026.
+          Hi {m.to}, here is your {CORP.name} moon tax Late notice for Sep 2026.
         </p>
         <table className="w-full tabular-nums">
           <thead>
@@ -1053,8 +1053,8 @@ function StatementMailPreview() {
             owed).
           </strong>
           <br />
-          Donate to {CORP.name}; any of your characters counts. Code {m.code} pins it to this
-          Statement.
+          Donate to {CORP.name}; any of your characters counts. Code {m.code} pins it to this Late
+          notice.
           <br />
           The link has every line&apos;s pricing, terms and payments:{' '}
           <span className="text-accent underline">{m.verify}</span>
@@ -1063,9 +1063,9 @@ function StatementMailPreview() {
     </NewComponent>
   );
 }
-// ---------------------------------------------------------------- Statements page
+// ---------------------------------------------------------------- Late notices page
 
-function StatementsF({
+function LateNoticesF({
   step,
   preview,
   queue = QUEUE_RUNNING,
@@ -1083,14 +1083,14 @@ function StatementsF({
       <MoonsHeader lead={running ? <ChipF items={queue} open={queueOpen} /> : undefined} />
       <MoonsTabs value="statements" />
       <BookHealthStrip />
-      <StatementRun step={step} queue={queue} />
+      <LateNoticeRun step={step} queue={queue} />
       <Panel
         title="All periods"
         meta={<span className="text-xs text-text-dim">Monthly · minimum 5,000,000 ISK</span>}
         padded={false}
       >
         <DataTable
-          label="Statement periods"
+          label="Late notices sent"
           columns={periodColumns}
           rows={PERIODS}
           rowKey={(row) => row.id}
@@ -1120,7 +1120,7 @@ function StatementsF({
           </div>
         }
       >
-        <StatementMailPreview />
+        <LateNoticeMailPreview />
       </Modal>
     </Page>
   );
@@ -1141,7 +1141,7 @@ function PhoneChipButton({ items }: { items: QueueItem[] }) {
     <NewComponent name="MailQueueChip (phone)">
       <button
         type="button"
-        aria-label={`Statements: ${percent}% sent${done ? ', done' : ''}${c.failed ? `, ${c.failed} failed` : ''}`}
+        aria-label={`Late notices: ${percent}% sent${done ? ', done' : ''}${c.failed ? `, ${c.failed} failed` : ''}`}
         className="relative inline-flex size-11 items-center justify-center rounded-xs border border-line hover:bg-panel-2"
       >
         <Icon.MailSent size={Icon.ICON_SIZE.md} aria-hidden="true" />
@@ -1183,7 +1183,7 @@ function ChipF({ items, open }: { items: QueueItem[]; open?: boolean }) {
         <Modal
           open={Boolean(open)}
           onClose={() => {}}
-          title="Sep 2026 Statements"
+          title="Sep 2026 Late notices"
           placement="sheet-full"
         >
           {body}
@@ -1199,7 +1199,7 @@ function ChipF({ items, open }: { items: QueueItem[]; open?: boolean }) {
         <Popover open={Boolean(open)}>
           <PopoverTrigger asChild>{button}</PopoverTrigger>
           <PopoverContent align="end" className="w-[34rem] max-w-[90vw] space-y-3 p-3">
-            <p className="text-sm font-semibold">Sep 2026 Statements</p>
+            <p className="text-sm font-semibold">Sep 2026 Late notices</p>
             <QueueSummary items={items} />
             <div className="max-h-[28rem] overflow-y-auto">
               <QueueTable items={items} />
@@ -1283,20 +1283,20 @@ export const AssignDonation = corp(() => <MinersF dialog="assign" />);
 /** @summary 9 · Assign a donation, phone. */
 export const AssignDonationPhone = corp(() => <MinersF dialog="assign" />, true);
 
-/** @summary 10 · Statements: the Sep 2026 run at Check, periods and write-offs below. New component: StatementRun. */
-export const Statements = corp(() => <StatementsF step="check" />);
-/** @summary 10 · Statements, phone. */
-export const StatementsPhone = corp(() => <StatementsF step="check" />, true);
+/** @summary 10 · Late notices: the Sep 2026 run at Check, periods and write-offs below. New component: LateNoticeRun. */
+export const LateNotices = corp(() => <LateNoticesF step="check" />);
+/** @summary 10 · Late notices, phone. */
+export const LateNoticesPhone = corp(() => <LateNoticesF step="check" />, true);
 
-/** @summary 11 · Preview mail: the short Statement mail (date, refinery, mined value, tax, total, code, verify link), in a dialog. New component: StatementMailPreview. */
-export const PreviewMail = corp(() => <StatementsF step="check" preview />);
+/** @summary 11 · Preview mail: the short Late notice mail (date, refinery, mined value, tax, total, code, verify link), in a dialog. New component: LateNoticeMailPreview. */
+export const PreviewMail = corp(() => <LateNoticesF step="check" preview />);
 /** @summary 11 · Preview mail, phone: a full-height sheet. */
-export const PreviewMailPhone = corp(() => <StatementsF step="check" preview />, true);
+export const PreviewMailPhone = corp(() => <LateNoticesF step="check" preview />, true);
 
 /** @summary 12 · Send: step 2 of the run with EVE's mail limit, "19 mails take about 4 minutes". */
-export const SendNotice = corp(() => <StatementsF step="send" />);
+export const SendNotice = corp(() => <LateNoticesF step="send" />);
 /** @summary 12 · Send, phone. */
-export const SendNoticePhone = corp(() => <StatementsF step="send" />, true);
+export const SendNoticePhone = corp(() => <LateNoticesF step="send" />, true);
 
 /** @summary 13 · Progress chip in the page header while sending, here on the Miners tab. New component: MailQueueChip. */
 export const ProgressChip = corp(() => <MinersF chip={QUEUE_RUNNING} />);
@@ -1304,15 +1304,15 @@ export const ProgressChip = corp(() => <MinersF chip={QUEUE_RUNNING} />);
 export const ProgressChipPhone = corp(() => <MinersF chip={QUEUE_RUNNING} />, true);
 
 /** @summary 14 · Queue: the chip's popover, sent, paused, waiting, failed with Retry / Open in EVE. */
-export const Queue = corp(() => <StatementsF step="sending" queueOpen />);
+export const Queue = corp(() => <LateNoticesF step="sending" queueOpen />);
 /** @summary 14 · Queue, phone: the same list as a full-height sheet. */
-export const QueuePhone = corp(() => <StatementsF step="sending" queueOpen />, true);
+export const QueuePhone = corp(() => <LateNoticesF step="sending" queueOpen />, true);
 
 /** @summary 15 · Queue done: the run at Done, the one failure still retryable. */
-export const QueueDone = corp(() => <StatementsF step="done" queue={QUEUE_DONE} queueOpen />);
+export const QueueDone = corp(() => <LateNoticesF step="done" queue={QUEUE_DONE} queueOpen />);
 /** @summary 15 · Queue done, phone. */
 export const QueueDonePhone = corp(
-  () => <StatementsF step="done" queue={QUEUE_DONE} queueOpen />,
+  () => <LateNoticesF step="done" queue={QUEUE_DONE} queueOpen />,
   true
 );
 
