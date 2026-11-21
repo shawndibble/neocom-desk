@@ -11,9 +11,8 @@
  */
 import { newest, type BookView } from './bookView';
 import {
-  lateNoticeFromStatementDoc,
   listedKeys,
-  mergeNoticeMail,
+  mergeNoticeDocs,
   noticeDocId,
   minerPaymentCode,
   type LateNotice,
@@ -182,22 +181,5 @@ export function readLateNotices(
   noticeDocs: readonly unknown[],
   legacyDocs: readonly unknown[]
 ): LateNotice[] {
-  const byId = new Map<string, LateNotice>();
-  for (const raw of legacyDocs) {
-    // Every legacy doc the book still reads is a notice, as the server reads it (`fromLegacy`).
-    const notice = isRecord(raw)
-      ? lateNoticeFromStatementDoc({ ...raw, kind: 'notice' })
-      : undefined;
-    if (notice?.id && notice.minerId) byId.set(notice.id, notice);
-  }
-  for (const raw of noticeDocs) {
-    if (!isRecord(raw) || typeof raw.id !== 'string' || typeof raw.minerId !== 'string') continue;
-    if (!Array.isArray(raw.lines) || !isRecord(raw.mail)) continue;
-    const notice = { ...raw } as unknown as LateNotice & { updatedAt?: unknown };
-    delete notice.updatedAt;
-    // A mail change an older tab wrote to only one copy still counts (`mergeNoticeMail`).
-    const old = byId.get(notice.id);
-    byId.set(notice.id, old ? { ...notice, mail: mergeNoticeMail(notice.mail, old.mail) } : notice);
-  }
-  return [...byId.values()];
+  return mergeNoticeDocs(noticeDocs.filter(isRecord), legacyDocs.filter(isRecord));
 }
