@@ -63,7 +63,13 @@ export function activeLedgerFilters(
 export function ledgerWhat(row: PayeeLedgerRow, t: Translate): string {
   switch (row.kind) {
     case 'charge':
-      if (row.charge.kind === 'correction') return t('miningTax.ledger.what.correction');
+      if (row.reversal) return t('miningTax.ledger.what.reversal');
+      if (row.charge.kind === 'correction')
+        return t(
+          row.charge.opening
+            ? 'miningTax.ledger.what.openingBalance'
+            : 'miningTax.ledger.what.correction'
+        );
       return row.charge.place
         ? t('miningTax.ledger.what.minedAt', { place: row.charge.place })
         : t('miningTax.ledger.what.mined');
@@ -72,7 +78,9 @@ export function ledgerWhat(row: PayeeLedgerRow, t: Translate): string {
         ? t('miningTax.ledger.what.paymentFrom', { name: row.payment.from })
         : t('miningTax.ledger.what.payment');
     case 'writeOff':
-      return t(`miningTax.ledger.what.${row.cause}`);
+      return row.reversal
+        ? t('miningTax.ledger.what.reversal')
+        : t(`miningTax.ledger.what.${row.cause}`);
     case 'notice':
       return t(`miningTax.ledger.what.${row.notice.kind}`);
     case 'opening':

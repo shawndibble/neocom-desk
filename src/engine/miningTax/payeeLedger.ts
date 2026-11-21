@@ -36,6 +36,13 @@ export interface LedgerCharge {
   ore?: readonly OreLine[];
   /** An Adjustment's reason. */
   reason?: string;
+  /** An Adjustment that is the balance rolled over from another system. */
+  opening?: boolean;
+  /**
+   * An Adjustment an officer undid: the account no longer counts it. It stays, struck through,
+   * with a reversal row on the day it was undone, so the balance nets out.
+   */
+  reversed?: { at: string; reason?: string };
 }
 
 /** A payment the account counted, by its id there. Its amount and the days it paid come from the account. */
@@ -56,6 +63,8 @@ export interface LedgerWriteOff {
   at: string;
   amount: number;
   reason?: string;
+  /** Undone by an officer: the account counts nothing of it; shown with its reversal. */
+  reversed?: { at: string; reason?: string };
 }
 
 /** A late notice sent (a `LateNotice` fits): an event, never an amount. */
@@ -84,6 +93,8 @@ export interface PayeeLedgerSource {
   writeOffs?: readonly LedgerWriteOff[];
   /** Absent for a personal Payee. */
   notices?: readonly LedgerNotice[];
+  /** Mined but not billable yet: shown beside the ledger, never in its balance. */
+  notYetBilled?: { tax: number; days: number };
 }
 
 export type PayeeLedgerKind = 'charge' | 'payment' | 'writeOff' | 'notice';
@@ -100,6 +111,10 @@ interface RowBase {
   paid: number;
   /** The balance after it; negative is credit. */
   balance: number;
+  /** A record an officer undid: shown struck through, its reversal follows on the day undone. */
+  reversed?: boolean;
+  /** The row undoing a reversed record. */
+  reversal?: boolean;
 }
 
 export type PayeeLedgerRow =
@@ -140,6 +155,8 @@ export interface PayeeLedger {
   status: PayeeLedgerStatus;
   /** Money ahead of every billed day. */
   credit: number;
+  /** Mined but not billable yet, outside the balance. */
+  notYetBilled: { tax: number; days: number };
 }
 
 /** A row before the running balance. */
@@ -194,7 +211,12 @@ export function payeeLedger(source: PayeeLedgerSource): PayeeLedger {
     balance += moves ? row.charged - row.paid : 0;
     return { ...row, balance } as PayeeLedgerRow;
   });
-  return { rows: balanced, status: statusOf(account), credit: account.credit };
+  return {
+    rows: balanced,
+    status: statusOf(account),
+    credit: account.credit,
+    notYetBilled: source.notYetBilled ?? { tax: 0, days: 0 },
+  };
 }
 
 function statusOf(account: LedgerAccount): PayeeLedgerStatus {
@@ -204,15 +226,37 @@ function statusOf(account: LedgerAccount): PayeeLedgerStatus {
 }
 
 function chargeRows({ account, charges }: PayeeLedgerSource): Unbalanced[] {
-  return charges.map((charge) => ({
-    kind: 'charge',
-    key: `charge:${charge.id}`,
-    date: charge.date,
-    charged: charge.tax,
-    paid: 0,
-    charge,
-    held: account.byDay.get(charge.date)?.held ?? false,
-  }));
+  return charges.flatMap((charge): Unbalanced[] => {
+    const row: Unbalanced = {
+      kind: 'charge',
+      key: `charge:${charge.id}`,
+      date: charge.date,
+      charged: charge.tax,
+      paid: 0,
+      charge,
+      held: !charge.reversed && (account.byDay.get(charge.date)?.held ?? false),
+      ...(charge.reversed ? { reversed: true } : {}),
+    };
+    if (!charge.reversed) return [row];
+    // Undone: the original stays, struck through, and this row takes it back off.
+    return [
+      row,
+      {
+        kind: 'charge',
+        key: `charge:${charge.id}:reversal`,
+        date: dayOf(charge.reversed.at),
+        at: charge.reversed.at,
+        charged: -charge.tax,
+        paid: 0,
+        charge: {
+          ...charge,
+          ...(charge.reversed.reason ? { reason: charge.reversed.reason } : {}),
+        },
+        held: false,
+        reversal: true,
+      },
+    ];
+  });
 }
 
 function paymentRows({ account, payments = [] }: PayeeLedgerSource): Unbalanced[] {
@@ -236,35 +280,70 @@ function paymentRows({ account, payments = [] }: PayeeLedgerSource): Unbalanced[
   });
 }
 
-/** What officer write-offs forgave, poured into them in the order they were recorded. */
+/**
+ * What officer write-offs forgave, poured into them in the order they were recorded. One an
+ * officer undid forgave nothing: it shows its amount, and its reversal takes it back.
+ */
 function officerWriteOffRows({ account, writeOffs = [] }: PayeeLedgerSource): Unbalanced[] {
   const forgiven = account.applications.writeOffs.map((d) => ({ ...d }));
   let head = 0;
-  return [...writeOffs]
-    .sort((a, b) => a.at.localeCompare(b.at))
-    .map((w) => {
-      const days: DayAmount[] = [];
-      let left = Math.max(0, w.amount);
-      while (left > 0 && head < forgiven.length) {
-        const day = forgiven[head]!;
-        const take = Math.min(left, day.amount);
-        days.push({ date: day.date, amount: take });
-        day.amount -= take;
-        left -= take;
-        if (day.amount <= 0) head += 1;
-      }
-      return {
+  const reversedRows = writeOffs
+    .filter((w) => w.reversed)
+    .flatMap((w): Unbalanced[] => [
+      {
         kind: 'writeOff',
         cause: 'officer',
         key: `writeOff:${w.id}`,
         date: dayOf(w.at),
         at: w.at,
         charged: 0,
-        paid: days.reduce((sum, d) => sum + d.amount, 0),
-        days,
+        paid: Math.max(0, w.amount),
+        days: [],
         ...(w.reason ? { reason: w.reason } : {}),
-      };
-    });
+        reversed: true,
+      },
+      {
+        kind: 'writeOff',
+        cause: 'officer',
+        key: `writeOff:${w.id}:reversal`,
+        date: dayOf(w.reversed!.at),
+        at: w.reversed!.at,
+        charged: Math.max(0, w.amount),
+        paid: 0,
+        days: [],
+        ...(w.reversed!.reason ? { reason: w.reversed!.reason } : {}),
+        reversal: true,
+      },
+    ]);
+  return [
+    ...reversedRows,
+    ...[...writeOffs]
+      .filter((w) => !w.reversed)
+      .sort((a, b) => a.at.localeCompare(b.at))
+      .map((w): Unbalanced => {
+        const days: DayAmount[] = [];
+        let left = Math.max(0, w.amount);
+        while (left > 0 && head < forgiven.length) {
+          const day = forgiven[head]!;
+          const take = Math.min(left, day.amount);
+          days.push({ date: day.date, amount: take });
+          day.amount -= take;
+          left -= take;
+          if (day.amount <= 0) head += 1;
+        }
+        return {
+          kind: 'writeOff',
+          cause: 'officer',
+          key: `writeOff:${w.id}`,
+          date: dayOf(w.at),
+          at: w.at,
+          charged: 0,
+          paid: days.reduce((sum, d) => sum + d.amount, 0),
+          days,
+          ...(w.reason ? { reason: w.reason } : {}),
+        };
+      }),
+  ];
 }
 
 /**

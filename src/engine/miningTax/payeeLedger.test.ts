@@ -234,3 +234,72 @@ describe('payeeLedger', () => {
     ]);
   });
 });
+
+describe('payeeLedger: what an officer’s page needs (C3)', () => {
+  it('shows a reversed correction struck through, with its reversal on the day it was undone', () => {
+    const charges = [
+      charge('a', '2026-10-01', 1_000_000),
+      charge('c1', '2026-10-02', 300_000, {
+        kind: 'correction',
+        reason: 'Auth rollover',
+        reversed: { at: '2026-10-05T10:00:00Z', reason: 'Entered twice' },
+      }),
+    ];
+    // The account no longer counts the reversed correction.
+    const account = MinerRunningAccount.build({
+      days: [{ date: '2026-10-01', tax: 1_000_000 }],
+      payments: [],
+    });
+    const ledger = payeeLedger({ account, charges });
+    expect(
+      ledger.rows.map((r) => [
+        r.date,
+        r.key,
+        r.charged,
+        r.balance,
+        r.reversed ?? false,
+        r.reversal ?? false,
+      ])
+    ).toEqual([
+      ['2026-10-01', 'charge:a', 1_000_000, 1_000_000, false, false],
+      ['2026-10-02', 'charge:c1', 300_000, 1_300_000, true, false],
+      ['2026-10-05', 'charge:c1:reversal', -300_000, 1_000_000, false, true],
+    ]);
+    expect(ledger.rows.at(-1)!.balance).toBe(account.balance);
+  });
+
+  it('shows a reversed officer write-off and its reversal, forgiving nothing on balance', () => {
+    const charges = [charge('a', '2026-10-01', 1_000_000)];
+    const account = MinerRunningAccount.build({
+      days: [{ date: '2026-10-01', tax: 1e6 }],
+      payments: [],
+    });
+    const ledger = payeeLedger({
+      account,
+      charges,
+      writeOffs: [
+        {
+          id: 'w1',
+          at: '2026-10-03T00:00:00Z',
+          amount: 400_000,
+          reason: 'Left',
+          reversed: { at: '2026-10-04T00:00:00Z', reason: 'Came back' },
+        },
+      ],
+    });
+    expect(ledger.rows.map((r) => [r.key, r.charged, r.paid, r.balance])).toEqual([
+      ['charge:a', 1_000_000, 0, 1_000_000],
+      ['writeOff:w1', 0, 400_000, 600_000],
+      ['writeOff:w1:reversal', 400_000, 0, 1_000_000],
+    ]);
+  });
+
+  it('carries the figure not billed yet, outside the balance', () => {
+    const src = source(MINED, []);
+    expect(payeeLedger({ ...src, notYetBilled: { tax: 500, days: 1 } }).notYetBilled).toEqual({
+      tax: 500,
+      days: 1,
+    });
+    expect(payeeLedger(src).notYetBilled).toEqual({ tax: 0, days: 0 });
+  });
+});

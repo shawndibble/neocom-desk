@@ -51,7 +51,7 @@ test('a payment short within the tolerance closes the day and writes the gap off
     .or(page.getByRole('cell', { name: MINER.ada.name }))
     .first()
     .click();
-  const adjustment = ledgerRow(page, /Market adjustment/);
+  const adjustment = ledgerRow(page, /Shortfall forgiven/);
   await expect(adjustment).toContainText(isk(2 * DAY_TAX - b.paid));
   expect(2 * DAY_TAX - b.paid).toBeLessThanOrEqual(DAY_TOLERANCE);
   await expect(page.getByRole('heading', { name: 'Owed days · 0' })).toBeVisible();

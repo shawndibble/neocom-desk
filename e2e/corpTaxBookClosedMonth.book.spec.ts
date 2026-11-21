@@ -52,8 +52,9 @@ test('a Miner whose history passes a closed month reads the same totals', async 
   const book = closedMonthBook({ checkpointed: true });
   await emulator.seed(book.seed.docs());
   await openMiner(page, book.minerId, MINER.ada.name);
+  // The one Payee ledger opens on the checkpoint: "Balance through <day>".
   await expect(page.getByRole('table', { name: 'Account ledger' })).toContainText(
-    'Closed months, through this day'
+    'Balance through'
   );
   await expectTotals(page, book);
 });
