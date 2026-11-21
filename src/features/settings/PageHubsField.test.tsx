@@ -5,7 +5,7 @@ import '@/i18n';
 import { db } from '@/db';
 import { useHubByCharacter } from '@/features/market/characterHubs';
 import { useDefaultMarketHub, useMarketHub } from '@/features/market/hub';
-import { PAGE_HUB_AREAS, usePageHubs } from '@/features/market/pageHubs';
+import { PAGE_HUB_AREAS, usePageHubs, useParkedPageHubs } from '@/features/market/pageHubs';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { PageHubsField } from './PageHubsField';
 
@@ -20,7 +20,12 @@ beforeEach(async () => {
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   useMarketHub.setState({ value: 'jita', hydrated: false });
   usePageHubs.setState({ value: {}, hydrated: false });
-  await Promise.all([usePageHubs.getState().hydrate(), useMarketHub.getState().hydrate()]);
+  useParkedPageHubs.setState({ value: {}, hydrated: false });
+  await Promise.all([
+    usePageHubs.getState().hydrate(),
+    useParkedPageHubs.getState().hydrate(),
+    useMarketHub.getState().hydrate(),
+  ]);
 });
 
 describe('PageHubsField', () => {
@@ -68,5 +73,24 @@ describe('PageHubsField', () => {
     await waitFor(() => expect(usePageHubs.getState().value).toEqual({ contracts: 'hek' }));
     // Undo closes its own toast.
     expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull();
+  });
+
+  it('lists a hub set aside by the page’s popover, edits it there, and Remove forgets it', async () => {
+    await useParkedPageHubs.getState().setValue({ skills: 'rens' });
+    render(<PageHubsField />);
+    expect(screen.getByRole('combobox', { name: 'Trade Hub for Skills' })).toHaveTextContent(
+      'Rens'
+    );
+    expect(screen.getByText('Using your Trade Hub for now')).toBeInTheDocument();
+    // Not offered to add: it already has one.
+    await userEvent.click(screen.getByRole('button', { name: /Add page hub/ }));
+    expect(screen.queryByRole('menuitem', { name: 'Skills' })).toBeNull();
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(screen.getByRole('button', { name: 'Remove Skills hub' }));
+    await waitFor(() => expect(useParkedPageHubs.getState().value).toEqual({}));
+    expect(usePageHubs.getState().value).toEqual({ contracts: 'hek' });
+    await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    await waitFor(() => expect(useParkedPageHubs.getState().value).toEqual({ skills: 'rens' }));
+    expect(usePageHubs.getState().value).toEqual({ contracts: 'hek' });
   });
 });

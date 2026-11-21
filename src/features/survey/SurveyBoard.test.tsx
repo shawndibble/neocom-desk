@@ -109,7 +109,9 @@ describe('SurveyBoard', () => {
     expect(screen.getByText(/87% left/)).toBeTruthy();
     // 169 units left at the market price, summed (the scanner's own ISK is ignored).
     // The figure is an `IskAmount`: shorthand on screen, the exact value one hover away.
-    expect(screen.getByText('ISK left').parentElement?.textContent).toMatch(/33\.\d+M/);
+    expect(screen.getByText('ISK left at last scan').parentElement?.textContent).toMatch(
+      /33\.\d+M/
+    );
     expect(await screen.findByTestId('charts')).toBeTruthy();
   });
 

@@ -8,7 +8,7 @@
 import { useTranslation } from 'react-i18next';
 import { Popover, PopoverContent, PopoverTrigger, textActionClassName } from '@/components/ui';
 import { formatEveClock } from '@/engine/survey/chatMessage';
-import type { SurveyScan } from '@/engine/survey/series';
+import { scanVolume, type SurveyScan } from '@/engine/survey/series';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatCount } from '@/lib/formatCount';
 
@@ -36,8 +36,6 @@ function oreLines(scan: SurveyScan): OreLine[] {
   return [...byOre.values()].sort((a, b) => b.volume - a.volume);
 }
 
-const volumeOf = (scan: SurveyScan): number => scan.rocks.reduce((sum, r) => sum + r.volume, 0);
-
 export function SurveyScanList({ scans, ignored, onSetIgnored }: SurveyScanListProps) {
   const { t } = useTranslation();
   const rows = [...scans].reverse();
@@ -64,7 +62,9 @@ export function SurveyScanList({ scans, ignored, onSetIgnored }: SurveyScanListP
                   {formatEveClock(scan.at)}
                 </span>
                 <span className="text-text-dim">
-                  {t('survey.scanList.volume', { volume: formatCompactNumber(volumeOf(scan)) })}
+                  {t('survey.scanList.volume', {
+                    volume: formatCompactNumber(scanVolume(scan.rocks)),
+                  })}
                 </span>
                 <span className="min-w-0 truncate text-text-dim">
                   {t('survey.scannedBy', { name: scan.by ?? t('survey.anonymous') })}

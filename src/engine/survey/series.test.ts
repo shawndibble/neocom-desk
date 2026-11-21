@@ -1,6 +1,12 @@
 import { MINUTE_MS } from '@/lib/age';
 import { describe, expect, it } from 'vitest';
-import { countedScans, summarizeSurvey, type SurveyScan } from './series';
+import {
+  countedScans,
+  firstCountedScan,
+  scanVolume,
+  summarizeSurvey,
+  type SurveyScan,
+} from './series';
 
 const T0 = Date.UTC(2026, 9, 8, 16, 40, 0);
 
@@ -321,5 +327,23 @@ describe('interval minedByOre', () => {
     const s = summarizeSurvey([scan(0, ['A', 400], ['B', 100]), scan(5, ['A', 300], ['C', 900])])!;
     expect(s.intervals[0].minedByOre).toEqual({ A: 100, B: 100 });
     expect(s.intervals[0].added).toBe(900);
+  });
+});
+
+describe('firstCountedScan', () => {
+  it('is the earliest counted scan whatever the stored order, skipping ignored ones', () => {
+    const early = { ...scan(0, ['Sylvite', 600]), id: 'early' };
+    const mid = { ...scan(10, ['Sylvite', 400]), id: 'mid' };
+    const late = { ...scan(20, ['Sylvite', 100]), id: 'late' };
+    expect(firstCountedScan([late, early, mid], new Set())).toBe(early);
+    expect(firstCountedScan([late, early, mid], new Set(['early']))).toBe(mid);
+    expect(firstCountedScan([], new Set())).toBeUndefined();
+  });
+});
+
+describe('scanVolume', () => {
+  it('sums rock volumes and skips a non-positive one', () => {
+    expect(scanVolume([{ volume: 600 }, { volume: 400 }, { volume: -5 }])).toBe(1000);
+    expect(scanVolume([])).toBe(0);
   });
 });

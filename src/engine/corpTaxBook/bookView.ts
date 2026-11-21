@@ -117,6 +117,8 @@ export interface BookViewInput {
   moonOwnerPricesOn?: (date: string) => ReadonlyMap<number, number>;
   /** Ore of chunks with no notification, estimated from a linked Moon Ore Survey (D13), by extraction id. */
   surveyOreLines?: ReadonlyMap<string, readonly OreLine[]>;
+  /** Extraction ids whose survey lines were sized by the survey's own measured volume, not a chunk rate. */
+  surveyMeasured?: ReadonlySet<string>;
   /** Current members, when the viewer can read the roster; else standing comes from the ledger. */
   memberIds?: ReadonlySet<number>;
 }
@@ -207,9 +209,12 @@ export interface ExtractionRow {
   /** Fracture and Expired as the engine plans them, set in every state, so a chunk not yet fractured still has a span to draw. */
   plannedFractureAt: string;
   plannedExpiresAt: string;
-  oreSource: 'notification' | 'survey' | 'unknown';
+  /** `mined`: no notification or survey, so the make-up is rebuilt from the ore mined after the chunk ended. */
+  oreSource: 'notification' | 'survey' | 'mined' | 'unknown';
   oreLines: OreLine[];
-  /** The chunk rate a survey estimate was made at (D13); absent for the other sources. */
+  /** A survey chunk whose ended extraction saw an ore mined past the survey's figure: that figure is a floor. */
+  oreCorrected?: boolean;
+  /** The chunk rate a survey estimate was guessed at (D13); absent for the other sources and for a measured volume. */
   chunkRate?: ChunkRate;
   estimatedValue: number | null;
   /** Share of the estimate already mined, 0-100; null when the make-up is unknown or it has not fractured. */
@@ -754,8 +759,9 @@ export type ExtractionRowBase = Omit<ExtractionRow, 'minedPct' | 'tax' | 'minerC
 
 type ExtractionRowInput = Pick<
   BookViewInput,
-  'now' | 'structureExpiryHours' | 'chunkM3PerHour' | 'surveyOreLines'
->;
+  'now' | 'structureExpiryHours' | 'chunkM3PerHour' | 'surveyOreLines' | 'surveyMeasured'
+> &
+  Partial<Pick<BookViewInput, 'entries'>>;
 
 /** One Extraction's row without the ledger-derived fields; the same rows the Overview schedule reads. */
 export function extractionRowBase(
@@ -771,10 +777,32 @@ export function extractionRowBase(
     ...(x.fullyMined ? { fullyMinedAt: x.fullyMined.at } : {}),
   });
   const planned = fractureAndExpiry(ex, expiryHours);
-  // Source order (D13): the ExtractionStarted notification, then a linked Survey.
+  // Source order (D13): the ExtractionStarted notification (exact, never corrected), then a
+  // linked Survey's first scan, then what was mined once the chunk has ended.
   const notified = x.oreLines ?? [];
   const surveyed = notified.length === 0 ? (input.surveyOreLines?.get(ex.id) ?? []) : [];
-  const oreLines: OreLine[] = [...(notified.length > 0 ? notified : surveyed)];
+  let oreSource: ExtractionRow['oreSource'] =
+    notified.length > 0 ? 'notification' : surveyed.length > 0 ? 'survey' : 'unknown';
+  let oreLines: OreLine[] = [...(notified.length > 0 ? notified : surveyed)];
+  let corrected = false;
+  const ended =
+    status.state === 'expired' ||
+    (status.state !== 'cancelled' && !!x.fullyMined && !!status.fracturedAt);
+  if (oreSource !== 'notification' && ended && input.entries) {
+    const mined = minedDuringExtraction(ex, input.entries, { expiryHours });
+    if (oreSource === 'survey') {
+      // Per ore, never in total: an ore mined past its survey figure raises that ore alone.
+      oreLines = oreLines.map((l) => {
+        const got = mined.find((m) => m.typeId === l.typeId)?.quantity ?? 0;
+        if (got <= l.quantity) return l;
+        corrected = true;
+        return { typeId: l.typeId, quantity: got };
+      });
+    } else if (mined.length > 0) {
+      oreSource = 'mined';
+      oreLines = mined;
+    }
+  }
   const estimatedValue = oreLines.length
     ? oreLines.reduce((sum, l) => sum + l.quantity * (todayPrices.get(l.typeId) ?? 0), 0)
     : null;
@@ -790,9 +818,10 @@ export function extractionRowBase(
     ...(status.expiresAt ? { expiresAt: status.expiresAt } : {}),
     plannedFractureAt: new Date(planned.fracturedAt).toISOString(),
     plannedExpiresAt: new Date(planned.expiresAt).toISOString(),
-    oreSource: notified.length > 0 ? 'notification' : surveyed.length > 0 ? 'survey' : 'unknown',
+    oreSource,
     oreLines,
-    ...(surveyed.length > 0
+    ...(corrected ? { oreCorrected: true } : {}),
+    ...(oreSource === 'survey' && !input.surveyMeasured?.has(ex.id)
       ? { chunkRate: chunkRateFor(chunkRates.get(x.structureId), input.chunkM3PerHour) }
       : {}),
     estimatedValue,

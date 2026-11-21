@@ -27,6 +27,15 @@ describe('searchMarketItems', () => {
     expect(ids(searchMarketItems(index, 'TRITANIUM', 10))).toEqual([3, 1, 5, 2]);
   });
 
+  it('finds a quoted name without typing the quotes, as a prefix match', () => {
+    const quoted = buildMarketItemIndex([
+      { typeId: 10, name: "Zeta 'Augmented' Wasp", marketGroupId: 1, volume: 1 },
+      { typeId: 11, name: "'Augmented' Wasp", marketGroupId: 1, volume: 1 },
+    ]);
+    expect(ids(searchMarketItems(quoted, 'augmented wasp', 10))).toEqual([11, 10]);
+    expect(ids(searchMarketItems(quoted, "'Augmented' wasp", 10))).toEqual([11, 10]);
+  });
+
   it('caps its answer', () => {
     expect(ids(searchMarketItems(index, 'tritanium', 2))).toEqual([3, 1]);
   });

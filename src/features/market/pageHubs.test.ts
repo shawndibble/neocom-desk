@@ -12,7 +12,14 @@ import {
   useMarketHub,
 } from './hub';
 import { useClosestHubs } from './closestHub';
-import { dropPageHub, ownChoice, parsePageHubs, setPageHub, usePageHubs } from './pageHubs';
+import {
+  dropPageHub,
+  ownChoice,
+  parsePageHubs,
+  setPageHub,
+  useParkedPageHubs,
+  usePageHubs,
+} from './pageHubs';
 
 describe('parsePageHubs', () => {
   it('keeps every entry as stored, even one this build cannot read, so writing it back loses nothing', () => {
@@ -59,6 +66,7 @@ async function reset(rows: { key: string; value: unknown }[]) {
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   useMarketHub.setState({ value: 'jita', hydrated: false });
   usePageHubs.setState({ value: {}, hydrated: false });
+  useParkedPageHubs.setState({ value: {}, hydrated: false });
   useGlobalClosest.setState({ value: false, hydrated: false });
   useClosestHubs.setState({ byCharacter: {} });
 }
@@ -100,7 +108,9 @@ describe('picking a hub for a page', () => {
   });
 
   it('switching to the page starts it at the hub in use, so nothing re-prices', async () => {
-    await setHubScope('contracts', 'global');
+    // Nothing set aside: the seeded `amarr` entry is forgotten, not parked.
+    await usePageHubs.getState().hydrate();
+    await usePageHubs.getState().setValue({});
     await useMarketHub.getState().setValue('hek');
     await setHubScope('contracts', 'page');
     expect(usePageHubs.getState().value).toEqual({ contracts: 'hek' });

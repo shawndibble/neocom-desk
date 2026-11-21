@@ -7658,7 +7658,7 @@
     "statTimeLeft": "Time left",
     "statTotalTime": "Total time",
     "statRocks": "Rocks left",
-    "statIsk": "ISK left",
+    "statIsk": "ISK left at last scan",
     "eveTime": "{{time}} EVE",
     "showLocalTime": "Show in your time zone",
     "showEveTime": "Show in EVE time (UTC)",
@@ -14960,7 +14960,7 @@
           "settings": "These preferences. Every other preference stays on this device:",
           "settingsDetail": {
             "notifications": "Notifications: your notification preferences.",
-            "defaults": "Defaults: trade hub (the default, the trade hub of each character, and the trade hub of each page you set one for, the price percent of each page, and whether to use the closest trade hub), industry facility, reaction facility, assumed ME/TE, PI expiring-soon window, corp dark threshold, default characters shown.",
+            "defaults": "Defaults: trade hub (the default, the trade hub of each character, the trade hub of each page you set one for (including ones switched back to your trade hub), the price percent of each page, and whether to use the closest trade hub), industry facility, reaction facility, assumed ME/TE, PI expiring-soon window, corp dark threshold, default characters shown.",
             "industry": "Industry: build groups and BPC Sourcing's hide auctions / hide PLEX.",
             "market": "Market: appraisal price %, ISK-per-LP value, courier collateral warning, item contract flag multiple, and the structure broker fees you typed.",
             "skills": "Skills: Alpha/Omega per character, the target skill plan, SP Extraction monitoring and its threshold, and which characters you marked as SP Farm. Clones: the names you gave your jump clones.",
@@ -15473,13 +15473,15 @@
     "tradeHubFor": "Trade Hub for {{name}}",
     "tradeHubApplyAll": "Apply default to all",
     "pageHubsLabel": "Page hubs",
-    "pageHubsNote": "Pages that price at their own Trade Hub instead of your Trade Hub above. Each page's hub menu can switch between the two.",
+    "pageHubsNote": "Pages with a Trade Hub of their own. A page's hub picker switches between its own hub and your Trade Hub above and keeps both; Remove forgets the page's own.",
     "pageHubFor": "Trade Hub for {{page}}",
     "pageHubAdd": "Add page hub",
     "pageHubAddOne": "Add {{page}} hub",
     "pageHubRemove": "Remove",
+    "pageHubParked": "Using your Trade Hub for now",
     "pageHubRemoveFor": "Remove {{page}} hub",
     "pageHubRemoved": "{{page}} uses your Trade Hub again",
+    "pageHubRemovedParked": "{{page}} hub removed",
     "pageHubUndo": "Undo",
     "courierCollateralLabel": "Flag courier collateral at",
     "courierCollateralHint": "Shows a High collateral warning when a courier contract's collateral is this many times its reward or more.",
@@ -16023,7 +16025,7 @@
       "groupTotals_other": "{{count, number}} items · {{value}} ISK",
       "emptyOffice": "Empty office",
       "nothingStored": "Nothing stored here",
-      "contentsOf": "Contents of {{place}}",
+      "showByItem": "Show by item",
       "stackValue": "{{value}} ISK",
       "divisionsInUse": "{{count}} of 7 divisions in use",
       "noMatchesTitle": "Nothing matches",
@@ -18301,6 +18303,7 @@
       "oreUnknown": "Ore unknown",
       "oreUnknownLabel": "Why the ore is unknown",
       "oreUnknownWhy": "The game sent no ore details for this chunk. A Survey can fill them in.",
+      "oreUnknownWhyOwnerGrant": "{{name}}'s permission doesn't include extraction notices, so the book can't read this chunk's ore. Ask the moon owner to grant again from their Moons page. A Survey can fill it in meanwhile.",
       "minedVsLeft": "{{mined}}% mined · {{left}}% left",
       "startedOn": "started {{date}}",
       "windowDays_one": "{{count}} day",
@@ -18344,7 +18347,9 @@
           "unknownWhy": "The book has no moon notification or survey for the Extraction started {{date}}, so the ore make-up can't be shown.",
           "source": {
             "notification": "From the moon notification",
-            "survey": "From a survey"
+            "survey": "From a survey",
+            "surveyCorrected": "From a survey, raised to what was mined",
+            "mined": "From what was mined"
           },
           "shareOf": "{{ore}} share",
           "cols": {
@@ -18575,6 +18580,7 @@
         "markedBy": "Marked fully mined by {{name}}, {{at}}.",
         "why": "Residue is ore that came off the rock but was never delivered (strip-miner waste, which becomes space dust). Until the moon is marked fully mined it cannot be told apart from ore nobody mined yet.",
         "noSource": "Loss needs the chunk's ore. Link a Survey above to see it.",
+        "unknownLoss": "Unknown: no notification or survey for this chunk.",
         "tableLabel": "Ore lost per ore",
         "cols": {
           "ore": "Ore",
@@ -18971,6 +18977,7 @@
         "autoGroupFailed": "The sync worked, but grouping this account's Characters failed: {{message}}",
         "couldNotRead": "The last sync could not read {{sources}}.",
         "couldNotReadDetail": "What it could not read may be out of date until a sync reads it again. Check the syncing character's corporation roles and EVE authorization.",
+        "couldNotReadOre": "The automatic sync's character needs the Station Manager role to read the book's Extractions and the ore in each chunk. Until then they update only when an officer with that role opens this page.",
         "reassignFailed": "The sync worked, but matching earlier unmatched payments to Miners failed: {{message}}",
         "scheduledStopped": "Automatic sync stopped: {{reason}}",
         "scheduledStoppedDetail": "Until someone turns it back on in the book's settings (Automatic sync), the book is only as fresh as the last officer sync.",
@@ -19170,7 +19177,8 @@
             "gone-quiet": "Gone quiet",
             "failed": "Could not connect",
             "needs-names": "No refinery names",
-            "names-not-shared": "No refinery names"
+            "names-not-shared": "No refinery names",
+            "needs-ore": "No chunk ore"
           }
         },
         "needs": {
@@ -19200,10 +19208,15 @@
           },
           "needs-names": {
             "text": "Refinery names aren't shown: this corp was connected before names were read. Log in again as its CEO to fix it. Coverage and billing don't change.",
+            "textBoth": "Refinery names and each chunk's ore aren't shown: this corp was connected before they were read. Log in again as its CEO to fix it. Coverage and billing don't change.",
             "action": "Grant again"
           },
           "names-not-shared": {
             "text": "Refinery names aren't shown. {{name}}'s CEO or an officer can grant them again from that corp's Moons page."
+          },
+          "needs-ore": {
+            "text": "Each chunk's ore isn't shown: this corp was connected before the extraction notices were read. Log in again as its CEO to fix it. Coverage and billing don't change.",
+            "action": "Grant again"
           },
           "grantNamed": "Grant again for {{name}}",
           "removeNamed": "Remove {{name}}",
@@ -19426,10 +19439,20 @@
           "hintLost": "The character who gave access lost the Accountant role or removed the access. EVE no longer holds the oldest unread mining, so it can never be counted. Reconnect to keep the rest.",
           "action": "Reconnect"
         },
-        "refineryNames": {
-          "title": "Refinery names not shared",
-          "hint": "Grant again to show your refinery names.",
-          "action": "Grant again"
+        "grantAgain": {
+          "action": "Grant again",
+          "names": {
+            "title": "Refinery names not shared",
+            "hint": "Grant again to show your refinery names."
+          },
+          "ore": {
+            "title": "Chunk ore not shared",
+            "hint": "Your permission doesn't include extraction notices. Grant again so the book shows the ore in each chunk."
+          },
+          "both": {
+            "title": "Refinery names and chunk ore not shared",
+            "hint": "Grant again to show your refinery names and the ore in each chunk."
+          }
         },
         "removal": {
           "title": "Removal pending, takes effect {{time}}",
@@ -19544,7 +19567,8 @@
         "couldNotRead": "It could not read {{sources}} that time.",
         "missing": {
           "extractions": "Extractions",
-          "donations": "donations"
+          "donations": "donations",
+          "ore": "Extractions and each chunk's ore"
         },
         "lastSkipped": "Last run {{age}} was skipped: {{reason}}.",
         "skipped": {

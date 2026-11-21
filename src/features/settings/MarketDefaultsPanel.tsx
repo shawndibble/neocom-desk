@@ -3,7 +3,7 @@ import { StructureFeesList } from '@/features/market/StructureFeesList';
 import { Fields, Panel } from '@/components/ui';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useDefaultMarketHub, useGlobalClosest, useMarketHub } from '@/features/market/hub';
-import { usePageHubs } from '@/features/market/pageHubs';
+import { usePageHubs, useParkedPageHubs } from '@/features/market/pageHubs';
 import { useHubByCharacter } from '@/features/market/characterHubs';
 import { TradeHubField } from '@/features/settings/TradeHubField';
 import { PageHubsField } from '@/features/settings/PageHubsField';
@@ -27,6 +27,7 @@ export function MarketDefaultsPanel() {
     useHubByCharacter,
     useMarketHub,
     usePageHubs,
+    useParkedPageHubs,
     useGlobalClosest
   );
   const collateralRatio = useCourierCollateralRatio((state) => state.value);

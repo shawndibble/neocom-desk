@@ -518,9 +518,21 @@ describe('syncCorpTaxBook', () => {
     });
     expect(d.loadEsiExtractions).not.toHaveBeenCalled();
     expect(d.loadDonations).not.toHaveBeenCalled();
-    expect(out).toMatchObject({ kind: 'synced', missing: ['donations'] });
+    expect(out).toMatchObject({ kind: 'synced', missing: ['ore', 'donations'] });
     // So members' "not credited" notes do not count this sync as one the donation missed.
     expect(vi.mocked(d.uploadSync).mock.calls[0][1].donationsRead).toBe(false);
+  });
+
+  it('says it read no chunk ore without Station_Manager, unless the corp has no refinery', async () => {
+    const noRole = deps({ verifyOfficer: vi.fn(async () => verdict({ isStationManager: false })) });
+    expect(await run(noRole)).toMatchObject({ kind: 'synced', missing: ['ore'] });
+    expect(noRole.loadMoonNotifications).not.toHaveBeenCalled();
+    const noRefinery = deps({
+      verifyOfficer: vi.fn(async () => verdict({ isStationManager: false })),
+      loadObserverFeed: vi.fn(async () => 'no-refineries' as const),
+    });
+    expect(await run(noRefinery)).toMatchObject({ kind: 'synced', missing: [] });
+    expect(await run(deps())).toMatchObject({ kind: 'synced', missing: [] });
   });
 
   it('tells the book whether it read the wallet: yes when it did, no when the read failed', async () => {

@@ -145,6 +145,11 @@ export interface FeederViewSummary {
    * grant again; absent on a view built before it existed.
    */
   refineryNamesGranted?: boolean;
+  /**
+   * The grant reads the Extraction started notifications, so each chunk's ore is known. False on a
+   * grant from before, so the page offers to grant again; absent while the record does not know.
+   */
+  chunkOreGranted?: boolean;
   /** The moon owner turned Pop Sharing off (#6222); absent on a view built before it existed. */
   popSharingOptedOut?: boolean;
   /**
@@ -279,6 +284,7 @@ export type FeederViewRecord = Pick<
   | 'refinerySystems'
   | 'refineryStructures'
   | 'readsStructureNames'
+  | 'readsNotifications'
   | 'popSharingOptOut'
 >;
 
@@ -485,6 +491,9 @@ export function buildFeederView(input: FeederViewInput): FeederView {
       ? { side: record.payeeSetBy.side, at: record.payeeSetBy.at }
       : null,
     refineryNamesGranted: record.readsStructureNames === true,
+    ...(record.readsNotifications !== undefined
+      ? { chunkOreGranted: record.readsNotifications }
+      : {}),
     ...(record.popSharingOptOut ? { popSharingOptedOut: true } : {}),
   };
   return {

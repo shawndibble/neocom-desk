@@ -11,7 +11,7 @@
  * numeral ("gyro 2" finds "Gyrostabilizer II"); and, with `ignoreSeparators`,
  * dashes and spaces ignored on both sides ("ttp2b" finds "TTP-2B").
  */
-import { compactKey, queryTokens, tokenPrefixMatchText } from './tokenSearch';
+import { compactKey, queryTokens, searchKey, tokenPrefixMatchText } from './tokenSearch';
 
 export interface RankedSearchOptions<T> {
   primary: (item: T) => string;
@@ -45,7 +45,7 @@ function rankOf<T>(
   if (primaryLower === q) return PRIMARY_EXACT;
   if (primaryLower.startsWith(q)) return PRIMARY_PREFIX;
   if (primaryLower.includes(q)) return PRIMARY_SUBSTRING;
-  if (options.secondary?.some((field) => field(item).toLowerCase().includes(q))) {
+  if (options.secondary?.some((field) => searchKey(field(item)).includes(q))) {
     return SECONDARY_ONLY;
   }
   if (tokens && tokenPrefixMatchText(primaryLower, tokens)) return TOKEN_PREFIX;
@@ -58,7 +58,7 @@ export function rankedSearch<T>(
   query: string,
   options: RankedSearchOptions<T>
 ): T[] {
-  const q = query.trim().toLowerCase();
+  const q = searchKey(query.trim());
   if (!q) return [];
 
   // Bucketed by rank rather than one sort over every match: a one-character
@@ -70,7 +70,7 @@ export function rankedSearch<T>(
   const buckets: { item: T; primaryText: string }[][] = [[], [], [], [], [], []];
   for (const item of items) {
     const primaryText = options.primary(item);
-    const rank = rankOf(item, options, primaryText.toLowerCase(), q, tokens, qCompact);
+    const rank = rankOf(item, options, searchKey(primaryText), q, tokens, qCompact);
     if (rank !== NO_MATCH) buckets[rank].push({ item, primaryText });
   }
 

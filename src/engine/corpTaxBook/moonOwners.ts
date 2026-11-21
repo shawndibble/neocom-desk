@@ -56,6 +56,8 @@ export interface MoonOwnerFeeder {
   removal?: { startedAt: number; startedByName: string; effectiveAt?: number };
   /** Whether its grant reads refinery names (#4654); absent until a read since then. */
   readsStructureNames?: boolean;
+  /** Whether its grant reads the Extraction started notifications (each chunk's ore); absent until a read says. */
+  readsNotifications?: boolean;
   payouts: readonly MoonOwnerPayout[];
 }
 
@@ -184,7 +186,15 @@ export interface MoonOwnerRow {
   sameOwner?: boolean;
   /** False when its grant predates the structure scope: rows fall back to systems and ids. */
   readsStructureNames?: boolean;
+  /** False when its grant predates the notifications scope: its chunks' ore stays unknown. */
+  readsNotifications?: boolean;
 }
+
+/** What the moon owner's grant reads, as far as a sync has said. */
+const grantReads = (f: MoonOwnerFeeder) => ({
+  ...(f.readsStructureNames !== undefined ? { readsStructureNames: f.readsStructureNames } : {}),
+  ...(f.readsNotifications !== undefined ? { readsNotifications: f.readsNotifications } : {}),
+});
 
 /**
  * Whether a row is on the pay list: whole ISK owed. A settled otherwise moon owner still owed what
@@ -450,7 +460,7 @@ function workFromSummary(
     ...(f.staleSince !== undefined ? { staleSince: f.staleSince } : {}),
     mode: settledNow ? 'settled-otherwise' : 'normal',
     ...(f.sameOwner ? { sameOwner: true } : {}),
-    ...(f.readsStructureNames !== undefined ? { readsStructureNames: f.readsStructureNames } : {}),
+    ...grantReads(f),
   };
 }
 
@@ -539,9 +549,7 @@ function work(
       ...(f.staleSince !== undefined ? { staleSince: f.staleSince } : {}),
       mode: settledNow ? 'settled-otherwise' : 'normal',
       ...(f.sameOwner ? { sameOwner: true } : {}),
-      ...(f.readsStructureNames !== undefined
-        ? { readsStructureNames: f.readsStructureNames }
-        : {}),
+      ...grantReads(f),
     },
   };
 }

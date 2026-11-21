@@ -101,6 +101,21 @@ export const usePageHubs = createSyncedSetting<PageHubMap>({
   parse: parsePageHubs,
 });
 
+export const PARKED_PAGE_HUBS_SETTING_KEY = 'sync.pageHubsParked';
+
+/**
+ * Page hubs set aside (issue #6531): a page switched to App setting in its hub
+ * popover keeps its own hub here, so switching back restores it. Only Settings'
+ * Remove forgets one. Its own map, not a flag beside `sync.pageHubs`: older
+ * builds read `sync.pageHubs` alone, and an entry left there would keep a page
+ * the pilot switched to App setting on its own hub in those builds.
+ */
+export const useParkedPageHubs = createSyncedSetting<PageHubMap>({
+  key: PARKED_PAGE_HUBS_SETTING_KEY,
+  defaultValue: {},
+  parse: parsePageHubs,
+});
+
 export function setPageHub(map: PageHubMap, area: PageHubArea, hub: HubChoice): PageHubMap {
   return { ...map, [area]: hub };
 }

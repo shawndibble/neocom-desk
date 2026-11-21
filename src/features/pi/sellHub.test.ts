@@ -42,4 +42,13 @@ describe('migratePiHub', () => {
     await migratePiHub();
     expect(usePageHubs.getState().value).toEqual({ pi: 'dodixie' });
   });
+
+  it('never turns back on a PI hub another device set aside (App setting)', async () => {
+    await db.settings.bulkPut([
+      { key: PI_SETTINGS_KEY, value: { ...DEFAULT_PI_SETTINGS, hub: 'amarr', hubChosen: true } },
+      { key: 'sync.pageHubsParked', value: { pi: 'dodixie' } },
+    ]);
+    await migratePiHub();
+    expect(usePageHubs.getState().value).toEqual({});
+  });
 });

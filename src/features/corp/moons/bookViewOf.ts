@@ -30,7 +30,7 @@ export function bookViewInputOf(
   now: string,
   data: BookData,
   prices: BookPrices,
-  extra: Pick<BookViewInput, 'memberIds' | 'surveyOreLines'> = {}
+  extra: Pick<BookViewInput, 'memberIds' | 'surveyOreLines' | 'surveyMeasured'> = {}
 ): BookViewInput {
   const s = data.settings;
   return {
@@ -68,6 +68,7 @@ export function bookViewInputOf(
     moonOwnerPricesOn: prices.moonOwnerPricesOn,
     memberIds: extra.memberIds,
     surveyOreLines: extra.surveyOreLines,
+    surveyMeasured: extra.surveyMeasured,
   };
 }
 
@@ -83,8 +84,19 @@ registerTestReset(() => heldPrices.clear());
 
 const heldKey = (data: BookData) => `${data.settings.hubId}:${data.settings.oreForm}`;
 
-function typeIdsOf(data: BookWithRefinery, priced: BookData['observed']): Set<number> {
-  const typeIds = new Set<number>(priced.map((r) => r.typeId));
+/** The ore types a survey stands in for: priced and named like the notified ones. */
+export function surveyTypeIdsOf(lines: BookViewInput['surveyOreLines']): ReadonlySet<number> {
+  const ids = new Set<number>();
+  for (const ls of lines?.values() ?? []) for (const l of ls) ids.add(l.typeId);
+  return ids;
+}
+
+function typeIdsOf(
+  data: BookWithRefinery,
+  priced: BookData['observed'],
+  extra: ReadonlySet<number> = new Set()
+): Set<number> {
+  const typeIds = new Set<number>([...priced.map((r) => r.typeId), ...extra]);
   for (const x of data.state.extractions) for (const l of x.oreLines ?? []) typeIds.add(l.typeId);
   // A refinery page reads no ledger row: the ore its moon docs hold is priced all the same.
   for (const d of data.refinery?.docs.values() ?? [])
@@ -108,9 +120,13 @@ export async function cachedBookPrices(data: BookWithRefinery): Promise<BookPric
 }
 
 /** The unit prices every loaded row and Extraction needs, as the view's two lookups. */
-export async function loadBookPrices(data: BookWithRefinery, from?: string): Promise<BookPrices> {
+export async function loadBookPrices(
+  data: BookWithRefinery,
+  from?: string,
+  extraTypeIds?: ReadonlySet<number>
+): Promise<BookPrices> {
   const priced = from !== undefined ? data.observed.filter((r) => r.date >= from) : data.observed;
-  const typeIds = typeIdsOf(data, priced);
+  const typeIds = typeIdsOf(data, priced, extraTypeIds);
   const dates = new Set<string>(priced.map((r) => r.date));
   const loadedOn = utcDay();
   dates.add(loadedOn);

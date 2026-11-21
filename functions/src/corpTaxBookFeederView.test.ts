@@ -495,6 +495,14 @@ describe('buildFeederView', () => {
     const granted = buildFeederView(input({ record: record({ readsStructureNames: true }) }));
     expect(granted.summary.refineryNamesGranted).toBe(true);
   });
+
+  it('says whether the grant reads the Extraction notices; absent while the record does not know', () => {
+    expect('chunkOreGranted' in buildFeederView(input()).summary).toBe(false);
+    const old = buildFeederView(input({ record: record({ readsNotifications: false }) }));
+    expect(old.summary.chunkOreGranted).toBe(false);
+    const granted = buildFeederView(input({ record: record({ readsNotifications: true }) }));
+    expect(granted.summary.chunkOreGranted).toBe(true);
+  });
 });
 
 describe('review fixes', () => {

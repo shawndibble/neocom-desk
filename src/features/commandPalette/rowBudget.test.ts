@@ -31,6 +31,10 @@ describe('matchTier', () => {
     expect(matchTier('Nocaldarix', 'caldari')).toBe(2);
     expect(matchTier('Settings', 'caldari')).toBe(3);
   });
+
+  it('ignores quote marks on both sides', () => {
+    expect(matchTier("'Augmented' Wasp", 'augmented wasp')).toBe(0);
+  });
 });
 
 describe('rankGroups', () => {

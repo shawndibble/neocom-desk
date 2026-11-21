@@ -125,12 +125,15 @@ describe('alertedSharedPops', () => {
     expect(await alertedSharedPops(7)).toEqual([{ pop: pop(), moonName: 'Ainsan IV - Moon 2' }]);
   });
 
-  it('leaves out a muted sharing corporation and a pop for another audience', async () => {
+  it('leaves out a pop for another audience', async () => {
     mocks.loadSharedPopsCached.mockResolvedValue([pop({ viewerCharacterIds: [8] })]);
     expect(await alertedSharedPops(7)).toEqual([]);
+  });
+
+  it('keeps a muted sharing corporation: dismissing the pop must not let its event alert', async () => {
     mocks.loadSharedPopsCached.mockResolvedValue([pop()]);
     setPrefs({ mutedSharedPopCorporations: [98000001] });
-    expect(await alertedSharedPops(7)).toEqual([]);
+    expect(await alertedSharedPops(7)).toEqual([{ pop: pop(), moonName: 'Ainsan IV - Moon 2' }]);
   });
 
   it('returns none when Shared moon pop alerts are off for the Character, so the event keeps alerting', async () => {

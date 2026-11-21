@@ -3,6 +3,7 @@
 _Recorded 2026-11-21 · issue #6531._
 
 - **The hub picker is a popover, on every page.** Market hub settings (App setting · <page>), Market hub (Closest on its own row, then a 2×3 grid), then the page's percent. A menu cannot hold a text field, and one shared control reads the same everywhere. Rules out a PI-only popover.
+- **Switching to App setting sets the page's own hub aside; switching back restores it.** Only Settings › Page hubs' Remove forgets it (owner, after using it: toggling lost the page's hub). The set-aside hub lives in its own synced map `sync.pageHubsParked`, not as a flag beside `sync.pageHubs`, so older builds, which read `sync.pageHubs` alone, also see the page on the Global hub. Settings lists set-aside hubs too, noted "Using your Trade Hub for now".
 - **On App setting a hub pick still moves the Global hub.** The owner wants the popover to be a quick way to change the app-wide hub. Rules out "a pick on App setting gives the page its own hub".
 - **One percent per page, whichever hub the page uses, default 100.** Stored in `sync.pagePricePercents`, never in `sync.pageHubs`, so switching between App setting and the page keeps the rate. The page passes the side it prices on; that only names the field (Buy percent / Sell percent), e.g. Contracts' own buy/sell flip changes the label, not the value.
 - **Applied where each page reads its prices, never inside the shared price lookups.** Those are cached per station and shared by every page, so scaling there would leak one page's percent into another.
