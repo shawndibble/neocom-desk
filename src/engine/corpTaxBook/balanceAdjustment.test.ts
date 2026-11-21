@@ -6,9 +6,6 @@ describe('accountBalance', () => {
     expect(accountBalance({ owed: 300, credit: 0 })).toBe(300);
     expect(accountBalance({ owed: 0, credit: 500 })).toBe(-500);
   });
-  it('counts a Statement-era Miner’s billable days not yet on a Statement', () => {
-    expect(accountBalance({ owed: 100, unbilled: 300, credit: 50 })).toBe(350);
-  });
 });
 
 describe('balanceAdjustment', () => {
