@@ -65,6 +65,7 @@ import {
   LIVE_CHECK_ACTION_NAMES,
   NOTICE_AFTER_KINDS,
   NOTICE_RULE_BOUNDS,
+  PAYMENT_NOTE_MAX,
   TAX_CONTACT_MAX_CHARACTERS,
   TRANSFER_RECIPIENTS,
   type NoticeRules,
@@ -830,7 +831,8 @@ const reason = (v: unknown) => boundedString(v, 'reason', 500);
 /** Optional reason: absent or blank stores nothing. */
 const optReason = (v: unknown) =>
   v === undefined || (typeof v === 'string' && v.trim() === '') ? undefined : reason(v);
-const optNote = (v: unknown) => (v === undefined ? undefined : boundedString(v, 'note', 500));
+const optNote = (v: unknown) =>
+  v === undefined ? undefined : boundedString(v, 'note', PAYMENT_NOTE_MAX);
 const optNextStep = (v: unknown) =>
   v === undefined ? undefined : boundedString(v, 'nextStep', 500);
 /** A Late notice's id, as `noticeId` or by the old name an older client still sends. */

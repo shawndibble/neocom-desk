@@ -10,8 +10,17 @@
  */
 import { UNKNOWN_ACTION } from '../../../../functions/src/callableManifest';
 import { callableErrorReason } from '@/lib/callableError';
-import { LATE_NOTICES, LEGACY_NOTICES } from '@/engine/corpTaxBook/noticeCollections';
-import { LIVE_CHECK_ACTION_NAMES } from '../../../../functions/src/corpTaxBookKinds';
+import {
+  LEGACY_NOTICE_MAIL_KIND,
+  LIVE_CHECK_ACTION_NAMES,
+} from '../../../../functions/src/corpTaxBookKinds';
+import {
+  LATE_NOTICES,
+  LATE_NOTICE_LINKS,
+  STATEMENTS as LEGACY_NOTICES,
+  STATEMENT_LINKS as LEGACY_NOTICE_LINKS,
+  RUNNING_ACCOUNT_CHECKPOINTS,
+} from '../../../../functions/src/corpTaxBookVersionKeys';
 import { parseBookSettings, type BookSettings } from '@/engine/corpTaxBook/bookDocs';
 import type { DivisionNames } from '@/engine/corpTaxBook/divisionNames';
 import type { PayeeSetBy } from '@/engine/corpTaxBook/payeeChange';
@@ -731,15 +740,8 @@ export async function deleteBook(characterId: number, corporationId: number): Pr
   await callSignedIn(characterId, 'deleteCorpTaxBookCallable', { corporationId, accessToken });
 }
 
-/** Where the book keeps its late notices (`noticeCollections.ts`), and their verify links. */
-export { LATE_NOTICES, LEGACY_NOTICES };
-const LATE_NOTICE_LINKS = 'lateNoticeLinks';
 /** The action servers older than `issueLateNotice` take a late notice through (and audit it as). */
 export const LEGACY_ISSUE_ACTION = 'issueStatement';
-/** The mail kind the legacy `recordMail` action takes for a late notice's first mail. */
-const LEGACY_NOTICE_MAIL_KIND = 'statement';
-/** Where servers older than the `lateNotices` collection keep a late notice's verify link. */
-const LEGACY_NOTICE_LINKS = 'statementLinks';
 
 /**
  * The book's late notices: the `lateNotices` docs, and the legacy docs older servers wrote them
@@ -781,8 +783,8 @@ export async function readsLegacyNotices(book: OpenBook): Promise<boolean> {
 
 /** Each Miner's closed-through checkpoint; none until the server has written one. Best effort. */
 export async function readCheckpoints(book: OpenBook): Promise<RunningAccountCheckpoint[]> {
-  return book.written('accountCheckpoints')
-    ? book.list<RunningAccountCheckpoint>('accountCheckpoints').catch(() => [])
+  return book.written(RUNNING_ACCOUNT_CHECKPOINTS)
+    ? book.list<RunningAccountCheckpoint>(RUNNING_ACCOUNT_CHECKPOINTS).catch(() => [])
     : [];
 }
 

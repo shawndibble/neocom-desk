@@ -24,7 +24,10 @@ import { chunk } from '@/lib/chunk';
 import { readDisputes } from '@/engine/corpTaxBook/disputes';
 import {
   LATE_NOTICES,
-  LEGACY_NOTICES,
+  RUNNING_ACCOUNT_CHECKPOINTS,
+  STATEMENTS as LEGACY_NOTICES,
+} from '../../../../../functions/src/corpTaxBookVersionKeys';
+import {
   bookDeclarationOf,
   readsLegacyNotices,
   settingsFrom,
@@ -57,9 +60,9 @@ export async function readMinerScope(
   };
   // Best effort: a server that keeps no checkpoints yet, or rules that predate them, read none.
   const checkpoint = (async () => {
-    if (!book.written('accountCheckpoints')) return undefined;
+    if (!book.written(RUNNING_ACCOUNT_CHECKPOINTS)) return undefined;
     try {
-      return (await one('accountCheckpoints')) as RunningAccountCheckpoint | undefined;
+      return (await one(RUNNING_ACCOUNT_CHECKPOINTS)) as RunningAccountCheckpoint | undefined;
     } catch {
       return undefined;
     }

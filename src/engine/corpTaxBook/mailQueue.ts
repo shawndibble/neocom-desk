@@ -1,4 +1,5 @@
 import { MINUTE_MS } from '@/lib/age';
+import { LEGACY_NOTICE_MAIL_KIND } from '../../../functions/src/corpTaxBookKinds';
 /**
  * The Corp Tax Book send queue's rules (D16, issue #4064). Pure: the runner
  * (`features/corpTaxBook/mailQueueRunner.ts`) owns the clock, ESI and Dexie and
@@ -39,12 +40,14 @@ export type MailKind =
   | 'vetting-result'
   | 'vetting-request';
 
-/** The kind a late notice's mail was queued under before it was renamed: a queue may still hold one. */
-const LEGACY_NOTICE_MAIL = 'statement';
-
-/** Only a late notice's mail is logged on the notice; other kinds have none to log on. */
-export const isLateNoticeMail = (kind: string): kind is 'notice' | 'reminder' =>
-  kind === 'notice' || kind === 'reminder' || kind === LEGACY_NOTICE_MAIL;
+/**
+ * Only a late notice's mail is logged on the notice; other kinds have none to log on. A queue may
+ * still hold one under the kind it had before the rename.
+ */
+export const isLateNoticeMail = (
+  kind: string
+): kind is 'notice' | 'reminder' | typeof LEGACY_NOTICE_MAIL_KIND =>
+  kind === 'notice' || kind === 'reminder' || kind === LEGACY_NOTICE_MAIL_KIND;
 export type MailStatus = 'waiting' | 'sent' | 'failed';
 export type MailFailureReason = 'cspa' | 'auth' | 'other';
 

@@ -38,6 +38,7 @@ import { useBookMiners } from './useBookMiners';
 import { DonationPicker, PaymentOutcomePanel } from './RecordPaymentParts';
 import { DialogFooter } from '@/components/ui/DialogFooter';
 import { Well } from '@/components/ui/Well';
+import { PAYMENT_NOTE_MAX } from '../../../../functions/src/corpTaxBookKinds';
 
 export function Label({ text, children }: { text: ReactNode; children: ReactNode }) {
   return (
@@ -64,7 +65,6 @@ export function GroupLabel({ text, children }: { text: ReactNode; children: Reac
 }
 
 /** The longest note the server keeps on a payment (`recordPayment`'s `note`). */
-const PAYMENT_NOTE_MAX = 500;
 
 interface ShellProps {
   open: boolean;
