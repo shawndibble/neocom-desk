@@ -15,7 +15,7 @@ import type { FeederReadClock } from './feederHealth';
 import type { DayCharge, Miner } from './charges';
 import type { FeederCoverage } from './coverage';
 import { activeDismissalFor, type Dismissal } from './dismissals';
-import { disputeHold, type OreDispute } from './disputes';
+import { disputeHold, isMinersDispute, type OreDispute } from './disputes';
 import {
   chunkRateFor,
   extractionStatus,
@@ -354,11 +354,7 @@ export function buildBookView(input: BookViewInput): BookView {
     /** The open dispute that holds a date, and until when. */
     const disputeOf = (date: string) => {
       for (const d of input.disputes ?? []) {
-        // A dispute filed before a regroup names the Miner it was then; its lines name the character.
-        const mine =
-          d.minerId === id ||
-          d.lines.some((l) => characterIds.some((c) => l.recordKey.startsWith(`${c}:`)));
-        if (d.date !== date || !mine) continue;
+        if (d.date !== date || !isMinersDispute(d, id, characterIds)) continue;
         const hold = disputeHold(d, input.now);
         if (hold) return { disputeId: d.id, until: hold.until };
       }
@@ -636,6 +632,8 @@ export interface MinerDetail {
   }[];
   dismissals: Dismissal[];
   declarations: Declaration[];
+  /** The Miner's disputes, answered or not. */
+  disputes: OreDispute[];
   credit: number;
   /** The checkpoint the account is built from: what came before it is summed up in it. */
   checkpoint?: RunningAccountCheckpoint;
@@ -711,6 +709,9 @@ export function minerDetail(view: BookView, minerId: string): MinerDetail | unde
     officerWriteOffs: officerWriteOffsOf(view, minerId, inner),
     dismissals,
     declarations: view.input.declarations.filter((d) => noticeIds.has(d.statementId)),
+    disputes: (view.input.disputes ?? []).filter((d) =>
+      isMinersDispute(d, minerId, inner.characterIds)
+    ),
     credit: inner.account.credit,
     ...(inner.account.input.checkpoint ? { checkpoint: inner.account.input.checkpoint } : {}),
   };

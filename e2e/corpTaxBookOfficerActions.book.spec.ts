@@ -266,11 +266,9 @@ test('keeping the bill on a declaration records the reason the Miner reads', asy
   await expectInActivity(page, 'No contract from Ada reached the CEO');
 });
 
-// The Miner page's Activity ("Mail, dismissals and the audit log for this Miner") stays at
-// "Nothing has happened" after an officer answers the Miner's declaration or dispute.
-test.fixme("the officer's answer to a declaration is on the Miner's own activity", async ({
-  page,
-}) => {
+// An officer's answer names only the declaration or the dispute: the Miner's Activity counts
+// those too (`isMinerAuditEntry`).
+test("the officer's answer to a declaration is on the Miner's own activity", async ({ page }) => {
   await openNeedsYou(page);
   await card(page, `${MINER.ada.name} says they paid`)
     .getByRole('button', { name: 'Keep the bill' })

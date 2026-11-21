@@ -612,6 +612,7 @@ describe('accountLedger', () => {
     expect(day.disputed).toEqual({ disputeId: 'd1', until: '2026-10-01T00:00:00.000Z' });
     expect(l.held).toEqual({ tax: day.tax, days: 1 });
     expect(l.notYetBilled).toEqual(ledgerOf(buildBookView(running([]))).notYetBilled);
+    expect(minerDetail(view, 'solo:1')!.disputes.map((d) => d.id)).toEqual(['d1']);
   });
 
   it('dates an officer charge by the day picked, and keeps it owed on a day recorded paid', () => {
