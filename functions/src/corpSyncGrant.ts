@@ -989,7 +989,6 @@ async function recordRun(
           observedRows: result.observedRows,
           extractions: result.extractions,
           donationsAdded: result.donationsAdded,
-          settled: result.settled,
           missing: result.missing,
         }
       : { at: deps.now(), outcome: 'skipped', reason: result.reason };

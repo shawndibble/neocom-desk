@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   finalNoticeId,
   isFinalNoticeId,
+  lateNoticeRefusal,
   mergeNoticeMail,
+  mergeNoticeDocs,
   legacyStatementDocOf,
   listedKeys,
   paymentCode,
@@ -265,5 +267,53 @@ describe('mergeNoticeMail: one notice kept in two docs reads as one mail state',
         { sent: 0, manualSent: 0, remindersStopped: false }
       )
     ).toEqual({ sent: 0, manualSent: 0, remindersStopped: false });
+  });
+});
+
+describe('lateNoticeRefusal: two tabs never mail the same days', () => {
+  const line = (key: string) => ({ key });
+  const earlier = [
+    { issuedAt: '2026-11-10T00:00:00.000Z', kind: 'late' as const, lines: [line('a')] },
+  ];
+  const now = '2026-11-20T00:00:00.000Z';
+
+  it('sends a notice of new days once the cooldown has passed', () => {
+    expect(lateNoticeRefusal({ lines: [line('b')] }, earlier, 7, now)).toBeNull();
+    expect(lateNoticeRefusal({ lines: [line('b')] }, [], 7, now)).toBeNull();
+  });
+
+  it('refuses a day another notice already listed', () => {
+    expect(lateNoticeRefusal({ lines: [line('b'), line('a')] }, earlier, 7, now)).toBe(
+      'already-listed'
+    );
+  });
+
+  it('refuses one inside the cooldown after the last notice', () => {
+    expect(lateNoticeRefusal({ lines: [line('b')] }, earlier, 14, now)).toBe('notice-cooldown');
+    // A final notice closed an account: it starts no cooldown.
+    expect(
+      lateNoticeRefusal({ lines: [line('b')] }, [{ ...earlier[0], kind: 'final' }], 14, now)
+    ).toBeNull();
+  });
+});
+
+describe('mergeNoticeDocs: one notice per id from both collections', () => {
+  const current = {
+    ...lateNoticeFromStatementDoc(storedNotice)!,
+    mail: { sent: 1, manualSent: 0, remindersStopped: false },
+    updatedAt: { seconds: 1 },
+  };
+
+  it('keeps the lateNotices doc, without its stamp, and reads its mail from both docs', () => {
+    const [notice] = mergeNoticeDocs([current], [storedNotice]);
+    expect(notice).not.toHaveProperty('updatedAt');
+    expect(notice.mail).toMatchObject({ sent: 2, manualSent: 1, remindersStopped: true });
+    expect(notice.lines).toEqual(current.lines);
+  });
+
+  it('reads a legacy doc with no copy as its notice, and drops anything that is no notice', () => {
+    expect(mergeNoticeDocs([], [storedNotice]).map((n) => n.id)).toEqual([storedNotice.id]);
+    expect(mergeNoticeDocs([], [{ ...storedNotice, kind: undefined }])).toEqual([]);
+    expect(mergeNoticeDocs([{ id: 'x' }], [])).toEqual([]);
   });
 });

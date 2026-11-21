@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planLateNoticeCopies } from './corpTaxBookLateNoticeBackfill.js';
+import { planLateNoticeCopies, planPaymentReaders } from './corpTaxBookLateNoticeBackfill.js';
 
 const notice = (id: string, kind?: string, mail: Record<string, unknown> = {}) => ({
   id,
@@ -64,5 +64,34 @@ describe('planLateNoticeCopies', () => {
         links: new Set(['n1']),
       })
     ).toEqual({ notices: [], links: [], mail: [] });
+  });
+});
+
+describe('planPaymentReaders', () => {
+  const miners = [{ id: 'g', data: { characterIds: [1, 2, 3], officerClaimed: [3] } }];
+
+  it("gives each payment stored without `uids` its Miner's readers and its sender", () => {
+    expect(
+      planPaymentReaders(
+        [
+          { id: 'p1', data: { minerId: 'g', uid: 'char:2' } },
+          { id: 'p2', data: { minerId: 'solo:7', uid: 'char:7' } },
+          { id: 'p3', data: { uid: 'char:9' } },
+          { id: 'p4', data: { minerId: 'g', uid: 'char:3' } },
+        ],
+        miners
+      )
+    ).toEqual([
+      { id: 'p1', uids: ['char:1', 'char:2'] },
+      { id: 'p2', uids: ['char:7'] },
+      { id: 'p3', uids: ['char:9'] },
+      { id: 'p4', uids: ['char:1', 'char:2', 'char:3'] },
+    ]);
+  });
+
+  it('leaves a payment that has `uids` alone, so a re-run plans nothing', () => {
+    expect(
+      planPaymentReaders([{ id: 'p1', data: { minerId: 'g', uid: 'char:2', uids: [] } }], miners)
+    ).toEqual([]);
   });
 });
