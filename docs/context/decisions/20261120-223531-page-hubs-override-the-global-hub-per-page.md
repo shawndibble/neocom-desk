@@ -50,3 +50,14 @@ _Recorded 2026-11-20. Issue #6523._
   both pages. The Fittings export's "minus owned" station still falls back
   to the Global hub on purpose: it is the station the Appraisal tab's Minus
   owned uses, so it moves with the Appraisal area, not with Ship Fit Costs.
+- **Industry, LP Store and Corp SRP join (slice 3).**
+  - **Industry** covers BPC Sourcing, whose settings hub becomes a `HubField`, and the hub a new
+    plan starts at (`newPlanHubId`, used by new plans, Opportunities and Retarget Group).
+  - A new plan starts at the Industry entry when there is one. Otherwise it keeps the rule from
+    before page hubs, the latest plan's hub, else the Global hub (Jita before). That keeps "no entries, nothing
+    moves".
+  - Each Build Plan keeps its own hub.
+  - **LP Store** covers its offers and landing. The header gear is a `HubField`. The filter box
+    keeps its hub `Select`, because the box applies its drafts together on Apply. An Applied hub
+    writes through `pickHubFor('lpStore', …)`.
+  - **Corp SRP** covers Doctrine coverage.

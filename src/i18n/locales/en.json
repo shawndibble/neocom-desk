@@ -11329,7 +11329,10 @@
     "area": {
       "fittings": "Ship Fit Costs",
       "skills": "Skills",
-      "contracts": "Contracts"
+      "contracts": "Contracts",
+      "industry": "Industry",
+      "lpStore": "LP Store",
+      "corpSrp": "Corp SRP"
     }
   },
   "contractDetail": {
@@ -15473,7 +15476,7 @@
     "itemContractFlagHint": "On the Items board, flags an item contract that asks this many times the hub's buy-now price. A blueprint copy is flagged when it asks more than the original, whatever this says.",
     "itemContractFlagOption": "{{count}}× hub price",
     "bpcMarketHubLabel": "Market hub",
-    "bpcMarketHubHint": "Where BPC Sourcing checks BPO prices and LP offers. Same as the active character’s Trade Hub in Settings › Market defaults.",
+    "bpcMarketHubHint": "Where BPC Sourcing checks BPO prices and LP offers. The Industry hub: your Trade Hub, unless Industry has its own in Settings › Page hubs.",
     "bpcHideAuctionsLabel": "Hide auctions",
     "bpcHidePlexLabel": "Hide PLEX contracts",
     "bpcHideAuctionsHint": "Hides auction contracts when BPC Sourcing opens. You can change it per search in the filter bar.",

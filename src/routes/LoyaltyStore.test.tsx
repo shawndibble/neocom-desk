@@ -1170,9 +1170,10 @@ describe('LoyaltyStore switching stores through the search', () => {
       })
     );
     const settings = screen.getAllByRole('dialog').at(-1)!;
-    await user.click(within(settings).getByRole('combobox', { name: 'Market hub' }));
-    await user.click(await screen.findByRole('option', { name: OTHER_HUB.systemName }));
-    expect(useMarketHub.getState().value).toBe(OTHER_HUB.id);
+    await user.click(within(settings).getByRole('button', { name: /Market hub/ }));
+    await user.click(await screen.findByRole('menuitemradio', { name: OTHER_HUB.stationLabel }));
+    // On Global, so the gear's pick moves the Global hub the filter row reads.
+    await waitFor(() => expect(useMarketHub.getState().value).toBe(OTHER_HUB.id));
     expect(screen.getByTestId('lp-basis-readout')).toHaveTextContent(OTHER_HUB.systemName);
   });
 

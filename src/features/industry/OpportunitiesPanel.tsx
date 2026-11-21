@@ -96,6 +96,7 @@ import { CorpProjectsPanel } from './corpProjects/CorpProjectsPanel';
 import { buildableEntry } from './corpProjects/corpProjectRows';
 import { useCorpProjects } from './corpProjects/useCorpProjects';
 import type { BuildPlanPricingInputs } from './buildPlanPricingInputs';
+import { useHubFor } from '@/features/market/hub';
 import {
   OPPORTUNITIES_COLUMN_IDS,
   OPPORTUNITIES_DEFAULT_COLUMNS,
@@ -250,9 +251,13 @@ export function OpportunitiesPanel({
     }
     return map;
   }, [plansQuery]);
+  // The Industry page hub (its entry, or Global) is part of what a row prices at:
+  // a change re-keys the batch so rows re-price at it.
+  const { hubId: industryHubId } = useHubFor('industry');
   const resolveHubForCharacter = useMemo(
     () => (characterId: number) => hubForCharacter(characterId, plansByCharacter),
-    [plansByCharacter]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- hubForCharacter reads the Industry hub from its store
+    [plansByCharacter, industryHubId]
   );
 
   // The same latest plan, whose price basis and build location a fresh plan starts
