@@ -4,6 +4,10 @@
  * Every figure follows from `bookSeed.ts`'s flat pricing: one ordinary mined day owes `DAY_TAX`.
  */
 import { closedThroughFor } from '../../../functions/src/corpTaxBookCheckpoint';
+import {
+  RUNNING_ACCOUNT_CHECKPOINTS,
+  WRITE_OFFS,
+} from '../../../functions/src/corpTaxBookVersionKeys';
 import { BookSeed, DAY_TAX, day, noonOf, verifyToken } from './bookSeed';
 import { MINER, OFFICER, solo } from './identities';
 
@@ -285,7 +289,7 @@ export function closedMonthBook(how: { checkpointed?: boolean } = {}) {
     characterIds: [MINER.ada.id],
   };
   if (how.checkpointed) {
-    seed.raw('accountCheckpoints', minerId, {
+    seed.raw(RUNNING_ACCOUNT_CHECKPOINTS, minerId, {
       ...checkpoint,
       at: new Date(seed.now).toISOString(),
       by: OFFICER.id,
@@ -312,7 +316,7 @@ export function minerLedgerBook() {
   const seed = new BookSeed({ startBack: 30 })
     .mine(MINER.ada.id, [6, 5, 4])
     .donation({ id: 'j1_970001', characterId: MINER.ada.id, amount: DAY_TAX, back: 3, minerId });
-  seed.raw('writeOffs', 'wo-ada-1', {
+  seed.raw(WRITE_OFFS, 'wo-ada-1', {
     id: 'wo-ada-1',
     minerId,
     amount: DAY_TAX,

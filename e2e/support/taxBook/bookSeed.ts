@@ -12,8 +12,15 @@
  * never a calendar date, so it reads the same whenever it runs.
  */
 import {
+  BOOK_VERSION_FIELD,
+  COLLECTION_VERSIONS_FIELD,
+  DECLARATIONS,
+  DISPUTES,
   LATE_NOTICES,
   LATE_NOTICE_LINKS,
+  MINERS,
+  OBSERVED,
+  PAYMENTS,
   STATEMENTS,
   STATEMENT_LINKS,
   TOKENS_COLLECTION,
@@ -172,7 +179,7 @@ export class BookSeed {
       const refinery = REFINERY[d.refinery ?? 'alpha'];
       const date = day(d.back, this.now);
       this.mined.set(characterId, [...(this.mined.get(characterId) ?? []), d]);
-      this.sub('observed', `${characterId}_${ORE_TYPE}_${date}_${refinery.id}`, {
+      this.sub(OBSERVED, `${characterId}_${ORE_TYPE}_${date}_${refinery.id}`, {
         structureId: refinery.id,
         characterId,
         recordedCorporationId: recordedCorpOf(characterId),
@@ -191,7 +198,7 @@ export class BookSeed {
   /** A donation as the server stored it (`source: 'donation'`). */
   donation(p: Donation): this {
     const id = p.refId !== undefined ? `j1_${p.refId}` : p.id;
-    return this.sub('payments', id, {
+    return this.sub(PAYMENTS, id, {
       id,
       source: 'donation',
       characterId: p.characterId,
@@ -208,7 +215,7 @@ export class BookSeed {
 
   /** A Miner grouping several Characters (`miners/{id}`), the first the main. */
   group(id: string, characterIds: readonly number[], createdBack = 60): this {
-    return this.sub('miners', id, {
+    return this.sub(MINERS, id, {
       id,
       characterIds: [...characterIds],
       mainCharacterId: characterIds[0],
@@ -315,7 +322,7 @@ export class BookSeed {
     back: number;
     characterId: number;
   }): this {
-    return this.sub('declarations', p.id, {
+    return this.sub(DECLARATIONS, p.id, {
       id: p.id,
       [NOTICE_ID_FIELD]: p.noticeId,
       kind: p.kind ?? 'contract',
@@ -344,7 +351,7 @@ export class BookSeed {
     const minerId = solo(p.characterId);
     const date = day(p.back, this.now);
     const id = `${minerId.replace(/[^A-Za-z0-9_-]/g, '_')}_${date}`;
-    return this.sub('disputes', id, {
+    return this.sub(DISPUTES, id, {
       id,
       minerId,
       date,
@@ -389,8 +396,10 @@ export class BookSeed {
             path,
             data: {
               ...data,
-              bookVersion: stamp,
-              collectionVersions: Object.fromEntries([...collections].map((c) => [c, stamp])),
+              [BOOK_VERSION_FIELD]: stamp,
+              [COLLECTION_VERSIONS_FIELD]: Object.fromEntries(
+                [...collections].map((c) => [c, stamp])
+              ),
             },
           }
         : { path, data }

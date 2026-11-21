@@ -49,6 +49,8 @@ test("a payment's row opens in place to show the days it paid", async ({ page, b
     .click();
   await expect(minerLedger(page)).toContainText('Days it paid');
   await expect(minerLedger(page)).toContainText(day(6));
+  // And leads to the transfer itself.
+  await expect(minerLedger(page).getByRole('link', { name: 'View the payment' })).toBeVisible();
 });
 
 test('past a closed month the ledger opens on its balance through it', async ({ page, book }) => {
