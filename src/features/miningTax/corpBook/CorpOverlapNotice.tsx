@@ -38,11 +38,11 @@ interface Props {
   onChanged: () => void;
   /**
    * A message reached the corporation (#6206): reload the books. With it, "I paid it another way"
-   * on a day billed on a Statement goes to the corporation instead of staying a device-only note,
+   * on a day a Late notice asked for goes to the corporation instead of staying a device-only note,
    * and a Conflict offers "Tell {corp}".
    */
   onBookChanged?: () => void;
-  /** Opens the Resolve dialog (resolving in the app) on a problem of this day or its Statement. */
+  /** Opens the Resolve dialog (resolving in the app) on a problem of this day or its Late notice. */
   onResolve?: (target: ResolveTarget) => void;
   /** Who is asking and who answers the book's tax questions: a Conflict's "Tell" mails them too. */
   mail?: MailContext;

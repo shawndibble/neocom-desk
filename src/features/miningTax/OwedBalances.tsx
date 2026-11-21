@@ -57,7 +57,7 @@ interface OwedBalancesProps {
   onReviewPayments: () => void;
   /**
    * Corp Tax Book Conflicts still to fix. Not owed, so never in the total, but each turns into
-   * a bill on its day: shown at every width so the next Statement holds no surprise.
+   * a bill on its day: shown at every width so the next Late notice holds no surprise.
    */
   conflicts?: ConflictSummary | null;
   /** Opens the first Conflict to resolve. */
@@ -364,7 +364,7 @@ export function OwedBalances({
         </div>
       )}
       {/* After the owed cards: owed comes first (decision 20261004), and a Conflict is not owed
-          yet. Always a full-width row, since it is a warning about the next Statement, not a
+          yet. Always a full-width row, since it is a warning about what the book bills next, not a
           Payee balance to sit among the cards. */}
       {conflicts &&
         promptRow(

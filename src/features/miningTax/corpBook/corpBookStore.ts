@@ -225,7 +225,7 @@ export async function readCorpBooks(
         )
       );
       if (!book) continue;
-      // ESI names what no Statement did; no Firebase session needed for that.
+      // ESI names what no Late notice did; no Firebase session needed for that.
       const named = book.structureNames ?? {};
       const structureNames = { ...named, ...(await namesFromEsi(book.observed, named)) };
       books.push({ ...book, structureNames, memberCharacterIds: [...members] });
@@ -532,7 +532,7 @@ export async function claimCorpTaxBookPayment(
 }
 
 /**
- * A Miner's own "I paid this another way" on one of their Statements (#6206), with an optional
+ * A Miner's own "I paid this another way" on one of their Late notices (#6206), with an optional
  * amount and note. It pauses Overdue until an officer confirms or rejects it.
  */
 export async function declareCorpTaxBookPayment(

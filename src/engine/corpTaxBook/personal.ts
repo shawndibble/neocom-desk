@@ -346,7 +346,7 @@ export interface BookRowView {
   resolvesAt?: string;
   /**
    * A conflict: why the two records clash (`ConflictCause`). An `overListed` one is ore the book
-   * never recorded: no Statement bills it (`billed` 0) and it never resolves to the corporation.
+   * never recorded: the book never bills it (`billed` 0) and it never resolves to the corporation.
    */
   conflictCause?: ConflictCause;
   /** An `ownerCollected` conflict: the member's Payee that is the moon owner. */
@@ -456,8 +456,8 @@ export interface PersonalOverlay {
    */
   trimmed: Map<string, Map<string, { oreLines: OreLine[]; valueShare: number }>>;
   /**
-   * Per Mining Ledger Entry key, the Assignments to another Payee whose ore a book bills too (on a
-   * Statement, or a Conflict that ran its 14 days), by id: the share of the Assignment's value, as
+   * Per Mining Ledger Entry key, the Assignments to another Payee whose ore a book bills too (a
+   * Billed day, or a Conflict that ran its 14 days), by id: the share of the Assignment's value, as
    * the tab shows it, that is not owed to that Payee as well.
    */
   alsoBilled: Map<string, Map<string, number>>;
