@@ -43,6 +43,25 @@ export function characterIdsOfMiner(minerId: string, miners: readonly Miner[]): 
  */
 export { minerIdFor };
 
+/**
+ * Every Miner of the book as a picker lists them: the groupings, and each Miner of its own that
+ * `ids` (the server's miner list) names whose character no grouping holds. Once each.
+ */
+export function bookMinersOf(grouped: readonly Miner[], ids: readonly string[]): Miner[] {
+  const out = [...grouped];
+  const seen = new Set(grouped.map((m) => m.id));
+  const held = new Set(grouped.flatMap((m) => m.characterIds));
+  for (const id of ids) {
+    const solo = /^solo:(\d+)$/.exec(id);
+    if (!solo || seen.has(id)) continue;
+    const characterId = Number(solo[1]);
+    if (held.has(characterId)) continue;
+    seen.add(id);
+    out.push({ id, characterIds: [characterId], mainCharacterId: characterId });
+  }
+  return out;
+}
+
 /** What one Observed Mining Entry owes, snapshotted with the inputs that priced it. */
 export interface DayCharge {
   /** `observedEntryKey`: character + refinery + day. */

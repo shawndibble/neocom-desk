@@ -34,6 +34,7 @@ import {
   wallClock,
 } from './moonsFormat';
 import { MinerPicker } from './MinerPicker';
+import { useBookMiners } from './useBookMiners';
 import { DonationPicker, PaymentOutcomePanel } from './RecordPaymentParts';
 import { DialogFooter } from '@/components/ui/DialogFooter';
 import { Well } from '@/components/ui/Well';
@@ -499,11 +500,12 @@ export function ReassignPaymentDialog({
   const zone = useTimeZone();
   const { t } = useTranslation();
   const k = 'corpTaxBook.moons.dialogs.reassign';
-  const { edit, view, names } = useBook();
+  const { edit } = useBook();
+  const book = useBookMiners();
   const [to, setTo] = useState<'miner' | 'unmatched'>('miner');
   const [minerId, setMinerId] = useState('');
   const filterRef = useRef<HTMLInputElement>(null);
-  const others = view.miners.filter((m) => m.id !== payment.minerId);
+  const others = book.miners.filter((m) => m.id !== payment.minerId);
   return (
     <DialogShell
       initialFocusRef={filterRef}
@@ -542,7 +544,7 @@ export function ReassignPaymentDialog({
       {to === 'miner' && (
         <MinerPicker
           miners={others}
-          nameOf={names.character}
+          nameOf={book.nameOf}
           value={minerId}
           onChange={setMinerId}
           filterRef={filterRef}

@@ -25,7 +25,8 @@ import {
 import { getValidAccessToken } from '@/auth/session';
 import { popShareMarks, type PopShareMarks } from '@/engine/corpTaxBook/popShareMarks';
 import { readPopSharingCached } from './popSharingCache';
-import type { Miner } from '@/engine/corpTaxBook/charges';
+import { bookMinersOf, type Miner } from '@/engine/corpTaxBook/charges';
+import { MINER_LIST_DOC } from '../../../../functions/src/corpTaxBookReadModels';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
 import type { Declaration } from '@/engine/corpTaxBook/overdue';
 import type { Adjustment } from '@/engine/corpTaxBook/adjustments';
@@ -177,6 +178,27 @@ export interface FeederChunkParts {
    * absent when the sharing settings could not be read.
    */
   shareMarks?: PopShareMarks['structures'];
+}
+
+/**
+ * Every Miner of the book, for a picker on a page read for one Miner (moving a payment): the
+ * groupings, and each Miner of its own the server's miner list names (one doc). Without that doc
+ * (an older server) only the groupings.
+ */
+export async function readBookMiners(characterId: number, corporationId: number): Promise<Miner[]> {
+  await ensureSignedIn(characterId);
+  const book = doc(getSyncFirestore(characterId), 'corps', String(corporationId));
+  return asOfficer(characterId, corporationId, async () => {
+    const [grouped, list] = await Promise.all([
+      getDocs(collection(book, 'miners')),
+      getDoc(doc(book, 'readModels', MINER_LIST_DOC)).catch(() => null),
+    ]);
+    const listed = (list?.data()?.miners as { minerId?: unknown }[] | undefined) ?? [];
+    return bookMinersOf(
+      grouped.docs.map((d) => ({ ...(d.data() as Miner), id: d.id })),
+      listed.flatMap((m) => (typeof m.minerId === 'string' ? [m.minerId] : []))
+    );
+  });
 }
 
 /**
