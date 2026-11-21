@@ -169,9 +169,16 @@ export function useCorpBook(
   const [now, setNow] = useState(utcNow);
   const [names, setNames] = useState(EMPTY_NAMES);
   const [memberIds, setMemberIds] = useState<ReadonlySet<number> | undefined>(undefined);
-  const [survey, setSurvey] = useState<
-    { lines: NonNullable<BookViewInput['surveyOreLines']>; prices: BookPrices } | undefined
+  // Built from one read: a newer read (reload, late rows, another scope) must not borrow its prices.
+  const [builtSurvey, setSurvey] = useState<
+    | {
+        from: Fetched;
+        lines: NonNullable<BookViewInput['surveyOreLines']>;
+        prices: BookPrices | undefined;
+      }
+    | undefined
   >(undefined);
+  const survey = builtSurvey?.from === fetched ? builtSurvey : undefined;
   const surveyOreLines = survey?.lines;
   const reload = useCallback(() => setAttempt((n) => n + 1), []);
   // The Moon owners tab reads no ledger rows unless its summaries cannot stand in (#5717).
@@ -336,11 +343,15 @@ export function useCorpBook(
         );
       }
       // The survey's ores are priced like the notified ones: the read's prices never saw them.
+      // A failed price load keeps the lines (and their names); the read's own prices stand in.
       const prices =
         found.size > 0
-          ? await loadBookPrices(data, data.minerScope?.from, surveyTypeIdsOf(found))
+          ? await loadBookPrices(data, data.minerScope?.from, surveyTypeIdsOf(found)).catch(
+              () => undefined
+            )
           : undefined;
-      if (!cancelled) setSurvey(prices ? { lines: found, prices } : undefined);
+      if (!cancelled)
+        setSurvey(found.size > 0 ? { from: fetched, lines: found, prices } : undefined);
     })().catch(() => undefined);
     return () => {
       cancelled = true;
