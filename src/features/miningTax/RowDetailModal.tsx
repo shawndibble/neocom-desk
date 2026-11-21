@@ -24,7 +24,6 @@ import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { unreportedClaims } from '@/engine/miningTax/ownership';
 import { CharacterLink, SystemLink } from '@/features/entities';
 import { formatIsk } from '@/lib/isk';
-import { formatLocalDate } from '@/lib/localDate';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { cx } from '@/lib/cx';
 import { AssignDialog } from './AssignDialog';
@@ -307,8 +306,6 @@ export function RowDetailModal({
                 {t('miningTax.detail.valueLine', { value: formatIsk(estimatedValue) })}
               </>
             )}
-            {assignment?.paidAt !== undefined &&
-              ` · ${t('miningTax.paidAtLabel')} ${formatLocalDate(new Date(assignment.paidAt))}`}
           </span>
           <StatusPill status={status} label={t(`miningTax.status.${STATUS_LABEL_KEY[status]}`)} />
         </div>
