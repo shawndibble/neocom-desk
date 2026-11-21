@@ -51,7 +51,12 @@ import { recordDefaultOptOuts } from './defaultOptOuts';
 import type { GroupMember } from './groupRows';
 import { groupPayees } from './payeeGroups';
 import { removePayeeRecord } from './payees';
-import { loadPayeeAccounts, removePaymentLinks, savePaymentLink } from './paymentLinkStore';
+import {
+  linksReady,
+  loadPayeeAccounts,
+  removePaymentLinks,
+  savePaymentLink,
+} from './paymentLinkStore';
 import type { SessionContinuation } from './sessionContinuation';
 import { putAssignments } from './storedAssignments';
 
@@ -117,7 +122,9 @@ const charactersOf = (records: readonly { characterId: number }[]) =>
 
 /**
  * Assigns an entry's ore (or a slice of it) to a Payee. Which days are paid is read off the
- * Payees' accounts before the write, so a paid growth collector hands its flag over.
+ * Payees' accounts before the write, so a paid growth collector hands its flag over. Until the
+ * links are known (`linksReady`) every day reads as paid, so no collector hands over a day a link
+ * pays elsewhere.
  */
 export async function assign(
   input: AssignInput
@@ -125,8 +132,11 @@ export async function assign(
   let isPaid = input.isPaid;
   if (!isPaid) {
     try {
-      const accounts = await loadPayeeAccounts();
-      isPaid = (a) => accounts.isPaid(a);
+      const tracked = (await db.characters.toCollection().primaryKeys()) as number[];
+      if (await linksReady(tracked)) {
+        const accounts = await loadPayeeAccounts();
+        isPaid = (a) => accounts.isPaid(a);
+      } else isPaid = () => true;
     } catch (cause) {
       return failure(cause);
     }

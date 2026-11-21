@@ -82,7 +82,7 @@ describe('loadOwedBalances', () => {
         },
       ],
       payeeCheckpoints: new Map(),
-  billedElsewhere: new Map(),
+      billedElsewhere: new Map(),
     });
 
     expect(balances).toHaveLength(1);

@@ -5,8 +5,7 @@
  * book says it hasn't credited is owed again (#6219), and ore a book bills is owed to the
  * corporation, not to the member's own Payee too (#6204).
  */
-import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
-import { entryKey } from '@/engine/miningTax/types';
+import type { PayeeRecord } from '@/db';
 import type { PersonalOverlay } from '@/engine/corpTaxBook/personal';
 import i18n from '@/i18n';
 import {
@@ -18,9 +17,8 @@ import {
 import { loadBookPrices, loadCorpNames, loadTrackedCorpBooks } from './corpBook/corpBookSources';
 import { buildCorpBookView, type CorpBookView } from './corpBook/corpBookView';
 import { buildDisplayRows } from './corpBook/corpRows';
-import { allMembers, type DisplayRow } from './groupRows';
+import type { DisplayRow } from './groupRows';
 import { PayeeAccounts, withPaidStatus } from './payeeAccounts';
-import type { PayeePaymentLink, StoredPayeeCheckpoint } from '@/engine/miningTax/payeeAccount';
 import { loadMadePaymentsWithStatus } from './madePayments';
 import { groupPayees, payeeDuplicateAliases } from './payeeGroups';
 import type { MoonMiningTaxSnapshot } from './snapshot';

@@ -125,17 +125,16 @@ describe('PayeeAccount', () => {
       expect(resumed.nextCheckpoint(TODAY, '2026-11-21T00:00:00Z')).toBeUndefined();
     });
 
-    it('ignores a stored checkpoint once anything on or before it changed', () => {
+    it('trusts a stored checkpoint (a write on or before it drops it), and previews a back-dated payment on the whole history', () => {
       const old = [charge('z', '2026-08-10', 300_000), ...CHARGES];
       const whole = PayeeAccount.build({ payeeId: 'p1', charges: old, links: [] });
       const stored = whole.nextCheckpoint(TODAY, '2026-11-20T00:00:00Z')!;
-      // A payment from August linked after the month closed still pays the August day.
-      const links = [link(9, 300_000, '2026-08-12')];
-      const resumed = PayeeAccount.build({ payeeId: 'p1', charges: old, links, stored });
-      expect(resumed.startsFrom).toBeUndefined();
-      expect(resumed.isPaid('2026-08-10')).toBe(true);
-      // So it closes again, from the whole history.
-      expect(resumed.nextCheckpoint(TODAY, '2026-11-20T00:00:00Z')?.checkpoint.owed).toEqual([]);
+      const resumed = PayeeAccount.build({ payeeId: 'p1', charges: old, links: [], stored });
+      expect(resumed.startsFrom).toBe(stored.checkpoint);
+      // A payment from August, before the checkpoint, previews as paying the August day.
+      expect(resumed.preview(300_000, '2026-08-12').lines).toContainEqual(
+        expect.objectContaining({ date: '2026-08-10', settled: true })
+      );
     });
 
     it('feeds the Payee ledger an opening row for what it closed', () => {

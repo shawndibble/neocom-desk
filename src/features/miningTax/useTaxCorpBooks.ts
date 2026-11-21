@@ -46,7 +46,8 @@ export function useTaxCorpBooks(
   // The ledger as the tab reads it: an Assignment is Paid while its Payee's account has paid its
   // day, oldest first (decision 20261120-235011), whatever mark it stores.
   const ledger = useMemo(
-    (): TaxSnapshot | null => (data ? { ...data, entries: withPaidStatus(data.entries, accounts) } : null),
+    (): TaxSnapshot | null =>
+      data ? { ...data, entries: withPaidStatus(data.entries, accounts) } : null,
     [data, accounts]
   );
 
@@ -77,11 +78,14 @@ export function useTaxCorpBooks(
     const next = billedElsewhereOf(alsoBilled);
     const held = billed ?? new Map<string, number>();
     const same =
-      next.size === held.size && [...next].every(([id, v]) => Math.abs((held.get(id) ?? 0) - v) < 1e-9);
+      next.size === held.size &&
+      [...next].every(([id, v]) => Math.abs((held.get(id) ?? 0) - v) < 1e-9);
     if (same) return;
-    setBilledElsewhere(next);
     const dates = new Map(data.entries.flatMap((r) => r.assignments.map((a) => [a.id, a.date])));
-    void saveBilledElsewhere(next, (id) => dates.get(id)).catch(() => undefined);
+    // Rebuilt once stored (or once storing failed: this page still bills what the books do).
+    void saveBilledElsewhere(next, (id) => dates.get(id))
+      .catch(() => undefined)
+      .finally(() => setBilledElsewhere(next));
   }, [alsoBilled, billed, data]);
   // The player's own Unmatched donations are claimed for them; only a failed claim is left to retry.
   // Only from a book read this visit: the last good copy can offer a donation already claimed since.

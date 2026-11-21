@@ -120,7 +120,6 @@ describe('continueSession', () => {
     await db.miningTaxAssignments.put(previous);
 
     const result = await continueSession(continuation(previous), () => PRICES);
-
     expect(result.ok).toBe(true);
     const records = await stored();
     expect(records).toHaveLength(2);

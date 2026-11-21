@@ -35,13 +35,22 @@ export async function readStoredCheckpoints(): Promise<StoredCheckpoints> {
  * that covers `db.settings`, or none.
  */
 export async function dropPayeeCheckpointsFrom(date: string | null): Promise<void> {
-  await db.settings.put({ key: PAYEE_HISTORY_GEN_KEY, value: (await readPayeeHistoryGen()) + 1 });
-  const held = await readStoredCheckpoints();
+  const [genRow, heldRow] = await db.settings.bulkGet([
+    PAYEE_HISTORY_GEN_KEY,
+    PAYEE_CHECKPOINTS_KEY,
+  ]);
+  const gen = typeof genRow?.value === 'number' ? genRow.value : 0;
+  const held =
+    heldRow?.value && typeof heldRow.value === 'object' ? (heldRow.value as StoredCheckpoints) : {};
   const kept = Object.entries(held).filter(
     ([, cp]) => date !== null && cp.checkpoint.through < date
   );
-  if (kept.length === Object.keys(held).length) return;
-  await db.settings.put({ key: PAYEE_CHECKPOINTS_KEY, value: Object.fromEntries(kept) });
+  await db.settings.bulkPut([
+    { key: PAYEE_HISTORY_GEN_KEY, value: gen + 1 },
+    ...(kept.length === Object.keys(held).length
+      ? []
+      : [{ key: PAYEE_CHECKPOINTS_KEY, value: Object.fromEntries(kept) }]),
+  ]);
 }
 
 /** The earliest of some dates (`YYYY-MM-DD`, or ISO instants), or undefined for none. */

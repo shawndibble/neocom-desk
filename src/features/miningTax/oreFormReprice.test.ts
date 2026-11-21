@@ -89,6 +89,18 @@ describe('repriceForOreForm', () => {
     expect(syncMock.scheduleSync).not.toHaveBeenCalled();
   });
 
+  it("reads paid off the Payee's account, never the stored mark (M1)", async () => {
+    formMock.compressed = false;
+    // An older client marked it paid; no link pays it: it is owed, so it re-prices.
+    await db.miningTaxAssignments.put(record({ status: 'paid' }));
+    await repriceForOreForm(CHAR, { statusOf: () => 'outstanding' });
+    expect(await db.miningTaxAssignments.get('a1')).toMatchObject({
+      estimatedValue: 500,
+      // The mark stays as the older client left it.
+      status: 'paid',
+    });
+  });
+
   it.each(['paid', 'needs-review', 'dismissed'] as const)(
     'never touches a %s record',
     async (status) => {

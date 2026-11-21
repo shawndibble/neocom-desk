@@ -1,14 +1,21 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, type MiningTaxAssignmentRecord } from '@/db';
 import type { PayeePaymentLink } from '@/engine/miningTax/payeeAccount';
 import { readTombstones, tombstoneKey } from '@/sync/localBookkeeping';
 import { MINING_TAX_PAYMENT_LINKS } from '@/sync/syncedCollections';
+import { PAYEE_CHECKPOINTS_KEY, readStoredCheckpoints } from '@/db/payeeCheckpoints';
+import { pullCursorKey } from '@/sync/localBookkeeping';
 import {
+  linksReady,
+  loadBilledElsewhere,
   loadPaymentLinks,
   readLegacyPaidMarks,
   removePaymentLinks,
+  saveBilledElsewhere,
+  savePayeeCheckpoints,
   savePaymentLink,
 } from './paymentLinkStore';
+import { readPayeeHistoryGen } from '@/db/payeeCheckpoints';
 
 const link = (over: Partial<PayeePaymentLink> = {}): PayeePaymentLink => ({
   payeeId: 'p1',
@@ -174,5 +181,67 @@ describe('readLegacyPaidMarks', () => {
     });
     await readLegacyPaidMarks();
     expect(await ids()).toEqual([]);
+  });
+});
+
+describe('checkpoints on the device', () => {
+  const cp = (through: string) => ({
+    checkpoint: {
+      minerId: 'p1',
+      through,
+      balance: 0,
+      credit: 0,
+      paidThrough: through,
+      owed: [],
+      at: 'x',
+    } as never,
+  });
+
+  it('a link dated on or before a checkpoint drops it', async () => {
+    await db.settings.put({ key: PAYEE_CHECKPOINTS_KEY, value: { p1: cp('2026-09-30') } });
+    await savePaymentLink(link({ paidOn: '2026-09-12' }), 7);
+    expect(await readStoredCheckpoints()).toEqual({});
+  });
+
+  it('stores a checkpoint only while nothing was written since its inputs were read', async () => {
+    const gen = await readPayeeHistoryGen();
+    await savePaymentLink(link({ paidOn: '2026-10-12' }), 7);
+    await savePayeeCheckpoints(new Map([['p1', cp('2026-09-30')]]), gen);
+    expect(await readStoredCheckpoints()).toEqual({});
+    await savePayeeCheckpoints(new Map([['p1', cp('2026-09-30')]]), await readPayeeHistoryGen());
+    expect(Object.keys(await readStoredCheckpoints())).toEqual(['p1']);
+  });
+
+  it('a changed book share drops the checkpoints from its Assignment’s day', async () => {
+    await db.settings.put({ key: PAYEE_CHECKPOINTS_KEY, value: { p1: cp('2026-09-30') } });
+    expect(await saveBilledElsewhere(new Map([['a1', 0.5]]), () => '2026-10-05')).toBe(true);
+    expect(Object.keys(await readStoredCheckpoints())).toEqual(['p1']);
+    expect(await saveBilledElsewhere(new Map([['a1', 0.5]]), () => '2026-10-05')).toBe(false);
+    expect(await saveBilledElsewhere(new Map([['a1', 1]]), () => '2026-09-05')).toBe(true);
+    expect(await readStoredCheckpoints()).toEqual({});
+    expect(await loadBilledElsewhere()).toEqual(new Map([['a1', 1]]));
+  });
+});
+
+describe('linksReady', () => {
+  it('is ready when this device does not sync (tests never do)', async () => {
+    expect(await linksReady([1, 2])).toBe(true);
+  });
+
+  it('waits for a completed links pull per Character when it syncs', async () => {
+    vi.resetModules();
+    vi.doMock('@/app/syncStatus', () => ({ isSyncConfigured: () => true }));
+    const store = await import('./paymentLinkStore');
+    await db.settings.put({
+      key: pullCursorKey(1, 'miningTaxPaymentLinks'),
+      value: { high: 0, fullAt: 0 },
+    });
+    expect(await store.linksReady([1, 2])).toBe(false);
+    await db.settings.put({
+      key: pullCursorKey(2, 'miningTaxPaymentLinks'),
+      value: { high: 0, fullAt: 0 },
+    });
+    expect(await store.linksReady([1, 2])).toBe(true);
+    vi.doUnmock('@/app/syncStatus');
   });
 });
