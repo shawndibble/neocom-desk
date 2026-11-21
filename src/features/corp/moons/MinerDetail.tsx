@@ -335,11 +335,19 @@ export function MinerDetail({ id }: { id: string }) {
           {d.oreLines
             .map((l) => `${names.ore(l.typeId)}\u00a0×\u00a0${formatCount(l.quantity)}`)
             .join(', ')}
-          {withStatus && (
-            <span className={cx('block text-xs whitespace-nowrap', STATUS_TONE[d.status])}>
-              {d.heldBy !== undefined
-                ? t('corpTaxBook.moons.dayStatus.held', { owner: names.corporation(d.heldBy) })
-                : t(`corpTaxBook.moons.dayStatus.${d.status}`)}
+          {/* A day a dispute holds says so wherever it is listed: nothing pays it until the dispute ends. */}
+          {(withStatus || d.disputed) && (
+            <span
+              className={cx(
+                'block text-xs whitespace-nowrap',
+                d.disputed ? 'text-warning' : STATUS_TONE[d.status]
+              )}
+            >
+              {d.disputed
+                ? t('corpTaxBook.moons.dayStatus.disputed', { date: shortDate(d.disputed.until) })
+                : d.heldBy !== undefined
+                  ? t('corpTaxBook.moons.dayStatus.held', { owner: names.corporation(d.heldBy) })
+                  : t(`corpTaxBook.moons.dayStatus.${d.status}`)}
               {(() => {
                 const n = noticeOf(d.noticeId);
                 return n && <> · {noticeLink(n)}</>;

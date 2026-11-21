@@ -5,10 +5,11 @@
  * account the book then shows.
  */
 import type { Page } from '@playwright/test';
-import { expect, openMiner, signInAsOfficer, test } from './support/taxBook/bookTest';
+import { expect, minerUrl, openMiner, signInAsOfficer, test } from './support/taxBook/bookTest';
 import { officerBook } from './support/taxBook/bookScenarios';
 import { DAY_TAX, isk, shortDay } from './support/taxBook/bookSeed';
-import { MINER } from './support/taxBook/identities';
+import { readDoc } from './support/taxBook/emulator';
+import { CORP, MINER } from './support/taxBook/identities';
 
 const book = officerBook();
 
@@ -82,10 +83,27 @@ async function openMovePayment(page: Page) {
   return page.getByRole('dialog', { name: 'Move a payment' });
 }
 
-// Two bugs: the Miner page reads only that Miner (bookRead/scopedMiner.ts), so the picker
-// (`view.miners`, BookDialogs.tsx ReassignPaymentDialog) lists no other Miner; and see below.
+// The Miner page reads only that Miner, so the picker reads the book's Miners itself
+// (`useBookMiners`): the groupings and the server's miner list, which holds every Miner an
+// officer's visit to the whole book counted. That visit comes first, as it would in use.
+// Still open: that visit recorded Bram's days as paid for good (`meta/paid`), so once the payment
+// moves off they stay paid, written off as Market adjustments, and his Owed stays 0. Moving a
+// payment must release the recorded paid-through (server side), as the test below needs too.
 test.fixme('an officer moves a payment to another Miner', async ({ page }) => {
-  const dialog = await openMovePayment(page);
+  await signInAsOfficer(page, './corp/moons/miners');
+  await expect(page.getByRole('row', { name: new RegExp(MINER.cora.name) })).toBeVisible();
+  await expect
+    .poll(async () => {
+      const list = await readDoc(`corps/${CORP}/readModels/minerList`);
+      return ((list?.miners as { minerId: string }[] | undefined) ?? []).map((m) => m.minerId);
+    })
+    .toContain(book.id('cora'));
+  // Straight to Bram's page, as a link would: the book is read for him alone.
+  await page.goto(minerUrl(book.id('bram')));
+  await expect(page.getByRole('table', { name: 'Account ledger' })).toBeVisible();
+  await page.getByRole('button', { name: /^More actions for .* payment$/ }).click();
+  await page.getByRole('menuitem', { name: 'Move to another Miner' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Move a payment' });
   await dialog.getByRole('radio', { name: MINER.cora.name }).check();
   await dialog.getByRole('button', { name: 'Move payment' }).click();
   await expect(dialog).toBeHidden();
@@ -95,9 +113,11 @@ test.fixme('an officer moves a payment to another Miner', async ({ page }) => {
   await owed(page, book.cora.owed - book.bram.paid);
 });
 
-// The server re-checks roles live for `reassignPayment`, but the client's LIVE_CHECK_ACTIONS
-// (taxBook/bookClient.ts) omit it, so no access token goes and the server answers
-// `live-check-required`: "That did not go through".
+// The server re-checks roles live for `reassignPayment`: its token goes with it now
+// (LIVE_CHECK_ACTION_NAMES, shared with the server). Still open: the officer's visit recorded the
+// days the payment paid as paid for good (`meta/paid`, settledThrough), so once it is moved off
+// they stay paid, the money written off as a Market adjustment, and Owed stays 0. Moving a payment
+// must release the Miner's recorded paid-through (server side, like a checkpoint on an edit).
 test.fixme('an officer takes a payment off a Miner, and it waits in Needs you', async ({
   page,
 }) => {
@@ -171,9 +191,8 @@ test('a disputed day is held: payments skip it and pay the next days', async ({ 
   await expect(owedDays).toContainText(shortDay(book.dax.heldBack));
 });
 
-// The held day has no status on the Miner page: the ledger leaves it out and its note counts it
-// as "not billable yet" (MinerDetail.tsx, AccountLedger.tsx), while Needs you says it is held.
-test.fixme("the Miner page says a disputed day is held, not that it isn't billable yet", async ({
+// The held day says it is held, with its dispute, in Owed days and under the ledger, as Needs you does.
+test("the Miner page says a disputed day is held, not that it isn't billable yet", async ({
   page,
 }) => {
   await openMiner(page, book.id('dax'), MINER.dax.name);

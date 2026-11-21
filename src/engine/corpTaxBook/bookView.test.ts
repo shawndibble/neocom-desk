@@ -607,6 +607,11 @@ describe('accountLedger', () => {
     const l = ledgerOf(view);
     expect(l.entries.some((e) => e.date === '2026-09-16')).toBe(false);
     expect(l.balance).toBe(view.miners[0].owed - view.miners[0].credit);
+    // Held, with the dispute that holds it: never "not billable yet".
+    const day = minerDetail(view, 'solo:1')!.days.find((d) => d.date === '2026-09-16')!;
+    expect(day.disputed).toEqual({ disputeId: 'd1', until: '2026-10-01T00:00:00.000Z' });
+    expect(l.held).toEqual({ tax: day.tax, days: 1 });
+    expect(l.notYetBilled).toEqual(ledgerOf(buildBookView(running([]))).notYetBilled);
   });
 
   it('dates an officer charge by the day picked, and keeps it owed on a day recorded paid', () => {

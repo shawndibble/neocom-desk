@@ -15,7 +15,7 @@ import type { FeederReadClock } from './feederHealth';
 import type { DayCharge, Miner } from './charges';
 import type { FeederCoverage } from './coverage';
 import { activeDismissalFor, type Dismissal } from './dismissals';
-import type { OreDispute } from './disputes';
+import { disputeHold, type OreDispute } from './disputes';
 import {
   chunkRateFor,
   extractionStatus,
@@ -146,6 +146,8 @@ export interface DayRow {
   owed?: number;
   /** A `not-billable` day held while this moon owner's ledger cannot be read (#6210). */
   heldBy?: number;
+  /** An `owed` day an open dispute holds: nothing pays it or bills it until the dispute ends. */
+  disputed?: { disputeId: string; until: string };
   /** The newest late notice that listed the day. */
   noticeId?: string;
   dismissalId?: string;
@@ -349,6 +351,19 @@ export function buildBookView(input: BookViewInput): BookView {
     const noticeBy = new Map<string, string>();
     for (const n of notices) for (const line of n.lines) noticeBy.set(line.key, n.id);
     const through = input.checkpoints?.get(id)?.through;
+    /** The open dispute that holds a date, and until when. */
+    const disputeOf = (date: string) => {
+      for (const d of input.disputes ?? []) {
+        // A dispute filed before a regroup names the Miner it was then; its lines name the character.
+        const mine =
+          d.minerId === id ||
+          d.lines.some((l) => characterIds.some((c) => l.recordKey.startsWith(`${c}:`)));
+        if (d.date !== date || !mine) continue;
+        const hold = disputeHold(d, input.now);
+        if (hold) return { disputeId: d.id, until: hold.until };
+      }
+      return undefined;
+    };
 
     const days: DayRow[] = mine
       .map((c): DayRow => {
@@ -361,6 +376,7 @@ export function buildBookView(input: BookViewInput): BookView {
         else if (day ? day.settled : through !== undefined && c.date <= through) status = 'paid';
         else status = 'owed';
         const heldBy = status === 'not-billable' ? heldByOf(c.date) : undefined;
+        const disputed = status === 'owed' && day?.held ? disputeOf(c.date) : undefined;
         const noticeId = noticeBy.get(c.key);
         return {
           key: c.key,
@@ -378,6 +394,7 @@ export function buildBookView(input: BookViewInput): BookView {
           status,
           ...(status === 'owed' ? { owed: account.owedOf(c.date, c.taxOwed) } : {}),
           ...(heldBy !== undefined ? { heldBy } : {}),
+          ...(disputed ? { disputed } : {}),
           ...(noticeId ? { noticeId } : {}),
           ...(dismissal ? { dismissalId: dismissal.id } : {}),
         };

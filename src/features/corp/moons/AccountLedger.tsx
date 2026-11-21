@@ -278,6 +278,14 @@ export function AccountLedger({
             stackLayout="dense"
             {...table}
           />
+          {ledger.held.days > 0 && (
+            <p className="border-t border-line px-3 py-2 text-xs text-text-dim tabular-nums">
+              {t('corpTaxBook.moons.ledger.heldByDispute', {
+                count: ledger.held.days,
+                amount: isk(ledger.held.tax),
+              })}
+            </p>
+          )}
           {ledger.notYetBilled.days > 0 && (
             <p className="border-t border-line px-3 py-2 text-xs text-text-dim tabular-nums">
               {t('corpTaxBook.moons.ledger.notYetBilled', {

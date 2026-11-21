@@ -18429,6 +18429,7 @@
         "owed": "Owed",
         "not-billable": "Today's mining",
         "held": "Waiting for {{owner}}'s ledger",
+        "disputed": "Held: disputed, until {{date}}",
         "dismissed": "Dismissed"
       },
       "payment": {
@@ -18736,6 +18737,8 @@
         "even": "even",
         "summary_one": "{{count}} entry · {{balance}} ISK {{side}}",
         "summary_other": "{{count}} entries · {{balance}} ISK {{side}}",
+        "heldByDispute_one": "Held by a dispute: {{count}} day, {{amount}} ISK tax. Not in the balance until the dispute ends.",
+        "heldByDispute_other": "Held by a dispute: {{count}} days, {{amount}} ISK tax. Not in the balance until the dispute ends.",
         "notYetBilled_one": "Not in the balance yet: {{count}} day mined, {{amount}} ISK tax, not billable yet.",
         "notYetBilled_other": "Not in the balance yet: {{count}} days mined, {{amount}} ISK tax, not billable yet.",
         "cols": {
