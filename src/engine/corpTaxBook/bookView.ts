@@ -32,6 +32,7 @@ import { DAY_MS } from '@/lib/age';
 import { wholeIsk } from './wholeIsk';
 import { utcDayOf } from '../localDay';
 import type { MinerRunningAccount } from './minerRunningAccount';
+import type { BookMinerRunningAccount } from './personal';
 import { settleOpenSet, type MinerSettlement, type OpenSet, type OpenSetInput } from './openSet';
 
 /** What a view is built from: the open set's input, placed by the book's Extractions. */
@@ -208,6 +209,33 @@ export function bookMiner(
   const settlement = view.internals.byMiner.get(minerId);
   const row = settlement && view.miners.find((m) => m.id === minerId);
   return row && settlement ? { row, settlement, account: settlement.account } : undefined;
+}
+
+/** A Miner's account with what it billed and was paid: what the one Payee ledger is built from. */
+export type MinerAccountBooks = Pick<
+  BookMinerRunningAccount,
+  'minerId' | 'account' | 'lines' | 'payments' | 'notices'
+> & {
+  /** Mined but not Billable yet: beside the ledger, never in its balance. */
+  notYetBilled?: { tax: number; days: number };
+};
+
+/** Undefined for a Miner the view does not hold. */
+export function minerAccountOf(
+  view: Pick<BookView, 'internals'>,
+  minerId: string
+): MinerAccountBooks | undefined {
+  const s = view.internals.byMiner.get(minerId);
+  if (!s) return undefined;
+  const pending = s.days.filter((d) => d.status === 'not-billable');
+  return {
+    minerId,
+    account: s.account,
+    lines: s.billable.lines,
+    payments: s.payments,
+    notices: s.notices,
+    notYetBilled: { tax: pending.reduce((sum, d) => sum + d.tax, 0), days: pending.length },
+  };
 }
 
 /** Tax on days that are not Billable yet: not dismissed, after the Miner's last Billable day. */

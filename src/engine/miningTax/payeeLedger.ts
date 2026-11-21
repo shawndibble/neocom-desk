@@ -13,14 +13,8 @@ import {
   type LateNoticeStanding,
 } from '../../../functions/src/corpTaxBookLateNotice';
 import type { DayAmount, MinerRunningAccount } from '../corpTaxBook/minerRunningAccount';
-import { utcDay } from '../localDay';
+import { utcDayOf } from '../localDay';
 import type { OreLine } from './types';
-
-/** What the ledger reads off a Running account (`MinerRunningAccount`, for either kind of Payee). */
-export type LedgerAccount = Pick<
-  MinerRunningAccount,
-  'byDay' | 'applications' | 'credit' | 'balance' | 'paidThrough' | 'owes'
->;
 
 /** One line the account billed: a mined day's ore, or an officer's Adjustment. */
 export interface LedgerCharge {
@@ -83,7 +77,18 @@ export interface LedgerNotice {
  * describe has no date to stand on and is left out.
  */
 export interface PayeeLedgerSource {
-  account: LedgerAccount;
+  /** What the ledger reads off a Running account (`MinerRunningAccount`, for either kind of Payee). */
+  account: Pick<
+    MinerRunningAccount,
+    | 'byDay'
+    | 'applications'
+    | 'credit'
+    | 'balance'
+    | 'paidThrough'
+    | 'owes'
+    | 'writtenOffDays'
+    | 'writeOffDays'
+  >;
   /**
    * The closed-through checkpoint the account starts from (`RunningAccountCheckpoint`): one
    * opening row stands for every day through it, and no charge on or before it is listed again.
@@ -164,8 +169,6 @@ export interface PayeeLedger {
 /** A row before the running balance. */
 type Unbalanced<R = PayeeLedgerRow> = R extends PayeeLedgerRow ? Omit<R, 'balance'> : never;
 
-const dayOf = (at: string) => utcDay(Date.parse(at));
-
 export function payeeLedger(source: PayeeLedgerSource): PayeeLedger {
   const { account } = source;
   const { opening } = source;
@@ -188,7 +191,7 @@ export function payeeLedger(source: PayeeLedgerSource): PayeeLedger {
     ...(source.notices ?? []).map((notice): Unbalanced => ({
       kind: 'notice',
       key: `notice:${notice.id}`,
-      date: dayOf(notice.issuedAt),
+      date: utcDayOf(notice.issuedAt),
       at: notice.issuedAt,
       charged: 0,
       paid: 0,
@@ -221,7 +224,7 @@ export function payeeLedger(source: PayeeLedgerSource): PayeeLedger {
   };
 }
 
-function statusOf(account: LedgerAccount): PayeeLedgerStatus {
+function statusOf(account: PayeeLedgerSource['account']): PayeeLedgerStatus {
   if (account.owes) return { kind: 'owes', ...account.owes };
   if (account.paidThrough) return { kind: 'paid', through: account.paidThrough };
   return { kind: 'none' };
@@ -246,7 +249,7 @@ function chargeRows({ account, charges }: PayeeLedgerSource): Unbalanced[] {
       {
         kind: 'charge',
         key: `charge:${charge.id}:reversal`,
-        date: dayOf(charge.reversed.at),
+        date: utcDayOf(charge.reversed.at),
         at: charge.reversed.at,
         charged: -charge.tax,
         paid: 0,
@@ -270,7 +273,7 @@ function paymentRows({ account, payments = [] }: PayeeLedgerSource): Unbalanced[
       {
         kind: 'payment',
         key: `payment:${payment.id}`,
-        date: dayOf(payment.at),
+        date: utcDayOf(payment.at),
         at: payment.at,
         charged: 0,
         paid: applied.days.reduce((sum, d) => sum + d.amount, applied.credit),
@@ -287,65 +290,50 @@ function paymentRows({ account, payments = [] }: PayeeLedgerSource): Unbalanced[
  * officer undid forgave nothing: it shows its amount, and its reversal takes it back.
  */
 function officerWriteOffRows({ account, writeOffs = [] }: PayeeLedgerSource): Unbalanced[] {
-  const forgiven = account.applications.writeOffs.map((d) => ({ ...d }));
-  let head = 0;
-  const reversedRows = writeOffs
-    .filter((w) => w.reversed)
-    .flatMap((w): Unbalanced[] => [
+  const poured = account.writeOffDays();
+  return writeOffs.flatMap((w): Unbalanced[] => {
+    const reason = w.reason ? { reason: w.reason } : {};
+    if (!w.reversed)
+      return [
+        {
+          kind: 'writeOff',
+          cause: 'officer',
+          key: `writeOff:${w.id}`,
+          date: utcDayOf(w.at),
+          at: w.at,
+          charged: 0,
+          paid: (poured.get(w.id) ?? []).reduce((sum, d) => sum + d.amount, 0),
+          days: poured.get(w.id) ?? [],
+          ...reason,
+        },
+      ];
+    return [
       {
         kind: 'writeOff',
         cause: 'officer',
         key: `writeOff:${w.id}`,
-        date: dayOf(w.at),
+        date: utcDayOf(w.at),
         at: w.at,
         charged: 0,
         paid: Math.max(0, w.amount),
         days: [],
-        ...(w.reason ? { reason: w.reason } : {}),
+        ...reason,
         reversed: true,
       },
       {
         kind: 'writeOff',
         cause: 'officer',
         key: `writeOff:${w.id}:reversal`,
-        date: dayOf(w.reversed!.at),
-        at: w.reversed!.at,
+        date: utcDayOf(w.reversed.at),
+        at: w.reversed.at,
         charged: Math.max(0, w.amount),
         paid: 0,
         days: [],
-        ...(w.reversed!.reason ? { reason: w.reversed!.reason } : {}),
+        ...(w.reversed.reason ? { reason: w.reversed.reason } : {}),
         reversal: true,
       },
-    ]);
-  return [
-    ...reversedRows,
-    ...[...writeOffs]
-      .filter((w) => !w.reversed)
-      .sort((a, b) => a.at.localeCompare(b.at))
-      .map((w): Unbalanced => {
-        const days: DayAmount[] = [];
-        let left = Math.max(0, w.amount);
-        while (left > 0 && head < forgiven.length) {
-          const day = forgiven[head]!;
-          const take = Math.min(left, day.amount);
-          days.push({ date: day.date, amount: take });
-          day.amount -= take;
-          left -= take;
-          if (day.amount <= 0) head += 1;
-        }
-        return {
-          kind: 'writeOff',
-          cause: 'officer',
-          key: `writeOff:${w.id}`,
-          date: dayOf(w.at),
-          at: w.at,
-          charged: 0,
-          paid: days.reduce((sum, d) => sum + d.amount, 0),
-          days,
-          ...(w.reason ? { reason: w.reason } : {}),
-        };
-      }),
-  ];
+    ];
+  });
 }
 
 /**
@@ -353,21 +341,17 @@ function officerWriteOffRows({ account, writeOffs = [] }: PayeeLedgerSource): Un
  * it), so it reads right after that payment; a day no payment reached, on the day itself.
  */
 function toleranceRows({ account, payments = [] }: PayeeLedgerSource): Unbalanced[] {
-  const described = new Map(payments.map((p) => [p.id, p]));
-  const closedBy = new Map<string, LedgerPayment>();
-  for (const p of account.applications.payments) {
-    const payment = described.get(p.paymentId);
-    if (payment) for (const d of p.days) closedBy.set(d.date, payment);
-  }
+  const closing = new Map(payments.map((p) => [p.id, p]));
   const groups = new Map<string, { date: string; at?: string; days: DayAmount[] }>();
-  for (const [date, day] of account.byDay) {
-    if (day.writtenOff <= 0) continue;
-    const payment = closedBy.get(date);
-    const key = payment ? `tolerance:${payment.id}` : `tolerance:${date}`;
+  for (const w of account.writtenOffDays(payments)) {
+    const payment = w.paymentId === undefined ? undefined : closing.get(w.paymentId);
+    const key = payment ? `tolerance:${payment.id}` : `tolerance:${w.date}`;
     const group =
       groups.get(key) ??
-      (payment ? { date: dayOf(payment.at), at: payment.at, days: [] } : { date, days: [] });
-    group.days.push({ date, amount: day.writtenOff });
+      (payment
+        ? { date: utcDayOf(payment.at), at: payment.at, days: [] }
+        : { date: w.date, days: [] });
+    group.days.push({ date: w.date, amount: w.amount });
     groups.set(key, group);
   }
   return [...groups].map(([key, g]) => ({

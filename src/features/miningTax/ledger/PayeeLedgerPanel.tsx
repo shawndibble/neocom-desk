@@ -1,6 +1,9 @@
 import { useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  activeDateRangeFilters,
+  summarizeFilterValues,
+  type ActiveFilter,
   Button,
   DataTable,
   DateRangeFields,
@@ -21,21 +24,102 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import {
   payeeLedger,
   type PayeeLedger,
+  type PayeeLedgerKind,
   type PayeeLedgerRow,
   type PayeeLedgerSource,
 } from '@/engine/miningTax/payeeLedger';
 import { formatDateWithYear } from '@/lib/formatDateTick';
+import type { CsvColumn } from '@/lib/csv';
 import { formatIsk } from '@/lib/isk';
+import type { Translate } from '@/lib/translate';
 import { LedgerRowDetail } from './LedgerRowDetail';
-import {
-  activeLedgerFilters,
-  DEFAULT_LEDGER_FILTER,
-  filterLedgerRows,
-  LEDGER_KINDS,
-  ledgerCsvColumns,
-  ledgerWhat,
-  type LedgerFilter,
-} from './ledgerRows';
+
+/** The panel's filter and the words for each row, shared by its table and its export. */
+const LEDGER_KINDS: readonly PayeeLedgerKind[] = ['charge', 'payment', 'writeOff', 'notice'];
+
+interface LedgerFilter {
+  /** Inclusive `YYYY-MM-DD`; null is no bound. */
+  startDate: string | null;
+  endDate: string | null;
+  /** The kinds of row shown; every kind by default. */
+  kinds: readonly PayeeLedgerKind[];
+}
+
+const DEFAULT_LEDGER_FILTER: LedgerFilter = {
+  startDate: null,
+  endDate: null,
+  kinds: LEDGER_KINDS,
+};
+
+/**
+ * The rows the filter keeps. Each keeps the account's running balance: filtering hides rows, it
+ * never re-adds them. The opening balance is what every later balance starts from: always kept.
+ */
+function filterLedgerRows(rows: readonly PayeeLedgerRow[], filter: LedgerFilter): PayeeLedgerRow[] {
+  return rows.filter(
+    (r) =>
+      r.kind === 'opening' ||
+      (filter.kinds.includes(r.kind) &&
+        (filter.startDate === null || r.date >= filter.startDate) &&
+        (filter.endDate === null || r.date <= filter.endDate))
+  );
+}
+
+function activeLedgerFilters(filter: LedgerFilter, t: Translate): ActiveFilter<LedgerFilter>[] {
+  const active = activeDateRangeFilters(filter, t, {
+    from: t('miningTax.ledger.filter.from'),
+    to: t('miningTax.ledger.filter.to'),
+  });
+  if (filter.kinds.length < LEDGER_KINDS.length)
+    active.unshift({
+      label: t('miningTax.ledger.filter.show'),
+      value: summarizeFilterValues(
+        filter.kinds.map((k) => t(`miningTax.ledger.kind.${k}`)),
+        t
+      ),
+      clear: (value) => ({ ...value, kinds: LEDGER_KINDS }),
+    });
+  return active;
+}
+
+/** What a row is, in a few words: the table's What column and the export's. */
+function ledgerWhat(row: PayeeLedgerRow, t: Translate): string {
+  switch (row.kind) {
+    case 'charge':
+      if (row.reversal) return t('miningTax.ledger.what.reversal');
+      if (row.charge.kind === 'correction')
+        return t(
+          row.charge.opening
+            ? 'miningTax.ledger.what.openingBalance'
+            : 'miningTax.ledger.what.correction'
+        );
+      return row.charge.place
+        ? t('miningTax.ledger.what.minedAt', { place: row.charge.place })
+        : t('miningTax.ledger.what.mined');
+    case 'payment':
+      return row.payment.from
+        ? t('miningTax.ledger.what.paymentFrom', { name: row.payment.from })
+        : t('miningTax.ledger.what.payment');
+    case 'writeOff':
+      return row.reversal
+        ? t('miningTax.ledger.what.reversal')
+        : t(`miningTax.ledger.what.${row.cause}`);
+    case 'notice':
+      return t(`miningTax.ledger.what.${row.notice.kind}`);
+    case 'opening':
+      return t('miningTax.ledger.what.opening', { date: row.date });
+  }
+}
+
+function ledgerCsvColumns(t: Translate): CsvColumn<PayeeLedgerRow>[] {
+  return [
+    { header: t('miningTax.ledger.column.date'), value: (r) => r.date },
+    { header: t('miningTax.ledger.column.what'), value: (r) => ledgerWhat(r, t) },
+    { header: t('miningTax.ledger.column.charged'), value: (r) => r.charged || null },
+    { header: t('miningTax.ledger.column.credited'), value: (r) => r.paid || null },
+    { header: t('miningTax.ledger.column.balance'), value: (r) => r.balance },
+  ];
+}
 
 export interface PayeeLedgerPanelProps {
   open: boolean;

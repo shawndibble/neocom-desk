@@ -1451,21 +1451,15 @@ function paidByOf(account: MinerRunningAccount, date: string, share: number): Pa
 /** The reasons of the officer write-offs that forgave each date, poured in the order recorded. */
 function writeOffReasons(p: Prepared, minerId: string, account: MinerRunningAccount) {
   const out = new Map<string, string[]>();
-  const forgiven = account.applications.writeOffs.map((d) => ({ ...d }));
-  let head = 0;
-  const writeOffs = (p.book.writeOffs ?? [])
-    .filter((w) => w.minerId === minerId && !w.reversed)
-    .sort((a, b) => a.at.localeCompare(b.at));
-  for (const w of writeOffs) {
-    let left = Math.max(0, w.amount);
-    while (left > 0 && head < forgiven.length) {
-      const day = forgiven[head]!;
-      const take = Math.min(left, day.amount);
+  const reasonOf = new Map(
+    (p.book.writeOffs ?? []).filter((w) => w.minerId === minerId).map((w) => [w.id, w.reason])
+  );
+  for (const [id, days] of account.writeOffDays()) {
+    const reason = reasonOf.get(id);
+    if (reason === undefined) continue;
+    for (const day of days) {
       const reasons = out.get(day.date) ?? [];
-      if (!reasons.includes(w.reason)) out.set(day.date, [...reasons, w.reason]);
-      day.amount -= take;
-      left -= take;
-      if (day.amount <= 0) head += 1;
+      if (!reasons.includes(reason)) out.set(day.date, [...reasons, reason]);
     }
   }
   return out;

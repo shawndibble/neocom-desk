@@ -5,6 +5,7 @@ import {
   buildBookView,
   extractionDetail,
   bookMiner,
+  minerAccountOf,
   minerDetail,
   noticeDetail,
   type BookView,
@@ -462,7 +463,9 @@ describe('the Miner ledger (minerLedgerSource into payeeLedger)', () => {
       payments,
     });
   const ledgerOf = (v: BookView) => {
-    const l = payeeLedger(minerLedgerSource(v, 'solo:1', { character: (id) => `Pilot ${id}` })!);
+    const l = payeeLedger(
+      minerLedgerSource(minerAccountOf(v, 'solo:1')!, v.input, { character: (id) => `Pilot ${id}` })
+    );
     return { ...l, balance: l.rows.at(-1)?.balance ?? 0 };
   };
   const shape = (l: ReturnType<typeof ledgerOf>) =>
@@ -738,7 +741,11 @@ describe('the Miner ledger from a checkpoint', () => {
         ]),
       })
     );
-    const l = payeeLedger(minerLedgerSource(view, 'solo:1', { character: (id) => `Pilot ${id}` })!);
+    const l = payeeLedger(
+      minerLedgerSource(minerAccountOf(view, 'solo:1')!, view.input, {
+        character: (id) => `Pilot ${id}`,
+      })
+    );
     expect(l.rows.map((e) => [e.kind, e.date, e.charged, e.paid, e.balance])).toEqual([
       ['opening', '2026-08-31', 50_000, 0, 50_000],
       ['charge', '2026-09-10', 100_000, 0, 150_000],

@@ -40,13 +40,16 @@ import {
 } from '@/features/miningTax/paymentLinks';
 import {
   paymentLinkKey,
+  linkAt,
   type PayeePaymentLink,
   heldPaymentKeys,
 } from '@/engine/miningTax/payeeRunningAccount';
+import type { LedgerCharge, LedgerPayment } from '@/engine/miningTax/payeeLedger';
 import type { PayeeRunningAccounts } from '@/features/miningTax/payeeRunningAccounts';
 import { buildSettleUpReason } from '@/features/miningTax/groupRows';
 import { systemLabel } from '@/features/miningTax/names';
-import { bookLedgerSource, personalLedgerSource } from '@/features/miningTax/ledger/ledgerSources';
+import { madePaymentHref } from '@/features/miningTax/madePaymentHref';
+import { minerLedgerSource } from '@/engine/corpTaxBook/minerLedgerSource';
 import { minerIdFor } from '@/engine/corpTaxBook/charges';
 import { formatIsk } from '@/lib/isk';
 import { pricesAtHubOnDate, type DatedUnitPrices } from '@/features/miningTax/pricing';
@@ -628,29 +631,47 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
       const account = accounts.of(ledgerTarget.payeeId);
       if (!account) return null;
       const byId = new Map(everyAssignment.map((a) => [a.id, a]));
-      return personalLedgerSource(
-        account,
-        (id) => byId.get(id),
-        (a) => systemLabel(systemNames, a.solarSystemId),
-        (l) =>
-          l.kind === 'recorded' || l.kind === 'legacy'
-            ? undefined
-            : characterNameOf(
-                madePayments.find((m) => m.key === `${l.kind}:${l.refId}`)?.characterId ?? 0
-              )
-      );
+      return {
+        account: account.account,
+        charges: account.charges.map((c): LedgerCharge => {
+          const a = byId.get(c.id);
+          const place = a ? systemLabel(systemNames, a.solarSystemId) : undefined;
+          return {
+            id: c.id,
+            date: c.date,
+            kind: 'mined',
+            tax: c.tax,
+            ...(place ? { place } : {}),
+            ...(a ? { ore: a.oreLines } : {}),
+          };
+        }),
+        payments: account.links.map((l): LedgerPayment => {
+          // A recorded or legacy link names no payer of its own, and no transaction.
+          const payer =
+            l.kind === 'recorded' || l.kind === 'legacy'
+              ? undefined
+              : characterNameOf(
+                  madePayments.find((m) => m.key === `${l.kind}:${l.refId}`)?.characterId ?? 0
+                );
+          const href = madePaymentHref(l);
+          return {
+            id: paymentLinkKey(l),
+            at: linkAt(l),
+            ...(payer ? { from: payer } : {}),
+            ...(href ? { href } : {}),
+          };
+        }),
+      };
     }
     const book = corpView?.books.find((b) => b.loaded.corporationId === ledgerTarget.corporationId);
     if (!book) return null;
     const miner = book.summary.miners.find((m) => m.minerId === ledgerMinerId);
     if (!miner) return null;
-    return bookLedgerSource(
-      miner,
-      book.loaded.writeOffs ?? [],
-      (structureId) =>
-        structureId === undefined ? undefined : book.loaded.structureNames?.[structureId],
-      characterNameOf
-    );
+    return minerLedgerSource(miner, book.loaded, {
+      character: characterNameOf,
+      place: (l) =>
+        l.structureId === undefined ? undefined : book.loaded.structureNames?.[l.structureId],
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- characterNameOf reads trackedCharacters
   }, [
     ledgerTarget,

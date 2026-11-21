@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { payeeLedger } from '../miningTax/payeeLedger';
-import { buildBookView, type BookViewInput } from './bookView';
+import { buildBookView, minerAccountOf, type BookViewInput } from './bookView';
 import { minerLedgerSource } from './minerLedgerSource';
 import type { ObservedMiningEntry } from './types';
 
@@ -52,8 +52,15 @@ function input(overrides: Partial<BookViewInput> = {}): BookViewInput {
   };
 }
 
-const ledgerOf = (v: ReturnType<typeof buildBookView>) =>
-  payeeLedger(minerLedgerSource(v, 'solo:1', { character: (id) => `Pilot ${id}` })!);
+const sourceOf = (
+  v: ReturnType<typeof buildBookView>,
+  names: Partial<Parameters<typeof minerLedgerSource>[2]> = {}
+) =>
+  minerLedgerSource(minerAccountOf(v, 'solo:1')!, v.input, {
+    character: (id) => `Pilot ${id}`,
+    ...names,
+  });
+const ledgerOf = (v: ReturnType<typeof buildBookView>) => payeeLedger(sourceOf(v));
 const owedLessCredit = (v: ReturnType<typeof buildBookView>) =>
   v.miners[0]!.owed - v.miners[0]!.credit;
 
@@ -87,10 +94,9 @@ describe("minerLedgerSource: a Miner's account as the Payee ledger reads it", ()
         ],
       })
     );
-    const source = minerLedgerSource(view, 'solo:1', {
-      character: (id) => `Pilot ${id}`,
+    const source = sourceOf(view, {
       walletHref: (id) => (id.startsWith('j') ? `/wallet/${id}` : undefined),
-    })!;
+    });
     expect(new Map(source.payments?.map((p) => [p.id, p.href]))).toEqual(
       new Map([
         ['j3_5550123', '/wallet/j3_5550123'],
@@ -129,6 +135,8 @@ describe("minerLedgerSource: a Miner's account as the Payee ledger reads it", ()
     const l = ledgerOf(view);
     expect(l.rows.at(-1)!.balance).toBeCloseTo(owedLessCredit(view), 6);
     const keys = l.rows.map((r) => r.key);
+    // A correction keeps its raw id, which the row menu's edit and reverse take.
+    expect(sourceOf(view).charges.map((c) => c.id)).toEqual(expect.arrayContaining(['c1', 'o1']));
     expect(keys).toContain('charge:c1:reversal');
     expect(keys).toContain('writeOff:w1');
     const opening = l.rows.find((r) => r.key === 'charge:o1');
@@ -159,5 +167,70 @@ describe("minerLedgerSource: a Miner's account as the Payee ledger reads it", ()
     const l = ledgerOf(view);
     expect(l.rows[0]).toMatchObject({ kind: 'opening', date: '2026-08-31', charged: 100_000 });
     expect(l.rows.at(-1)!.balance).toBeCloseTo(owedLessCredit(view), 6);
+  });
+  it('names where a day was mined and who paid, and leaves out what the caller cannot name', () => {
+    const view = buildBookView(input({ payments: [pay('p1', 150_000, '2026-09-17T10:00:00Z')] }));
+    const named = sourceOf(view, { place: (l) => `Refinery ${l.structureId}` });
+    expect(named.charges.map((c) => c.place)).toEqual(['Refinery 1001', 'Refinery 1001']);
+    const unnamed = sourceOf(view, { character: () => undefined });
+    expect(unnamed.charges.map((c) => c.place)).toEqual([undefined, undefined]);
+    expect(unnamed.payments?.[0]).not.toHaveProperty('from');
+  });
+
+  it('lists a correction the account bills, not one dated past the days it bills', () => {
+    const adjustment = (id: string, date: string) => ({
+      id,
+      minerId: 'solo:1',
+      date,
+      amount: 10_000,
+      reason: id,
+      by: 2,
+      at: '2026-09-18T00:00:00Z',
+    });
+    const view = buildBookView(
+      input({
+        adjustments: [adjustment('billed', '2026-09-15'), adjustment('future', '2026-09-18')],
+      })
+    );
+    const ids = sourceOf(view).charges.map((c) => c.id);
+    expect(ids).toContain('billed');
+    expect(ids).not.toContain('future');
+    expect(ledgerOf(view).rows.at(-1)!.balance).toBeCloseTo(owedLessCredit(view), 6);
+  });
+
+  it('never pours a write-off dated before the snapshot into a day after it', () => {
+    const checkpoint = {
+      minerId: 'solo:1',
+      through: '2026-08-31',
+      owed: [{ date: '2026-08-10', remaining: 100_000, tax: 100_000, credited: 0 }],
+      credit: 0,
+      balance: 100_000,
+      paidThrough: null,
+      characterIds: [1],
+      at: '2026-11-01T00:00:00Z',
+    };
+    const writeOffs = [
+      // Already in the snapshot's balance.
+      {
+        id: 'old',
+        minerId: 'solo:1',
+        amount: 30_000,
+        at: '2026-08-20T12:00:00Z',
+        reason: 'Before',
+      },
+      { id: 'new', minerId: 'solo:1', amount: 20_000, at: '2026-09-17T12:00:00Z', reason: 'After' },
+    ];
+    const view = buildBookView(
+      input({
+        entries: [entry('2026-08-10'), entry('2026-09-10')],
+        checkpoints: new Map([['solo:1', checkpoint]]),
+        writeOffs,
+      })
+    );
+    const offs = ledgerOf(view).rows.filter((r) => r.kind === 'writeOff');
+    expect(offs.map((r) => r.key)).toEqual(['writeOff:new']);
+    expect(offs[0]!.kind === 'writeOff' && offs[0]!.days).toEqual([
+      { date: '2026-08-10', amount: 20_000 },
+    ]);
   });
 });

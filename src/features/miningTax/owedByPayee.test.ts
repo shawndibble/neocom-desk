@@ -46,6 +46,17 @@ describe('computeOwedByPayee', () => {
     expect(owed.size).toBe(2);
   });
 
+  it('owes what the account owes, a needs-review day it bills included, as the cards say', () => {
+    const all = [
+      assignment({ id: '1', taxOwed: 100 }),
+      assignment({ id: '2', taxOwed: 50, date: '2026-10-02', status: 'needs-review' }),
+    ];
+    const accounts = accountsOf(all);
+    const owed = computeOwedByPayee(all, accounts);
+    expect(accounts.of('p1')?.owes?.amount).toBe(150);
+    expect(owed.get('p1')).toMatchObject({ amount: 150, count: 2 });
+  });
+
   it('leaves out an Assignment whose day is paid', () => {
     const all = [assignment({ id: '1' }), assignment({ id: '2', date: '2026-10-02' })];
     const owed = computeOwedByPayee(
