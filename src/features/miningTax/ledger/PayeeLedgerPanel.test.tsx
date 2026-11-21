@@ -91,6 +91,21 @@ describe('PayeeLedgerPanel', () => {
     expect(within(table()).getByText('Handed over in person')).toBeInTheDocument();
   });
 
+  it("shows a pick between a pilot's Miners above the ledger (N7)", () => {
+    render(
+      <MemoryRouter>
+        <PayeeLedgerPanel
+          open
+          onClose={() => {}}
+          payeeName="Brass Meridian"
+          source={CORP_BOOK_LEDGER}
+          picker={<div role="group" aria-label="Whose account" />}
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole('group', { name: 'Whose account' })).toBeInTheDocument();
+  });
+
   it('says so when nothing is billed yet, and spins while loading', () => {
     const { unmount } = renderPanel(EMPTY_LEDGER);
     expect(screen.getByText('Nothing on this ledger yet')).toBeInTheDocument();

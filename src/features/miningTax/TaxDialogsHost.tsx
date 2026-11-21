@@ -62,6 +62,7 @@ import {
   type TaxDialogStore,
 } from '@/features/miningTax/useTaxDialogs';
 import { useTranslation } from 'react-i18next';
+import { SegmentedControl } from '@/components/ui';
 
 const LinkPaymentDialog = lazy(() =>
   guarded(() => import('@/features/miningTax/LinkPaymentDialog')).then((m) => ({
@@ -583,6 +584,43 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     : undefined;
 
   // The Payee ledger: a personal Payee's account, or the book Miner of the active Character.
+  // A book's ledger is one Miner's: the one picked, else the active Character's, else the first.
+  const ledgerBook =
+    ledgerTarget?.kind === 'book'
+      ? corpView?.books.find((b) => b.loaded.corporationId === ledgerTarget.corporationId)
+      : undefined;
+  const ledgerMiners = ledgerBook?.summary.miners ?? [];
+  const ledgerMinerId = (() => {
+    if (!ledgerBook || ledgerTarget?.kind !== 'book') return undefined;
+    const own =
+      activeCharacterId === null
+        ? undefined
+        : minerIdFor(activeCharacterId, ledgerBook.loaded.miners);
+    const ids = ledgerMiners.map((m) => m.minerId);
+    return [ledgerTarget.minerId, own].find((id) => id !== undefined && ids.includes(id)) ?? ids[0];
+  })();
+  const minerName = (minerId: string) => {
+    const main = ledgerBook?.loaded.miners.find((m) => m.id === minerId)?.mainCharacterId;
+    const solo = /^solo:(\d+)$/.exec(minerId)?.[1];
+    const id = main ?? (solo === undefined ? undefined : Number(solo));
+    return (id === undefined ? undefined : characterNameOf(id)) ?? minerId;
+  };
+  const ledgerPicker =
+    ledgerBook && ledgerMiners.length > 1 && ledgerMinerId !== undefined ? (
+      <SegmentedControl
+        label={t('miningTax.ledger.minerPicker')}
+        options={ledgerMiners.map((m) => ({ value: m.minerId, label: minerName(m.minerId) }))}
+        value={ledgerMinerId}
+        onChange={(minerId) =>
+          actions.openLedger({
+            kind: 'book',
+            corporationId: ledgerBook.loaded.corporationId,
+            minerId,
+          })
+        }
+        uppercase={false}
+      />
+    ) : null;
   const ledgerSource = useMemo(() => {
     if (!ledgerTarget) return null;
     if (ledgerTarget.kind === 'personal') {
@@ -603,9 +641,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     }
     const book = corpView?.books.find((b) => b.loaded.corporationId === ledgerTarget.corporationId);
     if (!book) return null;
-    const own =
-      activeCharacterId === null ? undefined : minerIdFor(activeCharacterId, book.loaded.miners);
-    const miner = book.summary.miners.find((m) => m.minerId === own) ?? book.summary.miners[0];
+    const miner = book.summary.miners.find((m) => m.minerId === ledgerMinerId);
     if (!miner) return null;
     return bookLedgerSource(
       miner,
@@ -622,7 +658,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     systemNames,
     madePayments,
     corpView,
-    activeCharacterId,
+    ledgerMinerId,
     trackedCharacters,
   ]);
   const ledgerTitle =
@@ -976,6 +1012,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             payeeName={ledgerTitle}
             source={ledgerSource}
             typeNames={typeNames}
+            {...(ledgerPicker ? { picker: ledgerPicker } : {})}
           />
         </Suspense>
       )}

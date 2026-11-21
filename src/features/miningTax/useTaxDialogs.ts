@@ -14,7 +14,9 @@ export interface LinkWalletTarget {
 
 /** The Payee ledger open: a personal Payee's, or a Corp Tax Book's. */
 export type LedgerTarget =
-  { kind: 'personal'; payeeId: string } | { kind: 'book'; corporationId: number };
+  | { kind: 'personal'; payeeId: string }
+  /** A Corp Tax Book's ledger, on one of the member's Miners there (the active Character's by default). */
+  | { kind: 'book'; corporationId: number; minerId?: string };
 
 /** Which Mining Tax dialog is open, and on what. `null` / `false` keeps each one closed. */
 export interface TaxDialogState {

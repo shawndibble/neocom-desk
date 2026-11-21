@@ -8885,7 +8885,8 @@
       "emptyHint": "A day shows here once it is billed.",
       "filteredTitle": "No entries match these filters",
       "openFor": "Open the ledger of {{payee}}",
-      "balanceCredit": "{{amount}} credit"
+      "balanceCredit": "{{amount}} credit",
+      "minerPicker": "Whose account"
     }
   },
   "assets": {
