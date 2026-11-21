@@ -13,7 +13,12 @@ import { NeedsYouQueue } from './NeedsYouQueue';
 import type { BookContextValue } from './bookContextValue';
 import type { GroupingAnswer } from '../taxBook/bookClient';
 
-vi.mock('../taxBook/bookClient', () => ({ editBook: vi.fn(async () => ({})), readAudit: vi.fn() }));
+const dismissGroupingAnswer = vi.fn(async () => ({ dismissedAt: '2026-10-20T00:00:00Z' }));
+vi.mock('../taxBook/bookClient', () => ({
+  editBook: vi.fn(async () => ({})),
+  readAudit: vi.fn(),
+  dismissGroupingAnswer: (...args: unknown[]) => dismissGroupingAnswer(...(args as [])),
+}));
 const loadDivisions = vi.fn(async () => ({ cached: null, needsReauth: false }) as unknown);
 vi.mock('../wallet', () => ({ loadCorporationDivisions: () => loadDivisions() }));
 vi.mock('./lateNoticeMailing', () => ({
@@ -348,6 +353,27 @@ describe('NeedsYouQueue (#6207)', () => {
     renderQueue([], {
       miners: [{ ...group, characterIds: [7, 9, 8] }],
       groupingAnswers: [declined],
+    });
+    expect(screen.queryByText(/says they aren't part of/)).not.toBeInTheDocument();
+  });
+
+  it('dismisses a declined grouping, and hides one an officer dismissed', async () => {
+    const declined: GroupingAnswer = {
+      characterId: 8,
+      minerId: 'g1',
+      answer: 'declined',
+      at: '2026-10-19T00:00:00Z',
+      via: 'character',
+    };
+    const miners = [{ ...miner('g1', 7), characterIds: [7, 9] }, miner('solo:8', 8)];
+    renderQueue([], { miners, groupingAnswers: [declined] });
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    // The officer's own Character signs the call; the answer's Character is the one dismissed.
+    expect(dismissGroupingAnswer).toHaveBeenCalledWith(9, 98000001, 8);
+    cleanup();
+    renderQueue([], {
+      miners,
+      groupingAnswers: [{ ...declined, dismissedAt: '2026-10-20T00:00:00Z' }],
     });
     expect(screen.queryByText(/says they aren't part of/)).not.toBeInTheDocument();
   });

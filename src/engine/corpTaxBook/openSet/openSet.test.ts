@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { settleOpenSet, placeOfFactory, type OpenSet, type OpenSetInput } from '.';
 import type { SyncExtraction } from '../sync';
 import type { ObservedMiningEntry } from '../types';
+import type { OreDispute } from '../disputes';
 
 const CORP = 98000001;
 const OWNER = 98000777;
@@ -172,6 +173,69 @@ describe('settleOpenSet: officer and member agree', () => {
     const theirs = settleOpenSet(book);
     const mine = settleOpenSet(member(book, characterIds));
     expect(settlementOf(mine, minerId)).toEqual(settlementOf(theirs, minerId));
+  });
+
+  it('waives a snapshot’s held day by what dismissing its dispute credited', () => {
+    const held = '2026-06-20';
+    // Adjustments dated on or before `through` are in the snapshot already: the waiver
+    // `dismissDispute` writes on the held day is counted once (from the dispute), the other never.
+    const adjustment = (id: string, date: string, amount: number) => ({
+      id,
+      minerId: 'solo:1',
+      date,
+      amount,
+      reason: 'r',
+      by: 9,
+      at: '2026-09-12T00:00:00Z',
+    });
+    const book = (resolution?: OreDispute['resolution']) =>
+      officer({
+        miners: [{ id: 'solo:1', characterIds: [1], mainCharacterId: 1 }],
+        adjustments: [
+          adjustment('a-old', '2026-06-10', -50_000),
+          ...(resolution?.kind === 'dismissed'
+            ? [adjustment('a-waiver', held, -resolution.amountIsk)]
+            : []),
+        ],
+        checkpoints: new Map([
+          [
+            'solo:1',
+            {
+              minerId: 'solo:1',
+              through: '2026-06-30',
+              owed: [{ date: held, remaining: 100_000, tax: 100_000, credited: 0, held: true }],
+              credit: 0,
+              balance: 0,
+              paidThrough: '2026-06-30',
+              characterIds: [1],
+              at: '2026-09-01T00:00:00Z',
+            },
+          ],
+        ]),
+        disputes: [
+          {
+            id: `solo:1_${held}`,
+            minerId: 'solo:1',
+            date: held,
+            lines: [{ recordKey: keyOf(1, held), typeId: ORE, quantity: 1000, payeeName: 'Them' }],
+            by: 1,
+            at: '2026-09-10T00:00:00Z',
+            ...(resolution ? { resolution } : {}),
+          },
+        ],
+      });
+    const account = (b: OpenSetInput) => settleOpenSet(b).miners.get('solo:1')!.account;
+    expect(account(book()).day(held)?.held).toBe(true);
+    const at = '2026-09-12T00:00:00Z';
+    expect(account(book({ kind: 'rejected', at, by: 9, reason: 'no' })).owes?.amount).toBe(100_000);
+    const waived = account(
+      book({ kind: 'dismissed', at, by: 9, reason: 'fair', amountIsk: 100_000 })
+    );
+    expect(waived.day(held)).toMatchObject({ held: false, settled: true });
+    expect(waived.owes).toBeNull();
+    const part = account(book({ kind: 'dismissed', at, by: 9, reason: 'rate', amountIsk: 40_000 }));
+    expect(part.day(held)?.remaining).toBe(60_000);
+    expect(part.owes?.amount).toBe(60_000);
   });
 
   it('places a day on its Extraction for the officer, and on the row’s moon only for a member', () => {

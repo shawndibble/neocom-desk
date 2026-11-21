@@ -42,6 +42,21 @@ describe('groupingAnswersFrom', () => {
     ]);
   });
 
+  it('reads when an officer dismissed an answer from Needs you', () => {
+    expect(
+      groupingAnswersFrom({
+        answers: {
+          '61': {
+            minerId: 'm-a',
+            answer: 'declined',
+            at: '2026-10-18T10:00:00Z',
+            dismissedAt: '2026-10-19T10:00:00Z',
+          },
+        },
+      })[0]?.dismissedAt
+    ).toBe('2026-10-19T10:00:00Z');
+  });
+
   it('drops anything malformed, and a missing doc is no answers', () => {
     expect(groupingAnswersFrom(undefined)).toEqual([]);
     expect(

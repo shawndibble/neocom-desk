@@ -74,6 +74,11 @@ export function settleMiner(
       .filter((d) => isMinersDispute(d, minerId, characterIds) && disputeHold(d, input.now))
       .map((d) => d.date)
   );
+  // What dismissing a dispute credited: a checkpoint's held day reads it off the dispute.
+  const disputeWaivers = new Map<string, number>();
+  for (const d of input.disputes ?? [])
+    if (d.resolution?.kind === 'dismissed' && isMinersDispute(d, minerId, characterIds))
+      disputeWaivers.set(d.date, (disputeWaivers.get(d.date) ?? 0) + d.resolution.amountIsk);
   const checkpoint = usableCheckpoint(input.checkpoints?.get(minerId), characterIds);
   const storedPaidThrough = input.minerPaidThrough?.get(minerId);
   const account = MinerRunningAccount.build({
@@ -83,6 +88,7 @@ export function settleMiner(
     writeOffs: (input.writeOffs ?? []).filter((w) => w.minerId === minerId && !w.reversed),
     startDate: input.startDate,
     heldDays,
+    disputeWaivers,
     ...(storedPaidThrough !== undefined ? { storedPaidThrough } : {}),
     ...(input.dayTolerancePct !== undefined ? { dayTolerancePct: input.dayTolerancePct } : {}),
     toleranceExemptions: exemptionsOf(input.toleranceExemptions, minerId),

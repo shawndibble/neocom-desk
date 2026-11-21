@@ -318,6 +318,66 @@ describe('MinerRunningAccount.build from a closed-through checkpoint', () => {
   });
 });
 
+describe('MinerRunningAccount.build: a snapshot’s held day follows the live dispute', () => {
+  // An open dispute held 2026-10-20 when the snapshot was taken: owed, out of the balance, and
+  // the paid-through day passed it.
+  const snapshot = checkpoint({
+    owed: [{ date: '2026-10-20', remaining: 500_000, tax: 500_000, credited: 0, held: true }],
+  });
+  const build = (over: Partial<MinerRunningAccountInput> = {}) =>
+    MinerRunningAccount.build({
+      days: [day('2026-11-02', 1e6)],
+      payments: [payment('p1', 600_000, '2026-11-05T10:00:00Z')],
+      checkpoint: snapshot,
+      ...over,
+    });
+
+  it('stays held while the dispute is open: no money, and out of the balance', () => {
+    const account = build({ heldDays: new Set(['2026-10-20']) });
+    expect(account.day('2026-10-20')).toMatchObject({ held: true, credited: 0 });
+    expect(account.balance).toBe(400_000);
+    expect(account.owes).toEqual({ amount: 400_000, days: 1, oldest: '2026-11-02' });
+  });
+
+  it('is owed again once the dispute is rejected or withdrawn, and paid oldest first', () => {
+    const account = build();
+    expect(account.day('2026-10-20')).toMatchObject({ held: false, settled: true });
+    expect(account.day('2026-11-02')?.remaining).toBe(900_000);
+    expect(account.balance).toBe(900_000);
+    expect(account.paidThrough).toBe('2026-10-31');
+    const unpaid = build({ payments: [] });
+    expect(unpaid.owes).toEqual({ amount: 1.5e6, days: 2, oldest: '2026-10-20' });
+    expect(unpaid.paidThrough).toBe('2026-10-19');
+  });
+
+  it('is waived once officers dismiss the dispute: by what the dismissal credited', () => {
+    const account = build({ disputeWaivers: new Map([['2026-10-20', 500_000]]) });
+    expect(account.day('2026-10-20')).toMatchObject({ held: false, settled: true });
+    expect(account.day('2026-11-02')?.remaining).toBe(400_000);
+    expect(account.balance).toBe(400_000);
+    expect(account.paidThrough).toBe('2026-10-31');
+    // A waiver of part of the day (a rate dispute) leaves the rest owed.
+    const part = build({ payments: [], disputeWaivers: new Map([['2026-10-20', 200_000]]) });
+    expect(part.day('2026-10-20')?.remaining).toBe(300_000);
+    expect(part.balance).toBe(1.3e6);
+  });
+
+  it('carries a day the snapshot did not hold unchanged: a live hold or waiver does not reach it', () => {
+    const account = build({
+      payments: [],
+      heldDays: new Set(['2026-10-20']),
+      disputeWaivers: new Map([['2026-10-20', 500_000]]),
+      checkpoint: checkpoint({
+        owed: [{ date: '2026-10-20', remaining: 500_000, tax: 500_000, credited: 0 }],
+        balance: 500_000,
+        paidThrough: '2026-10-19',
+      }),
+    });
+    expect(account.day('2026-10-20')).toMatchObject({ held: false, remaining: 500_000 });
+    expect(account.balance).toBe(1.5e6);
+  });
+});
+
 describe('MinerRunningAccount.checkpoint', () => {
   const input: MinerRunningAccountInput = {
     days: [day('2026-10-01', 1e6), day('2026-10-02', 2e6), day('2026-11-02', 1e6)],

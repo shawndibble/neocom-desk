@@ -951,7 +951,16 @@ export function MinerDetail({ id }: { id: string }) {
                   })}
                   <span className="text-text-dim">
                     {' '}
-                    · “{d.reason}”{d.reversed && ` · ${t('corpTaxBook.moons.miner.reversed')}`}
+                    · “{d.reason}”
+                    {d.reversed &&
+                      // A reversal stamped with a lock date ends the dismissal only from that day.
+                      ` · ${
+                        d.reversed.from
+                          ? t('corpTaxBook.moons.miner.reversedFrom', {
+                              date: shortDate(d.reversed.from),
+                            })
+                          : t('corpTaxBook.moons.miner.reversed')
+                      }`}
                   </span>
                 </ActivityRow>
               );

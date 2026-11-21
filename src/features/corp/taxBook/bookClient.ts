@@ -427,6 +427,8 @@ export interface GroupingAnswer {
   at: string;
   /** Whether the character answered itself or the Miner's verify link declined for it. */
   via: 'character' | 'verify-link';
+  /** ISO instant an officer took it out of Needs you (`dismissGroupingAnswer`). */
+  dismissedAt?: string;
 }
 
 /** Reads `meta/groupingAnswers`, dropping anything malformed. */
@@ -444,8 +446,21 @@ export function groupingAnswersFrom(d: Record<string, unknown> | undefined): Gro
         answer: a.answer,
         at: String(a.at ?? ''),
         via: a.via === 'verify-link' ? ('verify-link' as const) : ('character' as const),
+        ...(typeof a.dismissedAt === 'string' ? { dismissedAt: a.dismissedAt } : {}),
       },
     ];
+  });
+}
+
+/** An officer takes a Character's answer to a grouping out of Needs you. */
+export function dismissGroupingAnswer(
+  characterId: number,
+  corporationId: number,
+  answerCharacterId: number
+): Promise<{ dismissedAt: string }> {
+  return callSignedIn(characterId, 'dismissGroupingAnswer', {
+    corporationId,
+    characterId: answerCharacterId,
   });
 }
 
