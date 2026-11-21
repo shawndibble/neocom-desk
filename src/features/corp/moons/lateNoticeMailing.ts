@@ -58,7 +58,7 @@ export function mailRecipientOf(
 export function mailTarget(
   ctx: Pick<BookContextValue, 'names' | 'view'> & Partial<Pick<BookContextValue, 'settings'>>,
   notice: Pick<LateNotice, 'id'>,
-  miner: Pick<MinerRow, 'id' | 'mainCharacterId' | 'characterIds' | 'owed' | 'account'>
+  miner: Pick<MinerRow, 'id' | 'mainCharacterId' | 'characterIds' | 'owed'>
 ): LateNoticeToMail {
   const recipientId = mailRecipientOf(miner, ctx.view.input.memberIds);
   const days = owedDays(ctx.view, miner.id).map((d) => ({
@@ -86,7 +86,7 @@ export function mailTarget(
         }
       : {}),
     days,
-    oldest: miner.account.owes?.oldest ?? days[0]?.date ?? '',
+    oldest: ctx.view.internals.byMiner.get(miner.id)?.account.owes?.oldest ?? days[0]?.date ?? '',
   };
 }
 

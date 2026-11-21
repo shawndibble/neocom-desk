@@ -199,8 +199,8 @@ export function MinersTab() {
     {
       id: 'account',
       header: t('corpTaxBook.moons.cols.account'),
-      render: (m) => <AccountStatus account={m.account} />,
-      sortValue: (m) => accountSortValue(m.account),
+      render: (m) => <AccountStatus account={view.internals.byMiner.get(m.id)?.account} />,
+      sortValue: (m) => accountSortValue(view.internals.byMiner.get(m.id)?.account),
       sortFirst: 'asc',
     },
     {

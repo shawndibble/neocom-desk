@@ -9,7 +9,6 @@ const miner = {
   mainCharacterId: 1,
   characterIds: [1],
   owed: 1,
-  account: { paidThrough: null, owes: null, closableThrough: null },
 } as MinerRow;
 const ctx = (settings?: unknown) =>
   ({

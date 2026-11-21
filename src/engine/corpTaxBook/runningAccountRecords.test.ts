@@ -5,6 +5,7 @@ import type { BookView } from './bookView';
 const view = () =>
   ({
     input: {
+      now: '2026-11-05T12:00:00Z',
       payments: [
         { id: 'p1', minerId: 'm1', characterId: 1, amount: 100.4, at: 'x', source: 'donation' },
         {
@@ -24,8 +25,11 @@ const view = () =>
         [
           'm1',
           {
-            // The account's own owed days (`owedDays`): settled and held ones are left out there.
             account: {
+              paidThrough: '2026-11-02',
+              owes: { amount: 300.6, days: 2, oldest: '2026-11-03' },
+              closableThrough: (today: string) => (today === '2026-11-05' ? '2026-11-02' : null),
+              // The account's own owed days (`owedDays`): settled and held ones are left out there.
               owedDays: () => [
                 { date: '2026-11-03', owed: 900, tax: 900 },
                 { date: '2026-11-04', owed: 400, tax: 1000 },
@@ -33,20 +37,22 @@ const view = () =>
             },
           },
         ],
+        [
+          'm2',
+          {
+            account: {
+              paidThrough: null,
+              owes: null,
+              closableThrough: () => null,
+              owedDays: () => [],
+            },
+          },
+        ],
       ]),
     },
     miners: [
-      {
-        id: 'm1',
-        owed: 300.6,
-        credit: 0,
-        account: {
-          paidThrough: '2026-11-02',
-          closableThrough: '2026-11-02',
-          owes: { amount: 300.6, days: 2, oldest: '2026-11-03' },
-        },
-      },
-      { id: 'm2', owed: 0, credit: 49.6, account: { paidThrough: null, owes: null } },
+      { id: 'm1', owed: 300.6, credit: 0 },
+      { id: 'm2', owed: 0, credit: 49.6 },
     ],
   }) as unknown as BookView;
 

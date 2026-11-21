@@ -12,7 +12,7 @@ import {
   forfeitAllowed,
   type ForfeitBasis,
 } from '../../../functions/src/corpTaxBookEngine';
-import type { BookView } from './bookView';
+import { bookMiner, type BookView } from './bookView';
 import { finalNoticeId, type LateNotice } from '../../../functions/src/corpTaxBookLateNotice';
 import { draftNotice } from './lateNotices';
 
@@ -51,8 +51,8 @@ export interface ClosePlan {
  * notice changes neither what is owed nor the credit.
  */
 export function planCloseAccount(view: BookView, minerId: string): ClosePlan | undefined {
-  const row = view.miners.find((m) => m.id === minerId);
-  if (!row || !view.internals.byMiner.has(minerId)) return undefined;
+  const row = bookMiner(view, minerId)?.row;
+  if (!row) return undefined;
   const plan = draftNotice(view, minerId, { id: finalNoticeId(minerId), kind: 'final' });
   return {
     pendingTax: row.pending,

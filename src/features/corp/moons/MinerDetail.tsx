@@ -36,7 +36,7 @@ import {
   type ActivityKind,
   type LedgerRow,
 } from '@/engine/corpTaxBook/bookSections';
-import { minerDetail, type DayRow, type DayStatus } from '@/engine/corpTaxBook/bookView';
+import { bookMiner, minerDetail, type DayRow, type DayStatus } from '@/engine/corpTaxBook/bookView';
 import type { Adjustment } from '@/engine/corpTaxBook/adjustments';
 import {
   adjustmentLineKey,
@@ -761,7 +761,7 @@ export function MinerDetail({ id }: { id: string }) {
           { label: t('corpTaxBook.moons.miner.paid'), value: iskOrDash(paidTotal) },
           {
             label: t('corpTaxBook.moons.miner.oldestUnpaid'),
-            value: <OldestUnpaid account={row.account} />,
+            value: <OldestUnpaid account={bookMiner(view, id)!.account} />,
           },
           {
             label: t('corpTaxBook.moons.miner.lastPayment'),

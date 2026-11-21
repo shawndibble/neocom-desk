@@ -9,9 +9,9 @@ import { useBook } from './useBook';
  * A Miner's running account in words (#6294): "Owes X (N days, oldest D)" or "Paid through D";
  * a dash when they have neither paid nor owed a day yet.
  */
-export function AccountStatus({ account }: { account: RunningAccountStatus }) {
+export function AccountStatus({ account }: { account: RunningAccountStatus | undefined }) {
   const { t } = useTranslation();
-  if (account.owes)
+  if (account?.owes)
     return (
       <span className="text-danger">
         {t('corpTaxBook.moons.account.owes', {
@@ -21,7 +21,7 @@ export function AccountStatus({ account }: { account: RunningAccountStatus }) {
         })}
       </span>
     );
-  if (account.paidThrough)
+  if (account?.paidThrough)
     return (
       <span className="text-success">
         {t('corpTaxBook.moons.account.paidThrough', { date: shortDate(account.paidThrough) })}
