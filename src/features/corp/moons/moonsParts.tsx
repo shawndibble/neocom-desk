@@ -1,4 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useTimeZone } from '@/lib/timeFormat';
 import { useTranslation } from 'react-i18next';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
@@ -8,7 +9,7 @@ import type { ExtractionRow, MinerStanding } from '@/engine/corpTaxBook/bookView
 import type { ExtractionState } from '@/engine/corpTaxBook/extraction';
 import { DAY_MS } from '@/lib/age';
 import { cx } from '@/lib/cx';
-import { shortDate } from './moonsFormat';
+import { atDate } from './moonsFormat';
 import { useBook } from './useBook';
 import { tapTargetClassName } from './sectionHelpers';
 
@@ -152,21 +153,22 @@ export function DueWord({
   now: string;
   pausedUntil?: string | null;
 }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   if (pausedUntil) {
     return (
       <span className="whitespace-nowrap text-text-dim">
-        {t('corpTaxBook.moons.statementPeriod.pausedUntil', { date: shortDate(pausedUntil) })}
+        {t('corpTaxBook.moons.statementPeriod.pausedUntil', { date: atDate(pausedUntil, zone) })}
       </span>
     );
   }
   if (dueAt === null) return <span className="text-text-dim">—</span>;
   const elapsed = Date.parse(now) - Date.parse(dueAt);
-  if (elapsed < 0) return <span className="whitespace-nowrap">{shortDate(dueAt)}</span>;
+  if (elapsed < 0) return <span className="whitespace-nowrap">{atDate(dueAt, zone)}</span>;
   const late = Math.max(1, Math.floor(elapsed / DAY_MS));
   return (
     <span className="font-semibold whitespace-nowrap text-danger">
-      {t('corpTaxBook.moons.statementPeriod.dueLate', { date: shortDate(dueAt), count: late })}
+      {t('corpTaxBook.moons.statementPeriod.dueLate', { date: atDate(dueAt, zone), count: late })}
     </span>
   );
 }

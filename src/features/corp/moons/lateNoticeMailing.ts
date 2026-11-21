@@ -4,6 +4,7 @@
  * #4064's; nothing here duplicates it.
  */
 import { useTranslation } from 'react-i18next';
+import { useTimeZone } from '@/lib/timeFormat';
 import { oldestUnsettled } from '@/engine/corpTaxBook/bookSections';
 import { minerDetail, type MinerRow } from '@/engine/corpTaxBook/bookView';
 import { owedDays } from '@/engine/corpTaxBook/lateNotices';
@@ -13,7 +14,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { reminderAllowed } from '@/engine/corpTaxBook/mailQueue';
 import type { LateNoticeToMail } from '@/features/corpTaxBook/mailQueue';
 import { minerPaymentCode, type LateNotice } from '../../../../functions/src/corpTaxBookLateNotice';
-import { isRefineryPlaceholder, shortDate } from './moonsFormat';
+import { atDate, isRefineryPlaceholder } from './moonsFormat';
 import type { BookContextValue } from './bookContextValue';
 import { useBook } from './useBook';
 import i18n from '@/i18n';
@@ -129,6 +130,7 @@ export function useMinerReminder(
   onNotice: (text: string) => void,
   noticeId?: string
 ) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const ctx = useBook();
   const { view, names, corporationId, characterId } = ctx;
@@ -172,7 +174,7 @@ export function useMinerReminder(
       result.ok
         ? t('corpTaxBook.moons.needs.reminderQueuedFor', {
             name: names.character(detail.row.mainCharacterId),
-            date: shortDate(notice.issuedAt),
+            date: atDate(notice.issuedAt, zone),
           })
         : t(`corpTaxBook.moons.needs.reminderRefused.${result.reason}`)
     );

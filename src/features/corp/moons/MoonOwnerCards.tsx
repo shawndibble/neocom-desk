@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { useTimeZone } from '@/lib/timeFormat';
 import { Pill } from '@/components/ui/Pill';
 import { Button, Panel, isRowOwnEvent } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -37,6 +38,7 @@ export function MoonOwnerCards({
   /** Pop Sharing marks by moon owner corporation (#6226). */
   shareMarks?: Readonly<Record<string, PopShareMark>>;
 }) {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   return (
     <Panel padded={false} title={t(k('label'))} meta={t(k('summary'), { shown: rows.length })}>
@@ -70,7 +72,7 @@ export function MoonOwnerCards({
                 <PopShareIcon mark={shareMarks?.[String(r.corporationId)]} />
                 {r.status !== 'active' && <MoonOwnerStatusPill status={r.status} />}
               </p>
-              <p className="text-xs text-text-dim">{moonOwnerNote(r, now, t)}</p>
+              <p className="text-xs text-text-dim">{moonOwnerNote(r, now, t, zone)}</p>
               <OwedLine r={r} name={name} onPay={onPay} />
             </div>
             <Icon.GoTo

@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState, type ReactElement } from 'react';
+import { useTimeZone } from '@/lib/timeFormat';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -39,7 +40,7 @@ import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { useBook } from './useBook';
 import { useTabsProjection } from './useTabsProjection';
 import { BookTotals } from './BookTotals';
-import { isk, shortDate } from './moonsFormat';
+import { atDate, isk } from './moonsFormat';
 import {
   MINERS_COLUMN_IDS,
   MINERS_CARDS_BELOW_REM,
@@ -80,6 +81,7 @@ interface MinersFilter {
 }
 
 export function MinersTab() {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const { view, names, edit, canEdit } = useBook();
   const { miners, donationsBeforeBook } = useTabsProjection();
@@ -215,7 +217,7 @@ export function MinersTab() {
     {
       id: 'paid',
       header: t('corpTaxBook.moons.cols.lastPaid'),
-      render: (m) => (m.lastPaidAt ? shortDate(m.lastPaidAt) : '—'),
+      render: (m) => (m.lastPaidAt ? atDate(m.lastPaidAt, zone) : '—'),
       sortValue: (m) => m.lastPaidAt ?? '',
     },
   ];
@@ -425,7 +427,7 @@ export function MinersTab() {
                 <span className="min-w-0 truncate font-semibold">{nameOf(m)}</span>
                 <span className="shrink-0 text-xs text-text-dim">
                   {t('corpTaxBook.moons.miners.closedOn', {
-                    date: shortDate((closedAtById.get(m.id) ?? '').slice(0, 10)),
+                    date: atDate(closedAtById.get(m.id)!, zone),
                   })}
                 </span>
               </Link>

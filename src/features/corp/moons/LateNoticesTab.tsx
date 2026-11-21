@@ -1,11 +1,12 @@
 import { useMemo } from 'react';
+import { useTimeZone } from '@/lib/timeFormat';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { DataTable, EmptyState, Panel, type DataTableColumn } from '@/components/ui';
 import { useBook } from './useBook';
 import { caretColumn } from './caretColumn';
 import { minerPath } from './moonsPaths';
-import { isk, shortDate } from './moonsFormat';
+import { atDate, isk } from './moonsFormat';
 import { LateNoticeRun } from './LateNoticeRun';
 import { useCards } from './sectionHelpers';
 
@@ -20,6 +21,7 @@ interface NoticeRow {
 
 /** The late notices sent so far, one row per Miner (#6294): the run above sends the next ones. */
 export function LateNoticesTab() {
+  const zone = useTimeZone();
   const { t } = useTranslation();
   const { view, names } = useBook();
   const navigate = useNavigate();
@@ -74,7 +76,7 @@ export function LateNoticesTab() {
     {
       id: 'last',
       header: t('corpTaxBook.moons.notices.last'),
-      render: (r) => shortDate(r.lastIssuedAt),
+      render: (r) => atDate(r.lastIssuedAt, zone),
       sortValue: (r) => r.lastIssuedAt,
       sortFirst: 'desc',
     },

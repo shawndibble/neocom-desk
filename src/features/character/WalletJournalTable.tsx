@@ -63,7 +63,7 @@ import { useColumnVisibility } from '@/lib/columnVisibility';
 import { useElementNarrowerThan } from '@/lib/useElementNarrowerThan';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useTimeZone } from '@/lib/timeFormat';
-import { formatTimeOfDay, formatTimestamp } from '@/lib/timestamp';
+import { formatDateOnly, formatTimeOfDay, formatTimestamp } from '@/lib/timestamp';
 import {
   useVisibleWalletJournalColumns,
   WALLET_JOURNAL_COLUMN_IDS,
@@ -292,7 +292,8 @@ const characterRowKey = (entry: JournalRow) => `${entry.characterId}:${entry.id}
 function rangeLabel(
   filter: WalletJournalFilter,
   rows: readonly JournalRow[],
-  t: TFunction
+  t: TFunction,
+  timeZone: 'UTC' | undefined
 ): string {
   const from = filter.startDate && formatIsoDay(filter.startDate);
   const to = filter.endDate && formatIsoDay(filter.endDate);
@@ -305,7 +306,7 @@ function rangeLabel(
   );
   return first === null
     ? t('wallet.journalRangeAll')
-    : t('wallet.journalRangeSince', { since: formatIsoDay(first.slice(0, 10)) });
+    : t('wallet.journalRangeSince', { since: formatDateOnly(new Date(first), timeZone) });
 }
 
 /**
@@ -596,7 +597,7 @@ export function JournalTable({
         open={panel.open}
         onClose={() => panel.onOpenChange(false)}
         scopeLabel={panel.scopeLabel}
-        rangeLabel={rangeLabel(filter, filteredJournal, t)}
+        rangeLabel={rangeLabel(filter, filteredJournal, t, timeZone)}
         totals={totals}
         breakdown={breakdown}
         selectedRefType={filter.refType}
