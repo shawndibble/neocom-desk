@@ -5,8 +5,7 @@
  */
 import { utcDayOf } from '@/engine/localDay';
 import {
-  canAdvanceCheckpoint,
-  closedThroughFor,
+  snapshotThroughFor,
   type RunningAccountCheckpoint,
 } from '../../../functions/src/corpTaxBookCheckpoint';
 import type { BookView } from './bookView';
@@ -71,17 +70,18 @@ export function runningAccountRecords(view: BookView, only?: string): RunningAcc
 }
 
 /**
- * The checkpoints due now (decision 20261120-235011): each Miner's account closed through the end
- * of the last month at least 31 days old, where that moves the stored one forward. Only an
- * officer's client can work them out: the server has no prices. Only from a read of the WHOLE
- * book: a page read for one Miner cannot see the groupings around them.
+ * The snapshots due now (decision 20261120-235011, "a lock date"): each Miner's account through
+ * the day before the lock date (`snapshotThroughFor`), for a Miner with no snapshot at that date
+ * yet, once per lock date. Only an officer's client can work them out: the server has no prices.
+ * Only from a read of the WHOLE book: a page read for one Miner cannot see the groupings around
+ * them.
  */
 export function dueCheckpoints(
   view: BookView,
   recorded: { at: string; by: number }
 ): RunningAccountCheckpoint[] {
   const today = utcDayOf(recorded.at);
-  const through = closedThroughFor(today);
+  const through = snapshotThroughFor(today);
   if (through < view.input.startDate) return [];
   return view.miners.flatMap((m) => {
     const inner = view.internals.byMiner.get(m.id);
@@ -92,7 +92,7 @@ export function dueCheckpoints(
     if (inner.billableThrough === undefined || inner.billableThrough < through) return [];
     if (!inner.billable.lines.every((l) => l.date > through || savedPrice(l))) return [];
     const stored = inner.account.input.checkpoint;
-    if (!canAdvanceCheckpoint(stored, { through }, today)) return [];
+    if (stored && stored.through >= through) return [];
     // Nothing billed and no money: nothing to close.
     if (inner.billable.lines.length === 0 && inner.payments.length === 0 && !stored) return [];
     return [

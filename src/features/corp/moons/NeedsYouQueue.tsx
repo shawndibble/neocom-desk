@@ -33,7 +33,6 @@ import {
 import { atDate, isk, shortDate, shortDateTime } from './moonsFormat';
 import { autoCredited, paidToOwn, transferStatus, type TransferStatus } from './claimWalletCheck';
 import { useOwnWalletJournals } from './useOwnWalletJournals';
-import { useCheckpointsAwaitingDirector } from './checkpointHolds';
 import { MOONS_TABS, minerPath } from './moonsPaths';
 import { tabPath } from '@/lib/pageTabs';
 import { mailTarget, useCorporationName } from './lateNoticeMailing';
@@ -175,8 +174,6 @@ export function NeedsYouQueue() {
   const { view, names, edit, canEdit, characterId, corporationId, settings } = ctx;
   const { miners } = view;
   const { needsYou, uncounted, disputes, noticesDue, count } = useNeedsYou();
-  // A closed month the server records only with a Director's approval: quiet, never an error.
-  const awaitingDirector = useCheckpointsAwaitingDirector(corporationId);
   // The officer's own Characters on this device: a transfer paid to one is checked in its journal.
   const ownIds = new Set(useCharacters().map((c) => c.characterId));
   const journals = useOwnWalletJournals(
@@ -296,11 +293,6 @@ export function NeedsYouQueue() {
       )}
       {count === 0 && (
         <p className="px-3 py-2.5 text-xs text-text-dim">{t('corpTaxBook.moons.needs.none')}</p>
-      )}
-      {awaitingDirector.length > 0 && (
-        <p className="px-3 py-2 text-xs text-text-dim">
-          {t('corpTaxBook.moons.needs.checkpointDirector', { count: awaitingDirector.length })}
-        </p>
       )}
       {creditedAutomatically.map(({ d, miner, amount, at }) => (
         <p key={d.id} className="px-3 py-2 text-xs text-text-dim">

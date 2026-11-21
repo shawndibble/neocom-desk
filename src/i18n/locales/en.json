@@ -18723,9 +18723,7 @@
           "queued": "A reminder for this late notice is already queued.",
           "missingLink": "This late notice has no verify link yet, so no mail can go."
         },
-        "none": "Nothing needs you.",
-        "checkpointDirector_one": "Closing a past month for {{count}} Miner needs a Director's visit; until then the account is worked out from its whole history.",
-        "checkpointDirector_other": "Closing a past month for {{count}} Miners needs a Director's visit; until then their accounts are worked out from their whole history."
+        "none": "Nothing needs you."
       },
       "ledger": {
         "title": "Ledger",
@@ -18840,10 +18838,7 @@
           "mail": "Mail",
           "dismissed": "Dismissed",
           "audit": "Audit"
-        },
-        "resetCheckpoint": "Reopen closed months",
-        "checkpointReset": "Months closed through {{date}} reopened: the account is worked out from its whole history again.",
-        "checkpointResetFailed": "Couldn't reopen the closed months. Only a Director can."
+        }
       },
       "activity": {
         "button": "Activity",
@@ -18981,9 +18976,7 @@
         "billableHint": "A day becomes billable {{hours}} h after it ends, once a sync has read it. The book warns here when nobody has synced for about 3 days.",
         "hiddenLabel": "hidden from members",
         "hiddenHint": "A new book stays out of members' Mining Tax pages for 3 days, so officers can set it up first.",
-        "showToMembers": "Show to members now",
-        "checkpointSkipped_one": "The server did not store {{count}} Miner's closed months ({{reasons}}). Their account is read in full meanwhile.",
-        "checkpointSkipped_other": "The server did not store {{count}} Miners' closed months ({{reasons}}). Their accounts are read in full meanwhile."
+        "showToMembers": "Show to members now"
       },
       "run": {
         "check": "Check",

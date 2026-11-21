@@ -652,26 +652,6 @@ export function MinerDetail({ id }: { id: string }) {
       {t('corpTaxBook.moons.corrections.adjust.open')}
     </DropdownMenuItem>
   );
-  // A Director's correction of a closed month: the next load works the account out again from
-  // its history, and the officer tab records the checkpoint afresh.
-  const resetItem =
-    ctx.verdict.isDirector && detail.checkpoint ? (
-      <DropdownMenuItem
-        onSelect={() =>
-          void edit({ action: 'resetCheckpoint', minerId: id }).then(
-            () =>
-              setNotice(
-                t('corpTaxBook.moons.miner.checkpointReset', {
-                  date: shortDate(detail.checkpoint!.through),
-                })
-              ),
-            () => setNotice(t('corpTaxBook.moons.miner.checkpointResetFailed'))
-          )
-        }
-      >
-        {t('corpTaxBook.moons.miner.resetCheckpoint')}
-      </DropdownMenuItem>
-    ) : null;
   const closeItem = guestOpen ? (
     <DropdownMenuItem onSelect={() => setDialog({ kind: 'close' })}>
       {t('corpTaxBook.moons.miner.closeAccount')}
@@ -690,7 +670,6 @@ export function MinerDetail({ id }: { id: string }) {
           {dismissAllItem}
           {rateItem}
           {adjustItem}
-          {resetItem}
           {closeItem}
         </HeaderMoreMenu>
       ) : (
@@ -712,7 +691,6 @@ export function MinerDetail({ id }: { id: string }) {
           <HeaderMoreMenu>
             {rateItem}
             {adjustItem}
-            {resetItem}
             {closeItem}
           </HeaderMoreMenu>
         </>

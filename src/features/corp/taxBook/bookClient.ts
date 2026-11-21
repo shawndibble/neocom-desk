@@ -883,30 +883,20 @@ export async function recordLateNoticeMail(
   }
 }
 
-/** What `recordCheckpoints` did: the Miners it moved forward, and why it left the others. */
-export interface CheckpointsRecorded {
-  recorded: string[];
-  skipped: { minerId: string; reason: string }[];
-}
-
 /**
- * Records Running account checkpoints (`recordCheckpoints`). A server that does not know the
- * action yet keeps none, and the book reads the whole history as before: that is no failure.
+ * Records each Miner's snapshot for the lock date (`recordCheckpoints`). What the server skips
+ * (`exists`, `wrong-date`), and a server that does not know the action yet, are no failure: the
+ * account reads its whole history meanwhile.
  */
 export async function recordCheckpoints(
   characterId: number,
   corporationId: number,
   checkpoints: readonly RunningAccountCheckpoint[]
-): Promise<CheckpointsRecorded> {
+): Promise<void> {
   try {
-    const out = await editBook<Partial<CheckpointsRecorded>>(characterId, corporationId, {
-      action: 'recordCheckpoints',
-      checkpoints,
-    });
-    return { recorded: out.recorded ?? [], skipped: out.skipped ?? [] };
+    await editBook(characterId, corporationId, { action: 'recordCheckpoints', checkpoints });
   } catch (error) {
     if (!unknownAction(error)) throw error;
-    return { recorded: [], skipped: [] };
   }
 }
 

@@ -10,24 +10,6 @@ import { utcDay } from '@/engine/localDay';
 import { scheduleSync } from '@/sync';
 import { appendTombstones, tombstoneKey } from '@/sync/localBookkeeping';
 import { PAYEES } from '@/sync/syncedCollections';
-import { dropPayeeCheckpointsReachedBy } from './payeeCheckpoints';
-import { payeeGroupKey } from './payeeGroups';
-
-/**
- * Writes Payee records. A record that joins, leaves or changes its merged Payee (`payeeGroupKey`)
- * regroups whose money pays which days, so the device's account checkpoints are dropped. Only
- * awaits Dexie, so it may run inside a caller's transaction over `db.payees` and `db.settings`.
- */
-async function putPayees(records: readonly PayeeRecord[]): Promise<void> {
-  if (records.length === 0) return;
-  await db.transaction('rw', db.payees, db.settings, async () => {
-    const stored = await db.payees.bulkGet(records.map((r) => r.id));
-    if (records.some((r, i) => !stored[i] || payeeGroupKey(stored[i]) !== payeeGroupKey(r)))
-      await dropPayeeCheckpointsReachedBy(null);
-    // One `put` per record, as every Payee write always made: a pilot has a handful.
-    for (const r of records) await db.payees.put(r);
-  });
-}
 
 /**
  * The Character's Payees. A Payee that still carries the old single remembered `systemId` has it
@@ -61,7 +43,7 @@ async function migrateLegacyPayeeSystems(
     }
     migrated.set(payee.id, next);
   }
-  await putPayees([...migrated.values()]);
+  await db.payees.bulkPut([...migrated.values()]);
   scheduleSync(characterId, { collections: ['payees'] });
   return payees.map((p) => migrated.get(p.id) ?? p);
 }
@@ -133,7 +115,7 @@ export async function createPayee(characterId: number, input: PayeeInput): Promi
     ...(input.entityId != null && input.entityKind != null ? { entityKind: input.entityKind } : {}),
     updatedAt: Date.now(),
   };
-  await putPayees([record]);
+  await db.payees.put(record);
   scheduleSync(characterId, { collections: ['payees'] });
   return record;
 }
@@ -148,7 +130,7 @@ export async function createPayeeOnce(
   input: Omit<PayeeInput, 'defaultSystemIds'>,
   existing: (payees: readonly PayeeRecord[]) => PayeeRecord | undefined
 ): Promise<{ payee: PayeeRecord; created: boolean }> {
-  const out = await db.transaction('rw', db.payees, db.settings, async () => {
+  const out = await db.transaction('rw', db.payees, async () => {
     const found = existing(await db.payees.where('characterId').equals(characterId).toArray());
     if (found) return { payee: found, created: false };
     const record: PayeeRecord = {
@@ -163,7 +145,7 @@ export async function createPayeeOnce(
         : {}),
       updatedAt: Date.now(),
     };
-    await putPayees([record]);
+    await db.payees.put(record);
     return { payee: record, created: true };
   });
   if (out.created) scheduleSync(characterId, { collections: ['payees'] });
@@ -207,7 +189,7 @@ export async function updatePayee(payee: PayeeRecord, input: PayeeInput): Promis
   else if (input.entityKind !== undefined && updated.entityId !== undefined) {
     updated.entityKind = input.entityKind;
   }
-  await putPayees([updated]);
+  await db.payees.put(updated);
   scheduleSync(payee.characterId, { collections: ['payees'] });
   return updated;
 }
@@ -239,7 +221,7 @@ export async function applyPayeeTerms(
       return next;
     });
   if (written.length === 0) return;
-  await putPayees(written);
+  await db.payees.bulkPut(written);
   for (const characterId of new Set(written.map((p) => p.characterId))) {
     scheduleSync(characterId, { collections: ['payees'] });
   }
@@ -313,12 +295,12 @@ async function writeIf(
   payeeId: string,
   change: (stored: PayeeRecord) => PayeeRecord | undefined
 ): Promise<PayeeRecord | undefined> {
-  const updated = await db.transaction('rw', db.payees, db.settings, async () => {
+  const updated = await db.transaction('rw', db.payees, async () => {
     const stored = await db.payees.get(payeeId);
     const next = stored ? change(stored) : undefined;
     if (!next) return undefined;
     const record: PayeeRecord = { ...next, updatedAt: Date.now() };
-    await putPayees([record]);
+    await db.payees.put(record);
     return record;
   });
   if (updated) scheduleSync(updated.characterId, { collections: ['payees'] });
@@ -339,7 +321,6 @@ export function withCorporationLink(payee: PayeeRecord, corporationId: number): 
 export async function removePayeeRecord(
   payee: Pick<PayeeRecord, 'id' | 'characterId'>
 ): Promise<void> {
-  await dropPayeeCheckpointsReachedBy(null);
   await db.payees.delete(payee.id);
   await appendTombstones(tombstoneKey(PAYEES, payee.characterId), [payee.id]);
 }
