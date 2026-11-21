@@ -1624,9 +1624,41 @@ function recordAnswer(
 ): void {
   tx.set(
     sub(deps.db, corporationId, META).doc(ANSWERS_DOC),
-    { answers: { [String(characterId)]: { ...entry, at: new Date(deps.now()).toISOString() } } },
+    {
+      answers: {
+        // A new answer is a new Needs you item: an officer's earlier dismissal does not carry over.
+        [String(characterId)]: {
+          ...entry,
+          at: new Date(deps.now()).toISOString(),
+          dismissedAt: FieldValue.delete(),
+        },
+      },
+    },
     { merge: true }
   );
+}
+
+/**
+ * An officer dismisses a Character's answer to a grouping from Needs you: stamps
+ * `answers.<characterId>.dismissedAt` on `meta/groupingAnswers`. Idempotent: a dismissed answer
+ * keeps its first stamp. A new answer clears it (`recordAnswer`).
+ */
+export async function dismissGroupingAnswer(
+  deps: BookDeps,
+  caller: Caller,
+  input: BookCall & { characterId: number }
+): Promise<{ dismissedAt: string }> {
+  await authorizeOfficer(deps, caller, input, 'edit', { live: false });
+  const ref = sub(deps.db, input.corporationId, META).doc(ANSWERS_DOC);
+  const key = String(input.characterId);
+  return deps.db.runTransaction(async (tx) => {
+    const entry = (await tx.get(ref)).get(new FieldPath('answers', key)) as Data | undefined;
+    if (!entry) fail('not-found', 'No answer to dismiss', 'not-found');
+    if (typeof entry.dismissedAt === 'string') return { dismissedAt: entry.dismissedAt };
+    const dismissedAt = new Date(deps.now()).toISOString();
+    tx.update(ref, new FieldPath('answers', key, 'dismissedAt'), dismissedAt);
+    return { dismissedAt };
+  });
 }
 
 /** Drops what these characters last answered to a grouping question (D26b, #4210). */
@@ -2538,8 +2570,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
       const dispute = await mustGet(c, ref, 'Dispute');
       if (!hasLines(dispute)) fail('not-found', 'Dispute not found', 'not-found');
       if (dispute.resolution) fail('failed-precondition', 'Already resolved', 'already-resolved');
-      // The answer ends the day's hold, and the waiver credits the day.
-      refuseLocked(now, dispute.date);
+      // The answer ends the day's hold, and the waiver credits the day. Answered on a locked day
+      // too: a snapshot keeps a held day aside (`held`), so the answer only settles that day.
       if (dispute.minerId !== action.minerId)
         fail('invalid-argument', "Dispute is another Miner's", 'wrong-miner');
       const lines = (dispute.lines as DisputeConflictInput['lines'] | undefined) ?? [];
@@ -2604,8 +2636,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     case 'rejectDispute': {
       const ref = col(c, DISPUTES).doc(action.disputeId);
       const dispute = await mustGet(c, ref, 'Dispute');
-      // The answer ends the day's hold: the day is due again.
-      refuseLocked(now, dispute.date);
+      // The answer ends the day's hold: the day is due again. On a locked day too (`dismissDispute`).
       if (!hasLines(dispute)) fail('not-found', 'Dispute not found', 'not-found');
       if (dispute.resolution) fail('failed-precondition', 'Already resolved', 'already-resolved');
       const nextStep = action.nextStep !== undefined ? { nextStep: action.nextStep } : {};

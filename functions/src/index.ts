@@ -89,6 +89,7 @@ import {
   parseConfirmGroupingInput,
   parseDeclineByTokenInput,
   parseEditAction,
+  parseGroupingAnswerInput,
   parseStopReminders,
   parseSyncInput,
   parseToken,
@@ -199,6 +200,7 @@ import {
   declineGroupingByToken,
   listPendingGroupings,
   editBook,
+  dismissGroupingAnswer,
   readStatementByToken,
   deleteBook,
   reclaimBook,
@@ -1318,6 +1320,15 @@ corpTaxBookAction('editCorpTaxBookCallable', (request) =>
     callerOf(request),
     parseBookCall(request.data),
     parseEditAction(request.data)
+  )
+);
+
+// An officer takes a Character's answer to a grouping out of Needs you.
+corpTaxBookAction('dismissGroupingAnswer', (request) =>
+  dismissGroupingAnswer(
+    corpTaxBookDeps(),
+    callerOf(request),
+    parseGroupingAnswerInput(request.data)
   )
 );
 
