@@ -3,6 +3,7 @@
  * JSON about one late notice, and this turns it into what the page prints. Pure: names (ore,
  * refinery, corporation) and number formatting stay in the page.
  */
+import type { OwedDay } from '../../../functions/src/corpTaxBookAccounts';
 import type { TaxPriceSource } from '../miningTax/priceBasis';
 
 /**
@@ -60,12 +61,8 @@ export interface VerifyPayload {
   ledger?: VerifyLedgerData;
 }
 
-/** A running day still owed: what remains of it and its whole tax. */
-export interface UnpaidDay {
-  date: string;
-  owed: number;
-  tax: number;
-}
+/** A running day still owed: what remains of it and its whole tax (the shared `OwedDay`). */
+export type UnpaidDay = OwedDay;
 
 /** The Miner's whole history for the verify page's ledger. */
 export interface VerifyLedgerData {

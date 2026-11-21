@@ -140,7 +140,14 @@ export async function enqueueReminder(
     manualRemindersSent: number;
   }
 ): Promise<ReminderResult> {
-  if (!reminderAllowed(input)) return { ok: false, reason: 'stopped' };
+  if (
+    !reminderAllowed({
+      sent: 0,
+      remindersStopped: input.remindersStopped,
+      manualSent: input.manualRemindersSent,
+    })
+  )
+    return { ok: false, reason: 'stopped' };
   if (isAlreadyQueued(await listQueue(input.corporationId), input.notice.noticeId, 'reminder'))
     return { ok: false, reason: 'queued' };
   const batchId = crypto.randomUUID();

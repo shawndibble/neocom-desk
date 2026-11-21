@@ -192,11 +192,11 @@ describe('summarize and displayStatus', () => {
 
 describe('Stop reminders (D27)', () => {
   it('allows reminders freely when not opted out', () => {
-    expect(reminderAllowed({ remindersStopped: false, manualRemindersSent: 5 })).toBe(true);
+    expect(reminderAllowed({ sent: 0, remindersStopped: false, manualSent: 5 })).toBe(true);
   });
   it('allows exactly one to an opted-out Miner', () => {
-    expect(reminderAllowed({ remindersStopped: true, manualRemindersSent: 0 })).toBe(true);
-    expect(reminderAllowed({ remindersStopped: true, manualRemindersSent: 1 })).toBe(false);
+    expect(reminderAllowed({ sent: 0, remindersStopped: true, manualSent: 0 })).toBe(true);
+    expect(reminderAllowed({ sent: 0, remindersStopped: true, manualSent: 1 })).toBe(false);
   });
 });
 

@@ -6,27 +6,22 @@
  * The callables enforce `forfeitAllowed` through a mirror
  * (functions/src/corpTaxBookEngine.ts); functionsMirror.test.ts keeps them equal.
  */
-import { shiftDate } from '../miningTax/yieldRange';
 import type { Miner } from './charges';
+import {
+  FORFEIT_NO_REPLY_DAYS,
+  forfeitAllowed,
+  type ForfeitBasis,
+} from '../../../functions/src/corpTaxBookEngine';
 import type { BookView } from './bookView';
 import { finalNoticeId, type LateNotice } from '../../../functions/src/corpTaxBookLateNotice';
 import { draftNotice } from './lateNotices';
 
-/** A guest's credit is forfeited without consent only after this many days with no reply. */
-export const FORFEIT_NO_REPLY_DAYS = 90;
-
-export type ForfeitBasis =
-  { kind: 'consent'; note: string } | { kind: 'no-reply'; askedAt: string };
+/** When a guest's credit may be forfeited: the shared rule (functions/src/corpTaxBookEngine.ts). */
+export { FORFEIT_NO_REPLY_DAYS, forfeitAllowed, type ForfeitBasis };
 
 /** What happens to the guest's credit when the account closes. Refund is the default. */
 export type CreditDisposition =
   { kind: 'refund' } | ({ kind: 'forfeit' } & { basis: ForfeitBasis });
-
-/** Consent is recorded in words, or 90 full days have passed since the guest was asked. */
-export function forfeitAllowed(basis: ForfeitBasis, today: string): boolean {
-  if (basis.kind === 'consent') return basis.note.trim().length > 0;
-  return basis.askedAt <= shiftDate(today, -FORFEIT_NO_REPLY_DAYS);
-}
 
 /**
  * Late notice mail stops once the account is closed: the final notice and any issued before the

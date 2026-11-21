@@ -11,6 +11,7 @@ import {
 import type { BookView } from './bookView';
 import { MinerRunningAccount } from './minerRunningAccount';
 import { paymentNet } from './payments';
+import type { OwedDay } from '../../../functions/src/corpTaxBookAccounts';
 import { savedPrice } from './billableLines';
 
 /** One Miner's account as `recordAccounts` takes it. */
@@ -28,7 +29,7 @@ export interface AccountRecord {
    * The running days still owed, oldest first, with what remains of each: what the verify page
    * lists as "Still owed". Absent from an older client, and then the page reads the notice's lines.
    */
-  unpaidDays?: { date: string; owed: number; tax: number }[];
+  unpaidDays?: OwedDay[];
   /**
    * The newest day to store as paid for good (`meta/paid`), when every day up to it is paid and
    * saved-price: only the officer's client can know, the server has no prices.
