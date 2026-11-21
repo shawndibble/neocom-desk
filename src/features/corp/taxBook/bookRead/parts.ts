@@ -4,7 +4,7 @@
  * Opening a tab reads only its parts; a later tab reads the ones it adds, and
  * the parts already held are reused.
  *
- * - `core`: miners, statements, extractions, feeders (with payouts), the scheduled-sync
+ * - `core`: miners, late notices, extractions, feeders (with payouts), the scheduled-sync
  *   status and the uncounted donations (#6207). Every tab joins these.
  * - `observed`: the ledger rows (a Dexie delta on a device that holds a copy, ADR 0031). Every
  *   tab reads them except Moon owners, whose figures come from the `owners` summaries (#5717);

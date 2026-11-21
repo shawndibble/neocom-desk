@@ -662,7 +662,7 @@ service cloud.firestore {
       }
 
       match /{officerOnly}/{docId} {
-        allow get, list: if officerOnly in ['extractions', 'rebills', 'meta', 'audit', 'feeders', 'minerTotals', 'moonDocs', 'readModels']
+        allow get, list: if officerOnly in ['extractions', 'rebills', 'meta', 'audit', 'feeders', 'moonDocs', 'readModels']
           && isOfficer();
         allow write: if false;
       }

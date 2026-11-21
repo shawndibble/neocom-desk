@@ -95,7 +95,7 @@ export interface BookSummary {
 export interface BookState {
   book: BookSummary;
   miners: Miner[];
-  /** The book's late notices, from `lateNotices` and the legacy `statements` docs. */
+  /** The book's late notices, from `lateNotices`. */
   notices: LateNotice[];
   payments: SettlePayment[];
   dismissals: Dismissal[];
