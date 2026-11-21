@@ -1579,14 +1579,8 @@ describe('Late notices and checkpoints (decision 20261120-235011)', () => {
     ).toThrow();
   });
 
-  it('resets a Miner’s checkpoint', () => {
-    expect(parseEditAction({ action: 'resetCheckpoint', minerId: 'solo:5' })).toEqual({
-      action: 'resetCheckpoint',
-      minerId: 'solo:5',
-    });
-    expect(needsLiveCheck(parseEditAction({ action: 'resetCheckpoint', minerId: 'solo:5' }))).toBe(
-      true
-    );
+  it('no longer resets a checkpoint: a snapshot never goes stale', () => {
+    expect(() => parseEditAction({ action: 'resetCheckpoint', minerId: 'solo:5' })).toThrow();
   });
 
   describe('recordCheckpoints', () => {
@@ -1647,7 +1641,8 @@ describe('Late notices and checkpoints (decision 20261120-235011)', () => {
   });
 });
 
-describe('checkpointRefusal: a checkpoint is a cache, stored only when it can be trusted', () => {
+describe('checkpointRefusal: one snapshot per Miner per lock date', () => {
+  // On 18 Nov the lock date is 1 Sep: a snapshot covers every day through 31 Aug.
   const k = {
     minerId: 'solo:5',
     through: '2026-08-31',
@@ -1657,38 +1652,35 @@ describe('checkpointRefusal: a checkpoint is a cache, stored only when it can be
     paidThrough: '2026-08-19',
     characterIds: [5],
   };
-  const ctx = { today: '2026-10-18', known: true, characterIds: [5], isDirector: false };
-  const live = {
-    unpaidDays: [
-      { date: '2026-08-20', owed: 100 },
-      { date: '2026-09-02', owed: 70 },
-    ],
-  };
+  const ctx = { today: '2026-11-18', known: true, characterIds: [5] };
+  const stored = { ...k, at: '2026-11-02T10:00:00.000Z' };
 
-  it('stores one that moves forward, adds up and owes what the account says', () => {
-    expect(checkpointRefusal(k, ctx)).toEqual([]);
-    expect(checkpointRefusal(k, { ...ctx, live })).toEqual([]);
+  it('stores one through the day before the lock date that adds up', () => {
+    expect(checkpointRefusal(k, ctx)).toBeUndefined();
   });
 
-  it('names every reason it refuses one', () => {
-    expect(
-      checkpointRefusal({ ...k, balance: 5 }, { ...ctx, stored: { through: '2026-08-31' } })
-    ).toEqual(['not-forward', 'balance']);
-    expect(checkpointRefusal(k, { ...ctx, known: false })).toEqual(['unknown-miner']);
+  it('refuses one through any other day', () => {
+    expect(checkpointRefusal({ ...k, through: '2026-09-30' }, ctx)).toBe('wrong-date');
+    expect(checkpointRefusal({ ...k, through: '2026-07-31' }, ctx)).toBe('wrong-date');
   });
 
-  it('refuses one summed for other characters than the Miner has now', () => {
-    expect(checkpointRefusal(k, { ...ctx, characterIds: [5, 6] })).toEqual(['characters-changed']);
+  it('refuses one when a snapshot already covers that day', () => {
+    expect(checkpointRefusal(k, { ...ctx, stored })).toBe('exists');
   });
 
-  it('owing less than the recorded account through that day needs a Director', () => {
-    const less = { ...k, owed: [], balance: 0, paidThrough: '2026-08-31' };
-    expect(checkpointRefusal(less, { ...ctx, live })).toEqual(['director-approval']);
-    expect(checkpointRefusal(less, { ...ctx, live, isDirector: true })).toEqual([]);
-    // Days after `through` are not the checkpoint's to owe.
-    expect(
-      checkpointRefusal(k, { ...ctx, live: { unpaidDays: [{ date: '2026-09-02', owed: 70 }] } })
-    ).toEqual([]);
+  it('replaces a stored one that is no snapshot: older, the strict cache, or other characters', () => {
+    const older = { ...stored, through: '2026-07-31' };
+    expect(checkpointRefusal(k, { ...ctx, stored: older })).toBeUndefined();
+    const strictCache = { ...stored, through: '2026-09-30', at: '2026-11-02T10:00:00.000Z' };
+    expect(checkpointRefusal(k, { ...ctx, stored: strictCache })).toBeUndefined();
+    const others = { ...stored, characterIds: [5, 6] };
+    expect(checkpointRefusal(k, { ...ctx, stored: others })).toBeUndefined();
+  });
+
+  it('refuses one that does not add up, for an unknown Miner, or for other characters', () => {
+    expect(checkpointRefusal({ ...k, balance: 5 }, ctx)).toBe('balance');
+    expect(checkpointRefusal(k, { ...ctx, known: false })).toBe('unknown-miner');
+    expect(checkpointRefusal(k, { ...ctx, characterIds: [5, 6] })).toBe('characters-changed');
   });
 });
 

@@ -2,10 +2,9 @@
  * One-off (decision 20261120-235011, step 2): copies every Late notice stored as a `statements`
  * doc (`kind: 'notice'`) into `lateNotices`, and every `statementLinks` doc into
  * `lateNoticeLinks`; brings an existing copy's mail state level with its legacy doc; then marks
- * the book backfilled, after which no read looks at the legacy docs. It also gives each payment
- * stored without `uids` its Miner's readers and its sender, and each `observed` row its
- * Character's Miner's readers and itself, so a main reads an alt's donations and mined days.
- * Idempotent: a re-run copies nothing new. A book that fails is reported and the run goes on. `--dry-run` only counts. Run it once the functions that write
+ * the book backfilled, after which no read looks at the legacy docs. Idempotent: a re-run copies
+ * nothing new. A book that fails is reported and the run goes on. `--dry-run` only counts. Run it
+ * once the functions that write
  * `lateNotices` are deployed (docs/deploy/late-notices.md).
  *
  *   cd functions && npm run build
@@ -15,10 +14,7 @@ import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import {
   applyLateNoticeBackfill,
-  applyPaymentReadersBackfill,
-  backfillObservedReaders,
   planLateNoticeBackfill,
-  planPaymentReadersBackfill,
 } from '../lib/corpTaxBookLateNoticeBackfill.js';
 
 const [projectId, ...rest] = process.argv.slice(2);
@@ -35,8 +31,6 @@ const corps = only.length
 let notices = 0;
 let links = 0;
 let mail = 0;
-let readers = 0;
-let rowReaders = 0;
 const failed = [];
 // Every book is a Running account: the server now refuses a calendar Statement on every one.
 // A book with no `runningAccountFrom` is listed, so an officer knows an older tab of it is refused.
@@ -51,34 +45,19 @@ for (const corporationId of corps) {
     )
       unswitched.push(corporationId);
     const plan = await planLateNoticeBackfill(db, corporationId);
-    const paymentReaders = await planPaymentReadersBackfill(db, corporationId);
-    const counts = [
-      plan.notices.length,
-      plan.links.length,
-      plan.mail.length,
-      paymentReaders.length,
-    ];
+    const counts = [plan.notices.length, plan.links.length, plan.mail.length];
     if (counts.some((n) => n > 0))
       console.log(
         corporationId,
         `notices: ${counts[0]}`,
         `links: ${counts[1]}`,
-        `mail: ${counts[2]}`,
-        `payment readers: ${counts[3]}`
+        `mail: ${counts[2]}`
       );
     notices += counts[0];
     links += counts[1];
     mail += counts[2];
-    readers += counts[3];
-    if (!dryRun) {
-      // Marks the book even with nothing to copy, so its reads stop looking at the legacy docs.
-      await applyLateNoticeBackfill(db, corporationId, plan);
-      await applyPaymentReadersBackfill(db, corporationId, paymentReaders);
-    }
-    // Page by page (a book holds many rows); a dry run only counts.
-    const rows = await backfillObservedReaders(db, corporationId, { dryRun });
-    if (rows > 0) console.log(corporationId, `row readers: ${rows}`);
-    rowReaders += rows;
+    // Marks the book even with nothing to copy, so its reads stop looking at the legacy docs.
+    if (!dryRun) await applyLateNoticeBackfill(db, corporationId, plan);
   } catch (e) {
     // One book's failure (a notice issued mid-run, a timeout) leaves the rest to go on; re-run it.
     failed.push(corporationId);
@@ -89,9 +68,7 @@ console.log(
   dryRun ? 'dry run: nothing written' : 'copied',
   `notices: ${notices}`,
   `links: ${links}`,
-  `mail synced: ${mail}`,
-  `payment readers: ${readers}`,
-  `row readers: ${rowReaders}`
+  `mail synced: ${mail}`
 );
 if (unswitched.length > 0)
   console.log(

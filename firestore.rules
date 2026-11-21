@@ -528,17 +528,13 @@ service cloud.firestore {
         allow list, write: if false;
       }
 
-      // A mined row is its Character's (`uid`) and its Miner's readers' (`uids`), so a main reads an
-      // alt's days. One stored before `uids` reads by its Character alone.
       match /observed/{rowId} {
-        allow get, list: if isOfficer() || isOwnLine() || isOnOwnLine();
+        allow get, list: if isOfficer() || isOwnLine();
         allow write: if false;
       }
 
-      // A payment is its sender's (`uid`) and its Miner's readers' (`uids`), so a main reads an
-      // alt's donation. One stored before `uids` reads by its sender alone.
       match /payments/{paymentId} {
-        allow get, list: if isOfficer() || isOwnLine() || isOnOwnLine();
+        allow get, list: if isOfficer() || isOwnLine();
         allow write: if false;
       }
 

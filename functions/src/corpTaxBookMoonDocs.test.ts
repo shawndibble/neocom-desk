@@ -53,8 +53,8 @@ describe('moonDocsToCheck: the nightly pass rebuilds only what can still change'
   });
   const closedId = `1000_${Date.parse(closed.extractionStartTime)}`;
   const openId = `1000_${Date.parse(open.extractionStartTime)}`;
-  // On 18 Oct the book is closed through 31 Aug: a pull that ended by then cannot gain a row.
-  const today = '2026-10-18';
+  // On 18 Nov the lock date is 1 Sep: a pull that ended before it is locked.
+  const today = '2026-11-18';
 
   it('skips a closed pull whose doc is current', () => {
     const held = new Map([

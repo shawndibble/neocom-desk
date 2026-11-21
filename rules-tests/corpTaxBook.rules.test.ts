@@ -57,15 +57,8 @@ beforeEach(async () => {
     );
     await setDoc(doc(db, `${CORP}/observed/a`), { uid: 'char:2', characterId: 2, quantity: 5 });
     await setDoc(doc(db, `${CORP}/observed/b`), { uid: 'char:3', characterId: 3, quantity: 7 });
-    // An alt's mined row, read by its whole Miner (`uids`): main 2, alt 8.
-    await setDoc(doc(db, `${CORP}/observed/c`), {
-      uid: 'char:8',
-      uids: ['char:2', 'char:8'],
-      characterId: 8,
-      quantity: 9,
-    });
     await setDoc(doc(db, `${CORP}/payments/p1`), { uid: 'char:2', amount: 1 });
-    // An alt's donation, read by its whole Miner (`uids`): main 2, alt 8.
+    // An alt's donation: its Miner's other characters do not read it (no copied readers).
     await setDoc(doc(db, `${CORP}/payments/p2`), {
       uid: 'char:8',
       minerId: 'm1',
@@ -184,54 +177,21 @@ describe('corps (Tax Book) rules', () => {
     for (const path of OFFICER_ONLY) await assertFails(getDoc(doc(db, `${CORP}/${path}`)));
   });
 
-  it("lets a Miner's main read an alt's payment, and no one outside the Miner", async () => {
+  it('reads a payment and a mined row by its own Character only, never a stored `uids`', async () => {
     const main = characterAuth(env, 2, 'h2').firestore();
-    await assertSucceeds(getDoc(doc(main, `${CORP}/payments/p2`)));
+    await assertSucceeds(getDoc(doc(main, `${CORP}/payments/p1`)));
     await assertSucceeds(
+      getDocs(query(collection(main, `${CORP}/payments`), where('uid', '==', 'char:2')))
+    );
+    await assertFails(getDoc(doc(main, `${CORP}/payments/p2`)));
+    await assertFails(
       getDocs(
         query(collection(main, `${CORP}/payments`), where('uids', 'array-contains', 'char:2'))
       )
     );
-    const outsider = characterAuth(env, 3, 'h3').firestore();
-    await assertFails(getDoc(doc(outsider, `${CORP}/payments/p2`)));
-    await assertFails(getDoc(doc(outsider, `${CORP}/payments/p1`)));
-    await assertFails(
-      getDocs(
-        query(collection(outsider, `${CORP}/payments`), where('uids', 'array-contains', 'char:2'))
-      )
-    );
-    await assertFails(getDocs(collection(outsider, `${CORP}/payments`)));
-  });
-
-  it("lets a Miner's main read an alt's mined rows, and no one outside the Miner", async () => {
-    const main = characterAuth(env, 2, 'h2').firestore();
-    await assertSucceeds(getDoc(doc(main, `${CORP}/observed/c`)));
-    await assertSucceeds(
-      getDocs(
-        query(collection(main, `${CORP}/observed`), where('uids', 'array-contains', 'char:2'))
-      )
-    );
-    const outsider = characterAuth(env, 3, 'h3').firestore();
-    await assertFails(getDoc(doc(outsider, `${CORP}/observed/c`)));
-    await assertFails(
-      getDocs(
-        query(collection(outsider, `${CORP}/observed`), where('uids', 'array-contains', 'char:2'))
-      )
-    );
-    // A row stored before `uids` still reads by its Character, and only by it.
-    await assertSucceeds(getDoc(doc(main, `${CORP}/observed/a`)));
-    await assertFails(getDoc(doc(characterAuth(env, 8, 'h8').firestore(), `${CORP}/observed/a`)));
-  });
-
-  it('still lets the sender read an older payment stored without `uids`', async () => {
-    const sender = characterAuth(env, 2, 'h2').firestore();
-    await assertSucceeds(getDoc(doc(sender, `${CORP}/payments/p1`)));
-    await assertSucceeds(
-      getDocs(query(collection(sender, `${CORP}/payments`), where('uid', '==', 'char:2')))
-    );
     const alt = characterAuth(env, 8, 'h8').firestore();
     await assertSucceeds(getDoc(doc(alt, `${CORP}/payments/p2`)));
-    await assertFails(getDoc(doc(alt, `${CORP}/payments/p1`)));
+    await assertFails(getDoc(doc(alt, `${CORP}/observed/a`)));
   });
 
   it.each(['statementLinks/s1', 'lateNoticeLinks/n1'])(

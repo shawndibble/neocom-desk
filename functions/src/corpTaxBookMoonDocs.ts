@@ -18,7 +18,7 @@ import {
   type MirrorExtraction,
   type ObservedRow,
 } from './corpTaxBookEngine.js';
-import { closedThroughFor } from './corpTaxBookCheckpoint.js';
+import { lockDateFor } from './corpTaxBookCheckpoint.js';
 import { HOUR_MS, utcDay } from './timeConstants.js';
 
 export const MOON_DOCS = 'moonDocs';
@@ -221,10 +221,10 @@ export function planMoonDocs(
 }
 
 /**
- * The docs the nightly pass rebuilds (decision 20261120-235011): a pull whose window ends after
- * the day the book is closed through can still gain rows; a closed pull is rebuilt only when its
+ * The docs the nightly pass rebuilds (decision 20261120-235011): a pull whose window reaches the
+ * lock date can still change; one wholly before it is locked, and is rebuilt only when its
  * doc is missing or on another schema. `held` maps each stored doc to its schema; a doc whose pull
- * is gone is checked too, so it is deleted. Nothing re-reads the rows of a closed pull.
+ * is gone is checked too, so it is deleted. Nothing re-reads the rows of a locked pull.
  */
 export function moonDocsToCheck(
   extractions: readonly StoredExtraction[],
@@ -232,14 +232,14 @@ export function moonDocsToCheck(
   expiryHours: Readonly<Record<string, number>>,
   today: string
 ): Set<string> {
-  const closedThrough = closedThroughFor(today);
+  const lockDate = lockDateFor(today);
   const out = new Set<string>();
   const live = new Set<string>();
   for (const x of extractions) {
     const id = extractionIdOf(x);
     live.add(id);
     const window = pullWindow(x, expiryHours);
-    const open = window === null || window.to > closedThrough;
+    const open = window === null || window.to >= lockDate;
     if (open || held.get(id) !== MOON_DOC_SCHEMA) out.add(id);
   }
   for (const id of held.keys()) if (!live.has(id)) out.add(id);

@@ -2,28 +2,12 @@
 // `lateNotices` collection existed lives only as a `statements` doc (`kind: 'notice'`), its link
 // only in `statementLinks`. This copies each into `lateNotices` / `lateNoticeLinks` once, brings
 // the mail state of a copy that already exists level with its legacy doc (`mergeNoticeMail`), and
-// marks the book (`BACKFILLED_DOC`), after which no read looks at the legacy docs. It also gives
-// each payment stored before `uids` its readers (`planPaymentReaders`). A re-run copies nothing
-// new. Run by functions/scripts/backfill-late-notices.mjs.
+// marks the book (`BACKFILLED_DOC`), after which no read looks at the legacy docs. A re-run copies
+// nothing new. Run by functions/scripts/backfill-late-notices.mjs.
 
-import {
-  FieldPath,
-  FieldValue,
-  type Firestore,
-  type QueryDocumentSnapshot,
-  type Timestamp,
-} from 'firebase-admin/firestore';
+import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import { commitInBatches, type BatchOp } from './commitInBatches.js';
-import {
-  LATE_NOTICES,
-  LATE_NOTICE_LINKS,
-  MINERS,
-  OBSERVED,
-  PAYMENTS,
-  STATEMENTS,
-  STATEMENT_LINKS,
-} from './corpTaxBook.js';
-import { characterUids, minerUidsOf, paymentUids, type ReaderMiner } from './corpTaxBookClaims.js';
+import { LATE_NOTICES, LATE_NOTICE_LINKS, STATEMENTS, STATEMENT_LINKS } from './corpTaxBook.js';
 import {
   lateNoticeFromStatementDoc,
   mergeNoticeMail,
@@ -31,8 +15,6 @@ import {
   type LateNoticeMail,
 } from './corpTaxBookLateNotice.js';
 import { BACKFILLED_DOC } from './corpTaxBookLateNoticeStore.js';
-import { READERS_EPOCH_FIELD, sameReaders } from './corpTaxBookReaders.js';
-import { OBSERVED_UPDATED_AT_FIELD } from './corpTaxBookVersionKeys.js';
 import { META } from './corpTaxBook.js';
 
 type Doc = { id: string; data: Record<string, unknown> };
@@ -131,162 +113,4 @@ export async function applyLateNoticeBackfill(
   ];
   await commitInBatches(db, ops);
   await book.collection(META).doc(BACKFILLED_DOC).set({ at: Date.now() });
-}
-
-/**
- * The payments whose readers (`uids`) are missing or not what the groupings say now, each with its
- * readers: its Miner's (`minerUidsOf`) and its sender's (`paymentUids`). One already right is left
- * alone, so a re-run plans nothing.
- */
-export function planPaymentReaders(
-  payments: readonly Doc[],
-  miners: readonly Doc[]
-): { id: string; uids: string[] }[] {
-  const byId = new Map(miners.map((m) => [m.id, readerMinerOf(m)]));
-  return payments.flatMap(({ id, data }) => {
-    const minerId = typeof data.minerId === 'string' ? data.minerId : undefined;
-    const readers = minerId === undefined ? [] : minerUidsOf(minerId, byId.get(minerId));
-    const uids = paymentUids(readers, data.uid);
-    return sameReaders(data.uids, uids) ? [] : [{ id, uids }];
-  });
-}
-
-/** A stored grouping, as the readers rules read it. */
-function readerMinerOf({ id, data }: Doc): ReaderMiner {
-  return {
-    id,
-    characterIds: (data.characterIds as number[] | undefined) ?? [],
-    officerClaimed: data.officerClaimed as number[] | undefined,
-    pendingConfirmation: data.pendingConfirmation as number[] | undefined,
-    ...(typeof data.createdAt === 'string' ? { createdAt: data.createdAt } : {}),
-  };
-}
-
-/**
- * The `observed` rows whose readers (`uids`) are missing or not what the groupings say now, each
- * with its readers (`characterUids`). A row already right is left alone, so a re-run plans nothing.
- */
-export function planObservedReaders(
-  rows: readonly Doc[],
-  miners: readonly Doc[]
-): { id: string; uids: string[] }[] {
-  const grouped = miners.map(readerMinerOf);
-  const memo = new Map<number, string[]>();
-  return rows.flatMap(({ id, data }) => {
-    if (typeof data.characterId !== 'number') return [];
-    const characterId = data.characterId;
-    let uids = memo.get(characterId);
-    if (!uids) memo.set(characterId, (uids = characterUids(characterId, grouped)));
-    return sameReaders(data.uids, uids) ? [] : [{ id, uids }];
-  });
-}
-
-/** How many `observed` rows one page of the backfill reads. */
-const ROWS_PAGE = 1000;
-
-/**
- * Gives one book's `observed` rows their readers where missing or stale, a page at a time (a book
- * can hold far more rows than a batch). Each write is guarded by the row's update time: a row a
- * sync rewrote meanwhile fails its batch, and a re-run picks up what is left. A row it changes
- * gets a fresh `updatedAt`, and the book's readers epoch moves once it wrote any, so every
- * device's delta read starts over and sees them. With `dryRun` it only counts. Returns how many
- * rows it gave (or would give) readers.
- */
-export async function backfillObservedReaders(
-  db: Firestore,
-  corporationId: number,
-  options: { dryRun: boolean }
-): Promise<number> {
-  const book = db.collection('corps').doc(String(corporationId));
-  const miners = (
-    await book
-      .collection(MINERS)
-      .select('characterIds', 'officerClaimed', 'pendingConfirmation', 'createdAt')
-      .get()
-  ).docs.map((d) => ({ id: d.id, data: d.data() }));
-  const rows = book.collection(OBSERVED);
-  let planned = 0;
-  let after: QueryDocumentSnapshot | undefined;
-  for (;;) {
-    let q = rows.orderBy(FieldPath.documentId()).select('characterId', 'uids').limit(ROWS_PAGE);
-    if (after) q = q.startAfter(after);
-    const page = await q.get();
-    const plan = planObservedReaders(
-      page.docs.map((d) => ({ id: d.id, data: d.data() })),
-      miners
-    );
-    planned += plan.length;
-    if (!options.dryRun && plan.length > 0) {
-      const read = new Map(page.docs.map((d) => [d.id, d.updateTime]));
-      await commitInBatches(
-        db,
-        plan.map(
-          ({ id, uids }): BatchOp =>
-            (b) =>
-              void b.update(
-                rows.doc(id),
-                { uids, [OBSERVED_UPDATED_AT_FIELD]: FieldValue.serverTimestamp() },
-                { lastUpdateTime: read.get(id)! }
-              )
-        )
-      );
-    }
-    if (page.size < ROWS_PAGE) break;
-    after = page.docs[page.size - 1];
-  }
-  if (!options.dryRun && planned > 0) await bumpReadersEpoch(db, corporationId);
-  return planned;
-}
-
-/** Moves the book's readers epoch: every device's delta read of rows and payments starts over. */
-const bumpReadersEpoch = (db: Firestore, corporationId: number) =>
-  db
-    .collection('corps')
-    .doc(String(corporationId))
-    .update({ [READERS_EPOCH_FIELD]: FieldValue.increment(1) });
-
-/** A payment's planned readers, with the version read, so a write meanwhile is never overwritten. */
-export type PaymentReaders = { id: string; uids: string[]; updateTime: Timestamp };
-
-/** Reads one book's payments and groupings and plans the payments' readers. */
-export async function planPaymentReadersBackfill(
-  db: Firestore,
-  corporationId: number
-): Promise<PaymentReaders[]> {
-  const book = db.collection('corps').doc(String(corporationId));
-  const [payments, miners] = await Promise.all([
-    book.collection(PAYMENTS).select('minerId', 'uid', 'uids').get(),
-    book.collection(MINERS).select('characterIds', 'officerClaimed', 'pendingConfirmation').get(),
-  ]);
-  const read = new Map(payments.docs.map((d) => [d.id, d.updateTime]));
-  const docs = (snap: typeof payments) => snap.docs.map((d) => ({ id: d.id, data: d.data() }));
-  return planPaymentReaders(docs(payments), docs(miners)).map((p) => ({
-    ...p,
-    updateTime: read.get(p.id)!,
-  }));
-}
-
-/**
- * Writes the readers to each payment as it was read: one written meanwhile (a sync, an officer's
- * placement) fails its batch, and a re-run plans what is left.
- */
-export async function applyPaymentReadersBackfill(
-  db: Firestore,
-  corporationId: number,
-  plan: readonly PaymentReaders[]
-): Promise<void> {
-  const payments = db.collection('corps').doc(String(corporationId)).collection(PAYMENTS);
-  await commitInBatches(
-    db,
-    plan.map(
-      ({ id, uids, updateTime }): BatchOp =>
-        (b) =>
-          void b.update(
-            payments.doc(id),
-            { uids, [OBSERVED_UPDATED_AT_FIELD]: FieldValue.serverTimestamp() },
-            { lastUpdateTime: updateTime }
-          )
-    )
-  );
-  if (plan.length > 0) await bumpReadersEpoch(db, corporationId);
 }

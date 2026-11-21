@@ -13,7 +13,6 @@ import {
   TOLERANCE_EXEMPTIONS,
   WRITE_OFFS,
 } from './corpTaxBook.js';
-import { paymentUids } from './corpTaxBookClaims.js';
 import { soloMinerId } from './corpTaxBookDonationMatch.js';
 import { LEGACY_MINER_KEYED } from './corpTaxBookLegacyMirror.js';
 
@@ -80,14 +79,9 @@ export function planRekey(input: {
   const { target, targetUids, existingDisputeIds } = input;
   const writes: RekeyWrite[] = [];
   const claimed = new Set(existingDisputeIds);
-  // `uids` are the sign-ins the rules let read the record; a record without any keeps none, but a
-  // payment always gets them (an older one read by its sender's `uid` alone included).
-  const readers = (data: Record<string, unknown>, collection: string) =>
-    collection === PAYMENTS
-      ? { uids: paymentUids(targetUids, data.uid) }
-      : 'uids' in data
-        ? { uids: [...targetUids] }
-        : {};
+  // `uids` are the sign-ins the rules let read the record; a record without any keeps none.
+  const readers = (data: Record<string, unknown>) =>
+    'uids' in data ? { uids: [...targetUids] } : {};
   for (const { collection, id, data } of input.records) {
     if (MINER_CACHES.includes(collection)) {
       writes.push({ kind: 'delete', collection, id });
@@ -97,10 +91,10 @@ export function planRekey(input: {
           kind: 'update',
           collection,
           id,
-          fields: { targetId: target, ...readers(data, collection) },
+          fields: { targetId: target, ...readers(data) },
         });
     } else if (collection === DISPUTES) {
-      const fields = { minerId: target, ...readers(data, collection) };
+      const fields = { minerId: target, ...readers(data) };
       const toId = disputeIdFor(target, String(data.date));
       if (claimed.has(toId)) {
         writes.push({ kind: 'update', collection, id, fields });
@@ -113,7 +107,7 @@ export function planRekey(input: {
         kind: 'update',
         collection,
         id,
-        fields: { minerId: target, ...readers(data, collection) },
+        fields: { minerId: target, ...readers(data) },
       });
     }
   }
