@@ -59,6 +59,7 @@ export const ALERT_CHIPS = [
   'market',
   'industry',
   'mail',
+  'calendar',
   'structures',
   'skills',
 ] as const;
@@ -85,8 +86,8 @@ const EVENT_CHIP: Readonly<Record<string, TopicChip>> = {
   mercenaryDenAnarchy: 'industry',
   sharedMoonPop: 'industry',
   newMail: 'mail',
-  newCalendarEvent: 'mail',
-  calendarEventStarting: 'mail',
+  newCalendarEvent: 'calendar',
+  calendarEventStarting: 'calendar',
   structureFuelLow: 'structures',
   skyhookRaidable: 'structures',
   skillLevelComplete: 'skills',

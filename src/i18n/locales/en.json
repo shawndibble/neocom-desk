@@ -7045,6 +7045,7 @@
         "market": "Market",
         "industry": "Industry",
         "mail": "Mail",
+        "calendar": "Calendar",
         "structures": "Structures",
         "skills": "Skills"
       },

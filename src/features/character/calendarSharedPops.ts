@@ -180,19 +180,22 @@ const wordsOf = (text: string): string[] =>
 /** How far a Calendar event's start may sit from a pop's time and still be that pop. */
 export const POP_EVENT_MATCH_MS = 5 * MINUTE_MS;
 
+/** What the event match reads of a pop: its times, and the refinery's and the moon's names. */
+export type SharedPopMatchSource = Pick<SharedPopEntry, 'pop' | 'moonName'>;
+
 /**
- * The Calendar events with those a Shared Pop already shows taken out: the corp put the same
- * fleet in the in-game calendar. An event is that fleet when it starts within five minutes of
- * either of the pop's times (so the viewer's choice never brings it back) and every word of its
- * title is in the refinery's or the moon's name. Only a pop that is on the board counts.
+ * Whether a Calendar event (its title and start) is the same fleet as one of these Shared Pops:
+ * it starts within five minutes of either of the pop's times (so the viewer's choice never brings
+ * it back) and every word of its title is in the refinery's or the moon's name. Only a pop that
+ * is on the board counts (`readableRefineries` are left out, as in `toSharedPopSources`). Shared
+ * by the Calendar, which drops the event, and the calendar alerts, which stay quiet for it.
  */
-export function dropEventsOfSharedPops<T extends BoardCalendarEventSource>(
-  events: readonly T[],
-  entries: readonly SharedPopEntry[],
+export function sharedPopEventMatcher(
+  entries: readonly SharedPopMatchSource[],
   readableRefineries: ReadonlySet<number>,
   nowMs: number,
   pref: SharedPopTimePref
-): T[] {
+): (subject: string, startMs: number) => boolean {
   const pops = entries
     .filter((e) => sharedPopIsShown(e.pop, nowMs) && !readableRefineries.has(e.pop.structureId))
     .map((e) => {
@@ -204,15 +207,27 @@ export function dropEventsOfSharedPops<T extends BoardCalendarEventSource>(
         ),
       };
     });
-  return events.filter((event) => {
-    const words = wordsOf(event.subject);
-    if (words.length === 0) return true;
-    return !pops.some(
+  return (subject, startMs) => {
+    const words = wordsOf(subject);
+    if (words.length === 0) return false;
+    return pops.some(
       (pop) =>
         words.every((word) => pop.words.has(word)) &&
-        pop.times.some((ms) => Math.abs(event.deadlineMs - ms) <= POP_EVENT_MATCH_MS)
+        pop.times.some((ms) => Math.abs(startMs - ms) <= POP_EVENT_MATCH_MS)
     );
-  });
+  };
+}
+
+/** The Calendar events with those a Shared Pop already shows taken out (`sharedPopEventMatcher`). */
+export function dropEventsOfSharedPops<T extends BoardCalendarEventSource>(
+  events: readonly T[],
+  entries: readonly SharedPopMatchSource[],
+  readableRefineries: ReadonlySet<number>,
+  nowMs: number,
+  pref: SharedPopTimePref
+): T[] {
+  const isPop = sharedPopEventMatcher(entries, readableRefineries, nowMs, pref);
+  return events.filter((event) => !isPop(event.subject, event.deadlineMs));
 }
 
 /** What `boardSourcesWithSharedPops` reads from a Calendar board read. */
