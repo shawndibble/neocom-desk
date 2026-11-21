@@ -1383,6 +1383,7 @@ export function checkpointRefusal(
   if (
     stored &&
     stored.through >= k.through &&
+    typeof stored.at === 'string' &&
     isSnapshot(stored) &&
     checkpointFits(stored, ctx.characterIds)
   )

@@ -1625,6 +1625,9 @@ describe('checkpointRefusal: one snapshot per Miner per lock date', () => {
     expect(checkpointRefusal(k, { ...ctx, stored: strictCache })).toBeUndefined();
     const others = { ...stored, characterIds: [5, 6] };
     expect(checkpointRefusal(k, { ...ctx, stored: others })).toBeUndefined();
+    // One stored with no record of when is no snapshot either.
+    const undated = { ...stored, at: undefined as unknown as string };
+    expect(checkpointRefusal(k, { ...ctx, stored: undated })).toBeUndefined();
   });
 
   it('refuses one that does not add up, for an unknown Miner, or for other characters', () => {
