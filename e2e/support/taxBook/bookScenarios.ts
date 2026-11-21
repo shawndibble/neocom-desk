@@ -59,3 +59,52 @@ export function historyBook() {
     coraOwes: { amount: 2 * DAY_TAX, days: 2, oldestBack: 5 },
   };
 }
+
+/**
+ * One Miner (Ada) and one donation, to watch where money lands on the Running account. She mined
+ * two ordinary days (6 and 5 days ago, `DAY_TAX` each), unless the case adds a second refinery.
+ * The donation came in 2 days ago with her payment code, so the server placed it on her.
+ */
+export type PaymentCase = 'exact' | 'shortWithinTolerance' | 'shortBeyondTolerance' | 'over';
+
+/** What the book's 0.5% per-day tolerance forgives on one `DAY_TAX` day. */
+export const DAY_TOLERANCE = DAY_TAX * 0.005;
+
+const PAID: Record<PaymentCase, number> = {
+  exact: DAY_TAX,
+  // 4,000 short of two days: within the second day's 5,000 tolerance.
+  shortWithinTolerance: 2 * DAY_TAX - 4_000,
+  shortBeyondTolerance: 1.5 * DAY_TAX,
+  over: 2.5 * DAY_TAX,
+};
+
+export function paymentBook(kind: PaymentCase) {
+  const minerId = solo(MINER.ada.id);
+  const paid = PAID[kind];
+  const seed = new BookSeed({ startBack: 30 })
+    .mine(MINER.ada.id, [6, 5])
+    .donation({ id: 'j1_920001', characterId: MINER.ada.id, amount: paid, back: 2, minerId });
+  return { seed, minerId, paid, oldestBack: 6, newestBack: 5 };
+}
+
+/**
+ * Ada mined at two refineries on the same date (6 days ago), and one ordinary day after. One
+ * donation pays exactly that date's two lines: the date settles as one, the next stays owed.
+ */
+export function twoRefineriesBook() {
+  const minerId = solo(MINER.ada.id);
+  const seed = new BookSeed({ startBack: 30 })
+    .mine(MINER.ada.id, [
+      { back: 6, refinery: 'alpha' },
+      { back: 6, refinery: 'beta' },
+      { back: 5, refinery: 'alpha' },
+    ])
+    .donation({
+      id: 'j1_920002',
+      characterId: MINER.ada.id,
+      amount: 2 * DAY_TAX,
+      back: 2,
+      minerId,
+    });
+  return { seed, minerId, sharedBack: 6, owedBack: 5 };
+}
