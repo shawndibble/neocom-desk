@@ -163,6 +163,8 @@ describe('interaction grammar source guards (DESIGN.md §6c)', () => {
     // in src/components/ui and is not scanned.)
     const audited = [
       'src/features/assets/assetBrowserRows.tsx',
+      // Corp assets unfolded contents rows: the by-item view's holdings menu (Show info, View in Market, Set stock target); a container's click only unfolds.
+      'src/features/corp/CorpAssetContents.tsx',
       // My ships rows: Show info, Show fitting, Plan route, Open location assets; the row click holds only Show info.
       'src/features/assets/MyShipsView.tsx',
       // Admin's Member rows: Make admin… and Remove, reachable nowhere else.
